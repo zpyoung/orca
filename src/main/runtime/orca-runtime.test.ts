@@ -1377,9 +1377,69 @@ describe('OrcaRuntimeService', () => {
         createdWorktree.path,
         'cli-fresh-base',
         'origin/main',
-        false
+        false,
+        false,
+        {
+          suggestLocalBaseRefUpdate: true,
+          remoteTrackingBase: {
+            remote: 'origin',
+            branch: 'main',
+            ref: 'refs/remotes/origin/main',
+            base: 'origin/main'
+          }
+        }
       )
       expect(result.worktree).toMatchObject({ path: createdWorktree.path })
+    } finally {
+      gitSpy.mockRestore()
+    }
+  })
+
+  it('returns runtime local base update suggestions from addWorktree', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    const createdWorktree = {
+      path: '/tmp/workspaces/cli-stale-main',
+      head: 'def',
+      branch: 'cli-stale-main',
+      isBare: false,
+      isMainWorktree: false
+    }
+    computeWorktreePathMock.mockReturnValue(createdWorktree.path)
+    ensurePathWithinWorkspaceMock.mockReturnValue(createdWorktree.path)
+    vi.mocked(addWorktree).mockResolvedValueOnce({
+      localBaseRefUpdateSuggestion: {
+        baseRef: 'origin/main',
+        localBranch: 'main',
+        behind: 5
+      }
+    })
+    vi.mocked(listWorktrees).mockResolvedValueOnce([createdWorktree])
+    const gitSpy = vi.spyOn(gitRunner, 'gitExecFileAsync').mockImplementation(async (args) => {
+      if (args[0] === 'rev-parse' && args.includes('refs/heads/cli-stale-main^{commit}')) {
+        throw new Error('branch not found')
+      }
+      if (args[0] === 'remote') {
+        return { stdout: 'origin\n', stderr: '' }
+      }
+      if (args[0] === 'rev-parse' && args.includes('--git-common-dir')) {
+        return { stdout: '/tmp/repo/.git\n', stderr: '' }
+      }
+      if (args[0] === 'rev-parse' && args[1] === '--verify') {
+        return { stdout: 'base-sha\n', stderr: '' }
+      }
+      return { stdout: '', stderr: '' }
+    })
+    try {
+      const result = await runtime.createManagedWorktree({
+        repoSelector: 'id:repo-1',
+        name: 'cli-stale-main'
+      })
+
+      expect(result.localBaseRefUpdateSuggestion).toEqual({
+        baseRef: 'origin/main',
+        localBranch: 'main',
+        behind: 5
+      })
     } finally {
       gitSpy.mockRestore()
     }

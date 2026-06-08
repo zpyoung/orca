@@ -10,6 +10,24 @@ import { GitLabRateLimitPanel } from '../gitlab/gitlab-rate-limit-display'
 
 export { GIT_PANE_SEARCH_ENTRIES }
 
+const KEEP_LOCAL_MAIN_UP_TO_DATE_TITLE = 'Keep Local Main Up to Date'
+const KEEP_LOCAL_MAIN_UP_TO_DATE_DESCRIPTION =
+  'When you create a workspace, Orca refreshes the remote base and safely fast-forwards your matching local branch, such as main or master. This keeps commands like git diff main...HEAD from comparing against stale history. Orca skips the update if that branch has uncommitted changes or local-only commits.'
+const KEEP_LOCAL_MAIN_UP_TO_DATE_KEYWORDS = [
+  'main',
+  'master',
+  'origin/main',
+  'git diff',
+  'behind main',
+  'up to date',
+  'stale main',
+  'refresh local main',
+  'base ref',
+  'fresh base',
+  'safely',
+  'worktree'
+]
+
 type GitPaneProps = {
   settings: GlobalSettings
   updateSettings: (updates: Partial<GlobalSettings>) => void | Promise<void>
@@ -80,43 +98,24 @@ export function GitPane({
       </SearchableSetting>
     ) : null,
     matchesSettingsSearch(searchQuery, {
-      title: 'Refresh Local Base Ref',
-      description:
-        'Safely fast-forward local main or master so AI tools and diffs use a fresh base.',
-      keywords: [
-        'main',
-        'master',
-        'origin/main',
-        'git diff',
-        'base ref',
-        'fresh base',
-        'safely',
-        'worktree'
-      ]
+      title: KEEP_LOCAL_MAIN_UP_TO_DATE_TITLE,
+      description: KEEP_LOCAL_MAIN_UP_TO_DATE_DESCRIPTION,
+      keywords: KEEP_LOCAL_MAIN_UP_TO_DATE_KEYWORDS
     }) ? (
       <SearchableSetting
         key="refresh-base-ref"
-        title="Refresh Local Base Ref"
-        description="Safely fast-forward local main or master so AI tools and diffs use a fresh base."
-        keywords={[
-          'main',
-          'master',
-          'origin/main',
-          'git diff',
-          'base ref',
-          'fresh base',
-          'safely',
-          'worktree'
-        ]}
+        title={KEEP_LOCAL_MAIN_UP_TO_DATE_TITLE}
+        description={KEEP_LOCAL_MAIN_UP_TO_DATE_DESCRIPTION}
+        keywords={KEEP_LOCAL_MAIN_UP_TO_DATE_KEYWORDS}
         className="flex items-center justify-between gap-4 py-2"
       >
         <div className="space-y-0.5">
-          <Label>Refresh Local Base Ref</Label>
+          <Label>{KEEP_LOCAL_MAIN_UP_TO_DATE_TITLE}</Label>
           <p className="text-xs text-muted-foreground">
-            Turn this on if you or AI tools use commands like <code>git diff main...HEAD</code>.
-            Orca first refreshes the remote base, then safely fast-forwards the matching local{' '}
-            <code>main</code> or <code>master</code> so those commands do not compare against stale
-            history. Orca skips the update if the local branch is dirty or diverged.
+            When you create a workspace, Orca refreshes the remote base and safely fast-forwards
+            your matching local branch, such as <code>main</code> or <code>master</code>. This keeps
+            commands like <code>git diff main...HEAD</code> from comparing against stale history.
+            Orca skips the update if that branch has uncommitted changes or local-only commits.
           </p>
         </div>
         <button

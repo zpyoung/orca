@@ -30,4 +30,13 @@ describe('GitPane', () => {
     expect(markup).not.toContain('Branch name prompt')
     expect(markup).not.toContain('Branch name model')
   })
+
+  it('renders the local main freshness setting with outcome-focused copy', () => {
+    const markup = renderGitPane('behind main')
+
+    expect(markup).toContain('Keep Local Main Up to Date')
+    expect(markup).toContain('git diff main...HEAD')
+    expect(markup).toContain('local-only commits')
+    expect(markup).not.toContain('Refresh Local Base Ref')
+  })
 })
