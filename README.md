@@ -22,7 +22,9 @@
   <a href="#install"><strong>Download 🐋</strong></a>
 </p>
 
-![Orca mobile companion demo showing the iPhone emulator alongside agent workspaces and source control](docs/assets/orca-mobile-emulator.gif)
+<p align="center">
+  <img src="docs/assets/readme-feature-showcase.gif" alt="Orca feature showcase cycling through parallel worktrees, terminal splits, design mode, GitHub and Linear workflows, CLI agents, and SSH worktrees" width="960" />
+</p>
 
 ## Supported Agents
 
