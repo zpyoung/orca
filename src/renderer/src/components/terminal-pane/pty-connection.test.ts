@@ -5443,6 +5443,35 @@ describe('connectPanePty', () => {
     expect(transport.sendInput).not.toHaveBeenCalled()
   })
 
+  it('clears tab, pane, and worktree unread on plain Escape keydown', async () => {
+    // Why: plain Escape produces real terminal input (\x1b) and so is a genuine
+    // "user is here" signal. The interrupt-intent early return must not skip the
+    // unread clears, or the attention dot would linger after the user presses Escape.
+    const { connectPanePty } = await import('./pty-connection')
+    const transport = createMockTransport()
+    transportFactoryQueue.push(transport)
+
+    const pane = createPane(1)
+    pane.terminal.element = createPaneContainer()
+    const manager = createManager(1)
+    const deps = createDeps()
+
+    connectPanePty(pane as never, manager as never, deps as never)
+
+    const keydown = new Event('keydown')
+    Object.defineProperty(keydown, 'key', { value: 'Escape' })
+    Object.defineProperty(keydown, 'repeat', { value: false })
+    Object.defineProperty(keydown, 'ctrlKey', { value: false })
+    Object.defineProperty(keydown, 'metaKey', { value: false })
+    Object.defineProperty(keydown, 'altKey', { value: false })
+    Object.defineProperty(keydown, 'shiftKey', { value: false })
+    ;(pane.terminal.element as EventTarget).dispatchEvent(keydown)
+
+    expect(deps.clearTerminalTabUnread).toHaveBeenCalledWith('tab-1')
+    expect(deps.clearTerminalPaneUnread).toHaveBeenCalledWith(makePaneKey('tab-1', LEAF_1))
+    expect(deps.clearWorktreeUnread).toHaveBeenCalledWith('wt-1')
+  })
+
   it('does not clear pane attention from raw onData after a bell', async () => {
     const { connectPanePty } = await import('./pty-connection')
     const transport = createMockTransport()

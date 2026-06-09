@@ -897,6 +897,12 @@ export function connectPanePty(
   const onTerminalKeyDown = (event: KeyboardEvent): void => {
     if (isPlainEscapeKeyEvent(event)) {
       setPendingTerminalInputIntent('plain-escape')
+      // Why: plain Escape produces real terminal input (\x1b), so it is a
+      // genuine "user is here" signal and must still dismiss attention before
+      // the early return for interrupt-intent inference.
+      deps.clearTerminalTabUnread(deps.tabId)
+      deps.clearTerminalPaneUnread(cacheKey)
+      deps.clearWorktreeUnread(deps.worktreeId)
       return
     }
     if (isCtrlCKeyEvent(event)) {
