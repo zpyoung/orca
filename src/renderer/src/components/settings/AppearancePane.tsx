@@ -27,6 +27,7 @@ import {
   getAppearancePaneSearchEntries,
   getLanguageEntries,
   getLayoutEntries,
+  getLeftSidebarAppearanceEntry,
   getSidebarEntries,
   getStatusBarEntries,
   getStatusBarToggles,
@@ -48,6 +49,7 @@ import {
 } from '@/i18n/supported-languages'
 import { translate } from '@/i18n/i18n'
 import type { UiLanguage } from '../../../../shared/ui-language'
+import { LeftSidebarAppearanceSetting } from './LeftSidebarAppearanceSetting'
 export { getAppearancePaneSearchEntries }
 
 type AppearancePaneProps = {
@@ -104,6 +106,7 @@ export function AppearancePane({
   const terminalAppearanceSearchEntries = getTerminalAppearanceSearchEntries({
     showWarpImport: !isWebClientLocation()
   })
+  const leftSidebarAppearanceEntry = getLeftSidebarAppearanceEntry()
   const visibleSections = [
     matchesSettingsSearch(searchQuery, getThemeEntries()) ||
     (SHOW_UI_LANGUAGE_SETTING && matchesSettingsSearch(searchQuery, getLanguageEntries())) ||
@@ -412,6 +415,15 @@ export function AppearancePane({
         />
 
         <div className="divide-y divide-border/40">
+          <SearchableSetting
+            title={leftSidebarAppearanceEntry.title}
+            description={leftSidebarAppearanceEntry.description}
+            keywords={leftSidebarAppearanceEntry.keywords}
+            className="space-y-2"
+          >
+            <LeftSidebarAppearanceSetting settings={settings} updateSettings={updateSettings} />
+          </SearchableSetting>
+
           <SearchableSetting
             title={translate(
               'auto.components.settings.AppearancePane.cf81907069',

@@ -4188,7 +4188,19 @@
           "7d26ccabe8": "深色",
           "fb0e0b4453": "系统",
           "932ff1fbff": "主题",
-          "0f28e7b30c": "选择 Orca 在应用程序窗口中的外观。"
+          "0f28e7b30c": "选择 Orca 在应用程序窗口中的外观。",
+          "leftSidebarAppearance": {
+            "title": "左侧边栏外观",
+            "description": "让左侧边栏匹配终端、保持默认，或使用色调。",
+            "rowDescription": "让左侧边栏匹配终端、保持默认，或使用色调。",
+            "default": "默认",
+            "matchTerminal": "匹配终端",
+            "tinted": "色调",
+            "tintColor": "边栏色调",
+            "tintColorDescription": "混入左侧边栏表面的颜色。",
+            "tintOpacity": "色调强度",
+            "tintOpacityDescription": "控制色调混入边栏的强度。"
+          }
         },
         "AutoRenameBranchFromWorkSetting": {
           "1626524572": "Nautilus",
@@ -6192,6 +6204,10 @@
               "locale": "区域设置",
               "i18n": "国际化",
               "translation": "翻译"
+            },
+            "leftSidebarAppearance": {
+              "title": "左侧边栏外观",
+              "description": "让左侧边栏匹配终端、保持默认，或使用色调。"
             }
           }
         },

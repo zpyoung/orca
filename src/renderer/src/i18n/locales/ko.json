@@ -4188,7 +4188,19 @@
           "7d26ccabe8": "다크",
           "fb0e0b4453": "체계",
           "932ff1fbff": "주제",
-          "0f28e7b30c": "Orca가 앱 창에 표시되는 방식을 선택합니다."
+          "0f28e7b30c": "Orca가 앱 창에 표시되는 방식을 선택합니다.",
+          "leftSidebarAppearance": {
+            "title": "왼쪽 사이드바 모양",
+            "description": "왼쪽 사이드바를 터미널에 맞추거나 기본값을 유지하거나 은은한 색조를 적용합니다.",
+            "rowDescription": "왼쪽 사이드바를 터미널에 맞추거나 기본값을 유지하거나 은은한 색조를 적용합니다.",
+            "default": "기본값",
+            "matchTerminal": "터미널에 맞춤",
+            "tinted": "색조 적용",
+            "tintColor": "사이드바 색조",
+            "tintColorDescription": "왼쪽 사이드바 표면에 섞을 색상입니다.",
+            "tintOpacity": "색조 강도",
+            "tintOpacityDescription": "사이드바에 색조를 얼마나 강하게 섞을지 조절합니다."
+          }
         },
         "AutoRenameBranchFromWorkSetting": {
           "1626524572": "Nautilus",
@@ -6192,6 +6204,10 @@
               "locale": "로케일",
               "i18n": "i18n",
               "translation": "번역"
+            },
+            "leftSidebarAppearance": {
+              "title": "왼쪽 사이드바 모양",
+              "description": "왼쪽 사이드바를 터미널에 맞추거나 기본값을 유지하거나 은은한 색조를 적용합니다."
             }
           }
         },

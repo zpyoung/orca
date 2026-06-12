@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useMemo } from 'react'
 import { useAppStore } from '@/store'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useSidebarResize } from '@/hooks/useSidebarResize'
@@ -14,6 +14,8 @@ import { cn } from '@/lib/utils'
 import { FolderPlus, Loader2 } from 'lucide-react'
 import { useSidebarProjectDrop } from './useSidebarProjectDrop'
 import { useWorkspaceBoardPanel } from './useWorkspaceBoardPanel'
+import { useSystemPrefersDark } from '../terminal-pane/use-system-prefers-dark'
+import { resolveLeftSidebarStyleVariables } from '@/lib/left-sidebar-appearance'
 
 const WorktreeMetaDialog = React.lazy(() => import('./WorktreeMetaDialog'))
 const NonGitFolderDialog = React.lazy(() => import('./NonGitFolderDialog'))
@@ -43,9 +45,15 @@ function Sidebar({
   const sidebarWidth = useAppStore((s) => s.sidebarWidth)
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth)
   const repos = useAppStore((s) => s.repos)
+  const settings = useAppStore((s) => s.settings)
   const fetchAllWorktrees = useAppStore((s) => s.fetchAllWorktrees)
   const activeModal = useAppStore((s) => s.activeModal)
   const { nativeDropTarget, dropHandlers, affordance } = useSidebarProjectDrop()
+  const systemPrefersDark = useSystemPrefersDark()
+  const leftSidebarStyle = useMemo(
+    () => resolveLeftSidebarStyleVariables(settings, systemPrefersDark),
+    [settings, systemPrefersDark]
+  ) as React.CSSProperties | undefined
   const [shouldMountAddRepoDialog, setShouldMountAddRepoDialog] = React.useState(false)
   const unmountAddRepoDialogTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const {
@@ -116,6 +124,7 @@ function Sidebar({
         ref={containerRef}
         data-native-file-drop-target={sidebarOpen ? nativeDropTarget : undefined}
         className="relative min-h-0 flex-shrink-0 bg-worktree-sidebar flex flex-col overflow-hidden scrollbar-sleek-parent"
+        style={leftSidebarStyle}
         {...dropHandlers}
       >
         {sidebarOpen && (
@@ -183,6 +192,7 @@ function Sidebar({
       </React.Suspense>
       {sidebarOpen ? (
         <WorkspaceKanbanDrawer
+          leftSidebarStyle={leftSidebarStyle}
           open={workspaceBoardOpen}
           preserveOpenForMenu={workspaceBoardMenuOpen}
           onOpenChange={handleWorkspaceBoardOpenChange}
