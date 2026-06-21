@@ -1322,8 +1322,8 @@ const WorktreeCard = React.memo(function WorktreeCard({
               </RepoIdentityChip>
             )}
 
-            {/* Why: in the experimental card, weight carries unread without a
-                 bell, so read titles step back slightly for scan contrast. */}
+            {/* Why: unread alert lives in the left status lane; weight plus dimmed
+                 read titles carry scan contrast in the title row. */}
             <WorktreeTitleInlineRename
               displayName={visibleCardTitle}
               disabled={isDeleting || affiliateListMode}
