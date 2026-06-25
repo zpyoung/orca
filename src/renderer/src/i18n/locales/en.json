@@ -1123,6 +1123,8 @@
         "notePasteTooLarge": "Paste is too large for the note field."
       },
       "NewWorkspaceComposerModal": {
+        "createWorktree": "Create worktree",
+        "createWorkspace": "Create workspace",
         "fa90f739a5": "Choose the project, workspace name, and agent before creating the workspace."
       },
       "PullRequestPage": {
