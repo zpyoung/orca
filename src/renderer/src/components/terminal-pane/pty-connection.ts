@@ -27,6 +27,7 @@ import { getFitOverrideForPty, bindPanePtyId } from '@/lib/pane-manager/mobile-f
 import { isPtyLocked } from '@/lib/pane-manager/mobile-driver-state'
 import { isPaneReplaying, replayIntoTerminal, replayIntoTerminalAsync } from './replay-guard'
 import {
+  nativeWindowsRewriteNeedsFollowupRenderRefresh,
   terminalOutputContainsEastAsianRendererRisk,
   terminalOutputPrefersRenderRefresh,
   terminalRewriteOutputRenderRefreshDecision,
@@ -2752,19 +2753,22 @@ export function connectPanePty(
       return decision.prefersRenderRefresh
     }
 
-    function shouldForceForegroundRenderRefresh(data: string): boolean {
+    function shouldForceForegroundRenderRefresh(data: string): {
+      refresh: boolean
+      inPlaceRewrite: boolean
+    } {
       const rewriteOutputPrefersRenderRefresh = foregroundRewriteOutputPrefersRenderRefresh(data)
       const recentInput =
         performance.now() - lastTerminalInputAt <= FOREGROUND_INTERACTIVE_REDRAW_WINDOW_MS
       if (foregroundAnsiOutputPrefersRenderRefresh(data)) {
         // Why: Codex-style background SGR panels can paint cell fills while
         // glyphs lag behind; refresh only renderer-risk ANSI chunks, not all output.
-        return true
+        return { refresh: true, inPlaceRewrite: rewriteOutputPrefersRenderRefresh }
       }
       if (rewriteOutputPrefersRenderRefresh) {
         // Why: resize fixes these panes because xterm's buffer is right but
         // in-place redraw cells can remain stale in the renderer until repaint.
-        return true
+        return { refresh: true, inPlaceRewrite: true }
       }
       if (
         shouldApplyWindowsRendererUnicodeRefresh &&
@@ -2776,13 +2780,15 @@ export function connectPanePty(
         // bytes; the prompt model is correct, but the local Windows renderer
         // can leave individual glyph cells blank until repaint. Keep this
         // scoped to recent East Asian text input, not all Unicode output.
-        return true
+        return { refresh: true, inPlaceRewrite: false }
       }
-      return (
-        shouldApplyNativeWindowsRewriteRefresh &&
-        containsNonAsciiOutput(data) &&
-        containsWindowsRewriteControl(data)
-      )
+      return {
+        refresh:
+          shouldApplyNativeWindowsRewriteRefresh &&
+          containsNonAsciiOutput(data) &&
+          containsWindowsRewriteControl(data),
+        inPlaceRewrite: false
+      }
     }
 
     function writePtyOutputToXterm(
@@ -2819,8 +2825,18 @@ export function connectPanePty(
       const nativeWindowsCursorRestore =
         shouldProtectNativeWindowsSynchronizedOutput && foreground && containsCursorRestore(data)
       const foregroundOutput = foreground || parseHiddenStartupOutput
-      const foregroundRenderRefreshNeeded =
-        foregroundOutput && shouldForceForegroundRenderRefresh(data)
+      const renderRefreshDecision = foregroundOutput
+        ? shouldForceForegroundRenderRefresh(data)
+        : { refresh: false, inPlaceRewrite: false }
+      const foregroundRenderRefreshNeeded = renderRefreshDecision.refresh
+      // Why: see nativeWindowsRewriteNeedsFollowupRenderRefresh — Claude Code's
+      // in-place prompt redraws on Windows ConPTY can paint one frame late, so a
+      // follow-up repaint corrects the column desync without a window resize.
+      const nativeWindowsInPlaceRewriteFollowup = nativeWindowsRewriteNeedsFollowupRenderRefresh({
+        isNativeWindowsConpty: shouldApplyNativeWindowsRewriteRefresh,
+        isForeground: foreground,
+        isInPlaceRewrite: renderRefreshDecision.inPlaceRewrite
+      })
       synchronizedForegroundOutputActive = nextSynchronizedForegroundOutputActive
       if (!foreground && hiddenMode2031ScanTail) {
         respondToSkippedMode2031Subscribe(data)
@@ -2836,7 +2852,7 @@ export function connectPanePty(
           (synchronizedForegroundOutput ||
             nativeWindowsCursorRestore ||
             foregroundRenderRefreshNeeded),
-        followupForegroundRefresh: nativeWindowsCursorRestore,
+        followupForegroundRefresh: nativeWindowsCursorRestore || nativeWindowsInPlaceRewriteFollowup,
         stripTransientCursorShows: shouldProtectNativeWindowsSynchronizedOutput && foreground,
         coalesceForeground: synchronizedForegroundOutput && synchronizedOutputEnded,
         holdForeground: synchronizedForegroundOutput && nextSynchronizedForegroundOutputActive

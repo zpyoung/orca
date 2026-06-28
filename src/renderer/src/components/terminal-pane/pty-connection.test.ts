@@ -7310,6 +7310,92 @@ describe('connectPanePty', () => {
     }
   })
 
+  it('schedules a follow-up repaint for Claude-style in-place prompt redraws on native Windows', async () => {
+    // Why: issue #5656/#5653 — Claude Code echoes prompt keystrokes by redrawing
+    // the input line in place (CR + CHA + reprint + erase-line) without DEC 2026.
+    // On native Windows ConPTY the xterm buffer is correct but the DOM renderer
+    // paints one frame late, leaving phantom/overwritten characters until a resize.
+    // The connection layer now requests a follow-up next-frame repaint; with the
+    // synchronous rAF stub that surfaces as a SECOND _core.refresh call. Without the
+    // fix only the single synchronous settle refresh runs.
+    const restoreNavigator = temporarilySetNavigatorUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+    )
+    try {
+      const { connectPanePty } = await import('./pty-connection')
+      const transport = createMockTransport()
+      const capturedDataCallback: { current: ((data: string) => void) | null } = { current: null }
+      transport.connect.mockImplementation(
+        async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+          capturedDataCallback.current = callbacks.onData ?? null
+          return 'pty-id'
+        }
+      )
+      transportFactoryQueue.push(transport)
+
+      const pane = createPane(1)
+      const refresh = vi.fn()
+      const terminal = pane.terminal as typeof pane.terminal & {
+        _core?: { refresh: typeof refresh }
+      }
+      terminal._core = { refresh }
+      terminal.write = vi.fn((_data: string, callback?: () => void) => {
+        callback?.()
+      })
+
+      connectPanePty(pane as never, createManager(1) as never, createDeps() as never)
+      await flushAsyncTicks(6)
+
+      // User typed into the prompt; Claude redraws the input line in place.
+      capturedDataCallback.current?.('\r\x1b[3Gzzzx\x1b[K')
+
+      // One synchronous settle refresh + one follow-up next-frame refresh.
+      expect(refresh).toHaveBeenCalledTimes(2)
+      expect(refresh).toHaveBeenNthCalledWith(1, 0, 39, true)
+      expect(refresh).toHaveBeenNthCalledWith(2, 0, 39, true)
+    } finally {
+      restoreNavigator()
+    }
+  })
+
+  it('does not schedule a follow-up repaint for the Claude redraw pattern on non-Windows clients', async () => {
+    const restoreNavigator = temporarilySetNavigatorUserAgent('Mozilla/5.0 (Macintosh)')
+    try {
+      const { connectPanePty } = await import('./pty-connection')
+      const transport = createMockTransport()
+      const capturedDataCallback: { current: ((data: string) => void) | null } = { current: null }
+      transport.connect.mockImplementation(
+        async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+          capturedDataCallback.current = callbacks.onData ?? null
+          return 'pty-id'
+        }
+      )
+      transportFactoryQueue.push(transport)
+
+      const pane = createPane(1)
+      const refresh = vi.fn()
+      const terminal = pane.terminal as typeof pane.terminal & {
+        _core?: { refresh: typeof refresh }
+      }
+      terminal._core = { refresh }
+      terminal.write = vi.fn((_data: string, callback?: () => void) => {
+        callback?.()
+      })
+
+      connectPanePty(pane as never, createManager(1) as never, createDeps() as never)
+      await flushAsyncTicks(6)
+
+      // The CR redraw still forces one synchronous refresh (cross-platform rewrite
+      // handling), but no native-Windows follow-up next-frame repaint is scheduled.
+      capturedDataCallback.current?.('\r\x1b[3Gzzzx\x1b[K')
+
+      expect(refresh).toHaveBeenCalledTimes(1)
+      expect(refresh).toHaveBeenCalledWith(0, 39, true)
+    } finally {
+      restoreNavigator()
+    }
+  })
+
   it('keeps terminal UI drawing glyphs on the active renderer', async () => {
     const { connectPanePty } = await import('./pty-connection')
     const transport = createMockTransport()
