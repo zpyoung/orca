@@ -661,7 +661,7 @@ import { closeLocalWatcherForWorktreePath } from '../ipc/filesystem-watcher'
 import { HeadlessEmulator, type HeadlessEmulatorOptions } from '../daemon/headless-emulator'
 import { killAllProcessesForWorktree } from './worktree-teardown'
 import { MOBILE_SUBSCRIBE_SCROLLBACK_ROWS } from './scrollback-limits'
-import type { IFilesystemProvider, IPtyProvider } from '../providers/types'
+import type { IFilesystemProvider, IPtyProvider, PtyProcessInfo } from '../providers/types'
 import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import {
   assertFolderWorkspacePathUsable,
@@ -1037,7 +1037,7 @@ type RuntimePtyController = {
   hasChildProcesses?(ptyId: string): Promise<boolean>
   clearBuffer?(ptyId: string): Promise<void>
   resize?(ptyId: string, cols: number, rows: number): boolean
-  listProcesses?(): Promise<{ id: string; cwd: string; title: string }[]>
+  listProcesses?(): Promise<PtyProcessInfo[]>
   serializeBuffer?(
     ptyId: string,
     opts?: { scrollbackRows?: number; altScreenForcesZeroRows?: boolean }
@@ -5039,6 +5039,46 @@ export class OrcaRuntimeService {
     for (const leaf of this.getLeavesForPty(ptyId)) {
       this.adoptPreAllocatedHandle(leaf)
     }
+  }
+
+  private adoptControllerTerminalHandle(ptyId: string, handle: string | undefined): void {
+    const trimmed = handle?.trim()
+    if (!trimmed || !trimmed.startsWith('term_')) {
+      return
+    }
+    if (this.isTerminalHandleAdoptionBlocked(ptyId, trimmed)) {
+      return
+    }
+    // Why: after an app/runtime restart, the live PTY child still has its
+    // original ORCA_TERMINAL_HANDLE, but the runtime's in-memory map is gone.
+    this.registerPreAllocatedHandleForPty(ptyId, trimmed)
+  }
+
+  // Why: adoption is best-effort restart recovery and must be first-wins.
+  // Re-keying a pty that already has a handle this session would strand
+  // waiters registered under the old handle, and provider-reported values
+  // are not trusted to be collision-free — a handle bound to a different
+  // pty must never be stolen by a later report.
+  private isTerminalHandleAdoptionBlocked(ptyId: string, handle: string): boolean {
+    if (this.handleByPtyId.get(ptyId) ?? this.findHandleForPtyRecord(ptyId)) {
+      return true
+    }
+    for (const leaf of this.getLeavesForPty(ptyId)) {
+      const issued = this.handleByLeafKey.get(this.getLeafKey(leaf.tabId, leaf.leafId))
+      if (issued && issued !== handle) {
+        return true
+      }
+    }
+    const existingRecord = this.handles.get(handle)
+    if (existingRecord && existingRecord.ptyId !== ptyId) {
+      return true
+    }
+    for (const [otherPtyId, otherHandle] of this.handleByPtyId) {
+      if (otherHandle === handle && otherPtyId !== ptyId) {
+        return true
+      }
+    }
+    return false
   }
 
   onPtySpawned(ptyId: string): void {
@@ -17789,6 +17829,7 @@ export class OrcaRuntimeService {
     const sessions = sessionsResult.value
     const livePtyIds = new Set(sessions.map((session) => session.id))
     for (const session of sessions) {
+      this.adoptControllerTerminalHandle(session.id, session.terminalHandle)
       const worktreeId =
         inferWorktreeIdFromPtyId(session.id) ??
         findResolvedWorktreeIdForPath(resolvedWorktrees, session.cwd)
