@@ -20,6 +20,7 @@ import {
   type AgentStatusEntry
 } from '../../shared/agent-status-types'
 import {
+  hasCompatibleAgentTitleIdentity,
   normalizeCompatibleAgentStatusEntryForOwner,
   normalizeCompatibleAgentTitleForOwner
 } from '../../shared/agent-title-owner'
@@ -940,6 +941,12 @@ type RuntimePtyWorktreeRecord = {
   tailLinesTotal: number
   preview: string
   waitBlockedAt: number | null
+}
+
+type PtyForegroundAgentRefresh = {
+  promise: Promise<boolean>
+  startedAfterTitleObservation: number
+  requestedAfterTitleObservation: number
 }
 
 function copySleepingAgentLaunchConfig(
@@ -1925,7 +1932,8 @@ export class OrcaRuntimeService {
   private resolvedWorktreeGeneration = 0
   private cloneInFlightByPath = new Map<string, Promise<void>>()
   private agentDetector: AgentDetector | null = null
-  private ptyForegroundAgentRefreshes = new Map<string, Promise<void>>()
+  private ptyForegroundAgentRefreshes = new Map<string, PtyForegroundAgentRefresh>()
+  private ptyDelayedForegroundSnapshotTitleObservations = new Map<string, number>()
   private _orchestrationDb: OrchestrationDb | null = null
   private messageWaitersByHandle = new Map<string, Set<MessageWaiter>>()
   // Why: mobile clients subscribe to terminal output via terminal.subscribe.
@@ -3253,7 +3261,7 @@ export class OrcaRuntimeService {
 
   /**
    * Publishes a PTY-backed terminal tab snapshot to the synced mobile session,
-   * normalizing Pi-compatible titles based on launch ownership.
+   * normalizing Pi-compatible titles based on launch or foreground ownership.
    */
   private publishPtyBackedMobileSessionTerminal(
     worktreeId: string,
@@ -3269,9 +3277,10 @@ export class OrcaRuntimeService {
     }
   ): void {
     const existing = this.mobileSessionTabsByWorktree.get(worktreeId)
+    const ownerAgent = pty.launchAgent ?? pty.foregroundAgent
     const title = normalizeCompatibleAgentTitleForOwner(
       args.title ?? getLatestPtyTitle(pty) ?? 'Terminal',
-      pty.launchAgent
+      ownerAgent
     )
     const existingTab = existing?.tabs.find(
       (candidate): candidate is RuntimeMobileSessionTerminalTab =>
@@ -5194,11 +5203,25 @@ export class OrcaRuntimeService {
         if (agentStatus === 'idle' && prevStatus !== 'idle') {
           this.resolvePtyTuiIdleWaiters(pty, ptyId)
         }
+        const shouldDelayMobileSnapshot =
+          shouldTouchPtyBackedSessionTabs &&
+          this.shouldDelayPtyBackedMobileSnapshotForForegroundAgent(pty, oscTitle)
+        let foregroundRefresh: Promise<boolean> | undefined
         // Why: gate on an actual status transition — braille spinner frames
         // mutate the title every tick, so probing per-title-change would stream
         // a foreground query per frame during active work.
         if (prevStatus !== pty.lastAgentStatus) {
-          this.refreshPtyForegroundAgent(ptyId)
+          foregroundRefresh = this.refreshPtyForegroundAgentFromController(ptyId, {
+            afterTitleObservation: observedAt
+          })
+        } else if (shouldDelayMobileSnapshot) {
+          // Why: same-status compatible title changes can arrive before the
+          // foreground owner probe settles; publishing them would flicker.
+          foregroundRefresh = this.getPendingForegroundAgentRefreshForTitle(ptyId, observedAt)
+        }
+        if (foregroundRefresh && shouldDelayMobileSnapshot) {
+          shouldTouchPtyBackedSessionTabs = false
+          this.delayPtyBackedMobileSnapshotForForegroundAgent(ptyId, observedAt, foregroundRefresh)
         }
       }
     }
@@ -8718,6 +8741,15 @@ export class OrcaRuntimeService {
     }
   }
 
+  private shouldDelayPtyBackedMobileSnapshotForForegroundAgent(
+    pty: RuntimePtyWorktreeRecord,
+    title: string
+  ): boolean {
+    return (
+      !pty.launchAgent && pty.foregroundAgent === null && hasCompatibleAgentTitleIdentity(title)
+    )
+  }
+
   /**
    * Schedules an asynchronous query to check which agent process is currently
    * running in the foreground of a PTY.
@@ -8726,19 +8758,75 @@ export class OrcaRuntimeService {
     void this.refreshPtyForegroundAgentFromController(ptyId)
   }
 
+  private getPendingForegroundAgentRefreshForTitle(
+    ptyId: string,
+    titleObservedAt: number
+  ): Promise<boolean> | undefined {
+    if (!this.ptyForegroundAgentRefreshes.has(ptyId)) {
+      return undefined
+    }
+    return this.refreshPtyForegroundAgentFromController(ptyId, {
+      afterTitleObservation: titleObservedAt
+    })
+  }
+
+  private delayPtyBackedMobileSnapshotForForegroundAgent(
+    ptyId: string,
+    titleObservedAt: number,
+    foregroundRefresh: Promise<boolean>
+  ): void {
+    this.ptyDelayedForegroundSnapshotTitleObservations.set(ptyId, titleObservedAt)
+    void foregroundRefresh.then((foregroundAgentChanged) => {
+      if (this.ptyDelayedForegroundSnapshotTitleObservations.get(ptyId) !== titleObservedAt) {
+        return
+      }
+      this.ptyDelayedForegroundSnapshotTitleObservations.delete(ptyId)
+      if (!foregroundAgentChanged) {
+        this.touchMobileSessionSnapshotsForPty(ptyId)
+      }
+    })
+  }
+
   /**
    * Deduplicates and manages in-flight foreground agent refresh queries
    * for a specific PTY.
    */
-  private refreshPtyForegroundAgentFromController(ptyId: string): Promise<void> {
+  private refreshPtyForegroundAgentFromController(
+    ptyId: string,
+    options: { afterTitleObservation?: number } = {}
+  ): Promise<boolean> {
+    const startedAfterTitleObservation = options.afterTitleObservation ?? 0
     const pendingRefresh = this.ptyForegroundAgentRefreshes.get(ptyId)
     if (pendingRefresh) {
-      return pendingRefresh
+      pendingRefresh.requestedAfterTitleObservation = Math.max(
+        pendingRefresh.requestedAfterTitleObservation,
+        startedAfterTitleObservation
+      )
+      return pendingRefresh.promise
     }
-    const refresh = this.loadPtyForegroundAgentFromController(ptyId).finally(() => {
-      this.ptyForegroundAgentRefreshes.delete(ptyId)
+    const entry: PtyForegroundAgentRefresh = {
+      promise: Promise.resolve(false),
+      startedAfterTitleObservation,
+      requestedAfterTitleObservation: startedAfterTitleObservation
+    }
+    const refresh = (async (): Promise<boolean> => {
+      while (true) {
+        entry.startedAfterTitleObservation = entry.requestedAfterTitleObservation
+        const foregroundAgentChanged = await this.loadPtyForegroundAgentFromController(ptyId)
+        if (
+          foregroundAgentChanged ||
+          entry.requestedAfterTitleObservation <= entry.startedAfterTitleObservation
+        ) {
+          return foregroundAgentChanged
+        }
+      }
+    })().finally(() => {
+      if (this.ptyForegroundAgentRefreshes.get(ptyId) === entry) {
+        this.ptyForegroundAgentRefreshes.delete(ptyId)
+      }
     })
-    this.ptyForegroundAgentRefreshes.set(ptyId, refresh)
+    entry.promise = refresh
+    this.ptyForegroundAgentRefreshes.set(ptyId, entry)
     return refresh
   }
 
@@ -8746,34 +8834,35 @@ export class OrcaRuntimeService {
    * Queries the PTY controller for the active foreground process, identifies if it
    * is a recognized agent, and updates the PTY's foreground agent state if changed.
    */
-  private async loadPtyForegroundAgentFromController(ptyId: string): Promise<void> {
+  private async loadPtyForegroundAgentFromController(ptyId: string): Promise<boolean> {
     if (!this.ptyController) {
-      return
+      return false
     }
     const pty = this.ptysById.get(ptyId)
     if (!pty?.connected) {
-      return
+      return false
     }
     // Why: foregroundAgent is only consulted as the owner fallback when
     // launchAgent is unknown, so a known launchAgent makes the relay
     // getForegroundProcess round-trip pure waste (covers all launched agents).
     if (pty.launchAgent) {
-      return
+      return false
     }
     let foregroundProcess: string | null
     try {
       foregroundProcess = await this.ptyController.getForegroundProcess(ptyId)
     } catch {
-      return
+      return false
     }
     const foregroundAgent = foregroundProcess
       ? (recognizeAgentProcess(foregroundProcess)?.agent ?? null)
       : null
     if (pty.foregroundAgent === foregroundAgent) {
-      return
+      return false
     }
     pty.foregroundAgent = foregroundAgent
     this.touchMobileSessionSnapshotsForPty(ptyId)
+    return true
   }
 
   private getFreshExplicitAgentStatusForHandle(handle: string): {
