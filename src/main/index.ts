@@ -91,13 +91,20 @@ import {
   shouldBypassSingleInstanceLock
 } from './startup/single-instance-lock'
 import { startEventLoopStallProbe } from './startup/event-loop-stall-probe'
-import { isStartupDiagnosticsEnabled, logStartupDiagnostic } from './startup/startup-diagnostics'
+import {
+  isStartupDiagnosticsEnabled,
+  logStartupDiagnostic,
+  logStartupMilestone
+} from './startup/startup-diagnostics'
 import { ensureWindowsUserDataAclGrant } from './startup/windows-user-data-acl'
 import { shouldQuitWhenAllWindowsClosed } from './startup/window-all-closed-quit-policy'
 import { RateLimitService } from './rate-limits/service'
 import { getInitialClaudeRateLimitTarget } from './rate-limits/claude-rate-limit-target'
 import { getInitialCodexRateLimitTarget } from './rate-limits/codex-rate-limit-target'
-import { attachMainWindowServices } from './window/attach-main-window-services'
+import {
+  attachMainWindowServices,
+  ensureAutoUpdaterConfigured
+} from './window/attach-main-window-services'
 import { createMainWindow, loadMainWindow } from './window/createMainWindow'
 import { createSystemTray, destroySystemTray } from './tray/system-tray'
 import { focusExistingMainWindow } from './window/focus-existing-window'
@@ -397,6 +404,11 @@ if (app.isPackaged && process.platform !== 'win32') {
 }
 configureDevUserDataPath(is.dev)
 configureOrcaUserDataPathEnv()
+
+// Why: just past createMainWindow's win32 10s ready-to-show reveal fallback,
+// so a window revealed on that path still gets its tray icon.
+const TRAY_CREATE_FALLBACK_MS = 12_000
+
 const startupDiagnosticsEnabled = isStartupDiagnosticsEnabled()
 if (startupDiagnosticsEnabled) {
   logStartupDiagnostic('before-single-instance-lock', {
@@ -408,14 +420,6 @@ if (startupDiagnosticsEnabled) {
     e2eUserData: Boolean(process.env.ORCA_E2E_USER_DATA_DIR)
   })
   startEventLoopStallProbe()
-}
-
-// Why: startup benchmarking needs in-process timestamps — harness-side stderr
-// arrival times include pipe buffering jitter. `t` is ms since process start.
-function logStartupMilestone(event: string, details: Record<string, unknown> = {}): void {
-  if (startupDiagnosticsEnabled) {
-    logStartupDiagnostic(event, { t: Math.round(performance.now()), ...details })
-  }
 }
 
 function focusExistingWindow(): void {
@@ -781,9 +785,45 @@ function openMainWindow(): BrowserWindow {
   })
   recordCrashBreadcrumb('main_window_created')
   logStartupMilestone('window-created')
+  // Why: new Tray() is a synchronous Shell_NotifyIcon call that can block for
+  // seconds while explorer.exe's notification area is busy (part of issue
+  // #7225's pre-paint stall), so create it after first paint. The timer
+  // fallback covers windows revealed without ready-to-show ever firing
+  // (createMainWindow's win32 10s reveal fallback) — those can still be
+  // hidden to the tray on close, so the icon must exist by then.
+  let trayCreated = false
+  const createSystemTrayDeferred = (): void => {
+    if (trayCreated || window.isDestroyed() || isQuitting || !store) {
+      return
+    }
+    trayCreated = true
+    // Why: Windows-only system tray. createSystemTray is idempotent and a
+    // no-op off win32, so calling it on each window open keeps exactly one
+    // live icon.
+    createSystemTray({
+      appIcon: store.getSettings().appIcon,
+      onOpen: showMainWindowFromTray,
+      onQuit: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          // Why: a real quit can still surface renderer save/discard prompts;
+          // the window must be visible if a hidden-to-tray session vetoes
+          // shutdown.
+          showMainWindowFromTray()
+        }
+        // Why: set the quit latch before app.quit() so the window 'close'
+        // handler proceeds to teardown instead of re-hiding to the tray.
+        isQuitting = true
+        app.quit()
+      }
+    })
+    logStartupMilestone('tray-created')
+  }
   window.once('ready-to-show', () => {
     logStartupMilestone('ready-to-show')
+    setImmediate(createSystemTrayDeferred)
   })
+  const trayCreateFallback = setTimeout(createSystemTrayDeferred, TRAY_CREATE_FALLBACK_MS)
+  trayCreateFallback.unref?.()
 
   // Why: telemetry-plan.md§First-launch experience anchors default-on
   // `app_opened` to the first main-window load. Existing users in the
@@ -879,23 +919,6 @@ function openMainWindow(): BrowserWindow {
     stopAllSyntheticTitleSpinners()
   })
   mainWindow = window
-  // Why: Windows-only system tray. createSystemTray is idempotent and a no-op
-  // off win32, so calling it on each window open keeps exactly one live icon.
-  createSystemTray({
-    appIcon: store.getSettings().appIcon,
-    onOpen: showMainWindowFromTray,
-    onQuit: () => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        // Why: a real quit can still surface renderer save/discard prompts; the
-        // window must be visible if a hidden-to-tray session vetoes shutdown.
-        showMainWindowFromTray()
-      }
-      // Why: set the quit latch before app.quit() so the window 'close' handler
-      // proceeds to teardown instead of re-hiding the window to the tray.
-      isQuitting = true
-      app.quit()
-    }
-  })
   window.on('show', resumeSyntheticTitleSpinnerTimer)
   window.on('restore', resumeSyntheticTitleSpinnerTimer)
   window.on('hide', stopSyntheticTitleSpinnerTimer)
@@ -1821,7 +1844,12 @@ app.whenReady().then(async () => {
   logStartupMilestone('i18n-ready')
 
   registerAppMenu({
-    onCheckForUpdates: (options) => checkForUpdatesFromMenu(options),
+    onCheckForUpdates: (options) => {
+      // Why: the menu is clickable before first paint; a manual check must
+      // run against a configured updater (see attach-main-window-services).
+      ensureAutoUpdaterConfigured()
+      return checkForUpdatesFromMenu(options)
+    },
     onBeforeReload: ({ ignoreCache, webContentsId }) => {
       if (mainWindow?.webContents.id === webContentsId) {
         markExpectedRendererReload(webContentsId)
