@@ -166,6 +166,7 @@ import {
 import { lookupGitHubWorkItemDetailsForSource } from '@/lib/github-work-item-source-lookup'
 import {
   canUseGitHubRepoContext,
+  getGitHubMutationRoutingSettings,
   getGitHubRuntimeRepoId,
   getGitHubSourceRuntimeHost
 } from '@/lib/github-source-runtime-context'
@@ -3848,21 +3849,11 @@ function PRActionsPanel({
   const actionItem = { ...item, state: localState }
   const mergePresentation = presentGitHubPRMergeState(actionItem)
   const mergeMethods = resolveGitHubPRMergeMethods(actionItem.mergeMethodSettings)
-  const repoOwnerSettings = useAppStore(
-    useShallow((s) => getSettingsForRepoRuntimeOwner(s, repoId ?? item.repoId ?? null))
+  const sourceSettings = useAppStore(
+    useShallow((s) =>
+      getGitHubMutationRoutingSettings(s, item.repoId ?? repoId ?? null, sourceContext)
+    )
   )
-  const sourceSettings = useMemo(() => {
-    if (sourceContext?.provider !== 'github') {
-      return repoOwnerSettings
-    }
-    const sourceRuntimeSettings = getTaskSourceRuntimeSettings(sourceContext)
-    return sourceRuntimeSettings.activeRuntimeEnvironmentId
-      ? ({
-          ...repoOwnerSettings,
-          ...sourceRuntimeSettings
-        } as typeof repoOwnerSettings)
-      : repoOwnerSettings
-  }, [repoOwnerSettings, sourceContext])
   const mergeTarget = getActiveRuntimeTarget(sourceSettings)
   const canMutateWithRepoContext =
     !!repoPath || !!projectOrigin || mergeTarget.kind === 'environment'
@@ -5465,32 +5456,36 @@ async function runPullRequestStateUpdate(args: {
     }
     return
   }
-  const runtimeHost = getGitHubSourceRuntimeHost(args.sourceContext)
-  if (!args.repoPath && !runtimeHost) {
+  // Why: close/reopen must route by the repo owner host like merge (#6957).
+  const target = getActiveRuntimeTarget(
+    getGitHubMutationRoutingSettings(useAppStore.getState(), args.repoId, args.sourceContext)
+  )
+  if (!args.repoPath && target.kind !== 'environment') {
     throw new Error('No repo context available for this pull request.')
   }
-  const res = runtimeHost
-    ? await callRuntimeRpc<Awaited<ReturnType<typeof window.api.gh.updatePRState>>>(
-        { kind: 'environment', environmentId: runtimeHost.environmentId },
-        'github.updatePRState',
-        {
-          repo: getGitHubRuntimeRepoId(args.sourceContext, args.repoId ?? ''),
+  const res =
+    target.kind === 'environment'
+      ? await callRuntimeRpc<Awaited<ReturnType<typeof window.api.gh.updatePRState>>>(
+          target,
+          'github.updatePRState',
+          {
+            repo: getGitHubRuntimeRepoId(args.sourceContext, args.repoId ?? ''),
+            prNumber: args.number,
+            updates: args.updates
+          },
+          { timeoutMs: 30_000 }
+        )
+      : await window.api.gh.updatePRState({
+          repoPath: args.repoPath ?? '',
+          repoId: args.repoId ?? undefined,
+          sourceContext: args.sourceContext,
           prNumber: args.number,
           updates: args.updates
-        },
-        { timeoutMs: 30_000 }
-      )
-    : await window.api.gh.updatePRState({
-        repoPath: args.repoPath ?? '',
-        repoId: args.repoId ?? undefined,
-        sourceContext: args.sourceContext,
-        prNumber: args.number,
-        updates: args.updates
-      })
+        })
   if (!res.ok) {
     throw new Error(res.error)
   }
-  if (runtimeHost) {
+  if (target.kind === 'environment') {
     notifyWorkItemDetailsMutation(
       {
         repoPath: args.repoPath ?? '',
