@@ -2771,6 +2771,9 @@
           "EditorFileTabCloseButton": {
             "4655cf570e": "Cerrar pestaña",
             "a768f428f1": "Cerrar pestaña"
+          },
+          "TerminalTabSplitMenuSection": {
+            "splitTerminal": "Split terminal"
           }
         }
       },

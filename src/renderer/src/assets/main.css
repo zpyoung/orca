@@ -101,6 +101,8 @@
   --color-status-success: var(--status-success);
   --color-status-success-background: var(--status-success-background);
   --color-status-success-border: var(--status-success-border);
+  --color-tab-group-split-divider: var(--tab-group-split-divider);
+  --color-tab-group-split-divider-strong: var(--tab-group-split-divider-strong);
   --color-git-graph-ref: var(--git-graph-ref);
   --color-git-graph-remote-ref: var(--git-graph-remote-ref);
   --color-git-graph-base-ref: var(--git-graph-base-ref);
@@ -202,6 +204,11 @@
   --git-graph-lane-4: #40b0a6;
   --git-graph-lane-5: #b66dff;
   --annotation-highlight: #f59e0b;
+  /* Why: tab-group splits use a dedicated divider — `--border` is too faint on
+     card/editor surfaces when panes are side-by-side or stacked. Default must
+     meet >=3:1 against `--card`, not only the hover/drag strong state. */
+  --tab-group-split-divider: #868690;
+  --tab-group-split-divider-strong: #71717a;
 }
 
 /* ── Dark Mode ───────────────────────────────────────── */
@@ -285,6 +292,9 @@
   --git-graph-lane-4: #40b0a6;
   --git-graph-lane-5: #b66dff;
   --annotation-highlight: #fbbf24;
+  /* Brighter than terminal defaults so the always-visible line clears 3:1 on `--card`. */
+  --tab-group-split-divider: #71717a;
+  --tab-group-split-divider-strong: #a1a1aa;
 }
 
 .linear-priority-bars {
@@ -616,6 +626,52 @@
   height: 100dvh;
   width: 100vw;
   overflow: hidden;
+}
+
+/* Tab-group split resize handle — wide hit area, visible center line. */
+.tab-group-split-resize-handle {
+  flex-shrink: 0;
+  position: relative;
+  background: transparent;
+}
+
+.tab-group-split-resize-handle.is-vertical {
+  width: 6px;
+  cursor: col-resize;
+}
+
+.tab-group-split-resize-handle.is-horizontal {
+  height: 6px;
+  cursor: row-resize;
+}
+
+.tab-group-split-resize-handle::after {
+  content: '';
+  position: absolute;
+  border-radius: 1px;
+  background: var(--tab-group-split-divider);
+  transition: background 100ms ease;
+}
+
+.tab-group-split-resize-handle.is-vertical::after {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 3px;
+  transform: translateX(-50%);
+}
+
+.tab-group-split-resize-handle.is-horizontal::after {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 3px;
+  transform: translateY(-50%);
+}
+
+.tab-group-split-resize-handle:hover::after,
+.tab-group-split-resize-handle.is-dragging::after {
+  background: var(--tab-group-split-divider-strong);
 }
 
 /* ── Titlebar ────────────────────────────────────────── */

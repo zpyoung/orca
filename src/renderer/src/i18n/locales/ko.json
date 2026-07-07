@@ -2771,6 +2771,9 @@
           "EditorFileTabCloseButton": {
             "4655cf570e": "탭 닫기",
             "a768f428f1": "탭 닫기"
+          },
+          "TerminalTabSplitMenuSection": {
+            "splitTerminal": "Split terminal"
           }
         }
       },

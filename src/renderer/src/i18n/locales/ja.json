@@ -2771,6 +2771,9 @@
           "EditorFileTabCloseButton": {
             "4655cf570e": "タブを閉じる",
             "a768f428f1": "タブを閉じる"
+          },
+          "TerminalTabSplitMenuSection": {
+            "splitTerminal": "Split terminal"
           }
         }
       },
