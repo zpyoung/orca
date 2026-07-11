@@ -195,6 +195,12 @@ import {
   type NativeFileDropPayload,
   type NativeFileDropPathEntry
 } from '../shared/native-file-drop'
+import type {
+  LocalLogTailChangedPayload,
+  LocalLogTailReadArgs,
+  LocalLogTailReadResult,
+  LocalLogTailWatchArgs
+} from '../shared/local-log-tail-types'
 import { subscribeRuntimeEnvironmentFromPreload } from './runtime-environment-subscriptions'
 import type { RuntimeEnvironmentSubscriptionHandle } from './runtime-environment-subscriptions'
 import type { HostedReviewForBranchArgs } from '../shared/hosted-review'
@@ -2720,8 +2726,30 @@ const api = {
     readFile: (args: {
       filePath: string
       connectionId?: string
-    }): Promise<{ content: string; isBinary: boolean; isImage?: boolean; mimeType?: string }> =>
-      ipcRenderer.invoke('fs:readFile', args),
+      includeLocalLogMetadata?: boolean
+    }): Promise<{
+      content: string
+      isBinary: boolean
+      isImage?: boolean
+      mimeType?: string
+      fileIdentity?: string
+    }> => ipcRenderer.invoke('fs:readFile', args),
+    readLocalLogTail: (args: LocalLogTailReadArgs): Promise<LocalLogTailReadResult> =>
+      ipcRenderer.invoke('fs:readLocalLogTail', args),
+    startLocalLogTail: (args: LocalLogTailWatchArgs): Promise<void> =>
+      ipcRenderer.invoke('fs:startLocalLogTail', args),
+    stopLocalLogTail: (args: { subscriptionId: string }): Promise<void> =>
+      ipcRenderer.invoke('fs:stopLocalLogTail', args),
+    onLocalLogTailChanged: (
+      callback: (payload: LocalLogTailChangedPayload) => void
+    ): (() => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        payload: LocalLogTailChangedPayload
+      ): void => callback(payload)
+      ipcRenderer.on('fs:localLogTailChanged', listener)
+      return () => ipcRenderer.removeListener('fs:localLogTailChanged', listener)
+    },
     downloadFile: (args: {
       filePath: string
       connectionId: string

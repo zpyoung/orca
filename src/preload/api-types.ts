@@ -9,6 +9,12 @@ import type {
   HostedReviewProvider
 } from '../shared/hosted-review'
 import type { NativeFileDropPayload } from '../shared/native-file-drop'
+import type {
+  LocalLogTailChangedPayload,
+  LocalLogTailReadArgs,
+  LocalLogTailReadResult,
+  LocalLogTailWatchArgs
+} from '../shared/local-log-tail-types'
 import type { ReadClipboardTextOptions } from '../shared/clipboard-text'
 import type { AppIdentity } from '../shared/app-identity'
 import type {
@@ -2351,7 +2357,18 @@ export type PreloadApi = {
     readFile: (args: {
       filePath: string
       connectionId?: string
-    }) => Promise<{ content: string; isBinary: boolean; isImage?: boolean; mimeType?: string }>
+      includeLocalLogMetadata?: boolean
+    }) => Promise<{
+      content: string
+      isBinary: boolean
+      isImage?: boolean
+      mimeType?: string
+      fileIdentity?: string
+    }>
+    readLocalLogTail: (args: LocalLogTailReadArgs) => Promise<LocalLogTailReadResult>
+    startLocalLogTail: (args: LocalLogTailWatchArgs) => Promise<void>
+    stopLocalLogTail: (args: { subscriptionId: string }) => Promise<void>
+    onLocalLogTailChanged: (callback: (payload: LocalLogTailChangedPayload) => void) => () => void
     downloadFile: (args: {
       filePath: string
       connectionId: string

@@ -1027,6 +1027,11 @@ export type PersistedOpenFile = {
   /** Signature of the disk content the dirty draft is based on; lets restore
    *  re-derive a changed-on-disk conflict from ground truth. */
   lastKnownDiskSignature?: string
+  /** Why: a read-only tab (AI Vault View Log) must survive restart still
+   *  read-only; persisted only when true so old sessions stay writable. */
+  readOnly?: boolean
+  /** Opt-in streaming append for a read-only local log tab. */
+  liveTail?: boolean
 }
 
 export type WorkspaceSessionState = {

@@ -1478,6 +1478,14 @@ function createFileApi(): NonNullable<Partial<PreloadApi>['fs']> {
         relativePath: file.relativePath
       })
     },
+    readLocalLogTail: async () => {
+      throw new Error('Local log tailing is unavailable in paired web clients.')
+    },
+    startLocalLogTail: async () => {
+      throw new Error('Local log tailing is unavailable in paired web clients.')
+    },
+    stopLocalLogTail: async () => {},
+    onLocalLogTailChanged: () => noopUnsubscribe,
     downloadFile: async () => {
       throw new Error('Remote file download is unavailable in paired web clients.')
     },
