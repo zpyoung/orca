@@ -1229,6 +1229,7 @@ describe('createIpcPtyTransport', () => {
     const spawnMock = vi.fn().mockResolvedValue({
       id: 'pty-reattach',
       isReattach: true,
+      launchAgent: 'droid',
       snapshot: 'snapshot data',
       snapshotCols: 132,
       snapshotRows: 43
@@ -1266,6 +1267,7 @@ describe('createIpcPtyTransport', () => {
 
     expect(result).toEqual({
       id: 'pty-reattach',
+      launchAgent: 'droid',
       snapshot: 'snapshot data',
       snapshotCols: 132,
       snapshotRows: 43,
@@ -1273,6 +1275,30 @@ describe('createIpcPtyTransport', () => {
       coldRestore: undefined,
       replay: undefined,
       sessionExpired: undefined
+    })
+  })
+
+  it('drops an unknown daemon launch identity from the connection result', async () => {
+    const { createIpcPtyTransport } = await import('./pty-transport')
+    const spawn = window.api.pty.spawn as unknown as ReturnType<typeof vi.fn>
+    spawn.mockResolvedValueOnce({
+      id: 'pty-unknown-launch-agent',
+      isReattach: true,
+      launchAgent: 'not-an-agent'
+    })
+
+    const result = await createIpcPtyTransport({}).connect({ url: '', callbacks: {} })
+
+    expect(result).toEqual({
+      id: 'pty-unknown-launch-agent',
+      snapshot: undefined,
+      snapshotCols: undefined,
+      snapshotRows: undefined,
+      isAlternateScreen: undefined,
+      sessionExpired: undefined,
+      coldRestore: undefined,
+      replay: undefined,
+      pendingEscapeTailAnsi: undefined
     })
   })
 

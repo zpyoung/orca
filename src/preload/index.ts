@@ -986,6 +986,8 @@ const api = {
     /** Return the PTY foreground process basename when available (e.g. "codex"). */
     getForegroundProcess: (id: string): Promise<string | null> =>
       ipcRenderer.invoke('pty:getForegroundProcess', { id }),
+    confirmForegroundProcess: (id: string): Promise<string | null> =>
+      ipcRenderer.invoke('pty:confirmForegroundProcess', { id }),
 
     /** Resolve the live cwd of a PTY via `/proc` (Linux) or `lsof` (macOS).
      *  Returns `''` when the id is unknown or the platform cannot resolve one. */

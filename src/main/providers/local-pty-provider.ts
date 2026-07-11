@@ -51,9 +51,10 @@ import {
   resolveWindowsGitBashShellPath
 } from '../git-bash'
 import { WINDOWS_GIT_BASH_SHELL } from '../../shared/windows-terminal-shell'
-import { resolveAgentForegroundProcess } from './agent-foreground-process'
+import { resolveAgentForegroundProcessWithAvailability } from './agent-foreground-process'
 import { getAgentForegroundContextPaths } from './agent-foreground-context-paths'
 import { recognizeAgentProcessFromCommandLine } from '../../shared/agent-process-recognition'
+import { readWindowsConptyProcessIds } from './windows-conpty-process-membership'
 import { shouldUseShellReadyStartupDelivery } from '../../shared/codex-startup-delivery'
 import { assertSafeAgentStartupCwd, resolveSafePtyDefaultCwd } from './pty-default-cwd'
 
@@ -971,13 +972,45 @@ export class LocalPtyProvider implements IPtyProvider {
       return null
     }
     try {
-      return await resolveAgentForegroundProcess(
+      const resolution = await resolveAgentForegroundProcessWithAvailability(
         proc.pid,
         resolveForegroundFallbackProcess(proc.process || null, ptyShellName.get(id)),
         {
           contextPaths: ptyAgentForegroundContextPaths.get(id)
         }
       )
+      return resolution.processName
+    } catch {
+      return null
+    }
+  }
+
+  async confirmForegroundProcess(id: string): Promise<string | null> {
+    const proc = ptyProcesses.get(id)
+    if (!proc) {
+      return null
+    }
+    try {
+      const resolution = await resolveAgentForegroundProcessWithAvailability(
+        proc.pid,
+        resolveForegroundFallbackProcess(proc.process || null, ptyShellName.get(id)),
+        {
+          contextPaths: ptyAgentForegroundContextPaths.get(id),
+          fresh: true,
+          ...(process.platform === 'win32'
+            ? {
+                forceProcessScan: true,
+                readWindowsConptyProcessIds: () => readWindowsConptyProcessIds(proc.pid)
+              }
+            : {})
+        }
+      )
+      // Why: a fresh scan can outlive this PTY id; never publish identity from
+      // an exited process or a replacement session that reused the same id.
+      if (ptyProcesses.get(id) !== proc) {
+        return null
+      }
+      return resolution.available ? resolution.processName : null
     } catch {
       return null
     }

@@ -36,6 +36,7 @@ export type LocalPtySessionMetadata = { cwd?: string; shellOverride?: string }
 
 export type PtyConnectResult = {
   id: string
+  launchAgent?: TuiAgent
   launchConfig?: SleepingAgentLaunchConfig
   snapshot?: string
   snapshotCols?: number

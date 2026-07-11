@@ -2729,6 +2729,8 @@ function createPtyApi(): NonNullable<Partial<PreloadApi>['pty']> {
     publishTerminalViewAttributes: () => {},
     hasChildProcesses: () => Promise.resolve(false),
     getForegroundProcess: () => Promise.resolve(null),
+    // Why: paired web panes cannot provide a local post-boundary process scan.
+    confirmForegroundProcess: () => Promise.resolve(null),
     getCwd: () => Promise.resolve('~'),
     getSize: () => Promise.resolve(null),
     listSessions: () => Promise.resolve([]),

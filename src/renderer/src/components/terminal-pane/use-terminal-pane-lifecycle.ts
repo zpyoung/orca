@@ -1873,6 +1873,28 @@ export function useTerminalPaneLifecycle({
   }, [cwd, isVisible, isVisibleRef, panePtyBindingsRef, tabId])
 
   useEffect(() => {
+    if (!isActive || !isVisible || typeof window === 'undefined') {
+      return
+    }
+    const onWindowFocus = (): void => {
+      const activePane = managerRef.current?.getActivePane()
+      if (!activePane) {
+        return
+      }
+      const binding = panePtyBindingsRef.current.get(activePane.id) as
+        | (IDisposable & { sampleForegroundAgentOnFocus?: () => void })
+        | undefined
+      // Why: window refocus does not change the active leaf, so the pane
+      // manager's onActivePaneChange hook is not fired. Re-sample the same
+      // pane to revoke stale launch-only identity and confirm current Droid
+      // ownership before the next Windows Shift+Enter.
+      binding?.sampleForegroundAgentOnFocus?.()
+    }
+    window.addEventListener('focus', onWindowFocus)
+    return () => window.removeEventListener('focus', onWindowFocus)
+  }, [isActive, isVisible, managerRef, panePtyBindingsRef])
+
+  useEffect(() => {
     const manager = managerRef.current
     if (!manager || !settings) {
       return

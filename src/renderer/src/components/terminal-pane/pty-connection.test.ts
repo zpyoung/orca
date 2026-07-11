@@ -13,10 +13,11 @@ import {
 } from './layout-serialization'
 import { buildFreshShellViewportBlankingSequence } from './terminal-restored-viewport'
 import { TERMINAL_PASTE_DIRECT_MAX_BYTES } from './terminal-paste-coordinator'
+import { resolveWindowsShiftEnterEncodingForPane } from './terminal-windows-shift-enter'
 import type * as UseNotificationDispatchModule from './use-notification-dispatch'
 import { getEagerPtyBufferHandle } from './pty-dispatcher'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
-import type { TerminalLayoutSnapshot } from '../../../../shared/types'
+import type { TerminalLayoutSnapshot, TuiAgent } from '../../../../shared/types'
 import { YOLO_TUI_AGENT_ARGS } from '../../../../shared/tui-agent-permissions'
 import { SETUP_AGENT_SEQUENCE_STARTUP_COMMAND_ENV } from '../../../../shared/setup-agent-sequencing'
 import {
@@ -110,7 +111,13 @@ type StoreState = {
   activeWorktreeId: string | null
   tabsByWorktree: Record<
     string,
-    { id: string; ptyId: string | null; title?: string; launchAgent?: string }[]
+    {
+      id: string
+      ptyId: string | null
+      title?: string
+      launchAgent?: string
+      shellOverride?: string
+    }[]
   >
   ptyIdsByTabId?: Record<string, string[]>
   terminalLayoutsByTabId?: Record<string, TerminalLayoutSnapshot>
@@ -177,7 +184,10 @@ type StoreState = {
   paneForegroundAgentByPaneKey: Record<string, PaneForegroundAgentEntry>
   sleepingAgentSessionsByPaneKey: Record<string, unknown>
   suppressedPtyExitIds: Record<string, true>
-  agentLaunchConfigByPaneKey: Record<string, { launchConfig: unknown }>
+  agentLaunchConfigByPaneKey: Record<
+    string,
+    { launchConfig: unknown; identity?: { agentType?: string } }
+  >
   getAgentLaunchConfigForStatusEntry: ReturnType<typeof vi.fn>
   getAgentLaunchConfigForStatusMetadata: ReturnType<typeof vi.fn>
   clearSleepingAgentSession: ReturnType<typeof vi.fn>
@@ -194,6 +204,22 @@ type StoreState = {
   markTerminalTabUnread: ReturnType<typeof vi.fn>
   markTerminalPaneUnread: ReturnType<typeof vi.fn>
   markAgentCompletionPaneUnread: ReturnType<typeof vi.fn>
+}
+
+type WindowsShiftEnterPaneState = Parameters<typeof resolveWindowsShiftEnterEncodingForPane>[0]
+
+function resolveMockPaneWindowsShiftEnterEncoding(
+  state: StoreState,
+  paneKey: string
+): ReturnType<typeof resolveWindowsShiftEnterEncodingForPane> {
+  return resolveWindowsShiftEnterEncodingForPane(
+    {
+      paneForegroundAgentByPaneKey: state.paneForegroundAgentByPaneKey,
+      agentLaunchConfigByPaneKey:
+        state.agentLaunchConfigByPaneKey as WindowsShiftEnterPaneState['agentLaunchConfigByPaneKey']
+    },
+    paneKey
+  )
 }
 
 type ConnectCallbacks = {
@@ -823,6 +849,7 @@ describe('connectPanePty', () => {
           reportGeometry: vi.fn(),
           getMainBufferSnapshot: vi.fn().mockResolvedValue(null),
           getForegroundProcess: vi.fn().mockResolvedValue(null),
+          confirmForegroundProcess: vi.fn().mockResolvedValue(null),
           hasChildProcesses: vi.fn().mockResolvedValue(false),
           write: vi.fn(),
           writeAccepted: vi.fn().mockResolvedValue(true),
@@ -853,6 +880,9 @@ describe('connectPanePty', () => {
       addEventListener: vi.fn(),
       removeEventListener: vi.fn()
     }
+    vi.mocked(window.api.pty.confirmForegroundProcess).mockImplementation((id) =>
+      window.api.pty.getForegroundProcess(id)
+    )
     globalThis.requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
       callback(0)
       return 1
@@ -4934,6 +4964,416 @@ describe('connectPanePty', () => {
 
     expect(mockStoreState.clearAgentLaunchConfig).toHaveBeenCalledWith(paneKey)
     expect(mockStoreState.dropAgentStatus).not.toHaveBeenCalled()
+  })
+
+  it('routes a manually typed Droid only after foreground enrichment confirms it', async () => {
+    vi.useFakeTimers()
+    const { connectPanePty } = await import('./pty-connection')
+    const dataCallbackRef: { current: ((data: string) => void) | null } = { current: null }
+    const pane = createPane(1)
+    const ptyId = 'pty-manually-typed-droid'
+    const tabId = 'tab-manually-typed-droid'
+    const foregroundResults = ['powershell.exe', 'droid']
+    vi.mocked(window.api.pty.confirmForegroundProcess).mockImplementation(async (id: string) =>
+      id === ptyId ? (foregroundResults.shift() ?? 'droid') : null
+    )
+    const transport = createMockTransport(ptyId)
+    transport.connect.mockImplementation(async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+      dataCallbackRef.current = callbacks.onData ?? null
+      return { id: ptyId }
+    })
+    transportFactoryQueue.push(transport)
+    const paneKey = makePaneKey(tabId, LEAF_1)
+
+    connectPanePty(
+      pane as never,
+      createManager(1) as never,
+      createDeps({ tabId, isVisibleRef: { current: false } }) as never
+    )
+    await vi.advanceTimersByTimeAsync(20)
+    await flushAsyncTicks()
+
+    sendTerminalInputThroughPane(pane, 'droid\r')
+    expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, paneKey)).toBe('alt-enter')
+
+    dataCallbackRef.current?.('\x1b]133;C\x07')
+    expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, paneKey)).toBe('alt-enter')
+    await vi.advanceTimersByTimeAsync(350)
+    expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, paneKey)).toBe('alt-enter')
+    await vi.advanceTimersByTimeAsync(1200)
+    expect(mockStoreState.paneForegroundAgentByPaneKey[paneKey]).toEqual({
+      agent: 'droid',
+      routingTrusted: true,
+      shellForeground: false
+    })
+  })
+
+  it('confirms a manually typed Droid without OSC command boundaries', async () => {
+    vi.useFakeTimers()
+    const { connectPanePty } = await import('./pty-connection')
+    vi.mocked(window.api.pty.confirmForegroundProcess).mockResolvedValue('droid')
+    const pane = createPane(1)
+    const ptyId = 'pty-manual-droid-no-osc'
+    const tabId = 'tab-manual-droid-no-osc'
+    const paneKey = makePaneKey(tabId, LEAF_1)
+    transportFactoryQueue.push(createMockTransport(ptyId))
+
+    connectPanePty(
+      pane as never,
+      createManager(1) as never,
+      createDeps({ tabId, isVisibleRef: { current: false } }) as never
+    )
+    await vi.advanceTimersByTimeAsync(20)
+    await flushAsyncTicks()
+
+    sendTerminalInputThroughPane(pane, 'droid\r')
+    expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, paneKey)).toBe('alt-enter')
+
+    await vi.advanceTimersByTimeAsync(350)
+
+    expect(window.api.pty.confirmForegroundProcess).toHaveBeenCalledWith(ptyId)
+    expect(mockStoreState.paneForegroundAgentByPaneKey[paneKey]).toEqual({
+      agent: 'droid',
+      routingTrusted: true,
+      shellForeground: false
+    })
+    expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, paneKey)).toBe('csi-u')
+  })
+
+  it('revokes trusted Droid after accepted no-OSC exit input until shell confirmation', async () => {
+    vi.useFakeTimers()
+    const { connectPanePty } = await import('./pty-connection')
+    vi.mocked(window.api.pty.confirmForegroundProcess).mockResolvedValue('cmd.exe')
+    const pane = createPane(1)
+    const ptyId = 'pty-droid-exit-no-osc'
+    const tabId = 'tab-droid-exit-no-osc'
+    const paneKey = makePaneKey(tabId, LEAF_1)
+    transportFactoryQueue.push(createMockTransport(ptyId))
+
+    connectPanePty(pane as never, createManager(1) as never, createDeps({ tabId }) as never)
+    await vi.advanceTimersByTimeAsync(20)
+    await flushAsyncTicks()
+    mockStoreState.paneForegroundAgentByPaneKey[paneKey] = {
+      agent: 'droid',
+      routingTrusted: true,
+      shellForeground: false
+    }
+
+    sendTerminalInputThroughPane(pane, '\x03')
+    await flushAsyncTicks()
+
+    expect(mockStoreState.paneForegroundAgentByPaneKey[paneKey]).toEqual({
+      agent: 'droid',
+      shellForeground: false
+    })
+    expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, paneKey)).toBe('alt-enter')
+
+    await vi.advanceTimersByTimeAsync(350 + 1200 + 6000)
+
+    expect(mockStoreState.paneForegroundAgentByPaneKey[paneKey]).toEqual({
+      agent: null,
+      shellForeground: true
+    })
+    expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, paneKey)).toBe('alt-enter')
+  })
+
+  it('never promotes typed Droid text when foreground enrichment is unavailable', async () => {
+    vi.useFakeTimers()
+    const { connectPanePty } = await import('./pty-connection')
+    vi.mocked(window.api.pty.confirmForegroundProcess)
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(new Error('inspection unavailable'))
+      .mockResolvedValueOnce(null)
+    const dataCallbackRef: { current: ((data: string) => void) | null } = { current: null }
+    const pane = createPane(1)
+    const ptyId = 'pty-typed-droid-unavailable-start'
+    const tabId = 'tab-typed-droid-unavailable-start'
+    const paneKey = makePaneKey(tabId, LEAF_1)
+    const transport = createMockTransport(ptyId)
+    transport.connect.mockImplementation(async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+      dataCallbackRef.current = callbacks.onData ?? null
+      return { id: ptyId }
+    })
+    transportFactoryQueue.push(transport)
+
+    connectPanePty(
+      pane as never,
+      createManager(1) as never,
+      createDeps({ tabId, isVisibleRef: { current: false } }) as never
+    )
+    await vi.advanceTimersByTimeAsync(20)
+    await flushAsyncTicks()
+
+    sendTerminalInputThroughPane(pane, 'droid\r')
+    dataCallbackRef.current?.('\x1b]133;C\x07')
+    await vi.advanceTimersByTimeAsync(350)
+    expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, paneKey)).toBe('alt-enter')
+
+    await vi.advanceTimersByTimeAsync(1200)
+    expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, paneKey)).toBe('alt-enter')
+
+    await vi.advanceTimersByTimeAsync(5999)
+    expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, paneKey)).toBe('alt-enter')
+    await vi.advanceTimersByTimeAsync(1)
+
+    expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, paneKey)).toBe('alt-enter')
+  })
+
+  it.each(['process', 'launch'] as const)(
+    'does not let typed Droid input replace another live TUI %s identity',
+    async (identitySource) => {
+      vi.useFakeTimers()
+      const { connectPanePty } = await import('./pty-connection')
+      const dataCallbackRef: { current: ((data: string) => void) | null } = { current: null }
+      const pane = createPane(1)
+      const ptyId = `pty-antigravity-${identitySource}-typed-droid`
+      const tabId = `tab-antigravity-${identitySource}-typed-droid`
+      const paneKey = makePaneKey(tabId, LEAF_1)
+      const transport = createMockTransport(ptyId)
+      transport.connect.mockImplementation(
+        async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+          dataCallbackRef.current = callbacks.onData ?? null
+          return { id: ptyId }
+        }
+      )
+      transportFactoryQueue.push(transport)
+
+      connectPanePty(
+        pane as never,
+        createManager(1) as never,
+        createDeps({ tabId, isVisibleRef: { current: false } }) as never
+      )
+      await vi.advanceTimersByTimeAsync(20)
+      await flushAsyncTicks()
+      if (identitySource === 'process') {
+        mockStoreState.paneForegroundAgentByPaneKey[paneKey] = {
+          agent: 'antigravity',
+          shellForeground: false
+        }
+      } else {
+        mockStoreState.agentLaunchConfigByPaneKey[paneKey] = {
+          launchConfig: { agentArgs: '', agentEnv: {} },
+          identity: { agentType: 'antigravity' }
+        }
+      }
+
+      sendTerminalInputThroughPane(pane, 'droid\r')
+      dataCallbackRef.current?.('\x1b]133;C\x07')
+
+      expect(mockStoreState.paneForegroundAgentByPaneKey[paneKey]).toEqual({
+        agent: null,
+        shellForeground: false
+      })
+      expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, paneKey)).toBe('alt-enter')
+    }
+  )
+
+  it.each([
+    ['SSH', 'ssh:conn@@pty-typed-droid', 'tab-ssh-typed-droid'],
+    ['remote runtime', 'remote:web-env-1@@pty-typed-droid', 'tab-remote-typed-droid']
+  ])(
+    'does not persist typed command process evidence for %s panes',
+    async (_label, ptyId, tabId) => {
+      vi.useFakeTimers()
+      const { connectPanePty } = await import('./pty-connection')
+      const dataCallbackRef: { current: ((data: string) => void) | null } = { current: null }
+      const pane = createPane(1)
+      const paneKey = makePaneKey(tabId, LEAF_1)
+      const transport = createMockTransport(ptyId)
+      transport.connect.mockImplementation(
+        async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+          dataCallbackRef.current = callbacks.onData ?? null
+          return { id: ptyId }
+        }
+      )
+      transportFactoryQueue.push(transport)
+
+      connectPanePty(
+        pane as never,
+        createManager(1) as never,
+        createDeps({ tabId, isVisibleRef: { current: false } }) as never
+      )
+      await vi.advanceTimersByTimeAsync(20)
+      await flushAsyncTicks()
+
+      sendTerminalInputThroughPane(pane, 'droid\r')
+      dataCallbackRef.current?.('\x1b]133;C\x07\x1b]133;D;0\x07')
+
+      expect(mockStoreState.paneForegroundAgentByPaneKey[paneKey]).toBeUndefined()
+      expect(mockStoreState.setPaneForegroundAgent).not.toHaveBeenCalledWith(
+        paneKey,
+        expect.anything()
+      )
+    }
+  )
+
+  it('keeps Droid routing visible through command-finished foreground confirmation', async () => {
+    vi.useFakeTimers()
+    const { connectPanePty } = await import('./pty-connection')
+    const getForegroundProcess = vi.mocked(window.api.pty.confirmForegroundProcess)
+    getForegroundProcess.mockResolvedValue('droid')
+    const dataCallbackRef: { current: ((data: string) => void) | null } = { current: null }
+    const ptyId = 'pty-droid-confirmation-window'
+    const transport = createMockTransport(ptyId)
+    transport.connect.mockImplementation(async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+      dataCallbackRef.current = callbacks.onData ?? null
+      return { id: ptyId }
+    })
+    transportFactoryQueue.push(transport)
+    const paneKey = makePaneKey('tab-1', LEAF_1)
+
+    connectPanePty(
+      createPane(1) as never,
+      createManager(1) as never,
+      createDeps({ isVisibleRef: { current: false } }) as never
+    )
+    await vi.advanceTimersByTimeAsync(20)
+    await flushAsyncTicks()
+    mockStoreState.agentLaunchConfigByPaneKey[paneKey] = {
+      launchConfig: { agentArgs: '', agentEnv: {} },
+      identity: { agentType: 'droid' }
+    }
+    mockStoreState.clearAgentLaunchConfig.mockImplementation((key: string) => {
+      delete mockStoreState.agentLaunchConfigByPaneKey[key]
+    })
+
+    const readsBeforeFinish = getForegroundProcess.mock.calls.length
+    dataCallbackRef.current?.('\x1b]133;D;0\x07')
+    expect(mockStoreState.clearAgentLaunchConfig).not.toHaveBeenCalled()
+    expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, paneKey)).toBe('alt-enter')
+
+    await vi.advanceTimersByTimeAsync(350)
+    expect(mockStoreState.clearAgentLaunchConfig).not.toHaveBeenCalled()
+    expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, paneKey)).toBe('csi-u')
+
+    expect(getForegroundProcess).toHaveBeenCalledTimes(readsBeforeFinish + 1)
+    expect(mockStoreState.clearAgentLaunchConfig).not.toHaveBeenCalled()
+    expect(mockStoreState.paneForegroundAgentByPaneKey[paneKey]).toEqual({
+      agent: 'droid',
+      routingTrusted: true,
+      shellForeground: false
+    })
+    expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, paneKey)).toBe('csi-u')
+  })
+
+  it('retires pane launch routing after one fresh scan confirms shell', async () => {
+    vi.useFakeTimers()
+    const { connectPanePty } = await import('./pty-connection')
+    vi.mocked(window.api.pty.confirmForegroundProcess).mockResolvedValue('powershell.exe')
+    const dataCallbackRef: { current: ((data: string) => void) | null } = { current: null }
+    const ptyId = 'pty-droid-confirmed-shell'
+    const transport = createMockTransport(ptyId)
+    transport.connect.mockImplementation(async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+      dataCallbackRef.current = callbacks.onData ?? null
+      return { id: ptyId }
+    })
+    transportFactoryQueue.push(transport)
+    const paneKey = makePaneKey('tab-1', LEAF_1)
+
+    connectPanePty(
+      createPane(1) as never,
+      createManager(1) as never,
+      createDeps({ isVisibleRef: { current: false } }) as never
+    )
+    await vi.advanceTimersByTimeAsync(20)
+    await flushAsyncTicks()
+    mockStoreState.agentLaunchConfigByPaneKey[paneKey] = {
+      launchConfig: { agentArgs: '', agentEnv: {} },
+      identity: { agentType: 'droid' }
+    }
+    mockStoreState.clearAgentLaunchConfig.mockImplementation((key: string) => {
+      delete mockStoreState.agentLaunchConfigByPaneKey[key]
+    })
+
+    dataCallbackRef.current?.('\x1b]133;D;0\x07')
+    await vi.advanceTimersByTimeAsync(350)
+    expect(mockStoreState.clearAgentLaunchConfig).toHaveBeenCalledExactlyOnceWith(paneKey)
+    expect(mockStoreState.paneForegroundAgentByPaneKey[paneKey]).toEqual({
+      agent: null,
+      shellForeground: true
+    })
+    expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, paneKey)).toBe('alt-enter')
+  })
+
+  it('retires stale routing after unavailable command-finish reads without asserting shell', async () => {
+    vi.useFakeTimers()
+    const { connectPanePty } = await import('./pty-connection')
+    vi.mocked(window.api.pty.confirmForegroundProcess).mockResolvedValue(null)
+    const dataCallbackRef: { current: ((data: string) => void) | null } = { current: null }
+    const ptyId = 'pty-droid-unavailable-finish'
+    const tabId = 'tab-droid-unavailable-finish'
+    const transport = createMockTransport(ptyId)
+    transport.connect.mockImplementation(async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+      dataCallbackRef.current = callbacks.onData ?? null
+      return { id: ptyId }
+    })
+    transportFactoryQueue.push(transport)
+    const paneKey = makePaneKey(tabId, LEAF_1)
+
+    connectPanePty(
+      createPane(1) as never,
+      createManager(1) as never,
+      createDeps({ tabId, isVisibleRef: { current: false } }) as never
+    )
+    await vi.advanceTimersByTimeAsync(20)
+    await flushAsyncTicks()
+    mockStoreState.agentLaunchConfigByPaneKey[paneKey] = {
+      launchConfig: { agentArgs: '', agentEnv: {} },
+      identity: { agentType: 'droid' }
+    }
+    mockStoreState.clearAgentLaunchConfig.mockImplementation((key: string) => {
+      delete mockStoreState.agentLaunchConfigByPaneKey[key]
+    })
+
+    dataCallbackRef.current?.('\x1b]133;D;0\x07')
+    await vi.advanceTimersByTimeAsync(350 + 1200 + 6000)
+
+    expect(mockStoreState.clearAgentLaunchConfig).toHaveBeenCalledExactlyOnceWith(paneKey)
+    expect(mockStoreState.paneForegroundAgentByPaneKey[paneKey]).toEqual({
+      agent: null,
+      shellForeground: false
+    })
+    expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, paneKey)).toBe('alt-enter')
+  })
+
+  it('cancels deferred cleanup on a new command and retires identity at its later shell', async () => {
+    vi.useFakeTimers()
+    const { connectPanePty } = await import('./pty-connection')
+    vi.mocked(window.api.pty.confirmForegroundProcess).mockResolvedValue('powershell.exe')
+    const dataCallbackRef: { current: ((data: string) => void) | null } = { current: null }
+    const ptyId = 'pty-droid-superseded-confirmation'
+    const transport = createMockTransport(ptyId)
+    transport.connect.mockImplementation(async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+      dataCallbackRef.current = callbacks.onData ?? null
+      return { id: ptyId }
+    })
+    transportFactoryQueue.push(transport)
+    const paneKey = makePaneKey('tab-1', LEAF_1)
+    connectPanePty(
+      createPane(1) as never,
+      createManager(1) as never,
+      createDeps({ isVisibleRef: { current: false } }) as never
+    )
+    await vi.advanceTimersByTimeAsync(20)
+    await flushAsyncTicks()
+    mockStoreState.agentLaunchConfigByPaneKey[paneKey] = {
+      launchConfig: { agentArgs: '', agentEnv: {} },
+      identity: { agentType: 'droid' }
+    }
+    mockStoreState.clearAgentLaunchConfig.mockImplementation((key: string) => {
+      delete mockStoreState.agentLaunchConfigByPaneKey[key]
+    })
+
+    dataCallbackRef.current?.('\x1b]133;D;0\x07')
+    dataCallbackRef.current?.('\x1b]133;C\x07')
+    expect(mockStoreState.clearAgentLaunchConfig).not.toHaveBeenCalled()
+    expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, paneKey)).toBe('alt-enter')
+
+    dataCallbackRef.current?.('\x1b]133;D;0\x07')
+    await vi.advanceTimersByTimeAsync(350 + 1200 + 6000)
+
+    expect(mockStoreState.clearAgentLaunchConfig).toHaveBeenCalledExactlyOnceWith(paneKey)
+    expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, paneKey)).toBe('alt-enter')
   })
 
   it('flushes pending interrupt inference before dropping an exited foreground agent command', async () => {
@@ -16966,6 +17406,8 @@ describe('connectPanePty', () => {
 
   describe('visible foreground agent sampling (perf)', () => {
     const VISIBLE_PTY_SETTLE_MS = 350
+    const WRAPPER_RESOLVE_RETRY_MS = 1200
+    const SECOND_WRAPPER_RETRY_MS = 6000
 
     // Why: every connectPanePty binding in this file shares the tab-1/LEAF_1 pane
     // key, and an undisposed reattach binding elsewhere can resolve a foreground
@@ -16976,9 +17418,19 @@ describe('connectPanePty', () => {
         ptyId?: string
         tabId?: string
         isVisibleRef?: { current: boolean }
+        launchConfig?: {
+          agentCommand?: string
+          agentArgs: string
+          agentEnv: Record<string, string>
+        }
+        launchAgent?: TuiAgent
       } = {}
     ): Promise<{
-      binding: { noteVisibilityResume: () => void }
+      binding: {
+        noteVisibilityResume: () => void
+        sampleForegroundAgentOnFocus: () => void
+        requestDroidReconfirmation: () => void
+      }
       deps: ReturnType<typeof createDeps>
       transport: MockTransport
       cacheKey: string
@@ -16986,9 +17438,19 @@ describe('connectPanePty', () => {
       const { connectPanePty } = await import('./pty-connection')
       const ptyId = args.ptyId ?? 'tab-pty'
       const tabId = args.tabId ?? `tab-${ptyId}`
-      const transport = createMockTransport(ptyId)
+      const hasReattachMetadata = args.launchConfig !== undefined || args.launchAgent !== undefined
+      const transport = createMockTransport(hasReattachMetadata ? null : ptyId)
+      let connectedPtyId: string | null = hasReattachMetadata ? null : ptyId
+      transport.getPtyId.mockImplementation(() => connectedPtyId)
       transport.connect.mockImplementation(async ({ sessionId }: { sessionId?: string }) => {
-        return sessionId ? { id: sessionId } : null
+        connectedPtyId = sessionId ?? null
+        return sessionId
+          ? {
+              id: sessionId,
+              ...(args.launchConfig ? { launchConfig: args.launchConfig } : {}),
+              ...(args.launchAgent ? { launchAgent: args.launchAgent } : {})
+            }
+          : null
       })
       transportFactoryQueue.push(transport)
       const deps = createDeps({
@@ -17001,7 +17463,11 @@ describe('connectPanePty', () => {
         createPane(1) as never,
         createManager(1) as never,
         deps as never
-      ) as unknown as { noteVisibilityResume: () => void }
+      ) as unknown as {
+        noteVisibilityResume: () => void
+        sampleForegroundAgentOnFocus: () => void
+        requestDroidReconfirmation: () => void
+      }
       await vi.advanceTimersByTimeAsync(20)
       await flushAsyncTicks(20)
       return { binding, deps, transport, cacheKey: makePaneKey(tabId, LEAF_1) }
@@ -17084,6 +17550,92 @@ describe('connectPanePty', () => {
       expect(foregroundReadCallsFor(ptyId)).toHaveLength(0)
     })
 
+    it('does not confirm foreground routing for a Windows WSL pane', async () => {
+      vi.useFakeTimers()
+      const restoreUserAgent = temporarilySetNavigatorUserAgent(
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+      )
+      const ptyId = 'pty-wsl-no-confirm'
+      const tabId = `tab-${ptyId}`
+      mockStoreState.tabsByWorktree = {
+        'wt-1': [{ id: tabId, ptyId, shellOverride: 'wsl.exe' }]
+      }
+
+      try {
+        const { binding, cacheKey } = await connectRestoredPaneForForegroundSampling({
+          ptyId,
+          tabId
+        })
+        mockStoreState.paneForegroundAgentByPaneKey[cacheKey] = {
+          agent: 'droid',
+          routingTrusted: true,
+          shellForeground: false
+        }
+
+        binding.sampleForegroundAgentOnFocus()
+        await vi.advanceTimersByTimeAsync(10_000)
+
+        expect(window.api.pty.confirmForegroundProcess).not.toHaveBeenCalled()
+      } finally {
+        restoreUserAgent()
+      }
+    })
+
+    it('keeps trusted Droid routing through a rapid Shift+Enter burst', async () => {
+      vi.useFakeTimers()
+      const ptyId = 'pty-droid-shift-enter-burst'
+      const tabId = `tab-${ptyId}`
+      const { binding, cacheKey } = await connectRestoredPaneForForegroundSampling({
+        ptyId,
+        tabId
+      })
+      mockStoreState.paneForegroundAgentByPaneKey[cacheKey] = {
+        agent: 'droid',
+        routingTrusted: true,
+        shellForeground: false
+      }
+      mockStoreState.agentStatusByPaneKey[cacheKey] = {
+        state: 'working',
+        agentType: 'droid'
+      }
+      vi.mocked(window.api.pty.confirmForegroundProcess).mockResolvedValue('droid')
+
+      binding.requestDroidReconfirmation()
+      await vi.advanceTimersByTimeAsync(200)
+      binding.requestDroidReconfirmation()
+      await vi.advanceTimersByTimeAsync(349)
+
+      expect(mockStoreState.paneForegroundAgentByPaneKey[cacheKey]).toEqual({
+        agent: 'droid',
+        routingTrusted: true,
+        shellForeground: false
+      })
+
+      await vi.advanceTimersByTimeAsync(1)
+      expect(mockStoreState.paneForegroundAgentByPaneKey[cacheKey]).toEqual({
+        agent: 'droid',
+        shellForeground: false
+      })
+
+      await vi.advanceTimersByTimeAsync(350)
+      await flushAsyncTicks()
+      expect(window.api.pty.confirmForegroundProcess).toHaveBeenCalledWith(ptyId)
+      expect(mockStoreState.paneForegroundAgentByPaneKey[cacheKey]).toEqual({
+        agent: 'droid',
+        routingTrusted: true,
+        shellForeground: false
+      })
+
+      binding.requestDroidReconfirmation()
+      await vi.advanceTimersByTimeAsync(700)
+      await flushAsyncTicks()
+      expect(mockStoreState.paneForegroundAgentByPaneKey[cacheKey]).toEqual({
+        agent: 'droid',
+        routingTrusted: true,
+        shellForeground: false
+      })
+    })
+
     it('samples once when an identityless hidden pane resumes visible', async () => {
       vi.useFakeTimers()
       const getForegroundProcess = vi.mocked(window.api.pty.getForegroundProcess)
@@ -17101,20 +17653,162 @@ describe('connectPanePty', () => {
       expect(foregroundReadCallsFor(ptyId)).toEqual([[ptyId]])
     })
 
-    it('does not sample when launch metadata already supplies tab identity', async () => {
+    it('confirms daemon launch identity before restoring warm-reattach routing', async () => {
       vi.useFakeTimers()
-      const getForegroundProcess = vi.mocked(window.api.pty.getForegroundProcess)
-      getForegroundProcess.mockResolvedValue('codex')
+      vi.mocked(window.api.pty.confirmForegroundProcess).mockResolvedValue('droid')
       const ptyId = 'pty-launch-identity-no-sample'
       const tabId = `tab-${ptyId}`
-      mockStoreState.tabsByWorktree = {
-        'wt-1': [{ id: tabId, ptyId, launchAgent: 'codex' }]
-      }
+      mockStoreState.tabsByWorktree = { 'wt-1': [{ id: tabId, ptyId }] }
 
-      await connectRestoredPaneForForegroundSampling({ ptyId, tabId })
+      const { cacheKey } = await connectRestoredPaneForForegroundSampling({
+        ptyId,
+        tabId,
+        launchAgent: 'droid'
+      })
+      expect(mockStoreState.registerAgentLaunchConfig).not.toHaveBeenCalled()
+      expect(mockStoreState.paneForegroundAgentByPaneKey[cacheKey]).toEqual({
+        agent: 'droid',
+        shellForeground: false
+      })
+      expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, cacheKey)).toBe('alt-enter')
+
       await advanceVisibleForegroundRead()
 
-      expect(foregroundReadCallsFor(ptyId)).toHaveLength(0)
+      expect(mockStoreState.paneForegroundAgentByPaneKey[cacheKey]).toEqual({
+        agent: 'droid',
+        routingTrusted: true,
+        shellForeground: false
+      })
+      expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, cacheKey)).toBe('csi-u')
+    })
+
+    it('retires stale daemon launch identity when warm reattach finds the shell', async () => {
+      vi.useFakeTimers()
+      vi.mocked(window.api.pty.confirmForegroundProcess).mockResolvedValue('powershell.exe')
+      const ptyId = 'pty-stale-daemon-launch-identity'
+      const tabId = `tab-${ptyId}`
+      mockStoreState.tabsByWorktree = { 'wt-1': [{ id: tabId, ptyId }] }
+
+      const { cacheKey } = await connectRestoredPaneForForegroundSampling({
+        ptyId,
+        tabId,
+        launchAgent: 'droid'
+      })
+      expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, cacheKey)).toBe('alt-enter')
+
+      await vi.advanceTimersByTimeAsync(
+        VISIBLE_PTY_SETTLE_MS + WRAPPER_RESOLVE_RETRY_MS + SECOND_WRAPPER_RETRY_MS
+      )
+      await flushAsyncTicks()
+
+      expect(window.api.pty.confirmForegroundProcess).toHaveBeenCalledTimes(3)
+      expect(mockStoreState.paneForegroundAgentByPaneKey[cacheKey]).toEqual({
+        agent: null,
+        shellForeground: true
+      })
+      expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, cacheKey)).toBe('alt-enter')
+    })
+
+    it('fails closed when a warm reattach has no persisted launch identity', async () => {
+      vi.useFakeTimers()
+      const ptyId = 'pty-reattach-missing-launch-identity'
+      const tabId = `tab-${ptyId}`
+
+      const { cacheKey } = await connectRestoredPaneForForegroundSampling({
+        ptyId,
+        tabId,
+        isVisibleRef: { current: false }
+      })
+
+      expect(mockStoreState.paneForegroundAgentByPaneKey[cacheKey]).toBeUndefined()
+      expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, cacheKey)).toBe('alt-enter')
+    })
+
+    it('does not let persisted args spoof pane identity without an allowlisted command', async () => {
+      vi.useFakeTimers()
+      const ptyId = 'pty-unknown-persisted-launch'
+      const tabId = `tab-${ptyId}`
+      mockStoreState.tabsByWorktree = { 'wt-1': [{ id: tabId, ptyId }] }
+      mockStoreState.registerAgentLaunchConfig.mockImplementation(
+        (key: string, launchConfig: unknown, identity: { agentType?: string }): void => {
+          mockStoreState.agentLaunchConfigByPaneKey[key] = { launchConfig, identity }
+        }
+      )
+
+      const { cacheKey } = await connectRestoredPaneForForegroundSampling({
+        ptyId,
+        tabId,
+        isVisibleRef: { current: false },
+        launchConfig: {
+          agentCommand: 'custom-wrapper --agent droid',
+          agentArgs: 'droid',
+          agentEnv: {}
+        }
+      })
+      await vi.advanceTimersByTimeAsync(300)
+      await flushAsyncTicks(20)
+
+      expect(
+        mockStoreState.agentLaunchConfigByPaneKey[cacheKey]?.identity?.agentType
+      ).toBeUndefined()
+      expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, cacheKey)).toBe('alt-enter')
+    })
+
+    it('does not re-scan stale launch metadata after the local ladder confirms shell', async () => {
+      vi.useFakeTimers()
+      const getForegroundProcess = vi.mocked(window.api.pty.getForegroundProcess)
+      getForegroundProcess.mockResolvedValue('powershell.exe')
+      const isVisibleRef = { current: false }
+      const ptyId = 'pty-stale-launch-shell-settled'
+      const tabId = `tab-${ptyId}`
+      mockStoreState.tabsByWorktree = {
+        'wt-1': [{ id: tabId, ptyId, launchAgent: 'droid' }]
+      }
+      mockStoreState.registerAgentLaunchConfig.mockImplementation(
+        (key: string, launchConfig: unknown, identity: { agentType?: string }): void => {
+          mockStoreState.agentLaunchConfigByPaneKey[key] = { launchConfig, identity }
+        }
+      )
+      mockStoreState.clearAgentLaunchConfig.mockImplementation((key: string) => {
+        delete mockStoreState.agentLaunchConfigByPaneKey[key]
+      })
+
+      const { binding, cacheKey } = await connectRestoredPaneForForegroundSampling({
+        ptyId,
+        tabId,
+        isVisibleRef,
+        launchConfig: { agentCommand: 'droid', agentArgs: '', agentEnv: {} }
+      })
+      await vi.advanceTimersByTimeAsync(300)
+      await flushAsyncTicks(20)
+      // Launch metadata starts confirmation but is never byte-routing authority.
+      expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, cacheKey)).toBe('alt-enter')
+      isVisibleRef.current = true
+      binding.noteVisibilityResume()
+      await advanceVisibleForegroundRead()
+      await vi.advanceTimersByTimeAsync(WRAPPER_RESOLVE_RETRY_MS)
+      await vi.advanceTimersByTimeAsync(SECOND_WRAPPER_RETRY_MS)
+
+      expect(foregroundReadCallsFor(ptyId).length).toBeGreaterThanOrEqual(3)
+      expect(mockStoreState.paneForegroundAgentByPaneKey[cacheKey]).toEqual({
+        agent: null,
+        shellForeground: true
+      })
+      expect(mockStoreState.clearAgentLaunchConfig).toHaveBeenCalledWith(cacheKey)
+
+      mockStoreState.paneForegroundAgentByPaneKey[cacheKey] = {
+        agent: null,
+        shellForeground: false
+      }
+      expect(resolveMockPaneWindowsShiftEnterEncoding(mockStoreState, cacheKey)).toBe('alt-enter')
+
+      vi.clearAllTimers()
+      const settledReadCount = foregroundReadCallsFor(ptyId).length
+      binding.sampleForegroundAgentOnFocus()
+      await vi.advanceTimersByTimeAsync(
+        VISIBLE_PTY_SETTLE_MS + WRAPPER_RESOLVE_RETRY_MS + SECOND_WRAPPER_RETRY_MS
+      )
+      expect(foregroundReadCallsFor(ptyId)).toHaveLength(settledReadCount)
     })
 
     it('does not sample when a live hook row already supplies pane identity', async () => {
@@ -17142,6 +17836,7 @@ describe('connectPanePty', () => {
       const tabId = `tab-${ptyId}`
       mockStoreState.paneForegroundAgentByPaneKey[makePaneKey(tabId, LEAF_1)] = {
         agent: 'codex',
+        routingTrusted: true,
         shellForeground: false
       }
 
@@ -17168,10 +17863,7 @@ describe('connectPanePty', () => {
       expect(foregroundReadCallsFor(ptyId)).toHaveLength(0)
     })
 
-    it('re-samples a shell-marked pane a launch agent still owns', async () => {
-      // Why: a reattach or a full-screen agent's leaked nested-shell 133;D leaves
-      // shellForeground on a launchAgent pane, suppressing its icon. The launch
-      // metadata means an agent is expected, so re-read to recover its identity.
+    it('does not re-sample a shell-confirmed pane from stale launch metadata', async () => {
       vi.useFakeTimers()
       const getForegroundProcess = vi.mocked(window.api.pty.getForegroundProcess)
       getForegroundProcess.mockResolvedValue('codex')
@@ -17188,19 +17880,17 @@ describe('connectPanePty', () => {
       const { cacheKey } = await connectRestoredPaneForForegroundSampling({ ptyId, tabId })
       await advanceVisibleForegroundRead()
 
-      expect(foregroundReadCallsFor(ptyId)).toEqual([[ptyId]])
-      expect(mockStoreState.setPaneForegroundAgent).toHaveBeenCalledWith(cacheKey, {
-        agent: 'codex',
-        shellForeground: false
-      })
+      expect(foregroundReadCallsFor(ptyId)).toHaveLength(0)
+      expect(mockStoreState.setPaneForegroundAgent).not.toHaveBeenCalledWith(
+        cacheKey,
+        expect.anything()
+      )
     })
 
-    it('re-confirms rather than trusting a leaked 133;D that races the recovery read', async () => {
-      // Why: an idle reattached agent (no launchAgent/hook/title) schedules the
-      // visible-pty recovery read. A full-screen agent's nested shell then leaks a
-      // 133;D onto the main PTY. Trusting that D would mark the pane shell-
-      // foreground and the sample gate would latch it, hiding the agent icon
-      // forever — instead the leak must re-confirm the foreground.
+    it('fails closed when a leaked 133;D cancels identityless recovery', async () => {
+      // Why: a cached visible read has no routing authority. If a command
+      // boundary races it without an agent hint, cancel the sample and trust
+      // the shell marker instead of promoting stale process identity.
       vi.useFakeTimers()
       const { connectPanePty } = await import('./pty-connection')
       const getForegroundProcess = vi.mocked(window.api.pty.getForegroundProcess)
@@ -17230,12 +17920,58 @@ describe('connectPanePty', () => {
 
       await advanceVisibleForegroundRead()
 
+      expect(mockStoreState.setPaneForegroundAgent).toHaveBeenCalledWith(cacheKey, {
+        agent: null,
+        shellForeground: true
+      })
+      expect(foregroundReadCallsFor(ptyId)).toHaveLength(0)
+    })
+
+    it('re-confirms leaked 133;D after detach moved pane-scoped Droid identity', async () => {
+      vi.useFakeTimers()
+      const { connectPanePty } = await import('./pty-connection')
+      const getForegroundProcess = vi.mocked(window.api.pty.getForegroundProcess)
+      getForegroundProcess.mockResolvedValue('droid')
+      const ptyId = 'pty-detached-droid-leaked-d'
+      const tabId = 'tab-detached-droid'
+      const cacheKey = makePaneKey(tabId, LEAF_1)
+      const dataCallbackRef: { current: ((data: string) => void) | null } = { current: null }
+      const transport = createMockTransport(ptyId)
+      transport.connect.mockImplementation(
+        async ({ sessionId, callbacks }: { sessionId?: string; callbacks?: ConnectCallbacks }) => {
+          dataCallbackRef.current = callbacks?.onData ?? null
+          return sessionId ? { id: sessionId } : null
+        }
+      )
+      transportFactoryQueue.push(transport)
+      mockStoreState.paneForegroundAgentByPaneKey[cacheKey] = {
+        agent: 'droid',
+        shellForeground: false
+      }
+      mockStoreState.agentLaunchConfigByPaneKey[cacheKey] = {
+        launchConfig: { agentArgs: '', agentEnv: {} },
+        identity: { agentType: 'droid' }
+      }
+      const deps = createDeps({
+        tabId,
+        restoredLeafId: LEAF_1,
+        restoredPtyIdByLeafId: { [LEAF_1]: ptyId }
+      })
+
+      connectPanePty(createPane(1) as never, createManager(1) as never, deps as never)
+      await vi.advanceTimersByTimeAsync(20)
+      await flushAsyncTicks(20)
+      dataCallbackRef.current?.('\x1b]133;D;0\x07')
+      await advanceVisibleForegroundRead()
+
+      expect(foregroundReadCallsFor(ptyId)).toEqual([[ptyId]])
       expect(mockStoreState.setPaneForegroundAgent).not.toHaveBeenCalledWith(cacheKey, {
         agent: null,
         shellForeground: true
       })
       expect(mockStoreState.setPaneForegroundAgent).toHaveBeenCalledWith(cacheKey, {
-        agent: 'codex',
+        agent: 'droid',
+        routingTrusted: true,
         shellForeground: false
       })
     })

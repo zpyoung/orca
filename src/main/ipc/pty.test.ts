@@ -555,6 +555,7 @@ describe('registerPtyHandlers', () => {
       acknowledgeDataEvent: vi.fn(),
       hasChildProcesses: vi.fn(),
       getForegroundProcess: vi.fn(),
+      confirmForegroundProcess: vi.fn(),
       serialize: vi.fn(),
       revive: vi.fn(),
       onData: vi.fn(() => () => {}),
@@ -596,6 +597,7 @@ describe('registerPtyHandlers', () => {
       acknowledgeDataEvent: vi.fn(),
       hasChildProcesses: vi.fn(),
       getForegroundProcess: vi.fn(),
+      confirmForegroundProcess: vi.fn(),
       serialize: vi.fn(),
       revive: vi.fn(),
       onData: vi.fn((handler: (payload: { id: string; data: string }) => void) => {
@@ -3973,6 +3975,7 @@ describe('registerPtyHandlers', () => {
       listProcesses: vi.fn(),
       hasChildProcesses: vi.fn(),
       getForegroundProcess: vi.fn(),
+      confirmForegroundProcess: vi.fn(),
       serialize: vi.fn(),
       revive: vi.fn(),
       getDefaultShell: vi.fn(),
@@ -4034,6 +4037,7 @@ describe('registerPtyHandlers', () => {
       listProcesses: vi.fn(),
       hasChildProcesses: vi.fn(),
       getForegroundProcess: vi.fn(),
+      confirmForegroundProcess: vi.fn(),
       serialize: vi.fn(),
       revive: vi.fn(),
       getDefaultShell: vi.fn(),
@@ -4050,8 +4054,12 @@ describe('registerPtyHandlers', () => {
     await expect(
       handlers.get('pty:getForegroundProcess')!(null, { id: 'remote-pty' })
     ).resolves.toBeNull()
+    await expect(
+      handlers.get('pty:confirmForegroundProcess')!(null, { id: 'remote-pty' })
+    ).resolves.toBeNull()
     expect(provider.hasChildProcesses).not.toHaveBeenCalled()
     expect(provider.getForegroundProcess).not.toHaveBeenCalled()
+    expect(provider.confirmForegroundProcess).not.toHaveBeenCalled()
   })
 
   // Why: regression for the Claude-Code split-pane garbled-render desync. resize

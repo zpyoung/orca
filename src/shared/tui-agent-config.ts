@@ -63,6 +63,9 @@ export type TuiAgentConfig = {
    * `›` prompt only when the composer row exists, so Orca can paste as soon
    * as that prompt appears after bracketed paste is enabled. */
   draftPasteReadySignal?: DraftPasteReadySignal
+  /** Windows Shift+Enter override. Omitted agents keep the legacy Esc+CR path
+   * because the renderer cannot infer every local or remote TUI's decoder. */
+  windowsShiftEnterEncoding?: 'csi-u'
 }
 
 export const TUI_AGENT_CONFIG: Record<TuiAgent, TuiAgentConfig> = {
@@ -281,7 +284,10 @@ export const TUI_AGENT_CONFIG: Record<TuiAgent, TuiAgentConfig> = {
     detectCmd: 'droid',
     launchCmd: 'droid',
     expectedProcess: 'droid',
-    promptInjectionMode: 'argv'
+    promptInjectionMode: 'argv',
+    // Why: Droid decodes CSI-u on Windows and treats Orca's legacy Esc+CR
+    // fallback as plain Enter, which submits instead of inserting a newline.
+    windowsShiftEnterEncoding: 'csi-u'
   },
   kimi: {
     detectCmd: 'kimi',

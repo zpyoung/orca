@@ -58,7 +58,10 @@ vi.mock('./windows-powershell-executable', () => ({
 }))
 
 vi.mock('./agent-foreground-process', () => ({
-  resolveAgentForegroundProcess: resolveAgentForegroundProcessMock
+  resolveAgentForegroundProcessWithAvailability: async (...args: unknown[]) => ({
+    available: true,
+    processName: await resolveAgentForegroundProcessMock(...args)
+  })
 }))
 
 vi.mock('../wsl', () => ({
@@ -1036,6 +1039,24 @@ describe('LocalPtyProvider', () => {
 
     it('returns null for unknown PTY ids', async () => {
       expect(await provider.getForegroundProcess('nonexistent')).toBeNull()
+    })
+  })
+
+  describe('confirmForegroundProcess', () => {
+    it('drops a delayed result after the PTY exits', async () => {
+      let resolveScan!: (processName: string) => void
+      resolveAgentForegroundProcessMock.mockReturnValue(
+        new Promise<string>((resolve) => {
+          resolveScan = resolve
+        })
+      )
+      const { id } = await provider.spawn({ cols: 80, rows: 24 })
+
+      const confirmation = provider.confirmForegroundProcess(id)
+      exitCb?.({ exitCode: 0 })
+      resolveScan('droid')
+
+      await expect(confirmation).resolves.toBeNull()
     })
   })
 

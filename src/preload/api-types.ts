@@ -1231,6 +1231,7 @@ export type PreloadApi = {
       telemetry?: { agent_kind: AgentKind; launch_source: LaunchSource; request_kind: RequestKind }
     }) => Promise<{
       id: string
+      launchAgent?: TuiAgent
       launchConfig?: SleepingAgentLaunchConfig
       snapshot?: string
       snapshotCols?: number
@@ -1280,6 +1281,7 @@ export type PreloadApi = {
     publishTerminalViewAttributes: (attributes: TerminalViewAttributes) => void
     hasChildProcesses: (id: string) => Promise<boolean>
     getForegroundProcess: (id: string) => Promise<string | null>
+    confirmForegroundProcess: (id: string) => Promise<string | null>
     getCwd: (id: string) => Promise<string>
     getSize: (id: string) => Promise<{ cols: number; rows: number } | null>
     listSessions: () => Promise<{ id: string; cwd: string; title: string }[]>

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-09",
+  "updatedAt": "2026-07-10",
   "policy": {
     "maturityLevels": [
       "experimental",
@@ -1810,6 +1810,258 @@
         "Real Windows ConPTY execution is not covered by macOS/Linux CI."
       ],
       "demotionRule": "Cannot promote if standard-key behavior is inferred without PTY byte evidence."
+    },
+    {
+      "id": "terminal-input.windows-modified-enter-routing",
+      "title": "Windows modified Enter routes agent-compatible bytes to the active pane",
+      "maturity": "experimental",
+      "protection": "partial",
+      "owner": "terminal-input",
+      "layer": "main-provider-renderer-unit-and-windows-electron",
+      "surfaces": [
+        "terminal input",
+        "Windows modified Enter",
+        "agent identity",
+        "split panes",
+        "SSH",
+        "WSL",
+        "remote runtime"
+      ],
+      "platforms": [
+        "macos",
+        "linux",
+        "windows"
+      ],
+      "providers": [
+        "local",
+        "daemon",
+        "ssh",
+        "wsl",
+        "remote-runtime"
+      ],
+      "coveredPlatforms": [
+        "macos"
+      ],
+      "coveredProviders": [],
+      "coverageNotes": "Deterministic main/renderer tests run on macOS and exercise simulated Windows plus POSIX/Linux process-confirmation behavior. They cover exact local-ConPTY membership, detached-child rejection, unchanged SSH/WSL/remote fallback, process-confirmed Droid routing and launch-triggered confirmation, typed-alias and forged-OSC isolation, shells without OSC 133, split/detach ownership with preserved shell classification, stale PTY exit/rebind rejection, command-generation revocation, daemon v21 warm-reattach identity, unavailable inspection, and lazy subprocess/RPC callback counts. The Electron byte test runs only on Windows; live Windows and Linux PTY evidence remains uncollected. Test failures report exact expected bytes; no product telemetry or raw terminal logging is added.",
+      "motivatingLinks": [
+        "https://github.com/stablyai/orca/issues/7620",
+        "https://github.com/stablyai/orca/pull/7668"
+      ],
+      "invariant": "Shift+Enter sends CSI-u only when the active pane is a genuine local Windows ConPTY with allowlisted Droid ownership or fresh routing-trusted Droid process evidence. Every new command and PTY replacement revokes stale routing until current evidence settles. All other Windows panes preserve Esc+CR; non-Windows panes remain CSI-u; SSH/WSL/remote behavior is unchanged; split or reused panes cannot inherit sibling or prior-PTY authority; unrelated keys perform no agent or ConPTY lookup.",
+      "oracle": "Main/renderer tests assert exact bytes for local and non-local Windows plus non-Windows policy cells. Fresh Windows process evidence authorizes bytes only after a recognized global candidate is intersected with the exact ConPTY console process list; detached descendants, helper failure/timeout/root-only fallback, stale PTY exit/rebind results, typed text, and hook/OSC output fail closed. A new OSC 133;C immediately publishes a routing-neutral generation, including during D-to-C races. In cmd.exe/Git Bash/custom shells without OSC 133, accepted inferred commands start the same fresh generation; accepted submit/interrupt, title exit, focus, and visibility revoke trusted Droid bytes while one bounded confirmation runs. Detach preserves the live PTY's source shell override so WSL/native classification cannot change with the current default. Ordinary fast shell commands use cached/no-scan paths; routing-relevant confirmation bypasses cached process snapshots and keeps the bounded three-read ladder. Daemon protocol v21 persists only an allowlisted launchAgent; warm reattach uses it as a display/confirmation hint and restores routing only after current process proof. The Windows Electron test focuses the real xterm textarea and records exact renderer-to-main PTY writes.",
+      "commands": [
+        "pnpm exec vitest run --config config/vitest.config.ts src/main/daemon/daemon-foreground-confirmation-protocol.test.ts src/main/daemon/daemon-pty-adapter.test.ts src/main/daemon/daemon-pty-router.test.ts src/main/daemon/daemon-server.test.ts src/main/daemon/degraded-daemon-pty-provider.test.ts src/main/daemon/pty-subprocess-foreground-scan-cadence.test.ts src/main/daemon/pty-subprocess.test.ts src/main/ipc/pty.test.ts src/main/providers/agent-foreground-process.test.ts src/main/providers/local-pty-provider.test.ts src/main/providers/windows-conpty-process-membership.test.ts src/renderer/src/components/terminal-pane/pane-foreground-agent-tracker.test.ts src/renderer/src/components/terminal-pane/pty-connection.test.ts src/renderer/src/components/terminal-pane/pty-transport.test.ts src/renderer/src/components/terminal-pane/terminal-pane-tab-detach.test.ts src/renderer/src/components/terminal-pane/terminal-shortcut-policy.test.ts src/renderer/src/components/terminal-pane/terminal-windows-shift-enter.test.ts src/renderer/src/store/slices/store-cascades.test.ts src/renderer/src/store/slices/terminal-pane-detach-agent-identity.test.ts src/shared/agent-process-recognition.test.ts src/shared/process-table-snapshot.test.ts tests/e2e/terminal-foreground-confirmation.unit.test.ts",
+        "pnpm run test:e2e -- tests/e2e/terminal-shortcuts.spec.ts"
+      ],
+      "testFiles": [
+        "src/main/daemon/daemon-foreground-confirmation-protocol.test.ts",
+        "src/main/daemon/daemon-pty-adapter.test.ts",
+        "src/main/daemon/daemon-pty-router.test.ts",
+        "src/main/daemon/daemon-server.test.ts",
+        "src/main/daemon/degraded-daemon-pty-provider.test.ts",
+        "src/main/daemon/pty-subprocess-foreground-scan-cadence.test.ts",
+        "src/main/daemon/pty-subprocess.test.ts",
+        "src/main/ipc/pty.test.ts",
+        "src/main/providers/agent-foreground-process.test.ts",
+        "src/main/providers/local-pty-provider.test.ts",
+        "src/main/providers/windows-conpty-process-membership.test.ts",
+        "src/renderer/src/components/terminal-pane/pane-foreground-agent-tracker.test.ts",
+        "src/renderer/src/components/terminal-pane/pty-connection.test.ts",
+        "src/renderer/src/components/terminal-pane/pty-transport.test.ts",
+        "src/renderer/src/components/terminal-pane/terminal-pane-tab-detach.test.ts",
+        "src/renderer/src/components/terminal-pane/terminal-shortcut-policy.test.ts",
+        "src/renderer/src/components/terminal-pane/terminal-windows-shift-enter.test.ts",
+        "src/renderer/src/store/slices/store-cascades.test.ts",
+        "src/renderer/src/store/slices/terminal-pane-detach-agent-identity.test.ts",
+        "src/shared/agent-process-recognition.test.ts",
+        "src/shared/process-table-snapshot.test.ts",
+        "tests/e2e/terminal-foreground-confirmation.unit.test.ts",
+        "tests/e2e/terminal-shortcuts.spec.ts"
+      ],
+      "assertionRefs": [
+        {
+          "file": "src/shared/process-table-snapshot.test.ts",
+          "assertions": [
+            "a fresh request bypasses a same-tick TTL cache and any scan already in flight before the request",
+            "same-turn fresh requests and ordinary cache misses share one later scan while requests arriving after it starts queue behind it"
+          ]
+        },
+        {
+          "file": "src/main/providers/agent-foreground-process.test.ts",
+          "assertions": [
+            "successful root-present Windows enumeration and failed, blank, malformed, or root-missing enumeration remain distinct evidence states",
+            "an observed shell root with no children is authoritative while a snapshot omitting that root is unavailable",
+            "an attached Droid candidate is authorized only when exact ConPTY membership contains it, while a detached Start-Process descendant is rejected",
+            "a Windows process-table scan with no recognized agent performs zero ConPTY membership helper forks",
+            "fresh POSIX scan failure or a snapshot missing the PTY root is unavailable rather than shell proof",
+            "the compatibility process-name API still preserves its existing fallback contract for other consumers"
+          ]
+        },
+        {
+          "file": "src/main/providers/windows-conpty-process-membership.test.ts",
+          "assertions": [
+            "the fixed node-pty helper returns validated integer console membership containing the PTY root",
+            "root-only fallback, malformed/missing-root messages, spawn errors, and a silent helper timeout all fail closed",
+            "the bounded timeout kills the child helper exactly once"
+          ]
+        },
+        {
+          "file": "src/main/providers/local-pty-provider.test.ts",
+          "assertions": [
+            "a delayed foreground confirmation is discarded after the owning PTY exits"
+          ]
+        },
+        {
+          "file": "src/main/daemon/daemon-pty-adapter.test.ts",
+          "assertions": [
+            "new daemon sessions and warm reattach results carry the same minimal allowlisted launchAgent"
+          ]
+        },
+        {
+          "file": "src/main/daemon/daemon-server.test.ts",
+          "assertions": [
+            "daemon protocol v21 persists allowlisted launchAgent across reattach and drops unknown identity strings"
+          ]
+        },
+        {
+          "file": "src/main/daemon/pty-subprocess.test.ts",
+          "assertions": [
+            "Windows daemon foreground lookup can return PowerShell synchronously before async process-tree enrichment resolves the agent",
+            "the enriched agent result is served by a later foreground read",
+            "fresh confirmation awaits a post-request scan instead of serving cached PowerShell and returns null when inspection is unavailable"
+          ]
+        },
+        {
+          "file": "tests/e2e/terminal-foreground-confirmation.unit.test.ts",
+          "assertions": [
+            "the real daemon handle and pane tracker keep restored Droid identity when confirmation resolves after the old cache window",
+            "one fresh command-finish scan confirms real shell exit, while unavailable inspection performs exactly three bounded reads and never claims shell"
+          ]
+        },
+        {
+          "file": "src/renderer/src/components/terminal-pane/terminal-shortcut-policy.test.ts",
+          "assertions": [
+            "Windows defaults and non-Droid agents preserve Esc+CR while explicit Droid capability selects CSI-u",
+            "SSH, WSL, and remote Windows-client panes preserve Esc+CR without consulting the Droid capability",
+            "non-Windows Shift+Enter remains CSI-u and unrelated keys invoke neither agent nor ConPTY callbacks"
+          ]
+        },
+        {
+          "file": "src/renderer/src/components/terminal-pane/terminal-windows-shift-enter.test.ts",
+          "assertions": [
+            "only routing-trusted current process identity overrides launch evidence and confirmed shell foreground clears stale identity",
+            "a newer untrusted or neutral command generation blocks stale launch ownership until confirmation",
+            "only allowlisted fresh process or pane-scoped launch ownership selects Droid's CSI-u capability",
+            "forged hook or OSC-derived Droid status cannot change the Windows byte encoding",
+            "after split and original-pane close, a sole surviving sibling cannot inherit the original pane's Droid launch identity"
+          ]
+        },
+        {
+          "file": "src/renderer/src/components/terminal-pane/pane-foreground-agent-tracker.test.ts",
+          "assertions": [
+            "manual and restored local agent identity is published from bounded foreground-process reads",
+            "a delayed read cannot publish after the pane rebinds to a replacement PTY id",
+            "every new command publishes a routing-neutral generation before confirmation",
+            "typed agent text only widens the confirmation window and never becomes published or routable identity",
+            "unavailable typed-command confirmation stays on legacy routing through the three-read ladder and then fails closed",
+            "ordinary fast OSC 133;C-to-D command pairs publish shell without a fresh confirmation scan",
+            "command-start and visible launch recovery use at most three reads across the bounded 350 ms, 1.2 s, and 6 s ladder",
+            "null and rejected reads participate in the same bounded known-identity ladder",
+            "command-finished accepts one fresh recognized shell scan when agent evidence exists, while unavailable final evidence retires routing without claiming shell"
+          ]
+        },
+        {
+          "file": "src/renderer/src/components/terminal-pane/pty-connection.test.ts",
+          "assertions": [
+            "after detach remount, pane-key launch/process identity forces a leaked nested OSC 133;D through foreground confirmation",
+            "a still-running Droid process republishes Droid instead of being overwritten with shell-foreground evidence",
+            "typing droid does not route CSI-u until fresh process evidence confirms Droid",
+            "null and rejected command-start reads never promote typed Droid text to process evidence",
+            "typed Droid input cannot replace live Antigravity process or pane-scoped launch identity inside another TUI",
+            "typed Droid input on SSH or remote-runtime panes never writes local process evidence",
+            "Droid routing survives a fresh command-finish scan that still sees Droid and retires after one fresh shell result",
+            "a D-to-C transition immediately routes legacy bytes while the new command generation is pending",
+            "an identityless visible-read versus OSC 133;D race cancels stale sampling and fails closed to shell",
+            "a manually typed Droid in a shell without OSC 133 gains routing only after accepted-input fresh confirmation",
+            "accepted no-OSC exit or interrupt input immediately revokes trusted Droid bytes and confirms the returned shell",
+            "unavailable command-finish evidence resolves deferred cleanup, returns legacy routing, and does not assert shell foreground",
+            "daemon-returned allowlisted launchAgent requests warm-reattach confirmation without restoring stale byte authority or the original args/env payload, while missing identity fails closed",
+            "an unknown persisted wrapper cannot spoof launch identity and confirmed shell state prevents repeat focus scans"
+          ]
+        },
+        {
+          "file": "src/renderer/src/components/terminal-pane/pty-transport.test.ts",
+          "assertions": [
+            "allowlisted daemon launchAgent reaches PtyConnectResult on reattach",
+            "unknown launch identity is dropped at the renderer transport boundary"
+          ]
+        },
+        {
+          "file": "src/renderer/src/store/slices/terminal-pane-detach-agent-identity.test.ts",
+          "assertions": [
+            "pane-to-tab detach moves only the detached leaf's launch and process identity to its new pane key",
+            "pane-to-tab detach preserves the source PTY shell override across native PowerShell and WSL classifications",
+            "the source hook snapshot is retired rather than copied to a key the running PTY cannot emit",
+            "the detached Droid keeps CSI-u while the source sibling keeps its own legacy encoding"
+          ]
+        },
+        {
+          "file": "src/shared/agent-process-recognition.test.ts",
+          "assertions": [
+            "Droid's process name resolves to the allowlisted Droid agent identity without substring matching"
+          ]
+        },
+        {
+          "file": "tests/e2e/terminal-shortcuts.spec.ts",
+          "assertions": [
+            "on Windows the focused terminal sends CSI-u bytes for a Droid pane and Esc+CR bytes after switching that same pane to Antigravity identity",
+            "the byte oracle observes the real renderer-to-main PTY write path rather than terminal DOM state"
+          ]
+        }
+      ],
+      "evidenceRuns": [
+        {
+          "date": "2026-07-10",
+          "runner": "local",
+          "platform": "macos",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts src/main/daemon/daemon-foreground-confirmation-protocol.test.ts src/main/daemon/daemon-pty-adapter.test.ts src/main/daemon/daemon-pty-router.test.ts src/main/daemon/daemon-server.test.ts src/main/daemon/degraded-daemon-pty-provider.test.ts src/main/daemon/pty-subprocess-foreground-scan-cadence.test.ts src/main/daemon/pty-subprocess.test.ts src/main/ipc/pty.test.ts src/main/providers/agent-foreground-process.test.ts src/main/providers/local-pty-provider.test.ts src/main/providers/windows-conpty-process-membership.test.ts src/renderer/src/components/terminal-pane/pane-foreground-agent-tracker.test.ts src/renderer/src/components/terminal-pane/pty-connection.test.ts src/renderer/src/components/terminal-pane/pty-transport.test.ts src/renderer/src/components/terminal-pane/terminal-pane-tab-detach.test.ts src/renderer/src/components/terminal-pane/terminal-shortcut-policy.test.ts src/renderer/src/components/terminal-pane/terminal-windows-shift-enter.test.ts src/renderer/src/store/slices/store-cascades.test.ts src/renderer/src/store/slices/terminal-pane-detach-agent-identity.test.ts src/shared/agent-process-recognition.test.ts src/shared/process-table-snapshot.test.ts tests/e2e/terminal-foreground-confirmation.unit.test.ts",
+          "result": "passed",
+          "durationSeconds": 8.71,
+          "summary": "Twenty-two focused test files passed (1206 tests) on current main, covering fresh-scan ordering/deduplication, exact ConPTY membership and detached-child rejection, stale PTY guards, daemon v21 launch ownership with current-process confirmation, no-OSC command/exit recovery, preserved detach shell classification, unavailable evidence, routing-neutral command generations, exact shortcut bytes, and the composed daemon-plus-tracker contract; the Windows Electron byte test remains platform-gated and is not counted as local macOS evidence."
+        }
+      ],
+      "runtimeBudget": {
+        "p95Seconds": 90,
+        "scope": "focused renderer units plus the Windows Electron terminal-shortcut spec"
+      },
+      "flakeHistory": {
+        "status": "unknown",
+        "evidence": "The deterministic units are stable locally; the Windows-only Electron byte path needs CI or nightly soak history before promotion."
+      },
+      "redGreenEvidence": {
+        "status": "partial",
+        "evidence": "Reverting to the previous unconditional Windows Esc+CR branch fails the Droid byte assertion, while resolving launch metadata from any key other than the active pane fails the split-survivor isolation assertion. Saved intentional-break artifacts and live Windows history are still missing."
+      },
+      "performanceBudget": {
+        "required": true,
+        "evidence": "Callback-count tests prove unrelated ordinary keys invoke neither ConPTY nor agent resolution. Windows Shift+Enter performs two store reads: one local-ConPTY classification with an O(tabs-in-worktree) tab lookup, then two pane-keyed O(1) ownership lookups. Typed text performs no routing write. Ordinary fast OSC 133;C-to-D shell commands perform no fresh confirmation RPC or process scan. An accepted submit/interrupt while trusted Droid is current, a typed allowlisted agent command, title exit, focus, visibility transition, or an idle burst after trusted Droid Shift+Enter can schedule the bounded confirmation ladder; each event cancels/deduplicates prior work and no timer recurs after settling. Windows confirmation performs one fresh process-table scan and forks exact ConPTY membership only after a recognized agent candidate appears; no recognized candidate makes zero helper calls. Same-turn fresh requests share one scan and later arrivals queue at most one successor. Recovery remains three bounded one-shot reads (350 ms, 1.2 s, 6 s). No polling loop, provider fanout, persistent listener, hidden-pane wake loop, or per-printable-key work is added."
+      },
+      "promotionCriteria": [
+        "Run the exact PTY-byte Electron oracle on Windows without silent platform skips.",
+        "Collect stable runtime and flake history for local and daemon Windows ConPTY while retaining deterministic unchanged-provider assertions for SSH, WSL, and remote runtime.",
+        "Attach saved intentional-break evidence for Droid capability removal and split-sibling identity leakage."
+      ],
+      "knownGaps": [
+        "No Windows runner or live Linux PTY evidence is attached; the Electron byte test skips on macOS and Linux, while Linux behavior is covered only by deterministic POSIX unit paths.",
+        "Droid inside SSH, WSL, or remote-runtime intentionally keeps the pre-existing Windows-client Esc+CR behavior because local foreground confirmation is unavailable; this PR narrows the exception to issue #7620's local ConPTY surface.",
+        "The Electron test injects allowlisted pane identity rather than launching the real Droid and Antigravity binaries.",
+        "If both Windows process-enumeration backends remain unavailable through the bounded ladder, routing fails closed to the legacy Esc+CR path; no live Droid artifact covers that degraded host configuration.",
+        "Protocol v21 restarts older daemons because the minimal persisted launchAgent is a new contract; sessions preserved by pre-v21 daemons cannot supply warm-reattach launch ownership and fail closed until current process confirmation or restart.",
+        "No live daemon, SSH, WSL, remote-runtime, paired-web, or restore/replay byte artifact has been collected.",
+        "A running PTY keeps its spawn-time ORCA_PANE_KEY after pane-to-tab detach. This change transfers launch/process routing evidence and retires the stale hook snapshot, but does not redesign future hook reattribution across tab IDs."
+      ],
+      "demotionRule": "Keep non-blocking or demote to protection none if the Windows byte test silently skips, flakes without an actionable artifact, routes bytes using tab/title/terminal-output heuristics, or adds any ordinary-key lookup, IPC, polling, scan, or lifecycle leak."
     },
     {
       "id": "terminal-input.agent-prompt-injection",

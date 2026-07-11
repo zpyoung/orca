@@ -36,6 +36,7 @@ import {
   type ProcessedAgentStatusChunk
 } from '../../../../shared/agent-status-osc'
 import { extractIpcErrorMessage } from '@/lib/ipc-error'
+import { isTuiAgent } from '../../../../shared/tui-agent-config'
 
 // Re-export public API so existing consumers keep working.
 export {
@@ -725,6 +726,9 @@ export function createIpcPtyTransport(opts: IpcPtyTransportOptions = {}): PtyTra
           ...(telemetry ? { telemetry } : {})
         })
         const spawnResult = result as PtyConnectResult & { isReattach?: boolean }
+        const resultLaunchAgent = isTuiAgent(spawnResult.launchAgent)
+          ? spawnResult.launchAgent
+          : undefined
 
         // If destroyed while spawn was in flight, kill the new pty and bail
         if (destroyed) {
@@ -754,6 +758,7 @@ export function createIpcPtyTransport(opts: IpcPtyTransportOptions = {}): PtyTra
         if (spawnResult.isReattach || spawnResult.coldRestore || spawnResult.sessionExpired) {
           return {
             id: spawnResult.id,
+            ...(resultLaunchAgent ? { launchAgent: resultLaunchAgent } : {}),
             ...(spawnResult.launchConfig ? { launchConfig: spawnResult.launchConfig } : {}),
             snapshot: spawnResult.snapshot,
             snapshotCols: spawnResult.snapshotCols,
@@ -765,9 +770,10 @@ export function createIpcPtyTransport(opts: IpcPtyTransportOptions = {}): PtyTra
             pendingEscapeTailAnsi: spawnResult.pendingEscapeTailAnsi
           } satisfies PtyConnectResult
         }
-        if (spawnResult.launchConfig || spawnResult.startupCwdFallback) {
+        if (resultLaunchAgent || spawnResult.launchConfig || spawnResult.startupCwdFallback) {
           return {
             id: spawnResult.id,
+            ...(resultLaunchAgent ? { launchAgent: resultLaunchAgent } : {}),
             ...(spawnResult.launchConfig ? { launchConfig: spawnResult.launchConfig } : {}),
             ...(spawnResult.startupCwdFallback
               ? { startupCwdFallback: spawnResult.startupCwdFallback }

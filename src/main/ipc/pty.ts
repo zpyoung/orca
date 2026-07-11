@@ -34,6 +34,7 @@ import {
   redactPtyIdForDiagnostics
 } from '../../shared/pty-delivery-diagnostics'
 import { recordCrashBreadcrumb } from '../crash-reporting/crash-breadcrumb-store'
+import { isTuiAgent } from '../../shared/tui-agent-config'
 import type { SleepingAgentLaunchConfig } from '../../shared/agent-session-resume'
 import type { ProjectExecutionRuntimeResolution } from '../../shared/project-execution-runtime'
 import {
@@ -1480,6 +1481,7 @@ export function registerPtyHandlers(
   ipcMain.removeHandler('pty:hasPty')
   ipcMain.removeHandler('pty:hasChildProcesses')
   ipcMain.removeHandler('pty:getForegroundProcess')
+  ipcMain.removeHandler('pty:confirmForegroundProcess')
   ipcMain.removeHandler('pty:getCwd')
   ipcMain.removeHandler('pty:getSize')
   ipcMain.removeHandler('pty:declarePendingPaneSerializer')
@@ -3916,6 +3918,9 @@ export function registerPtyHandlers(
       if (args.startupCommandDelivery !== undefined) {
         spawnOptions.startupCommandDelivery = args.startupCommandDelivery
       }
+      if (isTuiAgent(args.launchAgent)) {
+        spawnOptions.launchAgent = args.launchAgent
+      }
       if (args.worktreeId !== undefined) {
         spawnOptions.worktreeId = args.worktreeId
       }
@@ -4954,6 +4959,19 @@ export function registerPtyHandlers(
         return null
       }
       return getProviderForPty(args.id).getForegroundProcess(args.id)
+    }
+  )
+
+  ipcMain.handle(
+    'pty:confirmForegroundProcess',
+    async (_event, args: { id: string }): Promise<string | null> => {
+      if (!hasPtyProviderForInspection(args.id)) {
+        return null
+      }
+      const provider = getProviderForPty(args.id)
+      // Why: falling back to the cached foreground API would turn stale
+      // process identity into shell/agent authority at a command boundary.
+      return provider.confirmForegroundProcess?.(args.id) ?? null
     }
   )
 
