@@ -136,6 +136,46 @@ describe('terminal send RPC', () => {
     expect(runtime.mobileTookFloor).not.toHaveBeenCalled()
   })
 
+  it('awaits a desktop viewport claim before acknowledged input', async () => {
+    let releaseClaim = (): void => {}
+    const refreshRemoteDesktopViewer = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          releaseClaim = () => resolve(true)
+        })
+    )
+    const sendTerminal = vi.fn().mockResolvedValue({
+      handle: 'terminal-1',
+      accepted: true,
+      bytesWritten: 1
+    })
+    const runtime = stubRuntime({
+      resolveLiveLeafForHandle: vi.fn().mockReturnValue({ ptyId: 'pty-1' }),
+      getDriver: vi.fn().mockReturnValue({ kind: 'idle' }),
+      refreshRemoteDesktopViewer,
+      sendTerminal
+    })
+    const dispatcher = new RpcDispatcher({ runtime, methods: TERMINAL_METHODS })
+
+    const response = dispatcher.dispatch(
+      makeRequest('terminal.send', {
+        terminal: 'terminal-1',
+        text: '\x03',
+        client: { id: 'desktop-1', type: 'desktop' },
+        viewport: { cols: 96, rows: 32 },
+        claimViewport: true
+      })
+    )
+
+    await vi.waitFor(() =>
+      expect(refreshRemoteDesktopViewer).toHaveBeenCalledWith('pty-1', 'desktop-1', 96, 32, true)
+    )
+    expect(sendTerminal).not.toHaveBeenCalled()
+    releaseClaim()
+    await expect(response).resolves.toMatchObject({ ok: true })
+    expect(sendTerminal).toHaveBeenCalled()
+  })
+
   it('accepts legacy clientless mobile input when the current driver is mobile', async () => {
     const runtime = stubRuntime({
       resolveLiveLeafForHandle: vi.fn().mockReturnValue({ ptyId: 'pty-1' }),

@@ -2713,6 +2713,7 @@ function createPtyApi(): NonNullable<Partial<PreloadApi>['pty']> {
     write: () => {},
     writeAccepted: () => Promise.resolve(false),
     resize: () => {},
+    claimViewport: () => {},
     reportGeometry: () => {},
     signal: () => {},
     // Web panes clear the host buffer via the terminal.clearBuffer runtime RPC.

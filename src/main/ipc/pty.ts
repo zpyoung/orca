@@ -4441,6 +4441,7 @@ export function registerPtyHandlers(
   }
 
   type PtyWritePayload = { id: string; data: string }
+  type PtyViewportClaimPayload = { id: string; cols: number; rows: number }
 
   const isPtyWritePayload = (value: unknown): value is PtyWritePayload =>
     typeof value === 'object' &&
@@ -4448,6 +4449,18 @@ export function registerPtyHandlers(
     typeof (value as { id?: unknown }).id === 'string' &&
     (value as { id: string }).id.length > 0 &&
     typeof (value as { data?: unknown }).data === 'string'
+
+  const isPtyViewportClaimPayload = (value: unknown): value is PtyViewportClaimPayload =>
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { id?: unknown }).id === 'string' &&
+    (value as { id: string }).id.length > 0 &&
+    typeof (value as { cols?: unknown }).cols === 'number' &&
+    Number.isFinite((value as { cols: number }).cols) &&
+    typeof (value as { rows?: unknown }).rows === 'number' &&
+    Number.isFinite((value as { rows: number }).rows) &&
+    (value as { cols: number }).cols > 0 &&
+    (value as { rows: number }).rows > 0
 
   const isPtyWriteEventFromMainWindow = (
     event: IpcMainEvent | IpcMainInvokeEvent,
@@ -4512,8 +4525,15 @@ export function registerPtyHandlers(
     }
   }
 
+  const hostViewportClaimTails = new Map<string, Promise<boolean>>()
+
   ipcMain.on('pty:write', (event, args: unknown) => {
     if (!isPtyWriteEventFromMainWindow(event, mainWindow.webContents) || !isPtyWritePayload(args)) {
+      return
+    }
+    const claimTail = hostViewportClaimTails.get(args.id)
+    if (claimTail) {
+      void claimTail.then((claimed) => (claimed ? writePtyInput(args) : false))
       return
     }
     writePtyInput(args)
@@ -4522,7 +4542,38 @@ export function registerPtyHandlers(
     if (!isPtyWriteEventFromMainWindow(event, mainWindow.webContents) || !isPtyWritePayload(args)) {
       return false
     }
-    return writePtyInputAccepted(args)
+    const claimTail = hostViewportClaimTails.get(args.id)
+    return claimTail
+      ? claimTail.then((claimed) => (claimed ? writePtyInputAccepted(args) : false))
+      : writePtyInputAccepted(args)
+  })
+
+  ipcMain.removeAllListeners('pty:claimViewport')
+  ipcMain.on('pty:claimViewport', (event, args: unknown) => {
+    if (
+      !isPtyWriteEventFromMainWindow(event, mainWindow.webContents) ||
+      !runtime ||
+      !isPtyViewportClaimPayload(args)
+    ) {
+      return
+    }
+    const prior = hostViewportClaimTails.get(args.id)
+    // Why: two panes can mirror one PTY. Never let a later no-op claim replace
+    // the in-flight resize that the following host input must await.
+    const claim = (
+      prior
+        ? prior.then(
+            () => runtime.claimRemoteDesktopHost(args.id, args.cols, args.rows),
+            () => runtime.claimRemoteDesktopHost(args.id, args.cols, args.rows)
+          )
+        : runtime.claimRemoteDesktopHost(args.id, args.cols, args.rows)
+    ).catch(() => false)
+    hostViewportClaimTails.set(args.id, claim)
+    void claim.then(() => {
+      if (hostViewportClaimTails.get(args.id) === claim) {
+        hostViewportClaimTails.delete(args.id)
+      }
+    })
   })
 
   // Why: resize is fire-and-forget — the renderer doesn't need a reply.
@@ -4538,14 +4589,22 @@ export function registerPtyHandlers(
     if (runtime?.isResizeSuppressed()) {
       return
     }
-    // Why: presence-lock defense-in-depth. While mobile is driving,
-    // desktop-side resizes (auto-fit on window resize, split drag) must
-    // not reach the PTY. The renderer guard checks the driver state too,
-    // but this is the load-bearing layer because the renderer mirror lags
-    // by one IPC hop. Note: BOTH guards apply — isResizeSuppressed handles
-    // the safeFit cascade after take-back; this driver check handles the
-    // ongoing locked state. See docs/mobile-presence-lock.md.
-    if (runtime?.getDriver(args.id).kind === 'mobile') {
+    // Why: presence-lock defense-in-depth. While a phone OR a remote desktop
+    // viewer drives the PTY width, the host's own desktop-side resizes
+    // (auto-fit on window resize, split drag, tab reveal, "+"-new-tab
+    // re-render) must not reach the PTY — otherwise they overwrite the remote
+    // viewer's grid and its alt-screen TUI garbles ("porridge"). The renderer
+    // guard checks the driver state too, but this is the load-bearing layer
+    // because the renderer mirror lags by one IPC hop. Note: BOTH guards apply
+    // — isResizeSuppressed handles the safeFit cascade after take-back; this
+    // driver check handles the ongoing locked state. See
+    // docs/mobile-presence-lock.md.
+    const mobileOwnsResize = runtime?.getDriver(args.id).kind === 'mobile'
+    const remoteDesktopOwnsResize = runtime?.isRemoteDesktopResizeDriven?.(args.id) === true
+    if (mobileOwnsResize || remoteDesktopOwnsResize) {
+      if (remoteDesktopOwnsResize) {
+        runtime?.recordRemoteDesktopHostReclaimTarget(args.id, args.cols, args.rows)
+      }
       return
     }
     const provider = tryGetProviderForPty(args.id)
