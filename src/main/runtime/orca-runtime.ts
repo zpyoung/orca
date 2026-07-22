@@ -314,6 +314,7 @@ import {
 } from '../../shared/worktree-ownership'
 import {
   createAgentScratchWorktreePathMatcher,
+  isAgentScratchRepoRootPath,
   type AgentScratchWorktreePathMatcher
 } from '../../shared/agent-scratch-worktrees'
 import {
@@ -23853,7 +23854,7 @@ export class OrcaRuntimeService {
           generation,
           runtimeKey,
           result,
-          expiresAt: Date.now() + WORKTREE_SCAN_CACHE_TTL_MS
+          expiresAt: Date.now() + resolveWorktreeScanCacheTtlMs(repo)
         })
       }
       return result
@@ -29253,7 +29254,17 @@ const DEFAULT_WORKTREE_PS_LIMIT = 200
 const DISCONNECTED_PTY_RECORD_MAX = 128
 const RESOLVED_WORKTREE_CACHE_TTL_MS = 1000
 const WORKTREE_SCAN_CACHE_TTL_MS = 30_000
+// Why: agent-scratch repos don't need 30s freshness — the steady-state scan
+// fan-out was measured at ~128 git execs/min on real installs, mostly against
+// these (crash-cluster diagnostics, 2026-07).
+const WORKTREE_SCAN_AGENT_SCRATCH_TTL_MS = 5 * 60_000
 const RESOLVED_WORKTREE_REPO_TIMEOUT_MS = 5000
+
+export function resolveWorktreeScanCacheTtlMs(repo: Pick<Repo, 'path' | 'connectionId'>): number {
+  return !repo.connectionId && isAgentScratchRepoRootPath(repo.path)
+    ? WORKTREE_SCAN_AGENT_SCRATCH_TTL_MS
+    : WORKTREE_SCAN_CACHE_TTL_MS
+}
 const PTY_CONTROLLER_LIST_TIMEOUT_MS = 3000
 // Why: the renderer waits 15s; leave room for the verified failure response and release the spawn fence before its caller times out.
 const WORKTREE_TERMINAL_SLEEP_TIMEOUT_MS = 12_000
