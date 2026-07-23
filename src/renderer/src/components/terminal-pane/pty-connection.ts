@@ -5823,7 +5823,7 @@ export function connectPanePty(
       writeTerminalOutput(pane.terminal, data, {
         foreground: foregroundOutput,
         beforeWrite: beforeTerminalOutputWrite,
-        // Why: claim the delivery's parse-deferred ACK credit (null outside a delivery); the FIRST scheduler write carries it all and fires when bytes are consumed.
+        // Why: every scheduler write claims one child so a split delivery is credited only after all children parse or discard.
         ackCredit: takeCurrentTerminalDeliveryCredit() ?? undefined,
         onBackgroundBacklogDropped: markHiddenOutputRestoreNeeded,
         latencySensitive:

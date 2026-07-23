@@ -13560,6 +13560,8 @@ describe('connectPanePty', () => {
 
   it('requests snapshot recovery for one oversized live frame deferred by replay', async () => {
     const { connectPanePty } = await import('./pty-connection')
+    const { deliverTerminalDataWithDeferredCredit } =
+      await import('@/lib/pane-manager/terminal-delivery-credit')
     const transport = createMockTransport('pty-large-live')
     const callbacksRef: {
       replay: ((data: string) => void) | null
@@ -13584,7 +13586,11 @@ describe('connectPanePty', () => {
     callbacksRef.replay?.('authoritative replay')
     await flushAsyncTicks(8)
     const oversizedLiveFrame = 'L'.repeat(512 * 1024 + 1)
-    callbacksRef.data?.(oversizedLiveFrame)
+    const acknowledgeDroppedFrame = vi.fn()
+    deliverTerminalDataWithDeferredCredit(acknowledgeDroppedFrame, () => {
+      callbacksRef.data?.(oversizedLiveFrame)
+    })
+    expect(acknowledgeDroppedFrame).not.toHaveBeenCalled()
     while (parseCallbacks.length > 0) {
       parseCallbacks.shift()?.()
       await flushAsyncTicks(4)
@@ -13595,6 +13601,7 @@ describe('connectPanePty', () => {
       scrollbackRows: 5000
     })
     expect(writes.some((write) => write.startsWith('L'))).toBe(false)
+    expect(acknowledgeDroppedFrame).toHaveBeenCalledOnce()
     binding.dispose()
   })
 
