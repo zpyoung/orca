@@ -60,7 +60,7 @@ jobs:
     # Actions enabled, the scheduled cut would run against the fork's main and
     # diverge it (version line) every slot, conflicting every PR back upstream.
     # Gate to the canonical repo so the workflow no-ops on forks.
-    if: github.repository == 'stablyai/orca'
+    if: github.repository == 'zpyoung/orca'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -714,7 +714,9 @@ jobs:
     needs:
       - cut
       - create-release
-    if: needs.cut.outputs.should_release == 'true'
+    # Fork: mac-only. Windows/Linux builds are disabled (no SignPath on this fork).
+    # macOS is built + signed by build-mac -> release-mac-build.yml.
+    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -1539,7 +1541,6 @@ jobs:
   publish-release:
     needs:
       - cut
-      - build
       - build-mac
       - terminal-rendering-golden
     runs-on: ubuntu-latest

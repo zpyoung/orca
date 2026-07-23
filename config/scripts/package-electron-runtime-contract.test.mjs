@@ -267,11 +267,13 @@ describe('Electron runtime package contract', () => {
     expect(macDispatchStep.env.RELEASE_MAC_BUILD_WORKFLOW).toBe('release-mac-build.yml')
     expect(macDispatchStep.env.RELEASE_MAC_BUILD_TAG).toBe('${{ needs.cut.outputs.tag }}')
     expect(buildMatrixRunners).not.toContain('blacksmith-6vcpu-macos-15')
-    expect(releaseWorkflow.jobs['publish-release'].needs).toContain('build')
+    // Fork is macOS-only: the Windows/Linux `build` job is disabled, so publishing
+    // must not depend on it (a skipped dependency would cascade-skip publish-release).
+    expect(releaseWorkflow.jobs['publish-release'].needs).not.toContain('build')
     expect(releaseWorkflow.jobs['publish-release'].needs).toContain('build-mac')
   })
 
-  it('runs the macOS release build in an isolated Blacksmith workflow', () => {
+  it('runs the macOS release build in an isolated GitHub-hosted workflow', () => {
     const releaseMacWorkflowText = readFileSync(
       join(projectDir, '.github/workflows/release-mac-build.yml'),
       'utf8'
@@ -288,7 +290,7 @@ describe('Electron runtime package contract', () => {
     )
     expect(releaseMacWorkflow.on.workflow_dispatch.inputs.tag.required).toBe(true)
     expect(releaseMacWorkflow.on.workflow_dispatch.inputs.release_run_id.required).toBe(true)
-    expect(buildMacJob['runs-on']).toBe('blacksmith-6vcpu-macos-15')
+    expect(buildMacJob['runs-on']).toBe('macos-15')
     expect(checkoutStep.with.ref).toBe('refs/tags/${{ inputs.tag }}')
     expect(publishStep.with.command).toContain('ORCA_MAC_RELEASE=1')
     expect(publishStep.with.command).toContain('electron-builder')
@@ -641,7 +643,7 @@ describe('Electron runtime package contract', () => {
     expect(releaseBuildNeeds).not.toContain('terminal-rendering-golden')
     expect(releaseBuildNeeds).not.toContain('terminal-rendering-release-evidence')
     expect(publishReleaseNeeds).toContain('terminal-rendering-golden')
-    expect(publishReleaseNeeds).toContain('build')
+    expect(publishReleaseNeeds).not.toContain('build')
     expect(publishReleaseNeeds).not.toContain('terminal-rendering-release-evidence')
     expect(releaseGoldenJob['continue-on-error']).toBeUndefined()
     expect(releaseGoldenJob.strategy.matrix.include.map(({ platform }) => platform).sort()).toEqual(

@@ -52,8 +52,8 @@ const winSpeechNativeResource = {
 
 /** @type {import('electron-builder').Configuration} */
 module.exports = {
-  appId: 'com.stablyai.orca',
-  productName: 'Orca',
+  appId: 'com.zpyoung.orca',
+  productName: 'Orca Dev',
   directories: {
     buildResources: 'resources/build'
   },
@@ -400,7 +400,7 @@ module.exports = {
   npmRebuild: true,
   publish: {
     provider: 'github',
-    owner: 'stablyai',
+    owner: 'zpyoung',
     repo: 'orca',
     releaseType: 'release'
   }
