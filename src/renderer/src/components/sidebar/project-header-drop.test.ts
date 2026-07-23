@@ -124,9 +124,9 @@ describe('computeProjectHeaderDropPreview', () => {
       scrollTop: 0,
       sidebarRepoHeaderIds: ['a', 'b', 'c', 'd', 'e'],
       rects: [
-        { repoId: 'b', bucketKey: 'ungrouped', headerIndex: 1, top: 100, bottom: 128 },
-        { repoId: 'c', bucketKey: 'ungrouped', headerIndex: 2, top: 200, bottom: 228 },
-        { repoId: 'd', bucketKey: 'ungrouped', headerIndex: 3, top: 300, bottom: 328 }
+        { repoId: 'b', bucketKey: 'ungrouped', headerIndex: 1, top: 100, bottom: 124 },
+        { repoId: 'c', bucketKey: 'ungrouped', headerIndex: 2, top: 200, bottom: 224 },
+        { repoId: 'd', bucketKey: 'ungrouped', headerIndex: 3, top: 300, bottom: 324 }
       ]
     })
 
@@ -205,7 +205,7 @@ describe('computeProjectHeaderDropPreview', () => {
 
   describe('nearest-boundary choice across an interior gap', () => {
     // The gap models estimate-vs-actual drift: sectionBottom is an estimated
-    // row offset (worktree-header-section-boundaries.ts, no virtualizer gap:6 or
+    // row offset (worktree-header-section-boundaries.ts, no virtualizer gap:2 or
     // measured sizes) while the next header's top is actual vItem.start geometry,
     // so they diverge in tall sections. Near the real boundary the pointer snaps
     // to actual geometry (beforeNext); the estimate governs only deep-body drops.

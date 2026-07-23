@@ -2046,7 +2046,7 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
       [stickyHeaderIndexes]
     ),
     overscan: 10,
-    gap: 6,
+    gap: 2,
     // Why: the sticky group header lives inside the virtual list, so scroll math needs the same top inset as the DOM reveal.
     scrollPaddingStart: WORKTREE_SIDEBAR_REVEAL_TOP_INSET,
     isScrollingResetDelay: USER_SCROLL_MEASUREMENT_ADJUSTMENT_SUPPRESS_MS,
@@ -4281,7 +4281,7 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
                     data-workspace-status={headerWorkspaceStatus ?? undefined}
                     data-workspace-pin-drop-target={isPinnedHeader ? '' : undefined}
                     className={cn(
-                      'group relative flex h-7 w-full items-center gap-1.5 pr-2 text-left transition-all',
+                      'group relative flex h-6 w-full items-center gap-1.5 pr-2 text-left transition-all',
                       isDraggableRepoHeader || isDraggableProjectGroupHeader
                         ? 'cursor-grab active:cursor-grabbing'
                         : 'cursor-pointer',
