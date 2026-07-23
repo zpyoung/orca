@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { VirtualItem } from '@tanstack/react-virtual'
 import {
   HOST_STICKY_PINNED_HEIGHT,
+  estimateRenderRowSize,
   extractWorktreeVirtualRowIndexes,
   getActiveStickyIndexesForScroll,
   getStickyHeaderIndexes,
@@ -126,6 +127,17 @@ describe('getActiveStickyIndexesForScroll', () => {
         virtualItems: flatItems
       })
     ).toEqual({ hostIndex: null, groupIndex: 0 })
+  })
+})
+
+describe('estimateRenderRowSize host headers', () => {
+  it('estimates host headers at their rendered height (h-8 + inner pt-1 = 36)', () => {
+    // Regression: header rows return the estimate verbatim (measureElement no-ops them),
+    // so an under-estimate makes the following row overlap the host card at small gaps.
+    const twoHosts = [hostRow('a'), hostRow('b')]
+    expect(estimateRenderRowSize(twoHosts, 0, 0, null)).toBe(36)
+    // Secondary host header adds the 4px inter-section top margin.
+    expect(estimateRenderRowSize(twoHosts, 1, 0, null)).toBe(40)
   })
 })
 

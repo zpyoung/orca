@@ -128,9 +128,9 @@ describe('computeProjectGroupHeaderDropPreview', () => {
       scrollTop: 0,
       sidebarProjectGroupHeaderIds: ['a', 'b', 'c', 'd', 'e'],
       rects: [
-        { groupId: 'b', bucketKey: 'root', headerIndex: 1, top: 100, bottom: 128 },
-        { groupId: 'c', bucketKey: 'root', headerIndex: 2, top: 200, bottom: 228 },
-        { groupId: 'd', bucketKey: 'root', headerIndex: 3, top: 300, bottom: 328 }
+        { groupId: 'b', bucketKey: 'root', headerIndex: 1, top: 100, bottom: 124 },
+        { groupId: 'c', bucketKey: 'root', headerIndex: 2, top: 200, bottom: 224 },
+        { groupId: 'd', bucketKey: 'root', headerIndex: 3, top: 300, bottom: 324 }
       ]
     })
 

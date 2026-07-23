@@ -3,8 +3,10 @@ import type { Range, VirtualItem } from '@tanstack/react-virtual'
 import type { HostSectionRow } from './host-section-rows'
 import { PINNED_GROUP_KEY } from './worktree-list-groups'
 
-export const GROUP_HEADER_ROW_HEIGHT = 28
-export const HOST_HEADER_ROW_HEIGHT = 32
+export const GROUP_HEADER_ROW_HEIGHT = 24
+// Why: header rows return this estimate verbatim (measureElement no-ops them), so it must
+// equal the rendered DOM height. HostSectionHeader is h-8 (32px) inside a pt-1 (4px) wrapper.
+export const HOST_HEADER_ROW_HEIGHT = 36
 const SECONDARY_GROUP_HEADER_TOP_MARGIN = 4
 const IMPORTED_WORKTREES_LINE_ROW_HEIGHT = 36
 const PENDING_CREATION_ROW_HEIGHT = 56
