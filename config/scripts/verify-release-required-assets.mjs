@@ -4,25 +4,12 @@ import { pathToFileURL } from 'node:url'
 
 const API_VERSION = '2022-11-28'
 
-export function getRequiredReleaseAssetNames(tag) {
-  const version = tag.replace(/^v/i, '')
+export function getRequiredReleaseAssetNames() {
+  // Fork: mac-only. The mac .zip assets (names derive from productName) are
+  // added dynamically from latest-mac.yml below, so only the
+  // deterministically-named manifest + dmg installers are hardcoded here.
   return [
-    'latest-linux.yml',
-    'latest-linux-arm64.yml',
     'latest-mac.yml',
-    'latest.yml',
-    'orca-linux.AppImage',
-    'orca-linux-arm64.AppImage',
-    `orca-ide_${version}_amd64.deb`,
-    `orca-ide_${version}_arm64.deb`,
-    `orca-ide-${version}.x86_64.rpm`,
-    `orca-ide-${version}.aarch64.rpm`,
-    'orca-windows-setup.exe',
-    'orca-windows-setup.exe.blockmap',
-    `Orca-${version}-mac.zip`,
-    `Orca-${version}-mac.zip.blockmap`,
-    `Orca-${version}-arm64-mac.zip`,
-    `Orca-${version}-arm64-mac.zip.blockmap`,
     'orca-macos-x64.dmg',
     'orca-macos-x64.dmg.blockmap',
     'orca-macos-arm64.dmg',
@@ -90,12 +77,7 @@ export async function verifyRequiredReleaseAssets({ repo, tag, token }) {
   const assetsByName = new Map(release.assets.map((asset) => [asset.name, asset]))
 
   const requiredNames = new Set(getRequiredReleaseAssetNames(tag))
-  const manifestNames = [
-    'latest-linux.yml',
-    'latest-linux-arm64.yml',
-    'latest-mac.yml',
-    'latest.yml'
-  ]
+  const manifestNames = ['latest-mac.yml']
 
   for (const manifestName of manifestNames) {
     const manifestAsset = assetsByName.get(manifestName)
@@ -150,7 +132,7 @@ async function main() {
   if (!token) {
     throw new Error('GH_TOKEN or GITHUB_TOKEN must be set')
   }
-  const repo = process.env.GITHUB_REPOSITORY || 'stablyai/orca'
+  const repo = process.env.GITHUB_REPOSITORY || 'zpyoung/orca'
   const result = await verifyRequiredReleaseAssets({ repo, tag, token })
   console.log(`Verified ${result.checked.length} required release assets for ${repo}@${tag}`)
 }
