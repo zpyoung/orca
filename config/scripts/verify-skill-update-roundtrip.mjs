@@ -50,6 +50,16 @@ const manifest = JSON.parse(await readFile('resources/skills/current-manifest.js
 const registry = JSON.parse(await readFile('resources/skills/snapshot-registry.json', 'utf8'))
 const releaseMapping = JSON.parse(await readFile('resources/skills/release-mapping.json', 'utf8'))
 
+// Why: with no cut releases yet, released skill history is empty, so there is no
+// prior version to update from and the roundtrip has nothing to exercise.
+if (releaseMapping.releases.length === 0) {
+  console.log(
+    '[skill-update-roundtrip] no released skill history in this repository; skipping update roundtrip'
+  )
+  await rm(sandbox, { recursive: true, force: true })
+  process.exit(0)
+}
+
 function currentSkill(name) {
   const skill = manifest.skills.find((entry) => entry.name === name)
   if (!skill) {
