@@ -388,6 +388,10 @@ jobs:
             node config/scripts/release-rc-history.mjs "$1"
           }
 
+          highest_fork_suffix_for_rc() {
+            node config/scripts/release-rc-history.mjs "$1" --rc "$2"
+          }
+
           require_valid_version_suffix() {
             # Why a dot-appended identifier (rc.N.perf): it sorts just
             # above its own base rc.N but BELOW rc.N+1, so suffixed side-
@@ -562,14 +566,48 @@ jobs:
               explicit_rc="${explicit#*-rc.}"
               explicit_rc="${explicit_rc%%.*}"
               highest_explicit_rc="$(highest_rc_for_base "$explicit_base")"
-              if [[ -n "$highest_explicit_rc" && "$explicit_rc" -le "$highest_explicit_rc" ]]; then
-                # Why the remedy is spelled this narrowly: kind=rc derives its
-                # base from bump(latest_stable, patch), so it can only resume a
-                # series on that base. A minor/major series (1.5.0-rc.N) exists
-                # only because this override created it, and pointing an
-                # operator at kind=rc there would cut an unrelated release.
-                echo "::error::Refusing explicit version $explicit: rc.$explicit_rc is not above rc.$highest_explicit_rc, the highest already cut for $explicit_base. Request rc.$((highest_explicit_rc + 1)) or higher. If you are resuming an unpublished tag and $explicit_base is the next patch after latest stable $latest_stable, dispatch kind=rc instead, which recovers that tag when it was cut from the ref you dispatch; otherwise cut rc.$((highest_explicit_rc + 1)) and leave the unpublished tag alone." >&2
+
+              # Why refuse a bare rc once a fork series exists: this fork's
+              # history is tracked by the `.zy` suffix alone, so a bare release
+              # is invisible to the gate below. Clients can still install it, so
+              # a later `.zy` cut at a lower rc would sort beneath it and strand
+              # them. Refusing the mix keeps the tracked series total.
+              if [[ -n "$highest_explicit_rc" && -z "${VERSION_SUFFIX:-}" && "$explicit" != *-rc.*.* ]]; then
+                echo "::error::Refusing bare explicit version $explicit: a fork .zy release series already exists for $explicit_base, and a bare release would not be tracked against it. Pass version_suffix=zyNN." >&2
                 exit 1
+              fi
+              if [[ -n "$highest_explicit_rc" && "$explicit_rc" -le "$highest_explicit_rc" ]]; then
+                # Why an equal rc can still be admitted: this fork's releases are
+                # ordered by (rc, zy-suffix), not rc alone. Its rc position names
+                # the upstream commit the build was cut from, so a second build on
+                # that same upstream point must reuse the rc and advance only the
+                # suffix. Comparing rc alone would force the rc upward and make
+                # the tag name an upstream anchor it was never built on. A
+                # strictly-advancing suffix is still monotonic for clients, which
+                # is the property this gate exists to protect.
+                fork_suffix_ok=false
+                if [[ -n "${VERSION_SUFFIX:-}" && "$explicit_rc" -eq "$highest_explicit_rc" ]]; then
+                  # Only the fixed-width zy counter participates; any other
+                  # identifier (e.g. perf) is not part of the fork series.
+                  if [[ "$VERSION_SUFFIX" =~ ^zy([0-9]{2})$ ]]; then
+                    proposed_suffix="${BASH_REMATCH[1]}"
+                    highest_suffix="$(highest_fork_suffix_for_rc "$explicit_base" "$explicit_rc")"
+                    # 10# forces base-10: 08 and 09 are invalid octal literals.
+                    if [[ -z "$highest_suffix" ]] || ((10#$proposed_suffix > 10#$highest_suffix)); then
+                      fork_suffix_ok=true
+                    fi
+                  fi
+                fi
+
+                if [[ "$fork_suffix_ok" != true ]]; then
+                  # Why the remedy is spelled this narrowly: kind=rc derives its
+                  # base from bump(latest_stable, patch), so it can only resume a
+                  # series on that base. A minor/major series (1.5.0-rc.N) exists
+                  # only because this override created it, and pointing an
+                  # operator at kind=rc there would cut an unrelated release.
+                  echo "::error::Refusing explicit version $explicit: rc.$explicit_rc is not above rc.$highest_explicit_rc, the highest already cut for $explicit_base. Request rc.$((highest_explicit_rc + 1)) or higher, or re-cut rc.$explicit_rc with a version_suffix of zyNN above the highest already cut for that rc. If you are resuming an unpublished tag and $explicit_base is the next patch after latest stable $latest_stable, dispatch kind=rc instead, which recovers that tag when it was cut from the ref you dispatch; otherwise cut rc.$((highest_explicit_rc + 1)) and leave the unpublished tag alone." >&2
+                  exit 1
+                fi
               fi
             fi
             new="$explicit"
