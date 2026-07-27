@@ -9,7 +9,11 @@ const TRUNCATION_NOTICE =
   '\n\n---\nRelease notes were truncated because GitHub release bodies are limited to 125,000 characters.'
 // Fork builds append `.zy<NN>` to an rc tag so they sort above their upstream
 // anchor and below upstream's next rc. Only rc tags carry the suffix.
-const DESKTOP_RELEASE_TAG_PATTERN = /^v(\d+)\.(\d+)\.(\d+)(?:-rc\.(\d+)(?:\.zy(\d+))?)?$/
+// Why `\d{2,}` and not `\d+`: the counter is zero-padded, and semver compares
+// alphanumeric identifiers as strings — `zy01` and `zy1` are distinct tags that
+// both parse to 1, so accepting the unpadded form would rank them equal here
+// while semver ranks `zy01` below `zy1`.
+const DESKTOP_RELEASE_TAG_PATTERN = /^v(\d+)\.(\d+)\.(\d+)(?:-rc\.(\d+)(?:\.zy(\d{2,}))?)?$/
 
 export function parseDesktopReleaseTag(tag) {
   const match = DESKTOP_RELEASE_TAG_PATTERN.exec(tag)

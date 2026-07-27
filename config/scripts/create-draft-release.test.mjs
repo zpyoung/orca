@@ -71,6 +71,15 @@ describe('parseDesktopReleaseTag', () => {
   it('rejects a zy suffix on a stable tag, which the version rule never produces', () => {
     expect(parseDesktopReleaseTag('v1.4.151.zy01')).toBeNull()
   })
+
+  // Why: semver compares alphanumeric identifiers as strings, so zy01 and zy1
+  // are distinct tags that would both parse to 1. Accepting the unpadded form
+  // ranks them equal here while semver ranks zy01 below zy1.
+  it('rejects an unpadded zy counter', () => {
+    expect(parseDesktopReleaseTag('v1.4.151-rc.1.zy1')).toBeNull()
+    expect(parseDesktopReleaseTag('v1.4.151-rc.1.zy01')).toMatchObject({ fork: 1 })
+    expect(parseDesktopReleaseTag('v1.4.151-rc.1.zy10')).toMatchObject({ fork: 10 })
+  })
 })
 
 describe('fork release tag ordering', () => {

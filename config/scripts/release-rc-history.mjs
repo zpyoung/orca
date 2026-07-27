@@ -24,7 +24,9 @@ function gitLines(args, cwd) {
 // Fork releases are the only ones this repo's clients can install, so the
 // series that must stay monotonic is the `.zy` one. A bare rc tag on this fork
 // is therefore treated as upstream's, not ours.
-const FORK_RC_PATTERN = /^(\d+)\.zy\d+(?:\s|$)/
+// `zy\d{2,}` mirrors the zero-padded counter the release skill emits; the
+// unpadded form is not a tag this fork ever cuts.
+const FORK_RC_PATTERN = /^(\d+)\.zy\d{2,}(?:\s|$)/
 
 export function forkRcNumberFromTag(base, tag) {
   const prefix = `v${base}-rc.`

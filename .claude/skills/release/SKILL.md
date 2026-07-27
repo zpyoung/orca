@@ -62,28 +62,52 @@ it block. It is informational; releases cut from main's actual content.
 
 ## 4. Compute the version
 
-The version is the upstream anchor plus a `zyNN` identifier marking it as a fork build.
+`release-cut.yml` takes the version in **two separate inputs**, so compute three values and keep
+them distinct:
 
-```sh
-HIGHEST=$(node config/scripts/release-rc-history.mjs "${BASE}")
-```
+| Value | Meaning | Example |
+|---|---|---|
+| `VERSION_BASE` | passed as `-f version` — no fork identifier | `1.4.156-rc.1` |
+| `VERSION_SUFFIX` | passed as `-f version_suffix` — the fork identifier alone | `zy01` |
+| `TAG` | what release-cut actually creates, `v${VERSION_BASE}.${VERSION_SUFFIX}` | `v1.4.156-rc.1.zy01` |
 
-- **Anchor is an rc** (`v1.4.156-rc.1`) → `VERSION=1.4.156-rc.1`, `BASE=1.4.156`
-- **Anchor is stable** (`v1.4.156`) → use the next patch at rc.0: `VERSION=1.4.157-rc.0`,
+`TAG` is never passed to the workflow — release-cut concatenates the two inputs. But it is the
+value the changelog heading and every report must use.
+
+Derive `VERSION_BASE` from the anchor, and `BASE` (the bare `X.Y.Z`) for the history lookup:
+
+- **Anchor is an rc** (`v1.4.156-rc.1`) → `VERSION_BASE=1.4.156-rc.1`, `BASE=1.4.156`
+- **Anchor is stable** (`v1.4.156`) → next patch at rc.0: `VERSION_BASE=1.4.157-rc.0`,
   `BASE=1.4.157`
 
   A stable anchor **must** re-enter rc shape. `1.4.157-zy01` sorts *below* `1.4.157-rc.0.zy01`
   because `rc` precedes `zy` alphabetically, which would regress the update channel.
 
-- If `$HIGHEST` is non-empty and ≥ the anchor's rc number, use `rc.$((HIGHEST + 1))` instead —
-  release-cut refuses an rc at or below the highest already cut for that base.
+Then check the gate:
 
-`release-rc-history.mjs` counts only `.zy`-suffixed releases, so upstream's inherited rc history
-does not pin the gate. Suffix stays `zy01` unless that exact tag already exists, in which case
-increment (`zy02`, …). Keep it zero-padded — unpadded `zy10` sorts below `zy9`.
+```sh
+HIGHEST=$(node config/scripts/release-rc-history.mjs "${BASE}")
+```
 
-Sanity-check the result before dispatching: it must be greater than the last released version, and
-less than the anchor's next rc.
+If `$HIGHEST` is non-empty and ≥ `VERSION_BASE`'s rc number, rewrite `VERSION_BASE` to use
+`rc.$((HIGHEST + 1))` — release-cut refuses an rc at or below the highest already cut for that
+base. `release-rc-history.mjs` counts only `.zy`-suffixed releases, so upstream's inherited rc
+history does not pin the gate.
+
+`VERSION_SUFFIX` stays `zy01` unless `$TAG` already exists, in which case increment (`zy02`, …).
+**Always zero-pad to at least two digits** — unpadded `zy10` sorts below `zy9`, and both
+`create-draft-release.mjs` and `release-rc-history.mjs` reject the unpadded form outright.
+
+Worked example — anchor `v1.4.156-rc.1`, no prior fork release:
+
+```sh
+VERSION_BASE=1.4.156-rc.1
+VERSION_SUFFIX=zy01
+TAG=v1.4.156-rc.1.zy01
+```
+
+Sanity-check `$TAG` before dispatching: it must be greater than the last released version, and less
+than the anchor's next rc.
 
 ## 5. Write the changelog
 
@@ -102,8 +126,9 @@ Synced to upstream [v1.4.156-rc.1](https://github.com/stablyai/orca/releases/tag
   `Fixed`, `Removed`, `Deprecated`, `Security`.
 - **Reword each commit into reader-facing prose.** Read the full commit body — squash-merged PRs
   carry detail the subject line throws away. Do not paste subjects verbatim.
-- The heading version must exactly match the tag minus its leading `v`;
-  `create-draft-release.mjs` matches on it to build the release body.
+- The heading must be exactly `$TAG` minus its leading `v` (here, `1.4.156-rc.1.zy01`);
+  `create-draft-release.mjs` matches on it to build the release body. A mismatch silently drops
+  the section and the release ships with generated notes only.
 - With no fork commits, keep the section — the `Synced to upstream` line alone is the entry.
 
 Then update the frontmatter:
@@ -114,23 +139,25 @@ Then update the frontmatter:
 
 ## 6. Confirm, commit, dispatch
 
-Unless `--yes` was passed, show the computed version, the changelog diff, the upstream gap, and the
-commits included, then ask for confirmation.
+Unless `--yes` was passed, show `$TAG`, the changelog diff, the upstream gap, and the commits
+included, then ask for confirmation.
 
 ```sh
 git add CHANGELOG.md
-git commit -m "docs(changelog): release ${VERSION}"
-git commit --amend -m "docs(changelog): release ${VERSION}"   # after writing the real SHA in
+git commit -m "docs(changelog): release ${TAG}"
+git commit --amend -m "docs(changelog): release ${TAG}"   # after writing the real SHA in
 git push origin main
 
 gh workflow run release-cut.yml \
   -f kind=rc \
   -f ref=main \
-  -f version="${VERSION}" \
-  -f version_suffix="zy01"
+  -f version="${VERSION_BASE}" \
+  -f version_suffix="${VERSION_SUFFIX}"
 ```
 
-`kind` is a required input; it is ignored when `version` is set, but must still be passed.
+Pass `version` and `version_suffix` separately — never the joined `$TAG`, and never `$TAG` with a
+leading `v`. `kind` is a required input; it is ignored when `version` is set, but must still be
+passed.
 
 Report the run URL:
 

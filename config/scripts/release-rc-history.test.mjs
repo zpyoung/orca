@@ -46,6 +46,15 @@ describe('release RC history', () => {
     expect(forkRcNumberFromTag('1.4.36', 'v1.4.35-rc.7.zy01')).toBeNull()
   })
 
+  // Why: the counter is zero-padded so it stays string-sortable past zy09. An
+  // unpadded tag is not one this fork cuts, and accepting it here would let a
+  // zy1/zy01 pair collapse to the same rc number.
+  it('rejects an unpadded zy counter', () => {
+    expect(forkRcNumberFromTag('1.4.36', 'v1.4.36-rc.7.zy1')).toBeNull()
+    expect(forkRcNumberFromTag('1.4.36', 'v1.4.36-rc.7.zy10')).toBe(7)
+    expect(forkRcNumberFromReleaseSubject('1.4.36', 'release: v1.4.36-rc.6.zy1')).toBeNull()
+  })
+
   it('counts fork release subjects with optional slot markers', () => {
     expect(forkRcNumberFromReleaseSubject('1.4.36', 'release: v1.4.36-rc.6.zy01')).toBe(6)
     expect(
