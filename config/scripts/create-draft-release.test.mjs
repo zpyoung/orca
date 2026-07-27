@@ -72,13 +72,14 @@ describe('parseDesktopReleaseTag', () => {
     expect(parseDesktopReleaseTag('v1.4.151.zy01')).toBeNull()
   })
 
-  // Why: semver compares alphanumeric identifiers as strings, so zy01 and zy1
-  // are distinct tags that would both parse to 1. Accepting the unpadded form
-  // ranks them equal here while semver ranks zy01 below zy1.
-  it('rejects an unpadded zy counter', () => {
-    expect(parseDesktopReleaseTag('v1.4.151-rc.1.zy1')).toBeNull()
+  // Why: zyNN is one alphanumeric semver identifier compared as a string, so
+  // only a fixed width keeps string order and numeric order in agreement.
+  // zy1 sorts above zy01, and zy100 below zy99 — both would be mis-ranked here.
+  it('accepts only a two-digit zy counter', () => {
     expect(parseDesktopReleaseTag('v1.4.151-rc.1.zy01')).toMatchObject({ fork: 1 })
-    expect(parseDesktopReleaseTag('v1.4.151-rc.1.zy10')).toMatchObject({ fork: 10 })
+    expect(parseDesktopReleaseTag('v1.4.151-rc.1.zy99')).toMatchObject({ fork: 99 })
+    expect(parseDesktopReleaseTag('v1.4.151-rc.1.zy1')).toBeNull()
+    expect(parseDesktopReleaseTag('v1.4.151-rc.1.zy100')).toBeNull()
   })
 })
 

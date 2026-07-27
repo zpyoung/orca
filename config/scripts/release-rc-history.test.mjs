@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import {
   forkRcNumberFromReleaseSubject,
   forkRcNumberFromTag,
+  highestForkSuffixForRc,
   highestRcForBase
 } from './release-rc-history.mjs'
 
@@ -46,12 +47,12 @@ describe('release RC history', () => {
     expect(forkRcNumberFromTag('1.4.36', 'v1.4.35-rc.7.zy01')).toBeNull()
   })
 
-  // Why: the counter is zero-padded so it stays string-sortable past zy09. An
-  // unpadded tag is not one this fork cuts, and accepting it here would let a
-  // zy1/zy01 pair collapse to the same rc number.
-  it('rejects an unpadded zy counter', () => {
-    expect(forkRcNumberFromTag('1.4.36', 'v1.4.36-rc.7.zy1')).toBeNull()
+  // Why: zyNN is one alphanumeric semver identifier compared as a string, so
+  // only a fixed width keeps string order and numeric order in agreement.
+  it('accepts only a two-digit zy counter', () => {
     expect(forkRcNumberFromTag('1.4.36', 'v1.4.36-rc.7.zy10')).toBe(7)
+    expect(forkRcNumberFromTag('1.4.36', 'v1.4.36-rc.7.zy1')).toBeNull()
+    expect(forkRcNumberFromTag('1.4.36', 'v1.4.36-rc.7.zy100')).toBeNull()
     expect(forkRcNumberFromReleaseSubject('1.4.36', 'release: v1.4.36-rc.6.zy1')).toBeNull()
   })
 
@@ -97,6 +98,42 @@ describe('release RC history', () => {
       git(repo, ['tag', 'v1.4.36-rc.6.zy01'])
 
       expect(highestRcForBase('1.4.36', { cwd: repo })).toBe(6)
+    })
+  })
+
+  // Why this exists: release-cut's gate compares rc numbers alone, which would
+  // refuse a second fork cut anchored on the same upstream rc. Consulting the
+  // suffix lets the rc position keep naming the upstream anchor.
+  describe('highestForkSuffixForRc', () => {
+    it('reports the highest suffix cut for one rc, from tags and subjects', () => {
+      withGitRepo((repo) => {
+        commit(repo, 'initial')
+        commit(repo, 'release: v1.4.36-rc.6.zy01')
+        git(repo, ['tag', 'v1.4.36-rc.6.zy01'])
+        commit(repo, 'release: v1.4.36-rc.6.zy02')
+
+        expect(highestForkSuffixForRc('1.4.36', 6, { cwd: repo })).toBe(2)
+      })
+    })
+
+    it('scopes to the requested rc rather than the whole base', () => {
+      withGitRepo((repo) => {
+        commit(repo, 'initial')
+        commit(repo, 'release: v1.4.36-rc.6.zy07')
+        commit(repo, 'release: v1.4.36-rc.7.zy01')
+
+        expect(highestForkSuffixForRc('1.4.36', 7, { cwd: repo })).toBe(1)
+        expect(highestForkSuffixForRc('1.4.36', 6, { cwd: repo })).toBe(7)
+      })
+    })
+
+    it('returns null for an rc with no fork cuts yet', () => {
+      withGitRepo((repo) => {
+        commit(repo, 'initial')
+        commit(repo, 'release: v1.4.36-rc.6')
+
+        expect(highestForkSuffixForRc('1.4.36', 6, { cwd: repo })).toBeNull()
+      })
     })
   })
 
