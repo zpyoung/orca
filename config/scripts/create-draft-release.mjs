@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 
+import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 
 const API_VERSION = '2022-11-28'
 const MAX_RELEASE_BODY_LENGTH = 120_000
 const TRUNCATION_NOTICE =
   '\n\n---\nRelease notes were truncated because GitHub release bodies are limited to 125,000 characters.'
-const DESKTOP_RELEASE_TAG_PATTERN = /^v(\d+)\.(\d+)\.(\d+)(?:-rc\.(\d+))?$/
+// Fork builds append `.zy<NN>` to an rc tag so they sort above their upstream
+// anchor and below upstream's next rc. Only rc tags carry the suffix.
+const DESKTOP_RELEASE_TAG_PATTERN = /^v(\d+)\.(\d+)\.(\d+)(?:-rc\.(\d+)(?:\.zy(\d+))?)?$/
 
 export function parseDesktopReleaseTag(tag) {
   const match = DESKTOP_RELEASE_TAG_PATTERN.exec(tag)
@@ -18,7 +21,8 @@ export function parseDesktopReleaseTag(tag) {
     major: Number(match[1]),
     minor: Number(match[2]),
     patch: Number(match[3]),
-    rc: match[4] === undefined ? null : Number(match[4])
+    rc: match[4] === undefined ? null : Number(match[4]),
+    fork: match[5] === undefined ? null : Number(match[5])
   }
 }
 
@@ -27,16 +31,27 @@ function compareDesktopReleaseTags(a, b) {
   if (versionDiff !== 0) {
     return versionDiff
   }
-  if (a.rc === b.rc) {
+  if (a.rc !== b.rc) {
+    // Why: a stable release outranks every rc of the same version.
+    if (a.rc === null) {
+      return 1
+    }
+    if (b.rc === null) {
+      return -1
+    }
+    return a.rc - b.rc
+  }
+  // Why: inverse of the rc rule — a fork build outranks the bare rc it is built on.
+  if (a.fork === b.fork) {
     return 0
   }
-  if (a.rc === null) {
-    return 1
-  }
-  if (b.rc === null) {
+  if (a.fork === null) {
     return -1
   }
-  return a.rc - b.rc
+  if (b.fork === null) {
+    return 1
+  }
+  return a.fork - b.fork
 }
 
 export function latestPreviousPublishedDesktopReleaseTag(releases, tag) {
@@ -111,12 +126,45 @@ export function truncateReleaseBody(body, maxLength = MAX_RELEASE_BODY_LENGTH) {
   return `${body.slice(0, availableLength).trimEnd()}${TRUNCATION_NOTICE}`
 }
 
+// Why: the release page should lead with what this fork changed; GitHub's
+// generated notes only describe the upstream commits the tag inherited.
+export function extractChangelogSection(changelog, tag) {
+  if (typeof changelog !== 'string' || !changelog) {
+    return ''
+  }
+
+  const version = tag.replace(/^v/, '')
+  const lines = changelog.split('\n')
+  const startIndex = lines.findIndex(
+    (line) => line.trimEnd() === `## [${version}]` || line.startsWith(`## [${version}] `)
+  )
+  if (startIndex === -1) {
+    return ''
+  }
+
+  const rest = lines.slice(startIndex + 1)
+  const endOffset = rest.findIndex((line) => line.startsWith('## '))
+  const section = endOffset === -1 ? rest : rest.slice(0, endOffset)
+  return section.join('\n').trim()
+}
+
+function readChangelogFile(path = 'CHANGELOG.md') {
+  try {
+    return readFileSync(path, 'utf8')
+  } catch {
+    // Why: a missing or unreadable changelog must degrade to generated notes,
+    // never fail a release that has already been tagged.
+    return ''
+  }
+}
+
 export async function createDraftRelease({
   repo,
   tag,
   token,
   fetchImpl = fetch,
-  log = console.log
+  log = console.log,
+  readChangelog = readChangelogFile
 }) {
   if (!repo) {
     throw new Error('repo is required')
@@ -151,7 +199,12 @@ export async function createDraftRelease({
   )
 
   const generatedBody = typeof releaseNotes.body === 'string' ? releaseNotes.body : ''
-  const body = truncateReleaseBody(generatedBody)
+  const changelogSection = extractChangelogSection(readChangelog(), tag)
+  // Why: changelog first so it survives truncation, which trims from the end.
+  const fullBody = changelogSection
+    ? `${changelogSection}\n\n---\n\n${generatedBody}`
+    : generatedBody
+  const body = truncateReleaseBody(fullBody)
   const name =
     typeof releaseNotes.name === 'string' && releaseNotes.name.length > 0 ? releaseNotes.name : tag
   const prerelease = tag.includes('-rc.')
@@ -170,10 +223,11 @@ export async function createDraftRelease({
     })
   })
 
-  if (generatedBody.length !== body.length) {
-    log(`Created draft release ${tag} with truncated generated notes (${body.length} chars).`)
+  const source = changelogSection ? 'changelog + generated notes' : 'generated notes'
+  if (fullBody.length !== body.length) {
+    log(`Created draft release ${tag} with truncated ${source} (${body.length} chars).`)
   } else {
-    log(`Created draft release ${tag} with generated notes (${body.length} chars).`)
+    log(`Created draft release ${tag} with ${source} (${body.length} chars).`)
   }
 }
 

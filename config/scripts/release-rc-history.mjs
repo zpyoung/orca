@@ -18,32 +18,34 @@ function gitLines(args, cwd) {
   }
 }
 
-export function rcNumberFromTag(base, tag) {
+// Why only `.zy<NN>` counts: this fork inherits upstream's `release: vX-rc.N`
+// subjects and tags through every sync, so counting them would pin the gate to
+// upstream's series and refuse every fork cut at its own merge-base anchor.
+// Fork releases are the only ones this repo's clients can install, so the
+// series that must stay monotonic is the `.zy` one. A bare rc tag on this fork
+// is therefore treated as upstream's, not ours.
+const FORK_RC_PATTERN = /^(\d+)\.zy\d+(?:\s|$)/
+
+export function forkRcNumberFromTag(base, tag) {
   const prefix = `v${base}-rc.`
   if (!tag.startsWith(prefix)) {
     return null
   }
 
-  const suffix = tag.slice(prefix.length)
-  // Why the optional .identifier: suffixed side-branch RCs (v1.2.3-rc.4.perf)
-  // must advance the shared rc counter, or the next suffixed cut recomputes
-  // an existing tag and the workflow refuses to re-cut over it.
-  const match = /^(\d+)(?:\.[0-9A-Za-z]+)?$/.exec(suffix)
+  const match = FORK_RC_PATTERN.exec(tag.slice(prefix.length))
   return match ? Number(match[1]) : null
 }
 
-export function rcNumberFromReleaseSubject(base, subject) {
+export function forkRcNumberFromReleaseSubject(base, subject) {
   const prefix = `release: v${base}-rc.`
   if (!subject.startsWith(prefix)) {
     return null
   }
 
-  // Why the same optional .identifier as the tag form: the commit subject is
-  // the only record left once a tag is deleted, and that is exactly when the
-  // explicit-version gate leans on this. Without it, deleting a
-  // v1.2.3-rc.4.perf tag drops the series back to rc.3 and an explicit
-  // 1.2.3-rc.4 is waved through — below what perf-channel clients already run.
-  const match = /^(\d+)(?:\.[0-9A-Za-z]+)?(?:\s|$)/.exec(subject.slice(prefix.length))
+  // Why the subject form matters: it is the only record left once a tag is
+  // deleted, and that is exactly when release-cut's explicit-version gate
+  // reads this.
+  const match = FORK_RC_PATTERN.exec(subject.slice(prefix.length))
   return match ? Number(match[1]) : null
 }
 
@@ -51,7 +53,7 @@ export function highestRcForBase(base, { cwd = process.cwd() } = {}) {
   const numbers = []
 
   for (const tag of gitLines(['tag', '--list', `v${base}-rc.*`], cwd)) {
-    const rcNumber = rcNumberFromTag(base, tag)
+    const rcNumber = forkRcNumberFromTag(base, tag)
     if (rcNumber !== null) {
       numbers.push(rcNumber)
     }
@@ -62,7 +64,7 @@ export function highestRcForBase(base, { cwd = process.cwd() } = {}) {
   )
   if (logRefs.length > 0) {
     for (const subject of gitLines(['log', '--format=%s', ...logRefs], cwd)) {
-      const rcNumber = rcNumberFromReleaseSubject(base, subject)
+      const rcNumber = forkRcNumberFromReleaseSubject(base, subject)
       if (rcNumber !== null) {
         numbers.push(rcNumber)
       }

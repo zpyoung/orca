@@ -4,9 +4,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
-  highestRcForBase,
-  rcNumberFromReleaseSubject,
-  rcNumberFromTag
+  forkRcNumberFromReleaseSubject,
+  forkRcNumberFromTag,
+  highestRcForBase
 } from './release-rc-history.mjs'
 
 function git(cwd, args) {
@@ -38,50 +38,54 @@ function commit(cwd, message, { allowEmpty = true } = {}) {
 }
 
 describe('release RC history', () => {
-  it('parses only exact desktop RC tag suffixes', () => {
-    expect(rcNumberFromTag('1.4.36', 'v1.4.36-rc.7')).toBe(7)
-    expect(rcNumberFromTag('1.4.36', 'v1.4.36-rc.7-extra')).toBeNull()
-    expect(rcNumberFromTag('1.4.36', 'v1.4.35-rc.7')).toBeNull()
+  it('counts fork RC tags and ignores bare upstream ones', () => {
+    expect(forkRcNumberFromTag('1.4.36', 'v1.4.36-rc.7.zy01')).toBe(7)
+    expect(forkRcNumberFromTag('1.4.36', 'v1.4.36-rc.7')).toBeNull()
+    expect(forkRcNumberFromTag('1.4.36', 'v1.4.36-rc.7.perf')).toBeNull()
+    expect(forkRcNumberFromTag('1.4.36', 'v1.4.36-rc.7.zy01-extra')).toBeNull()
+    expect(forkRcNumberFromTag('1.4.36', 'v1.4.35-rc.7.zy01')).toBeNull()
   })
 
-  it('parses release commit subjects with optional slot markers', () => {
-    expect(rcNumberFromReleaseSubject('1.4.36', 'release: v1.4.36-rc.6')).toBe(6)
+  it('counts fork release subjects with optional slot markers', () => {
+    expect(forkRcNumberFromReleaseSubject('1.4.36', 'release: v1.4.36-rc.6.zy01')).toBe(6)
     expect(
-      rcNumberFromReleaseSubject('1.4.36', 'release: v1.4.36-rc.6 [rc-slot:2026-05-30-03]')
+      forkRcNumberFromReleaseSubject('1.4.36', 'release: v1.4.36-rc.6.zy01 [rc-slot:2026-05-30-03]')
     ).toBe(6)
-    expect(rcNumberFromReleaseSubject('1.4.36', 'release: v1.4.36-rc.6-extra')).toBeNull()
-    expect(rcNumberFromReleaseSubject('1.4.36', 'fix: v1.4.36-rc.6')).toBeNull()
+    expect(forkRcNumberFromReleaseSubject('1.4.36', 'release: v1.4.36-rc.6')).toBeNull()
+    expect(forkRcNumberFromReleaseSubject('1.4.36', 'fix: v1.4.36-rc.6.zy01')).toBeNull()
   })
 
-  it('counts a suffixed side-branch RC from its subject as well as its tag', () => {
-    expect(rcNumberFromTag('1.4.36', 'v1.4.36-rc.6.perf')).toBe(6)
-    expect(rcNumberFromReleaseSubject('1.4.36', 'release: v1.4.36-rc.6.perf')).toBe(6)
-    expect(
-      rcNumberFromReleaseSubject('1.4.36', 'release: v1.4.36-rc.6.perf [rc-slot:2026-05-30-03]')
-    ).toBe(6)
-  })
-
-  it('keeps a suffixed RC counted once its tag is deleted', () => {
+  // Why this case: upstream's release history arrives through every sync. Counting
+  // it would pin the gate to upstream's rc number and refuse every fork cut
+  // anchored at that same merge-base.
+  it('ignores upstream release history inherited through a sync', () => {
     withGitRepo((repo) => {
       commit(repo, 'initial')
       commit(repo, 'release: v1.4.36-rc.5')
       git(repo, ['tag', 'v1.4.36-rc.5'])
-      // Why this case: the subject is the only record left after the tag goes,
-      // and that is precisely when release-cut's explicit-version gate reads
-      // this. Under-reporting rc.6 here lets an explicit 1.4.36-rc.6 cut land
-      // below the v1.4.36-rc.6.perf build that clients already run.
-      commit(repo, 'release: v1.4.36-rc.6.perf')
+      commit(repo, 'release: v1.4.36-rc.6 [rc-slot:2026-05-30-03]')
+
+      expect(highestRcForBase('1.4.36', { cwd: repo })).toBeNull()
+    })
+  })
+
+  it('keeps a fork RC counted once its tag is deleted', () => {
+    withGitRepo((repo) => {
+      commit(repo, 'initial')
+      commit(repo, 'release: v1.4.36-rc.5.zy01')
+      git(repo, ['tag', 'v1.4.36-rc.5.zy01'])
+      commit(repo, 'release: v1.4.36-rc.6.zy01')
 
       expect(highestRcForBase('1.4.36', { cwd: repo })).toBe(6)
     })
   })
 
-  it('keeps RC numbers monotonic after a stale tag is deleted', () => {
+  it('takes the highest fork RC when upstream history interleaves', () => {
     withGitRepo((repo) => {
       commit(repo, 'initial')
-      commit(repo, 'release: v1.4.36-rc.5')
-      git(repo, ['tag', 'v1.4.36-rc.5'])
-      commit(repo, 'release: v1.4.36-rc.6')
+      commit(repo, 'release: v1.4.36-rc.9')
+      commit(repo, 'release: v1.4.36-rc.6.zy01')
+      git(repo, ['tag', 'v1.4.36-rc.6.zy01'])
 
       expect(highestRcForBase('1.4.36', { cwd: repo })).toBe(6)
     })
@@ -91,7 +95,7 @@ describe('release RC history', () => {
     withGitRepo((repo) => {
       commit(repo, 'initial')
       git(repo, ['update-ref', 'refs/remotes/origin/main', 'HEAD'])
-      commit(repo, 'release: v1.4.36-rc.6')
+      commit(repo, 'release: v1.4.36-rc.6.zy01')
       git(repo, ['update-ref', 'refs/remotes/origin/main', 'HEAD'])
       git(repo, ['checkout', 'HEAD~1'])
 

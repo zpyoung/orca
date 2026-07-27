@@ -110,8 +110,13 @@ validation-screenshots/
 test-results/
 playwright-report/
 
-# Agent skill installations (machine-local, populated by agent tooling)
-/.claude/skills/
+# Agent skill installations (machine-local, populated by agent tooling).
+# Exclude directory *contents* rather than the directory itself, so fork-owned
+# skills below can be re-included — git cannot re-include a path whose parent
+# directory is itself excluded.
+/.claude/skills/*
+# Fork-owned, versioned with the repo (not an installation).
+!/.claude/skills/release/
 /.agents/skills/
 /skills-lock.json
 
