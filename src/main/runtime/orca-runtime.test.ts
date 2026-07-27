@@ -1297,7 +1297,7 @@ async function createExplicitAgentStatusHarness(options: {
   getForegroundProcess: (ptyId: string) => Promise<string | null>
   inspectProcess?: (
     ptyId: string
-  ) => Promise<{ foregroundProcess: string | null; hasChildProcesses: boolean }>
+  ) => Promise<{ foregroundProcess: string | null; hasChildProcesses: boolean; unavailable?: true }>
   confirmForegroundProcess?: (ptyId: string) => Promise<string | null>
   title?: string
 }): Promise<{
@@ -6123,6 +6123,45 @@ describe('OrcaRuntimeService', () => {
     )
   })
 
+  it('pins explicit origin preference on runtime open-by-number work item lookups', async () => {
+    const originRepo = {
+      id: TEST_REPO_ID,
+      path: TEST_REPO_PATH,
+      displayName: 'repo',
+      badgeColor: 'blue',
+      addedAt: 1,
+      issueSourcePreference: 'origin' as const
+    }
+    const runtime = new OrcaRuntimeService({
+      ...store,
+      getRepos: () => [originRepo],
+      getRepo: (id: string) => (id === originRepo.id ? originRepo : undefined)
+    } as never)
+    const prRepo = { owner: 'acme', repo: 'orca' }
+
+    await runtime.getRepoWorkItem('id:repo-1', 42, 'pr')
+    await runtime.getRepoWorkItemDetails('id:repo-1', 42, 'pr')
+    await runtime.getRepoWorkItemByOwnerRepo('id:repo-1', prRepo, 42, 'pr')
+
+    expect(getGitHubWorkItemMock).toHaveBeenCalledWith(TEST_REPO_PATH, 42, 'pr', null, {}, 'origin')
+    expect(getGitHubWorkItemDetailsMock).toHaveBeenCalledWith(
+      TEST_REPO_PATH,
+      42,
+      'pr',
+      null,
+      {},
+      'origin'
+    )
+    // Why: explicit owner/repo already pins identity, so it stays preference-free.
+    expect(getGitHubWorkItemByOwnerRepoMock).toHaveBeenCalledWith(
+      TEST_REPO_PATH,
+      prRepo,
+      42,
+      'pr',
+      null
+    )
+  })
+
   it('routes runtime GitHub PR details and actions through the selected WSL project runtime', async () => {
     setPlatform('win32')
     const runtimeStore = {
@@ -6220,7 +6259,8 @@ describe('OrcaRuntimeService', () => {
       42,
       'pr',
       null,
-      localGitOptions
+      localGitOptions,
+      undefined
     )
     expect(getGitHubWorkItemByOwnerRepoMock).toHaveBeenCalledWith(
       TEST_REPO_PATH,
@@ -6235,7 +6275,8 @@ describe('OrcaRuntimeService', () => {
       42,
       'pr',
       null,
-      localGitOptions
+      localGitOptions,
+      undefined
     )
     expect(getGitHubPRChecksMock).toHaveBeenCalledWith(
       TEST_REPO_PATH,
@@ -10542,6 +10583,24 @@ describe('OrcaRuntimeService', () => {
     await expect(runtime.inspectTerminalProcess(handle)).rejects.toBe(failure)
     expect(inspectProcess).toHaveBeenCalledExactlyOnceWith('pty-1')
     expect(providerInspectProcess).toHaveBeenCalledExactlyOnceWith('pty-1')
+    expect(getForegroundProcess).not.toHaveBeenCalled()
+  })
+
+  it('preserves provider unavailable results during process inspection', async () => {
+    const inspection = {
+      foregroundProcess: null,
+      hasChildProcesses: true,
+      unavailable: true as const
+    }
+    const inspectProcess = vi.fn(async () => inspection)
+    const getForegroundProcess = vi.fn(async () => null)
+    const { runtime, handle } = await createExplicitAgentStatusHarness({
+      getForegroundProcess,
+      inspectProcess
+    })
+
+    await expect(runtime.inspectTerminalProcess(handle)).resolves.toEqual(inspection)
+    expect(inspectProcess).toHaveBeenCalledExactlyOnceWith('pty-1')
     expect(getForegroundProcess).not.toHaveBeenCalled()
   })
 
@@ -18843,6 +18902,333 @@ describe('OrcaRuntimeService', () => {
       })
     )
     expect(result.tabs[0]).not.toHaveProperty('launchAgent')
+  })
+
+  it('publishes the hook provider session on a headless mobile tab so native chat can address the transcript', async () => {
+    const paneKey = makePaneKey('claude-tab', HEADLESS_LEAF_ID)
+    const providerSession = {
+      key: 'session_id' as const,
+      id: '7dd0c22c-0ff6-45bf-b88a-cea11c34d073',
+      transcriptPath: '/transcripts/7dd0c22c.jsonl'
+    }
+    const runtime = new OrcaRuntimeService(store, undefined, {
+      // Headless serve has no renderer, so the hook snapshot is the only carrier.
+      getAgentStatusSnapshot: () => [
+        {
+          paneKey,
+          state: 'done',
+          prompt: 'Hi',
+          agentType: 'claude',
+          connectionId: null,
+          receivedAt: Date.now(),
+          stateStartedAt: Date.now(),
+          tabId: 'claude-tab',
+          worktreeId: TEST_WORKTREE_ID,
+          providerSession
+        }
+      ]
+    })
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-claude' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    await runtime.createTerminal(`id:${TEST_WORKTREE_ID}`, {
+      tabId: 'claude-tab',
+      leafId: HEADLESS_LEAF_ID,
+      launchAgent: 'claude',
+      title: 'Terminal'
+    })
+
+    runtime.onPtyData('pty-claude', '\x1b]0;✳ Claude Code\x07', 123)
+    await new Promise<void>((resolve) => setImmediate(resolve))
+
+    const result = await runtime.listMobileSessionTabs(`id:${TEST_WORKTREE_ID}`)
+
+    expect(result.tabs[0]).toEqual(
+      expect.objectContaining({
+        type: 'terminal',
+        agentStatus: expect.objectContaining({ agentType: 'claude', providerSession })
+      })
+    )
+  })
+
+  it('recovers the agent type from the hook row when the pane was launched without an agent hint', async () => {
+    // A user who types `claude` in a plain terminal leaves no launchAgent, and headless
+    // has no renderer to publish one; without the hook's agentType mobile treats the tab
+    // as a non-agent terminal and hides native chat even though the session is addressable.
+    const paneKey = makePaneKey('shell-tab', HEADLESS_LEAF_ID)
+    const providerSession = {
+      key: 'session_id' as const,
+      id: 'ac1f6b90-2f77-4f0e-9c5e-1d2f6a4b8c31',
+      transcriptPath: '/transcripts/ac1f6b90.jsonl'
+    }
+    const runtime = new OrcaRuntimeService(store, undefined, {
+      getAgentStatusSnapshot: () => [
+        {
+          paneKey,
+          state: 'done',
+          prompt: 'Hi',
+          agentType: 'claude',
+          connectionId: null,
+          receivedAt: Date.now(),
+          stateStartedAt: Date.now(),
+          tabId: 'shell-tab',
+          worktreeId: TEST_WORKTREE_ID,
+          providerSession
+        }
+      ]
+    })
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-shell' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    await runtime.createTerminal(`id:${TEST_WORKTREE_ID}`, {
+      tabId: 'shell-tab',
+      leafId: HEADLESS_LEAF_ID,
+      title: 'Terminal'
+    })
+
+    runtime.onPtyData('pty-shell', '\x1b]0;✳ Claude Code\x07', 123)
+    await new Promise<void>((resolve) => setImmediate(resolve))
+
+    const result = await runtime.listMobileSessionTabs(`id:${TEST_WORKTREE_ID}`)
+
+    expect(result.tabs[0]).toEqual(
+      expect.objectContaining({
+        type: 'terminal',
+        agentStatus: expect.objectContaining({ agentType: 'claude', providerSession })
+      })
+    )
+  })
+
+  it('reads one agent-status snapshot per projection, not one per terminal tab', async () => {
+    // The getter rebuilds every known pane's payload on each call, so reading it
+    // inside the per-tab loop made a projection O(tabs x panes) of pure garbage —
+    // worst in headless serve, where every terminal tab takes the hook fallback.
+    let snapshotReads = 0
+    const runtime = new OrcaRuntimeService(store, undefined, {
+      getAgentProviderSessionSnapshot: () => {
+        snapshotReads += 1
+        return []
+      }
+    })
+    runtime.setPtyController({
+      spawn: vi.fn(async () => ({ id: `pty-${snapshotReads}-${Math.random()}` })),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    for (const tabId of ['fan-a', 'fan-b', 'fan-c']) {
+      await runtime.createTerminal(`id:${TEST_WORKTREE_ID}`, {
+        tabId,
+        leafId: HEADLESS_LEAF_ID,
+        launchAgent: 'claude',
+        title: 'Terminal'
+      })
+    }
+    snapshotReads = 0
+
+    const result = await runtime.listMobileSessionTabs(`id:${TEST_WORKTREE_ID}`)
+
+    // Guards the assertion below from passing vacuously on a one-tab projection.
+    expect(result.tabs.filter((tab) => tab.type === 'terminal').length).toBeGreaterThan(1)
+    expect(snapshotReads).toBe(1)
+  })
+
+  it('publishes hook-only identity for a pane that never emitted an agent title', async () => {
+    // The hook row is the whole evidence here: no launchAgent hint, no recognized OSC
+    // title, so `pty.lastAgentStatus` stays unset. Gating the hook read behind that
+    // made the headless carrier unreachable in exactly the case it exists for.
+    const paneKey = makePaneKey('quiet-tab', HEADLESS_LEAF_ID)
+    const providerSession = {
+      key: 'session_id' as const,
+      id: 'b91c7e40-5a2d-4f19-9c33-2a7b6e5d4c88',
+      transcriptPath: '/transcripts/b91c7e40.jsonl'
+    }
+    const runtime = new OrcaRuntimeService(store, undefined, {
+      getAgentStatusSnapshot: () => [
+        {
+          paneKey,
+          state: 'done',
+          prompt: 'Hi',
+          agentType: 'claude',
+          connectionId: null,
+          receivedAt: Date.now(),
+          stateStartedAt: Date.now(),
+          tabId: 'quiet-tab',
+          worktreeId: TEST_WORKTREE_ID,
+          providerSession
+        }
+      ]
+    })
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-quiet' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    await runtime.createTerminal(`id:${TEST_WORKTREE_ID}`, {
+      tabId: 'quiet-tab',
+      leafId: HEADLESS_LEAF_ID,
+      title: 'Terminal'
+    })
+
+    const result = await runtime.listMobileSessionTabs(`id:${TEST_WORKTREE_ID}`)
+
+    expect(result.tabs[0]).toEqual(
+      expect.objectContaining({
+        type: 'terminal',
+        agentStatus: expect.objectContaining({ agentType: 'claude', providerSession })
+      })
+    )
+  })
+
+  it('reads a resume-identity-only row the live-agent snapshot filters out', async () => {
+    // Pi publishes its session separately from status, and the shared getter drops
+    // those rows so they can't read as running agents — leaving native chat with no
+    // transcript to address unless the unfiltered snapshot is consulted too.
+    const paneKey = makePaneKey('pi-tab', HEADLESS_LEAF_ID)
+    const providerSession = {
+      key: 'session_id' as const,
+      id: '/sessions/pi-1.json',
+      transcriptPath: '/sessions/pi-1.json'
+    }
+    const now = Date.now()
+    const runtime = new OrcaRuntimeService(store, undefined, {
+      getAgentProviderSessionSnapshot: () => [
+        {
+          paneKey,
+          state: 'done',
+          prompt: '',
+          agentType: 'pi',
+          connectionId: null,
+          receivedAt: now + 1,
+          stateStartedAt: now + 1,
+          tabId: 'pi-tab',
+          worktreeId: TEST_WORKTREE_ID,
+          providerSession,
+          providerSessionOnly: true
+        }
+      ]
+    })
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-pi' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    await runtime.createTerminal(`id:${TEST_WORKTREE_ID}`, {
+      tabId: 'pi-tab',
+      leafId: HEADLESS_LEAF_ID,
+      title: 'Terminal'
+    })
+
+    const result = await runtime.listMobileSessionTabs(`id:${TEST_WORKTREE_ID}`)
+
+    expect(result.tabs[0]).toEqual(
+      expect.objectContaining({
+        type: 'terminal',
+        agentStatus: expect.objectContaining({ agentType: 'pi', providerSession })
+      })
+    )
+  })
+
+  it('does not let stale Pi resume metadata claim a plain terminal', async () => {
+    const paneKey = makePaneKey('stale-pi-tab', HEADLESS_LEAF_ID)
+    const runtime = new OrcaRuntimeService(store, undefined, {
+      getAgentProviderSessionSnapshot: () => [
+        {
+          paneKey,
+          state: 'done',
+          prompt: '',
+          agentType: 'pi',
+          connectionId: null,
+          receivedAt: Date.now() - AGENT_STATUS_STALE_AFTER_MS - 1,
+          stateStartedAt: Date.now() - AGENT_STATUS_STALE_AFTER_MS - 1,
+          tabId: 'stale-pi-tab',
+          worktreeId: TEST_WORKTREE_ID,
+          providerSession: {
+            key: 'session_id',
+            id: '/sessions/stale-pi.json',
+            transcriptPath: '/sessions/stale-pi.json'
+          },
+          providerSessionOnly: true
+        }
+      ]
+    })
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-stale-pi' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    await runtime.createTerminal(`id:${TEST_WORKTREE_ID}`, {
+      tabId: 'stale-pi-tab',
+      leafId: HEADLESS_LEAF_ID,
+      title: 'Terminal'
+    })
+
+    const result = await runtime.listMobileSessionTabs(`id:${TEST_WORKTREE_ID}`)
+
+    expect(result.tabs[0]).toEqual(
+      expect.objectContaining({
+        type: 'terminal',
+        agentStatus: expect.not.objectContaining({ agentType: 'pi' })
+      })
+    )
+  })
+
+  it('does not claim a stale hook agent owns a pane whose agent has since exited', async () => {
+    // `pty.lastAgentStatus` outlives the agent, so an unbounded hook read would keep
+    // offering mobile native chat for what is now a plain shell — and point it at a
+    // dead transcript. The session id may stay; the ownership claim must not.
+    const paneKey = makePaneKey('exited-tab', HEADLESS_LEAF_ID)
+    const staleReceivedAt = Date.now() - AGENT_STATUS_STALE_AFTER_MS - 1_000
+    const runtime = new OrcaRuntimeService(store, undefined, {
+      getAgentStatusSnapshot: () => [
+        {
+          paneKey,
+          state: 'done',
+          prompt: 'Hi',
+          agentType: 'claude',
+          connectionId: null,
+          receivedAt: staleReceivedAt,
+          stateStartedAt: staleReceivedAt,
+          tabId: 'exited-tab',
+          worktreeId: TEST_WORKTREE_ID,
+          providerSession: {
+            key: 'session_id' as const,
+            id: 'd4c3b2a1-0000-4000-8000-000000000001',
+            transcriptPath: '/transcripts/d4c3b2a1.jsonl'
+          }
+        }
+      ]
+    })
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-exited' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    await runtime.createTerminal(`id:${TEST_WORKTREE_ID}`, {
+      tabId: 'exited-tab',
+      leafId: HEADLESS_LEAF_ID,
+      title: 'Terminal'
+    })
+
+    runtime.onPtyData('pty-exited', '\x1b]0;✳ Claude Code\x07', 123)
+    await new Promise<void>((resolve) => setImmediate(resolve))
+
+    const result = await runtime.listMobileSessionTabs(`id:${TEST_WORKTREE_ID}`)
+
+    const tab = result.tabs[0]
+    expect(tab?.type).toBe('terminal')
+    const agentStatus = tab && 'agentStatus' in tab ? tab.agentStatus : null
+    expect(agentStatus?.agentType ?? null).toBeNull()
   })
 
   it('waits for unknown-launch foreground owner before publishing Pi-compatible mobile status', async () => {
@@ -34515,10 +34901,20 @@ describe('OrcaRuntimeService', () => {
     expect(updateSettings).not.toHaveBeenCalled()
   })
 
-  it('routes runtime GitHub PR base git calls through the selected WSL project runtime', async () => {
+  it('threads explicit origin preference through runtime WSL PR base resolution', async () => {
     setPlatform('win32')
+    const localRepo = {
+      id: TEST_REPO_ID,
+      path: TEST_REPO_PATH,
+      displayName: 'repo',
+      badgeColor: 'blue',
+      addedAt: 1,
+      issueSourcePreference: 'origin' as const
+    }
     const runtimeStore = {
       ...store,
+      getRepos: () => [localRepo],
+      getRepo: (id: string) => (id === localRepo.id ? localRepo : undefined),
       getProjects: () => [
         {
           id: 'project-1',
@@ -34546,8 +34942,18 @@ describe('OrcaRuntimeService', () => {
       if (args[0] === 'config') {
         return { stdout: 'origin\n', stderr: '' }
       }
+      if (args[0] === 'remote' && args[1] === 'get-url') {
+        if (args[2] !== 'origin' && args[2] !== 'upstream') {
+          throw new Error(`unexpected remote: ${String(args[2])}`)
+        }
+        const url =
+          args[2] === 'origin'
+            ? 'git@github.com:org/repo.git'
+            : 'git@github.com:org/upstream-repo.git'
+        return { stdout: `${url}\n`, stderr: '' }
+      }
       if (args[0] === 'remote') {
-        return { stdout: 'origin\n', stderr: '' }
+        return { stdout: 'origin\nupstream\n', stderr: '' }
       }
       if (args[0] === 'fetch') {
         return { stdout: '', stderr: '' }
@@ -34575,11 +34981,6 @@ describe('OrcaRuntimeService', () => {
         headSha: 'pr-head-sha',
         branchNameOverride: 'feature/add-feature'
       })
-      expect(gitSpy).toHaveBeenCalledWith(['symbolic-ref', '--quiet', 'refs/remotes/origin/HEAD'], {
-        cwd: TEST_REPO_PATH,
-        timeout: 15_000,
-        wslDistro: 'Ubuntu'
-      })
       expect(gitSpy).toHaveBeenCalledWith(
         [
           'fetch',
@@ -34592,6 +34993,12 @@ describe('OrcaRuntimeService', () => {
         cwd: TEST_REPO_PATH,
         wslDistro: 'Ubuntu'
       })
+      // Why: the explicit origin preference must short-circuit before any
+      // identity probe, so no remote — not just upstream — gets a get-url.
+      expect(gitSpy).not.toHaveBeenCalledWith(
+        ['remote', 'get-url', expect.anything()],
+        expect.anything()
+      )
     } finally {
       gitSpy.mockRestore()
     }
@@ -34604,7 +35011,8 @@ describe('OrcaRuntimeService', () => {
       displayName: 'repo',
       badgeColor: 'blue',
       addedAt: 1,
-      connectionId: 'ssh-1'
+      connectionId: 'ssh-1',
+      issueSourcePreference: 'origin' as const
     }
     const runtimeStore = {
       ...store,
@@ -34617,7 +35025,7 @@ describe('OrcaRuntimeService', () => {
           return { stdout: `${ORIGIN_REMOTE_URL}\n`, stderr: '' }
         }
         if (args[0] === 'remote') {
-          return { stdout: 'origin\n', stderr: '' }
+          return { stdout: 'origin\nupstream\n', stderr: '' }
         }
         if (
           args[0] === 'rev-parse' &&
@@ -34648,6 +35056,13 @@ describe('OrcaRuntimeService', () => {
       branchNameOverride: 'contributor/fix'
     })
     expect(provider.fetchGitHubPullRequestHead).toHaveBeenCalledWith('/remote/repo', 'origin', 42)
+    expect(getPullRequestPushTargetMock).toHaveBeenCalledWith(
+      '/remote/repo',
+      42,
+      'ssh-1',
+      {},
+      'origin'
+    )
     expect(provider.exec).not.toHaveBeenCalledWith(
       expect.arrayContaining(['fetch']),
       '/remote/repo'

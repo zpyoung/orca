@@ -247,8 +247,13 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     // Why: default-on everywhere so it round-trips across platforms; only darwin acts on it.
     showMenuBarIcon: true,
     terminalClipboardOnSelect: false,
-    // Why: OSC 52 is a clipboard data-exfiltration vector; default off (query stays disabled separately).
-    terminalAllowOsc52Clipboard: false,
+    // Why: default on so Zellij/tmux/nvim copy works out of the box. Query
+    // replies stay disabled and payload size is capped in the OSC 52 handler.
+    // This default only covers new profiles; existing ones persisted `false`
+    // and are flipped once by the stamp below (shared/osc52-clipboard-settings.ts,
+    // applied by both the Electron store and the web client's localStorage store).
+    terminalAllowOsc52Clipboard: true,
+    terminalAllowOsc52ClipboardDefaultedOnForAllUsers: true,
     claudeAgentTeamsMode: 'off',
     setupScriptLaunchMode: 'new-tab',
     terminalScrollbackRows: DESKTOP_TERMINAL_SCROLLBACK_ROWS_DEFAULT,
@@ -300,6 +305,10 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     terminalModelQueryAuthority: true,
     defaultTuiAgent: null,
     disabledTuiAgents: [...DEFAULT_DISABLED_TUI_AGENTS],
+    pluginSystemEnabled: false,
+    disabledPlugins: [],
+    pluginConsents: {},
+    devPluginPaths: [],
     claudeAgentTeamsDefaultDisabledMigrated: true,
     skipDeleteWorktreeConfirm: false,
     skipCloseTerminalWithRunningProcessConfirm: false,
@@ -454,6 +463,8 @@ export function getDefaultUIState(): PersistedUIState {
     showSleepingWorkspaces: DEFAULT_SHOW_SLEEPING_WORKSPACES,
     hideDefaultBranchWorkspace: false,
     hideAutomationGeneratedWorkspaces: false,
+    hideCliCreatedWorkspaces: false,
+    hideDetachedHeadWorkspaces: false,
     showDotfilesByWorktree: {},
     filterRepoIds: [],
     collapsedGroups: [],
@@ -484,6 +495,8 @@ export function getDefaultUIState(): PersistedUIState {
     setupGuideBrowserMilestoneLegacyComplete: false,
     browserImportHintHidden: false,
     trayMinimizeNoticeShown: false,
+    // Why: fresh profiles start on the new default, so nothing was overridden to report.
+    osc52ClipboardDefaultOnNoticePending: false,
     mobileEmulatorTabIntroDismissed: false,
     mobileEmulatorAgentSetupDismissed: false,
     // Why: only upgraded profiles saw the old ordering, so only they get the one-time notice.

@@ -59,7 +59,11 @@ import { MobileDriverOverlay } from './MobileDriverOverlay'
 import { stripSshReconnectOwnedErrorLines, TerminalErrorToast } from './TerminalErrorToast'
 import { TerminalSessionStateSaveFailureDialog } from './TerminalSessionStateSaveFailureDialog'
 import TerminalContextMenu from './TerminalContextMenu'
-import TerminalPaneHeaderOverlay from './TerminalPaneHeaderOverlay'
+import TerminalPaneHeaderOverlay, { type PaneTitleOverlayRect } from './TerminalPaneHeaderOverlay'
+import {
+  arePaneTitleOverlayRectsEqual,
+  clearPaneTitleOverlayRects
+} from './pane-title-overlay-rects'
 import NativeChatView from '../native-chat/NativeChatView'
 import { splitTerminalPaneWithInheritedCwd } from './terminal-pane-split-with-inherited-cwd'
 import { TerminalAgentSessionForkDialog } from './TerminalAgentSessionForkDialog'
@@ -236,12 +240,7 @@ type TerminalPaneProps = {
   showSplitButton?: boolean
   onPtyExit: (ptyId: string) => void
   onCloseTab: () => void
-}
-
-type PaneTitleOverlayRect = {
-  left: number
-  top: number
-  width: number
+  onInitialRenderSettled?: () => void
 }
 
 type TerminalQuickCommandEditorDialogProps = {
@@ -274,24 +273,6 @@ function formatClipboardImagePasteError(error: unknown): string {
   return `Image paste failed: ${detail}`
 }
 
-function arePaneTitleOverlayRectsEqual(
-  a: Record<number, PaneTitleOverlayRect>,
-  b: Record<number, PaneTitleOverlayRect>
-): boolean {
-  const aKeys = Object.keys(a)
-  const bKeys = Object.keys(b)
-  if (aKeys.length !== bKeys.length) {
-    return false
-  }
-  return aKeys.every((key) => {
-    const paneId = Number(key)
-    const left = Math.abs((a[paneId]?.left ?? 0) - (b[paneId]?.left ?? 0))
-    const top = Math.abs((a[paneId]?.top ?? 0) - (b[paneId]?.top ?? 0))
-    const width = Math.abs((a[paneId]?.width ?? 0) - (b[paneId]?.width ?? 0))
-    return left < 0.5 && top < 0.5 && width < 0.5
-  })
-}
-
 export default function TerminalPane({
   tabId,
   worktreeId,
@@ -302,7 +283,8 @@ export default function TerminalPane({
   isolatedPaneKey = null,
   showSplitButton = true,
   onPtyExit,
-  onCloseTab
+  onCloseTab,
+  onInitialRenderSettled
 }: TerminalPaneProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const managerRef = useRef<PaneManager | null>(null)
@@ -331,6 +313,8 @@ export default function TerminalPane({
   const isRendererVisible = isVisible && isWorktreeActive
   const isVisibleRef = useRef(isRendererVisible)
   isVisibleRef.current = isRendererVisible
+  const onInitialRenderSettledRef = useRef(onInitialRenderSettled)
+  onInitialRenderSettledRef.current = onInitialRenderSettled
   const sshReconnectTargetId = useAppStore((store) => {
     const connectionId = getConnectionIdFromState(store, worktreeId)
     // Why: runtime-owned SSH targets are internal plumbing users can't connect to, so a reconnect prompt would mislead.
@@ -1467,7 +1451,8 @@ export default function TerminalPane({
     setPaneCount,
     setPaneLayoutRevision,
     resolveExternalPaneDropTarget,
-    onExternalPaneDrop: handleExternalPaneDrop
+    onExternalPaneDrop: handleExternalPaneDrop,
+    onInitialRenderSettledRef
   })
 
   useEffect(() => {
@@ -2268,7 +2253,7 @@ export default function TerminalPane({
     const manager = managerRef.current
     const container = containerRef.current
     if (!manager || !container) {
-      setPaneTitleOverlayRects({})
+      setPaneTitleOverlayRects(clearPaneTitleOverlayRects)
       return
     }
     const containerRect = container.getBoundingClientRect()
@@ -2293,7 +2278,7 @@ export default function TerminalPane({
     const manager = managerRef.current
     const container = containerRef.current
     if (!manager || !container) {
-      setPaneTitleOverlayRects({})
+      setPaneTitleOverlayRects(clearPaneTitleOverlayRects)
       return
     }
 
