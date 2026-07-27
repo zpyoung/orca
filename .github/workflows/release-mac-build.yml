@@ -27,7 +27,12 @@ jobs:
     # Fork: GitHub-hosted macOS runner (no Blacksmith on this fork). Signs +
     # notarizes with the fork's own Apple Developer ID secrets.
     runs-on: macos-15
-    timeout-minutes: 60
+    # Fork: notarization here runs ~40-45min (new Developer ID team, and the app
+    # carries many nested signed components across two arches), vs ~9min total
+    # upstream on Blacksmith. Upstream's 60 left no room: one 45min attempt ate
+    # the budget and the job died mid-notarize with the submission already
+    # Accepted at Apple. Sized so a full retry fits (50 + 0.5 + 50).
+    timeout-minutes: 120
     env:
       NODE_OPTIONS: --max-old-space-size=4096
     steps:
@@ -135,8 +140,11 @@ jobs:
       - name: Publish release artifacts (macOS)
         uses: nick-fields/retry@v4
         with:
-          timeout_minutes: 45
-          max_attempts: 3
+          # max_attempts is 2, not upstream's 3: at 50min an attempt, three of
+          # them cannot fit under any sane job cap, so a 3 here would restore
+          # the same unreachable-retry illusion this timeout pair just cost.
+          timeout_minutes: 50
+          max_attempts: 2
           retry_wait_seconds: 30
           command: node config/scripts/ensure-native-runtime.mjs --runtime=electron && ORCA_MAC_RELEASE=1 pnpm exec electron-builder --config config/electron-builder.config.cjs --mac --publish always
         env:
