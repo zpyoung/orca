@@ -1,5 +1,5 @@
 ---
-last_released_commit: d10c1ec30ccfa7038e2d6793890ad77b5beb319f
+last_released_commit: 18bcfd42d851cd170448df47028eb6b01888404f
 upstream_synced: v1.4.160-rc.0
 ---
 
@@ -12,12 +12,14 @@ line per release, and detailed in each GitHub release's generated notes.
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
 
-## [1.4.160-rc.0.zy02] - 2026-07-27
+## [1.4.160-rc.0.zy03] - 2026-07-27
 
 Synced to upstream [v1.4.160-rc.0](https://github.com/stablyai/orca/releases/tag/v1.4.160-rc.0).
 
-Supersedes `1.4.160-rc.0.zy01`, which was tagged but never shipped — its build failed before
-signing, so no artifacts were published under that version and its changes reach users here.
+The first release of this fork to publish artifacts. `1.4.160-rc.0.zy01` and `1.4.160-rc.0.zy02`
+were tagged but never shipped — zy01 had no macOS signing credentials, and zy02 signed and
+notarized successfully but ran out of build time before it could staple and upload. Everything
+below reaches users here.
 
 ### Added
 - A `release` skill that records fork-owned changes in this file and cuts a versioned build from
