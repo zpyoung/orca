@@ -182,11 +182,19 @@ git commit -m "docs(changelog): release ${TAG}"
 git push origin main
 
 gh workflow run release-cut.yml \
+  --repo zpyoung/orca \
   -f kind=rc \
   -f ref=main \
   -f version="${VERSION_BASE}" \
   -f version_suffix="${VERSION_SUFFIX}"
 ```
+
+`--repo` is **not optional**. The clone has an `upstream` remote and no `gh repo set-default`, so a
+bare `gh` command resolves to `stablyai/orca`, not the fork. The dispatch then fails `HTTP 403`
+(the account has read-only access upstream), which reads as a credentials problem and sends you
+debugging auth rather than the target. Read-only `gh` commands are worse — they succeed against the
+wrong repo and return upstream's data as if it were the fork's, so `--repo` belongs on every `gh`
+call here, not just the dispatch.
 
 Pass `version` and `version_suffix` separately — never the joined `$TAG`, and never `$TAG` with a
 leading `v`. `kind` is a required input; it is ignored when `version` is set, but must still be
@@ -195,8 +203,13 @@ passed.
 Report the run URL:
 
 ```sh
-gh run list --workflow=release-cut.yml --limit 1 --json url,status
+gh run list --repo zpyoung/orca --workflow=release-cut.yml --limit 1 --json url,status
 ```
+
+**`dry_run=true` cannot validate any of this.** Its `if:` condition also skips release-cut's
+"Compute next version" step, so a dry run never evaluates the version gate, the rc/suffix history,
+or the tag it would cut — it only echoes the schedule-window state, which a manual dispatch already
+bypasses. There is no way to rehearse a cut; verify by reading the gate, then dispatch for real.
 
 ## 7. Report
 
