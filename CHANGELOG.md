@@ -1,5 +1,5 @@
 ---
-last_released_commit: 1f3303bd2a45c32a66a1238e6777d875ecfd35fa
+last_released_commit: d10c1ec30ccfa7038e2d6793890ad77b5beb319f
 upstream_synced: v1.4.160-rc.0
 ---
 
@@ -12,9 +12,12 @@ line per release, and detailed in each GitHub release's generated notes.
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
 
-## [1.4.160-rc.0.zy01] - 2026-07-27
+## [1.4.160-rc.0.zy02] - 2026-07-27
 
 Synced to upstream [v1.4.160-rc.0](https://github.com/stablyai/orca/releases/tag/v1.4.160-rc.0).
+
+Supersedes `1.4.160-rc.0.zy01`, which was tagged but never shipped — its build failed before
+signing, so no artifacts were published under that version and its changes reach users here.
 
 ### Added
 - A `release` skill that records fork-owned changes in this file and cuts a versioned build from
@@ -26,6 +29,8 @@ Synced to upstream [v1.4.160-rc.0](https://github.com/stablyai/orca/releases/tag
   official Orca install instead of replacing it.
 - The sidebar workspace list is denser: less space between rows, shorter section headers, and
   tighter padding inside each workspace card.
+- Builds no longer collect or transmit telemetry. This fork runs no analytics project, so the
+  transport is compiled out of the binary rather than left dormant behind a consent check.
 
 ### Fixed
 - Sidebar host headers no longer overlap the row beneath them at the tighter row spacing.
