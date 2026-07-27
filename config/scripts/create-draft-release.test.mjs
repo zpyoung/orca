@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   createDraftRelease,
+  extractChangelogSection,
   latestPreviousPublishedDesktopReleaseTag,
   parseDesktopReleaseTag,
   truncateReleaseBody
@@ -54,6 +55,104 @@ describe('parseDesktopReleaseTag', () => {
       rc: 2
     })
     expect(parseDesktopReleaseTag('mobile-v0.0.12')).toBeNull()
+  })
+
+  it('parses fork release tags carrying a zy suffix', () => {
+    expect(parseDesktopReleaseTag('v1.4.151-rc.1.zy01')).toMatchObject({
+      tag: 'v1.4.151-rc.1.zy01',
+      major: 1,
+      minor: 4,
+      patch: 151,
+      rc: 1,
+      fork: 1
+    })
+  })
+
+  it('rejects a zy suffix on a stable tag, which the version rule never produces', () => {
+    expect(parseDesktopReleaseTag('v1.4.151.zy01')).toBeNull()
+  })
+
+  // Why: zyNN is one alphanumeric semver identifier compared as a string, so
+  // only a fixed width keeps string order and numeric order in agreement.
+  // zy1 sorts above zy01, and zy100 below zy99 — both would be mis-ranked here.
+  it('accepts only a two-digit zy counter', () => {
+    expect(parseDesktopReleaseTag('v1.4.151-rc.1.zy01')).toMatchObject({ fork: 1 })
+    expect(parseDesktopReleaseTag('v1.4.151-rc.1.zy99')).toMatchObject({ fork: 99 })
+    expect(parseDesktopReleaseTag('v1.4.151-rc.1.zy1')).toBeNull()
+    expect(parseDesktopReleaseTag('v1.4.151-rc.1.zy100')).toBeNull()
+  })
+})
+
+describe('fork release tag ordering', () => {
+  it('bounds fork notes to the upstream rc the build is anchored on', () => {
+    expect(
+      latestPreviousPublishedDesktopReleaseTag(
+        [release('v1.4.151-rc.1'), release('v1.4.151-rc.1.zy01')],
+        'v1.4.151-rc.1.zy01'
+      )
+    ).toBe('v1.4.151-rc.1')
+  })
+
+  it('bounds a later fork cut to the prior fork cut on the same anchor', () => {
+    expect(
+      latestPreviousPublishedDesktopReleaseTag(
+        [release('v1.4.151-rc.1.zy01'), release('v1.4.151-rc.1.zy02')],
+        'v1.4.151-rc.1.zy02'
+      )
+    ).toBe('v1.4.151-rc.1.zy01')
+  })
+
+  it('bounds a new anchor to the fork cut on the previous anchor', () => {
+    expect(
+      latestPreviousPublishedDesktopReleaseTag(
+        [release('v1.4.151-rc.1.zy01'), release('v1.4.156-rc.2.zy01')],
+        'v1.4.156-rc.2.zy01'
+      )
+    ).toBe('v1.4.151-rc.1.zy01')
+  })
+})
+
+describe('extractChangelogSection', () => {
+  const changelog = [
+    '---',
+    'last_released_commit: abc123',
+    '---',
+    '',
+    '# Changelog',
+    '',
+    '## [1.4.156-rc.2.zy01] - 2026-07-27',
+    '',
+    'Synced to upstream v1.4.156-rc.2.',
+    '',
+    '### Changed',
+    '- Newer entry.',
+    '',
+    '## [1.4.151-rc.1.zy01] - 2026-07-26',
+    '',
+    '### Changed',
+    '- Older entry.',
+    ''
+  ].join('\n')
+
+  it('returns the section body for the matching tag without its heading', () => {
+    const section = extractChangelogSection(changelog, 'v1.4.156-rc.2.zy01')
+
+    expect(section).toContain('Synced to upstream v1.4.156-rc.2.')
+    expect(section).toContain('- Newer entry.')
+    expect(section).not.toContain('## [1.4.156-rc.2.zy01]')
+  })
+
+  it('stops at the next version heading', () => {
+    expect(extractChangelogSection(changelog, 'v1.4.156-rc.2.zy01')).not.toContain('- Older entry.')
+  })
+
+  it('reads the last section through to end of file', () => {
+    expect(extractChangelogSection(changelog, 'v1.4.151-rc.1.zy01')).toContain('- Older entry.')
+  })
+
+  it('returns empty string when the tag has no section or the changelog is missing', () => {
+    expect(extractChangelogSection(changelog, 'v9.9.9')).toBe('')
+    expect(extractChangelogSection('', 'v1.4.156-rc.2.zy01')).toBe('')
   })
 })
 
@@ -218,6 +317,71 @@ describe('createDraftRelease', () => {
     const generateNotesBody = JSON.parse(fetchImpl.mock.calls[1][1].body)
     expect(generateNotesBody).toEqual({ tag_name: 'v1.4.36', target_commitish: 'v1.4.36' })
     expect(generateNotesBody).not.toHaveProperty('previous_tag_name')
+  })
+
+  it('leads the release body with the changelog section for the tag', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([release('v1.4.151-rc.1')]))
+      .mockResolvedValueOnce(jsonResponse({ name: 'v1.4.151-rc.1.zy01', body: 'upstream notes' }))
+      .mockResolvedValueOnce(jsonResponse({ tag_name: 'v1.4.151-rc.1.zy01', draft: true }))
+
+    await createDraftRelease({
+      repo: 'zpyoung/orca',
+      tag: 'v1.4.151-rc.1.zy01',
+      token: 'token',
+      fetchImpl,
+      log: vi.fn(),
+      readChangelog: () => '# Changelog\n\n## [1.4.151-rc.1.zy01] - 2026-07-27\n\n- Fork entry.\n'
+    })
+
+    const createBody = JSON.parse(fetchImpl.mock.calls[2][1].body)
+    expect(createBody.body).toBe('- Fork entry.\n\n---\n\nupstream notes')
+    expect(createBody.prerelease).toBe(true)
+  })
+
+  it('falls back to generated notes when the changelog has no section for the tag', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([release('v1.4.151-rc.1')]))
+      .mockResolvedValueOnce(jsonResponse({ name: 'v1.4.151-rc.1.zy01', body: 'upstream notes' }))
+      .mockResolvedValueOnce(jsonResponse({ tag_name: 'v1.4.151-rc.1.zy01', draft: true }))
+
+    await createDraftRelease({
+      repo: 'zpyoung/orca',
+      tag: 'v1.4.151-rc.1.zy01',
+      token: 'token',
+      fetchImpl,
+      log: vi.fn(),
+      readChangelog: () => ''
+    })
+
+    const createBody = JSON.parse(fetchImpl.mock.calls[2][1].body)
+    expect(createBody.body).toBe('upstream notes')
+  })
+
+  it('keeps the changelog section when the combined body must be truncated', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([release('v1.4.151-rc.1')]))
+      .mockResolvedValueOnce(
+        jsonResponse({ name: 'v1.4.151-rc.1.zy01', body: 'a'.repeat(130_000) })
+      )
+      .mockResolvedValueOnce(jsonResponse({ tag_name: 'v1.4.151-rc.1.zy01', draft: true }))
+
+    await createDraftRelease({
+      repo: 'zpyoung/orca',
+      tag: 'v1.4.151-rc.1.zy01',
+      token: 'token',
+      fetchImpl,
+      log: vi.fn(),
+      readChangelog: () => '# Changelog\n\n## [1.4.151-rc.1.zy01] - 2026-07-27\n\n- Fork entry.\n'
+    })
+
+    const createBody = JSON.parse(fetchImpl.mock.calls[2][1].body)
+    expect(createBody.body).toHaveLength(120_000)
+    expect(createBody.body.startsWith('- Fork entry.')).toBe(true)
+    expect(createBody.body).toContain('Release notes were truncated')
   })
 
   it('paginates through every release page before choosing the previous release', async () => {
