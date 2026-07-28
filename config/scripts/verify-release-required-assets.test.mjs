@@ -34,15 +34,21 @@ afterEach(() => {
 })
 
 describe('getRequiredReleaseAssetNames', () => {
-  it('requires the mac manifest and both dmg installers', () => {
+  it('requires the mac manifest and the arm64 dmg installer', () => {
     expect(getRequiredReleaseAssetNames('v1.4.27')).toEqual(
       expect.arrayContaining([
         'latest-mac.yml',
-        'orca-macos-x64.dmg',
-        'orca-macos-x64.dmg.blockmap',
         'orca-macos-arm64.dmg',
         'orca-macos-arm64.dmg.blockmap'
       ])
+    )
+  })
+
+  // Fork: arm64-only, so an x64 asset must not be required — each arch costs a
+  // separate ~40min notarization and no fork machine runs Intel.
+  it('does not require x64 assets', () => {
+    expect(getRequiredReleaseAssetNames('v1.4.27').filter((name) => name.includes('x64'))).toEqual(
+      []
     )
   })
 

@@ -5,16 +5,10 @@ import { pathToFileURL } from 'node:url'
 const API_VERSION = '2022-11-28'
 
 export function getRequiredReleaseAssetNames() {
-  // Fork: mac-only. The mac .zip assets (names derive from productName) are
-  // added dynamically from latest-mac.yml below, so only the
-  // deterministically-named manifest + dmg installers are hardcoded here.
-  return [
-    'latest-mac.yml',
-    'orca-macos-x64.dmg',
-    'orca-macos-x64.dmg.blockmap',
-    'orca-macos-arm64.dmg',
-    'orca-macos-arm64.dmg.blockmap'
-  ]
+  // Fork: mac-only, arm64-only. The mac .zip assets (names derive from
+  // productName) are added dynamically from latest-mac.yml below, so only the
+  // deterministically-named manifest + dmg installer are hardcoded here.
+  return ['latest-mac.yml', 'orca-macos-arm64.dmg', 'orca-macos-arm64.dmg.blockmap']
 }
 
 export function extractManifestAssetNames(manifestText) {
