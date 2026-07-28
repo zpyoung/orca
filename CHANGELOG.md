@@ -1,5 +1,5 @@
 ---
-last_released_commit: 18bcfd42d851cd170448df47028eb6b01888404f
+last_released_commit: e74897f170cb6743c11ac3c66dd471841fb3769d
 upstream_synced: v1.4.160-rc.0
 ---
 
@@ -12,14 +12,13 @@ line per release, and detailed in each GitHub release's generated notes.
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
 
-## [1.4.160-rc.0.zy03] - 2026-07-27
+## [1.4.160-rc.0.zy04] - 2026-07-28
 
 Synced to upstream [v1.4.160-rc.0](https://github.com/stablyai/orca/releases/tag/v1.4.160-rc.0).
 
-The first release of this fork to publish artifacts. `1.4.160-rc.0.zy01` and `1.4.160-rc.0.zy02`
-were tagged but never shipped — zy01 had no macOS signing credentials, and zy02 signed and
-notarized successfully but ran out of build time before it could staple and upload. Everything
-below reaches users here.
+The first release of this fork to publish artifacts. `1.4.160-rc.0.zy01` through
+`1.4.160-rc.0.zy03` were tagged but never shipped — zy01 had no macOS signing credentials, and
+zy02 and zy03 ran out of build time while Apple notarized. Everything below reaches users here.
 
 ### Added
 - A `release` skill that records fork-owned changes in this file and cuts a versioned build from
@@ -29,6 +28,8 @@ below reaches users here.
 - Release builds are signed, notarized, macOS-only, and auto-update from this fork rather than
   upstream. The app installs under its own name and bundle identifier, so it runs alongside an
   official Orca install instead of replacing it.
+- Builds are Apple Silicon only. Intel Macs are no longer supported: every architecture needs its
+  own notarization pass from Apple, and no machine running this fork is Intel.
 - The sidebar workspace list is denser: less space between rows, shorter section headers, and
   tighter padding inside each workspace card.
 - Builds no longer collect or transmit telemetry. This fork runs no analytics project, so the
