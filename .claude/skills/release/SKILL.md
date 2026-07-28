@@ -33,22 +33,38 @@ push as non-fast-forward.
 ## 2. Resolve the release inputs
 
 ```sh
-MERGE_BASE=$(git merge-base upstream/main HEAD)
-ANCHOR=$(git describe --tags --abbrev=0 --match 'v[0-9]*' "$MERGE_BASE")
+ANCHOR=$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude '*-rc*' --exclude '*.zy*' HEAD)
 GAP=$(git rev-list --count HEAD..upstream/main)
 ```
+
+The anchor is the newest upstream **stable** tag reachable from `HEAD` — the release the sync
+automation last merged. Do not compute it from `git merge-base upstream/main HEAD`. Upstream cuts
+its stable tags on release branches rather than on `main`, and those branches carry no trunk commits
+of their own, so merging one never advances the merge base. Since the sync no longer merges
+`upstream/main` at all, that merge base freezes at the last trunk commit the fork absorbed and the
+anchor is stuck there forever — reporting the same rc while the fork ships v1.4.161, v1.4.162, and
+onward. Both `--exclude`s matter too: upstream rc tags and the fork's own `…-rc.N.zyNN` tags are all
+reachable from `HEAD` and would otherwise win.
+
+If `git describe` finds no match, **stop and report**: it means no upstream stable release has been
+merged yet. Do not fall back to an rc tag.
 
 Read `last_released_commit` and `upstream_synced` from `CHANGELOG.md`'s YAML frontmatter, then
 list candidate commits:
 
 ```sh
-git log --no-merges --format='%H%x09%an%x09%s' "$LAST_RELEASED_COMMIT"..HEAD ^upstream/main
+git log --no-merges --format='%H%x09%an%x09%s' "$LAST_RELEASED_COMMIT"..HEAD ^upstream/main ^"$ANCHOR"
 ```
 
-`^upstream/main` is **not optional**. `--no-merges` drops merge *commits*, not the upstream commits
+Both exclusions are **not optional**. `--no-merges` drops merge *commits*, not the upstream commits
 a merge brings in — since the sync merges rather than rebases, every upstream commit absorbed since
-the last release is reachable from `HEAD` and would otherwise appear here. Without the exclusion
+the last release is reachable from `HEAD` and would otherwise appear here. Without the exclusions
 this range returns upstream's work and the changelog would describe it as the fork's.
+
+`^upstream/main` alone is not enough. The sync merges a release-branch tag, and upstream builds that
+branch by cherry-picking fixes onto it — so those commits carry release-branch SHAs that are *not*
+reachable from `upstream/main`. They are real-authored, so the bot filter below does not catch them
+either. `^"$ANCHOR"` is what excludes them.
 
 Then **exclude** two more classes from what remains:
 
@@ -68,12 +84,14 @@ replacement.
 Release if **either** holds:
 
 - there is at least one non-bot fork commit in the range, or
-- `$ANCHOR` differs from `upstream_synced` (upstream shipped since the last release)
+- `$ANCHOR` differs from `upstream_synced` (upstream shipped a new stable release since the last one)
 
 If neither holds, report "nothing to release" and stop.
 
 Always report the upstream gap — e.g. *"main is 100 commits behind upstream/main"* — but never let
-it block. It is informational; releases cut from main's actual content.
+it block. It is informational; releases cut from main's actual content. Expect this number to stay
+large and to grow between upstream stable releases: the sync deliberately tracks stable tags, so
+everything upstream has landed on `main` since the last stable cut is unmerged by design.
 
 ## 4. Compute the version
 
