@@ -1,6 +1,6 @@
 ---
-last_released_commit: e74897f170cb6743c11ac3c66dd471841fb3769d
-upstream_synced: v1.4.160-rc.0
+last_released_commit: 346f3ade48858fefb62527f802f7a740b223295e
+upstream_synced: v1.4.159
 ---
 
 # Changelog
@@ -11,6 +11,24 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.160-rc.0.zy05] - 2026-07-28
+
+Synced to upstream [v1.4.159](https://github.com/stablyai/orca/releases/tag/v1.4.159).
+
+This is the first release built on an upstream *stable* tag. Earlier fork releases tracked
+upstream's `main`, which carries unreleased work; the sync automation now merges only what upstream
+has actually shipped, so the fork lands further behind the trunk by design and picks up each stable
+release as it appears.
+
+### Changed
+- Fork versions are now anchored to the newest upstream stable release contained in `main` rather
+  than to a merge base against upstream's trunk. Upstream tags its stable releases on release
+  branches that carry no trunk commits, so the old anchor could never advance past
+  `v1.4.160-rc.0` and would have reported a stale upstream version on every future release.
+- Changelog entries no longer risk attributing upstream's work to this fork. Commits that upstream
+  cherry-picks onto a release branch are authored by real committers and are unreachable from its
+  trunk, so neither the previous range nor the bot-author filter excluded them.
 
 ## [1.4.160-rc.0.zy04] - 2026-07-28
 
