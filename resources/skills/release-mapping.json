@@ -1,4 +1,18 @@
 {
   "schemaVersion": 1,
-  "releases": []
+  "releases": [
+    {
+      "appVersion": "1.4.160-rc.0.zy06",
+      "skills": {
+        "computer-use": 1,
+        "linear-tickets": 1,
+        "orca-cli": 1,
+        "orca-emulator": 1,
+        "orca-emulator-android": 1,
+        "orca-linear": 1,
+        "orca-per-workspace-env": 1,
+        "orchestration": 1
+      }
+    }
+  ]
 }
