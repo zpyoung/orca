@@ -301,14 +301,18 @@ module.exports = {
         to: 'MacOS/orca-notification-status'
       }
     ],
+    // Fork: arm64 only. Each arch is a separate ~40min notarization submission,
+    // so dual-arch put the mac job past any workable timeout; no fork machine
+    // runs Intel, and dropping x64 also sidesteps the cross-arch packaging
+    // hazard described above.
     target: [
       {
         target: 'dmg',
-        arch: ['x64', 'arm64']
+        arch: ['arm64']
       },
       {
         target: 'zip',
-        arch: ['x64', 'arm64']
+        arch: ['arm64']
       }
     ]
   },
