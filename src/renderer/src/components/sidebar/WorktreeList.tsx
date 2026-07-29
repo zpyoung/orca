@@ -154,10 +154,18 @@ import {
 import { isRepoHeaderActionTarget, useRepoHeaderDrag } from './project-header-drag'
 import {
   getLogicalRepoOrderRankById,
-  getSidebarOrderedRepoHeaderIdsByBucket
+  getSidebarOrderedRepoHeaderIdsByBucket,
+  measureProjectHeaderDragRects
 } from './project-header-drop'
 import { useProjectGroupHeaderDrag } from './project-group-header-drag'
-import { getSidebarOrderedProjectGroupHeaderIdsByBucket } from './project-group-header-drop'
+import {
+  getSidebarOrderedProjectGroupHeaderIdsByBucket,
+  measureProjectGroupHeaderDragRects
+} from './project-group-header-drop'
+import {
+  getWorktreeGroupMembershipDropTarget,
+  type WorktreeGroupMembershipDropTarget
+} from './worktree-group-membership-drop'
 import {
   buildManualOrderUpdatesForGroupDrop,
   buildManualOrderUpdatesForVisibleGroups,
@@ -1028,6 +1036,68 @@ function getPointerDropStatusTarget(args: {
   }
 }
 
+// Why: pairs the hit-test result with the dragged worktree's repoId so the
+// render pass can tell "leave" apart from "join" without re-deriving it.
+type WorktreeGroupMembershipDragPreview = {
+  target: WorktreeGroupMembershipDropTarget
+  repoId: string | null
+}
+
+const WORKTREE_GROUP_MEMBERSHIP_DRAG_PREVIEW_NONE: WorktreeGroupMembershipDragPreview = {
+  target: { kind: 'none' },
+  repoId: null
+}
+
+function areWorktreeGroupMembershipDragPreviewsEqual(
+  a: WorktreeGroupMembershipDragPreview,
+  b: WorktreeGroupMembershipDragPreview
+): boolean {
+  if (a.repoId !== b.repoId || a.target.kind !== b.target.kind) {
+    return false
+  }
+  return a.target.kind === 'join' && b.target.kind === 'join'
+    ? a.target.groupId === b.target.groupId
+    : true
+}
+
+// Why: the hit-test module speaks for a single worktree; a multi-select drag
+// has no well-defined "current group" to compare against, so it opts out
+// entirely rather than silently reparenting only the primary card.
+function getPointerWorktreeGroupMembershipDragPreview(args: {
+  container: HTMLElement | null
+  clientY: number
+  draggedIds: readonly string[]
+  worktreeId: string
+  worktreeMap: ReadonlyMap<string, Worktree>
+}): WorktreeGroupMembershipDragPreview {
+  if (!args.container || args.draggedIds.length !== 1) {
+    return WORKTREE_GROUP_MEMBERSHIP_DRAG_PREVIEW_NONE
+  }
+  const draggedWorktree = args.worktreeMap.get(args.worktreeId)
+  if (!draggedWorktree) {
+    return WORKTREE_GROUP_MEMBERSHIP_DRAG_PREVIEW_NONE
+  }
+  const containerRect = args.container.getBoundingClientRect()
+  const pointerY = args.clientY - containerRect.top + args.container.scrollTop
+  const groupHeaderRects = measureProjectGroupHeaderDragRects(args.container).map((rect) => ({
+    groupId: rect.groupId,
+    top: rect.top,
+    bottom: rect.bottom
+  }))
+  const ownRepoHeaderRect = measureProjectHeaderDragRects(args.container).find(
+    (rect) => rect.repoId === draggedWorktree.repoId
+  )
+  const target = getWorktreeGroupMembershipDropTarget({
+    pointerY,
+    groupHeaderRects,
+    draggedWorktree,
+    ownRepoSectionRect: ownRepoHeaderRect
+      ? { top: ownRepoHeaderRect.top, bottom: ownRepoHeaderRect.bottom }
+      : null
+  })
+  return { target, repoId: draggedWorktree.repoId }
+}
+
 function shouldPreferSidebarStatusDropTarget(args: {
   sourceGroupKey: string
   target: WorktreeSidebarStatusDropTarget
@@ -1377,12 +1447,15 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
   const [worktreeDragState, setWorktreeDragState] = useState<WorktreeRowDragState>(
     WORKTREE_ROW_DRAG_INITIAL_STATE
   )
+  const [worktreeGroupMembershipDragPreview, setWorktreeGroupMembershipDragPreview] =
+    useState<WorktreeGroupMembershipDragPreview>(WORKTREE_GROUP_MEMBERSHIP_DRAG_PREVIEW_NONE)
   const [pendingRevealRetryTick, setPendingRevealRetryTick] = useState(0)
   const [documentVisibilityRevision, setDocumentVisibilityRevision] = useState(0)
   const [highlightedRevealRowKey, setHighlightedRevealRowKey] = useState<string | null>(null)
   const setRenamingWorktreeId = useAppStore((s) => s.setRenamingWorktreeId)
   const assignWorktreeParent = useAppStore((s) => s.assignWorktreeParent)
   const updateWorktreeLineage = useAppStore((s) => s.updateWorktreeLineage)
+  const updateWorktreeMeta = useAppStore((s) => s.updateWorktreeMeta)
   const cyclicLineageIds = useMemo(
     () => getCyclicProjectedWorktreeLineageIds(worktreeLineageById, worktreeMap),
     [worktreeLineageById, worktreeMap]
@@ -2644,6 +2717,11 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
     setSidebarPointerDragDocumentStyles(false)
     setDragOverStatus(null)
     setPinDragOver(false)
+    setWorktreeGroupMembershipDragPreview((prev) =>
+      areWorktreeGroupMembershipDragPreviewsEqual(prev, WORKTREE_GROUP_MEMBERSHIP_DRAG_PREVIEW_NONE)
+        ? prev
+        : WORKTREE_GROUP_MEMBERSHIP_DRAG_PREVIEW_NONE
+    )
     clearWorkspaceKanbanSidebarDropTargetVisual()
     onWorkspaceBoardDragPreviewCancel()
   }, [cancelWorktreePointerAutoscroll, onWorkspaceBoardDragPreviewCancel])
@@ -2832,6 +2910,40 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
     }
 
     const sidebarContainer = scrollRef.current
+    // Why: a group-header hit is unambiguous, so it wins over lineage/status/
+    // reorder targets before any of those are even computed.
+    const membershipPreview = getPointerWorktreeGroupMembershipDragPreview({
+      container: sidebarContainer,
+      clientY: drag.currentY,
+      draggedIds: drag.draggedIds,
+      worktreeId: drag.worktreeId,
+      worktreeMap
+    })
+    setWorktreeGroupMembershipDragPreview((prev) =>
+      areWorktreeGroupMembershipDragPreviewsEqual(prev, membershipPreview)
+        ? prev
+        : membershipPreview
+    )
+    if (membershipPreview.target.kind !== 'none') {
+      clearWorkspaceKanbanSidebarDropTargetVisual()
+      setDragOverStatus(null)
+      setPinDragOver(false)
+      setWorktreeDragState((prev) =>
+        prev.dropIndex === null &&
+        prev.dropIndicatorY === null &&
+        prev.pointerY === drag.currentY &&
+        prev.previewOffsetsByWorktreeId.size === 0
+          ? prev
+          : {
+              ...prev,
+              dropIndex: null,
+              dropIndicatorY: null,
+              previewOffsetsByWorktreeId: EMPTY_WORKTREE_DRAG_PREVIEW_OFFSETS,
+              pointerY: drag.currentY
+            }
+      )
+      return
+    }
     const preferredStatusTarget = getEligibleLineageDropTarget(
       sidebarContainer
         ? getPointerDropStatusTarget({
@@ -2987,7 +3099,8 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
     shouldShowWorkspaceBoardDropIndicator,
     getEligibleLineageDropTarget,
     workspaceBoardOpen,
-    workspaceStatuses
+    workspaceStatuses,
+    worktreeMap
   ])
 
   const scheduleWorktreePointerDragFrame = useCallback(
@@ -3228,6 +3341,23 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
           groups: getWorkspaceKanbanSidebarDropGroups()
         })
       } else {
+        const membershipTarget = getPointerWorktreeGroupMembershipDragPreview({
+          container: scrollRef.current,
+          clientY: event.clientY,
+          draggedIds: drag.draggedIds,
+          worktreeId: drag.worktreeId,
+          worktreeMap
+        }).target
+        if (membershipTarget.kind === 'join') {
+          void updateWorktreeMeta(drag.worktreeId, { projectGroupId: membershipTarget.groupId })
+          clearWorktreeDrag()
+          return
+        }
+        if (membershipTarget.kind === 'leave') {
+          void updateWorktreeMeta(drag.worktreeId, { projectGroupId: null })
+          clearWorktreeDrag()
+          return
+        }
         const preferredStatusTarget = getEligibleLineageDropTarget(
           scrollRef.current
             ? getPointerDropStatusTarget({
@@ -3360,8 +3490,10 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
     refreshWorktreeDragSession,
     scheduleWorktreePointerDragFrame,
     shouldShowWorkspaceBoardDropIndicator,
+    updateWorktreeMeta,
     worktreeDragGroups,
     worktreeDragUnitGroups,
+    worktreeMap,
     workspaceStatuses
   ])
 
@@ -4292,6 +4424,15 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
                         'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
                       isPinnedHeader &&
                         pinDragOver &&
+                        'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
+                      projectGroupIdForHeader !== undefined &&
+                        worktreeGroupMembershipDragPreview.target.kind === 'join' &&
+                        worktreeGroupMembershipDragPreview.target.groupId ===
+                          projectGroupIdForHeader &&
+                        'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
+                      projectIdForHeader !== undefined &&
+                        worktreeGroupMembershipDragPreview.target.kind === 'leave' &&
+                        worktreeGroupMembershipDragPreview.repoId === projectIdForHeader &&
                         'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
                       row.repo && 'overflow-hidden'
                     )}
