@@ -1,5 +1,5 @@
 import { normalizeExecutionHostId } from './execution-host'
-import type { Repo, ProjectGroup, ProjectGroupCreatedFrom } from './types'
+import type { Repo, ProjectGroup, ProjectGroupCreatedFrom, WorktreeMeta } from './types'
 
 export const UNGROUPED_PROJECT_GROUP_KEY = 'project-group:ungrouped'
 
@@ -106,6 +106,21 @@ export function clearMissingProjectGroupMemberships(repos: Repo[], groups: Proje
       ? { ...repo, projectGroupId: null }
       : repo
   )
+}
+
+export function clearMissingProjectGroupWorktreeMemberships(
+  worktreeMeta: Record<string, WorktreeMeta>,
+  groups: readonly Pick<ProjectGroup, 'id'>[]
+): Record<string, WorktreeMeta> {
+  const groupIds = new Set(groups.map((group) => group.id))
+  const result: Record<string, WorktreeMeta> = {}
+  for (const [worktreeId, meta] of Object.entries(worktreeMeta)) {
+    result[worktreeId] =
+      meta.projectGroupId && !groupIds.has(meta.projectGroupId)
+        ? { ...meta, projectGroupId: null }
+        : meta
+  }
+  return result
 }
 
 export function getProjectGroupSubtreeIds(

@@ -3524,6 +3524,53 @@ describe('Store', () => {
     expect(store.getRepo('sibling')?.projectGroupId).toBe(sibling.id)
   })
 
+  it('deleteProjectGroup releases worktree membership for the deleted group and its descendants', async () => {
+    const store = await createStore()
+    const root = store.createProjectGroup({ name: 'Platform', createdFrom: 'folder-scan' })
+    const child = store.createProjectGroup({
+      name: 'Services',
+      parentGroupId: root.id,
+      createdFrom: 'folder-scan'
+    })
+    const sibling = store.createProjectGroup({ name: 'Tools', createdFrom: 'manual' })
+    store.setWorktreeMeta('direct::/direct', { displayName: 'direct', projectGroupId: root.id })
+    store.setWorktreeMeta('nested::/nested', { displayName: 'nested', projectGroupId: child.id })
+    store.setWorktreeMeta('sibling::/sibling', { displayName: 'sibling', projectGroupId: sibling.id })
+
+    expect(store.deleteProjectGroup(root.id)).toBe(true)
+
+    const meta = store.getAllWorktreeMeta()
+    expect(meta['direct::/direct'].projectGroupId).toBeNull()
+    expect(meta['nested::/nested'].projectGroupId).toBeNull()
+    expect(meta['sibling::/sibling'].projectGroupId).toBe(sibling.id)
+  })
+
+  it('deleteProjectGroup never deletes a worktree meta entry', async () => {
+    const store = await createStore()
+    const group = store.createProjectGroup({ name: 'Platform', createdFrom: 'manual' })
+    store.setWorktreeMeta('wt1', { displayName: 'wt1', projectGroupId: group.id })
+    store.setWorktreeMeta('wt2', { displayName: 'wt2' })
+
+    expect(store.deleteProjectGroup(group.id)).toBe(true)
+
+    expect(Object.keys(store.getAllWorktreeMeta()).sort()).toEqual(['wt1', 'wt2'])
+  })
+
+  it('deleteProjectGroup still deletes folder workspaces in the deleted group subtree', async () => {
+    const store = await createStore()
+    const group = store.createProjectGroup({
+      name: 'Platform',
+      parentPath: '/workspace/platform',
+      createdFrom: 'folder-scan'
+    })
+    const workspace = store.createFolderWorkspace({ projectGroupId: group.id, name: 'Folder ws' })
+
+    expect(store.deleteProjectGroup(group.id)).toBe(true)
+
+    expect(store.getFolderWorkspace(workspace.id)).toBeUndefined()
+    expect(store.getFolderWorkspaces()).toHaveLength(0)
+  })
+
   it('adapts flat folder-scan groups into sparse nested folder scopes on load', async () => {
     writeDataFile({
       schemaVersion: 1,
@@ -4981,6 +5028,20 @@ describe('Store', () => {
     expect(persisted.worktreeMeta).not.toHaveProperty('r1::/tmp/wt')
     expect(persisted.worktreeMeta).not.toHaveProperty('r1::/tmp/scalar')
     expect(persisted.workspaceLineageByChildKey).not.toHaveProperty('worktree:r1::/tmp/wt')
+  })
+
+  it('setWorktreeMeta normalizes an unknown project group id to null and preserves a valid one', async () => {
+    const store = await createStore()
+    const group = store.createProjectGroup({ name: 'Platform', createdFrom: 'manual' })
+
+    const valid = store.setWorktreeMeta('wt1', { displayName: 'wt1', projectGroupId: group.id })
+    expect(valid.projectGroupId).toBe(group.id)
+
+    const invalid = store.setWorktreeMeta('wt2', {
+      displayName: 'wt2',
+      projectGroupId: 'missing-group'
+    })
+    expect(invalid.projectGroupId).toBeNull()
   })
 
   it('creates and updates folder workspaces from folder-backed project groups', async () => {

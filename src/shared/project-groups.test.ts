@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   clearMissingProjectGroupMemberships,
+  clearMissingProjectGroupWorktreeMemberships,
   createProjectGroup,
   getEffectiveProjectGroupManualRank,
   getNextProjectGroupOrder,
@@ -8,7 +9,7 @@ import {
   normalizeProjectGroupName,
   normalizeProjectGroups
 } from './project-groups'
-import type { Repo } from './types'
+import type { Repo, WorktreeMeta } from './types'
 
 function repo(overrides: Partial<Repo>): Repo {
   return {
@@ -18,6 +19,22 @@ function repo(overrides: Partial<Repo>): Repo {
     badgeColor: '#999',
     addedAt: 1,
     kind: 'git',
+    ...overrides
+  }
+}
+
+function worktreeMeta(overrides: Partial<WorktreeMeta> = {}): WorktreeMeta {
+  return {
+    displayName: 'wt',
+    comment: '',
+    linkedIssue: null,
+    linkedPR: null,
+    linkedLinearIssue: null,
+    isArchived: false,
+    isUnread: false,
+    isPinned: false,
+    sortOrder: 0,
+    lastActivityAt: 0,
     ...overrides
   }
 }
@@ -96,6 +113,22 @@ describe('project-groups', () => {
 
     expect(repos.find((entry) => entry.id === 'known')?.projectGroupId).toBe(groups[0].id)
     expect(repos.find((entry) => entry.id === 'missing')?.projectGroupId).toBeNull()
+  })
+
+  it('clears worktree memberships whose group no longer exists', () => {
+    const groups = [createProjectGroup({ name: 'Known', createdFrom: 'manual', tabOrder: 0 })]
+    const result = clearMissingProjectGroupWorktreeMemberships(
+      {
+        known: worktreeMeta({ projectGroupId: groups[0].id }),
+        missing: worktreeMeta({ projectGroupId: 'x' }),
+        ungrouped: worktreeMeta()
+      },
+      groups
+    )
+
+    expect(result.known.projectGroupId).toBe(groups[0].id)
+    expect(result.missing.projectGroupId).toBeNull()
+    expect(result.ungrouped.projectGroupId).toBeUndefined()
   })
 
   it('falls back to global repo order when projectGroupOrder is unset', () => {
