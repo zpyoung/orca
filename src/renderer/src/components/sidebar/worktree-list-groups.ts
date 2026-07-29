@@ -51,6 +51,7 @@ import {
   getCyclicProjectedWorktreeLineageIds,
   getLineageRenderInfo
 } from './worktree-lineage-projection'
+import { getProjectGroupExecutionHostIdForRows } from './worktree-list-host-filtering'
 
 export { getLineageRenderInfo } from './worktree-lineage-projection'
 
@@ -743,20 +744,33 @@ function getMixedHostContextLabels(
   return uniqueLabels.size > 1 ? labelsByRepoId : undefined
 }
 
+/**
+ * Host-mismatch labels for a flat worktree list. Without `baselineHostId`,
+ * labels appear only when the list itself spans multiple hosts (unchanged
+ * behavior for the `groupBy: 'none'`/pinned callers). With `baselineHostId`
+ * (a group's effective host), a single loose worktree that merely disagrees
+ * with its group's host also earns a label — `uniqueHostIds.size > 1` alone
+ * can't see that mismatch when the group holds just one loose member.
+ */
 function getMixedWorktreeHostContextLabels(
   worktrees: readonly Worktree[],
   repoMap: Map<string, Repo>,
   hostLabelById: ReadonlyMap<string, string> | undefined,
-  defaultHostId: ExecutionHostId
+  defaultHostId: ExecutionHostId,
+  baselineHostId?: ExecutionHostId
 ): Map<string, string> | undefined {
   const labelsByWorktreeId = new Map<string, string>()
   const uniqueHostIds = new Set<ExecutionHostId>()
+  let differsFromBaseline = false
   for (const worktree of worktrees) {
     const hostId = getWorktreeExecutionHostId(worktree, repoMap.get(worktree.repoId), defaultHostId)
     uniqueHostIds.add(hostId)
+    if (baselineHostId !== undefined && hostId !== baselineHostId) {
+      differsFromBaseline = true
+    }
     labelsByWorktreeId.set(worktree.id, hostLabelById?.get(hostId) ?? getExecutionHostLabel(hostId))
   }
-  return uniqueHostIds.size > 1 ? labelsByWorktreeId : undefined
+  return uniqueHostIds.size > 1 || differsFromBaseline ? labelsByWorktreeId : undefined
 }
 
 function getHostWorktreeCounts(
@@ -1104,8 +1118,21 @@ export function buildRows(
     return result
   }
 
+  // Why: a loose worktree keeps its repo root-level but renders under this
+  // Project Group instead — display-only membership, never execution routing.
+  // Built ahead of the bucketing loop below so a group-bound worktree can be
+  // diverted before it is ever pushed into a repo section.
+  const projectGroupsById = new Map(projectGroups.map((projectGroup) => [projectGroup.id, projectGroup]))
+  const looseWorktreesByProjectGroupId = new Map<string, Worktree[]>()
+
   const grouped = new Map<string, WorktreeGroupEntry>()
   for (const w of naturalWorktrees) {
+    if (groupBy === 'repo' && w.projectGroupId && projectGroupsById.has(w.projectGroupId)) {
+      const looseList = looseWorktreesByProjectGroupId.get(w.projectGroupId) ?? []
+      looseList.push(w)
+      looseWorktreesByProjectGroupId.set(w.projectGroupId, looseList)
+      continue
+    }
     let key: string
     let label: string
     let repo: Repo | undefined
@@ -1394,7 +1421,6 @@ export function buildRows(
     })
   }
 
-  const projectGroupsById = new Map(projectGroups.map((group) => [group.id, group]))
   const folderWorkspacesByProjectGroupId = new Map<string, FolderWorkspace[]>()
   for (const workspace of folderWorkspaces) {
     const group = projectGroupsById.get(workspace.projectGroupId)
@@ -1429,10 +1455,11 @@ export function buildRows(
   const getProjectGroupSubtreeCount = (groupId: string): number => {
     const directCount = groupByProjectGroupId.get(groupId)?.length ?? 0
     const folderWorkspaceCount = folderWorkspacesByProjectGroupId.get(groupId)?.length ?? 0
+    const looseWorktreeCount = looseWorktreesByProjectGroupId.get(groupId)?.length ?? 0
     const children = childGroupsByParentId.get(groupId) ?? []
     return children.reduce(
       (count, child) => count + getProjectGroupSubtreeCount(child.id),
-      directCount + folderWorkspaceCount
+      directCount + folderWorkspaceCount + looseWorktreeCount
     )
   }
 
@@ -1459,6 +1486,27 @@ export function buildRows(
           projectGroup,
           depth: 0,
           groupDepth: depth + 1
+        })
+      }
+      const looseWorktrees = looseWorktreesByProjectGroupId.get(projectGroup.id) ?? []
+      if (looseWorktrees.length > 0) {
+        // Why: incoming order only — orderMainWorktreeFirst encodes "a repo's
+        // main checkout heads its own section," which is meaningless once a
+        // group spans repos and would hoist a member for no visible reason.
+        const baselineHostId = getProjectGroupExecutionHostIdForRows(projectGroup, defaultHostId)
+        appendWorktreeRows(result, looseWorktrees, repoMap, lineageById, worktreeMap, {
+          nestLineage,
+          collapsedGroups,
+          groupDepth: depth + 1,
+          sectionKey: `${key}::loose`,
+          hostContextLabelByWorktreeId: getMixedWorktreeHostContextLabels(
+            looseWorktrees,
+            repoMap,
+            hostLabelById,
+            defaultHostId,
+            baselineHostId
+          ),
+          cyclicLineageIds
         })
       }
       appendOrderedGroups(withRepoSectionDisplayLabels(repoEntries), depth + 1)
