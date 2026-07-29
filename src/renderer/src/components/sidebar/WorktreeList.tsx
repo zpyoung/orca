@@ -5678,9 +5678,20 @@ const WorktreeList = React.memo(function WorktreeList({
       repos: visibleReposForRows,
       worktreesByRepo,
       visibleWorktrees,
-      filterRepoIds
+      filterRepoIds,
+      // Why: must agree with buildRows' `projectGroupsById`, which is built
+      // from this same host-filtered list — not the full `projectGroups` —
+      // or a cross-host group can "exist" here while buildRows can't find it.
+      projectGroups: visibleProjectGroupsForRows
     })
-  }, [filterRepoIds, groupBy, visibleReposForRows, visibleWorktrees, worktreesByRepo])
+  }, [
+    filterRepoIds,
+    groupBy,
+    visibleProjectGroupsForRows,
+    visibleReposForRows,
+    visibleWorktrees,
+    worktreesByRepo
+  ])
   const allRepoIds = useMemo(() => repos.map((r) => r.id), [repos])
 
   // Why: subscribe on a flat key array (useShallow) so progress ticks don't rebuild the whole row model.
