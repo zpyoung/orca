@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   isContextWorktreeDeletable,
   shouldUseNativeContextMenu,
@@ -12,6 +12,10 @@ import {
   isWorktreeParentPickerDisabled,
   planWorkspaceStatusAssignment,
   selectMenuScopedMap,
+  addWorktreeToGroup,
+  removeWorktreeFromGroup,
+  shouldShowWorktreeGroupMembershipActions,
+  shouldShowRemoveWorktreeFromGroup,
   shouldRevealWorktreeDeveloperMenu
 } from './WorktreeContextMenu'
 import type { Worktree, WorktreeLineage, WorkspaceStatusDefinition } from '../../../../shared/types'
@@ -233,6 +237,42 @@ describe('project removal from workspace context menus', () => {
     expect(isContextWorktreeDeletable({ isMainWorktree: false }, folderRepo)).toBe(true)
     expect(isContextWorktreeDeletable({ isMainWorktree: true }, folderRepo)).toBe(false)
     expect(isContextWorktreeDeletable({ isMainWorktree: false }, null)).toBe(false)
+  })
+})
+
+describe('worktree-scoped project group membership', () => {
+  // Why: distinct from the repo-level "Move to group"/"Remove from group" pair
+  // above — these act on the individual worktree row's own projectGroupId,
+  // independent of its repo's group. See handleMoveProjectToGroup for the
+  // repo-scoped equivalent this mirrors.
+  it('adding to a group calls updateWorktreeMeta with the chosen group id', () => {
+    const updateWorktreeMeta = vi.fn()
+    addWorktreeToGroup('wt-1', 'group-2', updateWorktreeMeta)
+    expect(updateWorktreeMeta).toHaveBeenCalledWith('wt-1', { projectGroupId: 'group-2' })
+  })
+
+  it('removing from a group calls updateWorktreeMeta with null', () => {
+    const updateWorktreeMeta = vi.fn()
+    removeWorktreeFromGroup('wt-1', updateWorktreeMeta)
+    expect(updateWorktreeMeta).toHaveBeenCalledWith('wt-1', { projectGroupId: null })
+  })
+
+  it('hides the actions for a folder-workspace row', () => {
+    expect(shouldShowWorktreeGroupMembershipActions('folder-1', [{ id: 'group-1' }])).toBe(false)
+  })
+
+  it('hides the actions when no project groups exist', () => {
+    expect(shouldShowWorktreeGroupMembershipActions(null, [])).toBe(false)
+  })
+
+  it('shows the actions for a worktree row once at least one group exists', () => {
+    expect(shouldShowWorktreeGroupMembershipActions(null, [{ id: 'group-1' }])).toBe(true)
+  })
+
+  it('offers "remove from group" only when the worktree currently has a group', () => {
+    expect(shouldShowRemoveWorktreeFromGroup({ projectGroupId: 'group-1' })).toBe(true)
+    expect(shouldShowRemoveWorktreeFromGroup({ projectGroupId: null })).toBe(false)
+    expect(shouldShowRemoveWorktreeFromGroup({ projectGroupId: undefined })).toBe(false)
   })
 })
 

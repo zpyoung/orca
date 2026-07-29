@@ -35,6 +35,7 @@ import type { AppState } from '@/store/types'
 import { useAllWorktrees, useRepoById, useRepoMap, useWorktreeMap } from '@/store/selectors'
 import { cn } from '@/lib/utils'
 import type {
+  ProjectGroup,
   Repo,
   Worktree,
   WorkspaceStatus,
@@ -311,6 +312,37 @@ export function planWorkspaceStatusAssignment(
     .filter((item) => getWorkspaceStatus(item, workspaceStatuses) !== status)
     .map((item) => item.id)
   return { kind: 'local-only', localWriteIds }
+}
+
+// Why: gates the worktree-scoped group submenu independent of the repo-scoped
+// one — folder workspace rows redirect updateWorktreeMeta to an allowlist
+// that excludes projectGroupId, so they must never see this action.
+function shouldShowWorktreeGroupMembershipActions(
+  folderWorkspaceId: string | null,
+  projectGroups: readonly Pick<ProjectGroup, 'id'>[]
+): boolean {
+  return folderWorkspaceId === null && projectGroups.length > 0
+}
+
+function shouldShowRemoveWorktreeFromGroup(worktree: Pick<Worktree, 'projectGroupId'>): boolean {
+  return worktree.projectGroupId != null
+}
+
+// Why: kept as free functions (rather than inline in the useCallback) so the
+// exact updateWorktreeMeta call args are unit-testable without rendering the menu.
+function addWorktreeToGroup(
+  worktreeId: string,
+  groupId: string,
+  updateWorktreeMeta: (worktreeId: string, updates: { projectGroupId: string | null }) => void
+): void {
+  updateWorktreeMeta(worktreeId, { projectGroupId: groupId })
+}
+
+function removeWorktreeFromGroup(
+  worktreeId: string,
+  updateWorktreeMeta: (worktreeId: string, updates: { projectGroupId: string | null }) => void
+): void {
+  updateWorktreeMeta(worktreeId, { projectGroupId: null })
 }
 
 const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
@@ -603,6 +635,16 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
     }
     void moveProjectToGroup(repo.id, null)
   }, [moveProjectToGroup, repo])
+
+  const handleAddWorktreeToGroup = useCallback(
+    (groupId: string) => addWorktreeToGroup(worktree.id, groupId, updateWorktreeMeta),
+    [updateWorktreeMeta, worktree.id]
+  )
+
+  const handleRemoveWorktreeFromGroup = useCallback(
+    () => removeWorktreeFromGroup(worktree.id, updateWorktreeMeta),
+    [updateWorktreeMeta, worktree.id]
+  )
 
   const handleAssignWorkspaceStatus = useCallback(
     (status: string) => {
@@ -980,6 +1022,41 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
                   ) : null}
                 </>
               ) : null}
+              {shouldShowWorktreeGroupMembershipActions(folderWorkspaceId, projectGroups) ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger disabled={isDeleting}>
+                      <FolderInput className="size-3.5" />
+                      {translate(
+                        'auto.components.sidebar.WorktreeContextMenu.addWorktreeToGroup',
+                        'Add worktree to group'
+                      )}
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                      {projectGroups
+                        .filter((group) => group.id !== worktree.projectGroupId)
+                        .map((group) => (
+                          <DropdownMenuItem
+                            key={group.id}
+                            onSelect={() => handleAddWorktreeToGroup(group.id)}
+                          >
+                            <span className="max-w-48 truncate">{group.name}</span>
+                          </DropdownMenuItem>
+                        ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                  {shouldShowRemoveWorktreeFromGroup(worktree) ? (
+                    <DropdownMenuItem onSelect={handleRemoveWorktreeFromGroup} disabled={isDeleting}>
+                      <CircleX className="size-3.5" />
+                      {translate(
+                        'auto.components.sidebar.WorktreeContextMenu.removeWorktreeFromGroup',
+                        'Remove worktree from group'
+                      )}
+                    </DropdownMenuItem>
+                  ) : null}
+                </>
+              ) : null}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onSelect={handleOpenParentPicker}
@@ -1156,5 +1233,9 @@ export {
   shouldRemoveProjectFromContextMenu,
   shouldUseNativeContextMenu,
   shouldSuppressContextMenuFollowUpClick,
-  shouldIgnoreNestedWorktreeContextMenuScope
+  shouldIgnoreNestedWorktreeContextMenuScope,
+  addWorktreeToGroup,
+  removeWorktreeFromGroup,
+  shouldShowWorktreeGroupMembershipActions,
+  shouldShowRemoveWorktreeFromGroup
 }
