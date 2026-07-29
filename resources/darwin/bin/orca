@@ -19,7 +19,16 @@ if [ -z "$APP_PATH" ]; then
 fi
 
 CONTENTS="$APP_PATH/Contents"
-ELECTRON="$CONTENTS/MacOS/Orca"
+# Why: this fork renames productName so it installs alongside upstream, so the bundle
+# executable is not always "Orca" — read the real name instead of hardcoding it.
+EXECUTABLE="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$CONTENTS/Info.plist" 2>/dev/null || true)"
+ELECTRON="$CONTENTS/MacOS/$EXECUTABLE"
+# Why: PlistBuddy reports a missing plist on stdout and still exits 0, so validate the
+# resolved path rather than trusting the name it printed.
+if [ -z "$EXECUTABLE" ] || [ ! -x "$ELECTRON" ]; then
+	echo "Unable to locate the Orca executable in: $CONTENTS/MacOS"
+	exit 1
+fi
 # Why: Orca packages the CLI entrypoint outside app.asar so the public shell
 # command can execute it directly with ELECTRON_RUN_AS_NODE, mirroring VS Code's
 # launcher model instead of requiring a separate npm-distributed binary.
