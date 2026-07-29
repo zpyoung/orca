@@ -85,7 +85,6 @@ import {
   type Row,
   type ProjectGroupingModel,
   type WorktreeGroupBy,
-  ALL_GROUP_KEY,
   PINNED_GROUP_KEY,
   buildRows,
   getProjectGroupHeaderKey,
@@ -1313,8 +1312,10 @@ export function getWorktreeDragGroups(rows: HostSectionRow[]): WorktreeDragGroup
     if (row.sectionKey === PINNED_GROUP_KEY && naturalWorktreeIds.has(row.worktree.id)) {
       continue
     }
-    if (!current) {
-      current = { key: ALL_GROUP_KEY, ids: [] }
+    // Why: a header's key is not always its items' sectionKey (loose worktrees
+    // carry `<group>::loose`), and every other drag consumer keys off sectionKey.
+    if (!current || current.key !== row.sectionKey) {
+      current = { key: row.sectionKey, ids: [] }
       groups.push({ key: current.key, worktreeIds: current.ids })
     }
     current.ids.push(row.worktree.id)
@@ -3225,8 +3226,15 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
       const canPreviewWorkspaceBoardOnDrag =
         !workspaceBoardOpen &&
         onWorkspaceBoardDragPreviewStart !== NOOP_WORKSPACE_BOARD_DRAG_PREVIEW_CALLBACK
+      // Why: the reorder gate treats a lone row as having nowhere to drag, but
+      // group membership gives it somewhere — leaving its group, or joining one.
+      const canDragForGroupMembership =
+        groupBy === 'repo' &&
+        (worktreeMap.get(worktreeId)?.projectGroupId != null ||
+          measureProjectGroupHeaderDragRects(container).length > 0)
       if (
         rects.length <= 1 &&
+        !canDragForGroupMembership &&
         !hasWorkspaceKanbanSidebarDropBoard() &&
         !canPreviewWorkspaceBoardOnDrag
       ) {
@@ -3264,11 +3272,13 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
     [
       getReorderDraggedIds,
       getReorderUnitDraggedIds,
+      groupBy,
       groupKeyByRowKey,
       onWorkspaceBoardDragPreviewStart,
       selectedWorktreeIds,
       selectedWorktrees,
-      workspaceBoardOpen
+      workspaceBoardOpen,
+      worktreeMap
     ]
   )
 

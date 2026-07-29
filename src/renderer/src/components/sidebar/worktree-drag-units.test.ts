@@ -45,12 +45,12 @@ describe('getWorktreeDragUnitGroups', () => {
   it('ignores imported worktree card rows without splitting drag groups', () => {
     const groups = getWorktreeDragUnitGroups([
       header('repo:one'),
-      item('main'),
+      item('main', 0, 'repo:one'),
       importedCard(),
-      item('feature'),
+      item('feature', 0, 'repo:one'),
       header('repo:two'),
       importedCard(),
-      item('other')
+      item('other', 0, 'repo:two')
     ])
 
     expect(groups).toEqual([
@@ -85,6 +85,21 @@ describe('getWorktreeDragUnitGroups', () => {
           { worktreeId: 'pinned-copy', worktreeIds: ['pinned-copy'] },
           { worktreeId: 'other-pinned', worktreeIds: ['other-pinned'] }
         ]
+      }
+    ])
+  })
+
+  it('gives loose worktrees under a project-group header their own drag group', () => {
+    const groups = getWorktreeDragUnitGroups([
+      header('project-group:g1'),
+      item('loose', 0, 'project-group:g1::loose')
+    ])
+
+    expect(groups).toEqual([
+      {
+        key: 'project-group:g1::loose',
+        worktreeIds: ['loose'],
+        units: [{ worktreeId: 'loose', worktreeIds: ['loose'] }]
       }
     ])
   })
