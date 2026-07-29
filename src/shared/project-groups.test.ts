@@ -22,6 +22,26 @@ function repo(overrides: Partial<Repo>): Repo {
   }
 }
 
+/** Walks parentGroupId from every group and fails if any walk cannot reach a root (null) or loops. */
+function assertAllGroupsReachRoot(
+  groups: readonly { id: string; parentGroupId: string | null }[]
+): void {
+  const byId = new Map(groups.map((group) => [group.id, group]))
+  for (const start of groups) {
+    const seen = new Set<string>()
+    let current: { id: string; parentGroupId: string | null } | undefined = start
+    while (current) {
+      expect(seen.has(current.id)).toBe(false)
+      seen.add(current.id)
+      if (current.parentGroupId === null) {
+        break
+      }
+      current = byId.get(current.parentGroupId)
+    }
+    expect(current).toBeDefined()
+  }
+}
+
 describe('project-groups', () => {
   it('creates a durable project group with normalized defaults', () => {
     const group = createProjectGroup({
@@ -70,6 +90,60 @@ describe('project-groups', () => {
       isCollapsed: true,
       parentGroupId: null
     })
+  })
+
+  it('clears a self-referencing parent and a parent naming a nonexistent group', () => {
+    const groups = normalizeProjectGroups([
+      { id: 'self', name: 'Self', tabOrder: 0, parentGroupId: 'self' },
+      { id: 'orphan', name: 'Orphan', tabOrder: 1, parentGroupId: 'ghost' }
+    ])
+
+    expect(groups.find((group) => group.id === 'self')?.parentGroupId).toBeNull()
+    expect(groups.find((group) => group.id === 'orphan')?.parentGroupId).toBeNull()
+  })
+
+  it('breaks a two-node parent cycle so both groups become reachable from a root', () => {
+    const groups = normalizeProjectGroups([
+      { id: 'a', name: 'A', tabOrder: 0, parentGroupId: 'b' },
+      { id: 'b', name: 'B', tabOrder: 1, parentGroupId: 'a' }
+    ])
+
+    assertAllGroupsReachRoot(groups)
+    expect(groups.some((group) => group.parentGroupId === null)).toBe(true)
+  })
+
+  it('breaks a longer parent cycle (A -> B -> C -> A) so every group is reachable from a root', () => {
+    const groups = normalizeProjectGroups([
+      { id: 'a', name: 'A', tabOrder: 0, parentGroupId: 'b' },
+      { id: 'b', name: 'B', tabOrder: 1, parentGroupId: 'c' },
+      { id: 'c', name: 'C', tabOrder: 2, parentGroupId: 'a' }
+    ])
+
+    assertAllGroupsReachRoot(groups)
+    expect(groups.some((group) => group.parentGroupId === null)).toBe(true)
+  })
+
+  it('returns a valid group tree completely unchanged', () => {
+    const groups = normalizeProjectGroups([
+      { id: 'root', name: 'Root', tabOrder: 0, parentGroupId: null },
+      { id: 'child', name: 'Child', tabOrder: 1, parentGroupId: 'root' },
+      { id: 'grandchild', name: 'Grandchild', tabOrder: 2, parentGroupId: 'child' }
+    ])
+
+    expect(groups.find((group) => group.id === 'root')?.parentGroupId).toBeNull()
+    expect(groups.find((group) => group.id === 'child')?.parentGroupId).toBe('root')
+    expect(groups.find((group) => group.id === 'grandchild')?.parentGroupId).toBe('child')
+  })
+
+  it('normalizes a cycle alongside a group with a missing parent without throwing', () => {
+    const groups = normalizeProjectGroups([
+      { id: 'a', name: 'A', tabOrder: 0, parentGroupId: 'b' },
+      { id: 'b', name: 'B', tabOrder: 1, parentGroupId: 'a' },
+      { id: 'c', name: 'C', tabOrder: 2, parentGroupId: 'ghost' }
+    ])
+
+    expect(groups.find((group) => group.id === 'c')?.parentGroupId).toBeNull()
+    assertAllGroupsReachRoot(groups)
   })
 
   it('preserves normalized execution ownership for persisted groups', () => {
