@@ -115,8 +115,9 @@ export function clearMissingProjectGroupWorktreeMemberships(
   const groupIds = new Set(groups.map((group) => group.id))
   const result: Record<string, WorktreeMeta> = {}
   for (const [worktreeId, meta] of Object.entries(worktreeMeta)) {
+    // Why: orca-data.json is user-editable, so entries can be hand-corrupted to null/undefined.
     result[worktreeId] =
-      meta.projectGroupId && !groupIds.has(meta.projectGroupId)
+      meta && meta.projectGroupId && !groupIds.has(meta.projectGroupId)
         ? { ...meta, projectGroupId: null }
         : meta
   }

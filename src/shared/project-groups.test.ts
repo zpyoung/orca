@@ -131,6 +131,34 @@ describe('project-groups', () => {
     expect(result.ungrouped.projectGroupId).toBeUndefined()
   })
 
+  it('passes through a null worktree meta entry without throwing', () => {
+    const groups = [createProjectGroup({ name: 'Known', createdFrom: 'manual', tabOrder: 0 })]
+
+    let result: Record<string, WorktreeMeta> | undefined
+    expect(() => {
+      result = clearMissingProjectGroupWorktreeMemberships(
+        { corrupt: null as unknown as WorktreeMeta },
+        groups
+      )
+    }).not.toThrow()
+
+    expect(result?.corrupt).toBeNull()
+  })
+
+  it('passes through an undefined worktree meta entry without throwing', () => {
+    const groups = [createProjectGroup({ name: 'Known', createdFrom: 'manual', tabOrder: 0 })]
+
+    let result: Record<string, WorktreeMeta> | undefined
+    expect(() => {
+      result = clearMissingProjectGroupWorktreeMemberships(
+        { corrupt: undefined as unknown as WorktreeMeta },
+        groups
+      )
+    }).not.toThrow()
+
+    expect(result?.corrupt).toBeUndefined()
+  })
+
   it('falls back to global repo order when projectGroupOrder is unset', () => {
     const repoOrder = new Map([
       ['a', 0],
