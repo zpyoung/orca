@@ -92,7 +92,10 @@ export function normalizeProjectGroups(value: unknown): ProjectGroup[] {
   )
   const groupIds = new Set(groups.map((group) => group.id))
   for (const group of groups) {
-    if (group.parentGroupId === group.id || !groupIds.has(group.parentGroupId ?? '')) {
+    if (
+      group.parentGroupId === group.id ||
+      (group.parentGroupId != null && !groupIds.has(group.parentGroupId))
+    ) {
       group.parentGroupId = null
     }
   }
@@ -122,7 +125,7 @@ function breakProjectGroupParentCycles(groups: readonly ProjectGroup[]): void {
       }
       status.set(current.id, 'visiting')
       path.push(current)
-      current = current.parentGroupId ? groupById.get(current.parentGroupId) : undefined
+      current = current.parentGroupId != null ? groupById.get(current.parentGroupId) : undefined
     }
     for (const visited of path) {
       status.set(visited.id, 'resolved')

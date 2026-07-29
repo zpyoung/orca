@@ -135,6 +135,34 @@ describe('project-groups', () => {
     expect(groups.find((group) => group.id === 'grandchild')?.parentGroupId).toBe('child')
   })
 
+  it('breaks a two-node parent cycle when one group id is the empty string', () => {
+    const groups = normalizeProjectGroups([
+      { id: '', name: 'Empty', tabOrder: 0, parentGroupId: 'b' },
+      { id: 'b', name: 'B', tabOrder: 1, parentGroupId: '' }
+    ])
+
+    assertAllGroupsReachRoot(groups)
+    expect(groups.some((group) => group.parentGroupId === null)).toBe(true)
+  })
+
+  it('clears a parent naming a nonexistent empty-string group id', () => {
+    const groups = normalizeProjectGroups([
+      { id: 'orphan', name: 'Orphan', tabOrder: 0, parentGroupId: '' }
+    ])
+
+    expect(groups.find((group) => group.id === 'orphan')?.parentGroupId).toBeNull()
+  })
+
+  it('preserves an empty-string group id as a legitimate root', () => {
+    const groups = normalizeProjectGroups([
+      { id: '', name: 'Root', tabOrder: 0, parentGroupId: null },
+      { id: 'child', name: 'Child', tabOrder: 1, parentGroupId: '' }
+    ])
+
+    expect(groups.find((group) => group.id === '')?.parentGroupId).toBeNull()
+    expect(groups.find((group) => group.id === 'child')?.parentGroupId).toBe('')
+  })
+
   it('normalizes a cycle alongside a group with a missing parent without throwing', () => {
     const groups = normalizeProjectGroups([
       { id: 'a', name: 'A', tabOrder: 0, parentGroupId: 'b' },
