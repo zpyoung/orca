@@ -1122,7 +1122,9 @@ export function buildRows(
   // Project Group instead — display-only membership, never execution routing.
   // Built ahead of the bucketing loop below so a group-bound worktree can be
   // diverted before it is ever pushed into a repo section.
-  const projectGroupsById = new Map(projectGroups.map((projectGroup) => [projectGroup.id, projectGroup]))
+  const projectGroupsById = new Map(
+    projectGroups.map((projectGroup) => [projectGroup.id, projectGroup])
+  )
   const looseWorktreesByProjectGroupId = new Map<string, Worktree[]>()
 
   const grouped = new Map<string, WorktreeGroupEntry>()
@@ -1592,7 +1594,14 @@ export function getGroupKeysForWorktree(
   const groupIds: string[] = []
   const groupsById = new Map(projectGroups.map((group) => [group.id, group]))
   const visited = new Set<string>()
-  let currentGroupId = repo?.projectGroupId ?? null
+  // Why: must match buildRows' own diversion condition exactly — a loose
+  // worktree renders under its own group, independent of its repo's, so the
+  // ancestor walk has to start there or reveal won't expand the group it's
+  // actually under.
+  let currentGroupId =
+    worktree.projectGroupId && groupsById.has(worktree.projectGroupId)
+      ? worktree.projectGroupId
+      : (repo?.projectGroupId ?? null)
   while (currentGroupId && !visited.has(currentGroupId)) {
     const group = groupsById.get(currentGroupId)
     if (!group) {

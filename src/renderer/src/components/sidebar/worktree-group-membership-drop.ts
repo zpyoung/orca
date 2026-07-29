@@ -52,11 +52,15 @@ export function getWorktreeGroupMembershipDropTarget(args: {
 }): WorktreeGroupMembershipDropTarget {
   const currentGroupId = args.draggedWorktree.projectGroupId ?? null
 
-  // Checked before leave: a header hit is the more specific target when a
-  // header rect and the own-repo-section rect happen to overlap.
+  // A header hit always wins over the leave check below, regardless of which
+  // group it belongs to: the current group's header means none (not leave),
+  // any other group's header means join. Only when no header is hit does the
+  // own-repo-section rect get considered.
   const hoveredGroup = findHoveredGroupHeaderRect(args.pointerY, args.groupHeaderRects)
-  if (hoveredGroup && hoveredGroup.groupId !== currentGroupId) {
-    return { kind: 'join', groupId: hoveredGroup.groupId }
+  if (hoveredGroup) {
+    return hoveredGroup.groupId !== currentGroupId
+      ? { kind: 'join', groupId: hoveredGroup.groupId }
+      : { kind: 'none' }
   }
 
   if (

@@ -3535,7 +3535,10 @@ describe('Store', () => {
     const sibling = store.createProjectGroup({ name: 'Tools', createdFrom: 'manual' })
     store.setWorktreeMeta('direct::/direct', { displayName: 'direct', projectGroupId: root.id })
     store.setWorktreeMeta('nested::/nested', { displayName: 'nested', projectGroupId: child.id })
-    store.setWorktreeMeta('sibling::/sibling', { displayName: 'sibling', projectGroupId: sibling.id })
+    store.setWorktreeMeta('sibling::/sibling', {
+      displayName: 'sibling',
+      projectGroupId: sibling.id
+    })
 
     expect(store.deleteProjectGroup(root.id)).toBe(true)
 
@@ -3554,6 +3557,36 @@ describe('Store', () => {
     expect(store.deleteProjectGroup(group.id)).toBe(true)
 
     expect(Object.keys(store.getAllWorktreeMeta()).sort()).toEqual(['wt1', 'wt2'])
+  })
+
+  it('deleteProjectGroup tolerates a null worktree-meta entry without throwing', async () => {
+    // orca-data.json is user-editable, so a worktreeMeta entry can be hand-corrupted to null.
+    writeDataFile({
+      schemaVersion: 1,
+      repos: [],
+      worktreeMeta: { corrupt: null },
+      settings: {},
+      ui: {},
+      githubCache: { pr: {}, issue: {} },
+      projectGroups: [
+        {
+          id: 'group-1',
+          name: 'Platform',
+          parentPath: null,
+          parentGroupId: null,
+          createdFrom: 'manual',
+          tabOrder: 0,
+          isCollapsed: false,
+          color: null,
+          createdAt: 1,
+          updatedAt: 1
+        }
+      ]
+    })
+    const store = await createStore()
+
+    expect(() => store.deleteProjectGroup('group-1')).not.toThrow()
+    expect(store.getAllWorktreeMeta().corrupt).toBeNull()
   })
 
   it('deleteProjectGroup still deletes folder workspaces in the deleted group subtree', async () => {
@@ -5030,18 +5063,22 @@ describe('Store', () => {
     expect(persisted.workspaceLineageByChildKey).not.toHaveProperty('worktree:r1::/tmp/wt')
   })
 
-  it('setWorktreeMeta normalizes an unknown project group id to null and preserves a valid one', async () => {
+  it('setWorktreeMeta preserves a projectGroupId that names no group in this host store catalog', async () => {
+    // Project groups are host-owned: each host's Store only holds its own groups, but a worktree
+    // can be added to a group owned by a DIFFERENT host. This id must survive even though it
+    // names no group in `this.state.projectGroups` — that store cannot tell "foreign host" from "stale".
     const store = await createStore()
     const group = store.createProjectGroup({ name: 'Platform', createdFrom: 'manual' })
 
     const valid = store.setWorktreeMeta('wt1', { displayName: 'wt1', projectGroupId: group.id })
     expect(valid.projectGroupId).toBe(group.id)
 
-    const invalid = store.setWorktreeMeta('wt2', {
+    const foreignHostGroupId = 'group-owned-by-another-host'
+    const foreign = store.setWorktreeMeta('wt2', {
       displayName: 'wt2',
-      projectGroupId: 'missing-group'
+      projectGroupId: foreignHostGroupId
     })
-    expect(invalid.projectGroupId).toBeNull()
+    expect(foreign.projectGroupId).toBe(foreignHostGroupId)
   })
 
   it('creates and updates folder workspaces from folder-backed project groups', async () => {

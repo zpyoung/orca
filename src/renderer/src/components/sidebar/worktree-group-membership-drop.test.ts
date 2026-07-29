@@ -250,4 +250,23 @@ describe('getWorktreeGroupMembershipDropTarget', () => {
       })
     ).toEqual({ kind: 'join', groupId: 'group-b' })
   })
+
+  it("returns none when hovering the current group's own header, even though it overlaps the own-repo section", () => {
+    // Regression: the header hit must win over the leave check regardless of
+    // which group it belongs to, not just when it belongs to a different one.
+    const overlappingCurrentHeader: WorktreeGroupHeaderDropRect = {
+      groupId: 'group-a',
+      top: 300,
+      bottom: 350
+    }
+
+    expect(
+      getWorktreeGroupMembershipDropTarget({
+        pointerY: 325,
+        groupHeaderRects: [overlappingCurrentHeader],
+        draggedWorktree: grouped('group-a'),
+        ownRepoSectionRect: OWN_REPO_SECTION
+      })
+    ).toEqual({ kind: 'none' })
+  })
 })

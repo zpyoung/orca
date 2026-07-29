@@ -3933,9 +3933,9 @@ describe('cross-repo worktree groups (loose worktrees)', () => {
       [crossGroup]
     )
 
-    expect(
-      rows.some((row) => row.type === 'item' && row.worktree.id === groupedWorktree.id)
-    ).toBe(true)
+    expect(rows.some((row) => row.type === 'item' && row.worktree.id === groupedWorktree.id)).toBe(
+      true
+    )
   })
 
   it('renders a projectGroupId-tagged worktree normally in pr-status mode', () => {
@@ -3961,9 +3961,9 @@ describe('cross-repo worktree groups (loose worktrees)', () => {
       [crossGroup]
     )
 
-    expect(
-      rows.some((row) => row.type === 'item' && row.worktree.id === groupedWorktree.id)
-    ).toBe(true)
+    expect(rows.some((row) => row.type === 'item' && row.worktree.id === groupedWorktree.id)).toBe(
+      true
+    )
   })
 
   it('renders a projectGroupId-tagged worktree normally in groupBy none', () => {
@@ -3989,9 +3989,81 @@ describe('cross-repo worktree groups (loose worktrees)', () => {
       [crossGroup]
     )
 
-    expect(
-      rows.some((row) => row.type === 'item' && row.worktree.id === groupedWorktree.id)
-    ).toBe(true)
+    expect(rows.some((row) => row.type === 'item' && row.worktree.id === groupedWorktree.id)).toBe(
+      true
+    )
+  })
+
+  describe('getGroupKeysForWorktree with loose worktrees', () => {
+    // Why: buildRows diverts a loose worktree by its OWN projectGroupId, not its
+    // repo's — reveal keys must derive the ancestor chain from the same source,
+    // or expanding a collapsed group won't uncollapse the group actually rendered.
+    it("reveals through the worktree's own group and its ancestors, not its repo's", () => {
+      const ownParentGroup: ProjectGroup = {
+        ...crossGroup,
+        id: 'group-own-parent',
+        name: 'Own Parent'
+      }
+      const ownChildGroup: ProjectGroup = {
+        ...crossGroup,
+        id: 'group-own-child',
+        name: 'Own Child',
+        parentGroupId: ownParentGroup.id
+      }
+      const repoOwnGroup: ProjectGroup = {
+        ...crossGroup,
+        id: 'group-repo-own',
+        name: 'Repo Own'
+      }
+      const groupedRepo: Repo = { ...repo, projectGroupId: repoOwnGroup.id }
+      const looseWorktree: Worktree = { ...worktree, projectGroupId: ownChildGroup.id }
+
+      expect(
+        getGroupKeysForWorktree(
+          'repo',
+          looseWorktree,
+          new Map([[groupedRepo.id, groupedRepo]]),
+          null,
+          undefined,
+          undefined,
+          [ownParentGroup, ownChildGroup, repoOwnGroup]
+        )
+      ).toEqual(['project-group:group-own-parent', 'project-group:group-own-child', 'repo:repo-1'])
+    })
+
+    it("regression: a worktree with no own projectGroupId still reveals through its repo's group", () => {
+      const groupedRepo: Repo = { ...repo, projectGroupId: crossGroup.id }
+      const plainWorktree: Worktree = { ...worktree }
+
+      expect(
+        getGroupKeysForWorktree(
+          'repo',
+          plainWorktree,
+          new Map([[groupedRepo.id, groupedRepo]]),
+          null,
+          undefined,
+          undefined,
+          [crossGroup]
+        )
+      ).toEqual(['project-group:group-cross', 'repo:repo-1'])
+    })
+
+    it('falls back to the repo-derived keys when the worktree names a group absent from projectGroups', () => {
+      const groupedRepo: Repo = { ...repo, projectGroupId: crossGroup.id }
+      const orphanWorktree: Worktree = { ...worktree, projectGroupId: 'missing-group-id' }
+
+      expect(
+        getGroupKeysForWorktree(
+          'repo',
+          orphanWorktree,
+          new Map([[groupedRepo.id, groupedRepo]]),
+          null,
+          undefined,
+          undefined,
+          [crossGroup]
+        )
+      ).toEqual(['project-group:group-cross', 'repo:repo-1'])
+    })
   })
 })
 

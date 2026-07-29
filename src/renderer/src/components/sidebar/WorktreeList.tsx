@@ -2498,6 +2498,21 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
     [toggleGroupWithScrollAnchor]
   )
 
+  // Why: the keyboard-nav row model must agree with the rendered one on which
+  // project groups exist, or a host filter that hides a group but keeps a
+  // cross-host member visible buckets/orders that worktree differently than
+  // what is on screen.
+  const visibleWorkspaceHostIds = useAppStore((s) => s.visibleWorkspaceHostIds)
+  const workspaceHostScope = useAppStore((s) => s.workspaceHostScope)
+  const visibleHostIdSetForNav = useMemo(
+    () => getVisibleSidebarHostIdSet(visibleWorkspaceHostIds, workspaceHostScope),
+    [visibleWorkspaceHostIds, workspaceHostScope]
+  )
+  const visibleProjectGroupsForRows = useMemo(
+    () => filterProjectGroupsForVisibleHosts(projectGroups, visibleHostIdSetForNav, defaultHostId),
+    [defaultHostId, projectGroups, visibleHostIdSetForNav]
+  )
+
   const navigateWorktree = useCallback(
     (direction: 'up' | 'down') => {
       // Why: cycle over the rows the sidebar actually rendered — collapsing a group

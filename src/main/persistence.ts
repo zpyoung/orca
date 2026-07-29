@@ -220,7 +220,6 @@ import { sanitizeRepoIcon } from '../shared/repo-icon'
 import { normalizeRepoBadgeColor } from '../shared/repo-badge-color'
 import {
   clearMissingProjectGroupMemberships,
-  clearMissingProjectGroupWorktreeMemberships,
   createProjectGroup,
   getNextProjectGroupOrder,
   getProjectGroupSubtreeIds,
@@ -3728,10 +3727,6 @@ export class Store {
     }
 
     const repos = clearMissingProjectGroupMemberships(result.repos, result.projectGroups ?? [])
-    result.worktreeMeta = clearMissingProjectGroupWorktreeMemberships(
-      result.worktreeMeta ?? {},
-      result.projectGroups ?? []
-    )
     const projectHostSetupCompatibility = mergeProjectHostSetupCompatibilityState(result, repos)
     if (!projectHostSetupCompatibilityStateEqual(result, projectHostSetupCompatibility)) {
       this.loadNeedsSave = true
@@ -4400,10 +4395,18 @@ export class Store {
         : repo
     )
     // Why: same rationale as repos above — a worktree's group membership is sidebar-only, so release it, never delete the worktree.
-    this.state.worktreeMeta = clearMissingProjectGroupWorktreeMemberships(
-      this.state.worktreeMeta,
-      this.state.projectGroups
-    )
+    // Keyed on the ids actually deleted (not "any id missing from this host's catalog"): groups are host-owned,
+    // so an id absent from this.state.projectGroups may simply belong to another host, not be stale.
+    for (const [worktreeId, meta] of Object.entries(this.state.worktreeMeta)) {
+      // Why: orca-data.json is user-editable, so entries can be hand-corrupted to null.
+      if (
+        meta &&
+        typeof meta.projectGroupId === 'string' &&
+        deletedGroupIds.has(meta.projectGroupId)
+      ) {
+        this.state.worktreeMeta[worktreeId] = { ...meta, projectGroupId: null }
+      }
+    }
     const removedFolderWorkspaceKeys = new Set<string>()
     for (const workspace of this.state.folderWorkspaces ?? []) {
       if (deletedGroupIds.has(workspace.projectGroupId)) {
@@ -5418,18 +5421,10 @@ export class Store {
   }
 
   setWorktreeMeta(worktreeId: string, meta: Partial<WorktreeMeta>): WorktreeMeta {
-    const sanitizedMeta = { ...meta }
-    if ('projectGroupId' in sanitizedMeta) {
-      const nextGroupId = sanitizedMeta.projectGroupId
-      if (
-        typeof nextGroupId === 'string' &&
-        !this.state.projectGroups.some((group) => group.id === nextGroupId)
-      ) {
-        sanitizedMeta.projectGroupId = null
-      }
-    }
+    // Why: project groups are host-owned, so a projectGroupId naming no group in THIS host's
+    // catalog may still be valid on the group's owner host — never null it out here.
     const existing = this.state.worktreeMeta[worktreeId] || getDefaultWorktreeMeta()
-    const updated = { ...existing, ...sanitizedMeta }
+    const updated = { ...existing, ...meta }
     updated.linkedWorkItem = normalizeWorkspaceLinkedItem(updated.linkedWorkItem)
     const linkedTaskSourceContext = normalizeStoredTaskSourceContext(
       updated.linkedTaskSourceContext
