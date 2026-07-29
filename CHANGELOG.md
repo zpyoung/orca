@@ -1,6 +1,6 @@
 ---
-last_released_commit: ff1e6830afbc5db91e95d5505168fb0774ee5aec
-upstream_synced: v1.4.159
+last_released_commit: 3bd78a38ed4a9ec600cc04165eacff08611cbdff
+upstream_synced: v1.4.161
 ---
 
 # Changelog
@@ -11,6 +11,21 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.162-rc.0.zy01] - 2026-07-29
+
+Synced to upstream [v1.4.161](https://github.com/stablyai/orca/releases/tag/v1.4.161).
+
+### Fixed
+- The `orca` command-line tool works again on this fork. Its launcher looked for a binary named
+  `Orca` inside the app bundle, but fork builds ship it as `Orca Dev` so the app can install beside
+  official Orca — so every invocation failed with "No such file or directory". The launcher now
+  reads the bundle's own executable name instead of assuming upstream's.
+
+### Changed
+- Upstream's new local-build compatibility contract is pinned to this fork's application identity
+  (`com.zpyoung.orca`). Locally-built artifacts are validated against the fork rather than upstream,
+  so a local build installs over a fork build instead of being rejected as foreign.
 
 ## [1.4.160-rc.0.zy06] - 2026-07-28
 
