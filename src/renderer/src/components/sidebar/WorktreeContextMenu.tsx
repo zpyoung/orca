@@ -37,6 +37,7 @@ import { cn } from '@/lib/utils'
 import type {
   ProjectGroup,
   Repo,
+  RepoKind,
   Worktree,
   WorkspaceStatus,
   WorkspaceStatusDefinition
@@ -317,11 +318,15 @@ export function planWorkspaceStatusAssignment(
 // Why: gates the worktree-scoped group submenu independent of the repo-scoped
 // one — folder workspace rows redirect updateWorktreeMeta to an allowlist
 // that excludes projectGroupId, so they must never see this action.
+// `folderWorkspaceId` covers only `folder:`-keyed workspaces; a folder-MODE repo
+// projects synthetic worktrees through mergeFolderWorkspace, which also drops
+// projectGroupId, so `repoKind` is the second half of the same gate.
 function shouldShowWorktreeGroupMembershipActions(
   folderWorkspaceId: string | null,
-  projectGroups: readonly Pick<ProjectGroup, 'id'>[]
+  projectGroups: readonly Pick<ProjectGroup, 'id'>[],
+  repoKind: RepoKind | undefined
 ): boolean {
-  return folderWorkspaceId === null && projectGroups.length > 0
+  return folderWorkspaceId === null && repoKind !== 'folder' && projectGroups.length > 0
 }
 
 function shouldShowRemoveWorktreeFromGroup(worktree: Pick<Worktree, 'projectGroupId'>): boolean {
@@ -1022,7 +1027,11 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
                   ) : null}
                 </>
               ) : null}
-              {shouldShowWorktreeGroupMembershipActions(folderWorkspaceId, projectGroups) ? (
+              {shouldShowWorktreeGroupMembershipActions(
+                folderWorkspaceId,
+                projectGroups,
+                repo?.kind
+              ) ? (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuSub>

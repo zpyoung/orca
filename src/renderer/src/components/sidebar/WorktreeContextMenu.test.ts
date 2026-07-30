@@ -258,15 +258,32 @@ describe('worktree-scoped project group membership', () => {
   })
 
   it('hides the actions for a folder-workspace row', () => {
-    expect(shouldShowWorktreeGroupMembershipActions('folder-1', [{ id: 'group-1' }])).toBe(false)
+    expect(shouldShowWorktreeGroupMembershipActions('folder-1', [{ id: 'group-1' }], 'git')).toBe(
+      false
+    )
+  })
+
+  it('hides the actions for a worktree in a folder-mode repo', () => {
+    // Regression: only `folder:`-keyed workspaces set folderWorkspaceId, but a
+    // folder-MODE repo's synthetic worktrees project through mergeFolderWorkspace,
+    // which drops projectGroupId — so the action would silently no-op there too.
+    expect(shouldShowWorktreeGroupMembershipActions(null, [{ id: 'group-1' }], 'folder')).toBe(
+      false
+    )
   })
 
   it('hides the actions when no project groups exist', () => {
-    expect(shouldShowWorktreeGroupMembershipActions(null, [])).toBe(false)
+    expect(shouldShowWorktreeGroupMembershipActions(null, [], 'git')).toBe(false)
   })
 
   it('shows the actions for a worktree row once at least one group exists', () => {
-    expect(shouldShowWorktreeGroupMembershipActions(null, [{ id: 'group-1' }])).toBe(true)
+    expect(shouldShowWorktreeGroupMembershipActions(null, [{ id: 'group-1' }], 'git')).toBe(true)
+  })
+
+  it('shows the actions when repo kind is unset, the pre-RepoKind default', () => {
+    expect(shouldShowWorktreeGroupMembershipActions(null, [{ id: 'group-1' }], undefined)).toBe(
+      true
+    )
   })
 
   it('offers "remove from group" only when the worktree currently has a group', () => {
