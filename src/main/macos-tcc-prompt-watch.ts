@@ -19,12 +19,12 @@ export type LogStreamChild = ChildProcessByStdio<null, Readable, Readable>
 
 /** Why: terminals run from the detached helper, which TCC can hold responsible independently. */
 const ORCA_RESPONSIBLE_IDENTIFIERS = new Set([
-  'com.stablyai.orca',
-  'com.stablyai.orca.helper',
-  'com.stablyai.orca.dev',
-  'com.stablyai.orca.dev.helper',
-  'com.stablyai.orca.local',
-  'com.stablyai.orca.local.helper'
+  'com.zpyoung.orca',
+  'com.zpyoung.orca.helper',
+  'com.zpyoung.orca.dev',
+  'com.zpyoung.orca.dev.helper',
+  'com.zpyoung.orca.local',
+  'com.zpyoung.orca.local.helper'
 ])
 
 /** Why: the prompt classes #9756 is about — other-apps' data plus the protected home folders agents sweep. */

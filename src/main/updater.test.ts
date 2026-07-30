@@ -2554,7 +2554,7 @@ describe('updater', () => {
     expect(autoUpdaterMock.setFeedURL.mock.calls.slice(feedCallsBeforeCheck)).not.toContainEqual([
       {
         provider: 'generic',
-        url: 'https://github.com/stablyai/orca/releases/latest/download'
+        url: 'https://github.com/zpyoung/orca/releases/latest/download'
       }
     ])
   })
@@ -2578,7 +2578,7 @@ describe('updater', () => {
     })
     expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
       provider: 'generic',
-      url: 'https://github.com/stablyai/orca/releases/latest/download'
+      url: 'https://github.com/zpyoung/orca/releases/latest/download'
     })
     expect(sendMock).not.toHaveBeenCalledWith(
       'updater:status',

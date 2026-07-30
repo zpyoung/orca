@@ -178,7 +178,7 @@ describe('fetchNewerReleaseTagsWithReadiness', () => {
 
   it('reports transport failures as unavailable instead of not-ready', async () => {
     netFetchMock.mockImplementation((url: string) => {
-      if (url === 'https://github.com/stablyai/orca/releases.atom') {
+      if (url === 'https://github.com/zpyoung/orca/releases.atom') {
         return Promise.resolve({
           ok: true,
           status: 200,
@@ -255,7 +255,7 @@ describe('fetchNewerReleaseTagsWithReadiness', () => {
 
   it('treats an explicit asset 404 as not-ready when another asset is unavailable', async () => {
     netFetchMock.mockImplementation((url: string, init?: { method?: string }) => {
-      if (url === 'https://github.com/stablyai/orca/releases.atom') {
+      if (url === 'https://github.com/zpyoung/orca/releases.atom') {
         return Promise.resolve({
           ok: true,
           status: 200,
