@@ -314,3 +314,51 @@ describe('findWorktreeOwnProjectHeaderRect', () => {
     ).toBe(ANCHOR)
   })
 })
+
+describe('getWorktreeGroupMembershipDropTarget with a folder-mode repo', () => {
+  // Regression: gating only the context menu left the drag path able to assign a
+  // folder-mode repo's synthetic worktree, which mergeFolderWorkspace then drops.
+  it('returns none over a group header the worktree is not in', () => {
+    expect(
+      getWorktreeGroupMembershipDropTarget({
+        pointerY: 125,
+        groupHeaderRects: [GROUP_A, GROUP_B],
+        draggedWorktree: grouped(null),
+        ownRepoSectionRect: OWN_REPO_SECTION,
+        ownRepoKind: 'folder'
+      })
+    ).toEqual({ kind: 'none' })
+  })
+
+  it('returns none over its own repo section, so it cannot leave either', () => {
+    expect(
+      getWorktreeGroupMembershipDropTarget({
+        pointerY: 325,
+        groupHeaderRects: [GROUP_A],
+        draggedWorktree: grouped('group-a'),
+        ownRepoSectionRect: OWN_REPO_SECTION,
+        ownRepoKind: 'folder'
+      })
+    ).toEqual({ kind: 'none' })
+  })
+
+  it('still joins for a git repo, and for an unset kind (the pre-RepoKind default)', () => {
+    expect(
+      getWorktreeGroupMembershipDropTarget({
+        pointerY: 125,
+        groupHeaderRects: [GROUP_A],
+        draggedWorktree: grouped(null),
+        ownRepoSectionRect: OWN_REPO_SECTION,
+        ownRepoKind: 'git'
+      })
+    ).toEqual({ kind: 'join', groupId: 'group-a' })
+    expect(
+      getWorktreeGroupMembershipDropTarget({
+        pointerY: 125,
+        groupHeaderRects: [GROUP_A],
+        draggedWorktree: grouped(null),
+        ownRepoSectionRect: OWN_REPO_SECTION
+      })
+    ).toEqual({ kind: 'join', groupId: 'group-a' })
+  })
+})

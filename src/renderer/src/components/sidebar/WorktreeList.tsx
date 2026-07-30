@@ -1149,6 +1149,7 @@ function getPointerWorktreeGroupMembershipDragPreview(args: {
     pointerY,
     groupHeaderRects,
     draggedWorktree,
+    ownRepoKind: args.repoMap.get(draggedWorktree.repoId)?.kind,
     ownRepoSectionRect: ownRepoHeaderRect
       ? (stickyProjectHeaderRects.get(ownRepoHeaderRect.repoId) ?? {
           top: ownRepoHeaderRect.top,
@@ -3306,9 +3307,13 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
         onWorkspaceBoardDragPreviewStart !== NOOP_WORKSPACE_BOARD_DRAG_PREVIEW_CALLBACK
       // Why: the reorder gate treats a lone row as having nowhere to drag, but
       // group membership gives it somewhere — leaving its group, or joining one.
+      // Excludes folder-mode repos for the same reason the drop hit-test does:
+      // their projection drops projectGroupId, so there is nowhere to drag to.
+      const draggedWorktreeForGroupMembership = worktreeMap.get(worktreeId)
       const canDragForGroupMembership =
         groupBy === 'repo' &&
-        (worktreeMap.get(worktreeId)?.projectGroupId != null ||
+        repoMap.get(draggedWorktreeForGroupMembership?.repoId ?? '')?.kind !== 'folder' &&
+        (draggedWorktreeForGroupMembership?.projectGroupId != null ||
           measureProjectGroupHeaderDragRects(container).length > 0)
       if (
         rects.length <= 1 &&
@@ -3352,6 +3357,7 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
       getReorderUnitDraggedIds,
       groupBy,
       groupKeyByRowKey,
+      repoMap,
       onWorkspaceBoardDragPreviewStart,
       selectedWorktreeIds,
       selectedWorktrees,

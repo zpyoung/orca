@@ -1,4 +1,4 @@
-import type { Worktree } from '../../../../shared/types'
+import type { RepoKind, Worktree } from '../../../../shared/types'
 
 /** Hit-test rect for one project-group header row in the sidebar. */
 export type WorktreeGroupHeaderDropRect = {
@@ -71,7 +71,16 @@ export function getWorktreeGroupMembershipDropTarget(args: {
   groupHeaderRects: readonly WorktreeGroupHeaderDropRect[]
   draggedWorktree: Pick<Worktree, 'id' | 'repoId' | 'projectGroupId'>
   ownRepoSectionRect: WorktreeOwnRepoSectionRect | null
+  ownRepoKind?: RepoKind
 }): WorktreeGroupMembershipDropTarget {
+  // Why: a folder-mode repo's synthetic worktrees project through
+  // mergeFolderWorkspace, which drops projectGroupId — so a drop here would look
+  // like it worked and vanish on the next refresh. Same reason the context menu
+  // hides these actions; gated in the drop decision so preview, highlight and
+  // commit all inherit it from one place.
+  if (args.ownRepoKind === 'folder') {
+    return { kind: 'none' }
+  }
   const currentGroupId = args.draggedWorktree.projectGroupId ?? null
 
   // A header hit always wins over the leave check below, regardless of which
