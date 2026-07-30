@@ -1061,6 +1061,31 @@ function areWorktreeGroupMembershipDragPreviewsEqual(
     : true
 }
 
+// Why: measureProject{,Group}HeaderDragRects report a header's LOGICAL content
+// position, which is what header reordering needs but is scrolled out of view for
+// the header that is currently pinned — so hit-testing a pointer against it never
+// matches the pinned header the user is actually pointing at. Returns the painted
+// position, in the same content space, for the pinned headers only.
+function measureStickySidebarHeaderContentRects(
+  container: HTMLElement,
+  containerRect: DOMRect,
+  idAttribute: string
+): Map<string, { top: number; bottom: number }> {
+  const rectsById = new Map<string, { top: number; bottom: number }>()
+  container
+    .querySelectorAll<HTMLElement>(`[data-worktree-sticky-header-active] [${idAttribute}]`)
+    .forEach((element) => {
+      const id = element.getAttribute(idAttribute)
+      if (!id) {
+        return
+      }
+      const rect = element.getBoundingClientRect()
+      const top = rect.top - containerRect.top + container.scrollTop
+      rectsById.set(id, { top, bottom: top + rect.height })
+    })
+  return rectsById
+}
+
 // Why: the hit-test module speaks for a single worktree; a multi-select drag
 // has no well-defined "current group" to compare against, so it opts out
 // entirely rather than silently reparenting only the primary card.
@@ -1091,10 +1116,19 @@ function getPointerWorktreeGroupMembershipDragPreview(args: {
   }
   const containerRect = args.container.getBoundingClientRect()
   const pointerY = args.clientY - containerRect.top + args.container.scrollTop
+  const stickyGroupHeaderRects = measureStickySidebarHeaderContentRects(
+    args.container,
+    containerRect,
+    'data-project-group-header-id'
+  )
+  const stickyProjectHeaderRects = measureStickySidebarHeaderContentRects(
+    args.container,
+    containerRect,
+    'data-repo-header-id'
+  )
   const groupHeaderRects = measureProjectGroupHeaderDragRects(args.container).map((rect) => ({
     groupId: rect.groupId,
-    top: rect.top,
-    bottom: rect.bottom
+    ...(stickyGroupHeaderRects.get(rect.groupId) ?? { top: rect.top, bottom: rect.bottom })
   }))
   const projectHeaderRects = measureProjectHeaderDragRects(args.container)
   const ownRepoHeaderRect = findWorktreeOwnProjectHeaderRect({
@@ -1116,7 +1150,10 @@ function getPointerWorktreeGroupMembershipDragPreview(args: {
     groupHeaderRects,
     draggedWorktree,
     ownRepoSectionRect: ownRepoHeaderRect
-      ? { top: ownRepoHeaderRect.top, bottom: ownRepoHeaderRect.bottom }
+      ? (stickyProjectHeaderRects.get(ownRepoHeaderRect.repoId) ?? {
+          top: ownRepoHeaderRect.top,
+          bottom: ownRepoHeaderRect.bottom
+        })
       : null
   })
   // Why: the leave highlight draws on the header actually hit-tested, which for
@@ -2199,6 +2236,22 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
     }
   }, [])
 
+  // Why: reveal and the keyboard-nav row model must both agree with the rendered
+  // tree on which project groups exist, or a host filter that hides a group while
+  // keeping a cross-host member visible expands — and orders — that worktree
+  // against a group that is not on screen. Declared above the reveal effect
+  // because its dependency array reads this during render.
+  const visibleWorkspaceHostIds = useAppStore((s) => s.visibleWorkspaceHostIds)
+  const workspaceHostScope = useAppStore((s) => s.workspaceHostScope)
+  const visibleHostIdSetForNav = useMemo(
+    () => getVisibleSidebarHostIdSet(visibleWorkspaceHostIds, workspaceHostScope),
+    [visibleWorkspaceHostIds, workspaceHostScope]
+  )
+  const visibleProjectGroupsForRows = useMemo(
+    () => filterProjectGroupsForVisibleHosts(projectGroups, visibleHostIdSetForNav, defaultHostId),
+    [defaultHostId, projectGroups, visibleHostIdSetForNav]
+  )
+
   React.useEffect(() => {
     if (!pendingRevealWorktree) {
       return
@@ -2250,7 +2303,10 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
                   prCache,
                   workspaceStatuses,
                   settings,
-                  projectGroups,
+                  // Why: must be the same host-filtered set buildRows used, or
+                  // reveal expands a group that was filtered out of the rendered
+                  // tree and the worktree stays collapsed under its repo group.
+                  visibleProjectGroupsForRows,
                   projectGrouping
                 )
           for (const groupKey of groupKeys) {
@@ -2377,6 +2433,7 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
     pinnedDisplayPolicy,
     projectGrouping,
     projectGroups,
+    visibleProjectGroupsForRows,
     pendingRevealRetryTick,
     flashRevealedRow,
     setRenamingWorktreeId,
@@ -2597,21 +2654,6 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
   const getLineageToggleHandler = useMemo(
     () => createLineageToggleHandlerCache(toggleGroupWithScrollAnchor),
     [toggleGroupWithScrollAnchor]
-  )
-
-  // Why: the keyboard-nav row model must agree with the rendered one on which
-  // project groups exist, or a host filter that hides a group but keeps a
-  // cross-host member visible buckets/orders that worktree differently than
-  // what is on screen.
-  const visibleWorkspaceHostIds = useAppStore((s) => s.visibleWorkspaceHostIds)
-  const workspaceHostScope = useAppStore((s) => s.workspaceHostScope)
-  const visibleHostIdSetForNav = useMemo(
-    () => getVisibleSidebarHostIdSet(visibleWorkspaceHostIds, workspaceHostScope),
-    [visibleWorkspaceHostIds, workspaceHostScope]
-  )
-  const visibleProjectGroupsForRows = useMemo(
-    () => filterProjectGroupsForVisibleHosts(projectGroups, visibleHostIdSetForNav, defaultHostId),
-    [defaultHostId, projectGroups, visibleHostIdSetForNav]
   )
 
   const navigateWorktree = useCallback(
@@ -5769,6 +5811,17 @@ const WorktreeList = React.memo(function WorktreeList({
   )
   const projectGroups = useAppStore((s) => s.projectGroups ?? EMPTY_PROJECT_GROUPS)
   const folderWorkspaces = useAppStore((s) => s.folderWorkspaces)
+  // Declared here rather than beside the other row inputs below because reveal
+  // needs the host-filtered group set too, and its memo runs earlier.
+  const defaultHostId = getSettingsFocusedExecutionHostId(settings)
+  const visibleHostIdSet = useMemo(
+    () => getVisibleSidebarHostIdSet(visibleWorkspaceHostIds, workspaceHostScope),
+    [visibleWorkspaceHostIds, workspaceHostScope]
+  )
+  const visibleProjectGroupsForRows = useMemo(
+    () => filterProjectGroupsForVisibleHosts(projectGroups, visibleHostIdSet, defaultHostId),
+    [defaultHostId, projectGroups, visibleHostIdSet]
+  )
   const effectiveCollapsedGroups = useMemo(() => {
     if (!agentSendTargetWorktreeId) {
       return collapsedGroups
@@ -5788,7 +5841,7 @@ const WorktreeList = React.memo(function WorktreeList({
         prCache,
         workspaceStatuses,
         settings,
-        projectGroups,
+        visibleProjectGroupsForRows,
         projectGrouping
       )) {
         next.delete(groupKey)
@@ -5808,19 +5861,14 @@ const WorktreeList = React.memo(function WorktreeList({
     collapsedGroups,
     groupBy,
     prCache,
-    projectGroups,
     projectGrouping,
     repoMap,
     settings,
+    visibleProjectGroupsForRows,
     workspaceStatuses,
     worktreeLineageById,
     worktreeMap
   ])
-  const defaultHostId = getSettingsFocusedExecutionHostId(settings)
-  const visibleHostIdSet = useMemo(
-    () => getVisibleSidebarHostIdSet(visibleWorkspaceHostIds, workspaceHostScope),
-    [visibleWorkspaceHostIds, workspaceHostScope]
-  )
   const visibleReposForRows = useMemo(() => {
     if (!visibleHostIdSet) {
       return repos
@@ -5831,10 +5879,6 @@ const WorktreeList = React.memo(function WorktreeList({
       return visibleHostIdSet.has(hostId)
     })
   }, [defaultHostId, repos, visibleHostIdSet])
-  const visibleProjectGroupsForRows = useMemo(
-    () => filterProjectGroupsForVisibleHosts(projectGroups, visibleHostIdSet, defaultHostId),
-    [defaultHostId, projectGroups, visibleHostIdSet]
-  )
   const visibleFolderWorkspacesForRows = useMemo(
     () =>
       filterFolderWorkspacesForVisibleHosts(

@@ -3841,6 +3841,43 @@ describe('cross-repo worktree groups (loose worktrees)', () => {
     expect((item as { hostContextLabel?: string } | undefined)?.hostContextLabel).toBeUndefined()
   })
 
+  it('keeps a worktree in its repo section when its group id is the empty string', () => {
+    // `getProjectGroupHeaderKey('')` returns the Ungrouped sentinel, so an
+    // ''-id group has no header key of its own to render under. Falling back to
+    // the repo section is the safe read of that, and this pins it: diverting
+    // instead would put the row under a key that collides with Ungrouped.
+    // `''` reaching persisted state at all takes hand-editing — see backlog.md.
+    const emptyIdGroup: ProjectGroup = { ...crossGroup, id: '', name: 'Empty Id' }
+    const looseWorktree: Worktree = { ...worktree, projectGroupId: '' }
+
+    const rows = buildRows(
+      'repo',
+      [looseWorktree],
+      repoMap,
+      null,
+      new Set(),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      false,
+      undefined,
+      [emptyIdGroup]
+    )
+
+    expect(rows.find((row) => row.type === 'item')).toMatchObject({
+      worktree: { id: looseWorktree.id },
+      sectionKey: 'repo:repo-1'
+    })
+    // The ''-id group still emits a header, and it collides with the Ungrouped
+    // sentinel — the part of this that is genuinely worth fixing one day.
+    expect(rows.filter((row) => row.type === 'header').map((row) => row.key)).toEqual([
+      'project-group:ungrouped',
+      'repo:repo-1'
+    ])
+  })
+
   it('labels only the differing members of a mixed-host group, not every member', () => {
     // Regression: the return gate was all-or-nothing, so once any member
     // differed the whole map was returned and members sitting on the group's own
