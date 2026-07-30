@@ -2999,10 +2999,12 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
         : membershipPreview
     )
     if (membershipPreview.target.kind !== 'none') {
-      // Why: a tracked lineage/status target survives as both a row highlight
-      // and a within-tolerance sticky commit fallback, so it has to be dropped
-      // here the way the board branch above drops it.
+      // Why: both tracked targets survive as within-tolerance sticky commit
+      // fallbacks, and pointer-up resolves the board one FIRST — so a release on
+      // a header shortly after leaving a lane could commit that lane instead of
+      // joining. Dropped here the way the board branch above drops the status one.
       drag.latestStatusDropTarget = null
+      drag.latestBoardDropTarget = null
       clearWorkspaceKanbanSidebarDropTargetVisual()
       setDragOverStatus(null)
       setPinDragOver(false)
