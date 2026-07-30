@@ -368,9 +368,28 @@ export const PROJECT_GROUP_META = {
 
 /** Suffix marking a group's loose-worktree block, which has no header row of its own. */
 const LOOSE_WORKTREE_SECTION_KEY_SUFFIX = '::loose'
+const PROJECT_GROUP_HEADER_KEY_PREFIX = 'project-group:'
 
 export function getProjectGroupHeaderKey(groupId: string | null): string {
-  return groupId ? `project-group:${groupId}` : UNGROUPED_PROJECT_GROUP_KEY
+  return groupId ? `${PROJECT_GROUP_HEADER_KEY_PREFIX}${groupId}` : UNGROUPED_PROJECT_GROUP_KEY
+}
+
+/**
+ * The project group a row renders under when it is a loose worktree, or null for
+ * every other section.
+ *
+ * Reading this off the row rather than off `repo.projectGroupId` is the point: a
+ * loose worktree's own membership is independent of its repo's, so anything that
+ * needs the group a row is *displayed* in has to ask the row, not the repo.
+ */
+export function getLooseSectionProjectGroupId(sectionKey: string): string | null {
+  if (!sectionKey.endsWith(LOOSE_WORKTREE_SECTION_KEY_SUFFIX)) {
+    return null
+  }
+  const headerKey = sectionKey.slice(0, -LOOSE_WORKTREE_SECTION_KEY_SUFFIX.length)
+  return headerKey.startsWith(PROJECT_GROUP_HEADER_KEY_PREFIX)
+    ? headerKey.slice(PROJECT_GROUP_HEADER_KEY_PREFIX.length)
+    : null
 }
 
 export const PINNED_GROUP_KEY = 'pinned'

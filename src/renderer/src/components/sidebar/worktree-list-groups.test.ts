@@ -9,6 +9,7 @@ import {
   buildRows,
   getGroupKeyForWorktree,
   getGroupKeysForWorktree,
+  getLooseSectionProjectGroupId,
   getLineageGroupKey,
   getLineageRenderInfo,
   getPRGroupKey,
@@ -3876,6 +3877,17 @@ describe('cross-repo worktree groups (loose worktrees)', () => {
       'project-group:ungrouped',
       'repo:repo-1'
     ])
+  })
+
+  it('reads the displayed group off a loose section key, not off the repo', () => {
+    // Regression: indentation and other display-time group lookups read
+    // repo.projectGroupId, which stopped being the group a loose row renders in.
+    expect(getLooseSectionProjectGroupId('project-group:group-cross::loose')).toBe('group-cross')
+    expect(getLooseSectionProjectGroupId('repo:repo-1')).toBeNull()
+    expect(getLooseSectionProjectGroupId('project-group:group-cross')).toBeNull()
+    expect(getLooseSectionProjectGroupId('pinned')).toBeNull()
+    // A group id containing the suffix must still round-trip.
+    expect(getLooseSectionProjectGroupId('project-group:a::loose::loose')).toBe('a::loose')
   })
 
   it('labels only the differing members of a mixed-host group, not every member', () => {

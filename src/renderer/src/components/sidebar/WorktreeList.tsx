@@ -89,6 +89,7 @@ import {
   buildRows,
   getProjectGroupHeaderKey,
   getProjectHeaderRevealTarget,
+  getLooseSectionProjectGroupId,
   getGroupKeysForWorktree,
   getLineageGroupKey,
   getPinnedWorktreeDisplayPolicy,
@@ -5009,7 +5010,11 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
               const lineageToggleGroupKey = itemRow.lineageGroupKey
               const experimentalNewWorktreeCardStyle =
                 settings?.experimentalNewWorktreeCardStyle === true
-              const projectGroupId = itemRow.repo?.projectGroupId
+              // Why: the group this row is displayed in, which for a loose
+              // worktree is its own and not its repo's — the repo's group decides
+              // folder-backed indentation for rows that render under the repo.
+              const projectGroupId =
+                getLooseSectionProjectGroupId(itemRow.sectionKey) ?? itemRow.repo?.projectGroupId
               const isFolderBackedRepoChild =
                 groupBy === 'repo' &&
                 Boolean(projectGroupId && folderBackedProjectGroupIds.has(projectGroupId))
