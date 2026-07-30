@@ -18,6 +18,28 @@ export type WorktreeGroupMembershipDropTarget =
   | { kind: 'leave' }
   | { kind: 'none' }
 
+/**
+ * The measured repo-header rect standing in for the dragged worktree's own
+ * project section.
+ *
+ * A logical project header merges a project's host setups under a single anchor
+ * repo, and the DOM carries only that anchor's id — so matching the dragged
+ * worktree's own `repoId` against the rects misses every non-anchor sibling and
+ * silently makes drag-to-leave unreachable for it. Both sides are compared on
+ * the logical header key the row model built the header from instead.
+ */
+export function findWorktreeOwnProjectHeaderRect<TRect extends { repoId: string }>(args: {
+  rects: readonly TRect[]
+  ownProjectHeaderKey: string
+  projectHeaderKeyByRepoId: ReadonlyMap<string, string>
+}): TRect | null {
+  return (
+    args.rects.find(
+      (rect) => args.projectHeaderKeyByRepoId.get(rect.repoId) === args.ownProjectHeaderKey
+    ) ?? null
+  )
+}
+
 function isPointerWithinRect(pointerY: number, rect: { top: number; bottom: number }): boolean {
   // Inclusive both edges, matching the rest of the sidebar's drag hit-testing
   // (worktree-lineage-drag-drop.ts, worktree-sidebar-header-drop-preview.ts).

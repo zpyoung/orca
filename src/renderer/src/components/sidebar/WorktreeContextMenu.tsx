@@ -1034,20 +1034,25 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
                       )}
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent>
-                      {projectGroups
-                        .filter((group) => group.id !== worktree.projectGroupId)
-                        .map((group) => (
-                          <DropdownMenuItem
-                            key={group.id}
-                            onSelect={() => handleAddWorktreeToGroup(group.id)}
-                          >
-                            <span className="max-w-48 truncate">{group.name}</span>
-                          </DropdownMenuItem>
-                        ))}
+                      {/* Why: disabled rather than filtered, matching the repo-level
+                          submenu above — filtering the current group out leaves an
+                          empty submenu whenever it is the only group that exists. */}
+                      {projectGroups.map((group) => (
+                        <DropdownMenuItem
+                          key={group.id}
+                          disabled={worktree.projectGroupId === group.id}
+                          onSelect={() => handleAddWorktreeToGroup(group.id)}
+                        >
+                          <span className="max-w-48 truncate">{group.name}</span>
+                        </DropdownMenuItem>
+                      ))}
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
                   {shouldShowRemoveWorktreeFromGroup(worktree) ? (
-                    <DropdownMenuItem onSelect={handleRemoveWorktreeFromGroup} disabled={isDeleting}>
+                    <DropdownMenuItem
+                      onSelect={handleRemoveWorktreeFromGroup}
+                      disabled={isDeleting}
+                    >
                       <CircleX className="size-3.5" />
                       {translate(
                         'auto.components.sidebar.WorktreeContextMenu.removeWorktreeFromGroup',

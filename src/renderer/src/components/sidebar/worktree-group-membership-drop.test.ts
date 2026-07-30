@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Worktree } from '../../../../shared/types'
 import {
+  findWorktreeOwnProjectHeaderRect,
   getWorktreeGroupMembershipDropTarget,
   type WorktreeGroupHeaderDropRect,
   type WorktreeOwnRepoSectionRect
@@ -268,5 +269,48 @@ describe('getWorktreeGroupMembershipDropTarget', () => {
         ownRepoSectionRect: OWN_REPO_SECTION
       })
     ).toEqual({ kind: 'none' })
+  })
+})
+
+describe('findWorktreeOwnProjectHeaderRect', () => {
+  type Rect = { repoId: string; top: number; bottom: number }
+
+  const ANCHOR: Rect = { repoId: 'repo-local', top: 400, bottom: 430 }
+  const OTHER_PROJECT: Rect = { repoId: 'repo-other', top: 500, bottom: 530 }
+
+  it("matches the anchor rect for a worktree in a merged project's non-anchor repo", () => {
+    // Regression: a logical project header merges host setups under one anchor
+    // repo, so the DOM never carries the ssh sibling's id — matching on repoId
+    // left drag-to-leave silently unreachable for worktrees in that sibling.
+    expect(
+      findWorktreeOwnProjectHeaderRect({
+        rects: [ANCHOR, OTHER_PROJECT],
+        ownProjectHeaderKey: 'project:proj-1',
+        projectHeaderKeyByRepoId: new Map([
+          ['repo-local', 'project:proj-1'],
+          ['repo-other', 'project:proj-2']
+        ])
+      })
+    ).toBe(ANCHOR)
+  })
+
+  it('returns null when no rendered header belongs to the same logical project', () => {
+    expect(
+      findWorktreeOwnProjectHeaderRect({
+        rects: [OTHER_PROJECT],
+        ownProjectHeaderKey: 'project:proj-1',
+        projectHeaderKeyByRepoId: new Map([['repo-other', 'project:proj-2']])
+      })
+    ).toBeNull()
+  })
+
+  it('still matches an unmerged repo whose header key is its own repo key', () => {
+    expect(
+      findWorktreeOwnProjectHeaderRect({
+        rects: [ANCHOR],
+        ownProjectHeaderKey: 'repo:repo-local',
+        projectHeaderKeyByRepoId: new Map([['repo-local', 'repo:repo-local']])
+      })
+    ).toBe(ANCHOR)
   })
 })

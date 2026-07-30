@@ -3841,6 +3841,48 @@ describe('cross-repo worktree groups (loose worktrees)', () => {
     expect((item as { hostContextLabel?: string } | undefined)?.hostContextLabel).toBeUndefined()
   })
 
+  it('labels only the differing members of a mixed-host group, not every member', () => {
+    // Regression: the return gate was all-or-nothing, so once any member
+    // differed the whole map was returned and members sitting on the group's own
+    // host got a redundant label too.
+    const sshGroup: ProjectGroup = { ...crossGroup, id: 'group-ssh-mixed', connectionId: 'gpu-vm' }
+    const matchingHostWorktree: Worktree = {
+      ...worktree,
+      id: 'wt-mixed-matching',
+      projectGroupId: sshGroup.id,
+      hostId: 'ssh:gpu-vm'
+    }
+    const differingHostWorktree: Worktree = {
+      ...worktree,
+      id: 'wt-mixed-differing',
+      projectGroupId: sshGroup.id
+    }
+
+    const rows = buildRows(
+      'repo',
+      [matchingHostWorktree, differingHostWorktree],
+      repoMap,
+      null,
+      new Set(),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      false,
+      undefined,
+      [sshGroup]
+    )
+
+    const items = rows.filter((row) => row.type === 'item')
+    expect(
+      items.find((row) => row.worktree.id === matchingHostWorktree.id)?.hostContextLabel
+    ).toBeUndefined()
+    expect(items.find((row) => row.worktree.id === differingHostWorktree.id)).toMatchObject({
+      hostContextLabel: LOCAL_HOST_LABEL
+    })
+  })
+
   it('regression: omitted baselineHostId leaves top-level host labels unchanged when every host matches', () => {
     const secondLocal: Worktree = { ...worktree, id: 'wt-local-second' }
     const rows = buildRows('none', [worktree, secondLocal], repoMap, null, new Set())

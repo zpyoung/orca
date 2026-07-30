@@ -630,4 +630,51 @@ test.describe('Cross-repo worktree groups', () => {
       })
       .toEqual({ kind: 'repo-header', id: repoId })
   })
+
+  test('releasing a drag outside the sidebar does not join a group at the same height', async ({
+    orcaPage
+  }) => {
+    // Regression: the membership hit-test is vertical-only and pointerup is a
+    // window-capture listener, so a release far to the right of the sidebar used
+    // to still commit a join whenever it shared a group header's y.
+    await waitForSessionReady(orcaPage)
+    const [repo] = await createRepoFixture([
+      { name: 'e2e-xrepo-golf', secondaryBranch: 'feature-g' }
+    ])
+    const [{ repoId, secondaryWorktreeId }] = await seedRepos(orcaPage, [repo!])
+    const secondaryId = secondaryWorktreeId!
+    const groupId = await createProjectGroup(orcaPage, 'E2E XRepo Group Golf')
+
+    await expect
+      .poll(async () => findNearestHeaderAbove(await getSidebarRowMarkers(orcaPage), secondaryId), {
+        timeout: 10_000
+      })
+      .toEqual({ kind: 'repo-header', id: repoId })
+
+    const source = orcaPage.locator(`[data-worktree-id="${secondaryId}"]`).first()
+    const groupHeader = orcaPage.locator(`[data-project-group-header-id="${groupId}"]`)
+    await source.scrollIntoViewIfNeeded()
+    await groupHeader.scrollIntoViewIfNeeded()
+    const sourceBox = await source.boundingBox()
+    const headerBox = await groupHeader.boundingBox()
+    if (!sourceBox || !headerBox) {
+      throw new Error('Worktree drag bounding box was not available')
+    }
+    const viewport = orcaPage.viewportSize()
+    const outsideX = Math.max(
+      headerBox.x + headerBox.width + 240,
+      (viewport?.width ?? headerBox.x + headerBox.width + 400) - 40
+    )
+
+    await orcaPage.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2)
+    await orcaPage.mouse.down()
+    await orcaPage.mouse.move(outsideX, headerBox.y + headerBox.height / 2, { steps: 8 })
+    await orcaPage.mouse.up()
+
+    await expect
+      .poll(async () => findNearestHeaderAbove(await getSidebarRowMarkers(orcaPage), secondaryId), {
+        timeout: 10_000
+      })
+      .toEqual({ kind: 'repo-header', id: repoId })
+  })
 })

@@ -745,12 +745,17 @@ function getMixedHostContextLabels(
 }
 
 /**
- * Host-mismatch labels for a flat worktree list. Without `baselineHostId`,
- * labels appear only when the list itself spans multiple hosts (unchanged
- * behavior for the `groupBy: 'none'`/pinned callers). With `baselineHostId`
- * (a group's effective host), a single loose worktree that merely disagrees
- * with its group's host also earns a label — `uniqueHostIds.size > 1` alone
- * can't see that mismatch when the group holds just one loose member.
+ * Host-mismatch labels for a flat worktree list.
+ *
+ * Without `baselineHostId`, every worktree is labelled and the map is returned
+ * only when the list itself spans multiple hosts — unchanged behavior for the
+ * `groupBy: 'none'`/pinned callers.
+ *
+ * With `baselineHostId` (a group's effective host), only the worktrees that
+ * disagree with the baseline are labelled, so a member sitting on its group's
+ * own host stays unlabelled even when the group is mixed. A single loose
+ * worktree that merely disagrees with its group still earns a label, which
+ * `uniqueHostIds.size > 1` alone cannot see.
  */
 function getMixedWorktreeHostContextLabels(
   worktrees: readonly Worktree[],
@@ -765,7 +770,10 @@ function getMixedWorktreeHostContextLabels(
   for (const worktree of worktrees) {
     const hostId = getWorktreeExecutionHostId(worktree, repoMap.get(worktree.repoId), defaultHostId)
     uniqueHostIds.add(hostId)
-    if (baselineHostId !== undefined && hostId !== baselineHostId) {
+    if (baselineHostId !== undefined) {
+      if (hostId === baselineHostId) {
+        continue
+      }
       differsFromBaseline = true
     }
     labelsByWorktreeId.set(worktree.id, hostLabelById?.get(hostId) ?? getExecutionHostLabel(hostId))

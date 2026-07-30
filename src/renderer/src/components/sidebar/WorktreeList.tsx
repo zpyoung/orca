@@ -88,6 +88,7 @@ import {
   PINNED_GROUP_KEY,
   buildRows,
   getProjectGroupHeaderKey,
+  getProjectHeaderRevealTarget,
   getGroupKeysForWorktree,
   getLineageGroupKey,
   getPinnedWorktreeDisplayPolicy,
@@ -162,6 +163,7 @@ import {
   measureProjectGroupHeaderDragRects
 } from './project-group-header-drop'
 import {
+  findWorktreeOwnProjectHeaderRect,
   getWorktreeGroupMembershipDropTarget,
   type WorktreeGroupMembershipDropTarget
 } from './worktree-group-membership-drop'
@@ -1064,12 +1066,23 @@ function areWorktreeGroupMembershipDragPreviewsEqual(
 // entirely rather than silently reparenting only the primary card.
 function getPointerWorktreeGroupMembershipDragPreview(args: {
   container: HTMLElement | null
+  clientX: number
   clientY: number
   draggedIds: readonly string[]
   worktreeId: string
   worktreeMap: ReadonlyMap<string, Worktree>
+  repoMap: Map<string, Repo>
+  projectGrouping?: ProjectGroupingModel
 }): WorktreeGroupMembershipDragPreview {
   if (!args.container || args.draggedIds.length !== 1) {
+    return WORKTREE_GROUP_MEMBERSHIP_DRAG_PREVIEW_NONE
+  }
+  // Why: header hit-testing below is vertical-only and pointerup is a
+  // window-capture listener, so without a containment check a release far
+  // outside the sidebar still commits a membership change whenever it shares a
+  // header's y. Same guard shape as getPointerDropStatusTarget.
+  const pointerTarget = document.elementFromPoint(args.clientX, args.clientY)
+  if (!(pointerTarget instanceof Element) || !args.container.contains(pointerTarget)) {
     return WORKTREE_GROUP_MEMBERSHIP_DRAG_PREVIEW_NONE
   }
   const draggedWorktree = args.worktreeMap.get(args.worktreeId)
@@ -1083,9 +1096,21 @@ function getPointerWorktreeGroupMembershipDragPreview(args: {
     top: rect.top,
     bottom: rect.bottom
   }))
-  const ownRepoHeaderRect = measureProjectHeaderDragRects(args.container).find(
-    (rect) => rect.repoId === draggedWorktree.repoId
-  )
+  const projectHeaderRects = measureProjectHeaderDragRects(args.container)
+  const ownRepoHeaderRect = findWorktreeOwnProjectHeaderRect({
+    rects: projectHeaderRects,
+    ownProjectHeaderKey: getProjectHeaderRevealTarget(
+      draggedWorktree.repoId,
+      args.repoMap,
+      args.projectGrouping
+    ).key,
+    projectHeaderKeyByRepoId: new Map(
+      projectHeaderRects.map((rect) => [
+        rect.repoId,
+        getProjectHeaderRevealTarget(rect.repoId, args.repoMap, args.projectGrouping).key
+      ])
+    )
+  })
   const target = getWorktreeGroupMembershipDropTarget({
     pointerY,
     groupHeaderRects,
@@ -1094,7 +1119,9 @@ function getPointerWorktreeGroupMembershipDragPreview(args: {
       ? { top: ownRepoHeaderRect.top, bottom: ownRepoHeaderRect.bottom }
       : null
   })
-  return { target, repoId: draggedWorktree.repoId }
+  // Why: the leave highlight draws on the header actually hit-tested, which for
+  // a merged logical project is the anchor repo rather than the dragged one.
+  return { target, repoId: ownRepoHeaderRect?.repoId ?? null }
 }
 
 function shouldPreferSidebarStatusDropTarget(args: {
@@ -2915,10 +2942,13 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
     // reorder targets before any of those are even computed.
     const membershipPreview = getPointerWorktreeGroupMembershipDragPreview({
       container: sidebarContainer,
+      clientX: drag.currentX,
       clientY: drag.currentY,
       draggedIds: drag.draggedIds,
       worktreeId: drag.worktreeId,
-      worktreeMap
+      worktreeMap,
+      repoMap,
+      projectGrouping
     })
     setWorktreeGroupMembershipDragPreview((prev) =>
       areWorktreeGroupMembershipDragPreviewsEqual(prev, membershipPreview)
@@ -2926,6 +2956,10 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
         : membershipPreview
     )
     if (membershipPreview.target.kind !== 'none') {
+      // Why: a tracked lineage/status target survives as both a row highlight
+      // and a within-tolerance sticky commit fallback, so it has to be dropped
+      // here the way the board branch above drops it.
+      drag.latestStatusDropTarget = null
       clearWorkspaceKanbanSidebarDropTargetVisual()
       setDragOverStatus(null)
       setPinDragOver(false)
@@ -3099,6 +3133,8 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
     onWorkspaceBoardDragPreviewCommit,
     shouldShowWorkspaceBoardDropIndicator,
     getEligibleLineageDropTarget,
+    projectGrouping,
+    repoMap,
     workspaceBoardOpen,
     workspaceStatuses,
     worktreeMap
@@ -3353,10 +3389,13 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
       } else {
         const membershipTarget = getPointerWorktreeGroupMembershipDragPreview({
           container: scrollRef.current,
+          clientX: event.clientX,
           clientY: event.clientY,
           draggedIds: drag.draggedIds,
           worktreeId: drag.worktreeId,
-          worktreeMap
+          worktreeMap,
+          repoMap,
+          projectGrouping
         }).target
         if (membershipTarget.kind === 'join') {
           void updateWorktreeMeta(drag.worktreeId, { projectGroupId: membershipTarget.groupId })
@@ -3497,7 +3536,9 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
     onPinWorktrees,
     onReorderWorktrees,
     onWorkspaceBoardDragPreviewCommit,
+    projectGrouping,
     refreshWorktreeDragSession,
+    repoMap,
     scheduleWorktreePointerDragFrame,
     shouldShowWorkspaceBoardDropIndicator,
     updateWorktreeMeta,
