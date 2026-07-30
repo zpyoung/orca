@@ -37,6 +37,10 @@ function makeRuntime(ui: PersistedUIState = getDefaultUIState()): OrcaRuntimeSer
     updateUIState: vi.fn((updates: Partial<PersistedUIState>) => {
       currentUI = { ...currentUI, ...updates }
       return currentUI
+    }),
+    getOrchestrationDb: () => ({
+      getLegacyAdoption: () => undefined,
+      resolveLegacyWorkerCandidate: () => undefined
     })
   } as unknown as OrcaRuntimeService
 }

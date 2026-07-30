@@ -3,6 +3,7 @@ import { existsSync, statSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import os from 'node:os'
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, type Tray } from 'electron'
+import { initTccPromptNotice, stopTccPromptNotice } from './macos-tcc-prompt-notice'
 import { electronApp, is } from '@electron-toolkit/utils'
 import {
   Store,
@@ -20,8 +21,21 @@ import { StatsCollector, initStatsPath } from './stats/collector'
 import { ClaudeUsageStore, initClaudeUsagePath } from './claude-usage/store'
 import { CodexUsageStore, initCodexUsagePath } from './codex-usage/store'
 import { OpenCodeUsageStore, initOpenCodeUsagePath } from './opencode-usage/store'
-import { killAllPty } from './ipc/pty'
-import { initDaemonPtyProvider, disconnectDaemon, shutdownDaemon } from './daemon/daemon-init'
+import {
+  killAllPty,
+  clearProviderPtyState,
+  getPtyIdForPaneKey,
+  registerPaneKeyTeardownListener,
+  getLocalPtyProvider,
+  getSshPtyProvider,
+  registerHeadlessPtyRuntime
+} from './ipc/pty'
+import {
+  initDaemonPtyProvider,
+  disconnectDaemon,
+  getDaemonProvider,
+  shutdownDaemon
+} from './daemon/daemon-init'
 import { closeAllWatchers } from './ipc/filesystem-watcher'
 import { disposeWorktreeBaseDirectoryWatchers } from './ipc/worktree-base-directory-watcher'
 import { registerCoreHandlers } from './ipc/register-core-handlers'
@@ -42,6 +56,10 @@ import { triggerStartupNotificationRegistration } from './ipc/notifications'
 import { OrcaRuntimeService, type RuntimeWorktreeLifecycleEvent } from './runtime/orca-runtime'
 import { loadAgentSessionClaimSigner } from './runtime/agent-session-claim-identity'
 import { OrcaRuntimeRpcServer } from './runtime/runtime-rpc'
+import {
+  recordRuntimeRpcStartFailure,
+  showRuntimeRpcStartupFailureDialog
+} from './runtime/runtime-rpc-startup-failure'
 import { resolveAdvertisedPairingEndpoint } from './runtime/pairing-endpoint'
 import { ServeReadinessPublisher } from './server/serve-readiness'
 import { reserveServeStdoutForReadiness } from './server/serve-stdout-boundary'
@@ -112,6 +130,7 @@ import {
 import { maybeRedirectAppImageCliLaunch } from './startup/appimage-cli-redirect'
 import { maybeRedirectPackagedCliEntryLaunch } from './startup/packaged-cli-entry-redirect'
 import { startFirstWindowStartupServices } from './startup/first-window-startup-services'
+import { recoverLegacyWorkerTerminalsForRendererStartup } from './startup/legacy-worker-renderer-recovery'
 import { createWslCliReconciliationStartupBarrier } from './startup/wsl-cli-reconciliation-startup-barrier'
 import { getDevInstanceIdentity } from './startup/dev-instance-identity'
 import { hydrateShellPath, mergePathSegments } from './startup/hydrate-shell-path'
@@ -150,6 +169,7 @@ import {
   setTrayAttention,
   type SystemTrayOptions
 } from './tray/system-tray'
+import { createMacAppActivationHandler } from './window/macos-app-activation'
 import { focusExistingMainWindow } from './window/focus-existing-window'
 import { notifyMainWindowBecameVisible } from './window/main-window-visibility'
 import { CodexAccountService } from './codex-accounts/service'
@@ -196,14 +216,6 @@ import { setDefaultWslDistroOverride } from './git/runner'
 import { getRepoIdFromWorktreeId } from '../shared/worktree-id'
 import { parseWorkspaceKey } from '../shared/workspace-scope'
 import { setMigrationUnsupportedPtyListener } from './agent-hooks/migration-unsupported-pty-state'
-import {
-  clearProviderPtyState,
-  getPtyIdForPaneKey,
-  registerPaneKeyTeardownListener,
-  getLocalPtyProvider,
-  getSshPtyProvider,
-  registerHeadlessPtyRuntime
-} from './ipc/pty'
 import { AgentBrowserBridge } from './browser/agent-browser-bridge'
 import { EmulatorBridge } from './emulator/emulator-bridge'
 import { browserCertificateTrustController, browserManager } from './browser/browser-manager'
@@ -235,6 +247,11 @@ import {
   recordCrashBreadcrumb
 } from './crash-reporting/crash-breadcrumb-store'
 import { recordDurableCrashBreadcrumb } from './crash-reporting/durable-crash-breadcrumb'
+import { installMainThreadHangWatchdog } from './hang-watchdog/main-thread-hang-watchdog'
+import {
+  consumeHangDetectionMarker,
+  hangDetectionMarkerPath
+} from './hang-watchdog/hang-detection-marker'
 import { getMainProcessLifecycleIdentity } from './crash-reporting/main-process-lifecycle-identity'
 import { CrashReportStore } from './crash-reporting/crash-report-store'
 import {
@@ -550,6 +567,11 @@ function requestDesktopActivation(): void {
   desktopActivationGate.requestActivation()
 }
 
+const handleMacAppActivation = createMacAppActivationHandler({
+  getWindow: () => mainWindow,
+  requestActivation: requestDesktopActivation
+})
+
 function getDesktopWindowStatus(): RuntimeDesktopWindowStatus {
   const state = desktopActivationGate.getState()
   return state === 'ready' ? 'openable' : state
@@ -701,9 +723,23 @@ if (hasSingleInstanceLock) {
 }
 
 ipcMain.handle('app:awaitFirstWindowStartupServices', async () => {
-  // Why: restored WSL terminals get a bounded chance to receive launcher repairs before window rendering proceeds.
   await Promise.all([firstWindowStartupServicesReady, managedWslCliStartupBarrierReady])
 })
+
+ipcMain.handle('app:recoverLegacyWorkerTerminalsForRendererStartup', () =>
+  recoverLegacyWorkerTerminalsForRendererStartup({
+    firstWindowStartupServicesReady,
+    managedWslCliStartupBarrierReady,
+    localPtyProviderStartupReady,
+    reconcile: async () => {
+      await runtime?.refreshRestoredOrchestrationAuthority()
+      return runtime?.reconcileLegacyWorkerTerminals({ materializeRenderer: true })
+    },
+    onDeferredRecoveryError: (error) => {
+      console.warn('[orchestration] legacy worker provider-ready recovery failed', error)
+    }
+  })
+)
 
 // Why: the renderer pulls this once its ui:openSettings listener attaches, so a Settings request queued before mount isn't lost.
 ipcMain.handle('ui:consumePendingOpenSettings', (event) =>
@@ -1230,6 +1266,8 @@ function openMainWindow(): BrowserWindow {
       onWorktreeLifecycle: emitPluginWorktreeLifecycle
     }
   )
+  // Why: attach the durable renderer pull now, but launch the diagnostic process after first paint.
+  initTccPromptNotice(window, { deferWatchUntilReadyToShow: true })
   rateLimits.attach(window)
   // Why: quota probes spawn CLIs and hit network, so don't fetch immediately and compete with first paint; show/focus listeners refresh later.
   rateLimits.start({ fetchImmediately: false })
@@ -1838,8 +1876,19 @@ function shouldSuppressCodexAutoApprovalSyntheticTitleFromHook(args: {
   )
 }
 
-app.whenReady().then(async () => {
+void app.whenReady().then(async () => {
   logStartupMilestone('app-ready')
+  installMainThreadHangWatchdog({ userDataPath: getCanonicalUserDataPath() })
+  const hangDetection = consumeHangDetectionMarker(
+    hangDetectionMarkerPath(getCanonicalUserDataPath())
+  )
+  if (hangDetection) {
+    recordDurableCrashBreadcrumb('main_thread_hang_detected', {
+      unresponsiveMs: hangDetection.unresponsiveMs,
+      previousPid: hangDetection.parentPid,
+      selfRecovered: hangDetection.selfRecovered
+    })
+  }
   // Why: install certificate decisions before any webview or headless window issues its first TLS request.
   app.on(
     'certificate-error',
@@ -1967,6 +2016,16 @@ app.whenReady().then(async () => {
   }
   // Why: telemetry must init before any IPC handler/renderer can call track(); it's a no-op in dev and while TELEMETRY_ENABLED is false, so it's safe early.
   initTelemetry(store)
+  // Why: the breadcrumb alone never leaves the machine — it rides crash reports, and a hang is not
+  // a crash (the app is force-quit, so no report is ever generated). Without this the incidence
+  // number the watchdog exists to produce would sit unread on the user's disk. Must run after
+  // initTelemetry: track() drops silently until the client and store are wired.
+  if (hangDetection) {
+    track('main_thread_hang_detected', {
+      unresponsive_ms: Math.round(hangDetection.unresponsiveMs),
+      self_recovered: hangDetection.selfRecovered
+    })
+  }
   // Why: the trust-grant module is bundled into plain-node CLI entries where
   // the telemetry client cannot load, so the tracker is injected here instead
   // of imported there.
@@ -2140,6 +2199,11 @@ app.whenReady().then(async () => {
     getAgentProviderSessionSnapshot: () => agentHookServer.getStatusSnapshot(),
     getAgentProviderSessionRowsForPane: (paneKey) =>
       agentHookServer.getStatusSnapshotForPane(paneKey),
+    attestAgentHookCompatibilityAuthority: (candidate) =>
+      agentHookServer.attestCompatibilityAuthority(candidate),
+    retireAgentHookCompatibilityAuthority: (paneKey) =>
+      agentHookServer.retirePaneAuthority(paneKey),
+    canRecoverPersistentLocalPtys: () => getDaemonProvider() !== null,
     // Why: source codex-home here (runs in window AND serve) so aiVault.listSessions includes managed-Codex sessions; registerCoreHandlers is window-only.
     getAdditionalAiVaultCodexHomePaths: () =>
       codexRuntimeHome ? codexRuntimeHome.getHostCodexHomePathsForSessionDiscovery() : [],
@@ -2154,6 +2218,7 @@ app.whenReady().then(async () => {
       isAgentStatusHooksEnabled(store?.getSettings()) ? agentHookServer.buildPtyEnv() : {}
   })
   runtime = runtimeService
+  runtimeService.prepareLegacyWorkerTerminalRecovery()
   publishProviderSessionChanges(agentHookServer.getProviderSessionIdentities())
   browserManager.setBrowserGuestStateChangedListener((worktreeId) => {
     runtimeService.notifyMobileSessionTabsChanged(worktreeId)
@@ -2577,7 +2642,7 @@ app.whenReady().then(async () => {
   })
 
   startTerminalRuntimeStartupServices()
-  app.on('activate', requestDesktopActivation)
+  app.on('activate', handleMacAppActivation)
 
   if (serveOptions) {
     // Why: give managed WSL launchers a brief chance to migrate before headless PTYs go live, without slow repairs withholding all RPC readiness.
@@ -2596,6 +2661,8 @@ app.whenReady().then(async () => {
       store,
       prepareCodexSessionResumeForLaunch
     )
+    await runtime.refreshRestoredOrchestrationAuthority()
+    await runtime.reconcileLegacyWorkerTerminals()
     // Why: headless servers can't mount <webview> panes; use offscreen WebContents, gated on a real display so browser.headless.v1 stays honest.
     if (headlessBrowserDisplayAvailable) {
       runtime.setOffscreenBrowserBackend(new OffscreenBrowserBackend(browserManager))
@@ -2651,12 +2718,19 @@ app.whenReady().then(async () => {
   }
 
   // Why: window and RPC startup run in parallel; registerPtyHandlers gates PTY spawns so RPC binds without racing the daemon provider swap.
-  const [win] = await Promise.all([
+  const [win, runtimeRpcStartResult] = await Promise.all([
     Promise.resolve(openMainWindow()),
-    runtimeRpc.start().catch((error) => {
-      console.error('[runtime] Failed to start local RPC transport:', error)
-    })
+    runtimeRpc.start().then(
+      () => ({ ok: true as const }),
+      (error: unknown) => {
+        recordRuntimeRpcStartFailure(error)
+        return { ok: false as const, error }
+      }
+    )
   ])
+  if (!runtimeRpcStartResult.ok) {
+    void showRuntimeRpcStartupFailureDialog(win, runtimeRpcStartResult.error)
+  }
 
   const cloudAuth = getOrcaCloudAuthConfig()
   if (cloudAuth.configured) {
@@ -2701,6 +2775,9 @@ app.whenReady().then(async () => {
   })
 })
 
+// Why: app.exit() skips Electron quit events, so keep its log child from surviving forced exits.
+process.once('exit', stopTccPromptNotice)
+
 app.on('before-quit', () => {
   if (isQuittingForUpdate()) {
     recordUpdaterLifecycle('before_quit_allowed', undefined, {
@@ -2723,6 +2800,8 @@ app.on('before-quit', () => {
 // Why: will-quit fires twice — first pass runs sync cleanup + preventDefault to await checkpoint writes; second pass exits.
 let daemonDisconnectDone = false
 app.on('will-quit', (e) => {
+  // Why: renderer guards can still cancel before this committed phase; `log stream` must survive those vetoes.
+  stopTccPromptNotice()
   const updateQuitInProgress = isQuittingForUpdate()
   if (updateQuitInProgress) {
     recordUpdaterLifecycle(

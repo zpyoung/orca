@@ -18,6 +18,7 @@ import type {
   TerminalTabCloseRequest,
   TerminalTabCloseResponse
 } from '../shared/terminal-tab-close'
+import type { TerminalTabCreateReply } from '../shared/terminal-reveal-identity'
 import type {
   LocalLogTailChangedPayload,
   LocalLogTailReadArgs,
@@ -27,12 +28,35 @@ import type {
 import type { ReadClipboardTextOptions } from '../shared/clipboard-text'
 import type { AppIdentity } from '../shared/app-identity'
 import type {
+  HostQualifiedDetectedWorktreeResult,
+  LegacyDetectedWorktreeRequest,
+  ListDetectedWorktreesArgs,
+  ProviderRequestId
+} from '../shared/detected-worktree-provider-contract'
+import type {
+  HostRepoCatalogSnapshot,
+  ListReposForExecutionHostArgs
+} from '../shared/host-repo-catalog-contract'
+import type {
+  HostLineageSnapshot,
+  ListDesktopLineageForHostArgs
+} from '../shared/host-lineage-contract'
+import type {
   WriteTerminalRenderDesyncEvidenceArgs,
   WriteTerminalRenderDesyncEvidenceResult
 } from '../shared/terminal-render-desync-evidence'
 import type { MobileRelayStatus } from '../shared/mobile-relay-status'
 import type { MobilePairingConnectionMode } from '../shared/mobile-pairing-connection-mode'
-import type { SshMutationExpectation } from '../shared/ssh-types'
+import type { MobileRelayMintFailure } from '../shared/mobile-relay-mint-failure'
+import type {
+  SshMutationExpectation,
+  SshConnectionState,
+  SshConfigImportResult,
+  SshTargetAddResult,
+  SshTarget,
+  PortForwardEntry,
+  EnrichedDetectedPort
+} from '../shared/ssh-types'
 import type {
   CreateLocalOrcaProfileArgs,
   CreateLocalOrcaProfileResult,
@@ -104,6 +128,7 @@ import type {
   CustomPet,
   DetectedWorktreeListResult,
   DirEntry,
+  FilesystemPathFlavor,
   ForceDeleteWorktreeBranchResult,
   FsChangedPayload,
   GhosttyImportPreview,
@@ -260,10 +285,8 @@ import type {
 import type { SetupScriptImportCandidate } from '../shared/setup-script-imports'
 import type { GitHistoryOptions, GitHistoryResult } from '../shared/git-history'
 import type { PublicKnownRuntimeEnvironment } from '../shared/runtime-environments'
-import type {
-  EphemeralVmRecipeDoctorResult,
-  EphemeralVmRecipeResultWarning
-} from '../shared/ephemeral-vm-recipes'
+import type { EphemeralVmRecipeDoctorResult } from '../shared/ephemeral-vm-recipes'
+import type { EphemeralVmRecipeResultWarning } from '../shared/ephemeral-vm-recipe-diagnostics'
 import type { EphemeralVmRuntimeRecord } from '../shared/ephemeral-vm-runtimes'
 import type { RuntimeAccessGrant } from '../shared/runtime-access-grants'
 import type { RuntimeRpcResponse } from '../shared/runtime-rpc-envelope'
@@ -431,14 +454,6 @@ import type {
   WorkspacePortScanResult
 } from '../shared/workspace-ports'
 import type { GhAuthDiagnostic } from '../shared/github-auth-types'
-import type {
-  SshConnectionState,
-  SshConfigImportResult,
-  SshTargetAddResult,
-  SshTarget,
-  PortForwardEntry,
-  EnrichedDetectedPort
-} from '../shared/ssh-types'
 import type {
   CodexUsageBreakdownKind,
   CodexUsageBreakdownRow,
@@ -958,6 +973,8 @@ export type AppApi = {
   /** Resolves when the daemon PTY provider and hook receiver have either
    *  started or failed open for the first BrowserWindow. */
   awaitFirstWindowStartupServices: () => Promise<void>
+  /** Reconciles legacy worker authority around persisted terminal reconnect. */
+  recoverLegacyWorkerTerminalsForRendererStartup: () => Promise<void>
   /** Emits a startup benchmark marker when ORCA_STARTUP_DIAGNOSTICS is enabled. */
   startupDiagnostic: (event: string, details?: Record<string, unknown>) => Promise<void>
   /** macOS active input mode, or layout ID when no IME is selected (e.g. `com.apple.keylayout.PolishPro`).
@@ -1159,6 +1176,7 @@ export type PreloadApi = {
   }
   repos: {
     list: () => Promise<Repo[]>
+    listForExecutionHost?: (args: ListReposForExecutionHostArgs) => Promise<HostRepoCatalogSnapshot>
     // Why: error union matches the IPC handler's return shape; renderer callers branch on `'error' in result`.
     add: (args: {
       path: string
@@ -1344,7 +1362,13 @@ export type PreloadApi = {
   }
   worktrees: {
     list: (args: { repoId: string }) => Promise<Worktree[]>
-    listDetected: (args: { repoId: string }) => Promise<DetectedWorktreeListResult>
+    listDetected: {
+      (
+        args: ListDetectedWorktreesArgs
+      ): Promise<HostQualifiedDetectedWorktreeResult | DetectedWorktreeListResult>
+      (args: LegacyDetectedWorktreeRequest): Promise<DetectedWorktreeListResult>
+    }
+    cancelListDetected?: (args: { providerRequestId: ProviderRequestId }) => Promise<void>
     listAll: () => Promise<Worktree[]>
     create: (args: CreateWorktreeArgs) => Promise<CreateWorktreeResult>
     /** Two-phase progress for a background `create`, correlated by `creationId`. The remote/runtime
@@ -1394,6 +1418,7 @@ export type PreloadApi = {
       lineage: Record<string, WorktreeLineage>
       workspaceLineage?: Record<string, WorkspaceLineage>
     }>
+    listLineageForHost?: (args: ListDesktopLineageForHostArgs) => Promise<HostLineageSnapshot>
     updateLineage: (args: {
       worktreeId: string
       parentWorktreeId?: string
@@ -2442,6 +2467,14 @@ export type PreloadApi = {
     unsubscribe: (ptyId: string) => Promise<void>
     onData: (callback: (payload: TerminalPreviewDataPayload) => void) => () => void
   }
+  macosTccPrompts: {
+    /** Fires once macOS has raised its Nth consent dialog naming Orca (#9756). */
+    onThreshold: (callback: (payload: { promptCount: number }) => void) => () => void
+    consumePending: () => Promise<{ claimId: number; promptCount: number } | null>
+    acknowledgePending: (claimId: number) => Promise<void>
+    releasePending: (claimId: number) => Promise<void>
+    dismiss: () => Promise<void>
+  }
   developerPermissions: {
     getStatus: () => Promise<DeveloperPermissionState[]>
     request: (args: { id: DeveloperPermissionId }) => Promise<DeveloperPermissionRequestResult>
@@ -3069,6 +3102,8 @@ export type PreloadApi = {
     onZoomBrowserPage: (callback: (direction: 'in' | 'out' | 'reset') => void) => () => void
     onHardReloadBrowserPage: (callback: () => void) => () => void
     onCloseActiveTab: (callback: () => void) => () => void
+    onCloseFloatingItem: (callback: (payload: { sourceId: string }) => void) => () => void
+    onSelectFloatingIndex: (callback: (payload: { index: number }) => void) => () => void
     onSwitchTab: (callback: (direction: 1 | -1) => void) => () => void
     onSwitchTabAcrossAllTypes: (callback: (direction: 1 | -1) => void) => () => void
     onSwitchRecentTab: (callback: () => void) => () => void
@@ -3104,7 +3139,9 @@ export type PreloadApi = {
         title?: string
         ptyId?: string
         activate?: boolean
+        focus?: boolean
         presentation?: RuntimeTerminalPresentation
+        surfaceOwner?: false
         tabId?: string
         leafId?: string
         splitFromLeafId?: string
@@ -3118,12 +3155,7 @@ export type PreloadApi = {
     onRequestTerminalTabMount: (
       callback: (data: { worktreeId: string; tabId?: string; ptyId?: string }) => void
     ) => () => void
-    replyTerminalCreate: (reply: {
-      requestId: string
-      tabId?: string
-      title?: string
-      error?: string
-    }) => void
+    replyTerminalCreate: (reply: TerminalTabCreateReply) => void
     onSplitTerminal: (
       callback: (data: {
         tabId: string
@@ -3192,6 +3224,7 @@ export type PreloadApi = {
       runtimeEnvironmentId?: string | null
     }) => Promise<string | null>
     writeClipboardText: (text: string) => Promise<void>
+    writeTerminalClipboardText: (text: string) => Promise<void>
     writeSelectionClipboardText: (text: string) => Promise<void>
     writeClipboardImage: (dataUrl: string) => Promise<void>
     performNativePaste: (options?: { mode?: 'paste' | 'paste-and-match-style' }) => void
@@ -3209,7 +3242,7 @@ export type PreloadApi = {
     syncTrafficLights: (zoomFactor: number) => void
     setMarkdownEditorFocused: (focused: boolean) => void
     setTerminalInputFocused: (focused: boolean) => void
-    setFloatingTerminalInputFocused: (focused: boolean) => void
+    setFloatingFocus: (state: { panelFocused: boolean; terminalFocused: boolean }) => void
     setShortcutRecorderFocused: (focused: boolean) => void
     onRichMarkdownContextCommand: (
       callback: (payload: RichMarkdownContextMenuCommandPayload) => void
@@ -3372,6 +3405,7 @@ export type PreloadApi = {
     browseDir: (args: { targetId: string; dirPath: string }) => Promise<{
       entries: { name: string; isDirectory: boolean }[]
       resolvedPath: string
+      pathFlavor: FilesystemPathFlavor
     }>
     onCredentialRequest: (
       callback: (data: {
@@ -3484,6 +3518,13 @@ export type PreloadApi = {
     /** Listen for PTYs on a legacy numeric pane key that have registry-backed UUID pane proof. */
     onMigrationUnsupported: (callback: (entry: MigrationUnsupportedPtyEntry) => void) => () => void
     onMigrationUnsupportedClear: (callback: (data: { ptyId: string }) => void) => () => void
+    onLegacyWorkerTerminalRecovery: (
+      callback: (data: {
+        paneKey: string
+        resolution: 'adopted' | 'exited' | 'rolled_back'
+        ptyId?: string
+      }) => void
+    ) => () => void
     getMigrationUnsupportedSnapshot: () => Promise<MigrationUnsupportedPtyEntry[]>
     /** Drop a paneKey from the main-process hook cache and on-disk last-status file. Fire-and-forget. */
     drop: (paneKey: string) => void
@@ -3507,14 +3548,20 @@ export type PreloadApi = {
       connectionMode?: MobilePairingConnectionMode
       rotate?: boolean
     }) => Promise<
-      | { available: false }
+      | {
+          available: false
+          reason?: string
+          guidance?: string
+          relayFailure?: MobileRelayMintFailure
+        }
       | {
           available: true
-          qrDataUrl: string
+          qrDataUrl: string | null
+          qrError?: 'encoding_failed'
           pairingUrl: string
           endpoint: string
           deviceId: string
-          /** Mode the QR actually encodes; 'local-only' when Relay could not be attached. */
+          /** Mode the QR actually encodes. */
           connectionMode: MobilePairingConnectionMode
         }
     >

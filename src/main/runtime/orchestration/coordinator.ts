@@ -362,7 +362,7 @@ export class Coordinator {
         terminals.push(created.handle)
         this.opts.onLog(`Created worker terminal ${created.handle}`)
       } catch (err) {
-        this.opts.onLog(`Failed to create terminal: ${err}`)
+        this.opts.onLog(`Failed to create terminal: ${String(err)}`)
         return
       }
     }
@@ -378,7 +378,7 @@ export class Coordinator {
       try {
         await this.dispatchTask(task, targetHandle)
       } catch (err) {
-        this.opts.onLog(`Failed to dispatch task ${task.id}: ${err}`)
+        this.opts.onLog(`Failed to dispatch task ${task.id}: ${String(err)}`)
       }
     }
   }
