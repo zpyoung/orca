@@ -3413,6 +3413,32 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
         clearWorktreeDrag()
         return
       }
+      // Why: resolved from the release coordinates BEFORE the board target, which
+      // carries a within-tolerance sticky fallback fed by a requestAnimationFrame
+      // the release can outrun. Clearing that fallback on a membership hit only
+      // helps when the frame runs, which is the case that was never broken.
+      // A release inside the board is outside this container, so the hit-test
+      // returns none there and the board path below still wins on its own turf.
+      const membershipTarget = getPointerWorktreeGroupMembershipDragPreview({
+        container: scrollRef.current,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        draggedIds: drag.draggedIds,
+        worktreeId: drag.worktreeId,
+        worktreeMap,
+        repoMap,
+        projectGrouping
+      }).target
+      if (membershipTarget.kind === 'join') {
+        void updateWorktreeMeta(drag.worktreeId, { projectGroupId: membershipTarget.groupId })
+        clearWorktreeDrag()
+        return
+      }
+      if (membershipTarget.kind === 'leave') {
+        void updateWorktreeMeta(drag.worktreeId, { projectGroupId: null })
+        clearWorktreeDrag()
+        return
+      }
       const boardDropTarget = resolveWorkspaceKanbanCardDropCommitTarget({
         currentTarget: getWorkspaceKanbanSidebarDropTarget(event.clientX, event.clientY),
         latestTrackedTarget: drag.latestBoardDropTarget,
@@ -3437,26 +3463,6 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
           groups: getWorkspaceKanbanSidebarDropGroups()
         })
       } else {
-        const membershipTarget = getPointerWorktreeGroupMembershipDragPreview({
-          container: scrollRef.current,
-          clientX: event.clientX,
-          clientY: event.clientY,
-          draggedIds: drag.draggedIds,
-          worktreeId: drag.worktreeId,
-          worktreeMap,
-          repoMap,
-          projectGrouping
-        }).target
-        if (membershipTarget.kind === 'join') {
-          void updateWorktreeMeta(drag.worktreeId, { projectGroupId: membershipTarget.groupId })
-          clearWorktreeDrag()
-          return
-        }
-        if (membershipTarget.kind === 'leave') {
-          void updateWorktreeMeta(drag.worktreeId, { projectGroupId: null })
-          clearWorktreeDrag()
-          return
-        }
         const preferredStatusTarget = getEligibleLineageDropTarget(
           scrollRef.current
             ? getPointerDropStatusTarget({
