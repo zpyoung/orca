@@ -6146,7 +6146,11 @@
           "1b1b70279a": "Aún no hay dispositivos emparejados.",
           "1592afcc7a": "Aún no hay dispositivos emparejados. Escanea el código QR con la aplicación móvil de Orca.",
           "relayDegradedNotice": "No se pudo contactar con Relay: este código solo funciona en tu LAN o Tailscale. Genera uno nuevo e inténtalo de nuevo.",
-          "pairingQrError": "Este código de emparejamiento no se pudo representar como código QR. Cópialo en Orca Mobile."
+          "pairingQrError": "Este código de emparejamiento no se pudo representar como código QR. Cópialo en Orca Mobile.",
+          "copyPairingCode": "Copy pairing code",
+          "diagnosticsCopied": "Diagnostics copied",
+          "diagnosticsCopyFailed": "Failed to copy diagnostics",
+          "pairingCodeReady": "Pairing code ready"
         },
         "MobileSettingsPane": {
           "9a3c280e49": "GitHub Releases",
@@ -9452,7 +9456,8 @@
           "signInRequired": "Inicia sesión para usar Orca Mobile Relay.",
           "relayUnavailable": "Orca Relay no está disponible en esta compilación. Usa LAN.",
           "signInAgain": "Iniciar sesión de nuevo",
-          "localTitle": "LAN"
+          "localTitle": "LAN",
+          "retrying": "Retrying"
         },
         "MobilePairingSetupSection": {
           "title": "Vincular un teléfono",
@@ -11469,7 +11474,16 @@
             "stable": "Estable"
           },
           "relayDegradedNotice": "No se pudo contactar con Relay: este código solo funciona en tu LAN o Tailscale.",
-          "pairingQrError": "Este código de emparejamiento no se pudo representar como código QR. Cópialo en Orca Mobile."
+          "pairingQrError": "Este código de emparejamiento no se pudo representar como código QR. Cópialo en Orca Mobile.",
+          "noPairingCode": "No pairing code available",
+          "noRelayCode": "No pairing code available",
+          "pairThisComputer": "Pair this computer.",
+          "pairThisMac": "Pair this Mac.",
+          "pairThisPc": "Pair this PC.",
+          "pairingCodeReady": "Pairing code ready",
+          "qrGeneratePrompt": "Generate a pairing code to continue",
+          "qrRenderFailed": "QR couldn’t be rendered — copy the code below",
+          "qrSignInRequired": "Sign in to create a Relay pairing code"
         },
         "MobilePage": {
           "e17393c6a3": "Vista previa del teléfono",
@@ -11482,7 +11496,9 @@
           "4e1eb5d55c": "No se pudo revocar el dispositivo",
           "255372e6e8": "Dispositivo revocado",
           "1b4509a8a1": "emparejado",
-          "c5909374cf": "introducción"
+          "c5909374cf": "introducción",
+          "diagnosticsCopied": "Diagnostics copied",
+          "diagnosticsCopyFailed": "Failed to copy diagnostics"
         },
         "MobilePageToolbar": {
           "ad2284a9e2": "Cerrar · Esc",
@@ -11613,6 +11629,18 @@
           "blocked-title": "Windows may be blocking Orca Mobile",
           "blocked-description": "An existing inbound Block rule can override the pairing exception. Repair removes conflicting TCP rules for this Orca app, then allows port {{port}} on Private networks.",
           "repair": "Repair firewall access"
+        },
+        "MobileRelayMintFailureNotice": {
+          "body": "Retry, or use LAN to pair over Tailscale or the same Wi‑Fi.",
+          "copyDiagnostics": "Copy diagnostics",
+          "retry": "Retry Relay",
+          "retrying": "Retrying…",
+          "retryingBody": "Creating a new pairing code. This can take a moment over a remote connection.",
+          "retryingTitle": "Retrying Orca Relay…",
+          "title": "Couldn’t create a Relay pairing code.",
+          "unavailableBody": "Use LAN to pair over Tailscale or the same Wi‑Fi.",
+          "unavailableTitle": "Orca Relay isn’t available on this desktop.",
+          "useLan": "Use LAN"
         }
       },
       "gitlab": {
