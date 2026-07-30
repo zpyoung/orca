@@ -1,6 +1,6 @@
 ---
-last_released_commit: 3bd78a38ed4a9ec600cc04165eacff08611cbdff
-upstream_synced: v1.4.161
+last_released_commit: e1eda00beec0159b6015aba67aa3c3e58b49da6b
+upstream_synced: v1.4.162
 ---
 
 # Changelog
@@ -11,6 +11,24 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.163-rc.0.zy01] - 2026-07-30
+
+Synced to upstream [v1.4.162](https://github.com/stablyai/orca/releases/tag/v1.4.162).
+
+### Added
+- Orchestration is back. Upstream pulled its orchestration primitives and connected-server workers
+  out of the v1.4.161 release branch, and the fork inherited that removal when it synced. Upstream
+  shipped the subsystem again in v1.4.162, so the orchestration CLI, runtime, and federation
+  workers return with it.
+
+### Fixed
+- The macOS permission-prompt watcher new in v1.4.162 now recognises this fork. It counts the
+  consent dialogs macOS raises in Orca's name, but matched only upstream's bundle identifiers, so on
+  a fork build it silently counted nothing.
+- Mobile pairing screens no longer break the Spanish, Japanese, Korean, and Chinese catalogs.
+  Upstream shipped these strings in English only; the fork carries English placeholders for them,
+  matching the fallback already shown at runtime, until upstream ships translations.
 
 ## [1.4.162-rc.0.zy01] - 2026-07-29
 
