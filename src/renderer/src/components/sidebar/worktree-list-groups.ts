@@ -366,6 +366,9 @@ export const PROJECT_GROUP_META = {
   icon: FolderTree
 } as const
 
+/** Suffix marking a group's loose-worktree block, which has no header row of its own. */
+const LOOSE_WORKTREE_SECTION_KEY_SUFFIX = '::loose'
+
 export function getProjectGroupHeaderKey(groupId: string | null): string {
   return groupId ? `project-group:${groupId}` : UNGROUPED_PROJECT_GROUP_KEY
 }
@@ -1508,7 +1511,7 @@ export function buildRows(
           nestLineage,
           collapsedGroups,
           groupDepth: depth + 1,
-          sectionKey: `${key}::loose`,
+          sectionKey: `${key}${LOOSE_WORKTREE_SECTION_KEY_SUFFIX}`,
           hostContextLabelByWorktreeId: getMixedWorktreeHostContextLabels(
             looseWorktrees,
             repoMap,
@@ -1606,10 +1609,11 @@ export function getGroupKeysForWorktree(
   // worktree renders under its own group, independent of its repo's, so the
   // ancestor walk has to start there or reveal won't expand the group it's
   // actually under.
-  let currentGroupId =
+  const divertedGroupId =
     worktree.projectGroupId && groupsById.has(worktree.projectGroupId)
       ? worktree.projectGroupId
-      : (repo?.projectGroupId ?? null)
+      : null
+  let currentGroupId = divertedGroupId ?? repo?.projectGroupId ?? null
   while (currentGroupId && !visited.has(currentGroupId)) {
     const group = groupsById.get(currentGroupId)
     if (!group) {
@@ -1622,5 +1626,12 @@ export function getGroupKeysForWorktree(
     const parentId = group.parentGroupId ?? null
     currentGroupId = parentId && groupsById.has(parentId) ? parentId : null
   }
-  return [...groupIds.map((id) => getProjectGroupHeaderKey(id)), groupKey]
+  // Why: the trailing key names the section the row actually renders in. A
+  // diverted worktree is in its group's loose block, not its repo section, so
+  // returning the repo key would pop open a collapsed repo the row has left.
+  const sectionKey =
+    divertedGroupId === null
+      ? groupKey
+      : `${getProjectGroupHeaderKey(divertedGroupId)}${LOOSE_WORKTREE_SECTION_KEY_SUFFIX}`
+  return [...groupIds.map((id) => getProjectGroupHeaderKey(id)), sectionKey]
 }

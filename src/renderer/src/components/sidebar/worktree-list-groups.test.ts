@@ -4077,6 +4077,8 @@ describe('cross-repo worktree groups (loose worktrees)', () => {
     // Why: buildRows diverts a loose worktree by its OWN projectGroupId, not its
     // repo's — reveal keys must derive the ancestor chain from the same source,
     // or expanding a collapsed group won't uncollapse the group actually rendered.
+    // The trailing key is the loose block, not the repo section: returning the repo
+    // key would pop open a collapsed repo the row is no longer rendered under.
     it("reveals through the worktree's own group and its ancestors, not its repo's", () => {
       const ownParentGroup: ProjectGroup = {
         ...crossGroup,
@@ -4107,7 +4109,11 @@ describe('cross-repo worktree groups (loose worktrees)', () => {
           undefined,
           [ownParentGroup, ownChildGroup, repoOwnGroup]
         )
-      ).toEqual(['project-group:group-own-parent', 'project-group:group-own-child', 'repo:repo-1'])
+      ).toEqual([
+        'project-group:group-own-parent',
+        'project-group:group-own-child',
+        'project-group:group-own-child::loose'
+      ])
     })
 
     it("regression: a worktree with no own projectGroupId still reveals through its repo's group", () => {

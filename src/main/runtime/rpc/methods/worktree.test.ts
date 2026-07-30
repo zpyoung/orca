@@ -523,6 +523,56 @@ describe('worktree RPC methods', () => {
     )
   })
 
+  it('drops projectGroupId from a mobile-scoped worktree.set', async () => {
+    // Locked decision: only the desktop app writes group membership. worktree.set
+    // is on the mobile allowlist as a whole, so the field has to be dropped here.
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      dedupeWorktreeCreate: passthroughDedupe,
+      updateManagedWorktreeMeta: vi.fn().mockResolvedValue({ id: 'wt-1' })
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: WORKTREE_METHODS })
+
+    const replies: string[] = []
+    await dispatcher.dispatchStreaming(
+      makeRequest('worktree.set', {
+        worktree: 'id:wt-1',
+        displayName: 'from phone',
+        projectGroupId: 'group-1'
+      }),
+      (response) => replies.push(response),
+      { clientKind: 'mobile' }
+    )
+
+    // Omitted, not undefined: setWorktreeMeta merges by spread, so an explicit
+    // undefined would clear an existing membership instead of leaving it alone.
+    const [, meta] = vi.mocked(runtime.updateManagedWorktreeMeta).mock.calls[0]!
+    expect('projectGroupId' in meta).toBe(false)
+    expect(meta).toMatchObject({ displayName: 'from phone' })
+  })
+
+  it('still forwards projectGroupId for a runtime-scoped worktree.set', async () => {
+    // The desktop app writing to an SSH-hosted worktree takes this path.
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      dedupeWorktreeCreate: passthroughDedupe,
+      updateManagedWorktreeMeta: vi.fn().mockResolvedValue({ id: 'wt-1' })
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: WORKTREE_METHODS })
+
+    const replies: string[] = []
+    await dispatcher.dispatchStreaming(
+      makeRequest('worktree.set', { worktree: 'id:wt-1', projectGroupId: 'group-1' }),
+      (response) => replies.push(response),
+      { clientKind: 'runtime' }
+    )
+
+    expect(runtime.updateManagedWorktreeMeta).toHaveBeenCalledWith(
+      'id:wt-1',
+      expect.objectContaining({ projectGroupId: 'group-1' })
+    )
+  })
+
   it('rejects worktree.set when both parent and no-parent are supplied', async () => {
     const runtime = {
       getRuntimeId: () => 'test-runtime',
