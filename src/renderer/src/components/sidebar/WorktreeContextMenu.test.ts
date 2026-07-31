@@ -14,11 +14,17 @@ import {
   selectMenuScopedMap,
   addWorktreeToGroup,
   removeWorktreeFromGroup,
-  shouldShowWorktreeGroupMembershipActions,
+  createGroupFromWorktree,
+  getWorktreeGroupMenuVisibility,
   shouldShowRemoveWorktreeFromGroup,
   shouldRevealWorktreeDeveloperMenu
 } from './WorktreeContextMenu'
-import type { Worktree, WorktreeLineage, WorkspaceStatusDefinition } from '../../../../shared/types'
+import type {
+  ProjectGroup,
+  Worktree,
+  WorktreeLineage,
+  WorkspaceStatusDefinition
+} from '../../../../shared/types'
 
 describe('shouldRevealWorktreeDeveloperMenu', () => {
   it('stays hidden for an ordinary right-click', () => {
@@ -257,39 +263,85 @@ describe('worktree-scoped project group membership', () => {
     expect(updateWorktreeMeta).toHaveBeenCalledWith('wt-1', { projectGroupId: null })
   })
 
-  it('hides the actions for a folder-workspace row', () => {
-    expect(shouldShowWorktreeGroupMembershipActions('folder-1', [{ id: 'group-1' }], 'git')).toBe(
-      false
-    )
-  })
-
-  it('hides the actions for a worktree in a folder-mode repo', () => {
-    // Regression: only `folder:`-keyed workspaces set folderWorkspaceId, but a
-    // folder-MODE repo's synthetic worktrees project through mergeFolderWorkspace,
-    // which drops projectGroupId — so the action would silently no-op there too.
-    expect(shouldShowWorktreeGroupMembershipActions(null, [{ id: 'group-1' }], 'folder')).toBe(
-      false
-    )
-  })
-
-  it('hides the actions when no project groups exist', () => {
-    expect(shouldShowWorktreeGroupMembershipActions(null, [], 'git')).toBe(false)
-  })
-
-  it('shows the actions for a worktree row once at least one group exists', () => {
-    expect(shouldShowWorktreeGroupMembershipActions(null, [{ id: 'group-1' }], 'git')).toBe(true)
-  })
-
-  it('shows the actions when repo kind is unset, the pre-RepoKind default', () => {
-    expect(shouldShowWorktreeGroupMembershipActions(null, [{ id: 'group-1' }], undefined)).toBe(
-      true
-    )
-  })
-
   it('offers "remove from group" only when the worktree currently has a group', () => {
     expect(shouldShowRemoveWorktreeFromGroup({ projectGroupId: 'group-1' })).toBe(true)
     expect(shouldShowRemoveWorktreeFromGroup({ projectGroupId: null })).toBe(false)
     expect(shouldShowRemoveWorktreeFromGroup({ projectGroupId: undefined })).toBe(false)
+  })
+})
+
+describe('getWorktreeGroupMenuVisibility', () => {
+  // Why: a row must show exactly one create action — never both, never
+  // neither. Pinned directly per case rather than trusted as a byproduct of
+  // the other assertions.
+  it('offers the worktree-scoped create action (and not the project one) on a normal row', () => {
+    const visibility = getWorktreeGroupMenuVisibility(null, [{ id: 'group-1' }], 'git')
+    expect(visibility.showWorktreeCreate).toBe(true)
+    expect(visibility.showProjectCreate).toBe(false)
+    expect(visibility.showWorktreeCreate).not.toBe(visibility.showProjectCreate)
+  })
+
+  it('falls back to the project-scoped create action for a folder-workspace row', () => {
+    const visibility = getWorktreeGroupMenuVisibility('folder-1', [{ id: 'group-1' }], 'git')
+    expect(visibility.showWorktreeCreate).toBe(false)
+    expect(visibility.showProjectCreate).toBe(true)
+    expect(visibility.showAddSubmenu).toBe(false)
+    expect(visibility.showWorktreeCreate).not.toBe(visibility.showProjectCreate)
+  })
+
+  it('falls back to the project-scoped create action for a worktree in a folder-mode repo', () => {
+    // Regression: only `folder:`-keyed workspaces set folderWorkspaceId, but a
+    // folder-MODE repo's synthetic worktrees project through mergeFolderWorkspace,
+    // which drops projectGroupId — so a worktree-scoped write would silently
+    // no-op there too.
+    const visibility = getWorktreeGroupMenuVisibility(null, [{ id: 'group-1' }], 'folder')
+    expect(visibility.showWorktreeCreate).toBe(false)
+    expect(visibility.showProjectCreate).toBe(true)
+    expect(visibility.showAddSubmenu).toBe(false)
+    expect(visibility.showWorktreeCreate).not.toBe(visibility.showProjectCreate)
+  })
+
+  it('offers the worktree create action but hides "add to group" when no project groups exist', () => {
+    // This is what makes the *first* group reachable from a worktree row: the
+    // add-to-existing-group submenu has nothing to list, but creating a new
+    // group scoped to just this worktree is still on offer.
+    const visibility = getWorktreeGroupMenuVisibility(null, [], 'git')
+    expect(visibility.showWorktreeCreate).toBe(true)
+    expect(visibility.showAddSubmenu).toBe(false)
+    expect(visibility.showProjectCreate).toBe(false)
+    expect(visibility.showWorktreeCreate).not.toBe(visibility.showProjectCreate)
+  })
+
+  it('treats an unset repo kind (the pre-RepoKind default) as worktree-scoped', () => {
+    const visibility = getWorktreeGroupMenuVisibility(null, [{ id: 'group-1' }], undefined)
+    expect(visibility.showWorktreeCreate).toBe(true)
+    expect(visibility.showAddSubmenu).toBe(true)
+    expect(visibility.showProjectCreate).toBe(false)
+    expect(visibility.showWorktreeCreate).not.toBe(visibility.showProjectCreate)
+  })
+})
+
+describe('createGroupFromWorktree', () => {
+  const group = { id: 'group-9' } as ProjectGroup
+
+  it('creates the group and assigns only that worktree to it', async () => {
+    const createProjectGroup = vi.fn().mockResolvedValue(group)
+    const updateWorktreeMeta = vi.fn()
+
+    await createGroupFromWorktree('wt-1', 'Solo group', createProjectGroup, updateWorktreeMeta)
+
+    expect(createProjectGroup).toHaveBeenCalledWith('Solo group')
+    expect(updateWorktreeMeta).toHaveBeenCalledWith('wt-1', { projectGroupId: 'group-9' })
+    expect(updateWorktreeMeta).toHaveBeenCalledTimes(1)
+  })
+
+  it('does nothing when group creation returns null (create failed)', async () => {
+    const createProjectGroup = vi.fn().mockResolvedValue(null)
+    const updateWorktreeMeta = vi.fn()
+
+    await createGroupFromWorktree('wt-1', 'Solo group', createProjectGroup, updateWorktreeMeta)
+
+    expect(updateWorktreeMeta).not.toHaveBeenCalled()
   })
 })
 
