@@ -4531,8 +4531,8 @@
           "workspaceSection": "워크스페이스",
           "primaryDeleteDisabled": "기본 작업 트리는 삭제할 수 없습니다. 대신 프로젝트를 제거하세요.",
           "deleteWorktree": "작업 트리 삭제",
-          "addWorktreeToGroup": "Add worktree to group",
-          "removeWorktreeFromGroup": "Remove worktree from group"
+          "addWorktreeToGroup": "작업 트리를 그룹에 추가",
+          "removeWorktreeFromGroup": "작업 트리를 그룹에서 제거"
         },
         "WorktreeList": {
           "d880ea0744": "그룹을 만들고 이 프로젝트를 그룹으로 이동하세요.",

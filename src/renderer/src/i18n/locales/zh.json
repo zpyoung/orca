@@ -4543,8 +4543,8 @@
           "workspaceSection": "工作区",
           "primaryDeleteDisabled": "主工作树不能删除。请改为移除项目。",
           "deleteWorktree": "删除工作树",
-          "addWorktreeToGroup": "Add worktree to group",
-          "removeWorktreeFromGroup": "Remove worktree from group"
+          "addWorktreeToGroup": "将工作树添加到组",
+          "removeWorktreeFromGroup": "从组中移除工作树"
         },
         "WorktreeList": {
           "d880ea0744": "创建一个组并将该项目移入其中。",
