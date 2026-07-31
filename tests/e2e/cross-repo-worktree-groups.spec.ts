@@ -334,6 +334,40 @@ async function addWorktreeToGroupViaMenu(
   await chooseFromSubmenu(page, 'Add worktree to group', groupName)
 }
 
+async function createGroupFromWorktreeViaMenu(
+  page: Page,
+  worktreeId: string,
+  groupName: string
+): Promise<string> {
+  await openWorktreeContextMenu(page, worktreeId)
+  await page.getByRole('menuitem', { name: 'New group from worktree', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'New Project Group', exact: true })
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('textbox', { name: 'Group Name', exact: true }).fill(groupName)
+  await dialog.getByRole('button', { name: 'Create', exact: true }).click()
+  // Why: the dialog only closes once the underlying createProjectGroup +
+  // updateWorktreeMeta awaits resolve, so this is also the store-settled gate.
+  await expect(dialog).toBeHidden()
+  return page.evaluate(async (name) => {
+    const store = window.__store
+    if (!store) {
+      throw new Error('window.__store is not available')
+    }
+    const findGroup = () =>
+      store.getState().projectGroups.find((candidate) => candidate.name === name)
+    let group = findGroup()
+    const deadline = Date.now() + 10_000
+    while (!group && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      group = findGroup()
+    }
+    if (!group) {
+      throw new Error(`Expected project group to exist: ${name}`)
+    }
+    return group.id
+  }, groupName)
+}
+
 async function removeWorktreeFromGroupViaMenu(page: Page, worktreeId: string): Promise<void> {
   await openWorktreeContextMenu(page, worktreeId)
   await page.getByRole('menuitem', { name: 'Remove worktree from group', exact: true }).click()
@@ -345,7 +379,9 @@ async function moveRepoToGroupViaMenu(
   groupName: string
 ): Promise<void> {
   await openWorktreeContextMenu(page, anyWorktreeIdOfRepo)
-  await chooseFromSubmenu(page, 'Move to group', groupName)
+  // Why: the worktree row's repo-scoped items name their scope, so this is
+  // "Move project to group" — the project header keeps the unqualified label.
+  await chooseFromSubmenu(page, 'Move project to group', groupName)
 }
 
 async function deleteProjectGroupViaMenu(
@@ -676,5 +712,120 @@ test.describe('Cross-repo worktree groups', () => {
         timeout: 10_000
       })
       .toEqual({ kind: 'repo-header', id: repoId })
+  })
+
+  test('creating a group from a worktree via the context menu does not move its repo', async ({
+    orcaPage
+  }) => {
+    // Regression guard: the old create action built a group from the whole
+    // repo, so this worktree-scoped one must leave the sibling worktree put.
+    await waitForSessionReady(orcaPage)
+    const [repo] = await createRepoFixture([
+      { name: 'e2e-xrepo-hotel', secondaryBranch: 'feature-h' }
+    ])
+    const [{ repoId, mainWorktreeId, secondaryWorktreeId }] = await seedRepos(orcaPage, [repo!])
+    const secondaryId = secondaryWorktreeId!
+
+    await expect
+      .poll(async () => findNearestHeaderAbove(await getSidebarRowMarkers(orcaPage), secondaryId), {
+        timeout: 10_000
+      })
+      .toEqual({ kind: 'repo-header', id: repoId })
+
+    const groupId = await createGroupFromWorktreeViaMenu(
+      orcaPage,
+      secondaryId,
+      'E2E XRepo Group Hotel'
+    )
+
+    await expect
+      .poll(async () => findNearestHeaderAbove(await getSidebarRowMarkers(orcaPage), secondaryId), {
+        timeout: 10_000
+      })
+      .toEqual({ kind: 'group-header', id: groupId })
+
+    await expect(orcaPage.locator(`[data-repo-header-id="${repoId}"]`)).toBeVisible()
+    await expect
+      .poll(
+        async () => findNearestHeaderAbove(await getSidebarRowMarkers(orcaPage), mainWorktreeId),
+        { timeout: 10_000 }
+      )
+      .toEqual({ kind: 'repo-header', id: repoId })
+  })
+
+  test("creating a group from a repo's only worktree via the context menu leaves an empty placeholder for the repo", async ({
+    orcaPage
+  }) => {
+    await waitForSessionReady(orcaPage)
+    const [repo] = await createRepoFixture([{ name: 'e2e-xrepo-india' }])
+    const [{ repoId, mainWorktreeId }] = await seedRepos(orcaPage, [repo!])
+
+    await expect
+      .poll(
+        async () =>
+          countWorktreeRowsUnderHeader(await getSidebarRowMarkers(orcaPage), {
+            kind: 'repo-header',
+            id: repoId
+          }),
+        { timeout: 10_000 }
+      )
+      .toBe(1)
+
+    const groupId = await createGroupFromWorktreeViaMenu(
+      orcaPage,
+      mainWorktreeId,
+      'E2E XRepo Group India'
+    )
+
+    await expect(orcaPage.locator(`[data-repo-header-id="${repoId}"]`)).toBeVisible()
+    await expect
+      .poll(
+        async () =>
+          countWorktreeRowsUnderHeader(await getSidebarRowMarkers(orcaPage), {
+            kind: 'repo-header',
+            id: repoId
+          }),
+        { timeout: 10_000 }
+      )
+      .toBe(0)
+    await expect
+      .poll(
+        async () => findNearestHeaderAbove(await getSidebarRowMarkers(orcaPage), mainWorktreeId),
+        { timeout: 10_000 }
+      )
+      .toEqual({ kind: 'group-header', id: groupId })
+  })
+
+  test('a folder-workspace row with no repo offers no group-creation action', async ({
+    orcaPage
+  }) => {
+    await waitForSessionReady(orcaPage)
+    const { parentPath, folderPath } = await createFolderBackedWorkspaceFixture()
+    const { folderWorktreeId } = await seedFolderWorkspace(orcaPage, {
+      parentPath,
+      folderPath,
+      groupName: 'E2E XRepo Folder Group Juliet',
+      workspaceName: 'E2E XRepo Folder Task Juliet'
+    })
+
+    await expect(orcaPage.locator(`[data-worktree-id="${folderWorktreeId}"]`)).toBeVisible({
+      timeout: 10_000
+    })
+    await openWorktreeContextMenu(orcaPage, folderWorktreeId)
+
+    // Sanity: the menu actually opened, so the absence below is the gate — not a no-op menu.
+    await expect(orcaPage.getByRole('menuitem', { name: 'Copy Path', exact: true })).toBeVisible()
+    await expect(
+      orcaPage.getByRole('menuitem', { name: 'New group from worktree', exact: true })
+    ).toHaveCount(0)
+    // Why: this fixture's folder workspace has no associated repo (a plain
+    // directory, never git-initialized), so showProjectCreate's hasRepo gate
+    // is also false — there is no project to move, so neither create action
+    // applies (unlike a folder workspace or folder-mode repo backed by a
+    // real repo, which would show the project-scoped "New group from
+    // project" action instead).
+    await expect(
+      orcaPage.getByRole('menuitem', { name: 'New group from project', exact: true })
+    ).toHaveCount(0)
   })
 })
