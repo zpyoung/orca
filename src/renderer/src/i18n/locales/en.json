@@ -13732,7 +13732,9 @@
           "comfortable": "Comfortable",
           "wide": "Wide",
           "full": "Full"
-        }
+        },
+        "menuLabel": "Chat width",
+        "menuTooltip": "Chat width (applies to all chat panes)"
       }
     },
     "tab": {
