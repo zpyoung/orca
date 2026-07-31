@@ -5520,7 +5520,10 @@
             "defaultCopy": "지원되는 에이전트의 새 터미널 탭을 여는 방식을 선택합니다.",
             "defaultViewLabel": "기본 Chat UI 보기",
             "defaultViewTerminal": "Terminal 채팅",
-            "defaultViewNative": "Chat UI"
+            "defaultViewNative": "Chat UI",
+            "widthTitle": "Chat width",
+            "widthCopy": "Set the reading column width for every chat pane.",
+            "widthLabel": "Chat width"
           },
           "agentDashboard": {
             "title": "Agent Dashboard",

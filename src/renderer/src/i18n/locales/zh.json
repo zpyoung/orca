@@ -5520,7 +5520,10 @@
             "defaultCopy": "选择如何打开受支持智能体的新终端标签页。",
             "defaultViewLabel": "默认 Chat UI 视图",
             "defaultViewTerminal": "终端聊天",
-            "defaultViewNative": "Chat UI"
+            "defaultViewNative": "Chat UI",
+            "widthTitle": "Chat width",
+            "widthCopy": "Set the reading column width for every chat pane.",
+            "widthLabel": "Chat width"
           },
           "agentDashboard": {
             "title": "Agent Dashboard",

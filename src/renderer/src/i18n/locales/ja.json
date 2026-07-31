@@ -5520,7 +5520,10 @@
             "defaultCopy": "対応エージェントの新しいターミナルタブを開く方法を選択します。",
             "defaultViewLabel": "デフォルトの Chat UI ビュー",
             "defaultViewTerminal": "Terminal チャット",
-            "defaultViewNative": "Chat UI"
+            "defaultViewNative": "Chat UI",
+            "widthTitle": "Chat width",
+            "widthCopy": "Set the reading column width for every chat pane.",
+            "widthLabel": "Chat width"
           },
           "agentDashboard": {
             "title": "Agent Dashboard",

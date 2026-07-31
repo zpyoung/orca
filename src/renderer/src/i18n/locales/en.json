@@ -5558,7 +5558,10 @@
             "defaultCopy": "Choose how new supported agent terminal tabs open.",
             "defaultViewLabel": "Default Chat UI view",
             "defaultViewTerminal": "Terminal chat",
-            "defaultViewNative": "Chat UI"
+            "defaultViewNative": "Chat UI",
+            "widthTitle": "Chat width",
+            "widthCopy": "Set the reading column width for every chat pane.",
+            "widthLabel": "Chat width"
           },
           "agentDashboard": {
             "title": "Agent Dashboard",

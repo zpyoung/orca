@@ -5535,7 +5535,10 @@
             "defaultCopy": "Elige cómo se abren las nuevas pestañas de terminal de agentes compatibles.",
             "defaultViewLabel": "Vista predeterminada de Chat UI",
             "defaultViewTerminal": "Chat en terminal",
-            "defaultViewNative": "Chat UI"
+            "defaultViewNative": "Chat UI",
+            "widthTitle": "Chat width",
+            "widthCopy": "Set the reading column width for every chat pane.",
+            "widthLabel": "Chat width"
           },
           "agentDashboard": {
             "title": "Agent Dashboard",
