@@ -32,6 +32,7 @@ import {
 } from 'lucide-react'
 import { useAppStore } from '@/store'
 import type { AppState } from '@/store/types'
+import type { WorktreeMetaUpdateOptions } from '@/store/slices/worktree-helpers'
 import { useAllWorktrees, useRepoById, useRepoMap, useWorktreeMap } from '@/store/selectors'
 import { cn } from '@/lib/utils'
 import type {
@@ -371,17 +372,34 @@ function removeWorktreeFromGroup(
 // rendering the menu. Never calls moveProjectToGroup: the new group must hold
 // only this one worktree, not the whole repo.
 async function createGroupFromWorktree(
-  worktreeId: string,
+  worktree: Pick<Worktree, 'id' | 'instanceId' | 'projectGroupId'>,
   name: string,
   createProjectGroup: (name: string) => Promise<ProjectGroup | null>,
   updateWorktreeMeta: (
     worktreeId: string,
-    updates: { projectGroupId: string | null }
+    updates: { projectGroupId: string | null },
+    options?: WorktreeMetaUpdateOptions
   ) => Promise<void>
 ): Promise<void> {
+  // Why: createProjectGroup crosses an async gap — capture identity/membership
+  // first so a delete, path-reuse replacement, or another group change mid-flight
+  // isn't clobbered by this assignment landing late.
+  const capturedInstanceId = worktree.instanceId ?? null
+  const capturedProjectGroupId = worktree.projectGroupId ?? null
   const group = await createProjectGroup(name)
   if (group) {
-    await updateWorktreeMeta(worktreeId, { projectGroupId: group.id })
+    await updateWorktreeMeta(
+      worktree.id,
+      { projectGroupId: group.id },
+      {
+        shouldApply: (current) =>
+          Boolean(
+            current &&
+            (current.instanceId ?? null) === capturedInstanceId &&
+            (current.projectGroupId ?? null) === capturedProjectGroupId
+          )
+      }
+    )
   }
 }
 
@@ -666,7 +684,7 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
   const handleSubmitNewProjectGroup = useCallback(
     async (name: string) => {
       if (createGroupDialog?.scope === 'worktree') {
-        await createGroupFromWorktree(worktree.id, name, createProjectGroup, updateWorktreeMeta)
+        await createGroupFromWorktree(worktree, name, createProjectGroup, updateWorktreeMeta)
         return
       }
       if (!repo) {
@@ -677,14 +695,7 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
         await moveProjectToGroup(repo.id, group.id)
       }
     },
-    [
-      createGroupDialog,
-      createProjectGroup,
-      moveProjectToGroup,
-      repo,
-      updateWorktreeMeta,
-      worktree.id
-    ]
+    [createGroupDialog, createProjectGroup, moveProjectToGroup, repo, updateWorktreeMeta, worktree]
   )
 
   const handleMoveProjectToGroup = useCallback(
