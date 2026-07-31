@@ -13699,7 +13699,15 @@
         "allow": "許可する",
         "deny": "拒否"
       },
-      "launchPromptNotDelivered": "配信されませんでした — ターミナルを確認してください"
+      "launchPromptNotDelivered": "配信されませんでした — ターミナルを確認してください",
+      "width": {
+        "tier": {
+          "narrow": "Narrow",
+          "comfortable": "Comfortable",
+          "wide": "Wide",
+          "full": "Full"
+        }
+      }
     },
     "tab": {
       "bar": {

@@ -13722,7 +13722,15 @@
         "allow": "Allow",
         "deny": "Deny"
       },
-      "launchPromptNotDelivered": "Not delivered — check the terminal"
+      "launchPromptNotDelivered": "Not delivered — check the terminal",
+      "width": {
+        "tier": {
+          "narrow": "Narrow",
+          "comfortable": "Comfortable",
+          "wide": "Wide",
+          "full": "Full"
+        }
+      }
     },
     "tab": {
       "bar": {

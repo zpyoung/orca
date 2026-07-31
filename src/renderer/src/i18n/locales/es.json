@@ -13699,7 +13699,15 @@
         "allow": "Permitir",
         "deny": "Denegar"
       },
-      "launchPromptNotDelivered": "No entregado — revisa la terminal"
+      "launchPromptNotDelivered": "No entregado — revisa la terminal",
+      "width": {
+        "tier": {
+          "narrow": "Narrow",
+          "comfortable": "Comfortable",
+          "wide": "Wide",
+          "full": "Full"
+        }
+      }
     },
     "tab": {
       "bar": {

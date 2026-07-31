@@ -13699,7 +13699,15 @@
         "allow": "允许",
         "deny": "拒绝"
       },
-      "launchPromptNotDelivered": "未送达 — 请检查终端"
+      "launchPromptNotDelivered": "未送达 — 请检查终端",
+      "width": {
+        "tier": {
+          "narrow": "Narrow",
+          "comfortable": "Comfortable",
+          "wide": "Wide",
+          "full": "Full"
+        }
+      }
     },
     "tab": {
       "bar": {
