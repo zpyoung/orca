@@ -12,6 +12,7 @@ import {
   type NativeChatMessage
 } from '../../../../shared/native-chat-types'
 import type { NativeChatLiveSession } from './use-native-chat-live-session'
+import { useNativeChatWidthClassName } from './use-native-chat-width'
 import { orderNativeChatMessages } from './native-chat-message-grouping'
 import { stripNoiseMessages } from './native-chat-noise'
 import { foldToolMessages, splitNativeChatBlocks } from './native-chat-tool-fold'
@@ -252,6 +253,7 @@ export function NativeChatMessageList({
   allowFileUriLinks?: boolean
   failedDeliveryMessageIds?: ReadonlySet<string>
 }): React.JSX.Element {
+  const widthClassName = useNativeChatWidthClassName()
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const [stuckToBottom, setStuckToBottom] = useState(true)
@@ -379,7 +381,7 @@ export function NativeChatMessageList({
           ref={contentRef}
           // Why: same max width as the composer column; horizontal inset comes
           // from the scroll container so content aligns with the composer field.
-          className="mx-auto flex w-full max-w-4xl flex-col gap-5"
+          className={cn('mx-auto flex w-full flex-col gap-5', widthClassName)}
           // Why: `zoom` scales the chat transcript's text and layout together,
           // scoped to this container so the rest of the app is untouched. It's
           // the desktop analog of the mobile pinch-zoom (Chromium/Electron only).

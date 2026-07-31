@@ -3,6 +3,7 @@ import { Check, Pencil, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import type { AskAnswerSelection, AskPrompt } from './native-chat-interactive-prompt'
+import { useNativeChatWidthClassName } from './use-native-chat-width'
 
 export type NativeChatQuestionCardProps = {
   prompt: AskPrompt
@@ -31,6 +32,7 @@ export function NativeChatQuestionCard({
   onCancel,
   answerInputRef
 }: NativeChatQuestionCardProps): React.JSX.Element {
+  const widthClassName = useNativeChatWidthClassName()
   const [index, setIndex] = useState(0)
   // Keep option identity by index: labels are display text and are not guaranteed
   // unique, while Claude's selector commits the numbered row (STA-1860).
@@ -124,7 +126,7 @@ export function NativeChatQuestionCard({
     // composer's width and padding, rendered as the "ask" dialog card directly
     // above the text input. Its free-text row is the answer input.
     <div className="shrink-0 bg-background" aria-busy={isSubmitting}>
-      <div className="mx-auto w-full max-w-4xl px-3 pt-2 pb-4 sm:px-4">
+      <div className={cn('mx-auto w-full px-3 pt-2 pb-4 sm:px-4', widthClassName)}>
         {total > 1 ? (
           <div className="mb-2 flex gap-1 overflow-x-auto pb-1 scrollbar-sleek">
             {prompt.questions.map((qq, i) => (
