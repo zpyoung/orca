@@ -271,22 +271,22 @@ describe('worktree-scoped project group membership', () => {
 })
 
 describe('getWorktreeGroupMenuVisibility', () => {
-  // Why: a row must show exactly one create action — never both, never
-  // neither. Pinned directly per case rather than trusted as a byproduct of
-  // the other assertions.
+  // Why: a row must never show both create actions at once. A repo-less
+  // folder workspace legitimately shows neither — there is no project to
+  // target — so the invariant is "never both", not "always exactly one".
   it('offers the worktree-scoped create action (and not the project one) on a normal row', () => {
-    const visibility = getWorktreeGroupMenuVisibility(null, [{ id: 'group-1' }], 'git')
+    const visibility = getWorktreeGroupMenuVisibility(null, [{ id: 'group-1' }], 'git', true)
     expect(visibility.showWorktreeCreate).toBe(true)
     expect(visibility.showProjectCreate).toBe(false)
-    expect(visibility.showWorktreeCreate).not.toBe(visibility.showProjectCreate)
+    expect(visibility.showWorktreeCreate && visibility.showProjectCreate).toBe(false)
   })
 
   it('falls back to the project-scoped create action for a folder-workspace row', () => {
-    const visibility = getWorktreeGroupMenuVisibility('folder-1', [{ id: 'group-1' }], 'git')
+    const visibility = getWorktreeGroupMenuVisibility('folder-1', [{ id: 'group-1' }], 'git', true)
     expect(visibility.showWorktreeCreate).toBe(false)
     expect(visibility.showProjectCreate).toBe(true)
     expect(visibility.showAddSubmenu).toBe(false)
-    expect(visibility.showWorktreeCreate).not.toBe(visibility.showProjectCreate)
+    expect(visibility.showWorktreeCreate && visibility.showProjectCreate).toBe(false)
   })
 
   it('falls back to the project-scoped create action for a worktree in a folder-mode repo', () => {
@@ -294,30 +294,45 @@ describe('getWorktreeGroupMenuVisibility', () => {
     // folder-MODE repo's synthetic worktrees project through mergeFolderWorkspace,
     // which drops projectGroupId — so a worktree-scoped write would silently
     // no-op there too.
-    const visibility = getWorktreeGroupMenuVisibility(null, [{ id: 'group-1' }], 'folder')
+    const visibility = getWorktreeGroupMenuVisibility(null, [{ id: 'group-1' }], 'folder', true)
     expect(visibility.showWorktreeCreate).toBe(false)
     expect(visibility.showProjectCreate).toBe(true)
     expect(visibility.showAddSubmenu).toBe(false)
-    expect(visibility.showWorktreeCreate).not.toBe(visibility.showProjectCreate)
+    expect(visibility.showWorktreeCreate && visibility.showProjectCreate).toBe(false)
   })
 
   it('offers the worktree create action but hides "add to group" when no project groups exist', () => {
     // This is what makes the *first* group reachable from a worktree row: the
     // add-to-existing-group submenu has nothing to list, but creating a new
     // group scoped to just this worktree is still on offer.
-    const visibility = getWorktreeGroupMenuVisibility(null, [], 'git')
+    const visibility = getWorktreeGroupMenuVisibility(null, [], 'git', true)
     expect(visibility.showWorktreeCreate).toBe(true)
     expect(visibility.showAddSubmenu).toBe(false)
     expect(visibility.showProjectCreate).toBe(false)
-    expect(visibility.showWorktreeCreate).not.toBe(visibility.showProjectCreate)
+    expect(visibility.showWorktreeCreate && visibility.showProjectCreate).toBe(false)
   })
 
   it('treats an unset repo kind (the pre-RepoKind default) as worktree-scoped', () => {
-    const visibility = getWorktreeGroupMenuVisibility(null, [{ id: 'group-1' }], undefined)
+    const visibility = getWorktreeGroupMenuVisibility(null, [{ id: 'group-1' }], undefined, true)
     expect(visibility.showWorktreeCreate).toBe(true)
     expect(visibility.showAddSubmenu).toBe(true)
     expect(visibility.showProjectCreate).toBe(false)
-    expect(visibility.showWorktreeCreate).not.toBe(visibility.showProjectCreate)
+    expect(visibility.showWorktreeCreate && visibility.showProjectCreate).toBe(false)
+  })
+
+  it('shows neither create action for a repo-less folder workspace row', () => {
+    // A folder workspace can have no repo at all (repoId is optional), so
+    // useRepoById returns undefined — there is no project to target and no
+    // valid submit path for a project-scoped create action.
+    const visibility = getWorktreeGroupMenuVisibility(
+      'folder-1',
+      [{ id: 'group-1' }],
+      undefined,
+      false
+    )
+    expect(visibility.showWorktreeCreate).toBe(false)
+    expect(visibility.showProjectCreate).toBe(false)
+    expect(visibility.showWorktreeCreate && visibility.showProjectCreate).toBe(false)
   })
 })
 
@@ -326,7 +341,7 @@ describe('createGroupFromWorktree', () => {
 
   it('creates the group and assigns only that worktree to it', async () => {
     const createProjectGroup = vi.fn().mockResolvedValue(group)
-    const updateWorktreeMeta = vi.fn()
+    const updateWorktreeMeta = vi.fn().mockResolvedValue(undefined)
 
     await createGroupFromWorktree('wt-1', 'Solo group', createProjectGroup, updateWorktreeMeta)
 
@@ -337,7 +352,7 @@ describe('createGroupFromWorktree', () => {
 
   it('does nothing when group creation returns null (create failed)', async () => {
     const createProjectGroup = vi.fn().mockResolvedValue(null)
-    const updateWorktreeMeta = vi.fn()
+    const updateWorktreeMeta = vi.fn().mockResolvedValue(undefined)
 
     await createGroupFromWorktree('wt-1', 'Solo group', createProjectGroup, updateWorktreeMeta)
 

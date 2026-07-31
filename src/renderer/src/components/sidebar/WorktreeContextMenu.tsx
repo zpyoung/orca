@@ -328,19 +328,20 @@ export type WorktreeGroupMenuVisibility = {
 // back to the honestly-scoped project action instead. `folderWorkspaceId`
 // covers only `folder:`-keyed workspaces; a folder-MODE repo projects
 // synthetic worktrees through mergeFolderWorkspace, which also drops
-// projectGroupId, so `repoKind` is the second half of the same gate.
-// showWorktreeCreate/showProjectCreate are always exact opposites — a row
-// shows exactly one create action.
+// projectGroupId, so `repoKind` is the second half of the same gate. A
+// repo-less folder workspace has no project to target, so showProjectCreate
+// also requires `hasRepo` — the invariant is never both, not always exactly one.
 function getWorktreeGroupMenuVisibility(
   folderWorkspaceId: string | null,
   projectGroups: readonly Pick<ProjectGroup, 'id'>[],
-  repoKind: RepoKind | undefined
+  repoKind: RepoKind | undefined,
+  hasRepo: boolean
 ): WorktreeGroupMenuVisibility {
   const canHoldMembership = folderWorkspaceId === null && repoKind !== 'folder'
   return {
     showWorktreeCreate: canHoldMembership,
     showAddSubmenu: canHoldMembership && projectGroups.length > 0,
-    showProjectCreate: !canHoldMembership
+    showProjectCreate: !canHoldMembership && hasRepo
   }
 }
 
@@ -373,11 +374,14 @@ async function createGroupFromWorktree(
   worktreeId: string,
   name: string,
   createProjectGroup: (name: string) => Promise<ProjectGroup | null>,
-  updateWorktreeMeta: (worktreeId: string, updates: { projectGroupId: string | null }) => void
+  updateWorktreeMeta: (
+    worktreeId: string,
+    updates: { projectGroupId: string | null }
+  ) => Promise<void>
 ): Promise<void> {
   const group = await createProjectGroup(name)
   if (group) {
-    updateWorktreeMeta(worktreeId, { projectGroupId: group.id })
+    await updateWorktreeMeta(worktreeId, { projectGroupId: group.id })
   }
 }
 
@@ -522,7 +526,8 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
   const worktreeGroupMenuVisibility = getWorktreeGroupMenuVisibility(
     folderWorkspaceId,
     projectGroups,
-    repo?.kind
+    repo?.kind,
+    Boolean(repo)
   )
   const sleepLabel =
     isMultiContext && sleepableWorktrees.length > 0
@@ -1280,10 +1285,17 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
           'auto.components.sidebar.WorktreeContextMenu.6664418e98',
           'New Project Group'
         )}
-        description={translate(
-          'auto.components.sidebar.WorktreeContextMenu.c39c37676a',
-          'Create a group and move this project into it.'
-        )}
+        description={
+          createGroupDialog?.scope === 'worktree'
+            ? translate(
+                'auto.components.sidebar.WorktreeContextMenu.3ae4748032',
+                'Create a group and move this worktree into it.'
+              )
+            : translate(
+                'auto.components.sidebar.WorktreeContextMenu.c39c37676a',
+                'Create a group and move this project into it.'
+              )
+        }
         initialName={
           createGroupDialog?.scope === 'worktree'
             ? `${worktree.displayName} group`
