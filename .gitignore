@@ -83,6 +83,8 @@ design-docs/
 # and the tracked reference docs linked from AGENTS.md / README.md).
 docs/**
 !docs/
+!docs/architecture/
+!docs/architecture/**
 !docs/assets/
 !docs/assets/**
 !docs/readme/
