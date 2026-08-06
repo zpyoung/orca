@@ -5536,9 +5536,9 @@
             "defaultViewLabel": "Vista predeterminada de Chat UI",
             "defaultViewTerminal": "Chat en terminal",
             "defaultViewNative": "Chat UI",
-            "widthTitle": "Chat width",
-            "widthCopy": "Set the reading column width for every chat pane.",
-            "widthLabel": "Chat width"
+            "widthTitle": "Ancho del chat",
+            "widthCopy": "Establece el ancho de la columna de lectura de todos los paneles de chat.",
+            "widthLabel": "Ancho del chat"
           },
           "agentDashboard": {
             "title": "Agent Dashboard",
@@ -13705,13 +13705,13 @@
       "launchPromptNotDelivered": "No entregado — revisa la terminal",
       "width": {
         "tier": {
-          "narrow": "Narrow",
-          "comfortable": "Comfortable",
-          "wide": "Wide",
-          "full": "Full"
+          "narrow": "Estrecho",
+          "comfortable": "Cómodo",
+          "wide": "Amplio",
+          "full": "Completo"
         },
-        "menuLabel": "Chat width",
-        "menuTooltip": "Chat width (applies to all chat panes)"
+        "menuLabel": "Ancho del chat",
+        "menuTooltip": "Ancho del chat (se aplica a todos los paneles de chat)"
       }
     },
     "tab": {

@@ -5521,9 +5521,9 @@
             "defaultViewLabel": "기본 Chat UI 보기",
             "defaultViewTerminal": "Terminal 채팅",
             "defaultViewNative": "Chat UI",
-            "widthTitle": "Chat width",
-            "widthCopy": "Set the reading column width for every chat pane.",
-            "widthLabel": "Chat width"
+            "widthTitle": "채팅 너비",
+            "widthCopy": "모든 채팅 창의 읽기 열 너비를 설정합니다.",
+            "widthLabel": "채팅 너비"
           },
           "agentDashboard": {
             "title": "Agent Dashboard",
@@ -13705,13 +13705,13 @@
       "launchPromptNotDelivered": "전달되지 않음 — 터미널을 확인하세요",
       "width": {
         "tier": {
-          "narrow": "Narrow",
-          "comfortable": "Comfortable",
-          "wide": "Wide",
-          "full": "Full"
+          "narrow": "좁게",
+          "comfortable": "편안하게",
+          "wide": "넓게",
+          "full": "전체"
         },
-        "menuLabel": "Chat width",
-        "menuTooltip": "Chat width (applies to all chat panes)"
+        "menuLabel": "채팅 너비",
+        "menuTooltip": "채팅 너비(모든 채팅 창에 적용됨)"
       }
     },
     "tab": {

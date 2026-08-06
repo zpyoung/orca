@@ -5521,9 +5521,9 @@
             "defaultViewLabel": "デフォルトの Chat UI ビュー",
             "defaultViewTerminal": "Terminal チャット",
             "defaultViewNative": "Chat UI",
-            "widthTitle": "Chat width",
-            "widthCopy": "Set the reading column width for every chat pane.",
-            "widthLabel": "Chat width"
+            "widthTitle": "チャットの幅",
+            "widthCopy": "すべてのチャットペインの読み取り列の幅を設定します。",
+            "widthLabel": "チャットの幅"
           },
           "agentDashboard": {
             "title": "Agent Dashboard",
@@ -13705,13 +13705,13 @@
       "launchPromptNotDelivered": "配信されませんでした — ターミナルを確認してください",
       "width": {
         "tier": {
-          "narrow": "Narrow",
-          "comfortable": "Comfortable",
-          "wide": "Wide",
-          "full": "Full"
+          "narrow": "狭い",
+          "comfortable": "ゆったり",
+          "wide": "広い",
+          "full": "全幅"
         },
-        "menuLabel": "Chat width",
-        "menuTooltip": "Chat width (applies to all chat panes)"
+        "menuLabel": "チャットの幅",
+        "menuTooltip": "チャットの幅（すべてのチャットペインに適用されます）"
       }
     },
     "tab": {

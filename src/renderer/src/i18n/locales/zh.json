@@ -5521,9 +5521,9 @@
             "defaultViewLabel": "默认 Chat UI 视图",
             "defaultViewTerminal": "终端聊天",
             "defaultViewNative": "Chat UI",
-            "widthTitle": "Chat width",
-            "widthCopy": "Set the reading column width for every chat pane.",
-            "widthLabel": "Chat width"
+            "widthTitle": "聊天宽度",
+            "widthCopy": "设置所有聊天窗格的阅读栏宽度。",
+            "widthLabel": "聊天宽度"
           },
           "agentDashboard": {
             "title": "Agent Dashboard",
@@ -13705,13 +13705,13 @@
       "launchPromptNotDelivered": "未送达 — 请检查终端",
       "width": {
         "tier": {
-          "narrow": "Narrow",
-          "comfortable": "Comfortable",
-          "wide": "Wide",
-          "full": "Full"
+          "narrow": "窄",
+          "comfortable": "舒适",
+          "wide": "宽",
+          "full": "全宽"
         },
-        "menuLabel": "Chat width",
-        "menuTooltip": "Chat width (applies to all chat panes)"
+        "menuLabel": "聊天宽度",
+        "menuTooltip": "聊天宽度（应用于所有聊天窗格）"
       }
     },
     "tab": {

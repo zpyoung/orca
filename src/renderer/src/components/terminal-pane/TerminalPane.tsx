@@ -2816,8 +2816,11 @@ export default function TerminalPane({
     leafId: chatPane?.leafId ?? null,
     leafIds: getNativeChatLeafIds()
   })
+  // effectiveChatViewMode, not isChatViewMode: with the experimental flag off the
+  // tab can still carry viewMode 'chat', and the header must not offer chat-only
+  // controls while the chat surface is suppressed.
   const activePaneIsChatLeaf = Boolean(
-    isChatViewMode && activePane?.leafId && activePane.leafId === chatLeafId
+    effectiveChatViewMode && activePane?.leafId && activePane.leafId === chatLeafId
   )
   // A split can host different agents, so continuation resolves the specific leaf before using tab-wide hints.
   const resolveAgentForLeaf = (leafId: string | null): string | null => {
