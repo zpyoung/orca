@@ -2619,6 +2619,8 @@ export type OpenInApplication = {
 export type SourceControlViewMode = 'list' | 'tree'
 export type SourceControlGroupOrder = 'changes-first' | 'staged-first' | 'untracked-first'
 
+export type NativeChatWidthTier = 'narrow' | 'comfortable' | 'wide' | 'full'
+
 export type LeftSidebarAppearanceMode = 'default' | 'match-terminal' | 'tinted'
 
 /** Strategy for the prefix prepended to worktree branch names. */
@@ -2792,6 +2794,8 @@ export type GlobalSettings = {
   openAgentTabsInChatByDefault?: boolean
   /** Experimental native chat surface for Claude/Codex sessions; off by default. */
   experimentalNativeChat?: boolean
+  /** Reading-column width for every native chat pane; optional for legacy settings. */
+  nativeChatWidth?: NativeChatWidthTier
   /** Last explicit native-chat model + option selections; live panes need an applied/dispatched record before showing a value. */
   nativeChatSessionOptions?: PersistedNativeChatSessionOptions
   /** Extra launcher rows for the worktree "Open in" submenu. VS Code is always shown first. */

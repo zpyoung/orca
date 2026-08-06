@@ -22,6 +22,12 @@ vi.mock('@/i18n/i18n', () => ({
       fallback
     )
 }))
+
+// The header is prop-driven, but the width menu it renders reads the store itself.
+vi.mock('../../store', () => ({
+  useAppStore: (selector: (state: unknown) => unknown) =>
+    selector({ settings: {}, updateSettings: vi.fn() })
+}))
 const mounted: { container: HTMLDivElement; root: Root }[] = []
 
 function makePane(id: number): ManagedPane {
@@ -49,6 +55,7 @@ function renderOverlay({
   onRenameSubmit = vi.fn(),
   canContinueAgentSessionInNewSession = false,
   onContinueAgentSessionInNewSession = vi.fn(),
+  isChatViewMode,
   renameValue = '',
   renamingPaneId = null
 }: {
@@ -61,6 +68,7 @@ function renderOverlay({
   onRenameSubmit?: ReturnType<typeof vi.fn>
   canContinueAgentSessionInNewSession?: boolean
   onContinueAgentSessionInNewSession?: ReturnType<typeof vi.fn>
+  isChatViewMode?: boolean
   renameValue?: string
   renamingPaneId?: number | null
 }): {
@@ -99,6 +107,7 @@ function renderOverlay({
         managerRef={{ current: null } as RefObject<PaneManager | null>}
         paneTransportsRef={{ current: new Map() } as RefObject<Map<number, PtyTransport>>}
         canContinueAgentSessionInNewSession={canContinueAgentSessionInNewSession}
+        isChatViewMode={isChatViewMode}
         onContinueAgentSessionInNewSession={
           onContinueAgentSessionInNewSession as (pane: ManagedPane) => void
         }
@@ -223,5 +232,29 @@ describe('TerminalPaneHeaderOverlay', () => {
     expect(onContinueAgentSessionInNewSession).toHaveBeenCalledWith(
       expect.objectContaining({ id: 1 })
     )
+  })
+
+  it('offers the chat width menu on a pane showing the chat view', () => {
+    const { container } = renderOverlay({
+      paneTitles: { 1: '', 2: '' },
+      isChatViewMode: true
+    })
+
+    expect(container.querySelector('button[aria-label="Chat width"]')).not.toBeNull()
+  })
+
+  it('hides the chat width menu on a terminal-view pane', () => {
+    const { container } = renderOverlay({
+      paneTitles: { 1: '', 2: '' },
+      isChatViewMode: false
+    })
+
+    expect(container.querySelector('button[aria-label="Chat width"]')).toBeNull()
+  })
+
+  it('hides the chat width menu when the chat-view flag is absent', () => {
+    const { container } = renderOverlay({ paneTitles: { 1: '', 2: '' } })
+
+    expect(container.querySelector('button[aria-label="Chat width"]')).toBeNull()
   })
 })

@@ -1,6 +1,7 @@
 import { ShieldQuestion } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ChatApproval } from './native-chat-interactive-prompt'
+import { useNativeChatWidthClassName } from './use-native-chat-width'
 
 export type NativeChatApprovalCardProps = {
   approval: ChatApproval
@@ -18,9 +19,11 @@ export function NativeChatApprovalCard({
   approval,
   onChoose
 }: NativeChatApprovalCardProps): React.JSX.Element {
+  const widthClassName = useNativeChatWidthClassName()
+
   return (
     <div className="shrink-0 bg-background">
-      <div className="mx-auto w-full max-w-4xl px-3 pt-2 pb-1 sm:px-4">
+      <div className={cn('mx-auto w-full px-3 pt-2 pb-1 sm:px-4', widthClassName)}>
         <div className="flex w-full flex-col gap-2 rounded-lg border border-input bg-card px-4 py-3 shadow-xs">
           <div className="flex items-start gap-2">
             <ShieldQuestion className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
