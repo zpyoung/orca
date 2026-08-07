@@ -90,6 +90,7 @@ import {
   getProjectGroupHeaderKey,
   getProjectHeaderRevealTarget,
   getLooseSectionProjectGroupId,
+  isLooseProjectGroupTopRow,
   getGroupKeysForWorktree,
   getLineageGroupKey,
   getPinnedWorktreeDisplayPolicy,
@@ -5015,6 +5016,10 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
               // folder-backed indentation for rows that render under the repo.
               const projectGroupId =
                 getLooseSectionProjectGroupId(itemRow.sectionKey) ?? itemRow.repo?.projectGroupId
+              const inProjectGroupLooseSection = isLooseProjectGroupTopRow(
+                itemRow.sectionKey,
+                nested
+              )
               const isFolderBackedRepoChild =
                 groupBy === 'repo' &&
                 Boolean(projectGroupId && folderBackedProjectGroupIds.has(projectGroupId))
@@ -5143,9 +5148,10 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
                     onCardDragStart={handleWorktreeCardDragStart}
                     onCardDragEnd={clearWorktreeDrag}
                     hideRepoBadge={groupBy === 'repo'}
-                    // Why: pinned worktrees mix repos in one section, so only it needs the leading repo identity chip.
                     hostContextLabel={itemRow.hostContextLabel}
+                    // Why: both sections mix repos, so the row carries its own origin chip.
                     inPinnedSection={isPinnedOverlayRow}
+                    inProjectGroupLooseSection={inProjectGroupLooseSection}
                     renameRowKey={itemRow.rowKey}
                     lineageChildCount={itemRow.lineageChildCount}
                     lineageCollapsed={itemRow.lineageCollapsed}

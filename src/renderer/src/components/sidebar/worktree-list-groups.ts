@@ -392,6 +392,17 @@ export function getLooseSectionProjectGroupId(sectionKey: string): string | null
     : null
 }
 
+/**
+ * Whether a row is the top row of a project group's loose section — the rows that
+ * render away from their repo header and so must carry their own origin identity.
+ *
+ * Lineage children inherit their parent's `sectionKey`, so `nested` is what separates
+ * the detached row from the descendants that sit inside it.
+ */
+export function isLooseProjectGroupTopRow(sectionKey: string, nested: boolean): boolean {
+  return !nested && getLooseSectionProjectGroupId(sectionKey) !== null
+}
+
 export const PINNED_GROUP_KEY = 'pinned'
 
 export const PINNED_GROUP_META = {

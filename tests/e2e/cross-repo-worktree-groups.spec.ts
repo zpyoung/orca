@@ -475,6 +475,12 @@ test.describe('Cross-repo worktree groups', () => {
       })
       .toEqual({ kind: 'repo-header', id: repoId })
 
+    // Under its repo header the row needs no origin cue; the header supplies it.
+    const originChip = orcaPage.locator(
+      `[data-worktree-id="${secondaryId}"] [aria-label^="Project "]`
+    )
+    await expect(originChip).toHaveCount(0)
+
     await addWorktreeToGroupViaMenu(orcaPage, secondaryId, groupName)
 
     await expect
@@ -482,6 +488,8 @@ test.describe('Cross-repo worktree groups', () => {
         timeout: 10_000
       })
       .toEqual({ kind: 'group-header', id: groupId })
+
+    await expect(originChip).toHaveCount(1)
 
     await expect(orcaPage.locator(`[data-repo-header-id="${repoId}"]`)).toBeVisible()
     await expect

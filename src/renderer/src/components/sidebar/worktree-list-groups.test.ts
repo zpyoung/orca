@@ -10,6 +10,7 @@ import {
   getGroupKeyForWorktree,
   getGroupKeysForWorktree,
   getLooseSectionProjectGroupId,
+  isLooseProjectGroupTopRow,
   getLineageGroupKey,
   getLineageRenderInfo,
   getPRGroupKey,
@@ -3888,6 +3889,15 @@ describe('cross-repo worktree groups (loose worktrees)', () => {
     expect(getLooseSectionProjectGroupId('pinned')).toBeNull()
     // A group id containing the suffix must still round-trip.
     expect(getLooseSectionProjectGroupId('project-group:a::loose::loose')).toBe('a::loose')
+  })
+
+  it('marks only the top row of a loose section as carrying origin identity', () => {
+    expect(isLooseProjectGroupTopRow('project-group:group-cross::loose', false)).toBe(true)
+    // Lineage children inherit the parent's section key but sit inside its card,
+    // so the origin chip must not repeat down the subtree.
+    expect(isLooseProjectGroupTopRow('project-group:group-cross::loose', true)).toBe(false)
+    expect(isLooseProjectGroupTopRow('repo:repo-1', false)).toBe(false)
+    expect(isLooseProjectGroupTopRow('pinned', false)).toBe(false)
   })
 
   it('labels only the differing members of a mixed-host group, not every member', () => {
