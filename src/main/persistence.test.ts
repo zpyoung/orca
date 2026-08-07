@@ -3559,8 +3559,9 @@ describe('Store', () => {
     expect(Object.keys(store.getAllWorktreeMeta()).sort()).toEqual(['wt1', 'wt2'])
   })
 
-  it('deleteProjectGroup tolerates a null worktree-meta entry without throwing', async () => {
+  it('deleteProjectGroup tolerates a hand-corrupted worktree-meta entry without throwing', async () => {
     // orca-data.json is user-editable, so a worktreeMeta entry can be hand-corrupted to null.
+    // Load-time normalization drops non-object entries outright, so the delete never sees one.
     writeDataFile({
       schemaVersion: 1,
       repos: [],
@@ -3586,7 +3587,7 @@ describe('Store', () => {
     const store = await createStore()
 
     expect(() => store.deleteProjectGroup('group-1')).not.toThrow()
-    expect(store.getAllWorktreeMeta().corrupt).toBeNull()
+    expect(store.getAllWorktreeMeta()).not.toHaveProperty('corrupt')
   })
 
   it('deleteProjectGroup still deletes folder workspaces in the deleted group subtree', async () => {

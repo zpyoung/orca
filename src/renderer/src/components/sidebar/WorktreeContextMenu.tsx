@@ -375,7 +375,7 @@ async function createGroupFromWorktree(
     worktreeId: string,
     updates: { projectGroupId: string | null },
     options?: WorktreeMetaUpdateOptions
-  ) => Promise<void>
+  ) => Promise<{ ok: true } | { ok: false; error: string }>
 ): Promise<void> {
   // Why: createProjectGroup crosses an async gap — capture identity/membership
   // first so a delete, path-reuse replacement, or another group change mid-flight
