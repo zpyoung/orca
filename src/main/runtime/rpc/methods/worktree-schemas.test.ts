@@ -102,6 +102,33 @@ describe('worktree RPC schemas', () => {
     ).not.toThrow()
   })
 
+  it('accepts a string projectGroupId on worktree.set', () => {
+    const parsed = WorktreeSet.safeParse({ worktree: 'id:wt-1', projectGroupId: 'group-1' })
+
+    expect(parsed.success).toBe(true)
+    expect(parsed.success && parsed.data.projectGroupId).toBe('group-1')
+  })
+
+  it('accepts a null projectGroupId on worktree.set', () => {
+    const parsed = WorktreeSet.safeParse({ worktree: 'id:wt-1', projectGroupId: null })
+
+    expect(parsed.success).toBe(true)
+    expect(parsed.success && parsed.data.projectGroupId).toBe(null)
+  })
+
+  it('accepts an omitted projectGroupId on worktree.set', () => {
+    const parsed = WorktreeSet.safeParse({ worktree: 'id:wt-1' })
+
+    expect(parsed.success).toBe(true)
+    expect(parsed.success && parsed.data.projectGroupId).toBeUndefined()
+  })
+
+  it('rejects a non-string, non-null projectGroupId on worktree.set', () => {
+    const parsed = WorktreeSet.safeParse({ worktree: 'id:wt-1', projectGroupId: 42 })
+
+    expect(parsed.success).toBe(false)
+  })
+
   it('keeps a blanked display name on remote hosts instead of dropping the clear', () => {
     // Blanking sends displayName:'' meaning "fall back to the branch/folder name".
     // Coercing it to undefined made updateManagedWorktreeMeta's omitUndefinedProperties

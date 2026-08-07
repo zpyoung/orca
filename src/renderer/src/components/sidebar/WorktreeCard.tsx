@@ -120,6 +120,7 @@ type WorktreeCardProps = {
   hideRepoBadge?: boolean
   hostContextLabel?: string
   inPinnedSection?: boolean
+  inProjectGroupLooseSection?: boolean
   activationRowKey?: string
   renameRowKey?: string
   contentIndent?: number
@@ -228,6 +229,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
   hideRepoBadge,
   hostContextLabel,
   inPinnedSection = false,
+  inProjectGroupLooseSection = false,
   activationRowKey,
   renameRowKey,
   contentIndent = 0,
@@ -1187,14 +1189,15 @@ const WorktreeCard = React.memo(function WorktreeCard({
   const cacheTtlMs = useAppStore((s) =>
     showAggregateCacheTimer ? (s.settings?.promptCacheTtlMs ?? 0) : 0
   )
-  // Why: pinned trees mix repos, so the repo icon shows regardless of groupBy's hideRepoBadge.
-  const showPinnedRepoIcon = inPinnedSection && !!repo
+  // Why: these sections render a row away from its repo header, so origin has to come from the
+  // row itself regardless of groupBy's hideRepoBadge.
+  const showOriginRepoIcon = (inPinnedSection || inProjectGroupLooseSection) && !!repo
   // Why: new card style retired the Compact/Detailed switch; repo identity uses the compact chip, not a lower pill.
   const showRepoIdentityInTitle = newCardStyle || compactCards
   const showInlineRepoBadge =
-    showRepoIdentityInTitle && !!repo && !hideRepoBadge && !isFolder && !showPinnedRepoIcon
+    showRepoIdentityInTitle && !!repo && !hideRepoBadge && !isFolder && !showOriginRepoIcon
   const showRepoBadgeInMetaRow =
-    !showRepoIdentityInTitle && !!repo && !hideRepoBadge && !showPinnedRepoIcon
+    !showRepoIdentityInTitle && !!repo && !hideRepoBadge && !showOriginRepoIcon
   const showHostContextBadge = !compactCards && !!hostContextLabel
   const showDetachedHeadInMetaRow = !compactCards && !isFolder && detachedHeadDisplay !== null
   const showBranch =
@@ -1424,7 +1427,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
         {/* Header row: Title */}
         <div className="flex min-w-0 items-center justify-between gap-2">
           <div className="flex min-w-0 flex-1 items-center gap-1.5">
-            {showPinnedRepoIcon && (
+            {showOriginRepoIcon && (
               <RepoIdentityChip repo={repo}>
                 <RepoIconGlyph
                   repoIcon={repo.repoIcon}
