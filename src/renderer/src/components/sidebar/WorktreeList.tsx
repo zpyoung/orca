@@ -251,6 +251,7 @@ import { ProjectGroupNameDialog } from './ProjectGroupNameDialog'
 import { ProjectGroupDeleteDialog } from './ProjectGroupDeleteDialog'
 import { selectProjectGroupRemovalTargets } from '@/store/slices/project-group-removal-targets'
 import { isGitRepoKind } from '../../../../shared/repo-kind'
+import { canWorktreeHoldGroupMembership } from '../../../../shared/project-groups'
 import {
   effectiveExternalWorktreeVisibility,
   isLegacyRepoForExternalWorktreeVisibility
@@ -701,6 +702,10 @@ type VirtualizedWorktreeViewportProps = {
   workspaceStatuses: readonly WorkspaceStatusDefinition[]
   projectGrouping?: ProjectGroupingModel
   projectGroups?: readonly ProjectGroup[]
+  // Why: reveal and the keyboard-nav row model must agree with the rendered tree on which
+  // groups exist, or a host filter that hides a group while keeping a cross-host member
+  // visible expands that worktree against a group that is not on screen.
+  visibleProjectGroupsForRows: readonly ProjectGroup[]
   onMoveWorktreeToStatus: (worktreeId: string, status: WorkspaceStatus) => void
   onMoveWorktreesToStatus: (worktreeIds: readonly string[], status: WorkspaceStatus) => void
   onMoveWorktreesToStatusAtIndex: (args: {
@@ -1491,6 +1496,7 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
   workspaceStatuses,
   projectGrouping,
   projectGroups = EMPTY_PROJECT_GROUPS,
+  visibleProjectGroupsForRows,
   onMoveWorktreeToStatus,
   onMoveWorktreesToStatus,
   onMoveWorktreesToStatusAtIndex,
@@ -2238,22 +2244,6 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
       window.removeEventListener(SUPPRESS_WORKTREE_LIST_SCROLL_ADJUSTMENT_EVENT, handleSuppress)
     }
   }, [])
-
-  // Why: reveal and the keyboard-nav row model must both agree with the rendered
-  // tree on which project groups exist, or a host filter that hides a group while
-  // keeping a cross-host member visible expands — and orders — that worktree
-  // against a group that is not on screen. Declared above the reveal effect
-  // because its dependency array reads this during render.
-  const visibleWorkspaceHostIds = useAppStore((s) => s.visibleWorkspaceHostIds)
-  const workspaceHostScope = useAppStore((s) => s.workspaceHostScope)
-  const visibleHostIdSetForNav = useMemo(
-    () => getVisibleSidebarHostIdSet(visibleWorkspaceHostIds, workspaceHostScope),
-    [visibleWorkspaceHostIds, workspaceHostScope]
-  )
-  const visibleProjectGroupsForRows = useMemo(
-    () => filterProjectGroupsForVisibleHosts(projectGroups, visibleHostIdSetForNav, defaultHostId),
-    [defaultHostId, projectGroups, visibleHostIdSetForNav]
-  )
 
   React.useEffect(() => {
     if (!pendingRevealWorktree) {
@@ -3311,12 +3301,12 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
         onWorkspaceBoardDragPreviewStart !== NOOP_WORKSPACE_BOARD_DRAG_PREVIEW_CALLBACK
       // Why: the reorder gate treats a lone row as having nowhere to drag, but
       // group membership gives it somewhere — leaving its group, or joining one.
-      // Excludes folder-mode repos for the same reason the drop hit-test does:
-      // their projection drops projectGroupId, so there is nowhere to drag to.
       const draggedWorktreeForGroupMembership = worktreeMap.get(worktreeId)
       const canDragForGroupMembership =
         groupBy === 'repo' &&
-        repoMap.get(draggedWorktreeForGroupMembership?.repoId ?? '')?.kind !== 'folder' &&
+        canWorktreeHoldGroupMembership({
+          repoKind: repoMap.get(draggedWorktreeForGroupMembership?.repoId ?? '')?.kind
+        }) &&
         (draggedWorktreeForGroupMembership?.projectGroupId != null ||
           measureProjectGroupHeaderDragRects(container).length > 0)
       if (
@@ -7103,6 +7093,7 @@ const WorktreeList = React.memo(function WorktreeList({
         workspaceStatuses={workspaceStatuses}
         projectGrouping={projectGrouping}
         projectGroups={projectGroups}
+        visibleProjectGroupsForRows={visibleProjectGroupsForRows}
         onMoveWorktreeToStatus={moveWorktreeToStatus}
         onMoveWorktreesToStatus={moveWorktreesToStatus}
         onMoveWorktreesToStatusAtIndex={moveWorktreesToStatusAtIndex}

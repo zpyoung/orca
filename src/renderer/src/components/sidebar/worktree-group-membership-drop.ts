@@ -1,4 +1,5 @@
 import type { RepoKind, Worktree } from '../../../../shared/types'
+import { canWorktreeHoldGroupMembership } from '../../../../shared/project-groups'
 
 /** Hit-test rect for one project-group header row in the sidebar. */
 export type WorktreeGroupHeaderDropRect = {
@@ -73,12 +74,9 @@ export function getWorktreeGroupMembershipDropTarget(args: {
   ownRepoSectionRect: WorktreeOwnRepoSectionRect | null
   ownRepoKind?: RepoKind
 }): WorktreeGroupMembershipDropTarget {
-  // Why: a folder-mode repo's synthetic worktrees project through
-  // mergeFolderWorkspace, which drops projectGroupId — so a drop here would look
-  // like it worked and vanish on the next refresh. Same reason the context menu
-  // hides these actions; gated in the drop decision so preview, highlight and
-  // commit all inherit it from one place.
-  if (args.ownRepoKind === 'folder') {
+  // Why: gated in the drop decision rather than at each caller so preview,
+  // highlight and commit all inherit it from one place.
+  if (!canWorktreeHoldGroupMembership({ repoKind: args.ownRepoKind })) {
     return { kind: 'none' }
   }
   const currentGroupId = args.draggedWorktree.projectGroupId ?? null

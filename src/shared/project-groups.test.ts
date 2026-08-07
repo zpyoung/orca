@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  canWorktreeHoldGroupMembership,
   clearMissingProjectGroupMemberships,
   createProjectGroup,
   getEffectiveProjectGroupManualRank,
@@ -256,5 +257,18 @@ describe('project-groups', () => {
     expect(subtreeIds.size).toBe(130_001)
     expect(subtreeIds.has('root')).toBe(true)
     expect(subtreeIds.has('child-129999')).toBe(true)
+  })
+
+  it('denies group membership to folder workspaces and folder-mode repos', () => {
+    expect(canWorktreeHoldGroupMembership({ folderWorkspaceId: null, repoKind: 'git' })).toBe(true)
+    expect(canWorktreeHoldGroupMembership({ folderWorkspaceId: 'fw-1', repoKind: 'git' })).toBe(
+      false
+    )
+    expect(canWorktreeHoldGroupMembership({ folderWorkspaceId: null, repoKind: 'folder' })).toBe(
+      false
+    )
+    // Callers with no folder-workspace concept omit it; an unknown repo kind is
+    // treated as git so a missing repo entry never silently blocks membership.
+    expect(canWorktreeHoldGroupMembership({ repoKind: undefined })).toBe(true)
   })
 })

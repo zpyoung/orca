@@ -70,6 +70,7 @@ import {
   parseWorkspaceKey,
   worktreeWorkspaceKey
 } from '../../../../shared/workspace-scope'
+import { canWorktreeHoldGroupMembership } from '../../../../shared/project-groups'
 
 type Props = {
   worktree: Worktree
@@ -323,22 +324,17 @@ export type WorktreeGroupMenuVisibility = {
 }
 
 // Why: derives worktree-vs-project group-menu visibility from one
-// `canHoldMembership` gate. Folder workspace rows redirect updateWorktreeMeta
-// to an allowlist that excludes projectGroupId, so a worktree-scoped write
-// there would appear to work and vanish on the next refresh — those rows fall
-// back to the honestly-scoped project action instead. `folderWorkspaceId`
-// covers only `folder:`-keyed workspaces; a folder-MODE repo projects
-// synthetic worktrees through mergeFolderWorkspace, which also drops
-// projectGroupId, so `repoKind` is the second half of the same gate. A
-// repo-less folder workspace has no project to target, so showProjectCreate
-// also requires `hasRepo` — the invariant is never both, not always exactly one.
+// `canHoldMembership` gate. Rows that cannot hold membership fall back to the
+// honestly-scoped project action instead. A repo-less folder workspace has no
+// project to target, so showProjectCreate also requires `hasRepo` — the
+// invariant is never both, not always exactly one.
 function getWorktreeGroupMenuVisibility(
   folderWorkspaceId: string | null,
   projectGroups: readonly Pick<ProjectGroup, 'id'>[],
   repoKind: RepoKind | undefined,
   hasRepo: boolean
 ): WorktreeGroupMenuVisibility {
-  const canHoldMembership = folderWorkspaceId === null && repoKind !== 'folder'
+  const canHoldMembership = canWorktreeHoldGroupMembership({ folderWorkspaceId, repoKind })
   return {
     showWorktreeCreate: canHoldMembership,
     showAddSubmenu: canHoldMembership && projectGroups.length > 0,

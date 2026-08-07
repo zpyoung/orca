@@ -1,7 +1,23 @@
 import { normalizeExecutionHostId } from './execution-host'
-import type { Repo, ProjectGroup, ProjectGroupCreatedFrom } from './types'
+import type { Repo, ProjectGroup, ProjectGroupCreatedFrom, RepoKind } from './types'
 
 export const UNGROUPED_PROJECT_GROUP_KEY = 'project-group:ungrouped'
+
+/**
+ * Whether a worktree row can own a `projectGroupId` of its own.
+ *
+ * Folder workspaces redirect meta writes to an allowlist that excludes
+ * projectGroupId, and a folder-mode repo's synthetic worktrees project through
+ * mergeFolderWorkspace, which drops it — either way the write appears to succeed and
+ * vanishes on the next refresh. Every affordance that can start a membership write
+ * gates on this, so it lives in one place rather than being re-derived per call site.
+ */
+export function canWorktreeHoldGroupMembership(args: {
+  folderWorkspaceId?: string | null
+  repoKind: RepoKind | undefined
+}): boolean {
+  return (args.folderWorkspaceId ?? null) === null && args.repoKind !== 'folder'
+}
 
 function createProjectGroupId(): string {
   const randomUUID = globalThis.crypto?.randomUUID
