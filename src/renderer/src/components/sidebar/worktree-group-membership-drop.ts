@@ -76,7 +76,7 @@ export function getWorktreeGroupMembershipDropTarget(args: {
 }): WorktreeGroupMembershipDropTarget {
   // Why: gated in the drop decision rather than at each caller so preview,
   // highlight and commit all inherit it from one place.
-  if (!canWorktreeHoldGroupMembership({ repoKind: args.ownRepoKind })) {
+  if (!canWorktreeHoldGroupMembership({ folderWorkspaceId: null, repoKind: args.ownRepoKind })) {
     return { kind: 'none' }
   }
   const currentGroupId = args.draggedWorktree.projectGroupId ?? null

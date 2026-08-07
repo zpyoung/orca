@@ -267,8 +267,10 @@ describe('project-groups', () => {
     expect(canWorktreeHoldGroupMembership({ folderWorkspaceId: null, repoKind: 'folder' })).toBe(
       false
     )
-    // Callers with no folder-workspace concept omit it; an unknown repo kind is
-    // treated as git so a missing repo entry never silently blocks membership.
-    expect(canWorktreeHoldGroupMembership({ repoKind: undefined })).toBe(true)
+    // An unknown repo kind is treated as git so a missing repo entry never
+    // silently blocks membership.
+    expect(canWorktreeHoldGroupMembership({ folderWorkspaceId: null, repoKind: undefined })).toBe(
+      true
+    )
   })
 })

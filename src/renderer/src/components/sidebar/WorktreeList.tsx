@@ -3305,6 +3305,9 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
       const canDragForGroupMembership =
         groupBy === 'repo' &&
         canWorktreeHoldGroupMembership({
+          // Folder-workspace rows never reach here — they are absent from worktreeMap,
+          // so the lookup above misses before this gate matters.
+          folderWorkspaceId: null,
           repoKind: repoMap.get(draggedWorktreeForGroupMembership?.repoId ?? '')?.kind
         }) &&
         (draggedWorktreeForGroupMembership?.projectGroupId != null ||
