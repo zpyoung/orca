@@ -406,7 +406,7 @@ describe('startParkedTerminalByteWatcher', () => {
   it('feeds Command Code output through the parked byte detector', async () => {
     const { dispose } = await startWatcher()
 
-    emit('# Command Code v0.27.2')
+    emit('# Command Code v0.27.2\r\n')
     emit('⌘ Parsing...')
 
     expect(commandStatusPolicy.onCommandCodeWorking).toHaveBeenCalledTimes(1)
@@ -542,6 +542,19 @@ describe('startParkedTerminalByteWatcher', () => {
     dispose()
   })
 
+  // Why: retained gauges would inflate every later high-water profile.
+  it('dispose drops the processor from the pty side-effect census', async () => {
+    await import('./pty-side-effect-pending-census')
+    const { collectRendererMemoryProfileCounts } = await import('@/lib/renderer-memory-profile')
+    expect(collectRendererMemoryProfileCounts()['ptySideEffects.processors']).toBe(0)
+
+    const { dispose } = await startWatcher()
+    expect(collectRendererMemoryProfileCounts()['ptySideEffects.processors']).toBe(1)
+
+    dispose()
+    expect(collectRendererMemoryProfileCounts()['ptySideEffects.processors']).toBe(0)
+  })
+
   it('disposes the previous watcher when a new one starts for the same PTY', async () => {
     await startWatcher({ paneId: 1 })
     const second = await startWatcher({ paneId: 2 })
@@ -552,6 +565,32 @@ describe('startParkedTerminalByteWatcher', () => {
     expect(mockStoreState.setRuntimePaneTitle).toHaveBeenCalledTimes(1)
     expect(mockStoreState.setRuntimePaneTitle).toHaveBeenCalledWith(TAB_ID, 2, IDLE_TITLE)
     second.dispose()
+  })
+
+  it('consumes host facts without a raw terminal stream for paired PTYs', async () => {
+    const remotePtyId = 'remote:env-1@@terminal-1'
+    const { dispose } = await startWatcher({ ptyId: remotePtyId })
+    const handler = await import('./terminal-side-effect-facts-handler')
+
+    expect(onData).toBeNull()
+    handler._dispatchTerminalSideEffectBatchForTest({
+      ptyId: remotePtyId,
+      seq: 10,
+      facts: [
+        {
+          kind: 'title',
+          normalizedTitle: '⠋ Remote build',
+          rawTitle: '⠋ Remote build'
+        }
+      ]
+    })
+
+    expect(mockStoreState.setRuntimePaneTitle).toHaveBeenCalledWith(
+      TAB_ID,
+      PANE_ID,
+      '⠋ Remote build'
+    )
+    dispose()
   })
 
   // ─── Main side-effect authority (terminal-side-effect-authority.md) ────
