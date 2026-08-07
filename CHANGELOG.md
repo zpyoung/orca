@@ -1,6 +1,6 @@
 ---
-last_released_commit: e1eda00beec0159b6015aba67aa3c3e58b49da6b
-upstream_synced: v1.4.162
+last_released_commit: c4feaab473e2e89eb43d93ac0a039ebc18e1e9e5
+upstream_synced: v1.4.176
 ---
 
 # Changelog
@@ -11,6 +11,31 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.177-rc.0.zy01] - 2026-08-07
+
+Synced to upstream [v1.4.176](https://github.com/stablyai/orca/releases/tag/v1.4.176).
+
+### Added
+- Native chat panes have a configurable reading column. Pick a width from the new menu in the pane
+  header, or set the default for every pane from the experimental chat settings. The tier names and
+  descriptions are translated into Spanish, Japanese, Korean, and Chinese.
+- A checked-in `.nvmrc` pinning Node 24, so `nvm use` matches the version the project already
+  requires. Upstream removed the file; the fork keeps it.
+
+### Fixed
+- The chat width menu no longer appears in the pane header when the experimental native chat
+  surface is switched off. It read the tab's raw view mode rather than the mode actually in effect,
+  so a chat-only control could surface on a plain terminal pane.
+
+### Changed
+- The fork no longer carries its own copy of the orchestration subsystem. It was restored here
+  after upstream pulled it from the v1.4.161 release branch, but upstream has since shipped a newer
+  version of the same code, so the fork now tracks upstream's directly. This brings creator-dispatch
+  task attribution and the newer worker-release handling that the fork's copy never had.
+- Two upstream fixes the fork had picked up early — the relay's refusal to fall back silently when
+  a pairing invite fails, and the new-workspace flicker when typing ahead of search — are dropped in
+  favour of upstream v1.4.176's versions of those files. They return when upstream ships them.
 
 ## [1.4.163-rc.0.zy01] - 2026-07-30
 
