@@ -1,6 +1,6 @@
 ---
-last_released_commit: c4feaab473e2e89eb43d93ac0a039ebc18e1e9e5
-upstream_synced: v1.4.176
+last_released_commit: d72fff99417664863f85ee4122c720615ac8d07d
+upstream_synced: v1.4.177
 ---
 
 # Changelog
@@ -11,6 +11,10 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.178-rc.0.zy01] - 2026-08-09
+
+Synced to upstream [v1.4.177](https://github.com/stablyai/orca/releases/tag/v1.4.177).
 
 ## [1.4.177-rc.0.zy01] - 2026-08-07
 
