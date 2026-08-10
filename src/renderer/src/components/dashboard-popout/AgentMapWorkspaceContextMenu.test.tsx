@@ -283,7 +283,7 @@ describe('Agent Map workspace context menu', () => {
     const ring = screen.getByRole('button', { name: 'Open Agent map worktree details' })
 
     fireEvent.contextMenu(ring)
-    const createGroup = await screen.findByText('New group from project', {}, { timeout: 5_000 })
+    const createGroup = await screen.findByText('New group from worktree', {}, { timeout: 5_000 })
     fireEvent.pointerDown(createGroup, { button: 0 })
     fireEvent.click(createGroup)
     expect(await screen.findByRole('dialog', { name: 'New Project Group' })).toBeInTheDocument()

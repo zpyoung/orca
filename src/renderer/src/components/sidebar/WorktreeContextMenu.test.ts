@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   isContextWorktreeDeletable,
   shouldUseNativeContextMenu,
@@ -12,9 +12,19 @@ import {
   isWorktreeParentPickerDisabled,
   planWorkspaceStatusAssignment,
   selectMenuScopedMap,
+  addWorktreeToGroup,
+  removeWorktreeFromGroup,
+  createGroupFromWorktree,
+  getWorktreeGroupMenuVisibility,
+  shouldShowRemoveWorktreeFromGroup,
   shouldRevealWorktreeDeveloperMenu
 } from './WorktreeContextMenu'
-import type { Worktree, WorktreeLineage, WorkspaceStatusDefinition } from '../../../../shared/types'
+import type {
+  ProjectGroup,
+  Worktree,
+  WorktreeLineage,
+  WorkspaceStatusDefinition
+} from '../../../../shared/types'
 
 describe('shouldRevealWorktreeDeveloperMenu', () => {
   it('stays hidden for an ordinary right-click', () => {
@@ -233,6 +243,216 @@ describe('project removal from workspace context menus', () => {
     expect(isContextWorktreeDeletable({ isMainWorktree: false }, folderRepo)).toBe(true)
     expect(isContextWorktreeDeletable({ isMainWorktree: true }, folderRepo)).toBe(false)
     expect(isContextWorktreeDeletable({ isMainWorktree: false }, null)).toBe(false)
+  })
+})
+
+describe('worktree-scoped project group membership', () => {
+  // Why: distinct from the repo-level "Move to group"/"Remove from group" pair
+  // above — these act on the individual worktree row's own projectGroupId,
+  // independent of its repo's group. See handleMoveProjectToGroup for the
+  // repo-scoped equivalent this mirrors.
+  it('adding to a group calls updateWorktreeMeta with the chosen group id', () => {
+    const updateWorktreeMeta = vi.fn()
+    addWorktreeToGroup('wt-1', 'group-2', updateWorktreeMeta)
+    expect(updateWorktreeMeta).toHaveBeenCalledWith('wt-1', { projectGroupId: 'group-2' })
+  })
+
+  it('removing from a group calls updateWorktreeMeta with null', () => {
+    const updateWorktreeMeta = vi.fn()
+    removeWorktreeFromGroup('wt-1', updateWorktreeMeta)
+    expect(updateWorktreeMeta).toHaveBeenCalledWith('wt-1', { projectGroupId: null })
+  })
+
+  it('offers "remove from group" only when the worktree currently has a group', () => {
+    expect(shouldShowRemoveWorktreeFromGroup({ projectGroupId: 'group-1' })).toBe(true)
+    expect(shouldShowRemoveWorktreeFromGroup({ projectGroupId: null })).toBe(false)
+    expect(shouldShowRemoveWorktreeFromGroup({ projectGroupId: undefined })).toBe(false)
+  })
+})
+
+describe('getWorktreeGroupMenuVisibility', () => {
+  // Why: a row must never show both create actions at once. A repo-less
+  // folder workspace legitimately shows neither — there is no project to
+  // target — so the invariant is "never both", not "always exactly one".
+  it('offers the worktree-scoped create action (and not the project one) on a normal row', () => {
+    const visibility = getWorktreeGroupMenuVisibility(null, [{ id: 'group-1' }], 'git', true)
+    expect(visibility.showWorktreeCreate).toBe(true)
+    expect(visibility.showProjectCreate).toBe(false)
+    expect(visibility.showWorktreeCreate && visibility.showProjectCreate).toBe(false)
+  })
+
+  it('falls back to the project-scoped create action for a folder-workspace row', () => {
+    const visibility = getWorktreeGroupMenuVisibility('folder-1', [{ id: 'group-1' }], 'git', true)
+    expect(visibility.showWorktreeCreate).toBe(false)
+    expect(visibility.showProjectCreate).toBe(true)
+    expect(visibility.showAddSubmenu).toBe(false)
+    expect(visibility.showWorktreeCreate && visibility.showProjectCreate).toBe(false)
+  })
+
+  it('falls back to the project-scoped create action for a worktree in a folder-mode repo', () => {
+    // Regression: only `folder:`-keyed workspaces set folderWorkspaceId, but a
+    // folder-MODE repo's synthetic worktrees project through mergeFolderWorkspace,
+    // which drops projectGroupId — so a worktree-scoped write would silently
+    // no-op there too.
+    const visibility = getWorktreeGroupMenuVisibility(null, [{ id: 'group-1' }], 'folder', true)
+    expect(visibility.showWorktreeCreate).toBe(false)
+    expect(visibility.showProjectCreate).toBe(true)
+    expect(visibility.showAddSubmenu).toBe(false)
+    expect(visibility.showWorktreeCreate && visibility.showProjectCreate).toBe(false)
+  })
+
+  it('offers the worktree create action but hides "add to group" when no project groups exist', () => {
+    // This is what makes the *first* group reachable from a worktree row: the
+    // add-to-existing-group submenu has nothing to list, but creating a new
+    // group scoped to just this worktree is still on offer.
+    const visibility = getWorktreeGroupMenuVisibility(null, [], 'git', true)
+    expect(visibility.showWorktreeCreate).toBe(true)
+    expect(visibility.showAddSubmenu).toBe(false)
+    expect(visibility.showProjectCreate).toBe(false)
+    expect(visibility.showWorktreeCreate && visibility.showProjectCreate).toBe(false)
+  })
+
+  it('treats an unset repo kind (the pre-RepoKind default) as worktree-scoped', () => {
+    const visibility = getWorktreeGroupMenuVisibility(null, [{ id: 'group-1' }], undefined, true)
+    expect(visibility.showWorktreeCreate).toBe(true)
+    expect(visibility.showAddSubmenu).toBe(true)
+    expect(visibility.showProjectCreate).toBe(false)
+    expect(visibility.showWorktreeCreate && visibility.showProjectCreate).toBe(false)
+  })
+
+  it('shows neither create action for a repo-less folder workspace row', () => {
+    // A folder workspace can have no repo at all (repoId is optional), so
+    // useRepoById returns undefined — there is no project to target and no
+    // valid submit path for a project-scoped create action.
+    const visibility = getWorktreeGroupMenuVisibility(
+      'folder-1',
+      [{ id: 'group-1' }],
+      undefined,
+      false
+    )
+    expect(visibility.showWorktreeCreate).toBe(false)
+    expect(visibility.showProjectCreate).toBe(false)
+    expect(visibility.showWorktreeCreate && visibility.showProjectCreate).toBe(false)
+  })
+})
+
+describe('createGroupFromWorktree', () => {
+  const group = { id: 'group-9' } as ProjectGroup
+
+  // Why: updateWorktreeMeta's third arg carries the shouldApply guard — pull it
+  // off the mock so tests can invoke it with representative worktrees instead
+  // of only asserting the call happened.
+  function capturedShouldApply(
+    updateWorktreeMeta: ReturnType<typeof vi.fn>
+  ): ((worktree: Worktree | undefined) => boolean) | undefined {
+    const [, , options] = updateWorktreeMeta.mock.calls[0] as [
+      string,
+      { projectGroupId: string | null },
+      { shouldApply?: (worktree: Worktree | undefined) => boolean } | undefined
+    ]
+    return options?.shouldApply
+  }
+
+  it('creates the group and assigns only that worktree to it', async () => {
+    const createProjectGroup = vi.fn().mockResolvedValue(group)
+    const updateWorktreeMeta = vi.fn().mockResolvedValue(undefined)
+    const worktree = { id: 'wt-1', instanceId: 'inst-1', projectGroupId: null }
+
+    await createGroupFromWorktree(worktree, 'Solo group', createProjectGroup, updateWorktreeMeta)
+
+    expect(createProjectGroup).toHaveBeenCalledWith('Solo group')
+    expect(updateWorktreeMeta).toHaveBeenCalledTimes(1)
+    const [calledId, updates] = updateWorktreeMeta.mock.calls[0]
+    expect(calledId).toBe('wt-1')
+    expect(updates).toEqual({ projectGroupId: 'group-9' })
+  })
+
+  it('does nothing when group creation returns null (create failed)', async () => {
+    const createProjectGroup = vi.fn().mockResolvedValue(null)
+    const updateWorktreeMeta = vi.fn().mockResolvedValue(undefined)
+    const worktree = { id: 'wt-1', instanceId: 'inst-1', projectGroupId: null }
+
+    await createGroupFromWorktree(worktree, 'Solo group', createProjectGroup, updateWorktreeMeta)
+
+    expect(updateWorktreeMeta).not.toHaveBeenCalled()
+  })
+
+  // Why: createProjectGroup crosses an async gap. These pin the shouldApply
+  // guard passed to updateWorktreeMeta so a delete/replace/re-group that
+  // happens while the group is being created can't be clobbered.
+  describe('shouldApply guard (mid-flight race)', () => {
+    it('applies when the worktree is unchanged after the async gap', async () => {
+      const createProjectGroup = vi.fn().mockResolvedValue(group)
+      const updateWorktreeMeta = vi.fn().mockResolvedValue(undefined)
+      const worktree = { id: 'wt-1', instanceId: 'inst-1', projectGroupId: null }
+
+      await createGroupFromWorktree(worktree, 'Solo group', createProjectGroup, updateWorktreeMeta)
+
+      const shouldApply = capturedShouldApply(updateWorktreeMeta)
+      expect(
+        shouldApply?.({ id: 'wt-1', instanceId: 'inst-1', projectGroupId: null } as Worktree)
+      ).toBe(true)
+    })
+
+    it('rejects when the worktree was deleted during the gap', async () => {
+      const createProjectGroup = vi.fn().mockResolvedValue(group)
+      const updateWorktreeMeta = vi.fn().mockResolvedValue(undefined)
+      const worktree = { id: 'wt-1', instanceId: 'inst-1', projectGroupId: null }
+
+      await createGroupFromWorktree(worktree, 'Solo group', createProjectGroup, updateWorktreeMeta)
+
+      const shouldApply = capturedShouldApply(updateWorktreeMeta)
+      expect(shouldApply?.(undefined)).toBe(false)
+    })
+
+    it('rejects when the id now resolves to a different worktree instance (path reuse)', async () => {
+      const createProjectGroup = vi.fn().mockResolvedValue(group)
+      const updateWorktreeMeta = vi.fn().mockResolvedValue(undefined)
+      const worktree = { id: 'wt-1', instanceId: 'inst-1', projectGroupId: null }
+
+      await createGroupFromWorktree(worktree, 'Solo group', createProjectGroup, updateWorktreeMeta)
+
+      const shouldApply = capturedShouldApply(updateWorktreeMeta)
+      expect(
+        shouldApply?.({ id: 'wt-1', instanceId: 'inst-2', projectGroupId: null } as Worktree)
+      ).toBe(false)
+    })
+
+    it('rejects when group membership changed during the gap', async () => {
+      const createProjectGroup = vi.fn().mockResolvedValue(group)
+      const updateWorktreeMeta = vi.fn().mockResolvedValue(undefined)
+      const worktree = { id: 'wt-1', instanceId: 'inst-1', projectGroupId: null }
+
+      await createGroupFromWorktree(worktree, 'Solo group', createProjectGroup, updateWorktreeMeta)
+
+      const shouldApply = capturedShouldApply(updateWorktreeMeta)
+      expect(
+        shouldApply?.({
+          id: 'wt-1',
+          instanceId: 'inst-1',
+          projectGroupId: 'group-other'
+        } as Worktree)
+      ).toBe(false)
+    })
+
+    it('still applies moving a worktree that already had a group into the newly created one', async () => {
+      const createProjectGroup = vi.fn().mockResolvedValue(group)
+      const updateWorktreeMeta = vi.fn().mockResolvedValue(undefined)
+      const worktree = { id: 'wt-1', instanceId: 'inst-1', projectGroupId: 'group-old' }
+
+      await createGroupFromWorktree(worktree, 'Solo group', createProjectGroup, updateWorktreeMeta)
+
+      const shouldApply = capturedShouldApply(updateWorktreeMeta)
+      // Membership is unchanged since capture (still group-old) — the guard
+      // must not require projectGroupId to be null to allow this move.
+      expect(
+        shouldApply?.({
+          id: 'wt-1',
+          instanceId: 'inst-1',
+          projectGroupId: 'group-old'
+        } as Worktree)
+      ).toBe(true)
+    })
   })
 })
 

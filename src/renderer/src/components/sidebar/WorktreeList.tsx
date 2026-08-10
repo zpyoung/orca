@@ -85,10 +85,12 @@ import {
   type Row,
   type ProjectGroupingModel,
   type WorktreeGroupBy,
-  ALL_GROUP_KEY,
   PINNED_GROUP_KEY,
   buildRows,
   getProjectGroupHeaderKey,
+  getProjectHeaderRevealTarget,
+  getLooseSectionProjectGroupId,
+  isLooseProjectGroupTopRow,
   getGroupKeysForWorktree,
   getLineageGroupKey,
   getPinnedWorktreeDisplayPolicy,
@@ -154,10 +156,19 @@ import {
 import { isRepoHeaderActionTarget, useRepoHeaderDrag } from './project-header-drag'
 import {
   getLogicalRepoOrderRankById,
-  getSidebarOrderedRepoHeaderIdsByBucket
+  getSidebarOrderedRepoHeaderIdsByBucket,
+  measureProjectHeaderDragRects
 } from './project-header-drop'
 import { useProjectGroupHeaderDrag } from './project-group-header-drag'
-import { getSidebarOrderedProjectGroupHeaderIdsByBucket } from './project-group-header-drop'
+import {
+  getSidebarOrderedProjectGroupHeaderIdsByBucket,
+  measureProjectGroupHeaderDragRects
+} from './project-group-header-drop'
+import {
+  findWorktreeOwnProjectHeaderRect,
+  getWorktreeGroupMembershipDropTarget,
+  type WorktreeGroupMembershipDropTarget
+} from './worktree-group-membership-drop'
 import {
   buildManualOrderUpdatesForGroupDrop,
   buildManualOrderUpdatesForVisibleGroups,
@@ -240,6 +251,7 @@ import { ProjectGroupNameDialog } from './ProjectGroupNameDialog'
 import { ProjectGroupDeleteDialog } from './ProjectGroupDeleteDialog'
 import { selectProjectGroupRemovalTargets } from '@/store/slices/project-group-removal-targets'
 import { isGitRepoKind } from '../../../../shared/repo-kind'
+import { canWorktreeHoldGroupMembership } from '../../../../shared/project-groups'
 import {
   effectiveExternalWorktreeVisibility,
   isLegacyRepoForExternalWorktreeVisibility
@@ -690,6 +702,10 @@ type VirtualizedWorktreeViewportProps = {
   workspaceStatuses: readonly WorkspaceStatusDefinition[]
   projectGrouping?: ProjectGroupingModel
   projectGroups?: readonly ProjectGroup[]
+  // Why: reveal and the keyboard-nav row model must agree with the rendered tree on which
+  // groups exist, or a host filter that hides a group while keeping a cross-host member
+  // visible expands that worktree against a group that is not on screen.
+  visibleProjectGroupsForRows: readonly ProjectGroup[]
   onMoveWorktreeToStatus: (worktreeId: string, status: WorkspaceStatus) => void
   onMoveWorktreesToStatus: (worktreeIds: readonly string[], status: WorkspaceStatus) => void
   onMoveWorktreesToStatusAtIndex: (args: {
@@ -1028,6 +1044,131 @@ function getPointerDropStatusTarget(args: {
   }
 }
 
+// Why: pairs the hit-test result with the dragged worktree's repoId so the
+// render pass can tell "leave" apart from "join" without re-deriving it.
+type WorktreeGroupMembershipDragPreview = {
+  target: WorktreeGroupMembershipDropTarget
+  repoId: string | null
+}
+
+const WORKTREE_GROUP_MEMBERSHIP_DRAG_PREVIEW_NONE: WorktreeGroupMembershipDragPreview = {
+  target: { kind: 'none' },
+  repoId: null
+}
+
+function areWorktreeGroupMembershipDragPreviewsEqual(
+  a: WorktreeGroupMembershipDragPreview,
+  b: WorktreeGroupMembershipDragPreview
+): boolean {
+  if (a.repoId !== b.repoId || a.target.kind !== b.target.kind) {
+    return false
+  }
+  return a.target.kind === 'join' && b.target.kind === 'join'
+    ? a.target.groupId === b.target.groupId
+    : true
+}
+
+// Why: measureProject{,Group}HeaderDragRects report a header's LOGICAL content
+// position, which is what header reordering needs but is scrolled out of view for
+// the header that is currently pinned — so hit-testing a pointer against it never
+// matches the pinned header the user is actually pointing at. Returns the painted
+// position, in the same content space, for the pinned headers only.
+function measureStickySidebarHeaderContentRects(
+  container: HTMLElement,
+  containerRect: DOMRect,
+  idAttribute: string
+): Map<string, { top: number; bottom: number }> {
+  const rectsById = new Map<string, { top: number; bottom: number }>()
+  container
+    .querySelectorAll<HTMLElement>(`[data-worktree-sticky-header-active] [${idAttribute}]`)
+    .forEach((element) => {
+      const id = element.getAttribute(idAttribute)
+      if (!id) {
+        return
+      }
+      const rect = element.getBoundingClientRect()
+      const top = rect.top - containerRect.top + container.scrollTop
+      rectsById.set(id, { top, bottom: top + rect.height })
+    })
+  return rectsById
+}
+
+// Why: the hit-test module speaks for a single worktree; a multi-select drag
+// has no well-defined "current group" to compare against, so it opts out
+// entirely rather than silently reparenting only the primary card.
+function getPointerWorktreeGroupMembershipDragPreview(args: {
+  container: HTMLElement | null
+  clientX: number
+  clientY: number
+  draggedIds: readonly string[]
+  worktreeId: string
+  worktreeMap: ReadonlyMap<string, Worktree>
+  repoMap: Map<string, Repo>
+  projectGrouping?: ProjectGroupingModel
+}): WorktreeGroupMembershipDragPreview {
+  if (!args.container || args.draggedIds.length !== 1) {
+    return WORKTREE_GROUP_MEMBERSHIP_DRAG_PREVIEW_NONE
+  }
+  // Why: header hit-testing below is vertical-only and pointerup is a
+  // window-capture listener, so without a containment check a release far
+  // outside the sidebar still commits a membership change whenever it shares a
+  // header's y. Same guard shape as getPointerDropStatusTarget.
+  const pointerTarget = document.elementFromPoint(args.clientX, args.clientY)
+  if (!(pointerTarget instanceof Element) || !args.container.contains(pointerTarget)) {
+    return WORKTREE_GROUP_MEMBERSHIP_DRAG_PREVIEW_NONE
+  }
+  const draggedWorktree = args.worktreeMap.get(args.worktreeId)
+  if (!draggedWorktree) {
+    return WORKTREE_GROUP_MEMBERSHIP_DRAG_PREVIEW_NONE
+  }
+  const containerRect = args.container.getBoundingClientRect()
+  const pointerY = args.clientY - containerRect.top + args.container.scrollTop
+  const stickyGroupHeaderRects = measureStickySidebarHeaderContentRects(
+    args.container,
+    containerRect,
+    'data-project-group-header-id'
+  )
+  const stickyProjectHeaderRects = measureStickySidebarHeaderContentRects(
+    args.container,
+    containerRect,
+    'data-repo-header-id'
+  )
+  const groupHeaderRects = measureProjectGroupHeaderDragRects(args.container).map((rect) => ({
+    groupId: rect.groupId,
+    ...(stickyGroupHeaderRects.get(rect.groupId) ?? { top: rect.top, bottom: rect.bottom })
+  }))
+  const projectHeaderRects = measureProjectHeaderDragRects(args.container)
+  const ownRepoHeaderRect = findWorktreeOwnProjectHeaderRect({
+    rects: projectHeaderRects,
+    ownProjectHeaderKey: getProjectHeaderRevealTarget(
+      draggedWorktree.repoId,
+      args.repoMap,
+      args.projectGrouping
+    ).key,
+    projectHeaderKeyByRepoId: new Map(
+      projectHeaderRects.map((rect) => [
+        rect.repoId,
+        getProjectHeaderRevealTarget(rect.repoId, args.repoMap, args.projectGrouping).key
+      ])
+    )
+  })
+  const target = getWorktreeGroupMembershipDropTarget({
+    pointerY,
+    groupHeaderRects,
+    draggedWorktree,
+    ownRepoKind: args.repoMap.get(draggedWorktree.repoId)?.kind,
+    ownRepoSectionRect: ownRepoHeaderRect
+      ? (stickyProjectHeaderRects.get(ownRepoHeaderRect.repoId) ?? {
+          top: ownRepoHeaderRect.top,
+          bottom: ownRepoHeaderRect.bottom
+        })
+      : null
+  })
+  // Why: the leave highlight draws on the header actually hit-tested, which for
+  // a merged logical project is the anchor repo rather than the dragged one.
+  return { target, repoId: ownRepoHeaderRect?.repoId ?? null }
+}
+
 function shouldPreferSidebarStatusDropTarget(args: {
   sourceGroupKey: string
   target: WorktreeSidebarStatusDropTarget
@@ -1243,8 +1384,10 @@ export function getWorktreeDragGroups(rows: HostSectionRow[]): WorktreeDragGroup
     if (row.sectionKey === PINNED_GROUP_KEY && naturalWorktreeIds.has(row.worktree.id)) {
       continue
     }
-    if (!current) {
-      current = { key: ALL_GROUP_KEY, ids: [] }
+    // Why: a header's key is not always its items' sectionKey (loose worktrees
+    // carry `<group>::loose`), and every other drag consumer keys off sectionKey.
+    if (!current || current.key !== row.sectionKey) {
+      current = { key: row.sectionKey, ids: [] }
       groups.push({ key: current.key, worktreeIds: current.ids })
     }
     current.ids.push(row.worktree.id)
@@ -1353,6 +1496,7 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
   workspaceStatuses,
   projectGrouping,
   projectGroups = EMPTY_PROJECT_GROUPS,
+  visibleProjectGroupsForRows,
   onMoveWorktreeToStatus,
   onMoveWorktreesToStatus,
   onMoveWorktreesToStatusAtIndex,
@@ -1377,12 +1521,15 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
   const [worktreeDragState, setWorktreeDragState] = useState<WorktreeRowDragState>(
     WORKTREE_ROW_DRAG_INITIAL_STATE
   )
+  const [worktreeGroupMembershipDragPreview, setWorktreeGroupMembershipDragPreview] =
+    useState<WorktreeGroupMembershipDragPreview>(WORKTREE_GROUP_MEMBERSHIP_DRAG_PREVIEW_NONE)
   const [pendingRevealRetryTick, setPendingRevealRetryTick] = useState(0)
   const [documentVisibilityRevision, setDocumentVisibilityRevision] = useState(0)
   const [highlightedRevealRowKey, setHighlightedRevealRowKey] = useState<string | null>(null)
   const setRenamingWorktreeId = useAppStore((s) => s.setRenamingWorktreeId)
   const assignWorktreeParent = useAppStore((s) => s.assignWorktreeParent)
   const updateWorktreeLineage = useAppStore((s) => s.updateWorktreeLineage)
+  const updateWorktreeMeta = useAppStore((s) => s.updateWorktreeMeta)
   const cyclicLineageIds = useMemo(
     () => getCyclicProjectedWorktreeLineageIds(worktreeLineageById, worktreeMap),
     [worktreeLineageById, worktreeMap]
@@ -2149,7 +2296,10 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
                   prCache,
                   workspaceStatuses,
                   settings,
-                  projectGroups,
+                  // Why: must be the same host-filtered set buildRows used, or
+                  // reveal expands a group that was filtered out of the rendered
+                  // tree and the worktree stays collapsed under its repo group.
+                  visibleProjectGroupsForRows,
                   projectGrouping
                 )
           for (const groupKey of groupKeys) {
@@ -2276,6 +2426,7 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
     pinnedDisplayPolicy,
     projectGrouping,
     projectGroups,
+    visibleProjectGroupsForRows,
     pendingRevealRetryTick,
     flashRevealedRow,
     setRenamingWorktreeId,
@@ -2629,6 +2780,11 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
     setSidebarPointerDragDocumentStyles(false)
     setDragOverStatus(null)
     setPinDragOver(false)
+    setWorktreeGroupMembershipDragPreview((prev) =>
+      areWorktreeGroupMembershipDragPreviewsEqual(prev, WORKTREE_GROUP_MEMBERSHIP_DRAG_PREVIEW_NONE)
+        ? prev
+        : WORKTREE_GROUP_MEMBERSHIP_DRAG_PREVIEW_NONE
+    )
     clearWorkspaceKanbanSidebarDropTargetVisual()
     onWorkspaceBoardDragPreviewCancel()
   }, [cancelWorktreePointerAutoscroll, onWorkspaceBoardDragPreviewCancel])
@@ -2817,6 +2973,49 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
     }
 
     const sidebarContainer = scrollRef.current
+    // Why: a group-header hit is unambiguous, so it wins over lineage/status/
+    // reorder targets before any of those are even computed.
+    const membershipPreview = getPointerWorktreeGroupMembershipDragPreview({
+      container: sidebarContainer,
+      clientX: drag.currentX,
+      clientY: drag.currentY,
+      draggedIds: drag.draggedIds,
+      worktreeId: drag.worktreeId,
+      worktreeMap,
+      repoMap,
+      projectGrouping
+    })
+    setWorktreeGroupMembershipDragPreview((prev) =>
+      areWorktreeGroupMembershipDragPreviewsEqual(prev, membershipPreview)
+        ? prev
+        : membershipPreview
+    )
+    if (membershipPreview.target.kind !== 'none') {
+      // Why: both tracked targets survive as within-tolerance sticky commit
+      // fallbacks, and pointer-up resolves the board one FIRST — so a release on
+      // a header shortly after leaving a lane could commit that lane instead of
+      // joining. Dropped here the way the board branch above drops the status one.
+      drag.latestStatusDropTarget = null
+      drag.latestBoardDropTarget = null
+      clearWorkspaceKanbanSidebarDropTargetVisual()
+      setDragOverStatus(null)
+      setPinDragOver(false)
+      setWorktreeDragState((prev) =>
+        prev.dropIndex === null &&
+        prev.dropIndicatorY === null &&
+        prev.pointerY === drag.currentY &&
+        prev.previewOffsetsByWorktreeId.size === 0
+          ? prev
+          : {
+              ...prev,
+              dropIndex: null,
+              dropIndicatorY: null,
+              previewOffsetsByWorktreeId: EMPTY_WORKTREE_DRAG_PREVIEW_OFFSETS,
+              pointerY: drag.currentY
+            }
+      )
+      return
+    }
     const preferredStatusTarget = getEligibleLineageDropTarget(
       sidebarContainer
         ? getPointerDropStatusTarget({
@@ -2971,8 +3170,11 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
     onWorkspaceBoardDragPreviewCommit,
     shouldShowWorkspaceBoardDropIndicator,
     getEligibleLineageDropTarget,
+    projectGrouping,
+    repoMap,
     workspaceBoardOpen,
-    workspaceStatuses
+    workspaceStatuses,
+    worktreeMap
   ])
 
   const scheduleWorktreePointerDragFrame = useCallback(
@@ -3097,8 +3299,22 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
       const canPreviewWorkspaceBoardOnDrag =
         !workspaceBoardOpen &&
         onWorkspaceBoardDragPreviewStart !== NOOP_WORKSPACE_BOARD_DRAG_PREVIEW_CALLBACK
+      // Why: the reorder gate treats a lone row as having nowhere to drag, but
+      // group membership gives it somewhere — leaving its group, or joining one.
+      const draggedWorktreeForGroupMembership = worktreeMap.get(worktreeId)
+      const canDragForGroupMembership =
+        groupBy === 'repo' &&
+        canWorktreeHoldGroupMembership({
+          // Folder-workspace rows never reach here — they are absent from worktreeMap,
+          // so the lookup above misses before this gate matters.
+          folderWorkspaceId: null,
+          repoKind: repoMap.get(draggedWorktreeForGroupMembership?.repoId ?? '')?.kind
+        }) &&
+        (draggedWorktreeForGroupMembership?.projectGroupId != null ||
+          measureProjectGroupHeaderDragRects(container).length > 0)
       if (
         rects.length <= 1 &&
+        !canDragForGroupMembership &&
         !hasWorkspaceKanbanSidebarDropBoard() &&
         !canPreviewWorkspaceBoardOnDrag
       ) {
@@ -3136,11 +3352,14 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
     [
       getReorderDraggedIds,
       getReorderUnitDraggedIds,
+      groupBy,
       groupKeyByRowKey,
+      repoMap,
       onWorkspaceBoardDragPreviewStart,
       selectedWorktreeIds,
       selectedWorktrees,
-      workspaceBoardOpen
+      workspaceBoardOpen,
+      worktreeMap
     ]
   )
 
@@ -3186,6 +3405,32 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
       event.preventDefault()
       event.stopPropagation()
       if (!refreshWorktreeDragSession()) {
+        clearWorktreeDrag()
+        return
+      }
+      // Why: resolved from the release coordinates BEFORE the board target, which
+      // carries a within-tolerance sticky fallback fed by a requestAnimationFrame
+      // the release can outrun. Clearing that fallback on a membership hit only
+      // helps when the frame runs, which is the case that was never broken.
+      // A release inside the board is outside this container, so the hit-test
+      // returns none there and the board path below still wins on its own turf.
+      const membershipTarget = getPointerWorktreeGroupMembershipDragPreview({
+        container: scrollRef.current,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        draggedIds: drag.draggedIds,
+        worktreeId: drag.worktreeId,
+        worktreeMap,
+        repoMap,
+        projectGrouping
+      }).target
+      if (membershipTarget.kind === 'join') {
+        void updateWorktreeMeta(drag.worktreeId, { projectGroupId: membershipTarget.groupId })
+        clearWorktreeDrag()
+        return
+      }
+      if (membershipTarget.kind === 'leave') {
+        void updateWorktreeMeta(drag.worktreeId, { projectGroupId: null })
         clearWorktreeDrag()
         return
       }
@@ -3342,11 +3587,15 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
     onPinWorktrees,
     onReorderWorktrees,
     onWorkspaceBoardDragPreviewCommit,
+    projectGrouping,
     refreshWorktreeDragSession,
+    repoMap,
     scheduleWorktreePointerDragFrame,
     shouldShowWorkspaceBoardDropIndicator,
+    updateWorktreeMeta,
     worktreeDragGroups,
     worktreeDragUnitGroups,
+    worktreeMap,
     workspaceStatuses
   ])
 
@@ -4278,6 +4527,15 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
                       isPinnedHeader &&
                         pinDragOver &&
                         'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
+                      projectGroupIdForHeader !== undefined &&
+                        worktreeGroupMembershipDragPreview.target.kind === 'join' &&
+                        worktreeGroupMembershipDragPreview.target.groupId ===
+                          projectGroupIdForHeader &&
+                        'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
+                      projectIdForHeader !== undefined &&
+                        worktreeGroupMembershipDragPreview.target.kind === 'leave' &&
+                        worktreeGroupMembershipDragPreview.repoId === projectIdForHeader &&
+                        'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
                       row.repo && 'overflow-hidden'
                     )}
                     style={{ paddingLeft: headerPaddingLeft }}
@@ -4746,7 +5004,15 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
               const lineageToggleGroupKey = itemRow.lineageGroupKey
               const experimentalNewWorktreeCardStyle =
                 settings?.experimentalNewWorktreeCardStyle === true
-              const projectGroupId = itemRow.repo?.projectGroupId
+              // Why: the group this row is displayed in, which for a loose
+              // worktree is its own and not its repo's — the repo's group decides
+              // folder-backed indentation for rows that render under the repo.
+              const projectGroupId =
+                getLooseSectionProjectGroupId(itemRow.sectionKey) ?? itemRow.repo?.projectGroupId
+              const inProjectGroupLooseSection = isLooseProjectGroupTopRow(
+                itemRow.sectionKey,
+                nested
+              )
               const isFolderBackedRepoChild =
                 groupBy === 'repo' &&
                 Boolean(projectGroupId && folderBackedProjectGroupIds.has(projectGroupId))
@@ -4875,9 +5141,10 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
                     onCardDragStart={handleWorktreeCardDragStart}
                     onCardDragEnd={clearWorktreeDrag}
                     hideRepoBadge={groupBy === 'repo'}
-                    // Why: pinned worktrees mix repos in one section, so only it needs the leading repo identity chip.
                     hostContextLabel={itemRow.hostContextLabel}
+                    // Why: both sections mix repos, so the row carries its own origin chip.
                     inPinnedSection={isPinnedOverlayRow}
+                    inProjectGroupLooseSection={inProjectGroupLooseSection}
                     renameRowKey={itemRow.rowKey}
                     lineageChildCount={itemRow.lineageChildCount}
                     lineageCollapsed={itemRow.lineageCollapsed}
@@ -5562,6 +5829,17 @@ const WorktreeList = React.memo(function WorktreeList({
   )
   const projectGroups = useAppStore((s) => s.projectGroups ?? EMPTY_PROJECT_GROUPS)
   const folderWorkspaces = useAppStore((s) => s.folderWorkspaces)
+  // Declared here rather than beside the other row inputs below because reveal
+  // needs the host-filtered group set too, and its memo runs earlier.
+  const defaultHostId = getSettingsFocusedExecutionHostId(settings)
+  const visibleHostIdSet = useMemo(
+    () => getVisibleSidebarHostIdSet(visibleWorkspaceHostIds, workspaceHostScope),
+    [visibleWorkspaceHostIds, workspaceHostScope]
+  )
+  const visibleProjectGroupsForRows = useMemo(
+    () => filterProjectGroupsForVisibleHosts(projectGroups, visibleHostIdSet, defaultHostId),
+    [defaultHostId, projectGroups, visibleHostIdSet]
+  )
   const effectiveCollapsedGroups = useMemo(() => {
     if (!agentSendTargetWorktreeId) {
       return collapsedGroups
@@ -5581,7 +5859,7 @@ const WorktreeList = React.memo(function WorktreeList({
         prCache,
         workspaceStatuses,
         settings,
-        projectGroups,
+        visibleProjectGroupsForRows,
         projectGrouping
       )) {
         next.delete(groupKey)
@@ -5601,19 +5879,14 @@ const WorktreeList = React.memo(function WorktreeList({
     collapsedGroups,
     groupBy,
     prCache,
-    projectGroups,
     projectGrouping,
     repoMap,
     settings,
+    visibleProjectGroupsForRows,
     workspaceStatuses,
     worktreeLineageById,
     worktreeMap
   ])
-  const defaultHostId = getSettingsFocusedExecutionHostId(settings)
-  const visibleHostIdSet = useMemo(
-    () => getVisibleSidebarHostIdSet(visibleWorkspaceHostIds, workspaceHostScope),
-    [visibleWorkspaceHostIds, workspaceHostScope]
-  )
   const visibleReposForRows = useMemo(() => {
     if (!visibleHostIdSet) {
       return repos
@@ -5624,10 +5897,6 @@ const WorktreeList = React.memo(function WorktreeList({
       return visibleHostIdSet.has(hostId)
     })
   }, [defaultHostId, repos, visibleHostIdSet])
-  const visibleProjectGroupsForRows = useMemo(
-    () => filterProjectGroupsForVisibleHosts(projectGroups, visibleHostIdSet, defaultHostId),
-    [defaultHostId, projectGroups, visibleHostIdSet]
-  )
   const visibleFolderWorkspacesForRows = useMemo(
     () =>
       filterFolderWorkspacesForVisibleHosts(
@@ -5678,9 +5947,20 @@ const WorktreeList = React.memo(function WorktreeList({
       repos: visibleReposForRows,
       worktreesByRepo,
       visibleWorktrees,
-      filterRepoIds
+      filterRepoIds,
+      // Why: must agree with buildRows' `projectGroupsById`, which is built
+      // from this same host-filtered list — not the full `projectGroups` —
+      // or a cross-host group can "exist" here while buildRows can't find it.
+      projectGroups: visibleProjectGroupsForRows
     })
-  }, [filterRepoIds, groupBy, visibleReposForRows, visibleWorktrees, worktreesByRepo])
+  }, [
+    filterRepoIds,
+    groupBy,
+    visibleProjectGroupsForRows,
+    visibleReposForRows,
+    visibleWorktrees,
+    worktreesByRepo
+  ])
   const allRepoIds = useMemo(() => repos.map((r) => r.id), [repos])
 
   // Why: subscribe on a flat key array (useShallow) so progress ticks don't rebuild the whole row model.
@@ -6816,6 +7096,7 @@ const WorktreeList = React.memo(function WorktreeList({
         workspaceStatuses={workspaceStatuses}
         projectGrouping={projectGrouping}
         projectGroups={projectGroups}
+        visibleProjectGroupsForRows={visibleProjectGroupsForRows}
         onMoveWorktreeToStatus={moveWorktreeToStatus}
         onMoveWorktreesToStatus={moveWorktreesToStatus}
         onMoveWorktreesToStatusAtIndex={moveWorktreesToStatusAtIndex}

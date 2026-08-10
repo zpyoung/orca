@@ -47,10 +47,10 @@ const makeWorktree = (id: string): Worktree => ({
   lastActivityAt: 0
 })
 
-const makeWorktreeRow = (id: string): Extract<Row, { type: 'item' }> => ({
+const makeWorktreeRow = (id: string, sectionKey = 'all'): Extract<Row, { type: 'item' }> => ({
   type: 'item',
-  rowKey: `all:${id}`,
-  sectionKey: 'all',
+  rowKey: `${sectionKey}:${id}`,
+  sectionKey,
   worktree: makeWorktree(id),
   repo,
   depth: 0,
@@ -87,9 +87,9 @@ describe('imported worktree virtual rows', () => {
     expect(
       getWorktreeDragGroups([
         makeHeaderRow('repo:repo-1'),
-        makeWorktreeRow('main'),
+        makeWorktreeRow('main', 'repo:repo-1'),
         makeImportedCardRow(),
-        makeWorktreeRow('feature')
+        makeWorktreeRow('feature', 'repo:repo-1')
       ])
     ).toEqual([{ key: 'repo:repo-1', worktreeIds: ['main', 'feature'] }])
   })

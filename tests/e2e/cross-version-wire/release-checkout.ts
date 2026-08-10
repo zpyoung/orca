@@ -61,7 +61,8 @@ function compareReleaseTags(a: string, b: string): number {
 
 /**
  * The version point the harness pairs current code against. An explicit
- * {@link BASELINE_REF_ENV} wins; otherwise the newest non-prerelease `v*` tag.
+ * {@link BASELINE_REF_ENV} wins; otherwise the newest non-prerelease `v*` tag,
+ * falling back to the newest prerelease when the repo publishes no stable tags.
  *
  * Throws rather than skipping: a cross-version lane that quietly runs nothing is
  * the exact failure this harness exists to prevent.
@@ -80,11 +81,14 @@ export function resolveBaselineReleaseRef(): string {
         `Run it inside a git checkout, or pin a ref with ${BASELINE_REF_ENV}.`
     )
   }
-  const releases = tags.filter((tag) => !tag.includes('-')).sort(compareReleaseTags)
+  const stable = tags.filter((tag) => !tag.includes('-'))
+  // A repo that only ever ships prereleases (forks) has no stable tag to pair against,
+  // and its newest prerelease is the last build its users actually run.
+  const releases = (stable.length > 0 ? stable : tags).sort(compareReleaseTags)
   const latest = releases.at(-1)
   if (!latest) {
     throw new Error(
-      `Cross-version harness found no release tags matching v[0-9]* (saw ${tags.length} tag(s) total). ` +
+      'Cross-version harness found no tags matching v[0-9]*. ' +
         'CI checkouts default to a shallow clone with no tags: use `actions/checkout` with `fetch-depth: 0`, ' +
         `or pin a ref with ${BASELINE_REF_ENV}.`
     )
