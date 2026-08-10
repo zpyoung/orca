@@ -7,6 +7,10 @@ import {
   isToolResultBlock,
   type NativeChatBlock
 } from '../../../../shared/native-chat-types'
+import {
+  categorizeNativeChatTool,
+  type NativeChatToolCategory
+} from '../../../../shared/native-chat-tool-category'
 import { diffFromText, diffFromToolCall, type DiffLine } from './native-chat-diff'
 import {
   countToolCalls,
@@ -15,6 +19,11 @@ import {
   truncateToolDetail
 } from './native-chat-tool-summary'
 import { NativeChatDiffView } from './NativeChatDiffView'
+import {
+  nativeChatToolCategoryClassName,
+  nativeChatToolCategoryDotClassName,
+  nativeChatToolCategoryGlyph
+} from './native-chat-tool-category-glyphs'
 
 /** A single inline tool line — `▸ ToolName  preview` — that expands in place to
  *  show the call's diff/input or the result's body. Tool calls read as flat
@@ -30,9 +39,11 @@ function ToolLine({ block }: { block: NativeChatBlock }): React.JSX.Element | nu
   let body: { output: string; isError?: boolean } | null = null
   let detail: string | null = null
   let inputHasDetail = false
+  let category: NativeChatToolCategory | null = null
 
   if (isToolCallBlock(block)) {
     name = block.name
+    category = categorizeNativeChatTool(block.name)
     const inputDisplay = createToolInputDisplay(block.input)
     preview = inputDisplay.label
     inputHasDetail = inputDisplay.hasDetail
@@ -48,6 +59,7 @@ function ToolLine({ block }: { block: NativeChatBlock }): React.JSX.Element | nu
   }
 
   const hasDetail = diff !== null || body !== null || inputHasDetail
+  const Glyph = category ? nativeChatToolCategoryGlyph(category) : null
 
   return (
     <div>
@@ -59,7 +71,21 @@ function ToolLine({ block }: { block: NativeChatBlock }): React.JSX.Element | nu
           hasDetail ? 'cursor-pointer' : 'cursor-default'
         )}
       >
-        <code className="shrink-0 font-mono text-xs font-semibold text-foreground/90 transition-colors group-hover:text-foreground">
+        {category && Glyph ? (
+          <Glyph
+            className={cn('size-3.5 shrink-0', nativeChatToolCategoryClassName(category))}
+            aria-hidden="true"
+            data-tool-category-glyph={category}
+          />
+        ) : null}
+        <code
+          className={cn(
+            'shrink-0 font-mono text-xs font-semibold transition-colors',
+            category
+              ? nativeChatToolCategoryClassName(category)
+              : 'text-foreground/90 group-hover:text-foreground'
+          )}
+        >
           {name}
         </code>
         {preview ? (
@@ -105,6 +131,17 @@ function ToolLine({ block }: { block: NativeChatBlock }): React.JSX.Element | nu
   )
 }
 
+// first-seen order, deduped — drives the collapsed run head's category dots
+function distinctToolCategories(blocks: NativeChatBlock[]): NativeChatToolCategory[] {
+  const seen = new Set<NativeChatToolCategory>()
+  for (const block of blocks) {
+    if (!isToolCallBlock(block)) continue
+    const category = categorizeNativeChatTool(block.name)
+    if (category) seen.add(category)
+  }
+  return Array.from(seen)
+}
+
 /** A run of a message's tool calls/results, collapsed to a one-line summary that
  *  expands to the individual inline tool lines. `expandSignal` lets the global
  *  toolbar toggle drive every run at once while still allowing per-run override. */
@@ -122,6 +159,7 @@ export function NativeChatToolRun({
 
   const callCount = countToolCalls(blocks) || blocks.length
   const summary = summarizeToolRun(blocks)
+  const categories = distinctToolCategories(blocks)
   const fallbackLabel =
     callCount === 1
       ? translate('components.native-chat.tool.countOne', '1 tool call')
@@ -138,6 +176,14 @@ export function NativeChatToolRun({
         onClick={() => setOpen((v) => !v)}
         className="group flex w-full items-center gap-1.5 py-0.5 text-left"
       >
+        {categories.map((cat) => (
+          <span
+            key={cat}
+            aria-hidden="true"
+            data-tool-category-dot={cat}
+            className={cn('size-1.5 shrink-0 rounded-full', nativeChatToolCategoryDotClassName(cat))}
+          />
+        ))}
         <span className="shrink-0 font-mono text-[11px] font-bold text-muted-foreground transition-colors group-hover:text-foreground/80">
           {callCount}×
         </span>
