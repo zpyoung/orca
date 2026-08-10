@@ -2,6 +2,7 @@ import React from 'react'
 import Markdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
+import rehypeHighlight from 'rehype-highlight'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import { cn } from '@/lib/utils'
@@ -186,6 +187,7 @@ type CommentMarkdownProps = React.ComponentPropsWithoutRef<'div'> & {
   onLinkClick?: CommentMarkdownLinkClickHandler
   allowFileUriLinks?: boolean
   expandImages?: boolean
+  highlightCode?: boolean
 }
 
 // Why forwardRef + rest props: Radix's HoverCardTrigger asChild merges a ref
@@ -201,11 +203,20 @@ const CommentMarkdown = React.memo(
       onLinkClick,
       allowFileUriLinks = false,
       expandImages = false,
+      highlightCode = false,
       ...rest
     },
     ref
   ) {
     const components = React.useMemo(() => {
+      // Gate on the flag first: the module-level singletons below are
+      // pre-invoked with zero arguments and can never see highlightCode, so
+      // any falsy-onLinkClick fallback must resolve through a factory call.
+      if (highlightCode) {
+        return variant === 'document'
+          ? createDocumentCommentMarkdownComponents(onLinkClick, true)
+          : createCompactCommentMarkdownComponents(onLinkClick, expandImages)
+      }
       if (!onLinkClick) {
         return variant === 'document'
           ? documentCommentMarkdownComponents
@@ -216,10 +227,14 @@ const CommentMarkdown = React.memo(
       return variant === 'document'
         ? createDocumentCommentMarkdownComponents(onLinkClick)
         : createCompactCommentMarkdownComponents(onLinkClick, expandImages)
-    }, [expandImages, variant, onLinkClick])
+    }, [expandImages, variant, onLinkClick, highlightCode])
     const activeRemarkPlugins = React.useMemo(
       () => (githubRepo ? [...remarkPlugins, remarkGitHubReferences(githubRepo)] : remarkPlugins),
       [githubRepo]
+    )
+    const activeRehypePlugins = React.useMemo(
+      () => (highlightCode ? [...rehypePlugins, rehypeHighlight] : rehypePlugins),
+      [highlightCode]
     )
 
     return (
@@ -231,13 +246,16 @@ const CommentMarkdown = React.memo(
           // direct utility classes on <code>, so these overrides win reliably.
           '[&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:rounded-none',
           'min-w-0 max-w-full [overflow-wrap:anywhere]',
+          // The code renderer applies text-code-accent unconditionally; reset it
+          // inside <pre> so hljs token colors aren't overridden by the accent.
+          highlightCode && 'native-chat-code [&_pre_code]:text-inherit',
           className
         )}
         {...rest}
       >
         <Markdown
           remarkPlugins={activeRemarkPlugins}
-          rehypePlugins={rehypePlugins}
+          rehypePlugins={activeRehypePlugins}
           components={components}
           urlTransform={
             allowFileUriLinks ? commentMarkdownFileUriUrlTransform : commentMarkdownUrlTransform
