@@ -1,0 +1,61 @@
+/* rich-markdown-editor.css's hljs rules are scoped to .rich-markdown-code-block-wrapper,
+   a wrapper chat never renders, so chat needs a parallel scoped set over the same tokens. */
+
+.native-chat-code .hljs-keyword {
+  color: var(--hljs-keyword);
+}
+.native-chat-code .hljs-string {
+  color: var(--hljs-string);
+}
+.native-chat-code .hljs-number {
+  color: var(--hljs-number);
+}
+.native-chat-code .hljs-comment {
+  color: var(--hljs-comment);
+  font-style: italic;
+}
+.native-chat-code .hljs-function {
+  color: var(--hljs-function);
+}
+.native-chat-code .hljs-title {
+  color: var(--hljs-title);
+}
+.native-chat-code .hljs-built_in {
+  color: var(--hljs-built-in);
+}
+.native-chat-code .hljs-type {
+  color: var(--hljs-type);
+}
+.native-chat-code .hljs-attr {
+  color: var(--hljs-attr);
+}
+.native-chat-code .hljs-selector-class {
+  color: var(--hljs-selector-class);
+}
+.native-chat-code .hljs-variable {
+  color: var(--hljs-variable);
+}
+.native-chat-code .hljs-meta {
+  color: var(--hljs-meta);
+}
+.native-chat-code .hljs-tag {
+  color: var(--hljs-tag);
+}
+.native-chat-code .hljs-name {
+  color: var(--hljs-name);
+}
+.native-chat-code .hljs-params {
+  color: var(--hljs-params);
+}
+.native-chat-code .hljs-literal {
+  color: var(--hljs-literal);
+}
+.native-chat-code .hljs-regexp {
+  color: var(--hljs-regexp);
+}
+.native-chat-code .hljs-operator {
+  color: var(--hljs-operator);
+}
+.native-chat-code .hljs-property {
+  color: var(--hljs-property);
+}
