@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   createNativeChatTranscriptRetention,
   encodeNativeChatTranscriptIdentity
@@ -24,23 +24,38 @@ export function useNativeChatRetainedSession(
   const activeIdentityRef = useRef(identity)
   const retentionRef = useRef(createNativeChatTranscriptRetention())
   const sessionMatchesIdentity = activeIdentityRef.current === identity
-  const readPhase = sessionMatchesIdentity ? session.readPhase : 'loading'
+  // The live hook clears its list synchronously when it rebinds, but that is a
+  // queued update: a higher-priority render can observe a matching identity while
+  // the list still holds the previous source. Treat it as ours only once we have
+  // seen it empty under this identity. State, not a ref — a discarded render must
+  // not leave the list marked acknowledged.
+  const [liveListIdentity, setLiveListIdentity] = useState(identity)
+  if (session.messages.length === 0 && liveListIdentity !== identity) {
+    setLiveListIdentity(identity)
+  }
+  const canServeLiveList = sessionMatchesIdentity && liveListIdentity === identity
+  // An unacknowledged list is not settled history, whatever the live hook calls it —
+  // reporting its phase would let retention hand back the previous source's turns.
+  const readPhase = canServeLiveList ? session.readPhase : 'loading'
 
   useEffect(() => {
     activeIdentityRef.current = identity
   }, [identity])
   useEffect(() => {
-    if (sessionMatchesIdentity && args.sessionId !== null && session.readPhase === 'ready') {
+    if (canServeLiveList && args.sessionId !== null && session.readPhase === 'ready') {
       retentionRef.current.capture(identity, session.messages)
     }
-  }, [args.sessionId, identity, session.messages, session.readPhase, sessionMatchesIdentity])
+  }, [args.sessionId, identity, session.messages, session.readPhase, canServeLiveList])
 
-  const messages = retentionRef.current.visible({
+  const retained = retentionRef.current.visible({
     identity,
     messages: session.messages,
     settled: readPhase === 'ready',
     loading: readPhase === 'loading'
   })
+  // A retrying or errored base read still carries live subscribe appends, so falling
+  // through to them beats showing nothing — but only for a list already proven ours.
+  const messages = retained.length > 0 || !canServeLiveList ? retained : session.messages
   if (messages === session.messages && readPhase === session.readPhase) {
     return session
   }
@@ -48,6 +63,11 @@ export function useNativeChatRetainedSession(
     ...session,
     messages,
     readPhase,
-    ...(sessionMatchesIdentity ? {} : { status: 'loading' as const, error: undefined })
+    // Live work is the only status worth carrying across a rebind — it drives Stop
+    // and the typing indicator. Anything else, including the previous source's
+    // error, must not outlive the identity it belongs to.
+    ...(canServeLiveList || (messages.length > 0 && session.status === 'working')
+      ? {}
+      : { status: 'loading' as const, error: undefined })
   }
 }
