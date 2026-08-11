@@ -313,11 +313,10 @@ describe('electron-builder config', () => {
         recursive: true
       })
 
-      prunePackagedNodePty(resourcesDir, 'darwin')
+      prunePackagedNodePty(resourcesDir, 'darwin', 'arm64')
 
       await expect(readdir(prebuildsDir).then((entries) => entries.sort())).resolves.toEqual([
-        'darwin-arm64',
-        'darwin-x64'
+        'darwin-arm64'
       ])
       await expect(
         readdir(join(resourcesDir, 'node_modules', 'node-pty', 'third_party'))
@@ -389,11 +388,10 @@ describe('electron-builder config', () => {
       await mkdir(join(parcelDir, 'watcher-linux-arm64-glibc'), { recursive: true })
       await mkdir(join(parcelDir, 'watcher-win32-x64'), { recursive: true })
 
-      prunePackagedParcelWatcher(resourcesDir, 'linux')
+      prunePackagedParcelWatcher(resourcesDir, 'linux', 'x64')
 
       await expect(readdir(parcelDir).then((entries) => entries.sort())).resolves.toEqual([
         'watcher',
-        'watcher-linux-arm64-glibc',
         'watcher-linux-x64-glibc'
       ])
     } finally {
@@ -411,7 +409,7 @@ describe('electron-builder config', () => {
       // A hypothetical future @parcel/* runtime dep that is NOT a watcher subpackage.
       await mkdir(join(parcelDir, 'transformer-js'), { recursive: true })
 
-      prunePackagedParcelWatcher(resourcesDir, 'linux')
+      prunePackagedParcelWatcher(resourcesDir, 'linux', 'x64')
 
       await expect(readdir(parcelDir).then((entries) => entries.sort())).resolves.toEqual([
         'transformer-js',
@@ -504,7 +502,8 @@ describe('electron-builder config', () => {
 
         await electronBuilderConfig.afterPack({
           appOutDir: join(root, 'linux-unpacked'),
-          electronPlatformName: 'linux'
+          electronPlatformName: 'linux',
+          arch: 1
         })
 
         expect((await stat(launcherPath)).mode & 0o111).not.toBe(0)
