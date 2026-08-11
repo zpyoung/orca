@@ -4375,6 +4375,15 @@ export function registerPtyHandlers(
           { isReattach: true, wslDistro: preAdoptedStablePane.result.wslDistro },
           args.connectionId
         )
+        if (!args.connectionId) {
+          options?.onCodexHomePtySpawned?.({
+            id: result.id,
+            codexHomePath: null,
+            reattached: true,
+            startedAt: codexHomeLaunchStartedAt,
+            startedSequence: codexHomeLaunchStartedSequence
+          })
+        }
         return result
       }
       if (!preAdoptedStablePane) {

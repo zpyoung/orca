@@ -2987,7 +2987,13 @@
             "d62d63b807": "ファイルの作成",
             "25dc1cd653": "ファイルを開く",
             "7cdf8ee0c8": "URLを開く",
-            "b27864279e": "agent を起動"
+            "b27864279e": "agent を起動",
+            "0e5b7a3f16": "開いているタブ、ファイル、URL、agent を検索…",
+            "8f0a1c4d92": "タブに切り替える",
+            "2c38630a01": "ワークスペースは存在しません",
+            "4f0d9a71c2": "タブは存在しません",
+            "d7d496a451": "ブラウザページは存在しません",
+            "7726ce9970": "モバイルエミュレータのタブは存在しません"
           },
           "TabBarQuickCommandsButton": {
             "a2c7a33831": "コマンド",
@@ -3021,6 +3027,7 @@
                 "classifier": {
                   "42e6262ae9": "利用可能な操作はありません。",
                   "097a982ee0": "ファイルをロード中...",
+                  "c41f8d20b7": "開いているタブ、ファイル、URL、agent を検索…",
                   "90eb94dc48": "http:// または https:// URL を入力します。",
                   "5553b283ce": "URL またはファイル パスを入力します。",
                   "queryTooLarge": "検索テキストが大きすぎます。",
@@ -4535,15 +4542,13 @@
         },
         "WorktreeContextMenu": {
           "c39c37676a": "グループを作成し、このプロジェクトをそのグループに移動します。",
-          "3ae4748032": "グループを作成し、このワークツリーをそのグループに移動します。",
           "6664418e98": "新規プロジェクトグループ",
           "e091caab15": "プロジェクトが見つかりませんでした",
           "439fa94d53": "アップデート",
           "579b1a8e61": "親から削除",
           "8d9cd19d09": "親ワークツリーを開く",
-          "308b16a770": "ワークツリーからの新規グループ",
-          "5bf97058a4": "プロジェクトをグループに移動",
-          "a2d9a2b93e": "プロジェクトをグループから削除",
+          "d35dfeae58": "グループから削除",
+          "76865d827f": "グループに移動",
           "503ec0f8e6": "プロジェクトからの新規グループ",
           "3350101edb": "パスのコピー",
           "f4475537d8": "削除",
@@ -4563,6 +4568,10 @@
           "workspaceSection": "ワークスペース",
           "primaryDeleteDisabled": "プライマリワークツリーは削除できません。代わりにプロジェクトを削除してください。",
           "deleteWorktree": "ワークツリーを削除",
+          "3ae4748032": "グループを作成し、このワークツリーをそのグループに移動します。",
+          "308b16a770": "ワークツリーからの新規グループ",
+          "5bf97058a4": "プロジェクトをグループに移動",
+          "a2d9a2b93e": "プロジェクトをグループから削除",
           "addWorktreeToGroup": "ワークツリーをグループに追加",
           "removeWorktreeFromGroup": "ワークツリーをグループから削除"
         },
@@ -9638,7 +9647,7 @@
           "anywhereDescription": "スマートフォンはモバイル回線または任意の Wi‑Fi から接続できます。サインインが必要なのは Relay のみです。",
           "signInRequired": "Relay のみ — LAN にはアカウントは不要です。",
           "relayUnavailable": "このビルドでは Orca Relay を利用できません。LAN をご利用ください。",
-          "signInAgain": "再サインイン",
+          "signInAgain": "Relay に再サインイン",
           "localTitle": "LAN",
           "retrying": "Retrying"
         },
@@ -11181,7 +11190,9 @@
             "openSupportedWorkspace": "Open a workspace before resuming a session.",
             "localSessionSshWorkspaceUnsupported": "このセッションの履歴はこのマシンに保存されているため、SSH ワークスペースでは再開できません。代わりにローカルワークスペースを開いてください。",
             "sessionHostMismatchUnsupported": "このセッションは別のホストに属しています。再開するには同じホスト上のワークスペースを開いてください。",
-            "prepareSessionResumeFailed": "Could not prepare this session for resume."
+            "prepareSessionResumeFailed": "Could not prepare this session for resume.",
+            "sessionDeleted": "セッションを削除しました",
+            "sessionDeleteFailed": "セッションを削除できませんでした"
           },
           "AiVaultPanelControls": {
             "scanningSessions": "Scanning sessions",
@@ -11313,7 +11324,17 @@
             "jumpToWorktree": "ワークツリーにジャンプ",
             "recoverableBadge": "未保存",
             "subagentCountSingular": "1 件のサブエージェント",
-            "subagentCountPlural": "{{value0}} 件のサブエージェント"
+            "subagentCountPlural": "{{value0}} 件のサブエージェント",
+            "delete": "削除",
+            "deleteReasonNonLocalHost": "このデバイス上のセッションのみ削除できます。",
+            "deleteReasonSyntheticPath": "このセッションは Orca では削除できません。",
+            "deleteReasonUnsupportedAgent": "{{value0}} のセッションは Orca では削除できません。",
+            "deleteReasonSessionLive": "このセッションはまだ実行中です — 削除する前に完了を待ってください。"
+          },
+          "AiVaultSessionDeleteDialog": {
+            "title": "このセッションを削除しますか?",
+            "description": "「{{value0}}」を削除します。削除すると、{{value1}} 自体のコマンドラインからも再開できなくなります。",
+            "confirm": "削除"
           },
           "FileExplorerNameFilter": {
             "26fb73c6e3": "ファイルを検索",
@@ -11813,6 +11834,8 @@
           },
           "relayDegradedNotice": "Relay に接続できませんでした — このコードは LAN または Tailscale でのみ動作します。",
           "pairingQrError": "このペアリングコードを QR コードとして表示できませんでした。代わりに Orca Mobile にコピーしてください。",
+          "directAddressDisclosure": "より速いローカル経路も使う",
+          "directAddressHint": "任意。近く（同じ Wi‑Fi または Tailscale）にいるときにスマホが使うアドレスを選びます。通常は Relay より高速です。外出中は引き続き Relay が使われます。",
           "noPairingCode": "No pairing code available",
           "noRelayCode": "No pairing code available",
           "pairThisComputer": "Pair this computer.",
@@ -11966,7 +11989,8 @@
           "repair-unverified": "Windows Firewall access could not be verified",
           "blocked-title": "WindowsがOrcaモバイルをブロックしている可能性があります",
           "blocked-description": "既存のインバウンドブロックルールがペアリング例外を上書きする可能性があります。修復はこのOrcaアプリの競合するTCPルールを削除し、プライベートネットワーク上のポート{{port}}を許可します。",
-          "repair": "ファイアウォールアクセスを修復"
+          "repair": "ファイアウォールアクセスを修復",
+          "relay-note": "ペアリングは Orca Relay 経由で引き続き機能します。許可すると、より高速なローカル接続が追加されるだけです。"
         },
         "MobileRelayMintFailureNotice": {
           "body": "Retry, or use LAN to pair over Tailscale or the same Wi‑Fi.",

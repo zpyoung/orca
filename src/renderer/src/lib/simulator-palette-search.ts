@@ -244,14 +244,7 @@ export function searchSimulatorTabs(
       continue
     }
 
-    let typeAliasHit: { text: string; range: MatchRange } | null = null
-    for (const alias of SIMULATOR_TYPE_SEARCH_ALIASES) {
-      const range = findRange(alias, trimmedQuery)
-      if (range) {
-        typeAliasHit = { text: alias, range }
-        break
-      }
-    }
+    const typeAliasHit = selectPaletteTypeAliasMatch(SIMULATOR_TYPE_SEARCH_ALIASES, trimmedQuery)
     if (typeAliasHit) {
       results.push({
         ...baseResult,

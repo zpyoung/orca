@@ -153,6 +153,11 @@ describe('simulator-palette-search', () => {
     expect(searchSimulatorTabs(entries, 'simulator')).toHaveLength(1)
     expect(searchSimulatorTabs(entries, 'ios')).toHaveLength(1)
     expect(searchSimulatorTabs(entries, 'emulator')).toHaveLength(1)
+    // Why: "emulator" must score as a prefix hit, not mid-string in 'mobile emulator tab'.
+    expect(searchSimulatorTabs(entries, 'emulator')[0]?.typeAliasMatch).toEqual({
+      text: 'emulator',
+      range: { start: 0, end: 8 }
+    })
   })
 
   it('searches worktree and repo metadata', () => {

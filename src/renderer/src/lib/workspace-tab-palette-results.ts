@@ -188,14 +188,7 @@ export function searchWorkspaceTabs(
     }
 
     // Why after display secondaries: path/file matches should beat bare type labels.
-    let typeAliasHit: { text: string; range: MatchRange } | null = null
-    for (const alias of entry.typeSearchAliases ?? []) {
-      const range = findRange(alias, trimmedQuery)
-      if (range) {
-        typeAliasHit = { text: alias, range }
-        break
-      }
-    }
+    const typeAliasHit = selectPaletteTypeAliasMatch(entry.typeSearchAliases ?? [], trimmedQuery)
     if (typeAliasHit) {
       results.push({
         ...baseResult,

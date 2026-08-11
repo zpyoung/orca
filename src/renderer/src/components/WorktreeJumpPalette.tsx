@@ -33,6 +33,10 @@ import {
   PaletteWorktreeStatusDot
 } from './cmd-j/palette-live-status'
 import {
+  resolveTerminalTabAttentionBadge,
+  terminalTabHasUnreadActivity
+} from '@/components/tab-bar/terminal-tab-activity-status'
+import {
   CommandDialog,
   CommandInput,
   CommandList,
@@ -107,6 +111,7 @@ import {
 import {
   buildFocusedGroupTabRecency,
   orderRecentWorkspaceTabs,
+  resolveRecentWorkspaceTabStatus,
   type RecentWorkspaceTabRow
 } from '@/lib/recent-workspace-tab-rows'
 import { subscribeCmdJRowIndexJump } from '@/lib/cmd-j-row-index-jump'
@@ -355,41 +360,6 @@ function PaletteRowShortcutBadge({
   )
 }
 
-type OpenTabPaletteItem = BrowserPaletteItem | SimulatorPaletteItem | WorkspaceTabPaletteItem
-
-// Why: while the palette is open the workspace digit chord addresses recent rows, so it labels them.
-const DIGIT_INDEX_ACTION_ID = 'workspace.selectByIndex' as const
-// Why: this is also the ⌘N ceiling — any deeper and RECENT WORKTREES falls below the first screenful.
-const EMPTY_QUERY_RECENT_TAB_CAP = 6
-// Why: hold total empty-query rows at the pre-existing 10 so the worktree header stays above the fold.
-const EMPTY_QUERY_ROW_BUDGET = 10
-const EMPTY_QUERY_WORKTREE_CAP = 5
-const EMPTY_RECENT_TAB_ORDER: readonly string[] = []
-
-function isCurrentOpenTabItem(item: OpenTabPaletteItem): boolean {
-  return item.type === 'browser-page' ? item.result.isCurrentPage : item.result.isCurrentTab
-}
-
-function PaletteRowShortcutBadge({
-  index,
-  modifierKeys
-}: {
-  index: number | undefined
-  modifierKeys: readonly string[]
-}): React.JSX.Element | null {
-  if (index === undefined || modifierKeys.length === 0) {
-    return null
-  }
-  return (
-    <ShortcutKeyCombo
-      keys={[...modifierKeys, String(index + 1)]}
-      className="inline-flex gap-0.5"
-      keyCapClassName="min-w-4 border-border/60 bg-background/45 px-1 py-px text-[9px] text-muted-foreground/88 shadow-none"
-      separatorClassName="text-[9px] text-muted-foreground/60"
-    />
-  )
-}
-
 function getComposerPrefetchRepoId(
   state: ReturnType<typeof useAppStore.getState>,
   initialRepoId?: string
@@ -588,21 +558,8 @@ function WorktreeJumpPaletteContent({
   const detectedWorktreesByRepo = useAppStore((s) => s.detectedWorktreesByRepo)
   const pendingWorktreeCreations = useAppStore((s) => s.pendingWorktreeCreations)
   const pluginCommands = usePluginCommands()
-  // Why: keep status maps subscribed through the close animation — dropping them while CommandDialog fades out would flash rows empty mid-animation.
-  const [statusInputsLingering, setStatusInputsLingering] = useState(false)
-  useEffect(() => {
-    if (visible) {
-      setStatusInputsLingering(true)
-      return
-    }
-    const timer = window.setTimeout(
-      () => setStatusInputsLingering(false),
-      PALETTE_STATUS_INPUTS_LINGER_MS
-    )
-    return () => window.clearTimeout(timer)
-  }, [visible])
-  const paletteStatusInputsActive = visible || statusInputsLingering
-  // Why: these hot status maps get a new identity on every app-wide write, so gate the subscription on active-or-closing to stop the always-mounted palette re-rendering on unrelated terminals.
+  const paletteStatusInputsActive = visible || lingering
+  // Why: keep hot status maps live through the shell's close-animation linger.
   // Why: ptyIdsByTabId must be included — slept tabs keep a wake-hint sessionId in tab.ptyId, so without it the palette dot would lie green.
   const { ptyIdsByTabId, terminalLayoutsByTabId, tabsByWorktree } = useAppStore(
     useShallow((s) => selectPaletteStatusInputs(s, paletteStatusInputsActive))
@@ -633,7 +590,15 @@ function WorktreeJumpPaletteContent({
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- these deps ARE the refresh policy, not reads: re-snapshot when the palette opens or the tab set moves under it, never on the agent churn the snapshot exists to ignore.
     [paletteStatusInputsActive, tabsByWorktree, unifiedTabsByWorktree]
   )
-  const { agentStatusByPaneKey, runtimePaneTitlesByTabId } = paletteIndexStatus
+  // Why the unread maps ride the same snapshot: recent-section membership is decided once, with the
+  // same open-time reading the frozen row order uses. Subscribing here would re-render the whole
+  // palette on app-wide unread churn to change membership the frozen order can no longer honour.
+  const {
+    agentStatusByPaneKey,
+    runtimePaneTitlesByTabId,
+    unreadTerminalTabs,
+    unreadAgentCompletionPanes
+  } = paletteIndexStatus
   const openFiles = useAppStore((s) => s.openFiles)
   const activeGroupIdByWorktree = useAppStore((s) => s.activeGroupIdByWorktree)
   const groupsByWorktree = useAppStore((s) => s.groupsByWorktree)
@@ -949,6 +914,9 @@ function WorktreeJumpPaletteContent({
   )
 
   const browserPageEntries = useMemo<SearchableBrowserPage[]>(() => {
+    if (!paletteStatusInputsActive) {
+      return EMPTY_BROWSER_PAGE_ENTRIES
+    }
     return buildSearchableBrowserPages({
       worktrees: browserSortedWorktrees,
       repoMap,
@@ -1190,51 +1158,109 @@ function WorktreeJumpPaletteContent({
     ]
   )
 
-  // Why: the recent section excludes the current tab (the top slot is never "where you are") and
-  // archived worktrees, both of which the typed-query index still surfaces.
-  const recentTabRows = useMemo<RecentWorkspaceTabRow[]>(() => {
-    const rows: RecentWorkspaceTabRow[] = []
+  // Why unfiltered: a row already frozen into the recent order must keep resolving its badge even
+  // once inclusion would drop it (a current tab that quiets down), or the pip blanks mid-open.
+  const openTabRecentRows = useMemo<OpenTabRecentRow[]>(() => {
+    const entries: OpenTabRecentRow[] = []
     for (const item of openTabItems) {
       const worktree = worktreeMap.get(item.result.worktreeId)
-      if (!worktree || worktree.isArchived || isCurrentOpenTabItem(item)) {
+      if (!worktree) {
         continue
       }
-      rows.push({
-        id: item.id,
-        worktreeId: worktree.id,
-        unifiedTabId: item.type === 'browser-page' ? null : item.result.tabId,
-        terminalTab:
-          item.type === 'workspace-tab' && item.result.contentType === 'terminal'
-            ? (terminalTabsById.get(item.result.entityId) ?? null)
-            : null,
-        worktreeLastActivityAt: worktree.lastActivityAt
+      entries.push({
+        item,
+        worktree,
+        row: {
+          id: item.id,
+          worktreeId: worktree.id,
+          unifiedTabId: item.type === 'browser-page' ? null : item.result.tabId,
+          terminalTab:
+            item.type === 'workspace-tab' && item.result.contentType === 'terminal'
+              ? (terminalTabsById.get(item.result.entityId) ?? null)
+              : null,
+          worktreeLastActivityAt: worktree.lastActivityAt
+        }
       })
     }
-    return rows
+    return entries
   }, [openTabItems, terminalTabsById, worktreeMap])
 
   const recentTabRowById = useMemo(
-    () => new Map(recentTabRows.map((row) => [row.id, row])),
-    [recentTabRows]
+    () => new Map(openTabRecentRows.map(({ row }) => [row.id, row])),
+    [openTabRecentRows]
   )
+
+  // Why: empty-query recent skips idle current tabs ("you're already there") and archived
+  // worktrees; high-signal current agents still surface so working / ask-question / unread
+  // badges stay visible. Typed-query still indexes every open tab.
+  const recentTabRows = useMemo<RecentWorkspaceTabRow[]>(() => {
+    const now = Date.now()
+    const rows: RecentWorkspaceTabRow[] = []
+    for (const { item, worktree, row } of openTabRecentRows) {
+      if (
+        shouldIncludeOpenTabInRecentSection({
+          item,
+          worktree,
+          row,
+          paneSources: recentTabPaneSources,
+          unreadTerminalTabs,
+          unreadAgentCompletionPanes,
+          now
+        })
+      ) {
+        rows.push(row)
+      }
+    }
+    return rows
+  }, [openTabRecentRows, recentTabPaneSources, unreadAgentCompletionPanes, unreadTerminalTabs])
 
   // Why: ordering is captured once on open. Live re-ranking would move rows under the cursor and
   // send ⌘3 to the wrong row; dots keep updating, positions don't.
   const [recentTabOrder, setRecentTabOrder] = useState<readonly string[]>(EMPTY_RECENT_TAB_ORDER)
   const recentTabOrderCapturedRef = useRef(false)
+  // Why: unified tabs can land before tabsByWorktree entities. A capture then ranks every chat as
+  // IDLE; allow one re-capture when entities arrive, then freeze for good.
+  const recentTabOrderAttentionReadyRef = useRef(false)
+  // Terminal rows without a tabsByWorktree entity can't resolve attention yet (see orderRecent…).
+  // Why current tabs count too: the missing entity is also what decides whether a current tab has a
+  // badge worth listing, so a capture now would freeze it out for the whole open. Archived is the
+  // one exclusion that needs no entity.
+  const recentOrderAttentionIncomplete = useMemo(() => {
+    for (const { item, worktree, row } of openTabRecentRows) {
+      if (
+        item.type !== 'workspace-tab' ||
+        item.result.contentType !== 'terminal' ||
+        row.terminalTab ||
+        worktree.isArchived
+      ) {
+        continue
+      }
+      return true
+    }
+    return false
+  }, [openTabRecentRows])
   // Why layout, not passive: a post-paint capture shows one frame of worktrees-only, which flashes
   // the list, renumbers ⌘1–6 under the user, and lets cmdk latch a worktree as the Enter target.
   useLayoutEffect(() => {
     if (!visible) {
       recentTabOrderCapturedRef.current = false
+      recentTabOrderAttentionReadyRef.current = false
       autoSelectedItemIdRef.current = null
       setRecentTabOrder(EMPTY_RECENT_TAB_ORDER)
       return
     }
     // Why: the query and filter are cleared by the open effect below, which runs after this one —
     // capturing before that lands would freeze the *previous* session's filtered subset for good.
-    if (recentTabOrderCapturedRef.current || hasQuery || query.length > 0 || filterActive) {
+    if (hasQuery || query.length > 0 || filterActive) {
       return
+    }
+    // Fully frozen after an attention-ready capture; provisional freeze while entities still pending
+    // so agent-status churn can't reshuffle under the cursor before the one-shot re-rank.
+    if (recentTabOrderCapturedRef.current) {
+      if (recentTabOrderAttentionReadyRef.current || recentOrderAttentionIncomplete) {
+        return
+      }
+      // Incomplete → complete: fall through and re-capture with real attention ranks.
     }
     const order = orderRecentWorkspaceTabs({
       rows: recentTabRows,
@@ -1246,11 +1272,15 @@ function WorktreeJumpPaletteContent({
     if (order.length === 0) {
       // Why: tabs can arrive after the palette opens (cold start, session restore, a late tab
       // mirror). Latching an empty snapshot would leave Recent dead — and digits inert — until
-      // close+reopen, so stay unlatched; the stable empty ref keeps this a no-op re-render.
+      // close+reopen. Also clear a provisional latch: incomplete→complete fallthrough can hit empty
+      // if open tabs briefly vanish, and keeping captured would freeze an empty Recent forever.
+      recentTabOrderCapturedRef.current = false
+      recentTabOrderAttentionReadyRef.current = false
       setRecentTabOrder(EMPTY_RECENT_TAB_ORDER)
       return
     }
     recentTabOrderCapturedRef.current = true
+    recentTabOrderAttentionReadyRef.current = !recentOrderAttentionIncomplete
     setRecentTabOrder(order)
     // Why: recents render above the worktrees, so a row auto-selected before they arrived is no
     // longer the list head — hand Enter back to the top, matching ⌘1. Untouched selections only:
@@ -1265,6 +1295,7 @@ function WorktreeJumpPaletteContent({
     hasQuery,
     lastVisitedAtByWorktreeId,
     query.length,
+    recentOrderAttentionIncomplete,
     recentTabPaneSources,
     recentTabRows,
     visible
@@ -1580,32 +1611,20 @@ function WorktreeJumpPaletteContent({
         })
       }
     }
-    // Why the create row is excluded: it's present for every non-empty query, so counting it would
-    // make "suppress lone headers" always false and reinstate the noise the rule exists to kill.
-    const populatedSectionCount = [
-      visibleWorktreeItems.length,
-      visibleProjectTargetItems.length,
-      visibleMiddleItems.length,
-      visibleOpenTabItems.length
-    ].filter((count) => count > 0).length
+    // Why always: a lone search section still needs its label (mock single-section Open Tabs);
+    // empty sections stay unlabeled because their push helpers short-circuit on zero rows.
+    const showWorktreeHeader = visibleWorktreeItems.length > 0
+    const showOpenTabsHeader = visibleOpenTabItems.length > 0
+    const showProjectTargetHeader = visibleProjectTargetItems.length > 0
+    const showMiddleHeader = visibleMiddleItems.length > 0
 
-    // Header rule: empty query shows lone headers as signposts; on query, suppress unless both sections are populated (else noise).
-    const showWorktreeHeader = hasQuery
-      ? visibleWorktreeItems.length > 0 && populatedSectionCount > 1
-      : visibleWorktreeItems.length > 0
-    const showOpenTabsHeader = hasQuery
-      ? visibleOpenTabItems.length > 0 && populatedSectionCount > 1
-      : visibleOpenTabItems.length > 0
-    const showProjectTargetHeader =
-      hasQuery && visibleProjectTargetItems.length > 0 && populatedSectionCount > 1
-    const showMiddleHeader = hasQuery && visibleMiddleItems.length > 0 && populatedSectionCount > 1
-
-    const pushOpenTabsHeader = (): void => {
+    // idSuffix: the interleaved layout re-emits a header for the section's remainder, which needs its own key.
+    const pushOpenTabsHeader = (idSuffix = ''): void => {
       if (!showOpenTabsHeader) {
         return
       }
       entries.push({
-        id: '__header_open_tabs__',
+        id: `__header_open_tabs__${idSuffix}`,
         type: 'section-header',
         label: hasQuery
           ? translate('auto.components.WorktreeJumpPalette.50a1d11d5b', 'Open Tabs')
@@ -1616,12 +1635,12 @@ function WorktreeJumpPaletteContent({
       })
     }
 
-    const pushWorktreesHeader = (): void => {
+    const pushWorktreesHeader = (idSuffix = ''): void => {
       if (!showWorktreeHeader) {
         return
       }
       entries.push({
-        id: '__header_worktrees__',
+        id: `__header_worktrees__${idSuffix}`,
         type: 'section-header',
         label: hasQuery
           ? translate('auto.components.WorktreeJumpPalette.worktreesHeader', 'Worktrees')
@@ -1706,24 +1725,42 @@ function WorktreeJumpPaletteContent({
         ? '__hint_worktree_overflow__'
         : '__hint_open_tab_overflow__'
 
-      if (openTabsLeadSections) {
-        pushOpenTabsHeader()
-      } else {
-        pushWorktreesHeader()
+      const pushLeadingHeader = (idSuffix = ''): void => {
+        if (openTabsLeadSections) {
+          pushOpenTabsHeader(idSuffix)
+        } else {
+          pushWorktreesHeader(idSuffix)
+        }
       }
+      const pushTrailingHeader = (idSuffix = ''): void => {
+        if (openTabsLeadSections) {
+          pushWorktreesHeader(idSuffix)
+        } else {
+          pushOpenTabsHeader(idSuffix)
+        }
+      }
+
+      pushLeadingHeader()
       appendPaletteListEntries(entries, multiPrimaryLayout.leadingPreview as PaletteItem[])
-      // Soft more for the leading section (scrollable rest + hard-cap tail).
+      // Soft more for the leading section (rows resuming below + hard-cap tail).
       pushOverflowHint(leadingHintId, multiPrimaryLayout.leadingMoreCount)
-      if (openTabsLeadSections) {
-        pushWorktreesHeader()
-      } else {
-        pushOpenTabsHeader()
-      }
+      pushTrailingHeader()
       // Floor first, then remaining leading rows, then trailing rest — same order
-      // as orderMultiPrimaryPaletteItems / keyboard selection.
+      // as orderMultiPrimaryPaletteItems / keyboard selection. Each remainder
+      // re-emits its own header so no row sits under the other section's label.
       appendPaletteListEntries(entries, multiPrimaryLayout.trailingFloor as PaletteItem[])
-      appendPaletteListEntries(entries, multiPrimaryLayout.leadingRest as PaletteItem[])
-      appendPaletteListEntries(entries, multiPrimaryLayout.trailingRest as PaletteItem[])
+      const hasLeadingRest = multiPrimaryLayout.leadingRest.length > 0
+      if (hasLeadingRest) {
+        pushLeadingHeader(CONTINUED_SECTION_HEADER_ID_SUFFIX)
+        appendPaletteListEntries(entries, multiPrimaryLayout.leadingRest as PaletteItem[])
+      }
+      if (multiPrimaryLayout.trailingRest.length > 0) {
+        // Only re-label when the leading remainder split the trailing section.
+        if (hasLeadingRest) {
+          pushTrailingHeader(CONTINUED_SECTION_HEADER_ID_SUFFIX)
+        }
+        appendPaletteListEntries(entries, multiPrimaryLayout.trailingRest as PaletteItem[])
+      }
       // Trailing rest is already on screen; only hard-cap overflow needs a hint.
       pushOverflowHint(trailingHintId, multiPrimaryLayout.trailingHardOverflowCount)
       pushProjectAndMiddleSections()
@@ -2421,7 +2458,9 @@ function WorktreeJumpPaletteContent({
         'Search chats, terminals, worktrees, settings, and actions'
       )}
       overlayClassName="bg-black/55 backdrop-blur-[2px]"
-      contentClassName="top-[10%] w-[900px] max-w-[96vw] overflow-hidden rounded-xl border border-border/70 bg-background/96 shadow-[0_26px_84px_rgba(0,0,0,0.32)] backdrop-blur-xl"
+      // Why max-h + calc list height: top offset + input + filter chips + footer
+      // must stay on-screen on short windows; a bare 72vh list was clipping the chrome.
+      contentClassName="top-[min(10%,4rem)] w-[900px] max-w-[96vw] max-h-[min(90vh,calc(100vh-1.5rem))] overflow-hidden rounded-xl border border-border/70 bg-background/96 shadow-[0_26px_84px_rgba(0,0,0,0.32)] backdrop-blur-xl"
       commandProps={{
         loop: true,
         value: commandSelectedItemId,
@@ -2453,7 +2492,10 @@ function WorktreeJumpPaletteContent({
         }
       />
       <PaletteFilterChips model={filterModel} filter={filter} onFilterChange={setRawFilter} />
-      <CommandList ref={listRef} className="max-h-[min(600px,72vh)] px-2.5 pb-2.5 pt-2">
+      <CommandList
+        ref={listRef}
+        className="max-h-[min(600px,calc(100vh-14rem))] px-2.5 pb-2.5 pt-2"
+      >
         {isLoading && selectableItems.length === 0 && !showCreateAction ? (
           <PaletteState
             title={translate(
@@ -2760,8 +2802,8 @@ function WorktreeJumpPaletteContent({
                 )
                 const WorkspaceTabIcon =
                   result.contentType === 'terminal' ? SquareTerminal : FileText
-                // Why null on a typed query: the dot belongs to the frozen recent section — the
-                // Open Tabs results a search returns show their content icon instead.
+                // Why null on a typed query: live corner pips belong to the frozen recent section —
+                // Open Tabs search results stay content-icon only (no agent status overlay).
                 const recentRow = hasQuery ? null : (recentTabRowById.get(entry.id) ?? null)
 
                 return (

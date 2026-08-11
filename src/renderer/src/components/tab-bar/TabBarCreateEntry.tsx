@@ -28,6 +28,7 @@ import {
 } from './TabBarCreateEntryRow'
 import { dropFileEntriesCoveredByTabResults } from './open-tab-entry-dedupe'
 import { activateOpenTabSearchResult } from './open-tab-selection-routing'
+import type { OpenTabSearchResult } from './open-tab-search'
 import { useOpenTabSearch } from './use-open-tab-search'
 import type { TuiAgent } from '../../../../shared/types'
 import { translate } from '@/i18n/i18n'
@@ -80,12 +81,15 @@ export default function TabBarCreateEntry({
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [switchError, setSwitchError] = useState<string | null>(null)
-  const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null)
-  const [selectedOptionQuery, setSelectedOptionQuery] = useState(query)
+  // null = follow ranking (deferred tabs can prepend); set on arrow keys only.
+  const [pinnedOptionId, setPinnedOptionId] = useState<string | null>(null)
   const [lastMenuOpen, setLastMenuOpen] = useState(menuOpen)
   const inputRef = useRef<HTMLInputElement>(null)
   const fileList = useRuntimeFileListForWorktree({ enabled: menuOpen, worktreeId })
-  const tabResults = useOpenTabSearch({ enabled: menuOpen, query, worktreeId })
+  const tabSearch = useOpenTabSearch({ enabled: menuOpen, query, worktreeId })
+  // Why gate on the query: the search defers, so its rows can still describe an
+  // earlier query — Enter must never submit a tab the current query never matched.
+  const tabResults = tabSearch.query === query ? tabSearch.results : EMPTY_TAB_RESULTS
   const shouldResolveAbsolutePaths = menuOpen && isTabEntryAbsolutePathLike(query.trim())
   const allowAbsolutePathsSelector = useMemo(
     () =>
@@ -149,14 +153,23 @@ export default function TabBarCreateEntry({
         allowAbsolutePaths,
         localPlatform
       }),
-      tabResults
+      tabResults,
+      worktreePath
     )
     if (matchingMenuOptions.length === 0) {
       return entryOptions
     }
     // Why: a matched create-menu action should win over a generic new-file fallback.
     return entryOptions.filter((option) => option.classification.kind !== 'new-file')
-  }, [allowAbsolutePaths, fileList, localPlatform, matchingMenuOptions.length, query, tabResults])
+  }, [
+    allowAbsolutePaths,
+    fileList,
+    localPlatform,
+    matchingMenuOptions.length,
+    query,
+    tabResults,
+    worktreePath
+  ])
   const matchingAgentOptions = useMemo(
     () => findMatchingTabAgentLaunchOptions(query, agentOptions),
     [agentOptions, query]
@@ -169,7 +182,7 @@ export default function TabBarCreateEntry({
       setPending(false)
       setError(null)
       setSwitchError(null)
-      setSelectedOptionId(null)
+      setPinnedOptionId(null)
     }
   }
 
@@ -193,19 +206,12 @@ export default function TabBarCreateEntry({
       option
     }))
   ]
-  const topOptionId = activeOptions.length > 0 ? getActiveOptionId(activeOptions[0]) : null
-  if (selectedOptionQuery !== query) {
-    setSelectedOptionQuery(query)
-    setSelectedOptionId(topOptionId)
-  } else if (selectedOptionId === null && topOptionId !== null) {
-    // Why pin the top row by id: the tab search defers the query, so tab rows
-    // arrive a render later and would otherwise slide under an index-kept highlight.
-    setSelectedOptionId(topOptionId)
-  }
-  const selectedOptionIndex = selectedOptionId
-    ? activeOptions.findIndex((option) => getActiveOptionId(option) === selectedOptionId)
+  // Why pin by id (not index): deferred tab rows prepend and would steal a
+  // user-moved highlight if we kept a raw index. Null pin follows top rank.
+  const pinnedOptionIndex = pinnedOptionId
+    ? activeOptions.findIndex((option) => getActiveOptionId(option) === pinnedOptionId)
     : -1
-  const activeSelectedIndex = Math.max(selectedOptionIndex, 0)
+  const activeSelectedIndex = Math.max(pinnedOptionIndex, 0)
   const selectedActiveOption = activeOptions[activeSelectedIndex]
   const statusOption = options.find(
     (option) => option.classification.kind === 'empty' || option.classification.kind === 'blocked'
@@ -287,7 +293,7 @@ export default function TabBarCreateEntry({
             const delta = event.key === 'ArrowDown' ? 1 : -1
             const nextIndex =
               (activeSelectedIndex + delta + activeOptions.length) % activeOptions.length
-            setSelectedOptionId(getActiveOptionId(activeOptions[nextIndex]))
+            setPinnedOptionId(getActiveOptionId(activeOptions[nextIndex]))
             return
           }
           // Why: with no result rows the static create/agent items render below;
@@ -336,12 +342,15 @@ export default function TabBarCreateEntry({
         />
       </div>
       {/* Above the list, not instead of it: a stale switch target must not wipe
-          the rows the user can still act on. */}
-      {switchError ? (
-        <div className="mt-1 px-1">
-          <EntryStatusRow message={switchError} />
-        </div>
-      ) : null}
+          the rows the user can still act on. The live region stays mounted so a
+          screen reader announces the failure instead of missing the insertion. */}
+      <div role="status">
+        {switchError ? (
+          <div className="mt-1 px-1">
+            <EntryStatusRow message={switchError} />
+          </div>
+        ) : null}
+      </div>
       {error || activeOptions.length > 0 || hasQuery ? (
         <div
           className="mt-1 space-y-0.5 px-1"

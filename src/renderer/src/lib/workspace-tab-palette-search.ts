@@ -242,13 +242,7 @@ export function buildSearchableWorkspaceTabs({
           titleSearchText: title,
           secondarySearchTexts: [],
           typeSearchAliases: TERMINAL_TYPE_SEARCH_ALIASES,
-          agentMetadata: collectAgentMetadataForTerminal({
-            terminalTabId: tab.entityId,
-            worktreeId: worktree.id,
-            agentStatusByPaneKey,
-            retainedAgentsByPaneKey,
-            sleepingAgentSessionsByPaneKey
-          })
+          agentMetadata: collectAgentMetadataFromIndex(agentIndex, tab.entityId, worktree.id)
         })
         continue
       }

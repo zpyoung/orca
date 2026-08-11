@@ -4710,15 +4710,13 @@
         },
         "WorktreeContextMenu": {
           "c39c37676a": "Create a group and move this project into it.",
-          "3ae4748032": "Create a group and move this worktree into it.",
           "6664418e98": "New Project Group",
           "e091caab15": "The project could not be found",
           "439fa94d53": "Update",
           "579b1a8e61": "Remove from Parent",
           "8d9cd19d09": "Open Parent Worktree",
-          "308b16a770": "New group from worktree",
-          "5bf97058a4": "Move project to group",
-          "a2d9a2b93e": "Remove project from group",
+          "d35dfeae58": "Remove from group",
+          "76865d827f": "Move to group",
           "503ec0f8e6": "New group from project",
           "3350101edb": "Copy Path",
           "f4475537d8": "Delete",
@@ -4741,6 +4739,10 @@
           "sleepWithDescendants": "Sleep with Descendants ({{value0}})",
           "sleepWithDescendantsDescription": "Close active panels in this workspace and every nested descendant to free up memory and CPU.",
           "deleteWithDescendants": "Delete with Descendants…",
+          "3ae4748032": "Create a group and move this worktree into it.",
+          "308b16a770": "New group from worktree",
+          "5bf97058a4": "Move project to group",
+          "a2d9a2b93e": "Remove project from group",
           "addWorktreeToGroup": "Add worktree to group",
           "removeWorktreeFromGroup": "Remove worktree from group"
         },
@@ -9917,7 +9919,7 @@
           "signIn": "Sign in for Relay",
           "signInAgain": "Sign in again for Relay",
           "localTitle": "LAN",
-          "localDescription": "Phone must be on this Wi‑Fi or connected through Tailscale. No sign-in required.",
+          "localDescription": "Phone must be on this Wi‑Fi or connected through Tailscale. No account needed.",
           "retrying": "Retrying"
         },
         "MobilePairingSetupSection": {
@@ -11609,7 +11611,9 @@
             "openSupportedWorkspace": "Open a workspace before resuming a session.",
             "sessionHostMismatchUnsupported": "This session belongs to a different host. Open a workspace on the same host to resume it.",
             "localSessionSshWorkspaceUnsupported": "This session's history is stored on this machine, so it can't resume in an SSH workspace. Open a local workspace instead.",
-            "prepareSessionResumeFailed": "Could not prepare this session for resume."
+            "prepareSessionResumeFailed": "Could not prepare this session for resume.",
+            "sessionDeleted": "Session deleted",
+            "sessionDeleteFailed": "Couldn't delete the session"
           },
           "AiVaultPanelControls": {
             "scanningSessions": "Scanning sessions",
@@ -11741,7 +11745,17 @@
             "jumpToOriginalPane": "Jump to Original Pane",
             "jumpToWorktree": "Jump to Worktree",
             "subagentCountSingular": "1 subagent",
-            "subagentCountPlural": "{{value0}} subagents"
+            "subagentCountPlural": "{{value0}} subagents",
+            "delete": "Delete",
+            "deleteReasonNonLocalHost": "Only sessions on this device can be deleted.",
+            "deleteReasonSyntheticPath": "This session can't be deleted from Orca.",
+            "deleteReasonUnsupportedAgent": "{{value0}} sessions can't be deleted from Orca.",
+            "deleteReasonSessionLive": "This session is still running — wait for it to finish before deleting."
+          },
+          "AiVaultSessionDeleteDialog": {
+            "title": "Delete this session?",
+            "description": "\"{{value0}}\" will be deleted. Once deleted, it will no longer be resumable from {{value1}}'s own command line either.",
+            "confirm": "Delete"
           },
           "FileExplorerNameFilter": {
             "26fb73c6e3": "Find files",
