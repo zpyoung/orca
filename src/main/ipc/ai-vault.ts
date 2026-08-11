@@ -61,6 +61,7 @@ type AiVaultHandlerOptions = AiVaultSessionSources &
   AiVaultResumeHandlerOptions & {
     getActiveRuntimeAiVaultHostInfos?: () => readonly RuntimeAiVaultHostInfo[]
     scanRuntimeAiVaultSessions?: RuntimeAiVaultScanner
+    getSessionLiveness?: Parameters<typeof deleteAiVaultSession>[1]['getSessionLiveness']
   }
 
 let scanCoordinator = new AiVaultScanCoordinator()

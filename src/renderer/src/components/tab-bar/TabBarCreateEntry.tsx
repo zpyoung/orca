@@ -44,6 +44,7 @@ function omniboxPlaceholder(): string {
 
 const EMPTY_AGENT_OPTIONS: readonly TabAgentLaunchOption[] = []
 const EMPTY_MENU_OPTIONS: readonly TabCreateMenuOption[] = []
+const EMPTY_TAB_RESULTS: readonly OpenTabSearchResult[] = []
 
 type TabBarCreateEntryProps = {
   agentOptions?: readonly TabAgentLaunchOption[]
@@ -94,6 +95,11 @@ export default function TabBarCreateEntry({
     [shouldResolveAbsolutePaths, worktreeId]
   )
   const allowAbsolutePaths = useAppStore(allowAbsolutePathsSelector)
+  // Why the worktree path: editor↔file dedupe folds case by the worktree's
+  // filesystem, which a Windows client's own platform does not describe.
+  const worktreePath = useAppStore((state) =>
+    menuOpen ? (state.getKnownWorktreeById(worktreeId)?.path ?? null) : null
+  )
   const localPlatform = getRendererAppPlatform() === 'win32' ? 'windows' : 'posix'
 
   // Why: once ArrowDown moves focus into the static menu list, ArrowUp on the
@@ -205,7 +211,8 @@ export default function TabBarCreateEntry({
     (option) => option.classification.kind === 'empty' || option.classification.kind === 'blocked'
   )
   const statusMessage =
-    statusOption?.classification.kind === 'empty' || statusOption?.classification.kind === 'blocked'
+    statusOption != null &&
+    (statusOption.classification.kind === 'empty' || statusOption.classification.kind === 'blocked')
       ? statusOption.classification.message
       : omniboxPlaceholder()
 
@@ -310,6 +317,7 @@ export default function TabBarCreateEntry({
             // it in this event rather than a later effect after the render commits.
             setQuery(nextQuery)
             onQueryChange?.(nextQuery)
+            setPinnedOptionId(null)
             setError(null)
             setSwitchError(null)
           }}

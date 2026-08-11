@@ -10,6 +10,7 @@ import { useAppStore } from '@/store'
 import type { AppState } from '@/store/types'
 import { emitCmdJRowIndexJump } from '@/lib/cmd-j-row-index-jump'
 import WorktreeJumpPalette from './WorktreeJumpPalette'
+import { makeRepo, makeWorktree } from './worktree-jump-palette-test-fixtures'
 
 vi.mock('react-i18next', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactI18Next>()
@@ -130,43 +131,6 @@ let testRoot: Root
 let testContainer: HTMLDivElement
 let setCommandQuery: ((next: string) => void) | null = null
 let setCommandSelection: ((next: string) => void) | null = null
-
-function makeRepo(): Repo {
-  return {
-    id: 'repo-1',
-    path: '/repos/repo-1',
-    displayName: 'Repo 1',
-    badgeColor: '#000000',
-    addedAt: 0
-  }
-}
-
-function makeWorktree(
-  id: string,
-  displayName: string,
-  overrides: Partial<Worktree> = {}
-): Worktree {
-  return {
-    id,
-    repoId: 'repo-1',
-    path: `/tmp/${id}`,
-    head: 'abc123',
-    branch: 'refs/heads/main',
-    isBare: false,
-    isMainWorktree: false,
-    displayName,
-    comment: '',
-    linkedIssue: null,
-    linkedPR: null,
-    linkedLinearIssue: null,
-    isArchived: false,
-    isUnread: false,
-    isPinned: false,
-    sortOrder: 0,
-    lastActivityAt: 0,
-    ...overrides
-  }
-}
 
 async function flushEffects(): Promise<void> {
   await act(async () => {

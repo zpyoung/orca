@@ -6,7 +6,8 @@ import {
 } from '../../../shared/tab-title-resolution'
 import type { Tab, TabContentType, TabGroup, TerminalTab, Worktree } from '../../../shared/types'
 import {
-  collectAgentMetadataForTerminal,
+  buildAgentMetadataTabIndex,
+  collectAgentMetadataFromIndex,
   type AgentMetadata,
   type WorkspaceTabAgentMetadataState
 } from './workspace-tab-agent-metadata'
@@ -163,6 +164,11 @@ export function buildSearchableWorkspaceTabs({
 }: BuildSearchableWorkspaceTabsOptions): SearchableWorkspaceTab[] {
   const entries: SearchableWorkspaceTab[] = []
   const openFilesById = new Map(openFiles.map((file) => [file.id, file]))
+  const agentIndex = buildAgentMetadataTabIndex({
+    agentStatusByPaneKey,
+    retainedAgentsByPaneKey,
+    sleepingAgentSessionsByPaneKey
+  })
 
   for (const worktree of worktrees) {
     const repoName = repoMap.get(worktree.repoId)?.displayName ?? ''

@@ -82,7 +82,11 @@ export function activateWorkspaceTabPaletteResult(
     return { status: 'failed', reason: initialFailure }
   }
 
-  const activated = activateAndRevealWorktree(result.worktreeId)
+  const executionHostId =
+    result.executionHostId ?? initialState.getKnownWorktreeById(result.worktreeId)?.hostId
+  const activated = executionHostId
+    ? activateAndRevealWorktree(result.worktreeId, { executionHostId })
+    : activateAndRevealWorktree(result.worktreeId)
   if (!activated) {
     return { status: 'failed', reason: 'missing-worktree' }
   }

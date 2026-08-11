@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- Why: stateful registration helper + shared mocked IPC/node-pty harness keep spawn-env assertions in one focused file. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createHash } from 'node:crypto'
 import { userInfo } from 'node:os'
 import { delimiter, join, posix } from 'node:path'
 import { prepareCodexSessionResume } from '../codex/codex-session-resume-preparation'
@@ -179,7 +180,7 @@ vi.mock('../pi/titlebar-extension-service', () => ({
 }))
 
 vi.mock('../pwsh', () => ({
-  isPwshAvailable: isPwshAvailableMock
+  isPwshAvailableAsync: isPwshAvailableMock
 }))
 
 vi.mock('../telemetry/client', () => ({
@@ -760,7 +761,7 @@ describe('registerPtyHandlers', () => {
     terminalHandle: 'term_recovered'
   }
 
-  function registerAgentClaimController(): {
+  function registerAgentClaimController(runtimeOverrides: Record<string, unknown> = {}): {
     spawn: (args: Record<string, unknown>) => Promise<unknown>
     write: (ptyId: string, data: string) => boolean
     resize: (ptyId: string, cols: number, rows: number) => boolean
@@ -782,7 +783,8 @@ describe('registerPtyHandlers', () => {
       }),
       createPreAllocatedTerminalHandle: vi.fn(() => 'term_recovered'),
       registerPreAllocatedHandleForPty: vi.fn(),
-      registerPty: vi.fn()
+      registerPty: vi.fn(),
+      ...runtimeOverrides
     }
     registerPtyHandlers(mainWindow as never, runtime as never)
     if (!controller) {
@@ -925,6 +927,29 @@ describe('registerPtyHandlers', () => {
       clearPtyOwnershipForConnection('ssh-attach')
       clearProviderPtyState(ownedSshPtyId)
     }
+  })
+
+  it('synchronizes subscriber-driven attach to the daemon snapshot sequence', async () => {
+    const daemonPtyId = 'repo-1::/tmp/wt@@sequence-handoff'
+    const providerSequence = { value: 204, generation: 'continued' as const }
+    const localProvider = createAgentClaimProvider({})
+    localProvider.attach.mockResolvedValueOnce({ providerSequence })
+    setLocalPtyProvider(localProvider as never)
+    const getPtyOutputSequence = vi.fn(() => 0)
+    const synchronizePtyOutputSequenceFromProvider = vi.fn()
+    const controller = registerAgentClaimController({
+      getPtyOutputSequence,
+      synchronizePtyOutputSequenceFromProvider
+    })
+
+    await expect(controller.attach(daemonPtyId)).resolves.toBe(true)
+
+    expect(getPtyOutputSequence).toHaveBeenCalledWith(daemonPtyId)
+    expect(synchronizePtyOutputSequenceFromProvider).toHaveBeenCalledWith(
+      daemonPtyId,
+      providerSequence,
+      0
+    )
   })
 
   it('does not dispatch a runtime PTY spawn after its client disconnects', async () => {
@@ -3074,16 +3099,25 @@ describe('registerPtyHandlers', () => {
         new Promise<void>((resolve) => (releaseRecovery = resolve))
       )
       readFileSyncMock.mockReturnValue(TEST_CODEX_AUTH_JSON)
+      const onCodexHomePtySpawned = vi.fn()
       handlers.clear()
-      registerPtyHandlers(mainWindow as never, undefined, () => TEST_CODEX_HOME, (() => ({
-        codexManagedAccounts: [
-          {
-            id: 'account-1',
-            managedHomePath: TEST_CODEX_HOME,
-            managedHomeRuntime: 'host'
-          }
-        ]
-      })) as never)
+      registerPtyHandlers(
+        mainWindow as never,
+        undefined,
+        () => TEST_CODEX_HOME,
+        (() => ({
+          codexManagedAccounts: [
+            {
+              id: 'account-1',
+              managedHomePath: TEST_CODEX_HOME,
+              managedHomeRuntime: 'host'
+            }
+          ]
+        })) as never,
+        undefined,
+        undefined,
+        { onCodexHomePtySpawned }
+      )
 
       const spawnPromise = handlers.get('pty:spawn')!(null, {
         cols: 80,
@@ -3094,10 +3128,17 @@ describe('registerPtyHandlers', () => {
         expect(ensureCodexBackfillRecoveryMock).toHaveBeenCalledWith(TEST_CODEX_HOME)
       )
       expect(spawnMock).not.toHaveBeenCalled()
+      expect(onCodexHomePtySpawned).not.toHaveBeenCalled()
 
       releaseRecovery()
-      await spawnPromise
+      const result = (await spawnPromise) as { id: string }
       expect(spawnMock).toHaveBeenCalledTimes(1)
+      expect(onCodexHomePtySpawned).toHaveBeenCalledWith({
+        id: result.id,
+        codexHomePath: TEST_CODEX_HOME,
+        startedAt: expect.any(Date),
+        startedSequence: expect.any(Number)
+      })
     })
 
     it('does not gate a bare local shell on managed Codex auth', async () => {
@@ -3108,19 +3149,37 @@ describe('registerPtyHandlers', () => {
         return ''
       })
       handlers.clear()
-      registerPtyHandlers(mainWindow as never, undefined, () => TEST_CODEX_HOME, (() => ({
-        codexManagedAccounts: [
-          {
-            id: 'account-1',
-            managedHomePath: TEST_CODEX_HOME,
-            managedHomeRuntime: 'host'
-          }
-        ]
-      })) as never)
+      const onCodexHomePtySpawned = vi.fn()
+      registerPtyHandlers(
+        mainWindow as never,
+        undefined,
+        () => TEST_CODEX_HOME,
+        (() => ({
+          codexManagedAccounts: [
+            {
+              id: 'account-1',
+              managedHomePath: TEST_CODEX_HOME,
+              managedHomeRuntime: 'host'
+            }
+          ]
+        })) as never,
+        undefined,
+        undefined,
+        { onCodexHomePtySpawned }
+      )
 
-      await handlers.get('pty:spawn')!(null, { cols: 80, rows: 24 })
+      const result = (await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24
+      })) as { id: string }
 
       expect(spawnMock).toHaveBeenCalledOnce()
+      expect(onCodexHomePtySpawned).toHaveBeenCalledWith({
+        id: result.id,
+        codexHomePath: TEST_CODEX_HOME,
+        startedAt: expect.any(Date),
+        startedSequence: expect.any(Number)
+      })
     })
 
     it('leaves an inherited CODEX_HOME untouched for system default when the flag is OFF', async () => {
@@ -4184,6 +4243,24 @@ describe('registerPtyHandlers', () => {
             configurable: true,
             value: originalPlatform
           })
+        }
+      })
+
+      it('prepends the bundled CLI dir to PATH for packaged macOS spawns', async () => {
+        const resourcesPathDescriptor = Object.getOwnPropertyDescriptor(process, 'resourcesPath')
+        Object.defineProperty(process, 'resourcesPath', {
+          configurable: true,
+          value: '/tmp/orca-resources'
+        })
+        try {
+          const env = await daemonSpawnAndGetEnv({ PATH: '/usr/bin' })
+          expect(env.PATH.split(delimiter)[0]).toBe(join('/tmp/orca-resources', 'bin'))
+        } finally {
+          if (resourcesPathDescriptor) {
+            Object.defineProperty(process, 'resourcesPath', resourcesPathDescriptor)
+          } else {
+            Reflect.deleteProperty(process, 'resourcesPath')
+          }
         }
       })
 
@@ -8011,6 +8088,114 @@ describe('registerPtyHandlers', () => {
     )
   })
 
+  it.each([
+    {
+      label: 'matching proof',
+      launchToken: 'renderer-launch-token',
+      envLaunchToken: 'renderer-launch-token',
+      hasLaunchConfig: true,
+      launchAgent: 'claude',
+      expectedToken: 'renderer-launch-token'
+    },
+    {
+      label: 'mismatched proof',
+      launchToken: 'renderer-launch-token',
+      envLaunchToken: 'different-process-token',
+      hasLaunchConfig: true,
+      launchAgent: 'claude',
+      expectedToken: null
+    },
+    {
+      label: 'missing top-level proof',
+      launchToken: undefined,
+      envLaunchToken: 'renderer-launch-token',
+      hasLaunchConfig: true,
+      launchAgent: 'claude',
+      expectedToken: null
+    },
+    {
+      label: 'oversized proof',
+      launchToken: 'x'.repeat(129),
+      envLaunchToken: 'x'.repeat(129),
+      hasLaunchConfig: true,
+      launchAgent: 'claude',
+      expectedToken: null
+    },
+    {
+      label: 'untracked launch',
+      launchToken: 'renderer-launch-token',
+      envLaunchToken: 'renderer-launch-token',
+      hasLaunchConfig: false,
+      launchAgent: 'claude',
+      expectedToken: null
+    },
+    {
+      label: 'invalid agent identity',
+      launchToken: 'renderer-launch-token',
+      envLaunchToken: 'renderer-launch-token',
+      hasLaunchConfig: true,
+      launchAgent: 'not-an-agent',
+      expectedToken: null
+    },
+    {
+      label: 'missing agent identity',
+      launchToken: 'renderer-launch-token',
+      envLaunchToken: 'renderer-launch-token',
+      hasLaunchConfig: true,
+      launchAgent: undefined,
+      expectedToken: null
+    }
+  ])('binds only $label from renderer pty:spawn to runtime authority', async (testCase) => {
+    const runtime = new OrcaRuntimeService()
+    registerPtyHandlers(mainWindow as never, runtime)
+    const worktreeId = 'repo-1::/tmp/renderer-authority'
+    const tabId = 'tab-renderer-authority'
+    const leafId = '99999999-9999-4999-8999-999999999999'
+    const paneKey = makePaneKey(tabId, leafId)
+
+    const result = (await handlers.get('pty:spawn')!(mainWindowIpcEvent, {
+      cols: 80,
+      rows: 24,
+      cwd: '/tmp/renderer-authority',
+      command: 'claude',
+      worktreeId,
+      tabId,
+      leafId,
+      env: {
+        ORCA_PANE_KEY: paneKey,
+        ORCA_TAB_ID: tabId,
+        ORCA_WORKTREE_ID: worktreeId,
+        ORCA_AGENT_LAUNCH_TOKEN: testCase.envLaunchToken
+      },
+      ...(testCase.launchToken ? { launchToken: testCase.launchToken } : {}),
+      ...(testCase.hasLaunchConfig
+        ? { launchConfig: { agentCommand: 'claude', agentArgs: '', agentEnv: {} } }
+        : {}),
+      ...(testCase.launchAgent ? { launchAgent: testCase.launchAgent } : {})
+    })) as { id: string; incarnationId: string }
+
+    const handle = runtime.preAllocateHandleForPty(result.id)
+    const authority = runtime.getOrchestrationDispatchAuthority(handle)
+    expect(authority).toMatchObject({ ptyId: result.id, paneKey })
+    expect(authority?.launchTokenHash).toBe(
+      testCase.expectedToken
+        ? createHash('sha256').update(testCase.expectedToken).digest('hex')
+        : null
+    )
+
+    if (testCase.expectedToken) {
+      runtime.registerPty(result.id, worktreeId, null, {
+        tabId,
+        leafId,
+        incarnationId: result.incarnationId,
+        agentLaunchAuthority: { launchToken: 'stale-overwrite', launchAgent: 'claude' }
+      })
+      expect(runtime.getOrchestrationDispatchAuthority(handle)?.launchTokenHash).toBe(
+        createHash('sha256').update(testCase.expectedToken).digest('hex')
+      )
+    }
+  })
+
   it('omits the pane identity from registerPty when the leafId is not a terminal leaf (#7587)', async () => {
     const runtime = {
       setPtyController: vi.fn(),
@@ -8883,6 +9068,7 @@ describe('registerPtyHandlers', () => {
       const prepareClaudeAuth = vi.fn(() => {
         throw new Error('replacement auth preflight must not run')
       })
+      const onCodexHomePtySpawned = vi.fn()
       let controller: RuntimeSpawnController | null = null
       const runtime = {
         setPtyController: vi.fn((value) => {
@@ -8920,7 +9106,8 @@ describe('registerPtyHandlers', () => {
         undefined,
         undefined,
         prepareClaudeAuth,
-        store as never
+        store as never,
+        { onCodexHomePtySpawned }
       )
       const spawnController = controller as unknown as RuntimeSpawnController
       await spawnController.spawn({
@@ -9014,6 +9201,7 @@ describe('registerPtyHandlers', () => {
         rows: 40,
         cwd,
         command: 'codex resume should-not-run',
+        launchAgent: 'codex',
         worktreeId,
         preAllocatedHandle: 'term-live-owner',
         tabId,
@@ -9038,6 +9226,13 @@ describe('registerPtyHandlers', () => {
         id: 'pty-live-owner',
         incarnationId: 'inc-live-owner',
         isReattach: true
+      })
+      expect(onCodexHomePtySpawned).toHaveBeenCalledWith({
+        id: 'pty-live-owner',
+        codexHomePath: null,
+        reattached: true,
+        startedAt: expect.any(Date),
+        startedSequence: expect.any(Number)
       })
       expect(claimedResult).toMatchObject({
         id: 'pty-live-owner',
@@ -16927,6 +17122,33 @@ describe('registerPtyHandlers', () => {
     expect(recordCodexPaneAccountMock.mock.calls).toEqual([
       ['pty-fresh', { selectionKey: 'host', accountId: 'account-a', homeRoute: 'real-home' }]
     ])
+  })
+
+  it('refreshes the WSL hook relay for the distro a reattached pane already owns', async () => {
+    // Why here and not only in the helper's unit test: nothing else catches pty.ts dropping the
+    // reattach call — the manager owns the hooks/platform gating this spy stands in for.
+    const ensureForDistro = vi
+      .spyOn(wslHookRelayManager, 'ensureForDistro')
+      .mockImplementation(() => {})
+    setLocalPtyProvider({
+      spawn: vi.fn(async () => ({ id: 'pty-wsl', isReattach: true, wslDistro: 'Ubuntu-24.04' })),
+      write: vi.fn(),
+      resize: vi.fn(),
+      kill: vi.fn(),
+      shutdown: vi.fn(),
+      onData: vi.fn(() => vi.fn()),
+      onExit: vi.fn(() => vi.fn()),
+      listProcesses: vi.fn(async () => []),
+      getForegroundProcess: vi.fn(async () => null)
+    } as never)
+    registerPtyHandlers(mainWindow as never)
+
+    try {
+      await handlers.get('pty:spawn')!(null, { cols: 80, rows: 24, sessionId: 'pty-wsl' })
+      expect(ensureForDistro).toHaveBeenCalledWith('Ubuntu-24.04')
+    } finally {
+      ensureForDistro.mockRestore()
+    }
   })
 
   posixOnlyIt(

@@ -1,3 +1,4 @@
+import { selectPaletteTypeAliasMatch } from './palette-type-alias-match'
 import { resolveWorktreeDisplayName } from './worktree-default-display-name'
 import type { MatchRange } from './worktree-palette-search'
 import type {

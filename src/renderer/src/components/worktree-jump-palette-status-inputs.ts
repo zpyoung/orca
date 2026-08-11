@@ -7,6 +7,8 @@ export type PaletteStatusInputsState = Pick<
   | 'ptyIdsByTabId'
   | 'terminalLayoutsByTabId'
   | 'tabsByWorktree'
+  | 'unreadTerminalTabs'
+  | 'unreadAgentCompletionPanes'
 >
 
 export type PaletteStatusInputs = Pick<
