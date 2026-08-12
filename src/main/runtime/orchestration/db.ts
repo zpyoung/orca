@@ -2261,6 +2261,28 @@ export class OrchestrationDb {
     return this.getRun(id) as RunRow
   }
 
+  // Internal seam for sibling orchestration-DB extensions (pipeline-run-db.ts): pipeline tables
+  // live on this same connection, which is what makes their single L4 transaction possible.
+  getSyncDatabase(): Database.Database {
+    return this.db
+  }
+
+  // Detached: no pane binding, no unbind side effect. createRun requires a pane key and always
+  // unbinds other runs for it, so it cannot serve driver-created runs. Opens no transaction of
+  // its own — callers compose this under their own BEGIN IMMEDIATE.
+  createDetachedRun(params: { objective: string }): RunRow {
+    const id = generateId('run')
+    this.db
+      .prepare(
+        `INSERT INTO runs (
+           id, objective, coordinator_handle, coordinator_pane_key,
+           consumer_generation, legacy
+         ) VALUES (?, ?, NULL, NULL, 1, 0)`
+      )
+      .run(id, params.objective)
+    return this.getRun(id) as RunRow
+  }
+
   bindRun(params: {
     runId: string
     coordinatorHandle: string
