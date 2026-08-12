@@ -3450,27 +3450,30 @@ export class OrchestrationDb {
     ) as LegacyOperationReceiptRow
   }
 
-  getUnreadMessages(toHandle: string, types?: MessageType[]): MessageRow[] {
+  getUnreadMessages(toHandle: string, types?: MessageType[], runId?: string): MessageRow[] {
+    const runFilter = runId ? ' AND run_id = ?' : ''
     if (types && types.length > 0) {
       const placeholders = types.map(() => '?').join(',')
+      const params = runId ? [toHandle, ...types, runId] : [toHandle, ...types]
       return exposeMessageListTimestamps(
         this.db
           .prepare(
             `SELECT * FROM messages
              WHERE to_handle = ? AND read = 0 AND delivery_contract = 'current_delivery'
-               AND type IN (${placeholders}) ORDER BY sequence`
+               AND type IN (${placeholders})${runFilter} ORDER BY sequence`
           )
-          .all(toHandle, ...types) as MessageRow[]
+          .all(...params) as MessageRow[]
       )
     }
+    const params = runId ? [toHandle, runId] : [toHandle]
     return exposeMessageListTimestamps(
       this.db
         .prepare(
           `SELECT * FROM messages
-           WHERE to_handle = ? AND read = 0 AND delivery_contract = 'current_delivery'
+           WHERE to_handle = ? AND read = 0 AND delivery_contract = 'current_delivery'${runFilter}
            ORDER BY sequence`
         )
-        .all(toHandle) as MessageRow[]
+        .all(...params) as MessageRow[]
     )
   }
 
@@ -6332,8 +6335,8 @@ export class OrchestrationDb {
       .run(dispatchId)
   }
 
-  getActiveDispatchForTerminal(handle: string): DispatchContextRow | undefined {
-    return this.findActiveDispatchForAssignee(handle)
+  getActiveDispatchForTerminal(handle: string, runId?: string): DispatchContextRow | undefined {
+    return this.findActiveDispatchForAssignee(handle, undefined, runId)
   }
 
   /**
@@ -6350,19 +6353,28 @@ export class OrchestrationDb {
     return this.hasAnyDispatchContextsCache
   }
 
-  getActiveDispatchForIdentity(handle: string, paneKey?: string): DispatchContextRow | undefined {
-    return this.findActiveDispatchForAssignee(handle, paneKey)
+  getActiveDispatchForIdentity(
+    handle: string,
+    paneKey?: string,
+    runId?: string
+  ): DispatchContextRow | undefined {
+    return this.findActiveDispatchForAssignee(handle, paneKey, runId)
   }
 
   private findActiveDispatchForAssignee(
     assigneeHandle: string,
-    assigneePaneKey?: string
+    assigneePaneKey?: string,
+    runId?: string
   ): DispatchContextRow | undefined {
+    const byHandleRunFilter = runId ? ' AND run_id = ?' : ''
+    const byHandleParams = runId ? [assigneeHandle, runId] : [assigneeHandle]
     const byHandle = this.db
       .prepare(
-        "SELECT * FROM dispatch_contexts WHERE assignee_handle = ? AND status IN ('pending', 'dispatched') LIMIT 1"
+        `SELECT * FROM dispatch_contexts
+         WHERE assignee_handle = ? AND status IN ('pending', 'dispatched')${byHandleRunFilter}
+         LIMIT 1`
       )
-      .get(assigneeHandle) as DispatchContextRow | undefined
+      .get(...byHandleParams) as DispatchContextRow | undefined
     if (byHandle) {
       return byHandle
     }
@@ -6371,14 +6383,18 @@ export class OrchestrationDb {
       return undefined
     }
 
+    const activesRunFilter = runId ? ' AND run_id = ?' : ''
+    const activesParams = runId
+      ? [paneKeyMatchSuffix(assigneePaneKey), runId]
+      : [paneKeyMatchSuffix(assigneePaneKey)]
     const actives = this.db
       .prepare(
         `SELECT * FROM dispatch_contexts
          WHERE assignee_pane_key IS NOT NULL
            AND status IN ('pending', 'dispatched')
-           AND ${DISPATCH_PANE_KEY_MATCH_SUFFIX_SQL} = ?`
+           AND ${DISPATCH_PANE_KEY_MATCH_SUFFIX_SQL} = ?${activesRunFilter}`
       )
-      .all(paneKeyMatchSuffix(assigneePaneKey)) as DispatchContextRow[]
+      .all(...activesParams) as DispatchContextRow[]
 
     for (const row of actives) {
       if (row.assignee_pane_key && isEquivalentPaneKey(row.assignee_pane_key, assigneePaneKey)) {
@@ -6539,16 +6555,18 @@ export class OrchestrationDb {
   }
 
   // Why: dispatched_at grace skips workers still within their first heartbeat interval; julianday() vs raw-TEXT compare avoids misflagging space-format timestamps as stale (#8452).
-  getStaleDispatches(thresholdIso: string): DispatchContextRow[] {
+  getStaleDispatches(thresholdIso: string, runId?: string): DispatchContextRow[] {
+    const runFilter = runId ? ' AND run_id = ?' : ''
+    const params = runId ? [thresholdIso, thresholdIso, runId] : [thresholdIso, thresholdIso]
     return this.db
       .prepare(
         `SELECT * FROM dispatch_contexts
          WHERE status = 'dispatched'
            AND dispatched_at IS NOT NULL
            AND julianday(dispatched_at) < julianday(?)
-           AND (last_heartbeat_at IS NULL OR julianday(last_heartbeat_at) < julianday(?))`
+           AND (last_heartbeat_at IS NULL OR julianday(last_heartbeat_at) < julianday(?))${runFilter}`
       )
-      .all(thresholdIso, thresholdIso) as DispatchContextRow[]
+      .all(...params) as DispatchContextRow[]
   }
 
   failDispatch(ctxId: string, error: string): DispatchContextRow | undefined {
@@ -6637,27 +6655,25 @@ export class OrchestrationDb {
       | undefined
   }
 
-  listGates(filter?: { taskId?: string; status?: GateStatus }): DecisionGateRow[] {
-    if (filter?.taskId && filter?.status) {
-      return this.db
-        .prepare(
-          'SELECT * FROM decision_gates WHERE task_id = ? AND status = ? ORDER BY created_at'
-        )
-        .all(filter.taskId, filter.status) as DecisionGateRow[]
-    }
+  listGates(filter?: { taskId?: string; status?: GateStatus; runId?: string }): DecisionGateRow[] {
+    const conditions: string[] = []
+    const params: string[] = []
     if (filter?.taskId) {
-      return this.db
-        .prepare('SELECT * FROM decision_gates WHERE task_id = ? ORDER BY created_at')
-        .all(filter.taskId) as DecisionGateRow[]
+      conditions.push('task_id = ?')
+      params.push(filter.taskId)
     }
     if (filter?.status) {
-      return this.db
-        .prepare('SELECT * FROM decision_gates WHERE status = ? ORDER BY created_at')
-        .all(filter.status) as DecisionGateRow[]
+      conditions.push('status = ?')
+      params.push(filter.status)
     }
+    if (filter?.runId) {
+      conditions.push('run_id = ?')
+      params.push(filter.runId)
+    }
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')} ` : ''
     return this.db
-      .prepare('SELECT * FROM decision_gates ORDER BY created_at')
-      .all() as DecisionGateRow[]
+      .prepare(`SELECT * FROM decision_gates ${where}ORDER BY created_at`)
+      .all(...params) as DecisionGateRow[]
   }
 
   getGate(id: string): DecisionGateRow | undefined {

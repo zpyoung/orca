@@ -35,12 +35,7 @@ describe('OrchestrationDb', () => {
   describe('messages', () => {
     it('inserts and retrieves a message', () => {
       const d = createDb()
-      const msg = d.insertMessage({
-        from: 'term_a',
-        to: 'term_b',
-        subject: 'hello',
-        body: 'world'
-      })
+      const msg = d.insertMessage({ from: 'term_a', to: 'term_b', subject: 'hello', body: 'world' })
       expect(msg.id).toMatch(/^msg_/)
       expect(msg.from_handle).toBe('term_a')
       expect(msg.to_handle).toBe('term_b')
@@ -148,12 +143,7 @@ describe('OrchestrationDb', () => {
     it('rejects invalid message type', () => {
       const d = createDb()
       expect(() =>
-        d.insertMessage({
-          from: 'a',
-          to: 'b',
-          subject: 'bad',
-          type: 'invalid' as MessageType
-        })
+        d.insertMessage({ from: 'a', to: 'b', subject: 'bad', type: 'invalid' as MessageType })
       ).toThrow()
     })
 
@@ -189,11 +179,7 @@ describe('OrchestrationDb', () => {
 
     it('persists explicit task display metadata', () => {
       const d = createDb()
-      const task = d.createTask({
-        spec: 'full details',
-        taskTitle: 'Checkout race',
-        displayName: 'Fix checkout race'
-      })
+      const task = d.createTask({ spec: 'full details', taskTitle: 'Checkout race', displayName: 'Fix checkout race' })
 
       expect(task.task_title).toBe('Checkout race')
       expect(task.display_name).toBe('Fix checkout race')
@@ -202,10 +188,7 @@ describe('OrchestrationDb', () => {
 
     it('persists the creating terminal handle for task-created worktrees', () => {
       const d = createDb()
-      const task = d.createTask({
-        spec: 'spawn related workspace',
-        createdByTerminalHandle: 'term_creator'
-      })
+      const task = d.createTask({ spec: 'spawn related workspace', createdByTerminalHandle: 'term_creator' })
 
       expect(task.created_by_terminal_handle).toBe('term_creator')
       expect(d.getTask(task.id)?.created_by_terminal_handle).toBe('term_creator')
@@ -494,11 +477,7 @@ describe('OrchestrationDb', () => {
       const d = createDb()
       const task = d.createTask({ spec: 'needs approval' })
       d.createDispatchContext(task.id, 'term_a')
-      const gate = d.createGate({
-        taskId: task.id,
-        question: 'Proceed?',
-        options: ['yes', 'no']
-      })
+      const gate = d.createGate({ taskId: task.id, question: 'Proceed?', options: ['yes', 'no'] })
 
       expect(gate.id).toMatch(/^gate_/)
       expect(gate.task_id).toBe(task.id)
@@ -555,11 +534,7 @@ describe('OrchestrationDb', () => {
   describe('coordinator runs', () => {
     it('creates and retrieves a coordinator run', () => {
       const d = createDb()
-      const run = d.createCoordinatorRun({
-        spec: 'build feature',
-        coordinatorHandle: 'coord',
-        pollIntervalMs: 1000
-      })
+      const run = d.createCoordinatorRun({ spec: 'build feature', coordinatorHandle: 'coord', pollIntervalMs: 1000 })
 
       expect(run.id).toMatch(/^run_/)
       expect(run.status).toBe('running')
@@ -569,10 +544,7 @@ describe('OrchestrationDb', () => {
 
     it('updates coordinator run status', () => {
       const d = createDb()
-      const run = d.createCoordinatorRun({
-        spec: 'work',
-        coordinatorHandle: 'coord'
-      })
+      const run = d.createCoordinatorRun({ spec: 'work', coordinatorHandle: 'coord' })
 
       const updated = d.updateCoordinatorRun(run.id, 'completed')
       expect(updated?.status).toBe('completed')
@@ -583,10 +555,7 @@ describe('OrchestrationDb', () => {
       const d = createDb()
       expect(d.getActiveCoordinatorRun()).toBeUndefined()
 
-      const run = d.createCoordinatorRun({
-        spec: 'work',
-        coordinatorHandle: 'coord'
-      })
+      const run = d.createCoordinatorRun({ spec: 'work', coordinatorHandle: 'coord' })
 
       expect(d.getActiveCoordinatorRun()?.id).toBe(run.id)
 
@@ -810,6 +779,30 @@ describe('OrchestrationDb', () => {
       expect(replies).toHaveLength(1)
       expect(replies[0].id).toBe(reply.id)
     })
+  })
+
+  it('scopes getUnreadMessages, getStaleDispatches, listGates, and active-dispatch lookups by runId, unchanged when omitted', () => {
+    const d = createDb()
+    const run2 = d.createRun({ objective: 'r2', coordinatorHandle: 'c2', coordinatorPaneKey: 'p2' }).id
+    const ctx1 = d.createDispatchContext(d.createTask({ spec: 'a' }).id, 'h1')
+    const ctx2 = d.createDispatchContext(d.createTask({ spec: 'b', runId: run2 }).id, 'h2')
+    d.insertMessage({ from: 'x', to: 'y', subject: 'm1' })
+    d.insertMessage({ from: 'x', to: 'y', subject: 'm2', runId: run2 })
+    const g1 = d.createGate({ taskId: d.createTask({ spec: 'g1' }).id, question: 'q' })
+    d.createGate({ taskId: d.createTask({ spec: 'g2', runId: run2 }).id, question: 'q' })
+    const iso = (ms: number) => new Date(Date.now() - ms).toISOString()
+    setDispatchTimes(d, ctx1.id, iso(3_600_000), iso(720_000))
+    setDispatchTimes(d, ctx2.id, iso(3_600_000), iso(720_000))
+    const threshold = iso(600_000)
+
+    expect(d.getUnreadMessages('y', undefined, LEGACY_RUN_ID).map((m) => m.subject)).toEqual(['m1'])
+    expect(d.getUnreadMessages('y')).toHaveLength(2)
+    expect(d.getStaleDispatches(threshold, LEGACY_RUN_ID).map((s) => s.id)).toEqual([ctx1.id])
+    expect(d.getStaleDispatches(threshold).map((s) => s.id).sort()).toEqual([ctx1.id, ctx2.id].sort())
+    expect(d.listGates({ runId: LEGACY_RUN_ID }).map((g) => g.id)).toEqual([g1.id])
+    expect(d.listGates()).toHaveLength(2)
+    expect(d.getActiveDispatchForTerminal('h1', run2)).toBeUndefined()
+    expect(d.getActiveDispatchForTerminal('h1')?.id).toBe(ctx1.id)
   })
 
   describe('schema migration from v1 → v2', () => {
