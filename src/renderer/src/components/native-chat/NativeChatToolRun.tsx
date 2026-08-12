@@ -135,9 +135,13 @@ function ToolLine({ block }: { block: NativeChatBlock }): React.JSX.Element | nu
 function distinctToolCategories(blocks: NativeChatBlock[]): NativeChatToolCategory[] {
   const seen = new Set<NativeChatToolCategory>()
   for (const block of blocks) {
-    if (!isToolCallBlock(block)) continue
+    if (!isToolCallBlock(block)) {
+      continue
+    }
     const category = categorizeNativeChatTool(block.name)
-    if (category) seen.add(category)
+    if (category) {
+      seen.add(category)
+    }
   }
   return Array.from(seen)
 }
@@ -181,7 +185,10 @@ export function NativeChatToolRun({
             key={cat}
             aria-hidden="true"
             data-tool-category-dot={cat}
-            className={cn('size-1.5 shrink-0 rounded-full', nativeChatToolCategoryDotClassName(cat))}
+            className={cn(
+              'size-1.5 shrink-0 rounded-full',
+              nativeChatToolCategoryDotClassName(cat)
+            )}
           />
         ))}
         <span className="shrink-0 font-mono text-[11px] font-bold text-muted-foreground transition-colors group-hover:text-foreground/80">

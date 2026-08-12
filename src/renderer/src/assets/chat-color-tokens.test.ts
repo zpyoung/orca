@@ -17,22 +17,25 @@ function getCssBlockBody(selector: string): string {
   return mainCss.slice(bodyStart, bodyEnd)
 }
 
-const CODE_ACCENT_SURFACE_EXPR =
-  'color-mix(in srgb, var(--code-accent) 12%, var(--background))'
+const CODE_ACCENT_SURFACE_EXPR = 'color-mix(in srgb, var(--code-accent) 12%, var(--background))'
 const CHAT_USER_SURFACE_EXPR = 'color-mix(in srgb, var(--tool-read) 13%, var(--background))'
 
-const PALETTE_TOKENS: Array<{ name: string; light: string; dark: string }> = [
+const PALETTE_TOKENS: { name: string; light: string; dark: string }[] = [
   { name: '--tool-read', light: '#2f6a96', dark: '#8ab4d8' },
   { name: '--tool-write', light: '#8a6100', dark: '#e3b341' },
   { name: '--tool-exec', light: '#24707a', dark: '#79bfc4' },
   { name: '--tool-search', light: '#4f4fc4', dark: '#9a9ae6' },
   { name: '--tool-net', light: '#6a4fb0', dark: '#b39ddb' },
   { name: '--code-accent', light: '#a01e6a', dark: '#f191c5' },
-  { name: '--code-accent-surface', light: CODE_ACCENT_SURFACE_EXPR, dark: CODE_ACCENT_SURFACE_EXPR },
+  {
+    name: '--code-accent-surface',
+    light: CODE_ACCENT_SURFACE_EXPR,
+    dark: CODE_ACCENT_SURFACE_EXPR
+  },
   { name: '--chat-user-surface', light: CHAT_USER_SURFACE_EXPR, dark: CHAT_USER_SURFACE_EXPR }
 ]
 
-const HLJS_TOKENS: Array<{ name: string; light: string; dark: string }> = [
+const HLJS_TOKENS: { name: string; light: string; dark: string }[] = [
   { name: '--hljs-keyword', light: '#cf222e', dark: '#ff7b72' },
   { name: '--hljs-string', light: '#0a3069', dark: '#a5d6ff' },
   { name: '--hljs-number', light: '#0550ae', dark: '#79c0ff' },
@@ -57,7 +60,7 @@ const HLJS_TOKENS: Array<{ name: string; light: string; dark: string }> = [
 const ALL_TOKENS = [...PALETTE_TOKENS, ...HLJS_TOKENS]
 
 // hljs-built_in is highlight.js's own class name; the token stays hyphenated like every other token.
-const NATIVE_CHAT_CODE_CLASS_TO_TOKEN: Array<{ className: string; token: string }> = [
+const NATIVE_CHAT_CODE_CLASS_TO_TOKEN: { className: string; token: string }[] = [
   { className: 'hljs-keyword', token: '--hljs-keyword' },
   { className: 'hljs-string', token: '--hljs-string' },
   { className: 'hljs-number', token: '--hljs-number' },
@@ -88,9 +91,7 @@ describe('chat transcript color tokens', () => {
     const themeInline = getCssBlockBody('@theme inline')
 
     for (const token of PALETTE_TOKENS) {
-      expect(themeInline).toContain(
-        `--color-${token.name.slice(2)}: var(${token.name});`
-      )
+      expect(themeInline).toContain(`--color-${token.name.slice(2)}: var(${token.name});`)
     }
   })
 

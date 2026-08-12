@@ -25,7 +25,7 @@ function getRuleBody(block: string, selectorSuffix: string): string {
 }
 
 // [class name as used in the selector, token name after the --hljs- prefix]
-const HLJS_TOKENS: Array<[string, string]> = [
+const HLJS_TOKENS: [string, string][] = [
   ['hljs-keyword', 'keyword'],
   ['hljs-string', 'string'],
   ['hljs-number', 'number'],
@@ -48,13 +48,19 @@ const HLJS_TOKENS: Array<[string, string]> = [
 ]
 
 describe('hljs token color promotion in rich-markdown-editor.css', () => {
-  it.each(HLJS_TOKENS)('%s uses var(--hljs-%s) in both light and dark blocks', (className, token) => {
-    const lightBody = getRuleBody(lightBlock, `.rich-markdown-code-block-wrapper .${className}`)
-    const darkBody = getRuleBody(darkBlock, `.dark .rich-markdown-code-block-wrapper .${className}`)
+  it.each(HLJS_TOKENS)(
+    '%s uses var(--hljs-%s) in both light and dark blocks',
+    (className, token) => {
+      const lightBody = getRuleBody(lightBlock, `.rich-markdown-code-block-wrapper .${className}`)
+      const darkBody = getRuleBody(
+        darkBlock,
+        `.dark .rich-markdown-code-block-wrapper .${className}`
+      )
 
-    expect(lightBody).toContain(`color: var(--hljs-${token});`)
-    expect(darkBody).toContain(`color: var(--hljs-${token});`)
-  })
+      expect(lightBody).toContain(`color: var(--hljs-${token});`)
+      expect(darkBody).toContain(`color: var(--hljs-${token});`)
+    }
+  )
 
   it('keeps the hljs-built_in selector underscore while consuming the hyphenated token', () => {
     const lightBody = getRuleBody(lightBlock, '.rich-markdown-code-block-wrapper .hljs-built_in')

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { categorizeNativeChatTool, type NativeChatToolCategory } from './native-chat-tool-category'
 
 describe('categorizeNativeChatTool', () => {
-  const table: Array<[string, NativeChatToolCategory]> = [
+  const table: [string, NativeChatToolCategory][] = [
     ['Read', 'read'],
     ['NotebookRead', 'read'],
     ['Edit', 'write'],

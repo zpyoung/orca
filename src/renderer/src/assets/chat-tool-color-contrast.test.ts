@@ -33,7 +33,7 @@ function resolveColorMix(fg: RgbaColor, bg: RgbaColor, fgPercent: number): RgbaC
   }
 }
 
-interface ThemeColors {
+type ThemeColors = {
   background: RgbaColor
   muted: RgbaColor
   foreground: RgbaColor
@@ -71,7 +71,7 @@ const THEMES: Record<'light' | 'dark', ThemeColors> = {
   dark: readThemeColors(getCssRuleBody('.dark'))
 }
 
-interface ContrastCase {
+type ContrastCase = {
   token: string
   ground: string
   foreground: RgbaColor
@@ -79,7 +79,7 @@ interface ContrastCase {
   floor: number
 }
 
-const TOOL_TOKENS: Array<{ token: string; key: keyof ThemeColors }> = [
+const TOOL_TOKENS: { token: string; key: keyof ThemeColors }[] = [
   { token: '--tool-read', key: 'toolRead' },
   { token: '--tool-write', key: 'toolWrite' },
   { token: '--tool-exec', key: 'toolExec' },
