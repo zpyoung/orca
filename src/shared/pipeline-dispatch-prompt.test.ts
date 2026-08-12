@@ -55,4 +55,35 @@ describe('assemblePipelineDispatchPrompt (T10)', () => {
     })
     expect(result).toBe('Verify.\n\n## Results of completed dependencies\n\n### Node "fix"\nline one\nline two')
   })
+
+  it('collapses a single trailing newline on the prompt to exactly one blank line (YAML `|` block scalars)', () => {
+    const result = assemblePipelineDispatchPrompt({
+      snapshotPrompt: 'Commit the fix.\n',
+      dependencies: [{ nodeId: 'fix', result: 'fix result' }]
+    })
+    expect(result).toBe('Commit the fix.\n\n## Results of completed dependencies\n\n### Node "fix"\nfix result')
+  })
+
+  it('collapses several trailing newlines on the prompt to exactly one blank line', () => {
+    const result = assemblePipelineDispatchPrompt({
+      snapshotPrompt: 'Commit the fix.\n\n\n',
+      dependencies: [{ nodeId: 'fix', result: 'fix result' }]
+    })
+    expect(result).toBe('Commit the fix.\n\n## Results of completed dependencies\n\n### Node "fix"\nfix result')
+  })
+
+  it('normalizes only the trailing line-break run, preserving trailing spaces on the prompt itself', () => {
+    const result = assemblePipelineDispatchPrompt({
+      snapshotPrompt: 'Run the suite:   \n',
+      dependencies: [{ nodeId: 'fix', result: 'fix result' }]
+    })
+    expect(result).toBe(
+      'Run the suite:   \n\n## Results of completed dependencies\n\n### Node "fix"\nfix result'
+    )
+  })
+
+  it('leaves the snapshot prompt completely unchanged, trailing newlines included, when there are no dependencies', () => {
+    const result = assemblePipelineDispatchPrompt({ snapshotPrompt: 'Commit the fix.\n\n\n', dependencies: [] })
+    expect(result).toBe('Commit the fix.\n\n\n')
+  })
 })

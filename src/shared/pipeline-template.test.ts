@@ -217,6 +217,17 @@ describe('parsePipelineTemplate: T11 rule 6 (per-node structure)', () => {
     expect(error.message).toContain('Duplicate')
   })
 
+  it('reports the duplicate id before a later field error on the same node (T11 rule 6 order)', () => {
+    const error = expectError(
+      base(
+        '  - id: a\n    prompt: hi\n    harness: claude\n  - id: a\n    title: [1]\n    prompt: hi\n    harness: claude\n'
+      )
+    )
+    expect(error.rule).toBe(6)
+    expect(error.field).toBe('id')
+    expect(error.message).toContain('Duplicate')
+  })
+
   it('fails when title is present but not a string', () => {
     const error = expectError(base('  - id: a\n    title: [1]\n    prompt: hi\n    harness: claude\n'))
     expect(error.rule).toBe(6)
@@ -377,6 +388,22 @@ nodes:
     needs: [b]
 `
     expect(expectError(content).rule).toBe(9)
+  })
+
+  it('never throws on a dependency chain thousands of nodes deep (no cycle)', () => {
+    const depth = 6500
+    const items: string[] = []
+    for (let i = 0; i < depth; i++) {
+      const needs = i < depth - 1 ? `[n${i + 1}]` : '[]'
+      items.push(`{id: n${i},prompt: h,needs: ${needs}}`)
+    }
+    const content = `version: 1\ndefaults: {harness: claude}\nnodes: [${items.join(',')}]\n`
+
+    let result: ReturnType<typeof parsePipelineTemplate> | undefined
+    expect(() => {
+      result = parsePipelineTemplate(content, 'deep.yaml')
+    }).not.toThrow()
+    expect(result?.ok === true || (result?.ok === false && typeof result.error.rule === 'number')).toBe(true)
   })
 })
 

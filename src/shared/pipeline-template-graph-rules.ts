@@ -18,38 +18,48 @@ function validateNeedsReferences(root: StructuralRoot): PipelineTemplateError | 
 
 type VisitState = 'visiting' | 'done'
 
+/** Depth-first search over the `needs` edges, as an explicit stack so an arbitrarily long chain cannot overflow the call stack. */
 function findDependencyCycle(root: StructuralRoot): PipelineTemplateError | null {
   const byId = new Map(root.nodes.map((node) => [node.id, node]))
   const state = new Map<string, VisitState>()
 
-  function visit(node: StructuralNode): PipelineTemplateError | null {
-    state.set(node.id, 'visiting')
-    for (const dependencyId of node.needs ?? []) {
+  for (const startNode of root.nodes) {
+    if (state.has(startNode.id)) {
+      continue
+    }
+
+    const stack: { node: StructuralNode; needsIndex: number }[] = [{ node: startNode, needsIndex: 0 }]
+    state.set(startNode.id, 'visiting')
+
+    while (stack.length > 0) {
+      const frame = stack.at(-1)
+      if (!frame) {
+        break
+      }
+      const needs = frame.node.needs ?? []
+      if (frame.needsIndex >= needs.length) {
+        state.set(frame.node.id, 'done')
+        stack.pop()
+        continue
+      }
+
+      const dependencyId = needs[frame.needsIndex]
+      frame.needsIndex += 1
+
       if (state.get(dependencyId) === 'visiting') {
         return {
           rule: 9,
-          nodeId: node.id,
+          nodeId: frame.node.id,
           field: 'needs',
           message: `dependency cycle detected through "${dependencyId}".`
         }
       }
       if (state.get(dependencyId) !== 'done') {
         const dependency = byId.get(dependencyId)
-        const cycle = dependency ? visit(dependency) : null
-        if (cycle) {
-          return cycle
+        if (dependency) {
+          state.set(dependency.id, 'visiting')
+          stack.push({ node: dependency, needsIndex: 0 })
         }
-      }
-    }
-    state.set(node.id, 'done')
-    return null
-  }
-
-  for (const node of root.nodes) {
-    if (!state.has(node.id)) {
-      const cycle = visit(node)
-      if (cycle) {
-        return cycle
       }
     }
   }

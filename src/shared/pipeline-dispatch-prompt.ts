@@ -16,5 +16,6 @@ export function assemblePipelineDispatchPrompt(args: {
     (dependency) => `### Node "${dependency.nodeId}"\n${dependency.result ?? '(no result recorded)'}`
   )
 
-  return `${args.snapshotPrompt}\n\n## Results of completed dependencies\n\n${sections.join('\n\n')}`
+  const trimmedPrompt = args.snapshotPrompt.replace(/(?:\r\n|\r|\n)+$/, '')
+  return `${trimmedPrompt}\n\n## Results of completed dependencies\n\n${sections.join('\n\n')}`
 }

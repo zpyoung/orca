@@ -35,7 +35,7 @@ function isTemplateError(value: StructuralNode | PipelineTemplateError): value i
   return 'rule' in value
 }
 
-function validateNode(node: unknown, index: number): StructuralNode | PipelineTemplateError {
+function validateNode(node: unknown, index: number, seenIds: Set<string>): StructuralNode | PipelineTemplateError {
   if (!isPlainMap(node)) {
     return err(6, `Node at position ${index} must be a map.`, undefined, `nodes[${index}]`)
   }
@@ -49,6 +49,11 @@ function validateNode(node: unknown, index: number): StructuralNode | PipelineTe
       'id'
     )
   }
+
+  if (seenIds.has(idValue)) {
+    return err(6, `Duplicate node id "${idValue}".`, idValue, 'id')
+  }
+  seenIds.add(idValue)
 
   if (node.title !== undefined && typeof node.title !== 'string') {
     return err(6, 'title must be a string.', idValue, 'title')
@@ -124,14 +129,10 @@ export function validatePipelineTemplateStructure(raw: Record<string, unknown>):
   const seenIds = new Set<string>()
   const nodes: StructuralNode[] = []
   for (const [index, rawNode] of raw.nodes.entries()) {
-    const node = validateNode(rawNode, index)
+    const node = validateNode(rawNode, index, seenIds)
     if (isTemplateError(node)) {
       return { ok: false, error: node }
     }
-    if (seenIds.has(node.id)) {
-      return { ok: false, error: err(6, `Duplicate node id "${node.id}".`, node.id, 'id') }
-    }
-    seenIds.add(node.id)
     nodes.push(node)
   }
 
