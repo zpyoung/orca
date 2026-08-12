@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, sym
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { MAX_ORCA_YAML_BYTES } from '../../shared/orca-yaml-file-limit'
 import { BUGFIX_FAST_STARTER_TEMPLATE } from './pipeline-starter-template'
 import {
   ensureStarterTemplate,
@@ -125,6 +126,14 @@ describe('pipeline-template-files', () => {
       mkdirSync(dir, { recursive: true })
       symlinkSync(join(dir, 'does-not-exist.yaml'), join(dir, 'broken.yaml'))
       writeFileSync(join(dir, 'kept.yaml'), 'kept: true\n', 'utf8')
+
+      expect(listPipelineTemplateFiles(dir).map((f) => f.basename)).toEqual(['kept.yaml'])
+    })
+
+    it('skips a file over the shared YAML size bound, keeping files within it', () => {
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(join(dir, 'huge.yaml'), 'a'.repeat(MAX_ORCA_YAML_BYTES + 1), 'utf8')
+      writeFileSync(join(dir, 'kept.yaml'), 'a'.repeat(MAX_ORCA_YAML_BYTES), 'utf8')
 
       expect(listPipelineTemplateFiles(dir).map((f) => f.basename)).toEqual(['kept.yaml'])
     })

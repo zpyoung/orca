@@ -88,12 +88,36 @@ function resolveTemplateByBasename(
   return { ok: true, definition: resolvePipelineDefinition(parsed.template, inputText) }
 }
 
-export function registerPipelineTemplateHandlers(homePath: string): void {
-  ipcMain.handle('pipelines:list-templates', () => listTemplateEntries(homePath))
+// renderer IPC args cross a trust boundary and are erased to `unknown` at runtime by the
+// time they reach here, regardless of the declared parameter type (§3.2 containment contract)
+function isValidResolveTemplateArgs(
+  args: unknown
+): args is { basename: string; inputText: string } {
+  if (typeof args !== 'object' || args === null) {
+    return false
+  }
+  const { basename, inputText } = args as Record<string, unknown>
+  return typeof basename === 'string' && typeof inputText === 'string'
+}
 
-  ipcMain.handle(
-    'pipelines:resolve-template',
-    (_event, args: { basename: string; inputText: string }) =>
-      resolveTemplateByBasename(homePath, args.basename, args.inputText)
+function handleResolveTemplate(homePath: string, args: unknown): PipelineTemplateResolveResult {
+  if (!isValidResolveTemplateArgs(args)) {
+    return { ok: false, error: { kind: 'invalid_basename' } }
+  }
+  return resolveTemplateByBasename(homePath, args.basename, args.inputText)
+}
+
+let registered = false
+
+// openMainWindow() can re-run on macOS 'activate'; ipcMain.handle() throws on re-registration
+export function registerPipelineTemplateHandlers(homePath: string): void {
+  if (registered) {
+    return
+  }
+  registered = true
+
+  ipcMain.handle('pipelines:list-templates', () => listTemplateEntries(homePath))
+  ipcMain.handle('pipelines:resolve-template', (_event, args: unknown) =>
+    handleResolveTemplate(homePath, args)
   )
 }
