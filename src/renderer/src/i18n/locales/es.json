@@ -2987,7 +2987,13 @@
             "d62d63b807": "Crear archivo",
             "25dc1cd653": "Abrir archivo",
             "7cdf8ee0c8": "Abrir URL",
-            "b27864279e": "Iniciar agente"
+            "b27864279e": "Iniciar agente",
+            "0e5b7a3f16": "Buscar pestañas abiertas, archivos, URL y agentes…",
+            "8f0a1c4d92": "Cambiar a la pestaña",
+            "2c38630a01": "El espacio de trabajo ya no existe",
+            "4f0d9a71c2": "La pestaña ya no existe",
+            "d7d496a451": "La página del navegador ya no existe",
+            "7726ce9970": "La pestaña del emulador móvil ya no existe"
           },
           "TabBarQuickCommandsButton": {
             "a2c7a33831": "Comando",
@@ -3021,6 +3027,7 @@
                 "classifier": {
                   "42e6262ae9": "No hay acción disponible.",
                   "097a982ee0": "Cargando archivos...",
+                  "c41f8d20b7": "Buscar pestañas abiertas, archivos, URL y agentes…",
                   "90eb94dc48": "Introduce una URL http:// o https://.",
                   "5553b283ce": "Introduce una URL o ruta de archivo.",
                   "queryTooLarge": "El texto de búsqueda es demasiado grande.",
@@ -4579,7 +4586,13 @@
           "setParentWorkspace": "Establecer worktree padre...",
           "workspaceSection": "Espacio de trabajo",
           "primaryDeleteDisabled": "El worktree principal no se puede eliminar. Quita el proyecto en su lugar.",
-          "deleteWorktree": "Eliminar worktree"
+          "deleteWorktree": "Eliminar worktree",
+          "3ae4748032": "Crea un grupo y mueve este worktree a él.",
+          "308b16a770": "Nuevo grupo del worktree",
+          "5bf97058a4": "Mover proyecto al grupo",
+          "a2d9a2b93e": "Quitar proyecto del grupo",
+          "addWorktreeToGroup": "Agregar worktree al grupo",
+          "removeWorktreeFromGroup": "Quitar worktree del grupo"
         },
         "WorktreeList": {
           "d880ea0744": "Crea un grupo y mueve este proyecto a él.",
@@ -9634,7 +9647,7 @@
           "anywhereDescription": "El teléfono puede estar en datos móviles o cualquier Wi‑Fi. El inicio de sesión solo es necesario para Relay.",
           "signInRequired": "Solo Relay — LAN no necesita una cuenta.",
           "relayUnavailable": "Orca Relay no está disponible en esta compilación. Usa LAN.",
-          "signInAgain": "Iniciar sesión de nuevo",
+          "signInAgain": "Volver a iniciar sesión para Relay",
           "localTitle": "LAN",
           "retrying": "Retrying"
         },
@@ -11177,7 +11190,9 @@
             "openSupportedWorkspace": "Abre un workspace antes de reanudar una sesión.",
             "localSessionSshWorkspaceUnsupported": "El historial de esta sesión solo existe en este equipo. Para reanudarla, abre un workspace local. Los workspaces SSH no tienen acceso a ese historial.",
             "sessionHostMismatchUnsupported": "Esta sesión pertenece a un host diferente. Abre un espacio de trabajo en el mismo host para reanudarla.",
-            "prepareSessionResumeFailed": "Could not prepare this session for resume."
+            "prepareSessionResumeFailed": "Could not prepare this session for resume.",
+            "sessionDeleted": "Sesión eliminada",
+            "sessionDeleteFailed": "No se pudo eliminar la sesión"
           },
           "AiVaultPanelControls": {
             "scanningSessions": "Buscando sesiones",
@@ -11309,7 +11324,17 @@
             "jumpToWorktree": "Saltar al worktree",
             "recoverableBadge": "No guardada",
             "subagentCountSingular": "1 subagente",
-            "subagentCountPlural": "{{value0}} subagentes"
+            "subagentCountPlural": "{{value0}} subagentes",
+            "delete": "Eliminar",
+            "deleteReasonNonLocalHost": "Solo se pueden eliminar las sesiones de este dispositivo.",
+            "deleteReasonSyntheticPath": "Esta sesión no se puede eliminar desde Orca.",
+            "deleteReasonUnsupportedAgent": "Las sesiones de {{value0}} no se pueden eliminar desde Orca.",
+            "deleteReasonSessionLive": "Esta sesión aún se está ejecutando: espera a que termine antes de eliminarla."
+          },
+          "AiVaultSessionDeleteDialog": {
+            "title": "¿Eliminar esta sesión?",
+            "description": "\"{{value0}}\" se eliminará. Una vez eliminada, tampoco podrá reanudarse desde la línea de comandos propia de {{value1}}.",
+            "confirm": "Eliminar"
           },
           "FileExplorerNameFilter": {
             "26fb73c6e3": "Buscar archivos",
@@ -11809,6 +11834,8 @@
           },
           "relayDegradedNotice": "No se pudo contactar con Relay: este código solo funciona en tu LAN o Tailscale.",
           "pairingQrError": "Este código de emparejamiento no se pudo representar como código QR. Cópialo en Orca Mobile.",
+          "directAddressDisclosure": "También usar una ruta local más rápida",
+          "directAddressHint": "Opcional. Elige la dirección Wi‑Fi o Tailscale que el teléfono usará cuando esté cerca — suele ser más rápido que Relay. Relay sigue funcionando cuando estás fuera.",
           "noPairingCode": "No pairing code available",
           "noRelayCode": "No pairing code available",
           "pairThisComputer": "Pair this computer.",
@@ -11962,7 +11989,8 @@
           "repair-unverified": "Windows Firewall access could not be verified",
           "blocked-title": "Windows may be blocking Orca Mobile",
           "blocked-description": "An existing inbound Block rule can override the pairing exception. Repair removes conflicting TCP rules for this Orca app, then allows port {{port}} on Private networks.",
-          "repair": "Repair firewall access"
+          "repair": "Repair firewall access",
+          "relay-note": "El emparejamiento sigue funcionando por Orca Relay: permitirlo solo añade la conexión local más rápida."
         },
         "MobileRelayMintFailureNotice": {
           "body": "Retry, or use LAN to pair over Tailscale or the same Wi‑Fi.",

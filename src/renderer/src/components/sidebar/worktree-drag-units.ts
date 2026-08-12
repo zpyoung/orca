@@ -1,5 +1,5 @@
 import type { WorktreeDragGroup } from './worktree-manual-order'
-import { ALL_GROUP_KEY, PINNED_GROUP_KEY } from './worktree-list-groups'
+import { PINNED_GROUP_KEY } from './worktree-list-groups'
 
 export type WorktreeDragUnitGroup = WorktreeDragGroup & {
   units: { worktreeId: string; worktreeIds: string[] }[]
@@ -47,8 +47,10 @@ export function getWorktreeDragUnitGroups(
     if (row.sectionKey === PINNED_GROUP_KEY && naturalWorktreeIds.has(row.worktree.id)) {
       continue
     }
-    if (!current) {
-      current = { key: ALL_GROUP_KEY, units: [] }
+    // Why: a header's key is not always its items' sectionKey (loose worktrees
+    // carry `<group>::loose`), and every other drag consumer keys off sectionKey.
+    if (!current || current.key !== row.sectionKey) {
+      current = { key: row.sectionKey, units: [] }
       groups.push({
         key: current.key,
         units: current.units,

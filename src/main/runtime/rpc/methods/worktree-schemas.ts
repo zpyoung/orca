@@ -263,7 +263,8 @@ export const WorktreeSet = WorktreeSelector.extend({
   diffComments: z.array(z.unknown()).optional(),
   mobileDiffReview: z.unknown().optional(),
   parentWorktree: OptionalString,
-  noParent: OptionalBoolean
+  noParent: OptionalBoolean,
+  projectGroupId: z.union([z.string(), z.null()]).optional()
 }).superRefine((params, ctx) => {
   assertLinkedWorkItemSourceContextMatch(params, ctx)
   if (params.parentWorktree && params.noParent === true) {

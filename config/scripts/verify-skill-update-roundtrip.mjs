@@ -80,7 +80,7 @@ function historicalRelease(name) {
       return { tag: `v${release.appVersion}`, snapshot }
     }
   }
-  throw new Error(`No historical released snapshot is available for ${name}`)
+  return null
 }
 
 async function materializePackage(name, tag, destination) {
@@ -170,9 +170,25 @@ function execSkills(args) {
   )
 }
 
+const targetHistorical = historicalRelease(targetName)
+const controlHistorical = historicalRelease(controlName)
+
+// Why: the fork's release history only spans its own tags, so a skill whose bytes never changed
+// across them has a single revision and nothing to update from. Seeding the control at its current
+// revision would make it vacuous — it could not detect a targeted update spilling over.
+if (!targetHistorical || !controlHistorical) {
+  const missing = [
+    targetHistorical ? null : targetName,
+    controlHistorical ? null : controlName
+  ].filter(Boolean)
+  console.log(
+    `[skill-update-roundtrip] no prior released revision for ${missing.join(', ')}; skipping update roundtrip`
+  )
+  await rm(sandbox, { recursive: true, force: true })
+  process.exit(0)
+}
+
 try {
-  const targetHistorical = historicalRelease(targetName)
-  const controlHistorical = historicalRelease(controlName)
   await installFakeAgentCommands()
   await mkdir(path.join(home, '.codex'), { recursive: true })
   await mkdir(path.join(home, '.claude'), { recursive: true })

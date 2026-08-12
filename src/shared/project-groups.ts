@@ -1,7 +1,26 @@
 import { normalizeExecutionHostId } from './execution-host'
-import type { Repo, ProjectGroup, ProjectGroupCreatedFrom } from './types'
+import type { Repo, ProjectGroup, ProjectGroupCreatedFrom, RepoKind } from './types'
 
 export const UNGROUPED_PROJECT_GROUP_KEY = 'project-group:ungrouped'
+
+/**
+ * Whether a worktree row can own a `projectGroupId` of its own.
+ *
+ * Folder workspaces redirect meta writes to an allowlist that excludes
+ * projectGroupId, and a folder-mode repo's synthetic worktrees project through
+ * mergeFolderWorkspace, which drops it — either way the write appears to succeed and
+ * vanishes on the next refresh. Every affordance that can start a membership write
+ * gates on this, so it lives in one place rather than being re-derived per call site.
+ *
+ * Both fields are required: omitting either half would default the gate open, which
+ * is the one direction that lets a silently-reverting write through.
+ */
+export function canWorktreeHoldGroupMembership(args: {
+  folderWorkspaceId: string | null
+  repoKind: RepoKind | undefined
+}): boolean {
+  return args.folderWorkspaceId === null && args.repoKind !== 'folder'
+}
 
 function createProjectGroupId(): string {
   const randomUUID = globalThis.crypto?.randomUUID
@@ -92,11 +111,45 @@ export function normalizeProjectGroups(value: unknown): ProjectGroup[] {
   )
   const groupIds = new Set(groups.map((group) => group.id))
   for (const group of groups) {
-    if (group.parentGroupId === group.id || !groupIds.has(group.parentGroupId ?? '')) {
+    if (
+      group.parentGroupId === group.id ||
+      (group.parentGroupId != null && !groupIds.has(group.parentGroupId))
+    ) {
       group.parentGroupId = null
     }
   }
+  breakProjectGroupParentCycles(groups)
   return groups
+}
+
+// Why: a multi-node parent cycle survives the self/missing-parent checks above, and
+// buildRows walks down from roots, so an unbroken cycle leaves every group in it
+// unreachable and therefore never rendered.
+function breakProjectGroupParentCycles(groups: readonly ProjectGroup[]): void {
+  const groupById = new Map(groups.map((group) => [group.id, group]))
+  const status = new Map<string, 'visiting' | 'resolved'>()
+
+  for (const start of groups) {
+    if (status.get(start.id) === 'resolved') {
+      continue
+    }
+    const path: ProjectGroup[] = []
+    let current: ProjectGroup | undefined = start
+    while (current && status.get(current.id) !== 'resolved') {
+      if (status.get(current.id) === 'visiting') {
+        // `current` is already on this walk's path, so the edge closing the loop is the
+        // last hop taken to reach it. Cutting just that edge frees every group on the path.
+        path.at(-1)!.parentGroupId = null
+        break
+      }
+      status.set(current.id, 'visiting')
+      path.push(current)
+      current = current.parentGroupId != null ? groupById.get(current.parentGroupId) : undefined
+    }
+    for (const visited of path) {
+      status.set(visited.id, 'resolved')
+    }
+  }
 }
 
 export function clearMissingProjectGroupMemberships(repos: Repo[], groups: ProjectGroup[]): Repo[] {

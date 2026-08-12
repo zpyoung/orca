@@ -1,6 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import type { Repo, Worktree } from '../../../../shared/types'
+import type { ProjectGroup, Repo, Worktree } from '../../../../shared/types'
 import { getEmptyProjectPlaceholderRepoIds } from './empty-project-placeholder-repos'
+
+const projectGroup: ProjectGroup = {
+  id: 'group-1',
+  name: 'Group',
+  parentPath: null,
+  parentGroupId: null,
+  createdFrom: 'manual',
+  tabOrder: 0,
+  isCollapsed: false,
+  color: null,
+  createdAt: 0,
+  updatedAt: 0
+}
 
 const repo: Repo = {
   id: 'repo-1',
@@ -39,7 +52,8 @@ describe('getEmptyProjectPlaceholderRepoIds', () => {
           repos: [repo],
           worktreesByRepo: { [repo.id]: [] },
           visibleWorktrees: [],
-          filterRepoIds: []
+          filterRepoIds: [],
+          projectGroups: []
         })
       )
     ).toEqual([repo.id])
@@ -53,7 +67,8 @@ describe('getEmptyProjectPlaceholderRepoIds', () => {
           repos: [repo],
           worktreesByRepo: {},
           visibleWorktrees: [],
-          filterRepoIds: []
+          filterRepoIds: [],
+          projectGroups: []
         })
       )
     ).toEqual([repo.id])
@@ -70,7 +85,8 @@ describe('getEmptyProjectPlaceholderRepoIds', () => {
           repos: [selectedRepo, hiddenRepo],
           worktreesByRepo: { [selectedRepo.id]: [], [hiddenRepo.id]: [] },
           visibleWorktrees: [],
-          filterRepoIds: [selectedRepo.id]
+          filterRepoIds: [selectedRepo.id],
+          projectGroups: []
         })
       )
     ).toEqual([selectedRepo.id])
@@ -83,7 +99,8 @@ describe('getEmptyProjectPlaceholderRepoIds', () => {
         repos: [repo],
         worktreesByRepo: { [repo.id]: [] },
         visibleWorktrees: [],
-        filterRepoIds: []
+        filterRepoIds: [],
+        projectGroups: []
       }).size
     ).toBe(0)
   })
@@ -95,7 +112,8 @@ describe('getEmptyProjectPlaceholderRepoIds', () => {
         repos: [repo],
         worktreesByRepo: { [repo.id]: [worktree] },
         visibleWorktrees: [],
-        filterRepoIds: []
+        filterRepoIds: [],
+        projectGroups: []
       }).size
     ).toBe(0)
   })
@@ -111,7 +129,8 @@ describe('getEmptyProjectPlaceholderRepoIds', () => {
           repos: [groupedRepo],
           worktreesByRepo: { [groupedRepo.id]: [groupedWorktree] },
           visibleWorktrees: [],
-          filterRepoIds: []
+          filterRepoIds: [],
+          projectGroups: []
         })
       )
     ).toEqual([groupedRepo.id])
@@ -127,7 +146,8 @@ describe('getEmptyProjectPlaceholderRepoIds', () => {
         repos: [groupedRepo],
         worktreesByRepo: { [groupedRepo.id]: [groupedWorktree] },
         visibleWorktrees: [groupedWorktree],
-        filterRepoIds: []
+        filterRepoIds: [],
+        projectGroups: []
       }).size
     ).toBe(0)
   })
@@ -150,7 +170,8 @@ describe('getEmptyProjectPlaceholderRepoIds', () => {
           // Why: simulate Hide sleeping removing every card while the project
           // filter still intentionally excludes `filteredOut`.
           visibleWorktrees: [],
-          filterRepoIds: [selected.id]
+          filterRepoIds: [selected.id],
+          projectGroups: []
         })
       )
     ).toEqual([selected.id])
@@ -172,7 +193,8 @@ describe('getEmptyProjectPlaceholderRepoIds', () => {
             [awake.id]: [awakeWt]
           },
           visibleWorktrees: [awakeWt],
-          filterRepoIds: []
+          filterRepoIds: [],
+          projectGroups: []
         })
       )
     ).toEqual([sleeping.id])
@@ -194,9 +216,101 @@ describe('getEmptyProjectPlaceholderRepoIds', () => {
             [ungrouped.id]: [ungroupedWt]
           },
           visibleWorktrees: [],
-          filterRepoIds: []
+          filterRepoIds: [],
+          projectGroups: []
         })
       )
     ).toEqual([grouped.id])
+  })
+
+  describe('repos fully grouped elsewhere via worktree-level projectGroupId', () => {
+    it('flags a repo whose only visible worktree is grouped elsewhere', () => {
+      const groupedWt: Worktree = { ...worktree, projectGroupId: projectGroup.id }
+
+      expect(
+        Array.from(
+          getEmptyProjectPlaceholderRepoIds({
+            groupBy: 'repo',
+            repos: [repo],
+            worktreesByRepo: { [repo.id]: [groupedWt] },
+            visibleWorktrees: [groupedWt],
+            filterRepoIds: [],
+            projectGroups: [projectGroup]
+          })
+        )
+      ).toEqual([repo.id])
+    })
+
+    it('does not flag a repo with one grouped and one ungrouped visible worktree', () => {
+      const groupedWt: Worktree = { ...worktree, id: 'wt-grouped', projectGroupId: projectGroup.id }
+      const ungroupedWt: Worktree = { ...worktree, id: 'wt-ungrouped' }
+
+      expect(
+        getEmptyProjectPlaceholderRepoIds({
+          groupBy: 'repo',
+          repos: [repo],
+          worktreesByRepo: { [repo.id]: [groupedWt, ungroupedWt] },
+          visibleWorktrees: [groupedWt, ungroupedWt],
+          filterRepoIds: [],
+          projectGroups: [projectGroup]
+        }).size
+      ).toBe(0)
+    })
+
+    it('does not newly flag a repo whose visible worktrees are all hidden by a host filter (vacuous every guard)', () => {
+      expect(
+        getEmptyProjectPlaceholderRepoIds({
+          groupBy: 'repo',
+          repos: [repo],
+          worktreesByRepo: { [repo.id]: [worktree] },
+          // Why: `[].every(...)` is vacuously true; ownVisible.length > 0 must
+          // gate isFullyGroupedElsewhere so a host-hidden repo isn't newly
+          // flagged as a placeholder. hasNoWorktrees already covers the
+          // genuinely empty repo.
+          visibleWorktrees: [],
+          filterRepoIds: [],
+          projectGroups: [projectGroup]
+        }).size
+      ).toBe(0)
+    })
+
+    it('does not treat a projectGroupId naming a nonexistent group as grouped', () => {
+      const ghostGroupedWt: Worktree = { ...worktree, projectGroupId: 'ghost-group' }
+
+      expect(
+        getEmptyProjectPlaceholderRepoIds({
+          groupBy: 'repo',
+          repos: [repo],
+          worktreesByRepo: { [repo.id]: [ghostGroupedWt] },
+          visibleWorktrees: [ghostGroupedWt],
+          filterRepoIds: [],
+          // Why: `ghost-group` does not exist in projectGroups, so it must not
+          // count as "grouped elsewhere".
+          projectGroups: []
+        }).size
+      ).toBe(0)
+    })
+
+    it('does not flag a repo whose only visible worktree names a group filtered out by the host filter', () => {
+      const crossHostGroupedWt: Worktree = { ...worktree, projectGroupId: 'ssh-prod-group' }
+
+      expect(
+        getEmptyProjectPlaceholderRepoIds({
+          groupBy: 'repo',
+          repos: [repo],
+          worktreesByRepo: { [repo.id]: [crossHostGroupedWt] },
+          visibleWorktrees: [crossHostGroupedWt],
+          filterRepoIds: [],
+          // Why: mirrors the caller passing `visibleProjectGroupsForRows`
+          // (host-filtered) rather than the full project-group list. A group
+          // owned by a hidden host ("ssh-prod-group") can still hold a
+          // locally-visible worktree, but filterProjectGroupsForVisibleHosts
+          // keys on the GROUP's own host, so it is absent here even though it
+          // exists in the store. buildRows can't find it either, so this
+          // criterion must agree and NOT flag the repo.
+          projectGroups: []
+        }).size
+      ).toBe(0)
+    })
   })
 })
