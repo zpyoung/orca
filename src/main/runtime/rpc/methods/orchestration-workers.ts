@@ -6,7 +6,6 @@ import { startFederatedWorker } from './orchestration-federated-worker-start'
 import { assertOrchestrationWorktreeCreationSupported } from './orchestration-folder-worktree-placement'
 import { WorkerStartParams } from './orchestration-worker-start-schema'
 import {
-  createExistingWorktreeWorkerTerminal,
   createWorkerWorktree,
   monitorWorkerSetup,
   requireWorkerAuthority,
@@ -20,6 +19,7 @@ import {
 } from './orchestration-worker-setup-gate'
 import { failWorkerStartWithReceipt } from './orchestration-worker-start-receipt'
 import { prepareLocalWorkerStart } from './orchestration-worker-start-validation'
+import { executeLocalWorkerStart } from './orchestration-worker-start-execution'
 
 export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
   defineMethod({
@@ -70,14 +70,13 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
           existingPlacement: 'current or an exact existing folder workspace'
         })
       }
-      let resolvedWorktree = createsWorktree
+      const resolvedWorktree = createsWorktree
         ? undefined
         : requestedWorktree === 'current'
           ? coordinatorWorktree
           : await runtime.showManagedWorktree(requestedWorktree)
-      let explicitTerminal
       if (params.terminal) {
-        explicitTerminal = await runtime.showTerminal(params.terminal)
+        const explicitTerminal = await runtime.showTerminal(params.terminal)
         if (explicitTerminal.worktreeId !== resolvedWorktree?.id) {
           throw new OrchestrationError(
             'terminal_worktree_mismatch',
@@ -92,22 +91,38 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
         }
       }
 
+      if (!createsWorktree) {
+        return executeLocalWorkerStart({
+          runtime,
+          db,
+          runId: run.id,
+          taskId: task.id,
+          worktreeId: resolvedWorktree!.id,
+          from: params.from,
+          retryOf: params.retryOf,
+          timeoutMs: params.timeoutMs,
+          devMode: params.devMode,
+          mutationReceipt: orchestrationMutation,
+          ...(params.terminal
+            ? { launch: 'reuse-terminal' as const, terminal: params.terminal }
+            : {
+                launch: 'new-terminal' as const,
+                agent: agent as TuiAgent,
+                launchPreferences: launch.preferences
+              })
+        })
+      }
+
       const startOptions = {
         worktree: requestedWorktree,
-        resolvedWorktreeId: resolvedWorktree?.id ?? null,
         name: params.name ?? null,
-        repo: params.repo ?? (createsWorktree ? coordinatorWorktree.repoId : null),
+        repo: params.repo ?? coordinatorWorktree.repoId,
         baseBranch: params.baseBranch ?? null,
-        terminal: params.terminal ?? null,
         agent: agent ?? null,
         launch: launch.receipt,
         timeoutMs: params.timeoutMs ?? 60_000,
-        setup: createsWorktree ? (params.setup ?? 'run') : 'not_applicable',
-        setupSource: createsWorktree
-          ? params.setup
-            ? 'explicit_request'
-            : 'orchestration_default'
-          : 'existing_worktree'
+        setup: params.setup ?? 'run',
+        setupSource: params.setup ? 'explicit_request' : 'orchestration_default'
       }
       const started = db.createStartingWorkerDispatch({
         taskId: task.id,
@@ -117,15 +132,8 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
         mutationReceipt: orchestrationMutation
       })
       const effects: WorkerEffect[] = []
-      if (resolvedWorktree) {
-        effects.push(
-          { kind: 'worktree', action: 'reused', id: resolvedWorktree.id },
-          { kind: 'setup', action: 'not_applicable', state: 'not_applicable' }
-        )
-      }
-      let terminalHandle = params.terminal
-      let terminalRevealWarning: string | undefined
-      let failedStage = 'terminal_create'
+      let terminalHandle: string | undefined
+      let failedStage = 'worktree_create'
       let setupReceipt: WorkerSetupReceipt = {
         requested: 'not_applicable',
         effective: 'not_applicable',
@@ -135,54 +143,24 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
         state: 'not_applicable'
       }
       try {
-        if (createsWorktree) {
-          failedStage = 'worktree_create'
-          const created = await createWorkerWorktree({
-            runtime,
-            db,
-            dispatchId: started.dispatch.id,
-            requestedWorktree,
-            coordinatorWorktree,
-            params,
-            agent: agent as TuiAgent,
-            launchPreferences: launch.preferences,
-            effects
-          })
-          resolvedWorktree = created.worktree
-          terminalHandle = created.terminalHandle
-          setupReceipt = created.setupReceipt
-        } else if (!terminalHandle) {
-          db.recordWorkerStage({
-            dispatchId: started.dispatch.id,
-            stage: 'terminal_creating',
-            worktreeId: resolvedWorktree!.id,
-            effects
-          })
-          const terminal = await createExistingWorktreeWorkerTerminal({
-            runtime,
-            worktreeId: resolvedWorktree!.id,
-            agent: agent as TuiAgent,
-            launchPreferences: launch.preferences,
-            taskId: task.id,
-            effects
-          })
-          terminalHandle = terminal.handle
-          terminalRevealWarning = terminal.warning
-        } else {
-          effects.push({
-            kind: 'terminal',
-            role: 'agent',
-            action: 'reused',
-            id: terminalHandle
-          })
-        }
-        if (!resolvedWorktree || !terminalHandle) {
-          throw new Error('Worker topology did not resolve an agent terminal and worktree.')
-        }
+        const created = await createWorkerWorktree({
+          runtime,
+          db,
+          dispatchId: started.dispatch.id,
+          requestedWorktree,
+          coordinatorWorktree,
+          params,
+          agent: agent as TuiAgent,
+          launchPreferences: launch.preferences,
+          effects
+        })
+        const createdWorktree = created.worktree
+        terminalHandle = created.terminalHandle
+        setupReceipt = created.setupReceipt
         const setupStage = {
           db,
           dispatchId: started.dispatch.id,
-          worktreeId: resolvedWorktree.id,
+          worktreeId: createdWorktree.id,
           terminalHandle,
           setup: setupReceipt,
           effects
@@ -214,10 +192,10 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
           dispatchId: started.dispatch.id,
           handle: terminalHandle,
           ...terminalAuthority,
-          worktreeId: resolvedWorktree.id,
+          worktreeId: createdWorktree.id,
           effects,
           setupState: setupReceipt.state,
-          terminalOwnership: params.terminal ? 'external' : 'created'
+          terminalOwnership: 'created'
         })
 
         failedStage = 'dispatch_input'
@@ -257,8 +235,7 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
           launch: launch.receipt,
           timeoutMs: params.timeoutMs ?? 60_000,
           effects,
-          residualResources: [],
-          ...(terminalRevealWarning ? { warning: terminalRevealWarning } : {})
+          residualResources: []
         }
       } catch (error) {
         return failWorkerStartWithReceipt({
