@@ -29,13 +29,18 @@ describe('pipelineBranchSlug', () => {
     expect(slug.length).toBe(40)
   })
 
-  it('re-trims a trailing - introduced by truncation at exactly 40 chars', () => {
+  it('truncates to 40 chars without re-trimming a trailing - stranded by truncation', () => {
     const name = `${'a'.repeat(39)}-b`
     expect(name.length).toBe(41)
     const slug = pipelineBranchSlug(name)
-    expect(slug).toBe('a'.repeat(39))
-    expect(slug.endsWith('-')).toBe(false)
-    expect(slug.length).toBeLessThanOrEqual(40)
+    expect(slug).toBe(`${'a'.repeat(39)}-`)
+    expect(slug.length).toBe(40)
+  })
+
+  it('gives distinct slugs to templates that only diverge past the truncation point', () => {
+    const withoutSuffix = pipelineBranchSlug('a'.repeat(39))
+    const withSuffix = pipelineBranchSlug(`${'a'.repeat(39)}-b`)
+    expect(withoutSuffix).not.toBe(withSuffix)
   })
 
   it('falls back to run when the result would be empty', () => {

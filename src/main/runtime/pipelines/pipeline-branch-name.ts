@@ -11,8 +11,7 @@ export function pipelineBranchSlug(templateName: string): string {
     .replace(/[^a-z0-9-]/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '')
-  // truncation can strand a single trailing '-' since runs are already collapsed to one
-  const truncated = collapsed.slice(0, 40).replace(/-+$/, '')
+  const truncated = collapsed.slice(0, 40)
   return truncated || 'run'
 }
 
