@@ -10,7 +10,7 @@ import {
   createNativeChatMerger,
   replaceList
 } from '../../../../shared/native-chat-merge'
-import { notFoundRetryDelayMs, shouldRetryNativeChatNotFound } from './native-chat-read-retry'
+import { startNativeChatSeedRead } from './native-chat-read-retry'
 import { mergeNativeChatLiveSession } from './native-chat-live-status'
 import { useNativeChatAssembledTranscript } from './use-native-chat-assembled-transcript'
 import {
@@ -131,10 +131,6 @@ export function useNativeChatLiveSession(
     let cancelled = false
     // Set by the first authoritative frame so the readSession seed below can't clobber a live snapshot.
     let frameArrived = false
-    let retryTimer: ReturnType<typeof setTimeout> | null = null
-    const retryStartedAt = Date.now()
-    // Re-bound as a const: TS drops the `!sessionId` narrowing inside the hoisted nested function.
-    const activeSessionId = sessionId
     limitRef.current = NATIVE_CHAT_INITIAL_LIMIT
     oldestOffsetRef.current = null
     setRead({ phase: 'loading' })
@@ -143,48 +139,33 @@ export function useNativeChatLiveSession(
     setHasMore(false)
 
     // Independent initial seed in case subscribe never delivers a snapshot; applied only until an authoritative frame lands so a live snapshot wins.
-    function loadSession(attempt: number): void {
-      if (frameArrived) {
-        return
-      }
-      void transport
-        .readSession({
+    const cancelSeedRead = startNativeChatSeedRead({
+      read: () =>
+        transport.readSession({
           agent,
-          sessionId: activeSessionId,
+          sessionId,
           limit: limitRef.current,
           ...(transcriptPath ? { transcriptPath } : {}),
           ...(sshConnectionId ? { sshConnectionId } : {})
-        })
-        .then((result) => {
-          if (cancelled || frameArrived) {
-            return
-          }
-          if (result && 'error' in result) {
-            // A not-yet-flushed transcript: stay in 'loading' and retry with backoff instead of a permanent error (#8401).
-            if (result.notFound && shouldRetryNativeChatNotFound(retryStartedAt, Date.now())) {
-              retryTimer = setTimeout(() => {
-                retryTimer = null
-                loadSession(attempt + 1)
-              }, notFoundRetryDelayMs(attempt))
-              return
-            }
-            setRead({ phase: 'error', error: result.error })
-            return
-          }
-          const messages = result?.messages ?? []
-          transcriptLifecycleControl.replace(result?.lifecycle)
-          oldestOffsetRef.current = result?.beforeOffset ?? null
-          setRead({ phase: 'ready', messages })
-          setHasMore(resolveNativeChatHasMore(result?.hasMore, messages.length, limitRef.current))
-        })
-        .catch((err: unknown) => {
-          if (!cancelled && !frameArrived) {
-            setRead({ phase: 'error', error: err instanceof Error ? err.message : String(err) })
-          }
-        })
-    }
-
-    loadSession(0)
+        }),
+      // A not-yet-flushed transcript: stay in 'loading' and retry with backoff instead of a permanent error (#8401).
+      isPending: (result) => Boolean(result && 'error' in result && result.notFound),
+      isSuperseded: () => frameArrived,
+      onResult: (result) => {
+        if (result && 'error' in result) {
+          setRead({ phase: 'error', error: result.error })
+          return
+        }
+        const messages = result?.messages ?? []
+        transcriptLifecycleControl.replace(result?.lifecycle)
+        oldestOffsetRef.current = result?.beforeOffset ?? null
+        setRead({ phase: 'ready', messages })
+        setHasMore(resolveNativeChatHasMore(result?.hasMore, messages.length, limitRef.current))
+      },
+      onError: (error: unknown) => {
+        setRead({ phase: 'error', error: error instanceof Error ? error.message : String(error) })
+      }
+    })
 
     const subscriptionId = nextSubscriptionId()
     const unsubscribe = transport.subscribe(
@@ -228,21 +209,8 @@ export function useNativeChatLiveSession(
 
     return () => {
       cancelled = true
-      if (retryTimer) {
-        clearTimeout(retryTimer)
-        retryTimer = null
-      }
-      // Web RPC bridge returns a Promise (not the desktop sync unsubscribe fn); calling it as a function crashed the view, so resolve first.
-      const teardown = unsubscribe as unknown
-      if (typeof teardown === 'function') {
-        ;(teardown as () => void)()
-      } else if (teardown && typeof (teardown as { then?: unknown }).then === 'function') {
-        void (teardown as Promise<unknown>).then((fn) => {
-          if (typeof fn === 'function') {
-            ;(fn as () => void)()
-          }
-        })
-      }
+      cancelSeedRead()
+      unsubscribe()
     }
     // `transport` identity changes on an owner flip, re-running this effect to re-subscribe against the new host.
   }, [agent, sessionId, transcriptPath, transport, sshConnectionId, transcriptLifecycleControl])

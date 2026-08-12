@@ -38,13 +38,30 @@ export function toRuntimeNativeChatErrorMessage(err: unknown): string {
   return RUNTIME_NATIVE_CHAT_READ_ERROR
 }
 
+/** The web preload bridge answers `subscribe` with a Promise instead of the
+ *  desktop's sync unsubscribe fn; calling that as a function crashed the view (R6). */
+function toSyncUnsubscribe(handle: unknown): () => void {
+  return () => {
+    if (typeof handle === 'function') {
+      ;(handle as () => void)()
+      return
+    }
+    if (handle && typeof (handle as { then?: unknown }).then === 'function') {
+      void (handle as Promise<unknown>).then((resolved) => {
+        if (typeof resolved === 'function') {
+          ;(resolved as () => void)()
+        }
+      })
+    }
+  }
+}
+
 /** Delegates straight to the local Electron IPC bridge. On the web client
  *  `window.api.nativeChat` already bridges to the paired runtime, so web keeps
- *  using this adapter (R3). Preserves whatever `subscribe` returns (sync fn on
- *  desktop, promise on the web bridge) — the hook's teardown handles both (R6). */
+ *  using this adapter (R3). */
 const localNativeChatTransport: NativeChatSessionTransport = {
   readSession: (args) => window.api.nativeChat.readSession(args),
-  subscribe: (args, onFrame) => window.api.nativeChat.subscribe(args, onFrame)
+  subscribe: (args, onFrame) => toSyncUnsubscribe(window.api.nativeChat.subscribe(args, onFrame))
 }
 
 function createRuntimeNativeChatTransport(environmentId: string): NativeChatSessionTransport {

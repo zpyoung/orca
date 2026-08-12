@@ -20,3 +20,62 @@ export function notFoundRetryDelayMs(attempt: number): number {
 export function shouldRetryNativeChatNotFound(startedAt: number, now: number): boolean {
   return now - startedAt < NOTFOUND_RETRY_WINDOW_MS
 }
+
+export type NativeChatSeedReadOptions<TResult> = {
+  read: () => Promise<TResult>
+  /** True when the transcript is not on disk yet, so the read is worth repeating. */
+  isPending: (result: TResult) => boolean
+  onResult: (result: TResult) => void
+  onError: (error: unknown) => void
+  /** True once an authoritative source owns the transcript, so a late read must not repaint it. */
+  isSuperseded: () => boolean
+}
+
+/**
+ * Reads a transcript, repeating on a still-unflushed miss until the retry window
+ * closes. Returns a cancel handle owning the pending retry timer, so a caller
+ * tearing down releases every allocation this made.
+ */
+export function startNativeChatSeedRead<TResult>(
+  options: NativeChatSeedReadOptions<TResult>
+): () => void {
+  let cancelled = false
+  let retryTimer: ReturnType<typeof setTimeout> | null = null
+  const startedAt = Date.now()
+
+  function attemptRead(attempt: number): void {
+    if (cancelled || options.isSuperseded()) {
+      return
+    }
+    void options
+      .read()
+      .then((result) => {
+        if (cancelled || options.isSuperseded()) {
+          return
+        }
+        if (options.isPending(result) && shouldRetryNativeChatNotFound(startedAt, Date.now())) {
+          retryTimer = setTimeout(() => {
+            retryTimer = null
+            attemptRead(attempt + 1)
+          }, notFoundRetryDelayMs(attempt))
+          return
+        }
+        options.onResult(result)
+      })
+      .catch((error: unknown) => {
+        if (!cancelled && !options.isSuperseded()) {
+          options.onError(error)
+        }
+      })
+  }
+
+  attemptRead(0)
+
+  return () => {
+    cancelled = true
+    if (retryTimer) {
+      clearTimeout(retryTimer)
+      retryTimer = null
+    }
+  }
+}
