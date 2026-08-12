@@ -42,6 +42,7 @@ package-lock.json
 *.swp
 *.swo
 *~
+.memsearch/
 
 # OS
 # Keep these in step with isOsMetadataSkillEntryName (skill-package-identity.ts): both disk
