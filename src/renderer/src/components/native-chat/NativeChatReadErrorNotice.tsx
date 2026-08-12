@@ -14,7 +14,7 @@ export function NativeChatReadErrorNotice({ message }: { message: string }): Rea
       <span className="min-w-0 flex-1">
         {translate(
           'components.native-chat.state.readErrorNotice',
-          'Chat history could not be refreshed. {value0}',
+          'Chat history could not be refreshed. {{value0}}',
           { value0: message }
         )}
       </span>
