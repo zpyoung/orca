@@ -90,6 +90,18 @@ function setDispatchedAt(db: OrchestrationDb, dispatchId: string, dispatchedAt: 
   sqlite.prepare('UPDATE dispatch_contexts SET dispatched_at = ? WHERE id = ?').run(dispatchedAt, dispatchId)
 }
 
+// Bypasses createGate's own run_id derivation to simulate a gate row with no enforced link between
+// its run_id and its task_id's actual run — decision_gates has no FK for this (see db.ts).
+function insertMisscopedGateRow(
+  db: OrchestrationDb,
+  params: { id: string; runId: string; taskId: string; question: string }
+): void {
+  const sqlite = (db as unknown as { db: Database.Database }).db
+  sqlite
+    .prepare('INSERT INTO decision_gates (id, run_id, task_id, question) VALUES (?, ?, ?, ?)')
+    .run(params.id, params.runId, params.taskId, params.question)
+}
+
 async function tick(ms = 100): Promise<void> {
   await new Promise((resolve) => {
     setTimeout(resolve, ms)
@@ -363,6 +375,81 @@ describe('Coordinator run isolation (L12a)', () => {
     expect(result.completedTasks).toEqual([taskA.id])
     expect(db.getTask(taskB.id)?.status).toBe('dispatched')
     expect(db.getMessageById(rogueMessage.id)?.subject).toContain('Rejected worker_done')
+  })
+
+  it('never blocks another run task via a gate row whose run_id does not match its task (G2)', async () => {
+    db = new OrchestrationDb(':memory:')
+    const runA = db.createRun({
+      objective: 'A',
+      coordinatorHandle: 'coord_a8',
+      coordinatorPaneKey: 'tab_a8:11111111-1111-4111-8111-111111111129'
+    })
+    const runB = db.createRun({
+      objective: 'B',
+      coordinatorHandle: 'coord_b8',
+      coordinatorPaneKey: 'tab_b8:22222222-2222-4222-8222-222222222239'
+    })
+    const taskB = db.createTask({ spec: 'b work', runId: runB.id })
+    insertMisscopedGateRow(db, {
+      id: 'gate_misscoped_1',
+      runId: runA.id,
+      taskId: taskB.id,
+      question: 'Proceed?'
+    })
+
+    const taskA = db.createTask({ spec: 'a work', runId: runA.id })
+    const runtime = createMockRuntime([{ handle: 'term_a8' }])
+    const coordinator = new Coordinator(db, runtime, {
+      spec: 'go',
+      coordinatorHandle: 'coord_a8',
+      taskRunId: runA.id,
+      pollIntervalMs: 30
+    })
+    const runPromise = coordinator.run()
+    await tick()
+
+    expect(db.getTask(taskB.id)?.status).toBe('ready')
+
+    completeDispatchedTask(db, taskA.id, 'coord_a8', runA.id)
+    await runPromise
+  })
+
+  it('excludes a terminal holding a genuinely active dispatch in another run, without repeatedly retrying it (G5)', async () => {
+    db = new OrchestrationDb(':memory:')
+    const runA = db.createRun({
+      objective: 'A',
+      coordinatorHandle: 'coord_a9',
+      coordinatorPaneKey: 'tab_a9:11111111-1111-4111-8111-111111111130'
+    })
+    const runB = db.createRun({
+      objective: 'B',
+      coordinatorHandle: 'coord_b9',
+      coordinatorPaneKey: 'tab_b9:22222222-2222-4222-8222-222222222240'
+    })
+    const taskB = db.createTask({ spec: 'b work', runId: runB.id })
+    db.createDispatchContext(taskB.id, 'term_shared')
+
+    const taskA = db.createTask({ spec: 'a work', runId: runA.id })
+    const runtime = createMockRuntime([{ handle: 'term_shared' }])
+    const logs: string[] = []
+    const coordinator = new Coordinator(db, runtime, {
+      spec: 'go',
+      coordinatorHandle: 'coord_a9',
+      taskRunId: runA.id,
+      pollIntervalMs: 30,
+      onLog: (msg) => logs.push(msg)
+    })
+    const runPromise = coordinator.run()
+    await tick()
+    await tick()
+
+    const dispatchA = db.getDispatchContext(taskA.id)
+    expect(dispatchA?.assignee_handle).not.toBe('term_shared')
+    expect(logs.some((line) => line.includes('Failed to dispatch'))).toBe(false)
+
+    completeDispatchedTask(db, taskA.id, 'coord_a9', runA.id)
+    const result = await runPromise
+    expect(result.status).toBe('completed')
   })
 })
 

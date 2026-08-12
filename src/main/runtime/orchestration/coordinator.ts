@@ -368,7 +368,9 @@ export class Coordinator {
     const pendingGates = this.db.listGates({ status: 'pending', runId: this.opts.taskRunId })
     for (const gate of pendingGates) {
       const task = this.db.getTask(gate.task_id)
-      if (task && task.status !== 'blocked') {
+      // Why (L12a): decision_gates has no FK tying run_id to its task's run, so a gate listed
+      // under this run can still reference another run's task.
+      if (task && task.run_id === this.opts.taskRunId && task.status !== 'blocked') {
         // Why: gate exists but task isn't blocked — re-block to restore the invariant.
         this.db.updateTaskStatus(gate.task_id, 'blocked')
       }
@@ -515,22 +517,17 @@ export class Coordinator {
       const result = await this.runtime.listTerminals(this.opts.worktree, undefined, {
         includeVisualLayouts: false
       })
-      const dispatched = this.db.listTasks({ status: 'dispatched', runId: this.opts.taskRunId })
-      const busyHandles = new Set<string>()
 
-      for (const task of dispatched) {
-        const ctx = this.db.getDispatchContext(task.id)
-        if (ctx?.assignee_handle) {
-          busyHandles.add(ctx.assignee_handle)
-        }
-      }
-
-      // Why: createDispatchContext's dispatch-lock guarantees correctness; this filter is only an optimization to skip busy/disconnected terminals.
+      // Why: createDispatchContext's dispatch-lock is global — a terminal handle can't host two
+      // live dispatches no matter whose run they belong to — so this optimization filter has to
+      // stay global too; scoping it to this run would let a handle busy in another run look
+      // available, and dispatchTask (including its git drift probe) would be retried on it every
+      // tick only to hit the lock and fail.
       return result.terminals
         .filter(
           (t) =>
             t.handle !== this.opts.coordinatorHandle &&
-            !busyHandles.has(t.handle) &&
+            !this.db.getActiveDispatchForTerminal(t.handle) &&
             t.connected &&
             t.writable
         )
