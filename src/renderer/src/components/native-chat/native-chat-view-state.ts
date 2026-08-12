@@ -12,20 +12,30 @@ export type NativeChatViewState =
   | { kind: 'loading' }
   | { kind: 'error'; message: string }
   | { kind: 'empty' }
-  | { kind: 'ready'; isWorking: false }
-  | { kind: 'ready'; isWorking: true }
+  | { kind: 'ready'; isWorking: false; error?: string }
+  | { kind: 'ready'; isWorking: true; error?: string }
+
+const NATIVE_CHAT_READ_FAILED = 'Conversation could not be loaded.'
 
 /**
- * Decide which surface to render. Error is terminal, but any renderable message
- * wins over loading/empty so optimistic first sends never get replaced by a
- * full-pane placeholder while transcript discovery catches up.
+ * Decide which surface to render. Any renderable message wins over every
+ * full-pane surface — including error — so optimistic first sends never get
+ * replaced by a placeholder while transcript discovery catches up.
+ *
+ * A failing read is still reported, as `error` alongside the messages: a
+ * permanent failure (no read permission, an agent whose transcripts cannot be
+ * decoded) would otherwise be indistinguishable from a healthy pane.
  */
 export function selectNativeChatViewState(session: NativeChatSession): NativeChatViewState {
-  if (session.status === 'error') {
-    return { kind: 'error', message: session.error ?? 'Conversation could not be loaded.' }
-  }
   if (session.messages.length > 0) {
-    return { kind: 'ready', isWorking: session.status === 'working' }
+    return {
+      kind: 'ready',
+      isWorking: session.status === 'working',
+      ...(session.status === 'error' ? { error: session.error ?? NATIVE_CHAT_READ_FAILED } : {})
+    }
+  }
+  if (session.status === 'error') {
+    return { kind: 'error', message: session.error ?? NATIVE_CHAT_READ_FAILED }
   }
   if (session.status === 'loading') {
     return { kind: 'loading' }

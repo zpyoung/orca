@@ -43,8 +43,7 @@ export function toRuntimeNativeChatErrorMessage(err: unknown): string {
  *  using this adapter (R3). Preserves whatever `subscribe` returns (sync fn on
  *  desktop, promise on the web bridge) — the hook's teardown handles both (R6). */
 const localNativeChatTransport: NativeChatSessionTransport = {
-  readSession: (agent, sessionId, limit, transcriptPath) =>
-    window.api.nativeChat.readSession(agent, sessionId, limit, transcriptPath),
+  readSession: (args) => window.api.nativeChat.readSession(args),
   subscribe: (args, onFrame) => window.api.nativeChat.subscribe(args, onFrame)
 }
 
@@ -52,12 +51,12 @@ function createRuntimeNativeChatTransport(environmentId: string): NativeChatSess
   const target: RuntimeClientTarget = { kind: 'environment', environmentId }
 
   return {
-    readSession: async (agent, sessionId, limit, transcriptPath) => {
+    readSession: async ({ agent, sessionId, limit, transcriptPath, beforeOffset }) => {
       try {
         const result = await callRuntimeRpc<unknown>(
           target,
           'nativeChat.readSession',
-          { agent, sessionId, limit, transcriptPath },
+          { agent, sessionId, limit, transcriptPath, beforeOffset },
           { timeoutMs: 15_000 }
         )
         return parseRuntimeNativeChatReadSessionResult(result)
@@ -132,10 +131,17 @@ function createRuntimeNativeChatTransport(environmentId: string): NativeChatSess
                   type?: string
                   messages?: NativeChatAppendedMessages
                   hasMore?: boolean
+                  beforeOffset?: number
                   error?: string
                   lifecycle?: unknown
                 }
                 const lifecycle = parseRuntimeNativeChatTurnLifecycle(frame?.lifecycle)
+                // Seeds the paging cursor: a snapshot supersedes the seed read
+                // that carried the offset, so dropping it here retires paging.
+                const offset =
+                  typeof frame?.beforeOffset === 'number' && Number.isFinite(frame.beforeOffset)
+                    ? { beforeOffset: frame.beforeOffset }
+                    : {}
                 if (
                   (frame?.type === 'appended' ||
                     frame?.type === 'snapshot' ||
@@ -148,6 +154,7 @@ function createRuntimeNativeChatTransport(environmentId: string): NativeChatSess
                       type: 'snapshot',
                       messages: frame.messages,
                       hasMore: frame.hasMore ?? frame.messages.length >= (limit ?? 300),
+                      ...offset,
                       ...(frame.error ? { error: frame.error } : {}),
                       ...(lifecycle ? { lifecycle } : {})
                     })
@@ -156,6 +163,7 @@ function createRuntimeNativeChatTransport(environmentId: string): NativeChatSess
                       type: 'snapshot',
                       messages: frame.messages,
                       hasMore: frame.hasMore ?? false,
+                      ...offset,
                       ...(frame.error ? { error: frame.error } : {}),
                       ...(lifecycle ? { lifecycle } : {})
                     })
@@ -166,6 +174,7 @@ function createRuntimeNativeChatTransport(environmentId: string): NativeChatSess
                             type: 'replacement',
                             messages: frame.messages,
                             hasMore: frame.hasMore ?? false,
+                            ...offset,
                             ...(lifecycle ? { lifecycle } : {})
                           }
                         : {

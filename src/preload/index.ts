@@ -214,6 +214,7 @@ import type {
   PreflightRuntimeContext,
   RefreshAgentsResult,
   NativeChatAppendedPayload,
+  NativeChatReadSessionArgs,
   NativeChatReadSessionResult,
   NativeChatSubscriptionFrame,
   PluginHostInstallResult,
@@ -4250,13 +4251,8 @@ const api = {
   },
 
   nativeChat: {
-    readSession: (
-      agent: AgentType,
-      sessionId: string,
-      limit?: number,
-      transcriptPath?: string
-    ): Promise<NativeChatReadSessionResult> =>
-      ipcRenderer.invoke('nativeChat:readSession', { agent, sessionId, limit, transcriptPath }),
+    readSession: (args: NativeChatReadSessionArgs): Promise<NativeChatReadSessionResult> =>
+      ipcRenderer.invoke('nativeChat:readSession', args),
     /** Start live tailing; onAppended fires with only newly-appended messages. Returns an unsubscribe fn that closes the watcher. */
     subscribe: (
       args: {
@@ -4265,6 +4261,7 @@ const api = {
         sessionId: string
         transcriptPath?: string
         limit?: number
+        sshConnectionId?: string
       },
       onFrame: (frame: NativeChatSubscriptionFrame) => void
     ): (() => void) => {

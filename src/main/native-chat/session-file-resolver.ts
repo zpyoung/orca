@@ -6,7 +6,7 @@ import { resolveNativeChatTranscriptAgent } from '../../shared/native-chat-agent
 import { walkSessionFiles } from '../ai-vault/session-scanner-discovery'
 import { OMP_SESSION_ARTIFACT_DIR_PATTERN } from '../ai-vault/session-scanner-omp-subagent-transcripts'
 import { normalizeAgentSessionsDir } from '../ai-vault/session-scanner-values'
-import { getOrcaManagedCodexHomePath } from '../codex/codex-home-paths'
+import { resolveOrcaManagedCodexHomePath } from '../codex/codex-home-paths'
 import {
   findGrokChatHistoryBySessionId,
   resolveGrokSessionsDir
@@ -29,7 +29,9 @@ function claudeProjectsDir(): string {
 // Duplicates are filtered so a managed-home symlink to ~/.codex isn't scanned twice.
 function codexSessionsDirs(): string[] {
   const candidates = [
-    join(getOrcaManagedCodexHomePath(), 'sessions'),
+    // Path-only: this resolver also runs on the relay, where materializing the
+    // mirror would create directories on the user's remote host from a read.
+    join(resolveOrcaManagedCodexHomePath(), 'sessions'),
     join(process.env.CODEX_HOME?.trim() || join(homedir(), '.codex'), 'sessions')
   ]
   return candidates.filter((dir, index) => candidates.indexOf(dir) === index)
