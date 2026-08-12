@@ -10,6 +10,7 @@ import {
   writeFileSync
 } from 'node:fs'
 import { isAbsolute, join, relative } from 'node:path'
+import { MAX_ORCA_YAML_BYTES } from '../../shared/orca-yaml-file-limit'
 import { BUGFIX_FAST_STARTER_TEMPLATE } from './pipeline-starter-template'
 
 const STARTER_TEMPLATE_BASENAME = 'bugfix-fast.yaml'
@@ -28,6 +29,9 @@ function readTemplateFile(
   basename: string
 ): { path: string; basename: string; content: string } | undefined {
   try {
+    if (statSync(path).size > MAX_ORCA_YAML_BYTES) {
+      return undefined
+    }
     return { path, basename, content: readFileSync(path, 'utf8') }
   } catch {
     return undefined

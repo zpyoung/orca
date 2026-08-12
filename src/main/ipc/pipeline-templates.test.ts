@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getPipelineTemplatesDir } from '../pipelines/pipeline-template-files'
 
 const { handleMock } = vi.hoisted(() => ({ handleMock: vi.fn() }))
@@ -34,15 +34,37 @@ describe('registerPipelineTemplateHandlers', () => {
   let home: string
   let dir: string
 
-  beforeEach(() => {
+  beforeAll(() => {
     home = mkdtempSync(join(tmpdir(), 'orca-pipeline-ipc-'))
     dir = getPipelineTemplatesDir(home)
-    handleMock.mockReset()
     registerPipelineTemplateHandlers(home)
   })
 
-  afterEach(() => {
+  beforeEach(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  afterAll(() => {
     rmSync(home, { recursive: true, force: true })
+  })
+
+  describe('registration lifecycle', () => {
+    it('registering a second time does not throw and leaves working handlers', async () => {
+      const callCountBefore = handleMock.mock.calls.length
+
+      expect(() => registerPipelineTemplateHandlers(home)).not.toThrow()
+
+      expect(handleMock.mock.calls.length).toBe(callCountBefore)
+      const result = (await getHandler('pipelines:list-templates')()) as unknown[]
+      expect(result).toEqual([
+        {
+          basename: 'bugfix-fast.yaml',
+          name: 'bugfix-fast',
+          description: 'Reproduce a bug, fix it, prove the fix, open a PR. No human gates.',
+          needsNewerOrca: false
+        }
+      ])
+    })
   })
 
   describe('pipelines:list-templates', () => {
@@ -164,6 +186,19 @@ describe('registerPipelineTemplateHandlers', () => {
         basename: './extra.yaml',
         inputText: 'x'
       })
+
+      expect(result).toEqual({ ok: false, error: { kind: 'invalid_basename' } })
+    })
+
+    const malformedArgs = [
+      ['null args', null],
+      ['missing basename', { inputText: 'x' }],
+      ['non-string basename', { basename: 42, inputText: 'x' }],
+      ['non-string inputText', { basename: 'extra.yaml', inputText: 42 }]
+    ] as const
+
+    it.each(malformedArgs)('rejects %s before touching disk', async (_label, args) => {
+      const result = await getHandler('pipelines:resolve-template')(null, args)
 
       expect(result).toEqual({ ok: false, error: { kind: 'invalid_basename' } })
     })
