@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { OrchestrationDb } from './db'
+import { LEGACY_RUN_ID, OrchestrationDb } from './db'
 import { reconcileLifecycleMessage } from './lifecycle-reconciliation'
 import {
   Coordinator,
@@ -119,7 +119,8 @@ describe('Coordinator', () => {
     const runtime = createMockRuntime()
     const coordinator = new Coordinator(db, runtime, {
       spec: 'do stuff',
-      coordinatorHandle: 'coord'
+      coordinatorHandle: 'coord',
+      taskRunId: LEGACY_RUN_ID,
     })
     await expect(coordinator.run()).rejects.toThrow('No tasks found')
   })
@@ -136,6 +137,7 @@ describe('Coordinator', () => {
     const coordinator = new Coordinator(db, runtime, {
       spec: 'build it',
       coordinatorHandle: 'coord',
+      taskRunId: LEGACY_RUN_ID,
       pollIntervalMs: 50
     })
 
@@ -169,6 +171,7 @@ describe('Coordinator', () => {
     const coordinator = new Coordinator(db, withPaneLookup, {
       spec: 'build it',
       coordinatorHandle: 'coord',
+      taskRunId: LEGACY_RUN_ID,
       pollIntervalMs: 50
     })
     const runPromise = coordinator.run()
@@ -201,6 +204,7 @@ describe('Coordinator', () => {
     const coordinator = new Coordinator(db, withAuthority, {
       spec: 'build it',
       coordinatorHandle: 'coord',
+      taskRunId: LEGACY_RUN_ID,
       pollIntervalMs: 50
     })
     const runPromise = coordinator.run()
@@ -237,6 +241,7 @@ describe('Coordinator', () => {
     const coordinator = new Coordinator(db, runtime, {
       spec: 'go',
       coordinatorHandle: 'coord',
+      taskRunId: LEGACY_RUN_ID,
       pollIntervalMs: 20
     })
     const result = await coordinator.run()
@@ -276,6 +281,7 @@ describe('Coordinator', () => {
     const coordinator = new Coordinator(db, runtime, {
       spec: 'go',
       coordinatorHandle: 'coord',
+      taskRunId: LEGACY_RUN_ID,
       pollIntervalMs: 20
     })
     const result = await coordinator.run()
@@ -293,6 +299,7 @@ describe('Coordinator', () => {
     const coordinator = new Coordinator(db, runtime, {
       spec: 'go',
       coordinatorHandle: 'coord',
+      taskRunId: LEGACY_RUN_ID,
       pollIntervalMs: 50
     })
 
@@ -325,6 +332,7 @@ describe('Coordinator', () => {
     const coordinator = new Coordinator(db, runtime, {
       spec: 'go',
       coordinatorHandle: 'coord',
+      taskRunId: LEGACY_RUN_ID,
       pollIntervalMs: 50
     })
 
@@ -361,6 +369,7 @@ describe('Coordinator', () => {
     const coordinator = new Coordinator(db, runtime, {
       spec: 'go',
       coordinatorHandle: 'coord',
+      taskRunId: LEGACY_RUN_ID,
       pollIntervalMs: 10
     })
 
@@ -381,6 +390,7 @@ describe('Coordinator', () => {
     const coordinator = new Coordinator(db, runtime, {
       spec: 'go',
       coordinatorHandle: 'coord',
+      taskRunId: LEGACY_RUN_ID,
       pollIntervalMs: 50
     })
 
@@ -443,6 +453,7 @@ describe('Coordinator', () => {
     const coordinator = new Coordinator(db, runtime, {
       spec: 'go',
       coordinatorHandle: 'coord',
+      taskRunId: LEGACY_RUN_ID,
       pollIntervalMs: 50
     })
 
@@ -493,6 +504,7 @@ describe('Coordinator', () => {
     const coordinator = new Coordinator(db, runtime, {
       spec: 'go',
       coordinatorHandle: 'coord',
+      taskRunId: LEGACY_RUN_ID,
       pollIntervalMs: 50,
       maxConcurrent: 2
     })
@@ -541,6 +553,7 @@ describe('Coordinator', () => {
     const coordinator = new Coordinator(db, runtime, {
       spec: 'go',
       coordinatorHandle: 'coord',
+      taskRunId: LEGACY_RUN_ID,
       pollIntervalMs: 20,
       onLog: (m) => logs.push(m)
     })
@@ -569,6 +582,7 @@ describe('Coordinator', () => {
     const coordinator = new Coordinator(db, runtime, {
       spec: 'go',
       coordinatorHandle: 'coord',
+      taskRunId: LEGACY_RUN_ID,
       pollIntervalMs: 20
     })
 
@@ -620,6 +634,7 @@ describe('Coordinator', () => {
     const staleCoordinator = new Coordinator(db, runtime, {
       spec: 'go',
       coordinatorHandle: 'coord',
+      taskRunId: LEGACY_RUN_ID,
       pollIntervalMs: 20,
       onLog: (m) => logs.push(m)
     })
@@ -643,6 +658,7 @@ describe('Coordinator', () => {
     const completionCoordinator = new Coordinator(db, runtime, {
       spec: 'go',
       coordinatorHandle: 'coord',
+      taskRunId: LEGACY_RUN_ID,
       pollIntervalMs: 20
     })
     const result = await completionCoordinator.run()
@@ -673,6 +689,7 @@ describe('Coordinator', () => {
     const coordinator = new Coordinator(db, runtime, {
       spec: 'go',
       coordinatorHandle: 'coord',
+      taskRunId: LEGACY_RUN_ID,
       pollIntervalMs: 20,
       onLog: (m) => logs.push(m)
     })
@@ -692,6 +709,7 @@ describe('Coordinator', () => {
     const coordinator = new Coordinator(db, runtime, {
       spec: 'go',
       coordinatorHandle: 'coord',
+      taskRunId: LEGACY_RUN_ID,
       pollIntervalMs: 50
     })
 
@@ -722,6 +740,7 @@ describe('Coordinator', () => {
       const coordinator = new Coordinator(db, runtime, {
         spec: 'go',
         coordinatorHandle: 'coord',
+        taskRunId: LEGACY_RUN_ID,
         pollIntervalMs: 50,
         worktree: 'wt1'
       })
@@ -758,6 +777,7 @@ describe('Coordinator', () => {
       const coordinator = new Coordinator(db, runtime, {
         spec: 'go',
         coordinatorHandle: 'coord',
+        taskRunId: LEGACY_RUN_ID,
         pollIntervalMs: 50,
         worktree: 'wt1'
       })
@@ -798,6 +818,7 @@ allow-stale-base: true`
       const coordinator = new Coordinator(db, runtime, {
         spec: 'go',
         coordinatorHandle: 'coord',
+        taskRunId: LEGACY_RUN_ID,
         pollIntervalMs: 50,
         worktree: 'wt1'
       })
@@ -831,6 +852,7 @@ allow-stale-base: true`
       const coordinator = new Coordinator(db, runtime, {
         spec: 'go',
         coordinatorHandle: 'coord',
+        taskRunId: LEGACY_RUN_ID,
         pollIntervalMs: 50,
         worktree: 'wt1'
       })
@@ -860,6 +882,7 @@ allow-stale-base: true`
       const coordinator = new Coordinator(db, runtime, {
         spec: 'go',
         coordinatorHandle: 'coord',
+        taskRunId: LEGACY_RUN_ID,
         pollIntervalMs: 50,
         // worktree deliberately omitted
         onLog: (msg) => logs.push(msg)
@@ -891,6 +914,7 @@ allow-stale-base: true`
       const coordinator = new Coordinator(db, runtime, {
         spec: 'go',
         coordinatorHandle: 'coord',
+        taskRunId: LEGACY_RUN_ID,
         pollIntervalMs: 50,
         worktree: 'wt1'
       })
