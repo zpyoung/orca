@@ -5,13 +5,14 @@ import { useNativeChatLaunchDraftSignal } from './use-native-chat-launch-draft-a
 import type { NativeChatSession } from '../../../../shared/native-chat-types'
 import { useNativeChatRetainedSession } from './use-native-chat-retained-session'
 import { selectNativeChatViewState } from './native-chat-view-state'
-import { NativeChatMessageList } from './NativeChatMessageList'
 import { NativeChatComposer, type NativeChatComposerHandle } from './NativeChatComposer'
 import { useNativeChatFontScale } from './use-native-chat-font-scale'
 import { useNativeChatCanSend } from './use-native-chat-can-send'
 import { NativeChatInteractiveCard } from './NativeChatInteractiveCard'
 import { NativeChatEmptyState } from './NativeChatEmptyState'
+import { NativeChatConversation } from './NativeChatConversation'
 import { NativeChatSessionGate } from './NativeChatSessionGate'
+import { useNativeChatLaunchPromptOverlay } from './use-native-chat-launch-prompt-overlay'
 import { useNativeChatInteractiveSend } from './use-native-chat-interactive-send'
 import { findTabAgentEntry } from './native-chat-tab-agent-entry'
 import {
@@ -23,7 +24,6 @@ import {
   appendPendingSendCache,
   commandMarkersAsMessages,
   appendCommandMarkerCache,
-  launchPromptAsMessage,
   pendingSendsAsMessages,
   nextNativeChatPendingSendId,
   prunePendingSends,
@@ -49,7 +49,10 @@ import {
 } from './use-native-chat-context-menu'
 import type { NativeChatContextMenuActions } from './use-native-chat-context-menu'
 import { resolveNativeChatFileLinkContext } from './native-chat-file-link'
-import { selectNativeChatRuntimeEnvironmentId } from './native-chat-runtime-owner'
+import {
+  selectNativeChatRuntimeEnvironmentId,
+  selectNativeChatSshConnectionId
+} from './native-chat-runtime-owner'
 import { useNativeChatPasteBridge } from './use-native-chat-paste-bridge'
 import { useNativeChatFileLinkClick } from './use-native-chat-file-link-click'
 import type { NativeChatViewProps } from './native-chat-view-types'
@@ -131,12 +134,16 @@ function NativeChatResolvedView({
   const runtimeEnvironmentId = useAppStore((s) =>
     selectNativeChatRuntimeEnvironmentId(s, terminalTabId)
   )
+  // Model A: the agent's transcript is on an ssh host this renderer's main
+  // process cannot read, so main routes the read/tail to that host's relay.
+  const sshConnectionId = useAppStore((s) => selectNativeChatSshConnectionId(s, terminalTabId))
   const session = useNativeChatRetainedSession({
     paneKey,
     agent,
     sessionId,
     transcriptPath,
-    runtimeEnvironmentId
+    runtimeEnvironmentId,
+    sshConnectionId
   })
   const launchPrompt = useAppStore((s) => s.nativeChatLaunchPromptByTabId[terminalTabId] ?? null)
   const clearNativeChatLaunchPrompt = useAppStore((s) => s.clearNativeChatLaunchPrompt)
@@ -267,16 +274,10 @@ function NativeChatResolvedView({
     [commandMarkerScope]
   )
 
-  const launchPromptMessage = useMemo(
-    () => launchPromptAsMessage(paneLaunchPrompt, session.messages),
-    [paneLaunchPrompt, session.messages]
+  const { launchPromptMessage, sessionWithLaunchPrompt } = useNativeChatLaunchPromptOverlay(
+    paneLaunchPrompt,
+    session
   )
-  const sessionWithLaunchPrompt = useMemo<typeof session>(() => {
-    if (!launchPromptMessage) {
-      return session
-    }
-    return { ...session, messages: [...session.messages, launchPromptMessage] }
-  }, [launchPromptMessage, session])
 
   const sessionAfterCommandBoundaries = useMemo<typeof session>(() => {
     const messages = applyCommandMarkerBoundaries(sessionWithLaunchPrompt.messages, commandMarkers)
@@ -411,14 +412,14 @@ function NativeChatResolvedView({
         ) : viewState.kind === 'empty' ? (
           <NativeChatEmptyState kind="empty" agent={agent} />
         ) : (
-          <NativeChatMessageList
+          <NativeChatConversation
             session={sessionWithPending}
             isWorking={isWorking}
-            expandSignal={false}
             fontScale={fontScale.scale}
             onLinkClick={nativeChatFileLinkClick}
             allowFileUriLinks={fileLinkContext !== null}
             failedDeliveryMessageIds={failedLaunchPromptMessageIds}
+            readError={viewState.error}
           />
         )}
       </div>

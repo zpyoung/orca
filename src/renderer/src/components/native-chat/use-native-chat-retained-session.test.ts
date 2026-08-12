@@ -90,6 +90,19 @@ describe('useNativeChatRetainedSession', () => {
     expect(latest?.messages).toEqual([])
   })
 
+  // Two ssh hosts can hand back the same agent session id, so the connection is
+  // part of the identity — otherwise host B renders host A's conversation.
+  it('misses retained messages when the ssh connection changes', async () => {
+    const onHostA = { ...ARGS, runtimeEnvironmentId: null, sshConnectionId: 'ssh:host-a' }
+    liveSession.mockReturnValue(session('ready', [message('from-host-a')]))
+    await render(onHostA)
+
+    liveSession.mockReturnValue(session('loading', []))
+    await render({ ...onHostA, sshConnectionId: 'ssh:host-b' })
+
+    expect(latest?.messages).toEqual([])
+  })
+
   // The live hook deliberately surfaces subscribe appends over a spinner while the
   // base read retries a not-yet-flushed transcript; retention must not undo that.
   it('keeps live appends visible while the base read is still retrying', async () => {

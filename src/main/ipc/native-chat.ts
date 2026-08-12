@@ -8,9 +8,12 @@ import { clearNativeChatTranscriptCache } from '../native-chat/transcript-read-c
 import type { ReadTranscriptResult } from '../native-chat/transcript-reader'
 import {
   subscribeNativeChatTranscript,
-  readNativeChatTranscriptTail,
-  type NativeChatTranscriptSubscription
+  readNativeChatTranscriptTail
 } from '../native-chat/transcript-watch'
+import {
+  readSshNativeChatTranscript,
+  subscribeSshNativeChatForSender
+} from './native-chat-ssh-subscription'
 
 // Re-export so existing test imports of `clearNativeChatTranscriptCache` from
 // this module keep working after the cache moved to transcript-read-cache.ts.
@@ -25,6 +28,12 @@ export type NativeChatReadSessionArgs = {
   /** Authoritative transcript path from the agent hook (providerSession), used to
    *  locate the file when the session id no longer names it (recent Claude Code). */
   transcriptPath?: string
+  /** Set when the pane's agent runs on a plain `ssh:` host, whose disk this
+   *  process cannot see; the read then runs on that host's relay. */
+  sshConnectionId?: string
+  /** Read the window ending here instead of at the file's tail — a prior
+   *  result's `beforeOffset`, which pages older history. */
+  beforeOffset?: number
 }
 
 // Why: render and parse only the recent window so long transcripts do not stall
@@ -35,11 +44,22 @@ async function readSession(args: NativeChatReadSessionArgs): Promise<ReadTranscr
   const { agent, sessionId } = args
   // Clamp to a positive window; default to the desktop window for the first page.
   const limit = args.limit && args.limit > 0 ? Math.floor(args.limit) : DESKTOP_READ_WINDOW
+  if (args.sshConnectionId) {
+    return readSshNativeChatTranscript({
+      sshConnectionId: args.sshConnectionId,
+      agent,
+      sessionId,
+      limit,
+      ...(args.transcriptPath ? { transcriptPath: args.transcriptPath } : {}),
+      ...(typeof args.beforeOffset === 'number' ? { beforeOffset: args.beforeOffset } : {})
+    })
+  }
   return readNativeChatTranscriptTail({
     agent,
     sessionId,
     transcriptPath: args.transcriptPath,
-    limit
+    limit,
+    ...(typeof args.beforeOffset === 'number' ? { beforeOffset: args.beforeOffset } : {})
   })
 }
 
@@ -52,6 +72,9 @@ export type NativeChatSubscribeArgs = {
   /** Authoritative transcript path from the agent hook (providerSession). */
   transcriptPath?: string
   limit?: number
+  /** Set when the pane's agent runs on a plain `ssh:` host; the watcher then
+   *  lives on that host's relay and this process forwards its frames. */
+  sshConnectionId?: string
 }
 
 export type NativeChatAppendedPayload = {
@@ -61,6 +84,7 @@ export type NativeChatAppendedPayload = {
         type: 'snapshot'
         messages: NativeChatMessage[]
         hasMore: boolean
+        beforeOffset?: number
         error?: string
         lifecycle?: NativeChatTurnLifecycle
       }
@@ -68,6 +92,7 @@ export type NativeChatAppendedPayload = {
         type: 'replacement'
         messages: NativeChatMessage[]
         hasMore: boolean
+        beforeOffset?: number
         lifecycle?: NativeChatTurnLifecycle
       }
     | {
@@ -78,7 +103,7 @@ export type NativeChatAppendedPayload = {
 }
 
 type LiveSubscription = {
-  subscription: NativeChatTranscriptSubscription
+  subscription: { unsubscribe: () => void }
 }
 
 // Why: live subscriptions are keyed by (webContents.id, subscriptionId) so the
@@ -140,6 +165,18 @@ function beginPendingSubscription(senderId: number, subscriptionId: string): sym
   return token
 }
 
+function storeLiveSubscription(
+  senderId: number,
+  subscriptionId: string,
+  subscription: { unsubscribe: () => void }
+): void {
+  const bySubId = liveSubscriptions.get(senderId) ?? new Map<string, LiveSubscription>()
+  // A concurrent subscribe with the same id beat us here; honor the latest.
+  bySubId.get(subscriptionId)?.subscription.unsubscribe()
+  bySubId.set(subscriptionId, { subscription })
+  liveSubscriptions.set(senderId, bySubId)
+}
+
 function takePendingSubscription(senderId: number, subscriptionId: string, token: symbol): boolean {
   const bySubId = pendingSubscriptions.get(senderId)
   if (bySubId?.get(subscriptionId) !== token) {
@@ -163,14 +200,32 @@ async function handleSubscribe(event: IpcMainEvent, args: NativeChatSubscribeArg
   const pendingToken = beginPendingSubscription(sender.id, subscriptionId)
   registerSenderCleanup(sender)
 
-  let subscription: NativeChatTranscriptSubscription
+  if (args.sshConnectionId) {
+    const relaySubscription = subscribeSshNativeChatForSender({
+      sender,
+      subscriptionId,
+      sshConnectionId: args.sshConnectionId,
+      agent,
+      sessionId,
+      limit,
+      ...(transcriptPath ? { transcriptPath } : {})
+    })
+    if (!takePendingSubscription(sender.id, subscriptionId, pendingToken) || sender.isDestroyed()) {
+      relaySubscription.unsubscribe()
+      return
+    }
+    storeLiveSubscription(sender.id, subscriptionId, relaySubscription)
+    return
+  }
+
+  let subscription: { unsubscribe: () => void; watching: boolean }
   try {
     subscription = await subscribeNativeChatTranscript({
       agent,
       sessionId,
       transcriptPath,
       initialLimit: limit,
-      onInitialSnapshot: (messages, hasMore, _beforeOffset, error, lifecycle) => {
+      onInitialSnapshot: (messages, hasMore, beforeOffset, error, lifecycle) => {
         if (sender.isDestroyed()) {
           return
         }
@@ -182,13 +237,14 @@ async function handleSubscribe(event: IpcMainEvent, args: NativeChatSubscribeArg
             type: 'snapshot',
             messages,
             hasMore,
+            beforeOffset,
             ...(error ? { error } : {}),
             ...(lifecycle ? { lifecycle } : {})
           }
         }
         sender.send('nativeChat:appended', payload)
       },
-      onReplace: (messages, hasMore, _beforeOffset, lifecycle) => {
+      onReplace: (messages, hasMore, beforeOffset, lifecycle) => {
         if (sender.isDestroyed()) {
           return
         }
@@ -198,6 +254,7 @@ async function handleSubscribe(event: IpcMainEvent, args: NativeChatSubscribeArg
             type: 'replacement',
             messages,
             hasMore,
+            beforeOffset,
             ...(lifecycle ? { lifecycle } : {})
           }
         } satisfies NativeChatAppendedPayload)
@@ -229,14 +286,7 @@ async function handleSubscribe(event: IpcMainEvent, args: NativeChatSubscribeArg
     subscription.unsubscribe()
     return
   }
-  const bySubId = liveSubscriptions.get(sender.id) ?? new Map<string, LiveSubscription>()
-  // A concurrent subscribe with the same id beat us here; honor the latest.
-  const existing = bySubId.get(subscriptionId)
-  if (existing) {
-    existing.subscription.unsubscribe()
-  }
-  bySubId.set(subscriptionId, { subscription })
-  liveSubscriptions.set(sender.id, bySubId)
+  storeLiveSubscription(sender.id, subscriptionId, subscription)
   if (!subscription.watching && !sender.isDestroyed()) {
     const payload: NativeChatAppendedPayload = {
       subscriptionId,

@@ -25,7 +25,11 @@ if (!TARGET || !MERGE_HEAD || !OUT) {
 }
 
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 1 << 28 })
-const lines = (value) => value.split('\n').map((line) => line.trim()).filter(Boolean)
+const lines = (value) =>
+  value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
 
 // package.json's version line is fork-owned but written by github-actions[bot], so commit
 // authorship alone hands the file to upstream and regresses the published version series.
@@ -48,8 +52,17 @@ const IMPORT_REF = /(?:from\s*|require\(\s*|new URL\(\s*)['"](\.[^'"]+)['"]/g
 const isTest = (file) => /\.(test|spec)\.[cm]?[jt]sx?$/.test(file)
 
 const forkAuthored = lines(
-  git('log', '--format=%H', '--no-merges', '--author=zpyoung', '--author=Zachary Young',
-      'origin/main', '--not', 'upstream/main', TARGET)
+  git(
+    'log',
+    '--format=%H',
+    '--no-merges',
+    '--author=zpyoung',
+    '--author=Zachary Young',
+    'origin/main',
+    '--not',
+    'upstream/main',
+    TARGET
+  )
 )
 if (forkAuthored.length === 0) {
   throw new Error('no fork-authored commits resolved; refusing to classify')
@@ -79,8 +92,9 @@ function resolveImport(fromDir, reference) {
     }
   }
   const base = stack.join('/')
-  return EXTENSIONS.map((extension) => `${base}${extension}`)
-    .find((candidate) => forkOwned.has(candidate) && !SHARED_BARRELS.has(candidate))
+  return EXTENSIONS.map((extension) => `${base}${extension}`).find(
+    (candidate) => forkOwned.has(candidate) && !SHARED_BARRELS.has(candidate)
+  )
 }
 
 // A test whose subject the fork owns has to stay on the fork's version: upstream's newer test
@@ -109,10 +123,15 @@ const remove = upstreamOwned.filter((file) => !targetTree.has(file))
 
 writeFileSync(`${OUT}/checkout.txt`, `${checkout.join('\n')}\n`)
 writeFileSync(`${OUT}/remove.txt`, `${remove.join('\n')}\n`)
-writeFileSync(`${OUT}/coupled-tests.txt`, `${coupledTests.map((t) => `${t.file}\t${t.subject}`).join('\n')}\n`)
+writeFileSync(
+  `${OUT}/coupled-tests.txt`,
+  `${coupledTests.map((t) => `${t.file}\t${t.subject}`).join('\n')}\n`
+)
 
 console.log(`fork-authored commits: ${forkAuthored.length}`)
-console.log(`upstream-owned: ${upstreamOwned.length} (reset ${checkout.length}, remove ${remove.length})`)
+console.log(
+  `upstream-owned: ${upstreamOwned.length} (reset ${checkout.length}, remove ${remove.length})`
+)
 console.log(`coupled tests kept on the fork side: ${coupledTests.length}`)
 for (const { file, subject } of coupledTests) {
   console.log(`  ${file} -> ${subject}`)

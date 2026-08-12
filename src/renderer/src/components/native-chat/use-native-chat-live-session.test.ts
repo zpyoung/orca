@@ -350,6 +350,96 @@ describe('useNativeChatLiveSession — transport routing', () => {
     expect(latest?.messages.map((message) => message.id)).not.toContain('stale-old-path')
   })
 
+  // A byte-bounded reader returns the same tail no matter how high the limit
+  // goes, so paging has to ask for the window ending at the oldest known offset.
+  it('pages older history by beforeOffset and prepends it', async () => {
+    const transport = getMockTransport('env-1')
+    await render({ paneKey: PANE, agent: AGENT, sessionId: SESSION, runtimeEnvironmentId: 'env-1' })
+    await act(async () =>
+      transport.emit({
+        type: 'snapshot',
+        messages: [{ ...assistant('newer', 'tail'), timestamp: 20 }],
+        hasMore: true,
+        beforeOffset: 4_096
+      })
+    )
+    transport.readSession.mockResolvedValueOnce({
+      messages: [{ ...assistant('older', 'head'), timestamp: 10 }],
+      hasMore: false,
+      beforeOffset: 0
+    })
+
+    await act(async () => latest?.loadEarlier())
+
+    expect(transport.readSession).toHaveBeenLastCalledWith(
+      expect.objectContaining({ beforeOffset: 4_096 })
+    )
+    expect(latest?.messages.map((m) => m.id)).toEqual(['older', 'newer'])
+    expect(latest?.hasMore).toBe(false)
+  })
+
+  it('stops paging when the reader reports no older offset', async () => {
+    const transport = getMockTransport('env-1')
+    await render({ paneKey: PANE, agent: AGENT, sessionId: SESSION, runtimeEnvironmentId: 'env-1' })
+    await act(async () =>
+      transport.emit({
+        type: 'snapshot',
+        messages: [assistant('newer', 'tail')],
+        hasMore: true,
+        beforeOffset: 4_096
+      })
+    )
+    // Same offset back means the read could not move behind the window; treating
+    // that as "more" would let load-earlier retrigger forever.
+    transport.readSession.mockResolvedValueOnce({
+      messages: [assistant('older', 'head')],
+      hasMore: true,
+      beforeOffset: 4_096
+    })
+
+    await act(async () => latest?.loadEarlier())
+
+    expect(latest?.hasMore).toBe(false)
+  })
+
+  // An older remote runtime reports no offset at all; growing the limit is the
+  // only thing left, and it still has to work.
+  it('falls back to growing the limit when no offset is reported', async () => {
+    const transport = getMockTransport('env-1')
+    const many = Array.from({ length: NATIVE_CHAT_INITIAL_LIMIT }, (_unused, n) =>
+      assistant(`m-${n}`, 't')
+    )
+    await render({ paneKey: PANE, agent: AGENT, sessionId: SESSION, runtimeEnvironmentId: 'env-1' })
+    await act(async () => transport.emit({ type: 'snapshot', messages: many, hasMore: true }))
+    transport.readSession.mockResolvedValueOnce({ messages: [assistant('grown', 'g')] })
+
+    await act(async () => latest?.loadEarlier())
+
+    expect(transport.readSession).toHaveBeenLastCalledWith(
+      expect.objectContaining({ limit: NATIVE_CHAT_INITIAL_LIMIT + 200 })
+    )
+    expect(transport.readSession.mock.calls.at(-1)?.[0]).not.toHaveProperty('beforeOffset')
+    expect(latest?.messages.map((m) => m.id)).toEqual(['grown'])
+  })
+
+  it('routes an ssh-owned pane read through the connection that owns it', async () => {
+    const transport = getMockTransport(null)
+    await render({
+      paneKey: PANE,
+      agent: AGENT,
+      sessionId: SESSION,
+      sshConnectionId: 'ssh:host-1'
+    })
+
+    expect(transport.readSession).toHaveBeenCalledWith(
+      expect.objectContaining({ sshConnectionId: 'ssh:host-1' })
+    )
+    expect(transport.subscribe).toHaveBeenCalledWith(
+      expect.objectContaining({ sshConnectionId: 'ssh:host-1' }),
+      expect.any(Function)
+    )
+  })
+
   it('seeds ready from readSession when the subscription never delivers a frame', async () => {
     const transport = getMockTransport('env-1')
     // Older runtime: the stream wires only appends and stays silent for an empty
@@ -620,7 +710,43 @@ describe('useNativeChatLiveSession — notFound retry (#8401)', () => {
     expect(latest?.messages.map((m) => m.id)).toContain('a-1')
   })
 
-  it('surfaces an error once the ~60s retry window is exhausted', async () => {
+  // Claude Code creates a new session's JSONL only on its first buffered flush,
+  // measured at 73s/90s/152s after the session's own first record. Every one of
+  // those misses must still be retrying, not settled into a permanent error.
+  it('keeps retrying past the slowest observed Claude Code transcript flush', async () => {
+    vi.useFakeTimers()
+    const transport = getMockTransport('env-1', { autoSnapshot: false })
+    transport.readSession.mockResolvedValue({ error: 'No transcript found', notFound: true })
+
+    await render({ paneKey: PANE, agent: AGENT, sessionId: SESSION, runtimeEnvironmentId: 'env-1' })
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(160_000)
+    })
+
+    expect(latest?.status).toBe('loading')
+  })
+
+  it('recovers once a transcript flushed later than the old 60s window lands', async () => {
+    vi.useFakeTimers()
+    const transport = getMockTransport('env-1', { autoSnapshot: false })
+    transport.readSession.mockResolvedValue({ error: 'No transcript found', notFound: true })
+
+    await render({ paneKey: PANE, agent: AGENT, sessionId: SESSION, runtimeEnvironmentId: 'env-1' })
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(90_000)
+    })
+    transport.readSession.mockResolvedValue({ messages: [assistant('a-late', 'flushed')] })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000)
+    })
+
+    expect(latest?.status).not.toBe('error')
+    expect(latest?.messages.map((m) => m.id)).toContain('a-late')
+  })
+
+  it('surfaces an error once the retry window is exhausted', async () => {
     vi.useFakeTimers()
     const transport = getMockTransport('env-1', { autoSnapshot: false })
     transport.readSession.mockResolvedValue({ error: 'No transcript found', notFound: true })
@@ -629,7 +755,7 @@ describe('useNativeChatLiveSession — notFound retry (#8401)', () => {
     expect(latest?.status).toBe('loading')
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(70_000)
+      await vi.advanceTimersByTimeAsync(310_000)
     })
 
     expect(latest?.status).toBe('error')
@@ -691,7 +817,9 @@ describe('useNativeChatLiveSession — notFound retry (#8401)', () => {
     expect(latest?.readPhase).toBe('loading')
   })
 
-  it('renders live-appended content even when the initial read settled into a permanent error', async () => {
+  // The appended content must render, and the failure must still be reported —
+  // the view shows it inline rather than replacing the conversation with it.
+  it('renders live-appended content and keeps reporting a permanent read error', async () => {
     const transport = getMockTransport('env-1', { autoSnapshot: false })
     transport.readSession.mockResolvedValueOnce({ error: 'unreadable transcript' })
 
@@ -702,8 +830,7 @@ describe('useNativeChatLiveSession — notFound retry (#8401)', () => {
       transport.emit({ type: 'appended', messages: [assistant('a-late', 'landed late')] })
     })
 
-    expect(latest?.status).not.toBe('error')
-    expect(latest?.error).toBeUndefined()
     expect(latest?.messages.map((m) => m.id)).toContain('a-late')
+    expect(latest?.error).toBe('unreadable transcript')
   })
 })

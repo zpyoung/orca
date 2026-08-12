@@ -118,6 +118,52 @@ describe('install-electron-package-binary', () => {
     }
   })
 
+  it('retries a refused HTTP/2 stream from the release CDN', () => {
+    const projectDir = mkTempProject()
+
+    try {
+      writeFakeElectronPackage(projectDir)
+      writeFakeElectronGet(projectDir, {
+        downloadFailures: 1,
+        downloadErrorCode: 'ERR_HTTP2_STREAM_ERROR'
+      })
+      writeFakeExtractor(projectDir, { createExecutable: true })
+
+      const result = runInstallScript(projectDir, {
+        ORCA_ELECTRON_PACKAGE_RETRY_DELAYS_MS: '0,0'
+      })
+
+      expect(result.status, result.stderr).toBe(0)
+      expect(result.stderr).toContain(
+        'Transient Electron download failure (ERR_HTTP2_STREAM_ERROR)'
+      )
+    } finally {
+      rmSync(projectDir, { recursive: true, force: true })
+    }
+  })
+
+  it('retries a 5xx carried on a fetch Response', () => {
+    const projectDir = mkTempProject()
+
+    try {
+      writeFakeElectronPackage(projectDir)
+      writeFakeElectronGet(projectDir, {
+        downloadFailures: 1,
+        downloadErrorResponseStatus: 503
+      })
+      writeFakeExtractor(projectDir, { createExecutable: true })
+
+      const result = runInstallScript(projectDir, {
+        ORCA_ELECTRON_PACKAGE_RETRY_DELAYS_MS: '0,0'
+      })
+
+      expect(result.status, result.stderr).toBe(0)
+      expect(result.stderr).toContain('Transient Electron download failure (HTTP 503)')
+    } finally {
+      rmSync(projectDir, { recursive: true, force: true })
+    }
+  })
+
   it('fails after exhausting transient Electron download retries', () => {
     const projectDir = mkTempProject()
 
@@ -279,7 +325,12 @@ module.exports = path.join(__dirname, 'dist', fs.readFileSync(pathFile, 'utf8'))
 
 function writeFakeElectronGet(
   projectDir,
-  { downloadNeverSettles = false, downloadFailures = 0, downloadErrorCode = 'ECONNRESET' } = {}
+  {
+    downloadNeverSettles = false,
+    downloadFailures = 0,
+    downloadErrorCode = 'ECONNRESET',
+    downloadErrorResponseStatus = null
+  } = {}
 ) {
   const getDir = join(projectDir, 'node_modules', 'electron', 'node_modules', '@electron', 'get')
   mkdirSync(getDir, { recursive: true })
@@ -299,6 +350,13 @@ exports.downloadArtifact = async function downloadArtifact(details) {
     return new Promise(() => {})
   }
   if (downloadAttempt <= ${JSON.stringify(downloadFailures)}) {
+    const responseStatus = ${JSON.stringify(downloadErrorResponseStatus)}
+    if (responseStatus !== null) {
+      // Shape of @electron/get's fetch downloader: HTTPError carrying a WHATWG Response.
+      throw Object.assign(new Error('Response code ' + responseStatus), {
+        response: { status: responseStatus }
+      })
+    }
     const cause = Object.assign(new Error('download failed'), {
       code: ${JSON.stringify(downloadErrorCode)}
     })

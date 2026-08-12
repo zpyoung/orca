@@ -15247,7 +15247,8 @@
         "empty": {
           "title": "Start a chat with {{value0}}",
           "subtitle": "Ask {{value0}} to inspect code, explain output, or make a change."
-        }
+        },
+        "readErrorNotice": "Chat history could not be refreshed. {{value0}}"
       },
       "stop": "Stop the agent",
       "copyMessage": {

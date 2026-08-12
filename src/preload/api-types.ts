@@ -938,6 +938,15 @@ export type NativeChatReadSessionResult =
   | {
       messages: NativeChatMessage[]
       lifecycle?: NativeChatTurnLifecycle
+      /** Authoritative "older history exists". Optional: a runtime old enough to
+       *  omit it leaves the caller inferring from the returned count, which is
+       *  wrong whenever a read is bounded by bytes rather than turns. */
+      hasMore?: boolean
+      /** Byte offset of the oldest returned turn — pass it back as
+       *  `beforeOffset` to read the page immediately older. Optional for the
+       *  same old-runtime reason as `hasMore`; without it the caller can only
+       *  page by growing `limit`. */
+      beforeOffset?: number
     }
   | { error: string; notFound?: true }
 
@@ -949,6 +958,9 @@ export type NativeChatSubscriptionFrame =
       type: 'snapshot'
       messages: NativeChatMessage[]
       hasMore: boolean
+      /** Oldest returned turn's byte offset; seeds pagination from a live
+       *  snapshot, which otherwise supersedes the seed read that carried it. */
+      beforeOffset?: number
       error?: string
       lifecycle?: NativeChatTurnLifecycle
     }
@@ -956,6 +968,7 @@ export type NativeChatSubscriptionFrame =
       type: 'replacement'
       messages: NativeChatMessage[]
       hasMore: boolean
+      beforeOffset?: number
       lifecycle?: NativeChatTurnLifecycle
     }
   | {
@@ -980,17 +993,32 @@ export type NativeChatSubscribeArgs = {
   transcriptPath?: string
   /** First snapshot size; later readSession calls grow this for pagination. */
   limit?: number
+  /** Plain-`ssh:` owner of the pane, when it has one — the watcher then lives on
+   *  that host's relay and main forwards its frames. */
+  sshConnectionId?: string
+}
+
+export type NativeChatReadSessionArgs = {
+  agent: AgentType
+  sessionId: string
+  /** How many of the most-recent turns to return. */
+  limit?: number
+  /** Authoritative transcript path from the agent hook (providerSession). */
+  transcriptPath?: string
+  /** Plain-`ssh:` owner of the pane, when it has one — the read then runs on
+   *  that host's relay, since this process cannot see its disk. */
+  sshConnectionId?: string
+  /** Read the window ending at this byte offset instead of the file's tail —
+   *  a prior result's `beforeOffset`, which pages older history. */
+  beforeOffset?: number
 }
 
 export type NativeChatApi = {
   /** Read the on-disk transcript for an agent + session id, windowed to the most recent `limit`
-   *  turns. `transcriptPath` is the hook-reported authoritative path, preferred over the id glob. */
-  readSession: (
-    agent: AgentType,
-    sessionId: string,
-    limit?: number,
-    transcriptPath?: string
-  ) => Promise<NativeChatReadSessionResult>
+   *  turns. `transcriptPath` is the hook-reported authoritative path, preferred over the id glob.
+   *  Object-shaped on purpose: a positional tail is assignable when a caller
+   *  forwards fewer arguments than it was handed, which silently misroutes reads. */
+  readSession: (args: NativeChatReadSessionArgs) => Promise<NativeChatReadSessionResult>
   /** Live-tail a transcript. The first frame is a bounded race-safe snapshot;
    *  later frames contain only newly appended messages. */
   subscribe: (

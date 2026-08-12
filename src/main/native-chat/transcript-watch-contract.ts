@@ -24,6 +24,10 @@ export type SubscribeNativeChatTranscriptArgs = ResolveSessionFileOptions & {
     lifecycle?: NativeChatTurnLifecycle
   ) => void
   initialLimit?: number
+  /** Byte ceiling for snapshot and replacement reads. Set by the relay, whose
+   *  frames have to fit a shared writer budget; a dropped older turn still
+   *  shows up as `hasMore` with a `beforeOffset` that can page back to it. */
+  initialMaxBytes?: number
   filePath?: string
   debounceMs?: number
   /** Test-only override for the production resolve-poll backoff. */

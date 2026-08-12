@@ -98,3 +98,67 @@ function isTailAppend(
   }
   return true
 }
+
+/** An assembler plus the inputs it was last fed, so a caller re-deriving the
+ *  transcript every render can tell a tail extension from a base-axis change. */
+export type NativeChatTranscriptCache = {
+  assembler: IncrementalChatAssembler
+  applied: readonly NativeChatMessage[]
+  baseSignature: string | null
+  base: readonly NativeChatMessage[]
+}
+
+export function createNativeChatTranscriptCache(): NativeChatTranscriptCache {
+  return {
+    assembler: createIncrementalAssembler(),
+    applied: [],
+    baseSignature: null,
+    base: []
+  }
+}
+
+/** Assemble `base ++ appended`, reusing cached state when the transcript only
+ *  grew at the tail. Anything else — a new `baseSignature`, or a re-read that
+ *  replaced the base list — resets, so the cache can never drift from what a
+ *  full rebuild would produce (#17). */
+export function assembleCachedTranscript(
+  cache: NativeChatTranscriptCache,
+  base: readonly NativeChatMessage[],
+  appended: readonly NativeChatMessage[],
+  baseSignature: string
+): NativeChatMessage[] {
+  const transcript = appended.length > 0 ? [...base, ...appended] : (base as NativeChatMessage[])
+  const baseChanged = baseSignature !== cache.baseSignature || base !== cache.base
+  const isSuffixExtension =
+    !baseChanged &&
+    transcript.length >= cache.applied.length &&
+    sharesNativeChatPrefix(transcript, cache.applied, cache.applied.length)
+
+  let out: NativeChatMessage[]
+  if (isSuffixExtension && transcript.length > cache.applied.length) {
+    out = applyAppends(cache.assembler, transcript.slice(cache.applied.length))
+  } else if (isSuffixExtension) {
+    out = cache.assembler.messages
+  } else {
+    out = reset(cache.assembler, transcript)
+  }
+  cache.baseSignature = baseSignature
+  cache.base = base
+  cache.applied = transcript
+  return out
+}
+
+/** True when `whole`'s first `len` entries are referentially identical to
+ *  `prefix` (a tail-extension), so the caller can splice just the suffix. */
+export function sharesNativeChatPrefix(
+  whole: readonly NativeChatMessage[],
+  prefix: readonly NativeChatMessage[],
+  len: number
+): boolean {
+  for (let i = 0; i < len; i += 1) {
+    if (whole[i] !== prefix[i]) {
+      return false
+    }
+  }
+  return true
+}
