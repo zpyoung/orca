@@ -1,31 +1,10 @@
 import type { OrchestrationDb } from './db'
 import type { MessageRow, WorkerReportOutcome } from './types'
-import { parsePaneKey } from '../../../shared/stable-pane-id'
-
-// Why: the tab half can change on pane break-out, while opaque legacy keys
-// have no safe equivalence beyond exact equality.
-function isSamePane(assigneePaneKey: string, senderPaneKey: string): boolean {
-  if (assigneePaneKey === senderPaneKey) {
-    return true
-  }
-  const assigneeLeaf = parsePaneKey(assigneePaneKey)?.leafId
-  const senderLeaf = parsePaneKey(senderPaneKey)?.leafId
-  return Boolean(assigneeLeaf && senderLeaf && assigneeLeaf === senderLeaf)
-}
-
-function hasLifecycleAuthority(
-  dispatch: { assignee_handle: string | null; assignee_pane_key: string | null },
-  msg: MessageRow
-): boolean {
-  if (dispatch.assignee_pane_key) {
-    return Boolean(
-      msg.sender_pane_key && isSamePane(dispatch.assignee_pane_key, msg.sender_pane_key)
-    )
-  }
-  // Why: rows created before pane identity existed can only use the exact
-  // handle recorded at dispatch; payload knowledge alone is not authority.
-  return dispatch.assignee_handle === msg.from_handle
-}
+import { isOutOfRunScope } from './lifecycle-reconciliation-run-scope'
+import {
+  buildLifecycleAuthorityRejectionReason,
+  hasLifecycleAuthority
+} from './lifecycle-reconciliation-authority'
 
 export type LifecycleReconciliationResult =
   | { action: 'ignored' }
@@ -103,13 +82,14 @@ function getPersistedLifecycleRejection(
 export function reconcileLifecycleMessage(
   db: OrchestrationDb,
   msg: MessageRow,
-  onLog: LogFn = noopLog
+  onLog: LogFn = noopLog,
+  runId?: string
 ): LifecycleReconciliationResult {
   switch (msg.type) {
     case 'worker_done':
-      return reconcileWorkerDoneMessage(db, msg, onLog)
+      return reconcileWorkerDoneMessage(db, msg, onLog, runId)
     case 'heartbeat':
-      return reconcileHeartbeatMessage(db, msg, onLog)
+      return reconcileHeartbeatMessage(db, msg, onLog, runId)
     case 'status':
     case 'dispatch':
     case 'merge_ready':
@@ -124,7 +104,8 @@ export function reconcileLifecycleMessage(
 function reconcileHeartbeatMessage(
   db: OrchestrationDb,
   msg: MessageRow,
-  onLog: LogFn
+  onLog: LogFn,
+  runId?: string
 ): LifecycleReconciliationResult {
   if (!msg.payload) {
     onLog(`Heartbeat from ${msg.from_handle} missing payload; ignored`)
@@ -148,7 +129,7 @@ function reconcileHeartbeatMessage(
   }
 
   const dispatch = db.getDispatchContextById(dispatchId)
-  if (!dispatch || dispatch.status !== 'dispatched') {
+  if (!dispatch || dispatch.status !== 'dispatched' || isOutOfRunScope(dispatch, runId)) {
     // Why: an in-flight heartbeat can arrive after completion; retain it for
     // audit history without surfacing obsolete liveness to the coordinator.
     db.markAsReadAndDelivered([msg.id])
@@ -174,7 +155,8 @@ function reconcileHeartbeatMessage(
 function reconcileWorkerDoneMessage(
   db: OrchestrationDb,
   msg: MessageRow,
-  onLog: LogFn
+  onLog: LogFn,
+  runId?: string
 ): LifecycleReconciliationResult {
   onLog(`Worker done: ${msg.from_handle} — ${msg.subject}`)
 
@@ -228,7 +210,7 @@ function reconcileWorkerDoneMessage(
   }
 
   const task = db.getTask(taskId)
-  if (!task) {
+  if (!task || isOutOfRunScope(task, runId)) {
     return rejectLifecycleMessage(
       db,
       msg,
@@ -241,7 +223,7 @@ function reconcileWorkerDoneMessage(
   // Why: taskId alone is not a completion authority; retried tasks can have
   // stale worker_done messages racing the current active dispatch.
   const dispatch = db.getDispatchContextById(dispatchId)
-  if (!dispatch) {
+  if (!dispatch || isOutOfRunScope(dispatch, runId)) {
     return rejectLifecycleMessage(
       db,
       msg,
@@ -294,7 +276,7 @@ function reconcileWorkerDoneMessage(
   if (settlement.action === 'rejected') {
     return rejectLifecycleMessage(db, msg, settlement.code, settlement.reason, onLog)
   }
-  suppressEarlierHeartbeats(db, msg, dispatchId)
+  suppressEarlierHeartbeats(db, msg, dispatchId, runId)
 
   if (outcome === 'failed') {
     onLog(`Task ${taskId} failed by worker report`)
@@ -316,25 +298,14 @@ function rejectLifecycleMessage(
   return { action: 'rejected', code, reason }
 }
 
-function buildLifecycleAuthorityRejectionReason(
-  dispatchId: string,
-  dispatch: { assignee_handle: string | null; assignee_pane_key: string | null },
-  msg: MessageRow
-): string {
-  return (
-    `dispatch ${dispatchId} expected handle ${dispatch.assignee_handle ?? '<unknown>'}, ` +
-    `pane ${dispatch.assignee_pane_key ?? '<legacy>'}; received handle ${msg.from_handle}, ` +
-    `pane ${msg.sender_pane_key ?? '<missing>'}`
-  )
-}
-
 function suppressEarlierHeartbeats(
   db: OrchestrationDb,
   workerDone: MessageRow,
-  dispatchId: string
+  dispatchId: string,
+  runId?: string
 ): void {
   const heartbeatIds = db
-    .getUnreadMessages(workerDone.to_handle, ['heartbeat'])
+    .getUnreadMessages(workerDone.to_handle, ['heartbeat'], runId)
     .filter((message) => {
       if (message.sequence >= workerDone.sequence) {
         return false

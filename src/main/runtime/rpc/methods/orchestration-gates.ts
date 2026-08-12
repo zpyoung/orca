@@ -1,10 +1,28 @@
 import { z } from 'zod'
 import { defineMethod, type RpcMethod } from '../core'
 import { OptionalFiniteNumber, OptionalString, requiredString } from '../schemas'
-import type { GateStatus } from '../../orchestration/db'
+import { LEGACY_RUN_ID, type GateStatus, type OrchestrationDb } from '../../orchestration/db'
 import { Coordinator } from '../../orchestration/coordinator'
 import { resolveRunScope } from './orchestration-run-scope'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
+
+/**
+ * Resolves the task-run id a coordinator started from `coordinatorPaneKey` may read/mutate —
+ * distinct from the coordinator-run id `createCoordinatorRun` mints. Order (→ logic L12a item 3):
+ * the pane's bound run, then the migrated-DB adopted run id, then the raw legacy id only when no
+ * adoption row exists (a raw-legacy fallback on a migrated DB would find zero tasks).
+ */
+export function resolveCoordinatorTaskRunId(
+  db: OrchestrationDb,
+  coordinatorPaneKey: string | null
+): string {
+  const boundRun = coordinatorPaneKey ? db.getCurrentRunForPane(coordinatorPaneKey) : undefined
+  if (boundRun) {
+    return boundRun.id
+  }
+  const adoption = db.getLegacyAdoption()
+  return adoption ? adoption.adopted_run_id : LEGACY_RUN_ID
+}
 
 // Why: the coordinator instance is stored at module scope so orchestration.runStop
 // can signal it to halt. Only one coordinator can run at a time (enforced by
@@ -60,9 +78,12 @@ export const ORCHESTRATION_GATE_METHODS: RpcMethod[] = [
       }
 
       const coordinatorHandle = params.from ?? 'coordinator'
+      const coordinatorPaneKey = runtime.getTerminalPaneKey(coordinatorHandle)
+      const taskRunId = resolveCoordinatorTaskRunId(db, coordinatorPaneKey)
       const coordinator = new Coordinator(db, runtime, {
         spec: params.spec,
         coordinatorHandle,
+        taskRunId,
         pollIntervalMs: params.pollIntervalMs,
         maxConcurrent: params.maxConcurrent,
         worktree: params.worktree
