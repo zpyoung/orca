@@ -2060,6 +2060,12 @@ const api = {
     }
   },
 
+  pipelines: {
+    listTemplates: () => ipcRenderer.invoke('pipelines:list-templates'),
+    resolveTemplate: (args: { basename: string; inputText: string }) =>
+      ipcRenderer.invoke('pipelines:resolve-template', args)
+  } satisfies PreloadApi['pipelines'],
+
   codexAccounts: {
     list: (): Promise<unknown> => ipcRenderer.invoke('codexAccounts:list'),
     add: (args?: { runtime?: 'host' | 'wsl'; wslDistro?: string | null }): Promise<unknown> =>
