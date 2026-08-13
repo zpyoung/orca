@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { EMPTY_HISTORY, pushHistory, recallNext, recallPrevious } from './agent-composer-history'
+import {
+  EMPTY_HISTORY,
+  HISTORY_MAX_ENTRIES,
+  HISTORY_MAX_TOTAL_CHARS,
+  pushHistory,
+  recallNext,
+  recallPrevious
+} from './agent-composer-history'
 
 describe('history recall', () => {
   it('up-arrow on empty composer recalls the last sent input', () => {
@@ -42,5 +49,35 @@ describe('history recall', () => {
 
   it('recall on empty history is a no-op', () => {
     expect(recallPrevious(EMPTY_HISTORY).draft).toBeNull()
+  })
+
+  it('evicts oldest entries first once the per-pane entry bound is exceeded', () => {
+    let history = EMPTY_HISTORY
+    for (let i = 0; i < HISTORY_MAX_ENTRIES + 5; i++) {
+      history = pushHistory(history, `entry-${i}`)
+    }
+    expect(history.entries).toHaveLength(HISTORY_MAX_ENTRIES)
+    expect(history.entries[0]).toBe('entry-5')
+    expect(history.entries.at(-1)).toBe(`entry-${HISTORY_MAX_ENTRIES + 4}`)
+    expect(history.index).toBeNull()
+  })
+
+  it('evicts oldest entries first once the per-pane character bound is exceeded', () => {
+    const chunk = 'x'.repeat(1000)
+    let history = EMPTY_HISTORY
+    const pushes = Math.floor(HISTORY_MAX_TOTAL_CHARS / 1000) + 5
+    for (let i = 0; i < pushes; i++) {
+      history = pushHistory(history, `${chunk}-${i}`)
+    }
+    const totalChars = history.entries.reduce((sum, entry) => sum + entry.length, 0)
+    expect(totalChars).toBeLessThanOrEqual(HISTORY_MAX_TOTAL_CHARS)
+    expect(history.entries.at(-1)).toBe(`${chunk}-${pushes - 1}`)
+  })
+
+  it('never evicts the entry that was just pushed, even if it alone exceeds the character bound', () => {
+    const huge = 'x'.repeat(HISTORY_MAX_TOTAL_CHARS + 1000)
+    let history = pushHistory(EMPTY_HISTORY, 'small')
+    history = pushHistory(history, huge)
+    expect(history.entries).toEqual([huge])
   })
 })
