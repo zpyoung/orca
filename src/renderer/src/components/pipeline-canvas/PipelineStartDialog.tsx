@@ -9,7 +9,7 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
-import { ensurePipelineTab } from '@/lib/ensure-pipeline-tab'
+import { canEnsurePipelineTab, ensurePipelineTab } from '@/lib/ensure-pipeline-tab'
 import { translate } from '@/i18n/i18n'
 import { callRuntimeRpc, type RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
 
@@ -174,8 +174,8 @@ export default function PipelineStartDialog({
         {hasSubmodules && (
           <p className="text-xs text-muted-foreground">
             {translate(
-              'auto.components.pipeline.canvas.PipelineStartDialog.submoduleWarning',
-              'This repository has submodules: submodule contents are not checkpointed, so retries do not roll back submodule changes.'
+              'auto.components.pipeline.canvas.PipelineStartDialog.submoduleCaveat',
+              'Submodule contents are not checkpointed: if this repository has any, retries do not roll back submodule changes.'
             )}
           </p>
         )}
@@ -244,19 +244,32 @@ export default function PipelineStartDialog({
             className="scrollbar-sleek flex max-h-24 flex-col gap-0.5 overflow-y-auto text-xs text-muted-foreground"
           >
             {runHistory.map((run) => {
-              const rowContent = (
-                <>
-                  <span>
-                    {run.workspaceDisplayName} #{run.runNumber}
-                  </span>
-                  <span>{run.state}</span>
-                </>
+              const nameCell = (
+                <span>
+                  {run.workspaceDisplayName} #{run.runNumber}
+                </span>
               )
               const ownerWorktreeId = run.workspaceId ?? workspaceId
               if (!ownerWorktreeId) {
                 return (
                   <div key={run.runId} className="flex items-center justify-between gap-2">
-                    {rowContent}
+                    {nameCell}
+                    <span>{run.state}</span>
+                  </div>
+                )
+              }
+              // a row whose owning workspace no longer exists can't host a canvas — say so
+              // instead of leaving the row clickable and silently doing nothing.
+              if (!canEnsurePipelineTab(ownerWorktreeId)) {
+                return (
+                  <div key={run.runId} className="flex items-center justify-between gap-2">
+                    {nameCell}
+                    <span>
+                      {translate(
+                        'auto.components.pipeline.canvas.PipelineStartDialog.workspaceUnavailable',
+                        'Workspace deleted'
+                      )}
+                    </span>
                   </div>
                 )
               }
@@ -274,7 +287,8 @@ export default function PipelineStartDialog({
                   }}
                   className="flex items-center justify-between gap-2 rounded-sm px-1 py-0.5 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
-                  {rowContent}
+                  {nameCell}
+                  <span>{run.state}</span>
                 </button>
               )
             })}

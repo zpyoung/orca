@@ -49,8 +49,9 @@ export function RunPipelineMenuItem({
         target={target}
         isFolderWorkspace={isFolderWorkspace}
         // Why: no cheap renderer-side signal reports submodule presence (git status only carries
-        // dirty submodules, and a full probe on every menu render is too expensive) — show the
-        // caveat unconditionally rather than never, which would silently hide a real retry risk.
+        // dirty submodules, and a full probe on every menu render is too expensive) — the dialog's
+        // copy is worded as a general "if this repo has any" caveat, so showing it unconditionally
+        // stays true regardless of whether this particular repository actually has submodules.
         hasSubmodules
         onStarted={(result) => {
           ensurePipelineTab(worktreeId, {

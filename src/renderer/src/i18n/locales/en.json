@@ -15153,7 +15153,9 @@
             "recentRuns": "Recent runs",
             "input": "Input",
             "cancel": "Cancel",
-            "start": "Start"
+            "start": "Start",
+            "workspaceUnavailable": "Workspace deleted",
+            "submoduleCaveat": "Submodule contents are not checkpointed: if this repository has any, retries do not roll back submodule changes."
           },
           "node": {
             "visuals": {

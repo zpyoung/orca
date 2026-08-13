@@ -13,6 +13,15 @@ import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner
 import { useAppStore } from '@/store'
 
 const STALENESS_THRESHOLD_MS = 15_000
+const INITIAL_RETRY_DELAY_MS = 1_000
+const MAX_RETRY_DELAY_MS = 30_000
+
+// a bare rejection of the establishing call (vs. a classified onError) is always a
+// transport/setup failure, never a "this host lacks the method" response — that
+// classification only ever arrives through the onError callback.
+function classifySubscribeRejection(raw: unknown): PipelineRunSubscriptionError {
+  return { kind: 'transient', message: raw instanceof Error ? raw.message : String(raw) }
+}
 
 const TERMINAL_RUN_STATES: ReadonlySet<PipelineRunState> = new Set([
   'completed',
@@ -63,36 +72,73 @@ export function usePipelineRunSnapshot(runId: string): PipelineRunSnapshotState 
     setSubscriptionError(null)
 
     let subscription: { unsubscribe: () => void } | null = null
+    let retryTimeoutId: number | null = null
+    let retryAttempt = 0
 
-    void subscribeToPipelineRunSnapshot(
-      target,
-      runId,
-      (next) => {
-        if (disposed) {
-          return
-        }
-        setSnapshot(next)
-        setIsStale(false)
-        setSubscriptionError(null)
-        upsertPipelineRunFromSnapshot(next)
-      },
-      (error) => {
-        if (disposed) {
-          return
-        }
-        console.warn('[usePipelineRunSnapshot] subscription error:', error)
-        setSubscriptionError(error)
-      }
-    ).then((handle) => {
+    const scheduleRetry = (): void => {
       if (disposed) {
-        handle.unsubscribe()
         return
       }
-      subscription = handle
-    })
+      const delay = Math.min(INITIAL_RETRY_DELAY_MS * 2 ** retryAttempt, MAX_RETRY_DELAY_MS)
+      retryAttempt += 1
+      retryTimeoutId = window.setTimeout(() => {
+        retryTimeoutId = null
+        connect()
+      }, delay)
+    }
+
+    const connect = (): void => {
+      void subscribeToPipelineRunSnapshot(
+        target,
+        runId,
+        (next) => {
+          if (disposed) {
+            return
+          }
+          retryAttempt = 0
+          setSnapshot(next)
+          setIsStale(false)
+          setSubscriptionError(null)
+          upsertPipelineRunFromSnapshot(next)
+        },
+        (error) => {
+          if (disposed) {
+            return
+          }
+          console.warn('[usePipelineRunSnapshot] subscription error:', error)
+          setSubscriptionError(error)
+          // unsupported: this host will never grow the method — not retryable.
+          if (error.kind === 'unsupported') {
+            return
+          }
+          subscription?.unsubscribe()
+          subscription = null
+          scheduleRetry()
+        }
+      )
+        .then((handle) => {
+          if (disposed) {
+            handle.unsubscribe()
+            return
+          }
+          subscription = handle
+        })
+        .catch((rawError: unknown) => {
+          if (disposed) {
+            return
+          }
+          setSubscriptionError(classifySubscribeRejection(rawError))
+          scheduleRetry()
+        })
+    }
+
+    connect()
 
     return () => {
       disposed = true
+      if (retryTimeoutId !== null) {
+        window.clearTimeout(retryTimeoutId)
+      }
       subscription?.unsubscribe()
     }
   }, [runId, target, upsertPipelineRunFromSnapshot])
