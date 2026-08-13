@@ -203,6 +203,7 @@ describe('PipelineDriver', () => {
     expect(pipelineDb.updateRunState).toHaveBeenCalledWith('run-1', 'paused')
     expect(pipelineDb.updateRunState).toHaveBeenCalledTimes(1)
     expect(publisher.setPausingAnnotation).toHaveBeenCalledWith('run-1', true)
+    expect(pipelineDb.run.state).toBe('paused')
 
     db.tasks.set('task-a', { id: 'task-a', status: 'completed', result: 'result-a' })
     await advanceOneCycle() // a's in-flight attempt still runs to completion while paused
@@ -216,6 +217,8 @@ describe('PipelineDriver', () => {
     driver.resume()
     driver.resume() // idempotent
     expect(publisher.setPausingAnnotation).toHaveBeenCalledWith('run-1', false)
+    // completes the running -> paused -> running sequence (AC9)
+    expect(pipelineDb.run.state).toBe('running')
 
     await advanceOneCycle() // dispatches b within one cycle of resume
     expect(executeLocalWorkerStartMock).toHaveBeenCalledTimes(2)
