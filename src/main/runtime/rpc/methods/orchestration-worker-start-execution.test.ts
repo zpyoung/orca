@@ -95,6 +95,102 @@ describe('orchestration worker-start execution seam', () => {
     })
   })
 
+  describe('startOptions persistence', () => {
+    it('persists the requested worktree selector and null name/repo/baseBranch for a freshly created terminal', async () => {
+      const { task } = createRunAndTask('persist start options')
+
+      const result = (await callWorkerStart({
+        task: task.id,
+        from: 'term_coord',
+        agent: 'codex',
+        worktree: 'repo::other'
+      })) as { dispatchId: string }
+
+      const worker = db.getWorkerDispatch(result.dispatchId)
+      expect(JSON.parse(worker!.start_options)).toEqual({
+        worktree: 'repo::other',
+        resolvedWorktreeId: 'repo::worktree',
+        name: null,
+        repo: null,
+        baseBranch: null,
+        terminal: null,
+        agent: 'codex',
+        launch: {
+          requested: { agent: 'codex', model: null, effort: null },
+          effective: { agent: 'codex', model: null, effort: null }
+        },
+        timeoutMs: 60_000,
+        setup: 'not_applicable',
+        setupSource: 'existing_worktree'
+      })
+    })
+
+    it('persists a null name, repo, and baseBranch for a reused terminal with no params supplied', async () => {
+      const { task } = createRunAndTask('persist start options reuse')
+
+      const result = (await callWorkerStart({
+        task: task.id,
+        from: 'term_coord',
+        terminal: 'term_worker'
+      })) as { dispatchId: string }
+
+      const worker = db.getWorkerDispatch(result.dispatchId)
+      expect(JSON.parse(worker!.start_options)).toEqual({
+        worktree: 'current',
+        resolvedWorktreeId: 'repo::worktree',
+        name: null,
+        repo: null,
+        baseBranch: null,
+        terminal: 'term_worker',
+        agent: null,
+        launch: {
+          requested: { agent: null, model: null, effort: null },
+          effective: { agent: null, model: null, effort: null }
+        },
+        timeoutMs: 60_000,
+        setup: 'not_applicable',
+        setupSource: 'existing_worktree'
+      })
+    })
+
+    it('threads requestedWorktree, name, repo, and baseBranch through a direct seam call', async () => {
+      const { run, task } = createRunAndTask('direct seam start options')
+
+      const result = await executeLocalWorkerStart({
+        runtime,
+        db,
+        runId: run.id,
+        taskId: task.id,
+        worktreeId: 'repo::worktree',
+        from: `pipeline-driver:${run.id}`,
+        requestedWorktree: 'repo::other',
+        name: 'My Worker',
+        repo: 'org/repo',
+        baseBranch: 'main',
+        launch: 'new-terminal',
+        agent: 'codex'
+      })
+
+      const worker = db.getWorkerDispatch(result.dispatchId)
+      expect(JSON.parse(worker!.start_options)).toEqual({
+        worktree: 'repo::other',
+        resolvedWorktreeId: 'repo::worktree',
+        name: 'My Worker',
+        repo: 'org/repo',
+        baseBranch: 'main',
+        terminal: null,
+        agent: 'codex',
+        launch: {
+          requested: { agent: 'codex', model: null, effort: null },
+          effective: { agent: 'codex', model: null, effort: null }
+        },
+        timeoutMs: 60_000,
+        setup: 'not_applicable',
+        setupSource: 'existing_worktree'
+      })
+    })
+  })
+
   describe('pane-less invocation', () => {
     it('succeeds with a synthetic driver identity and no bound pane', async () => {
       const { run, task } = createRunAndTask('driver dispatched task')

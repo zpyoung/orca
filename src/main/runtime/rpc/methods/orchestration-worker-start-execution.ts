@@ -56,6 +56,10 @@ export type ExecuteLocalWorkerStartArgs = {
   timeoutMs?: number
   devMode?: boolean
   mutationReceipt?: Parameters<OrchestrationDb['createStartingWorkerDispatch']>[0]['mutationReceipt']
+  requestedWorktree?: string
+  name?: string
+  repo?: string
+  baseBranch?: string
 } & (
   | {
       launch: 'new-terminal'
@@ -96,7 +100,11 @@ export async function executeLocalWorkerStart(
     taskId: task.id,
     retryOf: args.retryOf,
     startOptions: {
+      worktree: args.requestedWorktree ?? null,
       resolvedWorktreeId: worktreeId,
+      name: args.name ?? null,
+      repo: args.repo ?? null,
+      baseBranch: args.baseBranch ?? null,
       terminal: args.launch === 'reuse-terminal' ? args.terminal : null,
       agent: args.launch === 'new-terminal' ? args.agent : null,
       launch: launchReceipt,
