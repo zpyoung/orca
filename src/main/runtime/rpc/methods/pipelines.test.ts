@@ -357,6 +357,10 @@ describe('PipelineStartParams', () => {
     return { worktree: 'id:w1', definition: { ...bareDefinition(), nodes: [node] } }
   }
 
+  function paramsWithNodes(nodes: Record<string, unknown>[]) {
+    return { worktree: 'id:w1', definition: { ...bareDefinition(), nodes } }
+  }
+
   it('rejects an onFailure.retries above the documented 0-10 range', () => {
     const result = PipelineStartParams.safeParse(
       paramsWithNode(nodeWith({ onFailure: { retries: 1000000000 } }))
@@ -394,5 +398,39 @@ describe('PipelineStartParams', () => {
       PipelineStartParams.safeParse(paramsWithNode(nodeWith({ onFailure: { retries: 10 } })))
         .success
     ).toBe(true)
+  })
+
+  it('rejects a node id that does not match the template pattern ^[a-z0-9-]{1,64}$', () => {
+    const result = PipelineStartParams.safeParse(paramsWithNode(nodeWith({ id: 'Not Valid!' })))
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects a node id longer than the template pattern allows', () => {
+    const result = PipelineStartParams.safeParse(paramsWithNode(nodeWith({ id: 'n'.repeat(65) })))
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts a node id that matches the template pattern', () => {
+    const result = PipelineStartParams.safeParse(paramsWithNode(nodeWith({ id: 'valid-node-1' })))
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects duplicate node ids across nodes', () => {
+    const result = PipelineStartParams.safeParse(
+      paramsWithNodes([nodeWith({ id: 'n1', index: 0 }), nodeWith({ id: 'n1', index: 1 })])
+    )
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts distinct node ids across nodes where one needs another', () => {
+    const result = PipelineStartParams.safeParse(
+      paramsWithNodes([nodeWith({ id: 'n1', index: 0 }), nodeWith({ id: 'n2', index: 1, needs: ['n1'] })])
+    )
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects a needs entry that references an undeclared node id', () => {
+    const result = PipelineStartParams.safeParse(paramsWithNode(nodeWith({ needs: ['does-not-exist'] })))
+    expect(result.success).toBe(false)
   })
 })
