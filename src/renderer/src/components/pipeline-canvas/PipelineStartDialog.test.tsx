@@ -28,12 +28,20 @@ type TestRunListEntry = {
 let listRunsResult: TestRunListEntry[] = []
 let startResult: TestPipelineStartResult = { runId: 'run-1', runNumber: 1 }
 
-const callRuntimeRpc = vi.fn<(..._args: unknown[]) => Promise<unknown>>(async (_target, method) => {
-  if (method === 'pipeline.listRuns') {
-    return { runs: listRunsResult }
+const callRuntimeRpc = vi.fn<(..._args: unknown[]) => Promise<unknown>>(
+  async (_target, method, params) => {
+    if (method === 'pipeline.listRuns') {
+      // mirrors the host: a workspaceId filter excludes rows whose own workspaceId
+      // doesn't match — including deleted-workspace rows, which carry none at all.
+      const workspaceId = (params as { workspaceId?: string } | undefined)?.workspaceId
+      const runs = workspaceId
+        ? listRunsResult.filter((run) => run.workspaceId === workspaceId)
+        : listRunsResult
+      return { runs }
+    }
+    return startResult
   }
-  return startResult
-})
+)
 vi.mock('@/runtime/runtime-rpc-client', () => ({
   callRuntimeRpc: (...args: unknown[]) => callRuntimeRpc(...args)
 }))
@@ -408,6 +416,43 @@ describe('PipelineStartDialog', () => {
     )
     await waitFor(() => expect(screen.getByText(/orca #3/)).toBeInTheDocument())
     expect(screen.queryByRole('button', { name: /orca #3/ })).not.toBeInTheDocument()
+  })
+
+  it('shows history for a run whose workspace no longer exists, even when opened from a still-live workspace (AC24)', async () => {
+    listRunsResult = [
+      {
+        runId: 'run-live',
+        templateName: 'bugfix-fast',
+        runNumber: 1,
+        state: 'running',
+        workspaceDisplayName: 'orca',
+        workspaceId: 'w1'
+      },
+      {
+        runId: 'run-deleted-workspace',
+        templateName: 'bugfix-fast',
+        runNumber: 2,
+        state: 'completed',
+        workspaceDisplayName: 'old-workspace'
+        // no workspaceId: the host nulls it once the owning workspace is deleted
+      }
+    ]
+    setup([{ basename: 'bugfix-fast.yaml', name: 'bugfix-fast', needsNewerOrca: false }])
+    render(
+      <PipelineStartDialog
+        open={true}
+        onOpenChange={() => {}}
+        worktreeSelector="id:w1"
+        workspaceId="w1"
+        target={target}
+        isFolderWorkspace={false}
+        hasSubmodules={false}
+      />
+    )
+
+    await waitFor(() => expect(screen.getByText(/orca #1/)).toBeInTheDocument())
+    expect(screen.getByText(/old-workspace #2/)).toBeInTheDocument()
+    expect(screen.getByText(/completed/i)).toBeInTheDocument()
   })
 
   it('shows no history section when there are no prior runs', async () => {

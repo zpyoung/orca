@@ -35,6 +35,15 @@ export function ensurePipelineTab(
   options?: EnsurePipelineTabOptions
 ): string | null {
   const store = useAppStore.getState()
+  // the caller always knows the run's owning workspace (it's the start flow or a
+  // history reopen) — seed it now so a canvas mounted from this call never has to
+  // guess its host from a pipelineRunsById entry that hasn't hydrated yet.
+  store.seedPipelineRunWorkspace({
+    runId: run.runId,
+    workspaceId: worktreeId,
+    templateName: run.templateName,
+    runNumber: run.runNumber
+  })
   const sourceGroupId =
     options?.targetGroupId ??
     store.activeGroupIdByWorktree[worktreeId] ??

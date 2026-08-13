@@ -85,6 +85,9 @@ export function activateCyclableTab(store: AppStoreState, next: TypeCyclableTab)
       if (next.tabId) {
         store.activateTab?.(next.tabId)
       }
+      if (store.activeWorktreeId) {
+        store.activatePipelineTabSurface(store.activeWorktreeId)
+      }
       return
     case 'editor':
       // Why: `setActiveFile` targets the file entity (its implicit activateTab

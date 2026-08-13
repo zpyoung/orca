@@ -45,6 +45,18 @@ export type PipelineRunsSlice = {
   ) => void
   markPipelineRunHydrationFailed: (worktreeId: string, generation: number) => void
   upsertPipelineRunFromSnapshot: (snapshot: PipelineRunSnapshotWire) => void
+  /**
+   * Records a run's owning workspace as soon as the caller knows it (run start,
+   * history reopen) — before listRuns hydration or a subscription snapshot would
+   * otherwise supply it. Consumers that resolve a run's host must never fall back
+   * to local for a run that simply hasn't been hydrated yet.
+   */
+  seedPipelineRunWorkspace: (args: {
+    runId: string
+    workspaceId: string
+    templateName: string
+    runNumber: number
+  }) => void
 }
 
 export const createPipelineRunsSlice: StateCreator<AppState, [], [], PipelineRunsSlice> = (
@@ -138,6 +150,28 @@ export const createPipelineRunsSlice: StateCreator<AppState, [], [], PipelineRun
           [worktreeId]: { phase: 'failed' }
         }
       }))
+    },
+
+    seedPipelineRunWorkspace: ({ runId, workspaceId, templateName, runNumber }) => {
+      set((s) => {
+        const priorRun = s.pipelineRunsById[runId]
+        if (priorRun?.workspaceId === workspaceId) {
+          return s
+        }
+        return {
+          pipelineRunsById: {
+            ...s.pipelineRunsById,
+            [runId]: {
+              runId,
+              templateName: priorRun?.templateName ?? templateName,
+              runNumber: priorRun?.runNumber ?? runNumber,
+              state: priorRun?.state ?? 'unknown',
+              workspaceId,
+              lastSnapshotAt: priorRun?.lastSnapshotAt ?? null
+            }
+          }
+        }
+      })
     },
 
     upsertPipelineRunFromSnapshot: (snapshot) => {

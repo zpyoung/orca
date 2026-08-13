@@ -101,6 +101,45 @@ describe('activatePipelineTabPaletteResult', () => {
     expect(state.groupsByWorktree['wt-1'][0].activeTabId).toBe('pipe-tab-1')
   })
 
+  it('clears a previously active terminal id instead of leaving it stale or writing the pipeline tab id into terminal state', () => {
+    seedStore({
+      unifiedTabsByWorktree: {
+        'wt-1': [
+          makeTab({ id: 'term-tab-1', entityId: 'term-tab-1', contentType: 'terminal' }),
+          makeTab()
+        ]
+      },
+      // the group's active tab is still the terminal at the moment activation is
+      // requested — activation itself is what must move it to the pipeline tab.
+      groupsByWorktree: {
+        'wt-1': [makeGroup({ activeTabId: 'term-tab-1', tabOrder: ['term-tab-1', 'pipe-tab-1'] })]
+      },
+      tabsByWorktree: {
+        'wt-1': [
+          {
+            id: 'term-tab-1',
+            ptyId: null,
+            worktreeId: 'wt-1',
+            title: 'term-tab-1',
+            customTitle: null,
+            color: null,
+            sortOrder: 0,
+            createdAt: 0
+          }
+        ]
+      },
+      activeTabId: 'term-tab-1',
+      activeTabIdByWorktree: { 'wt-1': 'term-tab-1' },
+      activeTabType: 'terminal'
+    })
+
+    activatePipelineTabPaletteResult(target)
+
+    const state = useAppStore.getState()
+    expect(state.activeTabIdByWorktree['wt-1']).toBeNull()
+    expect(state.activeTabId).toBeNull()
+  })
+
   it('never writes the run id into a file-id field', () => {
     activatePipelineTabPaletteResult(target)
 
