@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import type { ResolvedPipelineDefinition, ResolvedPipelineNode } from '../../../shared/pipeline-template-types'
 import { LEGACY_RUN_ID, OrchestrationDb } from './db'
+import { PipelineRunDb } from './pipeline-run-db'
 
 describe('OrchestrationDb reset scopes', () => {
   let db: OrchestrationDb | undefined
@@ -67,6 +69,55 @@ describe('OrchestrationDb reset scopes', () => {
         afterSequence: 0
       })
     ).toEqual([])
+  })
+
+  it('resetAll leaves no pipeline rows or counters behind', () => {
+    db = new OrchestrationDb(':memory:')
+    const node: ResolvedPipelineNode = {
+      id: 'a',
+      title: 'a',
+      prompt: 'do the thing',
+      index: 0,
+      needs: [],
+      harness: 'claude',
+      onFailure: { retries: 0 }
+    }
+    const definition: ResolvedPipelineDefinition = {
+      templateName: 'bugfix-fast',
+      templateVersion: 1,
+      needsNewerOrca: false,
+      inputText: 'fix it',
+      nodes: [node]
+    }
+    const pipelineDb = new PipelineRunDb(db!)
+    const run = pipelineDb.instantiate({
+      definition,
+      workspaceId: null,
+      workspaceDisplayName: 'repo',
+      baseCommit: null
+    })
+    pipelineDb.beginAttempt(run.runId, 'a', { attempt: 1 })
+
+    db!.resetAll()
+
+    expect(pipelineDb.getPipelineRun(run.runId)).toBeUndefined()
+    expect(pipelineDb.listPipelineRuns()).toEqual([])
+    expect(pipelineDb.getNodes(run.runId)).toEqual([])
+    expect(pipelineDb.getAttempts(run.runId)).toEqual([])
+
+    // Run numbering restarts too: a full reset clears the history the numbers describe.
+    const next = pipelineDb.instantiate({
+      definition,
+      workspaceId: null,
+      workspaceDisplayName: 'repo',
+      baseCommit: null
+    })
+    expect(next.runNumber).toBe(1)
+  })
+
+  it('resetAll clears pipeline tables even when they were never created (no PipelineRunDb touched this connection)', () => {
+    db = new OrchestrationDb(':memory:')
+    expect(() => db!.resetAll()).not.toThrow()
   })
 
   it('resetTasks preserves Runs and messages while clearing every worker attachment', () => {

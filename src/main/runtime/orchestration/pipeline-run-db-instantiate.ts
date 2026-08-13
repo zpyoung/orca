@@ -15,33 +15,53 @@ export type InstantiatePipelineRunResult = {
   taskIdByNodeId: Record<string, string>
 }
 
+type VisitState = 'visiting' | 'done'
+
+/** Explicit-stack post-order DFS (same shape as `pipeline-template-graph-rules.ts`'s cycle check) so an arbitrarily long `needs` chain cannot overflow the call stack. */
 function topologicalNodeOrder(nodes: ResolvedPipelineNode[]): ResolvedPipelineNode[] {
   const byId = new Map(nodes.map((node) => [node.id, node]))
-  const visited = new Set<string>()
+  const state = new Map<string, VisitState>()
   const ordered: ResolvedPipelineNode[] = []
 
-  function visit(node: ResolvedPipelineNode, stack: Set<string>): void {
-    if (visited.has(node.id)) {
-      return
+  for (const startNode of nodes) {
+    if (state.has(startNode.id)) {
+      continue
     }
-    if (stack.has(node.id)) {
-      throw new Error(`Pipeline node cycle detected at "${node.id}"`)
-    }
-    stack.add(node.id)
-    for (const depId of node.needs) {
+
+    const stack: { node: ResolvedPipelineNode; needsIndex: number }[] = [
+      { node: startNode, needsIndex: 0 }
+    ]
+    state.set(startNode.id, 'visiting')
+
+    while (stack.length > 0) {
+      const frame = stack.at(-1)
+      if (!frame) {
+        break
+      }
+      if (frame.needsIndex >= frame.node.needs.length) {
+        state.set(frame.node.id, 'done')
+        ordered.push(frame.node)
+        stack.pop()
+        continue
+      }
+
+      const depId = frame.node.needs[frame.needsIndex]
+      frame.needsIndex += 1
+
+      const depState = state.get(depId)
+      if (depState === 'visiting') {
+        throw new Error(`Pipeline node cycle detected at "${depId}"`)
+      }
+      if (depState === 'done') {
+        continue
+      }
       const dependency = byId.get(depId)
       if (!dependency) {
-        throw new Error(`Pipeline node "${node.id}" depends on unknown node "${depId}"`)
+        throw new Error(`Pipeline node "${frame.node.id}" depends on unknown node "${depId}"`)
       }
-      visit(dependency, stack)
+      state.set(dependency.id, 'visiting')
+      stack.push({ node: dependency, needsIndex: 0 })
     }
-    stack.delete(node.id)
-    visited.add(node.id)
-    ordered.push(node)
-  }
-
-  for (const node of nodes) {
-    visit(node, new Set())
   }
   return ordered
 }
