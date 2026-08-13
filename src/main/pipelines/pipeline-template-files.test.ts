@@ -56,6 +56,21 @@ describe('pipeline-template-files', () => {
       expect(statSync(path).mtimeMs).toBe(mtimeBefore)
     })
 
+    it.runIf(process.platform !== 'win32')(
+      'refuses to write through a symlink planted at the predictable temp path',
+      () => {
+        mkdirSync(dir, { recursive: true })
+        const secretPath = join(root, 'secret.txt')
+        writeFileSync(secretPath, 'do not touch\n', 'utf8')
+        symlinkSync(secretPath, join(dir, 'bugfix-fast.yaml.tmp'))
+
+        expect(() => ensureStarterTemplate(dir)).toThrow()
+
+        expect(readFileSync(secretPath, 'utf8')).toBe('do not touch\n')
+        expect(existsSync(join(dir, 'bugfix-fast.yaml'))).toBe(false)
+      }
+    )
+
     it('is a no-op on a second call once the starter already exists', () => {
       const first = ensureStarterTemplate(dir)
       const mtimeAfterFirst = statSync(first.path).mtimeMs

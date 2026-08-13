@@ -251,4 +251,74 @@ describe('PipelineSnapshotPublisher', () => {
     publisher.publish('run_1')
     expect(received[1].pausing).toBe(true)
   })
+
+  describe('a subscriber that throws', () => {
+    it('does not stop publish from delivering to the other subscribers, or from returning', () => {
+      source.setRun(runRow({ state: 'running' }))
+      const receivedGood: PipelineRunSnapshotWire[] = []
+      publisher.subscribe('run_1', () => {
+        throw new Error('renderer disconnected mid-emit')
+      })
+      publisher.subscribe('run_1', (snapshot) => receivedGood.push(snapshot))
+      expect(receivedGood).toHaveLength(1)
+
+      expect(() => publisher.publish('run_1')).not.toThrow()
+
+      expect(receivedGood).toHaveLength(2)
+    })
+
+    it('does not stop the heartbeat timer from continuing to fire and deliver to a well-behaved peer', () => {
+      source.setRun(runRow({ state: 'running' }))
+      const receivedGood: PipelineRunSnapshotWire[] = []
+      publisher.subscribe('run_1', () => {
+        throw new Error('boom')
+      })
+      publisher.subscribe('run_1', (snapshot) => receivedGood.push(snapshot))
+
+      expect(() => vi.advanceTimersByTime(5_000)).not.toThrow()
+      expect(receivedGood).toHaveLength(2)
+      expect(() => vi.advanceTimersByTime(5_000)).not.toThrow()
+      expect(receivedGood).toHaveLength(3)
+    })
+
+    it('drops a subscriber after repeated failures instead of retrying it forever', () => {
+      source.setRun(runRow({ state: 'running' }))
+      const throwing = vi.fn(() => {
+        throw new Error('boom')
+      })
+      // on-attach emit is failure 1
+      publisher.subscribe('run_1', throwing)
+      publisher.publish('run_1') // failure 2
+      publisher.publish('run_1') // failure 3 -> evicted
+      const callsAtEviction = throwing.mock.calls.length
+
+      publisher.publish('run_1')
+
+      expect(throwing.mock.calls.length).toBe(callsAtEviction)
+    })
+
+    it('resets the failure count on a successful emit, so an occasional throw never accumulates toward eviction', () => {
+      source.setRun(runRow({ state: 'running' }))
+      let shouldThrow = true
+      const flaky = vi.fn(() => {
+        if (shouldThrow) {
+          throw new Error('boom')
+        }
+      })
+      publisher.subscribe('run_1', flaky) // failure 1 (call 1)
+      publisher.publish('run_1') // failure 2 (call 2)
+      shouldThrow = false
+      publisher.publish('run_1') // success, resets the count (call 3)
+      shouldThrow = true
+      publisher.publish('run_1') // failure 1 again (call 4)
+      publisher.publish('run_1') // failure 2 again (call 5)
+      expect(flaky.mock.calls.length).toBe(5)
+
+      publisher.publish('run_1') // failure 3 -> evicted now (call 6)
+      const callsAtEviction = flaky.mock.calls.length
+      publisher.publish('run_1')
+
+      expect(flaky.mock.calls.length).toBe(callsAtEviction)
+    })
+  })
 })

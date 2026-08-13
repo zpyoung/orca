@@ -226,6 +226,59 @@ describe('pipeline run subscription bridge', () => {
     expect(rendererB.sender.send).not.toHaveBeenCalled()
   })
 
+  it('drops a malformed subscribe message instead of throwing', () => {
+    const listener = listeners.get('pipelineRun:subscribe')
+    if (!listener) {
+      throw new Error('subscribe listener not registered')
+    }
+    const renderer = createSender(10)
+
+    expect(() => listener({ sender: renderer.sender }, null)).not.toThrow()
+    expect(() => listener({ sender: renderer.sender }, 'not-an-object')).not.toThrow()
+    expect(() =>
+      listener({ sender: renderer.sender }, { subscriptionId: 123, runId: 'run-1' })
+    ).not.toThrow()
+
+    expect(subscribeToPipelineRunMock).not.toHaveBeenCalled()
+    expect(renderer.sender.send).not.toHaveBeenCalled()
+  })
+
+  it('reports an error frame for a malformed runId instead of throwing, addressed to the given subscriptionId', () => {
+    const listener = listeners.get('pipelineRun:subscribe')
+    if (!listener) {
+      throw new Error('subscribe listener not registered')
+    }
+    const renderer = createSender(11)
+
+    expect(() =>
+      listener({ sender: renderer.sender }, { subscriptionId: 'sub-11' })
+    ).not.toThrow()
+
+    expect(subscribeToPipelineRunMock).not.toHaveBeenCalled()
+    expect(renderer.sender.send).toHaveBeenCalledWith('pipelineRun:snapshot', {
+      subscriptionId: 'sub-11',
+      frame: { type: 'error', error: expect.any(String) }
+    })
+  })
+
+  it('drops a malformed unsubscribe message instead of throwing', () => {
+    const listener = listeners.get('pipelineRun:unsubscribe')
+    if (!listener) {
+      throw new Error('unsubscribe listener not registered')
+    }
+    const renderer = createSender(12)
+    const hostUnsubscribe = vi.fn()
+    subscribeToPipelineRunMock.mockReturnValueOnce(hostUnsubscribe)
+    subscribe(renderer.sender, 'sub-12', 'run-12')
+
+    expect(() => listener({ sender: renderer.sender }, null)).not.toThrow()
+    expect(() => listener({ sender: renderer.sender }, undefined)).not.toThrow()
+    expect(() => listener({ sender: renderer.sender }, { subscriptionId: 42 })).not.toThrow()
+
+    // the live subscription from a well-formed call earlier must survive the malformed ones
+    expect(hostUnsubscribe).not.toHaveBeenCalled()
+  })
+
   it('tears down a prior subscription when the same id resubscribes', () => {
     const hostUnsubscribeA = vi.fn()
     const hostUnsubscribeB = vi.fn()
