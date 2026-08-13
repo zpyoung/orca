@@ -103,6 +103,10 @@ export const ORCHESTRATION_WORKER_START_METHODS: RpcMethod[] = [
           timeoutMs: params.timeoutMs,
           devMode: params.devMode,
           mutationReceipt: orchestrationMutation,
+          requestedWorktree,
+          name: params.name,
+          repo: params.repo,
+          baseBranch: params.baseBranch,
           ...(params.terminal
             ? { launch: 'reuse-terminal' as const, terminal: params.terminal }
             : {
