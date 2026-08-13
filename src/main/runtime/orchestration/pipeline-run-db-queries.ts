@@ -70,7 +70,9 @@ export function recordWorktreeSetup(
 /**
  * Idempotent for same-state writes. Terminal states are absorbing: a terminal→anything
  * transition is a no-op that returns without writing (drives L22 idempotency, makes the E7
- * sweep safe to re-run).
+ * sweep safe to re-run). A same-state write also touches no column unless it carries a
+ * `failureReason` that differs from the row's current one — that's the only non-terminal
+ * field this call can otherwise change, so it's what "material" means here.
  */
 export function updateRunState(
   db: Database.Database,
@@ -80,6 +82,11 @@ export function updateRunState(
 ): void {
   const current = getPipelineRun(db, runId)
   if (!current || TERMINAL_PIPELINE_RUN_STATES.has(current.state)) {
+    return
+  }
+  const failureReasonChanged =
+    opts?.failureReason !== undefined && opts.failureReason !== current.failure_reason
+  if (state === current.state && !failureReasonChanged) {
     return
   }
   const now = new Date().toISOString()

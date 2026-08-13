@@ -41,6 +41,7 @@ import { buildOrchestrationTaskDisplayMetadata } from '../../../shared/orchestra
 import { ORCHESTRATION_LEGACY_RUN_ID } from '../../../shared/orchestration-rpc-contract'
 import { parsePaneKey } from '../../../shared/stable-pane-id'
 import { OrchestrationError } from './orchestration-error'
+import { ensurePipelineRunSchema } from './pipeline-run-db-schema'
 import { resolveOrchestrationMigrationStartVersion } from './orchestration-schema-version-skew'
 import {
   deriveWorkerTerminalListState,
@@ -6780,6 +6781,9 @@ export class OrchestrationDb {
   }
 
   resetAll(): void {
+    // Pipeline tables are created lazily by PipelineRunDb, so a run that never touched
+    // pipelines has none yet — ensure them (idempotent) before deleting from them.
+    ensurePipelineRunSchema(this.db)
     // Why: retain mutation receipts so a lost reset response cannot replay as a new mutation.
     this.runResetTransaction(`
       DELETE FROM coordinator_runs;
@@ -6798,6 +6802,11 @@ export class OrchestrationDb {
       DELETE FROM worker_terminal_resources;
       DELETE FROM worker_dispatches;
       DELETE FROM dispatch_contexts;
+      DELETE FROM pipeline_attempts;
+      DELETE FROM pipeline_nodes;
+      DELETE FROM pipeline_runs;
+      -- A full reset clears run history, so the numbering it displays restarts too.
+      DELETE FROM pipeline_run_counters;
       DELETE FROM tasks;
       DELETE FROM messages;
       DELETE FROM runs;

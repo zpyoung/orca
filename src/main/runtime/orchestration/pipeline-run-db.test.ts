@@ -191,6 +191,38 @@ describe('PipelineRunDb', () => {
       expect(otherTemplate.runNumber).toBe(1)
       expect(first.runId).not.toBe(second.runId)
     })
+
+    it('orders a dependency chain deep enough to overflow a recursive DFS, preserving deps as already-created task ids', () => {
+      const { db, pipelineDb } = create()
+      // Comfortably above the ~7000-node depth where the previous recursive
+      // DFS overflowed the call stack in this test environment.
+      const chainLength = 10000
+      const nodes: ResolvedPipelineNode[] = []
+      for (let i = 0; i < chainLength; i++) {
+        nodes.push(
+          makeNode({
+            id: `n${i}`,
+            index: i,
+            needs: i < chainLength - 1 ? [`n${i + 1}`] : []
+          })
+        )
+      }
+
+      const result = pipelineDb.instantiate({
+        definition: makeDefinition(nodes),
+        workspaceId: null,
+        workspaceDisplayName: 'repo',
+        baseCommit: null
+      })
+
+      expect(Object.keys(result.taskIdByNodeId)).toHaveLength(chainLength)
+      const dbNodes = pipelineDb.getNodes(result.runId)
+      expect(dbNodes).toHaveLength(chainLength)
+      for (let i = 0; i < chainLength - 1; i++) {
+        const task = db.getTask(result.taskIdByNodeId[`n${i}`]) as TaskRow
+        expect(JSON.parse(task.deps)).toEqual([result.taskIdByNodeId[`n${i + 1}`]])
+      }
+    })
   })
 
   describe('createDetachedRun (OrchestrationDb seam)', () => {
@@ -272,6 +304,52 @@ describe('PipelineRunDb', () => {
       pipelineDb.updateRunState(run.runId, 'running')
       expect(pipelineDb.getPipelineRun(run.runId)?.state).toBe('failed')
       expect(pipelineDb.getPipelineRun(run.runId)?.failure_reason).toBe('boom')
+    })
+
+    it('a same-state write with no failureReason change touches no column, including updated_at', async () => {
+      const { pipelineDb } = create()
+      const run = pipelineDb.instantiate({
+        definition: makeDefinition([makeNode({ id: 'a' })]),
+        workspaceId: null,
+        workspaceDisplayName: 'repo',
+        baseCommit: null
+      })
+      pipelineDb.updateRunState(run.runId, 'running')
+      const before = pipelineDb.getPipelineRun(run.runId)
+
+      // updated_at is an ISO string (millisecond resolution); sleep past it so a
+      // spurious rewrite would be observable.
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      pipelineDb.updateRunState(run.runId, 'running')
+
+      const after = pipelineDb.getPipelineRun(run.runId)
+      expect(after?.updated_at).toBe(before?.updated_at)
+      expect(after?.failure_reason).toBe(before?.failure_reason)
+    })
+
+    it('a failureReason that differs from the stored value is a material change even for a same-state write', async () => {
+      const { pipelineDb } = create()
+      const run = pipelineDb.instantiate({
+        definition: makeDefinition([makeNode({ id: 'a' })]),
+        workspaceId: null,
+        workspaceDisplayName: 'repo',
+        baseCommit: null
+      })
+      pipelineDb.updateRunState(run.runId, 'running')
+      const before = pipelineDb.getPipelineRun(run.runId)
+
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      pipelineDb.updateRunState(run.runId, 'running', { failureReason: 'transient hiccup' })
+
+      const afterChange = pipelineDb.getPipelineRun(run.runId)
+      expect(afterChange?.state).toBe('running')
+      expect(afterChange?.failure_reason).toBe('transient hiccup')
+      expect(afterChange?.updated_at).not.toBe(before?.updated_at)
+
+      // Repeating the same reason is once again a true no-op.
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      pipelineDb.updateRunState(run.runId, 'running', { failureReason: 'transient hiccup' })
+      expect(pipelineDb.getPipelineRun(run.runId)?.updated_at).toBe(afterChange?.updated_at)
     })
   })
 
