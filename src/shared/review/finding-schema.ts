@@ -25,8 +25,32 @@ export const FINDING_RECORD_KINDS = ['finding', 'limitation', 'question'] as con
 export const FindingRecordKindSchema = z.enum(FINDING_RECORD_KINDS)
 export type FindingRecordKind = z.infer<typeof FindingRecordKindSchema>
 
-export const FindingIdSchema = z.string().regex(FINDING_ID_PATTERN)
-export const FindingCategorySchema = z.string().min(1).max(40).regex(FINDING_CATEGORY_PATTERN)
+// Real ids never approach this; capped so a pathological string is a cheap
+// reject rather than an unbounded scan, matching the category guard below.
+const FINDING_ID_MAX_LENGTH = 20
+
+export const FindingIdSchema = z
+  .string()
+  .max(FINDING_ID_MAX_LENGTH)
+  .refine((value) => value.length <= FINDING_ID_MAX_LENGTH && FINDING_ID_PATTERN.test(value), {
+    message: 'must be F followed by a positive integer'
+  })
+
+// The promote stage emits `id: null` (or `""`) before the gate assigns one;
+// upstream's `assign_ids`/`validate_finding` treat any falsy id as
+// unassigned, so both are tolerated here — a supplied id still has to match.
+export const FindingIdFieldSchema = z.union([FindingIdSchema, z.literal(''), z.null()]).optional()
+
+// `(-[a-z0-9]+)*` backtracks catastrophically on a long non-match; check the
+// length before the regex ever runs, since zod's `.max()` failing does not
+// stop `.regex()` from also running.
+export const FindingCategorySchema = z
+  .string()
+  .min(1)
+  .max(40)
+  .refine((value) => value.length <= 40 && FINDING_CATEGORY_PATTERN.test(value), {
+    message: 'must be kebab-case, 1-40 chars'
+  })
 
 // Presence is not content: upstream rejects a whitespace-only value on every
 // field but `absence`'s `output`, where an empty string is the proof itself.
@@ -83,7 +107,7 @@ export type Evidence = z.infer<typeof EvidenceSchema>
  * asserted by a stage, and are optional here for exactly that reason.
  */
 export const FindingSchema = z.object({
-  id: FindingIdSchema.optional(),
+  id: FindingIdFieldSchema,
   severity: FindingSeveritySchema,
   confidence: FindingConfidenceSchema,
   category: FindingCategorySchema,

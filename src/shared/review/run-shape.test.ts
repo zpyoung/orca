@@ -31,10 +31,10 @@ describe('quick depth', () => {
 })
 
 describe('standard depth', () => {
-  it('walks claims -> merge -> gate -> manifest', () => {
+  it('walks claims -> merge[refute] -> gate -> manifest', () => {
     expect(acceptsPredecessor('standard', 'claims', 'resolve')).toBe(true)
-    expect(acceptsPredecessor('standard', 'merge', 'claims')).toBe(true)
-    expect(acceptsPredecessor('standard', 'gate', 'merge')).toBe(true)
+    expect(acceptsPredecessor('standard', 'merge', 'claims', { step: 'refute' })).toBe(true)
+    expect(acceptsPredecessor('standard', 'gate', 'merge', { predecessor: 'refute' })).toBe(true)
     expect(acceptsPredecessor('standard', 'manifest', 'gate')).toBe(true)
   })
 
@@ -48,18 +48,23 @@ describe('standard depth', () => {
 
   it('has no tiebreak round: merge never chains off merge, gate.final does not exist', () => {
     expect(acceptsPredecessor('standard', 'merge', 'merge')).toBe(false)
+    expect(
+      acceptsPredecessor('standard', 'merge', 'merge', { step: 'refute', predecessor: 'refute' })
+    ).toBe(false)
     expect(acceptsPredecessor('standard', 'gate.final', 'merge')).toBe(false)
   })
 })
 
 describe('deep depth', () => {
-  it('walks claims -> merge -> gate, then a tiebreak round through gate.final', () => {
+  it('walks claims -> merge[refute] -> gate, then a tiebreak round through gate.final', () => {
     expect(acceptsPredecessor('deep', 'claims', 'resolve')).toBe(true)
-    expect(acceptsPredecessor('deep', 'merge', 'claims')).toBe(true)
-    expect(acceptsPredecessor('deep', 'gate', 'merge')).toBe(true)
+    expect(acceptsPredecessor('deep', 'merge', 'claims', { step: 'refute' })).toBe(true)
+    expect(acceptsPredecessor('deep', 'gate', 'merge', { predecessor: 'refute' })).toBe(true)
     // the tiebreak merge chains off the refute merge's own output, not off gate
-    expect(acceptsPredecessor('deep', 'merge', 'merge')).toBe(true)
-    expect(acceptsPredecessor('deep', 'gate.final', 'merge')).toBe(true)
+    expect(
+      acceptsPredecessor('deep', 'merge', 'merge', { step: 'tiebreak', predecessor: 'refute' })
+    ).toBe(true)
+    expect(acceptsPredecessor('deep', 'gate.final', 'merge', { predecessor: 'tiebreak' })).toBe(true)
     expect(acceptsPredecessor('deep', 'manifest', 'gate.final')).toBe(true)
   })
 
@@ -73,6 +78,26 @@ describe('deep depth', () => {
 
   it('rejects an out-of-order predecessor', () => {
     expect(acceptsPredecessor('deep', 'prepass', 'merge')).toBe(false)
+  })
+
+  it('rejects gate.final off a refute-round merge', () => {
+    expect(acceptsPredecessor('deep', 'gate.final', 'merge', { predecessor: 'refute' })).toBe(false)
+  })
+
+  it('rejects a plain gate off a tiebreak-round merge', () => {
+    expect(acceptsPredecessor('deep', 'gate', 'merge', { predecessor: 'tiebreak' })).toBe(false)
+  })
+
+  it('rejects a second refute-round merge chaining off a refute-round merge', () => {
+    expect(
+      acceptsPredecessor('deep', 'merge', 'merge', { step: 'refute', predecessor: 'refute' })
+    ).toBe(false)
+  })
+
+  it('rejects a third round chaining off the tiebreak merge', () => {
+    expect(
+      acceptsPredecessor('deep', 'merge', 'merge', { step: 'tiebreak', predecessor: 'tiebreak' })
+    ).toBe(false)
   })
 })
 

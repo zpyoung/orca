@@ -59,9 +59,8 @@ describe('GateResultSchema', () => {
     expect(GateResultSchema.safeParse(needsFixes).success).toBe(true)
   })
 
-  it('round-trips a deep-depth contested gate with a ruling on the suppressed entry', () => {
+  it('round-trips a deep-depth contested gate with a ruling on the suppressed entry, carrying no verdict', () => {
     const contested = {
-      verdict: 'NEEDS_FIXES',
       findings: [],
       limitations: [],
       questions: [],
@@ -99,6 +98,64 @@ describe('GateResultSchema', () => {
         regrade_count: 0,
         chain
       }).success
+    ).toBe(false)
+  })
+})
+
+describe('verdict / contested[] pairing', () => {
+  const base = {
+    findings: [],
+    limitations: [],
+    questions: [],
+    suppressed: [],
+    suppressed_count: 0,
+    depth: 'deep',
+    severity_histogram: {},
+    blocking_count: 0,
+    advisory_count: 0,
+    unreviewed_paths: [],
+    regrade_count: 0,
+    chain
+  }
+
+  it('accepts a non-empty contested[] with the verdict field absent', () => {
+    expect(
+      GateResultSchema.safeParse({ ...base, contested: [finding], contested_count: 1 }).success
+    ).toBe(true)
+  })
+
+  it('accepts a non-empty contested[] with an explicit null verdict', () => {
+    expect(
+      GateResultSchema.safeParse({
+        ...base,
+        contested: [finding],
+        contested_count: 1,
+        verdict: null
+      }).success
+    ).toBe(true)
+  })
+
+  it('rejects a non-empty contested[] carrying a verdict', () => {
+    expect(
+      GateResultSchema.safeParse({
+        ...base,
+        contested: [finding],
+        contested_count: 1,
+        verdict: 'NEEDS_FIXES'
+      }).success
+    ).toBe(false)
+  })
+
+  it('accepts an empty contested[] with a verdict', () => {
+    expect(
+      GateResultSchema.safeParse({ ...base, contested: [], contested_count: 0, verdict: 'PASS' })
+        .success
+    ).toBe(true)
+  })
+
+  it('rejects an empty contested[] with no verdict', () => {
+    expect(
+      GateResultSchema.safeParse({ ...base, contested: [], contested_count: 0 }).success
     ).toBe(false)
   })
 })
