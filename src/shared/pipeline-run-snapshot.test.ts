@@ -278,4 +278,12 @@ describe('decodePipelineRunSnapshotWire', () => {
     const decoded = decodePipelineRunSnapshotWire({ runId: 'run_1', runNumber: 'four', state: 'running' })
     expect(decoded).toEqual({ runId: 'run_1', state: 'running' })
   })
+
+  it('drops node position fields even if a host sends them — layout is never derived from the wire (AC21)', () => {
+    const decoded = decodePipelineRunSnapshotWire({
+      runId: 'run_1',
+      nodes: [{ id: 'fix', status: 'running', x: 120, y: 40, column: 1, row: 0 }]
+    })
+    expect(decoded?.nodes).toEqual([{ id: 'fix', status: 'running' }])
+  })
 })
