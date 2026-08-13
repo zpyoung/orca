@@ -136,6 +136,17 @@ describe('RunPipelineMenuItem', () => {
     })
   })
 
+  it('shows the submodule caveat when the dialog opens, since the renderer has no cheap way to know if the repo has any', async () => {
+    renderMenu('wt-1')
+    const user = userEvent.setup()
+
+    await user.click(screen.getByText(/run pipeline/i))
+
+    await waitFor(() =>
+      expect(screen.getByText(/submodule contents are not checkpointed/i)).toBeInTheDocument()
+    )
+  })
+
   it('surfaces the refusal message instead of creating a tab', async () => {
     startResult = { refused: { nodeId: 'repro', field: 'harness', message: 'Agent disabled' } }
     renderMenu('wt-1')

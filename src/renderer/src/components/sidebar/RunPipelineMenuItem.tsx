@@ -48,7 +48,10 @@ export function RunPipelineMenuItem({
         workspaceId={worktreeId}
         target={target}
         isFolderWorkspace={isFolderWorkspace}
-        hasSubmodules={false}
+        // Why: no cheap renderer-side signal reports submodule presence (git status only carries
+        // dirty submodules, and a full probe on every menu render is too expensive) — show the
+        // caveat unconditionally rather than never, which would silently hide a real retry risk.
+        hasSubmodules
         onStarted={(result) => {
           ensurePipelineTab(worktreeId, {
             runId: result.runId,

@@ -122,6 +122,13 @@ export type TabsSlice = {
     contentType?: TabContentType
   ) => Tab | null
   activateTab: (tabId: string, opts?: { preservePreview?: boolean; worktreeId?: string }) => void
+  /**
+   * Marks a pipeline tab as the workspace's active surface. WorkspaceVisibleTabType has no
+   * member for pipeline tabs, so this reuses 'terminal' — but clears activeTabId so terminal-
+   * scoped actions (tab rename, workspace focus restore) can't reach the tab that was active
+   * before the pipeline tab was focused.
+   */
+  activatePipelineTabSurface: (worktreeId: string) => void
   closeUnifiedTab: (
     tabId: string,
     opts?: { recordInteraction?: boolean; terminalRetirementHandled?: boolean }
@@ -534,9 +541,13 @@ function deriveActiveSurfaceForWorktree(
     activeTabId:
       activeUnifiedTab?.contentType === 'terminal'
         ? activeUnifiedTab.entityId
-        : terminalTabStillExists
-          ? restoredTerminalTabId
-          : (terminalTabs[0]?.id ?? null),
+        : // Why: activeTabType maps pipeline to 'terminal' below (no union member of its own);
+          // carrying over a real terminal id here would let terminal-scoped consumers act on it.
+          activeUnifiedTab?.contentType === 'pipeline'
+          ? null
+          : terminalTabStillExists
+            ? restoredTerminalTabId
+            : (terminalTabs[0]?.id ?? null),
     activeTabType
   }
 }
@@ -1137,6 +1148,15 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
           : {})
       }
     })
+  },
+
+  activatePipelineTabSurface: (worktreeId) => {
+    set((state) => ({
+      activeTabType: state.activeWorktreeId === worktreeId ? 'terminal' : state.activeTabType,
+      activeTabTypeByWorktree: { ...state.activeTabTypeByWorktree, [worktreeId]: 'terminal' },
+      activeTabId: state.activeWorktreeId === worktreeId ? null : state.activeTabId,
+      activeTabIdByWorktree: { ...state.activeTabIdByWorktree, [worktreeId]: null }
+    }))
   },
 
   closeUnifiedTab: (tabId, opts) => {

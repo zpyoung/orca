@@ -80,6 +80,7 @@ export function useTabGroupWorkspaceModel({
   const setActiveTab = useAppStore((state) => state.setActiveTab)
   const setActiveFile = useAppStore((state) => state.setActiveFile)
   const setActiveTabType = useAppStore((state) => state.setActiveTabType)
+  const activatePipelineTabSurface = useAppStore((state) => state.activatePipelineTabSurface)
   const createBrowserTab = useAppStore((state) => state.createBrowserTab)
   const openNewBrowserTabInActiveWorkspace = useAppStore(
     (state) => state.openNewBrowserTabInActiveWorkspace
@@ -409,19 +410,24 @@ export function useTabGroupWorkspaceModel({
         setActiveTabType('simulator')
         // simulator has no editor file entity
       } else if (item.contentType === 'pipeline') {
-        // Why: entityId is a run id, not a file id — writing it into setActiveFile
-        // would masquerade a pipeline run as an open file. activateTab above
-        // already routes the split-group model to this tab; falling activeTabType
-        // to 'terminal' (pipeline has no member of its own, mirrors TabGroupPanel's
-        // own mapping) clears a stale 'editor' + activeFileId pair so file-scoped
-        // actions elsewhere (Cmd+S, focus-zoom) can't act on a file no longer shown.
+        // Why: entityId is a run id, not a file id, and WorkspaceVisibleTabType has no member
+        // for pipeline tabs — clear the previously active terminal id so it can't leak through.
         setActiveTabType('terminal')
       } else {
         setActiveFile(item.entityId)
         setActiveTabType('editor')
       }
     },
-    [activateTab, focusGroup, groupId, groupTabs, setActiveFile, setActiveTabType, worktreeId]
+    [
+      activatePipelineTabSurface,
+      activateTab,
+      focusGroup,
+      groupId,
+      groupTabs,
+      setActiveFile,
+      setActiveTabType,
+      worktreeId
+    ]
   )
 
   const activateBrowser = useCallback(
