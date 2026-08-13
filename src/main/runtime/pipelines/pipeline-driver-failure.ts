@@ -26,6 +26,9 @@ export type FailedAttemptContext = {
   terminalHandle?: string
   checkpoint?: PipelineCheckpointInfo
   workerState: 'failed' | 'start_unknown'
+  /** The worker-start outcome's own `failedStage`/`lastError`, when this attempt failed during launch rather than being discovered later via polling. */
+  failedStage?: string
+  lastError?: string
   attemptAlreadyBegun: boolean
 }
 
@@ -83,10 +86,11 @@ async function finalizeConsumedAttempt(args: {
   checkpointBackend?: PipelineCheckpointBackend
   worktreePath?: string
   checkpoint?: PipelineCheckpointInfo
+  exhaustedReason?: string
 }): Promise<FailedAttemptResolution> {
   const attemptsAllowed = 1 + (args.node.onFailure?.retries ?? 0)
   if (args.attempt >= attemptsAllowed) {
-    return { kind: 'fail-node', reason: 'attempts exhausted' }
+    return { kind: 'fail-node', reason: args.exhaustedReason ?? 'attempts exhausted' }
   }
 
   if (args.checkpointBackend && args.worktreePath && args.checkpoint) {
@@ -139,15 +143,18 @@ export async function resolveFailedAttempt(args: {
     return { kind: 'pending-retry', attempt: ctx.attempt, retryOf: retry.retryOf }
   }
 
+  // the generic 'C' is the fallback for a failure discovered later via polling, which has no
+  // worker-start outcome of its own to report a more specific stage from
+  const failureStage = ctx.failedStage ?? 'C'
   if (ctx.attemptAlreadyBegun) {
-    pipelineDb.endAttempt(runId, ctx.node.id, ctx.attempt, { outcome: 'failed', failureStage: 'C' })
+    pipelineDb.endAttempt(runId, ctx.node.id, ctx.attempt, { outcome: 'failed', failureStage })
   } else {
     pipelineDb.beginAttempt(runId, ctx.node.id, {
       attempt: ctx.attempt,
       dispatchId: ctx.dispatchId,
       checkpoint: ctx.checkpoint
     })
-    pipelineDb.endAttempt(runId, ctx.node.id, ctx.attempt, { outcome: 'failed', failureStage: 'C' })
+    pipelineDb.endAttempt(runId, ctx.node.id, ctx.attempt, { outcome: 'failed', failureStage })
   }
   pipelineDb.resetPrelaunchFailures(runId, ctx.node.id)
 
@@ -164,7 +171,8 @@ export async function resolveFailedAttempt(args: {
     runId,
     checkpointBackend,
     worktreePath,
-    checkpoint: ctx.checkpoint
+    checkpoint: ctx.checkpoint,
+    exhaustedReason: ctx.lastError ? `attempts exhausted: ${ctx.lastError}` : undefined
   })
 }
 

@@ -21,10 +21,7 @@ import {
   type PipelineNodeIndex
 } from './pipeline-driver-node-graph'
 import { pollDriverInFlight } from './pipeline-driver-poll'
-import {
-  resolvePipelineDriverRunContext,
-  type PipelineDriverRunContext
-} from './pipeline-driver-run-context'
+import { resolvePipelineDriverRunContext, type PipelineDriverRunContext } from './pipeline-driver-run-context'
 import {
   writePipelineRunCompleted,
   writePipelineRunFailed,
@@ -200,6 +197,7 @@ export class PipelineDriver {
   ): Promise<void> {
     const context = this.context as PipelineDriverRunContext
     const nodeIndex = this.nodeIndex as PipelineNodeIndex
+    let attemptBegun = false
 
     const outcome: PipelineDispatchOutcome = await dispatchPipelineNode({
       runtime: this.args.runtime,
@@ -215,7 +213,11 @@ export class PipelineDriver {
       retryOf,
       dependencies: buildDependencyResults(this.args.db, node, nodeIndex),
       isDispatchable: () => this.phase === 'running',
-      onSpawnStarted: (dispatchId) => {
+      onSpawnStarted: (dispatchId, checkpoint) => {
+        // the durable row must exist the instant the spawn commits, not only once this call
+        // returns — otherwise an abort landing during the readiness wait leaves it unrecorded
+        this.args.pipelineDb.beginAttempt(this.args.runId, node.id, { attempt, dispatchId, checkpoint })
+        attemptBegun = true
         const inFlight = beginInFlightSpawn({ phase: this.phase, node, taskId, attempt, dispatchId })
         if (inFlight) {
           this.inFlight = inFlight
@@ -248,11 +250,12 @@ export class PipelineDriver {
       const { dispatchId } = outcome.response
       const { terminalHandle, checkpoint } = outcome
       this.inFlight = { node, taskId, attempt, dispatchId, terminalHandle, checkpoint }
-      this.args.pipelineDb.beginAttempt(this.args.runId, node.id, {
-        attempt,
-        dispatchId,
-        checkpoint
-      })
+      if (!attemptBegun) {
+        // fallback, not the primary path: onSpawnStarted can go unfired (no dispatchable
+        // spawn-commit signal, or no dispatch context yet resolvable) — a live outcome must
+        // still guarantee the row exists
+        this.args.pipelineDb.beginAttempt(this.args.runId, node.id, { attempt, dispatchId, checkpoint })
+      }
       this.args.pipelineDb.resetPrelaunchFailures(this.args.runId, node.id)
       this.args.publisher.publish(this.args.runId)
       return
@@ -266,7 +269,9 @@ export class PipelineDriver {
       terminalHandle: outcome.terminalHandle,
       checkpoint: outcome.checkpoint,
       workerState: outcome.workerState,
-      attemptAlreadyBegun: false
+      failedStage: outcome.response.failedStage,
+      lastError: outcome.response.lastError,
+      attemptAlreadyBegun: attemptBegun
     })
   }
 

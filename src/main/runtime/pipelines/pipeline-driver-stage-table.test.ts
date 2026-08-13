@@ -274,6 +274,49 @@ describe('PipelineDriver stage table (attempt accounting by evidence)', () => {
     driver.stop()
   })
 
+  it('stage C: a settle outcome carrying a specific worker-start failure stage and reason persists them instead of the generic fallback', async () => {
+    const { driver, db, pipelineDb } = buildSingleNodeHarness({})
+    executeLocalWorkerStartMock.mockImplementation(
+      (args: { taskId: string; onPtySpawnCommitted?: () => void }) => {
+        db.registerDispatch({
+          dispatchId: 'dispatch-1',
+          taskId: args.taskId,
+          workerState: 'starting',
+          spawnReceipt: { committed: true }
+        })
+        args.onPtySpawnCommitted?.()
+        return Promise.resolve(
+          workerStartResponse({
+            taskId: args.taskId,
+            dispatchId: 'dispatch-1',
+            state: 'failed',
+            failedStage: 'agent_readiness',
+            lastError: 'Agent did not become ready (running).'
+          })
+        )
+      }
+    )
+
+    driver.start()
+    await flushAsync()
+
+    expect(pipelineDb.beginAttempt).toHaveBeenCalledWith(
+      'run-1',
+      'n',
+      expect.objectContaining({ attempt: 1, dispatchId: 'dispatch-1' })
+    )
+    expect(pipelineDb.endAttempt).toHaveBeenCalledWith('run-1', 'n', 1, {
+      outcome: 'failed',
+      failureStage: 'agent_readiness'
+    })
+    expect(pipelineDb.nodesById.get('n')?.outcome).toBe('failed')
+    expect(pipelineDb.nodesById.get('n')?.outcome_reason).toContain(
+      'Agent did not become ready (running).'
+    )
+    expect(pipelineDb.run.failure_reason).toContain('Agent did not become ready (running).')
+    driver.stop()
+  })
+
   it('stage C: a failure resolution that only lands after abort must not mark the node failed or flip the run', async () => {
     let resolveWaitForLeafPtyId: (value: string) => void = () => {
       throw new Error('resolveWaitForLeafPtyId called before the mock ran')
