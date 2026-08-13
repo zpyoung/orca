@@ -39,7 +39,6 @@ function runStateLabel(state: PipelineRunState | 'unknown' | null): string {
       return translate('auto.components.pipeline.canvas.PipelineCanvas.interrupted', 'Interrupted')
     case 'unknown':
     case null:
-    default:
       return translate('auto.components.pipeline.canvas.PipelineCanvas.unknownState', 'Unknown')
   }
 }
@@ -54,9 +53,13 @@ function relativeTimeFrom(iso: string | undefined): string {
   }
   const seconds = Math.max(0, Math.round((Date.now() - ms) / 1000))
   if (seconds < 60) {
-    return translate('auto.components.pipeline.canvas.PipelineCanvas.secondsAgo', '{{value0}}s ago', {
-      value0: seconds
-    })
+    return translate(
+      'auto.components.pipeline.canvas.PipelineCanvas.secondsAgo',
+      '{{value0}}s ago',
+      {
+        value0: seconds
+      }
+    )
   }
   const minutes = Math.round(seconds / 60)
   return translate('auto.components.pipeline.canvas.PipelineCanvas.minutesAgo', '{{value0}}m ago', {
@@ -78,7 +81,10 @@ export default function PipelineCanvas({ runId }: { runId: string }): React.JSX.
 
   const containerRef = useRef<HTMLDivElement>(null)
   const size = useAgentMapCanvasSize(containerRef, () => {})
-  const [viewport, setViewportState] = useState<AgentMapViewport>({ center: { x: 0, y: 0 }, zoom: 1 })
+  const [viewport, setViewportState] = useState<AgentMapViewport>({
+    center: { x: 0, y: 0 },
+    zoom: 1
+  })
   const viewportRef = useRef(viewport)
 
   const applyViewport = useCallback((next: AgentMapViewport): void => {
@@ -136,7 +142,11 @@ export default function PipelineCanvas({ runId }: { runId: string }): React.JSX.
         return
       }
       event.preventDefault()
-      zoomAtPoint(viewportRef.current.zoom * Math.exp(-event.deltaY * 0.0015), event.clientX, event.clientY)
+      zoomAtPoint(
+        viewportRef.current.zoom * Math.exp(-event.deltaY * 0.0015),
+        event.clientX,
+        event.clientY
+      )
     }
     container.addEventListener('wheel', handleWheel, { passive: false })
     return () => container.removeEventListener('wheel', handleWheel)
@@ -180,7 +190,10 @@ export default function PipelineCanvas({ runId }: { runId: string }): React.JSX.
     : runId
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-background" style={{ width: size.width || undefined }}>
+    <div
+      className="flex min-h-0 flex-1 flex-col bg-background"
+      style={{ width: size.width || undefined }}
+    >
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2">
         <div className="flex items-center gap-2 text-sm">
           <span className="font-medium text-foreground">{title}</span>
@@ -206,7 +219,10 @@ export default function PipelineCanvas({ runId }: { runId: string }): React.JSX.
         </p>
       )}
       <div ref={containerRef} className="scrollbar-sleek relative min-h-0 flex-1 overflow-auto">
-        <div style={{ transform: `scale(${viewport.zoom})`, transformOrigin: '0 0' }} className="inline-block">
+        <div
+          style={{ transform: `scale(${viewport.zoom})`, transformOrigin: '0 0' }}
+          className="inline-block"
+        >
           <PipelineCanvasScene nodes={nodes} pausing={snapshot.pausing === true} />
         </div>
         <AgentMapViewportControls

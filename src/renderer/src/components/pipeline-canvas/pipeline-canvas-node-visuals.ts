@@ -27,7 +27,8 @@ export function pipelineNodeVisual(status: PipelineNodeStatus | 'unknown'): Pipe
       return {
         icon: CheckCircle2,
         label: translate('auto.components.pipeline.canvas.node.visuals.succeeded', 'Succeeded'),
-        toneClassName: 'fill-status-success-background stroke-status-success-border text-status-success'
+        toneClassName:
+          'fill-status-success-background stroke-status-success-border text-status-success'
       }
     case 'failed':
       return {
@@ -73,7 +74,6 @@ export function pipelineNodeVisual(status: PipelineNodeStatus | 'unknown'): Pipe
         toneClassName: 'fill-background stroke-border text-muted-foreground'
       }
     case 'unknown':
-    default:
       return {
         icon: HelpCircle,
         label: translate('auto.components.pipeline.canvas.node.visuals.unknown', 'Unknown'),

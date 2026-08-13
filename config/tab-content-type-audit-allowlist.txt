@@ -59,6 +59,9 @@ src/renderer/src/components/emulator-pane/EmulatorPaneOverlayLayer.tsx
 src/renderer/src/components/emulator-pane/use-mobile-emulator-tab-intro-actions.ts
 src/renderer/src/lib/ensure-simulator-tab.ts
 src/renderer/src/lib/simulator-palette-search.ts
+# admits only contentType === 'pipeline'; a new member can never reach the body
+src/renderer/src/lib/pipeline-palette-search.ts
+src/renderer/src/lib/pipeline-tab-palette-activation.ts
 src/renderer/src/lib/simulator-tab-palette-activation.ts
 src/renderer/src/lib/simulator-tab-shutdown.ts
 src/renderer/src/components/automations/AutomationsPage.tsx
