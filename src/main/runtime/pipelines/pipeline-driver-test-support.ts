@@ -95,7 +95,7 @@ export class FakeOrchestrationDb {
   tasks = new Map<string, { id: string; status: string; result: string | null }>()
   dispatches = new Map<string, { id: string; task_id: string }>()
   latestDispatchByTask = new Map<string, string>()
-  workers = new Map<string, { dispatch_id: string; state: string }>()
+  workers = new Map<string, { dispatch_id: string; state: string; agent_terminal_handle: string | null }>()
   spawnReceipts = new Map<string, { spawn_attempt_at: string; spawn_committed_at: string | null }>()
 
   getTask = vi.fn((id: string) => this.tasks.get(id))
@@ -133,11 +133,16 @@ export class FakeOrchestrationDb {
     dispatchId: string
     taskId: string
     workerState: string
+    agentTerminalHandle?: string | null
     spawnReceipt?: { committed?: boolean }
   }): void {
     this.dispatches.set(args.dispatchId, { id: args.dispatchId, task_id: args.taskId })
     this.latestDispatchByTask.set(args.taskId, args.dispatchId)
-    this.workers.set(args.dispatchId, { dispatch_id: args.dispatchId, state: args.workerState })
+    this.workers.set(args.dispatchId, {
+      dispatch_id: args.dispatchId,
+      state: args.workerState,
+      agent_terminal_handle: args.agentTerminalHandle ?? null
+    })
     if (args.spawnReceipt) {
       this.spawnReceipts.set(args.dispatchId, {
         spawn_attempt_at: 'now',
@@ -159,7 +164,11 @@ export class FakePipelineRunDb {
   ) {}
 
   getPipelineRun = vi.fn(() => this.run)
-  getNodes = vi.fn(() => [...this.nodesById.values()].sort((a, b) => a.node_index - b.node_index))
+  // a real SQL-backed store returns fresh rows per query; cloning here means a caller that
+  // caches this array cannot observe later writes without calling getNodes() again
+  getNodes = vi.fn(() =>
+    [...this.nodesById.values()].sort((a, b) => a.node_index - b.node_index).map((row) => ({ ...row }))
+  )
   getAttempts = vi.fn(() => [])
   beginAttempt: ReturnType<typeof vi.fn> = vi.fn()
   endAttempt: ReturnType<typeof vi.fn> = vi.fn()

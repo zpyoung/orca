@@ -16,6 +16,7 @@ import type { PipelineCheckpointInfo } from './pipeline-driver-types'
 import type { PipelineCheckpointBackend } from './pipeline-checkpoint'
 import { validatePipelineNodeLaunch } from './pipeline-preflight'
 import type { PreflightExecutionHost } from './pipeline-preflight-executable-presence'
+import { extractDispatchTerminalHandle } from './pipeline-driver-stage-classify'
 
 export type PipelineDispatchOutcome =
   | { kind: 'refused'; message: string }
@@ -30,9 +31,8 @@ function pipelineDriverIdentity(runId: string): string {
 }
 
 /**
- * Every dispatch — first attempt, stage-B prelaunch cycle, or stage-C retry — runs this exact
- * sequence: pre-spawn revalidation, checkpoint capture (skipped in folder mode), dependency-aware
- * prompt assembly, then the beneath-fence launch.
+ * Every dispatch — first attempt, stage-B cycle, or stage-C retry — goes through this one
+ * function, so a retry can never skip revalidation or launch with a stale prompt.
  */
 export async function dispatchPipelineNode(args: {
   runtime: OrcaRuntimeService
@@ -92,4 +92,23 @@ export async function dispatchPipelineNode(args: {
   })
 
   return { kind: 'started', response, checkpoint }
+}
+
+/** Best-effort interrupt for a dispatch that only resolved after the run had already aborted. */
+export async function interruptAbortedDispatch(
+  runtime: OrcaRuntimeService,
+  outcome: PipelineDispatchOutcome
+): Promise<void> {
+  if (outcome.kind !== 'started') {
+    return
+  }
+  const handle = extractDispatchTerminalHandle(outcome.response.effects)
+  if (!handle) {
+    return
+  }
+  try {
+    await runtime.sendTerminal(handle, { interrupt: true })
+  } catch {
+    // abort only guarantees nothing further dispatches, not that the agent obeys \x03
+  }
 }

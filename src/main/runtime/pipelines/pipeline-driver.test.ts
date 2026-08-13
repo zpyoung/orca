@@ -274,6 +274,63 @@ describe('PipelineDriver', () => {
     driver.stop()
   })
 
+  it('abort: a dispatch already in flight when abort runs must not install a live attempt, and any spawned agent still gets the interrupt', async () => {
+    const nodeA = node({ id: 'a', index: 0 })
+    const db = new FakeOrchestrationDb()
+    db.tasks.set('task-a', { id: 'task-a', status: 'ready', result: null })
+    const pipelineDb = new FakePipelineRunDb(
+      runRow(),
+      new Map([['a', nodeRow({ node_id: 'a', node_index: 0, task_id: 'task-a' })]])
+    )
+    const runtime = runtimeStub()
+
+    let resolveWorkerStart: (value: ReturnType<typeof workerStartResponse>) => void = () => {
+      throw new Error('resolveWorkerStart called before the mock ran')
+    }
+    executeLocalWorkerStartMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveWorkerStart = resolve
+        })
+    )
+
+    const driver = new PipelineDriver({
+      runtime,
+      db: db.asOrchestrationDb(),
+      pipelineDb: pipelineDb.asPipelineRunDb(),
+      runId: 'run-1',
+      definition: definitionOf([nodeA]),
+      publisher: publisherStub() as unknown as PipelineSnapshotPublisher
+    })
+
+    driver.start()
+    await flushAsync() // dispatch is now awaiting worker-start; nothing has recorded itself yet
+
+    await driver.abort()
+    expect(pipelineDb.updateRunState).toHaveBeenCalledWith('run-1', 'aborted')
+    expect(runtime.sendTerminal).not.toHaveBeenCalled() // abort had no recorded in-flight attempt to interrupt
+
+    resolveWorkerStart(
+      workerStartResponse({
+        taskId: 'task-a',
+        dispatchId: 'd-a',
+        state: 'ready',
+        effects: [{ kind: 'terminal', role: 'agent', action: 'created', id: 'term-a' }]
+      })
+    )
+    await flushAsync()
+
+    // the race-losing dispatch spawned an agent after abort: it must still receive the interrupt...
+    expect(runtime.sendTerminal).toHaveBeenCalledWith('term-a', { interrupt: true })
+    // ...and must never have become a live in-flight attempt
+    expect(pipelineDb.beginAttempt).not.toHaveBeenCalled()
+
+    await advanceOneCycle()
+    await advanceOneCycle()
+    expect(executeLocalWorkerStartMock).toHaveBeenCalledTimes(1) // no further dispatch after abort
+    driver.stop()
+  })
+
   it('stop(): detaches without writing any state', async () => {
     const nodeA = node({ id: 'a', index: 0 })
     const db = new FakeOrchestrationDb()

@@ -44,6 +44,26 @@ export function allNodesSucceeded(index: PipelineNodeIndex): boolean {
   return true
 }
 
+/**
+ * `pipelineDb.setNodeOutcome` persists to the DB but never mutates the row objects `index` was
+ * built from — a real store returns fresh rows on every read, it does not hand back live
+ * references. The driver must call this immediately after every `setNodeOutcome` so its cached
+ * index reflects what was actually written, or `pickNextReadyNode`/`allNodesSucceeded` keep
+ * reading the pre-write snapshot forever.
+ */
+export function applyNodeOutcome(
+  index: PipelineNodeIndex,
+  nodeId: string,
+  outcome: 'succeeded' | 'failed',
+  reason?: string
+): void {
+  const row = index.rowByNodeId.get(nodeId)
+  if (row) {
+    row.outcome = outcome
+    row.outcome_reason = reason ?? null
+  }
+}
+
 /** The node's dependencies' recorded task results, in `needs` list order, for prompt assembly. */
 export function buildDependencyResults(
   db: OrchestrationDb,

@@ -1,15 +1,25 @@
 /** The host-side dispatch loop: walks the run's task DAG, applying retry and failure accounting. */
 
 import type { ResolvedPipelineNode } from '../../../shared/pipeline-template-types'
-import { dispatchPipelineNode, type PipelineDispatchOutcome } from './pipeline-driver-dispatch'
-import { resolveFailedAttempt, type FailedAttemptContext } from './pipeline-driver-failure'
+import {
+  dispatchPipelineNode,
+  interruptAbortedDispatch,
+  type PipelineDispatchOutcome
+} from './pipeline-driver-dispatch'
+import {
+  resolveFailedAttempt,
+  type FailedAttemptContext,
+  type FailedAttemptResolution
+} from './pipeline-driver-failure'
 import {
   allNodesSucceeded,
+  applyNodeOutcome,
   buildDependencyResults,
   buildPipelineNodeIndex,
   pickNextReadyNode,
   type PipelineNodeIndex
 } from './pipeline-driver-node-graph'
+import { pollInFlightDispatch } from './pipeline-driver-poll'
 import {
   resolvePipelineDriverRunContext,
   type PipelineDriverRunContext
@@ -157,13 +167,24 @@ export class PipelineDriver {
       this.failRunInternally(`Task ${inFlight.taskId} disappeared mid-run.`)
       return
     }
-    if (task.status === 'completed') {
-      this.args.pipelineDb.endAttempt(this.args.runId, inFlight.node.id, inFlight.attempt, {
-        outcome: 'succeeded'
-      })
-      this.args.pipelineDb.setNodeOutcome(this.args.runId, inFlight.node.id, {
-        outcome: 'succeeded'
-      })
+    const context = this.context as PipelineDriverRunContext
+    const outcome = await pollInFlightDispatch({
+      db: this.args.db,
+      runtime: this.args.runtime,
+      pipelineDb: this.args.pipelineDb,
+      runId: this.args.runId,
+      worktreeId: context.dispatchWorktreeId,
+      checkpointBackend: context.checkpointBackend,
+      worktreePath: context.worktreePath,
+      inFlight,
+      taskStatus: task.status
+    })
+
+    if (outcome.kind === 'pending') {
+      return
+    }
+    if (outcome.kind === 'succeeded') {
+      applyNodeOutcome(this.nodeIndex as PipelineNodeIndex, inFlight.node.id, 'succeeded')
       this.inFlight = undefined
       if (allNodesSucceeded(this.nodeIndex as PipelineNodeIndex)) {
         this.completeRun()
@@ -172,23 +193,7 @@ export class PipelineDriver {
       this.args.publisher.publish(this.args.runId)
       return
     }
-    if (task.status !== 'failed' && task.status !== 'blocked') {
-      return
-    }
-    const dispatch = this.args.db.getDispatchContext(inFlight.taskId)
-    const worker = dispatch ? this.args.db.getWorkerDispatch(dispatch.id) : undefined
-    const workerState: 'failed' | 'start_unknown' =
-      worker?.state === 'start_unknown' ? 'start_unknown' : 'failed'
-    await this.settleFailedAttempt({
-      node: inFlight.node,
-      taskId: inFlight.taskId,
-      attempt: inFlight.attempt,
-      dispatchId: inFlight.dispatchId,
-      terminalHandle: inFlight.terminalHandle,
-      checkpoint: inFlight.checkpoint,
-      workerState,
-      attemptAlreadyBegun: true
-    })
+    this.applyAttemptResolution(inFlight.node, inFlight.taskId, outcome)
   }
 
   private async dispatchAttempt(
@@ -214,6 +219,13 @@ export class PipelineDriver {
       retryOf,
       dependencies: buildDependencyResults(this.args.db, node, nodeIndex)
     })
+
+    if (this.phase === 'terminal') {
+      // abort ran while this dispatch was in flight: it must not become a live attempt, but if
+      // it did spawn an agent, that agent still needs the interrupt abort() couldn't send it
+      await interruptAbortedDispatch(this.args.runtime, outcome)
+      return
+    }
 
     if (outcome.kind === 'refused') {
       // stage A: retrying identical config cannot succeed, so this is terminal, not a retry
@@ -267,16 +279,23 @@ export class PipelineDriver {
       worktreePath: context.worktreePath,
       ctx
     })
+    this.applyAttemptResolution(ctx.node, ctx.taskId, resolution)
+  }
 
+  private applyAttemptResolution(
+    node: ResolvedPipelineNode,
+    taskId: string,
+    resolution: FailedAttemptResolution
+  ): void {
     if (resolution.kind === 'fail-node') {
-      this.failNode(ctx.node.id, resolution.reason)
+      this.failNode(node.id, resolution.reason)
       return
     }
 
     this.inFlight = undefined
     this.pendingRetry = {
-      node: ctx.node,
-      taskId: ctx.taskId,
+      node,
+      taskId,
       attempt: resolution.attempt,
       retryOf: resolution.retryOf
     }
@@ -285,6 +304,7 @@ export class PipelineDriver {
 
   private failNode(nodeId: string, reason: string): void {
     this.args.pipelineDb.setNodeOutcome(this.args.runId, nodeId, { outcome: 'failed', reason })
+    applyNodeOutcome(this.nodeIndex as PipelineNodeIndex, nodeId, 'failed', reason)
     this.inFlight = undefined
     this.pendingRetry = undefined
     this.phase = 'terminal'

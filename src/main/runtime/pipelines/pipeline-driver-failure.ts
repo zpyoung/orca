@@ -10,7 +10,10 @@ import {
   prepareDirectRetry,
   type PipelineRetryPreparation
 } from './pipeline-driver-retry'
-import { classifyPrelaunchStage } from './pipeline-driver-stage-classify'
+import {
+  classifyPrelaunchStage,
+  type PipelinePrelaunchStage
+} from './pipeline-driver-stage-classify'
 import type { PipelineCheckpointInfo } from './pipeline-driver-types'
 
 export type FailedAttemptContext = {
@@ -28,27 +31,69 @@ export type FailedAttemptResolution =
   | { kind: 'fail-node'; reason: string }
   | { kind: 'pending-retry'; attempt: number; retryOf?: string }
 
+/** The durable worker-dispatch record is a second source for the handle beyond this attempt's own response effects. */
+function resolveVerifiableTerminalHandle(
+  db: OrchestrationDb,
+  ctx: Pick<FailedAttemptContext, 'dispatchId' | 'terminalHandle'>
+): string | undefined {
+  return ctx.terminalHandle ?? db.getWorkerDispatch(ctx.dispatchId)?.agent_terminal_handle ?? undefined
+}
+
 async function prepareRetryForRoute(
   db: OrchestrationDb,
   runtime: OrcaRuntimeService,
   worktreeId: string,
+  stage: PipelinePrelaunchStage,
   ctx: Pick<FailedAttemptContext, 'dispatchId' | 'terminalHandle' | 'workerState'>
 ): Promise<PipelineRetryPreparation> {
+  const terminalHandle = resolveVerifiableTerminalHandle(db, ctx)
+  if (stage === 'C' && !terminalHandle) {
+    // stage C means an agent may have run: unlike stage B, a missing handle can never stand in for a verified stop
+    return {
+      ok: false,
+      reason: "Could not identify the failed attempt's terminal to verify it had stopped."
+    }
+  }
   if (ctx.workerState === 'start_unknown') {
     return prepareBridgedRetry({
       db,
       runtime,
       worktreeId,
       dispatchId: ctx.dispatchId,
-      terminalHandle: ctx.terminalHandle
+      terminalHandle
     })
   }
   return prepareDirectRetry({
     runtime,
     worktreeId,
     dispatchId: ctx.dispatchId,
-    terminalHandle: ctx.terminalHandle
+    terminalHandle
   })
+}
+
+/** Shared tail for any consumed attempt (stage C, or a plain re-readied re-dispatch): budget check, then restore. */
+async function finalizeConsumedAttempt(args: {
+  node: ResolvedPipelineNode
+  attempt: number
+  retryOf?: string
+  checkpointBackend?: PipelineCheckpointBackend
+  worktreePath?: string
+  checkpoint?: PipelineCheckpointInfo
+}): Promise<FailedAttemptResolution> {
+  const attemptsAllowed = 1 + (args.node.onFailure?.retries ?? 0)
+  if (args.attempt >= attemptsAllowed) {
+    return { kind: 'fail-node', reason: 'attempts exhausted' }
+  }
+
+  if (args.checkpointBackend && args.worktreePath && args.checkpoint) {
+    await args.checkpointBackend.restore({
+      worktreePath: args.worktreePath,
+      head: args.checkpoint.head,
+      snapshot: args.checkpoint.snapshot
+    })
+  }
+
+  return { kind: 'pending-retry', attempt: args.attempt + 1, retryOf: args.retryOf }
 }
 
 /**
@@ -77,7 +122,8 @@ export async function resolveFailedAttempt(args: {
         reason: 'launch-rejected: prelaunch failures exhausted (3 consecutive)'
       }
     }
-    const retry = await prepareRetryForRoute(db, runtime, worktreeId, ctx)
+    // stage B means nothing ever spawned, so this budget stays separate from onFailure.retries and never consumes an attempt
+    const retry = await prepareRetryForRoute(db, runtime, worktreeId, stage, ctx)
     if (!retry.ok) {
       return { kind: 'fail-node', reason: retry.reason }
     }
@@ -96,23 +142,40 @@ export async function resolveFailedAttempt(args: {
   }
   pipelineDb.resetPrelaunchFailures(runId, ctx.node.id)
 
-  const retry = await prepareRetryForRoute(db, runtime, worktreeId, ctx)
+  const retry = await prepareRetryForRoute(db, runtime, worktreeId, stage, ctx)
   if (!retry.ok) {
     return { kind: 'fail-node', reason: retry.reason }
   }
 
-  const attemptsAllowed = 1 + (ctx.node.onFailure?.retries ?? 0)
-  if (ctx.attempt >= attemptsAllowed) {
-    return { kind: 'fail-node', reason: 'attempts exhausted' }
-  }
+  return finalizeConsumedAttempt({
+    node: ctx.node,
+    attempt: ctx.attempt,
+    retryOf: retry.retryOf,
+    checkpointBackend,
+    worktreePath,
+    checkpoint: ctx.checkpoint
+  })
+}
 
-  if (checkpointBackend && worktreePath && ctx.checkpoint) {
-    await checkpointBackend.restore({
-      worktreePath,
-      head: ctx.checkpoint.head,
-      snapshot: ctx.checkpoint.snapshot
-    })
-  }
-
-  return { kind: 'pending-retry', attempt: ctx.attempt + 1, retryOf: retry.retryOf }
+/**
+ * A task an external actor put back to `ready` while the driver still considered its dispatch
+ * in flight (host recovery abandoning a missing worker terminal; an unexpected agent exit) has
+ * no `retryOf`-eligible landing — `retryOf` requires the task in {failed, blocked}. Re-dispatch
+ * it plainly instead, consuming a pipeline attempt like any other observed failure.
+ */
+export async function resolveReadiedAttempt(args: {
+  pipelineDb: PipelineRunDb
+  runId: string
+  node: ResolvedPipelineNode
+  attempt: number
+  checkpointBackend?: PipelineCheckpointBackend
+  worktreePath?: string
+  checkpoint?: PipelineCheckpointInfo
+}): Promise<FailedAttemptResolution> {
+  args.pipelineDb.endAttempt(args.runId, args.node.id, args.attempt, {
+    outcome: 'failed',
+    failureStage: 'reready'
+  })
+  args.pipelineDb.resetPrelaunchFailures(args.runId, args.node.id)
+  return finalizeConsumedAttempt({ ...args, retryOf: undefined })
 }
