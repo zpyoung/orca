@@ -147,19 +147,11 @@ function setupRealDispatchHarness(root: string, controlDir: string) {
   }
 }
 
-function agentTerminalHandle(outcome: Extract<PipelineDispatchOutcome, { kind: 'started' }>): string {
-  const effect = outcome.response.effects.find(
-    (candidate): candidate is { kind: string; role?: string; id?: string } =>
-      typeof candidate === 'object' &&
-      candidate !== null &&
-      (candidate as { kind?: string }).kind === 'terminal' &&
-      (candidate as { role?: string }).role === 'agent'
-  )
-  const handle = effect?.id
-  if (!handle) {
+function agentTerminalHandle(outcome: Extract<PipelineDispatchOutcome, { kind: 'live' }>): string {
+  if (!outcome.terminalHandle) {
     throw new Error('dispatch did not report an agent terminal handle')
   }
-  return handle
+  return outcome.terminalHandle
 }
 
 /** The same preamble the driver assembled, reconstructed independently for comparison — every
@@ -207,7 +199,10 @@ async function reportWorkerDone(args: {
       outcome: args.outcome
     })
   })
-  await method.handler(parsed, { runtime: args.runtime, orchestrationCapability: args.dispatchCapability })
+  await method.handler(parsed, {
+    runtime: args.runtime,
+    orchestrationCapability: args.dispatchCapability
+  })
 }
 
 describe('pipeline stub harness acceptance', () => {
@@ -249,10 +244,15 @@ describe('pipeline stub harness acceptance', () => {
       worktreeId: FLOATING_TERMINAL_WORKTREE_ID,
       attempt: 1,
       host: {},
-      dependencies: []
+      dependencies: [],
+      isDispatchable: () => true
     })
-    if (dispatchOutcome.kind !== 'started') {
-      throw new Error(`dispatch was refused: ${dispatchOutcome.message}`)
+    if (dispatchOutcome.kind !== 'live') {
+      throw new Error(
+        dispatchOutcome.kind === 'refused'
+          ? `dispatch was refused: ${dispatchOutcome.message}`
+          : `dispatch did not reach a live attempt (${dispatchOutcome.kind})`
+      )
     }
     const workerHandle = agentTerminalHandle(dispatchOutcome)
 
@@ -276,94 +276,86 @@ describe('pipeline stub harness acceptance', () => {
     }
   }
 
-  it(
-    'dispatches through agentCmdOverrides, delivers the assembled prompt, and the driver observes success',
-    async () => {
-      const result = await runDispatchThroughRealAgent('success')
-      expect(result.stubOutcome).toEqual({ index: 0, outcome: 'success', message: null })
+  it('dispatches through agentCmdOverrides, delivers the assembled prompt, and the driver observes success', async () => {
+    const result = await runDispatchThroughRealAgent('success')
+    expect(result.stubOutcome).toEqual({ index: 0, outcome: 'success', message: null })
 
-      expect(result.receivedPrompt).toContain(`Your task ID is: ${result.taskId}`)
-      expect(result.receivedPrompt).toContain(`--dispatch-id ${result.dispatchId}`)
-      expect(result.receivedPrompt).toBe(
-        reconstructExpectedPrompt({
-          runtime: result.harness.runtime,
-          runId: result.runId,
-          taskId: result.taskId,
-          dispatchId: result.dispatchId,
-          workerHandle: result.workerHandle,
-          dispatchCapability: result.dispatchCapability
-        })
-      )
-
-      await reportWorkerDone({
+    expect(result.receivedPrompt).toContain(`Your task ID is: ${result.taskId}`)
+    expect(result.receivedPrompt).toContain(`--dispatch-id ${result.dispatchId}`)
+    expect(result.receivedPrompt).toBe(
+      reconstructExpectedPrompt({
         runtime: result.harness.runtime,
-        workerHandle: result.workerHandle,
+        runId: result.runId,
         taskId: result.taskId,
         dispatchId: result.dispatchId,
-        dispatchCapability: result.dispatchCapability,
-        outcome: 'succeeded'
-      })
-      expect(result.harness.db.getTask(result.taskId)?.status).toBe('completed')
-
-      const pollOutcome = await pollInFlightDispatch({
-        db: result.harness.db,
-        runtime: result.harness.runtime,
-        pipelineDb: result.harness.pipelineDb,
-        runId: result.runId,
-        worktreeId: FLOATING_TERMINAL_WORKTREE_ID,
-        inFlight: {
-          node: result.node,
-          taskId: result.taskId,
-          attempt: 1,
-          dispatchId: result.dispatchId,
-          terminalHandle: result.workerHandle
-        },
-        taskStatus: result.harness.db.getTask(result.taskId)!.status
-      })
-      expect(pollOutcome).toEqual({ kind: 'succeeded' })
-    },
-    30_000
-  )
-
-  it(
-    'propagates a scripted failure back through orchestration.send to a driver fail-node verdict',
-    async () => {
-      const result = await runDispatchThroughRealAgent('failure')
-      expect(result.stubOutcome).toEqual({
-        index: 0,
-        outcome: 'failure',
-        message: 'scripted to fail'
-      })
-
-      await reportWorkerDone({
-        runtime: result.harness.runtime,
         workerHandle: result.workerHandle,
-        taskId: result.taskId,
-        dispatchId: result.dispatchId,
-        dispatchCapability: result.dispatchCapability,
-        outcome: 'failed'
+        dispatchCapability: result.dispatchCapability
       })
-      expect(result.harness.db.getTask(result.taskId)?.status).toBe('failed')
+    )
 
-      // attemptsAllowed = 1 + (node.onFailure?.retries ?? 0) = 1: the single attempt is
-      // exhausted, so the driver's real failure-resolution path must fail the node outright.
-      const pollOutcome = await pollInFlightDispatch({
-        db: result.harness.db,
-        runtime: result.harness.runtime,
-        pipelineDb: result.harness.pipelineDb,
-        runId: result.runId,
-        worktreeId: FLOATING_TERMINAL_WORKTREE_ID,
-        inFlight: {
-          node: result.node,
-          taskId: result.taskId,
-          attempt: 1,
-          dispatchId: result.dispatchId,
-          terminalHandle: result.workerHandle
-        },
-        taskStatus: result.harness.db.getTask(result.taskId)!.status
-      })
-      expect(pollOutcome).toMatchObject({ kind: 'fail-node' })
-    },
-    30_000
-  )
+    await reportWorkerDone({
+      runtime: result.harness.runtime,
+      workerHandle: result.workerHandle,
+      taskId: result.taskId,
+      dispatchId: result.dispatchId,
+      dispatchCapability: result.dispatchCapability,
+      outcome: 'succeeded'
+    })
+    expect(result.harness.db.getTask(result.taskId)?.status).toBe('completed')
+
+    const pollOutcome = await pollInFlightDispatch({
+      db: result.harness.db,
+      runtime: result.harness.runtime,
+      pipelineDb: result.harness.pipelineDb,
+      runId: result.runId,
+      worktreeId: FLOATING_TERMINAL_WORKTREE_ID,
+      inFlight: {
+        node: result.node,
+        taskId: result.taskId,
+        attempt: 1,
+        dispatchId: result.dispatchId,
+        terminalHandle: result.workerHandle
+      },
+      taskStatus: result.harness.db.getTask(result.taskId)!.status
+    })
+    expect(pollOutcome).toEqual({ kind: 'succeeded' })
+  }, 30_000)
+
+  it('propagates a scripted failure back through orchestration.send to a driver fail-node verdict', async () => {
+    const result = await runDispatchThroughRealAgent('failure')
+    expect(result.stubOutcome).toEqual({
+      index: 0,
+      outcome: 'failure',
+      message: 'scripted to fail'
+    })
+
+    await reportWorkerDone({
+      runtime: result.harness.runtime,
+      workerHandle: result.workerHandle,
+      taskId: result.taskId,
+      dispatchId: result.dispatchId,
+      dispatchCapability: result.dispatchCapability,
+      outcome: 'failed'
+    })
+    expect(result.harness.db.getTask(result.taskId)?.status).toBe('failed')
+
+    // attemptsAllowed = 1 + (node.onFailure?.retries ?? 0) = 1: the single attempt is
+    // exhausted, so the driver's real failure-resolution path must fail the node outright.
+    const pollOutcome = await pollInFlightDispatch({
+      db: result.harness.db,
+      runtime: result.harness.runtime,
+      pipelineDb: result.harness.pipelineDb,
+      runId: result.runId,
+      worktreeId: FLOATING_TERMINAL_WORKTREE_ID,
+      inFlight: {
+        node: result.node,
+        taskId: result.taskId,
+        attempt: 1,
+        dispatchId: result.dispatchId,
+        terminalHandle: result.workerHandle
+      },
+      taskStatus: result.harness.db.getTask(result.taskId)!.status
+    })
+    expect(pollOutcome).toMatchObject({ kind: 'fail-node' })
+  }, 30_000)
 })

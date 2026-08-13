@@ -9,7 +9,10 @@ import { isFolderRepo } from '../../../shared/repo-kind'
 import type { OrcaRuntimeService } from '../orca-runtime'
 import type { OrchestrationDb } from '../orchestration/db'
 import type { PipelineRunDb } from '../orchestration/pipeline-run-db'
-import { checkSshCheckpointGate, resolvePreflightExecutionHost } from './pipeline-instantiation-host'
+import {
+  checkSshCheckpointGate,
+  resolvePreflightExecutionHost
+} from './pipeline-instantiation-host'
 import {
   createPipelineRunWorktree,
   removePipelineRunWorktreeBestEffort,
@@ -91,7 +94,6 @@ export async function instantiatePipelineRun(args: {
   }
 
   let createdWorktreeId: string | undefined
-  let resolvedBranchName: string | undefined
   try {
     const { slug, branchName } = await resolvePipelineRunBranchName({
       runtime,
@@ -99,7 +101,6 @@ export async function instantiatePipelineRun(args: {
       templateName: definition.templateName,
       runNumber: instantiated.runNumber
     })
-    resolvedBranchName = branchName
     const worktree = await createPipelineRunWorktree({
       runtime,
       repoId: repo.id,
@@ -120,13 +121,7 @@ export async function instantiatePipelineRun(args: {
     // here (nothing to hand a driver, nothing to dispatch).
     const message = `Failed to set up the run worktree: ${messageOf(error)}`
     pipelineDb.updateRunState(instantiated.runId, 'failed', { failureReason: message })
-    if (resolvedBranchName) {
-      await removePipelineRunWorktreeBestEffort(runtime, {
-        repoId: repo.id,
-        branchName: resolvedBranchName,
-        runWorktreeId: createdWorktreeId
-      })
-    }
+    await removePipelineRunWorktreeBestEffort(runtime, { runWorktreeId: createdWorktreeId })
     return refusal(message)
   }
 }

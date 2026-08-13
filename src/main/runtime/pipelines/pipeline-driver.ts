@@ -24,7 +24,12 @@ import {
   resolvePipelineDriverRunContext,
   type PipelineDriverRunContext
 } from './pipeline-driver-run-context'
-import { extractDispatchTerminalHandle } from './pipeline-driver-stage-classify'
+import {
+  writePipelineRunCompleted,
+  writePipelineRunFailed,
+  writePipelineRunPaused,
+  writePipelineRunResumed
+} from './pipeline-driver-run-control'
 import type {
   PipelineDriverArgs,
   PipelineInFlightDispatch,
@@ -59,9 +64,7 @@ export class PipelineDriver {
       return
     }
     this.phase = 'paused'
-    this.args.pipelineDb.updateRunState(this.args.runId, 'paused')
-    this.args.publisher.setPausingAnnotation(this.args.runId, true)
-    this.args.publisher.publish(this.args.runId)
+    writePipelineRunPaused(this.args)
   }
 
   resume(): void {
@@ -69,9 +72,7 @@ export class PipelineDriver {
       return
     }
     this.phase = 'running'
-    this.args.pipelineDb.updateRunState(this.args.runId, 'running')
-    this.args.publisher.setPausingAnnotation(this.args.runId, false)
-    this.args.publisher.publish(this.args.runId)
+    writePipelineRunResumed(this.args)
   }
 
   async abort(): Promise<void> {
@@ -79,6 +80,8 @@ export class PipelineDriver {
       return
     }
     this.phase = 'terminal'
+    // the state write lands before the interrupt attempt: a crash mid-interrupt must not leave
+    // the run looking live
     this.args.pipelineDb.updateRunState(this.args.runId, 'aborted')
     this.stopTimer()
     const handle = this.inFlight?.terminalHandle
@@ -217,8 +220,17 @@ export class PipelineDriver {
       checkpointBackend: context.checkpointBackend,
       worktreePath: context.worktreePath,
       retryOf,
-      dependencies: buildDependencyResults(this.args.db, node, nodeIndex)
+      dependencies: buildDependencyResults(this.args.db, node, nodeIndex),
+      isDispatchable: () => this.phase === 'running'
     })
+
+    if (outcome.kind === 'abandoned') {
+      // pause or abort landed before the launch committed: nothing spawned, so requeue as a
+      // pending retry — a resume dispatches it fresh, and a terminal run never consults it
+      this.pendingRetry = { node, taskId, attempt, retryOf }
+      this.args.publisher.publish(this.args.runId)
+      return
+    }
 
     if (this.phase === 'terminal') {
       // abort ran while this dispatch was in flight: it must not become a live attempt, but if
@@ -233,21 +245,13 @@ export class PipelineDriver {
       return
     }
 
-    const { response, checkpoint } = outcome
-    const terminalHandle = extractDispatchTerminalHandle(response.effects)
-
-    if (response.state !== 'failed' && response.state !== 'outcome_unknown') {
-      this.inFlight = {
-        node,
-        taskId,
-        attempt,
-        dispatchId: response.dispatchId,
-        terminalHandle,
-        checkpoint
-      }
+    if (outcome.kind === 'live') {
+      const { dispatchId } = outcome.response
+      const { terminalHandle, checkpoint } = outcome
+      this.inFlight = { node, taskId, attempt, dispatchId, terminalHandle, checkpoint }
       this.args.pipelineDb.beginAttempt(this.args.runId, node.id, {
         attempt,
-        dispatchId: response.dispatchId,
+        dispatchId,
         checkpoint
       })
       this.args.pipelineDb.resetPrelaunchFailures(this.args.runId, node.id)
@@ -259,10 +263,10 @@ export class PipelineDriver {
       node,
       taskId,
       attempt,
-      dispatchId: response.dispatchId,
-      terminalHandle,
-      checkpoint,
-      workerState: response.state === 'outcome_unknown' ? 'start_unknown' : 'failed',
+      dispatchId: outcome.response.dispatchId,
+      terminalHandle: outcome.terminalHandle,
+      checkpoint: outcome.checkpoint,
+      workerState: outcome.workerState,
       attemptAlreadyBegun: false
     })
   }
@@ -287,6 +291,11 @@ export class PipelineDriver {
     taskId: string,
     resolution: FailedAttemptResolution
   ): void {
+    // a terminal run is absorbing: a resolution that only lands after abort must not overwrite
+    // an outcome the run already has
+    if (this.phase === 'terminal') {
+      return
+    }
     if (resolution.kind === 'fail-node') {
       this.failNode(node.id, resolution.reason)
       return
@@ -308,24 +317,21 @@ export class PipelineDriver {
     this.inFlight = undefined
     this.pendingRetry = undefined
     this.phase = 'terminal'
-    this.args.pipelineDb.updateRunState(this.args.runId, 'failed', { failureReason: reason })
     this.stopTimer()
-    this.args.publisher.publish(this.args.runId)
+    writePipelineRunFailed(this.args, reason)
   }
 
   private completeRun(): void {
     this.phase = 'terminal'
-    this.args.pipelineDb.updateRunState(this.args.runId, 'completed')
     this.stopTimer()
-    this.args.publisher.publish(this.args.runId)
+    writePipelineRunCompleted(this.args)
   }
 
   private failRunInternally(reason: string): void {
     this.phase = 'terminal'
     this.inFlight = undefined
     this.pendingRetry = undefined
-    this.args.pipelineDb.updateRunState(this.args.runId, 'failed', { failureReason: reason })
     this.stopTimer()
-    this.args.publisher.publish(this.args.runId)
+    writePipelineRunFailed(this.args, reason)
   }
 }
