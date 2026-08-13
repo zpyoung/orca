@@ -33,6 +33,9 @@ const transientDownloadErrorCodes = new Set([
   'ENETUNREACH',
   'ENOTFOUND',
   'EPIPE',
+  // The release CDN refuses individual HTTP/2 streams under load while the
+  // connection stays healthy, which is a retry, not a permanent failure.
+  'ERR_HTTP2_STREAM_ERROR',
   'ETIMEDOUT',
   'UND_ERR_CONNECT_TIMEOUT',
   'UND_ERR_HEADERS_TIMEOUT',
@@ -201,7 +204,7 @@ function isTransientDownloadError(error) {
     if (transientDownloadErrorCodes.has(candidate?.code)) {
       return true
     }
-    const statusCode = getDownloadStatusCode(candidate)
+    const statusCode = getDownloadErrorStatusCode(candidate)
     if (
       statusCode === 408 ||
       statusCode === 425 ||
@@ -214,8 +217,9 @@ function isTransientDownloadError(error) {
   return false
 }
 
-function getDownloadStatusCode(candidate) {
-  // @electron/get throws HTTPError carrying a fetch Response, which spells it `status`.
+// `@electron/get`'s fetch downloader attaches a WHATWG Response, which spells
+// the code `status`; its request-based downloader spells it `statusCode`.
+function getDownloadErrorStatusCode(candidate) {
   return candidate?.statusCode ?? candidate?.response?.statusCode ?? candidate?.response?.status
 }
 
@@ -231,7 +235,7 @@ function getErrorChain(error) {
 
 function formatDownloadError(error) {
   for (const candidate of getErrorChain(error)) {
-    const statusCode = getDownloadStatusCode(candidate)
+    const statusCode = getDownloadErrorStatusCode(candidate)
     if (statusCode) {
       return `HTTP ${statusCode}`
     }

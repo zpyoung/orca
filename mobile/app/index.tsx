@@ -27,6 +27,10 @@ import { createHostConnectRefetchGate } from '../src/transport/host-connect-refe
 import { sendSingleFlightRequest } from '../src/transport/request-single-flight'
 import { useCloseHost, useForceReconnect, usePrimeHosts } from '../src/transport/client-context'
 import { useAllHostClients } from '../src/transport/use-all-host-clients'
+import {
+  resolveHomeHostConnectionState,
+  selectHomeAutoConnectHostIds
+} from '../src/transport/home-host-auto-connect'
 import { classifyConnection } from '../src/transport/connection-health'
 import { subscribeToDesktopNotifications } from '../src/notifications/mobile-notifications'
 import {
@@ -241,7 +245,11 @@ export default function HomeScreen() {
   const hostIds = useMemo(() => hosts.map((h) => h.id), [hosts])
   // Why: scoped to the paired hosts so an unpaired desktop's cached reply leaves the header total.
   const stats = useMemo(() => totalHomeStats(statsByHost, hostIds), [statsByHost, hostIds])
-  const allClients = useAllHostClients(hostIds)
+  const autoConnectHostIds = useMemo(() => selectHomeAutoConnectHostIds(hosts), [hosts])
+  const allClients = useAllHostClients(hostIds, {
+    autoConnectHostIds,
+    closeUnusedOnRelease: true
+  })
   const hostPaths = useMemo(
     () => Object.fromEntries(allClients.map(({ hostId, path }) => [hostId, path])),
     [allClients]
@@ -740,7 +748,11 @@ export default function HomeScreen() {
           }
           ItemSeparatorComponent={CardGap}
           renderItem={({ item }) => {
-            const state = hostStates[item.id] ?? 'connecting'
+            const state = resolveHomeHostConnectionState(
+              item.id,
+              hostStates[item.id],
+              autoConnectHostIds
+            )
             const attempts = hostAttempts[item.id] ?? 0
             const lastConnectedAt = hostLastConnected[item.id] ?? null
             const verdict = classifyConnection({
@@ -925,7 +937,13 @@ export default function HomeScreen() {
         message={actionTarget ? hostEndpointLabel(actionTarget.endpoint) : undefined}
         actions={getHostListActionSheetActions({
           host: actionTarget,
-          state: actionTarget ? (hostStates[actionTarget.id] ?? 'connecting') : 'disconnected',
+          state: actionTarget
+            ? resolveHomeHostConnectionState(
+                actionTarget.id,
+                hostStates[actionTarget.id],
+                autoConnectHostIds
+              )
+            : 'disconnected',
           hasEverConnected: actionTarget
             ? (hostLastConnected[actionTarget.id] ?? null) != null
             : false,

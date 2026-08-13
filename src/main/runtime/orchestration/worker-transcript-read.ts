@@ -103,7 +103,7 @@ async function readInitialPage(
   if (endOffset !== undefined && (await stat(filePath)).size < endOffset) {
     return { ok: false, reason: 'source_changed', warnings: [] }
   }
-  const page = await readNativeChatTranscriptTailFile(filePath, limit, decode, false, endOffset)
+  const page = await readNativeChatTranscriptTailFile({ filePath, limit, decode, endOffset })
   return {
     ok: true,
     filePath,

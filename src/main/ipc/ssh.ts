@@ -12,6 +12,8 @@ import { SshConnectionManager } from '../ssh/ssh-connection-manager'
 import type { SshChannelMultiplexer } from '../ssh/ssh-channel-multiplexer'
 import { SshRelaySession, type SshRelayAiVaultHostInfo } from '../ssh/ssh-relay-session'
 import type { SshAiVaultRelayListParams } from '../../shared/ssh-ai-vault-relay'
+import type { NativeChatRelayPing } from '../../shared/native-chat-relay-protocol'
+import { notifySshRelayReady, onSshRelayReady } from './ssh-relay-ready-notifier'
 import { SshPortForwardManager } from '../ssh/ssh-port-forward'
 import type {
   DetectedPort,
@@ -183,6 +185,35 @@ export async function requestActiveSshAiVaultSessionList(
     throw new Error('SSH relay is not ready')
   }
   return session.requestAiVaultSessionList(params, options)
+}
+
+/** Issue a native-chat relay request against a plain (non runtime-owned) SSH
+ *  target. Runtime-owned targets reach their transcripts over runtime RPC. */
+export async function requestActiveSshNativeChat(
+  targetId: string,
+  method: string,
+  params: Record<string, unknown>,
+  options: { signal?: AbortSignal; timeoutMs?: number } = {}
+): Promise<unknown> {
+  const session = activeSessions.get(targetId)
+  if (!session) {
+    throw new Error('SSH relay is not ready')
+  }
+  return session.requestNativeChat(method, params, options)
+}
+
+export function onActiveSshNativeChatChanged(
+  targetId: string,
+  handler: (ping: NativeChatRelayPing) => void
+): () => void {
+  return activeSessions.get(targetId)?.onNativeChatChanged(handler) ?? (() => {})
+}
+
+/** Fires each time the target's relay reaches ready. A reconnect reaps every
+ *  relay-side native-chat subscription, and an idle pane issues no request that
+ *  would discover that, so subscribers re-establish from this signal. */
+export function onActiveSshRelayReady(targetId: string, handler: () => void): () => void {
+  return onSshRelayReady(targetId, handler)
 }
 
 function runTargetLifecycle(targetId: string, operation: () => Promise<void>): Promise<void> {
@@ -887,6 +918,7 @@ function configureRelaySessionCallbacks(session: SshRelaySession): void {
 
   // Why: fires after both establish() and reconnect() reach 'ready'; re-create persisted port forwards so they survive restarts and blips.
   session.setOnReady((tid) => {
+    notifySshRelayReady(tid)
     const state = relayLostBackoff.get(tid)
     if (state) {
       if (state.stabilizedTimer) {

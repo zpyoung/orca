@@ -1,6 +1,6 @@
 ---
-last_released_commit: c4feaab473e2e89eb43d93ac0a039ebc18e1e9e5
-upstream_synced: v1.4.176
+last_released_commit: d87046519fec7ce2e84c071491cffa4c6895127f
+upstream_synced: v1.4.180
 ---
 
 # Changelog
@@ -11,6 +11,55 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.181-rc.0.zy02] - 2026-08-12
+
+Synced to upstream [v1.4.180](https://github.com/stablyai/orca/releases/tag/v1.4.180).
+
+### Added
+- An architecture reference for the plugin subsystem, covering the trust tiers, the contribution
+  types a manifest can declare, the host API available to each runtime, and the limits that apply
+  to plugin workers and panels.
+
+### Fixed
+- Skill updates verify again. The v1.4.180 sync adopted upstream's skill ledger, whose release rows
+  name upstream tags that do not exist on this fork, so the roundtrip check failed outright. The
+  ledger is now rebuilt from the fork's own release tags, and the check stands down for a skill that
+  has only one recorded revision to move between — it reactivates on its own as fork releases
+  accumulate.
+- The upstream-sync skill is tracked in git again. It lived under a gitignored path, so the sync
+  automation would have called a skill its checkout could not see.
+
+### Changed
+- Local memsearch index data is ignored instead of surfacing as untracked files.
+
+## [1.4.181-rc.0.zy01] - 2026-08-11
+
+Synced to upstream [v1.4.180](https://github.com/stablyai/orca/releases/tag/v1.4.180).
+
+### Added
+- Worktrees can be placed in a project group independently of the group their repo belongs to, so
+  the sidebar can group related work across repositories. Grouping is presentational — running
+  commands stays scoped to each worktree's own repo.
+
+### Fixed
+- The native chat view no longer blanks to a loading pane when an agent finishes its turn. Session
+  retention could discard messages the live view had already committed to showing; it now only ever
+  adds to that list.
+- Deleting a provider session from the AI Vault is available again, together with upstream's fixes
+  that block deletion of a live session and contain deletion on WSL. The fork had been carrying an
+  upstream revert of this feature that upstream itself had already superseded.
+- The Cmd+J palette picks up upstream's current open-tab search, recent chats and terminals, and
+  digit shortcuts. The fork had been holding an earlier draft of the same work.
+
+### Changed
+- Upstream code the fork does not modify now tracks each upstream stable release directly, instead
+  of preserving whatever variant an earlier sync happened to inherit. Several subsystems had drifted
+  onto stale copies that upstream had since reworked.
+
+## [1.4.178-rc.0.zy01] - 2026-08-09
+
+Synced to upstream [v1.4.177](https://github.com/stablyai/orca/releases/tag/v1.4.177).
 
 ## [1.4.177-rc.0.zy01] - 2026-08-07
 

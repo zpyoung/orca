@@ -9,6 +9,7 @@ import type {
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import { parseHostAccessLink } from '../../../shared/remote-pairing-address'
 import { verifyRemotePairingRuntimeStatus } from '../../../shared/remote-pairing-verification'
+import type { AiVaultDeleteSessionArgs } from '../../../shared/ai-vault-session-deletion'
 import type { AiVaultListArgs, AiVaultListResult } from '../../../shared/ai-vault-types'
 import type {
   AiVaultPrepareSessionResumeArgs,
@@ -1188,13 +1189,14 @@ function createWebKeybindingsApi(): WebKeybindingsApi {
 // Why: web has no IPC for native-chat transcripts, so route readSession/subscribe through runtime RPC (as mobile does).
 function createNativeChatApi(): NativeChatApi {
   return {
-    readSession: async (agent, sessionId, limit, transcriptPath) =>
+    readSession: async ({ agent, sessionId, limit, transcriptPath, beforeOffset }) =>
       parseRuntimeNativeChatReadSessionResult(
         await callRuntimeResult<unknown>('nativeChat.readSession', {
           agent,
           sessionId,
           limit,
-          transcriptPath
+          transcriptPath,
+          beforeOffset
         })
       ),
     subscribe: (args, onFrame) => {
@@ -1542,6 +1544,15 @@ function createAiVaultApi(): NonNullable<Partial<PreloadApi>['aiVault']> {
     listSubagentSessions: () => Promise.resolve({ sessions: [], issues: [] }),
     // Why: full first-prompt re-parse is local-FS only; web/runtime falls back to preview text.
     getFirstUserPrompt: () => Promise.resolve({ prompt: null }),
+    // Why: session deletion is local-only and has no runtime RPC; a web
+    // client's sessions are runtime-hosted, so report the same non-local
+    // rejection the UI already gates on rather than pretend to delete.
+    deleteSession: (args: AiVaultDeleteSessionArgs) =>
+      Promise.resolve({
+        outcome: 'rejected',
+        agent: args.agent,
+        reason: 'non-local-host' as const
+      }),
     onWindowFocused: () => noopUnsubscribe
   }
 }
@@ -3725,6 +3736,11 @@ async function getRuntimeBackedStoredSettings(): Promise<GlobalSettings> {
       runtimeSettings.prBotAuthorOverrides = normalizePRBotAuthorOverrides(
         result.settings.prBotAuthorOverrides
       )
+    }
+    // Read-only mirror: the host owns this capability and `syncRuntimeBackedSettings` never
+    // sends it back, so web shows what the host enforces instead of a local value it ignores.
+    if (typeof result.settings.artifactSharingEnabled === 'boolean') {
+      runtimeSettings.artifactSharingEnabled = result.settings.artifactSharingEnabled
     }
     const next = mergeSettings(local, runtimeSettings)
     writeStoredSettings(next)

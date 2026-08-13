@@ -1388,10 +1388,18 @@ function sanitizeRepoUpstream(value: unknown): Repo['upstream'] | undefined {
   if (!value || typeof value !== 'object') {
     return undefined
   }
-  const candidate = value as { owner?: unknown; repo?: unknown }
+  const candidate = value as { owner?: unknown; repo?: unknown; host?: unknown }
   const owner = typeof candidate.owner === 'string' ? candidate.owner.trim() : ''
   const repo = typeof candidate.repo === 'string' ? candidate.repo.trim() : ''
-  return owner && repo ? { owner, repo } : undefined
+  if (!owner || !repo) {
+    return undefined
+  }
+  // Why: an `upstream` remote may live on a different server than `origin`, so
+  // dropping the host forced consumers to re-infer it from origin and could bind
+  // a GHES parent to a same-named github.com repo. Absent host stays absent so
+  // records written before this survive unchanged.
+  const host = typeof candidate.host === 'string' ? candidate.host.trim() : ''
+  return host ? { owner, repo, host } : { owner, repo }
 }
 
 function sanitizeGitRemoteIdentity(value: unknown): GitRemoteIdentity | null | undefined {
@@ -4394,6 +4402,19 @@ export class Store {
         ? { ...repo, projectGroupId: null }
         : repo
     )
+    // Why: same rationale as repos above — a worktree's group membership is sidebar-only, so release it, never delete the worktree.
+    // Keyed on the ids actually deleted (not "any id missing from this host's catalog"): groups are host-owned,
+    // so an id absent from this.state.projectGroups may simply belong to another host, not be stale.
+    for (const [worktreeId, meta] of Object.entries(this.state.worktreeMeta)) {
+      // Why: orca-data.json is user-editable, so entries can be hand-corrupted to null.
+      if (
+        meta &&
+        typeof meta.projectGroupId === 'string' &&
+        deletedGroupIds.has(meta.projectGroupId)
+      ) {
+        this.state.worktreeMeta[worktreeId] = { ...meta, projectGroupId: null }
+      }
+    }
     const removedFolderWorkspaceKeys = new Set<string>()
     for (const workspace of this.state.folderWorkspaces ?? []) {
       if (deletedGroupIds.has(workspace.projectGroupId)) {
@@ -5408,6 +5429,8 @@ export class Store {
   }
 
   setWorktreeMeta(worktreeId: string, meta: Partial<WorktreeMeta>): WorktreeMeta {
+    // Why: project groups are host-owned, so a projectGroupId naming no group in THIS host's
+    // catalog may still be valid on the group's owner host — never null it out here.
     const existing = this.state.worktreeMeta[worktreeId] || getDefaultWorktreeMeta()
     const updated = { ...existing, ...meta }
     updated.linkedWorkItem = normalizeWorkspaceLinkedItem(updated.linkedWorkItem)
@@ -5770,6 +5793,10 @@ export class Store {
     }
     if ('showMenuBarIcon' in updates) {
       sanitizedUpdates.showMenuBarIcon = updates.showMenuBarIcon === true
+    }
+    // Why: the artifact publish capability must be an exact boolean on disk; no truthy value grants it.
+    if ('artifactSharingEnabled' in updates) {
+      sanitizedUpdates.artifactSharingEnabled = updates.artifactSharingEnabled === true
     }
     if ('disabledTuiAgents' in updates) {
       sanitizedUpdates.disabledTuiAgents = normalizeDisabledTuiAgents(updates.disabledTuiAgents)

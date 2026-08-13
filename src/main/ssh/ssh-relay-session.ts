@@ -76,6 +76,7 @@ import {
   MIN_SSH_RELAY_GRACE_PERIOD_SECONDS,
   SSH_RELAY_CONFIGURE_GRACE_TIME_METHOD
 } from '../../shared/ssh-types'
+import { normalizeRemoteArtifactInput } from '../../shared/artifact-cli-bridge'
 import type { Store } from '../persistence'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { DEFAULT_PTY_SOURCE_WINDOW_SU } from '../../shared/pty-source-credit-contract'
@@ -99,6 +100,12 @@ import {
   SSH_AI_VAULT_LIST_SESSIONS_TIMEOUT_MS,
   type SshAiVaultRelayListParams
 } from '../../shared/ssh-ai-vault-relay'
+import {
+  NATIVE_CHAT_CHANGED_METHOD,
+  NATIVE_CHAT_RELAY_REQUEST_TIMEOUT_MS,
+  parseNativeChatRelayPing,
+  type NativeChatRelayPing
+} from '../../shared/native-chat-relay-protocol'
 import { isTerminalLeafId, makePaneKey } from '../../shared/stable-pane-id'
 import { isValidTerminalTabId } from '../../shared/terminal-tab-id'
 import {
@@ -455,6 +462,38 @@ export class SshRelaySession {
       }
       throw error
     }
+  }
+
+  /** Issue a native-chat relay request. Throws when the relay is not ready, so
+   *  the caller can retry on the reconnect it already has to handle. */
+  async requestNativeChat(
+    method: string,
+    params: Record<string, unknown>,
+    options: { signal?: AbortSignal; timeoutMs?: number } = {}
+  ): Promise<unknown> {
+    const mux = this.mux
+    if (!mux || mux.isDisposed() || this._state !== 'ready') {
+      throw new Error('SSH relay is not ready')
+    }
+    return mux.request(method, params, {
+      signal: options.signal,
+      timeoutMs: options.timeoutMs ?? NATIVE_CHAT_RELAY_REQUEST_TIMEOUT_MS
+    })
+  }
+
+  /** Listen for native-chat pull pings. Bound to the current mux: a reconnect
+   *  swaps the mux, and the caller resubscribes rather than re-arming here. */
+  onNativeChatChanged(handler: (ping: NativeChatRelayPing) => void): () => void {
+    const mux = this.mux
+    if (!mux || mux.isDisposed()) {
+      return () => {}
+    }
+    return mux.onNotificationByMethod(NATIVE_CHAT_CHANGED_METHOD, (params) => {
+      const ping = parseNativeChatRelayPing(params)
+      if (ping) {
+        handler(ping)
+      }
+    })
   }
 
   getPortScanner(): PortScanner | null {
@@ -1333,6 +1372,7 @@ export class SshRelaySession {
             )
           : {}
       const stdin = typeof params.stdin === 'string' ? params.stdin : undefined
+      const artifactInput = normalizeRemoteArtifactInput(params.artifactInput)
       const runtimeAuthority = this.runtime.registerOrchestrationCompatibilitySshAttachment(
         this.targetId,
         connectionIncarnation
@@ -1344,6 +1384,7 @@ export class SshRelaySession {
           cwd,
           env,
           ...(stdin !== undefined ? { stdin } : {}),
+          ...(artifactInput ? { artifactInput } : {}),
           runtimeAuthority
         })
       } finally {

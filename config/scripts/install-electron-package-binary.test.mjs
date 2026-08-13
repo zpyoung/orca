@@ -118,12 +118,39 @@ describe('install-electron-package-binary', () => {
     }
   })
 
-  it('retries an Electron download rejected with an HTTP status response', () => {
+  it('retries a refused HTTP/2 stream from the release CDN', () => {
     const projectDir = mkTempProject()
 
     try {
       writeFakeElectronPackage(projectDir)
-      writeFakeElectronGet(projectDir, { downloadFailures: 1, downloadErrorStatus: 503 })
+      writeFakeElectronGet(projectDir, {
+        downloadFailures: 1,
+        downloadErrorCode: 'ERR_HTTP2_STREAM_ERROR'
+      })
+      writeFakeExtractor(projectDir, { createExecutable: true })
+
+      const result = runInstallScript(projectDir, {
+        ORCA_ELECTRON_PACKAGE_RETRY_DELAYS_MS: '0,0'
+      })
+
+      expect(result.status, result.stderr).toBe(0)
+      expect(result.stderr).toContain(
+        'Transient Electron download failure (ERR_HTTP2_STREAM_ERROR)'
+      )
+    } finally {
+      rmSync(projectDir, { recursive: true, force: true })
+    }
+  })
+
+  it('retries a 5xx carried on a fetch Response', () => {
+    const projectDir = mkTempProject()
+
+    try {
+      writeFakeElectronPackage(projectDir)
+      writeFakeElectronGet(projectDir, {
+        downloadFailures: 1,
+        downloadErrorResponseStatus: 503
+      })
       writeFakeExtractor(projectDir, { createExecutable: true })
 
       const result = runInstallScript(projectDir, {
@@ -305,7 +332,7 @@ function writeFakeElectronGet(
     downloadNeverSettles = false,
     downloadFailures = 0,
     downloadErrorCode = 'ECONNRESET',
-    downloadErrorStatus = 0
+    downloadErrorResponseStatus = null
   } = {}
 ) {
   const getDir = join(projectDir, 'node_modules', 'electron', 'node_modules', '@electron', 'get')
@@ -326,12 +353,12 @@ exports.downloadArtifact = async function downloadArtifact(details) {
     return new Promise(() => {})
   }
   if (downloadAttempt <= ${JSON.stringify(downloadFailures)}) {
-    const status = ${JSON.stringify(downloadErrorStatus)}
-    if (status) {
+    const responseStatus = ${JSON.stringify(downloadErrorResponseStatus)}
+    if (responseStatus !== null) {
       // Mirrors @electron/get's HTTPError: a fetch Response, no code and no statusCode.
-      throw Object.assign(new Error('Response code ' + status + ' () for https://example.invalid'), {
+      throw Object.assign(new Error('Response code ' + responseStatus + ' () for https://example.invalid'), {
         name: 'HTTPError',
-        response: { status, statusText: '', ok: false }
+        response: { status: responseStatus, statusText: '', ok: false }
       })
     }
     const cause = Object.assign(new Error('download failed'), {
