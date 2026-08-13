@@ -3,6 +3,7 @@ import { categorizeNativeChatTool, type NativeChatToolCategory } from './native-
 
 describe('categorizeNativeChatTool', () => {
   const table: [string, NativeChatToolCategory][] = [
+    // PascalCase (Anthropic/Claude)
     ['Read', 'read'],
     ['NotebookRead', 'read'],
     ['Edit', 'write'],
@@ -17,7 +18,13 @@ describe('categorizeNativeChatTool', () => {
     ['Glob', 'search'],
     ['grep', 'search'],
     ['WebFetch', 'net'],
-    ['WebSearch', 'net']
+    ['WebSearch', 'net'],
+    // lowercase (OpenAI/other tooling, fixture data)
+    ['read', 'read'],
+    ['edit', 'write'],
+    ['write', 'write'],
+    ['bash', 'exec'],
+    ['glob', 'search']
   ]
 
   it.each(table)('classifies %s as %s', (name, category) => {
@@ -29,11 +36,10 @@ describe('categorizeNativeChatTool', () => {
   })
 
   it('does not match on wrong case', () => {
-    expect(categorizeNativeChatTool('bash')).toBeNull()
-    expect(categorizeNativeChatTool('edit')).toBeNull()
-    expect(categorizeNativeChatTool('write')).toBeNull()
     expect(categorizeNativeChatTool('webfetch')).toBeNull()
     expect(categorizeNativeChatTool('READ')).toBeNull()
+    expect(categorizeNativeChatTool('BASH')).toBeNull()
+    expect(categorizeNativeChatTool('EDIT')).toBeNull()
     expect(categorizeNativeChatTool('GLOB')).toBeNull()
   })
 

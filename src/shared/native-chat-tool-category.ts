@@ -8,6 +8,7 @@ export type NativeChatToolCategory = 'read' | 'write' | 'exec' | 'search' | 'net
 
 // a Map avoids prototype-chain lookups (e.g. name === 'constructor') that a plain object would leak through
 const TOOL_CATEGORY_BY_NAME: ReadonlyMap<string, NativeChatToolCategory> = new Map([
+  // PascalCase names (Anthropic/Claude tooling)
   ['Read', 'read'],
   ['NotebookRead', 'read'],
   ['Edit', 'write'],
@@ -22,7 +23,13 @@ const TOOL_CATEGORY_BY_NAME: ReadonlyMap<string, NativeChatToolCategory> = new M
   ['Glob', 'search'],
   ['grep', 'search'],
   ['WebFetch', 'net'],
-  ['WebSearch', 'net']
+  ['WebSearch', 'net'],
+  // lowercase names (OpenAI/other tooling, fixture data)
+  ['read', 'read'],
+  ['edit', 'write'],
+  ['write', 'write'],
+  ['bash', 'exec'],
+  ['glob', 'search']
 ])
 
 /**
