@@ -6,8 +6,8 @@ import {
   nativeChatComposerTargetIsRemote,
   type NativeChatResolvedTarget
 } from './native-chat-composer-target'
-import type { NativeChatComposerImageAttachment } from './NativeChatComposerField'
-import { setBoundedScopeCacheEntry } from './native-chat-composer-scope-cache'
+import type { AgentComposerImageAttachment } from '../agent-composer/AgentComposerField'
+import { setBoundedScopeCacheEntry } from '../agent-composer/agent-composer-scope-cache'
 
 export type UseNativeChatComposerAttachmentsArgs = {
   attachmentScopeKey: string
@@ -28,14 +28,14 @@ export function useNativeChatComposerAttachments({
   setDraft,
   setNotice
 }: UseNativeChatComposerAttachmentsArgs): {
-  imageAttachments: NativeChatComposerImageAttachment[]
+  imageAttachments: AgentComposerImageAttachment[]
   appendImageAttachments: (paths: string[]) => void
   attachResolvedPaths: (paths: string[]) => void
   clearImageAttachments: () => void
   removeImageAttachment: (id: string) => void
 } {
-  const [imageAttachments, setImageAttachments] = useState<NativeChatComposerImageAttachment[]>(
-    () => readNativeChatAttachmentCache(attachmentScopeKey)
+  const [imageAttachments, setImageAttachments] = useState<AgentComposerImageAttachment[]>(() =>
+    readNativeChatAttachmentCache(attachmentScopeKey)
   )
   const imageAttachmentCounter = useRef(0)
 
@@ -50,11 +50,7 @@ export function useNativeChatComposerAttachments({
   }
 
   const updateImageAttachments = useCallback(
-    (
-      updater: (
-        previous: NativeChatComposerImageAttachment[]
-      ) => NativeChatComposerImageAttachment[]
-    ) => {
+    (updater: (previous: AgentComposerImageAttachment[]) => AgentComposerImageAttachment[]) => {
       setImageAttachments((prev) => {
         const next = updater(prev)
         writeNativeChatAttachmentCache(attachmentScopeKey, next)
@@ -141,17 +137,15 @@ export function useNativeChatComposerAttachments({
   }
 }
 
-const attachmentCache = new Map<string, NativeChatComposerImageAttachment[]>()
+const attachmentCache = new Map<string, AgentComposerImageAttachment[]>()
 
-export function readNativeChatAttachmentCache(
-  scopeKey: string
-): NativeChatComposerImageAttachment[] {
+export function readNativeChatAttachmentCache(scopeKey: string): AgentComposerImageAttachment[] {
   return [...(attachmentCache.get(scopeKey) ?? [])]
 }
 
 function writeNativeChatAttachmentCache(
   scopeKey: string,
-  attachments: readonly NativeChatComposerImageAttachment[]
+  attachments: readonly AgentComposerImageAttachment[]
 ): void {
   if (attachments.length === 0) {
     attachmentCache.delete(scopeKey)

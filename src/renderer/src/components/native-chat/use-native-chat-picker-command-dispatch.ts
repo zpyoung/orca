@@ -10,11 +10,8 @@ import {
   nativeChatComposerTargetIsRemote,
   type NativeChatResolvedTarget
 } from './native-chat-composer-target'
-import {
-  pushHistory,
-  type HistoryState,
-  type NativeChatPickerItem
-} from './native-chat-composer-state'
+import { pushHistory, type HistoryState } from '../agent-composer/agent-composer-history'
+import type { NativeChatPickerItem } from './native-chat-composer-state'
 import type { NativeChatSendLifecycle } from './use-native-chat-send-lifecycle'
 import type { NativeChatPtySessionOptionsSurface } from './native-chat-pty-session-options'
 

@@ -87,17 +87,23 @@ vi.mock('@/lib/native-chat-telemetry', () => ({
   emitNativeChatPickerOpened: vi.fn(),
   emitNativeChatSendClassified: vi.fn()
 }))
-vi.mock('./use-native-chat-draft', () => ({
-  useNativeChatDraft: (scopeKey: string) => {
+vi.mock('../agent-composer/use-agent-composer-draft', () => ({
+  useAgentComposerDraft: (scopeKey: string) => {
     mocks.draftScopeKeys.push(scopeKey)
     return { draft: mocks.draft, setDraft: mocks.setDraft }
   }
 }))
-vi.mock('./native-chat-draft-cache', () => ({
-  readNativeChatDraftCache: () => ''
+vi.mock('../agent-composer/agent-composer-draft-cache', () => ({
+  readAgentComposerDraftCache: () => ''
 }))
-vi.mock('./NativeChatComposerField', () => ({
-  NativeChatComposerField: (props: { onSend?: () => void; onStop?: () => void }) => {
+vi.mock('../agent-composer/use-agent-composer-history', () => ({
+  useAgentComposerHistory: () => ({
+    history: { entries: [], index: null },
+    setHistory: vi.fn()
+  })
+}))
+vi.mock('../agent-composer/AgentComposerField', () => ({
+  AgentComposerField: (props: { onSend?: () => void; onStop?: () => void }) => {
     mocks.fieldProps = props
     return null
   }
@@ -128,8 +134,8 @@ vi.mock('./use-native-chat-external-attachments', () => ({
 vi.mock('../dictation/dictation-control-events', () => ({
   dispatchDictationControl: vi.fn()
 }))
-vi.mock('./use-native-chat-composer-keydown', () => ({
-  useNativeChatComposerKeyDown: () => vi.fn()
+vi.mock('../agent-composer/use-agent-composer-keydown', () => ({
+  useAgentComposerKeyDown: () => vi.fn()
 }))
 vi.mock('./use-native-chat-send-lifecycle', () => ({
   useNativeChatSendLifecycle: () => ({

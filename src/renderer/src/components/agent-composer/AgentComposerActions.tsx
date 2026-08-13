@@ -6,9 +6,9 @@ import type {
   SessionOptionDescriptor,
   SessionOptionsSurface
 } from '../../../../shared/native-chat-session-options'
-import { NativeChatSessionOptionPickers } from './NativeChatSessionOptionPickers'
+import { NativeChatSessionOptionPickers } from '../native-chat/NativeChatSessionOptionPickers'
 
-export type NativeChatComposerActionsProps = {
+export type AgentComposerActionsProps = {
   attachDisabled: boolean
   dictationDisabled: boolean
   sendDisabled: boolean
@@ -25,7 +25,7 @@ export type NativeChatComposerActionsProps = {
   sessionOptionsSnapshot: SessionOptionDescriptor[]
 }
 
-export function NativeChatComposerActions({
+export function AgentComposerActions({
   attachDisabled,
   dictationDisabled,
   sendDisabled,
@@ -40,7 +40,7 @@ export function NativeChatComposerActions({
   onStop,
   sessionOptionsSurface,
   sessionOptionsSnapshot
-}: NativeChatComposerActionsProps): React.JSX.Element {
+}: AgentComposerActionsProps): React.JSX.Element {
   const dictationLabel = isDictating
     ? translate('components.native-chat.composer.stopDictation', 'Stop dictation')
     : translate('components.native-chat.composer.startDictation', 'Start dictation')

@@ -1,13 +1,11 @@
 import { useCallback, type Dispatch, type KeyboardEventHandler, type SetStateAction } from 'react'
-import {
-  recallNext,
-  recallPrevious,
-  type ComposerAutocomplete,
-  type HistoryState,
-  type NativeChatPickerItem
-} from './native-chat-composer-state'
+import { recallNext, recallPrevious, type HistoryState } from './agent-composer-history'
+import type {
+  ComposerAutocomplete,
+  NativeChatPickerItem
+} from '../native-chat/native-chat-composer-state'
 
-export type UseNativeChatComposerKeyDownArgs = {
+export type UseAgentComposerKeyDownArgs = {
   autocomplete: ComposerAutocomplete
   activeSuggestion: number
   draft: string
@@ -24,7 +22,7 @@ export type UseNativeChatComposerKeyDownArgs = {
   setHistory: Dispatch<SetStateAction<HistoryState>>
 }
 
-export function useNativeChatComposerKeyDown({
+export function useAgentComposerKeyDown({
   autocomplete,
   activeSuggestion,
   draft,
@@ -39,7 +37,7 @@ export function useNativeChatComposerKeyDown({
   setDraft,
   setCaret,
   setHistory
-}: UseNativeChatComposerKeyDownArgs): KeyboardEventHandler<HTMLTextAreaElement> {
+}: UseAgentComposerKeyDownArgs): KeyboardEventHandler<HTMLTextAreaElement> {
   return useCallback(
     (event) => {
       if (isComposing() || event.nativeEvent.isComposing || event.keyCode === 229) {

@@ -2,8 +2,9 @@
 
 import { renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { EMPTY_HISTORY, type ComposerAutocomplete } from './native-chat-composer-state'
-import { useNativeChatComposerKeyDown } from './use-native-chat-composer-keydown'
+import { EMPTY_HISTORY } from './agent-composer-history'
+import type { ComposerAutocomplete } from '../native-chat/native-chat-composer-state'
+import { useAgentComposerKeyDown } from './use-agent-composer-keydown'
 
 const COMMAND = {
   kind: 'command' as const,
@@ -40,7 +41,7 @@ function setup(autocomplete: ComposerAutocomplete = picker(), composing = false)
     setHistory: vi.fn()
   }
   const hook = renderHook(() =>
-    useNativeChatComposerKeyDown({
+    useAgentComposerKeyDown({
       autocomplete,
       activeSuggestion: 0,
       draft: '/',
@@ -62,7 +63,7 @@ function keyEvent(key: string, isComposing = false) {
   }
 }
 
-describe('useNativeChatComposerKeyDown', () => {
+describe('useAgentComposerKeyDown', () => {
   it('dispatches command Enter but completes command Tab', () => {
     const enter = setup()
     enter.handler(keyEvent('Enter') as never)

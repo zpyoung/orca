@@ -9,18 +9,24 @@ import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import { NATIVE_FILE_DROP_TARGET } from '../../../../shared/native-file-drop'
 import { basename } from '@/lib/path'
-import { isNativeChatPastedImagePath } from './native-chat-image-paste'
-import type { ComposerAutocomplete, NativeChatPickerItem } from './native-chat-composer-state'
-import { NativeChatMentionHint, NativeChatPickerMenu } from './NativeChatAutocompleteMenus'
-import { NativeChatComposerActions } from './NativeChatComposerActions'
-import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'
-import { nativeChatComposerPlaceholder } from './native-chat-composer-target'
+import { isNativeChatPastedImagePath } from '../native-chat/native-chat-image-paste'
+import type {
+  ComposerAutocomplete,
+  NativeChatPickerItem
+} from '../native-chat/native-chat-composer-state'
+import {
+  NativeChatMentionHint,
+  NativeChatPickerMenu
+} from '../native-chat/NativeChatAutocompleteMenus'
+import { AgentComposerActions } from './AgentComposerActions'
+import { useNativeChatWidthClassName } from '../native-chat/fork-native-chat-width/use-native-chat-width'
+import { nativeChatComposerPlaceholder } from '../native-chat/native-chat-composer-target'
 import type {
   SessionOptionDescriptor,
   SessionOptionsSurface
 } from '../../../../shared/native-chat-session-options'
 
-export type NativeChatComposerFieldProps = {
+export type AgentComposerFieldProps = {
   textareaRef: RefObject<HTMLTextAreaElement | null>
   draft: string
   disabled: boolean
@@ -29,7 +35,7 @@ export type NativeChatComposerFieldProps = {
   autocomplete: ComposerAutocomplete
   activeSuggestion: number
   notice: string | null
-  imageAttachments: readonly NativeChatComposerImageAttachment[]
+  imageAttachments: readonly AgentComposerImageAttachment[]
   sendButtonDisabled: boolean
   isWorking: boolean
   attachDisabled: boolean
@@ -57,12 +63,12 @@ export type NativeChatComposerFieldProps = {
   sessionOptionsSnapshot: SessionOptionDescriptor[]
 }
 
-export type NativeChatComposerImageAttachment = {
+export type AgentComposerImageAttachment = {
   id: string
   path: string
 }
 
-export function NativeChatComposerField({
+export function AgentComposerField({
   textareaRef,
   draft,
   disabled,
@@ -97,7 +103,7 @@ export function NativeChatComposerField({
   onStop,
   sessionOptionsSurface,
   sessionOptionsSnapshot
-}: NativeChatComposerFieldProps): React.JSX.Element {
+}: AgentComposerFieldProps): React.JSX.Element {
   const widthClassName = useNativeChatWidthClassName()
 
   return (
@@ -201,7 +207,7 @@ export function NativeChatComposerField({
               )}
             />
             <div className="flex flex-wrap items-center gap-2 pt-0.5">
-              <NativeChatComposerActions
+              <AgentComposerActions
                 attachDisabled={attachDisabled}
                 dictationDisabled={dictationDisabled}
                 sendDisabled={sendButtonDisabled}

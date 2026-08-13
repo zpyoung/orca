@@ -29,25 +29,22 @@ vi.mock('@/components/ui/tooltip', () => ({
   TooltipContent: ({ children }: { children: ReactNode }) => <div>{children}</div>
 }))
 
-vi.mock('./NativeChatSessionOptionPickers', () => ({
+vi.mock('../native-chat/NativeChatSessionOptionPickers', () => ({
   NativeChatSessionOptionPickers: () => <div data-testid="session-option-pickers" />
 }))
 
-import {
-  NativeChatComposerActions,
-  type NativeChatComposerActionsProps
-} from './NativeChatComposerActions'
+import { AgentComposerActions, type AgentComposerActionsProps } from './AgentComposerActions'
 
 afterEach(() => cleanup())
 
-function renderActions(overrides: Partial<NativeChatComposerActionsProps> = {}): {
+function renderActions(overrides: Partial<AgentComposerActionsProps> = {}): {
   onSend: ReturnType<typeof vi.fn>
   onStop: ReturnType<typeof vi.fn>
 } {
   const onSend = vi.fn()
   const onStop = vi.fn()
   render(
-    <NativeChatComposerActions
+    <AgentComposerActions
       attachDisabled={false}
       dictationDisabled={false}
       sendDisabled={false}
@@ -68,10 +65,10 @@ function renderActions(overrides: Partial<NativeChatComposerActionsProps> = {}):
   return { onSend, onStop }
 }
 
-describe('NativeChatComposerActions', () => {
+describe('AgentComposerActions', () => {
   it('places session option pickers immediately beside dictation', () => {
     render(
-      <NativeChatComposerActions
+      <AgentComposerActions
         attachDisabled={false}
         dictationDisabled={false}
         sendDisabled={false}

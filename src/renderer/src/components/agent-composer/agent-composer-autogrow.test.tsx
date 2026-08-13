@@ -13,22 +13,22 @@ vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string) => fallback
 }))
 
-vi.mock('./NativeChatComposerActions', () => ({
-  NativeChatComposerActions: () => <div data-testid="composer-actions" />
+vi.mock('./AgentComposerActions', () => ({
+  AgentComposerActions: () => <div data-testid="composer-actions" />
 }))
 
-vi.mock('./NativeChatAutocompleteMenus', () => ({
+vi.mock('../native-chat/NativeChatAutocompleteMenus', () => ({
   NativeChatMentionHint: () => null,
   NativeChatPickerMenu: () => null
 }))
 
-import { NativeChatComposerField } from './NativeChatComposerField'
+import { AgentComposerField } from './AgentComposerField'
 
 afterEach(() => cleanup())
 
 function renderField(draft: string): HTMLTextAreaElement {
   render(
-    <NativeChatComposerField
+    <AgentComposerField
       textareaRef={createRef<HTMLTextAreaElement>()}
       draft={draft}
       disabled={false}
@@ -67,7 +67,7 @@ function renderField(draft: string): HTMLTextAreaElement {
   return screen.getByRole('textbox') as HTMLTextAreaElement
 }
 
-describe('native chat composer autogrow', () => {
+describe('agent composer autogrow', () => {
   it('sizes the textarea from its content instead of staying at rows={2}', () => {
     expect(renderField('').className).toContain('[field-sizing:content]')
   })

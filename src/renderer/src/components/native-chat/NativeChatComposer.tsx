@@ -13,16 +13,13 @@ import { resolveNativeChatLaunchDraftSend } from './native-chat-launch-draft-sen
 import { getVerifiedNativeChatCommands } from '../../../../shared/native-chat-agent-profiles'
 import { isSlashCommandDraft } from '../../../../shared/native-chat-slash-commands'
 import { emitNativeChatMessageSent } from '@/lib/native-chat-telemetry'
-import {
-  applyMentionSuggestion,
-  EMPTY_HISTORY,
-  pushHistory,
-  type HistoryState
-} from './native-chat-composer-state'
-import { readNativeChatDraftCache } from './native-chat-draft-cache'
-import { useNativeChatDraft } from './use-native-chat-draft'
+import { applyMentionSuggestion } from './native-chat-composer-state'
+import { pushHistory } from '../agent-composer/agent-composer-history'
+import { readAgentComposerDraftCache } from '../agent-composer/agent-composer-draft-cache'
+import { useAgentComposerDraft } from '../agent-composer/use-agent-composer-draft'
+import { useAgentComposerHistory } from '../agent-composer/use-agent-composer-history'
 import { useNativeChatLaunchDraftAdoption } from './use-native-chat-launch-draft-adoption'
-import { NativeChatComposerField } from './NativeChatComposerField'
+import { AgentComposerField } from '../agent-composer/AgentComposerField'
 import {
   nativeChatComposerTargetIsRemote,
   type NativeChatResolvedTarget
@@ -30,7 +27,7 @@ import {
 import { useNativeChatComposerAttachments } from './use-native-chat-composer-attachments'
 import { useNativeChatComposerPaste } from './use-native-chat-composer-paste'
 import { useNativeChatExternalAttachments } from './use-native-chat-external-attachments'
-import { useNativeChatComposerKeyDown } from './use-native-chat-composer-keydown'
+import { useAgentComposerKeyDown } from '../agent-composer/use-agent-composer-keydown'
 import { useNativeChatSendLifecycle } from './use-native-chat-send-lifecycle'
 import { useNativeChatSessionOptions } from './use-native-chat-session-options'
 import { useNativeChatFileAttachmentActions } from './use-native-chat-file-attachment-actions'
@@ -88,7 +85,7 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
     // Why: local, SSH, and runtime reconnects can replace or temporarily clear
     // the PTY id. Pane identity is the stable ownership key for unsent input.
     const draftScopeKey = paneKey
-    const { draft, setDraft } = useNativeChatDraft(draftScopeKey)
+    const { draft, setDraft } = useAgentComposerDraft(draftScopeKey)
     const [caret, setCaret] = useState(draft.length)
     useNativeChatLaunchDraftAdoption({
       terminalTabId,
@@ -99,7 +96,7 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       setDraft,
       setCaret
     })
-    const [history, setHistory] = useState<HistoryState>(EMPTY_HISTORY)
+    const { history, setHistory } = useAgentComposerHistory(draftScopeKey)
     const [activeSuggestion, setActiveSuggestion] = useState(0)
     const [notice, setNotice] = useState<string | null>(null)
     const [dictationPressed, setDictationPressed] = useState(false)
@@ -126,7 +123,7 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
     const lastDraftScopeKey = useRef(draftScopeKey)
     if (lastDraftScopeKey.current !== draftScopeKey) {
       lastDraftScopeKey.current = draftScopeKey
-      setCaret(readNativeChatDraftCache(draftScopeKey).length)
+      setCaret(readAgentComposerDraftCache(draftScopeKey).length)
     }
 
     const agentCommands = useMemo(() => getVerifiedNativeChatCommands(agent), [agent])
@@ -330,7 +327,8 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       sessionOptionsSurface,
       terminalTabId,
       trackPendingSend,
-      setDraft
+      setDraft,
+      setHistory
     ])
 
     const interrupt = useCallback(() => {
@@ -363,7 +361,7 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       setNotice
     })
 
-    const handleKeyDown = useNativeChatComposerKeyDown({
+    const handleKeyDown = useAgentComposerKeyDown({
       autocomplete,
       activeSuggestion,
       draft,
@@ -388,11 +386,11 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
         handleDraftOrCaretChange(value, element.selectionStart ?? value.length)
         setActiveSuggestion(0)
       },
-      [handleDraftOrCaretChange, setDraft, syncCaret]
+      [handleDraftOrCaretChange, setDraft, setHistory, syncCaret]
     )
 
     return (
-      <NativeChatComposerField
+      <AgentComposerField
         textareaRef={textareaRef}
         draft={draft}
         disabled={disabled}
