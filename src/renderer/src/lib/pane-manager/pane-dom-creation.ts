@@ -38,6 +38,11 @@ export function createPaneDOM(
   xtermContainer.className = 'xterm-container'
   container.appendChild(xtermContainer)
 
+  const dockContainer = document.createElement('div')
+  dockContainer.className = 'pane-dock-slot'
+  dockContainer.dataset.panePreventTerminalFocus = ''
+  container.appendChild(dockContainer)
+
   const userOpts = options.terminalOptions?.(id) ?? {}
   const terminalOpts: ITerminalOptions = {
     ...buildDefaultTerminalOptions(),
@@ -115,6 +120,7 @@ export function createPaneDOM(
     terminal,
     container,
     xtermContainer,
+    dockContainer,
     linkTooltip,
     terminalTuiScrollSensitivity: options.terminalTuiScrollSensitivity,
     terminalGpuAcceleration: options.terminalGpuAcceleration ?? 'auto',
