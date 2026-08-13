@@ -484,8 +484,10 @@ describe('PipelineDriver stage table (attempt accounting by evidence)', () => {
     driver.stop()
   })
 
-  it('plain branch: a task an external actor put back to `ready` is re-dispatched without retryOf, not stalled forever', async () => {
-    const { driver, db, pipelineDb, checkpointBackend } = buildSingleNodeHarness({ retries: 1 })
+  it('plain branch: a verified stop lets a task an external actor put back to `ready` re-dispatch without retryOf, not stalled forever', async () => {
+    const { driver, db, pipelineDb, runtime, checkpointBackend } = buildSingleNodeHarness({
+      retries: 1
+    })
     let call = 0
     executeLocalWorkerStartMock.mockImplementation(
       async (args: { taskId: string; retryOf?: string }) => {
@@ -512,6 +514,9 @@ describe('PipelineDriver stage table (attempt accounting by evidence)', () => {
     db.tasks.set('task-n', { id: 'task-n', status: 'ready', result: null })
     await advanceOneCycle() // observe the re-ready; must not stall waiting for completed/failed/blocked
 
+    // the re-readied route must gate on the same verified stop as any other stage-C re-dispatch
+    expect(runtime.waitForLeafPtyId).toHaveBeenCalledWith('term-1', expect.any(Number))
+    expect(runtime.stopExactTerminalsForWorktree).toHaveBeenCalled()
     expect(pipelineDb.endAttempt).toHaveBeenCalledWith('run-1', 'n', 1, {
       outcome: 'failed',
       failureStage: 'reready'
@@ -524,6 +529,68 @@ describe('PipelineDriver stage table (attempt accounting by evidence)', () => {
     db.tasks.set('task-n', { id: 'task-n', status: 'completed', result: 'ok' })
     await advanceOneCycle()
     expect(pipelineDb.run.state).toBe('completed')
+    driver.stop()
+  })
+
+  it('plain branch: an unconfirmed stop fails the re-readied node terminally instead of re-dispatching into a possibly-live terminal', async () => {
+    const { driver, db, pipelineDb, checkpointBackend } = buildSingleNodeHarness({
+      retries: 1,
+      runtimeOverrides: {
+        stopExactTerminalsForWorktree: vi.fn().mockResolvedValue({
+          stopped: 0,
+          stoppedPtyIds: [],
+          livePtyIds: ['pty-1'],
+          postStopVerified: false
+        })
+      }
+    })
+    executeLocalWorkerStartMock.mockImplementation(async (args: { taskId: string }) => {
+      db.tasks.get(args.taskId)!.status = 'dispatched'
+      return workerStartResponse({ taskId: args.taskId, dispatchId: 'dispatch-1', state: 'ready' })
+    })
+
+    driver.start()
+    await flushAsync() // dispatch attempt 1
+
+    db.registerDispatch({ dispatchId: 'dispatch-1', taskId: 'task-n', workerState: 'abandoned' })
+    db.tasks.set('task-n', { id: 'task-n', status: 'ready', result: null })
+    await advanceOneCycle()
+
+    expect(checkpointBackend.restore).not.toHaveBeenCalled()
+    expect(executeLocalWorkerStartMock).toHaveBeenCalledTimes(1) // no retry dispatch
+    expect(pipelineDb.nodesById.get('n')?.outcome).toBe('failed')
+    expect(pipelineDb.run.state).toBe('failed')
+    driver.stop()
+  })
+
+  it('plain branch: no terminal handle anywhere fails the re-readied node terminally instead of treating absence as a verified stop', async () => {
+    const { driver, db, pipelineDb, runtime, checkpointBackend } = buildSingleNodeHarness({
+      retries: 1
+    })
+    executeLocalWorkerStartMock.mockImplementation(async (args: { taskId: string }) => {
+      db.tasks.get(args.taskId)!.status = 'dispatched'
+      // creation threw before the terminal-created effect could be recorded: response carries no handle
+      return workerStartResponse({
+        taskId: args.taskId,
+        dispatchId: 'dispatch-1',
+        state: 'ready',
+        effects: []
+      })
+    })
+
+    driver.start()
+    await flushAsync() // dispatch attempt 1
+
+    // the worker-dispatch record (the alternate route) also has no handle recorded
+    db.registerDispatch({ dispatchId: 'dispatch-1', taskId: 'task-n', workerState: 'abandoned' })
+    db.tasks.set('task-n', { id: 'task-n', status: 'ready', result: null })
+    await advanceOneCycle()
+
+    expect(runtime.waitForLeafPtyId).not.toHaveBeenCalled() // nothing to verify a stop against
+    expect(checkpointBackend.restore).not.toHaveBeenCalled()
+    expect(executeLocalWorkerStartMock).toHaveBeenCalledTimes(1) // no retry dispatch
+    expect(pipelineDb.nodesById.get('n')?.outcome).toBe('failed')
+    expect(pipelineDb.run.state).toBe('failed')
     driver.stop()
   })
 })

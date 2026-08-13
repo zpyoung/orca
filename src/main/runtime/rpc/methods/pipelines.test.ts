@@ -325,6 +325,11 @@ describe('PipelineStartParams', () => {
     expect(result.success).toBe(false)
   })
 
+  it('rejects an empty nodes array', () => {
+    const result = PipelineStartParams.safeParse({ worktree: 'id:w1', definition: bareDefinition() })
+    expect(result.success).toBe(false)
+  })
+
   it('accepts a well-formed start request', () => {
     const result = PipelineStartParams.safeParse({
       worktree: 'id:w1',

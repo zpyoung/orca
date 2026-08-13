@@ -35,10 +35,15 @@ export async function pollInFlightDispatch(args: {
 
   if (args.taskStatus === 'ready') {
     return resolveReadiedAttempt({
+      db,
+      runtime,
       pipelineDb,
       runId,
+      worktreeId,
       node: inFlight.node,
       attempt: inFlight.attempt,
+      dispatchId: inFlight.dispatchId,
+      terminalHandle: inFlight.terminalHandle,
       checkpointBackend,
       worktreePath,
       checkpoint: inFlight.checkpoint

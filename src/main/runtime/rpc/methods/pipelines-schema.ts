@@ -30,7 +30,7 @@ const ResolvedPipelineDefinitionSchema = z.object({
   templateVersion: requiredNumber('Missing templateVersion'),
   needsNewerOrca: z.boolean(),
   inputText: z.string(),
-  nodes: z.array(ResolvedPipelineNodeSchema)
+  nodes: z.array(ResolvedPipelineNodeSchema).min(1, 'nodes must include at least one node')
 })
 
 export const PipelineStartParams = z.object({
