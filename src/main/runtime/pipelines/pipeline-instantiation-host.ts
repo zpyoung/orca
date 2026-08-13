@@ -1,5 +1,6 @@
 /** Executing-host resolution and the SSH checkpoint-support gate for instantiation preflight. */
 
+import { getRegisteredSshState } from '../../ipc/ssh'
 import { getSshGitProvider, SSH_GIT_PROVIDER_UNAVAILABLE_MESSAGE } from '../../providers/ssh-git-dispatch'
 import type { Repo } from '../../../shared/types'
 import type { OrcaRuntimeService } from '../orca-runtime'
@@ -13,7 +14,11 @@ export function resolvePreflightExecutionHost(
   worktreeId: string
 ): PreflightExecutionHost {
   if (repo.connectionId) {
-    return { connectionId: repo.connectionId }
+    const remotePlatform = getRegisteredSshState(repo.connectionId)?.remotePlatform
+    return {
+      connectionId: repo.connectionId,
+      ...(remotePlatform ? { hostPlatform: remotePlatform } : {})
+    }
   }
   const resolution = runtime.resolveProjectRuntimeForWorktree(worktreeId)
   const wslDistro =
