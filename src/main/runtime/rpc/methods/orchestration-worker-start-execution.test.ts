@@ -4,6 +4,8 @@ import { OrchestrationDb } from '../../orchestration/db'
 import { ORCHESTRATION_WORKER_START_METHODS } from './orchestration-workers'
 import { executeLocalWorkerStart } from './orchestration-worker-start-execution'
 
+type CreateTerminalOptions = Parameters<OrcaRuntimeService['createTerminal']>[1]
+
 describe('orchestration worker-start execution seam', () => {
   let db: OrchestrationDb
   let runtime: OrcaRuntimeService
@@ -241,6 +243,134 @@ describe('orchestration worker-start execution seam', () => {
         expect.not.stringContaining('original snapshot prompt')
       )
       expect(db.getTask(task.id)?.spec).toBe('original snapshot prompt')
+    })
+  })
+
+  describe('durable spawn-attempt record', () => {
+    it('records the spawn attempt before terminal creation is invoked', async () => {
+      const { run, task } = createRunAndTask('spawn attempt ordering')
+      const order: string[] = []
+      vi.spyOn(db, 'recordSpawnAttempt').mockImplementation((dispatchId: string) => {
+        order.push('recordSpawnAttempt')
+        return OrchestrationDb.prototype.recordSpawnAttempt.call(db, dispatchId)
+      })
+      vi.spyOn(runtime, 'createTerminal').mockImplementation(async () => {
+        order.push('createTerminal')
+        return { handle: 'term_worker', worktreeId: 'repo::worktree', title: 'worker' }
+      })
+
+      await executeLocalWorkerStart({
+        runtime,
+        db,
+        runId: run.id,
+        taskId: task.id,
+        worktreeId: 'repo::worktree',
+        from: `pipeline-driver:${run.id}`,
+        launch: 'new-terminal',
+        agent: 'codex'
+      })
+
+      expect(order).toEqual(['recordSpawnAttempt', 'createTerminal'])
+    })
+
+    it('leaves no spawn receipt row when the dispatch fails before terminal creation is attempted', async () => {
+      const { run, task } = createRunAndTask('pre-spawn failure')
+      vi.spyOn(db, 'recordWorkerStage').mockImplementationOnce(() => {
+        throw new Error('bookkeeping failed before any spawn was attempted')
+      })
+
+      const result = (await executeLocalWorkerStart({
+        runtime,
+        db,
+        runId: run.id,
+        taskId: task.id,
+        worktreeId: 'repo::worktree',
+        from: `pipeline-driver:${run.id}`,
+        launch: 'new-terminal',
+        agent: 'codex'
+      })) as { dispatchId: string; state: string }
+
+      expect(result.state).toBe('failed')
+      expect(runtime.createTerminal).not.toHaveBeenCalled()
+      expect(db.getSpawnReceipt(result.dispatchId)).toBeUndefined()
+    })
+
+    it('stamps spawn_committed_at when onPtySpawnCommitted fires before createTerminal resolves', async () => {
+      const { run, task } = createRunAndTask('native pre-return commit stamp')
+      vi.spyOn(runtime, 'createTerminal').mockImplementation(
+        async (_target?: string, options?: CreateTerminalOptions) => {
+          options?.onPtySpawnCommitted?.()
+          return { handle: 'term_worker', worktreeId: 'repo::worktree', title: 'worker' }
+        }
+      )
+
+      const result = (await executeLocalWorkerStart({
+        runtime,
+        db,
+        runId: run.id,
+        taskId: task.id,
+        worktreeId: 'repo::worktree',
+        from: `pipeline-driver:${run.id}`,
+        launch: 'new-terminal',
+        agent: 'codex'
+      })) as { dispatchId: string }
+
+      const receipt = db.getSpawnReceipt(result.dispatchId)
+      expect(receipt?.spawn_attempt_at).toEqual(expect.any(String))
+      expect(receipt?.spawn_committed_at).toEqual(expect.any(String))
+    })
+
+    it('stamps spawn_committed_at when onPtySpawnCommitted fires after createTerminal resolves', async () => {
+      const { run, task } = createRunAndTask('post-return commit stamp')
+      let firePostReturnCommit: (() => void) | undefined
+      vi.spyOn(runtime, 'createTerminal').mockImplementation(
+        async (_target?: string, options?: CreateTerminalOptions) => {
+          firePostReturnCommit = options?.onPtySpawnCommitted
+          return { handle: 'term_worker', worktreeId: 'repo::worktree', title: 'worker' }
+        }
+      )
+
+      const result = (await executeLocalWorkerStart({
+        runtime,
+        db,
+        runId: run.id,
+        taskId: task.id,
+        worktreeId: 'repo::worktree',
+        from: `pipeline-driver:${run.id}`,
+        launch: 'new-terminal',
+        agent: 'codex'
+      })) as { dispatchId: string }
+
+      expect(db.getSpawnReceipt(result.dispatchId)?.spawn_committed_at).toBeNull()
+
+      firePostReturnCommit?.()
+
+      expect(db.getSpawnReceipt(result.dispatchId)?.spawn_committed_at).toEqual(expect.any(String))
+    })
+
+    it('also invokes a caller-supplied onPtySpawnCommitted alongside the internal commit stamp', async () => {
+      const { run, task } = createRunAndTask('caller supplied callback')
+      vi.spyOn(runtime, 'createTerminal').mockImplementation(
+        async (_target?: string, options?: CreateTerminalOptions) => {
+          options?.onPtySpawnCommitted?.()
+          return { handle: 'term_worker', worktreeId: 'repo::worktree', title: 'worker' }
+        }
+      )
+      const callerCallback = vi.fn()
+
+      await executeLocalWorkerStart({
+        runtime,
+        db,
+        runId: run.id,
+        taskId: task.id,
+        worktreeId: 'repo::worktree',
+        from: `pipeline-driver:${run.id}`,
+        launch: 'new-terminal',
+        agent: 'codex',
+        onPtySpawnCommitted: callerCallback
+      })
+
+      expect(callerCallback).toHaveBeenCalledTimes(1)
     })
   })
 })

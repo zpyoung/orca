@@ -41,6 +41,7 @@ import { buildOrchestrationTaskDisplayMetadata } from '../../../shared/orchestra
 import { ORCHESTRATION_LEGACY_RUN_ID } from '../../../shared/orchestration-rpc-contract'
 import { parsePaneKey } from '../../../shared/stable-pane-id'
 import { OrchestrationError } from './orchestration-error'
+import { ensureDispatchSpawnReceiptSchema } from './dispatch-spawn-receipt-schema'
 import { ensurePipelineRunSchema } from './pipeline-run-db-schema'
 import { resolveOrchestrationMigrationStartVersion } from './orchestration-schema-version-skew'
 import {
@@ -605,6 +606,7 @@ export class OrchestrationDb {
       );
     `)
     this.createUndeliveredInboxIndexIfPossible()
+    ensureDispatchSpawnReceiptSchema(this.db)
   }
 
   // Why: CREATE TABLE IF NOT EXISTS won't alter existing DBs; migrate in a txn that bumps user_version only on success (atomic all-or-nothing).
@@ -4127,6 +4129,39 @@ export class OrchestrationDb {
     }
   }
 
+  // Written immediately before terminal creation is invoked: absence of this row after a
+  // failure is positive proof nothing spawned (L16a stage B).
+  recordSpawnAttempt(dispatchId: string): void {
+    this.db
+      .prepare(
+        `INSERT INTO dispatch_spawn_receipts (dispatch_id, spawn_attempt_at)
+         VALUES (?, datetime('now'))`
+      )
+      .run(dispatchId)
+  }
+
+  markSpawnCommitted(dispatchId: string): void {
+    this.db
+      .prepare(
+        `UPDATE dispatch_spawn_receipts SET spawn_committed_at = datetime('now')
+         WHERE dispatch_id = ?`
+      )
+      .run(dispatchId)
+  }
+
+  getSpawnReceipt(
+    dispatchId: string
+  ): { spawn_attempt_at: string; spawn_committed_at: string | null } | undefined {
+    return this.db
+      .prepare(
+        `SELECT spawn_attempt_at, spawn_committed_at
+         FROM dispatch_spawn_receipts WHERE dispatch_id = ?`
+      )
+      .get(dispatchId) as
+      | { spawn_attempt_at: string; spawn_committed_at: string | null }
+      | undefined
+  }
+
   recordWorkerStage(params: {
     dispatchId: string
     stage: string
@@ -6801,6 +6836,7 @@ export class OrchestrationDb {
       DELETE FROM worker_terminal_archives;
       DELETE FROM worker_terminal_resources;
       DELETE FROM worker_dispatches;
+      DELETE FROM dispatch_spawn_receipts;
       DELETE FROM dispatch_contexts;
       DELETE FROM pipeline_attempts;
       DELETE FROM pipeline_nodes;
@@ -6832,6 +6868,7 @@ export class OrchestrationDb {
       DELETE FROM worker_terminal_archives;
       DELETE FROM worker_terminal_resources;
       DELETE FROM worker_dispatches;
+      DELETE FROM dispatch_spawn_receipts;
       DELETE FROM dispatch_contexts;
       DELETE FROM tasks;
     `)

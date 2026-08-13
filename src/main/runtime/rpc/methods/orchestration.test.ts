@@ -2229,7 +2229,8 @@ describe('orchestration RPC methods', () => {
       expect(runtime.createTerminal).toHaveBeenCalledWith('id:repo::worktree', {
         startupAgent: 'codex',
         title: `worker-${task.id}`,
-        surfaceOwner: false
+        surfaceOwner: false,
+        onPtySpawnCommitted: expect.any(Function)
       })
       expect(runtime.sendTerminalAgentPrompt).toHaveBeenCalledWith(
         'term_worker',
