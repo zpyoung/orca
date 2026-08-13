@@ -57,6 +57,7 @@ export async function dispatchPipelineNode(args: {
   retryOf?: string
   dependencies: PipelineDispatchDependency[]
   isDispatchable: () => boolean
+  onSpawnStarted?: (dispatchId: string) => void
 }): Promise<PipelineDispatchOutcome> {
   const preflight = await validatePipelineNodeLaunch({
     runtime: args.runtime,
@@ -104,7 +105,17 @@ export async function dispatchPipelineNode(args: {
     retryOf: args.retryOf,
     launch: 'new-terminal',
     agent: preflight.agent,
-    launchPreferences: preferences
+    launchPreferences: preferences,
+    // the durable spawn receipt exists as soon as the PTY commits, well before the readiness
+    // wait — surface it here so an in-flight attempt is abortable before this call returns
+    onPtySpawnCommitted: args.onSpawnStarted
+      ? () => {
+          const dispatch = args.db.getDispatchContext(args.taskId)
+          if (dispatch) {
+            args.onSpawnStarted?.(dispatch.id)
+          }
+        }
+      : undefined
   })
   const terminalHandle = extractDispatchTerminalHandle(response.effects)
 

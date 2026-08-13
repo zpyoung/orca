@@ -334,6 +334,67 @@ describe('PipelineDriver', () => {
     driver.stop()
   })
 
+  it('abort: reaches an attempt whose process has already spawned but whose worker-start call has not returned yet (the readiness-wait window)', async () => {
+    const nodeA = node({ id: 'a', index: 0 })
+    const db = new FakeOrchestrationDb()
+    db.tasks.set('task-a', { id: 'task-a', status: 'ready', result: null })
+    const pipelineDb = new FakePipelineRunDb(
+      runRow(),
+      new Map([['a', nodeRow({ node_id: 'a', node_index: 0, task_id: 'task-a' })]])
+    )
+    const runtime = runtimeStub()
+
+    let resolveWorkerStart: (value: ReturnType<typeof workerStartResponse>) => void = () => {
+      throw new Error('resolveWorkerStart called before the mock ran')
+    }
+    executeLocalWorkerStartMock.mockImplementation(
+      (args: { taskId: string; onPtySpawnCommitted?: () => void }) =>
+        new Promise((resolve) => {
+          resolveWorkerStart = resolve
+          // simulate the PTY spawn committing (and the terminal handle landing in the durable
+          // dispatch record, as `persistWorkerReadinessStage` does) while the readiness wait
+          // that follows is still pending — this is the up-to-60s window the finding is about
+          db.registerDispatch({
+            dispatchId: 'd-a',
+            taskId: args.taskId,
+            workerState: 'starting',
+            agentTerminalHandle: 'term-a'
+          })
+          args.onPtySpawnCommitted?.()
+        })
+    )
+
+    const driver = new PipelineDriver({
+      runtime,
+      db: db.asOrchestrationDb(),
+      pipelineDb: pipelineDb.asPipelineRunDb(),
+      runId: 'run-1',
+      definition: definitionOf([nodeA]),
+      publisher: publisherStub() as unknown as PipelineSnapshotPublisher
+    })
+
+    driver.start()
+    await flushAsync() // spawn has committed; worker-start is still awaiting the readiness wait
+
+    await driver.abort()
+    expect(pipelineDb.updateRunState).toHaveBeenCalledWith('run-1', 'aborted')
+    // reachable before the readiness wait resolves, not only once the whole call returns
+    expect(runtime.sendTerminal).toHaveBeenCalledWith('term-a', { interrupt: true })
+
+    resolveWorkerStart(
+      workerStartResponse({
+        taskId: 'task-a',
+        dispatchId: 'd-a',
+        state: 'ready',
+        effects: [{ kind: 'terminal', role: 'agent', action: 'created', id: 'term-a' }]
+      })
+    )
+    await flushAsync()
+    expect(pipelineDb.beginAttempt).not.toHaveBeenCalled() // still never becomes a live attempt
+
+    driver.stop()
+  })
+
   it('abort: a dispatch still awaiting preflight when abort runs must never reach the launch at all', async () => {
     const nodeA = node({ id: 'a', index: 0 })
     const db = new FakeOrchestrationDb()

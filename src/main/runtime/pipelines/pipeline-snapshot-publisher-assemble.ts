@@ -127,12 +127,16 @@ export function assemblePipelineSnapshot(
       runPhase: phase
     })
     const metadata = nodeMetadataByNodeId.get(nodeRow.node_id)
+    // queued/paused retrying: `latest` is still the failed attempt row until the retry
+    // redispatches, so the attempt about to run is one past it, not the failed one
+    const attempt =
+      status === 'retrying' && !attemptInFlight ? (latest?.attempt ?? 0) + 1 : latest?.attempt
 
     return {
       id: nodeRow.node_id,
       title: nodeRow.title,
       status,
-      attempt: latest?.attempt,
+      attempt,
       attemptsAllowed: 1 + nodeRow.retries_allowed,
       startedAt: latest?.started_at,
       endedAt: latest?.ended_at ?? undefined,

@@ -325,6 +325,57 @@ describe('PipelineDriver stage table (attempt accounting by evidence)', () => {
     driver.stop()
   })
 
+  it('stage C: a restore that would only land after abort must never touch the worktree', async () => {
+    let resolveWaitForLeafPtyId: (value: string) => void = () => {
+      throw new Error('resolveWaitForLeafPtyId called before the mock ran')
+    }
+    const { driver, db, pipelineDb, checkpointBackend } = buildSingleNodeHarness({
+      retries: 1,
+      runtimeOverrides: {
+        waitForLeafPtyId: vi.fn(
+          () =>
+            new Promise<string>((resolve) => {
+              resolveWaitForLeafPtyId = resolve
+            })
+        )
+      }
+    })
+    executeLocalWorkerStartMock.mockImplementation(async (args: { taskId: string }) => {
+      db.tasks.get(args.taskId)!.status = 'dispatched'
+      return workerStartResponse({
+        taskId: args.taskId,
+        dispatchId: 'dispatch-1',
+        state: 'ready',
+        effects: [{ kind: 'terminal', role: 'agent', action: 'created', id: 'term-1' }]
+      })
+    })
+
+    driver.start()
+    await flushAsync() // dispatch attempt 1
+
+    db.registerDispatch({
+      dispatchId: 'dispatch-1',
+      taskId: 'task-n',
+      workerState: 'failed',
+      spawnReceipt: { committed: true }
+    })
+    db.tasks.set('task-n', { id: 'task-n', status: 'failed', result: null })
+    // retries: 1 means this failure is eligible for restore-and-retry; resolution is now
+    // awaiting the pty-stop check, immediately before the restore call
+    await advanceOneCycle()
+
+    await driver.abort()
+    expect(pipelineDb.run.state).toBe('aborted')
+
+    resolveWaitForLeafPtyId('pty-1') // the stale resolution only proceeds after abort already landed
+    await flushAsync()
+
+    // the destructive git operation itself must never run once the run is aborted — not just the
+    // downstream DB bookkeeping a previous fix guarded instead
+    expect(checkpointBackend.restore).not.toHaveBeenCalled()
+    driver.stop()
+  })
+
   it('stage C: no terminal handle anywhere fails the node terminally instead of treating absence as a verified stop', async () => {
     const { driver, db, pipelineDb, runtime, checkpointBackend } = buildSingleNodeHarness({
       retries: 1

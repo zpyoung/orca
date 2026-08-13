@@ -155,6 +155,29 @@ describe('assemblePipelineSnapshot', () => {
     expect(node?.attemptsAllowed).toBe(2)
   })
 
+  it('retrying (queued, live run): publishes the next attempt number, not the failed attempt', () => {
+    const source = sourceOf(
+      runRow({ state: 'running' }),
+      [nodeRow({ node_id: 'repro', retries_allowed: 1 })],
+      [attemptRow({ attempt: 1, ended_at: '2026-08-12T00:01:00.000Z', outcome: 'failed' })]
+    )
+    const node = assemblePipelineSnapshot(source, 'run_1').nodes?.[0]
+    expect(node?.status).toBe('retrying')
+    expect(node?.attempt).toBe(2)
+    expect(node?.attemptsAllowed).toBe(2)
+  })
+
+  it('retrying (queued, paused run): still publishes the next attempt number while held by Pause', () => {
+    const source = sourceOf(
+      runRow({ state: 'paused' }),
+      [nodeRow({ node_id: 'repro', retries_allowed: 1 })],
+      [attemptRow({ attempt: 1, ended_at: '2026-08-12T00:01:00.000Z', outcome: 'failed' })]
+    )
+    const node = assemblePipelineSnapshot(source, 'run_1').nodes?.[0]
+    expect(node?.status).toBe('retrying')
+    expect(node?.attempt).toBe(2)
+  })
+
   it('succeeded: node outcome recorded succeeded, regardless of run phase', () => {
     const source = sourceOf(
       runRow({ state: 'running' }),
