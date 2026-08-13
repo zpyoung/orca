@@ -1,5 +1,5 @@
 ---
-last_released_commit: d87046519fec7ce2e84c071491cffa4c6895127f
+last_released_commit: df807fdd3d98fe6bcf31cfa9583f4a7fb252d9bc
 upstream_synced: v1.4.180
 ---
 
@@ -11,6 +11,23 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.181-rc.0.zy03] - 2026-08-13
+
+Synced to upstream [v1.4.180](https://github.com/stablyai/orca/releases/tag/v1.4.180).
+
+### Fixed
+- Chat view now reads transcripts over the SSH relay when a pane is hosted on a remote machine.
+  Previously it always read from local disk, so an SSH-hosted conversation showed a read error and
+  the first message only appeared after toggling to the terminal and back. A transcript that does
+  not exist yet is treated as an empty conversation rather than a failure, oversized snapshots are
+  clipped to a wire byte budget instead of being lost, byte-bounded pagination can reach older
+  history, subscriptions re-arm when the relay reconnects so an idle pane recovers on its own,
+  retained sessions are keyed by SSH connection so rebinding a pane between hosts cannot show the
+  previous host's messages, and read failures surface inline with a retry option.
+- CI retries the Electron download failures it actually hits — refused HTTP/2 streams and 5xx
+  responses are now classified as transient, with a retry budget long enough to outlast observed
+  CDN degradations.
 
 ## [1.4.181-rc.0.zy02] - 2026-08-12
 
