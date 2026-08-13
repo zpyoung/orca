@@ -20,7 +20,8 @@ vi.mock('../../ipc/preflight-wsl-agent-detection', () => ({
   detectWslCommandsOnPath: vi.fn().mockResolvedValue(new Set())
 }))
 vi.mock('../../ipc/ssh', () => ({
-  getActiveMultiplexer: getActiveMultiplexerMock
+  getActiveMultiplexer: getActiveMultiplexerMock,
+  getRegisteredSshState: vi.fn()
 }))
 vi.mock('../../providers/ssh-git-dispatch', () => ({
   getSshGitProvider: getSshGitProviderMock,
