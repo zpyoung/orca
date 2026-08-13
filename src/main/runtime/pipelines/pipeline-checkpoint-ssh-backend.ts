@@ -1,4 +1,4 @@
-/** SSH pipeline checkpoint backend (tech §3.7, §4.6): calls the relay's narrow checkpoint RPCs, never `SshGitProvider.exec`. */
+/** SSH pipeline checkpoint backend: calls the relay's narrow checkpoint RPCs, never `SshGitProvider.exec`. */
 
 import type { SshGitProvider } from '../../providers/ssh-git-provider'
 import type { PipelineCheckpointBackend } from './pipeline-checkpoint'

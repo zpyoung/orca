@@ -1,4 +1,4 @@
-/** Checkpoint capture: a GC-anchored snapshot of worktree content, without touching it (logic L9, L9a). */
+/** Checkpoint capture: a GC-anchored snapshot of worktree content, without touching it. */
 
 import {
   checkpointRef,

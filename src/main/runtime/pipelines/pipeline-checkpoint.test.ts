@@ -8,9 +8,12 @@ import { createLocalCheckpointBackend } from './pipeline-checkpoint'
 const git = (args: string[], cwd: string): string =>
   execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
 
+// `git init -b` post-dates the Git 2.25 baseline; set the branch name before the first
+// commit instead, which every Git version supports.
 function initRepo(dir: string): void {
   mkdirSync(dir, { recursive: true })
-  git(['init', '-q', '-b', 'main'], dir)
+  git(['init', '-q'], dir)
+  git(['symbolic-ref', 'HEAD', 'refs/heads/main'], dir)
   git(['config', 'user.email', 'test@example.com'], dir)
   git(['config', 'user.name', 'Test'], dir)
 }

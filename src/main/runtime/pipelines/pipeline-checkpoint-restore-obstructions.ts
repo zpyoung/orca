@@ -1,4 +1,4 @@
-/** Clears on-disk paths and type collisions that would block checkout-index from materializing the snapshot tree (logic L9b items 3-4). */
+/** Clears on-disk paths and type collisions that would block checkout-index from materializing the snapshot tree. */
 
 import { join } from 'node:path'
 import { getLocalWorktreePathAccess, removeLocalWorktreePath } from '../../local-worktree-filesystem'
@@ -42,7 +42,7 @@ function ancestorPaths(relativePath: string): string[] {
   return segments.slice(1).map((_, index) => segments.slice(0, index + 1).join('/'))
 }
 
-/** Removes on-disk paths the snapshot tree no longer contains (L9b item 3). */
+/** Removes on-disk paths the snapshot tree no longer contains. */
 export async function removeSnapshotDeletions(
   target: CheckpointGitTarget,
   head: string,
@@ -58,9 +58,10 @@ export async function removeSnapshotDeletions(
 
 /**
  * Removes any on-disk file/directory occupying a path (or an ancestor of a path) the snapshot tree
- * claims, so checkout-index can create the snapshot's file there — covers tracked type changes
- * (L9b item 3) and ignored obstructions (L9b item 4). Submodule paths are left untouched: checkout-index
- * never writes gitlink content, so clearing one would only risk the submodule's own working tree (L9).
+ * claims, so checkout-index can create the snapshot's file there — covers both tracked type changes
+ * (e.g. a file replaced by a directory) and ignored obstructions (an ignored file/directory sitting on
+ * a path the snapshot now claims). Submodule paths are left untouched: checkout-index never writes
+ * gitlink content, so clearing one would only risk the submodule's own working tree.
  */
 export async function clearSnapshotTypeObstructions(
   target: CheckpointGitTarget,

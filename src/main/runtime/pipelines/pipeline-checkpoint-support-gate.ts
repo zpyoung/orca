@@ -1,4 +1,4 @@
-/** SSH relay checkpoint support gate (tech §4.6a; logic E2 as amended, §10 A2): fail-loud preflight, never a silent degrade. */
+/** SSH relay checkpoint support gate: fail-loud preflight, never a silent degrade. */
 
 import type { SshGitProvider } from '../../providers/ssh-git-provider'
 

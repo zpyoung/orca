@@ -1,4 +1,4 @@
-/** Low-level git plumbing shared by pipeline-checkpoint capture and restore (logic §4.6). */
+/** Low-level git plumbing shared by pipeline-checkpoint capture and restore. */
 
 import { randomUUID } from 'node:crypto'
 import { tmpdir } from 'node:os'
@@ -19,6 +19,8 @@ export type CheckpointGitTarget = {
   wslDistro?: string
   // relay backend supplies its own executor here; local/WSL omits it and gets the gitExecFileAsync default below
   run?: CheckpointGitRunner
+  // backend's own env baseline (e.g. the relay's PATH-augmented git env); defaults to process.env
+  baseEnv?: () => NodeJS.ProcessEnv
 }
 
 export function checkpointRef(runId: string, nodeId: string, attempt: number): string {
@@ -53,7 +55,10 @@ export async function withTemporaryIndex<T>(
 ): Promise<T> {
   const tmpIndexPath = join(tmpdir(), `orca-pipeline-checkpoint-${randomUUID()}.index`)
   const indexFileValue = target.wslDistro ? toLinuxPath(tmpIndexPath) : tmpIndexPath
-  const env: NodeJS.ProcessEnv = { ...process.env, GIT_INDEX_FILE: indexFileValue }
+  const env: NodeJS.ProcessEnv = {
+    ...(target.baseEnv?.() ?? process.env),
+    GIT_INDEX_FILE: indexFileValue
+  }
   if (target.wslDistro) {
     addWslEnvKeys(env, ['GIT_INDEX_FILE'])
   }

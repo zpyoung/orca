@@ -1,8 +1,10 @@
 /**
- * Relay-side pipeline checkpoint RPCs (tech §3.7, §5.7; logic §9-7).
+ * Relay-side pipeline checkpoint RPCs.
  *
- * Narrow, shape-validated mutating operations that cross the read-only `git.exec`
- * allowlist boundary (fence F6) without widening it. Every field is validated before
+ * Narrow, shape-validated mutating operations that cross the relay's read-only `git.exec`
+ * allowlist boundary without widening it: that allowlist stays read-only by design, so
+ * checkpoint capture/restore — which genuinely need to mutate the repo — ship as their own
+ * fixed-shape RPCs instead of new allowed subcommands. Every field is validated before
  * any git process runs, and the validated fields fully determine the only ref this
  * surface may write. Reuses the exact capture/restore plumbing the local/WSL backend
  * runs (`../main/runtime/pipelines/pipeline-checkpoint-capture.ts` /
@@ -80,7 +82,7 @@ export function validatePipelineCheckpointRestoreArgs(
   return { worktreePath, head, snapshot }
 }
 
-// bypasses the git.exec allowlist deliberately (fence F6 note): this narrow RPC's own
+// bypasses the git.exec allowlist deliberately: this narrow RPC's own
 // validation is the only gate, so the git call itself must not be re-filtered by it
 async function runRelayCheckpointGit(
   args: string[],
@@ -97,7 +99,7 @@ async function runRelayCheckpointGit(
 }
 
 function checkpointTarget(worktreePath: string): CheckpointGitTarget {
-  return { cwd: expandTilde(worktreePath), run: runRelayCheckpointGit }
+  return { cwd: expandTilde(worktreePath), run: runRelayCheckpointGit, baseEnv: buildRelayGitEnv }
 }
 
 export async function pipelineCheckpointSupportedOp(): Promise<{ supported: true }> {
