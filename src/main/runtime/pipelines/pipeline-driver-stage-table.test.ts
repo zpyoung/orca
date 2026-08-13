@@ -274,6 +274,57 @@ describe('PipelineDriver stage table (attempt accounting by evidence)', () => {
     driver.stop()
   })
 
+  it('stage C: a failure resolution that only lands after abort must not mark the node failed or flip the run', async () => {
+    let resolveWaitForLeafPtyId: (value: string) => void = () => {
+      throw new Error('resolveWaitForLeafPtyId called before the mock ran')
+    }
+    const { driver, db, pipelineDb } = buildSingleNodeHarness({
+      retries: 0,
+      runtimeOverrides: {
+        waitForLeafPtyId: vi.fn(
+          () =>
+            new Promise<string>((resolve) => {
+              resolveWaitForLeafPtyId = resolve
+            })
+        )
+      }
+    })
+    executeLocalWorkerStartMock.mockImplementation(async (args: { taskId: string }) => {
+      db.tasks.get(args.taskId)!.status = 'dispatched'
+      return workerStartResponse({
+        taskId: args.taskId,
+        dispatchId: 'dispatch-1',
+        state: 'ready',
+        effects: [{ kind: 'terminal', role: 'agent', action: 'created', id: 'term-1' }]
+      })
+    })
+
+    driver.start()
+    await flushAsync() // dispatch attempt 1
+
+    db.registerDispatch({
+      dispatchId: 'dispatch-1',
+      taskId: 'task-n',
+      workerState: 'failed',
+      spawnReceipt: { committed: true }
+    })
+    db.tasks.set('task-n', { id: 'task-n', status: 'failed', result: null })
+    await advanceOneCycle() // observes the failure; resolution is now awaiting the pty-stop check
+
+    await driver.abort()
+    expect(pipelineDb.run.state).toBe('aborted')
+
+    resolveWaitForLeafPtyId('pty-1') // the stale resolution only proceeds after abort already landed
+    await flushAsync()
+
+    // the DB layer already absorbs a same/lower-priority state write, so this alone would not
+    // have caught the bug; the node-outcome assertions below are the ones that actually regress
+    expect(pipelineDb.run.state).toBe('aborted')
+    expect(pipelineDb.setNodeOutcome).not.toHaveBeenCalled()
+    expect(pipelineDb.nodesById.get('n')?.outcome).toBeNull()
+    driver.stop()
+  })
+
   it('stage C: no terminal handle anywhere fails the node terminally instead of treating absence as a verified stop', async () => {
     const { driver, db, pipelineDb, runtime, checkpointBackend } = buildSingleNodeHarness({
       retries: 1
@@ -328,7 +379,11 @@ describe('PipelineDriver stage table (attempt accounting by evidence)', () => {
           })
         }
         expect(args.retryOf).toBe('dispatch-1')
-        return workerStartResponse({ taskId: args.taskId, dispatchId: 'dispatch-2', state: 'ready' })
+        return workerStartResponse({
+          taskId: args.taskId,
+          dispatchId: 'dispatch-2',
+          state: 'ready'
+        })
       }
     )
 
@@ -502,7 +557,11 @@ describe('PipelineDriver stage table (attempt accounting by evidence)', () => {
         }
         // host recovery's plain branch: re-readied, so no retryOf is available or expected
         expect(args.retryOf).toBeUndefined()
-        return workerStartResponse({ taskId: args.taskId, dispatchId: 'dispatch-2', state: 'ready' })
+        return workerStartResponse({
+          taskId: args.taskId,
+          dispatchId: 'dispatch-2',
+          state: 'ready'
+        })
       }
     )
 

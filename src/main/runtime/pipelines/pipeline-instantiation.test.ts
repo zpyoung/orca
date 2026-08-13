@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ResolvedPipelineDefinition, ResolvedPipelineNode } from '../../../shared/pipeline-template-types'
+import type {
+  ResolvedPipelineDefinition,
+  ResolvedPipelineNode
+} from '../../../shared/pipeline-template-types'
 import type { Repo } from '../../../shared/types'
 import type { OrcaRuntimeService } from '../orca-runtime'
 import { OrchestrationDb } from '../orchestration/db'
@@ -94,7 +97,9 @@ function runtimeStub(overrides: Partial<OrcaRuntimeService> = {}) {
       worktree: { id: 'wt_run', branch: createArgs.branchNameOverride, repoId: 'repo_1' }
     })),
     removeManagedWorktree: vi.fn().mockResolvedValue({}),
-    listManagedWorktrees: vi.fn().mockResolvedValue({ worktrees: [], totalCount: 0, truncated: false }),
+    listManagedWorktrees: vi
+      .fn()
+      .mockResolvedValue({ worktrees: [], totalCount: 0, truncated: false }),
     ...overrides
   } as unknown as OrcaRuntimeService
 }
@@ -197,9 +202,7 @@ describe('instantiatePipelineRun', () => {
         db,
         pipelineDb,
         worktreeSelector: 'id:wt_origin',
-        definition: definition([
-          node({ id: 'repro', harness: 'grok', model: 'grok-code-fast-1' })
-        ])
+        definition: definition([node({ id: 'repro', harness: 'grok', model: 'grok-code-fast-1' })])
       })
 
       expect(result).toEqual({
@@ -485,7 +488,9 @@ describe('instantiatePipelineRun', () => {
     it('fails the run terminally with its allocated run number, dispatches nothing, and lets the next Start take the next run number', async () => {
       const { db, pipelineDb } = create()
       const runtime = runtimeStub({
-        createManagedWorktree: vi.fn().mockRejectedValue(new Error('ENOSPC: no space left on device'))
+        createManagedWorktree: vi
+          .fn()
+          .mockRejectedValue(new Error('ENOSPC: no space left on device'))
       })
 
       const failedResult = await instantiatePipelineRun({
@@ -550,17 +555,12 @@ describe('instantiatePipelineRun', () => {
       expect(runtime.removeManagedWorktree).toHaveBeenCalledWith('wt_run', true)
     })
 
-    it('finds and removes the worktree by the branch it asked for when the creator throws before returning an id', async () => {
+    it('does nothing when the creator throws before returning an id: there is no certain identity to remove', async () => {
       const { db, pipelineDb } = create()
       const runtime = runtimeStub({
-        createManagedWorktree: vi.fn().mockRejectedValue(new Error('listing omitted the new worktree')),
-        listManagedWorktrees: vi.fn().mockResolvedValue({
-          worktrees: [
-            { id: 'wt_orphaned', branch: 'refs/heads/pipeline/bugfix-fast-1', repoId: 'repo_1' }
-          ],
-          totalCount: 1,
-          truncated: false
-        })
+        createManagedWorktree: vi
+          .fn()
+          .mockRejectedValue(new Error('listing omitted the new worktree'))
       })
 
       const result = await instantiatePipelineRun({
@@ -574,8 +574,45 @@ describe('instantiatePipelineRun', () => {
       expect(result).toEqual({
         refused: { message: expect.stringContaining('listing omitted') }
       })
-      expect(runtime.listManagedWorktrees).toHaveBeenCalledWith('repo_1')
-      expect(runtime.removeManagedWorktree).toHaveBeenCalledWith('wt_orphaned', true)
+      expect(runtime.listManagedWorktrees).not.toHaveBeenCalled()
+      expect(runtime.removeManagedWorktree).not.toHaveBeenCalled()
+    })
+
+    it("never force-removes a pre-existing worktree even when it sits on this run's own collision-walked branch name", async () => {
+      const { db, pipelineDb } = create()
+      // the unsuffixed name is already taken, so this run's own resolved branch is the '-2' suffix
+      const searchRepoRefs = vi.fn().mockImplementation(async (_repoId: string, query: string) => {
+        return query === 'pipeline/bugfix-fast-1'
+          ? { refs: ['refs/heads/pipeline/bugfix-fast-1'], truncated: false }
+          : { refs: [], truncated: false }
+      })
+      const runtime = runtimeStub({
+        searchRepoRefs,
+        createManagedWorktree: vi.fn().mockRejectedValue(new Error('setup died mid-create')),
+        // by the time compensation looks, something else already occupies the exact branch name
+        // this run resolved to — neither worktree below was created by this run's own call
+        listManagedWorktrees: vi.fn().mockResolvedValue({
+          worktrees: [
+            { id: 'wt_prior', branch: 'refs/heads/pipeline/bugfix-fast-1', repoId: 'repo_1' },
+            { id: 'wt_racer', branch: 'refs/heads/pipeline/bugfix-fast-1-2', repoId: 'repo_1' }
+          ],
+          totalCount: 2,
+          truncated: false
+        })
+      })
+
+      const result = await instantiatePipelineRun({
+        runtime,
+        db,
+        pipelineDb,
+        worktreeSelector: 'id:wt_origin',
+        definition: definition([node({ id: 'repro' })])
+      })
+
+      expect(result).toEqual({
+        refused: { message: expect.stringContaining('setup died mid-create') }
+      })
+      expect(runtime.removeManagedWorktree).not.toHaveBeenCalled()
     })
   })
 })

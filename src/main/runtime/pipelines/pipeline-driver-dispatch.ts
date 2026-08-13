@@ -20,10 +20,19 @@ import { extractDispatchTerminalHandle } from './pipeline-driver-stage-classify'
 
 export type PipelineDispatchOutcome =
   | { kind: 'refused'; message: string }
+  | { kind: 'abandoned' }
   | {
-      kind: 'started'
+      kind: 'live'
       response: OrchestrationWorkerStartResponse
       checkpoint?: PipelineCheckpointInfo
+      terminalHandle?: string
+    }
+  | {
+      kind: 'settle'
+      response: OrchestrationWorkerStartResponse
+      checkpoint?: PipelineCheckpointInfo
+      terminalHandle?: string
+      workerState: 'failed' | 'start_unknown'
     }
 
 function pipelineDriverIdentity(runId: string): string {
@@ -47,6 +56,7 @@ export async function dispatchPipelineNode(args: {
   worktreePath?: string
   retryOf?: string
   dependencies: PipelineDispatchDependency[]
+  isDispatchable: () => boolean
 }): Promise<PipelineDispatchOutcome> {
   const preflight = await validatePipelineNodeLaunch({
     runtime: args.runtime,
@@ -77,6 +87,12 @@ export async function dispatchPipelineNode(args: {
     effort: args.node.effort
   })
 
+  // last check before the point of no return: pause/abort issued during preflight or checkpoint
+  // capture must still stop a launch that hasn't committed yet
+  if (!args.isDispatchable()) {
+    return { kind: 'abandoned' }
+  }
+
   const response = await executeLocalWorkerStart({
     runtime: args.runtime,
     db: args.db,
@@ -90,8 +106,18 @@ export async function dispatchPipelineNode(args: {
     agent: preflight.agent,
     launchPreferences: preferences
   })
+  const terminalHandle = extractDispatchTerminalHandle(response.effects)
 
-  return { kind: 'started', response, checkpoint }
+  if (response.state === 'failed' || response.state === 'outcome_unknown') {
+    return {
+      kind: 'settle',
+      response,
+      checkpoint,
+      terminalHandle,
+      workerState: response.state === 'outcome_unknown' ? 'start_unknown' : 'failed'
+    }
+  }
+  return { kind: 'live', response, checkpoint, terminalHandle }
 }
 
 /** Best-effort interrupt for a dispatch that only resolved after the run had already aborted. */
@@ -99,15 +125,14 @@ export async function interruptAbortedDispatch(
   runtime: OrcaRuntimeService,
   outcome: PipelineDispatchOutcome
 ): Promise<void> {
-  if (outcome.kind !== 'started') {
+  if (outcome.kind !== 'live' && outcome.kind !== 'settle') {
     return
   }
-  const handle = extractDispatchTerminalHandle(outcome.response.effects)
-  if (!handle) {
+  if (!outcome.terminalHandle) {
     return
   }
   try {
-    await runtime.sendTerminal(handle, { interrupt: true })
+    await runtime.sendTerminal(outcome.terminalHandle, { interrupt: true })
   } catch {
     // abort only guarantees nothing further dispatches, not that the agent obeys \x03
   }

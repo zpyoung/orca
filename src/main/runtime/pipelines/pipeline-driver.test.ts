@@ -334,6 +334,105 @@ describe('PipelineDriver', () => {
     driver.stop()
   })
 
+  it('abort: a dispatch still awaiting preflight when abort runs must never reach the launch at all', async () => {
+    const nodeA = node({ id: 'a', index: 0 })
+    const db = new FakeOrchestrationDb()
+    db.tasks.set('task-a', { id: 'task-a', status: 'ready', result: null })
+    const pipelineDb = new FakePipelineRunDb(
+      runRow(),
+      new Map([['a', nodeRow({ node_id: 'a', node_index: 0, task_id: 'task-a' })]])
+    )
+    const runtime = runtimeStub()
+
+    let resolvePreflight: (value: { ok: true; agent: 'claude' }) => void = () => {
+      throw new Error('resolvePreflight called before the mock ran')
+    }
+    validatePipelineNodeLaunchMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePreflight = resolve
+        })
+    )
+
+    const driver = new PipelineDriver({
+      runtime,
+      db: db.asOrchestrationDb(),
+      pipelineDb: pipelineDb.asPipelineRunDb(),
+      runId: 'run-1',
+      definition: definitionOf([nodeA]),
+      publisher: publisherStub() as unknown as PipelineSnapshotPublisher
+    })
+
+    driver.start()
+    await flushAsync() // dispatch is now awaiting preflight; nothing has committed yet
+
+    await driver.abort()
+    expect(pipelineDb.updateRunState).toHaveBeenCalledWith('run-1', 'aborted')
+
+    resolvePreflight({ ok: true, agent: 'claude' }) // the stale dispatch only proceeds after abort landed
+    await flushAsync()
+
+    expect(executeLocalWorkerStartMock).not.toHaveBeenCalled() // must never launch once abort landed first
+    expect(pipelineDb.beginAttempt).not.toHaveBeenCalled()
+
+    await advanceOneCycle()
+    await advanceOneCycle()
+    expect(executeLocalWorkerStartMock).not.toHaveBeenCalled()
+    driver.stop()
+  })
+
+  it('pause: a dispatch still awaiting preflight when pause runs must not launch, and resume retries it fresh', async () => {
+    const nodeA = node({ id: 'a', index: 0 })
+    const db = new FakeOrchestrationDb()
+    db.tasks.set('task-a', { id: 'task-a', status: 'ready', result: null })
+    const pipelineDb = new FakePipelineRunDb(
+      runRow(),
+      new Map([['a', nodeRow({ node_id: 'a', node_index: 0, task_id: 'task-a' })]])
+    )
+    const runtime = runtimeStub()
+
+    let resolvePreflight: (value: { ok: true; agent: 'claude' }) => void = () => {
+      throw new Error('resolvePreflight called before the mock ran')
+    }
+    validatePipelineNodeLaunchMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolvePreflight = resolve
+        })
+    )
+    executeLocalWorkerStartMock.mockImplementation(async (args: { taskId: string }) => {
+      db.tasks.get(args.taskId)!.status = 'dispatched'
+      return workerStartResponse({ taskId: args.taskId, dispatchId: 'd-a', state: 'ready' })
+    })
+
+    const driver = new PipelineDriver({
+      runtime,
+      db: db.asOrchestrationDb(),
+      pipelineDb: pipelineDb.asPipelineRunDb(),
+      runId: 'run-1',
+      definition: definitionOf([nodeA]),
+      publisher: publisherStub() as unknown as PipelineSnapshotPublisher
+    })
+
+    driver.start()
+    await flushAsync() // dispatch is now awaiting preflight; nothing has committed yet
+
+    driver.pause()
+    expect(pipelineDb.run.state).toBe('paused')
+
+    resolvePreflight({ ok: true, agent: 'claude' }) // the stale dispatch only proceeds after pause landed
+    await flushAsync()
+
+    expect(executeLocalWorkerStartMock).not.toHaveBeenCalled() // must not launch once pause landed first
+    expect(pipelineDb.beginAttempt).not.toHaveBeenCalled()
+
+    driver.resume()
+    await advanceOneCycle()
+
+    expect(executeLocalWorkerStartMock).toHaveBeenCalledTimes(1) // resume dispatches the abandoned node fresh
+    driver.stop()
+  })
+
   it('stop(): detaches without writing any state', async () => {
     const nodeA = node({ id: 'a', index: 0 })
     const db = new FakeOrchestrationDb()

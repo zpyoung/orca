@@ -67,30 +67,22 @@ export async function createPipelineRunWorktree(args: {
   return { branch: toShortBranchName(created.worktree.branch), runWorktreeId: created.worktree.id }
 }
 
-async function findWorktreeIdByBranch(
-  runtime: OrcaRuntimeService,
-  repoId: string,
-  branchName: string
-): Promise<string | undefined> {
-  const { worktrees } = await runtime.listManagedWorktrees(repoId)
-  return worktrees.find((worktree) => toShortBranchName(worktree.branch) === branchName)?.id
-}
-
 /**
- * Best-effort cleanup after a run whose worktree setup failed. The creator can create the git
- * worktree and branch and still throw before handing back an id, so this falls back to looking
- * the worktree up by the branch we asked it to create when no id came back.
+ * Best-effort cleanup after a run whose worktree setup failed. Removes only the worktree the
+ * creator's own return value identified with certainty. If the creator threw before handing
+ * back an id, there is no trustworthy identity to act on — not even the branch name we asked
+ * for, since a collision walk can hand a *different* run that same name — so this does nothing
+ * rather than guess which worktree to force-remove.
  */
 export async function removePipelineRunWorktreeBestEffort(
   runtime: OrcaRuntimeService,
-  args: { repoId: string; branchName: string; runWorktreeId: string | undefined }
+  args: { runWorktreeId: string | undefined }
 ): Promise<void> {
+  if (!args.runWorktreeId) {
+    return
+  }
   try {
-    const targetId =
-      args.runWorktreeId ?? (await findWorktreeIdByBranch(runtime, args.repoId, args.branchName))
-    if (targetId) {
-      await runtime.removeManagedWorktree(targetId, true)
-    }
+    await runtime.removeManagedWorktree(args.runWorktreeId, true)
   } catch {
     // best-effort: the run is already terminal-failed regardless of whether this succeeds
   }
