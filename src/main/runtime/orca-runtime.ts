@@ -230,6 +230,7 @@ import type {
   MemorySnapshot,
   Tab,
   TabGroupLayoutNode,
+  TerminalDockPaneState,
   TerminalQuickCommand,
   TerminalLayoutSnapshot,
   TerminalPaneLayoutNode,
@@ -2711,6 +2712,25 @@ function getSetupRunnerCommandPlatformForLaunch(
   fallbackPlatform: 'windows' | 'posix'
 ): 'windows' | 'posix' {
   return getSetupRunnerCommandPlatformForPath(setup?.runnerScriptPath ?? '', fallbackPlatform)
+}
+
+export const DEFAULT_TERMINAL_DOCK_GUTTER_ROWS = 6
+
+/** Upserts one pane's dock state into a per-pane record without touching any
+ *  other pane's entry — the RPC patch is single-pane so other clients'
+ *  concurrent updates to different panes on the same tab must survive. */
+export function mergeTerminalDockByPaneKey(
+  existing: Record<string, TerminalDockPaneState> | undefined,
+  patch: { paneKey: string; docked?: boolean; gutterRows?: number }
+): Record<string, TerminalDockPaneState> {
+  const current = existing?.[patch.paneKey]
+  return {
+    ...existing,
+    [patch.paneKey]: {
+      docked: patch.docked ?? current?.docked ?? false,
+      gutterRows: patch.gutterRows ?? current?.gutterRows ?? DEFAULT_TERMINAL_DOCK_GUTTER_ROWS
+    }
+  }
 }
 
 export class OrcaRuntimeService {
@@ -8338,6 +8358,7 @@ export class OrcaRuntimeService {
       color?: string | null
       isPinned?: boolean
       viewMode?: 'terminal' | 'chat'
+      terminalDock?: { paneKey: string; docked?: boolean; gutterRows?: number }
     }
   ): Promise<{ updated: true }> {
     const explicitWorktreeId = this.getValidatedExplicitWorktreeIdSelector(worktreeSelector)
@@ -8360,7 +8381,12 @@ export class OrcaRuntimeService {
   private persistHeadlessSessionTabProps(
     worktreeId: string,
     tabId: string,
-    props: { color?: string | null; isPinned?: boolean; viewMode?: 'terminal' | 'chat' }
+    props: {
+      color?: string | null
+      isPinned?: boolean
+      viewMode?: 'terminal' | 'chat'
+      terminalDock?: { paneKey: string; docked?: boolean; gutterRows?: number }
+    }
   ): void {
     const session = this.getWorkspaceSessionForWorktree(worktreeId)
     if (!session || !this.store?.setWorkspaceSession) {
@@ -8396,7 +8422,15 @@ export class OrcaRuntimeService {
             ? {
                 ...tab,
                 ...(props.color !== undefined ? { color: props.color } : {}),
-                ...(props.isPinned !== undefined ? { isPinned: props.isPinned } : {})
+                ...(props.isPinned !== undefined ? { isPinned: props.isPinned } : {}),
+                ...(props.terminalDock
+                  ? {
+                      terminalDockByPaneKey: mergeTerminalDockByPaneKey(
+                        tab.terminalDockByPaneKey,
+                        props.terminalDock
+                      )
+                    }
+                  : {})
               }
             : tab
         )
@@ -8412,7 +8446,12 @@ export class OrcaRuntimeService {
   private applyHeadlessSessionTabPropsToSnapshot(
     worktreeId: string,
     tabId: string,
-    props: { color?: string | null; isPinned?: boolean; viewMode?: 'terminal' | 'chat' }
+    props: {
+      color?: string | null
+      isPinned?: boolean
+      viewMode?: 'terminal' | 'chat'
+      terminalDock?: { paneKey: string; docked?: boolean; gutterRows?: number }
+    }
   ): void {
     const snapshot = this.mobileSessionTabsByWorktree.get(worktreeId)
     if (!snapshot) {
@@ -8428,7 +8467,15 @@ export class OrcaRuntimeService {
         ...tab,
         ...(props.color !== undefined ? { color: props.color } : {}),
         ...(props.isPinned !== undefined ? { isPinned: props.isPinned } : {}),
-        ...(props.viewMode !== undefined ? { viewMode: props.viewMode } : {})
+        ...(props.viewMode !== undefined ? { viewMode: props.viewMode } : {}),
+        ...(props.terminalDock && tab.type === 'terminal'
+          ? {
+              terminalDockByPaneKey: mergeTerminalDockByPaneKey(
+                tab.terminalDockByPaneKey,
+                props.terminalDock
+              )
+            }
+          : {})
       }
     })
     if (!changed) {

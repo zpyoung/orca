@@ -277,6 +277,7 @@ import type {
   SearchResult,
   StatsSummary,
   MemorySnapshot,
+  TerminalDockPaneState,
   TuiAgent,
   ReleaseBuildListResult,
   UpdateCheckOptions,
@@ -3249,6 +3250,7 @@ export type PreloadApi = {
         launchToken?: string
         launchAgent?: TuiAgent
         viewMode?: 'terminal' | 'chat'
+        terminalDockByPaneKey?: Record<string, TerminalDockPaneState>
         title?: string
         ptyId?: string
         activate?: boolean

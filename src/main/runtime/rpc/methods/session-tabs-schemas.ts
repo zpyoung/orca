@@ -128,7 +128,17 @@ export const SetTabProps = WorktreeTabSelector.extend({
   color: z.string().max(64).nullable().optional(),
   isPinned: z.boolean().optional(),
   // undefined = leave unchanged; no "clear" semantic (absence means default 'terminal').
-  viewMode: z.enum(['terminal', 'chat']).optional()
+  viewMode: z.enum(['terminal', 'chat']).optional(),
+  // undefined = leave unchanged. A single-pane patch, not the whole record —
+  // the host merges it in, so one client's update can't clobber another
+  // pane's entry from a different client.
+  terminalDock: z
+    .object({
+      paneKey: z.string().min(1),
+      docked: z.boolean().optional(),
+      gutterRows: z.number().int().min(3).max(15).optional()
+    })
+    .optional()
 })
 
 export const CreateTerminalTab = WorktreeTabSelector.extend({

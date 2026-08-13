@@ -115,6 +115,8 @@ export type KeybindingActionId =
   | 'terminal.splitRight'
   | 'terminal.splitDown'
   | 'terminal.switchInputSource'
+  | 'terminal.dock.toggle'
+  | 'terminal.dock.passthrough'
   | PluginKeybindingActionId
 
 export type KeybindingOverrides = Partial<Record<KeybindingActionId, string[]>>
@@ -1100,6 +1102,22 @@ export const KEYBINDING_DEFINITIONS: readonly KeybindingDefinition[] = [
     },
     // Why: macOS uses Shift+Space as an input-source shortcut; Orca otherwise rejects Shift-only bindings to avoid stealing typed text.
     allowShiftOnlyKeybindings: true
+  },
+  {
+    id: 'terminal.dock.toggle',
+    title: 'Toggle agent composer dock',
+    group: 'Terminal Panes',
+    scope: 'terminal',
+    searchKeywords: ['shortcut', 'terminal', 'dock', 'composer', 'agent', 'toggle'],
+    defaultBindings: platformBindings(['Mod+Shift+K'])
+  },
+  {
+    id: 'terminal.dock.passthrough',
+    title: 'Toggle terminal passthrough mode',
+    group: 'Terminal Panes',
+    scope: 'terminal',
+    searchKeywords: ['shortcut', 'terminal', 'dock', 'passthrough', 'raw', 'toggle'],
+    defaultBindings: platformBindings(['Mod+Shift+P'])
   },
   ...buildAgentTabKeybindingDefinitions()
 ]

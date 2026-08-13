@@ -18,6 +18,7 @@ import type {
   Repo,
   TabGroupLayoutNode,
   TerminalColorOverrides,
+  TerminalDockPaneState,
   TerminalLayoutSnapshot,
   TuiAgent,
   Worktree,
@@ -187,6 +188,9 @@ export type RuntimeMobileSessionTerminalTab = {
   /** Per-tab view preference (terminal xterm vs native chat). Host-persisted so
    *  paired clients converge; clients still win during the optimistic echo window. */
   viewMode?: 'terminal' | 'chat'
+  /** Per-pane docked-composer state, keyed by pane key. Host-persisted so
+   *  paired clients converge. */
+  terminalDockByPaneKey?: Record<string, TerminalDockPaneState>
   /** Launch context delivered only into the TUI input as an unsent draft; the
    *  mobile chat composer adopts it so the context isn't invisible in chat. */
   launchDraft?: string

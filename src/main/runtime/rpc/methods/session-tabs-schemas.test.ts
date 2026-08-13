@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { ActivateTab, CloseLifecycleTab, CloseTab, UpdatePaneLayout } from './session-tabs-schemas'
+import {
+  ActivateTab,
+  CloseLifecycleTab,
+  CloseTab,
+  SetTabProps,
+  UpdatePaneLayout
+} from './session-tabs-schemas'
+import { DEFAULT_TERMINAL_DOCK_GUTTER_ROWS, mergeTerminalDockByPaneKey } from '../../orca-runtime'
 
 const WT = 'id:wt'
 
@@ -133,5 +140,71 @@ describe('UpdatePaneLayout.root (untrusted remote pane-layout tree)', () => {
         }
       })
     ).toThrow()
+  })
+})
+
+describe('SetTabProps.terminalDock (session.tabs.setTabProps params)', () => {
+  it('parses a single-pane dock patch', () => {
+    const parsed = SetTabProps.parse({
+      worktree: WT,
+      tabId: 'tab-1',
+      terminalDock: { paneKey: 'pane-1', docked: true, gutterRows: 6 }
+    })
+    expect(parsed.terminalDock).toEqual({ paneKey: 'pane-1', docked: true, gutterRows: 6 })
+  })
+
+  it('accepts a patch with only one of docked/gutterRows set', () => {
+    const parsed = SetTabProps.parse({
+      worktree: WT,
+      tabId: 'tab-1',
+      terminalDock: { paneKey: 'pane-1', docked: true }
+    })
+    expect(parsed.terminalDock).toEqual({ paneKey: 'pane-1', docked: true })
+  })
+
+  it('leaves other props unchanged when terminalDock is absent', () => {
+    const parsed = SetTabProps.parse({
+      worktree: WT,
+      tabId: 'tab-1',
+      color: '#fff'
+    })
+    expect(parsed.terminalDock).toBeUndefined()
+    expect(parsed.color).toBe('#fff')
+  })
+
+  it('rejects a gutterRows value outside 3..15', () => {
+    expect(() =>
+      SetTabProps.parse({
+        worktree: WT,
+        tabId: 'tab-1',
+        terminalDock: { paneKey: 'pane-1', gutterRows: 999 }
+      })
+    ).toThrow()
+  })
+
+  it('rejects a missing paneKey', () => {
+    expect(() =>
+      SetTabProps.parse({
+        worktree: WT,
+        tabId: 'tab-1',
+        terminalDock: { docked: true }
+      })
+    ).toThrow()
+  })
+})
+
+describe('mergeTerminalDockByPaneKey (host merge semantics)', () => {
+  it('merges into an existing multi-pane record and defaults a fresh entry', () => {
+    const existing = {
+      'pane-1': { docked: true, gutterRows: 6 },
+      'pane-2': { docked: false, gutterRows: 10 }
+    }
+    expect(mergeTerminalDockByPaneKey(existing, { paneKey: 'pane-2', docked: true })).toEqual({
+      'pane-1': { docked: true, gutterRows: 6 },
+      'pane-2': { docked: true, gutterRows: 10 }
+    })
+    expect(mergeTerminalDockByPaneKey(undefined, { paneKey: 'pane-3', docked: true })).toEqual({
+      'pane-3': { docked: true, gutterRows: DEFAULT_TERMINAL_DOCK_GUTTER_ROWS }
+    })
   })
 })

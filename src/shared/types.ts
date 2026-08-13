@@ -853,6 +853,12 @@ export type TabContentType =
 export type WorkspaceVisibleTabType = 'terminal' | 'editor' | 'browser' | 'simulator'
 export type CtrlTabOrderMode = 'mru' | 'sequential'
 
+/** Per-pane docked-composer state; gutterRows is an integer clamped to 3..15. */
+export type TerminalDockPaneState = {
+  docked: boolean
+  gutterRows: number
+}
+
 export type Tab = {
   id: string // UUID for terminals, filePath for editors (preserves current convention)
   entityId: string // ID of the backing content (terminal tab ID, file path, browser workspace ID)
@@ -875,6 +881,9 @@ export type Tab = {
    *  underneath; `'terminal'` (the default for legacy/missing) shows the raw
    *  xterm. Optional so sessions persisted before this field hydrate cleanly. */
   viewMode?: 'terminal' | 'chat'
+  /** Per-pane docked-composer state, keyed by pane key. Optional so sessions
+   *  persisted before this field hydrate cleanly. */
+  terminalDockByPaneKey?: Record<string, TerminalDockPaneState>
 }
 
 export type TabGroup = {
@@ -2938,6 +2947,8 @@ export type GlobalSettings = {
   openAgentTabsInChatByDefault?: boolean
   /** Experimental native chat surface for Claude/Codex sessions; off by default. */
   experimentalNativeChat?: boolean
+  /** Experimental per-pane docked composer for agent terminals; off by default. */
+  experimentalTerminalDock?: boolean
   /** Reading-column width for every native chat pane; optional for legacy settings. */
   nativeChatWidth?: NativeChatWidthTier
   /** Last explicit native-chat model + option selections; live panes need an applied/dispatched record before showing a value. */
