@@ -14,8 +14,11 @@ type Emit = (snapshot: PipelineRunSnapshotWire) => void
 
 /**
  * Pushes complete pipeline-run snapshots to subscribers: an immediate snapshot on attach
- * (even for a terminal run), then a heartbeat republish at least every 5s while the run is
- * live, stopping the moment the run reaches a terminal state (L23a, L24a).
+ * (even for a terminal run, so a client that subscribes after the run finished still learns
+ * the outcome instead of hanging with no data), then a heartbeat republish at least every 5s
+ * while the run is live — the heartbeat is what lets a client detect staleness even when
+ * nothing has changed since the last push — stopping the moment the run reaches a terminal
+ * state.
  */
 export class PipelineSnapshotPublisher {
   private readonly subscribersByRunId = new Map<string, Set<Emit>>()
@@ -59,7 +62,7 @@ export class PipelineSnapshotPublisher {
     }
   }
 
-  /** Records the L20 pause-requested-but-attempt-still-running annotation for future assembly. */
+  /** Records the pause-requested-but-attempt-still-running annotation for future assembly. */
   setPausingAnnotation(runId: string, pausing: boolean): void {
     this.pausingByRunId.set(runId, pausing)
   }

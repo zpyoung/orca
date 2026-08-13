@@ -64,14 +64,15 @@ function computeLimitBreached(
   limitMinutes: number | undefined,
   now: Date
 ): boolean {
-  if (!attempt || attempt.ended_at !== null || limitMinutes === undefined) {
+  if (!attempt || limitMinutes === undefined) {
     return false
   }
   const startedAtMs = Date.parse(attempt.started_at)
-  if (Number.isNaN(startedAtMs)) {
+  const endedAtMs = attempt.ended_at === null ? now.getTime() : Date.parse(attempt.ended_at)
+  if (Number.isNaN(startedAtMs) || Number.isNaN(endedAtMs)) {
     return false
   }
-  const elapsedMinutes = (now.getTime() - startedAtMs) / 60_000
+  const elapsedMinutes = (endedAtMs - startedAtMs) / 60_000
   return elapsedMinutes > limitMinutes
 }
 
@@ -90,7 +91,7 @@ function groupByNodeId(attempts: PipelineAttemptRow[]): Map<string, PipelineAtte
 
 /**
  * Assembles a complete pipeline-run snapshot from storage — every field recomputed from
- * current rows, never a delta from a prior push (L23, L24).
+ * current rows, never a delta from a prior push.
  */
 export function assemblePipelineSnapshot(
   source: PipelineSnapshotSource,
@@ -110,7 +111,8 @@ export function assemblePipelineSnapshot(
   const nodes = source.getNodes(runId).map((nodeRow) => {
     const nodeAttempts = attemptsByNodeId.get(nodeRow.node_id) ?? []
     const latest = latestOf(nodeAttempts)
-    const everDispatched = nodeAttempts.length > 0
+    // stage-B prelaunch cycles dispatch a shell but deliberately leave no attempt row
+    const everDispatched = nodeAttempts.length > 0 || nodeRow.prelaunch_failures > 0
     const attemptInFlight = latest !== undefined && latest.ended_at === null
     const priorFailedAttempt = nodeAttempts.some((attempt) => attempt.outcome === 'failed')
     const status = derivePipelineNodeStatus({
