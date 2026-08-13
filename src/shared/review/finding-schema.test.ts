@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { EvidenceSchema, FindingCategorySchema, FindingIdSchema, FindingSchema } from './finding-schema'
+import {
+  EvidenceSchema,
+  FindingCategorySchema,
+  FindingIdFieldSchema,
+  FindingIdSchema,
+  FindingSchema
+} from './finding-schema'
 
 describe('finding id shape', () => {
   it.each(['F1', 'F12', 'F999'])('accepts %s', (id) => {
@@ -8,6 +14,36 @@ describe('finding id shape', () => {
 
   it.each(['F0', 'F01', 'F', 'G1', '', 'f1', 'F1a'])('rejects %s', (id) => {
     expect(FindingIdSchema.safeParse(id).success).toBe(false)
+  })
+
+  it('accepts the longest allowed id', () => {
+    expect(FindingIdSchema.safeParse(`F${'9'.repeat(19)}`).success).toBe(true)
+  })
+
+  it('rejects an id one character past the length cap', () => {
+    expect(FindingIdSchema.safeParse(`F${'9'.repeat(20)}`).success).toBe(false)
+  })
+
+  it('rejects an 8,000,001-character id without throwing, quickly', () => {
+    const huge = `F${'9'.repeat(8_000_000)}`
+    const start = Date.now()
+    const result = FindingIdSchema.safeParse(huge)
+    expect(result.success).toBe(false)
+    expect(Date.now() - start).toBeLessThan(2000)
+  })
+})
+
+describe('finding id field (tolerates pre-assignment)', () => {
+  it.each([null, undefined, ''])('accepts %s as not yet assigned', (id) => {
+    expect(FindingIdFieldSchema.safeParse(id).success).toBe(true)
+  })
+
+  it.each(['F1', 'F12'])('accepts a validly assigned id %s', (id) => {
+    expect(FindingIdFieldSchema.safeParse(id).success).toBe(true)
+  })
+
+  it.each(['F0', 'Fx', '1', 'F01'])('rejects a malformed non-null id %s', (id) => {
+    expect(FindingIdFieldSchema.safeParse(id).success).toBe(false)
   })
 })
 
@@ -22,6 +58,14 @@ describe('finding category shape', () => {
 
   it('rejects 41 characters', () => {
     expect(FindingCategorySchema.safeParse('a'.repeat(41)).success).toBe(false)
+  })
+
+  it('rejects an 8,000,001-character category without throwing, quickly', () => {
+    const huge = `${'a-'.repeat(4_000_000)}-`
+    const start = Date.now()
+    const result = FindingCategorySchema.safeParse(huge)
+    expect(result.success).toBe(false)
+    expect(Date.now() - start).toBeLessThan(2000)
   })
 
   it.each(['', 'Has-Caps', '-leading-hyphen', 'trailing-hyphen-', 'double--hyphen', 'has space'])(
@@ -105,6 +149,15 @@ describe('Finding round trip', () => {
 
   it('parses a representative promote-stage finding', () => {
     expect(FindingSchema.parse(promoteFinding)).toMatchObject(promoteFinding)
+  })
+
+  it('parses a promote finding whose id is not yet assigned (null)', () => {
+    expect(FindingSchema.safeParse({ ...promoteFinding, id: null }).success).toBe(true)
+  })
+
+  it('parses a promote finding whose id is absent', () => {
+    const { id: _id, ...withoutId } = promoteFinding
+    expect(FindingSchema.safeParse(withoutId).success).toBe(true)
   })
 
   it('parses a gate-graded finding carrying prior_id and the computed fields', () => {

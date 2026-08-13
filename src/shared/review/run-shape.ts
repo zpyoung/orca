@@ -13,7 +13,22 @@ export const REVIEW_CHAIN_STEPS = [
 ] as const
 export type ChainStep = (typeof REVIEW_CHAIN_STEPS)[number]
 
-type PredecessorTable = Partial<Record<ChainStep, readonly ChainStep[]>>
+export const MERGE_STAGES = ['refute', 'tiebreak'] as const
+export type MergeStage = (typeof MERGE_STAGES)[number]
+
+// `merge` is one `chain.step` name shared by two structurally different
+// rounds (refute, tiebreak); a bare step name can't tell a refute round's
+// output from a tiebreak round's, so both table keys and predecessor refs
+// for `merge` carry its stage alongside the step name.
+type StepRef = Exclude<ChainStep, 'merge'> | `merge:${MergeStage}`
+
+type PredecessorTable = Partial<Record<StepRef, readonly StepRef[]>>
+
+/** The `step`/`predecessor` stage to check, only meaningful when that side is `merge`. */
+export type MergeStageQualifiers = {
+  step?: MergeStage
+  predecessor?: MergeStage
+}
 
 // Shared by every depth: `resolve` mints the run id and has no predecessor;
 // `prepass`/`select-model` both fan out from it directly.
@@ -24,12 +39,17 @@ const COMMON_PREFIX: PredecessorTable = {
 }
 
 /**
- * Accepted-predecessor sets per depth, keyed by `chain.step`. An empty array
- * means "no predecessor" (only `resolve`); a step absent from a depth's
- * table is not part of that depth's shape at all — a run cannot skip into
- * it or out of it. `deep`'s `merge` accepts both `claims` (the first,
- * refute-stage round) and `merge` (a tiebreak round chained directly off the
- * refute round's own output, never off `gate` — upstream `CHAIN_PREDECESSOR`).
+ * Accepted-predecessor sets per depth, keyed by `chain.step` (merge steps
+ * qualified by stage). An empty array means "no predecessor" (only
+ * `resolve`); a key absent from a depth's table is not part of that depth's
+ * shape at all — a run cannot skip into it or out of it.
+ *
+ * `deep`'s `merge:refute` accepts only `claims` (the recall round); its
+ * `merge:tiebreak` accepts only `merge:refute` (chained directly off the
+ * refute round's own output, never off `gate` — upstream `CHAIN_PREDECESSOR`),
+ * so a third round or a same-stage repeat has no accepting entry. `gate`
+ * accepts only `merge:refute`; `gate.final` accepts only `merge:tiebreak` —
+ * each is the single-round output it was designed for, not the other's.
  * `deep`'s `manifest` accepts a plain `gate` (nothing was contested) or
  * `gate.final` (a tiebreak round settled a dispute); `manifestAcceptsGate`
  * below adds the payload-level refusal step identity alone cannot express.
@@ -43,33 +63,52 @@ export const RUN_SHAPE_TABLE: Record<ReviewDepth, PredecessorTable> = {
   standard: {
     ...COMMON_PREFIX,
     claims: ['resolve'],
-    merge: ['claims'],
-    gate: ['merge'],
+    'merge:refute': ['claims'],
+    gate: ['merge:refute'],
     manifest: ['gate']
   },
   deep: {
     ...COMMON_PREFIX,
     claims: ['resolve'],
-    merge: ['claims', 'merge'],
-    gate: ['merge'],
-    'gate.final': ['merge'],
+    'merge:refute': ['claims'],
+    'merge:tiebreak': ['merge:refute'],
+    gate: ['merge:refute'],
+    'gate.final': ['merge:tiebreak'],
     manifest: ['gate', 'gate.final']
   }
+}
+
+function stepRef(step: ChainStep, stage: MergeStage | undefined): StepRef | null {
+  if (step !== 'merge') {
+    return step
+  }
+  // a merge step with no declared stage can't be looked up — which round it
+  // is is exactly the fact the table keys on.
+  return stage ? `merge:${stage}` : null
 }
 
 export function acceptsPredecessor(
   depth: ReviewDepth,
   step: ChainStep,
-  predecessorStep: ChainStep | null
+  predecessorStep: ChainStep | null,
+  mergeStages?: MergeStageQualifiers
 ): boolean {
-  const accepted = RUN_SHAPE_TABLE[depth][step]
+  const key = stepRef(step, mergeStages?.step)
+  if (key === null) {
+    return false
+  }
+  const accepted = RUN_SHAPE_TABLE[depth][key]
   if (!accepted) {
     return false
   }
   if (accepted.length === 0) {
     return predecessorStep === null
   }
-  return predecessorStep !== null && accepted.includes(predecessorStep)
+  if (predecessorStep === null) {
+    return false
+  }
+  const predecessorRef = stepRef(predecessorStep, mergeStages?.predecessor)
+  return predecessorRef !== null && accepted.includes(predecessorRef)
 }
 
 /**
