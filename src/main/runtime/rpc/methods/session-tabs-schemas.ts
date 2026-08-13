@@ -5,7 +5,20 @@ import type { TuiAgent } from '../../../../shared/types'
 import { sleepingAgentLaunchConfigSchema } from '../../../../shared/workspace-session-sleeping-agents'
 import { RUNTIME_NAVIGATION_TARGETS } from '../../../../shared/runtime-navigation'
 import { TAB_ACTIVATION_INTENTS } from '../../../../shared/tab-activation-intent'
+import { parseLegacyNumericPaneKey, parsePaneKey } from '../../../../shared/stable-pane-id'
 import { OptionalBoolean } from '../schemas'
+
+// Why: paneKey is attacker-reachable (remote client input) and never checked
+// against a live pane, so its shape is bound to the two forms the host ever
+// mints: makePaneKey's `tabId:UUID`, or the pre-stable-id `tabId:N` legacy
+// pane. A garbage key just fails the merge lookup harmlessly, but bounding
+// the shape here caps how many distinct never-matching keys the RPC boundary
+// will forward for the host to retain.
+const MAX_TERMINAL_DOCK_PANE_KEY_LENGTH = 256
+
+function isValidTerminalDockPaneKey(value: string): boolean {
+  return parsePaneKey(value) !== null || parseLegacyNumericPaneKey(value) !== null
+}
 
 export const WorktreeTabSelector = z.object({
   worktree: z
@@ -134,7 +147,11 @@ export const SetTabProps = WorktreeTabSelector.extend({
   // pane's entry from a different client.
   terminalDock: z
     .object({
-      paneKey: z.string().min(1),
+      paneKey: z
+        .string()
+        .min(1)
+        .max(MAX_TERMINAL_DOCK_PANE_KEY_LENGTH)
+        .refine(isValidTerminalDockPaneKey, { message: 'Invalid pane key' }),
       docked: z.boolean().optional(),
       gutterRows: z.number().int().min(3).max(15).optional()
     })

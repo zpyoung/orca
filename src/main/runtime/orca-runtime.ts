@@ -2716,6 +2716,11 @@ function getSetupRunnerCommandPlatformForLaunch(
 
 export const DEFAULT_TERMINAL_DOCK_GUTTER_ROWS = 6
 
+// Why: pane-close pruning isn't wired up yet (deliberately, per a later task),
+// so this cap is the only backstop against an unbounded per-tab record; sized
+// well above any real split layout.
+export const MAX_TERMINAL_DOCK_PANE_ENTRIES = 64
+
 /** Upserts one pane's dock state into a per-pane record without touching any
  *  other pane's entry — the RPC patch is single-pane so other clients'
  *  concurrent updates to different panes on the same tab must survive. */
@@ -2724,13 +2729,24 @@ export function mergeTerminalDockByPaneKey(
   patch: { paneKey: string; docked?: boolean; gutterRows?: number }
 ): Record<string, TerminalDockPaneState> {
   const current = existing?.[patch.paneKey]
-  return {
-    ...existing,
-    [patch.paneKey]: {
-      docked: patch.docked ?? current?.docked ?? false,
-      gutterRows: patch.gutterRows ?? current?.gutterRows ?? DEFAULT_TERMINAL_DOCK_GUTTER_ROWS
+  const nextEntry: TerminalDockPaneState = {
+    docked: patch.docked ?? current?.docked ?? false,
+    gutterRows: patch.gutterRows ?? current?.gutterRows ?? DEFAULT_TERMINAL_DOCK_GUTTER_ROWS
+  }
+  const existingKeys = existing ? Object.keys(existing) : []
+  // Why: only a brand-new key can grow the record, so eviction is scoped to
+  // that case — an update to an already-tracked pane never evicts anything.
+  const overflow =
+    current === undefined ? existingKeys.length + 1 - MAX_TERMINAL_DOCK_PANE_ENTRIES : 0
+  const evicted = overflow > 0 ? new Set(existingKeys.slice(0, overflow)) : null
+  const result: Record<string, TerminalDockPaneState> = {}
+  for (const key of existingKeys) {
+    if (!evicted?.has(key)) {
+      result[key] = existing![key]!
     }
   }
+  result[patch.paneKey] = nextEntry
+  return result
 }
 
 export class OrcaRuntimeService {
@@ -6617,6 +6633,16 @@ export class OrcaRuntimeService {
           candidate.parentTabId === args.tabId &&
           candidate.viewMode !== undefined
       )?.viewMode
+    // Why: same rescue/split hazard as viewMode above — reconstructing this
+    // surface must not drop a dock record no arg here ever supplies.
+    const terminalDockByPaneKey =
+      existingTab?.terminalDockByPaneKey ??
+      existing?.tabs.find(
+        (candidate): candidate is RuntimeMobileSessionTerminalTab =>
+          candidate.type === 'terminal' &&
+          candidate.parentTabId === args.tabId &&
+          candidate.terminalDockByPaneKey !== undefined
+      )?.terminalDockByPaneKey
     const tab: RuntimeMobileSessionTerminalTab = {
       type: 'terminal',
       id: `${args.tabId}::${args.leafId}`,
@@ -6627,6 +6653,7 @@ export class OrcaRuntimeService {
       ...(pty.launchAgent ? { launchAgent: pty.launchAgent } : {}),
       ...(args.startupCwd ? { startupCwd: args.startupCwd } : {}),
       ...(viewMode ? { viewMode } : {}),
+      ...(terminalDockByPaneKey ? { terminalDockByPaneKey } : {}),
       parentLayout,
       isActive:
         args.activate || (args.selectIfNoActiveTab !== false && existing?.activeTabId == null)
@@ -6973,6 +7000,15 @@ export class OrcaRuntimeService {
     persistedTabs: readonly TerminalTab[],
     session: WorkspaceSessionState
   ): RuntimeMobileSessionTerminalTab[] {
+    // Why: the dock record lives only on the unified Tab, not the legacy
+    // TerminalTab this hydration path otherwise rebuilds from.
+    const terminalDockByPaneKeyByTabId = new Map<string, Record<string, TerminalDockPaneState>>()
+    for (const unifiedTab of session.unifiedTabs?.[worktreeId] ?? []) {
+      if (unifiedTab.terminalDockByPaneKey) {
+        terminalDockByPaneKeyByTabId.set(unifiedTab.id, unifiedTab.terminalDockByPaneKey)
+        terminalDockByPaneKeyByTabId.set(unifiedTab.entityId, unifiedTab.terminalDockByPaneKey)
+      }
+    }
     return [...persistedTabs]
       .sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt - b.createdAt)
       .flatMap((tab, index) => {
@@ -6981,6 +7017,7 @@ export class OrcaRuntimeService {
         if (leafIds.length === 0) {
           leafIds.push(this.deriveHeadlessLegacyTerminalLeafId(tab.id))
         }
+        const terminalDockByPaneKey = terminalDockByPaneKeyByTabId.get(tab.id)
         return leafIds.flatMap((leafId) => {
           const ptyId =
             layout?.ptyIdsByLeafId?.[leafId] ?? (leafIds.length === 1 ? tab.ptyId : null)
@@ -7004,6 +7041,7 @@ export class OrcaRuntimeService {
               ...(tab.color != null ? { color: tab.color } : {}),
               ...(tab.isPinned ? { isPinned: true } : {}),
               ...(tab.viewMode ? { viewMode: tab.viewMode } : {}),
+              ...(terminalDockByPaneKey ? { terminalDockByPaneKey } : {}),
               isActive: this.isPersistedTerminalLeafActive(
                 session,
                 worktreeId,
@@ -31020,6 +31058,9 @@ export class OrcaRuntimeService {
         ...(tab.color != null ? { color: tab.color } : {}),
         ...(tab.isPinned ? { isPinned: true } : {}),
         ...(tab.viewMode ? { viewMode: tab.viewMode } : {}),
+        ...(tab.terminalDockByPaneKey
+          ? { terminalDockByPaneKey: tab.terminalDockByPaneKey }
+          : {}),
         ...(tab.launchDraft ? { launchDraft: tab.launchDraft } : {}),
         ...(tab.launchDraftCreatedAt !== undefined
           ? { launchDraftCreatedAt: tab.launchDraftCreatedAt }

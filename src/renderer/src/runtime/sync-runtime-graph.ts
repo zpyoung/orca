@@ -1281,7 +1281,13 @@ export function buildMobileSessionTabSnapshots(
         if (isWebOnlyMirroredTerminalTab(terminal, inputs.terminalLayoutByTabId.get(terminal.id))) {
           continue
         }
-        tabs.push(...buildMobileTerminalSurfaceTabs(inputs, terminal, item.tabId))
+        tabs.push(
+          ...buildMobileTerminalSurfaceTabs(
+            inputs,
+            terminal,
+            item.tabId ? unifiedTabByIdForWorktree.get(item.tabId) : undefined
+          )
+        )
       } else if (item.type === 'editor') {
         const file = openFilesForWorktree?.get(item.id)
         if (!file || !isMobilePublishableOpenFile(file)) {
@@ -1814,8 +1820,9 @@ function getRuntimeLeafIdsForTerminal(
 function buildMobileTerminalSurfaceTabs(
   inputs: MobileSessionWorktreeInputs,
   terminal: NonNullable<AppState['tabsByWorktree'][string]>[number],
-  unifiedTabId?: string
+  unifiedTab?: Tab
 ): RuntimeMobileSessionSnapshotTab[] {
+  const unifiedTabId = unifiedTab?.id
   const capture = inputs.mountedSurfaceCaptureByTabId.get(terminal.id)
   const isDesktopTabActive = unifiedTabId
     ? isUnifiedTabActiveInActiveGroup(inputs, unifiedTabId)
@@ -1905,6 +1912,9 @@ function buildMobileTerminalSurfaceTabs(
             launchDraft: publishedLaunchDraft.text,
             launchDraftCreatedAt: publishedLaunchDraft.createdAt
           }
+        : {}),
+      ...(unifiedTab?.terminalDockByPaneKey
+        ? { terminalDockByPaneKey: unifiedTab.terminalDockByPaneKey }
         : {}),
       parentLayout,
       isActive: isDesktopTabActive && leafId === activeLeafId
