@@ -27,7 +27,6 @@
 src/renderer/src/components/Terminal.tsx
 src/renderer/src/components/tab-bar/TabBar.tsx
 src/renderer/src/components/tab-group/TabGroupPanel.tsx
-src/renderer/src/components/tab-group/useTabGroupWorkspaceModel.ts
 src/renderer/src/components/terminal/terminal-tab-bulk-actions.ts
 src/renderer/src/components/terminal/terminal-tab-create.ts
 src/renderer/src/lib/launch-agent-in-new-tab.ts

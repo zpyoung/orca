@@ -9,6 +9,7 @@ import type {
   TerminalTab
 } from '../../../../shared/types'
 import { resolveUnifiedTabLabel } from '../../../../shared/tab-title-resolution'
+import { assertExhaustiveTabContentType } from '../../../../shared/tab-content-type-exhaustive'
 import { useAppStore } from '../../store'
 import { destroyWorkspaceWebviews } from '../../store/slices/browser-webview-cleanup'
 import { requestEditorFileClose } from '../editor/editor-autosave'
@@ -34,6 +35,64 @@ export function recordTerminalTabGroupSplit(createdTerminal: TerminalTab | null 
     return
   }
   useAppStore.getState().recordFeatureInteraction('terminal-pane-split')
+}
+
+/** Routes closeItem's post-terminal dispatch by content type; returns false only when an
+ *  editor-family close was deferred to the unsaved-save queue instead of proceeding. */
+function closeNonTerminalGroupTab(
+  item: Tab,
+  worktreeId: string,
+  runtimeEnvironmentId: string | null,
+  actions: {
+    closeBrowserTab: (entityId: string) => void
+    closeUnifiedTab: (tabId: string) => void
+    closeEditorIfUnreferenced: (entityId: string, tabId: string) => boolean
+  }
+): boolean {
+  switch (item.contentType) {
+    case 'browser': {
+      const browserState = useAppStore.getState()
+      const hasLocalPages = (browserState.browserPagesByWorkspace[item.entityId] ?? []).length > 0
+      // Why: host-close a remote-owned browser or a pageless host-mirror (else un-closable); local fallbacks have pages so stay local.
+      const shouldCloseOnHost =
+        isWebRuntimeSessionActive(runtimeEnvironmentId) &&
+        (browserWorkspaceHasRemoteOwner(browserState, item.entityId, runtimeEnvironmentId) ||
+          !hasLocalPages)
+      if (shouldCloseOnHost) {
+        void closeWebRuntimeSessionTab({
+          worktreeId,
+          tabId: item.id,
+          environmentId: runtimeEnvironmentId,
+          reason: 'user'
+        })
+      }
+      destroyWorkspaceWebviews(browserState.browserPagesByWorkspace, item.entityId)
+      actions.closeBrowserTab(item.entityId)
+      actions.closeUnifiedTab(item.id)
+      return true
+    }
+    case 'simulator':
+    case 'pipeline':
+      actions.closeUnifiedTab(item.id)
+      return true
+    case 'editor':
+    case 'diff':
+    case 'conflict-review':
+    case 'check-details': {
+      if (!actions.closeEditorIfUnreferenced(item.entityId, item.id)) {
+        return false
+      }
+      actions.closeUnifiedTab(item.id)
+      return true
+    }
+    case 'terminal':
+      // unreachable: closeItem routes terminal tabs through closeTerminalTab before
+      // this dispatch is ever called.
+      return true
+  }
+  // outside the switch, not in a default: case, so control-flow narrowing to
+  // `never` still fires here once every member above is handled
+  return assertExhaustiveTabContentType(item.contentType)
 }
 
 export type GroupEditorItem = OpenFile & { tabId: string }
@@ -244,33 +303,13 @@ export function useTabGroupWorkspaceModel({
         )
         return
       }
-      if (item.contentType === 'browser') {
-        const browserState = useAppStore.getState()
-        const hasLocalPages = (browserState.browserPagesByWorkspace[item.entityId] ?? []).length > 0
-        // Why: host-close a remote-owned browser or a pageless host-mirror (else un-closable); local fallbacks have pages so stay local.
-        const shouldCloseOnHost =
-          isWebRuntimeSessionActive(runtimeEnvironmentId) &&
-          (browserWorkspaceHasRemoteOwner(browserState, item.entityId, runtimeEnvironmentId) ||
-            !hasLocalPages)
-        if (shouldCloseOnHost) {
-          void closeWebRuntimeSessionTab({
-            worktreeId,
-            tabId: item.id,
-            environmentId: runtimeEnvironmentId,
-            reason: 'user'
-          })
-        }
-        destroyWorkspaceWebviews(browserState.browserPagesByWorkspace, item.entityId)
-        closeBrowserTab(item.entityId)
-        closeUnifiedTab(item.id)
-      } else if (item.contentType === 'simulator' || item.contentType === 'pipeline') {
-        closeUnifiedTab(item.id)
-      } else {
-        const canCloseTab = closeEditorIfUnreferenced(item.entityId, item.id)
-        if (!canCloseTab) {
-          return
-        }
-        closeUnifiedTab(item.id)
+      const closeProceeded = closeNonTerminalGroupTab(item, worktreeId, runtimeEnvironmentId, {
+        closeBrowserTab,
+        closeUnifiedTab,
+        closeEditorIfUnreferenced
+      })
+      if (!closeProceeded) {
+        return
       }
       if (!opts?.skipEmptyCheck) {
         leaveWorktreeIfEmpty()
@@ -303,36 +342,51 @@ export function useTabGroupWorkspaceModel({
           closeTerminalTab(item.entityId, { skipRunningProcessConfirm: true })
           continue
         }
-        if (item.contentType === 'browser') {
-          // Why: see closeItem — host-close a remote-owned browser or pageless host-mirror; always remove the visible tab.
-          const browserState = useAppStore.getState()
-          const hasLocalPages =
-            (browserState.browserPagesByWorkspace[item.entityId] ?? []).length > 0
-          const shouldCloseOnHost =
-            isWebRuntimeSessionActive(runtimeEnvironmentId) &&
-            (browserWorkspaceHasRemoteOwner(browserState, item.entityId, runtimeEnvironmentId) ||
-              !hasLocalPages)
-          if (shouldCloseOnHost) {
-            void closeWebRuntimeSessionTab({
-              worktreeId,
-              tabId: item.id,
-              environmentId: runtimeEnvironmentId,
-              reason: 'user'
-            })
-          }
-          destroyWorkspaceWebviews(browserState.browserPagesByWorkspace, item.entityId)
-          closeBrowserTab(item.entityId)
-          closeUnifiedTab(item.id)
-        } else if (item.contentType === 'terminal') {
-          closeTab(item.entityId)
-        } else if (item.contentType === 'simulator' || item.contentType === 'pipeline') {
-          closeUnifiedTab(item.id)
-        } else {
-          const canCloseTab = closeEditorIfUnreferenced(item.entityId, item.id)
-          if (canCloseTab) {
+        switch (item.contentType) {
+          case 'browser': {
+            // Why: see closeItem — host-close a remote-owned browser or pageless host-mirror; always remove the visible tab.
+            const browserState = useAppStore.getState()
+            const hasLocalPages =
+              (browserState.browserPagesByWorkspace[item.entityId] ?? []).length > 0
+            const shouldCloseOnHost =
+              isWebRuntimeSessionActive(runtimeEnvironmentId) &&
+              (browserWorkspaceHasRemoteOwner(browserState, item.entityId, runtimeEnvironmentId) ||
+                !hasLocalPages)
+            if (shouldCloseOnHost) {
+              void closeWebRuntimeSessionTab({
+                worktreeId,
+                tabId: item.id,
+                environmentId: runtimeEnvironmentId,
+                reason: 'user'
+              })
+            }
+            destroyWorkspaceWebviews(browserState.browserPagesByWorkspace, item.entityId)
+            closeBrowserTab(item.entityId)
             closeUnifiedTab(item.id)
+            continue
+          }
+          case 'terminal':
+            closeTab(item.entityId)
+            continue
+          case 'simulator':
+          case 'pipeline':
+            closeUnifiedTab(item.id)
+            continue
+          case 'editor':
+          case 'diff':
+          case 'conflict-review':
+          case 'check-details': {
+            const canCloseTab = closeEditorIfUnreferenced(item.entityId, item.id)
+            if (canCloseTab) {
+              closeUnifiedTab(item.id)
+            }
+            continue
           }
         }
+        // outside the switch, not in a default: case, so control-flow narrowing to
+        // `never` still fires here once every member above is handled — `continue`
+        // (not `break`) is required above for that narrowing to reach this line
+        assertExhaustiveTabContentType(item.contentType)
       }
     },
     [closeBrowserTab, closeEditorIfUnreferenced, closeTab, closeUnifiedTab, groupTabs, worktreeId]
@@ -406,17 +460,32 @@ export function useTabGroupWorkspaceModel({
       }
       focusGroup(worktreeId, groupId)
       activateTab(item.id)
-      if (item.contentType === 'simulator') {
-        setActiveTabType('simulator')
-        // simulator has no editor file entity
-      } else if (item.contentType === 'pipeline') {
-        // Why: entityId is a run id, not a file id, and WorkspaceVisibleTabType has no member
-        // for pipeline tabs — clear the previously active terminal id so it can't leak through.
-        activatePipelineTabSurface(worktreeId)
-      } else {
-        setActiveFile(item.entityId)
-        setActiveTabType('editor')
+      switch (item.contentType) {
+        case 'simulator':
+          setActiveTabType('simulator')
+          // simulator has no editor file entity
+          return
+        case 'pipeline':
+          // Why: entityId is a run id, not a file id, and WorkspaceVisibleTabType has no member
+          // for pipeline tabs — clear the previously active terminal id so it can't leak through.
+          activatePipelineTabSurface(worktreeId)
+          return
+        case 'editor':
+        case 'diff':
+        case 'conflict-review':
+        case 'check-details':
+          setActiveFile(item.entityId)
+          setActiveTabType('editor')
+          return
+        case 'terminal':
+        case 'browser':
+          // Why: activateTerminal/activateBrowser own these tabs; reaching here would route
+          // their entityId through setActiveFile as though it were a file path.
+          return
       }
+      // outside the switch, not in a default: case, so control-flow narrowing to
+      // `never` still fires here once every member above is handled
+      assertExhaustiveTabContentType(item.contentType)
     },
     [
       activatePipelineTabSurface,

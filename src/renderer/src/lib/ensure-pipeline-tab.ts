@@ -1,4 +1,5 @@
 import { useAppStore } from '@/store'
+import { activateAndRevealWorkspace } from './worktree-activation'
 
 type EnsurePipelineTabOptions = {
   targetGroupId?: string
@@ -64,10 +65,22 @@ export function ensurePipelineTab(
     return null
   }
 
-  const existing = getPipelineTabForRun(worktreeId, run.runId)
   const shouldSurface = options?.surfacePane ?? true
+  // run history is unfiltered by workspace, so a clicked row's owner is often not the
+  // workspace on screen — switch to it, or surfacing just mutates state behind a view
+  // the caller never sees.
+  if (shouldSurface && store.activeWorktreeId !== worktreeId) {
+    // e.g. a disconnected SSH host or an unmounted folder path — the workspace's tab
+    // group can still exist locally while the view itself can't be brought up; report
+    // failure instead of continuing on to create/activate a tab no one will see.
+    if (!activateAndRevealWorkspace(worktreeId)) {
+      return null
+    }
+  }
+
+  const existing = getPipelineTabForRun(worktreeId, run.runId)
   if (existing) {
-    if (shouldSurface && store.activeWorktreeId === worktreeId) {
+    if (shouldSurface) {
       store.activateTab(existing.id)
       store.focusGroup(worktreeId, existing.groupId)
     }
