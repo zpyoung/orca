@@ -804,6 +804,43 @@ export class SshGitProvider implements IGitProvider {
     })
   }
 
+  // method-not-found is the old-relay detection mode this maps to `false`; any other
+  // error (transport, validation) rethrows so callers can tell "no support" from "broken"
+  async pipelineCheckpointSupported(): Promise<boolean> {
+    try {
+      const result = (await this.mux.request('git.pipelineCheckpointSupported', {})) as {
+        supported?: boolean
+      }
+      return result?.supported === true
+    } catch (error) {
+      if (isJsonRpcMethodNotFoundError(error)) {
+        return false
+      }
+      throw error
+    }
+  }
+
+  async pipelineCheckpointCapture(args: {
+    worktreePath: string
+    runId: string
+    nodeId: string
+    attempt: number
+  }): Promise<{ head: string; snapshot: string; ref: string }> {
+    return (await this.runWithDiffDedupeClear(async () =>
+      this.mux.request('git.pipelineCheckpointCapture', args)
+    )) as { head: string; snapshot: string; ref: string }
+  }
+
+  async pipelineCheckpointRestore(args: {
+    worktreePath: string
+    head: string
+    snapshot: string
+  }): Promise<void> {
+    await this.runWithDiffDedupeClear(async () => {
+      await this.mux.request('git.pipelineCheckpointRestore', args)
+    })
+  }
+
   async forceDeletePreservedBranch(
     repoPath: string,
     branchName: string,

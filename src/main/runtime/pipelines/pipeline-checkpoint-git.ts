@@ -8,9 +8,17 @@ import { removeHostTree } from '../../host-tree-removal'
 import { toLinuxPath } from '../../wsl'
 import { addWslEnvKeys } from '../../wsl-env'
 
+export type CheckpointGitRunner = (
+  args: string[],
+  cwd: string,
+  env?: NodeJS.ProcessEnv
+) => Promise<string>
+
 export type CheckpointGitTarget = {
   cwd: string
   wslDistro?: string
+  // relay backend supplies its own executor here; local/WSL omits it and gets the gitExecFileAsync default below
+  run?: CheckpointGitRunner
 }
 
 export function checkpointRef(runId: string, nodeId: string, attempt: number): string {
@@ -23,6 +31,9 @@ export async function runCheckpointGit(
   args: string[],
   env?: NodeJS.ProcessEnv
 ): Promise<string> {
+  if (target.run) {
+    return target.run(args, target.cwd, env)
+  }
   const { stdout } = await gitExecFileAsync(args, {
     cwd: target.cwd,
     wslDistro: target.wslDistro,
