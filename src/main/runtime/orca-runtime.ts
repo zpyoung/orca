@@ -2714,7 +2714,7 @@ function getSetupRunnerCommandPlatformForLaunch(
   return getSetupRunnerCommandPlatformForPath(setup?.runnerScriptPath ?? '', fallbackPlatform)
 }
 
-export const DEFAULT_TERMINAL_DOCK_GUTTER_ROWS = 6
+export const DEFAULT_TERMINAL_DOCK_GUTTER_ROWS = 5
 
 // Why: pane-close pruning isn't wired up yet (deliberately, per a later task),
 // so this cap is the only backstop against an unbounded per-tab record; sized
