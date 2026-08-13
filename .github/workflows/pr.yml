@@ -126,6 +126,9 @@ jobs:
 
       - run: pnpm typecheck
 
+      - name: Verify tab-content-type exhaustiveness gate
+        run: pnpm run check:tab-content-type-exhaustive-gate
+
   git_compatibility:
     name: Git compatibility
     runs-on: ubuntu-latest
