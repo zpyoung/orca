@@ -254,6 +254,11 @@ jobs:
         with:
           native-runtime: node
 
+      # Why: the suite requires electron at import time, and electron's own lazy
+      # download has no retry. Install through the script that retries instead.
+      - name: Install Electron package binary for tests
+        run: node config/scripts/install-electron-package-binary.mjs
+
       # A path filter that matches nothing exits 1 ("No test files found"), so this
       # lane cannot report success while running zero tests.
       - name: Old/new client and server terminal journey

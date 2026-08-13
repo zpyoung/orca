@@ -158,6 +158,9 @@ describe('install-electron-package-binary', () => {
       })
 
       expect(result.status, result.stderr).toBe(0)
+      expect(
+        readFileSync(join(projectDir, 'electron-get.log'), 'utf8').trim().split('\n')
+      ).toHaveLength(2)
       expect(result.stderr).toContain('Transient Electron download failure (HTTP 503)')
     } finally {
       rmSync(projectDir, { recursive: true, force: true })
@@ -352,9 +355,10 @@ exports.downloadArtifact = async function downloadArtifact(details) {
   if (downloadAttempt <= ${JSON.stringify(downloadFailures)}) {
     const responseStatus = ${JSON.stringify(downloadErrorResponseStatus)}
     if (responseStatus !== null) {
-      // Shape of @electron/get's fetch downloader: HTTPError carrying a WHATWG Response.
-      throw Object.assign(new Error('Response code ' + responseStatus), {
-        response: { status: responseStatus }
+      // Mirrors @electron/get's HTTPError: a fetch Response, no code and no statusCode.
+      throw Object.assign(new Error('Response code ' + responseStatus + ' () for https://example.invalid'), {
+        name: 'HTTPError',
+        response: { status: responseStatus, statusText: '', ok: false }
       })
     }
     const cause = Object.assign(new Error('download failed'), {

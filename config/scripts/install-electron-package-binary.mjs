@@ -188,8 +188,8 @@ async function downloadElectronArtifactWithRetry(downloadOptions) {
 function getDownloadRetryDelays() {
   const configured = process.env.ORCA_ELECTRON_PACKAGE_RETRY_DELAYS_MS
   if (!configured) {
-    // Observed CDN degradations span several seconds, outlasting a 4s budget.
-    return [1_000, 3_000, 8_000]
+    // Release-CDN 503 bursts have outlasted a 4s backoff and failed every lane at once.
+    return [1_000, 3_000, 8_000, 15_000]
   }
 
   const delays = configured.split(',').map(Number)

@@ -1,4 +1,4 @@
-type RgbaColor = { r: number; g: number; b: number; a: number }
+export type RgbaColor = { r: number; g: number; b: number; a: number }
 
 const APP_SURFACE_COLORS: Record<'dark' | 'light', RgbaColor> = {
   dark: { r: 10, g: 10, b: 10, a: 1 },
@@ -53,7 +53,7 @@ function compositeTerminalBackground(
   return alpha < 1 ? compositeRgb(color, appSurface, alpha) : { ...color, a: 1 }
 }
 
-function parseCssRgbColor(color: string | undefined): RgbaColor | null {
+export function parseCssRgbColor(color: string | undefined): RgbaColor | null {
   const value = color?.trim().toLowerCase()
   if (!value) {
     return null
@@ -188,7 +188,7 @@ function relativeLuminance(rgb: Pick<RgbaColor, 'r' | 'g' | 'b'>): number {
   return 0.2126 * toLinear(rgb.r) + 0.7152 * toLinear(rgb.g) + 0.0722 * toLinear(rgb.b)
 }
 
-function contrastRatio(
+export function contrastRatio(
   foreground: Pick<RgbaColor, 'r' | 'g' | 'b'>,
   background: Pick<RgbaColor, 'r' | 'g' | 'b'>
 ): number {
