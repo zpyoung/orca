@@ -1,10 +1,12 @@
 import type { PipelineRunSnapshotWire } from '../../../shared/pipeline-run-snapshot'
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
-import { callRuntimeRpc, type RuntimeClientTarget } from './runtime-rpc-client'
+import type { RuntimeClientTarget } from './runtime-rpc-client'
 
 export type PipelineRunSnapshotSubscription = { unsubscribe: () => void }
 
 const PIPELINE_SUBSCRIBE_METHOD = 'pipeline.subscribe'
+
+let localPipelineRunSubscriptionSeq = 0
 
 /**
  * Streams `pipeline.subscribe` snapshots for one run. Mirrors
@@ -12,7 +14,9 @@ const PIPELINE_SUBSCRIBE_METHOD = 'pipeline.subscribe'
  * environment the subscription rides the same envelope every other streaming
  * RPC uses, and the shared-control layer already keeps it alive and replays
  * it across reconnects (see `runtime-subscription-replay.ts`), so nothing
- * here needs to re-issue the call itself.
+ * here needs to re-issue the call itself. A local target has no RPC envelope
+ * to ride — `runtime:call` only carries unary methods — so it goes over the
+ * dedicated `pipelineRuns` IPC bridge instead.
  */
 export async function subscribeToPipelineRunSnapshot(
   target: RuntimeClientTarget,
@@ -21,15 +25,15 @@ export async function subscribeToPipelineRunSnapshot(
   onError: (error: unknown) => void = console.warn
 ): Promise<PipelineRunSnapshotSubscription> {
   if (target.kind === 'local') {
-    // The desktop's local `runtime:call` IPC channel only carries unary RPCs
-    // (RpcDispatcher.dispatch rejects any streaming method outright), so a local
-    // run has no bridge to ride yet; surface that instead of hanging silently.
-    try {
-      await callRuntimeRpc(target, PIPELINE_SUBSCRIBE_METHOD, { runId })
-    } catch (error) {
-      onError(error)
-    }
-    return { unsubscribe: () => {} }
+    const subscriptionId = `pipeline-run-${runId}-${++localPipelineRunSubscriptionSeq}`
+    const unsubscribe = window.api.pipelineRuns.subscribe({ subscriptionId, runId }, (frame) => {
+      if (frame.type === 'error') {
+        onError(new Error(frame.error))
+        return
+      }
+      onSnapshot(frame.snapshot)
+    })
+    return { unsubscribe }
   }
 
   const handle = await window.api.runtimeEnvironments.subscribe(

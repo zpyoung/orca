@@ -54,7 +54,12 @@ describe('subscribeToPipelineRunSnapshot', () => {
     )
 
     const snapshot: PipelineRunSnapshotWire = { runId: 'run-1', state: 'running' }
-    deliver?.({ id: 'req-1', ok: true, result: { subscriptionId: 'sub-1', ...snapshot }, _meta: { runtimeId: 'r' } })
+    deliver?.({
+      id: 'req-1',
+      ok: true,
+      result: { subscriptionId: 'sub-1', ...snapshot },
+      _meta: { runtimeId: 'r' }
+    })
 
     expect(onSnapshot).toHaveBeenCalledTimes(1)
     expect(onSnapshot.mock.calls[0]![0]).toMatchObject({ runId: 'run-1', state: 'running' })
@@ -127,28 +132,77 @@ describe('subscribeToPipelineRunSnapshot', () => {
     expect(underlyingUnsubscribe).toHaveBeenCalledTimes(1)
   })
 
-  it('reports an error for a local target, since no local streaming bridge exists yet', async () => {
-    const callMock = vi.fn(async () => ({
-      id: 'req-1',
-      ok: false,
-      error: { code: 'method_not_supported', message: 'Method pipeline.subscribe requires a streaming transport' }
-    }))
+  it('routes a local target through the pipelineRuns IPC bridge, not runtime.call', async () => {
+    const subscribeMock = vi.fn((_args: unknown, _onFrame: unknown) => vi.fn())
     ;(window as unknown as { api: unknown }).api = {
-      runtime: { call: callMock }
+      pipelineRuns: { subscribe: subscribeMock }
+    }
+
+    await subscribeToPipelineRunSnapshot(
+      { kind: 'local' },
+      'run-1',
+      () => {},
+      () => {}
+    )
+
+    expect(subscribeMock).toHaveBeenCalledTimes(1)
+    const [args] = subscribeMock.mock.calls[0]!
+    expect(args).toMatchObject({ runId: 'run-1' })
+    expect((args as { subscriptionId: string }).subscriptionId).toEqual(expect.any(String))
+  })
+
+  it('forwards a local snapshot frame to onSnapshot', async () => {
+    let onFrame: ((frame: { type: string; snapshot?: unknown; error?: string }) => void) | undefined
+    ;(window as unknown as { api: unknown }).api = {
+      pipelineRuns: {
+        subscribe: vi.fn((_args: unknown, callback: typeof onFrame) => {
+          onFrame = callback
+          return vi.fn()
+        })
+      }
+    }
+    const onSnapshot = vi.fn()
+    await subscribeToPipelineRunSnapshot({ kind: 'local' }, 'run-1', onSnapshot, () => {})
+
+    const snapshot: PipelineRunSnapshotWire = { runId: 'run-1', state: 'running' }
+    onFrame?.({ type: 'snapshot', snapshot })
+
+    expect(onSnapshot).toHaveBeenCalledExactlyOnceWith(snapshot)
+  })
+
+  it('routes a local error frame to onError instead of onSnapshot', async () => {
+    let onFrame: ((frame: { type: string; snapshot?: unknown; error?: string }) => void) | undefined
+    ;(window as unknown as { api: unknown }).api = {
+      pipelineRuns: {
+        subscribe: vi.fn((_args: unknown, callback: typeof onFrame) => {
+          onFrame = callback
+          return vi.fn()
+        })
+      }
     }
     const onSnapshot = vi.fn()
     const onError = vi.fn()
+    await subscribeToPipelineRunSnapshot({ kind: 'local' }, 'run-1', onSnapshot, onError)
+
+    onFrame?.({ type: 'error', error: 'Pipeline run run-1 was not found.' })
+
+    expect(onSnapshot).not.toHaveBeenCalled()
+    expect(onError).toHaveBeenCalledExactlyOnceWith(new Error('Pipeline run run-1 was not found.'))
+  })
+
+  it('delegates a local unsubscribe to the bridge-returned unsubscribe function', async () => {
+    const bridgeUnsubscribe = vi.fn()
+    ;(window as unknown as { api: unknown }).api = {
+      pipelineRuns: { subscribe: vi.fn(() => bridgeUnsubscribe) }
+    }
     const subscription = await subscribeToPipelineRunSnapshot(
       { kind: 'local' },
       'run-1',
-      onSnapshot,
-      onError
+      () => {},
+      () => {}
     )
 
-    expect(callMock).toHaveBeenCalledWith({ method: 'pipeline.subscribe', params: { runId: 'run-1' } })
-    expect(onSnapshot).not.toHaveBeenCalled()
-    expect(onError).toHaveBeenCalledTimes(1)
-    // Why: nothing was ever subscribed locally, so unsubscribe must be a harmless no-op.
-    expect(() => subscription.unsubscribe()).not.toThrow()
+    subscription.unsubscribe()
+    expect(bridgeUnsubscribe).toHaveBeenCalledOnce()
   })
 })

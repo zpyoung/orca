@@ -554,6 +554,7 @@ import type {
 } from '../shared/workspace-cleanup'
 import type { KeybindingActionId, KeybindingFileSnapshot } from '../shared/keybindings'
 import type { PipelineTemplateError, ResolvedPipelineDefinition } from '../shared/pipeline-template'
+import type { PipelineRunSnapshotWire } from '../shared/pipeline-run-snapshot'
 
 // Mirrors `PipelineTemplateListEntry` / `PipelineTemplateResolveResult` in
 // `src/main/ipc/pipeline-templates.ts` — declared locally because that file lives outside the
@@ -1018,6 +1019,33 @@ export type NativeChatApi = {
   subscribe: (
     args: NativeChatSubscribeArgs,
     onFrame: (frame: NativeChatSubscriptionFrame) => void
+  ) => () => void
+}
+
+export type PipelineRunSubscribeArgs = {
+  /** Unique per-caller id, echoed on every frame so a window watching
+   *  several runs routes each snapshot to the right subscription. */
+  subscriptionId: string
+  runId: string
+}
+
+export type PipelineRunSubscriptionFrame =
+  | { type: 'snapshot'; snapshot: PipelineRunSnapshotWire }
+  | { type: 'error'; error: string }
+
+/** Wire payload for the `pipelineRun:snapshot` push channel. */
+export type PipelineRunSnapshotPayload = {
+  subscriptionId: string
+  frame: PipelineRunSubscriptionFrame
+}
+
+export type PipelineRunsApi = {
+  /** Live-tail a local pipeline run. Mirrors nativeChat.subscribe: a complete
+   *  snapshot on attach, heartbeats while the run is live, and one final
+   *  snapshot at the terminal state after which emission stops. */
+  subscribe: (
+    args: PipelineRunSubscribeArgs,
+    onFrame: (frame: PipelineRunSubscriptionFrame) => void
   ) => () => void
 }
 
@@ -2800,6 +2828,7 @@ export type PreloadApi = {
   openCodeUsage: OpenCodeUsageApi
   aiVault: AiVaultApi
   nativeChat: NativeChatApi
+  pipelineRuns: PipelineRunsApi
   fs: {
     readDir: (args: { dirPath: string; connectionId?: string }) => Promise<DirEntry[]>
     readFile: (args: {
