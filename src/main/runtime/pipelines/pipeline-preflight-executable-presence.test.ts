@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const isCommandOnPathMock = vi.fn()
+const execCommandInWslMock = vi.fn()
 const detectCommandsInInstallDirsMock = vi.fn()
 const detectWslCommandsOnPathMock = vi.fn()
 const getActiveMultiplexerMock = vi.fn()
 
 vi.mock('../../ipc/preflight-command-exec', () => ({
-  isCommandOnPath: isCommandOnPathMock
+  isCommandOnPath: isCommandOnPathMock,
+  execCommandInWsl: execCommandInWslMock
 }))
 vi.mock('../../ipc/local-agent-install-dir-detection', () => ({
   detectCommandsInInstallDirs: detectCommandsInInstallDirsMock
@@ -25,6 +27,7 @@ const claudeCommands = [{ id: 'claude' as const, cmd: 'claude' }]
 describe('probeAgentPresence', () => {
   beforeEach(() => {
     isCommandOnPathMock.mockReset().mockResolvedValue(false)
+    execCommandInWslMock.mockReset().mockResolvedValue({ stdout: '', stderr: '' })
     detectCommandsInInstallDirsMock.mockReset().mockReturnValue(new Set())
     detectWslCommandsOnPathMock.mockReset().mockResolvedValue(new Set())
     getActiveMultiplexerMock.mockReset()
@@ -66,7 +69,8 @@ describe('probeAgentPresence', () => {
     )
   })
 
-  it('reports not-found for a WSL host missing the command', async () => {
+  it('reports not-found (not transport) for a WSL host missing the command when the distro is reachable', async () => {
+    execCommandInWslMock.mockResolvedValue({ stdout: '', stderr: '' })
     await expect(
       probeAgentPresence({
         agent: 'claude',
@@ -74,6 +78,31 @@ describe('probeAgentPresence', () => {
         host: { wslDistro: 'Ubuntu' }
       })
     ).resolves.toEqual({ ok: false, transport: false })
+  })
+
+  it('reports a transport failure, not not-found, when a WSL miss cannot be confirmed against a reachable distro', async () => {
+    detectWslCommandsOnPathMock.mockResolvedValue(new Set())
+    execCommandInWslMock.mockRejectedValue(new Error('wsl.exe timed out'))
+    await expect(
+      probeAgentPresence({
+        agent: 'claude',
+        commands: claudeCommands,
+        host: { wslDistro: 'Ubuntu' }
+      })
+    ).resolves.toEqual({ ok: false, transport: true })
+    expect(execCommandInWslMock).toHaveBeenCalledWith({ distro: 'Ubuntu' }, ':')
+  })
+
+  it('does not probe distro reachability when the WSL command is found', async () => {
+    detectWslCommandsOnPathMock.mockResolvedValue(new Set(['claude']))
+    await expect(
+      probeAgentPresence({
+        agent: 'claude',
+        commands: claudeCommands,
+        host: { wslDistro: 'Ubuntu' }
+      })
+    ).resolves.toEqual({ ok: true })
+    expect(execCommandInWslMock).not.toHaveBeenCalled()
   })
 
   it('probes the relay for an SSH host, sending the client-supplied command list', async () => {

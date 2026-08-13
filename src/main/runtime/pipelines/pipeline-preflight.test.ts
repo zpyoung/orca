@@ -4,12 +4,14 @@ import type { TuiAgent } from '../../../shared/types'
 import type { OrcaRuntimeService } from '../orca-runtime'
 
 const isCommandOnPathMock = vi.fn()
+const execCommandInWslMock = vi.fn()
 const detectCommandsInInstallDirsMock = vi.fn()
 const detectWslCommandsOnPathMock = vi.fn()
 const getActiveMultiplexerMock = vi.fn()
 
 vi.mock('../../ipc/preflight-command-exec', () => ({
-  isCommandOnPath: isCommandOnPathMock
+  isCommandOnPath: isCommandOnPathMock,
+  execCommandInWsl: execCommandInWslMock
 }))
 vi.mock('../../ipc/local-agent-install-dir-detection', () => ({
   detectCommandsInInstallDirs: detectCommandsInInstallDirsMock
@@ -46,6 +48,7 @@ function runtimeStub(overrides: Partial<OrcaRuntimeService> = {}) {
 describe('validatePipelineNodeLaunch', () => {
   beforeEach(() => {
     isCommandOnPathMock.mockReset().mockResolvedValue(true)
+    execCommandInWslMock.mockReset().mockResolvedValue({ stdout: '', stderr: '' })
     detectCommandsInInstallDirsMock.mockReset().mockReturnValue(new Set())
     detectWslCommandsOnPathMock.mockReset().mockResolvedValue(new Set())
     getActiveMultiplexerMock.mockReset()
@@ -185,6 +188,63 @@ describe('validatePipelineNodeLaunch', () => {
     expect(result.ok).toBe(false)
     if (!result.ok) {
       expect(result.message).toContain('/opt/missing/claude-cli')
+    }
+  })
+
+  it('(d) alias coverage: only the legacy detection alias on PATH refuses, since the launcher invokes the real command', async () => {
+    isCommandOnPathMock.mockImplementation(async (cmd: string) => cmd === 'mistral-vibe')
+    const runtime = runtimeStub()
+    const result = await validatePipelineNodeLaunch({
+      runtime,
+      node: node({ harness: 'mistral-vibe' }),
+      host: {}
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.message).toContain('"vibe"')
+    }
+  })
+
+  it('(d) alias coverage: the real launch command on PATH passes even though the detection alias is absent', async () => {
+    isCommandOnPathMock.mockImplementation(async (cmd: string) => cmd === 'vibe')
+    const runtime = runtimeStub()
+    const result = await validatePipelineNodeLaunch({
+      runtime,
+      node: node({ harness: 'mistral-vibe' }),
+      host: {}
+    })
+    expect(result).toEqual({ ok: true, agent: 'mistral-vibe' })
+  })
+
+  it('(d) reports a distinct message on a WSL detection transport failure, not a throw', async () => {
+    detectWslCommandsOnPathMock.mockResolvedValue(new Set())
+    execCommandInWslMock.mockRejectedValue(new Error('wsl.exe timed out'))
+    const runtime = runtimeStub()
+    const result = await validatePipelineNodeLaunch({
+      runtime,
+      node: node(),
+      host: { wslDistro: 'Ubuntu' }
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.field).toBe('harness')
+      expect(result.message).toMatch(/could not verify/i)
+      expect(result.message).not.toMatch(/not found/i)
+    }
+  })
+
+  it('(d) reports the plain not-found message for a genuinely missing WSL command on a reachable distro', async () => {
+    detectWslCommandsOnPathMock.mockResolvedValue(new Set())
+    execCommandInWslMock.mockResolvedValue({ stdout: '', stderr: '' })
+    const runtime = runtimeStub()
+    const result = await validatePipelineNodeLaunch({
+      runtime,
+      node: node(),
+      host: { wslDistro: 'Ubuntu' }
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.message).toMatch(/not found/i)
     }
   })
 })

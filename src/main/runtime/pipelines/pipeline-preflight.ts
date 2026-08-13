@@ -1,5 +1,5 @@
 /**
- * Pipeline node launch preflight (logic L3, E4, L16a stage A; tech §3.3/§4.3).
+ * Pipeline node launch preflight.
  * Decides whether a node's configured agent can actually launch on the host that
  * will execute it. Read-only; called at instantiation for every node and reused
  * unchanged as the pre-dispatch revalidation before every dispatch, including
@@ -60,9 +60,9 @@ export async function validatePipelineNodeLaunch(args: {
   }
 
   const cmdOverrides = runtime.getClientSettings().agentCmdOverrides ?? {}
-  const probe = resolveEffectiveLaunchProbe(agent, cmdOverrides)
+  const probe = resolveEffectiveLaunchProbe(agent, cmdOverrides, host)
   if (!probe) {
-    return refuse(node.id, 'harness', `Agent ${agent}'s configured command override is empty.`)
+    return refuse(node.id, 'harness', `Agent ${agent}'s effective launch command is empty.`)
   }
 
   const presence = await probeAgentPresence({ agent, commands: probe.commands, host })

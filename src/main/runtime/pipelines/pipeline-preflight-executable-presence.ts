@@ -1,5 +1,5 @@
 /**
- * Host-dispatched executable presence check for preflight (tech §3.3/§4.3).
+ * Host-dispatched executable presence check for preflight.
  * Integrates three existing detection mechanisms, one per executing-host type:
  * native PATH + install-dir lookup, WSL PATH lookup, and the SSH relay's
  * `preflight.detectAgents`, whose protocol already takes a client-supplied
@@ -7,8 +7,11 @@
  */
 
 import { detectCommandsInInstallDirs } from '../../ipc/local-agent-install-dir-detection'
-import { isCommandOnPath } from '../../ipc/preflight-command-exec'
-import { detectWslCommandsOnPath } from '../../ipc/preflight-wsl-agent-detection'
+import { execCommandInWsl, isCommandOnPath } from '../../ipc/preflight-command-exec'
+import {
+  detectWslCommandsOnPath,
+  type WslPreflightTarget
+} from '../../ipc/preflight-wsl-agent-detection'
 import { getActiveMultiplexer } from '../../ipc/ssh'
 import {
   getTuiAgentDetectionProbeCommands,
@@ -66,12 +69,28 @@ async function probeOverWsl(
   commands: readonly TuiAgentDetectionCommand[],
   wslDistro: string
 ): Promise<PresenceResult> {
+  const target: WslPreflightTarget = { distro: wslDistro }
   try {
     const probes = getTuiAgentDetectionProbeCommands(commands, 'wsl')
-    const found = await detectWslCommandsOnPath({ distro: wslDistro }, probes)
-    return toPresenceResult(resolveDetectedTuiAgentIds(commands, found, 'wsl'), agent)
+    const found = await detectWslCommandsOnPath(target, probes)
+    const result = toPresenceResult(resolveDetectedTuiAgentIds(commands, found, 'wsl'), agent)
+    if (result.ok) {
+      return result
+    }
+    // detectWslCommandsOnPath swallows its own transport errors into an empty set, so an
+    // apparent miss is confirmed against a live distro before it is trusted as "not installed"
+    return (await isWslDistroReachable(target)) ? result : { ok: false, transport: true }
   } catch {
     return { ok: false, transport: true }
+  }
+}
+
+async function isWslDistroReachable(target: WslPreflightTarget): Promise<boolean> {
+  try {
+    await execCommandInWsl(target, ':')
+    return true
+  } catch {
+    return false
   }
 }
 
