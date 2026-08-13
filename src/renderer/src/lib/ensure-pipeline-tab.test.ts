@@ -188,3 +188,25 @@ describe('ensurePipelineTab', () => {
     expect(mockStoreState.createUnifiedTab).not.toHaveBeenCalled()
   })
 })
+
+describe('canEnsurePipelineTab', () => {
+  beforeEach(() => {
+    mockStoreState.activeGroupIdByWorktree = { 'wt-1': 'group-1' }
+    mockStoreState.groupsByWorktree = { 'wt-1': [{ id: 'group-1' }] }
+  })
+
+  it('is true when the workspace has a group to host a pipeline canvas', async () => {
+    const { canEnsurePipelineTab } = await import('./ensure-pipeline-tab')
+    expect(canEnsurePipelineTab('wt-1')).toBe(true)
+  })
+
+  // Regression (R6): a run-history row for a deleted workspace must be recognizable as
+  // inert instead of silently no-opping on click — this is the precondition ensurePipelineTab
+  // itself checks, exposed so callers can decide up front rather than discover it by failing.
+  it('is false for a workspace that no longer has any group — e.g. a deleted workspace', async () => {
+    mockStoreState.activeGroupIdByWorktree = {}
+    mockStoreState.groupsByWorktree = {}
+    const { canEnsurePipelineTab } = await import('./ensure-pipeline-tab')
+    expect(canEnsurePipelineTab('wt-deleted')).toBe(false)
+  })
+})

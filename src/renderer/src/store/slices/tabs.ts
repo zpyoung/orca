@@ -568,6 +568,25 @@ function deriveActiveSurfaceForWorktree(
   }
 }
 
+/**
+ * Clears the legacy terminal-scoped active-tab pointer for `worktreeId` — the state
+ * shape a pipeline tab must never be found under, since `WorkspaceVisibleTabType` has
+ * no member of its own for it. Shared by `activateTab` (folded in below, so every
+ * activation route gets this by construction) and the standalone
+ * `activatePipelineTabSurface` action some callers still call directly.
+ */
+function pipelineTabSurfaceClearPatch(
+  state: Pick<AppState, 'activeWorktreeId' | 'activeTabId' | 'activeTabIdByWorktree' | 'activeTabType' | 'activeTabTypeByWorktree'>,
+  worktreeId: string
+): Pick<AppState, 'activeTabId' | 'activeTabIdByWorktree' | 'activeTabType' | 'activeTabTypeByWorktree'> {
+  return {
+    activeTabType: state.activeWorktreeId === worktreeId ? 'terminal' : state.activeTabType,
+    activeTabTypeByWorktree: { ...state.activeTabTypeByWorktree, [worktreeId]: 'terminal' },
+    activeTabId: state.activeWorktreeId === worktreeId ? null : state.activeTabId,
+    activeTabIdByWorktree: { ...state.activeTabIdByWorktree, [worktreeId]: null }
+  }
+}
+
 function buildActiveSurfacePatch(
   state: Pick<
     AppState,
@@ -1161,18 +1180,16 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
         // Why: skip writing unreadTerminalTabs when the reference is unchanged, avoiding a no-op alloc that re-runs full-state selectors.
         ...(nextUnreadTerminalTabs !== state.unreadTerminalTabs
           ? { unreadTerminalTabs: nextUnreadTerminalTabs }
-          : {})
+          : {}),
+        // Why: folded in here (not left to each caller) so every activation route gets
+        // it — see pipelineTabSurfaceClearPatch's doc comment.
+        ...(tab.contentType === 'pipeline' ? pipelineTabSurfaceClearPatch(state, worktreeId) : {})
       }
     })
   },
 
   activatePipelineTabSurface: (worktreeId) => {
-    set((state) => ({
-      activeTabType: state.activeWorktreeId === worktreeId ? 'terminal' : state.activeTabType,
-      activeTabTypeByWorktree: { ...state.activeTabTypeByWorktree, [worktreeId]: 'terminal' },
-      activeTabId: state.activeWorktreeId === worktreeId ? null : state.activeTabId,
-      activeTabIdByWorktree: { ...state.activeTabIdByWorktree, [worktreeId]: null }
-    }))
+    set((state) => pipelineTabSurfaceClearPatch(state, worktreeId))
   },
 
   closeUnifiedTab: (tabId, opts) => {

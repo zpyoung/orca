@@ -89,6 +89,20 @@ describe('computePipelineCanvasLayout', () => {
   it('returns an empty layout for an empty node list', () => {
     expect(computePipelineCanvasLayout([])).toEqual([])
   })
+
+  // Regression (R7): depth was computed by a recursive DFS, one call frame per needs-chain
+  // link. Processing nodes in dependency order lets memoization mask this (each depth is
+  // already cached by the time the next node needs it) — the deepest node must be visited
+  // *first*, with nothing cached yet, to force the full uncached recursion depth.
+  it('lays out a very deep dependency chain without overflowing the call stack', () => {
+    const depth = 50_000
+    const ids = Array.from({ length: depth }, (_, i) => `n${i}`)
+    const nodes = deriveSequentialPipelineLayoutNodes(ids).toReversed()
+    const positions = computePipelineCanvasLayout(nodes)
+    expect(positions).toHaveLength(depth)
+    expect(positionOf(positions, 'n0').column).toBe(0)
+    expect(positionOf(positions, `n${depth - 1}`).column).toBe(depth - 1)
+  })
 })
 
 describe('deriveSequentialPipelineLayoutNodes', () => {

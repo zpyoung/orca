@@ -28,6 +28,21 @@ export function getPipelineTabForRun(
   )
 }
 
+function resolveGroupIdForPipelineTab(worktreeId: string, targetGroupId?: string): string | null {
+  const store = useAppStore.getState()
+  return (
+    targetGroupId ??
+    store.activeGroupIdByWorktree[worktreeId] ??
+    store.groupsByWorktree[worktreeId]?.[0]?.id ??
+    null
+  )
+}
+
+/** True when `worktreeId` currently has a tab group to host a pipeline canvas — false for a workspace that no longer exists (e.g. a deleted one named by stale run history). */
+export function canEnsurePipelineTab(worktreeId: string): boolean {
+  return resolveGroupIdForPipelineTab(worktreeId) !== null
+}
+
 /** One pipeline tab per run id; focuses the existing tab for a run instead of duplicating it. */
 export function ensurePipelineTab(
   worktreeId: string,
@@ -44,10 +59,7 @@ export function ensurePipelineTab(
     templateName: run.templateName,
     runNumber: run.runNumber
   })
-  const sourceGroupId =
-    options?.targetGroupId ??
-    store.activeGroupIdByWorktree[worktreeId] ??
-    store.groupsByWorktree[worktreeId]?.[0]?.id
+  const sourceGroupId = resolveGroupIdForPipelineTab(worktreeId, options?.targetGroupId)
   if (!sourceGroupId) {
     return null
   }

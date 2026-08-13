@@ -3,7 +3,9 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { useAppStore } from '@/store'
+import type * as EnsurePipelineTabModule from '@/lib/ensure-pipeline-tab'
 
 type TestTemplateEntry = {
   basename: string
@@ -47,9 +49,15 @@ vi.mock('@/runtime/runtime-rpc-client', () => ({
 }))
 
 const ensurePipelineTab = vi.fn<(..._args: unknown[]) => string | null>(() => 'tab-1')
-vi.mock('@/lib/ensure-pipeline-tab', () => ({
-  ensurePipelineTab: (...args: unknown[]) => ensurePipelineTab(...args)
-}))
+vi.mock('@/lib/ensure-pipeline-tab', async (importOriginal) => {
+  // canEnsurePipelineTab stays real (reads the real store, seeded per-test via
+  // seedLiveWorkspace) — only tab creation itself is faked.
+  const actual = await importOriginal<typeof EnsurePipelineTabModule>()
+  return {
+    ...actual,
+    ensurePipelineTab: (...args: unknown[]) => ensurePipelineTab(...args)
+  }
+})
 
 type TestResolveResult =
   | {
@@ -92,6 +100,25 @@ function setup(templates: TestTemplateEntry[]): void {
 }
 
 const target = { kind: 'local' as const }
+
+/** Seeds a tab group for `worktreeId` so canEnsurePipelineTab treats it as a live workspace. */
+function seedLiveWorkspace(worktreeId: string): void {
+  useAppStore.setState({
+    groupsByWorktree: {
+      ...useAppStore.getState().groupsByWorktree,
+      [worktreeId]: [{ id: `${worktreeId}-group`, worktreeId, activeTabId: null, tabOrder: [] }]
+    },
+    activeGroupIdByWorktree: {
+      ...useAppStore.getState().activeGroupIdByWorktree,
+      [worktreeId]: `${worktreeId}-group`
+    }
+  })
+}
+
+beforeEach(() => {
+  // default to no live workspaces — each test opts a workspace in via seedLiveWorkspace
+  useAppStore.setState({ groupsByWorktree: {}, activeGroupIdByWorktree: {} })
+})
 
 afterEach(() => {
   cleanup()
@@ -179,7 +206,7 @@ describe('PipelineStartDialog', () => {
     expect(screen.queryByText(/forward-only/i)).not.toBeInTheDocument()
   })
 
-  it('shows the submodule warning when the workspace has submodules', async () => {
+  it('shows the submodule caveat when hasSubmodules is set', async () => {
     setup([{ basename: 'a.yaml', name: 'bugfix-fast', needsNewerOrca: false }])
     render(
       <PipelineStartDialog
@@ -193,6 +220,25 @@ describe('PipelineStartDialog', () => {
     )
     await waitFor(() => expect(screen.getByText('bugfix-fast')).toBeInTheDocument())
     expect(screen.getByText(/submodule/i)).toBeInTheDocument()
+  })
+
+  // Regression (R11): the copy must stay true whether or not this repository actually
+  // has submodules — a general "if this repo has any" caveat, never an assertion that it does.
+  it('phrases the submodule caveat as conditional, not as a claim about this repository', async () => {
+    setup([{ basename: 'a.yaml', name: 'bugfix-fast', needsNewerOrca: false }])
+    render(
+      <PipelineStartDialog
+        open={true}
+        onOpenChange={() => {}}
+        worktreeSelector="id:w1"
+        target={target}
+        isFolderWorkspace={false}
+        hasSubmodules={true}
+      />
+    )
+    await waitFor(() => expect(screen.getByText('bugfix-fast')).toBeInTheDocument())
+    expect(screen.getByText(/if this repository has any/i)).toBeInTheDocument()
+    expect(screen.queryByText(/this repository has submodules/i)).not.toBeInTheDocument()
   })
 
   it('resolves the selected template and starts the run on submit', async () => {
@@ -325,6 +371,7 @@ describe('PipelineStartDialog', () => {
   })
 
   it('reopens a history run at its own workspace when clicked', async () => {
+    seedLiveWorkspace('w9')
     listRunsResult = [
       {
         runId: 'run-9',
@@ -361,6 +408,7 @@ describe('PipelineStartDialog', () => {
   })
 
   it("falls back to the dialog's own scoping workspace when a history row carries none", async () => {
+    seedLiveWorkspace('w1')
     listRunsResult = [
       {
         runId: 'run-9',
@@ -418,7 +466,8 @@ describe('PipelineStartDialog', () => {
     expect(screen.queryByRole('button', { name: /orca #3/ })).not.toBeInTheDocument()
   })
 
-  it('shows history for a run whose workspace no longer exists, even when opened from a still-live workspace (AC24)', async () => {
+  it('shows history for a run whose workspace no longer exists, presented as non-actionable rather than a silent no-op (AC24)', async () => {
+    seedLiveWorkspace('w1')
     listRunsResult = [
       {
         runId: 'run-live',
@@ -433,8 +482,10 @@ describe('PipelineStartDialog', () => {
         templateName: 'bugfix-fast',
         runNumber: 2,
         state: 'completed',
-        workspaceDisplayName: 'old-workspace'
-        // no workspaceId: the host nulls it once the owning workspace is deleted
+        workspaceDisplayName: 'old-workspace',
+        // the row still carries its original (now-dead) workspace id — it does not
+        // resolve to any currently live workspace
+        workspaceId: 'w-deleted'
       }
     ]
     setup([{ basename: 'bugfix-fast.yaml', name: 'bugfix-fast', needsNewerOrca: false }])
@@ -451,8 +502,11 @@ describe('PipelineStartDialog', () => {
     )
 
     await waitFor(() => expect(screen.getByText(/orca #1/)).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: /orca #1/ })).toBeInTheDocument()
+
     expect(screen.getByText(/old-workspace #2/)).toBeInTheDocument()
-    expect(screen.getByText(/completed/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /old-workspace #2/ })).not.toBeInTheDocument()
+    expect(screen.getByText(/workspace deleted/i)).toBeInTheDocument()
   })
 
   it('shows no history section when there are no prior runs', async () => {

@@ -621,6 +621,75 @@ describe('TabsSlice', () => {
 
       expect(store.getState().unreadTerminalTabs[t2TerminalId]).toBeUndefined()
     })
+
+    // Regression (R3, four review rounds): every activation route funnels through
+    // activateTab, so the stale-terminal-id clear belongs here rather than in each
+    // caller — a caller that forgets the companion call can no longer reintroduce the bug.
+    it('clears the stale active-terminal id when activating a pipeline tab, without a companion call', () => {
+      const terminal = store.getState().createUnifiedTab(WT, 'terminal')
+      store.setState({
+        activeWorktreeId: WT,
+        activeTabId: terminal.entityId,
+        activeTabType: 'terminal',
+        activeTabIdByWorktree: { [WT]: terminal.entityId },
+        activeTabTypeByWorktree: { [WT]: 'terminal' }
+      })
+      const pipelineTab = store.getState().createUnifiedTab(WT, 'pipeline', {
+        entityId: 'run-1',
+        label: 'bugfix-fast #1',
+        activate: false
+      })
+
+      store.getState().activateTab(pipelineTab.id)
+
+      expect(store.getState().activeTabId).toBeNull()
+      expect(store.getState().activeTabIdByWorktree[WT]).toBeNull()
+      expect(store.getState().groupsByWorktree[WT][0].activeTabId).toBe(pipelineTab.id)
+    })
+
+    it("leaves a background worktree's active-terminal id untouched when a pipeline tab activates in a different worktree", () => {
+      const OTHER_WT = 'repo1::/tmp/other'
+      const terminal = store.getState().createUnifiedTab(OTHER_WT, 'terminal')
+      store.setState({
+        activeWorktreeId: OTHER_WT,
+        activeTabId: terminal.entityId,
+        activeTabType: 'terminal',
+        activeTabIdByWorktree: { [OTHER_WT]: terminal.entityId },
+        activeTabTypeByWorktree: { [OTHER_WT]: 'terminal' }
+      })
+      const pipelineTab = store.getState().createUnifiedTab(WT, 'pipeline', {
+        entityId: 'run-1',
+        label: 'bugfix-fast #1',
+        activate: false
+      })
+
+      store.getState().activateTab(pipelineTab.id)
+
+      expect(store.getState().activeTabId).toBe(terminal.entityId)
+      expect(store.getState().activeTabIdByWorktree[OTHER_WT]).toBe(terminal.entityId)
+      expect(store.getState().activeTabIdByWorktree[WT]).toBeNull()
+    })
+
+    it('does not disturb active-terminal id when activating a non-pipeline tab', () => {
+      const terminal = store.getState().createUnifiedTab(WT, 'terminal')
+      store.setState({
+        activeWorktreeId: WT,
+        activeTabId: terminal.entityId,
+        activeTabType: 'terminal',
+        activeTabIdByWorktree: { [WT]: terminal.entityId },
+        activeTabTypeByWorktree: { [WT]: 'terminal' }
+      })
+      const editorTab = store.getState().createUnifiedTab(WT, 'editor', {
+        id: 'f.ts',
+        label: 'f.ts',
+        activate: false
+      })
+
+      store.getState().activateTab(editorTab.id)
+
+      expect(store.getState().activeTabId).toBe(terminal.entityId)
+      expect(store.getState().activeTabIdByWorktree[WT]).toBe(terminal.entityId)
+    })
   })
 
   // Ghostty "show until interact": BEL always marks unread (even focused/visible tabs); only user interaction via clearTerminalTabUnread dismisses it.

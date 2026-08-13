@@ -211,6 +211,91 @@ describe('usePipelineRunSnapshot', () => {
     expect(unsubscribeMock).toHaveBeenCalledTimes(1)
   })
 
+  // Regression (R8): the initial subscribe promise rejecting (e.g. transport not up yet)
+  // used to be neither caught nor retried, so observation never recovered even once the
+  // connection came back.
+  it('retries a rejected initial subscription with backoff, and recovers once it succeeds', async () => {
+    subscribeToPipelineRunSnapshot.mockRejectedValueOnce(new Error('transport not ready'))
+    const { result } = renderHook(() => usePipelineRunSnapshot('run-1'))
+    await flushMicrotasks()
+
+    expect(subscribeToPipelineRunSnapshot).toHaveBeenCalledTimes(1)
+    expect(result.current.subscriptionError).toEqual({
+      kind: 'transient',
+      message: 'transport not ready'
+    })
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000)
+    })
+    expect(subscribeToPipelineRunSnapshot).toHaveBeenCalledTimes(2)
+
+    act(() =>
+      deliverSnapshot?.({ runId: 'run-1', state: 'running', publishedAt: new Date().toISOString() })
+    )
+    expect(result.current.snapshot).not.toBeNull()
+    expect(result.current.subscriptionError).toBeNull()
+  })
+
+  it('does not retry after an unsupported-host error — that host will never grow the method', async () => {
+    renderHook(() => usePipelineRunSnapshot('run-1'))
+    await flushMicrotasks()
+    expect(subscribeToPipelineRunSnapshot).toHaveBeenCalledTimes(1)
+
+    act(() => deliverError?.({ kind: 'unsupported', message: 'this host has no pipelines' }))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000)
+    })
+
+    expect(subscribeToPipelineRunSnapshot).toHaveBeenCalledTimes(1)
+  })
+
+  it('retries after a transient error reported once a subscription is already established', async () => {
+    renderHook(() => usePipelineRunSnapshot('run-1'))
+    await flushMicrotasks()
+    expect(subscribeToPipelineRunSnapshot).toHaveBeenCalledTimes(1)
+
+    act(() => deliverError?.({ kind: 'transient', message: 'connection dropped' }))
+    expect(unsubscribeMock).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000)
+    })
+    expect(subscribeToPipelineRunSnapshot).toHaveBeenCalledTimes(2)
+  })
+
+  it('never leaks a pending retry timer past unmount', async () => {
+    subscribeToPipelineRunSnapshot.mockRejectedValueOnce(new Error('transport not ready'))
+    const { unmount } = renderHook(() => usePipelineRunSnapshot('run-1'))
+    await flushMicrotasks()
+    expect(subscribeToPipelineRunSnapshot).toHaveBeenCalledTimes(1)
+
+    unmount()
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000)
+    })
+
+    expect(subscribeToPipelineRunSnapshot).toHaveBeenCalledTimes(1)
+  })
+
+  it('never leaks a pending retry timer into the next runId after a rejection', async () => {
+    subscribeToPipelineRunSnapshot.mockRejectedValueOnce(new Error('transport not ready'))
+    const { rerender } = renderHook(({ runId }) => usePipelineRunSnapshot(runId), {
+      initialProps: { runId: 'run-1' }
+    })
+    await flushMicrotasks()
+    expect(subscribeToPipelineRunSnapshot).toHaveBeenCalledTimes(1)
+
+    rerender({ runId: 'run-2' })
+    await flushMicrotasks()
+    // the run-1 attempt's retry must not fire and add a spurious third call once run-2 is active
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000)
+    })
+
+    expect(subscribeToPipelineRunSnapshot).toHaveBeenCalledTimes(2)
+  })
+
   it("subscribes to the run's owning workspace host, not the globally selected environment", async () => {
     pipelineRunsById = { 'run-1': { workspaceId: 'workspace-A' } }
     runtimeEnvironmentIdByWorktreeId = { 'workspace-A': 'env-A' }
