@@ -138,13 +138,20 @@ export async function executeLocalWorkerStart(
         worktreeId,
         effects
       })
+      // recordSpawnAttempt must land before the PTY spawn call: its absence after a
+      // failure is positive proof nothing spawned (L16a stage B).
+      db.recordSpawnAttempt(started.dispatch.id)
       const terminal = await createExistingWorktreeWorkerTerminal({
         runtime,
         worktreeId,
         agent: args.agent,
         launchPreferences: args.launchPreferences,
         taskId: task.id,
-        effects
+        effects,
+        onPtySpawnCommitted: () => {
+          db.markSpawnCommitted(started.dispatch.id)
+          args.onPtySpawnCommitted?.()
+        }
       })
       terminalHandle = terminal.handle
       terminalRevealWarning = terminal.warning
