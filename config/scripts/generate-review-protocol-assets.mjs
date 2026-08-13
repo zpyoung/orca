@@ -33,6 +33,25 @@ function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex')
 }
 
+function describeNonRegularEntry(entry) {
+  if (entry.isSymbolicLink()) {
+    return 'symlink'
+  }
+  if (entry.isFIFO()) {
+    return 'FIFO'
+  }
+  if (entry.isSocket()) {
+    return 'socket'
+  }
+  if (entry.isCharacterDevice()) {
+    return 'character device'
+  }
+  if (entry.isBlockDevice()) {
+    return 'block device'
+  }
+  return 'neither a file nor a directory'
+}
+
 async function listFilesRecursive(root) {
   const files = []
   async function walk(dir) {
@@ -42,6 +61,10 @@ async function listFilesRecursive(root) {
         await walk(entryPath)
       } else if (entry.isFile()) {
         files.push(entryPath)
+      } else {
+        throw new Error(
+          `Unexpected ${describeNonRegularEntry(entry)} in vendored protocol tree: ${entryPath}`
+        )
       }
     }
   }
@@ -187,9 +210,44 @@ async function verifyArtifacts(artifacts, repoRoot = REPO_ROOT) {
   }
 }
 
+const PIN_DOCUMENTED_CONSTANTS = [
+  ['UPSTREAM_PIN_VERSION', UPSTREAM_PIN_VERSION],
+  ['UPSTREAM_SCRIPT_SHA256', UPSTREAM_SCRIPT_SHA256],
+  ['UPSTREAM_SKILL_DIR_SHA256', UPSTREAM_SKILL_DIR_SHA256],
+  ['ORCA_REVIEW_PROTOCOL_VERSION', ORCA_REVIEW_PROTOCOL_VERSION]
+]
+
+function extractPinConstant(pinContent, constantName) {
+  const match = pinContent.match(new RegExp(`${constantName}\\s*=\\s*'([^']*)'`))
+  if (!match) {
+    throw new Error(`PIN.md does not record a value for ${constantName}.`)
+  }
+  return match[1]
+}
+
+// PIN.md is excluded from the digest (see computeSkillDirHash) so it can drift
+// from the constants it documents without failing verification; this checks
+// the two sources of truth agree, independent of the digest.
+async function verifyPinDocumentation(protocolDir) {
+  const pinContent = await readFile(path.join(protocolDir, PIN_FILE_NAME), 'utf8')
+  for (const [name, expected] of PIN_DOCUMENTED_CONSTANTS) {
+    const documented = extractPinConstant(pinContent, name)
+    if (documented !== expected) {
+      throw new Error(
+        `PIN.md documents ${name} = '${documented}' but the generator's authoritative value is '${expected}'.`
+      )
+    }
+  }
+}
+
 async function main() {
   const artifacts = await buildArtifacts()
-  await (process.argv.includes('--write') ? writeArtifacts : verifyArtifacts)(artifacts)
+  if (process.argv.includes('--write')) {
+    await writeArtifacts(artifacts)
+    return
+  }
+  await verifyArtifacts(artifacts)
+  await verifyPinDocumentation(path.join(REPO_ROOT, 'protocol', PROTOCOL_SNAPSHOT_NAME))
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
@@ -208,5 +266,6 @@ export {
   buildArtifacts,
   computeSkillDirHash,
   verifyArtifacts,
+  verifyPinDocumentation,
   writeArtifacts
 }

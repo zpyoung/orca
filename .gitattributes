@@ -12,3 +12,7 @@
 /src/cli/bundled-skill-guides.ts text eol=lf
 # Bundled plugin trees are byte-hashed; CRLF checkout would break the pinned hash.
 /resources/plugins/** text eol=lf
+# Vendored protocol snapshot is byte-hashed; CRLF checkout would break the pinned digest.
+/protocol/adversarial-review@2026.7.31/** text eol=lf
+# Generated from the byte-hashed snapshot above; check mode compares checked-out bytes to freshly generated content.
+/src/shared/review/protocol-assets.ts text eol=lf

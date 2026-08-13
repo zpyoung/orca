@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -10,6 +10,7 @@ import {
   buildArtifacts,
   computeSkillDirHash,
   verifyArtifacts,
+  verifyPinDocumentation,
   writeArtifacts
 } from './generate-review-protocol-assets.mjs'
 
@@ -111,5 +112,54 @@ describe('review protocol asset generator', () => {
     await writeFile(path.join(tamperedProtocolRoot, 'assets', 'promote-prompt.md'), 'tampered\n')
 
     await expect(buildArtifacts(root)).rejects.toThrow(/directory hash/i)
+  })
+
+  it('rejects a symlink planted under the vendored tree instead of silently skipping it', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'orca-review-protocol-assets-'))
+    temporaryDirectories.push(root)
+    const { cp } = await import('node:fs/promises')
+    const tamperedProtocolRoot = path.join(root, 'protocol', 'adversarial-review@2026.7.31')
+    await cp(protocolDir, tamperedProtocolRoot, { recursive: true })
+    const escapeLinkPath = path.join(tamperedProtocolRoot, 'assets', 'escape.md')
+    await symlink('/etc/passwd', escapeLinkPath)
+
+    await expect(computeSkillDirHash(tamperedProtocolRoot)).rejects.toThrow(
+      new RegExp(escapeLinkPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    )
+  })
+
+  it('verifies PIN.md documentation against the authoritative constants', async () => {
+    await expect(verifyPinDocumentation(protocolDir)).resolves.toBeUndefined()
+  })
+
+  it('fails fast with a specific message when PIN.md drifts from a recorded constant', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'orca-review-protocol-assets-'))
+    temporaryDirectories.push(root)
+    const { cp } = await import('node:fs/promises')
+    const tamperedProtocolRoot = path.join(root, 'protocol', 'adversarial-review@2026.7.31')
+    await cp(protocolDir, tamperedProtocolRoot, { recursive: true })
+    const pinPath = path.join(tamperedProtocolRoot, 'PIN.md')
+    const pinContent = await readFile(pinPath, 'utf8')
+    await writeFile(
+      pinPath,
+      pinContent.replace(
+        "UPSTREAM_SCRIPT_SHA256 = '886e59af7bda5f6741563788ee74d7b7e667f5a5eeea5555859aa6bcd8ea6ba5'",
+        "UPSTREAM_SCRIPT_SHA256 = '0000000000000000000000000000000000000000000000000000000000000000'"
+      )
+    )
+
+    await expect(verifyPinDocumentation(tamperedProtocolRoot)).rejects.toThrow(/UPSTREAM_SCRIPT_SHA256/)
+  })
+
+  it('tolerates an unrelated prose edit appended to PIN.md', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'orca-review-protocol-assets-'))
+    temporaryDirectories.push(root)
+    const { cp } = await import('node:fs/promises')
+    const tamperedProtocolRoot = path.join(root, 'protocol', 'adversarial-review@2026.7.31')
+    await cp(protocolDir, tamperedProtocolRoot, { recursive: true })
+    const pinPath = path.join(tamperedProtocolRoot, 'PIN.md')
+    await writeFile(pinPath, `${await readFile(pinPath, 'utf8')}\nAn unrelated clarifying sentence.\n`)
+
+    await expect(verifyPinDocumentation(tamperedProtocolRoot)).resolves.toBeUndefined()
   })
 })
