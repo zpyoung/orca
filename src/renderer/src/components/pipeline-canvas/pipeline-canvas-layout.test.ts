@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   computePipelineCanvasLayout,
+  derivePipelineLayoutNodes,
   deriveSequentialPipelineLayoutNodes,
   type PipelineLayoutNode
 } from './pipeline-canvas-layout'
@@ -106,5 +107,41 @@ describe('deriveSequentialPipelineLayoutNodes', () => {
       deriveSequentialPipelineLayoutNodes(['repro', 'fix', 'test', 'pr'])
     )
     expect(positions.map((p) => p.column)).toEqual([0, 1, 2, 3])
+  })
+})
+
+describe('derivePipelineLayoutNodes', () => {
+  it('uses the real needs edges when every node carries a needs array', () => {
+    // 'merge' needs both 'a' and 'b' — a chain fallback would invent an a->b edge that
+    // does not exist and misplace 'merge' relative to the actual DAG.
+    const nodes = derivePipelineLayoutNodes([
+      { id: 'a', needs: [] },
+      { id: 'b', needs: [] },
+      { id: 'merge', needs: ['a', 'b'] }
+    ])
+    expect(nodes).toEqual([
+      { id: 'a', needs: [] },
+      { id: 'b', needs: [] },
+      { id: 'merge', needs: ['a', 'b'] }
+    ])
+    const positions = computePipelineCanvasLayout(nodes)
+    expect(positions.find((p) => p.id === 'a')?.column).toBe(0)
+    expect(positions.find((p) => p.id === 'b')?.column).toBe(0)
+    expect(positions.find((p) => p.id === 'merge')?.column).toBe(1)
+  })
+
+  it('falls back to sequential list order when any node lacks a needs array', () => {
+    // an older host omits `needs` on the wire entirely (optional-field evolution) —
+    // degrade to today's chain-by-list-order behavior rather than misreading a merge.
+    const nodes = derivePipelineLayoutNodes([
+      { id: 'a' },
+      { id: 'b' },
+      { id: 'merge', needs: ['a', 'b'] }
+    ])
+    expect(nodes).toEqual(deriveSequentialPipelineLayoutNodes(['a', 'b', 'merge']))
+  })
+
+  it('returns an empty layout-node list for no nodes', () => {
+    expect(derivePipelineLayoutNodes([])).toEqual([])
   })
 })

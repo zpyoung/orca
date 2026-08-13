@@ -22,6 +22,10 @@ export type PipelineRunSnapshotPayload = {
 
 type LiveSubscription = { unsubscribe: () => void }
 
+// A renderer that keeps calling subscribe with fresh ids (bug or otherwise) must not grow this
+// map without bound — each entry retains a host publisher subscriber.
+export const MAX_PIPELINE_SUBSCRIPTIONS_PER_SENDER = 64
+
 // Why: subscriptions are keyed by (webContents.id, subscriptionId) so a window
 // watching several runs tears down only what it asked to, and a destroyed
 // window releases every host-side watcher it owns — a subscription leak on
@@ -89,6 +93,15 @@ function handleSubscribe(
   // Replace any prior subscription under the same id (run change/resubscribe).
   teardownSubscription(sender.id, subscriptionId)
   registerSenderCleanup(sender)
+
+  const liveCount = liveSubscriptions.get(sender.id)?.size ?? 0
+  if (liveCount >= MAX_PIPELINE_SUBSCRIPTIONS_PER_SENDER) {
+    sendFrame(sender, subscriptionId, {
+      type: 'error',
+      error: `too many active pipeline subscriptions for this window (limit ${MAX_PIPELINE_SUBSCRIPTIONS_PER_SENDER})`
+    })
+    return
+  }
 
   let unsubscribe: () => void
   try {

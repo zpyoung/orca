@@ -4,6 +4,7 @@ import '@testing-library/jest-dom/vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { PipelineRunSnapshotWire } from '../../../../shared/pipeline-run-snapshot'
+import type { PipelineRunSubscriptionError } from '@/runtime/pipeline-run-client'
 
 vi.mock('@/store', () => ({
   useAppStore: (selector: (state: Record<string, unknown>) => unknown) =>
@@ -14,7 +15,8 @@ let mockedHookResult: {
   snapshot: PipelineRunSnapshotWire | null
   runState: string | null
   isStale: boolean
-} = { snapshot: null, runState: null, isStale: false }
+  subscriptionError: PipelineRunSubscriptionError | null
+} = { snapshot: null, runState: null, isStale: false, subscriptionError: null }
 
 vi.mock('./usePipelineRunSnapshot', () => ({
   usePipelineRunSnapshot: () => mockedHookResult
@@ -29,7 +31,7 @@ import PipelineCanvas from './PipelineCanvas'
 
 afterEach(() => {
   cleanup()
-  mockedHookResult = { snapshot: null, runState: null, isStale: false }
+  mockedHookResult = { snapshot: null, runState: null, isStale: false, subscriptionError: null }
 })
 
 describe('PipelineCanvas', () => {
@@ -38,11 +40,48 @@ describe('PipelineCanvas', () => {
     expect(screen.getByText('run-1')).toBeInTheDocument()
   })
 
+  it('shows an unsupported-host message instead of the blank loading placeholder', () => {
+    mockedHookResult = {
+      snapshot: null,
+      runState: null,
+      isStale: false,
+      subscriptionError: { kind: 'unsupported', message: 'Unknown method: pipeline.subscribe' }
+    }
+    render(<PipelineCanvas runId="run-1" />)
+    expect(screen.getByText(/does not support pipelines/i)).toBeInTheDocument()
+    expect(screen.queryByText(/could not reach/i)).not.toBeInTheDocument()
+  })
+
+  it('shows a distinct transient-error message before any snapshot has arrived', () => {
+    mockedHookResult = {
+      snapshot: null,
+      runState: null,
+      isStale: false,
+      subscriptionError: { kind: 'transient', message: 'socket closed' }
+    }
+    render(<PipelineCanvas runId="run-1" />)
+    expect(screen.getByText(/could not reach/i)).toBeInTheDocument()
+    expect(screen.queryByText(/does not support pipelines/i)).not.toBeInTheDocument()
+  })
+
+  it('keeps rendering the run once a snapshot exists even if a later subscription error occurs', () => {
+    mockedHookResult = {
+      snapshot: { runId: 'run-1', templateName: 'bugfix-fast', runNumber: 4, state: 'running' },
+      runState: 'running',
+      isStale: false,
+      subscriptionError: { kind: 'transient', message: 'socket closed' }
+    }
+    render(<PipelineCanvas runId="run-1" />)
+    expect(screen.getByText(/bugfix-fast/)).toBeInTheDocument()
+    expect(screen.getByText(/could not reach/i)).toBeInTheDocument()
+  })
+
   it('shows the template name, run number, and run state once a snapshot arrives', () => {
     mockedHookResult = {
       snapshot: { runId: 'run-1', templateName: 'bugfix-fast', runNumber: 4, state: 'running' },
       runState: 'running',
-      isStale: false
+      isStale: false,
+      subscriptionError: null
     }
     render(<PipelineCanvas runId="run-1" />)
     expect(screen.getByText(/bugfix-fast/)).toBeInTheDocument()
@@ -54,7 +93,8 @@ describe('PipelineCanvas', () => {
     mockedHookResult = {
       snapshot: { runId: 'run-1', needsNewerOrca: true, state: 'running' },
       runState: 'running',
-      isStale: false
+      isStale: false,
+      subscriptionError: null
     }
     render(<PipelineCanvas runId="run-1" />)
     expect(screen.getByText(/may need a newer Orca/i)).toBeInTheDocument()
@@ -64,7 +104,8 @@ describe('PipelineCanvas', () => {
     mockedHookResult = {
       snapshot: { runId: 'run-1', needsNewerOrca: false, state: 'running' },
       runState: 'running',
-      isStale: false
+      isStale: false,
+      subscriptionError: null
     }
     render(<PipelineCanvas runId="run-1" />)
     expect(screen.queryByText(/may need a newer Orca/i)).not.toBeInTheDocument()
@@ -74,7 +115,8 @@ describe('PipelineCanvas', () => {
     mockedHookResult = {
       snapshot: { runId: 'run-1', state: 'running', publishedAt: new Date().toISOString() },
       runState: 'running',
-      isStale: true
+      isStale: true,
+      subscriptionError: null
     }
     render(<PipelineCanvas runId="run-1" />)
     expect(screen.getByText(/last confirmed/i)).toBeInTheDocument()
@@ -84,7 +126,8 @@ describe('PipelineCanvas', () => {
     mockedHookResult = {
       snapshot: { runId: 'run-1', state: 'running', publishedAt: new Date().toISOString() },
       runState: 'running',
-      isStale: false
+      isStale: false,
+      subscriptionError: null
     }
     render(<PipelineCanvas runId="run-1" />)
     expect(screen.queryByText(/last confirmed/i)).not.toBeInTheDocument()
@@ -101,7 +144,8 @@ describe('PipelineCanvas', () => {
         ]
       },
       runState: 'running',
-      isStale: false
+      isStale: false,
+      subscriptionError: null
     }
     render(<PipelineCanvas runId="run-1" />)
     expect(screen.getByText('Reproduce')).toBeInTheDocument()
@@ -119,7 +163,8 @@ describe('PipelineCanvas', () => {
         nodes: [{ id: 'fix', title: 'Fix', status: 'running', startedAt }]
       },
       runState: 'running',
-      isStale: false
+      isStale: false,
+      subscriptionError: null
     }
     render(<PipelineCanvas runId="run-1" />)
     expect(screen.getByText(/^1m 0[0-9]s$/)).toBeInTheDocument()
@@ -134,7 +179,8 @@ describe('PipelineCanvas', () => {
         nodes: [{ id: 'fix', title: 'Fix', status: 'running' }]
       },
       runState: 'running',
-      isStale: false
+      isStale: false,
+      subscriptionError: null
     }
     render(<PipelineCanvas runId="run-1" />)
     expect(screen.queryByText(/^\d+(m \d+)?s$/)).not.toBeInTheDocument()
@@ -144,7 +190,8 @@ describe('PipelineCanvas', () => {
     mockedHookResult = {
       snapshot: { runId: 'run-1', state: 'running' },
       runState: 'running',
-      isStale: false
+      isStale: false,
+      subscriptionError: null
     }
     render(<PipelineCanvas runId="run-1" />)
     expect(screen.getByRole('button', { name: /pause/i })).toBeInTheDocument()
@@ -154,7 +201,8 @@ describe('PipelineCanvas', () => {
     mockedHookResult = {
       snapshot: { runId: 'run-1', state: 'completed' },
       runState: 'completed',
-      isStale: false
+      isStale: false,
+      subscriptionError: null
     }
     render(<PipelineCanvas runId="run-1" />)
     expect(screen.queryByRole('button', { name: /pause/i })).not.toBeInTheDocument()

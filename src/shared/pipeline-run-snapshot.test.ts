@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   decodePipelineNodeStatus,
+  decodePipelineRunSnapshotWire,
   decodePipelineRunState,
   derivePipelineNodeStatus,
   type PipelineNodeObservables,
@@ -220,5 +221,61 @@ describe('decodePipelineRunState', () => {
     expect(() => decodePipelineRunState('some-future-state')).not.toThrow()
     expect(decodePipelineRunState('some-future-state')).toBe('unknown')
     expect(decodePipelineRunState(undefined)).toBe('unknown')
+  })
+})
+
+describe('decodePipelineRunSnapshotWire', () => {
+  it('passes through a well-formed snapshot unchanged', () => {
+    const raw = {
+      runId: 'run_1',
+      templateName: 'bugfix-fast',
+      runNumber: 4,
+      state: 'running',
+      nodes: [{ id: 'repro', status: 'running', attempt: 1, needs: [] }]
+    }
+    expect(decodePipelineRunSnapshotWire(raw)).toEqual(raw)
+  })
+
+  it('rejects a payload with no string runId', () => {
+    expect(decodePipelineRunSnapshotWire({ nodes: [] })).toBeNull()
+    expect(decodePipelineRunSnapshotWire({ runId: 42 })).toBeNull()
+    expect(decodePipelineRunSnapshotWire(null)).toBeNull()
+    expect(decodePipelineRunSnapshotWire('run_1')).toBeNull()
+    expect(decodePipelineRunSnapshotWire(undefined)).toBeNull()
+  })
+
+  it('drops a non-array nodes field instead of throwing or forwarding it', () => {
+    expect(() => decodePipelineRunSnapshotWire({ runId: 'run_1', nodes: {} })).not.toThrow()
+    const decoded = decodePipelineRunSnapshotWire({ runId: 'run_1', nodes: { 0: { id: 'repro' } } })
+    expect(decoded).toEqual({ runId: 'run_1' })
+  })
+
+  it('drops a node missing a string id rather than passing a broken entry through', () => {
+    const decoded = decodePipelineRunSnapshotWire({
+      runId: 'run_1',
+      nodes: [{ status: 'running' }, { id: 'fix', status: 'waiting' }]
+    })
+    expect(decoded?.nodes).toEqual([{ id: 'fix', status: 'waiting' }])
+  })
+
+  it('drops a wrong-typed attempt field but keeps the rest of the node', () => {
+    const decoded = decodePipelineRunSnapshotWire({
+      runId: 'run_1',
+      nodes: [{ id: 'fix', status: 'running', attempt: 'two' }]
+    })
+    expect(decoded?.nodes).toEqual([{ id: 'fix', status: 'running' }])
+  })
+
+  it('drops a needs array containing non-string entries', () => {
+    const decoded = decodePipelineRunSnapshotWire({
+      runId: 'run_1',
+      nodes: [{ id: 'fix', needs: ['repro', 7] }]
+    })
+    expect(decoded?.nodes).toEqual([{ id: 'fix' }])
+  })
+
+  it('drops a wrong-typed top-level field but keeps the rest of the snapshot', () => {
+    const decoded = decodePipelineRunSnapshotWire({ runId: 'run_1', runNumber: 'four', state: 'running' })
+    expect(decoded).toEqual({ runId: 'run_1', state: 'running' })
   })
 })

@@ -4,7 +4,10 @@ import {
   type PipelineRunSnapshotWire,
   type PipelineRunState
 } from '../../../../shared/pipeline-run-snapshot'
-import { subscribeToPipelineRunSnapshot } from '@/runtime/pipeline-run-client'
+import {
+  subscribeToPipelineRunSnapshot,
+  type PipelineRunSubscriptionError
+} from '@/runtime/pipeline-run-client'
 import { getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import { useAppStore } from '@/store'
 
@@ -21,6 +24,7 @@ export type PipelineRunSnapshotState = {
   snapshot: PipelineRunSnapshotWire | null
   runState: PipelineRunState | 'unknown' | null
   isStale: boolean
+  subscriptionError: PipelineRunSubscriptionError | null
 }
 
 /**
@@ -36,11 +40,15 @@ export function usePipelineRunSnapshot(runId: string): PipelineRunSnapshotState 
   const upsertPipelineRunFromSnapshot = useAppStore((state) => state.upsertPipelineRunFromSnapshot)
   const [snapshot, setSnapshot] = useState<PipelineRunSnapshotWire | null>(null)
   const [isStale, setIsStale] = useState(false)
+  const [subscriptionError, setSubscriptionError] = useState<PipelineRunSubscriptionError | null>(
+    null
+  )
 
   useEffect(() => {
     let disposed = false
     setSnapshot(null)
     setIsStale(false)
+    setSubscriptionError(null)
 
     const target = getActiveRuntimeTarget({ activeRuntimeEnvironmentId })
     let subscription: { unsubscribe: () => void } | null = null
@@ -54,10 +62,15 @@ export function usePipelineRunSnapshot(runId: string): PipelineRunSnapshotState 
         }
         setSnapshot(next)
         setIsStale(false)
+        setSubscriptionError(null)
         upsertPipelineRunFromSnapshot(next)
       },
       (error) => {
+        if (disposed) {
+          return
+        }
         console.warn('[usePipelineRunSnapshot] subscription error:', error)
+        setSubscriptionError(error)
       }
     ).then((handle) => {
       if (disposed) {
@@ -95,6 +108,7 @@ export function usePipelineRunSnapshot(runId: string): PipelineRunSnapshotState 
   return {
     snapshot,
     runState: snapshot ? decodePipelineRunState(snapshot.state) : null,
-    isStale
+    isStale,
+    subscriptionError
   }
 }

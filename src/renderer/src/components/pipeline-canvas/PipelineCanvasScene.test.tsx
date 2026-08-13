@@ -124,6 +124,25 @@ describe('PipelineCanvasScene', () => {
     expect(container.querySelectorAll('[data-pipeline-edge]')).toHaveLength(2)
   })
 
+  it('draws edges from real needs data instead of inventing a list-order chain', () => {
+    // 'merge' needs both 'a' and 'b'; a sequential-chain fallback would draw a->b
+    // and b->merge (2 edges, the wrong ones) instead of a->merge and b->merge.
+    const { container } = render(
+      <PipelineCanvasScene
+        nodes={[
+          node({ id: 'a', status: 'succeeded', needs: [] }),
+          node({ id: 'b', status: 'succeeded', needs: [] }),
+          node({ id: 'merge', status: 'running', needs: ['a', 'b'] })
+        ]}
+        pausing={false}
+      />
+    )
+    const edgeKeys = Array.from(container.querySelectorAll('[data-pipeline-edge]')).map((el) =>
+      el.getAttribute('data-edge')
+    )
+    expect(edgeKeys.sort()).toEqual(['a->merge', 'b->merge'])
+  })
+
   it('renders titles for every node', () => {
     render(
       <PipelineCanvasScene

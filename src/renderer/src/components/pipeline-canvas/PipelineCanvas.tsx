@@ -1,3 +1,4 @@
+import { AlertTriangle } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AgentMapViewportControls } from '@/components/dashboard-popout/AgentMapViewportControls'
 import { clamp } from '@/components/dashboard-popout/agent-map-canvas-zoom'
@@ -7,6 +8,7 @@ import { useAgentMapViewportTransition } from '@/components/dashboard-popout/use
 import { useNow } from '@/components/dashboard/useNow'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import { translate } from '@/i18n/i18n'
+import type { PipelineRunSubscriptionError } from '@/runtime/pipeline-run-client'
 import { getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import { useAppStore } from '@/store'
 import type { PipelineRunState } from '../../../../shared/pipeline-run-snapshot'
@@ -67,12 +69,24 @@ function relativeTimeFrom(iso: string | undefined): string {
   })
 }
 
+function subscriptionErrorHeadline(kind: PipelineRunSubscriptionError['kind']): string {
+  return kind === 'unsupported'
+    ? translate(
+        'auto.components.pipeline.canvas.PipelineCanvas.unsupportedHost',
+        'This host does not support pipelines'
+      )
+    : translate(
+        'auto.components.pipeline.canvas.PipelineCanvas.transientSubscriptionError',
+        'Could not reach the pipeline run'
+      )
+}
+
 /**
  * Tab surface for a pipeline run: viewport wiring, run-state header, the
  * "needs a newer Orca" banner, and staleness chrome over the live node scene.
  */
 export default function PipelineCanvas({ runId }: { runId: string }): React.JSX.Element {
-  const { snapshot, runState, isStale } = usePipelineRunSnapshot(runId)
+  const { snapshot, runState, isStale, subscriptionError } = usePipelineRunSnapshot(runId)
   const activeRuntimeEnvironmentId = useAppStore(
     (state) => state.settings?.activeRuntimeEnvironmentId ?? null
   )
@@ -163,6 +177,17 @@ export default function PipelineCanvas({ runId }: { runId: string }): React.JSX.
   const now = useNow(ELAPSED_TICK_MS)
 
   if (!snapshot) {
+    if (subscriptionError) {
+      return (
+        <div className="flex flex-1 flex-col items-center justify-center gap-1 bg-background text-center">
+          <AlertTriangle className="mb-1 size-7 text-muted-foreground" />
+          <p className="text-sm font-medium text-foreground">
+            {subscriptionErrorHeadline(subscriptionError.kind)}
+          </p>
+          <p className="max-w-sm text-xs text-muted-foreground">{subscriptionError.message}</p>
+        </div>
+      )
+    }
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-1 bg-background text-muted-foreground">
         <p className="text-sm font-medium">
@@ -216,6 +241,11 @@ export default function PipelineCanvas({ runId }: { runId: string }): React.JSX.
             'auto.components.pipeline.canvas.PipelineCanvas.needsNewerOrca',
             'This template may need a newer Orca'
           )}
+        </p>
+      )}
+      {subscriptionError && (
+        <p className="border-b border-border bg-muted px-4 py-1 text-xs text-muted-foreground">
+          {subscriptionErrorHeadline(subscriptionError.kind)}
         </p>
       )}
       <div ref={containerRef} className="scrollbar-sleek relative min-h-0 flex-1 overflow-auto">

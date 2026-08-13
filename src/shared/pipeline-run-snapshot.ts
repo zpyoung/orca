@@ -44,6 +44,7 @@ export type PipelineRunSnapshotWire = {
     endedAt?: string
     limitBreached?: boolean
     limitMinutes?: number
+    needs?: string[]
   }[]
 }
 
@@ -103,4 +104,76 @@ export function decodePipelineRunState(tag: string | undefined): PipelineRunStat
   return (RUN_STATE_VALUES as readonly string[]).includes(tag as string)
     ? (tag as PipelineRunState)
     : 'unknown'
+}
+
+type PipelineRunSnapshotWireNode = NonNullable<PipelineRunSnapshotWire['nodes']>[number]
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function readOptionalString(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key]
+  return typeof value === 'string' ? value : undefined
+}
+
+function readOptionalNumber(record: Record<string, unknown>, key: string): number | undefined {
+  const value = record[key]
+  return typeof value === 'number' ? value : undefined
+}
+
+function readOptionalBoolean(record: Record<string, unknown>, key: string): boolean | undefined {
+  const value = record[key]
+  return typeof value === 'boolean' ? value : undefined
+}
+
+function assignIfPresent<T, K extends keyof T>(target: T, key: K, value: T[K] | undefined): void {
+  if (value !== undefined) {
+    target[key] = value
+  }
+}
+
+function decodePipelineSnapshotNode(raw: unknown): PipelineRunSnapshotWireNode | null {
+  if (!isRecord(raw) || typeof raw.id !== 'string') {
+    return null
+  }
+  const node: PipelineRunSnapshotWireNode = { id: raw.id }
+  assignIfPresent(node, 'title', readOptionalString(raw, 'title'))
+  assignIfPresent(node, 'status', readOptionalString(raw, 'status'))
+  assignIfPresent(node, 'attempt', readOptionalNumber(raw, 'attempt'))
+  assignIfPresent(node, 'attemptsAllowed', readOptionalNumber(raw, 'attemptsAllowed'))
+  assignIfPresent(node, 'startedAt', readOptionalString(raw, 'startedAt'))
+  assignIfPresent(node, 'endedAt', readOptionalString(raw, 'endedAt'))
+  assignIfPresent(node, 'limitBreached', readOptionalBoolean(raw, 'limitBreached'))
+  assignIfPresent(node, 'limitMinutes', readOptionalNumber(raw, 'limitMinutes'))
+  if (Array.isArray(raw.needs) && raw.needs.every((id) => typeof id === 'string')) {
+    node.needs = raw.needs as string[]
+  }
+  return node
+}
+
+/**
+ * Structural admission for a `pipeline.subscribe` payload from either transport: rejects
+ * outright only when `runId` itself isn't a string, and otherwise drops (never forwards)
+ * any field or node whose shape doesn't match — the wire's non-identifying fields are
+ * optional by design (host version skew), so a malformed one must degrade, not throw.
+ */
+export function decodePipelineRunSnapshotWire(raw: unknown): PipelineRunSnapshotWire | null {
+  if (!isRecord(raw) || typeof raw.runId !== 'string') {
+    return null
+  }
+  const snapshot: PipelineRunSnapshotWire = { runId: raw.runId }
+  assignIfPresent(snapshot, 'templateName', readOptionalString(raw, 'templateName'))
+  assignIfPresent(snapshot, 'runNumber', readOptionalNumber(raw, 'runNumber'))
+  assignIfPresent(snapshot, 'needsNewerOrca', readOptionalBoolean(raw, 'needsNewerOrca'))
+  assignIfPresent(snapshot, 'state', readOptionalString(raw, 'state'))
+  assignIfPresent(snapshot, 'failureReason', readOptionalString(raw, 'failureReason'))
+  assignIfPresent(snapshot, 'publishedAt', readOptionalString(raw, 'publishedAt'))
+  assignIfPresent(snapshot, 'pausing', readOptionalBoolean(raw, 'pausing'))
+  if (Array.isArray(raw.nodes)) {
+    snapshot.nodes = raw.nodes
+      .map((node) => decodePipelineSnapshotNode(node))
+      .filter((node): node is PipelineRunSnapshotWireNode => node !== null)
+  }
+  return snapshot
 }
