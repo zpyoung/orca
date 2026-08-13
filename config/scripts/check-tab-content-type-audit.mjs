@@ -55,9 +55,13 @@ export function parseAllowlist(text) {
   )
 }
 
-/** Every tracked file the sweep hits, mapped to whether it self-clears the gate. */
+/** Every file the sweep hits, mapped to whether it self-clears the gate. */
 export function collectSweepHits(root = process.cwd()) {
-  const tracked = execFileSync('git', ['ls-files', '*.ts', '*.tsx'], {
+  // Why: a brand-new consumer is untracked until it is committed, which is exactly
+  // when this gate still has time to be useful — scanning tracked files alone let
+  // one through a full local `lint` and only failed after the commit.
+  const listed = ['ls-files', '--cached', '--others', '--exclude-standard', '*.ts', '*.tsx']
+  const candidates = execFileSync('git', listed, {
     cwd: root,
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024
@@ -68,7 +72,7 @@ export function collectSweepHits(root = process.cwd()) {
     .filter((rel) => rel !== EXHAUSTIVE_MODULE_PATH)
 
   const hits = []
-  for (const rel of tracked) {
+  for (const rel of new Set(candidates)) {
     let src
     try {
       src = fs.readFileSync(path.join(root, rel), 'utf8')
