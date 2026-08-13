@@ -15,6 +15,7 @@ import {
   type PipelinePrelaunchStage
 } from './pipeline-driver-stage-classify'
 import type { PipelineCheckpointInfo } from './pipeline-driver-types'
+import { verifyPtyStopped } from './pipeline-driver-verified-stop'
 
 export type FailedAttemptContext = {
   node: ResolvedPipelineNode
@@ -162,12 +163,20 @@ export async function resolveFailedAttempt(args: {
  * in flight (host recovery abandoning a missing worker terminal; an unexpected agent exit) has
  * no `retryOf`-eligible landing — `retryOf` requires the task in {failed, blocked}. Re-dispatch
  * it plainly instead, consuming a pipeline attempt like any other observed failure.
+ *
+ * An attempt was already dispatched, so its terminal may still be live — gate the re-dispatch on
+ * the same verified stop a stage-C retry requires, failing terminally when it can't be confirmed.
  */
 export async function resolveReadiedAttempt(args: {
+  db: OrchestrationDb
+  runtime: OrcaRuntimeService
   pipelineDb: PipelineRunDb
   runId: string
+  worktreeId: string
   node: ResolvedPipelineNode
   attempt: number
+  dispatchId: string
+  terminalHandle?: string
   checkpointBackend?: PipelineCheckpointBackend
   worktreePath?: string
   checkpoint?: PipelineCheckpointInfo
@@ -177,5 +186,24 @@ export async function resolveReadiedAttempt(args: {
     failureStage: 'reready'
   })
   args.pipelineDb.resetPrelaunchFailures(args.runId, args.node.id)
+
+  const terminalHandle = resolveVerifiableTerminalHandle(args.db, args)
+  if (!terminalHandle) {
+    return {
+      kind: 'fail-node',
+      reason: "Could not identify the re-readied attempt's terminal to verify it had stopped."
+    }
+  }
+  const stopped = await verifyPtyStopped(args.runtime, {
+    worktreeId: args.worktreeId,
+    terminalHandle
+  })
+  if (!stopped) {
+    return {
+      kind: 'fail-node',
+      reason: "Could not confirm the re-readied attempt's terminal had stopped."
+    }
+  }
+
   return finalizeConsumedAttempt({ ...args, retryOf: undefined })
 }
