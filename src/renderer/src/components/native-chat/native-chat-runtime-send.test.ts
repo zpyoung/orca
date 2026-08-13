@@ -22,7 +22,9 @@ import {
   NATIVE_CHAT_SUBMIT_DELAY_MS,
   NATIVE_CHAT_QUESTION_STEP_MS,
   NATIVE_CHAT_ADVANCE_BUFFER_MS,
-  NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT
+  NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
+  NATIVE_CHAT_SUBMIT_OBSERVATION_MAX_READS,
+  NATIVE_CHAT_SUBMIT_OBSERVATION_POLL_MS
 } from './native-chat-runtime-send'
 import {
   buildNativeChatImagePasteBytes,
@@ -172,6 +174,97 @@ describe('sendNativeChatMessage', () => {
     ])
     expect(sendRuntimePtyInput.mock.calls[1]?.[1]).toBe('pty-a')
     expect(sendRuntimePtyInput.mock.calls[3]?.[1]).toBe('pty-b')
+  })
+})
+
+describe('sendNativeChatMessage post-send observation', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    sendRuntimePtyInput.mockClear()
+    resetNativeChatPtySendQueuesForTests()
+    sendRuntimePtyInput.mockReturnValue(true)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    resetNativeChatPtySendQueuesForTests()
+    // sendNativeChatMessageVerified's tests (next file section) share this mock
+    // and only reset sendRuntimePtyInputVerified, not this one.
+    sendRuntimePtyInput.mockClear()
+  })
+
+  const settleSend = () => vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS)
+  const fullObservationWindow = () =>
+    vi.advanceTimersByTimeAsync(
+      NATIVE_CHAT_SUBMIT_OBSERVATION_POLL_MS * NATIVE_CHAT_SUBMIT_OBSERVATION_MAX_READS
+    )
+
+  it('reports unobservable when confirmSubmitted is absent, with no extra reads', async () => {
+    const onOutcome = vi.fn()
+    sendNativeChatMessage(SETTINGS, PTY, 'hi', { onOutcome })
+    await settleSend()
+
+    expect(onOutcome).toHaveBeenCalledExactlyOnceWith('unobservable')
+    // clear + body + Enter only — the observation step added no pty writes.
+    expect(sendRuntimePtyInput).toHaveBeenCalledTimes(3)
+  })
+
+  it('reports observed-cleared on the first read and does not poll again', async () => {
+    const confirmSubmitted = vi.fn().mockReturnValue(true)
+    const onOutcome = vi.fn()
+    sendNativeChatMessage(SETTINGS, PTY, 'hi', { confirmSubmitted, onOutcome })
+    await settleSend()
+
+    expect(confirmSubmitted).toHaveBeenCalledOnce()
+    expect(onOutcome).toHaveBeenCalledExactlyOnceWith('observed-cleared')
+
+    await fullObservationWindow()
+    expect(confirmSubmitted).toHaveBeenCalledOnce()
+    expect(onOutcome).toHaveBeenCalledOnce()
+  })
+
+  it('reports observed-cleared once a flapping read turns true', async () => {
+    const confirmSubmitted = vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true)
+    const onOutcome = vi.fn()
+    sendNativeChatMessage(SETTINGS, PTY, 'hi', { confirmSubmitted, onOutcome })
+    await settleSend()
+    expect(onOutcome).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_OBSERVATION_POLL_MS)
+
+    expect(confirmSubmitted).toHaveBeenCalledTimes(2)
+    expect(onOutcome).toHaveBeenCalledExactlyOnceWith('observed-cleared')
+  })
+
+  it('reports may-not-have-sent when every read is false, and never re-writes after the CR', async () => {
+    const confirmSubmitted = vi.fn().mockReturnValue(false)
+    const onOutcome = vi.fn()
+    sendNativeChatMessage(SETTINGS, PTY, 'hi', { confirmSubmitted, onOutcome })
+    await settleSend()
+    sendRuntimePtyInput.mockClear()
+
+    await fullObservationWindow()
+
+    expect(confirmSubmitted).toHaveBeenCalledTimes(NATIVE_CHAT_SUBMIT_OBSERVATION_MAX_READS)
+    expect(onOutcome).toHaveBeenCalledExactlyOnceWith('may-not-have-sent')
+    // The no-auto-resend invariant: a negative observation must never trigger another pty write.
+    expect(sendRuntimePtyInput).not.toHaveBeenCalled()
+  })
+
+  it('reports may-not-have-sent exactly once when the transport throws on the CR write', async () => {
+    // mockImplementationOnce (not a standing mockImplementation) so this
+    // failure does not leak into later describe blocks that share this mock.
+    sendRuntimePtyInput
+      .mockImplementationOnce(() => true) // clear
+      .mockImplementationOnce(() => true) // body
+      .mockImplementationOnce(() => {
+        throw new Error('transport dead')
+      })
+    const onOutcome = vi.fn()
+    sendNativeChatMessage(SETTINGS, PTY, 'hi', { onOutcome })
+
+    await settleSend()
+
+    expect(onOutcome).toHaveBeenCalledExactlyOnceWith('may-not-have-sent')
   })
 })
 
