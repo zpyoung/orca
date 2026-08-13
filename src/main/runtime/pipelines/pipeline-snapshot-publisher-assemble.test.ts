@@ -191,6 +191,26 @@ describe('assemblePipelineSnapshot', () => {
     expect(node?.status).toBe('interrupted')
   })
 
+  it('running: a stage-B prelaunch cycle in progress creates no attempt row but counts as dispatched', () => {
+    const source = sourceOf(
+      runRow({ state: 'running' }),
+      [nodeRow({ node_id: 'repro', prelaunch_failures: 1 })],
+      []
+    )
+    const node = assemblePipelineSnapshot(source, 'run_1').nodes?.[0]
+    expect(node?.status).toBe('running')
+  })
+
+  it('interrupted: a node that only ever had prelaunch cycles renders interrupted once the run is terminal', () => {
+    const source = sourceOf(
+      runRow({ state: 'aborted' }),
+      [nodeRow({ node_id: 'repro', prelaunch_failures: 2 })],
+      []
+    )
+    const node = assemblePipelineSnapshot(source, 'run_1').nodes?.[0]
+    expect(node?.status).toBe('interrupted')
+  })
+
   it('computes limitBreached from the snapshot definition and elapsed time', () => {
     const source = sourceOf(
       runRow({ state: 'running' }),
@@ -211,6 +231,46 @@ describe('assemblePipelineSnapshot', () => {
     )
     const now = new Date('2026-08-12T00:05:00.000Z')
     const node = assemblePipelineSnapshot(source, 'run_1', { now }).nodes?.[0]
+    expect(node?.limitBreached).toBe(false)
+  })
+
+  it('keeps limitBreached true after the attempt ends, using its actual elapsed duration', () => {
+    const source = sourceOf(
+      runRow({ state: 'completed' }),
+      [nodeRow({ node_id: 'fix', retries_allowed: 0, outcome: 'succeeded' })],
+      [
+        attemptRow({
+          node_id: 'fix',
+          attempt: 1,
+          started_at: '2026-08-12T00:00:00.000Z',
+          ended_at: '2026-08-12T00:25:00.000Z',
+          outcome: 'succeeded'
+        })
+      ]
+    )
+    const node = assemblePipelineSnapshot(source, 'run_1', {
+      now: new Date('2026-08-12T01:00:00.000Z')
+    }).nodes?.[0]
+    expect(node?.limitBreached).toBe(true)
+  })
+
+  it('does not flag limitBreached when the attempt ended within the advisory limit', () => {
+    const source = sourceOf(
+      runRow({ state: 'completed' }),
+      [nodeRow({ node_id: 'fix', retries_allowed: 0, outcome: 'succeeded' })],
+      [
+        attemptRow({
+          node_id: 'fix',
+          attempt: 1,
+          started_at: '2026-08-12T00:00:00.000Z',
+          ended_at: '2026-08-12T00:10:00.000Z',
+          outcome: 'succeeded'
+        })
+      ]
+    )
+    const node = assemblePipelineSnapshot(source, 'run_1', {
+      now: new Date('2026-08-12T01:00:00.000Z')
+    }).nodes?.[0]
     expect(node?.limitBreached).toBe(false)
   })
 
