@@ -59,6 +59,9 @@ jobs:
       - name: Verify skill freshness manifest
         run: pnpm run verify:skill-bundle-manifest
 
+      - name: Verify review protocol assets
+        run: pnpm run verify:review-protocol-assets
+
       - name: Verify localization catalog
         run: pnpm run verify:localization-catalog
 

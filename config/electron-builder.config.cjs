@@ -82,6 +82,9 @@ module.exports = {
     // either source tree would duplicate content without a runtime consumer.
     '!skill-guides{,/**/*}',
     '!skill-stubs{,/**/*}',
+    // Why: the vendored review-protocol snapshot is compiled into src/shared/review/
+    // protocol-assets.ts; the source tree has no runtime consumer of its own.
+    '!protocol{,/**/*}',
     '!tests{,/**/*}',
     // Why: examples/ is plugin authoring documentation with no runtime consumer —
     // bundled plugins ship via extraResources from resources/plugins/launch/. It also
