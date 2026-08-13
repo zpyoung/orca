@@ -1,4 +1,4 @@
-/** Local/WSL pipeline checkpoint backend (logic L9, L9a, L9b; tech §4.6). SSH ships separately behind the same contract. */
+/** Local/WSL pipeline checkpoint backend. SSH ships separately behind the same contract. */
 
 import { captureCheckpoint } from './pipeline-checkpoint-capture'
 import { restoreCheckpoint } from './pipeline-checkpoint-restore'

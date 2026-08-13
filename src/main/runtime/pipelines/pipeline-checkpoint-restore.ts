@@ -1,4 +1,4 @@
-/** Checkpoint restore: the four L9b observables (branch HEAD, index, worktree content, ignored files). */
+/** Checkpoint restore: restores branch HEAD, index, worktree content, and ignored-file handling to the checkpoint. */
 
 import {
   clearSnapshotTypeObstructions,
@@ -21,7 +21,7 @@ export async function restoreCheckpoint(
 ): Promise<void> {
   // why: submodule.recurse=true would otherwise hard-reset submodule working trees too — superproject-only (L9)
   await runCheckpointGit(target, ['reset', '--hard', '--no-recurse-submodules', args.head])
-  // -ff: a plain -f leaves untracked nested git repos in place — L9b item 3 needs that residue gone too.
+  // -ff: a plain -f leaves untracked nested git repos in place, but restore must remove that residue too.
   await runCheckpointGit(target, ['clean', '-ffd'])
 
   await removeSnapshotDeletions(target, args.head, args.snapshot)

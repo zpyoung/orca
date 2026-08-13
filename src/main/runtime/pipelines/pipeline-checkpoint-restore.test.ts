@@ -16,6 +16,16 @@ import { createLocalCheckpointBackend } from './pipeline-checkpoint'
 const git = (args: string[], cwd: string): string =>
   execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
 
+// `git init -b` post-dates the Git 2.25 baseline; set the branch name before the first
+// commit instead, which every Git version supports.
+function initRepo(dir: string): void {
+  mkdirSync(dir, { recursive: true })
+  git(['init', '-q'], dir)
+  git(['symbolic-ref', 'HEAD', 'refs/heads/main'], dir)
+  git(['config', 'user.email', 'test@example.com'], dir)
+  git(['config', 'user.name', 'Test'], dir)
+}
+
 describe('createLocalCheckpointBackend restore', () => {
   let root: string
   let repo: string
@@ -24,10 +34,7 @@ describe('createLocalCheckpointBackend restore', () => {
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'orca-pipeline-checkpoint-restore-'))
     repo = join(root, 'repo')
-    mkdirSync(repo, { recursive: true })
-    git(['init', '-q', '-b', 'main'], repo)
-    git(['config', 'user.email', 'test@example.com'], repo)
-    git(['config', 'user.name', 'Test'], repo)
+    initRepo(repo)
     writeFileSync(join(repo, 'tracked.txt'), 'original\n')
     writeFileSync(join(repo, 'to-be-deleted.txt'), 'will vanish before checkpoint\n')
     writeFileSync(join(repo, '.gitignore'), 'ignored.log\n')
@@ -166,10 +173,7 @@ describe('createLocalCheckpointBackend restore', () => {
 
   it('does not hard-reset a submodule working tree even when submodule.recurse is enabled', async () => {
     const submoduleUpstream = join(root, 'submodule-upstream')
-    mkdirSync(submoduleUpstream, { recursive: true })
-    git(['init', '-q', '-b', 'main'], submoduleUpstream)
-    git(['config', 'user.email', 'test@example.com'], submoduleUpstream)
-    git(['config', 'user.name', 'Test'], submoduleUpstream)
+    initRepo(submoduleUpstream)
     writeFileSync(join(submoduleUpstream, 'inner.txt'), 'inner\n')
     git(['add', '-A'], submoduleUpstream)
     git(['commit', '-qm', 'submodule init'], submoduleUpstream)
