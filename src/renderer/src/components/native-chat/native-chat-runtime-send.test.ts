@@ -22,10 +22,12 @@ import {
   NATIVE_CHAT_SUBMIT_DELAY_MS,
   NATIVE_CHAT_QUESTION_STEP_MS,
   NATIVE_CHAT_ADVANCE_BUFFER_MS,
-  NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
+  NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT
+} from './native-chat-runtime-send'
+import {
   NATIVE_CHAT_SUBMIT_OBSERVATION_MAX_READS,
   NATIVE_CHAT_SUBMIT_OBSERVATION_POLL_MS
-} from './native-chat-runtime-send'
+} from './native-chat-send-outcome'
 import {
   buildNativeChatImagePasteBytes,
   buildNativeChatPasteBytes,
@@ -266,6 +268,45 @@ describe('sendNativeChatMessage post-send observation', () => {
 
     expect(onOutcome).toHaveBeenCalledExactlyOnceWith('may-not-have-sent')
   })
+
+  it('reports may-not-have-sent exactly once when cancelled before the submit delay', () => {
+    const onOutcome = vi.fn()
+    const handle = sendNativeChatMessage(SETTINGS, PTY, 'hi', { onOutcome })
+    handle.cancel()
+
+    expect(onOutcome).toHaveBeenCalledExactlyOnceWith('may-not-have-sent')
+  })
+
+  it('reports may-not-have-sent exactly once when the transport throws on the body write', () => {
+    sendRuntimePtyInput
+      .mockImplementationOnce(() => true) // clear
+      .mockImplementationOnce(() => {
+        throw new Error('transport dead')
+      })
+    const onOutcome = vi.fn()
+    sendNativeChatMessage(SETTINGS, PTY, 'hi', { onOutcome })
+
+    expect(onOutcome).toHaveBeenCalledExactlyOnceWith('may-not-have-sent')
+  })
+
+  it('does not write the CR and reports may-not-have-sent when the body write is rejected, even though confirmSubmitted would read true', async () => {
+    const confirmSubmitted = vi.fn().mockReturnValue(true)
+    const onOutcome = vi.fn()
+    sendRuntimePtyInput
+      .mockImplementationOnce(() => true) // clear
+      .mockImplementationOnce(() => false) // oversized body, rejected
+    sendNativeChatMessage(SETTINGS, PTY, 'hi', { confirmSubmitted, onOutcome })
+
+    expect(onOutcome).toHaveBeenCalledExactlyOnceWith('may-not-have-sent')
+    expect(confirmSubmitted).not.toHaveBeenCalled()
+
+    await fullObservationWindow()
+
+    expect(sendRuntimePtyInput.mock.calls.some((call) => call[2] === NATIVE_CHAT_SUBMIT)).toBe(
+      false
+    )
+    expect(onOutcome).toHaveBeenCalledOnce()
+  })
 })
 
 describe('sendNativeChatMessageVerified', () => {
@@ -483,6 +524,44 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
     expect(sendRuntimePtyInput.mock.calls.some((call) => call[2] === NATIVE_CHAT_SUBMIT)).toBe(
       false
     )
+  })
+
+  it('reports may-not-have-sent once and releases the queue when the delayed caption write throws', async () => {
+    sendRuntimePtyInput
+      .mockImplementationOnce(() => true) // clear
+      .mockImplementationOnce(() => true) // image
+      .mockImplementationOnce(() => {
+        throw new Error('transport dead')
+      }) // caption
+    const onOutcome = vi.fn()
+    sendNativeChatMessageWithImageAttachments(
+      SETTINGS,
+      PTY,
+      'describe this',
+      ['/tmp/orca-paste-image.png'],
+      { onOutcome }
+    )
+
+    await vi.advanceTimersByTimeAsync(NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS)
+    expect(onOutcome).toHaveBeenCalledExactlyOnceWith('may-not-have-sent')
+
+    // The failed entry must release the per-PTY queue so a later send still starts.
+    sendRuntimePtyInput.mockClear()
+    sendRuntimePtyInput.mockReturnValue(true)
+    sendNativeChatMessage(SETTINGS, PTY, 'second send')
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(sendRuntimePtyInput).toHaveBeenCalledWith(
+      SETTINGS,
+      PTY,
+      NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT
+    )
+    expect(
+      sendRuntimePtyInput.mock.calls.some(
+        (call) => call[2] === buildNativeChatPasteBytes('second send')
+      )
+    ).toBe(true)
   })
 })
 
