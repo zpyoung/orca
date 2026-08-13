@@ -941,6 +941,46 @@ describe('TabsSlice', () => {
     })
   })
 
+  describe('activatePipelineTabSurface', () => {
+    it('clears the stale terminal-scoped active tab id left over from before a pipeline tab was focused', () => {
+      store.setState({
+        activeWorktreeId: WT,
+        activeTabId: 'term-1',
+        activeTabType: 'terminal',
+        activeTabIdByWorktree: { [WT]: 'term-1' },
+        activeTabTypeByWorktree: { [WT]: 'terminal' }
+      })
+
+      store.getState().activatePipelineTabSurface(WT)
+
+      expect(store.getState().activeTabId).toBeNull()
+      expect(store.getState().activeTabIdByWorktree[WT]).toBeNull()
+      expect(store.getState().activeTabType).toBe('terminal')
+      // tab.rename and workspace-focus restore both gate on activeTabType === 'terminal' && activeTabId;
+      // with activeTabId cleared, neither can target the terminal that was active before.
+      const wouldTargetStaleTerminal =
+        store.getState().activeTabType === 'terminal' && Boolean(store.getState().activeTabId)
+      expect(wouldTargetStaleTerminal).toBe(false)
+    })
+
+    it("leaves a background worktree's singular active-tab fields untouched, clearing only its own per-worktree pointer", () => {
+      const OTHER_WT = 'repo1::/tmp/other'
+      store.setState({
+        activeWorktreeId: WT,
+        activeTabId: 'term-active',
+        activeTabType: 'terminal',
+        activeTabIdByWorktree: { [WT]: 'term-active', [OTHER_WT]: 'term-background' },
+        activeTabTypeByWorktree: { [WT]: 'terminal', [OTHER_WT]: 'terminal' }
+      })
+
+      store.getState().activatePipelineTabSurface(OTHER_WT)
+
+      expect(store.getState().activeTabId).toBe('term-active')
+      expect(store.getState().activeTabType).toBe('terminal')
+      expect(store.getState().activeTabIdByWorktree[OTHER_WT]).toBeNull()
+    })
+  })
+
   // ─── reorderUnifiedTabs ───────────────────────────────────────────
 
   describe('reorderUnifiedTabs', () => {
