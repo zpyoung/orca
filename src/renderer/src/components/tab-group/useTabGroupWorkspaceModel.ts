@@ -262,7 +262,7 @@ export function useTabGroupWorkspaceModel({
         destroyWorkspaceWebviews(browserState.browserPagesByWorkspace, item.entityId)
         closeBrowserTab(item.entityId)
         closeUnifiedTab(item.id)
-      } else if (item.contentType === 'simulator') {
+      } else if (item.contentType === 'simulator' || item.contentType === 'pipeline') {
         closeUnifiedTab(item.id)
       } else {
         const canCloseTab = closeEditorIfUnreferenced(item.entityId, item.id)
@@ -324,7 +324,7 @@ export function useTabGroupWorkspaceModel({
           closeUnifiedTab(item.id)
         } else if (item.contentType === 'terminal') {
           closeTab(item.entityId)
-        } else if (item.contentType === 'simulator') {
+        } else if (item.contentType === 'simulator' || item.contentType === 'pipeline') {
           closeUnifiedTab(item.id)
         } else {
           const canCloseTab = closeEditorIfUnreferenced(item.entityId, item.id)
@@ -408,6 +408,10 @@ export function useTabGroupWorkspaceModel({
       if (item.contentType === 'simulator') {
         setActiveTabType('simulator')
         // simulator has no editor file entity
+      } else if (item.contentType === 'pipeline') {
+        // Why: entityId is a run id, not a file id — writing it into setActiveFile
+        // would masquerade a pipeline run as an open file. activateTab above
+        // already routes the split-group model to this tab.
       } else {
         setActiveFile(item.entityId)
         setActiveTabType('editor')

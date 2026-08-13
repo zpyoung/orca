@@ -258,11 +258,16 @@ export function launchAgentInNewTab(args: LaunchAgentInNewTabArgs): LaunchAgentI
   const termIds = (fresh.tabsByWorktree[worktreeId] ?? []).map((t) => t.id)
   const editorIds = fresh.openFiles.filter((f) => f.worktreeId === worktreeId).map((f) => f.id)
   const browserIds = (fresh.browserTabsByWorktree?.[worktreeId] ?? []).map((t) => t.id)
+  const pipelineIds = (fresh.unifiedTabsByWorktree[worktreeId] ?? [])
+    .filter((t) => t.contentType === 'pipeline')
+    .map((t) => t.id)
   const base = reconcileTabOrder(
     fresh.tabBarOrderByWorktree[worktreeId],
     termIds,
     editorIds,
-    browserIds
+    browserIds,
+    [],
+    pipelineIds
   )
   const order = base.filter((id) => id !== tab.id)
   order.push(tab.id)

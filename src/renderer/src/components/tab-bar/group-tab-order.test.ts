@@ -63,6 +63,21 @@ function simulatorTab(id: string, groupId: string, sortOrder: number): Tab {
   }
 }
 
+function pipelineTab(id: string, groupId: string, runId: string, sortOrder: number): Tab {
+  return {
+    id,
+    entityId: runId,
+    groupId,
+    worktreeId: 'wt',
+    contentType: 'pipeline',
+    label: 'bugfix-fast #1',
+    customLabel: null,
+    color: null,
+    sortOrder,
+    createdAt: sortOrder
+  }
+}
+
 describe('getGroupVisibleTabOrder', () => {
   it('returns active-group refs with backing ids plus unified tab ids', () => {
     const group: TabGroup = {
@@ -188,6 +203,35 @@ describe('getGroupVisibleTabOrder', () => {
       { type: 'editor', id: '/repo/file.md', tabId: 'tab-e1' }
     ])
   })
+
+  it('includes pipeline tabs keyed by unified tab id, never the run id, in the declared group order', () => {
+    const group: TabGroup = {
+      id: 'g1',
+      worktreeId: 'wt',
+      activeTabId: 'tab-p1',
+      tabOrder: ['tab-t1', 'tab-p1', 'tab-e1']
+    }
+    const tabs: Tab[] = [
+      terminalTab('tab-t1', 'g1', 'term-1', 0),
+      pipelineTab('tab-p1', 'g1', 'run_abc', 1),
+      editorTab('tab-e1', 'g1', '/repo/file.md', 2)
+    ]
+    expect(
+      getGroupVisibleTabOrder(
+        group,
+        tabs,
+        new Set(['term-1']),
+        new Set(['/repo/file.md']),
+        new Set(),
+        new Set(),
+        new Set(['tab-p1'])
+      )
+    ).toEqual([
+      { type: 'terminal', id: 'term-1', tabId: 'tab-t1' },
+      { type: 'pipeline', id: 'tab-p1', tabId: 'tab-p1' },
+      { type: 'editor', id: '/repo/file.md', tabId: 'tab-e1' }
+    ])
+  })
 })
 
 type NavState = Pick<
@@ -301,6 +345,47 @@ describe('getActiveTabNavOrder', () => {
       { type: 'simulator', id: 'sim-1' },
       { type: 'editor', id: 'e1' },
       { type: 'terminal', id: 'term-2' }
+    ])
+  })
+
+  it('reaches a pipeline tab in the active-group order, keyed by tab id not run id', () => {
+    const group: TabGroup = {
+      id: 'g1',
+      worktreeId: 'wt',
+      activeTabId: 'tab-p1',
+      tabOrder: ['tab-t1', 'tab-p1']
+    }
+    const tabs: Tab[] = [
+      terminalTab('tab-t1', 'g1', 'term-1', 0),
+      pipelineTab('tab-p1', 'g1', 'run_abc', 1)
+    ]
+    const state = makeState({
+      activeGroupIdByWorktree: { wt: 'g1' },
+      groupsByWorktree: { wt: [group] },
+      unifiedTabsByWorktree: { wt: tabs },
+      tabsByWorktree: {
+        // @ts-expect-error — minimal shape
+        wt: [{ id: 'term-1' }]
+      }
+    })
+    expect(getActiveTabNavOrder(state, 'wt')).toEqual([
+      { type: 'terminal', id: 'term-1', tabId: 'tab-t1' },
+      { type: 'pipeline', id: 'tab-p1', tabId: 'tab-p1' }
+    ])
+  })
+
+  it('reaches a pipeline tab in the legacy fallback order, keyed by tab id not run id', () => {
+    const state = makeState({
+      tabBarOrderByWorktree: { wt: ['term-1', 'tab-p1'] },
+      unifiedTabsByWorktree: { wt: [pipelineTab('tab-p1', 'g1', 'run_abc', 1)] },
+      tabsByWorktree: {
+        // @ts-expect-error — minimal shape
+        wt: [{ id: 'term-1' }]
+      }
+    })
+    expect(getActiveTabNavOrder(state, 'wt')).toEqual([
+      { type: 'terminal', id: 'term-1' },
+      { type: 'pipeline', id: 'tab-p1' }
     ])
   })
 })

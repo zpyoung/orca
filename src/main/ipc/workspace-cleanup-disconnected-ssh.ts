@@ -72,6 +72,7 @@ function createDisconnectedSshCandidate(
       terminalTabCount: 0,
       cleanEditorTabCount: 0,
       browserTabCount: 0,
+      pipelineTabCount: 0,
       diffCommentCount: meta.diffComments?.length ?? 0,
       newestDiffCommentAt: getNewestWorkspaceCleanupDiffCommentAt(meta.diffComments),
       retainedDoneAgentCount: 0

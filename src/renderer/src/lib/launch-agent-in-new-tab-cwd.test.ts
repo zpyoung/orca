@@ -16,6 +16,7 @@ const store = {
   tabsByWorktree: { 'wt-1': [{ id: 'tab-1' }] },
   openFiles: [] as { id: string; worktreeId: string }[],
   browserTabsByWorktree: {} as Record<string, { id: string }[]>,
+  unifiedTabsByWorktree: {} as Record<string, { id: string; contentType: string }[]>,
   tabBarOrderByWorktree: {} as Record<string, string[]>,
   createTab: vi.fn(() => ({ id: 'tab-1' })),
   queueTabInitialCwd: mockQueueTabInitialCwd,

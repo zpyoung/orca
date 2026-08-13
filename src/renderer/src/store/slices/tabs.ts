@@ -12,6 +12,7 @@ import type {
   WorkspaceVisibleTabType
 } from '../../../../shared/types'
 import { emitNativeChatToggled } from '@/lib/native-chat-telemetry'
+import { assertExhaustiveTabContentType } from '../../../../shared/tab-content-type-exhaustive'
 import {
   dedupeTabOrder,
   ensureGroup,
@@ -701,18 +702,30 @@ export function projectWorktreeTabModelReconciliation(
   const liveBrowserIds = new Set(
     (state.browserTabsByWorktree[worktreeId] ?? []).map((browserTab) => browserTab.id)
   )
+  const pipelineRunHydration = state.pipelineRunHydrationByWorkspaceId[worktreeId]
 
   const isRenderableTab = (tab: Tab): boolean => {
-    if (tab.contentType === 'terminal') {
-      return liveTerminalIds.has(tab.entityId)
+    switch (tab.contentType) {
+      case 'terminal':
+        return liveTerminalIds.has(tab.entityId)
+      case 'browser':
+        return liveBrowserIds.has(tab.entityId)
+      case 'simulator':
+        return true
+      case 'pipeline':
+        // Why: reconciliation is synchronous but pipeline-run hydration is not —
+        // prune only on positive evidence (hydrated AND the run id is gone),
+        // never on absence of evidence, or every pipeline tab is pruned before
+        // hydration ever completes.
+        return pipelineRunHydration?.phase !== 'hydrated' || tab.entityId in state.pipelineRunsById
+      case 'editor':
+      case 'diff':
+      case 'conflict-review':
+      case 'check-details':
+        return liveEditorIds.has(tab.entityId)
+      default:
+        return assertExhaustiveTabContentType(tab.contentType)
     }
-    if (tab.contentType === 'browser') {
-      return liveBrowserIds.has(tab.entityId)
-    }
-    if (tab.contentType === 'simulator') {
-      return true
-    }
-    return liveEditorIds.has(tab.entityId)
   }
 
   const validTabs = reconciledUnifiedTabs.filter(isRenderableTab)

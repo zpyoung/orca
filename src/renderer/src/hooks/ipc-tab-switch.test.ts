@@ -315,6 +315,21 @@ describe('handleSwitchTabAcrossAllTypes', () => {
     expect(store.setActiveTab).not.toHaveBeenCalled()
     expect(store.setActiveTabType).not.toHaveBeenCalled()
   })
+
+  it('crosses into a pipeline tab without writing its run id into setActiveFile', () => {
+    const store = makeStore('terminal')
+    store.activeTabId = 'term-1'
+    getStateMock.mockReturnValue(store)
+    getActiveTabNavOrderMock.mockReturnValue([
+      { type: 'terminal', id: 'term-1' },
+      { type: 'pipeline', id: 'tab-p1', tabId: 'tab-p1' }
+    ])
+
+    expect(handleSwitchTabAcrossAllTypes(1)).toBe(true)
+    expect(store.activateTab).toHaveBeenCalledWith('tab-p1')
+    expect(store.setActiveFile).not.toHaveBeenCalled()
+    expect(store.setActiveTab).not.toHaveBeenCalledWith('tab-p1')
+  })
 })
 
 describe('handleSwitchRecentTab', () => {

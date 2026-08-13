@@ -233,6 +233,8 @@ function createTestStore() {
         pendingReconnectTabByWorktree: {},
         activeTabIdByWorktree: {},
         unifiedTabsByWorktree: {},
+        pipelineRunsById: {},
+        pipelineRunHydrationByWorkspaceId: {},
         groupsByWorktree: {},
         activeGroupIdByWorktree: {},
         layoutByWorktree: {},

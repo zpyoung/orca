@@ -834,6 +834,7 @@ export type TabContentType =
   | 'check-details'
   | 'browser'
   | 'simulator'
+  | 'pipeline'
 
 export type WorkspaceVisibleTabType = 'terminal' | 'editor' | 'browser' | 'simulator'
 export type CtrlTabOrderMode = 'mru' | 'sequential'

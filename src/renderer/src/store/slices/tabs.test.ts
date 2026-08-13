@@ -2194,6 +2194,95 @@ describe('TabsSlice', () => {
       })
     })
 
+    describe('pipeline tab retention', () => {
+      function seedPipelineTab(): void {
+        const groupId = 'g-pipeline'
+        store.setState({
+          unifiedTabsByWorktree: {
+            [WT]: [
+              makeUnifiedTab({
+                id: 'run_abc',
+                entityId: 'run_abc',
+                groupId,
+                worktreeId: WT,
+                contentType: 'pipeline',
+                label: 'bugfix-fast #1'
+              })
+            ]
+          },
+          groupsByWorktree: {
+            [WT]: [
+              makeTabGroup({
+                id: groupId,
+                worktreeId: WT,
+                activeTabId: 'run_abc',
+                tabOrder: ['run_abc']
+              })
+            ]
+          },
+          activeGroupIdByWorktree: { [WT]: groupId },
+          tabsByWorktree: { [WT]: [] }
+        })
+      }
+
+      it('retains a pipeline tab when hydration for its workspace is absent', () => {
+        seedPipelineTab()
+        const result = store.getState().reconcileWorktreeTabModel(WT)
+        expect(result.renderableTabCount).toBe(1)
+        expect(store.getState().unifiedTabsByWorktree[WT].map((tab) => tab.id)).toEqual(['run_abc'])
+      })
+
+      it('retains a pipeline tab while hydration is in-flight', () => {
+        seedPipelineTab()
+        store.setState({
+          pipelineRunHydrationByWorkspaceId: {
+            [WT]: { phase: 'in-flight', startedAt: Date.now(), generation: 1 }
+          }
+        })
+        const result = store.getState().reconcileWorktreeTabModel(WT)
+        expect(result.renderableTabCount).toBe(1)
+      })
+
+      it('retains a pipeline tab when hydration failed', () => {
+        seedPipelineTab()
+        store.setState({
+          pipelineRunHydrationByWorkspaceId: { [WT]: { phase: 'failed' } }
+        })
+        const result = store.getState().reconcileWorktreeTabModel(WT)
+        expect(result.renderableTabCount).toBe(1)
+      })
+
+      it('retains a pipeline tab once hydrated when the run id is known', () => {
+        seedPipelineTab()
+        store.setState({
+          pipelineRunHydrationByWorkspaceId: { [WT]: { phase: 'hydrated' } },
+          pipelineRunsById: {
+            run_abc: {
+              runId: 'run_abc',
+              templateName: 'bugfix-fast',
+              runNumber: 1,
+              state: 'running',
+              workspaceId: WT,
+              lastSnapshotAt: null
+            }
+          }
+        })
+        const result = store.getState().reconcileWorktreeTabModel(WT)
+        expect(result.renderableTabCount).toBe(1)
+      })
+
+      it('prunes a pipeline tab only once hydrated and the run id is absent', () => {
+        seedPipelineTab()
+        store.setState({
+          pipelineRunHydrationByWorkspaceId: { [WT]: { phase: 'hydrated' } },
+          pipelineRunsById: {}
+        })
+        const result = store.getState().reconcileWorktreeTabModel(WT)
+        expect(result.renderableTabCount).toBe(0)
+        expect(store.getState().unifiedTabsByWorktree[WT]).toEqual([])
+      })
+    })
+
     it('collapses empty split groups when reconciliation drops a stale tab', () => {
       const terminalGroupId = 'g-terminal'
       const staleGroupId = 'g-stale'

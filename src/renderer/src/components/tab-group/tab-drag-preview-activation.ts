@@ -1,5 +1,6 @@
 import { useAppStore } from '../../store'
 import type { AppState } from '../../store/types'
+import { assertExhaustiveTabContentType } from '../../../../shared/tab-content-type-exhaustive'
 
 export type TabDragActivationSnapshot = {
   activeGroupId: string | null
@@ -29,42 +30,55 @@ function previewActiveSurfacePatch(
     [worktreeId]: tabType
   })
 
-  if (unifiedTab.contentType === 'terminal') {
-    return {
-      activeTabId: unifiedTab.entityId,
-      activeTabType: 'terminal',
-      activeTabIdByWorktree: {
-        ...state.activeTabIdByWorktree,
-        [worktreeId]: unifiedTab.entityId
-      },
-      activeTabTypeByWorktree: nextActiveTabTypeByWorktree('terminal')
-    }
-  }
-  if (unifiedTab.contentType === 'browser') {
-    return {
-      activeBrowserTabId: unifiedTab.entityId,
-      activeTabType: 'browser',
-      activeBrowserTabIdByWorktree: {
-        ...state.activeBrowserTabIdByWorktree,
-        [worktreeId]: unifiedTab.entityId
-      },
-      activeTabTypeByWorktree: nextActiveTabTypeByWorktree('browser')
-    }
-  }
-  if (unifiedTab.contentType === 'simulator') {
-    return {
-      activeTabType: 'simulator',
-      activeTabTypeByWorktree: nextActiveTabTypeByWorktree('simulator')
-    }
-  }
-  return {
-    activeFileId: unifiedTab.entityId,
-    activeTabType: 'editor',
-    activeFileIdByWorktree: {
-      ...state.activeFileIdByWorktree,
-      [worktreeId]: unifiedTab.entityId
-    },
-    activeTabTypeByWorktree: nextActiveTabTypeByWorktree('editor')
+  switch (unifiedTab.contentType) {
+    case 'terminal':
+      return {
+        activeTabId: unifiedTab.entityId,
+        activeTabType: 'terminal',
+        activeTabIdByWorktree: {
+          ...state.activeTabIdByWorktree,
+          [worktreeId]: unifiedTab.entityId
+        },
+        activeTabTypeByWorktree: nextActiveTabTypeByWorktree('terminal')
+      }
+    case 'browser':
+      return {
+        activeBrowserTabId: unifiedTab.entityId,
+        activeTabType: 'browser',
+        activeBrowserTabIdByWorktree: {
+          ...state.activeBrowserTabIdByWorktree,
+          [worktreeId]: unifiedTab.entityId
+        },
+        activeTabTypeByWorktree: nextActiveTabTypeByWorktree('browser')
+      }
+    case 'simulator':
+      return {
+        activeTabType: 'simulator',
+        activeTabTypeByWorktree: nextActiveTabTypeByWorktree('simulator')
+      }
+    case 'pipeline':
+      // Why: entityId is a run id, not a file id — WorkspaceVisibleTabType has no
+      // pipeline member, so this falls back to the neutral 'terminal' surface
+      // without writing the run id into any activeFileId/activeTabId field.
+      return {
+        activeTabType: 'terminal',
+        activeTabTypeByWorktree: nextActiveTabTypeByWorktree('terminal')
+      }
+    case 'editor':
+    case 'diff':
+    case 'conflict-review':
+    case 'check-details':
+      return {
+        activeFileId: unifiedTab.entityId,
+        activeTabType: 'editor',
+        activeFileIdByWorktree: {
+          ...state.activeFileIdByWorktree,
+          [worktreeId]: unifiedTab.entityId
+        },
+        activeTabTypeByWorktree: nextActiveTabTypeByWorktree('editor')
+      }
+    default:
+      return assertExhaustiveTabContentType(unifiedTab.contentType)
   }
 }
 

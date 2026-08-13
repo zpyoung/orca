@@ -1,9 +1,10 @@
 import type { Tab, TabGroup } from '../../../../shared/types'
 import type { AppState } from '../../store/types'
+import { assertExhaustiveTabContentType } from '../../../../shared/tab-content-type-exhaustive'
 import { reconcileTabOrder } from './reconcile-order'
 
 export type VisibleTabRef = {
-  type: 'terminal' | 'editor' | 'browser' | 'simulator'
+  type: 'terminal' | 'editor' | 'browser' | 'simulator' | 'pipeline'
   id: string
   tabId?: string
 }
@@ -13,6 +14,7 @@ export type ActiveTabNavOrderIds = {
   editorIds?: string[]
   browserIds?: string[]
   simulatorIds?: string[]
+  pipelineIds?: string[]
 }
 
 /**
@@ -53,47 +55,67 @@ export function getGroupVisibleTabOrder(
   terminalEntityIds: ReadonlySet<string>,
   editorEntityIds: ReadonlySet<string>,
   browserEntityIds: ReadonlySet<string>,
-  simulatorTabIds: ReadonlySet<string> = new Set()
+  simulatorTabIds: ReadonlySet<string> = new Set(),
+  pipelineTabIds: ReadonlySet<string> = new Set()
 ): VisibleTabRef[] {
   const tabsById = new Map(groupTabs.map((t) => [t.id, t]))
   const result: VisibleTabRef[] = []
-  // Dedupe per category: terminal/browser key by entityId (multiple tabs
-  // can theoretically point at the same runtime entity), editor keys by
-  // unified tab id. Keeping the keyspaces separate avoids a cross-type
-  // collision from dropping a legitimate tab.
+  // Dedupe per category: terminal/browser key by entityId (multiple tabs can
+  // theoretically point at the same runtime entity); editor/simulator/pipeline
+  // key by unified tab id, since pipeline's entityId is a run id shared by
+  // every tab reattached to that run. Keeping the keyspaces separate avoids a
+  // cross-type collision from dropping a legitimate tab.
   const seenTerminals = new Set<string>()
   const seenBrowsers = new Set<string>()
   const seenEditors = new Set<string>()
   const seenSimulators = new Set<string>()
+  const seenPipelines = new Set<string>()
   for (const unifiedId of group.tabOrder) {
     const tab = tabsById.get(unifiedId)
     if (!tab) {
       continue
     }
-    if (tab.contentType === 'terminal') {
-      if (!terminalEntityIds.has(tab.entityId) || seenTerminals.has(tab.entityId)) {
+    switch (tab.contentType) {
+      case 'terminal':
+        if (!terminalEntityIds.has(tab.entityId) || seenTerminals.has(tab.entityId)) {
+          continue
+        }
+        seenTerminals.add(tab.entityId)
+        result.push({ type: 'terminal', id: tab.entityId, tabId: tab.id })
         continue
-      }
-      seenTerminals.add(tab.entityId)
-      result.push({ type: 'terminal', id: tab.entityId, tabId: tab.id })
-    } else if (tab.contentType === 'browser') {
-      if (!browserEntityIds.has(tab.entityId) || seenBrowsers.has(tab.entityId)) {
+      case 'browser':
+        if (!browserEntityIds.has(tab.entityId) || seenBrowsers.has(tab.entityId)) {
+          continue
+        }
+        seenBrowsers.add(tab.entityId)
+        result.push({ type: 'browser', id: tab.entityId, tabId: tab.id })
         continue
-      }
-      seenBrowsers.add(tab.entityId)
-      result.push({ type: 'browser', id: tab.entityId, tabId: tab.id })
-    } else if (tab.contentType === 'simulator') {
-      if (!simulatorTabIds.has(tab.id) || seenSimulators.has(tab.id)) {
+      case 'simulator':
+        if (!simulatorTabIds.has(tab.id) || seenSimulators.has(tab.id)) {
+          continue
+        }
+        seenSimulators.add(tab.id)
+        result.push({ type: 'simulator', id: tab.id, tabId: tab.id })
         continue
-      }
-      seenSimulators.add(tab.id)
-      result.push({ type: 'simulator', id: tab.id, tabId: tab.id })
-    } else {
-      if (!editorEntityIds.has(tab.entityId) || seenEditors.has(tab.id)) {
+      case 'pipeline':
+        if (!pipelineTabIds.has(tab.id) || seenPipelines.has(tab.id)) {
+          continue
+        }
+        seenPipelines.add(tab.id)
+        result.push({ type: 'pipeline', id: tab.id, tabId: tab.id })
         continue
-      }
-      seenEditors.add(tab.id)
-      result.push({ type: 'editor', id: tab.entityId, tabId: tab.id })
+      case 'editor':
+      case 'diff':
+      case 'conflict-review':
+      case 'check-details':
+        if (!editorEntityIds.has(tab.entityId) || seenEditors.has(tab.id)) {
+          continue
+        }
+        seenEditors.add(tab.id)
+        result.push({ type: 'editor', id: tab.entityId, tabId: tab.id })
+        continue
+      default:
+        return assertExhaustiveTabContentType(tab.contentType)
     }
   }
   return result
@@ -137,6 +159,11 @@ export function getActiveTabNavOrder(
     (state.unifiedTabsByWorktree[worktreeId] ?? [])
       .filter((tab) => tab.contentType === 'simulator')
       .map((tab) => tab.id)
+  const pipelineIds =
+    ids.pipelineIds ??
+    (state.unifiedTabsByWorktree[worktreeId] ?? [])
+      .filter((tab) => tab.contentType === 'pipeline')
+      .map((tab) => tab.id)
 
   const activeGroupId = state.activeGroupIdByWorktree[worktreeId]
   const group = activeGroupId
@@ -153,7 +180,8 @@ export function getActiveTabNavOrder(
       new Set(terminalIds),
       new Set(editorIds),
       new Set(browserIds),
-      new Set(simulatorIds)
+      new Set(simulatorIds),
+      new Set(pipelineIds)
     )
   }
 
@@ -163,18 +191,22 @@ export function getActiveTabNavOrder(
     terminalIds,
     editorIds,
     browserIds,
-    simulatorIds
+    simulatorIds,
+    pipelineIds
   )
   const terminalIdSet = new Set(terminalIds)
   const editorIdSet = new Set(editorIds)
   const browserIdSet = new Set(browserIds)
   const simulatorIdSet = new Set(simulatorIds)
+  const pipelineIdSet = new Set(pipelineIds)
   const result: VisibleTabRef[] = []
   for (const id of visibleIds) {
     if (terminalIdSet.has(id)) {
       result.push({ type: 'terminal', id })
     } else if (editorIdSet.has(id)) {
       result.push({ type: 'editor', id })
+    } else if (pipelineIdSet.has(id)) {
+      result.push({ type: 'pipeline', id })
     } else if (browserIdSet.has(id)) {
       result.push({ type: 'browser', id })
     } else if (simulatorIdSet.has(id)) {

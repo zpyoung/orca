@@ -11,6 +11,7 @@
 import { z } from 'zod'
 import type {
   BrowserWorkspace,
+  Tab,
   TabGroupLayoutNode,
   TerminalPaneLayoutNode,
   TuiAgent,
@@ -108,7 +109,8 @@ const tabContentTypeSchema = z.enum([
   'conflict-review',
   'check-details',
   'browser',
-  'simulator'
+  'simulator',
+  'pipeline'
 ])
 
 const workspaceVisibleTabTypeSchema = z.enum(['terminal', 'editor', 'browser', 'simulator'])
@@ -143,6 +145,22 @@ const tabSchema = z.object({
   // default instead of failing the whole-session parse. Legacy/missing stays
   // undefined → 'terminal' in the renderer.
   viewMode: z.enum(['terminal', 'chat']).catch('terminal').optional()
+})
+
+// Why: a whole-array z.array(tabSchema) would fail the ENTIRE session parse the moment one
+// tab carries a contentType this build's enum doesn't recognize (e.g. a downgrade reading a
+// session a newer build wrote). Parse each tab independently and drop the ones that don't
+// validate, mirroring tabContentTypeSchema's tolerance for viewMode but at tab granularity —
+// this is what keeps a version-skewed contentType from wiping the rest of the tab bar.
+const tabArraySchema = z.array(z.unknown()).transform((rawTabs) => {
+  const tabs: Tab[] = []
+  for (const rawTab of rawTabs) {
+    const result = tabSchema.safeParse(rawTab)
+    if (result.success) {
+      tabs.push(result.data)
+    }
+  }
+  return tabs
 })
 
 const tabGroupSchema = z.object({
@@ -289,7 +307,7 @@ export const workspaceSessionStateSchema: z.ZodType<WorkspaceSessionState> = z.o
   activeTabTypeByWorktree: z.record(z.string(), workspaceVisibleTabTypeSchema).optional(),
   browserUrlHistory: browserHistoryEntriesSchema.optional(),
   activeTabIdByWorktree: z.record(z.string(), z.string().nullable()).optional(),
-  unifiedTabs: z.record(z.string(), z.array(tabSchema)).optional(),
+  unifiedTabs: z.record(z.string(), tabArraySchema).optional(),
   tabGroups: z.record(z.string(), z.array(tabGroupSchema)).optional(),
   tabGroupLayouts: z.record(z.string(), tabGroupLayoutNodeSchema).optional(),
   activeGroupIdByWorktree: z.record(z.string(), z.string()).optional(),

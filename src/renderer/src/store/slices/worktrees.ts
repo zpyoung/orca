@@ -8,6 +8,7 @@ import type {
   FolderWorkspace,
   GitHubPrStartPoint,
   Worktree,
+  TabContentType,
   WorkspaceVisibleTabType,
   GitPushTarget,
   RemoveWorktreeResult,
@@ -16,6 +17,7 @@ import type {
   ProjectHostSetup,
   WorktreeMeta
 } from '../../../../shared/types'
+import { assertExhaustiveTabContentType } from '../../../../shared/tab-content-type-exhaustive'
 import type { RuntimeWorktreeListResult } from '../../../../shared/runtime-types'
 import {
   findWorktreeById,
@@ -436,11 +438,24 @@ function areDetectedWorktreeResultsEqual(
   )
 }
 
-function toVisibleTabType(contentType: string): WorkspaceVisibleTabType {
-  if (contentType === 'browser' || contentType === 'terminal' || contentType === 'simulator') {
-    return contentType
+function toVisibleTabType(contentType: TabContentType): WorkspaceVisibleTabType {
+  switch (contentType) {
+    case 'browser':
+    case 'terminal':
+    case 'simulator':
+      return contentType
+    case 'editor':
+    case 'diff':
+    case 'conflict-review':
+    case 'check-details':
+      return 'editor'
+    case 'pipeline':
+      // Why: WorkspaceVisibleTabType has no pipeline member (deliberately not
+      // widened); the split-group model tracks pipeline focus separately.
+      return 'terminal'
+    default:
+      return assertExhaustiveTabContentType(contentType)
   }
-  return 'editor'
 }
 
 type WorktreeWithLineage = Worktree & {
@@ -5982,22 +5997,17 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
           : browserTabStillOpen
             ? restoredBrowserTabId
             : (browserTabs[0]?.id ?? null)
-      const activeTabType =
-        activeUnifiedTab?.contentType === 'terminal'
-          ? 'terminal'
-          : activeUnifiedTab?.contentType === 'browser'
-            ? 'browser'
-            : activeUnifiedTab
+      const activeTabType = activeUnifiedTab
+        ? toVisibleTabType(activeUnifiedTab.contentType)
+        : restoredTabType === 'browser' && browserTabStillOpen
+          ? 'browser'
+          : restoredTabType === 'editor' && fileStillOpen
+            ? 'editor'
+            : fileStillOpen
               ? 'editor'
-              : restoredTabType === 'browser' && browserTabStillOpen
+              : browserTabs.length > 0
                 ? 'browser'
-                : restoredTabType === 'editor' && fileStillOpen
-                  ? 'editor'
-                  : fileStillOpen
-                    ? 'editor'
-                    : browserTabs.length > 0
-                      ? 'browser'
-                      : 'terminal'
+                : 'terminal'
       const activeTabId =
         activeUnifiedTab?.contentType === 'terminal'
           ? activeUnifiedTab.entityId

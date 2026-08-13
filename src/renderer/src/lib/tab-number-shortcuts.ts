@@ -4,6 +4,7 @@ import type { AppState } from '@/store/types'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
 import { dedupeTabOrder } from '@/store/slices/tab-group-state'
 import type { Tab } from '../../../shared/types'
+import { assertExhaustiveTabContentType } from '../../../shared/tab-content-type-exhaustive'
 import {
   activateWebRuntimeSessionTab,
   isWebRuntimeSessionActive
@@ -66,40 +67,46 @@ export function activateTabNumberShortcut(index: number): boolean {
   store.focusGroup(worktreeId, target.groupId)
   store.activateTab(target.id)
 
-  if (target.contentType === 'terminal') {
-    if (isWebRuntimeSessionActive(runtimeEnvironmentId)) {
-      void activateWebRuntimeSessionTab({
-        worktreeId,
-        tabId: target.entityId,
-        environmentId: runtimeEnvironmentId
-      })
-    }
-    store.setActiveTab(target.entityId)
-    store.setActiveTabType('terminal')
-    focusTerminalTabSurface(target.entityId)
-    return true
+  switch (target.contentType) {
+    case 'terminal':
+      if (isWebRuntimeSessionActive(runtimeEnvironmentId)) {
+        void activateWebRuntimeSessionTab({
+          worktreeId,
+          tabId: target.entityId,
+          environmentId: runtimeEnvironmentId
+        })
+      }
+      store.setActiveTab(target.entityId)
+      store.setActiveTabType('terminal')
+      focusTerminalTabSurface(target.entityId)
+      return true
+    case 'browser':
+      if (isWebRuntimeSessionActive(runtimeEnvironmentId)) {
+        void activateWebRuntimeSessionTab({
+          worktreeId,
+          tabId: target.id,
+          environmentId: runtimeEnvironmentId
+        })
+      }
+      store.setActiveBrowserTab(target.entityId)
+      store.setActiveTabType('browser')
+      return true
+    case 'simulator':
+      store.setActiveTab(target.id)
+      store.setActiveTabType('simulator')
+      return true
+    case 'pipeline':
+      // Why: activateTab above already focuses the split-group model; entityId
+      // is a run id, so it must not land in setActiveFile.
+      return true
+    case 'editor':
+    case 'diff':
+    case 'conflict-review':
+    case 'check-details':
+      store.setActiveFile(target.entityId)
+      store.setActiveTabType('editor')
+      return true
+    default:
+      return assertExhaustiveTabContentType(target.contentType)
   }
-
-  if (target.contentType === 'browser') {
-    if (isWebRuntimeSessionActive(runtimeEnvironmentId)) {
-      void activateWebRuntimeSessionTab({
-        worktreeId,
-        tabId: target.id,
-        environmentId: runtimeEnvironmentId
-      })
-    }
-    store.setActiveBrowserTab(target.entityId)
-    store.setActiveTabType('browser')
-    return true
-  }
-
-  if (target.contentType === 'simulator') {
-    store.setActiveTab(target.id)
-    store.setActiveTabType('simulator')
-    return true
-  }
-
-  store.setActiveFile(target.entityId)
-  store.setActiveTabType('editor')
-  return true
 }

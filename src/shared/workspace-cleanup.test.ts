@@ -34,6 +34,7 @@ function makeCandidate(overrides: CandidateOverrides = {}): WorkspaceCleanupCand
       terminalTabCount: 0,
       cleanEditorTabCount: 0,
       browserTabCount: 0,
+      pipelineTabCount: 0,
       diffCommentCount: 0,
       newestDiffCommentAt: null,
       retainedDoneAgentCount: 0

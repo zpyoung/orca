@@ -53,6 +53,7 @@ describe('workspace cleanup presentation', () => {
           terminalTabCount: 1,
           cleanEditorTabCount: 0,
           browserTabCount: 0,
+          pipelineTabCount: 0,
           diffCommentCount: 0,
           newestDiffCommentAt: null,
           retainedDoneAgentCount: 0
@@ -129,6 +130,7 @@ describe('workspace cleanup presentation', () => {
         terminalTabCount: 0,
         cleanEditorTabCount: 0,
         browserTabCount: 1,
+        pipelineTabCount: 0,
         diffCommentCount: 0,
         newestDiffCommentAt: null,
         retainedDoneAgentCount: 0
@@ -217,6 +219,7 @@ describe('workspace cleanup presentation', () => {
             terminalTabCount: 0,
             cleanEditorTabCount: 1,
             browserTabCount: 0,
+            pipelineTabCount: 0,
             diffCommentCount: 0,
             newestDiffCommentAt: null,
             retainedDoneAgentCount: 0

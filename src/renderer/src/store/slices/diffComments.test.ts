@@ -147,6 +147,7 @@ import { createNewIssueDraftSlice } from './new-issue-draft'
 import { createTaskCreationDraftsSlice } from './task-creation-drafts'
 import { createRemoteServerUpdatesSlice } from './remote-server-updates'
 import { createTerminalQuickCommandHostsSlice } from './terminal-quick-command-hosts'
+import { createPipelineRunsSlice } from './pipeline-runs'
 
 function createTestStore() {
   return create<AppState>()((...a) => ({
@@ -191,7 +192,8 @@ function createTestStore() {
     ...createNewIssueDraftSlice(...a),
     ...createTaskCreationDraftsSlice(...a),
     ...createRemoteServerUpdatesSlice(...a),
-    ...createTerminalQuickCommandHostsSlice(...a)
+    ...createTerminalQuickCommandHostsSlice(...a),
+    ...createPipelineRunsSlice(...a)
   }))
 }
 

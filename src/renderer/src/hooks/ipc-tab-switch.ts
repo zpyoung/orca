@@ -6,6 +6,7 @@ import {
   getNextTabWithinActiveType,
   type TypeCyclableTab
 } from '@/components/terminal/tab-type-cycle'
+import { assertExhaustiveTabContentType } from '../../../shared/tab-content-type-exhaustive'
 import { sanitizeRecentTabIds } from '../store/slices/tab-group-state'
 
 type AppStoreState = ReturnType<typeof useAppStore.getState>
@@ -59,30 +60,44 @@ function resolveCycleContext(): CycleContext | null {
  * correct tab instance is focused.
  */
 export function activateCyclableTab(store: AppStoreState, next: TypeCyclableTab): void {
-  if (next.type === 'terminal') {
-    store.setActiveTab(next.id)
-    store.setActiveTabType('terminal')
-  } else if (next.type === 'browser') {
-    store.setActiveBrowserTab(next.id)
-    if (next.tabId) {
-      store.activateTab?.(next.tabId)
-    }
-    store.setActiveTabType('browser')
-  } else if (next.type === 'simulator') {
-    store.setActiveTab(next.tabId ?? next.id)
-    if (next.tabId) {
-      store.activateTab?.(next.tabId)
-    }
-    store.setActiveTabType('simulator')
-  } else {
-    // Why: `setActiveFile` targets the file entity (its implicit activateTab
-    // picks the first matching tab in the active group); `activateTab(tabId)`
-    // then disambiguates which split copy when the same file is open twice.
-    store.setActiveFile(next.id)
-    if (next.tabId) {
-      store.activateTab?.(next.tabId)
-    }
-    store.setActiveTabType('editor')
+  switch (next.type) {
+    case 'terminal':
+      store.setActiveTab(next.id)
+      store.setActiveTabType('terminal')
+      return
+    case 'browser':
+      store.setActiveBrowserTab(next.id)
+      if (next.tabId) {
+        store.activateTab?.(next.tabId)
+      }
+      store.setActiveTabType('browser')
+      return
+    case 'simulator':
+      store.setActiveTab(next.tabId ?? next.id)
+      if (next.tabId) {
+        store.activateTab?.(next.tabId)
+      }
+      store.setActiveTabType('simulator')
+      return
+    case 'pipeline':
+      // Why: entityId is a run id, not a file id — only disambiguate the split
+      // copy via activateTab; there is no legacy WorkspaceVisibleTabType for it.
+      if (next.tabId) {
+        store.activateTab?.(next.tabId)
+      }
+      return
+    case 'editor':
+      // Why: `setActiveFile` targets the file entity (its implicit activateTab
+      // picks the first matching tab in the active group); `activateTab(tabId)`
+      // then disambiguates which split copy when the same file is open twice.
+      store.setActiveFile(next.id)
+      if (next.tabId) {
+        store.activateTab?.(next.tabId)
+      }
+      store.setActiveTabType('editor')
+      return
+    default:
+      assertExhaustiveTabContentType(next.type)
   }
 }
 

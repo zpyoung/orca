@@ -9,6 +9,7 @@ import {
   type AgentStatusEntry
 } from '../../../shared/agent-status-types'
 import { agentProviderSessionsEqual } from '../../../shared/agent-session-resume'
+import { assertExhaustiveTabContentType } from '../../../shared/tab-content-type-exhaustive'
 import type {
   RuntimeMobileSessionTabsResult,
   RuntimeMobileSessionBrowserTab,
@@ -1721,10 +1722,25 @@ function sameGroups(a: readonly TabGroup[] | undefined, b: readonly TabGroup[] |
 }
 
 function toVisibleTabType(tab: Tab): WebSessionTabsSyncState['activeTabType'] {
-  if (tab.contentType === 'browser' || tab.contentType === 'terminal') {
-    return tab.contentType
+  switch (tab.contentType) {
+    case 'browser':
+    case 'terminal':
+      return tab.contentType
+    case 'simulator':
+      return 'simulator'
+    case 'pipeline':
+      // Why: mobile projection omits pipeline tabs entirely; this local
+      // visible-type surface falls back to 'terminal' rather than mislabeling
+      // the tab as an editor.
+      return 'terminal'
+    case 'editor':
+    case 'diff':
+    case 'conflict-review':
+    case 'check-details':
+      return 'editor'
+    default:
+      return assertExhaustiveTabContentType(tab.contentType)
   }
-  return 'editor'
 }
 
 function findCurrentVisibleUnifiedTabId(args: {

@@ -1,7 +1,7 @@
 import { translate } from '@/i18n/i18n'
 import type { WorkspaceCleanupBlocker } from '../../../../shared/workspace-cleanup'
 
-type ContextDetailKind = 'terminal' | 'editor' | 'browser' | 'diff' | 'agent'
+type ContextDetailKind = 'terminal' | 'editor' | 'browser' | 'pipeline' | 'diff' | 'agent'
 
 export function getWorkspaceCleanupBlockerLabel(blocker: WorkspaceCleanupBlocker): string {
   switch (blocker) {
@@ -26,6 +26,11 @@ export function getWorkspaceCleanupBlockerLabel(blocker: WorkspaceCleanupBlocker
       return translate(
         'auto.components.workspace.cleanup.candidateRow.runningTerminalBlocker',
         'Running terminal process'
+      )
+    case 'running-pipeline':
+      return translate(
+        'auto.components.workspace.cleanup.candidateRow.runningPipelineBlocker',
+        'Running pipeline'
       )
     case 'terminal-liveness-unknown':
       return translate(
@@ -150,6 +155,12 @@ export function formatWorkspaceCleanupContextDetail(
       return translate(
         'auto.components.workspace.cleanup.candidateRow.browserTabsCount',
         'Browser tabs: {{value0}}',
+        { value0: count }
+      )
+    case 'pipeline':
+      return translate(
+        'auto.components.workspace.cleanup.candidateRow.pipelineTabsCount',
+        'Pipeline runs: {{value0}}',
         { value0: count }
       )
     case 'diff':

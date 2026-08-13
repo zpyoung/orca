@@ -71,6 +71,7 @@ describe('createNewTerminalTab', () => {
         tabsByWorktree: { 'wt-1': [{ id: 'tab-1' }] },
         openFiles: [],
         tabBarOrderByWorktree: {},
+        unifiedTabsByWorktree: {},
         setTabBarOrder
       })
 
@@ -142,6 +143,7 @@ describe('createNewTerminalTab', () => {
         tabsByWorktree: { 'wt-1': [{ id: 'tab-1' }] },
         openFiles: [],
         tabBarOrderByWorktree: {},
+        unifiedTabsByWorktree: {},
         setTabBarOrder
       })
 

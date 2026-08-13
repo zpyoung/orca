@@ -126,6 +126,16 @@ function deriveActiveSurface(
       type: 'browser'
     }
   }
+  if (activeUnified?.contentType === 'pipeline') {
+    // Why: entityId is a run id, not a file id — writing it into fileId would
+    // corrupt session restore into opening a phantom file.
+    return {
+      terminalTabId: terminalFallback,
+      browserTabId: browserFallback,
+      fileId: fileFallback,
+      type: 'terminal'
+    }
+  }
   if (activeUnified) {
     return {
       terminalTabId: terminalFallback,

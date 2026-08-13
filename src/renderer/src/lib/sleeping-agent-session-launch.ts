@@ -49,11 +49,16 @@ function appendTabToWorktreeOrder(worktreeId: string, tabId: string): void {
     .filter((file) => file.worktreeId === worktreeId)
     .map((f) => f.id)
   const browserIds = (state.browserTabsByWorktree?.[worktreeId] ?? []).map((tab) => tab.id)
+  const pipelineIds = (state.unifiedTabsByWorktree[worktreeId] ?? [])
+    .filter((tab) => tab.contentType === 'pipeline')
+    .map((tab) => tab.id)
   const base = reconcileTabOrder(
     state.tabBarOrderByWorktree[worktreeId],
     termIds,
     editorIds,
-    browserIds
+    browserIds,
+    [],
+    pipelineIds
   )
   const order = base.filter((id) => id !== tabId)
   order.push(tabId)

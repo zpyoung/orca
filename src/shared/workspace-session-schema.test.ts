@@ -501,6 +501,97 @@ describe('parseWorkspaceSession', () => {
     }
   })
 
+  it('round-trips a pipeline tab alongside other tabs', () => {
+    const result = parseWorkspaceSession({
+      activeRepoId: null,
+      activeWorktreeId: 'wt',
+      activeTabId: null,
+      tabsByWorktree: {},
+      terminalLayoutsByTabId: {},
+      unifiedTabs: {
+        wt: [
+          {
+            id: 'run_abc',
+            entityId: 'run_abc',
+            groupId: 'group1',
+            worktreeId: 'wt',
+            contentType: 'pipeline',
+            label: 'bugfix-fast #1',
+            customLabel: null,
+            color: null,
+            sortOrder: 0,
+            createdAt: 0
+          },
+          {
+            id: 'tab1',
+            entityId: 'tab1',
+            groupId: 'group1',
+            worktreeId: 'wt',
+            contentType: 'terminal',
+            label: 'Claude',
+            customLabel: null,
+            color: null,
+            sortOrder: 1,
+            createdAt: 0
+          }
+        ]
+      }
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.value.unifiedTabs?.wt).toHaveLength(2)
+      expect(result.value.unifiedTabs?.wt[0].contentType).toBe('pipeline')
+      expect(result.value.unifiedTabs?.wt[1].contentType).toBe('terminal')
+    }
+  })
+
+  it('drops a tab with an unrecognised contentType without wiping the partition', () => {
+    // Simulates version skew: a session written by a newer build carrying a
+    // contentType this build's closed enum doesn't know. Both directions of the
+    // hazard need this: a downgrade reading forward-written state must lose only
+    // the one tab, not every terminal/editor/browser tab in the workspace.
+    const result = parseWorkspaceSession({
+      activeRepoId: null,
+      activeWorktreeId: 'wt',
+      activeTabId: null,
+      tabsByWorktree: {},
+      terminalLayoutsByTabId: {},
+      unifiedTabs: {
+        wt: [
+          {
+            id: 'tab1',
+            entityId: 'tab1',
+            groupId: 'group1',
+            worktreeId: 'wt',
+            contentType: 'terminal',
+            label: 'Claude',
+            customLabel: null,
+            color: null,
+            sortOrder: 0,
+            createdAt: 0
+          },
+          {
+            id: 'run_future',
+            entityId: 'run_future',
+            groupId: 'group1',
+            worktreeId: 'wt',
+            contentType: 'from-the-future',
+            label: 'unknown surface',
+            customLabel: null,
+            color: null,
+            sortOrder: 1,
+            createdAt: 0
+          }
+        ]
+      }
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.value.unifiedTabs?.wt).toHaveLength(1)
+      expect(result.value.unifiedTabs?.wt[0].id).toBe('tab1')
+    }
+  })
+
   it('degrades an unknown viewMode to the safe default instead of failing parse', () => {
     const result = parseWorkspaceSession({
       activeRepoId: null,

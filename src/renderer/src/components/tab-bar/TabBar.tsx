@@ -132,6 +132,7 @@ type TabBarProps = {
   activeFileId?: string | null
   activeBrowserTabId?: string | null
   activeSimulatorTabId?: string | null
+  activePipelineTabId?: string | null
   activeTabType?: WorkspaceVisibleTabType
   onActivateFile?: (fileId: string) => void
   onCloseFile?: (fileId: string) => void
@@ -176,6 +177,13 @@ type TabItem =
       isPinned: boolean
       data: Tab
     }
+  | {
+      type: 'pipeline'
+      id: string
+      unifiedTabId: string
+      isPinned: boolean
+      data: Tab
+    }
 
 function getTabDragLabel(item: TabItem, generatedTitlesEnabled: boolean): string {
   if (item.type === 'terminal') {
@@ -186,6 +194,9 @@ function getTabDragLabel(item: TabItem, generatedTitlesEnabled: boolean): string
   }
   if (item.type === 'simulator') {
     return item.data.label || 'Mobile Emulator'
+  }
+  if (item.type === 'pipeline') {
+    return item.data.label || 'Pipeline'
   }
   return getEditorDisplayLabel(item.data)
 }
@@ -258,6 +269,7 @@ function TabBarInner({
   activeFileId,
   activeBrowserTabId,
   activeSimulatorTabId,
+  activePipelineTabId,
   activeTabType,
   onActivateFile,
   onCloseFile,
@@ -815,6 +827,13 @@ function TabBarInner({
         .map((t) => t.id),
     [unifiedTabs, resolvedGroupId]
   )
+  const pipelineTabIds = useMemo(
+    () =>
+      (unifiedTabs ?? [])
+        .filter((t) => t.groupId === resolvedGroupId && t.contentType === 'pipeline')
+        .map((t) => t.id),
+    [unifiedTabs, resolvedGroupId]
+  )
 
   // Build the unified ordered list, reconciling stored order with current items
   const orderedItems = useMemo(() => {
@@ -823,7 +842,8 @@ function TabBarInner({
       terminalIds,
       editorFileIds,
       browserTabIds,
-      simulatorTabIds
+      simulatorTabIds,
+      pipelineTabIds
     )
     const items: TabItem[] = []
     for (const id of ids) {
@@ -874,6 +894,17 @@ function TabBarInner({
         })
         continue
       }
+      const pipelineUnified = unifiedTabByVisibleId.get(id)
+      if (pipelineUnified && pipelineUnified.contentType === 'pipeline') {
+        items.push({
+          type: 'pipeline',
+          id,
+          unifiedTabId: pipelineUnified.id,
+          isPinned: pipelineUnified.isPinned === true,
+          data: pipelineUnified
+        })
+        continue
+      }
     }
     return items
   }, [
@@ -882,6 +913,7 @@ function TabBarInner({
     editorFileIds,
     browserTabIds,
     simulatorTabIds,
+    pipelineTabIds,
     terminalMap,
     editorMap,
     browserMap,
@@ -916,6 +948,9 @@ function TabBarInner({
       if (item.type === 'simulator') {
         return activeTabType === 'simulator' && item.id === activeSimulatorTabId
       }
+      if (item.type === 'pipeline') {
+        return item.id === activePipelineTabId
+      }
       return (
         (activeTabType === 'editor' || activeTabType === 'simulator') && activeFileId === item.id
       )
@@ -925,6 +960,7 @@ function TabBarInner({
     activeBrowserTabId,
     activeFileId,
     activeSimulatorTabId,
+    activePipelineTabId,
     activeTabId,
     activeTabType,
     orderedItems
@@ -1139,6 +1175,43 @@ function TabBarInner({
                     key={item.id}
                     file={simFile}
                     isActive={activeTabType === 'simulator' && item.id === activeSimulatorTabId}
+                    isPinned={item.isPinned}
+                    hasTabsToRight={index < orderedItems.length - 1}
+                    hasTabsToLeft={index > 0}
+                    tabCount={orderedItems.length}
+                    statusByRelativePath={statusByRelativePath}
+                    onActivate={() => onActivateFile?.(item.id)}
+                    onClose={() => onCloseFile?.(item.id)}
+                    onCloseOthers={() => onCloseOthers(item.id)}
+                    onCloseToRight={() => onCloseToRight(item.id)}
+                    onCloseToLeft={() => onCloseToLeft(item.id)}
+                    onCloseAll={() => onCloseAllFiles?.()}
+                    onMakePermanent={() => {}}
+                    onTogglePin={() => togglePinned(item)}
+                    dragData={dragData}
+                    dropIndicator={dropIndicatorByVisibleId.get(item.id) ?? null}
+                    includeTopTabBorder={includeTopTabBorder}
+                  />
+                )
+              }
+              if (item.type === 'pipeline') {
+                const pipelineLabel = item.data.label || 'Pipeline'
+                const pipelineFile: OpenFile & { tabId: string } = {
+                  id: item.id,
+                  tabId: item.id,
+                  filePath: pipelineLabel,
+                  relativePath: pipelineLabel,
+                  worktreeId,
+                  language: 'pipeline',
+                  isPreview: false,
+                  isDirty: false,
+                  mode: 'edit'
+                }
+                return (
+                  <EditorFileTab
+                    key={item.id}
+                    file={pipelineFile}
+                    isActive={item.id === activePipelineTabId}
                     isPinned={item.isPinned}
                     hasTabsToRight={index < orderedItems.length - 1}
                     hasTabsToLeft={index > 0}

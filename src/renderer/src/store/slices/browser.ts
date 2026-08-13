@@ -456,7 +456,8 @@ function getFallbackTabTypeForWorktree(
   worktreeId: string,
   openFiles: AppState['openFiles'],
   terminalTabsByWorktree: AppState['tabsByWorktree'],
-  browserTabsByWorktree?: AppState['browserTabsByWorktree']
+  browserTabsByWorktree?: AppState['browserTabsByWorktree'],
+  unifiedTabsByWorktree?: AppState['unifiedTabsByWorktree']
 ): AppState['activeTabType'] {
   if (openFiles.some((file) => file.worktreeId === worktreeId)) {
     return 'editor'
@@ -467,6 +468,12 @@ function getFallbackTabTypeForWorktree(
   if ((terminalTabsByWorktree[worktreeId] ?? []).length > 0) {
     return 'terminal'
   }
+  if ((unifiedTabsByWorktree?.[worktreeId] ?? []).some((tab) => tab.contentType === 'simulator')) {
+    return 'simulator'
+  }
+  // Why: pipeline has no WorkspaceVisibleTabType member (deliberately not
+  // widened), so a pipeline-only worktree falls back here explicitly rather
+  // than by accident.
   return 'terminal'
 }
 
@@ -773,7 +780,9 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
         const fallbackTabType = getFallbackTabTypeForWorktree(
           owningWorktreeId,
           s.openFiles,
-          s.tabsByWorktree
+          s.tabsByWorktree,
+          undefined,
+          s.unifiedTabsByWorktree
         )
         nextActiveTabTypeByWorktree[owningWorktreeId] = fallbackTabType
         if (isActiveTabInOwningWorktree && s.activeTabType === 'browser') {
@@ -1737,7 +1746,8 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
             worktreeId,
             s.openFiles,
             s.tabsByWorktree,
-            browserTabsByWorktree
+            browserTabsByWorktree,
+            s.unifiedTabsByWorktree
           )
         }
       }
@@ -1760,7 +1770,8 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
           activeWorktreeId,
           s.openFiles,
           s.tabsByWorktree,
-          browserTabsByWorktree
+          browserTabsByWorktree,
+          s.unifiedTabsByWorktree
         )
       })()
 
