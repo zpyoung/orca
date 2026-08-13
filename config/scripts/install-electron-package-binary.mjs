@@ -185,7 +185,8 @@ async function downloadElectronArtifactWithRetry(downloadOptions) {
 function getDownloadRetryDelays() {
   const configured = process.env.ORCA_ELECTRON_PACKAGE_RETRY_DELAYS_MS
   if (!configured) {
-    return [1_000, 3_000]
+    // Release-CDN 503 bursts have outlasted a 4s backoff and failed every lane at once.
+    return [1_000, 3_000, 8_000, 15_000]
   }
 
   const delays = configured.split(',').map(Number)
@@ -200,7 +201,7 @@ function isTransientDownloadError(error) {
     if (transientDownloadErrorCodes.has(candidate?.code)) {
       return true
     }
-    const statusCode = candidate?.statusCode ?? candidate?.response?.statusCode
+    const statusCode = getDownloadStatusCode(candidate)
     if (
       statusCode === 408 ||
       statusCode === 425 ||
@@ -211,6 +212,11 @@ function isTransientDownloadError(error) {
     }
   }
   return false
+}
+
+function getDownloadStatusCode(candidate) {
+  // @electron/get throws HTTPError carrying a fetch Response, which spells it `status`.
+  return candidate?.statusCode ?? candidate?.response?.statusCode ?? candidate?.response?.status
 }
 
 function getErrorChain(error) {
@@ -225,7 +231,7 @@ function getErrorChain(error) {
 
 function formatDownloadError(error) {
   for (const candidate of getErrorChain(error)) {
-    const statusCode = candidate?.statusCode ?? candidate?.response?.statusCode
+    const statusCode = getDownloadStatusCode(candidate)
     if (statusCode) {
       return `HTTP ${statusCode}`
     }

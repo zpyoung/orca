@@ -118,6 +118,28 @@ describe('install-electron-package-binary', () => {
     }
   })
 
+  it('retries an Electron download rejected with an HTTP status response', () => {
+    const projectDir = mkTempProject()
+
+    try {
+      writeFakeElectronPackage(projectDir)
+      writeFakeElectronGet(projectDir, { downloadFailures: 1, downloadErrorStatus: 503 })
+      writeFakeExtractor(projectDir, { createExecutable: true })
+
+      const result = runInstallScript(projectDir, {
+        ORCA_ELECTRON_PACKAGE_RETRY_DELAYS_MS: '0,0'
+      })
+
+      expect(result.status, result.stderr).toBe(0)
+      expect(
+        readFileSync(join(projectDir, 'electron-get.log'), 'utf8').trim().split('\n')
+      ).toHaveLength(2)
+      expect(result.stderr).toContain('Transient Electron download failure (HTTP 503)')
+    } finally {
+      rmSync(projectDir, { recursive: true, force: true })
+    }
+  })
+
   it('fails after exhausting transient Electron download retries', () => {
     const projectDir = mkTempProject()
 
@@ -279,7 +301,12 @@ module.exports = path.join(__dirname, 'dist', fs.readFileSync(pathFile, 'utf8'))
 
 function writeFakeElectronGet(
   projectDir,
-  { downloadNeverSettles = false, downloadFailures = 0, downloadErrorCode = 'ECONNRESET' } = {}
+  {
+    downloadNeverSettles = false,
+    downloadFailures = 0,
+    downloadErrorCode = 'ECONNRESET',
+    downloadErrorStatus = 0
+  } = {}
 ) {
   const getDir = join(projectDir, 'node_modules', 'electron', 'node_modules', '@electron', 'get')
   mkdirSync(getDir, { recursive: true })
@@ -299,6 +326,14 @@ exports.downloadArtifact = async function downloadArtifact(details) {
     return new Promise(() => {})
   }
   if (downloadAttempt <= ${JSON.stringify(downloadFailures)}) {
+    const status = ${JSON.stringify(downloadErrorStatus)}
+    if (status) {
+      // Mirrors @electron/get's HTTPError: a fetch Response, no code and no statusCode.
+      throw Object.assign(new Error('Response code ' + status + ' () for https://example.invalid'), {
+        name: 'HTTPError',
+        response: { status, statusText: '', ok: false }
+      })
+    }
     const cause = Object.assign(new Error('download failed'), {
       code: ${JSON.stringify(downloadErrorCode)}
     })
