@@ -5309,6 +5309,9 @@
           "connectName": "Connect to SSH host {{value0}}",
           "authFailedTooltip": "{{value0}} · authentication failed",
           "failedTooltip": "{{value0}} · connection failed"
+        },
+        "RunPipelineMenuItem": {
+          "run": "Run pipeline…"
         }
       },
       "shared": {

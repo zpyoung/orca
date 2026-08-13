@@ -38,10 +38,17 @@ export type PipelineStartDialogProps = {
   target: RuntimeClientTarget
   isFolderWorkspace: boolean
   hasSubmodules: boolean
-  onStarted?: (result: { runId: string; runNumber: number; branch?: string }) => void
+  onStarted?: (result: {
+    runId: string
+    runNumber: number
+    branch?: string
+    templateName: string
+  }) => void
 }
 
-function describeResolveError(error: Extract<PipelineTemplateResolveResult, { ok: false }>['error']): string {
+function describeResolveError(
+  error: Extract<PipelineTemplateResolveResult, { ok: false }>['error']
+): string {
   if (error.kind === 'template_error') {
     return error.detail.message
   }
@@ -131,7 +138,7 @@ export default function PipelineStartDialog({
         setErrorMessage(result.refused.message)
         return
       }
-      onStarted?.(result)
+      onStarted?.({ ...result, templateName: resolved.definition.templateName })
       onOpenChange(false)
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error))
@@ -175,11 +182,17 @@ export default function PipelineStartDialog({
         <div
           className="scrollbar-sleek flex max-h-48 flex-col gap-1 overflow-y-auto"
           role="listbox"
-          aria-label={translate('auto.components.pipeline.canvas.PipelineStartDialog.templates', 'Templates')}
+          aria-label={translate(
+            'auto.components.pipeline.canvas.PipelineStartDialog.templates',
+            'Templates'
+          )}
         >
           {templates === null && (
             <p className="text-sm text-muted-foreground">
-              {translate('auto.components.pipeline.canvas.PipelineStartDialog.loading', 'Loading templates…')}
+              {translate(
+                'auto.components.pipeline.canvas.PipelineStartDialog.loading',
+                'Loading templates…'
+              )}
             </p>
           )}
           {templates?.length === 0 && (
@@ -243,7 +256,10 @@ export default function PipelineStartDialog({
         <label className="flex flex-col gap-1.5 text-xs font-medium text-muted-foreground">
           {translate('auto.components.pipeline.canvas.PipelineStartDialog.input', 'Input')}
           <textarea
-            aria-label={translate('auto.components.pipeline.canvas.PipelineStartDialog.input', 'Input')}
+            aria-label={translate(
+              'auto.components.pipeline.canvas.PipelineStartDialog.input',
+              'Input'
+            )}
             value={inputText}
             onChange={(event) => setInputText(event.target.value)}
             rows={4}

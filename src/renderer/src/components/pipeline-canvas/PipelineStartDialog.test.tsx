@@ -72,7 +72,12 @@ afterEach(() => {
 describe('PipelineStartDialog', () => {
   it('lists templates with their name and description', async () => {
     setup([
-      { basename: 'bugfix-fast.yaml', name: 'bugfix-fast', description: 'Fix a bug', needsNewerOrca: false }
+      {
+        basename: 'bugfix-fast.yaml',
+        name: 'bugfix-fast',
+        description: 'Fix a bug',
+        needsNewerOrca: false
+      }
     ])
     render(
       <PipelineStartDialog
@@ -190,7 +195,13 @@ describe('PipelineStartDialog', () => {
         expect.objectContaining({ worktree: 'id:w1' })
       )
     )
-    await waitFor(() => expect(onStarted).toHaveBeenCalledWith({ runId: 'run-1', runNumber: 1 }))
+    await waitFor(() =>
+      expect(onStarted).toHaveBeenCalledWith({
+        runId: 'run-1',
+        runNumber: 1,
+        templateName: 'bugfix-fast'
+      })
+    )
   })
 
   it('shows the refusal message instead of starting when the host refuses', async () => {

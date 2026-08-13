@@ -57,6 +57,7 @@ import { WorktreeOpenInSubMenu } from './WorktreeOpenInMenu'
 import { ProjectGroupNameDialog } from './ProjectGroupNameDialog'
 import { WorktreeParentPickerPopover } from './WorktreeParentPickerPopover'
 import { WorktreeDeveloperMenu } from './WorktreeDeveloperMenu'
+import { RunPipelineMenuItem } from './RunPipelineMenuItem'
 import { getEligibleWorktreeParents } from './worktree-parent-candidates'
 import {
   hasSleepableWorkspaceActivity,
@@ -1199,6 +1200,12 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
             </>
           ) : null}
 
+          {!isMultiContext && (
+            <>
+              <RunPipelineMenuItem worktreeId={worktree.id} disabled={isDeleting} />
+              <DropdownMenuSeparator />
+            </>
+          )}
           {shouldRevealWorktreeDeveloperMenu({ developerMenuRevealed, isMultiContext }) ? (
             <>
               <WorktreeDeveloperMenu worktreeId={worktree.id} disabled={isDeleting} />
