@@ -106,7 +106,8 @@ export function activateTabNumberShortcut(index: number): boolean {
       store.setActiveFile(target.entityId)
       store.setActiveTabType('editor')
       return true
-    default:
-      return assertExhaustiveTabContentType(target.contentType)
   }
+  // outside the switch, not in a default: case, so control-flow narrowing to
+  // `never` still fires here once every member above is handled
+  return assertExhaustiveTabContentType(target.contentType)
 }

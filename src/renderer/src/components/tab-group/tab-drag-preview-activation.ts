@@ -77,9 +77,10 @@ function previewActiveSurfacePatch(
         },
         activeTabTypeByWorktree: nextActiveTabTypeByWorktree('editor')
       }
-    default:
-      return assertExhaustiveTabContentType(unifiedTab.contentType)
   }
+  // outside the switch, not in a default: case, so control-flow narrowing to
+  // `never` still fires here once every member above is handled
+  return assertExhaustiveTabContentType(unifiedTab.contentType)
 }
 
 export function captureTabDragActivationSnapshot(worktreeId: string): TabDragActivationSnapshot {

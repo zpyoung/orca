@@ -114,9 +114,10 @@ export function getGroupVisibleTabOrder(
         seenEditors.add(tab.id)
         result.push({ type: 'editor', id: tab.entityId, tabId: tab.id })
         continue
-      default:
-        return assertExhaustiveTabContentType(tab.contentType)
     }
+    // outside the switch, not in a default: case, so control-flow narrowing to
+    // `never` still fires here once every member above is handled
+    return assertExhaustiveTabContentType(tab.contentType)
   }
   return result
 }

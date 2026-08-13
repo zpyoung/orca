@@ -453,9 +453,10 @@ function toVisibleTabType(contentType: TabContentType): WorkspaceVisibleTabType 
       // Why: WorkspaceVisibleTabType has no pipeline member (deliberately not
       // widened); the split-group model tracks pipeline focus separately.
       return 'terminal'
-    default:
-      return assertExhaustiveTabContentType(contentType)
   }
+  // outside the switch, not in a default: case, so control-flow narrowing to
+  // `never` still fires here once every member above is handled
+  return assertExhaustiveTabContentType(contentType)
 }
 
 type WorktreeWithLineage = Worktree & {

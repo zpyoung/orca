@@ -2663,7 +2663,9 @@
             "gitStatusErrorBlocker": "Git status unavailable",
             "dirtyFilesBlocker": "Changed files",
             "unknownBaseBlocker": "Could not verify unpushed commits",
-            "dismissedBlocker": "Ignored"
+            "dismissedBlocker": "Ignored",
+            "runningPipelineBlocker": "Running pipeline",
+            "pipelineTabsCount": "Pipeline runs: {{value0}}"
           },
           "workspace": {
             "cleanup": {
@@ -15095,6 +15097,13 @@
           "openLink": "Open link",
           "updating": "Updating…",
           "update": "Update shared content"
+        }
+      },
+      "pipeline": {
+        "canvas": {
+          "PipelineCanvas": {
+            "0da3663ff7": "Pipeline run"
+          }
         }
       }
     },

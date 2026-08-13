@@ -96,9 +96,10 @@ export function activateCyclableTab(store: AppStoreState, next: TypeCyclableTab)
       }
       store.setActiveTabType('editor')
       return
-    default:
-      assertExhaustiveTabContentType(next.type)
   }
+  // outside the switch, not in a default: case, so control-flow narrowing to
+  // `never` still fires here once every member above is handled
+  assertExhaustiveTabContentType(next.type)
 }
 
 /**

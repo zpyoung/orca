@@ -723,9 +723,10 @@ export function projectWorktreeTabModelReconciliation(
       case 'conflict-review':
       case 'check-details':
         return liveEditorIds.has(tab.entityId)
-      default:
-        return assertExhaustiveTabContentType(tab.contentType)
     }
+    // outside the switch, not in a default: case, so control-flow narrowing to
+    // `never` still fires here once every member above is handled
+    return assertExhaustiveTabContentType(tab.contentType)
   }
 
   const validTabs = reconciledUnifiedTabs.filter(isRenderableTab)

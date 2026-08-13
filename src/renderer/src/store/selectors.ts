@@ -88,25 +88,27 @@ export function selectFloatingVisibleTabCount(state: FloatingVisibleTabCountStat
     switch (tab.contentType) {
       case 'terminal':
         count += terminalIds.has(tab.entityId) ? 1 : 0
-        break
+        continue
       case 'browser':
         count += browserIds.has(tab.entityId) ? 1 : 0
-        break
+        continue
       case 'simulator':
       case 'pipeline':
         // Why: simulator/pipeline unified tabs have no separate backing record;
         // the tab itself is the visible floating workspace item.
         count += 1
-        break
+        continue
       case 'editor':
       case 'diff':
       case 'conflict-review':
       case 'check-details':
         count += editorIds.has(tab.entityId) ? 1 : 0
-        break
-      default:
-        assertExhaustiveTabContentType(tab.contentType)
+        continue
     }
+    // outside the switch, not in a default: case, so control-flow narrowing to
+    // `never` still fires here once every member above is handled — `continue`
+    // (not `break`) is required above for that narrowing to reach this line
+    assertExhaustiveTabContentType(tab.contentType)
   }
 
   floatingVisibleTabCountCache = {
