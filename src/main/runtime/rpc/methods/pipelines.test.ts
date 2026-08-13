@@ -335,4 +335,59 @@ describe('PipelineStartParams', () => {
     })
     expect(result.success).toBe(true)
   })
+
+  function nodeWith(overrides: Record<string, unknown>) {
+    return {
+      id: 'n1',
+      title: 'N1',
+      prompt: 'do it',
+      index: 0,
+      needs: [],
+      harness: 'claude',
+      ...overrides
+    }
+  }
+
+  function paramsWithNode(node: Record<string, unknown>) {
+    return { worktree: 'id:w1', definition: { ...bareDefinition(), nodes: [node] } }
+  }
+
+  it('rejects an onFailure.retries above the documented 0-10 range', () => {
+    const result = PipelineStartParams.safeParse(
+      paramsWithNode(nodeWith({ onFailure: { retries: 1000000000 } }))
+    )
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects a non-integer onFailure.retries', () => {
+    const result = PipelineStartParams.safeParse(
+      paramsWithNode(nodeWith({ onFailure: { retries: 1.5 } }))
+    )
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects a zero limits.maxMinutes', () => {
+    const result = PipelineStartParams.safeParse(
+      paramsWithNode(nodeWith({ limits: { maxMinutes: 0 } }))
+    )
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects a negative limits.maxMinutes', () => {
+    const result = PipelineStartParams.safeParse(
+      paramsWithNode(nodeWith({ limits: { maxMinutes: -5 } }))
+    )
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts onFailure.retries at both boundary values, 0 and 10', () => {
+    expect(
+      PipelineStartParams.safeParse(paramsWithNode(nodeWith({ onFailure: { retries: 0 } })))
+        .success
+    ).toBe(true)
+    expect(
+      PipelineStartParams.safeParse(paramsWithNode(nodeWith({ onFailure: { retries: 10 } })))
+        .success
+    ).toBe(true)
+  })
 })

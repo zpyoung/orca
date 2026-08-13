@@ -1,8 +1,16 @@
 import { z } from 'zod'
-import { OptionalFiniteNumber, OptionalString, requiredNumber, requiredString } from '../schemas'
+import { OptionalString, requiredNumber, requiredString } from '../schemas'
 
-const PipelineNodeLimits = z.object({ maxMinutes: OptionalFiniteNumber }).optional()
-const PipelineNodeOnFailure = z.object({ retries: OptionalFiniteNumber }).optional()
+// Why: the template layer already enforces these ranges client-side, but the resolved
+// definition arrives here as untrusted RPC input and must be re-validated at the boundary.
+const RETRY_MESSAGE = 'onFailure.retries must be an integer between 0 and 10'
+const MAX_MINUTES_MESSAGE = 'limits.maxMinutes must be a finite number greater than 0'
+
+const OptionalPipelineRetries = z.number().int(RETRY_MESSAGE).min(0, RETRY_MESSAGE).max(10, RETRY_MESSAGE).optional()
+const OptionalPipelineMaxMinutes = z.number().finite(MAX_MINUTES_MESSAGE).gt(0, MAX_MINUTES_MESSAGE).optional()
+
+const PipelineNodeLimits = z.object({ maxMinutes: OptionalPipelineMaxMinutes }).optional()
+const PipelineNodeOnFailure = z.object({ retries: OptionalPipelineRetries }).optional()
 
 const ResolvedPipelineNodeSchema = z.object({
   id: requiredString('Missing node id'),
