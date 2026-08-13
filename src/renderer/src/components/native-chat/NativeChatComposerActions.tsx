@@ -118,24 +118,36 @@ export function NativeChatComposerActions({
             {dictationLabel}
           </TooltipContent>
         </Tooltip>
+        {isWorking && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                aria-label={translate('components.native-chat.stop', 'Stop the agent')}
+                disabled={!onStop}
+                onClick={onStop}
+                variant="secondary"
+                size="icon"
+                className="size-8 rounded-full pointer-coarse:size-10"
+              >
+                <Square className="size-3.5 fill-current" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top" sideOffset={4}>
+              {translate('components.native-chat.stop', 'Stop the agent')}
+            </TooltipContent>
+          </Tooltip>
+        )}
         <Button
           type="button"
-          aria-label={
-            isWorking
-              ? translate('components.native-chat.stop', 'Stop the agent')
-              : translate('components.native-chat.composer.send', 'Send')
-          }
+          aria-label={translate('components.native-chat.composer.send', 'Send')}
           disabled={sendDisabled}
-          onClick={isWorking ? onStop : onSend}
-          variant={isWorking ? 'secondary' : 'default'}
+          onClick={onSend}
+          variant="default"
           size="icon"
           className="size-8 rounded-full pointer-coarse:size-10"
         >
-          {isWorking ? (
-            <Square className="size-3.5 fill-current" />
-          ) : (
-            <ArrowUp className="size-4" />
-          )}
+          <ArrowUp className="size-4" />
         </Button>
       </div>
     </div>
