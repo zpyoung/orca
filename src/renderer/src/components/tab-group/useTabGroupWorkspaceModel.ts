@@ -412,7 +412,7 @@ export function useTabGroupWorkspaceModel({
       } else if (item.contentType === 'pipeline') {
         // Why: entityId is a run id, not a file id, and WorkspaceVisibleTabType has no member
         // for pipeline tabs — clear the previously active terminal id so it can't leak through.
-        setActiveTabType('terminal')
+        activatePipelineTabSurface(worktreeId)
       } else {
         setActiveFile(item.entityId)
         setActiveTabType('editor')
