@@ -4,13 +4,31 @@ import { createPipelineRunsSlice, type PipelineRunsSlice } from './pipeline-runs
 
 const HYDRATION_DEADLINE_MS = 30_000
 
+const mocks = vi.hoisted(() => ({
+  callRuntimeRpc: vi.fn(),
+  getRuntimeEnvironmentIdForWorktree: vi.fn(() => null as string | null)
+}))
+
+vi.mock('@/runtime/runtime-rpc-client', () => ({
+  callRuntimeRpc: mocks.callRuntimeRpc
+}))
+
+vi.mock('@/lib/worktree-runtime-owner', () => ({
+  getRuntimeEnvironmentIdForWorktree: mocks.getRuntimeEnvironmentIdForWorktree
+}))
+
 function createTestStore() {
-  return create<PipelineRunsSlice>()(createPipelineRunsSlice)
+  return create<PipelineRunsSlice>()((...args) => {
+    const wideArgs = args as Parameters<typeof createPipelineRunsSlice>
+    return createPipelineRunsSlice(...wideArgs) as PipelineRunsSlice
+  })
 }
 
 beforeEach(() => {
   vi.useFakeTimers()
   vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'))
+  mocks.callRuntimeRpc.mockReset().mockResolvedValue({ runs: [] })
+  mocks.getRuntimeEnvironmentIdForWorktree.mockReset().mockReturnValue(null)
 })
 
 afterEach(() => {
@@ -65,6 +83,58 @@ describe('requestPipelineRunHydration', () => {
       phase: 'in-flight',
       generation: second
     })
+  })
+})
+
+describe('firing pipeline.listRuns', () => {
+  it('fires the RPC against a local target when requesting hydration', () => {
+    const store = createTestStore()
+    store.getState().requestPipelineRunHydration('w1')
+
+    expect(mocks.callRuntimeRpc).toHaveBeenCalledTimes(1)
+    expect(mocks.callRuntimeRpc).toHaveBeenCalledWith({ kind: 'local' }, 'pipeline.listRuns')
+  })
+
+  it('fires the RPC against the resolved environment target for a remote worktree', () => {
+    mocks.getRuntimeEnvironmentIdForWorktree.mockReturnValue('env-1')
+    const store = createTestStore()
+    store.getState().requestPipelineRunHydration('w1')
+
+    expect(mocks.callRuntimeRpc).toHaveBeenCalledWith(
+      { kind: 'environment', environmentId: 'env-1' },
+      'pipeline.listRuns'
+    )
+  })
+
+  it('does not fire a second RPC call for a fresh in-flight request', () => {
+    const store = createTestStore()
+    store.getState().requestPipelineRunHydration('w1')
+    store.getState().requestPipelineRunHydration('w1')
+
+    expect(mocks.callRuntimeRpc).toHaveBeenCalledTimes(1)
+  })
+
+  it('routes a successful completion to hydratePipelineRuns with the request generation', async () => {
+    mocks.callRuntimeRpc.mockResolvedValue({
+      runs: [{ runId: 'r1', templateName: 'bugfix-fast', runNumber: 1, state: 'running' }]
+    })
+    const store = createTestStore()
+    store.getState().requestPipelineRunHydration('w1')
+    // the slice's own .then() is registered on this same promise before ours, so
+    // awaiting it guarantees hydratePipelineRuns has already run by the time we resume.
+    await mocks.callRuntimeRpc.mock.results[0]!.value
+
+    expect(store.getState().pipelineRunHydrationByWorkspaceId.w1).toEqual({ phase: 'hydrated' })
+    expect(store.getState().pipelineRunsById.r1).toMatchObject({ runId: 'r1', state: 'running' })
+  })
+
+  it('routes a rejected completion to markPipelineRunHydrationFailed', async () => {
+    mocks.callRuntimeRpc.mockRejectedValue(new Error('host unreachable'))
+    const store = createTestStore()
+    store.getState().requestPipelineRunHydration('w1')
+    await mocks.callRuntimeRpc.mock.results[0]!.value.catch(() => {})
+
+    expect(store.getState().pipelineRunHydrationByWorkspaceId.w1).toEqual({ phase: 'failed' })
   })
 })
 
