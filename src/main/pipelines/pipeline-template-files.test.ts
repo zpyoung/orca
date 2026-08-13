@@ -1,7 +1,9 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import type * as NodeFs from 'node:fs'
+import type { PathLike, PathOrFileDescriptor } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MAX_ORCA_YAML_BYTES } from '../../shared/orca-yaml-file-limit'
 import { BUGFIX_FAST_STARTER_TEMPLATE } from './pipeline-starter-template'
 import {
@@ -9,6 +11,28 @@ import {
   getPipelineTemplatesDir,
   listPipelineTemplateFiles
 } from './pipeline-template-files'
+
+// hooks let individual tests observe/react to a real fs call from inside the module under
+// test, to simulate a race landing between that call and the next one
+let onWriteFileSync: ((path: PathOrFileDescriptor) => void) | undefined
+let onRealpathSync: ((path: PathLike) => void) | undefined
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof NodeFs>()
+  return {
+    ...actual,
+    writeFileSync: ((...args: Parameters<typeof actual.writeFileSync>) => {
+      const result = actual.writeFileSync(...args)
+      onWriteFileSync?.(args[0])
+      return result
+    }) as typeof actual.writeFileSync,
+    realpathSync: ((...args: Parameters<typeof actual.realpathSync>) => {
+      const result = actual.realpathSync(...args)
+      onRealpathSync?.(args[0])
+      return result
+    }) as typeof actual.realpathSync
+  }
+})
 
 describe('getPipelineTemplatesDir', () => {
   it('resolves to <home>/.orca/pipelines', () => {
@@ -70,6 +94,28 @@ describe('pipeline-template-files', () => {
         expect(existsSync(join(dir, 'bugfix-fast.yaml'))).toBe(false)
       }
     )
+
+    it('does not clobber a user template created in the window between the absence check and placement', () => {
+      const path = join(dir, 'bugfix-fast.yaml')
+      const raceContent = 'user: created-mid-flight\n'
+      // simulates a concurrent writer landing the destination right after our temp copy is
+      // ready but before it gets placed — the exact window a check-then-rename can race
+      onWriteFileSync = (writtenPath) => {
+        if (String(writtenPath).endsWith('.tmp')) {
+          writeFileSync(path, raceContent, 'utf8')
+        }
+      }
+
+      let result: { created: boolean; path: string }
+      try {
+        result = ensureStarterTemplate(dir)
+      } finally {
+        onWriteFileSync = undefined
+      }
+
+      expect(result).toEqual({ created: false, path })
+      expect(readFileSync(path, 'utf8')).toBe(raceContent)
+    })
 
     it('is a no-op on a second call once the starter already exists', () => {
       const first = ensureStarterTemplate(dir)
@@ -144,6 +190,38 @@ describe('pipeline-template-files', () => {
 
       expect(listPipelineTemplateFiles(dir).map((f) => f.basename)).toEqual(['kept.yaml'])
     })
+
+    it.runIf(process.platform !== 'win32')(
+      'reads the validated target even when the entry is swapped for an escaping symlink before the read (simulated via a filesystem hook on realpathSync)',
+      () => {
+        mkdirSync(dir, { recursive: true })
+        const insidePath = join(dir, 'real-inside.yaml')
+        writeFileSync(insidePath, 'inside: true\n', 'utf8')
+        const entryPath = join(dir, 'linked.yaml')
+        symlinkSync(insidePath, entryPath)
+        const outsidePath = join(root, 'outside.yaml')
+        writeFileSync(outsidePath, 'outside: leaked\n', 'utf8')
+
+        // fires the moment containment validation resolves the entry — the exact point
+        // where a stale re-open of the entry path (rather than the validated target) races
+        onRealpathSync = (path) => {
+          if (path === entryPath) {
+            rmSync(entryPath)
+            symlinkSync(outsidePath, entryPath)
+          }
+        }
+
+        let files: ReturnType<typeof listPipelineTemplateFiles>
+        try {
+          files = listPipelineTemplateFiles(dir)
+        } finally {
+          onRealpathSync = undefined
+        }
+
+        const linked = files.find((f) => f.basename === 'linked.yaml')
+        expect(linked?.content).toBe('inside: true\n')
+      }
+    )
 
     it('skips a file over the shared YAML size bound, keeping files within it', () => {
       mkdirSync(dir, { recursive: true })
