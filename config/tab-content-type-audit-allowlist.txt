@@ -40,6 +40,10 @@ src/shared/workspace-session-terminal-tab-close.ts
 src/renderer/src/components/workspace-cleanup/workspace-cleanup-candidate-labels.ts
 src/renderer/src/components/tab-group/tab-drag-data.ts
 src/renderer/src/components/terminal/tab-type-cycle.ts
+# was miscategorized under (b): onFocusEditorTab's else branch wrote a pipeline
+# run id into setActiveFile under activeTabType 'editor' — a live defect, not a
+# closed positive check. Fixed with an explicit pipeline branch (fix-r N4).
+src/renderer/src/hooks/useIpcEvents.ts
 
 # (b) closed positive checks already reviewed as correct (spec's verified-safe
 # list plus the same pattern found elsewhere in the sweep)
@@ -72,7 +76,6 @@ src/renderer/src/components/native-chat/use-native-chat-toggle-shortcut.ts
 src/renderer/src/components/shared/kill-all-terminal-surfaces.ts
 src/renderer/src/components/terminal-pane/TerminalPaneOverlayLayer.tsx
 src/renderer/src/components/terminal-pane/terminal-unified-tab-lookup.ts
-src/renderer/src/hooks/useIpcEvents.ts
 src/renderer/src/lib/automation-session-reuse.ts
 src/renderer/src/components/WorktreeJumpPalette.tsx
 

@@ -4,6 +4,9 @@ import {
   type PipelineRunSnapshotWire,
   type PipelineRunState
 } from '../../../../shared/pipeline-run-snapshot'
+import type { AppState } from '../types'
+import { callRuntimeRpc, type RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
+import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
 
 const HYDRATION_DEADLINE_MS = 30_000
 
@@ -44,7 +47,7 @@ export type PipelineRunsSlice = {
   upsertPipelineRunFromSnapshot: (snapshot: PipelineRunSnapshotWire) => void
 }
 
-export const createPipelineRunsSlice: StateCreator<PipelineRunsSlice, [], [], PipelineRunsSlice> = (
+export const createPipelineRunsSlice: StateCreator<AppState, [], [], PipelineRunsSlice> = (
   set,
   get
 ) => {
@@ -77,6 +80,20 @@ export const createPipelineRunsSlice: StateCreator<PipelineRunsSlice, [], [], Pi
           [worktreeId]: { phase: 'in-flight', startedAt: Date.now(), generation }
         }
       }))
+      const environmentId = getRuntimeEnvironmentIdForWorktree(get(), worktreeId)
+      const target: RuntimeClientTarget = environmentId
+        ? { kind: 'environment', environmentId }
+        : { kind: 'local' }
+      // no workspaceId filter: a renderer worktree id isn't provably identical to the
+      // host's workspace_id across every worktree kind, and a false-empty filtered
+      // result would hydrate this workspace as if the run had already ended.
+      callRuntimeRpc<{ runs: PipelineRunListEntry[] }>(target, 'pipeline.listRuns')
+        .then((result) => {
+          get().hydratePipelineRuns(worktreeId, generation, result.runs)
+        })
+        .catch(() => {
+          get().markPipelineRunHydrationFailed(worktreeId, generation)
+        })
       return generation
     },
 

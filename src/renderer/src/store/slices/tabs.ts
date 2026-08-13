@@ -417,10 +417,25 @@ function collapseGroupLayout(
 }
 
 function toVisibleTabType(contentType: TabContentType): WorkspaceVisibleTabType {
-  if (contentType === 'browser' || contentType === 'terminal' || contentType === 'simulator') {
-    return contentType
+  switch (contentType) {
+    case 'browser':
+    case 'terminal':
+    case 'simulator':
+      return contentType
+    case 'pipeline':
+      // entityId is a run id; WorkspaceVisibleTabType has no member for it, so fall back
+      // like a plain split-group focus does rather than tag it 'editor' and risk a stale
+      // activeFileId being treated as the file this tab shows.
+      return 'terminal'
+    case 'editor':
+    case 'diff':
+    case 'conflict-review':
+    case 'check-details':
+      return 'editor'
   }
-  return 'editor'
+  // outside the switch, not in a default: case, so control-flow narrowing to
+  // `never` still fires here once every member above is handled
+  return assertExhaustiveTabContentType(contentType)
 }
 
 function deriveActiveSurfaceForWorktree(
@@ -703,6 +718,15 @@ export function projectWorktreeTabModelReconciliation(
     (state.browserTabsByWorktree[worktreeId] ?? []).map((browserTab) => browserTab.id)
   )
   const pipelineRunHydration = state.pipelineRunHydrationByWorkspaceId[worktreeId]
+  // Why: reconciliation is the only synchronous place that sees every pipeline tab, so it
+  // is what must kick off (or leave outstanding) the async listRuns request; the action
+  // itself no-ops for a fresh in-flight entry, so calling it here is always safe to repeat.
+  if (
+    pipelineRunHydration?.phase !== 'hydrated' &&
+    reconciledUnifiedTabs.some((tab) => tab.contentType === 'pipeline')
+  ) {
+    state.requestPipelineRunHydration(worktreeId)
+  }
 
   const isRenderableTab = (tab: Tab): boolean => {
     switch (tab.contentType) {

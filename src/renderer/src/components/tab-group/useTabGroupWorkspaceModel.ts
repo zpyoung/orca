@@ -411,7 +411,11 @@ export function useTabGroupWorkspaceModel({
       } else if (item.contentType === 'pipeline') {
         // Why: entityId is a run id, not a file id — writing it into setActiveFile
         // would masquerade a pipeline run as an open file. activateTab above
-        // already routes the split-group model to this tab.
+        // already routes the split-group model to this tab; falling activeTabType
+        // to 'terminal' (pipeline has no member of its own, mirrors TabGroupPanel's
+        // own mapping) clears a stale 'editor' + activeFileId pair so file-scoped
+        // actions elsewhere (Cmd+S, focus-zoom) can't act on a file no longer shown.
+        setActiveTabType('terminal')
       } else {
         setActiveFile(item.entityId)
         setActiveTabType('editor')
