@@ -15204,6 +15204,9 @@
         "loadFailed": "Failed to load the GitLab job log.",
         "emptyTrace": "No log is available for this GitLab job.",
         "timedOut": "Timed out loading the GitLab job log."
+      },
+      "pipelineRunClient": {
+        "mismatchedSnapshotRunId": "Received a snapshot for run {{value0}}, expected {{value1}}."
       }
     },
     "ssh": {

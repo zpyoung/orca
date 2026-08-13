@@ -2,36 +2,51 @@
 
 import '@testing-library/jest-dom/vitest'
 import { cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { PipelineRunSnapshotWire } from '../../../../shared/pipeline-run-snapshot'
 import type { PipelineRunSubscriptionError } from '@/runtime/pipeline-run-client'
+import type { RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
 
-vi.mock('@/store', () => ({
-  useAppStore: (selector: (state: Record<string, unknown>) => unknown) =>
-    selector({ settings: { activeRuntimeEnvironmentId: null } })
-}))
+const DEFAULT_TARGET: RuntimeClientTarget = { kind: 'local' }
 
 let mockedHookResult: {
   snapshot: PipelineRunSnapshotWire | null
   runState: string | null
   isStale: boolean
   subscriptionError: PipelineRunSubscriptionError | null
-} = { snapshot: null, runState: null, isStale: false, subscriptionError: null }
+  target: RuntimeClientTarget
+} = {
+  snapshot: null,
+  runState: null,
+  isStale: false,
+  subscriptionError: null,
+  target: DEFAULT_TARGET
+}
 
 vi.mock('./usePipelineRunSnapshot', () => ({
   usePipelineRunSnapshot: () => mockedHookResult
 }))
 
+const callRuntimeRpc = vi.fn<(..._args: unknown[]) => Promise<unknown>>(async () => ({
+  state: 'ok'
+}))
 vi.mock('@/runtime/runtime-rpc-client', () => ({
-  callRuntimeRpc: vi.fn(async () => ({ state: 'ok' })),
-  getActiveRuntimeTarget: () => ({ kind: 'local' as const })
+  callRuntimeRpc: (...args: unknown[]) => callRuntimeRpc(...args)
 }))
 
 import PipelineCanvas from './PipelineCanvas'
 
 afterEach(() => {
   cleanup()
-  mockedHookResult = { snapshot: null, runState: null, isStale: false, subscriptionError: null }
+  callRuntimeRpc.mockClear()
+  mockedHookResult = {
+    snapshot: null,
+    runState: null,
+    isStale: false,
+    subscriptionError: null,
+    target: DEFAULT_TARGET
+  }
 })
 
 describe('PipelineCanvas', () => {
@@ -45,7 +60,8 @@ describe('PipelineCanvas', () => {
       snapshot: null,
       runState: null,
       isStale: false,
-      subscriptionError: { kind: 'unsupported', message: 'Unknown method: pipeline.subscribe' }
+      subscriptionError: { kind: 'unsupported', message: 'Unknown method: pipeline.subscribe' },
+      target: DEFAULT_TARGET
     }
     render(<PipelineCanvas runId="run-1" />)
     expect(screen.getByText(/does not support pipelines/i)).toBeInTheDocument()
@@ -57,7 +73,8 @@ describe('PipelineCanvas', () => {
       snapshot: null,
       runState: null,
       isStale: false,
-      subscriptionError: { kind: 'transient', message: 'socket closed' }
+      subscriptionError: { kind: 'transient', message: 'socket closed' },
+      target: DEFAULT_TARGET
     }
     render(<PipelineCanvas runId="run-1" />)
     expect(screen.getByText(/could not reach/i)).toBeInTheDocument()
@@ -69,7 +86,8 @@ describe('PipelineCanvas', () => {
       snapshot: { runId: 'run-1', templateName: 'bugfix-fast', runNumber: 4, state: 'running' },
       runState: 'running',
       isStale: false,
-      subscriptionError: { kind: 'transient', message: 'socket closed' }
+      subscriptionError: { kind: 'transient', message: 'socket closed' },
+      target: DEFAULT_TARGET
     }
     render(<PipelineCanvas runId="run-1" />)
     expect(screen.getByText(/bugfix-fast/)).toBeInTheDocument()
@@ -81,7 +99,8 @@ describe('PipelineCanvas', () => {
       snapshot: { runId: 'run-1', templateName: 'bugfix-fast', runNumber: 4, state: 'running' },
       runState: 'running',
       isStale: false,
-      subscriptionError: null
+      subscriptionError: null,
+      target: DEFAULT_TARGET
     }
     render(<PipelineCanvas runId="run-1" />)
     expect(screen.getByText(/bugfix-fast/)).toBeInTheDocument()
@@ -94,7 +113,8 @@ describe('PipelineCanvas', () => {
       snapshot: { runId: 'run-1', needsNewerOrca: true, state: 'running' },
       runState: 'running',
       isStale: false,
-      subscriptionError: null
+      subscriptionError: null,
+      target: DEFAULT_TARGET
     }
     render(<PipelineCanvas runId="run-1" />)
     expect(screen.getByText(/may need a newer Orca/i)).toBeInTheDocument()
@@ -105,7 +125,8 @@ describe('PipelineCanvas', () => {
       snapshot: { runId: 'run-1', needsNewerOrca: false, state: 'running' },
       runState: 'running',
       isStale: false,
-      subscriptionError: null
+      subscriptionError: null,
+      target: DEFAULT_TARGET
     }
     render(<PipelineCanvas runId="run-1" />)
     expect(screen.queryByText(/may need a newer Orca/i)).not.toBeInTheDocument()
@@ -116,7 +137,8 @@ describe('PipelineCanvas', () => {
       snapshot: { runId: 'run-1', state: 'running', publishedAt: new Date().toISOString() },
       runState: 'running',
       isStale: true,
-      subscriptionError: null
+      subscriptionError: null,
+      target: DEFAULT_TARGET
     }
     render(<PipelineCanvas runId="run-1" />)
     expect(screen.getByText(/last confirmed/i)).toBeInTheDocument()
@@ -127,7 +149,8 @@ describe('PipelineCanvas', () => {
       snapshot: { runId: 'run-1', state: 'running', publishedAt: new Date().toISOString() },
       runState: 'running',
       isStale: false,
-      subscriptionError: null
+      subscriptionError: null,
+      target: DEFAULT_TARGET
     }
     render(<PipelineCanvas runId="run-1" />)
     expect(screen.queryByText(/last confirmed/i)).not.toBeInTheDocument()
@@ -145,7 +168,8 @@ describe('PipelineCanvas', () => {
       },
       runState: 'running',
       isStale: false,
-      subscriptionError: null
+      subscriptionError: null,
+      target: DEFAULT_TARGET
     }
     render(<PipelineCanvas runId="run-1" />)
     expect(screen.getByText('Reproduce')).toBeInTheDocument()
@@ -164,7 +188,8 @@ describe('PipelineCanvas', () => {
       },
       runState: 'running',
       isStale: false,
-      subscriptionError: null
+      subscriptionError: null,
+      target: DEFAULT_TARGET
     }
     render(<PipelineCanvas runId="run-1" />)
     expect(screen.getByText(/^1m 0[0-9]s$/)).toBeInTheDocument()
@@ -180,7 +205,8 @@ describe('PipelineCanvas', () => {
       },
       runState: 'running',
       isStale: false,
-      subscriptionError: null
+      subscriptionError: null,
+      target: DEFAULT_TARGET
     }
     render(<PipelineCanvas runId="run-1" />)
     expect(screen.queryByText(/^\d+(m \d+)?s$/)).not.toBeInTheDocument()
@@ -191,7 +217,8 @@ describe('PipelineCanvas', () => {
       snapshot: { runId: 'run-1', state: 'running' },
       runState: 'running',
       isStale: false,
-      subscriptionError: null
+      subscriptionError: null,
+      target: DEFAULT_TARGET
     }
     render(<PipelineCanvas runId="run-1" />)
     expect(screen.getByRole('button', { name: /pause/i })).toBeInTheDocument()
@@ -202,10 +229,59 @@ describe('PipelineCanvas', () => {
       snapshot: { runId: 'run-1', state: 'completed' },
       runState: 'completed',
       isStale: false,
-      subscriptionError: null
+      subscriptionError: null,
+      target: DEFAULT_TARGET
     }
     render(<PipelineCanvas runId="run-1" />)
     expect(screen.queryByRole('button', { name: /pause/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /abort/i })).not.toBeInTheDocument()
+  })
+
+  it("sends Pause to the run's own resolved target, not some other host", async () => {
+    const runOwnerTarget: RuntimeClientTarget = { kind: 'environment', environmentId: 'env-owner' }
+    mockedHookResult = {
+      snapshot: { runId: 'run-1', state: 'running' },
+      runState: 'running',
+      isStale: false,
+      subscriptionError: null,
+      target: runOwnerTarget
+    }
+    const user = userEvent.setup()
+    render(<PipelineCanvas runId="run-1" />)
+    await user.click(screen.getByRole('button', { name: /pause/i }))
+    expect(callRuntimeRpc).toHaveBeenCalledWith(runOwnerTarget, 'pipeline.pause', { runId: 'run-1' })
+    expect(callRuntimeRpc).not.toHaveBeenCalledWith(DEFAULT_TARGET, 'pipeline.pause', {
+      runId: 'run-1'
+    })
+  })
+
+  it('shows the persisted failure reason for a failed run', () => {
+    mockedHookResult = {
+      snapshot: {
+        runId: 'run-1',
+        state: 'failed',
+        failureReason: 'setup refused: harness disabled for node "repro"'
+      },
+      runState: 'failed',
+      isStale: false,
+      subscriptionError: null,
+      target: DEFAULT_TARGET
+    }
+    render(<PipelineCanvas runId="run-1" />)
+    expect(
+      screen.getByText('setup refused: harness disabled for node "repro"')
+    ).toBeInTheDocument()
+  })
+
+  it('omits the failure reason banner for a non-failed run even if one is present on the wire', () => {
+    mockedHookResult = {
+      snapshot: { runId: 'run-1', state: 'running', failureReason: 'stale from a prior attempt' },
+      runState: 'running',
+      isStale: false,
+      subscriptionError: null,
+      target: DEFAULT_TARGET
+    }
+    render(<PipelineCanvas runId="run-1" />)
+    expect(screen.queryByText('stale from a prior attempt')).not.toBeInTheDocument()
   })
 })

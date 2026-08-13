@@ -88,11 +88,43 @@ describe('subscribeToPipelineRunSnapshot', () => {
       deliver?.({
         id: 'req-1',
         ok: true,
-        result: { runId: 'run_1', nodes: {} },
+        result: { runId: 'run-1', nodes: {} },
         _meta: { runtimeId: 'r' }
       })
     ).not.toThrow()
-    expect(onSnapshot).toHaveBeenCalledExactlyOnceWith({ runId: 'run_1' })
+    expect(onSnapshot).toHaveBeenCalledExactlyOnceWith({ runId: 'run-1' })
+  })
+
+  it('drops a remote snapshot for a different run id and surfaces it as an error, not onSnapshot', async () => {
+    let deliver: ((response: RuntimeRpcResponse<unknown>) => void) | undefined
+    ;(window as unknown as { api: unknown }).api = {
+      runtimeEnvironments: {
+        subscribe: vi.fn(async (_args: unknown, callbacks: { onResponse: typeof deliver }) => {
+          deliver = callbacks.onResponse
+          return { unsubscribe: vi.fn() }
+        })
+      }
+    }
+    const onSnapshot = vi.fn()
+    const onError = vi.fn()
+    await subscribeToPipelineRunSnapshot(
+      { kind: 'environment', environmentId: 'env-1' },
+      'run-1',
+      onSnapshot,
+      onError
+    )
+
+    deliver?.({
+      id: 'req-1',
+      ok: true,
+      result: { runId: 'run-2', state: 'running' },
+      _meta: { runtimeId: 'r' }
+    })
+
+    expect(onSnapshot).not.toHaveBeenCalled()
+    expect(onError).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ kind: 'transient' })
+    )
   })
 
   it('routes an error response to onError instead of onSnapshot', async () => {
@@ -294,9 +326,31 @@ describe('subscribeToPipelineRunSnapshot', () => {
     await subscribeToPipelineRunSnapshot({ kind: 'local' }, 'run-1', onSnapshot, () => {})
 
     expect(() =>
-      onFrame?.({ type: 'snapshot', snapshot: { runId: 'run_1', nodes: {} } })
+      onFrame?.({ type: 'snapshot', snapshot: { runId: 'run-1', nodes: {} } })
     ).not.toThrow()
-    expect(onSnapshot).toHaveBeenCalledExactlyOnceWith({ runId: 'run_1' })
+    expect(onSnapshot).toHaveBeenCalledExactlyOnceWith({ runId: 'run-1' })
+  })
+
+  it('drops a local snapshot frame for a different run id and surfaces it as an error, not onSnapshot', async () => {
+    let onFrame: ((frame: { type: string; snapshot?: unknown; error?: string }) => void) | undefined
+    ;(window as unknown as { api: unknown }).api = {
+      pipelineRuns: {
+        subscribe: vi.fn((_args: unknown, callback: typeof onFrame) => {
+          onFrame = callback
+          return vi.fn()
+        })
+      }
+    }
+    const onSnapshot = vi.fn()
+    const onError = vi.fn()
+    await subscribeToPipelineRunSnapshot({ kind: 'local' }, 'run-1', onSnapshot, onError)
+
+    onFrame?.({ type: 'snapshot', snapshot: { runId: 'run-2', state: 'running' } })
+
+    expect(onSnapshot).not.toHaveBeenCalled()
+    expect(onError).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ kind: 'transient' })
+    )
   })
 
   it('routes a local error frame to onError instead of onSnapshot', async () => {

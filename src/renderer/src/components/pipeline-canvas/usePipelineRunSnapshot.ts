@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   decodePipelineRunState,
   type PipelineRunSnapshotWire,
@@ -8,7 +8,8 @@ import {
   subscribeToPipelineRunSnapshot,
   type PipelineRunSubscriptionError
 } from '@/runtime/pipeline-run-client'
-import { getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
+import type { RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
+import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
 import { useAppStore } from '@/store'
 
 const STALENESS_THRESHOLD_MS = 15_000
@@ -25,6 +26,7 @@ export type PipelineRunSnapshotState = {
   runState: PipelineRunState | 'unknown' | null
   isStale: boolean
   subscriptionError: PipelineRunSubscriptionError | null
+  target: RuntimeClientTarget
 }
 
 /**
@@ -32,10 +34,20 @@ export type PipelineRunSnapshotState = {
  * run state (unknown tags never throw), feeds every snapshot into the
  * pipeline-runs store slice, and derives the staleness indicator from the
  * newest snapshot's `publishedAt` rather than from message-arrival timing.
+ *
+ * Resolves its host from the run's own owning workspace (via the pipeline-runs
+ * store slice), not the globally selected runtime environment — a run must stay
+ * reachable, and its controls must stay targeted at the right host, regardless
+ * of what the user has selected elsewhere in the app.
  */
 export function usePipelineRunSnapshot(runId: string): PipelineRunSnapshotState {
-  const activeRuntimeEnvironmentId = useAppStore(
-    (state) => state.settings?.activeRuntimeEnvironmentId ?? null
+  const runEnvironmentId = useAppStore((state) =>
+    getRuntimeEnvironmentIdForWorktree(state, state.pipelineRunsById[runId]?.workspaceId ?? null)
+  )
+  const target: RuntimeClientTarget = useMemo(
+    () =>
+      runEnvironmentId ? { kind: 'environment', environmentId: runEnvironmentId } : { kind: 'local' },
+    [runEnvironmentId]
   )
   const upsertPipelineRunFromSnapshot = useAppStore((state) => state.upsertPipelineRunFromSnapshot)
   const [snapshot, setSnapshot] = useState<PipelineRunSnapshotWire | null>(null)
@@ -50,7 +62,6 @@ export function usePipelineRunSnapshot(runId: string): PipelineRunSnapshotState 
     setIsStale(false)
     setSubscriptionError(null)
 
-    const target = getActiveRuntimeTarget({ activeRuntimeEnvironmentId })
     let subscription: { unsubscribe: () => void } | null = null
 
     void subscribeToPipelineRunSnapshot(
@@ -84,7 +95,7 @@ export function usePipelineRunSnapshot(runId: string): PipelineRunSnapshotState 
       disposed = true
       subscription?.unsubscribe()
     }
-  }, [runId, activeRuntimeEnvironmentId, upsertPipelineRunFromSnapshot])
+  }, [runId, target, upsertPipelineRunFromSnapshot])
 
   useEffect(() => {
     if (!snapshot) {
@@ -109,6 +120,7 @@ export function usePipelineRunSnapshot(runId: string): PipelineRunSnapshotState 
     snapshot,
     runState: snapshot ? decodePipelineRunState(snapshot.state) : null,
     isStale,
-    subscriptionError
+    subscriptionError,
+    target
   }
 }

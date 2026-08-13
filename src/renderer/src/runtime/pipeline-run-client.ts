@@ -1,3 +1,4 @@
+import { translate } from '@/i18n/i18n'
 import {
   decodePipelineRunSnapshotWire,
   type PipelineRunSnapshotWire
@@ -26,6 +27,30 @@ function classifySubscriptionError(raw: unknown): PipelineRunSubscriptionError {
   return { kind: code === METHOD_NOT_FOUND_CODE ? 'unsupported' : 'transient', message }
 }
 
+// a misrouted or malformed stream must never hand one run's state to another run's canvas.
+function admitPipelineRunSnapshot(
+  runId: string,
+  decoded: PipelineRunSnapshotWire | null,
+  onSnapshot: (snapshot: PipelineRunSnapshotWire) => void,
+  onError: (error: PipelineRunSubscriptionError) => void
+): void {
+  if (!decoded) {
+    return
+  }
+  if (decoded.runId !== runId) {
+    onError({
+      kind: 'transient',
+      message: translate(
+        'auto.runtime.pipelineRunClient.mismatchedSnapshotRunId',
+        'Received a snapshot for run {{value0}}, expected {{value1}}.',
+        { value0: decoded.runId, value1: runId }
+      )
+    })
+    return
+  }
+  onSnapshot(decoded)
+}
+
 /**
  * Streams `pipeline.subscribe` snapshots for one run. Mirrors
  * `subscribeRuntimeClientEvents`'s listener-first shape: for a remote runtime
@@ -49,10 +74,7 @@ export async function subscribeToPipelineRunSnapshot(
         onError(classifySubscriptionError(new Error(frame.error)))
         return
       }
-      const decoded = decodePipelineRunSnapshotWire(frame.snapshot)
-      if (decoded) {
-        onSnapshot(decoded)
-      }
+      admitPipelineRunSnapshot(runId, decodePipelineRunSnapshotWire(frame.snapshot), onSnapshot, onError)
     })
     return { unsubscribe }
   }
@@ -64,7 +86,7 @@ export async function subscribeToPipelineRunSnapshot(
       params: { runId }
     },
     {
-      onResponse: (response) => handlePipelineSubscribeResponse(response, onSnapshot, onError),
+      onResponse: (response) => handlePipelineSubscribeResponse(runId, response, onSnapshot, onError),
       onError: (error) => onError(classifySubscriptionError(error))
     }
   )
@@ -72,6 +94,7 @@ export async function subscribeToPipelineRunSnapshot(
 }
 
 function handlePipelineSubscribeResponse(
+  runId: string,
   response: RuntimeRpcResponse<unknown>,
   onSnapshot: (snapshot: PipelineRunSnapshotWire) => void,
   onError: (error: PipelineRunSubscriptionError) => void
@@ -80,8 +103,5 @@ function handlePipelineSubscribeResponse(
     onError(classifySubscriptionError(response.error))
     return
   }
-  const decoded = decodePipelineRunSnapshotWire(response.result)
-  if (decoded) {
-    onSnapshot(decoded)
-  }
+  admitPipelineRunSnapshot(runId, decodePipelineRunSnapshotWire(response.result), onSnapshot, onError)
 }

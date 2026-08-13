@@ -9,8 +9,6 @@ import { useNow } from '@/components/dashboard/useNow'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import { translate } from '@/i18n/i18n'
 import type { PipelineRunSubscriptionError } from '@/runtime/pipeline-run-client'
-import { getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
-import { useAppStore } from '@/store'
 import type { PipelineRunState } from '../../../../shared/pipeline-run-snapshot'
 import { formatPipelineElapsedTime, pipelineNodeElapsedMs } from './pipeline-canvas-elapsed-time'
 import PipelineCanvasScene from './PipelineCanvasScene'
@@ -86,11 +84,7 @@ function subscriptionErrorHeadline(kind: PipelineRunSubscriptionError['kind']): 
  * "needs a newer Orca" banner, and staleness chrome over the live node scene.
  */
 export default function PipelineCanvas({ runId }: { runId: string }): React.JSX.Element {
-  const { snapshot, runState, isStale, subscriptionError } = usePipelineRunSnapshot(runId)
-  const activeRuntimeEnvironmentId = useAppStore(
-    (state) => state.settings?.activeRuntimeEnvironmentId ?? null
-  )
-  const target = getActiveRuntimeTarget({ activeRuntimeEnvironmentId })
+  const { snapshot, runState, isStale, subscriptionError, target } = usePipelineRunSnapshot(runId)
   const prefersReducedMotion = usePrefersReducedMotion()
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -246,6 +240,11 @@ export default function PipelineCanvas({ runId }: { runId: string }): React.JSX.
       {subscriptionError && (
         <p className="border-b border-border bg-muted px-4 py-1 text-xs text-muted-foreground">
           {subscriptionErrorHeadline(subscriptionError.kind)}
+        </p>
+      )}
+      {runState === 'failed' && snapshot.failureReason && (
+        <p className="border-b border-border bg-muted px-4 py-1 text-xs text-destructive">
+          {snapshot.failureReason}
         </p>
       )}
       <div ref={containerRef} className="scrollbar-sleek relative min-h-0 flex-1 overflow-auto">

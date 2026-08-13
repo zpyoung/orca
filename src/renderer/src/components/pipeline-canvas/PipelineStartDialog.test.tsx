@@ -22,6 +22,7 @@ type TestRunListEntry = {
   runNumber: number
   state: string
   workspaceDisplayName: string
+  workspaceId?: string
 }
 
 let listRunsResult: TestRunListEntry[] = []
@@ -35,6 +36,11 @@ const callRuntimeRpc = vi.fn<(..._args: unknown[]) => Promise<unknown>>(async (_
 })
 vi.mock('@/runtime/runtime-rpc-client', () => ({
   callRuntimeRpc: (...args: unknown[]) => callRuntimeRpc(...args)
+}))
+
+const ensurePipelineTab = vi.fn<(..._args: unknown[]) => string | null>(() => 'tab-1')
+vi.mock('@/lib/ensure-pipeline-tab', () => ({
+  ensurePipelineTab: (...args: unknown[]) => ensurePipelineTab(...args)
 }))
 
 type TestResolveResult =
@@ -84,6 +90,7 @@ afterEach(() => {
   callRuntimeRpc.mockClear()
   resolveTemplate.mockClear()
   listTemplates.mockClear()
+  ensurePipelineTab.mockClear()
   listRunsResult = []
   startResult = { runId: 'run-1', runNumber: 1 }
 })
@@ -307,6 +314,100 @@ describe('PipelineStartDialog', () => {
     )
     await waitFor(() => expect(screen.getByText(/orca #3/)).toBeInTheDocument())
     expect(screen.getByText(/completed/i)).toBeInTheDocument()
+  })
+
+  it('reopens a history run at its own workspace when clicked', async () => {
+    listRunsResult = [
+      {
+        runId: 'run-9',
+        templateName: 'bugfix-fast',
+        runNumber: 3,
+        state: 'running',
+        workspaceDisplayName: 'orca',
+        workspaceId: 'w9'
+      }
+    ]
+    setup([{ basename: 'bugfix-fast.yaml', name: 'bugfix-fast', needsNewerOrca: false }])
+    const onOpenChange = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <PipelineStartDialog
+        open={true}
+        onOpenChange={onOpenChange}
+        worktreeSelector="id:w1"
+        workspaceId="w1"
+        target={target}
+        isFolderWorkspace={false}
+        hasSubmodules={false}
+      />
+    )
+    await waitFor(() => expect(screen.getByText(/orca #3/)).toBeInTheDocument())
+    await user.click(screen.getByText(/orca #3/))
+
+    expect(ensurePipelineTab).toHaveBeenCalledWith('w9', {
+      runId: 'run-9',
+      runNumber: 3,
+      templateName: 'bugfix-fast'
+    })
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
+
+  it("falls back to the dialog's own scoping workspace when a history row carries none", async () => {
+    listRunsResult = [
+      {
+        runId: 'run-9',
+        templateName: 'bugfix-fast',
+        runNumber: 3,
+        state: 'running',
+        workspaceDisplayName: 'orca'
+      }
+    ]
+    setup([{ basename: 'bugfix-fast.yaml', name: 'bugfix-fast', needsNewerOrca: false }])
+    const user = userEvent.setup()
+    render(
+      <PipelineStartDialog
+        open={true}
+        onOpenChange={() => {}}
+        worktreeSelector="id:w1"
+        workspaceId="w1"
+        target={target}
+        isFolderWorkspace={false}
+        hasSubmodules={false}
+      />
+    )
+    await waitFor(() => expect(screen.getByText(/orca #3/)).toBeInTheDocument())
+    await user.click(screen.getByText(/orca #3/))
+
+    expect(ensurePipelineTab).toHaveBeenCalledWith('w1', {
+      runId: 'run-9',
+      runNumber: 3,
+      templateName: 'bugfix-fast'
+    })
+  })
+
+  it('leaves a history row inert when no workspace is known for it', async () => {
+    listRunsResult = [
+      {
+        runId: 'run-9',
+        templateName: 'bugfix-fast',
+        runNumber: 3,
+        state: 'running',
+        workspaceDisplayName: 'orca'
+      }
+    ]
+    setup([{ basename: 'bugfix-fast.yaml', name: 'bugfix-fast', needsNewerOrca: false }])
+    render(
+      <PipelineStartDialog
+        open={true}
+        onOpenChange={() => {}}
+        worktreeSelector="id:w1"
+        target={target}
+        isFolderWorkspace={false}
+        hasSubmodules={false}
+      />
+    )
+    await waitFor(() => expect(screen.getByText(/orca #3/)).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: /orca #3/ })).not.toBeInTheDocument()
   })
 
   it('shows no history section when there are no prior runs', async () => {

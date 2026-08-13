@@ -10,10 +10,24 @@ import type { PipelineRunSubscriptionError } from '@/runtime/pipeline-run-client
 
 const upsertPipelineRunFromSnapshot = vi.fn()
 
+// keyed by worktreeId, standing in for the real resolver's indexed-worktree lookup
+let runtimeEnvironmentIdByWorktreeId: Record<string, string> = {}
+let pipelineRunsById: Record<string, { workspaceId: string | null }> = {}
+
+vi.mock('@/lib/worktree-runtime-owner', () => ({
+  getRuntimeEnvironmentIdForWorktree: (
+    _state: unknown,
+    worktreeId: string | null
+  ): string | null => (worktreeId ? (runtimeEnvironmentIdByWorktreeId[worktreeId] ?? null) : null)
+}))
+
 vi.mock('@/store', () => ({
   useAppStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({
-      settings: { activeRuntimeEnvironmentId: null },
+      // deliberately a *different* environment than any workspace-owner mapping used below,
+      // so a test that resolves to it instead of the run's own workspace owner is caught.
+      settings: { activeRuntimeEnvironmentId: 'env-GLOBALLY-SELECTED' },
+      pipelineRunsById,
       upsertPipelineRunFromSnapshot
     })
 }))
@@ -56,6 +70,8 @@ describe('usePipelineRunSnapshot', () => {
     upsertPipelineRunFromSnapshot.mockClear()
     deliverSnapshot = undefined
     deliverError = undefined
+    runtimeEnvironmentIdByWorktreeId = {}
+    pipelineRunsById = {}
   })
 
   afterEach(() => {
@@ -193,5 +209,66 @@ describe('usePipelineRunSnapshot', () => {
     await flushMicrotasks()
     unmount()
     expect(unsubscribeMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("subscribes to the run's owning workspace host, not the globally selected environment", async () => {
+    pipelineRunsById = { 'run-1': { workspaceId: 'workspace-A' } }
+    runtimeEnvironmentIdByWorktreeId = { 'workspace-A': 'env-A' }
+    const { result } = renderHook(() => usePipelineRunSnapshot('run-1'))
+    await flushMicrotasks()
+
+    expect(subscribeToPipelineRunSnapshot).toHaveBeenCalledWith(
+      { kind: 'environment', environmentId: 'env-A' },
+      'run-1',
+      expect.any(Function),
+      expect.any(Function)
+    )
+    expect(result.current.target).toEqual({ kind: 'environment', environmentId: 'env-A' })
+  })
+
+  it('targets local when the owning workspace resolves to no runtime environment, ignoring any globally selected one', async () => {
+    pipelineRunsById = { 'run-1': { workspaceId: 'workspace-local' } }
+    runtimeEnvironmentIdByWorktreeId = {} // workspace-local has no mapped environment: it's local
+
+    const { result } = renderHook(() => usePipelineRunSnapshot('run-1'))
+    await flushMicrotasks()
+
+    expect(subscribeToPipelineRunSnapshot).toHaveBeenCalledWith(
+      { kind: 'local' },
+      'run-1',
+      expect.any(Function),
+      expect.any(Function)
+    )
+    expect(result.current.target).toEqual({ kind: 'local' })
+  })
+
+  it('re-resolves the target when the run id changes to one owned by a different workspace', async () => {
+    pipelineRunsById = {
+      'run-1': { workspaceId: 'workspace-A' },
+      'run-2': { workspaceId: 'workspace-B' }
+    }
+    runtimeEnvironmentIdByWorktreeId = { 'workspace-A': 'env-A', 'workspace-B': 'env-B' }
+
+    const { rerender } = renderHook(({ runId }) => usePipelineRunSnapshot(runId), {
+      initialProps: { runId: 'run-1' }
+    })
+    await flushMicrotasks()
+    expect(subscribeToPipelineRunSnapshot).toHaveBeenNthCalledWith(
+      1,
+      { kind: 'environment', environmentId: 'env-A' },
+      'run-1',
+      expect.any(Function),
+      expect.any(Function)
+    )
+
+    rerender({ runId: 'run-2' })
+    await flushMicrotasks()
+    expect(subscribeToPipelineRunSnapshot).toHaveBeenNthCalledWith(
+      2,
+      { kind: 'environment', environmentId: 'env-B' },
+      'run-2',
+      expect.any(Function),
+      expect.any(Function)
+    )
   })
 })
