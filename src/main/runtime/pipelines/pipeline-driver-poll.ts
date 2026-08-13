@@ -13,6 +13,26 @@ import type { PipelineInFlightDispatch } from './pipeline-driver-types'
 
 export type PollOutcome = { kind: 'pending' } | { kind: 'succeeded' } | FailedAttemptResolution
 
+export type DriverPollOutcome = { kind: 'task-missing' } | PollOutcome
+
+/** The driver-facing wrapper: resolves the task first, since a disappeared task is the driver's own concern, not a poll outcome. */
+export async function pollDriverInFlight(args: {
+  db: OrchestrationDb
+  runtime: OrcaRuntimeService
+  pipelineDb: PipelineRunDb
+  runId: string
+  worktreeId: string
+  checkpointBackend?: PipelineCheckpointBackend
+  worktreePath?: string
+  inFlight: PipelineInFlightDispatch
+}): Promise<DriverPollOutcome> {
+  const task = args.db.getTask(args.inFlight.taskId)
+  if (!task) {
+    return { kind: 'task-missing' }
+  }
+  return pollInFlightDispatch({ ...args, taskStatus: task.status })
+}
+
 export async function pollInFlightDispatch(args: {
   db: OrchestrationDb
   runtime: OrcaRuntimeService

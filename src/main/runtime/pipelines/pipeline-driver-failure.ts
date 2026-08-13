@@ -16,6 +16,7 @@ import {
 } from './pipeline-driver-stage-classify'
 import type { PipelineCheckpointInfo } from './pipeline-driver-types'
 import { verifyPtyStopped } from './pipeline-driver-verified-stop'
+import { isTerminalPipelineRunState } from './pipeline-snapshot-publisher-assemble'
 
 export type FailedAttemptContext = {
   node: ResolvedPipelineNode
@@ -33,7 +34,7 @@ export type FailedAttemptResolution =
   | { kind: 'pending-retry'; attempt: number; retryOf?: string }
 
 /** The durable worker-dispatch record is a second source for the handle beyond this attempt's own response effects. */
-function resolveVerifiableTerminalHandle(
+export function resolveVerifiableTerminalHandle(
   db: OrchestrationDb,
   ctx: Pick<FailedAttemptContext, 'dispatchId' | 'terminalHandle'>
 ): string | undefined {
@@ -77,6 +78,8 @@ async function finalizeConsumedAttempt(args: {
   node: ResolvedPipelineNode
   attempt: number
   retryOf?: string
+  pipelineDb: PipelineRunDb
+  runId: string
   checkpointBackend?: PipelineCheckpointBackend
   worktreePath?: string
   checkpoint?: PipelineCheckpointInfo
@@ -87,11 +90,16 @@ async function finalizeConsumedAttempt(args: {
   }
 
   if (args.checkpointBackend && args.worktreePath && args.checkpoint) {
-    await args.checkpointBackend.restore({
-      worktreePath: args.worktreePath,
-      head: args.checkpoint.head,
-      snapshot: args.checkpoint.snapshot
-    })
+    // read fresh right at the destructive call: abort can land asynchronously while this
+    // resolution is in flight, and the worktree must never move once the run is terminal
+    const run = args.pipelineDb.getPipelineRun(args.runId)
+    if (run && !isTerminalPipelineRunState(run.state)) {
+      await args.checkpointBackend.restore({
+        worktreePath: args.worktreePath,
+        head: args.checkpoint.head,
+        snapshot: args.checkpoint.snapshot
+      })
+    }
   }
 
   return { kind: 'pending-retry', attempt: args.attempt + 1, retryOf: args.retryOf }
@@ -152,6 +160,8 @@ export async function resolveFailedAttempt(args: {
     node: ctx.node,
     attempt: ctx.attempt,
     retryOf: retry.retryOf,
+    pipelineDb,
+    runId,
     checkpointBackend,
     worktreePath,
     checkpoint: ctx.checkpoint

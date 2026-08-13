@@ -11,6 +11,7 @@ import {
   type FailedAttemptContext,
   type FailedAttemptResolution
 } from './pipeline-driver-failure'
+import { beginInFlightSpawn, resolveAbortInterruptHandle } from './pipeline-driver-in-flight'
 import {
   allNodesSucceeded,
   applyNodeOutcome,
@@ -19,7 +20,7 @@ import {
   pickNextReadyNode,
   type PipelineNodeIndex
 } from './pipeline-driver-node-graph'
-import { pollInFlightDispatch } from './pipeline-driver-poll'
+import { pollDriverInFlight } from './pipeline-driver-poll'
 import {
   resolvePipelineDriverRunContext,
   type PipelineDriverRunContext
@@ -84,7 +85,7 @@ export class PipelineDriver {
     // the run looking live
     this.args.pipelineDb.updateRunState(this.args.runId, 'aborted')
     this.stopTimer()
-    const handle = this.inFlight?.terminalHandle
+    const handle = resolveAbortInterruptHandle(this.args.db, this.inFlight)
     this.inFlight = undefined
     this.pendingRetry = undefined
     if (handle) {
@@ -103,19 +104,8 @@ export class PipelineDriver {
   }
 
   private stopTimer(): void {
-    if (this.timer) {
-      clearInterval(this.timer)
-      this.timer = undefined
-    }
-  }
-
-  private async ensureContext(): Promise<void> {
-    const run = this.args.pipelineDb.getPipelineRun(this.args.runId)
-    if (!run) {
-      throw new Error(`Pipeline run ${this.args.runId} was not found.`)
-    }
-    this.context = await resolvePipelineDriverRunContext(this.args.runtime, run)
-    this.nodeIndex = buildPipelineNodeIndex(this.args.pipelineDb.getNodes(this.args.runId))
+    clearInterval(this.timer)
+    this.timer = undefined
   }
 
   private async tick(): Promise<void> {
@@ -125,7 +115,12 @@ export class PipelineDriver {
     this.ticking = true
     try {
       if (!this.context || !this.nodeIndex) {
-        await this.ensureContext()
+        const run = this.args.pipelineDb.getPipelineRun(this.args.runId)
+        if (!run) {
+          throw new Error(`Pipeline run ${this.args.runId} was not found.`)
+        }
+        this.context = await resolvePipelineDriverRunContext(this.args.runtime, run)
+        this.nodeIndex = buildPipelineNodeIndex(this.args.pipelineDb.getNodes(this.args.runId))
       }
       if (this.inFlight) {
         await this.pollInFlight()
@@ -165,13 +160,8 @@ export class PipelineDriver {
     if (!inFlight) {
       return
     }
-    const task = this.args.db.getTask(inFlight.taskId)
-    if (!task) {
-      this.failRunInternally(`Task ${inFlight.taskId} disappeared mid-run.`)
-      return
-    }
     const context = this.context as PipelineDriverRunContext
-    const outcome = await pollInFlightDispatch({
+    const outcome = await pollDriverInFlight({
       db: this.args.db,
       runtime: this.args.runtime,
       pipelineDb: this.args.pipelineDb,
@@ -179,10 +169,13 @@ export class PipelineDriver {
       worktreeId: context.dispatchWorktreeId,
       checkpointBackend: context.checkpointBackend,
       worktreePath: context.worktreePath,
-      inFlight,
-      taskStatus: task.status
+      inFlight
     })
 
+    if (outcome.kind === 'task-missing') {
+      this.failRunInternally(`Task ${inFlight.taskId} disappeared mid-run.`)
+      return
+    }
     if (outcome.kind === 'pending') {
       return
     }
@@ -221,7 +214,13 @@ export class PipelineDriver {
       worktreePath: context.worktreePath,
       retryOf,
       dependencies: buildDependencyResults(this.args.db, node, nodeIndex),
-      isDispatchable: () => this.phase === 'running'
+      isDispatchable: () => this.phase === 'running',
+      onSpawnStarted: (dispatchId) => {
+        const inFlight = beginInFlightSpawn({ phase: this.phase, node, taskId, attempt, dispatchId })
+        if (inFlight) {
+          this.inFlight = inFlight
+        }
+      }
     })
 
     if (outcome.kind === 'abandoned') {
