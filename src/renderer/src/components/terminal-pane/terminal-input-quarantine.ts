@@ -38,8 +38,17 @@ const quarantineListeners = new Map<string, Set<QuarantineListener>>()
 const quarantineExpiryTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
 function notifyQuarantineListeners(tabId: string, armed: boolean): void {
-  for (const listener of quarantineListeners.get(tabId) ?? []) {
-    listener(armed)
+  const listeners = quarantineListeners.get(tabId)
+  if (!listeners) {
+    return
+  }
+  // snapshot: a listener unsubscribing another mid-dispatch must not skip it
+  for (const listener of Array.from(listeners)) {
+    try {
+      listener(armed)
+    } catch {
+      // a subscriber's exception must never block the safety decision or the other listeners
+    }
   }
 }
 

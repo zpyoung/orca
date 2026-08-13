@@ -217,4 +217,62 @@ describe('terminal input quarantine subscriptions', () => {
     vi.advanceTimersByTime(5_000)
     expect(events).toEqual([true])
   })
+
+  it('still notifies remaining listeners and returns the correct decision when one throws', () => {
+    const events: boolean[] = []
+    subscribeTerminalInputQuarantine(TAB, (armed) => {
+      if (!armed) {
+        throw new Error('boom')
+      }
+    })
+    subscribeTerminalInputQuarantine(TAB, (armed) => events.push(armed))
+    armTerminalInputQuarantine(TAB, 0)
+    expect(shouldDropQuarantinedTerminalInput(TAB, '\r', REATTACH_MS)).toBe(true)
+    expect(events).toEqual([true, false])
+  })
+
+  it('returns the same decision whether or not a throwing listener is subscribed', () => {
+    const bare = shouldDropQuarantinedTerminalInput(TAB, '\r', REATTACH_MS)
+    armTerminalInputQuarantine(TAB, 0)
+    const withoutListener = shouldDropQuarantinedTerminalInput(TAB, '\r', REATTACH_MS)
+
+    _resetTerminalInputQuarantineForTests()
+    subscribeTerminalInputQuarantine(TAB, () => {
+      throw new Error('boom')
+    })
+    armTerminalInputQuarantine(TAB, 0)
+    const withListener = shouldDropQuarantinedTerminalInput(TAB, '\r', REATTACH_MS)
+
+    expect(withListener).toBe(withoutListener)
+    expect(bare).toBe(false)
+  })
+
+  it('still notifies a listener removed mid-dispatch by another listener', () => {
+    const events: boolean[] = []
+    let unsubscribeB: () => void = () => {}
+    subscribeTerminalInputQuarantine(TAB, (armed) => {
+      if (!armed) {
+        unsubscribeB()
+      }
+    })
+    unsubscribeB = subscribeTerminalInputQuarantine(TAB, (armed) => events.push(armed))
+    armTerminalInputQuarantine(TAB, 0)
+    expect(shouldDropQuarantinedTerminalInput(TAB, '\r', REATTACH_MS)).toBe(true)
+    expect(events).toEqual([true, false])
+  })
+
+  it('isolates a throwing listener on the expiry timer path too', () => {
+    vi.useFakeTimers()
+    subscribeTerminalInputQuarantine(TAB, (armed) => {
+      if (!armed) {
+        throw new Error('boom')
+      }
+    })
+    const events: boolean[] = []
+    subscribeTerminalInputQuarantine(TAB, (armed) => events.push(armed))
+    armTerminalInputQuarantine(TAB)
+    expect(() => vi.advanceTimersByTime(5_000)).not.toThrow()
+    expect(events).toEqual([true, false])
+    expect(isTerminalInputQuarantined(TAB)).toBe(false)
+  })
 })
