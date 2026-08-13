@@ -146,6 +146,65 @@ describe('buildMobileSessionTabSnapshots — pipeline tab omission', () => {
     expect(snapshot?.activeTabType).toBeNull()
   })
 
+  it('omits the pipeline tab itself even when an open file happens to share its entityId — rules out the accidental non-matching-lookup shape (AC19)', () => {
+    // Historically the omission happened only because two bugs cancelled: an unrecognized
+    // contentType fell through to the editor branch tagged with the tab's entityId (a run id),
+    // and that id then failed to match anything in openFiles, so the tab was dropped by luck.
+    // Colliding an open file's id with the run id removes that luck: if the fallthrough ever
+    // reappears, the pipeline tab's own unified-tab id would leak through as a phantom file tab.
+    // (An unrelated, pre-existing orphan-file recovery sweep independently republishes any open
+    // file with no owning tab at all — that sweep fires here too, on a file id that can never
+    // really collide with a run id since `OpenFile.id` is always a filesystem path; asserting
+    // on the pipeline tab's own identifiers, rather than on `tabs` being empty, is what isolates
+    // the guard this test actually targets from that unrelated, always-on behavior.)
+    const collidingId = 'run-1'
+    const state = makeState({
+      activeGroupIdByWorktree: { 'wt-1': 'group-1' },
+      groupsByWorktree: {
+        'wt-1': [
+          {
+            id: 'group-1',
+            activeTabId: 'pipeline-tab-1',
+            tabOrder: ['pipeline-tab-1'],
+            recentTabIds: ['pipeline-tab-1']
+          }
+        ]
+      } as unknown as AppState['groupsByWorktree'],
+      unifiedTabsByWorktree: {
+        'wt-1': [
+          {
+            id: 'pipeline-tab-1',
+            groupId: 'group-1',
+            contentType: 'pipeline',
+            entityId: collidingId,
+            title: 'bugfix-fast #4'
+          }
+        ]
+      } as unknown as AppState['unifiedTabsByWorktree'],
+      openFiles: [
+        {
+          id: collidingId,
+          filePath: collidingId,
+          relativePath: collidingId,
+          worktreeId: 'wt-1',
+          language: 'plaintext',
+          mode: 'edit',
+          isDirty: false
+        }
+      ]
+    })
+
+    const snapshot = buildMobileSessionTabSnapshots(state)[0]
+
+    expect(snapshot?.tabs?.some((tab) => tab.id === 'pipeline-tab-1')).toBe(false)
+    expect(snapshot?.activeTabId).toBeNull()
+    expect(snapshot?.activeTabType).toBeNull()
+    for (const group of snapshot?.tabGroups ?? []) {
+      expect(group.tabOrder).not.toContain('pipeline-tab-1')
+      expect(group.activeTabId).not.toBe('pipeline-tab-1')
+    }
+  })
+
   it('does not let a pipeline tab leak through the fallback editor-tab recovery sweep', () => {
     const fileId = '/repo/src/app.ts'
     const state = makeState({

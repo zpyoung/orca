@@ -38,6 +38,22 @@ describe('PipelineCanvasScene', () => {
     expect(rendered).toHaveAttribute('data-status', expectedStatus)
   })
 
+  it('never throws when a node carries an unrecognized status tag', () => {
+    expect(() =>
+      render(<PipelineCanvasScene nodes={[node({ id: 'n1', status: 'some-unrecognized-future-tag' })]} pausing={false} />)
+    ).not.toThrow()
+  })
+
+  it('updates a node normally on a later render after an unrecognized status tag (AC18: unknown never blocks later updates)', () => {
+    const { rerender, container } = render(
+      <PipelineCanvasScene nodes={[node({ id: 'test', status: 'some-future-tag' })]} pausing={false} />
+    )
+    expect(container.querySelector('[data-node-id="test"]')).toHaveAttribute('data-status', 'unknown')
+
+    rerender(<PipelineCanvasScene nodes={[node({ id: 'test', status: 'succeeded' })]} pausing={false} />)
+    expect(container.querySelector('[data-node-id="test"]')).toHaveAttribute('data-status', 'succeeded')
+  })
+
   it('shows the attempt counter on a retrying node', () => {
     render(
       <PipelineCanvasScene
@@ -155,5 +171,25 @@ describe('PipelineCanvasScene', () => {
     )
     expect(screen.getByText('Reproduce')).toBeInTheDocument()
     expect(screen.getByText('Fix')).toBeInTheDocument()
+  })
+
+  it('renders identical node positions across unmount and remount for the same topology (AC21: no persisted layout)', () => {
+    const nodes = [
+      node({ id: 'repro', status: 'succeeded', needs: [] }),
+      node({ id: 'fix', status: 'running', needs: ['repro'] })
+    ]
+    const first = render(<PipelineCanvasScene nodes={nodes} pausing={false} />)
+    const firstRect = first.container.querySelector('[data-node-id="fix"] rect')
+    const firstPosition = { x: firstRect?.getAttribute('x'), y: firstRect?.getAttribute('y') }
+    expect(firstPosition.x).not.toBeNull()
+    first.unmount()
+
+    const second = render(
+      <PipelineCanvasScene nodes={nodes.map((n) => ({ ...n }))} pausing={false} />
+    )
+    const secondRect = second.container.querySelector('[data-node-id="fix"] rect')
+    expect({ x: secondRect?.getAttribute('x'), y: secondRect?.getAttribute('y') }).toEqual(
+      firstPosition
+    )
   })
 })

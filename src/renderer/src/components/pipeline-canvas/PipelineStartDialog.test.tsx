@@ -37,9 +37,28 @@ vi.mock('@/runtime/runtime-rpc-client', () => ({
   callRuntimeRpc: (...args: unknown[]) => callRuntimeRpc(...args)
 }))
 
+type TestResolveResult =
+  | {
+      ok: true
+      definition: {
+        templateName: string
+        templateVersion: number
+        needsNewerOrca: boolean
+        inputText: string
+        nodes: unknown[]
+      }
+    }
+  | {
+      ok: false
+      error:
+        | { kind: 'template_error'; detail: { rule: number; nodeId?: string; field?: string; message: string } }
+        | { kind: 'template_not_found' }
+        | { kind: 'invalid_basename' }
+    }
+
 const listTemplates = vi.fn<() => Promise<TestTemplateEntry[]>>()
-const resolveTemplate = vi.fn(async () => ({
-  ok: true as const,
+const resolveTemplate = vi.fn<() => Promise<TestResolveResult>>(async () => ({
+  ok: true,
   definition: {
     templateName: 'bugfix-fast',
     templateVersion: 1,
@@ -202,6 +221,42 @@ describe('PipelineStartDialog', () => {
         templateName: 'bugfix-fast'
       })
     )
+  })
+
+  it('shows the structural-rejection message naming the offending node and never starts the run (AC14)', async () => {
+    setup([{ basename: 'broken.yaml', name: 'broken', needsNewerOrca: false }])
+    resolveTemplate.mockResolvedValueOnce({
+      ok: false as const,
+      error: {
+        kind: 'template_error' as const,
+        detail: {
+          rule: 8,
+          nodeId: 'b',
+          field: 'needs',
+          message: 'Node "b" needs an unknown node id "nonexistent".'
+        }
+      }
+    })
+    const user = userEvent.setup()
+    render(
+      <PipelineStartDialog
+        open={true}
+        onOpenChange={() => {}}
+        worktreeSelector="id:w1"
+        target={target}
+        isFolderWorkspace={false}
+        hasSubmodules={false}
+      />
+    )
+    await waitFor(() => expect(screen.getByText('broken')).toBeInTheDocument())
+    await user.click(screen.getByText('broken'))
+    await user.type(screen.getByRole('textbox', { name: /input/i }), 'x')
+    await user.click(screen.getByRole('button', { name: /^start$/i }))
+
+    await waitFor(() =>
+      expect(screen.getByText('Node "b" needs an unknown node id "nonexistent".')).toBeInTheDocument()
+    )
+    expect(callRuntimeRpc).not.toHaveBeenCalledWith(target, 'pipeline.start', expect.anything())
   })
 
   it('shows the refusal message instead of starting when the host refuses', async () => {

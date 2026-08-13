@@ -354,7 +354,7 @@ describe('parsePipelineTemplate: T11 rule 8 (needs references)', () => {
 })
 
 describe('parsePipelineTemplate: T11 rule 9 (dependency cycle)', () => {
-  it('fails on a two-node cycle', () => {
+  it('fails on a two-node cycle, naming a node id in the message (AC14: refusal names the offending node)', () => {
     const content = `
 version: 1
 nodes:
@@ -367,7 +367,10 @@ nodes:
     harness: claude
     needs: [a]
 `
-    expect(expectError(content).rule).toBe(9)
+    const error = expectError(content)
+    expect(error.rule).toBe(9)
+    expect(error.nodeId).toBe('b')
+    expect(error.message).toContain('"a"')
   })
 
   it('fails on a longer cycle reached through an intermediate node', () => {
@@ -450,6 +453,20 @@ describe('parsePipelineTemplate: T12 unknown keys never fail resolution', () => 
 
   it('does not set needsNewerOrca when no unrecognized key exists anywhere', () => {
     expect(expectTemplate(VALID_TEMPLATE).needsNewerOrca).toBe(false)
+  })
+
+  it('resolves identically to the unmodified template aside from the flag itself (AC13)', () => {
+    const baseline = resolvePipelineDefinition(expectTemplate(VALID_TEMPLATE), 'shared input')
+    const withUnknownKeys = VALID_TEMPLATE.replace('version: 1', 'version: 1\nconcurrency: 3').replace(
+      'title: A',
+      'title: A\n    sandbox: strict'
+    )
+    const flaggedTemplate = expectTemplate(withUnknownKeys)
+    expect(flaggedTemplate.needsNewerOrca).toBe(true)
+    const flagged = resolvePipelineDefinition(flaggedTemplate, 'shared input')
+    expect(flagged.nodes).toEqual(baseline.nodes)
+    expect(flagged.templateName).toBe(baseline.templateName)
+    expect(flagged.templateVersion).toBe(baseline.templateVersion)
   })
 })
 
