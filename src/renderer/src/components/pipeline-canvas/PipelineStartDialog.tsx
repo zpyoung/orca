@@ -9,6 +9,7 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { ensurePipelineTab } from '@/lib/ensure-pipeline-tab'
 import { translate } from '@/i18n/i18n'
 import { callRuntimeRpc, type RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
 
@@ -26,6 +27,7 @@ type PipelineRunListEntry = {
   runNumber: number
   state: string
   workspaceDisplayName: string
+  workspaceId?: string
 }
 
 export type PipelineStartDialogProps = {
@@ -242,14 +244,41 @@ export default function PipelineStartDialog({
             )}
             className="scrollbar-sleek flex max-h-24 flex-col gap-0.5 overflow-y-auto text-xs text-muted-foreground"
           >
-            {runHistory.map((run) => (
-              <div key={run.runId} className="flex items-center justify-between gap-2">
-                <span>
-                  {run.workspaceDisplayName} #{run.runNumber}
-                </span>
-                <span>{run.state}</span>
-              </div>
-            ))}
+            {runHistory.map((run) => {
+              const rowContent = (
+                <>
+                  <span>
+                    {run.workspaceDisplayName} #{run.runNumber}
+                  </span>
+                  <span>{run.state}</span>
+                </>
+              )
+              const ownerWorktreeId = run.workspaceId ?? workspaceId
+              if (!ownerWorktreeId) {
+                return (
+                  <div key={run.runId} className="flex items-center justify-between gap-2">
+                    {rowContent}
+                  </div>
+                )
+              }
+              return (
+                <button
+                  key={run.runId}
+                  type="button"
+                  onClick={() => {
+                    ensurePipelineTab(ownerWorktreeId, {
+                      runId: run.runId,
+                      runNumber: run.runNumber,
+                      templateName: run.templateName
+                    })
+                    onOpenChange(false)
+                  }}
+                  className="flex items-center justify-between gap-2 rounded-sm px-1 py-0.5 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  {rowContent}
+                </button>
+              )
+            })}
           </section>
         )}
 
