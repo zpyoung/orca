@@ -1,5 +1,13 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -82,7 +90,7 @@ describe('createLocalCheckpointBackend restore', () => {
 
   it('removes an on-disk file that head tracked but the snapshot no longer contains', async () => {
     expect(existsSync(join(repo, 'to-be-deleted.txt'))).toBe(true)
-    execFileSync('rm', [join(repo, 'to-be-deleted.txt')])
+    rmSync(join(repo, 'to-be-deleted.txt'))
 
     const { head, snapshot } = await backend.capture({
       worktreePath: repo,
@@ -136,5 +144,120 @@ describe('createLocalCheckpointBackend restore', () => {
     await backend.restore({ worktreePath: repo, head, snapshot })
 
     expect(readFileSync(join(repo, 'ignored.log'), 'utf8')).toBe('captured content\n')
+  })
+
+  it('removes an untracked nested git repository left behind by a failed attempt', async () => {
+    const { head, snapshot } = await backend.capture({
+      worktreePath: repo,
+      runId: 'run1',
+      nodeId: 'node1',
+      attempt: 1
+    })
+
+    const residue = join(repo, 'residue')
+    mkdirSync(residue, { recursive: true })
+    git(['init', '-q'], residue)
+    writeFileSync(join(residue, 'junk.txt'), 'nested repo junk\n')
+
+    await backend.restore({ worktreePath: repo, head, snapshot })
+
+    expect(existsSync(residue)).toBe(false)
+  })
+
+  it('does not hard-reset a submodule working tree even when submodule.recurse is enabled', async () => {
+    const submoduleUpstream = join(root, 'submodule-upstream')
+    mkdirSync(submoduleUpstream, { recursive: true })
+    git(['init', '-q', '-b', 'main'], submoduleUpstream)
+    git(['config', 'user.email', 'test@example.com'], submoduleUpstream)
+    git(['config', 'user.name', 'Test'], submoduleUpstream)
+    writeFileSync(join(submoduleUpstream, 'inner.txt'), 'inner\n')
+    git(['add', '-A'], submoduleUpstream)
+    git(['commit', '-qm', 'submodule init'], submoduleUpstream)
+
+    git(['-c', 'protocol.file.allow=always', 'submodule', 'add', submoduleUpstream, 'sub'], repo)
+    git(['add', '-A'], repo)
+    git(['commit', '-qm', 'add submodule'], repo)
+    git(['config', 'submodule.recurse', 'true'], repo)
+
+    const { head, snapshot } = await backend.capture({
+      worktreePath: repo,
+      runId: 'run1',
+      nodeId: 'node1',
+      attempt: 1
+    })
+
+    writeFileSync(join(repo, 'sub', 'inner.txt'), 'modified inside submodule by the user\n')
+
+    await backend.restore({ worktreePath: repo, head, snapshot })
+
+    expect(readFileSync(join(repo, 'sub', 'inner.txt'), 'utf8')).toBe(
+      'modified inside submodule by the user\n'
+    )
+  })
+
+  it('restores when the snapshot replaces a tracked file with a directory at the same path', async () => {
+    writeFileSync(join(repo, 'config'), 'file content\n')
+    git(['add', '-A'], repo)
+    git(['commit', '-qm', 'add config file'], repo)
+
+    rmSync(join(repo, 'config'))
+    mkdirSync(join(repo, 'config'))
+    writeFileSync(join(repo, 'config', 'part'), 'directory content\n')
+
+    const { head, snapshot } = await backend.capture({
+      worktreePath: repo,
+      runId: 'run1',
+      nodeId: 'node1',
+      attempt: 1
+    })
+    expect(snapshot).not.toBe(head)
+
+    await backend.restore({ worktreePath: repo, head, snapshot })
+
+    expect(readFileSync(join(repo, 'config', 'part'), 'utf8')).toBe('directory content\n')
+  })
+
+  it('restores when the snapshot replaces a tracked directory with a file at the same path', async () => {
+    mkdirSync(join(repo, 'config'))
+    writeFileSync(join(repo, 'config', 'part'), 'original directory content\n')
+    git(['add', '-A'], repo)
+    git(['commit', '-qm', 'add config directory'], repo)
+
+    rmSync(join(repo, 'config'), { recursive: true, force: true })
+    writeFileSync(join(repo, 'config'), 'file content\n')
+
+    const { head, snapshot } = await backend.capture({
+      worktreePath: repo,
+      runId: 'run1',
+      nodeId: 'node1',
+      attempt: 1
+    })
+    expect(snapshot).not.toBe(head)
+
+    await backend.restore({ worktreePath: repo, head, snapshot })
+
+    expect(readFileSync(join(repo, 'config'), 'utf8')).toBe('file content\n')
+  })
+
+  it('overwrites an ignored directory occupying a path the snapshot tree claims', async () => {
+    writeFileSync(join(repo, 'built'), 'tracked content\n')
+
+    const { head, snapshot } = await backend.capture({
+      worktreePath: repo,
+      runId: 'run1',
+      nodeId: 'node1',
+      attempt: 1
+    })
+    expect(snapshot).not.toBe(head)
+
+    rmSync(join(repo, 'built'))
+    // .git/info/exclude (not .gitignore) so the rule survives restore's own reset --hard.
+    appendFileSync(join(repo, '.git', 'info', 'exclude'), 'built\n')
+    mkdirSync(join(repo, 'built'))
+    writeFileSync(join(repo, 'built', 'junk.txt'), 'ignored directory junk\n')
+
+    await backend.restore({ worktreePath: repo, head, snapshot })
+
+    expect(readFileSync(join(repo, 'built'), 'utf8')).toBe('tracked content\n')
   })
 })

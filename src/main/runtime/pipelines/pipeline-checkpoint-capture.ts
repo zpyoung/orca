@@ -37,7 +37,8 @@ export async function captureCheckpoint(
   }
 
   const snapshot = await withTemporaryIndex(target, async (env) => {
-    await runCheckpointGit(target, ['read-tree', 'HEAD'], env)
+    // why: submodule.recurse=true would otherwise re-checkout submodule working trees during this read-only capture
+    await runCheckpointGit(target, ['read-tree', '--no-recurse-submodules', 'HEAD'], env)
     await runCheckpointGit(target, ['add', '-A'], env)
     const tree = (await runCheckpointGit(target, ['write-tree'], env)).trim()
     const message = `orca pipeline checkpoint ${args.nodeId}-${args.attempt}`
