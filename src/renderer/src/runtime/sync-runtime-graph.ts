@@ -1263,16 +1263,23 @@ export function buildMobileSessionTabSnapshots(
           !isWebOnlyMirroredTerminalTab(terminal, inputs.terminalLayoutByTabId.get(terminal.id))
       )
       .map((terminal) => terminal.id)
+    const pipelineIds = inputs.unifiedTabs
+      .filter((tab) => tab.contentType === 'pipeline')
+      .map((tab) => tab.id)
     const groupProjection = buildMobileSessionGroupProjection(inputs, {
       terminalIds: publishableTerminalIds,
       editorIds,
-      browserIds: [...browserWorkspaceByIdForWorktree.keys()]
+      browserIds: [...browserWorkspaceByIdForWorktree.keys()],
+      pipelineIds
     })
     const tabs: RuntimeMobileSessionSnapshotTab[] = []
     const emittedEditorFileIds = new Set<string>()
     const emittedEditorTabIds = new Set<string>()
 
     for (const item of groupProjection.order) {
+      if (!isMobilePublishableTabRef(item)) {
+        continue
+      }
       if (item.type === 'terminal') {
         const terminal = terminalTabByIdForWorktree.get(item.id)
         if (!terminal) {
@@ -1655,12 +1662,18 @@ function buildLegacyNavOrderView(
   }
 }
 
+function isMobilePublishableTabRef(item: Pick<VisibleTabRef, 'type'>): boolean {
+  // Why: pipeline tabs have no wire representation on the mobile snapshot; the omission is a contract, not a byproduct of an unhandled type.
+  return item.type !== 'pipeline'
+}
+
 function buildMobileSessionGroupProjection(
   inputs: MobileSessionWorktreeInputs,
   ids: {
     terminalIds: string[]
     editorIds: string[]
     browserIds: string[]
+    pipelineIds: string[]
   }
 ): {
   order: VisibleTabRef[]
@@ -1675,26 +1688,30 @@ function buildMobileSessionGroupProjection(
           editorIds: ids.editorIds
         }),
         inputs
-      )
+      ).filter(isMobilePublishableTabRef)
     }
   }
 
   const terminalIds = new Set(ids.terminalIds)
   const editorIds = new Set(ids.editorIds)
   const browserIds = new Set(ids.browserIds)
+  const pipelineIds = new Set(ids.pipelineIds)
   const tabs = inputs.unifiedTabs
   const order: VisibleTabRef[] = []
   const tabGroups: RuntimeMobileSessionTabGroup[] = []
 
   for (const group of getOrderedTabGroups(groups, inputs.tabGroupLayout)) {
     const groupTabs = tabs.filter((tab) => tab.groupId === group.id)
+    // Why: pass the real pipeline ids through so the filter below drops a genuine entry, not an already-empty set.
     const visibleOrder = getGroupVisibleTabOrder(
       group,
       groupTabs,
       terminalIds,
       editorIds,
-      browserIds
-    )
+      browserIds,
+      undefined,
+      pipelineIds
+    ).filter(isMobilePublishableTabRef)
     if (visibleOrder.length === 0) {
       continue
     }
