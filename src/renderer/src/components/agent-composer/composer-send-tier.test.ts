@@ -19,9 +19,7 @@ describe('resolveComposerSendTier', () => {
     })
 
     it(`demotes ${agent} to input when local ConPTY lacks reliable wrap markers`, () => {
-      expect(resolveComposerSendTier(agent, { isLocalConptyBelowWrapMarkers: true })).toBe(
-        'input'
-      )
+      expect(resolveComposerSendTier(agent, { isLocalConptyBelowWrapMarkers: true })).toBe('input')
     })
   }
 
@@ -29,19 +27,13 @@ describe('resolveComposerSendTier', () => {
 
   for (const agent of nonVerifiedAgents) {
     it(`resolves non-allowlisted agent ${agent} to input regardless of wrap markers`, () => {
-      expect(resolveComposerSendTier(agent, { isLocalConptyBelowWrapMarkers: false })).toBe(
-        'input'
-      )
-      expect(resolveComposerSendTier(agent, { isLocalConptyBelowWrapMarkers: true })).toBe(
-        'input'
-      )
+      expect(resolveComposerSendTier(agent, { isLocalConptyBelowWrapMarkers: false })).toBe('input')
+      expect(resolveComposerSendTier(agent, { isLocalConptyBelowWrapMarkers: true })).toBe('input')
     })
   }
 
   it('resolves grok (card-tier) to input despite being NATIVE_CHAT_SUPPORTED_AGENTS', () => {
-    expect(resolveComposerSendTier('grok', { isLocalConptyBelowWrapMarkers: false })).toBe(
-      'input'
-    )
+    expect(resolveComposerSendTier('grok', { isLocalConptyBelowWrapMarkers: false })).toBe('input')
     expect(resolveComposerSendTier('grok', { isLocalConptyBelowWrapMarkers: true })).toBe('input')
   })
 

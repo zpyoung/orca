@@ -40,9 +40,10 @@ import {
 
 afterEach(() => cleanup())
 
-function renderActions(
-  overrides: Partial<NativeChatComposerActionsProps> = {}
-): { onSend: ReturnType<typeof vi.fn>; onStop: ReturnType<typeof vi.fn> } {
+function renderActions(overrides: Partial<NativeChatComposerActionsProps> = {}): {
+  onSend: ReturnType<typeof vi.fn>
+  onStop: ReturnType<typeof vi.fn>
+} {
   const onSend = vi.fn()
   const onStop = vi.fn()
   render(
