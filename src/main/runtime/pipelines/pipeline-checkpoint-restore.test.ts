@@ -64,6 +64,21 @@ describe('createLocalCheckpointBackend restore', () => {
     expect(existsSync(join(repo, 'junk.txt'))).toBe(false)
   })
 
+  it('removes a plain untracked junk file that was never staged or committed', async () => {
+    const { head, snapshot } = await backend.capture({
+      worktreePath: repo,
+      runId: 'run1',
+      nodeId: 'node1',
+      attempt: 1
+    })
+
+    writeFileSync(join(repo, 'junk-untracked.txt'), 'never staged, never committed\n')
+
+    await backend.restore({ worktreePath: repo, head, snapshot })
+
+    expect(existsSync(join(repo, 'junk-untracked.txt'))).toBe(false)
+  })
+
   it('flattens a staged modification to unstaged and preserves untracked classification', async () => {
     writeFileSync(join(repo, 'tracked.txt'), 'staged change\n')
     git(['add', 'tracked.txt'], repo)

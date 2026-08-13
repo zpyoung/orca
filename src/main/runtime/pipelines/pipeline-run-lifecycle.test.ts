@@ -298,6 +298,33 @@ describe('pipeline-run-lifecycle', () => {
       expect(driverStartMock).toHaveBeenCalledTimes(2)
     })
 
+    it('starts two runs concurrently in git workspaces with distinct branch names, not just distinct run numbers', async () => {
+      const db = create()
+      const gitRuntime = () =>
+        runtimeStub({ showRepo: vi.fn().mockResolvedValue(repo({ kind: 'git' })) })
+
+      const [first, second] = await Promise.all([
+        startPipelineRun({
+          runtime: gitRuntime(),
+          db,
+          worktreeSelector: 'id:wt_origin',
+          definition: definition([node({ id: 'repro' })])
+        }),
+        startPipelineRun({
+          runtime: gitRuntime(),
+          db,
+          worktreeSelector: 'id:wt_origin',
+          definition: definition([node({ id: 'repro' })])
+        })
+      ])
+
+      if ('refused' in first || 'refused' in second) {
+        throw new Error('expected both starts to succeed')
+      }
+      expect(first.branch).toBeDefined()
+      expect(first.branch).not.toBe(second.branch)
+    })
+
     it('coexists with an active coordinator run: starting a pipeline never raises "Coordinator already running"', async () => {
       const db = create()
       db.createCoordinatorRun({ spec: 'do the thing', coordinatorHandle: 'coordinator' })

@@ -213,6 +213,32 @@ describe('instantiatePipelineRun', () => {
       expect(runtime.createManagedWorktree).not.toHaveBeenCalled()
     })
 
+    it('refuses a catalog-rejected effort, naming the node and field "effort", with no run, no tasks, no worktree', async () => {
+      const { db, pipelineDb } = create()
+      const before = snapshotCounts(db, pipelineDb)
+      const runtime = runtimeStub()
+
+      const result = await instantiatePipelineRun({
+        runtime,
+        db,
+        pipelineDb,
+        worktreeSelector: 'id:wt_origin',
+        definition: definition([
+          node({ id: 'repro', harness: 'codex', model: 'gpt-5.6-luna', effort: 'xhigh' })
+        ])
+      })
+
+      expect(result).toEqual({
+        refused: {
+          nodeId: 'repro',
+          field: 'effort',
+          message: expect.stringContaining('does not support effort xhigh')
+        }
+      })
+      expectNoNewRows(db, pipelineDb, before)
+      expect(runtime.createManagedWorktree).not.toHaveBeenCalled()
+    })
+
     it('checks nodes in list order and stops at the first failing node', async () => {
       const { db, pipelineDb } = create()
       const before = snapshotCounts(db, pipelineDb)

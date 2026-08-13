@@ -110,6 +110,31 @@ describe('PipelineRunDb', () => {
       expect(nodes[1].task_id).toBe(result.taskIdByNodeId.fix)
     })
 
+    it('persists the resolved definition as a value copy, immune to later mutation of the caller-owned definition object', () => {
+      const { db, pipelineDb } = create()
+      const pr = makeNode({ id: 'pr', index: 0, prompt: 'original pr prompt' })
+      const def = makeDefinition([pr])
+
+      const result = pipelineDb.instantiate({
+        definition: def,
+        workspaceId: null,
+        workspaceDisplayName: 'repo',
+        baseCommit: null
+      })
+
+      // simulates the client-side template file changing after instantiation (L5): the run
+      // must keep dispatching from what was recorded at instantiation, never from this object
+      def.nodes[0].prompt = 'edited pr prompt'
+
+      const snapshot = JSON.parse(
+        pipelineDb.getPipelineRun(result.runId)?.snapshot_json ?? '{}'
+      ) as ResolvedPipelineDefinition
+      expect(snapshot.nodes[0].prompt).toBe('original pr prompt')
+
+      const task = db.getTask(result.taskIdByNodeId.pr) as TaskRow
+      expect(task.spec).toBe('original pr prompt')
+    })
+
     it('never writes harness/model/effort/limits/onFailure to a task row, and leaves the tasks schema untouched', () => {
       const { db, pipelineDb } = create()
       const node = makeNode({
@@ -282,6 +307,32 @@ describe('PipelineRunDb', () => {
 
       expect(pipelineDb.markOrphanedRunsInterrupted()).toEqual([])
     })
+
+    it('sweeps paused and setup runs too, not only running', () => {
+      const { pipelineDb } = create()
+      const paused = pipelineDb.instantiate({
+        definition: makeDefinition([makeNode({ id: 'a' })]),
+        workspaceId: null,
+        workspaceDisplayName: 'repo',
+        baseCommit: null
+      })
+      pipelineDb.updateRunState(paused.runId, 'running')
+      pipelineDb.updateRunState(paused.runId, 'paused')
+
+      // never reached `running`: the process died between the L4 transaction and worktree setup
+      const inSetup = pipelineDb.instantiate({
+        definition: makeDefinition([makeNode({ id: 'a' })], { templateName: 'other' }),
+        workspaceId: null,
+        workspaceDisplayName: 'repo',
+        baseCommit: null
+      })
+
+      const affected = pipelineDb.markOrphanedRunsInterrupted()
+
+      expect(new Set(affected)).toEqual(new Set([paused.runId, inSetup.runId]))
+      expect(pipelineDb.getPipelineRun(paused.runId)?.state).toBe('interrupted')
+      expect(pipelineDb.getPipelineRun(inSetup.runId)?.state).toBe('interrupted')
+    })
   })
 
   describe('updateRunState', () => {
@@ -444,6 +495,27 @@ describe('PipelineRunDb', () => {
       const filtered = pipelineDb.listPipelineRuns({ workspaceId: 'wt_1' })
       expect(filtered.map((r) => r.run_id)).toEqual([inWorkspace.runId])
       expect(pipelineDb.listPipelineRuns()).toHaveLength(2)
+    })
+
+    it('keeps the denormalized workspace display name and run number after the run completes, independent of the workspace still existing', () => {
+      const { pipelineDb } = create()
+      const run = pipelineDb.instantiate({
+        definition: makeDefinition([makeNode({ id: 'a' })]),
+        workspaceId: 'wt_ghost', // no workspace by this id is ever created in this DB
+        workspaceDisplayName: 'deleted-repo',
+        baseCommit: 'abc'
+      })
+      pipelineDb.updateRunState(run.runId, 'running')
+      pipelineDb.updateRunState(run.runId, 'completed')
+
+      const listed = pipelineDb.listPipelineRuns().find((r) => r.run_id === run.runId)
+      expect(listed?.workspace_display_name).toBe('deleted-repo')
+      expect(listed?.run_number).toBe(run.runNumber)
+      expect(listed?.state).toBe('completed')
+
+      const byId = pipelineDb.getPipelineRun(run.runId)
+      expect(byId?.workspace_display_name).toBe('deleted-repo')
+      expect(byId?.run_number).toBe(run.runNumber)
     })
   })
 })
