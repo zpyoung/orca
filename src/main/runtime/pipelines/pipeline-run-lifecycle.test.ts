@@ -395,6 +395,26 @@ describe('pipeline-run-lifecycle', () => {
       expect(() => pausePipelineRun('nope', db)).toThrow(/not found/i)
     })
 
+    it('removes the driver at the terminal transition without breaking the final snapshot delivered to an attached subscriber', async () => {
+      const db = create()
+      const runId = await startedRun(db)
+      const pipelineDb = new PipelineRunDb(db)
+
+      const emit = vi.fn()
+      subscribeToPipelineRun(db, runId, emit)
+      emit.mockClear() // drop the synchronous on-attach snapshot
+
+      pipelineDb.updateRunState(runId, 'completed')
+      getPipelineSnapshotPublisher(db).publish(runId)
+
+      expect(emit).toHaveBeenCalledTimes(1)
+      expect(emit).toHaveBeenLastCalledWith(expect.objectContaining({ state: 'completed' }))
+
+      driverPauseMock.mockClear()
+      pausePipelineRun(runId, db)
+      expect(driverPauseMock).not.toHaveBeenCalled()
+    })
+
     it('pause/resume/abort on a run with no live driver in this process reads back its DB state without throwing', async () => {
       const db = create()
       primeSweep(db)

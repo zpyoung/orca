@@ -22,7 +22,9 @@ export function getPipelineDriver(runId: string): PipelineDriver | undefined {
 export function getPipelineSnapshotPublisher(db: OrchestrationDb): PipelineSnapshotPublisher {
   let publisher = publishersByDb.get(db)
   if (!publisher) {
-    publisher = new PipelineSnapshotPublisher(new PipelineRunDb(db))
+    publisher = new PipelineSnapshotPublisher(new PipelineRunDb(db), {
+      onTerminal: (runId) => driversByRunId.delete(runId)
+    })
     publishersByDb.set(db, publisher)
   }
   return publisher

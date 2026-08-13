@@ -109,18 +109,16 @@ export function ensureStarterTemplate(dir: string): { created: boolean; path: st
   }
 
   mkdirSync(dir, { recursive: true })
-  const tempPath = `${path}.tmp`
+  const tempPath = join(dir, `${STARTER_TEMPLATE_BASENAME}.tmp`)
   try {
-    writeFileSync(tempPath, BUGFIX_FAST_STARTER_TEMPLATE, 'utf8')
+    // exclusive create refuses to follow anything already at the temp path — including a
+    // symlink planted at this predictable name — instead of writing through it
+    writeFileSync(tempPath, BUGFIX_FAST_STARTER_TEMPLATE, { encoding: 'utf8', flag: 'wx' })
     renameSync(tempPath, path)
   } catch (error) {
     try {
-      if (existsSync(tempPath)) {
-        unlinkSync(tempPath)
-      }
-    } catch {
-      // best-effort cleanup; the original write error is more actionable
-    }
+      unlinkSync(tempPath)
+    } catch {}
     throw error
   }
   return { created: true, path }

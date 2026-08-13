@@ -26,12 +26,30 @@ type LiveSubscription = { unsubscribe: () => void }
 // map without bound — each entry retains a host publisher subscriber.
 export const MAX_PIPELINE_SUBSCRIPTIONS_PER_SENDER = 64
 
+const MAX_PIPELINE_SUBSCRIPTION_ARG_LENGTH = 512
+
 // Why: subscriptions are keyed by (webContents.id, subscriptionId) so a window
 // watching several runs tears down only what it asked to, and a destroyed
 // window releases every host-side watcher it owns — a subscription leak on
 // window close is the failure mode this map exists to prevent.
 const liveSubscriptions = new Map<number, Map<string, LiveSubscription>>()
 const senderCleanupRegistered = new Set<number>()
+
+function isPipelineSubscriptionArg(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= MAX_PIPELINE_SUBSCRIPTION_ARG_LENGTH
+  )
+}
+
+function readSubscriptionId(args: unknown): string | undefined {
+  if (!args || typeof args !== 'object') {
+    return undefined
+  }
+  const subscriptionId = (args as Record<string, unknown>).subscriptionId
+  return isPipelineSubscriptionArg(subscriptionId) ? subscriptionId : undefined
+}
 
 function teardownSubscription(senderId: number, subscriptionId: string): void {
   const bySubId = liveSubscriptions.get(senderId)
@@ -80,16 +98,23 @@ function sendFrame(
   } satisfies PipelineRunSnapshotPayload)
 }
 
-function handleSubscribe(
-  event: IpcMainEvent,
-  args: PipelineRunSubscribeArgs,
-  runtime: OrcaRuntimeService
-): void {
+function handleSubscribe(event: IpcMainEvent, rawArgs: unknown, runtime: OrcaRuntimeService): void {
   const sender = event.sender
   if (sender.isDestroyed()) {
     return
   }
-  const { subscriptionId, runId } = args
+  const subscriptionId = readSubscriptionId(rawArgs)
+  if (!subscriptionId) {
+    return
+  }
+  const runId = (rawArgs as Record<string, unknown>).runId
+  if (!isPipelineSubscriptionArg(runId)) {
+    sendFrame(sender, subscriptionId, {
+      type: 'error',
+      error: 'malformed pipeline run subscription request'
+    })
+    return
+  }
   // Replace any prior subscription under the same id (run change/resubscribe).
   teardownSubscription(sender.id, subscriptionId)
   registerSenderCleanup(sender)
@@ -142,10 +167,14 @@ export function _getPipelineRunSenderCleanupCountForTest(): number {
  * `runtime:call` is the only local RPC channel the preload exposes.
  */
 export function registerPipelineSubscriptionHandlers(runtime: OrcaRuntimeService): void {
-  ipcMain.on('pipelineRun:subscribe', (event, args: PipelineRunSubscribeArgs) => {
+  ipcMain.on('pipelineRun:subscribe', (event, args: unknown) => {
     handleSubscribe(event, args, runtime)
   })
-  ipcMain.on('pipelineRun:unsubscribe', (event, args: { subscriptionId: string }) => {
-    teardownSubscription(event.sender.id, args.subscriptionId)
+  ipcMain.on('pipelineRun:unsubscribe', (event, args: unknown) => {
+    const subscriptionId = readSubscriptionId(args)
+    if (!subscriptionId) {
+      return
+    }
+    teardownSubscription(event.sender.id, subscriptionId)
   })
 }
