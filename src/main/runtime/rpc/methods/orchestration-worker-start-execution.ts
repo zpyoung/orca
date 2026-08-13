@@ -139,7 +139,7 @@ export async function executeLocalWorkerStart(
         effects
       })
       // recordSpawnAttempt must land before the PTY spawn call: its absence after a
-      // failure is positive proof nothing spawned (L16a stage B).
+      // failure is positive proof nothing spawned.
       db.recordSpawnAttempt(started.dispatch.id)
       const terminal = await createExistingWorktreeWorkerTerminal({
         runtime,
