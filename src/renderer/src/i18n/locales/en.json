@@ -2100,7 +2100,8 @@
         "pluginCommandFailed": "Could not run the plugin command.",
         "recentChatsTerminalsHeader": "Recent Chats & Terminals",
         "27f10cca63": "Search chats, terminals, worktrees, settings, and actions...",
-        "2770f02910": "Search chats, terminals, worktrees, settings, and actions"
+        "2770f02910": "Search chats, terminals, worktrees, settings, and actions",
+        "pipelineTabMissing": "Pipeline tab no longer exists"
       },
       "github": {
         "pr": {
@@ -3101,7 +3102,8 @@
             "2c38630a01": "Workspace no longer exists",
             "4f0d9a71c2": "Tab no longer exists",
             "d7d496a451": "Browser page no longer exists",
-            "7726ce9970": "Mobile emulator tab no longer exists"
+            "7726ce9970": "Mobile emulator tab no longer exists",
+            "pipelineTabMissing": "Pipeline tab no longer exists"
           },
           "TabBarQuickCommandsButton": {
             "a2c7a33831": "Command",
@@ -15102,7 +15104,64 @@
       "pipeline": {
         "canvas": {
           "PipelineCanvas": {
-            "0da3663ff7": "Pipeline run"
+            "0da3663ff7": "Pipeline run",
+            "setup": "Setting up",
+            "running": "Running",
+            "paused": "Paused",
+            "completed": "Completed",
+            "failed": "Failed",
+            "aborted": "Aborted",
+            "interrupted": "Interrupted",
+            "unknownState": "Unknown",
+            "recently": "recently",
+            "secondsAgo": "{{value0}}s ago",
+            "minutesAgo": "{{value0}}m ago",
+            "lastConfirmed": "last confirmed {{value0}}",
+            "needsNewerOrca": "This template may need a newer Orca"
+          },
+          "PipelineCanvasScene": {
+            "scene": "Pipeline nodes",
+            "attempt": "attempt {{value0}} of {{value1}}",
+            "pausing": "pausing",
+            "overlimit": "over its {{value0}} min limit"
+          },
+          "PipelineRunControls": {
+            "pause": "Pause",
+            "resume": "Resume",
+            "abort": "Abort",
+            "abortTitle": "Abort this pipeline run?",
+            "abortDescription": "The running node is interrupted and no further node is dispatched. The worktree and its checkpoints stay in place for you to inspect or recover.",
+            "cancel": "Cancel",
+            "abortRun": "Abort run"
+          },
+          "PipelineStartDialog": {
+            "notFound": "That template no longer exists in ~/.orca/pipelines/.",
+            "invalidBasename": "Invalid template selection.",
+            "title": "Run pipeline",
+            "description": "Pick a template and describe the input. The run starts in a new worktree on this workspace.",
+            "folderWarning": "This is a folder workspace: the run executes forward-only in the folder itself, with no worktree and no checkpoints to roll back to on retry or Abort.",
+            "submoduleWarning": "This repository has submodules: submodule contents are not checkpointed, so retries do not roll back submodule changes.",
+            "templates": "Templates",
+            "loading": "Loading templates…",
+            "empty": "No templates found in ~/.orca/pipelines/.",
+            "needsNewerOrca": "This template may need a newer Orca",
+            "recentRuns": "Recent runs",
+            "input": "Input",
+            "cancel": "Cancel",
+            "start": "Start"
+          },
+          "node": {
+            "visuals": {
+              "succeeded": "Succeeded",
+              "failed": "Failed",
+              "retrying": "Retrying",
+              "running": "Running",
+              "held": "Held",
+              "notrun": "Not run",
+              "interrupted": "Interrupted",
+              "waiting": "Waiting",
+              "unknown": "Unknown"
+            }
           }
         }
       }
