@@ -60,6 +60,7 @@ function createPane(id: number, container = createMockElement('pane')): ManagedP
     stablePaneId: leafId,
     container,
     xtermContainer: createMockElement(),
+    dockContainer: createMockElement(),
     linkTooltip: createMockElement(),
     terminal: {} as never,
     fitAddon: {} as never,

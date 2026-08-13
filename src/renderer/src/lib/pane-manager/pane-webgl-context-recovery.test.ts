@@ -20,6 +20,7 @@ function createPane(options: { loadAddon?: () => void } = {}): ManagedPaneIntern
     } as never,
     container: {} as never,
     xtermContainer: {} as never,
+    dockContainer: {} as never,
     linkTooltip: {} as never,
     terminalGpuAcceleration: 'on',
     gpuRenderingEnabled: true,
