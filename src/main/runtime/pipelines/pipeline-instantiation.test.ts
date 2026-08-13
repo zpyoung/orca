@@ -88,10 +88,12 @@ function runtimeStub(overrides: Partial<OrcaRuntimeService> = {}) {
     resolveProjectRuntimeForWorktree: vi.fn().mockReturnValue(undefined),
     validateOrchestrationAgentLauncher: vi.fn(),
     getClientSettings: vi.fn().mockReturnValue({ agentCmdOverrides: {} }),
-    createManagedWorktree: vi.fn().mockResolvedValue({
-      worktree: { id: 'wt_run', branch: 'pipeline/bugfix-fast-1', repoId: 'repo_1' }
-    }),
+    searchRepoRefs: vi.fn().mockResolvedValue({ refs: [], truncated: false }),
+    createManagedWorktree: vi.fn().mockImplementation(async (createArgs) => ({
+      worktree: { id: 'wt_run', branch: createArgs.branchNameOverride, repoId: 'repo_1' }
+    })),
     removeManagedWorktree: vi.fn().mockResolvedValue({}),
+    listManagedWorktrees: vi.fn().mockResolvedValue({ worktrees: [], totalCount: 0, truncated: false }),
     ...overrides
   } as unknown as OrcaRuntimeService
 }
@@ -296,7 +298,32 @@ describe('instantiatePipelineRun', () => {
     })
   })
 
-  describe('folder workspaces (L10/E1)', () => {
+  describe('storage transaction failure', () => {
+    it('refuses instead of throwing and persists nothing when the transaction fails', async () => {
+      const { db, pipelineDb } = create()
+      const before = snapshotCounts(db, pipelineDb)
+      const runtime = runtimeStub()
+      vi.spyOn(pipelineDb, 'instantiate').mockImplementation(() => {
+        throw new Error('disk full while writing pipeline_runs')
+      })
+
+      const result = await instantiatePipelineRun({
+        runtime,
+        db,
+        pipelineDb,
+        worktreeSelector: 'id:wt_origin',
+        definition: definition([node({ id: 'repro' })])
+      })
+
+      expect(result).toEqual({
+        refused: { message: expect.stringContaining('disk full') }
+      })
+      expectNoNewRows(db, pipelineDb, before)
+      expect(runtime.createManagedWorktree).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('folder workspaces', () => {
     it('creates no branch and no worktree, with a null base commit, and reports success', async () => {
       const { db, pipelineDb } = create()
       const runtime = runtimeStub({
@@ -364,9 +391,70 @@ describe('instantiatePipelineRun', () => {
       expect(run?.run_worktree_id).toBe('wt_run')
       expect(run?.state).toBe('running')
     })
+
+    it('normalizes a full ref from the worktree creator to the short branch name in both the result and the persisted row', async () => {
+      const { db, pipelineDb } = create()
+      const runtime = runtimeStub({
+        createManagedWorktree: vi.fn().mockResolvedValue({
+          worktree: { id: 'wt_run', branch: 'refs/heads/pipeline/bugfix-fast-1', repoId: 'repo_1' }
+        })
+      })
+
+      const result = await instantiatePipelineRun({
+        runtime,
+        db,
+        pipelineDb,
+        worktreeSelector: 'id:wt_origin',
+        definition: definition([node({ id: 'repro' })])
+      })
+
+      if ('refused' in result) {
+        throw new Error(`expected success, got refusal: ${result.refused.message}`)
+      }
+      expect(result.branch).toBe('pipeline/bugfix-fast-1')
+
+      const run = pipelineDb.getPipelineRun(result.runId)
+      expect(run?.branch).toBe('pipeline/bugfix-fast-1')
+    })
   })
 
-  describe('post-commit worktree failure compensation (L4b, E13, AC27)', () => {
+  describe('branch collision', () => {
+    it('skips a branch that already exists and never hands the taken name to the worktree creator', async () => {
+      const { db, pipelineDb } = create()
+      const searchRepoRefs = vi.fn().mockImplementation(async (_repoId: string, query: string) => {
+        return query === 'pipeline/bugfix-fast-1'
+          ? { refs: ['refs/heads/pipeline/bugfix-fast-1'], truncated: false }
+          : { refs: [], truncated: false }
+      })
+      const runtime = runtimeStub({ searchRepoRefs })
+
+      const result = await instantiatePipelineRun({
+        runtime,
+        db,
+        pipelineDb,
+        worktreeSelector: 'id:wt_origin',
+        definition: definition([node({ id: 'repro' })])
+      })
+
+      if ('refused' in result) {
+        throw new Error(`expected success, got refusal: ${result.refused.message}`)
+      }
+      expect(result.branch).toBe('pipeline/bugfix-fast-1-2')
+
+      expect(runtime.createManagedWorktree).toHaveBeenCalledTimes(1)
+      expect(runtime.createManagedWorktree).toHaveBeenCalledWith(
+        expect.objectContaining({ branchNameOverride: 'pipeline/bugfix-fast-1-2' })
+      )
+      expect(runtime.createManagedWorktree).not.toHaveBeenCalledWith(
+        expect.objectContaining({ branchNameOverride: 'pipeline/bugfix-fast-1' })
+      )
+
+      const run = pipelineDb.getPipelineRun(result.runId)
+      expect(run?.branch).toBe('pipeline/bugfix-fast-1-2')
+    })
+  })
+
+  describe('post-commit worktree failure compensation', () => {
     it('fails the run terminally with its allocated run number, dispatches nothing, and lets the next Start take the next run number', async () => {
       const { db, pipelineDb } = create()
       const runtime = runtimeStub({
@@ -433,6 +521,34 @@ describe('instantiatePipelineRun', () => {
         refused: { message: expect.stringContaining('disk full') }
       })
       expect(runtime.removeManagedWorktree).toHaveBeenCalledWith('wt_run', true)
+    })
+
+    it('finds and removes the worktree by the branch it asked for when the creator throws before returning an id', async () => {
+      const { db, pipelineDb } = create()
+      const runtime = runtimeStub({
+        createManagedWorktree: vi.fn().mockRejectedValue(new Error('listing omitted the new worktree')),
+        listManagedWorktrees: vi.fn().mockResolvedValue({
+          worktrees: [
+            { id: 'wt_orphaned', branch: 'refs/heads/pipeline/bugfix-fast-1', repoId: 'repo_1' }
+          ],
+          totalCount: 1,
+          truncated: false
+        })
+      })
+
+      const result = await instantiatePipelineRun({
+        runtime,
+        db,
+        pipelineDb,
+        worktreeSelector: 'id:wt_origin',
+        definition: definition([node({ id: 'repro' })])
+      })
+
+      expect(result).toEqual({
+        refused: { message: expect.stringContaining('listing omitted') }
+      })
+      expect(runtime.listManagedWorktrees).toHaveBeenCalledWith('repo_1')
+      expect(runtime.removeManagedWorktree).toHaveBeenCalledWith('wt_orphaned', true)
     })
   })
 })

@@ -25,7 +25,7 @@ export function resolvePreflightExecutionHost(
 
 /**
  * SSH-hosted git workspaces must pass the relay checkpoint support gate before anything is
- * persisted, alongside (not after) the per-node launch checks (logic L3, E2 amendment A2).
+ * persisted, alongside (not after) the per-node launch checks.
  */
 export async function checkSshCheckpointGate(
   connectionId: string
