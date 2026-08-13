@@ -1,8 +1,8 @@
 import type Database from '../../sqlite/sync-database'
 
 /**
- * Additive, idempotent DDL for the durable spawn-attempt record (tech.md §5.3). A new table so
- * no existing orchestration table's DDL changes.
+ * Additive, idempotent DDL for the durable spawn-attempt record. A new table so no existing
+ * orchestration table's DDL changes.
  */
 export function ensureDispatchSpawnReceiptSchema(db: Database.Database): void {
   db.exec(`

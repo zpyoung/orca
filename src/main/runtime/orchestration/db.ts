@@ -2265,7 +2265,7 @@ export class OrchestrationDb {
   }
 
   // Internal seam for sibling orchestration-DB extensions (pipeline-run-db.ts): pipeline tables
-  // live on this same connection, which is what makes their single L4 transaction possible.
+  // live on this same connection, which is what makes their single transaction possible.
   getSyncDatabase(): Database.Database {
     return this.db
   }
@@ -4130,7 +4130,7 @@ export class OrchestrationDb {
   }
 
   // Written immediately before terminal creation is invoked: absence of this row after a
-  // failure is positive proof nothing spawned (L16a stage B).
+  // failure is positive proof nothing spawned.
   recordSpawnAttempt(dispatchId: string): void {
     this.db
       .prepare(
