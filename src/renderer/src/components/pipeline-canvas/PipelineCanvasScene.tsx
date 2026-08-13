@@ -1,9 +1,6 @@
 import { decodePipelineNodeStatus } from '../../../../shared/pipeline-run-snapshot'
 import { translate } from '@/i18n/i18n'
-import {
-  computePipelineCanvasLayout,
-  deriveSequentialPipelineLayoutNodes
-} from './pipeline-canvas-layout'
+import { computePipelineCanvasLayout, derivePipelineLayoutNodes } from './pipeline-canvas-layout'
 import { pipelineNodeVisual } from './pipeline-canvas-node-visuals'
 
 export type PipelineCanvasSceneNode = {
@@ -14,6 +11,7 @@ export type PipelineCanvasSceneNode = {
   attemptsAllowed?: number
   limitBreached?: boolean
   limitMinutes?: number
+  needs?: string[]
   /** Elapsed time for the current attempt, pre-formatted by the caller. */
   elapsedLabel?: string
 }
@@ -45,7 +43,7 @@ export default function PipelineCanvasScene({
   nodes,
   pausing
 }: PipelineCanvasSceneProps): React.JSX.Element {
-  const layoutNodes = deriveSequentialPipelineLayoutNodes(nodes.map((n) => n.id))
+  const layoutNodes = derivePipelineLayoutNodes(nodes)
   const positions = computePipelineCanvasLayout(layoutNodes)
   const positionById = new Map(positions.map((p) => [p.id, p]))
   const layoutById = new Map(layoutNodes.map((n) => [n.id, n]))
@@ -84,6 +82,7 @@ export default function PipelineCanvasScene({
               <path
                 key={`${depId}->${node.id}`}
                 data-pipeline-edge
+                data-edge={`${depId}->${node.id}`}
                 d={path}
                 fill="none"
                 className="stroke-border"

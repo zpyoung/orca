@@ -25,6 +25,7 @@ vi.mock('../runtime/pipelines/pipeline-run-lifecycle', () => ({
 import {
   _getPipelineRunSenderCleanupCountForTest,
   clearPipelineRunSubscriptions,
+  MAX_PIPELINE_SUBSCRIPTIONS_PER_SENDER,
   registerPipelineSubscriptionHandlers
 } from './pipeline-subscription'
 
@@ -172,6 +173,57 @@ describe('pipeline run subscription bridge', () => {
       subscriptionId: 'sub-4',
       frame: { type: 'error', error: 'Pipeline run run-missing was not found.' }
     })
+  })
+
+  it('rejects a subscribe beyond the per-sender cap instead of leaking another host subscription', () => {
+    subscribeToPipelineRunMock.mockImplementation(() => vi.fn())
+    const renderer = createSender(6)
+
+    for (let i = 0; i < MAX_PIPELINE_SUBSCRIPTIONS_PER_SENDER; i++) {
+      subscribe(renderer.sender, `sub-${i}`, `run-${i}`)
+    }
+    expect(subscribeToPipelineRunMock).toHaveBeenCalledTimes(MAX_PIPELINE_SUBSCRIPTIONS_PER_SENDER)
+
+    subscribe(renderer.sender, 'sub-overflow', 'run-overflow')
+
+    // the overflow attempt must not create a host subscription — that's the leak this bounds
+    expect(subscribeToPipelineRunMock).toHaveBeenCalledTimes(MAX_PIPELINE_SUBSCRIPTIONS_PER_SENDER)
+    expect(renderer.sender.send).toHaveBeenCalledWith('pipelineRun:snapshot', {
+      subscriptionId: 'sub-overflow',
+      frame: {
+        type: 'error',
+        error: expect.stringContaining(String(MAX_PIPELINE_SUBSCRIPTIONS_PER_SENDER))
+      }
+    })
+  })
+
+  it('does not let a same-id resubscribe count against the per-sender cap', () => {
+    subscribeToPipelineRunMock.mockImplementation(() => vi.fn())
+    const renderer = createSender(7)
+
+    for (let i = 0; i < MAX_PIPELINE_SUBSCRIPTIONS_PER_SENDER; i++) {
+      subscribe(renderer.sender, `sub-${i}`, `run-${i}`)
+    }
+    // resubscribing under an already-live id replaces it — no net growth, so it must still succeed
+    subscribe(renderer.sender, 'sub-0', 'run-0-again')
+
+    expect(subscribeToPipelineRunMock).toHaveBeenCalledTimes(MAX_PIPELINE_SUBSCRIPTIONS_PER_SENDER + 1)
+    const lastCall = capturedCall(MAX_PIPELINE_SUBSCRIPTIONS_PER_SENDER)
+    expect(lastCall.runId).toBe('run-0-again')
+  })
+
+  it('scopes the subscription cap per sender, not globally', () => {
+    subscribeToPipelineRunMock.mockImplementation(() => vi.fn())
+    const rendererA = createSender(8)
+    const rendererB = createSender(9)
+
+    for (let i = 0; i < MAX_PIPELINE_SUBSCRIPTIONS_PER_SENDER; i++) {
+      subscribe(rendererA.sender, `a-sub-${i}`, `run-${i}`)
+    }
+    subscribe(rendererB.sender, 'b-sub-0', 'run-b-0')
+
+    expect(subscribeToPipelineRunMock).toHaveBeenCalledTimes(MAX_PIPELINE_SUBSCRIPTIONS_PER_SENDER + 1)
+    expect(rendererB.sender.send).not.toHaveBeenCalled()
   })
 
   it('tears down a prior subscription when the same id resubscribes', () => {

@@ -15117,7 +15117,9 @@
             "secondsAgo": "{{value0}}s ago",
             "minutesAgo": "{{value0}}m ago",
             "lastConfirmed": "last confirmed {{value0}}",
-            "needsNewerOrca": "This template may need a newer Orca"
+            "needsNewerOrca": "This template may need a newer Orca",
+            "unsupportedHost": "This host does not support pipelines",
+            "transientSubscriptionError": "Could not reach the pipeline run"
           },
           "PipelineCanvasScene": {
             "scene": "Pipeline nodes",

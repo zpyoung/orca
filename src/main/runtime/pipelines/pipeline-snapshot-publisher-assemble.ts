@@ -39,20 +39,24 @@ function runPhaseFor(state: PipelineRunState): 'live' | 'paused' | 'terminal' {
   return isTerminalPipelineRunState(state) ? 'terminal' : 'live'
 }
 
-function parseLimitMinutesByNodeId(snapshotJson: string): Map<string, number> {
-  const limits = new Map<string, number>()
+type PipelineNodeSnapshotMetadata = { limitMinutes?: number; needs?: string[] }
+
+/** Reads per-node limits and dependency edges from the run's stored `ResolvedPipelineDefinition` — the same record `pipeline-run-db-instantiate.ts` derived task `deps` from at instantiation, so this is that data's one home, not a second copy of it. */
+function parseNodeMetadataByNodeId(snapshotJson: string): Map<string, PipelineNodeSnapshotMetadata> {
+  const metadata = new Map<string, PipelineNodeSnapshotMetadata>()
   let definition: ResolvedPipelineDefinition
   try {
     definition = JSON.parse(snapshotJson) as ResolvedPipelineDefinition
   } catch {
-    return limits
+    return metadata
   }
   for (const node of definition.nodes ?? []) {
-    if (typeof node.limits?.maxMinutes === 'number') {
-      limits.set(node.id, node.limits.maxMinutes)
-    }
+    metadata.set(node.id, {
+      limitMinutes: typeof node.limits?.maxMinutes === 'number' ? node.limits.maxMinutes : undefined,
+      needs: Array.isArray(node.needs) ? node.needs : undefined
+    })
   }
-  return limits
+  return metadata
 }
 
 function latestOf(attempts: PipelineAttemptRow[]): PipelineAttemptRow | undefined {
@@ -105,7 +109,7 @@ export function assemblePipelineSnapshot(
   }
 
   const phase = runPhaseFor(run.state)
-  const limitMinutesByNodeId = parseLimitMinutesByNodeId(run.snapshot_json)
+  const nodeMetadataByNodeId = parseNodeMetadataByNodeId(run.snapshot_json)
   const attemptsByNodeId = groupByNodeId(source.getAttempts(runId))
 
   const nodes = source.getNodes(runId).map((nodeRow) => {
@@ -122,7 +126,7 @@ export function assemblePipelineSnapshot(
       priorFailedAttempt,
       runPhase: phase
     })
-    const limitMinutes = limitMinutesByNodeId.get(nodeRow.node_id)
+    const metadata = nodeMetadataByNodeId.get(nodeRow.node_id)
 
     return {
       id: nodeRow.node_id,
@@ -132,8 +136,9 @@ export function assemblePipelineSnapshot(
       attemptsAllowed: 1 + nodeRow.retries_allowed,
       startedAt: latest?.started_at,
       endedAt: latest?.ended_at ?? undefined,
-      limitBreached: computeLimitBreached(latest, limitMinutes, now),
-      limitMinutes
+      limitBreached: computeLimitBreached(latest, metadata?.limitMinutes, now),
+      limitMinutes: metadata?.limitMinutes,
+      needs: metadata?.needs
     }
   })
 

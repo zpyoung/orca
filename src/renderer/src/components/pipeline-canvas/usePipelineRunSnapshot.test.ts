@@ -4,6 +4,7 @@ import { act } from 'react'
 import { renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PipelineRunSnapshotWire } from '../../../../shared/pipeline-run-snapshot'
+import type { PipelineRunSubscriptionError } from '@/runtime/pipeline-run-client'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -18,14 +19,14 @@ vi.mock('@/store', () => ({
 }))
 
 let deliverSnapshot: ((snapshot: PipelineRunSnapshotWire) => void) | undefined
-let deliverError: ((error: unknown) => void) | undefined
+let deliverError: ((error: PipelineRunSubscriptionError) => void) | undefined
 const unsubscribeMock = vi.fn()
 const subscribeToPipelineRunSnapshot = vi.fn(
   async (
     _target: unknown,
     _runId: string,
     onSnapshot: (snapshot: PipelineRunSnapshotWire) => void,
-    onError: (error: unknown) => void
+    onError: (error: PipelineRunSubscriptionError) => void
   ) => {
     deliverSnapshot = onSnapshot
     deliverError = onError
@@ -139,7 +140,37 @@ describe('usePipelineRunSnapshot', () => {
   it('does not throw when the subscription reports an error', async () => {
     renderHook(() => usePipelineRunSnapshot('run-1'))
     await flushMicrotasks()
-    expect(() => act(() => deliverError?.(new Error('boom')))).not.toThrow()
+    expect(() =>
+      act(() => deliverError?.({ kind: 'transient', message: 'boom' }))
+    ).not.toThrow()
+  })
+
+  it('starts with no subscription error', async () => {
+    const { result } = renderHook(() => usePipelineRunSnapshot('run-1'))
+    await flushMicrotasks()
+    expect(result.current.subscriptionError).toBeNull()
+  })
+
+  it('surfaces an unsupported-host subscription error distinctly from a transient one', async () => {
+    const { result } = renderHook(() => usePipelineRunSnapshot('run-1'))
+    await flushMicrotasks()
+    act(() => deliverError?.({ kind: 'unsupported', message: 'this host has no pipelines' }))
+    expect(result.current.subscriptionError).toEqual({
+      kind: 'unsupported',
+      message: 'this host has no pipelines'
+    })
+  })
+
+  it('clears a subscription error once a snapshot arrives', async () => {
+    const { result } = renderHook(() => usePipelineRunSnapshot('run-1'))
+    await flushMicrotasks()
+    act(() => deliverError?.({ kind: 'transient', message: 'boom' }))
+    expect(result.current.subscriptionError).not.toBeNull()
+
+    act(() =>
+      deliverSnapshot?.({ runId: 'run-1', state: 'running', publishedAt: new Date().toISOString() })
+    )
+    expect(result.current.subscriptionError).toBeNull()
   })
 
   it('unsubscribes the prior run when runId changes, and resubscribes for the new one', async () => {

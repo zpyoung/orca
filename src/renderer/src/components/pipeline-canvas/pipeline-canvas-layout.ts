@@ -46,10 +46,8 @@ export function computePipelineCanvasLayout(
 }
 
 /**
- * The pipeline snapshot wire carries no dependency edges — only the
- * template's list order, already applied host-side. Until the wire grows a
- * real edges field, treat that order as a straight chain so the only shipped
- * template (a chain) still lays out and draws edges correctly.
+ * Chains each node to the one before it in list order — the layout used when
+ * real dependency edges aren't available.
  */
 export function deriveSequentialPipelineLayoutNodes(
   nodeIds: readonly string[]
@@ -58,4 +56,21 @@ export function deriveSequentialPipelineLayoutNodes(
     id,
     needs: index === 0 ? [] : [nodeIds[index - 1]!]
   }))
+}
+
+export type PipelineLayoutSourceNode = { id: string; needs?: readonly string[] }
+
+/**
+ * Layout nodes from the wire: real `needs` edges when every node carries
+ * them, else a list-order chain — the degrade path for an older host that
+ * doesn't send `needs` at all (optional-field wire evolution).
+ */
+export function derivePipelineLayoutNodes(
+  nodes: readonly PipelineLayoutSourceNode[]
+): PipelineLayoutNode[] {
+  const hasRealDependencyData = nodes.length > 0 && nodes.every((node) => Array.isArray(node.needs))
+  if (hasRealDependencyData) {
+    return nodes.map((node) => ({ id: node.id, needs: node.needs ?? [] }))
+  }
+  return deriveSequentialPipelineLayoutNodes(nodes.map((node) => node.id))
 }

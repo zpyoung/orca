@@ -274,6 +274,23 @@ describe('assemblePipelineSnapshot', () => {
     expect(node?.limitBreached).toBe(false)
   })
 
+  it('carries each node dependency list from the snapshot definition', () => {
+    const source = sourceOf(
+      runRow(),
+      [nodeRow({ node_id: 'repro' }), nodeRow({ node_id: 'fix', node_index: 1 })],
+      []
+    )
+    const snapshot = assemblePipelineSnapshot(source, 'run_1')
+    expect(snapshot.nodes?.find((n) => n.id === 'repro')?.needs).toEqual([])
+    expect(snapshot.nodes?.find((n) => n.id === 'fix')?.needs).toEqual(['repro'])
+  })
+
+  it('omits needs for a node absent from the snapshot definition', () => {
+    const source = sourceOf(runRow(), [nodeRow({ node_id: 'orphan' })], [])
+    const node = assemblePipelineSnapshot(source, 'run_1').nodes?.[0]
+    expect(node?.needs).toBeUndefined()
+  })
+
   it('carries the pausing annotation when supplied', () => {
     const source = sourceOf(runRow({ state: 'paused' }), [], [])
     const snapshot = assemblePipelineSnapshot(source, 'run_1', { pausing: true })
