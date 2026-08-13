@@ -445,6 +445,22 @@ function toVisibleTabType(contentType: TabContentType): WorkspaceVisibleTabType 
   return assertExhaustiveTabContentType(contentType)
 }
 
+/** True when the worktree's focused group's active tab is a pipeline canvas. */
+export function isPipelineTabActiveForWorktree(
+  state: Pick<AppState, 'activeGroupIdByWorktree' | 'groupsByWorktree' | 'unifiedTabsByWorktree'>,
+  worktreeId: string
+): boolean {
+  const groupId = state.activeGroupIdByWorktree[worktreeId]
+  const group = (state.groupsByWorktree[worktreeId] ?? []).find((candidate) => candidate.id === groupId)
+  if (!group?.activeTabId) {
+    return false
+  }
+  const tab = (state.unifiedTabsByWorktree[worktreeId] ?? []).find(
+    (candidate) => candidate.id === group.activeTabId
+  )
+  return tab?.contentType === 'pipeline'
+}
+
 function deriveActiveSurfaceForWorktree(
   state: Pick<
     AppState,

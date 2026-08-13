@@ -98,6 +98,7 @@ export function activateTabNumberShortcut(index: number): boolean {
     case 'pipeline':
       // Why: activateTab above already focuses the split-group model; entityId
       // is a run id, so it must not land in setActiveFile.
+      store.activatePipelineTabSurface(worktreeId)
       return true
     case 'editor':
     case 'diff':

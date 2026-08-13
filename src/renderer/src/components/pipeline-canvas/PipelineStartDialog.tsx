@@ -96,11 +96,10 @@ export default function PipelineStartDialog({
         setTemplates(entries)
       }
     })
-    void callRuntimeRpc<{ runs: PipelineRunListEntry[] }>(
-      target,
-      'pipeline.listRuns',
-      workspaceId ? { workspaceId } : {}
-    )
+    // Why unfiltered: a workspaceId filter excludes rows whose workspace has since
+    // been deleted (the host nulls that field), making completed-run history
+    // unreachable from every workspace's start dialog.
+    void callRuntimeRpc<{ runs: PipelineRunListEntry[] }>(target, 'pipeline.listRuns', {})
       .then((result) => {
         if (!cancelled) {
           setRunHistory(result.runs)
@@ -112,7 +111,7 @@ export default function PipelineStartDialog({
     return () => {
       cancelled = true
     }
-  }, [open, target, workspaceId])
+  }, [open, target])
 
   const selected = templates?.find((entry) => entry.basename === selectedBasename) ?? null
   const canSubmit = selected !== null && inputText.trim().length > 0 && !submitting

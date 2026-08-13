@@ -6,6 +6,7 @@ const mockStoreState = vi.hoisted(() => ({
   activateTab: vi.fn(),
   createUnifiedTab: vi.fn(),
   focusGroup: vi.fn(),
+  seedPipelineRunWorkspace: vi.fn(),
   groupsByWorktree: {} as Record<string, { id: string }[]>,
   unifiedTabsByWorktree: {} as Record<
     string,
@@ -28,6 +29,7 @@ describe('ensurePipelineTab', () => {
     mockStoreState.activateTab.mockReset()
     mockStoreState.createUnifiedTab.mockReset()
     mockStoreState.focusGroup.mockReset()
+    mockStoreState.seedPipelineRunWorkspace.mockReset()
     vi.resetModules()
   })
 
@@ -55,6 +57,25 @@ describe('ensurePipelineTab', () => {
     })
     expect(mockStoreState.activateTab).toHaveBeenCalledWith('tab-1')
     expect(mockStoreState.focusGroup).toHaveBeenCalledWith('wt-1', 'group-1')
+  })
+
+  it("seeds the run's owning workspace before a group is even resolved, so a canvas mounted from this call already knows its host", async () => {
+    mockStoreState.createUnifiedTab.mockReturnValue({
+      id: 'tab-1',
+      groupId: 'group-1',
+      contentType: 'pipeline',
+      entityId: 'run-1'
+    })
+    const { ensurePipelineTab } = await import('./ensure-pipeline-tab')
+
+    ensurePipelineTab('wt-1', { runId: 'run-1', runNumber: 3, templateName: 'bugfix-fast' })
+
+    expect(mockStoreState.seedPipelineRunWorkspace).toHaveBeenCalledWith({
+      runId: 'run-1',
+      workspaceId: 'wt-1',
+      templateName: 'bugfix-fast',
+      runNumber: 3
+    })
   })
 
   it('reuses the existing tab for the same run id instead of creating a duplicate', async () => {

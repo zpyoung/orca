@@ -1,4 +1,6 @@
 import type { TerminalTab, WorkspaceVisibleTabType } from '../../../../shared/types'
+import { useAppStore } from '@/store'
+import { isPipelineTabActiveForWorktree } from '@/store/slices/tabs'
 
 export function shouldRepairActiveTerminalTab(args: {
   activeTabType: WorkspaceVisibleTabType
@@ -12,6 +14,12 @@ export function shouldRepairActiveTerminalTab(args: {
     return false
   }
   if (args.activeTabId && args.tabs.some((tab) => tab.id === args.activeTabId)) {
+    return false
+  }
+  // pipeline maps to 'terminal' as a neutral sentinel with activeTabId cleared — the
+  // caller can't tell that apart from a stale id without asking the tab model directly.
+  const worktreeId = args.tabs[0]?.worktreeId
+  if (worktreeId && isPipelineTabActiveForWorktree(useAppStore.getState(), worktreeId)) {
     return false
   }
   return true

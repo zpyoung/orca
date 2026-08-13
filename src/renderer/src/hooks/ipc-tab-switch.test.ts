@@ -44,6 +44,7 @@ type MockStore = {
   setActiveBrowserTab: ReturnType<typeof vi.fn>
   activateTab: ReturnType<typeof vi.fn>
   setActiveTabType: ReturnType<typeof vi.fn>
+  activatePipelineTabSurface: ReturnType<typeof vi.fn>
 }
 
 function makeStore(activeTabType: ActiveTabType, overrides: Partial<MockStore> = {}): MockStore {
@@ -60,6 +61,7 @@ function makeStore(activeTabType: ActiveTabType, overrides: Partial<MockStore> =
     setActiveBrowserTab: vi.fn(),
     activateTab: vi.fn(),
     setActiveTabType: vi.fn(),
+    activatePipelineTabSurface: vi.fn(),
     ...overrides
   }
 }
@@ -329,6 +331,19 @@ describe('handleSwitchTabAcrossAllTypes', () => {
     expect(store.activateTab).toHaveBeenCalledWith('tab-p1')
     expect(store.setActiveFile).not.toHaveBeenCalled()
     expect(store.setActiveTab).not.toHaveBeenCalledWith('tab-p1')
+  })
+
+  it('clears the previously active terminal id when cycling into a pipeline tab', () => {
+    const store = makeStore('terminal')
+    store.activeTabId = 'term-1'
+    getStateMock.mockReturnValue(store)
+    getActiveTabNavOrderMock.mockReturnValue([
+      { type: 'terminal', id: 'term-1' },
+      { type: 'pipeline', id: 'tab-p1', tabId: 'tab-p1' }
+    ])
+
+    expect(handleSwitchTabAcrossAllTypes(1)).toBe(true)
+    expect(store.activatePipelineTabSurface).toHaveBeenCalledWith('wt-1')
   })
 })
 

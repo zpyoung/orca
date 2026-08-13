@@ -44,8 +44,6 @@ export function activatePipelineTabPaletteResult({
   const state = useAppStore.getState()
   state.focusGroup(worktreeId, tab.groupId)
   state.activateTab(tab.id)
-  state.setActiveTab(tab.id)
-  // Why no setActiveTabType: pipeline has no WorkspaceVisibleTabType member —
-  // entityId is a run id, and writing it into a file-id field would misroute it.
+  state.activatePipelineTabSurface(worktreeId)
   return { status: 'activated', tabId: tab.id }
 }

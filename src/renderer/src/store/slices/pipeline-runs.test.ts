@@ -238,6 +238,63 @@ describe('runs are never removed', () => {
   })
 })
 
+describe('seedPipelineRunWorkspace', () => {
+  it('records the owning workspace for a run the store has never seen', () => {
+    const store = createTestStore()
+    store.getState().seedPipelineRunWorkspace({
+      runId: 'r1',
+      workspaceId: 'w1',
+      templateName: 'bugfix-fast',
+      runNumber: 5
+    })
+
+    expect(store.getState().pipelineRunsById.r1).toEqual({
+      runId: 'r1',
+      templateName: 'bugfix-fast',
+      runNumber: 5,
+      state: 'unknown',
+      workspaceId: 'w1',
+      lastSnapshotAt: null
+    })
+  })
+
+  it('does not clobber richer state already learned from hydration or a snapshot', () => {
+    const store = createTestStore()
+    store.getState().upsertPipelineRunFromSnapshot({ runId: 'r1', state: 'running' })
+
+    store.getState().seedPipelineRunWorkspace({
+      runId: 'r1',
+      workspaceId: 'w1',
+      templateName: 'bugfix-fast',
+      runNumber: 5
+    })
+
+    expect(store.getState().pipelineRunsById.r1).toMatchObject({
+      state: 'running',
+      workspaceId: 'w1'
+    })
+  })
+
+  it('overwrites a stale workspaceId with the caller-known owner', () => {
+    const store = createTestStore()
+    store.getState().seedPipelineRunWorkspace({
+      runId: 'r1',
+      workspaceId: 'w-old',
+      templateName: 'bugfix-fast',
+      runNumber: 5
+    })
+
+    store.getState().seedPipelineRunWorkspace({
+      runId: 'r1',
+      workspaceId: 'w-new',
+      templateName: 'bugfix-fast',
+      runNumber: 5
+    })
+
+    expect(store.getState().pipelineRunsById.r1.workspaceId).toBe('w-new')
+  })
+})
+
 describe('upsertPipelineRunFromSnapshot', () => {
   it('upserts a run independently of the hydration/listRuns path', () => {
     const store = createTestStore()
