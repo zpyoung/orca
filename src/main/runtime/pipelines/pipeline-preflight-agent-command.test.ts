@@ -74,4 +74,37 @@ describe('resolveEffectiveLaunchProbe', () => {
       expect(probe?.primaryCommand).toBe('/opt/my\\')
     })
   })
+
+  it('resolves an override with a POSIX-escaped space using the reported SSH host platform, not the controller platform', () => {
+    withPlatform('win32', () => {
+      const probe = resolveEffectiveLaunchProbe(
+        'claude',
+        { claude: '/opt/my\\ agent/bin --flag' },
+        { connectionId: 'ssh-1', hostPlatform: 'linux' }
+      )
+      expect(probe?.primaryCommand).toBe('/opt/my agent/bin')
+    })
+  })
+
+  it('parses a quoted Windows override using the reported SSH host platform, not the controller platform', () => {
+    withPlatform('linux', () => {
+      const probe = resolveEffectiveLaunchProbe(
+        'claude',
+        { claude: '"C:\\Program Files\\Agent\\agent.exe" --flag' },
+        { connectionId: 'ssh-1', hostPlatform: 'win32' }
+      )
+      expect(probe?.primaryCommand).toBe('C:\\Program Files\\Agent\\agent.exe')
+    })
+  })
+
+  it('falls back to the controller platform when the SSH host has no reported platform', () => {
+    withPlatform('win32', () => {
+      const probe = resolveEffectiveLaunchProbe(
+        'claude',
+        { claude: '/opt/my\\ agent/bin --flag' },
+        { connectionId: 'ssh-1' }
+      )
+      expect(probe?.primaryCommand).toBe('/opt/my\\')
+    })
+  })
 })

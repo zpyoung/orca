@@ -18,11 +18,16 @@ import {
   resolveDetectedTuiAgentIds,
   type TuiAgentDetectionCommand
 } from '../../../shared/tui-agent-detection-commands'
+import type { SshRemotePlatform } from '../../../shared/ssh-types'
 import type { TuiAgent } from '../../../shared/types'
 
 export type PresenceResult = { ok: true } | { ok: false; transport: boolean }
 
-export type PreflightExecutionHost = { connectionId?: string; wslDistro?: string }
+export type PreflightExecutionHost = {
+  connectionId?: string
+  wslDistro?: string
+  hostPlatform?: SshRemotePlatform
+}
 
 export async function probeAgentPresence(args: {
   agent: TuiAgent

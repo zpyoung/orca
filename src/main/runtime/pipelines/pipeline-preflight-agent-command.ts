@@ -11,9 +11,17 @@ export type EffectiveLaunchProbe = {
   primaryCommand: string
 }
 
-// a WSL guest is always a POSIX shell regardless of the controller's own platform
+// a WSL guest is always a POSIX shell regardless of the controller's own platform; an SSH host
+// with no reported platform falls back to the controller's, since overrides are typically quoted
+// for the remote OS and guessing POSIX would corrupt a quoted Windows path with backslash escaping
 function executingHostPlatform(host: PreflightExecutionHost): NodeJS.Platform {
-  return host.wslDistro ? 'linux' : process.platform
+  if (host.wslDistro) {
+    return 'linux'
+  }
+  if (host.connectionId) {
+    return host.hostPlatform ?? process.platform
+  }
+  return process.platform
 }
 
 // launch construction lets settings.agentCmdOverrides replace an agent's whole command and
