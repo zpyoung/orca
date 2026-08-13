@@ -9,6 +9,11 @@ import {
   type SearchableBrowserPage
 } from '@/lib/browser-palette-search'
 import {
+  searchPipelineTabs,
+  type PipelinePaletteSearchResult,
+  type SearchablePipelineTab
+} from '@/lib/pipeline-palette-search'
+import {
   searchSimulatorTabs,
   type SearchableSimulatorTab,
   type SimulatorPaletteSearchResult
@@ -25,7 +30,7 @@ export const OPEN_TAB_SEARCH_RESULT_LIMIT = 4
 // Why its own guard: searchWorkspaceTabs has no size limit of its own.
 export const OPEN_TAB_SEARCH_QUERY_MAX_BYTES = 2 * 1024
 
-export type OpenTabSearchSource = 'workspace' | 'browser' | 'simulator'
+export type OpenTabSearchSource = 'workspace' | 'browser' | 'simulator' | 'pipeline'
 
 type OpenTabSearchResultBase = {
   executionHostId: ExecutionHostId
@@ -58,11 +63,18 @@ export type OpenTabSearchResult =
       tabId: string
       groupId: string
     })
+  | (OpenTabSearchResultBase & {
+      source: 'pipeline'
+      contentType: 'pipeline'
+      tabId: string
+      groupId: string
+    })
 
 export type OpenTabSearchInput = {
   workspaceTabs: readonly SearchableWorkspaceTab[]
   browserPages: readonly SearchableBrowserPage[]
   simulatorTabs: readonly SearchableSimulatorTab[]
+  pipelineTabs: readonly SearchablePipelineTab[]
   query: string
 }
 
@@ -76,7 +88,8 @@ type RankedResult = {
 const SOURCE_RANK: Record<OpenTabSearchSource, number> = {
   workspace: 0,
   browser: 1,
-  simulator: 2
+  simulator: 2,
+  pipeline: 3
 }
 
 const TITLE_PREFIX_TIER = 0
@@ -97,6 +110,7 @@ type EngineResult =
   | WorkspaceTabPaletteSearchResult
   | BrowserPaletteSearchResult
   | SimulatorPaletteSearchResult
+  | PipelinePaletteSearchResult
 
 // Why the positive signal rather than "no title and no secondary range": the
 // simulator alias branch and the browser workspace-label branch are real matches
@@ -161,6 +175,7 @@ export function searchOpenTabs({
   workspaceTabs,
   browserPages,
   simulatorTabs,
+  pipelineTabs,
   query
 }: OpenTabSearchInput): OpenTabSearchResult[] {
   const trimmed = query.trim()
@@ -173,6 +188,7 @@ export function searchOpenTabs({
     workspaceTabs[0]?.worktree.hostId ??
     browserPages[0]?.worktree.hostId ??
     simulatorTabs[0]?.worktree.hostId ??
+    pipelineTabs[0]?.worktree.hostId ??
     LOCAL_EXECUTION_HOST_ID
   // Why map workspace only: editor relativePath is read from the searchable entry.
   const workspaceEntriesByTabId = new Map(workspaceTabs.map((entry) => [entry.tab.id, entry]))
@@ -200,6 +216,13 @@ export function searchOpenTabs({
       ...baseResult('simulator', result.tabId, result, executionHostId),
       source: 'simulator',
       contentType: 'simulator',
+      tabId: result.tabId,
+      groupId: result.groupId
+    })),
+    ...rank('pipeline', searchPipelineTabs([...pipelineTabs], trimmed), (result) => ({
+      ...baseResult('pipeline', result.tabId, result, executionHostId),
+      source: 'pipeline',
+      contentType: 'pipeline',
       tabId: result.tabId,
       groupId: result.groupId
     }))

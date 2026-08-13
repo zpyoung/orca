@@ -5,6 +5,10 @@ import type { Repo, Worktree } from '../../../../shared/types'
 import { buildSearchableBrowserPages } from '@/lib/browser-palette-page-entries'
 import type { SearchableBrowserPage } from '@/lib/browser-palette-search'
 import {
+  buildSearchablePipelineTabs,
+  type SearchablePipelineTab
+} from '@/lib/pipeline-palette-search'
+import {
   buildSearchableSimulatorTabs,
   type SearchableSimulatorTab
 } from '@/lib/simulator-palette-search'
@@ -23,6 +27,7 @@ export type OpenTabSearchEntries = {
   workspaceTabs: readonly SearchableWorkspaceTab[]
   browserPages: readonly SearchableBrowserPage[]
   simulatorTabs: readonly SearchableSimulatorTab[]
+  pipelineTabs: readonly SearchablePipelineTab[]
 }
 
 export type OpenTabSearchEntryState = Pick<
@@ -40,6 +45,7 @@ export type OpenTabSearchEntryState = Pick<
   | 'browserTabsByWorktree'
   | 'groupsByWorktree'
   | 'openFiles'
+  | 'pipelineRunsById'
   | 'tabsByWorktree'
   | 'unifiedTabsByWorktree'
 > & {
@@ -96,6 +102,7 @@ export function selectOpenTabSearchEntryState(
     generatedTitlesEnabled: state.settings?.tabAutoGenerateTitle === true,
     groupsByWorktree: state.groupsByWorktree,
     openFiles: state.openFiles,
+    pipelineRunsById: state.pipelineRunsById,
     repo,
     tabsByWorktree: state.tabsByWorktree,
     unifiedTabsByWorktree: state.unifiedTabsByWorktree,
@@ -162,6 +169,14 @@ export function buildOpenTabSearchEntries(
       groupsByWorktree: state.groupsByWorktree,
       activeWorktreeId: state.activeWorktreeId,
       activeTabType: state.activeTabType
+    }),
+    pipelineTabs: buildSearchablePipelineTabs({
+      ...scope,
+      unifiedTabsByWorktree: state.unifiedTabsByWorktree,
+      activeGroupIdByWorktree: state.activeGroupIdByWorktree,
+      groupsByWorktree: state.groupsByWorktree,
+      activeWorktreeId: state.activeWorktreeId,
+      pipelineRunsById: state.pipelineRunsById
     })
   }
 }

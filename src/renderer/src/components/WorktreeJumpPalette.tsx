@@ -19,7 +19,8 @@ import {
   Server,
   ServerOff,
   Smartphone,
-  SquareTerminal
+  SquareTerminal,
+  Workflow
 } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { getRepoMapFromState, useAllWorktrees } from '@/store/selectors'
@@ -90,6 +91,13 @@ import {
 } from '@/lib/browser-palette-search'
 import { buildSearchableBrowserPages } from '@/lib/browser-palette-page-entries'
 import { activateBrowserPagePaletteResult } from '@/lib/browser-page-palette-activation'
+import { activatePipelineTabPaletteResult } from '@/lib/pipeline-tab-palette-activation'
+import {
+  buildSearchablePipelineTabs,
+  searchPipelineTabs,
+  type SearchablePipelineTab,
+  type PipelinePaletteSearchResult
+} from '@/lib/pipeline-palette-search'
 import { activateSimulatorTabPaletteResult } from '@/lib/simulator-tab-palette-activation'
 import {
   buildSearchableSimulatorTabs,
@@ -206,6 +214,12 @@ type SimulatorPaletteItem = {
   result: SimulatorPaletteSearchResult
 }
 
+type PipelinePaletteItem = {
+  id: string
+  type: 'pipeline-tab'
+  result: PipelinePaletteSearchResult
+}
+
 type WorkspaceTabPaletteItem = {
   id: string
   type: 'workspace-tab'
@@ -255,6 +269,7 @@ type PaletteItem =
   | QuickActionPaletteItem
   | BrowserPaletteItem
   | SimulatorPaletteItem
+  | PipelinePaletteItem
   | WorkspaceTabPaletteItem
 
 type PaletteListEntry = PaletteItem | CreateWorktreePaletteItem | SectionHeader | HintRow
@@ -264,7 +279,11 @@ const CREATE_WORKSPACE_QUICK_ACTION_ITEM_ID = `quick-action:${CREATE_WORKSPACE_Q
 // Why: outlast the CommandDialog close animation so its rows do not disappear mid-fade.
 const PALETTE_CLOSE_LINGER_MS = 300
 
-type OpenTabPaletteItem = BrowserPaletteItem | SimulatorPaletteItem | WorkspaceTabPaletteItem
+type OpenTabPaletteItem =
+  | BrowserPaletteItem
+  | SimulatorPaletteItem
+  | PipelinePaletteItem
+  | WorkspaceTabPaletteItem
 
 // Why: while the palette is open the workspace digit chord addresses recent rows, so it labels them.
 const DIGIT_INDEX_ACTION_ID = 'workspace.selectByIndex' as const
@@ -277,6 +296,7 @@ const EMPTY_RECENT_TAB_ORDER: readonly string[] = []
 const EMPTY_SORTED_WORKTREES: Worktree[] = []
 const EMPTY_BROWSER_PAGE_ENTRIES: SearchableBrowserPage[] = []
 const EMPTY_SIMULATOR_TAB_ENTRIES: SearchableSimulatorTab[] = []
+const EMPTY_PIPELINE_TAB_ENTRIES: SearchablePipelineTab[] = []
 const EMPTY_WORKSPACE_TAB_ENTRIES: SearchableWorkspaceTab[] = []
 // Why: the interleaved layout emits a section header twice; the second copy needs a distinct entry id.
 const CONTINUED_SECTION_HEADER_ID_SUFFIX = '__continued'
@@ -580,6 +600,7 @@ function WorktreeJumpPaletteContent({
   const browserTabsByWorktree = useAppStore((s) => s.browserTabsByWorktree)
   const browserPagesByWorkspace = useAppStore((s) => s.browserPagesByWorkspace)
   const unifiedTabsByWorktree = useAppStore((s) => s.unifiedTabsByWorktree)
+  const pipelineRunsById = useAppStore((s) => s.pipelineRunsById)
   // Why non-reactive: agentStatusByPaneKey and runtimePaneTitlesByTabId are the two hottest maps in
   // the app, and subscribing re-rendered the whole palette on every agent transition to change
   // nothing but the status dots — which now hold their own subscription (PaletteLiveStatusProvider).
@@ -975,6 +996,37 @@ function WorktreeJumpPaletteContent({
     [simulatorTabEntries, deferredQuery]
   )
 
+  const pipelineTabEntries = useMemo<SearchablePipelineTab[]>(() => {
+    if (!paletteStatusInputsActive) {
+      return EMPTY_PIPELINE_TAB_ENTRIES
+    }
+    return buildSearchablePipelineTabs({
+      worktrees: browserSortedWorktrees,
+      repoMap,
+      worktreeOrder,
+      unifiedTabsByWorktree,
+      activeGroupIdByWorktree,
+      groupsByWorktree,
+      activeWorktreeId,
+      pipelineRunsById
+    })
+  }, [
+    paletteStatusInputsActive,
+    activeGroupIdByWorktree,
+    activeWorktreeId,
+    browserSortedWorktrees,
+    groupsByWorktree,
+    pipelineRunsById,
+    repoMap,
+    unifiedTabsByWorktree,
+    worktreeOrder
+  ])
+
+  const pipelineMatches = useMemo(
+    () => searchPipelineTabs(pipelineTabEntries, deferredQuery.trim()),
+    [pipelineTabEntries, deferredQuery]
+  )
+
   const workspaceTabEntries = useMemo<SearchableWorkspaceTab[]>(() => {
     if (!paletteStatusInputsActive) {
       return EMPTY_WORKSPACE_TAB_ENTRIES
@@ -1096,6 +1148,16 @@ function WorktreeJumpPaletteContent({
     [simulatorMatches]
   )
 
+  const pipelineItems = useMemo<PipelinePaletteItem[]>(
+    () =>
+      pipelineMatches.map((result) => ({
+        id: `pipeline-tab:${result.tabId}`,
+        type: 'pipeline-tab' as const,
+        result
+      })),
+    [pipelineMatches]
+  )
+
   const workspaceTabItems = useMemo<WorkspaceTabPaletteItem[]>(
     () =>
       workspaceTabMatches.map((result) => ({
@@ -1107,7 +1169,7 @@ function WorktreeJumpPaletteContent({
   )
 
   const openTabItems = useMemo<OpenTabPaletteItem[]>(() => {
-    const items = [...browserItems, ...simulatorItems, ...workspaceTabItems]
+    const items = [...browserItems, ...simulatorItems, ...pipelineItems, ...workspaceTabItems]
     // Why relevance first: each source's score folds in worktree/tab position, so a prefix hit in a
     // far worktree used to sink below a mid-title hit in the current one. Empty query leaves every
     // relevance unmatched, so ordering falls straight through to the existing scores.
@@ -1127,7 +1189,7 @@ function WorktreeJumpPaletteContent({
       }
       return a.id.localeCompare(b.id)
     })
-  }, [browserItems, simulatorItems, workspaceTabItems])
+  }, [browserItems, simulatorItems, pipelineItems, workspaceTabItems])
 
   const terminalTabsById = useMemo(() => {
     const byId = new Map<string, TerminalTab>()
@@ -1816,6 +1878,7 @@ function WorktreeJumpPaletteContent({
   const hasAnyOpenTabs =
     browserPageEntries.length > 0 ||
     simulatorTabEntries.length > 0 ||
+    pipelineTabEntries.length > 0 ||
     workspaceTabEntries.length > 0
   const hasAnyMiddleResults = middleItems.length > 0
 
@@ -2055,6 +2118,30 @@ function WorktreeJumpPaletteContent({
     [closeModal]
   )
 
+  const handleSelectPipelineTab = useCallback(
+    (result: PipelinePaletteSearchResult) => {
+      const activation = activatePipelineTabPaletteResult(result)
+      if (activation.status === 'failed') {
+        toast.error(
+          activation.reason === 'missing-tab'
+            ? translate(
+                'auto.components.WorktreeJumpPalette.pipelineTabMissing',
+                'Pipeline tab no longer exists'
+              )
+            : translate(
+                'auto.components.WorktreeJumpPalette.2c38630a01',
+                'Workspace no longer exists'
+              )
+        )
+        return
+      }
+      skipRestoreFocusRef.current = true
+      closeModal()
+      setSelectedItemId('')
+    },
+    [closeModal]
+  )
+
   const handleSelectWorkspaceTab = useCallback(
     (result: WorkspaceTabPaletteSearchResult) => {
       const activation = activateWorkspaceTabPaletteResult(result)
@@ -2170,6 +2257,8 @@ function WorktreeJumpPaletteContent({
         handleSelectBrowserPage(item.result)
       } else if (item.type === 'simulator-tab') {
         handleSelectSimulatorTab(item.result)
+      } else if (item.type === 'pipeline-tab') {
+        handleSelectPipelineTab(item.result)
       } else if (item.type === 'workspace-tab') {
         handleSelectWorkspaceTab(item.result)
       } else if (item.type === 'settings') {
@@ -2180,6 +2269,7 @@ function WorktreeJumpPaletteContent({
     },
     [
       handleSelectBrowserPage,
+      handleSelectPipelineTab,
       handleSelectProjectTarget,
       handleSelectQuickAction,
       handleSelectSettings,
@@ -2944,6 +3034,88 @@ function WorktreeJumpPaletteContent({
                               <span className="truncate">
                                 <HighlightedText
                                   text={simulatorRepoName}
+                                  matchRange={result.repoRange}
+                                />
+                              </span>
+                            </span>
+                          )}
+                          <PaletteRowShortcutBadge
+                            index={recentTabShortcutIndexById.get(entry.id)}
+                            modifierKeys={digitShortcutModifiers}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </CommandItem>
+                )
+              }
+
+              if (entry.type === 'pipeline-tab') {
+                const result = entry.result
+                const pipelineWorktree = worktreeMap.get(result.worktreeId)
+                const pipelineRepo = pipelineWorktree
+                  ? repoMap.get(pipelineWorktree.repoId)
+                  : undefined
+                const pipelineRepoName = pipelineRepo?.displayName ?? result.repoName
+                const pipelineHostBadge = getPaletteHostBadge(
+                  pipelineRepo,
+                  hostOptions,
+                  hostFilterActive
+                )
+
+                return (
+                  <CommandItem
+                    key={entry.id}
+                    value={entry.id}
+                    onSelect={() => handleSelectItem(entry)}
+                    className={cn(
+                      'group mx-0.5 flex cursor-pointer items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 text-left outline-none transition-[background-color,border-color,box-shadow]',
+                      'data-[selected=true]:border-border data-[selected=true]:bg-accent data-[selected=true]:text-foreground'
+                    )}
+                  >
+                    <div className="flex h-5 w-4 shrink-0 items-center justify-center self-start text-muted-foreground/85">
+                      <Workflow className="size-3.5" aria-hidden="true" />
+                    </div>
+                    <div className="min-w-0 flex-1 overflow-hidden">
+                      <div className="flex items-center justify-between gap-2.5">
+                        <div className="min-w-0 flex-1 overflow-hidden">
+                          <PaletteOpenTabPrimaryLine
+                            title={result.title}
+                            titleRange={result.titleRange}
+                            secondaryText={result.secondaryText}
+                            secondaryRange={result.secondaryRange}
+                            worktreeName={result.worktreeName}
+                            worktreeRange={result.worktreeRange}
+                            leadingBadges={
+                              <>
+                                {result.isCurrentTab && (
+                                  <span className="shrink-0 self-center rounded-[6px] border border-border/60 bg-background/45 px-1.5 py-px text-[9px] font-medium leading-normal text-muted-foreground/88">
+                                    {translate(
+                                      'auto.components.WorktreeJumpPalette.52404f8096',
+                                      'Current Tab'
+                                    )}
+                                  </span>
+                                )}
+                                {!result.isCurrentTab && result.isCurrentWorktree && (
+                                  <span className="shrink-0 self-center rounded-[6px] border border-border/60 bg-background/45 px-1.5 py-px text-[9px] font-medium leading-normal text-muted-foreground/88">
+                                    {translate(
+                                      'auto.components.WorktreeJumpPalette.c5081f2814',
+                                      'Current Worktree'
+                                    )}
+                                  </span>
+                                )}
+                              </>
+                            }
+                          />
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <PaletteHostBadgeChip badge={pipelineHostBadge} />
+                          {pipelineRepoName && (
+                            <span className="inline-flex max-w-[180px] items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-[11px] font-semibold leading-none text-foreground">
+                              <RepoBadgeMark color={pipelineRepo?.badgeColor} />
+                              <span className="truncate">
+                                <HighlightedText
+                                  text={pipelineRepoName}
                                   matchRange={result.repoRange}
                                 />
                               </span>
