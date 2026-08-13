@@ -37,9 +37,12 @@ import { readAgentComposerDraftCache } from './agent-composer-draft-cache'
 import { useAgentComposerDraft } from './use-agent-composer-draft'
 import { useAgentComposerHistory } from './use-agent-composer-history'
 import { useAgentComposerKeyDown } from './use-agent-composer-keydown'
-import { AgentComposerField, type AgentComposerImageAttachment } from './AgentComposerField'
+import {
+  AgentComposerField,
+  type AgentComposerFieldProps,
+  type AgentComposerImageAttachment
+} from './AgentComposerField'
 import type { AgentComposerCoreProps, AgentComposerHandle } from './agent-composer-types'
-import type { AgentComposerFieldProps } from './AgentComposerField'
 
 // Why: a plain ESC byte is what the agent TUIs read as the interrupt key over a
 // PTY (matching how xterm forwards Escape).
