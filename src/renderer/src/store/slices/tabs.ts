@@ -33,6 +33,7 @@ import {
   getOrphanTerminalIds,
   terminalTabHasReconnectablePty
 } from './terminal-orphan-helpers'
+import { withActiveTabTypeForWorktree } from './active-tab-type-record'
 import { createBrowserUuid } from '@/lib/browser-uuid'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
@@ -123,10 +124,10 @@ export type TabsSlice = {
   ) => Tab | null
   activateTab: (tabId: string, opts?: { preservePreview?: boolean; worktreeId?: string }) => void
   /**
-   * Marks a pipeline tab as the workspace's active surface. WorkspaceVisibleTabType has no
-   * member for pipeline tabs, so this reuses 'terminal' — but clears activeTabId so terminal-
-   * scoped actions (tab rename, workspace focus restore) can't reach the tab that was active
-   * before the pipeline tab was focused.
+   * Marks a pipeline tab as the workspace's active surface: activeTabType goes to null (no
+   * WorkspaceVisibleTabType member represents a pipeline canvas) and activeTabId is cleared so
+   * terminal-scoped actions (tab rename, workspace focus restore) can't reach the tab that was
+   * active before the pipeline tab was focused.
    */
   activatePipelineTabSurface: (worktreeId: string) => void
   closeUnifiedTab: (
@@ -423,17 +424,16 @@ function collapseGroupLayout(
   }
 }
 
-function toVisibleTabType(contentType: TabContentType): WorkspaceVisibleTabType {
+function toVisibleTabType(contentType: TabContentType): WorkspaceVisibleTabType | null {
   switch (contentType) {
     case 'browser':
     case 'terminal':
     case 'simulator':
       return contentType
     case 'pipeline':
-      // entityId is a run id; WorkspaceVisibleTabType has no member for it, so fall back
-      // like a plain split-group focus does rather than tag it 'editor' and risk a stale
-      // activeFileId being treated as the file this tab shows.
-      return 'terminal'
+      // entityId is a run id, not a file/terminal/browser id — no WorkspaceVisibleTabType
+      // member represents it.
+      return null
     case 'editor':
     case 'diff':
     case 'conflict-review':
@@ -443,22 +443,6 @@ function toVisibleTabType(contentType: TabContentType): WorkspaceVisibleTabType 
   // outside the switch, not in a default: case, so control-flow narrowing to
   // `never` still fires here once every member above is handled
   return assertExhaustiveTabContentType(contentType)
-}
-
-/** True when the worktree's focused group's active tab is a pipeline canvas. */
-export function isPipelineTabActiveForWorktree(
-  state: Pick<AppState, 'activeGroupIdByWorktree' | 'groupsByWorktree' | 'unifiedTabsByWorktree'>,
-  worktreeId: string
-): boolean {
-  const groupId = state.activeGroupIdByWorktree[worktreeId]
-  const group = (state.groupsByWorktree[worktreeId] ?? []).find((candidate) => candidate.id === groupId)
-  if (!group?.activeTabId) {
-    return false
-  }
-  const tab = (state.unifiedTabsByWorktree[worktreeId] ?? []).find(
-    (candidate) => candidate.id === group.activeTabId
-  )
-  return tab?.contentType === 'pipeline'
 }
 
 function deriveActiveSurfaceForWorktree(
@@ -481,7 +465,7 @@ function deriveActiveSurfaceForWorktree(
   activeBrowserTabId: string | null
   activeFileId: string | null
   activeTabId: string | null
-  activeTabType: WorkspaceVisibleTabType
+  activeTabType: WorkspaceVisibleTabType | null
 } {
   const groups = state.groupsByWorktree[worktreeId] ?? []
   const activeGroupId = preferredGroupId ?? state.activeGroupIdByWorktree[worktreeId] ?? null
@@ -511,7 +495,7 @@ function deriveActiveSurfaceForWorktree(
 
   let activeFileId: string | null
   let activeBrowserTabId: string | null
-  let activeTabType: WorkspaceVisibleTabType
+  let activeTabType: WorkspaceVisibleTabType | null
 
   if (activeUnifiedTab) {
     activeFileId =
@@ -557,9 +541,7 @@ function deriveActiveSurfaceForWorktree(
     activeTabId:
       activeUnifiedTab?.contentType === 'terminal'
         ? activeUnifiedTab.entityId
-        : // Why: activeTabType maps pipeline to 'terminal' below (no union member of its own);
-          // carrying over a real terminal id here would let terminal-scoped consumers act on it.
-          activeUnifiedTab?.contentType === 'pipeline'
+        : activeTabType === null
           ? null
           : terminalTabStillExists
             ? restoredTerminalTabId
@@ -572,16 +554,16 @@ function deriveActiveSurfaceForWorktree(
  * Clears the legacy terminal-scoped active-tab pointer for `worktreeId` — the state
  * shape a pipeline tab must never be found under, since `WorkspaceVisibleTabType` has
  * no member of its own for it. Shared by `activateTab` (folded in below, so every
- * activation route gets this by construction) and the standalone
- * `activatePipelineTabSurface` action some callers still call directly.
+ * activation route gets this by construction), the standalone `activatePipelineTabSurface`
+ * action some callers still call directly, and drag-preview activation.
  */
-function pipelineTabSurfaceClearPatch(
+export function pipelineTabSurfaceClearPatch(
   state: Pick<AppState, 'activeWorktreeId' | 'activeTabId' | 'activeTabIdByWorktree' | 'activeTabType' | 'activeTabTypeByWorktree'>,
   worktreeId: string
 ): Pick<AppState, 'activeTabId' | 'activeTabIdByWorktree' | 'activeTabType' | 'activeTabTypeByWorktree'> {
   return {
-    activeTabType: state.activeWorktreeId === worktreeId ? 'terminal' : state.activeTabType,
-    activeTabTypeByWorktree: { ...state.activeTabTypeByWorktree, [worktreeId]: 'terminal' },
+    activeTabType: state.activeWorktreeId === worktreeId ? null : state.activeTabType,
+    activeTabTypeByWorktree: withActiveTabTypeForWorktree(state.activeTabTypeByWorktree, worktreeId, null),
     activeTabId: state.activeWorktreeId === worktreeId ? null : state.activeTabId,
     activeTabIdByWorktree: { ...state.activeTabIdByWorktree, [worktreeId]: null }
   }
@@ -633,10 +615,11 @@ function buildActiveSurfacePatch(
       [worktreeId]: derived.activeTabId
     },
     activeTabType: derived.activeTabType,
-    activeTabTypeByWorktree: {
-      ...state.activeTabTypeByWorktree,
-      [worktreeId]: derived.activeTabType
-    }
+    activeTabTypeByWorktree: withActiveTabTypeForWorktree(
+      state.activeTabTypeByWorktree,
+      worktreeId,
+      derived.activeTabType
+    )
   }
 }
 

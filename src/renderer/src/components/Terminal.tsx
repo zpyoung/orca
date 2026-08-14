@@ -2412,7 +2412,7 @@ function Terminal(): React.JSX.Element | null {
                   })()
                 : null
             }
-            activeTabType={activeTabType}
+            activeTabType={activeTabType ?? undefined}
             onActivateFile={(fileId) => {
               const unifiedTabs =
                 useAppStore.getState().unifiedTabsByWorktree[renderedActiveWorktreeId ?? ''] ?? []

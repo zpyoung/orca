@@ -645,6 +645,10 @@ describe('TabsSlice', () => {
       expect(store.getState().activeTabId).toBeNull()
       expect(store.getState().activeTabIdByWorktree[WT]).toBeNull()
       expect(store.getState().groupsByWorktree[WT][0].activeTabId).toBe(pipelineTab.id)
+      // null (not 'terminal') is the honest encoding of "no visible tab type" —
+      // a placeholder here is exactly what earlier rounds' readers resurrected.
+      expect(store.getState().activeTabType).toBeNull()
+      expect(store.getState().activeTabTypeByWorktree[WT]).toBeUndefined()
     })
 
     it("leaves a background worktree's active-terminal id untouched when a pipeline tab activates in a different worktree", () => {
@@ -1024,9 +1028,12 @@ describe('TabsSlice', () => {
 
       expect(store.getState().activeTabId).toBeNull()
       expect(store.getState().activeTabIdByWorktree[WT]).toBeNull()
-      expect(store.getState().activeTabType).toBe('terminal')
+      // null (no WorkspaceVisibleTabType member represents a pipeline canvas) rather than a
+      // 'terminal' placeholder — a placeholder here is what earlier rounds' readers resurrected.
+      expect(store.getState().activeTabType).toBeNull()
+      expect(store.getState().activeTabTypeByWorktree[WT]).toBeUndefined()
       // tab.rename and workspace-focus restore both gate on activeTabType === 'terminal' && activeTabId;
-      // with activeTabId cleared, neither can target the terminal that was active before.
+      // with activeTabType null, neither can target the terminal that was active before.
       const wouldTargetStaleTerminal =
         store.getState().activeTabType === 'terminal' && Boolean(store.getState().activeTabId)
       expect(wouldTargetStaleTerminal).toBe(false)
@@ -1047,6 +1054,8 @@ describe('TabsSlice', () => {
       expect(store.getState().activeTabId).toBe('term-active')
       expect(store.getState().activeTabType).toBe('terminal')
       expect(store.getState().activeTabIdByWorktree[OTHER_WT]).toBeNull()
+      expect(store.getState().activeTabTypeByWorktree[OTHER_WT]).toBeUndefined()
+      expect(store.getState().activeTabTypeByWorktree[WT]).toBe('terminal')
     })
   })
 

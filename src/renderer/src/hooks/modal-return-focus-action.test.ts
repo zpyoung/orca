@@ -72,6 +72,19 @@ describe('resolveModalReturnFocusAction', () => {
     ).toEqual({ kind: 'simulator' })
   })
 
+  it('falls back to the generic surface when no visible tab type was focused (e.g. a pipeline canvas)', () => {
+    expect(
+      resolveModalReturnFocusAction({
+        tabType: null,
+        worktreeId: 'wt-1',
+        browserPageId: null,
+        browserTarget: 'webview',
+        terminalTabId: null,
+        terminalLeafId: null
+      })
+    ).toEqual({ kind: 'surface' })
+  })
+
   it('returns none when there is no worktree to restore into', () => {
     expect(
       resolveModalReturnFocusAction({

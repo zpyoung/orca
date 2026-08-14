@@ -660,7 +660,7 @@ function WorktreeJumpPaletteContent({
   const [rawFilter, setRawFilter] = useState<PaletteFilterState>(EMPTY_PALETTE_FILTER)
   const [dialogElement, setDialogElement] = useState<HTMLElement | null>(null)
   const previousWorktreeIdRef = useRef<string | null>(null)
-  const previousActiveTabTypeRef = useRef<'browser' | 'editor' | 'terminal' | 'simulator'>(
+  const previousActiveTabTypeRef = useRef<'browser' | 'editor' | 'terminal' | 'simulator' | null>(
     'terminal'
   )
   const previousBrowserPageIdRef = useRef<string | null>(null)

@@ -459,6 +459,166 @@ describe('setActiveWorktree focus handling', () => {
   })
 })
 
+// Regression (round-4 sibling bug): a workspace reactivation reads activeTabTypeByWorktree /
+// activeTabIdByWorktree to restore focus. With a real terminal tab present, a missing/null
+// pointer must not fall back to that terminal — that fallback is exactly what resurrected a
+// stale terminal id under a pipeline-focused worktree in earlier rounds.
+describe('setActiveWorktree pipeline-focused reactivation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetRemoteRuntimeMocks()
+  })
+
+  it('does not resurrect the terminal id or type when switching away from and back to a pipeline-focused worktree', () => {
+    const store = createTestStore()
+    const wt = makeWorktree({ id: 'repo1::/path/pipeline-wt', repoId: 'repo1' })
+    const other = makeWorktree({ id: 'repo1::/path/other-wt', repoId: 'repo1' })
+    const terminalRow = makeTerminalTab({ id: 'term-1', worktreeId: wt.id })
+
+    store.setState({
+      worktreesByRepo: { repo1: [wt, other] },
+      activeWorktreeId: wt.id,
+      tabsByWorktree: { [wt.id]: [terminalRow] },
+      terminalLayoutsByTabId: {},
+      unifiedTabsByWorktree: {
+        [wt.id]: [
+          {
+            id: 'unified-term-1',
+            entityId: 'term-1',
+            groupId: 'group-1',
+            worktreeId: wt.id,
+            contentType: 'terminal',
+            label: 'Terminal',
+            customLabel: null,
+            color: null,
+            sortOrder: 0,
+            createdAt: 1,
+            isPinned: false
+          },
+          {
+            id: 'unified-pipeline-1',
+            entityId: 'run-1',
+            groupId: 'group-1',
+            worktreeId: wt.id,
+            contentType: 'pipeline',
+            label: 'bugfix-fast #1',
+            customLabel: null,
+            color: null,
+            sortOrder: 1,
+            createdAt: 2,
+            isPinned: false
+          }
+        ]
+      },
+      groupsByWorktree: {
+        [wt.id]: [
+          {
+            id: 'group-1',
+            worktreeId: wt.id,
+            activeTabId: 'unified-pipeline-1',
+            tabOrder: ['unified-term-1', 'unified-pipeline-1'],
+            recentTabIds: ['unified-term-1', 'unified-pipeline-1']
+          }
+        ]
+      },
+      activeGroupIdByWorktree: { [wt.id]: 'group-1' },
+      layoutByWorktree: { [wt.id]: { type: 'leaf', groupId: 'group-1' } },
+      // Why: mirrors the post-activation state activateTab produces — the terminal-scoped
+      // pointer is already cleared before this test begins.
+      activeTabId: null,
+      activeTabIdByWorktree: { [wt.id]: null },
+      activeTabType: null,
+      activeTabTypeByWorktree: {},
+      requestPipelineRunHydration: vi.fn()
+    } as unknown as Partial<AppState>)
+
+    store.getState().setActiveWorktree(other.id)
+    store.getState().setActiveWorktree(wt.id)
+
+    expect(store.getState().activeTabId).toBeNull()
+    expect(store.getState().activeTabType).toBeNull()
+    expect(store.getState().activeTabTypeByWorktree[wt.id]).toBeUndefined()
+  })
+})
+
+describe('setActiveFolderWorkspace pipeline-focused reactivation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetRemoteRuntimeMocks()
+  })
+
+  it('does not resurrect the terminal id or type when switching away from and back to a pipeline-focused folder workspace', () => {
+    const store = createTestStore()
+    const folderWorkspace = makeFolderWorkspace({ id: 'folder-pipeline' })
+    const otherFolderWorkspace = makeFolderWorkspace({ id: 'folder-other' })
+    const workspaceKey = folderWorkspaceKey(folderWorkspace.id)
+    const terminalRow = makeTerminalTab({ id: 'term-1', worktreeId: workspaceKey })
+
+    store.setState({
+      folderWorkspaces: [folderWorkspace, otherFolderWorkspace],
+      activeWorktreeId: workspaceKey,
+      tabsByWorktree: { [workspaceKey]: [terminalRow] },
+      unifiedTabsByWorktree: {
+        [workspaceKey]: [
+          {
+            id: 'unified-term-1',
+            entityId: 'term-1',
+            groupId: 'group-1',
+            worktreeId: workspaceKey,
+            contentType: 'terminal',
+            label: 'Terminal',
+            customLabel: null,
+            color: null,
+            sortOrder: 0,
+            createdAt: 1,
+            isPinned: false
+          },
+          {
+            id: 'unified-pipeline-1',
+            entityId: 'run-1',
+            groupId: 'group-1',
+            worktreeId: workspaceKey,
+            contentType: 'pipeline',
+            label: 'bugfix-fast #1',
+            customLabel: null,
+            color: null,
+            sortOrder: 1,
+            createdAt: 2,
+            isPinned: false
+          }
+        ]
+      },
+      groupsByWorktree: {
+        [workspaceKey]: [
+          {
+            id: 'group-1',
+            worktreeId: workspaceKey,
+            activeTabId: 'unified-pipeline-1',
+            tabOrder: ['unified-term-1', 'unified-pipeline-1'],
+            recentTabIds: ['unified-term-1', 'unified-pipeline-1']
+          }
+        ]
+      },
+      activeGroupIdByWorktree: { [workspaceKey]: 'group-1' },
+      activeTabId: null,
+      activeTabIdByWorktree: { [workspaceKey]: null },
+      activeTabType: null,
+      activeTabTypeByWorktree: {},
+      reconcileWorktreeTabModel: vi.fn(() => ({
+        activeRenderableTabId: 'unified-pipeline-1',
+        renderableTabCount: 2
+      }))
+    } as unknown as Partial<AppState>)
+
+    store.getState().setActiveFolderWorkspace(otherFolderWorkspace.id)
+    store.getState().setActiveFolderWorkspace(folderWorkspace.id)
+
+    expect(store.getState().activeTabId).toBeNull()
+    expect(store.getState().activeTabType).toBeNull()
+    expect(store.getState().activeTabTypeByWorktree[workspaceKey]).toBeUndefined()
+  })
+})
+
 describe('fetchWorktrees', () => {
   beforeEach(() => {
     vi.clearAllMocks()

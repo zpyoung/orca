@@ -8,6 +8,7 @@ import {
   pushRecentlyClosedTabKind
 } from './recently-closed-tabs'
 import type { RecentlyClosedTabPosition } from './recently-closed-tabs'
+import { withActiveTabTypeForWorktree } from './active-tab-type-record'
 import { joinPath } from '@/lib/path'
 import { toast } from 'sonner'
 import { isPathInsideOrEqual } from '../../../../shared/cross-platform-path'
@@ -479,8 +480,9 @@ export type EditorSlice = {
   activeFileId: string | null
   activeFileIdByWorktree: Record<string, string | null> // worktreeId -> last active file
   activeTabTypeByWorktree: Record<string, WorkspaceVisibleTabType> // worktreeId -> last active tab type
-  activeTabType: WorkspaceVisibleTabType
-  setActiveTabType: (type: WorkspaceVisibleTabType) => void
+  // null means no visible-tab-type surface is focused (e.g. a pipeline canvas), not an unset default.
+  activeTabType: WorkspaceVisibleTabType | null
+  setActiveTabType: (type: WorkspaceVisibleTabType | null) => void
   openFile: (
     file: Omit<OpenFile, 'id' | 'isDirty'>,
     options?: {
@@ -1697,7 +1699,7 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
       return {
         activeTabType: type,
         activeTabTypeByWorktree: worktreeId
-          ? { ...s.activeTabTypeByWorktree, [worktreeId]: type }
+          ? withActiveTabTypeForWorktree(s.activeTabTypeByWorktree, worktreeId, type)
           : s.activeTabTypeByWorktree
       }
     }),

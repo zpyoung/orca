@@ -1,6 +1,8 @@
 import { useAppStore } from '../../store'
 import type { AppState } from '../../store/types'
 import { assertExhaustiveTabContentType } from '../../../../shared/tab-content-type-exhaustive'
+import { withActiveTabTypeForWorktree } from '../../store/slices/active-tab-type-record'
+import { pipelineTabSurfaceClearPatch } from '../../store/slices/tabs'
 
 export type TabDragActivationSnapshot = {
   activeGroupId: string | null
@@ -25,10 +27,8 @@ function previewActiveSurfacePatch(
 
   const nextActiveTabTypeByWorktree = (
     tabType: AppState['activeTabType']
-  ): AppState['activeTabTypeByWorktree'] => ({
-    ...state.activeTabTypeByWorktree,
-    [worktreeId]: tabType
-  })
+  ): AppState['activeTabTypeByWorktree'] =>
+    withActiveTabTypeForWorktree(state.activeTabTypeByWorktree, worktreeId, tabType)
 
   switch (unifiedTab.contentType) {
     case 'terminal':
@@ -57,13 +57,9 @@ function previewActiveSurfacePatch(
         activeTabTypeByWorktree: nextActiveTabTypeByWorktree('simulator')
       }
     case 'pipeline':
-      // Why: entityId is a run id, not a file id — WorkspaceVisibleTabType has no
-      // pipeline member, so this falls back to the neutral 'terminal' surface
-      // without writing the run id into any activeFileId/activeTabId field.
-      return {
-        activeTabType: 'terminal',
-        activeTabTypeByWorktree: nextActiveTabTypeByWorktree('terminal')
-      }
+      // Why: entityId is a run id, not a file/terminal/browser id — dragging focus onto a
+      // pipeline tab must clear activeTabId too, so route through pipelineTabSurfaceClearPatch.
+      return pipelineTabSurfaceClearPatch(state, worktreeId)
     case 'editor':
     case 'diff':
     case 'conflict-review':

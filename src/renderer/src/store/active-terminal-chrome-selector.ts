@@ -4,6 +4,7 @@ type ActiveTerminalChromeSelectorState = Pick<
   AppState,
   | 'activeWorktreeId'
   | 'activeTabId'
+  | 'activeTabType'
   | 'tabsByWorktree'
   | 'canExpandPaneByTabId'
   | 'expandedPaneByTabId'
@@ -26,7 +27,9 @@ export function selectActiveTerminalChromeState(
   const tabs = state.activeWorktreeId
     ? (state.tabsByWorktree[state.activeWorktreeId] ?? EMPTY_TABS)
     : EMPTY_TABS
-  const effectiveActiveTabId = state.activeTabId ?? tabs[0]?.id ?? null
+  // no visible tab type means no terminal is showing — never synthesize one from tabs[0].
+  const effectiveActiveTabId =
+    state.activeTabType === null ? null : (state.activeTabId ?? tabs[0]?.id ?? null)
   return {
     activeWorktreeId: state.activeWorktreeId,
     activeTabId: state.activeTabId,

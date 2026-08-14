@@ -87,7 +87,7 @@ function deriveActiveSurface(
   terminalTabId: string | null
   browserTabId: string | null
   fileId: string | null
-  type: WorkspaceVisibleTabType
+  type: WorkspaceVisibleTabType | null
 } {
   const activeGroup = groups.find((group) => group.id === activeGroupId) ?? groups[0] ?? null
   const activeUnified = activeGroup?.activeTabId
@@ -133,7 +133,7 @@ function deriveActiveSurface(
       terminalTabId: terminalFallback,
       browserTabId: browserFallback,
       fileId: fileFallback,
-      type: 'terminal'
+      type: null
     }
   }
   if (activeUnified) {
@@ -261,9 +261,11 @@ export function closeTerminalTabInWorkspaceSession(
     ...session.activeFileIdByWorktree,
     [worktreeId]: surface.fileId
   }
-  next.activeTabTypeByWorktree = {
-    ...session.activeTabTypeByWorktree,
-    [worktreeId]: surface.type
+  next.activeTabTypeByWorktree = { ...session.activeTabTypeByWorktree }
+  if (surface.type === null) {
+    delete next.activeTabTypeByWorktree[worktreeId]
+  } else {
+    next.activeTabTypeByWorktree[worktreeId] = surface.type
   }
   if (session.activeWorktreeId === worktreeId) {
     next.activeTabId = surface.terminalTabId

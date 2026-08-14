@@ -1,6 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { TerminalTab } from '../../../../shared/types'
-import { useAppStore } from '@/store'
 import {
   resolveRepairedActiveTerminalTabId,
   shouldRepairActiveTerminalTab
@@ -19,45 +18,7 @@ function tab(id: string, worktreeId = 'wt-1'): TerminalTab {
   }
 }
 
-const initialAppState = useAppStore.getInitialState()
-
-// seeds the store so `worktreeId`'s focused group's active tab is a pipeline canvas —
-// the state active-terminal-repair reads to decide whether a null activeTabId is an
-// intentional pipeline focus rather than something stale to repair.
-function seedPipelineTabActive(worktreeId: string): void {
-  useAppStore.setState(
-    {
-      ...initialAppState,
-      activeGroupIdByWorktree: { [worktreeId]: 'group-1' },
-      groupsByWorktree: {
-        [worktreeId]: [{ id: 'group-1', worktreeId, activeTabId: 'pipe-tab-1', tabOrder: ['pipe-tab-1'] }]
-      },
-      unifiedTabsByWorktree: {
-        [worktreeId]: [
-          {
-            id: 'pipe-tab-1',
-            entityId: 'run-1',
-            groupId: 'group-1',
-            worktreeId,
-            contentType: 'pipeline',
-            label: 'bugfix-fast #1',
-            customLabel: null,
-            color: null,
-            sortOrder: 0,
-            createdAt: 0
-          }
-        ]
-      }
-    },
-    true
-  )
-}
-
 describe('shouldRepairActiveTerminalTab', () => {
-  afterEach(() => {
-    useAppStore.setState(initialAppState, true)
-  })
-
   it('does not repair while editor or browser content is active', () => {
     expect(
       shouldRepairActiveTerminalTab({
@@ -91,35 +52,18 @@ describe('shouldRepairActiveTerminalTab', () => {
       })
     ).toBe(false)
   })
-})
 
-describe('shouldRepairActiveTerminalTab with a pipeline tab active', () => {
-  beforeEach(() => {
-    seedPipelineTabActive('wt-1')
-  })
-
-  afterEach(() => {
-    useAppStore.setState(initialAppState, true)
-  })
-
-  it('does not resurrect a terminal id for a workspace whose active tab is a pipeline canvas', () => {
+  // Regression: activeTabType null (a pipeline canvas or any other non-terminal focus) must
+  // never repair, even with a real terminal tab and no activeTabId — the same guard that
+  // excludes 'editor'/'browser' above excludes null without needing to consult the tab model.
+  it('does not repair when no visible tab type is focused', () => {
     expect(
       shouldRepairActiveTerminalTab({
-        activeTabType: 'terminal',
+        activeTabType: null,
         activeTabId: null,
         tabs: [tab('terminal-1', 'wt-1')]
       })
     ).toBe(false)
-  })
-
-  it('still repairs a different, genuinely terminal-active workspace', () => {
-    expect(
-      shouldRepairActiveTerminalTab({
-        activeTabType: 'terminal',
-        activeTabId: null,
-        tabs: [tab('terminal-1', 'wt-other')]
-      })
-    ).toBe(true)
   })
 })
 
@@ -168,19 +112,14 @@ describe('resolveRepairedActiveTerminalTabId', () => {
     ).toBe('terminal-1')
   })
 
-  it('leaves a pipeline-active workspace alone instead of resolving a terminal to switch to', () => {
-    seedPipelineTabActive('wt-1')
-    try {
-      expect(
-        resolveRepairedActiveTerminalTabId({
-          activeTabType: 'terminal',
-          activeTabId: null,
-          rememberedTabId: null,
-          tabs: [tab('terminal-1', 'wt-1')]
-        })
-      ).toBeNull()
-    } finally {
-      useAppStore.setState(initialAppState, true)
-    }
+  it('leaves a pipeline-focused workspace alone instead of resolving a terminal to switch to', () => {
+    expect(
+      resolveRepairedActiveTerminalTabId({
+        activeTabType: null,
+        activeTabId: null,
+        rememberedTabId: null,
+        tabs: [tab('terminal-1', 'wt-1')]
+      })
+    ).toBeNull()
   })
 })

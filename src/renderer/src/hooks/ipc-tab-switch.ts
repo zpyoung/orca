@@ -120,7 +120,9 @@ export function handleSwitchTab(direction: number): boolean {
   const { store, allTabIds, groupTabIdInNav } = ctx
   const next = getNextTabWithinActiveType({
     tabs: allTabIds,
-    activeTabType: store.activeTabType,
+    // null means the focused unified tab is a pipeline canvas — the one TabCycleType
+    // member WorkspaceVisibleTabType has no slot for.
+    activeTabType: store.activeTabType ?? 'pipeline',
     activeTabId: store.activeTabId,
     activeFileId: store.activeFileId,
     activeBrowserTabId: store.activeBrowserTabId,
@@ -151,7 +153,7 @@ export function handleSwitchTabAcrossAllTypes(direction: number): boolean {
   const { store, allTabIds, groupTabIdInNav } = ctx
   const next = getNextTabAcrossAllTypes({
     tabs: allTabIds,
-    activeTabType: store.activeTabType,
+    activeTabType: store.activeTabType ?? 'pipeline',
     activeTabId: store.activeTabId,
     activeFileId: store.activeFileId,
     activeBrowserTabId: store.activeBrowserTabId,
@@ -222,12 +224,12 @@ export function handleSwitchTerminalTab(direction: number): boolean {
     return false
   }
   const currentId = getActiveEntityIdForTabType(
-    store.activeTabType,
+    store.activeTabType ?? 'pipeline',
     store.activeTabId,
     store.activeFileId,
     store.activeBrowserTabId
   )
-  // Why: when an editor/browser tab is active, jump to the first terminal on
+  // Why: when an editor/browser/pipeline tab is active, jump to the first terminal on
   // forward navigation instead of skipping to index 1.
   const idx = terminalTabs.findIndex((t) => t.id === currentId)
   // Why: only no-op when the sole terminal is already focused. With one terminal

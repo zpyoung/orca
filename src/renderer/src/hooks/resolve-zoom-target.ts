@@ -4,7 +4,7 @@
  */
 export function resolveZoomTarget(args: {
   activeView: TopLevelView
-  activeTabType: 'terminal' | 'editor' | 'browser' | 'simulator'
+  activeTabType: 'terminal' | 'editor' | 'browser' | 'simulator' | null
   activeElement: unknown
 }): 'terminal' | 'editor' | 'simulator' | 'ui' {
   const { activeView, activeTabType, activeElement } = args
