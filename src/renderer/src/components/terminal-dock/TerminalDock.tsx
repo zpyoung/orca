@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { AgentType } from '../../../../shared/agent-status-types'
 import { cn } from '@/lib/utils'
 import { AgentComposer } from '../agent-composer/AgentComposer'
@@ -7,7 +7,8 @@ import { DEFAULT_GUTTER_ROWS } from './terminal-dock-pane-state'
 // Row height mirrors the composer field's text-sm/leading-5 (20px) so a
 // gutterRows count tracks visible textarea lines; the remainder covers the
 // composer's own card padding and action row, which don't scale with rows.
-const ROW_HEIGHT_PX = 20
+export const TERMINAL_DOCK_ROW_HEIGHT_PX = 20
+const ROW_HEIGHT_PX = TERMINAL_DOCK_ROW_HEIGHT_PX
 const CHROME_HEIGHT_PX = 96
 
 // A gutter that fits exactly is still useless — the terminal above it is the
@@ -66,6 +67,16 @@ export type TerminalDockProps = {
   gutterRows?: number
   /** Short reason the composer can't accept input right now, or null when it can. */
   disabledReason: string | null
+  /** Fires once per mount/unmount transition (including auto-undock), never per render, so
+   *  the host can coalesce the resulting PTY resize into exactly one send. */
+  onMountedChange?: (mounted: boolean) => void
+  /** Wired to the gutter-resize handle's pointerdown; omit to render a non-interactive handle. */
+  onGutterPointerDown?: (event: React.PointerEvent<HTMLDivElement>) => void
+  /** Reads the hosting pane's current terminal screen; reserved for context-aware composing. */
+  readTerminalScreen?: () => string | null
+  /** True while the pane is in raw passthrough mode: xterm (not the composer) owns keyboard
+   *  focus, so the composer greys out and stops accepting pointer interaction. */
+  passthroughActive?: boolean
 }
 
 /** Fixed-height gutter beneath a terminal pane hosting the mountable
@@ -80,6 +91,21 @@ export function TerminalDock(props: TerminalDockProps): React.JSX.Element | null
   const gutterRows = props.gutterRows ?? DEFAULT_GUTTER_ROWS
   const mounted = useAutoUndock(paneHeightPx, gutterRows)
 
+  const onMountedChangeRef = useRef(props.onMountedChange)
+  onMountedChangeRef.current = props.onMountedChange
+  // Why: fires on every content mount/unmount edge (manual toggle, auto-undock, or the host
+  // removing this component outright) so the caller can hold-and-flush exactly one PTY resize
+  // per edge instead of guessing which internal transition caused the DOM to change.
+  useLayoutEffect(() => {
+    if (!mounted) {
+      return undefined
+    }
+    onMountedChangeRef.current?.(true)
+    return () => {
+      onMountedChangeRef.current?.(false)
+    }
+  }, [mounted])
+
   if (!mounted) {
     return null
   }
@@ -91,6 +117,14 @@ export function TerminalDock(props: TerminalDockProps): React.JSX.Element | null
       data-pane-prevent-terminal-focus
       data-terminal-dock=""
     >
+      {props.onGutterPointerDown ? (
+        <div
+          className="h-1.5 shrink-0 cursor-row-resize"
+          data-terminal-dock-gutter-handle=""
+          data-pane-prevent-terminal-focus
+          onPointerDown={props.onGutterPointerDown}
+        />
+      ) : null}
       <div
         className="flex h-4 shrink-0 items-center px-3 pt-1 text-[11px] font-medium text-muted-foreground"
         role="status"
@@ -98,14 +132,24 @@ export function TerminalDock(props: TerminalDockProps): React.JSX.Element | null
       >
         <span className={cn(disabledReason === null && 'invisible')}>{disabledReason}</span>
       </div>
-      <div className="scrollbar-sleek min-h-0 flex-1 overflow-y-auto">
-        <AgentComposer
-          terminalTabId={terminalTabId}
-          paneKey={paneKey}
-          targetPtyId={targetPtyId}
-          agent={agent}
-          canSend={disabledReason === null}
-        />
+      <div className="relative min-h-0 flex-1">
+        <div className="scrollbar-sleek h-full overflow-y-auto">
+          <AgentComposer
+            terminalTabId={terminalTabId}
+            paneKey={paneKey}
+            targetPtyId={targetPtyId}
+            agent={agent}
+            canSend={disabledReason === null}
+          />
+        </div>
+        {props.passthroughActive ? (
+          <div
+            className="absolute inset-0 flex items-center justify-center bg-background/70 text-xs font-medium text-muted-foreground"
+            data-terminal-dock-passthrough-overlay=""
+          >
+            Passthrough active — terminal has keyboard focus
+          </div>
+        ) : null}
       </div>
     </div>
   )

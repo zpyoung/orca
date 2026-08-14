@@ -184,6 +184,58 @@ describe('TerminalDock', () => {
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
   })
 
+  it('reports mount and unmount edges exactly once each, not on every render', () => {
+    const onMountedChange = vi.fn()
+    const { rerender } = render(<TerminalDock {...baseProps} onMountedChange={onMountedChange} />)
+    expect(onMountedChange).toHaveBeenCalledTimes(1)
+    expect(onMountedChange).toHaveBeenLastCalledWith(true)
+
+    rerender(<TerminalDock {...baseProps} onMountedChange={onMountedChange} gutterRows={6} />)
+    expect(onMountedChange).toHaveBeenCalledTimes(1)
+
+    const low = terminalDockAutoUndockLowThresholdPx(6)
+    rerender(
+      <TerminalDock
+        {...baseProps}
+        onMountedChange={onMountedChange}
+        gutterRows={6}
+        paneHeightPx={low - 1}
+      />
+    )
+    expect(onMountedChange).toHaveBeenCalledTimes(2)
+    expect(onMountedChange).toHaveBeenLastCalledWith(false)
+  })
+
+  it('reports an unmount edge when the host removes the component outright', () => {
+    const onMountedChange = vi.fn()
+    const { unmount } = render(<TerminalDock {...baseProps} onMountedChange={onMountedChange} />)
+    onMountedChange.mockClear()
+
+    unmount()
+
+    expect(onMountedChange).toHaveBeenCalledExactlyOnceWith(false)
+  })
+
+  it('renders a gutter drag handle only when a pointerdown handler is supplied', () => {
+    const { rerender } = render(<TerminalDock {...baseProps} />)
+    expect(document.querySelector('[data-terminal-dock-gutter-handle]')).not.toBeInTheDocument()
+
+    const onGutterPointerDown = vi.fn()
+    rerender(<TerminalDock {...baseProps} onGutterPointerDown={onGutterPointerDown} />)
+    const handle = document.querySelector('[data-terminal-dock-gutter-handle]')
+    expect(handle).toBeInTheDocument()
+    fireEvent.pointerDown(handle as Element)
+    expect(onGutterPointerDown).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows a passthrough overlay and hides it once passthrough exits', () => {
+    const { rerender } = render(<TerminalDock {...baseProps} passthroughActive={true} />)
+    expect(screen.getByText(/passthrough active/i)).toBeInTheDocument()
+
+    rerender(<TerminalDock {...baseProps} passthroughActive={false} />)
+    expect(screen.queryByText(/passthrough active/i)).not.toBeInTheDocument()
+  })
+
   it('does not flap at +/-1px around the derived thresholds for a non-default gutterRows', () => {
     const gutterRows = MAX_GUTTER_ROWS
     const low = terminalDockAutoUndockLowThresholdPx(gutterRows)

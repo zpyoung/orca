@@ -43,6 +43,9 @@ import {
   serializeTerminalLayout
 } from './layout-serialization'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
+import { TerminalPaneDockMount } from './TerminalPaneDockMount'
+import { useTerminalPaneDock } from './use-terminal-pane-dock'
+import { DEFAULT_GUTTER_ROWS } from '../terminal-dock/terminal-dock-pane-state'
 import type { TerminalKittyKeyboardModeTracker } from '../../../../shared/terminal-kitty-keyboard-mode-tracker'
 import {
   applyExpandedLayoutTo,
@@ -522,6 +525,16 @@ function TerminalPane(
   const tabAgentTypeByLeaf = useAppStore((store) =>
     selectTerminalTabAgentTypesByLeaf(store.agentStatusByPaneKey, tabId)
   )
+  const experimentalTerminalDockEnabled = useAppStore(
+    (store) => store.settings?.experimentalTerminalDock === true
+  )
+  const terminalDock = useTerminalPaneDock({
+    tabId,
+    worktreeId,
+    enabled: experimentalTerminalDockEnabled,
+    managerRef,
+    containerRef
+  })
   const toggleTabViewMode = useAppStore((store) => store.toggleTabViewMode)
   const setTabViewMode = useAppStore((store) => store.setTabViewMode)
   const savedLayout = useAppStore((store) => store.terminalLayoutsByTabId[tabId] ?? EMPTY_LAYOUT)
@@ -640,10 +653,14 @@ function TerminalPane(
     },
     [applyNativeChatLeafRoute, chatLeafId, isChatEligibleForLeaf, isChatViewMode]
   )
+  const undockOnConfirmedAgentExit = terminalDock.undockOnConfirmedAgentExit
   useEffect(() => {
     // Why: transport callbacks must observe only committed chat ownership; render work can be replayed/discarded under concurrent React.
-    onAgentExitedRef.current = handleConfirmedAgentExit
-  }, [handleConfirmedAgentExit])
+    onAgentExitedRef.current = (leafId: string) => {
+      handleConfirmedAgentExit(leafId)
+      undockOnConfirmedAgentExit(leafId)
+    }
+  }, [handleConfirmedAgentExit, undockOnConfirmedAgentExit])
   const canToggleChatForLeaf = useCallback(
     (leafId: string | null): boolean => {
       // Scope the "always allow toggling back" rule to the leaf showing chat; must not make an unsupported sibling look eligible.
@@ -2611,11 +2628,14 @@ function TerminalPane(
       const restored = await restoreTerminalFitToDesktop(ptyId, settingsRef.current ?? undefined)
       if (restored) {
         scheduleRestoredTerminalRefit()
-        // Why: after the overlay unmounts, refocus the reclaimed terminal instead of the removed button/body.
-        pane.terminal.focus()
+        // Why: after the overlay unmounts, refocus the reclaimed terminal instead of the removed
+        // button/body — unless the composer owns focus for this pane, which it keeps.
+        if (!terminalDock.paneDockOwnsFocus(makePaneKey(tabId, pane.leafId))) {
+          pane.terminal.focus()
+        }
       }
     },
-    [refreshMobileOverlays, scheduleRestoredTerminalRefit]
+    [refreshMobileOverlays, scheduleRestoredTerminalRefit, tabId, terminalDock]
   )
 
   const restoreAllTerminalFits = useCallback(
@@ -2627,10 +2647,12 @@ function TerminalPane(
       )
       if (restored) {
         scheduleRestoredTerminalRefit()
-        focusPane.terminal.focus()
+        if (!terminalDock.paneDockOwnsFocus(makePaneKey(tabId, focusPane.leafId))) {
+          focusPane.terminal.focus()
+        }
       }
     },
-    [getMobileOwnedTerminalPtyIds, scheduleRestoredTerminalRefit]
+    [getMobileOwnedTerminalPtyIds, scheduleRestoredTerminalRefit, tabId, terminalDock]
   )
 
   const terminalShouldHandleMiddleClick = useCallback(
@@ -2685,7 +2707,12 @@ function TerminalPane(
       // middle-click paste follow-up, so arm the shared window to swallow it and
       // avoid inserting text into the PTY twice.
       armPrimarySelectionNativePasteSuppression()
-      clickedPane.terminal.focus()
+      // Why: middle-click paste writes through the transport below, not via xterm's own
+      // paste handling, so this focus call is only about UX — skip it when the composer
+      // owns focus rather than yanking it away for a paste the user didn't aim at it.
+      if (!terminalDock.paneDockOwnsFocus(makePaneKey(tabId, clickedPane.leafId))) {
+        clickedPane.terminal.focus()
+      }
       void readPrimarySelectionText().then(async (text) => {
         if (!text) {
           return
@@ -2746,7 +2773,7 @@ function TerminalPane(
         recordTerminalUserInputForLeaf(tabId, clickedPane.leafId)
       })
     },
-    [getPrimarySelectionMiddleClickPane, tabId, worktreeId]
+    [getPrimarySelectionMiddleClickPane, tabId, terminalDock, worktreeId]
   )
 
   const handlePrimarySelectionAuxClick = useCallback(
@@ -3077,6 +3104,36 @@ function TerminalPane(
             chatPane.container,
             `native-chat-${tabId}-${chatPane.leafId}`
           )
+        : null}
+      {experimentalTerminalDockEnabled
+        ? managedPanes.map((pane) => {
+            const agent = tabAgentTypeByLeaf[pane.leafId]
+            if (!agent) {
+              return null
+            }
+            const paneKey = makePaneKey(tabId, pane.leafId)
+            const targetPtyId = paneTransportsRef.current.get(pane.id)?.getPtyId() ?? null
+            return (
+              <TerminalPaneDockMount
+                key={paneKey}
+                pane={pane}
+                terminalTabId={tabId}
+                paneKey={paneKey}
+                agent={agent}
+                docked={terminalDock.isPaneDocked(paneKey)}
+                gutterRows={terminalDock.gutterRowsFor(paneKey) ?? DEFAULT_GUTTER_ROWS}
+                targetPtyId={targetPtyId}
+                disabledReason={terminalDock.disabledReasonFor({
+                  paneKey,
+                  targetPtyId,
+                  recoveryPhase: ptyRecoveryStatesByPaneId[pane.id]?.phase ?? null
+                })}
+                readTerminalScreen={() => pane.serializeAddon.serialize({ scrollback: 0 })}
+                onCommitGutterRows={(rows) => terminalDock.commitGutterRows(paneKey, rows)}
+                passthroughActive={terminalDock.isPanePassthrough(paneKey)}
+              />
+            )
+          })
         : null}
       <TerminalContextMenu
         open={contextMenu.open}

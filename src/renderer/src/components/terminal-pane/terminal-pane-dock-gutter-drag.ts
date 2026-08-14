@@ -1,0 +1,125 @@
+import type { ManagedPane } from '@/lib/pane-manager/pane-manager-types'
+import { holdPtyResizesForPaneSubtrees } from '@/lib/pane-manager/pane-pty-resize-hold'
+import { safeFit } from '@/lib/pane-manager/pane-fit'
+import { MAX_GUTTER_ROWS, MIN_GUTTER_ROWS } from '../terminal-dock/terminal-dock-pane-state'
+import { TERMINAL_DOCK_ROW_HEIGHT_PX } from '../terminal-dock/TerminalDock'
+
+export function clampGutterRows(rows: number): number {
+  return Math.min(MAX_GUTTER_ROWS, Math.max(MIN_GUTTER_ROWS, Math.round(rows)))
+}
+
+export type TerminalDockGutterDragArgs = {
+  pane: ManagedPane
+  startGutterRows: number
+  /** Applied on every rAF-batched pointermove so xterm can fit locally during the drag. */
+  onLiveRowsChange: (rows: number) => void
+  /** Applied once on a committed release, after the single coalesced PTY resize flushes. */
+  onCommit: (rows: number) => void
+}
+
+type PointerCaptureTarget = {
+  setPointerCapture: (pointerId: number) => void
+  hasPointerCapture: (pointerId: number) => boolean
+  releasePointerCapture: (pointerId: number) => void
+}
+
+/** Drags the strip above the dock to resize its gutter. Mirrors pane-divider-drag's
+ *  hold-through-drag/flush-once-on-release shape (rAF-batched live updates, pointer capture
+ *  with a window-level fallback, abort-safe cancel) collapsed to a single row-count axis. */
+export function beginTerminalDockGutterDrag(
+  event: { clientY: number; pointerId: number; currentTarget: PointerCaptureTarget },
+  args: TerminalDockGutterDragArgs,
+  fit: (pane: ManagedPane) => boolean = safeFit
+): void {
+  const handle = event.currentTarget
+  const startY = event.clientY
+  const { pane, startGutterRows, onLiveRowsChange, onCommit } = args
+  let liveRows = startGutterRows
+  let pendingRows: number | null = null
+  let rafId: number | null = null
+  let released = false
+
+  const release = holdPtyResizesForPaneSubtrees([pane.container])
+
+  const applyPendingRows = (): void => {
+    rafId = null
+    if (pendingRows === null) {
+      return
+    }
+    liveRows = pendingRows
+    pendingRows = null
+    onLiveRowsChange(liveRows)
+  }
+
+  const scheduleRows = (rows: number): void => {
+    pendingRows = rows
+    if (rafId === null) {
+      rafId = requestAnimationFrame(applyPendingRows)
+    }
+  }
+
+  const cancelScheduledFrame = (): void => {
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId)
+      rafId = null
+    }
+  }
+
+  const removeListeners = (): void => {
+    window.removeEventListener('pointermove', onPointerMove, true)
+    window.removeEventListener('pointerup', onPointerUp, true)
+    window.removeEventListener('pointercancel', onPointerCancel, true)
+    window.removeEventListener('blur', onBlur, true)
+  }
+
+  const finish = (commit: boolean): void => {
+    if (released) {
+      return
+    }
+    released = true
+    cancelScheduledFrame()
+    removeListeners()
+    try {
+      if (handle.hasPointerCapture(event.pointerId)) {
+        handle.releasePointerCapture(event.pointerId)
+      }
+    } catch {
+      // Best effort: capture may already be gone.
+    }
+
+    if (commit) {
+      if (pendingRows !== null) {
+        liveRows = pendingRows
+        pendingRows = null
+        onLiveRowsChange(liveRows)
+      }
+      fit(pane)
+      release.flush()
+      if (liveRows !== startGutterRows) {
+        onCommit(liveRows)
+      }
+    } else {
+      onLiveRowsChange(startGutterRows)
+      release.cancel()
+    }
+  }
+
+  const onPointerMove = (moveEvent: PointerEvent): void => {
+    // Why: dragging the handle up should grow the gutter, so pixels above start are positive rows.
+    const deltaRows = Math.round((startY - moveEvent.clientY) / TERMINAL_DOCK_ROW_HEIGHT_PX)
+    scheduleRows(clampGutterRows(startGutterRows + deltaRows))
+  }
+  const onPointerUp = (): void => finish(true)
+  const onPointerCancel = (): void => finish(false)
+  const onBlur = (): void => finish(false)
+
+  try {
+    handle.setPointerCapture(event.pointerId)
+  } catch {
+    // Some pointer types (or test doubles) don't support capture; window listeners still work.
+  }
+  window.addEventListener('pointermove', onPointerMove, true)
+  window.addEventListener('pointerup', onPointerUp, true)
+  window.addEventListener('pointercancel', onPointerCancel, true)
+  window.addEventListener('blur', onBlur, true)
+}

@@ -81,6 +81,7 @@ import {
 import { RESET_KITTY_KEYBOARD_PROTOCOL } from '../../../../shared/terminal-mode-reset-profiles'
 import { resolveTerminalLayoutActiveLeafId } from './terminal-layout-leaf-ids'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
+import { resolveTerminalDockPruneTarget } from './terminal-pane-dock-prune'
 import { applyExpandedLayoutTo, restoreExpandedLayoutFrom } from './expand-collapse'
 import { applyTerminalAppearance } from './terminal-appearance'
 import { createOsc52OscHandler } from './osc52-clipboard'
@@ -1379,6 +1380,20 @@ export function useTerminalPaneLifecycle({
           panePtyBindings.delete(paneId)
         }
         const leafId = closedPane?.leafId
+        if (leafId) {
+          const dockPruneState = useAppStore.getState()
+          const dockPruneTarget = resolveTerminalDockPruneTarget({
+            unifiedTabsByWorktree: dockPruneState.unifiedTabsByWorktree,
+            worktreeId,
+            tabId,
+            leafId
+          })
+          if (dockPruneTarget) {
+            dockPruneState.pruneTerminalDockPaneKeys(dockPruneTarget.unifiedTabId, [
+              dockPruneTarget.paneKey
+            ])
+          }
+        }
         if (leafId && isRetiredSurface) {
           retireMountedTerminalPaneSurface({
             paneKey: makePaneKey(tabId, leafId),
