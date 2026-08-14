@@ -11,7 +11,10 @@ import type { SshConnection, SshConnectionCallbacks } from '../ssh/ssh-connectio
 import { SshConnectionManager } from '../ssh/ssh-connection-manager'
 import type { SshChannelMultiplexer } from '../ssh/ssh-channel-multiplexer'
 import { SshRelaySession, type SshRelayAiVaultHostInfo } from '../ssh/ssh-relay-session'
-import type { SshAiVaultRelayListParams } from '../../shared/ssh-ai-vault-relay'
+import type {
+  SshAiVaultRelayListParams,
+  SshAiVaultRelayTitleParams
+} from '../../shared/ssh-ai-vault-relay'
 import type { NativeChatRelayPing } from '../../shared/native-chat-relay-protocol'
 import { notifySshRelayReady, onSshRelayReady } from './ssh-relay-ready-notifier'
 import { SshPortForwardManager } from '../ssh/ssh-port-forward'
@@ -185,6 +188,21 @@ export async function requestActiveSshAiVaultSessionList(
     throw new Error('SSH relay is not ready')
   }
   return session.requestAiVaultSessionList(params, options)
+}
+
+export async function requestActiveSshAiVaultSessionTitles(
+  targetId: string,
+  params: SshAiVaultRelayTitleParams,
+  options: { signal?: AbortSignal; timeoutMs?: number } = {}
+): Promise<unknown | null> {
+  if (isRuntimeOwnedSshTargetId(targetId)) {
+    return null
+  }
+  const session = activeSessions.get(targetId)
+  if (!session) {
+    throw new Error('SSH relay is not ready')
+  }
+  return session.requestAiVaultSessionTitles(params, options)
 }
 
 /** Issue a native-chat relay request against a plain (non runtime-owned) SSH

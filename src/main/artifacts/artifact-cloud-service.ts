@@ -12,6 +12,7 @@ import type {
 import { assertArtifactSharingAllowed } from '../../shared/artifact-sharing-gate'
 import { ensureActiveOrcaProfile } from '../orca-profiles/profile-index-store'
 import { getOrcaCloudAuthConfig } from '../orca-profiles/profile-cloud-auth-config'
+import { prepareArtifactCloudUse } from '../orca-profiles/profile-artifact-cloud-cleanup'
 import { runWithFreshOrcaCloudSession } from '../orca-profiles/profile-cloud-session-refresh'
 import {
   allowsArtifactCloudAuthOverride,
@@ -28,6 +29,7 @@ import {
 import type { ActiveOrcaProfileState } from '../orca-profiles/profile-index-store'
 import { artifactRequest, artifactWriteBody } from './artifact-cloud-request'
 import { ArtifactPublisher } from './artifact-publisher'
+import { OrcaCloudRequestError } from '../orca-profiles/profile-cloud-client'
 
 type ArtifactAuthContext = {
   profileId: string
@@ -249,10 +251,8 @@ export class ArtifactCloudService {
         }
         return this.publisher.runForSlug(record.slug, auth, async () => {
           auth.assertCurrent()
-          await artifactRequest<void>(apiUrl, token, `/${record.slug}`, {
-            method: 'DELETE',
-            editToken: record.editToken
-          })
+          await deleteArtifactRequest(apiUrl, token, `/${record.slug}`, record.editToken)
+          auth.assertCurrent()
           removeArtifactShareRecords(auth.profileId, this.userDataPath, auth.scope, {
             sourceKey: request.sourceKey,
             slug: record.slug
@@ -266,9 +266,8 @@ export class ArtifactCloudService {
     return this.withAuth(options, (token, apiUrl, auth) =>
       this.publisher.runForSlug(id, auth, async () => {
         auth.assertCurrent()
-        await artifactRequest<void>(apiUrl, token, `/${encodeURIComponent(id)}`, {
-          method: 'DELETE'
-        })
+        await deleteArtifactRequest(apiUrl, token, `/${encodeURIComponent(id)}`)
+        auth.assertCurrent()
         removeArtifactShareRecords(auth.profileId, this.userDataPath, auth.scope, { slug: id })
       })
     )

@@ -5797,7 +5797,7 @@
             "defaultTitle": "デフォルトのビュー",
             "defaultCopy": "対応 Agent の新規ターミナルタブを開く方法を選択します。",
             "defaultViewLabel": "デフォルトの Chat UI ビュー",
-            "defaultViewTerminal": "Terminal チャット",
+            "defaultViewTerminal": "ターミナルチャット",
             "defaultViewNative": "Chat UI",
             "widthTitle": "チャットの幅",
             "widthCopy": "すべてのチャットペインの読み取り列の幅を設定します。",

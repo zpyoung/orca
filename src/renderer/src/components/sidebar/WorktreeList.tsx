@@ -5916,16 +5916,28 @@ const WorktreeList = React.memo(function WorktreeList({
       return visibleHostIdSet.has(hostId)
     })
   }, [defaultHostId, repos, visibleHostIdSet])
-  const visibleFolderWorkspacesForRows = useMemo(
-    () =>
-      filterFolderWorkspacesForVisibleHosts(
-        folderWorkspaces,
-        projectGroups,
-        visibleHostIdSet,
-        defaultHostId
-      ),
-    [defaultHostId, folderWorkspaces, projectGroups, visibleHostIdSet]
-  )
+  const visibleFolderWorkspacesForRows = useMemo(() => {
+    const hostVisibleWorkspaces = filterFolderWorkspacesForVisibleHosts(
+      folderWorkspaces,
+      projectGroups,
+      visibleHostIdSet,
+      defaultHostId
+    )
+    if (!hideWorkspacesFromOtherDevices) {
+      return hostVisibleWorkspaces
+    }
+    return filterFolderWorkspacesFromOtherDevices(
+      hostVisibleWorkspaces,
+      pairedDeviceIdsByEnvironment
+    )
+  }, [
+    defaultHostId,
+    folderWorkspaces,
+    hideWorkspacesFromOtherDevices,
+    pairedDeviceIdsByEnvironment,
+    projectGroups,
+    visibleHostIdSet
+  ])
   const repoOrder = useMemo(() => {
     return getLogicalRepoOrderRankById(repos.map((repo) => repo.id))
   }, [repos])

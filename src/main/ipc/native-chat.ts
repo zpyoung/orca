@@ -185,7 +185,11 @@ function storeLiveSubscription(
   liveSubscriptions.set(senderId, bySubId)
 }
 
-function takePendingSubscription(senderId: number, subscriptionId: string, token: symbol): boolean {
+function takePendingSubscription(
+  senderId: number,
+  subscriptionId: string,
+  pending: PendingSubscription
+): boolean {
   const bySubId = pendingSubscriptions.get(senderId)
   if (bySubId?.get(subscriptionId) !== pending) {
     return false
@@ -218,7 +222,7 @@ async function handleSubscribe(event: IpcMainEvent, args: NativeChatSubscribeArg
       limit,
       ...(transcriptPath ? { transcriptPath } : {})
     })
-    if (!takePendingSubscription(sender.id, subscriptionId, pendingToken) || sender.isDestroyed()) {
+    if (!takePendingSubscription(sender.id, subscriptionId, pending) || sender.isDestroyed()) {
       relaySubscription.unsubscribe()
       return
     }
@@ -228,60 +232,63 @@ async function handleSubscribe(event: IpcMainEvent, args: NativeChatSubscribeArg
 
   let subscription: { unsubscribe: () => void; watching: boolean }
   try {
-    subscription = await subscribeNativeChatTranscript({
-      agent,
-      sessionId,
-      transcriptPath,
-      initialLimit: limit,
-      onInitialSnapshot: (messages, hasMore, beforeOffset, error, lifecycle) => {
-        if (sender.isDestroyed()) {
-          return
-        }
-        // Forward an initial-drain error so a watching client's first frame carries it
-        // instead of stranding the view at 'loading' when the read keeps throwing.
-        const payload: NativeChatAppendedPayload = {
-          subscriptionId,
-          frame: {
-            type: 'snapshot',
-            messages,
-            hasMore,
-            beforeOffset,
-            ...(error ? { error } : {}),
-            ...(lifecycle ? { lifecycle } : {})
+    subscription = await subscribeNativeChatTranscript(
+      {
+        agent,
+        sessionId,
+        transcriptPath,
+        initialLimit: limit,
+        onInitialSnapshot: (messages, hasMore, beforeOffset, error, lifecycle) => {
+          if (sender.isDestroyed()) {
+            return
           }
+          // Forward an initial-drain error so a watching client's first frame carries it
+          // instead of stranding the view at 'loading' when the read keeps throwing.
+          const payload: NativeChatAppendedPayload = {
+            subscriptionId,
+            frame: {
+              type: 'snapshot',
+              messages,
+              hasMore,
+              beforeOffset,
+              ...(error ? { error } : {}),
+              ...(lifecycle ? { lifecycle } : {})
+            }
+          }
+          sender.send('nativeChat:appended', payload)
+        },
+        onReplace: (messages, hasMore, beforeOffset, lifecycle) => {
+          if (sender.isDestroyed()) {
+            return
+          }
+          sender.send('nativeChat:appended', {
+            subscriptionId,
+            frame: {
+              type: 'replacement',
+              messages,
+              hasMore,
+              beforeOffset,
+              ...(lifecycle ? { lifecycle } : {})
+            }
+          } satisfies NativeChatAppendedPayload)
+        },
+        onAppend: (messages, lifecycle) => {
+          if (sender.isDestroyed()) {
+            return
+          }
+          const payload: NativeChatAppendedPayload = {
+            subscriptionId,
+            frame: {
+              type: 'appended',
+              messages,
+              ...(lifecycle ? { lifecycle } : {})
+            }
+          }
+          sender.send('nativeChat:appended', payload)
         }
-        sender.send('nativeChat:appended', payload)
       },
-      onReplace: (messages, hasMore, beforeOffset, lifecycle) => {
-        if (sender.isDestroyed()) {
-          return
-        }
-        sender.send('nativeChat:appended', {
-          subscriptionId,
-          frame: {
-            type: 'replacement',
-            messages,
-            hasMore,
-            beforeOffset,
-            ...(lifecycle ? { lifecycle } : {})
-          }
-        } satisfies NativeChatAppendedPayload)
-      },
-      onAppend: (messages, lifecycle) => {
-        if (sender.isDestroyed()) {
-          return
-        }
-        const payload: NativeChatAppendedPayload = {
-          subscriptionId,
-          frame: {
-            type: 'appended',
-            messages,
-            ...(lifecycle ? { lifecycle } : {})
-          }
-        }
-        sender.send('nativeChat:appended', payload)
-      }
-    })
+      pending.controller.signal
+    )
   } catch {
     takePendingSubscription(sender.id, subscriptionId, pending)
     return

@@ -2520,6 +2520,7 @@ function TerminalPane(
     rightClickToPaste
   })
   const {
+    executionHostId: quickCommandExecutionHostId,
     hosts: quickCommandHosts,
     refreshRemoteHost: refreshQuickCommandRemoteHost,
     remoteHostLoadFailed: quickCommandHostLoadFailed,
@@ -2538,12 +2539,23 @@ function TerminalPane(
           repoCommands: commands.filter((command) => {
             const scope = getTerminalQuickCommandScope(command)
             return (
-              scope.type === 'repo' && terminalQuickCommandMatchesRepo(command, quickCommandRepoId)
+              scope.type === 'repo' &&
+              terminalQuickCommandMatchesWorkspaceProject(command, {
+                commandHostId: host.hostId,
+                projectHostSetups: projectHostSetupProjection.setups,
+                targetHostId: quickCommandExecutionHostId,
+                targetRepoId: quickCommandRepoId
+              })
             )
           })
         }
       }),
-    [quickCommandHosts, quickCommandRepoId]
+    [
+      projectHostSetupProjection.setups,
+      quickCommandExecutionHostId,
+      quickCommandHosts,
+      quickCommandRepoId
+    ]
   )
   useEffect(() => {
     if (contextMenu.open) {

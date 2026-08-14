@@ -23,8 +23,8 @@ import {
   selectEditorPanelGitStatusEntries
 } from './editor-panel-git-entry-selector'
 import { createEditorPanelDraftSelector } from './editor-panel-draft-selector'
-import { attemptEditorFileSave } from './editor-file-save-attempt'
 import { createCurrentMarkdownArtifactRequest } from './markdown-artifact-upload'
+import { useEditorPanelSave } from './useEditorPanelSave'
 
 function EditorPanelInner({
   activeFileId: activeFileIdProp,

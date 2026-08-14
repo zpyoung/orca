@@ -3721,28 +3721,6 @@
           ]
         },
         {
-          "file": "src/renderer/src/components/sidebar/add-repo-browse-authority.test.ts",
-          "assertions": [
-            "paired runtime browsing opens the host browser without invoking native pickFolders while desktop local and SSH routes remain intact"
-          ]
-        },
-        {
-          "file": "src/renderer/src/components/sidebar/AddRepoDialogStepContent.test.tsx",
-          "assertions": ["paired runtime browsing renders the in-app host filesystem browser"]
-        },
-        {
-          "file": "src/renderer/src/components/sidebar/AddRepoStartSteps.test.tsx",
-          "assertions": [
-            "host-scoped Add Project actions remain disabled until a paired runtime is selectable"
-          ]
-        },
-        {
-          "file": "src/renderer/src/store/slices/repos-paired-runtime-add.test.ts",
-          "assertions": [
-            "an explicitly selected paired runtime submits repo.add to that runtime without native repo or folder-picker calls"
-          ]
-        },
-        {
           "file": "src/main/ipc/settings.test.ts",
           "assertions": [
             "generic settings IPC strips activeRuntimeEnvironmentId while the dedicated validated IPC persists it",

@@ -12,6 +12,7 @@ export type NativeChatTranscriptRetention = {
     identity: string
     messages: NativeChatMessage[]
     settled: boolean
+    loading: boolean
   }) => NativeChatMessage[]
 }
 
@@ -23,12 +24,13 @@ export function createNativeChatTranscriptRetention(): NativeChatTranscriptReten
     capture(identity, messages) {
       captured = { identity, messages }
     },
-    visible({ identity, messages, settled }) {
+    visible({ identity, messages, settled, loading }) {
       if (settled) {
         return messages
       }
-      // An unsettled read includes a failed one: retained history beats blanking the pane for a transient error.
-      return captured?.identity === identity ? captured.messages : EMPTY_NATIVE_CHAT_TRANSCRIPT
+      return loading && captured?.identity === identity
+        ? captured.messages
+        : EMPTY_NATIVE_CHAT_TRANSCRIPT
     }
   }
 }

@@ -124,6 +124,10 @@ import {
   spendsSharedGitHubComQuota,
   type RateLimitBucketKind
 } from './rate-limit'
+import {
+  GITHUB_CHECK_DETAILS_HOST_TIMEOUT_MS,
+  GITHUB_CHECK_DETAILS_TIMEOUT_MESSAGE
+} from '../../shared/github-check-details-deadline'
 import { hydrateGitHubPRStack, mergeGitHubPRStack } from './github-pr-stack'
 
 type GhExecOptions = GitHubRepoExecOptions & { signal?: AbortSignal }
@@ -189,6 +193,8 @@ const repositoryMergeMetadataCache = new Map<
 >()
 const PR_STACK_SUMMARY_CACHE_TTL_MS = 60_000
 const PR_STACK_SUMMARY_CACHE_MAX_ENTRIES = 512
+const STACK_METADATA_UNAVAILABLE_ERROR =
+  'Could not verify GitHub pull request stack metadata. Refresh and try again.'
 const prStackSummaryCache = new Map<
   string,
   { value: GitHubPRStack | undefined; expiresAt: number }
@@ -3067,65 +3073,6 @@ async function getCachedGitHubPRStackSummary(
   }
 }
 
-function prunePRStackSummaryCache(now = Date.now()): void {
-  for (const [key, cached] of prStackSummaryCache) {
-    if (cached.expiresAt <= now) {
-      prStackSummaryCache.delete(key)
-    }
-  }
-  while (prStackSummaryCache.size > PR_STACK_SUMMARY_CACHE_MAX_ENTRIES) {
-    const oldestKey = prStackSummaryCache.keys().next().value
-    if (oldestKey === undefined) {
-      return
-    }
-    prStackSummaryCache.delete(oldestKey)
-  }
-}
-
-async function getCachedGitHubPRStackSummary(
-  ownerRepo: GitHubApiRepository,
-  number: number,
-  ghOptions: ReturnType<typeof ghRepoExecOptions>,
-  executionScope: string
-): Promise<GitHubPRStack | undefined> {
-  const key = `${executionScope}\0${githubRepoIdentityKey(ownerRepo)}#${number}`
-  const now = Date.now()
-  prunePRStackSummaryCache(now)
-  const cached = prStackSummaryCache.get(key)
-  if (cached && cached.expiresAt > now) {
-    return cached.value
-  }
-  const existing = prStackSummaryInFlight.get(key)
-  if (existing) {
-    return existing
-  }
-  const request = getRestPRByNumber(ownerRepo, number, ghOptions).then((pr) => pr?.stack)
-  prStackSummaryInFlight.set(key, request)
-  try {
-    const value = await request
-    prStackSummaryCache.delete(key)
-    prStackSummaryCache.set(key, {
-      value,
-      expiresAt: Date.now() + PR_STACK_SUMMARY_CACHE_TTL_MS
-    })
-    prunePRStackSummaryCache()
-    return value
-  } catch (err) {
-    // Why: avoid repeating a failed REST probe on every review poll.
-    prStackSummaryCache.delete(key)
-    prStackSummaryCache.set(key, {
-      value: undefined,
-      expiresAt: Date.now() + PR_STACK_SUMMARY_CACHE_TTL_MS
-    })
-    prunePRStackSummaryCache()
-    throw err
-  } finally {
-    if (prStackSummaryInFlight.get(key) === request) {
-      prStackSummaryInFlight.delete(key)
-    }
-  }
-}
-
 async function getPRByNumber(
   ownerRepo: GitHubApiRepository,
   number: number,
@@ -5123,19 +5070,28 @@ export async function mergePR(
   await acquire()
   let concurrencySlotHeld = true
   try {
-    let stackSummary: GitHubPRStack | undefined
-    let stackHeadSha: string | undefined
+    let restData: PullRequestLookupData
     try {
-      const restData = await getRestPRByNumber(ownerRepo, prNumber, ghOptions)
-      stackSummary = restData?.stack
-      stackHeadSha = restData?.headRefOid
-    } catch {
-      // GitHub remains authoritative when stack metadata cannot be read.
+      restData = await getRestPRByNumber(ownerRepo, prNumber, ghOptions, {
+        requireUsableStackMetadata: true
+      })
+    } catch (err) {
+      const diagnostic =
+        err instanceof SyntaxError
+          ? 'invalid JSON response'
+          : err instanceof Error
+            ? err.message
+            : String(err)
+      console.warn(
+        `mergePR stack metadata probe failed for ${ownerRepo.owner}/${ownerRepo.repo}#${String(prNumber)}:`,
+        diagnostic
+      )
+      return { ok: false, error: STACK_METADATA_UNAVAILABLE_ERROR }
     }
-    if (stackSummary) {
+    if (restData.stack) {
       const mergeMetadata = await detectRepositoryMergeMetadata(
         ownerRepo,
-        stackSummary.baseRefName,
+        restData.stack.baseRefName,
         ghOptions,
         githubPRStackExecutionScope(connectionId, localGitOptions)
       )
@@ -5146,7 +5102,7 @@ export async function mergePR(
         prNumber,
         method,
         mergeAction: mergeMetadata.mergeQueueRequired === true ? 'merge_queue' : 'direct_merge',
-        headSha: stackHeadSha,
+        headSha: restData.headRefOid,
         ghOptions
       })
     }
@@ -5293,7 +5249,7 @@ async function enablePRAutoMerge(
   if (ownerRepo) {
     try {
       const restData = await getRestPRByNumber(ownerRepo, prNumber, ghOptions)
-      if (restData?.stack) {
+      if (restData.stack) {
         return {
           ok: false,
           error: 'GitHub does not support auto-merge for stacked pull requests.'

@@ -62,6 +62,7 @@ export type ReadNativeChatTranscriptTailFileArgs = {
    *  `hasMore` set — before `beforeOffset` is computed, so a caller paging by
    *  offset never skips what the ceiling removed. */
   maxBytes?: number
+  signal?: AbortSignal
 }
 
 export async function readNativeChatTranscriptTailFile({
@@ -71,7 +72,8 @@ export async function readNativeChatTranscriptTailFile({
   includeTrailingLine = false,
   endOffset,
   decodeLifecycle,
-  maxBytes
+  maxBytes,
+  signal
 }: ReadNativeChatTranscriptTailFileArgs): Promise<{
   messages: NativeChatMessage[]
   lifecycle?: NativeChatTurnLifecycle
@@ -248,7 +250,8 @@ export async function readNativeChatTranscriptTail(
     beforeOffset?: number
     /** Byte ceiling for the returned window; see the tail-file reader. */
     maxBytes?: number
-  }
+  },
+  signal?: AbortSignal
 ): Promise<
   | {
       messages: NativeChatMessage[]
@@ -279,7 +282,8 @@ export async function readNativeChatTranscriptTail(
       includeTrailingLine: true,
       endOffset: args.beforeOffset,
       decodeLifecycle,
-      maxBytes: args.maxBytes
+      maxBytes: args.maxBytes,
+      signal
     })
     return {
       messages: result.messages,

@@ -4,17 +4,16 @@
 // reconciled once that boundary lands) is unit-testable without IPC.
 
 import type { AgentStatusState } from '../../../../shared/agent-status-types'
+import { assembleNativeChatSession, type NativeChatSources } from './native-chat-session-assembler'
 import type {
   AgentType,
-  NativeChatMessage,
   NativeChatSession,
   NativeChatSessionStatus,
   NativeChatTurnLifecycle
 } from '../../../../shared/native-chat-types'
 
 export type NativeChatLiveMergeInput = {
-  /** Already deduped, ordered, and transcript-normalized by the live assembler. */
-  messages: NativeChatMessage[]
+  sources: NativeChatSources
   sessionId: string | null
   agent: AgentType
   /** Live hook state for the pane, or null when no hook entry exists. */
@@ -23,8 +22,6 @@ export type NativeChatLiveMergeInput = {
   stateStartedAt?: number | null
   /** Latest provider-authored turn boundary recovered from the transcript. */
   transcriptLifecycle?: NativeChatTurnLifecycle
-  /** Transcript tail before presentation normalization or canonical re-dedup. */
-  statusTailMessage?: NativeChatMessage
   /** Claude can finish its lead turn while background children remain active. */
   hookHasWorkingSubagents?: boolean
   /** True before the initial snapshot resolves; forces 'loading'. */
@@ -47,24 +44,23 @@ export type NativeChatLiveMergeInput = {
  */
 export function mergeNativeChatLiveSession(input: NativeChatLiveMergeInput): NativeChatSession {
   const {
-    messages,
+    sources,
     sessionId,
     agent,
     hookState,
     stateStartedAt,
     transcriptLifecycle,
-    statusTailMessage,
     hookHasWorkingSubagents,
     loading,
     error
   } = input
   if (error) {
-    return { messages, status: 'error', sessionId, agent, error }
+    return assembleNativeChatSession({ sources, sessionId, agent, status: 'error', error })
   }
 
   const status = liveStatusOverride(
     hookState,
-    statusTailMessage ?? messages.at(-1),
+    sources,
     stateStartedAt,
     transcriptLifecycle,
     hookHasWorkingSubagents ?? false
@@ -74,14 +70,14 @@ export function mergeNativeChatLiveSession(input: NativeChatLiveMergeInput): Nat
   // idle pane while the agent works. A known session with nothing to show yet is
   // held on the loading surface by selectNativeChatViewState instead.
   if (loading && status !== 'working') {
-    return { messages, status: 'loading', sessionId, agent }
+    return assembleNativeChatSession({ sources, sessionId, agent, status: 'loading' })
   }
-  return {
-    messages,
-    status: status ?? (messages.length === 0 ? 'empty' : 'ready'),
+  return assembleNativeChatSession({
+    sources,
     sessionId,
-    agent
-  }
+    agent,
+    ...(status ? { status } : {})
+  })
 }
 
 /** Slack for comparing transcript timestamps to hook receipt times across hosts. */
@@ -89,7 +85,7 @@ export const LIFECYCLE_CLOCK_SKEW_SLACK_MS = 2_000
 
 function liveStatusOverride(
   hookState: AgentStatusState | null,
-  statusTailMessage: NativeChatMessage | undefined,
+  sources: NativeChatSources,
   stateStartedAt: number | null | undefined,
   transcriptLifecycle: NativeChatTurnLifecycle | undefined,
   hookHasWorkingSubagents: boolean
@@ -121,7 +117,7 @@ function liveStatusOverride(
   // do not settle early on capable providers.
   if (
     transcriptLifecycle?.state !== 'working' &&
-    trailingAssistantPostDates(statusTailMessage, stateStartedAt)
+    trailingAssistantPostDates(sources, stateStartedAt)
   ) {
     return undefined
   }
@@ -154,15 +150,12 @@ function lifecycleTerminatesCurrentTurn(
 }
 
 function trailingAssistantPostDates(
-  message: NativeChatMessage | undefined,
+  sources: NativeChatSources,
   stateStartedAt: number | null | undefined
 ): boolean {
   if (stateStartedAt == null) {
     return false
   }
-  return (
-    message?.role === 'assistant' &&
-    message.timestamp != null &&
-    message.timestamp >= stateStartedAt
-  )
+  const last = (sources.transcript ?? []).at(-1)
+  return last?.role === 'assistant' && last.timestamp != null && last.timestamp >= stateStartedAt
 }

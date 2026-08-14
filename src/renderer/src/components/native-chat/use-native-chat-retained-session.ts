@@ -53,7 +53,8 @@ export function useNativeChatRetainedSession(
   const retained = retentionRef.current.visible({
     identity,
     messages: session.messages,
-    settled: readPhase === 'ready'
+    settled: readPhase === 'ready',
+    loading: readPhase === 'loading'
   })
   // A retrying or errored base read still carries live subscribe appends, so falling
   // through to them beats showing nothing — but only for a list already proven ours.
@@ -72,9 +73,4 @@ export function useNativeChatRetainedSession(
       ? {}
       : { status: 'loading' as const, error: undefined })
   }
-  // Retained history beats the full-pane error: a reveal-time read/stream failure is usually transient.
-  if (session.status === 'error' && messages.length > 0) {
-    return { ...session, messages, readPhase, status: 'ready', error: undefined }
-  }
-  return { ...session, messages, readPhase }
 }

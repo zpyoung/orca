@@ -353,4 +353,16 @@ describe('WorktreeJumpPalette', () => {
 
     expect(testContainer.textContent).toContain('Feature workspace')
   })
+
+  it('replaces a completed emoji shortcode in the search query', async () => {
+    await renderPalette({ worktreesByRepo: { 'repo-1': [] } })
+    const input = testContainer.querySelector<HTMLInputElement>('[data-command-input="true"]')
+    expect(input).not.toBeNull()
+
+    await act(async () => {
+      fireEvent.change(input!, { target: { value: ':wink:', selectionStart: 6 } })
+    })
+
+    expect(input?.value).toBe('😉')
+  })
 })
