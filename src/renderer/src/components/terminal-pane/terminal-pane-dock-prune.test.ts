@@ -1,6 +1,12 @@
-import { describe, expect, it } from 'vitest'
+// @vitest-environment happy-dom
+
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Tab } from '../../../../shared/types'
-import { resolveTerminalDockPruneTarget } from './terminal-pane-dock-prune'
+import { writeTerminalDockPaneState } from '../terminal-dock/terminal-dock-pane-state'
+import {
+  pruneTerminalDockPaneKeysEverywhere,
+  resolveTerminalDockPruneTarget
+} from './terminal-pane-dock-prune'
 
 function makeUnifiedTab(overrides: Partial<Tab>): Tab {
   return {
@@ -55,5 +61,51 @@ describe('resolveTerminalDockPruneTarget', () => {
       experimentalTerminalDockEnabled: false
     })
     expect(result).toBeNull()
+  })
+})
+
+describe('pruneTerminalDockPaneKeysEverywhere', () => {
+  const PANE_KEY = 'terminal-1:11111111-1111-4111-8111-111111111111'
+
+  beforeEach(() => {
+    window.localStorage.clear()
+  })
+
+  it('prunes both the store record and the localStorage fallback for a retiring pane', () => {
+    writeTerminalDockPaneState(PANE_KEY, { docked: true, gutterRows: 9 })
+    const unifiedTab = makeUnifiedTab({ entityId: 'terminal-1' })
+    const pruneStoreDockPaneKeys = vi.fn()
+
+    pruneTerminalDockPaneKeysEverywhere({
+      unifiedTabsByWorktree: { 'wt-1': [unifiedTab] },
+      worktreeId: 'wt-1',
+      tabId: 'terminal-1',
+      leafId: '11111111-1111-4111-8111-111111111111',
+      experimentalTerminalDockEnabled: true,
+      pruneStoreDockPaneKeys
+    })
+
+    expect(pruneStoreDockPaneKeys).toHaveBeenCalledExactlyOnceWith('unified-1', [PANE_KEY])
+    const raw = window.localStorage.getItem('orca.terminalDock.paneState.v1')
+    expect(raw ? JSON.parse(raw) : {}).not.toHaveProperty(PANE_KEY)
+  })
+
+  it('prunes neither store when the flag is off, even for a pane with locally persisted state', () => {
+    writeTerminalDockPaneState(PANE_KEY, { docked: true, gutterRows: 9 })
+    const unifiedTab = makeUnifiedTab({ entityId: 'terminal-1' })
+    const pruneStoreDockPaneKeys = vi.fn()
+
+    pruneTerminalDockPaneKeysEverywhere({
+      unifiedTabsByWorktree: { 'wt-1': [unifiedTab] },
+      worktreeId: 'wt-1',
+      tabId: 'terminal-1',
+      leafId: '11111111-1111-4111-8111-111111111111',
+      experimentalTerminalDockEnabled: false,
+      pruneStoreDockPaneKeys
+    })
+
+    expect(pruneStoreDockPaneKeys).not.toHaveBeenCalled()
+    const raw = window.localStorage.getItem('orca.terminalDock.paneState.v1')
+    expect(raw ? JSON.parse(raw) : {}).toHaveProperty(PANE_KEY)
   })
 })

@@ -4,6 +4,7 @@ import { useAppStore } from '@/store'
 import type { AgentStatusState } from '../../../../shared/agent-status-types'
 import { makePaneKey, parsePaneKey } from '../../../../shared/stable-pane-id'
 import { getCachedUnifiedTerminalTabForWorktree } from './terminal-unified-tab-lookup'
+import { useTerminalDockLocalFallback } from './use-terminal-dock-local-fallback'
 import {
   isTerminalInputQuarantined,
   subscribeTerminalInputQuarantine
@@ -32,7 +33,7 @@ export type UseTerminalPaneDockResult = {
   /** Combines docked state with the experimental flag — a stale persisted `docked: true`
    *  from before the flag was disabled must not keep programmatic focus off the terminal. */
   paneDockOwnsFocus: (paneKey: string) => boolean
-  gutterRowsFor: (paneKey: string) => number | undefined
+  gutterRowsFor: (paneKey: string) => number
   isPanePassthrough: (paneKey: string) => boolean
   commitGutterRows: (paneKey: string, rows: number) => void
   disabledReasonFor: (args: {
@@ -74,17 +75,23 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
   // Why: quarantine can arm/clear between renders with no store write to react to.
   const [, forceQuarantineRerender] = useState(0)
 
+  const { resolvedStateFor, persistLocalDockState, forgetPane } = useTerminalDockLocalFallback()
+  // Why: "ever echoed" is per-tab, not per-pane — a modern host's record simply omitting one
+  // pane still means default (not local fallback) governs that pane, per resolveTerminalDockPaneState.
+  const hostHasEverEchoed = terminalDockByPaneKey !== undefined
   const isPaneDocked = useCallback(
-    (paneKey: string): boolean => terminalDockByPaneKey?.[paneKey]?.docked === true,
-    [terminalDockByPaneKey]
+    (paneKey: string): boolean =>
+      resolvedStateFor(paneKey, terminalDockByPaneKey?.[paneKey], hostHasEverEchoed).docked,
+    [hostHasEverEchoed, resolvedStateFor, terminalDockByPaneKey]
   )
   const paneDockOwnsFocus = useCallback(
     (paneKey: string): boolean => enabled && isPaneDocked(paneKey),
     [enabled, isPaneDocked]
   )
   const gutterRowsFor = useCallback(
-    (paneKey: string): number | undefined => terminalDockByPaneKey?.[paneKey]?.gutterRows,
-    [terminalDockByPaneKey]
+    (paneKey: string): number =>
+      resolvedStateFor(paneKey, terminalDockByPaneKey?.[paneKey], hostHasEverEchoed).gutterRows,
+    [hostHasEverEchoed, resolvedStateFor, terminalDockByPaneKey]
   )
   const isPanePassthrough = useCallback(
     (paneKey: string): boolean => passthroughPaneKeys.has(paneKey),
@@ -106,8 +113,9 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
         return
       }
       setTabTerminalDockState(unifiedTabId, { paneKey, gutterRows: rows })
+      persistLocalDockState(paneKey, { docked: isPaneDocked(paneKey), gutterRows: rows })
     },
-    [resolveUnifiedTabId, setTabTerminalDockState]
+    [isPaneDocked, persistLocalDockState, resolveUnifiedTabId, setTabTerminalDockState]
   )
 
   const toggleDockForFocusedPane = useCallback((): void => {
@@ -120,8 +128,18 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       return
     }
     const paneKey = makePaneKey(tabId, activeLeafId)
-    setTabTerminalDockState(unifiedTabId, { paneKey, docked: !isPaneDocked(paneKey) })
-  }, [isPaneDocked, managerRef, resolveUnifiedTabId, setTabTerminalDockState, tabId])
+    const nextDocked = !isPaneDocked(paneKey)
+    setTabTerminalDockState(unifiedTabId, { paneKey, docked: nextDocked })
+    persistLocalDockState(paneKey, { docked: nextDocked, gutterRows: gutterRowsFor(paneKey) })
+  }, [
+    gutterRowsFor,
+    isPaneDocked,
+    managerRef,
+    persistLocalDockState,
+    resolveUnifiedTabId,
+    setTabTerminalDockState,
+    tabId
+  ])
 
   const undockOnConfirmedAgentExit = useCallback(
     (leafId: string): void => {
@@ -139,8 +157,17 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
         return
       }
       setTabTerminalDockState(unifiedTabId, { paneKey, docked: false })
+      persistLocalDockState(paneKey, { docked: false, gutterRows: gutterRowsFor(paneKey) })
     },
-    [enabled, isPaneDocked, resolveUnifiedTabId, setTabTerminalDockState, tabId]
+    [
+      enabled,
+      gutterRowsFor,
+      isPaneDocked,
+      persistLocalDockState,
+      resolveUnifiedTabId,
+      setTabTerminalDockState,
+      tabId
+    ]
   )
 
   const togglePassthroughForFocusedPane = useCallback((): void => {
@@ -285,6 +312,7 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
     (leafId: string): void => {
       const paneKey = makePaneKey(tabId, leafId)
       previousAgentStatesRef.current.delete(paneKey)
+      forgetPane(paneKey)
       setPassthroughPaneKeys((previous) => {
         if (!previous.has(paneKey)) {
           return previous
@@ -294,7 +322,7 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
         return next
       })
     },
-    [tabId]
+    [forgetPane, tabId]
   )
 
   return useMemo(

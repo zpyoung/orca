@@ -1,9 +1,14 @@
 // @vitest-environment happy-dom
 
 import { act, renderHook } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { create, type StoreApi, type UseBoundStore } from 'zustand'
 import type { Tab } from '../../../../shared/types'
+import {
+  DEFAULT_GUTTER_ROWS,
+  readTerminalDockPaneState,
+  writeTerminalDockPaneState
+} from '../terminal-dock/terminal-dock-pane-state'
 
 type FakeState = {
   unifiedTabsByWorktree: Record<string, Tab[]>
@@ -61,6 +66,7 @@ const LEAF_ID = '11111111-1111-4111-8111-111111111111'
 const PANE_KEY = `tab-1:${LEAF_ID}`
 
 beforeEach(() => {
+  window.localStorage.clear()
   mocks.setTabTerminalDockState = vi.fn()
   fakeStore.setState({
     setTabTerminalDockState: mocks.setTabTerminalDockState,
@@ -70,6 +76,10 @@ beforeEach(() => {
       ]
     }
   })
+})
+
+afterEach(() => {
+  window.localStorage.clear()
 })
 
 function renderDockHook(enabled: boolean) {
@@ -110,6 +120,18 @@ function dispatchPassthroughToggle(container: HTMLDivElement): void {
   container.dispatchEvent(
     new KeyboardEvent('keydown', {
       key: 'p',
+      ctrlKey: true,
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true
+    })
+  )
+}
+
+function dispatchDockToggle(container: HTMLDivElement): void {
+  container.dispatchEvent(
+    new KeyboardEvent('keydown', {
+      key: 'k',
       ctrlKey: true,
       shiftKey: true,
       bubbles: true,
@@ -207,5 +229,89 @@ describe('useTerminalPaneDock', () => {
     act(() => result.current.prunePassthroughForRetiredPane(LEAF_ID))
 
     expect(result.current.isPanePassthrough(PANE_KEY)).toBe(false)
+  })
+
+  describe('client-local fallback', () => {
+    it('writes the localStorage fallback when the dock is toggled', () => {
+      // gutterRows deliberately off the default (5) so a spuriously-untouched read can't
+      // coincidentally match the expected value.
+      fakeStore.setState({
+        unifiedTabsByWorktree: {
+          'wt-1': [
+            makeUnifiedTab({
+              terminalDockByPaneKey: { [PANE_KEY]: { docked: true, gutterRows: 7 } }
+            })
+          ]
+        }
+      })
+      const { container } = renderDockHookWithShortcutTarget()
+
+      act(() => dispatchDockToggle(container))
+
+      expect(readTerminalDockPaneState(PANE_KEY)).toEqual({ docked: false, gutterRows: 7 })
+    })
+
+    it('writes the localStorage fallback when the gutter is resized', () => {
+      const { result } = renderDockHook(true)
+
+      act(() => result.current.commitGutterRows(PANE_KEY, 9))
+
+      expect(readTerminalDockPaneState(PANE_KEY)).toEqual({ docked: true, gutterRows: 9 })
+    })
+
+    it('lets the local value govern at mount when the host has never echoed the field', () => {
+      fakeStore.setState({
+        unifiedTabsByWorktree: {
+          'wt-1': [makeUnifiedTab({ terminalDockByPaneKey: undefined })]
+        }
+      })
+      writeTerminalDockPaneState(PANE_KEY, { docked: true, gutterRows: 11 })
+
+      const { result } = renderDockHook(true)
+
+      expect(result.current.isPaneDocked(PANE_KEY)).toBe(true)
+      expect(result.current.gutterRowsFor(PANE_KEY)).toBe(11)
+    })
+
+    it('lets the host value win once echoed, without the local value overriding it', () => {
+      fakeStore.setState({
+        unifiedTabsByWorktree: {
+          'wt-1': [
+            makeUnifiedTab({
+              terminalDockByPaneKey: { [PANE_KEY]: { docked: false, gutterRows: 6 } }
+            })
+          ]
+        }
+      })
+      writeTerminalDockPaneState(PANE_KEY, { docked: true, gutterRows: 12 })
+
+      const { result } = renderDockHook(true)
+
+      expect(result.current.isPaneDocked(PANE_KEY)).toBe(false)
+      expect(result.current.gutterRowsFor(PANE_KEY)).toBe(6)
+    })
+
+    it('defaults when neither the host nor the local fallback has a value', () => {
+      fakeStore.setState({
+        unifiedTabsByWorktree: {
+          'wt-1': [makeUnifiedTab({ terminalDockByPaneKey: undefined })]
+        }
+      })
+
+      const { result } = renderDockHook(true)
+
+      expect(result.current.isPaneDocked(PANE_KEY)).toBe(false)
+      expect(result.current.gutterRowsFor(PANE_KEY)).toBe(DEFAULT_GUTTER_ROWS)
+    })
+
+    it('writes nothing to localStorage when the flag is disabled', () => {
+      const { result } = renderDockHook(false)
+
+      act(() => {
+        result.current.undockOnConfirmedAgentExit(LEAF_ID)
+      })
+
+      expect(window.localStorage.getItem('orca.terminalDock.paneState.v1')).toBeNull()
+    })
   })
 })

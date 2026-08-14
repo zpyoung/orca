@@ -81,7 +81,7 @@ import {
 import { RESET_KITTY_KEYBOARD_PROTOCOL } from '../../../../shared/terminal-mode-reset-profiles'
 import { resolveTerminalLayoutActiveLeafId } from './terminal-layout-leaf-ids'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
-import { resolveTerminalDockPruneTarget } from './terminal-pane-dock-prune'
+import { pruneTerminalDockPaneKeysEverywhere } from './terminal-pane-dock-prune'
 import { applyExpandedLayoutTo, restoreExpandedLayoutFrom } from './expand-collapse'
 import { applyTerminalAppearance } from './terminal-appearance'
 import { createOsc52OscHandler } from './osc52-clipboard'
@@ -1388,18 +1388,14 @@ export function useTerminalPaneLifecycle({
         if (leafId) {
           onPaneRetiredRef?.current?.(leafId)
           const dockPruneState = useAppStore.getState()
-          const dockPruneTarget = resolveTerminalDockPruneTarget({
+          pruneTerminalDockPaneKeysEverywhere({
             unifiedTabsByWorktree: dockPruneState.unifiedTabsByWorktree,
             worktreeId,
             tabId,
             leafId,
-            experimentalTerminalDockEnabled: settingsRef.current?.experimentalTerminalDock === true
+            experimentalTerminalDockEnabled: settingsRef.current?.experimentalTerminalDock === true,
+            pruneStoreDockPaneKeys: dockPruneState.pruneTerminalDockPaneKeys
           })
-          if (dockPruneTarget) {
-            dockPruneState.pruneTerminalDockPaneKeys(dockPruneTarget.unifiedTabId, [
-              dockPruneTarget.paneKey
-            ])
-          }
         }
         if (leafId && isRetiredSurface) {
           retireMountedTerminalPaneSurface({

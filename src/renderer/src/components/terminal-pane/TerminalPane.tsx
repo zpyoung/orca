@@ -45,7 +45,6 @@ import {
 import { makePaneKey } from '../../../../shared/stable-pane-id'
 import { TerminalPaneDockMount } from './TerminalPaneDockMount'
 import { useTerminalPaneDock } from './use-terminal-pane-dock'
-import { DEFAULT_GUTTER_ROWS } from '../terminal-dock/terminal-dock-pane-state'
 import type { TerminalKittyKeyboardModeTracker } from '../../../../shared/terminal-kitty-keyboard-mode-tracker'
 import {
   applyExpandedLayoutTo,
@@ -3143,7 +3142,7 @@ function TerminalPane(
                 paneKey={paneKey}
                 agent={agent}
                 docked={terminalDock.isPaneDocked(paneKey)}
-                gutterRows={terminalDock.gutterRowsFor(paneKey) ?? DEFAULT_GUTTER_ROWS}
+                gutterRows={terminalDock.gutterRowsFor(paneKey)}
                 targetPtyId={targetPtyId}
                 disabledReason={terminalDock.disabledReasonFor({
                   paneKey,

@@ -1,5 +1,6 @@
 import type { Tab } from '../../../../shared/types'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
+import { removeTerminalDockPaneKeys } from '../terminal-dock/terminal-dock-pane-state'
 import { getCachedUnifiedTerminalTabForWorktree } from './terminal-unified-tab-lookup'
 
 /** Resolves which unified tab and pane key to prune from `terminalDockByPaneKey` when a pane
@@ -26,4 +27,22 @@ export function resolveTerminalDockPruneTarget(args: {
     return null
   }
   return { unifiedTabId: unifiedTab.id, paneKey: makePaneKey(args.tabId, args.leafId) }
+}
+
+/** Prunes a retiring pane's dock state from both the store record and the localStorage
+ *  fallback in one call, so the two can't drift apart at a close/detach edge. */
+export function pruneTerminalDockPaneKeysEverywhere(args: {
+  unifiedTabsByWorktree: Record<string, Tab[]>
+  worktreeId: string
+  tabId: string
+  leafId: string
+  experimentalTerminalDockEnabled: boolean
+  pruneStoreDockPaneKeys: (unifiedTabId: string, paneKeys: readonly string[]) => void
+}): void {
+  const target = resolveTerminalDockPruneTarget(args)
+  if (!target) {
+    return
+  }
+  args.pruneStoreDockPaneKeys(target.unifiedTabId, [target.paneKey])
+  removeTerminalDockPaneKeys(new Set([target.paneKey]))
 }
