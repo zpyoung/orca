@@ -1367,7 +1367,7 @@ export function setWebRuntimeTabProps(args: {
   color?: string | null
   isPinned?: boolean
   viewMode?: 'terminal' | 'chat'
-  terminalDock?: { paneKey: string; docked?: boolean; gutterRows?: number }
+  terminalDock?: { paneKey?: string; docked?: boolean; gutterRows?: number; remove?: string[] }
 }): boolean {
   const environmentId =
     getRuntimeEnvironmentIdForWorktree(useAppStore.getState(), args.worktreeId) ?? null

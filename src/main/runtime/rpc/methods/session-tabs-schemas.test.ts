@@ -10,7 +10,8 @@ import {
   DEFAULT_TERMINAL_DOCK_GUTTER_ROWS,
   MAX_TERMINAL_DOCK_PANE_ENTRIES,
   mergeTerminalDockByPaneKey,
-  OrcaRuntimeService
+  OrcaRuntimeService,
+  removeTerminalDockPaneKeys
 } from '../../orca-runtime'
 import { getDefaultWorkspaceSession } from '../../../../shared/constants'
 import type { Tab, TerminalTab, WorkspaceSessionState } from '../../../../shared/types'
@@ -245,6 +246,93 @@ describe('SetTabProps.terminalDock (session.tabs.setTabProps params)', () => {
   })
 })
 
+describe('SetTabProps.terminalDock.remove (session.tabs.setTabProps params)', () => {
+  const OTHER_PANE_KEY = makePaneKey(DOCK_TAB_ID, '22222222-2222-4222-a222-222222222222')
+
+  it('accepts a removal-only patch with no paneKey', () => {
+    const parsed = SetTabProps.parse({
+      worktree: WT,
+      tabId: 'tab-1',
+      terminalDock: { remove: [DOCK_PANE_KEY, OTHER_PANE_KEY] }
+    })
+    expect(parsed.terminalDock).toEqual({ remove: [DOCK_PANE_KEY, OTHER_PANE_KEY] })
+  })
+
+  it('accepts a patch carrying both a set and a removal', () => {
+    const parsed = SetTabProps.parse({
+      worktree: WT,
+      tabId: 'tab-1',
+      terminalDock: { paneKey: DOCK_PANE_KEY, docked: true, remove: [OTHER_PANE_KEY] }
+    })
+    expect(parsed.terminalDock).toEqual({
+      paneKey: DOCK_PANE_KEY,
+      docked: true,
+      remove: [OTHER_PANE_KEY]
+    })
+  })
+
+  it('still rejects docked/gutterRows without paneKey when remove is also present', () => {
+    expect(() =>
+      SetTabProps.parse({
+        worktree: WT,
+        tabId: 'tab-1',
+        terminalDock: { docked: true, remove: [OTHER_PANE_KEY] }
+      })
+    ).toThrow()
+  })
+
+  it('rejects an invalid pane key inside the removal list', () => {
+    expect(() =>
+      SetTabProps.parse({
+        worktree: WT,
+        tabId: 'tab-1',
+        terminalDock: { remove: ['not-a-pane-key'] }
+      })
+    ).toThrow()
+  })
+
+  it('rejects a removal list past the cap', () => {
+    const remove = Array.from({ length: 65 }, (_, i) => `tab-1:${i}`)
+    expect(() =>
+      SetTabProps.parse({ worktree: WT, tabId: 'tab-1', terminalDock: { remove } })
+    ).toThrow()
+  })
+
+  it('accepts a removal list at the cap', () => {
+    const remove = Array.from({ length: 64 }, (_, i) => `tab-1:${i}`)
+    const parsed = SetTabProps.parse({ worktree: WT, tabId: 'tab-1', terminalDock: { remove } })
+    expect(parsed.terminalDock?.remove).toHaveLength(64)
+  })
+
+  it('leaves terminalDock unaffected when the patch carries neither paneKey nor remove', () => {
+    // Absence must stay a pure leave-unchanged signal — an accidental
+    // absence-clears reading would silently wipe other clients' state.
+    const parsed = SetTabProps.parse({ worktree: WT, tabId: 'tab-1', color: '#fff' })
+    expect(parsed.terminalDock).toBeUndefined()
+  })
+})
+
+describe('removeTerminalDockPaneKeys (host removal semantics)', () => {
+  it('drops only the named keys', () => {
+    const existing = {
+      'pane-1': { docked: true, gutterRows: 6 },
+      'pane-2': { docked: false, gutterRows: 10 }
+    }
+    expect(removeTerminalDockPaneKeys(existing, ['pane-1'])).toEqual({
+      'pane-2': { docked: false, gutterRows: 10 }
+    })
+  })
+
+  it('is a no-op, not an error, when the key is not present', () => {
+    const existing = { 'pane-1': { docked: true, gutterRows: 6 } }
+    expect(removeTerminalDockPaneKeys(existing, ['pane-missing'])).toBe(existing)
+  })
+
+  it('is a no-op for an undefined record', () => {
+    expect(removeTerminalDockPaneKeys(undefined, ['pane-1'])).toBeUndefined()
+  })
+})
+
 describe('mergeTerminalDockByPaneKey (host merge semantics)', () => {
   it('merges into an existing multi-pane record and defaults a fresh entry', () => {
     const existing = {
@@ -331,6 +419,90 @@ describe('terminalDockByPaneKey publication (D3: write-only field)', () => {
 
     expect(result.tabs[0]).toMatchObject({
       terminalDockByPaneKey: { [DOCK_PANE_KEY]: { docked: true, gutterRows: 6 } }
+    })
+  })
+
+  it('removes the named key, persists, and republishes, leaving other panes untouched', async () => {
+    const otherPaneKey = makePaneKey(DOCK_TAB_ID, '22222222-2222-4222-a222-222222222222')
+    const runtime = new OrcaRuntimeService({
+      getWorkspaceSession: () => makePersistedSession()
+    } as never)
+
+    await runtime.listMobileSessionTabs(`id:${DOCK_WORKTREE_ID}`)
+    await runtime.setMobileSessionTabProps(`id:${DOCK_WORKTREE_ID}`, {
+      tabId: DOCK_TAB_ID,
+      terminalDock: { paneKey: DOCK_PANE_KEY, docked: true, gutterRows: 6 }
+    })
+    await runtime.setMobileSessionTabProps(`id:${DOCK_WORKTREE_ID}`, {
+      tabId: DOCK_TAB_ID,
+      terminalDock: { paneKey: otherPaneKey, docked: false, gutterRows: 8 }
+    })
+    await runtime.setMobileSessionTabProps(`id:${DOCK_WORKTREE_ID}`, {
+      tabId: DOCK_TAB_ID,
+      terminalDock: { remove: [DOCK_PANE_KEY] }
+    })
+    const result = await runtime.listMobileSessionTabs(`id:${DOCK_WORKTREE_ID}`)
+
+    expect(result.tabs[0]).toMatchObject({
+      terminalDockByPaneKey: { [otherPaneKey]: { docked: false, gutterRows: 8 } }
+    })
+  })
+
+  it('removing a key that is not present is a no-op, never an error', async () => {
+    const runtime = new OrcaRuntimeService({
+      getWorkspaceSession: () => makePersistedSession()
+    } as never)
+
+    await runtime.listMobileSessionTabs(`id:${DOCK_WORKTREE_ID}`)
+    await runtime.setMobileSessionTabProps(`id:${DOCK_WORKTREE_ID}`, {
+      tabId: DOCK_TAB_ID,
+      terminalDock: { paneKey: DOCK_PANE_KEY, docked: true, gutterRows: 6 }
+    })
+
+    await expect(
+      runtime.setMobileSessionTabProps(`id:${DOCK_WORKTREE_ID}`, {
+        tabId: DOCK_TAB_ID,
+        terminalDock: { remove: ['tab:404'] }
+      })
+    ).resolves.toEqual({ updated: true })
+
+    const result = await runtime.listMobileSessionTabs(`id:${DOCK_WORKTREE_ID}`)
+    expect(result.tabs[0]).toMatchObject({
+      terminalDockByPaneKey: { [DOCK_PANE_KEY]: { docked: true, gutterRows: 6 } }
+    })
+  })
+
+  it('a live pane survives churn that previously evicted it, once retired panes are pruned', async () => {
+    // Repro (task description): P0 stays docked while P1..P64 are created, docked, and
+    // closed one at a time. Before the removal path existed, each churned pane grew the
+    // record and the cap eventually evicted P0 by insertion order, not liveness.
+    const runtime = new OrcaRuntimeService({
+      getWorkspaceSession: () => makePersistedSession()
+    } as never)
+    await runtime.listMobileSessionTabs(`id:${DOCK_WORKTREE_ID}`)
+
+    await runtime.setMobileSessionTabProps(`id:${DOCK_WORKTREE_ID}`, {
+      tabId: DOCK_TAB_ID,
+      terminalDock: { paneKey: 'pane-p0', docked: true }
+    })
+
+    for (let i = 0; i < MAX_TERMINAL_DOCK_PANE_ENTRIES; i++) {
+      const churnKey = `pane-churn-${i}`
+      await runtime.setMobileSessionTabProps(`id:${DOCK_WORKTREE_ID}`, {
+        tabId: DOCK_TAB_ID,
+        terminalDock: { paneKey: churnKey, docked: true }
+      })
+      await runtime.setMobileSessionTabProps(`id:${DOCK_WORKTREE_ID}`, {
+        tabId: DOCK_TAB_ID,
+        terminalDock: { remove: [churnKey] }
+      })
+    }
+
+    const result = await runtime.listMobileSessionTabs(`id:${DOCK_WORKTREE_ID}`)
+    expect(result.tabs[0]).toMatchObject({
+      terminalDockByPaneKey: {
+        'pane-p0': { docked: true, gutterRows: DEFAULT_TERMINAL_DOCK_GUTTER_ROWS }
+      }
     })
   })
 

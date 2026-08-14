@@ -16,9 +16,19 @@ import { OptionalBoolean } from '../schemas'
 // will forward for the host to retain.
 const MAX_TERMINAL_DOCK_PANE_KEY_LENGTH = 256
 
+// Why: bounds one removal call to roughly the host's own per-tab entry cap —
+// a client can never usefully need to remove more keys than the record can hold.
+const MAX_TERMINAL_DOCK_REMOVE_KEYS = 64
+
 function isValidTerminalDockPaneKey(value: string): boolean {
   return parsePaneKey(value) !== null || parseLegacyNumericPaneKey(value) !== null
 }
+
+const TerminalDockPaneKeySchema = z
+  .string()
+  .min(1)
+  .max(MAX_TERMINAL_DOCK_PANE_KEY_LENGTH)
+  .refine(isValidTerminalDockPaneKey, { message: 'Invalid pane key' })
 
 export const WorktreeTabSelector = z.object({
   worktree: z
@@ -142,18 +152,20 @@ export const SetTabProps = WorktreeTabSelector.extend({
   isPinned: z.boolean().optional(),
   // undefined = leave unchanged; no "clear" semantic (absence means default 'terminal').
   viewMode: z.enum(['terminal', 'chat']).optional(),
-  // undefined = leave unchanged. A single-pane patch, not the whole record —
-  // the host merges it in, so one client's update can't clobber another
-  // pane's entry from a different client.
+  // undefined = leave unchanged. A single-pane set and/or a removal list, never
+  // the whole record — the host merges/removes in place, so one client's
+  // update can't clobber another pane's entry from a different client.
   terminalDock: z
     .object({
-      paneKey: z
-        .string()
-        .min(1)
-        .max(MAX_TERMINAL_DOCK_PANE_KEY_LENGTH)
-        .refine(isValidTerminalDockPaneKey, { message: 'Invalid pane key' }),
+      paneKey: TerminalDockPaneKeySchema.optional(),
       docked: z.boolean().optional(),
-      gutterRows: z.number().int().min(3).max(15).optional()
+      gutterRows: z.number().int().min(3).max(15).optional(),
+      remove: z.array(TerminalDockPaneKeySchema).max(MAX_TERMINAL_DOCK_REMOVE_KEYS).optional()
+    })
+    .superRefine((value, ctx) => {
+      if (value.paneKey === undefined && (value.docked !== undefined || value.gutterRows !== undefined)) {
+        ctx.addIssue({ code: 'custom', message: 'Setting docked/gutterRows requires paneKey' })
+      }
     })
     .optional()
 })

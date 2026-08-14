@@ -2642,6 +2642,61 @@ describe('TabsSlice', () => {
       const before = store.getState().unifiedTabsByWorktree[WT]
       store.getState().pruneTerminalDockPaneKeys('dock-tab-1', ['pane-z'])
       expect(store.getState().unifiedTabsByWorktree[WT]).toBe(before)
+      expect(setWebRuntimeTabPropsMock).not.toHaveBeenCalled()
+    })
+
+    it('mirrors only the removed keys to the host', async () => {
+      const paneKeyA = makePaneKey('dock-tab-1', LEAF_ID)
+      const paneKeyB = makePaneKey('dock-tab-1', '22222222-2222-4222-8222-222222222222')
+      const paneKeyC = makePaneKey('dock-tab-1', '33333333-3333-4333-8333-333333333333')
+      seedDockTab({
+        terminalDockByPaneKey: {
+          [paneKeyA]: { docked: true, gutterRows: 6 },
+          [paneKeyB]: { docked: false, gutterRows: 8 },
+          [paneKeyC]: { docked: true, gutterRows: 10 }
+        }
+      })
+      getRuntimeEnvironmentIdForWorktreeMock.mockReturnValue('env-1')
+
+      store
+        .getState()
+        .pruneTerminalDockPaneKeys('dock-tab-1', [paneKeyA, paneKeyC, 'pane-missing'])
+
+      await vi.waitFor(() => expect(setWebRuntimeTabPropsMock).toHaveBeenCalledTimes(1))
+      expect(setWebRuntimeTabPropsMock).toHaveBeenCalledWith({
+        worktreeId: WT,
+        tabId: 'dock-tab-1',
+        terminalDock: { remove: [paneKeyA, paneKeyC] }
+      })
+    })
+
+    it('remaps removed pane keys to the host tab id for a mirrored terminal', async () => {
+      const mirroredTabId = toWebTerminalSurfaceTabId('host-tab-9')
+      const localPaneKeyA = makePaneKey(mirroredTabId, LEAF_ID)
+      const localPaneKeyB = makePaneKey(mirroredTabId, '22222222-2222-4222-8222-222222222222')
+      seedDockTab({
+        id: mirroredTabId,
+        terminalDockByPaneKey: {
+          [localPaneKeyA]: { docked: true, gutterRows: 6 },
+          [localPaneKeyB]: { docked: false, gutterRows: 8 }
+        }
+      })
+      getRuntimeEnvironmentIdForWorktreeMock.mockReturnValue('env-1')
+
+      store.getState().pruneTerminalDockPaneKeys(mirroredTabId, [localPaneKeyA])
+
+      await vi.waitFor(() => expect(setWebRuntimeTabPropsMock).toHaveBeenCalledTimes(1))
+      expect(setWebRuntimeTabPropsMock).toHaveBeenCalledWith({
+        worktreeId: WT,
+        tabId: mirroredTabId,
+        terminalDock: { remove: [makePaneKey('host-tab-9', LEAF_ID)] }
+      })
+    })
+
+    it('does not mirror the removal without a runtime environment for the worktree', () => {
+      seedDockTab({ terminalDockByPaneKey: { 'pane-a': { docked: true, gutterRows: 6 } } })
+      store.getState().pruneTerminalDockPaneKeys('dock-tab-1', ['pane-a'])
+      expect(setWebRuntimeTabPropsMock).not.toHaveBeenCalled()
     })
 
     it('switching a tab to chat view preserves its dock state', () => {

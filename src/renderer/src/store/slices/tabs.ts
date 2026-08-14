@@ -141,7 +141,7 @@ export type TabsSlice = {
     tabId: string,
     patch: { paneKey: string; docked?: boolean; gutterRows?: number }
   ) => void
-  /** Drop retired pane keys from a tab's dock record so it can't grow without bound. */
+  /** Drop retired pane keys from a tab's dock record and mirror the removal to the host. */
   pruneTerminalDockPaneKeys: (tabId: string, paneKeys: readonly string[]) => void
   setTabCustomLabel: (
     tabId: string,
@@ -356,6 +356,54 @@ function mirrorTabTerminalDockToHost(
         tabId,
         terminalDock: { ...patch, paneKey: hostPaneKey }
       })
+    }
+  )
+}
+
+// Why: dock state is host-tracked like color/pin/viewMode, so mirror local pruning
+// or it's lost on reconnect and to paired clients. Only the action path mirrors
+// (never reconcile applying a host value), so the echoed snapshot can't re-trigger
+// an outbound RPC. Sends only the removed keys (never the whole record), remapped
+// to the host's tab-id namespace via the same mechanism the set path uses.
+function mirrorTerminalDockPruneToHost(
+  state: AppState,
+  tabId: string,
+  removedPaneKeys: readonly string[]
+): void {
+  if (removedPaneKeys.length === 0) {
+    return
+  }
+  const found = findTabAndWorktree(state.unifiedTabsByWorktree, tabId)
+  if (
+    !found ||
+    found.tab.contentType !== 'terminal' ||
+    !getRuntimeEnvironmentIdForWorktree(state, found.worktreeId)
+  ) {
+    return
+  }
+  const worktreeId = found.worktreeId
+  const environmentId = getRuntimeEnvironmentIdForWorktree(state, worktreeId)
+  if (!environmentId) {
+    return
+  }
+  void Promise.all([
+    import('@/runtime/web-runtime-session'),
+    import('@/runtime/web-session-tabs-sync')
+  ]).then(
+    ([
+      { setWebRuntimeTabProps, isWebTerminalSurfaceTabId, toHostSessionTabId },
+      { resolveHostSessionTabIdForWebSessionTab, remapPaneKeyTabId }
+    ]) => {
+      const hostTabId =
+        resolveHostSessionTabIdForWebSessionTab(state, { environmentId, worktreeId, tabId }) ??
+        (isWebTerminalSurfaceTabId(tabId) ? toHostSessionTabId(tabId) : tabId)
+      const hostPaneKeys = removedPaneKeys
+        .map((paneKey) => remapPaneKeyTabId(paneKey, () => hostTabId))
+        .filter((paneKey): paneKey is string => paneKey !== null)
+      if (hostPaneKeys.length === 0) {
+        return
+      }
+      setWebRuntimeTabProps({ worktreeId, tabId, terminalDock: { remove: hostPaneKeys } })
     }
   )
 }
@@ -1457,17 +1505,21 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
       return
     }
     const paneKeySet = new Set(paneKeys)
+    let removedKeys: string[] = []
     set((state) => {
       const found = findTabAndWorktree(state.unifiedTabsByWorktree, tabId)
       if (!found) {
         return {}
       }
-      const next = removePaneKeysFromRecord(found.tab.terminalDockByPaneKey, paneKeySet)
-      if (next === found.tab.terminalDockByPaneKey) {
+      const existing = found.tab.terminalDockByPaneKey
+      const next = removePaneKeysFromRecord(existing, paneKeySet)
+      if (next === existing) {
         return {}
       }
+      removedKeys = Object.keys(existing!).filter((key) => paneKeySet.has(key))
       return patchTab(state.unifiedTabsByWorktree, tabId, { terminalDockByPaneKey: next }) ?? {}
     })
+    mirrorTerminalDockPruneToHost(get(), tabId, removedKeys)
   },
 
   setRenamingTabId: (tabId) => {

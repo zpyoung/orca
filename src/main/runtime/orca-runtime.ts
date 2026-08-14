@@ -2716,10 +2716,19 @@ function getSetupRunnerCommandPlatformForLaunch(
 
 export const DEFAULT_TERMINAL_DOCK_GUTTER_ROWS = 5
 
-// Why: pane-close pruning isn't wired up yet (deliberately, per a later task),
-// so this cap is the only backstop against an unbounded per-tab record; sized
-// well above any real split layout.
+// Why: clients now prune retired panes via the removal path below, but this
+// cap remains the backstop for clients that never prune (old clients, or a
+// client that crashes before pruning); sized well above any real split layout.
 export const MAX_TERMINAL_DOCK_PANE_ENTRIES = 64
+
+/** One `session.tabs.setTabProps` dock patch: an upsert of `paneKey`, a
+ *  removal of `remove`, or both — `undefined` fields mean "leave unchanged". */
+export type TerminalDockPropsPatch = {
+  paneKey?: string
+  docked?: boolean
+  gutterRows?: number
+  remove?: readonly string[]
+}
 
 /** Upserts one pane's dock state into a per-pane record without touching any
  *  other pane's entry — the RPC patch is single-pane so other clients'
@@ -2747,6 +2756,59 @@ export function mergeTerminalDockByPaneKey(
   }
   result[patch.paneKey] = nextEntry
   return result
+}
+
+/** Drops named keys from a per-pane dock record; a key that isn't present is a
+ *  no-op. Returns the same reference when nothing matched, so callers can
+ *  detect "no change" without a deep comparison. */
+export function removeTerminalDockPaneKeys(
+  existing: Record<string, TerminalDockPaneState> | undefined,
+  paneKeys: readonly string[]
+): Record<string, TerminalDockPaneState> | undefined {
+  if (!existing || paneKeys.length === 0) {
+    return existing
+  }
+  const toRemove = new Set(paneKeys)
+  if (!Object.keys(existing).some((key) => toRemove.has(key))) {
+    return existing
+  }
+  const result: Record<string, TerminalDockPaneState> = {}
+  for (const [key, value] of Object.entries(existing)) {
+    if (!toRemove.has(key)) {
+      result[key] = value
+    }
+  }
+  return result
+}
+
+// Removal runs before the upsert so a patch that both prunes and sets a pane
+// on the same call frees its own capacity instead of tripping the cap above.
+function applyTerminalDockByPaneKeyPatch(
+  existing: Record<string, TerminalDockPaneState> | undefined,
+  patch: TerminalDockPropsPatch
+): Record<string, TerminalDockPaneState> | undefined {
+  const pruned = patch.remove?.length
+    ? removeTerminalDockPaneKeys(existing, patch.remove)
+    : existing
+  if (patch.paneKey === undefined) {
+    return pruned
+  }
+  return mergeTerminalDockByPaneKey(pruned, {
+    paneKey: patch.paneKey,
+    docked: patch.docked,
+    gutterRows: patch.gutterRows
+  })
+}
+
+function terminalDockPatchFragment(
+  existing: Record<string, TerminalDockPaneState> | undefined,
+  patch: TerminalDockPropsPatch | undefined
+): { terminalDockByPaneKey?: Record<string, TerminalDockPaneState> } {
+  if (!patch) {
+    return {}
+  }
+  const next = applyTerminalDockByPaneKeyPatch(existing, patch)
+  return next !== undefined ? { terminalDockByPaneKey: next } : {}
 }
 
 export class OrcaRuntimeService {
@@ -8396,7 +8458,7 @@ export class OrcaRuntimeService {
       color?: string | null
       isPinned?: boolean
       viewMode?: 'terminal' | 'chat'
-      terminalDock?: { paneKey: string; docked?: boolean; gutterRows?: number }
+      terminalDock?: TerminalDockPropsPatch
     }
   ): Promise<{ updated: true }> {
     const explicitWorktreeId = this.getValidatedExplicitWorktreeIdSelector(worktreeSelector)
@@ -8423,7 +8485,7 @@ export class OrcaRuntimeService {
       color?: string | null
       isPinned?: boolean
       viewMode?: 'terminal' | 'chat'
-      terminalDock?: { paneKey: string; docked?: boolean; gutterRows?: number }
+      terminalDock?: TerminalDockPropsPatch
     }
   ): void {
     const session = this.getWorkspaceSessionForWorktree(worktreeId)
@@ -8461,14 +8523,7 @@ export class OrcaRuntimeService {
                 ...tab,
                 ...(props.color !== undefined ? { color: props.color } : {}),
                 ...(props.isPinned !== undefined ? { isPinned: props.isPinned } : {}),
-                ...(props.terminalDock
-                  ? {
-                      terminalDockByPaneKey: mergeTerminalDockByPaneKey(
-                        tab.terminalDockByPaneKey,
-                        props.terminalDock
-                      )
-                    }
-                  : {})
+                ...terminalDockPatchFragment(tab.terminalDockByPaneKey, props.terminalDock)
               }
             : tab
         )
@@ -8488,7 +8543,7 @@ export class OrcaRuntimeService {
       color?: string | null
       isPinned?: boolean
       viewMode?: 'terminal' | 'chat'
-      terminalDock?: { paneKey: string; docked?: boolean; gutterRows?: number }
+      terminalDock?: TerminalDockPropsPatch
     }
   ): void {
     const snapshot = this.mobileSessionTabsByWorktree.get(worktreeId)
@@ -8506,13 +8561,8 @@ export class OrcaRuntimeService {
         ...(props.color !== undefined ? { color: props.color } : {}),
         ...(props.isPinned !== undefined ? { isPinned: props.isPinned } : {}),
         ...(props.viewMode !== undefined ? { viewMode: props.viewMode } : {}),
-        ...(props.terminalDock && tab.type === 'terminal'
-          ? {
-              terminalDockByPaneKey: mergeTerminalDockByPaneKey(
-                tab.terminalDockByPaneKey,
-                props.terminalDock
-              )
-            }
+        ...(tab.type === 'terminal'
+          ? terminalDockPatchFragment(tab.terminalDockByPaneKey, props.terminalDock)
           : {})
       }
     })

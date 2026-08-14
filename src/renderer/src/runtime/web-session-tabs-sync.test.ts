@@ -1671,6 +1671,71 @@ describe('applyWebSessionTabsSnapshot', () => {
     expect(setWebRuntimeTabPropsMock).not.toHaveBeenCalled()
   })
 
+  it('never mirrors a removal back to the host when a locally pruned pane is still present in the host echo', () => {
+    // The client already pruned 'pane-b' via the store action (out of band, mirrored
+    // separately); the host's snapshot hasn't caught up and still echoes both panes.
+    // Reconcile must not react to that stale echo by firing an outbound removal.
+    const mirroredId = toWebTerminalSurfaceTabId('host-tab-1')
+    const existingTab: TerminalTab = {
+      id: mirroredId,
+      ptyId: 'remote:web-env-1@@terminal-1',
+      worktreeId: WT,
+      title: 'zsh',
+      defaultTitle: 'zsh',
+      customTitle: null,
+      color: null,
+      sortOrder: 0,
+      createdAt: NOW
+    }
+    const existingUnifiedTab: Tab = {
+      id: mirroredId,
+      entityId: mirroredId,
+      groupId: 'host-group-1',
+      worktreeId: WT,
+      contentType: 'terminal',
+      label: 'zsh',
+      customLabel: null,
+      color: null,
+      sortOrder: 0,
+      createdAt: NOW,
+      isPreview: false,
+      isPinned: false,
+      terminalDockByPaneKey: { 'pane-a': { docked: true, gutterRows: 6 } }
+    }
+
+    const patch = applyWebSessionTabsSnapshot(
+      makeState({
+        tabsByWorktree: { [WT]: [existingTab] },
+        ptyIdsByTabId: { [mirroredId]: ['remote:web-env-1@@terminal-1'] },
+        unifiedTabsByWorktree: { [WT]: [existingUnifiedTab] }
+      }),
+      makeSnapshot([
+        {
+          type: 'terminal',
+          id: HOST_SURFACE_ID,
+          title: 'new title',
+          parentTabId: 'host-tab-1',
+          leafId: LEAF_ID,
+          isActive: true,
+          terminalDockByPaneKey: {
+            'host-tab-1:pane-a': { docked: true, gutterRows: 6 },
+            'host-tab-1:pane-b': { docked: false, gutterRows: 8 }
+          },
+          status: 'ready',
+          terminal: 'terminal-1'
+        }
+      ]),
+      ENV,
+      NOW + 1
+    ) as Partial<WebSessionTabsSyncState>
+
+    expect(
+      patch.unifiedTabsByWorktree?.[WT]?.find((tab) => tab.entityId === mirroredId)
+        ?.terminalDockByPaneKey
+    ).toEqual({ 'pane-a': { docked: true, gutterRows: 6 } })
+    expect(setWebRuntimeTabPropsMock).not.toHaveBeenCalled()
+  })
+
   it('preserves quick command labels from host terminal surfaces', () => {
     const patch = applyWebSessionTabsSnapshot(
       makeState(),
