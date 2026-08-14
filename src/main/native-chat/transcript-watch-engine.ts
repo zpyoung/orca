@@ -58,7 +58,7 @@ export async function installTranscriptWatcher(
   } catch {
     return null
   }
-  const { onAppend, onInitialSnapshot, onReplace, initialLimit } = args
+  const { onAppend, onInitialSnapshot, onReplace, initialLimit, initialMaxBytes } = args
   const decodeLifecycle = nativeChatTurnLifecycleDecoderForAgent(args.agent)
 
   const state: IncrementalTranscriptState = {
@@ -162,14 +162,13 @@ export async function installTranscriptWatcher(
       // Why: 0 is a valid window — an explicit undefined check keeps an empty
       // snapshot empty instead of falling back to an unbounded incremental read.
       contentReplaced && !initialDrain && onReplace && initialLimit !== undefined
-        ? await readNativeChatTranscriptTailFile(
+        ? await readNativeChatTranscriptTailFile({
             filePath,
-            initialLimit,
+            limit: initialLimit,
             decode,
-            false,
-            undefined,
-            decodeLifecycle
-          )
+            decodeLifecycle,
+            maxBytes: initialMaxBytes
+          })
         : null
     if (closed) {
       return
@@ -190,14 +189,13 @@ export async function installTranscriptWatcher(
 
     const initialSnapshot =
       initialDrain && onInitialSnapshot && initialLimit !== undefined
-        ? await readNativeChatTranscriptTailFile(
+        ? await readNativeChatTranscriptTailFile({
             filePath,
-            initialLimit,
+            limit: initialLimit,
             decode,
-            false,
-            undefined,
-            decodeLifecycle
-          )
+            decodeLifecycle,
+            maxBytes: initialMaxBytes
+          })
         : null
     if (closed) {
       return

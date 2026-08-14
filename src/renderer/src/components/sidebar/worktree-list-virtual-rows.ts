@@ -22,7 +22,7 @@ export function getRenderRowKey(row: RenderRow): string {
     return `host:${row.hostId}`
   }
   if (row.type === 'header') {
-    return `hdr:${row.key}`
+    return row.hostId ? `hdr:${row.hostId}:${row.key}` : `hdr:${row.key}`
   }
   if (row.type === 'lineage-group') {
     return `lineage-group:${row.key}`

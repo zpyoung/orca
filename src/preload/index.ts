@@ -4,6 +4,7 @@ import { electronAPI } from '@electron-toolkit/preload'
 import { preloadE2EConfig } from './e2e-config'
 import { glApi } from './gitlab'
 import type { AppIdentity } from '../shared/app-identity'
+import type { ComputerAwakeStatus } from '../shared/computer-awake-mode'
 import type {
   DashboardRevealAgentArgs,
   DashboardSleepWorkspaceArgs,
@@ -75,6 +76,7 @@ import type {
   GitHubCommentResult,
   GitHubCreateIssueResult,
   GitHubOwnerRepo,
+  GitHubReactionContent,
   GitHubWorkItem,
   JiraProjectStatusOrder,
   GitPushTarget,
@@ -214,6 +216,7 @@ import type {
   PreflightRuntimeContext,
   RefreshAgentsResult,
   NativeChatAppendedPayload,
+  NativeChatReadSessionArgs,
   NativeChatReadSessionResult,
   NativeChatSubscriptionFrame,
   PipelineRunSnapshotPayload,
@@ -226,6 +229,7 @@ import type {
 } from './api-types'
 import type { AgentKind, LaunchSource, RequestKind } from '../shared/telemetry-events'
 import { createBrowserFindSubscriptions } from './browser-find-subscriptions'
+import { createUsageProviderApi } from './usage-provider-api'
 import type { AppStarSource } from '../shared/gh-star-source'
 import type { ExecutionHostId } from '../shared/execution-host'
 import type {
@@ -253,6 +257,7 @@ import type {
   AiVaultListArgs,
   AiVaultSubagentListArgs
 } from '../shared/ai-vault-types'
+import type { AiVaultSessionTitlesArgs } from '../shared/ai-vault-session-title'
 import type { AiVaultPrepareSessionResumeArgs } from '../shared/ai-vault-resume-preparation'
 import type { AgentType } from '../shared/native-chat-types'
 import { ORCA_UPDATER_QUIT_AND_INSTALL_ABORTED_EVENT } from '../shared/updater-renderer-events'
@@ -962,6 +967,11 @@ const api = {
       snapshot?: string
       snapshotCols?: number
       snapshotRows?: number
+      snapshotPrefixAnsi?: string
+      snapshotFrameAnsi?: string
+      snapshotFrameRestoreAnsi?: string
+      snapshotKittyKeyboardFlags?: number
+      snapshotSeq?: number
       isReattach?: boolean
       isAlternateScreen?: boolean
       replay?: string
@@ -1072,6 +1082,7 @@ const api = {
       opts?: { scrollbackRows?: number }
     ): Promise<{
       data: string
+      frameRestoreAnsi?: string
       cols: number
       rows: number
       cwd?: string | null
@@ -1081,6 +1092,7 @@ const api = {
       alternateScreen?: boolean
       scrollbackAnsi?: string
       pendingEscapeTailAnsi?: string
+      kittyKeyboardFlags?: number
     } | null> => ipcRenderer.invoke('pty:getMainBufferSnapshot', { id, opts }),
 
     getRendererDeliveryDebugSnapshot: (): Promise<{
@@ -1243,6 +1255,7 @@ const api = {
         rows: number
         seq?: number
         lastTitle?: string
+        kittyKeyboardFlags?: number
       } | null
     ): void => {
       ipcRenderer.send('pty:serializeBuffer:response', { requestId, snapshot })
@@ -1470,6 +1483,16 @@ const api = {
       prRepo?: GitHubOwnerRepo | null
       noCache?: boolean
     }): Promise<unknown[]> => ipcRenderer.invoke('gh:prComments', args),
+
+    setPRCommentReaction: (args: {
+      repoPath: string
+      repoId?: string
+      sourceContext?: TaskSourceContext | null
+      reactionSubjectId: string
+      content: GitHubReactionContent
+      reacted: boolean
+      prRepo?: GitHubOwnerRepo | null
+    }): Promise<boolean> => ipcRenderer.invoke('gh:setPRCommentReaction', args),
 
     resolveReviewThread: (args: {
       repoPath: string
@@ -2036,6 +2059,16 @@ const api = {
       return () => ipcRenderer.removeListener('settings:changed', listener)
     }
   },
+
+  agentAwake: {
+    getStatus: (): Promise<ComputerAwakeStatus> => ipcRenderer.invoke('agentAwake:getStatus'),
+    onChanged: (callback: (status: ComputerAwakeStatus) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, status: ComputerAwakeStatus): void =>
+        callback(status)
+      ipcRenderer.on('agentAwake:changed', listener)
+      return () => ipcRenderer.removeListener('agentAwake:changed', listener)
+    }
+  } satisfies PreloadApi['agentAwake'],
 
   localhostWorktreeLabels: {
     register: (args: LocalhostWorktreeLabelRoute): Promise<LocalhostWorktreeLabelResult> =>
@@ -3760,6 +3793,12 @@ const api = {
       ipcRenderer.on('ui:appMenuPaste', listener)
       return () => ipcRenderer.removeListener('ui:appMenuPaste', listener)
     },
+    onAppMenuSelectionAction: (callback: (action: 'copy' | 'select-all') => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, action: 'copy' | 'select-all'): void =>
+        callback(action)
+      ipcRenderer.on('ui:appMenuSelectionAction', listener)
+      return () => ipcRenderer.removeListener('ui:appMenuSelectionAction', listener)
+    },
     onEditableContextPaste: (
       callback: (data: { plainTextOnly: boolean }) => void
     ): (() => void) => {
@@ -4073,6 +4112,9 @@ const api = {
         mode: options?.mode === 'paste-and-match-style' ? 'paste-and-match-style' : 'paste'
       })
     },
+    performNativeSelectionAction: (action: 'copy' | 'select-all'): void => {
+      ipcRenderer.send('ui:performNativeSelectionAction', action)
+    },
     writeClipboardFile: (
       args:
         | {
@@ -4189,63 +4231,15 @@ const api = {
     getSnapshot: (): Promise<MemorySnapshot> => ipcRenderer.invoke('memory:getSnapshot')
   },
 
-  claudeUsage: {
-    getScanState: (): Promise<unknown> => ipcRenderer.invoke('claudeUsage:getScanState'),
-    setEnabled: (args: { enabled: boolean }): Promise<unknown> =>
-      ipcRenderer.invoke('claudeUsage:setEnabled', args),
-    refresh: (args?: { force?: boolean }): Promise<unknown> =>
-      ipcRenderer.invoke('claudeUsage:refresh', args),
-    getSnapshot: (args: { scope: string; range: string; limit?: number }): Promise<unknown> =>
-      ipcRenderer.invoke('claudeUsage:getSnapshot', args),
-    getSummary: (args: { scope: string; range: string }): Promise<unknown> =>
-      ipcRenderer.invoke('claudeUsage:getSummary', args),
-    getDaily: (args: { scope: string; range: string }): Promise<unknown> =>
-      ipcRenderer.invoke('claudeUsage:getDaily', args),
-    getBreakdown: (args: { scope: string; range: string; kind: string }): Promise<unknown> =>
-      ipcRenderer.invoke('claudeUsage:getBreakdown', args),
-    getRecentSessions: (args: { scope: string; range: string; limit?: number }): Promise<unknown> =>
-      ipcRenderer.invoke('claudeUsage:getRecentSessions', args)
-  },
-
-  codexUsage: {
-    getScanState: (): Promise<unknown> => ipcRenderer.invoke('codexUsage:getScanState'),
-    setEnabled: (args: { enabled: boolean }): Promise<unknown> =>
-      ipcRenderer.invoke('codexUsage:setEnabled', args),
-    refresh: (args?: { force?: boolean }): Promise<unknown> =>
-      ipcRenderer.invoke('codexUsage:refresh', args),
-    getSnapshot: (args: { scope: string; range: string; limit?: number }): Promise<unknown> =>
-      ipcRenderer.invoke('codexUsage:getSnapshot', args),
-    getSummary: (args: { scope: string; range: string }): Promise<unknown> =>
-      ipcRenderer.invoke('codexUsage:getSummary', args),
-    getDaily: (args: { scope: string; range: string }): Promise<unknown> =>
-      ipcRenderer.invoke('codexUsage:getDaily', args),
-    getBreakdown: (args: { scope: string; range: string; kind: string }): Promise<unknown> =>
-      ipcRenderer.invoke('codexUsage:getBreakdown', args),
-    getRecentSessions: (args: { scope: string; range: string; limit?: number }): Promise<unknown> =>
-      ipcRenderer.invoke('codexUsage:getRecentSessions', args)
-  },
-
-  openCodeUsage: {
-    getScanState: (): Promise<unknown> => ipcRenderer.invoke('openCodeUsage:getScanState'),
-    setEnabled: (args: { enabled: boolean }): Promise<unknown> =>
-      ipcRenderer.invoke('openCodeUsage:setEnabled', args),
-    refresh: (args?: { force?: boolean }): Promise<unknown> =>
-      ipcRenderer.invoke('openCodeUsage:refresh', args),
-    getSnapshot: (args: { scope: string; range: string; limit?: number }): Promise<unknown> =>
-      ipcRenderer.invoke('openCodeUsage:getSnapshot', args),
-    getSummary: (args: { scope: string; range: string }): Promise<unknown> =>
-      ipcRenderer.invoke('openCodeUsage:getSummary', args),
-    getDaily: (args: { scope: string; range: string }): Promise<unknown> =>
-      ipcRenderer.invoke('openCodeUsage:getDaily', args),
-    getBreakdown: (args: { scope: string; range: string; kind: string }): Promise<unknown> =>
-      ipcRenderer.invoke('openCodeUsage:getBreakdown', args),
-    getRecentSessions: (args: { scope: string; range: string; limit?: number }): Promise<unknown> =>
-      ipcRenderer.invoke('openCodeUsage:getRecentSessions', args)
-  },
+  claudeUsage: createUsageProviderApi(ipcRenderer, 'claudeUsage'),
+  codexUsage: createUsageProviderApi(ipcRenderer, 'codexUsage'),
+  openCodeUsage: createUsageProviderApi(ipcRenderer, 'openCodeUsage'),
 
   aiVault: {
     listSessions: (args?: AiVaultListArgs): Promise<unknown> =>
       ipcRenderer.invoke('aiVault:listSessions', args),
+    resolveSessionTitles: (args: AiVaultSessionTitlesArgs): Promise<unknown> =>
+      ipcRenderer.invoke('aiVault:resolveSessionTitles', args),
     cancelListSessions: (args: { requestToken: string }): Promise<void> =>
       ipcRenderer.invoke('aiVault:cancelListSessions', args),
     prepareSessionResume: (args: AiVaultPrepareSessionResumeArgs): Promise<unknown> =>
@@ -4264,13 +4258,8 @@ const api = {
   },
 
   nativeChat: {
-    readSession: (
-      agent: AgentType,
-      sessionId: string,
-      limit?: number,
-      transcriptPath?: string
-    ): Promise<NativeChatReadSessionResult> =>
-      ipcRenderer.invoke('nativeChat:readSession', { agent, sessionId, limit, transcriptPath }),
+    readSession: (args: NativeChatReadSessionArgs): Promise<NativeChatReadSessionResult> =>
+      ipcRenderer.invoke('nativeChat:readSession', args),
     /** Start live tailing; onAppended fires with only newly-appended messages. Returns an unsubscribe fn that closes the watcher. */
     subscribe: (
       args: {
@@ -4279,6 +4268,7 @@ const api = {
         sessionId: string
         transcriptPath?: string
         limit?: number
+        sshConnectionId?: string
       },
       onFrame: (frame: NativeChatSubscriptionFrame) => void
     ): (() => void) => {

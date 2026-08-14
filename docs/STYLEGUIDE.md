@@ -4,7 +4,7 @@ This is the **UI/visual design** doc for Orca — color tokens, typography, comp
 
 ## Overview
 
-Orca is an Electron desktop app for orchestrating coding agents across git worktrees. The visual identity is **monochrome and quiet** — neutral grays carry the chrome, color is reserved for state (selection ring, destructive, git decorations). The product spends most of its time hosting other people's tools (Monaco, xterm, Markdown previews), so Orca's own UI should recede and frame.
+Orca is an Electron desktop app for orchestrating coding agents across git worktrees. Orca's chrome is **monochrome and quiet** — neutral grays carry it, color is reserved for state (selection ring, destructive, git decorations). The native chat transcript is a documented exception, where color is load-bearing rather than decorative — see [Tool activity colors](#tool-activity-colors). The product spends most of its time hosting other people's tools (Monaco, xterm, Markdown previews), so Orca's own UI should recede and frame.
 
 When in doubt:
 
@@ -25,7 +25,9 @@ Never hardcode a hex value in component code if a variable already covers it. If
 
 ## Color roles
 
-Tokens come in pairs: a **surface** and a **foreground** that meets contrast on it. Always use them together.
+Role tokens come in pairs: a **surface** and a **foreground** that meets contrast on it. Always use them together — this governs the surface/foreground pairs below.
+
+**Categorical tokens are the exception.** `--git-graph-lane-1` through `-5` and the `--tool-*` family (see [Tool activity colors](#tool-activity-colors)) are standalone hues, not surface/foreground pairs. A categorical token has no paired foreground, so it must clear a measured contrast floor against every surface it's drawn on instead.
 
 | Role                                     | Use it for                                                  | Don't use it for                                    |
 | ---------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------- |
@@ -60,6 +62,30 @@ For diff status, file-tree decorations, and the changes view, use the git decora
 | `--git-decoration-ignored`   | Ignored by git |
 
 Use these _only_ for git status. Don't reuse them for unrelated state colors — that breaks the convention.
+
+### Tool activity colors
+
+The native chat transcript colors tool lines on one axis: five hues answer *what kind of work is this?* Each category also carries a lucide glyph, so hue is never the sole encoder. Contrast is measured against the app canvas (`#ffffff` light, `#0a0a0a` dark):
+
+| Token | Light | on canvas | Dark | on canvas | Meaning | Example tools |
+| --- | --- | --- | --- | --- | --- | --- |
+| `--tool-read` | `#2f6a96` | 5.80:1 | `#8ab4d8` | 9.05:1 | Reading a file | Read, NotebookRead |
+| `--tool-write` | `#8a6100` | 5.54:1 | `#e3b341` | 10.17:1 | Modifying your files | Edit, MultiEdit, Write |
+| `--tool-exec` | `#24707a` | 5.72:1 | `#79bfc4` | 9.49:1 | Running a command | Bash, terminal, shell |
+| `--tool-search` | `#4f4fc4` | 6.47:1 | `#9a9ae6` | 7.67:1 | Locating something | Grep, Glob |
+| `--tool-net` | `#6a4fb0` | 6.25:1 | `#b39ddb` | 8.26:1 | Reaching the network | WebFetch, WebSearch |
+
+`--tool-write` is the only warm hue, and that's deliberate: amber means the agent touched your files. The four cool hues recede into chrome; the one warm hue is the thing worth noticing. An unrecognized tool name takes no category and renders exactly as it does today — neutral, no glyph. Orca hosts agents whose tool vocabularies it doesn't control, so a classifier that guessed would mislabel third-party tools with confident color.
+
+Any tool hue must clear a contrast floor:
+
+- **4.5:1 minimum** against the canvas for **text** drawn in a tool hue, in both themes.
+- **3:1 minimum** for **non-text** marks (the category dot on a collapsed tool run) against both `--background` and `--muted` — a dot can land on either.
+- **Hue is never the sole encoder.** Every colored role also carries a glyph, position, or weight difference, so desaturating the transcript — or viewing it with red-green color vision deficiency — loses no information.
+
+Use these _only_ for tool activity. Don't reuse them for unrelated state colors, and don't reach for `--git-decoration-*` to color a tool category — that breaks the convention in either direction.
+
+The second axis is content type: `--code-accent` / `--code-accent-surface` mark inline code and file paths in prose, kept deliberately off the tool hues so a path in a sentence can't be misread as a tool category.
 
 ### List rows: hover, selected, current
 
@@ -110,7 +136,7 @@ Don't add a fourth level. If something needs more emphasis than "floating," you'
 
 Use the shadcn primitives in `src/renderer/src/components/ui/` before writing anything custom. The shadcn-style wrappers in this folder follow a consistent pattern:
 
-- Most carry a `data-slot="<name>"` attribute on their root for CSS targeting — do not strip it. (The non-shadcn helpers in this folder — `sonner`, `repo-multi-combobox`, `team-multi-combobox` — don't follow this pattern and shouldn't be modeled when adding new primitives that should.)
+- Most carry a `data-slot="<name>"` attribute on their root for CSS targeting — do not strip it. (The non-shadcn helpers in this folder — `sonner` and `repo-multi-combobox` — don't follow this pattern and shouldn't be modeled when adding new primitives that should.)
 - Use `cn()` for class merging. Pass user `className` last so callers can override.
 - Use `class-variance-authority` (CVA) for variants when there are multiple.
 
@@ -148,7 +174,7 @@ When a control has multiple plausible primitives, use this fork:
 | Drawer / panel sliding in from an edge                       | `Sheet`                                                              | `Dialog` centered                     |
 | Single choice from a known list                              | `Select`                                                             | Custom listbox                        |
 | Single choice with search / fuzzy filtering                  | `Command` inside `Popover`                                           | `Select` (no search)                  |
-| Multi-select with search                                     | `repo-multi-combobox` / `team-multi-combobox` (mirror their pattern) | Roll a new one                        |
+| Multi-select with search                                     | `repo-multi-combobox` (mirror its pattern)                           | Roll a new one                        |
 | Transient confirmation ("Saved", "Copied")                   | `sonner` toast                                                       | `Dialog`, inline banner               |
 | Persistent inline status ("3 errors")                        | inline text + `Badge`                                                | toast (toasts disappear)              |
 

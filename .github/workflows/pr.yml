@@ -111,7 +111,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: bash .github/scripts/check-root-directory-entries.sh "$BASE_SHA" "$HEAD_SHA"
+        run: node .github/scripts/check-root-directory-entries.mjs "$BASE_SHA" "$HEAD_SHA"
 
   typecheck:
     runs-on: ubuntu-latest
@@ -189,8 +189,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install zsh
-        run: sudo apt-get update && sudo apt-get install -y zsh
+      # Why fish: shell-ready.test.ts gates its live fish test on the binary being
+      # present, so without this the fish barrier is only covered by config-shape
+      # assertions and never actually exercised.
+      - name: Install zsh and fish
+        run: sudo apt-get update && sudo apt-get install -y zsh fish
 
       - uses: ./.github/actions/install-node-dependencies
         with:
@@ -259,6 +262,11 @@ jobs:
       - uses: ./.github/actions/install-node-dependencies
         with:
           native-runtime: node
+
+      # Why: the suite requires electron at import time, and electron's own lazy
+      # download has no retry. Install through the script that retries instead.
+      - name: Install Electron package binary for tests
+        run: node config/scripts/install-electron-package-binary.mjs
 
       # A path filter that matches nothing exits 1 ("No test files found"), so this
       # lane cannot report success while running zero tests.
@@ -380,6 +388,13 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Test Windows-specific boundaries
+        run: >-
+          pnpm exec vitest run --config config/vitest.config.ts
+          src/main/cli/wsl-cli-powershell-boundary.test.ts
+          src/main/orca-profiles/profile-index-store.test.ts
+          src/shared/secure-file-fsync-flags.test.ts
 
       - name: Build package inputs
         run: pnpm run build:release

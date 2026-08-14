@@ -48,6 +48,9 @@ export type PtyConnectionDeps = {
   } | null
   restoredLeafId?: string | null
   restoredPtyIdByLeafId?: Record<string, string>
+  /** Park intent sampled at render time, before the host disposes the tab's
+   *  watchers; consumed once the restored layout has been replayed. */
+  mountFollowsTerminalPark: boolean
   paneTransportsRef: React.RefObject<Map<number, PtyTransport>>
   paneMode2031Ref: React.RefObject<Map<number, boolean>>
   /** Per-pane mirror of the kitty keyboard flags the pane's application
@@ -98,6 +101,7 @@ export type PtyConnectionDeps = {
   setCacheTimerStartedAt: (key: string, ts: number | null) => void
   syncPanePtyLayoutBinding: (paneId: number, ptyId: string | null) => void
   clearExitedPanePtyLayoutBinding: (paneId: number, exitedPtyId: string) => void
+  deferPtyInput?: (paneId: number, data: string, forward: (data: string) => void) => void
   /** Records a DECSET 2031 subscription answered from main's
    *  '2031-subscribe' fact, mirroring the xterm CSI handler's registry write
    *  (paneMode2031 + last replied theme) so later theme flips push CSI 997.

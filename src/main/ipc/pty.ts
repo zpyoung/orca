@@ -13,7 +13,7 @@ import {
 } from 'electron'
 export { getBashShellReadyRcfileContent } from '../providers/local-pty-shell-ready'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
-import type { Store } from '../persistence'
+import type { PtyBindingSourceExpectation, Store } from '../persistence'
 import { retireTerminalSurfaceFromPersistence } from '../runtime/mobile-session-terminal-persistence-retirement'
 import type { GlobalSettings, TuiAgent } from '../../shared/types'
 import { toSshExecutionHostId } from '../../shared/execution-host'
@@ -64,10 +64,13 @@ import { piTitlebarExtensionService } from '../pi/titlebar-extension-service'
 import {
   detectExplicitPiAgentKindFromCommand,
   isPiCompatibleAgentType,
+  PRIMARY_AGENT_DIR_ENV_BY_KIND,
+  SOURCE_AGENT_DIR_ENV_BY_KIND,
   type PiAgentKind
 } from '../../shared/pi-agent-kind'
 import { isPwshAvailableAsync } from '../pwsh'
 import { LocalPtyProvider } from '../providers/local-pty-provider'
+import { normalizeWindowsTerminalCwd } from '../providers/windows-shell-args'
 import type { IPtyProvider, PtySpawnOptions, PtySpawnResult } from '../providers/types'
 import { isPtyWriteUnavailableError } from '../providers/pty-write-unavailable-error'
 import {
@@ -133,11 +136,12 @@ import {
   parsePaneKey
 } from '../../shared/stable-pane-id'
 import { isValidTerminalTabId } from '../../shared/terminal-tab-id'
+import { parseTerminalKittyKeyboardFlags } from '../../shared/terminal-kitty-keyboard-flags'
 import {
   resolveTerminalStartupCwdForWorkspace,
   type TerminalStartupCwdMissingDirFallback
 } from '../../shared/terminal-startup-cwd'
-import { isWslUncPath } from '../../shared/wsl-paths'
+import { isWslUncPath, toWindowsWslPath } from '../../shared/wsl-paths'
 import { splitWorktreeIdForFilesystem } from '../../shared/worktree-id'
 import type { AgentSessionOwnerBinding } from '../../shared/agent-session-host-authority'
 import {
@@ -148,7 +152,7 @@ import {
   clearMigrationUnsupportedPty,
   clearMigrationUnsupportedPtysForPaneKey
 } from '../agent-hooks/migration-unsupported-pty-state'
-import { parseWslPath } from '../wsl'
+import { parseWslPath, wslUncDirectoryExistsAsync } from '../wsl'
 import { mergePersistedWindowsPath, resolvePathEnvKey } from '../pty/windows-environment-path'
 import { addOrcaWslInteropEnv, stampWslOrchestrationCompatibilityHost } from '../pty/wsl-orca-env'
 import { PtyProducerFlowController } from './pty-producer-flow-control'
@@ -196,7 +200,9 @@ import {
 } from '../codex-accounts/managed-codex-auth-readiness'
 import {
   forgetCodexPaneAccount,
-  recordCodexPaneAccount
+  getCodexPaneAccount,
+  recordCodexPaneAccount,
+  type CodexPaneHomeRoute
 } from '../codex/codex-pane-account-registry'
 import { resolveCodexPaneLaunchAccount } from '../codex/codex-pane-launch-account'
 import { getSystemCodexHomePath } from '../codex/codex-home-paths'
@@ -1236,6 +1242,7 @@ export type CodexHomePtySpawnedLifecycleArgs = {
   id: string
   codexHomePath: string | null
   reattached?: boolean
+  reattachedHomeRoute?: CodexPaneHomeRoute | null
   launchEnv?: NodeJS.ProcessEnv
   startedAt?: Date
   startedSequence?: number
@@ -1447,6 +1454,30 @@ function recordCodexPaneAccountForSpawn(args: {
   recordCodexPaneAccount(args.ptyId, record)
 }
 
+function snapshotCodexPaneHomeRoutes(
+  ptyIds: readonly (string | null | undefined)[]
+): ReadonlyMap<string, CodexPaneHomeRoute | null> {
+  const routes = new Map<string, CodexPaneHomeRoute | null>()
+  for (const ptyId of ptyIds) {
+    if (!ptyId || routes.has(ptyId)) {
+      continue
+    }
+    routes.set(ptyId, getCodexPaneAccount(ptyId)?.homeRoute ?? null)
+  }
+  return routes
+}
+
+function codexReattachedHomeRouteField(
+  routes: ReadonlyMap<string, CodexPaneHomeRoute | null>,
+  ptyId: string,
+  reattached: boolean
+): { reattachedHomeRoute?: CodexPaneHomeRoute | null } {
+  if (!reattached || !routes.has(ptyId)) {
+    return {}
+  }
+  return { reattachedHomeRoute: routes.get(ptyId) ?? null }
+}
+
 function readEnvWithProcessFallback(
   baseEnv: Record<string, string>,
   key: string
@@ -1458,16 +1489,29 @@ function resolvePiAgentSourceDir(
   baseEnv: Record<string, string>,
   kind: PiAgentKind
 ): string | undefined {
-  const sourceKey = kind === 'omp' ? 'ORCA_OMP_SOURCE_AGENT_DIR' : 'ORCA_PI_SOURCE_AGENT_DIR'
-  const overlayKey = kind === 'omp' ? 'ORCA_OMP_CODING_AGENT_DIR' : 'ORCA_PI_CODING_AGENT_DIR'
-  const otherOverlayKey = kind === 'omp' ? 'ORCA_PI_CODING_AGENT_DIR' : 'ORCA_OMP_CODING_AGENT_DIR'
+  const sourceKey = SOURCE_AGENT_DIR_ENV_BY_KIND[kind]
+  const primaryKey = PRIMARY_AGENT_DIR_ENV_BY_KIND[kind]
 
   const sourceDir = readEnvWithProcessFallback(baseEnv, sourceKey)
   if (sourceDir) {
     return sourceDir
   }
 
-  const publicDir = readEnvWithProcessFallback(baseEnv, 'PI_CODING_AGENT_DIR')
+  if (kind === 'prime-agent') {
+    return (
+      readEnvWithProcessFallback(baseEnv, primaryKey) ??
+      readShellStartupEnvVar(
+        primaryKey,
+        baseEnv.HOME ?? process.env.HOME,
+        baseEnv.SHELL ?? process.env.SHELL
+      )
+    )
+  }
+
+  const overlayKey = kind === 'omp' ? 'ORCA_OMP_CODING_AGENT_DIR' : 'ORCA_PI_CODING_AGENT_DIR'
+  const otherOverlayKey = kind === 'omp' ? 'ORCA_PI_CODING_AGENT_DIR' : 'ORCA_OMP_CODING_AGENT_DIR'
+
+  const publicDir = readEnvWithProcessFallback(baseEnv, primaryKey)
   const ownOverlayDir = readEnvWithProcessFallback(baseEnv, overlayKey)
   const otherOverlayDir = readEnvWithProcessFallback(baseEnv, otherOverlayKey)
   // Why: if PI_CODING_AGENT_DIR is a restored Orca overlay with no source shadow, remirroring leaks another agent's overlay tree; fall through to defaults.
@@ -1476,7 +1520,7 @@ function resolvePiAgentSourceDir(
   }
 
   return readShellStartupEnvVar(
-    'PI_CODING_AGENT_DIR',
+    primaryKey,
     baseEnv.HOME ?? process.env.HOME,
     baseEnv.SHELL ?? process.env.SHELL
   )
@@ -1486,8 +1530,7 @@ function resolveScopedPiAgentSourceDir(
   baseEnv: Record<string, string>,
   kind: PiAgentKind
 ): string | undefined {
-  const sourceKey = kind === 'omp' ? 'ORCA_OMP_SOURCE_AGENT_DIR' : 'ORCA_PI_SOURCE_AGENT_DIR'
-  return readEnvWithProcessFallback(baseEnv, sourceKey)
+  return readEnvWithProcessFallback(baseEnv, SOURCE_AGENT_DIR_ENV_BY_KIND[kind])
 }
 
 function clearPiAgentShadowEnv(baseEnv: Record<string, string>, kind: PiAgentKind): void {
@@ -1495,6 +1538,11 @@ function clearPiAgentShadowEnv(baseEnv: Record<string, string>, kind: PiAgentKin
     delete baseEnv.ORCA_OMP_CODING_AGENT_DIR
     delete baseEnv.ORCA_OMP_SOURCE_AGENT_DIR
     delete baseEnv.ORCA_OMP_STATUS_EXTENSION
+    return
+  }
+  if (kind === 'prime-agent') {
+    delete baseEnv.ORCA_PRIME_AGENT_SOURCE_AGENT_DIR
+    delete baseEnv.ORCA_PRIME_AGENT_STATUS_EXTENSION
     return
   }
   delete baseEnv.ORCA_PI_CODING_AGENT_DIR
@@ -1517,6 +1565,14 @@ function exposePiManagedExtensionEnv(
       baseEnv.ORCA_OMP_STATUS_EXTENSION = managedEnv.ORCA_OMP_STATUS_EXTENSION
     } else {
       delete baseEnv.ORCA_OMP_STATUS_EXTENSION
+    }
+    return
+  }
+  if (kind === 'prime-agent') {
+    if (managedEnv.ORCA_PRIME_AGENT_SOURCE_AGENT_DIR) {
+      baseEnv.ORCA_PRIME_AGENT_SOURCE_AGENT_DIR = managedEnv.ORCA_PRIME_AGENT_SOURCE_AGENT_DIR
+    } else {
+      delete baseEnv.ORCA_PRIME_AGENT_SOURCE_AGENT_DIR
     }
     return
   }
@@ -1666,6 +1722,10 @@ export function buildPtyHostEnv(
     piAgentKind === 'omp'
       ? resolvePiAgentSourceDir(baseEnv, 'omp')
       : resolveScopedPiAgentSourceDir(baseEnv, 'omp')
+  const preexistingPrimeAgentDir =
+    piAgentKind === 'prime-agent'
+      ? resolvePiAgentSourceDir(baseEnv, 'prime-agent')
+      : resolveScopedPiAgentSourceDir(baseEnv, 'prime-agent')
 
   if (opts.agentStatusHooksEnabled) {
     // Why: OPENCODE_CONFIG_DIR is a single path, not a colon-list; mirror the user's value into an overlay so their plugins and Orca's status plugin coexist. See docs/opencode-config-dir-collision.md.
@@ -1738,6 +1798,7 @@ export function buildPtyHostEnv(
   if (opts.agentStatusHooksEnabled) {
     clearPiAgentShadowEnv(baseEnv, 'pi')
     clearPiAgentShadowEnv(baseEnv, 'omp')
+    clearPiAgentShadowEnv(baseEnv, 'prime-agent')
     // Why: bare shells historically defaulted to Pi + OMP shadow prep and
     // created ~/.<agent>/agent even when the user never launches those agents
     // (#10196). Only create default homes on an explicit Pi/OMP launch;
@@ -1758,8 +1819,19 @@ export function buildPtyHostEnv(
       Object.assign(baseEnv, ompEnv)
       exposePiManagedExtensionEnv(baseEnv, 'omp', ompEnv)
     }
+
+    if (piAgentKind === 'prime-agent' && !opts.isWsl) {
+      const primeEnv = piTitlebarExtensionService.buildPtyEnv(
+        id,
+        preexistingPrimeAgentDir,
+        'prime-agent',
+        { materializeDefaultHome: explicitPiAgentKind === 'prime-agent' }
+      )
+      Object.assign(baseEnv, primeEnv)
+      exposePiManagedExtensionEnv(baseEnv, 'prime-agent', primeEnv)
+    }
   } else {
-    // Why: strip BOTH kinds' shadow vars so a nested PTY can't inherit a stale overlay from either agent.
+    // Why: nested PTYs must not inherit stale source or overlay state from another agent.
     restoreOrStripOverlayEnv(baseEnv, {
       primary: 'PI_CODING_AGENT_DIR',
       overlay: 'ORCA_PI_CODING_AGENT_DIR',
@@ -1771,6 +1843,8 @@ export function buildPtyHostEnv(
       source: 'ORCA_OMP_SOURCE_AGENT_DIR'
     })
     delete baseEnv.ORCA_OMP_STATUS_EXTENSION
+    delete baseEnv.ORCA_PRIME_AGENT_SOURCE_AGENT_DIR
+    delete baseEnv.ORCA_PRIME_AGENT_STATUS_EXTENSION
   }
 
   // Why: keep the Codex home override PTY-scoped so dev/prod Orcas don't share hooks through ~/.codex.
@@ -3510,6 +3584,23 @@ export function registerPtyHandlers(
     syntheticKillExitPtyIds.set(id, cleanupTimer)
   }
 
+  // Why: a rejected split retires its PTY while kill's shutdown is still in flight; kill's late
+  // synthetic exit must not land afterwards, or an SSH pane's code -1 would re-preserve the
+  // surface the retirement just removed. Timed like the duplicate window so a reused id is free.
+  const retiredRejectedPtyIds = new Map<string, NodeJS.Timeout>()
+
+  function rememberRetiredRejectedPty(id: string): void {
+    const existing = retiredRejectedPtyIds.get(id)
+    if (existing) {
+      clearTimeout(existing)
+    }
+    const cleanupTimer = setTimeout(() => {
+      retiredRejectedPtyIds.delete(id)
+    }, SYNTHETIC_KILL_EXIT_DUPLICATE_WINDOW_MS)
+    cleanupTimer.unref?.()
+    retiredRejectedPtyIds.set(id, cleanupTimer)
+  }
+
   function consumeSyntheticKillExit(id: string): boolean {
     const cleanupTimer = syntheticKillExitPtyIds.get(id)
     if (!cleanupTimer) {
@@ -3968,6 +4059,7 @@ export function registerPtyHandlers(
     rows: number
     seq?: number
     lastTitle?: string
+    kittyKeyboardFlags?: number
   } | null
   const pendingSerializeRequests = new Map<
     string,
@@ -3996,6 +4088,7 @@ export function registerPtyHandlers(
           rows?: unknown
           seq?: unknown
           lastTitle?: unknown
+          kittyKeyboardFlags?: unknown
         } | null
       }
     ) => {
@@ -4015,6 +4108,7 @@ export function registerPtyHandlers(
           rows: number
           seq?: number
           lastTitle?: string
+          kittyKeyboardFlags?: number
         } = {
           data: snapshot.data,
           cols: snapshot.cols,
@@ -4025,6 +4119,12 @@ export function registerPtyHandlers(
         }
         if (typeof snapshot.lastTitle === 'string' && snapshot.lastTitle.length > 0) {
           result.lastTitle = snapshot.lastTitle
+        }
+        // Why gated on seq: without a boundary the flags cannot be reconciled
+        // against live bytes, so they prove nothing.
+        const kittyKeyboardFlags = parseTerminalKittyKeyboardFlags(snapshot.kittyKeyboardFlags)
+        if (result.seq !== undefined && kittyKeyboardFlags !== undefined) {
+          result.kittyKeyboardFlags = kittyKeyboardFlags
         }
         settleSerializeRequest(args.requestId, result)
       } else {
@@ -4348,6 +4448,12 @@ export function registerPtyHandlers(
       const codexHomeLaunchStartedAt = !args.connectionId ? new Date() : undefined
       const codexHomeLaunchStartedSequence = !args.connectionId ? ++ptyLifecycleSequence : undefined
       const preAdoptedStablePane = args.adoptedStablePane ?? null
+      const reattachedCodexHomeRoutes = !args.connectionId
+        ? snapshotCodexPaneHomeRoutes([
+            preAdoptedStablePane?.result.id,
+            args.sessionId ? getAppPtyId(args.connectionId, args.sessionId) : undefined
+          ])
+        : new Map<string, CodexPaneHomeRoute | null>()
       const startupPromise = getLocalPtyStartupPromise(args.connectionId)
       if (startupPromise) {
         await startupPromise
@@ -4381,7 +4487,8 @@ export function registerPtyHandlers(
             codexHomePath: null,
             reattached: true,
             startedAt: codexHomeLaunchStartedAt,
-            startedSequence: codexHomeLaunchStartedSequence
+            startedSequence: codexHomeLaunchStartedSequence,
+            ...codexReattachedHomeRouteField(reattachedCodexHomeRoutes, result.id, true)
           })
         }
         return result
@@ -4485,6 +4592,7 @@ export function registerPtyHandlers(
         worktreeId: string
         tabId: string
         leafId: string
+        expectedSourceBinding?: PtyBindingSourceExpectation
       } | null = null
       if (shouldPersistHostSessionBinding) {
         if (
@@ -4503,7 +4611,10 @@ export function registerPtyHandlers(
           store,
           worktreeId: args.worktreeId,
           tabId: args.tabId,
-          leafId: args.leafId
+          leafId: args.leafId,
+          ...(args.expectedSourceBinding
+            ? { expectedSourceBinding: args.expectedSourceBinding }
+            : {})
         }
       }
       const sshScopedEnv = stripRemotePaneEnvWhenHooksDisabled(args.connectionId, args.env)
@@ -4798,6 +4909,15 @@ export function registerPtyHandlers(
       let stablePaneBindingPersisted = false
       let rejectedRegistrationCandidate: PtySpawnResult | null = null
       let pendingRegistrationPtyId: string | null = null
+      // Why hoisted to the reply scope: main reconciles the provider sequence
+      // deep inside the spawn path, but the pane needs that renderer-domain
+      // boundary beside the daemon snapshot's kitty flags.
+      let reconciledSnapshotSeq: number | null = null
+      // False when bytes crossed the data socket during the spawn RPC: the
+      // reconciled boundary covers them, but the daemon proved its kitty flags
+      // before they existed, so the claim must not erase what the pane may
+      // have scanned from those bytes live.
+      let snapshotKittyFlagsCoverReconciledSeq = true
       let preparedProvisionalExecutionContext = false
       let releaseWorktreeSpawn: (() => void) | undefined
       try {
@@ -4948,11 +5068,19 @@ export function registerPtyHandlers(
           // Why: admission precedes sequence/context state and every durable publication below.
           runtime?.assertPtyRegistrationAllowed?.(result.id, result.incarnationId)
           if (result.providerSequence) {
-            runtime?.synchronizePtyOutputSequenceFromProvider?.(
-              result.id,
-              result.providerSequence,
-              sequenceBeforeProviderSpawn
-            )
+            const runtimeSequenceBeforeReconcile = runtime?.getPtyOutputSequence?.(result.id) ?? 0
+            // Why kept: this is the reattach boundary in the RENDERER's sequence
+            // domain, and the daemon snapshot's kitty flags mean nothing without
+            // the boundary they were proven at.
+            reconciledSnapshotSeq =
+              runtime?.synchronizePtyOutputSequenceFromProvider?.(
+                result.id,
+                result.providerSequence,
+                sequenceBeforeProviderSpawn
+              ) ?? null
+            if (runtimeSequenceBeforeReconcile > sequenceBeforeProviderSpawn) {
+              snapshotKittyFlagsCoverReconciledSeq = false
+            }
           }
           ensureWslHookRelayForReattach(result, args.connectionId)
           runtime?.preparePtyExecutionContext?.(
@@ -5056,6 +5184,7 @@ export function registerPtyHandlers(
               reattached: true,
               startedAt: codexHomeLaunchStartedAt,
               startedSequence: codexHomeLaunchStartedSequence,
+              ...codexReattachedHomeRouteField(reattachedCodexHomeRoutes, result.id, true),
               ...(env ? { launchEnv: env } : {})
             })
           }
@@ -5122,15 +5251,19 @@ export function registerPtyHandlers(
               leafId: hostSessionBinding.leafId,
               ptyId: result.id,
               ...(result.incarnationId ? { incarnationId: result.incarnationId } : {}),
-              ...(cwd ? { startupCwd: cwd } : {})
+              ...(cwd ? { startupCwd: cwd } : {}),
+              ...(hostSessionBinding.expectedSourceBinding
+                ? { expectedSourceBinding: hostSessionBinding.expectedSourceBinding }
+                : {})
             }
-            if (args.connectionId) {
-              hostSessionBinding.store.persistPtyBinding(
-                binding,
-                toSshExecutionHostId(args.connectionId)
-              )
-            } else {
-              hostSessionBinding.store.persistPtyBinding(binding)
+            const persisted = args.connectionId
+              ? hostSessionBinding.store.persistPtyBinding(
+                  binding,
+                  toSshExecutionHostId(args.connectionId)
+                )
+              : hostSessionBinding.store.persistPtyBinding(binding)
+            if (persisted === false) {
+              throw new Error('terminal_split_source_not_found')
             }
           } catch (err) {
             console.error('[pty] failed to persist runtime PTY binding after spawn:', err)
@@ -5142,6 +5275,9 @@ export function registerPtyHandlers(
                 console.warn('[pty] failed to clean up PTY after persistence failure:', shutdownErr)
               }
               clearProviderPtyState(result.id)
+            }
+            if (err instanceof Error && err.message === 'terminal_split_source_not_found') {
+              throw err
             }
             throw Object.assign(new Error(createTerminalSessionStateSaveFailureMessage()), {
               agentSessionOperationOutcome: 'unknown' as const
@@ -5229,6 +5365,11 @@ export function registerPtyHandlers(
             codexHomePath: selectedCodexHomePath,
             startedAt: codexHomeLaunchStartedAt,
             startedSequence: codexHomeLaunchStartedSequence,
+            ...codexReattachedHomeRouteField(
+              reattachedCodexHomeRoutes,
+              result.id,
+              result.isReattach === true
+            ),
             ...(result.isReattach === true ? { reattached: true } : env ? { launchEnv: env } : {})
           })
         }
@@ -5248,6 +5389,11 @@ export function registerPtyHandlers(
         }
         resolvePaneSpawnReservation(paneSpawnReservationKey, paneSpawnReservation, {
           ...result,
+          ...(typeof result.snapshotKittyKeyboardFlags === 'number' &&
+          reconciledSnapshotSeq !== null &&
+          snapshotKittyFlagsCoverReconciledSeq
+            ? { snapshotSeq: reconciledSnapshotSeq }
+            : { snapshotKittyKeyboardFlags: undefined }),
           isReattach: true
         })
         return response
@@ -5364,19 +5510,23 @@ export function registerPtyHandlers(
         // Why: controller is synchronous, but keep ownership until async shutdown proves whether the provider emitted an exit.
         void shutdownProviderAndDetectExit(provider, ptyId, { immediate: false })
           .then((providerExitObserved) => {
+            const retired = retiredRejectedPtyIds.has(ptyId)
             const incarnationId = finishPtyShutdown(ptyId, connectionId, store)
-            if (!providerExitObserved) {
+            if (!providerExitObserved && !retired) {
               runtime?.onPtyExit(ptyId, -1, incarnationId)
               rememberSyntheticKillExit(ptyId)
               sendPtyExitToRenderer({ id: ptyId, code: -1 })
             }
           })
           .catch((err) => {
+            const retired = retiredRejectedPtyIds.has(ptyId)
             if (isPtyAlreadyGoneError(err)) {
               const incarnationId = finishPtyShutdown(ptyId, connectionId, store)
-              runtime?.onPtyExit(ptyId, -1, incarnationId)
-              rememberSyntheticKillExit(ptyId)
-              sendPtyExitToRenderer({ id: ptyId, code: -1 })
+              if (!retired) {
+                runtime?.onPtyExit(ptyId, -1, incarnationId)
+                rememberSyntheticKillExit(ptyId)
+                sendPtyExitToRenderer({ id: ptyId, code: -1 })
+              }
               return
             }
             console.warn(
@@ -5384,7 +5534,9 @@ export function registerPtyHandlers(
             )
             // Why: close runtime tails without clearing provider ownership, so
             // a retry can still target a PTY that survived the failed shutdown.
-            runtime?.onPtyExit(ptyId, -1, ptyIncarnationById.get(ptyId))
+            if (!retired) {
+              runtime?.onPtyExit(ptyId, -1, ptyIncarnationById.get(ptyId))
+            }
           })
         return true
       }
@@ -5395,11 +5547,30 @@ export function registerPtyHandlers(
           console.warn(
             `[pty] Failed to stop PTY ${ptyId}: ${err instanceof Error ? err.message : String(err)}`
           )
-          runtime?.onPtyExit(ptyId, -1, ptyIncarnationById.get(ptyId))
+          if (!retiredRejectedPtyIds.has(ptyId)) {
+            runtime?.onPtyExit(ptyId, -1, ptyIncarnationById.get(ptyId))
+          }
         })
         return true
       }
       return killWithCurrentProvider()
+    },
+    retireRejectedPty: (ptyId) => {
+      rememberRetiredRejectedPty(ptyId)
+      // Why: a completed stop already cleared provider state, tombstoned the lease and told the
+      // renderer; repeating that double-fires the exit IPC. The runtime still needs code 0 so an
+      // SSH pane retires for good instead of staying preserved by the stop's negative exit.
+      if (!ptyOwnership.has(ptyId)) {
+        runtime?.onPtyExit(ptyId, 0, ptyIncarnationById.get(ptyId))
+        return
+      }
+      let connectionId: string | null | undefined = ptyOwnership.get(ptyId)
+      const parsedSshId = connectionId === undefined ? parseAppSshPtyId(ptyId) : null
+      connectionId ??= parsedSshId?.connectionId
+      const incarnationId = finishPtyShutdown(ptyId, connectionId, store)
+      runtime?.onPtyExit(ptyId, 0, incarnationId)
+      rememberSyntheticKillExit(ptyId)
+      sendPtyExitToRenderer({ id: ptyId, code: 0 })
     },
     markReversibleStops: (ptyIds) => {
       for (const ptyId of ptyIds) {
@@ -5613,6 +5784,7 @@ export function registerPtyHandlers(
       args: { id?: unknown; opts?: { scrollbackRows?: unknown } }
     ): Promise<{
       data: string
+      frameRestoreAnsi?: string
       cols: number
       rows: number
       cwd?: string | null
@@ -5623,6 +5795,7 @@ export function registerPtyHandlers(
       alternateScreen?: boolean
       scrollbackAnsi?: string
       pendingEscapeTailAnsi?: string
+      kittyKeyboardFlags?: number
     } | null> => {
       if (!runtime || typeof args?.id !== 'string' || args.id.length === 0) {
         return null
@@ -5726,30 +5899,45 @@ export function registerPtyHandlers(
     ) => {
       const codexHomeLaunchStartedAt = !args.connectionId ? new Date() : undefined
       const codexHomeLaunchStartedSequence = !args.connectionId ? ++ptyLifecycleSequence : undefined
+      const initialLeafId =
+        typeof args.leafId === 'string' && isTerminalLeafId(args.leafId) ? args.leafId : null
+      const initialPaneKey =
+        typeof args.worktreeId === 'string' &&
+        typeof args.tabId === 'string' &&
+        isValidTerminalTabId(args.tabId) &&
+        args.tabId.length <= 512 &&
+        initialLeafId
+          ? makePaneKey(args.tabId, initialLeafId)
+          : null
+      const initialStablePanePtyId = (() => {
+        try {
+          return !args.connectionId && initialPaneKey
+            ? resolveStablePaneOwner(
+                runtime,
+                store,
+                initialPaneKey,
+                args.worktreeId,
+                args.connectionId
+              )?.ptyId
+            : undefined
+        } catch {
+          return undefined
+        }
+      })()
+      const reattachedCodexHomeRoutes = !args.connectionId
+        ? snapshotCodexPaneHomeRoutes([
+            initialStablePanePtyId,
+            args.sessionId ? getAppPtyId(args.connectionId, args.sessionId) : undefined
+          ])
+        : new Map<string, CodexPaneHomeRoute | null>()
       const spawnTiming = createPtySpawnTiming()
       const startupPromise = getLocalPtyStartupPromise(args.connectionId)
       if (startupPromise) {
         await startupPromise
       }
-      // Why: honor the fallback only for fresh local spawns — reattach needs exact cwd and SSH can't probe the local filesystem.
-      const allowMissingCwdFallback =
-        !args.connectionId && !args.sessionId && args.cwdFallback === 'worktree'
-      let didFallbackToWorkspaceRootCwd = false
-      const cwd = resolvePtySpawnStartupCwd(
-        args.worktreeId,
-        args.cwd,
-        allowMissingCwdFallback
-          ? {
-              directoryExists: localStartupCwdDirectoryExists,
-              onFallbackToWorkspaceRoot: () => {
-                didFallbackToWorkspaceRootCwd = true
-              }
-            }
-          : undefined
-      )
-      const startupCwdFallback =
-        didFallbackToWorkspaceRootCwd && cwd ? ({ kind: 'worktree', cwd } as const) : undefined
-      spawnTiming.mark('preflight')
+      let cwd = resolvePtySpawnStartupCwd(args.worktreeId, args.cwd)
+      let prevalidatedCwd: string | undefined
+      let startupCwdFallback: { kind: 'worktree'; cwd: string } | undefined
       const earlyLeafId =
         typeof args.leafId === 'string' && isTerminalLeafId(args.leafId) ? args.leafId : null
       const earlyPaneKey =
@@ -5793,6 +5981,15 @@ export function registerPtyHandlers(
       let stablePaneBindingPersisted = false
       let rejectedRegistrationCandidate: PtySpawnResult | null = null
       let pendingRegistrationPtyId: string | null = null
+      // Why hoisted to the reply scope: main reconciles the provider sequence
+      // deep inside the spawn path, but the pane needs that renderer-domain
+      // boundary beside the daemon snapshot's kitty flags.
+      let reconciledSnapshotSeq: number | null = null
+      // False when bytes crossed the data socket during the spawn RPC: the
+      // reconciled boundary covers them, but the daemon proved its kitty flags
+      // before they existed, so the claim must not erase what the pane may
+      // have scanned from those bytes live.
+      let snapshotKittyFlagsCoverReconciledSeq = true
       let preparedProvisionalExecutionContext = false
       let releaseWorktreeSpawn: (() => void) | undefined
       try {
@@ -5800,6 +5997,7 @@ export function registerPtyHandlers(
           await assertFolderWorkspacePtyPathUsable(args.worktreeId)
         }
         const provider = getProvider(args.connectionId)
+        spawnTiming.mark('stable_adoption_setup')
         const preAdoptedStablePane =
           earlyStablePaneOwner && earlyWorktreeId
             ? await adoptStablePane({
@@ -5813,9 +6011,97 @@ export function registerPtyHandlers(
                 ownsPaneSpawnReservation: true
               })
             : null
+        spawnTiming.mark('stable_adoption')
         if (earlyStablePaneOwner && !preAdoptedStablePane) {
           await assertFolderWorkspacePtyPathUsable(args.worktreeId)
         }
+        if (!preAdoptedStablePane) {
+          // Why: reattach needs exact cwd, SSH cannot probe locally, and successful stable-pane adoption needs no launch preflight.
+          const requestedMissingCwdFallback =
+            !args.connectionId && !args.sessionId && args.cwdFallback === 'worktree'
+          const isPosixStartupCwd = args.cwd?.startsWith('/') === true
+          const startupWorkspaceCwd =
+            requestedMissingCwdFallback && isPosixStartupCwd
+              ? resolvePtySpawnStartupCwd(args.worktreeId, '.')
+              : undefined
+          const initiallyResolvedStartupCwd =
+            requestedMissingCwdFallback && isPosixStartupCwd ? cwd : undefined
+          const startupTerminalRuntimeOptions =
+            requestedMissingCwdFallback && process.platform === 'win32'
+              ? resolveLocalWindowsTerminalRuntimeOptions({
+                  requestedShellOverride: args.shellOverride,
+                  settings: getSettings?.(),
+                  projectRuntime: args.projectRuntime,
+                  fallbackHostShell: process.env.COMSPEC || 'powershell.exe'
+                })
+              : undefined
+          const wslRuntimeOwnsStartupCwd =
+            requestedMissingCwdFallback &&
+            isPosixStartupCwd &&
+            (isWslShellName(startupTerminalRuntimeOptions?.shellOverride) ||
+              isWslUncPath(startupWorkspaceCwd ?? ''))
+          const startupWslContext = wslRuntimeOwnsStartupCwd
+            ? resolveWslSessionContext({
+                cwd: startupWorkspaceCwd,
+                shellOverride: startupTerminalRuntimeOptions?.shellOverride,
+                terminalWindowsWslDistro: startupTerminalRuntimeOptions?.terminalWindowsWslDistro
+              })
+            : undefined
+          let wslStartupCwdExists: boolean | null = null
+          let wslWorkspaceCwdExists: boolean | null = null
+          if (startupWslContext && initiallyResolvedStartupCwd) {
+            const validationCwd = toWindowsWslPath(
+              initiallyResolvedStartupCwd,
+              startupWslContext.distro
+            )
+            wslStartupCwdExists = isWslUncPath(validationCwd)
+              ? await wslUncDirectoryExistsAsync(validationCwd)
+              : localStartupCwdDirectoryExists(validationCwd)
+            if (wslStartupCwdExists === true) {
+              prevalidatedCwd = validationCwd
+            }
+            if (wslStartupCwdExists === false && startupWorkspaceCwd) {
+              wslWorkspaceCwdExists = isWslUncPath(startupWorkspaceCwd)
+                ? await wslUncDirectoryExistsAsync(startupWorkspaceCwd)
+                : localStartupCwdDirectoryExists(startupWorkspaceCwd)
+              if (wslWorkspaceCwdExists === true) {
+                prevalidatedCwd = startupWorkspaceCwd
+              }
+            }
+          }
+          const allowMissingCwdFallback =
+            requestedMissingCwdFallback &&
+            (!wslRuntimeOwnsStartupCwd ||
+              (wslStartupCwdExists === false && wslWorkspaceCwdExists === true))
+          let didFallbackToWorkspaceRootCwd = false
+          cwd = resolvePtySpawnStartupCwd(
+            args.worktreeId,
+            args.cwd,
+            allowMissingCwdFallback
+              ? {
+                  directoryExists: (path) =>
+                    startupWslContext &&
+                    wslStartupCwdExists === false &&
+                    path === initiallyResolvedStartupCwd
+                      ? false
+                      : startupWslContext && path === startupWorkspaceCwd
+                        ? wslWorkspaceCwdExists === true
+                        : localStartupCwdDirectoryExists(
+                            process.platform === 'win32' ? normalizeWindowsTerminalCwd(path) : path
+                          ),
+                  onFallbackToWorkspaceRoot: () => {
+                    didFallbackToWorkspaceRootCwd = true
+                  }
+                }
+              : undefined
+          )
+          if (didFallbackToWorkspaceRootCwd && wslWorkspaceCwdExists === true && cwd) {
+            prevalidatedCwd = cwd
+          }
+          startupCwdFallback =
+            didFallbackToWorkspaceRootCwd && cwd ? { kind: 'worktree', cwd } : undefined
+        }
+        spawnTiming.mark('preflight')
         const freshSpawnRecovery = preAdoptedStablePane
           ? undefined
           : recoverFreshSpawnProviderRouting(provider, args.connectionId, args.sessionId)
@@ -6154,6 +6440,7 @@ export function registerPtyHandlers(
           cols: args.cols,
           rows: args.rows,
           cwd,
+          ...(prevalidatedCwd && !isDaemonHostSpawn ? { prevalidatedCwd } : {}),
           env: spawnEnv,
           ...(isMintedSessionId ? { isNewSession: true } : {})
         }
@@ -6323,11 +6610,19 @@ export function registerPtyHandlers(
           assertSpawnReplyWasLive(result)
           runtime?.assertPtyRegistrationAllowed?.(result.id, result.incarnationId)
           if (result.providerSequence) {
-            runtime?.synchronizePtyOutputSequenceFromProvider?.(
-              result.id,
-              result.providerSequence,
-              sequenceBeforeProviderSpawn
-            )
+            const runtimeSequenceBeforeReconcile = runtime?.getPtyOutputSequence?.(result.id) ?? 0
+            // Why kept: this is the reattach boundary in the RENDERER's sequence
+            // domain, and the daemon snapshot's kitty flags mean nothing without
+            // the boundary they were proven at.
+            reconciledSnapshotSeq =
+              runtime?.synchronizePtyOutputSequenceFromProvider?.(
+                result.id,
+                result.providerSequence,
+                sequenceBeforeProviderSpawn
+              ) ?? null
+            if (runtimeSequenceBeforeReconcile > sequenceBeforeProviderSpawn) {
+              snapshotKittyFlagsCoverReconciledSeq = false
+            }
           }
           ensureWslHookRelayForReattach(result, args.connectionId)
           runtime?.preparePtyExecutionContext?.(
@@ -6703,6 +6998,13 @@ export function registerPtyHandlers(
         }
         const response = {
           ...result,
+          // Why both or neither: a pane can only adopt proven kitty flags together
+          // with the sequence boundary they describe.
+          ...(typeof result.snapshotKittyKeyboardFlags === 'number' &&
+          reconciledSnapshotSeq !== null &&
+          snapshotKittyFlagsCoverReconciledSeq
+            ? { snapshotSeq: reconciledSnapshotSeq }
+            : { snapshotKittyKeyboardFlags: undefined }),
           ...(!result.isReattach && effectiveLaunchConfig
             ? { launchConfig: effectiveLaunchConfig }
             : {}),
@@ -6722,6 +7024,11 @@ export function registerPtyHandlers(
             codexHomePath: selectedCodexHomePath,
             startedAt: codexHomeLaunchStartedAt,
             startedSequence: codexHomeLaunchStartedSequence,
+            ...codexReattachedHomeRouteField(
+              reattachedCodexHomeRoutes,
+              result.id,
+              result.isReattach === true
+            ),
             ...(result.isReattach === true
               ? { reattached: true }
               : baseEnv

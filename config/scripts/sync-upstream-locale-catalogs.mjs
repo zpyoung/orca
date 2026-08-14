@@ -20,7 +20,8 @@ if (!TARGET) {
 }
 
 const LOCALES = ['en', 'es', 'ja', 'ko', 'zh']
-const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
+const isPlainObject = (value) =>
+  value !== null && typeof value === 'object' && !Array.isArray(value)
 
 function reconcile(fork, upstream, stats) {
   const merged = {}
@@ -47,8 +48,12 @@ function reconcile(fork, upstream, stats) {
 for (const locale of LOCALES) {
   const file = `src/renderer/src/i18n/locales/${locale}.json`
   const fork = JSON.parse(readFileSync(file, 'utf8'))
-  const upstream = JSON.parse(execFileSync('git', ['show', `${TARGET}:${file}`], { encoding: 'utf8' }))
+  const upstream = JSON.parse(
+    execFileSync('git', ['show', `${TARGET}:${file}`], { encoding: 'utf8' })
+  )
   const stats = { replaced: 0, forkOnly: 0 }
   writeFileSync(file, `${JSON.stringify(reconcile(fork, upstream, stats), null, 2)}\n`)
-  console.log(`${locale}: ${stats.replaced} fork values replaced by upstream, ${stats.forkOnly} fork-only keys kept`)
+  console.log(
+    `${locale}: ${stats.replaced} fork values replaced by upstream, ${stats.forkOnly} fork-only keys kept`
+  )
 }

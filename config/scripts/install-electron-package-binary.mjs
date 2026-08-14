@@ -33,6 +33,9 @@ const transientDownloadErrorCodes = new Set([
   'ENETUNREACH',
   'ENOTFOUND',
   'EPIPE',
+  // The release CDN refuses individual HTTP/2 streams under load while the
+  // connection stays healthy, which is a retry, not a permanent failure.
+  'ERR_HTTP2_STREAM_ERROR',
   'ETIMEDOUT',
   'UND_ERR_CONNECT_TIMEOUT',
   'UND_ERR_HEADERS_TIMEOUT',
@@ -185,7 +188,8 @@ async function downloadElectronArtifactWithRetry(downloadOptions) {
 function getDownloadRetryDelays() {
   const configured = process.env.ORCA_ELECTRON_PACKAGE_RETRY_DELAYS_MS
   if (!configured) {
-    return [1_000, 3_000]
+    // Release-CDN 503 bursts have outlasted a 4s backoff and failed every lane at once.
+    return [1_000, 3_000, 8_000, 15_000]
   }
 
   const delays = configured.split(',').map(Number)
@@ -200,7 +204,7 @@ function isTransientDownloadError(error) {
     if (transientDownloadErrorCodes.has(candidate?.code)) {
       return true
     }
-    const statusCode = candidate?.statusCode ?? candidate?.response?.statusCode
+    const statusCode = getDownloadErrorStatusCode(candidate)
     if (
       statusCode === 408 ||
       statusCode === 425 ||
@@ -211,6 +215,12 @@ function isTransientDownloadError(error) {
     }
   }
   return false
+}
+
+// `@electron/get`'s fetch downloader attaches a WHATWG Response, which spells
+// the code `status`; its request-based downloader spells it `statusCode`.
+function getDownloadErrorStatusCode(candidate) {
+  return candidate?.statusCode ?? candidate?.response?.statusCode ?? candidate?.response?.status
 }
 
 function getErrorChain(error) {
@@ -225,7 +235,7 @@ function getErrorChain(error) {
 
 function formatDownloadError(error) {
   for (const candidate of getErrorChain(error)) {
-    const statusCode = candidate?.statusCode ?? candidate?.response?.statusCode
+    const statusCode = getDownloadErrorStatusCode(candidate)
     if (statusCode) {
       return `HTTP ${statusCode}`
     }

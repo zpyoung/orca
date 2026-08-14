@@ -42,6 +42,7 @@ package-lock.json
 *.swp
 *.swo
 *~
+.memsearch/
 
 # OS
 # Keep these in step with isOsMetadataSkillEntryName (skill-package-identity.ts): both disk
@@ -96,6 +97,7 @@ docs/**
 !docs/readme/
 !docs/readme/**
 !docs/STYLEGUIDE.md
+!docs/ai-vault-process-isolation-plan.md
 !docs/mobile-terminal-shortcut-bar.md
 !docs/reference/
 !docs/reference/git-compatibility.md

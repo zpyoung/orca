@@ -25,7 +25,6 @@
 
 # (a) fixed for pipeline, explicit if/else-if branches rather than a switch
 src/renderer/src/components/Terminal.tsx
-src/renderer/src/components/tab-bar/TabBar.tsx
 src/renderer/src/components/tab-group/TabGroupPanel.tsx
 src/renderer/src/components/terminal/terminal-tab-bulk-actions.ts
 src/renderer/src/components/terminal/terminal-tab-create.ts
@@ -39,6 +38,10 @@ src/shared/workspace-session-terminal-tab-close.ts
 src/renderer/src/components/workspace-cleanup/workspace-cleanup-candidate-labels.ts
 src/renderer/src/components/tab-group/tab-drag-data.ts
 src/renderer/src/components/terminal/tab-type-cycle.ts
+# TabBar's item projection after main's tab-bar split; both carry an explicit
+# contentType === 'pipeline' branch ported from the pre-split TabBar.tsx
+src/renderer/src/components/tab-bar/tab-bar-item-model.ts
+src/renderer/src/components/tab-bar/use-tab-bar-item-projection.ts
 # was miscategorized under (b): onFocusEditorTab's else branch wrote a pipeline
 # run id into setActiveFile under activeTabType 'editor' — a live defect, not a
 # closed positive check. Fixed with an explicit pipeline branch (fix-r N4).
@@ -78,6 +81,12 @@ src/renderer/src/components/terminal-pane/TerminalPaneOverlayLayer.tsx
 src/renderer/src/components/terminal-pane/terminal-unified-tab-lookup.ts
 src/renderer/src/lib/automation-session-reuse.ts
 src/renderer/src/components/WorktreeJumpPalette.tsx
+src/renderer/src/components/tab-bar/use-tab-bar-runtime-model.ts
+src/renderer/src/runtime/web-runtime-browser-materialization.ts
+src/renderer/src/store/slices/terminal-session-row-hydration.ts
+# closed Set<TabContentType> of editor-family members; 'pipeline' is absent, so a
+# pipeline tab is correctly never a Cmd+S target
+src/renderer/src/components/editor/editor-cmd-save-target.ts
 
 # (c) consumers of unions deliberately not widened for pipeline
 src/renderer/src/hooks/resolve-zoom-target.ts
@@ -91,6 +100,7 @@ src/renderer/src/components/tab-bar/recent-tab-switching.ts
 src/renderer/src/lib/workspace-tab-palette-activation.ts
 src/renderer/src/lib/workspace-tab-palette-results.ts
 src/renderer/src/lib/workspace-tab-palette-search.ts
+src/renderer/src/runtime/web-session-focus-intent.ts
 
 # (d) unrelated `contentType` field (not TabContentType)
 src/renderer/src/components/sidebar/SidebarFeedbackDialog.tsx

@@ -1,6 +1,6 @@
 ---
-last_released_commit: f0ee5a3d0fc9e4bfa91662919f4a0b5fa1e506a3
-upstream_synced: v1.4.180
+last_released_commit: 4102ac6b1e948a8d97ac9ceac976d7f8d4bb0b41
+upstream_synced: v1.4.182
 ---
 
 # Changelog
@@ -11,6 +11,73 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.183-rc.0.zy01] - 2026-08-14
+
+Synced to upstream [v1.4.182](https://github.com/stablyai/orca/releases/tag/v1.4.182).
+
+### Added
+- The native chat transcript is colored. Each recognized agent tool takes its own glyph and hue on
+  its line, and a collapsed run of tool calls shows one dot per distinct kind of work in the order
+  it first appeared — so a folded run says what happened without being expanded. Code blocks and
+  inline code in chat are syntax-highlighted, the user bubble and reasoning rule are tinted, and
+  every new color is held to a contrast floor in both themes. Tool names are matched exactly, so an
+  agent whose vocabulary Orca does not know renders exactly as before rather than being assigned a
+  color that claims something untrue about the call. Glyphs carry the same distinction as the hues,
+  so color is never the only signal.
+
+### Fixed
+- Electron downloads that fail with an HTTP status response are retried instead of failing the run.
+  The transient-error check read only `statusCode`, but the error raised for a rejected fetch
+  carries `status`, so release-CDN 503s aborted on the first attempt and took several test lanes
+  down at once.
+
+### Changed
+- Upstream code the fork does not own now tracks v1.4.182 directly. Where this release extended the
+  same code the fork's SSH-relay chat feature touches, both sides are kept: upstream's transcript
+  read cancellation, subscription teardown, quick-command matching, and cross-device workspace
+  filtering are back alongside the fork's relay work. Files the fork does own — the workspace card,
+  the live chat session hook, and the macOS-only signed build configuration — stay on the fork's
+  versions, and three upstream tests that assert behavior this fork deliberately does not carry
+  were dropped.
+
+## [1.4.181-rc.0.zy03] - 2026-08-13
+
+Synced to upstream [v1.4.180](https://github.com/stablyai/orca/releases/tag/v1.4.180).
+
+### Fixed
+- Chat view now reads transcripts over the SSH relay when a pane is hosted on a remote machine.
+  Previously it always read from local disk, so an SSH-hosted conversation showed a read error and
+  the first message only appeared after toggling to the terminal and back. A transcript that does
+  not exist yet is treated as an empty conversation rather than a failure, oversized snapshots are
+  clipped to a wire byte budget instead of being lost, byte-bounded pagination can reach older
+  history, subscriptions re-arm when the relay reconnects so an idle pane recovers on its own,
+  retained sessions are keyed by SSH connection so rebinding a pane between hosts cannot show the
+  previous host's messages, and read failures surface inline with a retry option.
+- CI retries the Electron download failures it actually hits — refused HTTP/2 streams and 5xx
+  responses are now classified as transient, with a retry budget long enough to outlast observed
+  CDN degradations.
+
+## [1.4.181-rc.0.zy02] - 2026-08-12
+
+Synced to upstream [v1.4.180](https://github.com/stablyai/orca/releases/tag/v1.4.180).
+
+### Added
+- An architecture reference for the plugin subsystem, covering the trust tiers, the contribution
+  types a manifest can declare, the host API available to each runtime, and the limits that apply
+  to plugin workers and panels.
+
+### Fixed
+- Skill updates verify again. The v1.4.180 sync adopted upstream's skill ledger, whose release rows
+  name upstream tags that do not exist on this fork, so the roundtrip check failed outright. The
+  ledger is now rebuilt from the fork's own release tags, and the check stands down for a skill that
+  has only one recorded revision to move between — it reactivates on its own as fork releases
+  accumulate.
+- The upstream-sync skill is tracked in git again. It lived under a gitignored path, so the sync
+  automation would have called a skill its checkout could not see.
+
+### Changed
+- Local memsearch index data is ignored instead of surfacing as untracked files.
 
 ## [1.4.181-rc.0.zy01] - 2026-08-11
 

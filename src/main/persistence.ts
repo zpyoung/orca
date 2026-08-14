@@ -134,7 +134,7 @@ import {
   ONBOARDING_FLOW_VERSION,
   ONBOARDING_FINAL_STEP
 } from '../shared/constants'
-import { parseWorkspaceSession } from '../shared/workspace-session-schema'
+import { parseWorkspaceSessionSalvaging } from '../shared/workspace-session-salvage'
 import { normalizeUsagePercentageDisplay } from '../shared/usage-percentage-display'
 import { normalizeStatusBarUsageMode } from '../shared/status-bar-usage-mode'
 import { isExistingPersistedProfile } from '../shared/project-order-manual-default-notice'
@@ -555,15 +555,27 @@ function workspaceSessionPatchNeedsFullNormalization(patch: WorkspaceSessionPatc
   )
 }
 
+function workspaceSessionSalvageLogDetails(result: {
+  droppedCount: number
+  droppedPaths: string[]
+}): { count: number; fields: string[]; detailsTruncated: boolean } {
+  return {
+    count: result.droppedCount,
+    fields: [...new Set(result.droppedPaths.map((path) => path.split('.', 1)[0]))],
+    detailsTruncated: result.droppedCount > result.droppedPaths.length
+  }
+}
+
 /** Normalize non-'local' host partitions; 'local' (the legacy workspaceSession blob) is dropped so the two surfaces never diverge.
  *  Each partition is zod-validated independently, so one corrupt host drops to defaults without taking out the others. Idempotent. */
 function parseWorkspaceSessionsByHostId(
   raw: unknown,
   defaults: WorkspaceSessionState
-): Partial<Record<ExecutionHostId, WorkspaceSessionState>> {
+): { partitions: Partial<Record<ExecutionHostId, WorkspaceSessionState>>; repaired: boolean } {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    return {}
+    return { partitions: {}, repaired: raw !== undefined }
   }
+  let repaired = false
   const partitions: Partial<Record<ExecutionHostId, WorkspaceSessionState>> = {}
   for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
     const hostId = normalizeExecutionHostId(key)
@@ -571,17 +583,25 @@ function parseWorkspaceSessionsByHostId(
     if (!hostId || hostId === LOCAL_EXECUTION_HOST_ID) {
       continue
     }
-    const result = parseWorkspaceSession(value)
+    const result = parseWorkspaceSessionSalvaging(value)
     if (!result.ok) {
+      repaired = true
       console.error(
         `[persistence] Corrupt workspace session for host ${hostId}, using defaults:`,
         result.error
       )
       continue
     }
+    if (result.droppedCount > 0) {
+      console.warn(
+        `[persistence] Salvaged workspace session for host ${hostId}; dropped corrupt entries:`,
+        workspaceSessionSalvageLogDetails(result)
+      )
+      repaired = true
+    }
     partitions[hostId] = { ...defaults, ...result.value }
   }
-  return partitions
+  return { partitions, repaired }
 }
 
 function backupPath(dataFile: string, index: number): string {
@@ -2763,6 +2783,14 @@ export type StoreOptions = {
   dataFile?: string
 }
 
+export type PtyBindingSourceExpectation = {
+  worktreeId?: string
+  tabId: string
+  leafId: string
+  ptyId: string
+  incarnationId?: string
+}
+
 export class Store {
   private state: PersistedState
   private readonly dataFile: string
@@ -3224,6 +3252,13 @@ export class Store {
           parsed.settings
         )
         const migratedTerminalCursorStyle = normalizeTerminalCursorStyleDefault(parsed.settings)
+        if (
+          parsed.settings?.terminalCursorStyle !==
+            migratedTerminalCursorStyle.terminalCursorStyle ||
+          parsed.settings?.terminalCursorStyleDefaultedToBlock !== true
+        ) {
+          this.loadNeedsSave = true
+        }
         const migratedTerminalLineHeight = normalizeTerminalLineHeight(
           parsed.settings?.terminalLineHeight
         )
@@ -3651,7 +3686,7 @@ export class Store {
             if (parsed.workspaceSession === undefined) {
               return defaults.workspaceSession
             }
-            const result = parseWorkspaceSession(parsed.workspaceSession)
+            const result = parseWorkspaceSessionSalvaging(parsed.workspaceSession)
             if (!result.ok) {
               console.error(
                 '[persistence] Corrupt workspace session, using defaults:',
@@ -3659,13 +3694,28 @@ export class Store {
               )
               return defaults.workspaceSession
             }
+            if (result.droppedCount > 0) {
+              console.warn(
+                '[persistence] Salvaged workspace session; dropped corrupt entries:',
+                workspaceSessionSalvageLogDetails(result)
+              )
+              // Why: salvage repairs only the in-memory session; without a save the corrupt entries stay on disk and get re-dropped every launch.
+              this.loadNeedsSave = true
+            }
             return { ...defaults.workspaceSession, ...result.value }
           })(),
           // Why: per-host session partitions, validated independently; 'local' stays in workspaceSession for downgrade compat.
-          workspaceSessionsByHostId: parseWorkspaceSessionsByHostId(
-            parsed.workspaceSessionsByHostId,
-            defaults.workspaceSession
-          ),
+          workspaceSessionsByHostId: (() => {
+            const { partitions, repaired } = parseWorkspaceSessionsByHostId(
+              parsed.workspaceSessionsByHostId,
+              defaults.workspaceSession
+            )
+            if (repaired) {
+              // Why: salvage repairs only the in-memory partitions; without a save the corrupt entries stay on disk and get re-dropped every launch.
+              this.loadNeedsSave = true
+            }
+            return partitions
+          })(),
           sshTargets: (parsed.sshTargets ?? []).map(normalizeSshTarget),
           deletedSshConfigAliases: Array.isArray(parsed.deletedSshConfigAliases)
             ? parsed.deletedSshConfigAliases.filter(
@@ -4451,6 +4501,7 @@ export class Store {
     linkedTask?: FolderWorkspace['linkedTask']
     linkedTaskSourceContext?: FolderWorkspace['linkedTaskSourceContext']
     connectionId?: string | null
+    creatorProvenance?: FolderWorkspace['creatorProvenance']
     createdWithAgent?: FolderWorkspace['createdWithAgent']
     pendingFirstAgentMessageRename?: boolean
   }): FolderWorkspace {
@@ -4473,6 +4524,7 @@ export class Store {
       name: normalizeFolderWorkspaceName(input.name, `${group.name} workspace`),
       folderPath,
       connectionId: input.connectionId ?? group.connectionId ?? null,
+      ...(input.creatorProvenance ? { creatorProvenance: input.creatorProvenance } : {}),
       linkedTask,
       linkedTaskSourceContext: isWorkspaceLinkedItemSourceContextMatch(linkedTask, sourceContext)
         ? sourceContext
@@ -5758,7 +5810,7 @@ export class Store {
     }
   }
 
-  // Why: UI view-state is written from both desktop and mobile (ui.set RPC), so notify to keep bi-directional sync (desktop hydrates UI only once).
+  // Why: renderer-visible UI state is written from desktop and mobile, so notify to keep bi-directional sync.
   onUIChanged(listener: (ui: PersistedState['ui']) => void): () => void {
     this.uiChangeListeners.add(listener)
     return () => {
@@ -5817,6 +5869,15 @@ export class Store {
     if ('terminalCustomThemes' in updates) {
       sanitizedUpdates.terminalCustomThemes = normalizeTerminalCustomThemes(
         updates.terminalCustomThemes
+      )
+    }
+    if ('terminalCursorStyle' in updates) {
+      Object.assign(
+        sanitizedUpdates,
+        normalizeTerminalCursorStyleDefault(
+          { terminalCursorStyle: updates.terminalCursorStyle },
+          { preserveExplicitValue: true }
+        )
       )
     }
     if ('terminalScrollbackRows' in updates) {
@@ -6169,7 +6230,8 @@ export class Store {
       (lastEmittedBucket === null ||
         compareFeatureInteractionUsageBuckets(nextBucket, lastEmittedBucket) > 0)
 
-    this.updateUI({
+    this.state.ui = {
+      ...this.state.ui,
       featureInteractions: {
         ...featureInteractions,
         [id]: {
@@ -6177,11 +6239,15 @@ export class Store {
           interactionCount: nextCount
         }
       }
-    })
+    }
     this.state.featureInteractionTelemetryBuckets = shouldEmit
       ? { ...telemetryBuckets, [id]: nextBucket }
       : telemetryBuckets
     this.scheduleSave()
+    // Why: live UI only consumes the seen transition; count-only telemetry must not re-hydrate the renderer.
+    if (!existing) {
+      this.notifyUIChanged()
+    }
 
     if (shouldEmit) {
       track('feature_interaction_usage_bucket_reached', {
@@ -6730,15 +6796,37 @@ export class Store {
       incarnationId?: string
       startupCwd?: string
       expectedBinding?: { ptyId: string; incarnationId?: string }
+      expectedSourceBinding?: PtyBindingSourceExpectation
     },
     hostId?: string | null
   ): boolean {
     const resolvedHostId = this.resolveHostId(hostId)
     const session = this.getWorkspaceSession(resolvedHostId)
     const paneKey = `${args.tabId}:${args.leafId}`
+    const bindingWorktreeId = args.expectedSourceBinding?.worktreeId ?? args.worktreeId
+    if (args.expectedSourceBinding) {
+      const expected = args.expectedSourceBinding
+      if (expected.tabId !== args.tabId) {
+        return false
+      }
+      const sourceTab = session.tabsByWorktree?.[bindingWorktreeId]?.find(
+        (candidate) => candidate.id === expected.tabId && candidate.worktreeId === bindingWorktreeId
+      )
+      const sourceLayout = session.terminalLayoutsByTabId?.[expected.tabId]
+      const sourcePaneKey = `${expected.tabId}:${expected.leafId}`
+      if (
+        !sourceTab ||
+        sourceLayout?.ptyIdsByLeafId?.[expected.leafId] !== expected.ptyId ||
+        !layoutContainsLeafId(sourceLayout.root, expected.leafId) ||
+        (expected.incarnationId !== undefined &&
+          session.terminalPtyIncarnationsByPaneKey?.[sourcePaneKey] !== expected.incarnationId)
+      ) {
+        return false
+      }
+    }
     if (args.expectedBinding) {
-      const tab = session.tabsByWorktree?.[args.worktreeId]?.find(
-        (candidate) => candidate.id === args.tabId && candidate.worktreeId === args.worktreeId
+      const tab = session.tabsByWorktree?.[bindingWorktreeId]?.find(
+        (candidate) => candidate.id === args.tabId && candidate.worktreeId === bindingWorktreeId
       )
       const boundPtyId = session.terminalLayoutsByTabId?.[args.tabId]?.ptyIdsByLeafId?.[args.leafId]
       if (
@@ -6761,9 +6849,13 @@ export class Store {
       args.incarnationId !== args.expectedBinding.incarnationId
     let terminalMembershipChanged = false
     const advanceTopologyFence = (): void => {
-      const repoId = getRepoIdFromWorktreeId(args.worktreeId)
+      const repoId = getRepoIdFromWorktreeId(bindingWorktreeId)
       const currentRevision = session.terminalTopologyRevisionByRepoId?.[repoId] ?? 0
-      if (!reconciledIncarnation && (!terminalMembershipChanged || currentRevision <= 0)) {
+      const establishesSplitAuthority = args.expectedSourceBinding !== undefined
+      if (
+        !reconciledIncarnation &&
+        (!terminalMembershipChanged || (currentRevision <= 0 && !establishesSplitAuthority))
+      ) {
         return
       }
       // Why: host-admitted membership or incarnation changes must outrank a stale renderer replay.
@@ -6794,7 +6886,7 @@ export class Store {
         delete session.terminalSurfaceTombstonesByPaneKey[paneKey]
       }
     }
-    const tabs = session.tabsByWorktree?.[args.worktreeId]
+    const tabs = session.tabsByWorktree?.[bindingWorktreeId]
     const tab = tabs?.find((t) => t.id === args.tabId)
     if (tab) {
       tab.ptyId = args.ptyId
@@ -6805,18 +6897,19 @@ export class Store {
         ...(tabs ?? []),
         createMinimalPersistedTerminalTab({
           ...args,
+          worktreeId: bindingWorktreeId,
           existingTabCount: tabs?.length ?? 0
         })
       ]
       session.tabsByWorktree = {
         ...session.tabsByWorktree,
-        [args.worktreeId]: nextTabs
+        [bindingWorktreeId]: nextTabs
       }
-      session.activeWorktreeId ??= args.worktreeId
+      session.activeWorktreeId ??= bindingWorktreeId
       session.activeTabId ??= args.tabId
       session.activeTabIdByWorktree = {
         ...session.activeTabIdByWorktree,
-        [args.worktreeId]: session.activeTabIdByWorktree?.[args.worktreeId] ?? args.tabId
+        [bindingWorktreeId]: session.activeTabIdByWorktree?.[bindingWorktreeId] ?? args.tabId
       }
     }
     if (!isTerminalLeafId(args.leafId)) {
