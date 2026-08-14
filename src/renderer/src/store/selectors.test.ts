@@ -213,6 +213,7 @@ describe('store selectors', () => {
     const state = {
       activeWorktreeId: 'wt-1',
       activeTabId: 'term-1',
+      activeTabType: 'terminal',
       tabsByWorktree: {
         'wt-1': [activeTab, secondTab],
         'wt-2': [otherWorktreeTab]

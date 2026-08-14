@@ -29,6 +29,7 @@ import type {
   TerminalTab
 } from '../../../shared/types'
 import type { OpenFile } from '../store/slices/editor'
+import { withActiveTabTypeForWorktree } from '../store/slices/active-tab-type-record'
 import { isTerminalLeafId, makePaneKey, parsePaneKey } from '../../../shared/stable-pane-id'
 import { getRemoteRuntimePtyEnvironmentId, toRemoteRuntimePtyId } from './runtime-terminal-stream'
 import { sanitizeTerminalLayoutPaneTitlesForLabels } from '@/lib/terminal-pane-title-sanitization'
@@ -1729,10 +1730,9 @@ function toVisibleTabType(tab: Tab): WebSessionTabsSyncState['activeTabType'] {
     case 'simulator':
       return 'simulator'
     case 'pipeline':
-      // Why: mobile projection omits pipeline tabs entirely; this local
-      // visible-type surface falls back to 'terminal' rather than mislabeling
-      // the tab as an editor.
-      return 'terminal'
+      // Why: mobile projection omits pipeline tabs entirely, and this local
+      // visible-type surface has no member for one either.
+      return null
     case 'editor':
     case 'diff':
     case 'conflict-review':
@@ -2579,10 +2579,11 @@ export function applyWebSessionTabsSnapshot(
       : (currentActiveEditorStillValid ?? nextActiveEditorFileId)
     : state.activeFileId
   const nextActiveTabType = isActiveWorktree ? nextVisibleTabType : state.activeTabType
-  const nextActiveTabTypeByWorktree =
-    state.activeTabTypeByWorktree[worktreeId] !== nextVisibleTabType
-      ? { ...state.activeTabTypeByWorktree, [worktreeId]: nextVisibleTabType }
-      : state.activeTabTypeByWorktree
+  const nextActiveTabTypeByWorktree = withActiveTabTypeForWorktree(
+    state.activeTabTypeByWorktree,
+    worktreeId,
+    nextVisibleTabType
+  )
   const agentStatusPatch = buildMirroredAgentStatusPatch(
     state,
     currentTerminalTabs,

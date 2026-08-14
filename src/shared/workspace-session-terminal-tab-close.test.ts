@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getDefaultWorkspaceSession } from './constants'
 import type { Tab, TerminalTab, WorkspaceSessionState } from './types'
 import { closeTerminalTabInWorkspaceSession } from './workspace-session-terminal-tab-close'
+import { workspaceSessionStateSchema } from './workspace-session-schema'
 
 const WORKTREE_ID = 'worktree-1'
 
@@ -190,6 +191,41 @@ describe('closeTerminalTabInWorkspaceSession', () => {
     expect(result.session.activeTabTypeByWorktree?.[WORKTREE_ID]).toBe('browser')
     expect(result.session.activeBrowserTabIdByWorktree?.[WORKTREE_ID]).toBe('browser-1')
     expect(result.session.activeWorktreeId).toBe(WORKTREE_ID)
+  })
+
+  it('omits the persisted visible-tab-type entry when the survivor is a pipeline canvas, instead of writing a placeholder', () => {
+    const current = session({
+      unifiedTabs: {
+        [WORKTREE_ID]: [
+          unifiedTab('terminal-1', 'terminal-1', 'terminal'),
+          unifiedTab('pipeline-1', 'run-1', 'pipeline')
+        ]
+      },
+      tabGroups: {
+        [WORKTREE_ID]: [
+          {
+            id: 'group-1',
+            worktreeId: WORKTREE_ID,
+            activeTabId: 'terminal-1',
+            tabOrder: ['terminal-1', 'pipeline-1'],
+            recentTabIds: ['pipeline-1', 'terminal-1']
+          }
+        ]
+      },
+      activeTabTypeByWorktree: { [WORKTREE_ID]: 'terminal' }
+    })
+
+    const result = closeTerminalTabInWorkspaceSession(current, WORKTREE_ID, 'terminal-1')
+
+    expect(result.session.tabGroups?.[WORKTREE_ID]?.[0]?.activeTabId).toBe('pipeline-1')
+    expect(WORKTREE_ID in (result.session.activeTabTypeByWorktree ?? {})).toBe(false)
+    expect(result.session.activeTabTypeByWorktree?.[WORKTREE_ID]).toBeUndefined()
+
+    // Why: the schema's activeTabTypeByWorktree values are a closed enum with no
+    // pipeline member — a session omitting the key (not writing a placeholder)
+    // must still parse and survive a write/read round trip.
+    const parsed = workspaceSessionStateSchema.parse(result.session)
+    expect(parsed.activeTabTypeByWorktree?.[WORKTREE_ID]).toBeUndefined()
   })
 
   it('rejects pinned tabs without mutating the session', () => {

@@ -70,8 +70,11 @@ function getActiveVisibleTabKey(
     return group.activeTabId
   }
 
+  // null activeTabType means the focused unified tab is a pipeline canvas — the one
+  // TabCycleType member WorkspaceVisibleTabType has no slot for.
+  const activeTabType = state.activeTabType ?? 'pipeline'
   const activeEntityId = getActiveEntityIdForTabType(
-    state.activeTabType,
+    activeTabType,
     state.activeTabId,
     state.activeFileId,
     state.activeBrowserTabId
@@ -79,9 +82,8 @@ function getActiveVisibleTabKey(
   const activeEntry =
     activeEntityId == null
       ? null
-      : (entries.find(
-          (entry) => entry.type === state.activeTabType && entry.id === activeEntityId
-        ) ?? null)
+      : (entries.find((entry) => entry.type === activeTabType && entry.id === activeEntityId) ??
+        null)
   return activeEntry ? getVisibleTabKey(activeEntry) : null
 }
 
