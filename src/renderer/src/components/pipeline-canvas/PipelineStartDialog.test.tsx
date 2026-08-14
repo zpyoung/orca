@@ -342,11 +342,11 @@ describe('PipelineStartDialog', () => {
     await waitFor(() => expect(screen.getByText('Agent disabled')).toBeInTheDocument())
   })
 
-  it('shows prior runs with their workspace, run number, and state', async () => {
+  it('shows prior runs with their template name, workspace, run number, and state', async () => {
     listRunsResult = [
       {
         runId: 'run-9',
-        templateName: 'bugfix-fast',
+        templateName: 'nightly-refactor',
         runNumber: 3,
         state: 'completed',
         workspaceDisplayName: 'orca'
@@ -366,7 +366,10 @@ describe('PipelineStartDialog', () => {
     await waitFor(() =>
       expect(callRuntimeRpc).toHaveBeenCalledWith(target, 'pipeline.listRuns', expect.any(Object))
     )
-    await waitFor(() => expect(screen.getByText(/orca #3/)).toBeInTheDocument())
+    // the run's own template name (nightly-refactor) must be distinguishable from the
+    // picker's bugfix-fast, so a run isn't identifiable only by its workspace and number
+    await waitFor(() => expect(screen.getByText(/nightly-refactor/)).toBeInTheDocument())
+    expect(screen.getByText(/orca #3/)).toBeInTheDocument()
     expect(screen.getByText(/completed/i)).toBeInTheDocument()
   })
 
@@ -405,6 +408,50 @@ describe('PipelineStartDialog', () => {
       templateName: 'bugfix-fast'
     })
     expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
+
+  it('keeps the dialog open and reports failure when a live-workspace row cannot be surfaced', async () => {
+    seedLiveWorkspace('w9')
+    listRunsResult = [
+      {
+        runId: 'run-9',
+        templateName: 'bugfix-fast',
+        runNumber: 3,
+        state: 'running',
+        workspaceDisplayName: 'orca',
+        workspaceId: 'w9'
+      }
+    ]
+    // canEnsurePipelineTab's render-time gate can go stale by the time of the click
+    // (e.g. an SSH host disconnects) — ensurePipelineTab reports that failure by
+    // returning null.
+    ensurePipelineTab.mockReturnValueOnce(null)
+    setup([{ basename: 'bugfix-fast.yaml', name: 'bugfix-fast', needsNewerOrca: false }])
+    const onOpenChange = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <PipelineStartDialog
+        open={true}
+        onOpenChange={onOpenChange}
+        worktreeSelector="id:w1"
+        workspaceId="w1"
+        target={target}
+        isFolderWorkspace={false}
+        hasSubmodules={false}
+      />
+    )
+    await waitFor(() => expect(screen.getByText(/orca #3/)).toBeInTheDocument())
+    await user.click(screen.getByText(/orca #3/))
+
+    expect(ensurePipelineTab).toHaveBeenCalledWith('w9', {
+      runId: 'run-9',
+      runNumber: 3,
+      templateName: 'bugfix-fast'
+    })
+    expect(onOpenChange).not.toHaveBeenCalled()
+    await waitFor(() =>
+      expect(screen.getByText(/couldn't open that run's workspace/i)).toBeInTheDocument()
+    )
   })
 
   it("falls back to the dialog's own scoping workspace when a history row carries none", async () => {
@@ -466,8 +513,14 @@ describe('PipelineStartDialog', () => {
     expect(screen.queryByRole('button', { name: /orca #3/ })).not.toBeInTheDocument()
   })
 
-  it('shows history for a run whose workspace no longer exists, presented as non-actionable rather than a silent no-op (AC24)', async () => {
+  it('presents a run-history row as non-actionable, not hidden, once its owning workspace is removed via the real store purge path', async () => {
     seedLiveWorkspace('w1')
+    seedLiveWorkspace('w-removed')
+    // drive the same removal path a host worktree-deletion event triggers (see
+    // purgeWorktreeTerminalState), instead of simply never seeding the workspace —
+    // so the row's non-live classification traces to real removal, not a fixture
+    // that merely looks like one.
+    useAppStore.getState().purgeWorktreeTerminalState(['w-removed'])
     listRunsResult = [
       {
         runId: 'run-live',
@@ -478,14 +531,12 @@ describe('PipelineStartDialog', () => {
         workspaceId: 'w1'
       },
       {
-        runId: 'run-deleted-workspace',
+        runId: 'run-removed-workspace',
         templateName: 'bugfix-fast',
         runNumber: 2,
         state: 'completed',
         workspaceDisplayName: 'old-workspace',
-        // the row still carries its original (now-dead) workspace id — it does not
-        // resolve to any currently live workspace
-        workspaceId: 'w-deleted'
+        workspaceId: 'w-removed'
       }
     ]
     setup([{ basename: 'bugfix-fast.yaml', name: 'bugfix-fast', needsNewerOrca: false }])

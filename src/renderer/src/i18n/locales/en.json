@@ -15155,7 +15155,8 @@
             "cancel": "Cancel",
             "start": "Start",
             "workspaceUnavailable": "Workspace deleted",
-            "submoduleCaveat": "Submodule contents are not checkpointed: if this repository has any, retries do not roll back submodule changes."
+            "submoduleCaveat": "Submodule contents are not checkpointed: if this repository has any, retries do not roll back submodule changes.",
+            "openRunFailed": "Couldn't open that run's workspace."
           },
           "node": {
             "visuals": {

@@ -246,7 +246,7 @@ export default function PipelineStartDialog({
             {runHistory.map((run) => {
               const nameCell = (
                 <span>
-                  {run.workspaceDisplayName} #{run.runNumber}
+                  {run.templateName} · {run.workspaceDisplayName} #{run.runNumber}
                 </span>
               )
               const ownerWorktreeId = run.workspaceId ?? workspaceId
@@ -278,12 +278,24 @@ export default function PipelineStartDialog({
                   key={run.runId}
                   type="button"
                   onClick={() => {
-                    ensurePipelineTab(ownerWorktreeId, {
+                    const tabId = ensurePipelineTab(ownerWorktreeId, {
                       runId: run.runId,
                       runNumber: run.runNumber,
                       templateName: run.templateName
                     })
-                    onOpenChange(false)
+                    // canEnsurePipelineTab above is a render-time gate; the workspace can
+                    // still become unreachable (e.g. a disconnected SSH host) between then
+                    // and this click, so only close once the canvas actually surfaced.
+                    if (tabId) {
+                      onOpenChange(false)
+                      return
+                    }
+                    setErrorMessage(
+                      translate(
+                        'auto.components.pipeline.canvas.PipelineStartDialog.openRunFailed',
+                        "Couldn't open that run's workspace."
+                      )
+                    )
                   }}
                   className="flex items-center justify-between gap-2 rounded-sm px-1 py-0.5 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
