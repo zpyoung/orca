@@ -26,6 +26,7 @@ import type {
   Tab,
   TabGroup,
   TabGroupLayoutNode,
+  TerminalDockPaneState,
   TerminalLayoutSnapshot,
   TerminalTab
 } from '../../../shared/types'
@@ -170,6 +171,9 @@ type MirroredTerminalTab = {
   ptyIds: string[]
   layout: TerminalLayoutSnapshot
   retainedSurfaceByPrunedLeafId?: ReadonlyMap<string, TerminalSurface>
+  // Why: TerminalTab carries no dock field (host-side only, echoed on Tab), so the
+  // host value rides alongside tab instead of on it.
+  terminalDockByPaneKey?: Record<string, TerminalDockPaneState>
 }
 
 type MirroredBrowserTab = {
@@ -1026,6 +1030,11 @@ function buildMirroredTerminalTabs(
     // Why: viewMode echoes back through host snapshots, so prefer the client's record during the echo window and adopt the host value only without a prior tab.
     const hostViewModeSurface = surfaces.find((surface) => surface.viewMode)
     const viewMode = existing ? existing.viewMode : hostViewModeSurface?.viewMode
+    // Why: TerminalTab has no dock field to carry client precedence, so only the raw host
+    // value is resolved here; the caller applies existing-tab precedence at the Tab level.
+    const hostTerminalDockByPaneKey = surfaces.find(
+      (surface) => surface.terminalDockByPaneKey
+    )?.terminalDockByPaneKey
     return {
       tab: {
         id: localTabId,
@@ -1051,7 +1060,8 @@ function buildMirroredTerminalTabs(
       hostTabId: parentTabId,
       ptyIds,
       layout,
-      ...(retainedSurfaceByPrunedLeafId ? { retainedSurfaceByPrunedLeafId } : {})
+      ...(retainedSurfaceByPrunedLeafId ? { retainedSurfaceByPrunedLeafId } : {}),
+      ...(hostTerminalDockByPaneKey ? { terminalDockByPaneKey: hostTerminalDockByPaneKey } : {})
     }
   })
 }
@@ -1323,7 +1333,9 @@ function buildTerminalUnifiedTab(
   tab: TerminalTab,
   groupId: string,
   // Why: viewMode is host-tracked but the client's optimistic toggle must win during the echo window; callers pass the reconciled value.
-  viewMode?: Tab['viewMode']
+  viewMode?: Tab['viewMode'],
+  // Why: same echo-window precedence as viewMode; callers pass the already-reconciled value.
+  terminalDockByPaneKey?: Tab['terminalDockByPaneKey']
 ): Tab {
   return {
     id: tab.id,
@@ -1341,7 +1353,8 @@ function buildTerminalUnifiedTab(
     createdAt: tab.createdAt,
     isPreview: false,
     isPinned: tab.isPinned === true,
-    ...(viewMode ? { viewMode } : {})
+    ...(viewMode ? { viewMode } : {}),
+    ...(terminalDockByPaneKey ? { terminalDockByPaneKey } : {})
   }
 }
 
@@ -2588,13 +2601,23 @@ function applyWebSessionTabsSnapshotWithContext(
       .filter((tab) => tab.contentType === 'terminal' && tab.viewMode)
       .map((tab) => [tab.id, tab.viewMode] as const)
   )
-  const mirroredTerminalUnifiedTabs = mirroredTerminalTabs.map((entry) =>
-    buildTerminalUnifiedTab(
+  // Why: terminalDockByPaneKey has no legacy TerminalTab layer to echo through (unlike
+  // viewMode), so "existing" here means the currently-stored unified tab, and its record
+  // wins whenever that tab already existed at all — even if the record itself is absent.
+  const existingUnifiedTerminalTabById = new Map(
+    currentUnifiedTabs
+      .filter((tab) => tab.contentType === 'terminal')
+      .map((tab) => [tab.id, tab] as const)
+  )
+  const mirroredTerminalUnifiedTabs = mirroredTerminalTabs.map((entry) => {
+    const existingUnifiedTab = existingUnifiedTerminalTabById.get(entry.tab.id)
+    return buildTerminalUnifiedTab(
       entry.tab,
       hostGroupIdByTabId.get(entry.hostTabId) ?? targetGroupId,
-      entry.tab.viewMode ?? existingViewModeByTabId.get(entry.tab.id)
+      entry.tab.viewMode ?? existingViewModeByTabId.get(entry.tab.id),
+      existingUnifiedTab ? existingUnifiedTab.terminalDockByPaneKey : entry.terminalDockByPaneKey
     )
-  )
+  })
   const mirroredBrowserUnifiedTabs = mirroredBrowserTabs.map((entry) => entry.unifiedTab)
   const mirroredEditorUnifiedTabs = mirroredEditorTabs.map((entry) => entry.unifiedTab)
   const mirroredUnifiedTabs = [

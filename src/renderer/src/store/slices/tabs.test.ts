@@ -2,6 +2,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { Tab, TabGroup } from '../../../../shared/types'
 import type * as AgentStatusModule from '@/lib/agent-status'
+import type * as WorktreeRuntimeOwnerModule from '@/lib/worktree-runtime-owner'
+import type * as WebRuntimeSessionModule from '@/runtime/web-runtime-session'
 import { FLOATING_TERMINAL_WORKTREE_ID, getDefaultUIState } from '../../../../shared/constants'
 import { buildMobileSessionTabSnapshots } from '../../runtime/sync-runtime-graph'
 import { closeMobileSessionTabInStore } from '../../runtime/mobile-session-tab-close'
@@ -15,6 +17,33 @@ vi.mock('@/lib/agent-status', async (importOriginal) => {
   return {
     ...actual,
     detectAgentStatusFromTitle: vi.fn().mockReturnValue(null)
+  }
+})
+
+const getRuntimeEnvironmentIdForWorktreeMock = vi.fn<(...args: unknown[]) => string | null>(
+  () => null
+)
+vi.mock('@/lib/worktree-runtime-owner', async (importOriginal) => {
+  const actual = await importOriginal<typeof WorktreeRuntimeOwnerModule>()
+  return {
+    ...actual,
+    getRuntimeEnvironmentIdForWorktree: (...args: unknown[]) =>
+      getRuntimeEnvironmentIdForWorktreeMock(...args)
+  }
+})
+
+// Why: setWebRuntimeTabProps (real impl, imported via vi.importActual below) reads
+// useAppStore.getState() directly; stub it so that import doesn't pull in the full
+// app store composition just to satisfy a call whose result the mocked
+// getRuntimeEnvironmentIdForWorktree above ignores anyway.
+vi.mock('@/store', () => ({ useAppStore: { getState: vi.fn(() => ({})), setState: vi.fn() } }))
+
+const setWebRuntimeTabPropsMock = vi.fn()
+vi.mock('@/runtime/web-runtime-session', async (importOriginal) => {
+  const actual = await importOriginal<typeof WebRuntimeSessionModule>()
+  return {
+    ...actual,
+    setWebRuntimeTabProps: (...args: unknown[]) => setWebRuntimeTabPropsMock(...args)
   }
 })
 
@@ -2401,6 +2430,180 @@ describe('TabsSlice', () => {
       const result = store.getState().reconcileWorktreeTabModel(WT)
       expect(result.renderableTabCount).toBe(1)
       expect(result.activeRenderableTabId).toBe(tab.id)
+    })
+  })
+
+  // ─── setTabTerminalDockState / pruneTerminalDockPaneKeys ─────────────
+
+  describe('terminal dock state', () => {
+    beforeEach(() => {
+      getRuntimeEnvironmentIdForWorktreeMock.mockReset()
+      getRuntimeEnvironmentIdForWorktreeMock.mockReturnValue(null)
+      setWebRuntimeTabPropsMock.mockReset()
+    })
+
+    function seedDockTab(overrides: Partial<Tab> = {}): Tab {
+      const tab = makeUnifiedTab({
+        id: 'dock-tab-1',
+        worktreeId: WT,
+        groupId: 'g-dock',
+        contentType: 'terminal',
+        ...overrides
+      })
+      store.setState({
+        unifiedTabsByWorktree: { [WT]: [tab] },
+        groupsByWorktree: {
+          [WT]: [
+            makeTabGroup({
+              id: 'g-dock',
+              worktreeId: WT,
+              activeTabId: tab.id,
+              tabOrder: [tab.id]
+            })
+          ]
+        }
+      })
+      return tab
+    }
+
+    it('patches the pane entry, defaulting unspecified fields', () => {
+      seedDockTab()
+      store
+        .getState()
+        .setTabTerminalDockState('dock-tab-1', { paneKey: 'dock-tab-1:1', docked: true })
+
+      expect(store.getState().getTab('dock-tab-1')?.terminalDockByPaneKey).toEqual({
+        'dock-tab-1:1': { docked: true, gutterRows: 5 }
+      })
+    })
+
+    it('merges a second patch onto the same pane without disturbing other panes', () => {
+      seedDockTab()
+      store
+        .getState()
+        .setTabTerminalDockState('dock-tab-1', { paneKey: 'pane-a', docked: true, gutterRows: 8 })
+      store.getState().setTabTerminalDockState('dock-tab-1', { paneKey: 'pane-b', docked: false })
+      store.getState().setTabTerminalDockState('dock-tab-1', { paneKey: 'pane-a', gutterRows: 10 })
+
+      expect(store.getState().getTab('dock-tab-1')?.terminalDockByPaneKey).toEqual({
+        'pane-a': { docked: true, gutterRows: 10 },
+        'pane-b': { docked: false, gutterRows: 5 }
+      })
+    })
+
+    it('mirrors only the single-pane patch to the host', async () => {
+      seedDockTab()
+      getRuntimeEnvironmentIdForWorktreeMock.mockReturnValue('env-1')
+
+      store
+        .getState()
+        .setTabTerminalDockState('dock-tab-1', { paneKey: 'pane-a', docked: true, gutterRows: 9 })
+
+      await vi.waitFor(() => expect(setWebRuntimeTabPropsMock).toHaveBeenCalledTimes(1))
+      expect(setWebRuntimeTabPropsMock).toHaveBeenCalledWith({
+        worktreeId: WT,
+        tabId: 'dock-tab-1',
+        terminalDock: { paneKey: 'pane-a', docked: true, gutterRows: 9 }
+      })
+    })
+
+    it('forwards the terminalDock patch all the way onto the outbound RPC params', async () => {
+      // Why: the mock above only proves tabs.ts *calls* setWebRuntimeTabProps with the
+      // patch; it says nothing about whether that function forwards the field onto the
+      // wire. Use the real implementation here to close that specific gap.
+      getRuntimeEnvironmentIdForWorktreeMock.mockReturnValue('env-1')
+      const runtimeCall = vi
+        .fn()
+        .mockResolvedValue({ id: 'p', ok: true, result: { updated: true } })
+      vi.stubGlobal('window', { api: { runtimeEnvironments: { call: runtimeCall } } })
+
+      const real = await vi.importActual<typeof WebRuntimeSessionModule>(
+        '@/runtime/web-runtime-session'
+      )
+
+      expect(
+        real.setWebRuntimeTabProps({
+          worktreeId: WT,
+          tabId: 'dock-tab-1',
+          terminalDock: { paneKey: 'pane-a', docked: true, gutterRows: 9 }
+        })
+      ).toBe(true)
+
+      await vi.waitFor(() => expect(runtimeCall).toHaveBeenCalledTimes(1))
+      expect(runtimeCall).toHaveBeenCalledWith({
+        selector: 'env-1',
+        method: 'session.tabs.setTabProps',
+        params: {
+          worktree: `id:${WT}`,
+          tabId: 'dock-tab-1',
+          terminalDock: { paneKey: 'pane-a', docked: true, gutterRows: 9 }
+        },
+        timeoutMs: 15_000
+      })
+
+      vi.unstubAllGlobals()
+      // Restore the mockApi-backed window the rest of this file's tests depend on.
+      // @ts-expect-error -- partial window stub is sufficient for these store-only tests
+      globalThis.window = { api: mockApi }
+    })
+
+    it('does not mirror to the host without a runtime environment for the worktree', () => {
+      seedDockTab()
+      store.getState().setTabTerminalDockState('dock-tab-1', { paneKey: 'pane-a', docked: true })
+
+      expect(setWebRuntimeTabPropsMock).not.toHaveBeenCalled()
+    })
+
+    it('is a no-op for an unknown tab id', () => {
+      const before = store.getState().unifiedTabsByWorktree[WT]
+      store.getState().setTabTerminalDockState('missing-tab', { paneKey: 'pane-a', docked: true })
+      expect(store.getState().unifiedTabsByWorktree[WT]).toBe(before)
+    })
+
+    it('drops only the retired pane keys', () => {
+      const tab = seedDockTab({
+        terminalDockByPaneKey: {
+          'pane-a': { docked: true, gutterRows: 6 },
+          'pane-b': { docked: false, gutterRows: 8 },
+          'pane-c': { docked: true, gutterRows: 10 }
+        }
+      })
+      store.getState().pruneTerminalDockPaneKeys(tab.id, ['pane-a', 'pane-c'])
+
+      expect(store.getState().getTab(tab.id)?.terminalDockByPaneKey).toEqual({
+        'pane-b': { docked: false, gutterRows: 8 }
+      })
+    })
+
+    it('is a no-op when no pane keys match', () => {
+      seedDockTab({ terminalDockByPaneKey: { 'pane-a': { docked: true, gutterRows: 6 } } })
+      const before = store.getState().unifiedTabsByWorktree[WT]
+      store.getState().pruneTerminalDockPaneKeys('dock-tab-1', ['pane-z'])
+      expect(store.getState().unifiedTabsByWorktree[WT]).toBe(before)
+    })
+
+    it('switching a tab to chat view preserves its dock state', () => {
+      seedDockTab({
+        terminalDockByPaneKey: { 'pane-a': { docked: true, gutterRows: 6 } }
+      })
+
+      store.getState().setTabViewMode('dock-tab-1', 'chat')
+
+      const tab = store.getState().getTab('dock-tab-1')
+      expect(tab?.viewMode).toBe('chat')
+      expect(tab?.terminalDockByPaneKey).toEqual({ 'pane-a': { docked: true, gutterRows: 6 } })
+    })
+
+    it('toggling view mode preserves dock state', () => {
+      seedDockTab({
+        terminalDockByPaneKey: { 'pane-a': { docked: true, gutterRows: 6 } }
+      })
+
+      store.getState().toggleTabViewMode('dock-tab-1')
+
+      expect(store.getState().getTab('dock-tab-1')?.terminalDockByPaneKey).toEqual({
+        'pane-a': { docked: true, gutterRows: 6 }
+      })
     })
   })
 })

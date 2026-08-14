@@ -6,6 +6,7 @@ import type {
   TabContentType,
   TabGroup,
   TabGroupLayoutNode,
+  TerminalDockPaneState,
   TerminalTab,
   TuiAgent,
   WorkspaceSessionState,
@@ -135,6 +136,13 @@ export type TabsSlice = {
   setTabViewMode: (tabId: string, mode: 'terminal' | 'chat') => void
   /** Flip a tab between terminal and native-chat renderings; the live TerminalPane stays mounted. */
   toggleTabViewMode: (tabId: string) => void
+  /** Patch one pane's docked-composer state on a tab; mirrors the single-pane patch to the host. */
+  setTabTerminalDockState: (
+    tabId: string,
+    patch: { paneKey: string; docked?: boolean; gutterRows?: number }
+  ) => void
+  /** Drop retired pane keys from a tab's dock record so it can't grow without bound. */
+  pruneTerminalDockPaneKeys: (tabId: string, paneKeys: readonly string[]) => void
   setTabCustomLabel: (
     tabId: string,
     label: string | null,
@@ -253,6 +261,58 @@ function mirrorTabViewModeToHost(
   const worktreeId = found.worktreeId
   void import('@/runtime/web-runtime-session').then(({ setWebRuntimeTabProps }) =>
     setWebRuntimeTabProps({ worktreeId, tabId, viewMode })
+  )
+}
+
+const DEFAULT_TERMINAL_DOCK_GUTTER_ROWS = 5
+
+function mergeTerminalDockPaneState(
+  existing: TerminalDockPaneState | undefined,
+  patch: { docked?: boolean; gutterRows?: number }
+): TerminalDockPaneState {
+  return {
+    docked: patch.docked ?? existing?.docked ?? false,
+    gutterRows: patch.gutterRows ?? existing?.gutterRows ?? DEFAULT_TERMINAL_DOCK_GUTTER_ROWS
+  }
+}
+
+function removePaneKeysFromRecord<T>(
+  record: Record<string, T> | undefined,
+  paneKeys: ReadonlySet<string>
+): Record<string, T> | undefined {
+  if (!record) {
+    return record
+  }
+  const matchingKeys = Object.keys(record).filter((key) => paneKeys.has(key))
+  if (matchingKeys.length === 0) {
+    return record
+  }
+  const next = { ...record }
+  for (const key of matchingKeys) {
+    delete next[key]
+  }
+  return next
+}
+
+// Why: dock state is host-tracked like color/pin/viewMode, so mirror local sets or they're lost on reconnect and to paired clients.
+// Only the action path mirrors (never reconcile applying a host value), so the echoed snapshot can't re-trigger an outbound RPC.
+// Sends only the single-pane patch (never the whole record) so two clients editing different panes can't clobber each other.
+function mirrorTabTerminalDockToHost(
+  state: AppState,
+  tabId: string,
+  patch: { paneKey: string; docked?: boolean; gutterRows?: number }
+): void {
+  const found = findTabAndWorktree(state.unifiedTabsByWorktree, tabId)
+  if (
+    !found ||
+    found.tab.contentType !== 'terminal' ||
+    !getRuntimeEnvironmentIdForWorktree(state, found.worktreeId)
+  ) {
+    return
+  }
+  const worktreeId = found.worktreeId
+  void import('@/runtime/web-runtime-session').then(({ setWebRuntimeTabProps }) =>
+    setWebRuntimeTabProps({ worktreeId, tabId, terminalDock: patch })
   )
 }
 
@@ -1319,6 +1379,46 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
       emitNativeChatToggled(committed)
       mirrorTabViewModeToHost(get(), tabId, committed.to)
     }
+  },
+
+  setTabTerminalDockState: (tabId, patch) => {
+    set((state) => {
+      const found = findTabAndWorktree(state.unifiedTabsByWorktree, tabId)
+      if (!found) {
+        return {}
+      }
+      const nextPaneState = mergeTerminalDockPaneState(
+        found.tab.terminalDockByPaneKey?.[patch.paneKey],
+        patch
+      )
+      return (
+        patchTab(state.unifiedTabsByWorktree, tabId, {
+          terminalDockByPaneKey: {
+            ...found.tab.terminalDockByPaneKey,
+            [patch.paneKey]: nextPaneState
+          }
+        }) ?? {}
+      )
+    })
+    mirrorTabTerminalDockToHost(get(), tabId, patch)
+  },
+
+  pruneTerminalDockPaneKeys: (tabId, paneKeys) => {
+    if (paneKeys.length === 0) {
+      return
+    }
+    const paneKeySet = new Set(paneKeys)
+    set((state) => {
+      const found = findTabAndWorktree(state.unifiedTabsByWorktree, tabId)
+      if (!found) {
+        return {}
+      }
+      const next = removePaneKeysFromRecord(found.tab.terminalDockByPaneKey, paneKeySet)
+      if (next === found.tab.terminalDockByPaneKey) {
+        return {}
+      }
+      return patchTab(state.unifiedTabsByWorktree, tabId, { terminalDockByPaneKey: next }) ?? {}
+    })
   },
 
   setRenamingTabId: (tabId) => {
