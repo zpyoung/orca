@@ -1,13 +1,13 @@
 import {
   closeSync,
+  constants,
   fstatSync,
-  linkSync,
+  lstatSync,
   mkdirSync,
   openSync,
   readFileSync,
   readdirSync,
   realpathSync,
-  unlinkSync,
   writeFileSync
 } from 'node:fs'
 import { isAbsolute, join, relative } from 'node:path'
@@ -15,6 +15,13 @@ import { MAX_ORCA_YAML_BYTES } from '../../shared/orca-yaml-file-limit'
 import { BUGFIX_FAST_STARTER_TEMPLATE } from './pipeline-starter-template'
 
 const STARTER_TEMPLATE_BASENAME = 'bugfix-fast.yaml'
+
+// a bare open() blocks indefinitely on a FIFO until a writer appears; O_NONBLOCK makes it
+// return immediately so the fstat check below can reject a non-regular entry instead of
+// hanging the process. The constant doesn't exist on Windows, but ordinary Windows
+// directories can't contain FIFOs, so the plain read flag is correct there too.
+const OPEN_FLAGS: number | string =
+  process.platform === 'win32' ? 'r' : constants.O_RDONLY | constants.O_NONBLOCK
 
 export function getPipelineTemplatesDir(homePath: string): string {
   return join(homePath, '.orca', 'pipelines')
@@ -25,40 +32,50 @@ function isRealPathInsideDir(dirRealPath: string, candidateRealPath: string): bo
   return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
 }
 
-// opens once and checks/reads through that one fd, so nothing can swap the target between
-// the validation and the read
+// opens by name first, then confirms the open descriptor's identity (dev+ino) matches a
+// freshly resolved, contained real path — applies to every entry, not just ones readdir
+// classified as symlinks, and pins the read to the exact file that was validated even if
+// the name is swapped afterward
 function readTemplateFile(
-  readPath: string,
-  reportedPath: string,
+  entryPath: string,
+  dirRealPath: string,
   basename: string
 ): { path: string; basename: string; content: string } | undefined {
   let fd: number
   try {
-    fd = openSync(readPath, 'r')
+    fd = openSync(entryPath, OPEN_FLAGS)
   } catch {
     return undefined
   }
   try {
-    const stats = fstatSync(fd)
-    if (!stats.isFile() || stats.size > MAX_ORCA_YAML_BYTES) {
+    const openStats = fstatSync(fd)
+    if (!openStats.isFile() || openStats.size > MAX_ORCA_YAML_BYTES) {
       return undefined
     }
-    return { path: reportedPath, basename, content: readFileSync(fd, 'utf8') }
+    const currentRealPath = realpathSync(entryPath)
+    if (!isRealPathInsideDir(dirRealPath, currentRealPath)) {
+      return undefined
+    }
+    // lstat (not stat) so a real path that turned into a symlink after resolution reports
+    // its own identity rather than silently following through to a new target
+    const currentStats = lstatSync(currentRealPath)
+    // an inode of 0 means the platform couldn't report real identity (seen on some Windows
+    // filesystems) — treat that as indeterminate and reject rather than let a trivial
+    // 0-equals-0 match through
+    if (
+      openStats.ino === 0 ||
+      currentStats.ino === 0 ||
+      currentStats.dev !== openStats.dev ||
+      currentStats.ino !== openStats.ino
+    ) {
+      return undefined
+    }
+    return { path: entryPath, basename, content: readFileSync(fd, 'utf8') }
   } catch {
     return undefined
   } finally {
     closeSync(fd)
   }
-}
-
-function resolveContainedSymlink(entryPath: string, dirRealPath: string): string | undefined {
-  let targetRealPath: string
-  try {
-    targetRealPath = realpathSync(entryPath)
-  } catch {
-    return undefined
-  }
-  return isRealPathInsideDir(dirRealPath, targetRealPath) ? targetRealPath : undefined
 }
 
 /**
@@ -84,18 +101,14 @@ export function listPipelineTemplateFiles(
 
   const files: { path: string; basename: string; content: string }[] = []
   for (const entry of entries) {
-    const entryPath = join(dir, entry.name)
-    let readPath = entryPath
-    if (entry.isSymbolicLink()) {
-      const resolved = resolveContainedSymlink(entryPath, dirRealPath)
-      if (!resolved) {
-        continue
-      }
-      readPath = resolved
-    } else if (!entry.isFile()) {
+    // liveness guard, not the security check: readdir's type bit rules out fifos and other
+    // special files before anything opens them, since open() can block indefinitely on one.
+    // It's a snapshot, so it doesn't replace readTemplateFile's fd-identity check below,
+    // which still runs for every file and symlink entry that passes here.
+    if (!entry.isFile() && !entry.isSymbolicLink()) {
       continue
     }
-    const file = readTemplateFile(readPath, entryPath, entry.name)
+    const file = readTemplateFile(join(dir, entry.name), dirRealPath, entry.name)
     if (file) {
       files.push(file)
     }
@@ -111,23 +124,16 @@ export function listPipelineTemplateFiles(
 export function ensureStarterTemplate(dir: string): { created: boolean; path: string } {
   const path = join(dir, STARTER_TEMPLATE_BASENAME)
   mkdirSync(dir, { recursive: true })
-  const tempPath = join(dir, `${STARTER_TEMPLATE_BASENAME}.tmp`)
-  // exclusive create refuses to follow anything already at the temp path — including a
-  // symlink planted at this predictable name — instead of writing through it
-  writeFileSync(tempPath, BUGFIX_FAST_STARTER_TEMPLATE, { encoding: 'utf8', flag: 'wx' })
   try {
-    // a hard link fails with EEXIST rather than replacing an existing destination, so
-    // create-if-absent is a single atomic step instead of a check followed by a write
-    linkSync(tempPath, path)
+    // exclusive create refuses to follow anything already at this path — file, symlink, or
+    // stale leftover — rather than writing through or replacing it; a single call means
+    // there's no intermediate path for stale or hostile state to wedge
+    writeFileSync(path, BUGFIX_FAST_STARTER_TEMPLATE, { encoding: 'utf8', flag: 'wx' })
     return { created: true, path }
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
       return { created: false, path }
     }
     throw error
-  } finally {
-    try {
-      unlinkSync(tempPath)
-    } catch {}
   }
 }
