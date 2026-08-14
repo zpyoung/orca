@@ -1,5 +1,4 @@
 import type { AgentStatusState } from '../../../../shared/agent-status-types'
-import { isManagedAgentHookTarget } from '../../../../shared/managed-agent-hook-targets'
 
 const NON_WORKING_STATES = new Set<AgentStatusState>(['blocked', 'waiting', 'done'])
 
@@ -18,5 +17,7 @@ export function shouldAutoExitPassthroughOnAgentStatus(args: {
   if (!args.nextState || !NON_WORKING_STATES.has(args.nextState)) {
     return false
   }
-  return isManagedAgentHookTarget(args.agentType)
+  // Observing the transition in agentStatusByPaneKey is itself proof that this
+  // pane has a status source, including OSC-backed and custom agents.
+  return args.agentType != null && args.agentType.length > 0
 }

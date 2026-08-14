@@ -3,11 +3,14 @@
 import '@testing-library/jest-dom/vitest'
 
 import { cleanup, render, screen } from '@testing-library/react'
-import type { ReactNode } from 'react'
+import type { ReactNode, Ref } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ManagedPane } from '@/lib/pane-manager/pane-manager-types'
 import { queuePanePtyResizeIfHeld } from '@/lib/pane-manager/pane-pty-resize-hold'
-import { terminalDockAutoUndockHighThresholdPx } from '../terminal-dock/TerminalDock'
+import {
+  terminalDockAutoUndockHighThresholdPx,
+  terminalDockGutterHeightPx
+} from '../terminal-dock/TerminalDock'
 import { DEFAULT_GUTTER_ROWS } from '../terminal-dock/terminal-dock-pane-state'
 
 vi.mock('@/i18n/i18n', () => ({
@@ -28,6 +31,24 @@ vi.mock('@/components/ui/tooltip', () => ({
 vi.mock('../native-chat/NativeChatSessionOptionPickers', () => ({
   NativeChatSessionOptionPickers: () => <div data-testid="session-option-pickers" />
 }))
+vi.mock('../terminal-dock/TerminalDockComposer', async () => {
+  const React = await import('react')
+  return {
+    TerminalDockComposer: ({ ref }: { ref?: Ref<unknown> }) => {
+      const textareaRef = React.useRef<HTMLTextAreaElement>(null)
+      React.useImperativeHandle(ref, () => ({
+        focus: () => {
+          textareaRef.current?.focus()
+          return true
+        },
+        insertTypedText: () => false,
+        handlePasteEvent: () => {},
+        pasteFromClipboard: () => {}
+      }))
+      return <textarea ref={textareaRef} />
+    }
+  }
+})
 vi.mock('../native-chat/native-chat-runtime-send', () => ({
   sendNativeChatMessage: vi.fn(() => ({ cancel: vi.fn(), settleAfterMs: 0 })),
   sendNativeChatMessageWithImageAttachments: vi.fn(),
@@ -89,6 +110,36 @@ describe('TerminalPaneDockMount', () => {
     render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={true} />)
     const dockSlot = pane.container.querySelector('.pane-dock-slot') as HTMLElement
     expect(dockSlot.querySelector('[data-terminal-dock]')).not.toBeNull()
+  })
+
+  it('owns slot geometry and reports the effective auto-undock surface', () => {
+    const pane = makeFakePane()
+    const onEffectiveMountedChange = vi.fn()
+    const { rerender } = render(
+      <TerminalPaneDockMount
+        {...baseProps}
+        pane={pane}
+        docked={true}
+        onEffectiveMountedChange={onEffectiveMountedChange}
+      />
+    )
+    const dockSlot = pane.container.querySelector('.pane-dock-slot') as HTMLElement
+    expect(dockSlot.style.height).toBe(`${terminalDockGutterHeightPx(DEFAULT_GUTTER_ROWS)}px`)
+    expect(pane.container.style.getPropertyValue('--terminal-dock-height')).toBe(
+      `${terminalDockGutterHeightPx(DEFAULT_GUTTER_ROWS)}px`
+    )
+    expect(onEffectiveMountedChange).toHaveBeenCalledWith(true)
+
+    rerender(
+      <TerminalPaneDockMount
+        {...baseProps}
+        pane={pane}
+        docked={false}
+        onEffectiveMountedChange={onEffectiveMountedChange}
+      />
+    )
+    expect(dockSlot.style.height).toBe('0px')
+    expect(onEffectiveMountedChange).toHaveBeenLastCalledWith(false)
   })
 
   it('holds and releases the PTY resize around a dock/undock edge without throwing', () => {

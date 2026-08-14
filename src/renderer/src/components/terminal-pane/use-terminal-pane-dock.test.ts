@@ -113,6 +113,7 @@ function renderDockHookWithShortcutTarget(): {
       containerRef: { current: container }
     })
   )
+  act(() => result.current.setPaneDockMounted(PANE_KEY, true))
   return { container, result }
 }
 
@@ -160,11 +161,48 @@ describe('useTerminalPaneDock', () => {
     expect(mocks.setTabTerminalDockState).not.toHaveBeenCalled()
   })
 
-  it('reads persisted docked/gutterRows from the unified tab record', () => {
+  it('reads persisted dock state and owns focus only while the composer is mounted', () => {
     const { result } = renderDockHook(true)
     expect(result.current.isPaneDocked(PANE_KEY)).toBe(true)
     expect(result.current.gutterRowsFor(PANE_KEY)).toBe(5)
+    expect(result.current.paneDockOwnsFocus(PANE_KEY)).toBe(false)
+    act(() => result.current.setPaneDockMounted(PANE_KEY, true))
     expect(result.current.paneDockOwnsFocus(PANE_KEY)).toBe(true)
+    act(() => result.current.setPaneDockMounted(PANE_KEY, false))
+    expect(result.current.paneDockOwnsFocus(PANE_KEY)).toBe(false)
+  })
+
+  it('docks a recognized pane by default only when neither persistence source decided', () => {
+    fakeStore.setState({
+      unifiedTabsByWorktree: { 'wt-1': [makeUnifiedTab({ terminalDockByPaneKey: {} })] }
+    })
+    const { result } = renderDockHook(true)
+
+    act(() => result.current.ensurePaneDockDefault(PANE_KEY, 'claude'))
+
+    expect(mocks.setTabTerminalDockState).toHaveBeenCalledExactlyOnceWith('unified-1', {
+      paneKey: PANE_KEY,
+      docked: true,
+      gutterRows: DEFAULT_GUTTER_ROWS
+    })
+    expect(readTerminalDockPaneState(PANE_KEY)).toEqual({
+      docked: true,
+      gutterRows: DEFAULT_GUTTER_ROWS
+    })
+  })
+
+  it('preserves an explicit local undock when the host has not echoed dock state', () => {
+    fakeStore.setState({
+      unifiedTabsByWorktree: {
+        'wt-1': [makeUnifiedTab({ terminalDockByPaneKey: undefined })]
+      }
+    })
+    writeTerminalDockPaneState(PANE_KEY, { docked: false, gutterRows: 7 })
+    const { result } = renderDockHook(true)
+
+    act(() => result.current.ensurePaneDockDefault(PANE_KEY, 'claude'))
+
+    expect(mocks.setTabTerminalDockState).not.toHaveBeenCalled()
   })
 
   it('paneDockOwnsFocus is false when disabled even for a persisted docked pane', () => {
@@ -305,13 +343,16 @@ describe('useTerminalPaneDock', () => {
     })
 
     it('writes nothing to localStorage when the flag is disabled', () => {
+      writeTerminalDockPaneState(PANE_KEY, { docked: true, gutterRows: 6 })
+      const before = window.localStorage.getItem('orca.terminalDock.paneState.v1')
       const { result } = renderDockHook(false)
 
       act(() => {
         result.current.undockOnConfirmedAgentExit(LEAF_ID)
+        result.current.prunePassthroughForRetiredPane(LEAF_ID)
       })
 
-      expect(window.localStorage.getItem('orca.terminalDock.paneState.v1')).toBeNull()
+      expect(window.localStorage.getItem('orca.terminalDock.paneState.v1')).toBe(before)
     })
   })
 })

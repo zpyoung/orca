@@ -126,7 +126,7 @@ import { resolvePaneWslDistro } from './terminal-pane-wsl-distro'
 import { getExecutionHostIdForWorktree } from '@/lib/worktree-runtime-owner'
 import { isPaneReplaying, type ReplayingPanesRef } from './replay-guard'
 import { canReleaseReplayedScrollbackFromStore } from './replayed-scrollback-store-release'
-import { fitAndFocusPanes, fitPanes } from './pane-helpers'
+import { fitAndFocusPanes, fitPanes, type PaneFocusOwnership } from './pane-helpers'
 import { markTerminalPinnedViewport } from '@/lib/pane-manager/terminal-scroll-intent'
 import { syncTerminalScrollIntentSoon } from '@/lib/pane-manager/terminal-scroll-intent-settle'
 import { registerRuntimeTerminalTab, scheduleRuntimeGraphSync } from '@/runtime/sync-runtime-graph'
@@ -230,6 +230,7 @@ async function formatTerminalUrlTooltip(
 
 type UseTerminalPaneLifecycleDeps = {
   tabId: string
+  paneDockOwnsFocus: PaneFocusOwnership['paneDockOwnsFocus']
   worktreeId: string
   cwd?: string
   startup?: {
@@ -613,6 +614,7 @@ export function retireMountedTerminalPaneSurface(args: {
 /** Wires mounted terminal panes to renderer state and terminal event handling. */
 export function useTerminalPaneLifecycle({
   tabId,
+  paneDockOwnsFocus,
   worktreeId,
   cwd,
   startup,
@@ -684,6 +686,8 @@ export function useTerminalPaneLifecycle({
   configureTerminalOutputBacklogCap(settings?.terminalScrollbackRows)
   const systemPrefersDarkRef = useRef(systemPrefersDark)
   systemPrefersDarkRef.current = systemPrefersDark
+  const paneDockOwnsFocusRef = useRef(paneDockOwnsFocus)
+  paneDockOwnsFocusRef.current = paneDockOwnsFocus
   const previousVisibleForReconcileRef = useRef<TerminalPaneVisibilitySnapshot | null>(null)
   const mountFollowsTerminalPark = useTerminalParkMountIntent(tabId)
   const linkProviderDisposablesRef = useRef(new Map<number, IDisposable>())
@@ -834,7 +838,10 @@ export function useTerminalPaneLifecycle({
           return
         }
         if (focusActive) {
-          fitAndFocusPanes(manager)
+          fitAndFocusPanes(manager, {
+            tabId,
+            paneDockOwnsFocus: paneDockOwnsFocusRef.current
+          })
           return
         }
         fitPanes(manager)

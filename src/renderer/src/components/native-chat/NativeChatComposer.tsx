@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useMemo, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react'
 import { useAppStore } from '../../store'
 import { emitNativeChatMessageSent } from '@/lib/native-chat-telemetry'
 import { applyMentionSuggestion } from './native-chat-composer-state'
@@ -21,6 +21,7 @@ import { useNativeChatDictationActions } from './use-native-chat-dictation-actio
 import { useNativeChatSessionOptionCommand } from './use-native-chat-session-option-command'
 import { useNativeChatPickerState } from './use-native-chat-picker-state'
 import { useNativeChatPickerCommandDispatch } from './use-native-chat-picker-command-dispatch'
+import { seedHistory } from '../agent-composer/agent-composer-history'
 import type {
   NativeChatComposerHandle,
   NativeChatComposerProps
@@ -53,7 +54,12 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       targetPtyId,
       agent,
       canSend = true,
+      sendDisabled = false,
+      layout,
       isWorking = false,
+      sendTier,
+      historyPrompts,
+      onSendOutcome,
       onStop,
       onOptimisticSend,
       onOptimisticSendCanceled,
@@ -71,13 +77,23 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       targetPtyId,
       agent,
       canSend,
+      sendDisabled,
+      layout,
       isWorking,
+      sendTier,
+      onSendOutcome,
       onStop,
       onOptimisticSend,
       onOptimisticSendCanceled,
       readTerminalScreen
     }
     const core = useAgentComposerCoreState(coreProps)
+    const setComposerHistory = core.setHistory
+    useEffect(() => {
+      if (historyPrompts && historyPrompts.length > 0) {
+        setComposerHistory((previous) => seedHistory(previous, historyPrompts))
+      }
+    }, [setComposerHistory, historyPrompts])
     useNativeChatLaunchDraftAdoption({
       terminalTabId,
       agent,
@@ -102,16 +118,21 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       setActiveSuggestion: core.setActiveSuggestion
     })
 
-    const { imageAttachments, attachResolvedPaths, clearImageAttachments, removeImageAttachment } =
-      useNativeChatComposerAttachments({
-        attachmentScopeKey: paneKey,
-        caret: core.caret,
-        resolveTarget: core.resolveTarget,
-        textareaRef: core.textareaRef,
-        setCaret: core.setCaret,
-        setDraft: core.setDraft,
-        setNotice: core.setNotice
-      })
+    const {
+      imageAttachments,
+      attachResolvedPaths,
+      clearImageAttachments,
+      restoreImageAttachments,
+      removeImageAttachment
+    } = useNativeChatComposerAttachments({
+      attachmentScopeKey: paneKey,
+      caret: core.caret,
+      resolveTarget: core.resolveTarget,
+      textareaRef: core.textareaRef,
+      setCaret: core.setCaret,
+      setDraft: core.setDraft,
+      setNotice: core.setNotice
+    })
 
     const { attachExternalPaths, resolveAttachmentOwner } = useNativeChatExternalAttachments({
       terminalTabId,
@@ -206,6 +227,7 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       onAttach: pickAttachment,
       onRemoveImageAttachment: removeImageAttachment,
       clearImageAttachments,
+      restoreImageAttachments,
       onPaste: handlePaste,
       pasteFromClipboard,
       isDictating,

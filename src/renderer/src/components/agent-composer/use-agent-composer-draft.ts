@@ -29,11 +29,10 @@ export function useAgentComposerDraft(scopeKey: string): {
   // forms as a useState setter so call sites are drop-in.
   const setDraft = useCallback(
     (next: string | ((previous: string) => string)) => {
-      setDraftState((previous) => {
-        const resolved = typeof next === 'function' ? next(previous) : next
-        writeAgentComposerDraftCache(scopeKey, resolved)
-        return resolved
-      })
+      const previous = readAgentComposerDraftCache(scopeKey)
+      const resolved = typeof next === 'function' ? next(previous) : next
+      writeAgentComposerDraftCache(scopeKey, resolved)
+      setDraftState(resolved)
     },
     [scopeKey]
   )

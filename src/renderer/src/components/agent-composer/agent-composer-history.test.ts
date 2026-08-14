@@ -5,7 +5,8 @@ import {
   HISTORY_MAX_TOTAL_CHARS,
   pushHistory,
   recallNext,
-  recallPrevious
+  recallPrevious,
+  seedHistory
 } from './agent-composer-history'
 
 describe('history recall', () => {
@@ -79,5 +80,16 @@ describe('history recall', () => {
     let history = pushHistory(EMPTY_HISTORY, 'small')
     history = pushHistory(history, huge)
     expect(history.entries).toEqual([huge])
+  })
+
+  it('seeds recovered prompts once while preserving their order', () => {
+    const initial = pushHistory(EMPTY_HISTORY, 'already sent')
+    const seeded = seedHistory(initial, ['older', 'already sent', '', 'newer', 'older'])
+    expect(seeded.entries).toEqual(['already sent', 'older', 'newer'])
+  })
+
+  it('returns the same state when every recovered prompt is already present', () => {
+    const initial = seedHistory(EMPTY_HISTORY, ['a', 'b'])
+    expect(seedHistory(initial, ['a', 'b'])).toBe(initial)
   })
 })

@@ -74,6 +74,14 @@ export function readTerminalDockPaneState(paneKey: string): TerminalDockPaneStat
   return map[paneKey] ?? DEFAULT_TERMINAL_DOCK_PANE_STATE
 }
 
+/** Distinguishes a deliberate local undock from the absent-state default. */
+export function hasTerminalDockPaneState(paneKey: string): boolean {
+  if (isUnsafeObjectKey(paneKey)) {
+    return false
+  }
+  return Object.hasOwn(readStoredMap(), paneKey)
+}
+
 export function writeTerminalDockPaneState(paneKey: string, state: TerminalDockPaneState): void {
   if (isUnsafeObjectKey(paneKey)) {
     return

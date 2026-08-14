@@ -32,6 +32,7 @@ export type AgentComposerFieldProps = {
   disabled: boolean
   hasPty: boolean
   canSend: boolean
+  layout?: 'dock'
   autocomplete: ComposerAutocomplete
   activeSuggestion: number
   notice: string | null
@@ -74,6 +75,7 @@ export function AgentComposerField({
   disabled,
   hasPty,
   canSend,
+  layout,
   autocomplete,
   activeSuggestion,
   notice,
@@ -107,10 +109,16 @@ export function AgentComposerField({
   const widthClassName = useNativeChatWidthClassName()
 
   return (
-    <div className="shrink-0 bg-background">
+    <div className={cn('bg-background', layout === 'dock' ? 'h-full min-h-0' : 'shrink-0')}>
       {/* Extra bottom padding keeps the input box off the window rim. */}
-      <div className="px-3 pt-2 pb-4 sm:px-4">
-        <div className={cn('relative mx-auto w-full', widthClassName)}>
+      <div className={cn('px-3 pt-2 sm:px-4', layout === 'dock' ? 'h-full min-h-0 pb-2' : 'pb-4')}>
+        <div
+          className={cn(
+            'relative mx-auto w-full',
+            layout === 'dock' && 'flex h-full min-h-0 flex-col',
+            widthClassName
+          )}
+        >
           {autocomplete.mode === 'slash' || autocomplete.mode === 'skill' ? (
             <NativeChatPickerMenu
               autocomplete={autocomplete}
@@ -136,11 +144,17 @@ export function AgentComposerField({
               // no focus/click border flash. The box is a container, not a
               // focus target.
               'rounded-lg border border-border p-1.5 shadow-xs',
-              'bg-muted/50 dark:bg-input/40'
+              'bg-muted/50 dark:bg-input/40',
+              layout === 'dock' && 'flex min-h-0 flex-1 flex-col overflow-hidden'
             )}
           >
             {imageAttachments.length > 0 ? (
-              <div className="mb-2 flex flex-wrap gap-1.5 px-1">
+              <div
+                className={cn(
+                  'mb-2 flex flex-wrap gap-1.5 px-1',
+                  layout === 'dock' && 'scrollbar-sleek max-h-12 shrink-0 overflow-y-auto'
+                )}
+              >
                 {imageAttachments.map((attachment) => (
                   <div
                     key={attachment.id}
@@ -201,12 +215,14 @@ export function AgentComposerField({
               // keeps that gutter off the heavy native scrollbar. Both are layout-driven,
               // so re-wrap on window/pane resize is handled without a measure pass.
               className={cn(
-                'scrollbar-sleek min-h-12 w-full resize-none bg-transparent px-2 py-1 text-sm outline-none pointer-coarse:min-h-14',
-                '[field-sizing:content] max-h-[calc(8lh+0.5rem)]',
+                'scrollbar-sleek w-full resize-none bg-transparent px-2 py-1 text-sm outline-none',
+                layout === 'dock'
+                  ? 'scrollbar-sleek min-h-0 flex-1 overflow-y-auto'
+                  : 'min-h-12 [field-sizing:content] max-h-[calc(8lh+0.5rem)] pointer-coarse:min-h-14',
                 'placeholder:text-muted-foreground/60 disabled:cursor-not-allowed disabled:opacity-50'
               )}
             />
-            <div className="flex flex-wrap items-center gap-2 pt-0.5">
+            <div className="flex shrink-0 flex-wrap items-center gap-2 pt-0.5">
               <AgentComposerActions
                 attachDisabled={attachDisabled}
                 dictationDisabled={dictationDisabled}

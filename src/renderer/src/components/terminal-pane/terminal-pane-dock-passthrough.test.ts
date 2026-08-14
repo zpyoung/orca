@@ -29,12 +29,22 @@ describe('shouldAutoExitPassthroughOnAgentStatus', () => {
     ).toBe(true)
   })
 
-  it('does not exit for an agent without a hook status source', () => {
+  it('exits for OSC/custom agents when the status slice observes the transition', () => {
     expect(
       shouldAutoExitPassthroughOnAgentStatus({
         previousState: 'working',
         nextState: 'done',
         agentType: 'some-unsupported-cli'
+      })
+    ).toBe(true)
+  })
+
+  it('does not exit without an identified status source', () => {
+    expect(
+      shouldAutoExitPassthroughOnAgentStatus({
+        previousState: 'working',
+        nextState: 'done',
+        agentType: null
       })
     ).toBe(false)
   })

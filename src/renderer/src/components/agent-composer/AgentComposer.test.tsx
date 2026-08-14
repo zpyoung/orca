@@ -2,7 +2,7 @@
 
 import '@testing-library/jest-dom/vitest'
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -37,6 +37,7 @@ vi.mock('../native-chat/native-chat-runtime-send', () => ({
   submitNativeChatPrompt: vi.fn()
 }))
 
+import { buildAgentTuiClearInputForText } from '../../../../shared/agent-tui-input-clear'
 import { AgentComposer } from './AgentComposer'
 
 afterEach(() => {
@@ -67,5 +68,106 @@ describe('AgentComposer bare mount', () => {
 
     expect(screen.getByRole('textbox')).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
+  })
+
+  it('uses verified clear and post-submit screen observation for a verified dock send', () => {
+    const readTerminalScreen = vi.fn(() => '❯ ')
+    render(
+      <AgentComposer
+        terminalTabId="tab-verified"
+        paneKey="pane-verified"
+        targetPtyId="pty-verified"
+        agent="claude"
+        sendTier="verified"
+        readTerminalScreen={readTerminalScreen}
+      />
+    )
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'first\nsecond' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    const options = mocks.sendNativeChatMessage.mock.calls[0]?.[3]
+    expect(options.clearInput).toBe(buildAgentTuiClearInputForText('first\nsecond'))
+    expect(options.confirmCleared()).toBe(true)
+    expect(options.confirmSubmitted()).toBe(true)
+    expect(readTerminalScreen).toHaveBeenCalledTimes(2)
+  })
+
+  it('uses input-tier slack clear without observation', () => {
+    render(
+      <AgentComposer
+        terminalTabId="tab-input"
+        paneKey="pane-input"
+        targetPtyId="pty-input"
+        agent="grok"
+        sendTier="input"
+        readTerminalScreen={vi.fn(() => '› ')}
+      />
+    )
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'hello' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    const options = mocks.sendNativeChatMessage.mock.calls[0]?.[3]
+    expect(options.clearInput).toBe(buildAgentTuiClearInputForText('hello'))
+    expect(options.confirmCleared).toBeUndefined()
+    expect(options.confirmSubmitted).toBeUndefined()
+  })
+
+  it('prepends a retained payload without overwriting text typed while the send settles', () => {
+    render(
+      <AgentComposer
+        terminalTabId="tab-restore"
+        paneKey="pane-restore"
+        targetPtyId="pty-restore"
+        agent="claude"
+        sendTier="verified"
+      />
+    )
+    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
+    fireEvent.change(textarea, { target: { value: 'possibly lost' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    fireEvent.change(textarea, { target: { value: 'typed after send' } })
+
+    const options = mocks.sendNativeChatMessage.mock.calls[0]?.[3]
+    act(() => options.onOutcome('may-not-have-sent'))
+
+    expect(textarea.value).toBe('possibly lost\n\ntyped after send')
+    expect(screen.getByText(/Check the terminal before retrying/)).toBeInTheDocument()
+  })
+
+  it('can disable Send without disabling draft editing', () => {
+    render(
+      <AgentComposer
+        terminalTabId="tab-card"
+        paneKey="pane-card"
+        targetPtyId="pty-card"
+        agent="claude"
+        sendDisabled
+      />
+    )
+
+    const textarea = screen.getByRole('textbox')
+    expect(textarea).toBeEnabled()
+    fireEvent.change(textarea, { target: { value: 'draft while card is open' } })
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
+    fireEvent.keyDown(textarea, { key: 'Enter' })
+    expect(mocks.sendNativeChatMessage).not.toHaveBeenCalled()
+  })
+
+  it('keeps Send independent from the working-only Stop action', () => {
+    render(
+      <AgentComposer
+        terminalTabId="tab-busy"
+        paneKey="pane-busy"
+        targetPtyId="pty-busy"
+        agent="claude"
+        isWorking
+        onStop={vi.fn()}
+      />
+    )
+
+    expect(screen.getByRole('button', { name: 'Stop the agent' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'follow up' } })
+    expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled()
   })
 })

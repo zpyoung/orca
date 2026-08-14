@@ -31,13 +31,14 @@ export function beginTerminalDockGutterDrag(
   event: { clientY: number; pointerId: number; currentTarget: PointerCaptureTarget },
   args: TerminalDockGutterDragArgs,
   fit: (pane: ManagedPane) => boolean = safeFit
-): void {
+): () => void {
   const handle = event.currentTarget
   const startY = event.clientY
   const { pane, startGutterRows, onLiveRowsChange, onCommit } = args
   let liveRows = startGutterRows
   let pendingRows: number | null = null
   let rafId: number | null = null
+  let settleRafId: number | null = null
   let released = false
 
   const release = holdPtyResizesForPaneSubtrees([pane.container])
@@ -50,6 +51,7 @@ export function beginTerminalDockGutterDrag(
     liveRows = pendingRows
     pendingRows = null
     onLiveRowsChange(liveRows)
+    fit(pane)
   }
 
   const scheduleRows = (rows: number): void => {
@@ -109,12 +111,16 @@ export function beginTerminalDockGutterDrag(
         // would measure stale geometry and flush it while the hold is still open, then the
         // real, later layout change triggers its own unheld resize once this hold releases —
         // two PTY SIGWINCHes for one release. Deferring a frame lets fit read the settled size.
-        requestAnimationFrame(fitAndFlush)
+        settleRafId = requestAnimationFrame(() => {
+          settleRafId = null
+          fitAndFlush()
+        })
       } else {
         fitAndFlush()
       }
     } else {
       onLiveRowsChange(startGutterRows)
+      fit(pane)
       release.cancel()
     }
   }
@@ -148,4 +154,16 @@ export function beginTerminalDockGutterDrag(
   window.addEventListener('pointerup', onPointerUp, true)
   window.addEventListener('pointercancel', onPointerCancel, true)
   window.addEventListener('blur', onBlur, true)
+
+  return () => {
+    if (!released) {
+      finish(false)
+      return
+    }
+    if (settleRafId !== null) {
+      cancelAnimationFrame(settleRafId)
+      settleRafId = null
+      release.cancel()
+    }
+  }
 }

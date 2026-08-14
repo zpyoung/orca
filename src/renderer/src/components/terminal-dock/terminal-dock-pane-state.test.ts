@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   DEFAULT_GUTTER_ROWS,
+  hasTerminalDockPaneState,
   MAX_GUTTER_ROWS,
   MIN_GUTTER_ROWS,
   readTerminalDockPaneState,
@@ -26,6 +27,12 @@ describe('readTerminalDockPaneState', () => {
       docked: false,
       gutterRows: DEFAULT_GUTTER_ROWS
     })
+  })
+
+  it('distinguishes absent state from an explicit undocked decision', () => {
+    expect(hasTerminalDockPaneState('pane-1')).toBe(false)
+    writeTerminalDockPaneState('pane-1', { docked: false, gutterRows: 5 })
+    expect(hasTerminalDockPaneState('pane-1')).toBe(true)
   })
 
   it('round-trips a written value through localStorage', () => {

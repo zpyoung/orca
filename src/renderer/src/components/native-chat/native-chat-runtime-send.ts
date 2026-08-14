@@ -8,7 +8,6 @@ import {
 } from '@/runtime/runtime-terminal-inspection'
 import type { getSettingsForAgentTabRuntimeOwner } from '@/lib/agent-paste-draft'
 import type { AskAnswerKeyGroup } from './native-chat-interactive-prompt'
-import { AGENT_TUI_CLEAR_INPUT_MAX } from '../../../../shared/agent-tui-input-clear'
 import {
   NATIVE_CHAT_ADVANCE_BUFFER_MS,
   NATIVE_CHAT_QUESTION_STEP_MS,
@@ -36,25 +35,20 @@ import {
   submitAndObserve
 } from './native-chat-send-outcome'
 import type { SendOutcome } from './native-chat-send-outcome'
+import {
+  clearConfirmDurationMs,
+  clearThenWrite,
+  clearUnsubmittedAgentInput,
+  NATIVE_CHAT_CLEAR_CONFIRM_MS,
+  NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT
+} from './native-chat-runtime-clear'
 
 export { NATIVE_CHAT_ADVANCE_BUFFER_MS, NATIVE_CHAT_QUESTION_STEP_MS, NATIVE_CHAT_SUBMIT_DELAY_MS }
 export { resetNativeChatPtySendQueuesForTests }
 
 export const NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS = 300
 
-// Why: agent TUI composers treat Ctrl+U as kill-to-start-of-line. Chat sends
-// start from an empty line so a prior cancelled paste cannot glue onto the next
-// prompt. Not used on verified option commands — model-switch confirmation
-// observes the PTY and Ctrl+U can miss confirmation markers.
-//
-// One Ctrl+U only ever clears ONE logical line. When the line may hold an
-// injected multi-line launch draft, callers pass `clearInput` built by
-// buildAgentTuiClearInputForText — see agent-tui-input-clear.ts for the measured
-// 2N-1 law and the sequences that do NOT work.
-export const NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT = '\x15'
-
-/** Gap before re-reading the agent's input line to confirm a clear landed. */
-export const NATIVE_CHAT_CLEAR_CONFIRM_MS = 140
+export { NATIVE_CHAT_CLEAR_CONFIRM_MS, NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT }
 
 export type NativeChatSendOptions = {
   /** Bytes that empty the agent's input line. Defaults to a single Ctrl+U. */
@@ -87,54 +81,6 @@ export type NativeChatSendHandle = {
 
 export type RuntimeSettings = ReturnType<typeof getSettingsForAgentTabRuntimeOwner>
 
-function clearUnsubmittedAgentInput(
-  settings: RuntimeSettings,
-  ptyId: string,
-  options?: NativeChatSendOptions
-): void {
-  sendRuntimePtyInput(settings, ptyId, options?.clearInput ?? NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT)
-}
-
-/**
- * Run `writeBody` once the input line is clear. With no `confirmCleared` the
- * clear is a plain in-order write on the same byte stream, so the TUI consumes
- * it before the body and the body follows immediately. With one, we pause to
- * actually look at the agent's input line, and widen to a maximal burst when the
- * draft is still visible — the injected line count is only a lower bound on what
- * the buffer holds, since the user can type into the TUI directly.
- */
-function clearThenWrite(
-  settings: RuntimeSettings,
-  ptyId: string,
-  options: NativeChatSendOptions | undefined,
-  delay: (ms: number, fn: () => void) => void,
-  writeBody: () => void
-): void {
-  clearUnsubmittedAgentInput(settings, ptyId, options)
-  const confirmCleared = options?.confirmCleared
-  if (!confirmCleared) {
-    writeBody()
-    return
-  }
-  delay(NATIVE_CHAT_CLEAR_CONFIRM_MS, () => {
-    let cleared = false
-    try {
-      cleared = confirmCleared()
-    } catch {
-      // An unreadable terminal is unconfirmed; the maximal clear remains safe.
-    }
-    if (!cleared) {
-      sendRuntimePtyInput(settings, ptyId, AGENT_TUI_CLEAR_INPUT_MAX)
-    }
-    writeBody()
-  })
-}
-
-/** Extra time a send needs when it stops to confirm the clear before the body. */
-function clearConfirmDurationMs(options?: NativeChatSendOptions): number {
-  return options?.confirmCleared ? NATIVE_CHAT_CLEAR_CONFIRM_MS : 0
-}
-
 /**
  * Chat message path:
  *   1. clear any unsubmitted TUI line
@@ -160,30 +106,40 @@ export function sendNativeChatMessage(
       }
       const delayGuarded = guardedDelay(delay, markSubmitted, reportOutcome)
       runOutcomeGuarded(markSubmitted, reportOutcome, () => {
-        clearThenWrite(settings, ptyId, options, delayGuarded, () => {
-          if (isCancelled()) {
-            reportOutcome('may-not-have-sent')
-            return
-          }
-          if (!sendRuntimePtyInput(settings, ptyId, buildNativeChatPasteBytes(text))) {
-            // A rejected write leaves the composer empty, so confirmSubmitted would
-            // misread that as a landed send — the CR must not follow it.
+        clearThenWrite(
+          settings,
+          ptyId,
+          options,
+          delayGuarded,
+          () => {
+            if (isCancelled()) {
+              reportOutcome('may-not-have-sent')
+              return
+            }
+            if (!sendRuntimePtyInput(settings, ptyId, buildNativeChatPasteBytes(text))) {
+              // A rejected write leaves the composer empty, so confirmSubmitted would
+              // misread that as a landed send — the CR must not follow it.
+              markSubmitted()
+              reportOutcome('may-not-have-sent')
+              return
+            }
+            // Schedule from the actual body write: an overdue clear-confirm callback
+            // must not collapse the required body-to-Enter gap after a renderer stall.
+            delayGuarded(NATIVE_CHAT_SUBMIT_DELAY_MS, () => {
+              submitAndObserve(
+                settings,
+                ptyId,
+                markSubmitted,
+                reportOutcome,
+                options?.confirmSubmitted
+              )
+            })
+          },
+          () => {
             markSubmitted()
             reportOutcome('may-not-have-sent')
-            return
           }
-          // Schedule from the actual body write: an overdue clear-confirm callback
-          // must not collapse the required body-to-Enter gap after a renderer stall.
-          delayGuarded(NATIVE_CHAT_SUBMIT_DELAY_MS, () => {
-            submitAndObserve(
-              settings,
-              ptyId,
-              markSubmitted,
-              reportOutcome,
-              options?.confirmSubmitted
-            )
-          })
-        })
+        )
       })
     },
     {
@@ -332,44 +288,56 @@ export function sendNativeChatMessageWithImageAttachments(
       }
       const delayGuarded = guardedDelay(delay, markSubmitted, reportOutcome)
       runOutcomeGuarded(markSubmitted, reportOutcome, () => {
-        clearThenWrite(settings, ptyId, options, delayGuarded, () => {
-          if (isCancelled()) {
-            reportOutcome('may-not-have-sent')
-            return
-          }
-          for (const imagePath of imagePaths) {
-            if (!sendRuntimePtyInput(settings, ptyId, buildNativeChatImagePasteBytes(imagePath))) {
-              // A rejected write leaves the composer empty, so confirmSubmitted would
-              // misread that as a landed send — the CR must not follow it.
-              markSubmitted()
+        clearThenWrite(
+          settings,
+          ptyId,
+          options,
+          delayGuarded,
+          () => {
+            if (isCancelled()) {
               reportOutcome('may-not-have-sent')
               return
             }
-          }
-          const submit = (): void => {
-            delayGuarded(NATIVE_CHAT_SUBMIT_DELAY_MS, () => {
-              submitAndObserve(
-                settings,
-                ptyId,
-                markSubmitted,
-                reportOutcome,
-                options?.confirmSubmitted
-              )
+            for (const imagePath of imagePaths) {
+              if (
+                !sendRuntimePtyInput(settings, ptyId, buildNativeChatImagePasteBytes(imagePath))
+              ) {
+                // A rejected write leaves the composer empty, so confirmSubmitted would
+                // misread that as a landed send — the CR must not follow it.
+                markSubmitted()
+                reportOutcome('may-not-have-sent')
+                return
+              }
+            }
+            const submit = (): void => {
+              delayGuarded(NATIVE_CHAT_SUBMIT_DELAY_MS, () => {
+                submitAndObserve(
+                  settings,
+                  ptyId,
+                  markSubmitted,
+                  reportOutcome,
+                  options?.confirmSubmitted
+                )
+              })
+            }
+            if (trimmedText.length === 0) {
+              submit()
+              return
+            }
+            delayGuarded(NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS, () => {
+              if (!sendRuntimePtyInput(settings, ptyId, buildNativeChatPasteBytes(text))) {
+                markSubmitted()
+                reportOutcome('may-not-have-sent')
+                return
+              }
+              submit()
             })
+          },
+          () => {
+            markSubmitted()
+            reportOutcome('may-not-have-sent')
           }
-          if (trimmedText.length === 0) {
-            submit()
-            return
-          }
-          delayGuarded(NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS, () => {
-            if (!sendRuntimePtyInput(settings, ptyId, buildNativeChatPasteBytes(text))) {
-              markSubmitted()
-              reportOutcome('may-not-have-sent')
-              return
-            }
-            submit()
-          })
-        })
+        )
       })
     },
     {

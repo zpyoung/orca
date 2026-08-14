@@ -30,6 +30,20 @@ export function pushHistory(history: HistoryState, sent: string): HistoryState {
   return { entries: boundHistoryEntries([...history.entries, sent]), index: null }
 }
 
+/** Adds transcript/status prompts once without disturbing live recall state. */
+export function seedHistory(history: HistoryState, prompts: readonly string[]): HistoryState {
+  const seen = new Set(history.entries)
+  let next = history
+  for (const prompt of prompts) {
+    if (prompt.trim() === '' || seen.has(prompt)) {
+      continue
+    }
+    seen.add(prompt)
+    next = pushHistory(next, prompt)
+  }
+  return next
+}
+
 export type HistoryRecall = { history: HistoryState; draft: string | null }
 
 export function recallPrevious(history: HistoryState): HistoryRecall {

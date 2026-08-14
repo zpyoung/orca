@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ManagedPane } from '@/lib/pane-manager/pane-manager-types'
 import type { AgentType } from '../../../../shared/agent-status-types'
 import type { AgentComposerHandle } from '../agent-composer/agent-composer-types'
-import { TerminalDock } from '../terminal-dock/TerminalDock'
+import { TerminalDock, terminalDockGutterHeightPx } from '../terminal-dock/TerminalDock'
 import { applyTerminalDockGeometryChange } from './terminal-pane-dock-geometry'
 import { beginTerminalDockGutterDrag } from './terminal-pane-dock-gutter-drag'
 import {
@@ -24,6 +24,11 @@ function findXtermContainer(pane: ManagedPane): HTMLElement | null {
   return pane.container.querySelector<HTMLElement>('.xterm-container')
 }
 
+export function terminalPaneUsesConptyBelowWrapMarkers(pane: ManagedPane): boolean {
+  const windowsPty = pane.terminal.options?.windowsPty
+  return windowsPty?.backend === 'conpty' && windowsPty.buildNumber === undefined
+}
+
 export type TerminalPaneDockMountProps = {
   pane: ManagedPane
   terminalTabId: string
@@ -34,7 +39,9 @@ export type TerminalPaneDockMountProps = {
   targetPtyId: string | null
   disabledReason: string | null
   readTerminalScreen: () => string | null
+  onInitialize?: () => void
   onCommitGutterRows: (rows: number) => void
+  onEffectiveMountedChange?: (mounted: boolean) => void
   passthroughActive: boolean
 }
 
@@ -43,14 +50,25 @@ export type TerminalPaneDockMountProps = {
  *  resize. Renders nothing when not docked — the caller already gates the experimental flag
  *  and agent eligibility, so reaching here at all means the feature is live for this pane. */
 export function TerminalPaneDockMount(props: TerminalPaneDockMountProps): React.JSX.Element | null {
-  const { pane, docked, passthroughActive } = props
+  const { pane, docked, passthroughActive, onEffectiveMountedChange } = props
   const dockRef = useRef<AgentComposerHandle>(null)
+  const cancelGutterDragRef = useRef<(() => void) | null>(null)
   const [liveGutterRows, setLiveGutterRows] = useState<number | null>(null)
   // Why: the auto-undock hysteresis needs the pane's own available height, not the
   // terminal's — the split layout fixes this pane's box; only the internal xterm/dock
   // split moves, so this never feeds back into itself when the dock mounts or resizes.
   const [paneHeightPx, setPaneHeightPx] = useState(
     () => pane.container.getBoundingClientRect().height
+  )
+  const [effectiveDockMounted, setEffectiveDockMounted] = useState(false)
+  const dockContainer = useMemo(() => findDockContainer(pane), [pane])
+
+  useEffect(
+    () => () => {
+      cancelGutterDragRef.current?.()
+      cancelGutterDragRef.current = null
+    },
+    [docked]
   )
 
   useEffect(() => {
@@ -67,13 +85,22 @@ export function TerminalPaneDockMount(props: TerminalPaneDockMountProps): React.
     return () => observer.disconnect()
   }, [pane])
 
+  const onInitializeRef = useRef(props.onInitialize)
+  onInitializeRef.current = props.onInitialize
+  useEffect(() => {
+    onInitializeRef.current?.()
+  }, [props.paneKey])
+
   // Why: seeded from the initial props rather than {docked: false, passthroughActive: false}
   // so an already-docked pane on first mount (e.g. restored session) isn't read as a fresh
   // dock transition and doesn't steal focus from whatever the app is doing at startup.
-  const focusStateRef = useRef<TerminalDockFocusState>({ docked, passthroughActive })
+  const focusStateRef = useRef<TerminalDockFocusState>({
+    docked: effectiveDockMounted,
+    passthroughActive
+  })
   useEffect(() => {
     const previous = focusStateRef.current
-    const next: TerminalDockFocusState = { docked, passthroughActive }
+    const next: TerminalDockFocusState = { docked: effectiveDockMounted, passthroughActive }
     focusStateRef.current = next
     const action = resolveTerminalDockFocusTransition(previous, next)
     if (action === 'focus-composer') {
@@ -81,7 +108,7 @@ export function TerminalPaneDockMount(props: TerminalPaneDockMountProps): React.
     } else if (action === 'focus-terminal') {
       pane.terminal.focus()
     }
-  }, [docked, passthroughActive, pane])
+  }, [effectiveDockMounted, passthroughActive, pane])
 
   // Why: while docked (and not in passthrough), a terminal pointerdown must still select and
   // scroll xterm but not take keyboard focus from the composer — data-pane-prevent-terminal-focus
@@ -92,7 +119,7 @@ export function TerminalPaneDockMount(props: TerminalPaneDockMountProps): React.
     if (!xtermContainer) {
       return undefined
     }
-    if (docked && !passthroughActive) {
+    if (effectiveDockMounted && !passthroughActive) {
       xtermContainer.setAttribute('data-pane-prevent-terminal-focus', '')
     } else {
       xtermContainer.removeAttribute('data-pane-prevent-terminal-focus')
@@ -100,31 +127,68 @@ export function TerminalPaneDockMount(props: TerminalPaneDockMountProps): React.
     return () => {
       xtermContainer.removeAttribute('data-pane-prevent-terminal-focus')
     }
-  }, [pane, docked, passthroughActive])
-
-  const handleMountedChange = useCallback(() => {
-    applyTerminalDockGeometryChange(pane)
-  }, [pane])
+  }, [pane, effectiveDockMounted, passthroughActive])
 
   const { gutterRows, onCommitGutterRows } = props
+  const renderedGutterRows = liveGutterRows ?? gutterRows
+  const handleMountedChange = useCallback(
+    (mounted: boolean) => {
+      if (!mounted) {
+        cancelGutterDragRef.current?.()
+        cancelGutterDragRef.current = null
+      }
+      setEffectiveDockMounted(mounted)
+      onEffectiveMountedChange?.(mounted)
+      if (!dockContainer) {
+        return
+      }
+      const height = mounted ? terminalDockGutterHeightPx(renderedGutterRows) : 0
+      applyTerminalDockGeometryChange(pane, undefined, () => {
+        dockContainer.style.height = `${height}px`
+        pane.container.style.setProperty('--terminal-dock-height', `${height}px`)
+      })
+    },
+    [dockContainer, pane, onEffectiveMountedChange, renderedGutterRows]
+  )
+
+  useLayoutEffect(() => {
+    if (!dockContainer || !effectiveDockMounted) {
+      return
+    }
+    const height = terminalDockGutterHeightPx(renderedGutterRows)
+    if (dockContainer.style.height === `${height}px`) {
+      return
+    }
+    applyTerminalDockGeometryChange(pane, undefined, () => {
+      dockContainer.style.height = `${height}px`
+      pane.container.style.setProperty('--terminal-dock-height', `${height}px`)
+    })
+  }, [dockContainer, effectiveDockMounted, pane, renderedGutterRows])
+
   const handleGutterPointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
-      beginTerminalDockGutterDrag(event, {
+      cancelGutterDragRef.current?.()
+      cancelGutterDragRef.current = beginTerminalDockGutterDrag(event, {
         pane,
         startGutterRows: gutterRows,
-        onLiveRowsChange: setLiveGutterRows,
+        onLiveRowsChange: (rows) => {
+          if (dockContainer) {
+            const height = terminalDockGutterHeightPx(rows)
+            dockContainer.style.height = `${height}px`
+            pane.container.style.setProperty('--terminal-dock-height', `${height}px`)
+          }
+          setLiveGutterRows(rows)
+        },
         onCommit: (rows) => {
           setLiveGutterRows(null)
           onCommitGutterRows(rows)
         }
       })
     },
-    [gutterRows, onCommitGutterRows, pane]
+    [dockContainer, gutterRows, onCommitGutterRows, pane]
   )
 
-  const dockContainer = useMemo(() => findDockContainer(pane), [pane])
-
-  if (!props.docked || !dockContainer) {
+  if (!docked || !dockContainer) {
     return null
   }
 
@@ -136,11 +200,12 @@ export function TerminalPaneDockMount(props: TerminalPaneDockMountProps): React.
       targetPtyId={props.targetPtyId}
       agent={props.agent}
       paneHeightPx={paneHeightPx}
-      gutterRows={liveGutterRows ?? props.gutterRows}
+      gutterRows={renderedGutterRows}
       disabledReason={props.disabledReason}
       onMountedChange={handleMountedChange}
       onGutterPointerDown={handleGutterPointerDown}
       readTerminalScreen={props.readTerminalScreen}
+      isLocalConptyBelowWrapMarkers={terminalPaneUsesConptyBelowWrapMarkers(pane)}
       passthroughActive={props.passthroughActive}
     />,
     dockContainer

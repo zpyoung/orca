@@ -5,6 +5,8 @@ import type {
 } from '../agent-composer/agent-composer-types'
 
 export type NativeChatComposerProps = AgentComposerCoreProps & {
+  /** Prompts recovered by a host from the pane transcript or live status. */
+  historyPrompts?: readonly string[]
   /** Record a dispatched slash command that does not create a chat turn. */
   onSlashCommand?: (command: string) => void
   /** Picker-only agent commands continue in the hosted TUI after dispatch. */

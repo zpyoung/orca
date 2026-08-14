@@ -7,10 +7,13 @@ import {
   useState
 } from 'react'
 import type { AgentType } from '../../../../shared/agent-status-types'
+import { isTuiAgent } from '../../../../shared/tui-agent-config'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
-import { AgentComposer } from '../agent-composer/AgentComposer'
+import { emitTerminalDockSendOutcome } from '@/lib/terminal-dock-telemetry'
+import { TerminalDockComposer } from './TerminalDockComposer'
 import type { AgentComposerHandle } from '../agent-composer/agent-composer-types'
+import { resolveComposerSendTier } from '../agent-composer/composer-send-tier'
 import { DEFAULT_GUTTER_ROWS } from './terminal-dock-pane-state'
 
 // Row height mirrors the composer field's text-sm/leading-5 (20px) so a
@@ -81,8 +84,10 @@ export type TerminalDockProps = {
   onMountedChange?: (mounted: boolean) => void
   /** Wired to the gutter-resize handle's pointerdown; omit to render a non-interactive handle. */
   onGutterPointerDown?: (event: React.PointerEvent<HTMLDivElement>) => void
-  /** Reads the hosting pane's current terminal screen; reserved for context-aware composing. */
+  /** Reads the hosting pane's current terminal screen for verified clear/submit observation. */
   readTerminalScreen?: () => string | null
+  /** True only for local native ConPTY versions whose wrap markers are not reliable. */
+  isLocalConptyBelowWrapMarkers?: boolean
   /** True while the pane is in raw passthrough mode: xterm (not the composer) owns keyboard
    *  focus, so the composer greys out and stops accepting pointer interaction. */
   passthroughActive?: boolean
@@ -100,6 +105,11 @@ export const TerminalDock = forwardRef<AgentComposerHandle, TerminalDockProps>(
     const { terminalTabId, paneKey, targetPtyId, agent, paneHeightPx, disabledReason } = props
     const gutterRows = props.gutterRows ?? DEFAULT_GUTTER_ROWS
     const mounted = useAutoUndock(paneHeightPx, gutterRows)
+    const sendTier = isTuiAgent(agent)
+      ? resolveComposerSendTier(agent, {
+          isLocalConptyBelowWrapMarkers: props.isLocalConptyBelowWrapMarkers ?? false
+        })
+      : 'input'
     const composerRef = useRef<AgentComposerHandle>(null)
     // Why: exposes the mounted composer's imperative handle to the host so it can move
     // keyboard focus onto the dock (dock entry, passthrough exit) without reaching past this
@@ -140,6 +150,7 @@ export const TerminalDock = forwardRef<AgentComposerHandle, TerminalDockProps>(
         style={{ height: terminalDockGutterHeightPx(gutterRows) }}
         data-pane-prevent-terminal-focus
         data-terminal-dock=""
+        data-terminal-dock-passthrough={props.passthroughActive ? '' : undefined}
       >
         {props.onGutterPointerDown ? (
           <div
@@ -157,14 +168,17 @@ export const TerminalDock = forwardRef<AgentComposerHandle, TerminalDockProps>(
           <span className={cn(disabledReason === null && 'invisible')}>{disabledReason}</span>
         </div>
         <div className="relative min-h-0 flex-1">
-          <div className="scrollbar-sleek h-full overflow-y-auto">
-            <AgentComposer
+          <div className="h-full overflow-visible" inert={props.passthroughActive || undefined}>
+            <TerminalDockComposer
               ref={composerRef}
               terminalTabId={terminalTabId}
               paneKey={paneKey}
               targetPtyId={targetPtyId}
               agent={agent}
-              canSend={disabledReason === null}
+              canSend={disabledReason === null && !props.passthroughActive}
+              sendTier={sendTier}
+              readTerminalScreen={props.readTerminalScreen}
+              onSendOutcome={(outcome) => emitTerminalDockSendOutcome({ outcome, agent })}
             />
           </div>
           {props.passthroughActive ? (

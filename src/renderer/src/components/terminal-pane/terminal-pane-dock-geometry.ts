@@ -9,9 +9,14 @@ import { safeFit } from '@/lib/pane-manager/pane-fit'
  *  injectable so callers/tests can observe the hold without a real xterm attached. */
 export function applyTerminalDockGeometryChange(
   pane: ManagedPane,
-  fit: (pane: ManagedPane) => boolean = safeFit
+  fit: (pane: ManagedPane) => boolean = safeFit,
+  mutateGeometry: () => void = () => {}
 ): void {
   const release = holdPtyResizesForPaneSubtrees([pane.container])
-  fit(pane)
-  release.flush()
+  try {
+    mutateGeometry()
+    fit(pane)
+  } finally {
+    release.flush()
+  }
 }

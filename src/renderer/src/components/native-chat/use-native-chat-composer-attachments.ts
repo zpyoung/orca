@@ -32,6 +32,7 @@ export function useNativeChatComposerAttachments({
   appendImageAttachments: (paths: string[]) => void
   attachResolvedPaths: (paths: string[]) => void
   clearImageAttachments: () => void
+  restoreImageAttachments: (attachments: readonly AgentComposerImageAttachment[]) => void
   removeImageAttachment: (id: string) => void
 } {
   const [imageAttachments, setImageAttachments] = useState<AgentComposerImageAttachment[]>(() =>
@@ -51,11 +52,9 @@ export function useNativeChatComposerAttachments({
 
   const updateImageAttachments = useCallback(
     (updater: (previous: AgentComposerImageAttachment[]) => AgentComposerImageAttachment[]) => {
-      setImageAttachments((prev) => {
-        const next = updater(prev)
-        writeNativeChatAttachmentCache(attachmentScopeKey, next)
-        return next
-      })
+      const next = updater(readNativeChatAttachmentCache(attachmentScopeKey))
+      writeNativeChatAttachmentCache(attachmentScopeKey, next)
+      setImageAttachments(next)
     },
     [attachmentScopeKey]
   )
@@ -127,11 +126,20 @@ export function useNativeChatComposerAttachments({
     [appendImageAttachments, insertFileReferences, resolveTarget, setNotice, textareaRef]
   )
 
+  const restoreImageAttachments = useCallback(
+    (attachments: readonly AgentComposerImageAttachment[]) => {
+      const restored = restoreNativeChatAttachmentCache(attachmentScopeKey, attachments)
+      setImageAttachments(restored)
+    },
+    [attachmentScopeKey]
+  )
+
   return {
     imageAttachments,
     appendImageAttachments,
     attachResolvedPaths,
     clearImageAttachments: () => updateImageAttachments(() => []),
+    restoreImageAttachments,
     removeImageAttachment: (id) =>
       updateImageAttachments((prev) => prev.filter((attachment) => attachment.id !== id))
   }
@@ -153,6 +161,23 @@ function writeNativeChatAttachmentCache(
   }
   // LRU-bounded so pending attachments for permanently-removed panes can't accumulate.
   setBoundedScopeCacheEntry(attachmentCache, scopeKey, [...attachments])
+}
+
+export function restoreNativeChatAttachmentCache(
+  scopeKey: string,
+  attachments: readonly AgentComposerImageAttachment[]
+): AgentComposerImageAttachment[] {
+  const current = readNativeChatAttachmentCache(scopeKey)
+  const paths = new Set(current.map((attachment) => attachment.path))
+  const restored = [...current]
+  for (const attachment of attachments) {
+    if (!paths.has(attachment.path)) {
+      paths.add(attachment.path)
+      restored.push(attachment)
+    }
+  }
+  writeNativeChatAttachmentCache(scopeKey, restored)
+  return restored
 }
 
 export function clearNativeChatAttachmentCacheForTests(): void {

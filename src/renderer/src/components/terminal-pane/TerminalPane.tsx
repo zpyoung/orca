@@ -43,6 +43,7 @@ import {
   serializeTerminalLayout
 } from './layout-serialization'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
+import { isTuiAgent } from '../../../../shared/tui-agent-config'
 import { TerminalPaneDockMount } from './TerminalPaneDockMount'
 import { useTerminalPaneDock } from './use-terminal-pane-dock'
 import type { TerminalKittyKeyboardModeTracker } from '../../../../shared/terminal-kitty-keyboard-mode-tracker'
@@ -547,7 +548,7 @@ function TerminalPane(
   const terminalDock = useTerminalPaneDock({
     tabId,
     worktreeId,
-    enabled: experimentalTerminalDockEnabled,
+    enabled: experimentalTerminalDockEnabled && !effectiveChatViewMode,
     managerRef,
     containerRef
   })
@@ -1370,6 +1371,7 @@ function TerminalPane(
 
   useTerminalPaneLifecycle({
     tabId,
+    paneDockOwnsFocus: terminalDock.paneDockOwnsFocus,
     worktreeId,
     cwd,
     startup,
@@ -1726,6 +1728,7 @@ function TerminalPane(
 
   useTerminalPaneGlobalEffects({
     tabId,
+    paneDockOwnsFocus: terminalDock.paneDockOwnsFocus,
     // Why: use the pane's own worktreeId prop, not global activeWorktreeId, so terminal-drop routes to this PTY's worktree without racing worktree switches.
     worktreeId,
     cwd,
@@ -3126,10 +3129,10 @@ function TerminalPane(
             `native-chat-${tabId}-${chatPane.leafId}`
           )
         : null}
-      {experimentalTerminalDockEnabled
+      {experimentalTerminalDockEnabled && !effectiveChatViewMode
         ? managedPanes.map((pane) => {
-            const agent = tabAgentTypeByLeaf[pane.leafId]
-            if (!agent) {
+            const agent = resolveAgentForLeaf(pane.leafId)
+            if (!isTuiAgent(agent)) {
               return null
             }
             const paneKey = makePaneKey(tabId, pane.leafId)
@@ -3151,7 +3154,11 @@ function TerminalPane(
                   sshDisconnected: sshConnectionUnavailable
                 })}
                 readTerminalScreen={() => pane.serializeAddon.serialize({ scrollback: 0 })}
+                onInitialize={() => terminalDock.ensurePaneDockDefault(paneKey, agent)}
                 onCommitGutterRows={(rows) => terminalDock.commitGutterRows(paneKey, rows)}
+                onEffectiveMountedChange={(mounted) =>
+                  terminalDock.setPaneDockMounted(paneKey, mounted)
+                }
                 passthroughActive={terminalDock.isPanePassthrough(paneKey)}
               />
             )

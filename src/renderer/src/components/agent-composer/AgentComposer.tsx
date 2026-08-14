@@ -11,11 +11,6 @@ import {
 } from 'react'
 import { sendRuntimePtyInput } from '@/runtime/runtime-terminal-inspection'
 import { getSettingsForAgentTabRuntimeOwner } from '@/lib/agent-paste-draft'
-import {
-  sendNativeChatMessage,
-  sendNativeChatMessageWithImageAttachments,
-  submitNativeChatPrompt
-} from '../native-chat/native-chat-runtime-send'
 import type {
   NativeChatSendHandle,
   NativeChatSendOptions
@@ -32,11 +27,12 @@ import type {
   SessionOptionDescriptor,
   SessionOptionsSurface
 } from '../../../../shared/native-chat-session-options'
-import { pushHistory, type HistoryState } from './agent-composer-history'
+import type { HistoryState } from './agent-composer-history'
 import { readAgentComposerDraftCache } from './agent-composer-draft-cache'
 import { useAgentComposerDraft } from './use-agent-composer-draft'
 import { useAgentComposerHistory } from './use-agent-composer-history'
 import { useAgentComposerKeyDown } from './use-agent-composer-keydown'
+import { useAgentComposerSend } from './use-agent-composer-send'
 import {
   AgentComposerField,
   type AgentComposerFieldProps,
@@ -194,6 +190,7 @@ export type AgentComposerHostBridges = {
   onAttach?: () => void
   onRemoveImageAttachment?: (id: string) => void
   clearImageAttachments?: () => void
+  restoreImageAttachments?: (attachments: readonly AgentComposerImageAttachment[]) => void
 
   onPaste?: (event: PasteEventLike) => void
   pasteFromClipboard?: () => void
@@ -231,64 +228,12 @@ export function useAgentComposerCompose(
   props: AgentComposerCoreProps,
   bridges?: AgentComposerHostBridges
 ): AgentComposerComposeResult {
-  const { canSend = true, isWorking = false, onStop, onOptimisticSend } = props
+  const { canSend = true, isWorking = false } = props
   const generatedListboxId = `agent-composer-picker-${useId().replaceAll(':', '')}`
   const imageAttachments = bridges?.imageAttachments ?? EMPTY_ATTACHMENTS
   const autocomplete = bridges?.autocomplete ?? DEFAULT_AUTOCOMPLETE
 
-  const send = useCallback(() => {
-    const text = core.draft
-    const imagePaths = imageAttachments.map((attachment) => attachment.path)
-    if ((text.trim() === '' && imagePaths.length === 0) || core.disabled) {
-      return
-    }
-    if (bridges?.isDispatchingSessionOption) {
-      return
-    }
-    const target = core.resolveTarget()
-    if (!target) {
-      return
-    }
-    const classification = bridges?.classifySend?.(text) ?? 'chat'
-    const sendOptions = bridges?.buildSendOptions?.()
-    let pendingHandle: NativeChatSendHandle | null = null
-    if (classification !== 'chat' && imagePaths.length === 0) {
-      pendingHandle = sendNativeChatMessage(target.settings, target.ptyId, text, sendOptions)
-    } else if (imagePaths.length > 0) {
-      pendingHandle = sendNativeChatMessageWithImageAttachments(
-        target.settings,
-        target.ptyId,
-        text,
-        imagePaths,
-        sendOptions
-      )
-    } else if (text.trim().length > 0) {
-      pendingHandle = sendNativeChatMessage(target.settings, target.ptyId, text, sendOptions)
-    } else {
-      submitNativeChatPrompt(target.settings, target.ptyId)
-    }
-    if (classification !== 'chat') {
-      if (pendingHandle) {
-        core.trackPendingSend(pendingHandle)
-      }
-      if (classification === 'command') {
-        bridges?.onSlashCommand?.(text.trim())
-        bridges?.onCommandDispatched?.(text.trim())
-      }
-    } else {
-      const pendingId = onOptimisticSend?.(text, imagePaths)
-      if (pendingHandle) {
-        core.trackPendingSend(pendingHandle, pendingId)
-      }
-    }
-    bridges?.onAfterSend?.({ classification, ptyId: target.ptyId })
-    core.setHistory((previous) => pushHistory(previous, text))
-    core.setDraft('')
-    core.setCaret(0)
-    bridges?.clearSkillOrigin?.()
-    bridges?.clearImageAttachments?.()
-    core.setNotice(null)
-  }, [core, imageAttachments, bridges, onOptimisticSend])
+  const send = useAgentComposerSend(core, props, bridges, imageAttachments)
 
   const handleDraftChange = useCallback(
     (value: string, element: HTMLTextAreaElement) => {
@@ -355,9 +300,10 @@ export function useAgentComposerCompose(
       .catch(() => {})
   }, [bridges, core])
 
-  const sendButtonDisabled = isWorking
-    ? !core.hasPty || !onStop
-    : core.disabled || (core.draft.trim() === '' && imageAttachments.length === 0)
+  const sendButtonDisabled =
+    core.disabled ||
+    props.sendDisabled ||
+    (core.draft.trim() === '' && imageAttachments.length === 0)
 
   const fieldProps: AgentComposerFieldProps = {
     textareaRef: core.textareaRef,
@@ -365,6 +311,7 @@ export function useAgentComposerCompose(
     disabled: core.disabled,
     hasPty: core.hasPty,
     canSend,
+    layout: props.layout,
     autocomplete,
     activeSuggestion: core.activeSuggestion,
     notice: core.notice,
@@ -372,7 +319,7 @@ export function useAgentComposerCompose(
     sendButtonDisabled,
     isWorking,
     attachDisabled: core.disabled,
-    dictationDisabled: bridges?.dictationDisabled ?? true,
+    dictationDisabled: core.disabled || (bridges?.dictationDisabled ?? true),
     isDictating: bridges?.isDictating ?? false,
     isDictationHoldMode: bridges?.isDictationHoldMode ?? false,
     onDraftChange: handleDraftChange,

@@ -541,7 +541,7 @@
 .pane-link-tooltip {
   position: absolute;
   box-sizing: border-box;
-  bottom: 0;
+  bottom: var(--terminal-dock-height, 0px);
   left: 0;
   z-index: 40;
   margin: 0;

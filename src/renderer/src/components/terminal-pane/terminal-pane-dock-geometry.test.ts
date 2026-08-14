@@ -41,6 +41,21 @@ describe('applyTerminalDockGeometryChange', () => {
     expect(flushCount).toBe(0)
   })
 
+  it('releases the resize hold even when the geometry mutation throws', () => {
+    const pane = makeFakePane()
+
+    expect(() =>
+      applyTerminalDockGeometryChange(
+        pane,
+        () => true,
+        () => {
+          throw new Error('mutation failed')
+        }
+      )
+    ).toThrow('mutation failed')
+    expect(queuePanePtyResizeIfHeld(pane.container, 80, 24)).toBe(false)
+  })
+
   it('is not held once the change settles, so the next resize sends immediately', () => {
     const pane = makeFakePane()
     applyTerminalDockGeometryChange(pane, () => true)

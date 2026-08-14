@@ -114,7 +114,7 @@ export function submitAndObserve(
 ): void {
   let sent = true
   try {
-    sendRuntimePtyInput(settings, ptyId, NATIVE_CHAT_SUBMIT)
+    sent = sendRuntimePtyInput(settings, ptyId, NATIVE_CHAT_SUBMIT)
   } catch {
     sent = false
   } finally {

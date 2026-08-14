@@ -252,6 +252,45 @@ describe('sendNativeChatMessage post-send observation', () => {
     expect(sendRuntimePtyInput).not.toHaveBeenCalled()
   })
 
+  it('aborts before the body when the transport rejects the initial clear', () => {
+    sendRuntimePtyInput.mockReturnValueOnce(false)
+    const confirmSubmitted = vi.fn().mockReturnValue(true)
+    const onOutcome = vi.fn()
+
+    sendNativeChatMessage(SETTINGS, PTY, 'hi', { confirmSubmitted, onOutcome })
+
+    expect(sendRuntimePtyInput).toHaveBeenCalledTimes(1)
+    expect(confirmSubmitted).not.toHaveBeenCalled()
+    expect(onOutcome).toHaveBeenCalledExactlyOnceWith('may-not-have-sent')
+  })
+
+  it('aborts before the body when the transport rejects maximal-clear escalation', async () => {
+    sendRuntimePtyInput.mockReturnValueOnce(true).mockReturnValueOnce(false)
+    const confirmCleared = vi.fn().mockReturnValue(false)
+    const onOutcome = vi.fn()
+
+    sendNativeChatMessage(SETTINGS, PTY, 'hi', { confirmCleared, onOutcome })
+    await vi.runAllTimersAsync()
+
+    expect(sendRuntimePtyInput).toHaveBeenCalledTimes(2)
+    expect(onOutcome).toHaveBeenCalledExactlyOnceWith('may-not-have-sent')
+  })
+
+  it('reports may-not-have-sent when the transport rejects the CR write', async () => {
+    sendRuntimePtyInput
+      .mockImplementationOnce(() => true)
+      .mockImplementationOnce(() => true)
+      .mockImplementationOnce(() => false)
+    const confirmSubmitted = vi.fn().mockReturnValue(true)
+    const onOutcome = vi.fn()
+    sendNativeChatMessage(SETTINGS, PTY, 'hi', { confirmSubmitted, onOutcome })
+
+    await settleSend()
+
+    expect(confirmSubmitted).not.toHaveBeenCalled()
+    expect(onOutcome).toHaveBeenCalledExactlyOnceWith('may-not-have-sent')
+  })
+
   it('reports may-not-have-sent exactly once when the transport throws on the CR write', async () => {
     // mockImplementationOnce (not a standing mockImplementation) so this
     // failure does not leak into later describe blocks that share this mock.

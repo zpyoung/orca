@@ -35,6 +35,7 @@ export function NativeChatInteractiveCard({
   messages,
   transcriptSettled,
   onShowingQuestionChange,
+  onShowingCardChange,
   answerInputRef
 }: {
   paneKey: string
@@ -47,6 +48,8 @@ export function NativeChatInteractiveCard({
   /** Reports whether a question card is on screen so the view can replace the
    *  composer with it (the card's free-text row is the answer input). */
   onShowingQuestionChange?: (showing: boolean) => void
+  /** Reports any visible card without changing native chat's question-only exclusion. */
+  onShowingCardChange?: (showing: boolean) => void
   /** Forwarded to the question card's free-text row so pane-level Paste keeps
    *  a target while the composer is unmounted. */
   answerInputRef?: React.RefObject<HTMLInputElement | null>
@@ -108,13 +111,18 @@ export function NativeChatInteractiveCard({
 
   // Tell the view when a question card is up so it can hide the composer (this
   // card supplies its own input). Reset on unmount so the composer comes back.
-  const showingQuestion = card?.kind === 'question' && canSend && cardKey !== dismissedKey
+  const showingCard = card != null && canSend && cardKey !== dismissedKey
+  const showingQuestion = showingCard && card.kind === 'question'
   useEffect(() => {
     onShowingQuestionChange?.(showingQuestion)
     return () => onShowingQuestionChange?.(false)
   }, [showingQuestion, onShowingQuestionChange])
+  useLayoutEffect(() => {
+    onShowingCardChange?.(showingCard)
+    return () => onShowingCardChange?.(false)
+  }, [showingCard, onShowingCardChange])
 
-  if (!card || !canSend || cardKey === dismissedKey) {
+  if (!showingCard) {
     return null
   }
   if (card.kind === 'question') {

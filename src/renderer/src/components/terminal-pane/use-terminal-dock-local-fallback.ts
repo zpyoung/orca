@@ -2,6 +2,7 @@ import { useCallback, useRef } from 'react'
 import type { TerminalDockPaneState } from '../../../../shared/types'
 import { resolveTerminalDockPaneState } from '../terminal-dock/resolve-terminal-dock-pane-state'
 import {
+  hasTerminalDockPaneState,
   readTerminalDockPaneState,
   writeTerminalDockPaneState
 } from '../terminal-dock/terminal-dock-pane-state'
@@ -15,6 +16,8 @@ export type TerminalDockLocalFallback = {
     hostState: TerminalDockPaneState | undefined,
     hostHasEverEchoed: boolean
   ) => TerminalDockPaneState
+  /** Whether the client has an explicit fallback entry for this pane. */
+  hasLocalDockState: (paneKey: string) => boolean
   /** Write-through target for every dock-state change — keeps the cached copy and the
    *  on-disk copy both current so a later resolution never reads stale data. */
   persistLocalDockState: (paneKey: string, state: TerminalDockPaneState) => void
@@ -50,6 +53,11 @@ export function useTerminalDockLocalFallback(): TerminalDockLocalFallback {
     [localFallbackFor]
   )
 
+  const hasLocalDockState = useCallback(
+    (paneKey: string): boolean => hasTerminalDockPaneState(paneKey),
+    []
+  )
+
   const persistLocalDockState = useCallback(
     (paneKey: string, state: TerminalDockPaneState): void => {
       writeTerminalDockPaneState(paneKey, state)
@@ -62,5 +70,5 @@ export function useTerminalDockLocalFallback(): TerminalDockLocalFallback {
     cacheRef.current.delete(paneKey)
   }, [])
 
-  return { resolvedStateFor, persistLocalDockState, forgetPane }
+  return { resolvedStateFor, hasLocalDockState, persistLocalDockState, forgetPane }
 }

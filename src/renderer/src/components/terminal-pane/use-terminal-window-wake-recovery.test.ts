@@ -19,6 +19,8 @@ import {
 
 describe('useTerminalWindowWakeRecovery', () => {
   const manager = {} as PaneManager
+  const paneDockOwnsFocus = vi.fn(() => false)
+  const focusOwnership = { tabId: 'tab-1', paneDockOwnsFocus }
   let systemResumedCallback: (() => void) | null = null
   const unsubscribeSystemResumed = vi.fn()
   const onSystemResumed = vi.fn((callback: () => void) => {
@@ -46,6 +48,7 @@ describe('useTerminalWindowWakeRecovery', () => {
   function renderWakeRecoveryHook(isVisible = true) {
     return renderHook(() =>
       useTerminalWindowWakeRecovery({
+        ...focusOwnership,
         isVisible,
         managerRef: { current: manager },
         isActiveRef: { current: true },
@@ -63,6 +66,7 @@ describe('useTerminalWindowWakeRecovery', () => {
     window.dispatchEvent(new Event('focus'))
     expect(recoverVisibleTerminalWindowWakeMock).toHaveBeenCalledTimes(1)
     expect(recoverVisibleTerminalWindowWakeMock).toHaveBeenNthCalledWith(1, {
+      ...focusOwnership,
       manager,
       isActive: true,
       clearGlyphAtlases: false
@@ -73,6 +77,7 @@ describe('useTerminalWindowWakeRecovery', () => {
 
     expect(recoverVisibleTerminalWindowWakeMock).toHaveBeenCalledTimes(2)
     expect(recoverVisibleTerminalWindowWakeMock).toHaveBeenNthCalledWith(2, {
+      ...focusOwnership,
       manager,
       isActive: true,
       clearGlyphAtlases: true
@@ -89,6 +94,7 @@ describe('useTerminalWindowWakeRecovery', () => {
     document.dispatchEvent(new Event('visibilitychange'))
 
     expect(recoverVisibleTerminalWindowWakeMock).toHaveBeenLastCalledWith({
+      ...focusOwnership,
       manager,
       isActive: true,
       clearGlyphAtlases: false
@@ -117,6 +123,7 @@ describe('useTerminalWindowWakeRecovery', () => {
     const reassertPtySizeAfterWindowWake = vi.fn()
     renderHook(() =>
       useTerminalWindowWakeRecovery({
+        ...focusOwnership,
         isVisible: true,
         managerRef: { current: manager },
         isActiveRef: { current: true },
@@ -144,6 +151,7 @@ describe('useTerminalWindowWakeRecovery', () => {
     const reassertPtySizeAfterWindowWake = vi.fn()
     renderHook(() =>
       useTerminalWindowWakeRecovery({
+        ...focusOwnership,
         isVisible: true,
         managerRef: { current: manager },
         isActiveRef: { current: true },

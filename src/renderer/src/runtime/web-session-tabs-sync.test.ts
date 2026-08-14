@@ -1462,10 +1462,7 @@ describe('applyWebSessionTabsSnapshot', () => {
     ).toEqual({ [makePaneKey(mirroredId!, LEAF_ID)]: { docked: true, gutterRows: 5 } })
   })
 
-  it('ignores host terminalDockByPaneKey for an existing tab that predates the dock feature (old client / new host)', () => {
-    // P4: the new-client/old-host direction (host omits the field) is covered above;
-    // this is the missing reverse direction — a new host publishes the field, but an
-    // "old client" tab that never learned about dock state must behave exactly as before.
+  it('adopts host terminalDockByPaneKey for an existing tab with no local dock record', () => {
     const mirroredId = toWebTerminalSurfaceTabId('host-tab-1')
     const existingTab: TerminalTab = {
       id: mirroredId,
@@ -1522,13 +1519,15 @@ describe('applyWebSessionTabsSnapshot', () => {
     expect(
       patch.unifiedTabsByWorktree?.[WT]?.find((tab) => tab.entityId === mirroredId)
         ?.terminalDockByPaneKey
-    ).toBeUndefined()
+    ).toEqual({
+      [makePaneKey(mirroredId, LEAF_ID)]: { docked: true, gutterRows: 8 }
+    })
   })
 
-  it('keeps the client terminalDockByPaneKey when an in-flight host snapshot echoes a different value', () => {
-    // Echo-window: unlike viewMode, TerminalTab has no dock field, so "existing"
-    // here is the currently-stored unified tab rather than the legacy tabsByWorktree row.
+  it('adopts a changed host terminalDockByPaneKey so paired clients converge', () => {
     const mirroredId = toWebTerminalSurfaceTabId('host-tab-1')
+    const mirroredPaneKey = makePaneKey(mirroredId, LEAF_ID)
+    const hostPaneKey = makePaneKey('host-tab-1', LEAF_ID)
     const existingTab: TerminalTab = {
       id: mirroredId,
       ptyId: 'remote:web-env-1@@terminal-1',
@@ -1553,7 +1552,7 @@ describe('applyWebSessionTabsSnapshot', () => {
       createdAt: NOW,
       isPreview: false,
       isPinned: false,
-      terminalDockByPaneKey: { 'pane-a': { docked: true, gutterRows: 6 } }
+      terminalDockByPaneKey: { [mirroredPaneKey]: { docked: true, gutterRows: 6 } }
     }
 
     const patch = applyWebSessionTabsSnapshot(
@@ -1570,7 +1569,7 @@ describe('applyWebSessionTabsSnapshot', () => {
           parentTabId: 'host-tab-1',
           leafId: LEAF_ID,
           isActive: true,
-          terminalDockByPaneKey: { 'pane-a': { docked: false, gutterRows: 12 } },
+          terminalDockByPaneKey: { [hostPaneKey]: { docked: false, gutterRows: 12 } },
           status: 'ready',
           terminal: 'terminal-1'
         }
@@ -1582,7 +1581,7 @@ describe('applyWebSessionTabsSnapshot', () => {
     expect(
       patch.unifiedTabsByWorktree?.[WT]?.find((tab) => tab.entityId === mirroredId)
         ?.terminalDockByPaneKey
-    ).toEqual({ 'pane-a': { docked: true, gutterRows: 6 } })
+    ).toEqual({ [mirroredPaneKey]: { docked: false, gutterRows: 12 } })
   })
 
   it('falls back to the client terminalDockByPaneKey when an old host omits the field', () => {

@@ -110,6 +110,28 @@ describe('beginTerminalDockGutterDrag', () => {
     expect(queuePanePtyResizeIfHeld(pane.container, 80, 24)).toBe(false)
   })
 
+  it('returns a disposer that cancels an active drag and releases its PTY hold', () => {
+    const pane = makeFakePane()
+    const committedRows: number[] = []
+    const dispose = beginTerminalDockGutterDrag(
+      { clientY: 100, pointerId: 1, currentTarget: makeHandle() },
+      {
+        pane,
+        startGutterRows: 5,
+        onLiveRowsChange: () => {},
+        onCommit: (rows) => committedRows.push(rows)
+      },
+      () => true
+    )
+
+    dispatchWindow('pointermove', { clientY: 40 })
+    dispose()
+    dispatchWindow('pointerup')
+
+    expect(committedRows).toEqual([])
+    expect(queuePanePtyResizeIfHeld(pane.container, 80, 24)).toBe(false)
+  })
+
   it('does not commit when the release lands back on the starting row count', async () => {
     const pane = makeFakePane()
     const committedRows: number[] = []

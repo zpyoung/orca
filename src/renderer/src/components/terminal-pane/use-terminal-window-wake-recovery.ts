@@ -1,10 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import type { PaneManager } from '@/lib/pane-manager/pane-manager'
+import type { PaneFocusOwnership } from './pane-helpers'
 import { recoverVisibleTerminalWindowWake } from './terminal-visibility-resume'
 import { recordTerminalFreezeBreadcrumb } from './terminal-freeze-breadcrumbs'
 import type { IDisposable } from '@xterm/xterm'
 
-type UseTerminalWindowWakeRecoveryArgs = {
+type UseTerminalWindowWakeRecoveryArgs = PaneFocusOwnership & {
   isVisible: boolean
   managerRef: React.RefObject<PaneManager | null>
   isActiveRef: React.RefObject<boolean>
@@ -17,12 +18,16 @@ type WindowWakePtyBinding = IDisposable & {
 }
 
 export function useTerminalWindowWakeRecovery({
+  tabId,
+  paneDockOwnsFocus,
   isVisible,
   managerRef,
   isActiveRef,
   isVisibleRef,
   panePtyBindingsRef
 }: UseTerminalWindowWakeRecoveryArgs): void {
+  const paneDockOwnsFocusRef = useRef(paneDockOwnsFocus)
+  paneDockOwnsFocusRef.current = paneDockOwnsFocus
   useEffect(() => {
     if (!isVisible) {
       return
@@ -70,6 +75,8 @@ export function useTerminalWindowWakeRecovery({
       }
       recoverVisibleTerminalWindowWake({
         manager,
+        tabId,
+        paneDockOwnsFocus: paneDockOwnsFocusRef.current,
         isActive: isActiveRef.current,
         clearGlyphAtlases
       })
@@ -88,6 +95,8 @@ export function useTerminalWindowWakeRecovery({
         }
         recoverVisibleTerminalWindowWake({
           manager: settledManager,
+          tabId,
+          paneDockOwnsFocus: paneDockOwnsFocusRef.current,
           isActive: isActiveRef.current,
           clearGlyphAtlases: clearGlyphAtlasesOnSettle
         })
@@ -131,5 +140,5 @@ export function useTerminalWindowWakeRecovery({
       }
       unsubscribeSystemResumed?.()
     }
-  }, [isActiveRef, isVisible, isVisibleRef, managerRef, panePtyBindingsRef])
+  }, [isActiveRef, isVisible, isVisibleRef, managerRef, panePtyBindingsRef, tabId])
 }

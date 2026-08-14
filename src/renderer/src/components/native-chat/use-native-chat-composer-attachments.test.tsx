@@ -127,6 +127,30 @@ describe('useNativeChatComposerAttachments', () => {
     act(() => probe.root.unmount())
   })
 
+  it('restores failed-send chips by path without duplicating chips attached since send', async () => {
+    const probe = await renderProbe('pty-restore')
+    await act(async () => {
+      probe.latest().appendImageAttachments(['/tmp/sent.png'])
+    })
+    const sent = [...probe.latest().imageAttachments]
+    await act(async () => {
+      probe.latest().clearImageAttachments()
+    })
+    await act(async () => {
+      probe.latest().appendImageAttachments(['/tmp/new.png', '/tmp/sent.png'])
+    })
+    await act(async () => {
+      probe.latest().restoreImageAttachments(sent)
+    })
+
+    expect(probe.latest().imageAttachments.map((attachment) => attachment.path)).toEqual([
+      '/tmp/new.png',
+      '/tmp/sent.png'
+    ])
+    expect(readNativeChatAttachmentCache('pty-restore')).toEqual(probe.latest().imageAttachments)
+    act(() => probe.root.unmount())
+  })
+
   it('rescopes attachments when the scope key changes (composer reused for another pane)', async () => {
     const probe = await renderProbe('pty-1')
     await act(async () => {

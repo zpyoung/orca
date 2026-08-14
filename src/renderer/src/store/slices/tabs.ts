@@ -14,6 +14,10 @@ import type {
 } from '../../../../shared/types'
 import { emitNativeChatToggled } from '@/lib/native-chat-telemetry'
 import {
+  removeTerminalDockPaneKeys as removeLocalTerminalDockPaneKeys,
+  writeTerminalDockPaneState
+} from '@/components/terminal-dock/terminal-dock-pane-state'
+import {
   dedupeTabOrder,
   ensureGroup,
   findGroupAndWorktree,
@@ -1479,6 +1483,7 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
       ...patch,
       ...(normalizedGutterRows !== undefined ? { gutterRows: normalizedGutterRows } : {})
     }
+    let committedPaneState: TerminalDockPaneState | null = null
     set((state) => {
       const found = findTabAndWorktree(state.unifiedTabsByWorktree, tabId)
       if (!found) {
@@ -1488,6 +1493,7 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
         found.tab.terminalDockByPaneKey?.[patch.paneKey],
         normalizedPatch
       )
+      committedPaneState = nextPaneState
       return (
         patchTab(state.unifiedTabsByWorktree, tabId, {
           terminalDockByPaneKey: {
@@ -1497,6 +1503,9 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
         }) ?? {}
       )
     })
+    if (committedPaneState) {
+      writeTerminalDockPaneState(patch.paneKey, committedPaneState)
+    }
     mirrorTabTerminalDockToHost(get(), tabId, normalizedPatch)
   },
 
@@ -1519,6 +1528,9 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
       removedKeys = Object.keys(existing!).filter((key) => paneKeySet.has(key))
       return patchTab(state.unifiedTabsByWorktree, tabId, { terminalDockByPaneKey: next }) ?? {}
     })
+    if (removedKeys.length > 0) {
+      removeLocalTerminalDockPaneKeys(new Set(removedKeys))
+    }
     mirrorTerminalDockPruneToHost(get(), tabId, removedKeys)
   },
 

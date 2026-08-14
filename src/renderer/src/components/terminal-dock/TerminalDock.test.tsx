@@ -4,7 +4,7 @@ import '@testing-library/jest-dom/vitest'
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { createRef, type ReactNode } from 'react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { AgentComposerHandle } from '../agent-composer/agent-composer-types'
 
 vi.mock('@/i18n/i18n', () => ({
@@ -45,6 +45,13 @@ import {
   terminalDockGutterHeightPx
 } from './TerminalDock'
 import { DEFAULT_GUTTER_ROWS, MAX_GUTTER_ROWS, MIN_GUTTER_ROWS } from './terminal-dock-pane-state'
+
+beforeAll(() => {
+  Object.defineProperty(window, 'api', {
+    configurable: true,
+    value: { ui: { onFileDrop: () => () => {} } }
+  })
+})
 
 afterEach(() => {
   cleanup()
@@ -115,6 +122,8 @@ describe('TerminalDock', () => {
 
     expect(dock.style.height).toBe(shortHeight)
     expect(dock.style.height).toBe(`${terminalDockGutterHeightPx(5)}px`)
+    expect(textarea).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto')
+    expect(textarea.closest('.overflow-hidden')).not.toBeNull()
   })
 
   it('unmounts below the low threshold', () => {
@@ -238,12 +247,17 @@ describe('TerminalDock', () => {
     expect(onGutterPointerDown).toHaveBeenCalledTimes(1)
   })
 
-  it('shows a passthrough overlay and hides it once passthrough exits', () => {
+  it('makes the composer inert while passthrough owns input', () => {
     const { rerender } = render(<TerminalDock {...baseProps} passthroughActive={true} />)
     expect(screen.getByText(/passthrough active/i)).toBeInTheDocument()
+    expect(screen.getByRole('textbox')).toBeDisabled()
+    const dock = screen.getByRole('status').closest('[data-terminal-dock]')
+    expect(dock).toHaveAttribute('data-terminal-dock-passthrough')
+    expect(screen.getByRole('textbox').closest('[inert]')).not.toBeNull()
 
     rerender(<TerminalDock {...baseProps} passthroughActive={false} />)
     expect(screen.queryByText(/passthrough active/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox')).toBeEnabled()
   })
 
   it('does not flap at +/-1px around the derived thresholds for a non-default gutterRows', () => {

@@ -2641,9 +2641,8 @@ function applyWebSessionTabsSnapshotWithContext(
       .filter((tab) => tab.contentType === 'terminal' && tab.viewMode)
       .map((tab) => [tab.id, tab.viewMode] as const)
   )
-  // Why: terminalDockByPaneKey has no legacy TerminalTab layer to echo through (unlike
-  // viewMode), so "existing" here means the currently-stored unified tab, and its record
-  // wins whenever that tab already existed at all — even if the record itself is absent.
+  // Existing state remains the fallback for old hosts that omit the field. A published host
+  // record wins so independently updating paired clients converge instead of pinning stale state.
   const existingUnifiedTerminalTabById = new Map(
     currentUnifiedTabs
       .filter((tab) => tab.contentType === 'terminal')
@@ -2670,9 +2669,9 @@ function applyWebSessionTabsSnapshotWithContext(
       entry.tab,
       hostGroupIdByTabId.get(entry.hostTabId) ?? targetGroupId,
       entry.tab.viewMode ?? existingViewModeByTabId.get(entry.tab.id),
-      existingUnifiedTab
-        ? existingUnifiedTab.terminalDockByPaneKey
-        : (rekeyedHandoffDockRecord ?? entry.terminalDockByPaneKey)
+      rekeyedHandoffDockRecord ??
+        entry.terminalDockByPaneKey ??
+        existingUnifiedTab?.terminalDockByPaneKey
     )
   })
   const mirroredBrowserUnifiedTabs = mirroredBrowserTabs.map((entry) => entry.unifiedTab)
