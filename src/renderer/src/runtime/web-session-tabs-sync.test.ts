@@ -1330,7 +1330,10 @@ describe('applyWebSessionTabsSnapshot', () => {
     ).toBe('chat')
   })
 
-  it('adopts host terminalDockByPaneKey when this client has no prior tab', () => {
+  it('remaps host terminalDockByPaneKey to the mirrored tab id when this client has no prior tab', () => {
+    // Host and local tab ids differ under a remote/web mirror (unlike desktop, where
+    // they're the same string and this bug is invisible): the stored key must follow.
+    const hostPaneKey = makePaneKey('host-tab-1', LEAF_ID)
     const patch = applyWebSessionTabsSnapshot(
       makeState(),
       makeSnapshot([
@@ -1341,7 +1344,7 @@ describe('applyWebSessionTabsSnapshot', () => {
           parentTabId: 'host-tab-1',
           leafId: LEAF_ID,
           isActive: true,
-          terminalDockByPaneKey: { 'host-tab-1:pane-a': { docked: true, gutterRows: 8 } },
+          terminalDockByPaneKey: { [hostPaneKey]: { docked: true, gutterRows: 8 } },
           status: 'ready',
           terminal: 'terminal-1'
         }
@@ -1354,7 +1357,172 @@ describe('applyWebSessionTabsSnapshot', () => {
     expect(
       patch.unifiedTabsByWorktree?.[WT]?.find((tab) => tab.entityId === mirroredId)
         ?.terminalDockByPaneKey
-    ).toEqual({ 'host-tab-1:pane-a': { docked: true, gutterRows: 8 } })
+    ).toEqual({ [makePaneKey(mirroredId!, LEAF_ID)]: { docked: true, gutterRows: 8 } })
+  })
+
+  it('drops an inbound dock record entry whose key does not parse as a pane key', () => {
+    const hostPaneKey = makePaneKey('host-tab-1', LEAF_ID)
+    const patch = applyWebSessionTabsSnapshot(
+      makeState(),
+      makeSnapshot([
+        {
+          type: 'terminal',
+          id: HOST_SURFACE_ID,
+          title: 'zsh',
+          parentTabId: 'host-tab-1',
+          leafId: LEAF_ID,
+          isActive: true,
+          terminalDockByPaneKey: {
+            [hostPaneKey]: { docked: true, gutterRows: 8 },
+            'not-a-pane-key': { docked: false, gutterRows: 5 }
+          },
+          status: 'ready',
+          terminal: 'terminal-1'
+        }
+      ]),
+      ENV,
+      NOW
+    ) as Partial<WebSessionTabsSyncState>
+
+    const mirroredId = patch.tabsByWorktree?.[WT]?.[0]?.id
+    expect(
+      patch.unifiedTabsByWorktree?.[WT]?.find((tab) => tab.entityId === mirroredId)
+        ?.terminalDockByPaneKey
+    ).toEqual({ [makePaneKey(mirroredId!, LEAF_ID)]: { docked: true, gutterRows: 8 } })
+  })
+
+  it('carries a provisional tab dock record across a host handoff, re-keyed to the replacement tab id', () => {
+    // P2: the provisional tab's own unified-tab record is its only copy of the user's
+    // optimistic dock choice; the handoff must re-key it onto the replacement instead
+    // of letting the in-flight host snapshot (with no dock field yet) erase it.
+    const provisionalTabId = 'provisional-dock'
+    const provisionalPaneKey = makePaneKey(provisionalTabId, LEAF_ID)
+    recordWebAgentSessionHandoff({
+      environmentId: ENV,
+      worktreeId: WT,
+      provisionalTabId,
+      hostTabId: 'host-tab-1',
+      hostTerminalHandle: 'term_host-1'
+    })
+    const provisionalTerminalTab: TerminalTab = {
+      id: provisionalTabId,
+      ptyId: null,
+      worktreeId: WT,
+      title: 'Claude',
+      defaultTitle: 'Claude',
+      customTitle: null,
+      color: null,
+      sortOrder: 0,
+      createdAt: NOW,
+      launchAgent: 'claude'
+    }
+    const provisionalUnifiedTab: Tab = {
+      id: provisionalTabId,
+      entityId: provisionalTabId,
+      groupId: 'g-1',
+      worktreeId: WT,
+      contentType: 'terminal',
+      label: 'Claude',
+      customLabel: null,
+      color: null,
+      sortOrder: 0,
+      createdAt: NOW,
+      isPreview: false,
+      isPinned: false,
+      terminalDockByPaneKey: { [provisionalPaneKey]: { docked: true, gutterRows: 5 } }
+    }
+
+    const patch = applyWebSessionTabsSnapshot(
+      makeState({
+        tabsByWorktree: { [WT]: [provisionalTerminalTab] },
+        unifiedTabsByWorktree: { [WT]: [provisionalUnifiedTab] }
+      }),
+      makeSnapshot([
+        {
+          type: 'terminal',
+          id: HOST_SURFACE_ID,
+          title: 'Claude',
+          parentTabId: 'host-tab-1',
+          leafId: LEAF_ID,
+          isActive: true,
+          launchAgent: 'claude',
+          status: 'ready',
+          terminal: 'terminal-1'
+        }
+      ]),
+      ENV,
+      NOW
+    ) as Partial<WebSessionTabsSyncState>
+
+    const mirroredId = patch.tabsByWorktree?.[WT]?.[0]?.id
+    expect(mirroredId).not.toBe(provisionalTabId)
+    expect(
+      patch.unifiedTabsByWorktree?.[WT]?.find((tab) => tab.entityId === mirroredId)
+        ?.terminalDockByPaneKey
+    ).toEqual({ [makePaneKey(mirroredId!, LEAF_ID)]: { docked: true, gutterRows: 5 } })
+  })
+
+  it('ignores host terminalDockByPaneKey for an existing tab that predates the dock feature (old client / new host)', () => {
+    // P4: the new-client/old-host direction (host omits the field) is covered above;
+    // this is the missing reverse direction — a new host publishes the field, but an
+    // "old client" tab that never learned about dock state must behave exactly as before.
+    const mirroredId = toWebTerminalSurfaceTabId('host-tab-1')
+    const existingTab: TerminalTab = {
+      id: mirroredId,
+      ptyId: 'remote:web-env-1@@terminal-1',
+      worktreeId: WT,
+      title: 'old title',
+      defaultTitle: 'old title',
+      customTitle: null,
+      color: null,
+      sortOrder: 0,
+      createdAt: NOW
+    }
+    const existingUnifiedTab: Tab = {
+      id: mirroredId,
+      entityId: mirroredId,
+      groupId: 'host-group-1',
+      worktreeId: WT,
+      contentType: 'terminal',
+      label: 'old title',
+      customLabel: null,
+      color: null,
+      sortOrder: 0,
+      createdAt: NOW,
+      isPreview: false,
+      isPinned: false
+    }
+
+    const patch = applyWebSessionTabsSnapshot(
+      makeState({
+        tabsByWorktree: { [WT]: [existingTab] },
+        ptyIdsByTabId: { [mirroredId]: ['remote:web-env-1@@terminal-1'] },
+        unifiedTabsByWorktree: { [WT]: [existingUnifiedTab] }
+      }),
+      makeSnapshot([
+        {
+          type: 'terminal',
+          id: HOST_SURFACE_ID,
+          title: 'new title',
+          parentTabId: 'host-tab-1',
+          leafId: LEAF_ID,
+          isActive: true,
+          terminalDockByPaneKey: {
+            [makePaneKey('host-tab-1', LEAF_ID)]: { docked: true, gutterRows: 8 }
+          },
+          status: 'ready',
+          terminal: 'terminal-1'
+        }
+      ]),
+      ENV,
+      NOW + 1
+    ) as Partial<WebSessionTabsSyncState>
+
+    expect(patch.tabsByWorktree?.[WT]?.[0]?.title).toBe('new title')
+    expect(
+      patch.unifiedTabsByWorktree?.[WT]?.find((tab) => tab.entityId === mirroredId)
+        ?.terminalDockByPaneKey
+    ).toBeUndefined()
   })
 
   it('keeps the client terminalDockByPaneKey when an in-flight host snapshot echoes a different value', () => {

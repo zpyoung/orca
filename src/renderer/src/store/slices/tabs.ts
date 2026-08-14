@@ -265,6 +265,21 @@ function mirrorTabViewModeToHost(
 }
 
 const DEFAULT_TERMINAL_DOCK_GUTTER_ROWS = 5
+const MIN_TERMINAL_DOCK_GUTTER_ROWS = 3
+const MAX_TERMINAL_DOCK_GUTTER_ROWS = 15
+
+// Why: gutterRows also flows to the host's RPC schema, which enforces the same
+// 3..15 integer contract; clamping here keeps local and host state from diverging.
+function normalizeTerminalDockGutterRows(gutterRows: number | undefined): number | undefined {
+  if (gutterRows === undefined) {
+    return undefined
+  }
+  const rounded =
+    typeof gutterRows === 'number' && Number.isFinite(gutterRows)
+      ? Math.round(gutterRows)
+      : DEFAULT_TERMINAL_DOCK_GUTTER_ROWS
+  return Math.min(MAX_TERMINAL_DOCK_GUTTER_ROWS, Math.max(MIN_TERMINAL_DOCK_GUTTER_ROWS, rounded))
+}
 
 function mergeTerminalDockPaneState(
   existing: TerminalDockPaneState | undefined,
@@ -272,7 +287,10 @@ function mergeTerminalDockPaneState(
 ): TerminalDockPaneState {
   return {
     docked: patch.docked ?? existing?.docked ?? false,
-    gutterRows: patch.gutterRows ?? existing?.gutterRows ?? DEFAULT_TERMINAL_DOCK_GUTTER_ROWS
+    gutterRows:
+      normalizeTerminalDockGutterRows(patch.gutterRows) ??
+      existing?.gutterRows ??
+      DEFAULT_TERMINAL_DOCK_GUTTER_ROWS
   }
 }
 
@@ -297,6 +315,7 @@ function removePaneKeysFromRecord<T>(
 // Why: dock state is host-tracked like color/pin/viewMode, so mirror local sets or they're lost on reconnect and to paired clients.
 // Only the action path mirrors (never reconcile applying a host value), so the echoed snapshot can't re-trigger an outbound RPC.
 // Sends only the single-pane patch (never the whole record) so two clients editing different panes can't clobber each other.
+// The patch is expected to already carry normalized values (gutterRows clamped) so local and host state can't diverge.
 function mirrorTabTerminalDockToHost(
   state: AppState,
   tabId: string,
@@ -311,8 +330,33 @@ function mirrorTabTerminalDockToHost(
     return
   }
   const worktreeId = found.worktreeId
-  void import('@/runtime/web-runtime-session').then(({ setWebRuntimeTabProps }) =>
-    setWebRuntimeTabProps({ worktreeId, tabId, terminalDock: patch })
+  const environmentId = getRuntimeEnvironmentIdForWorktree(state, worktreeId)
+  if (!environmentId) {
+    return
+  }
+  void Promise.all([
+    import('@/runtime/web-runtime-session'),
+    import('@/runtime/web-session-tabs-sync')
+  ]).then(
+    ([
+      { setWebRuntimeTabProps, isWebTerminalSurfaceTabId, toHostSessionTabId },
+      { resolveHostSessionTabIdForWebSessionTab, remapPaneKeyTabId }
+    ]) => {
+      // Why: the paneKey's tab-ID segment must land under the same host tab id the
+      // RPC itself targets, or the host accumulates a second, web-namespaced record.
+      const hostTabId =
+        resolveHostSessionTabIdForWebSessionTab(state, { environmentId, worktreeId, tabId }) ??
+        (isWebTerminalSurfaceTabId(tabId) ? toHostSessionTabId(tabId) : tabId)
+      const hostPaneKey = remapPaneKeyTabId(patch.paneKey, () => hostTabId)
+      if (!hostPaneKey) {
+        return
+      }
+      setWebRuntimeTabProps({
+        worktreeId,
+        tabId,
+        terminalDock: { ...patch, paneKey: hostPaneKey }
+      })
+    }
   )
 }
 
@@ -1382,6 +1426,11 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
   },
 
   setTabTerminalDockState: (tabId, patch) => {
+    const normalizedGutterRows = normalizeTerminalDockGutterRows(patch.gutterRows)
+    const normalizedPatch = {
+      ...patch,
+      ...(normalizedGutterRows !== undefined ? { gutterRows: normalizedGutterRows } : {})
+    }
     set((state) => {
       const found = findTabAndWorktree(state.unifiedTabsByWorktree, tabId)
       if (!found) {
@@ -1389,7 +1438,7 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
       }
       const nextPaneState = mergeTerminalDockPaneState(
         found.tab.terminalDockByPaneKey?.[patch.paneKey],
-        patch
+        normalizedPatch
       )
       return (
         patchTab(state.unifiedTabsByWorktree, tabId, {
@@ -1400,7 +1449,7 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
         }) ?? {}
       )
     })
-    mirrorTabTerminalDockToHost(get(), tabId, patch)
+    mirrorTabTerminalDockToHost(get(), tabId, normalizedPatch)
   },
 
   pruneTerminalDockPaneKeys: (tabId, paneKeys) => {

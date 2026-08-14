@@ -1035,6 +1035,10 @@ function buildMirroredTerminalTabs(
     const hostTerminalDockByPaneKey = surfaces.find(
       (surface) => surface.terminalDockByPaneKey
     )?.terminalDockByPaneKey
+    const mirroredTerminalDockByPaneKey = remapTerminalDockRecordTabId(
+      hostTerminalDockByPaneKey,
+      toWebTerminalSurfaceTabId
+    )
     return {
       tab: {
         id: localTabId,
@@ -1061,7 +1065,9 @@ function buildMirroredTerminalTabs(
       ptyIds,
       layout,
       ...(retainedSurfaceByPrunedLeafId ? { retainedSurfaceByPrunedLeafId } : {}),
-      ...(hostTerminalDockByPaneKey ? { terminalDockByPaneKey: hostTerminalDockByPaneKey } : {})
+      ...(mirroredTerminalDockByPaneKey
+        ? { terminalDockByPaneKey: mirroredTerminalDockByPaneKey }
+        : {})
     }
   })
 }
@@ -1071,6 +1077,38 @@ function toMirroredPaneKey(surface: TerminalSurface, leafId = surface.leafId): s
     return null
   }
   return makePaneKey(toWebTerminalSurfaceTabId(surface.parentTabId), leafId)
+}
+
+/** Rewrites a pane key's tab-ID segment across the mirror boundary, leaving the leaf untouched.
+ *  Returns null for a key that doesn't parse, so callers drop rather than forward it verbatim. */
+export function remapPaneKeyTabId(
+  paneKey: string,
+  remapTabId: (tabId: string) => string
+): string | null {
+  const parsed = parsePaneKey(paneKey)
+  if (!parsed) {
+    return null
+  }
+  return makePaneKey(remapTabId(parsed.tabId), parsed.leafId)
+}
+
+// Why: dock records cross the mirror boundary keyed by the *other* side's tab id;
+// entries that don't parse are dropped rather than forwarded under a wrong or stale key.
+function remapTerminalDockRecordTabId(
+  record: Record<string, TerminalDockPaneState> | undefined,
+  remapTabId: (tabId: string) => string
+): Record<string, TerminalDockPaneState> | undefined {
+  if (!record) {
+    return undefined
+  }
+  const next: Record<string, TerminalDockPaneState> = {}
+  for (const [key, value] of Object.entries(record)) {
+    const remappedKey = remapPaneKeyTabId(key, remapTabId)
+    if (remappedKey) {
+      next[remappedKey] = value
+    }
+  }
+  return Object.keys(next).length > 0 ? next : undefined
 }
 
 /** Normalises and mirrors agent status updates from the host payload, preserving ownership metadata. */
@@ -2411,27 +2449,29 @@ function applyWebSessionTabsSnapshotWithContext(
     terminalSurfaceTabs.map((tab) => toWebTerminalSurfaceTabId(tab.parentTabId))
   )
   const nextHostTerminalTabIds = new Set(terminalSurfaceTabs.map((tab) => tab.parentTabId))
-  const exactProvisionalHandoffs = new Set(
-    currentTerminalTabs
-      .filter((tab) => !isMirroredTerminalSurfaceId(tab.id))
-      .filter((tab) => {
-        if (nextHostTerminalTabIds.has(tab.id)) {
-          return true
-        }
-        const handoff = {
-          environmentId,
-          worktreeId,
-          provisionalTabId: tab.id
-        }
-        const hostTabId = resolveWebAgentSessionHandoff(handoff)
-        return (
-          hostTabId !== null &&
-          (nextHostTerminalTabIds.has(hostTabId) ||
-            isWebAgentSessionHandoffPostCreateSnapshotConfirmed(handoff))
-        )
-      })
-      .map((tab) => tab.id)
-  )
+  // Why: also captures the provisional tab's replacement host tab id, so the dock
+  // record it carries can be re-keyed to the replacement instead of dropped.
+  const exactProvisionalHandoffEntries = currentTerminalTabs
+    .filter((tab) => !isMirroredTerminalSurfaceId(tab.id))
+    .map((tab): [string, string] | null => {
+      if (nextHostTerminalTabIds.has(tab.id)) {
+        return [tab.id, tab.id]
+      }
+      const handoff = {
+        environmentId,
+        worktreeId,
+        provisionalTabId: tab.id
+      }
+      const hostTabId = resolveWebAgentSessionHandoff(handoff)
+      const isHandoff =
+        hostTabId !== null &&
+        (nextHostTerminalTabIds.has(hostTabId) ||
+          isWebAgentSessionHandoffPostCreateSnapshotConfirmed(handoff))
+      return isHandoff && hostTabId !== null ? [tab.id, hostTabId] : null
+    })
+    .filter((entry): entry is [string, string] => entry !== null)
+  const exactProvisionalHandoffs = new Set(exactProvisionalHandoffEntries.map(([id]) => id))
+  const provisionalHandoffHostTabIdByProvisionalTabId = new Map(exactProvisionalHandoffEntries)
   const retainedTerminalTabs = currentTerminalTabs.filter(
     (tab) =>
       !shouldReplaceTerminalTab(
@@ -2609,13 +2649,30 @@ function applyWebSessionTabsSnapshotWithContext(
       .filter((tab) => tab.contentType === 'terminal')
       .map((tab) => [tab.id, tab] as const)
   )
+  // Why: a provisional tab's optimistic dock record has no unified tab under the
+  // replacement id yet, so it would otherwise be lost the instant the host confirms
+  // the handoff; carry it forward re-keyed to the replacement tab id.
+  const provisionalDockRecordByHostTabId = new Map<string, Record<string, TerminalDockPaneState>>()
+  for (const [provisionalTabId, hostTabId] of provisionalHandoffHostTabIdByProvisionalTabId) {
+    const provisionalDockRecord =
+      existingUnifiedTerminalTabById.get(provisionalTabId)?.terminalDockByPaneKey
+    if (provisionalDockRecord) {
+      provisionalDockRecordByHostTabId.set(hostTabId, provisionalDockRecord)
+    }
+  }
   const mirroredTerminalUnifiedTabs = mirroredTerminalTabs.map((entry) => {
     const existingUnifiedTab = existingUnifiedTerminalTabById.get(entry.tab.id)
+    const handoffDockRecord = provisionalDockRecordByHostTabId.get(entry.hostTabId)
+    const rekeyedHandoffDockRecord = handoffDockRecord
+      ? remapTerminalDockRecordTabId(handoffDockRecord, () => entry.tab.id)
+      : undefined
     return buildTerminalUnifiedTab(
       entry.tab,
       hostGroupIdByTabId.get(entry.hostTabId) ?? targetGroupId,
       entry.tab.viewMode ?? existingViewModeByTabId.get(entry.tab.id),
-      existingUnifiedTab ? existingUnifiedTab.terminalDockByPaneKey : entry.terminalDockByPaneKey
+      existingUnifiedTab
+        ? existingUnifiedTab.terminalDockByPaneKey
+        : (rekeyedHandoffDockRecord ?? entry.terminalDockByPaneKey)
     )
   })
   const mirroredBrowserUnifiedTabs = mirroredBrowserTabs.map((entry) => entry.unifiedTab)

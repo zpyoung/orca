@@ -4,6 +4,8 @@ import type { Tab, TabGroup } from '../../../../shared/types'
 import type * as AgentStatusModule from '@/lib/agent-status'
 import type * as WorktreeRuntimeOwnerModule from '@/lib/worktree-runtime-owner'
 import type * as WebRuntimeSessionModule from '@/runtime/web-runtime-session'
+import { toWebTerminalSurfaceTabId } from '@/runtime/web-terminal-surface-id'
+import { makePaneKey } from '../../../../shared/stable-pane-id'
 import { FLOATING_TERMINAL_WORKTREE_ID, getDefaultUIState } from '../../../../shared/constants'
 import { buildMobileSessionTabSnapshots } from '../../runtime/sync-runtime-graph'
 import { closeMobileSessionTabInStore } from '../../runtime/mobile-session-tab-close'
@@ -142,6 +144,7 @@ import {
 } from './store-test-helpers'
 
 const WT = 'repo1::/tmp/feature'
+const LEAF_ID = '11111111-1111-4111-8111-111111111111'
 
 describe('TabsSlice', () => {
   let store: ReturnType<typeof createTestStore>
@@ -2494,16 +2497,75 @@ describe('TabsSlice', () => {
     it('mirrors only the single-pane patch to the host', async () => {
       seedDockTab()
       getRuntimeEnvironmentIdForWorktreeMock.mockReturnValue('env-1')
+      const paneKey = makePaneKey('dock-tab-1', LEAF_ID)
 
       store
         .getState()
-        .setTabTerminalDockState('dock-tab-1', { paneKey: 'pane-a', docked: true, gutterRows: 9 })
+        .setTabTerminalDockState('dock-tab-1', { paneKey, docked: true, gutterRows: 9 })
 
       await vi.waitFor(() => expect(setWebRuntimeTabPropsMock).toHaveBeenCalledTimes(1))
       expect(setWebRuntimeTabPropsMock).toHaveBeenCalledWith({
         worktreeId: WT,
         tabId: 'dock-tab-1',
-        terminalDock: { paneKey: 'pane-a', docked: true, gutterRows: 9 }
+        terminalDock: { paneKey, docked: true, gutterRows: 9 }
+      })
+    })
+
+    it('remaps the outbound pane key to the host tab id for a mirrored terminal', async () => {
+      // P1: the RPC's tabId is translated back to the host id; the paneKey's tab-ID
+      // segment must follow, or the host accumulates a second, web-namespaced record.
+      const mirroredTabId = toWebTerminalSurfaceTabId('host-tab-9')
+      seedDockTab({ id: mirroredTabId })
+      getRuntimeEnvironmentIdForWorktreeMock.mockReturnValue('env-1')
+      const localPaneKey = makePaneKey(mirroredTabId, LEAF_ID)
+
+      store
+        .getState()
+        .setTabTerminalDockState(mirroredTabId, { paneKey: localPaneKey, docked: true })
+
+      await vi.waitFor(() => expect(setWebRuntimeTabPropsMock).toHaveBeenCalledTimes(1))
+      expect(setWebRuntimeTabPropsMock).toHaveBeenCalledWith({
+        worktreeId: WT,
+        tabId: mirroredTabId,
+        terminalDock: { paneKey: makePaneKey('host-tab-9', LEAF_ID), docked: true }
+      })
+    })
+
+    it('clamps an out-of-range gutterRows locally and mirrors the clamped value', async () => {
+      seedDockTab()
+      getRuntimeEnvironmentIdForWorktreeMock.mockReturnValue('env-1')
+      const paneKey = makePaneKey('dock-tab-1', LEAF_ID)
+
+      store.getState().setTabTerminalDockState('dock-tab-1', { paneKey, gutterRows: 999 })
+
+      expect(store.getState().getTab('dock-tab-1')?.terminalDockByPaneKey).toEqual({
+        [paneKey]: { docked: false, gutterRows: 15 }
+      })
+      await vi.waitFor(() => expect(setWebRuntimeTabPropsMock).toHaveBeenCalledTimes(1))
+      expect(setWebRuntimeTabPropsMock).toHaveBeenCalledWith({
+        worktreeId: WT,
+        tabId: 'dock-tab-1',
+        terminalDock: { paneKey, gutterRows: 15 }
+      })
+    })
+
+    it('clamps a below-range gutterRows to the minimum', () => {
+      seedDockTab()
+      const paneKey = makePaneKey('dock-tab-1', LEAF_ID)
+      store.getState().setTabTerminalDockState('dock-tab-1', { paneKey, gutterRows: 0 })
+
+      expect(store.getState().getTab('dock-tab-1')?.terminalDockByPaneKey).toEqual({
+        [paneKey]: { docked: false, gutterRows: 3 }
+      })
+    })
+
+    it('falls back to the default for a non-finite gutterRows instead of propagating it', () => {
+      seedDockTab()
+      const paneKey = makePaneKey('dock-tab-1', LEAF_ID)
+      store.getState().setTabTerminalDockState('dock-tab-1', { paneKey, gutterRows: Number.NaN })
+
+      expect(store.getState().getTab('dock-tab-1')?.terminalDockByPaneKey).toEqual({
+        [paneKey]: { docked: false, gutterRows: 5 }
       })
     })
 
