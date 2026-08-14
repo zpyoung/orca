@@ -11,7 +11,8 @@ export function clampGutterRows(rows: number): number {
 export type TerminalDockGutterDragArgs = {
   pane: ManagedPane
   startGutterRows: number
-  /** Applied on every rAF-batched pointermove so xterm can fit locally during the drag. */
+  /** Applied on every rAF-batched pointermove so xterm can fit locally during the drag, and
+   *  once more on a fresh release-time row change before the deferred fit/flush (see finish). */
   onLiveRowsChange: (rows: number) => void
   /** Applied once on a committed release, after the single coalesced PTY resize flushes. */
   onCommit: (rows: number) => void
@@ -88,15 +89,29 @@ export function beginTerminalDockGutterDrag(
     }
 
     if (commit) {
-      if (pendingRows !== null) {
-        liveRows = pendingRows
-        pendingRows = null
-        onLiveRowsChange(liveRows)
+      const finalRows = pendingRows ?? liveRows
+      const hadFreshRowChange = pendingRows !== null
+      liveRows = finalRows
+      pendingRows = null
+
+      const fitAndFlush = (): void => {
+        fit(pane)
+        release.flush()
+        if (finalRows !== startGutterRows) {
+          onCommit(finalRows)
+        }
       }
-      fit(pane)
-      release.flush()
-      if (liveRows !== startGutterRows) {
-        onCommit(liveRows)
+
+      if (hadFreshRowChange) {
+        onLiveRowsChange(finalRows)
+        // Why: a release-before-next-frame calls onLiveRowsChange synchronously above, but
+        // its DOM commit (React state -> gutter height) lands a frame later. Fitting here
+        // would measure stale geometry and flush it while the hold is still open, then the
+        // real, later layout change triggers its own unheld resize once this hold releases —
+        // two PTY SIGWINCHes for one release. Deferring a frame lets fit read the settled size.
+        requestAnimationFrame(fitAndFlush)
+      } else {
+        fitAndFlush()
       }
     } else {
       onLiveRowsChange(startGutterRows)
@@ -105,12 +120,23 @@ export function beginTerminalDockGutterDrag(
   }
 
   const onPointerMove = (moveEvent: PointerEvent): void => {
+    if (moveEvent.pointerId !== event.pointerId) {
+      return
+    }
     // Why: dragging the handle up should grow the gutter, so pixels above start are positive rows.
     const deltaRows = Math.round((startY - moveEvent.clientY) / TERMINAL_DOCK_ROW_HEIGHT_PX)
     scheduleRows(clampGutterRows(startGutterRows + deltaRows))
   }
-  const onPointerUp = (): void => finish(true)
-  const onPointerCancel = (): void => finish(false)
+  const onPointerUp = (upEvent: PointerEvent): void => {
+    if (upEvent.pointerId === event.pointerId) {
+      finish(true)
+    }
+  }
+  const onPointerCancel = (cancelEvent: PointerEvent): void => {
+    if (cancelEvent.pointerId === event.pointerId) {
+      finish(false)
+    }
+  }
   const onBlur = (): void => finish(false)
 
   try {

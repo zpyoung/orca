@@ -45,6 +45,9 @@ function makeFakePane(): ManagedPane {
   const container = document.createElement('div')
   container.className = 'pane'
   container.dataset.paneId = '1'
+  const xtermContainer = document.createElement('div')
+  xtermContainer.className = 'xterm-container'
+  container.appendChild(xtermContainer)
   const dockSlot = document.createElement('div')
   dockSlot.className = 'pane-dock-slot'
   container.appendChild(dockSlot)
@@ -58,7 +61,7 @@ function makeFakePane(): ManagedPane {
     // Why: unmeasurable in jsdom (proposeDimensions null) so safeFit's pre-fit
     // measurability gate returns cleanly instead of throwing on a pane with no real xterm.
     fitAddon: { proposeDimensions: () => null, fit: () => {} },
-    terminal: { cols: 0, rows: 0, resize: () => {} }
+    terminal: { cols: 0, rows: 0, resize: () => {}, focus: () => {} }
   } as unknown as ManagedPane
 }
 
@@ -102,5 +105,59 @@ describe('TerminalPaneDockMount', () => {
     rerender(<TerminalPaneDockMount {...baseProps} pane={pane} docked={false} />)
     expect(queuePanePtyResizeIfHeld(pane.container, 80, 24)).toBe(false)
     unmount()
+  })
+
+  it('focuses the composer when the pane docks', () => {
+    const pane = makeFakePane()
+    const { rerender } = render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={false} />)
+    expect(document.activeElement).not.toBe(screen.queryByRole('textbox'))
+
+    rerender(<TerminalPaneDockMount {...baseProps} pane={pane} docked={true} />)
+
+    expect(document.activeElement).toBe(screen.getByRole('textbox'))
+  })
+
+  it('returns focus to xterm when the pane undocks', () => {
+    const pane = makeFakePane()
+    const focusSpy = vi.spyOn(pane.terminal, 'focus')
+    const { rerender } = render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={true} />)
+    expect(focusSpy).not.toHaveBeenCalled()
+
+    rerender(<TerminalPaneDockMount {...baseProps} pane={pane} docked={false} />)
+
+    expect(focusSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('focuses the composer again when passthrough exits while still docked', () => {
+    const pane = makeFakePane()
+    const { rerender } = render(
+      <TerminalPaneDockMount {...baseProps} pane={pane} docked={true} passthroughActive={true} />
+    )
+
+    rerender(
+      <TerminalPaneDockMount {...baseProps} pane={pane} docked={true} passthroughActive={false} />
+    )
+
+    expect(document.activeElement).toBe(screen.getByRole('textbox'))
+  })
+
+  it('marks the xterm container to skip pointerdown keyboard focus while docked outside passthrough, and clears it otherwise', () => {
+    const pane = makeFakePane()
+    const xtermContainer = pane.container.querySelector('.xterm-container') as HTMLElement
+    const { rerender } = render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={false} />)
+    expect(xtermContainer).not.toHaveAttribute('data-pane-prevent-terminal-focus')
+
+    rerender(<TerminalPaneDockMount {...baseProps} pane={pane} docked={true} />)
+    expect(xtermContainer).toHaveAttribute('data-pane-prevent-terminal-focus')
+
+    rerender(
+      <TerminalPaneDockMount {...baseProps} pane={pane} docked={true} passthroughActive={true} />
+    )
+    expect(xtermContainer).not.toHaveAttribute('data-pane-prevent-terminal-focus')
+
+    rerender(
+      <TerminalPaneDockMount {...baseProps} pane={pane} docked={false} passthroughActive={true} />
+    )
+    expect(xtermContainer).not.toHaveAttribute('data-pane-prevent-terminal-focus')
   })
 })

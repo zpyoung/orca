@@ -3,8 +3,9 @@
 import '@testing-library/jest-dom/vitest'
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import type { ReactNode } from 'react'
+import { createRef, type ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { AgentComposerHandle } from '../agent-composer/agent-composer-types'
 
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string) => fallback
@@ -67,6 +68,15 @@ describe('TerminalDock', () => {
     expect(textarea).toBeEnabled()
     fireEvent.change(textarea, { target: { value: 'hello dock' } })
     expect(textarea.value).toBe('hello dock')
+  })
+
+  it('exposes the composer imperative handle through its own forwarded ref', () => {
+    const ref = createRef<AgentComposerHandle>()
+    render(<TerminalDock {...baseProps} ref={ref} />)
+
+    expect(document.activeElement).not.toBe(screen.getByRole('textbox'))
+    ref.current?.focus()
+    expect(document.activeElement).toBe(screen.getByRole('textbox'))
   })
 
   it('marks its interactive dock chrome so pointerdown never yanks terminal focus', () => {

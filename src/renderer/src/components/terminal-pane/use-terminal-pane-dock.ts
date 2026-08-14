@@ -39,11 +39,16 @@ export type UseTerminalPaneDockResult = {
     paneKey: string
     targetPtyId: string | null
     recoveryPhase: PtyTransportRecoveryState['phase'] | null
+    sshDisconnected?: boolean
   }) => string | null
   /** Wire into the confirmed-agent-exit signal (onAgentExitedRef) alongside any existing
    *  consumer — undocks a pane whose agent just confirmed exit, same as the passthrough
    *  auto-exit, this never touches panes that were never docked. */
   undockOnConfirmedAgentExit: (leafId: string) => void
+  /** Wire into the pane-retirement signal (close/detach) alongside the store-side dock-state
+   *  prune — drops a closed pane's passthrough membership and auto-exit tracking so neither
+   *  lingers for a leaf id that will never be reused. */
+  prunePassthroughForRetiredPane: (leafId: string) => void
 }
 
 /** Centralizes the terminal dock's TerminalPane-side state: which panes are docked (mirrored
@@ -63,6 +68,9 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
   const [passthroughPaneKeys, setPassthroughPaneKeys] = useState<ReadonlySet<string>>(
     () => new Set()
   )
+  // Why: passthrough auto-exit compares against this per pane; keyed by paneKey rather than
+  // reset per passthrough session so a pane's entry survives across the Set churn of toggling.
+  const previousAgentStatesRef = useRef<Map<string, AgentStatusState | null>>(new Map())
   // Why: quarantine can arm/clear between renders with no store write to react to.
   const [, forceQuarantineRerender] = useState(0)
 
@@ -145,10 +153,16 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       const next = new Set(previous)
       if (next.has(paneKey)) {
         next.delete(paneKey)
+        previousAgentStatesRef.current.delete(paneKey)
       } else {
         next.add(paneKey)
         // Why: passthrough exists so the raw terminal (not the composer) receives keys.
         activePane.terminal.focus()
+        // Why: without this seed, the auto-exit subscription's first observed status change
+        // has no baseline to compare against — if that first change is the real
+        // working->non-working transition, previousState reads null and auto-exit never fires.
+        const currentState = useAppStore.getState().agentStatusByPaneKey[paneKey]?.state ?? null
+        previousAgentStatesRef.current.set(paneKey, currentState)
       }
       return next
     })
@@ -166,7 +180,10 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       if (!container || !(event.target instanceof Node) || !container.contains(event.target)) {
         return
       }
-      const keybindings = useAppStore.getState().settings?.keybindings
+      // Why: the store's keybindings slice (from ~/.orca/keybindings.json), same source every
+      // other terminal.* shortcut resolves against — not the legacy settings.keybindings field,
+      // which the shortcuts UI never writes to.
+      const keybindings = useAppStore.getState().keybindings
       const action = resolveTerminalDockShortcutAction(
         event,
         resolveShortcutPlatform(),
@@ -200,12 +217,14 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       paneKey: string
       targetPtyId: string | null
       recoveryPhase: PtyTransportRecoveryState['phase'] | null
+      sshDisconnected?: boolean
     }): string | null => {
       const parsed = parsePaneKey(disabledArgs.paneKey)
       return resolveTerminalDockDisabledReason({
         targetPtyId: disabledArgs.targetPtyId,
         recoveryPhase: disabledArgs.recoveryPhase,
-        quarantined: parsed ? isTerminalInputQuarantined(parsed.tabId) : false
+        quarantined: parsed ? isTerminalInputQuarantined(parsed.tabId) : false,
+        sshDisconnected: disabledArgs.sshDisconnected
       })
     },
     []
@@ -215,10 +234,18 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
   // dock undock uses), so it's a raw subscription over the currently-passthrough panes only
   // — never a full-record selector, which would re-render this component on any pane's status
   // change anywhere in the app.
-  const previousAgentStatesRef = useRef<Map<string, AgentStatusState | null>>(new Map())
   useEffect(() => {
     if (!enabled) {
       return undefined
+    }
+    // Why: catches a pane whose passthrough entry seed was lost to a remount of this hook
+    // (subscription install) rather than a fresh toggle — the toggle-time seed above covers
+    // the common case, this is the defensive backstop for the set already being non-empty.
+    for (const paneKey of passthroughPaneKeys) {
+      if (!previousAgentStatesRef.current.has(paneKey)) {
+        const currentState = useAppStore.getState().agentStatusByPaneKey[paneKey]?.state ?? null
+        previousAgentStatesRef.current.set(paneKey, currentState)
+      }
     }
     return useAppStore.subscribe(() => {
       if (passthroughPaneKeys.size === 0) {
@@ -240,6 +267,7 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
             agentType: entry?.agentType
           })
         ) {
+          previousAgentStatesRef.current.delete(paneKey)
           setPassthroughPaneKeys((previous) => {
             if (!previous.has(paneKey)) {
               return previous
@@ -253,6 +281,22 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
     })
   }, [enabled, passthroughPaneKeys])
 
+  const prunePassthroughForRetiredPane = useCallback(
+    (leafId: string): void => {
+      const paneKey = makePaneKey(tabId, leafId)
+      previousAgentStatesRef.current.delete(paneKey)
+      setPassthroughPaneKeys((previous) => {
+        if (!previous.has(paneKey)) {
+          return previous
+        }
+        const next = new Set(previous)
+        next.delete(paneKey)
+        return next
+      })
+    },
+    [tabId]
+  )
+
   return useMemo(
     () => ({
       isPaneDocked,
@@ -261,7 +305,8 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       isPanePassthrough,
       commitGutterRows,
       disabledReasonFor,
-      undockOnConfirmedAgentExit
+      undockOnConfirmedAgentExit,
+      prunePassthroughForRetiredPane
     }),
     [
       commitGutterRows,
@@ -270,6 +315,7 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       isPaneDocked,
       isPanePassthrough,
       paneDockOwnsFocus,
+      prunePassthroughForRetiredPane,
       undockOnConfirmedAgentExit
     ]
   )

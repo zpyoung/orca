@@ -4,13 +4,19 @@ import { getCachedUnifiedTerminalTabForWorktree } from './terminal-unified-tab-l
 
 /** Resolves which unified tab and pane key to prune from `terminalDockByPaneKey` when a pane
  *  retires — covers plain close, retire, and detach-to-a-new-tab alike, since in every case
- *  the closed pane's `sourceTabId:leafId` key stops describing anything under the source tab. */
+ *  the closed pane's `sourceTabId:leafId` key stops describing anything under the source tab.
+ *  Returns null when the flag is off — flag-off is the dock's kill switch, so a pane closing
+ *  must not write to `terminalDockByPaneKey` even to clean up a stale pre-disable entry. */
 export function resolveTerminalDockPruneTarget(args: {
   unifiedTabsByWorktree: Record<string, Tab[]>
   worktreeId: string
   tabId: string
   leafId: string
+  experimentalTerminalDockEnabled: boolean
 }): { unifiedTabId: string; paneKey: string } | null {
+  if (!args.experimentalTerminalDockEnabled) {
+    return null
+  }
   const unifiedTab = getCachedUnifiedTerminalTabForWorktree(
     args.unifiedTabsByWorktree,
     args.worktreeId,

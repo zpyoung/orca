@@ -290,6 +290,10 @@ type UseTerminalPaneLifecycleDeps = {
   isVisibleRef: React.RefObject<boolean>
   onPtyExitRef: React.RefObject<(ptyId: string) => void>
   onAgentExitedRef: React.RefObject<(leafId: string) => void>
+  /** Fires when a pane retires (close, retire, or detach-to-a-new-tab) with its leaf id —
+   *  lets dock-adjacent local state (e.g. passthrough membership) prune itself alongside the
+   *  store-side dock-state prune this hook already performs at the same point. */
+  onPaneRetiredRef?: React.RefObject<(leafId: string) => void>
   onPtyErrorRef?: React.RefObject<(paneId: number, message: string) => void>
   onPtyRecoveryStateRef?: React.RefObject<
     (paneId: number, state: PtyTransportRecoveryState | null) => void
@@ -639,6 +643,7 @@ export function useTerminalPaneLifecycle({
   isVisibleRef,
   onPtyExitRef,
   onAgentExitedRef,
+  onPaneRetiredRef,
   onPtyErrorRef,
   onPtyRecoveryStateRef,
   clearTabPtyId,
@@ -1381,12 +1386,14 @@ export function useTerminalPaneLifecycle({
         }
         const leafId = closedPane?.leafId
         if (leafId) {
+          onPaneRetiredRef?.current?.(leafId)
           const dockPruneState = useAppStore.getState()
           const dockPruneTarget = resolveTerminalDockPruneTarget({
             unifiedTabsByWorktree: dockPruneState.unifiedTabsByWorktree,
             worktreeId,
             tabId,
-            leafId
+            leafId,
+            experimentalTerminalDockEnabled: settingsRef.current?.experimentalTerminalDock === true
           })
           if (dockPruneTarget) {
             dockPruneState.pruneTerminalDockPaneKeys(dockPruneTarget.unifiedTabId, [

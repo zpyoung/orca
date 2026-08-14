@@ -59,4 +59,26 @@ describe('resolveTerminalDockDisabledReason', () => {
       })
     ).toBe('Reconnecting…')
   })
+
+  it('disables with an SSH-specific reason ahead of an as-yet-unreflected PTY recovery phase', () => {
+    expect(
+      resolveTerminalDockDisabledReason({
+        targetPtyId: 'pty-1',
+        recoveryPhase: 'connected',
+        quarantined: false,
+        sshDisconnected: true
+      })
+    ).toBe('SSH disconnected')
+  })
+
+  it('does not disable for SSH when the connection is live', () => {
+    expect(
+      resolveTerminalDockDisabledReason({
+        targetPtyId: 'pty-1',
+        recoveryPhase: 'connected',
+        quarantined: false,
+        sshDisconnected: false
+      })
+    ).toBeNull()
+  })
 })

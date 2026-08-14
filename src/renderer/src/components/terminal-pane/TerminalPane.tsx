@@ -200,6 +200,7 @@ import {
   updateTerminalRemoteRuntimeRecoveryUiState,
   type VisiblePtyRecoveryState
 } from './terminal-remote-runtime-recovery-ui-state'
+import { updateTerminalDockRawRecoveryPhaseByPaneId } from './terminal-pane-dock-recovery-phase'
 
 const NATIVE_CHAT_ROOT_SELECTOR = '[data-native-chat-root="true"]'
 
@@ -351,6 +352,12 @@ function TerminalPane(
     sshReconnectTargetLabel,
     sshReconnectTargetRemoved
   } = useAppStore(useShallow((store) => selectTerminalPaneHostState(store, worktreeId)))
+  // Why: the dock's disabled reason needs this regardless of tab visibility — a hidden pane's
+  // composer must not stay enabled against a dead SSH connection just because the reconnect
+  // banner (which only shows for the active, visible pane) isn't currently rendering.
+  const sshConnectionUnavailable = Boolean(
+    sshReconnectTargetId && sshReconnectStatus && sshReconnectStatus !== 'connected'
+  )
   useEffect(() => {
     if (!sshReconnectEnvironmentId) {
       return
@@ -387,6 +394,7 @@ function TerminalPane(
     useState<ExecutionHostId>(LOCAL_EXECUTION_HOST_ID)
   const [chatLeafId, setChatLeafId] = useState<string | null>(null)
   const onAgentExitedRef = useRef<(leafId: string) => void>(() => {})
+  const onPaneRetiredRef = useRef<(leafId: string) => void>(() => {})
   const [tabWideAgentHintLeafId, setTabWideAgentHintLeafId] = useState<string | null | undefined>(
     undefined
   )
@@ -398,6 +406,9 @@ function TerminalPane(
   const [terminalError, setTerminalError] = useState<string | null>(null)
   const [ptyRecoveryStatesByPaneId, setPtyRecoveryStatesByPaneId] = useState<
     Record<number, VisiblePtyRecoveryState>
+  >({})
+  const [dockRawRecoveryPhaseByPaneId, setDockRawRecoveryPhaseByPaneId] = useState<
+    Record<number, PtyTransportRecoveryState['phase']>
   >({})
   const [sessionStateSaveFailureOpen, setSessionStateSaveFailureOpen] = useState(false)
   const daemonActions = useDaemonActions()
@@ -490,6 +501,12 @@ function TerminalPane(
     (paneId: number, state: PtyTransportRecoveryState | null) => {
       setPtyRecoveryStatesByPaneId((previous) =>
         updateTerminalRemoteRuntimeRecoveryUiState(previous, paneId, state)
+      )
+      // Why: the dock's disabled-reason resolver needs every phase (offline, ended, disposed,
+      // connecting included) — ptyRecoveryStatesByPaneId is the recovery banner's own filtered
+      // view and must not be widened, so the dock reads this separate, unfiltered track instead.
+      setDockRawRecoveryPhaseByPaneId((previous) =>
+        updateTerminalDockRawRecoveryPhaseByPaneId(previous, paneId, state)
       )
     }
   )
@@ -661,6 +678,10 @@ function TerminalPane(
       undockOnConfirmedAgentExit(leafId)
     }
   }, [handleConfirmedAgentExit, undockOnConfirmedAgentExit])
+  const prunePassthroughForRetiredPane = terminalDock.prunePassthroughForRetiredPane
+  useEffect(() => {
+    onPaneRetiredRef.current = prunePassthroughForRetiredPane
+  }, [prunePassthroughForRetiredPane])
   const canToggleChatForLeaf = useCallback(
     (leafId: string | null): boolean => {
       // Scope the "always allow toggling back" rule to the leaf showing chat; must not make an unsupported sibling look eligible.
@@ -1380,6 +1401,7 @@ function TerminalPane(
     isVisibleRef,
     onPtyExitRef,
     onAgentExitedRef,
+    onPaneRetiredRef,
     onPtyErrorRef,
     onPtyRecoveryStateRef,
     clearTabPtyId,
@@ -3126,7 +3148,8 @@ function TerminalPane(
                 disabledReason={terminalDock.disabledReasonFor({
                   paneKey,
                   targetPtyId,
-                  recoveryPhase: ptyRecoveryStatesByPaneId[pane.id]?.phase ?? null
+                  recoveryPhase: dockRawRecoveryPhaseByPaneId[pane.id] ?? null,
+                  sshDisconnected: sshConnectionUnavailable
                 })}
                 readTerminalScreen={() => pane.serializeAddon.serialize({ scrollback: 0 })}
                 onCommitGutterRows={(rows) => terminalDock.commitGutterRows(paneKey, rows)}

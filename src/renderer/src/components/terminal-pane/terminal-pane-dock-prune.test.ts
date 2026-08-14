@@ -25,7 +25,8 @@ describe('resolveTerminalDockPruneTarget', () => {
       unifiedTabsByWorktree: { 'wt-1': [unifiedTab] },
       worktreeId: 'wt-1',
       tabId: 'terminal-1',
-      leafId: '11111111-1111-4111-8111-111111111111'
+      leafId: '11111111-1111-4111-8111-111111111111',
+      experimentalTerminalDockEnabled: true
     })
     expect(result).toEqual({
       unifiedTabId: 'unified-1',
@@ -38,7 +39,20 @@ describe('resolveTerminalDockPruneTarget', () => {
       unifiedTabsByWorktree: { 'wt-1': [] },
       worktreeId: 'wt-1',
       tabId: 'terminal-1',
-      leafId: '11111111-1111-4111-8111-111111111111'
+      leafId: '11111111-1111-4111-8111-111111111111',
+      experimentalTerminalDockEnabled: true
+    })
+    expect(result).toBeNull()
+  })
+
+  it('returns null when the flag is off, even for a pane with a real unified tab', () => {
+    const unifiedTab = makeUnifiedTab({ entityId: 'terminal-1' })
+    const result = resolveTerminalDockPruneTarget({
+      unifiedTabsByWorktree: { 'wt-1': [unifiedTab] },
+      worktreeId: 'wt-1',
+      tabId: 'terminal-1',
+      leafId: '11111111-1111-4111-8111-111111111111',
+      experimentalTerminalDockEnabled: false
     })
     expect(result).toBeNull()
   })

@@ -24,9 +24,13 @@ function makeHandle(): {
   }
 }
 
-function dispatchWindow(type: string, init: Partial<{ clientY: number }> = {}): void {
+function dispatchWindow(
+  type: string,
+  init: Partial<{ clientY: number; pointerId: number }> = {}
+): void {
   const event = new Event(type) as PointerEvent
   Object.defineProperty(event, 'clientY', { value: init.clientY ?? 0 })
+  Object.defineProperty(event, 'pointerId', { value: init.pointerId ?? 1 })
   window.dispatchEvent(event)
 }
 
@@ -124,5 +128,85 @@ describe('beginTerminalDockGutterDrag', () => {
     dispatchWindow('pointerup')
 
     expect(committedRows).toEqual([])
+  })
+
+  it('ignores move/up/cancel events from a pointer other than the one that started the drag', async () => {
+    const pane = makeFakePane()
+    const liveRows: number[] = []
+    const committedRows: number[] = []
+
+    beginTerminalDockGutterDrag(
+      { clientY: 100, pointerId: 1, currentTarget: makeHandle() },
+      {
+        pane,
+        startGutterRows: 5,
+        onLiveRowsChange: (rows) => liveRows.push(rows),
+        onCommit: (rows) => committedRows.push(rows)
+      },
+      () => true
+    )
+
+    // A second touch/pen elsewhere must not move or commit this drag.
+    dispatchWindow('pointermove', { clientY: 40, pointerId: 2 })
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    dispatchWindow('pointerup', { pointerId: 2 })
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+
+    expect(liveRows).toEqual([])
+    expect(committedRows).toEqual([])
+
+    // The original pointer can still move and release the drag normally.
+    dispatchWindow('pointermove', { clientY: 40, pointerId: 1 })
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    dispatchWindow('pointerup', { pointerId: 1 })
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+
+    expect(committedRows).toEqual([8])
+  })
+
+  it('fits and flushes against the settled geometry, not a stale one, on a release that lands before the next frame applies the final row change', async () => {
+    const pane = makeFakePane()
+    let flushCount = 0
+    pane.container.addEventListener('orca-pane-pty-resize-hold-flush', () => {
+      flushCount += 1
+    })
+    // Stands in for gutterRows-driven DOM geometry that a React state update commits
+    // asynchronously — settling on a microtask, later than the synchronous call that
+    // requests it, the way batched state does.
+    let settledRows = 5
+    const fitReadsAt: number[] = []
+
+    beginTerminalDockGutterDrag(
+      { clientY: 100, pointerId: 1, currentTarget: makeHandle() },
+      {
+        pane,
+        startGutterRows: 5,
+        onLiveRowsChange: (rows) => {
+          void Promise.resolve().then(() => {
+            settledRows = rows
+          })
+        },
+        onCommit: () => {}
+      },
+      () => {
+        fitReadsAt.push(settledRows)
+        queuePanePtyResizeIfHeld(pane.container, 80, settledRows)
+        return true
+      }
+    )
+
+    // Move straight to 8 rows and release before the move's own rAF ever applies it —
+    // the queued row change and the release land in the same tick.
+    dispatchWindow('pointermove', { clientY: 40 })
+    dispatchWindow('pointerup')
+
+    expect(flushCount).toBe(0)
+
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+
+    expect(fitReadsAt).toEqual([8])
+    expect(flushCount).toBe(1)
   })
 })
