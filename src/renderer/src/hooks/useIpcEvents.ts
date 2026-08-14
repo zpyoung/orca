@@ -86,6 +86,7 @@ import {
   setDriverForBrowserPage
 } from '@/lib/pane-manager/browser-mobile-driver-state'
 import { destroyPersistentWebview } from '@/components/browser-pane/webview-registry'
+import { rememberLiveBrowserUrl } from '@/components/browser-pane/browser-runtime'
 import {
   acquireBrowserAutomationVisibility,
   releaseBrowserAutomationVisibility
@@ -100,11 +101,12 @@ import { dispatchTerminalSideEffectBatch } from '@/components/terminal-pane/term
 import { subscribeToUnpairedDeviceAuthNotification } from './unpaired-device-auth-notification'
 import {
   applyRuntimeEnvironmentSshStateChanged,
-  hydrateRuntimeEnvironmentSshState
+  hydrateRuntimeEnvironmentSshState,
+  refreshRuntimeEnvironmentSshTargetMetadata
 } from '@/runtime/runtime-environment-ssh-state'
 import {
   createRuntimeProjectRefreshScheduler,
-  refreshRuntimeProjectWorktrees
+  refreshRuntimeProjectWorktreesAndLineage
 } from './runtime-project-refresh-scheduler'
 import { createRuntimeClientEventsSync } from './runtime-client-events-sync'
 import { detectLanguage } from '@/lib/language-detect'
@@ -126,7 +128,6 @@ import type { AppState } from '../store/types'
 import { guardPinnedTabClose, resolvePinnedTabLabel } from '../store/pinned-tab-close-guard'
 import {
   closeWebRuntimeSessionTab,
-  createWebRuntimeSessionBrowserTab,
   createWebRuntimeSessionTerminal,
   isWebRuntimeSessionActive
 } from '@/runtime/web-runtime-session'
@@ -156,6 +157,7 @@ import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner
 import { resolveTerminalWorktreeRoute } from '@/lib/terminal-worktree-route'
 import { resolveAgentPaneAuthorityKey } from '@/store/slices/agent-pane-authority'
 import { translate } from '@/i18n/i18n'
+import { redactKagiSessionToken } from '../../../shared/browser-url'
 import { closeTerminalTab } from '@/components/terminal/terminal-tab-actions'
 import { initialAgentTabViewModeProps } from '@/lib/native-chat-initial-view-mode'
 import { getConnectionIdFromState } from '@/lib/connection-context'
@@ -798,7 +800,10 @@ export function useIpcEvents(): void {
         options?.forceLocalOwner
           ? { forceLocalOwner: true }
           : options?.executionHostId
-            ? { executionHostId: options.executionHostId }
+            ? {
+                executionHostId: options.executionHostId,
+                suppressRemoteLineageRefresh: true
+              }
             : undefined
       )
       await useAppStore
@@ -902,15 +907,15 @@ export function useIpcEvents(): void {
 
     const runtimeProjectRefreshScheduler = createRuntimeProjectRefreshScheduler({
       refresh: async (environmentId) => {
-        // Why: refresh the env's SSH bucket on (re)connect so a pre-drop snapshot can't keep a reconnect overlay stale.
-        void hydrateRuntimeEnvironmentSshState(environmentId, { force: true }).catch(() => {})
+        // Why: project events can reveal target CRUD, but known target states already arrive by push.
+        void refreshRuntimeEnvironmentSshTargetMetadata(environmentId).catch(() => {})
         const repos = await useAppStore.getState().fetchRuntimeEnvironmentRepos(environmentId)
-        await refreshRuntimeProjectWorktrees(environmentId, repos, (repoId, options) =>
-          useAppStore.getState().fetchWorktrees(repoId, options)
+        await refreshRuntimeProjectWorktreesAndLineage(
+          environmentId,
+          repos,
+          (repoId, options) => useAppStore.getState().fetchWorktrees(repoId, options),
+          (options) => useAppStore.getState().fetchWorktreeLineage(options)
         )
-        await useAppStore.getState().fetchWorktreeLineage({
-          executionHostId: toRuntimeExecutionHostId(environmentId)
-        })
       },
       onError: (error) => {
         console.error('Failed to refresh runtime projects:', error)
@@ -2086,6 +2091,7 @@ export function useIpcEvents(): void {
           return
         }
         const store = useAppStore.getState()
+        rememberLiveBrowserUrl(browserPageId, redactKagiSessionToken(url))
         store.setBrowserPageUrl(browserPageId, url)
         store.updateBrowserPageState(browserPageId, { title, loading: false })
       })
@@ -2140,35 +2146,23 @@ export function useIpcEvents(): void {
       window.api.ui.onNewBrowserTab(() => {
         const store = useAppStore.getState()
         if (isFloatingWorkspacePanelFocused()) {
-          void createFloatingWorkspaceBrowserTab(store)
+          void createFloatingWorkspaceBrowserTab(store).catch((error) => {
+            toast.error(error instanceof Error ? error.message : String(error))
+          })
           return
         }
         const worktreeId = store.activeWorktreeId
-        if (worktreeId) {
-          const environmentId = getWorktreeRuntimeEnvironmentId(worktreeId)
-          if (environmentId) {
-            if (!isWebRuntimeSessionActive(environmentId)) {
-              store.createBrowserTab(worktreeId, store.browserDefaultUrl ?? 'about:blank', {
-                title: translate('auto.hooks.useIpcEvents.f6300deb8b', 'New Browser Tab'),
-                focusAddressBar: true
-              })
-              return
-            }
-            void (async () => {
-              // Why: paired web tabs are host-owned; on RPC failure leave local state so the next host snapshot stays authoritative.
-              await createWebRuntimeSessionBrowserTab({
-                worktreeId,
-                environmentId,
-                url: store.browserDefaultUrl ?? 'about:blank'
-              })
-            })()
-            return
-          }
-          store.createBrowserTab(worktreeId, store.browserDefaultUrl ?? 'about:blank', {
-            title: translate('auto.hooks.useIpcEvents.f6300deb8b', 'New Browser Tab'),
-            focusAddressBar: true
-          })
+        if (!worktreeId) {
+          return
         }
+        const targetGroupId =
+          store.activeGroupIdByWorktree[worktreeId] ?? store.groupsByWorktree[worktreeId]?.[0]?.id
+        if (!targetGroupId) {
+          return
+        }
+        void store.openNewBrowserTabInActiveWorkspace(targetGroupId).catch((error) => {
+          toast.error(error instanceof Error ? error.message : String(error))
+        })
       })
     )
 
@@ -2210,7 +2204,9 @@ export function useIpcEvents(): void {
       if (!worktreeId) {
         return
       }
-      void openMobileEmulatorTab(worktreeId, { placement: 'rightSplit' })
+      void openMobileEmulatorTab(worktreeId, { placement: 'rightSplit' }).catch((error) => {
+        toast.error(error instanceof Error ? error.message : String(error))
+      })
     })
     if (unsubscribeNewSimulatorTab) {
       unsubs.push(unsubscribeNewSimulatorTab)

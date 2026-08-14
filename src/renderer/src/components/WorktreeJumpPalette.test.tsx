@@ -2,6 +2,7 @@
 
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as ReactI18Next from 'react-i18next'
 import { useAppStore } from '@/store'
@@ -74,25 +75,40 @@ vi.mock('@/components/ui/command', async () => {
         </div>
       ) : null
     },
-    CommandInput: ({
-      value,
-      onValueChange,
-      placeholder
-    }: {
-      value?: string
-      onValueChange?: (next: string) => void
-      placeholder?: string
-    }) => {
+    Command: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    CommandGroup: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    CommandInput: React.forwardRef(function CommandInput(
+      {
+        value,
+        onValueChange,
+        placeholder,
+        onClick,
+        onSelect,
+        onKeyDown
+      }: {
+        value?: string
+        onValueChange?: (next: string) => void
+        placeholder?: string
+        onClick?: React.MouseEventHandler<HTMLInputElement>
+        onSelect?: React.ReactEventHandler<HTMLInputElement>
+        onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>
+      },
+      ref: React.ForwardedRef<HTMLInputElement>
+    ) {
       setCommandQuery = onValueChange ?? null
       return (
         <input
+          ref={ref}
           data-command-input="true"
           placeholder={placeholder}
           value={value}
           onChange={(event) => onValueChange?.(event.currentTarget.value)}
+          onClick={onClick}
+          onSelect={onSelect}
+          onKeyDown={onKeyDown}
         />
       )
-    },
+    }),
     CommandList: React.forwardRef(function CommandList(
       { children }: { children: React.ReactNode },
       ref: React.ForwardedRef<HTMLDivElement>

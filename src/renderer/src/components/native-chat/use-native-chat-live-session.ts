@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   NATIVE_CHAT_SOURCE_PRIORITY,
   type AgentType,
@@ -22,6 +22,9 @@ import {
 import { getNativeChatSessionTransport } from './native-chat-session-transport'
 import { useNativeChatTranscriptLifecycle } from './use-native-chat-transcript-lifecycle'
 import { useNativeChatHookStatus } from './use-native-chat-hook-status'
+import { useNativeChatAssembledMessages } from './use-native-chat-assembled-messages'
+import { createNativeChatReadRetryTimer } from './native-chat-read-retry-timer'
+import { openNativeChatTranscriptStream } from './native-chat-stream-teardown'
 
 export type UseNativeChatLiveSessionArgs = {
   /** Composite `${tabId}:${leafId}` key — selects the live hook entry. */
@@ -77,8 +80,8 @@ export type ReadState =
  * Transport: per-owner (getNativeChatSessionTransport) — a runtime-owned pane
  * (Model B) reads/tails the remote host; local/ssh panes keep the local IPC path.
  *
- * Teardown: subscription closes on unmount and on owner/agent/sessionId change so
- * a swap or owner-flip never leaks a watcher.
+ * Teardown: subscription closes when hidden, unmounted, or rebound so no source
+ * generation leaks a watcher.
  */
 export function useNativeChatLiveSession(
   args: UseNativeChatLiveSessionArgs
@@ -107,6 +110,11 @@ export function useNativeChatLiveSession(
 
   const [hookState, hookStateStartedAt, hookHasWorkingSubagents] = useNativeChatHookStatus(paneKey)
 
+  const latestEnabled = useRef(enabled)
+  // Fence late frames before passive cleanup closes the previous stream.
+  useLayoutEffect(() => {
+    latestEnabled.current = enabled
+  }, [enabled])
   const latestSessionId = useRef<string | null>(sessionId)
   latestSessionId.current = sessionId
   // Tracks the current transport so a load-earlier resolve from a prior host is discarded after an owner flip (session id can stay the same).
@@ -118,6 +126,19 @@ export function useNativeChatLiveSession(
     // Why: agent/path/owner rebinds can keep the same session; every source generation must invalidate pagination captured before it.
     transcriptEpochRef.current += 1
     setLoadingEarlier(false)
+    const sourceChanged = retainedSourceKeyRef.current !== sourceKey
+    retainedSourceKeyRef.current = sourceKey
+    if (!enabled) {
+      if (sourceChanged) {
+        limitRef.current = NATIVE_CHAT_INITIAL_LIMIT
+        transcriptLifecycleControl.reset()
+        setRead({ phase: 'loading' })
+        replaceList(appendMergerRef.current, [])
+        setAppended([])
+        setHasMore(false)
+      }
+      return () => undefined
+    }
     transcriptLifecycleControl.reset()
     if (!sessionId) {
       // No session id yet: surface live hook state on an empty transcript; backfills once the id arrives.
@@ -125,7 +146,7 @@ export function useNativeChatLiveSession(
       replaceList(appendMergerRef.current, [])
       setAppended([])
       setHasMore(false)
-      return
+      return () => undefined
     }
 
     let cancelled = false
@@ -168,7 +189,8 @@ export function useNativeChatLiveSession(
     })
 
     const subscriptionId = nextSubscriptionId()
-    const unsubscribe = transport.subscribe(
+    const closeStream = openNativeChatTranscriptStream(
+      transport,
       {
         subscriptionId,
         agent,
@@ -200,10 +222,17 @@ export function useNativeChatLiveSession(
             setHasMore(frame.hasMore)
             return
           }
-          transcriptLifecycleControl.append(frame.lifecycle)
-          // Merge by id then bound to the window; the base read + assembler re-dedup mean trimming the append tail can't drop a covered turn (#6).
-          setAppended(applyAppend(appendMergerRef.current, frame.messages, limitRef.current))
+          frameArrived = true
+          transcriptLifecycleControl.replace(frame.lifecycle)
+          replaceList(appendMergerRef.current, frame.messages)
+          setAppended([])
+          setRead({ phase: 'ready', messages: appendMergerRef.current.list })
+          setHasMore(frame.hasMore)
+          return
         }
+        transcriptLifecycleControl.append(frame.lifecycle)
+        // Merge by id then bound to the window; the base read + assembler re-dedup mean trimming the append tail can't drop a covered turn (#6).
+        setAppended(applyAppend(appendMergerRef.current, frame.messages, limitRef.current))
       }
     )
 
@@ -216,7 +245,13 @@ export function useNativeChatLiveSession(
   }, [agent, sessionId, transcriptPath, transport, sshConnectionId, transcriptLifecycleControl])
 
   const loadEarlier = useCallback(() => {
-    if (!sessionId || loadingEarlier || !hasMore || read.phase !== 'ready') {
+    if (
+      !latestEnabled.current ||
+      !sessionId ||
+      loadingEarlier ||
+      !hasMore ||
+      read.phase !== 'ready'
+    ) {
       return
     }
     const request = nextNativeChatPageRequest(limitRef.current, oldestOffsetRef.current)
@@ -235,6 +270,7 @@ export function useNativeChatLiveSession(
       .then((result) => {
         // Ignore a stale resolve from a swapped session or flipped owner — either would paint the wrong host's history.
         if (
+          !latestEnabled.current ||
           latestSessionId.current !== sessionId ||
           latestTransport.current !== transport ||
           transcriptEpochRef.current !== requestEpoch
@@ -275,7 +311,7 @@ export function useNativeChatLiveSession(
       })
       .finally(() => {
         // Clear the loading flag on the current epoch even when the result is discarded, so a stale resolve can't wedge it true.
-        if (transcriptEpochRef.current === requestEpoch) {
+        if (latestEnabled.current && transcriptEpochRef.current === requestEpoch) {
           setLoadingEarlier(false)
         }
       })
@@ -302,12 +338,13 @@ export function useNativeChatLiveSession(
 
   return useMemo<NativeChatLiveSession>(() => {
     const session = mergeNativeChatLiveSession({
-      sources: { transcript: surfacedMessages },
+      messages: normalizedMessages,
       sessionId,
       agent,
       hookState,
       stateStartedAt: hookStateStartedAt,
       transcriptLifecycle,
+      statusTailMessage: assembledMessages.at(-1),
       hookHasWorkingSubagents,
       // Why: show live watcher-append content over a spinner (#8401), so the loading override applies only when nothing is appended.
       loading: read.phase === 'loading' && appended.length === 0,
@@ -318,7 +355,8 @@ export function useNativeChatLiveSession(
     })
     return { ...session, hasMore, loadingEarlier, loadEarlier, readPhase: read.phase }
   }, [
-    surfacedMessages,
+    normalizedMessages,
+    assembledMessages,
     read,
     sessionId,
     agent,

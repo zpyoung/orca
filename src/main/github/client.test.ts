@@ -1,6 +1,7 @@
 /* oxlint-disable max-lines -- Why: GitHub client fixtures cover local and SSH repo identity paths in one suite so mocked CLI behavior stays consistent. */
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as GithubApiRepositoryModule from './github-api-repository'
+import type * as GitHubEnterpriseRepositoryModule from './github-enterprise-repository'
 
 type RateLimitGuardResult =
   | { blocked: false }
@@ -103,6 +104,11 @@ vi.mock('./local-git-config-signature', () => ({
   readLocalGitConfigSignature: readLocalGitConfigSignatureMock
 }))
 
+vi.mock('./github-enterprise-repository', async (importOriginal) => ({
+  ...(await importOriginal<typeof GitHubEnterpriseRepositoryModule>()),
+  isGitHubHostAuthenticated: vi.fn().mockResolvedValue(true)
+}))
+
 vi.mock('./rate-limit', () => ({
   getRateLimit: getRateLimitMock,
   rateLimitGuard: rateLimitGuardMock,
@@ -179,6 +185,7 @@ import {
   getPullRequestPushTarget,
   mergePR,
   resolveReviewThread,
+  setPRCommentReaction,
   setPRAutoMerge,
   updatePRState,
   updatePRTitle,
@@ -4142,6 +4149,8 @@ describe('GitHub GraphQL rate-limit guard', () => {
     __resetPRConflictSummaryCachesForTests()
   })
 
+  afterEach(() => vi.restoreAllMocks())
+
   it('skips PR review-thread GraphQL fetch while preserving REST comments', async () => {
     rateLimitGuardMock.mockImplementation(((bucket: string) =>
       bucket === 'graphql'
@@ -4169,6 +4178,60 @@ describe('GitHub GraphQL rate-limit guard', () => {
     expect(ghExecFileAsyncMock).toHaveBeenCalledTimes(2)
     expect(ghExecFileAsyncMock.mock.calls.some((call) => call[0][1] === 'graphql')).toBe(false)
     expect(noteRateLimitSpendMock).not.toHaveBeenCalledWith('graphql')
+  })
+
+  it('maps review summary reaction subjects from GraphQL', async () => {
+    getOwnerRepoMock.mockResolvedValueOnce({ owner: 'acme', repo: 'widgets' })
+    ghExecFileAsyncMock
+      .mockResolvedValueOnce({
+        stdout: JSON.stringify({
+          data: {
+            repository: {
+              pullRequest: {
+                reviewThreads: { nodes: [] },
+                comments: { nodes: [] },
+                reviews: {
+                  nodes: [
+                    {
+                      id: 'PRR_44',
+                      databaseId: 44,
+                      author: {
+                        __typename: 'Bot',
+                        login: 'coderabbitai',
+                        avatarUrl: 'https://avatar'
+                      },
+                      body: 'Automated review summary',
+                      createdAt: '2026-04-01T00:00:00Z',
+                      url: 'https://github.com/acme/widgets/pull/7#pullrequestreview-44',
+                      reactionGroups: [
+                        {
+                          content: 'ROCKET',
+                          viewerHasReacted: true,
+                          reactors: { totalCount: 2 }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        })
+      })
+      .mockResolvedValueOnce({ stdout: '[]' })
+      .mockResolvedValueOnce({ stdout: '[]' })
+
+    await expect(getPRComments('/repo-root', 7)).resolves.toEqual([
+      expect.objectContaining({
+        id: 44,
+        reactionSubjectId: 'PRR_44',
+        isBot: true,
+        reactions: [{ content: 'rocket', count: 2, viewerHasReacted: true }]
+      })
+    ])
+    expect(ghExecFileAsyncMock.mock.calls[0]?.[0]).toEqual(
+      expect.arrayContaining([expect.stringContaining('reviews(first: 100)')])
+    )
   })
 
   it('uses explicit PR repo for comments when a fork PR is discovered', async () => {

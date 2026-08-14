@@ -59,6 +59,10 @@ import {
   type WorkspaceSessionHydrationOptions
 } from '@/lib/workspace-session-hydration-keys'
 import { buildValidWorktreeIdsForSessionHydration } from './degraded-repo-worktree-validity'
+import {
+  assertManagedBrowserMaterializationAllowed,
+  getClientCreationActionPolicy
+} from '@/lib/client-creation-action-policy'
 
 type CreateBrowserTabOptions = {
   activate?: boolean
@@ -560,6 +564,7 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
   },
 
   createBrowserTab: (worktreeId, url, options) => {
+    assertManagedBrowserMaterializationAllowed(get(), options?.browserRuntimeEnvironmentId)
     const workspaceId = createBrowserUuid()
     const page = buildBrowserPage(
       workspaceId,
@@ -675,9 +680,16 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
     if (!worktreeId) {
       return
     }
+    const browserAvailability = getClientCreationActionPolicy(state, worktreeId)['managed-browser']
+    if (browserAvailability.state !== 'enabled') {
+      throw new Error(browserAvailability.reason)
+    }
     const defaultUrl = state.browserDefaultUrl ?? 'about:blank'
     const runtimeEnvironmentId = getRuntimeEnvironmentIdForWorktree(state, worktreeId)
-    if (runtimeEnvironmentId) {
+    if (browserAvailability.provider === 'paired-runtime') {
+      if (!runtimeEnvironmentId) {
+        throw new Error('The paired runtime browser provider is unavailable.')
+      }
       const { createWebRuntimeSessionBrowserTab } = await import('@/runtime/web-runtime-session')
       try {
         const created = await createWebRuntimeSessionBrowserTab({
@@ -696,12 +708,14 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
           '[browser] remote browser tab creation failed:',
           error instanceof Error ? error.message : String(error)
         )
+        throw error
       }
-      return
+      throw new Error('The paired runtime could not create a managed browser tab.')
     }
     get().createBrowserTab(worktreeId, defaultUrl, {
       title: translate('auto.store.slices.browser.d175274b6d', 'New Browser Tab'),
       focusAddressBar: true,
+      ...(runtimeEnvironmentId ? { browserRuntimeEnvironmentId: null } : {}),
       targetGroupId: groupId
     })
     get().recordFeatureInteraction('browser-tab-created')
@@ -1651,21 +1665,25 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
         }
         const hydratedTabs: BrowserWorkspace[] = []
         for (const tab of tabs) {
-          const persistedPages = persistedPagesByWorkspace[tab.id] ?? [
-            {
-              id: createBrowserUuid(),
-              workspaceId: tab.id,
-              worktreeId,
-              url: normalizeUrl(tab.url),
-              title: tab.title,
-              loading: false,
-              faviconUrl: tab.faviconUrl ?? null,
-              canGoBack: tab.canGoBack,
-              canGoForward: tab.canGoForward,
-              loadError: tab.loadError ?? null,
-              createdAt: tab.createdAt
-            } satisfies BrowserPage
-          ]
+          // Salvage can leave an empty page array; hydrate it like a missing array.
+          const storedPages = persistedPagesByWorkspace[tab.id]
+          const persistedPages = storedPages?.length
+            ? storedPages
+            : [
+                {
+                  id: createBrowserUuid(),
+                  workspaceId: tab.id,
+                  worktreeId,
+                  url: normalizeUrl(tab.url),
+                  title: tab.title,
+                  loading: false,
+                  faviconUrl: tab.faviconUrl ?? null,
+                  canGoBack: tab.canGoBack,
+                  canGoForward: tab.canGoForward,
+                  loadError: tab.loadError ?? null,
+                  createdAt: tab.createdAt
+                } satisfies BrowserPage
+              ]
           const nextPages = persistedPages.map((page) => {
             // Why: in-memory hydration callers can bypass the persistence schema's unknown-key stripping.
             const { allowWindowClose: _legacyAllowWindowClose, ...persistedPage } =

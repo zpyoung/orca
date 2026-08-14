@@ -137,6 +137,56 @@ describe('useAddRepoHostSelection', () => {
     expect(setStep).toHaveBeenCalledWith('add')
   })
 
+  it('uses the paired runtime as the only local filesystem authority in web clients', async () => {
+    mocks.isWebClient = true
+    mocks.stateValues = ['local', false]
+    const { useAddRepoHostSelection } = await import('./use-add-repo-host-selection')
+
+    const result = useAddRepoHostSelection({ isOpen: true, setStep: vi.fn() })
+
+    expect(result.hostOptions.map((host) => host.id)).toEqual(['ssh:ssh-1', 'runtime:env-1'])
+    expect(result.selectedHostId).toBe('runtime:env-1')
+    expect(result.selectedParsedHost).toMatchObject({
+      kind: 'runtime',
+      environmentId: 'env-1'
+    })
+  })
+
+  it('has no local fallback while a paired web runtime is loading', async () => {
+    mocks.isWebClient = true
+    mocks.stateValues = ['local', false]
+    mocks.hostOptions = [mocks.hostOptions[0]]
+    const { useAddRepoHostSelection } = await import('./use-add-repo-host-selection')
+
+    const result = useAddRepoHostSelection({ isOpen: true, setStep: vi.fn() })
+
+    expect(result.hostOptions).toEqual([])
+    expect(result.selectedHostId).toBeNull()
+    expect(result.selectedParsedHost).toBeNull()
+    expect(mocks.stateSetters[0]).not.toHaveBeenCalledWith('local')
+  })
+
+  it.each(['error', 'blocked'] as const)(
+    'has no paired-web fallback when the only host is %s',
+    async (health) => {
+      mocks.isWebClient = true
+      mocks.stateValues = ['runtime:env-1', false]
+      mocks.hostOptions = [
+        {
+          ...mocks.hostOptions[2],
+          health
+        }
+      ]
+      const { useAddRepoHostSelection } = await import('./use-add-repo-host-selection')
+
+      const result = useAddRepoHostSelection({ isOpen: true, setStep: vi.fn() })
+
+      expect(result.hostOptions).toHaveLength(1)
+      expect(result.selectedHostId).toBeNull()
+      expect(result.selectedParsedHost).toBeNull()
+    }
+  )
+
   it('selects a local or SSH host without changing the durable active server', async () => {
     mocks.stateValues = ['runtime:env-1', false]
     mocks.storeState.settings = { activeRuntimeEnvironmentId: 'env-1' }

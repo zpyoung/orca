@@ -54,6 +54,11 @@ import {
   isDefaultBranchWorkspace,
   isSleepingSweepExemptWorkspace
 } from '@/components/sidebar/visible-worktrees'
+import {
+  EMPTY_PAIRED_DEVICE_IDS_BY_ENVIRONMENT,
+  getPairedDeviceIdsByEnvironment,
+  isWorkspaceFromOtherDevice
+} from '@/components/sidebar/workspace-creator-visibility'
 import { getLiveAgentStatusByWorktreeId, isInactiveWorkspace } from '@/lib/worktree-activity-state'
 import { orderEmptyQueryWorktrees } from '@/lib/order-empty-query-worktrees'
 import {
@@ -170,6 +175,8 @@ import { resolvePaletteFocusRestoreTarget } from '@/components/cmd-j/palette-foc
 import { selectWorktreePaletteCacheInputs } from '@/components/cmd-j/worktree-palette-cache-inputs'
 import { getRepoHostIdentity } from '@/store/slices/repo-host-identity'
 import { buildPluginQuickActions } from '@/components/cmd-j/plugin-quick-actions'
+import { WorkspaceEmojiSuggestionPopover } from '@/components/workspace-emoji/WorkspaceEmojiSuggestionPopover'
+import { useWorkspaceEmojiShortcodeInput } from '@/components/workspace-emoji/useWorkspaceEmojiShortcodeInput'
 import { usePluginCommands } from '@/store/plugin-panels'
 import {
   getComposerEligibleRepos,
@@ -613,6 +620,7 @@ function WorktreeJumpPaletteContent({
   const hideAutomationGeneratedWorkspaces = useAppStore((s) => s.hideAutomationGeneratedWorkspaces)
   const hideCliCreatedWorkspaces = useAppStore((s) => s.hideCliCreatedWorkspaces)
   const hideDetachedHeadWorkspaces = useAppStore((s) => s.hideDetachedHeadWorkspaces)
+  const hideWorkspacesFromOtherDevices = useAppStore((s) => s.hideWorkspacesFromOtherDevices)
   const showSleepingWorkspaces = useAppStore((s) => s.showSleepingWorkspaces)
   const alwaysShowDefaultBranchWorkspace = useAppStore((s) => s.alwaysShowDefaultBranchWorkspace)
   const lastVisitedAtByWorktreeId = useAppStore((s) => s.lastVisitedAtByWorktreeId)
@@ -746,6 +754,13 @@ function WorktreeJumpPaletteContent({
       ),
     [agentStatusByPaneKey, tabsByWorktree]
   )
+  const pairedDeviceIdsByEnvironment = useMemo(
+    () =>
+      hideWorkspacesFromOtherDevices
+        ? getPairedDeviceIdsByEnvironment(runtimeEnvironments, runtimeStatusByEnvironmentId)
+        : EMPTY_PAIRED_DEVICE_IDS_BY_ENVIRONMENT,
+    [hideWorkspacesFromOtherDevices, runtimeEnvironments, runtimeStatusByEnvironmentId]
+  )
 
   // Why: empty-query mirrors sidebar filters so Search opens on the same quiet list; typed search widens to global non-archived scope.
   const emptyQueryVisibleWorktrees = useMemo(
@@ -769,6 +784,12 @@ function WorktreeJumpPaletteContent({
           return false
         }
         if (hideDetachedHeadWorkspaces && isDetachedHeadWorkspace(worktree)) {
+          return false
+        }
+        if (
+          hideWorkspacesFromOtherDevices &&
+          isWorkspaceFromOtherDevice(worktree, pairedDeviceIdsByEnvironment)
+        ) {
           return false
         }
         if (
@@ -797,6 +818,8 @@ function WorktreeJumpPaletteContent({
       hideCliCreatedWorkspaces,
       hideDefaultBranchWorkspace,
       hideDetachedHeadWorkspaces,
+      hideWorkspacesFromOtherDevices,
+      pairedDeviceIdsByEnvironment,
       ptyIdsByTabId,
       showSleepingWorkspaces,
       tabsByWorktree,
@@ -1455,23 +1478,37 @@ function WorktreeJumpPaletteContent({
   // Why: filtering via buildQuickActionContext() inside a memo with stable primitive deps
   // instead of calling it inline every render — a fresh context object as a useMemo dep
   // defeated the middleItems memo (new identity every keystroke).
+  const quickActionAvailabilityInputs = useMemo(
+    () => ({
+      activeView,
+      activeWorktreeId,
+      worktreesByRepo,
+      repos,
+      sshConnectionStates,
+      activeGroupIdByWorktree,
+      groupsByWorktree,
+      isLoading,
+      activeRuntimeEnvironmentId: settings?.activeRuntimeEnvironmentId,
+      runtimeStatusByEnvironmentId
+    }),
+    [
+      activeView,
+      activeWorktreeId,
+      worktreesByRepo,
+      repos,
+      sshConnectionStates,
+      activeGroupIdByWorktree,
+      groupsByWorktree,
+      isLoading,
+      settings?.activeRuntimeEnvironmentId,
+      runtimeStatusByEnvironmentId
+    ]
+  )
   const availableActionResults = useMemo(() => {
+    void quickActionAvailabilityInputs
     const ctx = buildQuickActionContext()
     return actionResults.filter((action) => action.isAvailable(ctx).available)
-  }, [
-    actionResults,
-    buildQuickActionContext,
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- these are the availability-determining primitives buildQuickActionContext reads from the store; listing them ensures the memo recomputes when availability actually changes, not on every render.
-    activeView,
-    activeWorktreeId,
-    worktreesByRepo,
-    repos,
-    sshConnectionStates,
-    activeGroupIdByWorktree,
-    groupsByWorktree,
-    isLoading,
-    settings?.activeRuntimeEnvironmentId
-  ])
+  }, [actionResults, buildQuickActionContext, quickActionAvailabilityInputs])
 
   const middleItems = useMemo<(SettingsPaletteItem | QuickActionPaletteItem)[]>(
     () =>
@@ -1913,6 +1950,11 @@ function WorktreeJumpPaletteContent({
     setSelectedItemId('')
     listRef.current?.scrollTo(0, 0)
   }, [])
+  const emojiInput = useWorkspaceEmojiShortcodeInput({
+    inputRef,
+    onValueChange: handleQueryChange,
+    value: query
+  })
 
   const cancelFallbackFocusFrames = useCallback((): void => {
     if (fallbackFocusOuterFrameRef.current !== null) {
@@ -2475,7 +2517,10 @@ function WorktreeJumpPaletteContent({
           'Search chats, terminals, worktrees, settings, and actions...'
         )}
         value={query}
-        onValueChange={handleQueryChange}
+        onValueChange={emojiInput.handleValueChange}
+        onClick={(event) => emojiInput.syncCursor(event.currentTarget)}
+        onSelect={(event) => emojiInput.syncCursor(event.currentTarget)}
+        onKeyDown={(event) => emojiInput.handleKeyDown(event)}
         wrapperClassName="mx-3 mt-3 rounded-lg border border-border/55 bg-muted/28 px-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
         iconClassName="mr-2.5 h-4 w-4 text-muted-foreground/60"
         className="h-12 text-[14px] placeholder:text-muted-foreground/75"
@@ -2490,6 +2535,19 @@ function WorktreeJumpPaletteContent({
             />
           </div>
         }
+      />
+      <WorkspaceEmojiSuggestionPopover
+        anchorRef={inputRef}
+        open={emojiInput.open}
+        commandValue={emojiInput.commandValue}
+        heading={translate('auto.components.new.workspace.SmartWorkspaceNameField.emoji', 'Emoji')}
+        suggestions={emojiInput.suggestions}
+        onCommandValueChange={emojiInput.onCommandValueChange}
+        onSelect={emojiInput.selectSuggestion}
+        onOpenChange={(open) => !open && emojiInput.close()}
+        portalContainer={dialogElement}
+        side="bottom"
+        contentClassName="w-80"
       />
       <PaletteFilterChips model={filterModel} filter={filter} onFilterChange={setRawFilter} />
       <CommandList

@@ -154,6 +154,7 @@ describe('worktree RPC methods', () => {
       setupDecision: 'skip',
       createdWithAgent: undefined,
       automationProvenance: undefined,
+      creatorProvenance: { kind: 'host' },
       startup: undefined,
       startupDraft: undefined,
       lineage: {

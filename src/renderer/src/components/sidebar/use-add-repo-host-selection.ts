@@ -66,9 +66,8 @@ export function useAddRepoHostSelection({
     selectableHostOptions.find(
       (host) => host.id === LOCAL_EXECUTION_HOST_ID && canSelectAddRepoHost(host)
     ) ??
-    selectableHostOptions.find((host) => canSelectAddRepoHost(host)) ??
-    selectableHostOptions[0]
-  const selectedHostId = selectedHost?.id ?? LOCAL_EXECUTION_HOST_ID
+    selectableHostOptions.find((host) => canSelectAddRepoHost(host))
+  const selectedHostId = selectedHost?.id ?? (isWebClient ? null : LOCAL_EXECUTION_HOST_ID)
   const selectedParsedHost = parseExecutionHostId(selectedHostId)
   const selectedSshTargetId =
     selectedParsedHost?.kind === 'ssh' ? selectedParsedHost.targetId : null

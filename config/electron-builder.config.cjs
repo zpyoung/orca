@@ -150,6 +150,7 @@ module.exports = {
     'out/main/hermes/**',
     'out/main/win32-utils.js',
     'out/main/daemon-entry.js',
+    'out/main/session-scanner-service-entry.js',
     'out/main/plugin-host-entry.js',
     'out/main/computer-sidecar.js',
     'out/main/parcel-watcher-process-entry.js',
