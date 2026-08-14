@@ -57,7 +57,7 @@ export async function dispatchPipelineNode(args: {
   retryOf?: string
   dependencies: PipelineDispatchDependency[]
   isDispatchable: () => boolean
-  onSpawnStarted?: (dispatchId: string) => void
+  onSpawnStarted?: (dispatchId: string, checkpoint: PipelineCheckpointInfo | undefined) => void
 }): Promise<PipelineDispatchOutcome> {
   const preflight = await validatePipelineNodeLaunch({
     runtime: args.runtime,
@@ -112,7 +112,7 @@ export async function dispatchPipelineNode(args: {
       ? () => {
           const dispatch = args.db.getDispatchContext(args.taskId)
           if (dispatch) {
-            args.onSpawnStarted?.(dispatch.id)
+            args.onSpawnStarted?.(dispatch.id, checkpoint)
           }
         }
       : undefined

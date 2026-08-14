@@ -11,6 +11,7 @@ import {
   runtimeStub,
   workerStartResponse
 } from './pipeline-driver-test-support'
+import { assemblePipelineSnapshot } from './pipeline-snapshot-publisher-assemble'
 import type { PipelineSnapshotPublisher } from './pipeline-snapshot-publisher'
 
 const resolveContextMock = vi.fn()
@@ -376,6 +377,13 @@ describe('PipelineDriver', () => {
     driver.start()
     await flushAsync() // spawn has committed; worker-start is still awaiting the readiness wait
 
+    // the durable row must exist from the moment the spawn commits, before abort ever runs
+    expect(pipelineDb.beginAttempt).toHaveBeenCalledWith(
+      'run-1',
+      'a',
+      expect.objectContaining({ attempt: 1, dispatchId: 'd-a' })
+    )
+
     await driver.abort()
     expect(pipelineDb.updateRunState).toHaveBeenCalledWith('run-1', 'aborted')
     // reachable before the readiness wait resolves, not only once the whole call returns
@@ -390,7 +398,96 @@ describe('PipelineDriver', () => {
       })
     )
     await flushAsync()
-    expect(pipelineDb.beginAttempt).not.toHaveBeenCalled() // still never becomes a live attempt
+    expect(pipelineDb.beginAttempt).toHaveBeenCalledTimes(1) // the late 'live' outcome must not double-write the row
+
+    // the node must read as interrupted, not not_run, and its attempt must appear in history
+    const snapshot = assemblePipelineSnapshot(pipelineDb, 'run-1')
+    expect(snapshot.nodes?.[0]).toMatchObject({ id: 'a', status: 'interrupted' })
+    expect(pipelineDb.getAttempts('run-1', 'a')).toHaveLength(1)
+
+    driver.stop()
+  })
+
+  it('live snapshot: a node whose spawn has committed reads as running, not waiting, while the readiness wait is still pending', async () => {
+    const nodeA = node({ id: 'a', index: 0 })
+    const db = new FakeOrchestrationDb()
+    db.tasks.set('task-a', { id: 'task-a', status: 'ready', result: null })
+    const pipelineDb = new FakePipelineRunDb(
+      runRow(),
+      new Map([['a', nodeRow({ node_id: 'a', node_index: 0, task_id: 'task-a' })]])
+    )
+    const runtime = runtimeStub()
+
+    executeLocalWorkerStartMock.mockImplementation(
+      (args: { taskId: string; onPtySpawnCommitted?: () => void }) =>
+        new Promise(() => {
+          // never resolves in this test: the readiness wait is still in flight when we snapshot
+          db.registerDispatch({
+            dispatchId: 'd-a',
+            taskId: args.taskId,
+            workerState: 'starting',
+            agentTerminalHandle: 'term-a'
+          })
+          args.onPtySpawnCommitted?.()
+        })
+    )
+
+    const driver = new PipelineDriver({
+      runtime,
+      db: db.asOrchestrationDb(),
+      pipelineDb: pipelineDb.asPipelineRunDb(),
+      runId: 'run-1',
+      definition: definitionOf([nodeA]),
+      publisher: publisherStub() as unknown as PipelineSnapshotPublisher
+    })
+
+    driver.start()
+    await flushAsync() // spawn has committed; worker-start never resolves in this test
+
+    const snapshot = assemblePipelineSnapshot(pipelineDb, 'run-1')
+    expect(snapshot.nodes?.[0]).toMatchObject({ id: 'a', status: 'running' })
+
+    driver.stop()
+  })
+
+  it('live outcome whose spawn-commit signal never fired: the row is still written exactly once as a fallback', async () => {
+    const nodeA = node({ id: 'a', index: 0 })
+    const db = new FakeOrchestrationDb()
+    db.tasks.set('task-a', { id: 'task-a', status: 'ready', result: null })
+    const pipelineDb = new FakePipelineRunDb(
+      runRow(),
+      new Map([['a', nodeRow({ node_id: 'a', node_index: 0, task_id: 'task-a' })]])
+    )
+    const runtime = runtimeStub()
+
+    // onPtySpawnCommitted is never invoked here — the caller's spawn-commit signal can go
+    // unfired for reasons unrelated to whether a process actually spawned, so the driver must
+    // not depend on it alone
+    executeLocalWorkerStartMock.mockImplementation(async (args: { taskId: string }) => {
+      db.tasks.get(args.taskId)!.status = 'dispatched'
+      return workerStartResponse({ taskId: args.taskId, dispatchId: 'd-a', state: 'ready' })
+    })
+
+    const driver = new PipelineDriver({
+      runtime,
+      db: db.asOrchestrationDb(),
+      pipelineDb: pipelineDb.asPipelineRunDb(),
+      runId: 'run-1',
+      definition: definitionOf([nodeA]),
+      publisher: publisherStub() as unknown as PipelineSnapshotPublisher
+    })
+
+    driver.start()
+    await flushAsync()
+
+    expect(pipelineDb.beginAttempt).toHaveBeenCalledTimes(1)
+    expect(pipelineDb.beginAttempt).toHaveBeenCalledWith(
+      'run-1',
+      'a',
+      expect.objectContaining({ attempt: 1, dispatchId: 'd-a' })
+    )
+    const snapshot = assemblePipelineSnapshot(pipelineDb, 'run-1')
+    expect(snapshot.nodes?.[0]).toMatchObject({ id: 'a', status: 'running' })
 
     driver.stop()
   })

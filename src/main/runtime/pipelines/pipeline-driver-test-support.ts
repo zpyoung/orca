@@ -6,10 +6,15 @@ import type {
 import type { OrcaRuntimeService } from '../orca-runtime'
 import type { OrchestrationDb } from '../orchestration/db'
 import type {
+  PipelineAttemptRow,
   PipelineNodeRow,
   PipelineRunDb,
   PipelineRunRow
 } from '../orchestration/pipeline-run-db'
+import type {
+  BeginAttemptArgs,
+  EndAttemptArgs
+} from '../orchestration/pipeline-run-db-attempts'
 import type { PipelineCheckpointBackend } from './pipeline-checkpoint'
 import type { OrchestrationWorkerStartResponse } from '../rpc/methods/orchestration-worker-start-execution'
 
@@ -158,6 +163,8 @@ export class FakeOrchestrationDb {
 
 /** A minimal in-memory `PipelineRunDb` double covering only what the driver reads/writes. */
 export class FakePipelineRunDb {
+  attempts: PipelineAttemptRow[] = []
+
   constructor(
     public run: PipelineRunRow,
     public nodesById: Map<string, PipelineNodeRow>
@@ -169,9 +176,40 @@ export class FakePipelineRunDb {
   getNodes = vi.fn(() =>
     [...this.nodesById.values()].sort((a, b) => a.node_index - b.node_index).map((row) => ({ ...row }))
   )
-  getAttempts = vi.fn(() => [])
-  beginAttempt: ReturnType<typeof vi.fn> = vi.fn()
-  endAttempt: ReturnType<typeof vi.fn> = vi.fn()
+  getAttempts = vi.fn((runId: string, nodeId?: string) =>
+    this.attempts
+      .filter((row) => row.run_id === runId && (nodeId === undefined || row.node_id === nodeId))
+      .map((row) => ({ ...row }))
+  )
+  beginAttempt: ReturnType<typeof vi.fn> = vi.fn(
+    (runId: string, nodeId: string, args: BeginAttemptArgs) => {
+      this.attempts.push({
+        run_id: runId,
+        node_id: nodeId,
+        attempt: args.attempt,
+        dispatch_id: args.dispatchId ?? null,
+        checkpoint_head: args.checkpoint?.head ?? null,
+        checkpoint_snapshot: args.checkpoint?.snapshot ?? null,
+        checkpoint_ref: args.checkpoint?.ref ?? null,
+        started_at: new Date().toISOString(),
+        ended_at: null,
+        outcome: null,
+        failure_stage: null
+      })
+    }
+  )
+  endAttempt: ReturnType<typeof vi.fn> = vi.fn(
+    (runId: string, nodeId: string, attempt: number, args: EndAttemptArgs) => {
+      const row = this.attempts.find(
+        (a) => a.run_id === runId && a.node_id === nodeId && a.attempt === attempt && a.ended_at === null
+      )
+      if (row) {
+        row.ended_at = new Date().toISOString()
+        row.outcome = args.outcome
+        row.failure_stage = args.failureStage ?? null
+      }
+    }
+  )
   setNodeOutcome = vi.fn(
     (
       _runId: string,
