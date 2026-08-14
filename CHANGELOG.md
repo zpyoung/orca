@@ -1,6 +1,6 @@
 ---
-last_released_commit: df807fdd3d98fe6bcf31cfa9583f4a7fb252d9bc
-upstream_synced: v1.4.180
+last_released_commit: 4102ac6b1e948a8d97ac9ceac976d7f8d4bb0b41
+upstream_synced: v1.4.182
 ---
 
 # Changelog
@@ -11,6 +11,35 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.183-rc.0.zy01] - 2026-08-14
+
+Synced to upstream [v1.4.182](https://github.com/stablyai/orca/releases/tag/v1.4.182).
+
+### Added
+- The native chat transcript is colored. Each recognized agent tool takes its own glyph and hue on
+  its line, and a collapsed run of tool calls shows one dot per distinct kind of work in the order
+  it first appeared — so a folded run says what happened without being expanded. Code blocks and
+  inline code in chat are syntax-highlighted, the user bubble and reasoning rule are tinted, and
+  every new color is held to a contrast floor in both themes. Tool names are matched exactly, so an
+  agent whose vocabulary Orca does not know renders exactly as before rather than being assigned a
+  color that claims something untrue about the call. Glyphs carry the same distinction as the hues,
+  so color is never the only signal.
+
+### Fixed
+- Electron downloads that fail with an HTTP status response are retried instead of failing the run.
+  The transient-error check read only `statusCode`, but the error raised for a rejected fetch
+  carries `status`, so release-CDN 503s aborted on the first attempt and took several test lanes
+  down at once.
+
+### Changed
+- Upstream code the fork does not own now tracks v1.4.182 directly. Where this release extended the
+  same code the fork's SSH-relay chat feature touches, both sides are kept: upstream's transcript
+  read cancellation, subscription teardown, quick-command matching, and cross-device workspace
+  filtering are back alongside the fork's relay work. Files the fork does own — the workspace card,
+  the live chat session hook, and the macOS-only signed build configuration — stay on the fork's
+  versions, and three upstream tests that assert behavior this fork deliberately does not carry
+  were dropped.
 
 ## [1.4.181-rc.0.zy03] - 2026-08-13
 
