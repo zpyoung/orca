@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { AgentType } from '../../../../shared/agent-status-types'
 import { cn } from '@/lib/utils'
+import { translate } from '@/i18n/i18n'
 import { AgentComposer } from '../agent-composer/AgentComposer'
 import { DEFAULT_GUTTER_ROWS } from './terminal-dock-pane-state'
 
@@ -147,7 +148,10 @@ export function TerminalDock(props: TerminalDockProps): React.JSX.Element | null
             className="absolute inset-0 flex items-center justify-center bg-background/70 text-xs font-medium text-muted-foreground"
             data-terminal-dock-passthrough-overlay=""
           >
-            Passthrough active — terminal has keyboard focus
+            {translate(
+              'components.terminal-dock.passthroughActive',
+              'Passthrough active — terminal has keyboard focus'
+            )}
           </div>
         ) : null}
       </div>

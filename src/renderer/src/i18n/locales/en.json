@@ -15321,6 +15321,9 @@
       "sent": "Session context sent to {{agent}} in a new session.",
       "deliveryFailed": "The new {{agent}} session started, but its context could not be sent.",
       "launchFailed": "Could not start a new {{agent}} session."
+    },
+    "terminal-dock": {
+      "passthroughActive": "Passthrough active — terminal has keyboard focus"
     }
   },
   "dashboardPopout": {
