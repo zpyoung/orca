@@ -38,11 +38,12 @@ vi.mock('../native-chat/native-chat-runtime-send', () => ({
 }))
 
 import {
-  AUTO_UNDOCK_HIGH_THRESHOLD_PX,
-  AUTO_UNDOCK_LOW_THRESHOLD_PX,
   TerminalDock,
+  terminalDockAutoUndockHighThresholdPx,
+  terminalDockAutoUndockLowThresholdPx,
   terminalDockGutterHeightPx
 } from './TerminalDock'
+import { DEFAULT_GUTTER_ROWS, MAX_GUTTER_ROWS, MIN_GUTTER_ROWS } from './terminal-dock-pane-state'
 
 afterEach(() => {
   cleanup()
@@ -54,7 +55,7 @@ const baseProps = {
   paneKey: 'pane-1',
   targetPtyId: 'pty-1',
   agent: 'claude' as const,
-  paneHeightPx: AUTO_UNDOCK_HIGH_THRESHOLD_PX + 100,
+  paneHeightPx: terminalDockAutoUndockHighThresholdPx(DEFAULT_GUTTER_ROWS) + 100,
   disabledReason: null
 }
 
@@ -107,52 +108,102 @@ describe('TerminalDock', () => {
   })
 
   it('unmounts below the low threshold', () => {
-    render(<TerminalDock {...baseProps} paneHeightPx={AUTO_UNDOCK_LOW_THRESHOLD_PX - 1} />)
+    const low = terminalDockAutoUndockLowThresholdPx(DEFAULT_GUTTER_ROWS)
+    render(<TerminalDock {...baseProps} paneHeightPx={low - 1} />)
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
   })
 
   it('stays mounted between the low and high thresholds once already mounted (no flap on 1px)', () => {
+    const high = terminalDockAutoUndockHighThresholdPx(DEFAULT_GUTTER_ROWS)
     const { rerender } = render(<TerminalDock {...baseProps} />)
     expect(screen.getByRole('textbox')).toBeInTheDocument()
 
-    rerender(<TerminalDock {...baseProps} paneHeightPx={AUTO_UNDOCK_HIGH_THRESHOLD_PX - 1} />)
+    rerender(<TerminalDock {...baseProps} paneHeightPx={high - 1} />)
     expect(screen.getByRole('textbox')).toBeInTheDocument()
 
-    rerender(<TerminalDock {...baseProps} paneHeightPx={AUTO_UNDOCK_HIGH_THRESHOLD_PX + 1} />)
+    rerender(<TerminalDock {...baseProps} paneHeightPx={high + 1} />)
     expect(screen.getByRole('textbox')).toBeInTheDocument()
   })
 
   it('stays unmounted between the low and high thresholds once already unmounted (no flap on 1px)', () => {
-    const { rerender } = render(
-      <TerminalDock {...baseProps} paneHeightPx={AUTO_UNDOCK_LOW_THRESHOLD_PX - 1} />
-    )
+    const low = terminalDockAutoUndockLowThresholdPx(DEFAULT_GUTTER_ROWS)
+    const high = terminalDockAutoUndockHighThresholdPx(DEFAULT_GUTTER_ROWS)
+    const { rerender } = render(<TerminalDock {...baseProps} paneHeightPx={low - 1} />)
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
 
-    rerender(<TerminalDock {...baseProps} paneHeightPx={AUTO_UNDOCK_LOW_THRESHOLD_PX + 1} />)
+    rerender(<TerminalDock {...baseProps} paneHeightPx={low + 1} />)
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
 
-    rerender(<TerminalDock {...baseProps} paneHeightPx={AUTO_UNDOCK_HIGH_THRESHOLD_PX - 1} />)
+    rerender(<TerminalDock {...baseProps} paneHeightPx={high - 1} />)
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
   })
 
   it('re-mounts once the height reaches the high threshold', () => {
-    const { rerender } = render(
-      <TerminalDock {...baseProps} paneHeightPx={AUTO_UNDOCK_LOW_THRESHOLD_PX - 1} />
-    )
+    const low = terminalDockAutoUndockLowThresholdPx(DEFAULT_GUTTER_ROWS)
+    const high = terminalDockAutoUndockHighThresholdPx(DEFAULT_GUTTER_ROWS)
+    const { rerender } = render(<TerminalDock {...baseProps} paneHeightPx={low - 1} />)
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
 
-    rerender(<TerminalDock {...baseProps} paneHeightPx={AUTO_UNDOCK_HIGH_THRESHOLD_PX} />)
+    rerender(<TerminalDock {...baseProps} paneHeightPx={high} />)
     expect(screen.getByRole('textbox')).toBeInTheDocument()
   })
 
   it('preserves the draft across an auto-undock/re-dock cycle via the paneKey-scoped cache', () => {
+    const low = terminalDockAutoUndockLowThresholdPx(DEFAULT_GUTTER_ROWS)
+    const high = terminalDockAutoUndockHighThresholdPx(DEFAULT_GUTTER_ROWS)
     const { rerender } = render(<TerminalDock {...baseProps} />)
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'mid sentence' } })
 
-    rerender(<TerminalDock {...baseProps} paneHeightPx={AUTO_UNDOCK_LOW_THRESHOLD_PX - 1} />)
+    rerender(<TerminalDock {...baseProps} paneHeightPx={low - 1} />)
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
 
-    rerender(<TerminalDock {...baseProps} paneHeightPx={AUTO_UNDOCK_HIGH_THRESHOLD_PX + 1} />)
+    rerender(<TerminalDock {...baseProps} paneHeightPx={high + 1} />)
     expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('mid sentence')
+  })
+
+  it('does not mount a 15-row gutter in a pane too short to fit it', () => {
+    const gutterRows = MAX_GUTTER_ROWS
+    const tooShort = terminalDockGutterHeightPx(gutterRows)
+    render(<TerminalDock {...baseProps} gutterRows={gutterRows} paneHeightPx={tooShort} />)
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  })
+
+  it('does not mount the default gutter in a pane too short to fit it', () => {
+    render(<TerminalDock {...baseProps} gutterRows={DEFAULT_GUTTER_ROWS} paneHeightPx={180} />)
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  })
+
+  it('scales thresholds with gutterRows: a height that mounts a 3-row gutter rejects a 15-row one', () => {
+    const paneHeightPx = terminalDockAutoUndockHighThresholdPx(MIN_GUTTER_ROWS)
+
+    render(<TerminalDock {...baseProps} gutterRows={MIN_GUTTER_ROWS} paneHeightPx={paneHeightPx} />)
+    expect(screen.getByRole('textbox')).toBeInTheDocument()
+    cleanup()
+
+    render(<TerminalDock {...baseProps} gutterRows={MAX_GUTTER_ROWS} paneHeightPx={paneHeightPx} />)
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  })
+
+  it('does not flap at +/-1px around the derived thresholds for a non-default gutterRows', () => {
+    const gutterRows = MAX_GUTTER_ROWS
+    const low = terminalDockAutoUndockLowThresholdPx(gutterRows)
+    const high = terminalDockAutoUndockHighThresholdPx(gutterRows)
+
+    const { rerender } = render(
+      <TerminalDock {...baseProps} gutterRows={gutterRows} paneHeightPx={high + 100} />
+    )
+    expect(screen.getByRole('textbox')).toBeInTheDocument()
+
+    rerender(<TerminalDock {...baseProps} gutterRows={gutterRows} paneHeightPx={low + 1} />)
+    expect(screen.getByRole('textbox')).toBeInTheDocument()
+
+    rerender(<TerminalDock {...baseProps} gutterRows={gutterRows} paneHeightPx={low - 1} />)
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+
+    rerender(<TerminalDock {...baseProps} gutterRows={gutterRows} paneHeightPx={high - 1} />)
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+
+    rerender(<TerminalDock {...baseProps} gutterRows={gutterRows} paneHeightPx={high + 1} />)
+    expect(screen.getByRole('textbox')).toBeInTheDocument()
   })
 })

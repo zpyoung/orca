@@ -10,29 +10,47 @@ import { DEFAULT_GUTTER_ROWS } from './terminal-dock-pane-state'
 const ROW_HEIGHT_PX = 20
 const CHROME_HEIGHT_PX = 96
 
+// A gutter that fits exactly is still useless — the terminal above it is the
+// ground truth the user watches their text land in, so undocking must leave
+// it a minimum of visible rows rather than trigger on gutter fit alone.
+const MIN_VISIBLE_TERMINAL_PX = 60
+
 // Why: two thresholds instead of one give the flip a dead zone — a pane
 // hovering at a single boundary would mount/unmount every resize tick.
-export const AUTO_UNDOCK_LOW_THRESHOLD_PX = 180
-export const AUTO_UNDOCK_HIGH_THRESHOLD_PX = 220
+const HYSTERESIS_BAND_PX = 40
 
 export function terminalDockGutterHeightPx(gutterRows: number): number {
   return CHROME_HEIGHT_PX + gutterRows * ROW_HEIGHT_PX
 }
 
-function useAutoUndock(paneHeightPx: number): boolean {
-  const [mounted, setMounted] = useState(() => paneHeightPx >= AUTO_UNDOCK_LOW_THRESHOLD_PX)
+// Thresholds scale with gutterRows: a taller gutter needs a taller pane
+// before it can dock without starving the terminal above it.
+export function terminalDockAutoUndockLowThresholdPx(gutterRows: number): number {
+  return terminalDockGutterHeightPx(gutterRows) + MIN_VISIBLE_TERMINAL_PX
+}
+
+export function terminalDockAutoUndockHighThresholdPx(gutterRows: number): number {
+  return terminalDockAutoUndockLowThresholdPx(gutterRows) + HYSTERESIS_BAND_PX
+}
+
+function useAutoUndock(paneHeightPx: number, gutterRows: number): boolean {
+  const [mounted, setMounted] = useState(
+    () => paneHeightPx >= terminalDockAutoUndockHighThresholdPx(gutterRows)
+  )
 
   useEffect(() => {
+    const lowThreshold = terminalDockAutoUndockLowThresholdPx(gutterRows)
+    const highThreshold = terminalDockAutoUndockHighThresholdPx(gutterRows)
     setMounted((wasMounted) => {
-      if (wasMounted && paneHeightPx < AUTO_UNDOCK_LOW_THRESHOLD_PX) {
+      if (wasMounted && paneHeightPx < lowThreshold) {
         return false
       }
-      if (!wasMounted && paneHeightPx >= AUTO_UNDOCK_HIGH_THRESHOLD_PX) {
+      if (!wasMounted && paneHeightPx >= highThreshold) {
         return true
       }
       return wasMounted
     })
-  }, [paneHeightPx])
+  }, [paneHeightPx, gutterRows])
 
   return mounted
 }
@@ -54,12 +72,13 @@ export type TerminalDockProps = {
  *  composer core. Height depends only on gutterRows, never on draft
  *  content — the pane's resize path fires a PTY SIGWINCH on geometry
  *  change, so a content-driven height would resize the PTY on every
- *  keystroke. Unmounts below a minimum pane height and re-mounts above a
- *  strictly greater one so a 1px resize jitter can't flap it. */
+ *  keystroke. Unmounts below a pane height derived from the current
+ *  gutterRows and re-mounts above a strictly greater derived threshold
+ *  so a 1px resize jitter can't flap it. */
 export function TerminalDock(props: TerminalDockProps): React.JSX.Element | null {
   const { terminalTabId, paneKey, targetPtyId, agent, paneHeightPx, disabledReason } = props
   const gutterRows = props.gutterRows ?? DEFAULT_GUTTER_ROWS
-  const mounted = useAutoUndock(paneHeightPx)
+  const mounted = useAutoUndock(paneHeightPx, gutterRows)
 
   if (!mounted) {
     return null
@@ -67,7 +86,7 @@ export function TerminalDock(props: TerminalDockProps): React.JSX.Element | null
 
   return (
     <div
-      className="flex flex-col border-t border-border bg-background"
+      className="flex shrink-0 flex-col border-t border-border bg-background"
       style={{ height: terminalDockGutterHeightPx(gutterRows) }}
       data-pane-prevent-terminal-focus
       data-terminal-dock=""
