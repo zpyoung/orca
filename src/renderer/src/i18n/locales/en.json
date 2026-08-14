@@ -15323,7 +15323,8 @@
       "launchFailed": "Could not start a new {{agent}} session."
     },
     "terminal-dock": {
-      "passthroughActive": "Passthrough active — terminal has keyboard focus"
+      "passthroughActive": "Passthrough active — terminal has keyboard focus",
+      "sshDisconnected": "SSH disconnected"
     }
   },
   "dashboardPopout": {
