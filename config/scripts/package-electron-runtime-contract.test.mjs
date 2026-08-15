@@ -576,11 +576,11 @@ describe('Electron runtime package contract', () => {
     expect(releaseGoldenJob.strategy.matrix.include.map(({ platform }) => platform).sort()).toEqual(
       goldenPlatforms
     )
-    expect(releaseGoldenJob.steps.map((step) => step.run ?? '')).toContain(
-      'xvfb-run --auto-servernum env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e:terminal-rendering-golden'
-    )
     const releaseLinuxRunStep = releaseGoldenJob.steps.find(
       (step) => step.name === 'Run terminal rendering golden on Linux'
+    )
+    expect(releaseLinuxRunStep.run).toContain(
+      'xvfb-run --auto-servernum env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e:terminal-rendering-golden'
     )
     const releaseMacRunStep = releaseGoldenJob.steps.find(
       (step) => step.name === 'Run terminal rendering golden on macOS'
