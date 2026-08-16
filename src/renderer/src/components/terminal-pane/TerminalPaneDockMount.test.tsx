@@ -2,13 +2,14 @@
 
 import '@testing-library/jest-dom/vitest'
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import type { ReactNode, Ref } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ManagedPane } from '@/lib/pane-manager/pane-manager-types'
 import { queuePanePtyResizeIfHeld } from '@/lib/pane-manager/pane-pty-resize-hold'
 import {
   terminalDockAutoUndockHighThresholdPx,
+  terminalDockAutoUndockLowThresholdPx,
   terminalDockGutterHeightPx
 } from '../terminal-dock/TerminalDock'
 import { DEFAULT_GUTTER_ROWS } from '../terminal-dock/terminal-dock-pane-state'
@@ -210,5 +211,96 @@ describe('TerminalPaneDockMount', () => {
       <TerminalPaneDockMount {...baseProps} pane={pane} docked={false} passthroughActive={true} />
     )
     expect(xtermContainer).not.toHaveAttribute('data-pane-prevent-terminal-focus')
+  })
+
+  it('reclaims focus after a terminal mousedown steals it, without blocking the mousedown from reaching xterm', () => {
+    const pane = makeFakePane()
+    render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={true} />)
+    const composerTextarea = screen.getByRole('textbox')
+    expect(document.activeElement).toBe(composerTextarea)
+
+    const xtermContainer = pane.container.querySelector('.xterm-container') as HTMLElement
+    // Stands in for xterm's real DOM: a descendant with xterm's own always-on MouseService
+    // mousedown handler, which focuses its helper textarea before selection is handled —
+    // this fires at the target phase, before data-pane-prevent-terminal-focus is ever
+    // consulted (that attribute only opts out of Orca's own pane-pointer-down focus call).
+    const xtermHelperTextarea = document.createElement('textarea')
+    xtermContainer.appendChild(xtermHelperTextarea)
+    let xtermMouseDownFired = false
+    xtermHelperTextarea.addEventListener('mousedown', () => {
+      xtermMouseDownFired = true
+      xtermHelperTextarea.focus()
+    })
+
+    act(() => {
+      xtermHelperTextarea.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    })
+
+    expect(xtermMouseDownFired).toBe(true)
+    expect(document.activeElement).toBe(composerTextarea)
+  })
+
+  it('does not reclaim focus from a terminal mousedown once undocked', () => {
+    const pane = makeFakePane()
+    const { rerender } = render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={true} />)
+    rerender(<TerminalPaneDockMount {...baseProps} pane={pane} docked={false} />)
+
+    const xtermContainer = pane.container.querySelector('.xterm-container') as HTMLElement
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    input.focus()
+
+    act(() => {
+      xtermContainer.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    })
+
+    expect(document.activeElement).toBe(input)
+  })
+
+  it('releases the prevent-focus attribute and returns focus to xterm when hysteresis auto-hides the dock', () => {
+    class FakeResizeObserver {
+      static instances: FakeResizeObserver[] = []
+      callback: ResizeObserverCallback
+      constructor(callback: ResizeObserverCallback) {
+        this.callback = callback
+        FakeResizeObserver.instances.push(this)
+      }
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    }
+    const originalResizeObserver = globalThis.ResizeObserver
+    globalThis.ResizeObserver = FakeResizeObserver as unknown as typeof globalThis.ResizeObserver
+
+    try {
+      const pane = makeFakePane()
+      const focusSpy = vi.spyOn(pane.terminal, 'focus')
+      render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={true} />)
+      const xtermContainer = pane.container.querySelector('.xterm-container') as HTMLElement
+      expect(xtermContainer).toHaveAttribute('data-pane-prevent-terminal-focus')
+
+      const shrunkHeight = terminalDockAutoUndockLowThresholdPx(DEFAULT_GUTTER_ROWS) - 1
+      act(() => {
+        FakeResizeObserver.instances[0]?.callback(
+          [{ contentRect: { height: shrunkHeight } } as ResizeObserverEntry],
+          FakeResizeObserver.instances[0] as unknown as ResizeObserver
+        )
+      })
+
+      expect(xtermContainer).not.toHaveAttribute('data-pane-prevent-terminal-focus')
+      expect(focusSpy).toHaveBeenCalledTimes(1)
+
+      // Focus is released, not just the attribute: a terminal mousedown after the auto-hide
+      // must reach xterm normally instead of being reclaimed by a now-hidden composer.
+      const input = document.createElement('input')
+      document.body.appendChild(input)
+      input.focus()
+      act(() => {
+        xtermContainer.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+      })
+      expect(document.activeElement).toBe(input)
+    } finally {
+      globalThis.ResizeObserver = originalResizeObserver
+    }
   })
 })

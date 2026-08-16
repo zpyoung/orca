@@ -3,6 +3,7 @@ import type { PaneManager } from '@/lib/pane-manager/pane-manager'
 import { useAppStore } from '@/store'
 import { emitTerminalDockToggled } from '@/lib/terminal-dock-telemetry'
 import type { AgentType } from '../../../../shared/agent-status-types'
+import { isTuiAgent } from '../../../../shared/tui-agent-config'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
 import { getCachedUnifiedTerminalTabForWorktree } from './terminal-unified-tab-lookup'
 import { useTerminalDockLocalFallback } from './use-terminal-dock-local-fallback'
@@ -31,6 +32,12 @@ export type UseTerminalPaneDockResult = {
   exitPanePassthrough: (paneKey: string) => void
   /** Docks a recognized agent pane once, unless either persistence source has a decision. */
   ensurePaneDockDefault: (paneKey: string, agent: AgentType) => void
+  /** The agent to render the dock with for this pane: `detectedAgent` when it's a live,
+   *  recognized TUI agent; otherwise the last agent this pane was recognized as, but only
+   *  while persisted-docked — so a status flap (reconnect, hook reconciliation) that clears
+   *  live status without a confirmed exit can never unmount the composer. Null means render
+   *  nothing, matching the caller's prior `!isTuiAgent(agent)` gate. */
+  resolveDockAgent: (paneKey: string, detectedAgent: string | null) => AgentType | null
   commitGutterRows: (paneKey: string, rows: number) => void
   disabledReasonFor: (args: {
     paneKey: string
@@ -65,6 +72,9 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
   const [mountedPaneKeys, setMountedPaneKeys] = useState<ReadonlySet<string>>(() => new Set())
   const paneAgentRef = useRef(new Map<string, AgentType>())
   const agentForPane = useCallback((paneKey: string) => paneAgentRef.current.get(paneKey), [])
+  const noteDetectedAgent = useCallback((paneKey: string, agent: AgentType): void => {
+    paneAgentRef.current.set(paneKey, agent)
+  }, [])
   const { resolvedStateFor, hasLocalDockState, persistLocalDockState, forgetPane } =
     useTerminalDockLocalFallback()
   // Why: "ever echoed" is per-tab, not per-pane — a modern host's record simply omitting one
@@ -78,6 +88,16 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
   const isPaneComposerMounted = useCallback(
     (paneKey: string): boolean => enabled && isPaneDocked(paneKey) && mountedPaneKeys.has(paneKey),
     [enabled, isPaneDocked, mountedPaneKeys]
+  )
+  const resolveDockAgent = useCallback(
+    (paneKey: string, detectedAgent: string | null): AgentType | null => {
+      if (isTuiAgent(detectedAgent)) {
+        noteDetectedAgent(paneKey, detectedAgent)
+        return detectedAgent
+      }
+      return isPaneDocked(paneKey) ? (agentForPane(paneKey) ?? null) : null
+    },
+    [agentForPane, isPaneDocked, noteDetectedAgent]
   )
   const passthrough = useTerminalDockPassthrough({
     enabled,
@@ -127,7 +147,7 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
 
   const ensurePaneDockDefault = useCallback(
     (paneKey: string, agent: AgentType): void => {
-      paneAgentRef.current.set(paneKey, agent)
+      noteDetectedAgent(paneKey, agent)
       const hasPersistedDecision =
         Object.hasOwn(terminalDockByPaneKey ?? {}, paneKey) || hasLocalDockState(paneKey)
       if (!shouldDockTerminalComposerByDefault({ enabled, agent, hasPersistedDecision })) {
@@ -145,6 +165,7 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       enabled,
       gutterRowsFor,
       hasLocalDockState,
+      noteDetectedAgent,
       persistLocalDockState,
       resolveUnifiedTabId,
       setTabTerminalDockState,
@@ -273,6 +294,7 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       setPaneDockMounted,
       exitPanePassthrough,
       ensurePaneDockDefault,
+      resolveDockAgent,
       commitGutterRows,
       disabledReasonFor,
       undockOnConfirmedAgentExit,
@@ -286,6 +308,7 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       isPaneDocked,
       isPanePassthrough,
       ensurePaneDockDefault,
+      resolveDockAgent,
       paneDockOwnsFocus,
       prunePassthroughForRetiredPane,
       setPaneDockMounted,

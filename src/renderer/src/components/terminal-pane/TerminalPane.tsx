@@ -43,7 +43,6 @@ import {
   serializeTerminalLayout
 } from './layout-serialization'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
-import { isTuiAgent } from '../../../../shared/tui-agent-config'
 import { TerminalPaneDockMount } from './TerminalPaneDockMount'
 import { useTerminalPaneDock } from './use-terminal-pane-dock'
 import type { TerminalKittyKeyboardModeTracker } from '../../../../shared/terminal-kitty-keyboard-mode-tracker'
@@ -3131,11 +3130,11 @@ function TerminalPane(
         : null}
       {experimentalTerminalDockEnabled && !effectiveChatViewMode
         ? managedPanes.map((pane) => {
-            const agent = resolveAgentForLeaf(pane.leafId)
-            if (!isTuiAgent(agent)) {
+            const paneKey = makePaneKey(tabId, pane.leafId)
+            const agent = terminalDock.resolveDockAgent(paneKey, resolveAgentForLeaf(pane.leafId))
+            if (!agent) {
               return null
             }
-            const paneKey = makePaneKey(tabId, pane.leafId)
             const targetPtyId = paneTransportsRef.current.get(pane.id)?.getPtyId() ?? null
             return (
               <TerminalPaneDockMount

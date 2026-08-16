@@ -205,6 +205,34 @@ describe('useTerminalPaneDock', () => {
     expect(mocks.setTabTerminalDockState).not.toHaveBeenCalled()
   })
 
+  it('keeps resolving the last-recognized agent for a persisted-docked pane through a status-record deletion and re-add cycle, writing no docked:false', () => {
+    const { result } = renderDockHook(true)
+
+    expect(result.current.resolveDockAgent(PANE_KEY, 'claude')).toBe('claude')
+
+    // Simulates a reconnect/hook-reconciliation status flap: the live agentStatusByPaneKey
+    // entry (and therefore the caller's detectedAgent) is gone, but the pane is still
+    // persisted-docked.
+    expect(result.current.resolveDockAgent(PANE_KEY, null)).toBe('claude')
+
+    expect(result.current.resolveDockAgent(PANE_KEY, 'claude')).toBe('claude')
+
+    expect(mocks.setTabTerminalDockState).not.toHaveBeenCalledWith(
+      'unified-1',
+      expect.objectContaining({ docked: false })
+    )
+  })
+
+  it('resolves no agent for a status loss on a pane that was never docked', () => {
+    fakeStore.setState({
+      unifiedTabsByWorktree: { 'wt-1': [makeUnifiedTab({ terminalDockByPaneKey: {} })] }
+    })
+    const { result } = renderDockHook(true)
+
+    expect(result.current.resolveDockAgent(PANE_KEY, 'claude')).toBe('claude')
+    expect(result.current.resolveDockAgent(PANE_KEY, null)).toBeNull()
+  })
+
   it('paneDockOwnsFocus is false when disabled even for a persisted docked pane', () => {
     const { result } = renderDockHook(false)
     expect(result.current.paneDockOwnsFocus(PANE_KEY)).toBe(false)
