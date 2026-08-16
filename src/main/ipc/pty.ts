@@ -2399,6 +2399,7 @@ export function registerPtyHandlers(
   ipcMain.removeHandler('pty:resetRendererDeliveryDebug')
   ipcMain.removeHandler('pty:reportRendererDeliveryState')
   ipcMain.removeHandler('pty:writeAccepted')
+  ipcMain.removeHandler('pty:writeInputAccepted')
   ipcMain.removeAllListeners('pty:write')
   ipcMain.removeAllListeners('pty:ackColdRestore')
   ipcMain.removeAllListeners('pty:ackData')
@@ -7213,6 +7214,18 @@ export function registerPtyHandlers(
     return claimTail
       ? claimTail.then((claimed) => (claimed ? writePtyInputAccepted(args) : false))
       : writePtyInputAccepted(args)
+  })
+  // Why: the composer's acceptance path needs writePtyInput's real boolean (PTY
+  // gone, mobile lease) for local/direct-SSH writes; writeAccepted above answers
+  // a narrower "reached the local PTY" question and reports SSH as always false.
+  ipcMain.handle('pty:writeInputAccepted', (event, args: unknown): boolean | Promise<boolean> => {
+    if (!isPtyWriteEventFromMainWindow(event, mainWindow.webContents) || !isPtyWritePayload(args)) {
+      return false
+    }
+    const claimTail = hostViewportClaimTails.get(args.id)
+    return claimTail
+      ? claimTail.then((claimed) => (claimed ? writePtyInput(args) : false))
+      : writePtyInput(args)
   })
 
   ipcMain.removeAllListeners('pty:claimViewport')

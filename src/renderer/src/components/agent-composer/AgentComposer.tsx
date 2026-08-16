@@ -98,7 +98,8 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
   const { cancelPendingSends, trackPendingSend } = useNativeChatSendLifecycle(
     terminalTabId,
     targetPtyId,
-    onOptimisticSendCanceled
+    onOptimisticSendCanceled,
+    canSend
   )
 
   // Place the caret at the end of the (possibly restored) draft when the

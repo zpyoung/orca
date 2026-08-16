@@ -31,9 +31,9 @@ const SETTINGS = {} as Parameters<typeof sendNativeChatMessage>[0]
 const PTY = 'pty-launch-draft'
 const DRAFT = 'Linked Linear issue: ABC-123\nhttps://linear.app/x/issue/ABC-123'
 
-// Body writes go through the acceptance-aware transport, clear/Enter through
-// the fire-and-forget one — merge both mocks' calls by global invocation
-// order to assert on the pty write sequence as a whole.
+// Clear writes go through the fire-and-forget transport; body and Enter go
+// through the acceptance-aware one — merge both mocks' calls by global
+// invocation order to assert on the pty write sequence as a whole.
 const writes = (): string[] => {
   const entries: { order: number; bytes: string }[] = []
   for (const mock of [sendRuntimePtyInput, sendRuntimePtyInputAcceptance]) {

@@ -67,6 +67,38 @@ describe('useNativeChatSendLifecycle', () => {
     expect(onPendingSendCanceled).not.toHaveBeenCalled()
   })
 
+  it('cancels a pending send when the same pty turns transport-unsafe', () => {
+    vi.useFakeTimers()
+    const pending = handle()
+    const onPendingSendCanceled = vi.fn()
+    const { result, rerender } = renderHook(
+      ({ transportSafe }) =>
+        useNativeChatSendLifecycle('tab-1', 'pty-1', onPendingSendCanceled, transportSafe),
+      { initialProps: { transportSafe: true } }
+    )
+
+    act(() => result.current.trackPendingSend(pending, 'pending-1'))
+    rerender({ transportSafe: false })
+
+    expect(pending.cancel).toHaveBeenCalledOnce()
+    expect(onPendingSendCanceled).toHaveBeenCalledExactlyOnceWith('pending-1')
+  })
+
+  it('does not cancel a pending send when transportSafe is unset (default true)', () => {
+    vi.useFakeTimers()
+    const pending = handle()
+    const onPendingSendCanceled = vi.fn()
+    const { result, rerender } = renderHook(
+      () => useNativeChatSendLifecycle('tab-1', 'pty-1', onPendingSendCanceled),
+      { initialProps: {} }
+    )
+
+    act(() => result.current.trackPendingSend(pending, 'pending-1'))
+    rerender({})
+
+    expect(pending.cancel).not.toHaveBeenCalled()
+  })
+
   it('keeps a renderer-stalled send cancelable past its nominal schedule', async () => {
     vi.useFakeTimers()
     let resolveSettled!: () => void

@@ -27,6 +27,7 @@ describe('runtime terminal owner routing', () => {
   const runtimeTransportCall = vi.fn()
   const localWrite = vi.fn()
   const localWriteAccepted = vi.fn()
+  const localWriteInputAccepted = vi.fn()
   const localForeground = vi.fn()
   const localHasChildren = vi.fn()
   const localInspect = vi.fn()
@@ -48,6 +49,7 @@ describe('runtime terminal owner routing', () => {
         pty: {
           write: localWrite,
           writeAccepted: localWriteAccepted,
+          writeInputAccepted: localWriteInputAccepted,
           getForegroundProcess: localForeground,
           hasChildProcesses: localHasChildren,
           inspectProcess: localInspect
@@ -584,13 +586,47 @@ describe('runtime terminal owner routing', () => {
       )
     })
 
-    it('writes local desktop input synchronously, without a fire-and-forget acceptance check', async () => {
+    it('resolves true and records the owning pane when main accepts a local write', async () => {
+      localWriteInputAccepted.mockResolvedValue(true)
+      useAppStore.setState({
+        settings: { experimentalAgentHibernation: true } as never,
+        terminalLayoutsByTabId: {
+          'tab-1': {
+            root: { type: 'leaf', leafId: LEAF_ID },
+            activeLeafId: LEAF_ID,
+            expandedLeafId: null,
+            ptyIdsByLeafId: { [LEAF_ID]: 'local-pty' }
+          }
+        }
+      })
+
       await expect(
         sendRuntimePtyInputAcceptance({ activeRuntimeEnvironmentId: null }, 'local-pty', 'x')
       ).resolves.toBe(true)
 
+      expect(localWriteInputAccepted).toHaveBeenCalledWith('local-pty', 'x')
+      expect(localWrite).not.toHaveBeenCalled()
+      expect(useAppStore.getState().lastTerminalInputAtByPaneKey[PANE_KEY]).toEqual(
+        expect.any(Number)
+      )
+    })
+
+    it('resolves false without recording input when main rejects a local write', async () => {
+      localWriteInputAccepted.mockResolvedValue(false)
+
+      await expect(
+        sendRuntimePtyInputAcceptance({ activeRuntimeEnvironmentId: null }, 'local-pty', 'x')
+      ).resolves.toBe(false)
+
+      expect(localWriteInputAccepted).toHaveBeenCalledWith('local-pty', 'x')
+      expect(useAppStore.getState().lastTerminalInputAtByPaneKey).toEqual({})
+    })
+
+    it('leaves the fire-and-forget local write path untouched', async () => {
+      expect(sendRuntimePtyInput({ activeRuntimeEnvironmentId: null }, 'local-pty', 'x')).toBe(true)
+
       expect(localWrite).toHaveBeenCalledWith('local-pty', 'x')
-      expect(localWriteAccepted).not.toHaveBeenCalled()
+      expect(localWriteInputAccepted).not.toHaveBeenCalled()
     })
   })
 })

@@ -146,7 +146,7 @@ export function sendNativeChatMessage(
                 // Schedule from the actual body write: an overdue clear-confirm callback
                 // must not collapse the required body-to-Enter gap after a renderer stall.
                 delayGuarded(NATIVE_CHAT_SUBMIT_DELAY_MS, () => {
-                  submitAndObserve(
+                  void submitAndObserve(
                     settings,
                     ptyId,
                     markSubmitted,
@@ -332,7 +332,7 @@ export function sendNativeChatMessageWithImageAttachments(
               () => {
                 const submit = (): void => {
                   delayGuarded(NATIVE_CHAT_SUBMIT_DELAY_MS, () => {
-                    submitAndObserve(
+                    void submitAndObserve(
                       settings,
                       ptyId,
                       markSubmitted,

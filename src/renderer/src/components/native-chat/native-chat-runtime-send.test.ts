@@ -39,9 +39,9 @@ import {
 const SETTINGS = {} as Parameters<typeof sendNativeChatMessage>[0]
 const PTY = 'pty-1'
 
-// Body writes go through the acceptance-aware transport, clear/Enter through
-// the fire-and-forget one — merge both mocks' calls by global invocation
-// order to assert on the pty write sequence as a whole.
+// Clear writes go through the fire-and-forget transport; body and Enter go
+// through the acceptance-aware one — merge both mocks' calls by global
+// invocation order to assert on the pty write sequence as a whole.
 function mergedWriteBytes(): string[] {
   const entries: { order: number; bytes: string }[] = []
   for (const mock of [sendRuntimePtyInput, sendRuntimePtyInputAcceptance]) {
@@ -162,7 +162,7 @@ describe('sendNativeChatMessage', () => {
     ])
 
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS)
-    expect(sendRuntimePtyInput).toHaveBeenLastCalledWith(SETTINGS, PTY, NATIVE_CHAT_SUBMIT)
+    expect(sendRuntimePtyInputAcceptance).toHaveBeenLastCalledWith(SETTINGS, PTY, NATIVE_CHAT_SUBMIT)
     expect(mergedWriteBytes()).toHaveLength(6)
   })
 
@@ -303,9 +303,9 @@ describe('sendNativeChatMessage post-send observation', () => {
   })
 
   it('reports may-not-have-sent when the transport rejects the CR write', async () => {
-    sendRuntimePtyInput
-      .mockImplementationOnce(() => true) // clear
-      .mockImplementationOnce(() => false) // CR
+    sendRuntimePtyInputAcceptance
+      .mockResolvedValueOnce(true) // body
+      .mockResolvedValueOnce(false) // CR
     const confirmSubmitted = vi.fn().mockReturnValue(true)
     const onOutcome = vi.fn()
     sendNativeChatMessage(SETTINGS, PTY, 'hi', { confirmSubmitted, onOutcome })
@@ -319,8 +319,8 @@ describe('sendNativeChatMessage post-send observation', () => {
   it('reports may-not-have-sent exactly once when the transport throws on the CR write', async () => {
     // mockImplementationOnce (not a standing mockImplementation) so this
     // failure does not leak into later describe blocks that share this mock.
-    sendRuntimePtyInput
-      .mockImplementationOnce(() => true) // clear
+    sendRuntimePtyInputAcceptance
+      .mockResolvedValueOnce(true) // body
       .mockImplementationOnce(() => {
         throw new Error('transport dead')
       }) // CR
@@ -353,9 +353,9 @@ describe('sendNativeChatMessage post-send observation', () => {
     await fullObservationWindow()
 
     expect(onOutcome).toHaveBeenCalledExactlyOnceWith('may-not-have-sent')
-    expect(sendRuntimePtyInput.mock.calls.some((call) => call[2] === NATIVE_CHAT_SUBMIT)).toBe(
-      false
-    )
+    expect(
+      sendRuntimePtyInputAcceptance.mock.calls.some((call) => call[2] === NATIVE_CHAT_SUBMIT)
+    ).toBe(false)
   })
 
   it('does not write the CR and reports may-not-have-sent when the body write is rejected, even though confirmSubmitted would read true', async () => {
@@ -371,9 +371,9 @@ describe('sendNativeChatMessage post-send observation', () => {
 
     await fullObservationWindow()
 
-    expect(sendRuntimePtyInput.mock.calls.some((call) => call[2] === NATIVE_CHAT_SUBMIT)).toBe(
-      false
-    )
+    expect(
+      sendRuntimePtyInputAcceptance.mock.calls.some((call) => call[2] === NATIVE_CHAT_SUBMIT)
+    ).toBe(false)
     expect(onOutcome).toHaveBeenCalledOnce()
   })
 
@@ -456,7 +456,9 @@ describe('sendNativeChatMessageVerified', () => {
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS)
 
     expect(await result).toBe(true)
-    const submits = sendRuntimePtyInput.mock.calls.filter((call) => call[2] === NATIVE_CHAT_SUBMIT)
+    const submits = sendRuntimePtyInputAcceptance.mock.calls.filter(
+      (call) => call[2] === NATIVE_CHAT_SUBMIT
+    )
     // Only the verified path's Enter — chat's delayed Enter was cancelled.
     expect(submits).toHaveLength(0)
     expect(sendRuntimePtyInputVerified).toHaveBeenCalledWith(SETTINGS, PTY, NATIVE_CHAT_SUBMIT)
@@ -575,7 +577,7 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
     )
 
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS)
-    expect(sendRuntimePtyInput).toHaveBeenLastCalledWith(SETTINGS, PTY, NATIVE_CHAT_SUBMIT)
+    expect(sendRuntimePtyInputAcceptance).toHaveBeenLastCalledWith(SETTINGS, PTY, NATIVE_CHAT_SUBMIT)
     expect(totalWriteCalls()).toBe(4)
   })
 
@@ -597,7 +599,7 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
 
     await vi.advanceTimersByTimeAsync(1)
     expect(totalWriteCalls()).toBe(3)
-    expect(sendRuntimePtyInput).toHaveBeenLastCalledWith(SETTINGS, PTY, NATIVE_CHAT_SUBMIT)
+    expect(sendRuntimePtyInputAcceptance).toHaveBeenLastCalledWith(SETTINGS, PTY, NATIVE_CHAT_SUBMIT)
   })
 
   it('cancels deferred prompt and Enter writes after the attachment path', async () => {
@@ -614,9 +616,9 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
       buildNativeChatImagePasteBytes('/tmp/orca-paste-image.png'),
       NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT
     ])
-    expect(sendRuntimePtyInput.mock.calls.some((call) => call[2] === NATIVE_CHAT_SUBMIT)).toBe(
-      false
-    )
+    expect(
+      sendRuntimePtyInputAcceptance.mock.calls.some((call) => call[2] === NATIVE_CHAT_SUBMIT)
+    ).toBe(false)
   })
 
   it('reports may-not-have-sent once and releases the queue when the delayed caption write throws', async () => {

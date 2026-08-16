@@ -3,7 +3,7 @@
 // observation poll. Split out of native-chat-runtime-send.ts to keep that
 // file's clear/body/Enter sequencing at a readable size.
 
-import { sendRuntimePtyInput } from '@/runtime/runtime-terminal-inspection'
+import { sendRuntimePtyInputAcceptance } from '@/runtime/runtime-terminal-inspection'
 import type { RuntimeSettings } from './native-chat-runtime-send'
 import { NATIVE_CHAT_SUBMIT } from './native-chat-send'
 
@@ -102,19 +102,23 @@ function observeSendOutcome(
 /**
  * Write Enter as the delayed, separate pty write, mark the queue entry
  * submitted, then run the post-send observation. `markSubmitted` always runs,
- * even when the write throws, so a dead transport reports 'may-not-have-sent'
- * instead of stalling every later send queued behind it on this pty.
+ * even when the write rejects or throws, so a dead transport reports
+ * 'may-not-have-sent' instead of stalling every later send queued behind it
+ * on this pty. Routes through the acceptance-aware transport so a remote CR
+ * rejection is never mistaken for a landed submit — a rejected CR reports
+ * 'may-not-have-sent' directly and never starts the observation poll that
+ * could otherwise upgrade it to 'observed-cleared'.
  */
-export function submitAndObserve(
+export async function submitAndObserve(
   settings: RuntimeSettings,
   ptyId: string,
   markSubmitted: () => void,
   reportOutcome: (outcome: SendOutcome) => void,
   confirmSubmitted: (() => boolean) | undefined
-): void {
+): Promise<void> {
   let sent = true
   try {
-    sent = sendRuntimePtyInput(settings, ptyId, NATIVE_CHAT_SUBMIT)
+    sent = await sendRuntimePtyInputAcceptance(settings, ptyId, NATIVE_CHAT_SUBMIT)
   } catch {
     sent = false
   } finally {

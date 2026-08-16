@@ -153,6 +153,61 @@ describe('AgentComposer bare mount', () => {
     expect(mocks.sendNativeChatMessage).not.toHaveBeenCalled()
   })
 
+  it('cancels a pending send when the transport turns unsafe mid-delay', () => {
+    const onOptimisticSendCanceled = vi.fn()
+    const { rerender } = render(
+      <AgentComposer
+        terminalTabId="tab-unsafe"
+        paneKey="pane-unsafe"
+        targetPtyId="pty-unsafe"
+        agent="claude"
+        canSend
+        onOptimisticSendCanceled={onOptimisticSendCanceled}
+      />
+    )
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'hello' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    expect(mocks.sendHandle.cancel).not.toHaveBeenCalled()
+
+    rerender(
+      <AgentComposer
+        terminalTabId="tab-unsafe"
+        paneKey="pane-unsafe"
+        targetPtyId="pty-unsafe"
+        agent="claude"
+        canSend={false}
+        onOptimisticSendCanceled={onOptimisticSendCanceled}
+      />
+    )
+
+    expect(mocks.sendHandle.cancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not cancel a pending send from an agent-status flap alone', () => {
+    const { rerender } = render(
+      <AgentComposer
+        terminalTabId="tab-flap"
+        paneKey="pane-flap"
+        targetPtyId="pty-flap"
+        agent="claude"
+      />
+    )
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'hello' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    rerender(
+      <AgentComposer
+        terminalTabId="tab-flap"
+        paneKey="pane-flap"
+        targetPtyId="pty-flap"
+        agent="claude"
+        isWorking
+      />
+    )
+
+    expect(mocks.sendHandle.cancel).not.toHaveBeenCalled()
+  })
+
   it('keeps Send independent from the working-only Stop action', () => {
     render(
       <AgentComposer

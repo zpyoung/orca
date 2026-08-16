@@ -212,9 +212,13 @@ export async function sendRuntimePtyInputAcceptance(
   }
   const { target, terminal } = resolveRuntimeSendTarget(settings, ptyId)
   if (target.kind !== 'environment' || !terminal) {
-    window.api.pty.write(ptyId, data)
-    recordRuntimeTerminalInputForPtyId(ptyId)
-    return true
+    // Why: fire-and-forget `write` can't observe a PTY-gone or mobile-lease
+    // rejection; the acceptance path needs main's real answer.
+    const accepted = await window.api.pty.writeInputAccepted(ptyId, data)
+    if (accepted) {
+      recordRuntimeTerminalInputForPtyId(ptyId)
+    }
+    return accepted
   }
   try {
     const result = await callRuntimeRpc<{ send: RuntimeTerminalSend }>(
