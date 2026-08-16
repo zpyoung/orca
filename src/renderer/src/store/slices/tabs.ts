@@ -324,6 +324,43 @@ function removePaneKeysFromRecord<T>(
   return next
 }
 
+// Why: entries older than the echo window are dead by definition; drop them on every
+// stamp so the record doesn't grow unbounded across pane-key churn.
+function pruneExpiredTerminalDockPendingMutations(
+  record: Record<string, number>,
+  now: number
+): Record<string, number> {
+  let changed = false
+  const next: Record<string, number> = {}
+  for (const [key, mutatedAt] of Object.entries(record)) {
+    if (now - mutatedAt < TERMINAL_DOCK_ECHO_WINDOW_MS) {
+      next[key] = mutatedAt
+    } else {
+      changed = true
+    }
+  }
+  return changed ? next : record
+}
+
+// Why: pending-mutation timestamps live outside the per-tab dock record, so closing
+// a tab must drop its keys explicitly or they linger until they age out on their own.
+function removeTabPaneKeysFromPendingMutations(
+  record: Record<string, number>,
+  tabId: string
+): Record<string, number> {
+  const prefix = `${tabId}:`
+  let changed = false
+  const next: Record<string, number> = {}
+  for (const [key, mutatedAt] of Object.entries(record)) {
+    if (key.startsWith(prefix)) {
+      changed = true
+      continue
+    }
+    next[key] = mutatedAt
+  }
+  return changed ? next : record
+}
+
 // Why: dock state is host-tracked like color/pin/viewMode, so mirror local sets or they're lost on reconnect and to paired clients.
 // Only the action path mirrors (never reconcile applying a host value), so the echoed snapshot can't re-trigger an outbound RPC.
 // Sends only the single-pane patch (never the whole record) so two clients editing different panes can't clobber each other.
@@ -1312,6 +1349,12 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
         nextUnreadTerminalTabs = { ...current.unreadTerminalTabs }
         delete nextUnreadTerminalTabs[terminalEntityId]
       }
+      // Why: pending-mutation timestamps live outside the closed tab's own record, so drop
+      // its pane keys here or they linger in the store until they happen to age out.
+      const nextTerminalDockPendingMutationsByPaneKey = removeTabPaneKeysFromPendingMutations(
+        current.terminalDockPendingMutationsByPaneKey,
+        tabId
+      )
       let nextGroups = (current.groupsByWorktree[worktreeId] ?? []).map((candidate) =>
         candidate.id === group.id
           ? {
@@ -1353,6 +1396,9 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
         // Why: skip writing unreadTerminalTabs when the reference is unchanged, avoiding a no-op alloc that re-runs full-state selectors.
         ...(nextUnreadTerminalTabs !== current.unreadTerminalTabs
           ? { unreadTerminalTabs: nextUnreadTerminalTabs }
+          : {}),
+        ...(nextTerminalDockPendingMutationsByPaneKey !== current.terminalDockPendingMutationsByPaneKey
+          ? { terminalDockPendingMutationsByPaneKey: nextTerminalDockPendingMutationsByPaneKey }
           : {}),
         // Why: closing the last tab can leave the worktree selected but render-empty, so write the landing-state fallback directly.
         ...(shouldDeactivateWorktree
@@ -1513,7 +1559,10 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
         // Why: outranks a stale host echo for this pane until the mirrored RPC's own
         // echo (or the window's expiry) restores host authority — see reconcile.
         terminalDockPendingMutationsByPaneKey: {
-          ...state.terminalDockPendingMutationsByPaneKey,
+          ...pruneExpiredTerminalDockPendingMutations(
+            state.terminalDockPendingMutationsByPaneKey,
+            Date.now()
+          ),
           [patch.paneKey]: Date.now()
         }
       }
@@ -1546,7 +1595,7 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
         ...patchTab(state.unifiedTabsByWorktree, tabId, { terminalDockByPaneKey: next }),
         // Why: a pruned key must not be revived by a stale host echo still carrying it.
         terminalDockPendingMutationsByPaneKey: {
-          ...state.terminalDockPendingMutationsByPaneKey,
+          ...pruneExpiredTerminalDockPendingMutations(state.terminalDockPendingMutationsByPaneKey, now),
           ...Object.fromEntries(removedKeys.map((key) => [key, now]))
         }
       }

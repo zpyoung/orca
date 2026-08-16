@@ -1466,6 +1466,110 @@ describe('applyWebSessionTabsSnapshot', () => {
     ).toEqual({ [makePaneKey(mirroredId!, LEAF_ID)]: { docked: true, gutterRows: 5 } })
   })
 
+  it('rekeys the pending-mutation timestamp through handoff so a stale echo still loses to it (r3-5)', () => {
+    // The provisional tab's pending-mutation timestamp must follow the same
+    // provisional->final rekey the dock record gets, or a later stale host echo
+    // finds no timestamp under the new key and overwrites the optimistic value.
+    const provisionalTabId = 'provisional-dock-r3-5'
+    const hostTabId = 'host-tab-1'
+    const provisionalPaneKey = makePaneKey(provisionalTabId, LEAF_ID)
+    recordWebAgentSessionHandoff({
+      environmentId: ENV,
+      worktreeId: WT,
+      provisionalTabId,
+      hostTabId,
+      hostTerminalHandle: 'term_host-1'
+    })
+    const provisionalTerminalTab: TerminalTab = {
+      id: provisionalTabId,
+      ptyId: null,
+      worktreeId: WT,
+      title: 'Claude',
+      defaultTitle: 'Claude',
+      customTitle: null,
+      color: null,
+      sortOrder: 0,
+      createdAt: NOW,
+      launchAgent: 'claude'
+    }
+    const provisionalUnifiedTab: Tab = {
+      id: provisionalTabId,
+      entityId: provisionalTabId,
+      groupId: 'g-1',
+      worktreeId: WT,
+      contentType: 'terminal',
+      label: 'Claude',
+      customLabel: null,
+      color: null,
+      sortOrder: 0,
+      createdAt: NOW,
+      isPreview: false,
+      isPinned: false,
+      terminalDockByPaneKey: { [provisionalPaneKey]: { docked: true, gutterRows: 5 } }
+    }
+
+    const initialState = makeState({
+      tabsByWorktree: { [WT]: [provisionalTerminalTab] },
+      unifiedTabsByWorktree: { [WT]: [provisionalUnifiedTab] },
+      terminalDockPendingMutationsByPaneKey: { [provisionalPaneKey]: NOW }
+    })
+
+    const handoffPatch = applyWebSessionTabsSnapshot(
+      initialState,
+      makeSnapshot([
+        {
+          type: 'terminal',
+          id: HOST_SURFACE_ID,
+          title: 'Claude',
+          parentTabId: hostTabId,
+          leafId: LEAF_ID,
+          isActive: true,
+          launchAgent: 'claude',
+          status: 'ready',
+          terminal: 'terminal-1'
+        }
+      ]),
+      ENV,
+      NOW
+    ) as Partial<WebSessionTabsSyncState>
+
+    const mirroredId = handoffPatch.tabsByWorktree?.[WT]?.[0]?.id
+    expect(mirroredId).not.toBe(provisionalTabId)
+    const finalPaneKey = makePaneKey(mirroredId!, LEAF_ID)
+    expect(handoffPatch.terminalDockPendingMutationsByPaneKey?.[finalPaneKey]).toBe(NOW)
+
+    const stateAfterHandoff = { ...initialState, ...handoffPatch }
+
+    // A stale host echo, still built before the RPC landed, carrying the pre-mutation value.
+    const reconcilePatch = applyWebSessionTabsSnapshot(
+      stateAfterHandoff,
+      makeSnapshot([
+        {
+          type: 'terminal',
+          id: HOST_SURFACE_ID,
+          title: 'Claude',
+          parentTabId: hostTabId,
+          leafId: LEAF_ID,
+          isActive: true,
+          launchAgent: 'claude',
+          terminalDockByPaneKey: {
+            [makePaneKey(hostTabId, LEAF_ID)]: { docked: false, gutterRows: 12 }
+          },
+          status: 'ready',
+          terminal: 'terminal-1'
+        }
+      ]),
+      ENV,
+      NOW + 500
+    ) as Partial<WebSessionTabsSyncState>
+
+    const stateAfterReconcile = { ...stateAfterHandoff, ...reconcilePatch }
+    expect(
+      stateAfterReconcile.unifiedTabsByWorktree?.[WT]?.find((tab) => tab.entityId === mirroredId)
+        ?.terminalDockByPaneKey
+    ).toEqual({ [finalPaneKey]: { docked: true, gutterRows: 5 } })
+  })
+
   it('adopts host terminalDockByPaneKey for an existing tab with no local dock record', () => {
     const mirroredId = toWebTerminalSurfaceTabId('host-tab-1')
     const existingTab: TerminalTab = {
@@ -1996,6 +2100,37 @@ describe('applyWebSessionTabsSnapshot', () => {
       patch.unifiedTabsByWorktree?.[WT]?.find((tab) => tab.entityId === mirroredId)
         ?.terminalDockByPaneKey
     ).toEqual({ [paneKey]: { docked: false, gutterRows: 12 } })
+  })
+
+  it('prunes expired pending-mutation timestamps on the next consult, bounding the record (r3-6)', () => {
+    const mirroredId = toWebTerminalSurfaceTabId('host-tab-1')
+    const expiredPaneKey = makePaneKey('some-closed-tab', SECOND_LEAF_ID)
+    const freshPaneKey = makePaneKey(mirroredId, LEAF_ID)
+
+    const patch = applyWebSessionTabsSnapshot(
+      makeState({
+        terminalDockPendingMutationsByPaneKey: {
+          [expiredPaneKey]: NOW,
+          [freshPaneKey]: NOW + 500
+        }
+      }),
+      makeSnapshot([
+        {
+          type: 'terminal',
+          id: HOST_SURFACE_ID,
+          title: 'zsh',
+          parentTabId: 'host-tab-1',
+          leafId: LEAF_ID,
+          isActive: true,
+          status: 'ready',
+          terminal: 'terminal-1'
+        }
+      ]),
+      ENV,
+      NOW + TERMINAL_DOCK_ECHO_WINDOW_MS + 1
+    ) as Partial<WebSessionTabsSyncState>
+
+    expect(patch.terminalDockPendingMutationsByPaneKey).toEqual({ [freshPaneKey]: NOW + 500 })
   })
 
   it('preserves quick command labels from host terminal surfaces', () => {

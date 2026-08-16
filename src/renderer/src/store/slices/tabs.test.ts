@@ -6,6 +6,7 @@ import type * as WorktreeRuntimeOwnerModule from '@/lib/worktree-runtime-owner'
 import type * as WebRuntimeSessionModule from '@/runtime/web-runtime-session'
 import { toWebTerminalSurfaceTabId } from '@/runtime/web-terminal-surface-id'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
+import { TERMINAL_DOCK_ECHO_WINDOW_MS } from './tabs'
 import { FLOATING_TERMINAL_WORKTREE_ID, getDefaultUIState } from '../../../../shared/constants'
 import { buildMobileSessionTabSnapshots } from '../../runtime/sync-runtime-graph'
 import { closeMobileSessionTabInStore } from '../../runtime/mobile-session-tab-close'
@@ -2721,6 +2722,59 @@ describe('TabsSlice', () => {
       expect(store.getState().getTab('dock-tab-1')?.terminalDockByPaneKey).toEqual({
         'pane-a': { docked: true, gutterRows: 6 }
       })
+    })
+
+    it('prunes expired pending-mutation timestamps on the next stamp, bounding the record (r3-6)', () => {
+      seedDockTab()
+      const staleKey = 'stale-pane:1'
+      const freshKey = 'fresh-pane:1'
+      const now = Date.now()
+      store.setState({
+        terminalDockPendingMutationsByPaneKey: {
+          [staleKey]: now - TERMINAL_DOCK_ECHO_WINDOW_MS - 1,
+          [freshKey]: now
+        }
+      })
+
+      store.getState().setTabTerminalDockState('dock-tab-1', { paneKey: 'pane-a', docked: true })
+
+      const pending = store.getState().terminalDockPendingMutationsByPaneKey
+      expect(pending[staleKey]).toBeUndefined()
+      expect(pending[freshKey]).toBe(now)
+      expect(pending['pane-a']).toBeDefined()
+    })
+
+    it('prunes expired pending-mutation timestamps when a pane is pruned (r3-6)', () => {
+      seedDockTab({ terminalDockByPaneKey: { 'pane-a': { docked: true, gutterRows: 6 } } })
+      const staleKey = 'stale-pane:1'
+      const now = Date.now()
+      store.setState({
+        terminalDockPendingMutationsByPaneKey: { [staleKey]: now - TERMINAL_DOCK_ECHO_WINDOW_MS - 1 }
+      })
+
+      store.getState().pruneTerminalDockPaneKeys('dock-tab-1', ['pane-a'])
+
+      const pending = store.getState().terminalDockPendingMutationsByPaneKey
+      expect(pending[staleKey]).toBeUndefined()
+      expect(pending['pane-a']).toBeDefined()
+    })
+
+    it("clears a closed tab's pending-mutation keys so they do not linger (r3-6)", () => {
+      const paneKeyA = makePaneKey('dock-tab-1', LEAF_ID)
+      const otherTabPaneKey = makePaneKey('other-tab', LEAF_ID)
+      seedDockTab({ terminalDockByPaneKey: { [paneKeyA]: { docked: true, gutterRows: 6 } } })
+      store.setState({
+        terminalDockPendingMutationsByPaneKey: {
+          [paneKeyA]: Date.now(),
+          [otherTabPaneKey]: Date.now()
+        }
+      })
+
+      store.getState().closeUnifiedTab('dock-tab-1', { terminalRetirementHandled: true })
+
+      const pending = store.getState().terminalDockPendingMutationsByPaneKey
+      expect(pending[paneKeyA]).toBeUndefined()
+      expect(pending[otherTabPaneKey]).toBeDefined()
     })
   })
 })

@@ -1153,6 +1153,64 @@ function reconcileTerminalDockByPaneKey(
   return next
 }
 
+function pendingMutationsForTabId(
+  record: Record<string, number> | undefined,
+  tabId: string
+): Record<string, number> | undefined {
+  if (!record) {
+    return undefined
+  }
+  const prefix = `${tabId}:`
+  const next: Record<string, number> = {}
+  for (const [key, mutatedAt] of Object.entries(record)) {
+    if (key.startsWith(prefix)) {
+      next[key] = mutatedAt
+    }
+  }
+  return Object.keys(next).length > 0 ? next : undefined
+}
+
+// Why: pending-mutation timestamps must follow the same provisional->final tab-id
+// rekey the dock record gets during handoff, or a later stale host echo finds no
+// timestamp under the new key and overwrites the client's optimistic value.
+function remapPendingMutationTimestampsTabId(
+  record: Record<string, number> | undefined,
+  remapTabId: (tabId: string) => string
+): Record<string, number> | undefined {
+  if (!record) {
+    return undefined
+  }
+  const next: Record<string, number> = {}
+  for (const [key, mutatedAt] of Object.entries(record)) {
+    const remappedKey = remapPaneKeyTabId(key, remapTabId)
+    if (remappedKey) {
+      next[remappedKey] = mutatedAt
+    }
+  }
+  return Object.keys(next).length > 0 ? next : undefined
+}
+
+// Why: entries older than the echo window are dead by definition; drop them here
+// so the record doesn't grow unbounded across pane-key churn.
+function pruneExpiredTerminalDockPendingMutations(
+  record: Record<string, number> | undefined,
+  now: number
+): Record<string, number> | undefined {
+  if (!record) {
+    return undefined
+  }
+  let changed = false
+  const next: Record<string, number> = {}
+  for (const [key, mutatedAt] of Object.entries(record)) {
+    if (now - mutatedAt < TERMINAL_DOCK_ECHO_WINDOW_MS) {
+      next[key] = mutatedAt
+    } else {
+      changed = true
+    }
+  }
+  return changed ? next : record
+}
+
 /** Normalises and mirrors agent status updates from the host payload, preserving ownership metadata. */
 function remapHostAgentStatus(
   surface: TerminalSurface,
@@ -2694,11 +2752,19 @@ function applyWebSessionTabsSnapshotWithContext(
   // replacement id yet, so it would otherwise be lost the instant the host confirms
   // the handoff; carry it forward re-keyed to the replacement tab id.
   const provisionalDockRecordByHostTabId = new Map<string, Record<string, TerminalDockPaneState>>()
+  const provisionalPendingMutationsByHostTabId = new Map<string, Record<string, number>>()
   for (const [provisionalTabId, hostTabId] of provisionalHandoffHostTabIdByProvisionalTabId) {
     const provisionalDockRecord =
       existingUnifiedTerminalTabById.get(provisionalTabId)?.terminalDockByPaneKey
     if (provisionalDockRecord) {
       provisionalDockRecordByHostTabId.set(hostTabId, provisionalDockRecord)
+    }
+    const provisionalPendingMutations = pendingMutationsForTabId(
+      state.terminalDockPendingMutationsByPaneKey,
+      provisionalTabId
+    )
+    if (provisionalPendingMutations) {
+      provisionalPendingMutationsByHostTabId.set(hostTabId, provisionalPendingMutations)
     }
   }
   // Why: the kill switch gates adoption of host dock state, not its presence — a flag-off
@@ -2710,6 +2776,7 @@ function applyWebSessionTabsSnapshotWithContext(
     const mutatedAt = terminalDockPendingMutationsByPaneKey?.[paneKey]
     return mutatedAt !== undefined && now - mutatedAt < TERMINAL_DOCK_ECHO_WINDOW_MS
   }
+  let rekeyedHandoffPendingMutationsByPaneKey: Record<string, number> | undefined
   const mirroredTerminalUnifiedTabs = mirroredTerminalTabs.map((entry) => {
     const existingUnifiedTab = existingUnifiedTerminalTabById.get(entry.tab.id)
     if (!hostTerminalDockSyncEnabled) {
@@ -2724,6 +2791,16 @@ function applyWebSessionTabsSnapshotWithContext(
     const rekeyedHandoffDockRecord = handoffDockRecord
       ? remapTerminalDockRecordTabId(handoffDockRecord, () => entry.tab.id)
       : undefined
+    const handoffPendingMutations = provisionalPendingMutationsByHostTabId.get(entry.hostTabId)
+    const rekeyedHandoffPendingMutations = handoffPendingMutations
+      ? remapPendingMutationTimestampsTabId(handoffPendingMutations, () => entry.tab.id)
+      : undefined
+    if (rekeyedHandoffPendingMutations) {
+      rekeyedHandoffPendingMutationsByPaneKey = {
+        ...rekeyedHandoffPendingMutationsByPaneKey,
+        ...rekeyedHandoffPendingMutations
+      }
+    }
     return buildTerminalUnifiedTab(
       entry.tab,
       hostGroupIdByTabId.get(entry.hostTabId) ?? targetGroupId,
@@ -3394,9 +3471,19 @@ function applyWebSessionTabsSnapshotWithContext(
     now,
     batchContext
   )
+  const prunedTerminalDockPendingMutationsByPaneKey = pruneExpiredTerminalDockPendingMutations(
+    state.terminalDockPendingMutationsByPaneKey,
+    now
+  )
+  const nextTerminalDockPendingMutationsByPaneKey = rekeyedHandoffPendingMutationsByPaneKey
+    ? { ...prunedTerminalDockPendingMutationsByPaneKey, ...rekeyedHandoffPendingMutationsByPaneKey }
+    : prunedTerminalDockPendingMutationsByPaneKey
 
   const patch: Partial<WebSessionTabsSyncState> = {
     ...agentStatusPatch,
+    ...(nextTerminalDockPendingMutationsByPaneKey !== state.terminalDockPendingMutationsByPaneKey
+      ? { terminalDockPendingMutationsByPaneKey: nextTerminalDockPendingMutationsByPaneKey }
+      : {}),
     ...(nextOpenFiles !== state.openFiles ? { openFiles: nextOpenFiles } : {}),
     ...(nextTabsByWorktree !== state.tabsByWorktree ? { tabsByWorktree: nextTabsByWorktree } : {}),
     ...(nextBrowserTabsByWorktree !== state.browserTabsByWorktree
