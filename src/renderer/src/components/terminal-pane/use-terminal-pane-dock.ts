@@ -148,8 +148,11 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
   const ensurePaneDockDefault = useCallback(
     (paneKey: string, agent: AgentType): void => {
       noteDetectedAgent(paneKey, agent)
+      // Local fallback only counts before the host has ever echoed — once it has, a stale
+      // local entry for a pane the host record omits must not suppress the default.
       const hasPersistedDecision =
-        Object.hasOwn(terminalDockByPaneKey ?? {}, paneKey) || hasLocalDockState(paneKey)
+        Object.hasOwn(terminalDockByPaneKey ?? {}, paneKey) ||
+        (!hostHasEverEchoed && hasLocalDockState(paneKey))
       if (!shouldDockTerminalComposerByDefault({ enabled, agent, hasPersistedDecision })) {
         return
       }
@@ -165,6 +168,7 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       enabled,
       gutterRowsFor,
       hasLocalDockState,
+      hostHasEverEchoed,
       noteDetectedAgent,
       persistLocalDockState,
       resolveUnifiedTabId,

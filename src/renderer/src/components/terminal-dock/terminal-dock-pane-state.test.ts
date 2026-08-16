@@ -158,4 +158,27 @@ describe('writeTerminalDockPaneState bound', () => {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     expect(Object.keys(JSON.parse(raw as string))).toHaveLength(MAX_STORED_PANE_ENTRIES)
   })
+
+  it('moves a rewritten key to the newest position instead of leaving it at its original spot', () => {
+    writeTerminalDockPaneState('pane-a', { docked: true, gutterRows: 5 })
+    writeTerminalDockPaneState('pane-b', { docked: true, gutterRows: 5 })
+    writeTerminalDockPaneState('pane-a', { docked: false, gutterRows: 6 })
+
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+    expect(Object.keys(JSON.parse(raw as string))).toEqual(['pane-b', 'pane-a'])
+  })
+
+  it('never evicts a just-rewritten live pane, evicting the oldest untouched key instead', () => {
+    for (let i = 0; i < MAX_STORED_PANE_ENTRIES; i++) {
+      writeTerminalDockPaneState(`pane-${i}`, { docked: true, gutterRows: 5 })
+    }
+    // pane-0 is the oldest entry; rewriting it should refresh its recency and save it from
+    // the eviction its original insertion-order position would otherwise incur.
+    writeTerminalDockPaneState('pane-0', { docked: false, gutterRows: 6 })
+    writeTerminalDockPaneState('pane-overflow', { docked: true, gutterRows: 5 })
+
+    expect(hasTerminalDockPaneState('pane-0')).toBe(true)
+    expect(hasTerminalDockPaneState('pane-1')).toBe(false)
+    expect(hasTerminalDockPaneState('pane-overflow')).toBe(true)
+  })
 })

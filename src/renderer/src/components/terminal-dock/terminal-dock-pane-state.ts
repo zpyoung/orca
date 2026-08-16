@@ -104,6 +104,9 @@ export function writeTerminalDockPaneState(paneKey: string, state: TerminalDockP
     return
   }
   const map = readStoredMap()
+  // delete-then-set moves an existing key to the newest end of insertion order, so a rewrite
+  // of a live pane refreshes its recency instead of leaving it eligible for eviction.
+  delete map[paneKey]
   map[paneKey] = { docked: state.docked, gutterRows: clampGutterRows(state.gutterRows) }
   evictOldestEntries(map)
   writeStoredMap(map)

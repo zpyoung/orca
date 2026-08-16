@@ -191,6 +191,22 @@ describe('useTerminalPaneDock', () => {
     })
   })
 
+  it('docks a recognized pane by default when the host echoed an empty record, even with a stale local entry', () => {
+    fakeStore.setState({
+      unifiedTabsByWorktree: { 'wt-1': [makeUnifiedTab({ terminalDockByPaneKey: {} })] }
+    })
+    writeTerminalDockPaneState(PANE_KEY, { docked: false, gutterRows: 7 })
+    const { result } = renderDockHook(true)
+
+    act(() => result.current.ensurePaneDockDefault(PANE_KEY, 'claude'))
+
+    expect(mocks.setTabTerminalDockState).toHaveBeenCalledExactlyOnceWith('unified-1', {
+      paneKey: PANE_KEY,
+      docked: true,
+      gutterRows: DEFAULT_GUTTER_ROWS
+    })
+  })
+
   it('preserves an explicit local undock when the host has not echoed dock state', () => {
     fakeStore.setState({
       unifiedTabsByWorktree: {
