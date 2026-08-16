@@ -384,6 +384,51 @@ describe('mergeTerminalDockByPaneKey entry cap (D4: unbounded attacker-supplied 
   })
 })
 
+describe('mergeTerminalDockByPaneKey eviction protects live panes (M2: unverified pane-key flood)', () => {
+  it('evicts unverified keys before a verified one, even though the verified key was inserted first', () => {
+    const livePaneKeys = new Set(['pane-live'])
+    let record: Record<string, { docked: boolean; gutterRows: number }> | undefined
+    record = mergeTerminalDockByPaneKey(record, { paneKey: 'pane-live', docked: true }, livePaneKeys)
+    for (let i = 0; i < MAX_TERMINAL_DOCK_PANE_ENTRIES - 1; i++) {
+      record = mergeTerminalDockByPaneKey(
+        record,
+        { paneKey: `pane-fake-${i}`, docked: true },
+        livePaneKeys
+      )
+    }
+    expect(Object.keys(record!)).toHaveLength(MAX_TERMINAL_DOCK_PANE_ENTRIES)
+
+    const flooded = mergeTerminalDockByPaneKey(
+      record,
+      { paneKey: 'pane-fake-new', docked: true },
+      livePaneKeys
+    )
+
+    expect(Object.keys(flooded)).toHaveLength(MAX_TERMINAL_DOCK_PANE_ENTRIES)
+    expect(flooded['pane-live']).toBeDefined()
+    expect(flooded['pane-fake-0']).toBeUndefined()
+  })
+
+  it('falls back to oldest-first eviction among verified keys once no unverified key remains', () => {
+    const livePaneKeys = new Set(['pane-0', 'pane-1'])
+    let record: Record<string, { docked: boolean; gutterRows: number }> | undefined = {
+      'pane-0': { docked: true, gutterRows: 5 },
+      'pane-1': { docked: true, gutterRows: 5 }
+    }
+    for (let i = 2; i < MAX_TERMINAL_DOCK_PANE_ENTRIES; i++) {
+      livePaneKeys.add(`pane-${i}`)
+      record = mergeTerminalDockByPaneKey(record, { paneKey: `pane-${i}`, docked: true }, livePaneKeys)
+    }
+
+    livePaneKeys.add('pane-new')
+    const grown = mergeTerminalDockByPaneKey(record, { paneKey: 'pane-new', docked: true }, livePaneKeys)
+
+    expect(Object.keys(grown)).toHaveLength(MAX_TERMINAL_DOCK_PANE_ENTRIES)
+    expect(grown['pane-0']).toBeUndefined()
+    expect(grown['pane-new']).toBeDefined()
+  })
+})
+
 describe('terminalDockByPaneKey publication (D3: write-only field)', () => {
   function makePersistedSession(
     overrides: Partial<WorkspaceSessionState> = {}
@@ -503,6 +548,49 @@ describe('terminalDockByPaneKey publication (D3: write-only field)', () => {
       terminalDockByPaneKey: {
         'pane-p0': { docked: true, gutterRows: DEFAULT_TERMINAL_DOCK_GUTTER_ROWS }
       }
+    })
+  })
+
+  it('a flood of fabricated pane keys cannot evict a host-verified live pane, and legitimate updates for known panes still persist (M2)', async () => {
+    const runtime = new OrcaRuntimeService({
+      getWorkspaceSession: () => makePersistedSession()
+    } as never)
+    // Why: registerPty is the host's own PTY-binding record, independent of any
+    // client-supplied dock patch — it's the "known live pane" source under test.
+    runtime.registerPty('pty-live', DOCK_WORKTREE_ID, null, {
+      tabId: DOCK_TAB_ID,
+      leafId: '11111111-1111-4111-a111-111111111111'
+    })
+    await runtime.listMobileSessionTabs(`id:${DOCK_WORKTREE_ID}`)
+    await runtime.setMobileSessionTabProps(`id:${DOCK_WORKTREE_ID}`, {
+      tabId: DOCK_TAB_ID,
+      terminalDock: { paneKey: DOCK_PANE_KEY, docked: true, gutterRows: 6 }
+    })
+
+    const fakeLeafId = (i: number): string => `00000000-0000-4000-8000-${i.toString(16).padStart(12, '0')}`
+    for (let i = 0; i < MAX_TERMINAL_DOCK_PANE_ENTRIES; i++) {
+      await runtime.setMobileSessionTabProps(`id:${DOCK_WORKTREE_ID}`, {
+        tabId: DOCK_TAB_ID,
+        terminalDock: { paneKey: makePaneKey(DOCK_TAB_ID, fakeLeafId(i)), docked: true }
+      })
+    }
+
+    const flooded = await runtime.listMobileSessionTabs(`id:${DOCK_WORKTREE_ID}`)
+    expect(flooded.tabs[0]).toMatchObject({
+      terminalDockByPaneKey: expect.objectContaining({
+        [DOCK_PANE_KEY]: { docked: true, gutterRows: 6 }
+      })
+    })
+
+    await runtime.setMobileSessionTabProps(`id:${DOCK_WORKTREE_ID}`, {
+      tabId: DOCK_TAB_ID,
+      terminalDock: { paneKey: DOCK_PANE_KEY, gutterRows: 9 }
+    })
+    const updated = await runtime.listMobileSessionTabs(`id:${DOCK_WORKTREE_ID}`)
+    expect(updated.tabs[0]).toMatchObject({
+      terminalDockByPaneKey: expect.objectContaining({
+        [DOCK_PANE_KEY]: { docked: true, gutterRows: 9 }
+      })
     })
   })
 

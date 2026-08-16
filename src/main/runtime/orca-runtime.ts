@@ -2730,12 +2730,36 @@ export type TerminalDockPropsPatch = {
   remove?: readonly string[]
 }
 
+// Why: an unverified paneKey (syntactically valid but never bound to a host
+// PTY for this tab) must not be able to evict a verified live pane's entry —
+// evict unverified keys first, oldest first, and only reach into the verified
+// set when unverified keys alone can't cover the overflow.
+function selectTerminalDockEvictionKeys(
+  existingKeys: readonly string[],
+  overflow: number,
+  livePaneKeys: ReadonlySet<string> | undefined
+): Set<string> {
+  if (!livePaneKeys) {
+    return new Set(existingKeys.slice(0, overflow))
+  }
+  const unverified = existingKeys.filter((key) => !livePaneKeys.has(key))
+  if (unverified.length >= overflow) {
+    return new Set(unverified.slice(0, overflow))
+  }
+  const verified = existingKeys.filter((key) => livePaneKeys.has(key))
+  return new Set([...unverified, ...verified.slice(0, overflow - unverified.length)])
+}
+
 /** Upserts one pane's dock state into a per-pane record without touching any
  *  other pane's entry — the RPC patch is single-pane so other clients'
- *  concurrent updates to different panes on the same tab must survive. */
+ *  concurrent updates to different panes on the same tab must survive.
+ *  `livePaneKeys`, when given, is the set of paneKeys the host has verified
+ *  (a live or previously-live PTY binding for this tab) — eviction at the cap
+ *  prefers unverified keys so an unverified flood can't displace it. */
 export function mergeTerminalDockByPaneKey(
   existing: Record<string, TerminalDockPaneState> | undefined,
-  patch: { paneKey: string; docked?: boolean; gutterRows?: number }
+  patch: { paneKey: string; docked?: boolean; gutterRows?: number },
+  livePaneKeys?: ReadonlySet<string>
 ): Record<string, TerminalDockPaneState> {
   const current = existing?.[patch.paneKey]
   const nextEntry: TerminalDockPaneState = {
@@ -2747,7 +2771,8 @@ export function mergeTerminalDockByPaneKey(
   // that case — an update to an already-tracked pane never evicts anything.
   const overflow =
     current === undefined ? existingKeys.length + 1 - MAX_TERMINAL_DOCK_PANE_ENTRIES : 0
-  const evicted = overflow > 0 ? new Set(existingKeys.slice(0, overflow)) : null
+  const evicted =
+    overflow > 0 ? selectTerminalDockEvictionKeys(existingKeys, overflow, livePaneKeys) : null
   const result: Record<string, TerminalDockPaneState> = {}
   for (const key of existingKeys) {
     if (!evicted?.has(key)) {
@@ -2785,7 +2810,8 @@ export function removeTerminalDockPaneKeys(
 // on the same call frees its own capacity instead of tripping the cap above.
 function applyTerminalDockByPaneKeyPatch(
   existing: Record<string, TerminalDockPaneState> | undefined,
-  patch: TerminalDockPropsPatch
+  patch: TerminalDockPropsPatch,
+  livePaneKeys?: ReadonlySet<string>
 ): Record<string, TerminalDockPaneState> | undefined {
   const pruned = patch.remove?.length
     ? removeTerminalDockPaneKeys(existing, patch.remove)
@@ -2793,21 +2819,26 @@ function applyTerminalDockByPaneKeyPatch(
   if (patch.paneKey === undefined) {
     return pruned
   }
-  return mergeTerminalDockByPaneKey(pruned, {
-    paneKey: patch.paneKey,
-    docked: patch.docked,
-    gutterRows: patch.gutterRows
-  })
+  return mergeTerminalDockByPaneKey(
+    pruned,
+    {
+      paneKey: patch.paneKey,
+      docked: patch.docked,
+      gutterRows: patch.gutterRows
+    },
+    livePaneKeys
+  )
 }
 
 function terminalDockPatchFragment(
   existing: Record<string, TerminalDockPaneState> | undefined,
-  patch: TerminalDockPropsPatch | undefined
+  patch: TerminalDockPropsPatch | undefined,
+  livePaneKeys?: ReadonlySet<string>
 ): { terminalDockByPaneKey?: Record<string, TerminalDockPaneState> } {
   if (!patch) {
     return {}
   }
-  const next = applyTerminalDockByPaneKeyPatch(existing, patch)
+  const next = applyTerminalDockByPaneKeyPatch(existing, patch, livePaneKeys)
   return next !== undefined ? { terminalDockByPaneKey: next } : {}
 }
 
@@ -8478,6 +8509,20 @@ export class OrcaRuntimeService {
     return { updated: true }
   }
 
+  // Why: the host's own PTY registry (ptysById) is the one source of "panes
+  // this tab actually has" that a remote client can't forge — it's populated
+  // from spawn-time bindings, not RPC input, and keeps a disconnected/
+  // reconnecting pane's paneKey until the PTY is actually torn down.
+  private getLiveTerminalDockPaneKeysForTab(tabId: string): Set<string> {
+    const liveKeys = new Set<string>()
+    for (const pty of this.ptysById.values()) {
+      if (pty.tabId === tabId && pty.paneKey) {
+        liveKeys.add(pty.paneKey)
+      }
+    }
+    return liveKeys
+  }
+
   private persistHeadlessSessionTabProps(
     worktreeId: string,
     tabId: string,
@@ -8492,6 +8537,9 @@ export class OrcaRuntimeService {
     if (!session || !this.store?.setWorkspaceSession) {
       return
     }
+    const livePaneKeys = props.terminalDock
+      ? this.getLiveTerminalDockPaneKeysForTab(tabId)
+      : undefined
     const tabs = session.tabsByWorktree[worktreeId]
     const nextSession: WorkspaceSessionState = { ...session }
     let changed = false
@@ -8523,7 +8571,7 @@ export class OrcaRuntimeService {
                 ...tab,
                 ...(props.color !== undefined ? { color: props.color } : {}),
                 ...(props.isPinned !== undefined ? { isPinned: props.isPinned } : {}),
-                ...terminalDockPatchFragment(tab.terminalDockByPaneKey, props.terminalDock)
+                ...terminalDockPatchFragment(tab.terminalDockByPaneKey, props.terminalDock, livePaneKeys)
               }
             : tab
         )
@@ -8550,6 +8598,9 @@ export class OrcaRuntimeService {
     if (!snapshot) {
       return
     }
+    const livePaneKeys = props.terminalDock
+      ? this.getLiveTerminalDockPaneKeysForTab(tabId)
+      : undefined
     let changed = false
     const tabs = snapshot.tabs.map((tab) => {
       if (this.getMobileSessionTopLevelTabId(tab) !== tabId) {
@@ -8562,7 +8613,7 @@ export class OrcaRuntimeService {
         ...(props.isPinned !== undefined ? { isPinned: props.isPinned } : {}),
         ...(props.viewMode !== undefined ? { viewMode: props.viewMode } : {}),
         ...(tab.type === 'terminal'
-          ? terminalDockPatchFragment(tab.terminalDockByPaneKey, props.terminalDock)
+          ? terminalDockPatchFragment(tab.terminalDockByPaneKey, props.terminalDock, livePaneKeys)
           : {})
       }
     })
