@@ -27,7 +27,11 @@ export function useNativeChatSendLifecycle(
       if (cleanupTimer !== null) {
         clearTimeout(cleanupTimer)
       }
-      handle.cancel()
+      try {
+        handle.cancel()
+      } catch {
+        // Isolate one handle's throw so later queued sends still get cancelled.
+      }
       if (pendingId) {
         onPendingSendCanceled?.(pendingId)
       }

@@ -35,6 +35,7 @@ import {
   buildNativeChatPasteBytes,
   NATIVE_CHAT_SUBMIT
 } from './native-chat-send'
+import { cancelNativeChatPtySends } from './native-chat-pty-send-queue'
 
 const SETTINGS = {} as Parameters<typeof sendNativeChatMessage>[0]
 const PTY = 'pty-1'
@@ -445,6 +446,41 @@ describe('sendNativeChatMessage post-send observation', () => {
     await fullObservationWindow()
     expect(queuedOutcome).toHaveBeenCalledOnce()
   })
+
+  it('reports may-not-have-sent exactly once when the cleanup clear throws on cancel (r5-2)', () => {
+    const onOutcome = vi.fn()
+    sendRuntimePtyInput.mockImplementationOnce(() => {
+      throw new Error('preload write dead')
+    })
+    const handle = sendNativeChatMessage(SETTINGS, PTY, 'hi', { onOutcome })
+
+    handle.cancel()
+
+    expect(onOutcome).toHaveBeenCalledExactlyOnceWith('may-not-have-sent')
+  })
+
+  it('cancels a later queued send even when the first handle cleanup clear throws (r5-2)', async () => {
+    const firstOutcome = vi.fn()
+    sendNativeChatMessage(SETTINGS, PTY, 'first', { onOutcome: firstOutcome })
+    sendNativeChatMessage(SETTINGS, PTY, 'second')
+    sendRuntimePtyInput.mockImplementationOnce(() => {
+      throw new Error('preload write dead')
+    })
+
+    expect(() => cancelNativeChatPtySends(PTY)).not.toThrow()
+    expect(firstOutcome).toHaveBeenCalledExactlyOnceWith('may-not-have-sent')
+
+    await vi.runAllTimersAsync()
+
+    // A first-handle throw must not stop the fenced cancel loop from reaching
+    // the second (still-queued) handle — otherwise it starts on the pty this
+    // just tried to clean up.
+    expect(
+      sendRuntimePtyInputAcceptance.mock.calls.some(
+        (call) => call[2] === buildNativeChatPasteBytes('second')
+      )
+    ).toBe(false)
+  })
 })
 
 describe('sendNativeChatMessageVerified', () => {
@@ -525,6 +561,36 @@ describe('sendNativeChatMessageVerified', () => {
     expect(
       sendRuntimePtyInputVerified.mock.calls.some((call) => call[2] === NATIVE_CHAT_SUBMIT)
     ).toBe(false)
+  })
+
+  it('serializes a card selector write behind an in-flight option command (r5-3)', async () => {
+    let resolveBody!: (accepted: boolean) => void
+    sendRuntimePtyInputVerified.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveBody = resolve
+        })
+    )
+
+    const optionResult = sendNativeChatMessageVerified(SETTINGS, PTY, '/model sonnet')
+    await vi.waitFor(() => expect(sendRuntimePtyInputVerified).toHaveBeenCalledTimes(1))
+
+    // The card issues its selector write while the option command's body is
+    // still awaiting acceptance — it must queue behind the option, not
+    // interleave with its body/Enter.
+    sendNativeChatAskAnswer(SETTINGS, PTY, [{ raw: '2' }])
+    await vi.advanceTimersByTimeAsync(0)
+    expect(sendRuntimePtyInput).not.toHaveBeenCalledWith(SETTINGS, PTY, '2')
+
+    resolveBody(true)
+    await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS)
+    expect(await optionResult).toBe(true)
+    expect(sendRuntimePtyInputVerified).toHaveBeenLastCalledWith(SETTINGS, PTY, NATIVE_CHAT_SUBMIT)
+
+    // Only once the option command's CR has landed does the card's queued
+    // selector write fire.
+    await vi.runAllTimersAsync()
+    expect(sendRuntimePtyInput).toHaveBeenCalledWith(SETTINGS, PTY, '2')
   })
 })
 
@@ -707,6 +773,24 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
       )
     ).toBe(true)
   })
+
+  it('reports may-not-have-sent exactly once when the cleanup clear throws on cancel (r5-2)', () => {
+    const onOutcome = vi.fn()
+    sendRuntimePtyInput.mockImplementationOnce(() => {
+      throw new Error('preload write dead')
+    })
+    const handle = sendNativeChatMessageWithImageAttachments(
+      SETTINGS,
+      PTY,
+      'describe',
+      ['/tmp/orca-paste-image.png'],
+      { onOutcome }
+    )
+
+    handle.cancel()
+
+    expect(onOutcome).toHaveBeenCalledExactlyOnceWith('may-not-have-sent')
+  })
 })
 
 describe('empty prompt submit', () => {
@@ -727,9 +811,11 @@ describe('sendNativeChatAskAnswer', () => {
     sendRuntimePtyInput.mockClear()
     sendRuntimePtyInput.mockReturnValue(true)
     sendRuntimePtyInputVerified.mockReset().mockResolvedValue(true)
+    resetNativeChatPtySendQueuesForTests()
   })
   afterEach(() => {
     vi.useRealTimers()
+    resetNativeChatPtySendQueuesForTests()
   })
 
   it('returns a no-op handle for an empty key group list', () => {

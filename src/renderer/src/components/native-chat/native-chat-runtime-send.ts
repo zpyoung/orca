@@ -2,13 +2,13 @@
 // body, then Enter as a SEPARATE delayed pty write. Kept apart from the pure
 // byte builders in native-chat-send.ts so those stay IO-free and unit-testable.
 
-import {
-  sendRuntimePtyInput,
-  sendRuntimePtyInputVerified
-} from '@/runtime/runtime-terminal-inspection'
+import { sendRuntimePtyInput } from '@/runtime/runtime-terminal-inspection'
 import type { getSettingsForAgentTabRuntimeOwner } from '@/lib/agent-paste-draft'
 import { runBodyAcceptedThen } from './native-chat-runtime-send-acceptance'
-import { sendNativeChatAskAnswer } from './native-chat-ask-answer-send'
+import {
+  sendNativeChatAskAnswerQueued,
+  sendNativeChatMessageVerifiedQueued
+} from './native-chat-runtime-send-queued'
 import {
   NATIVE_CHAT_ADVANCE_BUFFER_MS,
   NATIVE_CHAT_QUESTION_STEP_MS,
@@ -86,6 +86,8 @@ export type RuntimeSettings = ReturnType<typeof getSettingsForAgentTabRuntimeOwn
 // The queue only reports `onCancelUnsubmitted` once `start` has run — a send
 // cancelled while still queued behind another PTY send never reaches `start`,
 // so it would otherwise report no outcome at all. Report it here instead.
+// The outcome must fire even if the queue's own cancel throws (r5-2) so a
+// throwing cleanup clear can never suppress it.
 const withQueuedCancelOutcome = (
   handle: NativeChatPtySendQueueHandle,
   reportOutcome: (outcome: SendOutcome) => void
@@ -93,12 +95,31 @@ const withQueuedCancelOutcome = (
   ...handle,
   cancel: () => {
     const startedBeforeCancel = handle.bodyStarted()
-    handle.cancel()
-    if (!startedBeforeCancel) {
-      reportOutcome('may-not-have-sent')
+    try {
+      handle.cancel()
+    } finally {
+      if (!startedBeforeCancel) {
+        reportOutcome('may-not-have-sent')
+      }
     }
   }
 })
+
+// Isolates the best-effort cleanup clear from outcome reporting (r5-2): a
+// synchronous throw from the preload write must not swallow the outcome.
+function bestEffortCancelClear(
+  settings: RuntimeSettings,
+  ptyId: string,
+  options: NativeChatSendOptions | undefined,
+  reportOutcome: (outcome: SendOutcome) => void
+): void {
+  try {
+    clearUnsubmittedAgentInput(settings, ptyId, options)
+  } catch {
+    // Cleanup only — the outcome report below must still fire.
+  }
+  reportOutcome('may-not-have-sent')
+}
 
 /**
  * Chat message path:
@@ -165,34 +186,10 @@ export function sendNativeChatMessage(
       })
     },
     {
-      onCancelUnsubmitted: () => {
-        clearUnsubmittedAgentInput(settings, ptyId, options)
-        reportOutcome('may-not-have-sent')
-      }
+      onCancelUnsubmitted: () => bestEffortCancelClear(settings, ptyId, options, reportOutcome)
     }
   )
   return withQueuedCancelOutcome(handle, reportOutcome)
-}
-
-function waitForNativeChatSubmit(signal?: AbortSignal): Promise<boolean> {
-  if (signal?.aborted) {
-    return Promise.resolve(false)
-  }
-  return new Promise((resolve) => {
-    let timer: ReturnType<typeof setTimeout> | null = null
-    const finish = (completed: boolean): void => {
-      if (timer === null) {
-        return
-      }
-      clearTimeout(timer)
-      timer = null
-      signal?.removeEventListener('abort', onAbort)
-      resolve(completed)
-    }
-    const onAbort = (): void => finish(false)
-    timer = setTimeout(() => finish(true), NATIVE_CHAT_SUBMIT_DELAY_MS)
-    signal?.addEventListener('abort', onAbort, { once: true })
-  })
 }
 
 /**
@@ -200,7 +197,9 @@ function waitForNativeChatSubmit(signal?: AbortSignal): Promise<boolean> {
  *
  * Does not pre-clear the line (model-switch confirmation watches the PTY).
  * Cancels any in-flight chat clear/body/Enter on this PTY first so a delayed
- * chat Enter cannot dismiss Claude's "Switch model?" dialog.
+ * chat Enter cannot dismiss Claude's "Switch model?" dialog, then queues its
+ * own body+Enter on the same per-PTY sequence (r5-3) so a card's selector
+ * write cannot land mid-body or mid-Enter of this command.
  */
 export async function sendNativeChatMessageVerified(
   settings: RuntimeSettings,
@@ -216,18 +215,7 @@ export async function sendNativeChatMessageVerified(
   if (signal?.aborted) {
     return false
   }
-
-  // Why: option commands await remote/SSH acceptance so the Enter cannot race
-  // ahead of the body while a model-change observer is already armed.
-  const bodyAccepted = await sendRuntimePtyInputVerified(
-    settings,
-    ptyId,
-    buildNativeChatPasteBytes(text)
-  )
-  if (!bodyAccepted || signal?.aborted || !(await waitForNativeChatSubmit(signal))) {
-    return false
-  }
-  return sendRuntimePtyInputVerified(settings, ptyId, NATIVE_CHAT_SUBMIT)
+  return sendNativeChatMessageVerifiedQueued(settings, ptyId, text, signal)
 }
 
 /** Types a slash command as individual keys so Codex opens its command palette. */
@@ -367,10 +355,7 @@ export function sendNativeChatMessageWithImageAttachments(
       })
     },
     {
-      onCancelUnsubmitted: () => {
-        clearUnsubmittedAgentInput(settings, ptyId, options)
-        reportOutcome('may-not-have-sent')
-      }
+      onCancelUnsubmitted: () => bestEffortCancelClear(settings, ptyId, options, reportOutcome)
     }
   )
   return withQueuedCancelOutcome(handle, reportOutcome)
@@ -382,4 +367,4 @@ export function submitNativeChatPrompt(settings: RuntimeSettings, ptyId: string)
   sendRuntimePtyInput(settings, ptyId, NATIVE_CHAT_SUBMIT)
 }
 
-export { sendNativeChatAskAnswer }
+export { sendNativeChatAskAnswerQueued as sendNativeChatAskAnswer }
