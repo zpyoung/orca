@@ -16,3 +16,10 @@ Required fields: file_under_test, reason_skipped.
 Tests that were skipped, abbreviated, or flagged as needing expansion.
 
 Reviewed every 2 weeks. Use `/quirk:artifacts:test-skip` to append.
+
+## TEST-1: Load-sensitive tests that fail only under full-suite concurrency on this dev host
+- **File under test**: src/main/updater.test.ts; src/rpc (terminal-output-frame-chunks-equivalence); src/renderer/src/components/github-project/project-view-wrapper-source-context-boundary.test.ts; src/renderer/src/components/right-sidebar (ai-vault-session-worktree-map); src/relay/subprocess.test.ts; src/main/providers (ssh-pty-provider-agent-session-create-operation); src/main/runtime/orchestration (orchestration-creator-authority-performance); src/shared/remote-runtime-shared-control-connection.test.ts; src/renderer/src/components/terminal-pane/terminal-fit-restore.test.ts
+- **Test type**: unit / integration
+- **Reason skipped**: environment — each passes in isolation on the warp-rich-input branch but intermittently times out or misses a fake-timer tick under full-suite load on an 8-core host (worker-pool contention; one case surfaced a 14999-vs-15000ms fake-timer bleed). None are touched by the branch; verified against RUN_BASE b84a7492 during the docked-composer run (2026-08-13..16).
+- **Edge cases to cover**: make the timeout-bound assertions load-tolerant (fake timers pinned per test, generous poll budgets), or isolate these files into a serial pool so full-suite runs stop reporting noise
+- **Priority**: P3
