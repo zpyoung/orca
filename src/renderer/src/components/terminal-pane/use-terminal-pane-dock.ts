@@ -1,15 +1,11 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type { PaneManager } from '@/lib/pane-manager/pane-manager'
 import { useAppStore } from '@/store'
 import { emitTerminalDockToggled } from '@/lib/terminal-dock-telemetry'
 import type { AgentType } from '../../../../shared/agent-status-types'
-import { isTuiAgent } from '../../../../shared/tui-agent-config'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
 import { getCachedUnifiedTerminalTabForWorktree } from './terminal-unified-tab-lookup'
-import {
-  readTerminalDockPaneAgent,
-  writeTerminalDockPaneAgent
-} from '../terminal-dock/terminal-dock-pane-state'
+import { useTerminalDockAgentLatch } from './terminal-pane-dock-agent-latch'
 import { useTerminalDockLocalFallback } from './use-terminal-dock-local-fallback'
 import { shouldDockTerminalComposerByDefault } from '../terminal-dock/terminal-dock-initial-state'
 import { useTerminalDockDisabledReason } from './use-terminal-dock-disabled-reason'
@@ -76,19 +72,6 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
   const setTabTerminalDockState = useAppStore((store) => store.setTabTerminalDockState)
 
   const [mountedPaneKeys, setMountedPaneKeys] = useState<ReadonlySet<string>>(() => new Set())
-  const paneAgentRef = useRef(new Map<string, AgentType>())
-  const agentForPane = useCallback((paneKey: string) => paneAgentRef.current.get(paneKey), [])
-  const noteDetectedAgent = useCallback(
-    (paneKey: string, agent: AgentType): void => {
-      const changed = paneAgentRef.current.get(paneKey) !== agent
-      paneAgentRef.current.set(paneKey, agent)
-      // Why: the kill switch — flag-off must not write a client-local latch either.
-      if (changed && enabled) {
-        writeTerminalDockPaneAgent(paneKey, agent)
-      }
-    },
-    [enabled]
-  )
   const { resolvedStateFor, hasLocalDockState, persistLocalDockState, forgetPane } =
     useTerminalDockLocalFallback()
   // Why: "ever echoed" is per-tab, not per-pane — a modern host's record simply omitting one
@@ -103,25 +86,8 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
     (paneKey: string): boolean => enabled && isPaneDocked(paneKey) && mountedPaneKeys.has(paneKey),
     [enabled, isPaneDocked, mountedPaneKeys]
   )
-  const resolveDockAgent = useCallback(
-    (paneKey: string, detectedAgent: string | null): AgentType | null => {
-      if (isTuiAgent(detectedAgent)) {
-        noteDetectedAgent(paneKey, detectedAgent)
-        return detectedAgent
-      }
-      if (!isPaneDocked(paneKey)) {
-        return null
-      }
-      // Why: an empty in-memory latch after a remount must not read as "no agent" — rehydrate
-      // from the client-local record before conceding no dock can be rendered.
-      const resolved = agentForPane(paneKey) ?? readTerminalDockPaneAgent(paneKey)
-      if (resolved) {
-        paneAgentRef.current.set(paneKey, resolved)
-      }
-      return resolved
-    },
-    [agentForPane, isPaneDocked, noteDetectedAgent]
-  )
+  const { agentForPane, noteDetectedAgent, resolveDockAgent, forgetPaneAgent } =
+    useTerminalDockAgentLatch({ enabled, isPaneDocked })
   const passthrough = useTerminalDockPassthrough({
     enabled,
     tabId,
@@ -295,7 +261,7 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
   const prunePassthroughForRetiredPane = useCallback(
     (leafId: string): void => {
       const paneKey = makePaneKey(tabId, leafId)
-      paneAgentRef.current.delete(paneKey)
+      forgetPaneAgent(paneKey)
       if (enabled) {
         forgetPane(paneKey)
       }
@@ -309,7 +275,7 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       })
       passthrough.prunePassthroughForRetiredPane(leafId)
     },
-    [enabled, forgetPane, passthrough, tabId]
+    [enabled, forgetPane, forgetPaneAgent, passthrough, tabId]
   )
 
   return useMemo(
