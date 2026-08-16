@@ -7168,6 +7168,23 @@ export function registerPtyHandlers(
     }
   }
 
+  // Why: a disposed SSH mux drops provider.write silently (fire-and-forget
+  // notify), so writePtyInput's plain boolean can't prove the write actually
+  // had a live transport underneath it — consult the provider directly.
+  const writePtyInputProvablyLive = (args: PtyWritePayload): boolean | Promise<boolean> => {
+    const result = writePtyInput(args)
+    const confirmLive = (accepted: boolean): boolean => {
+      if (!accepted) {
+        return false
+      }
+      const provider = ptyOwnership.has(args.id) ? tryGetProviderForPty(args.id) : undefined
+      const isLive = (provider as { isWriteChannelLive?: (id: string) => boolean } | undefined)
+        ?.isWriteChannelLive
+      return isLive ? isLive(args.id) : true
+    }
+    return result instanceof Promise ? result.then(confirmLive) : confirmLive(result)
+  }
+
   const writePtyInputAccepted = (args: PtyWritePayload): boolean | Promise<boolean> => {
     if (runtime?.getDriver(args.id).kind === 'mobile') {
       return false
@@ -7224,8 +7241,8 @@ export function registerPtyHandlers(
     }
     const claimTail = hostViewportClaimTails.get(args.id)
     return claimTail
-      ? claimTail.then((claimed) => (claimed ? writePtyInput(args) : false))
-      : writePtyInput(args)
+      ? claimTail.then((claimed) => (claimed ? writePtyInputProvablyLive(args) : false))
+      : writePtyInputProvablyLive(args)
   })
 
   ipcMain.removeAllListeners('pty:claimViewport')

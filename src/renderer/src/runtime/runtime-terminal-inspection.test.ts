@@ -628,5 +628,63 @@ describe('runtime terminal owner routing', () => {
       expect(localWrite).toHaveBeenCalledWith('local-pty', 'x')
       expect(localWriteInputAccepted).not.toHaveBeenCalled()
     })
+
+    it('does not dispatch the local ack IPC when cancelled during deferred size validation', async () => {
+      vi.useFakeTimers()
+      try {
+        const text = 'a'.repeat(CLIPBOARD_TEXT_MEASURE_YIELD_CODE_UNITS + 1)
+        let cancelled = false
+        const accepted = sendRuntimePtyInputAcceptance(
+          { activeRuntimeEnvironmentId: null },
+          'local-pty',
+          text,
+          () => cancelled
+        )
+        cancelled = true
+
+        await vi.runAllTimersAsync()
+
+        await expect(accepted).resolves.toBe(false)
+        expect(localWriteInputAccepted).not.toHaveBeenCalled()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('does not dispatch the remote RPC when cancelled during deferred size validation', async () => {
+      vi.useFakeTimers()
+      try {
+        const text = 'a'.repeat(CLIPBOARD_TEXT_MEASURE_YIELD_CODE_UNITS + 1)
+        let cancelled = false
+        const accepted = sendRuntimePtyInputAcceptance(
+          { activeRuntimeEnvironmentId: 'env-2' },
+          'remote:env-1@@terminal-1',
+          text,
+          () => cancelled
+        )
+        cancelled = true
+
+        await vi.runAllTimersAsync()
+
+        await expect(accepted).resolves.toBe(false)
+        expect(runtimeTransportCall).not.toHaveBeenCalled()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('dispatches normally when isCancelled is omitted or stays false', async () => {
+      localWriteInputAccepted.mockResolvedValue(true)
+
+      await expect(
+        sendRuntimePtyInputAcceptance(
+          { activeRuntimeEnvironmentId: null },
+          'local-pty',
+          'x',
+          () => false
+        )
+      ).resolves.toBe(true)
+      expect(localWriteInputAccepted).toHaveBeenCalledWith('local-pty', 'x')
+    })
   })
 })

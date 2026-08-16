@@ -208,6 +208,13 @@ export class SshPtyProvider implements IPtyProvider {
     this.mux.notify('pty.data', { id: this.toRelayPtyId(id), data })
   }
 
+  /** Whether a `write()` right now has any chance of reaching the relay — a
+   *  disposed mux drops `notify` silently, so acceptance-aware callers need
+   *  this instead of trusting write()'s void return. */
+  isWriteChannelLive(_id: string): boolean {
+    return !this.mux.isDisposed()
+  }
+
   resize(id: string, cols: number, rows: number): void {
     this.mux.notify('pty.resize', { id: this.toRelayPtyId(id), cols, rows })
   }

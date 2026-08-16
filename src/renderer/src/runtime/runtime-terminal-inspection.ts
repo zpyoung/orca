@@ -200,14 +200,24 @@ function sendRuntimePtyInputWithinLimit(
  * timeout, or `accepted: false` all resolve `false` rather than throwing, so
  * callers never need their own try/catch around this call. Local desktop
  * writes stay fire-and-forget, matching `sendRuntimePtyInput`.
+ *
+ * `isCancelled`, when given, is re-checked after the deferred size
+ * validation and immediately before dispatch (local ack'd IPC or remote RPC
+ * alike), so a cancel that lands while validation was pending still stops
+ * the write. Once dispatched, an in-flight RPC cannot be recalled — that
+ * residual window is unavoidable.
  */
 export async function sendRuntimePtyInputAcceptance(
   settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
   ptyId: string,
-  data: string
+  data: string,
+  isCancelled?: () => boolean
 ): Promise<boolean> {
   const tooLarge = isRuntimePtyInputTooLarge(data)
   if (typeof tooLarge === 'boolean' ? tooLarge : await tooLarge) {
+    return false
+  }
+  if (isCancelled?.()) {
     return false
   }
   const { target, terminal } = resolveRuntimeSendTarget(settings, ptyId)

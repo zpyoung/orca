@@ -189,15 +189,29 @@ describe('sendNativeChatMessage', () => {
     await vi.advanceTimersByTimeAsync(0)
 
     // Independent PTYs: each gets its own clear-then-body, unordered relative
-    // to the other PTY's writes.
-    expect(sendRuntimePtyInput.mock.calls.map((call) => [call[1], call[2]])).toEqual([
-      ['pty-a', NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT],
-      ['pty-b', NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT]
-    ])
-    expect(sendRuntimePtyInputAcceptance.mock.calls.map((call) => [call[1], call[2]])).toEqual([
-      ['pty-a', buildNativeChatPasteBytes('one')],
-      ['pty-b', buildNativeChatPasteBytes('two')]
-    ])
+    // to the other PTY's writes. Clear and body both go through the
+    // acceptance-aware transport now (r4-2).
+    const byPty = (ptyId: string): string[] =>
+      sendRuntimePtyInputAcceptance.mock.calls
+        .filter((call) => call[1] === ptyId)
+        .map((call) => call[2] as string)
+    expect(byPty('pty-a')).toEqual([NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT, buildNativeChatPasteBytes('one')])
+    expect(byPty('pty-b')).toEqual([NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT, buildNativeChatPasteBytes('two')])
+  })
+
+  it('passes a live isCancelled check through to the acceptance-aware body write', async () => {
+    const handle = sendNativeChatMessage(SETTINGS, PTY, 'hi')
+    await vi.advanceTimersByTimeAsync(0)
+
+    const bodyCall = sendRuntimePtyInputAcceptance.mock.calls.find(
+      (call) => call[2] === buildNativeChatPasteBytes('hi')
+    )
+    const isCancelled = bodyCall?.[3] as (() => boolean) | undefined
+    expect(isCancelled).toBeInstanceOf(Function)
+    expect(isCancelled?.()).toBe(false)
+
+    handle.cancel()
+    expect(isCancelled?.()).toBe(true)
   })
 })
 
@@ -278,32 +292,64 @@ describe('sendNativeChatMessage post-send observation', () => {
     expect(totalWriteCalls()).toBe(0)
   })
 
-  it('aborts before the body when the transport rejects the initial clear', () => {
-    sendRuntimePtyInput.mockReturnValueOnce(false)
+  it('aborts before the body when the transport rejects the initial clear', async () => {
+    sendRuntimePtyInputAcceptance.mockResolvedValueOnce(false)
     const confirmSubmitted = vi.fn().mockReturnValue(true)
     const onOutcome = vi.fn()
 
     sendNativeChatMessage(SETTINGS, PTY, 'hi', { confirmSubmitted, onOutcome })
+    await vi.advanceTimersByTimeAsync(0)
 
-    expect(sendRuntimePtyInput).toHaveBeenCalledTimes(1)
+    expect(sendRuntimePtyInputAcceptance).toHaveBeenCalledTimes(1)
     expect(confirmSubmitted).not.toHaveBeenCalled()
     expect(onOutcome).toHaveBeenCalledExactlyOnceWith('may-not-have-sent')
   })
 
+  it('reports may-not-have-sent exactly once on a remote clear rejection, and never writes body or CR (r4-2)', async () => {
+    sendRuntimePtyInputAcceptance.mockResolvedValueOnce(false) // clear rejected
+    const onOutcome = vi.fn()
+
+    sendNativeChatMessage(SETTINGS, PTY, 'hi', { onOutcome })
+    await fullObservationWindow()
+
+    expect(onOutcome).toHaveBeenCalledExactlyOnceWith('may-not-have-sent')
+    expect(
+      sendRuntimePtyInputAcceptance.mock.calls.some(
+        (call) => call[2] === buildNativeChatPasteBytes('hi') || call[2] === NATIVE_CHAT_SUBMIT
+      )
+    ).toBe(false)
+  })
+
+  it('proceeds with an unchanged clear-then-body-then-Enter flow when the clear is accepted (r4-2)', async () => {
+    const confirmSubmitted = vi.fn().mockReturnValue(true)
+    const onOutcome = vi.fn()
+
+    sendNativeChatMessage(SETTINGS, PTY, 'hi', { confirmSubmitted, onOutcome })
+    await settleSend()
+
+    expect(sendRuntimePtyInputAcceptance.mock.calls.map((call) => call[2])).toEqual([
+      NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
+      buildNativeChatPasteBytes('hi'),
+      NATIVE_CHAT_SUBMIT
+    ])
+    expect(onOutcome).toHaveBeenCalledExactlyOnceWith('observed-cleared')
+  })
+
   it('aborts before the body when the transport rejects maximal-clear escalation', async () => {
-    sendRuntimePtyInput.mockReturnValueOnce(true).mockReturnValueOnce(false)
+    sendRuntimePtyInputAcceptance.mockResolvedValueOnce(true).mockResolvedValueOnce(false)
     const confirmCleared = vi.fn().mockReturnValue(false)
     const onOutcome = vi.fn()
 
     sendNativeChatMessage(SETTINGS, PTY, 'hi', { confirmCleared, onOutcome })
     await vi.runAllTimersAsync()
 
-    expect(sendRuntimePtyInput).toHaveBeenCalledTimes(2)
+    expect(sendRuntimePtyInputAcceptance).toHaveBeenCalledTimes(2)
     expect(onOutcome).toHaveBeenCalledExactlyOnceWith('may-not-have-sent')
   })
 
   it('reports may-not-have-sent when the transport rejects the CR write', async () => {
     sendRuntimePtyInputAcceptance
+      .mockResolvedValueOnce(true) // clear
       .mockResolvedValueOnce(true) // body
       .mockResolvedValueOnce(false) // CR
     const confirmSubmitted = vi.fn().mockReturnValue(true)
@@ -320,6 +366,7 @@ describe('sendNativeChatMessage post-send observation', () => {
     // mockImplementationOnce (not a standing mockImplementation) so this
     // failure does not leak into later describe blocks that share this mock.
     sendRuntimePtyInputAcceptance
+      .mockResolvedValueOnce(true) // clear
       .mockResolvedValueOnce(true) // body
       .mockImplementationOnce(() => {
         throw new Error('transport dead')
@@ -343,9 +390,9 @@ describe('sendNativeChatMessage post-send observation', () => {
   it('reports may-not-have-sent exactly once when the transport throws on the body write, and never issues the CR (draft stays restorable)', async () => {
     // Regression for a remote handle rejecting the body RPC (e.g. terminal_handle_stale):
     // the CR must not follow a body write that never reached the PTY.
-    sendRuntimePtyInputAcceptance.mockImplementationOnce(() =>
-      Promise.reject(new Error('terminal_handle_stale'))
-    )
+    sendRuntimePtyInputAcceptance
+      .mockResolvedValueOnce(true) // clear
+      .mockImplementationOnce(() => Promise.reject(new Error('terminal_handle_stale'))) // body
     const onOutcome = vi.fn()
     sendNativeChatMessage(SETTINGS, PTY, 'hi', { onOutcome })
 
@@ -361,7 +408,9 @@ describe('sendNativeChatMessage post-send observation', () => {
   it('does not write the CR and reports may-not-have-sent when the body write is rejected, even though confirmSubmitted would read true', async () => {
     const confirmSubmitted = vi.fn().mockReturnValue(true)
     const onOutcome = vi.fn()
-    sendRuntimePtyInputAcceptance.mockResolvedValueOnce(false) // oversized body, rejected
+    sendRuntimePtyInputAcceptance
+      .mockResolvedValueOnce(true) // clear
+      .mockResolvedValueOnce(false) // oversized body, rejected
     sendNativeChatMessage(SETTINGS, PTY, 'hi', { confirmSubmitted, onOutcome })
 
     await vi.advanceTimersByTimeAsync(0)
@@ -447,7 +496,7 @@ describe('sendNativeChatMessageVerified', () => {
 
   it('cancels an in-flight chat Enter before delivering a verified option command', async () => {
     sendNativeChatMessage(SETTINGS, PTY, 'hello')
-    expect(sendRuntimePtyInput).toHaveBeenCalled()
+    expect(sendRuntimePtyInputAcceptance).toHaveBeenCalled()
 
     const result = sendNativeChatMessageVerified(SETTINGS, PTY, '/model haiku')
     // Chat cancel may Ctrl+U the unsubmitted body; Enter from chat must not fire.
@@ -573,7 +622,8 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
     expect(sendRuntimePtyInputAcceptance).toHaveBeenLastCalledWith(
       SETTINGS,
       PTY,
-      buildNativeChatPasteBytes('what do you see?')
+      buildNativeChatPasteBytes('what do you see?'),
+      expect.any(Function)
     )
 
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS)
@@ -622,8 +672,8 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
   })
 
   it('reports may-not-have-sent once and releases the queue when the delayed caption write throws', async () => {
-    sendRuntimePtyInput.mockReturnValue(true) // clear
     sendRuntimePtyInputAcceptance
+      .mockResolvedValueOnce(true) // clear
       .mockResolvedValueOnce(true) // image
       .mockImplementationOnce(() => Promise.reject(new Error('transport dead'))) // caption
     const onOutcome = vi.fn()
@@ -646,7 +696,7 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
     sendNativeChatMessage(SETTINGS, PTY, 'second send')
     await vi.advanceTimersByTimeAsync(0)
 
-    expect(sendRuntimePtyInput).toHaveBeenCalledWith(
+    expect(sendRuntimePtyInputAcceptance).toHaveBeenCalledWith(
       SETTINGS,
       PTY,
       NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT
