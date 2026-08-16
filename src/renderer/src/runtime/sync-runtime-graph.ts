@@ -91,6 +91,7 @@ type MobileSessionPublicationInputs = {
   editorDraftVersionByFileId: ReadonlyMap<string, string>
   agentStatusByWorktreeId: MobileSessionAgentStatusByWorktree
   generatedTitlesEnabled: boolean
+  terminalDockSyncEnabled: boolean
   terminalTheme: RuntimeMobileTerminalTheme | undefined
 }
 /**
@@ -147,6 +148,7 @@ type MobileSessionWorktreeInputs = {
   activeTerminalTabId: string | null
   activeBrowserWorkspaceId: string | null
   generatedTitlesEnabled: boolean
+  terminalDockSyncEnabled: boolean
   terminalTheme: RuntimeMobileTerminalTheme | undefined
   mountedSurfaceCaptureByTabId: ReadonlyMap<string, MountedTerminalSurfaceCapture>
 }
@@ -1045,6 +1047,7 @@ function buildMobileSessionWorktreeInputs(
       activeTabId !== null && terminalTabIds.includes(activeTabId) ? activeTabId : null,
     activeBrowserWorkspaceId: state.activeBrowserTabIdByWorktree?.[worktreeId] ?? null,
     generatedTitlesEnabled: publication.generatedTitlesEnabled,
+    terminalDockSyncEnabled: publication.terminalDockSyncEnabled,
     terminalTheme: publication.terminalTheme,
     mountedSurfaceCaptureByTabId: captureMountedTerminalSurfaces(
       terminalTabs,
@@ -1179,6 +1182,7 @@ function canReuseMobileSessionSnapshot(
     previous.activeTerminalTabId === next.activeTerminalTabId &&
     previous.activeBrowserWorkspaceId === next.activeBrowserWorkspaceId &&
     previous.generatedTitlesEnabled === next.generatedTitlesEnabled &&
+    previous.terminalDockSyncEnabled === next.terminalDockSyncEnabled &&
     previous.terminalTheme === next.terminalTheme &&
     narrowedEntriesEqual(previous.terminalLayoutByTabId, next.terminalLayoutByTabId) &&
     narrowedEntriesEqual(previous.paneTitlesByTabId, next.paneTitlesByTabId) &&
@@ -1215,6 +1219,7 @@ export function buildMobileSessionTabSnapshots(
       state.tabsByWorktree
     ),
     generatedTitlesEnabled: state.settings?.tabAutoGenerateTitle === true,
+    terminalDockSyncEnabled: state.settings?.experimentalTerminalDock === true,
     terminalTheme: getMobileTerminalTheme(state, systemPrefersDark)
   }
   const liveFolderWorkspaceIds = new Set(
@@ -1913,7 +1918,9 @@ function buildMobileTerminalSurfaceTabs(
             launchDraftCreatedAt: publishedLaunchDraft.createdAt
           }
         : {}),
-      ...(unifiedTab?.terminalDockByPaneKey
+      // Why: the kill switch withholds publication rather than publishing a delete, so a
+      // flag-off client can't clobber a flag-on peer's persisted record on the far side.
+      ...(inputs.terminalDockSyncEnabled && unifiedTab?.terminalDockByPaneKey
         ? { terminalDockByPaneKey: unifiedTab.terminalDockByPaneKey }
         : {}),
       parentLayout,

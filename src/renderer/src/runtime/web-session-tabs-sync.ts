@@ -221,7 +221,9 @@ export type WebSessionTabsSyncState = Pick<
   | 'unreadTerminalTabs'
   | 'sortEpoch'
 > &
-  Partial<Pick<AppState, 'automaticAgentResumeClaimsByTabId' | 'pendingStartupByTabId'>>
+  Partial<
+    Pick<AppState, 'automaticAgentResumeClaimsByTabId' | 'pendingStartupByTabId' | 'settings'>
+  >
 
 type WebSessionTabsBatchRecordKey =
   | 'activeBrowserTabIdByWorktree'
@@ -1108,7 +1110,14 @@ function remapTerminalDockRecordTabId(
       next[remappedKey] = value
     }
   }
-  return Object.keys(next).length > 0 ? next : undefined
+  if (Object.keys(next).length > 0) {
+    return next
+  }
+  // Why: an explicitly echoed empty record is host-authoritative and must stay
+  // distinguishable from an absent field (see hostHasEverEchoed in use-terminal-pane-dock.ts);
+  // a non-empty record that lost every entry to unparseable keys is not that — it still falls
+  // back like an absent field.
+  return Object.keys(record).length === 0 ? next : undefined
 }
 
 /** Normalises and mirrors agent status updates from the host payload, preserving ownership metadata. */
@@ -2659,8 +2668,20 @@ function applyWebSessionTabsSnapshotWithContext(
       provisionalDockRecordByHostTabId.set(hostTabId, provisionalDockRecord)
     }
   }
+  // Why: the kill switch gates adoption of host dock state, not its presence — a flag-off
+  // client still carries forward whatever it already holds so it can't clobber a flag-on
+  // peer's persisted record.
+  const hostTerminalDockSyncEnabled = state.settings?.experimentalTerminalDock === true
   const mirroredTerminalUnifiedTabs = mirroredTerminalTabs.map((entry) => {
     const existingUnifiedTab = existingUnifiedTerminalTabById.get(entry.tab.id)
+    if (!hostTerminalDockSyncEnabled) {
+      return buildTerminalUnifiedTab(
+        entry.tab,
+        hostGroupIdByTabId.get(entry.hostTabId) ?? targetGroupId,
+        entry.tab.viewMode ?? existingViewModeByTabId.get(entry.tab.id),
+        existingUnifiedTab?.terminalDockByPaneKey
+      )
+    }
     const handoffDockRecord = provisionalDockRecordByHostTabId.get(entry.hostTabId)
     const rekeyedHandoffDockRecord = handoffDockRecord
       ? remapTerminalDockRecordTabId(handoffDockRecord, () => entry.tab.id)
