@@ -396,9 +396,7 @@ describe('TerminalPaneDockMount', () => {
     render(<GutterRowsHarness pane={pane} />)
     expect(screen.getByRole('textbox')).toBeInTheDocument()
 
-    const handle = pane.container.querySelector(
-      '[data-terminal-dock-gutter-handle]'
-    ) as HTMLElement
+    const handle = pane.container.querySelector('[data-terminal-dock-gutter-handle]') as HTMLElement
     expect(handle).not.toBeNull()
 
     const dispatchWindowPointer = (type: string, clientY: number): void => {
@@ -439,12 +437,13 @@ describe('TerminalPaneDockMount', () => {
   })
 
   describe('gutter-drag termination unfreezes auto-undock', () => {
+    const noopCommit = (): void => {}
     function GutterRowsHarness({
       pane,
-      onCommit
+      onCommit = noopCommit
     }: {
       pane: ManagedPane
-      onCommit: (rows: number) => void
+      onCommit?: (rows: number) => void
     }): ReactNode {
       const [gutterRows, setGutterRows] = useState(DEFAULT_GUTTER_ROWS)
       return (

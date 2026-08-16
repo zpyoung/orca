@@ -35,7 +35,10 @@ function makeLegacyTerminalTab(overrides: Partial<TerminalTab> = {}): TerminalTa
 // getWorkspaceSession call, so a second runtime instance can hydrate from it
 // the way a real restart reads back whatever was last flushed to disk.
 function makeMutableSessionStore(initial: WorkspaceSessionState): {
-  store: { getWorkspaceSession: () => WorkspaceSessionState; setWorkspaceSession: typeof vi.fn }
+  store: {
+    getWorkspaceSession: () => WorkspaceSessionState
+    setWorkspaceSession: (next: WorkspaceSessionState) => void
+  }
   read: () => WorkspaceSessionState
 } {
   let session = initial
