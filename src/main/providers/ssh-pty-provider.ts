@@ -208,11 +208,11 @@ export class SshPtyProvider implements IPtyProvider {
     this.mux.notify('pty.data', { id: this.toRelayPtyId(id), data })
   }
 
-  /** Whether a `write()` right now has any chance of reaching the relay — a
-   *  disposed mux drops `notify` silently, so acceptance-aware callers need
-   *  this instead of trusting write()'s void return. */
-  isWriteChannelLive(_id: string): boolean {
-    return !this.mux.isDisposed()
+  /** Ack-path only: resolves once the relay transport actually settles the
+   *  frame — false if writer disposal or backpressure rejection drops it. */
+  writeAcknowledged(id: string, data: string): Promise<boolean> {
+    const params = { id: this.toRelayPtyId(id), data }
+    return new Promise((resolve) => this.mux.notifyWithSettlement('pty.data', params, (r) => resolve(r.ok)))
   }
 
   resize(id: string, cols: number, rows: number): void {
