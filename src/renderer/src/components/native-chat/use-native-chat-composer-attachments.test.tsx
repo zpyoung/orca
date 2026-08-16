@@ -5,6 +5,8 @@ import { createRoot, type Root } from 'react-dom/client'
 import {
   clearNativeChatAttachmentCacheForTests,
   readNativeChatAttachmentCache,
+  restoreNativeChatAttachmentCache,
+  subscribeNativeChatAttachmentCache,
   useNativeChatComposerAttachments
 } from './use-native-chat-composer-attachments'
 import type { NativeChatResolvedTarget } from './native-chat-composer-target'
@@ -170,6 +172,39 @@ describe('useNativeChatComposerAttachments', () => {
     expect(probe.latest().imageAttachments).toMatchObject([
       { path: '/tmp/orca-native-chat-pane-1.png' }
     ])
+    act(() => probe.root.unmount())
+  })
+
+  it('observes a restore performed after a replacement host mounted (dock/native-chat handoff)', async () => {
+    // The old host already unmounted (its send-lifecycle cleanup restores the
+    // payload after the new host has taken over) — the new host must still see it.
+    const replacement = await renderProbe('pty-handoff')
+    expect(replacement.latest().imageAttachments).toMatchObject([])
+
+    await act(async () => {
+      restoreNativeChatAttachmentCache('pty-handoff', [{ id: 'restored-1', path: '/tmp/lost.png' }])
+    })
+
+    expect(replacement.latest().imageAttachments).toMatchObject([{ path: '/tmp/lost.png' }])
+    expect(readNativeChatAttachmentCache('pty-handoff')).toMatchObject([{ path: '/tmp/lost.png' }])
+    act(() => replacement.root.unmount())
+  })
+
+  it('does not let a throwing subscriber abort fanout to other subscribers', async () => {
+    const throwing = vi.fn(() => {
+      throw new Error('boom')
+    })
+    const unsubscribeThrowing = subscribeNativeChatAttachmentCache('pty-throw', throwing)
+    const probe = await renderProbe('pty-throw')
+
+    expect(() => {
+      act(() => {
+        restoreNativeChatAttachmentCache('pty-throw', [{ id: 'r1', path: '/tmp/ok.png' }])
+      })
+    }).not.toThrow()
+
+    expect(probe.latest().imageAttachments).toMatchObject([{ path: '/tmp/ok.png' }])
+    unsubscribeThrowing()
     act(() => probe.root.unmount())
   })
 })

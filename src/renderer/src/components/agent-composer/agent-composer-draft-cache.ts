@@ -6,7 +6,7 @@
 // mirrors agent-composer-history-cache's subscribe/notify shape, since the dock
 // and native-chat view can both hold a live mount against the same pane.
 
-import { setBoundedScopeCacheEntry } from './agent-composer-scope-cache'
+import { pinScopeCacheKey, setBoundedScopeCacheEntry } from './agent-composer-scope-cache'
 
 const draftCache = new Map<string, string>()
 
@@ -42,6 +42,7 @@ export function subscribeAgentComposerDraftCache(
   const listeners = draftCacheListeners.get(scopeKey) ?? new Set<DraftCacheListener>()
   draftCacheListeners.set(scopeKey, listeners)
   listeners.add(listener)
+  const unpin = pinScopeCacheKey(scopeKey)
   try {
     listener(readAgentComposerDraftCache(scopeKey))
   } catch {
@@ -52,6 +53,7 @@ export function subscribeAgentComposerDraftCache(
     if (listeners.size === 0) {
       draftCacheListeners.delete(scopeKey)
     }
+    unpin()
   }
 }
 
