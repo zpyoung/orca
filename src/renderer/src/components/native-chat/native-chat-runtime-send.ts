@@ -26,7 +26,8 @@ import {
   cancelNativeChatPtySends,
   enqueueNativeChatPtySend,
   resetNativeChatPtySendQueuesForTests,
-  waitForNativeChatPtyIdle
+  waitForNativeChatPtyIdle,
+  type NativeChatPtySendQueueHandle
 } from './native-chat-pty-send-queue'
 import {
   createOutcomeReporter,
@@ -81,6 +82,23 @@ export type NativeChatSendHandle = {
 
 export type RuntimeSettings = ReturnType<typeof getSettingsForAgentTabRuntimeOwner>
 
+// The queue only reports `onCancelUnsubmitted` once `start` has run — a send
+// cancelled while still queued behind another PTY send never reaches `start`,
+// so it would otherwise report no outcome at all. Report it here instead.
+const withQueuedCancelOutcome = (
+  handle: NativeChatPtySendQueueHandle,
+  reportOutcome: (outcome: SendOutcome) => void
+): NativeChatPtySendQueueHandle => ({
+  ...handle,
+  cancel: () => {
+    const startedBeforeCancel = handle.bodyStarted()
+    handle.cancel()
+    if (!startedBeforeCancel) {
+      reportOutcome('may-not-have-sent')
+    }
+  }
+})
+
 /**
  * Chat message path:
  *   1. clear any unsubmitted TUI line
@@ -96,7 +114,7 @@ export function sendNativeChatMessage(
   options?: NativeChatSendOptions
 ): NativeChatSendHandle {
   const reportOutcome = createOutcomeReporter(options?.onOutcome)
-  return enqueueNativeChatPtySend(
+  const handle = enqueueNativeChatPtySend(
     ptyId,
     NATIVE_CHAT_SUBMIT_DELAY_MS + clearConfirmDurationMs(options),
     ({ isCancelled, delay, markSubmitted }) => {
@@ -149,6 +167,7 @@ export function sendNativeChatMessage(
       }
     }
   )
+  return withQueuedCancelOutcome(handle, reportOutcome)
 }
 
 function waitForNativeChatSubmit(signal?: AbortSignal): Promise<boolean> {
@@ -278,7 +297,7 @@ export function sendNativeChatMessageWithImageAttachments(
       ? NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS + NATIVE_CHAT_SUBMIT_DELAY_MS
       : NATIVE_CHAT_SUBMIT_DELAY_MS) + clearConfirmDurationMs(options)
   const reportOutcome = createOutcomeReporter(options?.onOutcome)
-  return enqueueNativeChatPtySend(
+  const handle = enqueueNativeChatPtySend(
     ptyId,
     durationMs,
     ({ isCancelled, delay, markSubmitted }) => {
@@ -347,6 +366,7 @@ export function sendNativeChatMessageWithImageAttachments(
       }
     }
   )
+  return withQueuedCancelOutcome(handle, reportOutcome)
 }
 
 /** Submit a TUI prompt with no body (Enter only) — e.g. a plain submit when the
@@ -406,9 +426,7 @@ export function sendNativeChatAskAnswer(
   return {
     cancel: () => {
       cancelled = true
-      for (const timer of timers) {
-        clearTimeout(timer)
-      }
+      timers.forEach((timer) => clearTimeout(timer))
     },
     // Hold the card until the last keystroke has fired and its submit gap passed.
     settleAfterMs

@@ -346,6 +346,25 @@ describe('sendNativeChatMessage post-send observation', () => {
     )
     expect(onOutcome).toHaveBeenCalledOnce()
   })
+
+  it('reports may-not-have-sent exactly once when a send queued behind another is cancelled before its body starts', async () => {
+    const firstOutcome = vi.fn()
+    const queuedOutcome = vi.fn()
+    sendNativeChatMessage(SETTINGS, PTY, 'first', { onOutcome: firstOutcome })
+    const queued = sendNativeChatMessage(SETTINGS, PTY, 'queued', { onOutcome: queuedOutcome })
+
+    // The queued send never reached `start`, so its body was never written.
+    queued.cancel()
+    expect(queuedOutcome).toHaveBeenCalledExactlyOnceWith('may-not-have-sent')
+
+    await settleSend()
+    expect(firstOutcome).toHaveBeenCalledExactlyOnceWith('unobservable')
+
+    // Cancelling again, and letting the queue reach the dropped entry, must not double-fire.
+    queued.cancel()
+    await fullObservationWindow()
+    expect(queuedOutcome).toHaveBeenCalledOnce()
+  })
 })
 
 describe('sendNativeChatMessageVerified', () => {
