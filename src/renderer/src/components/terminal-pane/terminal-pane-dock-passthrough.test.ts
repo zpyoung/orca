@@ -49,6 +49,23 @@ describe('shouldAutoExitPassthroughOnAgentStatus', () => {
     ).toBe(false)
   })
 
+  it('does not exit for Command Code, whose status is scraped rather than hook-fed', () => {
+    expect(
+      shouldAutoExitPassthroughOnAgentStatus({
+        previousState: 'working',
+        nextState: 'done',
+        agentType: 'command-code'
+      })
+    ).toBe(false)
+    expect(
+      shouldAutoExitPassthroughOnAgentStatus({
+        previousState: 'working',
+        nextState: 'blocked',
+        agentType: 'command-code'
+      })
+    ).toBe(false)
+  })
+
   it('does not exit when the agent was not already working', () => {
     expect(
       shouldAutoExitPassthroughOnAgentStatus({

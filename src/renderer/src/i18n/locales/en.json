@@ -15195,7 +15195,7 @@
         "pillAccessibleName": "{{value0}} {{value1}}",
         "valueUnknown": "Current value unknown — pick On or Off",
         "sentNotConfirmed": "Sent to the agent — not confirmed",
-      "sendMayNotHaveCompleted": "Send may not have completed. Check the terminal before retrying.",
+        "sendMayNotHaveCompleted": "Send may not have completed. Check the terminal before retrying.",
         "setWhenSessionStarts": "Set when the session starts.",
         "availableAfterSessionStarts": "Available after the session starts.",
         "optionUpdateFailed": "Could not update option",
@@ -15325,7 +15325,15 @@
     },
     "terminal-dock": {
       "passthroughActive": "Passthrough active — terminal has keyboard focus",
-      "sshDisconnected": "SSH disconnected"
+      "sshDisconnected": "SSH disconnected",
+      "connecting": "Connecting…",
+      "reconnecting": "Reconnecting…",
+      "disconnected": "Disconnected",
+      "offline": "Offline",
+      "sessionEnded": "Session ended",
+      "noSession": "No terminal session",
+      "mobileDriverLeaseHeld": "Mobile device is composing",
+      "reattaching": "Reattaching…"
     }
   },
   "dashboardPopout": {

@@ -4,6 +4,7 @@ import {
   subscribeTerminalInputQuarantine
 } from './terminal-input-quarantine'
 import { parsePaneKey } from '../../../../shared/stable-pane-id'
+import { getDriverForPty, onDriverChange } from '@/lib/pane-manager/mobile-driver-state'
 import type { PtyTransportRecoveryState } from './pty-transport-types'
 import { resolveTerminalDockDisabledReason } from './terminal-pane-dock-disabled-reason'
 
@@ -26,13 +27,27 @@ export function useTerminalDockDisabledReason(args: {
     })
   }, [args.enabled, args.tabId])
 
+  // Why: driver events aren't scoped to a known pty upfront (call sites cover every pane in
+  // the tab), so any driver change is treated as relevant rather than filtered by pty id.
+  useEffect(() => {
+    if (!args.enabled) {
+      return undefined
+    }
+    return onDriverChange(() => {
+      forceRerender((count) => count + 1)
+    })
+  }, [args.enabled])
+
   return useCallback((input) => {
     const parsed = parsePaneKey(input.paneKey)
     return resolveTerminalDockDisabledReason({
       targetPtyId: input.targetPtyId,
       recoveryPhase: input.recoveryPhase,
       quarantined: parsed ? isTerminalInputQuarantined(parsed.tabId) : false,
-      sshDisconnected: input.sshDisconnected
+      sshDisconnected: input.sshDisconnected,
+      mobileDriverLeaseHeld: input.targetPtyId
+        ? getDriverForPty(input.targetPtyId).kind === 'mobile'
+        : false
     })
   }, [])
 }

@@ -81,4 +81,37 @@ describe('resolveTerminalDockDisabledReason', () => {
       })
     ).toBeNull()
   })
+
+  it('disables with a lease-held reason when another client drives the PTY', () => {
+    expect(
+      resolveTerminalDockDisabledReason({
+        targetPtyId: 'pty-1',
+        recoveryPhase: 'connected',
+        quarantined: false,
+        mobileDriverLeaseHeld: true
+      })
+    ).toBe('Mobile device is composing')
+  })
+
+  it('enables when this client holds the driver lease (or there is none)', () => {
+    expect(
+      resolveTerminalDockDisabledReason({
+        targetPtyId: 'pty-1',
+        recoveryPhase: 'connected',
+        quarantined: false,
+        mobileDriverLeaseHeld: false
+      })
+    ).toBeNull()
+  })
+
+  it('lets a transport reason take priority over the driver lease', () => {
+    expect(
+      resolveTerminalDockDisabledReason({
+        targetPtyId: 'pty-1',
+        recoveryPhase: 'recovering',
+        quarantined: false,
+        mobileDriverLeaseHeld: true
+      })
+    ).toBe('Reconnecting…')
+  })
 })
