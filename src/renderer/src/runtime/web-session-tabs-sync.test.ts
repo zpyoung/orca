@@ -30,6 +30,7 @@ import type {
 } from '../../../shared/types'
 import type * as WebRuntimeSessionModule from './web-runtime-session'
 import type { OpenFile } from '../store/slices/editor'
+import { TERMINAL_DOCK_ECHO_WINDOW_MS } from '../store/slices/tabs'
 import {
   confirmWebAgentSessionHandoffAfterCreate,
   recordWebAgentSessionHandoff,
@@ -1858,6 +1859,143 @@ describe('applyWebSessionTabsSnapshot', () => {
         ?.terminalDockByPaneKey
     ).toEqual({ 'pane-a': { docked: true, gutterRows: 6 } })
     expect(setWebRuntimeTabPropsMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps a pane with a pending local dock mutation against a stale host echo, but still adopts a changed host value for a pane with no pending intent', () => {
+    // r2-2: an in-flight snapshot built before the client's own RPC lands must not
+    // revert the pane it just touched, while an unrelated pane still converges.
+    const mirroredId = toWebTerminalSurfaceTabId('host-tab-1')
+    const pendingPaneKey = makePaneKey(mirroredId, LEAF_ID)
+    const otherPaneKey = makePaneKey(mirroredId, SECOND_LEAF_ID)
+    const hostPendingPaneKey = makePaneKey('host-tab-1', LEAF_ID)
+    const hostOtherPaneKey = makePaneKey('host-tab-1', SECOND_LEAF_ID)
+    const existingTab: TerminalTab = {
+      id: mirroredId,
+      ptyId: 'remote:web-env-1@@terminal-1',
+      worktreeId: WT,
+      title: 'zsh',
+      defaultTitle: 'zsh',
+      customTitle: null,
+      color: null,
+      sortOrder: 0,
+      createdAt: NOW
+    }
+    const existingUnifiedTab: Tab = {
+      id: mirroredId,
+      entityId: mirroredId,
+      groupId: 'host-group-1',
+      worktreeId: WT,
+      contentType: 'terminal',
+      label: 'zsh',
+      customLabel: null,
+      color: null,
+      sortOrder: 0,
+      createdAt: NOW,
+      isPreview: false,
+      isPinned: false,
+      terminalDockByPaneKey: {
+        [pendingPaneKey]: { docked: true, gutterRows: 6 },
+        [otherPaneKey]: { docked: true, gutterRows: 5 }
+      }
+    }
+
+    const patch = applyWebSessionTabsSnapshot(
+      makeState({
+        tabsByWorktree: { [WT]: [existingTab] },
+        ptyIdsByTabId: { [mirroredId]: ['remote:web-env-1@@terminal-1'] },
+        unifiedTabsByWorktree: { [WT]: [existingUnifiedTab] },
+        terminalDockPendingMutationsByPaneKey: { [pendingPaneKey]: NOW }
+      }),
+      makeSnapshot([
+        {
+          type: 'terminal',
+          id: HOST_SURFACE_ID,
+          title: 'new title',
+          parentTabId: 'host-tab-1',
+          leafId: LEAF_ID,
+          isActive: true,
+          terminalDockByPaneKey: {
+            // Why: pre-dates the client's own toggle — the stale snapshot main built
+            // before the RPC landed.
+            [hostPendingPaneKey]: { docked: false, gutterRows: 12 },
+            [hostOtherPaneKey]: { docked: false, gutterRows: 9 }
+          },
+          status: 'ready',
+          terminal: 'terminal-1'
+        }
+      ]),
+      ENV,
+      NOW + 500
+    ) as Partial<WebSessionTabsSyncState>
+
+    expect(
+      patch.unifiedTabsByWorktree?.[WT]?.find((tab) => tab.entityId === mirroredId)
+        ?.terminalDockByPaneKey
+    ).toEqual({
+      [pendingPaneKey]: { docked: true, gutterRows: 6 },
+      [otherPaneKey]: { docked: false, gutterRows: 9 }
+    })
+  })
+
+  it('adopts the host value once a pending dock mutation is older than the echo window', () => {
+    const mirroredId = toWebTerminalSurfaceTabId('host-tab-1')
+    const paneKey = makePaneKey(mirroredId, LEAF_ID)
+    const hostPaneKey = makePaneKey('host-tab-1', LEAF_ID)
+    const existingTab: TerminalTab = {
+      id: mirroredId,
+      ptyId: 'remote:web-env-1@@terminal-1',
+      worktreeId: WT,
+      title: 'zsh',
+      defaultTitle: 'zsh',
+      customTitle: null,
+      color: null,
+      sortOrder: 0,
+      createdAt: NOW
+    }
+    const existingUnifiedTab: Tab = {
+      id: mirroredId,
+      entityId: mirroredId,
+      groupId: 'host-group-1',
+      worktreeId: WT,
+      contentType: 'terminal',
+      label: 'zsh',
+      customLabel: null,
+      color: null,
+      sortOrder: 0,
+      createdAt: NOW,
+      isPreview: false,
+      isPinned: false,
+      terminalDockByPaneKey: { [paneKey]: { docked: true, gutterRows: 6 } }
+    }
+
+    const patch = applyWebSessionTabsSnapshot(
+      makeState({
+        tabsByWorktree: { [WT]: [existingTab] },
+        ptyIdsByTabId: { [mirroredId]: ['remote:web-env-1@@terminal-1'] },
+        unifiedTabsByWorktree: { [WT]: [existingUnifiedTab] },
+        terminalDockPendingMutationsByPaneKey: { [paneKey]: NOW }
+      }),
+      makeSnapshot([
+        {
+          type: 'terminal',
+          id: HOST_SURFACE_ID,
+          title: 'new title',
+          parentTabId: 'host-tab-1',
+          leafId: LEAF_ID,
+          isActive: true,
+          terminalDockByPaneKey: { [hostPaneKey]: { docked: false, gutterRows: 12 } },
+          status: 'ready',
+          terminal: 'terminal-1'
+        }
+      ]),
+      ENV,
+      NOW + TERMINAL_DOCK_ECHO_WINDOW_MS + 1
+    ) as Partial<WebSessionTabsSyncState>
+
+    expect(
+      patch.unifiedTabsByWorktree?.[WT]?.find((tab) => tab.entityId === mirroredId)
+        ?.terminalDockByPaneKey
+    ).toEqual({ [paneKey]: { docked: false, gutterRows: 12 } })
   })
 
   it('preserves quick command labels from host terminal surfaces', () => {

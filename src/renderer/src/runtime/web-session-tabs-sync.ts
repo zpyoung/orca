@@ -31,6 +31,7 @@ import type {
   TerminalTab
 } from '../../../shared/types'
 import type { OpenFile } from '../store/slices/editor'
+import { TERMINAL_DOCK_ECHO_WINDOW_MS } from '../store/slices/tabs'
 import { isTerminalLeafId, makePaneKey, parsePaneKey } from '../../../shared/stable-pane-id'
 import { getRemoteRuntimePtyEnvironmentId, toRemoteRuntimePtyId } from './runtime-terminal-stream'
 import { sanitizeTerminalLayoutPaneTitlesForLabels } from '@/lib/terminal-pane-title-sanitization'
@@ -222,7 +223,13 @@ export type WebSessionTabsSyncState = Pick<
   | 'sortEpoch'
 > &
   Partial<
-    Pick<AppState, 'automaticAgentResumeClaimsByTabId' | 'pendingStartupByTabId' | 'settings'>
+    Pick<
+      AppState,
+      | 'automaticAgentResumeClaimsByTabId'
+      | 'pendingStartupByTabId'
+      | 'settings'
+      | 'terminalDockPendingMutationsByPaneKey'
+    >
   >
 
 type WebSessionTabsBatchRecordKey =
@@ -1118,6 +1125,32 @@ function remapTerminalDockRecordTabId(
   // a non-empty record that lost every entry to unparseable keys is not that — it still falls
   // back like an absent field.
   return Object.keys(record).length === 0 ? next : undefined
+}
+
+/** Per-pane echo precedence for terminalDockByPaneKey: a pane with a recent local
+ *  mutation (`isPending`) keeps its client value against a stale host echo; a pane
+ *  without one adopts the host's value, including the host's absence of that key,
+ *  so paired clients still converge. Falls back wholesale to whichever side has
+ *  the only record (M1: an explicitly echoed empty host record still counts). */
+function reconcileTerminalDockByPaneKey(
+  hostRecord: Record<string, TerminalDockPaneState> | undefined,
+  existingRecord: Record<string, TerminalDockPaneState> | undefined,
+  isPending: (paneKey: string) => boolean
+): Record<string, TerminalDockPaneState> | undefined {
+  if (!hostRecord) {
+    return existingRecord
+  }
+  if (!existingRecord) {
+    return hostRecord
+  }
+  const next: Record<string, TerminalDockPaneState> = {}
+  for (const key of new Set([...Object.keys(hostRecord), ...Object.keys(existingRecord)])) {
+    const value = isPending(key) ? existingRecord[key] : hostRecord[key]
+    if (value) {
+      next[key] = value
+    }
+  }
+  return next
 }
 
 /** Normalises and mirrors agent status updates from the host payload, preserving ownership metadata. */
@@ -2672,6 +2705,11 @@ function applyWebSessionTabsSnapshotWithContext(
   // client still carries forward whatever it already holds so it can't clobber a flag-on
   // peer's persisted record.
   const hostTerminalDockSyncEnabled = state.settings?.experimentalTerminalDock === true
+  const terminalDockPendingMutationsByPaneKey = state.terminalDockPendingMutationsByPaneKey
+  const isTerminalDockPaneKeyPending = (paneKey: string): boolean => {
+    const mutatedAt = terminalDockPendingMutationsByPaneKey?.[paneKey]
+    return mutatedAt !== undefined && now - mutatedAt < TERMINAL_DOCK_ECHO_WINDOW_MS
+  }
   const mirroredTerminalUnifiedTabs = mirroredTerminalTabs.map((entry) => {
     const existingUnifiedTab = existingUnifiedTerminalTabById.get(entry.tab.id)
     if (!hostTerminalDockSyncEnabled) {
@@ -2690,9 +2728,11 @@ function applyWebSessionTabsSnapshotWithContext(
       entry.tab,
       hostGroupIdByTabId.get(entry.hostTabId) ?? targetGroupId,
       entry.tab.viewMode ?? existingViewModeByTabId.get(entry.tab.id),
-      rekeyedHandoffDockRecord ??
-        entry.terminalDockByPaneKey ??
-        existingUnifiedTab?.terminalDockByPaneKey
+      reconcileTerminalDockByPaneKey(
+        rekeyedHandoffDockRecord ?? entry.terminalDockByPaneKey,
+        existingUnifiedTab?.terminalDockByPaneKey,
+        isTerminalDockPaneKeyPending
+      )
     )
   })
   const mirroredBrowserUnifiedTabs = mirroredBrowserTabs.map((entry) => entry.unifiedTab)

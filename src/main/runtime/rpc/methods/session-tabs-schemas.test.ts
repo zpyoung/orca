@@ -16,11 +16,30 @@ import {
 import { getDefaultWorkspaceSession } from '../../../../shared/constants'
 import type { Tab, TerminalTab, WorkspaceSessionState } from '../../../../shared/types'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
+import type { RuntimeSyncWindowGraph } from '../../../../shared/runtime-types'
 
 const WT = 'id:wt'
 const DOCK_WORKTREE_ID = 'repo::/worktree'
 const DOCK_TAB_ID = 'tab'
 const DOCK_PANE_KEY = makePaneKey(DOCK_TAB_ID, '11111111-1111-4111-a111-111111111111')
+
+function makeDockWorktreeSession(overrides: Partial<WorkspaceSessionState> = {}): WorkspaceSessionState {
+  const terminalTab: TerminalTab = {
+    id: DOCK_TAB_ID,
+    ptyId: 'pty-1',
+    worktreeId: DOCK_WORKTREE_ID,
+    title: 'Terminal',
+    customTitle: null,
+    color: null,
+    sortOrder: 0,
+    createdAt: 1
+  }
+  return {
+    ...getDefaultWorkspaceSession(),
+    tabsByWorktree: { [DOCK_WORKTREE_ID]: [terminalTab] },
+    ...overrides
+  }
+}
 
 describe('ActivateTab.navigation', () => {
   it('accepts declared targets and rejects unknown fanout', () => {
@@ -617,6 +636,106 @@ describe('terminalDockByPaneKey publication (D3: write-only field)', () => {
 
     expect(result.tabs[0]).toMatchObject({
       terminalDockByPaneKey: { [DOCK_PANE_KEY]: { docked: true, gutterRows: 6 } }
+    })
+  })
+})
+
+describe('renderer graph publication merges terminalDockByPaneKey per pane (r2-7)', () => {
+  it("preserves another client's newer per-pane patch when the desktop renderer republishes a record that never touched that pane", async () => {
+    const runtime = new OrcaRuntimeService({
+      getWorkspaceSession: () => makeDockWorktreeSession()
+    } as never)
+    await runtime.listMobileSessionTabs(`id:${DOCK_WORKTREE_ID}`)
+
+    // A headless client (no authoritative renderer window yet) patches pane B directly.
+    await runtime.setMobileSessionTabProps(`id:${DOCK_WORKTREE_ID}`, {
+      tabId: DOCK_TAB_ID,
+      terminalDock: { paneKey: 'pane-b', docked: true, gutterRows: 9 }
+    })
+
+    // The desktop renderer then publishes its own full graph: it changed pane A
+    // locally and has never tracked pane B at all.
+    const graph: RuntimeSyncWindowGraph = {
+      tabs: [],
+      leaves: [],
+      mobileSessionTabs: [
+        {
+          worktree: DOCK_WORKTREE_ID,
+          publicationEpoch: 'renderer:epoch-1',
+          snapshotVersion: 1,
+          activeGroupId: 'group-1',
+          activeTabId: `${DOCK_TAB_ID}::leaf-1`,
+          activeTabType: 'terminal',
+          tabs: [
+            {
+              type: 'terminal',
+              id: `${DOCK_TAB_ID}::leaf-1`,
+              parentTabId: DOCK_TAB_ID,
+              leafId: 'leaf-1',
+              title: 'Terminal',
+              ptyId: 'pty-1',
+              isActive: true,
+              terminalDockByPaneKey: { 'pane-a': { docked: true, gutterRows: 6 } }
+            }
+          ]
+        }
+      ]
+    }
+    runtime.syncWindowGraph(1, graph)
+
+    const result = await runtime.listMobileSessionTabs(`id:${DOCK_WORKTREE_ID}`)
+    expect(result.tabs[0]).toMatchObject({
+      terminalDockByPaneKey: {
+        'pane-a': { docked: true, gutterRows: 6 },
+        'pane-b': { docked: true, gutterRows: 9 }
+      }
+    })
+  })
+
+  it('still adopts a genuine local edit from the renderer, even for a pane the renderer had published before', async () => {
+    const runtime = new OrcaRuntimeService({
+      getWorkspaceSession: () => makeDockWorktreeSession()
+    } as never)
+    await runtime.listMobileSessionTabs(`id:${DOCK_WORKTREE_ID}`)
+
+    const rendererTab = (
+      paneA: { docked: boolean; gutterRows: number },
+      snapshotVersion: number
+    ): RuntimeSyncWindowGraph => ({
+      tabs: [],
+      leaves: [],
+      mobileSessionTabs: [
+        {
+          worktree: DOCK_WORKTREE_ID,
+          publicationEpoch: 'renderer:epoch-1',
+          snapshotVersion,
+          activeGroupId: 'group-1',
+          activeTabId: `${DOCK_TAB_ID}::leaf-1`,
+          activeTabType: 'terminal',
+          tabs: [
+            {
+              type: 'terminal',
+              id: `${DOCK_TAB_ID}::leaf-1`,
+              parentTabId: DOCK_TAB_ID,
+              leafId: 'leaf-1',
+              title: 'Terminal',
+              ptyId: 'pty-1',
+              isActive: true,
+              terminalDockByPaneKey: { 'pane-a': paneA }
+            }
+          ]
+        }
+      ]
+    })
+
+    // First renderer publish establishes the baseline the next one is diffed against.
+    runtime.syncWindowGraph(1, rendererTab({ docked: true, gutterRows: 6 }, 1))
+    // The user then flips pane A on the desktop itself.
+    runtime.syncWindowGraph(1, rendererTab({ docked: false, gutterRows: 6 }, 2))
+
+    const result = await runtime.listMobileSessionTabs(`id:${DOCK_WORKTREE_ID}`)
+    expect(result.tabs[0]).toMatchObject({
+      terminalDockByPaneKey: { 'pane-a': { docked: false, gutterRows: 6 } }
     })
   })
 })

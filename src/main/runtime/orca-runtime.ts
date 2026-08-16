@@ -2842,6 +2842,110 @@ function terminalDockPatchFragment(
   return next !== undefined ? { terminalDockByPaneKey: next } : {}
 }
 
+function terminalDockPaneStatesEqual(
+  a: TerminalDockPaneState | undefined,
+  b: TerminalDockPaneState | undefined
+): boolean {
+  if (a === b) {
+    return true
+  }
+  return a !== undefined && b !== undefined && a.docked === b.docked && a.gutterRows === b.gutterRows
+}
+
+/** Merges one terminal tab's renderer-published dock record against the
+ *  snapshot main already holds, per pane key, instead of letting a full
+ *  renderer republish clobber another client's single-pane RPC patch.
+ *  `rendererKnown` is the record from the *previous* accepted renderer
+ *  publication for this tab: a key absent from `incoming` that `rendererKnown`
+ *  never had either is another client's pane the renderer never saw, so it
+ *  survives; a key `rendererKnown` did have is a genuine local prune. A key
+ *  whose incoming value still matches `rendererKnown` (the renderer hasn't
+ *  touched it since) yields to a diverged `existing` value from elsewhere. */
+function mergeRendererTerminalDockByPaneKey(
+  incoming: Record<string, TerminalDockPaneState> | undefined,
+  existing: Record<string, TerminalDockPaneState> | undefined,
+  rendererKnown: Record<string, TerminalDockPaneState> | undefined
+): Record<string, TerminalDockPaneState> | undefined {
+  if (incoming === undefined || existing === undefined) {
+    return incoming ?? existing
+  }
+  const merged: Record<string, TerminalDockPaneState> = {}
+  for (const key of new Set([...Object.keys(incoming), ...Object.keys(existing)])) {
+    const incomingValue = incoming[key]
+    const existingValue = existing[key]
+    if (incomingValue === undefined) {
+      if (rendererKnown?.[key] !== undefined) {
+        continue
+      }
+      if (existingValue) {
+        merged[key] = existingValue
+      }
+      continue
+    }
+    const rendererStillEchoingKnownValue = terminalDockPaneStatesEqual(
+      incomingValue,
+      rendererKnown?.[key]
+    )
+    merged[key] =
+      rendererStillEchoingKnownValue &&
+      existingValue &&
+      !terminalDockPaneStatesEqual(existingValue, incomingValue)
+        ? existingValue
+        : incomingValue
+  }
+  return merged
+}
+
+/** Applies {@link mergeRendererTerminalDockByPaneKey} across every terminal
+ *  tab in a renderer's graph publication before it can overwrite the stored
+ *  snapshot wholesale — see that function for the merge rule. */
+function mergeRendererTerminalDockAcrossSnapshot(
+  incomingSnapshot: RuntimeMobileSessionTabsSnapshot,
+  existing: RuntimeMobileSessionTabsSnapshot | undefined,
+  rendererKnownByParentTabId:
+    | ReadonlyMap<string, Record<string, TerminalDockPaneState> | undefined>
+    | undefined
+): RuntimeMobileSessionTabsSnapshot {
+  if (!existing) {
+    return incomingSnapshot
+  }
+  const existingByParentTabId = new Map<string, Record<string, TerminalDockPaneState> | undefined>()
+  for (const tab of existing.tabs) {
+    if (tab.type === 'terminal') {
+      existingByParentTabId.set(tab.parentTabId, tab.terminalDockByPaneKey)
+    }
+  }
+  let changed = false
+  const tabs = incomingSnapshot.tabs.map((tab) => {
+    if (tab.type !== 'terminal') {
+      return tab
+    }
+    const merged = mergeRendererTerminalDockByPaneKey(
+      tab.terminalDockByPaneKey,
+      existingByParentTabId.get(tab.parentTabId),
+      rendererKnownByParentTabId?.get(tab.parentTabId)
+    )
+    if (merged === tab.terminalDockByPaneKey) {
+      return tab
+    }
+    changed = true
+    return { ...tab, terminalDockByPaneKey: merged }
+  })
+  return changed ? { ...incomingSnapshot, tabs } : incomingSnapshot
+}
+
+function buildRendererDockByPaneKeyBaseline(
+  tabs: readonly RuntimeMobileSessionSnapshotTab[]
+): ReadonlyMap<string, Record<string, TerminalDockPaneState> | undefined> {
+  const baseline = new Map<string, Record<string, TerminalDockPaneState> | undefined>()
+  for (const tab of tabs) {
+    if (tab.type === 'terminal') {
+      baseline.set(tab.parentTabId, tab.terminalDockByPaneKey)
+    }
+  }
+  return baseline
+}
+
 export class OrcaRuntimeService {
   private readonly runtimeId = randomUUID()
   private readonly startedAt = Date.now()
@@ -2879,6 +2983,13 @@ export class OrcaRuntimeService {
       rendererVersion: number
       rendererTabCount: number
       rendererTabIdentityKeys: ReadonlySet<string>
+      // Why: the baseline mergeRendererTerminalDockAcrossSnapshot diffs the next
+      // publication against, so an untouched pane's stale echo can't win over a
+      // value another client patched into the stored snapshot in between.
+      rendererDockByPaneKeyByParentTabId: ReadonlyMap<
+        string,
+        Record<string, TerminalDockPaneState> | undefined
+      >
     }
   >()
   private clientSessionTabSelections = new ClientSessionTabSelectionStore()
@@ -30497,7 +30608,15 @@ export class OrcaRuntimeService {
       this.reconcileNativeChatLaunchDraftResolutionTombstones(snapshot)
       const launchDraftFencedSnapshot = this.applyNativeChatLaunchDraftResolutionFence(snapshot)
       const fencedSnapshot = this.applyMobileSessionRetirementFences(launchDraftFencedSnapshot)
-      const nextSnapshot = this.mergePreservedHeadlessMobileSessionTabs(fencedSnapshot, existing)
+      // Why: fold the renderer's whole per-tab dock record against the stored
+      // snapshot per pane before the tab-level merge below, or an untouched
+      // pane's stale renderer echo clobbers another client's newer patch.
+      const dockMergedSnapshot = mergeRendererTerminalDockAcrossSnapshot(
+        fencedSnapshot,
+        existing,
+        accepted?.rendererDockByPaneKeyByParentTabId
+      )
+      const nextSnapshot = this.mergePreservedHeadlessMobileSessionTabs(dockMergedSnapshot, existing)
       // Why: clients drop same-epoch frames whose version isn't strictly newer,
       // and main-local touches may already have emitted a higher version than
       // the renderer's counter — keep the stored version strictly monotonic so
@@ -30517,7 +30636,8 @@ export class OrcaRuntimeService {
         rendererTabCount: fencedSnapshot.tabs.length,
         rendererTabIdentityKeys: new Set(
           fencedSnapshot.tabs.flatMap((tab) => this.getMobileSessionSnapshotTabIdentityKeys(tab))
-        )
+        ),
+        rendererDockByPaneKeyByParentTabId: buildRendererDockByPaneKeyBaseline(fencedSnapshot.tabs)
       })
     }
     for (const [worktreeId, existing] of [...this.mobileSessionTabsByWorktree.entries()]) {

@@ -70,6 +70,9 @@ export type TabsSlice = {
   groupsByWorktree: Record<string, TabGroup[]>
   activeGroupIdByWorktree: Record<string, string>
   layoutByWorktree: Record<string, TabGroupLayoutNode>
+  /** Pane key -> timestamp of the most recent local dock mutation, so reconcile can
+   *  hold the client's optimistic value against a stale host echo during the echo window. */
+  terminalDockPendingMutationsByPaneKey: Record<string, number>
   createUnifiedTab: (
     worktreeId: string,
     contentType: TabContentType,
@@ -271,6 +274,11 @@ function mirrorTabViewModeToHost(
 const DEFAULT_TERMINAL_DOCK_GUTTER_ROWS = 5
 const MIN_TERMINAL_DOCK_GUTTER_ROWS = 3
 const MAX_TERMINAL_DOCK_GUTTER_ROWS = 15
+
+// Why: bounds how long a local dock mutation outranks a stale host echo for its pane —
+// long enough to cover an SSH/relay round trip, short enough that a real host change
+// (another client, or a failed RPC never landing) still reaches this client promptly.
+export const TERMINAL_DOCK_ECHO_WINDOW_MS = 8_000
 
 // Why: gutterRows also flows to the host's RPC schema, which enforces the same
 // 3..15 integer contract; clamping here keeps local and host state from diverging.
@@ -988,6 +996,7 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
   groupsByWorktree: {},
   activeGroupIdByWorktree: {},
   layoutByWorktree: {},
+  terminalDockPendingMutationsByPaneKey: {},
 
   createUnifiedTab: (worktreeId, contentType, init) => {
     const id = init?.id ?? createBrowserUuid()
@@ -1494,14 +1503,20 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
         normalizedPatch
       )
       committedPaneState = nextPaneState
-      return (
-        patchTab(state.unifiedTabsByWorktree, tabId, {
+      return {
+        ...patchTab(state.unifiedTabsByWorktree, tabId, {
           terminalDockByPaneKey: {
             ...found.tab.terminalDockByPaneKey,
             [patch.paneKey]: nextPaneState
           }
-        }) ?? {}
-      )
+        }),
+        // Why: outranks a stale host echo for this pane until the mirrored RPC's own
+        // echo (or the window's expiry) restores host authority — see reconcile.
+        terminalDockPendingMutationsByPaneKey: {
+          ...state.terminalDockPendingMutationsByPaneKey,
+          [patch.paneKey]: Date.now()
+        }
+      }
     })
     if (committedPaneState) {
       writeTerminalDockPaneState(patch.paneKey, committedPaneState)
@@ -1526,7 +1541,15 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
         return {}
       }
       removedKeys = Object.keys(existing!).filter((key) => paneKeySet.has(key))
-      return patchTab(state.unifiedTabsByWorktree, tabId, { terminalDockByPaneKey: next }) ?? {}
+      const now = Date.now()
+      return {
+        ...patchTab(state.unifiedTabsByWorktree, tabId, { terminalDockByPaneKey: next }),
+        // Why: a pruned key must not be revived by a stale host echo still carrying it.
+        terminalDockPendingMutationsByPaneKey: {
+          ...state.terminalDockPendingMutationsByPaneKey,
+          ...Object.fromEntries(removedKeys.map((key) => [key, now]))
+        }
+      }
     })
     if (removedKeys.length > 0) {
       removeLocalTerminalDockPaneKeys(new Set(removedKeys))
