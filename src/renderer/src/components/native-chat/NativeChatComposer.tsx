@@ -189,6 +189,10 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       agent,
       disabled: core.disabled,
       isDispatchingSessionOption,
+      paneKey,
+      sendTier,
+      onSendOutcome,
+      readTerminalScreen,
       resolveTarget: core.resolveTarget,
       onSlashCommand,
       sessionOptionsSurface,
@@ -197,8 +201,10 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       setDraft: core.setDraft,
       setCaret: core.setCaret,
       setActiveSuggestion: core.setActiveSuggestion,
+      imageAttachments,
       clearSkillOrigin: picker.clearSkillOrigin,
       clearImageAttachments,
+      restoreImageAttachments,
       setNotice: core.setNotice
     })
 

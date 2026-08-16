@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, type Dispatch, type SetStateAction } from 'react'
 import { translate } from '@/i18n/i18n'
 import {
   sendNativeChatMessage,
@@ -18,6 +18,34 @@ import { buildComposerSendOptions } from './composer-send-options'
 import type { AgentComposerImageAttachment } from './AgentComposerField'
 import type { AgentComposerCoreProps } from './agent-composer-types'
 import type { AgentComposerCoreState, AgentComposerHostBridges } from './AgentComposer'
+
+/** Rebuilds an unsent send's payload into the draft so it survives a
+ *  `may-not-have-sent` outcome, regardless of which host or tier sent it. */
+export function createComposerPayloadRestore(args: {
+  paneKey: string
+  text: string
+  imageAttachments: readonly AgentComposerImageAttachment[]
+  setDraft: (draft: string) => void
+  setCaret: Dispatch<SetStateAction<number>>
+  setNotice: Dispatch<SetStateAction<string | null>>
+  restoreImageAttachments?: (attachments: readonly AgentComposerImageAttachment[]) => void
+}): () => void {
+  return () => {
+    const prefix = `${args.text}\n\n`
+    const currentDraft = readAgentComposerDraftCache(args.paneKey)
+    const restoredDraft = prefix + currentDraft
+    writeAgentComposerDraftCache(args.paneKey, restoredDraft)
+    args.setDraft(restoredDraft)
+    args.setCaret((current) => current + prefix.length)
+    args.restoreImageAttachments?.(args.imageAttachments)
+    args.setNotice(
+      translate(
+        'components.native-chat.composer.sendMayNotHaveCompleted',
+        'Send may not have completed. Check the terminal before retrying.'
+      )
+    )
+  }
+}
 
 export function useAgentComposerSend(
   core: AgentComposerCoreState,
@@ -42,37 +70,29 @@ export function useAgentComposerSend(
     }
     const classification = bridges?.classifySend?.(text) ?? 'chat'
     const baseSendOptions = bridges?.buildSendOptions?.()
-    const restorePayload = (): void => {
-      const prefix = `${text}
-
-`
-      const currentDraft = readAgentComposerDraftCache(props.paneKey)
-      const restoredDraft = prefix + currentDraft
-      writeAgentComposerDraftCache(props.paneKey, restoredDraft)
-      core.setDraft(restoredDraft)
-      core.setCaret((current) => current + prefix.length)
-      bridges?.restoreImageAttachments?.(sentAttachments)
-      core.setNotice(
-        translate(
-          'components.native-chat.composer.sendMayNotHaveCompleted',
-          'Send may not have completed. Check the terminal before retrying.'
-        )
-      )
-    }
-    const tierSendOptions = props.sendTier
-      ? buildComposerSendOptions({
-          text,
-          tier: props.sendTier,
-          readTerminalScreen: props.readTerminalScreen,
-          onOutcome: (outcome) => {
-            if (outcome === 'may-not-have-sent') {
-              restorePayload()
-            }
-            props.onSendOutcome?.(outcome)
-          }
-        })
-      : undefined
-    const sendOptions = mergeSendOptions(baseSendOptions, tierSendOptions)
+    const restorePayload = createComposerPayloadRestore({
+      paneKey: props.paneKey,
+      text,
+      imageAttachments: sentAttachments,
+      setDraft: core.setDraft,
+      setCaret: core.setCaret,
+      setNotice: core.setNotice,
+      restoreImageAttachments: bridges?.restoreImageAttachments
+    })
+    // Retention/outcome reporting applies to every send; only the verified-tier
+    // confirm callbacks are tier-gated (inside buildComposerSendOptions).
+    const outcomeSendOptions = buildComposerSendOptions({
+      text,
+      tier: props.sendTier ?? 'input',
+      readTerminalScreen: props.readTerminalScreen,
+      onOutcome: (outcome) => {
+        if (outcome === 'may-not-have-sent') {
+          restorePayload()
+        }
+        props.onSendOutcome?.(outcome)
+      }
+    })
+    const sendOptions = mergeSendOptions(baseSendOptions, outcomeSendOptions)
 
     core.setHistory((previous) => pushHistory(previous, text))
     core.setDraft('')
@@ -115,11 +135,8 @@ export function useAgentComposerSend(
 
 function mergeSendOptions(
   base: NativeChatSendOptions | undefined,
-  tier: NativeChatSendOptions | undefined
-): NativeChatSendOptions | undefined {
-  if (!tier) {
-    return base
-  }
+  tier: NativeChatSendOptions
+): NativeChatSendOptions {
   return {
     ...base,
     ...tier,

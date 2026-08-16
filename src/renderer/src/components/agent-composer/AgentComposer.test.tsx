@@ -57,7 +57,17 @@ describe('AgentComposer bare mount', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
-    expect(mocks.sendNativeChatMessage).toHaveBeenCalledWith({}, 'pty-1', 'hello there', undefined)
+    // Retention/outcome wiring applies even with no sendTier (r4-4): a bare
+    // mount still gets clearInput + an onOutcome, just no verified confirm.
+    const options = mocks.sendNativeChatMessage.mock.calls[0]?.[3]
+    expect(mocks.sendNativeChatMessage).toHaveBeenCalledWith(
+      {},
+      'pty-1',
+      'hello there',
+      expect.objectContaining({ onOutcome: expect.any(Function) })
+    )
+    expect(options.confirmCleared).toBeUndefined()
+    expect(options.confirmSubmitted).toBeUndefined()
     expect(textarea.value).toBe('')
   })
 
