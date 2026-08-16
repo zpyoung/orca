@@ -5,7 +5,7 @@
 // that scope key, which is how a second live mount learns about the first
 // mount's push. Mirrors terminal-input-quarantine's subscribe/notify shape.
 
-import { setBoundedScopeCacheEntry } from './agent-composer-scope-cache'
+import { pinScopeCacheKey, setBoundedScopeCacheEntry } from './agent-composer-scope-cache'
 import { EMPTY_HISTORY, type HistoryState } from './agent-composer-history'
 
 const historyCache = new Map<string, HistoryState>()
@@ -41,6 +41,7 @@ export function subscribeAgentComposerHistoryCache(
   const listeners = historyCacheListeners.get(scopeKey) ?? new Set<HistoryCacheListener>()
   historyCacheListeners.set(scopeKey, listeners)
   listeners.add(listener)
+  const unpin = pinScopeCacheKey(scopeKey)
   try {
     listener(readAgentComposerHistoryCache(scopeKey))
   } catch {
@@ -51,6 +52,7 @@ export function subscribeAgentComposerHistoryCache(
     if (listeners.size === 0) {
       historyCacheListeners.delete(scopeKey)
     }
+    unpin()
   }
 }
 

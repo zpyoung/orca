@@ -2,15 +2,31 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EMPTY_HISTORY, pushHistory } from './agent-composer-history'
 import {
   clearAgentComposerHistoryCacheForTests,
+  readAgentComposerHistoryCache,
   subscribeAgentComposerHistoryCache,
   writeAgentComposerHistoryCache
 } from './agent-composer-history-cache'
+import {
+  NATIVE_CHAT_COMPOSER_SCOPE_CACHE_MAX,
+  clearScopeCachePinsForTests
+} from './agent-composer-scope-cache'
 
 afterEach(() => {
   clearAgentComposerHistoryCacheForTests()
+  clearScopeCachePinsForTests()
 })
 
 describe('agent composer history cache subscriptions', () => {
+  it('a subscribed scope survives eviction pressure from cache churn', () => {
+    writeAgentComposerHistoryCache('pane-live', pushHistory(EMPTY_HISTORY, 'keep me'))
+    const unsubscribe = subscribeAgentComposerHistoryCache('pane-live', () => {})
+    for (let i = 0; i < NATIVE_CHAT_COMPOSER_SCOPE_CACHE_MAX + 10; i += 1) {
+      writeAgentComposerHistoryCache(`pane-churn-${i}`, pushHistory(EMPTY_HISTORY, `entry ${i}`))
+    }
+    expect(readAgentComposerHistoryCache('pane-live').entries).toEqual(['keep me'])
+    unsubscribe()
+  })
+
   it('notifies a new subscriber with the current value immediately', () => {
     writeAgentComposerHistoryCache('pane-1', pushHistory(EMPTY_HISTORY, 'first'))
     const received: (readonly string[])[] = []
