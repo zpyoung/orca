@@ -8697,6 +8697,37 @@ export class OrcaRuntimeService {
             : tab
         )
       }
+    } else if (props.terminalDock) {
+      // legacy sessions have no unified tab to carry the dock record — mint one
+      // so the patch actually persists instead of acking a no-op.
+      const legacyTab = tabs?.find((tab) => tab.id === tabId)
+      const dockFragment = terminalDockPatchFragment(undefined, props.terminalDock, livePaneKeys)
+      if (legacyTab && dockFragment.terminalDockByPaneKey) {
+        changed = true
+        const mintedTab: Tab = {
+          id: legacyTab.id,
+          entityId: legacyTab.id,
+          groupId: randomUUID(),
+          worktreeId,
+          contentType: 'terminal',
+          label: legacyTab.title,
+          customLabel: legacyTab.customTitle,
+          color: props.color !== undefined ? props.color : legacyTab.color,
+          sortOrder: legacyTab.sortOrder,
+          createdAt: legacyTab.createdAt,
+          isPinned: props.isPinned !== undefined ? props.isPinned : legacyTab.isPinned,
+          ...(props.viewMode !== undefined
+            ? { viewMode: props.viewMode }
+            : legacyTab.viewMode !== undefined
+              ? { viewMode: legacyTab.viewMode }
+              : {}),
+          ...dockFragment
+        }
+        nextSession.unifiedTabs = {
+          ...session.unifiedTabs,
+          [worktreeId]: [...(unifiedTabs ?? []), mintedTab]
+        }
+      }
     }
 
     if (!changed) {
