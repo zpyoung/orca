@@ -93,24 +93,32 @@ export function beginTerminalDockGutterDrag(
     if (commit) {
       const finalRows = pendingRows ?? liveRows
       const hadFreshRowChange = pendingRows !== null
+      const rowsChanged = finalRows !== startGutterRows
       liveRows = finalRows
       pendingRows = null
 
       const fitAndFlush = (): void => {
         fit(pane)
         release.flush()
-        if (finalRows !== startGutterRows) {
-          onCommit(finalRows)
-        }
       }
 
       if (hadFreshRowChange) {
         onLiveRowsChange(finalRows)
-        // Why: a release-before-next-frame calls onLiveRowsChange synchronously above, but
-        // its DOM commit (React state -> gutter height) lands a frame later. Fitting here
-        // would measure stale geometry and flush it while the hold is still open, then the
-        // real, later layout change triggers its own unheld resize once this hold releases —
-        // two PTY SIGWINCHes for one release. Deferring a frame lets fit read the settled size.
+      }
+      // Why: onCommit fires before the fit/flush below (not after, as a plain fire-and-forget)
+      // so its downstream auto-undock re-evaluation — freed to run once release settles the
+      // drag-frozen rows (see useAutoUndock) — lands under this same still-open hold instead
+      // of triggering its own separate, unheld resize once this one releases.
+      if (rowsChanged) {
+        onCommit(finalRows)
+      }
+
+      if (hadFreshRowChange || rowsChanged) {
+        // Why: the row/mount-state updates above land through React a frame later. Fitting
+        // here would measure stale geometry and flush it while the hold is still open, then
+        // the real, later layout change triggers its own unheld resize once this hold
+        // releases — two PTY SIGWINCHes for one release. Deferring a frame lets fit read the
+        // settled size.
         settleRafId = requestAnimationFrame(() => {
           settleRafId = null
           fitAndFlush()

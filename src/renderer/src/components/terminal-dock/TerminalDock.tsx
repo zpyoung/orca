@@ -1,11 +1,4 @@
-import {
-  forwardRef,
-  useEffect,
-  useImperativeHandle,
-  useLayoutEffect,
-  useRef,
-  useState
-} from 'react'
+import { forwardRef, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react'
 import type { AgentType } from '../../../../shared/agent-status-types'
 import { isTuiAgent } from '../../../../shared/tui-agent-config'
 import { cn } from '@/lib/utils'
@@ -46,12 +39,20 @@ export function terminalDockAutoUndockHighThresholdPx(gutterRows: number): numbe
   return terminalDockAutoUndockLowThresholdPx(gutterRows) + HYSTERESIS_BAND_PX
 }
 
-function useAutoUndock(paneHeightPx: number, gutterRows: number): boolean {
+function useAutoUndock(paneHeightPx: number, gutterRows: number, dragActive: boolean): boolean {
   const [mounted, setMounted] = useState(
     () => paneHeightPx >= terminalDockAutoUndockHighThresholdPx(gutterRows)
   )
 
-  useEffect(() => {
+  // Why: a live gutter drag can walk gutterRows across a threshold and back before
+  // release; evaluating against those intermediate rows undocks and immediately remounts
+  // within one gesture (two SIGWINCHes). Freezing while dragging lets release's settled
+  // rows decide once. useLayoutEffect (not useEffect) keeps that decision, and the
+  // mount-notify effect it feeds, in the same pre-paint commit as the prop change.
+  useLayoutEffect(() => {
+    if (dragActive) {
+      return
+    }
     const lowThreshold = terminalDockAutoUndockLowThresholdPx(gutterRows)
     const highThreshold = terminalDockAutoUndockHighThresholdPx(gutterRows)
     setMounted((wasMounted) => {
@@ -63,7 +64,7 @@ function useAutoUndock(paneHeightPx: number, gutterRows: number): boolean {
       }
       return wasMounted
     })
-  }, [paneHeightPx, gutterRows])
+  }, [paneHeightPx, gutterRows, dragActive])
 
   return mounted
 }
@@ -84,6 +85,9 @@ export type TerminalDockProps = {
   onMountedChange?: (mounted: boolean) => void
   /** Wired to the gutter-resize handle's pointerdown; omit to render a non-interactive handle. */
   onGutterPointerDown?: (event: React.PointerEvent<HTMLDivElement>) => void
+  /** True while a gutter-resize drag is live; suspends auto-undock re-evaluation so
+   *  intermediate rows crossing a threshold can't undock/remount before release. */
+  gutterDragActive?: boolean
   /** Reads the hosting pane's current terminal screen for verified clear/submit observation. */
   readTerminalScreen?: () => string | null
   /** True only for local native ConPTY versions whose wrap markers are not reliable. */
@@ -104,7 +108,7 @@ export const TerminalDock = forwardRef<AgentComposerHandle, TerminalDockProps>(
   function TerminalDock(props, ref): React.JSX.Element | null {
     const { terminalTabId, paneKey, targetPtyId, agent, paneHeightPx, disabledReason } = props
     const gutterRows = props.gutterRows ?? DEFAULT_GUTTER_ROWS
-    const mounted = useAutoUndock(paneHeightPx, gutterRows)
+    const mounted = useAutoUndock(paneHeightPx, gutterRows, props.gutterDragActive ?? false)
     const sendTier = isTuiAgent(agent)
       ? resolveComposerSendTier(agent, {
           isLocalConptyBelowWrapMarkers: props.isLocalConptyBelowWrapMarkers ?? false

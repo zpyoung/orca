@@ -74,6 +74,9 @@ describe('beginTerminalDockGutterDrag', () => {
     dispatchWindow('pointermove', { clientY: 40 })
     await new Promise((resolve) => requestAnimationFrame(resolve))
     dispatchWindow('pointerup')
+    // The row commit still needs a settle frame even though the live row was already
+    // applied — release's own auto-undock re-evaluation rides that same frame.
+    await new Promise((resolve) => requestAnimationFrame(resolve))
 
     expect(flushCount).toBe(1)
     expect(liveRows.at(-1)).toBe(8)
@@ -130,6 +133,42 @@ describe('beginTerminalDockGutterDrag', () => {
 
     expect(committedRows).toEqual([])
     expect(queuePanePtyResizeIfHeld(pane.container, 80, 24)).toBe(false)
+  })
+
+  it('commits the final rows before the hold flushes, so a caller-driven mount change lands under the same flush', async () => {
+    const pane = makeFakePane()
+    let flushCount = 0
+    pane.container.addEventListener('orca-pane-pty-resize-hold-flush', () => {
+      flushCount += 1
+    })
+    const order: string[] = []
+
+    beginTerminalDockGutterDrag(
+      { clientY: 100, pointerId: 1, currentTarget: makeHandle() },
+      {
+        pane,
+        startGutterRows: 5,
+        onLiveRowsChange: () => {},
+        onCommit: () => order.push('commit')
+      },
+      () => {
+        order.push('fit')
+        queuePanePtyResizeIfHeld(pane.container, 80, 24)
+        return true
+      }
+    )
+
+    dispatchWindow('pointermove', { clientY: 40 })
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    dispatchWindow('pointerup')
+
+    expect(order).toEqual(['fit', 'commit'])
+    expect(flushCount).toBe(0)
+
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+
+    expect(order).toEqual(['fit', 'commit', 'fit'])
+    expect(flushCount).toBe(1)
   })
 
   it('does not commit when the release lands back on the starting row count', async () => {

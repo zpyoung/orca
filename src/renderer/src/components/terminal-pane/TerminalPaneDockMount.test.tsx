@@ -2,8 +2,8 @@
 
 import '@testing-library/jest-dom/vitest'
 
-import { act, cleanup, render, screen } from '@testing-library/react'
-import type { ReactNode, Ref } from 'react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { useState, type ReactNode, type Ref } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ManagedPane } from '@/lib/pane-manager/pane-manager-types'
 import { queuePanePtyResizeIfHeld } from '@/lib/pane-manager/pane-pty-resize-hold'
@@ -60,6 +60,9 @@ import { TerminalPaneDockMount } from './TerminalPaneDockMount'
 
 afterEach(() => {
   cleanup()
+  // makeFakePane's container (and any manually appended focus targets) are plain DOM
+  // nodes outside React's tree, so RTL's cleanup() never removes them on its own.
+  document.body.replaceChildren()
   vi.clearAllMocks()
 })
 
@@ -159,9 +162,18 @@ describe('TerminalPaneDockMount', () => {
     unmount()
   })
 
-  it('focuses the composer when the pane docks', () => {
+  it('focuses the composer when the active (focused) pane docks', () => {
     const pane = makeFakePane()
+    const xtermContainer = pane.container.querySelector('.xterm-container') as HTMLElement
+    // Not a textarea: a real xterm helper textarea would collide with the composer's own
+    // role=textbox query once docking mounts it.
+    const xtermFocusStandIn = document.createElement('div')
+    xtermFocusStandIn.tabIndex = -1
+    xtermContainer.appendChild(xtermFocusStandIn)
     const { rerender } = render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={false} />)
+    act(() => {
+      xtermFocusStandIn.focus()
+    })
     expect(document.activeElement).not.toBe(screen.queryByRole('textbox'))
 
     rerender(<TerminalPaneDockMount {...baseProps} pane={pane} docked={true} />)
@@ -169,10 +181,26 @@ describe('TerminalPaneDockMount', () => {
     expect(document.activeElement).toBe(screen.getByRole('textbox'))
   })
 
-  it('returns focus to xterm when the pane undocks', () => {
+  it('does not move focus when a background (unfocused) pane docks', () => {
+    const pane = makeFakePane()
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    input.focus()
+    const { rerender } = render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={false} />)
+    expect(document.activeElement).toBe(input)
+
+    rerender(<TerminalPaneDockMount {...baseProps} pane={pane} docked={true} />)
+
+    expect(document.activeElement).toBe(input)
+  })
+
+  it('returns focus to xterm when the active pane undocks', () => {
     const pane = makeFakePane()
     const focusSpy = vi.spyOn(pane.terminal, 'focus')
     const { rerender } = render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={true} />)
+    act(() => {
+      screen.getByRole('textbox').focus()
+    })
     expect(focusSpy).not.toHaveBeenCalled()
 
     rerender(<TerminalPaneDockMount {...baseProps} pane={pane} docked={false} />)
@@ -180,17 +208,48 @@ describe('TerminalPaneDockMount', () => {
     expect(focusSpy).toHaveBeenCalledTimes(1)
   })
 
-  it('focuses the composer again when passthrough exits while still docked', () => {
+  it('does not call terminal.focus() when a background pane undocks', () => {
+    const pane = makeFakePane()
+    const focusSpy = vi.spyOn(pane.terminal, 'focus')
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    const { rerender } = render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={true} />)
+    act(() => {
+      input.focus()
+    })
+    expect(focusSpy).not.toHaveBeenCalled()
+
+    rerender(<TerminalPaneDockMount {...baseProps} pane={pane} docked={false} />)
+
+    expect(focusSpy).not.toHaveBeenCalled()
+  })
+
+  it('focuses the composer again when passthrough exits while still docked, in the active pane', () => {
     const pane = makeFakePane()
     const { rerender } = render(
       <TerminalPaneDockMount {...baseProps} pane={pane} docked={true} passthroughActive={true} />
     )
+    const xtermContainer = pane.container.querySelector('.xterm-container') as HTMLElement
+    const xtermFocusStandIn = document.createElement('div')
+    xtermFocusStandIn.tabIndex = -1
+    xtermContainer.appendChild(xtermFocusStandIn)
+    // Why: passthrough means xterm, not the composer, currently owns keyboard focus.
+    act(() => {
+      xtermFocusStandIn.focus()
+    })
 
     rerender(
       <TerminalPaneDockMount {...baseProps} pane={pane} docked={true} passthroughActive={false} />
     )
 
     expect(document.activeElement).toBe(screen.getByRole('textbox'))
+  })
+
+  it('does not fire a focus-steal transition when an already-docked pane first mounts (restored session)', () => {
+    const pane = makeFakePane()
+    render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={true} />)
+
+    expect(document.activeElement).not.toBe(screen.getByRole('textbox'))
   })
 
   it('marks the xterm container to skip pointerdown keyboard focus while docked outside passthrough, and clears it otherwise', () => {
@@ -217,6 +276,9 @@ describe('TerminalPaneDockMount', () => {
     const pane = makeFakePane()
     render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={true} />)
     const composerTextarea = screen.getByRole('textbox')
+    act(() => {
+      composerTextarea.focus()
+    })
     expect(document.activeElement).toBe(composerTextarea)
 
     const xtermContainer = pane.container.querySelector('.xterm-container') as HTMLElement
@@ -276,6 +338,9 @@ describe('TerminalPaneDockMount', () => {
       const pane = makeFakePane()
       const focusSpy = vi.spyOn(pane.terminal, 'focus')
       render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={true} />)
+      act(() => {
+        screen.getByRole('textbox').focus()
+      })
       const xtermContainer = pane.container.querySelector('.xterm-container') as HTMLElement
       expect(xtermContainer).toHaveAttribute('data-pane-prevent-terminal-focus')
 
@@ -302,5 +367,70 @@ describe('TerminalPaneDockMount', () => {
     } finally {
       globalThis.ResizeObserver = originalResizeObserver
     }
+  })
+
+  it('never unmounts the composer mid-drag even when live rows cross the auto-undock threshold, and settles once on release', async () => {
+    function GutterRowsHarness({ pane }: { pane: ManagedPane }): ReactNode {
+      const [gutterRows, setGutterRows] = useState(DEFAULT_GUTTER_ROWS)
+      return (
+        <TerminalPaneDockMount
+          {...baseProps}
+          pane={pane}
+          docked={true}
+          gutterRows={gutterRows}
+          onCommitGutterRows={setGutterRows}
+        />
+      )
+    }
+
+    const pane = makeFakePane()
+    // A fixed 300px pane: low/high thresholds for the default 5-row gutter are 256/296
+    // (mounted), but for the 15-row (max) gutter dragged to below, low is 456 — well past
+    // 300px, so growing the drag genuinely should undock once it settles.
+    pane.container.getBoundingClientRect = () => ({ height: 300 }) as DOMRect
+
+    render(<GutterRowsHarness pane={pane} />)
+    expect(screen.getByRole('textbox')).toBeInTheDocument()
+
+    const handle = pane.container.querySelector(
+      '[data-terminal-dock-gutter-handle]'
+    ) as HTMLElement
+    expect(handle).not.toBeNull()
+
+    const dispatchWindowPointer = (type: string, clientY: number): void => {
+      const event = new Event(type) as PointerEvent
+      Object.defineProperty(event, 'clientY', { value: clientY })
+      Object.defineProperty(event, 'pointerId', { value: 1 })
+      window.dispatchEvent(event)
+    }
+
+    act(() => {
+      fireEvent.pointerDown(handle, { clientY: 100, pointerId: 1 })
+    })
+
+    // Drag up 200px == 10 rows: 5 -> 15 (clamped max), crossing the low threshold for a
+    // 300px pane mid-gesture.
+    await act(async () => {
+      dispatchWindowPointer('pointermove', -100)
+      await new Promise((resolve) => requestAnimationFrame(resolve))
+    })
+    expect(screen.getByRole('textbox')).toBeInTheDocument()
+
+    // Pause, then grow further still — never unmounts while the drag stays live.
+    await act(async () => {
+      dispatchWindowPointer('pointermove', -140)
+      await new Promise((resolve) => requestAnimationFrame(resolve))
+    })
+    expect(screen.getByRole('textbox')).toBeInTheDocument()
+
+    await act(async () => {
+      dispatchWindowPointer('pointerup', -140)
+      await new Promise((resolve) => requestAnimationFrame(resolve))
+      await new Promise((resolve) => requestAnimationFrame(resolve))
+    })
+
+    // Release settles at the final (15-row) gutter, which genuinely doesn't fit a 300px
+    // pane — auto-undock now applies, evaluated exactly once.
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
   })
 })

@@ -260,6 +260,28 @@ describe('TerminalDock', () => {
     expect(screen.getByRole('textbox')).toBeEnabled()
   })
 
+  it('suspends auto-undock while a gutter drag is active, then evaluates once it ends', () => {
+    const low = terminalDockAutoUndockLowThresholdPx(DEFAULT_GUTTER_ROWS)
+    const { rerender } = render(<TerminalDock {...baseProps} />)
+    expect(screen.getByRole('textbox')).toBeInTheDocument()
+
+    rerender(<TerminalDock {...baseProps} gutterDragActive={true} paneHeightPx={low - 1} />)
+    expect(screen.getByRole('textbox')).toBeInTheDocument()
+
+    // Reverting past the threshold mid-drag must not remount either — no flip-flop.
+    rerender(<TerminalDock {...baseProps} gutterDragActive={true} paneHeightPx={low + 100} />)
+    expect(screen.getByRole('textbox')).toBeInTheDocument()
+
+    rerender(<TerminalDock {...baseProps} gutterDragActive={false} paneHeightPx={low - 1} />)
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  })
+
+  it('still auto-undocks from a pane-height change when no drag is active', () => {
+    const low = terminalDockAutoUndockLowThresholdPx(DEFAULT_GUTTER_ROWS)
+    render(<TerminalDock {...baseProps} paneHeightPx={low - 1} />)
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  })
+
   it('does not flap at +/-1px around the derived thresholds for a non-default gutterRows', () => {
     const gutterRows = MAX_GUTTER_ROWS
     const low = terminalDockAutoUndockLowThresholdPx(gutterRows)

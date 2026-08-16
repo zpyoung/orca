@@ -10,6 +10,7 @@ import {
   resolveTerminalDockFocusTransition,
   type TerminalDockFocusState
 } from './terminal-pane-dock-focus-transition'
+import { trackPaneFocusOwnership } from './terminal-pane-dock-focus'
 
 /** ManagedPane's public view drops the internal dockContainer field (pane-public-view.ts), so
  *  reach it the same way the pane DOM itself advertises it: the '.pane-dock-slot' class every
@@ -91,17 +92,28 @@ export function TerminalPaneDockMount(props: TerminalPaneDockMountProps): React.
     onInitializeRef.current?.()
   }, [props.paneKey])
 
-  // Why: seeded from the initial props rather than {docked: false, passthroughActive: false}
+  // Why: seeded from the docked prop (not effectiveDockMounted, which always starts false)
   // so an already-docked pane on first mount (e.g. restored session) isn't read as a fresh
   // dock transition and doesn't steal focus from whatever the app is doing at startup.
-  const focusStateRef = useRef<TerminalDockFocusState>({
-    docked: effectiveDockMounted,
-    passthroughActive
-  })
+  const focusStateRef = useRef<TerminalDockFocusState>({ docked, passthroughActive })
+  const paneFocusTrackerRef = useRef<ReturnType<typeof trackPaneFocusOwnership> | null>(null)
+  useEffect(() => {
+    const tracker = trackPaneFocusOwnership(pane.container)
+    paneFocusTrackerRef.current = tracker
+    return () => {
+      tracker.dispose()
+      paneFocusTrackerRef.current = null
+    }
+  }, [pane])
   useEffect(() => {
     const previous = focusStateRef.current
     const next: TerminalDockFocusState = { docked: effectiveDockMounted, passthroughActive }
     focusStateRef.current = next
+    // Why: with two docked splits, every pane's mount transition would otherwise fire this
+    // effect — only the pane that currently owns keyboard focus is the active one to steal it.
+    if (!paneFocusTrackerRef.current?.hasFocus()) {
+      return
+    }
     const action = resolveTerminalDockFocusTransition(previous, next)
     if (action === 'focus-composer') {
       dockRef.current?.focus()
@@ -223,6 +235,7 @@ export function TerminalPaneDockMount(props: TerminalPaneDockMountProps): React.
       disabledReason={props.disabledReason}
       onMountedChange={handleMountedChange}
       onGutterPointerDown={handleGutterPointerDown}
+      gutterDragActive={liveGutterRows !== null}
       readTerminalScreen={props.readTerminalScreen}
       isLocalConptyBelowWrapMarkers={terminalPaneUsesConptyBelowWrapMarkers(pane)}
       passthroughActive={props.passthroughActive}
