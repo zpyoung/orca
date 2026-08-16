@@ -632,6 +632,24 @@ describe('parseWorkspaceSession', () => {
     }
   })
 
+  it('hydrates an explicitly empty terminalDockByPaneKey record as {} not undefined', () => {
+    // the empty record is the host-has-echoed sentinel that suppresses the
+    // stale localStorage fallback across a restart
+    const result = sessionWithUnifiedTabDock({})
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.value.unifiedTabs?.wt[0].terminalDockByPaneKey).toEqual({})
+    }
+  })
+
+  it('hydrates a record that lost every entry to corruption as undefined', () => {
+    const result = sessionWithUnifiedTabDock({ 'pane-1': { docked: 'nope' } })
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.value.unifiedTabs?.wt[0].terminalDockByPaneKey).toBeUndefined()
+    }
+  })
+
   it('filters unsafe object keys out of terminalDockByPaneKey', () => {
     // Why: an object literal's `__proto__` key sets the prototype instead of
     // an own property; JSON.parse mirrors how a corrupted session file would
