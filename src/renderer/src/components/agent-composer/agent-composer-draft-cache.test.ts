@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   clearAgentComposerDraftCacheForTests,
   readAgentComposerDraftCache,
+  subscribeAgentComposerDraftCache,
   writeAgentComposerDraftCache
 } from './agent-composer-draft-cache'
 import { NATIVE_CHAT_COMPOSER_SCOPE_CACHE_MAX } from './agent-composer-scope-cache'
@@ -43,5 +44,53 @@ describe('agent composer draft cache', () => {
     expect(readAgentComposerDraftCache('scope-0')).toBe('')
     expect(readAgentComposerDraftCache('keep')).toBe('hot')
     expect(readAgentComposerDraftCache(`scope-${total - 1}`)).toBe(`draft-${total - 1}`)
+  })
+})
+
+describe('agent composer draft cache subscriptions', () => {
+  it('notifies a new subscriber with the current value immediately', () => {
+    writeAgentComposerDraftCache('pane-1', 'hello')
+    const received: string[] = []
+    subscribeAgentComposerDraftCache('pane-1', (draft) => received.push(draft))
+    expect(received).toEqual(['hello'])
+  })
+
+  it('notifies every live subscriber on write', () => {
+    const a = vi.fn()
+    const b = vi.fn()
+    subscribeAgentComposerDraftCache('pane-2', a)
+    subscribeAgentComposerDraftCache('pane-2', b)
+    a.mockClear()
+    b.mockClear()
+
+    writeAgentComposerDraftCache('pane-2', 'x')
+
+    expect(a).toHaveBeenCalledTimes(1)
+    expect(b).toHaveBeenCalledTimes(1)
+  })
+
+  it('a throwing subscriber does not prevent other subscribers from being notified', () => {
+    const throwing = vi.fn(() => {
+      throw new Error('boom')
+    })
+    const ok = vi.fn()
+    subscribeAgentComposerDraftCache('pane-3', throwing)
+    subscribeAgentComposerDraftCache('pane-3', ok)
+    throwing.mockClear()
+    ok.mockClear()
+
+    expect(() => writeAgentComposerDraftCache('pane-3', 'y')).not.toThrow()
+    expect(ok).toHaveBeenCalledTimes(1)
+  })
+
+  it('unsubscribe stops further notifications', () => {
+    const listener = vi.fn()
+    const unsubscribe = subscribeAgentComposerDraftCache('pane-4', listener)
+    listener.mockClear()
+    unsubscribe()
+
+    writeAgentComposerDraftCache('pane-4', 'z')
+
+    expect(listener).not.toHaveBeenCalled()
   })
 })
