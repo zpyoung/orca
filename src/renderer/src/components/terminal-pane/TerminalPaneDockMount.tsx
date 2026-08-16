@@ -219,8 +219,10 @@ export function TerminalPaneDockMount(props: TerminalPaneDockMountProps): React.
           setLiveGutterRows(rows)
         },
         onCommit: (rows) => {
-          setLiveGutterRows(null)
           onCommitGutterRows(rows)
+        },
+        onSettled: () => {
+          setLiveGutterRows(null)
         }
       })
     },

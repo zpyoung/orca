@@ -53,6 +53,7 @@ describe('beginTerminalDockGutterDrag', () => {
     })
     const liveRows: number[] = []
     const committedRows: number[] = []
+    let settledCount = 0
 
     beginTerminalDockGutterDrag(
       { clientY: 100, pointerId: 1, currentTarget: makeHandle() },
@@ -60,7 +61,10 @@ describe('beginTerminalDockGutterDrag', () => {
         pane,
         startGutterRows: 5,
         onLiveRowsChange: (rows) => liveRows.push(rows),
-        onCommit: (rows) => committedRows.push(rows)
+        onCommit: (rows) => committedRows.push(rows),
+        onSettled: () => {
+          settledCount += 1
+        }
       },
       () => {
         queuePanePtyResizeIfHeld(pane.container, 80, 24)
@@ -81,6 +85,7 @@ describe('beginTerminalDockGutterDrag', () => {
     expect(flushCount).toBe(1)
     expect(liveRows.at(-1)).toBe(8)
     expect(committedRows).toEqual([8])
+    expect(settledCount).toBe(1)
   })
 
   it('cancels without committing or resizing when the drag aborts', async () => {
@@ -91,6 +96,7 @@ describe('beginTerminalDockGutterDrag', () => {
     })
     const liveRows: number[] = []
     const committedRows: number[] = []
+    let settledCount = 0
 
     beginTerminalDockGutterDrag(
       { clientY: 100, pointerId: 1, currentTarget: makeHandle() },
@@ -98,7 +104,10 @@ describe('beginTerminalDockGutterDrag', () => {
         pane,
         startGutterRows: 5,
         onLiveRowsChange: (rows) => liveRows.push(rows),
-        onCommit: (rows) => committedRows.push(rows)
+        onCommit: (rows) => committedRows.push(rows),
+        onSettled: () => {
+          settledCount += 1
+        }
       },
       () => true
     )
@@ -110,7 +119,118 @@ describe('beginTerminalDockGutterDrag', () => {
     expect(flushCount).toBe(0)
     expect(committedRows).toEqual([])
     expect(liveRows.at(-1)).toBe(5)
+    expect(settledCount).toBe(1)
     expect(queuePanePtyResizeIfHeld(pane.container, 80, 24)).toBe(false)
+  })
+
+  it('settles exactly once, with no PTY resize, on a window blur with no prior movement', () => {
+    const pane = makeFakePane()
+    let flushCount = 0
+    pane.container.addEventListener('orca-pane-pty-resize-hold-flush', () => {
+      flushCount += 1
+    })
+    const committedRows: number[] = []
+    let settledCount = 0
+
+    beginTerminalDockGutterDrag(
+      { clientY: 100, pointerId: 1, currentTarget: makeHandle() },
+      {
+        pane,
+        startGutterRows: 5,
+        onLiveRowsChange: () => {},
+        onCommit: (rows) => committedRows.push(rows),
+        onSettled: () => {
+          settledCount += 1
+        }
+      },
+      () => true
+    )
+
+    window.dispatchEvent(new Event('blur'))
+
+    expect(flushCount).toBe(0)
+    expect(committedRows).toEqual([])
+    expect(settledCount).toBe(1)
+    expect(queuePanePtyResizeIfHeld(pane.container, 80, 24)).toBe(false)
+  })
+
+  it('settles exactly once, with no PTY resize, when a release lands back on the starting row after moving away', async () => {
+    const pane = makeFakePane()
+    let flushCount = 0
+    pane.container.addEventListener('orca-pane-pty-resize-hold-flush', () => {
+      flushCount += 1
+    })
+    const committedRows: number[] = []
+    let settledCount = 0
+
+    beginTerminalDockGutterDrag(
+      { clientY: 100, pointerId: 1, currentTarget: makeHandle() },
+      {
+        pane,
+        startGutterRows: 5,
+        onLiveRowsChange: () => {},
+        onCommit: (rows) => committedRows.push(rows),
+        onSettled: () => {
+          settledCount += 1
+        }
+      },
+      () => true
+    )
+
+    // Grow by 2 rows, then move back to the exact start position before releasing.
+    dispatchWindow('pointermove', { clientY: 60 })
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    dispatchWindow('pointermove', { clientY: 100 })
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    dispatchWindow('pointerup')
+
+    expect(flushCount).toBe(0)
+    expect(committedRows).toEqual([])
+    expect(settledCount).toBe(1)
+  })
+
+  it('allows a fresh drag to commit normally after a prior drag was cancelled', async () => {
+    const pane = makeFakePane()
+    let flushCount = 0
+    pane.container.addEventListener('orca-pane-pty-resize-hold-flush', () => {
+      flushCount += 1
+    })
+    const committedRows: number[] = []
+    let settledCount = 0
+    const onSettled = (): void => {
+      settledCount += 1
+    }
+
+    beginTerminalDockGutterDrag(
+      { clientY: 100, pointerId: 1, currentTarget: makeHandle() },
+      { pane, startGutterRows: 5, onLiveRowsChange: () => {}, onCommit: () => {}, onSettled },
+      () => true
+    )
+    dispatchWindow('pointercancel')
+    expect(settledCount).toBe(1)
+
+    beginTerminalDockGutterDrag(
+      { clientY: 100, pointerId: 1, currentTarget: makeHandle() },
+      {
+        pane,
+        startGutterRows: 5,
+        onLiveRowsChange: () => {},
+        onCommit: (rows) => committedRows.push(rows),
+        onSettled
+      },
+      () => {
+        queuePanePtyResizeIfHeld(pane.container, 80, 24)
+        return true
+      }
+    )
+    dispatchWindow('pointermove', { clientY: 60 })
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    dispatchWindow('pointerup')
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+
+    expect(committedRows).toEqual([7])
+    expect(flushCount).toBe(1)
+    expect(settledCount).toBe(2)
   })
 
   it('returns a disposer that cancels an active drag and releases its PTY hold', () => {
@@ -122,7 +242,8 @@ describe('beginTerminalDockGutterDrag', () => {
         pane,
         startGutterRows: 5,
         onLiveRowsChange: () => {},
-        onCommit: (rows) => committedRows.push(rows)
+        onCommit: (rows) => committedRows.push(rows),
+        onSettled: () => {}
       },
       () => true
     )
@@ -149,7 +270,8 @@ describe('beginTerminalDockGutterDrag', () => {
         pane,
         startGutterRows: 5,
         onLiveRowsChange: () => {},
-        onCommit: () => order.push('commit')
+        onCommit: () => order.push('commit'),
+        onSettled: () => {}
       },
       () => {
         order.push('fit')
@@ -181,7 +303,8 @@ describe('beginTerminalDockGutterDrag', () => {
         pane,
         startGutterRows: 5,
         onLiveRowsChange: () => {},
-        onCommit: (rows) => committedRows.push(rows)
+        onCommit: (rows) => committedRows.push(rows),
+        onSettled: () => {}
       },
       () => true
     )
@@ -202,7 +325,8 @@ describe('beginTerminalDockGutterDrag', () => {
         pane,
         startGutterRows: 5,
         onLiveRowsChange: (rows) => liveRows.push(rows),
-        onCommit: (rows) => committedRows.push(rows)
+        onCommit: (rows) => committedRows.push(rows),
+        onSettled: () => {}
       },
       () => true
     )
@@ -249,7 +373,8 @@ describe('beginTerminalDockGutterDrag', () => {
             settledRows = rows
           })
         },
-        onCommit: () => {}
+        onCommit: () => {},
+        onSettled: () => {}
       },
       () => {
         fitReadsAt.push(settledRows)

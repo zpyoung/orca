@@ -16,6 +16,10 @@ export type TerminalDockGutterDragArgs = {
   onLiveRowsChange: (rows: number) => void
   /** Applied once on a committed release, after the single coalesced PTY resize flushes. */
   onCommit: (rows: number) => void
+  /** Fires exactly once on every drag termination — changed commit, unchanged release,
+   *  pointercancel, blur, or a programmatic cancel — so callers can clear per-drag state
+   *  (e.g. a live-preview flag) that must never outlive the gesture. */
+  onSettled: () => void
 }
 
 type PointerCaptureTarget = {
@@ -34,7 +38,7 @@ export function beginTerminalDockGutterDrag(
 ): () => void {
   const handle = event.currentTarget
   const startY = event.clientY
-  const { pane, startGutterRows, onLiveRowsChange, onCommit } = args
+  const { pane, startGutterRows, onLiveRowsChange, onCommit, onSettled } = args
   let liveRows = startGutterRows
   let pendingRows: number | null = null
   let rafId: number | null = null
@@ -105,10 +109,11 @@ export function beginTerminalDockGutterDrag(
       if (hadFreshRowChange) {
         onLiveRowsChange(finalRows)
       }
-      // Why: onCommit fires before the fit/flush below (not after, as a plain fire-and-forget)
-      // so its downstream auto-undock re-evaluation — freed to run once release settles the
-      // drag-frozen rows (see useAutoUndock) — lands under this same still-open hold instead
-      // of triggering its own separate, unheld resize once this one releases.
+      // Why: onSettled (freeing auto-undock re-evaluation, see useAutoUndock) and onCommit
+      // both fire before the fit/flush below (not after, as a plain fire-and-forget) so their
+      // downstream effects land under this same still-open hold instead of triggering their
+      // own separate, unheld resize once this one releases.
+      onSettled()
       if (rowsChanged) {
         onCommit(finalRows)
       }
@@ -128,6 +133,7 @@ export function beginTerminalDockGutterDrag(
       }
     } else {
       onLiveRowsChange(startGutterRows)
+      onSettled()
       fit(pane)
       release.cancel()
     }

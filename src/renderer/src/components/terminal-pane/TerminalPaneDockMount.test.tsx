@@ -437,6 +437,217 @@ describe('TerminalPaneDockMount', () => {
     // pane — auto-undock now applies, evaluated exactly once.
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
   })
+
+  describe('gutter-drag termination unfreezes auto-undock', () => {
+    function GutterRowsHarness({
+      pane,
+      onCommit
+    }: {
+      pane: ManagedPane
+      onCommit: (rows: number) => void
+    }): ReactNode {
+      const [gutterRows, setGutterRows] = useState(DEFAULT_GUTTER_ROWS)
+      return (
+        <TerminalPaneDockMount
+          {...baseProps}
+          pane={pane}
+          docked={true}
+          gutterRows={gutterRows}
+          onCommitGutterRows={(rows) => {
+            setGutterRows(rows)
+            onCommit(rows)
+          }}
+        />
+      )
+    }
+
+    function installFakeResizeObserver(): {
+      trigger: (height: number) => void
+      restore: () => void
+    } {
+      const original = globalThis.ResizeObserver
+      let callback: ResizeObserverCallback | null = null
+      class FakeResizeObserver {
+        constructor(cb: ResizeObserverCallback) {
+          callback = cb
+        }
+        observe(): void {}
+        unobserve(): void {}
+        disconnect(): void {}
+      }
+      globalThis.ResizeObserver = FakeResizeObserver as unknown as typeof ResizeObserver
+      return {
+        trigger: (height: number) => {
+          act(() => {
+            callback?.([{ contentRect: { height } } as ResizeObserverEntry], {} as ResizeObserver)
+          })
+        },
+        restore: () => {
+          globalThis.ResizeObserver = original
+        }
+      }
+    }
+
+    function dispatchWindowPointer(type: string, clientY: number, pointerId = 1): void {
+      const event = new Event(type) as PointerEvent
+      Object.defineProperty(event, 'clientY', { value: clientY })
+      Object.defineProperty(event, 'pointerId', { value: pointerId })
+      window.dispatchEvent(event)
+    }
+
+    const shrunkHeight = terminalDockAutoUndockLowThresholdPx(DEFAULT_GUTTER_ROWS) - 1
+
+    it('unfreezes on a release that lands back on the starting row, and a fresh drag afterward still commits', async () => {
+      const resizeObserver = installFakeResizeObserver()
+      try {
+        const pane = makeFakePane()
+        const onCommit = vi.fn()
+        render(<GutterRowsHarness pane={pane} onCommit={onCommit} />)
+        expect(screen.getByRole('textbox')).toBeInTheDocument()
+
+        const handle = pane.container.querySelector(
+          '[data-terminal-dock-gutter-handle]'
+        ) as HTMLElement
+
+        act(() => {
+          fireEvent.pointerDown(handle, { clientY: 100, pointerId: 1 })
+        })
+        await act(async () => {
+          dispatchWindowPointer('pointermove', 60)
+          await new Promise((resolve) => requestAnimationFrame(resolve))
+        })
+
+        // Pane shrinks below the low threshold mid-drag: frozen, so auto-undock must not fire yet.
+        resizeObserver.trigger(shrunkHeight)
+        expect(screen.getByRole('textbox')).toBeInTheDocument()
+
+        // Move back to the exact start row before releasing — an unchanged-row commit.
+        await act(async () => {
+          dispatchWindowPointer('pointermove', 100)
+          await new Promise((resolve) => requestAnimationFrame(resolve))
+        })
+        await act(async () => {
+          dispatchWindowPointer('pointerup', 100)
+          await new Promise((resolve) => requestAnimationFrame(resolve))
+        })
+
+        expect(onCommit).not.toHaveBeenCalled()
+        expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+      } finally {
+        resizeObserver.restore()
+      }
+    })
+
+    it('leaves a fresh drag able to commit normally after a prior release landed back on the starting row', async () => {
+      const pane = makeFakePane()
+      const onCommit = vi.fn()
+      render(<GutterRowsHarness pane={pane} onCommit={onCommit} />)
+
+      const getHandle = (): HTMLElement =>
+        pane.container.querySelector('[data-terminal-dock-gutter-handle]') as HTMLElement
+
+      // First drag: grow away from the start row, then release back on it — no commit.
+      act(() => {
+        fireEvent.pointerDown(getHandle(), { clientY: 100, pointerId: 1 })
+      })
+      await act(async () => {
+        dispatchWindowPointer('pointermove', 60)
+        await new Promise((resolve) => requestAnimationFrame(resolve))
+      })
+      await act(async () => {
+        dispatchWindowPointer('pointermove', 100)
+        await new Promise((resolve) => requestAnimationFrame(resolve))
+      })
+      await act(async () => {
+        dispatchWindowPointer('pointerup', 100)
+        await new Promise((resolve) => requestAnimationFrame(resolve))
+      })
+      expect(onCommit).not.toHaveBeenCalled()
+      expect(screen.getByRole('textbox')).toBeInTheDocument()
+
+      // A fresh drag that actually changes rows still commits normally afterward.
+      act(() => {
+        fireEvent.pointerDown(getHandle(), { clientY: 100, pointerId: 1 })
+      })
+      await act(async () => {
+        dispatchWindowPointer('pointermove', 60)
+        await new Promise((resolve) => requestAnimationFrame(resolve))
+      })
+      await act(async () => {
+        dispatchWindowPointer('pointerup', 60)
+        await new Promise((resolve) => requestAnimationFrame(resolve))
+        await new Promise((resolve) => requestAnimationFrame(resolve))
+      })
+
+      expect(onCommit).toHaveBeenCalledTimes(1)
+    })
+
+    it('unfreezes on pointercancel', async () => {
+      const resizeObserver = installFakeResizeObserver()
+      try {
+        const pane = makeFakePane()
+        render(<GutterRowsHarness pane={pane} />)
+        expect(screen.getByRole('textbox')).toBeInTheDocument()
+
+        const handle = pane.container.querySelector(
+          '[data-terminal-dock-gutter-handle]'
+        ) as HTMLElement
+
+        act(() => {
+          fireEvent.pointerDown(handle, { clientY: 100, pointerId: 1 })
+        })
+        await act(async () => {
+          dispatchWindowPointer('pointermove', 60)
+          await new Promise((resolve) => requestAnimationFrame(resolve))
+        })
+
+        resizeObserver.trigger(shrunkHeight)
+        expect(screen.getByRole('textbox')).toBeInTheDocument()
+
+        act(() => {
+          dispatchWindowPointer('pointercancel', 60)
+        })
+
+        expect(baseProps.onCommitGutterRows).not.toHaveBeenCalled()
+        expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+      } finally {
+        resizeObserver.restore()
+      }
+    })
+
+    it('unfreezes on a window blur', async () => {
+      const resizeObserver = installFakeResizeObserver()
+      try {
+        const pane = makeFakePane()
+        render(<GutterRowsHarness pane={pane} />)
+        expect(screen.getByRole('textbox')).toBeInTheDocument()
+
+        const handle = pane.container.querySelector(
+          '[data-terminal-dock-gutter-handle]'
+        ) as HTMLElement
+
+        act(() => {
+          fireEvent.pointerDown(handle, { clientY: 100, pointerId: 1 })
+        })
+        await act(async () => {
+          dispatchWindowPointer('pointermove', 60)
+          await new Promise((resolve) => requestAnimationFrame(resolve))
+        })
+
+        resizeObserver.trigger(shrunkHeight)
+        expect(screen.getByRole('textbox')).toBeInTheDocument()
+
+        act(() => {
+          window.dispatchEvent(new Event('blur'))
+        })
+
+        expect(baseProps.onCommitGutterRows).not.toHaveBeenCalled()
+        expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+      } finally {
+        resizeObserver.restore()
+      }
+    })
+  })
 })
 
 describe('terminalPaneUsesConptyBelowWrapMarkers', () => {
