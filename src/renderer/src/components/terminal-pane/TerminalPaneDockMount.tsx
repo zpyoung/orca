@@ -100,10 +100,11 @@ export function TerminalPaneDockMount(props: TerminalPaneDockMountProps): React.
     onInitializeRef.current?.()
   }, [props.paneKey])
 
-  // Why: seeded from the docked prop (not effectiveDockMounted, which always starts false)
-  // so an already-docked pane on first mount (e.g. restored session) isn't read as a fresh
-  // dock transition and doesn't steal focus from whatever the app is doing at startup.
-  const focusStateRef = useRef<TerminalDockFocusState>({ docked, passthroughActive })
+  // Why: seeded false to match effectiveDockMounted's own initial value, not the docked
+  // prop — a persisted-docked pane that starts too short to mount still needs its later
+  // grow-past-threshold remount read as a real transition. Startup focus-stealing is
+  // prevented by the focus-ownership gate below, not by this seed.
+  const focusStateRef = useRef<TerminalDockFocusState>({ docked: false, passthroughActive })
   const paneFocusTrackerRef = useRef<ReturnType<typeof trackPaneFocusOwnership> | null>(null)
   useEffect(() => {
     const tracker = trackPaneFocusOwnership(pane.container)

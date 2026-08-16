@@ -256,6 +256,87 @@ describe('TerminalPaneDockMount', () => {
     expect(document.activeElement).not.toBe(screen.getByRole('textbox'))
   })
 
+  describe('persisted-docked pane below the auto-undock threshold at startup', () => {
+    class FakeResizeObserver {
+      static instances: FakeResizeObserver[] = []
+      callback: ResizeObserverCallback
+      constructor(callback: ResizeObserverCallback) {
+        this.callback = callback
+        FakeResizeObserver.instances.push(this)
+      }
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    }
+
+    function makeShortFakePane(): ManagedPane {
+      const pane = makeFakePane()
+      pane.container.getBoundingClientRect = () =>
+        ({ height: terminalDockAutoUndockLowThresholdPx(DEFAULT_GUTTER_ROWS) - 10 }) as DOMRect
+      return pane
+    }
+
+    it('focuses the composer once a growing pane crosses the high threshold, in the active pane', () => {
+      const originalResizeObserver = globalThis.ResizeObserver
+      globalThis.ResizeObserver = FakeResizeObserver as unknown as typeof globalThis.ResizeObserver
+      try {
+        const pane = makeShortFakePane()
+        const xtermContainer = pane.container.querySelector('.xterm-container') as HTMLElement
+        const xtermFocusStandIn = document.createElement('div')
+        xtermFocusStandIn.tabIndex = -1
+        xtermContainer.appendChild(xtermFocusStandIn)
+
+        render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={true} />)
+        expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+        act(() => {
+          xtermFocusStandIn.focus()
+        })
+
+        const grownHeight = terminalDockAutoUndockHighThresholdPx(DEFAULT_GUTTER_ROWS) + 10
+        const observer = FakeResizeObserver.instances.at(-1)
+        act(() => {
+          observer?.callback(
+            [{ contentRect: { height: grownHeight } } as ResizeObserverEntry],
+            observer as unknown as ResizeObserver
+          )
+        })
+
+        expect(document.activeElement).toBe(screen.getByRole('textbox'))
+      } finally {
+        globalThis.ResizeObserver = originalResizeObserver
+      }
+    })
+
+    it('moves nothing when a growing pane crosses the high threshold in a background (unfocused) pane', () => {
+      const originalResizeObserver = globalThis.ResizeObserver
+      globalThis.ResizeObserver = FakeResizeObserver as unknown as typeof globalThis.ResizeObserver
+      try {
+        const pane = makeShortFakePane()
+        const input = document.createElement('input')
+        document.body.appendChild(input)
+        input.focus()
+
+        render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={true} />)
+        expect(pane.container.querySelector('textarea')).not.toBeInTheDocument()
+        expect(document.activeElement).toBe(input)
+
+        const grownHeight = terminalDockAutoUndockHighThresholdPx(DEFAULT_GUTTER_ROWS) + 10
+        const observer = FakeResizeObserver.instances.at(-1)
+        act(() => {
+          observer?.callback(
+            [{ contentRect: { height: grownHeight } } as ResizeObserverEntry],
+            observer as unknown as ResizeObserver
+          )
+        })
+
+        expect(pane.container.querySelector('textarea')).toBeInTheDocument()
+        expect(document.activeElement).toBe(input)
+      } finally {
+        globalThis.ResizeObserver = originalResizeObserver
+      }
+    })
+  })
+
   it('marks the xterm container to skip pointerdown keyboard focus while docked outside passthrough, and clears it otherwise', () => {
     const pane = makeFakePane()
     const xtermContainer = pane.container.querySelector('.xterm-container') as HTMLElement
