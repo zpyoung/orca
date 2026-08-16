@@ -8606,15 +8606,25 @@ export class OrcaRuntimeService {
     const explicitWorktreeId = this.getValidatedExplicitWorktreeIdSelector(worktreeSelector)
     const worktreeId =
       explicitWorktreeId ?? (await this.resolveWorktreeSelector(worktreeSelector)).id
-    // Why: a renderer-authoritative host owns + republishes tab props, so a
-    // headless write would be overwritten. Persist only when headless.
-    if (this.getAvailableAuthoritativeWindow()) {
-      return { updated: true }
-    }
     const snapshot = this.mobileSessionTabsByWorktree.get(worktreeId)
     const hostTabId = snapshot
       ? (this.resolveMobileSessionHostTabId(snapshot, args.tabId) ?? args.tabId)
       : args.tabId
+    // Why: color/pin/viewMode are edited in the authoritative renderer itself
+    // and republished from there, so a headless write here would just be
+    // overwritten. Dock state has no renderer-side editor — the client patch
+    // is its only writer — so it must still land on the stored snapshot
+    // mergeRendererTerminalDockAcrossSnapshot treats as `existing`, which is
+    // what lets it survive the renderer's next (dock-unaware) publication.
+    if (this.getAvailableAuthoritativeWindow()) {
+      if (args.terminalDock === undefined) {
+        return { updated: true }
+      }
+      const dockArgs = { terminalDock: args.terminalDock }
+      this.persistHeadlessSessionTabProps(worktreeId, hostTabId, dockArgs)
+      this.applyHeadlessSessionTabPropsToSnapshot(worktreeId, hostTabId, dockArgs)
+      return { updated: true }
+    }
     this.persistHeadlessSessionTabProps(worktreeId, hostTabId, args)
     this.applyHeadlessSessionTabPropsToSnapshot(worktreeId, hostTabId, args)
     return { updated: true }
