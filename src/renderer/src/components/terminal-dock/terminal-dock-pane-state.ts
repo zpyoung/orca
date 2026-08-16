@@ -112,6 +112,36 @@ export function writeTerminalDockPaneState(paneKey: string, state: TerminalDockP
   writeStoredMap(map)
 }
 
+/** Moves every fallback entry keyed `oldTabId:<leaf>` to `newTabId:<leaf>`, e.g. when a
+ *  provisional pane is handed off to its host-confirmed tab id — otherwise the entry stays
+ *  under the retired id and is lost the moment that pane's teardown prunes it. A target key
+ *  that already holds a value is left alone and the source entry is dropped: the target can
+ *  only have been written under the pane's final identity, so it's never older. */
+export function rekeyTerminalDockPaneKeys(oldTabId: string, newTabId: string): void {
+  if (oldTabId === newTabId || isUnsafeObjectKey(oldTabId) || isUnsafeObjectKey(newTabId)) {
+    return
+  }
+  const map = readStoredMap()
+  const prefix = `${oldTabId}:`
+  let changed = false
+  for (const key of Object.keys(map)) {
+    if (!key.startsWith(prefix)) {
+      continue
+    }
+    const targetKey = `${newTabId}:${key.slice(prefix.length)}`
+    if (!(targetKey in map)) {
+      map[targetKey] = map[key]
+    }
+    delete map[key]
+    changed = true
+  }
+  if (!changed) {
+    return
+  }
+  evictOldestEntries(map)
+  writeStoredMap(map)
+}
+
 /** Drops dock state for panes that no longer exist, e.g. after a split closes. */
 export function removeTerminalDockPaneKeys(paneKeys: ReadonlySet<string>): void {
   if (paneKeys.size === 0) {

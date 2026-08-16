@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- Why: these tests cover one reconciliation boundary
  * across ready, pending, split, and batched session snapshots. */
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { posix as pathPosix } from 'node:path'
 import type { RuntimeMobileSessionTabsResult } from '../../../shared/runtime-types'
 import { makePaneKey } from '../../../shared/stable-pane-id'
@@ -41,6 +41,11 @@ import {
   recordWebSessionBrowserPlacement,
   takeWebSessionBrowserPlacementGroup
 } from './web-session-browser-placement'
+import {
+  hasTerminalDockPaneState,
+  readTerminalDockPaneState,
+  writeTerminalDockPaneState
+} from '../components/terminal-dock/terminal-dock-pane-state'
 import {
   _getWebSessionTabsTrackingCountsForTest,
   acceptReplayedWebSessionTabsSnapshot,
@@ -1568,6 +1573,168 @@ describe('applyWebSessionTabsSnapshot', () => {
       stateAfterReconcile.unifiedTabsByWorktree?.[WT]?.find((tab) => tab.entityId === mirroredId)
         ?.terminalDockByPaneKey
     ).toEqual({ [finalPaneKey]: { docked: true, gutterRows: 5 } })
+  })
+
+  describe('localStorage dock fallback rekey on handoff (r5-6)', () => {
+    // Why: this suite runs under Vitest's node environment (no jsdom/happy-dom), so terminal-dock-
+    // pane-state's `window.localStorage` calls need a stand-in to exercise, matching the module's
+    // own try/catch-guarded access pattern.
+    const fakeLocalStorage = (() => {
+      let entries = new Map<string, string>()
+      return {
+        getItem: (key: string): string | null => entries.get(key) ?? null,
+        setItem: (key: string, value: string): void => {
+          entries.set(key, value)
+        },
+        removeItem: (key: string): void => {
+          entries.delete(key)
+        },
+        clear: (): void => {
+          entries = new Map()
+        }
+      }
+    })()
+
+    beforeEach(() => {
+      fakeLocalStorage.clear()
+      ;(globalThis as { window?: unknown }).window = { localStorage: fakeLocalStorage }
+    })
+
+    afterEach(() => {
+      delete (globalThis as { window?: unknown }).window
+    })
+
+    function provisionalTerminalTab(id: string): TerminalTab {
+      return {
+        id,
+        ptyId: null,
+        worktreeId: WT,
+        title: 'Claude',
+        defaultTitle: 'Claude',
+        customTitle: null,
+        color: null,
+        sortOrder: 0,
+        createdAt: NOW,
+        launchAgent: 'claude'
+      }
+    }
+
+    it('moves the fallback entry to the replacement tab id on handoff', () => {
+      const provisionalTabId = 'provisional-dock-r5-6'
+      const hostTabId = 'host-tab-1'
+      const provisionalPaneKey = makePaneKey(provisionalTabId, LEAF_ID)
+      writeTerminalDockPaneState(provisionalPaneKey, { docked: true, gutterRows: 9 })
+      recordWebAgentSessionHandoff({
+        environmentId: ENV,
+        worktreeId: WT,
+        provisionalTabId,
+        hostTabId,
+        hostTerminalHandle: 'term_host-1'
+      })
+
+      applyWebSessionTabsSnapshot(
+        makeState({ tabsByWorktree: { [WT]: [provisionalTerminalTab(provisionalTabId)] } }),
+        makeSnapshot([
+          {
+            type: 'terminal',
+            id: HOST_SURFACE_ID,
+            title: 'Claude',
+            parentTabId: hostTabId,
+            leafId: LEAF_ID,
+            isActive: true,
+            launchAgent: 'claude',
+            status: 'ready',
+            terminal: 'terminal-1'
+          }
+        ]),
+        ENV,
+        NOW
+      )
+
+      const finalPaneKey = makePaneKey(toWebTerminalSurfaceTabId(hostTabId), LEAF_ID)
+      expect(hasTerminalDockPaneState(provisionalPaneKey)).toBe(false)
+      expect(readTerminalDockPaneState(finalPaneKey)).toEqual({ docked: true, gutterRows: 9 })
+    })
+
+    it('keeps the pre-existing final-key entry on collision and still drops the source', () => {
+      const provisionalTabId = 'provisional-dock-r5-6-collision'
+      const hostTabId = 'host-tab-1'
+      const provisionalPaneKey = makePaneKey(provisionalTabId, LEAF_ID)
+      const finalPaneKey = makePaneKey(toWebTerminalSurfaceTabId(hostTabId), LEAF_ID)
+      writeTerminalDockPaneState(provisionalPaneKey, { docked: true, gutterRows: 9 })
+      // Newer, written under the pane's true final identity — must win over the
+      // provisional-keyed value it would otherwise be clobbered by.
+      writeTerminalDockPaneState(finalPaneKey, { docked: false, gutterRows: 3 })
+      recordWebAgentSessionHandoff({
+        environmentId: ENV,
+        worktreeId: WT,
+        provisionalTabId,
+        hostTabId,
+        hostTerminalHandle: 'term_host-1'
+      })
+
+      applyWebSessionTabsSnapshot(
+        makeState({ tabsByWorktree: { [WT]: [provisionalTerminalTab(provisionalTabId)] } }),
+        makeSnapshot([
+          {
+            type: 'terminal',
+            id: HOST_SURFACE_ID,
+            title: 'Claude',
+            parentTabId: hostTabId,
+            leafId: LEAF_ID,
+            isActive: true,
+            launchAgent: 'claude',
+            status: 'ready',
+            terminal: 'terminal-1'
+          }
+        ]),
+        ENV,
+        NOW
+      )
+
+      expect(hasTerminalDockPaneState(provisionalPaneKey)).toBe(false)
+      expect(readTerminalDockPaneState(finalPaneKey)).toEqual({ docked: false, gutterRows: 3 })
+    })
+
+    it('leaves localStorage untouched when the experimental flag is off', () => {
+      const provisionalTabId = 'provisional-dock-r5-6-flag-off'
+      const hostTabId = 'host-tab-1'
+      const provisionalPaneKey = makePaneKey(provisionalTabId, LEAF_ID)
+      writeTerminalDockPaneState(provisionalPaneKey, { docked: true, gutterRows: 9 })
+      recordWebAgentSessionHandoff({
+        environmentId: ENV,
+        worktreeId: WT,
+        provisionalTabId,
+        hostTabId,
+        hostTerminalHandle: 'term_host-1'
+      })
+
+      applyWebSessionTabsSnapshot(
+        makeState({
+          tabsByWorktree: { [WT]: [provisionalTerminalTab(provisionalTabId)] },
+          settings: { experimentalTerminalDock: false } as GlobalSettings
+        }),
+        makeSnapshot([
+          {
+            type: 'terminal',
+            id: HOST_SURFACE_ID,
+            title: 'Claude',
+            parentTabId: hostTabId,
+            leafId: LEAF_ID,
+            isActive: true,
+            launchAgent: 'claude',
+            status: 'ready',
+            terminal: 'terminal-1'
+          }
+        ]),
+        ENV,
+        NOW
+      )
+
+      const finalPaneKey = makePaneKey(toWebTerminalSurfaceTabId(hostTabId), LEAF_ID)
+      expect(readTerminalDockPaneState(provisionalPaneKey)).toEqual({ docked: true, gutterRows: 9 })
+      expect(hasTerminalDockPaneState(finalPaneKey)).toBe(false)
+    })
   })
 
   it('adopts host terminalDockByPaneKey for an existing tab with no local dock record', () => {

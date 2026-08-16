@@ -8,6 +8,7 @@ import {
   MAX_STORED_PANE_ENTRIES,
   MIN_GUTTER_ROWS,
   readTerminalDockPaneState,
+  rekeyTerminalDockPaneKeys,
   removeTerminalDockPaneKeys,
   writeTerminalDockPaneState
 } from './terminal-dock-pane-state'
@@ -142,6 +143,55 @@ describe('removeTerminalDockPaneKeys', () => {
     writeTerminalDockPaneState('pane-1', { docked: true, gutterRows: 6 })
     removeTerminalDockPaneKeys(new Set(['pane-does-not-exist']))
     expect(readTerminalDockPaneState('pane-1')).toEqual({ docked: true, gutterRows: 6 })
+  })
+})
+
+describe('rekeyTerminalDockPaneKeys', () => {
+  it('moves entries under the old tab id to the new tab id, preserving leaf ids and values', () => {
+    writeTerminalDockPaneState('provisional-1:leaf-a', { docked: true, gutterRows: 6 })
+    writeTerminalDockPaneState('provisional-1:leaf-b', { docked: false, gutterRows: 8 })
+    writeTerminalDockPaneState('other-tab:leaf-c', { docked: true, gutterRows: 4 })
+
+    rekeyTerminalDockPaneKeys('provisional-1', 'web-terminal-host-1')
+
+    expect(hasTerminalDockPaneState('provisional-1:leaf-a')).toBe(false)
+    expect(hasTerminalDockPaneState('provisional-1:leaf-b')).toBe(false)
+    expect(readTerminalDockPaneState('web-terminal-host-1:leaf-a')).toEqual({
+      docked: true,
+      gutterRows: 6
+    })
+    expect(readTerminalDockPaneState('web-terminal-host-1:leaf-b')).toEqual({
+      docked: false,
+      gutterRows: 8
+    })
+    expect(readTerminalDockPaneState('other-tab:leaf-c')).toEqual({ docked: true, gutterRows: 4 })
+  })
+
+  it('keeps the pre-existing target entry on collision and drops the source (target wins)', () => {
+    writeTerminalDockPaneState('provisional-1:leaf-a', { docked: true, gutterRows: 6 })
+    writeTerminalDockPaneState('web-terminal-host-1:leaf-a', { docked: false, gutterRows: 9 })
+
+    rekeyTerminalDockPaneKeys('provisional-1', 'web-terminal-host-1')
+
+    expect(hasTerminalDockPaneState('provisional-1:leaf-a')).toBe(false)
+    expect(readTerminalDockPaneState('web-terminal-host-1:leaf-a')).toEqual({
+      docked: false,
+      gutterRows: 9
+    })
+  })
+
+  it('is a no-op when there is nothing under the old tab id', () => {
+    writeTerminalDockPaneState('other-tab:leaf-c', { docked: true, gutterRows: 4 })
+    rekeyTerminalDockPaneKeys('provisional-1', 'web-terminal-host-1')
+    expect(readTerminalDockPaneState('other-tab:leaf-c')).toEqual({ docked: true, gutterRows: 4 })
+    expect(hasTerminalDockPaneState('web-terminal-host-1:leaf-c')).toBe(false)
+  })
+
+  it('rejects unsafe tab ids', () => {
+    writeTerminalDockPaneState('__proto__:leaf-a', { docked: true, gutterRows: 6 })
+    rekeyTerminalDockPaneKeys('__proto__', 'web-terminal-host-1')
+    rekeyTerminalDockPaneKeys('provisional-1', '__proto__')
+    expect(hasTerminalDockPaneState('web-terminal-host-1:leaf-a')).toBe(false)
   })
 })
 

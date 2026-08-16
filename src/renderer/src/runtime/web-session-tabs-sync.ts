@@ -38,6 +38,7 @@ import { sanitizeTerminalLayoutPaneTitlesForLabels } from '@/lib/terminal-pane-t
 import { terminalLayoutEqual } from '@/lib/terminal-layout-equality'
 import { normalizeTerminalLayoutPtyOwnership } from '@/components/terminal-pane/terminal-layout-pty-ownership'
 import { isClientAuthoritativeAgentStatusPane } from '@/components/terminal-pane/renderer-owned-agent-status-registry'
+import { rekeyTerminalDockPaneKeys } from '@/components/terminal-dock/terminal-dock-pane-state'
 import { getExplicitRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
 import {
   createWebRuntimeSessionTerminal,
@@ -2748,6 +2749,10 @@ function applyWebSessionTabsSnapshotWithContext(
       .filter((tab) => tab.contentType === 'terminal')
       .map((tab) => [tab.id, tab] as const)
   )
+  // Why: the kill switch gates adoption of host dock state, not its presence — a flag-off
+  // client still carries forward whatever it already holds so it can't clobber a flag-on
+  // peer's persisted record.
+  const hostTerminalDockSyncEnabled = state.settings?.experimentalTerminalDock === true
   // Why: a provisional tab's optimistic dock record has no unified tab under the
   // replacement id yet, so it would otherwise be lost the instant the host confirms
   // the handoff; carry it forward re-keyed to the replacement tab id.
@@ -2766,11 +2771,12 @@ function applyWebSessionTabsSnapshotWithContext(
     if (provisionalPendingMutations) {
       provisionalPendingMutationsByHostTabId.set(hostTabId, provisionalPendingMutations)
     }
+    // Why: this is the localStorage twin of the in-memory rekey above — old hosts that never
+    // echo the dock field rely on it surviving under the pane's final identity after a reload.
+    if (hostTerminalDockSyncEnabled) {
+      rekeyTerminalDockPaneKeys(provisionalTabId, toWebTerminalSurfaceTabId(hostTabId))
+    }
   }
-  // Why: the kill switch gates adoption of host dock state, not its presence — a flag-off
-  // client still carries forward whatever it already holds so it can't clobber a flag-on
-  // peer's persisted record.
-  const hostTerminalDockSyncEnabled = state.settings?.experimentalTerminalDock === true
   const terminalDockPendingMutationsByPaneKey = state.terminalDockPendingMutationsByPaneKey
   const isTerminalDockPaneKeyPending = (paneKey: string): boolean => {
     const mutatedAt = terminalDockPendingMutationsByPaneKey?.[paneKey]
