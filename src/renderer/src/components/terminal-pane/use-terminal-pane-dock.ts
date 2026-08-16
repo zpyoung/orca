@@ -6,6 +6,10 @@ import type { AgentType } from '../../../../shared/agent-status-types'
 import { isTuiAgent } from '../../../../shared/tui-agent-config'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
 import { getCachedUnifiedTerminalTabForWorktree } from './terminal-unified-tab-lookup'
+import {
+  readTerminalDockPaneAgent,
+  writeTerminalDockPaneAgent
+} from '../terminal-dock/terminal-dock-pane-state'
 import { useTerminalDockLocalFallback } from './use-terminal-dock-local-fallback'
 import { shouldDockTerminalComposerByDefault } from '../terminal-dock/terminal-dock-initial-state'
 import { useTerminalDockDisabledReason } from './use-terminal-dock-disabled-reason'
@@ -35,8 +39,10 @@ export type UseTerminalPaneDockResult = {
   /** The agent to render the dock with for this pane: `detectedAgent` when it's a live,
    *  recognized TUI agent; otherwise the last agent this pane was recognized as, but only
    *  while persisted-docked — so a status flap (reconnect, hook reconciliation) that clears
-   *  live status without a confirmed exit can never unmount the composer. Null means render
-   *  nothing, matching the caller's prior `!isTuiAgent(agent)` gate. */
+   *  live status without a confirmed exit can never unmount the composer. Falls back to the
+   *  client-local latch when the in-memory one is empty (e.g. a renderer remount), so agent-
+   *  status availability is never what decides whether a persisted dock renders. Null means
+   *  render nothing, matching the caller's prior `!isTuiAgent(agent)` gate. */
   resolveDockAgent: (paneKey: string, detectedAgent: string | null) => AgentType | null
   commitGutterRows: (paneKey: string, rows: number) => void
   disabledReasonFor: (args: {
@@ -72,9 +78,17 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
   const [mountedPaneKeys, setMountedPaneKeys] = useState<ReadonlySet<string>>(() => new Set())
   const paneAgentRef = useRef(new Map<string, AgentType>())
   const agentForPane = useCallback((paneKey: string) => paneAgentRef.current.get(paneKey), [])
-  const noteDetectedAgent = useCallback((paneKey: string, agent: AgentType): void => {
-    paneAgentRef.current.set(paneKey, agent)
-  }, [])
+  const noteDetectedAgent = useCallback(
+    (paneKey: string, agent: AgentType): void => {
+      const changed = paneAgentRef.current.get(paneKey) !== agent
+      paneAgentRef.current.set(paneKey, agent)
+      // Why: the kill switch — flag-off must not write a client-local latch either.
+      if (changed && enabled) {
+        writeTerminalDockPaneAgent(paneKey, agent)
+      }
+    },
+    [enabled]
+  )
   const { resolvedStateFor, hasLocalDockState, persistLocalDockState, forgetPane } =
     useTerminalDockLocalFallback()
   // Why: "ever echoed" is per-tab, not per-pane — a modern host's record simply omitting one
@@ -95,7 +109,16 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
         noteDetectedAgent(paneKey, detectedAgent)
         return detectedAgent
       }
-      return isPaneDocked(paneKey) ? (agentForPane(paneKey) ?? null) : null
+      if (!isPaneDocked(paneKey)) {
+        return null
+      }
+      // Why: an empty in-memory latch after a remount must not read as "no agent" — rehydrate
+      // from the client-local record before conceding no dock can be rendered.
+      const resolved = agentForPane(paneKey) ?? readTerminalDockPaneAgent(paneKey)
+      if (resolved) {
+        paneAgentRef.current.set(paneKey, resolved)
+      }
+      return resolved
     },
     [agentForPane, isPaneDocked, noteDetectedAgent]
   )

@@ -7,9 +7,11 @@ import {
   MAX_GUTTER_ROWS,
   MAX_STORED_PANE_ENTRIES,
   MIN_GUTTER_ROWS,
+  readTerminalDockPaneAgent,
   readTerminalDockPaneState,
   rekeyTerminalDockPaneKeys,
   removeTerminalDockPaneKeys,
+  writeTerminalDockPaneAgent,
   writeTerminalDockPaneState
 } from './terminal-dock-pane-state'
 
@@ -117,6 +119,51 @@ describe('readTerminalDockPaneState', () => {
       gutterRows: DEFAULT_GUTTER_ROWS
     })
     expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+  })
+})
+
+describe('terminal dock pane agent latch', () => {
+  it('returns null when nothing has been recorded for the pane', () => {
+    expect(readTerminalDockPaneAgent('pane-1')).toBeNull()
+  })
+
+  it('round-trips a recognized TUI agent through localStorage', () => {
+    writeTerminalDockPaneAgent('pane-1', 'claude')
+    expect(readTerminalDockPaneAgent('pane-1')).toBe('claude')
+  })
+
+  it('ignores a persisted value outside the known TUI-agent set', () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ 'pane-1': { docked: true, gutterRows: 5, lastAgent: 'not-a-real-agent' } })
+    )
+    expect(readTerminalDockPaneAgent('pane-1')).toBeNull()
+  })
+
+  it('rejects unsafe keys', () => {
+    writeTerminalDockPaneAgent('__proto__', 'claude')
+    expect(readTerminalDockPaneAgent('__proto__')).toBeNull()
+  })
+
+  it('does not appear in the docked/gutterRows read, even once recorded', () => {
+    writeTerminalDockPaneAgent('pane-1', 'claude')
+    expect(readTerminalDockPaneState('pane-1')).toEqual({
+      docked: false,
+      gutterRows: DEFAULT_GUTTER_ROWS
+    })
+  })
+
+  it('survives a later docked/gutterRows write for the same pane', () => {
+    writeTerminalDockPaneAgent('pane-1', 'claude')
+    writeTerminalDockPaneState('pane-1', { docked: true, gutterRows: 8 })
+    expect(readTerminalDockPaneAgent('pane-1')).toBe('claude')
+    expect(readTerminalDockPaneState('pane-1')).toEqual({ docked: true, gutterRows: 8 })
+  })
+
+  it('is cleared when the pane entry is pruned on retirement', () => {
+    writeTerminalDockPaneAgent('pane-1', 'claude')
+    removeTerminalDockPaneKeys(new Set(['pane-1']))
+    expect(readTerminalDockPaneAgent('pane-1')).toBeNull()
   })
 })
 

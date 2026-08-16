@@ -7,6 +7,7 @@ import type { Tab } from '../../../../shared/types'
 import {
   DEFAULT_GUTTER_ROWS,
   readTerminalDockPaneState,
+  writeTerminalDockPaneAgent,
   writeTerminalDockPaneState
 } from '../terminal-dock/terminal-dock-pane-state'
 
@@ -311,6 +312,63 @@ describe('useTerminalPaneDock', () => {
     act(() => result.current.prunePassthroughForRetiredPane(LEAF_ID))
 
     expect(result.current.isPanePassthrough(PANE_KEY)).toBe(false)
+  })
+
+  describe('agent latch survives a renderer remount', () => {
+    it('rehydrates the client-local agent for a persisted-docked pane with no live status or launch/title evidence yet', () => {
+      writeTerminalDockPaneAgent(PANE_KEY, 'claude')
+
+      // A fresh hook instance stands in for a post-remount mount: its in-memory
+      // paneAgentRef starts empty, unlike the same-session flap covered above.
+      const { result } = renderDockHook(true)
+
+      expect(result.current.resolveDockAgent(PANE_KEY, null)).toBe('claude')
+    })
+
+    it('renders no phantom dock for a pane that was never docked, even with a stray persisted agent', () => {
+      fakeStore.setState({
+        unifiedTabsByWorktree: { 'wt-1': [makeUnifiedTab({ terminalDockByPaneKey: {} })] }
+      })
+      writeTerminalDockPaneAgent(PANE_KEY, 'claude')
+
+      const { result } = renderDockHook(true)
+
+      expect(result.current.resolveDockAgent(PANE_KEY, null)).toBeNull()
+    })
+
+    it('persists a live-detected agent so a later remount can rehydrate it', () => {
+      const { result } = renderDockHook(true)
+
+      act(() => {
+        result.current.resolveDockAgent(PANE_KEY, 'claude')
+      })
+
+      const { result: afterRemount } = renderDockHook(true)
+      expect(afterRemount.current.resolveDockAgent(PANE_KEY, null)).toBe('claude')
+    })
+
+    it('never writes the agent latch when the flag is disabled', () => {
+      const { result } = renderDockHook(false)
+
+      act(() => {
+        result.current.resolveDockAgent(PANE_KEY, 'claude')
+      })
+
+      expect(window.localStorage.getItem('orca.terminalDock.paneState.v1')).toBeNull()
+    })
+
+    it('ignores a persisted agent value outside the known TUI-agent set', () => {
+      window.localStorage.setItem(
+        'orca.terminalDock.paneState.v1',
+        JSON.stringify({
+          [PANE_KEY]: { docked: true, gutterRows: 5, lastAgent: 'not-a-real-agent' }
+        })
+      )
+
+      const { result } = renderDockHook(true)
+
+      expect(result.current.resolveDockAgent(PANE_KEY, null)).toBeNull()
+    })
   })
 
   describe('client-local fallback', () => {

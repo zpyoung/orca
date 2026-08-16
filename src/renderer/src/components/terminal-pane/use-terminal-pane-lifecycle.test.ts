@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { AppState } from '@/store/types'
 import {
+  REMOTE_CONPTY_UNVERIFIED_DATASET_KEY,
+  terminalPaneUsesConptyBelowWrapMarkers
+} from './TerminalPaneDockMount'
+import {
   applyTerminalPaneCloseRequest,
   applyTerminalScrollbackRowsToMountedPanes,
   clearQueuedInitialCwdAfterFirstPane,
@@ -14,6 +18,7 @@ import {
   replayLayoutWithOneShotParkIntent,
   resolveRemoteDockConptyUnverified,
   resetTerminalKeyboardProtocolAfterInterrupt,
+  restampRemoteDockConptyUnverifiedForLivePanes,
   retireMountedTerminalPaneSurface,
   shouldDetachPaneTransportOnUnmount,
   splitPaneWithOneShotStartup,
@@ -625,7 +630,16 @@ describe('resolveRemoteDockConptyUnverified', () => {
         executionHostId: 'ssh:my-host',
         state: dockConptyState({
           sshConnectionStates: new Map([
-            ['my-host', { targetId: 'my-host', status: 'connected', error: null, reconnectAttempt: 0, remotePlatform: 'win32' }]
+            [
+              'my-host',
+              {
+                targetId: 'my-host',
+                status: 'connected',
+                error: null,
+                reconnectAttempt: 0,
+                remotePlatform: 'win32'
+              }
+            ]
           ])
         })
       })
@@ -638,7 +652,16 @@ describe('resolveRemoteDockConptyUnverified', () => {
         executionHostId: 'ssh:my-host',
         state: dockConptyState({
           sshConnectionStates: new Map([
-            ['my-host', { targetId: 'my-host', status: 'connected', error: null, reconnectAttempt: 0, remotePlatform: 'linux' }]
+            [
+              'my-host',
+              {
+                targetId: 'my-host',
+                status: 'connected',
+                error: null,
+                reconnectAttempt: 0,
+                remotePlatform: 'linux'
+              }
+            ]
           ])
         })
       })
@@ -665,5 +688,52 @@ describe('resolveRemoteDockConptyUnverified', () => {
         })
       })
     ).toBe(false)
+  })
+})
+
+describe('restampRemoteDockConptyUnverifiedForLivePanes', () => {
+  function makeStampablePane(initialStamp?: 'true' | 'false'): {
+    container: { dataset: Record<string, string> }
+  } {
+    const dataset: Record<string, string> = {}
+    if (initialStamp !== undefined) {
+      dataset[REMOTE_CONPTY_UNVERIFIED_DATASET_KEY] = initialStamp
+    }
+    return { container: { dataset } }
+  }
+
+  it('leaves local panes untouched — a null verdict is a no-op', () => {
+    const getPanes = vi.fn(() => [makeStampablePane()])
+    const changed = restampRemoteDockConptyUnverifiedForLivePanes({ getPanes }, null)
+    expect(changed).toBe(false)
+    expect(getPanes).not.toHaveBeenCalled()
+  })
+
+  it('upgrades a pane stamped unknown once the host platform hydrates to Linux, and the consumer observes it', () => {
+    const pane = makeStampablePane('true')
+
+    const changed = restampRemoteDockConptyUnverifiedForLivePanes({ getPanes: () => [pane] }, false)
+
+    expect(changed).toBe(true)
+    expect(
+      terminalPaneUsesConptyBelowWrapMarkers({
+        container: pane.container,
+        terminal: { options: {} }
+      } as never)
+    ).toBe(false)
+  })
+
+  it('keeps a pane demoted when hydration confirms an old/unknown Windows host', () => {
+    const pane = makeStampablePane('true')
+
+    const changed = restampRemoteDockConptyUnverifiedForLivePanes({ getPanes: () => [pane] }, true)
+
+    expect(changed).toBe(false)
+    expect(
+      terminalPaneUsesConptyBelowWrapMarkers({
+        container: pane.container,
+        terminal: { options: {} }
+      } as never)
+    ).toBe(true)
   })
 })

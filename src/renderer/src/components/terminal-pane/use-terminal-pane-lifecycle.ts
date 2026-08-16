@@ -531,6 +531,32 @@ export function resolveRemoteDockConptyUnverified(args: {
   return isRemoteWindowsConptyStatusUnverified(remotePlatform)
 }
 
+type RemoteConptyDockPaneManager = {
+  getPanes(): { container: Pick<HTMLElement, 'dataset'> }[]
+}
+
+/** Re-stamps every live pane's remote-ConPTY-unverified dataset marker after SSH/runtime
+ *  platform hydration — the onPaneCreated stamp only reflects what was known when a pane
+ *  mounted, so a pane created before hydration must still pick up a later-confirmed verdict.
+ *  Returns whether any pane's stamp actually changed, so a caller only re-renders when needed. */
+export function restampRemoteDockConptyUnverifiedForLivePanes(
+  manager: RemoteConptyDockPaneManager,
+  remoteConptyUnverified: boolean | null
+): boolean {
+  if (remoteConptyUnverified === null) {
+    return false
+  }
+  const next = String(remoteConptyUnverified)
+  let changed = false
+  for (const pane of manager.getPanes()) {
+    if (pane.container.dataset[REMOTE_CONPTY_UNVERIFIED_DATASET_KEY] !== next) {
+      pane.container.dataset[REMOTE_CONPTY_UNVERIFIED_DATASET_KEY] = next
+      changed = true
+    }
+  }
+  return changed
+}
+
 /** Pane keys to evict from the dock localStorage record when a tab's whole PaneManager
  *  tears down — `tabStillExists` false is a genuine close, not a rehome/remount that
  *  keeps the same tab (and its dock state) alive elsewhere. */
@@ -2106,4 +2132,22 @@ export function useTerminalPaneLifecycle({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings?.terminalMouseHideWhileTyping])
+
+  // Why: reactive (not read-once at pane creation) — a pane created before SSH/runtime
+  // platform hydration must still pick up a later-confirmed verdict, not stay stranded.
+  const remoteConptyUnverified = useAppStore((store) =>
+    resolveRemoteDockConptyUnverified({
+      executionHostId: getExecutionHostIdForWorktree(store, worktreeId),
+      state: store
+    })
+  )
+  useEffect(() => {
+    const manager = managerRef.current
+    if (!manager) {
+      return
+    }
+    if (restampRemoteDockConptyUnverifiedForLivePanes(manager, remoteConptyUnverified)) {
+      setPaneLayoutRevision((revision) => revision + 1)
+    }
+  }, [managerRef, remoteConptyUnverified, setPaneLayoutRevision])
 }

@@ -1,5 +1,7 @@
 // Why: renderer-only UI preference (not synced settings), same rationale as
 // column-widths.ts — a per-pane resize/toggle would be a noisy settings write.
+import type { AgentType } from '../../../../shared/agent-status-types'
+import { isTuiAgent } from '../../../../shared/tui-agent-config'
 import type { TerminalDockPaneState } from '../../../../shared/types'
 
 const STORAGE_KEY = 'orca.terminalDock.paneState.v1'
@@ -13,7 +15,11 @@ export const DEFAULT_TERMINAL_DOCK_PANE_STATE: TerminalDockPaneState = {
   gutterRows: DEFAULT_GUTTER_ROWS
 }
 
-type StoredMap = Record<string, TerminalDockPaneState>
+// Why: `lastAgent` never crosses into `TerminalDockPaneState` itself — that type also shapes
+// the wire record published to the host (Tab.terminalDockByPaneKey), and this latch is a
+// renderer-only affordance for surviving a remount, not host-synced dock state.
+type StoredEntry = TerminalDockPaneState & { lastAgent?: string }
+type StoredMap = Record<string, StoredEntry>
 
 function isUnsafeObjectKey(key: string): boolean {
   return key === '__proto__' || key === 'constructor' || key === 'prototype'
@@ -23,12 +29,18 @@ function clampGutterRows(value: number): number {
   return Math.min(MAX_GUTTER_ROWS, Math.max(MIN_GUTTER_ROWS, Math.round(value)))
 }
 
-function isValidStoredEntry(value: unknown): value is { docked: boolean; gutterRows: number } {
+function isValidStoredEntry(
+  value: unknown
+): value is { docked: boolean; gutterRows: number; lastAgent?: unknown } {
   if (typeof value !== 'object' || value === null) {
     return false
   }
   const candidate = value as { docked?: unknown; gutterRows?: unknown }
   return typeof candidate.docked === 'boolean' && Number.isFinite(candidate.gutterRows)
+}
+
+function sanitizeStoredAgent(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined
 }
 
 function readStoredMap(): StoredMap {
@@ -48,7 +60,11 @@ function readStoredMap(): StoredMap {
       if (isUnsafeObjectKey(key) || !isValidStoredEntry(value)) {
         continue
       }
-      next[key] = { docked: value.docked, gutterRows: clampGutterRows(value.gutterRows) }
+      next[key] = {
+        docked: value.docked,
+        gutterRows: clampGutterRows(value.gutterRows),
+        lastAgent: sanitizeStoredAgent(value.lastAgent)
+      }
     }
     return next
   } catch {
@@ -87,8 +103,39 @@ export function readTerminalDockPaneState(paneKey: string): TerminalDockPaneStat
   if (isUnsafeObjectKey(paneKey)) {
     return DEFAULT_TERMINAL_DOCK_PANE_STATE
   }
+  const entry = readStoredMap()[paneKey]
+  return entry
+    ? { docked: entry.docked, gutterRows: entry.gutterRows }
+    : DEFAULT_TERMINAL_DOCK_PANE_STATE
+}
+
+/** The last TUI agent this pane was recognized as, validated against the known agent set —
+ *  survives a renderer remount so a persisted-docked pane with no live status or launch/title
+ *  evidence yet can still resolve which composer to render. */
+export function readTerminalDockPaneAgent(paneKey: string): AgentType | null {
+  if (isUnsafeObjectKey(paneKey)) {
+    return null
+  }
+  const stored = readStoredMap()[paneKey]?.lastAgent
+  return isTuiAgent(stored) ? stored : null
+}
+
+/** Write-through target alongside writeTerminalDockPaneState — kept separate since docked/
+ *  gutterRows changes and agent-recognition events happen on independent triggers. */
+export function writeTerminalDockPaneAgent(paneKey: string, agent: AgentType): void {
+  if (isUnsafeObjectKey(paneKey)) {
+    return
+  }
   const map = readStoredMap()
-  return map[paneKey] ?? DEFAULT_TERMINAL_DOCK_PANE_STATE
+  const existing = map[paneKey]
+  delete map[paneKey]
+  map[paneKey] = {
+    docked: existing?.docked ?? DEFAULT_TERMINAL_DOCK_PANE_STATE.docked,
+    gutterRows: existing?.gutterRows ?? DEFAULT_TERMINAL_DOCK_PANE_STATE.gutterRows,
+    lastAgent: agent
+  }
+  evictOldestEntries(map)
+  writeStoredMap(map)
 }
 
 /** Distinguishes a deliberate local undock from the absent-state default. */
@@ -104,10 +151,15 @@ export function writeTerminalDockPaneState(paneKey: string, state: TerminalDockP
     return
   }
   const map = readStoredMap()
+  const existingAgent = map[paneKey]?.lastAgent
   // delete-then-set moves an existing key to the newest end of insertion order, so a rewrite
   // of a live pane refreshes its recency instead of leaving it eligible for eviction.
   delete map[paneKey]
-  map[paneKey] = { docked: state.docked, gutterRows: clampGutterRows(state.gutterRows) }
+  map[paneKey] = {
+    docked: state.docked,
+    gutterRows: clampGutterRows(state.gutterRows),
+    lastAgent: existingAgent
+  }
   evictOldestEntries(map)
   writeStoredMap(map)
 }
