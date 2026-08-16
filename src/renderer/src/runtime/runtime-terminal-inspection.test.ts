@@ -3,6 +3,7 @@ import {
   inspectRuntimeTerminalProcess,
   recordRuntimeTerminalInputForPtyId,
   sendRuntimePtyInput,
+  sendRuntimePtyInputAcceptance,
   sendRuntimePtyInputVerified
 } from './runtime-terminal-inspection'
 import { CLIPBOARD_TEXT_MEASURE_YIELD_CODE_UNITS } from '../../../shared/clipboard-text'
@@ -488,5 +489,108 @@ describe('runtime terminal owner routing', () => {
 
     expect(localWriteAccepted).toHaveBeenCalledWith('local-pty', 'x')
     expect(localWrite).toHaveBeenCalledWith('local-pty', 'x')
+  })
+
+  describe('sendRuntimePtyInputAcceptance', () => {
+    it('resolves false on a remote RPC rejection, without throwing', async () => {
+      runtimeCall.mockRejectedValue(new Error('terminal_handle_stale'))
+
+      await expect(
+        sendRuntimePtyInputAcceptance(
+          { activeRuntimeEnvironmentId: 'env-2' },
+          'remote:env-1@@terminal-stale',
+          'x'
+        )
+      ).resolves.toBe(false)
+
+      expect(useAppStore.getState().lastTerminalInputAtByPaneKey).toEqual({})
+    })
+
+    it('resolves false when the remote transport reports accepted: false', async () => {
+      runtimeCall.mockResolvedValue({
+        ok: true,
+        result: { send: { handle: 'terminal-1', accepted: false, bytesWritten: 0 } },
+        _meta: { runtimeId: 'runtime-1' }
+      })
+
+      await expect(
+        sendRuntimePtyInputAcceptance(
+          { activeRuntimeEnvironmentId: 'env-2' },
+          'remote:env-1@@terminal-1',
+          'x'
+        )
+      ).resolves.toBe(false)
+
+      expect(runtimeCall).toHaveBeenCalledWith({
+        selector: 'env-1',
+        method: 'terminal.send',
+        params: {
+          terminal: 'terminal-1',
+          text: 'x',
+          client: { id: 'orca-desktop', type: 'desktop' }
+        },
+        timeoutMs: 15_000
+      })
+    })
+
+    it('resolves false when the deferred size check suppresses an oversized body, before any transport call', async () => {
+      vi.useFakeTimers()
+      try {
+        const text = makeByteOversizedTerminalInput()
+        const accepted = sendRuntimePtyInputAcceptance(
+          { activeRuntimeEnvironmentId: 'env-2' },
+          'remote:env-1@@terminal-1',
+          text
+        )
+
+        await vi.runAllTimersAsync()
+
+        await expect(accepted).resolves.toBe(false)
+        expect(runtimeTransportCall).not.toHaveBeenCalled()
+        expect(localWrite).not.toHaveBeenCalled()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('resolves true and records the owning pane on a successful remote send', async () => {
+      runtimeCall.mockResolvedValue({
+        ok: true,
+        result: { send: { handle: 'terminal-1', accepted: true, bytesWritten: 1 } },
+        _meta: { runtimeId: 'runtime-1' }
+      })
+      useAppStore.setState({
+        settings: { experimentalAgentHibernation: true } as never,
+        terminalLayoutsByTabId: {
+          'tab-1': {
+            root: { type: 'leaf', leafId: LEAF_ID },
+            activeLeafId: LEAF_ID,
+            expandedLeafId: null,
+            ptyIdsByLeafId: { [LEAF_ID]: 'remote:env-1@@terminal-1' }
+          }
+        }
+      })
+
+      await expect(
+        sendRuntimePtyInputAcceptance(
+          { activeRuntimeEnvironmentId: 'env-2' },
+          'remote:env-1@@terminal-1',
+          'x'
+        )
+      ).resolves.toBe(true)
+
+      expect(useAppStore.getState().lastTerminalInputAtByPaneKey[PANE_KEY]).toEqual(
+        expect.any(Number)
+      )
+    })
+
+    it('writes local desktop input synchronously, without a fire-and-forget acceptance check', async () => {
+      await expect(
+        sendRuntimePtyInputAcceptance({ activeRuntimeEnvironmentId: null }, 'local-pty', 'x')
+      ).resolves.toBe(true)
+
+      expect(localWrite).toHaveBeenCalledWith('local-pty', 'x')
+      expect(localWriteAccepted).not.toHaveBeenCalled()
+    })
   })
 })

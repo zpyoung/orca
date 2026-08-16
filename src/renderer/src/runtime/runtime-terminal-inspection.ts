@@ -3,7 +3,12 @@ import type { RuntimeTerminalSend } from '../../../shared/runtime-types'
 import { makePaneKey } from '../../../shared/stable-pane-id'
 import { isTerminalInputTooLargeWithDeferredMeasurement } from '../../../shared/terminal-input'
 import { useAppStore } from '../store'
-import { RuntimeRpcCallError, callRuntimeRpc, getActiveRuntimeTarget } from './runtime-rpc-client'
+import {
+  RuntimeRpcCallError,
+  callRuntimeRpc,
+  getActiveRuntimeTarget,
+  type RuntimeClientTarget
+} from './runtime-rpc-client'
 import {
   getRemoteRuntimePtyEnvironmentId,
   getRemoteRuntimeTerminalHandle
@@ -146,16 +151,23 @@ export function sendRuntimePtyInput(
   return sendRuntimePtyInputWithinLimit(settings, ptyId, data)
 }
 
+function resolveRuntimeSendTarget(
+  settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
+  ptyId: string
+): { target: RuntimeClientTarget; terminal: string | null } {
+  const ownerEnvironmentId = getRemoteRuntimePtyEnvironmentId(ptyId)
+  const target = ownerEnvironmentId
+    ? ({ kind: 'environment', environmentId: ownerEnvironmentId } as const)
+    : getActiveRuntimeTarget(settings)
+  return { target, terminal: getRemoteRuntimeTerminalHandle(ptyId) }
+}
+
 function sendRuntimePtyInputWithinLimit(
   settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
   ptyId: string,
   data: string
 ): boolean {
-  const ownerEnvironmentId = getRemoteRuntimePtyEnvironmentId(ptyId)
-  const target = ownerEnvironmentId
-    ? ({ kind: 'environment', environmentId: ownerEnvironmentId } as const)
-    : getActiveRuntimeTarget(settings)
-  const terminal = getRemoteRuntimeTerminalHandle(ptyId)
+  const { target, terminal } = resolveRuntimeSendTarget(settings, ptyId)
   if (target.kind !== 'environment' || !terminal) {
     window.api.pty.write(ptyId, data)
     recordRuntimeTerminalInputForPtyId(ptyId)
@@ -180,6 +192,47 @@ function sendRuntimePtyInputWithinLimit(
   return true
 }
 
+/**
+ * Acceptance-aware send for pipelines that must know real transport
+ * acceptance before issuing a follow-up write (e.g. the composer's submit
+ * CR): resolves once the deferred size check and, for a remote target, the
+ * RPC round-trip have both settled — never optimistically. A rejection,
+ * timeout, or `accepted: false` all resolve `false` rather than throwing, so
+ * callers never need their own try/catch around this call. Local desktop
+ * writes stay fire-and-forget, matching `sendRuntimePtyInput`.
+ */
+export async function sendRuntimePtyInputAcceptance(
+  settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
+  ptyId: string,
+  data: string
+): Promise<boolean> {
+  const tooLarge = isRuntimePtyInputTooLarge(data)
+  if (typeof tooLarge === 'boolean' ? tooLarge : await tooLarge) {
+    return false
+  }
+  const { target, terminal } = resolveRuntimeSendTarget(settings, ptyId)
+  if (target.kind !== 'environment' || !terminal) {
+    window.api.pty.write(ptyId, data)
+    recordRuntimeTerminalInputForPtyId(ptyId)
+    return true
+  }
+  try {
+    const result = await callRuntimeRpc<{ send: RuntimeTerminalSend }>(
+      target,
+      'terminal.send',
+      { terminal, text: data, client: DESKTOP_RUNTIME_CLIENT },
+      { timeoutMs: 15_000 }
+    )
+    if (result.send.accepted !== true) {
+      return false
+    }
+    recordRuntimeTerminalInputForPtyId(ptyId)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export async function sendRuntimePtyInputVerified(
   settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
   ptyId: string,
@@ -189,11 +242,7 @@ export async function sendRuntimePtyInputVerified(
   if (typeof tooLarge === 'boolean' ? tooLarge : await tooLarge) {
     return false
   }
-  const ownerEnvironmentId = getRemoteRuntimePtyEnvironmentId(ptyId)
-  const target = ownerEnvironmentId
-    ? ({ kind: 'environment', environmentId: ownerEnvironmentId } as const)
-    : getActiveRuntimeTarget(settings)
-  const terminal = getRemoteRuntimeTerminalHandle(ptyId)
+  const { target, terminal } = resolveRuntimeSendTarget(settings, ptyId)
   if (target.kind !== 'environment' || !terminal) {
     const accepted = await window.api.pty.writeAccepted(ptyId, data)
     if (!accepted) {

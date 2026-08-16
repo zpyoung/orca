@@ -4,9 +4,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const sendRuntimePtyInput = vi.fn()
+const sendRuntimePtyInputAcceptance = vi.fn()
 const sendRuntimePtyInputVerified = vi.fn()
 vi.mock('@/runtime/runtime-terminal-inspection', () => ({
   sendRuntimePtyInput: (...args: unknown[]) => sendRuntimePtyInput(...args),
+  sendRuntimePtyInputAcceptance: (...args: unknown[]) => sendRuntimePtyInputAcceptance(...args),
   sendRuntimePtyInputVerified: (...args: unknown[]) => sendRuntimePtyInputVerified(...args)
 }))
 
@@ -29,12 +31,25 @@ const SETTINGS = {} as Parameters<typeof sendNativeChatMessage>[0]
 const PTY = 'pty-launch-draft'
 const DRAFT = 'Linked Linear issue: ABC-123\nhttps://linear.app/x/issue/ABC-123'
 
-const writes = (): string[] => sendRuntimePtyInput.mock.calls.map((call) => call[2] as string)
+// Body writes go through the acceptance-aware transport, clear/Enter through
+// the fire-and-forget one — merge both mocks' calls by global invocation
+// order to assert on the pty write sequence as a whole.
+const writes = (): string[] => {
+  const entries: { order: number; bytes: string }[] = []
+  for (const mock of [sendRuntimePtyInput, sendRuntimePtyInputAcceptance]) {
+    mock.mock.calls.forEach((call, index) => {
+      entries.push({ order: mock.mock.invocationCallOrder[index], bytes: call[2] as string })
+    })
+  }
+  return entries.sort((a, b) => a.order - b.order).map((entry) => entry.bytes)
+}
 
 beforeEach(() => {
   vi.useFakeTimers()
   sendRuntimePtyInput.mockClear()
   sendRuntimePtyInput.mockReturnValue(true)
+  sendRuntimePtyInputAcceptance.mockClear()
+  sendRuntimePtyInputAcceptance.mockResolvedValue(true)
   resetNativeChatPtySendQueuesForTests()
 })
 afterEach(() => {
@@ -43,9 +58,10 @@ afterEach(() => {
 })
 
 describe('sendNativeChatMessage with a parked multi-line draft', () => {
-  it('leads with a clear sized to every line of the draft, not one Ctrl+U', () => {
+  it('leads with a clear sized to every line of the draft, not one Ctrl+U', async () => {
     const clearInput = buildAgentTuiClearInputForText(DRAFT)
     sendNativeChatMessage(SETTINGS, PTY, 'edited text', { clearInput })
+    await vi.advanceTimersByTimeAsync(0)
     expect(writes()).toEqual([clearInput, buildNativeChatPasteBytes('edited text')])
     expect(clearInput).not.toBe(NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT)
   })
@@ -55,7 +71,7 @@ describe('sendNativeChatMessage with a parked multi-line draft', () => {
     expect(writes()[0]).toBe(NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT)
   })
 
-  it('holds the body until the clear is confirmed, then submits after the gap', () => {
+  it('holds the body until the clear is confirmed, then submits after the gap', async () => {
     const clearInput = buildAgentTuiClearInputForText(DRAFT)
     sendNativeChatMessage(SETTINGS, PTY, 'edited', {
       clearInput,
@@ -63,9 +79,9 @@ describe('sendNativeChatMessage with a parked multi-line draft', () => {
     })
     // Body must NOT ride out with the clear — the confirm happens in between.
     expect(writes()).toEqual([clearInput])
-    vi.advanceTimersByTime(NATIVE_CHAT_CLEAR_CONFIRM_MS)
+    await vi.advanceTimersByTimeAsync(NATIVE_CHAT_CLEAR_CONFIRM_MS)
     expect(writes()).toEqual([clearInput, buildNativeChatPasteBytes('edited')])
-    vi.advanceTimersByTime(NATIVE_CHAT_SUBMIT_DELAY_MS)
+    await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS)
     expect(writes()).toEqual([clearInput, buildNativeChatPasteBytes('edited'), NATIVE_CHAT_SUBMIT])
   })
 
@@ -73,6 +89,10 @@ describe('sendNativeChatMessage with a parked multi-line draft', () => {
     vi.useRealTimers()
     const writeTimes = new Map<string, number>()
     sendRuntimePtyInput.mockImplementation((_settings, _pty, bytes: string) => {
+      writeTimes.set(bytes, performance.now())
+      return true
+    })
+    sendRuntimePtyInputAcceptance.mockImplementation(async (_settings, _pty, bytes: string) => {
       writeTimes.set(bytes, performance.now())
       return true
     })
@@ -100,13 +120,13 @@ describe('sendNativeChatMessage with a parked multi-line draft', () => {
     )
   })
 
-  it('widens to a maximal burst when the draft is still observed on the line', () => {
+  it('widens to a maximal burst when the draft is still observed on the line', async () => {
     const clearInput = buildAgentTuiClearInputForText(DRAFT)
     sendNativeChatMessage(SETTINGS, PTY, 'edited', {
       clearInput,
       confirmCleared: () => false
     })
-    vi.advanceTimersByTime(NATIVE_CHAT_CLEAR_CONFIRM_MS)
+    await vi.advanceTimersByTimeAsync(NATIVE_CHAT_CLEAR_CONFIRM_MS)
     expect(writes()).toEqual([
       clearInput,
       AGENT_TUI_CLEAR_INPUT_MAX,
@@ -114,12 +134,12 @@ describe('sendNativeChatMessage with a parked multi-line draft', () => {
     ])
   })
 
-  it('re-clears before the body, never after it', () => {
+  it('re-clears before the body, never after it', async () => {
     sendNativeChatMessage(SETTINGS, PTY, 'edited', {
       clearInput: buildAgentTuiClearInputForText(DRAFT),
       confirmCleared: () => false
     })
-    vi.advanceTimersByTime(NATIVE_CHAT_CLEAR_CONFIRM_MS + NATIVE_CHAT_SUBMIT_DELAY_MS)
+    await vi.advanceTimersByTimeAsync(NATIVE_CHAT_CLEAR_CONFIRM_MS + NATIVE_CHAT_SUBMIT_DELAY_MS)
     const order = writes()
     expect(order.indexOf(AGENT_TUI_CLEAR_INPUT_MAX)).toBeLessThan(
       order.indexOf(buildNativeChatPasteBytes('edited'))
