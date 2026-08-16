@@ -5,6 +5,7 @@ import {
   DEFAULT_GUTTER_ROWS,
   hasTerminalDockPaneState,
   MAX_GUTTER_ROWS,
+  MAX_STORED_PANE_ENTRIES,
   MIN_GUTTER_ROWS,
   readTerminalDockPaneState,
   removeTerminalDockPaneKeys,
@@ -141,5 +142,20 @@ describe('removeTerminalDockPaneKeys', () => {
     writeTerminalDockPaneState('pane-1', { docked: true, gutterRows: 6 })
     removeTerminalDockPaneKeys(new Set(['pane-does-not-exist']))
     expect(readTerminalDockPaneState('pane-1')).toEqual({ docked: true, gutterRows: 6 })
+  })
+})
+
+describe('writeTerminalDockPaneState bound', () => {
+  it('evicts the oldest entries once the stored map exceeds the cap', () => {
+    for (let i = 0; i < MAX_STORED_PANE_ENTRIES; i++) {
+      writeTerminalDockPaneState(`pane-${i}`, { docked: true, gutterRows: 5 })
+    }
+    writeTerminalDockPaneState('pane-overflow', { docked: true, gutterRows: 5 })
+
+    expect(hasTerminalDockPaneState('pane-0')).toBe(false)
+    expect(hasTerminalDockPaneState('pane-1')).toBe(true)
+    expect(hasTerminalDockPaneState('pane-overflow')).toBe(true)
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+    expect(Object.keys(JSON.parse(raw as string))).toHaveLength(MAX_STORED_PANE_ENTRIES)
   })
 })

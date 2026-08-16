@@ -4,6 +4,7 @@ import {
   buildWindowsPtyCompatibilityOptions,
   isLocalNativeWindowsConpty,
   isLocalNativeWindowsPty,
+  isRemoteWindowsConptyStatusUnverified,
   resolveWindowsShellOverride
 } from './windows-pty-compatibility'
 
@@ -300,5 +301,21 @@ describe('isLocalNativeWindowsConpty', () => {
         executionHostId: 'local'
       })
     ).toBe(false)
+  })
+})
+
+describe('isRemoteWindowsConptyStatusUnverified', () => {
+  it('demotes when the remote platform has not been reported yet', () => {
+    expect(isRemoteWindowsConptyStatusUnverified(undefined)).toBe(true)
+    expect(isRemoteWindowsConptyStatusUnverified(null)).toBe(true)
+  })
+
+  it('demotes a remote host confirmed to be Windows — no remote ConPTY build number is ever known', () => {
+    expect(isRemoteWindowsConptyStatusUnverified('win32')).toBe(true)
+  })
+
+  it('stays verified-eligible for a remote host confirmed non-Windows', () => {
+    expect(isRemoteWindowsConptyStatusUnverified('linux')).toBe(false)
+    expect(isRemoteWindowsConptyStatusUnverified('darwin')).toBe(false)
   })
 })

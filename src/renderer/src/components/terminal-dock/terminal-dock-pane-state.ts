@@ -56,6 +56,23 @@ function readStoredMap(): StoredMap {
   }
 }
 
+// Why: whole-tab teardown historically never pruned its keys (see
+// removeTerminalDockPaneKeys callers), so a long session can carry pre-existing
+// dead entries; capping on every write self-heals that backlog without needing
+// to know which keys are still live.
+export const MAX_STORED_PANE_ENTRIES = 500
+
+function evictOldestEntries(map: StoredMap): void {
+  const keys = Object.keys(map)
+  const overflow = keys.length - MAX_STORED_PANE_ENTRIES
+  if (overflow <= 0) {
+    return
+  }
+  for (const key of keys.slice(0, overflow)) {
+    delete map[key]
+  }
+}
+
 function writeStoredMap(map: StoredMap): void {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(map))
@@ -88,6 +105,7 @@ export function writeTerminalDockPaneState(paneKey: string, state: TerminalDockP
   }
   const map = readStoredMap()
   map[paneKey] = { docked: state.docked, gutterRows: clampGutterRows(state.gutterRows) }
+  evictOldestEntries(map)
   writeStoredMap(map)
 }
 

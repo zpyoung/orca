@@ -25,9 +25,17 @@ function findXtermContainer(pane: ManagedPane): HTMLElement | null {
   return pane.container.querySelector<HTMLElement>('.xterm-container')
 }
 
+/** Dataset key use-terminal-pane-lifecycle stamps on a non-local pane's container with
+ *  its remote-host ConPTY verdict — windowsPty only ever installs for a local pane, so a
+ *  remote/SSH pane needs this separate signal to reach the same demotion decision. */
+export const REMOTE_CONPTY_UNVERIFIED_DATASET_KEY = 'dockRemoteConptyUnverified'
+
 export function terminalPaneUsesConptyBelowWrapMarkers(pane: ManagedPane): boolean {
   const windowsPty = pane.terminal.options?.windowsPty
-  return windowsPty?.backend === 'conpty' && windowsPty.buildNumber === undefined
+  if (windowsPty?.backend === 'conpty' && windowsPty.buildNumber === undefined) {
+    return true
+  }
+  return pane.container.dataset[REMOTE_CONPTY_UNVERIFIED_DATASET_KEY] === 'true'
 }
 
 export type TerminalPaneDockMountProps = {

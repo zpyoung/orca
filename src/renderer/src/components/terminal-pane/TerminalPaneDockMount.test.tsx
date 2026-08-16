@@ -56,7 +56,11 @@ vi.mock('../native-chat/native-chat-runtime-send', () => ({
   submitNativeChatPrompt: vi.fn()
 }))
 
-import { TerminalPaneDockMount } from './TerminalPaneDockMount'
+import {
+  REMOTE_CONPTY_UNVERIFIED_DATASET_KEY,
+  TerminalPaneDockMount,
+  terminalPaneUsesConptyBelowWrapMarkers
+} from './TerminalPaneDockMount'
 
 afterEach(() => {
   cleanup()
@@ -432,5 +436,36 @@ describe('TerminalPaneDockMount', () => {
     // Release settles at the final (15-row) gutter, which genuinely doesn't fit a 300px
     // pane — auto-undock now applies, evaluated exactly once.
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  })
+})
+
+describe('terminalPaneUsesConptyBelowWrapMarkers', () => {
+  it('stays false when neither the local windowsPty option nor the remote stamp is set', () => {
+    const pane = makeFakePane()
+    expect(terminalPaneUsesConptyBelowWrapMarkers(pane)).toBe(false)
+  })
+
+  it('demotes a local pane below the ConPTY wrap-marker build threshold', () => {
+    const pane = makeFakePane()
+    pane.terminal.options = { windowsPty: { backend: 'conpty' } }
+    expect(terminalPaneUsesConptyBelowWrapMarkers(pane)).toBe(true)
+  })
+
+  it('keeps a local pane verified-eligible once a build number is known', () => {
+    const pane = makeFakePane()
+    pane.terminal.options = { windowsPty: { backend: 'conpty', buildNumber: 26100 } }
+    expect(terminalPaneUsesConptyBelowWrapMarkers(pane)).toBe(false)
+  })
+
+  it('demotes a remote/SSH pane stamped with an unverified ConPTY status', () => {
+    const pane = makeFakePane()
+    pane.container.dataset[REMOTE_CONPTY_UNVERIFIED_DATASET_KEY] = 'true'
+    expect(terminalPaneUsesConptyBelowWrapMarkers(pane)).toBe(true)
+  })
+
+  it('keeps a remote/SSH pane stamped verified-eligible', () => {
+    const pane = makeFakePane()
+    pane.container.dataset[REMOTE_CONPTY_UNVERIFIED_DATASET_KEY] = 'false'
+    expect(terminalPaneUsesConptyBelowWrapMarkers(pane)).toBe(false)
   })
 })

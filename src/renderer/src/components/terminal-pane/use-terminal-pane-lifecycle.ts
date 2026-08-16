@@ -21,10 +21,14 @@ import {
 } from '@/lib/pane-manager/pane-terminal-output-scheduler'
 import { normalizeTerminalLineHeight } from '../../../../shared/terminal-line-height-settings'
 import { normalizeTerminalTuiMouseWheelMultiplier } from '@/lib/pane-manager/pane-terminal-mouse-wheel'
-import { buildWindowsPtyCompatibilityOptions } from '@/lib/pane-manager/windows-pty-compatibility'
+import {
+  buildWindowsPtyCompatibilityOptions,
+  isRemoteWindowsConptyStatusUnverified
+} from '@/lib/pane-manager/windows-pty-compatibility'
 import { buildTerminalKeyboardProtocolOptions } from '@/lib/pane-manager/terminal-keyboard-protocol'
 import { resolvePaneKeyboardProtocolAgent } from './terminal-keyboard-protocol-pane-agent'
 import { useAppStore } from '@/store'
+import type { AppState } from '@/store/types'
 import type { DirectSshPaneRetryAttemptId } from '@/store/slices/direct-ssh-terminal-recovery'
 import {
   createFilePathLinkProvider,
@@ -81,7 +85,10 @@ import {
 import { RESET_KITTY_KEYBOARD_PROTOCOL } from '../../../../shared/terminal-mode-reset-profiles'
 import { resolveTerminalLayoutActiveLeafId } from './terminal-layout-leaf-ids'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
+import { parseExecutionHostId } from '../../../../shared/execution-host'
 import { pruneTerminalDockPaneKeysEverywhere } from './terminal-pane-dock-prune'
+import { removeTerminalDockPaneKeys } from '../terminal-dock/terminal-dock-pane-state'
+import { REMOTE_CONPTY_UNVERIFIED_DATASET_KEY } from './TerminalPaneDockMount'
 import { applyExpandedLayoutTo, restoreExpandedLayoutFrom } from './expand-collapse'
 import { applyTerminalAppearance } from './terminal-appearance'
 import { createOsc52OscHandler } from './osc52-clipboard'
@@ -501,6 +508,42 @@ export function replayLayoutWithOneShotParkIntent<TRestored>(
   } finally {
     deps.mountFollowsTerminalPark = false
   }
+}
+
+/**
+ * Whether a non-local pane's remote host makes ConPTY reliability unverifiable —
+ * null for a local host (the xterm windowsPty option already covers it). Remote
+ * hosts never report a ConPTY build number, so a Windows or unconfirmed remote
+ * platform demotes; only a positively known non-Windows platform stays eligible.
+ */
+export function resolveRemoteDockConptyUnverified(args: {
+  executionHostId: string
+  state: Pick<AppState, 'sshConnectionStates' | 'runtimeStatusByEnvironmentId'>
+}): boolean | null {
+  const parsedHost = parseExecutionHostId(args.executionHostId)
+  if (!parsedHost || parsedHost.kind === 'local') {
+    return null
+  }
+  const remotePlatform =
+    parsedHost.kind === 'ssh'
+      ? args.state.sshConnectionStates.get(parsedHost.targetId)?.remotePlatform
+      : args.state.runtimeStatusByEnvironmentId.get(parsedHost.environmentId)?.status?.hostPlatform
+  return isRemoteWindowsConptyStatusUnverified(remotePlatform)
+}
+
+/** Pane keys to evict from the dock localStorage record when a tab's whole PaneManager
+ *  tears down — `tabStillExists` false is a genuine close, not a rehome/remount that
+ *  keeps the same tab (and its dock state) alive elsewhere. */
+export function collectTerminalDockPaneKeysForTabTeardown(args: {
+  tabId: string
+  tabStillExists: boolean
+  experimentalTerminalDockEnabled: boolean
+  paneLeafIds: readonly string[]
+}): string[] {
+  if (args.tabStillExists || !args.experimentalTerminalDockEnabled) {
+    return []
+  }
+  return args.paneLeafIds.map((leafId) => makePaneKey(args.tabId, leafId))
 }
 
 export function shouldDetachPaneTransportOnUnmount(args: {
@@ -955,6 +998,17 @@ export function useTerminalPaneLifecycle({
     const manager = new PaneManager(container, {
       // `spawnHints.cwd` (from Split actions) lets the new PTY inherit the source pane's cwd — see docs/ssh-split-pane-inherit-cwd.md.
       onPaneCreated: (pane, spawnHints) => {
+        // Why: windowsPty only covers a local pane, so a remote/SSH pane needs this
+        // separate stamp for the dock's ConPTY-below-wrap-markers demotion check.
+        const dockConptyState = useAppStore.getState()
+        const remoteConptyUnverified = resolveRemoteDockConptyUnverified({
+          executionHostId: getExecutionHostIdForWorktree(dockConptyState, worktreeId),
+          state: dockConptyState
+        })
+        if (remoteConptyUnverified !== null) {
+          pane.container.dataset[REMOTE_CONPTY_UNVERIFIED_DATASET_KEY] =
+            String(remoteConptyUnverified)
+        }
         // OSC 52 — TUI-initiated clipboard writes (Zellij/tmux/nvim/fzf/ssh).
         // Why: read settingsRef at fire time so mid-session gate toggles apply; return true in both paths so xterm doesn't fall through.
         const osc52Disposable = pane.terminal.parser.registerOscHandler(
@@ -1906,6 +1960,21 @@ export function useTerminalPaneLifecycle({
       }
       panePtyBindings.clear()
       paneTransports.clear()
+      // Why: a genuinely closed tab (not a rehome/remount) leaves no per-pane retirement
+      // callback to prune the dock localStorage record — enumerate its panes here so
+      // entries don't accumulate one-per-closed-tab until the record's write quota dies.
+      // settingsRef is a live-read mirror for still-running callbacks, not a cleanup
+      // closure, so read the store directly here instead.
+      const teardownDockPaneKeys = collectTerminalDockPaneKeysForTabTeardown({
+        tabId,
+        tabStillExists,
+        experimentalTerminalDockEnabled:
+          useAppStore.getState().settings?.experimentalTerminalDock === true,
+        paneLeafIds: manager.getPanes().map((pane) => pane.leafId)
+      })
+      if (teardownDockPaneKeys.length > 0) {
+        removeTerminalDockPaneKeys(new Set(teardownDockPaneKeys))
+      }
       manager.destroy()
       releaseWebviewDragPassthrough?.()
       releaseWebviewDragPassthrough = null
