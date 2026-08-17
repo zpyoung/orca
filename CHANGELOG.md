@@ -1,6 +1,6 @@
 ---
-last_released_commit: 4102ac6b1e948a8d97ac9ceac976d7f8d4bb0b41
-upstream_synced: v1.4.182
+last_released_commit: bd4ed56737bf9c2723dfde9be20625dcc5d1a6e3
+upstream_synced: v1.4.184
 ---
 
 # Changelog
@@ -11,6 +11,19 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.185-rc.0.zy01] - 2026-08-17
+
+Synced to upstream [v1.4.184](https://github.com/stablyai/orca/releases/tag/v1.4.184).
+
+### Changed
+- Native Chat continues to read transcripts over this fork's SSH relay. Upstream replaced that path
+  with a WSL filesystem admission gate, which this build does not adopt, so reading transcripts from
+  a remote host behaves exactly as it did before the sync.
+- The workspace sidebar keeps this fork's tighter row spacing rather than upstream's roomier
+  virtual-row gap, so drag-and-drop drop targets stay aligned with the rows as drawn.
+- Index checks in two fork-owned files were rewritten to satisfy lint rules upstream newly enabled.
+  No behavior changes; it keeps future upstream syncs from stalling on a toolchain change alone.
 
 ## [1.4.183-rc.0.zy01] - 2026-08-14
 
