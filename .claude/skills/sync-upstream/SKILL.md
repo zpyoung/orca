@@ -85,10 +85,60 @@ the release omits, or aligning an assertion with what the release actually rende
 which and why in the commit message. Do **not** backport the missing implementation from
 `upstream/main`: taking unreleased trunk code is exactly what syncing stable tags exists to avoid.
 
+## When upstream tightens the linter
+
+A stable tag can enable new rules in `.oxlintrc.json` (and bump the `oxlint` devDependency). Those
+rules then fire on **fork-only files the merge never touched**, byte-identical to the pre-merge
+baseline. This is not an ownership question — there is no upstream side of a fork-only file to
+resolve to — and it blocked three consecutive syncs (v1.4.183 twice, v1.4.184) before the policy
+below existed.
+
+Diagnose it before treating a lint failure as merge damage:
+
+```sh
+git diff "$ORIGIN_MAIN_OLD" HEAD -- .oxlintrc.json     # did the merge add rules?
+git diff --quiet "$ORIGIN_MAIN_OLD" -- <violating-file> # is the file identical to baseline?
+```
+
+Both true → toolchain tightening. **Adopting the new rule in the fork's own file is in scope**, but
+only mechanically:
+
+```sh
+pnpm exec oxlint --fix <violating-file>
+```
+
+Commit it separately from the merge and the ownership commit, and name the rule in the message. Then
+re-run the full gate — the fix is only valid if typecheck, lint, and tests all still pass.
+
+Hard limits. Violate any of these and it is a human decision, not an automated one:
+
+- Only files byte-identical to `$ORIGIN_MAIN_OLD`. A violation in a file the merge *changed* is
+  `-X ours` damage — resolve it to one real side instead (see the two sections above).
+- Only what `--fix` rewrites on its own. Never hand-write a logic change to satisfy a rule, and never
+  reach for `--fix-suggestions` or `--fix-dangerously`; both can alter behavior.
+- Never edit `.oxlintrc.json` to silence the rule. Upstream owns that file, so the next sync would
+  re-add the rule and re-block.
+
+Only violations that survive into the **merged** tree matter. Running the new config against the
+pre-merge baseline over-reports badly: most flagged files take upstream's already-compliant version
+in the merge. Use the merged tree's `pnpm lint` output as the authoritative list.
+
+To get ahead of the next release instead of discovering this mid-sync, run the target's config
+against the current tree before merging — restore the baseline config afterward:
+
+```sh
+cp .oxlintrc.json /tmp/oxlintrc.baseline.json
+git show <target-ref>:.oxlintrc.json > .oxlintrc.json
+pnpm exec oxlint; cp /tmp/oxlintrc.baseline.json .oxlintrc.json
+```
+
 ## Verifying
 
 `pnpm typecheck` and `pnpm lint` are absolute — no baseline differential. `pnpm test` is
 baseline-differential: a failure counts only if the same test passes at the pre-merge SHA.
+
+The one exception to lint being absolute is the rule-tightening case above, and it is an exception
+about *how the tree is fixed*, not about tolerating a failure: lint must still pass before the push.
 
 Traps that fake results:
 
