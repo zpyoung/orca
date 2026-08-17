@@ -37,7 +37,7 @@ function createRelayDouble(responses: Record<string, unknown[]> = {}) {
       pingHandlers.push(handler)
       return () => {
         const index = pingHandlers.indexOf(handler)
-        if (index >= 0) {
+        if (index !== -1) {
           pingHandlers.splice(index, 1)
         }
       }
@@ -46,7 +46,7 @@ function createRelayDouble(responses: Record<string, unknown[]> = {}) {
       readyHandlers.push(handler)
       return () => {
         const index = readyHandlers.indexOf(handler)
-        if (index >= 0) {
+        if (index !== -1) {
           readyHandlers.splice(index, 1)
         }
       }
