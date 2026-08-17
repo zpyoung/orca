@@ -234,6 +234,7 @@ const {
   invalidateAuthorizedRootsCacheMock,
   prepareLocalWorktreeRootForRepoMock,
   createHostedReviewMock,
+  createStackedHostedReviewMock,
   getHostedReviewCreationEligibilityMock,
   getHostedReviewForBranchMock,
   getPRForBranchMock,
@@ -341,6 +342,7 @@ const {
     invalidateAuthorizedRootsCacheMock: vi.fn(),
     prepareLocalWorktreeRootForRepoMock: vi.fn(),
     createHostedReviewMock: vi.fn(),
+    createStackedHostedReviewMock: vi.fn(),
     getHostedReviewCreationEligibilityMock: vi.fn(),
     getHostedReviewForBranchMock: vi.fn(),
     getPRForBranchMock: vi.fn().mockResolvedValue(null),
@@ -511,6 +513,10 @@ vi.mock('../worktree-root-preparation', () => ({
 vi.mock('../source-control/hosted-review-creation', () => ({
   createHostedReview: createHostedReviewMock,
   getHostedReviewCreationEligibility: getHostedReviewCreationEligibilityMock
+}))
+
+vi.mock('../source-control/stacked-hosted-review-creation', () => ({
+  createStackedHostedReview: createStackedHostedReviewMock
 }))
 
 vi.mock('../source-control/hosted-review', () => ({
@@ -731,6 +737,14 @@ function resetRuntimeTestMocks(): void {
     provider: 'github',
     number: 1,
     url: 'https://example.com/pull/1'
+  })
+  createStackedHostedReviewMock.mockReset()
+  createStackedHostedReviewMock.mockResolvedValue({
+    ok: true,
+    number: 2,
+    url: 'https://example.com/pull/2',
+    stackNumber: 10,
+    parentReview: { number: 1, url: 'https://example.com/pull/1' }
   })
   getHostedReviewCreationEligibilityMock.mockReset()
   getHostedReviewCreationEligibilityMock.mockResolvedValue({
@@ -7037,6 +7051,15 @@ describe('OrcaRuntimeService', () => {
       body: '',
       draft: false
     })
+    await runtime.createStackedHostedReview({
+      repoSelector: `id:${TEST_REPO_ID}`,
+      provider: 'github',
+      base: 'stack/parent',
+      head: 'feature/ssh',
+      title: 'Feature SSH',
+      body: '',
+      draft: false
+    })
 
     expect(getHostedReviewCreationEligibilityMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -7053,6 +7076,16 @@ describe('OrcaRuntimeService', () => {
         title: 'Feature SSH'
       }),
       'ssh-1'
+    )
+    expect(createStackedHostedReviewMock).toHaveBeenCalledWith(
+      '/remote/repo',
+      expect.objectContaining({
+        provider: 'github',
+        base: 'stack/parent',
+        head: 'feature/ssh'
+      }),
+      'ssh-1',
+      {}
     )
   })
 
@@ -7116,6 +7149,15 @@ describe('OrcaRuntimeService', () => {
       body: '',
       draft: false
     })
+    await runtime.createStackedHostedReview({
+      repoSelector: `id:${TEST_REPO_ID}`,
+      provider: 'github',
+      base: 'stack/parent',
+      head: 'feature/wsl',
+      title: 'Feature WSL',
+      body: '',
+      draft: false
+    })
 
     expect(getHostedReviewCreationEligibilityMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -7140,6 +7182,16 @@ describe('OrcaRuntimeService', () => {
         provider: 'github',
         head: 'feature/wsl',
         title: 'Feature WSL'
+      }),
+      null,
+      { localGitExecOptions: { wslDistro: 'Ubuntu' } }
+    )
+    expect(createStackedHostedReviewMock).toHaveBeenCalledWith(
+      TEST_REPO_PATH,
+      expect.objectContaining({
+        provider: 'github',
+        base: 'stack/parent',
+        head: 'feature/wsl'
       }),
       null,
       { localGitExecOptions: { wslDistro: 'Ubuntu' } }
@@ -11380,6 +11432,57 @@ describe('OrcaRuntimeService', () => {
     })
   })
 
+  it('keeps blocked prompt text authoritative over an OpenCode marker', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-1' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => 'opencode'
+    })
+    const leafId = '11111111-1111-4111-8111-111111111111'
+    runtime.attachWindow(1)
+    runtime.syncWindowGraph(1, {
+      tabs: [
+        {
+          tabId: 'tab-1',
+          worktreeId: TEST_WORKTREE_ID,
+          title: 'OC | Native session',
+          activeLeafId: leafId,
+          layout: null
+        }
+      ],
+      leaves: [
+        {
+          tabId: 'tab-1',
+          worktreeId: TEST_WORKTREE_ID,
+          leafId,
+          paneRuntimeId: 1,
+          ptyId: 'pty-1',
+          paneTitle: 'OC | Native session'
+        }
+      ]
+    })
+    runtime.onPtyData(
+      'pty-1',
+      'Permission required\nThis command requires permission\nAllow once\nAllow always\nReject\n',
+      123
+    )
+    const [terminal] = (await runtime.listTerminals()).terminals
+
+    await expect(runtime.getTerminalAgentStatus(terminal.handle)).resolves.toEqual({
+      handle: terminal.handle,
+      isRunningAgent: true,
+      status: 'permission'
+    })
+    await expect(
+      runtime.waitForTerminal(terminal.handle, { condition: 'tui-idle', timeoutMs: 1_000 })
+    ).resolves.toMatchObject({
+      satisfied: false,
+      blockedReason: 'codex-interactive-prompt'
+    })
+  })
+
   it('reports permission from blocked wait text over title-only working state', async () => {
     const runtime = new OrcaRuntimeService(store)
     runtime.setPtyController({
@@ -15559,6 +15662,28 @@ describe('OrcaRuntimeService', () => {
       runtime.waitForTerminal(handle, { condition: 'tui-idle', timeoutMs: 1_000 })
     ).resolves.toMatchObject({
       handle,
+      condition: 'tui-idle',
+      status: 'running'
+    })
+  })
+
+  it('resolves live-leaf tui-idle from an OpenCode native title', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    syncSinglePty(runtime, 'remote:pty-1', {
+      tabTitle: 'repo terminal',
+      paneTitle: 'ssh build-host | OC | Native session'
+    })
+    const [terminal] = (await runtime.listTerminals()).terminals
+
+    await expect(
+      runtime.waitForTerminal(terminal.handle, { condition: 'tui-idle', timeoutMs: 1_000 })
+    ).resolves.toMatchObject({
+      handle: terminal.handle,
       condition: 'tui-idle',
       status: 'running'
     })
@@ -22744,6 +22869,65 @@ describe('OrcaRuntimeService', () => {
     await expect(runtime.isTerminalRunningAgent(terminal.handle)).resolves.toBe(false)
     await expect(runtime.getTerminalAgentStatus(terminal.handle)).resolves.toEqual({
       handle: terminal.handle,
+      isRunningAgent: false,
+      status: null
+    })
+  })
+
+  it('does not authorize an OpenCode marker left on a shell pane', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => 'zsh'
+    })
+    syncSinglePty(runtime, 'pty-1', { paneTitle: 'OC | zsh' })
+    const [terminal] = (await runtime.listTerminals()).terminals
+
+    await expect(runtime.isTerminalRunningAgent(terminal.handle)).resolves.toBe(false)
+    await expect(runtime.getTerminalAgentStatus(terminal.handle)).resolves.toEqual({
+      handle: terminal.handle,
+      isRunningAgent: false,
+      status: null
+    })
+  })
+
+  it('authorizes a hookless OpenCode marker with an OpenCode foreground process', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => 'opencode'
+    })
+    syncSinglePty(runtime, 'pty-1', { paneTitle: 'OC | Native session' })
+    const [terminal] = (await runtime.listTerminals()).terminals
+
+    await expect(runtime.isTerminalRunningAgent(terminal.handle)).resolves.toBe(true)
+    await expect(runtime.getTerminalAgentStatus(terminal.handle)).resolves.toEqual({
+      handle: terminal.handle,
+      isRunningAgent: true,
+      status: 'idle'
+    })
+  })
+
+  it('does not authorize an OpenCode marker left on a runtime PTY shell', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn: vi.fn().mockResolvedValue({ id: 'pty-bg' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => 'zsh'
+    })
+    runtime.attachWindow(1)
+    runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
+    const { handle } = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+      command: 'bash',
+      title: 'OC | zsh'
+    })
+
+    await expect(runtime.isTerminalRunningAgent(handle)).resolves.toBe(false)
+    await expect(runtime.getTerminalAgentStatus(handle)).resolves.toEqual({
+      handle,
       isRunningAgent: false,
       status: null
     })

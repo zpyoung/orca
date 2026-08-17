@@ -395,6 +395,7 @@ export function FloatingTerminalPanel({
     terminalTabs: tabs,
     assignments: terminalAssignments,
     isWorktreeActive: open,
+    activeTerminalTabId: activeTerminalId,
     coldParkTerminalPanes: false,
     shouldMeasureHiddenWorktree: false,
     activityTerminalPortals: NO_ACTIVITY_TERMINAL_PORTALS

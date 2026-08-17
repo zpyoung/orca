@@ -21,6 +21,7 @@ const CHECKOUT_FORMAT = 1
 const ARCHIVE_PATHS = ['src/main', 'src/shared', 'src/preload', 'src/renderer', 'src/types']
 
 const BASELINE_REF_ENV = 'ORCA_CROSS_VERSION_BASELINE_REF'
+const STABLE_DESKTOP_RELEASE_TAG = /^v\d+\.\d+\.\d+$/
 
 export type ReleaseCheckout = {
   /** The ref as requested, e.g. `v1.4.169`. */
@@ -94,6 +95,15 @@ export function resolveBaselineReleaseRef(): string {
     )
   }
   return latest
+}
+
+export function selectLatestStableReleaseTag(tags: string[]): string | null {
+  return (
+    tags
+      .filter((tag) => STABLE_DESKTOP_RELEASE_TAG.test(tag))
+      .sort(compareReleaseTags)
+      .at(-1) ?? null
+  )
 }
 
 function resolveCommit(ref: string): string {

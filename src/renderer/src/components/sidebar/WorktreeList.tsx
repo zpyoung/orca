@@ -106,12 +106,18 @@ import {
   getVirtualRowTransform,
   pruneStaleVirtualRowElementCache,
   shouldUseHeaderTopSpacing,
+  WORKTREE_SIDEBAR_VIRTUAL_ROW_GAP,
   type RenderRow
 } from './worktree-list-virtual-rows'
 import {
   revealElementInScrollContainer,
   WORKTREE_SIDEBAR_REVEAL_TOP_INSET
 } from './worktree-sidebar-reveal'
+import {
+  createPendingRevealScroll,
+  isRevealScrollSettling,
+  type PendingRevealScroll
+} from './worktree-sidebar-reveal-scroll-settle'
 import {
   getWorkspaceStatus,
   getWorkspaceStatusFromGroupKey,
@@ -149,6 +155,8 @@ import {
 } from '@/hooks/useVirtualizedScrollAnchor'
 import { activateAndRevealWorktree } from '@/lib/worktree-activation'
 import { useFolderWorkspacePathStatusCacheExpiryTick } from '@/lib/folder-workspace-path-status-cache-expiry'
+import { useWorktreeListScrollToTop } from './use-worktree-list-scroll-to-top'
+import { WorktreeListScrollToTopButton } from './WorktreeListScrollToTopButton'
 import {
   getFolderWorkspacePathStatusDescription,
   getFolderWorkspacePathStatusTitle
@@ -255,6 +263,7 @@ import { keybindingMatchesAction } from '../../../../shared/keybindings'
 import { ProjectGroupNameDialog } from './ProjectGroupNameDialog'
 import { ProjectGroupDeleteDialog } from './ProjectGroupDeleteDialog'
 import { selectProjectGroupRemovalTargets } from '@/store/slices/project-group-removal-targets'
+import { findRepoForHost } from '@/store/slices/repo-host-identity'
 import { isGitRepoKind } from '../../../../shared/repo-kind'
 import { canWorktreeHoldGroupMembership } from '../../../../shared/project-groups'
 import {
@@ -503,7 +512,8 @@ function revealMountedWorktreeElement(
   container: HTMLElement,
   worktreeId: string,
   behavior: ScrollBehavior,
-  optionId?: string
+  optionId?: string,
+  onScrollIssued?: (targetTop: number) => void
 ): HTMLElement | null {
   const element = optionId
     ? document.getElementById(optionId)
@@ -511,19 +521,24 @@ function revealMountedWorktreeElement(
   if (!element || !container.contains(element)) {
     return null
   }
-  return revealElementInScrollContainer(container, element, behavior) ? element : null
+  return revealElementInScrollContainer(container, element, behavior, onScrollIssued)
+    ? element
+    : null
 }
 
 function revealMountedSidebarRowElement(
   container: HTMLElement,
   rowKey: string,
-  behavior: ScrollBehavior
+  behavior: ScrollBehavior,
+  onScrollIssued?: (targetTop: number) => void
 ): HTMLElement | null {
   const element = document.getElementById(getWorktreeOptionId(rowKey))
   if (!element || !container.contains(element)) {
     return null
   }
-  return revealElementInScrollContainer(container, element, behavior) ? element : null
+  return revealElementInScrollContainer(container, element, behavior, onScrollIssued)
+    ? element
+    : null
 }
 
 function getRenderRowSidebarKey(row: RenderRow): string | null {
@@ -661,7 +676,7 @@ type VirtualizedWorktreeViewportProps = {
   collapsedGroups: Set<string>
   handleCreateForRepo: (projectId: string) => void
   handleOpenRepoSettings: (projectId: string, sectionId?: string) => void
-  handleOpenWorktreeVisibility: (projectId: string) => void
+  handleOpenWorktreeVisibility: (repo: Repo) => void
   handleShowImportedWorktrees: (projectId: string) => void
   handleKeepImportedWorktreesHidden: (projectId: string) => void
   importedWorktreeCardActionState: ReadonlyMap<string, ImportedWorktreeCardActionState>
@@ -1518,6 +1533,8 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
   scrollAnchorRef
 }: VirtualizedWorktreeViewportProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
+  // Why: callback-ref only mutates scrollRef; state re-runs the scroll-to-top listener attach.
+  const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
   const suppressMeasurementAdjustmentUntilRef = useRef(0)
   const directScrollInputUntilRef = useRef(0)
   const [dragOverStatus, setDragOverStatus] = useState<WorkspaceStatus | null>(null)
@@ -1553,6 +1570,7 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
   const pendingRevealRetryRef = useRef<{ worktreeId: string; count: number } | null>(null)
   const pendingRowRevealRetryRef = useRef<{ rowKey: string; count: number } | null>(null)
   const pendingRevealFrameIdsRef = useRef<Set<number>>(new Set())
+  const pendingRevealScrollRef = useRef<PendingRevealScroll | null>(null)
   const revealHighlightFrameIdRef = useRef<number | null>(null)
   const revealHighlightTimeoutRef = useRef<number | null>(null)
   const cancelPendingRevealFrames = useCallback(() => {
@@ -1755,6 +1773,7 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
         groupIds: group.worktreeIds,
         draggedIds: args.draggedIds,
         draggingWorktreeId: args.draggingWorktreeId,
+        fallbackGap: WORKTREE_SIDEBAR_VIRTUAL_ROW_GAP,
         grab: args.grab,
         anchor: args.anchor
       })
@@ -2185,14 +2204,34 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
     suppressMeasurementAdjustmentUntilRef.current = suppressUntil
     directScrollInputUntilRef.current = suppressUntil
   }, [])
+  const { showScrollToTop, scrollToTop } = useWorktreeListScrollToTop({
+    scrollElement,
+    onUserScrollIntent: markDirectScrollInput
+  })
   const hasDirectScrollInput = useCallback(
     () => window.performance.now() < directScrollInputUntilRef.current,
     []
   )
+  const markRevealScroll = useCallback((targetTop: number) => {
+    pendingRevealScrollRef.current = createPendingRevealScroll(targetTop, window.performance.now())
+  }, [])
+  const isRevealScrollSettlingNow = useCallback(() => {
+    const settling = isRevealScrollSettling({
+      now: window.performance.now(),
+      pending: pendingRevealScrollRef.current,
+      scrollTop: scrollRef.current?.scrollTop ?? 0
+    })
+    if (!settling) {
+      pendingRevealScrollRef.current = null
+    }
+    return settling
+  }, [])
   // Why: programmatic scrolls keep measurement correction quiet, but only direct input blocks anchor-restore retries.
+  // A reveal's smooth scroll is the exception: restoring the anchor mid-animation cancels it a few pixels in.
   const shouldSkipScrollAnchorRestore = useCallback(
-    () => window.performance.now() < directScrollInputUntilRef.current,
-    []
+    () =>
+      window.performance.now() < directScrollInputUntilRef.current || isRevealScrollSettlingNow(),
+    [isRevealScrollSettlingNow]
   )
 
   const virtualizer = useVirtualizer({
@@ -2361,7 +2400,8 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
               container,
               pendingRevealWorktree.worktreeId,
               pendingRevealWorktree.behavior,
-              getRenderRowOptionId(targetRow, pendingRevealWorktree.worktreeId)
+              getRenderRowOptionId(targetRow, pendingRevealWorktree.worktreeId),
+              markRevealScroll
             )
           : null
         if (revealedOption) {
@@ -2434,6 +2474,7 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
     visibleProjectGroupsForRows,
     pendingRevealRetryTick,
     flashRevealedRow,
+    markRevealScroll,
     setRenamingWorktreeId,
     schedulePendingRevealFrame,
     cancelPendingRevealFrames
@@ -2522,7 +2563,8 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
         ? revealMountedSidebarRowElement(
             container,
             pendingRevealSidebarRow.rowKey,
-            pendingRevealSidebarRow.behavior
+            pendingRevealSidebarRow.behavior,
+            markRevealScroll
           )
         : null
       if (revealedElement) {
@@ -2557,6 +2599,7 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
     virtualizer,
     pendingRevealRetryTick,
     flashRevealedRow,
+    markRevealScroll,
     clearPendingRevealSidebarRow,
     schedulePendingRevealFrame,
     cancelPendingRevealFrames
@@ -2812,6 +2855,7 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
         clearWorktreeDrag()
       }
       scrollRef.current = node
+      setScrollElement(node)
     },
     [
       cancelPendingRevealFrames,
@@ -4847,7 +4891,7 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
                               <DropdownMenuItem
                                 onSelect={() => {
                                   if (row.repo) {
-                                    handleOpenWorktreeVisibility(row.repo.id)
+                                    handleOpenWorktreeVisibility(row.repo)
                                   }
                                 }}
                               >
@@ -5438,6 +5482,7 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
           })}
         </div>
       </div>
+      {showScrollToTop ? <WorktreeListScrollToTopButton onClick={scrollToTop} /> : null}
     </div>
   )
 })
@@ -6289,8 +6334,11 @@ const WorktreeList = React.memo(function WorktreeList({
   )
 
   const handleOpenWorktreeVisibility = useCallback(
-    (projectId: string) => {
-      openModal('worktree-visibility', { repoId: projectId })
+    (repo: Repo) => {
+      openModal('worktree-visibility', {
+        repoId: repo.id,
+        hostId: getRepoExecutionHostId(repo)
+      })
     },
     [openModal]
   )
@@ -7057,9 +7105,11 @@ const WorktreeList = React.memo(function WorktreeList({
           if (!suppressExternalWorktreeInboxRepoId) {
             return
           }
-          const projectId = suppressExternalWorktreeInboxRepoId
+          const repo = findRepoForHost(repos, suppressExternalWorktreeInboxRepoId, { settings })
           setSuppressExternalWorktreeInboxRepoId(null)
-          handleOpenWorktreeVisibility(projectId)
+          if (repo) {
+            handleOpenWorktreeVisibility(repo)
+          }
         }}
       />
       <ProjectGroupDeleteDialog

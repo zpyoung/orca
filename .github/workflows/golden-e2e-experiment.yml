@@ -23,10 +23,9 @@ jobs:
             platform: linux
           - os: macos-15
             platform: mac
-          # Why: Windows golden E2E is temporarily disabled on CI while its
-          # flaky runner-only failures are investigated.
-          # - os: windows-latest
-          #   platform: windows
+          # Match the release gate: Windows runs the fresh-startup golden only.
+          - os: windows-2022
+            platform: windows
 
     steps:
       - name: Checkout

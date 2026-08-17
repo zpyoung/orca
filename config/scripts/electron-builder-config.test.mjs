@@ -4,6 +4,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
+const REPO_ROOT = join(import.meta.dirname, '..', '..')
+const SRC_MAIN_DIR = join(REPO_ROOT, 'src', 'main')
+
 const require = createRequire(import.meta.url)
 const electronBuilderConfig = require('../electron-builder.config.cjs')
 const { FileMatcher } = require('app-builder-lib/out/fileMatcher')

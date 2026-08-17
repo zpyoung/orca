@@ -128,11 +128,9 @@ import {
   RESET_TERMINAL_CURSOR_STYLE
 } from '../../../../shared/terminal-mode-reset-profiles'
 import { buildFreshShellViewportBlankingSequence } from './terminal-restored-viewport'
-import { createShellReadyMarkerScanState, scanForShellReadyMarker } from './shell-ready-marker-scan'
 import { getSystemPrefersDark } from '@/lib/terminal-theme'
 import {
   INITIAL_MODE_2031_REPLY_SCAN_STATE,
-  mode2031SequenceFor,
   resolveTerminalColorSchemeMode,
   scanMode2031ReplyDecision
 } from '../../../../shared/terminal-color-scheme-protocol'
@@ -345,7 +343,6 @@ const SSH_SESSION_EXPIRED_ERROR = 'SSH_SESSION_EXPIRED'
 const DIRECT_SSH_PANE_RETRY_SETTLEMENT_TIMEOUT_MS = 31_000
 const REMOTE_PTY_ID_PREFIX = 'remote:'
 const PTY_CONNECT_DIAG_LIMIT = 200
-const SSH_SHELL_READY_STARTUP_FALLBACK_MS = 1500
 const MANUAL_AGENT_COMMAND_MAX_CHARS = 4096
 const STARTUP_DRAFT_PASTE_QUIET_MS = 1500
 // Why: the notice deliberately omits the rejected path — saved cwds can
@@ -529,11 +526,10 @@ const e2eTerminalHiddenSnapshotOverrides = new Map<string, E2eTerminalHiddenSnap
 
 // Why: the per-chunk hidden-skip grammar is deleted (Phase 6) — hidden bytes
 // either never reach the renderer (delivery gate) or ride the background
-// scheduler queue. Only the mode-2031 fact-reply counter still has a producer.
+// scheduler queue.
 type E2eTerminalPtyOutputDebugSnapshot = {
   hiddenRendererSkipCount: number
   hiddenRendererSkippedChars: number
-  hiddenRendererMode2031ReplyCount: number
 }
 
 type E2eTerminalPtyOutputDebugApi = {
@@ -566,14 +562,12 @@ type ColdRestoreAgentResumeStartup = PendingStartupCommand & {
 
 const e2eTerminalPtyOutputDebugState: E2eTerminalPtyOutputDebugSnapshot = {
   hiddenRendererSkipCount: 0,
-  hiddenRendererSkippedChars: 0,
-  hiddenRendererMode2031ReplyCount: 0
+  hiddenRendererSkippedChars: 0
 }
 
 function resetE2eTerminalPtyOutputDebug(): void {
   e2eTerminalPtyOutputDebugState.hiddenRendererSkipCount = 0
   e2eTerminalPtyOutputDebugState.hiddenRendererSkippedChars = 0
-  e2eTerminalPtyOutputDebugState.hiddenRendererMode2031ReplyCount = 0
 }
 
 function exposeE2eTerminalPtyOutputDebug(): void {
@@ -594,14 +588,6 @@ function recordHiddenRendererSkip(chars: number): void {
   exposeE2eTerminalPtyOutputDebug()
   e2eTerminalPtyOutputDebugState.hiddenRendererSkipCount += 1
   e2eTerminalPtyOutputDebugState.hiddenRendererSkippedChars += chars
-}
-
-function recordHiddenMode2031Reply(): void {
-  if (!e2eConfig.exposeStore) {
-    return
-  }
-  exposeE2eTerminalPtyOutputDebug()
-  e2eTerminalPtyOutputDebugState.hiddenRendererMode2031ReplyCount += 1
 }
 
 function exposeE2eTerminalPtyDataInjection(): void {
@@ -1093,6 +1079,25 @@ function isSetupSplitGeometryReady(
   )
 }
 
+/** Start time of the newest completed turn, counting turns already folded into history.
+ *  Why: batched publications coalesce done→working→done into a single store notification,
+ *  so the done EDGE survives only in stateHistory; comparing `state` alone misses it. */
+function resolveLatestAgentDoneStartedAt(entry: AgentStatusEntry | undefined): number | undefined {
+  if (!entry) {
+    return undefined
+  }
+  if (entry.state === 'done') {
+    return entry.stateStartedAt
+  }
+  const history = entry.stateHistory ?? []
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    if (history[index].state === 'done') {
+      return history[index].startedAt
+    }
+  }
+  return undefined
+}
+
 /**
  * Establishes a binding between a terminal pane and its corresponding PTY stream,
  * managing input, output, title synchronization, and agent status tracking.
@@ -1130,7 +1135,6 @@ export function connectPanePty(
   let cleanupStartupDraftPasteTimers = (): void => {}
   let unregisterE2ePtyDataInjection = (): void => {}
   let startupInjectTimer: ReturnType<typeof setTimeout> | null = null
-  let sshShellReadyFallbackTimer: ReturnType<typeof setTimeout> | null = null
   let agentTaskCompleteNotificationGraceTimer: ReturnType<typeof setTimeout> | null = null
   let agentTaskCompleteNotificationMaxTimer: ReturnType<typeof setTimeout> | null = null
   let agentTaskCompleteStatusUnsubscribe: (() => void) | null = null
@@ -3607,10 +3611,10 @@ export function connectPanePty(
   const shouldApplyNativeWindowsRewriteRefresh = isNativeWindowsConpty
   const shouldApplyWindowsRendererUnicodeRefresh = CLIENT_PLATFORM === 'win32'
   const shouldProtectNativeWindowsSynchronizedOutput = isNativeWindowsConpty
-  let lastAgentStatusState = state.agentStatusByPaneKey[cacheKey]?.state
   let unsubscribeWindowsDoneTerminalModeReset: (() => void) | null = null
   if (isNativeWindowsConpty) {
     const initialAgentStatus = state.agentStatusByPaneKey[cacheKey]
+    let lastAgentDoneStartedAt = resolveLatestAgentDoneStartedAt(initialAgentStatus)
     if (
       !initialAgentStatus &&
       paneStartup?.telemetry?.launch_source === 'sidebar' &&
@@ -3629,13 +3633,18 @@ export function connectPanePty(
       const nextAgentStatusState = nextAgentStatus?.state
       if (nextAgentStatusState === 'done') {
         setFocusReportSuppressionForAgentCompletion(undefined, nextAgentStatus.agentType)
-        if (lastAgentStatusState !== 'done') {
-          queueAgentIdleTerminalModeReset()
-        }
       } else if (nextAgentStatusState) {
         suppressNativeWindowsIdleCodexFocusReports = false
       }
-      lastAgentStatusState = nextAgentStatusState
+      const nextAgentDoneStartedAt = resolveLatestAgentDoneStartedAt(nextAgentStatus)
+      // Why: a NEW completed turn — same-state `done` pings keep stateStartedAt, so they no-op.
+      if (
+        nextAgentDoneStartedAt !== undefined &&
+        nextAgentDoneStartedAt !== lastAgentDoneStartedAt
+      ) {
+        queueAgentIdleTerminalModeReset()
+      }
+      lastAgentDoneStartedAt = nextAgentDoneStartedAt
     })
   }
 
@@ -3718,13 +3727,13 @@ export function connectPanePty(
   })
   // Why: Phase-4 hidden-delivery gate — only meaningful under main authority
   // (renderer byte parsers need bytes otherwise). Decided once at pane
-  // creation: it picks the mode-2031 answer path (fact reply vs byte scan),
-  // which must have exactly one owner.
+  // creation: it picks which path records a mode-2031 subscription (main's
+  // fact vs the byte scan), which must have exactly one owner.
   const hiddenDeliveryGateActive =
     mainSideEffectAuthority && isRendererHiddenPtyDeliveryGateEnabled(state.settings)
   // Why: structural per-PTY gate predicate (authority on + gate on + bytes
   // transit local main, which implies snapshot-backed). Shared by the hidden
-  // mark sync and mode-2031 reply ownership so reply ownership can never
+  // mark sync and mode-2031 subscription recording so the recorder can never
   // disagree with what main may drop — and never depends on the racy hidden
   // mark (a fact can outrun the pty:data task that sets it).
   const isHiddenDeliveryGateManagedPty = (ptyId: string | null): ptyId is string =>
@@ -3744,6 +3753,8 @@ export function connectPanePty(
         onDone: scheduleCommandCodeOutputDoneStatus
       })
   const shouldDeliverStartupViaTerminalPaste = paneStartup?.delivery === 'terminal-paste'
+  const shouldUseProviderSshStartupDelivery =
+    Boolean(connectionId) && !shouldDeliverStartupViaTerminalPaste
   const hadExistingPaneTransportAtConnect = deps.paneTransportsRef.current.size > 0
   let lastTerminalInputAt = Number.NEGATIVE_INFINITY
   let hasReceivedPtyOutput = false
@@ -3797,6 +3808,7 @@ export function connectPanePty(
     env: paneEnv,
     ...(paneStartup?.envToDelete ? { envToDelete: paneStartup.envToDelete } : {}),
     command: shouldDeliverStartupViaTerminalPaste ? undefined : paneStartup?.command,
+    ...(shouldUseProviderSshStartupDelivery ? { commandDelivery: 'provider' as const } : {}),
     startupCommandDelivery: shouldDeliverStartupViaTerminalPaste
       ? undefined
       : connectionId && paneStartup?.command
@@ -3875,13 +3887,10 @@ export function connectPanePty(
   // desktop silent while the elected mobile xterm owns query replies.
   const sendDesktopQueryReplyImmediate = (data: string): boolean =>
     canSendDesktopQueryReply() && transport.sendInputImmediate(data)
-  // Why (gate mode only): for gate-managed PTYs this fact is the SOLE 2031
-  // responder — visible, hidden, marked or not. Conditioning the reply on the
-  // hidden mark double-fired (mark set + bytes delivered live via interest →
-  // fact AND xterm both replied) or dropped the reply entirely (fact outran
-  // the pty:data task that set the mark). The xterm-side CSI reply and the
-  // skipped-byte scan are disabled for these panes (same structural
-  // predicate), so exactly one reply goes out.
+  // Why (gate mode only): gate-managed PTYs never see the subscribe bytes, so this fact is
+  // their only cue to record the subscription — without the registry entry a later theme
+  // flip never pushes the CSI 997 update and the TUI keeps a stale theme after reveal.
+  // Record-only: a subscribe is not a query (see observeLiveMode2031Chunk, #9993).
   const handleHiddenMode2031SubscribeFact = (): void => {
     const ptyId = transport.getPtyId()
     if (disposed || (!isHiddenDeliveryGateManagedPty(ptyId) && remoteOutputGatedPtyId !== ptyId)) {
@@ -3891,22 +3900,14 @@ export function connectPanePty(
       useAppStore.getState().settings,
       getSystemPrefersDark()
     )
-    // Why immediate: a mode-2031 query reply must beat the remote input debounce
-    // or it can miss the querying program's read window (#7329).
-    sendDesktopQueryReplyImmediate(mode2031SequenceFor(mode))
-    // Why: register the subscription exactly like the xterm CSI handler
-    // would — without the registry entry, later theme flips never push the
-    // CSI 997 update and the TUI keeps a stale theme after reveal.
     deps.recordPaneMode2031Subscription?.(pane.id, mode)
-    recordHiddenMode2031Reply()
   }
   // Why (gate mode only): the counterpart to the subscribe fact. These panes never
-  // receive the withdrawal bytes — main drops them before delivery — and both the
-  // chunk scanner and the xterm CSI handler are disabled for them, so this fact is
-  // the ONLY observer that can retire the subscription. Without it a TUI that exits
-  // while hidden leaves paneMode2031 set, and the next theme flip pushes CSI 997
-  // into the shell that replaced it (#9993 via maybePushMode2031Flip). No reply is
-  // sent: a withdrawal is not a query.
+  // receive the withdrawal bytes — main drops them before delivery — and the chunk
+  // scanner is disabled for them, so this fact is the ONLY observer that can retire
+  // the subscription. Without it a TUI that exits while hidden leaves paneMode2031
+  // set, and the next theme flip pushes CSI 997 into the shell that replaced it
+  // (#9993 via maybePushMode2031Flip).
   const handleHiddenMode2031UnsubscribeFact = (): void => {
     const ptyId = transport.getPtyId()
     if (disposed || (!isHiddenDeliveryGateManagedPty(ptyId) && remoteOutputGatedPtyId !== ptyId)) {
@@ -4825,51 +4826,13 @@ export function connectPanePty(
         .catch(() => {})
     }
 
-    // Why: for ordinary local startup commands, the local PTY provider already
-    // writes via the shell-ready barrier. terminal-paste and SSH startup
-    // commands stay renderer-delivered so xterm/relay can apply their handling.
-    let pendingStartupCommand: PendingStartupCommand | null =
-      shouldDeliverStartupViaTerminalPaste || connectionId
-        ? paneStartup?.command
-          ? { command: paneStartup.command }
-          : null
+    // Why: local and ordinary SSH startup commands are provider-owned so delivery
+    // survives renderer replacement. Only explicit terminal-paste stays renderer-owned.
+    let pendingStartupCommand: PendingStartupCommand | null = shouldDeliverStartupViaTerminalPaste
+      ? paneStartup?.command
+        ? { command: paneStartup.command }
         : null
-    // Why: every renderer-delivered SSH command needs the relay's readiness marker;
-    // the existing fallback preserves shells that cannot emit it.
-    const shouldWaitForSshShellReady =
-      Boolean(connectionId) &&
-      Boolean(pendingStartupCommand) &&
-      !shouldDeliverStartupViaTerminalPaste
-    let sshShellReadyMarkerScan = shouldWaitForSshShellReady
-      ? createShellReadyMarkerScanState()
       : null
-    let sshStartupShellReady = !shouldWaitForSshShellReady
-    const armSshStartupShellReady = (): void => {
-      if (!connectionId || !pendingStartupCommand || shouldDeliverStartupViaTerminalPaste) {
-        return
-      }
-      if (startupInjectTimer !== null) {
-        clearTimeout(startupInjectTimer)
-        startupInjectTimer = null
-      }
-      if (sshShellReadyFallbackTimer !== null) {
-        clearTimeout(sshShellReadyFallbackTimer)
-        sshShellReadyFallbackTimer = null
-      }
-      sshShellReadyMarkerScan = createShellReadyMarkerScanState()
-      sshStartupShellReady = false
-    }
-    const markSshStartupShellReady = (): void => {
-      if (sshStartupShellReady) {
-        return
-      }
-      sshStartupShellReady = true
-      if (sshShellReadyFallbackTimer !== null) {
-        clearTimeout(sshShellReadyFallbackTimer)
-        sshShellReadyFallbackTimer = null
-      }
-      schedulePendingStartupCommandDelivery()
-    }
     const startupDraftReadyScanner = ownsStartupDraftPaste
       ? createDraftPasteReadyScanner(
           startupDraftAgentConfig?.draftPasteReadySignal ?? 'render-quiet-after-bracketed-paste'
@@ -5175,18 +5138,6 @@ export function connectPanePty(
       if (!startup) {
         return
       }
-      if (!sshStartupShellReady) {
-        if (sshShellReadyFallbackTimer === null) {
-          // Why: some SSH shells cannot emit Orca's ready marker. Prefer the
-          // marker when available, but fall back to the old renderer delivery
-          // behavior instead of dropping the startup command forever.
-          sshShellReadyFallbackTimer = setTimeout(() => {
-            sshShellReadyFallbackTimer = null
-            markSshStartupShellReady()
-          }, SSH_SHELL_READY_STARTUP_FALLBACK_MS)
-        }
-        return
-      }
       if (startupInjectTimer !== null) {
         clearTimeout(startupInjectTimer)
       }
@@ -5287,12 +5238,6 @@ export function connectPanePty(
       // a restart-in-place would leak the old TUI's flags into a fresh shell.
       kittyKeyboardModes.reset()
       prepareFreshShellViewportForSpawn(options)
-      if (connectionId && startupOverride?.command) {
-        // Why: SSH providers use `command` only as spawn metadata; the renderer
-        // must still submit the resume command to the fresh remote shell.
-        pendingStartupCommand = { command: startupOverride.command }
-      }
-      armSshStartupShellReady()
       const coldRestoreOverride =
         startupOverride && 'launchConfig' in startupOverride
           ? (startupOverride as ColdRestoreAgentResumeStartup)
@@ -5315,6 +5260,9 @@ export function connectPanePty(
         cols,
         rows,
         ...(startupOverride?.command ? { command: startupOverride.command } : {}),
+        ...(connectionId && startupOverride?.command && !shouldDeliverStartupViaTerminalPaste
+          ? { commandDelivery: 'provider' as const }
+          : {}),
         ...(connectionId && startupOverride?.command
           ? { startupCommandDelivery: 'shell-ready' as const }
           : {}),
@@ -5444,6 +5392,12 @@ export function connectPanePty(
             void window.api.pty.clearPendingPaneSerializer(cacheKey, gen).catch(() => {})
           }
           if (resolvedPtyId && connectionId) {
+            if (
+              shouldUseProviderSshStartupDelivery &&
+              (startupOverride?.command || paneStartup?.command)
+            ) {
+              armStartupDraftReadinessObservation()
+            }
             schedulePendingStartupCommandDelivery()
           }
           finishReattachLiveDataDeferral(Boolean(resolvedPtyId), outputCallbacks.generation)
@@ -6369,14 +6323,14 @@ export function connectPanePty(
       }
     }
 
+    // Why record-only: DECSET 2031 subscribes to future color changes, it is not a query —
+    // the protocol's query is `CSI ?996n`. fish arms 2031 for the ~1ms it paints a prompt, so
+    // any reply lands after the withdrawal and paints `?997;1n` as literal text (#9993).
     // Why here and not in xterm's CSI handler: xterm batches several PTY chunks into one
-    // synchronous parse, so a handler cannot tell where a chunk ended. fish enables and
-    // disables 2031 around every prompt, so answering a subscribe the same chunk withdraws
-    // pushes `?997;1n` into the prompt or a child's stdin as literal text (#9993). One raw
-    // chunk in, one order-aware decision out.
+    // synchronous parse, so a handler cannot tell where a chunk ended. One raw chunk in,
+    // one order-aware final state out.
     function observeLiveMode2031Chunk(data: string): void {
-      // Main's '2031-subscribe' fact is the sole responder for gate-managed PTYs; a second
-      // reply from here would answer one subscribe twice.
+      // Gate-managed PTYs never see these bytes; main's '2031-subscribe' fact records them.
       if (isHiddenDeliveryGateManagedPty(transport.getPtyId())) {
         return
       }
@@ -6390,13 +6344,13 @@ export function connectPanePty(
         return
       }
       const settings = useAppStore.getState().settings
-      const mode = resolveTerminalColorSchemeMode(settings, getSystemPrefersDark())
-      // Why immediate: the reply must land inside the program's read window, and hidden
-      // snapshot-backed panes skip xterm.write for PTY bytes entirely.
+      // Why seed the mode: maybePushMode2031Flip only pushes on a change, so an unseeded
+      // subscription would read as a flip on the next unrelated appearance re-apply.
       deps.paneMode2031Ref.current.set(pane.id, true)
-      sendDesktopQueryReplyImmediate(mode2031SequenceFor(mode))
-      deps.paneLastThemeModeRef.current.set(pane.id, mode)
-      recordHiddenMode2031Reply()
+      deps.paneLastThemeModeRef.current.set(
+        pane.id,
+        resolveTerminalColorSchemeMode(settings, getSystemPrefersDark())
+      )
     }
 
     // Why installed here: the handler observes CSI 3 J inside xterm's parse, so a
@@ -7657,6 +7611,12 @@ export function connectPanePty(
         if (hiddenOutputRestoreInFlight === trackedHiddenOutputRestore) {
           hiddenOutputRestoreInFlight = null
         }
+        // Why: after dispose the task body exits immediately, so re-arming here
+        // resolves instantly and re-enters this handler — an unbounded promise
+        // chain that eats the heap. The pane is gone; there is nothing to restore.
+        if (disposed) {
+          return
+        }
         if (hiddenOutputRestorePendingChunks.length > 0 || hiddenOutputRestorePendingOverflow) {
           hiddenOutputRestoreNeeded = true
           armHiddenOutputRestoreForegroundDeadline()
@@ -7725,13 +7685,6 @@ export function connectPanePty(
         recordAgentHibernationPaneOutput(cacheKey)
         // Why: output is the agent-start signal that ends the relaxed no-evidence process-scan cadence (a starting agent always prints).
         agentCompletionCoordinator.observeOutputActivity()
-      }
-      if (sshShellReadyMarkerScan) {
-        const scanned = scanForShellReadyMarker(sshShellReadyMarkerScan, data)
-        if (scanned.matched) {
-          markSshStartupShellReady()
-        }
-        data = scanned.output
       }
       observeStartupDraftPasteReadiness(data)
       resetHiddenOutputRestoreIfPtyChanged()
@@ -9412,10 +9365,6 @@ export function connectPanePty(
       if (startupInjectTimer !== null) {
         clearTimeout(startupInjectTimer)
         startupInjectTimer = null
-      }
-      if (sshShellReadyFallbackTimer !== null) {
-        clearTimeout(sshShellReadyFallbackTimer)
-        sshShellReadyFallbackTimer = null
       }
       cleanupStartupDraftPasteTimers()
       releaseUnattemptedStartupDraftPasteDelivery()
