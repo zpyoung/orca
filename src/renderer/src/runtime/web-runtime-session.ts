@@ -67,7 +67,6 @@ import { translate } from '../i18n/i18n'
 import { getRuntimeEnvironmentRevision } from './runtime-environment-revision'
 import { parsePaneKey } from '../../../shared/stable-pane-id'
 import { toRuntimeExecutionHostId } from '../../../shared/execution-host'
-import { assertRuntimeManagedBrowserCreationAvailable } from '../lib/client-creation-action-policy'
 import {
   claimWebSessionBrowserPlacementGroupCleanup,
   forgetWebSessionBrowserPlacement,
@@ -76,6 +75,7 @@ import {
   recordWebSessionBrowserPlacement,
   releaseWebSessionBrowserPlacementGroup
 } from './web-session-browser-placement'
+import { assertRuntimeManagedBrowserCreationAvailable } from '../lib/client-creation-action-policy'
 import { hasMaterializedWebRuntimeBrowserPage } from './web-runtime-browser-materialization'
 import {
   pauseAfterE2eWebRuntimeBrowserCreate,
@@ -463,6 +463,8 @@ export async function createWebRuntimeSessionBrowserTab(args: {
   clientTargetGroupId?: string
   clientTargetGroupCreated?: boolean
   focusOnCreate?: boolean
+  /** Wait until a renderer-backed host can publish the new page in its session snapshot. */
+  waitForRegistration?: boolean
   selectWorktree?: boolean
   stagedTitle?: string
   stagedFocusAddressBar?: boolean
@@ -549,7 +551,7 @@ export async function createWebRuntimeSessionBrowserTab(args: {
           // Why: place the new browser in the clicked split group so the host snapshot is authoritative for it (no left-snap).
           ...(args.targetGroupId ? { targetGroupId: args.targetGroupId } : {}),
           // Why: web clients need the local tab now; waiting for host webview registration makes the workspace appear to close.
-          waitForRegistration: false
+          waitForRegistration: args.waitForRegistration ?? false
         },
         timeoutMs: 15_000
       })) as RuntimeRpcResponse<BrowserTabCreateResult>

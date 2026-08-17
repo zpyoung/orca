@@ -10,7 +10,8 @@ const NATIVE_CHAT_DIR = join(import.meta.dirname, '..', 'native-chat')
 const NATIVE_CHAT_MODULES = [
   'transcript-read-cache.ts',
   'transcript-reader.ts',
-  'transcript-tail-reader.ts',
+  // transcript-tail-reader.ts stays on the fork's relay implementation, which
+  // reads through node:fs directly; the upstream WSL gate does not cover it here.
   'transcript-file-version.ts',
   'transcript-incremental-reader.ts',
   'transcript-watch-engine.ts'

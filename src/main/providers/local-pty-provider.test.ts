@@ -16,7 +16,8 @@ const {
   readWindowsConptyProcessIdsMock,
   killWithDescendantSweepMock,
   isWslAvailableAsyncMock,
-  wslUncDirectoryExistsMock
+  wslUncDirectoryExistsMock,
+  createShellPromptReadinessProbeMock
 } = vi.hoisted(() => ({
   existsSyncMock: vi.fn(),
   statSyncMock: vi.fn(),
@@ -29,7 +30,8 @@ const {
   readWindowsConptyProcessIdsMock: vi.fn(),
   killWithDescendantSweepMock: vi.fn(),
   isWslAvailableAsyncMock: vi.fn(),
-  wslUncDirectoryExistsMock: vi.fn()
+  wslUncDirectoryExistsMock: vi.fn(),
+  createShellPromptReadinessProbeMock: vi.fn()
 }))
 
 vi.mock('fs', () => ({
@@ -108,6 +110,10 @@ vi.mock('../wsl', () => ({
   wslUncDirectoryExists: (...args: unknown[]) => wslUncDirectoryExistsMock(...args)
 }))
 
+vi.mock('../shell-prompt-readiness-probe', () => ({
+  createShellPromptReadinessProbe: createShellPromptReadinessProbeMock
+}))
+
 import {
   _resetLocalPtyProviderStateForTest,
   LOCAL_PTY_FORCE_KILL_RETRY_MS,
@@ -175,6 +181,7 @@ describe('LocalPtyProvider', () => {
     isWslAvailableAsyncMock.mockResolvedValue(true)
     wslUncDirectoryExistsMock.mockReset()
     wslUncDirectoryExistsMock.mockReturnValue(true)
+    createShellPromptReadinessProbeMock.mockReset()
 
     exitCb = undefined
     mockProc = {

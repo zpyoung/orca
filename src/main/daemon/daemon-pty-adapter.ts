@@ -859,7 +859,7 @@ export class DaemonPtyAdapter implements IPtyProvider {
     // Why known `0` is no longer dropped: the pane tracker must be able to tell
     // "the app negotiated nothing" from "this reattach proved nothing".
     const kittyKeyboardFlags = parseTerminalKittyKeyboardFlags(
-      result.snapshot.modes.kittyKeyboardFlags
+      reattachSnapshot.modes.kittyKeyboardFlags
     )
     return {
       id: sessionId,
@@ -879,7 +879,7 @@ export class DaemonPtyAdapter implements IPtyProvider {
             snapshotFrameRestoreAnsi: reattachSnapshot.frameRestoreAnsi
           }
         : {}),
-      ...(providerSequence ? { providerSequence } : {}),
+      ...(reattachProviderSequence ? { providerSequence: reattachProviderSequence } : {}),
       ...(kittyKeyboardFlags !== undefined
         ? { snapshotKittyKeyboardFlags: kittyKeyboardFlags }
         : {}),
@@ -1249,26 +1249,13 @@ export class DaemonPtyAdapter implements IPtyProvider {
       if (!snapshot || typeof snapshot.outputSequence !== 'number') {
         return null
       }
-      const kittyKeyboardFlags = parseTerminalKittyKeyboardFlags(snapshot.modes.kittyKeyboardFlags)
-      return {
-        data: snapshot.rehydrateSequences + snapshot.snapshotAnsi,
-        frameRestoreAnsi: snapshot.frameRestoreAnsi,
-        scrollbackAnsi: snapshot.scrollbackAnsi,
-        cols: snapshot.cols,
-        rows: snapshot.rows,
-        cwd: snapshot.cwd,
-        lastTitle: snapshot.lastTitle,
-        seq: snapshot.outputSequence,
-        source: 'headless',
-        oscLinks: snapshot.oscLinks,
-        alternateScreen: snapshot.modes.alternateScreen,
-        // Why known `0` is carried too: it proves the app negotiated nothing at
-        // this boundary, which is a different fact from a source that cannot say.
-        ...(kittyKeyboardFlags !== undefined ? { kittyKeyboardFlags } : {}),
-        ...(snapshot.pendingEscapeTailAnsi
-          ? { pendingEscapeTailAnsi: snapshot.pendingEscapeTailAnsi }
-          : {})
-      }
+      const restored =
+        this.historyManager &&
+        this.historyReader &&
+        (scrollbackRows === undefined || scrollbackRows > DAEMON_SESSION_SCROLLBACK_ROWS)
+          ? await this.overlayDurableRestoreSnapshot(id, snapshot, scrollbackRows)
+          : snapshot
+      return this.toProviderBufferSnapshot(restored)
     } catch {
       return null
     }

@@ -908,8 +908,8 @@ export function useTerminalPaneLifecycle({
         }
         suppression.handlePtyInput(data, forward)
       },
-      // Why: record the main-answered 2031 subscribe in the CSI handler's registries, else theme flips never push CSI 997.
-      recordPaneMode2031Subscription: (paneId: number, repliedMode: 'dark' | 'light') => {
+      // Why: record the fact-observed 2031 subscribe in the pane registries, else theme flips never push CSI 997.
+      recordPaneMode2031Subscription: (paneId: number, subscribedMode: 'dark' | 'light') => {
         paneMode2031Ref.current.set(paneId, true)
         paneLastThemeModeRef.current.set(paneId, subscribedMode)
       },

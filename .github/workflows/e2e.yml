@@ -232,7 +232,14 @@ jobs:
         env:
           TEST_FILES_JSON: ${{ inputs.test_files }}
         run: |
-          mapfile -t TEST_FILES < <(jq -r '.[]' <<<"$TEST_FILES_JSON")
+          mapfile -t TEST_FILES < <(jq -r '.[] | select(
+            . != "tests/e2e/ssh-startup-exec-readiness.spec.ts" and
+            . != "tests/e2e/paired-startup-exec-readiness.spec.ts"
+          )' <<<"$TEST_FILES_JSON")
+          if [ "${#TEST_FILES[@]}" -eq 0 ]; then
+            echo "Changed startup-readiness specs are owned by the dedicated live lane."
+            exit 0
+          fi
           xvfb-run --auto-servernum env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 ORCA_E2E_WEB_CLIENT=1 \
             pnpm run test:e2e "${TEST_FILES[@]}" --workers=1
 
