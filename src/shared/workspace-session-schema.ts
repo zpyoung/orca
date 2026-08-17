@@ -117,9 +117,13 @@ const tabContentTypeSchema = z.enum([
   'conflict-review',
   'check-details',
   'browser',
-  'simulator'
+  'simulator',
+  'pipeline'
 ])
 
+// Why: no 'pipeline' member here — an older Orca's closed enum would reject it and
+// parseWorkspaceSession would drop that host's whole partition. A focused pipeline canvas
+// persists as an absent key instead.
 const workspaceVisibleTabTypeSchema = z.enum(['terminal', 'editor', 'browser', 'simulator'])
 
 const tabSchema = z.object({

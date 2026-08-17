@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import TabBar from '../tab-bar/TabBar'
+import PipelineCanvas from '../pipeline-canvas/PipelineCanvas'
 
 import { TabBarQuickCommandsButton } from '../tab-bar/TabBarQuickCommandsButton'
 import { useTabGroupWorkspaceModel } from './useTabGroupWorkspaceModel'
@@ -127,12 +128,14 @@ export default function TabGroupPanel({
       activeFileId={
         activeTab?.contentType === 'terminal' ||
         activeTab?.contentType === 'browser' ||
-        activeTab?.contentType === 'simulator'
+        activeTab?.contentType === 'simulator' ||
+        activeTab?.contentType === 'pipeline'
           ? null
           : activeTab?.id
       }
       activeBrowserTabId={activeTab?.contentType === 'browser' ? activeTab.entityId : null}
       activeSimulatorTabId={activeTab?.contentType === 'simulator' ? activeTab.id : null}
+      activePipelineTabId={activeTab?.contentType === 'pipeline' ? activeTab.id : null}
       activeTabType={
         activeTab?.contentType === 'terminal'
           ? 'terminal'
@@ -140,7 +143,9 @@ export default function TabGroupPanel({
             ? 'browser'
             : activeTab?.contentType === 'simulator'
               ? 'simulator'
-              : 'editor'
+              : activeTab?.contentType === 'pipeline'
+                ? 'terminal'
+                : 'editor'
       }
       onActivateFile={commands.activateEditor}
       onCloseFile={commands.closeItem}
@@ -310,10 +315,16 @@ export default function TabGroupPanel({
             data-contextual-tour-target="workspace-agent-terminal-tip"
           />
         ) : null}
+        {activeTab && activeTab.contentType === 'pipeline' && (
+          <div className="absolute inset-0 flex min-h-0 min-w-0">
+            <PipelineCanvas runId={activeTab.entityId} />
+          </div>
+        )}
         {activeTab &&
           activeTab.contentType !== 'terminal' &&
           activeTab.contentType !== 'browser' &&
-          activeTab.contentType !== 'simulator' && (
+          activeTab.contentType !== 'simulator' &&
+          activeTab.contentType !== 'pipeline' && (
             <div className="absolute inset-0 flex min-h-0 min-w-0">
               {/* Why: split groups render editor content in a plain relative pane body, not the legacy Terminal.tsx flex column. */}
               <Suspense

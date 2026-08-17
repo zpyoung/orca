@@ -44,6 +44,11 @@ import {
   worktreeIsCleanOp
 } from './git-handler-worktree-ops'
 import { annotatePrunableWorktreesByExistence } from './git-handler-worktree-list'
+import {
+  pipelineCheckpointCaptureOp,
+  pipelineCheckpointRestoreOp,
+  pipelineCheckpointSupportedOp
+} from './git-handler-pipeline-checkpoint'
 import { forceDeletePreservedRelayBranch } from './git-handler-branch-cleanup'
 import { refreshLocalBaseRefForWorktreeCreateOp } from './git-handler-local-base-ref-refresh'
 import { gitExecMutatesRepository } from '../shared/git-exec-mutation'
@@ -261,6 +266,15 @@ export class GitHandler {
     this.dispatcher.onRequest('git.renameCurrentBranch', (p) => this.renameCurrentBranch(p))
     this.dispatcher.onRequest('git.forceDeletePreservedBranch', (p) =>
       this.forceDeletePreservedBranch(p)
+    )
+    this.dispatcher.onRequest('git.pipelineCheckpointSupported', () =>
+      pipelineCheckpointSupportedOp()
+    )
+    this.dispatcher.onRequest('git.pipelineCheckpointCapture', (p) =>
+      pipelineCheckpointCaptureOp(p)
+    )
+    this.dispatcher.onRequest('git.pipelineCheckpointRestore', (p) =>
+      pipelineCheckpointRestoreOp(p)
     )
     this.dispatcher.onRequest('git.exec', (p, context) => this.exec(p, context))
     this.dispatcher.onRequest('git.clone', (p, context) => this.clone(p, context))

@@ -3,7 +3,7 @@ import type { TerminalTab, WorkspaceVisibleTabType } from '../../../../shared/ty
 import { resolveRepairedActiveTerminalTabId } from './active-terminal-repair'
 
 type ActiveTerminalRepairInput = {
-  activeTabType: WorkspaceVisibleTabType
+  activeTabType: WorkspaceVisibleTabType | null
   activeTabId: string | null
   activeTabIdByWorktree: Record<string, string | null>
   renderedActiveWorktreeId: string | null

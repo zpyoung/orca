@@ -9,6 +9,16 @@ import { closeMobileSessionTabInStore } from '../../runtime/mobile-session-tab-c
 // Mock sonner (imported by repos.ts)
 vi.mock('sonner', () => ({ toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() } }))
 
+const pipelineRpcMocks = vi.hoisted(() => ({
+  callRuntimeRpc: vi.fn().mockResolvedValue({ runs: [] })
+}))
+
+// Mock the pipeline.listRuns transport so reconciliation's hydration trigger
+// doesn't attempt a real RPC round-trip in tests.
+vi.mock('@/runtime/runtime-rpc-client', () => ({
+  callRuntimeRpc: pipelineRpcMocks.callRuntimeRpc
+}))
+
 // Mock agent-status (imported by terminal-helpers)
 vi.mock('@/lib/agent-status', async (importOriginal) => {
   const actual = await importOriginal<typeof AgentStatusModule>()
@@ -119,6 +129,7 @@ describe('TabsSlice', () => {
 
   beforeEach(() => {
     store = createTestStore()
+    pipelineRpcMocks.callRuntimeRpc.mockReset().mockResolvedValue({ runs: [] })
   })
 
   it('setRenamingTabId sets and clears the tab rename signal', () => {
@@ -610,6 +621,79 @@ describe('TabsSlice', () => {
 
       expect(store.getState().unreadTerminalTabs[t2TerminalId]).toBeUndefined()
     })
+
+    // Regression (R3, four review rounds): every activation route funnels through
+    // activateTab, so the stale-terminal-id clear belongs here rather than in each
+    // caller — a caller that forgets the companion call can no longer reintroduce the bug.
+    it('clears the stale active-terminal id when activating a pipeline tab, without a companion call', () => {
+      const terminal = store.getState().createUnifiedTab(WT, 'terminal')
+      store.setState({
+        activeWorktreeId: WT,
+        activeTabId: terminal.entityId,
+        activeTabType: 'terminal',
+        activeTabIdByWorktree: { [WT]: terminal.entityId },
+        activeTabTypeByWorktree: { [WT]: 'terminal' }
+      })
+      const pipelineTab = store.getState().createUnifiedTab(WT, 'pipeline', {
+        entityId: 'run-1',
+        label: 'bugfix-fast #1',
+        activate: false
+      })
+
+      store.getState().activateTab(pipelineTab.id)
+
+      expect(store.getState().activeTabId).toBeNull()
+      expect(store.getState().activeTabIdByWorktree[WT]).toBeNull()
+      expect(store.getState().groupsByWorktree[WT][0].activeTabId).toBe(pipelineTab.id)
+      // null (not 'terminal') is the honest encoding of "no visible tab type" —
+      // a placeholder here is exactly what earlier rounds' readers resurrected.
+      expect(store.getState().activeTabType).toBeNull()
+      expect(store.getState().activeTabTypeByWorktree[WT]).toBeUndefined()
+    })
+
+    it("leaves a background worktree's active-terminal id untouched when a pipeline tab activates in a different worktree", () => {
+      const OTHER_WT = 'repo1::/tmp/other'
+      const terminal = store.getState().createUnifiedTab(OTHER_WT, 'terminal')
+      store.setState({
+        activeWorktreeId: OTHER_WT,
+        activeTabId: terminal.entityId,
+        activeTabType: 'terminal',
+        activeTabIdByWorktree: { [OTHER_WT]: terminal.entityId },
+        activeTabTypeByWorktree: { [OTHER_WT]: 'terminal' }
+      })
+      const pipelineTab = store.getState().createUnifiedTab(WT, 'pipeline', {
+        entityId: 'run-1',
+        label: 'bugfix-fast #1',
+        activate: false
+      })
+
+      store.getState().activateTab(pipelineTab.id)
+
+      expect(store.getState().activeTabId).toBe(terminal.entityId)
+      expect(store.getState().activeTabIdByWorktree[OTHER_WT]).toBe(terminal.entityId)
+      expect(store.getState().activeTabIdByWorktree[WT]).toBeNull()
+    })
+
+    it('does not disturb active-terminal id when activating a non-pipeline tab', () => {
+      const terminal = store.getState().createUnifiedTab(WT, 'terminal')
+      store.setState({
+        activeWorktreeId: WT,
+        activeTabId: terminal.entityId,
+        activeTabType: 'terminal',
+        activeTabIdByWorktree: { [WT]: terminal.entityId },
+        activeTabTypeByWorktree: { [WT]: 'terminal' }
+      })
+      const editorTab = store.getState().createUnifiedTab(WT, 'editor', {
+        id: 'f.ts',
+        label: 'f.ts',
+        activate: false
+      })
+
+      store.getState().activateTab(editorTab.id)
+
+      expect(store.getState().activeTabId).toBe(terminal.entityId)
+      expect(store.getState().activeTabIdByWorktree[WT]).toBe(terminal.entityId)
+    })
   })
 
   // Ghostty "show until interact": BEL always marks unread (even focused/visible tabs); only user interaction via clearTerminalTabUnread dismisses it.
@@ -896,6 +980,82 @@ describe('TabsSlice', () => {
 
       expect(store.getState().unreadTerminalTabs[tabA.entityId]).toBeUndefined()
       expect(store.getState().unreadTerminalTabs[tabB.entityId]).toBeUndefined()
+    })
+
+    it('never derives activeTabType "editor" for a focused group whose active tab is a pipeline run', () => {
+      const groupId = 'g-pipeline'
+      store.setState({
+        activeWorktreeId: WT,
+        unifiedTabsByWorktree: {
+          [WT]: [
+            makeUnifiedTab({
+              id: 'run_abc',
+              entityId: 'run_abc',
+              groupId,
+              worktreeId: WT,
+              contentType: 'pipeline',
+              label: 'bugfix-fast #1'
+            })
+          ]
+        },
+        groupsByWorktree: {
+          [WT]: [
+            makeTabGroup({ id: groupId, worktreeId: WT, activeTabId: 'run_abc', tabOrder: ['run_abc'] })
+          ]
+        }
+      })
+
+      store.getState().focusGroup(WT, groupId)
+
+      // entityId is a run id, not a file id or open editor tab — a run id must
+      // never be written into activeFileId under an 'editor' activeTabType.
+      expect(store.getState().activeTabType).not.toBe('editor')
+      expect(store.getState().activeTabTypeByWorktree[WT]).not.toBe('editor')
+    })
+  })
+
+  describe('activatePipelineTabSurface', () => {
+    it('clears the stale terminal-scoped active tab id left over from before a pipeline tab was focused', () => {
+      store.setState({
+        activeWorktreeId: WT,
+        activeTabId: 'term-1',
+        activeTabType: 'terminal',
+        activeTabIdByWorktree: { [WT]: 'term-1' },
+        activeTabTypeByWorktree: { [WT]: 'terminal' }
+      })
+
+      store.getState().activatePipelineTabSurface(WT)
+
+      expect(store.getState().activeTabId).toBeNull()
+      expect(store.getState().activeTabIdByWorktree[WT]).toBeNull()
+      // null (no WorkspaceVisibleTabType member represents a pipeline canvas) rather than a
+      // 'terminal' placeholder — a placeholder here is what earlier rounds' readers resurrected.
+      expect(store.getState().activeTabType).toBeNull()
+      expect(store.getState().activeTabTypeByWorktree[WT]).toBeUndefined()
+      // tab.rename and workspace-focus restore both gate on activeTabType === 'terminal' && activeTabId;
+      // with activeTabType null, neither can target the terminal that was active before.
+      const wouldTargetStaleTerminal =
+        store.getState().activeTabType === 'terminal' && Boolean(store.getState().activeTabId)
+      expect(wouldTargetStaleTerminal).toBe(false)
+    })
+
+    it("leaves a background worktree's singular active-tab fields untouched, clearing only its own per-worktree pointer", () => {
+      const OTHER_WT = 'repo1::/tmp/other'
+      store.setState({
+        activeWorktreeId: WT,
+        activeTabId: 'term-active',
+        activeTabType: 'terminal',
+        activeTabIdByWorktree: { [WT]: 'term-active', [OTHER_WT]: 'term-background' },
+        activeTabTypeByWorktree: { [WT]: 'terminal', [OTHER_WT]: 'terminal' }
+      })
+
+      store.getState().activatePipelineTabSurface(OTHER_WT)
+
+      expect(store.getState().activeTabId).toBe('term-active')
+      expect(store.getState().activeTabType).toBe('terminal')
+      expect(store.getState().activeTabIdByWorktree[OTHER_WT]).toBeNull()
+      expect(store.getState().activeTabTypeByWorktree[OTHER_WT]).toBeUndefined()
+      expect(store.getState().activeTabTypeByWorktree[WT]).toBe('terminal')
     })
   })
 
@@ -2191,6 +2351,161 @@ describe('TabsSlice', () => {
         direction: 'horizontal',
         first: { type: 'leaf', groupId: terminalGroupId },
         second: { type: 'leaf', groupId: simulatorGroupId }
+      })
+    })
+
+    describe('pipeline tab retention', () => {
+      function seedPipelineTab(): void {
+        const groupId = 'g-pipeline'
+        store.setState({
+          unifiedTabsByWorktree: {
+            [WT]: [
+              makeUnifiedTab({
+                id: 'run_abc',
+                entityId: 'run_abc',
+                groupId,
+                worktreeId: WT,
+                contentType: 'pipeline',
+                label: 'bugfix-fast #1'
+              })
+            ]
+          },
+          groupsByWorktree: {
+            [WT]: [
+              makeTabGroup({
+                id: groupId,
+                worktreeId: WT,
+                activeTabId: 'run_abc',
+                tabOrder: ['run_abc']
+              })
+            ]
+          },
+          activeGroupIdByWorktree: { [WT]: groupId },
+          tabsByWorktree: { [WT]: [] }
+        })
+      }
+
+      it('retains a pipeline tab when hydration for its workspace is absent', () => {
+        seedPipelineTab()
+        const result = store.getState().reconcileWorktreeTabModel(WT)
+        expect(result.renderableTabCount).toBe(1)
+        expect(store.getState().unifiedTabsByWorktree[WT].map((tab) => tab.id)).toEqual(['run_abc'])
+      })
+
+      it('retains a pipeline tab while hydration is in-flight', () => {
+        seedPipelineTab()
+        store.setState({
+          pipelineRunHydrationByWorkspaceId: {
+            [WT]: { phase: 'in-flight', startedAt: Date.now(), generation: 1 }
+          }
+        })
+        const result = store.getState().reconcileWorktreeTabModel(WT)
+        expect(result.renderableTabCount).toBe(1)
+      })
+
+      it('retains a pipeline tab when hydration failed', () => {
+        seedPipelineTab()
+        store.setState({
+          pipelineRunHydrationByWorkspaceId: { [WT]: { phase: 'failed' } }
+        })
+        const result = store.getState().reconcileWorktreeTabModel(WT)
+        expect(result.renderableTabCount).toBe(1)
+      })
+
+      it('retains a pipeline tab once hydrated when the run id is known', () => {
+        seedPipelineTab()
+        store.setState({
+          pipelineRunHydrationByWorkspaceId: { [WT]: { phase: 'hydrated' } },
+          pipelineRunsById: {
+            run_abc: {
+              runId: 'run_abc',
+              templateName: 'bugfix-fast',
+              runNumber: 1,
+              state: 'running',
+              workspaceId: WT,
+              lastSnapshotAt: null
+            }
+          }
+        })
+        const result = store.getState().reconcileWorktreeTabModel(WT)
+        expect(result.renderableTabCount).toBe(1)
+      })
+
+      it('prunes a pipeline tab only once hydrated and the run id is absent', () => {
+        seedPipelineTab()
+        store.setState({
+          pipelineRunHydrationByWorkspaceId: { [WT]: { phase: 'hydrated' } },
+          pipelineRunsById: {}
+        })
+        const result = store.getState().reconcileWorktreeTabModel(WT)
+        expect(result.renderableTabCount).toBe(0)
+        expect(store.getState().unifiedTabsByWorktree[WT]).toEqual([])
+      })
+
+      it('fires hydration for a pipeline tab whose workspace has never been requested', () => {
+        seedPipelineTab()
+        store.getState().reconcileWorktreeTabModel(WT)
+
+        expect(pipelineRpcMocks.callRuntimeRpc).toHaveBeenCalledWith(
+          { kind: 'local' },
+          'pipeline.listRuns'
+        )
+        expect(store.getState().pipelineRunHydrationByWorkspaceId[WT]).toMatchObject({
+          phase: 'in-flight'
+        })
+      })
+
+      it('re-fires hydration for a pipeline tab whose workspace previously failed', () => {
+        seedPipelineTab()
+        store.setState({
+          pipelineRunHydrationByWorkspaceId: { [WT]: { phase: 'failed' } }
+        })
+        store.getState().reconcileWorktreeTabModel(WT)
+
+        expect(pipelineRpcMocks.callRuntimeRpc).toHaveBeenCalledTimes(1)
+        expect(store.getState().pipelineRunHydrationByWorkspaceId[WT]).toMatchObject({
+          phase: 'in-flight'
+        })
+      })
+
+      it('does not re-fire hydration for a workspace already hydrated', () => {
+        seedPipelineTab()
+        store.setState({
+          pipelineRunHydrationByWorkspaceId: { [WT]: { phase: 'hydrated' } },
+          pipelineRunsById: {
+            run_abc: {
+              runId: 'run_abc',
+              templateName: 'bugfix-fast',
+              runNumber: 1,
+              state: 'running',
+              workspaceId: WT,
+              lastSnapshotAt: null
+            }
+          }
+        })
+        store.getState().reconcileWorktreeTabModel(WT)
+
+        expect(pipelineRpcMocks.callRuntimeRpc).not.toHaveBeenCalled()
+      })
+
+      it('does not fire hydration for a workspace with no pipeline tabs', () => {
+        store.setState({
+          unifiedTabsByWorktree: {
+            [WT]: [
+              makeUnifiedTab({
+                id: 'terminal-1',
+                entityId: 'terminal-1',
+                groupId: 'g-terminal',
+                worktreeId: WT,
+                contentType: 'terminal'
+              })
+            ]
+          },
+          tabsByWorktree: { [WT]: [] }
+        })
+        store.getState().reconcileWorktreeTabModel(WT)
+
+        expect(pipelineRpcMocks.callRuntimeRpc).not.toHaveBeenCalled()
       })
     })
 

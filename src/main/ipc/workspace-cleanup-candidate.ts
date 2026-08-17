@@ -134,6 +134,7 @@ export function buildWorkspaceCleanupLocalContext(
     terminalTabCount: 0,
     cleanEditorTabCount: 0,
     browserTabCount: 0,
+    pipelineTabCount: 0,
     diffCommentCount: worktree.diffComments?.length ?? 0,
     newestDiffCommentAt: getNewestWorkspaceCleanupDiffCommentAt(worktree.diffComments),
     retainedDoneAgentCount: 0

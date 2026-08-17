@@ -1,0 +1,111 @@
+# Files the tab-content-type consumer audit (check:tab-content-type-audit) allows
+# to reference `.contentType` / a closed terminal|editor union WITHOUT importing
+# `src/shared/tab-content-type-exhaustive.ts`.
+#
+# This is a REVIEWED list, not a bypass: every entry below was read and is one of
+#   (a) fixed for 'pipeline' with explicit positive-equality branches (no
+#       else-fallthrough), just not phrased as a `switch` that imports the
+#       exhaustive helper,
+#   (b) a closed positive check (`=== 'simulator'`, `!== 'terminal'`, ...) whose
+#       fallthrough already excludes 'pipeline' correctly by construction,
+#   (c) a consumer of a union that is deliberately NOT widened for pipeline
+#       (WorkspaceVisibleTabType, the palette-search WorkspaceTabContentType
+#       family, TabCycleType/TabDragItemData as plain type declarations), or
+#   (d) an unrelated `contentType` field (MIME type on an image/artifact, not a
+#       Tab's TabContentType) that only textually matches the sweep.
+#
+# Residual, stated per the spec's own gate-2 caveat: this is a file-granular gate.
+# A file below could still contain an unconverted else-fallthrough alongside the
+# reviewed one. src/renderer/src/components/floating-terminal/FloatingTerminalPanel.tsx
+# is the one entry NOT fully converted — its editor/browser/terminal/simulator
+# item-routing silently drops a pipeline tab (never misroutes a run id into a real
+# field, since entityId lookups against floatingFiles/browserTabs simply miss) —
+# pipeline tabs cannot reach the floating pseudo-worktree today, but this is the
+# honest residual the mechanical gates approximate rather than prove.
+
+# (a) fixed for pipeline, explicit if/else-if branches rather than a switch
+src/renderer/src/components/Terminal.tsx
+src/renderer/src/components/tab-group/TabGroupPanel.tsx
+src/renderer/src/components/terminal/terminal-tab-bulk-actions.ts
+src/renderer/src/components/terminal/terminal-tab-create.ts
+src/renderer/src/lib/launch-agent-in-new-tab.ts
+src/renderer/src/lib/launch-ai-vault-session.ts
+src/renderer/src/lib/run-quick-command-in-new-tab.ts
+src/renderer/src/lib/sleeping-agent-session-launch.ts
+src/renderer/src/store/slices/browser.ts
+src/renderer/src/store/slices/workspace-cleanup.ts
+src/shared/workspace-session-terminal-tab-close.ts
+src/renderer/src/components/workspace-cleanup/workspace-cleanup-candidate-labels.ts
+src/renderer/src/components/tab-group/tab-drag-data.ts
+src/renderer/src/components/terminal/tab-type-cycle.ts
+# TabBar's item projection after main's tab-bar split; both carry an explicit
+# contentType === 'pipeline' branch ported from the pre-split TabBar.tsx
+src/renderer/src/components/tab-bar/tab-bar-item-model.ts
+src/renderer/src/components/tab-bar/use-tab-bar-item-projection.ts
+# was miscategorized under (b): onFocusEditorTab's else branch wrote a pipeline
+# run id into setActiveFile under activeTabType 'editor' — a live defect, not a
+# closed positive check. Fixed with an explicit pipeline branch (fix-r N4).
+src/renderer/src/hooks/useIpcEvents.ts
+
+# (b) closed positive checks already reviewed as correct (spec's verified-safe
+# list plus the same pattern found elsewhere in the sweep)
+src/renderer/src/store/slices/tab-group-state.ts
+src/renderer/src/store/slices/tabs-hydration.ts
+src/renderer/src/store/slices/editor.ts
+src/renderer/src/runtime/close-mirrored-editor-tab.ts
+src/renderer/src/runtime/mobile-session-tab-close.ts
+src/renderer/src/lib/session-write-subscriber.ts
+src/renderer/src/store/slices/terminals.ts
+src/renderer/src/store/slices/terminal-tab-retirement.ts
+src/renderer/src/store/slices/terminal-orphan-helpers.ts
+src/renderer/src/components/terminal/terminal-close-target.ts
+src/renderer/src/components/terminal/close-local-terminal-tab-state.ts
+src/renderer/src/runtime/sync-runtime-graph.ts
+src/renderer/src/components/emulator-pane/EmulatorPaneOverlayLayer.tsx
+src/renderer/src/components/emulator-pane/use-mobile-emulator-tab-intro-actions.ts
+src/renderer/src/lib/ensure-simulator-tab.ts
+src/renderer/src/lib/simulator-palette-search.ts
+# admits only contentType === 'pipeline'; a new member can never reach the body
+src/renderer/src/lib/pipeline-palette-search.ts
+src/renderer/src/lib/pipeline-tab-palette-activation.ts
+src/renderer/src/lib/ensure-pipeline-tab.ts
+src/renderer/src/lib/simulator-tab-palette-activation.ts
+src/renderer/src/lib/simulator-tab-shutdown.ts
+src/renderer/src/components/automations/AutomationsPage.tsx
+src/renderer/src/components/browser-pane/BrowserPaneOverlayLayer.tsx
+src/renderer/src/components/editor/CombinedDiffViewer.tsx
+src/renderer/src/components/native-chat/native-chat-availability.ts
+src/renderer/src/components/native-chat/use-native-chat-toggle-shortcut.ts
+src/renderer/src/components/shared/kill-all-terminal-surfaces.ts
+src/renderer/src/components/terminal-pane/TerminalPaneOverlayLayer.tsx
+src/renderer/src/components/terminal-pane/terminal-unified-tab-lookup.ts
+src/renderer/src/lib/automation-session-reuse.ts
+src/renderer/src/components/WorktreeJumpPalette.tsx
+src/renderer/src/components/tab-bar/use-tab-bar-runtime-model.ts
+src/renderer/src/runtime/web-runtime-browser-materialization.ts
+src/renderer/src/store/slices/terminal-session-row-hydration.ts
+# closed Set<TabContentType> of editor-family members; 'pipeline' is absent, so a
+# pipeline tab is correctly never a Cmd+S target
+src/renderer/src/components/editor/editor-cmd-save-target.ts
+
+# (c) consumers of unions deliberately not widened for pipeline
+src/renderer/src/hooks/resolve-zoom-target.ts
+src/shared/types.ts
+src/renderer/src/components/tab-bar/RecentTabSwitcher.tsx
+src/renderer/src/components/tab-bar/TabBarCreateEntryRow.tsx
+src/renderer/src/components/tab-bar/open-tab-entry-dedupe.ts
+src/renderer/src/components/tab-bar/open-tab-search.ts
+src/renderer/src/components/tab-bar/open-tab-selection-routing.ts
+src/renderer/src/components/tab-bar/recent-tab-switching.ts
+src/renderer/src/lib/workspace-tab-palette-activation.ts
+src/renderer/src/lib/workspace-tab-palette-results.ts
+src/renderer/src/lib/workspace-tab-palette-search.ts
+src/renderer/src/runtime/web-session-focus-intent.ts
+
+# (d) unrelated `contentType` field (not TabContentType)
+src/renderer/src/components/sidebar/SidebarFeedbackDialog.tsx
+src/shared/artifact-cli-bridge.ts
+src/shared/workbench-steps.ts
+
+# not converted — see residual note above
+src/renderer/src/components/floating-terminal/FloatingTerminalPanel.tsx

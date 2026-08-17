@@ -9,6 +9,7 @@ import {
   type AgentStatusEntry
 } from '../../../shared/agent-status-types'
 import { agentProviderSessionsEqual } from '../../../shared/agent-session-resume'
+import { assertExhaustiveTabContentType } from '../../../shared/tab-content-type-exhaustive'
 import type {
   RuntimeMobileSessionTabsResult,
   RuntimeMobileSessionTabsRemovedResult,
@@ -2300,10 +2301,25 @@ function sameGroups(a: readonly TabGroup[] | undefined, b: readonly TabGroup[] |
 }
 
 function toVisibleTabType(tab: Tab): WebSessionTabsSyncState['activeTabType'] {
-  if (tab.contentType === 'browser' || tab.contentType === 'terminal') {
-    return tab.contentType
+  switch (tab.contentType) {
+    case 'browser':
+    case 'terminal':
+      return tab.contentType
+    case 'simulator':
+      return 'simulator'
+    case 'pipeline':
+      // Why: mobile projection omits pipeline tabs entirely, and this local
+      // visible-type surface has no member for one either.
+      return null
+    case 'editor':
+    case 'diff':
+    case 'conflict-review':
+    case 'check-details':
+      return 'editor'
   }
-  return 'editor'
+  // outside the switch, not in a default: case, so control-flow narrowing to
+  // `never` still fires here once every member above is handled
+  return assertExhaustiveTabContentType(tab.contentType)
 }
 
 function applyWebSessionTabsSnapshotWithContext(
@@ -3229,17 +3245,16 @@ function applyWebSessionTabsSnapshotWithContext(
       : (currentActiveEditorStillValid ?? nextActiveEditorFileId)
     : state.activeFileId
   const nextActiveTabType = isActiveWorktree ? nextVisibleTabType : state.activeTabType
-  const nextActiveTabTypeByWorktree =
-    state.activeTabTypeByWorktree[worktreeId] !== nextVisibleTabType
-      ? withWorktreeEntry(
-          state,
-          'activeTabTypeByWorktree',
-          worktreeId,
-          nextVisibleTabType,
-          (current, next) => current === next,
-          batchContext
-        )
-      : state.activeTabTypeByWorktree
+  const nextActiveTabTypeByWorktree = withWorktreeEntry(
+    state,
+    'activeTabTypeByWorktree',
+    worktreeId,
+    nextVisibleTabType,
+    // a null next means no visible-tab-type surface, which the record encodes by omitting the
+    // key — so an already-absent entry is equal and must not churn the record identity
+    (current, next) => (next === null ? current === undefined : current === next),
+    batchContext
+  )
   const agentStatusPatch = buildMirroredAgentStatusPatch(
     state,
     currentTerminalTabs,

@@ -1842,9 +1842,12 @@ function Terminal(): React.JSX.Element | null {
         ) {
           destroyWorkspaceWebviews(state.browserPagesByWorkspace, id)
           closeBrowserTab(id)
-        } else if (unifiedTab?.contentType === 'simulator') {
-          // Why: simulator tabs live only in the unified-tab store, so the
-          // entity-store checks above never match them.
+        } else if (
+          unifiedTab?.contentType === 'simulator' ||
+          unifiedTab?.contentType === 'pipeline'
+        ) {
+          // Why: simulator/pipeline tabs live only in the unified-tab store, so
+          // the entity-store checks above never match them.
           state.closeUnifiedTab(unifiedTab.id)
         }
       }
@@ -2447,7 +2450,15 @@ function Terminal(): React.JSX.Element | null {
                 ? (useAppStore.getState().getActiveTab(renderedActiveWorktreeId)?.id ?? null)
                 : null
             }
-            activeTabType={activeTabType}
+            activePipelineTabId={
+              renderedActiveWorktreeId
+                ? (() => {
+                    const active = useAppStore.getState().getActiveTab(renderedActiveWorktreeId)
+                    return active?.contentType === 'pipeline' ? active.id : null
+                  })()
+                : null
+            }
+            activeTabType={activeTabType ?? undefined}
             onActivateFile={(fileId) => {
               const unifiedTabs =
                 useAppStore.getState().unifiedTabsByWorktree[renderedActiveWorktreeId ?? ''] ?? []
@@ -2455,6 +2466,12 @@ function Terminal(): React.JSX.Element | null {
               if (unifiedTab?.contentType === 'simulator') {
                 setActiveTab(fileId)
                 setActiveTabType('simulator')
+                return
+              }
+              if (unifiedTab?.contentType === 'pipeline') {
+                // Why: fileId here is the pipeline tab id, not a file id — writing
+                // it into setActiveFile would masquerade a run as an open file.
+                setActiveTab(fileId)
                 return
               }
               setActiveFile(fileId)

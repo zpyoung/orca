@@ -1,5 +1,8 @@
 import { useAppStore } from '../../store'
 import type { AppState } from '../../store/types'
+import { assertExhaustiveTabContentType } from '../../../../shared/tab-content-type-exhaustive'
+import { withActiveTabTypeForWorktree } from '../../store/slices/active-tab-type-record'
+import { pipelineTabSurfaceClearPatch } from '../../store/slices/tabs'
 
 export type TabDragActivationSnapshot = {
   activeGroupId: string | null
@@ -24,48 +27,56 @@ function previewActiveSurfacePatch(
 
   const nextActiveTabTypeByWorktree = (
     tabType: AppState['activeTabType']
-  ): AppState['activeTabTypeByWorktree'] => ({
-    ...state.activeTabTypeByWorktree,
-    [worktreeId]: tabType
-  })
+  ): AppState['activeTabTypeByWorktree'] =>
+    withActiveTabTypeForWorktree(state.activeTabTypeByWorktree, worktreeId, tabType)
 
-  if (unifiedTab.contentType === 'terminal') {
-    return {
-      activeTabId: unifiedTab.entityId,
-      activeTabType: 'terminal',
-      activeTabIdByWorktree: {
-        ...state.activeTabIdByWorktree,
-        [worktreeId]: unifiedTab.entityId
-      },
-      activeTabTypeByWorktree: nextActiveTabTypeByWorktree('terminal')
-    }
+  switch (unifiedTab.contentType) {
+    case 'terminal':
+      return {
+        activeTabId: unifiedTab.entityId,
+        activeTabType: 'terminal',
+        activeTabIdByWorktree: {
+          ...state.activeTabIdByWorktree,
+          [worktreeId]: unifiedTab.entityId
+        },
+        activeTabTypeByWorktree: nextActiveTabTypeByWorktree('terminal')
+      }
+    case 'browser':
+      return {
+        activeBrowserTabId: unifiedTab.entityId,
+        activeTabType: 'browser',
+        activeBrowserTabIdByWorktree: {
+          ...state.activeBrowserTabIdByWorktree,
+          [worktreeId]: unifiedTab.entityId
+        },
+        activeTabTypeByWorktree: nextActiveTabTypeByWorktree('browser')
+      }
+    case 'simulator':
+      return {
+        activeTabType: 'simulator',
+        activeTabTypeByWorktree: nextActiveTabTypeByWorktree('simulator')
+      }
+    case 'pipeline':
+      // Why: entityId is a run id, not a file/terminal/browser id — dragging focus onto a
+      // pipeline tab must clear activeTabId too, so route through pipelineTabSurfaceClearPatch.
+      return pipelineTabSurfaceClearPatch(state, worktreeId)
+    case 'editor':
+    case 'diff':
+    case 'conflict-review':
+    case 'check-details':
+      return {
+        activeFileId: unifiedTab.entityId,
+        activeTabType: 'editor',
+        activeFileIdByWorktree: {
+          ...state.activeFileIdByWorktree,
+          [worktreeId]: unifiedTab.entityId
+        },
+        activeTabTypeByWorktree: nextActiveTabTypeByWorktree('editor')
+      }
   }
-  if (unifiedTab.contentType === 'browser') {
-    return {
-      activeBrowserTabId: unifiedTab.entityId,
-      activeTabType: 'browser',
-      activeBrowserTabIdByWorktree: {
-        ...state.activeBrowserTabIdByWorktree,
-        [worktreeId]: unifiedTab.entityId
-      },
-      activeTabTypeByWorktree: nextActiveTabTypeByWorktree('browser')
-    }
-  }
-  if (unifiedTab.contentType === 'simulator') {
-    return {
-      activeTabType: 'simulator',
-      activeTabTypeByWorktree: nextActiveTabTypeByWorktree('simulator')
-    }
-  }
-  return {
-    activeFileId: unifiedTab.entityId,
-    activeTabType: 'editor',
-    activeFileIdByWorktree: {
-      ...state.activeFileIdByWorktree,
-      [worktreeId]: unifiedTab.entityId
-    },
-    activeTabTypeByWorktree: nextActiveTabTypeByWorktree('editor')
-  }
+  // outside the switch, not in a default: case, so control-flow narrowing to
+  // `never` still fires here once every member above is handled
+  return assertExhaustiveTabContentType(unifiedTab.contentType)
 }
 
 export function captureTabDragActivationSnapshot(worktreeId: string): TabDragActivationSnapshot {

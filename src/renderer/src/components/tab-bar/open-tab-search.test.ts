@@ -7,6 +7,7 @@ import type {
   Worktree
 } from '../../../../shared/types'
 import type { SearchableBrowserPage } from '@/lib/browser-palette-search'
+import type { SearchablePipelineTab } from '@/lib/pipeline-palette-search'
 import type { SearchableSimulatorTab } from '@/lib/simulator-palette-search'
 import type { SearchableWorkspaceTab } from '@/lib/workspace-tab-palette-search'
 import {
@@ -165,11 +166,41 @@ function makeSimulatorTab({
   }
 }
 
+function makePipelineTab({
+  id,
+  templateName,
+  runNumber,
+  isCurrentTab = false
+}: {
+  id: string
+  templateName: string
+  runNumber: number
+  isCurrentTab?: boolean
+}): SearchablePipelineTab {
+  return {
+    tab: makeTab(id, 'pipeline'),
+    worktree,
+    repoName: REPO_NAME,
+    worktreeSortIndex: 0,
+    isCurrentTab,
+    isCurrentWorktree: true,
+    run: {
+      runId: `${id}-run`,
+      templateName,
+      runNumber,
+      state: 'running',
+      workspaceId: null,
+      lastSnapshotAt: null
+    }
+  }
+}
+
 function search(input: Partial<OpenTabSearchInput> & { query: string }): OpenTabSearchResult[] {
   return searchOpenTabs({
     workspaceTabs: [],
     browserPages: [],
     simulatorTabs: [],
+    pipelineTabs: [],
     ...input
   })
 }
@@ -253,6 +284,19 @@ describe('searchOpenTabs ranking', () => {
     ])
   })
 
+  it('ranks pipeline behind every other source on a tied tier', () => {
+    const results = search({
+      query: 'zebra',
+      simulatorTabs: [makeSimulatorTab({ id: 'sim-1', label: 'Zebra emulator' })],
+      pipelineTabs: [makePipelineTab({ id: 'pipe-1', templateName: 'Zebra deploy', runNumber: 3 })]
+    })
+
+    expect(results.map((result) => result.id)).toEqual([
+      'open-tab:simulator:sim-1',
+      'open-tab:pipeline:pipe-1'
+    ])
+  })
+
   it('keeps only the highest-ranked results once the cap is reached', () => {
     const results = search({
       query: 'zebra',
@@ -278,20 +322,29 @@ describe('searchOpenTabs ranking', () => {
 describe('searchOpenTabs filtering', () => {
   // The focused tab is only unreachable from its own column; hiding it here would
   // make it unreachable from every other column's "+" too.
-  it('still returns the focused tab, page and emulator', () => {
+  it('still returns the focused tab, page, emulator and pipeline run', () => {
     const results = search({
       query: 'zebra',
       workspaceTabs: [makeWorkspaceTab({ id: 'tab-1', title: 'Zebra tab', isCurrentTab: true })],
       browserPages: [makeBrowserPage({ id: 'page-1', title: 'Zebra page', isCurrentPage: true })],
       simulatorTabs: [
         makeSimulatorTab({ id: 'sim-1', label: 'Zebra emulator', isCurrentTab: true })
+      ],
+      pipelineTabs: [
+        makePipelineTab({
+          id: 'pipe-1',
+          templateName: 'Zebra deploy',
+          runNumber: 3,
+          isCurrentTab: true
+        })
       ]
     })
 
     expect(results.map((result) => result.id)).toEqual([
       'open-tab:workspace:tab-1',
       'open-tab:browser:page-1',
-      'open-tab:simulator:sim-1'
+      'open-tab:simulator:sim-1',
+      'open-tab:pipeline:pipe-1'
     ])
   })
 
@@ -301,7 +354,8 @@ describe('searchOpenTabs filtering', () => {
         query: 'aurora',
         workspaceTabs: [makeWorkspaceTab({ id: 'tab-1', title: 'Notes' })],
         browserPages: [makeBrowserPage({ id: 'page-1', title: 'Release notes' })],
-        simulatorTabs: [makeSimulatorTab({ id: 'sim-1', label: 'Pixel 8' })]
+        simulatorTabs: [makeSimulatorTab({ id: 'sim-1', label: 'Pixel 8' })],
+        pipelineTabs: [makePipelineTab({ id: 'pipe-1', templateName: 'Deploy', runNumber: 1 })]
       })
     ).toEqual([])
   })
@@ -312,7 +366,8 @@ describe('searchOpenTabs filtering', () => {
         query: 'rocket',
         workspaceTabs: [makeWorkspaceTab({ id: 'tab-1', title: 'Notes' })],
         browserPages: [makeBrowserPage({ id: 'page-1', title: 'Release notes' })],
-        simulatorTabs: [makeSimulatorTab({ id: 'sim-1', label: 'Pixel 8' })]
+        simulatorTabs: [makeSimulatorTab({ id: 'sim-1', label: 'Pixel 8' })],
+        pipelineTabs: [makePipelineTab({ id: 'pipe-1', templateName: 'Deploy', runNumber: 1 })]
       })
     ).toEqual([])
   })
@@ -340,9 +395,27 @@ describe('searchOpenTabs filtering', () => {
 
     expect(results.map((result) => result.id)).toEqual(['open-tab:simulator:sim-1'])
   })
+
+  it('keeps the pipeline "pipeline run" alias match, which carries no ranges', () => {
+    const results = search({
+      query: 'pipeline',
+      pipelineTabs: [makePipelineTab({ id: 'pipe-1', templateName: 'Deploy Staging', runNumber: 7 })]
+    })
+
+    expect(results.map((result) => result.id)).toEqual(['open-tab:pipeline:pipe-1'])
+  })
 })
 
 describe('searchOpenTabs result fields', () => {
+  it('formats a pipeline row title as templateName #runNumber', () => {
+    const [result] = search({
+      query: 'deploy',
+      pipelineTabs: [makePipelineTab({ id: 'pipe-1', templateName: 'Deploy Staging', runNumber: 7 })]
+    })
+
+    expect(result).toMatchObject({ title: 'Deploy Staging #7' })
+  })
+
   it('carries the matched secondary text and leaves it null for a title match', () => {
     const [secondary] = search({
       query: 'zebra',
@@ -390,7 +463,8 @@ describe('searchOpenTabs result fields', () => {
       query: 'zebra',
       workspaceTabs: [makeWorkspaceTab({ id: 'tab-1', title: 'Zebra tab' })],
       browserPages: [makeBrowserPage({ id: 'page-1', title: 'Zebra page' })],
-      simulatorTabs: [makeSimulatorTab({ id: 'sim-1', label: 'Zebra emulator' })]
+      simulatorTabs: [makeSimulatorTab({ id: 'sim-1', label: 'Zebra emulator' })],
+      pipelineTabs: [makePipelineTab({ id: 'pipe-1', templateName: 'Zebra deploy', runNumber: 3 })]
     })
 
     expect(results).toMatchObject([
@@ -413,6 +487,13 @@ describe('searchOpenTabs result fields', () => {
         source: 'simulator',
         contentType: 'simulator',
         tabId: 'sim-1',
+        groupId: 'group-1',
+        worktreeId: 'wt-1'
+      },
+      {
+        source: 'pipeline',
+        contentType: 'pipeline',
+        tabId: 'pipe-1',
         groupId: 'group-1',
         worktreeId: 'wt-1'
       }

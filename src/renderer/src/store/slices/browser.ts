@@ -59,6 +59,7 @@ import {
   type WorkspaceSessionHydrationOptions
 } from '@/lib/workspace-session-hydration-keys'
 import { buildValidWorktreeIdsForSessionHydration } from './degraded-repo-worktree-validity'
+import { withActiveTabTypeForWorktree } from './active-tab-type-record'
 import {
   assertManagedBrowserMaterializationAllowed,
   getClientCreationActionPolicy
@@ -460,7 +461,8 @@ function getFallbackTabTypeForWorktree(
   worktreeId: string,
   openFiles: AppState['openFiles'],
   terminalTabsByWorktree: AppState['tabsByWorktree'],
-  browserTabsByWorktree?: AppState['browserTabsByWorktree']
+  browserTabsByWorktree?: AppState['browserTabsByWorktree'],
+  unifiedTabsByWorktree?: AppState['unifiedTabsByWorktree']
 ): AppState['activeTabType'] {
   if (openFiles.some((file) => file.worktreeId === worktreeId)) {
     return 'editor'
@@ -471,7 +473,12 @@ function getFallbackTabTypeForWorktree(
   if ((terminalTabsByWorktree[worktreeId] ?? []).length > 0) {
     return 'terminal'
   }
-  return 'terminal'
+  if ((unifiedTabsByWorktree?.[worktreeId] ?? []).some((tab) => tab.contentType === 'simulator')) {
+    return 'simulator'
+  }
+  // Why: a pipeline-only worktree has no editor/browser/terminal/simulator surface to fall
+  // back to — null (not a placeholder) is the honest answer.
+  return null
 }
 
 const browserWorkspaceByIdCache = new WeakMap<
@@ -781,15 +788,21 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
 
       const isActiveTabInOwningWorktree =
         s.activeWorktreeId === owningWorktreeId && s.activeBrowserTabId === tabId
-      const nextActiveTabTypeByWorktree = { ...s.activeTabTypeByWorktree }
+      let nextActiveTabTypeByWorktree = s.activeTabTypeByWorktree
       let nextActiveTabType = s.activeTabType
       if (remainingBrowserTabs.length === 0) {
         const fallbackTabType = getFallbackTabTypeForWorktree(
           owningWorktreeId,
           s.openFiles,
-          s.tabsByWorktree
+          s.tabsByWorktree,
+          undefined,
+          s.unifiedTabsByWorktree
         )
-        nextActiveTabTypeByWorktree[owningWorktreeId] = fallbackTabType
+        nextActiveTabTypeByWorktree = withActiveTabTypeForWorktree(
+          s.activeTabTypeByWorktree,
+          owningWorktreeId,
+          fallbackTabType
+        )
         if (isActiveTabInOwningWorktree && s.activeTabType === 'browser') {
           nextActiveTabType = fallbackTabType
         }
@@ -1751,12 +1764,18 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
           continue
         }
         if (nextActiveTabTypeByWorktree[worktreeId] === 'browser' && !hasBrowserTabs) {
-          nextActiveTabTypeByWorktree[worktreeId] = getFallbackTabTypeForWorktree(
+          const fallbackTabType = getFallbackTabTypeForWorktree(
             worktreeId,
             s.openFiles,
             s.tabsByWorktree,
-            browserTabsByWorktree
+            browserTabsByWorktree,
+            s.unifiedTabsByWorktree
           )
+          if (fallbackTabType === null) {
+            delete nextActiveTabTypeByWorktree[worktreeId]
+          } else {
+            nextActiveTabTypeByWorktree[worktreeId] = fallbackTabType
+          }
         }
       }
 
@@ -1778,7 +1797,8 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
           activeWorktreeId,
           s.openFiles,
           s.tabsByWorktree,
-          browserTabsByWorktree
+          browserTabsByWorktree,
+          s.unifiedTabsByWorktree
         )
       })()
 

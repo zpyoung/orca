@@ -8,6 +8,7 @@ import type {
   FolderWorkspace,
   GitHubPrStartPoint,
   Worktree,
+  TabContentType,
   WorkspaceVisibleTabType,
   GitPushTarget,
   RemoveWorktreeResult,
@@ -17,6 +18,7 @@ import type {
   Repo,
   WorktreeMeta
 } from '../../../../shared/types'
+import { assertExhaustiveTabContentType } from '../../../../shared/tab-content-type-exhaustive'
 import type { RuntimeWorktreeListResult } from '../../../../shared/runtime-types'
 import {
   findWorktreeById,
@@ -132,6 +134,7 @@ import type {
 } from '../../../../shared/detected-worktree-provider-contract'
 import type { DirectSshAuthority } from '../../../../shared/ssh-types'
 import { findIndexedWorktreeOwnerForHost } from '@/lib/worktree-runtime-owner-index'
+import { withActiveTabTypeForWorktree } from './active-tab-type-record'
 import { catalogRowsEqual, reuseEqualCatalogRows } from './worktree-catalog-reconciliation'
 export type { WorktreeSlice, WorktreeDeleteState } from './worktree-helpers'
 
@@ -337,11 +340,25 @@ function areDetectedWorktreeResultsEqual(
   )
 }
 
-function toVisibleTabType(contentType: string): WorkspaceVisibleTabType {
-  if (contentType === 'browser' || contentType === 'terminal' || contentType === 'simulator') {
-    return contentType
+function toVisibleTabType(contentType: TabContentType): WorkspaceVisibleTabType | null {
+  switch (contentType) {
+    case 'browser':
+    case 'terminal':
+    case 'simulator':
+      return contentType
+    case 'editor':
+    case 'diff':
+    case 'conflict-review':
+    case 'check-details':
+      return 'editor'
+    case 'pipeline':
+      // Why: WorkspaceVisibleTabType has no pipeline member (deliberately not
+      // widened); the split-group model tracks pipeline focus separately.
+      return null
   }
-  return 'editor'
+  // outside the switch, not in a default: case, so control-flow narrowing to
+  // `never` still fires here once every member above is handled
+  return assertExhaustiveTabContentType(contentType)
 }
 
 type WorktreeWithLineage = Worktree & {
@@ -5670,7 +5687,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
       // Why: restore from the reconciled tab-group model first; preferring legacy fallbacks can show a blank worktree.
       let activeFileId: string | null
       let activeBrowserTabId: string | null
-      let activeTabType: WorkspaceVisibleTabType
+      let activeTabType: WorkspaceVisibleTabType | null
       if (activeUnifiedTab) {
         activeFileId =
           activeUnifiedTab.contentType === 'editor' ||
@@ -5737,9 +5754,11 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
       const activeTabId =
         activeUnifiedTab?.contentType === 'terminal'
           ? activeUnifiedTab.entityId
-          : tabStillExists
-            ? restoredTabId
-            : (worktreeTabs[0]?.id ?? null)
+          : activeTabType === null
+            ? null
+            : tabStillExists
+              ? restoredTabId
+              : (worktreeTabs[0]?.id ?? null)
 
       // Why: focus isn't smart-sort activity — writing lastActivityAt here caused the "jump after focus" bug; only clear unread.
       const metaUpdates: Partial<WorktreeMeta> = shouldClearUnread ? { isUnread: false } : {}
@@ -5799,10 +5818,11 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
             }
           : {}
 
-      const nextActiveTabTypeByWorktree =
-        s.activeTabTypeByWorktree[worktreeId] === activeTabType
-          ? s.activeTabTypeByWorktree
-          : { ...s.activeTabTypeByWorktree, [worktreeId]: activeTabType }
+      const nextActiveTabTypeByWorktree = withActiveTabTypeForWorktree(
+        s.activeTabTypeByWorktree,
+        worktreeId,
+        activeTabType
+      )
       const hasStateChange =
         s.activeWorktreeId !== worktreeId ||
         s.activeWorkspaceExecutionHostId !== (executionHostId ?? null) ||
@@ -5986,28 +6006,25 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
           : browserTabStillOpen
             ? restoredBrowserTabId
             : (browserTabs[0]?.id ?? null)
-      const activeTabType =
-        activeUnifiedTab?.contentType === 'terminal'
-          ? 'terminal'
-          : activeUnifiedTab?.contentType === 'browser'
-            ? 'browser'
-            : activeUnifiedTab
+      const activeTabType = activeUnifiedTab
+        ? toVisibleTabType(activeUnifiedTab.contentType)
+        : restoredTabType === 'browser' && browserTabStillOpen
+          ? 'browser'
+          : restoredTabType === 'editor' && fileStillOpen
+            ? 'editor'
+            : fileStillOpen
               ? 'editor'
-              : restoredTabType === 'browser' && browserTabStillOpen
+              : browserTabs.length > 0
                 ? 'browser'
-                : restoredTabType === 'editor' && fileStillOpen
-                  ? 'editor'
-                  : fileStillOpen
-                    ? 'editor'
-                    : browserTabs.length > 0
-                      ? 'browser'
-                      : 'terminal'
+                : 'terminal'
       const activeTabId =
         activeUnifiedTab?.contentType === 'terminal'
           ? activeUnifiedTab.entityId
-          : tabStillExists
-            ? restoredTabId
-            : (worktreeTabs[0]?.id ?? null)
+          : activeTabType === null
+            ? null
+            : tabStillExists
+              ? restoredTabId
+              : (worktreeTabs[0]?.id ?? null)
       const nextEverActivated = s.everActivatedWorktreeIds.has(workspaceKey)
         ? s.everActivatedWorktreeIds
         : new Set([...s.everActivatedWorktreeIds, workspaceKey])
@@ -6020,10 +6037,11 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
         activeFileId,
         activeBrowserTabId,
         activeTabType,
-        activeTabTypeByWorktree:
-          s.activeTabTypeByWorktree[workspaceKey] === activeTabType
-            ? s.activeTabTypeByWorktree
-            : { ...s.activeTabTypeByWorktree, [workspaceKey]: activeTabType },
+        activeTabTypeByWorktree: withActiveTabTypeForWorktree(
+          s.activeTabTypeByWorktree,
+          workspaceKey,
+          activeTabType
+        ),
         activeTabId,
         everActivatedWorktreeIds: nextEverActivated,
         folderWorkspaces: workspace.isUnread

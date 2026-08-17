@@ -49,10 +49,16 @@ export function createNewTerminalTab(
   const editorIds = freshState.openFiles
     .filter((f) => f.worktreeId === activeWorktreeId)
     .map((f) => f.id)
+  const pipelineIds = (freshState.unifiedTabsByWorktree[activeWorktreeId] ?? [])
+    .filter((tab) => tab.contentType === 'pipeline')
+    .map((tab) => tab.id)
   const base = reconcileTabOrder(
     freshState.tabBarOrderByWorktree[activeWorktreeId],
     termIds,
-    editorIds
+    editorIds,
+    [],
+    [],
+    pipelineIds
   )
   // The new tab is already in base via termIds; move it to the end
   const order = base.filter((id) => id !== newTab.id)

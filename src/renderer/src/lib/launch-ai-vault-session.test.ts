@@ -20,6 +20,7 @@ const mockState = {
   tabsByWorktree: {} as Record<string, { id: string }[]>,
   openFiles: [] as { id: string; worktreeId: string }[],
   browserTabsByWorktree: {} as Record<string, { id: string }[]>,
+  unifiedTabsByWorktree: {} as Record<string, { id: string; contentType: string }[]>,
   tabBarOrderByWorktree: {} as Record<string, string[]>
 }
 

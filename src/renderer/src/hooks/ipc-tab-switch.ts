@@ -6,6 +6,7 @@ import {
   getNextTabWithinActiveType,
   type TypeCyclableTab
 } from '@/components/terminal/tab-type-cycle'
+import { assertExhaustiveTabContentType } from '../../../shared/tab-content-type-exhaustive'
 import { sanitizeRecentTabIds } from '../store/slices/tab-group-state'
 
 type AppStoreState = ReturnType<typeof useAppStore.getState>
@@ -59,31 +60,49 @@ function resolveCycleContext(): CycleContext | null {
  * correct tab instance is focused.
  */
 export function activateCyclableTab(store: AppStoreState, next: TypeCyclableTab): void {
-  if (next.type === 'terminal') {
-    store.setActiveTab(next.id)
-    store.setActiveTabType('terminal')
-  } else if (next.type === 'browser') {
-    store.setActiveBrowserTab(next.id)
-    if (next.tabId) {
-      store.activateTab?.(next.tabId)
-    }
-    store.setActiveTabType('browser')
-  } else if (next.type === 'simulator') {
-    store.setActiveTab(next.tabId ?? next.id)
-    if (next.tabId) {
-      store.activateTab?.(next.tabId)
-    }
-    store.setActiveTabType('simulator')
-  } else {
-    // Why: `setActiveFile` targets the file entity (its implicit activateTab
-    // picks the first matching tab in the active group); `activateTab(tabId)`
-    // then disambiguates which split copy when the same file is open twice.
-    store.setActiveFile(next.id)
-    if (next.tabId) {
-      store.activateTab?.(next.tabId)
-    }
-    store.setActiveTabType('editor')
+  switch (next.type) {
+    case 'terminal':
+      store.setActiveTab(next.id)
+      store.setActiveTabType('terminal')
+      return
+    case 'browser':
+      store.setActiveBrowserTab(next.id)
+      if (next.tabId) {
+        store.activateTab?.(next.tabId)
+      }
+      store.setActiveTabType('browser')
+      return
+    case 'simulator':
+      store.setActiveTab(next.tabId ?? next.id)
+      if (next.tabId) {
+        store.activateTab?.(next.tabId)
+      }
+      store.setActiveTabType('simulator')
+      return
+    case 'pipeline':
+      // Why: entityId is a run id, not a file id — only disambiguate the split
+      // copy via activateTab; there is no legacy WorkspaceVisibleTabType for it.
+      if (next.tabId) {
+        store.activateTab?.(next.tabId)
+      }
+      if (store.activeWorktreeId) {
+        store.activatePipelineTabSurface(store.activeWorktreeId)
+      }
+      return
+    case 'editor':
+      // Why: `setActiveFile` targets the file entity (its implicit activateTab
+      // picks the first matching tab in the active group); `activateTab(tabId)`
+      // then disambiguates which split copy when the same file is open twice.
+      store.setActiveFile(next.id)
+      if (next.tabId) {
+        store.activateTab?.(next.tabId)
+      }
+      store.setActiveTabType('editor')
+      return
   }
+  // outside the switch, not in a default: case, so control-flow narrowing to
+  // `never` still fires here once every member above is handled
+  assertExhaustiveTabContentType(next.type)
 }
 
 /**
@@ -101,7 +120,9 @@ export function handleSwitchTab(direction: number): boolean {
   const { store, allTabIds, groupTabIdInNav } = ctx
   const next = getNextTabWithinActiveType({
     tabs: allTabIds,
-    activeTabType: store.activeTabType,
+    // null means the focused unified tab is a pipeline canvas — the one TabCycleType
+    // member WorkspaceVisibleTabType has no slot for.
+    activeTabType: store.activeTabType ?? 'pipeline',
     activeTabId: store.activeTabId,
     activeFileId: store.activeFileId,
     activeBrowserTabId: store.activeBrowserTabId,
@@ -132,7 +153,7 @@ export function handleSwitchTabAcrossAllTypes(direction: number): boolean {
   const { store, allTabIds, groupTabIdInNav } = ctx
   const next = getNextTabAcrossAllTypes({
     tabs: allTabIds,
-    activeTabType: store.activeTabType,
+    activeTabType: store.activeTabType ?? 'pipeline',
     activeTabId: store.activeTabId,
     activeFileId: store.activeFileId,
     activeBrowserTabId: store.activeBrowserTabId,
@@ -203,12 +224,12 @@ export function handleSwitchTerminalTab(direction: number): boolean {
     return false
   }
   const currentId = getActiveEntityIdForTabType(
-    store.activeTabType,
+    store.activeTabType ?? 'pipeline',
     store.activeTabId,
     store.activeFileId,
     store.activeBrowserTabId
   )
-  // Why: when an editor/browser tab is active, jump to the first terminal on
+  // Why: when an editor/browser/pipeline tab is active, jump to the first terminal on
   // forward navigation instead of skipping to index 1.
   const idx = terminalTabs.findIndex((t) => t.id === currentId)
   // Why: only no-op when the sole terminal is already focused. With one terminal

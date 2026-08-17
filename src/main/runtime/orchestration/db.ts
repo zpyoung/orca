@@ -41,6 +41,8 @@ import { buildOrchestrationTaskDisplayMetadata } from '../../../shared/orchestra
 import { ORCHESTRATION_LEGACY_RUN_ID } from '../../../shared/orchestration-rpc-contract'
 import { parsePaneKey } from '../../../shared/stable-pane-id'
 import { OrchestrationError } from './orchestration-error'
+import { ensureDispatchSpawnReceiptSchema } from './dispatch-spawn-receipt-schema'
+import { ensurePipelineRunSchema } from './pipeline-run-db-schema'
 import { resolveOrchestrationMigrationStartVersion } from './orchestration-schema-version-skew'
 import {
   deriveWorkerTerminalListState,
@@ -609,6 +611,7 @@ export class OrchestrationDb {
       );
     `)
     this.createUndeliveredInboxIndexIfPossible()
+    ensureDispatchSpawnReceiptSchema(this.db)
   }
 
   // Why: CREATE TABLE IF NOT EXISTS won't alter existing DBs; migrate in a txn that bumps user_version only on success (atomic all-or-nothing).
@@ -2231,6 +2234,28 @@ export class OrchestrationDb {
     return this.getRun(id) as RunRow
   }
 
+  // Internal seam for sibling orchestration-DB extensions (pipeline-run-db.ts): pipeline tables
+  // live on this same connection, which is what makes their single transaction possible.
+  getSyncDatabase(): Database.Database {
+    return this.db
+  }
+
+  // Detached: no pane binding, no unbind side effect. createRun requires a pane key and always
+  // unbinds other runs for it, so it cannot serve driver-created runs. Opens no transaction of
+  // its own — callers compose this under their own BEGIN IMMEDIATE.
+  createDetachedRun(params: { objective: string }): RunRow {
+    const id = generateId('run')
+    this.db
+      .prepare(
+        `INSERT INTO runs (
+           id, objective, coordinator_handle, coordinator_pane_key,
+           consumer_generation, legacy
+         ) VALUES (?, ?, NULL, NULL, 1, 0)`
+      )
+      .run(id, params.objective)
+    return this.getRun(id) as RunRow
+  }
+
   bindRun(params: {
     runId: string
     coordinatorHandle: string
@@ -3420,27 +3445,30 @@ export class OrchestrationDb {
     ) as LegacyOperationReceiptRow
   }
 
-  getUnreadMessages(toHandle: string, types?: MessageType[]): MessageRow[] {
+  getUnreadMessages(toHandle: string, types?: MessageType[], runId?: string): MessageRow[] {
+    const runFilter = runId ? ' AND run_id = ?' : ''
     if (types && types.length > 0) {
       const placeholders = types.map(() => '?').join(',')
+      const params = runId ? [toHandle, ...types, runId] : [toHandle, ...types]
       return exposeMessageListTimestamps(
         this.db
           .prepare(
             `SELECT * FROM messages
              WHERE to_handle = ? AND read = 0 AND delivery_contract = 'current_delivery'
-               AND type IN (${placeholders}) ORDER BY sequence`
+               AND type IN (${placeholders})${runFilter} ORDER BY sequence`
           )
-          .all(toHandle, ...types) as MessageRow[]
+          .all(...params) as MessageRow[]
       )
     }
+    const params = runId ? [toHandle, runId] : [toHandle]
     return exposeMessageListTimestamps(
       this.db
         .prepare(
           `SELECT * FROM messages
-           WHERE to_handle = ? AND read = 0 AND delivery_contract = 'current_delivery'
+           WHERE to_handle = ? AND read = 0 AND delivery_contract = 'current_delivery'${runFilter}
            ORDER BY sequence`
         )
-        .all(toHandle) as MessageRow[]
+        .all(...params) as MessageRow[]
     )
   }
 
@@ -4069,6 +4097,39 @@ export class OrchestrationDb {
       this.db.exec('ROLLBACK')
       throw error
     }
+  }
+
+  // Written immediately before terminal creation is invoked: absence of this row after a
+  // failure is positive proof nothing spawned.
+  recordSpawnAttempt(dispatchId: string): void {
+    this.db
+      .prepare(
+        `INSERT INTO dispatch_spawn_receipts (dispatch_id, spawn_attempt_at)
+         VALUES (?, datetime('now'))`
+      )
+      .run(dispatchId)
+  }
+
+  markSpawnCommitted(dispatchId: string): void {
+    this.db
+      .prepare(
+        `UPDATE dispatch_spawn_receipts SET spawn_committed_at = datetime('now')
+         WHERE dispatch_id = ?`
+      )
+      .run(dispatchId)
+  }
+
+  getSpawnReceipt(
+    dispatchId: string
+  ): { spawn_attempt_at: string; spawn_committed_at: string | null } | undefined {
+    return this.db
+      .prepare(
+        `SELECT spawn_attempt_at, spawn_committed_at
+         FROM dispatch_spawn_receipts WHERE dispatch_id = ?`
+      )
+      .get(dispatchId) as
+      | { spawn_attempt_at: string; spawn_committed_at: string | null }
+      | undefined
   }
 
   recordWorkerStage(params: {
@@ -6331,8 +6392,8 @@ export class OrchestrationDb {
       .run(dispatchId)
   }
 
-  getActiveDispatchForTerminal(handle: string): DispatchContextRow | undefined {
-    return this.findActiveDispatchForAssignee(handle)
+  getActiveDispatchForTerminal(handle: string, runId?: string): DispatchContextRow | undefined {
+    return this.findActiveDispatchForAssignee(handle, undefined, runId)
   }
 
   /**
@@ -6349,19 +6410,28 @@ export class OrchestrationDb {
     return this.hasAnyDispatchContextsCache
   }
 
-  getActiveDispatchForIdentity(handle: string, paneKey?: string): DispatchContextRow | undefined {
-    return this.findActiveDispatchForAssignee(handle, paneKey)
+  getActiveDispatchForIdentity(
+    handle: string,
+    paneKey?: string,
+    runId?: string
+  ): DispatchContextRow | undefined {
+    return this.findActiveDispatchForAssignee(handle, paneKey, runId)
   }
 
   private findActiveDispatchForAssignee(
     assigneeHandle: string,
-    assigneePaneKey?: string
+    assigneePaneKey?: string,
+    runId?: string
   ): DispatchContextRow | undefined {
+    const byHandleRunFilter = runId ? ' AND run_id = ?' : ''
+    const byHandleParams = runId ? [assigneeHandle, runId] : [assigneeHandle]
     const byHandle = this.db
       .prepare(
-        "SELECT * FROM dispatch_contexts WHERE assignee_handle = ? AND status IN ('pending', 'dispatched') LIMIT 1"
+        `SELECT * FROM dispatch_contexts
+         WHERE assignee_handle = ? AND status IN ('pending', 'dispatched')${byHandleRunFilter}
+         LIMIT 1`
       )
-      .get(assigneeHandle) as DispatchContextRow | undefined
+      .get(...byHandleParams) as DispatchContextRow | undefined
     if (byHandle) {
       return byHandle
     }
@@ -6370,14 +6440,18 @@ export class OrchestrationDb {
       return undefined
     }
 
+    const activesRunFilter = runId ? ' AND run_id = ?' : ''
+    const activesParams = runId
+      ? [paneKeyMatchSuffix(assigneePaneKey), runId]
+      : [paneKeyMatchSuffix(assigneePaneKey)]
     const actives = this.db
       .prepare(
         `SELECT * FROM dispatch_contexts
          WHERE assignee_pane_key IS NOT NULL
            AND status IN ('pending', 'dispatched')
-           AND ${DISPATCH_PANE_KEY_MATCH_SUFFIX_SQL} = ?`
+           AND ${DISPATCH_PANE_KEY_MATCH_SUFFIX_SQL} = ?${activesRunFilter}`
       )
-      .all(paneKeyMatchSuffix(assigneePaneKey)) as DispatchContextRow[]
+      .all(...activesParams) as DispatchContextRow[]
 
     for (const row of actives) {
       if (row.assignee_pane_key && isEquivalentPaneKey(row.assignee_pane_key, assigneePaneKey)) {
@@ -6538,16 +6612,18 @@ export class OrchestrationDb {
   }
 
   // Why: dispatched_at grace skips workers still within their first heartbeat interval; julianday() vs raw-TEXT compare avoids misflagging space-format timestamps as stale (#8452).
-  getStaleDispatches(thresholdIso: string): DispatchContextRow[] {
+  getStaleDispatches(thresholdIso: string, runId?: string): DispatchContextRow[] {
+    const runFilter = runId ? ' AND run_id = ?' : ''
+    const params = runId ? [thresholdIso, thresholdIso, runId] : [thresholdIso, thresholdIso]
     return this.db
       .prepare(
         `SELECT * FROM dispatch_contexts
          WHERE status = 'dispatched'
            AND dispatched_at IS NOT NULL
            AND julianday(dispatched_at) < julianday(?)
-           AND (last_heartbeat_at IS NULL OR julianday(last_heartbeat_at) < julianday(?))`
+           AND (last_heartbeat_at IS NULL OR julianday(last_heartbeat_at) < julianday(?))${runFilter}`
       )
-      .all(thresholdIso, thresholdIso) as DispatchContextRow[]
+      .all(...params) as DispatchContextRow[]
   }
 
   failDispatch(ctxId: string, error: string): DispatchContextRow | undefined {
@@ -6636,27 +6712,25 @@ export class OrchestrationDb {
       | undefined
   }
 
-  listGates(filter?: { taskId?: string; status?: GateStatus }): DecisionGateRow[] {
-    if (filter?.taskId && filter?.status) {
-      return this.db
-        .prepare(
-          'SELECT * FROM decision_gates WHERE task_id = ? AND status = ? ORDER BY created_at'
-        )
-        .all(filter.taskId, filter.status) as DecisionGateRow[]
-    }
+  listGates(filter?: { taskId?: string; status?: GateStatus; runId?: string }): DecisionGateRow[] {
+    const conditions: string[] = []
+    const params: string[] = []
     if (filter?.taskId) {
-      return this.db
-        .prepare('SELECT * FROM decision_gates WHERE task_id = ? ORDER BY created_at')
-        .all(filter.taskId) as DecisionGateRow[]
+      conditions.push('task_id = ?')
+      params.push(filter.taskId)
     }
     if (filter?.status) {
-      return this.db
-        .prepare('SELECT * FROM decision_gates WHERE status = ? ORDER BY created_at')
-        .all(filter.status) as DecisionGateRow[]
+      conditions.push('status = ?')
+      params.push(filter.status)
     }
+    if (filter?.runId) {
+      conditions.push('run_id = ?')
+      params.push(filter.runId)
+    }
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')} ` : ''
     return this.db
-      .prepare('SELECT * FROM decision_gates ORDER BY created_at')
-      .all() as DecisionGateRow[]
+      .prepare(`SELECT * FROM decision_gates ${where}ORDER BY created_at`)
+      .all(...params) as DecisionGateRow[]
   }
 
   getGate(id: string): DecisionGateRow | undefined {
@@ -6741,6 +6815,9 @@ export class OrchestrationDb {
   }
 
   resetAll(): void {
+    // Pipeline tables are created lazily by PipelineRunDb, so a run that never touched
+    // pipelines has none yet — ensure them (idempotent) before deleting from them.
+    ensurePipelineRunSchema(this.db)
     // Why: retain mutation receipts so a lost reset response cannot replay as a new mutation.
     this.runResetTransaction(`
       DELETE FROM coordinator_runs;
@@ -6758,7 +6835,13 @@ export class OrchestrationDb {
       DELETE FROM worker_terminal_archives;
       DELETE FROM worker_terminal_resources;
       DELETE FROM worker_dispatches;
+      DELETE FROM dispatch_spawn_receipts;
       DELETE FROM dispatch_contexts;
+      DELETE FROM pipeline_attempts;
+      DELETE FROM pipeline_nodes;
+      DELETE FROM pipeline_runs;
+      -- A full reset clears run history, so the numbering it displays restarts too.
+      DELETE FROM pipeline_run_counters;
       DELETE FROM tasks;
       DELETE FROM messages;
       DELETE FROM runs;
@@ -6784,6 +6867,7 @@ export class OrchestrationDb {
       DELETE FROM worker_terminal_archives;
       DELETE FROM worker_terminal_resources;
       DELETE FROM worker_dispatches;
+      DELETE FROM dispatch_spawn_receipts;
       DELETE FROM dispatch_contexts;
       DELETE FROM tasks;
     `)

@@ -27,6 +27,7 @@ export function hasWorkspaceCleanupLocalContext(candidate: WorkspaceCleanupCandi
     candidate.localContext.terminalTabCount > 0 ||
     candidate.localContext.cleanEditorTabCount > 0 ||
     candidate.localContext.browserTabCount > 0 ||
+    candidate.localContext.pipelineTabCount > 0 ||
     candidate.localContext.diffCommentCount > 0 ||
     candidate.localContext.retainedDoneAgentCount > 0
   )

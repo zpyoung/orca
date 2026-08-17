@@ -62,6 +62,7 @@ const {
   registerWorkspacePortHandlersMock,
   registerLocalhostWorktreeLabelHandlersMock,
   registerNativeChatHandlersMock,
+  registerPipelineSubscriptionHandlersMock,
   registerEmulatorFrameStreamHandlersMock,
   registerEmulatorVideoStreamHandlersMock
 } = vi.hoisted(() => ({
@@ -126,6 +127,7 @@ const {
   registerWorkspacePortHandlersMock: vi.fn(),
   registerLocalhostWorktreeLabelHandlersMock: vi.fn(),
   registerNativeChatHandlersMock: vi.fn(),
+  registerPipelineSubscriptionHandlersMock: vi.fn(),
   registerEmulatorFrameStreamHandlersMock: vi.fn(),
   registerEmulatorVideoStreamHandlersMock: vi.fn()
 }))
@@ -372,6 +374,10 @@ vi.mock('./native-chat', () => ({
   registerNativeChatHandlers: registerNativeChatHandlersMock
 }))
 
+vi.mock('./pipeline-subscription', () => ({
+  registerPipelineSubscriptionHandlers: registerPipelineSubscriptionHandlersMock
+}))
+
 import { registerCoreHandlers } from './register-core-handlers'
 
 describe('registerCoreHandlers', () => {
@@ -435,6 +441,7 @@ describe('registerCoreHandlers', () => {
     registerWorkspacePortHandlersMock.mockReset()
     registerLocalhostWorktreeLabelHandlersMock.mockReset()
     registerNativeChatHandlersMock.mockReset()
+    registerPipelineSubscriptionHandlersMock.mockReset()
     registerEmulatorFrameStreamHandlersMock.mockReset()
     registerEmulatorVideoStreamHandlersMock.mockReset()
   })
@@ -542,6 +549,7 @@ describe('registerCoreHandlers', () => {
     )
     expect(aiVaultOptions.getActiveRuntimeAiVaultHostInfos()).toEqual([])
     expect(registerNativeChatHandlersMock).toHaveBeenCalled()
+    expect(registerPipelineSubscriptionHandlersMock).toHaveBeenCalledWith(runtime)
     expect(registerCliHandlersMock).toHaveBeenCalled()
     expect(registerPreflightHandlersMock).toHaveBeenCalled()
     expect(registerShellHandlersMock).toHaveBeenCalledWith(store)
@@ -646,5 +654,6 @@ describe('registerCoreHandlers', () => {
     // Why: ipcMain.handle throws on duplicate channel registration, so the
     // memory handler must not be wired up a second time on reactivation.
     expect(registerMemoryHandlersMock).not.toHaveBeenCalled()
+    expect(registerPipelineSubscriptionHandlersMock).not.toHaveBeenCalled()
   })
 })

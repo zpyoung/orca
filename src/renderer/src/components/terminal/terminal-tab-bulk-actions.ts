@@ -1,4 +1,3 @@
-import type { TabContentType } from '../../../../shared/types'
 import {
   hasUnroutableTerminalWorktreeOwner,
   resolveTerminalWorktreeRoute
@@ -7,13 +6,6 @@ import { closeWebRuntimeSessionTab, isWebRuntimeSessionActive } from '@/runtime/
 import { useAppStore } from '@/store'
 import { reconcileTabOrder } from '../tab-bar/reconcile-order'
 import { closeLocalTerminalTabState } from './close-local-terminal-tab-state'
-
-const EDITOR_TAB_CONTENT_TYPES = new Set<TabContentType>([
-  'editor',
-  'diff',
-  'conflict-review',
-  'check-details'
-])
 
 type TerminalTabBulkActionState = ReturnType<typeof useAppStore.getState>
 
@@ -74,6 +66,17 @@ export function closeTerminalTabsToRight(tabId: string, activeWorktreeId: string
   }
   const currentTerminalTabs = state.tabsByWorktree[activeWorktreeId] ?? []
   const currentEditorFiles = state.openFiles.filter((file) => file.worktreeId === activeWorktreeId)
+  const editorFileIdSet = new Set(currentEditorFiles.map((file) => file.id))
+  const unifiedTabs = state.unifiedTabsByWorktree?.[activeWorktreeId] ?? []
+  const browserIds = unifiedTabs
+    .filter((tab) => tab.contentType === 'browser')
+    .map((tab) => tab.entityId)
+  const simulatorIds = unifiedTabs
+    .filter((tab) => tab.contentType === 'simulator')
+    .map((tab) => tab.id)
+  const pipelineIds = unifiedTabs
+    .filter((tab) => tab.contentType === 'pipeline')
+    .map((tab) => tab.id)
   const runtimeEnvironmentId = resolveTerminalWorktreeRoute(
     state,
     activeWorktreeId
@@ -84,7 +87,10 @@ export function closeTerminalTabsToRight(tabId: string, activeWorktreeId: string
   const orderedIds = reconcileTabOrder(
     state.tabBarOrderByWorktree[activeWorktreeId],
     terminalIds,
-    currentEditorFiles.map((file) => file.id)
+    currentEditorFiles.map((file) => file.id),
+    browserIds,
+    simulatorIds,
+    pipelineIds
   )
 
   const index = orderedIds.indexOf(tabId)
@@ -110,11 +116,17 @@ export function closeTerminalTabsToRight(tabId: string, activeWorktreeId: string
       }
       continue
     }
-    const unifiedTab = (state.unifiedTabsByWorktree?.[activeWorktreeId] ?? []).find(
-      (tab) => tab.entityId === id && EDITOR_TAB_CONTENT_TYPES.has(tab.contentType)
-    )
-    if (!unifiedTab?.isPinned) {
+    if (editorFileIdSet.has(id)) {
+      // Why: the leading isPinnedVisibleTab check above already gates pinned
+      // tabs; a missing unifiedTabs entry (hydration race) still means "close".
       useAppStore.getState().closeFile(id)
+      continue
+    }
+    // Why: browser/simulator/pipeline tabs have no dedicated close path here — route
+    // them through the generic unified-tab closer instead of dropping them silently.
+    const unifiedTab = unifiedTabs.find((tab) => tab.entityId === id || tab.id === id)
+    if (unifiedTab) {
+      useAppStore.getState().closeUnifiedTab(unifiedTab.id)
     }
   }
 }

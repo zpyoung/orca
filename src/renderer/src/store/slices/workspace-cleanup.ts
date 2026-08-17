@@ -706,6 +706,10 @@ function getWorkspaceCleanupLocalStateSignature(
     options.applyDismissals === false
       ? null
       : (state.workspaceCleanupDismissals[worktreeId] ?? null)
+  const pipelineTabs = (state.unifiedTabsByWorktree[worktreeId] ?? [])
+    .filter((tab) => tab.contentType === 'pipeline')
+    .map((tab) => ({ entityId: tab.entityId, run: state.pipelineRunsById[tab.entityId] ?? null }))
+    .sort((a, b) => a.entityId.localeCompare(b.entityId))
 
   return JSON.stringify({
     active: state.activeWorktreeId === worktreeId,
@@ -715,6 +719,7 @@ function getWorkspaceCleanupLocalStateSignature(
     terminalLayoutsByTabId,
     openFiles,
     browserTabCount: (state.browserTabsByWorktree[worktreeId] ?? []).length,
+    pipelineTabs,
     retainedDoneAgentPaneKeys,
     agentStatuses,
     lastVisitedAt: state.lastVisitedAtByWorktreeId[worktreeId] ?? 0,
@@ -736,6 +741,25 @@ async function enrichWorkspaceCleanupCandidate(
   )
   const cleanEditorTabCount = openFiles.length - dirtyEditorBuffers.length
   const browserTabCount = (state.browserTabsByWorktree[candidate.worktreeId] ?? []).length
+  const pipelineHydration = (state.pipelineRunHydrationByWorkspaceId ?? {})[candidate.worktreeId]
+  // Why: mirrors isRenderableTab's retention-on-unknown (tabs.ts) — a tab drops out
+  // only on positive evidence (hydrated AND the run id genuinely absent), never on
+  // absence of evidence, or a live run's workspace looks empty before hydration lands.
+  const pipelineTabs = (state.unifiedTabsByWorktree[candidate.worktreeId] ?? []).filter(
+    (tab) =>
+      tab.contentType === 'pipeline' &&
+      (pipelineHydration?.phase !== 'hydrated' || tab.entityId in state.pipelineRunsById)
+  )
+  const pipelineTabCount = pipelineTabs.length
+  const hasRunningPipeline = pipelineTabs.some((tab) => {
+    const run = state.pipelineRunsById[tab.entityId]
+    // no run info at all means hydration hasn't resolved (else the filter above
+    // would have dropped it) — can't rule out a live run, so block conservatively.
+    if (!run) {
+      return true
+    }
+    return run.state === 'running' || run.state === 'paused'
+  })
   const retainedDoneAgentCount = Object.values(state.retainedAgentsByPaneKey).filter(
     (entry) => entry.worktreeId === candidate.worktreeId && entry.entry.state === 'done'
   ).length
@@ -761,9 +785,12 @@ async function enrichWorkspaceCleanupCandidate(
   } else if (terminalProbe === 'unknown') {
     blockers.push('terminal-liveness-unknown')
   }
+  if (hasRunningPipeline) {
+    blockers.push('running-pipeline')
+  }
 
   const lastVisitedAt = state.lastVisitedAtByWorktreeId[candidate.worktreeId] ?? 0
-  const hasVisibleContext = cleanEditorTabCount > 0 || browserTabCount > 0
+  const hasVisibleContext = cleanEditorTabCount > 0 || browserTabCount > 0 || pipelineTabCount > 0
   if (
     hasVisibleContext &&
     !preserveCleanupInspection &&
@@ -781,6 +808,7 @@ async function enrichWorkspaceCleanupCandidate(
       terminalTabCount: tabs.length,
       cleanEditorTabCount,
       browserTabCount,
+      pipelineTabCount,
       retainedDoneAgentCount
     }
   })

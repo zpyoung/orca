@@ -12,6 +12,7 @@ import type {
   WorkspaceVisibleTabType
 } from '../../../../shared/types'
 import { emitNativeChatToggled } from '@/lib/native-chat-telemetry'
+import { assertExhaustiveTabContentType } from '../../../../shared/tab-content-type-exhaustive'
 import {
   dedupeTabOrder,
   ensureGroup,
@@ -32,6 +33,7 @@ import {
   getOrphanTerminalIds,
   terminalTabHasReconnectablePty
 } from './terminal-orphan-helpers'
+import { withActiveTabTypeForWorktree } from './active-tab-type-record'
 import { createBrowserUuid } from '@/lib/browser-uuid'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
@@ -121,6 +123,13 @@ export type TabsSlice = {
     contentType?: TabContentType
   ) => Tab | null
   activateTab: (tabId: string, opts?: { preservePreview?: boolean; worktreeId?: string }) => void
+  /**
+   * Marks a pipeline tab as the workspace's active surface: activeTabType goes to null (no
+   * WorkspaceVisibleTabType member represents a pipeline canvas) and activeTabId is cleared so
+   * terminal-scoped actions (tab rename, workspace focus restore) can't reach the tab that was
+   * active before the pipeline tab was focused.
+   */
+  activatePipelineTabSurface: (worktreeId: string) => void
   closeUnifiedTab: (
     tabId: string,
     opts?: { recordInteraction?: boolean; terminalRetirementHandled?: boolean }
@@ -415,11 +424,25 @@ function collapseGroupLayout(
   }
 }
 
-function toVisibleTabType(contentType: TabContentType): WorkspaceVisibleTabType {
-  if (contentType === 'browser' || contentType === 'terminal' || contentType === 'simulator') {
-    return contentType
+function toVisibleTabType(contentType: TabContentType): WorkspaceVisibleTabType | null {
+  switch (contentType) {
+    case 'browser':
+    case 'terminal':
+    case 'simulator':
+      return contentType
+    case 'pipeline':
+      // entityId is a run id, not a file/terminal/browser id — no WorkspaceVisibleTabType
+      // member represents it.
+      return null
+    case 'editor':
+    case 'diff':
+    case 'conflict-review':
+    case 'check-details':
+      return 'editor'
   }
-  return 'editor'
+  // outside the switch, not in a default: case, so control-flow narrowing to
+  // `never` still fires here once every member above is handled
+  return assertExhaustiveTabContentType(contentType)
 }
 
 function deriveActiveSurfaceForWorktree(
@@ -442,7 +465,7 @@ function deriveActiveSurfaceForWorktree(
   activeBrowserTabId: string | null
   activeFileId: string | null
   activeTabId: string | null
-  activeTabType: WorkspaceVisibleTabType
+  activeTabType: WorkspaceVisibleTabType | null
 } {
   const groups = state.groupsByWorktree[worktreeId] ?? []
   const activeGroupId = preferredGroupId ?? state.activeGroupIdByWorktree[worktreeId] ?? null
@@ -472,7 +495,7 @@ function deriveActiveSurfaceForWorktree(
 
   let activeFileId: string | null
   let activeBrowserTabId: string | null
-  let activeTabType: WorkspaceVisibleTabType
+  let activeTabType: WorkspaceVisibleTabType | null
 
   if (activeUnifiedTab) {
     activeFileId =
@@ -518,10 +541,31 @@ function deriveActiveSurfaceForWorktree(
     activeTabId:
       activeUnifiedTab?.contentType === 'terminal'
         ? activeUnifiedTab.entityId
-        : terminalTabStillExists
-          ? restoredTerminalTabId
-          : (terminalTabs[0]?.id ?? null),
+        : activeTabType === null
+          ? null
+          : terminalTabStillExists
+            ? restoredTerminalTabId
+            : (terminalTabs[0]?.id ?? null),
     activeTabType
+  }
+}
+
+/**
+ * Clears the legacy terminal-scoped active-tab pointer for `worktreeId` — the state
+ * shape a pipeline tab must never be found under, since `WorkspaceVisibleTabType` has
+ * no member of its own for it. Shared by `activateTab` (folded in below, so every
+ * activation route gets this by construction), the standalone `activatePipelineTabSurface`
+ * action some callers still call directly, and drag-preview activation.
+ */
+export function pipelineTabSurfaceClearPatch(
+  state: Pick<AppState, 'activeWorktreeId' | 'activeTabId' | 'activeTabIdByWorktree' | 'activeTabType' | 'activeTabTypeByWorktree'>,
+  worktreeId: string
+): Pick<AppState, 'activeTabId' | 'activeTabIdByWorktree' | 'activeTabType' | 'activeTabTypeByWorktree'> {
+  return {
+    activeTabType: state.activeWorktreeId === worktreeId ? null : state.activeTabType,
+    activeTabTypeByWorktree: withActiveTabTypeForWorktree(state.activeTabTypeByWorktree, worktreeId, null),
+    activeTabId: state.activeWorktreeId === worktreeId ? null : state.activeTabId,
+    activeTabIdByWorktree: { ...state.activeTabIdByWorktree, [worktreeId]: null }
   }
 }
 
@@ -571,10 +615,11 @@ function buildActiveSurfacePatch(
       [worktreeId]: derived.activeTabId
     },
     activeTabType: derived.activeTabType,
-    activeTabTypeByWorktree: {
-      ...state.activeTabTypeByWorktree,
-      [worktreeId]: derived.activeTabType
-    }
+    activeTabTypeByWorktree: withActiveTabTypeForWorktree(
+      state.activeTabTypeByWorktree,
+      worktreeId,
+      derived.activeTabType
+    )
   }
 }
 
@@ -701,18 +746,40 @@ export function projectWorktreeTabModelReconciliation(
   const liveBrowserIds = new Set(
     (state.browserTabsByWorktree[worktreeId] ?? []).map((browserTab) => browserTab.id)
   )
+  const pipelineRunHydration = state.pipelineRunHydrationByWorkspaceId[worktreeId]
+  // Why: reconciliation is the only synchronous place that sees every pipeline tab, so it
+  // is what must kick off (or leave outstanding) the async listRuns request; the action
+  // itself no-ops for a fresh in-flight entry, so calling it here is always safe to repeat.
+  if (
+    pipelineRunHydration?.phase !== 'hydrated' &&
+    reconciledUnifiedTabs.some((tab) => tab.contentType === 'pipeline')
+  ) {
+    state.requestPipelineRunHydration(worktreeId)
+  }
 
   const isRenderableTab = (tab: Tab): boolean => {
-    if (tab.contentType === 'terminal') {
-      return liveTerminalIds.has(tab.entityId)
+    switch (tab.contentType) {
+      case 'terminal':
+        return liveTerminalIds.has(tab.entityId)
+      case 'browser':
+        return liveBrowserIds.has(tab.entityId)
+      case 'simulator':
+        return true
+      case 'pipeline':
+        // Why: reconciliation is synchronous but pipeline-run hydration is not —
+        // prune only on positive evidence (hydrated AND the run id is gone),
+        // never on absence of evidence, or every pipeline tab is pruned before
+        // hydration ever completes.
+        return pipelineRunHydration?.phase !== 'hydrated' || tab.entityId in state.pipelineRunsById
+      case 'editor':
+      case 'diff':
+      case 'conflict-review':
+      case 'check-details':
+        return liveEditorIds.has(tab.entityId)
     }
-    if (tab.contentType === 'browser') {
-      return liveBrowserIds.has(tab.entityId)
-    }
-    if (tab.contentType === 'simulator') {
-      return true
-    }
-    return liveEditorIds.has(tab.entityId)
+    // outside the switch, not in a default: case, so control-flow narrowing to
+    // `never` still fires here once every member above is handled
+    return assertExhaustiveTabContentType(tab.contentType)
   }
 
   const validTabs = reconciledUnifiedTabs.filter(isRenderableTab)
@@ -1096,9 +1163,16 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
         // Why: skip writing unreadTerminalTabs when the reference is unchanged, avoiding a no-op alloc that re-runs full-state selectors.
         ...(nextUnreadTerminalTabs !== state.unreadTerminalTabs
           ? { unreadTerminalTabs: nextUnreadTerminalTabs }
-          : {})
+          : {}),
+        // Why: folded in here (not left to each caller) so every activation route gets
+        // it — see pipelineTabSurfaceClearPatch's doc comment.
+        ...(tab.contentType === 'pipeline' ? pipelineTabSurfaceClearPatch(state, worktreeId) : {})
       }
     })
+  },
+
+  activatePipelineTabSurface: (worktreeId) => {
+    set((state) => pipelineTabSurfaceClearPatch(state, worktreeId))
   },
 
   closeUnifiedTab: (tabId, opts) => {

@@ -65,6 +65,10 @@ export function parseAllowStaleBaseFromSpec(spec: string): {
 export type CoordinatorOptions = {
   spec: string
   coordinatorHandle: string
+  // Why (L12a): the orchestration run whose tasks this coordinator may read/mutate — distinct from
+  // the coordinator-run id minted by createCoordinatorRun; conflating the two would scope every
+  // query to zero rows.
+  taskRunId: string
   pollIntervalMs?: number
   maxConcurrent?: number
   worktree?: string
@@ -73,6 +77,7 @@ export type CoordinatorOptions = {
 
 type CoordinatorState = {
   runId: string
+  taskRunId: string
   phase: 'decomposing' | 'dispatching' | 'monitoring' | 'merging' | 'done'
   completedTasks: string[]
   failedTasks: string[]
@@ -101,6 +106,7 @@ export class Coordinator {
     this.opts = {
       spec: options.spec,
       coordinatorHandle: options.coordinatorHandle,
+      taskRunId: options.taskRunId,
       pollIntervalMs: options.pollIntervalMs ?? DEFAULT_POLL_MS,
       maxConcurrent: options.maxConcurrent ?? MAX_CONCURRENT_DEFAULT,
       worktree: options.worktree,
@@ -108,6 +114,7 @@ export class Coordinator {
     }
     this.state = {
       runId: '',
+      taskRunId: options.taskRunId,
       phase: 'decomposing',
       completedTasks: [],
       failedTasks: [],
@@ -163,7 +170,7 @@ export class Coordinator {
       }
 
       // Why: an early stop leaves tasks incomplete, so the run counts as failed.
-      const tasks = this.db.listTasks()
+      const tasks = this.db.listTasks({ runId: this.opts.taskRunId })
       const allDone = tasks.every((t) => t.status === 'completed' || t.status === 'failed')
       const failedTasks = [
         ...new Set([
@@ -196,7 +203,7 @@ export class Coordinator {
   // Why: decomposition isn't implemented yet — tasks must be pre-created before run(); AI-driven decomposition is a future phase.
   private async decompose(): Promise<void> {
     this.state.phase = 'decomposing'
-    const existing = this.db.listTasks()
+    const existing = this.db.listTasks({ runId: this.opts.taskRunId })
     if (existing.length === 0) {
       throw new Error(
         'No tasks found. Create tasks with orchestration.taskCreate before running the coordinator.'
@@ -218,7 +225,7 @@ export class Coordinator {
   // Why: warn only, never auto-fail — a false positive (slow but correct worker) costs more than a false negative (hung worker holding a slot); see R6 of DESIGN_DOC_PREAMBLE_FIX.md.
   private warnStaleDispatches(): void {
     const thresholdIso = new Date(Date.now() - HUNG_THRESHOLD_MS).toISOString()
-    const stale = this.db.getStaleDispatches(thresholdIso)
+    const stale = this.db.getStaleDispatches(thresholdIso, this.opts.taskRunId)
     for (const ctx of stale) {
       const minutes = Math.round(HUNG_THRESHOLD_MS / 60000)
       this.opts.onLog(
@@ -228,7 +235,11 @@ export class Coordinator {
   }
 
   private processMessages(): void {
-    const messages = this.db.getUnreadMessages(this.opts.coordinatorHandle)
+    const messages = this.db.getUnreadMessages(
+      this.opts.coordinatorHandle,
+      undefined,
+      this.opts.taskRunId
+    )
     if (messages.length === 0) {
       return
     }
@@ -262,7 +273,7 @@ export class Coordinator {
   }
 
   private handleLifecycleMessage(msg: MessageRow): void {
-    const result = reconcileLifecycleMessage(this.db, msg, this.opts.onLog)
+    const result = reconcileLifecycleMessage(this.db, msg, this.opts.onLog, this.opts.taskRunId)
     if (result.action === 'completed') {
       if (!this.state.completedTasks.includes(result.taskId)) {
         this.state.completedTasks.push(result.taskId)
@@ -293,7 +304,12 @@ export class Coordinator {
     }
 
     const task = this.db.getTask(taskId)
-    if (!task || task.status === 'completed' || task.status === 'failed') {
+    if (
+      !task ||
+      task.run_id !== this.opts.taskRunId ||
+      task.status === 'completed' ||
+      task.status === 'failed'
+    ) {
       return
     }
 
@@ -330,6 +346,14 @@ export class Coordinator {
       return
     }
 
+    // Why (L12a): the message payload names an arbitrary task; without this check a decision_gate
+    // referencing another run's task would block that run's task out from under it.
+    const gateTask = this.db.getTask(payload.taskId)
+    if (!gateTask || gateTask.run_id !== this.opts.taskRunId) {
+      this.opts.onLog(`Warning: decision_gate references task outside this run: ${payload.taskId}`)
+      return
+    }
+
     this.db.createGate({
       taskId: payload.taskId,
       question: payload.question,
@@ -345,10 +369,12 @@ export class Coordinator {
 
   private processDecisionGates(): void {
     // Why: the coordinator never auto-resolves gates (humans do, via orchestration.gateResolve) — that would defeat them as approval checkpoints.
-    const pendingGates = this.db.listGates({ status: 'pending' })
+    const pendingGates = this.db.listGates({ status: 'pending', runId: this.opts.taskRunId })
     for (const gate of pendingGates) {
       const task = this.db.getTask(gate.task_id)
-      if (task && task.status !== 'blocked') {
+      // Why (L12a): decision_gates has no FK tying run_id to its task's run, so a gate listed
+      // under this run can still reference another run's task.
+      if (task && task.run_id === this.opts.taskRunId && task.status !== 'blocked') {
         // Why: gate exists but task isn't blocked — re-block to restore the invariant.
         this.db.updateTaskStatus(gate.task_id, 'blocked')
       }
@@ -357,12 +383,12 @@ export class Coordinator {
 
   private async dispatchReadyTasks(): Promise<void> {
     this.state.phase = 'dispatching'
-    const readyTasks = this.db.listTasks({ ready: true })
+    const readyTasks = this.db.listTasks({ ready: true, runId: this.opts.taskRunId })
     if (readyTasks.length === 0) {
       return
     }
 
-    const dispatched = this.db.listTasks({ status: 'dispatched' })
+    const dispatched = this.db.listTasks({ status: 'dispatched', runId: this.opts.taskRunId })
     let slotsAvailable = this.opts.maxConcurrent - dispatched.length
     if (slotsAvailable <= 0) {
       return
@@ -466,7 +492,11 @@ export class Coordinator {
     })
 
     // Why: surface a since-resolved decision gate's outcome to the worker via the preamble.
-    const gates = this.db.listGates({ taskId: task.id, status: 'resolved' })
+    const gates = this.db.listGates({
+      taskId: task.id,
+      status: 'resolved',
+      runId: this.opts.taskRunId
+    })
     let gateContext = ''
     if (gates.length > 0) {
       const latest = gates.at(-1)!
@@ -496,22 +526,17 @@ export class Coordinator {
       const result = await this.runtime.listTerminals(this.opts.worktree, undefined, {
         includeVisualLayouts: false
       })
-      const dispatched = this.db.listTasks({ status: 'dispatched' })
-      const busyHandles = new Set<string>()
 
-      for (const task of dispatched) {
-        const ctx = this.db.getDispatchContext(task.id)
-        if (ctx?.assignee_handle) {
-          busyHandles.add(ctx.assignee_handle)
-        }
-      }
-
-      // Why: createDispatchContext's dispatch-lock guarantees correctness; this filter is only an optimization to skip busy/disconnected terminals.
+      // Why: createDispatchContext's dispatch-lock is global — a terminal handle can't host two
+      // live dispatches no matter whose run they belong to — so this optimization filter has to
+      // stay global too; scoping it to this run would let a handle busy in another run look
+      // available, and dispatchTask (including its git drift probe) would be retried on it every
+      // tick only to hit the lock and fail.
       return result.terminals
         .filter(
           (t) =>
             t.handle !== this.opts.coordinatorHandle &&
-            !busyHandles.has(t.handle) &&
+            !this.db.getActiveDispatchForTerminal(t.handle) &&
             t.connected &&
             t.writable
         )
@@ -522,7 +547,7 @@ export class Coordinator {
   }
 
   private checkConvergence(): boolean {
-    const tasks = this.db.listTasks()
+    const tasks = this.db.listTasks({ runId: this.opts.taskRunId })
     if (tasks.length === 0) {
       return true
     }

@@ -122,6 +122,11 @@ export function formatContextDetails(candidate: WorkspaceCleanupCandidate): stri
       formatWorkspaceCleanupContextDetail('browser', candidate.localContext.browserTabCount)
     )
   }
+  if (candidate.localContext.pipelineTabCount > 0) {
+    parts.push(
+      formatWorkspaceCleanupContextDetail('pipeline', candidate.localContext.pipelineTabCount)
+    )
+  }
   if (candidate.localContext.diffCommentCount > 0) {
     parts.push(formatWorkspaceCleanupContextDetail('diff', candidate.localContext.diffCommentCount))
   }
@@ -198,6 +203,7 @@ export function getContextCount(candidate: WorkspaceCleanupCandidate): number {
     candidate.localContext.terminalTabCount +
     candidate.localContext.cleanEditorTabCount +
     candidate.localContext.browserTabCount +
+    candidate.localContext.pipelineTabCount +
     candidate.localContext.diffCommentCount +
     candidate.localContext.retainedDoneAgentCount
   )

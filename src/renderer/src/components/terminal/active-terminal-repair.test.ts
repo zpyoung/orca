@@ -5,11 +5,11 @@ import {
   shouldRepairActiveTerminalTab
 } from './active-terminal-repair'
 
-function tab(id: string): TerminalTab {
+function tab(id: string, worktreeId = 'wt-1'): TerminalTab {
   return {
     id,
     ptyId: null,
-    worktreeId: 'wt-1',
+    worktreeId,
     title: id,
     customTitle: null,
     color: null,
@@ -49,6 +49,19 @@ describe('shouldRepairActiveTerminalTab', () => {
         activeTabType: 'terminal',
         activeTabId: 'terminal-1',
         tabs: [tab('terminal-1')]
+      })
+    ).toBe(false)
+  })
+
+  // Regression: activeTabType null (a pipeline canvas or any other non-terminal focus) must
+  // never repair, even with a real terminal tab and no activeTabId — the same guard that
+  // excludes 'editor'/'browser' above excludes null without needing to consult the tab model.
+  it('does not repair when no visible tab type is focused', () => {
+    expect(
+      shouldRepairActiveTerminalTab({
+        activeTabType: null,
+        activeTabId: null,
+        tabs: [tab('terminal-1', 'wt-1')]
       })
     ).toBe(false)
   })
@@ -97,5 +110,16 @@ describe('resolveRepairedActiveTerminalTabId', () => {
         tabs: [tab('terminal-1'), tab('terminal-2')]
       })
     ).toBe('terminal-1')
+  })
+
+  it('leaves a pipeline-focused workspace alone instead of resolving a terminal to switch to', () => {
+    expect(
+      resolveRepairedActiveTerminalTabId({
+        activeTabType: null,
+        activeTabId: null,
+        rememberedTabId: null,
+        tabs: [tab('terminal-1', 'wt-1')]
+      })
+    ).toBeNull()
   })
 })

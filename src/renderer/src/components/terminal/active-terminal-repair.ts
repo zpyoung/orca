@@ -1,7 +1,7 @@
 import type { TerminalTab, WorkspaceVisibleTabType } from '../../../../shared/types'
 
 export function shouldRepairActiveTerminalTab(args: {
-  activeTabType: WorkspaceVisibleTabType
+  activeTabType: WorkspaceVisibleTabType | null
   activeTabId: string | null
   tabs: TerminalTab[]
 }): boolean {
@@ -13,7 +13,7 @@ export function shouldRepairActiveTerminalTab(args: {
 }
 
 export function resolveRepairedActiveTerminalTabId(args: {
-  activeTabType: WorkspaceVisibleTabType
+  activeTabType: WorkspaceVisibleTabType | null
   activeTabId: string | null
   rememberedTabId: string | null | undefined
   tabs: TerminalTab[]

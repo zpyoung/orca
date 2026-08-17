@@ -1,7 +1,27 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { Tab, TabGroup } from '../../../shared/types'
 import type { AppState } from '@/store/types'
-import { resolveTabNumberShortcutTarget } from './tab-number-shortcuts'
+
+const { getStateMock } = vi.hoisted(() => ({ getStateMock: vi.fn() }))
+
+vi.mock('@/store', () => ({
+  useAppStore: { getState: getStateMock }
+}))
+
+vi.mock('@/lib/worktree-runtime-owner', () => ({
+  getRuntimeEnvironmentIdForWorktree: vi.fn(() => undefined)
+}))
+
+vi.mock('@/runtime/web-runtime-session', () => ({
+  activateWebRuntimeSessionTab: vi.fn(),
+  isWebRuntimeSessionActive: vi.fn(() => false)
+}))
+
+vi.mock('@/lib/focus-terminal-tab-surface', () => ({
+  focusTerminalTabSurface: vi.fn()
+}))
+
+import { activateTabNumberShortcut, resolveTabNumberShortcutTarget } from './tab-number-shortcuts'
 
 function tab(overrides: Partial<Tab> & Pick<Tab, 'id' | 'groupId'>): Tab {
   return {
@@ -131,5 +151,64 @@ describe('resolveTabNumberShortcutTarget', () => {
     expect(resolveTabNumberShortcutTarget({ ...base, activeView: 'settings' }, 0)).toBeNull()
     expect(resolveTabNumberShortcutTarget({ ...base, activeWorktreeId: null }, 0)).toBeNull()
     expect(resolveTabNumberShortcutTarget(base, -1)).toBeNull()
+  })
+})
+
+describe('activateTabNumberShortcut', () => {
+  it('activates a pipeline tab without writing its run id into setActiveFile', () => {
+    const pipelineTab = tab({
+      id: 'tab-p1',
+      groupId: 'group-a',
+      entityId: 'run_abc',
+      contentType: 'pipeline'
+    })
+    const setActiveFile = vi.fn()
+    const setActiveTabType = vi.fn()
+    const activateTab = vi.fn()
+    const focusGroup = vi.fn()
+    getStateMock.mockReturnValue({
+      ...state({
+        groups: [{ id: 'group-a', worktreeId: 'wt-1', activeTabId: null, tabOrder: ['tab-p1'] }],
+        tabs: [pipelineTab]
+      }),
+      setActiveFile,
+      setActiveTabType,
+      activateTab,
+      focusGroup,
+      setActiveTab: vi.fn(),
+      setActiveBrowserTab: vi.fn(),
+      activatePipelineTabSurface: vi.fn()
+    })
+
+    expect(activateTabNumberShortcut(0)).toBe(true)
+    expect(activateTab).toHaveBeenCalledWith('tab-p1')
+    expect(setActiveFile).not.toHaveBeenCalled()
+    expect(setActiveTabType).not.toHaveBeenCalledWith('editor')
+  })
+
+  it('clears a previously active terminal id when a pipeline tab is switched to by number', () => {
+    const pipelineTab = tab({
+      id: 'tab-p1',
+      groupId: 'group-a',
+      entityId: 'run_abc',
+      contentType: 'pipeline'
+    })
+    const activatePipelineTabSurface = vi.fn()
+    getStateMock.mockReturnValue({
+      ...state({
+        groups: [{ id: 'group-a', worktreeId: 'wt-1', activeTabId: null, tabOrder: ['tab-p1'] }],
+        tabs: [pipelineTab]
+      }),
+      setActiveFile: vi.fn(),
+      setActiveTabType: vi.fn(),
+      activateTab: vi.fn(),
+      focusGroup: vi.fn(),
+      setActiveTab: vi.fn(),
+      setActiveBrowserTab: vi.fn(),
+      activatePipelineTabSurface
+    })
+
+    expect(activateTabNumberShortcut(0)).toBe(true)
+    expect(activatePipelineTabSurface).toHaveBeenCalledWith('wt-1')
   })
 })

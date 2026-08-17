@@ -60,6 +60,7 @@ export async function createExistingWorktreeWorkerTerminal(args: {
   launchPreferences?: AgentLaunchPreferences
   taskId: string
   effects: WorkerEffect[]
+  onPtySpawnCommitted?: () => void
 }): Promise<{ handle: string; warning?: string }> {
   const terminal = await args.runtime.createTerminal(`id:${args.worktreeId}`, {
     // Why: the agent id is not a shell command — `cursor` resolves to the Cursor
@@ -70,7 +71,8 @@ export async function createExistingWorktreeWorkerTerminal(args: {
     title: `worker-${args.taskId}`,
     // Why: dispatching a worker is background work; it must not pull the sidebar
     // to the worker's workspace while the user is reading somewhere else.
-    surfaceOwner: false
+    surfaceOwner: false,
+    ...(args.onPtySpawnCommitted ? { onPtySpawnCommitted: args.onPtySpawnCommitted } : {})
   })
   args.effects.push({
     kind: 'terminal',

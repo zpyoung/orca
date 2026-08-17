@@ -33,6 +33,7 @@ export function renderTabBarItems({
     activeFileId,
     activeBrowserTabId,
     activeSimulatorTabId,
+    activePipelineTabId,
     activeTabType,
     expandedPaneByTabId,
     onActivate,
@@ -179,6 +180,43 @@ export function renderTabBarItems({
           key={item.id}
           file={simulatorFile}
           isActive={activeTabType === 'simulator' && item.id === activeSimulatorTabId}
+          isPinned={item.isPinned}
+          hasTabsToRight={index < items.length - 1}
+          hasTabsToLeft={index > 0}
+          tabCount={items.length}
+          statusByRelativePath={statusByRelativePath}
+          onActivate={() => onActivateFile?.(item.id)}
+          onClose={() => onCloseFile?.(item.id)}
+          onCloseOthers={() => onCloseOthers(item.id)}
+          onCloseToRight={() => onCloseToRight(item.id)}
+          onCloseToLeft={() => onCloseToLeft(item.id)}
+          onCloseAll={() => onCloseAllFiles?.()}
+          onMakePermanent={() => {}}
+          onTogglePin={() => togglePinned(item)}
+          dragData={dragData}
+          dropIndicator={dropIndicatorByVisibleId.get(item.id) ?? null}
+          includeTopTabBorder={includeTopTabBorder}
+        />
+      )
+    }
+    if (item.type === 'pipeline') {
+      const pipelineLabel = item.data.label || 'Pipeline'
+      const pipelineFile: OpenFile & { tabId: string } = {
+        id: item.id,
+        tabId: item.id,
+        filePath: pipelineLabel,
+        relativePath: pipelineLabel,
+        worktreeId,
+        language: 'pipeline',
+        isPreview: false,
+        isDirty: false,
+        mode: 'edit'
+      }
+      return (
+        <EditorFileTab
+          key={item.id}
+          file={pipelineFile}
+          isActive={item.id === activePipelineTabId}
           isPinned={item.isPinned}
           hasTabsToRight={index < items.length - 1}
           hasTabsToLeft={index > 0}

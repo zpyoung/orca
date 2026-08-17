@@ -5,6 +5,7 @@ import { requestBrowserFocus } from '@/components/browser-pane/browser-focus'
 import { translate } from '@/i18n/i18n'
 import { activateBrowserPagePaletteResult } from '@/lib/browser-page-palette-activation'
 import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
+import { activatePipelineTabPaletteResult } from '@/lib/pipeline-tab-palette-activation'
 import { activateSimulatorTabPaletteResult } from '@/lib/simulator-tab-palette-activation'
 import { activateWorkspaceTabPaletteResult } from '@/lib/workspace-tab-palette-activation'
 import type { OpenTabSearchResult } from './open-tab-search'
@@ -64,6 +65,24 @@ export function activateOpenTabSearchResult(result: OpenTabSearchResult): OpenTa
         translate(
           'auto.components.tab.bar.TabBarCreateEntry.7726ce9970',
           'Mobile emulator tab no longer exists'
+        )
+      )
+    }
+    return { status: 'activated', focus: null }
+  }
+
+  if (result.source === 'pipeline') {
+    const activation = activatePipelineTabPaletteResult({
+      executionHostId: result.executionHostId,
+      tabId: result.tabId,
+      worktreeId: result.worktreeId
+    })
+    if (activation.status === 'failed') {
+      return failed(
+        activation.reason,
+        translate(
+          'auto.components.tab.bar.TabBarCreateEntry.pipelineTabMissing',
+          'Pipeline tab no longer exists'
         )
       )
     }

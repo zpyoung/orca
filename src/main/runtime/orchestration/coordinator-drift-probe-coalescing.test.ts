@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Coordinator, DISPATCH_STALE_THRESHOLD, type CoordinatorRuntime } from './coordinator'
-import { OrchestrationDb } from './db'
+import { LEGACY_RUN_ID, OrchestrationDb } from './db'
 
 describe('Coordinator drift probe coalescing', () => {
   let db: OrchestrationDb
@@ -47,6 +47,7 @@ describe('Coordinator drift probe coalescing', () => {
     const coordinator = new Coordinator(db, runtime, {
       spec: 'go',
       coordinatorHandle: 'coord',
+      taskRunId: LEGACY_RUN_ID,
       pollIntervalMs: 30,
       worktree: 'wt1'
     })
@@ -108,6 +109,7 @@ describe('Coordinator drift probe coalescing', () => {
     const coordinator = new Coordinator(db, runtime, {
       spec: 'go',
       coordinatorHandle: 'coord',
+      taskRunId: LEGACY_RUN_ID,
       maxConcurrent: 1,
       pollIntervalMs: 30,
       worktree: 'wt1'

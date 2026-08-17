@@ -17,6 +17,7 @@ export type WorkspaceCleanupBlocker =
   | 'pinned'
   | 'active-workspace'
   | 'running-terminal'
+  | 'running-pipeline'
   | 'terminal-liveness-unknown'
   | 'dirty-editor-buffer'
   | 'volatile-local-context'
@@ -58,6 +59,7 @@ export type WorkspaceCleanupCandidate = {
     terminalTabCount: number
     cleanEditorTabCount: number
     browserTabCount: number
+    pipelineTabCount: number
     diffCommentCount: number
     newestDiffCommentAt: number | null
     retainedDoneAgentCount: number
@@ -116,6 +118,7 @@ export const WORKSPACE_CLEANUP_HARD_BLOCKERS: ReadonlySet<WorkspaceCleanupBlocke
   'pinned',
   'active-workspace',
   'running-terminal',
+  'running-pipeline',
   'terminal-liveness-unknown',
   'dirty-editor-buffer',
   'volatile-local-context',

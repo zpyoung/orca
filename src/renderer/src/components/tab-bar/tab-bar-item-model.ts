@@ -43,6 +43,13 @@ export type TabBarItem =
       isPinned: boolean
       data: Tab
     }
+  | {
+      type: 'pipeline'
+      id: string
+      unifiedTabId: string
+      isPinned: boolean
+      data: Tab
+    }
 
 export function getTabDragLabel(item: TabBarItem, generatedTitlesEnabled: boolean): string {
   if (item.type === 'terminal') {
@@ -53,6 +60,9 @@ export function getTabDragLabel(item: TabBarItem, generatedTitlesEnabled: boolea
   }
   if (item.type === 'simulator') {
     return item.data.label || 'Mobile Emulator'
+  }
+  if (item.type === 'pipeline') {
+    return item.data.label || 'Pipeline'
   }
   return getEditorDisplayLabel(item.data)
 }
@@ -102,6 +112,7 @@ export function buildOrderedTabItems({
   editorFileIds,
   browserTabIds,
   simulatorTabIds,
+  pipelineTabIds,
   terminalMap,
   editorMap,
   browserMap,
@@ -112,6 +123,7 @@ export function buildOrderedTabItems({
   editorFileIds: string[]
   browserTabIds: string[]
   simulatorTabIds: string[]
+  pipelineTabIds: string[]
   terminalMap: Map<string, TerminalTab & { unifiedTabId?: string }>
   editorMap: Map<string, OpenFile & { tabId?: string }>
   browserMap: Map<string, BrowserTabState & { tabId?: string }>
@@ -122,7 +134,8 @@ export function buildOrderedTabItems({
     terminalIds,
     editorFileIds,
     browserTabIds,
-    simulatorTabIds
+    simulatorTabIds,
+    pipelineTabIds
   )
   const items: TabBarItem[] = []
   for (const id of ids) {
@@ -162,14 +175,24 @@ export function buildOrderedTabItems({
       })
       continue
     }
-    const simulatorTab = unifiedTabByVisibleId.get(id)
-    if (simulatorTab?.contentType === 'simulator') {
+    const unifiedTab = unifiedTabByVisibleId.get(id)
+    if (unifiedTab?.contentType === 'simulator') {
       items.push({
         type: 'simulator',
         id,
-        unifiedTabId: simulatorTab.id,
-        isPinned: simulatorTab.isPinned === true,
-        data: simulatorTab
+        unifiedTabId: unifiedTab.id,
+        isPinned: unifiedTab.isPinned === true,
+        data: unifiedTab
+      })
+      continue
+    }
+    if (unifiedTab?.contentType === 'pipeline') {
+      items.push({
+        type: 'pipeline',
+        id,
+        unifiedTabId: unifiedTab.id,
+        isPinned: unifiedTab.isPinned === true,
+        data: unifiedTab
       })
     }
   }
@@ -197,7 +220,8 @@ export function findActiveVisibleTabId(
     activeFileId?: string | null
     activeBrowserTabId?: string | null
     activeSimulatorTabId?: string | null
-    activeTabType?: WorkspaceVisibleTabType
+    activePipelineTabId?: string | null
+    activeTabType?: WorkspaceVisibleTabType | null
   }
 ): string | null {
   const activeItem = items.find((item) => {
@@ -212,6 +236,10 @@ export function findActiveVisibleTabId(
     }
     if (item.type === 'simulator') {
       return active.activeTabType === 'simulator' && item.id === active.activeSimulatorTabId
+    }
+    if (item.type === 'pipeline') {
+      // Why: activeTabType is null for a focused pipeline canvas, so the id alone identifies it.
+      return item.id === active.activePipelineTabId
     }
     return (
       (active.activeTabType === 'editor' || active.activeTabType === 'simulator') &&

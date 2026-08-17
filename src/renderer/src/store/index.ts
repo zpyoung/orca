@@ -44,6 +44,7 @@ import { createNewIssueDraftSlice } from './slices/new-issue-draft'
 import { createTaskCreationDraftsSlice } from './slices/task-creation-drafts'
 import { createRemoteServerUpdatesSlice } from './slices/remote-server-updates'
 import { createTerminalQuickCommandHostsSlice } from './slices/terminal-quick-command-hosts'
+import { createPipelineRunsSlice } from './slices/pipeline-runs'
 import { e2eConfig } from '@/lib/e2e-config'
 import type { createWebRuntimeSessionTerminal } from '@/runtime/web-runtime-session'
 import {
@@ -102,7 +103,8 @@ export const useAppStore = create<AppState>()((...a) => {
     ...createNewIssueDraftSlice(...a),
     ...createTaskCreationDraftsSlice(...a),
     ...createRemoteServerUpdatesSlice(...a),
-    ...createTerminalQuickCommandHostsSlice(...a)
+    ...createTerminalQuickCommandHostsSlice(...a),
+    ...createPipelineRunsSlice(...a)
   }
 })
 

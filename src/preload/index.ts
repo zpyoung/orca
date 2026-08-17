@@ -219,6 +219,8 @@ import type {
   NativeChatReadSessionArgs,
   NativeChatReadSessionResult,
   NativeChatSubscriptionFrame,
+  PipelineRunSnapshotPayload,
+  PipelineRunSubscriptionFrame,
   PluginHostInstallResult,
   PluginHostInstallSource,
   PluginHostListEntry,
@@ -2092,6 +2094,12 @@ const api = {
       return () => ipcRenderer.removeListener('keybindings:changed', listener)
     }
   },
+
+  pipelines: {
+    listTemplates: () => ipcRenderer.invoke('pipelines:list-templates'),
+    resolveTemplate: (args: { basename: string; inputText: string }) =>
+      ipcRenderer.invoke('pipelines:resolve-template', args)
+  } satisfies PreloadApi['pipelines'],
 
   codexAccounts: {
     list: (): Promise<unknown> => ipcRenderer.invoke('codexAccounts:list'),
@@ -4277,6 +4285,27 @@ const api = {
       }
     }
   },
+
+  pipelineRuns: {
+    /** Live-tail a local pipeline run's snapshots. Returns an unsubscribe fn
+     *  that closes the host-side watcher. */
+    subscribe: (
+      args: { subscriptionId: string; runId: string },
+      onFrame: (frame: PipelineRunSubscriptionFrame) => void
+    ): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, payload: PipelineRunSnapshotPayload) => {
+        if (payload.subscriptionId === args.subscriptionId) {
+          onFrame(payload.frame)
+        }
+      }
+      ipcRenderer.on('pipelineRun:snapshot', listener)
+      ipcRenderer.send('pipelineRun:subscribe', args)
+      return () => {
+        ipcRenderer.removeListener('pipelineRun:snapshot', listener)
+        ipcRenderer.send('pipelineRun:unsubscribe', { subscriptionId: args.subscriptionId })
+      }
+    }
+  } satisfies PreloadApi['pipelineRuns'],
 
   runtime: {
     syncWindowGraph: (graph: RuntimeSyncWindowGraph): Promise<RuntimeSyncWindowGraphResult> =>

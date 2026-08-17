@@ -43,6 +43,7 @@ export function useTabBarItemProjection({
     activeFileId,
     activeBrowserTabId,
     activeSimulatorTabId,
+    activePipelineTabId,
     activeTabType,
     expandedPaneByTabId
   } = props
@@ -68,6 +69,13 @@ export function useTabBarItemProjection({
         .map((tab) => tab.id),
     [unifiedTabs, resolvedGroupId]
   )
+  const pipelineTabIds = useMemo(
+    () =>
+      unifiedTabs
+        .filter((tab) => tab.groupId === resolvedGroupId && tab.contentType === 'pipeline')
+        .map((tab) => tab.id),
+    [unifiedTabs, resolvedGroupId]
+  )
   const orderedItems = useMemo(
     () =>
       buildOrderedTabItems({
@@ -76,6 +84,7 @@ export function useTabBarItemProjection({
         editorFileIds,
         browserTabIds,
         simulatorTabIds,
+        pipelineTabIds,
         terminalMap,
         editorMap,
         browserMap,
@@ -87,6 +96,7 @@ export function useTabBarItemProjection({
       editorFileIds,
       browserTabIds,
       simulatorTabIds,
+      pipelineTabIds,
       terminalMap,
       editorMap,
       browserMap,
@@ -107,12 +117,14 @@ export function useTabBarItemProjection({
         activeFileId,
         activeBrowserTabId,
         activeSimulatorTabId,
+        activePipelineTabId,
         activeTabType
       }),
     [
       activeBrowserTabId,
       activeFileId,
       activeSimulatorTabId,
+      activePipelineTabId,
       activeTabId,
       activeTabType,
       orderedItems

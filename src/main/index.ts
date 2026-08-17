@@ -48,6 +48,7 @@ import {
 import { closeAllWatchers } from './ipc/filesystem-watcher'
 import { disposeWorktreeBaseDirectoryWatchers } from './ipc/worktree-base-directory-watcher'
 import { registerCoreHandlers } from './ipc/register-core-handlers'
+import { registerPipelineTemplateHandlers } from './ipc/pipeline-templates'
 import { initObservability, shutdownObservability } from './observability'
 import { registerMobileHandlers } from './ipc/mobile'
 import { initTelemetry, shutdownTelemetry, trackAppOpenedOnce, track } from './telemetry/client'
@@ -1457,6 +1458,7 @@ function openMainWindow(options: { revealOnDidFinishLoad?: boolean } = {}): Brow
       ? { marketplace: pluginMarketplaceService, installer: pluginMarketplaceInstaller }
       : undefined
   )
+  registerPipelineTemplateHandlers(app.getPath('home'))
   automations.setWebContents(window.webContents)
   automations.start()
   attachMainWindowServices(

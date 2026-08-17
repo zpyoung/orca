@@ -1887,6 +1887,10 @@ export function useIpcEvents(): void {
           // Why: browser tabs need their own active-page state, not the editor file activation path.
           store.setActiveBrowserTab(browserTarget.workspaceId)
           store.setActiveTabType('browser')
+        } else if (tab.contentType === 'pipeline') {
+          // Why: entityId is a run id, not a file id — writing it into setActiveFile
+          // would masquerade a pipeline run as an open file (matches the palette
+          // activation precedent in pipeline-tab-palette-activation.ts).
         } else {
           store.setActiveFile(tab.entityId)
           store.setActiveTabType('editor')

@@ -89,11 +89,16 @@ export function launchAiVaultSessionInNewTab(args: {
   const termIds = (fresh.tabsByWorktree[args.worktreeId] ?? []).map((t) => t.id)
   const editorIds = fresh.openFiles.filter((f) => f.worktreeId === args.worktreeId).map((f) => f.id)
   const browserIds = (fresh.browserTabsByWorktree?.[args.worktreeId] ?? []).map((t) => t.id)
+  const pipelineIds = (fresh.unifiedTabsByWorktree[args.worktreeId] ?? [])
+    .filter((t) => t.contentType === 'pipeline')
+    .map((t) => t.id)
   const base = reconcileTabOrder(
     fresh.tabBarOrderByWorktree[args.worktreeId],
     termIds,
     editorIds,
-    browserIds
+    browserIds,
+    [],
+    pipelineIds
   )
   const order = base.filter((id) => id !== tab.id)
   order.push(tab.id)

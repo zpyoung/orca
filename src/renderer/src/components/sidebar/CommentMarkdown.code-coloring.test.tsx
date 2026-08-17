@@ -30,12 +30,7 @@ describe('CommentMarkdown highlightCode flag', () => {
 
   it('highlights fenced code with hljs classes when the flag is true and onLinkClick is provided', () => {
     const markup = renderToStaticMarkup(
-      <CommentMarkdown
-        variant="document"
-        content={JS_FENCE}
-        onLinkClick={() => {}}
-        highlightCode
-      />
+      <CommentMarkdown variant="document" content={JS_FENCE} onLinkClick={() => {}} highlightCode />
     )
 
     expect(markup).toContain('hljs-')
@@ -52,7 +47,12 @@ describe('CommentMarkdown highlightCode flag', () => {
   // singleton bug actually breaks.
   it('highlights fenced code with hljs classes and the code accent when the flag is true and onLinkClick is explicitly undefined', () => {
     const markup = renderToStaticMarkup(
-      <CommentMarkdown variant="document" content={JS_FENCE} onLinkClick={undefined} highlightCode />
+      <CommentMarkdown
+        variant="document"
+        content={JS_FENCE}
+        onLinkClick={undefined}
+        highlightCode
+      />
     )
 
     expect(markup).toContain('hljs-')
