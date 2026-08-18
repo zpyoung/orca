@@ -36,13 +36,18 @@ inferred: `config/fork-ownership.json` — read through `config/scripts/fork-own
 After the merge and its tree-conflict resolution:
 
 ```sh
+merge_head=$(git rev-parse HEAD)
 git merge <target-ref>
-node config/scripts/sync-upstream-file-ownership.mjs <target-ref> <merge-head> <out-dir>
+node config/scripts/sync-upstream-file-ownership.mjs <target-ref> "$merge_head" <out-dir>
 tr '\n' '\0' < <out-dir>/checkout.txt | xargs -0 git checkout <target-ref> --
-tr '\n' '\0' < <out-dir>/remove.txt   | xargs -0 git rm -f --ignore-unmatch
-tr '\n' '\0' < <out-dir>/ours.txt     | xargs -0 git checkout HEAD --
+tr '\n' '\0' < <out-dir>/remove.txt   | xargs -0 git rm -f --ignore-unmatch --
+tr '\n' '\0' < <out-dir>/ours.txt     | xargs -0 git checkout "$merge_head" --
 node config/scripts/sync-upstream-locale-catalogs.mjs <target-ref>
 ```
+
+`ours.txt` must resolve to `$merge_head`, not `HEAD`: a clean (non-conflicted) `git merge` advances
+`HEAD` to the new merge commit, so `git checkout HEAD --` would restore the already-merged content
+instead of the fork side.
 
 The manifest declares four classes, and the classifier sorts every differing path into the matching
 list:

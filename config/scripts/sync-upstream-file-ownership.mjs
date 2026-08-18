@@ -28,11 +28,10 @@ import { loadForkOwnershipManifest, classifyPath } from './fork-ownership-manife
 const MANIFEST_PATH = 'config/fork-ownership.json'
 
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 1 << 28 })
-const lines = (value) =>
-  value
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
+// -z + split on NUL avoids both git's C-style quoting of unusual pathnames and
+// any trimming that would corrupt a path with meaningful leading/trailing whitespace
+const gitPaths = (value) => value.split('\0').filter(Boolean)
+const fileLines = (content) => content.split(/\r\n|\n/)
 
 // no fallback on failure: resolving a file the wrong way is worse than refusing to sync.
 function loadManifestOrExit() {
@@ -52,12 +51,22 @@ function loadManifestOrExit() {
 }
 
 function classify(manifest, target, mergeHead, outDir) {
-  const differing = lines(git('diff', '--name-only', mergeHead, target))
+  const differing = gitPaths(git('diff', '--name-only', '-z', mergeHead, target))
   if (differing.length === 0) {
     console.error('no differing paths between merge-head and target-ref; refusing to classify')
     process.exit(2)
   }
-  const targetTree = new Set(lines(git('ls-tree', '-r', '--name-only', target)))
+  // the output lists and their `tr '\n' '\0' | xargs -0` consumers are newline-delimited;
+  // a path containing a newline would silently split into two bogus entries
+  for (const path of differing) {
+    if (path.includes('\n')) {
+      console.error(
+        `path contains a newline, which the sync output cannot represent: ${JSON.stringify(path)}`
+      )
+      process.exit(2)
+    }
+  }
+  const targetTree = new Set(gitPaths(git('ls-tree', '-r', '--name-only', '-z', target)))
 
   const checkout = []
   const remove = []
@@ -122,8 +131,9 @@ function findMissingSeamLines(manifest, refOrWorktree) {
       missing.push(`${seam.path}: cannot read (${error.message})`)
       continue
     }
+    const presentLines = new Set(fileLines(content))
     for (const line of seam.lines) {
-      if (!content.includes(line)) {
+      if (!presentLines.has(line)) {
         missing.push(`${seam.path}: missing line ${JSON.stringify(line)}`)
       }
     }

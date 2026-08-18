@@ -54,6 +54,11 @@ function outLines(outDir, name) {
     .filter(Boolean)
 }
 
+// unlike outLines, preserves leading/trailing whitespace in each path
+function outLinesExact(outDir, name) {
+  return readFileSync(join(outDir, name), 'utf8').split('\n').filter(Boolean)
+}
+
 afterEach(() => {
   while (tempDirs.length > 0) {
     rmSync(tempDirs.pop(), { force: true, recursive: true })
@@ -230,6 +235,70 @@ describe('classify mode', () => {
     expect(result.stderr.length).toBeGreaterThan(0)
   })
 
+  it('classifies a path with leading whitespace by its exact name, not a trimmed one', () => {
+    const root = initRepo()
+    const outDir = join(root, 'out')
+    mkdirSync(outDir)
+
+    writeManifest(
+      root,
+      baseManifest({
+        exceptions: [{ path: ' lead.txt', reason: 'fork policy doc', status: 'permanent' }]
+      })
+    )
+    writeFiles(root, { ' lead.txt': 'merge-head version\n' })
+    const mergeHead = commitAll(root, 'merge-head')
+
+    writeFiles(root, { ' lead.txt': 'target version\n' })
+    const target = commitAll(root, 'target')
+
+    const result = runScript(root, [target, mergeHead, outDir])
+
+    expect(result.status).toBe(0)
+    expect(outLinesExact(outDir, 'ours.txt')).toEqual([' lead.txt'])
+  })
+
+  it("classifies a pathname with a quote character without git's C-style quoting mangling it", () => {
+    const root = initRepo()
+    const outDir = join(root, 'out')
+    mkdirSync(outDir)
+
+    writeManifest(
+      root,
+      baseManifest({
+        exceptions: [{ path: 'has"quote.txt', reason: 'fork policy doc', status: 'permanent' }]
+      })
+    )
+    writeFiles(root, { 'has"quote.txt': 'merge-head version\n' })
+    const mergeHead = commitAll(root, 'merge-head')
+
+    writeFiles(root, { 'has"quote.txt': 'target version\n' })
+    const target = commitAll(root, 'target')
+
+    const result = runScript(root, [target, mergeHead, outDir])
+
+    expect(result.status).toBe(0)
+    expect(outLines(outDir, 'ours.txt')).toEqual(['has"quote.txt'])
+  })
+
+  it('exits 2 and names the path when a differing path contains a newline', () => {
+    const root = initRepo()
+    const outDir = join(root, 'out')
+    mkdirSync(outDir)
+
+    writeManifest(root, baseManifest())
+    writeFiles(root, { 'README.md': 'base\n' })
+    const mergeHead = commitAll(root, 'merge-head')
+
+    writeFiles(root, { 'src/weird\nname.txt': 'target\n' })
+    const target = commitAll(root, 'target')
+
+    const result = runScript(root, [target, mergeHead, outDir])
+
+    expect(result.status).toBe(2)
+    expect(result.stderr).toContain('weird')
+  })
+
   it('exits 2 when there are no differing paths to classify', () => {
     const root = initRepo()
     const outDir = join(root, 'out')
@@ -369,5 +438,69 @@ describe('--verify-seams mode', () => {
     const result = runScript(root, ['--verify-seams'])
 
     expect(result.status).toBe(2)
+  })
+
+  it('exits 1 when a declared seam line exists only as a substring of another line', () => {
+    const root = initRepo()
+    writeManifest(
+      root,
+      baseManifest({
+        seams: [
+          {
+            path: 'src/seam.ts',
+            feature: 'fork-infra',
+            kind: 'passthrough',
+            lines: ['const SEAM_MARKER = true']
+          }
+        ]
+      })
+    )
+    writeFiles(root, { 'src/seam.ts': 'const SEAM_MARKER = true\n' })
+    commitAll(root, 'base')
+    // the declared line is still a substring here; a substring check would wrongly pass this
+    writeFiles(root, { 'src/seam.ts': '// const SEAM_MARKER = true\n' })
+
+    const result = runScript(root, ['--verify-seams'])
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('src/seam.ts')
+  })
+
+  it('exits 0 when the declared seam line is present with CRLF line endings', () => {
+    const root = initRepo()
+    writeManifest(
+      root,
+      baseManifest({
+        seams: [
+          {
+            path: 'src/seam.ts',
+            feature: 'fork-infra',
+            kind: 'passthrough',
+            lines: ['const SEAM_MARKER = true']
+          }
+        ]
+      })
+    )
+    writeFiles(root, { 'src/seam.ts': 'const SEAM_MARKER = true\r\nother line\r\n' })
+    commitAll(root, 'base')
+
+    const result = runScript(root, ['--verify-seams'])
+
+    expect(result.status).toBe(0)
+  })
+})
+
+describe('SKILL.md procedure', () => {
+  const skillText = readFileSync(join(projectDir, '.claude/skills/sync-upstream/SKILL.md'), 'utf8')
+
+  it('restores ours.txt from the pre-merge fork commit, not from HEAD', () => {
+    const oursLine = skillText.split('\n').find((line) => line.includes('ours.txt'))
+    expect(oursLine).toContain('merge_head')
+    expect(oursLine).not.toMatch(/git checkout HEAD --/)
+  })
+
+  it('passes -- before remove.txt paths so a leading-dash path is not parsed as an option', () => {
+    const removeLine = skillText.split('\n').find((line) => line.includes('remove.txt'))
+    expect(removeLine).toMatch(/git rm -f --ignore-unmatch --\s*$/)
   })
 })
