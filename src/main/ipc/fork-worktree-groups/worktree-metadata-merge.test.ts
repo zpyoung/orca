@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { WorktreeMeta } from '../../shared/types'
-import { mergeWorktree } from './worktree-metadata-merge'
+import type { WorktreeMeta } from '../../../shared/types'
+import { mergeWorktree } from '../worktree-metadata-merge'
 
 const baseMeta: WorktreeMeta = {
   displayName: 'Feature',

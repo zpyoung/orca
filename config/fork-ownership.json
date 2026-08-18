@@ -3,7 +3,7 @@
     {
       "name": "worktree-groups",
       "purpose": "Lets a worktree join a project group independently of its repo's own group membership, so cross-repo worktrees can share a sidebar section.",
-      "globs": ["tests/e2e/cross-repo-worktree-groups.spec.ts"]
+      "globs": ["**/fork-worktree-groups/**"]
     },
     {
       "name": "native-chat-relay",
@@ -114,14 +114,9 @@
       "path": "src/shared/project-groups.ts",
       "feature": "worktree-groups",
       "kind": "registration",
-      "lines": ["export function canWorktreeHoldGroupMembership(args: {"]
-    },
-    {
-      "path": "src/shared/project-groups.test.ts",
-      "feature": "worktree-groups",
-      "kind": "passthrough",
       "lines": [
-        "  it('clears a self-referencing parent and a parent naming a nonexistent group', () => {"
+        "import { breakProjectGroupParentCycles } from './fork-worktree-groups/project-group-parent-cycles'",
+        "  breakProjectGroupParentCycles(groups)"
       ]
     },
     {
@@ -138,34 +133,31 @@
       "feature": "worktree-groups",
       "kind": "registration",
       "lines": [
-        "export function getLooseSectionProjectGroupId(sectionKey: string): string | null {",
-        "export function isLooseProjectGroupTopRow(sectionKey: string, nested: boolean): boolean {",
-        "    if (groupBy === 'repo' && w.projectGroupId && projectGroupsById.has(w.projectGroupId)) {"
+        "} from './fork-worktree-groups/worktree-loose-group-membership'",
+        "    const divertedProjectGroupId =",
+        "      groupBy === 'repo' ? getDivertedWorktreeProjectGroupId(w, projectGroupsById) : null",
+        "    const looseWorktreeCount = looseWorktreesByProjectGroupId.get(groupId)?.length ?? 0",
+        "          hostContextLabelByWorktreeId: getLooseWorktreeHostContextLabels(",
+        "    getWorktreeGroupRevealSectionKey(divertedGroupId, groupKey)"
       ]
-    },
-    {
-      "path": "src/renderer/src/components/sidebar/worktree-list-groups.test.ts",
-      "feature": "worktree-groups",
-      "kind": "passthrough",
-      "lines": ["  getLooseSectionProjectGroupId,", "  isLooseProjectGroupTopRow,"]
     },
     {
       "path": "src/renderer/src/components/sidebar/WorktreeList.tsx",
       "feature": "worktree-groups",
       "kind": "registration",
       "lines": [
-        "  getLooseSectionProjectGroupId,",
-        "  isLooseProjectGroupTopRow,",
-        "} from './worktree-group-membership-drop'",
+        "} from './fork-worktree-groups/worktree-group-membership-drag-preview'",
         "  const [worktreeGroupMembershipDragPreview, setWorktreeGroupMembershipDragPreview] =",
         "    const membershipPreview = getPointerWorktreeGroupMembershipDragPreview({",
         "      const membershipTarget = getPointerWorktreeGroupMembershipDragPreview({",
         "        canWorktreeHoldGroupMembership({",
         "        void updateWorktreeMeta(drag.worktreeId, { projectGroupId: membershipTarget.groupId })",
         "        void updateWorktreeMeta(drag.worktreeId, { projectGroupId: null })",
-        "                getLooseSectionProjectGroupId(itemRow.sectionKey) ?? itemRow.repo?.projectGroupId",
+        "                    inProjectGroupLooseSection={inProjectGroupLooseSection}",
         "    gap: 2,",
-        "                      'group relative flex h-6 w-full items-center gap-1.5 pr-2 text-left transition-all',"
+        "                      'group relative flex h-6 w-full items-center gap-1.5 pr-2 text-left transition-all',",
+        "import { needsWorktreeDragGroup } from './fork-worktree-groups/worktree-drag-group-key'",
+        "    if (needsWorktreeDragGroup(current?.key ?? null, row.sectionKey)) {"
       ]
     },
     {
@@ -173,33 +165,20 @@
       "feature": "worktree-groups",
       "kind": "registration",
       "lines": [
-        "function getWorktreeGroupMenuVisibility(",
-        "  const canHoldMembership = canWorktreeHoldGroupMembership({ folderWorkspaceId, repoKind })",
-        "                  <DropdownMenuItem onSelect={handleCreateGroupFromWorktree} disabled={isDeleting}>"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/sidebar/WorktreeContextMenu.test.ts",
-      "feature": "worktree-groups",
-      "kind": "passthrough",
-      "lines": [
-        "  it('adding to a group calls updateWorktreeMeta with the chosen group id', () => {"
+        "} from './fork-worktree-groups/WorktreeGroupMenuItems'",
+        "  const worktreeGroupDialog = useWorktreeGroupDialog({",
+        "              <WorktreeGroupMenuItems",
+        "      {worktreeGroupDialog.dialog}"
       ]
     },
     {
       "path": "src/renderer/src/components/sidebar/WorktreeCard.tsx",
       "feature": "worktree-groups",
-      "kind": "registration",
+      "kind": "passthrough",
       "lines": [
-        "  inProjectGroupLooseSection?: boolean",
+        "type ForkWorktreeCardProps = WorktreeCardProps & { inProjectGroupLooseSection?: boolean }",
         "  inProjectGroupLooseSection = false,",
-        "  // Why: these sections render a row away from its repo header, so origin has to come from the",
-        "  // row itself regardless of groupBy's hideRepoBadge.",
-        "  const showOriginRepoIcon = (inPinnedSection || inProjectGroupLooseSection) && !!repo",
-        "    showRepoIdentityInTitle && !!repo && !hideRepoBadge && !isFolder && !showOriginRepoIcon",
-        "    !showRepoIdentityInTitle && !!repo && !hideRepoBadge && !showOriginRepoIcon",
-        "            {showOriginRepoIcon && (",
-        "        titleOnlyCard ? 'py-0.5' : 'pt-0.5 pb-1',"
+        "    inPinnedSection: inPinnedSection || inProjectGroupLooseSection,"
       ]
     },
     {
@@ -207,8 +186,8 @@
       "feature": "worktree-groups",
       "kind": "registration",
       "lines": [
-        "    for (const [worktreeId, meta] of Object.entries(this.state.worktreeMeta)) {",
-        "        this.state.worktreeMeta[worktreeId] = { ...meta, projectGroupId: null }"
+        "import { releaseDeletedProjectGroupWorktreeMembership } from './fork-worktree-groups/project-group-membership-release'",
+        "    releaseDeletedProjectGroupWorktreeMembership(this.state.worktreeMeta, deletedGroupIds)"
       ]
     },
     {
@@ -224,24 +203,12 @@
       "lines": ["  projectGroupId: z.union([z.string(), z.null()]).optional()"]
     },
     {
-      "path": "src/main/runtime/rpc/methods/worktree-schemas.test.ts",
-      "feature": "worktree-groups",
-      "kind": "passthrough",
-      "lines": ["  it('accepts a string projectGroupId on worktree.set', () => {"]
-    },
-    {
       "path": "src/main/runtime/rpc/methods/worktree.ts",
       "feature": "worktree-groups",
-      "kind": "registration",
+      "kind": "passthrough",
       "lines": [
         "        ...(clientKind === 'mobile' ? {} : { projectGroupId: params.projectGroupId }),"
       ]
-    },
-    {
-      "path": "src/main/runtime/rpc/methods/worktree.test.ts",
-      "feature": "worktree-groups",
-      "kind": "passthrough",
-      "lines": ["  it('forwards projectGroupId through worktree.set', async () => {"]
     },
     {
       "path": "src/main/ipc/worktree-logic.test.ts",
@@ -250,39 +217,21 @@
       "lines": ["      projectGroupId: null,"]
     },
     {
-      "path": "src/main/persistence.test.ts",
-      "feature": "worktree-groups",
-      "kind": "passthrough",
-      "lines": [
-        "  it('deleteProjectGroup releases worktree membership for the deleted group and its descendants', async () => {"
-      ]
-    },
-    {
       "path": "src/renderer/src/components/sidebar/empty-project-placeholder-repos.ts",
       "feature": "worktree-groups",
       "kind": "registration",
-      "lines": ["    const isFullyGroupedElsewhere ="]
-    },
-    {
-      "path": "src/renderer/src/components/sidebar/empty-project-placeholder-repos.test.ts",
-      "feature": "worktree-groups",
-      "kind": "passthrough",
       "lines": [
-        "  describe('repos fully grouped elsewhere via worktree-level projectGroupId', () => {"
+        "import { hasOnlyWorktreesGroupedElsewhere } from './fork-worktree-groups/empty-project-placeholder-membership'",
+        "  projectGroups?: readonly ProjectGroup[]"
       ]
     },
     {
       "path": "src/renderer/src/components/sidebar/worktree-drag-units.ts",
       "feature": "worktree-groups",
       "kind": "registration",
-      "lines": ["    if (!current || current.key !== row.sectionKey) {"]
-    },
-    {
-      "path": "src/renderer/src/components/sidebar/worktree-drag-units.test.ts",
-      "feature": "worktree-groups",
-      "kind": "passthrough",
       "lines": [
-        "  it('gives loose worktrees under a project-group header their own drag group', () => {"
+        "import { needsWorktreeDragGroup } from './fork-worktree-groups/worktree-drag-group-key'",
+        "    if (needsWorktreeDragGroup(current?.key ?? null, row.sectionKey)) {"
       ]
     },
     {
@@ -291,50 +240,6 @@
       "kind": "passthrough",
       "lines": [
         "    const createGroup = await screen.findByText('New group from worktree', {}, { timeout: 5_000 })"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/sidebar/worktree-list-imported-rows.test.ts",
-      "feature": "worktree-groups",
-      "kind": "passthrough",
-      "lines": [
-        "const makeWorktreeRow = (id: string, sectionKey = 'all'): Extract<Row, { type: 'item' }> => ({"
-      ]
-    },
-    {
-      "path": "src/renderer/src/i18n/locales/en.json",
-      "feature": "worktree-groups",
-      "kind": "passthrough",
-      "lines": ["          \"3ae4748032\": \"Create a group and move this worktree into it.\","]
-    },
-    {
-      "path": "src/renderer/src/i18n/locales/es.json",
-      "feature": "worktree-groups",
-      "kind": "passthrough",
-      "lines": ["          \"3ae4748032\": \"Crea un grupo y mueve este worktree a \u00e9l.\","]
-    },
-    {
-      "path": "src/renderer/src/i18n/locales/ja.json",
-      "feature": "worktree-groups",
-      "kind": "passthrough",
-      "lines": [
-        "          \"3ae4748032\": \"\u30b0\u30eb\u30fc\u30d7\u3092\u4f5c\u6210\u3057\u3001\u3053\u306e\u30ef\u30fc\u30af\u30c4\u30ea\u30fc\u3092\u305d\u306e\u30b0\u30eb\u30fc\u30d7\u306b\u79fb\u52d5\u3057\u307e\u3059\u3002\","
-      ]
-    },
-    {
-      "path": "src/renderer/src/i18n/locales/ko.json",
-      "feature": "worktree-groups",
-      "kind": "passthrough",
-      "lines": [
-        "          \"3ae4748032\": \"\uadf8\ub8f9\uc744 \ub9cc\ub4e4\uace0 \uc774 \uc791\uc5c5 \ud2b8\ub9ac\ub97c \uadf8\ub8f9\uc73c\ub85c \uc774\ub3d9\ud558\uc138\uc694.\","
-      ]
-    },
-    {
-      "path": "src/renderer/src/i18n/locales/zh.json",
-      "feature": "worktree-groups",
-      "kind": "passthrough",
-      "lines": [
-        "          \"3ae4748032\": \"\u521b\u5efa\u4e00\u4e2a\u7ec4\u5e76\u5c06\u8be5\u5de5\u4f5c\u6811\u79fb\u5165\u5176\u4e2d\u3002\","
       ]
     },
     {
@@ -673,7 +578,9 @@
       "path": "src/renderer/src/components/native-chat/native-chat-view-state.test.ts",
       "feature": "native-chat-relay",
       "kind": "passthrough",
-      "lines": ["    const state = selectNativeChatViewState("]
+      "lines": [
+        "  it('keeps rendering messages when the read settled into an error, and reports it', () => {"
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/NativeChatView.tsx",
@@ -1054,6 +961,12 @@
       "ledger": "docs/fork-upstreaming.md#sidebar-density"
     },
     {
+      "path": "src/renderer/src/components/sidebar/worktree-card-surface.tsx",
+      "reason": "Sidebar-density preference: preserves compact workspace-card padding after upstream split card rendering into its surface module.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#sidebar-density"
+    },
+    {
       "path": "src/renderer/src/components/terminal-pane/TerminalPane.tsx",
       "reason": "Corrects effectiveChatViewMode; a cosmetic/logic fix to upstream's chat-header controls, not a fork feature.",
       "status": "pending-upstream",
@@ -1082,11 +995,6 @@
       "reason": "Upstream test deleted by the fork's relay/pagination rewrite (commit c137a9e97d); whether it returns green against the extracted structure or stays retired is decided during the relay feature's extraction task, not silently.",
       "status": "permanent",
       "deleted": true
-    },
-    {
-      "path": "src/renderer/src/components/sidebar/project-group-header-dom.test.ts",
-      "reason": "Stale sync residue, not a live fork claim: no fork commit authored this file, but it cannot simply reset to the tag because its source-shape assertion locks a region of WorktreeList.tsx's header row cn(...) call that is itself stale residue. The fork kept the pre-fix ternary (isDraggableRepoHeader || isDraggableProjectGroupHeader ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer') while upstream replaced it with !(isDraggableRepoHeader || isDraggableProjectGroupHeader) && 'cursor-pointer', which is the shape this test asserts. That stale line shares its cn(...) call with a genuine fork line, the h-6 section-header-height edit from commit 7436d38a21. Restoring this test and the grab-cursor shape must happen in the same commit that reduces WorktreeList.tsx to tag-plus-declared-seams (the worktree-groups extraction), not here.",
-      "status": "pending-decision"
     },
     {
       "path": "src/main/ipc/native-chat-ssh-subscription.ts",
@@ -1181,31 +1089,6 @@
     {
       "path": "src/shared/native-chat-relay-protocol.ts",
       "reason": "New fork-authored file for the native-chat-relay feature, not yet moved into its fork-native-chat-relay/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/renderer/src/components/sidebar/worktree-group-membership-drop.ts",
-      "reason": "New fork-authored file for the worktree-groups feature, not yet moved into its fork-worktree-groups/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/renderer/src/components/sidebar/worktree-group-membership-drop.test.ts",
-      "reason": "New fork-authored file for the worktree-groups feature, not yet moved into its fork-worktree-groups/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/main/ipc/worktree-metadata-merge.test.ts",
-      "reason": "New fork-authored file for the worktree-groups feature, not yet moved into its fork-worktree-groups/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/main/runtime/rpc/methods/worktree-create-automation-provenance.test.ts",
-      "reason": "New fork-authored file for the worktree-groups feature, not yet moved into its fork-worktree-groups/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/renderer/src/components/sidebar/WorktreeCard.origin-repo-chip.test.tsx",
-      "reason": "New fork-authored file for the worktree-groups feature, not yet moved into its fork-worktree-groups/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
       "status": "pending-decision"
     }
   ]

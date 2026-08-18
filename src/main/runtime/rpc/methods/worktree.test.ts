@@ -3,6 +3,7 @@ import { RpcDispatcher } from '../dispatcher'
 import type { RpcRequest } from '../core'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import { WORKTREE_METHODS } from './worktree'
+import { createAutomationDispatchToken } from '../../../automations/dispatch-tokens'
 
 const repo = {
   id: 'repo-1',
@@ -164,6 +165,325 @@ describe('worktree RPC methods', () => {
         orchestrationContext: undefined
       }
     })
+  })
+
+  it('mints automation provenance from a valid dispatch request on worktree creation', async () => {
+    const dispatchToken = createAutomationDispatchToken('automation-1', 'run-1')
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      dedupeWorktreeCreate: passthroughDedupe,
+      showRepo: vi.fn().mockResolvedValue(repo),
+      showAutomation: vi.fn(() => ({
+        id: 'automation-1',
+        name: 'Nightly review',
+        projectId: 'legacy-repo-1',
+        runContext: {
+          projectId: 'project-1',
+          repoId: 'repo-1',
+          hostId: 'ssh:ssh-target-1'
+        },
+        workspaceMode: 'new_per_run',
+        executionTargetType: 'ssh',
+        executionTargetId: 'ssh-target-1'
+      })),
+      listAutomationRuns: vi.fn(() => [
+        {
+          id: 'run-1',
+          automationId: 'automation-1',
+          title: 'Nightly review run',
+          status: 'dispatching',
+          workspaceId: null
+        }
+      ]),
+      createManagedWorktree: vi.fn().mockResolvedValue({ worktree: { id: 'wt-1' } })
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: WORKTREE_METHODS })
+
+    const response = await dispatcher.dispatch(
+      makeRequest('worktree.create', {
+        repo: 'repo-1',
+        name: 'automation-workspace',
+        automationProvenanceRequest: {
+          automationId: 'automation-1',
+          automationRunId: 'run-1',
+          dispatchToken,
+          createRequestId: 'create-request-1'
+        }
+      })
+    )
+
+    expect(response).toMatchObject({ ok: true })
+    const replay = await dispatcher.dispatch(
+      makeRequest('worktree.create', {
+        repo: 'repo-1',
+        name: 'automation-workspace-replay',
+        automationProvenanceRequest: {
+          automationId: 'automation-1',
+          automationRunId: 'run-1',
+          dispatchToken,
+          createRequestId: 'create-request-1'
+        }
+      })
+    )
+
+    expect(replay).toMatchObject({ ok: false, error: { code: 'invalid_argument' } })
+    expect(runtime.createManagedWorktree).toHaveBeenCalledTimes(1)
+    expect(runtime.createManagedWorktree).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repoSelector: 'repo-1',
+        name: 'automation-workspace',
+        automationProvenance: expect.objectContaining({
+          kind: 'created-by-automation',
+          automationId: 'automation-1',
+          automationNameSnapshot: 'Nightly review',
+          automationRunId: 'run-1',
+          automationRunTitleSnapshot: 'Nightly review run',
+          executionTargetType: 'ssh',
+          executionTargetId: 'ssh-target-1',
+          projectId: 'project-1',
+          repoId: 'repo-1',
+          hostId: 'ssh:ssh-target-1'
+        })
+      })
+    )
+  })
+
+  it('stamps automation provenance with the persisted runtime host from run context', async () => {
+    const dispatchToken = createAutomationDispatchToken('automation-runtime', 'run-runtime')
+    const runtimeLocalRepo = {
+      id: 'repo-runtime',
+      path: '/workspace/repo',
+      displayName: 'repo',
+      badgeColor: '#000',
+      addedAt: 1,
+      kind: 'git' as const
+    }
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      dedupeWorktreeCreate: passthroughDedupe,
+      showRepo: vi.fn().mockResolvedValue(runtimeLocalRepo),
+      showAutomation: vi.fn(() => ({
+        id: 'automation-runtime',
+        name: 'Runtime review',
+        projectId: 'legacy-repo-runtime',
+        runContext: {
+          projectId: 'project-runtime',
+          repoId: 'repo-runtime',
+          hostId: 'runtime:owner-runtime'
+        },
+        workspaceMode: 'new_per_run',
+        executionTargetType: 'runtime',
+        executionTargetId: 'owner-runtime'
+      })),
+      listAutomationRuns: vi.fn(() => [
+        {
+          id: 'run-runtime',
+          automationId: 'automation-runtime',
+          title: 'Runtime review run',
+          status: 'dispatching',
+          workspaceId: null
+        }
+      ]),
+      createManagedWorktree: vi.fn().mockResolvedValue({ worktree: { id: 'wt-runtime' } })
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: WORKTREE_METHODS })
+
+    const response = await dispatcher.dispatch(
+      makeRequest('worktree.create', {
+        repo: 'repo-runtime',
+        name: 'runtime-automation-workspace',
+        automationProvenanceRequest: {
+          automationId: 'automation-runtime',
+          automationRunId: 'run-runtime',
+          dispatchToken,
+          createRequestId: 'create-request-runtime'
+        }
+      })
+    )
+
+    expect(response).toMatchObject({ ok: true })
+    expect(runtime.createManagedWorktree).toHaveBeenCalledWith(
+      expect.objectContaining({
+        automationProvenance: expect.objectContaining({
+          automationId: 'automation-runtime',
+          automationRunId: 'run-runtime',
+          repoId: 'repo-runtime',
+          hostId: 'runtime:owner-runtime'
+        })
+      })
+    )
+  })
+
+  it('validates and stamps automation provenance from the dispatching run snapshot', async () => {
+    const dispatchToken = createAutomationDispatchToken('automation-edited', 'run-edited')
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      dedupeWorktreeCreate: passthroughDedupe,
+      showRepo: vi.fn().mockResolvedValue(repo),
+      showAutomation: vi.fn(() => ({
+        id: 'automation-edited',
+        name: 'Edited review',
+        projectId: 'legacy-repo-edited',
+        runContext: {
+          projectId: 'project-after-edit',
+          repoId: 'repo-after-edit',
+          hostId: 'runtime:after-edit'
+        },
+        workspaceMode: 'new_per_run',
+        executionTargetType: 'runtime',
+        executionTargetId: 'after-edit'
+      })),
+      listAutomationRuns: vi.fn(() => [
+        {
+          id: 'run-edited',
+          automationId: 'automation-edited',
+          title: 'Pre-edit run',
+          runContext: {
+            projectId: 'project-before-edit',
+            repoId: 'repo-1',
+            hostId: 'runtime:before-edit'
+          },
+          status: 'dispatching',
+          workspaceId: null
+        }
+      ]),
+      createManagedWorktree: vi.fn().mockResolvedValue({ worktree: { id: 'wt-edited' } })
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: WORKTREE_METHODS })
+
+    const response = await dispatcher.dispatch(
+      makeRequest('worktree.create', {
+        repo: 'repo-1',
+        name: 'edited-automation-workspace',
+        automationProvenanceRequest: {
+          automationId: 'automation-edited',
+          automationRunId: 'run-edited',
+          dispatchToken,
+          createRequestId: 'create-request-edited'
+        }
+      })
+    )
+
+    expect(response).toMatchObject({ ok: true })
+    expect(runtime.createManagedWorktree).toHaveBeenCalledWith(
+      expect.objectContaining({
+        automationProvenance: expect.objectContaining({
+          automationId: 'automation-edited',
+          automationRunId: 'run-edited',
+          projectId: 'project-before-edit',
+          repoId: 'repo-1',
+          hostId: 'runtime:before-edit'
+        })
+      })
+    )
+  })
+
+  it('allows the same automation provenance request to retry after a failed create attempt', async () => {
+    const dispatchToken = createAutomationDispatchToken('automation-retry', 'run-retry')
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      dedupeWorktreeCreate: passthroughDedupe,
+      showRepo: vi.fn().mockResolvedValue(repo),
+      showAutomation: vi.fn(() => ({
+        id: 'automation-retry',
+        name: 'Nightly retry',
+        projectId: 'repo-1',
+        workspaceMode: 'new_per_run',
+        executionTargetType: 'ssh',
+        executionTargetId: 'ssh-target-1'
+      })),
+      listAutomationRuns: vi.fn(() => [
+        {
+          id: 'run-retry',
+          automationId: 'automation-retry',
+          title: 'Nightly retry run',
+          status: 'dispatching',
+          workspaceId: null
+        }
+      ]),
+      createManagedWorktree: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('Branch "automation-workspace" already exists.'))
+        .mockResolvedValueOnce({ worktree: { id: 'wt-retry' } })
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: WORKTREE_METHODS })
+    const automationProvenanceRequest = {
+      automationId: 'automation-retry',
+      automationRunId: 'run-retry',
+      dispatchToken,
+      createRequestId: 'create-request-retry'
+    }
+
+    const firstResponse = await dispatcher.dispatch(
+      makeRequest('worktree.create', {
+        repo: 'repo-1',
+        name: 'automation-workspace',
+        automationProvenanceRequest
+      })
+    )
+    const retryResponse = await dispatcher.dispatch(
+      makeRequest('worktree.create', {
+        repo: 'repo-1',
+        name: 'automation-workspace-2',
+        automationProvenanceRequest
+      })
+    )
+
+    expect(firstResponse).toMatchObject({ ok: false })
+    expect(retryResponse).toMatchObject({ ok: true })
+    expect(runtime.createManagedWorktree).toHaveBeenCalledTimes(2)
+    expect(runtime.createManagedWorktree).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        name: 'automation-workspace-2',
+        automationProvenance: expect.objectContaining({
+          automationId: 'automation-retry',
+          automationRunId: 'run-retry'
+        })
+      })
+    )
+  })
+
+  it('rejects forged automation provenance requests on worktree creation', async () => {
+    const runtime = {
+      getRuntimeId: () => 'test-runtime',
+      dedupeWorktreeCreate: passthroughDedupe,
+      showRepo: vi.fn().mockResolvedValue(repo),
+      showAutomation: vi.fn(() => ({
+        id: 'automation-1',
+        name: 'Nightly review',
+        projectId: 'repo-1',
+        workspaceMode: 'new_per_run',
+        executionTargetType: 'local',
+        executionTargetId: 'local'
+      })),
+      listAutomationRuns: vi.fn(() => [
+        {
+          id: 'run-1',
+          automationId: 'automation-1',
+          title: 'Nightly review run',
+          status: 'dispatching',
+          workspaceId: null
+        }
+      ]),
+      createManagedWorktree: vi.fn()
+    } as unknown as OrcaRuntimeService
+    const dispatcher = new RpcDispatcher({ runtime, methods: WORKTREE_METHODS })
+
+    const response = await dispatcher.dispatch(
+      makeRequest('worktree.create', {
+        repo: 'repo-1',
+        name: 'manual-workspace',
+        automationProvenanceRequest: {
+          automationId: 'automation-1',
+          automationRunId: 'run-1',
+          dispatchToken: 'forged-token',
+          createRequestId: 'create-request-forged'
+        }
+      })
+    )
+
+    expect(response).toMatchObject({ ok: false, error: { code: 'invalid_argument' } })
+    expect(runtime.createManagedWorktree).not.toHaveBeenCalled()
   })
 
   it('forwards startup command and env to runtime worktree creation', async () => {
@@ -473,104 +793,6 @@ describe('worktree RPC methods', () => {
         linkedPR: null,
         pushTarget: null
       })
-    )
-  })
-
-  it('forwards projectGroupId through worktree.set', async () => {
-    const runtime = {
-      getRuntimeId: () => 'test-runtime',
-      dedupeWorktreeCreate: passthroughDedupe,
-      updateManagedWorktreeMeta: vi.fn().mockResolvedValue({ id: 'wt-1' })
-    } as unknown as OrcaRuntimeService
-    const dispatcher = new RpcDispatcher({ runtime, methods: WORKTREE_METHODS })
-
-    const response = await dispatcher.dispatch(
-      makeRequest('worktree.set', {
-        worktree: 'id:wt-1',
-        projectGroupId: 'group-1'
-      })
-    )
-
-    expect(response).toMatchObject({ ok: true })
-    expect(runtime.updateManagedWorktreeMeta).toHaveBeenCalledWith(
-      'id:wt-1',
-      expect.objectContaining({
-        projectGroupId: 'group-1'
-      })
-    )
-  })
-
-  it('forwards a projectGroupId clear through worktree.set', async () => {
-    const runtime = {
-      getRuntimeId: () => 'test-runtime',
-      dedupeWorktreeCreate: passthroughDedupe,
-      updateManagedWorktreeMeta: vi.fn().mockResolvedValue({ id: 'wt-1' })
-    } as unknown as OrcaRuntimeService
-    const dispatcher = new RpcDispatcher({ runtime, methods: WORKTREE_METHODS })
-
-    const response = await dispatcher.dispatch(
-      makeRequest('worktree.set', {
-        worktree: 'id:wt-1',
-        projectGroupId: null
-      })
-    )
-
-    expect(response).toMatchObject({ ok: true })
-    expect(runtime.updateManagedWorktreeMeta).toHaveBeenCalledWith(
-      'id:wt-1',
-      expect.objectContaining({
-        projectGroupId: null
-      })
-    )
-  })
-
-  it('drops projectGroupId from a mobile-scoped worktree.set', async () => {
-    // Locked decision: only the desktop app writes group membership. worktree.set
-    // is on the mobile allowlist as a whole, so the field has to be dropped here.
-    const runtime = {
-      getRuntimeId: () => 'test-runtime',
-      dedupeWorktreeCreate: passthroughDedupe,
-      updateManagedWorktreeMeta: vi.fn().mockResolvedValue({ id: 'wt-1' })
-    } as unknown as OrcaRuntimeService
-    const dispatcher = new RpcDispatcher({ runtime, methods: WORKTREE_METHODS })
-
-    const replies: string[] = []
-    await dispatcher.dispatchStreaming(
-      makeRequest('worktree.set', {
-        worktree: 'id:wt-1',
-        displayName: 'from phone',
-        projectGroupId: 'group-1'
-      }),
-      (response) => replies.push(response),
-      { clientKind: 'mobile' }
-    )
-
-    // Omitted, not undefined: setWorktreeMeta merges by spread, so an explicit
-    // undefined would clear an existing membership instead of leaving it alone.
-    const [, meta] = vi.mocked(runtime.updateManagedWorktreeMeta).mock.calls[0]!
-    expect('projectGroupId' in meta).toBe(false)
-    expect(meta).toMatchObject({ displayName: 'from phone' })
-  })
-
-  it('still forwards projectGroupId for a runtime-scoped worktree.set', async () => {
-    // The desktop app writing to an SSH-hosted worktree takes this path.
-    const runtime = {
-      getRuntimeId: () => 'test-runtime',
-      dedupeWorktreeCreate: passthroughDedupe,
-      updateManagedWorktreeMeta: vi.fn().mockResolvedValue({ id: 'wt-1' })
-    } as unknown as OrcaRuntimeService
-    const dispatcher = new RpcDispatcher({ runtime, methods: WORKTREE_METHODS })
-
-    const replies: string[] = []
-    await dispatcher.dispatchStreaming(
-      makeRequest('worktree.set', { worktree: 'id:wt-1', projectGroupId: 'group-1' }),
-      (response) => replies.push(response),
-      { clientKind: 'runtime' }
-    )
-
-    expect(runtime.updateManagedWorktreeMeta).toHaveBeenCalledWith(
-      'id:wt-1',
-      expect.objectContaining({ projectGroupId: 'group-1' })
     )
   })
 

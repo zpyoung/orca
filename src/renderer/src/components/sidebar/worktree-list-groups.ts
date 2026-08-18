@@ -52,6 +52,12 @@ import {
   getLineageRenderInfo
 } from './worktree-lineage-projection'
 import { getProjectGroupExecutionHostIdForRows } from './worktree-list-host-filtering'
+import {
+  getDivertedWorktreeProjectGroupId,
+  getLooseWorktreeHostContextLabels,
+  getWorktreeGroupRevealSectionKey,
+  LOOSE_WORKTREE_SECTION_KEY_SUFFIX
+} from './fork-worktree-groups/worktree-loose-group-membership'
 
 export { getLineageRenderInfo } from './worktree-lineage-projection'
 
@@ -366,41 +372,8 @@ export const PROJECT_GROUP_META = {
   icon: FolderTree
 } as const
 
-/** Suffix marking a group's loose-worktree block, which has no header row of its own. */
-const LOOSE_WORKTREE_SECTION_KEY_SUFFIX = '::loose'
-const PROJECT_GROUP_HEADER_KEY_PREFIX = 'project-group:'
-
 export function getProjectGroupHeaderKey(groupId: string | null): string {
-  return groupId ? `${PROJECT_GROUP_HEADER_KEY_PREFIX}${groupId}` : UNGROUPED_PROJECT_GROUP_KEY
-}
-
-/**
- * The project group a row renders under when it is a loose worktree, or null for
- * every other section.
- *
- * Reading this off the row rather than off `repo.projectGroupId` is the point: a
- * loose worktree's own membership is independent of its repo's, so anything that
- * needs the group a row is *displayed* in has to ask the row, not the repo.
- */
-export function getLooseSectionProjectGroupId(sectionKey: string): string | null {
-  if (!sectionKey.endsWith(LOOSE_WORKTREE_SECTION_KEY_SUFFIX)) {
-    return null
-  }
-  const headerKey = sectionKey.slice(0, -LOOSE_WORKTREE_SECTION_KEY_SUFFIX.length)
-  return headerKey.startsWith(PROJECT_GROUP_HEADER_KEY_PREFIX)
-    ? headerKey.slice(PROJECT_GROUP_HEADER_KEY_PREFIX.length)
-    : null
-}
-
-/**
- * Whether a row is the top row of a project group's loose section — the rows that
- * render away from their repo header and so must carry their own origin identity.
- *
- * Lineage children inherit their parent's `sectionKey`, so `nested` is what separates
- * the detached row from the descendants that sit inside it.
- */
-export function isLooseProjectGroupTopRow(sectionKey: string, nested: boolean): boolean {
-  return !nested && getLooseSectionProjectGroupId(sectionKey) !== null
+  return groupId ? `project-group:${groupId}` : UNGROUPED_PROJECT_GROUP_KEY
 }
 
 export const PINNED_GROUP_KEY = 'pinned'
@@ -794,24 +767,16 @@ function getMixedWorktreeHostContextLabels(
   worktrees: readonly Worktree[],
   repoMap: Map<string, Repo>,
   hostLabelById: ReadonlyMap<string, string> | undefined,
-  defaultHostId: ExecutionHostId,
-  baselineHostId?: ExecutionHostId
+  defaultHostId: ExecutionHostId
 ): Map<string, string> | undefined {
   const labelsByWorktreeId = new Map<string, string>()
   const uniqueHostIds = new Set<ExecutionHostId>()
-  let differsFromBaseline = false
   for (const worktree of worktrees) {
     const hostId = getWorktreeExecutionHostId(worktree, repoMap.get(worktree.repoId), defaultHostId)
     uniqueHostIds.add(hostId)
-    if (baselineHostId !== undefined) {
-      if (hostId === baselineHostId) {
-        continue
-      }
-      differsFromBaseline = true
-    }
     labelsByWorktreeId.set(worktree.id, hostLabelById?.get(hostId) ?? getExecutionHostLabel(hostId))
   }
-  return uniqueHostIds.size > 1 || differsFromBaseline ? labelsByWorktreeId : undefined
+  return uniqueHostIds.size > 1 ? labelsByWorktreeId : undefined
 }
 
 function getHostWorktreeCounts(
@@ -1168,10 +1133,12 @@ export function buildRows(
 
   const grouped = new Map<string, WorktreeGroupEntry>()
   for (const w of naturalWorktrees) {
-    if (groupBy === 'repo' && w.projectGroupId && projectGroupsById.has(w.projectGroupId)) {
-      const looseList = looseWorktreesByProjectGroupId.get(w.projectGroupId) ?? []
+    const divertedProjectGroupId =
+      groupBy === 'repo' ? getDivertedWorktreeProjectGroupId(w, projectGroupsById) : null
+    if (divertedProjectGroupId) {
+      const looseList = looseWorktreesByProjectGroupId.get(divertedProjectGroupId) ?? []
       looseList.push(w)
-      looseWorktreesByProjectGroupId.set(w.projectGroupId, looseList)
+      looseWorktreesByProjectGroupId.set(divertedProjectGroupId, looseList)
       continue
     }
     let key: string
@@ -1540,7 +1507,7 @@ export function buildRows(
           collapsedGroups,
           groupDepth: depth + 1,
           sectionKey: `${key}${LOOSE_WORKTREE_SECTION_KEY_SUFFIX}`,
-          hostContextLabelByWorktreeId: getMixedWorktreeHostContextLabels(
+          hostContextLabelByWorktreeId: getLooseWorktreeHostContextLabels(
             looseWorktrees,
             repoMap,
             hostLabelById,
@@ -1633,14 +1600,7 @@ export function getGroupKeysForWorktree(
   const groupIds: string[] = []
   const groupsById = new Map(projectGroups.map((group) => [group.id, group]))
   const visited = new Set<string>()
-  // Why: must match buildRows' own diversion condition exactly — a loose
-  // worktree renders under its own group, independent of its repo's, so the
-  // ancestor walk has to start there or reveal won't expand the group it's
-  // actually under.
-  const divertedGroupId =
-    worktree.projectGroupId && groupsById.has(worktree.projectGroupId)
-      ? worktree.projectGroupId
-      : null
+  const divertedGroupId = getDivertedWorktreeProjectGroupId(worktree, groupsById)
   let currentGroupId = divertedGroupId ?? repo?.projectGroupId ?? null
   while (currentGroupId && !visited.has(currentGroupId)) {
     const group = groupsById.get(currentGroupId)
@@ -1654,12 +1614,8 @@ export function getGroupKeysForWorktree(
     const parentId = group.parentGroupId ?? null
     currentGroupId = parentId && groupsById.has(parentId) ? parentId : null
   }
-  // Why: the trailing key names the section the row actually renders in. A
-  // diverted worktree is in its group's loose block, not its repo section, so
-  // returning the repo key would pop open a collapsed repo the row has left.
-  const sectionKey =
-    divertedGroupId === null
-      ? groupKey
-      : `${getProjectGroupHeaderKey(divertedGroupId)}${LOOSE_WORKTREE_SECTION_KEY_SUFFIX}`
-  return [...groupIds.map((id) => getProjectGroupHeaderKey(id)), sectionKey]
+  return [
+    ...groupIds.map((id) => getProjectGroupHeaderKey(id)),
+    getWorktreeGroupRevealSectionKey(divertedGroupId, groupKey)
+  ]
 }

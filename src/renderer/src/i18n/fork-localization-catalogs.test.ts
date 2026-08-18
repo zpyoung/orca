@@ -21,20 +21,25 @@ describe('registerForkLocalizationCatalogs', () => {
 
     registerForkLocalizationCatalogs(i18n)
 
-    expect(addResourceBundle).toHaveBeenCalledWith(
-      'en',
-      'translation',
-      expect.objectContaining({ components: expect.any(Object) }),
-      true,
-      true
+    const englishCatalogs = addResourceBundle.mock.calls
+      .filter(([language]) => language === 'en')
+      .map(([, , catalog]) => catalog)
+    expect(englishCatalogs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ components: expect.any(Object) }),
+        expect.objectContaining({ auto: expect.any(Object) })
+      ])
     )
+
     loaded?.({ es: { translation: true } })
-    expect(addResourceBundle).toHaveBeenCalledWith(
-      'es',
-      'translation',
-      expect.objectContaining({ components: expect.any(Object) }),
-      true,
-      true
+    const spanishCatalogs = addResourceBundle.mock.calls
+      .filter(([language]) => language === 'es')
+      .map(([, , catalog]) => catalog)
+    expect(spanishCatalogs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ components: expect.any(Object) }),
+        expect.objectContaining({ auto: expect.any(Object) })
+      ])
     )
   })
 })

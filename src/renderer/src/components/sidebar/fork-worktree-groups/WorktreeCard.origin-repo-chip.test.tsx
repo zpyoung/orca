@@ -1,7 +1,12 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { GlobalSettings, Repo, Worktree, WorktreeCardProperty } from '../../../../shared/types'
+import type {
+  GlobalSettings,
+  Repo,
+  Worktree,
+  WorktreeCardProperty
+} from '../../../../../shared/types'
 
 const fetchHostedReviewForBranch = vi.fn()
 const fetchIssue = vi.fn()
@@ -46,24 +51,24 @@ vi.mock('@/components/ui/tooltip', () => ({
   TooltipTrigger: ({ children }: { children: ReactNode }) => <>{children}</>
 }))
 
-vi.mock('./use-worktree-activity-status', () => ({
+vi.mock('../use-worktree-activity-status', () => ({
   useWorktreeActivityStatus: () => 'idle'
 }))
 
-vi.mock('./CacheTimer', () => ({
+vi.mock('../CacheTimer', () => ({
   default: () => null,
   usePromptCacheCountdownStartedAt: () => null
 }))
 
-vi.mock('./WorktreeCardAgents', () => ({
+vi.mock('../WorktreeCardAgents', () => ({
   default: () => null
 }))
 
-vi.mock('./SshDisconnectedDialog', () => ({
+vi.mock('../SshDisconnectedDialog', () => ({
   SshDisconnectedDialog: () => null
 }))
 
-vi.mock('./WorktreeContextMenu', () => ({
+vi.mock('../WorktreeContextMenu', () => ({
   default: ({ children }: { children: ReactNode }) => <>{children}</>,
   CLOSE_ALL_CONTEXT_MENUS_EVENT: 'orca:test-close-context-menus',
   WORKTREE_NATIVE_CONTEXT_MENU_ATTR: 'data-worktree-native-context-menu',
@@ -115,7 +120,7 @@ describe('WorktreeCard origin repo chip', () => {
   it(
     'shows the origin chip for a worktree rendered loose in a project group',
     async () => {
-      const { default: WorktreeCard } = await import('./WorktreeCard')
+      const { default: WorktreeCard } = await import('../WorktreeCard')
 
       const markup = renderToStaticMarkup(
         <WorktreeCard
@@ -137,7 +142,7 @@ describe('WorktreeCard origin repo chip', () => {
   it(
     'renders no origin chip for a row that still sits under its own repo header',
     async () => {
-      const { default: WorktreeCard } = await import('./WorktreeCard')
+      const { default: WorktreeCard } = await import('../WorktreeCard')
 
       const markup = renderToStaticMarkup(
         <WorktreeCard worktree={makeWorktree()} repo={makeRepo()} isActive={false} hideRepoBadge />
@@ -154,7 +159,7 @@ describe('WorktreeCard origin repo chip', () => {
     async () => {
       settings = { compactWorktreeCards: false, experimentalNewWorktreeCardStyle: true }
       worktreeCardProperties = ['status']
-      const { default: WorktreeCard } = await import('./WorktreeCard')
+      const { default: WorktreeCard } = await import('../WorktreeCard')
 
       const markup = renderToStaticMarkup(
         <WorktreeCard
@@ -176,7 +181,7 @@ describe('WorktreeCard origin repo chip', () => {
     'keeps the origin chip in the title row for legacy detailed cards',
     async () => {
       settings = { compactWorktreeCards: false, experimentalNewWorktreeCardStyle: false }
-      const { default: WorktreeCard } = await import('./WorktreeCard')
+      const { default: WorktreeCard } = await import('../WorktreeCard')
 
       const markup = renderToStaticMarkup(
         <WorktreeCard
@@ -197,7 +202,7 @@ describe('WorktreeCard origin repo chip', () => {
   it(
     'renders no origin chip when the row has no repo to name',
     async () => {
-      const { default: WorktreeCard } = await import('./WorktreeCard')
+      const { default: WorktreeCard } = await import('../WorktreeCard')
 
       const markup = renderToStaticMarkup(
         <WorktreeCard

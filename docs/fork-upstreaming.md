@@ -42,10 +42,8 @@ padding, and section-header height 28px → 24px — plus the two fixes the tigh
 the host-header row-height estimate corrected to match its rendered height (row-below overlap at
 the smaller gap), and the repo-header action-button focus ring inset so the shorter header row's
 `overflow-hidden` no longer clips it. Two lines of this change live inside the `worktree-groups`
-seam declarations for `WorktreeCard.tsx` and `WorktreeList.tsx` (their own diffs are otherwise
-Tier-1 fork content, so the density lines are folded into those seam entries rather than given a
-separate `exceptions` row for those two files — a path cannot appear in both `seams` and
-`exceptions`).
+seam declaration for `WorktreeList.tsx`; its other diffs are Tier-1 fork content, so the density
+lines are folded into that seam rather than given a separate `exceptions` row for the same path.
 
 **Why upstream, not isolated:** a density/spacing preference with no logic dependency on any fork
 feature; isolating a cosmetic tweak like this only doubles the maintenance surface for something
@@ -57,9 +55,9 @@ upstream could take outright.
 - `src/renderer/src/components/sidebar/worktree-list-scroll-adjustment.test.ts`
 - `src/renderer/src/components/sidebar/project-group-header-drop.test.ts`
 - `src/renderer/src/components/sidebar/project-header-drop.test.ts`
+- `src/renderer/src/components/sidebar/worktree-card-surface.tsx`
 
 **Paths (density lines folded into the `worktree-groups` seam declaration):**
-- `src/renderer/src/components/sidebar/WorktreeCard.tsx` (1 line)
 - `src/renderer/src/components/sidebar/WorktreeList.tsx` (2 lines)
 
 **Introduced:** commit `7436d38a21` (2026-07-25), "style(sidebar): tighten workspace list spacing
