@@ -23,3 +23,10 @@ Reviewed every 2 weeks. Use `/quirk:artifacts:test-skip` to append.
 - **Reason skipped**: environment — each passes in isolation on the warp-rich-input branch but intermittently times out or misses a fake-timer tick under full-suite load on an 8-core host (worker-pool contention; one case surfaced a 14999-vs-15000ms fake-timer bleed). None are touched by the branch; verified against RUN_BASE b84a7492 during the docked-composer run (2026-08-13..16).
 - **Edge cases to cover**: make the timeout-bound assertions load-tolerant (fake timers pinned per test, generous poll budgets), or isolate these files into a serial pool so full-suite runs stop reporting noise
 - **Priority**: P3
+
+## TEST-2: browser-cookie partition electron tests fail only under full-suite concurrency
+- **File under test**: src/main/browser/browser-cookie-import-partition.electron.test.ts; src/main/browser/browser-cookie-import-partition-rollback.electron.test.ts
+- **Test type**: integration
+- **Reason skipped**: environment — both fail in a full `pnpm test` run on this 8-core host but pass in isolation on this branch, and pass in isolation at origin/main (33096f51b3). Same worker-pool contention class as TEST-1; neither file is touched by the warp-rich-input branch. Observed while verifying the rebase onto origin/main.
+- **Edge cases to cover**: make the Electron cookie-clear assertions load-tolerant, or move the `.electron.test.ts` files into a serial pool
+- **Priority**: P3
