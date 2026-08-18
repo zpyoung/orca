@@ -862,6 +862,11 @@
       "status": "permanent"
     },
     {
+      "path": "config/scripts/sync-upstream-file-ownership.test.mjs",
+      "reason": "Tests for the fork's own sync classifier; upstream has no such script.",
+      "status": "permanent"
+    },
+    {
       "path": "config/scripts/sync-upstream-locale-catalogs.mjs",
       "reason": "Fork's own locale-catalog sync helper; upstream has no such script.",
       "status": "permanent"

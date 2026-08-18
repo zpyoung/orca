@@ -29,37 +29,37 @@ unchanged fails identically** — the fix is always a policy change, never a re-
 
 ## The rule
 
-Fork priority is only meaningful for files the fork actually changed. Everything else resolves to
-the upstream release.
+Fork priority is only meaningful for files the fork actually claims, and the claim is declared, not
+inferred: `config/fork-ownership.json` — read through `config/scripts/fork-ownership-manifest.mjs`
+— is the source of truth. Everything the manifest doesn't claim resolves to the upstream release.
 
-After the `-X ours` merge and its tree-conflict resolution:
+After the merge and its tree-conflict resolution:
 
 ```sh
+git merge <target-ref>
 node config/scripts/sync-upstream-file-ownership.mjs <target-ref> <merge-head> <out-dir>
 tr '\n' '\0' < <out-dir>/checkout.txt | xargs -0 git checkout <target-ref> --
 tr '\n' '\0' < <out-dir>/remove.txt   | xargs -0 git rm -f --ignore-unmatch
+tr '\n' '\0' < <out-dir>/ours.txt     | xargs -0 git checkout HEAD --
 node config/scripts/sync-upstream-locale-catalogs.mjs <target-ref>
 ```
 
-A file is **fork-owned** when a fork-authored commit touched it, plus three corrections the resolver
-already encodes:
+The manifest declares four classes, and the classifier sorts every differing path into the matching
+list:
 
-- **`package.json`** — its version line is fork-owned but written by `github-actions[bot]`, so
-  authorship alone hands the file to upstream and regresses the published version series.
-- **The fork's app identity** — `com.zpyoung.orca` lives in `local-build-compatibility-contract.*`
-  and its tests, which no fork-authored *non-merge* commit touched. Resetting them to upstream
-  breaks the packaged-identity contract.
-- **A test whose subject the fork owns** stays on the fork's version. Upstream's newer test asserts
-  against upstream's implementation, which this tree deliberately does not carry. The resolver finds
-  these by resolving the test's relative imports, ignoring `src/shared/types.ts` and
-  `constants.ts` — the fork appends to those barrels, and importing a type from one is not
-  behavioral coupling.
+- **`exception`** — a whole-file, fork-side-always-wins claim, written to `ours.txt`. An entry may
+  carry `"deleted": true`, meaning the fork deliberately deletes that upstream path; those go to
+  `remove.txt` instead, since the fork's intent for the path is removal, not fork-side content.
+- **`seam`** — a file that takes a real three-way merge, where only the manifest's declared `lines`
+  are a protected footprint. Written to `merge-review.txt`.
+- **`feature`** — a fork-owned path matched by a feature glob. Also written to `merge-review.txt`.
+- **`upstream`** — unclaimed. Resets to the release: `checkout.txt` if the tag still has the file,
+  `remove.txt` if the tag dropped it.
 
-And one deliberate exception in the other direction:
-
-- **`resources/skills/*.json`** resolve to upstream. The fork's snapshot history cannot be
-  reconciled with upstream's newer skill content: the append-only guard rejects it and
-  `generate:skill-bundle-manifest` cannot repair it.
+`merge-review.txt` isn't consumed by a shell command: `git merge` already ran a real three-way merge
+on every seam and feature path, either auto-resolving disjoint hunks or leaving conflict markers.
+Open each listed path and check it by hand against the manifest's declared `lines` for that path —
+those lines are the protected floor, not the whole file — before continuing.
 
 Locale catalogs get their own pass because upstream owns every key it defines. The fork's catalogs
 carry English fallbacks written by `sync:localization-catalog`; a fork-wins merge lets those shadow

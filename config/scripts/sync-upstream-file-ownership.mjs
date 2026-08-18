@@ -1,28 +1,31 @@
 #!/usr/bin/env node
 /**
- * Resolves, for an in-progress upstream sync merge, which differing files the fork owns and
- * which must be reset to the upstream release.
+ * Resolves, for an in-progress upstream sync merge, which side of each differing file wins,
+ * using `config/fork-ownership.json` as the source of truth instead of commit authorship.
  *
- * The fork's main carries upstream commits that only ever existed on an upstream release
- * branch — cherry-picks and reverts that never landed on upstream/main. Upstream's main then
- * evolves that same code, so a blanket `-X ours` preserves the stale release-branch variant
- * while taking upstream's new code around it, and the tree stops cohering. Fork priority is
- * only meaningful for files the fork actually changed.
+ * The manifest declares four classes: `exception` (whole-file, the fork side always wins;
+ * an entry may carry `deleted: true`, meaning the fork's intent for that upstream path is
+ * removal), `seam` (a real three-way merge where only the declared lines are protected),
+ * `feature` (a fork-owned path matched by a feature glob), and the unmatched default
+ * `upstream`. This script turns that classification into four newline-delimited path lists
+ * for the sync procedure to act on.
  *
  * Usage:
  *   node config/scripts/sync-upstream-file-ownership.mjs <target-ref> <merge-head> <out-dir>
+ *   node config/scripts/sync-upstream-file-ownership.mjs --verify-seams [<ref-or-worktree>]
  *
- * Writes `checkout.txt` (reset to target), `remove.txt` (absent at target) and
- * `coupled-tests.txt` (kept on the fork side) into <out-dir>.
+ * The first form writes checkout.txt, remove.txt, ours.txt and merge-review.txt into
+ * <out-dir>. The second confirms every declared seam line is still present verbatim in its
+ * file, so a merge or an edit can't silently erode a seam's protected footprint; it reads
+ * from a git ref when given one, otherwise from a worktree path (the working tree if the
+ * argument is omitted).
  */
 import { execFileSync } from 'node:child_process'
-import { writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { loadForkOwnershipManifest, classifyPath } from './fork-ownership-manifest.mjs'
 
-const [TARGET, MERGE_HEAD, OUT] = process.argv.slice(2)
-if (!TARGET || !MERGE_HEAD || !OUT) {
-  console.error('usage: sync-upstream-file-ownership.mjs <target-ref> <merge-head> <out-dir>')
-  process.exit(2)
-}
+const MANIFEST_PATH = 'config/fork-ownership.json'
 
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 1 << 28 })
 const lines = (value) =>
@@ -31,108 +34,128 @@ const lines = (value) =>
     .map((line) => line.trim())
     .filter(Boolean)
 
-// package.json's version line is fork-owned but written by github-actions[bot], so commit
-// authorship alone hands the file to upstream and regresses the published version series.
-const FORK_OWNED_ALWAYS = new Set(['package.json'])
+// no fallback on failure: resolving a file the wrong way is worse than refusing to sync.
+function loadManifestOrExit() {
+  let jsonText
+  try {
+    jsonText = readFileSync(MANIFEST_PATH, 'utf8')
+  } catch (error) {
+    console.error(`cannot read fork ownership manifest at ${MANIFEST_PATH}: ${error.message}`)
+    process.exit(2)
+  }
+  try {
+    return loadForkOwnershipManifest(jsonText)
+  } catch (error) {
+    console.error(`fork ownership manifest is invalid: ${error.message}`)
+    process.exit(2)
+  }
+}
 
-// The fork's snapshot history cannot be reconciled with upstream's newer skill content: the
-// append-only guard rejects it and regeneration cannot repair it. Upstream's artifacts win.
-const UPSTREAM_OWNED_ALWAYS = new Set([
-  'resources/skills/current-manifest.json',
-  'resources/skills/release-mapping.json',
-  'resources/skills/snapshot-registry.json'
-])
+function classify(manifest, target, mergeHead, outDir) {
+  const differing = lines(git('diff', '--name-only', mergeHead, target))
+  if (differing.length === 0) {
+    console.error('no differing paths between merge-head and target-ref; refusing to classify')
+    process.exit(2)
+  }
+  const targetTree = new Set(lines(git('ls-tree', '-r', '--name-only', target)))
 
-// The fork appends to these, but importing a type or constant from one says nothing about
-// whether a test asserts on fork-modified behavior.
-const SHARED_BARRELS = new Set(['src/shared/types.ts', 'src/shared/constants.ts'])
+  const checkout = []
+  const remove = []
+  const ours = []
+  const mergeReview = []
 
-const EXTENSIONS = ['', '.ts', '.tsx', '.cjs', '.mjs', '.js', '.jsx', '.json']
-const IMPORT_REF = /(?:from\s*|require\(\s*|new URL\(\s*)['"](\.[^'"]+)['"]/g
-const isTest = (file) => /\.(test|spec)\.[cm]?[jt]sx?$/.test(file)
+  for (const path of differing) {
+    const result = classifyPath(manifest, path)
+    if (result.class === 'exception') {
+      const list = result.entry.deleted ? remove : ours
+      list.push(path)
+    } else if (result.class === 'seam' || result.class === 'feature') {
+      mergeReview.push(path)
+    } else {
+      const list = targetTree.has(path) ? checkout : remove
+      list.push(path)
+    }
+  }
 
-const forkAuthored = lines(
-  git(
-    'log',
-    '--format=%H',
-    '--no-merges',
-    '--author=zpyoung',
-    '--author=Zachary Young',
-    'origin/main',
-    '--not',
-    'upstream/main',
-    TARGET
+  writeFileSync(join(outDir, 'checkout.txt'), `${checkout.join('\n')}\n`)
+  writeFileSync(join(outDir, 'remove.txt'), `${remove.join('\n')}\n`)
+  writeFileSync(join(outDir, 'ours.txt'), `${ours.join('\n')}\n`)
+  writeFileSync(join(outDir, 'merge-review.txt'), `${mergeReview.join('\n')}\n`)
+
+  console.log(`differing paths: ${differing.length}`)
+  console.log(
+    `checkout ${checkout.length}, remove ${remove.length}, ours ${ours.length}, merge-review ${mergeReview.length}`
   )
-)
-if (forkAuthored.length === 0) {
-  throw new Error('no fork-authored commits resolved; refusing to classify')
 }
 
-const forkOwned = new Set(lines(git('show', '--format=', '--name-only', ...forkAuthored)))
-for (const file of FORK_OWNED_ALWAYS) {
-  forkOwned.add(file)
-}
-for (const file of UPSTREAM_OWNED_ALWAYS) {
-  forkOwned.delete(file)
+// a bare argument could name either a git ref or a worktree directory; rev-parse is the
+// only reliable way to tell them apart, so let it decide rather than guessing from shape.
+function resolveSeamSource(refOrWorktree) {
+  if (!refOrWorktree) {
+    return { kind: 'worktree', root: '.' }
+  }
+  try {
+    execFileSync('git', ['rev-parse', '--verify', '--quiet', `${refOrWorktree}^{commit}`], {
+      stdio: ['ignore', 'ignore', 'ignore']
+    })
+    return { kind: 'ref', ref: refOrWorktree }
+  } catch {
+    return { kind: 'worktree', root: refOrWorktree }
+  }
 }
 
-const differing = lines(git('diff', '--name-only', MERGE_HEAD, TARGET))
-const targetTree = new Set(lines(git('ls-tree', '-r', '--name-only', TARGET)))
+function readSeamFile(source, path) {
+  if (source.kind === 'ref') {
+    return git('show', `${source.ref}:${path}`)
+  }
+  return readFileSync(join(source.root, path), 'utf8')
+}
 
-function resolveImport(fromDir, reference) {
-  const stack = []
-  for (const segment of `${fromDir}/${reference}`.split('/')) {
-    if (segment === '' || segment === '.') {
+function findMissingSeamLines(manifest, refOrWorktree) {
+  const source = resolveSeamSource(refOrWorktree)
+  const missing = []
+  for (const seam of manifest.seams) {
+    let content
+    try {
+      content = readSeamFile(source, seam.path)
+    } catch (error) {
+      missing.push(`${seam.path}: cannot read (${error.message})`)
       continue
     }
-    if (segment === '..') {
-      stack.pop()
-    } else {
-      stack.push(segment)
+    for (const line of seam.lines) {
+      if (!content.includes(line)) {
+        missing.push(`${seam.path}: missing line ${JSON.stringify(line)}`)
+      }
     }
   }
-  const base = stack.join('/')
-  return EXTENSIONS.map((extension) => `${base}${extension}`).find(
-    (candidate) => forkOwned.has(candidate) && !SHARED_BARRELS.has(candidate)
+  return missing
+}
+
+function verifySeams(manifest, refOrWorktree) {
+  const missing = findMissingSeamLines(manifest, refOrWorktree)
+  if (missing.length > 0) {
+    console.error(`--verify-seams: ${missing.length} seam line(s) not found`)
+    for (const entry of missing) {
+      console.error(`  ${entry}`)
+    }
+    process.exit(1)
+  }
+  const totalLines = manifest.seams.reduce((count, seam) => count + seam.lines.length, 0)
+  console.log(
+    `--verify-seams: all ${totalLines} seam line(s) present across ${manifest.seams.length} file(s)`
   )
+  process.exit(0)
 }
 
-// A test whose subject the fork owns has to stay on the fork's version: upstream's newer test
-// asserts against upstream's implementation, which this tree deliberately does not carry.
-const coupledTests = []
-for (const file of differing) {
-  if (forkOwned.has(file) || !isTest(file) || !targetTree.has(file)) {
-    continue
+const argv = process.argv.slice(2)
+
+if (argv[0] === '--verify-seams') {
+  verifySeams(loadManifestOrExit(), argv[1])
+} else {
+  const [TARGET, MERGE_HEAD, OUT] = argv
+  if (!TARGET || !MERGE_HEAD || !OUT) {
+    console.error('usage: sync-upstream-file-ownership.mjs <target-ref> <merge-head> <out-dir>')
+    process.exit(2)
   }
-  const directory = file.split('/').slice(0, -1).join('/')
-  const content = git('show', `${TARGET}:${file}`)
-  const subject = [...content.matchAll(IMPORT_REF)]
-    .map((match) => resolveImport(directory, match[1]))
-    .find(Boolean)
-  if (subject) {
-    coupledTests.push({ file, subject })
-  }
-}
-for (const { file } of coupledTests) {
-  forkOwned.add(file)
-}
-
-const upstreamOwned = differing.filter((file) => !forkOwned.has(file))
-const checkout = upstreamOwned.filter((file) => targetTree.has(file))
-const remove = upstreamOwned.filter((file) => !targetTree.has(file))
-
-writeFileSync(`${OUT}/checkout.txt`, `${checkout.join('\n')}\n`)
-writeFileSync(`${OUT}/remove.txt`, `${remove.join('\n')}\n`)
-writeFileSync(
-  `${OUT}/coupled-tests.txt`,
-  `${coupledTests.map((t) => `${t.file}\t${t.subject}`).join('\n')}\n`
-)
-
-console.log(`fork-authored commits: ${forkAuthored.length}`)
-console.log(
-  `upstream-owned: ${upstreamOwned.length} (reset ${checkout.length}, remove ${remove.length})`
-)
-console.log(`coupled tests kept on the fork side: ${coupledTests.length}`)
-for (const { file, subject } of coupledTests) {
-  console.log(`  ${file} -> ${subject}`)
+  classify(loadManifestOrExit(), TARGET, MERGE_HEAD, OUT)
 }
