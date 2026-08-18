@@ -2,7 +2,9 @@ import type { TerminalDockSendOutcome } from '../../../shared/telemetry-events'
 import type { TuiAgent } from '../../../shared/types'
 import { track, tuiAgentToAgentKind } from './telemetry'
 
-export type TerminalDockTelemetryAgent = TuiAgent | string | null | undefined
+// Deliberately open: callers pass an agent id that may not be a known TuiAgent,
+// and resolveAgentKind maps anything unrecognized to 'other'.
+export type TerminalDockTelemetryAgent = string | null | undefined
 
 function resolveAgentKind(
   agent: TerminalDockTelemetryAgent

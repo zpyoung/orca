@@ -1,5 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react'
 import { useAppStore } from '../../store'
+import { sendNativeChatTypedCommand } from './native-chat-runtime-send'
+import { isSlashCommandDraft } from '../../../../shared/native-chat-slash-commands'
 import { emitNativeChatMessageSent } from '@/lib/native-chat-telemetry'
 import { applyMentionSuggestion } from './native-chat-composer-state'
 import {
@@ -247,6 +249,12 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       isDispatchingSessionOption,
       onSlashCommand,
       onCommandDispatched: (command) => sessionOptionsSurface?.recordOutgoingCommand(command),
+      // Codex's TUI only autocompletes a slash command it sees typed; a pasted
+      // one lands as literal text.
+      sendTypedCommand: (target, text) =>
+        agent === 'codex' && isSlashCommandDraft(text)
+          ? sendNativeChatTypedCommand(target.settings, target.ptyId, text)
+          : null,
       buildSendOptions: () =>
         resolveNativeChatLaunchDraftSend({
           launchDraft,

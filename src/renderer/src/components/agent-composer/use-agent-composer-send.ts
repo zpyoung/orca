@@ -104,7 +104,9 @@ export function useAgentComposerSend(
     const pendingId = classification === 'chat' ? onOptimisticSend?.(text, imagePaths) : undefined
     let pendingHandle: NativeChatSendHandle | null = null
     if (classification !== 'chat' && imagePaths.length === 0) {
-      pendingHandle = sendNativeChatMessage(target.settings, target.ptyId, text, sendOptions)
+      pendingHandle =
+        bridges?.sendTypedCommand?.(target, text) ??
+        sendNativeChatMessage(target.settings, target.ptyId, text, sendOptions)
     } else if (imagePaths.length > 0) {
       pendingHandle = sendNativeChatMessageWithImageAttachments(
         target.settings,

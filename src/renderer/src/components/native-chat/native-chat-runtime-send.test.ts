@@ -57,6 +57,10 @@ function expectWriteOrder(expected: string[]): void {
   expect(mergedWriteBytes()).toEqual(expected)
 }
 
+function expectVerifiedWriteOrder(expected: string[]): void {
+  expect(sendRuntimePtyInputVerified.mock.calls.map((call) => call[2] as string)).toEqual(expected)
+}
+
 function totalWriteCalls(): number {
   return sendRuntimePtyInput.mock.calls.length + sendRuntimePtyInputAcceptance.mock.calls.length
 }
@@ -78,7 +82,10 @@ describe('sendNativeChatMessage', () => {
   it('clears the TUI line, then writes the framed body, before the Enter', async () => {
     const handle = sendNativeChatMessage(SETTINGS, PTY, 'hello world')
     await vi.advanceTimersByTimeAsync(0)
-    expectWriteOrder([NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT, buildNativeChatPasteBytes('hello world')])
+    expectWriteOrder([
+      NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
+      buildNativeChatPasteBytes('hello world')
+    ])
     expect(handle.settleAfterMs).toBe(NATIVE_CHAT_SUBMIT_DELAY_MS)
   })
 
@@ -151,7 +158,10 @@ describe('sendNativeChatMessage', () => {
     await vi.advanceTimersByTimeAsync(0)
 
     // First clear+body are immediate; second sequence waits for the first Enter.
-    expectWriteOrder([NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT, buildNativeChatPasteBytes('tell me a joke')])
+    expectWriteOrder([
+      NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
+      buildNativeChatPasteBytes('tell me a joke')
+    ])
 
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS)
     expectWriteOrder([
@@ -163,7 +173,11 @@ describe('sendNativeChatMessage', () => {
     ])
 
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS)
-    expect(sendRuntimePtyInputAcceptance).toHaveBeenLastCalledWith(SETTINGS, PTY, NATIVE_CHAT_SUBMIT)
+    expect(sendRuntimePtyInputAcceptance).toHaveBeenLastCalledWith(
+      SETTINGS,
+      PTY,
+      NATIVE_CHAT_SUBMIT
+    )
     expect(mergedWriteBytes()).toHaveLength(6)
   })
 
@@ -196,8 +210,14 @@ describe('sendNativeChatMessage', () => {
       sendRuntimePtyInputAcceptance.mock.calls
         .filter((call) => call[1] === ptyId)
         .map((call) => call[2] as string)
-    expect(byPty('pty-a')).toEqual([NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT, buildNativeChatPasteBytes('one')])
-    expect(byPty('pty-b')).toEqual([NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT, buildNativeChatPasteBytes('two')])
+    expect(byPty('pty-a')).toEqual([
+      NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
+      buildNativeChatPasteBytes('one')
+    ])
+    expect(byPty('pty-b')).toEqual([
+      NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
+      buildNativeChatPasteBytes('two')
+    ])
   })
 
   it('passes a live isCancelled check through to the acceptance-aware body write', async () => {
@@ -598,6 +618,7 @@ describe('typeNativeChatCommand', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     sendRuntimePtyInput.mockReset().mockReturnValue(true)
+    sendRuntimePtyInputAcceptance.mockReset().mockResolvedValue(true)
     sendRuntimePtyInputVerified.mockReset().mockResolvedValue(true)
     resetNativeChatPtySendQueuesForTests()
   })
@@ -611,7 +632,7 @@ describe('typeNativeChatCommand', () => {
     await vi.runAllTimersAsync()
 
     await expect(result).resolves.toBe(true)
-    expectWriteOrder(sendRuntimePtyInputVerified.mock.calls, [
+    expectVerifiedWriteOrder([
       NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
       '/',
       'm',
@@ -628,7 +649,7 @@ describe('typeNativeChatCommand', () => {
     await vi.runAllTimersAsync()
     await handle.settled
 
-    expectWriteOrder(sendRuntimePtyInputVerified.mock.calls, [
+    expectVerifiedWriteOrder([
       NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
       '/',
       's',
@@ -648,7 +669,7 @@ describe('typeNativeChatCommand', () => {
     await vi.runAllTimersAsync()
     await Promise.all([command.settled, next.settled])
 
-    expectWriteOrder(sendRuntimePtyInput.mock.calls, [
+    expectWriteOrder([
       NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
       NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
       buildNativeChatPasteBytes('next'),
@@ -693,7 +714,11 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
     )
 
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS)
-    expect(sendRuntimePtyInputAcceptance).toHaveBeenLastCalledWith(SETTINGS, PTY, NATIVE_CHAT_SUBMIT)
+    expect(sendRuntimePtyInputAcceptance).toHaveBeenLastCalledWith(
+      SETTINGS,
+      PTY,
+      NATIVE_CHAT_SUBMIT
+    )
     expect(totalWriteCalls()).toBe(4)
   })
 
@@ -715,7 +740,11 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
 
     await vi.advanceTimersByTimeAsync(1)
     expect(totalWriteCalls()).toBe(3)
-    expect(sendRuntimePtyInputAcceptance).toHaveBeenLastCalledWith(SETTINGS, PTY, NATIVE_CHAT_SUBMIT)
+    expect(sendRuntimePtyInputAcceptance).toHaveBeenLastCalledWith(
+      SETTINGS,
+      PTY,
+      NATIVE_CHAT_SUBMIT
+    )
   })
 
   it('cancels deferred prompt and Enter writes after the attachment path', async () => {

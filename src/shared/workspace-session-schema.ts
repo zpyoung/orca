@@ -23,6 +23,7 @@ import { isValidTerminalTabId } from './terminal-tab-id'
 import { parseExecutionHostId, type ExecutionHostId } from './execution-host'
 import { isTuiAgent } from './tui-agent-config'
 import { terminalDockByPaneKeySchema } from './workspace-session-terminal-dock-schema'
+import { persistedOpenFileSchema } from './workspace-session-editor-schema'
 import { isWorkspaceKey } from './workspace-scope'
 import {
   browserHistoryEntriesSchema,
@@ -181,22 +182,6 @@ const tabGroupLayoutNodeSchema: z.ZodType<TabGroupLayoutNode> = z.lazy(() =>
     })
   ])
 )
-
-// ─── Editor ─────────────────────────────────────────────────────────
-
-const persistedOpenFileSchema = z.object({
-  filePath: z.string(),
-  relativePath: z.string(),
-  worktreeId: z.string(),
-  language: z.string(),
-  isPreview: z.boolean().optional(),
-  runtimeEnvironmentId: z.string().nullable().optional(),
-  externalSshTargetId: z.string().trim().min(1).optional(),
-  dirtyDraftContent: z.string().optional(),
-  lastKnownDiskSignature: z.string().optional(),
-  readOnly: z.boolean().optional(),
-  liveTail: z.boolean().optional()
-})
 
 // ─── Workspace session ──────────────────────────────────────────────
 

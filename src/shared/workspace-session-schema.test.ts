@@ -662,7 +662,7 @@ describe('parseWorkspaceSession', () => {
     if (result.ok) {
       const record = result.value.unifiedTabs?.wt[0].terminalDockByPaneKey
       expect(record).toEqual({ 'pane-1': { docked: true, gutterRows: 6 } })
-      expect(Object.prototype.hasOwnProperty.call(record ?? {}, '__proto__')).toBe(false)
+      expect(Object.hasOwn(record ?? {}, '__proto__')).toBe(false)
     }
   })
 })

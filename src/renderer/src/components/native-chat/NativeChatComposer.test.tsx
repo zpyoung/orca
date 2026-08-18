@@ -278,7 +278,12 @@ describe('NativeChatComposer', () => {
 
     act(() => mocks.fieldProps?.onSend?.())
 
-    expect(mocks.sendNativeChatMessage).toHaveBeenCalledWith({}, 'pty-1', '$ref-oss', undefined)
+    expect(mocks.sendNativeChatMessage).toHaveBeenCalledWith(
+      {},
+      'pty-1',
+      '$ref-oss',
+      expect.anything()
+    )
     expect(mocks.sendNativeChatTypedCommand).not.toHaveBeenCalled()
   })
 
@@ -295,7 +300,12 @@ describe('NativeChatComposer', () => {
 
     act(() => mocks.fieldProps?.onSend?.())
 
-    expect(mocks.sendNativeChatMessage).toHaveBeenCalledWith({}, 'pty-1', '/clear', undefined)
+    expect(mocks.sendNativeChatMessage).toHaveBeenCalledWith(
+      {},
+      'pty-1',
+      '/clear',
+      expect.anything()
+    )
     expect(mocks.sendNativeChatTypedCommand).not.toHaveBeenCalled()
   })
 

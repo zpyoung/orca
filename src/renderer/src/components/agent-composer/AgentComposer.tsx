@@ -210,6 +210,10 @@ export type AgentComposerHostBridges = {
   onSlashCommand?: (command: string) => void
   /** Notified with the dispatched text when a send classifies as a command. */
   onCommandDispatched?: (command: string) => void
+  /** Sends a classified command as typed keystrokes rather than a paste, for
+   *  agents whose TUI only autocompletes typed input. Returning null takes the
+   *  ordinary paste path. */
+  sendTypedCommand?: (target: NativeChatResolvedTarget, text: string) => NativeChatSendHandle | null
   /** Overrides the clear/confirm bytes a send uses, e.g. to replace a parked
    *  launch draft rather than paste on top of it. */
   buildSendOptions?: () => NativeChatSendOptions | undefined
