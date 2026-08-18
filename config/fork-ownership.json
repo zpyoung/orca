@@ -761,6 +761,12 @@
       "feature": "native-chat-relay",
       "kind": "passthrough",
       "lines": ["        \"readErrorNotice\": \"Chat history could not be refreshed. {{value0}}\""]
+    },
+    {
+      "path": "config/scripts/pr-workflow-parallelism.test.mjs",
+      "feature": "fork-infra",
+      "kind": "registration",
+      "lines": ["      'fork_ownership_guard',"]
     }
   ],
   "exceptions": [
@@ -883,7 +889,7 @@
     },
     {
       "path": ".github/scripts/check-fork-ownership.mjs",
-      "reason": "The CI guard that enforces this manifest on pull requests — fork machinery, not upstream code.",
+      "reason": "The CI guard that enforces this manifest on pull requests \u2014 fork machinery, not upstream code.",
       "status": "permanent"
     },
     {

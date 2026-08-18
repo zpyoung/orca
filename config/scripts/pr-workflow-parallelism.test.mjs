@@ -211,6 +211,7 @@ describe('PR workflow parallelism', () => {
     expect(workflow.jobs.verify.needs).toEqual([
       'static_analysis',
       'root_directory_guard',
+      'fork_ownership_guard',
       'typecheck',
       'git_compatibility',
       'shell_contracts',
