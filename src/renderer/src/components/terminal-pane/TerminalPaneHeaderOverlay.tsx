@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { translate } from '@/i18n/i18n'
 import { WORKSPACE_FILE_PATH_MIME, WORKSPACE_FILE_PATHS_MIME } from '@/lib/workspace-file-drag'
 import { isImeCompositionKeyDown } from '@/lib/ime-composition-keyboard-event'
-import { NativeChatWidthMenu } from '@/components/native-chat/NativeChatWidthMenu'
+import { NativeChatWidthMenu } from '@/components/native-chat/fork-native-chat-width/NativeChatWidthMenu'
 import type { PtyTransport } from './pty-transport'
 import { handleInternalTerminalFileDrop } from './terminal-drop-handler'
 

@@ -1,10 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import type { GlobalSettings } from '../../../../shared/types'
+import type { GlobalSettings } from '../../../../../shared/types'
 
 const updateSettings = vi.fn()
 const storeState: { settings: Partial<GlobalSettings> | null } = { settings: {} }
 
-vi.mock('../../store', () => ({
+vi.mock('../../../store', () => ({
   useAppStore: (selector: (state: unknown) => unknown) =>
     selector({ ...storeState, updateSettings })
 }))

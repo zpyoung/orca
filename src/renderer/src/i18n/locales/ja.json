@@ -5784,10 +5784,7 @@
             "defaultCopy": "対応 Agent の新規ターミナルタブを開く方法を選択します。",
             "defaultViewLabel": "デフォルトの Chat UI ビュー",
             "defaultViewTerminal": "ターミナルチャット",
-            "defaultViewNative": "Chat UI",
-            "widthTitle": "チャットの幅",
-            "widthCopy": "すべてのチャットペインの読み取り列の幅を設定します。",
-            "widthLabel": "チャットの幅"
+            "defaultViewNative": "Chat UI"
           },
           "agentDashboard": {
             "title": "Agent ダッシュボード",
@@ -14410,17 +14407,7 @@
         "allow": "許可する",
         "deny": "拒否"
       },
-      "launchPromptNotDelivered": "配信されませんでした — ターミナルを確認してください",
-      "width": {
-        "tier": {
-          "narrow": "狭い",
-          "comfortable": "ゆったり",
-          "wide": "広い",
-          "full": "全幅"
-        },
-        "menuLabel": "チャットの幅",
-        "menuTooltip": "チャットの幅（すべてのチャットペインに適用されます）"
-      }
+      "launchPromptNotDelivered": "配信されませんでした — ターミナルを確認してください"
     },
     "tab": {
       "bar": {

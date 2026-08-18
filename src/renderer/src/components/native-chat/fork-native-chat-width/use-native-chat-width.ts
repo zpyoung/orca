@@ -1,6 +1,6 @@
-import { useAppStore } from '../../store'
+import { useAppStore } from '../../../store'
 import { nativeChatWidthClassName, resolveNativeChatWidthTier } from './native-chat-width'
-import type { NativeChatWidthTier } from '../../../../shared/types'
+import type { NativeChatWidthTier } from '../../../../../shared/types'
 
 /**
  * The globally-configured native chat reading-column tier. Every read of

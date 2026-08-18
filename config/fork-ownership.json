@@ -18,7 +18,7 @@
     {
       "name": "native-chat-width",
       "purpose": "Lets the user pick the reading-column width for every native-chat pane instead of a fixed max-width.",
-      "globs": []
+      "globs": ["**/fork-native-chat-width/**"]
     }
   ],
   "seams": [
@@ -347,14 +347,17 @@
       "path": "src/shared/constants.ts",
       "feature": "native-chat-width",
       "kind": "passthrough",
-      "lines": ["    nativeChatWidth: 'comfortable',"]
+      "lines": [
+        "import { DEFAULT_NATIVE_CHAT_WIDTH_TIER } from './fork-native-chat-width/native-chat-width-default'",
+        "    nativeChatWidth: DEFAULT_NATIVE_CHAT_WIDTH_TIER,"
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/NativeChatMessageList.tsx",
       "feature": "native-chat-width",
       "kind": "passthrough",
       "lines": [
-        "import { useNativeChatWidthClassName } from './use-native-chat-width'",
+        "import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'",
         "  const widthClassName = useNativeChatWidthClassName()",
         "          className={cn('mx-auto flex w-full flex-col gap-5', widthClassName)}"
       ]
@@ -364,7 +367,8 @@
       "feature": "native-chat-width",
       "kind": "passthrough",
       "lines": [
-        "import { useNativeChatWidthClassName } from './use-native-chat-width'",
+        "import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'",
+        "  const widthClassName = useNativeChatWidthClassName()",
         "      <div className={cn('mx-auto w-full px-3 pt-2 pb-1 sm:px-4', widthClassName)}>"
       ]
     },
@@ -373,7 +377,8 @@
       "feature": "native-chat-width",
       "kind": "passthrough",
       "lines": [
-        "import { useNativeChatWidthClassName } from './use-native-chat-width'",
+        "import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'",
+        "  const widthClassName = useNativeChatWidthClassName()",
         "        <div className={cn('relative mx-auto w-full', widthClassName)}>"
       ]
     },
@@ -382,7 +387,8 @@
       "feature": "native-chat-width",
       "kind": "passthrough",
       "lines": [
-        "import { useNativeChatWidthClassName } from './use-native-chat-width'",
+        "import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'",
+        "  const widthClassName = useNativeChatWidthClassName()",
         "      <div className={cn('mx-auto w-full px-3 pt-2 pb-4 sm:px-4', widthClassName)}>"
       ]
     },
@@ -391,7 +397,7 @@
       "feature": "native-chat-width",
       "kind": "registration",
       "lines": [
-        "import { NativeChatWidthMenu } from '@/components/native-chat/NativeChatWidthMenu'",
+        "import { NativeChatWidthMenu } from '@/components/native-chat/fork-native-chat-width/NativeChatWidthMenu'",
         "                  {isChatViewMode && isActivePane ? <NativeChatWidthMenu /> : null}"
       ]
     },
@@ -405,51 +411,21 @@
       "path": "src/renderer/src/components/settings/NativeChatExperimentalSetting.tsx",
       "feature": "native-chat-width",
       "kind": "registration",
-      "lines": ["  const widthTier = resolveNativeChatWidthTier(settings.nativeChatWidth)"]
-    },
-    {
-      "path": "src/renderer/src/i18n/locales/en.json",
-      "feature": "native-chat-width",
-      "kind": "passthrough",
       "lines": [
-        "            \"widthTitle\": \"Chat width\",",
-        "        \"menuTooltip\": \"Chat width (applies to all chat panes)\""
+        "import { NativeChatWidthSetting } from './fork-native-chat-width/NativeChatWidthSetting'",
+        "          <NativeChatWidthSetting",
+        "            value={settings.nativeChatWidth}",
+        "            onChange={(nativeChatWidth) => updateSettings({ nativeChatWidth })}",
+        "          />"
       ]
     },
     {
-      "path": "src/renderer/src/i18n/locales/es.json",
+      "path": "src/renderer/src/i18n/i18n.ts",
       "feature": "native-chat-width",
-      "kind": "passthrough",
+      "kind": "registration",
       "lines": [
-        "            \"widthTitle\": \"Ancho del chat\",",
-        "        \"menuTooltip\": \"Ancho del chat (se aplica a todos los paneles de chat)\""
-      ]
-    },
-    {
-      "path": "src/renderer/src/i18n/locales/ja.json",
-      "feature": "native-chat-width",
-      "kind": "passthrough",
-      "lines": [
-        "            \"widthTitle\": \"\u30c1\u30e3\u30c3\u30c8\u306e\u5e45\",",
-        "        \"menuTooltip\": \"\u30c1\u30e3\u30c3\u30c8\u306e\u5e45\uff08\u3059\u3079\u3066\u306e\u30c1\u30e3\u30c3\u30c8\u30da\u30a4\u30f3\u306b\u9069\u7528\u3055\u308c\u307e\u3059\uff09\""
-      ]
-    },
-    {
-      "path": "src/renderer/src/i18n/locales/ko.json",
-      "feature": "native-chat-width",
-      "kind": "passthrough",
-      "lines": [
-        "            \"widthTitle\": \"\ucc44\ud305 \ub108\ube44\",",
-        "        \"menuTooltip\": \"\ucc44\ud305 \ub108\ube44(\ubaa8\ub4e0 \ucc44\ud305 \ucc3d\uc5d0 \uc801\uc6a9\ub428)\""
-      ]
-    },
-    {
-      "path": "src/renderer/src/i18n/locales/zh.json",
-      "feature": "native-chat-width",
-      "kind": "passthrough",
-      "lines": [
-        "            \"widthTitle\": \"\u804a\u5929\u5bbd\u5ea6\",",
-        "        \"menuTooltip\": \"\u804a\u5929\u5bbd\u5ea6\uff08\u5e94\u7528\u4e8e\u6240\u6709\u804a\u5929\u7a97\u683c\uff09\""
+        "import { registerForkLocalizationCatalogs } from './fork-localization-catalogs'",
+        "registerForkLocalizationCatalogs(i18n)"
       ]
     },
     {
@@ -873,8 +849,23 @@
       "status": "permanent"
     },
     {
-      "path": "config/scripts/sync-upstream-locale-catalogs.mjs",
-      "reason": "Fork's own locale-catalog sync helper; upstream has no such script.",
+      "path": "config/scripts/fork-localization-catalog-check.mjs",
+      "reason": "Fork localization wrapper validates isolated feature catalogs while composing the upstream verifier.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/fork-localization-catalog-check.test.mjs",
+      "reason": "Tests for the fork localization wrapper.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/renderer/src/i18n/fork-localization-catalogs.ts",
+      "reason": "Fork i18n aggregation machinery merges isolated feature catalogs at runtime.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/renderer/src/i18n/fork-localization-catalogs.test.ts",
+      "reason": "Tests for the fork i18n aggregation machinery.",
       "status": "permanent"
     },
     {
@@ -1224,36 +1215,6 @@
     {
       "path": "src/shared/native-chat-tool-category.test.ts",
       "reason": "New fork-authored file for the native-chat-coloring feature, not yet moved into its fork-native-chat-coloring/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-width.ts",
-      "reason": "New fork-authored file for the native-chat-width feature, not yet moved into its fork-native-chat-width/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-width.test.ts",
-      "reason": "New fork-authored file for the native-chat-width feature, not yet moved into its fork-native-chat-width/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/NativeChatWidthMenu.tsx",
-      "reason": "New fork-authored file for the native-chat-width feature, not yet moved into its fork-native-chat-width/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/NativeChatWidthMenu.test.tsx",
-      "reason": "New fork-authored file for the native-chat-width feature, not yet moved into its fork-native-chat-width/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-width.ts",
-      "reason": "New fork-authored file for the native-chat-width feature, not yet moved into its fork-native-chat-width/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/renderer/src/components/settings/NativeChatExperimentalSetting.test.tsx",
-      "reason": "New fork-authored file for the native-chat-width feature, not yet moved into its fork-native-chat-width/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
       "status": "pending-decision"
     },
     {

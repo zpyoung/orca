@@ -1,5 +1,5 @@
 import { UnfoldHorizontal } from 'lucide-react'
-import type { NativeChatWidthTier } from '../../../../shared/types'
+import type { NativeChatWidthTier } from '../../../../../shared/types'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
-import { useAppStore } from '../../store'
+import { useAppStore } from '../../../store'
 import { NATIVE_CHAT_WIDTH_TIERS, nativeChatWidthTierLabel } from './native-chat-width'
 import { useNativeChatWidthTier } from './use-native-chat-width'
 

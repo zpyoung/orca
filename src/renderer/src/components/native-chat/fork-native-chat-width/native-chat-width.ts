@@ -4,8 +4,11 @@
  *  max-width through here so the four sites can never disagree. Kept DOM-free
  *  and React-free so it can be unit-tested. */
 
-import type { NativeChatWidthTier } from '../../../../shared/types'
+import type { NativeChatWidthTier } from '../../../../../shared/types'
 import { translate } from '@/i18n/i18n'
+import { DEFAULT_NATIVE_CHAT_WIDTH_TIER } from '../../../../../shared/fork-native-chat-width/native-chat-width-default'
+
+export { DEFAULT_NATIVE_CHAT_WIDTH_TIER }
 
 /** Ordered narrow -> full; both the Settings select and the header menu render
  *  tiers in this order so the two controls never disagree on ordering. */
@@ -15,8 +18,6 @@ export const NATIVE_CHAT_WIDTH_TIERS: readonly NativeChatWidthTier[] = [
   'wide',
   'full'
 ]
-
-export const DEFAULT_NATIVE_CHAT_WIDTH_TIER: NativeChatWidthTier = 'comfortable'
 
 /** Class names are literals, never interpolated — Tailwind's JIT only emits a
  *  utility it can find by static scan. */

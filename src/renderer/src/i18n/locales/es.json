@@ -5799,10 +5799,7 @@
             "defaultCopy": "Elige cómo se abren las nuevas pestañas de terminal de agentes compatibles.",
             "defaultViewLabel": "Vista predeterminada de Chat UI",
             "defaultViewTerminal": "Chat en terminal",
-            "defaultViewNative": "Chat UI",
-            "widthTitle": "Ancho del chat",
-            "widthCopy": "Establece el ancho de la columna de lectura de todos los paneles de chat.",
-            "widthLabel": "Ancho del chat"
+            "defaultViewNative": "Chat UI"
           },
           "agentDashboard": {
             "title": "Panel de agentes",
@@ -14410,17 +14407,7 @@
         "allow": "Permitir",
         "deny": "Denegar"
       },
-      "launchPromptNotDelivered": "No entregado — revisa la terminal",
-      "width": {
-        "tier": {
-          "narrow": "Estrecho",
-          "comfortable": "Cómodo",
-          "wide": "Amplio",
-          "full": "Completo"
-        },
-        "menuLabel": "Ancho del chat",
-        "menuTooltip": "Ancho del chat (se aplica a todos los paneles de chat)"
-      }
+      "launchPromptNotDelivered": "No entregado — revisa la terminal"
     },
     "tab": {
       "bar": {

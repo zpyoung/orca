@@ -12,7 +12,7 @@ import {
   type NativeChatMessage
 } from '../../../../shared/native-chat-types'
 import type { NativeChatLiveSession } from './use-native-chat-live-session'
-import { useNativeChatWidthClassName } from './use-native-chat-width'
+import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'
 import { orderNativeChatMessages } from './native-chat-message-grouping'
 import { stripNoiseMessages } from './native-chat-noise'
 import { foldToolMessages, splitNativeChatBlocks } from './native-chat-tool-fold'

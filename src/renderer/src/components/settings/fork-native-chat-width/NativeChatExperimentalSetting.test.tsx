@@ -1,8 +1,9 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import type { GlobalSettings } from '../../../../shared/types'
-import { getDefaultSettings } from '../../../../shared/constants'
-import { NativeChatExperimentalSetting } from './NativeChatExperimentalSetting'
+import type { GlobalSettings } from '../../../../../shared/types'
+import { getDefaultSettings } from '../../../../../shared/constants'
+import { NativeChatExperimentalSetting } from '../NativeChatExperimentalSetting'
+import { NativeChatWidthSetting } from './NativeChatWidthSetting'
 
 type ReactElementLike = {
   type: unknown
@@ -19,6 +20,9 @@ function visit(node: unknown, cb: (node: ReactElementLike) => void): void {
   }
   const element = node as ReactElementLike
   cb(element)
+  if (element.type === NativeChatWidthSetting) {
+    visit(NativeChatWidthSetting(element.props as Parameters<typeof NativeChatWidthSetting>[0]), cb)
+  }
   if (element.props?.children) {
     visit(element.props.children, cb)
   }

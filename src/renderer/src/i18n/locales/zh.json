@@ -5796,10 +5796,7 @@
             "defaultCopy": "选择如何打开受支持智能体的新终端标签页。",
             "defaultViewLabel": "默认 Chat UI 视图",
             "defaultViewTerminal": "终端聊天",
-            "defaultViewNative": "Chat UI",
-            "widthTitle": "聊天宽度",
-            "widthCopy": "设置所有聊天窗格的阅读栏宽度。",
-            "widthLabel": "聊天宽度"
+            "defaultViewNative": "Chat UI"
           },
           "agentDashboard": {
             "title": "智能体仪表盘",
@@ -14430,17 +14427,7 @@
         "allow": "允许",
         "deny": "拒绝"
       },
-      "launchPromptNotDelivered": "未送达 — 请检查终端",
-      "width": {
-        "tier": {
-          "narrow": "窄",
-          "comfortable": "舒适",
-          "wide": "宽",
-          "full": "全宽"
-        },
-        "menuLabel": "聊天宽度",
-        "menuTooltip": "聊天宽度（应用于所有聊天窗格）"
-      }
+      "launchPromptNotDelivered": "未送达 — 请检查终端"
     },
     "tab": {
       "bar": {
