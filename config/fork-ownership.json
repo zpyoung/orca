@@ -66,6 +66,48 @@
       "lines": ["const MACOS_PACKAGED_BUNDLE_ID = 'com.zpyoung.orca'"]
     },
     {
+      "path": "config/scripts/build-notification-status-macos.mjs",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["const bundleId = readArg('--bundle-id') ?? 'com.zpyoung.orca'"]
+    },
+    {
+      "path": "config/scripts/mac-build-compatibility.test.mjs",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["      appId: 'com.zpyoung.orca',"]
+    },
+    {
+      "path": "src/main/local-builds/local-build-candidate.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    appId: 'com.zpyoung.orca',"]
+    },
+    {
+      "path": "src/main/local-builds/local-build-compatibility-contract.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["      appId: 'com.zpyoung.orca',"]
+    },
+    {
+      "path": "src/shared/local-build-compatibility-contract.json",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["  \"appId\": \"com.zpyoung.orca\","]
+    },
+    {
+      "path": "src/shared/local-build-compatibility-contract.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["  appId: 'com.zpyoung.orca',"]
+    },
+    {
+      "path": "src/shared/local-build-compatibility.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    appId: 'com.zpyoung.orca',"]
+    },
+    {
       "path": "src/shared/project-groups.ts",
       "feature": "worktree-groups",
       "kind": "registration",
@@ -83,7 +125,10 @@
       "path": "src/shared/types.ts",
       "feature": "worktree-groups",
       "kind": "passthrough",
-      "lines": ["  projectGroupId?: string | null"]
+      "lines": [
+        "  /** Durable sidebar-only cross-repo group membership, independent of the",
+        "   *  worktree's repo's own `projectGroupId`. Execution remains repo-scoped. */"
+      ]
     },
     {
       "path": "src/renderer/src/components/sidebar/worktree-list-groups.ts",
@@ -432,16 +477,13 @@
       "path": "src/renderer/src/components/sidebar/comment-markdown-element-renderers.tsx",
       "feature": "native-chat-coloring",
       "kind": "passthrough",
-      "lines": ["  onLinkClick?: CommentMarkdownLinkClickHandler,", "  highlightCode?: boolean"]
+      "lines": ["  highlightCode?: boolean", "      ) : highlightCode ? ("]
     },
     {
       "path": "src/renderer/src/components/native-chat/NativeChatMessageList.tsx",
       "feature": "native-chat-coloring",
       "kind": "passthrough",
-      "lines": [
-        "                allowFileUriLinks={allowFileUriLinks}",
-        "                highlightCode"
-      ]
+      "lines": ["                highlightCode", "          highlightCode"]
     },
     {
       "path": "src/renderer/src/assets/main.css",
@@ -875,11 +917,6 @@
       "status": "permanent"
     },
     {
-      "path": "config/scripts/build-notification-status-macos.mjs",
-      "reason": "Fork release-tooling delta for the fork's own macOS notification status build step.",
-      "status": "permanent"
-    },
-    {
       "path": "config/scripts/verify-release-required-assets.mjs",
       "reason": "Fork release-tooling delta verifying the fork's own release asset set.",
       "status": "permanent"
@@ -897,11 +934,6 @@
     {
       "path": "config/scripts/electron-builder-config.test.mjs",
       "reason": "Tests the fork's arm64-only electron-builder config, not upstream's matrix.",
-      "status": "permanent"
-    },
-    {
-      "path": "config/scripts/mac-build-compatibility.test.mjs",
-      "reason": "Tests the fork's own macOS build compatibility contract.",
       "status": "permanent"
     },
     {
@@ -940,44 +972,19 @@
       "status": "permanent"
     },
     {
-      "path": "src/shared/local-build-compatibility-contract.json",
-      "reason": "Fork app-identity contract for locally built, unsigned artifacts.",
-      "status": "permanent"
-    },
-    {
-      "path": "src/shared/local-build-compatibility-contract.ts",
-      "reason": "Fork app-identity contract for locally built, unsigned artifacts.",
-      "status": "permanent"
-    },
-    {
-      "path": "src/shared/local-build-compatibility.test.ts",
-      "reason": "Tests for the fork's local-build compatibility contract.",
-      "status": "permanent"
-    },
-    {
-      "path": "src/main/local-builds/local-build-candidate.test.ts",
-      "reason": "Tests for the fork's local-build compatibility contract.",
-      "status": "permanent"
-    },
-    {
-      "path": "src/main/local-builds/local-build-compatibility-contract.test.ts",
-      "reason": "Tests for the fork's local-build compatibility contract.",
-      "status": "permanent"
-    },
-    {
       "path": "tests/e2e/cross-version-wire/release-checkout.ts",
       "reason": "Encodes the fork's own (tagless) release-history shape for cross-version wire tests.",
       "status": "permanent"
     },
     {
       "path": "src/renderer/src/components/native-chat/use-native-chat-retained-session.ts",
-      "reason": "Retention bug fix: excludes the error phase from the loading-state check so a transient read failure does not blank a retained transcript. Belongs upstream, not isolated as a fork feature.",
+      "reason": "Retention bug fix: excludes the error phase from the loading-state check so a transient read failure does not blank a retained transcript. Belongs upstream, not isolated as a fork feature. Also carries the native-chat-relay SSH-identity line `args.sshConnectionId ?? null,` and its two-line comment from commit c137a9e97d; those are not part of the upstream-bound fix and must be dropped when the upstream PR is prepared, since sshConnectionId does not exist upstream.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#retention-fix"
     },
     {
       "path": "src/renderer/src/components/native-chat/use-native-chat-retained-session.test.ts",
-      "reason": "Tests for the retention-fix hook above.",
+      "reason": "Tests for the retention-fix hook above. Also carries native-chat-relay SSH-connection test cases from commit c137a9e97d that exercise the sshConnectionId identity field; those are not part of the upstream-bound fix and must be dropped when the upstream PR is prepared, since sshConnectionId does not exist upstream.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#retention-fix"
     },

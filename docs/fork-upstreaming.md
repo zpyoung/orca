@@ -7,7 +7,7 @@ manifest `exceptions[]` row (`status: "pending-upstream"`, `ledger` pointing at 
 anchor) are created and removed together — see `config/scripts/fork-ownership-manifest.mjs` for
 the invariant this enforces.
 
-## Retention fix {#retention-fix}
+## Retention fix
 
 **What:** `useNativeChatRetainedSession` blanks a retained transcript while a fresh read is
 loading, even when the pane already has content from a prior successful read. The fix excludes
@@ -27,9 +27,15 @@ indefinitely while the fork carries a parallel, diverging copy of the same hook.
 **Introduced:** commit `6d7f5bc116` (2026-08-10), "fix(native-chat): stop retention blanking live
 transcript appends".
 
+**Excluded when preparing the upstream PR:** `use-native-chat-retained-session.ts` and its test
+also carry the native-chat-relay SSH-identity line `args.sshConnectionId ?? null,` and its two-line
+explanatory comment, added by commit `c137a9e97d`. `sshConnectionId` is a fork-only field with no
+upstream counterpart, so a PR built from this ledger entry must drop that line (and the test cases
+exercising it) or it will not compile against upstream's tree.
+
 **Status:** pending-upstream. Not yet submitted.
 
-## Sidebar density {#sidebar-density}
+## Sidebar density
 
 **What:** tightens the left-panel workspace list — virtualized row gap 6px → 2px, workspace-card
 padding, and section-header height 28px → 24px — plus the two fixes the tighter layout surfaced:
@@ -61,7 +67,7 @@ and density".
 
 **Status:** pending-upstream. Not yet submitted.
 
-## Chat header controls fix {#chat-header-controls-fix}
+## Chat header controls fix
 
 **What:** `TerminalPane.tsx` gates `activePaneIsChatLeaf` on `effectiveChatViewMode` rather than
 `isChatViewMode`. With the experimental native-chat flag off, a tab can still carry
