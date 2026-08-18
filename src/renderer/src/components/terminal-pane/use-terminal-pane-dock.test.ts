@@ -314,6 +314,29 @@ describe('useTerminalPaneDock', () => {
     expect(result.current.isPanePassthrough(PANE_KEY)).toBe(false)
   })
 
+  // The keyboard shortcut targets the focused pane, but a context menu acts on the pane it
+  // was opened over — in a split those differ, so a leaf-targeted toggle must not read the
+  // active pane.
+  it('toggles the named pane, not the focused one', () => {
+    const otherLeafId = '22222222-2222-4222-8222-222222222222'
+    const { result } = renderDockHookWithShortcutTarget()
+
+    act(() => result.current.toggleDockForLeaf(otherLeafId))
+
+    expect(mocks.setTabTerminalDockState).toHaveBeenCalledExactlyOnceWith('unified-1', {
+      paneKey: `tab-1:${otherLeafId}`,
+      docked: true
+    })
+  })
+
+  it('ignores a leaf-targeted toggle while the flag is off', () => {
+    const { result } = renderDockHook(false)
+
+    act(() => result.current.toggleDockForLeaf(LEAF_ID))
+
+    expect(mocks.setTabTerminalDockState).not.toHaveBeenCalled()
+  })
+
   describe('agent latch survives a renderer remount', () => {
     it('rehydrates the client-local agent for a persisted-docked pane with no live status or launch/title evidence yet', () => {
       writeTerminalDockPaneAgent(PANE_KEY, 'claude')

@@ -15334,6 +15334,14 @@
       "noSession": "No terminal session",
       "mobileDriverLeaseHeld": "Mobile device is composing",
       "reattaching": "Reattaching…"
+    },
+    "terminal": {
+      "pane": {
+        "TerminalContextMenu": {
+          "hideAgentComposer": "Hide agent composer",
+          "showAgentComposer": "Show agent composer"
+        }
+      }
     }
   },
   "dashboardPopout": {

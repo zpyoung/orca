@@ -47,6 +47,9 @@ export type UseTerminalPaneDockResult = {
     recoveryPhase: PtyTransportRecoveryState['phase'] | null
     sshDisconnected?: boolean
   }) => string | null
+  /** Toggles a specific pane's dock. The keyboard shortcut targets the focused pane, but
+   *  menu-driven callers act on the pane they were opened over, which need not be focused. */
+  toggleDockForLeaf: (leafId: string | null) => void
   /** Wire into the confirmed-agent-exit signal (onAgentExitedRef) alongside any existing
    *  consumer — undocks a pane whose agent just confirmed exit, same as the passthrough
    *  auto-exit, this never touches panes that were never docked. */
@@ -181,42 +184,44 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
     [enabled, isPaneDocked, persistLocalDockState, resolveUnifiedTabId, setTabTerminalDockState]
   )
 
+  const toggleDockForLeaf = useCallback(
+    (leafId: string | null): void => {
+      if (!enabled || !leafId) {
+        return
+      }
+      const unifiedTabId = resolveUnifiedTabId()
+      if (!unifiedTabId) {
+        return
+      }
+      const paneKey = makePaneKey(tabId, leafId)
+      const nextDocked = !isPaneDocked(paneKey)
+      if (!nextDocked) {
+        exitPanePassthrough(paneKey)
+      }
+      setTabTerminalDockState(unifiedTabId, { paneKey, docked: nextDocked })
+      persistLocalDockState(paneKey, { docked: nextDocked, gutterRows: gutterRowsFor(paneKey) })
+      emitTerminalDockToggled({
+        docked: nextDocked,
+        agent:
+          agentForPane(paneKey) ?? useAppStore.getState().agentStatusByPaneKey[paneKey]?.agentType
+      })
+    },
+    [
+      agentForPane,
+      enabled,
+      exitPanePassthrough,
+      gutterRowsFor,
+      isPaneDocked,
+      persistLocalDockState,
+      resolveUnifiedTabId,
+      setTabTerminalDockState,
+      tabId
+    ]
+  )
+
   const toggleDockForFocusedPane = useCallback((): void => {
-    if (!enabled) {
-      return
-    }
-    const activeLeafId = managerRef.current?.getActivePane()?.leafId
-    if (!activeLeafId) {
-      return
-    }
-    const unifiedTabId = resolveUnifiedTabId()
-    if (!unifiedTabId) {
-      return
-    }
-    const paneKey = makePaneKey(tabId, activeLeafId)
-    const nextDocked = !isPaneDocked(paneKey)
-    if (!nextDocked) {
-      exitPanePassthrough(paneKey)
-    }
-    setTabTerminalDockState(unifiedTabId, { paneKey, docked: nextDocked })
-    persistLocalDockState(paneKey, { docked: nextDocked, gutterRows: gutterRowsFor(paneKey) })
-    emitTerminalDockToggled({
-      docked: nextDocked,
-      agent:
-        agentForPane(paneKey) ?? useAppStore.getState().agentStatusByPaneKey[paneKey]?.agentType
-    })
-  }, [
-    agentForPane,
-    enabled,
-    exitPanePassthrough,
-    gutterRowsFor,
-    isPaneDocked,
-    managerRef,
-    persistLocalDockState,
-    resolveUnifiedTabId,
-    setTabTerminalDockState,
-    tabId
-  ])
+    toggleDockForLeaf(managerRef.current?.getActivePane()?.leafId ?? null)
+  }, [managerRef, toggleDockForLeaf])
 
   const undockOnConfirmedAgentExit = useCallback(
     (leafId: string): void => {
@@ -290,6 +295,7 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       resolveDockAgent,
       commitGutterRows,
       disabledReasonFor,
+      toggleDockForLeaf,
       undockOnConfirmedAgentExit,
       prunePassthroughForRetiredPane
     }),
@@ -305,6 +311,7 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       paneDockOwnsFocus,
       prunePassthroughForRetiredPane,
       setPaneDockMounted,
+      toggleDockForLeaf,
       undockOnConfirmedAgentExit
     ]
   )

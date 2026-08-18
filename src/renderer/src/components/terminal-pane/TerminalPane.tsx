@@ -2970,6 +2970,15 @@ function TerminalPane(
   // Each toggle gates on its own leaf (header=active, menu=opened-over), so mixed splits show it only where chat can render.
   const activePaneCanToggleChat = canToggleChatForLeaf(activePane?.leafId ?? null)
   const contextMenuCanToggleChat = canToggleChatForLeaf(contextMenuLeafId)
+  // Mirrors the dock's own mount gate, so the menu never offers a toggle for a pane
+  // where no dock could render.
+  const contextMenuDockPaneKey = contextMenuLeafId ? makePaneKey(tabId, contextMenuLeafId) : null
+  const contextMenuCanToggleDock = Boolean(
+    experimentalTerminalDockEnabled &&
+    !effectiveChatViewMode &&
+    contextMenuDockPaneKey &&
+    terminalDock.resolveDockAgent(contextMenuDockPaneKey, resolveAgentForLeaf(contextMenuLeafId))
+  )
   return (
     <>
       <div
@@ -3189,6 +3198,11 @@ function TerminalPane(
         canToggleNativeChat={contextMenuCanToggleChat}
         isNativeChatView={contextMenuIsChatView}
         onToggleNativeChat={handleContextMenuToggleNativeChat}
+        canToggleTerminalDock={contextMenuCanToggleDock}
+        isTerminalDockDocked={Boolean(
+          contextMenuDockPaneKey && terminalDock.isPaneDocked(contextMenuDockPaneKey)
+        )}
+        onToggleTerminalDock={() => terminalDock.toggleDockForLeaf(contextMenuLeafId)}
         onCopyAgentSessionContext={() => void contextMenu.onCopyAgentSessionContext()}
         quickCommandHosts={visibleQuickCommandHosts}
         quickCommandHostLoadFailed={quickCommandHostLoadFailed}
