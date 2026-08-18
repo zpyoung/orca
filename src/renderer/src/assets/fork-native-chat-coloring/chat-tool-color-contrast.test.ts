@@ -1,17 +1,21 @@
 import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { contrastRatio, parseCssRgbColor, type RgbaColor } from '../lib/terminal-title-contrast'
+import { contrastRatio, parseCssRgbColor, type RgbaColor } from '../../lib/terminal-title-contrast'
 
-const mainCss = fs.readFileSync(new URL('./main.css', import.meta.url), 'utf8')
+const mainCss = fs.readFileSync(new URL('../main.css', import.meta.url), 'utf8')
+const coloringCss = fs.readFileSync(
+  new URL('../fork-native-chat-coloring.css', import.meta.url),
+  'utf8'
+)
 
-function getCssRuleBody(selector: string): string {
-  const ruleMarker = mainCss.indexOf(`\n${selector} {`)
+function getCssRuleBody(css: string, selector: string): string {
+  const ruleMarker = css.indexOf(`\n${selector} {`)
   expect(ruleMarker).toBeGreaterThanOrEqual(0)
 
   const ruleStart = ruleMarker + 1
-  const bodyStart = mainCss.indexOf('{', ruleStart) + 1
-  const bodyEnd = mainCss.indexOf('}', bodyStart)
-  return mainCss.slice(bodyStart, bodyEnd)
+  const bodyStart = css.indexOf('{', ruleStart) + 1
+  const bodyEnd = css.indexOf('}', bodyStart)
+  return css.slice(bodyStart, bodyEnd)
 }
 
 function readToken(block: string, name: string): RgbaColor {
@@ -67,8 +71,12 @@ function readThemeColors(block: string): ThemeColors {
 }
 
 const THEMES: Record<'light' | 'dark', ThemeColors> = {
-  light: readThemeColors(getCssRuleBody(':root')),
-  dark: readThemeColors(getCssRuleBody('.dark'))
+  light: readThemeColors(
+    `${getCssRuleBody(mainCss, ':root')}\n${getCssRuleBody(coloringCss, ':root')}`
+  ),
+  dark: readThemeColors(
+    `${getCssRuleBody(mainCss, '.dark')}\n${getCssRuleBody(coloringCss, '.dark')}`
+  )
 }
 
 type ContrastCase = {

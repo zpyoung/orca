@@ -13,6 +13,10 @@ import {
 } from '../../../../shared/native-chat-types'
 import type { NativeChatLiveSession } from './use-native-chat-live-session'
 import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'
+import {
+  nativeChatReasoningClassName,
+  nativeChatUserMessageClassName
+} from './fork-native-chat-coloring/native-chat-message-coloring'
 import { orderNativeChatMessages } from './native-chat-message-grouping'
 import { stripNoiseMessages } from './native-chat-noise'
 import { foldToolMessages, splitNativeChatBlocks } from './native-chat-tool-fold'
@@ -121,9 +125,8 @@ function TypingIndicatorRow(): React.JSX.Element {
 }
 
 /** One message: its prose first, then a collapsible run folding all of the
- *  turn's tool activity. Per STYLEGUIDE: user prompts read as a lifted card
- *  with a tinted fill, assistant prose as body copy, reasoning de-emphasized
- *  with a tinted rule. */
+ *  turn's tool activity. Monochrome per STYLEGUIDE: user prompts read as a
+ *  lifted card, assistant prose as body copy, reasoning de-emphasized. */
 function MessageRow({
   message,
   expandSignal,
@@ -169,9 +172,9 @@ function MessageRow({
     // transcript caught up.)
     return (
       <div ref={rowRef} className="flex flex-col items-end gap-0.5">
-        {/* User turns get a distinct tinted fill (not the card/canvas color) so
+        {/* User turns get a distinct muted fill (not the card/canvas color) so
             the prompt reads apart from the assistant's body copy. */}
-        <div className="max-w-[85%] rounded-lg rounded-tr-sm bg-chat-user-surface px-3.5 py-2.5 text-sm text-foreground">
+        <div className={nativeChatUserMessageClassName()}>
           {markdown ? (
             <>
               <ImageAttachmentRefs blocks={prose} />
@@ -210,8 +213,7 @@ function MessageRow({
       className={cn(
         'group relative max-w-full text-sm leading-relaxed text-foreground',
         // Reasoning is the agent thinking aloud — quieter, italic, like an aside.
-        isReasoning &&
-          'border-l-2 pl-3 italic text-muted-foreground [border-left-color:color-mix(in_srgb,var(--tool-search)_55%,transparent)]',
+        isReasoning && nativeChatReasoningClassName(),
         isSystem && 'text-xs text-muted-foreground'
       )}
     >

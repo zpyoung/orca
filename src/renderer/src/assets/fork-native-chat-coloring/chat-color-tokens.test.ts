@@ -1,20 +1,24 @@
 import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const mainCss = fs.readFileSync(new URL('./main.css', import.meta.url), 'utf8')
-const chatCodeColorsCss = fs.readFileSync(
-  new URL('./native-chat-code-colors.css', import.meta.url),
+const mainCss = fs.readFileSync(new URL('../main.css', import.meta.url), 'utf8')
+const coloringCss = fs.readFileSync(
+  new URL('../fork-native-chat-coloring.css', import.meta.url),
   'utf8'
 )
+const chatCodeColorsCss = coloringCss.slice(
+  coloringCss.indexOf('.native-chat-code .hljs-keyword {'),
+  coloringCss.indexOf('/* Why: CodeBlockLowlight')
+)
 
-function getCssBlockBody(selector: string): string {
-  const ruleMarker = mainCss.indexOf(`\n${selector} {`)
+function getCssBlockBody(css: string, selector: string): string {
+  const ruleMarker = css.indexOf(`${selector} {`)
   expect(ruleMarker).toBeGreaterThanOrEqual(0)
 
   const ruleStart = ruleMarker + 1
-  const bodyStart = mainCss.indexOf('{', ruleStart) + 1
-  const bodyEnd = mainCss.indexOf('}', bodyStart)
-  return mainCss.slice(bodyStart, bodyEnd)
+  const bodyStart = css.indexOf('{', ruleStart) + 1
+  const bodyEnd = css.indexOf('}', bodyStart)
+  return css.slice(bodyStart, bodyEnd)
 }
 
 const CODE_ACCENT_SURFACE_EXPR = 'color-mix(in srgb, var(--code-accent) 12%, var(--background))'
@@ -84,11 +88,11 @@ const NATIVE_CHAT_CODE_CLASS_TO_TOKEN: { className: string; token: string }[] = 
 
 describe('chat transcript color tokens', () => {
   it('imports the native chat code colors stylesheet', () => {
-    expect(mainCss).toContain("@import './native-chat-code-colors.css';")
+    expect(mainCss).toContain("@import './fork-native-chat-coloring.css';")
   })
 
   it('binds all 8 palette tokens through @theme inline', () => {
-    const themeInline = getCssBlockBody('@theme inline')
+    const themeInline = getCssBlockBody(coloringCss, '@theme inline')
 
     for (const token of PALETTE_TOKENS) {
       expect(themeInline).toContain(`--color-${token.name.slice(2)}: var(${token.name});`)
@@ -96,22 +100,22 @@ describe('chat transcript color tokens', () => {
   })
 
   it('never binds an hljs token through @theme inline', () => {
-    const themeInline = getCssBlockBody('@theme inline')
+    const themeInline = getCssBlockBody(coloringCss, '@theme inline')
 
     expect(themeInline).not.toContain('hljs')
   })
 
   it.each(ALL_TOKENS)('declares $name in :root (light) and .dark with locked values', (token) => {
-    const root = getCssBlockBody(':root')
-    const dark = getCssBlockBody('.dark')
+    const root = getCssBlockBody(coloringCss, ':root')
+    const dark = getCssBlockBody(coloringCss, '.dark')
 
     expect(root).toContain(`${token.name}: ${token.light};`)
     expect(dark).toContain(`${token.name}: ${token.dark};`)
   })
 
   it('declares --code-accent-surface and --chat-user-surface as color-mix expressions in both themes', () => {
-    const root = getCssBlockBody(':root')
-    const dark = getCssBlockBody('.dark')
+    const root = getCssBlockBody(coloringCss, ':root')
+    const dark = getCssBlockBody(coloringCss, '.dark')
 
     for (const block of [root, dark]) {
       expect(block).toContain(`--code-accent-surface: ${CODE_ACCENT_SURFACE_EXPR};`)
@@ -120,7 +124,7 @@ describe('chat transcript color tokens', () => {
   })
 
   it('does not add any of the 27 new tokens to .plugin-security-chrome', () => {
-    const pluginSecurityChrome = getCssBlockBody('.plugin-security-chrome')
+    const pluginSecurityChrome = getCssBlockBody(mainCss, '.plugin-security-chrome')
 
     for (const token of ALL_TOKENS) {
       expect(pluginSecurityChrome).not.toContain(token.name)

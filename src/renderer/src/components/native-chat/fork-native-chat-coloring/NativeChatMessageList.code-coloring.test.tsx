@@ -4,9 +4,9 @@ import '@testing-library/jest-dom/vitest'
 
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { NativeChatMessage } from '../../../../shared/native-chat-types'
-import { NativeChatMessageList } from './NativeChatMessageList'
-import type { NativeChatLiveSession } from './use-native-chat-live-session'
+import type { NativeChatMessage } from '../../../../../shared/native-chat-types'
+import { NativeChatMessageList } from '../NativeChatMessageList'
+import type { NativeChatLiveSession } from '../use-native-chat-live-session'
 
 afterEach(cleanup)
 
@@ -108,5 +108,32 @@ describe('NativeChatMessageList code coloring', () => {
 
     expect(container.querySelector('.native-chat-code')).not.toBeNull()
     expect(container.querySelectorAll('[class*="hljs"]').length).toBeGreaterThan(0)
+  })
+  it('uses the chat user surface for user message bubbles', () => {
+    const { container } = render(
+      <NativeChatMessageList
+        session={sessionWith([messageWith('user', 'u1', 'hello')])}
+        isWorking={false}
+        expandSignal={false}
+        fontScale={1}
+      />
+    )
+
+    expect(container.querySelector('.bg-chat-user-surface')).not.toBeNull()
+  })
+
+  it('uses the tool-search border color for reasoning messages', () => {
+    const { container } = render(
+      <NativeChatMessageList
+        session={sessionWith([messageWith('reasoning', 'r1', 'thinking')])}
+        isWorking={false}
+        expandSignal={false}
+        fontScale={1}
+      />
+    )
+
+    expect(container.querySelector('.border-l-2')?.className).toContain(
+      '[border-left-color:color-mix(in_srgb,var(--tool-search)_55%,transparent)]'
+    )
   })
 })

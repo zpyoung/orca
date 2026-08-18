@@ -13,7 +13,10 @@
     {
       "name": "native-chat-coloring",
       "purpose": "Renders native-chat tool calls with category glyphs/dots and syntax-highlighted code blocks instead of monochrome text.",
-      "globs": []
+      "globs": [
+        "**/fork-native-chat-coloring/**",
+        "src/renderer/src/assets/fork-native-chat-coloring.css"
+      ]
     },
     {
       "name": "native-chat-width",
@@ -431,50 +434,58 @@
     {
       "path": "src/renderer/src/components/native-chat/NativeChatToolRun.tsx",
       "feature": "native-chat-coloring",
-      "kind": "registration",
+      "kind": "import-swap",
       "lines": [
-        "  categorizeNativeChatTool,",
-        "function distinctToolCategories(blocks: NativeChatBlock[]): NativeChatToolCategory[] {"
+        "  NativeChatToolCategoryDots,",
+        "  NativeChatToolName",
+        "        <NativeChatToolName name={name} />",
+        "        <NativeChatToolCategoryDots blocks={blocks} />"
       ]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/NativeChatToolRun.test.tsx",
-      "feature": "native-chat-coloring",
-      "kind": "passthrough",
-      "lines": ["  it('renders one dot per distinct category in first-seen order', () => {"]
     },
     {
       "path": "src/renderer/src/components/sidebar/CommentMarkdown.tsx",
       "feature": "native-chat-coloring",
       "kind": "passthrough",
-      "lines": ["      highlightCode = false,", "      if (highlightCode) {"]
+      "lines": [
+        "import rehypeHighlight from 'rehype-highlight'",
+        "  highlightCode?: boolean",
+        "      highlightCode = false,",
+        "      if (highlightCode) {",
+        "          ? createDocumentCommentMarkdownComponents(onLinkClick, true)",
+        "    }, [expandImages, variant, onLinkClick, highlightCode])",
+        "      () => (highlightCode ? [...rehypePlugins, rehypeHighlight] : rehypePlugins),",
+        "          highlightCode && 'native-chat-code [&_pre_code]:text-inherit',",
+        "          rehypePlugins={activeRehypePlugins}"
+      ]
     },
     {
       "path": "src/renderer/src/components/sidebar/comment-markdown-element-renderers.tsx",
       "feature": "native-chat-coloring",
       "kind": "passthrough",
-      "lines": ["  highlightCode?: boolean", "      ) : highlightCode ? ("]
+      "lines": [
+        "  highlightCode?: boolean",
+        "      ) : highlightCode ? (",
+        "        <code className=\"rounded bg-code-accent-surface px-1.5 py-0.5 font-mono text-[0.92em] text-code-accent [overflow-wrap:anywhere]\">"
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/NativeChatMessageList.tsx",
       "feature": "native-chat-coloring",
       "kind": "passthrough",
-      "lines": ["                highlightCode", "          highlightCode"]
+      "lines": [
+        "  nativeChatReasoningClassName,",
+        "  nativeChatUserMessageClassName",
+        "        <div className={nativeChatUserMessageClassName()}>",
+        "        isReasoning && nativeChatReasoningClassName(),",
+        "                highlightCode",
+        "          highlightCode"
+      ]
     },
     {
       "path": "src/renderer/src/assets/main.css",
       "feature": "native-chat-coloring",
       "kind": "passthrough",
-      "lines": [
-        "@import './native-chat-code-colors.css';",
-        "  --color-tool-read: var(--tool-read);"
-      ]
-    },
-    {
-      "path": "src/renderer/src/assets/rich-markdown-editor.css",
-      "feature": "native-chat-coloring",
-      "kind": "passthrough",
-      "lines": ["  color: var(--hljs-keyword);"]
+      "lines": ["@import './fork-native-chat-coloring.css';"]
     },
     {
       "path": "src/renderer/src/lib/terminal-title-contrast.ts",
@@ -1170,51 +1181,6 @@
     {
       "path": "src/shared/native-chat-relay-protocol.ts",
       "reason": "New fork-authored file for the native-chat-relay feature, not yet moved into its fork-native-chat-relay/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/renderer/src/assets/chat-color-tokens.test.ts",
-      "reason": "New fork-authored file for the native-chat-coloring feature, not yet moved into its fork-native-chat-coloring/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/renderer/src/assets/chat-tool-color-contrast.test.ts",
-      "reason": "New fork-authored file for the native-chat-coloring feature, not yet moved into its fork-native-chat-coloring/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/renderer/src/assets/hljs-editor-promotion.test.ts",
-      "reason": "New fork-authored file for the native-chat-coloring feature, not yet moved into its fork-native-chat-coloring/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/renderer/src/assets/native-chat-code-colors.css",
-      "reason": "New fork-authored file for the native-chat-coloring feature, not yet moved into its fork-native-chat-coloring/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-tool-category-glyphs.tsx",
-      "reason": "New fork-authored file for the native-chat-coloring feature, not yet moved into its fork-native-chat-coloring/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/NativeChatMessageList.code-coloring.test.tsx",
-      "reason": "New fork-authored file for the native-chat-coloring feature, not yet moved into its fork-native-chat-coloring/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/renderer/src/components/sidebar/CommentMarkdown.code-coloring.test.tsx",
-      "reason": "New fork-authored file for the native-chat-coloring feature, not yet moved into its fork-native-chat-coloring/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/shared/native-chat-tool-category.ts",
-      "reason": "New fork-authored file for the native-chat-coloring feature, not yet moved into its fork-native-chat-coloring/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/shared/native-chat-tool-category.test.ts",
-      "reason": "New fork-authored file for the native-chat-coloring feature, not yet moved into its fork-native-chat-coloring/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
       "status": "pending-decision"
     },
     {

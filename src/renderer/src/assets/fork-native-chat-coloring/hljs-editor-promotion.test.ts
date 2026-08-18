@@ -1,11 +1,11 @@
 import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const css = fs.readFileSync(new URL('./rich-markdown-editor.css', import.meta.url), 'utf8')
+const css = fs.readFileSync(new URL('../fork-native-chat-coloring.css', import.meta.url), 'utf8')
 
 // Region boundaries anchored on stable text, not line numbers.
 const regionStart = css.indexOf('CodeBlockLowlight')
-const regionEnd = css.indexOf('.rich-markdown-editor hr {', regionStart)
+const regionEnd = css.length
 expect(regionStart).toBeGreaterThanOrEqual(0)
 expect(regionEnd).toBeGreaterThan(regionStart)
 const hljsRegion = css.slice(regionStart, regionEnd)
@@ -47,7 +47,7 @@ const HLJS_TOKENS: [string, string][] = [
   ['hljs-property', 'property']
 ]
 
-describe('hljs token color promotion in rich-markdown-editor.css', () => {
+describe('hljs token color promotion cascade overrides', () => {
   it.each(HLJS_TOKENS)(
     '%s uses var(--hljs-%s) in both light and dark blocks',
     (className, token) => {

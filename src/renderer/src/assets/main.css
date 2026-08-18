@@ -3,8 +3,8 @@
 @import '@xterm/xterm/css/xterm.css';
 @import 'katex/dist/katex.min.css';
 @import './rich-markdown-editor.css';
+@import './fork-native-chat-coloring.css';
 @import './markdown-preview.css';
-@import './native-chat-code-colors.css';
 @import './terminal.css';
 @import './mobile-page.css';
 
@@ -113,14 +113,6 @@
   --color-git-graph-lane-4: var(--git-graph-lane-4);
   --color-git-graph-lane-5: var(--git-graph-lane-5);
   --color-annotation-highlight: var(--annotation-highlight);
-  --color-tool-read: var(--tool-read);
-  --color-tool-write: var(--tool-write);
-  --color-tool-exec: var(--tool-exec);
-  --color-tool-search: var(--tool-search);
-  --color-tool-net: var(--tool-net);
-  --color-code-accent: var(--code-accent);
-  --color-code-accent-surface: var(--code-accent-surface);
-  --color-chat-user-surface: var(--chat-user-surface);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -237,33 +229,6 @@
      meet >=3:1 against `--card`, not only the hover/drag strong state. */
   --tab-group-split-divider: #868690;
   --tab-group-split-divider-strong: #71717a;
-  --tool-read: #2f6a96;
-  --tool-write: #8a6100;
-  --tool-exec: #24707a;
-  --tool-search: #4f4fc4;
-  --tool-net: #6a4fb0;
-  --code-accent: #a01e6a;
-  --code-accent-surface: color-mix(in srgb, var(--code-accent) 12%, var(--background));
-  --chat-user-surface: color-mix(in srgb, var(--tool-read) 13%, var(--background));
-  --hljs-keyword: #cf222e;
-  --hljs-string: #0a3069;
-  --hljs-number: #0550ae;
-  --hljs-comment: #6e7781;
-  --hljs-function: #8250df;
-  --hljs-title: #8250df;
-  --hljs-built-in: #0550ae;
-  --hljs-type: #0550ae;
-  --hljs-attr: #0550ae;
-  --hljs-selector-class: #0550ae;
-  --hljs-variable: #953800;
-  --hljs-meta: #6e7781;
-  --hljs-tag: #116329;
-  --hljs-name: #116329;
-  --hljs-params: #953800;
-  --hljs-literal: #0550ae;
-  --hljs-regexp: #0a3069;
-  --hljs-operator: #cf222e;
-  --hljs-property: #0550ae;
 }
 
 /* ── Dark Mode ───────────────────────────────────────── */
@@ -369,33 +334,6 @@
   /* Brighter than terminal defaults so the always-visible line clears 3:1 on `--card`. */
   --tab-group-split-divider: #71717a;
   --tab-group-split-divider-strong: #a1a1aa;
-  --tool-read: #8ab4d8;
-  --tool-write: #e3b341;
-  --tool-exec: #79bfc4;
-  --tool-search: #9a9ae6;
-  --tool-net: #b39ddb;
-  --code-accent: #f191c5;
-  --code-accent-surface: color-mix(in srgb, var(--code-accent) 12%, var(--background));
-  --chat-user-surface: color-mix(in srgb, var(--tool-read) 13%, var(--background));
-  --hljs-keyword: #ff7b72;
-  --hljs-string: #a5d6ff;
-  --hljs-number: #79c0ff;
-  --hljs-comment: #8b949e;
-  --hljs-function: #d2a8ff;
-  --hljs-title: #d2a8ff;
-  --hljs-built-in: #79c0ff;
-  --hljs-type: #79c0ff;
-  --hljs-attr: #79c0ff;
-  --hljs-selector-class: #79c0ff;
-  --hljs-variable: #ffa657;
-  --hljs-meta: #8b949e;
-  --hljs-tag: #7ee787;
-  --hljs-name: #7ee787;
-  --hljs-params: #ffa657;
-  --hljs-literal: #79c0ff;
-  --hljs-regexp: #a5d6ff;
-  --hljs-operator: #ff7b72;
-  --hljs-property: #79c0ff;
 }
 
 .plugin-security-chrome {
