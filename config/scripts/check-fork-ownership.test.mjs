@@ -370,6 +370,38 @@ describe('stale entry rule', () => {
     expect(result.stdout).toContain('[stale-entry]')
     expect(result.stdout).toContain('manifest is invalid')
   })
+
+  it('allows an exception declared deleted whose path is genuinely absent at HEAD', () => {
+    const { root, base } = buildFixture({
+      manifest: {
+        exceptions: [{ path: 'src/long-gone.ts', reason: 'x', status: 'permanent', deleted: true }]
+      }
+    })
+
+    const result = runGuard(root, base, base)
+
+    expect(result.status).toBe(0)
+  })
+
+  it('does not flag a non-ASCII seam path that is present at HEAD', () => {
+    const { root, base } = buildFixture({
+      manifest: {
+        seams: [
+          {
+            path: 'src/café-seam.ts',
+            feature: 'fork-infra',
+            kind: 'passthrough',
+            lines: ['const MARKER = true']
+          }
+        ]
+      },
+      atTag: { 'src/café-seam.ts': 'const MARKER = true\n' }
+    })
+
+    const result = runGuard(root, base, base)
+
+    expect(result.status).toBe(0)
+  })
 })
 
 describe('silent capture rule', () => {
@@ -407,6 +439,23 @@ describe('silent capture rule', () => {
     const result = runGuard(root, base, base)
 
     expect(result.status).toBe(0)
+  })
+
+  // a non-ASCII path round-trips through git as latin1 (see gitPathList); classifyPath must
+  // compare against the same byte representation or this escapes silent-capture unnoticed
+  it('flags a non-ASCII feature-glob path that also exists upstream', () => {
+    const { root, base } = buildFixture({
+      manifest: {
+        features: [{ name: 'captured-feature', purpose: 'x', globs: ['src/café/**'] }]
+      },
+      atTag: { 'src/café/file.ts': 'upstream version\n' }
+    })
+
+    const result = runGuard(root, base, base)
+
+    expect(result.status).toBe(1)
+    expect(result.stdout).toContain('[silent-capture]')
+    expect(result.stdout).toContain('src/café/file.ts')
   })
 })
 
@@ -472,6 +521,35 @@ describe('seam integrity rule', () => {
 
     expect(result.status).toBe(1)
     expect(result.stdout).toContain('[seam-integrity]')
+  })
+
+  it('does not leak git stderr for a missing seam file outside the findings fence', () => {
+    const { root, base } = buildFixture({
+      manifest: {
+        seams: [
+          { path: 'src/missing-seam.ts', feature: 'fork-infra', kind: 'passthrough', lines: ['x'] }
+        ]
+      }
+    })
+
+    const result = runGuard(root, base, base)
+
+    expect(result.status).toBe(1)
+    expect(result.stdout).toContain('[seam-integrity]')
+    expect(result.stdout).toContain('cannot read file at HEAD')
+    expect(result.stderr).not.toContain('fatal')
+    expect(result.stderr).not.toContain('missing-seam')
+  })
+})
+
+describe('infrastructure error exit code', () => {
+  it('exits 2, not gits raw status, when base-sha does not resolve', () => {
+    const { root, base } = buildFixture({})
+    const badBase = '0'.repeat(40)
+
+    const result = runGuard(root, badBase, base)
+
+    expect(result.status).toBe(2)
   })
 })
 

@@ -21,8 +21,12 @@ const UPSTREAM_REPO_URL = 'https://github.com/stablyai/orca.git'
 // test-only network bypass: points ls-remote at a local fixture repo instead of upstream; unset in every real workflow run
 const UPSTREAM_REMOTE_OVERRIDE_ENV = 'CHECK_FORK_OWNERSHIP_UPSTREAM_REMOTE'
 
+// stderr is captured, not inherited: several calls below embed a manifest-derived path in
+// git's argv, and git echoes an unrecognized path back into its error text verbatim — inherited,
+// that text would reach the job log outside the stop-commands fence below and could forge a
+// workflow command
 function gitRaw(args, encoding) {
-  return execFileSync('git', args, { encoding, stdio: ['ignore', 'pipe', 'inherit'] })
+  return execFileSync('git', args, { encoding, stdio: ['ignore', 'pipe', 'pipe'] })
 }
 
 // see check-root-directory-entries.mjs: latin1 preserves a pathname's raw bytes 1:1,
@@ -35,15 +39,28 @@ function gitText(args) {
   return gitRaw(args, 'utf8')
 }
 
-function pathExistsAtRef(ref, path) {
-  try {
-    execFileSync('git', ['cat-file', '-e', `${ref}:${path}`], {
-      stdio: ['ignore', 'ignore', 'ignore']
-    })
-    return true
-  } catch {
-    // 'git cat-file -e ref:path' exits 128 (not 1) for a path absent from that tree
-    return false
+function gitTreePathSet(ref) {
+  return new Set(gitPathList(['ls-tree', '-r', '--name-only', '-z', ref]))
+}
+
+function toLatin1(value) {
+  return Buffer.from(value, 'utf8').toString('latin1')
+}
+
+// git-sourced paths above are read as latin1 to preserve raw bytes 1:1 (see gitPathList);
+// re-encode the manifest's JSON-parsed UTF-8 strings the same way so a non-ASCII path compares
+// equal instead of silently never matching
+function toLatin1Manifest(manifest) {
+  return {
+    features: manifest.features.map((feature) => ({
+      ...feature,
+      globs: feature.globs.map(toLatin1)
+    })),
+    seams: manifest.seams.map((seam) => ({ ...seam, path: toLatin1(seam.path) })),
+    exceptions: manifest.exceptions.map((exception) => ({
+      ...exception,
+      path: toLatin1(exception.path)
+    }))
   }
 }
 
@@ -120,7 +137,7 @@ export function pickComparisonTag(tagRowsText, headSha, checkAncestor = isAncest
   return null
 }
 
-function checkCoverage(findings, manifest, baseSha, headSha, comparisonRef) {
+function checkCoverage(findings, manifest, baseSha, headSha, comparisonTreePaths) {
   const added = gitPathList([
     'diff',
     '--name-only',
@@ -133,7 +150,7 @@ function checkCoverage(findings, manifest, baseSha, headSha, comparisonRef) {
     headSha
   ])
   for (const path of added) {
-    if (pathExistsAtRef(comparisonRef, path)) {
+    if (comparisonTreePaths.has(path)) {
       continue
     }
     if (classifyPath(manifest, path).class === 'upstream') {
@@ -150,7 +167,7 @@ function checkStaleEntries(findings, manifest, headTreePaths) {
   const treeSet = new Set(headTreePaths)
   for (const feature of manifest.features) {
     for (const glob of feature.globs) {
-      if (!headTreePaths.some((path) => matchGlob(glob, path))) {
+      if (!headTreePaths.some((path) => matchGlob(toLatin1(glob), path))) {
         findings.push({
           rule: 'stale-entry',
           path: null,
@@ -160,7 +177,7 @@ function checkStaleEntries(findings, manifest, headTreePaths) {
     }
   }
   for (const seam of manifest.seams) {
-    if (!treeSet.has(seam.path)) {
+    if (!treeSet.has(toLatin1(seam.path))) {
       findings.push({
         rule: 'stale-entry',
         path: seam.path,
@@ -169,7 +186,7 @@ function checkStaleEntries(findings, manifest, headTreePaths) {
     }
   }
   for (const exception of manifest.exceptions) {
-    const present = treeSet.has(exception.path)
+    const present = treeSet.has(toLatin1(exception.path))
     if (exception.deleted && present) {
       findings.push({
         rule: 'stale-entry',
@@ -186,13 +203,13 @@ function checkStaleEntries(findings, manifest, headTreePaths) {
   }
 }
 
-function checkSilentCapture(findings, manifest, headTreePaths, comparisonRef) {
+function checkSilentCapture(findings, manifest, headTreePaths, comparisonTreePaths) {
   for (const path of headTreePaths) {
     const result = classifyPath(manifest, path)
     if (result.class !== 'feature') {
       continue
     }
-    if (pathExistsAtRef(comparisonRef, path)) {
+    if (comparisonTreePaths.has(path)) {
       findings.push({
         rule: 'silent-capture',
         path,
@@ -258,6 +275,16 @@ function reportFindings(findings) {
   return 1
 }
 
+function reportInfrastructureFailure(error) {
+  const resumeToken = randomUUID()
+  console.log(`::stop-commands::${resumeToken}`)
+  process.stdout.write(Buffer.from(`git command failed (status ${error.status})\n`, 'utf8'))
+  if (typeof error.stderr === 'string' && error.stderr.length > 0) {
+    process.stdout.write(Buffer.from(error.stderr, 'latin1'))
+  }
+  console.log(`::${resumeToken}::`)
+}
+
 function checkForkOwnership(argv) {
   if (argv.length !== 2) {
     console.error(`Usage: ${process.argv[1]} <base-sha> <head-sha>`)
@@ -313,10 +340,12 @@ function checkForkOwnership(argv) {
   }
 
   if (manifest) {
+    const latin1Manifest = toLatin1Manifest(manifest)
     const headTreePaths = gitPathList(['ls-tree', '-r', '--name-only', '-z', headSha])
-    checkCoverage(findings, manifest, baseSha, headSha, comparisonRef)
+    const comparisonTreePaths = gitTreePathSet(comparisonRef)
+    checkCoverage(findings, latin1Manifest, baseSha, headSha, comparisonTreePaths)
     checkStaleEntries(findings, manifest, headTreePaths)
-    checkSilentCapture(findings, manifest, headTreePaths, comparisonRef)
+    checkSilentCapture(findings, latin1Manifest, headTreePaths, comparisonTreePaths)
     checkSeamIntegrity(findings, manifest, headSha)
   }
 
@@ -334,6 +363,9 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     if (typeof error.status !== 'number') {
       throw error
     }
-    process.exitCode = error.status
+    // git's stderr is captured rather than inherited (see gitRaw), so nothing about this
+    // failure has reached the log yet; the documented contract is 0/1/2, not git's raw status
+    reportInfrastructureFailure(error)
+    process.exitCode = 2
   }
 }

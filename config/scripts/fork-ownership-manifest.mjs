@@ -16,9 +16,17 @@ function isNonEmptyString(value) {
 // manifest paths are matched against repo-relative POSIX paths; reject anything
 // that can never match one, so a malformed entry can't silently become a dead
 // ownership claim (see matchGlob/classifyPath).
+// oxlint-disable-next-line no-control-regex -- C0 controls are exactly what this rejects
+const CONTROL_CHAR_PATTERN = /[\x00-\x1f]/
+
 function assertPosixRelativePathSyntax(value) {
   if (value.includes('\\')) {
     throw new Error(`must not contain a backslash: ${JSON.stringify(value)}`)
+  }
+  // a manifest path reaches git argv and CI log output verbatim; a control character
+  // (newline in particular) would let a crafted entry forge output the reader can't see coming
+  if (CONTROL_CHAR_PATTERN.test(value)) {
+    throw new Error(`must not contain a control character: ${JSON.stringify(value)}`)
   }
   for (const segment of value.split('/')) {
     if (segment === '' || segment === '.' || segment === '..') {

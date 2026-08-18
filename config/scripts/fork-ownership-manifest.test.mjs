@@ -477,4 +477,33 @@ describe('manifest path syntax validation', () => {
       expect(() => load({ exceptions: [{ path, reason: 'x', status: 'permanent' }] })).toThrow()
     }
   )
+
+  it.each([
+    ['embedded newline', 'evil\n::warning title=forged::pwned'],
+    ['embedded carriage return', 'evil\r::warning title=forged::pwned'],
+    ['embedded tab', 'tab\there.ts']
+  ])('rejects a seam path with a %s', (_label, path) => {
+    expect(() =>
+      load({ seams: [{ path, feature: 'fork-infra', kind: 'registration', lines: ['x'] }] })
+    ).toThrow(/control character/)
+  })
+
+  it('rejects an exception path with an embedded newline', () => {
+    expect(() =>
+      load({ exceptions: [{ path: 'evil\n::warning::pwned', reason: 'x', status: 'permanent' }] })
+    ).toThrow(/control character/)
+  })
+
+  it('rejects a feature glob with an embedded newline', () => {
+    expect(() =>
+      load({ features: [{ name: 'fork-x', purpose: 'p', globs: ['evil\n::warning::pwned/**'] }] })
+    ).toThrow(/control character/)
+  })
+
+  it('accepts an ordinary path with no control characters', () => {
+    const manifest = load({
+      seams: [{ path: 'ok/path.ts', feature: 'fork-infra', kind: 'registration', lines: ['x'] }]
+    })
+    expect(manifest.seams[0].path).toBe('ok/path.ts')
+  })
 })
