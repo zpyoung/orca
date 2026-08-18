@@ -3,7 +3,7 @@
 // runtime/rpc/methods/native-chat.ts: that one is about what a phone can render,
 // this one is about what the relay's shared writer queue will admit.
 
-import type { NativeChatBlock, NativeChatMessage } from '../../shared/native-chat-types'
+import type { NativeChatBlock, NativeChatMessage } from '../../../shared/native-chat-types'
 
 // The relay's control queue is 1MB and its producer queue 2MB, both shared with
 // pty output; an over-budget response fails its own request and an over-budget

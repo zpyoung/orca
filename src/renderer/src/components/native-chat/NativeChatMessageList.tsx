@@ -11,7 +11,7 @@ import {
   type NativeChatBlock,
   type NativeChatMessage
 } from '../../../../shared/native-chat-types'
-import type { NativeChatLiveSession } from './use-native-chat-live-session'
+import type { NativeChatLiveSession } from './fork-native-chat-relay/use-native-chat-live-session'
 import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'
 import {
   nativeChatReasoningClassName,

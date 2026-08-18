@@ -7,11 +7,13 @@ import type { NativeChatMessage } from '../../../../shared/native-chat-types'
 import type {
   NativeChatLiveSession,
   UseNativeChatLiveSessionArgs
-} from './use-native-chat-live-session'
+} from './fork-native-chat-relay/use-native-chat-live-session'
 
 const { liveSession } = vi.hoisted(() => ({ liveSession: vi.fn() }))
 
-vi.mock('./use-native-chat-live-session', () => ({ useNativeChatLiveSession: liveSession }))
+vi.mock('./fork-native-chat-relay/use-native-chat-live-session', () => ({
+  useNativeChatLiveSession: liveSession
+}))
 
 import { useNativeChatRetainedSession } from './use-native-chat-retained-session'
 import { selectNativeChatViewState } from './native-chat-view-state'

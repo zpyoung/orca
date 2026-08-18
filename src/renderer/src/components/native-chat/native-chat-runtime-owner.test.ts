@@ -2,9 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { TerminalTab } from '../../../../shared/types'
 import {
   selectNativeChatRuntimeEnvironmentId,
-  selectNativeChatSshConnectionId,
-  type NativeChatRuntimeOwnerState,
-  type NativeChatSshOwnerState
+  type NativeChatRuntimeOwnerState
 } from './native-chat-runtime-owner'
 
 function terminalTab(overrides: Partial<TerminalTab> = {}): TerminalTab {
@@ -75,42 +73,5 @@ describe('selectNativeChatRuntimeEnvironmentId', () => {
         'tab-1'
       )
     ).toBe('env-1')
-  })
-})
-
-/** A repo carrying the ssh connection that owns its worktrees. */
-function sshState(connectionId: string | null): NativeChatSshOwnerState {
-  return {
-    ...state(),
-    repos: [{ id: 'repo', connectionId } as never],
-    worktreesByRepo: { repo: [{ id: 'wt-1', repoId: 'repo', hostId: 'local' } as never] }
-  } as unknown as NativeChatSshOwnerState
-}
-
-describe('selectNativeChatSshConnectionId', () => {
-  it('returns null for a local worktree', () => {
-    expect(selectNativeChatSshConnectionId(sshState(null), 'tab-1')).toBeNull()
-  })
-
-  it('returns the connection id for a plain ssh worktree', () => {
-    expect(selectNativeChatSshConnectionId(sshState('ssh-target-1'), 'tab-1')).toBe('ssh-target-1')
-  })
-
-  // Runtime-owned ssh targets are Model B: they already read over runtime RPC,
-  // so routing them at the relay too would double-own the transcript.
-  it('returns null for a runtime-owned ssh target', () => {
-    expect(selectNativeChatSshConnectionId(sshState('runtime-ssh-env-1'), 'tab-1')).toBeNull()
-  })
-
-  it('returns null when the worktree is runtime-owned', () => {
-    const runtimeOwned = {
-      ...sshState('ssh-target-1'),
-      worktreesByRepo: worktreeRecord('runtime:env-1')
-    } as unknown as NativeChatSshOwnerState
-    expect(selectNativeChatSshConnectionId(runtimeOwned, 'tab-1')).toBeNull()
-  })
-
-  it('returns null when the tab matches no worktree', () => {
-    expect(selectNativeChatSshConnectionId(sshState('ssh-target-1'), 'tab-missing')).toBeNull()
   })
 })

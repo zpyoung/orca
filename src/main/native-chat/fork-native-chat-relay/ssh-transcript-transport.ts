@@ -10,9 +10,9 @@ import {
   NATIVE_CHAT_RELAY_READ_SESSION_METHOD,
   NATIVE_CHAT_RELAY_SUBSCRIBE_METHOD,
   NATIVE_CHAT_RELAY_UNSUBSCRIBE_METHOD
-} from '../../shared/native-chat-relay-protocol'
-import type { AgentType, NativeChatMessage } from '../../shared/native-chat-types'
-import type { ReadTranscriptResult } from './transcript-reader'
+} from '../../../shared/fork-native-chat-relay/native-chat-relay-protocol'
+import type { AgentType, NativeChatMessage } from '../../../shared/native-chat-types'
+import type { ReadTranscriptResult } from '../transcript-reader'
 import type { NativeChatRelayFrame, SshNativeChatRelay } from './ssh-transcript-relay-contract'
 
 export type { NativeChatRelayFrame, SshNativeChatRelay } from './ssh-transcript-relay-contract'

@@ -8,7 +8,7 @@
     {
       "name": "native-chat-relay",
       "purpose": "Reads and live-tails native-chat transcripts for an agent running on a plain ssh: host over the SSH relay, since the desktop process cannot see that host's disk.",
-      "globs": ["docs/architecture/native-chat.md"]
+      "globs": ["**/fork-native-chat-relay/**", "docs/architecture/native-chat.md"]
     },
     {
       "name": "native-chat-coloring",
@@ -407,8 +407,7 @@
       "feature": "native-chat-relay",
       "kind": "registration",
       "lines": [
-        "  readSshNativeChatTranscript,",
-        "  subscribeSshNativeChatForSender",
+        "} from './fork-native-chat-relay/native-chat-ssh-subscription'",
         "  if (args.sshConnectionId) {"
       ]
     },
@@ -417,7 +416,8 @@
       "feature": "native-chat-relay",
       "kind": "registration",
       "lines": [
-        "import { notifySshRelayReady, onSshRelayReady } from './ssh-relay-ready-notifier'",
+        "import type { NativeChatRelayPing } from '../../shared/fork-native-chat-relay/native-chat-relay-protocol'",
+        "} from './fork-native-chat-relay/ssh-relay-ready-notifier'",
         "export async function requestActiveSshNativeChat(",
         "    notifySshRelayReady(tid)"
       ]
@@ -427,22 +427,9 @@
       "feature": "native-chat-relay",
       "kind": "registration",
       "lines": [
+        "} from '../../shared/fork-native-chat-relay/native-chat-relay-protocol'",
         "  async requestNativeChat(",
         "  onNativeChatChanged(handler: (ping: NativeChatRelayPing) => void): () => void {"
-      ]
-    },
-    {
-      "path": "src/preload/api-types.ts",
-      "feature": "native-chat-relay",
-      "kind": "passthrough",
-      "lines": ["      hasMore?: boolean", "export type NativeChatReadSessionArgs = {"]
-    },
-    {
-      "path": "src/preload/index.ts",
-      "feature": "native-chat-relay",
-      "kind": "passthrough",
-      "lines": [
-        "    readSession: (args: NativeChatReadSessionArgs): Promise<NativeChatReadSessionResult> =>"
       ]
     },
     {
@@ -450,198 +437,8 @@
       "feature": "native-chat-relay",
       "kind": "registration",
       "lines": [
-        "import { NativeChatHandler } from './native-chat-handler'",
-        "  const _nativeChatHandler = new NativeChatHandler(dispatcher)",
-        "  void _nativeChatHandler"
-      ]
-    },
-    {
-      "path": "src/main/native-chat/session-file-resolver.ts",
-      "feature": "native-chat-relay",
-      "kind": "passthrough",
-      "lines": [
-        "    // Path-only: this resolver also runs on the relay, where materializing the",
-        "    // mirror would create directories on the user's remote host from a read."
-      ]
-    },
-    {
-      "path": "src/main/native-chat/transcript-tail-reader.ts",
-      "feature": "native-chat-relay",
-      "kind": "registration",
-      "lines": [
-        "export type ReadNativeChatTranscriptTailFileArgs = {",
-        "  maxBytes?: number",
-        "function reversedCopy<T>(items: readonly T[]): T[] {"
-      ]
-    },
-    {
-      "path": "src/main/native-chat/transcript-watch-contract.ts",
-      "feature": "native-chat-relay",
-      "kind": "passthrough",
-      "lines": ["  initialMaxBytes?: number"]
-    },
-    {
-      "path": "src/main/native-chat/transcript-watch-engine.ts",
-      "feature": "native-chat-relay",
-      "kind": "passthrough",
-      "lines": [
-        "  const { onAppend, onInitialSnapshot, onReplace, initialLimit, initialMaxBytes } = args"
-      ]
-    },
-    {
-      "path": "src/main/runtime/orchestration/worker-transcript-read.ts",
-      "feature": "native-chat-relay",
-      "kind": "passthrough",
-      "lines": [
-        "  const page = await readNativeChatTranscriptTailFile({ filePath, limit, decode, endOffset })"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-incremental-assembler.ts",
-      "feature": "native-chat-relay",
-      "kind": "registration",
-      "lines": [
-        "export function assembleCachedTranscript(",
-        "export function sharesNativeChatPrefix("
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-live-status.ts",
-      "feature": "native-chat-relay",
-      "kind": "registration",
-      "lines": [
-        "import { assembleNativeChatSession, type NativeChatSources } from './native-chat-session-assembler'"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-live-status.test.ts",
-      "feature": "native-chat-relay",
-      "kind": "passthrough",
-      "lines": ["      sources: { transcript: [user('u-1', 'do a thing')] },"]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-pagination.ts",
-      "feature": "native-chat-relay",
-      "kind": "registration",
-      "lines": [
-        "export function resolveNativeChatHasMore(",
-        "export function nextNativeChatPageRequest("
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-pagination.test.ts",
-      "feature": "native-chat-relay",
-      "kind": "passthrough",
-      "lines": ["describe('resolveNativeChatHasMore', () => {"]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-runtime-contract.ts",
-      "feature": "native-chat-relay",
-      "kind": "passthrough",
-      "lines": [
-        "      ...(typeof record.hasMore === 'boolean' ? { hasMore: record.hasMore } : {}),"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-runtime-owner.ts",
-      "feature": "native-chat-relay",
-      "kind": "registration",
-      "lines": ["export function selectNativeChatSshConnectionId("]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-runtime-owner.test.ts",
-      "feature": "native-chat-relay",
-      "kind": "passthrough",
-      "lines": ["  selectNativeChatSshConnectionId,"]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-session-transport.ts",
-      "feature": "native-chat-relay",
-      "kind": "registration",
-      "lines": ["function toSyncUnsubscribe(handle: unknown): () => void {"]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-session-transport.test.ts",
-      "feature": "native-chat-relay",
-      "kind": "passthrough",
-      "lines": [
-        "  it('returns the local adapter for a null owner and forwards every readSession arg', async () => {"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-view-state.ts",
-      "feature": "native-chat-relay",
-      "kind": "passthrough",
-      "lines": ["const NATIVE_CHAT_READ_FAILED = 'Conversation could not be loaded.'"]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-view-state.test.ts",
-      "feature": "native-chat-relay",
-      "kind": "passthrough",
-      "lines": [
-        "  it('keeps rendering messages when the read settled into an error, and reports it', () => {"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/NativeChatView.tsx",
-      "feature": "native-chat-relay",
-      "kind": "registration",
-      "lines": [
-        "import { NativeChatConversation } from './NativeChatConversation'",
-        "import { useNativeChatLaunchPromptOverlay } from './use-native-chat-launch-prompt-overlay'",
-        "  const sshConnectionId = useAppStore((s) => selectNativeChatSshConnectionId(s, terminalTabId))"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-live-session.ts",
-      "feature": "native-chat-relay",
-      "kind": "registration",
-      "lines": [
-        "import { startNativeChatSeedRead } from './native-chat-read-retry'",
-        "  sshConnectionId?: string | null"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-live-session.test.ts",
-      "feature": "native-chat-relay",
-      "kind": "passthrough",
-      "lines": ["  it('pages older history by beforeOffset and prepends it', async () => {"]
-    },
-    {
-      "path": "src/renderer/src/web/web-preload-api.ts",
-      "feature": "native-chat-relay",
-      "kind": "passthrough",
-      "lines": [
-        "    readSession: async ({ agent, sessionId, limit, transcriptPath, beforeOffset }) =>"
-      ]
-    },
-    {
-      "path": "src/renderer/src/web/web-preload-api.test.ts",
-      "feature": "native-chat-relay",
-      "kind": "passthrough",
-      "lines": [
-        "      globals.window.api.nativeChat.readSession({ agent: 'claude', sessionId: 'session-1' })"
-      ]
-    },
-    {
-      "path": "src/main/ipc/native-chat-subscribe-lifecycle.test.ts",
-      "feature": "native-chat-relay",
-      "kind": "passthrough",
-      "lines": ["        beforeOffset: 0,"]
-    },
-    {
-      "path": "src/main/native-chat/transcript-reader.test.ts",
-      "feature": "native-chat-relay",
-      "kind": "passthrough",
-      "lines": ["    const result = await readNativeChatTranscriptTailFile({"]
-    },
-    {
-      "path": "src/main/ai-vault/session-scanner-fs-import-guard.test.ts",
-      "feature": "native-chat-relay",
-      "kind": "passthrough",
-      "lines": [
-        "  // transcript-tail-reader.ts stays on the fork's relay implementation, which",
-        "  // reads through node:fs directly; the upstream WSL gate does not cover it here."
+        "import { NativeChatHandler } from './fork-native-chat-relay/native-chat-handler'",
+        "  const _nativeChatHandler = new NativeChatHandler(dispatcher)"
       ]
     },
     {
@@ -651,10 +448,96 @@
       "lines": ["export type ConnectionOwnerState = Pick<"]
     },
     {
-      "path": "src/renderer/src/i18n/locales/en.json",
+      "path": "src/main/native-chat/transcript-watch-contract.ts",
       "feature": "native-chat-relay",
       "kind": "passthrough",
-      "lines": ["        \"readErrorNotice\": \"Chat history could not be refreshed. {{value0}}\""]
+      "lines": [
+        "export type NativeChatTranscriptTailReader = (args: {",
+        "  tailReader?: NativeChatTranscriptTailReader",
+        "  initialMaxBytes?: number"
+      ]
+    },
+    {
+      "path": "src/main/native-chat/transcript-watch-engine.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": [
+        "  args: SubscribeNativeChatTranscriptArgs & { tailReader: NativeChatTranscriptTailReader },",
+        "            maxBytes: initialMaxBytes,"
+      ]
+    },
+    {
+      "path": "src/main/native-chat/transcript-watch.ts",
+      "feature": "native-chat-relay",
+      "kind": "import-swap",
+      "lines": [
+        "import { subscribeNativeChatTranscriptWithDecoder } from './fork-native-chat-relay/transcript-watch-subscription'",
+        "    { ...args, tailReader: defaultTailReader },"
+      ]
+    },
+    {
+      "path": "src/main/native-chat/transcript-incremental-reader.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": ["const MAX_NATIVE_CHAT_TRANSCRIPT_RECORD_BYTES = 2 * 1024 * 1024"]
+    },
+    {
+      "path": "src/preload/api-types.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": [
+        "export type NativeChatReadSessionArgs = {",
+        "  (args: NativeChatReadSessionArgs): Promise<NativeChatReadSessionResult>"
+      ]
+    },
+    {
+      "path": "src/preload/index.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": [
+        "const readNativeChatSession: NativeChatReadSession = (",
+        "    readSession: readNativeChatSession,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/web/web-preload-api.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": [
+        "} from '@/components/native-chat/fork-native-chat-relay/native-chat-runtime-contract'",
+        "  const readNativeChatSession: NativeChatApi['readSession'] = async (",
+        "    readSession: readNativeChatSession,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-session-transport.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": ["  subscribe: NativeChatApi['subscribe']"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatMessageList.tsx",
+      "feature": "native-chat-relay",
+      "kind": "import-swap",
+      "lines": [
+        "import type { NativeChatLiveSession } from './fork-native-chat-relay/use-native-chat-live-session'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatView.tsx",
+      "feature": "native-chat-relay",
+      "kind": "registration",
+      "lines": [
+        "import { NativeChatConversation } from './fork-native-chat-relay/NativeChatConversation'",
+        "} from './fork-native-chat-relay/native-chat-runtime-owner'",
+        "  const sshConnectionId = useAppStore((s) => selectNativeChatSshConnectionId(s, terminalTabId))"
+      ]
+    },
+    {
+      "path": "src/main/ipc/native-chat-subscribe-lifecycle.test.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": ["        beforeOffset: 0,"]
     },
     {
       "path": "config/scripts/pr-workflow-parallelism.test.mjs",
@@ -973,123 +856,10 @@
       "ledger": "docs/fork-upstreaming.md#chat-header-controls-fix"
     },
     {
-      "path": "src/main/native-chat/transcript-tail-reader-wsl-gate.test.ts",
-      "reason": "Upstream test for the WSL-gated fs layer that the fork's relay-bundle rewrite of transcript-tail-reader.ts removed; returns with the file when the Tier-2 copy is extracted.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
-      "path": "src/main/native-chat/transcript-watch-wsl-stall.test.ts",
-      "reason": "Upstream test for WSL stall handling that the fork's relay-bundle rewrite of transcript-tail-reader.ts removed; returns with the file when the Tier-2 copy is extracted.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-preassembled-session-parity.test.ts",
-      "reason": "Upstream test deleted by the fork's relay/pagination rewrite (commit c137a9e97d); whether it returns green against the extracted structure or stays retired is decided during the relay feature's extraction task, not silently.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
       "path": "src/renderer/src/components/native-chat/use-native-chat-live-session-visibility.test.ts",
-      "reason": "Upstream test deleted by the fork's relay/pagination rewrite (commit c137a9e97d); whether it returns green against the extracted structure or stays retired is decided during the relay feature's extraction task, not silently.",
+      "reason": "The tag visibility test assumes hidden panes disable reads, but the retained-session relay path must stay subscribed across SSH relay reconnects; it cannot assert both contracts.",
       "status": "permanent",
       "deleted": true
-    },
-    {
-      "path": "src/main/ipc/native-chat-ssh-subscription.ts",
-      "reason": "New fork-authored file for the native-chat-relay feature, not yet moved into its fork-native-chat-relay/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/main/ipc/ssh-relay-ready-notifier.ts",
-      "reason": "New fork-authored file for the native-chat-relay feature, not yet moved into its fork-native-chat-relay/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/main/native-chat/relay-bundle-compatibility.test.ts",
-      "reason": "New fork-authored file for the native-chat-relay feature, not yet moved into its fork-native-chat-relay/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/main/native-chat/ssh-transcript-relay-contract.ts",
-      "reason": "New fork-authored file for the native-chat-relay feature, not yet moved into its fork-native-chat-relay/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/main/native-chat/ssh-transcript-transport.ts",
-      "reason": "New fork-authored file for the native-chat-relay feature, not yet moved into its fork-native-chat-relay/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/main/native-chat/ssh-transcript-transport.test.ts",
-      "reason": "New fork-authored file for the native-chat-relay feature, not yet moved into its fork-native-chat-relay/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/main/native-chat/transcript-wire-budget.ts",
-      "reason": "New fork-authored file for the native-chat-relay feature, not yet moved into its fork-native-chat-relay/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/main/native-chat/transcript-wire-budget.test.ts",
-      "reason": "New fork-authored file for the native-chat-relay feature, not yet moved into its fork-native-chat-relay/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/relay/native-chat-handler.ts",
-      "reason": "New fork-authored file for the native-chat-relay feature, not yet moved into its fork-native-chat-relay/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/relay/native-chat-handler.test.ts",
-      "reason": "New fork-authored file for the native-chat-relay feature, not yet moved into its fork-native-chat-relay/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/relay/native-chat-outbox.ts",
-      "reason": "New fork-authored file for the native-chat-relay feature, not yet moved into its fork-native-chat-relay/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/relay/native-chat-outbox.test.ts",
-      "reason": "New fork-authored file for the native-chat-relay feature, not yet moved into its fork-native-chat-relay/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/relay/native-chat-relay-params.ts",
-      "reason": "New fork-authored file for the native-chat-relay feature, not yet moved into its fork-native-chat-relay/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-read-retry.ts",
-      "reason": "New fork-authored file for the native-chat-relay feature, not yet moved into its fork-native-chat-relay/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/NativeChatConversation.tsx",
-      "reason": "New fork-authored file for the native-chat-relay feature, not yet moved into its fork-native-chat-relay/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/NativeChatReadErrorNotice.tsx",
-      "reason": "New fork-authored file for the native-chat-relay feature, not yet moved into its fork-native-chat-relay/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-assembled-transcript.ts",
-      "reason": "New fork-authored file for the native-chat-relay feature, not yet moved into its fork-native-chat-relay/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-launch-prompt-overlay.ts",
-      "reason": "New fork-authored file for the native-chat-relay feature, not yet moved into its fork-native-chat-relay/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
-    },
-    {
-      "path": "src/shared/native-chat-relay-protocol.ts",
-      "reason": "New fork-authored file for the native-chat-relay feature, not yet moved into its fork-native-chat-relay/ directory (phase-4 extraction); until then it matches no feature glob and must not reset to upstream, which has no such file.",
-      "status": "pending-decision"
     }
   ]
 }

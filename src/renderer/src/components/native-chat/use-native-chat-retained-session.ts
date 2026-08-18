@@ -7,7 +7,7 @@ import {
   useNativeChatLiveSession,
   type NativeChatLiveSession,
   type UseNativeChatLiveSessionArgs
-} from './use-native-chat-live-session'
+} from './fork-native-chat-relay/use-native-chat-live-session'
 
 /** Keeps one committed conversation visible while its exact source rebinds. */
 export function useNativeChatRetainedSession(

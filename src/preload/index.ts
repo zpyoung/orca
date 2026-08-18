@@ -217,7 +217,7 @@ import type {
   RefreshAgentsResult,
   NativeChatAppendedPayload,
   NativeChatReadSessionArgs,
-  NativeChatReadSessionResult,
+  NativeChatReadSession,
   NativeChatSubscriptionFrame,
   PluginHostInstallResult,
   PluginHostInstallSource,
@@ -492,6 +492,19 @@ ipcRenderer.on('ui:findInBrowserPage', (_event, source: unknown) => {
 })
 
 // Custom APIs for renderer
+const readNativeChatSession: NativeChatReadSession = (
+  argsOrAgent: NativeChatReadSessionArgs | AgentType,
+  sessionId?: string,
+  limit?: number,
+  transcriptPath?: string
+) =>
+  ipcRenderer.invoke(
+    'nativeChat:readSession',
+    typeof argsOrAgent === 'string'
+      ? { agent: argsOrAgent, sessionId: sessionId ?? '', limit, transcriptPath }
+      : argsOrAgent
+  )
+
 const api = {
   app: {
     getIdentity: (): Promise<AppIdentity> => ipcRenderer.invoke('app:getIdentity'),
@@ -4274,8 +4287,7 @@ const api = {
   },
 
   nativeChat: {
-    readSession: (args: NativeChatReadSessionArgs): Promise<NativeChatReadSessionResult> =>
-      ipcRenderer.invoke('nativeChat:readSession', args),
+    readSession: readNativeChatSession,
     /** Start live tailing; onAppended fires with only newly-appended messages. Returns an unsubscribe fn that closes the watcher. */
     subscribe: (
       args: {

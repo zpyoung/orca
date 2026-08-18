@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NativeChatHandler } from './native-chat-handler'
-import { NATIVE_CHAT_CHANGED_METHOD } from '../shared/native-chat-relay-protocol'
-import type { RelayDispatcher } from './dispatcher'
+import { NATIVE_CHAT_CHANGED_METHOD } from '../../shared/fork-native-chat-relay/native-chat-relay-protocol'
+import type { RelayDispatcher } from '../dispatcher'
 
 type Handler = (params: Record<string, unknown>, context: { clientId: number }) => Promise<unknown>
 

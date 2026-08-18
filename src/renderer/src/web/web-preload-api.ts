@@ -4,7 +4,8 @@ import type {
   PreflightStatus,
   RefreshAgentsResult,
   NativeChatApi,
-  NativeChatAppendedMessages
+  NativeChatAppendedMessages,
+  NativeChatReadSessionArgs
 } from '../../../preload/api-types'
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import { parseHostAccessLink } from '../../../shared/remote-pairing-address'
@@ -20,6 +21,7 @@ import type {
   AiVaultPrepareSessionResumeResult
 } from '../../../shared/ai-vault-resume-preparation'
 import { buildNativeChatUnsubscribe } from '../../../shared/native-chat-stream-unsubscribe'
+import type { AgentType } from '../../../shared/native-chat-types'
 import type {
   ComputerUsePermissionSetupResult,
   ComputerUsePermissionStatusResult
@@ -152,7 +154,7 @@ import { getDefaultCreateProjectParent } from '@/components/sidebar/create-proje
 import {
   parseRuntimeNativeChatReadSessionResult,
   parseRuntimeNativeChatTurnLifecycle
-} from '@/components/native-chat/native-chat-runtime-contract'
+} from '@/components/native-chat/fork-native-chat-relay/native-chat-runtime-contract'
 import { createWebFileMutationMethods } from './web-file-mutation-methods'
 
 const SETTINGS_STORAGE_KEY = 'orca.web.settings.v1'
@@ -1241,17 +1243,23 @@ function createWebKeybindingsApi(): WebKeybindingsApi {
 
 // Why: web has no IPC for native-chat transcripts, so route readSession/subscribe through runtime RPC (as mobile does).
 function createNativeChatApi(): NativeChatApi {
+  const readNativeChatSession: NativeChatApi['readSession'] = async (
+    argsOrAgent: NativeChatReadSessionArgs | AgentType,
+    sessionId?: string,
+    limit?: number,
+    transcriptPath?: string
+  ) => {
+    const args =
+      typeof argsOrAgent === 'string'
+        ? { agent: argsOrAgent, sessionId: sessionId ?? '', limit, transcriptPath }
+        : argsOrAgent
+    return parseRuntimeNativeChatReadSessionResult(
+      await callRuntimeResult<unknown>('nativeChat.readSession', args)
+    )
+  }
+
   return {
-    readSession: async ({ agent, sessionId, limit, transcriptPath, beforeOffset }) =>
-      parseRuntimeNativeChatReadSessionResult(
-        await callRuntimeResult<unknown>('nativeChat.readSession', {
-          agent,
-          sessionId,
-          limit,
-          transcriptPath,
-          beforeOffset
-        })
-      ),
+    readSession: readNativeChatSession,
     subscribe: (args, onFrame) => {
       // No paired runtime yet: return a no-op teardown so the chat view mounts cleanly; only the not-paired case is swallowed.
       const environment = requireActiveEnvironmentOrNull()

@@ -24,9 +24,14 @@ describe('registerForkLocalizationCatalogs', () => {
     const englishCatalogs = addResourceBundle.mock.calls
       .filter(([language]) => language === 'en')
       .map(([, , catalog]) => catalog)
+    expect(englishCatalogs).toHaveLength(3)
     expect(englishCatalogs).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ components: expect.any(Object) }),
+        expect.objectContaining({
+          components: expect.objectContaining({
+            'native-chat': expect.objectContaining({ state: expect.any(Object) })
+          })
+        }),
         expect.objectContaining({ auto: expect.any(Object) })
       ])
     )
@@ -35,6 +40,7 @@ describe('registerForkLocalizationCatalogs', () => {
     const spanishCatalogs = addResourceBundle.mock.calls
       .filter(([language]) => language === 'es')
       .map(([, , catalog]) => catalog)
+    expect(spanishCatalogs).toHaveLength(3)
     expect(spanishCatalogs).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ components: expect.any(Object) }),

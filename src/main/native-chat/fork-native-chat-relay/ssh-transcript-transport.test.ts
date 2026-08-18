@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { NativeChatRelayPing } from '../../shared/native-chat-relay-protocol'
+import type { NativeChatRelayPing } from '../../../shared/fork-native-chat-relay/native-chat-relay-protocol'
 import {
   readSshNativeChatSession,
   subscribeSshNativeChatTranscript

@@ -1,8 +1,8 @@
 // The narrow relay surface the ssh transcript transport needs, kept separate
 // from the ipc/ssh module so the transport is testable without a live session.
 
-import type { NativeChatRelayPing } from '../../shared/native-chat-relay-protocol'
-import type { NativeChatMessage, NativeChatTurnLifecycle } from '../../shared/native-chat-types'
+import type { NativeChatRelayPing } from '../../../shared/fork-native-chat-relay/native-chat-relay-protocol'
+import type { NativeChatMessage, NativeChatTurnLifecycle } from '../../../shared/native-chat-types'
 
 export type NativeChatRelayFrame =
   | {

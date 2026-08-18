@@ -1,3 +1,8 @@
+import relayZH from '../components/native-chat/fork-native-chat-relay/locales/zh.json'
+import relayKO from '../components/native-chat/fork-native-chat-relay/locales/ko.json'
+import relayJA from '../components/native-chat/fork-native-chat-relay/locales/ja.json'
+import relayES from '../components/native-chat/fork-native-chat-relay/locales/es.json'
+import relayEN from '../components/native-chat/fork-native-chat-relay/locales/en.json'
 import worktreeGroupsEN from '../components/sidebar/fork-worktree-groups/locales/en.json'
 import en from '../components/native-chat/fork-native-chat-width/locales/en.json'
 import worktreeGroupsES from '../components/sidebar/fork-worktree-groups/locales/es.json'
@@ -26,11 +31,11 @@ type ForkCatalogRegistrar = {
 }
 
 const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
-  en: [en, worktreeGroupsEN],
-  es: [es, worktreeGroupsES],
-  ja: [ja, worktreeGroupsJA],
-  ko: [ko, worktreeGroupsKO],
-  zh: [zh, worktreeGroupsZH]
+  en: [relayEN, en, worktreeGroupsEN],
+  es: [relayES, es, worktreeGroupsES],
+  ja: [relayJA, ja, worktreeGroupsJA],
+  ko: [relayKO, ko, worktreeGroupsKO],
+  zh: [relayZH, zh, worktreeGroupsZH]
 }
 
 export function registerForkLocalizationCatalogs(i18n: ForkCatalogRegistrar): void {

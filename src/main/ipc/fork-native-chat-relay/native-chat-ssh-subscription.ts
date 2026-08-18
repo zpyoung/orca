@@ -5,18 +5,19 @@ import type { WebContents } from 'electron'
 import {
   readSshNativeChatSession,
   subscribeSshNativeChatTranscript
-} from '../native-chat/ssh-transcript-transport'
+} from '../../native-chat/fork-native-chat-relay/ssh-transcript-transport'
 import type {
   NativeChatRelayFrame,
   SshNativeChatRelay
-} from '../native-chat/ssh-transcript-relay-contract'
+} from '../../native-chat/fork-native-chat-relay/ssh-transcript-relay-contract'
 import {
   onActiveSshNativeChatChanged,
   onActiveSshRelayReady,
   requestActiveSshNativeChat
-} from './ssh'
-import type { AgentType } from '../../shared/native-chat-types'
-import type { ReadTranscriptResult } from '../native-chat/transcript-reader'
+} from '../ssh'
+import type { AgentType } from '../../../shared/native-chat-types'
+import type { ReadTranscriptResult } from '../../native-chat/transcript-reader'
+import type { NativeChatTranscriptSubscription } from '../../native-chat/transcript-watch-contract'
 
 /** Binds the transport to the live SSH relay sessions. Kept as a value so the
  *  transport itself stays testable without one. */
@@ -104,9 +105,9 @@ export function subscribeSshNativeChatForSender(args: {
   sessionId: string
   transcriptPath?: string
   limit: number
-}): { unsubscribe: () => void } {
+}): NativeChatTranscriptSubscription {
   const { sender, subscriptionId } = args
-  return subscribeSshNativeChatTranscript(
+  const subscription = subscribeSshNativeChatTranscript(
     sshNativeChatRelay,
     {
       connectionId: args.sshConnectionId,
@@ -122,4 +123,5 @@ export function subscribeSshNativeChatForSender(args: {
       }
     }
   )
+  return { watching: true, unsubscribe: subscription.unsubscribe }
 }

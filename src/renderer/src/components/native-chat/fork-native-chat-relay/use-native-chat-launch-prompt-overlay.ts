@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
-import type { NativeChatMessage, NativeChatSession } from '../../../../shared/native-chat-types'
+import type { NativeChatMessage, NativeChatSession } from '../../../../../shared/native-chat-types'
 import type { NativeChatLaunchPrompt } from '@/lib/native-chat-launch-prompt'
-import { launchPromptAsMessage } from './native-chat-pending'
+import { launchPromptAsMessage } from '../native-chat-pending'
 
 /**
  * Overlay the pane's launch prompt as an optimistic user turn until the

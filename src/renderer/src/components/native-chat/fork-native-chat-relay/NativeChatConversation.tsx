@@ -1,4 +1,4 @@
-import { NativeChatMessageList } from './NativeChatMessageList'
+import { NativeChatMessageList } from '../NativeChatMessageList'
 import { NativeChatReadErrorNotice } from './NativeChatReadErrorNotice'
 import type { CommentMarkdownLinkClickHandler } from '@/components/sidebar/CommentMarkdown'
 import type { NativeChatLiveSession } from './use-native-chat-live-session'

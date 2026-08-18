@@ -7,12 +7,12 @@
 // growing without bound — the same degradation the watcher already applies to a
 // rotated file.
 
-import type { NativeChatMessage, NativeChatTurnLifecycle } from '../shared/native-chat-types'
+import type { NativeChatMessage, NativeChatTurnLifecycle } from '../../shared/native-chat-types'
 import {
   clipNativeChatMessageToBytes,
   estimateNativeChatMessageBytes,
   NATIVE_CHAT_RELAY_BYTE_BUDGET
-} from '../main/native-chat/transcript-wire-budget'
+} from '../../main/native-chat/fork-native-chat-relay/transcript-wire-budget'
 
 /** No single message may exceed a pull's budget, or the drain could never progress. */
 const MAX_MESSAGE_BYTES = Math.floor(NATIVE_CHAT_RELAY_BYTE_BUDGET / 2)

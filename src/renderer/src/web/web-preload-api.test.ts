@@ -1514,12 +1514,12 @@ describe('web native chat preload API', () => {
     const { installWebPreloadApi } = await import('./web-preload-api')
     installWebPreloadApi()
 
-    await expect(
-      globals.window.api.nativeChat.readSession({ agent: 'claude', sessionId: 'session-1' })
-    ).resolves.toEqual({
-      messages: [message],
-      lifecycle
-    })
+    await expect(globals.window.api.nativeChat.readSession('claude', 'session-1')).resolves.toEqual(
+      {
+        messages: [message],
+        lifecycle
+      }
+    )
     const frames: unknown[] = []
     globals.window.api.nativeChat.subscribe(
       { subscriptionId: 'sub-1', agent: 'claude', sessionId: 'session-1' },

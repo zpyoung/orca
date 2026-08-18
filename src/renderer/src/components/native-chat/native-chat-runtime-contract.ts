@@ -47,13 +47,7 @@ export function parseRuntimeNativeChatReadSessionResult(
     const lifecycle = parseRuntimeNativeChatTurnLifecycle(record.lifecycle)
     return {
       messages: record.messages as NativeChatAppendedMessages,
-      ...(lifecycle ? { lifecycle } : {}),
-      // Dropping these would leave the caller inferring "older history exists"
-      // from the returned count and unable to page past the first window.
-      ...(typeof record.hasMore === 'boolean' ? { hasMore: record.hasMore } : {}),
-      ...(typeof record.beforeOffset === 'number' && Number.isFinite(record.beforeOffset)
-        ? { beforeOffset: record.beforeOffset }
-        : {})
+      ...(lifecycle ? { lifecycle } : {})
     }
   }
   if (typeof record.error === 'string') {
