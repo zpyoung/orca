@@ -7,9 +7,26 @@
 
 const SEAM_KINDS = new Set(['registration', 'import-swap', 'passthrough'])
 const EXCEPTION_STATUSES = new Set(['permanent', 'pending-upstream', 'pending-decision'])
+const KEBAB_CASE_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 function isNonEmptyString(value) {
   return typeof value === 'string' && value.length > 0
+}
+
+// manifest paths are matched against repo-relative POSIX paths; reject anything
+// that can never match one, so a malformed entry can't silently become a dead
+// ownership claim (see matchGlob/classifyPath).
+function assertPosixRelativePathSyntax(value) {
+  if (value.includes('\\')) {
+    throw new Error(`must not contain a backslash: ${JSON.stringify(value)}`)
+  }
+  for (const segment of value.split('/')) {
+    if (segment === '' || segment === '.' || segment === '..') {
+      throw new Error(
+        `must not have a leading/trailing "/" or an empty, ".", or ".." segment: ${JSON.stringify(value)}`
+      )
+    }
+  }
 }
 
 function validateFeature(feature, index) {
@@ -17,6 +34,9 @@ function validateFeature(feature, index) {
     throw new Error(`features[${index}] is missing a non-empty "name"`)
   }
   const { name } = feature
+  if (!KEBAB_CASE_PATTERN.test(name)) {
+    throw new Error(`Feature "${name}" has a name that is not kebab-case`)
+  }
   if (!isNonEmptyString(feature.purpose)) {
     throw new Error(`Feature "${name}" is missing a non-empty "purpose"`)
   }
@@ -38,6 +58,11 @@ function validateSeam(seam, index, featureNames) {
     throw new Error(`seams[${index}] is missing a non-empty "path"`)
   }
   const { path } = seam
+  try {
+    assertPosixRelativePathSyntax(path)
+  } catch (error) {
+    throw new Error(`Seam "${path}" has an invalid path: ${error.message}`)
+  }
   if (!isNonEmptyString(seam.feature)) {
     throw new Error(`Seam "${path}" is missing a non-empty "feature"`)
   }
@@ -63,6 +88,11 @@ function validateException(exception, index) {
     throw new Error(`exceptions[${index}] is missing a non-empty "path"`)
   }
   const { path } = exception
+  try {
+    assertPosixRelativePathSyntax(path)
+  } catch (error) {
+    throw new Error(`Exception "${path}" has an invalid path: ${error.message}`)
+  }
   if (!isNonEmptyString(exception.reason)) {
     throw new Error(`Exception "${path}" is missing a non-empty "reason"`)
   }
@@ -73,9 +103,7 @@ function validateException(exception, index) {
   }
   const hasLedger = exception.ledger !== undefined
   if (exception.status === 'pending-upstream' && !isNonEmptyString(exception.ledger)) {
-    throw new Error(
-      `Exception "${path}" has status "pending-upstream" and must include a "ledger"`
-    )
+    throw new Error(`Exception "${path}" has status "pending-upstream" and must include a "ledger"`)
   }
   if (exception.status !== 'pending-upstream' && hasLedger) {
     throw new Error(`Exception "${path}" has a "ledger" but status is not "pending-upstream"`)
@@ -134,19 +162,6 @@ export function loadForkOwnershipManifest(jsonText) {
 }
 
 const DISALLOWED_GLOB_CHARS = /[?{}[\]!]/
-const REGEXP_SPECIAL_CHARS = new Set(['.', '+', '^', '$', '(', ')', '|', '\\'])
-
-function escapeRegExpChar(char) {
-  return REGEXP_SPECIAL_CHARS.has(char) ? `\\${char}` : char
-}
-
-function compileLiteralSegment(segment) {
-  let compiled = ''
-  for (const char of segment) {
-    compiled += char === '*' ? '[^/]*' : escapeRegExpChar(char)
-  }
-  return compiled
-}
 
 // the grammar is closed and hand-rolled (no minimatch/glob dep in a module the
 // CI guard loads with no install step): split on '/' into literal-or-"**"
@@ -159,12 +174,13 @@ function compileGlobPattern(pattern) {
   if (disallowed) {
     throw new Error(`Unsupported glob syntax in "${pattern}": "${disallowed[0]}" is not supported`)
   }
+  assertPosixRelativePathSyntax(pattern)
 
   const atoms = []
   for (const segment of pattern.split('/')) {
     if (segment === '**') {
-      if (atoms.at(-1)?.type !== 'flex') {
-        atoms.push({ type: 'flex' })
+      if (atoms.at(-1)?.type !== 'globstar') {
+        atoms.push({ type: 'globstar' })
       }
       continue
     }
@@ -173,36 +189,82 @@ function compileGlobPattern(pattern) {
         `Unsupported glob syntax in "${pattern}": "**" must occupy its own path segment`
       )
     }
-    atoms.push({ type: 'literal', source: compileLiteralSegment(segment) })
+    atoms.push({ type: 'literal', segment })
   }
+  return atoms
+}
 
-  let source = '^'
-  atoms.forEach((atom, index) => {
-    if (atom.type === 'literal') {
-      source += atom.source
-      if (atoms[index + 1]?.type === 'literal') {
-        source += '/'
-      }
-      return
+// two-pointer scan with backtrack-to-last-star instead of a regex: no nested
+// quantifiers, so no catastrophic backtracking, and every byte of a segment
+// (including "\n") is compared literally, so "*" never special-cases it.
+function matchSegment(patternSegment, pathSegment) {
+  let pi = 0
+  let si = 0
+  let starAt = -1
+  let starMatchedUpTo = -1
+  while (si < pathSegment.length) {
+    if (patternSegment[pi] === pathSegment[si]) {
+      pi++
+      si++
+    } else if (patternSegment[pi] === '*') {
+      starAt = pi
+      starMatchedUpTo = si
+      pi++
+    } else if (starAt !== -1) {
+      pi = starAt + 1
+      starMatchedUpTo++
+      si = starMatchedUpTo
+    } else {
+      return false
     }
-    const isFirst = index === 0
-    const isLast = index === atoms.length - 1
-    // a "**" segment is legal on any side of a literal segment (leading,
-    // middle, or trailing) and always includes its own adjoining separator,
-    // so it matches zero directories with no leftover slash either way.
-    source += isFirst && isLast ? '.*' : isFirst ? '(?:.*/)?' : isLast ? '(?:/.*)?' : '/(?:.*/)?'
-  })
-  return new RegExp(`${source}$`)
+  }
+  while (patternSegment[pi] === '*') {
+    pi++
+  }
+  return pi === patternSegment.length
+}
+
+// same backtrack-to-last-globstar scan one level up, over path segments
+// instead of characters, so a pattern that repeats "**/*" resolves in time
+// linear in pattern and path length rather than a regex's exponential blowup.
+function matchAtoms(atoms, pathSegments) {
+  let ai = 0
+  let si = 0
+  let starAt = -1
+  let starMatchedUpTo = -1
+  while (si < pathSegments.length) {
+    const atom = atoms[ai]
+    if (atom?.type === 'literal' && matchSegment(atom.segment, pathSegments[si])) {
+      ai++
+      si++
+    } else if (atom?.type === 'globstar') {
+      starAt = ai
+      starMatchedUpTo = si
+      ai++
+    } else if (starAt !== -1) {
+      ai = starAt + 1
+      starMatchedUpTo++
+      si = starMatchedUpTo
+    } else {
+      return false
+    }
+  }
+  while (atoms[ai]?.type === 'globstar') {
+    ai++
+  }
+  return ai === atoms.length
 }
 
 /**
  * Tests a repo-relative POSIX path against one glob pattern from the
- * manifest's closed grammar: a directory wildcard (a segment consisting of
- * exactly two literal stars), a single-segment `*`, and literal text.
- * @throws {Error} if the pattern uses syntax outside that grammar.
+ * manifest's closed grammar: a directory wildcard (a lone "**" segment,
+ * matching zero or more whole directories), a single-segment `*`, and
+ * literal text.
+ * @throws {Error} if the pattern uses syntax outside that grammar, or is not
+ *   itself a valid repo-relative path (absolute, traversal, or backslash).
  */
 export function matchGlob(pattern, path) {
-  return compileGlobPattern(pattern).test(path)
+  return matchAtoms(compileGlobPattern(pattern), path.split('/'))
 }
 
 /**

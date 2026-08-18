@@ -22,7 +22,11 @@ describe('loadForkOwnershipManifest', () => {
   it('loads a fully populated manifest', () => {
     const manifest = load({
       features: [
-        { name: 'fork-native-chat-width', purpose: 'widens the native chat pane', globs: ['**/fork-native-chat-width/**'] }
+        {
+          name: 'fork-native-chat-width',
+          purpose: 'widens the native chat pane',
+          globs: ['**/fork-native-chat-width/**']
+        }
       ],
       seams: [
         {
@@ -50,12 +54,14 @@ describe('loadForkOwnershipManifest', () => {
     expect(() => loadForkOwnershipManifest('{not json')).toThrow()
   })
 
-  it.each([['array', '[]'], ['string', '"nope"'], ['number', '1'], ['null', 'null']])(
-    'throws when the top level is a %s, not an object',
-    (_label, jsonText) => {
-      expect(() => loadForkOwnershipManifest(jsonText)).toThrow()
-    }
-  )
+  it.each([
+    ['array', '[]'],
+    ['string', '"nope"'],
+    ['number', '1'],
+    ['null', 'null']
+  ])('throws when the top level is a %s, not an object', (_label, jsonText) => {
+    expect(() => loadForkOwnershipManifest(jsonText)).toThrow()
+  })
 
   it.each(['features', 'seams', 'exceptions'])('throws when "%s" is missing', (key) => {
     const manifest = baseManifest()
@@ -77,15 +83,13 @@ describe('loadForkOwnershipManifest', () => {
   })
 
   it('throws on a feature missing a non-empty name', () => {
-    expect(() =>
-      load({ features: [{ name: '', purpose: 'x', globs: [] }] })
-    ).toThrow(/name/)
+    expect(() => load({ features: [{ name: '', purpose: 'x', globs: [] }] })).toThrow(/name/)
   })
 
   it('throws on a feature missing a non-empty purpose', () => {
-    expect(() =>
-      load({ features: [{ name: 'fork-x', purpose: '', globs: [] }] })
-    ).toThrow(/purpose/)
+    expect(() => load({ features: [{ name: 'fork-x', purpose: '', globs: [] }] })).toThrow(
+      /purpose/
+    )
   })
 
   it('throws on a feature whose globs field is not an array', () => {
@@ -126,7 +130,9 @@ describe('loadForkOwnershipManifest', () => {
   it('throws when a seam references an unknown feature', () => {
     expect(() =>
       load({
-        seams: [{ path: 'a.ts', feature: 'fork-does-not-exist', kind: 'registration', lines: ['x'] }]
+        seams: [
+          { path: 'a.ts', feature: 'fork-does-not-exist', kind: 'registration', lines: ['x'] }
+        ]
       })
     ).toThrow(/fork-does-not-exist/)
   })
@@ -178,21 +184,21 @@ describe('loadForkOwnershipManifest', () => {
   })
 
   it('throws on an exception missing a non-empty path', () => {
-    expect(() =>
-      load({ exceptions: [{ path: '', reason: 'x', status: 'permanent' }] })
-    ).toThrow(/path/)
+    expect(() => load({ exceptions: [{ path: '', reason: 'x', status: 'permanent' }] })).toThrow(
+      /path/
+    )
   })
 
   it('throws on an exception missing a non-empty reason', () => {
-    expect(() =>
-      load({ exceptions: [{ path: 'a.ts', reason: '', status: 'permanent' }] })
-    ).toThrow(/reason/)
+    expect(() => load({ exceptions: [{ path: 'a.ts', reason: '', status: 'permanent' }] })).toThrow(
+      /reason/
+    )
   })
 
   it('throws on an invalid exception status', () => {
-    expect(() =>
-      load({ exceptions: [{ path: 'a.ts', reason: 'x', status: 'bogus' }] })
-    ).toThrow(/status/)
+    expect(() => load({ exceptions: [{ path: 'a.ts', reason: 'x', status: 'bogus' }] })).toThrow(
+      /status/
+    )
   })
 
   it.each(['permanent', 'pending-decision'])(
@@ -215,7 +221,12 @@ describe('loadForkOwnershipManifest', () => {
   it('allows "pending-upstream" with a ledger', () => {
     const manifest = load({
       exceptions: [
-        { path: 'a.ts', reason: 'x', status: 'pending-upstream', ledger: 'docs/fork-upstreaming.md#a' }
+        {
+          path: 'a.ts',
+          reason: 'x',
+          status: 'pending-upstream',
+          ledger: 'docs/fork-upstreaming.md#a'
+        }
       ]
     })
     expect(manifest.exceptions[0].ledger).toBe('docs/fork-upstreaming.md#a')
@@ -384,4 +395,86 @@ describe('matchGlob grammar', () => {
   it('rejects "**" glued inside a literal segment', () => {
     expect(() => matchGlob('a**b/x.ts', 'ab/x.ts')).toThrow()
   })
+})
+
+describe('matchGlob newline handling', () => {
+  it('matches a leading "**" against a path segment containing a newline', () => {
+    expect(matchGlob('**/foo', 'a\nb/foo')).toBe(true)
+  })
+
+  it('matches a trailing "**" against a path segment containing a newline', () => {
+    expect(matchGlob('a/**', 'a/x\ny')).toBe(true)
+  })
+
+  it('matches a directory glob across a newline-bearing segment', () => {
+    expect(matchGlob('**/fork-native-chat-width/**', 'src\n/fork-native-chat-width/x.ts')).toBe(
+      true
+    )
+  })
+
+  it('matches single-segment "*" against a newline, consistent with "**"', () => {
+    expect(matchGlob('a/*', 'a/x\ny')).toBe(true)
+  })
+})
+
+describe('matchGlob avoids catastrophic backtracking', () => {
+  it('resolves a repeated "**/*" pattern in time linear in input size', () => {
+    const n = 14
+    const pattern = `${Array.from({ length: n }, () => '**/*').join('/')}/Z`
+    const path = `${Array.from({ length: n * 2 }, () => 'a').join('/')}/Y`
+    const started = Date.now()
+    const result = matchGlob(pattern, path)
+    expect(Date.now() - started).toBeLessThan(1000)
+    expect(result).toBe(false)
+  })
+})
+
+describe('feature name kebab-case validation', () => {
+  it('throws when a feature name has a space and capital letters', () => {
+    expect(() => load({ features: [{ name: 'Not Kebab', purpose: 'p', globs: [] }] })).toThrow(
+      /kebab/i
+    )
+  })
+
+  it('throws when a feature name uses underscores', () => {
+    expect(() =>
+      load({ features: [{ name: 'fork_native_chat', purpose: 'p', globs: [] }] })
+    ).toThrow(/kebab/i)
+  })
+
+  it.each([
+    'worktree-groups',
+    'native-chat-relay',
+    'native-chat-coloring',
+    'native-chat-width',
+    'fork-infra'
+  ])('accepts real fork feature name "%s"', (name) => {
+    const manifest = load({ features: [{ name, purpose: 'p', globs: [] }] })
+    expect(manifest.features[0].name).toBe(name)
+  })
+})
+
+describe('manifest path syntax validation', () => {
+  it.each(['../owned/**', '/owned/**', 'owned\\subdir/**'])(
+    'rejects unsafe glob pattern "%s" in a feature',
+    (glob) => {
+      expect(() => load({ features: [{ name: 'fork-x', purpose: 'p', globs: [glob] }] })).toThrow()
+    }
+  )
+
+  it.each(['/a.ts', '../a.ts', 'a/../b.ts', 'a//b.ts', 'a/', 'a\\b.ts'])(
+    'rejects unsafe seam path "%s"',
+    (path) => {
+      expect(() =>
+        load({ seams: [{ path, feature: 'fork-infra', kind: 'registration', lines: ['x'] }] })
+      ).toThrow()
+    }
+  )
+
+  it.each(['/a.ts', '../a.ts', 'a/../b.ts', 'a//b.ts', 'a/', 'a\\b.ts'])(
+    'rejects unsafe exception path "%s"',
+    (path) => {
+      expect(() => load({ exceptions: [{ path, reason: 'x', status: 'permanent' }] })).toThrow()
+    }
+  )
 })
