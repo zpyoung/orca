@@ -882,6 +882,16 @@
       "status": "permanent"
     },
     {
+      "path": ".github/scripts/check-fork-ownership.mjs",
+      "reason": "The CI guard that enforces this manifest on pull requests — fork machinery, not upstream code.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/check-fork-ownership.test.mjs",
+      "reason": "Tests for the fork ownership CI guard above.",
+      "status": "permanent"
+    },
+    {
       "path": "config/fork-ownership.json",
       "reason": "The manifest declares itself so a sync never resets or removes its own source of truth.",
       "status": "permanent"
