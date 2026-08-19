@@ -91,6 +91,7 @@ the candidate path. Anything else is an ownership or collision finding to raise 
    ```sh
    copy_path='path/from-the-git-grep-output'
    target_ref='vX.Y.Z'
+   case "$target_ref" in v[0-9]*.[0-9]*.[0-9]*) ;; *) exit 2 ;; esac
    first_header=$(sed -n '1p' "$copy_path")
    second_header=$(sed -n '2p' "$copy_path")
    case "$first_header" in '// FORK-COPY-OF: '*) ;; *) exit 2 ;; esac
@@ -100,7 +101,7 @@ the candidate path. Anything else is an ownership or collision finding to raise 
    test -n "$recorded_paths" || exit 2
    printf '%s\n' "$recorded_sha" | grep -Eq '^[0-9a-f]{40}([0-9a-f]{24})?$' || exit 2
    git cat-file -e "${recorded_sha}^{commit}" || exit 2
-   target_commit=$(git rev-parse --verify --end-of-options "${target_ref}^{commit}") || exit 2
+   target_commit=$(git rev-parse --verify "${target_ref}^{commit}") || exit 2
    if git cat-file -e "${target_commit}:${copy_path}" 2>/dev/null; then exit 2; fi
    status_file=$(mktemp)
    git diff --name-status -z --find-renames "$recorded_sha" "$target_commit" > "$status_file" \

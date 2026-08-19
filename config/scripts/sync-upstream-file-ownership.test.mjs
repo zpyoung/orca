@@ -525,7 +525,8 @@ describe('phase-5 SKILL.md procedure', () => {
     expect(tierTwoProcedure).toContain('first two physical lines must be the two copy headers')
     expect(tierTwoProcedure).toContain("grep -Eq '^[0-9a-f]{40}([0-9a-f]{24})?$'")
     expect(tierTwoProcedure).toContain('git cat-file -e "${recorded_sha}^{commit}"')
-    expect(tierTwoProcedure).toContain('git rev-parse --verify --end-of-options')
+    expect(tierTwoProcedure).toContain('case "$target_ref" in v[0-9]*.[0-9]*.[0-9]*)')
+    expect(tierTwoProcedure).toContain('git rev-parse --verify "${target_ref}^{commit}"')
     expect(tierTwoProcedure).toContain('git cat-file -e "${target_commit}:${copy_path}"')
 
     const statusSnapshot =
