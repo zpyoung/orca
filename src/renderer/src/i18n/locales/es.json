@@ -4571,13 +4571,7 @@
           "setParentWorkspace": "Establecer worktree padre...",
           "workspaceSection": "Espacio de trabajo",
           "primaryDeleteDisabled": "El worktree principal no se puede eliminar. Quita el proyecto en su lugar.",
-          "deleteWorktree": "Eliminar worktree",
-          "3ae4748032": "Crea un grupo y mueve este worktree a él.",
-          "308b16a770": "Nuevo grupo del worktree",
-          "5bf97058a4": "Mover proyecto al grupo",
-          "a2d9a2b93e": "Quitar proyecto del grupo",
-          "addWorktreeToGroup": "Agregar worktree al grupo",
-          "removeWorktreeFromGroup": "Quitar worktree del grupo"
+          "deleteWorktree": "Eliminar worktree"
         },
         "WorktreeList": {
           "d880ea0744": "Crea un grupo y mueve este proyecto a él.",
@@ -5799,10 +5793,7 @@
             "defaultCopy": "Elige cómo se abren las nuevas pestañas de terminal de agentes compatibles.",
             "defaultViewLabel": "Vista predeterminada de Chat UI",
             "defaultViewTerminal": "Chat en terminal",
-            "defaultViewNative": "Chat UI",
-            "widthTitle": "Ancho del chat",
-            "widthCopy": "Establece el ancho de la columna de lectura de todos los paneles de chat.",
-            "widthLabel": "Ancho del chat"
+            "defaultViewNative": "Chat UI"
           },
           "agentDashboard": {
             "title": "Panel de agentes",
@@ -6255,11 +6246,7 @@
           "1b1b70279a": "Aún no hay dispositivos emparejados.",
           "1592afcc7a": "Aún no hay dispositivos emparejados. Escanea el código QR con la aplicación móvil de Orca.",
           "relayDegradedNotice": "No se pudo contactar con Relay: este código solo funciona en tu LAN o Tailscale. Genera uno nuevo e inténtalo de nuevo.",
-          "pairingQrError": "Este código de emparejamiento no se pudo representar como código QR. Cópialo en Orca Mobile.",
-          "copyPairingCode": "Copy pairing code",
-          "diagnosticsCopied": "Diagnostics copied",
-          "diagnosticsCopyFailed": "Failed to copy diagnostics",
-          "pairingCodeReady": "Pairing code ready"
+          "pairingQrError": "Este código de emparejamiento no se pudo representar como código QR. Cópialo en Orca Mobile."
         },
         "MobileSettingsPane": {
           "9a3c280e49": "GitHub Releases",
@@ -9635,8 +9622,7 @@
           "signInRequired": "Solo Relay — LAN no necesita una cuenta.",
           "relayUnavailable": "Orca Relay no está disponible en esta compilación. Usa LAN.",
           "signInAgain": "Volver a iniciar sesión para Relay",
-          "localTitle": "LAN",
-          "retrying": "Retrying"
+          "localTitle": "LAN"
         },
         "MobilePairingSetupSection": {
           "title": "Vincular un teléfono",
@@ -11771,16 +11757,7 @@
           "relayDegradedNotice": "No se pudo contactar con Relay: este código solo funciona en tu LAN o Tailscale.",
           "pairingQrError": "Este código de emparejamiento no se pudo representar como código QR. Cópialo en Orca Mobile.",
           "directAddressDisclosure": "También usar una ruta local más rápida",
-          "directAddressHint": "Opcional. Elige la dirección Wi‑Fi o Tailscale que el teléfono usará cuando esté cerca — suele ser más rápido que Relay. Relay sigue funcionando cuando estás fuera.",
-          "noPairingCode": "No pairing code available",
-          "noRelayCode": "No pairing code available",
-          "pairThisComputer": "Pair this computer.",
-          "pairThisMac": "Pair this Mac.",
-          "pairThisPc": "Pair this PC.",
-          "pairingCodeReady": "Pairing code ready",
-          "qrGeneratePrompt": "Generate a pairing code to continue",
-          "qrRenderFailed": "QR couldn’t be rendered — copy the code below",
-          "qrSignInRequired": "Sign in to create a Relay pairing code"
+          "directAddressHint": "Opcional. Elige la dirección Wi‑Fi o Tailscale que el teléfono usará cuando esté cerca — suele ser más rápido que Relay. Relay sigue funcionando cuando estás fuera."
         },
         "MobilePage": {
           "e17393c6a3": "Vista previa del teléfono",
@@ -11793,9 +11770,7 @@
           "4e1eb5d55c": "No se pudo revocar el dispositivo",
           "255372e6e8": "Dispositivo revocado",
           "1b4509a8a1": "emparejado",
-          "c5909374cf": "introducción",
-          "diagnosticsCopied": "Diagnostics copied",
-          "diagnosticsCopyFailed": "Failed to copy diagnostics"
+          "c5909374cf": "introducción"
         },
         "MobilePageToolbar": {
           "ad2284a9e2": "Cerrar · Esc",
@@ -11927,18 +11902,6 @@
           "blocked-description": "An existing inbound Block rule can override the pairing exception. Repair removes conflicting TCP rules for this Orca app, then allows port {{port}} on Private networks.",
           "repair": "Repair firewall access",
           "relay-note": "El emparejamiento sigue funcionando por Orca Relay: permitirlo solo añade la conexión local más rápida."
-        },
-        "MobileRelayMintFailureNotice": {
-          "body": "Retry, or use LAN to pair over Tailscale or the same Wi‑Fi.",
-          "copyDiagnostics": "Copy diagnostics",
-          "retry": "Retry Relay",
-          "retrying": "Retrying…",
-          "retryingBody": "Creating a new pairing code. This can take a moment over a remote connection.",
-          "retryingTitle": "Retrying Orca Relay…",
-          "title": "Couldn’t create a Relay pairing code.",
-          "unavailableBody": "Use LAN to pair over Tailscale or the same Wi‑Fi.",
-          "unavailableTitle": "Orca Relay isn’t available on this desktop.",
-          "useLan": "Use LAN"
         }
       },
       "gitlab": {
@@ -14410,17 +14373,7 @@
         "allow": "Permitir",
         "deny": "Denegar"
       },
-      "launchPromptNotDelivered": "No entregado — revisa la terminal",
-      "width": {
-        "tier": {
-          "narrow": "Estrecho",
-          "comfortable": "Cómodo",
-          "wide": "Amplio",
-          "full": "Completo"
-        },
-        "menuLabel": "Ancho del chat",
-        "menuTooltip": "Ancho del chat (se aplica a todos los paneles de chat)"
-      }
+      "launchPromptNotDelivered": "No entregado — revisa la terminal"
     },
     "tab": {
       "bar": {

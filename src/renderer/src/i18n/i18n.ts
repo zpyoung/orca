@@ -7,6 +7,7 @@ import i18next, {
 import { initReactI18next } from 'react-i18next'
 
 import en from './locales/en.json'
+import { registerForkLocalizationCatalogs } from './fork-localization-catalogs'
 import { isPseudoLocalizationLocale, pseudoLocalizeString } from './pseudo-localization'
 import { DEFAULT_LOCALE, resolveUiLocale } from './supported-languages'
 import type { SupportedUiLocale } from '../../../shared/ui-locale'
@@ -72,6 +73,8 @@ void i18n
       useSuspense: false
     }
   })
+
+registerForkLocalizationCatalogs(i18n)
 
 export function translate(key: string, fallback: string, options?: TOptions): string {
   const value = i18n.t(key, { defaultValue: fallback, ...options })

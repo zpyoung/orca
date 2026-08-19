@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- Why: persistence keeps schema defaults, migration, and load/save/flush in one file so the storage contract reviews as a unit. */
 import { app } from 'electron'
+import { releaseDeletedProjectGroupWorktreeMembership } from './fork-worktree-groups/project-group-membership-release'
 import {
   readFileSync,
   writeFileSync,
@@ -4507,19 +4508,7 @@ export class Store {
         ? { ...repo, projectGroupId: null }
         : repo
     )
-    // Why: same rationale as repos above — a worktree's group membership is sidebar-only, so release it, never delete the worktree.
-    // Keyed on the ids actually deleted (not "any id missing from this host's catalog"): groups are host-owned,
-    // so an id absent from this.state.projectGroups may simply belong to another host, not be stale.
-    for (const [worktreeId, meta] of Object.entries(this.state.worktreeMeta)) {
-      // Why: orca-data.json is user-editable, so entries can be hand-corrupted to null.
-      if (
-        meta &&
-        typeof meta.projectGroupId === 'string' &&
-        deletedGroupIds.has(meta.projectGroupId)
-      ) {
-        this.state.worktreeMeta[worktreeId] = { ...meta, projectGroupId: null }
-      }
-    }
+    releaseDeletedProjectGroupWorktreeMembership(this.state.worktreeMeta, deletedGroupIds)
     const removedFolderWorkspaceKeys = new Set<string>()
     for (const workspace of this.state.folderWorkspaces ?? []) {
       if (deletedGroupIds.has(workspace.projectGroupId)) {

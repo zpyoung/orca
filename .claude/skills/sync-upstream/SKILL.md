@@ -29,42 +29,146 @@ unchanged fails identically** — the fix is always a policy change, never a re-
 
 ## The rule
 
-Fork priority is only meaningful for files the fork actually changed. Everything else resolves to
-the upstream release.
+Fork priority is only meaningful for files the fork actually claims, and the claim is declared, not
+inferred: `config/fork-ownership.json` — read through `config/scripts/fork-ownership-manifest.mjs`
+— is the source of truth. Everything the manifest doesn't claim resolves to the upstream release.
 
-After the `-X ours` merge and its tree-conflict resolution:
+Run this block as one unit, starting from the pre-merge fork tip. If `git merge` stops on
+tree conflicts, resolve them before running the commands after it:
 
 ```sh
-node config/scripts/sync-upstream-file-ownership.mjs <target-ref> <merge-head> <out-dir>
+merge_head=$(git rev-parse HEAD)
+git merge <target-ref>
+node config/scripts/sync-upstream-file-ownership.mjs <target-ref> "$merge_head" <out-dir>
 tr '\n' '\0' < <out-dir>/checkout.txt | xargs -0 git checkout <target-ref> --
-tr '\n' '\0' < <out-dir>/remove.txt   | xargs -0 git rm -f --ignore-unmatch
-node config/scripts/sync-upstream-locale-catalogs.mjs <target-ref>
+tr '\n' '\0' < <out-dir>/remove.txt   | xargs -0 git rm -f --ignore-unmatch --
+tr '\n' '\0' < <out-dir>/ours.txt     | xargs -0 git checkout "$merge_head" --
 ```
 
-A file is **fork-owned** when a fork-authored commit touched it, plus three corrections the resolver
-already encodes:
+`ours.txt` must resolve to `$merge_head`, not `HEAD`: a clean (non-conflicted) `git merge` advances
+`HEAD` to the new merge commit, so `git checkout HEAD --` would restore the already-merged content
+instead of the fork side.
 
-- **`package.json`** — its version line is fork-owned but written by `github-actions[bot]`, so
-  authorship alone hands the file to upstream and regresses the published version series.
-- **The fork's app identity** — `com.zpyoung.orca` lives in `local-build-compatibility-contract.*`
-  and its tests, which no fork-authored *non-merge* commit touched. Resetting them to upstream
-  breaks the packaged-identity contract.
-- **A test whose subject the fork owns** stays on the fork's version. Upstream's newer test asserts
-  against upstream's implementation, which this tree deliberately does not carry. The resolver finds
-  these by resolving the test's relative imports, ignoring `src/shared/types.ts` and
-  `constants.ts` — the fork appends to those barrels, and importing a type from one is not
-  behavioral coupling.
+The manifest declares four classes, and the classifier sorts every differing path into the matching
+list:
 
-And one deliberate exception in the other direction:
+- **`exception`** — a whole-file, fork-side-always-wins claim, written to `ours.txt`. An entry may
+  carry `"deleted": true`, meaning the fork deliberately deletes that upstream path; those go to
+  `remove.txt` instead, since the fork's intent for the path is removal, not fork-side content.
+- **`seam`** — a file that takes a real three-way merge, where only the manifest's declared `lines`
+  are a protected footprint. Written to `merge-review.txt`.
+- **`feature`** — a fork-owned path matched by a feature glob. Also written to `merge-review.txt`.
+- **`upstream`** — unclaimed. Resets to the release: `checkout.txt` if the tag still has the file,
+  `remove.txt` if the tag dropped it.
 
-- **`resources/skills/*.json`** resolve to upstream. The fork's snapshot history cannot be
-  reconciled with upstream's newer skill content: the append-only guard rejects it and
-  `generate:skill-bundle-manifest` cannot repair it.
+`merge-review.txt` isn't consumed by a shell command: `git merge` already ran a real three-way merge
+on every seam and feature path, either auto-resolving disjoint hunks or leaving conflict markers.
+Open each listed path and check it by hand against the manifest's declared `lines` for that path —
+those lines are the protected floor, not the whole file — before continuing.
 
-Locale catalogs get their own pass because upstream owns every key it defines. The fork's catalogs
-carry English fallbacks written by `sync:localization-catalog`; a fork-wins merge lets those shadow
-upstream's real translations and non-English locales silently revert to English. The fork keeps only
-keys upstream has no opinion on.
+Upstream owns every key it defines, so the manifest leaves `src/renderer/src/locales/*.json`
+unclaimed and they reset to the tag through `checkout.txt` like any other upstream file. The fork's
+own keys live in per-feature bundles under the feature directories, which a feature glob claims. Keep
+that split: a fork entry duplicating a key upstream defines shadows upstream's real translation with
+the English fallback `sync:localization-catalog` wrote, and that locale silently renders English.
+
+## Tier-2 forked-copy replay
+
+Complete this checklist for **every** copy headed by `FORK-COPY-OF` and `FORK-COPY-SHA` after
+ownership resolution and before final verification. Treat the complete output of this command as
+the checklist; do not rely on a remembered path list:
+
+```sh
+git grep -l '^// FORK-COPY-OF:' -- ':(glob)**/fork-*/**'
+```
+
+Cross-check every candidate against `config/fork-ownership.json`: it must be covered by a feature
+glob, its first two physical lines must be the two copy headers, and the target tag must not contain
+the candidate path. Anything else is an ownership or collision finding to raise before replay.
+
+1. For each copy, set the copy path and new stable tag explicitly. Parse both headers, validate the
+   recorded SHA as a full commit ID, and resolve the target tag to a commit before invoking `git`:
+
+   ```sh
+   copy_path='path/from-the-git-grep-output'
+   target_ref='vX.Y.Z'
+   printf '%s\n' "$target_ref" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || exit 2
+   first_header=$(sed -n '1p' "$copy_path")
+   second_header=$(sed -n '2p' "$copy_path")
+   case "$first_header" in '// FORK-COPY-OF: '*) ;; *) exit 2 ;; esac
+   case "$second_header" in '// FORK-COPY-SHA: '*) ;; *) exit 2 ;; esac
+   recorded_paths=${first_header#// FORK-COPY-OF: }
+   recorded_sha=${second_header#// FORK-COPY-SHA: }
+   test -n "$recorded_paths" || exit 2
+   printf '%s\n' "$recorded_sha" | grep -Eq '^[0-9a-f]{40}([0-9a-f]{24})?$' || exit 2
+   git cat-file -e "${recorded_sha}^{commit}" || exit 2
+   target_commit=$(git rev-parse --verify "${target_ref}^{commit}") || exit 2
+   if git cat-file -e "${target_commit}:${copy_path}" 2>/dev/null; then exit 2; fi
+   status_file=$(mktemp)
+   git diff --name-status -z --find-renames "$recorded_sha" "$target_commit" > "$status_file" \
+     || { rm -f "$status_file"; exit 2; }
+   ```
+
+   For each comma-separated value in `recorded_paths`, set `recorded_path` explicitly and parse the
+   NUL-delimited whole-tree snapshot below. Do not pass the old path as a `git diff` pathspec: Git
+   filters before rename discovery and loses the replacement. The parser prints a JSON `rename`
+   result with the complete new path, a `status` result for `M` or `D`, or nothing when unchanged.
+
+   ```sh
+   recorded_path='one/path/from-recorded_paths'
+   node - "$status_file" "$recorded_path" <<'NODE'
+   const fs = require('node:fs')
+   const fields = fs.readFileSync(process.argv[2], 'utf8').split('\0')
+   const recordedPath = process.argv[3]
+   for (let index = 0; index < fields.length - 1; ) {
+     const status = fields[index++]
+     const firstPath = fields[index++]
+     if (status.startsWith('R')) {
+       const resolvedPath = fields[index++]
+       if (firstPath === recordedPath) {
+         console.log(JSON.stringify({ kind: 'rename', path: resolvedPath }))
+       }
+     } else if (firstPath === recordedPath) {
+       console.log(JSON.stringify({ kind: 'status', status }))
+     }
+   }
+   NODE
+   ```
+
+   Repeat the parser for every recorded path, then remove the snapshot with `rm -f "$status_file"`.
+   A `D` is not an empty delta: raise it to the user as a collision-policy decision before changing
+   the copy or its header. For an unchanged path, retain the path in the list.
+
+2. When a resolved module is materially smaller than its recorded source, inspect the same upstream
+   split commit for sibling modules. Add every sibling created by that one-to-many split to the
+   resolved path list; rename detection reports only the largest similarity match. Diff the old and
+   new commits across **every recorded and resolved path**, then replay that upstream delta into the
+   fork copy by hand, resolving interactions with fork behavior deliberately.
+
+   ```sh
+   git diff "$recorded_sha" "$target_commit" -- \
+     <every-recorded-path> <every-resolved-path>
+   ```
+
+3. Only after the hand replay is complete, replace `FORK-COPY-OF` with the complete resolved path
+   list and replace `FORK-COPY-SHA` with the value of `target_commit`. Update both header fields together,
+   including when a path was unchanged; never advance only the SHA or leave an old path behind.
+
+## Tier-4 pending-upstream review
+
+For every manifest `exceptions[]` entry whose `status` is `pending-upstream`, follow its `ledger`
+target in `docs/fork-upstreaming.md`, confirm that the target still exists, and review upstream
+movement over the old-to-new stable-tag range for that item. Keep its manifest and ledger state
+atomic by creating, updating, or removing the matching entries in the same change. Do not let a
+resolved, declined, or moved upstream item leave a stale manifest row or an orphaned ledger entry.
+
+## Upstream feature-collision review
+
+For every manifest `features[]` entry, compare its `purpose` with upstream release notes and the
+changelog for the old-to-new stable-tag range. Record exactly one outcome per feature: `none`,
+`possible`, or `confirmed`. Raise every `possible` or `confirmed` outcome to the user for a
+decision. Never silently delete a fork feature or reconcile it with an upstream implementation;
+apply any removal, archival, or reconciliation only after that decision.
 
 ## When upstream's own release does not compile
 
@@ -134,6 +238,24 @@ pnpm exec oxlint; cp /tmp/oxlintrc.baseline.json .oxlintrc.json
 
 ## Verifying
 
+Two manifest checks run against the new release, and the second one is where a sync goes quietly
+wrong:
+
+```sh
+node config/scripts/sync-upstream-file-ownership.mjs --verify-seams
+node config/scripts/sync-upstream-file-ownership.mjs --verify-residuals <target-ref>
+```
+
+`--verify-seams` asserts each declared line is still present. That is a one-way tripwire: it cannot
+see an undeclared edit, and it cannot represent a deletion at all, because a removed upstream line
+has no line to declare. `--verify-residuals` compares each seam file's whole added/removed footprint
+against the budget recorded in `residuals`, so both of those become visible.
+
+A drifted budget is a question, not a formality. A budget that *shrank* usually means the release
+absorbed a line the fork was carrying, and the seam should be re-read before the number is updated.
+Re-baseline by rerunning the recorder and committing the new numbers with the resolution, never as a
+sweep to make the check quiet.
+
 `pnpm typecheck` and `pnpm lint` are absolute — no baseline differential. `pnpm test` is
 baseline-differential: a failure counts only if the same test passes at the pre-merge SHA.
 
@@ -144,7 +266,19 @@ Traps that fake results:
 
 - `rm -f config/*.tsbuildinfo` before every typecheck. Composite projects cache errors across
   `git checkout` swaps.
-- `pnpm test` never builds the CLI, and the harness injects `GIT_CONFIG_*` that deterministically
-  fails the relay tests. Run `pnpm build:cli` first, then the suite with those variables unset.
+- `pnpm test` never builds the CLI, and ambient Git configuration can alter fixture commits.
+  Build the CLI first, then replace global/system config with one controlled empty file while also
+  stripping every inherited Git-config environment channel:
+
+  ```sh
+  empty_git_config=$(mktemp)
+  trap 'rm -f "$empty_git_config"' EXIT
+  pnpm build:cli && env -u GIT_CONFIG_COUNT -u GIT_CONFIG_KEY_0 -u GIT_CONFIG_KEY_1 \
+    -u GIT_CONFIG_VALUE_0 -u GIT_CONFIG_VALUE_1 -u GIT_CONFIG_GLOBAL -u GIT_CONFIG_SYSTEM \
+    -u GIT_CONFIG_PARAMETERS -u GIT_CONFIG_NOSYSTEM \
+    GIT_CONFIG_GLOBAL="$empty_git_config" GIT_CONFIG_SYSTEM="$empty_git_config" \
+    GIT_CONFIG_NOSYSTEM=1 pnpm test
+  ```
+
 - `.claude/skills/*` is gitignored. New skills here need `git add -f` or they never reach the host
   the automation runs on.

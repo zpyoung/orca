@@ -110,6 +110,23 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node .github/scripts/check-root-directory-entries.mjs "$BASE_SHA" "$HEAD_SHA"
 
+  fork_ownership_guard:
+    name: fork ownership guard
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Enforce fork ownership manifest
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node .github/scripts/check-fork-ownership.mjs "$BASE_SHA" "$HEAD_SHA"
+
   typecheck:
     runs-on: ubuntu-latest
 
@@ -505,6 +522,7 @@ jobs:
     needs:
       - static_analysis
       - root_directory_guard
+      - fork_ownership_guard
       - typecheck
       - git_compatibility
       - shell_contracts
@@ -527,6 +545,7 @@ jobs:
         env:
           STATIC_ANALYSIS: ${{ needs.static_analysis.result }}
           ROOT_DIRECTORY_GUARD: ${{ needs.root_directory_guard.result }}
+          FORK_OWNERSHIP_GUARD: ${{ needs.fork_ownership_guard.result }}
           TYPECHECK: ${{ needs.typecheck.result }}
           GIT_COMPATIBILITY: ${{ needs.git_compatibility.result }}
           SHELL_CONTRACTS: ${{ needs.shell_contracts.result }}
@@ -538,6 +557,7 @@ jobs:
           for result in \
             "$STATIC_ANALYSIS" \
             "$ROOT_DIRECTORY_GUARD" \
+            "$FORK_OWNERSHIP_GUARD" \
             "$TYPECHECK" \
             "$GIT_COMPATIBILITY" \
             "$SHELL_CONTRACTS" \

@@ -1,0 +1,1080 @@
+{
+  "features": [
+    {
+      "name": "worktree-groups",
+      "purpose": "Lets a worktree join a project group independently of its repo's own group membership, so cross-repo worktrees can share a sidebar section.",
+      "globs": ["**/fork-worktree-groups/**"]
+    },
+    {
+      "name": "native-chat-relay",
+      "purpose": "Reads and live-tails native-chat transcripts for an agent running on a plain ssh: host over the SSH relay, since the desktop process cannot see that host's disk.",
+      "globs": ["**/fork-native-chat-relay/**", "docs/architecture/native-chat.md"]
+    },
+    {
+      "name": "native-chat-coloring",
+      "purpose": "Renders native-chat tool calls with category glyphs/dots and syntax-highlighted code blocks instead of monochrome text.",
+      "globs": [
+        "**/fork-native-chat-coloring/**",
+        "src/renderer/src/assets/fork-native-chat-coloring.css"
+      ]
+    },
+    {
+      "name": "native-chat-width",
+      "purpose": "Lets the user pick the reading-column width for every native-chat pane instead of a fixed max-width.",
+      "globs": ["**/fork-native-chat-width/**"]
+    }
+  ],
+  "seams": [
+    {
+      "path": ".gitignore",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["!docs/fork-upstreaming.md"]
+    },
+    {
+      "path": "config/localization-coverage-allowlist.json",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    \"filePath\": \"src/renderer/src/components/sidebar/WorktreeCard.tsx\","]
+    },
+    {
+      "path": "src/main/telemetry/client.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["const TELEMETRY_ENABLED = false"]
+    },
+    {
+      "path": "src/main/macos-tcc-prompt-watch.ts",
+      "feature": "fork-infra",
+      "kind": "registration",
+      "lines": [
+        "  'com.zpyoung.orca',",
+        "  'com.zpyoung.orca.helper',",
+        "  'com.zpyoung.orca.dev',",
+        "  'com.zpyoung.orca.dev.helper',",
+        "  'com.zpyoung.orca.local',",
+        "  'com.zpyoung.orca.local.helper'"
+      ]
+    },
+    {
+      "path": "src/main/macos-tcc-prompt-watch.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    expect(event?.responsibleIdentifier).toBe('com.zpyoung.orca')"]
+    },
+    {
+      "path": "src/main/ipc/notifications.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["const MACOS_PACKAGED_BUNDLE_ID = 'com.zpyoung.orca'"]
+    },
+    {
+      "path": "config/scripts/build-notification-status-macos.mjs",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["const bundleId = readArg('--bundle-id') ?? 'com.zpyoung.orca'"]
+    },
+    {
+      "path": "config/scripts/mac-build-compatibility.test.mjs",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["      appId: 'com.zpyoung.orca',"]
+    },
+    {
+      "path": "src/main/local-builds/local-build-candidate.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    appId: 'com.zpyoung.orca',"]
+    },
+    {
+      "path": "src/main/local-builds/local-build-compatibility-contract.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["      appId: 'com.zpyoung.orca',"]
+    },
+    {
+      "path": "src/shared/local-build-compatibility-contract.json",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["  \"appId\": \"com.zpyoung.orca\","]
+    },
+    {
+      "path": "src/shared/local-build-compatibility-contract.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["  appId: 'com.zpyoung.orca',"]
+    },
+    {
+      "path": "src/shared/local-build-compatibility.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    appId: 'com.zpyoung.orca',"]
+    },
+    {
+      "path": "src/shared/project-groups.ts",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "import { breakProjectGroupParentCycles } from './fork-worktree-groups/project-group-parent-cycles'",
+        "  breakProjectGroupParentCycles(groups)"
+      ]
+    },
+    {
+      "path": "src/shared/types.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": [
+        "  /** Durable sidebar-only cross-repo group membership, independent of the",
+        "   *  worktree's repo's own `projectGroupId`. Execution remains repo-scoped. */"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list-groups.ts",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "} from './fork-worktree-groups/worktree-loose-group-membership'",
+        "    const divertedProjectGroupId =",
+        "      groupBy === 'repo' ? getDivertedWorktreeProjectGroupId(w, projectGroupsById) : null",
+        "    const looseWorktreeCount = looseWorktreesByProjectGroupId.get(groupId)?.length ?? 0",
+        "          hostContextLabelByWorktreeId: getLooseWorktreeHostContextLabels(",
+        "    getWorktreeGroupRevealSectionKey(divertedGroupId, groupKey)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/WorktreeList.tsx",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "} from './fork-worktree-groups/worktree-group-membership-drag-preview'",
+        "  const [worktreeGroupMembershipDragPreview, setWorktreeGroupMembershipDragPreview] =",
+        "    const membershipPreview = getPointerWorktreeGroupMembershipDragPreview({",
+        "      const membershipTarget = getPointerWorktreeGroupMembershipDragPreview({",
+        "        canWorktreeHoldGroupMembership({",
+        "        void updateWorktreeMeta(drag.worktreeId, { projectGroupId: membershipTarget.groupId })",
+        "        void updateWorktreeMeta(drag.worktreeId, { projectGroupId: null })",
+        "                    inProjectGroupLooseSection={inProjectGroupLooseSection}",
+        "    gap: 2,",
+        "                      'group relative flex h-6 w-full items-center gap-1.5 pr-2 text-left transition-all',",
+        "import { needsWorktreeDragGroup } from './fork-worktree-groups/worktree-drag-group-key'",
+        "    if (needsWorktreeDragGroup(current?.key ?? null, row.sectionKey)) {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/WorktreeContextMenu.tsx",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "} from './fork-worktree-groups/WorktreeGroupMenuItems'",
+        "  const worktreeGroupDialog = useWorktreeGroupDialog({",
+        "              <WorktreeGroupMenuItems",
+        "      {worktreeGroupDialog.dialog}"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/WorktreeCard.tsx",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": [
+        "type ForkWorktreeCardProps = WorktreeCardProps & { inProjectGroupLooseSection?: boolean }",
+        "  inProjectGroupLooseSection = false,",
+        "    inPinnedSection: inPinnedSection || inProjectGroupLooseSection,",
+        "}: ForkWorktreeCardProps): React.JSX.Element {"
+      ]
+    },
+    {
+      "path": "src/main/persistence.ts",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "import { releaseDeletedProjectGroupWorktreeMembership } from './fork-worktree-groups/project-group-membership-release'",
+        "    releaseDeletedProjectGroupWorktreeMembership(this.state.worktreeMeta, deletedGroupIds)"
+      ]
+    },
+    {
+      "path": "src/main/ipc/worktree-metadata-merge.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": ["    projectGroupId: meta?.projectGroupId ?? null,"]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/worktree-schemas.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": ["  projectGroupId: z.union([z.string(), z.null()]).optional()"]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/worktree.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": [
+        "        ...(clientKind === 'mobile' ? {} : { projectGroupId: params.projectGroupId }),",
+        "    handler: async (params, { runtime, clientKind }) => ({"
+      ]
+    },
+    {
+      "path": "src/main/ipc/worktree-logic.test.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": ["      projectGroupId: null,"]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/empty-project-placeholder-repos.ts",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "import { hasOnlyWorktreesGroupedElsewhere } from './fork-worktree-groups/empty-project-placeholder-membership'",
+        "  projectGroups?: readonly ProjectGroup[]"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-drag-units.ts",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "import { needsWorktreeDragGroup } from './fork-worktree-groups/worktree-drag-group-key'",
+        "    if (needsWorktreeDragGroup(current?.key ?? null, row.sectionKey)) {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/dashboard-popout/AgentMapWorkspaceContextMenu.test.tsx",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": [
+        "    const createGroup = await screen.findByText('New group from worktree', {}, { timeout: 5_000 })"
+      ]
+    },
+    {
+      "path": "src/shared/types.ts",
+      "feature": "native-chat-width",
+      "kind": "passthrough",
+      "lines": [
+        "export type NativeChatWidthTier = 'narrow' | 'comfortable' | 'wide' | 'full'",
+        "  nativeChatWidth?: NativeChatWidthTier"
+      ]
+    },
+    {
+      "path": "src/shared/constants.ts",
+      "feature": "native-chat-width",
+      "kind": "passthrough",
+      "lines": [
+        "import { DEFAULT_NATIVE_CHAT_WIDTH_TIER } from './fork-native-chat-width/native-chat-width-default'",
+        "    nativeChatWidth: DEFAULT_NATIVE_CHAT_WIDTH_TIER,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatMessageList.tsx",
+      "feature": "native-chat-width",
+      "kind": "passthrough",
+      "lines": [
+        "import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'",
+        "  const widthClassName = useNativeChatWidthClassName()",
+        "          className={cn('mx-auto flex w-full flex-col gap-5', widthClassName)}"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatApprovalCard.tsx",
+      "feature": "native-chat-width",
+      "kind": "passthrough",
+      "lines": [
+        "import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'",
+        "  const widthClassName = useNativeChatWidthClassName()",
+        "      <div className={cn('mx-auto w-full px-3 pt-2 pb-1 sm:px-4', widthClassName)}>"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatComposerField.tsx",
+      "feature": "native-chat-width",
+      "kind": "passthrough",
+      "lines": [
+        "import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'",
+        "  const widthClassName = useNativeChatWidthClassName()",
+        "        <div className={cn('relative mx-auto w-full', widthClassName)}>"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatQuestionCard.tsx",
+      "feature": "native-chat-width",
+      "kind": "passthrough",
+      "lines": [
+        "import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'",
+        "  const widthClassName = useNativeChatWidthClassName()",
+        "      <div className={cn('mx-auto w-full px-3 pt-2 pb-4 sm:px-4', widthClassName)}>"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/TerminalPaneHeaderOverlay.tsx",
+      "feature": "native-chat-width",
+      "kind": "registration",
+      "lines": [
+        "import { NativeChatWidthMenu } from '@/components/native-chat/fork-native-chat-width/NativeChatWidthMenu'",
+        "                  {isChatViewMode && isActivePane ? <NativeChatWidthMenu /> : null}"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/TerminalPaneHeaderOverlay.test.tsx",
+      "feature": "native-chat-width",
+      "kind": "passthrough",
+      "lines": ["vi.mock('../../store', () => ({"]
+    },
+    {
+      "path": "src/renderer/src/components/settings/NativeChatExperimentalSetting.tsx",
+      "feature": "native-chat-width",
+      "kind": "registration",
+      "lines": [
+        "import { NativeChatWidthSetting } from './fork-native-chat-width/NativeChatWidthSetting'",
+        "          <NativeChatWidthSetting",
+        "            value={settings.nativeChatWidth}",
+        "            onChange={(nativeChatWidth) => updateSettings({ nativeChatWidth })}"
+      ]
+    },
+    {
+      "path": "src/renderer/src/i18n/i18n.ts",
+      "feature": "native-chat-width",
+      "kind": "registration",
+      "lines": [
+        "import { registerForkLocalizationCatalogs } from './fork-localization-catalogs'",
+        "registerForkLocalizationCatalogs(i18n)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatToolRun.tsx",
+      "feature": "native-chat-coloring",
+      "kind": "import-swap",
+      "lines": [
+        "  NativeChatToolCategoryDots,",
+        "  NativeChatToolName",
+        "        <NativeChatToolName name={name} />",
+        "        <NativeChatToolCategoryDots blocks={blocks} />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/CommentMarkdown.tsx",
+      "feature": "native-chat-coloring",
+      "kind": "passthrough",
+      "lines": [
+        "import rehypeHighlight from 'rehype-highlight'",
+        "  highlightCode?: boolean",
+        "      highlightCode = false,",
+        "      if (highlightCode) {",
+        "          ? createDocumentCommentMarkdownComponents(onLinkClick, true)",
+        "    }, [expandImages, variant, onLinkClick, highlightCode])",
+        "      () => (highlightCode ? [...rehypePlugins, rehypeHighlight] : rehypePlugins),",
+        "          highlightCode && 'native-chat-code [&_pre_code]:text-inherit',",
+        "          rehypePlugins={activeRehypePlugins}"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/comment-markdown-element-renderers.tsx",
+      "feature": "native-chat-coloring",
+      "kind": "passthrough",
+      "lines": [
+        "  highlightCode?: boolean",
+        "      ) : highlightCode ? (",
+        "        <code className=\"rounded bg-code-accent-surface px-1.5 py-0.5 font-mono text-[0.92em] text-code-accent [overflow-wrap:anywhere]\">"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatMessageList.tsx",
+      "feature": "native-chat-coloring",
+      "kind": "passthrough",
+      "lines": [
+        "  nativeChatReasoningClassName,",
+        "  nativeChatUserMessageClassName",
+        "        <div className={nativeChatUserMessageClassName()}>",
+        "        isReasoning && nativeChatReasoningClassName(),",
+        "                highlightCode",
+        "          highlightCode"
+      ]
+    },
+    {
+      "path": "src/renderer/src/assets/main.css",
+      "feature": "native-chat-coloring",
+      "kind": "passthrough",
+      "lines": ["@import './fork-native-chat-coloring.css';"]
+    },
+    {
+      "path": "src/renderer/src/lib/terminal-title-contrast.ts",
+      "feature": "native-chat-coloring",
+      "kind": "passthrough",
+      "lines": [
+        "export type RgbaColor = { r: number; g: number; b: number; a: number }",
+        "export function parseCssRgbColor(color: string | undefined): RgbaColor | null {",
+        "export function contrastRatio("
+      ]
+    },
+    {
+      "path": "src/main/ipc/native-chat.ts",
+      "feature": "native-chat-relay",
+      "kind": "registration",
+      "lines": [
+        "} from './fork-native-chat-relay/native-chat-ssh-subscription'",
+        "  if (args.sshConnectionId) {"
+      ]
+    },
+    {
+      "path": "src/main/ipc/ssh.ts",
+      "feature": "native-chat-relay",
+      "kind": "registration",
+      "lines": [
+        "import type { NativeChatRelayPing } from '../../shared/fork-native-chat-relay/native-chat-relay-protocol'",
+        "} from './fork-native-chat-relay/ssh-relay-ready-notifier'",
+        "export async function requestActiveSshNativeChat(",
+        "    notifySshRelayReady(tid)"
+      ]
+    },
+    {
+      "path": "src/main/ssh/ssh-relay-session.ts",
+      "feature": "native-chat-relay",
+      "kind": "registration",
+      "lines": [
+        "} from '../../shared/fork-native-chat-relay/native-chat-relay-protocol'",
+        "  async requestNativeChat(",
+        "  onNativeChatChanged(handler: (ping: NativeChatRelayPing) => void): () => void {"
+      ]
+    },
+    {
+      "path": "src/relay/relay.ts",
+      "feature": "native-chat-relay",
+      "kind": "registration",
+      "lines": [
+        "import { NativeChatHandler } from './fork-native-chat-relay/native-chat-handler'",
+        "  const _nativeChatHandler = new NativeChatHandler(dispatcher)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/connection-owner-resolution.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": ["export type ConnectionOwnerState = Pick<"]
+    },
+    {
+      "path": "src/main/native-chat/transcript-watch-contract.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": [
+        "export type NativeChatTranscriptTailReader = (args: {",
+        "  tailReader?: NativeChatTranscriptTailReader",
+        "  initialMaxBytes?: number"
+      ]
+    },
+    {
+      "path": "src/main/native-chat/transcript-watch-engine.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": [
+        "  args: SubscribeNativeChatTranscriptArgs & { tailReader: NativeChatTranscriptTailReader },",
+        "            maxBytes: initialMaxBytes,"
+      ]
+    },
+    {
+      "path": "src/main/native-chat/transcript-watch.ts",
+      "feature": "native-chat-relay",
+      "kind": "import-swap",
+      "lines": [
+        "import { subscribeNativeChatTranscriptWithDecoder } from './fork-native-chat-relay/transcript-watch-subscription'",
+        "    { ...args, tailReader: defaultTailReader },"
+      ]
+    },
+    {
+      "path": "src/main/native-chat/transcript-incremental-reader.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": ["const MAX_NATIVE_CHAT_TRANSCRIPT_RECORD_BYTES = 2 * 1024 * 1024"]
+    },
+    {
+      "path": "src/preload/api-types.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": ["export type NativeChatReadSessionArgs = {"]
+    },
+    {
+      "path": "src/preload/index.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": ["const readNativeChatSession = (", "    readSession: readNativeChatSession,"]
+    },
+    {
+      "path": "src/renderer/src/web/web-preload-api.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": [
+        "} from '@/components/native-chat/fork-native-chat-relay/native-chat-runtime-contract'",
+        "  const readNativeChatSession = async (",
+        "    readSession: readNativeChatSession,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatMessageList.tsx",
+      "feature": "native-chat-relay",
+      "kind": "import-swap",
+      "lines": [
+        "import type { NativeChatLiveSession } from './fork-native-chat-relay/use-native-chat-live-session'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatView.tsx",
+      "feature": "native-chat-relay",
+      "kind": "registration",
+      "lines": [
+        "import { NativeChatConversation } from './fork-native-chat-relay/NativeChatConversation'",
+        "} from './fork-native-chat-relay/native-chat-runtime-owner'",
+        "  const sshConnectionId = useAppStore((s) => selectNativeChatSshConnectionId(s, terminalTabId))"
+      ]
+    },
+    {
+      "path": "src/main/ipc/native-chat-subscribe-lifecycle.test.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": ["        beforeOffset: 0,"]
+    },
+    {
+      "path": "config/scripts/pr-workflow-parallelism.test.mjs",
+      "feature": "fork-infra",
+      "kind": "registration",
+      "lines": ["      'fork_ownership_guard',"]
+    }
+  ],
+  "exceptions": [
+    {
+      "path": "package.json",
+      "reason": "Fork identity, versioning, and script wiring \u2014 replaces the old FORK_OWNED_ALWAYS authorship carve-out.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/electron-builder.config.cjs",
+      "reason": "Fork ships macOS-only arm64 artifacts under com.zpyoung.orca; upstream's multi-platform matrix must not win.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/dev-app-update.yml",
+      "reason": "Update feed points at the fork's own release bucket, not upstream's.",
+      "status": "permanent"
+    },
+    {
+      "path": "resources/darwin/bin/orca",
+      "reason": "CLI shim hardcodes the fork's app-identity path.",
+      "status": "permanent"
+    },
+    {
+      "path": ".nvmrc",
+      "reason": "Fork toolchain pin; upstream carries no equivalent file.",
+      "status": "permanent"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "reason": "Fork release history; upstream's changelog is a different document.",
+      "status": "permanent"
+    },
+    {
+      "path": ".github/workflows/pr.yml",
+      "reason": "Carries the fork_ownership_guard job and other fork-only gating that upstream's PR workflow does not run.",
+      "status": "permanent"
+    },
+    {
+      "path": ".github/workflows/release-cut.yml",
+      "reason": "Fork release-cut pipeline; upstream has no equivalent workflow.",
+      "status": "permanent"
+    },
+    {
+      "path": ".github/workflows/release-mac-build.yml",
+      "reason": "Fork's macOS build pipeline for its own release channel.",
+      "status": "permanent"
+    },
+    {
+      "path": ".github/workflows/readme-downloads-badge.yml",
+      "reason": "Generates the fork's own README download-count badge.",
+      "status": "permanent"
+    },
+    {
+      "path": ".github/workflows/track-community-prs.yaml",
+      "reason": "Upstream-org community-PR triage automation the fork must not run.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/electron-builder-mac-channel-config.test.mjs",
+      "reason": "Tests the multi-channel builder matrix the fork's arm64-only config removed.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "docs/assets/readme-downloads.svg",
+      "reason": "Fork's own README badge artifact.",
+      "status": "permanent"
+    },
+    {
+      "path": "docs/STYLEGUIDE.md",
+      "reason": "Fork-maintained design-system doc; edits here are fork policy, not upstream's.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/max-lines-baseline.txt",
+      "reason": "Fork's own max-lines ratchet baseline diverges from upstream's file sizes.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/reliability-gates.jsonc",
+      "reason": "Fork-specific reliability gate thresholds.",
+      "status": "permanent"
+    },
+    {
+      "path": ".claude/skills/release/SKILL.md",
+      "reason": "Fork-only release skill; upstream has no equivalent automation.",
+      "status": "permanent"
+    },
+    {
+      "path": ".claude/skills/sync-upstream/SKILL.md",
+      "reason": "Fork-only sync skill documenting how this fork merges upstream tags.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/sync-upstream-file-ownership.mjs",
+      "reason": "Fork's own sync classifier; upstream has no such script.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/sync-upstream-file-ownership.test.mjs",
+      "reason": "Tests for the fork's own sync classifier; upstream has no such script.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/fork-localization-catalog-check.mjs",
+      "reason": "Fork localization wrapper validates isolated feature catalogs while composing the upstream verifier.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/fork-localization-catalog-check.test.mjs",
+      "reason": "Tests for the fork localization wrapper.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/renderer/src/i18n/fork-localization-catalogs.ts",
+      "reason": "Fork i18n aggregation machinery merges isolated feature catalogs at runtime.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/renderer/src/i18n/fork-localization-catalogs.test.ts",
+      "reason": "Tests for the fork i18n aggregation machinery.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/fork-ownership-manifest.mjs",
+      "reason": "The manifest loader/matcher itself \u2014 fork machinery, not upstream code.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/fork-ownership-manifest.test.mjs",
+      "reason": "Tests for the manifest loader; a fork-added test matching no other entry would otherwise fail the guard's own coverage rule.",
+      "status": "permanent"
+    },
+    {
+      "path": ".github/scripts/check-fork-ownership.mjs",
+      "reason": "The CI guard that enforces this manifest on pull requests \u2014 fork machinery, not upstream code.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/check-fork-ownership.test.mjs",
+      "reason": "Tests for the fork ownership CI guard above.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/fork-ownership.json",
+      "reason": "The manifest declares itself so a sync never resets or removes its own source of truth.",
+      "status": "permanent"
+    },
+    {
+      "path": "docs/fork-upstreaming.md",
+      "reason": "The upstreaming ledger declares itself so a sync never removes it.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/create-draft-release.mjs",
+      "reason": "Fork release-tooling delta for the fork's own release process.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/create-draft-release.test.mjs",
+      "reason": "Tests for the fork's release-tooling delta above.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/release-rc-history.mjs",
+      "reason": "Fork release-tooling delta for the fork's own RC history.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/release-rc-history.test.mjs",
+      "reason": "Tests for the fork's release-tooling delta above.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/install-electron-package-binary.mjs",
+      "reason": "Fork release-tooling delta for packaging the fork's own Electron binary.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/install-electron-package-binary.test.mjs",
+      "reason": "Tests for the fork's release-tooling delta above.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/verify-release-required-assets.mjs",
+      "reason": "Fork release-tooling delta verifying the fork's own release asset set.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/verify-release-required-assets.test.mjs",
+      "reason": "Tests for the fork's release-tooling delta above.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/verify-skill-update-roundtrip.mjs",
+      "reason": "Fork release-tooling delta for the fork's skill-update packaging.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/electron-builder-config.test.mjs",
+      "reason": "Tests the fork's arm64-only electron-builder config, not upstream's matrix.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/package-electron-runtime-contract.test.mjs",
+      "reason": "Tests the fork's own packaged Electron runtime contract.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/main/updater.ts",
+      "reason": "Fork's own update feed and channel selection.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/main/updater-prerelease-feed.ts",
+      "reason": "Fork's own prerelease update feed.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/main/updater-prerelease-feed.test.ts",
+      "reason": "Tests for the fork's own prerelease update feed.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/main/updater-prerelease-feed-readiness.test.ts",
+      "reason": "Tests for the fork's own prerelease update feed readiness.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/main/updater.check-failure.test.ts",
+      "reason": "Tests for the fork's own update-check failure handling.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/main/updater.test.ts",
+      "reason": "Tests for the fork's own updater.",
+      "status": "permanent"
+    },
+    {
+      "path": "tests/e2e/cross-version-wire/release-checkout.ts",
+      "reason": "Encodes the fork's own (tagless) release-history shape for cross-version wire tests.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-retained-session.ts",
+      "reason": "Retention bug fix: excludes the error phase from the loading-state check so a transient read failure does not blank a retained transcript. Belongs upstream, not isolated as a fork feature. Also carries the native-chat-relay SSH-identity line `args.sshConnectionId ?? null,` and its two-line comment from commit c137a9e97d; those are not part of the upstream-bound fix and must be dropped when the upstream PR is prepared, since sshConnectionId does not exist upstream.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#retention-fix"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-retained-session.test.ts",
+      "reason": "Tests for the retention-fix hook above. Also carries native-chat-relay SSH-connection test cases from commit c137a9e97d that exercise the sshConnectionId identity field; those are not part of the upstream-bound fix and must be dropped when the upstream PR is prepared, since sshConnectionId does not exist upstream.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#retention-fix"
+    },
+    {
+      "path": "src/shared/native-chat-transcript-retention.ts",
+      "reason": "Retention bug fix's shared companion: the loading param whose error-phase exclusion is the actual fix.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#retention-fix"
+    },
+    {
+      "path": "src/shared/native-chat-transcript-retention.test.ts",
+      "reason": "Tests for the retention-fix shared companion above.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#retention-fix"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/repo-header-action-button-class.ts",
+      "reason": "Sidebar-density fix: insets the repo-header action-button focus ring so the shorter h-6 row's overflow-hidden no longer clips it.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#sidebar-density"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list-virtual-rows.ts",
+      "reason": "Sidebar-density fix: corrects the host-header row-height estimate so it matches the rendered h-8 + pt-1 height at the tighter 2px row gap.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#sidebar-density"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list-scroll-adjustment.test.ts",
+      "reason": "Tests for the sidebar-density row-height fix above.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#sidebar-density"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/project-group-header-drop.test.ts",
+      "reason": "Tests updated for the sidebar-density header-height change.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#sidebar-density"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/project-header-drop.test.ts",
+      "reason": "Tests updated for the sidebar-density header-height change.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#sidebar-density"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-card-surface.tsx",
+      "reason": "Sidebar-density preference: preserves compact workspace-card padding after upstream split card rendering into its surface module.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#sidebar-density"
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/TerminalPane.tsx",
+      "reason": "Corrects effectiveChatViewMode; a cosmetic/logic fix to upstream's chat-header controls, not a fork feature.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#chat-header-controls-fix"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-live-session-visibility.test.ts",
+      "reason": "The tag visibility test assumes hidden panes disable reads, but the retained-session relay path must stay subscribed across SSH relay reconnects; it cannot assert both contracts.",
+      "status": "permanent",
+      "deleted": true
+    }
+  ],
+  "residuals": {
+    ".gitignore": {
+      "added": 11,
+      "removed": 2
+    },
+    "config/localization-coverage-allowlist.json": {
+      "added": 7,
+      "removed": 0
+    },
+    "config/scripts/build-notification-status-macos.mjs": {
+      "added": 1,
+      "removed": 1
+    },
+    "config/scripts/mac-build-compatibility.test.mjs": {
+      "added": 1,
+      "removed": 1
+    },
+    "config/scripts/pr-workflow-parallelism.test.mjs": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/main/ipc/native-chat-subscribe-lifecycle.test.ts": {
+      "added": 4,
+      "removed": 1
+    },
+    "src/main/ipc/native-chat.ts": {
+      "added": 45,
+      "removed": 3
+    },
+    "src/main/ipc/notifications.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/main/ipc/ssh.ts": {
+      "added": 35,
+      "removed": 0
+    },
+    "src/main/ipc/worktree-logic.test.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/ipc/worktree-metadata-merge.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/main/local-builds/local-build-candidate.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/main/local-builds/local-build-compatibility-contract.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/main/macos-tcc-prompt-watch.test.ts": {
+      "added": 10,
+      "removed": 10
+    },
+    "src/main/macos-tcc-prompt-watch.ts": {
+      "added": 6,
+      "removed": 6
+    },
+    "src/main/native-chat/transcript-incremental-reader.ts": {
+      "added": 3,
+      "removed": 4
+    },
+    "src/main/native-chat/transcript-watch-contract.ts": {
+      "added": 23,
+      "removed": 0
+    },
+    "src/main/native-chat/transcript-watch-engine.ts": {
+      "added": 15,
+      "removed": 15
+    },
+    "src/main/native-chat/transcript-watch.ts": {
+      "added": 30,
+      "removed": 212
+    },
+    "src/main/persistence.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/main/runtime/rpc/methods/worktree-schemas.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/main/runtime/rpc/methods/worktree.ts": {
+      "added": 7,
+      "removed": 1
+    },
+    "src/main/ssh/ssh-relay-session.ts": {
+      "added": 38,
+      "removed": 0
+    },
+    "src/main/telemetry/client.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/preload/api-types.ts": {
+      "added": 31,
+      "removed": 0
+    },
+    "src/preload/index.ts": {
+      "added": 16,
+      "removed": 7
+    },
+    "src/relay/relay.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/renderer/src/assets/main.css": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/components/dashboard-popout/AgentMapWorkspaceContextMenu.test.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/NativeChatApprovalCard.tsx": {
+      "added": 4,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/NativeChatComposerField.tsx": {
+      "added": 4,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/NativeChatMessageList.tsx": {
+      "added": 12,
+      "removed": 4
+    },
+    "src/renderer/src/components/native-chat/NativeChatQuestionCard.tsx": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/NativeChatToolRun.tsx": {
+      "added": 6,
+      "removed": 3
+    },
+    "src/renderer/src/components/native-chat/NativeChatView.tsx": {
+      "added": 14,
+      "removed": 17
+    },
+    "src/renderer/src/components/settings/NativeChatExperimentalSetting.tsx": {
+      "added": 6,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/CommentMarkdown.tsx": {
+      "added": 15,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/WorktreeCard.tsx": {
+      "added": 5,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/WorktreeContextMenu.tsx": {
+      "added": 20,
+      "removed": 48
+    },
+    "src/renderer/src/components/sidebar/WorktreeList.tsx": {
+      "added": 184,
+      "removed": 26
+    },
+    "src/renderer/src/components/sidebar/comment-markdown-element-renderers.tsx": {
+      "added": 6,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/empty-project-placeholder-repos.ts": {
+      "added": 8,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/worktree-drag-units.ts": {
+      "added": 8,
+      "removed": 6
+    },
+    "src/renderer/src/components/sidebar/worktree-list-groups.ts": {
+      "added": 66,
+      "removed": 4
+    },
+    "src/renderer/src/components/terminal-pane/TerminalPaneHeaderOverlay.test.tsx": {
+      "added": 33,
+      "removed": 0
+    },
+    "src/renderer/src/components/terminal-pane/TerminalPaneHeaderOverlay.tsx": {
+      "added": 5,
+      "removed": 0
+    },
+    "src/renderer/src/i18n/i18n.ts": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/renderer/src/lib/connection-owner-resolution.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/lib/terminal-title-contrast.ts": {
+      "added": 3,
+      "removed": 3
+    },
+    "src/renderer/src/web/web-preload-api.ts": {
+      "added": 20,
+      "removed": 11
+    },
+    "src/shared/constants.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/shared/local-build-compatibility-contract.json": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/shared/local-build-compatibility-contract.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/shared/local-build-compatibility.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/shared/project-groups.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/shared/types.ts": {
+      "added": 10,
+      "removed": 0
+    }
+  }
+}

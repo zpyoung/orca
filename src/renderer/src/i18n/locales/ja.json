@@ -4552,13 +4552,7 @@
           "setParentWorkspace": "親ワークツリーを設定…",
           "workspaceSection": "ワークスペース",
           "primaryDeleteDisabled": "プライマリワークツリーは削除できません。代わりにプロジェクトを削除してください。",
-          "deleteWorktree": "ワークツリーを削除",
-          "3ae4748032": "グループを作成し、このワークツリーをそのグループに移動します。",
-          "308b16a770": "ワークツリーからの新規グループ",
-          "5bf97058a4": "プロジェクトをグループに移動",
-          "a2d9a2b93e": "プロジェクトをグループから削除",
-          "addWorktreeToGroup": "ワークツリーをグループに追加",
-          "removeWorktreeFromGroup": "ワークツリーをグループから削除"
+          "deleteWorktree": "ワークツリーを削除"
         },
         "WorktreeList": {
           "d880ea0744": "グループを作成し、このプロジェクトをそのグループに移動します。",
@@ -5784,10 +5778,7 @@
             "defaultCopy": "対応 Agent の新規ターミナルタブを開く方法を選択します。",
             "defaultViewLabel": "デフォルトの Chat UI ビュー",
             "defaultViewTerminal": "ターミナルチャット",
-            "defaultViewNative": "Chat UI",
-            "widthTitle": "チャットの幅",
-            "widthCopy": "すべてのチャットペインの読み取り列の幅を設定します。",
-            "widthLabel": "チャットの幅"
+            "defaultViewNative": "Chat UI"
           },
           "agentDashboard": {
             "title": "Agent ダッシュボード",
@@ -6277,11 +6268,7 @@
           "1b1b70279a": "まだデバイスがペアリングされていません。",
           "1592afcc7a": "まだデバイスがペアリングされていません。 Orca モバイルアプリで QR コードをスキャンします。",
           "relayDegradedNotice": "Relay に接続できませんでした — このコードは LAN または Tailscale でのみ動作します。再生成してからお試しください。",
-          "pairingQrError": "このペアリングコードを QR コードとして表示できませんでした。代わりに Orca Mobile にコピーしてください。",
-          "copyPairingCode": "Copy pairing code",
-          "diagnosticsCopied": "Diagnostics copied",
-          "diagnosticsCopyFailed": "Failed to copy diagnostics",
-          "pairingCodeReady": "Pairing code ready"
+          "pairingQrError": "このペアリングコードを QR コードとして表示できませんでした。代わりに Orca Mobile にコピーしてください。"
         },
         "MobileSettingsPane": {
           "9a3c280e49": "GitHub リリース",
@@ -9635,8 +9622,7 @@
           "signInRequired": "Relay のみ — LAN にはアカウントは不要です。",
           "relayUnavailable": "このビルドでは Orca Relay を利用できません。LAN をご利用ください。",
           "signInAgain": "Relay に再サインイン",
-          "localTitle": "LAN",
-          "retrying": "Retrying"
+          "localTitle": "LAN"
         },
         "MobilePairingSetupSection": {
           "title": "スマートフォンをペアリング",
@@ -11771,16 +11757,7 @@
           "relayDegradedNotice": "Relay に接続できませんでした — このコードは LAN または Tailscale でのみ動作します。",
           "pairingQrError": "このペアリングコードを QR コードとして表示できませんでした。代わりに Orca Mobile にコピーしてください。",
           "directAddressDisclosure": "より速いローカル経路も使う",
-          "directAddressHint": "任意。近く（同じ Wi‑Fi または Tailscale）にいるときにスマホが使うアドレスを選びます。通常は Relay より高速です。外出中は引き続き Relay が使われます。",
-          "noPairingCode": "No pairing code available",
-          "noRelayCode": "No pairing code available",
-          "pairThisComputer": "Pair this computer.",
-          "pairThisMac": "Pair this Mac.",
-          "pairThisPc": "Pair this PC.",
-          "pairingCodeReady": "Pairing code ready",
-          "qrGeneratePrompt": "Generate a pairing code to continue",
-          "qrRenderFailed": "QR couldn’t be rendered — copy the code below",
-          "qrSignInRequired": "Sign in to create a Relay pairing code"
+          "directAddressHint": "任意。近く（同じ Wi‑Fi または Tailscale）にいるときにスマホが使うアドレスを選びます。通常は Relay より高速です。外出中は引き続き Relay が使われます。"
         },
         "MobilePage": {
           "e17393c6a3": "スマートフォンプレビュー",
@@ -11793,9 +11770,7 @@
           "4e1eb5d55c": "デバイスの取り消しに失敗しました",
           "255372e6e8": "デバイスが取り消されました",
           "1b4509a8a1": "ペアになった",
-          "c5909374cf": "イントロ",
-          "diagnosticsCopied": "Diagnostics copied",
-          "diagnosticsCopyFailed": "Failed to copy diagnostics"
+          "c5909374cf": "イントロ"
         },
         "MobilePageToolbar": {
           "ad2284a9e2": "閉じる・Esc",
@@ -11927,18 +11902,6 @@
           "blocked-description": "既存のインバウンドブロックルールがペアリング例外を上書きする可能性があります。修復はこの Orca アプリの競合するTCPルールを削除し、プライベートネットワーク上のポート{{port}}を許可します。",
           "repair": "ファイアウォールアクセスを修復",
           "relay-note": "ペアリングは Orca Relay 経由で引き続き機能します。許可すると、より高速なローカル接続が追加されるだけです。"
-        },
-        "MobileRelayMintFailureNotice": {
-          "body": "Retry, or use LAN to pair over Tailscale or the same Wi‑Fi.",
-          "copyDiagnostics": "Copy diagnostics",
-          "retry": "Retry Relay",
-          "retrying": "Retrying…",
-          "retryingBody": "Creating a new pairing code. This can take a moment over a remote connection.",
-          "retryingTitle": "Retrying Orca Relay…",
-          "title": "Couldn’t create a Relay pairing code.",
-          "unavailableBody": "Use LAN to pair over Tailscale or the same Wi‑Fi.",
-          "unavailableTitle": "Orca Relay isn’t available on this desktop.",
-          "useLan": "Use LAN"
         }
       },
       "gitlab": {
@@ -14410,17 +14373,7 @@
         "allow": "許可する",
         "deny": "拒否"
       },
-      "launchPromptNotDelivered": "配信されませんでした — ターミナルを確認してください",
-      "width": {
-        "tier": {
-          "narrow": "狭い",
-          "comfortable": "ゆったり",
-          "wide": "広い",
-          "full": "全幅"
-        },
-        "menuLabel": "チャットの幅",
-        "menuTooltip": "チャットの幅（すべてのチャットペインに適用されます）"
-      }
+      "launchPromptNotDelivered": "配信されませんでした — ターミナルを確認してください"
     },
     "tab": {
       "bar": {

@@ -948,10 +948,13 @@ export type NativeChatReadSessionArgs = {
 
 export type NativeChatApi = {
   /** Read the on-disk transcript for an agent + session id, windowed to the most recent `limit`
-   *  turns. `transcriptPath` is the hook-reported authoritative path, preferred over the id glob.
-   *  Object-shaped on purpose: a positional tail is assignable when a caller
-   *  forwards fewer arguments than it was handed, which silently misroutes reads. */
-  readSession: (args: NativeChatReadSessionArgs) => Promise<NativeChatReadSessionResult>
+   *  turns. `transcriptPath` is the hook-reported authoritative path, preferred over the id glob. */
+  readSession: (
+    agent: AgentType,
+    sessionId: string,
+    limit?: number,
+    transcriptPath?: string
+  ) => Promise<NativeChatReadSessionResult>
   /** Live-tail a transcript. The first frame is a bounded race-safe snapshot;
    *  later frames contain only newly appended messages. */
   subscribe: (

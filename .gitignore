@@ -97,6 +97,7 @@ docs/**
 !docs/readme/
 !docs/readme/**
 !docs/STYLEGUIDE.md
+!docs/fork-upstreaming.md
 !docs/ai-vault-process-isolation-plan.md
 !docs/mobile-terminal-shortcut-bar.md
 !docs/reference/

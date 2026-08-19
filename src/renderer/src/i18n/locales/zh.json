@@ -4564,13 +4564,7 @@
           "setParentWorkspace": "设置父工作树...",
           "workspaceSection": "工作区",
           "primaryDeleteDisabled": "主工作树不能删除。请改为移除项目。",
-          "deleteWorktree": "删除工作树",
-          "3ae4748032": "创建一个组并将该工作树移入其中。",
-          "308b16a770": "来自工作树的新组",
-          "5bf97058a4": "将项目移至组",
-          "a2d9a2b93e": "从组中移除项目",
-          "addWorktreeToGroup": "将工作树添加到组",
-          "removeWorktreeFromGroup": "从组中移除工作树"
+          "deleteWorktree": "删除工作树"
         },
         "WorktreeList": {
           "d880ea0744": "创建一个组并将该项目移入其中。",
@@ -5796,10 +5790,7 @@
             "defaultCopy": "选择如何打开受支持智能体的新终端标签页。",
             "defaultViewLabel": "默认 Chat UI 视图",
             "defaultViewTerminal": "终端聊天",
-            "defaultViewNative": "Chat UI",
-            "widthTitle": "聊天宽度",
-            "widthCopy": "设置所有聊天窗格的阅读栏宽度。",
-            "widthLabel": "聊天宽度"
+            "defaultViewNative": "Chat UI"
           },
           "agentDashboard": {
             "title": "智能体仪表盘",
@@ -6252,11 +6243,7 @@
           "1b1b70279a": "尚未配对任何设备。",
           "1592afcc7a": "尚未配对任何设备。使用 Orca 手机应用程序扫描二维码。",
           "relayDegradedNotice": "无法连接 Relay — 此二维码仅在局域网或 Tailscale 内可用。请重新生成后再试。",
-          "pairingQrError": "无法将此配对码呈现为二维码。请改为将其复制到 Orca Mobile。",
-          "copyPairingCode": "Copy pairing code",
-          "diagnosticsCopied": "Diagnostics copied",
-          "diagnosticsCopyFailed": "Failed to copy diagnostics",
-          "pairingCodeReady": "Pairing code ready"
+          "pairingQrError": "无法将此配对码呈现为二维码。请改为将其复制到 Orca Mobile。"
         },
         "MobileSettingsPane": {
           "9a3c280e49": "GitHub 发布",
@@ -9647,8 +9634,7 @@
           "signInRequired": "仅 Relay 需要 — 局域网无需账号。",
           "relayUnavailable": "此版本不支持 Orca Relay。请使用局域网。",
           "signInAgain": "重新登录以使用 Relay",
-          "localTitle": "局域网",
-          "retrying": "Retrying"
+          "localTitle": "局域网"
         },
         "MobilePairingSetupSection": {
           "title": "配对手机",
@@ -11791,16 +11777,7 @@
           "relayDegradedNotice": "无法连接 Relay — 此二维码仅在局域网或 Tailscale 内可用。",
           "pairingQrError": "无法将此配对码呈现为二维码。请改为将其复制到 Orca Mobile。",
           "directAddressDisclosure": "也可使用更快的本地连接",
-          "directAddressHint": "可选。选择手机在附近（同一 Wi‑Fi 或 Tailscale）时使用的地址，通常比 Relay 更快。外出时仍走 Relay。",
-          "noPairingCode": "No pairing code available",
-          "noRelayCode": "No pairing code available",
-          "pairThisComputer": "Pair this computer.",
-          "pairThisMac": "Pair this Mac.",
-          "pairThisPc": "Pair this PC.",
-          "pairingCodeReady": "Pairing code ready",
-          "qrGeneratePrompt": "Generate a pairing code to continue",
-          "qrRenderFailed": "QR couldn’t be rendered — copy the code below",
-          "qrSignInRequired": "Sign in to create a Relay pairing code"
+          "directAddressHint": "可选。选择手机在附近（同一 Wi‑Fi 或 Tailscale）时使用的地址，通常比 Relay 更快。外出时仍走 Relay。"
         },
         "MobilePage": {
           "e17393c6a3": "手机预览",
@@ -11813,9 +11790,7 @@
           "4e1eb5d55c": "撤销设备失败",
           "255372e6e8": "设备已撤销",
           "1b4509a8a1": "配对的",
-          "c5909374cf": "简介",
-          "diagnosticsCopied": "Diagnostics copied",
-          "diagnosticsCopyFailed": "Failed to copy diagnostics"
+          "c5909374cf": "简介"
         },
         "MobilePageToolbar": {
           "ad2284a9e2": "关闭 · Esc",
@@ -11947,18 +11922,6 @@
           "blocked-description": "现有的入站阻止规则可能会覆盖配对例外。修复将移除此 Orca 应用的冲突 TCP 规则，然后在专用网络上允许端口 {{port}}。",
           "repair": "修复防火墙访问权限",
           "relay-note": "配对仍可通过 Orca Relay 进行 — 允许后只是额外获得更快的本地连接。"
-        },
-        "MobileRelayMintFailureNotice": {
-          "body": "Retry, or use LAN to pair over Tailscale or the same Wi‑Fi.",
-          "copyDiagnostics": "Copy diagnostics",
-          "retry": "Retry Relay",
-          "retrying": "Retrying…",
-          "retryingBody": "Creating a new pairing code. This can take a moment over a remote connection.",
-          "retryingTitle": "Retrying Orca Relay…",
-          "title": "Couldn’t create a Relay pairing code.",
-          "unavailableBody": "Use LAN to pair over Tailscale or the same Wi‑Fi.",
-          "unavailableTitle": "Orca Relay isn’t available on this desktop.",
-          "useLan": "Use LAN"
         }
       },
       "gitlab": {
@@ -14430,17 +14393,7 @@
         "allow": "允许",
         "deny": "拒绝"
       },
-      "launchPromptNotDelivered": "未送达 — 请检查终端",
-      "width": {
-        "tier": {
-          "narrow": "窄",
-          "comfortable": "舒适",
-          "wide": "宽",
-          "full": "全宽"
-        },
-        "menuLabel": "聊天宽度",
-        "menuTooltip": "聊天宽度（应用于所有聊天窗格）"
-      }
+      "launchPromptNotDelivered": "未送达 — 请检查终端"
     },
     "tab": {
       "bar": {

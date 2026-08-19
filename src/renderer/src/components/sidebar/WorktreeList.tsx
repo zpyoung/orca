@@ -87,11 +87,8 @@ import {
   type WorktreeGroupBy,
   PINNED_GROUP_KEY,
   buildRows,
-  getProjectGroupHeaderKey,
-  getProjectHeaderRevealTarget,
-  getLooseSectionProjectGroupId,
-  isLooseProjectGroupTopRow,
   getGroupKeysForWorktree,
+  getProjectGroupHeaderKey,
   getLineageGroupKey,
   getPinnedWorktreeDisplayPolicy,
   type PinnedWorktreeDisplayPolicy
@@ -169,8 +166,7 @@ import {
 import { isRepoHeaderActionTarget, useRepoHeaderDrag } from './project-header-drag'
 import {
   getLogicalRepoOrderRankById,
-  getSidebarOrderedRepoHeaderIdsByBucket,
-  measureProjectHeaderDragRects
+  getSidebarOrderedRepoHeaderIdsByBucket
 } from './project-header-drop'
 import { useProjectGroupHeaderDrag } from './project-group-header-drag'
 import {
@@ -178,10 +174,16 @@ import {
   measureProjectGroupHeaderDragRects
 } from './project-group-header-drop'
 import {
-  findWorktreeOwnProjectHeaderRect,
-  getWorktreeGroupMembershipDropTarget,
-  type WorktreeGroupMembershipDropTarget
-} from './worktree-group-membership-drop'
+  areWorktreeGroupMembershipDragPreviewsEqual,
+  getPointerWorktreeGroupMembershipDragPreview,
+  WORKTREE_GROUP_MEMBERSHIP_DRAG_PREVIEW_NONE,
+  type WorktreeGroupMembershipDragPreview
+} from './fork-worktree-groups/worktree-group-membership-drag-preview'
+import {
+  getLooseSectionProjectGroupId,
+  isLooseProjectGroupTopRow
+} from './fork-worktree-groups/worktree-loose-group-membership'
+import { needsWorktreeDragGroup } from './fork-worktree-groups/worktree-drag-group-key'
 import {
   buildManualOrderUpdatesForGroupDrop,
   buildManualOrderUpdatesForVisibleGroups,
@@ -265,7 +267,7 @@ import { ProjectGroupDeleteDialog } from './ProjectGroupDeleteDialog'
 import { selectProjectGroupRemovalTargets } from '@/store/slices/project-group-removal-targets'
 import { findRepoForHost } from '@/store/slices/repo-host-identity'
 import { isGitRepoKind } from '../../../../shared/repo-kind'
-import { canWorktreeHoldGroupMembership } from '../../../../shared/project-groups'
+import { canWorktreeHoldGroupMembership } from '../../../../shared/fork-worktree-groups/worktree-group-membership'
 import {
   effectiveExternalWorktreeVisibility,
   isLegacyRepoForExternalWorktreeVisibility
@@ -1064,131 +1066,6 @@ function getPointerDropStatusTarget(args: {
   }
 }
 
-// Why: pairs the hit-test result with the dragged worktree's repoId so the
-// render pass can tell "leave" apart from "join" without re-deriving it.
-type WorktreeGroupMembershipDragPreview = {
-  target: WorktreeGroupMembershipDropTarget
-  repoId: string | null
-}
-
-const WORKTREE_GROUP_MEMBERSHIP_DRAG_PREVIEW_NONE: WorktreeGroupMembershipDragPreview = {
-  target: { kind: 'none' },
-  repoId: null
-}
-
-function areWorktreeGroupMembershipDragPreviewsEqual(
-  a: WorktreeGroupMembershipDragPreview,
-  b: WorktreeGroupMembershipDragPreview
-): boolean {
-  if (a.repoId !== b.repoId || a.target.kind !== b.target.kind) {
-    return false
-  }
-  return a.target.kind === 'join' && b.target.kind === 'join'
-    ? a.target.groupId === b.target.groupId
-    : true
-}
-
-// Why: measureProject{,Group}HeaderDragRects report a header's LOGICAL content
-// position, which is what header reordering needs but is scrolled out of view for
-// the header that is currently pinned — so hit-testing a pointer against it never
-// matches the pinned header the user is actually pointing at. Returns the painted
-// position, in the same content space, for the pinned headers only.
-function measureStickySidebarHeaderContentRects(
-  container: HTMLElement,
-  containerRect: DOMRect,
-  idAttribute: string
-): Map<string, { top: number; bottom: number }> {
-  const rectsById = new Map<string, { top: number; bottom: number }>()
-  container
-    .querySelectorAll<HTMLElement>(`[data-worktree-sticky-header-active] [${idAttribute}]`)
-    .forEach((element) => {
-      const id = element.getAttribute(idAttribute)
-      if (!id) {
-        return
-      }
-      const rect = element.getBoundingClientRect()
-      const top = rect.top - containerRect.top + container.scrollTop
-      rectsById.set(id, { top, bottom: top + rect.height })
-    })
-  return rectsById
-}
-
-// Why: the hit-test module speaks for a single worktree; a multi-select drag
-// has no well-defined "current group" to compare against, so it opts out
-// entirely rather than silently reparenting only the primary card.
-function getPointerWorktreeGroupMembershipDragPreview(args: {
-  container: HTMLElement | null
-  clientX: number
-  clientY: number
-  draggedIds: readonly string[]
-  worktreeId: string
-  worktreeMap: ReadonlyMap<string, Worktree>
-  repoMap: Map<string, Repo>
-  projectGrouping?: ProjectGroupingModel
-}): WorktreeGroupMembershipDragPreview {
-  if (!args.container || args.draggedIds.length !== 1) {
-    return WORKTREE_GROUP_MEMBERSHIP_DRAG_PREVIEW_NONE
-  }
-  // Why: header hit-testing below is vertical-only and pointerup is a
-  // window-capture listener, so without a containment check a release far
-  // outside the sidebar still commits a membership change whenever it shares a
-  // header's y. Same guard shape as getPointerDropStatusTarget.
-  const pointerTarget = document.elementFromPoint(args.clientX, args.clientY)
-  if (!(pointerTarget instanceof Element) || !args.container.contains(pointerTarget)) {
-    return WORKTREE_GROUP_MEMBERSHIP_DRAG_PREVIEW_NONE
-  }
-  const draggedWorktree = args.worktreeMap.get(args.worktreeId)
-  if (!draggedWorktree) {
-    return WORKTREE_GROUP_MEMBERSHIP_DRAG_PREVIEW_NONE
-  }
-  const containerRect = args.container.getBoundingClientRect()
-  const pointerY = args.clientY - containerRect.top + args.container.scrollTop
-  const stickyGroupHeaderRects = measureStickySidebarHeaderContentRects(
-    args.container,
-    containerRect,
-    'data-project-group-header-id'
-  )
-  const stickyProjectHeaderRects = measureStickySidebarHeaderContentRects(
-    args.container,
-    containerRect,
-    'data-repo-header-id'
-  )
-  const groupHeaderRects = measureProjectGroupHeaderDragRects(args.container).map((rect) => ({
-    groupId: rect.groupId,
-    ...(stickyGroupHeaderRects.get(rect.groupId) ?? { top: rect.top, bottom: rect.bottom })
-  }))
-  const projectHeaderRects = measureProjectHeaderDragRects(args.container)
-  const ownRepoHeaderRect = findWorktreeOwnProjectHeaderRect({
-    rects: projectHeaderRects,
-    ownProjectHeaderKey: getProjectHeaderRevealTarget(
-      draggedWorktree.repoId,
-      args.repoMap,
-      args.projectGrouping
-    ).key,
-    projectHeaderKeyByRepoId: new Map(
-      projectHeaderRects.map((rect) => [
-        rect.repoId,
-        getProjectHeaderRevealTarget(rect.repoId, args.repoMap, args.projectGrouping).key
-      ])
-    )
-  })
-  const target = getWorktreeGroupMembershipDropTarget({
-    pointerY,
-    groupHeaderRects,
-    draggedWorktree,
-    ownRepoKind: args.repoMap.get(draggedWorktree.repoId)?.kind,
-    ownRepoSectionRect: ownRepoHeaderRect
-      ? (stickyProjectHeaderRects.get(ownRepoHeaderRect.repoId) ?? {
-          top: ownRepoHeaderRect.top,
-          bottom: ownRepoHeaderRect.bottom
-        })
-      : null
-  })
-  // Why: the leave highlight draws on the header actually hit-tested, which for
-  // a merged logical project is the anchor repo rather than the dragged one.
-  return { target, repoId: ownRepoHeaderRect?.repoId ?? null }
-}
-
 function shouldPreferSidebarStatusDropTarget(args: {
   sourceGroupKey: string
   target: WorktreeSidebarStatusDropTarget
@@ -1406,11 +1283,11 @@ export function getWorktreeDragGroups(rows: HostSectionRow[]): WorktreeDragGroup
     }
     // Why: a header's key is not always its items' sectionKey (loose worktrees
     // carry `<group>::loose`), and every other drag consumer keys off sectionKey.
-    if (!current || current.key !== row.sectionKey) {
+    if (needsWorktreeDragGroup(current?.key ?? null, row.sectionKey)) {
       current = { key: row.sectionKey, ids: [] }
       groups.push({ key: current.key, worktreeIds: current.ids })
     }
-    current.ids.push(row.worktree.id)
+    current!.ids.push(row.worktree.id)
   }
 
   return groups.filter((group) => group.worktreeIds.length > 0)
@@ -4562,10 +4439,10 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
                     data-workspace-status={headerWorkspaceStatus ?? undefined}
                     data-workspace-pin-drop-target={isPinnedHeader ? '' : undefined}
                     className={cn(
+                      // Why: no row-level grab — only the title surface below shows the hand;
+                      // actions use cursor-pointer so … / + never look reorderable.
                       'group relative flex h-6 w-full items-center gap-1.5 pr-2 text-left transition-all',
-                      isDraggableRepoHeader || isDraggableProjectGroupHeader
-                        ? 'cursor-grab active:cursor-grabbing'
-                        : 'cursor-pointer',
+                      !(isDraggableRepoHeader || isDraggableProjectGroupHeader) && 'cursor-pointer',
                       highlightedRevealRowKey === row.key &&
                         'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/50',
                       (isDraggingThis || isDraggingThisProjectGroup) &&

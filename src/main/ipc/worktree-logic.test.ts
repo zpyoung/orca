@@ -472,6 +472,7 @@ describe('mergeWorktree', () => {
       isUnread: true,
       isPinned: true,
       sortOrder: 5,
+      projectGroupId: null,
       lastActivityAt: 1000,
       workspaceStatus: 'in-review',
       diffComments: [],

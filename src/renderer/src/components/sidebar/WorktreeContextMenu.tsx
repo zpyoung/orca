@@ -18,7 +18,6 @@ import {
   Copy,
   Bell,
   BellOff,
-  CircleX,
   Pencil,
   Pin,
   PinOff,
@@ -26,19 +25,14 @@ import {
   Trash2,
   Unlink,
   Workflow,
-  FolderInput,
-  FolderPlus,
   FolderTree
 } from 'lucide-react'
 import { useAppStore } from '@/store'
 import type { AppState } from '@/store/types'
-import type { WorktreeMetaUpdateOptions } from '@/store/slices/worktree-helpers'
 import { useAllWorktrees, useRepoById, useRepoMap, useWorktreeMap } from '@/store/selectors'
 import { cn } from '@/lib/utils'
 import type {
-  ProjectGroup,
   Repo,
-  RepoKind,
   Worktree,
   WorkspaceStatus,
   WorkspaceStatusDefinition
@@ -69,7 +63,10 @@ import { WorkspaceSleepMenuItems } from './WorkspaceSleepMenuItems'
 import { isEventTargetInsideCurrentTarget } from './worktree-card-dom-events'
 import { translate } from '@/i18n/i18n'
 import { parseWorkspaceKey, worktreeWorkspaceKey } from '../../../../shared/workspace-scope'
-import { canWorktreeHoldGroupMembership } from '../../../../shared/project-groups'
+import {
+  useWorktreeGroupDialog,
+  WorktreeGroupMenuItems
+} from './fork-worktree-groups/WorktreeGroupMenuItems'
 
 type Props = {
   worktree: Worktree
@@ -316,88 +313,6 @@ export function planWorkspaceStatusAssignment(
   return { kind: 'local-only', localWriteIds }
 }
 
-export type WorktreeGroupMenuVisibility = {
-  showWorktreeCreate: boolean
-  showAddSubmenu: boolean
-  showProjectCreate: boolean
-}
-
-// Why: derives worktree-vs-project group-menu visibility from one
-// `canHoldMembership` gate. Rows that cannot hold membership fall back to the
-// honestly-scoped project action instead. A repo-less folder workspace has no
-// project to target, so showProjectCreate also requires `hasRepo` — the
-// invariant is never both, not always exactly one.
-function getWorktreeGroupMenuVisibility(
-  folderWorkspaceId: string | null,
-  projectGroups: readonly Pick<ProjectGroup, 'id'>[],
-  repoKind: RepoKind | undefined,
-  hasRepo: boolean
-): WorktreeGroupMenuVisibility {
-  const canHoldMembership = canWorktreeHoldGroupMembership({ folderWorkspaceId, repoKind })
-  return {
-    showWorktreeCreate: canHoldMembership,
-    showAddSubmenu: canHoldMembership && projectGroups.length > 0,
-    showProjectCreate: !canHoldMembership && hasRepo
-  }
-}
-
-function shouldShowRemoveWorktreeFromGroup(worktree: Pick<Worktree, 'projectGroupId'>): boolean {
-  return worktree.projectGroupId != null
-}
-
-// Why: kept as free functions (rather than inline in the useCallback) so the
-// exact updateWorktreeMeta call args are unit-testable without rendering the menu.
-function addWorktreeToGroup(
-  worktreeId: string,
-  groupId: string,
-  updateWorktreeMeta: (worktreeId: string, updates: { projectGroupId: string | null }) => void
-): void {
-  updateWorktreeMeta(worktreeId, { projectGroupId: groupId })
-}
-
-function removeWorktreeFromGroup(
-  worktreeId: string,
-  updateWorktreeMeta: (worktreeId: string, updates: { projectGroupId: string | null }) => void
-): void {
-  updateWorktreeMeta(worktreeId, { projectGroupId: null })
-}
-
-// Why: mirrors addWorktreeToGroup/removeWorktreeFromGroup above — a free
-// function so the create-then-assign sequence is unit-testable without
-// rendering the menu. Never calls moveProjectToGroup: the new group must hold
-// only this one worktree, not the whole repo.
-async function createGroupFromWorktree(
-  worktree: Pick<Worktree, 'id' | 'instanceId' | 'projectGroupId'>,
-  name: string,
-  createProjectGroup: (name: string) => Promise<ProjectGroup | null>,
-  updateWorktreeMeta: (
-    worktreeId: string,
-    updates: { projectGroupId: string | null },
-    options?: WorktreeMetaUpdateOptions
-  ) => Promise<{ ok: true } | { ok: false; error: string }>
-): Promise<void> {
-  // Why: createProjectGroup crosses an async gap — capture identity/membership
-  // first so a delete, path-reuse replacement, or another group change mid-flight
-  // isn't clobbered by this assignment landing late.
-  const capturedInstanceId = worktree.instanceId ?? null
-  const capturedProjectGroupId = worktree.projectGroupId ?? null
-  const group = await createProjectGroup(name)
-  if (group) {
-    await updateWorktreeMeta(
-      worktree.id,
-      { projectGroupId: group.id },
-      {
-        shouldApply: (current) =>
-          Boolean(
-            current &&
-            (current.instanceId ?? null) === capturedInstanceId &&
-            (current.projectGroupId ?? null) === capturedProjectGroupId
-          )
-      }
-    )
-  }
-}
-
 const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
   worktree,
   children,
@@ -414,7 +329,6 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
   const setWorktreesPinnedAndReveal = useAppStore((s) => s.setWorktreesPinnedAndReveal)
   const workspaceStatuses = useAppStore((s) => s.workspaceStatuses)
   const openModal = useAppStore((s) => s.openModal)
-  const projectGroups = useAppStore((s) => s.projectGroups)
   const createProjectGroup = useAppStore((s) => s.createProjectGroup)
   const moveProjectToGroup = useAppStore((s) => s.moveProjectToGroup)
   const repo = useRepoById(worktree.repoId)
@@ -429,12 +343,12 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
   const [contextWorktrees, setContextWorktrees] = useState<readonly Worktree[]>(
     effectiveSelectedWorktrees
   )
-  const [createGroupDialog, setCreateGroupDialog] = useState<{
-    scope: 'project' | 'worktree'
-  } | null>(null)
-  // Why: the lifecycle timer below reads this synchronously — the state above is
-  // stale inside that callback.
+  const [createGroupDialogOpen, setCreateGroupDialogOpen] = useState(false)
   const createGroupDialogActiveRef = useRef(false)
+  const worktreeGroupDialog = useWorktreeGroupDialog({
+    worktree,
+    dialogActiveRef: createGroupDialogActiveRef
+  })
   const [parentPicker, setParentPicker] = useState<{
     childWorktreeId: string
     anchorElement: HTMLElement
@@ -534,12 +448,6 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
     [activeContextWorktrees, repoMap]
   )
   const removesProject = shouldRemoveProjectFromContextMenu(repo, worktree)
-  const worktreeGroupMenuVisibility = getWorktreeGroupMenuVisibility(
-    folderWorkspaceId,
-    projectGroups,
-    repo?.kind,
-    Boolean(repo)
-  )
   const sleepLabel =
     isMultiContext && sleepableWorktrees.length > 0
       ? `Sleep ${sleepableWorktrees.length} Workspace${sleepableWorktrees.length === 1 ? '' : 's'}`
@@ -607,7 +515,8 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
     if (
       !lifecycleStartedRef.current ||
       menuOpen ||
-      createGroupDialog !== null ||
+      createGroupDialogOpen ||
+      worktreeGroupDialog.open ||
       createGroupDialogActiveRef.current ||
       parentPicker !== null ||
       pendingParentPickerRef.current !== null
@@ -622,7 +531,7 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
       onLifecycleComplete?.()
     }, 0)
     return () => window.clearTimeout(timer)
-  }, [createGroupDialog, menuOpen, onLifecycleComplete, parentPicker])
+  }, [createGroupDialogOpen, menuOpen, onLifecycleComplete, parentPicker, worktreeGroupDialog.open])
 
   useEffect(() => {
     const closeMenu = (): void => setMenuOpenState(false)
@@ -659,27 +568,16 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
       return
     }
     createGroupDialogActiveRef.current = true
-    setCreateGroupDialog({ scope: 'project' })
+    setCreateGroupDialogOpen(true)
   }, [repo])
-
-  const handleCreateGroupFromWorktree = useCallback(() => {
-    createGroupDialogActiveRef.current = true
-    setCreateGroupDialog({ scope: 'worktree' })
-  }, [])
 
   const handleCreateGroupDialogOpenChange = useCallback((open: boolean) => {
     createGroupDialogActiveRef.current = open
-    if (!open) {
-      setCreateGroupDialog(null)
-    }
+    setCreateGroupDialogOpen(open)
   }, [])
 
   const handleSubmitNewProjectGroup = useCallback(
     async (name: string) => {
-      if (createGroupDialog?.scope === 'worktree') {
-        await createGroupFromWorktree(worktree, name, createProjectGroup, updateWorktreeMeta)
-        return
-      }
       if (!repo) {
         return
       }
@@ -688,7 +586,7 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
         await moveProjectToGroup(repo.id, group.id)
       }
     },
-    [createGroupDialog, createProjectGroup, moveProjectToGroup, repo, updateWorktreeMeta, worktree]
+    [createProjectGroup, moveProjectToGroup, repo]
   )
 
   const handleMoveProjectToGroup = useCallback(
@@ -707,16 +605,6 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
     }
     void moveProjectToGroup(repo.id, null)
   }, [moveProjectToGroup, repo])
-
-  const handleAddWorktreeToGroup = useCallback(
-    (groupId: string) => addWorktreeToGroup(worktree.id, groupId, updateWorktreeMeta),
-    [updateWorktreeMeta, worktree.id]
-  )
-
-  const handleRemoveWorktreeFromGroup = useCallback(
-    () => removeWorktreeFromGroup(worktree.id, updateWorktreeMeta),
-    [updateWorktreeMeta, worktree.id]
-  )
 
   const handleAssignWorkspaceStatus = useCallback(
     (status: string) => {
@@ -1034,105 +922,15 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
                       'Mark Unread'
                     )}
               </DropdownMenuItem>
-              {worktreeGroupMenuVisibility.showWorktreeCreate ? (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={handleCreateGroupFromWorktree} disabled={isDeleting}>
-                    <FolderPlus className="size-3.5" />
-                    {translate(
-                      'auto.components.sidebar.WorktreeContextMenu.308b16a770',
-                      'New group from worktree'
-                    )}
-                  </DropdownMenuItem>
-                </>
-              ) : null}
-              {repo ? (
-                <>
-                  {worktreeGroupMenuVisibility.showProjectCreate ? (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onSelect={handleCreateGroupFromRepo} disabled={isDeleting}>
-                        <FolderPlus className="size-3.5" />
-                        {translate(
-                          'auto.components.sidebar.WorktreeContextMenu.503ec0f8e6',
-                          'New group from project'
-                        )}
-                      </DropdownMenuItem>
-                    </>
-                  ) : null}
-                  {projectGroups.length > 0 ? (
-                    <DropdownMenuSub>
-                      <DropdownMenuSubTrigger disabled={isDeleting}>
-                        <FolderInput className="size-3.5" />
-                        {translate(
-                          'auto.components.sidebar.WorktreeContextMenu.5bf97058a4',
-                          'Move project to group'
-                        )}
-                      </DropdownMenuSubTrigger>
-                      <DropdownMenuSubContent>
-                        {projectGroups.map((group) => (
-                          <DropdownMenuItem
-                            key={group.id}
-                            disabled={repo.projectGroupId === group.id}
-                            onSelect={() => handleMoveProjectToGroup(group.id)}
-                          >
-                            <span className="max-w-48 truncate">{group.name}</span>
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuSubContent>
-                    </DropdownMenuSub>
-                  ) : null}
-                  {repo.projectGroupId ? (
-                    <DropdownMenuItem onSelect={handleRemoveProjectFromGroup} disabled={isDeleting}>
-                      <CircleX className="size-3.5" />
-                      {translate(
-                        'auto.components.sidebar.WorktreeContextMenu.a2d9a2b93e',
-                        'Remove project from group'
-                      )}
-                    </DropdownMenuItem>
-                  ) : null}
-                </>
-              ) : null}
-              {worktreeGroupMenuVisibility.showAddSubmenu ? (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger disabled={isDeleting}>
-                      <FolderInput className="size-3.5" />
-                      {translate(
-                        'auto.components.sidebar.WorktreeContextMenu.addWorktreeToGroup',
-                        'Add worktree to group'
-                      )}
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent>
-                      {/* Why: disabled rather than filtered, matching the repo-level
-                          submenu above — filtering the current group out leaves an
-                          empty submenu whenever it is the only group that exists. */}
-                      {projectGroups.map((group) => (
-                        <DropdownMenuItem
-                          key={group.id}
-                          disabled={worktree.projectGroupId === group.id}
-                          onSelect={() => handleAddWorktreeToGroup(group.id)}
-                        >
-                          <span className="max-w-48 truncate">{group.name}</span>
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                  {shouldShowRemoveWorktreeFromGroup(worktree) ? (
-                    <DropdownMenuItem
-                      onSelect={handleRemoveWorktreeFromGroup}
-                      disabled={isDeleting}
-                    >
-                      <CircleX className="size-3.5" />
-                      {translate(
-                        'auto.components.sidebar.WorktreeContextMenu.removeWorktreeFromGroup',
-                        'Remove worktree from group'
-                      )}
-                    </DropdownMenuItem>
-                  ) : null}
-                </>
-              ) : null}
+              <WorktreeGroupMenuItems
+                worktree={worktree}
+                repo={repo}
+                disabled={isDeleting}
+                onCreateProject={handleCreateGroupFromRepo}
+                onCreateWorktree={worktreeGroupDialog.openDialog}
+                onMoveProject={handleMoveProjectToGroup}
+                onRemoveProject={handleRemoveProjectFromGroup}
+              />
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onSelect={handleOpenParentPicker}
@@ -1267,33 +1065,21 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
         </DropdownMenuContent>
       </DropdownMenu>
       <ProjectGroupNameDialog
-        open={createGroupDialog !== null}
+        open={createGroupDialogOpen}
         title={translate(
           'auto.components.sidebar.WorktreeContextMenu.6664418e98',
           'New Project Group'
         )}
-        description={
-          createGroupDialog?.scope === 'worktree'
-            ? translate(
-                'auto.components.sidebar.WorktreeContextMenu.3ae4748032',
-                'Create a group and move this worktree into it.'
-              )
-            : translate(
-                'auto.components.sidebar.WorktreeContextMenu.c39c37676a',
-                'Create a group and move this project into it.'
-              )
-        }
-        initialName={
-          createGroupDialog?.scope === 'worktree'
-            ? `${worktree.displayName} group`
-            : repo
-              ? `${repo.displayName} group`
-              : ''
-        }
+        description={translate(
+          'auto.components.sidebar.WorktreeContextMenu.c39c37676a',
+          'Create a group and move this project into it.'
+        )}
+        initialName={repo ? `${repo.displayName} group` : ''}
         confirmLabel="Create"
         onOpenChange={handleCreateGroupDialogOpenChange}
         onSubmit={handleSubmitNewProjectGroup}
       />
+      {worktreeGroupDialog.dialog}
       {/* Why: mounted only while open — one instance of this lives behind every
           worktree card, and each one subscribes to the worktree and lineage
           maps just to compute parent candidates it will never show. Closing
@@ -1322,10 +1108,5 @@ export {
   shouldRemoveProjectFromContextMenu,
   shouldUseNativeContextMenu,
   shouldSuppressContextMenuFollowUpClick,
-  shouldIgnoreNestedWorktreeContextMenuScope,
-  addWorktreeToGroup,
-  removeWorktreeFromGroup,
-  createGroupFromWorktree,
-  getWorktreeGroupMenuVisibility,
-  shouldShowRemoveWorktreeFromGroup
+  shouldIgnoreNestedWorktreeContextMenuScope
 }
