@@ -485,19 +485,13 @@
       "path": "src/preload/api-types.ts",
       "feature": "native-chat-relay",
       "kind": "passthrough",
-      "lines": [
-        "export type NativeChatReadSessionArgs = {",
-        "  (args: NativeChatReadSessionArgs): Promise<NativeChatReadSessionResult>"
-      ]
+      "lines": ["export type NativeChatReadSessionArgs = {"]
     },
     {
       "path": "src/preload/index.ts",
       "feature": "native-chat-relay",
       "kind": "passthrough",
-      "lines": [
-        "const readNativeChatSession: NativeChatReadSession = (",
-        "    readSession: readNativeChatSession,"
-      ]
+      "lines": ["const readNativeChatSession = (", "    readSession: readNativeChatSession,"]
     },
     {
       "path": "src/renderer/src/web/web-preload-api.ts",
@@ -505,15 +499,9 @@
       "kind": "passthrough",
       "lines": [
         "} from '@/components/native-chat/fork-native-chat-relay/native-chat-runtime-contract'",
-        "  const readNativeChatSession: NativeChatApi['readSession'] = async (",
+        "  const readNativeChatSession = async (",
         "    readSession: readNativeChatSession,"
       ]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-session-transport.ts",
-      "feature": "native-chat-relay",
-      "kind": "passthrough",
-      "lines": ["  subscribe: NativeChatApi['subscribe']"]
     },
     {
       "path": "src/renderer/src/components/native-chat/NativeChatMessageList.tsx",

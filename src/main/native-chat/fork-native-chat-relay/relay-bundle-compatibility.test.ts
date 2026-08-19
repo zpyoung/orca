@@ -11,10 +11,10 @@ const POST_NODE_18_APIS = [
   /\.with\(/,
   /\.isWellFormed\(/,
   /\.toWellFormed\(/,
-  /Object\.groupBy/,
-  /Map\.groupBy/,
-  /Array\.fromAsync/,
-  /Promise\.withResolvers/
+  /\bObject\.groupBy\b/,
+  /\bMap\.groupBy\b/,
+  /\bArray\.fromAsync\b/,
+  /\bPromise\.withResolvers\b/
 ]
 
 async function bundleRelayHandler(): Promise<{ source: string; inputs: string[] }> {
@@ -37,6 +37,25 @@ async function bundleRelayHandler(): Promise<{ source: string; inputs: string[] 
 }
 
 describe('native-chat modules bundled into the relay', () => {
+  it('recognizes every forbidden Node API spelling', () => {
+    const spellings = [
+      'array.toReversed(',
+      'array.toSorted(',
+      'array.toSpliced(',
+      'array.with(',
+      'text.isWellFormed(',
+      'text.toWellFormed(',
+      'Object.groupBy',
+      'Map.groupBy',
+      'Array.fromAsync',
+      'Promise.withResolvers'
+    ]
+
+    expect(POST_NODE_18_APIS.map((api, index) => api.test(spellings[index]!))).toEqual(
+      spellings.map(() => true)
+    )
+  })
+
   it('keeps the emitted bundle Electron-free and Node 18 compatible', async () => {
     const { source } = await bundleRelayHandler()
 

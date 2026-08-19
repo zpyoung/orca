@@ -64,7 +64,10 @@ describe('native-chat relay preload API', () => {
       beforeOffset: 8192
     }
 
-    await api.nativeChat.readSession(args)
+    const readSession = api.nativeChat.readSession as unknown as (
+      input: typeof args
+    ) => Promise<unknown>
+    await readSession(args)
 
     expect(invoke).toHaveBeenCalledWith('nativeChat:readSession', args)
   })

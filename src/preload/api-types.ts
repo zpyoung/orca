@@ -946,19 +946,15 @@ export type NativeChatReadSessionArgs = {
   beforeOffset?: number
 }
 
-export type NativeChatReadSession = {
-  (args: NativeChatReadSessionArgs): Promise<NativeChatReadSessionResult>
-  (
+export type NativeChatApi = {
+  /** Read the on-disk transcript for an agent + session id, windowed to the most recent `limit`
+   *  turns. `transcriptPath` is the hook-reported authoritative path, preferred over the id glob. */
+  readSession: (
     agent: AgentType,
     sessionId: string,
     limit?: number,
     transcriptPath?: string
-  ): Promise<NativeChatReadSessionResult>
-}
-
-export type NativeChatApi = {
-  /** Read the on-disk transcript for an agent + session id, windowed to the most recent `limit` turns. */
-  readSession: NativeChatReadSession
+  ) => Promise<NativeChatReadSessionResult>
   /** Live-tail a transcript. The first frame is a bounded race-safe snapshot;
    *  later frames contain only newly appended messages. */
   subscribe: (

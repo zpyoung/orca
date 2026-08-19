@@ -66,11 +66,21 @@ function toSyncUnsubscribe(handle: unknown): () => void {
   }
 }
 
+function readLocalNativeChatSession(
+  args: NativeChatReadSessionArgs
+): Promise<NativeChatReadSessionResult> {
+  // the positional public type keeps upstream consumers unchanged; the bridge also accepts object reads
+  const readSession = window.api.nativeChat.readSession as unknown as (
+    args: NativeChatReadSessionArgs
+  ) => Promise<NativeChatReadSessionResult>
+  return readSession(args)
+}
+
 /** Delegates straight to the local Electron IPC bridge. On the web client
  *  `window.api.nativeChat` already bridges to the paired runtime, so web keeps
  *  using this adapter (R3). */
 const localNativeChatTransport: NativeChatSessionTransport = {
-  readSession: (args) => window.api.nativeChat.readSession(args),
+  readSession: readLocalNativeChatSession,
   subscribe: (args, onFrame) => toSyncUnsubscribe(window.api.nativeChat.subscribe(args, onFrame))
 }
 

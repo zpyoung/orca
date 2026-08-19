@@ -217,7 +217,7 @@ import type {
   RefreshAgentsResult,
   NativeChatAppendedPayload,
   NativeChatReadSessionArgs,
-  NativeChatReadSession,
+  NativeChatReadSessionResult,
   NativeChatSubscriptionFrame,
   PluginHostInstallResult,
   PluginHostInstallSource,
@@ -492,12 +492,12 @@ ipcRenderer.on('ui:findInBrowserPage', (_event, source: unknown) => {
 })
 
 // Custom APIs for renderer
-const readNativeChatSession: NativeChatReadSession = (
+const readNativeChatSession = (
   argsOrAgent: NativeChatReadSessionArgs | AgentType,
   sessionId?: string,
   limit?: number,
   transcriptPath?: string
-) =>
+): Promise<NativeChatReadSessionResult> =>
   ipcRenderer.invoke(
     'nativeChat:readSession',
     typeof argsOrAgent === 'string'

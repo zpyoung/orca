@@ -102,7 +102,10 @@ describe('web native-chat relay preload API', () => {
       beforeOffset: 8192
     }
 
-    await expect(globals.window.api.nativeChat.readSession(args)).resolves.toEqual({
+    const readSession = globals.window.api.nativeChat.readSession as unknown as (
+      input: typeof args
+    ) => Promise<unknown>
+    await expect(readSession(args)).resolves.toEqual({
       messages: [],
       hasMore: true,
       beforeOffset: 4096

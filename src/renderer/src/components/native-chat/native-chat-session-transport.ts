@@ -1,9 +1,4 @@
-import type {
-  NativeChatApi,
-  NativeChatAppendedMessages,
-  NativeChatReadSessionResult
-} from '../../../../preload/api-types'
-import type { AgentType } from '../../../../shared/native-chat-types'
+import type { NativeChatApi, NativeChatAppendedMessages } from '../../../../preload/api-types'
 import { isWebClientLocation } from '@/lib/web-client-location'
 import {
   callRuntimeRpc,
@@ -20,15 +15,7 @@ import {
 /** The read/subscribe surface the live-session hook needs, decoupled from where
  *  the transcript actually lives. Same shape as `window.api.nativeChat`, so the
  *  hook and everything downstream (merge, assembler, pagination) are unchanged. */
-export type NativeChatSessionTransport = {
-  readSession: (
-    agent: AgentType,
-    sessionId: string,
-    limit?: number,
-    transcriptPath?: string
-  ) => Promise<NativeChatReadSessionResult>
-  subscribe: NativeChatApi['subscribe']
-}
+export type NativeChatSessionTransport = Pick<NativeChatApi, 'readSession' | 'subscribe'>
 
 const RUNTIME_TOO_OLD =
   'This remote runtime is too old to show agent chat history. Update the remote runtime to view it.'

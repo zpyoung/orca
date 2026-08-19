@@ -1243,7 +1243,7 @@ function createWebKeybindingsApi(): WebKeybindingsApi {
 
 // Why: web has no IPC for native-chat transcripts, so route readSession/subscribe through runtime RPC (as mobile does).
 function createNativeChatApi(): NativeChatApi {
-  const readNativeChatSession: NativeChatApi['readSession'] = async (
+  const readNativeChatSession = async (
     argsOrAgent: NativeChatReadSessionArgs | AgentType,
     sessionId?: string,
     limit?: number,
