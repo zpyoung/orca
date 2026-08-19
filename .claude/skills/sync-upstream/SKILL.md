@@ -78,43 +78,78 @@ ownership resolution and before final verification. Treat the complete output of
 the checklist; do not rely on a remembered path list:
 
 ```sh
-git grep -l '^// FORK-COPY-OF:'
+git grep -l '^// FORK-COPY-OF:' -- ':(glob)**/fork-*/**'
 ```
 
-1. Read the recorded SHA and every path in the comma-separated `FORK-COPY-OF` list. For each
-   recorded path, discover renames across the **whole tree** before filtering the result. Do not
-   pass an old path as a `git diff` pathspec: Git filters before rename discovery and loses the
-   replacement.
+Cross-check every candidate against `config/fork-ownership.json`: it must be covered by a feature
+glob, its first two physical lines must be the two copy headers, and the target tag must not contain
+the candidate path. Anything else is an ownership or collision finding to raise before replay.
+
+1. For each copy, set the copy path and new stable tag explicitly. Parse both headers, validate the
+   recorded SHA as a full commit ID, and resolve the target tag to a commit before invoking `git`:
 
    ```sh
-   git diff --name-status --find-renames "$recorded_sha" "$target_ref" \
-     | awk -v p="$recorded_path" '$1 ~ /^R/ && $2 == p { print $3 }'
+   copy_path='path/from-the-git-grep-output'
+   target_ref='vX.Y.Z'
+   first_header=$(sed -n '1p' "$copy_path")
+   second_header=$(sed -n '2p' "$copy_path")
+   case "$first_header" in '// FORK-COPY-OF: '*) ;; *) exit 2 ;; esac
+   case "$second_header" in '// FORK-COPY-SHA: '*) ;; *) exit 2 ;; esac
+   recorded_paths=${first_header#// FORK-COPY-OF: }
+   recorded_sha=${second_header#// FORK-COPY-SHA: }
+   test -n "$recorded_paths" || exit 2
+   printf '%s\n' "$recorded_sha" | grep -Eq '^[0-9a-f]{40}([0-9a-f]{24})?$' || exit 2
+   git cat-file -e "${recorded_sha}^{commit}" || exit 2
+   target_commit=$(git rev-parse --verify --end-of-options "${target_ref}^{commit}") || exit 2
+   if git cat-file -e "${target_commit}:${copy_path}" 2>/dev/null; then exit 2; fi
+   status_file=$(mktemp)
+   git diff --name-status -z --find-renames "$recorded_sha" "$target_commit" > "$status_file" \
+     || { rm -f "$status_file"; exit 2; }
    ```
 
-   If no rename resolves the path, classify it with another unfiltered status lookup:
+   For each comma-separated value in `recorded_paths`, set `recorded_path` explicitly and parse the
+   NUL-delimited whole-tree snapshot below. Do not pass the old path as a `git diff` pathspec: Git
+   filters before rename discovery and loses the replacement. The parser prints a JSON `rename`
+   result with the complete new path, a `status` result for `M` or `D`, or nothing when unchanged.
 
    ```sh
-   git diff --name-status --find-renames "$recorded_sha" "$target_ref" \
-     | awk -v p="$recorded_path" '$2 == p { print $1 }'
+   recorded_path='one/path/from-recorded_paths'
+   node - "$status_file" "$recorded_path" <<'NODE'
+   const fs = require('node:fs')
+   const fields = fs.readFileSync(process.argv[2], 'utf8').split('\0')
+   const recordedPath = process.argv[3]
+   for (let index = 0; index < fields.length - 1; ) {
+     const status = fields[index++]
+     const firstPath = fields[index++]
+     if (status.startsWith('R')) {
+       const resolvedPath = fields[index++]
+       if (firstPath === recordedPath) {
+         console.log(JSON.stringify({ kind: 'rename', path: resolvedPath }))
+       }
+     } else if (firstPath === recordedPath) {
+       console.log(JSON.stringify({ kind: 'status', status }))
+     }
+   }
+   NODE
    ```
 
-   `M` means it remains at the recorded path; `D` means upstream deleted it; and no status means it
-   is unchanged. A `D` is not an empty delta: raise it to the user as a collision-policy decision
-   before changing the copy or its header. For an unchanged path, retain the path in the list.
+   Repeat the parser for every recorded path, then remove the snapshot with `rm -f "$status_file"`.
+   A `D` is not an empty delta: raise it to the user as a collision-policy decision before changing
+   the copy or its header. For an unchanged path, retain the path in the list.
 
 2. When a resolved module is materially smaller than its recorded source, inspect the same upstream
    split commit for sibling modules. Add every sibling created by that one-to-many split to the
    resolved path list; rename detection reports only the largest similarity match. Diff the old and
-   new tags across **every recorded and resolved path**, then replay that upstream delta into the
+   new commits across **every recorded and resolved path**, then replay that upstream delta into the
    fork copy by hand, resolving interactions with fork behavior deliberately.
 
    ```sh
-   git diff "$recorded_sha" "$target_ref" -- \
+   git diff "$recorded_sha" "$target_commit" -- \
      <every-recorded-path> <every-resolved-path>
    ```
 
 3. Only after the hand replay is complete, replace `FORK-COPY-OF` with the complete resolved path
-   list and replace `FORK-COPY-SHA` with the synced tag commit. Update both header fields together,
+   list and replace `FORK-COPY-SHA` with the value of `target_commit`. Update both header fields together,
    including when a path was unchanged; never advance only the SHA or leave an old path behind.
 
 ## Tier-4 pending-upstream review
@@ -123,8 +158,7 @@ For every manifest `exceptions[]` entry whose `status` is `pending-upstream`, fo
 target in `docs/fork-upstreaming.md`, confirm that the target still exists, and review upstream
 movement over the old-to-new stable-tag range for that item. Keep its manifest and ledger state
 atomic by creating, updating, or removing the matching entries in the same change. Do not let a
-resolved, declined, or moved upstream item
-leave a stale manifest row or an orphaned ledger entry.
+resolved, declined, or moved upstream item leave a stale manifest row or an orphaned ledger entry.
 
 ## Upstream feature-collision review
 
@@ -217,7 +251,8 @@ Traps that fake results:
 
   ```sh
   pnpm build:cli && env -u GIT_CONFIG_COUNT -u GIT_CONFIG_KEY_0 -u GIT_CONFIG_KEY_1 \
-    -u GIT_CONFIG_VALUE_0 -u GIT_CONFIG_VALUE_1 -u GIT_CONFIG_GLOBAL -u GIT_CONFIG_SYSTEM pnpm test
+    -u GIT_CONFIG_VALUE_0 -u GIT_CONFIG_VALUE_1 -u GIT_CONFIG_GLOBAL -u GIT_CONFIG_SYSTEM \
+    -u GIT_CONFIG_PARAMETERS -u GIT_CONFIG_NOSYSTEM pnpm test
   ```
 
 - `.claude/skills/*` is gitignored. New skills here need `git add -f` or they never reach the host

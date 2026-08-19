@@ -520,25 +520,58 @@ describe('phase-5 SKILL.md procedure', () => {
     skillText.indexOf('## When upstream')
   )
 
-  it('requires whole-tree rename discovery before filtering fork-copy paths', () => {
-    const renameDiscovery =
-      tierTwoProcedure.match(/git diff --name-status --find-renames[\s\S]*?print \$3/)?.[0] ?? ''
+  it('requires a validated, whole-tree, NUL-delimited fork-copy status snapshot', () => {
+    expect(tierTwoProcedure).toContain("git grep -l '^// FORK-COPY-OF:' -- ':(glob)**/fork-*/**'")
+    expect(tierTwoProcedure).toContain('first two physical lines must be the two copy headers')
+    expect(tierTwoProcedure).toContain("grep -Eq '^[0-9a-f]{40}([0-9a-f]{24})?$'")
+    expect(tierTwoProcedure).toContain('git cat-file -e "${recorded_sha}^{commit}"')
+    expect(tierTwoProcedure).toContain('git rev-parse --verify --end-of-options')
+    expect(tierTwoProcedure).toContain('git cat-file -e "${target_commit}:${copy_path}"')
 
-    expect(tierTwoProcedure).toContain('across the **whole tree** before filtering the result')
-    expect(tierTwoProcedure).toContain('Do not\n   pass an old path as a `git diff` pathspec')
-    expect(renameDiscovery).toContain('--find-renames')
-    expect(renameDiscovery).not.toContain(' -- ')
+    const statusSnapshot =
+      tierTwoProcedure.match(/git diff --name-status -z --find-renames[^\n]+/)?.[0] ?? ''
+    expect(statusSnapshot).toContain('"$recorded_sha" "$target_commit"')
+    expect(statusSnapshot).not.toContain(' -- ')
+  })
+
+  it('classifies renamed, modified, and deleted whitespace paths from the documented parser', () => {
+    const command = 'node - "$status_file" "$recorded_path" <<\'NODE\''
+    const commandStart = tierTwoProcedure.indexOf(command)
+    const sourceStart = tierTwoProcedure.indexOf('\n', commandStart) + 1
+    const sourceEnd = tierTwoProcedure.indexOf('\n   NODE', sourceStart)
+    expect(commandStart).toBeGreaterThan(-1)
+    expect(sourceEnd).toBeGreaterThan(sourceStart)
+    const parserSource = tierTwoProcedure.slice(sourceStart, sourceEnd).replace(/^   /gm, '')
+    const statusFile = join(mkdtempSync(join(tmpdir(), 'orca-copy-status-')), 'status.bin')
+    tempDirs.push(dirname(statusFile))
+    writeFileSync(
+      statusFile,
+      ['R100', 'old name.ts', 'new name.ts', 'M', 'tab\tpath.ts', 'D', '--leading.ts', ''].join(
+        '\0'
+      )
+    )
+
+    const classify = (path) => {
+      const result = spawnSync(process.execPath, ['-', statusFile, path], {
+        encoding: 'utf8',
+        input: parserSource
+      })
+      expect(result.status).toBe(0)
+      return result.stdout.trim() ? JSON.parse(result.stdout) : null
+    }
+
+    expect(classify('old name.ts')).toEqual({ kind: 'rename', path: 'new name.ts' })
+    expect(classify('tab\tpath.ts')).toEqual({ kind: 'status', status: 'M' })
+    expect(classify('--leading.ts')).toEqual({ kind: 'status', status: 'D' })
+    expect(classify('unchanged.ts')).toBeNull()
   })
 
   it('requires complete fork-copy replay and synchronized header fields', () => {
-    expect(tierTwoProcedure).toContain("git grep -l '^// FORK-COPY-OF:'")
-    expect(tierTwoProcedure).toContain('the checklist; do not rely on a remembered path list')
-    expect(tierTwoProcedure).toContain('`M` means it remains at the recorded path')
-    expect(tierTwoProcedure).toContain('`D` means upstream deleted it')
-    expect(tierTwoProcedure).toContain('no status means it\n   is unchanged')
+    expect(tierTwoProcedure).toContain('A `D` is not an empty delta')
     expect(tierTwoProcedure).toContain('materially smaller than its recorded source')
     expect(tierTwoProcedure).toContain('every recorded and resolved path')
     expect(tierTwoProcedure).toContain('replay that upstream delta into the\n   fork copy by hand')
+    expect(tierTwoProcedure).toContain('<every-recorded-path> <every-resolved-path>')
     expect(tierTwoProcedure).toContain('Update both header fields together')
     expect(tierTwoProcedure).toContain('never advance only the SHA or leave an old path behind')
   })
@@ -568,22 +601,44 @@ describe('phase-5 SKILL.md procedure', () => {
     expect(tierTwoProcedure).toContain('raise it to the user as a collision-policy decision')
   })
 
-  it('builds the CLI before tests while stripping every ambient Git-config variable', () => {
-    const verificationCommand =
-      skillText.match(/pnpm build:cli && env[^\n]+(?:\\\n[^\n]+)?pnpm test/)?.[0] ?? ''
-
-    for (const variable of [
+  it('builds the CLI before tests while removing every Git-config injection channel', () => {
+    const verificationCommand = skillText.match(/pnpm build:cli && env[\s\S]*?pnpm test/)?.[0] ?? ''
+    const variables = [
       'GIT_CONFIG_COUNT',
       'GIT_CONFIG_KEY_0',
       'GIT_CONFIG_KEY_1',
       'GIT_CONFIG_VALUE_0',
       'GIT_CONFIG_VALUE_1',
       'GIT_CONFIG_GLOBAL',
-      'GIT_CONFIG_SYSTEM'
-    ]) {
+      'GIT_CONFIG_SYSTEM',
+      'GIT_CONFIG_PARAMETERS',
+      'GIT_CONFIG_NOSYSTEM'
+    ]
+
+    for (const variable of variables) {
       expect(verificationCommand).toContain(`-u ${variable}`)
     }
     expect(verificationCommand).toMatch(/^pnpm build:cli && env/)
     expect(verificationCommand).toMatch(/pnpm test$/)
+
+    const injectedEnv = {
+      ...process.env,
+      GIT_CONFIG_PARAMETERS: "'review.injected=still-present'"
+    }
+    expect(
+      spawnSync('git', ['config', '--get', 'review.injected'], {
+        encoding: 'utf8',
+        env: injectedEnv
+      }).stdout.trim()
+    ).toBe('still-present')
+    for (const variable of variables) {
+      delete injectedEnv[variable]
+    }
+    expect(
+      spawnSync('git', ['config', '--get', 'review.injected'], {
+        encoding: 'utf8',
+        env: injectedEnv
+      }).status
+    ).toBe(1)
   })
 })
