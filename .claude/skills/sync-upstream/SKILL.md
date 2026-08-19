@@ -71,6 +71,69 @@ carry English fallbacks written by `sync:localization-catalog`; a fork-wins merg
 upstream's real translations and non-English locales silently revert to English. The fork keeps only
 keys upstream has no opinion on.
 
+## Tier-2 forked-copy replay
+
+Complete this checklist for **every** copy headed by `FORK-COPY-OF` and `FORK-COPY-SHA` after
+ownership resolution and before final verification. Treat the complete output of this command as
+the checklist; do not rely on a remembered path list:
+
+```sh
+git grep -l '^// FORK-COPY-OF:'
+```
+
+1. Read the recorded SHA and every path in the comma-separated `FORK-COPY-OF` list. For each
+   recorded path, discover renames across the **whole tree** before filtering the result. Do not
+   pass an old path as a `git diff` pathspec: Git filters before rename discovery and loses the
+   replacement.
+
+   ```sh
+   git diff --name-status --find-renames "$recorded_sha" "$target_ref" \
+     | awk -v p="$recorded_path" '$1 ~ /^R/ && $2 == p { print $3 }'
+   ```
+
+   If no rename resolves the path, classify it with another unfiltered status lookup:
+
+   ```sh
+   git diff --name-status --find-renames "$recorded_sha" "$target_ref" \
+     | awk -v p="$recorded_path" '$2 == p { print $1 }'
+   ```
+
+   `M` means it remains at the recorded path; `D` means upstream deleted it; and no status means it
+   is unchanged. A `D` is not an empty delta: raise it to the user as a collision-policy decision
+   before changing the copy or its header. For an unchanged path, retain the path in the list.
+
+2. When a resolved module is materially smaller than its recorded source, inspect the same upstream
+   split commit for sibling modules. Add every sibling created by that one-to-many split to the
+   resolved path list; rename detection reports only the largest similarity match. Diff the old and
+   new tags across **every recorded and resolved path**, then replay that upstream delta into the
+   fork copy by hand, resolving interactions with fork behavior deliberately.
+
+   ```sh
+   git diff "$recorded_sha" "$target_ref" -- \
+     <every-recorded-path> <every-resolved-path>
+   ```
+
+3. Only after the hand replay is complete, replace `FORK-COPY-OF` with the complete resolved path
+   list and replace `FORK-COPY-SHA` with the synced tag commit. Update both header fields together,
+   including when a path was unchanged; never advance only the SHA or leave an old path behind.
+
+## Tier-4 pending-upstream review
+
+For every manifest `exceptions[]` entry whose `status` is `pending-upstream`, follow its `ledger`
+target in `docs/fork-upstreaming.md`, confirm that the target still exists, and review upstream
+movement over the old-to-new stable-tag range for that item. Keep its manifest and ledger state
+atomic by creating, updating, or removing the matching entries in the same change. Do not let a
+resolved, declined, or moved upstream item
+leave a stale manifest row or an orphaned ledger entry.
+
+## Upstream feature-collision review
+
+For every manifest `features[]` entry, compare its `purpose` with upstream release notes and the
+changelog for the old-to-new stable-tag range. Record exactly one outcome per feature: `none`,
+`possible`, or `confirmed`. Raise every `possible` or `confirmed` outcome to the user for a
+decision. Never silently delete a fork feature or reconcile it with an upstream implementation;
+apply any removal, archival, or reconciliation only after that decision.
+
 ## When upstream's own release does not compile
 
 Upstream's release branches suffer the same cherry-pick incoherence. v1.4.180 shipped
@@ -150,6 +213,12 @@ Traps that fake results:
 - `rm -f config/*.tsbuildinfo` before every typecheck. Composite projects cache errors across
   `git checkout` swaps.
 - `pnpm test` never builds the CLI, and the harness injects `GIT_CONFIG_*` that deterministically
-  fails the relay tests. Run `pnpm build:cli` first, then the suite with those variables unset.
+  fails the relay tests. Build the CLI before the suite and strip every ambient Git-config variable:
+
+  ```sh
+  pnpm build:cli && env -u GIT_CONFIG_COUNT -u GIT_CONFIG_KEY_0 -u GIT_CONFIG_KEY_1 \
+    -u GIT_CONFIG_VALUE_0 -u GIT_CONFIG_VALUE_1 -u GIT_CONFIG_GLOBAL -u GIT_CONFIG_SYSTEM pnpm test
+  ```
+
 - `.claude/skills/*` is gitignored. New skills here need `git add -f` or they never reach the host
   the automation runs on.

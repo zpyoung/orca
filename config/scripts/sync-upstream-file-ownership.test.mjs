@@ -504,3 +504,86 @@ describe('SKILL.md procedure', () => {
     expect(removeLine).toMatch(/git rm -f --ignore-unmatch --\s*$/)
   })
 })
+
+describe('phase-5 SKILL.md procedure', () => {
+  const skillText = readFileSync(join(projectDir, '.claude/skills/sync-upstream/SKILL.md'), 'utf8')
+  const tierTwoProcedure = skillText.slice(
+    skillText.indexOf('## Tier-2 forked-copy replay'),
+    skillText.indexOf('## Tier-4 pending-upstream review')
+  )
+  const tierFourProcedure = skillText.slice(
+    skillText.indexOf('## Tier-4 pending-upstream review'),
+    skillText.indexOf('## Upstream feature-collision review')
+  )
+  const collisionProcedure = skillText.slice(
+    skillText.indexOf('## Upstream feature-collision review'),
+    skillText.indexOf('## When upstream')
+  )
+
+  it('requires whole-tree rename discovery before filtering fork-copy paths', () => {
+    const renameDiscovery =
+      tierTwoProcedure.match(/git diff --name-status --find-renames[\s\S]*?print \$3/)?.[0] ?? ''
+
+    expect(tierTwoProcedure).toContain('across the **whole tree** before filtering the result')
+    expect(tierTwoProcedure).toContain('Do not\n   pass an old path as a `git diff` pathspec')
+    expect(renameDiscovery).toContain('--find-renames')
+    expect(renameDiscovery).not.toContain(' -- ')
+  })
+
+  it('requires complete fork-copy replay and synchronized header fields', () => {
+    expect(tierTwoProcedure).toContain("git grep -l '^// FORK-COPY-OF:'")
+    expect(tierTwoProcedure).toContain('the checklist; do not rely on a remembered path list')
+    expect(tierTwoProcedure).toContain('`M` means it remains at the recorded path')
+    expect(tierTwoProcedure).toContain('`D` means upstream deleted it')
+    expect(tierTwoProcedure).toContain('no status means it\n   is unchanged')
+    expect(tierTwoProcedure).toContain('materially smaller than its recorded source')
+    expect(tierTwoProcedure).toContain('every recorded and resolved path')
+    expect(tierTwoProcedure).toContain('replay that upstream delta into the\n   fork copy by hand')
+    expect(tierTwoProcedure).toContain('Update both header fields together')
+    expect(tierTwoProcedure).toContain('never advance only the SHA or leave an old path behind')
+  })
+
+  it('requires pending-upstream exceptions and their ledger targets to be reviewed atomically', () => {
+    expect(tierFourProcedure).toContain(
+      'every manifest `exceptions[]` entry whose `status` is `pending-upstream`'
+    )
+    expect(tierFourProcedure).toContain('`ledger`\ntarget in `docs/fork-upstreaming.md`')
+    expect(tierFourProcedure).toContain(
+      'review upstream\nmovement over the old-to-new stable-tag range'
+    )
+    expect(tierFourProcedure).toContain('manifest and ledger state\natomic')
+  })
+
+  it('records collision outcomes and preserves user decisions', () => {
+    expect(collisionProcedure).toContain(
+      'upstream release notes and the\nchangelog for the old-to-new stable-tag range'
+    )
+    expect(collisionProcedure).toContain(
+      'exactly one outcome per feature: `none`,\n`possible`, or `confirmed`'
+    )
+    expect(collisionProcedure).toContain(
+      'Raise every `possible` or `confirmed` outcome to the user'
+    )
+    expect(collisionProcedure).toContain('Never silently delete a fork feature or reconcile it')
+    expect(tierTwoProcedure).toContain('raise it to the user as a collision-policy decision')
+  })
+
+  it('builds the CLI before tests while stripping every ambient Git-config variable', () => {
+    const verificationCommand =
+      skillText.match(/pnpm build:cli && env[^\n]+(?:\\\n[^\n]+)?pnpm test/)?.[0] ?? ''
+
+    for (const variable of [
+      'GIT_CONFIG_COUNT',
+      'GIT_CONFIG_KEY_0',
+      'GIT_CONFIG_KEY_1',
+      'GIT_CONFIG_VALUE_0',
+      'GIT_CONFIG_VALUE_1',
+      'GIT_CONFIG_GLOBAL',
+      'GIT_CONFIG_SYSTEM'
+    ]) {
+      expect(verificationCommand).toContain(`-u ${variable}`)
+    }
+    expect(verificationCommand).toMatch(/^pnpm build:cli && env/)
+    expect(verificationCommand).toMatch(/pnpm test$/)
+  })
+})
