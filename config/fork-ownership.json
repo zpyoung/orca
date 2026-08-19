@@ -26,6 +26,12 @@
   ],
   "seams": [
     {
+      "path": "AGENTS.md",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["# Fork Feature Structure", "## Seams", "## Precedence", "## CI enforcement"]
+    },
+    {
       "path": ".gitignore",
       "feature": "fork-infra",
       "kind": "passthrough",
@@ -852,6 +858,10 @@
     }
   ],
   "residuals": {
+    "AGENTS.md": {
+      "added": 64,
+      "removed": 0
+    },
     ".gitignore": {
       "added": 11,
       "removed": 2
