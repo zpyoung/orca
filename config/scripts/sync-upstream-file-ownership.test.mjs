@@ -525,7 +525,7 @@ describe('phase-5 SKILL.md procedure', () => {
     expect(tierTwoProcedure).toContain('first two physical lines must be the two copy headers')
     expect(tierTwoProcedure).toContain("grep -Eq '^[0-9a-f]{40}([0-9a-f]{24})?$'")
     expect(tierTwoProcedure).toContain('git cat-file -e "${recorded_sha}^{commit}"')
-    expect(tierTwoProcedure).toContain('case "$target_ref" in v[0-9]*.[0-9]*.[0-9]*)')
+    expect(tierTwoProcedure).toContain("grep -Eq '^v[0-9]+\\.[0-9]+\\.[0-9]+$'")
     expect(tierTwoProcedure).toContain('git rev-parse --verify "${target_ref}^{commit}"')
     expect(tierTwoProcedure).toContain('git cat-file -e "${target_commit}:${copy_path}"')
 
@@ -602,8 +602,9 @@ describe('phase-5 SKILL.md procedure', () => {
     expect(tierTwoProcedure).toContain('raise it to the user as a collision-policy decision')
   })
 
-  it('builds the CLI before tests while removing every Git-config injection channel', () => {
-    const verificationCommand = skillText.match(/pnpm build:cli && env[\s\S]*?pnpm test/)?.[0] ?? ''
+  it('builds the CLI before tests with controlled global and system Git config', () => {
+    const verificationCommand =
+      skillText.match(/empty_git_config=\$\(mktemp\)[\s\S]*?pnpm test/)?.[0] ?? ''
     const variables = [
       'GIT_CONFIG_COUNT',
       'GIT_CONFIG_KEY_0',
@@ -619,27 +620,38 @@ describe('phase-5 SKILL.md procedure', () => {
     for (const variable of variables) {
       expect(verificationCommand).toContain(`-u ${variable}`)
     }
-    expect(verificationCommand).toMatch(/^pnpm build:cli && env/)
+    expect(verificationCommand).toContain('pnpm build:cli && env')
+    expect(verificationCommand).toContain('GIT_CONFIG_GLOBAL="$empty_git_config"')
+    expect(verificationCommand).toContain('GIT_CONFIG_SYSTEM="$empty_git_config"')
+    expect(verificationCommand).toContain('GIT_CONFIG_NOSYSTEM=1')
+    expect(verificationCommand).toContain('trap \'rm -f "$empty_git_config"\' EXIT')
     expect(verificationCommand).toMatch(/pnpm test$/)
 
+    const home = mkdtempSync(join(tmpdir(), 'orca-git-config-home-'))
+    const emptyConfig = join(home, 'empty.gitconfig')
+    tempDirs.push(home)
+    writeFileSync(join(home, '.gitconfig'), '[review]\n\tglobal = still-present\n')
+    writeFileSync(emptyConfig, '')
     const injectedEnv = {
       ...process.env,
-      GIT_CONFIG_PARAMETERS: "'review.injected=still-present'"
+      GIT_CONFIG_PARAMETERS: "'review.parameter=still-present'",
+      HOME: home,
+      USERPROFILE: home
     }
-    expect(
-      spawnSync('git', ['config', '--get', 'review.injected'], {
-        encoding: 'utf8',
-        env: injectedEnv
-      }).stdout.trim()
-    ).toBe('still-present')
+    const readConfig = (key, environment) =>
+      spawnSync('git', ['config', '--get', key], { encoding: 'utf8', env: environment })
+
+    expect(readConfig('review.parameter', injectedEnv).stdout.trim()).toBe('still-present')
+    expect(readConfig('review.global', injectedEnv).stdout.trim()).toBe('still-present')
     for (const variable of variables) {
       delete injectedEnv[variable]
     }
-    expect(
-      spawnSync('git', ['config', '--get', 'review.injected'], {
-        encoding: 'utf8',
-        env: injectedEnv
-      }).status
-    ).toBe(1)
+    Object.assign(injectedEnv, {
+      GIT_CONFIG_GLOBAL: emptyConfig,
+      GIT_CONFIG_SYSTEM: emptyConfig,
+      GIT_CONFIG_NOSYSTEM: '1'
+    })
+    expect(readConfig('review.parameter', injectedEnv).status).toBe(1)
+    expect(readConfig('review.global', injectedEnv).status).toBe(1)
   })
 })

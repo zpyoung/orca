@@ -91,7 +91,7 @@ the candidate path. Anything else is an ownership or collision finding to raise 
    ```sh
    copy_path='path/from-the-git-grep-output'
    target_ref='vX.Y.Z'
-   case "$target_ref" in v[0-9]*.[0-9]*.[0-9]*) ;; *) exit 2 ;; esac
+   printf '%s\n' "$target_ref" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || exit 2
    first_header=$(sed -n '1p' "$copy_path")
    second_header=$(sed -n '2p' "$copy_path")
    case "$first_header" in '// FORK-COPY-OF: '*) ;; *) exit 2 ;; esac
@@ -247,13 +247,18 @@ Traps that fake results:
 
 - `rm -f config/*.tsbuildinfo` before every typecheck. Composite projects cache errors across
   `git checkout` swaps.
-- `pnpm test` never builds the CLI, and the harness injects `GIT_CONFIG_*` that deterministically
-  fails the relay tests. Build the CLI before the suite and strip every ambient Git-config variable:
+- `pnpm test` never builds the CLI, and ambient Git configuration can alter fixture commits.
+  Build the CLI first, then replace global/system config with one controlled empty file while also
+  stripping every inherited Git-config environment channel:
 
   ```sh
+  empty_git_config=$(mktemp)
+  trap 'rm -f "$empty_git_config"' EXIT
   pnpm build:cli && env -u GIT_CONFIG_COUNT -u GIT_CONFIG_KEY_0 -u GIT_CONFIG_KEY_1 \
     -u GIT_CONFIG_VALUE_0 -u GIT_CONFIG_VALUE_1 -u GIT_CONFIG_GLOBAL -u GIT_CONFIG_SYSTEM \
-    -u GIT_CONFIG_PARAMETERS -u GIT_CONFIG_NOSYSTEM pnpm test
+    -u GIT_CONFIG_PARAMETERS -u GIT_CONFIG_NOSYSTEM \
+    GIT_CONFIG_GLOBAL="$empty_git_config" GIT_CONFIG_SYSTEM="$empty_git_config" \
+    GIT_CONFIG_NOSYSTEM=1 pnpm test
   ```
 
 - `.claude/skills/*` is gitignored. New skills here need `git add -f` or they never reach the host
