@@ -110,11 +110,15 @@ export function useNativeChatLiveSession(
   const [hookState, hookStateStartedAt, hookHasWorkingSubagents] = useNativeChatHookStatus(paneKey)
 
   const latestSessionId = useRef<string | null>(sessionId)
-  latestSessionId.current = sessionId
   // Tracks the current transport so a load-earlier resolve from a prior host is discarded after an owner flip (session id can stay the same).
   const latestTransport = useRef(transport)
-  latestTransport.current = transport
   const transcriptEpochRef = useRef(0)
+
+  // Mirrored on commit rather than during render: a render React discards must not make a stale load-earlier resolve look current.
+  useEffect(() => {
+    latestSessionId.current = sessionId
+    latestTransport.current = transport
+  }, [sessionId, transport])
 
   useEffect(() => {
     // Why: agent/path/owner rebinds can keep the same session; every source generation must invalidate pagination captured before it.
