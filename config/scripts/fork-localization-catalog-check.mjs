@@ -57,22 +57,6 @@ function mergeCatalog(target, addition) {
   return target
 }
 
-function removeCatalogEntries(target, removal) {
-  for (const [key, value] of Object.entries(removal)) {
-    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      if (typeof target[key] === 'object' && target[key] !== null && !Array.isArray(target[key])) {
-        removeCatalogEntries(target[key], value)
-        if (Object.keys(target[key]).length === 0) {
-          delete target[key]
-        }
-      }
-    } else {
-      delete target[key]
-    }
-  }
-  return target
-}
-
 function collectInterpolationVariables(value) {
   return typeof value === 'string' ? [...(value.match(/\{\{[^}]+\}\}/g) ?? [])].sort() : []
 }
@@ -284,21 +268,14 @@ async function runUpstreamVerifierWithForkCatalogs(root, options, verify) {
     return await verify(root, options)
   } finally {
     for (const locale of localeNames) {
-      const filePath = path.join(localesDir, `${locale}.json`)
-      const cleaned = await readJson(filePath)
-      for (const bundle of bundleDirectories) {
-        removeCatalogEntries(
-          cleaned,
-          await readJson(path.join(bundle.localesDir, `${locale}.json`))
-        )
-      }
       const original = originals.get(locale)
-      await fs.writeFile(
-        filePath,
-        JSON.stringify(cleaned) === JSON.stringify(original.catalog)
-          ? original.text
-          : `${JSON.stringify(cleaned, null, 2)}\n`
-      )
+      // a locale merged before an earlier iteration threw was never written; restoring it here
+      // would throw inside `finally` and replace the real error
+      if (!original) {
+        continue
+      }
+      const filePath = path.join(localesDir, `${locale}.json`)
+      await fs.writeFile(filePath, original.text)
     }
   }
 }

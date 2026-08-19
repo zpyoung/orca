@@ -16,7 +16,7 @@ vi.mock('./fork-native-chat-relay/use-native-chat-live-session', () => ({
 }))
 
 import { useNativeChatRetainedSession } from './use-native-chat-retained-session'
-import { selectNativeChatViewState } from './native-chat-view-state'
+import { selectNativeChatViewState } from './fork-native-chat-relay/native-chat-view-state'
 
 const ARGS: UseNativeChatLiveSessionArgs = {
   paneKey: 'tab:leaf',

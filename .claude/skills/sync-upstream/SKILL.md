@@ -33,7 +33,8 @@ Fork priority is only meaningful for files the fork actually claims, and the cla
 inferred: `config/fork-ownership.json` — read through `config/scripts/fork-ownership-manifest.mjs`
 — is the source of truth. Everything the manifest doesn't claim resolves to the upstream release.
 
-After the merge and its tree-conflict resolution:
+Run this block as one unit, starting from the pre-merge fork tip. If `git merge` stops on
+tree conflicts, resolve them before running the commands after it:
 
 ```sh
 merge_head=$(git rev-parse HEAD)
@@ -42,7 +43,6 @@ node config/scripts/sync-upstream-file-ownership.mjs <target-ref> "$merge_head" 
 tr '\n' '\0' < <out-dir>/checkout.txt | xargs -0 git checkout <target-ref> --
 tr '\n' '\0' < <out-dir>/remove.txt   | xargs -0 git rm -f --ignore-unmatch --
 tr '\n' '\0' < <out-dir>/ours.txt     | xargs -0 git checkout "$merge_head" --
-node config/scripts/sync-upstream-locale-catalogs.mjs <target-ref>
 ```
 
 `ours.txt` must resolve to `$merge_head`, not `HEAD`: a clean (non-conflicted) `git merge` advances
@@ -66,10 +66,11 @@ on every seam and feature path, either auto-resolving disjoint hunks or leaving 
 Open each listed path and check it by hand against the manifest's declared `lines` for that path —
 those lines are the protected floor, not the whole file — before continuing.
 
-Locale catalogs get their own pass because upstream owns every key it defines. The fork's catalogs
-carry English fallbacks written by `sync:localization-catalog`; a fork-wins merge lets those shadow
-upstream's real translations and non-English locales silently revert to English. The fork keeps only
-keys upstream has no opinion on.
+Upstream owns every key it defines, so the manifest leaves `src/renderer/src/locales/*.json`
+unclaimed and they reset to the tag through `checkout.txt` like any other upstream file. The fork's
+own keys live in per-feature bundles under the feature directories, which a feature glob claims. Keep
+that split: a fork entry duplicating a key upstream defines shadows upstream's real translation with
+the English fallback `sync:localization-catalog` wrote, and that locale silently renders English.
 
 ## Tier-2 forked-copy replay
 

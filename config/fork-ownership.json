@@ -178,7 +178,8 @@
       "lines": [
         "type ForkWorktreeCardProps = WorktreeCardProps & { inProjectGroupLooseSection?: boolean }",
         "  inProjectGroupLooseSection = false,",
-        "    inPinnedSection: inPinnedSection || inProjectGroupLooseSection,"
+        "    inPinnedSection: inPinnedSection || inProjectGroupLooseSection,",
+        "}: ForkWorktreeCardProps): React.JSX.Element {"
       ]
     },
     {
@@ -207,7 +208,8 @@
       "feature": "worktree-groups",
       "kind": "passthrough",
       "lines": [
-        "        ...(clientKind === 'mobile' ? {} : { projectGroupId: params.projectGroupId }),"
+        "        ...(clientKind === 'mobile' ? {} : { projectGroupId: params.projectGroupId }),",
+        "    handler: async (params, { runtime, clientKind }) => ({"
       ]
     },
     {
@@ -323,8 +325,7 @@
         "import { NativeChatWidthSetting } from './fork-native-chat-width/NativeChatWidthSetting'",
         "          <NativeChatWidthSetting",
         "            value={settings.nativeChatWidth}",
-        "            onChange={(nativeChatWidth) => updateSettings({ nativeChatWidth })}",
-        "          />"
+        "            onChange={(nativeChatWidth) => updateSettings({ nativeChatWidth })}"
       ]
     },
     {

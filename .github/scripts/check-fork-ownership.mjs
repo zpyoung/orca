@@ -26,7 +26,13 @@ const UPSTREAM_REMOTE_OVERRIDE_ENV = 'CHECK_FORK_OWNERSHIP_UPSTREAM_REMOTE'
 // that text would reach the job log outside the stop-commands fence below and could forge a
 // workflow command
 function gitRaw(args, encoding) {
-  return execFileSync('git', args, { encoding, stdio: ['ignore', 'pipe', 'pipe'] })
+  // the full-tree listing already runs to hundreds of KB, so the default 1 MiB cap is within
+  // reach of ordinary repo growth; match the classifier's ceiling
+  return execFileSync('git', args, {
+    encoding,
+    maxBuffer: 1 << 28,
+    stdio: ['ignore', 'pipe', 'pipe']
+  })
 }
 
 // see check-root-directory-entries.mjs: latin1 preserves a pathname's raw bytes 1:1,

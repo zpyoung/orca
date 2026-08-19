@@ -86,10 +86,13 @@ function classify(manifest, target, mergeHead, outDir) {
     }
   }
 
-  writeFileSync(join(outDir, 'checkout.txt'), `${checkout.join('\n')}\n`)
-  writeFileSync(join(outDir, 'remove.txt'), `${remove.join('\n')}\n`)
-  writeFileSync(join(outDir, 'ours.txt'), `${ours.join('\n')}\n`)
-  writeFileSync(join(outDir, 'merge-review.txt'), `${mergeReview.join('\n')}\n`)
+  // an empty list must be zero bytes: a lone newline becomes one empty argument under
+  // `tr | xargs -0`, and git rejects the empty string as a pathspec
+  const listFile = (paths) => (paths.length > 0 ? `${paths.join('\n')}\n` : '')
+  writeFileSync(join(outDir, 'checkout.txt'), listFile(checkout))
+  writeFileSync(join(outDir, 'remove.txt'), listFile(remove))
+  writeFileSync(join(outDir, 'ours.txt'), listFile(ours))
+  writeFileSync(join(outDir, 'merge-review.txt'), listFile(mergeReview))
 
   console.log(`differing paths: ${differing.length}`)
   console.log(

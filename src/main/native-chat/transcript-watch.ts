@@ -17,8 +17,13 @@ export type {
   SubscribeNativeChatTranscriptArgs
 } from './transcript-watch-contract'
 
-const defaultTailReader: NativeChatTranscriptTailReader = (args) =>
-  readNativeChatTranscriptTailFile(
+const defaultTailReader: NativeChatTranscriptTailReader = (args) => {
+  // the desktop reader takes no byte cap, and honoring the contract's field by ignoring it
+  // would turn a requested bound into an unbounded read
+  if (args.maxBytes !== undefined) {
+    throw new Error('defaultTailReader does not support maxBytes')
+  }
+  return readNativeChatTranscriptTailFile(
     args.filePath,
     args.limit,
     args.decode,
@@ -27,6 +32,7 @@ const defaultTailReader: NativeChatTranscriptTailReader = (args) =>
     args.decodeLifecycle,
     args.signal
   )
+}
 
 /**
  * Subscribe to live transcript updates, falling back to polling while a session file is unresolved.

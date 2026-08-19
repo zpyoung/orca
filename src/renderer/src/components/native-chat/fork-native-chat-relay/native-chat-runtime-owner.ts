@@ -1,3 +1,5 @@
+// FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-runtime-owner.ts
+// FORK-COPY-SHA: 2307f2ebbe1c1e737c0b12d920bb0a208332db2c
 import {
   getRuntimeEnvironmentIdForWorktree,
   type WorktreeRuntimeOwnerState
