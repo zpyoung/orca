@@ -242,6 +242,35 @@ function checkSilentCapture(findings, manifest, headTreePaths, comparisonTreePat
   }
 }
 
+// seam `lines` only assert presence, so they cannot see an undeclared edit or any deletion at
+// all; the recorded budget is what makes a seam file's whole footprint reviewable
+function checkResiduals(findings, manifest, headSha, comparisonRef) {
+  for (const [path, budget] of Object.entries(manifest.residuals)) {
+    let row
+    try {
+      row = gitText(['diff', '--numstat', comparisonRef, headSha, '--', path]).split('\n')[0]
+    } catch {
+      findings.push({ rule: 'residual-budget', path, detail: 'cannot diff against the release' })
+      continue
+    }
+    const [added, removed] = (row ?? '').split('\t')
+    // a binary file reports '-' for both counts; there is no line budget to compare
+    if (added === '-' || removed === '-') {
+      continue
+    }
+    const measured = { added: Number(added) || 0, removed: Number(removed) || 0 }
+    if (measured.added !== budget.added || measured.removed !== budget.removed) {
+      findings.push({
+        rule: 'residual-budget',
+        path,
+        detail:
+          `recorded +${budget.added}/-${budget.removed}, measured ` +
+          `+${measured.added}/-${measured.removed}; re-baseline only after re-reading the seam`
+      })
+    }
+  }
+}
+
 function checkSeamIntegrity(findings, manifest, headSha) {
   for (const seam of manifest.seams) {
     let content
@@ -278,7 +307,9 @@ function findingLineBuffer(finding) {
 
 function reportFindings(findings) {
   if (findings.length === 0) {
-    console.log('Fork ownership guard passed: no coverage, staleness, capture, or seam findings.')
+    console.log(
+      'Fork ownership guard passed: no coverage, staleness, capture, seam, or residual findings.'
+    )
     return 0
   }
 
@@ -373,6 +404,7 @@ function checkForkOwnership(argv) {
     checkStaleEntries(findings, manifest, headTreePaths)
     checkSilentCapture(findings, latin1Manifest, headTreePaths, comparisonTreePaths)
     checkSeamIntegrity(findings, manifest, headSha)
+    checkResiduals(findings, manifest, headSha, comparisonRef)
   }
 
   return reportFindings(findings)

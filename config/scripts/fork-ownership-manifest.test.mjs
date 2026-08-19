@@ -16,7 +16,7 @@ function load(overrides = {}) {
 
 describe('loadForkOwnershipManifest', () => {
   it('loads an empty manifest', () => {
-    expect(load()).toEqual({ features: [], seams: [], exceptions: [] })
+    expect(load()).toEqual({ features: [], seams: [], exceptions: [], residuals: {} })
   })
 
   it('loads a fully populated manifest', () => {
@@ -80,6 +80,38 @@ describe('loadForkOwnershipManifest', () => {
       features: [{ name: 'fork-pending-feature', purpose: 'not extracted yet', globs: [] }]
     })
     expect(manifest.features[0].globs).toEqual([])
+  })
+
+  const seamFor = (path) => ({ path, feature: 'fork-infra', kind: 'passthrough', lines: ['x'] })
+
+  it('defaults residuals to an empty map when the field is absent', () => {
+    expect(load().residuals).toEqual({})
+  })
+
+  it('keeps a residual budget that names a declared seam path', () => {
+    const manifest = load({
+      seams: [seamFor('src/a.ts')],
+      residuals: { 'src/a.ts': { added: 3, removed: 1 } }
+    })
+
+    expect(manifest.residuals['src/a.ts']).toEqual({ added: 3, removed: 1 })
+  })
+
+  it('throws on a residual budget for a path with no seam', () => {
+    expect(() => load({ residuals: { 'src/ghost.ts': { added: 1, removed: 0 } } })).toThrow(
+      /does not name a seam path/
+    )
+  })
+
+  it.each([
+    ['a negative count', { added: -1, removed: 0 }],
+    ['a fractional count', { added: 1.5, removed: 0 }],
+    ['a missing field', { added: 1 }],
+    ['a non-object budget', 4]
+  ])('throws on a residual budget with %s', (_label, budget) => {
+    expect(() => load({ seams: [seamFor('src/a.ts')], residuals: { 'src/a.ts': budget } })).toThrow(
+      /Residual/
+    )
   })
 
   it('throws on a feature missing a non-empty name', () => {

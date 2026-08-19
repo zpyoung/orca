@@ -160,9 +160,67 @@ function verifySeams(manifest, refOrWorktree) {
   process.exit(0)
 }
 
+function residualFindings(manifest, ref) {
+  const findings = []
+  for (const [path, budget] of Object.entries(manifest.residuals)) {
+    let actual = { added: 0, removed: 0 }
+    try {
+      const row = git('diff', '--numstat', ref, '--', path).split('\n')[0]
+      const [added, removed] = row.split('\t')
+      // a binary file reports '-' for both counts; there is no line budget to compare
+      if (added === '-' || removed === '-') {
+        continue
+      }
+      actual = { added: Number(added) || 0, removed: Number(removed) || 0 }
+    } catch (error) {
+      findings.push(`${path}: cannot diff against ${ref} (${error.message})`)
+      continue
+    }
+    if (actual.added !== budget.added || actual.removed !== budget.removed) {
+      findings.push(
+        `${path}: recorded +${budget.added}/-${budget.removed}, measured ` +
+          `+${actual.added}/-${actual.removed}`
+      )
+    }
+  }
+  return findings
+}
+
+function verifyResiduals(manifest, ref) {
+  if (!ref) {
+    console.error('usage: sync-upstream-file-ownership.mjs --verify-residuals <ref>')
+    process.exit(2)
+  }
+  const budgets = Object.keys(manifest.residuals).length
+  if (budgets === 0) {
+    console.error('--verify-residuals: the manifest records no residual budgets')
+    process.exit(2)
+  }
+  const findings = residualFindings(manifest, ref)
+  if (findings.length > 0) {
+    console.error(
+      `--verify-residuals: ${findings.length} seam file(s) drifted from the recorded budget`
+    )
+    for (const finding of findings) {
+      console.error(`  ${finding}`)
+    }
+    console.error(
+      'Re-baseline deliberately: a shrunk budget usually means upstream absorbed a fork line ' +
+        'and the seam needs re-reading, not that the drift is benign.'
+    )
+    process.exit(1)
+  }
+  console.log(
+    `--verify-residuals: all ${budgets} seam file(s) match their recorded budget vs ${ref}`
+  )
+  process.exit(0)
+}
+
 const argv = process.argv.slice(2)
 
-if (argv[0] === '--verify-seams') {
+if (argv[0] === '--verify-residuals') {
+  verifyResiduals(loadManifestOrExit(), argv[1])
+} else if (argv[0] === '--verify-seams') {
   verifySeams(loadManifestOrExit(), argv[1])
 } else {
   const [TARGET, MERGE_HEAD, OUT] = argv

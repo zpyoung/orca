@@ -91,6 +91,30 @@ function validateSeam(seam, index, featureNames) {
   return seam
 }
 
+function validateResiduals(residuals, seamPaths) {
+  if (residuals === undefined) {
+    return {}
+  }
+  if (typeof residuals !== 'object' || residuals === null || Array.isArray(residuals)) {
+    throw new Error('"residuals" must be a JSON object keyed by path')
+  }
+  for (const [path, budget] of Object.entries(residuals)) {
+    if (!seamPaths.has(path)) {
+      throw new Error(`Residual "${path}" does not name a seam path`)
+    }
+    if (typeof budget !== 'object' || budget === null || Array.isArray(budget)) {
+      throw new Error(`Residual "${path}" must be an object with "added" and "removed"`)
+    }
+    for (const field of ['added', 'removed']) {
+      const value = budget[field]
+      if (!Number.isInteger(value) || value < 0) {
+        throw new Error(`Residual "${path}" has a non-integer or negative "${field}"`)
+      }
+    }
+  }
+  return residuals
+}
+
 function validateException(exception, index) {
   if (!isNonEmptyString(exception?.path)) {
     throw new Error(`exceptions[${index}] is missing a non-empty "path"`)
@@ -166,7 +190,9 @@ export function loadForkOwnershipManifest(jsonText) {
     }
   }
 
-  return { features, seams, exceptions }
+  const residuals = validateResiduals(parsed.residuals, seamPaths)
+
+  return { features, seams, exceptions, residuals }
 }
 
 const DISALLOWED_GLOB_CHARS = /[?{}[\]!]/

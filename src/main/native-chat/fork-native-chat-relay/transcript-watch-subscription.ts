@@ -1,3 +1,5 @@
+// FORK-COPY-OF: src/main/native-chat/transcript-watch.ts
+// FORK-COPY-SHA: 2307f2ebbe1c1e737c0b12d920bb0a208332db2c
 import { extname } from 'node:path'
 import type { NativeChatMessage } from '../../../shared/native-chat-types'
 import {

@@ -238,6 +238,24 @@ pnpm exec oxlint; cp /tmp/oxlintrc.baseline.json .oxlintrc.json
 
 ## Verifying
 
+Two manifest checks run against the new release, and the second one is where a sync goes quietly
+wrong:
+
+```sh
+node config/scripts/sync-upstream-file-ownership.mjs --verify-seams
+node config/scripts/sync-upstream-file-ownership.mjs --verify-residuals <target-ref>
+```
+
+`--verify-seams` asserts each declared line is still present. That is a one-way tripwire: it cannot
+see an undeclared edit, and it cannot represent a deletion at all, because a removed upstream line
+has no line to declare. `--verify-residuals` compares each seam file's whole added/removed footprint
+against the budget recorded in `residuals`, so both of those become visible.
+
+A drifted budget is a question, not a formality. A budget that *shrank* usually means the release
+absorbed a line the fork was carrying, and the seam should be re-read before the number is updated.
+Re-baseline by rerunning the recorder and committing the new numbers with the resolution, never as a
+sweep to make the check quiet.
+
 `pnpm typecheck` and `pnpm lint` are absolute — no baseline differential. `pnpm test` is
 baseline-differential: a failure counts only if the same test passes at the pre-merge SHA.
 

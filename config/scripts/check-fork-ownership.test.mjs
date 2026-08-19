@@ -53,6 +53,32 @@ function baseManifest(overrides = {}) {
   return { features: [], seams: [], exceptions: [], ...overrides }
 }
 
+// a seam file whose residual budget the caller controls, tagged at v1.4.184
+function buildResidualFixture(budget) {
+  const root = initRepo()
+  writeManifest(root, baseManifest())
+  writeFiles(root, { 'src/budgeted.ts': 'const a = 1\n' })
+  const tagCommit = commitAll(root, 'tag-commit')
+  tagAt(root, 'v1.4.184', tagCommit)
+
+  writeManifest(
+    root,
+    baseManifest({
+      seams: [
+        {
+          path: 'src/budgeted.ts',
+          feature: 'fork-infra',
+          kind: 'passthrough',
+          lines: ['const b = 2']
+        }
+      ],
+      residuals: { 'src/budgeted.ts': budget }
+    })
+  )
+  writeFiles(root, { 'src/budgeted.ts': 'const a = 1\nconst b = 2\n' })
+  return { root, tagCommit, head: commitAll(root, 'fork-edit') }
+}
+
 function writeManifest(root, manifest) {
   writeFiles(root, { 'config/fork-ownership.json': JSON.stringify(manifest, null, 2) })
 }
@@ -244,6 +270,39 @@ describe('comparison-ref resolution (real git, network bypassed via local remote
 
     expect(result.status).toBe(0)
     expect(result.stdout).toContain('guard passed')
+  })
+
+  it('passes when a seam file matches its recorded residual budget', () => {
+    const { root, tagCommit, head } = buildResidualFixture({ added: 1, removed: 0 })
+
+    const result = runGuard(root, tagCommit, head)
+
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain('guard passed')
+  })
+
+  // seam `lines` assert presence only, so an undeclared edit is invisible without the budget
+  it('reports a seam file that drifted from its recorded residual budget', () => {
+    const { root, tagCommit, head } = buildResidualFixture({ added: 99, removed: 0 })
+
+    const result = runGuard(root, tagCommit, head)
+
+    expect(result.status).toBe(1)
+    expect(result.stdout).toContain('residual-budget')
+    expect(result.stdout).toContain('measured +1/-0')
+  })
+
+  // a deletion has no line to declare, so the budget is the only thing that can catch one
+  it('reports an upstream line deleted from a seam file', () => {
+    const { root } = buildResidualFixture({ added: 1, removed: 0 })
+    writeFiles(root, { 'src/budgeted.ts': 'const b = 2\n' })
+    const head = commitAll(root, 'delete-upstream-line')
+
+    const result = runGuard(root, git(root, ['rev-parse', 'v1.4.184']), head)
+
+    expect(result.status).toBe(1)
+    expect(result.stdout).toContain('residual-budget')
+    expect(result.stdout).toContain('measured +1/-1')
   })
 
   it('exits 2 when the upstream tag listing is empty', () => {
