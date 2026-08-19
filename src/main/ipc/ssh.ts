@@ -15,8 +15,15 @@ import type {
   SshAiVaultRelayListParams,
   SshAiVaultRelayTitleParams
 } from '../../shared/ssh-ai-vault-relay'
-import type { NativeChatRelayPing } from '../../shared/native-chat-relay-protocol'
-import { notifySshRelayReady, onSshRelayReady } from './ssh-relay-ready-notifier'
+import type { NativeChatRelayPing } from '../../shared/fork-native-chat-relay/native-chat-relay-protocol'
+import {
+  notifySshRelayReady,
+  onSshRelayReady
+} from './fork-native-chat-relay/ssh-relay-ready-notifier'
+import {
+  onActiveSshNativeChatChangedFromSessions,
+  requestActiveSshNativeChatFromSessions
+} from './fork-native-chat-relay/ssh-native-chat-api'
 import { SshPortForwardManager } from '../ssh/ssh-port-forward'
 import type {
   DetectedPort,
@@ -213,18 +220,14 @@ export async function requestActiveSshNativeChat(
   params: Record<string, unknown>,
   options: { signal?: AbortSignal; timeoutMs?: number } = {}
 ): Promise<unknown> {
-  const session = activeSessions.get(targetId)
-  if (!session) {
-    throw new Error('SSH relay is not ready')
-  }
-  return session.requestNativeChat(method, params, options)
+  return requestActiveSshNativeChatFromSessions(activeSessions, targetId, method, params, options)
 }
 
 export function onActiveSshNativeChatChanged(
   targetId: string,
   handler: (ping: NativeChatRelayPing) => void
 ): () => void {
-  return activeSessions.get(targetId)?.onNativeChatChanged(handler) ?? (() => {})
+  return onActiveSshNativeChatChangedFromSessions(activeSessions, targetId, handler)
 }
 
 /** Fires each time the target's relay reaches ready. A reconnect reaps every

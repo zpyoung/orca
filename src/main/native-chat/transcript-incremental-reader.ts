@@ -1,12 +1,11 @@
 import type { NativeChatMessage, NativeChatTurnLifecycle } from '../../shared/native-chat-types'
 import { transcriptFallbackId } from './transcript-fallback-id'
-import {
-  MAX_NATIVE_CHAT_TRANSCRIPT_RECORD_BYTES,
-  type NativeChatLineDecoder
-} from './transcript-tail-reader'
 import { openTranscriptReadStream, wslGatedStat } from './wsl-transcript-fs-access'
 
 const APPEND_BATCH_MESSAGE_LIMIT = 40
+const MAX_NATIVE_CHAT_TRANSCRIPT_RECORD_BYTES = 2 * 1024 * 1024
+
+type NativeChatLineDecoder = (line: string, fallbackId: string) => NativeChatMessage | null
 
 export type IncrementalTranscriptState = {
   offset: number

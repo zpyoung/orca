@@ -8,12 +8,14 @@ import { clearNativeChatTranscriptCache } from '../native-chat/transcript-read-c
 import type { ReadTranscriptResult } from '../native-chat/transcript-reader'
 import {
   subscribeNativeChatTranscript,
-  readNativeChatTranscriptTail
+  readNativeChatTranscriptTail,
+  type NativeChatTranscriptSubscription,
+  type SubscribeNativeChatTranscriptArgs
 } from '../native-chat/transcript-watch'
 import {
   readSshNativeChatTranscript,
   subscribeSshNativeChatForSender
-} from './native-chat-ssh-subscription'
+} from './fork-native-chat-relay/native-chat-ssh-subscription'
 
 // Re-export so existing test imports of `clearNativeChatTranscriptCache` from
 // this module keep working after the cache moved to transcript-read-cache.ts.
@@ -28,11 +30,7 @@ export type NativeChatReadSessionArgs = {
   /** Authoritative transcript path from the agent hook (providerSession), used to
    *  locate the file when the session id no longer names it (recent Claude Code). */
   transcriptPath?: string
-  /** Set when the pane's agent runs on a plain `ssh:` host, whose disk this
-   *  process cannot see; the read then runs on that host's relay. */
   sshConnectionId?: string
-  /** Read the window ending here instead of at the file's tail — a prior
-   *  result's `beforeOffset`, which pages older history. */
   beforeOffset?: number
 }
 
@@ -72,8 +70,6 @@ export type NativeChatSubscribeArgs = {
   /** Authoritative transcript path from the agent hook (providerSession). */
   transcriptPath?: string
   limit?: number
-  /** Set when the pane's agent runs on a plain `ssh:` host; the watcher then
-   *  lives on that host's relay and this process forwards its frames. */
   sshConnectionId?: string
 }
 
@@ -103,7 +99,7 @@ export type NativeChatAppendedPayload = {
 }
 
 type LiveSubscription = {
-  subscription: { unsubscribe: () => void }
+  subscription: NativeChatTranscriptSubscription
 }
 
 type PendingSubscription = {
@@ -173,18 +169,6 @@ function beginPendingSubscription(senderId: number, subscriptionId: string): Pen
   return pending
 }
 
-function storeLiveSubscription(
-  senderId: number,
-  subscriptionId: string,
-  subscription: { unsubscribe: () => void }
-): void {
-  const bySubId = liveSubscriptions.get(senderId) ?? new Map<string, LiveSubscription>()
-  // A concurrent subscribe with the same id beat us here; honor the latest.
-  bySubId.get(subscriptionId)?.subscription.unsubscribe()
-  bySubId.set(subscriptionId, { subscription })
-  liveSubscriptions.set(senderId, bySubId)
-}
-
 function takePendingSubscription(
   senderId: number,
   subscriptionId: string,
@@ -211,9 +195,8 @@ async function handleSubscribe(event: IpcMainEvent, args: NativeChatSubscribeArg
   // Replace any prior subscription under the same id (session change/resubscribe).
   const pending = beginPendingSubscription(sender.id, subscriptionId)
   registerSenderCleanup(sender)
-
   if (args.sshConnectionId) {
-    const relaySubscription = subscribeSshNativeChatForSender({
+    const subscription = subscribeSshNativeChatForSender({
       sender,
       subscriptionId,
       sshConnectionId: args.sshConnectionId,
@@ -223,72 +206,73 @@ async function handleSubscribe(event: IpcMainEvent, args: NativeChatSubscribeArg
       ...(transcriptPath ? { transcriptPath } : {})
     })
     if (!takePendingSubscription(sender.id, subscriptionId, pending) || sender.isDestroyed()) {
-      relaySubscription.unsubscribe()
+      subscription.unsubscribe()
       return
     }
-    storeLiveSubscription(sender.id, subscriptionId, relaySubscription)
+    const bySubId = liveSubscriptions.get(sender.id) ?? new Map<string, LiveSubscription>()
+    bySubId.get(subscriptionId)?.subscription.unsubscribe()
+    bySubId.set(subscriptionId, { subscription })
+    liveSubscriptions.set(sender.id, bySubId)
     return
   }
 
-  let subscription: { unsubscribe: () => void; watching: boolean }
-  try {
-    subscription = await subscribeNativeChatTranscript(
-      {
-        agent,
-        sessionId,
-        transcriptPath,
-        initialLimit: limit,
-        onInitialSnapshot: (messages, hasMore, beforeOffset, error, lifecycle) => {
-          if (sender.isDestroyed()) {
-            return
-          }
-          // Forward an initial-drain error so a watching client's first frame carries it
-          // instead of stranding the view at 'loading' when the read keeps throwing.
-          const payload: NativeChatAppendedPayload = {
-            subscriptionId,
-            frame: {
-              type: 'snapshot',
-              messages,
-              hasMore,
-              beforeOffset,
-              ...(error ? { error } : {}),
-              ...(lifecycle ? { lifecycle } : {})
-            }
-          }
-          sender.send('nativeChat:appended', payload)
-        },
-        onReplace: (messages, hasMore, beforeOffset, lifecycle) => {
-          if (sender.isDestroyed()) {
-            return
-          }
-          sender.send('nativeChat:appended', {
-            subscriptionId,
-            frame: {
-              type: 'replacement',
-              messages,
-              hasMore,
-              beforeOffset,
-              ...(lifecycle ? { lifecycle } : {})
-            }
-          } satisfies NativeChatAppendedPayload)
-        },
-        onAppend: (messages, lifecycle) => {
-          if (sender.isDestroyed()) {
-            return
-          }
-          const payload: NativeChatAppendedPayload = {
-            subscriptionId,
-            frame: {
-              type: 'appended',
-              messages,
-              ...(lifecycle ? { lifecycle } : {})
-            }
-          }
-          sender.send('nativeChat:appended', payload)
+  const subscribeArgs: SubscribeNativeChatTranscriptArgs = {
+    agent,
+    sessionId,
+    transcriptPath,
+    initialLimit: limit,
+    onInitialSnapshot: (messages, hasMore, beforeOffset, error, lifecycle) => {
+      if (sender.isDestroyed()) {
+        return
+      }
+      // Forward an initial-drain error so a watching client's first frame carries it
+      // instead of stranding the view at 'loading' when the read keeps throwing.
+      const payload: NativeChatAppendedPayload = {
+        subscriptionId,
+        frame: {
+          type: 'snapshot',
+          messages,
+          hasMore,
+          beforeOffset,
+          ...(error ? { error } : {}),
+          ...(lifecycle ? { lifecycle } : {})
         }
-      },
-      pending.controller.signal
-    )
+      }
+      sender.send('nativeChat:appended', payload)
+    },
+    onReplace: (messages, hasMore, beforeOffset, lifecycle) => {
+      if (sender.isDestroyed()) {
+        return
+      }
+      sender.send('nativeChat:appended', {
+        subscriptionId,
+        frame: {
+          type: 'replacement',
+          messages,
+          hasMore,
+          beforeOffset,
+          ...(lifecycle ? { lifecycle } : {})
+        }
+      } satisfies NativeChatAppendedPayload)
+    },
+    onAppend: (messages, lifecycle) => {
+      if (sender.isDestroyed()) {
+        return
+      }
+      const payload: NativeChatAppendedPayload = {
+        subscriptionId,
+        frame: {
+          type: 'appended',
+          messages,
+          ...(lifecycle ? { lifecycle } : {})
+        }
+      }
+      sender.send('nativeChat:appended', payload)
+    }
+  }
+  let subscription: NativeChatTranscriptSubscription
+  try {
+    subscription = await subscribeNativeChatTranscript(subscribeArgs, pending.controller.signal)
   } catch {
     takePendingSubscription(sender.id, subscriptionId, pending)
     return
@@ -301,7 +285,14 @@ async function handleSubscribe(event: IpcMainEvent, args: NativeChatSubscribeArg
     subscription.unsubscribe()
     return
   }
-  storeLiveSubscription(sender.id, subscriptionId, subscription)
+  const bySubId = liveSubscriptions.get(sender.id) ?? new Map<string, LiveSubscription>()
+  // A concurrent subscribe with the same id beat us here; honor the latest.
+  const existing = bySubId.get(subscriptionId)
+  if (existing) {
+    existing.subscription.unsubscribe()
+  }
+  bySubId.set(subscriptionId, { subscription })
+  liveSubscriptions.set(sender.id, bySubId)
   if (!subscription.watching && !sender.isDestroyed()) {
     const payload: NativeChatAppendedPayload = {
       subscriptionId,

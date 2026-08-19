@@ -1,7 +1,7 @@
 import { ShieldQuestion } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ChatApproval } from './native-chat-interactive-prompt'
-import { useNativeChatWidthClassName } from './use-native-chat-width'
+import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'
 
 export type NativeChatApprovalCardProps = {
   approval: ChatApproval

@@ -38,8 +38,6 @@ function claudeProjectsDir(): string {
 // getter; creating the runtime home belongs to launch, not this resolve poll.
 function codexSessionsDirs(): string[] {
   const candidates = [
-    // Path-only: this resolver also runs on the relay, where materializing the
-    // mirror would create directories on the user's remote host from a read.
     join(resolveOrcaManagedCodexHomePath(), 'sessions'),
     join(process.env.CODEX_HOME?.trim() || join(homedir(), '.codex'), 'sessions')
   ]

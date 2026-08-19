@@ -3,15 +3,15 @@ import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from '../../store'
 import { useNativeChatLaunchDraftSignal } from './use-native-chat-launch-draft-adoption'
 import { useNativeChatRetainedSession } from './use-native-chat-retained-session'
-import { selectNativeChatViewState } from './native-chat-view-state'
+import { selectNativeChatViewState } from './fork-native-chat-relay/native-chat-view-state'
 import { NativeChatComposer, type NativeChatComposerHandle } from './NativeChatComposer'
 import { useNativeChatFontScale } from './use-native-chat-font-scale'
 import { useNativeChatCanSend } from './use-native-chat-can-send'
 import { NativeChatInteractiveCard } from './NativeChatInteractiveCard'
 import { NativeChatEmptyState } from './NativeChatEmptyState'
-import { NativeChatConversation } from './NativeChatConversation'
+import { NativeChatConversation } from './fork-native-chat-relay/NativeChatConversation'
 import { NativeChatSessionGate } from './NativeChatSessionGate'
-import { useNativeChatLaunchPromptOverlay } from './use-native-chat-launch-prompt-overlay'
+import { useNativeChatLaunchPromptOverlay } from './fork-native-chat-relay/use-native-chat-launch-prompt-overlay'
 import { useNativeChatInteractiveSend } from './use-native-chat-interactive-send'
 import { findTabAgentEntry } from './native-chat-tab-agent-entry'
 import {
@@ -50,7 +50,7 @@ import { resolveNativeChatFileLinkContext } from './native-chat-file-link'
 import {
   selectNativeChatRuntimeEnvironmentId,
   selectNativeChatSshConnectionId
-} from './native-chat-runtime-owner'
+} from './fork-native-chat-relay/native-chat-runtime-owner'
 import { useNativeChatPasteBridge } from './use-native-chat-paste-bridge'
 import { useNativeChatFileLinkClick } from './use-native-chat-file-link-click'
 import type { NativeChatResolvedViewProps, NativeChatViewProps } from './native-chat-view-types'
@@ -124,8 +124,6 @@ function NativeChatResolvedView({
   const runtimeEnvironmentId = useAppStore((s) =>
     selectNativeChatRuntimeEnvironmentId(s, terminalTabId)
   )
-  // Model A: the agent's transcript is on an ssh host this renderer's main
-  // process cannot read, so main routes the read/tail to that host's relay.
   const sshConnectionId = useAppStore((s) => selectNativeChatSshConnectionId(s, terminalTabId))
   const session = useNativeChatRetainedSession({
     paneKey,

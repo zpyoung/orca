@@ -327,12 +327,7 @@ describe('readNativeChatTranscriptTailFile', () => {
       }
     ])
 
-    const result = await readNativeChatTranscriptTailFile({
-      filePath,
-      limit: 0,
-      decode,
-      includeTrailingLine: true
-    })
+    const result = await readNativeChatTranscriptTailFile(filePath, 0, decode, true)
 
     expect(result.messages).toEqual([])
     expect(result.hasMore).toBe(false)

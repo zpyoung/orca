@@ -4552,13 +4552,7 @@
           "setParentWorkspace": "상위 워크트리 설정...",
           "workspaceSection": "워크스페이스",
           "primaryDeleteDisabled": "기본 작업 트리는 삭제할 수 없습니다. 대신 프로젝트를 제거하세요.",
-          "deleteWorktree": "작업 트리 삭제",
-          "3ae4748032": "그룹을 만들고 이 작업 트리를 그룹으로 이동하세요.",
-          "308b16a770": "작업 트리의 새 그룹",
-          "5bf97058a4": "프로젝트를 그룹으로 이동",
-          "a2d9a2b93e": "프로젝트를 그룹에서 제거",
-          "addWorktreeToGroup": "작업 트리를 그룹에 추가",
-          "removeWorktreeFromGroup": "작업 트리를 그룹에서 제거"
+          "deleteWorktree": "작업 트리 삭제"
         },
         "WorktreeList": {
           "d880ea0744": "그룹을 만들고 이 프로젝트를 그룹으로 이동하세요.",
@@ -5784,10 +5778,7 @@
             "defaultCopy": "지원되는 에이전트의 새 터미널 탭을 여는 방식을 선택합니다.",
             "defaultViewLabel": "기본 Chat UI 보기",
             "defaultViewTerminal": "Terminal 채팅",
-            "defaultViewNative": "Chat UI",
-            "widthTitle": "채팅 너비",
-            "widthCopy": "모든 채팅 창의 읽기 열 너비를 설정합니다.",
-            "widthLabel": "채팅 너비"
+            "defaultViewNative": "Chat UI"
           },
           "agentDashboard": {
             "title": "에이전트 대시보드",
@@ -6240,11 +6231,7 @@
           "1b1b70279a": "아직 페어링된 기기가 없습니다.",
           "1592afcc7a": "아직 페어링된 기기가 없습니다. Orca 모바일 앱으로 QR 코드를 스캔하세요.",
           "relayDegradedNotice": "Relay에 연결할 수 없습니다 — 이 코드는 LAN 또는 Tailscale에서만 작동합니다. 다시 생성해 보세요.",
-          "pairingQrError": "이 페어링 코드를 QR 코드로 표시할 수 없습니다. 대신 Orca Mobile에 복사하세요.",
-          "copyPairingCode": "Copy pairing code",
-          "diagnosticsCopied": "Diagnostics copied",
-          "diagnosticsCopyFailed": "Failed to copy diagnostics",
-          "pairingCodeReady": "Pairing code ready"
+          "pairingQrError": "이 페어링 코드를 QR 코드로 표시할 수 없습니다. 대신 Orca Mobile에 복사하세요."
         },
         "MobileSettingsPane": {
           "9a3c280e49": "GitHub 릴리스",
@@ -9635,8 +9622,7 @@
           "signInRequired": "Relay만 해당 — LAN에는 계정이 필요하지 않습니다.",
           "relayUnavailable": "이 빌드에서는 Orca Relay를 사용할 수 없습니다. LAN을 사용하세요.",
           "signInAgain": "Relay용 다시 로그인",
-          "localTitle": "LAN",
-          "retrying": "Retrying"
+          "localTitle": "LAN"
         },
         "MobilePairingSetupSection": {
           "title": "휴대폰 페어링",
@@ -11771,16 +11757,7 @@
           "relayDegradedNotice": "Relay에 연결할 수 없습니다 — 이 코드는 LAN 또는 Tailscale에서만 작동합니다.",
           "pairingQrError": "이 페어링 코드를 QR 코드로 표시할 수 없습니다. 대신 Orca Mobile에 복사하세요.",
           "directAddressDisclosure": "더 빠른 로컬 경로도 사용",
-          "directAddressHint": "선택 사항. 근처에 있을 때(같은 Wi‑Fi 또는 Tailscale) 휴대폰이 사용할 주소를 고르세요. 보통 Relay보다 빠릅니다. 외부에 있을 때는 여전히 Relay를 사용합니다.",
-          "noPairingCode": "No pairing code available",
-          "noRelayCode": "No pairing code available",
-          "pairThisComputer": "Pair this computer.",
-          "pairThisMac": "Pair this Mac.",
-          "pairThisPc": "Pair this PC.",
-          "pairingCodeReady": "Pairing code ready",
-          "qrGeneratePrompt": "Generate a pairing code to continue",
-          "qrRenderFailed": "QR couldn’t be rendered — copy the code below",
-          "qrSignInRequired": "Sign in to create a Relay pairing code"
+          "directAddressHint": "선택 사항. 근처에 있을 때(같은 Wi‑Fi 또는 Tailscale) 휴대폰이 사용할 주소를 고르세요. 보통 Relay보다 빠릅니다. 외부에 있을 때는 여전히 Relay를 사용합니다."
         },
         "MobilePage": {
           "e17393c6a3": "휴대폰 미리보기",
@@ -11793,9 +11770,7 @@
           "4e1eb5d55c": "기기를 취소하지 못했습니다.",
           "255372e6e8": "기기가 취소되었습니다.",
           "1b4509a8a1": "페어링됨",
-          "c5909374cf": "소개",
-          "diagnosticsCopied": "Diagnostics copied",
-          "diagnosticsCopyFailed": "Failed to copy diagnostics"
+          "c5909374cf": "소개"
         },
         "MobilePageToolbar": {
           "ad2284a9e2": "닫기 · Esc",
@@ -11927,18 +11902,6 @@
           "blocked-description": "기존 인바운드 차단 규칙이 페어링 예외보다 우선할 수 있습니다. 복구를 실행하면 이 Orca 앱의 충돌하는 TCP 규칙을 제거한 다음 개인 네트워크에서 포트 {{port}}을(를) 허용합니다.",
           "repair": "방화벽 액세스 복구",
           "relay-note": "페어링은 Orca Relay를 통해 계속 작동합니다. 허용하면 더 빠른 로컬 연결이 추가될 뿐입니다."
-        },
-        "MobileRelayMintFailureNotice": {
-          "body": "Retry, or use LAN to pair over Tailscale or the same Wi‑Fi.",
-          "copyDiagnostics": "Copy diagnostics",
-          "retry": "Retry Relay",
-          "retrying": "Retrying…",
-          "retryingBody": "Creating a new pairing code. This can take a moment over a remote connection.",
-          "retryingTitle": "Retrying Orca Relay…",
-          "title": "Couldn’t create a Relay pairing code.",
-          "unavailableBody": "Use LAN to pair over Tailscale or the same Wi‑Fi.",
-          "unavailableTitle": "Orca Relay isn’t available on this desktop.",
-          "useLan": "Use LAN"
         }
       },
       "gitlab": {
@@ -14421,17 +14384,7 @@
         "allow": "허용하다",
         "deny": "부인하다"
       },
-      "launchPromptNotDelivered": "전달되지 않음 — 터미널을 확인하세요",
-      "width": {
-        "tier": {
-          "narrow": "좁게",
-          "comfortable": "편안하게",
-          "wide": "넓게",
-          "full": "전체"
-        },
-        "menuLabel": "채팅 너비",
-        "menuTooltip": "채팅 너비(모든 채팅 창에 적용됨)"
-      }
+      "launchPromptNotDelivered": "전달되지 않음 — 터미널을 확인하세요"
     },
     "tab": {
       "bar": {

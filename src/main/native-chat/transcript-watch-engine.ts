@@ -11,10 +11,10 @@ import {
   type IncrementalTranscriptState
 } from './transcript-incremental-reader'
 import { createTranscriptNativeWatcher } from './transcript-native-watcher'
-import { readNativeChatTranscriptTailFile } from './transcript-tail-reader'
 import { nativeChatTurnLifecycleDecoderForAgent } from './transcript-turn-lifecycle'
 import type {
   NativeChatTranscriptSubscription,
+  NativeChatTranscriptTailReader,
   SubscribeNativeChatTranscriptArgs
 } from './transcript-watch-contract'
 import { createTranscriptWatchScheduler } from './transcript-watch-scheduler'
@@ -23,6 +23,7 @@ import { WslTranscriptFsError } from './wsl-transcript-fs-gate'
 
 const ROTATION_RETRY_MS = 25
 const MAX_ROTATION_RETRY_MS = 2_000
+
 let activeWatcherCount = 0
 
 export function getActiveNativeChatWatcherCount(): number {
@@ -38,7 +39,7 @@ export function getActiveNativeChatWatcherCount(): number {
 export async function installTranscriptWatcher(
   filePath: string,
   decode: (line: string, fallbackId: string) => NativeChatMessage | null,
-  args: SubscribeNativeChatTranscriptArgs,
+  args: SubscribeNativeChatTranscriptArgs & { tailReader: NativeChatTranscriptTailReader },
   /** Cancels the install probe so an unsubscribe during it detaches the gate
    *  waiter immediately instead of at the 30s deadline. */
   signal?: AbortSignal
@@ -55,6 +56,7 @@ export async function installTranscriptWatcher(
     return null
   }
   const { onAppend, onInitialSnapshot, onReplace, initialLimit, initialMaxBytes } = args
+  const { tailReader } = args
   const decodeLifecycle = nativeChatTurnLifecycleDecoderForAgent(args.agent)
 
   const state: IncrementalTranscriptState = {
@@ -164,12 +166,13 @@ export async function installTranscriptWatcher(
       // Why: 0 is a valid window — an explicit undefined check keeps an empty
       // snapshot empty instead of falling back to an unbounded incremental read.
       contentReplaced && !initialDrain && onReplace && initialLimit !== undefined
-        ? await readNativeChatTranscriptTailFile({
+        ? await tailReader({
             filePath,
             limit: initialLimit,
             decode,
             decodeLifecycle,
-            maxBytes: initialMaxBytes
+            maxBytes: initialMaxBytes,
+            signal: gateAbort.signal
           })
         : null
     if (closed) {
@@ -191,12 +194,13 @@ export async function installTranscriptWatcher(
 
     const initialSnapshot =
       initialDrain && onInitialSnapshot && initialLimit !== undefined
-        ? await readNativeChatTranscriptTailFile({
+        ? await tailReader({
             filePath,
             limit: initialLimit,
             decode,
             decodeLifecycle,
-            maxBytes: initialMaxBytes
+            maxBytes: initialMaxBytes,
+            signal: gateAbort.signal
           })
         : null
     if (closed) {
