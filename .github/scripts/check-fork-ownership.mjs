@@ -64,7 +64,24 @@ function toLatin1Manifest(manifest) {
   }
 }
 
+// upstream keeps tagging past the fork's last sync, so its newest stable tags name commits this
+// clone has never fetched; probing one would exit 128 and abort the guard, and a commit we do
+// not have cannot be an ancestor of HEAD anyway
+function hasCommit(sha) {
+  try {
+    execFileSync('git', ['cat-file', '-e', `${sha}^{commit}`], {
+      stdio: ['ignore', 'ignore', 'ignore']
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
 function isAncestor(candidateSha, headSha) {
+  if (!hasCommit(candidateSha)) {
+    return false
+  }
   try {
     execFileSync('git', ['merge-base', '--is-ancestor', candidateSha, headSha], {
       stdio: ['ignore', 'ignore', 'ignore']
@@ -318,6 +335,9 @@ function checkForkOwnership(argv) {
     return 2
   }
   const comparisonRef = comparisonTag.sha
+  // names the winning tag so a skipped newer one is visible; safe unfenced because only
+  // /^v\d+\.\d+\.\d+$/ names survive candidate selection
+  console.log(`Comparing against upstream ${comparisonTag.name}.`)
 
   let manifestJsonText
   try {

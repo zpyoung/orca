@@ -219,6 +219,33 @@ describe('comparison-ref resolution (real git, network bypassed via local remote
     expect(result.stderr).toContain('reachable')
   })
 
+  // upstream keeps tagging after the fork's last sync, so its newest stable tags name commits
+  // this clone has never fetched; probing one must not abort the whole guard
+  it('skips an upstream stable tag whose commit this clone has never fetched', () => {
+    const upstream = initRepo()
+    writeManifest(upstream, baseManifest())
+    writeFiles(upstream, { 'docs/marker.md': 'tagged\n' })
+    const tagCommit = commitAll(upstream, 'tag-commit')
+    tagAt(upstream, 'v1.4.184', tagCommit)
+
+    const root = mkdtempSync(join(tmpdir(), 'orca-fork-ownership-guard-'))
+    tempDirs.push(root)
+    execFileSync('git', ['clone', '--quiet', upstream, root])
+    git(root, ['config', 'user.email', 'fork-ownership-guard-test@example.com'])
+    git(root, ['config', 'user.name', 'Fork Ownership Guard Test'])
+
+    writeFiles(upstream, { 'docs/marker.md': 'newer\n' })
+    tagAt(upstream, 'v1.4.185', commitAll(upstream, 'newer-tag-commit'))
+
+    writeFiles(root, { 'docs/marker.md': 'fork\n' })
+    const head = commitAll(root, 'fork-commit')
+
+    const result = runGuard(root, tagCommit, head, { upstreamRemote: upstream })
+
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain('guard passed')
+  })
+
   it('exits 2 when the upstream tag listing is empty', () => {
     const root = initRepo()
     writeManifest(root, baseManifest())
