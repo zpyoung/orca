@@ -1,0 +1,94 @@
+# syntax=docker/dockerfile:1.7
+ARG BASE_IMAGE=ubuntu:24.04
+FROM ${BASE_IMAGE}
+
+ARG NODE_MAJOR=24
+ARG PNPM_VERSION=10.24.0
+ARG NODE_GYP_VERSION=11.5.0
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    curl \
+    dbus-x11 \
+    git \
+    gnupg \
+    jq \
+    libasound2t64 \
+    libatk-bridge2.0-0 \
+    libatspi2.0-0 \
+    libdrm2 \
+    libgbm1 \
+    libgtk-3-0 \
+    libnss3 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxkbcommon0 \
+    libxrandr2 \
+    libxss1 \
+    openssh-client \
+    procps \
+    python3 \
+    software-properties-common \
+    unzip \
+    xauth \
+    xvfb \
+    xz-utils \
+    zsh \
+  && rm -rf /var/lib/apt/lists/*
+
+# fish 4+ only: DECSET 2031 arming lives in the 4.0 Rust tty_handoff, and noble ships 3.7.
+RUN add-apt-repository -y ppa:fish-shell/release-4 \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends fish \
+  && rm -rf /var/lib/apt/lists/*
+
+# The git-compatibility matrix and the ssh-docker e2e lanes shell out to docker themselves.
+RUN install -m 0755 -d /etc/apt/keyrings \
+  && curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc \
+  && chmod a+r /etc/apt/keyrings/docker.asc \
+  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+    > /etc/apt/sources.list.d/docker.list \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends docker-ce-cli docker-buildx-plugin \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN set -eux; \
+  version="$(curl -fsSL https://nodejs.org/dist/index.json \
+    | jq -r --arg prefix "v${NODE_MAJOR}." 'map(select(.version | startswith($prefix))) | .[0].version')"; \
+  case "$(dpkg --print-architecture)" in \
+    amd64) arch=x64 ;; \
+    arm64) arch=arm64 ;; \
+    *) echo "unsupported architecture" >&2; exit 1 ;; \
+  esac; \
+  curl -fsSL "https://nodejs.org/dist/${version}/node-${version}-linux-${arch}.tar.xz" -o /tmp/node.tar.xz; \
+  tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
+    --exclude=CHANGELOG.md --exclude=LICENSE --exclude=README.md; \
+  rm /tmp/node.tar.xz; \
+  npm install -g "pnpm@${PNPM_VERSION}" "node-gyp@${NODE_GYP_VERSION}"
+
+# pnpm's bundled gyp_main.py is not executable, so native rebuilds need the standalone node-gyp.
+ENV npm_config_node_gyp=/usr/local/lib/node_modules/node-gyp/bin/node-gyp.js
+
+WORKDIR /work
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY config/patches ./config/patches
+
+RUN pnpm install --no-frozen-lockfile --prefer-frozen-lockfile=false --ignore-scripts
+
+COPY config/scripts ./config/scripts
+
+RUN node config/scripts/ensure-native-runtime.mjs --runtime=node \
+  && node config/scripts/install-electron-package-binary.mjs \
+  && sha256sum pnpm-lock.yaml | cut -d ' ' -f 1 > /opt/orca-sandbox-lockfile.sha256
+
+COPY config/docker/test-sandbox/entrypoint.sh /usr/local/bin/orca-test-sandbox
+RUN chmod +x /usr/local/bin/orca-test-sandbox
+
+ENTRYPOINT ["/usr/local/bin/orca-test-sandbox"]
+CMD ["pnpm", "exec", "vitest", "run", "--config", "config/vitest.config.ts"]
