@@ -6140,12 +6140,6 @@
             "modeAriaLabel": "Agent Dashboard open mode",
             "modeInWindow": "In-window",
             "modePopout": "Pop-out"
-          },
-          "terminalDock": {
-            "title": "Terminal dock",
-            "description": "Composer docked beneath a terminal pane for supported coding-agent sessions.",
-            "copy": "Docks a rich input composer beneath a terminal pane running a supported coding-agent CLI, so you can compose and send prompts without typing directly into the terminal. The terminal stays visible, so you can always fall back to typing directly. Experimental and independent of Chat UI while we tune composer behavior.",
-            "toggleLabel": "Toggle terminal dock"
           }
         },
         "FloatingWorkspacePane": {
@@ -8470,10 +8464,6 @@
             "agentDashboard": {
               "title": "Agent Dashboard",
               "description": "Kanban board for monitoring agents across worktrees, in-window or as a pop-out."
-            },
-            "terminalDock": {
-              "title": "Terminal dock",
-              "description": "Composer docked beneath a terminal pane for supported coding-agent sessions."
             }
           }
         },
@@ -15195,7 +15185,6 @@
         "pillAccessibleName": "{{value0}} {{value1}}",
         "valueUnknown": "Current value unknown — pick On or Off",
         "sentNotConfirmed": "Sent to the agent — not confirmed",
-        "sendMayNotHaveCompleted": "Send may not have completed. Check the terminal before retrying.",
         "setWhenSessionStarts": "Set when the session starts.",
         "availableAfterSessionStarts": "Available after the session starts.",
         "optionUpdateFailed": "Could not update option",
@@ -15209,8 +15198,7 @@
           "max": "Max",
           "on": "On",
           "off": "Off"
-        },
-        "skillMultiplePlugins": "{{plugins}} - agent resolves"
+        }
       },
       "tool": {
         "running": "Running…",
@@ -15323,26 +15311,6 @@
       "sent": "Session context sent to {{agent}} in a new session.",
       "deliveryFailed": "The new {{agent}} session started, but its context could not be sent.",
       "launchFailed": "Could not start a new {{agent}} session."
-    },
-    "terminal-dock": {
-      "passthroughActive": "Passthrough active — terminal has keyboard focus",
-      "sshDisconnected": "SSH disconnected",
-      "connecting": "Connecting…",
-      "reconnecting": "Reconnecting…",
-      "disconnected": "Disconnected",
-      "offline": "Offline",
-      "sessionEnded": "Session ended",
-      "noSession": "No terminal session",
-      "mobileDriverLeaseHeld": "Mobile device is composing",
-      "reattaching": "Reattaching…"
-    },
-    "terminal": {
-      "pane": {
-        "TerminalContextMenu": {
-          "hideAgentComposer": "Hide agent composer",
-          "showAgentComposer": "Show agent composer"
-        }
-      }
     }
   },
   "dashboardPopout": {

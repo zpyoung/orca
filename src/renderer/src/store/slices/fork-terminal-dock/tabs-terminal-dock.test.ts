@@ -1,4 +1,3 @@
-/* eslint-disable max-lines */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { Tab } from '../../../../../shared/types'
 import type * as AgentStatusModule from '@/lib/agent-status'
