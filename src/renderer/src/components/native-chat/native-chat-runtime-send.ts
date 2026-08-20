@@ -4,11 +4,11 @@
 
 import { sendRuntimePtyInput } from '@/runtime/runtime-terminal-inspection'
 import type { getSettingsForAgentTabRuntimeOwner } from '@/lib/agent-paste-draft'
-import { runBodyAcceptedThen } from './native-chat-runtime-send-acceptance'
+import { runBodyAcceptedThen } from './fork-agent-composer/native-chat-runtime-send-acceptance'
 import {
   sendNativeChatAskAnswerQueued,
   sendNativeChatMessageVerifiedQueued
-} from './native-chat-runtime-send-queued'
+} from './fork-agent-composer/native-chat-runtime-send-queued'
 import {
   NATIVE_CHAT_ADVANCE_BUFFER_MS,
   NATIVE_CHAT_QUESTION_STEP_MS,
@@ -31,19 +31,22 @@ import {
   guardedDelay,
   runOutcomeGuarded,
   submitAndObserve
-} from './native-chat-send-outcome'
-import type { SendOutcome } from './native-chat-send-outcome'
+} from './fork-agent-composer/native-chat-send-outcome'
+import type { SendOutcome } from './fork-agent-composer/native-chat-send-outcome'
 import {
   clearConfirmDurationMs,
   clearThenWrite,
   clearUnsubmittedAgentInput,
   NATIVE_CHAT_CLEAR_CONFIRM_MS,
   NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT
-} from './native-chat-runtime-clear'
+} from './fork-agent-composer/native-chat-runtime-clear'
 
 export { NATIVE_CHAT_ADVANCE_BUFFER_MS, NATIVE_CHAT_QUESTION_STEP_MS, NATIVE_CHAT_SUBMIT_DELAY_MS }
 export { resetNativeChatPtySendQueuesForTests }
-export { sendNativeChatTypedCommand, typeNativeChatCommand } from './native-chat-typed-command-send'
+export {
+  sendNativeChatTypedCommand,
+  typeNativeChatCommand
+} from './fork-agent-composer/native-chat-typed-command-send'
 
 export const NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS = 300
 

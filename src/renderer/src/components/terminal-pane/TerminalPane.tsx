@@ -43,8 +43,8 @@ import {
   serializeTerminalLayout
 } from './layout-serialization'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
-import { TerminalPaneDockMount } from './TerminalPaneDockMount'
-import { useTerminalPaneDock } from './use-terminal-pane-dock'
+import { TerminalPaneDockMount } from './fork-terminal-dock/TerminalPaneDockMount'
+import { useTerminalPaneDock } from './fork-terminal-dock/use-terminal-pane-dock'
 import type { TerminalKittyKeyboardModeTracker } from '../../../../shared/terminal-kitty-keyboard-mode-tracker'
 import {
   applyExpandedLayoutTo,
@@ -199,7 +199,7 @@ import {
   updateTerminalRemoteRuntimeRecoveryUiState,
   type VisiblePtyRecoveryState
 } from './terminal-remote-runtime-recovery-ui-state'
-import { updateTerminalDockRawRecoveryPhaseByPaneId } from './terminal-pane-dock-recovery-phase'
+import { updateTerminalDockRawRecoveryPhaseByPaneId } from './fork-terminal-dock/terminal-pane-dock-recovery-phase'
 
 const NATIVE_CHAT_ROOT_SELECTOR = '[data-native-chat-root="true"]'
 

@@ -7,7 +7,7 @@ import type {
   NativeChatSessionOptionObservation,
   NativeChatTurnLifecycle
 } from '../../shared/native-chat-types'
-import type { NativeChatTranscriptCompanion } from '../../shared/native-chat-transcript-companion'
+import type { NativeChatTranscriptCompanion } from '../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 import {
   getActiveNativeChatWatcherCount,
   readNativeChatTranscriptTail,

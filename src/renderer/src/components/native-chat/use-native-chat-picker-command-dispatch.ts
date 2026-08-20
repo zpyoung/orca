@@ -10,15 +10,15 @@ import {
   nativeChatComposerTargetIsRemote,
   type NativeChatResolvedTarget
 } from './native-chat-composer-target'
-import { pushHistory, type HistoryState } from '../agent-composer/agent-composer-history'
+import { pushHistory, type HistoryState } from './fork-agent-composer/agent-composer-history'
 import type { NativeChatPickerItem } from './native-chat-composer-state'
 import type { NativeChatSendLifecycle } from './use-native-chat-send-lifecycle'
 import type { NativeChatPtySessionOptionsSurface } from './native-chat-pty-session-options'
-import type { SendOutcome } from './native-chat-send-outcome'
-import { buildComposerSendOptions } from '../agent-composer/composer-send-options'
-import { createComposerPayloadRestore } from '../agent-composer/use-agent-composer-send'
-import type { ComposerSendTier } from '../agent-composer/composer-send-tier'
-import type { AgentComposerImageAttachment } from '../agent-composer/AgentComposerField'
+import type { SendOutcome } from './fork-agent-composer/native-chat-send-outcome'
+import { buildComposerSendOptions } from './fork-agent-composer/composer-send-options'
+import { createComposerPayloadRestore } from './fork-agent-composer/use-agent-composer-send'
+import type { ComposerSendTier } from './fork-agent-composer/composer-send-tier'
+import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentComposerField'
 
 export function useNativeChatPickerCommandDispatch(args: {
   agent: AgentType

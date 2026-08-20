@@ -502,7 +502,7 @@ import type {
   AiVaultPrepareSessionResumeResult
 } from '../shared/ai-vault-resume-preparation'
 import type { AgentType, NativeChatMessage } from '../shared/native-chat-types'
-import type { NativeChatCompanionFrameFields } from '../shared/native-chat-transcript-companion'
+import type { NativeChatCompanionFrameFields } from '../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 import type { TelemetryConsentState } from '../shared/telemetry-consent-types'
 import type { AgentKind, LaunchSource, RequestKind } from '../shared/telemetry-events'
 import type { AppStarSource } from '../shared/gh-star-source'

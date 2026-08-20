@@ -13,7 +13,7 @@ import type {
   SessionOptionDescriptor
 } from '../../../../shared/native-chat-session-options'
 import type { NativeChatSessionOptionObservation } from '../../../../shared/native-chat-types'
-import { nativeChatReportedValuesFromObservation } from './native-chat-session-option-observation'
+import { nativeChatReportedValuesFromObservation } from './fork-native-chat-session-options/native-chat-session-option-observation'
 import { useAppStore } from '../../store'
 import {
   createNativeChatPtySessionOptions,

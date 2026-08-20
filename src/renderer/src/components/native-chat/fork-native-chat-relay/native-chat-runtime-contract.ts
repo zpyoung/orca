@@ -8,7 +8,7 @@ import type {
   NativeChatSessionOptionObservation,
   NativeChatTurnLifecycle
 } from '../../../../../shared/native-chat-types'
-import type { NativeChatCompanionFrameFields } from '../../../../../shared/native-chat-transcript-companion'
+import type { NativeChatCompanionFrameFields } from '../../../../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 
 export const RUNTIME_NATIVE_CHAT_READ_ERROR = "Couldn't read agent chat from the remote runtime."
 

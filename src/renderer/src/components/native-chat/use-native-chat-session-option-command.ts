@@ -5,7 +5,7 @@ import {
   nativeChatComposerTargetIsRemote,
   type NativeChatResolvedTarget
 } from './native-chat-composer-target'
-import { pushHistory, type HistoryState } from '../agent-composer/agent-composer-history'
+import { pushHistory, type HistoryState } from './fork-agent-composer/agent-composer-history'
 import { sendNativeChatMessageVerified, typeNativeChatCommand } from './native-chat-runtime-send'
 import { cancelNativeChatPtySends, waitForNativeChatPtyIdle } from './native-chat-pty-send-queue'
 import {

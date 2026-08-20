@@ -3,7 +3,7 @@ import type { AppState } from '@/store/types'
 import {
   REMOTE_CONPTY_UNVERIFIED_DATASET_KEY,
   terminalPaneUsesConptyBelowWrapMarkers
-} from './TerminalPaneDockMount'
+} from './fork-terminal-dock/TerminalPaneDockMount'
 import {
   applyTerminalPaneCloseRequest,
   applyTerminalScrollbackRowsToMountedPanes,

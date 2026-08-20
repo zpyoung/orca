@@ -38,7 +38,7 @@ import { sanitizeTerminalLayoutPaneTitlesForLabels } from '@/lib/terminal-pane-t
 import { terminalLayoutEqual } from '@/lib/terminal-layout-equality'
 import { normalizeTerminalLayoutPtyOwnership } from '@/components/terminal-pane/terminal-layout-pty-ownership'
 import { isClientAuthoritativeAgentStatusPane } from '@/components/terminal-pane/renderer-owned-agent-status-registry'
-import { rekeyTerminalDockPaneKeys } from '@/components/terminal-dock/terminal-dock-pane-state'
+import { rekeyTerminalDockPaneKeys } from '@/components/terminal-pane/fork-terminal-dock/terminal-dock-pane-state'
 import { getExplicitRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
 import {
   createWebRuntimeSessionTerminal,

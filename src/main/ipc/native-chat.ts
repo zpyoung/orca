@@ -3,7 +3,7 @@ import type { AgentType, NativeChatMessage } from '../../shared/native-chat-type
 import {
   nativeChatCompanionFrameFields,
   type NativeChatCompanionFrameFields
-} from '../../shared/native-chat-transcript-companion'
+} from '../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 import { clearNativeChatTranscriptCache } from '../native-chat/transcript-read-cache'
 import type { ReadTranscriptResult } from '../native-chat/transcript-reader'
 import {

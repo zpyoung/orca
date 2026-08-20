@@ -1,6 +1,6 @@
 import type { NativeChatMessage } from '../../shared/native-chat-types'
-import type { NativeChatTranscriptCompanion } from '../../shared/native-chat-transcript-companion'
-import type { NativeChatTranscriptCompanionDecoder } from './transcript-companion-decoder'
+import type { NativeChatTranscriptCompanion } from '../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
+import type { NativeChatTranscriptCompanionDecoder } from './fork-native-chat-session-options/transcript-companion-decoder'
 import { transcriptFallbackId } from './transcript-fallback-id'
 import { openTranscriptReadStream, wslGatedStat } from './wsl-transcript-fs-access'
 

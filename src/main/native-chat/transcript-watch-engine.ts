@@ -2,7 +2,7 @@ import type { NativeChatMessage } from '../../shared/native-chat-types'
 import {
   mergeNativeChatTranscriptCompanion,
   type NativeChatTranscriptCompanion
-} from '../../shared/native-chat-transcript-companion'
+} from '../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 import {
   boundaryFingerprint,
   readTranscriptFileVersion,
@@ -15,7 +15,7 @@ import {
   type IncrementalTranscriptState
 } from './transcript-incremental-reader'
 import { createTranscriptNativeWatcher } from './transcript-native-watcher'
-import { nativeChatTranscriptCompanionDecoderForAgent } from './transcript-companion-decoder'
+import { nativeChatTranscriptCompanionDecoderForAgent } from './fork-native-chat-session-options/transcript-companion-decoder'
 import type {
   NativeChatTranscriptSubscription,
   NativeChatTranscriptTailReader,

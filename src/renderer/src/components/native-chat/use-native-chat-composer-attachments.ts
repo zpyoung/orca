@@ -6,11 +6,11 @@ import {
   nativeChatComposerTargetIsRemote,
   type NativeChatResolvedTarget
 } from './native-chat-composer-target'
-import type { AgentComposerImageAttachment } from '../agent-composer/AgentComposerField'
+import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentComposerField'
 import {
   pinScopeCacheKey,
   setBoundedScopeCacheEntry
-} from '../agent-composer/agent-composer-scope-cache'
+} from './fork-agent-composer/agent-composer-scope-cache'
 
 export type UseNativeChatComposerAttachmentsArgs = {
   attachmentScopeKey: string

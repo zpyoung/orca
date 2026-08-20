@@ -1,7 +1,7 @@
 import type { AgentType, NativeChatMessage } from '../../shared/native-chat-types'
-import type { NativeChatTranscriptCompanion } from '../../shared/native-chat-transcript-companion'
+import type { NativeChatTranscriptCompanion } from '../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 import type { ResolveSessionFileOptions } from './session-file-resolver'
-import type { NativeChatTranscriptCompanionDecoder } from './transcript-companion-decoder'
+import type { NativeChatTranscriptCompanionDecoder } from './fork-native-chat-session-options/transcript-companion-decoder'
 
 export type NativeChatTranscriptTailReader = (args: {
   filePath: string

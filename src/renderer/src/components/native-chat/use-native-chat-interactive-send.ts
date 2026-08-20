@@ -20,7 +20,7 @@ import {
   sendNativeChatMessage,
   type NativeChatSendHandle
 } from './native-chat-runtime-send'
-import type { SendOutcome } from './native-chat-send-outcome'
+import type { SendOutcome } from './fork-agent-composer/native-chat-send-outcome'
 import { inferQuestionAnsweredFromCurrentStatus } from '../terminal-pane/agent-question-answered-inference'
 
 // ESC is the agent-TUI interrupt/cancel key over the PTY (matches how the

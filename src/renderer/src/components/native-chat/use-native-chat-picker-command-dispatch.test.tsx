@@ -33,13 +33,13 @@ const buildComposerSendOptions = vi.fn(
     onOutcome: (outcome: string) => void
   }) => ({ clearInput: `clear:${args.text}`, onOutcome: args.onOutcome })
 )
-vi.mock('../agent-composer/composer-send-options', () => ({
+vi.mock('./fork-agent-composer/composer-send-options', () => ({
   buildComposerSendOptions: (args: Parameters<typeof buildComposerSendOptions>[0]) =>
     buildComposerSendOptions(args)
 }))
 
 import { useNativeChatPickerCommandDispatch } from './use-native-chat-picker-command-dispatch'
-import type { AgentComposerImageAttachment } from '../agent-composer/AgentComposerField'
+import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentComposerField'
 
 const COMMAND = {
   kind: 'command' as const,

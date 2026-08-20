@@ -3,7 +3,7 @@ import type { NativeChatSessionOptionObservation } from '../../../../shared/nati
 import type {
   AgentComposerCoreProps,
   AgentComposerHandle
-} from '../agent-composer/agent-composer-types'
+} from './fork-agent-composer/agent-composer-types'
 
 export type NativeChatComposerProps = AgentComposerCoreProps & {
   /** Prompts recovered by a host from the pane transcript or live status. */

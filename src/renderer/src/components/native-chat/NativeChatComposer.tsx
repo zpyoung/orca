@@ -8,11 +8,11 @@ import {
   useAgentComposerCoreState,
   useAgentComposerCompose,
   type AgentComposerHostBridges
-} from '../agent-composer/AgentComposer'
+} from './fork-agent-composer/AgentComposer'
 import { resolveNativeChatLaunchDraftSend } from './native-chat-launch-draft-send'
 import { getVerifiedNativeChatCommands } from '../../../../shared/native-chat-agent-profiles'
 import { useNativeChatLaunchDraftAdoption } from './use-native-chat-launch-draft-adoption'
-import { AgentComposerField } from '../agent-composer/AgentComposerField'
+import { AgentComposerField } from './fork-agent-composer/AgentComposerField'
 import { nativeChatComposerTargetIsRemote } from './native-chat-composer-target'
 import { useNativeChatComposerAttachments } from './use-native-chat-composer-attachments'
 import { useNativeChatComposerPaste } from './use-native-chat-composer-paste'
@@ -23,7 +23,7 @@ import { useNativeChatDictationActions } from './use-native-chat-dictation-actio
 import { useNativeChatSessionOptionCommand } from './use-native-chat-session-option-command'
 import { useNativeChatPickerState } from './use-native-chat-picker-state'
 import { useNativeChatPickerCommandDispatch } from './use-native-chat-picker-command-dispatch'
-import { seedHistory } from '../agent-composer/agent-composer-history'
+import { seedHistory } from './fork-agent-composer/agent-composer-history'
 import type {
   NativeChatComposerHandle,
   NativeChatComposerProps

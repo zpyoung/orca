@@ -16,7 +16,7 @@ import { emitNativeChatToggled } from '@/lib/native-chat-telemetry'
 import {
   removeTerminalDockPaneKeys as removeLocalTerminalDockPaneKeys,
   writeTerminalDockPaneState
-} from '@/components/terminal-dock/terminal-dock-pane-state'
+} from '@/components/terminal-pane/fork-terminal-dock/terminal-dock-pane-state'
 import {
   dedupeTabOrder,
   ensureGroup,
@@ -1397,7 +1397,8 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
         ...(nextUnreadTerminalTabs !== current.unreadTerminalTabs
           ? { unreadTerminalTabs: nextUnreadTerminalTabs }
           : {}),
-        ...(nextTerminalDockPendingMutationsByPaneKey !== current.terminalDockPendingMutationsByPaneKey
+        ...(nextTerminalDockPendingMutationsByPaneKey !==
+        current.terminalDockPendingMutationsByPaneKey
           ? { terminalDockPendingMutationsByPaneKey: nextTerminalDockPendingMutationsByPaneKey }
           : {}),
         // Why: closing the last tab can leave the worktree selected but render-empty, so write the landing-state fallback directly.
@@ -1595,7 +1596,10 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
         ...patchTab(state.unifiedTabsByWorktree, tabId, { terminalDockByPaneKey: next }),
         // Why: a pruned key must not be revived by a stale host echo still carrying it.
         terminalDockPendingMutationsByPaneKey: {
-          ...pruneExpiredTerminalDockPendingMutations(state.terminalDockPendingMutationsByPaneKey, now),
+          ...pruneExpiredTerminalDockPendingMutations(
+            state.terminalDockPendingMutationsByPaneKey,
+            now
+          ),
           ...Object.fromEntries(removedKeys.map((key) => [key, now]))
         }
       }

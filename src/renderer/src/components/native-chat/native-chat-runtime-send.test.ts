@@ -29,7 +29,7 @@ import {
 import {
   NATIVE_CHAT_SUBMIT_OBSERVATION_MAX_READS,
   NATIVE_CHAT_SUBMIT_OBSERVATION_POLL_MS
-} from './native-chat-send-outcome'
+} from './fork-agent-composer/native-chat-send-outcome'
 import {
   buildNativeChatImagePasteBytes,
   buildNativeChatPasteBytes,

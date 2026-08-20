@@ -45,7 +45,7 @@ import {
   hasTerminalDockPaneState,
   readTerminalDockPaneState,
   writeTerminalDockPaneState
-} from '../components/terminal-dock/terminal-dock-pane-state'
+} from '../components/terminal-pane/fork-terminal-dock/terminal-dock-pane-state'
 import {
   _getWebSessionTabsTrackingCountsForTest,
   acceptReplayedWebSessionTabsSnapshot,

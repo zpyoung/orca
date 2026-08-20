@@ -7,8 +7,8 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type * as React from 'react'
 import type { AgentStatusEntry } from '../../../../shared/agent-status-types'
 import { NativeChatSessionGate } from './NativeChatSessionGate'
-import { useAgentComposerDraft } from '../agent-composer/use-agent-composer-draft'
-import { clearAgentComposerDraftCacheForTests } from '../agent-composer/agent-composer-draft-cache'
+import { useAgentComposerDraft } from './fork-agent-composer/use-agent-composer-draft'
+import { clearAgentComposerDraftCacheForTests } from './fork-agent-composer/agent-composer-draft-cache'
 
 function entry(overrides: Partial<AgentStatusEntry> & Pick<AgentStatusEntry, 'paneKey'>) {
   return {

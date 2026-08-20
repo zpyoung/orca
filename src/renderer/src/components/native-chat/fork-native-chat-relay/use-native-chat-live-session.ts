@@ -8,7 +8,7 @@ import {
   type NativeChatSession,
   type NativeChatSessionOptionObservation
 } from '../../../../../shared/native-chat-types'
-import { nativeChatCompanionFromFrame } from '../../../../../shared/native-chat-transcript-companion'
+import { nativeChatCompanionFromFrame } from '../../../../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 import {
   applyAppend,
   createNativeChatMerger,
@@ -24,7 +24,7 @@ import {
   resolveNativeChatHasMore
 } from './native-chat-pagination'
 import { getNativeChatSessionTransport } from './native-chat-session-transport'
-import { useNativeChatTranscriptCompanion } from '../use-native-chat-transcript-companion'
+import { useNativeChatTranscriptCompanion } from '../fork-native-chat-session-options/use-native-chat-transcript-companion'
 import { useNativeChatHookStatus } from '../use-native-chat-hook-status'
 
 export type UseNativeChatLiveSessionArgs = {

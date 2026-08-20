@@ -5,7 +5,7 @@ import type { AgentType, NativeChatMessage } from '../../../shared/native-chat-t
 import {
   retainNativeChatTranscriptCompanion,
   type NativeChatTranscriptCompanion
-} from '../../../shared/native-chat-transcript-companion'
+} from '../../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 import { resolveNativeChatTranscriptAgent } from '../../../shared/native-chat-agent-support'
 import { resolveSessionFilePath, type ResolveSessionFileOptions } from '../session-file-resolver'
 import {
@@ -18,7 +18,7 @@ import { transcriptFallbackId } from '../transcript-fallback-id'
 import {
   nativeChatTranscriptCompanionDecoderForAgent,
   type NativeChatTranscriptCompanionDecoder
-} from '../transcript-companion-decoder'
+} from '../fork-native-chat-session-options/transcript-companion-decoder'
 import { budgetNativeChatTailEntries } from './transcript-wire-budget'
 
 export const MAX_NATIVE_CHAT_TRANSCRIPT_RECORD_BYTES = 2 * 1024 * 1024

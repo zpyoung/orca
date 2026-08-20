@@ -12,7 +12,7 @@ import {
   nativeChatCompanionFrameFields,
   type NativeChatCompanionFrameFields,
   type NativeChatTranscriptCompanion
-} from '../../shared/native-chat-transcript-companion'
+} from '../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 import {
   clipNativeChatMessageToBytes,
   estimateNativeChatMessageBytes,

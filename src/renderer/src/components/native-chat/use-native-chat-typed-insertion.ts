@@ -1,5 +1,5 @@
 import { useCallback, type Dispatch, type RefObject, type SetStateAction } from 'react'
-import type { HistoryState } from '../agent-composer/agent-composer-history'
+import type { HistoryState } from './fork-agent-composer/agent-composer-history'
 
 /** Imperative text insertion and focus for the composer textarea, used by the
  *  paste pipeline and the composer's imperative handle. */
