@@ -40,3 +40,11 @@ Reviewed every sprint planning. Use `/quirk:artifacts:defer` to append.
 - **Estimated effort**: M
 - **Priority**: P3
 - **Proposed owner**: terminal-dock feature owner
+
+## DEFER-4: NativeChatComposer.tsx and native-chat-runtime-send.ts stay large seams instead of Tier-2 forked copies
+- **Deferred**: 2026-08-20
+- **Session context**: restructuring the branch onto the fork-ownership manifest introduced by origin/main
+- **Why deferred**: both files are rewritten rather than extended by the fork (+184/-345 and +174/-249 against v1.4.184), which AGENTS.md tiers as a forked copy behind an import-swap seam. Doing that pulls the closure they reach into the fork directory too — composer state, types, attachments, send lifecycle, interactive send, picker dispatch and state, typed insertion, pending, the two card components — roughly twenty modules whose upstream changes would then have to be replayed by hand at every sync. Both are declared registration seams with recorded residual budgets instead, which is how origin/main already treats comparable diffs (WorktreeList.tsx at +184/-26). Revisit if upstream's composer stops moving, or if the fork's composer diverges far enough that the replay cost is paid anyway.
+- **Estimated effort**: L
+- **Priority**: P3
+- **Proposed owner**: agent-composer feature owner
