@@ -1,35 +1,7 @@
-/* eslint-disable max-lines */
-import React, { useMemo, useCallback, useRef, useState, useEffect, useLayoutEffect } from 'react'
-import { toast } from 'sonner'
-import {
-  measureElement as measureVirtualElementSize,
-  useVirtualizer
-} from '@tanstack/react-virtual'
-import type { Range } from '@tanstack/react-virtual'
-import {
-  AlertTriangle,
-  ChevronDown,
-  CircleX,
-  Ellipsis,
-  Eye,
-  FolderInput,
-  FolderPlus,
-  FolderX,
-  Loader2,
-  Plus,
-  Server,
-  ServerOff,
-  Shapes,
-  SlidersHorizontal,
-  Trash2
-} from 'lucide-react'
+import React, { useCallback, useMemo } from 'react'
 import { useAppStore } from '@/store'
-import { createLineageToggleHandlerCache } from './worktree-lineage-toggle-handler-cache'
-import { reuseArrayIfEqual } from './worktree-agent-row-selectors'
 import { useShallow } from 'zustand/react/shallow'
-import type { AppState } from '@/store/types'
 import {
-  getAllWorktreesFromState,
   useAllWorktrees,
   useProjectHostSetupProjection,
   useRepoMap,
@@ -254,9 +226,7 @@ import {
 import { persistWorktreeSortOrderByHost } from '@/lib/worktree-sort-order-persistence'
 import {
   getRepoExecutionHostId,
-  getSettingsFocusedExecutionHostId,
-  getWorktreeExecutionHostId,
-  type ExecutionHostId
+  getSettingsFocusedExecutionHostId
 } from '../../../../shared/execution-host'
 import { getRepoHeaderCreateState } from './repo-header-create-state'
 import type { PendingSidebarRowReveal, PendingSidebarWorktreeReveal } from '@/store/slices/ui'
@@ -5373,11 +5343,6 @@ type WorktreeListProps = {
   onWorkspaceBoardDragPreviewCancel?: () => void
 }
 
-export function installWorktreeVisibleRefreshVisibilityListener(onChange: () => void): () => void {
-  document.addEventListener('visibilitychange', onChange)
-  return () => document.removeEventListener('visibilitychange', onChange)
-}
-
 const WorktreeList = React.memo(function WorktreeList({
   scrollOffsetRef,
   scrollAnchorRef,
@@ -5390,9 +5355,9 @@ const WorktreeList = React.memo(function WorktreeList({
   const allWorktrees = useAllWorktrees()
   const repoMap = useRepoMap()
   const worktreeMap = useWorktreeMap()
+  const repos = useAppStore((s) => s.repos)
   const worktreeLineageById = useAppStore((s) => s.worktreeLineageById)
   const workspaceLineageByChildKey = useAppStore((s) => s.workspaceLineageByChildKey)
-  const worktreesByRepo = useAppStore((s) => s.worktreesByRepo)
   const detectedWorktreesByRepo = useAppStore((s) => s.detectedWorktreesByRepo)
   const activeWorktreeId = useAppStore((s) => s.activeWorktreeId)
   const activeWorkspaceKey = useAppStore((s) => s.activeWorkspaceKey)
@@ -5401,365 +5366,29 @@ const WorktreeList = React.memo(function WorktreeList({
     [activeWorkspaceKey, activeWorktreeId]
   )
   const groupBy = useAppStore((s) => s.groupBy)
-  const setGroupBy = useAppStore((s) => s.setGroupBy)
-  const workspaceHostScope = useAppStore((s) => s.workspaceHostScope)
-  const visibleWorkspaceHostIds = useAppStore((s) => s.visibleWorkspaceHostIds)
-  const workspaceHostOrder = useAppStore((s) => s.workspaceHostOrder)
-  const setWorkspaceHostOrder = useAppStore((s) => s.setWorkspaceHostOrder)
   const workspaceStatuses = useAppStore((s) => s.workspaceStatuses)
   const sortBy = useAppStore((s) => s.sortBy)
-  const setSortBy = useAppStore((s) => s.setSortBy)
   const projectOrderBy = useAppStore((s) => s.projectOrderBy)
-  const showSleepingWorkspaces = useAppStore((s) => s.showSleepingWorkspaces)
-  const agentStatusEpoch = useAppStore((s) => (!showSleepingWorkspaces ? s.agentStatusEpoch : 0))
-  const hideDefaultBranchWorkspace = useAppStore((s) => s.hideDefaultBranchWorkspace)
-  const hideAutomationGeneratedWorkspaces = useAppStore((s) => s.hideAutomationGeneratedWorkspaces)
-  const hideCliCreatedWorkspaces = useAppStore((s) => s.hideCliCreatedWorkspaces)
-  const hideDetachedHeadWorkspaces = useAppStore((s) => s.hideDetachedHeadWorkspaces)
-  const hideWorkspacesFromOtherDevices = useAppStore((s) => s.hideWorkspacesFromOtherDevices)
-  const alwaysShowDefaultBranchWorkspace = useAppStore((s) => s.alwaysShowDefaultBranchWorkspace)
-  const filterRepoIds = useAppStore((s) => s.filterRepoIds)
   const openModal = useAppStore((s) => s.openModal)
   const openSettingsPage = useAppStore((s) => s.openSettingsPage)
   const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
-  const updateWorktreeMeta = useAppStore((s) => s.updateWorktreeMeta)
-  const updateWorktreesMeta = useAppStore((s) => s.updateWorktreesMeta)
-  const updateRepo = useAppStore((s) => s.updateRepo)
-  const fetchWorktrees = useAppStore((s) => s.fetchWorktrees)
   const activeView = useAppStore((s) => s.activeView)
   const activeModal = useAppStore((s) => s.activeModal)
   const pendingRevealWorktree = useAppStore((s) => s.pendingRevealWorktree)
   const pendingRevealSidebarRow = useAppStore((s) => s.pendingRevealSidebarRow)
-  const revealWorktreeInSidebar = useAppStore((s) => s.revealWorktreeInSidebar)
-  const revealSidebarRow = useAppStore((s) => s.revealSidebarRow)
-  const setWorktreesPinnedAndReveal = useAppStore((s) => s.setWorktreesPinnedAndReveal)
   const clearPendingRevealWorktreeId = useAppStore((s) => s.clearPendingRevealWorktreeId)
   const clearPendingRevealSidebarRow = useAppStore((s) => s.clearPendingRevealSidebarRow)
-  const agentSendPopoverTargetMode = useAppStore((s) => s.agentSendPopoverTargetMode)
-  // Why: eligibility only matters while the picker is open; when closed, don't subscribe to wake-time layout churn.
-  const agentTargetStatusByPaneKey = useAppStore((s) =>
-    agentSendPopoverTargetMode ? s.agentStatusByPaneKey : EMPTY_AGENT_STATUS_BY_PANE_KEY
-  )
-  const agentTargetStatusEpoch = useAppStore((s) =>
-    agentSendPopoverTargetMode ? s.agentStatusEpoch : 0
-  )
-  const agentTargetTabsByWorktree = useAppStore((s) =>
-    agentSendPopoverTargetMode ? s.tabsByWorktree : EMPTY_TABS_BY_WORKTREE
-  )
-  const agentTargetTerminalLayoutsByTabId = useAppStore((s) =>
-    agentSendPopoverTargetMode ? s.terminalLayoutsByTabId : EMPTY_TERMINAL_LAYOUTS_BY_TAB_ID
-  )
-  const agentTargetPtyIdsByTabId = useAppStore((s) =>
-    agentSendPopoverTargetMode ? s.ptyIdsByTabId : EMPTY_PTY_IDS_BY_TAB_ID
-  )
-  const agentTargetRuntimePaneTitlesByTabId = useAppStore((s) =>
-    agentSendPopoverTargetMode ? s.runtimePaneTitlesByTabId : EMPTY_RUNTIME_PANE_TITLES_BY_TAB_ID
-  )
-  const agentSendTargetWorktreeId = useMemo(() => {
-    void agentTargetStatusEpoch
-    if (!agentSendPopoverTargetMode) {
-      return null
-    }
-    const targets = deriveRunningAgentSendTargets(
-      {
-        agentStatusByPaneKey: agentTargetStatusByPaneKey,
-        tabsByWorktree: agentTargetTabsByWorktree,
-        terminalLayoutsByTabId: agentTargetTerminalLayoutsByTabId,
-        ptyIdsByTabId: agentTargetPtyIdsByTabId,
-        runtimePaneTitlesByTabId: agentTargetRuntimePaneTitlesByTabId
-      },
-      agentSendPopoverTargetMode.worktreeId
-    )
-    return targets.some((target) => target.status === 'eligible')
-      ? agentSendPopoverTargetMode.worktreeId
-      : null
-  }, [
-    // Why: eligibility can flip when the stale-boundary scheduler bumps this epoch without replacing the status map.
-    agentTargetStatusEpoch,
-    agentSendPopoverTargetMode,
-    agentTargetStatusByPaneKey,
-    agentTargetTabsByWorktree,
-    agentTargetTerminalLayoutsByTabId,
-    agentTargetPtyIdsByTabId,
-    agentTargetRuntimePaneTitlesByTabId
-  ])
-
-  // Read tabsByWorktree when needed for filtering or sorting
-  const needsActivityMaps = !showSleepingWorkspaces || sortBy === 'smart'
-  const tabsByWorktree = useAppStore((s) =>
-    needsActivityMaps ? getVisibleWorktreeTerminalActivityTabs(s.tabsByWorktree) : null
-  )
-  const ptyIdsByTabId = useAppStore((s) => (needsActivityMaps ? s.ptyIdsByTabId : null))
-  const browserTabsByWorktree = useAppStore((s) =>
-    !showSleepingWorkspaces ? getVisibleWorktreeBrowserActivityTabs(s.browserTabsByWorktree) : null
-  )
-
+  const collapsedGroups = useAppStore((s) => s.collapsedGroups)
+  const toggleGroup = useAppStore((s) => s.toggleCollapsedGroup)
+  const projectGroups = useAppStore((s) => s.projectGroups ?? EMPTY_PROJECT_GROUPS)
+  const folderWorkspaces = useAppStore((s) => s.folderWorkspaces)
+  const settings = useAppStore((s) => s.settings)
   const cardProps = useAppStore((s) => s.worktreeCardProperties)
-
   const { prCache, hostedReviewCache } = useAppStore(
     useShallow((s) => selectWorktreeListReviewCacheInputs(s, groupBy, cardProps))
   )
-  const settings = useAppStore((s) => s.settings)
   const pinnedDisplayPolicy = getPinnedWorktreeDisplayPolicy(settings)
-  const sshTargetLabels = useAppStore((s) => s.sshTargetLabels)
-  const sshConnectionStates = useAppStore((s) => s.sshConnectionStates)
-  const runtimeEnvironments = useAppStore((s) => s.runtimeEnvironments)
-  const runtimeStatusByEnvironmentId = useAppStore((s) => s.runtimeStatusByEnvironmentId)
-  const pairedDeviceIdsByEnvironment = useMemo(
-    () =>
-      hideWorkspacesFromOtherDevices
-        ? getPairedDeviceIdsByEnvironment(runtimeEnvironments, runtimeStatusByEnvironmentId)
-        : EMPTY_PAIRED_DEVICE_IDS_BY_ENVIRONMENT,
-    [hideWorkspacesFromOtherDevices, runtimeEnvironments, runtimeStatusByEnvironmentId]
-  )
-
-  const sortEpoch = useAppStore((s) => s.sortEpoch)
-
-  // Non-archived count — detects structural changes (add/remove) so the debounce below can apply immediately.
-  const worktreeCount = useMemo(() => {
-    let count = 0
-    for (const worktree of allWorktrees) {
-      if (!worktree.isArchived) {
-        count++
-      }
-    }
-    return count
-  }, [allWorktrees])
-
-  // Why debounce: scores are time-decaying, so recomputing on every sortEpoch bump makes worktrees jump; settle to coalesce.
-  // Structural changes (add/remove) bypass the debounce so a new worktree appears at its sorted position immediately.
-  const [debouncedSortEpoch, setDebouncedSortEpoch] = useState(sortEpoch)
-  const prevWorktreeCountRef = useRef(worktreeCount)
-  useEffect(() => {
-    if (debouncedSortEpoch === sortEpoch) {
-      return
-    }
-
-    const structuralChange = worktreeCount !== prevWorktreeCountRef.current
-    prevWorktreeCountRef.current = worktreeCount
-
-    // Why: manual drag/drop is direct manipulation; the settle-window delay would make a successful drop look broken.
-    if (structuralChange || sortBy === 'manual') {
-      setDebouncedSortEpoch(sortEpoch)
-      return
-    }
-
-    const timer = setTimeout(() => setDebouncedSortEpoch(sortEpoch), SORT_SETTLE_MS)
-    return () => clearTimeout(timer)
-  }, [sortEpoch, debouncedSortEpoch, worktreeCount, sortBy])
-
-  // Why a latching ref: a live signal makes Smart authoritative for the session, even after that activity ends.
-  const sessionHasHadLiveSmartSignal = useRef(false)
-
-  // ── Stable sort order ──────────────────────────────────────────
-  // Why sortEpoch (not selection): selection side-effects (clearing isUnread, PR-cache refresh) must not reorder the sidebar under the user.
-  // Why useMemo not useEffect: order must be computed synchronously before the worktrees memo reads it.
-  // Why a ref alongside the memo: telemetry effects need the last attention map without re-reading store state.
-  const lastAttentionByWorktreeRef = useRef<Map<string, WorktreeAttention> | null>(null)
-
-  const recomputedSortedIds = useMemo(() => {
-    const state = useAppStore.getState()
-    const nonArchivedWorktrees = getAllWorktreesFromState(state).filter(
-      (worktree) => !worktree.isArchived
-    )
-    const now = Date.now()
-
-    // Why cold-start detection: agent-status hydrates async, so the warm comparator would collapse all to Class 4; keep the persisted order until a live signal appears.
-    if (sortBy === 'smart' && !sessionHasHadLiveSmartSignal.current) {
-      // Why tabHasLivePty over tab.ptyId: slept terminals keep tab.ptyId as a wake hint, so it'd falsely keep cold-start ordering off.
-      const hasAnyLivePty = Object.values(state.tabsByWorktree)
-        .flat()
-        .some((tab) => tabHasLivePty(state.ptyIdsByTabId, tab.id))
-      if (
-        hasAnyLivePty ||
-        hasFreshAttributedAgentStatus(state.agentStatusByPaneKey, now, state.tabsByWorktree)
-      ) {
-        sessionHasHadLiveSmartSignal.current = true
-      } else {
-        nonArchivedWorktrees.sort(
-          (a, b) => b.sortOrder - a.sortOrder || compareWorktreeSortLabel(a, b)
-        )
-        lastAttentionByWorktreeRef.current = null
-        return nonArchivedWorktrees.map((w) => w.id)
-      }
-    }
-
-    const currentTabs = state.tabsByWorktree
-    // Why precompute: hot sort — build the attention map once so the O(N log N) comparator does O(1) lookups.
-    const attentionByWorktree =
-      sortBy === 'smart'
-        ? buildAttentionByWorktree(
-            nonArchivedWorktrees,
-            currentTabs,
-            state.agentStatusByPaneKey,
-            state.runtimePaneTitlesByTabId,
-            state.ptyIdsByTabId,
-            now,
-            state.migrationUnsupportedByPtyId,
-            state.terminalLayoutsByTabId
-          )
-        : new Map<string, WorktreeAttention>()
-    lastAttentionByWorktreeRef.current = sortBy === 'smart' ? attentionByWorktree : null
-    nonArchivedWorktrees.sort(buildWorktreeComparator(sortBy, repoMap, now, attentionByWorktree))
-    return nonArchivedWorktrees.map((w) => w.id)
-    // debouncedSortEpoch is an intentional trigger not read in the memo; its change (debounced) signals a recompute.
-    // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSortEpoch, repoMap, sortBy])
-  // Why: stable ID order prevents rank-only refreshes from echoing an unchanged snapshot.
-  const sortedIds = useReusedArrayIdentity(recomputedSortedIds)
-
-  // Why a ref of prior class: fire class_1_promotion only on transitions into Class 1, not every recompute that stays there.
-  const prevClassByWorktreeIdRef = useRef<Map<string, SmartClass>>(new Map())
-  // Why gate the first observation: an empty prev-class map makes every existing Class-1 worktree look freshly promoted; treat the first pass as a silent baseline.
-  const hasObservedSmartOnceRef = useRef<boolean>(false)
-
-  useEffect(() => {
-    const attention = lastAttentionByWorktreeRef.current
-    if (sortBy !== 'smart' || !attention) {
-      // Why reset: leaving Smart drops the prior-class map (and first-observation gate) so re-entry doesn't fire stale promotions.
-      prevClassByWorktreeIdRef.current = new Map()
-      hasObservedSmartOnceRef.current = false
-      return
-    }
-    const next = new Map<string, SmartClass>()
-    const isFirstObservation = !hasObservedSmartOnceRef.current
-    for (const [worktreeId, info] of attention) {
-      const prev = prevClassByWorktreeIdRef.current.get(worktreeId)
-      if (!isFirstObservation && info.cls === 1 && prev !== 1 && info.cause) {
-        track('smart_sort_class_1_promotion', { cause: info.cause })
-      }
-      next.set(worktreeId, info.cls)
-    }
-    prevClassByWorktreeIdRef.current = next
-    hasObservedSmartOnceRef.current = true
-  }, [sortBy, recomputedSortedIds])
-
-  // Why retry on recomputation: Smart may activate before attention hydrates; fire once, then stay quiet until the user leaves Smart.
-  const hasTrackedSmartDistributionRef = useRef(false)
-  useEffect(() => {
-    if (sortBy !== 'smart') {
-      hasTrackedSmartDistributionRef.current = false
-      return
-    }
-    if (hasTrackedSmartDistributionRef.current) {
-      return
-    }
-    const attention = lastAttentionByWorktreeRef.current
-    if (!attention || attention.size === 0) {
-      return
-    }
-    let class1 = 0
-    let class2 = 0
-    let class3 = 0
-    let class4 = 0
-    for (const info of attention.values()) {
-      if (info.cls === 1) {
-        class1++
-      } else if (info.cls === 2) {
-        class2++
-      } else if (info.cls === 3) {
-        class3++
-      } else {
-        class4++
-      }
-    }
-    track('smart_sort_class_distribution', {
-      class_1: class1,
-      class_2: class2,
-      class_3: class3,
-      class_4: class4,
-      total_worktrees: attention.size
-    })
-    hasTrackedSmartDistributionRef.current = true
-  }, [sortBy, recomputedSortedIds])
-
-  // Why fire on the transition: switching away from Smart is the signal; compare via ref so a round-trip doesn't double-fire.
-  const prevSortByRef = useRef(sortBy)
-  useEffect(() => {
-    const prev = prevSortByRef.current
-    prevSortByRef.current = sortBy
-    if (prev === 'smart' && sortBy === 'recent') {
-      track('smart_to_recent_switch', {})
-    }
-  }, [sortBy])
-
-  // Why: only persist during live sessions so cold start reads the persisted order instead of overwriting it.
-  useEffect(() => {
-    if (sortBy !== 'smart' || sortedIds.length === 0 || !sessionHasHadLiveSmartSignal.current) {
-      return
-    }
-    // Why: sortOrder lives in each host's worktreeMeta, so persist each host's ids on that host.
-    const state = useAppStore.getState()
-    persistWorktreeSortOrderByHost(state, sortedIds)
-  }, [sortedIds, sortBy])
-
-  // Flatten/filter/sort via the shared utility so card order matches Cmd+1–9 numbering.
-  const recomputedVisibleWorktrees = useMemo(() => {
-    void agentStatusEpoch
-    const ids = computeVisibleWorktreeIds(worktreesByRepo, sortedIds, {
-      filterRepoIds,
-      showSleepingWorkspaces,
-      tabsByWorktree,
-      ptyIdsByTabId,
-      browserTabsByWorktree,
-      // Why snapshot on agentStatusEpoch: update membership immediately without repainting on every hook ping.
-      worktreeIdsWithLiveAgent: showSleepingWorkspaces
-        ? EMPTY_WORKTREE_ID_SET
-        : getWorktreeIdsWithLiveAgent(
-            useAppStore.getState().agentStatusByPaneKey,
-            tabsByWorktree,
-            Date.now()
-          ),
-      hideDefaultBranchWorkspace,
-      hideAutomationGeneratedWorkspaces,
-      hideCliCreatedWorkspaces,
-      hideDetachedHeadWorkspaces,
-      hideWorkspacesFromOtherDevices,
-      pairedDeviceIdsByEnvironment,
-      alwaysShowDefaultBranchWorkspace,
-      repoMap,
-      workspaceHostScope,
-      visibleWorkspaceHostIds,
-      defaultHostId: getSettingsFocusedExecutionHostId(settings),
-      worktreeLineageById,
-      forcedVisibleWorktreeIds: agentSendTargetWorktreeId ? [agentSendTargetWorktreeId] : undefined
-    })
-    return ids.map((id) => worktreeMap.get(id)).filter((w): w is Worktree => w != null)
-  }, [
-    agentSendTargetWorktreeId,
-    agentStatusEpoch,
-    filterRepoIds,
-    showSleepingWorkspaces,
-    hideDefaultBranchWorkspace,
-    hideAutomationGeneratedWorkspaces,
-    hideCliCreatedWorkspaces,
-    hideDetachedHeadWorkspaces,
-    hideWorkspacesFromOtherDevices,
-    alwaysShowDefaultBranchWorkspace,
-    workspaceHostScope,
-    visibleWorkspaceHostIds,
-    settings,
-    repoMap,
-    tabsByWorktree,
-    ptyIdsByTabId,
-    browserTabsByWorktree,
-    sortedIds,
-    worktreeMap,
-    worktreeLineageById,
-    worktreesByRepo,
-    pairedDeviceIdsByEnvironment
-  ])
-  // Why: agentStatusEpoch bumps recompute this memo even when membership and
-  // order are unchanged; keeping the previous identity stops the whole
-  // rows/sectionRows/renderedWorktrees chain from churning per epoch.
-  const visibleWorktrees = useReusedArrayIdentity(recomputedVisibleWorktrees)
-
-  const worktrees = visibleWorktrees
-  const collapsedGroups = useAppStore((s) => s.collapsedGroups)
-  const toggleGroup = useAppStore((s) => s.toggleCollapsedGroup)
-
-  // Why: manual header order is bound to state.repos; Recent/Smart derive order from the sorted worktree stream.
-  const repos = useAppStore((s) => s.repos)
+  const defaultHostId = getSettingsFocusedExecutionHostId(settings)
   const projectHostSetupProjection = useProjectHostSetupProjection()
   const projectGrouping = useMemo(
     () => ({
@@ -5822,6 +5451,49 @@ const WorktreeList = React.memo(function WorktreeList({
     prCache,
     projectGrouping,
     repoMap,
+    worktreeMap,
+    worktreeLineageById,
+    settings,
+    agentSendTargetWorktreeId
+  })
+  const effectiveCollapsedGroups = useEffectiveCollapsedGroups({
+    collapsedGroups,
+    agentSendTargetWorktreeId,
+    groupBy,
+    repoMap,
+    worktreeMap,
+    worktreeLineageById,
+    prCache,
+    workspaceStatuses,
+    settings,
+    projectGroups,
+    projectGrouping
+  })
+  const visibleScope = useSidebarHostVisibleScope({
+    filterState,
+    defaultHostId,
+    repos,
+    projectGroups,
+    folderWorkspaces,
+    pairedDeviceIdsByEnvironment
+  })
+  const externalWorktreeCards = useSidebarExternalWorktreeCards({
+    repos,
+    visibleReposForRows: visibleScope.visibleReposForRows,
+    detectedWorktreesByRepo,
+    filterRepoIds: filterState.filterRepoIds
+  })
+  const rowModel = useSidebarSectionRows({
+    groupBy,
+    projectOrderBy,
+    pinnedDisplayPolicy,
+    defaultHostId,
+    worktrees: visibleWorktrees,
+    repos,
+    repoMap,
+    worktreeMap,
+    worktreeLineageById,
+    prCache,
     settings,
     visibleProjectGroupsForRows,
     workspaceStatuses,
@@ -6184,24 +5856,12 @@ const WorktreeList = React.memo(function WorktreeList({
     markSidebarWorktreeActiveImmediately(worktreeId, rowKey)
   }, [])
 
-  // Why: full-page nav views aren't scoped to a worktree, so no sidebar card should look selected.
-  const selectedSidebarWorktreeId =
-    activeView === 'tasks' || activeView === 'activity' ? null : currentSidebarWorktreeId
-
-  // Why layout effect: the Cmd/Ctrl+1–9 handler can fire right after commit; publishing after paint would leave the shortcut cache stale.
-  useLayoutEffect(() => {
-    setVisibleWorktreeIds(renderedWorktreeIds)
-    // Why null, not []: [] is a real rendered order (all collapsed/filtered); null tells shortcuts the list is unmounted.
-    return () => setVisibleWorktreeIds(null)
-  }, [renderedWorktreeIds])
-
   const handleCreateForRepo = useCallback(
     (projectId: string) => {
       openModal('new-workspace-composer', { initialRepoId: projectId, telemetrySource: 'sidebar' })
     },
     [openModal]
   )
-
   const handleOpenRepoSettings = useCallback(
     (projectId: string, sectionId?: string) => {
       openSettingsTarget({ pane: 'repo', repoId: projectId, ...(sectionId ? { sectionId } : {}) })
@@ -6209,329 +5869,22 @@ const WorktreeList = React.memo(function WorktreeList({
     },
     [openSettingsPage, openSettingsTarget]
   )
-
   const handleOpenWorktreeVisibility = useCallback(
     (repo: Repo) => {
-      openModal('worktree-visibility', {
+      openModal('worktree-visibility', { repoId: repo.id, hostId: getRepoExecutionHostId(repo) })
+    },
+    [openModal]
+  )
+  const handleRemoveProject = useCallback(
+    (repo: Repo) => {
+      openModal('confirm-remove-folder', {
         repoId: repo.id,
+        displayName: repo.displayName,
         hostId: getRepoExecutionHostId(repo)
       })
     },
     [openModal]
   )
-
-  const setImportedWorktreeCardState = useCallback(
-    (projectId: string, state: ImportedWorktreeCardActionState | null) => {
-      setImportedWorktreeCardActionState((previous) => {
-        const next = new Map(previous)
-        if (state) {
-          next.set(projectId, state)
-        } else {
-          next.delete(projectId)
-        }
-        return next
-      })
-    },
-    []
-  )
-
-  const handleShowImportedWorktrees = useCallback(
-    async (projectId: string) => {
-      await showImportedWorktreesCard({
-        projectId,
-        forceVisible: importedWorktreeCardActionState.get(projectId)?.forceVisible === true,
-        updateRepo,
-        fetchWorktrees,
-        setCardState: setImportedWorktreeCardState
-      })
-    },
-    [fetchWorktrees, importedWorktreeCardActionState, setImportedWorktreeCardState, updateRepo]
-  )
-
-  const handleKeepImportedWorktreesHidden = useCallback(
-    async (projectId: string) => {
-      const repo = repos.find((candidate) => candidate.id === projectId)
-      let detected = detectedWorktreesByRepo[projectId]
-      // Why: baseline seeding needs authoritative hidden paths, so don't dismiss on a stale snapshot.
-      if (detected?.authoritative !== true) {
-        const refreshed = await fetchWorktrees(projectId, { requireAuthoritative: true })
-        if (!refreshed) {
-          setImportedWorktreeCardState(projectId, {
-            pending: false,
-            error: IMPORTED_WORKTREES_KEEP_HIDDEN_ERROR
-          })
-          return
-        }
-        detected = useAppStore.getState().detectedWorktreesByRepo[projectId]
-      }
-      if (detected?.authoritative !== true) {
-        setImportedWorktreeCardState(projectId, {
-          pending: false,
-          error: IMPORTED_WORKTREES_KEEP_HIDDEN_ERROR
-        })
-        return
-      }
-      const hiddenWorktrees = getHiddenImportedWorktrees(detected)
-      await keepImportedWorktreesHiddenCard({
-        projectId,
-        updateRepo,
-        setCardState: setImportedWorktreeCardState,
-        hiddenWorktreePaths: hiddenWorktrees.map((worktree) => worktree.path),
-        existingBaselinePaths: repo?.externalWorktreeInboxBaselinePaths
-      })
-    },
-    [detectedWorktreesByRepo, fetchWorktrees, repos, setImportedWorktreeCardState, updateRepo]
-  )
-
-  const setNewExternalWorktreeInboxState = useCallback(
-    (projectId: string, state: NewExternalWorktreesInboxActionState | null) => {
-      setNewExternalWorktreeInboxActionState((previous) => {
-        const next = new Map(previous)
-        if (state) {
-          next.set(projectId, state)
-        } else {
-          next.delete(projectId)
-        }
-        return next
-      })
-    },
-    []
-  )
-
-  const getNewExternalWorktreeInboxActionArgs = useCallback(
-    (projectId: string, worktreePaths: readonly string[]) => {
-      const repo = repos.find((candidate) => candidate.id === projectId)
-      if (!repo) {
-        return null
-      }
-      return {
-        projectId,
-        repo,
-        worktreePaths,
-        updateRepo,
-        fetchWorktrees,
-        setInboxState: setNewExternalWorktreeInboxState
-      }
-    },
-    [fetchWorktrees, repos, setNewExternalWorktreeInboxState, updateRepo]
-  )
-
-  const handleImportNewExternalWorktree = useCallback(
-    async (projectId: string, worktreeId: string) => {
-      const inboxWorktrees = newExternalWorktreesInboxByRepo.get(projectId)?.inboxWorktrees ?? []
-      const worktree = inboxWorktrees.find((candidate) => candidate.id === worktreeId)
-      if (!worktree) {
-        return
-      }
-      const args = getNewExternalWorktreeInboxActionArgs(projectId, [worktree.path])
-      if (!args) {
-        return
-      }
-      await importNewExternalWorktreeInboxPaths(args)
-    },
-    [getNewExternalWorktreeInboxActionArgs, newExternalWorktreesInboxByRepo]
-  )
-
-  const handleImportAllNewExternalWorktrees = useCallback(
-    async (projectId: string) => {
-      const inboxWorktrees = newExternalWorktreesInboxByRepo.get(projectId)?.inboxWorktrees ?? []
-      const args = getNewExternalWorktreeInboxActionArgs(
-        projectId,
-        inboxWorktrees.map((worktree) => worktree.path)
-      )
-      if (!args) {
-        return
-      }
-      await importNewExternalWorktreeInboxPaths(args)
-    },
-    [getNewExternalWorktreeInboxActionArgs, newExternalWorktreesInboxByRepo]
-  )
-
-  const handleKeepNewExternalWorktreeInboxHidden = useCallback(
-    async (projectId: string) => {
-      const inboxWorktrees = newExternalWorktreesInboxByRepo.get(projectId)?.inboxWorktrees ?? []
-      const args = getNewExternalWorktreeInboxActionArgs(
-        projectId,
-        inboxWorktrees.map((worktree) => worktree.path)
-      )
-      if (!args) {
-        return
-      }
-      await keepNewExternalWorktreeInboxHidden(args)
-    },
-    [getNewExternalWorktreeInboxActionArgs, newExternalWorktreesInboxByRepo]
-  )
-
-  const handleOpenSuppressExternalWorktreeInbox = useCallback((projectId: string) => {
-    setSuppressExternalWorktreeInboxRepoId(projectId)
-  }, [])
-
-  const handleConfirmSuppressExternalWorktreeInbox = useCallback(async () => {
-    if (!suppressExternalWorktreeInboxRepoId) {
-      return
-    }
-    const projectId = suppressExternalWorktreeInboxRepoId
-    const inboxWorktrees = newExternalWorktreesInboxByRepo.get(projectId)?.inboxWorktrees ?? []
-    const args = getNewExternalWorktreeInboxActionArgs(
-      projectId,
-      inboxWorktrees.map((worktree) => worktree.path)
-    )
-    if (!args) {
-      setSuppressExternalWorktreeInboxRepoId(null)
-      return
-    }
-    const suppressed = await suppressNewExternalWorktreeInbox(args)
-    if (suppressed) {
-      setSuppressExternalWorktreeInboxRepoId(null)
-    }
-  }, [
-    getNewExternalWorktreeInboxActionArgs,
-    newExternalWorktreesInboxByRepo,
-    suppressExternalWorktreeInboxRepoId
-  ])
-
-  const handleRemoveProject = useCallback(
-    (repo: Repo) => {
-      openModal('confirm-remove-folder', {
-        repoId: repo.id,
-        displayName: repo.displayName
-      })
-    },
-    [openModal]
-  )
-
-  const moveProjectToGroup = useAppStore((s) => s.moveProjectToGroup)
-  const createProjectGroup = useAppStore((s) => s.createProjectGroup)
-  const updateProjectGroup = useAppStore((s) => s.updateProjectGroup)
-  const deleteProjectGroupWithContainedProjects = useAppStore(
-    (s) => s.deleteProjectGroupWithContainedProjects
-  )
-  const [projectGroupNameDialog, setProjectGroupNameDialog] =
-    useState<ProjectGroupNameDialogState | null>(null)
-  const [projectGroupDeleteDialog, setProjectGroupDeleteDialog] =
-    useState<ProjectGroupDeleteDialogState | null>(null)
-
-  const handleCreateGroupFromRepo = useCallback((repo: Repo) => {
-    setProjectGroupNameDialog({ type: 'create-from-repo', repo })
-  }, [])
-
-  const handleMoveProjectToGroup = useCallback(
-    (repo: Repo, groupId: string) => {
-      if (repo.projectGroupId === groupId) {
-        return
-      }
-      void moveProjectToGroup(repo.id, groupId)
-    },
-    [moveProjectToGroup]
-  )
-
-  const handleRemoveProjectFromGroup = useCallback(
-    (repo: Repo) => {
-      void moveProjectToGroup(repo.id, null)
-    },
-    [moveProjectToGroup]
-  )
-
-  const handleRenameProjectGroup = useCallback((groupId: string, currentName: string) => {
-    setProjectGroupNameDialog({ type: 'rename', groupId, currentName })
-  }, [])
-
-  const handleSubmitProjectGroupName = useCallback(
-    async (name: string) => {
-      if (!projectGroupNameDialog) {
-        return
-      }
-      if (projectGroupNameDialog.type === 'create-from-repo') {
-        const group = await createProjectGroup(name)
-        if (group) {
-          await moveProjectToGroup(projectGroupNameDialog.repo.id, group.id)
-        }
-        return
-      }
-      await updateProjectGroup(projectGroupNameDialog.groupId, { name })
-    },
-    [createProjectGroup, moveProjectToGroup, projectGroupNameDialog, updateProjectGroup]
-  )
-
-  const projectGroupDeleteTargets = useMemo(() => {
-    if (!projectGroupDeleteDialog) {
-      return null
-    }
-    return selectProjectGroupRemovalTargets(projectGroups, repos, projectGroupDeleteDialog.groupId)
-  }, [projectGroupDeleteDialog, projectGroups, repos])
-  const projectGroupDeleteProjectCount = projectGroupDeleteTargets?.projectIds.length ?? 0
-  const projectGroupDeleteProjectNames = useMemo(
-    () =>
-      (projectGroupDeleteTargets?.projectIds ?? []).map(
-        (projectId) => repoMap.get(projectId)?.displayName ?? projectId
-      ),
-    [projectGroupDeleteTargets, repoMap]
-  )
-  const projectGroupRemoveContainedProjects =
-    projectGroupDeleteProjectCount > 0 && projectGroupDeleteDialog?.removeContainedProjects === true
-
-  const handleDeleteProjectGroup = useCallback((groupId: string, groupName: string) => {
-    setProjectGroupDeleteDialog({ groupId, groupName, removeContainedProjects: false })
-  }, [])
-
-  const handleConfirmDeleteProjectGroup = useCallback(async () => {
-    if (!projectGroupDeleteDialog) {
-      return
-    }
-    try {
-      const result = await deleteProjectGroupWithContainedProjects(
-        projectGroupDeleteDialog.groupId,
-        {
-          removeContainedProjects: projectGroupRemoveContainedProjects
-        }
-      )
-      // Why: a missing group is already the desired end state, so only a real delete failure warrants a toast.
-      if (result.status === 'group-delete-failed') {
-        toast.error(
-          translate(
-            'auto.components.sidebar.WorktreeList.groupDeleteFailed',
-            'Failed to delete group'
-          ),
-          {
-            description: translate(
-              'auto.components.sidebar.WorktreeList.groupDeleteFailedDesc',
-              'Something went wrong while deleting the group. No projects were removed.'
-            )
-          }
-        )
-        return
-      }
-      if (result.status === 'deleted-group' && result.failedProjectRemovals.length > 0) {
-        const failedCount = result.failedProjectRemovals.length
-        const requestedCount = result.requestedProjectIds.length
-        toast.error(
-          translate(
-            'auto.components.sidebar.WorktreeList.b667b59632',
-            'Some projects could not be removed from Orca'
-          ),
-          {
-            description: translate(
-              'auto.components.sidebar.WorktreeList.f94466bc39',
-              '{{value0}} of {{value1}} contained project{{value2}} remained after deleting the group.',
-              {
-                value0: failedCount,
-                value1: requestedCount,
-                value2: requestedCount === 1 ? '' : 's'
-              }
-            )
-          }
-        )
-      }
-    } finally {
-      // Why: deleting contained projects can unmount this dialog before its close handler runs, so the parent owns cleanup.
-      setProjectGroupDeleteDialog(null)
-    }
-  }, [
-    deleteProjectGroupWithContainedProjects,
-    projectGroupRemoveContainedProjects,
-    projectGroupDeleteDialog
-  ])
-
   const handleCreateFolderWorkspace = useCallback(
     (projectGroup: ProjectGroup) => {
       if (!projectGroup.parentPath) {
@@ -6545,472 +5898,55 @@ const WorktreeList = React.memo(function WorktreeList({
     [openModal]
   )
 
-  const moveWorktreeToStatus = useCallback(
-    (worktreeId: string, status: WorkspaceStatus) => {
-      const current = worktreeMap.get(worktreeId)
-      if (!current || getWorkspaceStatus(current, workspaceStatuses) === status) {
-        return
-      }
-      void updateWorktreeMeta(worktreeId, { workspaceStatus: status })
-    },
-    [updateWorktreeMeta, worktreeMap, workspaceStatuses]
-  )
-
-  const moveWorktreesToStatus = useCallback(
-    (worktreeIds: readonly string[], status: WorkspaceStatus) => {
-      const updates = new Map<string, { workspaceStatus: WorkspaceStatus }>()
-      for (const worktreeId of worktreeIds) {
-        const current = worktreeMap.get(worktreeId)
-        if (!current || getWorkspaceStatus(current, workspaceStatuses) === status) {
-          continue
-        }
-        updates.set(worktreeId, { workspaceStatus: status })
-      }
-      if (updates.size > 0) {
-        void updateWorktreesMeta(updates)
-      }
-    },
-    [updateWorktreesMeta, worktreeMap, workspaceStatuses]
-  )
-
-  const moveWorktreesToStatusAtIndex = useCallback(
-    (args: {
-      worktreeIds: readonly string[]
-      status: WorkspaceStatus
-      dropIndex: number
-      groups: readonly WorktreeDragGroup[]
-    }) => {
-      const targetGroupKey = getWorkspaceStatusGroupKey(args.status)
-      const rankByWorktreeId = new Map<string, number>()
-      for (const group of args.groups) {
-        for (const worktreeId of group.worktreeIds) {
-          const worktree = worktreeMap.get(worktreeId)
-          if (worktree) {
-            rankByWorktreeId.set(worktreeId, worktree.manualOrder ?? worktree.sortOrder)
-          }
-        }
-      }
-      const order = buildManualOrderUpdatesForGroupDrop({
-        groups: args.groups,
-        targetGroupKey,
-        draggedIds: args.worktreeIds,
-        dropIndex: args.dropIndex,
-        now: Date.now(),
-        rankByWorktreeId
-      })
-      const updates = new Map<string, Partial<WorktreeMeta>>()
-      for (const worktreeId of args.worktreeIds) {
-        const current = worktreeMap.get(worktreeId)
-        if (!current) {
-          continue
-        }
-        const next: Partial<WorktreeMeta> = {}
-        if (getWorkspaceStatus(current, workspaceStatuses) !== args.status) {
-          next.workspaceStatus = args.status
-        }
-        updates.set(worktreeId, next)
-      }
-      for (const [worktreeId, manualOrder] of order.updates) {
-        updates.set(worktreeId, { ...updates.get(worktreeId), ...manualOrder })
-      }
-      for (const [worktreeId, update] of Array.from(updates)) {
-        if (Object.keys(update).length === 0) {
-          updates.delete(worktreeId)
-        }
-      }
-      if (updates.size === 0) {
-        return
-      }
-      // Why: the insertion line promises exact placement, so persist manual order on a cross-status drop.
-      if (order.changed) {
-        setSortBy('manual')
-      }
-      void updateWorktreesMeta(updates)
-    },
-    [setSortBy, updateWorktreesMeta, worktreeMap, workspaceStatuses]
-  )
-
-  const pinWorktree = useCallback(
-    (worktreeId: string) => {
-      setWorktreesPinnedAndReveal([worktreeId], true)
-    },
-    [setWorktreesPinnedAndReveal]
-  )
-
-  const pinWorktrees = useCallback(
-    (worktreeIds: readonly string[]) => {
-      setWorktreesPinnedAndReveal(worktreeIds, true)
-    },
-    [setWorktreesPinnedAndReveal]
-  )
-
-  const reorderWorktrees = useCallback(
-    (args: {
-      groups: readonly WorktreeDragGroup[]
-      sourceGroupKey: string
-      draggedIds: readonly string[]
-      dropIndex: number
-    }) => {
-      const rankByWorktreeId = new Map<string, number>()
-      for (const group of args.groups) {
-        for (const worktreeId of group.worktreeIds) {
-          const worktree = worktreeMap.get(worktreeId)
-          if (worktree) {
-            rankByWorktreeId.set(worktreeId, worktree.manualOrder ?? worktree.sortOrder)
-          }
-        }
-      }
-      const result = buildManualOrderUpdatesForVisibleGroups({
-        ...args,
-        now: Date.now(),
-        rankByWorktreeId
-      })
-      if (!result.changed) {
-        return
-      }
-      // Why: only switch to Manual after a real move so accidental click-drags don't change the sort.
-      setSortBy('manual')
-      void updateWorktreesMeta(result.updates)
-    },
-    [setSortBy, updateWorktreesMeta, worktreeMap]
-  )
-
-  const shouldShowWorkspaceBoardDropIndicator = useCallback(
-    (worktreeIds: readonly string[], status: WorkspaceStatus) => {
-      const sourceGroupKeys = worktreeIds.flatMap((worktreeId) => {
-        const worktree = worktreeMap.get(worktreeId)
-        return worktree ? [getWorkspaceStatus(worktree, workspaceStatuses)] : []
-      })
-      return shouldWriteManualOrderForGroupDrop({
-        sortBy,
-        sourceGroupKeys,
-        targetGroupKey: status
-      })
-    },
-    [sortBy, worktreeMap, workspaceStatuses]
-  )
-
-  const dropWorktreesOnWorkspaceBoard = useCallback(
-    (args: {
-      worktreeIds: readonly string[]
-      status: WorkspaceStatus
-      dropIndex: number
-      groups: readonly WorktreeDragGroup[]
-    }) => {
-      const result = buildWorkspaceKanbanSidebarDropUpdates({
-        ...args,
-        worktreeById: worktreeMap,
-        workspaceStatuses,
-        sortBy,
-        now: Date.now()
-      })
-      if (result.updates.size === 0) {
-        return
-      }
-      // Why: switch to Manual when the drop changes order so the placement stays visible.
-      if (result.shouldSwitchToManual) {
-        setSortBy('manual')
-      }
-      useAppStore.getState().recordFeatureInteraction('workspace-board-actions')
-      void updateWorktreesMeta(result.updates)
-    },
-    [setSortBy, sortBy, updateWorktreesMeta, worktreeMap, workspaceStatuses]
-  )
-
-  // Why: count hideDefaultBranchWorkspace as a filter so the Clear Filters escape hatch stays reachable when it alone empties the list.
-  const filterState = useMemo(
-    () => ({
-      showSleepingWorkspaces,
-      filterRepoIds,
-      hideDefaultBranchWorkspace,
-      hideAutomationGeneratedWorkspaces,
-      hideCliCreatedWorkspaces,
-      hideDetachedHeadWorkspaces,
-      hideWorkspacesFromOtherDevices,
-      alwaysShowDefaultBranchWorkspace,
-      visibleWorkspaceHostIds,
-      workspaceHostScope
-    }),
-    [
-      showSleepingWorkspaces,
-      filterRepoIds,
-      hideDefaultBranchWorkspace,
-      hideAutomationGeneratedWorkspaces,
-      hideCliCreatedWorkspaces,
-      hideDetachedHeadWorkspaces,
-      hideWorkspacesFromOtherDevices,
-      alwaysShowDefaultBranchWorkspace,
-      visibleWorkspaceHostIds,
-      workspaceHostScope
-    ]
-  )
-  const hasFilters = sidebarHasActiveFilters(filterState)
-  const setShowSleepingWorkspaces = useAppStore((s) => s.setShowSleepingWorkspaces)
-  const setHideDefaultBranchWorkspace = useAppStore((s) => s.setHideDefaultBranchWorkspace)
-  const setHideAutomationGeneratedWorkspaces = useAppStore(
-    (s) => s.setHideAutomationGeneratedWorkspaces
-  )
-  const setHideCliCreatedWorkspaces = useAppStore((s) => s.setHideCliCreatedWorkspaces)
-  const setHideDetachedHeadWorkspaces = useAppStore((s) => s.setHideDetachedHeadWorkspaces)
-  const setHideWorkspacesFromOtherDevices = useAppStore((s) => s.setHideWorkspacesFromOtherDevices)
-  const setAlwaysShowDefaultBranchWorkspace = useAppStore(
-    (s) => s.setAlwaysShowDefaultBranchWorkspace
-  )
-  const setFilterRepoIds = useAppStore((s) => s.setFilterRepoIds)
-  const setVisibleWorkspaceHostIds = useAppStore((s) => s.setVisibleWorkspaceHostIds)
-
-  const clearFilters = useCallback(() => {
-    const actions = computeClearFilterActions(filterState)
-    if (actions.resetShowSleepingWorkspaces) {
-      setShowSleepingWorkspaces(DEFAULT_SHOW_SLEEPING_WORKSPACES)
-    }
-    if (actions.resetFilterRepoIds) {
-      setFilterRepoIds([])
-    }
-    if (actions.resetHideDefaultBranchWorkspace) {
-      setHideDefaultBranchWorkspace(false)
-    }
-    if (actions.resetHideAutomationGeneratedWorkspaces) {
-      setHideAutomationGeneratedWorkspaces(false)
-    }
-    if (actions.resetHideCliCreatedWorkspaces) {
-      setHideCliCreatedWorkspaces(false)
-    }
-    if (actions.resetHideDetachedHeadWorkspaces) {
-      setHideDetachedHeadWorkspaces(false)
-    }
-    if (actions.resetHideWorkspacesFromOtherDevices) {
-      setHideWorkspacesFromOtherDevices(false)
-    }
-    if (actions.resetAlwaysShowDefaultBranchWorkspace) {
-      setAlwaysShowDefaultBranchWorkspace(true)
-    }
-    if (actions.resetVisibleWorkspaceHostIds) {
-      setVisibleWorkspaceHostIds(null)
-    }
-  }, [
-    setShowSleepingWorkspaces,
-    setFilterRepoIds,
-    setHideDefaultBranchWorkspace,
-    setHideAutomationGeneratedWorkspaces,
-    setHideCliCreatedWorkspaces,
-    setHideDetachedHeadWorkspaces,
-    setHideWorkspacesFromOtherDevices,
-    setAlwaysShowDefaultBranchWorkspace,
-    setVisibleWorkspaceHostIds,
-    filterState
-  ])
-
-  useEffect(() => {
-    if (!pendingRevealSidebarRow) {
-      return
-    }
-    const rowKey = pendingRevealSidebarRow.rowKey
-    const isProjectHeaderTarget =
-      rowKey.startsWith('project-group:') ||
-      rowKey.startsWith('project:') ||
-      rowKey.startsWith('repo:')
-    if (isProjectHeaderTarget && groupBy !== 'repo') {
-      setGroupBy('repo')
-      return
-    }
-    if (!renderedSidebarRowKeys.has(rowKey) && hasFilters) {
-      clearFilters()
-    }
-  }, [
-    clearFilters,
+  useSidebarRevealRequests({
     groupBy,
+    renderedSidebarRowKeys: rowModel.renderedSidebarRowKeys,
+    renderedWorktreeIds: selection.renderedWorktreeIds,
+    currentSidebarWorktreeId,
+    worktreeMap,
+    folderWorkspaces,
     hasFilters,
-    pendingRevealSidebarRow,
-    renderedSidebarRowKeys,
-    setGroupBy
-  ])
-
-  const handleRevealCurrentWorkspaceRequest = useCallback(
-    (event: Event) => {
-      const detail =
-        event instanceof CustomEvent
-          ? (event.detail as ScrollToCurrentWorkspaceRevealRequestDetail | undefined)
-          : undefined
-      if (detail?.target?.type === 'sidebar-row') {
-        const sidebarDetail = detail as Extract<
-          ScrollToCurrentWorkspaceRevealRequestDetail,
-          { target: { type: 'sidebar-row' } }
-        >
-        revealSidebarRow(detail.target.rowKey, {
-          behavior: 'smooth',
-          highlight: sidebarDetail.highlight !== false
-        })
-        return
-      }
-      if (!currentSidebarWorktreeId) {
-        return
-      }
-      const activeWorktree = getKnownSidebarWorktreeById(
-        currentSidebarWorktreeId,
-        worktreeMap,
-        folderWorkspaces
-      )
-      if (!activeWorktree || activeWorktree.isArchived) {
-        return
-      }
-      if (!renderedWorktreeIds.includes(currentSidebarWorktreeId)) {
-        // Why: the reveal action must show the current workspace, so relax filters that hide it first.
-        clearFilters()
-      }
-      revealWorktreeInSidebar(currentSidebarWorktreeId, {
-        behavior: 'smooth',
-        highlight: true,
-        beginRename: (detail as { beginRename?: boolean } | undefined)?.beginRename === true
-      })
-    },
-    [
-      clearFilters,
-      currentSidebarWorktreeId,
-      folderWorkspaces,
-      revealSidebarRow,
-      renderedWorktreeIds,
-      revealWorktreeInSidebar,
-      worktreeMap
-    ]
-  )
-
-  useEffect(() => {
-    window.addEventListener(
-      SCROLL_TO_CURRENT_WORKSPACE_REVEAL_REQUEST_EVENT,
-      handleRevealCurrentWorkspaceRequest
-    )
-    return () => {
-      window.removeEventListener(
-        SCROLL_TO_CURRENT_WORKSPACE_REVEAL_REQUEST_EVENT,
-        handleRevealCurrentWorkspaceRequest
-      )
-    }
-  }, [handleRevealCurrentWorkspaceRequest])
+    clearFilters
+  })
 
   const filtersHideAllRows =
     hasFilters &&
-    worktrees.length === 0 &&
-    placeholderRepoIds.size === 0 &&
-    importedWorktreesByRepo.size === 0
+    visibleWorktrees.length === 0 &&
+    rowModel.placeholderRepoIds.size === 0 &&
+    externalWorktreeCards.importedWorktreesByRepo.size === 0
   // Why: when active filters hide every row, the Clear Filters empty state must win over Project Group headers.
-  if (rows.length === 0 || filtersHideAllRows) {
-    return (
-      <div
-        data-worktree-sidebar-container
-        data-contextual-tour-target="workspace-list"
-        className="relative min-h-0 flex-1"
-      >
-        <div className="worktree-sidebar-scrollbar flex h-full flex-col overflow-y-auto overflow-x-hidden pl-1 scrollbar-sleek pt-px">
-          <div className="flex flex-col items-center gap-2 px-4 py-6 text-center text-[11px] text-muted-foreground">
-            <span>
-              {translate('auto.components.sidebar.WorktreeList.b7acbf038b', 'No workspaces found')}
-            </span>
-            {hasFilters && (
-              <button
-                onClick={clearFilters}
-                className="inline-flex items-center gap-1.5 bg-secondary/70 border border-border/80 text-foreground font-medium text-[11px] px-2.5 py-1 rounded-md cursor-pointer hover:bg-accent transition-colors"
-              >
-                <CircleX className="size-3.5" />
-                {translate('auto.components.sidebar.WorktreeList.370c6a55dd', 'Clear Filters')}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    )
+  if (rowModel.rows.length === 0 || filtersHideAllRows) {
+    return <SidebarWorktreeListEmptyState hasFilters={hasFilters} onClearFilters={clearFilters} />
   }
 
   return (
     <>
-      <ProjectGroupNameDialog
-        open={projectGroupNameDialog !== null}
-        title={
-          projectGroupNameDialog?.type === 'rename'
-            ? translate('auto.components.sidebar.WorktreeList.f9dc6cc5d3', 'Rename Project Group')
-            : translate('auto.components.sidebar.WorktreeList.13757c053c', 'New Project Group')
+      <SidebarWorktreeListDialogs
+        dialogs={projectGroupDialogs}
+        repos={repos}
+        settings={settings}
+        suppressExternalWorktreeInboxRepoId={
+          externalWorktreeCards.suppressExternalWorktreeInboxRepoId
         }
-        description={
-          projectGroupNameDialog?.type === 'rename'
-            ? translate(
-                'auto.components.sidebar.WorktreeList.bc1460beb3',
-                'Update the group name shown in the sidebar.'
-              )
-            : translate(
-                'auto.components.sidebar.WorktreeList.d880ea0744',
-                'Create a group and move this project into it.'
-              )
+        setSuppressExternalWorktreeInboxRepoId={
+          externalWorktreeCards.setSuppressExternalWorktreeInboxRepoId
         }
-        initialName={
-          projectGroupNameDialog?.type === 'rename'
-            ? projectGroupNameDialog.currentName
-            : projectGroupNameDialog
-              ? `${projectGroupNameDialog.repo.displayName} group`
-              : ''
+        newExternalWorktreeInboxActionState={
+          externalWorktreeCards.newExternalWorktreeInboxActionState
         }
-        confirmLabel={projectGroupNameDialog?.type === 'rename' ? 'Rename' : 'Create'}
-        onOpenChange={(open) => {
-          if (!open) {
-            setProjectGroupNameDialog(null)
-          }
+        onConfirmSuppressExternalWorktreeInbox={() => {
+          void externalWorktreeCards.handleConfirmSuppressExternalWorktreeInbox()
         }}
-        onSubmit={handleSubmitProjectGroupName}
-      />
-      <SuppressExternalWorktreeInboxDialog
-        open={suppressExternalWorktreeInboxRepoId !== null}
-        repoDisplayName={
-          suppressExternalWorktreeInboxRepoId
-            ? (repos.find((repo) => repo.id === suppressExternalWorktreeInboxRepoId)?.displayName ??
-              '')
-            : ''
-        }
-        pending={
-          suppressExternalWorktreeInboxRepoId
-            ? (newExternalWorktreeInboxActionState.get(suppressExternalWorktreeInboxRepoId)
-                ?.pending ?? false)
-            : false
-        }
-        onOpenChange={(open) => {
-          if (!open) {
-            setSuppressExternalWorktreeInboxRepoId(null)
-          }
-        }}
-        onConfirm={() => {
-          void handleConfirmSuppressExternalWorktreeInbox()
-        }}
-        onOpenRecovery={() => {
-          if (!suppressExternalWorktreeInboxRepoId) {
-            return
-          }
-          const repo = findRepoForHost(repos, suppressExternalWorktreeInboxRepoId, { settings })
-          setSuppressExternalWorktreeInboxRepoId(null)
-          if (repo) {
-            handleOpenWorktreeVisibility(repo)
-          }
-        }}
-      />
-      <ProjectGroupDeleteDialog
-        open={projectGroupDeleteDialog !== null}
-        groupName={projectGroupDeleteDialog?.groupName ?? ''}
-        projectCount={projectGroupDeleteProjectCount}
-        projectNames={projectGroupDeleteProjectNames}
-        removeContainedProjects={projectGroupRemoveContainedProjects}
-        onRemoveContainedProjectsChange={(removeContainedProjects) => {
-          setProjectGroupDeleteDialog((current) =>
-            current ? { ...current, removeContainedProjects } : current
-          )
-        }}
-        onOpenChange={(open) => {
-          if (!open) {
-            setProjectGroupDeleteDialog(null)
-          }
-        }}
-        onConfirm={handleConfirmDeleteProjectGroup}
+        onOpenWorktreeVisibility={handleOpenWorktreeVisibility}
       />
       <VirtualizedWorktreeViewport
-        key={viewportResetKey}
-        rows={sectionRows}
-        activeWorktreeId={selectedSidebarWorktreeId}
+        // Why: status headers move during wake (inactive -> active); key only on grouping mode so row identity survives.
+        key={`group:${groupBy}:host:${filterState.visibleWorkspaceHostIds?.join(',') ?? 'all'}:lineage`}
+        rows={rowModel.sectionRows}
+        // Why: full-page nav views aren't scoped to a worktree, so no sidebar card should look selected.
+        activeWorktreeId={
+          activeView === 'tasks' || activeView === 'activity' ? null : currentSidebarWorktreeId
+        }
         currentWorktreeId={currentSidebarWorktreeId}
         groupBy={groupBy}
         pinnedDisplayPolicy={pinnedDisplayPolicy}
@@ -7020,20 +5956,21 @@ const WorktreeList = React.memo(function WorktreeList({
         handleCreateForRepo={handleCreateForRepo}
         handleOpenRepoSettings={handleOpenRepoSettings}
         handleOpenWorktreeVisibility={handleOpenWorktreeVisibility}
-        handleShowImportedWorktrees={handleShowImportedWorktrees}
-        handleKeepImportedWorktreesHidden={handleKeepImportedWorktreesHidden}
-        importedWorktreeCardActionState={importedWorktreeCardActionState}
-        handleImportNewExternalWorktree={handleImportNewExternalWorktree}
-        handleImportAllNewExternalWorktrees={handleImportAllNewExternalWorktrees}
-        handleKeepNewExternalWorktreeInboxHidden={handleKeepNewExternalWorktreeInboxHidden}
-        handleOpenSuppressExternalWorktreeInbox={handleOpenSuppressExternalWorktreeInbox}
-        newExternalWorktreeInboxActionState={newExternalWorktreeInboxActionState}
+        handleShowImportedWorktrees={externalWorktreeCards.handleShowImportedWorktrees}
+        handleKeepImportedWorktreesHidden={externalWorktreeCards.handleKeepImportedWorktreesHidden}
+        importedWorktreeCardActionState={externalWorktreeCards.importedWorktreeCardActionState}
+        handleOpenSuppressExternalWorktreeInbox={
+          externalWorktreeCards.handleOpenSuppressExternalWorktreeInbox
+        }
+        newExternalWorktreeInboxActionState={
+          externalWorktreeCards.newExternalWorktreeInboxActionState
+        }
         handleRemoveProject={handleRemoveProject}
-        handleCreateGroupFromRepo={handleCreateGroupFromRepo}
-        handleMoveProjectToGroup={handleMoveProjectToGroup}
-        handleRemoveProjectFromGroup={handleRemoveProjectFromGroup}
-        handleRenameProjectGroup={handleRenameProjectGroup}
-        handleDeleteProjectGroup={handleDeleteProjectGroup}
+        handleCreateGroupFromRepo={projectGroupDialogs.handleCreateGroupFromRepo}
+        handleMoveProjectToGroup={projectGroupDialogs.handleMoveProjectToGroup}
+        handleRemoveProjectFromGroup={projectGroupDialogs.handleRemoveProjectFromGroup}
+        handleRenameProjectGroup={projectGroupDialogs.handleRenameProjectGroup}
+        handleDeleteProjectGroup={projectGroupDialogs.handleDeleteProjectGroup}
         handleCreateFolderWorkspace={handleCreateFolderWorkspace}
         activeModal={activeModal}
         pendingRevealWorktree={pendingRevealWorktree}
@@ -7041,21 +5978,21 @@ const WorktreeList = React.memo(function WorktreeList({
         clearPendingRevealWorktreeId={clearPendingRevealWorktreeId}
         clearPendingRevealSidebarRow={clearPendingRevealSidebarRow}
         agentSendTargetWorktreeId={agentSendTargetWorktreeId}
-        worktrees={worktrees}
+        worktrees={visibleWorktrees}
         folderWorkspaces={folderWorkspaces}
-        selectedWorktreeIds={selectedWorktreeIds}
-        selectedWorktrees={selectedWorktrees}
-        onSelectionGesture={updateSelectionForGesture}
+        selectedWorktreeIds={selection.selectedWorktreeIds}
+        selectedWorktrees={selection.selectedWorktrees}
+        onSelectionGesture={selection.updateSelectionForGesture}
         onImmediateWorktreeActivate={handleImmediateWorktreeActivate}
-        onContextMenuSelect={selectForContextMenu}
+        onContextMenuSelect={selection.selectForContextMenu}
         repoMap={repoMap}
         defaultHostId={defaultHostId}
         worktreeMap={worktreeMap}
         worktreeLineageById={worktreeLineageById}
         workspaceLineageByChildKey={workspaceLineageByChildKey}
-        allRepoIds={allRepoIds}
-        onReorderHostSections={handleReorderHostSections}
-        onHostDragActiveChange={setHostDragActive}
+        allRepoIds={rowModel.allRepoIds}
+        onReorderHostSections={rowModel.handleReorderHostSections}
+        onHostDragActiveChange={rowModel.setHostDragActive}
         prCache={prCache}
         hostedReviewCache={hostedReviewCache}
         workspaceStatuses={workspaceStatuses}
@@ -7072,8 +6009,10 @@ const WorktreeList = React.memo(function WorktreeList({
         onWorkspaceBoardDragPreviewStart={onWorkspaceBoardDragPreviewStart}
         onWorkspaceBoardDragPreviewCommit={onWorkspaceBoardDragPreviewCommit}
         onWorkspaceBoardDragPreviewCancel={onWorkspaceBoardDragPreviewCancel}
-        shouldShowWorkspaceBoardDropIndicator={shouldShowWorkspaceBoardDropIndicator}
-        onReorderWorktrees={reorderWorktrees}
+        shouldShowWorkspaceBoardDropIndicator={
+          statusMutations.shouldShowWorkspaceBoardDropIndicator
+        }
+        onReorderWorktrees={statusMutations.reorderWorktrees}
         scrollOffsetRef={scrollOffsetRef}
         scrollAnchorRef={scrollAnchorRef}
       />

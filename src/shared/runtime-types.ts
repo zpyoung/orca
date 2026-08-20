@@ -6,9 +6,8 @@ import type {
   AgentType
 } from './agent-status-types'
 import type {
-  BaseRefSearchResult,
-  BrowserCookieImportResult,
   BrowserCertificateFailure,
+  BrowserCookieImportResult,
   BrowserLoadError,
   BrowserSessionProfile,
   BrowserSessionProfileSource,
@@ -24,9 +23,10 @@ import type {
   Worktree,
   WorktreeLineage,
   WorkspaceLineage,
-  WorktreeLineageWarning,
-  TerminalPaneLayoutNode
-} from './types'
+  WorktreeLineage,
+  WorktreeLineageWarning
+} from './worktree/lineage-types'
+import type { GitWorktreeInfo, Worktree } from './worktree/types'
 import type {
   RuntimeMarkdownReadTabResult,
   RuntimeMarkdownSaveTabResult
@@ -151,6 +151,11 @@ export type RuntimeSyncWindowGraph = {
   /** Worktrees the renderer is still publishing unchanged; main must keep their
    *  stored snapshots alive instead of pruning them as removed. */
   unchangedMobileSessionWorktrees?: string[]
+}
+
+export type RuntimeRendererSyncWindowGraph = RuntimeSyncWindowGraph & {
+  /** Unique to one renderer document; a reload must publish from a new generation. */
+  rendererGeneration: string
 }
 
 export type RuntimeNativeChatLaunchDraftResolution = {

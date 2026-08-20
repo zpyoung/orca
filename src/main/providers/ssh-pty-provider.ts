@@ -204,8 +204,12 @@ export class SshPtyProvider implements IPtyProvider {
     })
   }
 
-  write(id: string, data: string): void {
-    this.mux.notify('pty.data', { id: this.toRelayPtyId(id), data })
+  write(id: string, data: string): boolean {
+    return writeToSshPty(this.mux, this.toRelayPtyId(id), data)
+  }
+
+  writeWithSettlement(id: string, data: string): Promise<boolean> {
+    return writeToSshPtyWithSettlement(this.mux, this.toRelayPtyId(id), data)
   }
 
   /** Ack-path only: resolves once the relay transport actually settles the

@@ -37,7 +37,8 @@ export type SkillDiscoverySource = {
    *  leaves it unset and names the owning plugin per skill instead. */
   pluginName?: string
   exists: boolean
-  skippedReason?: 'missing' | 'remote-repo'
+  /** `unavailable`: the root did not answer in time, so its skills are unknown rather than absent. */
+  skippedReason?: 'missing' | 'remote-repo' | 'unavailable'
 }
 
 export type SkillDiscoveryResult = {

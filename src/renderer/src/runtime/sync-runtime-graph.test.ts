@@ -1,40 +1,12 @@
-/* eslint-disable max-lines */
 import { describe, expect, it } from 'vitest'
 import {
-  buildMobileSessionTabSnapshots,
   canSkipRuntimeMobileSessionSyncKeyBuild,
   getRuntimeMobileSessionSyncKey,
   runtimeMobileSessionSyncKeysEqual
 } from './sync-runtime-graph'
-import type { AgentStatusEntry } from '../../../shared/agent-status-types'
+import { makeAgentStatusEntry, makeState } from './sync-runtime-graph-test-harness'
 import { getDefaultSettings } from '../../../shared/constants'
 import type { AppState } from '../store/types'
-
-function makeState(overrides: Partial<AppState> = {}): AppState {
-  return {
-    tabsByWorktree: {},
-    terminalLayoutsByTabId: {} as AppState['terminalLayoutsByTabId'],
-    runtimePaneTitlesByTabId: {} as AppState['runtimePaneTitlesByTabId'],
-    groupsByWorktree: {},
-    activeGroupIdByWorktree: {},
-    unifiedTabsByWorktree: {},
-    tabBarOrderByWorktree: {},
-    activeFileId: null,
-    activeFileIdByWorktree: {},
-    activeTabType: 'terminal',
-    activeTabTypeByWorktree: {},
-    activeBrowserTabIdByWorktree: {},
-    browserTabsByWorktree: {},
-    browserPagesByWorkspace: {},
-    browserCertificateFailuresByPageId: {},
-    openFiles: [],
-    editorDrafts: {},
-    activeTabId: null,
-    agentStatusByPaneKey: {},
-    agentStatusEpoch: 0,
-    ...overrides
-  } as AppState
-}
 
 // Why: the comparator at `runtimeMobileSessionSyncKeysEqual` checks
 // `terminalLayoutsByTabId`, `runtimePaneTitlesByTabId`, `groupsByWorktree`,
@@ -66,20 +38,6 @@ function makeSharedOverrides(): Partial<AppState> {
     editorDrafts: {},
     agentStatusByPaneKey: {},
     agentStatusEpoch: 0
-  }
-}
-
-function makeAgentStatusEntry(overrides: Partial<AgentStatusEntry> = {}): AgentStatusEntry {
-  return {
-    state: 'working',
-    prompt: 'fix parity',
-    updatedAt: 1_700_000_000_000,
-    stateStartedAt: 1_699_999_999_000,
-    agentType: 'codex',
-    paneKey: 'term-1:11111111-1111-4111-8111-111111111111',
-    terminalTitle: 'codex [working]',
-    stateHistory: [],
-    ...overrides
   }
 }
 
