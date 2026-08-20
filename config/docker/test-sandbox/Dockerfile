@@ -74,21 +74,28 @@ RUN set -eux; \
 # pnpm's bundled gyp_main.py is not executable, so native rebuilds need the standalone node-gyp.
 ENV npm_config_node_gyp=/usr/local/lib/node_modules/node-gyp/bin/node-gyp.js
 
+COPY --chmod=0755 config/docker/test-sandbox/entrypoint.sh /usr/local/bin/orca-test-sandbox
+
+# Tests that induce fs errors with chmod 0555 need a user that DAC actually stops;
+# as root those writes succeed. Named for CI's user because diagnostic redaction
+# rewrites the username, and a name appearing in fixture text corrupts the expected output.
+RUN useradd --create-home --shell /bin/bash runner \
+  && mkdir -p /work \
+  && chown runner:runner /work
+
+USER runner
 WORKDIR /work
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
-COPY config/patches ./config/patches
+COPY --chown=runner:runner package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY --chown=runner:runner config/patches ./config/patches
 
 RUN pnpm install --no-frozen-lockfile --prefer-frozen-lockfile=false --ignore-scripts
 
-COPY config/scripts ./config/scripts
+COPY --chown=runner:runner config/scripts ./config/scripts
 
 RUN node config/scripts/ensure-native-runtime.mjs --runtime=node \
   && node config/scripts/install-electron-package-binary.mjs \
-  && sha256sum pnpm-lock.yaml | cut -d ' ' -f 1 > /opt/orca-sandbox-lockfile.sha256
-
-COPY config/docker/test-sandbox/entrypoint.sh /usr/local/bin/orca-test-sandbox
-RUN chmod +x /usr/local/bin/orca-test-sandbox
+  && sha256sum pnpm-lock.yaml | cut -d ' ' -f 1 > /home/runner/lockfile.sha256
 
 ENTRYPOINT ["/usr/local/bin/orca-test-sandbox"]
 CMD ["pnpm", "exec", "vitest", "run", "--config", "config/vitest.config.ts"]

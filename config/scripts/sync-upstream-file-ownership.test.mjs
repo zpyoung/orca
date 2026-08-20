@@ -490,34 +490,70 @@ describe('--verify-seams mode', () => {
   })
 })
 
-describe('SKILL.md procedure', () => {
+describe('SKILL.md delegates rather than duplicating the ownership recipe', () => {
   const skillText = readFileSync(join(projectDir, '.claude/skills/sync-upstream/SKILL.md'), 'utf8')
+  const referenceText = readFileSync(
+    join(projectDir, '.claude/skills/sync-upstream/references/file-ownership.md'),
+    'utf8'
+  )
+
+  it('sends the reader to the reference for the ownership step', () => {
+    expect(skillText).toContain('references/file-ownership.md')
+  })
+
+  // a second copy of the classifier commands is what silently went stale before; the reference owns them
+  it('keeps the classifier invocation out of the runbook', () => {
+    expect(skillText).not.toMatch(/xargs -0 git/)
+    expect(referenceText).toMatch(/xargs -0 git/)
+  })
+
+  it('names no script the repo does not ship', () => {
+    for (const text of [skillText, referenceText]) {
+      for (const script of text.match(/config\/scripts\/[\w.-]+\.mjs/g) ?? []) {
+        expect(existsSync(join(projectDir, script))).toBe(true)
+      }
+    }
+  })
+
+  it('delegates releasing to the release skill', () => {
+    expect(skillText).toContain('Skill(release')
+  })
+})
+
+describe('file-ownership reference procedure', () => {
+  const referenceText = readFileSync(
+    join(projectDir, '.claude/skills/sync-upstream/references/file-ownership.md'),
+    'utf8'
+  )
 
   it('restores ours.txt from the pre-merge fork commit, not from HEAD', () => {
-    const oursLine = skillText.split('\n').find((line) => line.includes('ours.txt'))
+    const oursLine = referenceText.split('\n').find((line) => line.includes('ours.txt'))
     expect(oursLine).toContain('merge_head')
     expect(oursLine).not.toMatch(/git checkout HEAD --/)
   })
 
   it('passes -- before remove.txt paths so a leading-dash path is not parsed as an option', () => {
-    const removeLine = skillText.split('\n').find((line) => line.includes('remove.txt'))
+    const removeLine = referenceText.split('\n').find((line) => line.includes('remove.txt'))
     expect(removeLine).toMatch(/git rm -f --ignore-unmatch --\s*$/)
   })
 })
 
-describe('phase-5 SKILL.md procedure', () => {
-  const skillText = readFileSync(join(projectDir, '.claude/skills/sync-upstream/SKILL.md'), 'utf8')
-  const tierTwoProcedure = skillText.slice(
-    skillText.indexOf('## Tier-2 forked-copy replay'),
-    skillText.indexOf('## Tier-4 pending-upstream review')
+describe('phase-5 file-ownership reference procedure', () => {
+  const referenceText = readFileSync(
+    join(projectDir, '.claude/skills/sync-upstream/references/file-ownership.md'),
+    'utf8'
   )
-  const tierFourProcedure = skillText.slice(
-    skillText.indexOf('## Tier-4 pending-upstream review'),
-    skillText.indexOf('## Upstream feature-collision review')
+  const tierTwoProcedure = referenceText.slice(
+    referenceText.indexOf('## Tier-2 forked-copy replay'),
+    referenceText.indexOf('## Tier-4 pending-upstream review')
   )
-  const collisionProcedure = skillText.slice(
-    skillText.indexOf('## Upstream feature-collision review'),
-    skillText.indexOf('## When upstream')
+  const tierFourProcedure = referenceText.slice(
+    referenceText.indexOf('## Tier-4 pending-upstream review'),
+    referenceText.indexOf('## Upstream feature-collision review')
+  )
+  const collisionProcedure = referenceText.slice(
+    referenceText.indexOf('## Upstream feature-collision review'),
+    referenceText.indexOf('## When upstream')
   )
 
   it('requires a validated, whole-tree, NUL-delimited fork-copy status snapshot', () => {
@@ -604,7 +640,7 @@ describe('phase-5 SKILL.md procedure', () => {
 
   it('builds the CLI before tests with controlled global and system Git config', () => {
     const verificationCommand =
-      skillText.match(/empty_git_config=\$\(mktemp\)[\s\S]*?pnpm test/)?.[0] ?? ''
+      referenceText.match(/empty_git_config=\$\(mktemp\)[\s\S]*?pnpm test/)?.[0] ?? ''
     const variables = [
       'GIT_CONFIG_COUNT',
       'GIT_CONFIG_KEY_0',

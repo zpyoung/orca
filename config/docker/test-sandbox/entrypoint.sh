@@ -20,7 +20,16 @@ fi
 # Composite tsconfigs cache errors from whichever checkout populated them last.
 rm -f config/*.tsbuildinfo
 
-baked="$(cat /opt/orca-sandbox-lockfile.sha256)"
+# The source arrives as a plain tar, but suites that shell out to git need a real
+# repository. Tree hashes are content-derived, so one synthetic commit satisfies them.
+if [ "${ORCA_SANDBOX_SKIP_GIT:-0}" != "1" ] && [ ! -d .git ]; then
+  git init -q .
+  git add -A
+  git -c user.name=runner -c user.email=runner@sandbox.invalid \
+    commit -q -m 'sandbox snapshot' --no-verify
+fi
+
+baked="$(cat /home/runner/lockfile.sha256)"
 current="$(sha256sum pnpm-lock.yaml | cut -d ' ' -f 1)"
 if [ "$baked" != "$current" ]; then
   echo "orca-test-sandbox: lockfile differs from the image; reinstalling" >&2

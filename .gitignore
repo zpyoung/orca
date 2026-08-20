@@ -133,6 +133,7 @@ playwright-report/
 /.claude/skills/*
 # Fork-owned, versioned with the repo (not an installation).
 !/.claude/skills/release/
+!/.claude/skills/sync-upstream/
 /.agents/skills/
 /skills-lock.json
 

@@ -635,6 +635,11 @@
       "status": "permanent"
     },
     {
+      "path": ".claude/skills/sync-upstream/references/file-ownership.md",
+      "reason": "Fork-only sync skill reference; upstream has no such document.",
+      "status": "permanent"
+    },
+    {
       "path": "config/scripts/sync-upstream-file-ownership.mjs",
       "reason": "Fork's own sync classifier; upstream has no such script.",
       "status": "permanent"
@@ -863,7 +868,7 @@
       "removed": 0
     },
     ".gitignore": {
-      "added": 11,
+      "added": 12,
       "removed": 2
     },
     "config/localization-coverage-allowlist.json": {
