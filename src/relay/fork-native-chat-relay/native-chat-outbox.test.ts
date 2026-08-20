@@ -159,4 +159,46 @@ describe('native chat relay outbox', () => {
     expect(third.frames[0]!.messages.map((m) => m.id)).toEqual(['c'])
     expect(third.more).toBe(false)
   })
+
+  it('carries the observed session options onto the append frame', () => {
+    const outbox = createNativeChatOutbox()
+    pushNativeChatAppend(outbox, [message('a')], {
+      sessionOptions: { model: 'opus', effort: 'max', observedAt: 5 }
+    })
+
+    const frame = drainNativeChatOutbox(outbox).frames[0]
+
+    expect(frame).toMatchObject({
+      kind: 'append',
+      sessionOptions: { model: 'opus', effort: 'max', observedAt: 5 }
+    })
+  })
+
+  it('lets a coalesced append carry the newest observation', () => {
+    const outbox = createNativeChatOutbox()
+    pushNativeChatAppend(outbox, [message('a')], {
+      sessionOptions: { model: 'opus', observedAt: 5 }
+    })
+    pushNativeChatAppend(outbox, [message('b')], {
+      sessionOptions: { model: 'sonnet', observedAt: 9 }
+    })
+
+    const frames = drainNativeChatOutbox(outbox).frames
+
+    expect(frames).toHaveLength(1)
+    expect(frames[0]).toMatchObject({ sessionOptions: { model: 'sonnet', observedAt: 9 } })
+  })
+
+  it('buffers an options-only observation that carries no messages', () => {
+    // Codex records its model on a row that decodes to no message at all, so an
+    // append with an empty message list is still the only evidence of a switch.
+    const outbox = createNativeChatOutbox()
+    pushNativeChatAppend(outbox, [], { sessionOptions: { model: 'gpt-5.6-sol', observedAt: 1 } })
+
+    expect(drainNativeChatOutbox(outbox).frames[0]).toMatchObject({
+      kind: 'append',
+      messages: [],
+      sessionOptions: { model: 'gpt-5.6-sol' }
+    })
+  })
 })

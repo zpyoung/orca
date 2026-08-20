@@ -5,7 +5,30 @@ import type { TuiAgent } from '../../../../shared/types'
 import { sleepingAgentLaunchConfigSchema } from '../../../../shared/workspace-session-sleeping-agents'
 import { RUNTIME_NAVIGATION_TARGETS } from '../../../../shared/runtime-navigation'
 import { TAB_ACTIVATION_INTENTS } from '../../../../shared/tab-activation-intent'
+import { parseLegacyNumericPaneKey, parsePaneKey } from '../../../../shared/stable-pane-id'
 import { OptionalBoolean } from '../schemas'
+
+// Why: paneKey is attacker-reachable (remote client input) and never checked
+// against a live pane, so its shape is bound to the two forms the host ever
+// mints: makePaneKey's `tabId:UUID`, or the pre-stable-id `tabId:N` legacy
+// pane. A garbage key just fails the merge lookup harmlessly, but bounding
+// the shape here caps how many distinct never-matching keys the RPC boundary
+// will forward for the host to retain.
+const MAX_TERMINAL_DOCK_PANE_KEY_LENGTH = 256
+
+// Why: bounds one removal call to roughly the host's own per-tab entry cap —
+// a client can never usefully need to remove more keys than the record can hold.
+const MAX_TERMINAL_DOCK_REMOVE_KEYS = 64
+
+function isValidTerminalDockPaneKey(value: string): boolean {
+  return parsePaneKey(value) !== null || parseLegacyNumericPaneKey(value) !== null
+}
+
+const TerminalDockPaneKeySchema = z
+  .string()
+  .min(1)
+  .max(MAX_TERMINAL_DOCK_PANE_KEY_LENGTH)
+  .refine(isValidTerminalDockPaneKey, { message: 'Invalid pane key' })
 
 export const WorktreeTabSelector = z.object({
   worktree: z
@@ -128,7 +151,23 @@ export const SetTabProps = WorktreeTabSelector.extend({
   color: z.string().max(64).nullable().optional(),
   isPinned: z.boolean().optional(),
   // undefined = leave unchanged; no "clear" semantic (absence means default 'terminal').
-  viewMode: z.enum(['terminal', 'chat']).optional()
+  viewMode: z.enum(['terminal', 'chat']).optional(),
+  // undefined = leave unchanged. A single-pane set and/or a removal list, never
+  // the whole record — the host merges/removes in place, so one client's
+  // update can't clobber another pane's entry from a different client.
+  terminalDock: z
+    .object({
+      paneKey: TerminalDockPaneKeySchema.optional(),
+      docked: z.boolean().optional(),
+      gutterRows: z.number().int().min(3).max(15).optional(),
+      remove: z.array(TerminalDockPaneKeySchema).max(MAX_TERMINAL_DOCK_REMOVE_KEYS).optional()
+    })
+    .superRefine((value, ctx) => {
+      if (value.paneKey === undefined && (value.docked !== undefined || value.gutterRows !== undefined)) {
+        ctx.addIssue({ code: 'custom', message: 'Setting docked/gutterRows requires paneKey' })
+      }
+    })
+    .optional()
 })
 
 export const CreateTerminalTab = WorktreeTabSelector.extend({

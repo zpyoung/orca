@@ -49,6 +49,7 @@ describe('shellEscapePath', () => {
 })
 
 describe('fitAndFocusPanes', () => {
+  const leafId = '11111111-1111-4111-8111-111111111111'
   class FakeHTMLElement {
     readonly tagName: string
     readonly isContentEditable: boolean
@@ -76,14 +77,24 @@ describe('fitAndFocusPanes', () => {
     vi.unstubAllGlobals()
   })
 
-  function makeManager(): { manager: PaneManager; terminal: { focus: ReturnType<typeof vi.fn> } } {
+  function makeManager(): {
+    manager: PaneManager
+    terminal: { focus: ReturnType<typeof vi.fn> }
+    composer: { focus: ReturnType<typeof vi.fn> }
+  } {
     const terminal = { focus: vi.fn() }
+    const composer = { focus: vi.fn() }
+    const pane = {
+      leafId,
+      terminal,
+      container: { querySelector: vi.fn(() => composer) }
+    }
     const manager = {
       fitAllPanes: vi.fn(),
-      getActivePane: () => ({ terminal }),
-      getPanes: () => [{ terminal }]
+      getActivePane: () => pane,
+      getPanes: () => [pane]
     } as unknown as PaneManager
-    return { manager, terminal }
+    return { manager, terminal, composer }
   }
 
   function stubDocument(activeElement: Element | null, renameInputMounted = false): void {
@@ -131,5 +142,17 @@ describe('fitAndFocusPanes', () => {
 
     expect(manager.fitAllPanes).toHaveBeenCalled()
     expect(terminal.focus).toHaveBeenCalled()
+  })
+  it("restores focus to the active pane's docked composer when it owns input", () => {
+    stubDocument(null)
+    const { manager, terminal, composer } = makeManager()
+    const paneDockOwnsFocus = vi.fn(() => true)
+
+    fitAndFocusPanes(manager, { tabId: 'tab-1', paneDockOwnsFocus })
+
+    expect(manager.fitAllPanes).toHaveBeenCalled()
+    expect(paneDockOwnsFocus).toHaveBeenCalledWith(`tab-1:${leafId}`)
+    expect(composer.focus).toHaveBeenCalled()
+    expect(terminal.focus).not.toHaveBeenCalled()
   })
 })

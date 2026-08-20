@@ -25,6 +25,7 @@ import { buildWindowsPtyCompatibilityOptions } from '@/lib/pane-manager/windows-
 import { buildTerminalKeyboardProtocolOptions } from '@/lib/pane-manager/terminal-keyboard-protocol'
 import { resolvePaneKeyboardProtocolAgent } from './terminal-keyboard-protocol-pane-agent'
 import { useAppStore } from '@/store'
+
 import type { DirectSshPaneRetryAttemptId } from '@/store/slices/direct-ssh-terminal-recovery'
 import {
   createFilePathLinkProvider,
@@ -81,6 +82,16 @@ import {
 import { RESET_KITTY_KEYBOARD_PROTOCOL } from '../../../../shared/terminal-mode-reset-profiles'
 import { resolveTerminalLayoutActiveLeafId } from './terminal-layout-leaf-ids'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
+import {
+  collectTerminalDockPaneKeysForTabTeardown,
+  pruneTerminalDockPaneKeysEverywhere
+} from './fork-terminal-dock/terminal-pane-dock-prune'
+import { removeTerminalDockPaneKeys } from './fork-terminal-dock/terminal-dock-pane-state'
+import {
+  resolveRemoteDockConptyUnverified,
+  restampRemoteDockConptyUnverifiedForLivePanes
+} from './fork-terminal-dock/terminal-dock-remote-conpty'
+import { REMOTE_CONPTY_UNVERIFIED_DATASET_KEY } from './fork-terminal-dock/TerminalPaneDockMount'
 import { applyExpandedLayoutTo, restoreExpandedLayoutFrom } from './expand-collapse'
 import { applyTerminalAppearance } from './terminal-appearance'
 import { createOsc52OscHandler } from './osc52-clipboard'
@@ -125,7 +136,7 @@ import { resolvePaneWslDistro } from './terminal-pane-wsl-distro'
 import { getExecutionHostIdForWorktree } from '@/lib/worktree-runtime-owner'
 import { isPaneReplaying, type ReplayingPanesRef } from './replay-guard'
 import { canReleaseReplayedScrollbackFromStore } from './replayed-scrollback-store-release'
-import { fitAndFocusPanes, fitPanes } from './pane-helpers'
+import { fitAndFocusPanes, fitPanes, type PaneFocusOwnership } from './pane-helpers'
 import { markTerminalPinnedViewport } from '@/lib/pane-manager/terminal-scroll-intent'
 import { syncTerminalScrollIntentSoon } from '@/lib/pane-manager/terminal-scroll-intent-settle'
 import { registerRuntimeTerminalTab, scheduleRuntimeGraphSync } from '@/runtime/sync-runtime-graph'
@@ -229,6 +240,7 @@ async function formatTerminalUrlTooltip(
 
 type UseTerminalPaneLifecycleDeps = {
   tabId: string
+  paneDockOwnsFocus: PaneFocusOwnership['paneDockOwnsFocus']
   worktreeId: string
   cwd?: string
   startup?: {
@@ -289,6 +301,10 @@ type UseTerminalPaneLifecycleDeps = {
   isVisibleRef: React.RefObject<boolean>
   onPtyExitRef: React.RefObject<(ptyId: string) => void>
   onAgentExitedRef: React.RefObject<(leafId: string) => void>
+  /** Fires when a pane retires (close, retire, or detach-to-a-new-tab) with its leaf id —
+   *  lets dock-adjacent local state (e.g. passthrough membership) prune itself alongside the
+   *  store-side dock-state prune this hook already performs at the same point. */
+  onPaneRetiredRef?: React.RefObject<(leafId: string) => void>
   onPtyErrorRef?: React.RefObject<(paneId: number, message: string) => void>
   onPtyRecoveryStateRef?: React.RefObject<
     (paneId: number, state: PtyTransportRecoveryState | null) => void
@@ -608,6 +624,7 @@ export function retireMountedTerminalPaneSurface(args: {
 /** Wires mounted terminal panes to renderer state and terminal event handling. */
 export function useTerminalPaneLifecycle({
   tabId,
+  paneDockOwnsFocus,
   worktreeId,
   cwd,
   startup,
@@ -638,6 +655,7 @@ export function useTerminalPaneLifecycle({
   isVisibleRef,
   onPtyExitRef,
   onAgentExitedRef,
+  onPaneRetiredRef,
   onPtyErrorRef,
   onPtyRecoveryStateRef,
   clearTabPtyId,
@@ -678,6 +696,8 @@ export function useTerminalPaneLifecycle({
   configureTerminalOutputBacklogCap(settings?.terminalScrollbackRows)
   const systemPrefersDarkRef = useRef(systemPrefersDark)
   systemPrefersDarkRef.current = systemPrefersDark
+  const paneDockOwnsFocusRef = useRef(paneDockOwnsFocus)
+  paneDockOwnsFocusRef.current = paneDockOwnsFocus
   const previousVisibleForReconcileRef = useRef<TerminalPaneVisibilitySnapshot | null>(null)
   const mountFollowsTerminalPark = useTerminalParkMountIntent(tabId)
   const linkProviderDisposablesRef = useRef(new Map<number, IDisposable>())
@@ -828,7 +848,10 @@ export function useTerminalPaneLifecycle({
           return
         }
         if (focusActive) {
-          fitAndFocusPanes(manager)
+          fitAndFocusPanes(manager, {
+            tabId,
+            paneDockOwnsFocus: paneDockOwnsFocusRef.current
+          })
           return
         }
         fitPanes(manager)
@@ -942,6 +965,17 @@ export function useTerminalPaneLifecycle({
     const manager = new PaneManager(container, {
       // `spawnHints.cwd` (from Split actions) lets the new PTY inherit the source pane's cwd — see docs/ssh-split-pane-inherit-cwd.md.
       onPaneCreated: (pane, spawnHints) => {
+        // Why: windowsPty only covers a local pane, so a remote/SSH pane needs this
+        // separate stamp for the dock's ConPTY-below-wrap-markers demotion check.
+        const dockConptyState = useAppStore.getState()
+        const remoteConptyUnverified = resolveRemoteDockConptyUnverified({
+          executionHostId: getExecutionHostIdForWorktree(dockConptyState, worktreeId),
+          state: dockConptyState
+        })
+        if (remoteConptyUnverified !== null) {
+          pane.container.dataset[REMOTE_CONPTY_UNVERIFIED_DATASET_KEY] =
+            String(remoteConptyUnverified)
+        }
         // OSC 52 — TUI-initiated clipboard writes (Zellij/tmux/nvim/fzf/ssh).
         // Why: read settingsRef at fire time so mid-session gate toggles apply; return true in both paths so xterm doesn't fall through.
         const osc52Disposable = pane.terminal.parser.registerOscHandler(
@@ -1379,6 +1413,18 @@ export function useTerminalPaneLifecycle({
           panePtyBindings.delete(paneId)
         }
         const leafId = closedPane?.leafId
+        if (leafId) {
+          onPaneRetiredRef?.current?.(leafId)
+          const dockPruneState = useAppStore.getState()
+          pruneTerminalDockPaneKeysEverywhere({
+            unifiedTabsByWorktree: dockPruneState.unifiedTabsByWorktree,
+            worktreeId,
+            tabId,
+            leafId,
+            experimentalTerminalDockEnabled: settingsRef.current?.experimentalTerminalDock === true,
+            pruneStoreDockPaneKeys: dockPruneState.pruneTerminalDockPaneKeys
+          })
+        }
         if (leafId && isRetiredSurface) {
           retireMountedTerminalPaneSurface({
             paneKey: makePaneKey(tabId, leafId),
@@ -1881,6 +1927,21 @@ export function useTerminalPaneLifecycle({
       }
       panePtyBindings.clear()
       paneTransports.clear()
+      // Why: a genuinely closed tab (not a rehome/remount) leaves no per-pane retirement
+      // callback to prune the dock localStorage record — enumerate its panes here so
+      // entries don't accumulate one-per-closed-tab until the record's write quota dies.
+      // settingsRef is a live-read mirror for still-running callbacks, not a cleanup
+      // closure, so read the store directly here instead.
+      const teardownDockPaneKeys = collectTerminalDockPaneKeysForTabTeardown({
+        tabId,
+        tabStillExists,
+        experimentalTerminalDockEnabled:
+          useAppStore.getState().settings?.experimentalTerminalDock === true,
+        paneLeafIds: manager.getPanes().map((pane) => pane.leafId)
+      })
+      if (teardownDockPaneKeys.length > 0) {
+        removeTerminalDockPaneKeys(new Set(teardownDockPaneKeys))
+      }
       manager.destroy()
       releaseWebviewDragPassthrough?.()
       releaseWebviewDragPassthrough = null
@@ -2012,4 +2073,22 @@ export function useTerminalPaneLifecycle({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings?.terminalMouseHideWhileTyping])
+
+  // Why: reactive (not read-once at pane creation) — a pane created before SSH/runtime
+  // platform hydration must still pick up a later-confirmed verdict, not stay stranded.
+  const remoteConptyUnverified = useAppStore((store) =>
+    resolveRemoteDockConptyUnverified({
+      executionHostId: getExecutionHostIdForWorktree(store, worktreeId),
+      state: store
+    })
+  )
+  useEffect(() => {
+    const manager = managerRef.current
+    if (!manager) {
+      return
+    }
+    if (restampRemoteDockConptyUnverifiedForLivePanes(manager, remoteConptyUnverified)) {
+      setPaneLayoutRevision((revision) => revision + 1)
+    }
+  }, [managerRef, remoteConptyUnverified, setPaneLayoutRevision])
 }

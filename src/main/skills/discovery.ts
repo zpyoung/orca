@@ -16,6 +16,7 @@ import {
   stablePathId,
   type SkillScanRoot
 } from './skill-discovery-sources'
+import { pluginNameForSkill } from './fork-skill-plugin-attribution/skill-plugin-name-resolution'
 import { discoverClaudePluginSkillSources } from './claude-plugin-skill-sources'
 import { findSkillFiles } from './skill-root-file-walk'
 import { runSkillCandidateTasks } from './skill-candidate-concurrency'
@@ -106,6 +107,7 @@ async function scanRoot(root: SkillScanRoot): Promise<ScannedSkill[]> {
         return null
       }
       const sourceKind = sourceKindForSkill(root, skillFilePath, { relative, sep })
+      const pluginName = pluginNameForSkill(root, skillFilePath, { relative, sep })
       return {
         id: stablePathId(canonicalSkillFilePath),
         name: summary.name ?? basename(directoryPath),
@@ -120,6 +122,7 @@ async function scanRoot(root: SkillScanRoot): Promise<ScannedSkill[]> {
         skillFilePath,
         installed: true,
         updatedAt: summary.updatedAt,
+        ...(pluginName ? { pluginName } : {}),
         canonicalSkillFilePath
       } satisfies ScannedSkill
     })

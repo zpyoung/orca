@@ -208,6 +208,13 @@ export class SshPtyProvider implements IPtyProvider {
     this.mux.notify('pty.data', { id: this.toRelayPtyId(id), data })
   }
 
+  /** Ack-path only: resolves once the relay transport actually settles the
+   *  frame — false if writer disposal or backpressure rejection drops it. */
+  writeAcknowledged(id: string, data: string): Promise<boolean> {
+    const params = { id: this.toRelayPtyId(id), data }
+    return new Promise((resolve) => this.mux.notifyWithSettlement('pty.data', params, (r) => resolve(r.ok)))
+  }
+
   resize(id: string, cols: number, rows: number): void {
     this.mux.notify('pty.resize', { id: this.toRelayPtyId(id), cols, rows })
   }

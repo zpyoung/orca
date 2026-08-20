@@ -29,7 +29,7 @@ const defaultTailReader: NativeChatTranscriptTailReader = (args) => {
     args.decode,
     args.includeTrailingLine,
     args.endOffset,
-    args.decodeLifecycle,
+    args.decodeCompanion,
     args.signal
   )
 }

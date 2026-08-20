@@ -250,6 +250,7 @@ export const SETTINGS_CHANGED_WHITELIST = [
   'experimentalMobile',
   'experimentalPet',
   'experimentalNativeChat',
+  'experimentalTerminalDock',
   'experimentalActivity',
   'experimentalAgentDashboardPopout',
   'experimentalTerminalAttention',
@@ -534,6 +535,22 @@ const nativeChatSkillDiscoverySchema = z
     outcome: z.enum(['ready', 'error', 'timeout', 'unavailable']),
     execution_host_kind: z.enum(['local', 'runtime', 'ssh'])
   })
+  .strict()
+
+const terminalDockToggledSchema = z
+  .object({ docked: z.boolean(), agent_kind: agentKindSchema })
+  .strict()
+const terminalDockPassthroughToggledSchema = z
+  .object({ active: z.boolean(), agent_kind: agentKindSchema })
+  .strict()
+export const terminalDockSendOutcomeSchema = z.enum([
+  'observed-cleared',
+  'unobservable',
+  'may-not-have-sent'
+])
+export type TerminalDockSendOutcome = z.infer<typeof terminalDockSendOutcomeSchema>
+const terminalDockSendOutcomeEventSchema = z
+  .object({ outcome: terminalDockSendOutcomeSchema, agent_kind: agentKindSchema })
   .strict()
 
 const telemetryOptedInSchema = z.object({ via: optInViaSchema }).strict()
@@ -1462,6 +1479,10 @@ export const eventSchemas = {
   native_chat_picker_item_accepted: nativeChatPickerItemAcceptedSchema,
   native_chat_send_classified: nativeChatSendClassifiedSchema,
   native_chat_skill_discovery: nativeChatSkillDiscoverySchema,
+
+  terminal_dock_toggled: terminalDockToggledSchema,
+  terminal_dock_passthrough_toggled: terminalDockPassthroughToggledSchema,
+  terminal_dock_send_outcome: terminalDockSendOutcomeEventSchema,
 
   telemetry_opted_in: telemetryOptedInSchema,
   telemetry_opted_out: telemetryOptedOutSchema,

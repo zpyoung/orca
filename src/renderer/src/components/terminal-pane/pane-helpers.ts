@@ -1,27 +1,47 @@
 import type { PaneManager } from '@/lib/pane-manager/pane-manager'
+import { makePaneKey, type PaneKey } from '../../../../shared/stable-pane-id'
+
+export type PaneFocusOwnership = {
+  tabId: string
+  paneDockOwnsFocus: (paneKey: PaneKey) => boolean
+}
 
 export function fitPanes(manager: PaneManager): void {
   manager.fitAllPanes()
 }
 
-export function focusActivePane(manager: PaneManager): void {
+export function focusActivePane(manager: PaneManager, ownership?: PaneFocusOwnership): void {
   // Why: tab rename focuses the input on the next frame. A queued terminal
   // layout focus can land in between mount and focus, blurring rename closed.
   if (typeof document !== 'undefined' && document.querySelector('[data-tab-rename-input="true"]')) {
     return
   }
   const activeElement = typeof document === 'undefined' ? null : document.activeElement
+  const panes = manager.getPanes()
+  const activePane = manager.getActivePane() ?? panes[0]
+  if (!activePane) {
+    return
+  }
+  if (ownership?.paneDockOwnsFocus(makePaneKey(ownership.tabId, activePane.leafId))) {
+    const activeDock =
+      activeElement instanceof HTMLElement ? activeElement.closest('[data-terminal-dock]') : null
+    if (shouldPreserveEditableFocus(activeElement) && !activeDock) {
+      return
+    }
+    activePane.container
+      .querySelector<HTMLTextAreaElement>('[data-terminal-dock] textarea:not(:disabled)')
+      ?.focus()
+    return
+  }
   if (shouldPreserveEditableFocus(activeElement)) {
     return
   }
-  const panes = manager.getPanes()
-  const activePane = manager.getActivePane() ?? panes[0]
-  activePane?.terminal.focus()
+  activePane.terminal.focus()
 }
 
-export function fitAndFocusPanes(manager: PaneManager): void {
+export function fitAndFocusPanes(manager: PaneManager, ownership?: PaneFocusOwnership): void {
   fitPanes(manager)
-  focusActivePane(manager)
+  focusActivePane(manager, ownership)
 }
 
 export function isWindowsUserAgent(

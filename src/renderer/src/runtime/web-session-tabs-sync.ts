@@ -26,16 +26,29 @@ import type {
   Tab,
   TabGroup,
   TabGroupLayoutNode,
+  TerminalDockPaneState,
   TerminalLayoutSnapshot,
   TerminalTab
 } from '../../../shared/types'
 import type { OpenFile } from '../store/slices/editor'
+import {
+  pendingMutationsForTabId,
+  TERMINAL_DOCK_ECHO_WINDOW_MS,
+  pruneExpiredTerminalDockPendingMutations,
+  reconcileTerminalDockByPaneKey,
+  remapPaneKeyTabId,
+  remapPendingMutationTimestampsTabId,
+  remapTerminalDockRecordTabId
+} from './fork-terminal-dock/web-session-terminal-dock-reconcile'
+
+export { remapPaneKeyTabId }
 import { isTerminalLeafId, makePaneKey, parsePaneKey } from '../../../shared/stable-pane-id'
 import { getRemoteRuntimePtyEnvironmentId, toRemoteRuntimePtyId } from './runtime-terminal-stream'
 import { sanitizeTerminalLayoutPaneTitlesForLabels } from '@/lib/terminal-pane-title-sanitization'
 import { terminalLayoutEqual } from '@/lib/terminal-layout-equality'
 import { normalizeTerminalLayoutPtyOwnership } from '@/components/terminal-pane/terminal-layout-pty-ownership'
 import { isClientAuthoritativeAgentStatusPane } from '@/components/terminal-pane/renderer-owned-agent-status-registry'
+import { rekeyTerminalDockPaneKeys } from '@/components/terminal-pane/fork-terminal-dock/terminal-dock-pane-state'
 import { getExplicitRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
 import {
   createWebRuntimeSessionTerminal,
@@ -170,6 +183,9 @@ type MirroredTerminalTab = {
   ptyIds: string[]
   layout: TerminalLayoutSnapshot
   retainedSurfaceByPrunedLeafId?: ReadonlyMap<string, TerminalSurface>
+  // Why: TerminalTab carries no dock field (host-side only, echoed on Tab), so the
+  // host value rides alongside tab instead of on it.
+  terminalDockByPaneKey?: Record<string, TerminalDockPaneState>
 }
 
 type MirroredBrowserTab = {
@@ -217,7 +233,15 @@ export type WebSessionTabsSyncState = Pick<
   | 'unreadTerminalTabs'
   | 'sortEpoch'
 > &
-  Partial<Pick<AppState, 'automaticAgentResumeClaimsByTabId' | 'pendingStartupByTabId'>>
+  Partial<
+    Pick<
+      AppState,
+      | 'automaticAgentResumeClaimsByTabId'
+      | 'pendingStartupByTabId'
+      | 'settings'
+      | 'terminalDockPendingMutationsByPaneKey'
+    >
+  >
 
 type WebSessionTabsBatchRecordKey =
   | 'activeBrowserTabIdByWorktree'
@@ -1026,6 +1050,15 @@ function buildMirroredTerminalTabs(
     // Why: viewMode echoes back through host snapshots, so prefer the client's record during the echo window and adopt the host value only without a prior tab.
     const hostViewModeSurface = surfaces.find((surface) => surface.viewMode)
     const viewMode = existing ? existing.viewMode : hostViewModeSurface?.viewMode
+    // Why: TerminalTab has no dock field to carry client precedence, so only the raw host
+    // value is resolved here; the caller applies existing-tab precedence at the Tab level.
+    const hostTerminalDockByPaneKey = surfaces.find(
+      (surface) => surface.terminalDockByPaneKey
+    )?.terminalDockByPaneKey
+    const mirroredTerminalDockByPaneKey = remapTerminalDockRecordTabId(
+      hostTerminalDockByPaneKey,
+      toWebTerminalSurfaceTabId
+    )
     return {
       tab: {
         id: localTabId,
@@ -1051,7 +1084,10 @@ function buildMirroredTerminalTabs(
       hostTabId: parentTabId,
       ptyIds,
       layout,
-      ...(retainedSurfaceByPrunedLeafId ? { retainedSurfaceByPrunedLeafId } : {})
+      ...(retainedSurfaceByPrunedLeafId ? { retainedSurfaceByPrunedLeafId } : {}),
+      ...(mirroredTerminalDockByPaneKey
+        ? { terminalDockByPaneKey: mirroredTerminalDockByPaneKey }
+        : {})
     }
   })
 }
@@ -1323,7 +1359,9 @@ function buildTerminalUnifiedTab(
   tab: TerminalTab,
   groupId: string,
   // Why: viewMode is host-tracked but the client's optimistic toggle must win during the echo window; callers pass the reconciled value.
-  viewMode?: Tab['viewMode']
+  viewMode?: Tab['viewMode'],
+  // Why: same echo-window precedence as viewMode; callers pass the already-reconciled value.
+  terminalDockByPaneKey?: Tab['terminalDockByPaneKey']
 ): Tab {
   return {
     id: tab.id,
@@ -1341,7 +1379,8 @@ function buildTerminalUnifiedTab(
     createdAt: tab.createdAt,
     isPreview: false,
     isPinned: tab.isPinned === true,
-    ...(viewMode ? { viewMode } : {})
+    ...(viewMode ? { viewMode } : {}),
+    ...(terminalDockByPaneKey ? { terminalDockByPaneKey } : {})
   }
 }
 
@@ -2398,27 +2437,29 @@ function applyWebSessionTabsSnapshotWithContext(
     terminalSurfaceTabs.map((tab) => toWebTerminalSurfaceTabId(tab.parentTabId))
   )
   const nextHostTerminalTabIds = new Set(terminalSurfaceTabs.map((tab) => tab.parentTabId))
-  const exactProvisionalHandoffs = new Set(
-    currentTerminalTabs
-      .filter((tab) => !isMirroredTerminalSurfaceId(tab.id))
-      .filter((tab) => {
-        if (nextHostTerminalTabIds.has(tab.id)) {
-          return true
-        }
-        const handoff = {
-          environmentId,
-          worktreeId,
-          provisionalTabId: tab.id
-        }
-        const hostTabId = resolveWebAgentSessionHandoff(handoff)
-        return (
-          hostTabId !== null &&
-          (nextHostTerminalTabIds.has(hostTabId) ||
-            isWebAgentSessionHandoffPostCreateSnapshotConfirmed(handoff))
-        )
-      })
-      .map((tab) => tab.id)
-  )
+  // Why: also captures the provisional tab's replacement host tab id, so the dock
+  // record it carries can be re-keyed to the replacement instead of dropped.
+  const exactProvisionalHandoffEntries = currentTerminalTabs
+    .filter((tab) => !isMirroredTerminalSurfaceId(tab.id))
+    .map((tab): [string, string] | null => {
+      if (nextHostTerminalTabIds.has(tab.id)) {
+        return [tab.id, tab.id]
+      }
+      const handoff = {
+        environmentId,
+        worktreeId,
+        provisionalTabId: tab.id
+      }
+      const hostTabId = resolveWebAgentSessionHandoff(handoff)
+      const isHandoff =
+        hostTabId !== null &&
+        (nextHostTerminalTabIds.has(hostTabId) ||
+          isWebAgentSessionHandoffPostCreateSnapshotConfirmed(handoff))
+      return isHandoff && hostTabId !== null ? [tab.id, hostTabId] : null
+    })
+    .filter((entry): entry is [string, string] => entry !== null)
+  const exactProvisionalHandoffs = new Set(exactProvisionalHandoffEntries.map(([id]) => id))
+  const provisionalHandoffHostTabIdByProvisionalTabId = new Map(exactProvisionalHandoffEntries)
   const retainedTerminalTabs = currentTerminalTabs.filter(
     (tab) =>
       !shouldReplaceTerminalTab(
@@ -2588,13 +2629,82 @@ function applyWebSessionTabsSnapshotWithContext(
       .filter((tab) => tab.contentType === 'terminal' && tab.viewMode)
       .map((tab) => [tab.id, tab.viewMode] as const)
   )
-  const mirroredTerminalUnifiedTabs = mirroredTerminalTabs.map((entry) =>
-    buildTerminalUnifiedTab(
+  // Existing state remains the fallback for old hosts that omit the field. A published host
+  // record wins so independently updating paired clients converge instead of pinning stale state.
+  const existingUnifiedTerminalTabById = new Map(
+    currentUnifiedTabs
+      .filter((tab) => tab.contentType === 'terminal')
+      .map((tab) => [tab.id, tab] as const)
+  )
+  // Why: the kill switch gates adoption of host dock state, not its presence — a flag-off
+  // client still carries forward whatever it already holds so it can't clobber a flag-on
+  // peer's persisted record.
+  const hostTerminalDockSyncEnabled = state.settings?.experimentalTerminalDock === true
+  // Why: a provisional tab's optimistic dock record has no unified tab under the
+  // replacement id yet, so it would otherwise be lost the instant the host confirms
+  // the handoff; carry it forward re-keyed to the replacement tab id.
+  const provisionalDockRecordByHostTabId = new Map<string, Record<string, TerminalDockPaneState>>()
+  const provisionalPendingMutationsByHostTabId = new Map<string, Record<string, number>>()
+  for (const [provisionalTabId, hostTabId] of provisionalHandoffHostTabIdByProvisionalTabId) {
+    const provisionalDockRecord =
+      existingUnifiedTerminalTabById.get(provisionalTabId)?.terminalDockByPaneKey
+    if (provisionalDockRecord) {
+      provisionalDockRecordByHostTabId.set(hostTabId, provisionalDockRecord)
+    }
+    const provisionalPendingMutations = pendingMutationsForTabId(
+      state.terminalDockPendingMutationsByPaneKey,
+      provisionalTabId
+    )
+    if (provisionalPendingMutations) {
+      provisionalPendingMutationsByHostTabId.set(hostTabId, provisionalPendingMutations)
+    }
+    // Why: this is the localStorage twin of the in-memory rekey above — old hosts that never
+    // echo the dock field rely on it surviving under the pane's final identity after a reload.
+    if (hostTerminalDockSyncEnabled) {
+      rekeyTerminalDockPaneKeys(provisionalTabId, toWebTerminalSurfaceTabId(hostTabId))
+    }
+  }
+  const terminalDockPendingMutationsByPaneKey = state.terminalDockPendingMutationsByPaneKey
+  const isTerminalDockPaneKeyPending = (paneKey: string): boolean => {
+    const mutatedAt = terminalDockPendingMutationsByPaneKey?.[paneKey]
+    return mutatedAt !== undefined && now - mutatedAt < TERMINAL_DOCK_ECHO_WINDOW_MS
+  }
+  let rekeyedHandoffPendingMutationsByPaneKey: Record<string, number> | undefined
+  const mirroredTerminalUnifiedTabs = mirroredTerminalTabs.map((entry) => {
+    const existingUnifiedTab = existingUnifiedTerminalTabById.get(entry.tab.id)
+    if (!hostTerminalDockSyncEnabled) {
+      return buildTerminalUnifiedTab(
+        entry.tab,
+        hostGroupIdByTabId.get(entry.hostTabId) ?? targetGroupId,
+        entry.tab.viewMode ?? existingViewModeByTabId.get(entry.tab.id),
+        existingUnifiedTab?.terminalDockByPaneKey
+      )
+    }
+    const handoffDockRecord = provisionalDockRecordByHostTabId.get(entry.hostTabId)
+    const rekeyedHandoffDockRecord = handoffDockRecord
+      ? remapTerminalDockRecordTabId(handoffDockRecord, () => entry.tab.id)
+      : undefined
+    const handoffPendingMutations = provisionalPendingMutationsByHostTabId.get(entry.hostTabId)
+    const rekeyedHandoffPendingMutations = handoffPendingMutations
+      ? remapPendingMutationTimestampsTabId(handoffPendingMutations, () => entry.tab.id)
+      : undefined
+    if (rekeyedHandoffPendingMutations) {
+      rekeyedHandoffPendingMutationsByPaneKey = {
+        ...rekeyedHandoffPendingMutationsByPaneKey,
+        ...rekeyedHandoffPendingMutations
+      }
+    }
+    return buildTerminalUnifiedTab(
       entry.tab,
       hostGroupIdByTabId.get(entry.hostTabId) ?? targetGroupId,
-      entry.tab.viewMode ?? existingViewModeByTabId.get(entry.tab.id)
+      entry.tab.viewMode ?? existingViewModeByTabId.get(entry.tab.id),
+      reconcileTerminalDockByPaneKey(
+        rekeyedHandoffDockRecord ?? entry.terminalDockByPaneKey,
+        existingUnifiedTab?.terminalDockByPaneKey,
+        isTerminalDockPaneKeyPending
+      )
     )
-  )
+  })
   const mirroredBrowserUnifiedTabs = mirroredBrowserTabs.map((entry) => entry.unifiedTab)
   const mirroredEditorUnifiedTabs = mirroredEditorTabs.map((entry) => entry.unifiedTab)
   const mirroredUnifiedTabs = [
@@ -3254,9 +3364,19 @@ function applyWebSessionTabsSnapshotWithContext(
     now,
     batchContext
   )
+  const prunedTerminalDockPendingMutationsByPaneKey = pruneExpiredTerminalDockPendingMutations(
+    state.terminalDockPendingMutationsByPaneKey,
+    now
+  )
+  const nextTerminalDockPendingMutationsByPaneKey = rekeyedHandoffPendingMutationsByPaneKey
+    ? { ...prunedTerminalDockPendingMutationsByPaneKey, ...rekeyedHandoffPendingMutationsByPaneKey }
+    : prunedTerminalDockPendingMutationsByPaneKey
 
   const patch: Partial<WebSessionTabsSyncState> = {
     ...agentStatusPatch,
+    ...(nextTerminalDockPendingMutationsByPaneKey !== state.terminalDockPendingMutationsByPaneKey
+      ? { terminalDockPendingMutationsByPaneKey: nextTerminalDockPendingMutationsByPaneKey }
+      : {}),
     ...(nextOpenFiles !== state.openFiles ? { openFiles: nextOpenFiles } : {}),
     ...(nextTabsByWorktree !== state.tabsByWorktree ? { tabsByWorktree: nextTabsByWorktree } : {}),
     ...(nextBrowserTabsByWorktree !== state.browserTabsByWorktree

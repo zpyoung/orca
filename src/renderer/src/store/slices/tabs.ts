@@ -13,6 +13,12 @@ import type {
 } from '../../../../shared/types'
 import { emitNativeChatToggled } from '@/lib/native-chat-telemetry'
 import {
+  createTabTerminalDockActions,
+  removeTabPaneKeysFromPendingMutations,
+  TAB_TERMINAL_DOCK_INITIAL_STATE,
+  type TabTerminalDockSlice
+} from './fork-terminal-dock/tab-terminal-dock-state'
+import {
   dedupeTabOrder,
   ensureGroup,
   findGroupAndWorktree,
@@ -58,7 +64,7 @@ function replaceWorkspaceRecordKeys<T>(
   }
 }
 
-export type TabsSlice = {
+export type TabsSlice = TabTerminalDockSlice & {
   unifiedTabsByWorktree: Record<string, Tab[]>
   // Why: id of the tab whose inline title editor should open; shortcut (tab.rename) sets it, the tab clears it on consume.
   renamingTabId: string | null
@@ -832,6 +838,7 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
   groupsByWorktree: {},
   activeGroupIdByWorktree: {},
   layoutByWorktree: {},
+  ...TAB_TERMINAL_DOCK_INITIAL_STATE,
 
   createUnifiedTab: (worktreeId, contentType, init) => {
     const id = init?.id ?? createBrowserUuid()
@@ -1147,6 +1154,12 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
         nextUnreadTerminalTabs = { ...current.unreadTerminalTabs }
         delete nextUnreadTerminalTabs[terminalEntityId]
       }
+      // Why: pending-mutation timestamps live outside the closed tab's own record, so drop
+      // its pane keys here or they linger in the store until they happen to age out.
+      const nextTerminalDockPendingMutationsByPaneKey = removeTabPaneKeysFromPendingMutations(
+        current.terminalDockPendingMutationsByPaneKey,
+        tabId
+      )
       let nextGroups = (current.groupsByWorktree[worktreeId] ?? []).map((candidate) =>
         candidate.id === group.id
           ? {
@@ -1188,6 +1201,10 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
         // Why: skip writing unreadTerminalTabs when the reference is unchanged, avoiding a no-op alloc that re-runs full-state selectors.
         ...(nextUnreadTerminalTabs !== current.unreadTerminalTabs
           ? { unreadTerminalTabs: nextUnreadTerminalTabs }
+          : {}),
+        ...(nextTerminalDockPendingMutationsByPaneKey !==
+        current.terminalDockPendingMutationsByPaneKey
+          ? { terminalDockPendingMutationsByPaneKey: nextTerminalDockPendingMutationsByPaneKey }
           : {}),
         // Why: closing the last tab can leave the worktree selected but render-empty, so write the landing-state fallback directly.
         ...(shouldDeactivateWorktree
@@ -1320,6 +1337,8 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
       mirrorTabViewModeToHost(get(), tabId, committed.to)
     }
   },
+
+  ...createTabTerminalDockActions(set, get),
 
   setRenamingTabId: (tabId) => {
     set({ renamingTabId: tabId })

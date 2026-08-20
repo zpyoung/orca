@@ -87,17 +87,23 @@ vi.mock('@/lib/native-chat-telemetry', () => ({
   emitNativeChatPickerOpened: vi.fn(),
   emitNativeChatSendClassified: vi.fn()
 }))
-vi.mock('./use-native-chat-draft', () => ({
-  useNativeChatDraft: (scopeKey: string) => {
+vi.mock('./fork-agent-composer/use-agent-composer-draft', () => ({
+  useAgentComposerDraft: (scopeKey: string) => {
     mocks.draftScopeKeys.push(scopeKey)
     return { draft: mocks.draft, setDraft: mocks.setDraft }
   }
 }))
-vi.mock('./native-chat-draft-cache', () => ({
-  readNativeChatDraftCache: () => ''
+vi.mock('./fork-agent-composer/agent-composer-draft-cache', () => ({
+  readAgentComposerDraftCache: () => ''
 }))
-vi.mock('./NativeChatComposerField', () => ({
-  NativeChatComposerField: (props: { onSend?: () => void; onStop?: () => void }) => {
+vi.mock('./fork-agent-composer/use-agent-composer-history', () => ({
+  useAgentComposerHistory: () => ({
+    history: { entries: [], index: null },
+    setHistory: vi.fn()
+  })
+}))
+vi.mock('./fork-agent-composer/AgentComposerField', () => ({
+  AgentComposerField: (props: { onSend?: () => void; onStop?: () => void }) => {
     mocks.fieldProps = props
     return null
   }
@@ -128,8 +134,8 @@ vi.mock('./use-native-chat-external-attachments', () => ({
 vi.mock('../dictation/dictation-control-events', () => ({
   dispatchDictationControl: vi.fn()
 }))
-vi.mock('./use-native-chat-composer-keydown', () => ({
-  useNativeChatComposerKeyDown: () => vi.fn()
+vi.mock('./fork-agent-composer/use-agent-composer-keydown', () => ({
+  useAgentComposerKeyDown: () => vi.fn()
 }))
 vi.mock('./use-native-chat-send-lifecycle', () => ({
   useNativeChatSendLifecycle: () => ({
@@ -272,7 +278,12 @@ describe('NativeChatComposer', () => {
 
     act(() => mocks.fieldProps?.onSend?.())
 
-    expect(mocks.sendNativeChatMessage).toHaveBeenCalledWith({}, 'pty-1', '$ref-oss', undefined)
+    expect(mocks.sendNativeChatMessage).toHaveBeenCalledWith(
+      {},
+      'pty-1',
+      '$ref-oss',
+      expect.anything()
+    )
     expect(mocks.sendNativeChatTypedCommand).not.toHaveBeenCalled()
   })
 
@@ -289,7 +300,12 @@ describe('NativeChatComposer', () => {
 
     act(() => mocks.fieldProps?.onSend?.())
 
-    expect(mocks.sendNativeChatMessage).toHaveBeenCalledWith({}, 'pty-1', '/clear', undefined)
+    expect(mocks.sendNativeChatMessage).toHaveBeenCalledWith(
+      {},
+      'pty-1',
+      '/clear',
+      expect.anything()
+    )
     expect(mocks.sendNativeChatTypedCommand).not.toHaveBeenCalled()
   })
 

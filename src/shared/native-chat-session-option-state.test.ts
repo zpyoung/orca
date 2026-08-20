@@ -47,6 +47,71 @@ describe('applyNativeChatReportedSessionOptions', () => {
   })
 })
 
+describe('applyNativeChatReportedSessionOptions staleness guard', () => {
+  it('ignores a report from a turn that predates a dispatched pick', () => {
+    const record = claudeRecord()
+    record.model = { value: 'opus', source: 'reported' }
+    record.valuesByModel.opus = { effort: { value: 'max', source: 'dispatched', at: 200 } }
+    // The turn was already in flight when /effort max was sent, so it still records
+    // the previous level; folding it in would revert the pill under the user.
+    expect(
+      applyNativeChatReportedSessionOptions(record, { model: 'opus', effort: 'high' }, 100)
+    ).toBe(false)
+    expect(record.valuesByModel.opus?.effort).toEqual({
+      value: 'max',
+      source: 'dispatched',
+      at: 200
+    })
+  })
+
+  it('applies a report from a turn that ran after the pick', () => {
+    const record = claudeRecord()
+    record.model = { value: 'opus', source: 'reported' }
+    record.valuesByModel.opus = { effort: { value: 'max', source: 'dispatched', at: 100 } }
+    expect(
+      applyNativeChatReportedSessionOptions(record, { model: 'opus', effort: 'high' }, 200)
+    ).toBe(true)
+    expect(record.valuesByModel.opus?.effort).toEqual({ value: 'high', source: 'reported' })
+  })
+
+  it('drops the whole report when it predates a dispatched model switch', () => {
+    const record = claudeRecord()
+    record.model = { value: 'sonnet', source: 'dispatched', at: 200 }
+    // The report describes the model that was running before the switch, so its
+    // effort belongs to that model too and none of it may be folded in.
+    expect(
+      applyNativeChatReportedSessionOptions(record, { model: 'opus', effort: 'high' }, 100)
+    ).toBe(false)
+    expect(record.model).toEqual({ value: 'sonnet', source: 'dispatched', at: 200 })
+    expect(record.valuesByModel.opus).toBeUndefined()
+  })
+
+  it('fails open when either side carries no timestamp', () => {
+    const undated = claudeRecord()
+    undated.model = { value: 'opus', source: 'reported' }
+    undated.valuesByModel.opus = { effort: { value: 'max', source: 'dispatched' } }
+    expect(
+      applyNativeChatReportedSessionOptions(undated, { model: 'opus', effort: 'high' }, 100)
+    ).toBe(true)
+
+    const unstamped = claudeRecord()
+    unstamped.model = { value: 'opus', source: 'reported' }
+    unstamped.valuesByModel.opus = { effort: { value: 'max', source: 'dispatched', at: 200 } }
+    expect(
+      applyNativeChatReportedSessionOptions(unstamped, { model: 'opus', effort: 'high' })
+    ).toBe(true)
+  })
+
+  it('never withholds a report from an applied launch value', () => {
+    // Only a dispatched pick can outrank a report: an applied value describes the
+    // launch, which the agent's own log supersedes the moment it says otherwise.
+    const record = claudeRecord()
+    record.model = { value: 'opus', source: 'applied', at: 500 }
+    expect(applyNativeChatReportedSessionOptions(record, { model: 'sonnet' }, 100)).toBe(true)
+    expect(record.model).toEqual({ value: 'sonnet', source: 'reported' })
+  })
+})
+
 describe('matchNativeChatCatalogModelId', () => {
   it('matches exact ids, labels, and provider-id containment', () => {
     expect(matchNativeChatCatalogModelId(CLAUDE_SESSION_OPTION_CATALOG, 'sonnet')).toBe('sonnet')

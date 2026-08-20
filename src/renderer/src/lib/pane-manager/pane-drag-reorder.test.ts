@@ -126,6 +126,7 @@ function createPane(id: number, container: FakeElement): ManagedPaneInternal {
     terminal: {} as never,
     container: container as unknown as HTMLElement,
     xtermContainer: {} as never,
+    dockContainer: {} as never,
     linkTooltip: {} as never,
     terminalGpuAcceleration: 'auto',
     gpuRenderingEnabled: true,

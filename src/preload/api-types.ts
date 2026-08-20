@@ -277,6 +277,7 @@ import type {
   SearchResult,
   StatsSummary,
   MemorySnapshot,
+  TerminalDockPaneState,
   TuiAgent,
   ReleaseBuildListResult,
   UpdateCheckOptions,
@@ -500,11 +501,8 @@ import type {
   AiVaultPrepareSessionResumeArgs,
   AiVaultPrepareSessionResumeResult
 } from '../shared/ai-vault-resume-preparation'
-import type {
-  AgentType,
-  NativeChatMessage,
-  NativeChatTurnLifecycle
-} from '../shared/native-chat-types'
+import type { AgentType, NativeChatMessage } from '../shared/native-chat-types'
+import type { NativeChatCompanionFrameFields } from '../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 import type { TelemetryConsentState } from '../shared/telemetry-consent-types'
 import type { AgentKind, LaunchSource, RequestKind } from '../shared/telemetry-events'
 import type { AppStarSource } from '../shared/gh-star-source'
@@ -868,9 +866,8 @@ export type AiVaultApi = {
 
 // notFound marks a not-yet-on-disk miss (retry-worthy) vs a real read/parse error (#8401).
 export type NativeChatReadSessionResult =
-  | {
+  | (NativeChatCompanionFrameFields & {
       messages: NativeChatMessage[]
-      lifecycle?: NativeChatTurnLifecycle
       /** Authoritative "older history exists". Optional: a runtime old enough to
        *  omit it leaves the caller inferring from the returned count, which is
        *  wrong whenever a read is bounded by bytes rather than turns. */
@@ -880,35 +877,31 @@ export type NativeChatReadSessionResult =
        *  same old-runtime reason as `hasMore`; without it the caller can only
        *  page by growing `limit`. */
       beforeOffset?: number
-    }
+    })
   | { error: string; notFound?: true }
 
 /** Messages appended to a live-tailed transcript since the previous emit. */
 export type NativeChatAppendedMessages = NativeChatMessage[]
 
-export type NativeChatSubscriptionFrame =
-  | {
-      type: 'snapshot'
-      messages: NativeChatMessage[]
-      hasMore: boolean
-      /** Oldest returned turn's byte offset; seeds pagination from a live
-       *  snapshot, which otherwise supersedes the seed read that carried it. */
-      beforeOffset?: number
-      error?: string
-      lifecycle?: NativeChatTurnLifecycle
-    }
-  | {
-      type: 'replacement'
-      messages: NativeChatMessage[]
-      hasMore: boolean
-      beforeOffset?: number
-      lifecycle?: NativeChatTurnLifecycle
-    }
-  | {
-      type: 'appended'
-      messages: NativeChatMessage[]
-      lifecycle?: NativeChatTurnLifecycle
-    }
+export type NativeChatSubscriptionFrame = NativeChatCompanionFrameFields &
+  (
+    | {
+        type: 'snapshot'
+        messages: NativeChatMessage[]
+        hasMore: boolean
+        /** Oldest returned turn's byte offset; seeds pagination from a live
+         *  snapshot, which otherwise supersedes the seed read that carried it. */
+        beforeOffset?: number
+        error?: string
+      }
+    | {
+        type: 'replacement'
+        messages: NativeChatMessage[]
+        hasMore: boolean
+        beforeOffset?: number
+      }
+    | { type: 'appended'; messages: NativeChatMessage[] }
+  )
 
 /** Wire payload for the `nativeChat:appended` push channel. */
 export type NativeChatAppendedPayload = {
@@ -1545,6 +1538,7 @@ export type PreloadApi = {
     }>
     write: (id: string, data: string) => void
     writeAccepted: (id: string, data: string) => Promise<boolean>
+    writeInputAccepted: (id: string, data: string) => Promise<boolean>
     onWriteUnavailable?: (callback: (payload: { id: string }) => void) => () => void
     resize: (id: string, cols: number, rows: number) => void
     claimViewport: (id: string, cols: number, rows: number) => void
@@ -3249,6 +3243,7 @@ export type PreloadApi = {
         launchToken?: string
         launchAgent?: TuiAgent
         viewMode?: 'terminal' | 'chat'
+        terminalDockByPaneKey?: Record<string, TerminalDockPaneState>
         title?: string
         ptyId?: string
         activate?: boolean

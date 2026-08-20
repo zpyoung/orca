@@ -80,6 +80,9 @@ function renderMenu(overrides: Record<string, unknown> = {}): string {
     canToggleNativeChat: false,
     isNativeChatView: false,
     onToggleNativeChat: vi.fn(),
+    canToggleTerminalDock: false,
+    isTerminalDockDocked: false,
+    onToggleTerminalDock: vi.fn(),
     onCopyAgentSessionContext: vi.fn(),
     quickCommandHosts: [
       { hostId: 'local' as const, label: 'Local Linux', repoCommands: [], globalCommands: [] }
@@ -265,5 +268,44 @@ describe('TerminalContextMenu', () => {
 
     expect(rendered).toContain('Loading host…')
     expect(rendered).not.toContain('Add Quick Command…')
+  })
+
+  it('omits the agent composer item when the pane cannot host a dock', () => {
+    const rendered = renderMenu({ canToggleTerminalDock: false })
+
+    expect(rendered).not.toContain('Show agent composer')
+    expect(rendered).not.toContain('Hide agent composer')
+  })
+
+  it('offers to show the agent composer for an undocked pane', () => {
+    const onToggleTerminalDock = vi.fn()
+    const rendered = renderMenu({
+      canToggleTerminalDock: true,
+      isTerminalDockDocked: false,
+      onToggleTerminalDock
+    })
+
+    expect(rendered).toContain('Show agent composer')
+    items.list
+      .find((item) => childrenText(item.children).includes('Show agent composer'))
+      ?.onSelect?.()
+
+    expect(onToggleTerminalDock).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers to hide the agent composer once the pane is docked', () => {
+    const rendered = renderMenu({ canToggleTerminalDock: true, isTerminalDockDocked: true })
+
+    expect(rendered).toContain('Hide agent composer')
+    expect(rendered).not.toContain('Show agent composer')
+  })
+
+  it('renders the dock toggle shortcut so the menu teaches it', () => {
+    renderMenu({
+      canToggleTerminalDock: true,
+      keybindings: { 'terminal.dock.toggle': ['Mod+Shift+K'] } as KeybindingOverrides
+    })
+
+    expect(shortcuts.list).toContain('Ctrl+Shift+K')
   })
 })

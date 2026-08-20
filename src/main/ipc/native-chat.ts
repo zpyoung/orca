@@ -1,9 +1,9 @@
 import { ipcMain, type IpcMainEvent, type WebContents } from 'electron'
-import type {
-  AgentType,
-  NativeChatMessage,
-  NativeChatTurnLifecycle
-} from '../../shared/native-chat-types'
+import type { AgentType, NativeChatMessage } from '../../shared/native-chat-types'
+import {
+  nativeChatCompanionFrameFields,
+  type NativeChatCompanionFrameFields
+} from '../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 import { clearNativeChatTranscriptCache } from '../native-chat/transcript-read-cache'
 import type { ReadTranscriptResult } from '../native-chat/transcript-reader'
 import {
@@ -75,27 +75,23 @@ export type NativeChatSubscribeArgs = {
 
 export type NativeChatAppendedPayload = {
   subscriptionId: string
-  frame:
+  frame: (
     | {
         type: 'snapshot'
         messages: NativeChatMessage[]
         hasMore: boolean
         beforeOffset?: number
         error?: string
-        lifecycle?: NativeChatTurnLifecycle
       }
     | {
         type: 'replacement'
         messages: NativeChatMessage[]
         hasMore: boolean
         beforeOffset?: number
-        lifecycle?: NativeChatTurnLifecycle
       }
-    | {
-        type: 'appended'
-        messages: NativeChatMessage[]
-        lifecycle?: NativeChatTurnLifecycle
-      }
+    | { type: 'appended'; messages: NativeChatMessage[] }
+  ) &
+    NativeChatCompanionFrameFields
 }
 
 type LiveSubscription = {
@@ -221,7 +217,7 @@ async function handleSubscribe(event: IpcMainEvent, args: NativeChatSubscribeArg
     sessionId,
     transcriptPath,
     initialLimit: limit,
-    onInitialSnapshot: (messages, hasMore, beforeOffset, error, lifecycle) => {
+    onInitialSnapshot: (messages, hasMore, beforeOffset, error, companion) => {
       if (sender.isDestroyed()) {
         return
       }
@@ -235,12 +231,12 @@ async function handleSubscribe(event: IpcMainEvent, args: NativeChatSubscribeArg
           hasMore,
           beforeOffset,
           ...(error ? { error } : {}),
-          ...(lifecycle ? { lifecycle } : {})
+          ...nativeChatCompanionFrameFields(companion)
         }
       }
       sender.send('nativeChat:appended', payload)
     },
-    onReplace: (messages, hasMore, beforeOffset, lifecycle) => {
+    onReplace: (messages, hasMore, beforeOffset, companion) => {
       if (sender.isDestroyed()) {
         return
       }
@@ -251,11 +247,11 @@ async function handleSubscribe(event: IpcMainEvent, args: NativeChatSubscribeArg
           messages,
           hasMore,
           beforeOffset,
-          ...(lifecycle ? { lifecycle } : {})
+          ...nativeChatCompanionFrameFields(companion)
         }
       } satisfies NativeChatAppendedPayload)
     },
-    onAppend: (messages, lifecycle) => {
+    onAppend: (messages, companion) => {
       if (sender.isDestroyed()) {
         return
       }
@@ -264,7 +260,7 @@ async function handleSubscribe(event: IpcMainEvent, args: NativeChatSubscribeArg
         frame: {
           type: 'appended',
           messages,
-          ...(lifecycle ? { lifecycle } : {})
+          ...nativeChatCompanionFrameFields(companion)
         }
       }
       sender.send('nativeChat:appended', payload)

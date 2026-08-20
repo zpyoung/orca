@@ -153,7 +153,7 @@ import { translateHostAccessLinkError } from '@/lib/remote-pairing-copy'
 import { getDefaultCreateProjectParent } from '@/components/sidebar/create-project-defaults'
 import {
   parseRuntimeNativeChatReadSessionResult,
-  parseRuntimeNativeChatTurnLifecycle
+  parseRuntimeNativeChatCompanionFields
 } from '@/components/native-chat/fork-native-chat-relay/native-chat-runtime-contract'
 import { createWebFileMutationMethods } from './web-file-mutation-methods'
 
@@ -1311,8 +1311,9 @@ function createNativeChatApi(): NativeChatApi {
                 hasMore?: boolean
                 error?: string
                 lifecycle?: unknown
+                sessionOptions?: unknown
               }
-              const lifecycle = parseRuntimeNativeChatTurnLifecycle(result?.lifecycle)
+              const companion = parseRuntimeNativeChatCompanionFields(result)
               if (
                 (result?.type === 'appended' ||
                   result?.type === 'snapshot' ||
@@ -1326,7 +1327,7 @@ function createNativeChatApi(): NativeChatApi {
                     messages: result.messages,
                     hasMore: result.hasMore ?? result.messages.length >= (args.limit ?? 300),
                     ...(result.error ? { error: result.error } : {}),
-                    ...(lifecycle ? { lifecycle } : {})
+                    ...companion
                   })
                 } else if (result.type === 'snapshot') {
                   onFrame({
@@ -1334,7 +1335,7 @@ function createNativeChatApi(): NativeChatApi {
                     messages: result.messages,
                     hasMore: result.hasMore ?? false,
                     ...(result.error ? { error: result.error } : {}),
-                    ...(lifecycle ? { lifecycle } : {})
+                    ...companion
                   })
                 } else {
                   onFrame(
@@ -1343,12 +1344,12 @@ function createNativeChatApi(): NativeChatApi {
                           type: 'replacement',
                           messages: result.messages,
                           hasMore: result.hasMore ?? false,
-                          ...(lifecycle ? { lifecycle } : {})
+                          ...companion
                         }
                       : {
                           type: 'appended',
                           messages: result.messages,
-                          ...(lifecycle ? { lifecycle } : {})
+                          ...companion
                         }
                   )
                 }
@@ -3251,6 +3252,8 @@ function createPtyApi(): NonNullable<Partial<PreloadApi>['pty']> {
     spawn: () => Promise.reject(new Error('Local PTYs are unavailable in the web client.')),
     write: () => {},
     writeAccepted: () => Promise.resolve(false),
+    // web panes have no local PTY transport; the acceptance path must not claim delivery
+    writeInputAccepted: () => Promise.resolve(false),
     resize: () => {},
     claimViewport: () => {},
     reportGeometry: () => {},

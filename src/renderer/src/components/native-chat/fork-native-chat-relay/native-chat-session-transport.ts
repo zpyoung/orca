@@ -15,7 +15,7 @@ import {
 import { isRuntimeCompatBlockError } from '@/runtime/runtime-protocol-compat'
 import {
   parseRuntimeNativeChatReadSessionResult,
-  parseRuntimeNativeChatTurnLifecycle,
+  parseRuntimeNativeChatCompanionFields,
   RUNTIME_NATIVE_CHAT_READ_ERROR
 } from './native-chat-runtime-contract'
 
@@ -171,8 +171,9 @@ function createRuntimeNativeChatTransport(environmentId: string): NativeChatSess
                   beforeOffset?: number
                   error?: string
                   lifecycle?: unknown
+                  sessionOptions?: unknown
                 }
-                const lifecycle = parseRuntimeNativeChatTurnLifecycle(frame?.lifecycle)
+                const companion = parseRuntimeNativeChatCompanionFields(frame)
                 // Seeds the paging cursor: a snapshot supersedes the seed read
                 // that carried the offset, so dropping it here retires paging.
                 const offset =
@@ -193,7 +194,7 @@ function createRuntimeNativeChatTransport(environmentId: string): NativeChatSess
                       hasMore: frame.hasMore ?? frame.messages.length >= (limit ?? 300),
                       ...offset,
                       ...(frame.error ? { error: frame.error } : {}),
-                      ...(lifecycle ? { lifecycle } : {})
+                      ...companion
                     })
                   } else if (frame.type === 'snapshot') {
                     onFrame({
@@ -202,7 +203,7 @@ function createRuntimeNativeChatTransport(environmentId: string): NativeChatSess
                       hasMore: frame.hasMore ?? false,
                       ...offset,
                       ...(frame.error ? { error: frame.error } : {}),
-                      ...(lifecycle ? { lifecycle } : {})
+                      ...companion
                     })
                   } else {
                     onFrame(
@@ -212,12 +213,12 @@ function createRuntimeNativeChatTransport(environmentId: string): NativeChatSess
                             messages: frame.messages,
                             hasMore: frame.hasMore ?? false,
                             ...offset,
-                            ...(lifecycle ? { lifecycle } : {})
+                            ...companion
                           }
                         : {
                             type: 'appended',
                             messages: frame.messages,
-                            ...(lifecycle ? { lifecycle } : {})
+                            ...companion
                           }
                     )
                   }

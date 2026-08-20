@@ -10,6 +10,7 @@ import type {
 import type { AgentType } from '../../shared/agent-status-types'
 import type { Repo } from '../../shared/types'
 import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
+import { CODEX_PLUGIN_CACHE_ROOT_ID } from './fork-skill-plugin-attribution/skill-plugin-name-resolution'
 
 export type SkillScanRoot = Omit<SkillDiscoverySource, 'exists' | 'skippedReason'>
 type SkillDiscoveryPathApi = Pick<typeof posix, 'basename' | 'join'>
@@ -98,7 +99,7 @@ export function buildSkillDiscoverySources(
       'claude'
     ),
     source(
-      'codex-plugin-cache',
+      CODEX_PLUGIN_CACHE_ROOT_ID,
       'Codex plugin cache',
       pathApi.join(home, '.codex', 'plugins', 'cache'),
       'plugin',

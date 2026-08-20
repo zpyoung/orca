@@ -1,0 +1,24 @@
+{
+  "components": {
+    "terminal-dock": {
+      "passthroughActive": "Passthrough active — terminal has keyboard focus",
+      "connecting": "Connecting…",
+      "reconnecting": "Reconnecting…",
+      "disconnected": "Disconnected",
+      "offline": "Offline",
+      "sessionEnded": "Session ended",
+      "noSession": "No terminal session",
+      "sshDisconnected": "SSH disconnected",
+      "mobileDriverLeaseHeld": "Mobile device is composing",
+      "reattaching": "Reattaching…"
+    },
+    "terminal": {
+      "pane": {
+        "TerminalContextMenu": {
+          "hideAgentComposer": "Hide agent composer",
+          "showAgentComposer": "Show agent composer"
+        }
+      }
+    }
+  }
+}

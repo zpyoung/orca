@@ -12,6 +12,8 @@ import type {
   PersistedNativeChatSessionOptions,
   SessionOptionDescriptor
 } from '../../../../shared/native-chat-session-options'
+import type { NativeChatSessionOptionObservation } from '../../../../shared/native-chat-types'
+import { nativeChatReportedValuesFromObservation } from './fork-native-chat-session-options/native-chat-session-option-observation'
 import { useAppStore } from '../../store'
 import {
   createNativeChatPtySessionOptions,
@@ -90,15 +92,36 @@ export function useNativeChatSessionOptions(args: {
   dispatchCommand: NativeChatSessionOptionDispatchCommand
   onAgentPicker?: () => void
   readTerminalScreen?: () => string | null
+  /** What the agent recorded about itself in its own session log. Authoritative
+   *  over the screen scrape: it is written per turn, so it outlives the scrollback
+   *  and reflects a switch made outside the composer. */
+  reportedSessionOptions?: NativeChatSessionOptionObservation | null
 }): {
   surface: NativeChatPtySessionOptionsSurface | null
   snapshot: SessionOptionDescriptor[]
 } {
-  const { agent, terminalTabId, targetPtyId, dispatchCommand, onAgentPicker, readTerminalScreen } =
-    args
+  const {
+    agent,
+    terminalTabId,
+    targetPtyId,
+    dispatchCommand,
+    onAgentPicker,
+    readTerminalScreen,
+    reportedSessionOptions
+  } = args
   // The screen text that last parsed into reported values, so a later model
   // discovery can re-resolve it against the host's real ids.
   const reportedScreenRef = useRef<string | null>(null)
+  // The observation this pty's session log last supplied. Set at all means the log
+  // has answered, which retires the screen scrape; the value itself lets a later
+  // model discovery re-resolve it against the host's real ids.
+  const observedFromLogRef = useRef<NativeChatSessionOptionObservation | null>(null)
+  const observedPtyRef = useRef<string | null>(targetPtyId)
+  if (observedPtyRef.current !== targetPtyId) {
+    // A new pty is a new session; nothing the old one logged describes it.
+    observedPtyRef.current = targetPtyId
+    observedFromLogRef.current = null
+  }
   const discoveryContext = useMemo(
     () => resolveNativeChatModelDiscoveryContext(terminalTabId),
     [terminalTabId]
@@ -155,7 +178,24 @@ export function useNativeChatSessionOptions(args: {
   ])
 
   useEffect(() => {
-    if (!surface || agent !== 'claude') {
+    if (!surface || !discoveryContext || !reportedSessionOptions) {
+      return
+    }
+    const values = nativeChatReportedValuesFromObservation({
+      observation: reportedSessionOptions,
+      agent,
+      models: readNativeChatEnrichedModels(agent, discoveryContext.hostKey) ?? []
+    })
+    if (values) {
+      observedFromLogRef.current = reportedSessionOptions
+      surface.reportSessionOptions(values, reportedSessionOptions.observedAt)
+    }
+  }, [agent, discoveryContext, reportedSessionOptions, surface])
+
+  useEffect(() => {
+    // Why: the log is per-turn evidence and the frame is not, so once the log has
+    // answered for this pty, re-reading a frame painted before it can only rewind.
+    if (!surface || agent !== 'claude' || observedFromLogRef.current) {
       return
     }
     let cancelled = false
@@ -211,12 +251,21 @@ export function useNativeChatSessionOptions(args: {
       discoveryContext.hostKey,
       (models) => {
         surface.replaceModels(models)
+        const observation = observedFromLogRef.current
         const screen = agent === 'claude' ? reportedScreenRef.current : null
-        const reportedValues = screen
-          ? readClaudeSessionOptionsFromTerminalScreen(screen, models)
-          : null
-        if (reportedValues) {
-          surface.reportSessionOptions(reportedValues)
+        // Why: both readings resolved against the seed families before the probe
+        // landed. Re-resolving now is what upgrades `opus` to the host's real
+        // `opus[1m]` — the frame itself may already have scrolled out of reach.
+        if (observation) {
+          const values = nativeChatReportedValuesFromObservation({ observation, agent, models })
+          if (values) {
+            surface.reportSessionOptions(values, observation.observedAt)
+          }
+        } else if (screen) {
+          const reportedValues = readClaudeSessionOptionsFromTerminalScreen(screen, models)
+          if (reportedValues) {
+            surface.reportSessionOptions(reportedValues)
+          }
         }
         // A failed settings write must not surface as an unhandled rejection.
         void retirePersistedModelMissingFromDiscovery(agent, models).catch(() => undefined)

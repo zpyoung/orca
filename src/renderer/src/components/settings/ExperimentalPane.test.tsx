@@ -222,6 +222,37 @@ describe('ExperimentalPane', () => {
     expect(markup).toContain('aria-checked="true"')
   })
 
+  it('renders terminal dock as an off-by-default searchable experimental switch', () => {
+    const settings = getDefaultSettings('/tmp')
+    const markup = renderToStaticMarkup(
+      <ExperimentalPane settings={settings} updateSettings={vi.fn()} />
+    )
+
+    expect(settings.experimentalTerminalDock).toBe(false)
+    expect(markup).toContain('Terminal dock')
+    expect(getExperimentalPaneSearchEntries().map((entry) => entry.title)).toContain(
+      'Terminal dock'
+    )
+  })
+
+  it('enables terminal dock through the experimental switch', async () => {
+    const updateSettings = vi.fn()
+    const { root, container } = await renderExperimentalPane({ updateSettings })
+    const switchButton = container.querySelector<HTMLButtonElement>(
+      '#experimental-terminal-dock button[role="switch"]'
+    )
+    if (!switchButton) {
+      throw new Error('Terminal dock switch was not rendered')
+    }
+
+    await act(async () => {
+      switchButton.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(updateSettings).toHaveBeenCalledWith({ experimentalTerminalDock: true })
+    root.unmount()
+  })
+
   it('shows Chat UI default-mode as a child setting only when Chat UI is enabled', async () => {
     const updateSettings = vi.fn()
     const disabledSettings = getDefaultSettings('/tmp')

@@ -59,6 +59,72 @@ describe('NativeChatPickerMenu', () => {
     expect(screen.getByText('Project')).toBeTruthy()
   })
 
+  it('names the owning plugin instead of the generic plugin scope', () => {
+    render(
+      <NativeChatPickerMenu
+        autocomplete={autocomplete({
+          items: [
+            {
+              kind: 'skill',
+              id: 'skill:quirk:render',
+              name: 'quirk:render',
+              description: 'Render a page',
+              pluginName: 'quirk',
+              sources: [
+                {
+                  sourceKind: 'plugin',
+                  skillFilePath: '/plugins/quirk/skills/render/SKILL.md',
+                  pluginName: 'quirk'
+                }
+              ]
+            }
+          ]
+        })}
+        activeIndex={0}
+        listboxId="picker"
+        onChoose={vi.fn()}
+        onRetry={vi.fn()}
+      />
+    )
+    expect(screen.getByText('quirk')).toBeTruthy()
+    expect(screen.queryByText('Plugin')).toBeNull()
+  })
+
+  it('lists the competing plugins on a row that stayed merged', () => {
+    render(
+      <NativeChatPickerMenu
+        autocomplete={autocomplete({
+          prefix: '$',
+          items: [
+            {
+              kind: 'skill',
+              id: 'skill:render',
+              name: 'render',
+              description: 'Render a page',
+              sources: [
+                {
+                  sourceKind: 'plugin',
+                  skillFilePath: '/plugins/quirk/skills/render/SKILL.md',
+                  pluginName: 'quirk'
+                },
+                {
+                  sourceKind: 'plugin',
+                  skillFilePath: '/plugins/warp/skills/render/SKILL.md',
+                  pluginName: 'warp'
+                }
+              ]
+            }
+          ]
+        })}
+        activeIndex={0}
+        listboxId="picker"
+        onChoose={vi.fn()}
+        onRetry={vi.fn()}
+      />
+    )
+    expect(screen.getAllByText('quirk, warp - agent resolves').length).toBeGreaterThan(0)
+  })
+
   it('completes a command on pointer down instead of dispatching it internally', () => {
     const onChoose = vi.fn()
     const value = autocomplete()

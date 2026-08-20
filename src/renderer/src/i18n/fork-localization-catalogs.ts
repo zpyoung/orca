@@ -14,6 +14,27 @@ import ko from '../components/native-chat/fork-native-chat-width/locales/ko.json
 import worktreeGroupsZH from '../components/sidebar/fork-worktree-groups/locales/zh.json'
 import zh from '../components/native-chat/fork-native-chat-width/locales/zh.json'
 
+import dockEN from '../components/terminal-pane/fork-terminal-dock/locales/en.json'
+import dockES from '../components/terminal-pane/fork-terminal-dock/locales/es.json'
+import dockJA from '../components/terminal-pane/fork-terminal-dock/locales/ja.json'
+import dockKO from '../components/terminal-pane/fork-terminal-dock/locales/ko.json'
+import dockZH from '../components/terminal-pane/fork-terminal-dock/locales/zh.json'
+import dockSettingsEN from '../components/settings/fork-terminal-dock/locales/en.json'
+import dockSettingsES from '../components/settings/fork-terminal-dock/locales/es.json'
+import dockSettingsJA from '../components/settings/fork-terminal-dock/locales/ja.json'
+import dockSettingsKO from '../components/settings/fork-terminal-dock/locales/ko.json'
+import dockSettingsZH from '../components/settings/fork-terminal-dock/locales/zh.json'
+import agentComposerEN from '../components/native-chat/fork-agent-composer/locales/en.json'
+import agentComposerES from '../components/native-chat/fork-agent-composer/locales/es.json'
+import agentComposerJA from '../components/native-chat/fork-agent-composer/locales/ja.json'
+import agentComposerKO from '../components/native-chat/fork-agent-composer/locales/ko.json'
+import agentComposerZH from '../components/native-chat/fork-agent-composer/locales/zh.json'
+import skillPluginsEN from '../components/native-chat/fork-skill-plugin-attribution/locales/en.json'
+import skillPluginsES from '../components/native-chat/fork-skill-plugin-attribution/locales/es.json'
+import skillPluginsJA from '../components/native-chat/fork-skill-plugin-attribution/locales/ja.json'
+import skillPluginsKO from '../components/native-chat/fork-skill-plugin-attribution/locales/ko.json'
+import skillPluginsZH from '../components/native-chat/fork-skill-plugin-attribution/locales/zh.json'
+
 type ForkLocale = 'en' | 'es' | 'ja' | 'ko' | 'zh'
 type ForkCatalog = Record<string, unknown>
 type ForkCatalogRegistrar = {
@@ -31,11 +52,11 @@ type ForkCatalogRegistrar = {
 }
 
 const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
-  en: [relayEN, en, worktreeGroupsEN],
-  es: [relayES, es, worktreeGroupsES],
-  ja: [relayJA, ja, worktreeGroupsJA],
-  ko: [relayKO, ko, worktreeGroupsKO],
-  zh: [relayZH, zh, worktreeGroupsZH]
+  en: [relayEN, en, worktreeGroupsEN, dockEN, dockSettingsEN, agentComposerEN, skillPluginsEN],
+  es: [relayES, es, worktreeGroupsES, dockES, dockSettingsES, agentComposerES, skillPluginsES],
+  ja: [relayJA, ja, worktreeGroupsJA, dockJA, dockSettingsJA, agentComposerJA, skillPluginsJA],
+  ko: [relayKO, ko, worktreeGroupsKO, dockKO, dockSettingsKO, agentComposerKO, skillPluginsKO],
+  zh: [relayZH, zh, worktreeGroupsZH, dockZH, dockSettingsZH, agentComposerZH, skillPluginsZH]
 }
 
 export function registerForkLocalizationCatalogs(i18n: ForkCatalogRegistrar): void {

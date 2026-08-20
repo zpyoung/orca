@@ -28,6 +28,8 @@ const mocks = vi.hoisted(() => ({
   restoreScrollStateAfterLayout: vi.fn()
 }))
 
+const paneDockOwnsFocus = vi.fn(() => false)
+
 const reactRefState = vi.hoisted(() => ({
   slots: [] as { current: unknown }[],
   index: 0
@@ -177,6 +179,7 @@ function useMountForFileDrop(
 
   beginHookRender()
   useTerminalPaneGlobalEffects({
+    paneDockOwnsFocus,
     tabId: options.tabId ?? 'tab-1',
     worktreeId: options.worktreeId ?? 'wt-1',
     cwd: options.cwd,
@@ -282,6 +285,7 @@ describe('useTerminalPaneGlobalEffects', () => {
     const isVisibleRef = { current: false }
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       tabId: 'tab-1',
       worktreeId: 'wt-1',
       isActive: true,
@@ -363,6 +367,7 @@ describe('useTerminalPaneGlobalEffects', () => {
 
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       ...baseArgs,
       isActive: true,
       isVisible: true
@@ -380,6 +385,7 @@ describe('useTerminalPaneGlobalEffects', () => {
 
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       ...baseArgs,
       isActive: false,
       isVisible: false
@@ -389,6 +395,7 @@ describe('useTerminalPaneGlobalEffects', () => {
 
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       ...baseArgs,
       isActive: true,
       isVisible: true
@@ -401,7 +408,10 @@ describe('useTerminalPaneGlobalEffects', () => {
     expect(mocks.fitPanes).not.toHaveBeenCalled()
     expect(manager.resetWebglTextureAtlases).toHaveBeenCalledTimes(1)
     expect(manager.refreshAllPanes).toHaveBeenCalledTimes(1)
-    expect(mocks.focusActivePane).toHaveBeenCalledWith(manager)
+    expect(mocks.focusActivePane).toHaveBeenCalledWith(manager, {
+      tabId: 'tab-1',
+      paneDockOwnsFocus
+    })
     vi.advanceTimersByTime(500)
   })
 
@@ -445,6 +455,7 @@ describe('useTerminalPaneGlobalEffects', () => {
 
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       ...baseArgs,
       isActive: false,
       isVisible: true
@@ -461,6 +472,7 @@ describe('useTerminalPaneGlobalEffects', () => {
 
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       ...baseArgs,
       isActive: true,
       isVisible: true
@@ -473,7 +485,10 @@ describe('useTerminalPaneGlobalEffects', () => {
     expect(mocks.fitPanes).not.toHaveBeenCalled()
     expect(manager.resetWebglTextureAtlases).toHaveBeenCalledTimes(1)
     expect(manager.refreshAllPanes).toHaveBeenCalledTimes(1)
-    expect(mocks.focusActivePane).toHaveBeenCalledWith(manager)
+    expect(mocks.focusActivePane).toHaveBeenCalledWith(manager, {
+      tabId: 'tab-1',
+      paneDockOwnsFocus
+    })
     vi.advanceTimersByTime(500)
   })
 
@@ -509,6 +524,7 @@ describe('useTerminalPaneGlobalEffects', () => {
 
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       ...baseArgs,
       isActive: false,
       isVisible: false
@@ -523,6 +539,7 @@ describe('useTerminalPaneGlobalEffects', () => {
 
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       ...baseArgs,
       isActive: true,
       isVisible: true
@@ -564,6 +581,7 @@ describe('useTerminalPaneGlobalEffects', () => {
 
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       ...baseArgs,
       isActive: true,
       isVisible: true,
@@ -574,6 +592,7 @@ describe('useTerminalPaneGlobalEffects', () => {
 
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       ...baseArgs,
       isActive: false,
       isVisible: false,
@@ -583,6 +602,7 @@ describe('useTerminalPaneGlobalEffects', () => {
 
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       ...baseArgs,
       isActive: false,
       isVisible: false,
@@ -602,6 +622,7 @@ describe('useTerminalPaneGlobalEffects', () => {
 
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       ...baseArgs,
       isActive: true,
       isVisible: true,
@@ -614,7 +635,10 @@ describe('useTerminalPaneGlobalEffects', () => {
     // Reveal must route through fitAllRevealedPanes, never the sync fitAllPanes.
     expect(manager.fitAllRevealedPanes).toHaveBeenCalledTimes(1)
     expect(manager.fitAllPanes).not.toHaveBeenCalled()
-    expect(mocks.focusActivePane).toHaveBeenCalledWith(manager)
+    expect(mocks.focusActivePane).toHaveBeenCalledWith(manager, {
+      tabId: 'tab-1',
+      paneDockOwnsFocus
+    })
     expect(mocks.fitAndFocusPanes).not.toHaveBeenCalled()
     expect(manager.resetWebglTextureAtlases).toHaveBeenCalledTimes(1)
     expect(manager.refreshAllPanes).toHaveBeenCalledTimes(1)
@@ -661,6 +685,7 @@ describe('useTerminalPaneGlobalEffects', () => {
 
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       tabId: 'tab-1',
       worktreeId: 'wt-1',
       isActive: true,
@@ -681,6 +706,7 @@ describe('useTerminalPaneGlobalEffects', () => {
   it('re-reports the active PTY when the active leaf rebinds to a new PTY without visibility changing', () => {
     const manager = makeActivePtyManager()
     const mountArgs = {
+      paneDockOwnsFocus,
       tabId: 'tab-1',
       worktreeId: 'wt-1',
       isActive: true,
@@ -716,6 +742,7 @@ describe('useTerminalPaneGlobalEffects', () => {
 
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       tabId: 'tab-1',
       worktreeId: 'wt-1',
       isActive: false,
@@ -769,6 +796,7 @@ describe('useTerminalPaneGlobalEffects', () => {
 
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       ...baseArgs,
       isActive: true,
       isVisible: true
@@ -777,6 +805,7 @@ describe('useTerminalPaneGlobalEffects', () => {
     nextCapturedState = preHideState
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       ...baseArgs,
       isActive: false,
       isVisible: false
@@ -785,6 +814,7 @@ describe('useTerminalPaneGlobalEffects', () => {
     nextCapturedState = corruptedHiddenState
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       ...baseArgs,
       isActive: true,
       isVisible: true
@@ -816,6 +846,7 @@ describe('useTerminalPaneGlobalEffects', () => {
     registerManagerForReset(manager)
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       tabId: 'tab-1',
       worktreeId: 'wt-1',
       isActive: true,
@@ -871,6 +902,7 @@ describe('useTerminalPaneGlobalEffects', () => {
     registerManagerForReset(manager)
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       tabId: 'tab-1',
       worktreeId: 'wt-1',
       isActive: true,
@@ -914,7 +946,10 @@ describe('useTerminalPaneGlobalEffects', () => {
     expect(manager.resumeRendering).toHaveBeenCalledTimes(1)
     // Refocus recovery uses the same wobble-resistant reveal fit path.
     expect(manager.fitAllRevealedPanes).toHaveBeenCalledTimes(1)
-    expect(mocks.focusActivePane).toHaveBeenCalledWith(manager)
+    expect(mocks.focusActivePane).toHaveBeenCalledWith(manager, {
+      tabId: 'tab-1',
+      paneDockOwnsFocus
+    })
     expect(mocks.fitAndFocusPanes).not.toHaveBeenCalled()
     // Why: refocus recovery is atlas-preserving — no shared-atlas reset, no
     // registry-wide repaint, and no atlas-clearing reveal repaint; the
@@ -949,6 +984,7 @@ describe('useTerminalPaneGlobalEffects', () => {
     registerManagerForReset(manager)
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       tabId: 'tab-1',
       worktreeId: 'wt-1',
       isActive: true,
@@ -1004,6 +1040,7 @@ describe('useTerminalPaneGlobalEffects', () => {
     registerManagerForReset(siblingManager)
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       tabId: 'tab-1',
       worktreeId: 'wt-1',
       isActive: true,
@@ -1062,6 +1099,7 @@ describe('useTerminalPaneGlobalEffects', () => {
       resetHookRefs()
       beginHookRender()
       useTerminalPaneGlobalEffects({
+        paneDockOwnsFocus,
         tabId: 'tab-1',
         worktreeId: 'wt-1',
         isActive: options.isActive,
@@ -1111,6 +1149,7 @@ describe('useTerminalPaneGlobalEffects', () => {
 
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       tabId: 'tab-1',
       worktreeId: 'wt-1',
       isActive: true,
@@ -1169,6 +1208,7 @@ describe('useTerminalPaneGlobalEffects', () => {
 
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       tabId: 'tab-1',
       worktreeId: 'wt-1',
       isActive: true,
@@ -1283,6 +1323,7 @@ describe('useTerminalPaneGlobalEffects', () => {
 
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       tabId: 'tab-1',
       worktreeId: 'wt-1',
       isActive: false,
@@ -1319,6 +1360,7 @@ describe('useTerminalPaneGlobalEffects', () => {
 
     beginHookRender()
     useTerminalPaneGlobalEffects({
+      paneDockOwnsFocus,
       tabId: 'tab-1',
       worktreeId: 'wt-1',
       isActive: false,

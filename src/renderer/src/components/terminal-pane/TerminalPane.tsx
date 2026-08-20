@@ -43,6 +43,8 @@ import {
   serializeTerminalLayout
 } from './layout-serialization'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
+import { TerminalPaneDockMount } from './fork-terminal-dock/TerminalPaneDockMount'
+import { useTerminalPaneDock } from './fork-terminal-dock/use-terminal-pane-dock'
 import type { TerminalKittyKeyboardModeTracker } from '../../../../shared/terminal-kitty-keyboard-mode-tracker'
 import {
   applyExpandedLayoutTo,
@@ -197,6 +199,7 @@ import {
   updateTerminalRemoteRuntimeRecoveryUiState,
   type VisiblePtyRecoveryState
 } from './terminal-remote-runtime-recovery-ui-state'
+import { updateTerminalDockRawRecoveryPhaseByPaneId } from './fork-terminal-dock/terminal-pane-dock-recovery-phase'
 
 const NATIVE_CHAT_ROOT_SELECTOR = '[data-native-chat-root="true"]'
 
@@ -348,6 +351,12 @@ function TerminalPane(
     sshReconnectTargetLabel,
     sshReconnectTargetRemoved
   } = useAppStore(useShallow((store) => selectTerminalPaneHostState(store, worktreeId)))
+  // Why: the dock's disabled reason needs this regardless of tab visibility — a hidden pane's
+  // composer must not stay enabled against a dead SSH connection just because the reconnect
+  // banner (which only shows for the active, visible pane) isn't currently rendering.
+  const sshConnectionUnavailable = Boolean(
+    sshReconnectTargetId && sshReconnectStatus && sshReconnectStatus !== 'connected'
+  )
   useEffect(() => {
     if (!sshReconnectEnvironmentId) {
       return
@@ -384,6 +393,7 @@ function TerminalPane(
     useState<ExecutionHostId>(LOCAL_EXECUTION_HOST_ID)
   const [chatLeafId, setChatLeafId] = useState<string | null>(null)
   const onAgentExitedRef = useRef<(leafId: string) => void>(() => {})
+  const onPaneRetiredRef = useRef<(leafId: string) => void>(() => {})
   const [tabWideAgentHintLeafId, setTabWideAgentHintLeafId] = useState<string | null | undefined>(
     undefined
   )
@@ -395,6 +405,9 @@ function TerminalPane(
   const [terminalError, setTerminalError] = useState<string | null>(null)
   const [ptyRecoveryStatesByPaneId, setPtyRecoveryStatesByPaneId] = useState<
     Record<number, VisiblePtyRecoveryState>
+  >({})
+  const [dockRawRecoveryPhaseByPaneId, setDockRawRecoveryPhaseByPaneId] = useState<
+    Record<number, PtyTransportRecoveryState['phase']>
   >({})
   const [sessionStateSaveFailureOpen, setSessionStateSaveFailureOpen] = useState(false)
   const daemonActions = useDaemonActions()
@@ -488,6 +501,12 @@ function TerminalPane(
       setPtyRecoveryStatesByPaneId((previous) =>
         updateTerminalRemoteRuntimeRecoveryUiState(previous, paneId, state)
       )
+      // Why: the dock's disabled-reason resolver needs every phase (offline, ended, disposed,
+      // connecting included) — ptyRecoveryStatesByPaneId is the recovery banner's own filtered
+      // view and must not be widened, so the dock reads this separate, unfiltered track instead.
+      setDockRawRecoveryPhaseByPaneId((previous) =>
+        updateTerminalDockRawRecoveryPhaseByPaneId(previous, paneId, state)
+      )
     }
   )
 
@@ -522,6 +541,16 @@ function TerminalPane(
   const tabAgentTypeByLeaf = useAppStore((store) =>
     selectTerminalTabAgentTypesByLeaf(store.agentStatusByPaneKey, tabId)
   )
+  const experimentalTerminalDockEnabled = useAppStore(
+    (store) => store.settings?.experimentalTerminalDock === true
+  )
+  const terminalDock = useTerminalPaneDock({
+    tabId,
+    worktreeId,
+    enabled: experimentalTerminalDockEnabled && !effectiveChatViewMode,
+    managerRef,
+    containerRef
+  })
   const toggleTabViewMode = useAppStore((store) => store.toggleTabViewMode)
   const setTabViewMode = useAppStore((store) => store.setTabViewMode)
   const savedLayout = useAppStore((store) => store.terminalLayoutsByTabId[tabId] ?? EMPTY_LAYOUT)
@@ -640,10 +669,18 @@ function TerminalPane(
     },
     [applyNativeChatLeafRoute, chatLeafId, isChatEligibleForLeaf, isChatViewMode]
   )
+  const undockOnConfirmedAgentExit = terminalDock.undockOnConfirmedAgentExit
   useEffect(() => {
     // Why: transport callbacks must observe only committed chat ownership; render work can be replayed/discarded under concurrent React.
-    onAgentExitedRef.current = handleConfirmedAgentExit
-  }, [handleConfirmedAgentExit])
+    onAgentExitedRef.current = (leafId: string) => {
+      handleConfirmedAgentExit(leafId)
+      undockOnConfirmedAgentExit(leafId)
+    }
+  }, [handleConfirmedAgentExit, undockOnConfirmedAgentExit])
+  const prunePassthroughForRetiredPane = terminalDock.prunePassthroughForRetiredPane
+  useEffect(() => {
+    onPaneRetiredRef.current = prunePassthroughForRetiredPane
+  }, [prunePassthroughForRetiredPane])
   const canToggleChatForLeaf = useCallback(
     (leafId: string | null): boolean => {
       // Scope the "always allow toggling back" rule to the leaf showing chat; must not make an unsupported sibling look eligible.
@@ -1333,6 +1370,7 @@ function TerminalPane(
 
   useTerminalPaneLifecycle({
     tabId,
+    paneDockOwnsFocus: terminalDock.paneDockOwnsFocus,
     worktreeId,
     cwd,
     startup,
@@ -1363,6 +1401,7 @@ function TerminalPane(
     isVisibleRef,
     onPtyExitRef,
     onAgentExitedRef,
+    onPaneRetiredRef,
     onPtyErrorRef,
     onPtyRecoveryStateRef,
     clearTabPtyId,
@@ -1688,6 +1727,7 @@ function TerminalPane(
 
   useTerminalPaneGlobalEffects({
     tabId,
+    paneDockOwnsFocus: terminalDock.paneDockOwnsFocus,
     // Why: use the pane's own worktreeId prop, not global activeWorktreeId, so terminal-drop routes to this PTY's worktree without racing worktree switches.
     worktreeId,
     cwd,
@@ -2611,11 +2651,14 @@ function TerminalPane(
       const restored = await restoreTerminalFitToDesktop(ptyId, settingsRef.current ?? undefined)
       if (restored) {
         scheduleRestoredTerminalRefit()
-        // Why: after the overlay unmounts, refocus the reclaimed terminal instead of the removed button/body.
-        pane.terminal.focus()
+        // Why: after the overlay unmounts, refocus the reclaimed terminal instead of the removed
+        // button/body — unless the composer owns focus for this pane, which it keeps.
+        if (!terminalDock.paneDockOwnsFocus(makePaneKey(tabId, pane.leafId))) {
+          pane.terminal.focus()
+        }
       }
     },
-    [refreshMobileOverlays, scheduleRestoredTerminalRefit]
+    [refreshMobileOverlays, scheduleRestoredTerminalRefit, tabId, terminalDock]
   )
 
   const restoreAllTerminalFits = useCallback(
@@ -2627,10 +2670,12 @@ function TerminalPane(
       )
       if (restored) {
         scheduleRestoredTerminalRefit()
-        focusPane.terminal.focus()
+        if (!terminalDock.paneDockOwnsFocus(makePaneKey(tabId, focusPane.leafId))) {
+          focusPane.terminal.focus()
+        }
       }
     },
-    [getMobileOwnedTerminalPtyIds, scheduleRestoredTerminalRefit]
+    [getMobileOwnedTerminalPtyIds, scheduleRestoredTerminalRefit, tabId, terminalDock]
   )
 
   const terminalShouldHandleMiddleClick = useCallback(
@@ -2685,7 +2730,12 @@ function TerminalPane(
       // middle-click paste follow-up, so arm the shared window to swallow it and
       // avoid inserting text into the PTY twice.
       armPrimarySelectionNativePasteSuppression()
-      clickedPane.terminal.focus()
+      // Why: middle-click paste writes through the transport below, not via xterm's own
+      // paste handling, so this focus call is only about UX — skip it when the composer
+      // owns focus rather than yanking it away for a paste the user didn't aim at it.
+      if (!terminalDock.paneDockOwnsFocus(makePaneKey(tabId, clickedPane.leafId))) {
+        clickedPane.terminal.focus()
+      }
       void readPrimarySelectionText().then(async (text) => {
         if (!text) {
           return
@@ -2746,7 +2796,7 @@ function TerminalPane(
         recordTerminalUserInputForLeaf(tabId, clickedPane.leafId)
       })
     },
-    [getPrimarySelectionMiddleClickPane, tabId, worktreeId]
+    [getPrimarySelectionMiddleClickPane, tabId, terminalDock, worktreeId]
   )
 
   const handlePrimarySelectionAuxClick = useCallback(
@@ -2920,6 +2970,15 @@ function TerminalPane(
   // Each toggle gates on its own leaf (header=active, menu=opened-over), so mixed splits show it only where chat can render.
   const activePaneCanToggleChat = canToggleChatForLeaf(activePane?.leafId ?? null)
   const contextMenuCanToggleChat = canToggleChatForLeaf(contextMenuLeafId)
+  // Mirrors the dock's own mount gate, so the menu never offers a toggle for a pane
+  // where no dock could render.
+  const contextMenuDockPaneKey = contextMenuLeafId ? makePaneKey(tabId, contextMenuLeafId) : null
+  const contextMenuCanToggleDock = Boolean(
+    experimentalTerminalDockEnabled &&
+    !effectiveChatViewMode &&
+    contextMenuDockPaneKey &&
+    terminalDock.resolveDockAgent(contextMenuDockPaneKey, resolveAgentForLeaf(contextMenuLeafId))
+  )
   return (
     <>
       <div
@@ -3078,6 +3137,41 @@ function TerminalPane(
             `native-chat-${tabId}-${chatPane.leafId}`
           )
         : null}
+      {experimentalTerminalDockEnabled && !effectiveChatViewMode
+        ? managedPanes.map((pane) => {
+            const paneKey = makePaneKey(tabId, pane.leafId)
+            const agent = terminalDock.resolveDockAgent(paneKey, resolveAgentForLeaf(pane.leafId))
+            if (!agent) {
+              return null
+            }
+            const targetPtyId = paneTransportsRef.current.get(pane.id)?.getPtyId() ?? null
+            return (
+              <TerminalPaneDockMount
+                key={paneKey}
+                pane={pane}
+                terminalTabId={tabId}
+                paneKey={paneKey}
+                agent={agent}
+                docked={terminalDock.isPaneDocked(paneKey)}
+                gutterRows={terminalDock.gutterRowsFor(paneKey)}
+                targetPtyId={targetPtyId}
+                disabledReason={terminalDock.disabledReasonFor({
+                  paneKey,
+                  targetPtyId,
+                  recoveryPhase: dockRawRecoveryPhaseByPaneId[pane.id] ?? null,
+                  sshDisconnected: sshConnectionUnavailable
+                })}
+                readTerminalScreen={() => pane.serializeAddon.serialize({ scrollback: 0 })}
+                onInitialize={() => terminalDock.ensurePaneDockDefault(paneKey, agent)}
+                onCommitGutterRows={(rows) => terminalDock.commitGutterRows(paneKey, rows)}
+                onEffectiveMountedChange={(mounted) =>
+                  terminalDock.setPaneDockMounted(paneKey, mounted)
+                }
+                passthroughActive={terminalDock.isPanePassthrough(paneKey)}
+              />
+            )
+          })
+        : null}
       <TerminalContextMenu
         open={contextMenu.open}
         onOpenChange={contextMenu.setOpen}
@@ -3104,6 +3198,11 @@ function TerminalPane(
         canToggleNativeChat={contextMenuCanToggleChat}
         isNativeChatView={contextMenuIsChatView}
         onToggleNativeChat={handleContextMenuToggleNativeChat}
+        canToggleTerminalDock={contextMenuCanToggleDock}
+        isTerminalDockDocked={Boolean(
+          contextMenuDockPaneKey && terminalDock.isPaneDocked(contextMenuDockPaneKey)
+        )}
+        onToggleTerminalDock={() => terminalDock.toggleDockForLeaf(contextMenuLeafId)}
         onCopyAgentSessionContext={() => void contextMenu.onCopyAgentSessionContext()}
         quickCommandHosts={visibleQuickCommandHosts}
         quickCommandHostLoadFailed={quickCommandHostLoadFailed}

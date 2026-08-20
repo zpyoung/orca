@@ -21,6 +21,8 @@ export type DiscoveredSkill = {
   skillFilePath: string
   installed: boolean
   updatedAt: number | null
+  /** Owning plugin, for plugin-sourced skills. Absent in every other scope. */
+  pluginName?: string
 }
 
 export type SkillDiscoverySource = {
@@ -31,6 +33,9 @@ export type SkillDiscoverySource = {
   providers: SkillProvider[]
   /** Agent that owns this root; null is the explicit shared-skills scope. */
   owner: AgentType | null
+  /** Set when the root is one plugin's skills directory. A shared plugin cache
+   *  leaves it unset and names the owning plugin per skill instead. */
+  pluginName?: string
   exists: boolean
   skippedReason?: 'missing' | 'remote-repo'
 }

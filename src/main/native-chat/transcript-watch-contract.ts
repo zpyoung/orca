@@ -1,10 +1,7 @@
-import type {
-  AgentType,
-  NativeChatMessage,
-  NativeChatTurnLifecycle
-} from '../../shared/native-chat-types'
+import type { AgentType, NativeChatMessage } from '../../shared/native-chat-types'
+import type { NativeChatTranscriptCompanion } from '../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 import type { ResolveSessionFileOptions } from './session-file-resolver'
-import type { NativeChatTurnLifecycleDecoder } from './transcript-turn-lifecycle'
+import type { NativeChatTranscriptCompanionDecoder } from './fork-native-chat-session-options/transcript-companion-decoder'
 
 export type NativeChatTranscriptTailReader = (args: {
   filePath: string
@@ -12,12 +9,12 @@ export type NativeChatTranscriptTailReader = (args: {
   decode: (line: string, fallbackId: string) => NativeChatMessage | null
   includeTrailingLine?: boolean
   endOffset?: number
-  decodeLifecycle?: NativeChatTurnLifecycleDecoder | null
+  decodeCompanion?: NativeChatTranscriptCompanionDecoder | null
   maxBytes?: number
   signal?: AbortSignal
 }) => Promise<{
   messages: NativeChatMessage[]
-  lifecycle?: NativeChatTurnLifecycle
+  companion?: NativeChatTranscriptCompanion
   consumedTo: number
   hasMore: boolean
   beforeOffset: number
@@ -26,20 +23,20 @@ export type NativeChatTranscriptTailReader = (args: {
 export type SubscribeNativeChatTranscriptArgs = ResolveSessionFileOptions & {
   agent: AgentType
   sessionId: string
-  onAppend: (messages: NativeChatMessage[], lifecycle?: NativeChatTurnLifecycle) => void
+  onAppend: (messages: NativeChatMessage[], companion?: NativeChatTranscriptCompanion) => void
   onInitialSnapshot?: (
     messages: NativeChatMessage[],
     hasMore: boolean,
     beforeOffset: number,
     /** Set when the initial drain could not deliver a transcript. */
     error?: string,
-    lifecycle?: NativeChatTurnLifecycle
+    companion?: NativeChatTranscriptCompanion
   ) => void
   onReplace?: (
     messages: NativeChatMessage[],
     hasMore: boolean,
     beforeOffset: number,
-    lifecycle?: NativeChatTurnLifecycle
+    companion?: NativeChatTranscriptCompanion
   ) => void
   initialLimit?: number
   tailReader?: NativeChatTranscriptTailReader
