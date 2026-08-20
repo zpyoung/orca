@@ -49,7 +49,13 @@
       "path": "AGENTS.md",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": ["# Fork Feature Structure", "## Seams", "## Precedence", "## CI enforcement"]
+      "lines": [
+        "# Fork Feature Structure",
+        "## Seams",
+        "## Precedence",
+        "## CI enforcement",
+        "## Running Tests: Remote Sandbox Only"
+      ]
     },
     {
       "path": ".gitignore",
@@ -1389,6 +1395,36 @@
       "status": "permanent"
     },
     {
+      "path": ".claude/settings.json",
+      "reason": "Fork-only agent hook wiring; upstream ships no project settings file.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/run-sandboxed-test-shards.mjs",
+      "reason": "Fork's own sandboxed shard runner; upstream runs the suite on the workstation.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/docker/test-sandbox/Dockerfile",
+      "reason": "Fork-only test-sandbox image; upstream has no containerized test lane.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/docker/test-sandbox/entrypoint.sh",
+      "reason": "Fork-only test-sandbox entrypoint; upstream has no containerized test lane.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/docker/test-sandbox/README.md",
+      "reason": "Fork-only test-sandbox documentation; upstream has no containerized test lane.",
+      "status": "permanent"
+    },
+    {
+      "path": ".claude/hooks/require-sandboxed-tests.mjs",
+      "reason": "Fork-only guard keeping vitest on the remote sandbox host; upstream runs tests locally.",
+      "status": "permanent"
+    },
+    {
       "path": "config/scripts/sync-upstream-file-ownership.mjs",
       "reason": "Fork's own sync classifier; upstream has no such script.",
       "status": "permanent"
@@ -1705,11 +1741,11 @@
   ],
   "residuals": {
     ".gitignore": {
-      "added": 12,
+      "added": 14,
       "removed": 2
     },
     "AGENTS.md": {
-      "added": 64,
+      "added": 89,
       "removed": 0
     },
     "CLAUDE.md": {

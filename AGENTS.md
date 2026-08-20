@@ -86,6 +86,31 @@ Fork edits to an upstream-owned file are not blocked by the guard — but an und
 reverted at the next sync, so declare it.
 
 # Considerations
+## Running Tests: Remote Sandbox Only
+
+Vitest never runs on this machine. Every test run goes to the remote Docker host through
+[`config/docker/test-sandbox`](./config/docker/test-sandbox/README.md), which feeds each shard a
+throwaway container over stdin — shards cannot see each other's temp files, git config, or build
+output, and the laptop stays free.
+
+```sh
+pnpm test:sandbox --shards=16 --jobs=8            # full unit suite
+pnpm test:sandbox --shards=16 --only=3            # one shard
+pnpm test:sandbox --shards=16 --only=3 -- <args>  # extra vitest args
+```
+
+The host comes from `ORCA_SANDBOX_DOCKER_HOST` in `.claude/settings.local.json`, so no
+`--docker-host` flag is needed. That file is machine-local and untracked — a fresh checkout has to
+set it before the runner works.
+
+A `PreToolUse` hook (`.claude/hooks/require-sandboxed-tests.mjs`, wired in `.claude/settings.json`)
+rejects `pnpm test`, bare `vitest`, and their wrapped forms so the rule holds without relying on
+anyone remembering it. The blocked script names are read from `package.json`, so a renamed vitest
+script stays covered. Setting `ORCA_ALLOW_LOCAL_TESTS=1` in the environment disables the guard; an
+inline `VAR=1 pnpm test` prefix does not, because it never reaches the hook process.
+
+The `shell` and `e2e` lanes have not been run anywhere yet — treat a green run there as unproven.
+
 ## Worktree Safety
 
 Always use the primary working directory (the worktree) for all file reads and edits. Never follow absolute paths from subagent results that point to the main repo.

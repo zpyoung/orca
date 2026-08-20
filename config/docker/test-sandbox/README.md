@@ -14,24 +14,31 @@ ssh buildbox 'curl -fsSL https://get.docker.com | sh && sudo usermod -aG docker 
 docker context create buildbox --docker host=ssh://you@buildbox
 ```
 
+`--docker-host` defaults to `$ORCA_SANDBOX_DOCKER_HOST`, so set that once instead of passing the
+flag on every run. This checkout reads it from `.claude/settings.local.json`, which is machine-local
+and untracked — a fresh clone has to set it before the runner reaches anything but the local daemon.
+
 ## Running
 
 ```sh
-# full unit suite, 16 shards, 8 containers at a time, on the remote box
-pnpm test:sandbox --shards=16 --jobs=8 --docker-host=ssh://you@buildbox
+# full unit suite, 16 shards, 8 containers at a time
+pnpm test:sandbox --shards=16 --jobs=8
 
 # one shard, reusing the already-built image
-pnpm test:sandbox --shards=16 --only=3 --docker-host=ssh://you@buildbox
+pnpm test:sandbox --shards=16 --only=3
 
 # the real-shell lane CI keeps out of the shards
-pnpm test:sandbox --lane=shell --docker-host=ssh://you@buildbox
+pnpm test:sandbox --lane=shell
 
 # Playwright/Electron lane (needs the host Docker socket for the ssh-docker specs)
-pnpm test:sandbox --lane=e2e --shards=4 --docker-socket --docker-host=ssh://you@buildbox
+pnpm test:sandbox --lane=e2e --shards=4 --docker-socket
 
 # extra vitest arguments pass through after --
 pnpm test:sandbox --shards=16 --only=1 -- --reporter=verbose
 ```
+
+Running vitest directly is blocked by a `PreToolUse` hook — see the testing section in
+[`AGENTS.md`](../../../AGENTS.md).
 
 Per-shard logs land in `.orca-sandbox-logs/`. `--node=26` builds the second Node version from
 the CI matrix.
