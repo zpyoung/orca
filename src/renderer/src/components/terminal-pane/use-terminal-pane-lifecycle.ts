@@ -82,14 +82,16 @@ import {
 import { RESET_KITTY_KEYBOARD_PROTOCOL } from '../../../../shared/terminal-mode-reset-profiles'
 import { resolveTerminalLayoutActiveLeafId } from './terminal-layout-leaf-ids'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
-import { pruneTerminalDockPaneKeysEverywhere } from './fork-terminal-dock/terminal-pane-dock-prune'
+import {
+  collectTerminalDockPaneKeysForTabTeardown,
+  pruneTerminalDockPaneKeysEverywhere
+} from './fork-terminal-dock/terminal-pane-dock-prune'
 import { removeTerminalDockPaneKeys } from './fork-terminal-dock/terminal-dock-pane-state'
 import {
   resolveRemoteDockConptyUnverified,
   restampRemoteDockConptyUnverifiedForLivePanes
 } from './fork-terminal-dock/terminal-dock-remote-conpty'
 import { REMOTE_CONPTY_UNVERIFIED_DATASET_KEY } from './fork-terminal-dock/TerminalPaneDockMount'
-import { collectTerminalDockPaneKeysForTabTeardown } from './fork-terminal-dock/terminal-pane-dock-prune'
 import { applyExpandedLayoutTo, restoreExpandedLayoutFrom } from './expand-collapse'
 import { applyTerminalAppearance } from './terminal-appearance'
 import { createOsc52OscHandler } from './osc52-clipboard'
