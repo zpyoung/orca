@@ -30,7 +30,7 @@ import type {
 } from '../../../shared/types'
 import type * as WebRuntimeSessionModule from './web-runtime-session'
 import type { OpenFile } from '../store/slices/editor'
-import { TERMINAL_DOCK_ECHO_WINDOW_MS } from '../store/slices/tabs'
+import { TERMINAL_DOCK_ECHO_WINDOW_MS } from '../store/slices/fork-terminal-dock/tab-terminal-dock-state'
 import {
   confirmWebAgentSessionHandoffAfterCreate,
   recordWebAgentSessionHandoff,

@@ -6,13 +6,13 @@ import {
   SetTabProps,
   UpdatePaneLayout
 } from './session-tabs-schemas'
+import { OrcaRuntimeService } from '../../orca-runtime'
 import {
   DEFAULT_TERMINAL_DOCK_GUTTER_ROWS,
   MAX_TERMINAL_DOCK_PANE_ENTRIES,
   mergeTerminalDockByPaneKey,
-  OrcaRuntimeService,
   removeTerminalDockPaneKeys
-} from '../../orca-runtime'
+} from '../../fork-terminal-dock/terminal-dock-session-tab-props'
 import { getDefaultWorkspaceSession } from '../../../../shared/constants'
 import type { Tab, TerminalTab, WorkspaceSessionState } from '../../../../shared/types'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
@@ -23,7 +23,9 @@ const DOCK_WORKTREE_ID = 'repo::/worktree'
 const DOCK_TAB_ID = 'tab'
 const DOCK_PANE_KEY = makePaneKey(DOCK_TAB_ID, '11111111-1111-4111-a111-111111111111')
 
-function makeDockWorktreeSession(overrides: Partial<WorkspaceSessionState> = {}): WorkspaceSessionState {
+function makeDockWorktreeSession(
+  overrides: Partial<WorkspaceSessionState> = {}
+): WorkspaceSessionState {
   const terminalTab: TerminalTab = {
     id: DOCK_TAB_ID,
     ptyId: 'pty-1',
@@ -407,7 +409,11 @@ describe('mergeTerminalDockByPaneKey eviction protects live panes (M2: unverifie
   it('evicts unverified keys before a verified one, even though the verified key was inserted first', () => {
     const livePaneKeys = new Set(['pane-live'])
     let record: Record<string, { docked: boolean; gutterRows: number }> | undefined
-    record = mergeTerminalDockByPaneKey(record, { paneKey: 'pane-live', docked: true }, livePaneKeys)
+    record = mergeTerminalDockByPaneKey(
+      record,
+      { paneKey: 'pane-live', docked: true },
+      livePaneKeys
+    )
     for (let i = 0; i < MAX_TERMINAL_DOCK_PANE_ENTRIES - 1; i++) {
       record = mergeTerminalDockByPaneKey(
         record,
@@ -436,11 +442,19 @@ describe('mergeTerminalDockByPaneKey eviction protects live panes (M2: unverifie
     }
     for (let i = 2; i < MAX_TERMINAL_DOCK_PANE_ENTRIES; i++) {
       livePaneKeys.add(`pane-${i}`)
-      record = mergeTerminalDockByPaneKey(record, { paneKey: `pane-${i}`, docked: true }, livePaneKeys)
+      record = mergeTerminalDockByPaneKey(
+        record,
+        { paneKey: `pane-${i}`, docked: true },
+        livePaneKeys
+      )
     }
 
     livePaneKeys.add('pane-new')
-    const grown = mergeTerminalDockByPaneKey(record, { paneKey: 'pane-new', docked: true }, livePaneKeys)
+    const grown = mergeTerminalDockByPaneKey(
+      record,
+      { paneKey: 'pane-new', docked: true },
+      livePaneKeys
+    )
 
     expect(Object.keys(grown)).toHaveLength(MAX_TERMINAL_DOCK_PANE_ENTRIES)
     expect(grown['pane-0']).toBeUndefined()
@@ -586,7 +600,8 @@ describe('terminalDockByPaneKey publication (D3: write-only field)', () => {
       terminalDock: { paneKey: DOCK_PANE_KEY, docked: true, gutterRows: 6 }
     })
 
-    const fakeLeafId = (i: number): string => `00000000-0000-4000-8000-${i.toString(16).padStart(12, '0')}`
+    const fakeLeafId = (i: number): string =>
+      `00000000-0000-4000-8000-${i.toString(16).padStart(12, '0')}`
     for (let i = 0; i < MAX_TERMINAL_DOCK_PANE_ENTRIES; i++) {
       await runtime.setMobileSessionTabProps(`id:${DOCK_WORKTREE_ID}`, {
         tabId: DOCK_TAB_ID,

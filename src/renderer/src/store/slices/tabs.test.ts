@@ -6,7 +6,7 @@ import type * as WorktreeRuntimeOwnerModule from '@/lib/worktree-runtime-owner'
 import type * as WebRuntimeSessionModule from '@/runtime/web-runtime-session'
 import { toWebTerminalSurfaceTabId } from '@/runtime/web-terminal-surface-id'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
-import { TERMINAL_DOCK_ECHO_WINDOW_MS } from './tabs'
+import { TERMINAL_DOCK_ECHO_WINDOW_MS } from './fork-terminal-dock/tab-terminal-dock-state'
 import { FLOATING_TERMINAL_WORKTREE_ID, getDefaultUIState } from '../../../../shared/constants'
 import { buildMobileSessionTabSnapshots } from '../../runtime/sync-runtime-graph'
 import { closeMobileSessionTabInStore } from '../../runtime/mobile-session-tab-close'
@@ -2659,9 +2659,7 @@ describe('TabsSlice', () => {
       })
       getRuntimeEnvironmentIdForWorktreeMock.mockReturnValue('env-1')
 
-      store
-        .getState()
-        .pruneTerminalDockPaneKeys('dock-tab-1', [paneKeyA, paneKeyC, 'pane-missing'])
+      store.getState().pruneTerminalDockPaneKeys('dock-tab-1', [paneKeyA, paneKeyC, 'pane-missing'])
 
       await vi.waitFor(() => expect(setWebRuntimeTabPropsMock).toHaveBeenCalledTimes(1))
       expect(setWebRuntimeTabPropsMock).toHaveBeenCalledWith({
@@ -2749,7 +2747,9 @@ describe('TabsSlice', () => {
       const staleKey = 'stale-pane:1'
       const now = Date.now()
       store.setState({
-        terminalDockPendingMutationsByPaneKey: { [staleKey]: now - TERMINAL_DOCK_ECHO_WINDOW_MS - 1 }
+        terminalDockPendingMutationsByPaneKey: {
+          [staleKey]: now - TERMINAL_DOCK_ECHO_WINDOW_MS - 1
+        }
       })
 
       store.getState().pruneTerminalDockPaneKeys('dock-tab-1', ['pane-a'])

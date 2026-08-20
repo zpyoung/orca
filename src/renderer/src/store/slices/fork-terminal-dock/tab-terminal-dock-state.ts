@@ -1,0 +1,304 @@
+import type { StateCreator } from 'zustand'
+import type { AppState } from '../../types'
+import type { TerminalDockPaneState } from '../../../../../shared/types'
+import {
+  removeTerminalDockPaneKeys as removeLocalTerminalDockPaneKeys,
+  writeTerminalDockPaneState
+} from '@/components/terminal-pane/fork-terminal-dock/terminal-dock-pane-state'
+import { findTabAndWorktree, patchTab } from '../tab-group-state'
+import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
+
+/** The docked-composer state the tabs slice tracks per tab pane, plus the two
+ *  actions that mutate it. Kept out of the slice module so the fork owns one
+ *  file rather than a block inside upstream's. */
+export type TabTerminalDockSlice = {
+  /** Pane key -> timestamp of the most recent local dock mutation, so reconcile can
+   *  hold the client's optimistic value against a stale host echo during the echo window. */
+  terminalDockPendingMutationsByPaneKey: Record<string, number>
+  /** Patch one pane's docked-composer state on a tab; mirrors the single-pane patch to the host. */
+  setTabTerminalDockState: (
+    tabId: string,
+    patch: { paneKey: string; docked?: boolean; gutterRows?: number }
+  ) => void
+  /** Drop retired pane keys from a tab's dock record and mirror the removal to the host. */
+  pruneTerminalDockPaneKeys: (tabId: string, paneKeys: readonly string[]) => void
+}
+
+const DEFAULT_TERMINAL_DOCK_GUTTER_ROWS = 5
+const MIN_TERMINAL_DOCK_GUTTER_ROWS = 3
+const MAX_TERMINAL_DOCK_GUTTER_ROWS = 15
+
+// Why: bounds how long a local dock mutation outranks a stale host echo for its pane —
+// long enough to cover an SSH/relay round trip, short enough that a real host change
+// (another client, or a failed RPC never landing) still reaches this client promptly.
+export const TERMINAL_DOCK_ECHO_WINDOW_MS = 8_000
+
+// Why: gutterRows also flows to the host's RPC schema, which enforces the same
+// 3..15 integer contract; clamping here keeps local and host state from diverging.
+function normalizeTerminalDockGutterRows(gutterRows: number | undefined): number | undefined {
+  if (gutterRows === undefined) {
+    return undefined
+  }
+  const rounded =
+    typeof gutterRows === 'number' && Number.isFinite(gutterRows)
+      ? Math.round(gutterRows)
+      : DEFAULT_TERMINAL_DOCK_GUTTER_ROWS
+  return Math.min(MAX_TERMINAL_DOCK_GUTTER_ROWS, Math.max(MIN_TERMINAL_DOCK_GUTTER_ROWS, rounded))
+}
+
+function mergeTerminalDockPaneState(
+  existing: TerminalDockPaneState | undefined,
+  patch: { docked?: boolean; gutterRows?: number }
+): TerminalDockPaneState {
+  return {
+    docked: patch.docked ?? existing?.docked ?? false,
+    gutterRows:
+      normalizeTerminalDockGutterRows(patch.gutterRows) ??
+      existing?.gutterRows ??
+      DEFAULT_TERMINAL_DOCK_GUTTER_ROWS
+  }
+}
+
+function removePaneKeysFromRecord<T>(
+  record: Record<string, T> | undefined,
+  paneKeys: ReadonlySet<string>
+): Record<string, T> | undefined {
+  if (!record) {
+    return record
+  }
+  const matchingKeys = Object.keys(record).filter((key) => paneKeys.has(key))
+  if (matchingKeys.length === 0) {
+    return record
+  }
+  const next = { ...record }
+  for (const key of matchingKeys) {
+    delete next[key]
+  }
+  return next
+}
+
+// Why: entries older than the echo window are dead by definition; drop them on every
+// stamp so the record doesn't grow unbounded across pane-key churn.
+function pruneExpiredTerminalDockPendingMutations(
+  record: Record<string, number>,
+  now: number
+): Record<string, number> {
+  let changed = false
+  const next: Record<string, number> = {}
+  for (const [key, mutatedAt] of Object.entries(record)) {
+    if (now - mutatedAt < TERMINAL_DOCK_ECHO_WINDOW_MS) {
+      next[key] = mutatedAt
+    } else {
+      changed = true
+    }
+  }
+  return changed ? next : record
+}
+
+// Why: pending-mutation timestamps live outside the per-tab dock record, so closing
+// a tab must drop its keys explicitly or they linger until they age out on their own.
+function removeTabPaneKeysFromPendingMutations(
+  record: Record<string, number>,
+  tabId: string
+): Record<string, number> {
+  const prefix = `${tabId}:`
+  let changed = false
+  const next: Record<string, number> = {}
+  for (const [key, mutatedAt] of Object.entries(record)) {
+    if (key.startsWith(prefix)) {
+      changed = true
+      continue
+    }
+    next[key] = mutatedAt
+  }
+  return changed ? next : record
+}
+
+// Why: dock state is host-tracked like color/pin/viewMode, so mirror local sets or they're lost on reconnect and to paired clients.
+// Only the action path mirrors (never reconcile applying a host value), so the echoed snapshot can't re-trigger an outbound RPC.
+// Sends only the single-pane patch (never the whole record) so two clients editing different panes can't clobber each other.
+// The patch is expected to already carry normalized values (gutterRows clamped) so local and host state can't diverge.
+function mirrorTabTerminalDockToHost(
+  state: AppState,
+  tabId: string,
+  patch: { paneKey: string; docked?: boolean; gutterRows?: number }
+): void {
+  const found = findTabAndWorktree(state.unifiedTabsByWorktree, tabId)
+  if (
+    !found ||
+    found.tab.contentType !== 'terminal' ||
+    !getRuntimeEnvironmentIdForWorktree(state, found.worktreeId)
+  ) {
+    return
+  }
+  const worktreeId = found.worktreeId
+  const environmentId = getRuntimeEnvironmentIdForWorktree(state, worktreeId)
+  if (!environmentId) {
+    return
+  }
+  void Promise.all([
+    import('@/runtime/web-runtime-session'),
+    import('@/runtime/web-session-tabs-sync')
+  ]).then(
+    ([
+      { setWebRuntimeTabProps, isWebTerminalSurfaceTabId, toHostSessionTabId },
+      { resolveHostSessionTabIdForWebSessionTab, remapPaneKeyTabId }
+    ]) => {
+      // Why: the paneKey's tab-ID segment must land under the same host tab id the
+      // RPC itself targets, or the host accumulates a second, web-namespaced record.
+      const hostTabId =
+        resolveHostSessionTabIdForWebSessionTab(state, { environmentId, worktreeId, tabId }) ??
+        (isWebTerminalSurfaceTabId(tabId) ? toHostSessionTabId(tabId) : tabId)
+      const hostPaneKey = remapPaneKeyTabId(patch.paneKey, () => hostTabId)
+      if (!hostPaneKey) {
+        return
+      }
+      setWebRuntimeTabProps({
+        worktreeId,
+        tabId,
+        terminalDock: { ...patch, paneKey: hostPaneKey }
+      })
+    }
+  )
+}
+
+// Why: dock state is host-tracked like color/pin/viewMode, so mirror local pruning
+// or it's lost on reconnect and to paired clients. Only the action path mirrors
+// (never reconcile applying a host value), so the echoed snapshot can't re-trigger
+// an outbound RPC. Sends only the removed keys (never the whole record), remapped
+// to the host's tab-id namespace via the same mechanism the set path uses.
+function mirrorTerminalDockPruneToHost(
+  state: AppState,
+  tabId: string,
+  removedPaneKeys: readonly string[]
+): void {
+  if (removedPaneKeys.length === 0) {
+    return
+  }
+  const found = findTabAndWorktree(state.unifiedTabsByWorktree, tabId)
+  if (
+    !found ||
+    found.tab.contentType !== 'terminal' ||
+    !getRuntimeEnvironmentIdForWorktree(state, found.worktreeId)
+  ) {
+    return
+  }
+  const worktreeId = found.worktreeId
+  const environmentId = getRuntimeEnvironmentIdForWorktree(state, worktreeId)
+  if (!environmentId) {
+    return
+  }
+  void Promise.all([
+    import('@/runtime/web-runtime-session'),
+    import('@/runtime/web-session-tabs-sync')
+  ]).then(
+    ([
+      { setWebRuntimeTabProps, isWebTerminalSurfaceTabId, toHostSessionTabId },
+      { resolveHostSessionTabIdForWebSessionTab, remapPaneKeyTabId }
+    ]) => {
+      const hostTabId =
+        resolveHostSessionTabIdForWebSessionTab(state, { environmentId, worktreeId, tabId }) ??
+        (isWebTerminalSurfaceTabId(tabId) ? toHostSessionTabId(tabId) : tabId)
+      const hostPaneKeys = removedPaneKeys
+        .map((paneKey) => remapPaneKeyTabId(paneKey, () => hostTabId))
+        .filter((paneKey): paneKey is string => paneKey !== null)
+      if (hostPaneKeys.length === 0) {
+        return
+      }
+      setWebRuntimeTabProps({ worktreeId, tabId, terminalDock: { remove: hostPaneKeys } })
+    }
+  )
+}
+
+type DockSet = Parameters<StateCreator<AppState, [], [], TabTerminalDockSlice>>[0]
+type DockGet = Parameters<StateCreator<AppState, [], [], TabTerminalDockSlice>>[1]
+
+export const TAB_TERMINAL_DOCK_INITIAL_STATE = {
+  terminalDockPendingMutationsByPaneKey: {} as Record<string, number>
+}
+
+export { removeTabPaneKeysFromPendingMutations }
+
+export function createTabTerminalDockActions(
+  set: DockSet,
+  get: DockGet
+): Pick<TabTerminalDockSlice, 'setTabTerminalDockState' | 'pruneTerminalDockPaneKeys'> {
+  return {
+    setTabTerminalDockState: (tabId, patch) => {
+      const normalizedGutterRows = normalizeTerminalDockGutterRows(patch.gutterRows)
+      const normalizedPatch = {
+        ...patch,
+        ...(normalizedGutterRows !== undefined ? { gutterRows: normalizedGutterRows } : {})
+      }
+      let committedPaneState: TerminalDockPaneState | null = null
+      set((state) => {
+        const found = findTabAndWorktree(state.unifiedTabsByWorktree, tabId)
+        if (!found) {
+          return {}
+        }
+        const nextPaneState = mergeTerminalDockPaneState(
+          found.tab.terminalDockByPaneKey?.[patch.paneKey],
+          normalizedPatch
+        )
+        committedPaneState = nextPaneState
+        return {
+          ...patchTab(state.unifiedTabsByWorktree, tabId, {
+            terminalDockByPaneKey: {
+              ...found.tab.terminalDockByPaneKey,
+              [patch.paneKey]: nextPaneState
+            }
+          }),
+          // Why: outranks a stale host echo for this pane until the mirrored RPC's own
+          // echo (or the window's expiry) restores host authority — see reconcile.
+          terminalDockPendingMutationsByPaneKey: {
+            ...pruneExpiredTerminalDockPendingMutations(
+              state.terminalDockPendingMutationsByPaneKey,
+              Date.now()
+            ),
+            [patch.paneKey]: Date.now()
+          }
+        }
+      })
+      if (committedPaneState) {
+        writeTerminalDockPaneState(patch.paneKey, committedPaneState)
+      }
+      mirrorTabTerminalDockToHost(get(), tabId, normalizedPatch)
+    },
+
+    pruneTerminalDockPaneKeys: (tabId, paneKeys) => {
+      if (paneKeys.length === 0) {
+        return
+      }
+      const paneKeySet = new Set(paneKeys)
+      let removedKeys: string[] = []
+      set((state) => {
+        const found = findTabAndWorktree(state.unifiedTabsByWorktree, tabId)
+        if (!found) {
+          return {}
+        }
+        const existing = found.tab.terminalDockByPaneKey
+        const next = removePaneKeysFromRecord(existing, paneKeySet)
+        if (next === existing) {
+          return {}
+        }
+        removedKeys = Object.keys(existing!).filter((key) => paneKeySet.has(key))
+        const now = Date.now()
+        return {
+          ...patchTab(state.unifiedTabsByWorktree, tabId, { terminalDockByPaneKey: next }),
+          // Why: a pruned key must not be revived by a stale host echo still carrying it.
+          terminalDockPendingMutationsByPaneKey: {
+            ...pruneExpiredTerminalDockPendingMutations(
+              state.terminalDockPendingMutationsByPaneKey,
+              now
+            ),
+            ...Object.fromEntries(removedKeys.map((key) => [key, now]))
+          }
+        }
+      })
+      if (removedKeys.length > 0) {
+        removeLocalTerminalDockPaneKeys(new Set(removedKeys))
+      }
+      mirrorTerminalDockPruneToHost(get(), tabId, removedKeys)
+    }
+  }
+}
