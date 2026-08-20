@@ -22,6 +22,26 @@
       "name": "native-chat-width",
       "purpose": "Lets the user pick the reading-column width for every native-chat pane instead of a fixed max-width.",
       "globs": ["**/fork-native-chat-width/**"]
+    },
+    {
+      "name": "terminal-dock",
+      "purpose": "Docks a rich agent composer beneath a terminal pane running a supported coding-agent CLI, so a prompt can be composed and sent without typing into the TUI, with the terminal still visible as a fallback.",
+      "globs": ["**/fork-terminal-dock/**"]
+    },
+    {
+      "name": "agent-composer",
+      "purpose": "A host-agnostic composer core extracted from the native-chat composer, so the same draft, history, attachment, and tiered-send behavior serves both the chat pane and the terminal dock.",
+      "globs": ["**/fork-agent-composer/**"]
+    },
+    {
+      "name": "native-chat-session-options",
+      "purpose": "Reads the model and effort an agent recorded for itself on its own transcript turns, so the composer's pills pre-fill from the session log instead of a screen scrape that scrolls away.",
+      "globs": ["**/fork-native-chat-session-options/**"]
+    },
+    {
+      "name": "skill-plugin-attribution",
+      "purpose": "Attributes each discovered skill to the plugin that owns it, so the composer's skill picker can name the plugin and disambiguate a skill offered by more than one.",
+      "globs": ["**/fork-skill-plugin-attribution/**"]
     }
   ],
   "seams": [
@@ -539,12 +559,745 @@
       "feature": "fork-infra",
       "kind": "registration",
       "lines": ["      'fork_ownership_guard',"]
+    },
+    {
+      "path": "CLAUDE.md",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "for brevity\". Route it via the `typed-artifacts` skill (auto-loads on",
+        "those phrases) or use one of:"
+      ]
+    },
+    {
+      "path": "src/main/ipc/pty.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["        return tooLarge", "      return allSettled"]
+    },
+    {
+      "path": "src/main/native-chat/transcript-tail-reader.ts",
+      "feature": "native-chat-session-options",
+      "kind": "registration",
+      "lines": [
+        "} from './fork-native-chat-session-options/transcript-companion-decoder'",
+        "} from '../../shared/fork-native-chat-session-options/native-chat-transcript-companion'"
+      ]
+    },
+    {
+      "path": "src/main/native-chat/transcript-watch.test.ts",
+      "feature": "native-chat-session-options",
+      "kind": "passthrough",
+      "lines": [
+        "import type { NativeChatTranscriptCompanion } from '../../shared/fork-native-chat-session-options/native-chat-transcript-companion'",
+        "import type {"
+      ]
+    },
+    {
+      "path": "src/main/providers/ssh-pty-provider.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "    const params = { id: this.toRelayPtyId(id), data }",
+        "  writeAcknowledged(id: string, data: string): Promise<boolean> {"
+      ]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "} from './fork-terminal-dock/terminal-dock-session-tab-props'",
+        "          ...dockFragment"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/native-chat.test.ts",
+      "feature": "native-chat-session-options",
+      "kind": "passthrough",
+      "lines": [
+        "import type { NativeChatTranscriptCompanion } from '../../../../shared/fork-native-chat-session-options/native-chat-transcript-companion'",
+        "    companion?: NativeChatTranscriptCompanion"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/native-chat.ts",
+      "feature": "native-chat-session-options",
+      "kind": "registration",
+      "lines": [
+        "import { nativeChatCompanionFrameFields } from '../../../../shared/fork-native-chat-session-options/native-chat-transcript-companion'",
+        "        onAppend: (messages, companion) => {"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/session-tabs-schemas.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { parseLegacyNumericPaneKey, parsePaneKey } from '../../../../shared/stable-pane-id'",
+        "  terminalDock: z"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/session-tabs.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "        ...(params.terminalDock !== undefined ? { terminalDock: params.terminalDock } : {})",
+        "        ...(params.viewMode !== undefined ? { viewMode: params.viewMode } : {}),"
+      ]
+    },
+    {
+      "path": "src/main/skills/claude-plugin-skill-sources.test.ts",
+      "feature": "skill-plugin-attribution",
+      "kind": "passthrough",
+      "lines": ["        pluginName: 'compound-engineering',"]
+    },
+    {
+      "path": "src/main/skills/claude-plugin-skill-sources.ts",
+      "feature": "skill-plugin-attribution",
+      "kind": "registration",
+      "lines": [
+        "import { safePluginName, stablePathId, type SkillScanRoot } from './skill-discovery-sources'",
+        "        label: `Claude plugin ${pluginName}`,"
+      ]
+    },
+    {
+      "path": "src/main/skills/discovery.ts",
+      "feature": "skill-plugin-attribution",
+      "kind": "registration",
+      "lines": ["  pluginNameForSkill,", "        ...(pluginName ? { pluginName } : {}),"]
+    },
+    {
+      "path": "src/main/skills/skill-discovery-sources.ts",
+      "feature": "skill-plugin-attribution",
+      "kind": "registration",
+      "lines": [
+        "import { stripUnsafeDisplayCharacters } from '../../shared/skill-display-text'",
+        "  if (root.pluginName) {"
+      ]
+    },
+    {
+      "path": "src/main/skills/skill-discovery-wsl.ts",
+      "feature": "skill-plugin-attribution",
+      "kind": "registration",
+      "lines": ["  pluginNameForSkill,", "      ...(pluginName ? { pluginName } : {})"]
+    },
+    {
+      "path": "src/renderer/src/assets/terminal.css",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [".pane-dock-slot {", "  bottom: var(--terminal-dock-height, 0px);"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatAutocompleteMenus.test.tsx",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": ["                  pluginName: 'warp'", "              id: 'skill:render',"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatAutocompleteMenus.tsx",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": ["    if (plugins.length > 1) {", "        { plugins: plugins.join(', ') }"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatComposer.test.tsx",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": [
+        "vi.mock('./fork-agent-composer/AgentComposerField', () => ({",
+        "vi.mock('./fork-agent-composer/use-agent-composer-draft', () => ({"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatComposer.tsx",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": [
+        "} from './fork-agent-composer/AgentComposer'",
+        "import { seedHistory } from './fork-agent-composer/agent-composer-history'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatInteractiveCard.test.tsx",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": ["    vi.useRealTimers()", "    vi.useFakeTimers()"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatInteractiveCard.tsx",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": ["          resetSubmitting()", "  if (!showingCard) {"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatView.test.tsx",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": [
+        "import { useAgentComposerDraft } from './fork-agent-composer/use-agent-composer-draft'",
+        "import { clearAgentComposerDraftCacheForTests } from './fork-agent-composer/agent-composer-draft-cache'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-composer-state.test.ts",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": ["          pluginName: 'quirk',", "          pluginName: 'two words',"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-composer-state.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": ["      discovery.skills,", "  if (!leadsDraft && !hasSlashSkills) {"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-composer-types.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": ["} from './fork-agent-composer/agent-composer-types'", "import type {"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-pending.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": [
+        "import { setBoundedScopeCacheEntry } from './fork-agent-composer/agent-composer-scope-cache'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-picker-items.ts",
+      "feature": "skill-plugin-attribution",
+      "kind": "registration",
+      "lines": ["      pluginName?: string", "        id: `skill:${token}`,"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-pty-session-options.ts",
+      "feature": "native-chat-session-options",
+      "kind": "registration",
+      "lines": ["  ): boolean =>", "  const applyReport = ("]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-runtime-send-launch-draft.test.ts",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": ["const writes = (): string[] => {", "    await vi.advanceTimersByTimeAsync(0)"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-runtime-send.test.ts",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": [
+        "} from './fork-agent-composer/native-chat-send-outcome'",
+        "import { cancelNativeChatPtySends } from './native-chat-pty-send-queue'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-runtime-send.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": [
+        "} from './fork-agent-composer/native-chat-send-outcome'",
+        "} from './fork-agent-composer/native-chat-runtime-clear'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-session-option-cache.ts",
+      "feature": "native-chat-session-options",
+      "kind": "registration",
+      "lines": [
+        "import { setBoundedScopeCacheEntry } from './fork-agent-composer/agent-composer-scope-cache'",
+        "): boolean {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.test.tsx",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": [
+        "  it('observes a restore performed after a replacement host mounted (dock/native-chat handoff)', async () => {",
+        "    expect(() => {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": [
+        "} from './fork-agent-composer/agent-composer-scope-cache'",
+        "import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentComposerField'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-interactive-send.test.tsx",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": ["    onOutcome('observed-cleared')", "    onOutcome('may-not-have-sent')"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-interactive-send.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": [
+        "import type { SendOutcome } from './fork-agent-composer/native-chat-send-outcome'",
+        "          inFlightRef.current = null"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-picker-command-dispatch.test.tsx",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": [
+        "import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentComposerField'",
+        "vi.mock('./fork-agent-composer/composer-send-options', () => ({"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-picker-command-dispatch.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": [
+        "import type { ComposerSendTier } from './fork-agent-composer/composer-send-tier'",
+        "import type { SendOutcome } from './fork-agent-composer/native-chat-send-outcome'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-picker-state.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": ["        ? /(?:^|\\s)\\/\\S*$/.test(beforeCaret)"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-send-lifecycle.test.tsx",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": ["    rerender({})", "      { initialProps: {} }"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-send-lifecycle.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": [
+        "import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'",
+        "        handle.cancel()"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-session-option-command.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": [
+        "import { pushHistory, type HistoryState } from './fork-agent-composer/agent-composer-history'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-session-options.ts",
+      "feature": "native-chat-session-options",
+      "kind": "registration",
+      "lines": [
+        "import { nativeChatReportedValuesFromObservation } from './fork-native-chat-session-options/native-chat-session-option-observation'",
+        "import type { NativeChatSessionOptionObservation } from '../../../../shared/native-chat-types'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-typed-insertion.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": ["import type { HistoryState } from './fork-agent-composer/agent-composer-history'"]
+    },
+    {
+      "path": "src/renderer/src/components/settings/ExperimentalPane.test.tsx",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["      'Terminal dock'", "    expect(markup).toContain('Terminal dock')"]
+    },
+    {
+      "path": "src/renderer/src/components/settings/ExperimentalPane.tsx",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { TerminalDockExperimentalSetting } from './fork-terminal-dock/TerminalDockExperimentalSetting'",
+        "      {showTerminalDock ? ("
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/experimental-search.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { getTerminalDockExperimentalSearchEntry } from './fork-terminal-dock/terminal-dock-experimental-search-entry'",
+        "    terminalDock: findEntry("
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/TerminalContextMenu.test.tsx",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["      onToggleTerminalDock", "    isTerminalDockDocked: false,"]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/TerminalContextMenu.tsx",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["  onToggleTerminalDock,", "  isTerminalDockDocked,"]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/pane-helpers.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "    const composer = { focus: vi.fn() }",
+        "    return { manager, terminal, composer }"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/pane-helpers.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { makePaneKey, type PaneKey } from '../../../../shared/stable-pane-id'",
+        "    const activeDock ="
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/terminal-input-quarantine.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["  cb: QuarantineListener", "  quarantineListeners.clear()"]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/terminal-visibility-resume.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "const paneDockOwnsFocus = vi.fn(() => false)",
+        "const focusOwnership = { tabId: 'tab-1', paneDockOwnsFocus }"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/terminal-visibility-resume.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "import { focusActivePane, type PaneFocusOwnership } from './pane-helpers'",
+        "    focusActivePane(manager, { tabId, paneDockOwnsFocus })"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    paneDockOwnsFocus,", "        paneDockOwnsFocus,"]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["import type { PaneFocusOwnership } from './pane-helpers'", "  paneDockOwnsFocus,"]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-lifecycle.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { removeTerminalDockPaneKeys } from './fork-terminal-dock/terminal-dock-pane-state'",
+        "import { REMOTE_CONPTY_UNVERIFIED_DATASET_KEY } from './fork-terminal-dock/TerminalPaneDockMount'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/use-terminal-window-wake-recovery.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "  const paneDockOwnsFocus = vi.fn(() => false)",
+        "  const focusOwnership = { tabId: 'tab-1', paneDockOwnsFocus }"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/use-terminal-window-wake-recovery.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "import { useEffect, useRef } from 'react'",
+        "import type { PaneFocusOwnership } from './pane-helpers'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-container-listener-lifecycle.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-dom-creation.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "import { shouldFocusTerminalFromPanePointerDown } from './pane-pointer-focus'",
+        "describe('createPaneDOM dock slot', () => {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-dom-creation.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["    dockContainer,", "  container.appendChild(dockContainer)"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-drag-reorder.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-drop-no-op.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-fit-resize-observer.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-initial-fit-lifecycle.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-lifecycle.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,", "      dockContainer: fakeDockContainer,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-manager-types.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "  dockContainer: HTMLElement",
+        "  /** Empty strip beneath xtermContainer reserved for portaling a composer; see terminal.css. */"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-reveal-repaint.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-split-close.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-split-scroll.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-terminal-gpu-acceleration.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-tree-ops.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-tree-reparent-frame.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: createMockElement(),"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-webgl-context-recovery.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-webgl-refresh-lifecycle.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-webgl-renderer.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/windows-pty-compatibility.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "  isRemoteWindowsConptyStatusUnverified,",
+        "describe('isRemoteWindowsConptyStatusUnverified', () => {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/windows-pty-compatibility.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "  remotePlatform: NodeJS.Platform | null | undefined",
+        "export function isRemoteWindowsConptyStatusUnverified("
+      ]
+    },
+    {
+      "path": "src/renderer/src/runtime/runtime-terminal-inspection.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "  const localWriteInputAccepted = vi.fn()",
+        "          writeInputAccepted: localWriteInputAccepted,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/runtime/runtime-terminal-inspection.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["} from './runtime-rpc-client'", "  data: string,"]
+    },
+    {
+      "path": "src/renderer/src/runtime/sync-runtime-graph.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["      'terminalDockByPaneKey'", "      terminalDockByPaneKey: dockRecord"]
+    },
+    {
+      "path": "src/renderer/src/runtime/sync-runtime-graph.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "    terminalDockSyncEnabled: publication.terminalDockSyncEnabled,",
+        "        ? { terminalDockByPaneKey: unifiedTab.terminalDockByPaneKey }"
+      ]
+    },
+    {
+      "path": "src/renderer/src/runtime/web-runtime-session.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "          ...(args.terminalDock !== undefined ? { terminalDock: args.terminalDock } : {})",
+        "  terminalDock?: { paneKey?: string; docked?: boolean; gutterRows?: number; remove?: string[] }"
+      ]
+    },
+    {
+      "path": "src/renderer/src/runtime/web-session-tabs-sync.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "} from './fork-terminal-dock/web-session-terminal-dock-reconcile'",
+        "import { TERMINAL_DOCK_ECHO_WINDOW_MS } from '../store/slices/fork-terminal-dock/tab-terminal-dock-state'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/tabs.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "} from './fork-terminal-dock/tab-terminal-dock-state'",
+        "  type TabTerminalDockSlice"
+      ]
+    },
+    {
+      "path": "src/shared/keybindings.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "    ['terminal.dock.toggle', 'Mod+Shift+K'],",
+        "    ['terminal.dock.passthrough', 'Mod+Shift+P']"
+      ]
+    },
+    {
+      "path": "src/shared/keybindings.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["  | 'terminal.dock.toggle'", "    id: 'terminal.dock.toggle',"]
+    },
+    {
+      "path": "src/shared/native-chat-agent-profiles.ts",
+      "feature": "native-chat-session-options",
+      "kind": "registration",
+      "lines": ["    skillSourceOwner: 'grok',", "    skillSourceOwner: 'codex',"]
+    },
+    {
+      "path": "src/shared/native-chat-session-option-state.test.ts",
+      "feature": "native-chat-session-options",
+      "kind": "passthrough",
+      "lines": ["      value: 'max',", "      source: 'dispatched',"]
+    },
+    {
+      "path": "src/shared/native-chat-session-option-state.ts",
+      "feature": "native-chat-session-options",
+      "kind": "registration",
+      "lines": ["    [optionId]: tracked", "    record.model = tracked"]
+    },
+    {
+      "path": "src/shared/native-chat-types.ts",
+      "feature": "native-chat-session-options",
+      "kind": "registration",
+      "lines": ["  model?: string", "  effort?: string"]
+    },
+    {
+      "path": "src/shared/runtime-types.ts",
+      "feature": "skill-plugin-attribution",
+      "kind": "registration",
+      "lines": [
+        "  TerminalDockPaneState,",
+        "  terminalDockByPaneKey?: Record<string, TerminalDockPaneState>"
+      ]
+    },
+    {
+      "path": "src/shared/skills.ts",
+      "feature": "skill-plugin-attribution",
+      "kind": "registration",
+      "lines": [
+        "  /** Set when the root is one plugin's skills directory. A shared plugin cache",
+        "  /** Owning plugin, for plugin-sourced skills. Absent in every other scope. */"
+      ]
+    },
+    {
+      "path": "src/shared/telemetry-events.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["  'experimentalTerminalDock',", "const terminalDockToggledSchema = z"]
+    },
+    {
+      "path": "src/shared/workspace-session-schema.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "            terminalDockByPaneKey",
+        "        'pane-1': { docked: true, gutterRows: 6 }"
+      ]
+    },
+    {
+      "path": "src/shared/workspace-session-schema.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { terminalDockByPaneKeySchema } from './fork-terminal-dock/workspace-session-terminal-dock-schema'",
+        "import { persistedOpenFileSchema } from './workspace-session-editor-schema'"
+      ]
     }
   ],
   "exceptions": [
     {
       "path": "package.json",
-      "reason": "Fork identity, versioning, and script wiring \u2014 replaces the old FORK_OWNED_ALWAYS authorship carve-out.",
+      "reason": "Fork identity, versioning, and script wiring — replaces the old FORK_OWNED_ALWAYS authorship carve-out.",
       "status": "permanent"
     },
     {
@@ -671,7 +1424,7 @@
     },
     {
       "path": "config/scripts/fork-ownership-manifest.mjs",
-      "reason": "The manifest loader/matcher itself \u2014 fork machinery, not upstream code.",
+      "reason": "The manifest loader/matcher itself — fork machinery, not upstream code.",
       "status": "permanent"
     },
     {
@@ -681,7 +1434,7 @@
     },
     {
       "path": ".github/scripts/check-fork-ownership.mjs",
-      "reason": "The CI guard that enforces this manifest on pull requests \u2014 fork machinery, not upstream code.",
+      "reason": "The CI guard that enforces this manifest on pull requests — fork machinery, not upstream code.",
       "status": "permanent"
     },
     {
@@ -860,9 +1613,105 @@
       "reason": "The tag visibility test assumes hidden panes disable reads, but the retained-session relay path must stay subscribed across SSH relay reconnects; it cannot assert both contracts.",
       "status": "permanent",
       "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatComposerActions.tsx",
+      "reason": "Replaced by the host-agnostic AgentComposerActions in fork-agent-composer; restoring upstream's copy would reintroduce a second, chat-only action bar.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatComposerField.tsx",
+      "reason": "Replaced by the host-agnostic AgentComposerField in fork-agent-composer; restoring upstream's copy would reintroduce a second, chat-only composer field.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-composer-keydown.ts",
+      "reason": "Replaced by useAgentComposerKeydown in fork-agent-composer, which adds the docked composer's history recall.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-composer-keydown.test.tsx",
+      "reason": "Superseded by the fork copy's test in fork-agent-composer.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-composer-autogrow.test.tsx",
+      "reason": "Superseded by the fork copy's test in fork-agent-composer.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatComposerActions.test.tsx",
+      "reason": "Superseded by the fork copy's test in fork-agent-composer.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-composer-scope-cache.ts",
+      "reason": "Superseded by agent-composer-scope-cache, which keys by composer scope rather than chat pane.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-composer-scope-cache.test.ts",
+      "reason": "Superseded by the fork scope cache's own test.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-draft-cache.ts",
+      "reason": "Superseded by agent-composer-draft-cache, which subscribes so concurrent composer hosts converge.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-draft-cache.test.ts",
+      "reason": "Superseded by the fork draft cache's own test.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-draft.ts",
+      "reason": "Superseded by useAgentComposerDraft, which serves both the chat pane and the dock.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "BUGS.md",
+      "reason": "Fork-only defect log; upstream has no counterpart.",
+      "status": "permanent"
+    },
+    {
+      "path": "DEFERRED.md",
+      "reason": "Fork-only out-of-scope work log; upstream has no counterpart.",
+      "status": "permanent"
+    },
+    {
+      "path": "TEST_BACKLOG.md",
+      "reason": "Fork-only skipped-test log; upstream has no counterpart.",
+      "status": "permanent"
+    },
+    {
+      "path": "proposals.md",
+      "reason": "Fork-only architecture proposal log; upstream has no counterpart.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/shared/workspace-session-editor-schema.ts",
+      "reason": "Upstream's workspace-session-schema.ts sits one line under the 300-line cap, so the editor schemas were split into their own module to make room. A plain refactor of upstream's own file, not fork behavior.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#workspace-session-schema-split"
     }
   ],
   "residuals": {
+    ".gitignore": {
+      "added": 11,
+      "removed": 2
+    },
     "AGENTS.md": {
       "added": 64,
       "removed": 0
@@ -870,6 +1719,10 @@
     ".gitignore": {
       "added": 12,
       "removed": 2
+    },
+    "CLAUDE.md": {
+      "added": 17,
+      "removed": 0
     },
     "config/localization-coverage-allowlist.json": {
       "added": 7,
@@ -888,15 +1741,19 @@
       "removed": 0
     },
     "src/main/ipc/native-chat-subscribe-lifecycle.test.ts": {
-      "added": 4,
-      "removed": 1
+      "added": 7,
+      "removed": 4
     },
     "src/main/ipc/native-chat.ts": {
-      "added": 45,
-      "removed": 3
+      "added": 58,
+      "removed": 20
     },
     "src/main/ipc/notifications.ts": {
       "added": 1,
+      "removed": 1
+    },
+    "src/main/ipc/pty.ts": {
+      "added": 98,
       "removed": 1
     },
     "src/main/ipc/ssh.ts": {
@@ -928,16 +1785,24 @@
       "removed": 6
     },
     "src/main/native-chat/transcript-incremental-reader.ts": {
-      "added": 3,
-      "removed": 4
+      "added": 11,
+      "removed": 10
+    },
+    "src/main/native-chat/transcript-tail-reader.ts": {
+      "added": 25,
+      "removed": 23
     },
     "src/main/native-chat/transcript-watch-contract.ts": {
-      "added": 23,
-      "removed": 0
+      "added": 28,
+      "removed": 8
     },
     "src/main/native-chat/transcript-watch-engine.ts": {
-      "added": 15,
-      "removed": 15
+      "added": 37,
+      "removed": 33
+    },
+    "src/main/native-chat/transcript-watch.test.ts": {
+      "added": 117,
+      "removed": 17
     },
     "src/main/native-chat/transcript-watch.ts": {
       "added": 30,
@@ -947,12 +1812,56 @@
       "added": 4,
       "removed": 0
     },
+    "src/main/providers/ssh-pty-provider.ts": {
+      "added": 7,
+      "removed": 0
+    },
+    "src/main/runtime/orca-runtime.ts": {
+      "added": 140,
+      "removed": 11
+    },
+    "src/main/runtime/rpc/methods/native-chat.test.ts": {
+      "added": 14,
+      "removed": 32
+    },
+    "src/main/runtime/rpc/methods/native-chat.ts": {
+      "added": 8,
+      "removed": 7
+    },
+    "src/main/runtime/rpc/methods/session-tabs-schemas.ts": {
+      "added": 40,
+      "removed": 1
+    },
+    "src/main/runtime/rpc/methods/session-tabs.ts": {
+      "added": 2,
+      "removed": 1
+    },
     "src/main/runtime/rpc/methods/worktree-schemas.ts": {
       "added": 2,
       "removed": 1
     },
     "src/main/runtime/rpc/methods/worktree.ts": {
       "added": 7,
+      "removed": 1
+    },
+    "src/main/skills/claude-plugin-skill-sources.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/main/skills/claude-plugin-skill-sources.ts": {
+      "added": 7,
+      "removed": 7
+    },
+    "src/main/skills/discovery.ts": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/main/skills/skill-discovery-sources.ts": {
+      "added": 39,
+      "removed": 1
+    },
+    "src/main/skills/skill-discovery-wsl.ts": {
+      "added": 4,
       "removed": 1
     },
     "src/main/ssh/ssh-relay-session.ts": {
@@ -964,11 +1873,11 @@
       "removed": 1
     },
     "src/preload/api-types.ts": {
-      "added": 31,
-      "removed": 0
+      "added": 53,
+      "removed": 27
     },
     "src/preload/index.ts": {
-      "added": 16,
+      "added": 18,
       "removed": 7
     },
     "src/relay/relay.ts": {
@@ -979,6 +1888,10 @@
       "added": 1,
       "removed": 0
     },
+    "src/renderer/src/assets/terminal.css": {
+      "added": 19,
+      "removed": 1
+    },
     "src/renderer/src/components/dashboard-popout/AgentMapWorkspaceContextMenu.test.tsx": {
       "added": 1,
       "removed": 1
@@ -987,9 +1900,33 @@
       "added": 4,
       "removed": 1
     },
+    "src/renderer/src/components/native-chat/NativeChatAutocompleteMenus.test.tsx": {
+      "added": 66,
+      "removed": 0
+    },
+    "src/renderer/src/components/native-chat/NativeChatAutocompleteMenus.tsx": {
+      "added": 10,
+      "removed": 2
+    },
+    "src/renderer/src/components/native-chat/NativeChatComposer.test.tsx": {
+      "added": 26,
+      "removed": 10
+    },
+    "src/renderer/src/components/native-chat/NativeChatComposer.tsx": {
+      "added": 184,
+      "removed": 345
+    },
     "src/renderer/src/components/native-chat/NativeChatComposerField.tsx": {
-      "added": 4,
-      "removed": 1
+      "added": 0,
+      "removed": 223
+    },
+    "src/renderer/src/components/native-chat/NativeChatInteractiveCard.test.tsx": {
+      "added": 21,
+      "removed": 0
+    },
+    "src/renderer/src/components/native-chat/NativeChatInteractiveCard.tsx": {
+      "added": 20,
+      "removed": 30
     },
     "src/renderer/src/components/native-chat/NativeChatMessageList.tsx": {
       "added": 12,
@@ -1003,13 +1940,117 @@
       "added": 6,
       "removed": 3
     },
+    "src/renderer/src/components/native-chat/NativeChatView.test.tsx": {
+      "added": 4,
+      "removed": 4
+    },
     "src/renderer/src/components/native-chat/NativeChatView.tsx": {
-      "added": 14,
+      "added": 15,
       "removed": 17
+    },
+    "src/renderer/src/components/native-chat/native-chat-composer-state.test.ts": {
+      "added": 139,
+      "removed": 49
+    },
+    "src/renderer/src/components/native-chat/native-chat-composer-state.ts": {
+      "added": 33,
+      "removed": 41
+    },
+    "src/renderer/src/components/native-chat/native-chat-composer-types.ts": {
+      "added": 12,
+      "removed": 33
+    },
+    "src/renderer/src/components/native-chat/native-chat-pending.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/native-chat-picker-items.ts": {
+      "added": 48,
+      "removed": 15
+    },
+    "src/renderer/src/components/native-chat/native-chat-pty-session-options.ts": {
+      "added": 25,
+      "removed": 8
+    },
+    "src/renderer/src/components/native-chat/native-chat-runtime-send-launch-draft.test.ts": {
+      "added": 29,
+      "removed": 9
+    },
+    "src/renderer/src/components/native-chat/native-chat-runtime-send.test.ts": {
+      "added": 484,
+      "removed": 53
+    },
+    "src/renderer/src/components/native-chat/native-chat-runtime-send.ts": {
+      "added": 174,
+      "removed": 249
+    },
+    "src/renderer/src/components/native-chat/native-chat-session-option-cache.ts": {
+      "added": 32,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.test.tsx": {
+      "added": 59,
+      "removed": 0
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.ts": {
+      "added": 106,
+      "removed": 23
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-interactive-send.test.tsx": {
+      "added": 38,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-interactive-send.ts": {
+      "added": 16,
+      "removed": 2
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-picker-command-dispatch.test.tsx": {
+      "added": 128,
+      "removed": 28
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-picker-command-dispatch.ts": {
+      "added": 48,
+      "removed": 6
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-picker-state.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-send-lifecycle.test.tsx": {
+      "added": 59,
+      "removed": 0
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-send-lifecycle.ts": {
+      "added": 22,
+      "removed": 3
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-session-option-command.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-session-options.ts": {
+      "added": 57,
+      "removed": 8
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-typed-insertion.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/settings/ExperimentalPane.test.tsx": {
+      "added": 31,
+      "removed": 0
+    },
+    "src/renderer/src/components/settings/ExperimentalPane.tsx": {
+      "added": 8,
+      "removed": 0
     },
     "src/renderer/src/components/settings/NativeChatExperimentalSetting.tsx": {
       "added": 6,
       "removed": 1
+    },
+    "src/renderer/src/components/settings/experimental-search.ts": {
+      "added": 5,
+      "removed": 0
     },
     "src/renderer/src/components/sidebar/CommentMarkdown.tsx": {
       "added": 15,
@@ -1043,6 +2084,14 @@
       "added": 66,
       "removed": 4
     },
+    "src/renderer/src/components/terminal-pane/TerminalContextMenu.test.tsx": {
+      "added": 42,
+      "removed": 0
+    },
+    "src/renderer/src/components/terminal-pane/TerminalContextMenu.tsx": {
+      "added": 27,
+      "removed": 1
+    },
     "src/renderer/src/components/terminal-pane/TerminalPaneHeaderOverlay.test.tsx": {
       "added": 33,
       "removed": 0
@@ -1050,6 +2099,46 @@
     "src/renderer/src/components/terminal-pane/TerminalPaneHeaderOverlay.tsx": {
       "added": 5,
       "removed": 0
+    },
+    "src/renderer/src/components/terminal-pane/pane-helpers.test.ts": {
+      "added": 27,
+      "removed": 4
+    },
+    "src/renderer/src/components/terminal-pane/pane-helpers.ts": {
+      "added": 26,
+      "removed": 6
+    },
+    "src/renderer/src/components/terminal-pane/terminal-input-quarantine.ts": {
+      "added": 80,
+      "removed": 4
+    },
+    "src/renderer/src/components/terminal-pane/terminal-visibility-resume.test.ts": {
+      "added": 36,
+      "removed": 0
+    },
+    "src/renderer/src/components/terminal-pane/terminal-visibility-resume.ts": {
+      "added": 16,
+      "removed": 8
+    },
+    "src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects.test.ts": {
+      "added": 46,
+      "removed": 4
+    },
+    "src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects.ts": {
+      "added": 7,
+      "removed": 2
+    },
+    "src/renderer/src/components/terminal-pane/use-terminal-pane-lifecycle.ts": {
+      "added": 141,
+      "removed": 3
+    },
+    "src/renderer/src/components/terminal-pane/use-terminal-window-wake-recovery.test.ts": {
+      "added": 8,
+      "removed": 0
+    },
+    "src/renderer/src/components/terminal-pane/use-terminal-window-wake-recovery.ts": {
+      "added": 12,
+      "removed": 3
     },
     "src/renderer/src/i18n/i18n.ts": {
       "added": 3,
@@ -1059,16 +2148,132 @@
       "added": 1,
       "removed": 1
     },
+    "src/renderer/src/lib/pane-manager/pane-container-listener-lifecycle.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-dom-creation.test.ts": {
+      "added": 53,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-dom-creation.ts": {
+      "added": 6,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-drag-reorder.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-drop-no-op.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-fit-resize-observer.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-initial-fit-lifecycle.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-lifecycle.test.ts": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-manager-types.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-reveal-repaint.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-split-close.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-split-scroll.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-terminal-gpu-acceleration.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-tree-ops.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-tree-reparent-frame.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-webgl-context-recovery.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-webgl-refresh-lifecycle.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-webgl-renderer.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/windows-pty-compatibility.test.ts": {
+      "added": 17,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/windows-pty-compatibility.ts": {
+      "added": 12,
+      "removed": 0
+    },
     "src/renderer/src/lib/terminal-title-contrast.ts": {
       "added": 3,
       "removed": 3
     },
-    "src/renderer/src/web/web-preload-api.ts": {
-      "added": 20,
+    "src/renderer/src/runtime/runtime-terminal-inspection.test.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/runtime/runtime-terminal-inspection.ts": {
+      "added": 74,
       "removed": 11
     },
+    "src/renderer/src/runtime/sync-runtime-graph.test.ts": {
+      "added": 64,
+      "removed": 0
+    },
+    "src/renderer/src/runtime/sync-runtime-graph.ts": {
+      "added": 19,
+      "removed": 2
+    },
+    "src/renderer/src/runtime/web-runtime-session.ts": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/renderer/src/runtime/web-session-tabs-sync.ts": {
+      "added": 149,
+      "removed": 29
+    },
+    "src/renderer/src/store/slices/tabs.ts": {
+      "added": 20,
+      "removed": 1
+    },
+    "src/renderer/src/web/web-preload-api.ts": {
+      "added": 29,
+      "removed": 17
+    },
     "src/shared/constants.ts": {
-      "added": 2,
+      "added": 3,
+      "removed": 0
+    },
+    "src/shared/keybindings.test.ts": {
+      "added": 67,
+      "removed": 0
+    },
+    "src/shared/keybindings.ts": {
+      "added": 18,
       "removed": 0
     },
     "src/shared/local-build-compatibility-contract.json": {
@@ -1083,13 +2288,49 @@
       "added": 1,
       "removed": 1
     },
+    "src/shared/native-chat-agent-profiles.ts": {
+      "added": 12,
+      "removed": 4
+    },
+    "src/shared/native-chat-session-option-state.test.ts": {
+      "added": 65,
+      "removed": 0
+    },
+    "src/shared/native-chat-session-option-state.ts": {
+      "added": 42,
+      "removed": 4
+    },
+    "src/shared/native-chat-types.ts": {
+      "added": 14,
+      "removed": 0
+    },
     "src/shared/project-groups.ts": {
       "added": 2,
       "removed": 0
     },
-    "src/shared/types.ts": {
-      "added": 10,
+    "src/shared/runtime-types.ts": {
+      "added": 4,
       "removed": 0
+    },
+    "src/shared/skills.ts": {
+      "added": 5,
+      "removed": 0
+    },
+    "src/shared/telemetry-events.ts": {
+      "added": 21,
+      "removed": 0
+    },
+    "src/shared/types.ts": {
+      "added": 21,
+      "removed": 0
+    },
+    "src/shared/workspace-session-schema.test.ts": {
+      "added": 88,
+      "removed": 0
+    },
+    "src/shared/workspace-session-schema.ts": {
+      "added": 4,
+      "removed": 17
     }
   }
 }
