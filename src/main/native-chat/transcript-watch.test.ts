@@ -2,7 +2,12 @@ import { appendFile, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { NativeChatMessage, NativeChatTurnLifecycle } from '../../shared/native-chat-types'
+import type {
+  NativeChatMessage,
+  NativeChatSessionOptionObservation,
+  NativeChatTurnLifecycle
+} from '../../shared/native-chat-types'
+import type { NativeChatTranscriptCompanion } from '../../shared/native-chat-transcript-companion'
 import {
   getActiveNativeChatWatcherCount,
   readNativeChatTranscriptTail,
@@ -42,6 +47,30 @@ function claudeLine(uuid: string, role: 'user' | 'assistant', text: string): str
     uuid,
     timestamp: '2026-06-01T10:00:00.000Z',
     message: { role, content: role === 'user' ? text : [{ type: 'text', text }] }
+  })}\n`
+}
+
+// Claude stamps `effort` on the record and the model inside `message`.
+function claudeSessionOptionLine(uuid: string, model: string, effort: string): string {
+  return `${JSON.stringify({
+    type: 'assistant',
+    uuid,
+    timestamp: '2026-06-01T10:00:00.000Z',
+    effort,
+    message: {
+      role: 'assistant',
+      model: `claude-${model}`,
+      content: [{ type: 'text', text: 'ok' }]
+    }
+  })}\n`
+}
+
+// Codex opens each turn with a row that decodes to no message at all.
+function codexTurnContextLine(model: string, effort: string): string {
+  return `${JSON.stringify({
+    type: 'turn_context',
+    timestamp: '2026-06-01T10:00:02.000Z',
+    payload: { turn_id: 'turn-1', model, effort }
   })}\n`
 }
 
@@ -123,6 +152,73 @@ describe('subscribeNativeChatTranscript', () => {
     expect(snapshots).toEqual([[]])
   })
 
+  it('replays and updates the model and effort the agent recorded for itself', async () => {
+    // The startup frame is long gone by the time a session has turns; the log is
+    // what still knows, and it re-states the values on every turn.
+    const filePath = await tempFile(claudeSessionOptionLine('a-1', 'opus-5', 'high'))
+    const observed: (NativeChatSessionOptionObservation | undefined)[] = []
+    const sub = await subscribeNativeChatTranscript({
+      agent: 'claude',
+      sessionId: 'ignored',
+      filePath,
+      initialLimit: 40,
+      onInitialSnapshot: (_messages, _hasMore, _beforeOffset, _error, companion) => {
+        observed.push(companion?.sessionOptions)
+      },
+      onAppend: (_messages, companion) => {
+        observed.push(companion?.sessionOptions)
+      },
+      debounceMs: 5
+    })
+
+    await waitFor(() => observed.length === 1)
+    await appendFile(filePath, claudeSessionOptionLine('a-2', 'sonnet-5', 'low'))
+    await waitFor(() => observed.length === 2)
+    sub.unsubscribe()
+
+    expect(observed[0]).toMatchObject({ model: 'claude-opus-5', effort: 'high' })
+    expect(observed[1]).toMatchObject({ model: 'claude-sonnet-5', effort: 'low' })
+  })
+
+  it('reports each batch only for what that batch observed', async () => {
+    const filePath = await tempFile(codexLifecycleLine('task_started'))
+    const companions: (NativeChatTranscriptCompanion | undefined)[] = []
+    let drained = false
+    const sub = await subscribeNativeChatTranscript({
+      agent: 'codex',
+      sessionId: 'ignored',
+      filePath,
+      initialLimit: 40,
+      onInitialSnapshot: () => {
+        drained = true
+      },
+      onAppend: (_messages, companion) => {
+        companions.push(companion)
+      },
+      debounceMs: 5
+    })
+    // Appending before the initial drain settles folds the row into the snapshot
+    // instead of an append batch, which is what this test is about.
+    await waitFor(() => drained)
+    // Codex writes its options and its turn boundaries on different record types,
+    // so a drain can see one and not the other. The reader states what it read;
+    // accumulating across batches belongs to the consumer, not here — inventing a
+    // carry-over would make a batch claim evidence it never saw.
+    await appendFile(filePath, codexTurnContextLine('gpt-5.6-sol', 'high'))
+    await waitFor(() => companions.some((c) => c?.sessionOptions !== undefined))
+    await appendFile(filePath, codexLifecycleLine('task_complete'))
+    await waitFor(() => companions.some((c) => c?.lifecycle !== undefined))
+    sub.unsubscribe()
+
+    expect(companions.find((c) => c?.sessionOptions)?.sessionOptions).toMatchObject({
+      model: 'gpt-5.6-sol',
+      effort: 'high'
+    })
+    const lifecycleBatch = companions.find((c) => c?.lifecycle)
+    expect(lifecycleBatch?.lifecycle).toMatchObject({ state: 'completed' })
+    expect(lifecycleBatch?.sessionOptions).toBeUndefined()
+  })
+
   it('replays and appends provider-authored turn lifecycle markers', async () => {
     const filePath = await tempFile(claudeLine('u-1', 'user', 'first'))
     const lifecycles: NativeChatTurnLifecycle[] = []
@@ -130,14 +226,14 @@ describe('subscribeNativeChatTranscript', () => {
       agent: 'claude',
       sessionId: 'ignored',
       filePath,
-      onInitialSnapshot: (_messages, _hasMore, _beforeOffset, _error, lifecycle) => {
-        if (lifecycle) {
-          lifecycles.push(lifecycle)
+      onInitialSnapshot: (_messages, _hasMore, _beforeOffset, _error, companion) => {
+        if (companion?.lifecycle) {
+          lifecycles.push(companion.lifecycle)
         }
       },
-      onAppend: (_messages, lifecycle) => {
-        if (lifecycle) {
-          lifecycles.push(lifecycle)
+      onAppend: (_messages, companion) => {
+        if (companion?.lifecycle) {
+          lifecycles.push(companion.lifecycle)
         }
       },
       debounceMs: 5
@@ -159,15 +255,15 @@ describe('subscribeNativeChatTranscript', () => {
       agent: 'codex',
       sessionId: 'ignored',
       filePath,
-      onInitialSnapshot: (_messages, _hasMore, _beforeOffset, _error, lifecycle) => {
-        if (lifecycle) {
-          lifecycles.push(lifecycle)
+      onInitialSnapshot: (_messages, _hasMore, _beforeOffset, _error, companion) => {
+        if (companion?.lifecycle) {
+          lifecycles.push(companion.lifecycle)
         }
       },
-      onAppend: (messages, lifecycle) => {
+      onAppend: (messages, companion) => {
         expect(messages).toEqual([])
-        if (lifecycle) {
-          lifecycles.push(lifecycle)
+        if (companion?.lifecycle) {
+          lifecycles.push(companion.lifecycle)
         }
       },
       debounceMs: 5
@@ -196,8 +292,8 @@ describe('subscribeNativeChatTranscript', () => {
       sessionId: 'ignored',
       filePath,
       initialLimit: 40,
-      onInitialSnapshot: (messages, _hasMore, _beforeOffset, _error, lifecycle) => {
-        snapshot = { messages, lifecycle }
+      onInitialSnapshot: (messages, _hasMore, _beforeOffset, _error, companion) => {
+        snapshot = { messages, lifecycle: companion?.lifecycle }
       },
       onAppend: () => {},
       debounceMs: 5
@@ -225,7 +321,9 @@ describe('subscribeNativeChatTranscript', () => {
       limit: 40
     })
 
-    expect(result).toMatchObject({ lifecycle: { state: 'working', turnId: 'turn-2' } })
+    expect(result).toMatchObject({
+      companion: { lifecycle: { state: 'working', turnId: 'turn-2' } }
+    })
   })
 
   it('recovers a completion marker even when trailing non-boundary rows follow it', async () => {
@@ -258,7 +356,9 @@ describe('subscribeNativeChatTranscript', () => {
       limit: 40
     })
 
-    expect(result).toMatchObject({ lifecycle: { state: 'completed', turnId: 'a-1' } })
+    expect(result).toMatchObject({
+      companion: { lifecycle: { state: 'completed', turnId: 'a-1' } }
+    })
   })
 
   it('emits a bulk append in bounded ordered batches', async () => {

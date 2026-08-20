@@ -7,7 +7,12 @@
 // growing without bound — the same degradation the watcher already applies to a
 // rotated file.
 
-import type { NativeChatMessage, NativeChatTurnLifecycle } from '../../shared/native-chat-types'
+import type { NativeChatMessage } from '../../shared/native-chat-types'
+import {
+  nativeChatCompanionFrameFields,
+  type NativeChatCompanionFrameFields,
+  type NativeChatTranscriptCompanion
+} from '../../shared/native-chat-transcript-companion'
 import {
   clipNativeChatMessageToBytes,
   estimateNativeChatMessageBytes,
@@ -18,12 +23,11 @@ import {
 const MAX_MESSAGE_BYTES = Math.floor(NATIVE_CHAT_RELAY_BYTE_BUDGET / 2)
 const MAX_OUTBOX_BYTES = 4 * 1024 * 1024
 
-export type NativeChatSnapshotFrame = {
+export type NativeChatSnapshotFrame = NativeChatCompanionFrameFields & {
   kind: 'snapshot' | 'replace'
   messages: NativeChatMessage[]
   hasMore: boolean
   beforeOffset?: number
-  lifecycle?: NativeChatTurnLifecycle
   /** Set when the initial drain failed. Not terminal — the watcher keeps
    *  retrying, so a later frame supersedes it. */
   error?: string
@@ -31,7 +35,7 @@ export type NativeChatSnapshotFrame = {
 
 export type NativeChatOutboxFrame =
   | NativeChatSnapshotFrame
-  | { kind: 'append'; messages: NativeChatMessage[]; lifecycle?: NativeChatTurnLifecycle }
+  | (NativeChatCompanionFrameFields & { kind: 'append'; messages: NativeChatMessage[] })
 
 export type NativeChatOutbox = {
   frames: NativeChatOutboxFrame[]
@@ -83,10 +87,11 @@ export function pushNativeChatSnapshot(
 export function pushNativeChatAppend(
   outbox: NativeChatOutbox,
   messages: readonly NativeChatMessage[],
-  lifecycle?: NativeChatTurnLifecycle
+  companion?: NativeChatTranscriptCompanion
 ): void {
   outbox.seq++
-  if (messages.length === 0 && !lifecycle) {
+  const fields = nativeChatCompanionFrameFields(companion)
+  if (messages.length === 0 && !companion) {
     return
   }
   // Buffered even while a re-read is pending: the watcher advances past these
@@ -97,11 +102,9 @@ export function pushNativeChatAppend(
   // Coalesce consecutive appends so a fast stream cannot exhaust the frame bound.
   if (tail?.kind === 'append') {
     tail.messages.push(...clipped)
-    if (lifecycle) {
-      tail.lifecycle = lifecycle
-    }
+    Object.assign(tail, fields)
   } else {
-    outbox.frames.push({ kind: 'append', messages: clipped, ...(lifecycle ? { lifecycle } : {}) })
+    outbox.frames.push({ kind: 'append', messages: clipped, ...fields })
   }
   outbox.bytes += framePayloadBytes(clipped)
   enforceBounds(outbox)
@@ -145,7 +148,7 @@ function splitOversizedAppend(
   if (head.length === frame.messages.length) {
     return null
   }
-  // The lifecycle describes the newest turn, so it stays with the remainder.
+  // The companion describes the newest turn, so it stays with the remainder.
   frame.messages = frame.messages.slice(head.length)
   return { kind: 'append', messages: head }
 }

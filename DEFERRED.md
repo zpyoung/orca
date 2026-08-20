@@ -32,3 +32,11 @@ Reviewed every sprint planning. Use `/quirk:artifacts:defer` to append.
 - **Priority**: P3
 - **Proposed owner**: terminal-dock feature owner
 
+
+## DEFER-3: Session-option surface is rebuilt per host render, so a commit can land on an orphaned record
+- **Deferred**: 2026-08-18
+- **Session context**: fixing the dock composer's effort pill reverting to the value Claude's startup frame last painted
+- **Why deferred**: `useNativeChatSessionOptions` memoizes the whole surface on its inputs, so any dep change (canSend/passthrough flip, pty swap) builds a new surface with a new record while an in-flight `setOption` still holds the old one. The commit then writes only the orphan (and the shared scope cache), leaving the rendered snapshot stale until the next rebuild. Stabilizing the dock's screen reader plus the report gate closes the path that made this fire on every render; the remaining window needs the hook to keep one surface per scope and feed it changed inputs instead of rebuilding — a larger refactor than this fix warranted.
+- **Estimated effort**: M
+- **Priority**: P3
+- **Proposed owner**: terminal-dock feature owner

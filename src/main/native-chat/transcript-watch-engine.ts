@@ -1,4 +1,8 @@
-import type { NativeChatMessage, NativeChatTurnLifecycle } from '../../shared/native-chat-types'
+import type { NativeChatMessage } from '../../shared/native-chat-types'
+import {
+  mergeNativeChatTranscriptCompanion,
+  type NativeChatTranscriptCompanion
+} from '../../shared/native-chat-transcript-companion'
 import {
   boundaryFingerprint,
   readTranscriptFileVersion,
@@ -11,7 +15,7 @@ import {
   type IncrementalTranscriptState
 } from './transcript-incremental-reader'
 import { createTranscriptNativeWatcher } from './transcript-native-watcher'
-import { nativeChatTurnLifecycleDecoderForAgent } from './transcript-turn-lifecycle'
+import { nativeChatTranscriptCompanionDecoderForAgent } from './transcript-companion-decoder'
 import type {
   NativeChatTranscriptSubscription,
   NativeChatTranscriptTailReader,
@@ -57,7 +61,7 @@ export async function installTranscriptWatcher(
   }
   const { onAppend, onInitialSnapshot, onReplace, initialLimit, initialMaxBytes } = args
   const { tailReader } = args
-  const decodeLifecycle = nativeChatTurnLifecycleDecoderForAgent(args.agent)
+  const decodeCompanion = nativeChatTranscriptCompanionDecoderForAgent(args.agent)
 
   const state: IncrementalTranscriptState = {
     offset: 0,
@@ -96,7 +100,7 @@ export async function installTranscriptWatcher(
   }
 
   async function readAndEmitAppends(): Promise<void> {
-    let lifecycle: NativeChatTurnLifecycle | undefined
+    let companion: NativeChatTranscriptCompanion | undefined
     const remaining = await readIncrementalTranscriptMessages(
       filePath,
       state,
@@ -106,14 +110,14 @@ export async function installTranscriptWatcher(
           onAppend(messages)
         }
       },
-      decodeLifecycle ?? undefined,
-      (nextLifecycle) => {
-        lifecycle = nextLifecycle
+      decodeCompanion,
+      (next) => {
+        companion = mergeNativeChatTranscriptCompanion(companion, next)
       },
       gateAbort.signal
     )
-    if (!closed && (remaining.length > 0 || lifecycle)) {
-      onAppend(remaining, lifecycle)
+    if (!closed && (remaining.length > 0 || companion)) {
+      onAppend(remaining, companion)
     }
   }
 
@@ -170,7 +174,7 @@ export async function installTranscriptWatcher(
             filePath,
             limit: initialLimit,
             decode,
-            decodeLifecycle,
+            decodeCompanion,
             maxBytes: initialMaxBytes,
             signal: gateAbort.signal
           })
@@ -185,7 +189,7 @@ export async function installTranscriptWatcher(
         replacementSnapshot.messages,
         replacementSnapshot.hasMore,
         replacementSnapshot.beforeOffset,
-        replacementSnapshot.lifecycle
+        replacementSnapshot.companion
       )
       await readAndEmitAppends()
       await finishSuccessfulDrain(current)
@@ -198,7 +202,7 @@ export async function installTranscriptWatcher(
             filePath,
             limit: initialLimit,
             decode,
-            decodeLifecycle,
+            decodeCompanion,
             maxBytes: initialMaxBytes,
             signal: gateAbort.signal
           })
@@ -216,26 +220,26 @@ export async function installTranscriptWatcher(
           initialSnapshot.hasMore,
           initialSnapshot.beforeOffset,
           undefined,
-          initialSnapshot.lifecycle
+          initialSnapshot.companion
         )
         await readAndEmitAppends()
       } else {
-        let lifecycle: NativeChatTurnLifecycle | undefined
+        let companion: NativeChatTranscriptCompanion | undefined
         const messages = await readIncrementalTranscriptMessages(
           filePath,
           state,
           decode,
           undefined,
-          decodeLifecycle ?? undefined,
-          (nextLifecycle) => {
-            lifecycle = nextLifecycle
+          decodeCompanion,
+          (next) => {
+            companion = mergeNativeChatTranscriptCompanion(companion, next)
           },
           gateAbort.signal
         )
         if (closed) {
           return
         }
-        onInitialSnapshot(messages, false, 0, undefined, lifecycle)
+        onInitialSnapshot(messages, false, 0, undefined, companion)
       }
     } else {
       initialDrain = false

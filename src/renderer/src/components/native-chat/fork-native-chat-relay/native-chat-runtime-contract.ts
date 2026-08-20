@@ -4,7 +4,11 @@ import type {
   NativeChatAppendedMessages,
   NativeChatReadSessionResult
 } from '../../../../../preload/api-types'
-import type { NativeChatTurnLifecycle } from '../../../../../shared/native-chat-types'
+import type {
+  NativeChatSessionOptionObservation,
+  NativeChatTurnLifecycle
+} from '../../../../../shared/native-chat-types'
+import type { NativeChatCompanionFrameFields } from '../../../../../shared/native-chat-transcript-companion'
 
 export const RUNTIME_NATIVE_CHAT_READ_ERROR = "Couldn't read agent chat from the remote runtime."
 
@@ -38,6 +42,44 @@ export function parseRuntimeNativeChatTurnLifecycle(
   }
 }
 
+/** A remote runtime old enough to omit this simply reports nothing observed —
+ *  the composer keeps its terminal-scrape fallback, so absence is not an error. */
+export function parseRuntimeNativeChatSessionOptions(
+  value: unknown
+): NativeChatSessionOptionObservation | undefined {
+  if (typeof value !== 'object' || value === null) {
+    return undefined
+  }
+  const record = value as Record<string, unknown>
+  const model = typeof record.model === 'string' ? record.model.trim() : ''
+  const effort = typeof record.effort === 'string' ? record.effort.trim() : ''
+  if (!model && !effort) {
+    return undefined
+  }
+  const observedAt =
+    typeof record.observedAt === 'number' && Number.isFinite(record.observedAt)
+      ? record.observedAt
+      : null
+  return {
+    ...(model ? { model } : {}),
+    ...(effort ? { effort } : {}),
+    observedAt
+  }
+}
+
+/** The two companion keys off one frame, validated. Every hop spreads this so a
+ *  frame can never carry one of them through a path that forgot the other. */
+export function parseRuntimeNativeChatCompanionFields(
+  frame: { lifecycle?: unknown; sessionOptions?: unknown } | null | undefined
+): NativeChatCompanionFrameFields {
+  const lifecycle = parseRuntimeNativeChatTurnLifecycle(frame?.lifecycle)
+  const sessionOptions = parseRuntimeNativeChatSessionOptions(frame?.sessionOptions)
+  return {
+    ...(lifecycle ? { lifecycle } : {}),
+    ...(sessionOptions ? { sessionOptions } : {})
+  }
+}
+
 export function parseRuntimeNativeChatReadSessionResult(
   value: unknown
 ): NativeChatReadSessionResult {
@@ -46,10 +88,9 @@ export function parseRuntimeNativeChatReadSessionResult(
   }
   const record = value as Record<string, unknown>
   if (Array.isArray(record.messages)) {
-    const lifecycle = parseRuntimeNativeChatTurnLifecycle(record.lifecycle)
     return {
       messages: record.messages as NativeChatAppendedMessages,
-      ...(lifecycle ? { lifecycle } : {}),
+      ...parseRuntimeNativeChatCompanionFields(record),
       // Dropping these would leave the caller inferring "older history exists"
       // from the returned count and unable to page past the first window.
       ...(typeof record.hasMore === 'boolean' ? { hasMore: record.hasMore } : {}),

@@ -99,6 +99,7 @@ function TerminalDockCardComposer(
         isWorking={props.isWorking}
         onStop={interactiveSend.cancel}
         historyPrompts={historyPrompts}
+        reportedSessionOptions={session.sessionOptions}
       />
     </>
   )

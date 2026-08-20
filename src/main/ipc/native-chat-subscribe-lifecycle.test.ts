@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { NativeChatTurnLifecycle } from '../../shared/native-chat-types'
+import type { NativeChatTranscriptCompanion } from '../../shared/native-chat-transcript-companion'
 
 const { handlers, listeners, subscribeTranscript } = vi.hoisted(() => ({
   handlers: new Map<string, (_event: unknown, args?: unknown) => unknown>(),
@@ -113,7 +113,7 @@ type InitialSnapshotCallback = (
   hasMore: boolean,
   beforeOffset: number,
   error?: string,
-  lifecycle?: NativeChatTurnLifecycle
+  companion?: NativeChatTranscriptCompanion
 ) => void
 
 // The onInitialSnapshot callback the handler passed into the Nth subscribeTranscript
@@ -309,7 +309,7 @@ describe('nativeChat subscribe lifecycle', () => {
     const lifecycle = { state: 'completed', turnId: 'turn-1', timestamp: 42 } as const
 
     subscribe(renderer.sender, 'lifecycle')
-    initialSnapshot(0)([], false, 0, undefined, lifecycle)
+    initialSnapshot(0)([], false, 0, undefined, { lifecycle })
 
     expect(renderer.sender.send).toHaveBeenCalledWith('nativeChat:appended', {
       subscriptionId: 'lifecycle',

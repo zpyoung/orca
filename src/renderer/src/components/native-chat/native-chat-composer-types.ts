@@ -1,4 +1,5 @@
 import type { NativeChatLaunchDraft } from '@/lib/native-chat-launch-prompt'
+import type { NativeChatSessionOptionObservation } from '../../../../shared/native-chat-types'
 import type {
   AgentComposerCoreProps,
   AgentComposerHandle
@@ -15,6 +16,9 @@ export type NativeChatComposerProps = AgentComposerCoreProps & {
   launchDraft?: NativeChatLaunchDraft | null
   /** True once the transcript shows the TUI-side draft was submitted or cleared. */
   launchDraftResolved?: boolean
+  /** Model and effort the agent recorded for itself in its session log; pre-fills
+   *  the option pickers without waiting on the startup frame still being on screen. */
+  reportedSessionOptions?: NativeChatSessionOptionObservation | null
 }
 
 export type NativeChatComposerHandle = AgentComposerHandle

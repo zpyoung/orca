@@ -1,4 +1,6 @@
-import type { NativeChatMessage, NativeChatTurnLifecycle } from '../../shared/native-chat-types'
+import type { NativeChatMessage } from '../../shared/native-chat-types'
+import type { NativeChatTranscriptCompanion } from '../../shared/native-chat-transcript-companion'
+import type { NativeChatTranscriptCompanionDecoder } from './transcript-companion-decoder'
 import { transcriptFallbackId } from './transcript-fallback-id'
 import { openTranscriptReadStream, wslGatedStat } from './wsl-transcript-fs-access'
 
@@ -28,8 +30,8 @@ export async function readIncrementalTranscriptMessages(
   state: IncrementalTranscriptState,
   decode: NativeChatLineDecoder,
   onBatch?: (messages: NativeChatMessage[]) => void,
-  decodeLifecycle?: (line: string, fallbackId: string) => NativeChatTurnLifecycle | null,
-  onLifecycle?: (lifecycle: NativeChatTurnLifecycle) => void,
+  decodeCompanion?: NativeChatTranscriptCompanionDecoder | null,
+  onCompanion?: (companion: NativeChatTranscriptCompanion) => void,
   signal?: AbortSignal
 ): Promise<NativeChatMessage[]> {
   const end = (await wslGatedStat(filePath, 'exact', signal)).size
@@ -100,9 +102,9 @@ export async function readIncrementalTranscriptMessages(
       return
     }
     const fallbackId = transcriptFallbackId(filePath, state.pendingStart)
-    const lifecycle = decodeLifecycle?.(line, fallbackId)
-    if (lifecycle) {
-      onLifecycle?.(lifecycle)
+    const companion = decodeCompanion?.(line, fallbackId)
+    if (companion) {
+      onCompanion?.(companion)
     }
     const message = decode(line, fallbackId)
     if (!message) {

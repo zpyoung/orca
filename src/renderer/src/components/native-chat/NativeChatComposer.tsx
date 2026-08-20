@@ -69,7 +69,8 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       onSwitchToTerminal,
       readTerminalScreen,
       launchDraft,
-      launchDraftResolved = false
+      launchDraftResolved = false,
+      reportedSessionOptions
     },
     ref
   ): React.JSX.Element {
@@ -184,7 +185,8 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
         targetPtyId,
         dispatchCommand: dispatchSessionOptionCommand,
         onAgentPicker: onSwitchToTerminal,
-        readTerminalScreen
+        readTerminalScreen,
+        reportedSessionOptions
       })
 
     const dispatchPickerCommand = useNativeChatPickerCommandDispatch({

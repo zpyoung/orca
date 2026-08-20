@@ -34,3 +34,10 @@ entries' IDs; manual edits to fix typos are fine.
 - **Severity**: low
 - **Addendum (2026-08-14)**: project-view-wrapper-source-context-boundary 'builds project work items with a host-pinned repository identity' also failed (30s timeout) in a full-suite run on this host during the branch adversarial review; file untouched by warp-rich-input. Same environment/load class; not yet reproduced in isolation.
 
+
+## BUG-3: Two suites fail deterministically on this dev host, unrelated to any branch change
+- **Observed**: 2026-08-18
+- **File**: src/shared/posix-command-path-lookup.test.ts:61
+- **Description**: `buildPosixCommandPathLookupScript > resolves without mutating alias and function masks in zsh` resolves `node` through the host's zsh, which finds `/usr/local/Cellar/node/25.9.0_1/bin/node` while the test process runs the nvm node it asserts against (`process.execPath`) — a host PATH-ordering dependence, not a code defect. `terminal-ime-xterm-resumed-preedit-visibility.test.ts` fails two cases (`shown: false` vs `true`) for a preedit the IME resumes. Both fail in isolation and on a tree with the working changes stashed; no commit on warp-rich-input touches either area.
+- **Introduced by**: pre-existing / environment
+- **Severity**: low

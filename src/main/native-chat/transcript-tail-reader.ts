@@ -1,9 +1,9 @@
 import type { FileHandle } from 'node:fs/promises'
-import type {
-  AgentType,
-  NativeChatMessage,
-  NativeChatTurnLifecycle
-} from '../../shared/native-chat-types'
+import type { AgentType, NativeChatMessage } from '../../shared/native-chat-types'
+import {
+  retainNativeChatTranscriptCompanion,
+  type NativeChatTranscriptCompanion
+} from '../../shared/native-chat-transcript-companion'
 import { resolveNativeChatTranscriptAgent } from '../../shared/native-chat-agent-support'
 import { resolveSessionFilePath, type ResolveSessionFileOptions } from './session-file-resolver'
 import {
@@ -14,9 +14,9 @@ import {
 } from './transcript-line-decoders'
 import { transcriptFallbackId } from './transcript-fallback-id'
 import {
-  nativeChatTurnLifecycleDecoderForAgent,
-  type NativeChatTurnLifecycleDecoder
-} from './transcript-turn-lifecycle'
+  nativeChatTranscriptCompanionDecoderForAgent,
+  type NativeChatTranscriptCompanionDecoder
+} from './transcript-companion-decoder'
 import {
   closeTranscriptHandle,
   wslGatedOpen,
@@ -53,11 +53,11 @@ export async function readNativeChatTranscriptTailFile(
   decode: NativeChatLineDecoder,
   includeTrailingLine = false,
   endOffset?: number,
-  decodeLifecycle?: NativeChatTurnLifecycleDecoder | null,
+  decodeCompanion?: NativeChatTranscriptCompanionDecoder | null,
   signal?: AbortSignal
 ): Promise<{
   messages: NativeChatMessage[]
-  lifecycle?: NativeChatTurnLifecycle
+  companion?: NativeChatTranscriptCompanion
   consumedTo: number
   hasMore: boolean
   beforeOffset: number
@@ -77,7 +77,7 @@ export async function readNativeChatTranscriptTailFile(
   const lineParts: Buffer[] = []
   let lineBytes = 0
   let lineOversized = false
-  let lifecycle: NativeChatTurnLifecycle | undefined
+  let companion: NativeChatTranscriptCompanion | undefined
   let malformedRecordCount = 0
   let oversizedRecordCount = 0
   let ignoreNextMalformedRecord = false
@@ -136,7 +136,7 @@ export async function readNativeChatTranscriptTailFile(
     const selected = limit > 0 ? chronological.slice(Math.max(0, chronological.length - limit)) : []
     return {
       messages: selected.map((entry) => entry.message),
-      ...(lifecycle ? { lifecycle } : {}),
+      ...(companion ? { companion } : {}),
       consumedTo,
       hasMore: limit > 0 && chronological.length > limit,
       beforeOffset: selected[0]?.offset ?? end,
@@ -190,10 +190,12 @@ export async function readNativeChatTranscriptTailFile(
     }
     ignoreNextMalformedRecord = false
     const fallbackId = transcriptFallbackId(filePath, lineOffset)
-    // Why: scan the same bounded JSONL window for provider-authored lifecycle
-    // records so reconnect snapshots can replay completion without guessing
-    // from the last visible assistant message.
-    lifecycle ??= decodeLifecycle?.(line, fallbackId) ?? undefined
+    // Why: scan the same bounded JSONL window for the provider-authored values
+    // that ride alongside the messages — turn lifecycle, so reconnect snapshots
+    // replay completion without guessing from the last assistant message, and
+    // the recorded model/effort. Traversal is newest-first, so the first value
+    // seen for a field is the newest and must not be rewound by an older row.
+    companion = retainNativeChatTranscriptCompanion(companion, decodeCompanion?.(line, fallbackId))
     const message = decode(line, fallbackId)
     if (message) {
       messages.push({ message, offset: lineOffset })
@@ -252,14 +254,14 @@ export async function readNativeChatTranscriptTail(
 ): Promise<
   | {
       messages: NativeChatMessage[]
-      lifecycle?: NativeChatTurnLifecycle
+      companion?: NativeChatTranscriptCompanion
       hasMore: boolean
       beforeOffset: number
     }
   | { error: string; notFound?: true }
 > {
   const decode = nativeChatLineDecoderForAgent(args.agent)
-  const decodeLifecycle = nativeChatTurnLifecycleDecoderForAgent(args.agent)
+  const decodeCompanion = nativeChatTranscriptCompanionDecoderForAgent(args.agent)
   if (!decode) {
     return { error: 'Transcript unavailable' }
   }
@@ -286,16 +288,16 @@ export async function readNativeChatTranscriptTail(
       decode,
       true,
       args.beforeOffset,
-      decodeLifecycle,
+      decodeCompanion,
       signal
     )
     signal?.throwIfAborted()
     return {
       messages: result.messages,
-      // Why: an older pagination page must not rewind the live lifecycle; only
-      // the current transcript tail can authoritatively describe turn state.
-      ...(args.beforeOffset === undefined && result.lifecycle
-        ? { lifecycle: result.lifecycle }
+      // Why: an older pagination page must not rewind live state; only the
+      // current transcript tail authoritatively describes the newest turn.
+      ...(args.beforeOffset === undefined && result.companion
+        ? { companion: result.companion }
         : {}),
       hasMore: result.hasMore,
       beforeOffset: result.beforeOffset

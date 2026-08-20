@@ -72,6 +72,14 @@ export function TerminalPaneDockMount(props: TerminalPaneDockMountProps): React.
   const [effectiveDockMounted, setEffectiveDockMounted] = useState(false)
   const dockContainer = useMemo(() => findDockContainer(pane), [pane])
 
+  // Why: getPanes() hands out a fresh pane view per render, so the host's reader
+  // closes over a new pane every time. The composer memoizes its whole session-option
+  // surface on this identity, and rebuilding that surface re-reads the agent frame —
+  // pinning the option pills to whatever the frame last painted.
+  const readTerminalScreenRef = useRef(props.readTerminalScreen)
+  readTerminalScreenRef.current = props.readTerminalScreen
+  const readTerminalScreen = useCallback(() => readTerminalScreenRef.current(), [])
+
   useEffect(
     () => () => {
       cancelGutterDragRef.current?.()
@@ -247,7 +255,7 @@ export function TerminalPaneDockMount(props: TerminalPaneDockMountProps): React.
       onMountedChange={handleMountedChange}
       onGutterPointerDown={handleGutterPointerDown}
       gutterDragActive={liveGutterRows !== null}
-      readTerminalScreen={props.readTerminalScreen}
+      readTerminalScreen={readTerminalScreen}
       isLocalConptyBelowWrapMarkers={terminalPaneUsesConptyBelowWrapMarkers(pane)}
       passthroughActive={props.passthroughActive}
     />,

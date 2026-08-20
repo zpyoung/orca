@@ -32,10 +32,20 @@ vi.mock('@/components/ui/tooltip', () => ({
 vi.mock('../native-chat/NativeChatSessionOptionPickers', () => ({
   NativeChatSessionOptionPickers: () => <div data-testid="session-option-pickers" />
 }))
+const composerScreenReaders = vi.hoisted(() => [] as (() => string | null)[])
 vi.mock('../terminal-dock/TerminalDockComposer', async () => {
   const React = await import('react')
   return {
-    TerminalDockComposer: ({ ref }: { ref?: Ref<unknown> }) => {
+    TerminalDockComposer: ({
+      ref,
+      readTerminalScreen
+    }: {
+      ref?: Ref<unknown>
+      readTerminalScreen?: () => string | null
+    }) => {
+      if (readTerminalScreen) {
+        composerScreenReaders.push(readTerminalScreen)
+      }
       const textareaRef = React.useRef<HTMLTextAreaElement>(null)
       React.useImperativeHandle(ref, () => ({
         focus: () => {
@@ -63,6 +73,7 @@ import {
 } from './TerminalPaneDockMount'
 
 afterEach(() => {
+  composerScreenReaders.length = 0
   cleanup()
   // makeFakePane's container (and any manually appended focus targets) are plain DOM
   // nodes outside React's tree, so RTL's cleanup() never removes them on its own.
@@ -118,6 +129,33 @@ describe('TerminalPaneDockMount', () => {
     render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={true} />)
     const dockSlot = pane.container.querySelector('.pane-dock-slot') as HTMLElement
     expect(dockSlot.querySelector('[data-terminal-dock]')).not.toBeNull()
+  })
+
+  it('keeps one screen reader while the host hands down fresh pane views', () => {
+    // getPanes() rebuilds a pane's public view per render, so the host's reader is a new
+    // closure every time. The composer memoizes its session-option surface on that
+    // identity, and each rebuild re-reads the agent frame over what the user just picked.
+    const pane = makeFakePane()
+    const { rerender } = render(
+      <TerminalPaneDockMount
+        {...baseProps}
+        pane={pane}
+        docked={true}
+        readTerminalScreen={() => 'first'}
+      />
+    )
+    rerender(
+      <TerminalPaneDockMount
+        {...baseProps}
+        pane={{ ...pane }}
+        docked={true}
+        readTerminalScreen={() => 'second'}
+      />
+    )
+
+    expect(new Set(composerScreenReaders).size).toBe(1)
+    // Stable identity, still reading through to the pane view the host rendered last.
+    expect(composerScreenReaders[0]?.()).toBe('second')
   })
 
   it('owns slot geometry and reports the effective auto-undock surface', () => {

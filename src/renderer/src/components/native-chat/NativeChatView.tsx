@@ -441,6 +441,7 @@ function NativeChatResolvedView({
           onSlashCommand={onSlashCommand}
           onSwitchToTerminal={onSwitchToTerminal}
           readTerminalScreen={readTerminalScreen}
+          reportedSessionOptions={session.sessionOptions}
           {...launchDraftSignal}
         />
       )}
