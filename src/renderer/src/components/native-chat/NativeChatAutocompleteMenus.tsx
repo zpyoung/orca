@@ -222,8 +222,8 @@ function PickerOption({
         ) : null}
       </span>
       {item.kind === 'skill' ? (
-        <span className="shrink-0 pt-0.5 text-[11px] text-muted-foreground">
-          {scopeLabel(item.sources[0]?.sourceKind)}
+        <span className="max-w-[9rem] shrink-0 truncate pt-0.5 text-[11px] text-muted-foreground">
+          {item.pluginName ?? scopeLabel(item.sources[0]?.sourceKind)}
         </span>
       ) : null}
     </button>
@@ -238,6 +238,14 @@ function getPickerAnnotation(item: NativeChatPickerItem): string | null {
     )
   }
   if (item.kind === 'skill' && item.sources.length > 1) {
+    const plugins = [...new Set(item.sources.flatMap((source) => source.pluginName ?? []))]
+    if (plugins.length > 1) {
+      return translate(
+        'components.native-chat.composer.skillMultiplePlugins',
+        '{{plugins}} - agent resolves',
+        { plugins: plugins.join(', ') }
+      )
+    }
     // Why: name the interpolation `sourceCount`, not `count` — a `count` option
     // makes i18next resolve plural-suffixed keys that these locales don't define.
     return translate(

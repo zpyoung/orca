@@ -15209,7 +15209,8 @@
           "max": "Max",
           "on": "On",
           "off": "Off"
-        }
+        },
+        "skillMultiplePlugins": "{{plugins}} - agent resolves"
       },
       "tool": {
         "running": "Running…",
