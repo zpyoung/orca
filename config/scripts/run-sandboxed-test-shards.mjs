@@ -17,6 +17,7 @@
  *   --only=1,4,9            Run just these shard numbers
  *   --node=24               Node major version baked into the image (default: 24)
  *   --docker-host=URL       Docker endpoint, e.g. ssh://user@buildbox
+ *                           (defaults to $ORCA_SANDBOX_DOCKER_HOST)
  *   --docker-socket         Mount the host Docker socket (git-compat and ssh e2e lanes)
  *   --logs=DIR              Where to write per-shard logs (default: .orca-sandbox-logs)
  *   --env KEY=VALUE         Extra environment variable for every shard (repeatable)
@@ -145,7 +146,7 @@ function readOptions() {
       ? values.only.split(',').map((entry) => readPositiveInteger(entry, '--only'))
       : null,
     nodeMajor: readPositiveInteger(values.node, '--node'),
-    dockerHost: values['docker-host'] ?? null,
+    dockerHost: resolveDockerHost(values['docker-host']),
     mountDockerSocket: values['docker-socket'],
     logsDir: path.resolve(PROJECT_DIR, values.logs),
     extraEnv: values.env.map(readEnvPair),
@@ -153,6 +154,24 @@ function readOptions() {
     keepFailed: values['keep-failed'],
     extraArgs: positionals
   }
+}
+
+/**
+ * Resolves the Docker endpoint, refusing to default to the local daemon — an unset host
+ * would otherwise run every shard on the workstation the sandbox exists to keep free.
+ */
+function resolveDockerHost(flagValue) {
+  const host = flagValue || process.env.ORCA_SANDBOX_DOCKER_HOST
+  if (host) {
+    return host
+  }
+  if (process.env.DOCKER_HOST) {
+    return null
+  }
+  fail(
+    'no Docker host resolved. Set ORCA_SANDBOX_DOCKER_HOST, or pass --docker-host explicitly ' +
+      '(config/docker/test-sandbox/README.md). Refusing to fall back to the local daemon.'
+  )
 }
 
 function readPositiveInteger(raw, flag) {

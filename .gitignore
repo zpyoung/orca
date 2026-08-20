@@ -136,6 +136,8 @@ playwright-report/
 !/.claude/skills/sync-upstream/
 /.agents/skills/
 /skills-lock.json
+# Machine-local agent settings; carries this checkout's remote test-host address.
+/.claude/settings.local.json
 
 # Generated Clawpatch state includes machine-local paths and review records.
 /.clawpatch/
