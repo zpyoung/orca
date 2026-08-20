@@ -2117,7 +2117,7 @@
       "removed": 2
     },
     "src/renderer/src/components/terminal-pane/use-terminal-pane-lifecycle.ts": {
-      "added": 79,
+      "added": 81,
       "removed": 2
     },
     "src/renderer/src/components/terminal-pane/use-terminal-window-wake-recovery.test.ts": {
