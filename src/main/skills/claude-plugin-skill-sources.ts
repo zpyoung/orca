@@ -1,6 +1,7 @@
 import { open, stat } from 'node:fs/promises'
 import { basename, isAbsolute, join, relative, sep, type posix } from 'node:path'
-import { safePluginName, stablePathId, type SkillScanRoot } from './skill-discovery-sources'
+import { stablePathId, type SkillScanRoot } from './skill-discovery-sources'
+import { safePluginName } from './fork-skill-plugin-attribution/skill-plugin-name-resolution'
 
 const MAX_PLUGIN_METADATA_BYTES = 4 * 1024 * 1024
 

@@ -5,10 +5,10 @@ import {
   terminalPaneUsesConptyBelowWrapMarkers
 } from '../fork-terminal-dock/TerminalPaneDockMount'
 import {
-  collectTerminalDockPaneKeysForTabTeardown,
   resolveRemoteDockConptyUnverified,
   restampRemoteDockConptyUnverifiedForLivePanes
-} from '../use-terminal-pane-lifecycle'
+} from './terminal-dock-remote-conpty'
+import { collectTerminalDockPaneKeysForTabTeardown } from './terminal-pane-dock-prune'
 
 type DockConptyState = Pick<AppState, 'sshConnectionStates' | 'runtimeStatusByEnvironmentId'>
 

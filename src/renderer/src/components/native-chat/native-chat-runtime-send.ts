@@ -5,6 +5,8 @@
 import { sendRuntimePtyInput } from '@/runtime/runtime-terminal-inspection'
 import type { getSettingsForAgentTabRuntimeOwner } from '@/lib/agent-paste-draft'
 import { runBodyAcceptedThen } from './fork-agent-composer/native-chat-runtime-send-acceptance'
+import { enqueueNativeChatBodySend } from './fork-agent-composer/native-chat-body-send'
+import type { SendOutcome } from './fork-agent-composer/native-chat-send-outcome'
 import {
   sendNativeChatAskAnswerQueued,
   sendNativeChatMessageVerifiedQueued
@@ -21,22 +23,11 @@ import {
 } from './native-chat-send'
 import {
   cancelNativeChatPtySends,
-  enqueueNativeChatPtySend,
   resetNativeChatPtySendQueuesForTests,
-  waitForNativeChatPtyIdle,
-  type NativeChatPtySendQueueHandle
+  waitForNativeChatPtyIdle
 } from './native-chat-pty-send-queue'
 import {
-  createOutcomeReporter,
-  guardedDelay,
-  runOutcomeGuarded,
-  submitAndObserve
-} from './fork-agent-composer/native-chat-send-outcome'
-import type { SendOutcome } from './fork-agent-composer/native-chat-send-outcome'
-import {
   clearConfirmDurationMs,
-  clearThenWrite,
-  clearUnsubmittedAgentInput,
   NATIVE_CHAT_CLEAR_CONFIRM_MS,
   NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT
 } from './fork-agent-composer/native-chat-runtime-clear'
@@ -83,44 +74,6 @@ export type NativeChatSendHandle = {
 
 export type RuntimeSettings = ReturnType<typeof getSettingsForAgentTabRuntimeOwner>
 
-// The queue only reports `onCancelUnsubmitted` once `start` has run — a send
-// cancelled while still queued behind another PTY send never reaches `start`,
-// so it would otherwise report no outcome at all. Report it here instead.
-// The outcome must fire even if the queue's own cancel throws (r5-2) so a
-// throwing cleanup clear can never suppress it.
-const withQueuedCancelOutcome = (
-  handle: NativeChatPtySendQueueHandle,
-  reportOutcome: (outcome: SendOutcome) => void
-): NativeChatPtySendQueueHandle => ({
-  ...handle,
-  cancel: () => {
-    const startedBeforeCancel = handle.bodyStarted()
-    try {
-      handle.cancel()
-    } finally {
-      if (!startedBeforeCancel) {
-        reportOutcome('may-not-have-sent')
-      }
-    }
-  }
-})
-
-// Isolates the best-effort cleanup clear from outcome reporting (r5-2): a
-// synchronous throw from the preload write must not swallow the outcome.
-function bestEffortCancelClear(
-  settings: RuntimeSettings,
-  ptyId: string,
-  options: NativeChatSendOptions | undefined,
-  reportOutcome: (outcome: SendOutcome) => void
-): void {
-  try {
-    clearUnsubmittedAgentInput(settings, ptyId, options)
-  } catch {
-    // Cleanup only — the outcome report below must still fire.
-  }
-  reportOutcome('may-not-have-sent')
-}
-
 /**
  * Chat message path:
  *   1. clear any unsubmitted TUI line
@@ -135,61 +88,13 @@ export function sendNativeChatMessage(
   text: string,
   options?: NativeChatSendOptions
 ): NativeChatSendHandle {
-  const reportOutcome = createOutcomeReporter(options?.onOutcome)
-  const handle = enqueueNativeChatPtySend(
+  return enqueueNativeChatBodySend({
+    settings,
     ptyId,
-    NATIVE_CHAT_SUBMIT_DELAY_MS + clearConfirmDurationMs(options),
-    ({ isCancelled, delay, markSubmitted }) => {
-      if (isCancelled()) {
-        reportOutcome('may-not-have-sent')
-        return
-      }
-      const delayGuarded = guardedDelay(delay, markSubmitted, reportOutcome)
-      runOutcomeGuarded(markSubmitted, reportOutcome, () => {
-        clearThenWrite(
-          settings,
-          ptyId,
-          options,
-          delayGuarded,
-          () => {
-            if (isCancelled()) {
-              reportOutcome('may-not-have-sent')
-              return
-            }
-            runBodyAcceptedThen(
-              settings,
-              ptyId,
-              [buildNativeChatPasteBytes(text)],
-              isCancelled,
-              markSubmitted,
-              reportOutcome,
-              () => {
-                // Schedule from the actual body write: an overdue clear-confirm callback
-                // must not collapse the required body-to-Enter gap after a renderer stall.
-                delayGuarded(NATIVE_CHAT_SUBMIT_DELAY_MS, () => {
-                  void submitAndObserve(
-                    settings,
-                    ptyId,
-                    markSubmitted,
-                    reportOutcome,
-                    options?.confirmSubmitted
-                  )
-                })
-              }
-            )
-          },
-          () => {
-            markSubmitted()
-            reportOutcome('may-not-have-sent')
-          }
-        )
-      })
-    },
-    {
-      onCancelUnsubmitted: () => bestEffortCancelClear(settings, ptyId, options, reportOutcome)
-    }
-  )
-  return withQueuedCancelOutcome(handle, reportOutcome)
+    options,
+    durationMs: NATIVE_CHAT_SUBMIT_DELAY_MS + clearConfirmDurationMs(options),
+    chunks: [buildNativeChatPasteBytes(text)]
+  })
 }
 
 /**
@@ -229,81 +134,33 @@ export function sendNativeChatMessageWithImageAttachments(
     return sendNativeChatMessage(settings, ptyId, text, options)
   }
   const trimmedText = text.trim()
-  const durationMs =
-    (trimmedText.length > 0
-      ? NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS + NATIVE_CHAT_SUBMIT_DELAY_MS
-      : NATIVE_CHAT_SUBMIT_DELAY_MS) + clearConfirmDurationMs(options)
-  const reportOutcome = createOutcomeReporter(options?.onOutcome)
-  const handle = enqueueNativeChatPtySend(
+  return enqueueNativeChatBodySend({
+    settings,
     ptyId,
-    durationMs,
-    ({ isCancelled, delay, markSubmitted }) => {
-      if (isCancelled()) {
-        reportOutcome('may-not-have-sent')
+    options,
+    durationMs:
+      (trimmedText.length > 0
+        ? NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS + NATIVE_CHAT_SUBMIT_DELAY_MS
+        : NATIVE_CHAT_SUBMIT_DELAY_MS) + clearConfirmDurationMs(options),
+    chunks: imagePaths.map(buildNativeChatImagePasteBytes),
+    afterAccepted: ({ isCancelled, markSubmitted, reportOutcome, delayGuarded, submit }) => {
+      if (trimmedText.length === 0) {
+        submit()
         return
       }
-      const delayGuarded = guardedDelay(delay, markSubmitted, reportOutcome)
-      runOutcomeGuarded(markSubmitted, reportOutcome, () => {
-        clearThenWrite(
+      delayGuarded(NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS, () => {
+        runBodyAcceptedThen(
           settings,
           ptyId,
-          options,
-          delayGuarded,
-          () => {
-            if (isCancelled()) {
-              reportOutcome('may-not-have-sent')
-              return
-            }
-            const imageChunks = imagePaths.map(buildNativeChatImagePasteBytes)
-            runBodyAcceptedThen(
-              settings,
-              ptyId,
-              imageChunks,
-              isCancelled,
-              markSubmitted,
-              reportOutcome,
-              () => {
-                const submit = (): void => {
-                  delayGuarded(NATIVE_CHAT_SUBMIT_DELAY_MS, () => {
-                    void submitAndObserve(
-                      settings,
-                      ptyId,
-                      markSubmitted,
-                      reportOutcome,
-                      options?.confirmSubmitted
-                    )
-                  })
-                }
-                if (trimmedText.length === 0) {
-                  submit()
-                  return
-                }
-                delayGuarded(NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS, () => {
-                  runBodyAcceptedThen(
-                    settings,
-                    ptyId,
-                    [buildNativeChatPasteBytes(text)],
-                    isCancelled,
-                    markSubmitted,
-                    reportOutcome,
-                    submit
-                  )
-                })
-              }
-            )
-          },
-          () => {
-            markSubmitted()
-            reportOutcome('may-not-have-sent')
-          }
+          [buildNativeChatPasteBytes(text)],
+          isCancelled,
+          markSubmitted,
+          reportOutcome,
+          submit
         )
       })
-    },
-    {
-      onCancelUnsubmitted: () => bestEffortCancelClear(settings, ptyId, options, reportOutcome)
     }
-  )
-  return withQueuedCancelOutcome(handle, reportOutcome)
+  })
 }
 
 /** Submit a TUI prompt with no body (Enter only) — e.g. a plain submit when the

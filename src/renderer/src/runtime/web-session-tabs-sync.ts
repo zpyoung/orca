@@ -31,9 +31,9 @@ import type {
   TerminalTab
 } from '../../../shared/types'
 import type { OpenFile } from '../store/slices/editor'
-import { TERMINAL_DOCK_ECHO_WINDOW_MS } from '../store/slices/fork-terminal-dock/tab-terminal-dock-state'
 import {
   pendingMutationsForTabId,
+  TERMINAL_DOCK_ECHO_WINDOW_MS,
   pruneExpiredTerminalDockPendingMutations,
   reconcileTerminalDockByPaneKey,
   remapPaneKeyTabId,

@@ -7,6 +7,7 @@ import {
 } from '@/components/terminal-pane/fork-terminal-dock/terminal-dock-pane-state'
 import { findTabAndWorktree, patchTab } from '../tab-group-state'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
+import { pruneExpiredTerminalDockPendingMutations } from '@/runtime/fork-terminal-dock/web-session-terminal-dock-reconcile'
 
 /** The docked-composer state the tabs slice tracks per tab pane, plus the two
  *  actions that mutate it. Kept out of the slice module so the fork owns one
@@ -27,11 +28,6 @@ export type TabTerminalDockSlice = {
 const DEFAULT_TERMINAL_DOCK_GUTTER_ROWS = 5
 const MIN_TERMINAL_DOCK_GUTTER_ROWS = 3
 const MAX_TERMINAL_DOCK_GUTTER_ROWS = 15
-
-// Why: bounds how long a local dock mutation outranks a stale host echo for its pane —
-// long enough to cover an SSH/relay round trip, short enough that a real host change
-// (another client, or a failed RPC never landing) still reaches this client promptly.
-export const TERMINAL_DOCK_ECHO_WINDOW_MS = 8_000
 
 // Why: gutterRows also flows to the host's RPC schema, which enforces the same
 // 3..15 integer contract; clamping here keeps local and host state from diverging.
@@ -75,24 +71,6 @@ function removePaneKeysFromRecord<T>(
     delete next[key]
   }
   return next
-}
-
-// Why: entries older than the echo window are dead by definition; drop them on every
-// stamp so the record doesn't grow unbounded across pane-key churn.
-function pruneExpiredTerminalDockPendingMutations(
-  record: Record<string, number>,
-  now: number
-): Record<string, number> {
-  let changed = false
-  const next: Record<string, number> = {}
-  for (const [key, mutatedAt] of Object.entries(record)) {
-    if (now - mutatedAt < TERMINAL_DOCK_ECHO_WINDOW_MS) {
-      next[key] = mutatedAt
-    } else {
-      changed = true
-    }
-  }
-  return changed ? next : record
 }
 
 // Why: pending-mutation timestamps live outside the per-tab dock record, so closing

@@ -1,6 +1,10 @@
 import { makePaneKey, parsePaneKey } from '../../../../shared/stable-pane-id'
 import type { TerminalDockPaneState } from '../../../../shared/types'
-import { TERMINAL_DOCK_ECHO_WINDOW_MS } from '../../store/slices/fork-terminal-dock/tab-terminal-dock-state'
+
+// Why: bounds how long a local dock mutation outranks a stale host echo for its pane —
+// long enough to cover an SSH/relay round trip, short enough that a real host change
+// (another client, or a failed RPC never landing) still reaches this client promptly.
+export const TERMINAL_DOCK_ECHO_WINDOW_MS = 8_000
 
 /** Rewrites a pane key's tab-ID segment across the mirror boundary, leaving the leaf untouched.
  *  Returns null for a key that doesn't parse, so callers drop rather than forward it verbatim. */

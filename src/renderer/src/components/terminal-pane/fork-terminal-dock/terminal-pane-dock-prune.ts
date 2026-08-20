@@ -46,3 +46,18 @@ export function pruneTerminalDockPaneKeysEverywhere(args: {
   args.pruneStoreDockPaneKeys(target.unifiedTabId, [target.paneKey])
   removeTerminalDockPaneKeys(new Set([target.paneKey]))
 }
+
+/** Pane keys to evict from the dock localStorage record when a tab's whole PaneManager
+ *  tears down — `tabStillExists` false is a genuine close, not a rehome/remount that
+ *  keeps the same tab (and its dock state) alive elsewhere. */
+export function collectTerminalDockPaneKeysForTabTeardown(args: {
+  tabId: string
+  tabStillExists: boolean
+  experimentalTerminalDockEnabled: boolean
+  paneLeafIds: readonly string[]
+}): string[] {
+  if (args.tabStillExists || !args.experimentalTerminalDockEnabled) {
+    return []
+  }
+  return args.paneLeafIds.map((leafId) => makePaneKey(args.tabId, leafId))
+}

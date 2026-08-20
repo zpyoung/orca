@@ -1,11 +1,7 @@
 import { posix as pathPosix } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import {
-  buildSkillDiscoverySources,
-  CODEX_PLUGIN_CACHE_ROOT_ID,
-  pluginNameForSkill,
-  type SkillScanRoot
-} from '../skill-discovery-sources'
+import { buildSkillDiscoverySources, type SkillScanRoot } from '../skill-discovery-sources'
+import { CODEX_PLUGIN_CACHE_ROOT_ID, pluginNameForSkill } from './skill-plugin-name-resolution'
 
 const HOME = '/home/alice'
 

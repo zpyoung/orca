@@ -10,12 +10,12 @@ import { buildEncodedWslBashCommand, quoteBashString } from '../wsl-bash-command
 import {
   buildSkillDiscoverySources,
   compareSkills,
-  pluginNameForSkill,
   sourceKindForSkill,
   sourceLabelForSkill,
   stablePathId,
   type SkillScanRoot
 } from './skill-discovery-sources'
+import { pluginNameForSkill } from './fork-skill-plugin-attribution/skill-plugin-name-resolution'
 import { discoverClaudePluginSkillSourcesInWsl } from './claude-plugin-skill-sources-wsl'
 
 const MAX_MARKDOWN_BYTES = 256 * 1024

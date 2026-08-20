@@ -5,7 +5,7 @@ import type * as WorktreeRuntimeOwnerModule from '@/lib/worktree-runtime-owner'
 import type * as WebRuntimeSessionModule from '@/runtime/web-runtime-session'
 import { toWebTerminalSurfaceTabId } from '@/runtime/web-terminal-surface-id'
 import { makePaneKey } from '../../../../../shared/stable-pane-id'
-import { TERMINAL_DOCK_ECHO_WINDOW_MS } from '../fork-terminal-dock/tab-terminal-dock-state'
+import { TERMINAL_DOCK_ECHO_WINDOW_MS } from '@/runtime/fork-terminal-dock/web-session-terminal-dock-reconcile'
 
 // Mock sonner (imported by repos.ts)
 vi.mock('sonner', () => ({ toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() } }))

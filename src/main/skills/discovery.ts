@@ -11,12 +11,12 @@ import type {
 import {
   buildSkillDiscoverySources,
   compareSkills,
-  pluginNameForSkill,
   sourceKindForSkill,
   sourceLabelForSkill,
   stablePathId,
   type SkillScanRoot
 } from './skill-discovery-sources'
+import { pluginNameForSkill } from './fork-skill-plugin-attribution/skill-plugin-name-resolution'
 import { discoverClaudePluginSkillSources } from './claude-plugin-skill-sources'
 import { findSkillFiles } from './skill-root-file-walk'
 import { runSkillCandidateTasks } from './skill-candidate-concurrency'

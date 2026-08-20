@@ -72,7 +72,7 @@ function makeSnapshot(
 }
 
 import type * as WebRuntimeSessionModule from '../web-runtime-session'
-import { TERMINAL_DOCK_ECHO_WINDOW_MS } from '../../store/slices/fork-terminal-dock/tab-terminal-dock-state'
+import { TERMINAL_DOCK_ECHO_WINDOW_MS } from './web-session-terminal-dock-reconcile'
 
 const setWebRuntimeTabPropsMock = vi.fn()
 vi.mock('../web-runtime-session', async (importOriginal) => {
@@ -83,34 +83,45 @@ vi.mock('../web-runtime-session', async (importOriginal) => {
   }
 })
 
+function makeExistingTerminalTab(mirroredId: string, title = 'zsh'): TerminalTab {
+  return {
+    id: mirroredId,
+    ptyId: 'remote:web-env-1@@terminal-1',
+    worktreeId: WT,
+    title,
+    defaultTitle: title,
+    customTitle: null,
+    color: null,
+    sortOrder: 0,
+    createdAt: NOW
+  }
+}
+
+function makeExistingUnifiedTab(mirroredId: string, overrides: Partial<Tab> = {}): Tab {
+  return {
+    id: mirroredId,
+    entityId: mirroredId,
+    groupId: 'host-group-1',
+    worktreeId: WT,
+    contentType: 'terminal',
+    label: 'zsh',
+    customLabel: null,
+    color: null,
+    sortOrder: 0,
+    createdAt: NOW,
+    isPreview: false,
+    isPinned: false,
+    ...overrides
+  }
+}
+
 describe('applyWebSessionTabsSnapshot dock echo precedence', () => {
   it('adopts host terminalDockByPaneKey for an existing tab with no local dock record', () => {
     const mirroredId = toWebTerminalSurfaceTabId('host-tab-1')
-    const existingTab: TerminalTab = {
-      id: mirroredId,
-      ptyId: 'remote:web-env-1@@terminal-1',
-      worktreeId: WT,
-      title: 'old title',
-      defaultTitle: 'old title',
-      customTitle: null,
-      color: null,
-      sortOrder: 0,
-      createdAt: NOW
-    }
-    const existingUnifiedTab: Tab = {
-      id: mirroredId,
-      entityId: mirroredId,
-      groupId: 'host-group-1',
-      worktreeId: WT,
-      contentType: 'terminal',
-      label: 'old title',
-      customLabel: null,
-      color: null,
-      sortOrder: 0,
-      createdAt: NOW,
-      isPreview: false,
-      isPinned: false
-    }
+    const existingTab = makeExistingTerminalTab(mirroredId, 'old title')
+    const existingUnifiedTab = makeExistingUnifiedTab(mirroredId, {
+      label: 'old title'
+    })
 
     const patch = applyWebSessionTabsSnapshot(
       makeState({
@@ -150,32 +161,11 @@ describe('applyWebSessionTabsSnapshot dock echo precedence', () => {
     const mirroredId = toWebTerminalSurfaceTabId('host-tab-1')
     const mirroredPaneKey = makePaneKey(mirroredId, LEAF_ID)
     const hostPaneKey = makePaneKey('host-tab-1', LEAF_ID)
-    const existingTab: TerminalTab = {
-      id: mirroredId,
-      ptyId: 'remote:web-env-1@@terminal-1',
-      worktreeId: WT,
-      title: 'old title',
-      defaultTitle: 'old title',
-      customTitle: null,
-      color: null,
-      sortOrder: 0,
-      createdAt: NOW
-    }
-    const existingUnifiedTab: Tab = {
-      id: mirroredId,
-      entityId: mirroredId,
-      groupId: 'host-group-1',
-      worktreeId: WT,
-      contentType: 'terminal',
+    const existingTab = makeExistingTerminalTab(mirroredId, 'old title')
+    const existingUnifiedTab = makeExistingUnifiedTab(mirroredId, {
       label: 'old title',
-      customLabel: null,
-      color: null,
-      sortOrder: 0,
-      createdAt: NOW,
-      isPreview: false,
-      isPinned: false,
       terminalDockByPaneKey: { [mirroredPaneKey]: { docked: true, gutterRows: 6 } }
-    }
+    })
 
     const patch = applyWebSessionTabsSnapshot(
       makeState({
@@ -210,32 +200,10 @@ describe('applyWebSessionTabsSnapshot dock echo precedence', () => {
     // Wire-skew: new client + old host. The host strips the unknown field, so no
     // surface ever carries it; detection is "the field never echoes back."
     const mirroredId = toWebTerminalSurfaceTabId('host-tab-1')
-    const existingTab: TerminalTab = {
-      id: mirroredId,
-      ptyId: 'remote:web-env-1@@terminal-1',
-      worktreeId: WT,
-      title: 'zsh',
-      defaultTitle: 'zsh',
-      customTitle: null,
-      color: null,
-      sortOrder: 0,
-      createdAt: NOW
-    }
-    const existingUnifiedTab: Tab = {
-      id: mirroredId,
-      entityId: mirroredId,
-      groupId: 'host-group-1',
-      worktreeId: WT,
-      contentType: 'terminal',
-      label: 'zsh',
-      customLabel: null,
-      color: null,
-      sortOrder: 0,
-      createdAt: NOW,
-      isPreview: false,
-      isPinned: false,
+    const existingTab = makeExistingTerminalTab(mirroredId)
+    const existingUnifiedTab = makeExistingUnifiedTab(mirroredId, {
       terminalDockByPaneKey: { 'pane-a': { docked: true, gutterRows: 6 } }
-    }
+    })
 
     const patch = applyWebSessionTabsSnapshot(
       makeState({
@@ -273,32 +241,10 @@ describe('applyWebSessionTabsSnapshot dock echo precedence', () => {
     // A modern host that pruned its last dock entry publishes {}; that must win over a
     // stale local record instead of reading as "old host never echoed the field."
     const mirroredId = toWebTerminalSurfaceTabId('host-tab-1')
-    const existingTab: TerminalTab = {
-      id: mirroredId,
-      ptyId: 'remote:web-env-1@@terminal-1',
-      worktreeId: WT,
-      title: 'zsh',
-      defaultTitle: 'zsh',
-      customTitle: null,
-      color: null,
-      sortOrder: 0,
-      createdAt: NOW
-    }
-    const existingUnifiedTab: Tab = {
-      id: mirroredId,
-      entityId: mirroredId,
-      groupId: 'host-group-1',
-      worktreeId: WT,
-      contentType: 'terminal',
-      label: 'zsh',
-      customLabel: null,
-      color: null,
-      sortOrder: 0,
-      createdAt: NOW,
-      isPreview: false,
-      isPinned: false,
+    const existingTab = makeExistingTerminalTab(mirroredId)
+    const existingUnifiedTab = makeExistingUnifiedTab(mirroredId, {
       terminalDockByPaneKey: { 'pane-a': { docked: true, gutterRows: 6 } }
-    }
+    })
 
     const patch = applyWebSessionTabsSnapshot(
       makeState({
@@ -331,33 +277,11 @@ describe('applyWebSessionTabsSnapshot dock echo precedence', () => {
 
   it('does not adopt host dock state, but keeps the client record untouched, with the kill switch off', () => {
     const mirroredId = toWebTerminalSurfaceTabId('host-tab-1')
-    const existingTab: TerminalTab = {
-      id: mirroredId,
-      ptyId: 'remote:web-env-1@@terminal-1',
-      worktreeId: WT,
-      title: 'zsh',
-      defaultTitle: 'zsh',
-      customTitle: null,
-      color: null,
-      sortOrder: 0,
-      createdAt: NOW
-    }
-    const existingUnifiedTab: Tab = {
-      id: mirroredId,
-      entityId: mirroredId,
-      groupId: 'host-group-1',
-      worktreeId: WT,
-      contentType: 'terminal',
-      label: 'zsh',
-      customLabel: null,
-      color: null,
-      sortOrder: 0,
-      createdAt: NOW,
-      isPreview: false,
-      isPinned: false,
+    const existingTab = makeExistingTerminalTab(mirroredId)
+    const existingUnifiedTab = makeExistingUnifiedTab(mirroredId, {
       // Why: persisted by a flag-on peer; a flag-off client reconciling this snapshot must not clobber it.
       terminalDockByPaneKey: { 'pane-a': { docked: true, gutterRows: 6 } }
-    }
+    })
 
     const patch = applyWebSessionTabsSnapshot(
       makeState({
@@ -419,32 +343,10 @@ describe('applyWebSessionTabsSnapshot dock echo precedence', () => {
     // separately); the host's snapshot hasn't caught up and still echoes both panes.
     // Reconcile must not react to that stale echo by firing an outbound removal.
     const mirroredId = toWebTerminalSurfaceTabId('host-tab-1')
-    const existingTab: TerminalTab = {
-      id: mirroredId,
-      ptyId: 'remote:web-env-1@@terminal-1',
-      worktreeId: WT,
-      title: 'zsh',
-      defaultTitle: 'zsh',
-      customTitle: null,
-      color: null,
-      sortOrder: 0,
-      createdAt: NOW
-    }
-    const existingUnifiedTab: Tab = {
-      id: mirroredId,
-      entityId: mirroredId,
-      groupId: 'host-group-1',
-      worktreeId: WT,
-      contentType: 'terminal',
-      label: 'zsh',
-      customLabel: null,
-      color: null,
-      sortOrder: 0,
-      createdAt: NOW,
-      isPreview: false,
-      isPinned: false,
+    const existingTab = makeExistingTerminalTab(mirroredId)
+    const existingUnifiedTab = makeExistingUnifiedTab(mirroredId, {
       terminalDockByPaneKey: { 'pane-a': { docked: true, gutterRows: 6 } }
-    }
+    })
 
     const patch = applyWebSessionTabsSnapshot(
       makeState({
@@ -487,35 +389,13 @@ describe('applyWebSessionTabsSnapshot dock echo precedence', () => {
     const otherPaneKey = makePaneKey(mirroredId, SECOND_LEAF_ID)
     const hostPendingPaneKey = makePaneKey('host-tab-1', LEAF_ID)
     const hostOtherPaneKey = makePaneKey('host-tab-1', SECOND_LEAF_ID)
-    const existingTab: TerminalTab = {
-      id: mirroredId,
-      ptyId: 'remote:web-env-1@@terminal-1',
-      worktreeId: WT,
-      title: 'zsh',
-      defaultTitle: 'zsh',
-      customTitle: null,
-      color: null,
-      sortOrder: 0,
-      createdAt: NOW
-    }
-    const existingUnifiedTab: Tab = {
-      id: mirroredId,
-      entityId: mirroredId,
-      groupId: 'host-group-1',
-      worktreeId: WT,
-      contentType: 'terminal',
-      label: 'zsh',
-      customLabel: null,
-      color: null,
-      sortOrder: 0,
-      createdAt: NOW,
-      isPreview: false,
-      isPinned: false,
+    const existingTab = makeExistingTerminalTab(mirroredId)
+    const existingUnifiedTab = makeExistingUnifiedTab(mirroredId, {
       terminalDockByPaneKey: {
         [pendingPaneKey]: { docked: true, gutterRows: 6 },
         [otherPaneKey]: { docked: true, gutterRows: 5 }
       }
-    }
+    })
 
     const patch = applyWebSessionTabsSnapshot(
       makeState({
@@ -559,32 +439,10 @@ describe('applyWebSessionTabsSnapshot dock echo precedence', () => {
     const mirroredId = toWebTerminalSurfaceTabId('host-tab-1')
     const paneKey = makePaneKey(mirroredId, LEAF_ID)
     const hostPaneKey = makePaneKey('host-tab-1', LEAF_ID)
-    const existingTab: TerminalTab = {
-      id: mirroredId,
-      ptyId: 'remote:web-env-1@@terminal-1',
-      worktreeId: WT,
-      title: 'zsh',
-      defaultTitle: 'zsh',
-      customTitle: null,
-      color: null,
-      sortOrder: 0,
-      createdAt: NOW
-    }
-    const existingUnifiedTab: Tab = {
-      id: mirroredId,
-      entityId: mirroredId,
-      groupId: 'host-group-1',
-      worktreeId: WT,
-      contentType: 'terminal',
-      label: 'zsh',
-      customLabel: null,
-      color: null,
-      sortOrder: 0,
-      createdAt: NOW,
-      isPreview: false,
-      isPinned: false,
+    const existingTab = makeExistingTerminalTab(mirroredId)
+    const existingUnifiedTab = makeExistingUnifiedTab(mirroredId, {
       terminalDockByPaneKey: { [paneKey]: { docked: true, gutterRows: 6 } }
-    }
+    })
 
     const patch = applyWebSessionTabsSnapshot(
       makeState({

@@ -615,7 +615,7 @@ describe('TerminalPaneDockMount', () => {
 
     const shrunkHeight = terminalDockAutoUndockLowThresholdPx(DEFAULT_GUTTER_ROWS) - 1
 
-    it('unfreezes on a release that lands back on the starting row, and a fresh drag afterward still commits', async () => {
+    it('unfreezes auto-undock on a release that lands back on the starting row', async () => {
       const resizeObserver = installFakeResizeObserver()
       try {
         const pane = makeFakePane()
