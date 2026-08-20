@@ -309,16 +309,6 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/native-chat/NativeChatComposerField.tsx",
-      "feature": "native-chat-width",
-      "kind": "passthrough",
-      "lines": [
-        "import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'",
-        "  const widthClassName = useNativeChatWidthClassName()",
-        "        <div className={cn('relative mx-auto w-full', widthClassName)}>"
-      ]
-    },
-    {
       "path": "src/renderer/src/components/native-chat/NativeChatQuestionCard.tsx",
       "feature": "native-chat-width",
       "kind": "passthrough",
@@ -1915,10 +1905,6 @@
     "src/renderer/src/components/native-chat/NativeChatComposer.tsx": {
       "added": 184,
       "removed": 345
-    },
-    "src/renderer/src/components/native-chat/NativeChatComposerField.tsx": {
-      "added": 0,
-      "removed": 223
     },
     "src/renderer/src/components/native-chat/NativeChatInteractiveCard.test.tsx": {
       "added": 21,
