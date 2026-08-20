@@ -3,8 +3,8 @@
 import { createRef } from 'react'
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { DiscoveredSkill } from '../../../../shared/skills'
-import type { NativeChatPickerState } from './use-native-chat-picker-state'
+import type { DiscoveredSkill } from '../../../../../shared/skills'
+import type { NativeChatPickerState } from '../use-native-chat-picker-state'
 
 const mocks = vi.hoisted(() => ({
   discoveryEnabled: [] as boolean[]
@@ -26,7 +26,7 @@ const SKILLS: DiscoveredSkill[] = [
   }
 ]
 
-vi.mock('./use-native-chat-skills', () => ({
+vi.mock('../use-native-chat-skills', () => ({
   useNativeChatSkills: (_agent: string, _tabId: string, enabled: boolean) => {
     mocks.discoveryEnabled.push(enabled)
     return { status: 'ready', skills: SKILLS, error: null, retry: () => {} }
@@ -38,7 +38,7 @@ vi.mock('@/lib/native-chat-telemetry', () => ({
   emitNativeChatSendClassified: vi.fn()
 }))
 
-import { useNativeChatPickerState } from './use-native-chat-picker-state'
+import { useNativeChatPickerState } from '../use-native-chat-picker-state'
 
 function renderPickerState(draft: string): NativeChatPickerState {
   const captured = createRef<NativeChatPickerState>()
