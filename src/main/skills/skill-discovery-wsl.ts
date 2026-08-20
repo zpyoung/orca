@@ -10,6 +10,7 @@ import { buildEncodedWslBashCommand, quoteBashString } from '../wsl-bash-command
 import {
   buildSkillDiscoverySources,
   compareSkills,
+  pluginNameForSkill,
   sourceKindForSkill,
   sourceLabelForSkill,
   stablePathId,
@@ -131,6 +132,7 @@ export function parseWslSkillDiscoveryOutput(
     const directoryPath = pathPosix.dirname(skillFilePath)
     const summary = summarizeSkillMarkdown(markdown)
     const sourceKind = sourceKindForSkill(root, skillFilePath, pathPosix)
+    const pluginName = pluginNameForSkill(root, skillFilePath, pathPosix)
     skillsByCanonicalPath.set(canonicalSkillFilePath, {
       id: stablePathId(canonicalSkillFilePath),
       name: summary.name ?? pathPosix.basename(directoryPath),
@@ -145,7 +147,8 @@ export function parseWslSkillDiscoveryOutput(
       directoryPath,
       skillFilePath,
       installed: true,
-      updatedAt: Number.isFinite(updatedAtSeconds) ? updatedAtSeconds * 1000 : null
+      updatedAt: Number.isFinite(updatedAtSeconds) ? updatedAtSeconds * 1000 : null,
+      ...(pluginName ? { pluginName } : {})
     })
   }
 

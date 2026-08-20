@@ -11,6 +11,7 @@ import type {
 import {
   buildSkillDiscoverySources,
   compareSkills,
+  pluginNameForSkill,
   sourceKindForSkill,
   sourceLabelForSkill,
   stablePathId,
@@ -106,6 +107,7 @@ async function scanRoot(root: SkillScanRoot): Promise<ScannedSkill[]> {
         return null
       }
       const sourceKind = sourceKindForSkill(root, skillFilePath, { relative, sep })
+      const pluginName = pluginNameForSkill(root, skillFilePath, { relative, sep })
       return {
         id: stablePathId(canonicalSkillFilePath),
         name: summary.name ?? basename(directoryPath),
@@ -120,6 +122,7 @@ async function scanRoot(root: SkillScanRoot): Promise<ScannedSkill[]> {
         skillFilePath,
         installed: true,
         updatedAt: summary.updatedAt,
+        ...(pluginName ? { pluginName } : {}),
         canonicalSkillFilePath
       } satisfies ScannedSkill
     })
