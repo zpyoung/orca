@@ -164,6 +164,20 @@ describe('terminal input quarantine subscriptions', () => {
     expect(events).toEqual([true, false])
   })
 
+  it('isolates a throwing subscriber on the immediate already-armed notification', () => {
+    armTerminalInputQuarantine(TAB, 0)
+    expect(() =>
+      subscribeTerminalInputQuarantine(TAB, () => {
+        throw new Error('boom')
+      })
+    ).not.toThrow()
+
+    const events: boolean[] = []
+    subscribeTerminalInputQuarantine(TAB, (armed) => events.push(armed))
+    expect(shouldDropQuarantinedTerminalInput(TAB, '\r', REATTACH_MS)).toBe(true)
+    expect(events).toEqual([true, false])
+  })
+
   it('isolates a throwing listener on the expiry timer path too', () => {
     vi.useFakeTimers()
     subscribeTerminalInputQuarantine(TAB, (armed) => {

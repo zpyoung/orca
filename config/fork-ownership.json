@@ -2097,7 +2097,7 @@
       "removed": 6
     },
     "src/renderer/src/components/terminal-pane/terminal-input-quarantine.ts": {
-      "added": 80,
+      "added": 84,
       "removed": 4
     },
     "src/renderer/src/components/terminal-pane/terminal-visibility-resume.test.ts": {
