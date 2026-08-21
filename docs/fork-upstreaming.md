@@ -51,8 +51,8 @@ upstream could take outright.
 
 **Paths (own `exceptions` rows):**
 - `src/renderer/src/components/sidebar/repo-header-action-button-class.ts`
-- `src/renderer/src/components/sidebar/worktree-list-virtual-rows.ts`
-- `src/renderer/src/components/sidebar/worktree-list-scroll-adjustment.test.ts`
+- `src/renderer/src/components/sidebar/worktree-list/viewport/virtual-rows.ts`
+- `src/renderer/src/components/sidebar/worktree-list/viewport/scroll-adjustment.test.ts`
 - `src/renderer/src/components/sidebar/project-group-header-drop.test.ts`
 - `src/renderer/src/components/sidebar/project-header-drop.test.ts`
 - `src/renderer/src/components/sidebar/worktree-card-surface.tsx`

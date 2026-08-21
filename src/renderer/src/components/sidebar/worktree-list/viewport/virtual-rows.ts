@@ -4,9 +4,13 @@ import { PINNED_GROUP_KEY, getWorktreeLineageGroupKey } from '../grouping/group-
 import { getRenderRowKey } from '../listing/render-row'
 import type { RenderRow } from '../listing/render-row'
 
-export const GROUP_HEADER_ROW_HEIGHT = 28
-export const HOST_HEADER_ROW_HEIGHT = 32
-export const WORKTREE_SIDEBAR_VIRTUAL_ROW_GAP = 6
+export const GROUP_HEADER_ROW_HEIGHT = 24
+// Why: header rows return this estimate verbatim (measureElement no-ops them), so it must
+// equal the rendered DOM height. HostSectionHeader is h-8 (32px) inside a pt-1 (4px) wrapper.
+export const HOST_HEADER_ROW_HEIGHT = 36
+// Why: must match the virtualizer's `gap` in WorktreeList so drop-preview math
+// agrees with rendered row spacing (the fork's density keeps it at 2, not 6).
+export const WORKTREE_SIDEBAR_VIRTUAL_ROW_GAP = 2
 const SECONDARY_GROUP_HEADER_TOP_MARGIN = 4
 const IMPORTED_WORKTREES_LINE_ROW_HEIGHT = 36
 const PENDING_CREATION_ROW_HEIGHT = 56

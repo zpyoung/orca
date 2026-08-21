@@ -1679,85 +1679,13 @@
   ],
   "exceptions": [
     {
-      "path": "package.json",
-      "reason": "Fork identity, versioning, and script wiring \u2014 replaces the old FORK_OWNED_ALWAYS authorship carve-out.",
+      "path": ".claude/hooks/require-sandboxed-tests.mjs",
+      "reason": "Fork-only guard keeping vitest on the remote sandbox host; upstream runs tests locally.",
       "status": "permanent"
     },
     {
-      "path": "config/electron-builder.config.cjs",
-      "reason": "Fork ships macOS-only arm64 artifacts under com.zpyoung.orca; upstream's multi-platform matrix must not win.",
-      "status": "permanent"
-    },
-    {
-      "path": "config/dev-app-update.yml",
-      "reason": "Update feed points at the fork's own release bucket, not upstream's.",
-      "status": "permanent"
-    },
-    {
-      "path": "resources/darwin/bin/orca",
-      "reason": "CLI shim hardcodes the fork's app-identity path.",
-      "status": "permanent"
-    },
-    {
-      "path": ".nvmrc",
-      "reason": "Fork toolchain pin; upstream carries no equivalent file.",
-      "status": "permanent"
-    },
-    {
-      "path": "CHANGELOG.md",
-      "reason": "Fork release history; upstream's changelog is a different document.",
-      "status": "permanent"
-    },
-    {
-      "path": ".github/workflows/pr.yml",
-      "reason": "Carries the fork_ownership_guard job and other fork-only gating that upstream's PR workflow does not run.",
-      "status": "permanent"
-    },
-    {
-      "path": ".github/workflows/release-cut.yml",
-      "reason": "Fork release-cut pipeline; upstream has no equivalent workflow.",
-      "status": "permanent"
-    },
-    {
-      "path": ".github/workflows/release-mac-build.yml",
-      "reason": "Fork's macOS build pipeline for its own release channel.",
-      "status": "permanent"
-    },
-    {
-      "path": ".github/workflows/readme-downloads-badge.yml",
-      "reason": "Generates the fork's own README download-count badge.",
-      "status": "permanent"
-    },
-    {
-      "path": ".github/workflows/track-community-prs.yaml",
-      "reason": "Upstream-org community-PR triage automation the fork must not run.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
-      "path": "config/scripts/electron-builder-mac-channel-config.test.mjs",
-      "reason": "Tests the multi-channel builder matrix the fork's arm64-only config removed.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
-      "path": "docs/assets/readme-downloads.svg",
-      "reason": "Fork's own README badge artifact.",
-      "status": "permanent"
-    },
-    {
-      "path": "docs/STYLEGUIDE.md",
-      "reason": "Fork-maintained design-system doc; edits here are fork policy, not upstream's.",
-      "status": "permanent"
-    },
-    {
-      "path": "config/max-lines-baseline.txt",
-      "reason": "Fork's own max-lines ratchet baseline diverges from upstream's file sizes.",
-      "status": "permanent"
-    },
-    {
-      "path": "config/reliability-gates.jsonc",
-      "reason": "Fork-specific reliability gate thresholds.",
+      "path": ".claude/settings.json",
+      "reason": "Fork-only agent hook wiring; upstream ships no project settings file.",
       "status": "permanent"
     },
     {
@@ -1776,13 +1704,64 @@
       "status": "permanent"
     },
     {
-      "path": ".claude/settings.json",
-      "reason": "Fork-only agent hook wiring; upstream ships no project settings file.",
+      "path": ".github/scripts/check-fork-ownership.mjs",
+      "reason": "The CI guard that enforces this manifest on pull requests \u2014 fork machinery, not upstream code.",
       "status": "permanent"
     },
     {
-      "path": "config/scripts/run-sandboxed-test-shards.mjs",
-      "reason": "Fork's own sandboxed shard runner; upstream runs the suite on the workstation.",
+      "path": ".github/workflows/pr.yml",
+      "reason": "Carries the fork_ownership_guard job and other fork-only gating that upstream's PR workflow does not run.",
+      "status": "permanent"
+    },
+    {
+      "path": ".github/workflows/readme-downloads-badge.yml",
+      "reason": "Generates the fork's own README download-count badge.",
+      "status": "permanent"
+    },
+    {
+      "path": ".github/workflows/release-cut.yml",
+      "reason": "Fork release-cut pipeline; upstream has no equivalent workflow.",
+      "status": "permanent"
+    },
+    {
+      "path": ".github/workflows/release-mac-build.yml",
+      "reason": "Fork's macOS build pipeline for its own release channel.",
+      "status": "permanent"
+    },
+    {
+      "path": ".github/workflows/track-community-prs.yaml",
+      "reason": "Upstream-org community-PR triage automation the fork must not run.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": ".nvmrc",
+      "reason": "Fork toolchain pin; upstream carries no equivalent file.",
+      "status": "permanent"
+    },
+    {
+      "path": "BUGS.md",
+      "reason": "Fork-only defect log; upstream has no counterpart.",
+      "status": "permanent"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "reason": "Fork release history; upstream's changelog is a different document.",
+      "status": "permanent"
+    },
+    {
+      "path": "DEFERRED.md",
+      "reason": "Fork-only out-of-scope work log; upstream has no counterpart.",
+      "status": "permanent"
+    },
+    {
+      "path": "TEST_BACKLOG.md",
+      "reason": "Fork-only skipped-test log; upstream has no counterpart.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/dev-app-update.yml",
+      "reason": "Update feed points at the fork's own release bucket, not upstream's.",
       "status": "permanent"
     },
     {
@@ -1791,68 +1770,18 @@
       "status": "permanent"
     },
     {
-      "path": "config/docker/test-sandbox/entrypoint.sh",
-      "reason": "Fork-only test-sandbox entrypoint; upstream has no containerized test lane.",
-      "status": "permanent"
-    },
-    {
       "path": "config/docker/test-sandbox/README.md",
       "reason": "Fork-only test-sandbox documentation; upstream has no containerized test lane.",
       "status": "permanent"
     },
     {
-      "path": ".claude/hooks/require-sandboxed-tests.mjs",
-      "reason": "Fork-only guard keeping vitest on the remote sandbox host; upstream runs tests locally.",
+      "path": "config/docker/test-sandbox/entrypoint.sh",
+      "reason": "Fork-only test-sandbox entrypoint; upstream has no containerized test lane.",
       "status": "permanent"
     },
     {
-      "path": "config/scripts/sync-upstream-file-ownership.mjs",
-      "reason": "Fork's own sync classifier; upstream has no such script.",
-      "status": "permanent"
-    },
-    {
-      "path": "config/scripts/sync-upstream-file-ownership.test.mjs",
-      "reason": "Tests for the fork's own sync classifier; upstream has no such script.",
-      "status": "permanent"
-    },
-    {
-      "path": "config/scripts/fork-localization-catalog-check.mjs",
-      "reason": "Fork localization wrapper validates isolated feature catalogs while composing the upstream verifier.",
-      "status": "permanent"
-    },
-    {
-      "path": "config/scripts/fork-localization-catalog-check.test.mjs",
-      "reason": "Tests for the fork localization wrapper.",
-      "status": "permanent"
-    },
-    {
-      "path": "src/renderer/src/i18n/fork-localization-catalogs.ts",
-      "reason": "Fork i18n aggregation machinery merges isolated feature catalogs at runtime.",
-      "status": "permanent"
-    },
-    {
-      "path": "src/renderer/src/i18n/fork-localization-catalogs.test.ts",
-      "reason": "Tests for the fork i18n aggregation machinery.",
-      "status": "permanent"
-    },
-    {
-      "path": "config/scripts/fork-ownership-manifest.mjs",
-      "reason": "The manifest loader/matcher itself \u2014 fork machinery, not upstream code.",
-      "status": "permanent"
-    },
-    {
-      "path": "config/scripts/fork-ownership-manifest.test.mjs",
-      "reason": "Tests for the manifest loader; a fork-added test matching no other entry would otherwise fail the guard's own coverage rule.",
-      "status": "permanent"
-    },
-    {
-      "path": ".github/scripts/check-fork-ownership.mjs",
-      "reason": "The CI guard that enforces this manifest on pull requests \u2014 fork machinery, not upstream code.",
-      "status": "permanent"
-    },
-    {
-      "path": "config/scripts/check-fork-ownership.test.mjs",
-      "reason": "Tests for the fork ownership CI guard above.",
+      "path": "config/electron-builder.config.cjs",
+      "reason": "Fork ships macOS-only arm64 artifacts under com.zpyoung.orca; upstream's multi-platform matrix must not win.",
       "status": "permanent"
     },
     {
@@ -1861,8 +1790,18 @@
       "status": "permanent"
     },
     {
-      "path": "docs/fork-upstreaming.md",
-      "reason": "The upstreaming ledger declares itself so a sync never removes it.",
+      "path": "config/max-lines-baseline.txt",
+      "reason": "Fork's own max-lines ratchet baseline diverges from upstream's file sizes.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/reliability-gates.jsonc",
+      "reason": "Fork-specific reliability gate thresholds.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/check-fork-ownership.test.mjs",
+      "reason": "Tests for the fork ownership CI guard above.",
       "status": "permanent"
     },
     {
@@ -1876,13 +1815,34 @@
       "status": "permanent"
     },
     {
-      "path": "config/scripts/release-rc-history.mjs",
-      "reason": "Fork release-tooling delta for the fork's own RC history.",
+      "path": "config/scripts/electron-builder-config.test.mjs",
+      "reason": "Tests the fork's arm64-only electron-builder config, not upstream's matrix.",
       "status": "permanent"
     },
     {
-      "path": "config/scripts/release-rc-history.test.mjs",
-      "reason": "Tests for the fork's release-tooling delta above.",
+      "path": "config/scripts/electron-builder-mac-channel-config.test.mjs",
+      "reason": "Tests the multi-channel builder matrix the fork's arm64-only config removed.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/fork-localization-catalog-check.mjs",
+      "reason": "Fork localization wrapper validates isolated feature catalogs while composing the upstream verifier.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/fork-localization-catalog-check.test.mjs",
+      "reason": "Tests for the fork localization wrapper.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/fork-ownership-manifest.mjs",
+      "reason": "The manifest loader/matcher itself \u2014 fork machinery, not upstream code.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/fork-ownership-manifest.test.mjs",
+      "reason": "Tests for the manifest loader; a fork-added test matching no other entry would otherwise fail the guard's own coverage rule.",
       "status": "permanent"
     },
     {
@@ -1893,6 +1853,36 @@
     {
       "path": "config/scripts/install-electron-package-binary.test.mjs",
       "reason": "Tests for the fork's release-tooling delta above.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/package-electron-runtime-contract.test.mjs",
+      "reason": "Tests the fork's own packaged Electron runtime contract.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/release-rc-history.mjs",
+      "reason": "Fork release-tooling delta for the fork's own RC history.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/release-rc-history.test.mjs",
+      "reason": "Tests for the fork's release-tooling delta above.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/run-sandboxed-test-shards.mjs",
+      "reason": "Fork's own sandboxed shard runner; upstream runs the suite on the workstation.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/sync-upstream-file-ownership.mjs",
+      "reason": "Fork's own sync classifier; upstream has no such script.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/sync-upstream-file-ownership.test.mjs",
+      "reason": "Tests for the fork's own sync classifier; upstream has no such script.",
       "status": "permanent"
     },
     {
@@ -1911,28 +1901,51 @@
       "status": "permanent"
     },
     {
-      "path": "config/scripts/electron-builder-config.test.mjs",
-      "reason": "Tests the fork's arm64-only electron-builder config, not upstream's matrix.",
+      "path": "docs/STYLEGUIDE.md",
+      "reason": "Fork-maintained design-system doc; edits here are fork policy, not upstream's.",
       "status": "permanent"
     },
     {
-      "path": "config/scripts/package-electron-runtime-contract.test.mjs",
-      "reason": "Tests the fork's own packaged Electron runtime contract.",
+      "path": "docs/assets/readme-downloads.svg",
+      "reason": "Fork's own README badge artifact.",
       "status": "permanent"
     },
     {
-      "path": "src/main/updater.ts",
-      "reason": "Fork's own update feed and channel selection.",
+      "path": "docs/fork-upstreaming.md",
+      "reason": "The upstreaming ledger declares itself so a sync never removes it.",
       "status": "permanent"
     },
     {
-      "path": "src/main/updater-prerelease-feed.ts",
-      "reason": "Fork's own prerelease update feed.",
+      "path": "mobile/src/browser/mobile-browser-frameless-stream.test.tsx",
+      "reason": "React Doctor gate: imports Buffer from `node:buffer`. Mobile disables unicorn/prefer-node-protocol for Metro's sake, but this file is a Vitest test that Metro never bundles, and React Doctor does not read mobile/.oxlintrc.json.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate"
+    },
+    {
+      "path": "mobile/src/session/pending-terminal-handle-recovery.test.ts",
+      "reason": "React Doctor gate: rewrites `Array<T>` as `T[]`. The mobile package turns typescript/array-type off, but React Doctor does not read mobile/.oxlintrc.json and blocks the changed line.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate"
+    },
+    {
+      "path": "mobile/src/transport/mobile-relay-rpc-session-liveness.test.ts",
+      "reason": "React Doctor gate: rewrites `Array<T>` as `T[]`. The mobile package turns typescript/array-type off, but React Doctor does not read mobile/.oxlintrc.json and blocks the changed line.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate"
+    },
+    {
+      "path": "package.json",
+      "reason": "Fork identity, versioning, and script wiring \u2014 replaces the old FORK_OWNED_ALWAYS authorship carve-out.",
       "status": "permanent"
     },
     {
-      "path": "src/main/updater-prerelease-feed.test.ts",
-      "reason": "Tests for the fork's own prerelease update feed.",
+      "path": "proposals.md",
+      "reason": "Fork-only architecture proposal log; upstream has no counterpart.",
+      "status": "permanent"
+    },
+    {
+      "path": "resources/darwin/bin/orca",
+      "reason": "CLI shim hardcodes the fork's app-identity path.",
       "status": "permanent"
     },
     {
@@ -1941,84 +1954,28 @@
       "status": "permanent"
     },
     {
+      "path": "src/main/updater-prerelease-feed.test.ts",
+      "reason": "Tests for the fork's own prerelease update feed.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/main/updater-prerelease-feed.ts",
+      "reason": "Fork's own prerelease update feed.",
+      "status": "permanent"
+    },
+    {
       "path": "src/main/updater.check-failure.test.ts",
       "reason": "Tests for the fork's own update-check failure handling.",
       "status": "permanent"
     },
     {
-      "path": "tests/e2e/cross-version-wire/release-checkout.ts",
-      "reason": "Encodes the fork's own (tagless) release-history shape for cross-version wire tests.",
+      "path": "src/main/updater.ts",
+      "reason": "Fork's own update feed and channel selection.",
       "status": "permanent"
     },
     {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-retained-session.ts",
-      "reason": "Retention bug fix: excludes the error phase from the loading-state check so a transient read failure does not blank a retained transcript. Belongs upstream, not isolated as a fork feature. Also carries the native-chat-relay SSH-identity line `args.sshConnectionId ?? null,` and its two-line comment from commit c137a9e97d; those are not part of the upstream-bound fix and must be dropped when the upstream PR is prepared, since sshConnectionId does not exist upstream.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#retention-fix"
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-retained-session.test.ts",
-      "reason": "Tests for the retention-fix hook above. Also carries native-chat-relay SSH-connection test cases from commit c137a9e97d that exercise the sshConnectionId identity field; those are not part of the upstream-bound fix and must be dropped when the upstream PR is prepared, since sshConnectionId does not exist upstream.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#retention-fix"
-    },
-    {
-      "path": "src/shared/native-chat-transcript-retention.ts",
-      "reason": "Retention bug fix's shared companion: the loading param whose error-phase exclusion is the actual fix.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#retention-fix"
-    },
-    {
-      "path": "src/shared/native-chat-transcript-retention.test.ts",
-      "reason": "Tests for the retention-fix shared companion above.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#retention-fix"
-    },
-    {
-      "path": "src/renderer/src/components/sidebar/repo-header-action-button-class.ts",
-      "reason": "Sidebar-density fix: insets the repo-header action-button focus ring so the shorter h-6 row's overflow-hidden no longer clips it.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#sidebar-density"
-    },
-    {
-      "path": "src/renderer/src/components/sidebar/worktree-list-virtual-rows.ts",
-      "reason": "Sidebar-density fix: corrects the host-header row-height estimate so it matches the rendered h-8 + pt-1 height at the tighter 2px row gap.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#sidebar-density"
-    },
-    {
-      "path": "src/renderer/src/components/sidebar/worktree-list-scroll-adjustment.test.ts",
-      "reason": "Tests for the sidebar-density row-height fix above.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#sidebar-density"
-    },
-    {
-      "path": "src/renderer/src/components/sidebar/project-group-header-drop.test.ts",
-      "reason": "Tests updated for the sidebar-density header-height change.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#sidebar-density"
-    },
-    {
-      "path": "src/renderer/src/components/sidebar/project-header-drop.test.ts",
-      "reason": "Tests updated for the sidebar-density header-height change.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#sidebar-density"
-    },
-    {
-      "path": "src/renderer/src/components/sidebar/worktree-card-surface.tsx",
-      "reason": "Sidebar-density preference: preserves compact workspace-card padding after upstream split card rendering into its surface module.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#sidebar-density"
-    },
-    {
-      "path": "src/renderer/src/components/terminal-pane/TerminalPane.tsx",
-      "reason": "Corrects effectiveChatViewMode; a cosmetic/logic fix to upstream's chat-header controls, not a fork feature.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#chat-header-controls-fix"
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-live-session-visibility.test.ts",
-      "reason": "The tag visibility test assumes hidden panes disable reads, but the retained-session relay path must stay subscribed across SSH relay reconnects; it cannot assert both contracts.",
+      "path": "src/renderer/src/components/native-chat/NativeChatComposerActions.test.tsx",
+      "reason": "Superseded by the fork copy's test in fork-agent-composer.",
       "status": "permanent",
       "deleted": true
     },
@@ -2035,32 +1992,8 @@
       "deleted": true
     },
     {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-composer-keydown.ts",
-      "reason": "Replaced by useAgentComposerKeydown in fork-agent-composer, which adds the docked composer's history recall.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-composer-keydown.test.tsx",
-      "reason": "Superseded by the fork copy's test in fork-agent-composer.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
       "path": "src/renderer/src/components/native-chat/native-chat-composer-autogrow.test.tsx",
       "reason": "Superseded by the fork copy's test in fork-agent-composer.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/NativeChatComposerActions.test.tsx",
-      "reason": "Superseded by the fork copy's test in fork-agent-composer.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-composer-scope-cache.ts",
-      "reason": "Superseded by agent-composer-scope-cache, which keys by composer scope rather than chat pane.",
       "status": "permanent",
       "deleted": true
     },
@@ -2071,8 +2004,8 @@
       "deleted": true
     },
     {
-      "path": "src/renderer/src/components/native-chat/native-chat-draft-cache.ts",
-      "reason": "Superseded by agent-composer-draft-cache, which subscribes so concurrent composer hosts converge.",
+      "path": "src/renderer/src/components/native-chat/native-chat-composer-scope-cache.ts",
+      "reason": "Superseded by agent-composer-scope-cache, which keys by composer scope rather than chat pane.",
       "status": "permanent",
       "deleted": true
     },
@@ -2083,30 +2016,110 @@
       "deleted": true
     },
     {
+      "path": "src/renderer/src/components/native-chat/native-chat-draft-cache.ts",
+      "reason": "Superseded by agent-composer-draft-cache, which subscribes so concurrent composer hosts converge.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-composer-keydown.test.tsx",
+      "reason": "Superseded by the fork copy's test in fork-agent-composer.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-composer-keydown.ts",
+      "reason": "Replaced by useAgentComposerKeydown in fork-agent-composer, which adds the docked composer's history recall.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
       "path": "src/renderer/src/components/native-chat/use-native-chat-draft.ts",
       "reason": "Superseded by useAgentComposerDraft, which serves both the chat pane and the dock.",
       "status": "permanent",
       "deleted": true
     },
     {
-      "path": "BUGS.md",
-      "reason": "Fork-only defect log; upstream has no counterpart.",
+      "path": "src/renderer/src/components/native-chat/use-native-chat-live-session-visibility.test.ts",
+      "reason": "The tag visibility test assumes hidden panes disable reads, but the retained-session relay path must stay subscribed across SSH relay reconnects; it cannot assert both contracts.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-retained-session.test.ts",
+      "reason": "Tests for the retention-fix hook above. Also carries native-chat-relay SSH-connection test cases from commit c137a9e97d that exercise the sshConnectionId identity field; those are not part of the upstream-bound fix and must be dropped when the upstream PR is prepared, since sshConnectionId does not exist upstream.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#retention-fix"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-retained-session.ts",
+      "reason": "Retention bug fix: excludes the error phase from the loading-state check so a transient read failure does not blank a retained transcript. Belongs upstream, not isolated as a fork feature. Also carries the native-chat-relay SSH-identity line `args.sshConnectionId ?? null,` and its two-line comment from commit c137a9e97d; those are not part of the upstream-bound fix and must be dropped when the upstream PR is prepared, since sshConnectionId does not exist upstream.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#retention-fix"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/project-group-header-drop.test.ts",
+      "reason": "Tests updated for the sidebar-density header-height change.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#sidebar-density"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/project-header-drop.test.ts",
+      "reason": "Tests updated for the sidebar-density header-height change.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#sidebar-density"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/repo-header-action-button-class.ts",
+      "reason": "Sidebar-density fix: insets the repo-header action-button focus ring so the shorter h-6 row's overflow-hidden no longer clips it.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#sidebar-density"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-card-surface.tsx",
+      "reason": "Sidebar-density preference: preserves compact workspace-card padding after upstream split card rendering into its surface module.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#sidebar-density"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/viewport/scroll-adjustment.test.ts",
+      "reason": "Tests for the sidebar-density row-height fix above.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#sidebar-density"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/viewport/virtual-rows.ts",
+      "reason": "Sidebar-density fix: corrects the host-header row-height estimate so it matches the rendered h-8 + pt-1 height at the tighter 2px row gap.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#sidebar-density"
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/TerminalPane.tsx",
+      "reason": "Corrects effectiveChatViewMode; a cosmetic/logic fix to upstream's chat-header controls, not a fork feature.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#chat-header-controls-fix"
+    },
+    {
+      "path": "src/renderer/src/i18n/fork-localization-catalogs.test.ts",
+      "reason": "Tests for the fork i18n aggregation machinery.",
       "status": "permanent"
     },
     {
-      "path": "DEFERRED.md",
-      "reason": "Fork-only out-of-scope work log; upstream has no counterpart.",
+      "path": "src/renderer/src/i18n/fork-localization-catalogs.ts",
+      "reason": "Fork i18n aggregation machinery merges isolated feature catalogs at runtime.",
       "status": "permanent"
     },
     {
-      "path": "TEST_BACKLOG.md",
-      "reason": "Fork-only skipped-test log; upstream has no counterpart.",
-      "status": "permanent"
+      "path": "src/shared/native-chat-transcript-retention.test.ts",
+      "reason": "Tests for the retention-fix shared companion above.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#retention-fix"
     },
     {
-      "path": "proposals.md",
-      "reason": "Fork-only architecture proposal log; upstream has no counterpart.",
-      "status": "permanent"
+      "path": "src/shared/native-chat-transcript-retention.ts",
+      "reason": "Retention bug fix's shared companion: the loading param whose error-phase exclusion is the actual fix.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#retention-fix"
     },
     {
       "path": "src/shared/workspace-session-editor-schema.ts",
@@ -2115,22 +2128,9 @@
       "ledger": "docs/fork-upstreaming.md#workspace-session-schema-split"
     },
     {
-      "path": "mobile/src/session/pending-terminal-handle-recovery.test.ts",
-      "reason": "React Doctor gate: rewrites `Array<T>` as `T[]`. The mobile package turns typescript/array-type off, but React Doctor does not read mobile/.oxlintrc.json and blocks the changed line.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate"
-    },
-    {
-      "path": "mobile/src/transport/mobile-relay-rpc-session-liveness.test.ts",
-      "reason": "React Doctor gate: rewrites `Array<T>` as `T[]`. The mobile package turns typescript/array-type off, but React Doctor does not read mobile/.oxlintrc.json and blocks the changed line.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate"
-    },
-    {
-      "path": "mobile/src/browser/mobile-browser-frameless-stream.test.tsx",
-      "reason": "React Doctor gate: imports Buffer from `node:buffer`. Mobile disables unicorn/prefer-node-protocol for Metro's sake, but this file is a Vitest test that Metro never bundles, and React Doctor does not read mobile/.oxlintrc.json.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate"
+      "path": "tests/e2e/cross-version-wire/release-checkout.ts",
+      "reason": "Encodes the fork's own (tagless) release-history shape for cross-version wire tests.",
+      "status": "permanent"
     }
   ],
   "residuals": {
