@@ -8,7 +8,10 @@ import type { WorktreeDragUnitGroup } from '../worktree-drag-units'
 import type { WorktreeSidebarDropPreview } from '../worktree-sidebar-drop-preview'
 import type { WorktreeStatusDropAtIndexArgs } from './virtualized-worktree-viewport-props'
 import type { WorktreeStatusDropRequest } from './use-worktree-drag-session'
-import type { WorktreeSidebarLineageDropTarget } from './worktree-row-drag-state'
+import type {
+  WorktreePointerDrag,
+  WorktreeSidebarLineageDropTarget
+} from './worktree-row-drag-state'
 
 // The shared surface every drop path (pointer, native drag, document capture) commits through.
 export type WorktreeDropCommitContext = {
@@ -26,6 +29,8 @@ export type WorktreeDropCommitContext = {
     draggedIds: readonly string[]
   ) => WorktreeSidebarLineageDropTarget
   commitWorktreeLineageParentDrop: (draggedIds: readonly string[], parentId: string) => boolean
+  trackWorktreeGroupMembershipDragFrame: (drag: WorktreePointerDrag) => boolean
+  commitWorktreeGroupMembershipDrop: (event: PointerEvent, drag: WorktreePointerDrag) => boolean
   clearReorderedWorktreeParents: (args: {
     draggedIds: readonly string[]
     sourceGroupKey: string

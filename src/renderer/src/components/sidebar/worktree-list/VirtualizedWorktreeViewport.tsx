@@ -24,6 +24,7 @@ import { useWorktreeNativeDrag } from './use-worktree-native-drag'
 import { useWorktreePointerDrag } from './use-worktree-pointer-drag'
 import { useWorktreeSidebarHeaderDrag } from './use-worktree-sidebar-header-drag'
 import { useWorktreeSidebarScrollSuppression } from './use-worktree-sidebar-scroll-suppression'
+import { useWorktreeGroupMembershipDrag } from '../fork-worktree-groups/use-worktree-group-membership-drag'
 import {
   EMPTY_PROJECT_GROUPS,
   type VirtualizedWorktreeViewportProps
@@ -101,10 +102,12 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     worktreeLineageById,
     worktreeDragGroups: session.worktreeDragGroups
   })
+  const groupMembershipDrag = useWorktreeGroupMembershipDrag({ scrollRef, viewport: props })
   const runtime = useWorktreeDragRuntime({
     worktreeDragSessionRef: session.worktreeDragSessionRef,
     statusDropAnchorsRef: session.statusDropAnchorsRef,
-    onWorkspaceBoardDragPreviewCancel: props.onWorkspaceBoardDragPreviewCancel
+    onWorkspaceBoardDragPreviewCancel: props.onWorkspaceBoardDragPreviewCancel,
+    onWorktreePointerDragCleanup: groupMembershipDrag.resetPreview
   })
 
   const primaryActive = usePrimaryActiveWorktreeRow({
@@ -158,6 +161,7 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     workspaceStatuses,
     settings,
     projectGroups,
+    visibleProjectGroupsForRows: props.visibleProjectGroupsForRows,
     projectGrouping: props.projectGrouping,
     flashRevealedRow: reveal.flashRevealedRow,
     markRevealScroll: scrollSuppression.markRevealScroll,
@@ -202,6 +206,8 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
       refreshWorktreeDragSession: session.refreshWorktreeDragSession,
       getEligibleLineageDropTarget: lineageDrop.getEligibleLineageDropTarget,
       commitWorktreeLineageParentDrop: lineageDrop.commitWorktreeLineageParentDrop,
+      trackWorktreeGroupMembershipDragFrame: groupMembershipDrag.trackPointerDragFrame,
+      commitWorktreeGroupMembershipDrop: groupMembershipDrag.commitPointerDrop,
       clearReorderedWorktreeParents: lineageDrop.clearReorderedWorktreeParents,
       clearWorktreeDrag: runtime.clearWorktreeDrag,
       onMoveWorktreesToStatus: props.onMoveWorktreesToStatus,
@@ -210,6 +216,8 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
       onPinWorktrees: props.onPinWorktrees
     }),
     [
+      groupMembershipDrag.commitPointerDrop,
+      groupMembershipDrag.trackPointerDragFrame,
       lineageDrop.clearReorderedWorktreeParents,
       lineageDrop.commitWorktreeLineageParentDrop,
       lineageDrop.getEligibleLineageDropTarget,
@@ -235,6 +243,7 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     markScrollMovement,
     selectedWorktreeIds: props.selectedWorktreeIds,
     selectedWorktrees: props.selectedWorktrees,
+    canStartWorktreeDragForGroupMembership: groupMembershipDrag.canStartDrag,
     workspaceBoardOpen: props.workspaceBoardOpen,
     onWorkspaceBoardDragPreviewStart: props.onWorkspaceBoardDragPreviewStart,
     onWorkspaceBoardDragPreviewCommit: props.onWorkspaceBoardDragPreviewCommit,
@@ -326,6 +335,7 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     newCardStyle,
     folderBackedProjectGroupIds,
     projectGroups,
+    worktreeGroupMembershipDragPreview: groupMembershipDrag.preview,
     session,
     runtime,
     primaryActive,

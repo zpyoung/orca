@@ -90,6 +90,10 @@ export type VirtualizedWorktreeViewportProps = {
   workspaceStatuses: readonly WorkspaceStatusDefinition[]
   projectGrouping?: ProjectGroupingModel
   projectGroups?: readonly ProjectGroup[]
+  // Why: reveal must agree with the rendered tree on which groups exist, or a
+  // host filter that hides a group while keeping a cross-host member visible
+  // expands that worktree against a group that is not on screen.
+  visibleProjectGroupsForRows: readonly ProjectGroup[]
   onMoveWorktreeToStatus: (worktreeId: string, status: WorkspaceStatus) => void
   onMoveWorktreesToStatus: (worktreeIds: readonly string[], status: WorkspaceStatus) => void
   onMoveWorktreesToStatusAtIndex: (args: WorktreeStatusDropAtIndexArgs) => void

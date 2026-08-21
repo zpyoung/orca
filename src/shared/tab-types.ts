@@ -1,4 +1,5 @@
 import type { AiVaultSessionTitle } from './ai-vault-session-title'
+import type { TerminalDockPaneState } from './fork-terminal-dock/terminal-dock-pane-state'
 
 // ─── Tab Group Layout ───────────────────────────────────────────────
 export type TabGroupSplitDirection = 'horizontal' | 'vertical'
@@ -49,6 +50,9 @@ export type Tab = {
    *  underneath; `'terminal'` (the default for legacy/missing) shows the raw
    *  xterm. Optional so sessions persisted before this field hydrate cleanly. */
   viewMode?: 'terminal' | 'chat'
+  /** Per-pane docked-composer state, keyed by pane key. Optional so sessions
+   *  persisted before this field hydrate cleanly. */
+  terminalDockByPaneKey?: Record<string, TerminalDockPaneState>
 }
 
 export type TabGroup = {

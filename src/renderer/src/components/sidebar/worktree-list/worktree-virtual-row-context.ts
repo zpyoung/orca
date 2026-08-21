@@ -4,6 +4,7 @@ import type { ProjectGroup } from '../../../../../shared/project-group-types'
 import type { RenderRow } from '../worktree-list-virtual-rows'
 import type { LineageToggleHandler } from '../worktree-lineage-toggle-handler-cache'
 import type { SidebarRevealHighlight } from './use-sidebar-reveal-highlight'
+import type { WorktreeGroupMembershipDragPreview } from '../fork-worktree-groups/worktree-group-membership-drag-preview'
 import type { WorktreeDragRuntime } from './use-worktree-drag-runtime'
 import type { WorktreeDragSession } from './use-worktree-drag-session'
 import type { useFolderWorkspacePathStatusRows } from './use-folder-workspace-path-status-rows'
@@ -28,6 +29,7 @@ type BuildArgs = {
   sshConnectionStates: AppState['sshConnectionStates']
   newCardStyle: boolean
   folderBackedProjectGroupIds: ReadonlySet<string>
+  worktreeGroupMembershipDragPreview: WorktreeGroupMembershipDragPreview
   session: WorktreeDragSession
   runtime: WorktreeDragRuntime
   primaryActive: ReturnType<typeof usePrimaryActiveWorktreeRow>
@@ -81,6 +83,7 @@ export function buildWorktreeVirtualRowContext(args: BuildArgs): WorktreeVirtual
       highlightedRevealRowKey: reveal.highlightedRevealRowKey,
       dragOverStatus: runtime.dragOverStatus,
       pinDragOver: runtime.pinDragOver,
+      worktreeGroupMembershipDragPreview: args.worktreeGroupMembershipDragPreview,
       headerDrag,
       getCachedFolderWorkspacePathStatus: args.getCachedFolderWorkspacePathStatus,
       toggleGroupWithScrollAnchor: args.toggleGroupWithScrollAnchor,

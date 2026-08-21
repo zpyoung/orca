@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Tab } from '../../../../../shared/types'
+import type { Tab } from '../../../../../shared/tab-types'
 import { writeTerminalDockPaneState } from './terminal-dock-pane-state'
 import {
   pruneTerminalDockPaneKeysEverywhere,

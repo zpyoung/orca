@@ -2,7 +2,7 @@ import type {
   RuntimeMobileSessionSnapshotTab,
   RuntimeMobileSessionTabsSnapshot
 } from '../../../shared/runtime-types'
-import type { TerminalDockPaneState } from '../../../shared/types'
+import type { TerminalDockPaneState } from '../../../shared/fork-terminal-dock/terminal-dock-pane-state'
 
 export const DEFAULT_TERMINAL_DOCK_GUTTER_ROWS = 5
 

@@ -37,6 +37,7 @@ import {
   handleRepoHeaderCollapseAffordancePointerDown,
   shouldIgnoreRepoHeaderToggle
 } from './repo-header-event-guards'
+import type { WorktreeGroupMembershipDragPreview } from '../fork-worktree-groups/worktree-group-membership-drag-preview'
 import type { WorktreeSidebarHeaderDrag } from './use-worktree-sidebar-header-drag'
 import { getWorktreeOptionId } from './worktree-option-dom'
 
@@ -49,6 +50,7 @@ export type SectionHeaderRowContext = {
   highlightedRevealRowKey: string | null
   dragOverStatus: WorkspaceStatus | null
   pinDragOver: boolean
+  worktreeGroupMembershipDragPreview: WorktreeGroupMembershipDragPreview
   headerDrag: WorktreeSidebarHeaderDrag
   getCachedFolderWorkspacePathStatus: (request: {
     scope: 'project-group'
@@ -224,7 +226,7 @@ export function renderWorktreeSectionHeaderRow(args: {
         className={cn(
           // Why: no row-level grab — only the title surface below shows the hand;
           // actions use cursor-pointer so … / + never look reorderable.
-          'group relative flex h-7 w-full items-center gap-1.5 pr-2 text-left transition-all',
+          'group relative flex h-6 w-full items-center gap-1.5 pr-2 text-left transition-all',
           !(isDraggableRepoHeader || isDraggableProjectGroupHeader) && 'cursor-pointer',
           ctx.highlightedRevealRowKey === row.key &&
             'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/50',
@@ -235,6 +237,14 @@ export function renderWorktreeSectionHeaderRow(args: {
             'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
           isPinnedHeader &&
             ctx.pinDragOver &&
+            'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
+          projectGroupIdForHeader !== undefined &&
+            ctx.worktreeGroupMembershipDragPreview.target.kind === 'join' &&
+            ctx.worktreeGroupMembershipDragPreview.target.groupId === projectGroupIdForHeader &&
+            'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
+          projectIdForHeader !== undefined &&
+            ctx.worktreeGroupMembershipDragPreview.target.kind === 'leave' &&
+            ctx.worktreeGroupMembershipDragPreview.repoId === projectIdForHeader &&
             'rounded-md bg-worktree-sidebar-accent ring-1 ring-worktree-sidebar-ring/40',
           row.repo && 'overflow-hidden'
         )}

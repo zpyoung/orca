@@ -220,10 +220,7 @@ describe('setup script prompt inspection', () => {
       getSetupScriptPromptDismissalKey(remoteIdentity)
     ]
     expect(
-      filterSetupScriptPromptDismissalsToValidRepos(
-        input,
-        new Set([localIdentity, remoteIdentity])
-      )
+      filterSetupScriptPromptDismissalsToValidRepos(input, new Set([localIdentity, remoteIdentity]))
     ).toBe(input)
   })
 

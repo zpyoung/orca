@@ -1,7 +1,8 @@
 import type { PropsWithChildren } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import type { Repo, Worktree } from '../../../../../shared/types'
+import type { Repo } from '../../../../../shared/repo-types'
+import type { Worktree } from '../../../../../shared/worktree/types'
 
 const mocks = vi.hoisted(() => ({
   state: {

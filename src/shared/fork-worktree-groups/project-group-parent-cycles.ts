@@ -1,4 +1,4 @@
-import type { ProjectGroup } from '../types'
+import type { ProjectGroup } from '../project-group-types'
 
 // Why: a multi-node parent cycle survives the self/missing-parent checks above, and
 // buildRows walks down from roots, so an unbroken cycle leaves every group in it

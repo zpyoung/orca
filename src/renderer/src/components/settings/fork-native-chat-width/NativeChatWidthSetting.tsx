@@ -1,4 +1,4 @@
-import type { NativeChatWidthTier } from '../../../../../shared/types'
+import type { NativeChatWidthTier } from '../../../../../shared/fork-native-chat-width/native-chat-width-tier'
 import { translate } from '@/i18n/i18n'
 import {
   NATIVE_CHAT_WIDTH_TIERS,

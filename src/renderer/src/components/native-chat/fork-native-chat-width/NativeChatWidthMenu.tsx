@@ -1,5 +1,5 @@
 import { UnfoldHorizontal } from 'lucide-react'
-import type { NativeChatWidthTier } from '../../../../../shared/types'
+import type { NativeChatWidthTier } from '../../../../../shared/fork-native-chat-width/native-chat-width-tier'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,

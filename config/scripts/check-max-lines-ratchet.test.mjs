@@ -55,12 +55,12 @@ describe('hasMaxLinesDisable', () => {
 })
 
 describe('defaultLimitForPath', () => {
-  it('uses 800 for tests, 400 for tsx, 600 for mjs, 300 otherwise', () => {
-    expect(defaultLimitForPath('a/b.test.ts')).toBe(800)
-    expect(defaultLimitForPath('a/b.spec.tsx')).toBe(800)
-    expect(defaultLimitForPath('a/b.tsx')).toBe(400)
-    expect(defaultLimitForPath('a/b.mjs')).toBe(600)
-    expect(defaultLimitForPath('a/b.ts')).toBe(300)
+  it('uses 1000 for tests, 600 for tsx, 800 for mjs, 500 otherwise', () => {
+    expect(defaultLimitForPath('a/b.test.ts')).toBe(1000)
+    expect(defaultLimitForPath('a/b.spec.tsx')).toBe(1000)
+    expect(defaultLimitForPath('a/b.tsx')).toBe(600)
+    expect(defaultLimitForPath('a/b.mjs')).toBe(800)
+    expect(defaultLimitForPath('a/b.ts')).toBe(500)
   })
 })
 

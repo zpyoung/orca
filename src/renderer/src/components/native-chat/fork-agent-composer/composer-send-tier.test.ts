@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { TuiAgent } from '../../../../../shared/types'
+import type { TuiAgent } from '../../../../../shared/tui-agent'
 import { COMPOSER_VERIFIED_TIER_AGENTS, resolveComposerSendTier } from './composer-send-tier'
 
 describe('COMPOSER_VERIFIED_TIER_AGENTS', () => {

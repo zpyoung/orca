@@ -3,7 +3,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { create, type StoreApi, type UseBoundStore } from 'zustand'
-import type { Tab } from '../../../../../shared/types'
+import type { Tab } from '../../../../../shared/tab-types'
 import {
   DEFAULT_GUTTER_ROWS,
   readTerminalDockPaneState,

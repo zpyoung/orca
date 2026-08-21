@@ -28,7 +28,8 @@ import {
   setRendererPtyVisibilityClaim
 } from './pty-renderer-delivery-claims'
 
-type UseTerminalPaneGlobalEffectsArgs = PaneFocusOwnership & {
+type UseTerminalPaneGlobalEffectsArgs = Partial<PaneFocusOwnership> & {
+  tabId: string
   worktreeId: string
   cwd?: string
   isActive: boolean
@@ -62,7 +63,8 @@ function reportRendererPtyVisibility(
 
 export function useTerminalPaneGlobalEffects({
   tabId,
-  paneDockOwnsFocus,
+  // absent when the dock is off: the terminal keeps focus, as before the dock existed
+  paneDockOwnsFocus = () => false,
   worktreeId,
   cwd,
   isActive,

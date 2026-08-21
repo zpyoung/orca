@@ -2843,7 +2843,13 @@ function TerminalPane(
         recordTerminalUserInputForLeaf(tabId, clickedPane.leafId)
       })
     },
-    [getPrimarySelectionMiddleClickPane, tabId, terminalDock, worktreeId]
+    [
+      getPrimarySelectionMiddleClickPane,
+      forceBracketedMultilineTextPaste,
+      tabId,
+      terminalDock,
+      worktreeId
+    ]
   )
 
   const handlePrimarySelectionAuxClick = useCallback(

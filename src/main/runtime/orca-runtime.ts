@@ -239,37 +239,13 @@ import type {
   ProjectHostSetupResult,
   ProjectHostSetupUpdateArgs,
   ProjectHostSetupUpdateResult,
-  Repo,
-  RemoveWorktreeResult,
-  StatsSummary,
-  Worktree,
-  WorktreeLineage,
-  WorkspaceLineage,
-  WorkspaceKey,
-  WorktreeLineageWarning,
-  WorktreeMeta,
-  WorktreeBaseStatusEvent,
-  WorktreeRemoteBranchConflictEvent,
-  WorktreeStartupLaunch,
-  LinearCustomViewModel,
-  JiraConnectArgs,
-  JiraCreateIssueArgs,
-  JiraIssueFilter,
-  JiraIssueUpdate,
-  JiraSiteSelection,
-  LinearIssueUpdate,
-  LinearProjectSummary,
-  LinearWorkspaceSelection,
-  NestedRepoScanResult,
-  ProjectGroup,
-  FolderWorkspace,
-  ProjectGroupImportMode,
-  ProjectGroupImportResult,
-  MemorySnapshot,
-  Tab,
-  TabGroupLayoutNode,
-  TerminalDockPaneState,
-  TerminalQuickCommand,
+  ProjectUpdateArgs
+} from '../../shared/project-types'
+import type { BaseRefSearchResult, Repo } from '../../shared/repo-types'
+import type { Tab, TabGroupLayoutNode } from '../../shared/tab-types'
+import type { TerminalQuickCommand } from '../../shared/terminal-quick-command-types'
+import type { TerminalDockPaneState } from '../../shared/fork-terminal-dock/terminal-dock-pane-state'
+import type {
   TerminalLayoutSnapshot,
   TerminalPaneLayoutNode,
   TerminalTab

@@ -4,7 +4,7 @@
  *  max-width through here so the four sites can never disagree. Kept DOM-free
  *  and React-free so it can be unit-tested. */
 
-import type { NativeChatWidthTier } from '../../../../../shared/types'
+import type { NativeChatWidthTier } from '../../../../../shared/fork-native-chat-width/native-chat-width-tier'
 import { translate } from '@/i18n/i18n'
 import { DEFAULT_NATIVE_CHAT_WIDTH_TIER } from '../../../../../shared/fork-native-chat-width/native-chat-width-default'
 

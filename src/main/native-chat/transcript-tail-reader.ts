@@ -1,4 +1,3 @@
-import type { FileHandle } from 'node:fs/promises'
 import type { AgentType, NativeChatMessage } from '../../shared/native-chat-types'
 import {
   retainNativeChatTranscriptCompanion,

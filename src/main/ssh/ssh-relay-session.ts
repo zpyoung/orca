@@ -111,8 +111,6 @@ import {
   parseNativeChatRelayPing,
   type NativeChatRelayPing
 } from '../../shared/fork-native-chat-relay/native-chat-relay-protocol'
-import { isTerminalLeafId, makePaneKey } from '../../shared/stable-pane-id'
-import { isValidTerminalTabId } from '../../shared/terminal-tab-id'
 import {
   openSshPtyConsumerSession,
   type OpenSshPtyConsumerSessionOptions,

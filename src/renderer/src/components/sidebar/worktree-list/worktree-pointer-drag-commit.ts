@@ -60,6 +60,16 @@ export function commitWorktreePointerDrop(args: PointerDropCommitArgs): void {
     ctx.clearWorktreeDrag()
     return
   }
+  // Why: resolved from the release coordinates BEFORE the board target, which
+  // carries a within-tolerance sticky fallback fed by a requestAnimationFrame
+  // the release can outrun. Clearing that fallback on a membership hit only
+  // helps when the frame runs, which is the case that was never broken.
+  // A release inside the board is outside this container, so the hit-test
+  // returns none there and the board path below still wins on its own turf.
+  if (ctx.commitWorktreeGroupMembershipDrop(event, drag)) {
+    ctx.clearWorktreeDrag()
+    return
+  }
   const boardDropTarget = resolveWorkspaceKanbanCardDropCommitTarget({
     currentTarget: getWorkspaceKanbanSidebarDropTarget(event.clientX, event.clientY),
     latestTrackedTarget: drag.latestBoardDropTarget,

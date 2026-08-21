@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import type { GlobalSettings } from '../../../../../shared/types'
+import type { GlobalSettings } from '../../../../../shared/global-settings-types'
 
 const updateSettings = vi.fn()
 const storeState: { settings: Partial<GlobalSettings> | null } = { settings: {} }

@@ -1,4 +1,5 @@
 import type { ExecutionHostId } from './execution-host'
+import type { NativeChatWidthTier } from './fork-native-chat-width/native-chat-width-tier'
 import type { GitHubProjectSettings } from './github/project-types'
 import type { VoiceSettings } from './speech-types'
 import type { GitLabProjectSettings } from './gitlab-types'
@@ -205,6 +206,10 @@ export type GlobalSettings = {
   openAgentTabsInChatByDefault?: boolean
   /** Experimental native chat surface for Claude/Codex sessions; off by default. */
   experimentalNativeChat?: boolean
+  /** Experimental per-pane docked composer for agent terminals; off by default. */
+  experimentalTerminalDock?: boolean
+  /** Reading-column width for every native chat pane; optional for legacy settings. */
+  nativeChatWidth?: NativeChatWidthTier
   /** Last explicit native-chat model + option selections; live panes need an applied/dispatched record before showing a value. */
   nativeChatSessionOptions?: PersistedNativeChatSessionOptions
   /** Extra launcher rows for the worktree "Open in" submenu. VS Code is always shown first. */

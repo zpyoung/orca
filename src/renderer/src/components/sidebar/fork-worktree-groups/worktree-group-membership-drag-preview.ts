@@ -1,4 +1,5 @@
-import type { Repo, Worktree } from '../../../../../shared/types'
+import type { Repo } from '../../../../../shared/repo-types'
+import type { Worktree } from '../../../../../shared/worktree/types'
 import { getProjectHeaderRevealTarget, type ProjectGroupingModel } from '../worktree-list-groups'
 import { measureProjectHeaderDragRects } from '../project-header-drop'
 import { measureProjectGroupHeaderDragRects } from '../project-group-header-drop'

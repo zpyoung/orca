@@ -37,81 +37,16 @@ const {
 } = mocks
 
 describe('SSH IPC handlers', () => {
-  const relayBuildId = '0.1.0+ipc-test'
-  const ipcTestSource = {
-    relayPtyId: 'remote-pty',
-    spanId: 'ipc-test-delivery:0:5',
-    clientGeneration: 1,
-    ownerGeneration: 1,
-    deliveryToken: 'ipc-test-delivery',
-    sourceStartSu: 0,
-    sourceEndSu: 5
-  } as const
-  const handlers = new Map<string, (_event: unknown, args: unknown) => unknown>()
-  const mockStore = {
-    getRepos: () => [],
-    getSshPtyConsumerRecovery: vi.fn().mockReturnValue(null),
-    upsertSshPtyConsumerRecovery: vi.fn(),
-    removeSshPtyConsumerRecovery: vi.fn(),
-    getSshRemotePtyLeases: vi.fn().mockReturnValue([]),
-    markSshRemotePtyLease: vi.fn(),
-    markSshRemotePtyLeases: vi.fn(),
-    markSshRemotePtyLeasesAsync: vi.fn(),
-    markSshRemotePtyLeasesForShutdown: vi.fn(),
-    markSshRemotePtyLeasesAttachedAsync: vi.fn(),
-    removeSshRemotePtyLeases: vi.fn()
-  }
-  const mockWindow = {
-    isDestroyed: () => false,
-    webContents: { send: vi.fn() }
-  }
-  const createMockWindow = () => ({
-    isDestroyed: () => false,
-    webContents: { send: vi.fn() }
-  })
-  const createConnectionManagerMock = () => ({
-    connect: vi.fn(),
-    disconnect: vi.fn(),
-    disconnectConnection: vi.fn(),
-    reconnect: vi.fn(),
-    getConnection: vi.fn(),
-    getState: vi.fn(),
-    disconnectAll: vi.fn(),
-    setCallbacks: vi.fn(),
-    callbacksRef: { current: null as unknown }
-  })
-  const createPortForwardManagerMock = () => ({
-    addForward: vi.fn(),
-    updateForward: vi.fn(),
-    removeForward: vi.fn(),
-    listForwards: vi.fn().mockReturnValue([]),
-    removeAllForwards: vi.fn(),
-    dispose: vi.fn(),
-    setCallbacks: vi.fn(),
-    callbacksRef: { current: null as unknown }
-  })
-  type RelayDisposeCallback = (reason: 'shutdown' | 'connection_lost') => void
-  const relayReconnectDelaysMs = [500, 1000, 2000, 4000, 8000, 15_000] as const
-  const relayLostStabilizedMs = 5_000
-  const createRelayLaunchResult = () => ({
-    transport: { write: vi.fn(), onData: vi.fn(), onClose: vi.fn() },
-    platform: 'linux-x64',
-    serverBuildId: relayBuildId
-  })
-  const getLatestRelayDisposeCallback = (): RelayDisposeCallback => {
-    const calls = mockMux.onDispose.mock.calls
-    const callback = calls.at(-1)?.[0] as RelayDisposeCallback | undefined
-    expect(callback).toBeDefined()
-    return callback!
-  }
-  const useSlowRelayLaunchOnce = (delayMs: number): void => {
-    mockDeployAndLaunchRelay.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          setTimeout(() => resolve(createRelayLaunchResult()), delayMs)
-        })
-    )
-  }
+  const harness = createSshIpcHarness(mocks)
+  const {
+    relayBuildId,
+    handlers,
+    mockWindow,
+    relayReconnectDelaysMs,
+    relayLostStabilizedMs,
+    getLatestRelayDisposeCallback,
+    useSlowRelayLaunchOnce
+  } = harness
 
   beforeEach(harness.reset)
 

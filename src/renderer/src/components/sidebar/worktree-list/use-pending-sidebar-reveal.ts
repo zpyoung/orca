@@ -157,6 +157,7 @@ export function usePendingSidebarReveal(args: PendingSidebarRevealArgs): void {
     pinnedDisplayPolicy,
     args.projectGrouping,
     args.projectGroups,
+    args.visibleProjectGroupsForRows,
     pendingRevealRetryTick,
     flashRevealedRow,
     markRevealScroll,

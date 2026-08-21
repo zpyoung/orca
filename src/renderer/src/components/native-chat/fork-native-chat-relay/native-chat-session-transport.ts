@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-session-transport.ts
-// FORK-COPY-SHA: 2307f2ebbe1c1e737c0b12d920bb0a208332db2c
+// FORK-COPY-SHA: d802fdc7429f5f9d959b99a73656545bd760eace
 import type {
   NativeChatApi,
   NativeChatAppendedMessages,

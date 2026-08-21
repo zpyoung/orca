@@ -3,12 +3,17 @@
     {
       "name": "worktree-groups",
       "purpose": "Lets a worktree join a project group independently of its repo's own group membership, so cross-repo worktrees can share a sidebar section.",
-      "globs": ["**/fork-worktree-groups/**"]
+      "globs": [
+        "**/fork-worktree-groups/**"
+      ]
     },
     {
       "name": "native-chat-relay",
       "purpose": "Reads and live-tails native-chat transcripts for an agent running on a plain ssh: host over the SSH relay, since the desktop process cannot see that host's disk.",
-      "globs": ["**/fork-native-chat-relay/**", "docs/architecture/native-chat.md"]
+      "globs": [
+        "**/fork-native-chat-relay/**",
+        "docs/architecture/native-chat.md"
+      ]
     },
     {
       "name": "native-chat-coloring",
@@ -21,27 +26,37 @@
     {
       "name": "native-chat-width",
       "purpose": "Lets the user pick the reading-column width for every native-chat pane instead of a fixed max-width.",
-      "globs": ["**/fork-native-chat-width/**"]
+      "globs": [
+        "**/fork-native-chat-width/**"
+      ]
     },
     {
       "name": "terminal-dock",
       "purpose": "Docks a rich agent composer beneath a terminal pane running a supported coding-agent CLI, so a prompt can be composed and sent without typing into the TUI, with the terminal still visible as a fallback.",
-      "globs": ["**/fork-terminal-dock/**"]
+      "globs": [
+        "**/fork-terminal-dock/**"
+      ]
     },
     {
       "name": "agent-composer",
       "purpose": "A host-agnostic composer core extracted from the native-chat composer, so the same draft, history, attachment, and tiered-send behavior serves both the chat pane and the terminal dock.",
-      "globs": ["**/fork-agent-composer/**"]
+      "globs": [
+        "**/fork-agent-composer/**"
+      ]
     },
     {
       "name": "native-chat-session-options",
       "purpose": "Reads the model and effort an agent recorded for itself on its own transcript turns, so the composer's pills pre-fill from the session log instead of a screen scrape that scrolls away.",
-      "globs": ["**/fork-native-chat-session-options/**"]
+      "globs": [
+        "**/fork-native-chat-session-options/**"
+      ]
     },
     {
       "name": "skill-plugin-attribution",
       "purpose": "Attributes each discovered skill to the plugin that owns it, so the composer's skill picker can name the plugin and disambiguate a skill offered by more than one.",
-      "globs": ["**/fork-skill-plugin-attribution/**"]
+      "globs": [
+        "**/fork-skill-plugin-attribution/**"
+      ]
     }
   ],
   "seams": [
@@ -61,19 +76,25 @@
       "path": ".gitignore",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": ["!docs/fork-upstreaming.md"]
+      "lines": [
+        "!docs/fork-upstreaming.md"
+      ]
     },
     {
       "path": "config/localization-coverage-allowlist.json",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": ["    \"filePath\": \"src/renderer/src/components/sidebar/WorktreeCard.tsx\","]
+      "lines": [
+        "    \"filePath\": \"src/renderer/src/components/sidebar/WorktreeCard.tsx\","
+      ]
     },
     {
       "path": "src/main/telemetry/client.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": ["const TELEMETRY_ENABLED = false"]
+      "lines": [
+        "const TELEMETRY_ENABLED = false"
+      ]
     },
     {
       "path": "src/main/macos-tcc-prompt-watch.ts",
@@ -92,55 +113,73 @@
       "path": "src/main/macos-tcc-prompt-watch.test.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": ["    expect(event?.responsibleIdentifier).toBe('com.zpyoung.orca')"]
+      "lines": [
+        "    expect(event?.responsibleIdentifier).toBe('com.zpyoung.orca')"
+      ]
     },
     {
       "path": "src/main/ipc/notifications.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": ["const MACOS_PACKAGED_BUNDLE_ID = 'com.zpyoung.orca'"]
+      "lines": [
+        "const MACOS_PACKAGED_BUNDLE_ID = 'com.zpyoung.orca'"
+      ]
     },
     {
       "path": "config/scripts/build-notification-status-macos.mjs",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": ["const bundleId = readArg('--bundle-id') ?? 'com.zpyoung.orca'"]
+      "lines": [
+        "const bundleId = readArg('--bundle-id') ?? 'com.zpyoung.orca'"
+      ]
     },
     {
       "path": "config/scripts/mac-build-compatibility.test.mjs",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": ["      appId: 'com.zpyoung.orca',"]
+      "lines": [
+        "      appId: 'com.zpyoung.orca',"
+      ]
     },
     {
       "path": "src/main/local-builds/local-build-candidate.test.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": ["    appId: 'com.zpyoung.orca',"]
+      "lines": [
+        "    appId: 'com.zpyoung.orca',"
+      ]
     },
     {
       "path": "src/main/local-builds/local-build-compatibility-contract.test.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": ["      appId: 'com.zpyoung.orca',"]
+      "lines": [
+        "      appId: 'com.zpyoung.orca',"
+      ]
     },
     {
       "path": "src/shared/local-build-compatibility-contract.json",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": ["  \"appId\": \"com.zpyoung.orca\","]
+      "lines": [
+        "  \"appId\": \"com.zpyoung.orca\","
+      ]
     },
     {
       "path": "src/shared/local-build-compatibility-contract.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": ["  appId: 'com.zpyoung.orca',"]
+      "lines": [
+        "  appId: 'com.zpyoung.orca',"
+      ]
     },
     {
       "path": "src/shared/local-build-compatibility.test.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": ["    appId: 'com.zpyoung.orca',"]
+      "lines": [
+        "    appId: 'com.zpyoung.orca',"
+      ]
     },
     {
       "path": "src/shared/project-groups.ts",
@@ -149,15 +188,6 @@
       "lines": [
         "import { breakProjectGroupParentCycles } from './fork-worktree-groups/project-group-parent-cycles'",
         "  breakProjectGroupParentCycles(groups)"
-      ]
-    },
-    {
-      "path": "src/shared/types.ts",
-      "feature": "worktree-groups",
-      "kind": "passthrough",
-      "lines": [
-        "  /** Durable sidebar-only cross-repo group membership, independent of the",
-        "   *  worktree's repo's own `projectGroupId`. Execution remains repo-scoped. */"
       ]
     },
     {
@@ -171,25 +201,6 @@
         "    const looseWorktreeCount = looseWorktreesByProjectGroupId.get(groupId)?.length ?? 0",
         "          hostContextLabelByWorktreeId: getLooseWorktreeHostContextLabels(",
         "    getWorktreeGroupRevealSectionKey(divertedGroupId, groupKey)"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/sidebar/WorktreeList.tsx",
-      "feature": "worktree-groups",
-      "kind": "registration",
-      "lines": [
-        "} from './fork-worktree-groups/worktree-group-membership-drag-preview'",
-        "  const [worktreeGroupMembershipDragPreview, setWorktreeGroupMembershipDragPreview] =",
-        "    const membershipPreview = getPointerWorktreeGroupMembershipDragPreview({",
-        "      const membershipTarget = getPointerWorktreeGroupMembershipDragPreview({",
-        "        canWorktreeHoldGroupMembership({",
-        "        void updateWorktreeMeta(drag.worktreeId, { projectGroupId: membershipTarget.groupId })",
-        "        void updateWorktreeMeta(drag.worktreeId, { projectGroupId: null })",
-        "                    inProjectGroupLooseSection={inProjectGroupLooseSection}",
-        "    gap: 2,",
-        "                      'group relative flex h-6 w-full items-center gap-1.5 pr-2 text-left transition-all',",
-        "import { needsWorktreeDragGroup } from './fork-worktree-groups/worktree-drag-group-key'",
-        "    if (needsWorktreeDragGroup(current?.key ?? null, row.sectionKey)) {"
       ]
     },
     {
@@ -227,13 +238,17 @@
       "path": "src/main/ipc/worktree-metadata-merge.ts",
       "feature": "worktree-groups",
       "kind": "passthrough",
-      "lines": ["    projectGroupId: meta?.projectGroupId ?? null,"]
+      "lines": [
+        "    projectGroupId: meta?.projectGroupId ?? null,"
+      ]
     },
     {
       "path": "src/main/runtime/rpc/methods/worktree-schemas.ts",
       "feature": "worktree-groups",
       "kind": "passthrough",
-      "lines": ["  projectGroupId: z.union([z.string(), z.null()]).optional()"]
+      "lines": [
+        "  projectGroupId: z.union([z.string(), z.null()]).optional()"
+      ]
     },
     {
       "path": "src/main/runtime/rpc/methods/worktree.ts",
@@ -248,7 +263,9 @@
       "path": "src/main/ipc/worktree-logic.test.ts",
       "feature": "worktree-groups",
       "kind": "passthrough",
-      "lines": ["      projectGroupId: null,"]
+      "lines": [
+        "      projectGroupId: null,"
+      ]
     },
     {
       "path": "src/renderer/src/components/sidebar/empty-project-placeholder-repos.ts",
@@ -274,15 +291,6 @@
       "kind": "passthrough",
       "lines": [
         "    const createGroup = await screen.findByText('New group from worktree', {}, { timeout: 5_000 })"
-      ]
-    },
-    {
-      "path": "src/shared/types.ts",
-      "feature": "native-chat-width",
-      "kind": "passthrough",
-      "lines": [
-        "export type NativeChatWidthTier = 'narrow' | 'comfortable' | 'wide' | 'full'",
-        "  nativeChatWidth?: NativeChatWidthTier"
       ]
     },
     {
@@ -337,7 +345,9 @@
       "path": "src/renderer/src/components/terminal-pane/TerminalPaneHeaderOverlay.test.tsx",
       "feature": "native-chat-width",
       "kind": "passthrough",
-      "lines": ["vi.mock('../../store', () => ({"]
+      "lines": [
+        "vi.mock('../../store', () => ({"
+      ]
     },
     {
       "path": "src/renderer/src/components/settings/NativeChatExperimentalSetting.tsx",
@@ -413,7 +423,9 @@
       "path": "src/renderer/src/assets/main.css",
       "feature": "native-chat-coloring",
       "kind": "passthrough",
-      "lines": ["@import './fork-native-chat-coloring.css';"]
+      "lines": [
+        "@import './fork-native-chat-coloring.css';"
+      ]
     },
     {
       "path": "src/renderer/src/lib/terminal-title-contrast.ts",
@@ -468,7 +480,9 @@
       "path": "src/renderer/src/lib/connection-owner-resolution.ts",
       "feature": "native-chat-relay",
       "kind": "passthrough",
-      "lines": ["export type ConnectionOwnerState = Pick<"]
+      "lines": [
+        "export type ConnectionOwnerState = Pick<"
+      ]
     },
     {
       "path": "src/main/native-chat/transcript-watch-contract.ts",
@@ -502,19 +516,26 @@
       "path": "src/main/native-chat/transcript-incremental-reader.ts",
       "feature": "native-chat-relay",
       "kind": "passthrough",
-      "lines": ["const MAX_NATIVE_CHAT_TRANSCRIPT_RECORD_BYTES = 2 * 1024 * 1024"]
+      "lines": [
+        "const MAX_NATIVE_CHAT_TRANSCRIPT_RECORD_BYTES = 2 * 1024 * 1024"
+      ]
     },
     {
       "path": "src/preload/api-types.ts",
       "feature": "native-chat-relay",
       "kind": "passthrough",
-      "lines": ["export type NativeChatReadSessionArgs = {"]
+      "lines": [
+        "  NativeChatReadSessionArgs,"
+      ]
     },
     {
       "path": "src/preload/index.ts",
       "feature": "native-chat-relay",
       "kind": "passthrough",
-      "lines": ["const readNativeChatSession = (", "    readSession: readNativeChatSession,"]
+      "lines": [
+        "const readNativeChatSession = (",
+        "    readSession: readNativeChatSession,"
+      ]
     },
     {
       "path": "src/renderer/src/web/web-preload-api.ts",
@@ -548,13 +569,17 @@
       "path": "src/main/ipc/native-chat-subscribe-lifecycle.test.ts",
       "feature": "native-chat-relay",
       "kind": "passthrough",
-      "lines": ["        beforeOffset: 0,"]
+      "lines": [
+        "        beforeOffset: 0,"
+      ]
     },
     {
       "path": "config/scripts/pr-workflow-parallelism.test.mjs",
       "feature": "fork-infra",
       "kind": "registration",
-      "lines": ["      'fork_ownership_guard',"]
+      "lines": [
+        "      'fork_ownership_guard',"
+      ]
     },
     {
       "path": "CLAUDE.md",
@@ -569,7 +594,11 @@
       "path": "src/main/ipc/pty.ts",
       "feature": "terminal-dock",
       "kind": "registration",
-      "lines": ["        return tooLarge", "      return allSettled"]
+      "lines": [
+        "  const writePtyProviderInputAcknowledged = (",
+        "        return tooLarge ? false : writePtyProviderInputAcknowledgedChunks(settlementWrite, id, data)",
+        "      return allSettled"
+      ]
     },
     {
       "path": "src/main/native-chat/transcript-tail-reader.ts",
@@ -647,7 +676,9 @@
       "path": "src/main/skills/claude-plugin-skill-sources.test.ts",
       "feature": "skill-plugin-attribution",
       "kind": "passthrough",
-      "lines": ["        pluginName: 'compound-engineering',"]
+      "lines": [
+        "        pluginName: 'compound-engineering',"
+      ]
     },
     {
       "path": "src/main/skills/claude-plugin-skill-sources.ts",
@@ -689,19 +720,28 @@
       "path": "src/renderer/src/assets/terminal.css",
       "feature": "terminal-dock",
       "kind": "passthrough",
-      "lines": [".pane-dock-slot {", "  bottom: var(--terminal-dock-height, 0px);"]
+      "lines": [
+        ".pane-dock-slot {",
+        "  bottom: var(--terminal-dock-height, 0px);"
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/NativeChatAutocompleteMenus.test.tsx",
       "feature": "agent-composer",
       "kind": "passthrough",
-      "lines": ["                  pluginName: 'warp'", "              id: 'skill:render',"]
+      "lines": [
+        "                  pluginName: 'warp'",
+        "              id: 'skill:render',"
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/NativeChatAutocompleteMenus.tsx",
       "feature": "agent-composer",
       "kind": "registration",
-      "lines": ["    if (plugins.length > 1) {", "        { plugins: plugins.join(', ') }"]
+      "lines": [
+        "    if (plugins.length > 1) {",
+        "        { plugins: plugins.join(', ') }"
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/NativeChatComposer.test.tsx",
@@ -725,13 +765,19 @@
       "path": "src/renderer/src/components/native-chat/NativeChatInteractiveCard.test.tsx",
       "feature": "agent-composer",
       "kind": "passthrough",
-      "lines": ["    vi.useRealTimers()", "    vi.useFakeTimers()"]
+      "lines": [
+        "    vi.useRealTimers()",
+        "    vi.useFakeTimers()"
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/NativeChatInteractiveCard.tsx",
       "feature": "agent-composer",
       "kind": "registration",
-      "lines": ["          resetSubmitting()", "  if (!showingCard) {"]
+      "lines": [
+        "          resetSubmitting()",
+        "  if (!showingCard) {"
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/NativeChatView.test.tsx",
@@ -746,19 +792,28 @@
       "path": "src/renderer/src/components/native-chat/native-chat-composer-state.test.ts",
       "feature": "agent-composer",
       "kind": "passthrough",
-      "lines": ["          pluginName: 'quirk',", "          pluginName: 'two words',"]
+      "lines": [
+        "          pluginName: 'quirk',",
+        "          pluginName: 'two words',"
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/native-chat-composer-state.ts",
       "feature": "agent-composer",
       "kind": "registration",
-      "lines": ["      discovery.skills,", "  if (!leadsDraft && !hasSlashSkills) {"]
+      "lines": [
+        "      discovery.skills,",
+        "  if (!leadsDraft && !hasSlashSkills) {"
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/native-chat-composer-types.ts",
       "feature": "agent-composer",
       "kind": "registration",
-      "lines": ["} from './fork-agent-composer/agent-composer-types'", "import type {"]
+      "lines": [
+        "} from './fork-agent-composer/agent-composer-types'",
+        "import type {"
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/native-chat-pending.ts",
@@ -772,19 +827,28 @@
       "path": "src/renderer/src/components/native-chat/native-chat-picker-items.ts",
       "feature": "skill-plugin-attribution",
       "kind": "registration",
-      "lines": ["      pluginName?: string", "        id: `skill:${token}`,"]
+      "lines": [
+        "      pluginName?: string",
+        "        id: `skill:${token}`,"
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/native-chat-pty-session-options.ts",
       "feature": "native-chat-session-options",
       "kind": "registration",
-      "lines": ["  ): boolean =>", "  const applyReport = ("]
+      "lines": [
+        "  ): boolean =>",
+        "  const applyReport = ("
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/native-chat-runtime-send-launch-draft.test.ts",
       "feature": "agent-composer",
       "kind": "passthrough",
-      "lines": ["const writes = (): string[] => {", "    await vi.advanceTimersByTimeAsync(0)"]
+      "lines": [
+        "const writes = (): string[] => {",
+        "    await vi.advanceTimersByTimeAsync(0)"
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/native-chat-runtime-send.test.ts",
@@ -835,7 +899,10 @@
       "path": "src/renderer/src/components/native-chat/use-native-chat-interactive-send.test.tsx",
       "feature": "agent-composer",
       "kind": "passthrough",
-      "lines": ["    onOutcome('observed-cleared')", "    onOutcome('may-not-have-sent')"]
+      "lines": [
+        "    onOutcome('observed-cleared')",
+        "    onOutcome('may-not-have-sent')"
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/use-native-chat-interactive-send.ts",
@@ -868,13 +935,18 @@
       "path": "src/renderer/src/components/native-chat/use-native-chat-picker-state.ts",
       "feature": "agent-composer",
       "kind": "registration",
-      "lines": ["        ? /(?:^|\\s)\\/\\S*$/.test(beforeCaret)"]
+      "lines": [
+        "        ? /(?:^|\\s)\\/\\S*$/.test(beforeCaret)"
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/use-native-chat-send-lifecycle.test.tsx",
       "feature": "agent-composer",
       "kind": "passthrough",
-      "lines": ["    rerender({})", "      { initialProps: {} }"]
+      "lines": [
+        "    rerender({})",
+        "      { initialProps: {} }"
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/use-native-chat-send-lifecycle.ts",
@@ -906,13 +978,18 @@
       "path": "src/renderer/src/components/native-chat/use-native-chat-typed-insertion.ts",
       "feature": "agent-composer",
       "kind": "registration",
-      "lines": ["import type { HistoryState } from './fork-agent-composer/agent-composer-history'"]
+      "lines": [
+        "import type { HistoryState } from './fork-agent-composer/agent-composer-history'"
+      ]
     },
     {
       "path": "src/renderer/src/components/settings/ExperimentalPane.test.tsx",
       "feature": "terminal-dock",
       "kind": "passthrough",
-      "lines": ["      'Terminal dock'", "    expect(markup).toContain('Terminal dock')"]
+      "lines": [
+        "      'Terminal dock'",
+        "    expect(markup).toContain('Terminal dock')"
+      ]
     },
     {
       "path": "src/renderer/src/components/settings/ExperimentalPane.tsx",
@@ -936,13 +1013,19 @@
       "path": "src/renderer/src/components/terminal-pane/TerminalContextMenu.test.tsx",
       "feature": "terminal-dock",
       "kind": "passthrough",
-      "lines": ["      onToggleTerminalDock", "    isTerminalDockDocked: false,"]
+      "lines": [
+        "      onToggleTerminalDock",
+        "    isTerminalDockDocked: false,"
+      ]
     },
     {
       "path": "src/renderer/src/components/terminal-pane/TerminalContextMenu.tsx",
       "feature": "terminal-dock",
       "kind": "registration",
-      "lines": ["  onToggleTerminalDock,", "  isTerminalDockDocked,"]
+      "lines": [
+        "  onToggleTerminalDock,",
+        "  isTerminalDockDocked,"
+      ]
     },
     {
       "path": "src/renderer/src/components/terminal-pane/pane-helpers.test.ts",
@@ -966,7 +1049,10 @@
       "path": "src/renderer/src/components/terminal-pane/terminal-input-quarantine.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
-      "lines": ["  cb: QuarantineListener", "  quarantineListeners.clear()"]
+      "lines": [
+        "  cb: QuarantineListener",
+        "  quarantineListeners.clear()"
+      ]
     },
     {
       "path": "src/renderer/src/components/terminal-pane/terminal-visibility-resume.test.ts",
@@ -987,16 +1073,13 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects.test.ts",
-      "feature": "terminal-dock",
-      "kind": "passthrough",
-      "lines": ["    paneDockOwnsFocus,", "        paneDockOwnsFocus,"]
-    },
-    {
       "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects.ts",
       "feature": "terminal-dock",
       "kind": "registration",
-      "lines": ["import type { PaneFocusOwnership } from './pane-helpers'", "  paneDockOwnsFocus,"]
+      "lines": [
+        "import type { PaneFocusOwnership } from './pane-helpers'",
+        "  paneDockOwnsFocus = () => false,"
+      ]
     },
     {
       "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-lifecycle.ts",
@@ -1029,7 +1112,9 @@
       "path": "src/renderer/src/lib/pane-manager/pane-container-listener-lifecycle.test.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
-      "lines": ["    dockContainer: {} as never,"]
+      "lines": [
+        "    dockContainer: {} as never,"
+      ]
     },
     {
       "path": "src/renderer/src/lib/pane-manager/pane-dom-creation.test.ts",
@@ -1044,37 +1129,51 @@
       "path": "src/renderer/src/lib/pane-manager/pane-dom-creation.ts",
       "feature": "terminal-dock",
       "kind": "registration",
-      "lines": ["    dockContainer,", "  container.appendChild(dockContainer)"]
+      "lines": [
+        "    dockContainer,",
+        "  container.appendChild(dockContainer)"
+      ]
     },
     {
       "path": "src/renderer/src/lib/pane-manager/pane-drag-reorder.test.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
-      "lines": ["    dockContainer: {} as never,"]
+      "lines": [
+        "    dockContainer: {} as never,"
+      ]
     },
     {
       "path": "src/renderer/src/lib/pane-manager/pane-drop-no-op.test.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
-      "lines": ["    dockContainer: {} as never,"]
+      "lines": [
+        "    dockContainer: {} as never,"
+      ]
     },
     {
       "path": "src/renderer/src/lib/pane-manager/pane-fit-resize-observer.test.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
-      "lines": ["    dockContainer: {} as never,"]
+      "lines": [
+        "    dockContainer: {} as never,"
+      ]
     },
     {
       "path": "src/renderer/src/lib/pane-manager/pane-initial-fit-lifecycle.test.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
-      "lines": ["    dockContainer: {} as never,"]
+      "lines": [
+        "    dockContainer: {} as never,"
+      ]
     },
     {
       "path": "src/renderer/src/lib/pane-manager/pane-lifecycle.test.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
-      "lines": ["    dockContainer: {} as never,", "      dockContainer: fakeDockContainer,"]
+      "lines": [
+        "    dockContainer: {} as never,",
+        "      dockContainer: fakeDockContainer,"
+      ]
     },
     {
       "path": "src/renderer/src/lib/pane-manager/pane-manager-types.ts",
@@ -1089,55 +1188,73 @@
       "path": "src/renderer/src/lib/pane-manager/pane-reveal-repaint.test.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
-      "lines": ["    dockContainer: {} as never,"]
+      "lines": [
+        "    dockContainer: {} as never,"
+      ]
     },
     {
       "path": "src/renderer/src/lib/pane-manager/pane-split-close.test.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
-      "lines": ["    dockContainer: {} as never,"]
+      "lines": [
+        "    dockContainer: {} as never,"
+      ]
     },
     {
       "path": "src/renderer/src/lib/pane-manager/pane-split-scroll.test.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
-      "lines": ["    dockContainer: {} as never,"]
+      "lines": [
+        "    dockContainer: {} as never,"
+      ]
     },
     {
       "path": "src/renderer/src/lib/pane-manager/pane-terminal-gpu-acceleration.test.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
-      "lines": ["    dockContainer: {} as never,"]
+      "lines": [
+        "    dockContainer: {} as never,"
+      ]
     },
     {
       "path": "src/renderer/src/lib/pane-manager/pane-tree-ops.test.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
-      "lines": ["    dockContainer: {} as never,"]
+      "lines": [
+        "    dockContainer: {} as never,"
+      ]
     },
     {
       "path": "src/renderer/src/lib/pane-manager/pane-tree-reparent-frame.test.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
-      "lines": ["    dockContainer: createMockElement(),"]
+      "lines": [
+        "    dockContainer: createMockElement(),"
+      ]
     },
     {
       "path": "src/renderer/src/lib/pane-manager/pane-webgl-context-recovery.test.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
-      "lines": ["    dockContainer: {} as never,"]
+      "lines": [
+        "    dockContainer: {} as never,"
+      ]
     },
     {
       "path": "src/renderer/src/lib/pane-manager/pane-webgl-refresh-lifecycle.test.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
-      "lines": ["    dockContainer: {} as never,"]
+      "lines": [
+        "    dockContainer: {} as never,"
+      ]
     },
     {
       "path": "src/renderer/src/lib/pane-manager/pane-webgl-renderer.test.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
-      "lines": ["    dockContainer: {} as never,"]
+      "lines": [
+        "    dockContainer: {} as never,"
+      ]
     },
     {
       "path": "src/renderer/src/lib/pane-manager/windows-pty-compatibility.test.ts",
@@ -1170,13 +1287,10 @@
       "path": "src/renderer/src/runtime/runtime-terminal-inspection.ts",
       "feature": "terminal-dock",
       "kind": "registration",
-      "lines": ["} from './runtime-rpc-client'", "  data: string,"]
-    },
-    {
-      "path": "src/renderer/src/runtime/sync-runtime-graph.test.ts",
-      "feature": "terminal-dock",
-      "kind": "passthrough",
-      "lines": ["      'terminalDockByPaneKey'", "      terminalDockByPaneKey: dockRecord"]
+      "lines": [
+        "} from './runtime-rpc-client'",
+        "  data: string,"
+      ]
     },
     {
       "path": "src/renderer/src/runtime/sync-runtime-graph.ts",
@@ -1215,50 +1329,56 @@
       ]
     },
     {
-      "path": "src/shared/keybindings.test.ts",
-      "feature": "terminal-dock",
-      "kind": "passthrough",
-      "lines": [
-        "    ['terminal.dock.toggle', 'Mod+Shift+K'],",
-        "    ['terminal.dock.passthrough', 'Mod+Shift+P']"
-      ]
-    },
-    {
       "path": "src/shared/keybindings.ts",
       "feature": "terminal-dock",
       "kind": "registration",
-      "lines": ["  | 'terminal.dock.toggle'", "    id: 'terminal.dock.toggle',"]
+      "lines": [
+        "  | 'terminal.dock.toggle'",
+        "    id: 'terminal.dock.toggle',"
+      ]
     },
     {
       "path": "src/shared/native-chat-agent-profiles.ts",
       "feature": "native-chat-session-options",
       "kind": "registration",
-      "lines": ["    skillSourceOwner: 'grok',", "    skillSourceOwner: 'codex',"]
+      "lines": [
+        "    skillSourceOwner: 'grok',",
+        "    skillSourceOwner: 'codex',"
+      ]
     },
     {
       "path": "src/shared/native-chat-session-option-state.test.ts",
       "feature": "native-chat-session-options",
       "kind": "passthrough",
-      "lines": ["      value: 'max',", "      source: 'dispatched',"]
+      "lines": [
+        "      value: 'max',",
+        "      source: 'dispatched',"
+      ]
     },
     {
       "path": "src/shared/native-chat-session-option-state.ts",
       "feature": "native-chat-session-options",
       "kind": "registration",
-      "lines": ["    [optionId]: tracked", "    record.model = tracked"]
+      "lines": [
+        "    [optionId]: tracked",
+        "    record.model = tracked"
+      ]
     },
     {
       "path": "src/shared/native-chat-types.ts",
       "feature": "native-chat-session-options",
       "kind": "registration",
-      "lines": ["  model?: string", "  effort?: string"]
+      "lines": [
+        "  model?: string",
+        "  effort?: string"
+      ]
     },
     {
       "path": "src/shared/runtime-types.ts",
       "feature": "skill-plugin-attribution",
       "kind": "registration",
       "lines": [
-        "  TerminalDockPaneState,",
+        "import type { TerminalDockPaneState } from './fork-terminal-dock/terminal-dock-pane-state'",
         "  terminalDockByPaneKey?: Record<string, TerminalDockPaneState>"
       ]
     },
@@ -1275,7 +1395,10 @@
       "path": "src/shared/telemetry-events.ts",
       "feature": "terminal-dock",
       "kind": "registration",
-      "lines": ["  'experimentalTerminalDock',", "const terminalDockToggledSchema = z"]
+      "lines": [
+        "  'experimentalTerminalDock',",
+        "const terminalDockToggledSchema = z"
+      ]
     },
     {
       "path": "src/shared/workspace-session-schema.test.ts",
@@ -1294,12 +1417,228 @@
         "import { terminalDockByPaneKeySchema } from './fork-terminal-dock/workspace-session-terminal-dock-schema'",
         "import { persistedOpenFileSchema } from './workspace-session-editor-schema'"
       ]
+    },
+    {
+      "path": "src/shared/worktree/types.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": [
+        "  projectGroupId?: string | null"
+      ]
+    },
+    {
+      "path": "src/shared/worktree/meta-types.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": [
+        "  projectGroupId?: string | null"
+      ]
+    },
+    {
+      "path": "src/shared/tab-types.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "import type { TerminalDockPaneState } from './fork-terminal-dock/terminal-dock-pane-state'",
+        "  terminalDockByPaneKey?: Record<string, TerminalDockPaneState>"
+      ]
+    },
+    {
+      "path": "src/shared/global-settings-types.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "import type { NativeChatWidthTier } from './fork-native-chat-width/native-chat-width-tier'",
+        "  experimentalTerminalDock?: boolean",
+        "  nativeChatWidth?: NativeChatWidthTier"
+      ]
+    },
+    {
+      "path": "src/preload/api/native-chat-api.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": [
+        "import type { NativeChatCompanionFrameFields } from '../../shared/fork-native-chat-session-options/native-chat-transcript-companion'",
+        "export type NativeChatReadSessionArgs = {"
+      ]
+    },
+    {
+      "path": "src/preload/api/pty-api.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "  writeInputAccepted: (id: string, data: string) => Promise<boolean>"
+      ]
+    },
+    {
+      "path": "src/preload/api/ui-command-event-api.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "import type { TerminalDockPaneState } from '../../shared/fork-terminal-dock/terminal-dock-pane-state'",
+        "      terminalDockByPaneKey?: Record<string, TerminalDockPaneState>"
+      ]
+    },
+    {
+      "path": ".oxlintrc.json",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "        \"max-lines\": [\"error\", { \"max\": 500, \"skipBlankLines\": true, \"skipComments\": true }]",
+        "        \"max-lines\": [\"error\", { \"max\": 1000, \"skipBlankLines\": true, \"skipComments\": true }]"
+      ]
+    },
+    {
+      "path": "config/scripts/check-max-lines-ratchet.mjs",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "    return 1000",
+        "  return 500"
+      ]
+    },
+    {
+      "path": "config/scripts/check-max-lines-ratchet.test.mjs",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "  it('uses 1000 for tests, 600 for tsx, 800 for mjs, 500 otherwise', () => {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/WorktreeList.tsx",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": [
+        "        visibleProjectGroupsForRows={visibleScope.visibleProjectGroupsForRows}"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/worktree-drag-groups.ts",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "import { needsWorktreeDragGroup } from '../fork-worktree-groups/worktree-drag-group-key'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/use-effective-collapsed-groups.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": [
+        "  visibleProjectGroupsForRows: readonly ProjectGroup[]"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/virtualized-worktree-viewport-props.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": [
+        "  visibleProjectGroupsForRows: readonly ProjectGroup[]"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/pending-sidebar-reveal-inputs.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": [
+        "  visibleProjectGroupsForRows: readonly ProjectGroup[]"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/use-pending-sidebar-reveal.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": [
+        "    args.visibleProjectGroupsForRows,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/use-sidebar-section-rows.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": [
+        "        projectGroups: args.visibleProjectGroupsForRows"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/use-worktree-drag-runtime.ts",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "    onWorktreePointerDragCleanup?.()"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/worktree-drop-commit-context.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": [
+        "  trackWorktreeGroupMembershipDragFrame: (drag: WorktreePointerDrag) => boolean"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/worktree-pointer-drag-flush.ts",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "  if (ctx.trackWorktreeGroupMembershipDragFrame(drag)) {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/worktree-pointer-drag-commit.ts",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "  if (ctx.commitWorktreeGroupMembershipDrop(event, drag)) {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/use-worktree-pointer-drag.ts",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "        !canStartWorktreeDragForGroupMembership(container, worktreeId) &&"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/VirtualizedWorktreeViewport.tsx",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "  const groupMembershipDrag = useWorktreeGroupMembershipDrag({ scrollRef, viewport: props })"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/worktree-virtual-row-context.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": [
+        "  worktreeGroupMembershipDragPreview: WorktreeGroupMembershipDragPreview"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/worktree-section-header-row.tsx",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": [
+        "  worktreeGroupMembershipDragPreview: WorktreeGroupMembershipDragPreview",
+        "          'group relative flex h-6 w-full items-center gap-1.5 pr-2 text-left transition-all',"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/worktree-list-item-row.tsx",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": [
+        "    getLooseSectionProjectGroupId(itemRow.sectionKey) ?? itemRow.repo?.projectGroupId"
+      ]
     }
   ],
   "exceptions": [
     {
       "path": "package.json",
-      "reason": "Fork identity, versioning, and script wiring — replaces the old FORK_OWNED_ALWAYS authorship carve-out.",
+      "reason": "Fork identity, versioning, and script wiring \u2014 replaces the old FORK_OWNED_ALWAYS authorship carve-out.",
       "status": "permanent"
     },
     {
@@ -1456,7 +1795,7 @@
     },
     {
       "path": "config/scripts/fork-ownership-manifest.mjs",
-      "reason": "The manifest loader/matcher itself — fork machinery, not upstream code.",
+      "reason": "The manifest loader/matcher itself \u2014 fork machinery, not upstream code.",
       "status": "permanent"
     },
     {
@@ -1466,7 +1805,7 @@
     },
     {
       "path": ".github/scripts/check-fork-ownership.mjs",
-      "reason": "The CI guard that enforces this manifest on pull requests — fork machinery, not upstream code.",
+      "reason": "The CI guard that enforces this manifest on pull requests \u2014 fork machinery, not upstream code.",
       "status": "permanent"
     },
     {
@@ -1744,6 +2083,10 @@
       "added": 14,
       "removed": 2
     },
+    ".oxlintrc.json": {
+      "added": 4,
+      "removed": 4
+    },
     "AGENTS.md": {
       "added": 89,
       "removed": 0
@@ -1759,6 +2102,14 @@
     "config/scripts/build-notification-status-macos.mjs": {
       "added": 1,
       "removed": 1
+    },
+    "config/scripts/check-max-lines-ratchet.mjs": {
+      "added": 4,
+      "removed": 4
+    },
+    "config/scripts/check-max-lines-ratchet.test.mjs": {
+      "added": 6,
+      "removed": 6
     },
     "config/scripts/mac-build-compatibility.test.mjs": {
       "added": 1,
@@ -1781,7 +2132,7 @@
       "removed": 1
     },
     "src/main/ipc/pty.ts": {
-      "added": 98,
+      "added": 96,
       "removed": 1
     },
     "src/main/ipc/ssh.ts": {
@@ -1901,8 +2252,20 @@
       "removed": 1
     },
     "src/preload/api-types.ts": {
-      "added": 53,
+      "added": 1,
+      "removed": 0
+    },
+    "src/preload/api/native-chat-api.ts": {
+      "added": 50,
       "removed": 27
+    },
+    "src/preload/api/pty-api.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/preload/api/ui-command-event-api.ts": {
+      "added": 2,
+      "removed": 0
     },
     "src/preload/index.ts": {
       "added": 18,
@@ -2089,8 +2452,8 @@
       "removed": 48
     },
     "src/renderer/src/components/sidebar/WorktreeList.tsx": {
-      "added": 184,
-      "removed": 26
+      "added": 10,
+      "removed": 9
     },
     "src/renderer/src/components/sidebar/comment-markdown-element-renderers.tsx": {
       "added": 6,
@@ -2098,7 +2461,7 @@
     },
     "src/renderer/src/components/sidebar/empty-project-placeholder-repos.ts": {
       "added": 8,
-      "removed": 2
+      "removed": 1
     },
     "src/renderer/src/components/sidebar/worktree-drag-units.ts": {
       "added": 8,
@@ -2107,6 +2470,66 @@
     "src/renderer/src/components/sidebar/worktree-list-groups.ts": {
       "added": 66,
       "removed": 4
+    },
+    "src/renderer/src/components/sidebar/worktree-list/VirtualizedWorktreeViewport.tsx": {
+      "added": 11,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/pending-sidebar-reveal-inputs.ts": {
+      "added": 5,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/use-effective-collapsed-groups.ts": {
+      "added": 6,
+      "removed": 4
+    },
+    "src/renderer/src/components/sidebar/worktree-list/use-pending-sidebar-reveal.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/components/sidebar/worktree-list/use-sidebar-section-rows.ts": {
+      "added": 13,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/worktree-list/use-worktree-drag-runtime.ts": {
+      "added": 13,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/worktree-list/use-worktree-pointer-drag.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/renderer/src/components/sidebar/worktree-list/virtualized-worktree-viewport-props.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/renderer/src/components/sidebar/worktree-list/worktree-drag-groups.ts": {
+      "added": 7,
+      "removed": 4
+    },
+    "src/renderer/src/components/sidebar/worktree-list/worktree-drop-commit-context.ts": {
+      "added": 6,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/worktree-list-item-row.tsx": {
+      "added": 11,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/worktree-list/worktree-pointer-drag-commit.ts": {
+      "added": 10,
+      "removed": 0
+    },
+    "src/renderer/src/components/sidebar/worktree-list/worktree-pointer-drag-flush.ts": {
+      "added": 14,
+      "removed": 0
+    },
+    "src/renderer/src/components/sidebar/worktree-list/worktree-section-header-row.tsx": {
+      "added": 11,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/worktree-virtual-row-context.ts": {
+      "added": 3,
+      "removed": 0
     },
     "src/renderer/src/components/terminal-pane/TerminalContextMenu.test.tsx": {
       "added": 42,
@@ -2144,13 +2567,9 @@
       "added": 16,
       "removed": 8
     },
-    "src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects.test.ts": {
-      "added": 46,
-      "removed": 4
-    },
     "src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects.ts": {
-      "added": 7,
-      "removed": 2
+      "added": 8,
+      "removed": 1
     },
     "src/renderer/src/components/terminal-pane/use-terminal-pane-lifecycle.ts": {
       "added": 81,
@@ -2264,10 +2683,6 @@
       "added": 74,
       "removed": 11
     },
-    "src/renderer/src/runtime/sync-runtime-graph.test.ts": {
-      "added": 64,
-      "removed": 0
-    },
     "src/renderer/src/runtime/sync-runtime-graph.ts": {
       "added": 19,
       "removed": 2
@@ -2292,8 +2707,8 @@
       "added": 3,
       "removed": 0
     },
-    "src/shared/keybindings.test.ts": {
-      "added": 67,
+    "src/shared/global-settings-types.ts": {
+      "added": 5,
       "removed": 0
     },
     "src/shared/keybindings.ts": {
@@ -2329,8 +2744,8 @@
       "removed": 0
     },
     "src/shared/project-groups.ts": {
-      "added": 2,
-      "removed": 0
+      "added": 3,
+      "removed": 1
     },
     "src/shared/runtime-types.ts": {
       "added": 4,
@@ -2340,11 +2755,11 @@
       "added": 5,
       "removed": 0
     },
-    "src/shared/telemetry-events.ts": {
-      "added": 21,
+    "src/shared/tab-types.ts": {
+      "added": 4,
       "removed": 0
     },
-    "src/shared/types.ts": {
+    "src/shared/telemetry-events.ts": {
       "added": 21,
       "removed": 0
     },
@@ -2355,6 +2770,14 @@
     "src/shared/workspace-session-schema.ts": {
       "added": 4,
       "removed": 17
+    },
+    "src/shared/worktree/meta-types.ts": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/shared/worktree/types.ts": {
+      "added": 3,
+      "removed": 0
     }
   }
 }

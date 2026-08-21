@@ -24,7 +24,9 @@ export function useEffectiveCollapsedGroups(args: {
   prCache: AppState['prCache'] | null
   workspaceStatuses: readonly WorkspaceStatusDefinition[]
   settings: AppState['settings']
-  projectGroups: readonly ProjectGroup[]
+  // Why: must be the host-filtered set buildRows uses, or the agent send picker
+  // force-opens a group key the rendered tree never built.
+  visibleProjectGroupsForRows: readonly ProjectGroup[]
   projectGrouping: ProjectGroupingModel
 }): Set<string> {
   const {
@@ -37,7 +39,7 @@ export function useEffectiveCollapsedGroups(args: {
     prCache,
     workspaceStatuses,
     settings,
-    projectGroups,
+    visibleProjectGroupsForRows,
     projectGrouping
   } = args
   return useMemo(() => {
@@ -59,7 +61,7 @@ export function useEffectiveCollapsedGroups(args: {
         prCache,
         workspaceStatuses,
         settings,
-        projectGroups,
+        visibleProjectGroupsForRows,
         projectGrouping
       )) {
         next.delete(groupKey)
@@ -79,10 +81,10 @@ export function useEffectiveCollapsedGroups(args: {
     collapsedGroups,
     groupBy,
     prCache,
-    projectGroups,
     projectGrouping,
     repoMap,
     settings,
+    visibleProjectGroupsForRows,
     workspaceStatuses,
     worktreeLineageById,
     worktreeMap

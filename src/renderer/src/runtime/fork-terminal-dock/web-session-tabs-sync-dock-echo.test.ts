@@ -4,7 +4,9 @@ import type { RuntimeMobileSessionTabsResult } from '../../../../shared/runtime-
 import { makePaneKey } from '../../../../shared/stable-pane-id'
 import { toWebTerminalSurfaceTabId } from '../../../../shared/terminal-surface-id'
 
-import type { GlobalSettings, Tab, TerminalTab } from '../../../../shared/types'
+import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import type { Tab } from '../../../../shared/tab-types'
+import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 
 import { applyWebSessionTabsSnapshot, type WebSessionTabsSyncState } from '../web-session-tabs-sync'
 

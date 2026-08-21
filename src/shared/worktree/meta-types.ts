@@ -52,6 +52,9 @@ export type WorktreeMeta = {
   sortOrder: number
   /** User-authored sidebar ordering. Higher values render earlier in Manual sort. */
   manualOrder?: number
+  /** Durable sidebar-only cross-repo group membership, independent of the
+   *  worktree's repo's own `projectGroupId`. Execution remains repo-scoped. */
+  projectGroupId?: string | null
   lastActivityAt: number
   /** See {@link Worktree.createdAt}. Persisted to orca-data.json. */
   createdAt?: number

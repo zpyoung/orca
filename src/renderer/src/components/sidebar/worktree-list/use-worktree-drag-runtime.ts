@@ -22,8 +22,14 @@ export function useWorktreeDragRuntime(args: {
   worktreeDragSessionRef: React.MutableRefObject<WorktreeSidebarDragSession | null>
   statusDropAnchorsRef: React.MutableRefObject<Map<string, WorktreeSidebarDropAnchor>>
   onWorkspaceBoardDragPreviewCancel: () => void
+  onWorktreePointerDragCleanup?: () => void
 }) {
-  const { worktreeDragSessionRef, statusDropAnchorsRef, onWorkspaceBoardDragPreviewCancel } = args
+  const {
+    worktreeDragSessionRef,
+    statusDropAnchorsRef,
+    onWorkspaceBoardDragPreviewCancel,
+    onWorktreePointerDragCleanup
+  } = args
   const [dragOverStatus, setDragOverStatus] = useState<WorkspaceStatus | null>(null)
   const [pinDragOver, setPinDragOver] = useState(false)
   const [nativeLineageDropTargetId, setNativeLineageDropTargetId] = useState<string | null>(null)
@@ -70,9 +76,14 @@ export function useWorktreeDragRuntime(args: {
     setSidebarPointerDragDocumentStyles(false)
     setDragOverStatus(null)
     setPinDragOver(false)
+    onWorktreePointerDragCleanup?.()
     clearWorkspaceKanbanSidebarDropTargetVisual()
     onWorkspaceBoardDragPreviewCancel()
-  }, [cancelWorktreePointerAutoscroll, onWorkspaceBoardDragPreviewCancel])
+  }, [
+    cancelWorktreePointerAutoscroll,
+    onWorkspaceBoardDragPreviewCancel,
+    onWorktreePointerDragCleanup
+  ])
 
   const clearWorktreeDrag = useCallback(() => {
     cleanupWorktreePointerDrag()

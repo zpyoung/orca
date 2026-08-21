@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand'
 import type { AppState } from '../../types'
-import type { TerminalDockPaneState } from '../../../../../shared/types'
+import type { TerminalDockPaneState } from '../../../../../shared/fork-terminal-dock/terminal-dock-pane-state'
 import {
   removeTerminalDockPaneKeys as removeLocalTerminalDockPaneKeys,
   writeTerminalDockPaneState

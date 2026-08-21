@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react'
-import type { TerminalDockPaneState } from '../../../../../shared/types'
+import type { TerminalDockPaneState } from '../../../../../shared/fork-terminal-dock/terminal-dock-pane-state'
 import { resolveTerminalDockPaneState } from './resolve-terminal-dock-pane-state'
 import {
   hasTerminalDockPaneState,

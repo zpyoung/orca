@@ -473,9 +473,11 @@ describe('SSH readoption catalog identity', () => {
     expect(oldSetup).toBeDefined()
     expect(newSetup).toBeDefined()
 
-    store.getState().recordSshRepoReadoptions([
-      { oldTargetId: 'ssh-old', newTargetId: 'ssh-new', repoIds: [repo.id] }
-    ])
+    store
+      .getState()
+      .recordSshRepoReadoptions([
+        { oldTargetId: 'ssh-old', newTargetId: 'ssh-new', repoIds: [repo.id] }
+      ])
 
     const next = store.getState().projectHostSetups
     expect(next).not.toBe(setups)
@@ -487,4 +489,3 @@ describe('SSH readoption catalog identity', () => {
     expect(store.getState().pendingSshRepoReadoptions).toEqual([])
   })
 })
-

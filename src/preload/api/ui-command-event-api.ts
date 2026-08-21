@@ -1,4 +1,5 @@
 import type { PersistedUIState } from '../../shared/persisted-ui-state-types'
+import type { TerminalDockPaneState } from '../../shared/fork-terminal-dock/terminal-dock-pane-state'
 import type { TuiAgent } from '../../shared/tui-agent'
 import type {
   WorktreeDefaultTabsLaunch,
@@ -130,6 +131,7 @@ export type UiCommandEventApi = {
       launchToken?: string
       launchAgent?: TuiAgent
       viewMode?: 'terminal' | 'chat'
+      terminalDockByPaneKey?: Record<string, TerminalDockPaneState>
       title?: string
       ptyId?: string
       activate?: boolean

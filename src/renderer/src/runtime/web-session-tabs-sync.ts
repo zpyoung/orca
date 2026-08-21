@@ -22,14 +22,11 @@ import type {
 import type {
   BrowserCertificateFailure,
   BrowserPage,
-  BrowserWorkspace,
-  Tab,
-  TabGroup,
-  TabGroupLayoutNode,
-  TerminalDockPaneState,
-  TerminalLayoutSnapshot,
-  TerminalTab
-} from '../../../shared/types'
+  BrowserWorkspace
+} from '../../../shared/browser-workspace-types'
+import type { TerminalDockPaneState } from '../../../shared/fork-terminal-dock/terminal-dock-pane-state'
+import type { Tab, TabGroup, TabGroupLayoutNode } from '../../../shared/tab-types'
+import type { TerminalLayoutSnapshot, TerminalTab } from '../../../shared/terminal-tab-types'
 import type { OpenFile } from '../store/slices/editor'
 import {
   pendingMutationsForTabId,
