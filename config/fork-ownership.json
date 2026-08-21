@@ -2111,8 +2111,8 @@
       "removed": 4
     },
     "config/scripts/check-max-lines-ratchet.test.mjs": {
-      "added": 6,
-      "removed": 6
+      "added": 9,
+      "removed": 9
     },
     "config/scripts/mac-build-compatibility.test.mjs": {
       "added": 1,

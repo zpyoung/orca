@@ -68,12 +68,12 @@ describe('collectMobileBumps', () => {
   it('captures only overrides whose max exceeds the default for the glob', () => {
     const cfg = JSON.stringify({
       overrides: [
-        { files: ['app/h/*/tasks.tsx'], rules: { 'max-lines': ['error', { max: 14682 }] } }, // bump (>400)
+        { files: ['app/h/*/tasks.tsx'], rules: { 'max-lines': ['error', { max: 14682 }] } }, // bump (>600)
         {
           files: ['src/terminal/TerminalWebView.tsx'],
           rules: { 'max-lines': ['error', { max: 379 }] }
-        }, // stricter (<400), skip
-        { files: ['scripts/mock-server.ts'], rules: { 'max-lines': ['error', { max: 407 }] } } // bump (>300)
+        }, // stricter (<600), skip
+        { files: ['scripts/mock-server.ts'], rules: { 'max-lines': ['error', { max: 607 }] } } // bump (>500)
       ]
     })
     expect(collectMobileBumps(cfg)).toEqual([
