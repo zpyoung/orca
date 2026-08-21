@@ -63,8 +63,7 @@ function reportRendererPtyVisibility(
 
 export function useTerminalPaneGlobalEffects({
   tabId,
-  // absent when the dock is off: the terminal keeps focus, as before the dock existed
-  paneDockOwnsFocus = () => false,
+  paneDockOwnsFocus,
   worktreeId,
   cwd,
   isActive,

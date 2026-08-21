@@ -116,7 +116,6 @@ inline src/main/ssh/ssh-connection.ts
 inline src/main/ssh/ssh-relay-deploy.ts
 inline src/main/ssh/ssh-relay-session.ts
 inline src/main/text-generation/commit-message-text-generation.ts
-inline src/main/updater.test.ts
 inline src/main/updater.ts
 inline src/main/window/attach-main-window-services.ts
 inline src/main/window/createMainWindow.ts

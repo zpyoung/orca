@@ -1068,8 +1068,8 @@
       "feature": "terminal-dock",
       "kind": "passthrough",
       "lines": [
-        "import { focusActivePane, type PaneFocusOwnership } from './pane-helpers'",
-        "    focusActivePane(manager, { tabId, paneDockOwnsFocus })"
+        "import { paneFocusOwnershipArgs } from './fork-terminal-dock/pane-focus-ownership-args'",
+        "    focusActivePane(manager, ...paneFocusOwnershipArgs(tabId, paneDockOwnsFocus))"
       ]
     },
     {
@@ -1078,7 +1078,7 @@
       "kind": "registration",
       "lines": [
         "import type { PaneFocusOwnership } from './pane-helpers'",
-        "  paneDockOwnsFocus = () => false,"
+        "  paneDockOwnsFocus,"
       ]
     },
     {
@@ -1633,6 +1633,14 @@
       "lines": [
         "    getLooseSectionProjectGroupId(itemRow.sectionKey) ?? itemRow.repo?.projectGroupId"
       ]
+    },
+    {
+      "path": "src/main/updater.publishing-window-feed.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "      url: 'https://github.com/zpyoung/orca/releases/latest/download'"
+      ]
     }
   ],
   "exceptions": [
@@ -1901,11 +1909,6 @@
     {
       "path": "src/main/updater.check-failure.test.ts",
       "reason": "Tests for the fork's own update-check failure handling.",
-      "status": "permanent"
-    },
-    {
-      "path": "src/main/updater.test.ts",
-      "reason": "Tests for the fork's own updater.",
       "status": "permanent"
     },
     {
@@ -2251,6 +2254,10 @@
       "added": 2,
       "removed": 1
     },
+    "src/main/updater.publishing-window-feed.test.ts": {
+      "added": 5,
+      "removed": 5
+    },
     "src/preload/api-types.ts": {
       "added": 1,
       "removed": 0
@@ -2564,11 +2571,11 @@
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/terminal-visibility-resume.ts": {
-      "added": 16,
+      "added": 21,
       "removed": 8
     },
     "src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects.ts": {
-      "added": 8,
+      "added": 7,
       "removed": 1
     },
     "src/renderer/src/components/terminal-pane/use-terminal-pane-lifecycle.ts": {
