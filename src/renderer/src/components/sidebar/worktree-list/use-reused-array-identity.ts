@@ -1,3 +1,4 @@
+/* oxlint-disable react-doctor/no-ref-current-in-render -- Why: the render-phase write is the identity cache itself; deferring it to an effect would hand callers a stale array. */
 import { useRef } from 'react'
 import { reuseArrayIfEqual } from '../worktree-agent-row-selectors'
 

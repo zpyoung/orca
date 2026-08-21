@@ -77,7 +77,7 @@ async function authenticateSession() {
   return session
 }
 
-function sentRequests(): Array<{ id: string; method: string }> {
+function sentRequests(): { id: string; method: string }[] {
   return fakes.sendText.mock.calls.map(
     ([value]) => JSON.parse(value as string) as { id: string; method: string }
   )

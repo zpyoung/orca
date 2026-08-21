@@ -1,3 +1,4 @@
+/* oxlint-disable react-doctor/no-effect-with-fresh-deps -- Why: the inline ref literals are the fixture under test; hoisting them would stop exercising a fresh-ref render. */
 import type * as ReactModule from 'react'
 import type * as StoreModule from '@/store'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'

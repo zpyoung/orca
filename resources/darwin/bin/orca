@@ -23,9 +23,19 @@ CONTENTS="$APP_PATH/Contents"
 # executable is not always "Orca" — read the real name instead of hardcoding it.
 EXECUTABLE="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$CONTENTS/Info.plist" 2>/dev/null || true)"
 ELECTRON="$CONTENTS/MacOS/$EXECUTABLE"
-# Why: PlistBuddy reports a missing plist on stdout and still exits 0, so validate the
-# resolved path rather than trusting the name it printed.
+# Why: PlistBuddy reports a missing plist on stdout and still exits 0, and it is absent
+# entirely off macOS, so fall back to the bundle's sole MacOS entry.
 if [ -z "$EXECUTABLE" ] || [ ! -x "$ELECTRON" ]; then
+	ELECTRON=""
+	for candidate in "$CONTENTS/MacOS"/*; do
+		if [ -f "$candidate" ] && [ -x "$candidate" ]; then
+			ELECTRON="$candidate"
+			break
+		fi
+	done
+fi
+
+if [ -z "$ELECTRON" ]; then
 	echo "Unable to locate the Orca executable in: $CONTENTS/MacOS"
 	exit 1
 fi

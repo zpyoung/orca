@@ -72,7 +72,7 @@ describe('hasPendingTerminalHandleRecoveryNeed', () => {
  */
 describe('pending-handle recovery through MobileSessionTabsStreamHealth', () => {
   function makeHarness() {
-    const pending: Array<(response: RpcResponse) => void> = []
+    const pending: ((response: RpcResponse) => void)[] = []
     const sendRequest = vi.fn(
       () =>
         new Promise<RpcResponse>((resolve) => {

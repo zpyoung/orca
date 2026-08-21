@@ -2079,6 +2079,60 @@
       "reason": "Upstream's workspace-session-schema.ts sits one line under the 300-line cap, so the editor schemas were split into their own module to make room. A plain refactor of upstream's own file, not fork behavior.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#workspace-session-schema-split"
+    },
+    {
+      "path": "mobile/src/session/pending-terminal-handle-recovery.test.ts",
+      "reason": "React Doctor gate: rewrites `Array<T>` as `T[]`. The mobile package turns typescript/array-type off, but React Doctor does not read mobile/.oxlintrc.json and blocks the changed line.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate"
+    },
+    {
+      "path": "mobile/src/transport/mobile-relay-rpc-session-liveness.test.ts",
+      "reason": "React Doctor gate: rewrites `Array<T>` as `T[]`. The mobile package turns typescript/array-type off, but React Doctor does not read mobile/.oxlintrc.json and blocks the changed line.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate"
+    },
+    {
+      "path": "mobile/src/browser/mobile-browser-frameless-stream.test.tsx",
+      "reason": "React Doctor gate: file-level oxlint-disable for unicorn/prefer-node-protocol. Mobile must keep the npm `buffer` polyfill for Metro, which is why mobile/.oxlintrc.json disables the rule; React Doctor does not read that config.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate"
+    },
+    {
+      "path": "mobile/src/worktree/use-retired-worktree-names.test.tsx",
+      "reason": "React Doctor gate: file-level oxlint-disable for react-doctor/no-effect-with-fresh-deps, a false positive on a deferred-RPC test harness whose client is built once per mount.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate"
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects-file-drop.test.ts",
+      "reason": "React Doctor gate: file-level oxlint-disable for react-doctor/no-effect-with-fresh-deps, a false positive on inline ref literals that are the fixture under test.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate"
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects-window-focus-recovery.test.ts",
+      "reason": "React Doctor gate: file-level oxlint-disable for react-doctor/no-effect-with-fresh-deps, a false positive on inline ref literals that are the fixture under test.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/use-reused-array-identity.ts",
+      "reason": "React Doctor gate: file-level oxlint-disable for react-doctor/no-ref-current-in-render, a false positive on upstream's render-phase identity cache.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/use-sidebar-worktree-sort-order.ts",
+      "reason": "React Doctor gate: file-level oxlint-disable for react-doctor/no-ref-current-in-render, a false positive on the sort memo's attention-map and live-signal refs.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/use-worktree-list-virtualizer.ts",
+      "reason": "React Doctor gate: file-level oxlint-disable for react-doctor/no-ref-current-in-render, a false positive on upstream's latest-value refs.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate"
     }
   ],
   "residuals": {
@@ -2491,7 +2545,7 @@
       "removed": 4
     },
     "src/renderer/src/components/sidebar/worktree-list/use-pending-sidebar-reveal.ts": {
-      "added": 1,
+      "added": 2,
       "removed": 0
     },
     "src/renderer/src/components/sidebar/worktree-list/use-sidebar-section-rows.ts": {

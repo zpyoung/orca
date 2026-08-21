@@ -103,3 +103,46 @@ upstream code under a fork glob and hand the fork permanent ownership of a schem
 send after the rebase onto main".
 
 **Status:** pending-upstream. Not yet submitted.
+
+## React Doctor changed-lines gate
+
+**What:** two `Array<T>` → `T[]` rewrites and eight file-level `oxlint-disable` directives, all in
+files v1.4.186 introduced. The `Enforce React Doctor on changed lines` job runs the `react-doctor`
+CLI, whose own rule set is neither `.oxlintrc.json` nor `config/oxlint-react-doctor.json`, so it
+blocks lines those two configs deliberately allow:
+
+- `unicorn/prefer-node-protocol` and `typescript/array-type` are off for the whole mobile package
+  in `mobile/.oxlintrc.json`; the CLI does not read it.
+- `react-doctor/no-ref-current-in-render` and `react-doctor/no-effect-with-fresh-deps` are absent
+  from `config/oxlint-react-doctor.json`, the repo's curated React Doctor rule list; the CLI runs
+  its full default set anyway.
+
+Each suppressed site is a deliberate, upstream-authored pattern: latest-value refs written during
+render, a render-phase array-identity cache, and test harnesses whose inline ref literals are the
+fixture under test. The `buffer` import stays on the npm polyfill because Metro cannot resolve Node
+builtins in a React Native bundle.
+
+**Why upstream, not isolated:** the findings are on upstream's own code. Isolating would mean
+forking ten upstream modules — four of them hot sidebar hooks — to carry one comment each, and
+rewriting the ref patterns to satisfy the heuristic would change upstream behavior the fork has no
+reason to change.
+
+**Paths:**
+- `mobile/src/browser/mobile-browser-frameless-stream.test.tsx`
+- `mobile/src/session/pending-terminal-handle-recovery.test.ts`
+- `mobile/src/transport/mobile-relay-rpc-session-liveness.test.ts`
+- `mobile/src/worktree/use-retired-worktree-names.test.tsx`
+- `src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects-file-drop.test.ts`
+- `src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects-window-focus-recovery.test.ts`
+- `src/renderer/src/components/sidebar/worktree-list/use-reused-array-identity.ts`
+- `src/renderer/src/components/sidebar/worktree-list/use-sidebar-worktree-sort-order.ts`
+- `src/renderer/src/components/sidebar/worktree-list/use-worktree-list-virtualizer.ts`
+
+`use-pending-sidebar-reveal.ts` carries the same `no-ref-current-in-render` directive but is
+already a declared seam, so it stays in `seams` with its residual raised to two added lines rather
+than gaining an `exceptions` row.
+
+**Introduced:** the v1.4.186 sync (2026-08-21), fixing the `static analysis` job on PR #12.
+
+**Status:** pending-upstream. Not yet submitted. Drop any entry upstream resolves on its own — the
+CLI's rule set moves independently of the pinned `react-doctor@0.9.1` version.
