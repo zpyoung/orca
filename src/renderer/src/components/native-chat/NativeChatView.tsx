@@ -20,8 +20,6 @@ import {
 } from './native-chat-working-suppression'
 import {
   appendPendingSendCache,
-  commandMarkersAsMessages,
-  appendCommandMarkerCache,
   pendingSendsAsMessages,
   nextNativeChatPendingSendId,
   prunePendingSends,

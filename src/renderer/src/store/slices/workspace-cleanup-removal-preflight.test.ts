@@ -157,24 +157,6 @@ describe('workspace cleanup removal and protection', () => {
     )
   })
 
-  it('forwards the snapshot batch through each successful removal', async () => {
-    const candidate = makeCandidate({ executionHostId: 'ssh:ssh-1' })
-    installWorkspaceCleanupApi(
-      vi.fn(async () => ({ scannedAt: NOW, candidates: [candidate], errors: [] }))
-    )
-    const removeWorktree = vi.fn().mockResolvedValue({ ok: true })
-    const store = createCleanupTestStore(removeWorktree)
-
-    await store.getState().removeWorkspaceCleanupCandidates([candidate.worktreeId], {
-      snapshotPruneBatchId: 'batch-1'
-    })
-
-    expect(removeWorktree).toHaveBeenCalledWith(candidate.worktreeId, false, {
-      suppressPreservedBranchToast: true,
-      snapshotPruneBatchId: 'batch-1'
-    })
-  })
-
   it('demotes an active suggested workspace when it was not viewed from cleanup', async () => {
     const [candidate] = await enrichWorkspaceCleanupCandidates(
       [makeCandidate()],

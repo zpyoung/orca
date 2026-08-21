@@ -102,6 +102,7 @@ import {
   NodeFileReadTooLargeError,
   readNodeFileWithinLimit
 } from '../../shared/node-bounded-file-reader'
+import { QUICK_OPEN_LISTING_MAX_RESULTS } from '../../shared/quick-open-listing-limits'
 
 const MOBILE_FILE_LIST_LIMIT = 5000
 // Legacy SSH relays cannot enforce a byte budget; 32 max-length paths stay under one 4 MiB frame.

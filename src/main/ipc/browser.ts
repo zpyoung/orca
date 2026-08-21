@@ -4,31 +4,10 @@ import type { AgentBrowserBridge } from '../browser/agent-browser-bridge'
 import { browserSessionRegistry } from '../browser/browser-session-registry'
 import { isTrustedBrowserRenderer } from './browser-renderer-trust'
 import {
-  pickCookieFile,
-  importCookiesFromFile,
-  detectInstalledBrowsers,
-  selectBrowserProfile,
-  importCookiesFromBrowser
-} from '../browser/browser-cookie-import'
-import type {
-  BrowserSetGrabModeArgs,
-  BrowserSetGrabModeResult,
-  BrowserAwaitGrabSelectionArgs,
-  BrowserGrabResult,
-  BrowserCancelGrabArgs,
-  BrowserCaptureSelectionScreenshotArgs,
-  BrowserCaptureSelectionScreenshotResult,
-  BrowserExtractHoverArgs,
-  BrowserExtractHoverResult
-} from '../../shared/browser-grab-types'
-import type {
-  BrowserCertificateProceedResult,
-  BrowserCookieImportResult,
-  BrowserSessionProfile,
-  BrowserSessionProfileCreateOptions,
-  BrowserSessionProfileScope,
-  BrowserViewportOverride
-} from '../../shared/browser-workspace-types'
+  isLiveBrowserWebContentsId,
+  resolveTabRegistrationWaiters
+} from './browser-tab-registration-wait'
+import { registerBrowserGuestViewHandlers } from './browser-guest-view-ipc'
 import {
   disposeGrabModeStateForPage,
   registerBrowserGrabHandlers,

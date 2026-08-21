@@ -43,6 +43,10 @@ vi.mock('./browser-cookie-clear-store', () => ({
   }) => ({
     get: (filter: object) => targetSession.cookies.get(filter),
     remove: (url: string, name: string) => targetSession.cookies.remove(url, name),
+    // Why (STA-4300): the import writes go through CDP identities; route them to the same spy so
+    // a missing method cannot silently reroute every write down the rejected-cookie path.
+    writeCookieIdentity: (identity: Record<string, unknown>) =>
+      targetSession.cookies.set!(identity),
     snapshotClearIdentities: snapshotClearIdentitiesMock,
     restoreClearIdentities: restoreClearIdentitiesMock,
     dispose: disposeClearStoreMock
@@ -210,8 +214,12 @@ describe('validated cookie replacement', () => {
     const result = await importCookiesFromFile(filePath, 'persist:test')
 
     expect(result.ok).toBe(false)
-    // Why: the imported cookie is still removed — that half of the rollback is lossless.
-    expect(cookiesRemoveMock.mock.calls).toEqual([['https://example.com/', 'first']])
+    // Why: a rejected CDP command does not prove the cookie was not written before the transport
+    // failed, so rollback must remove the failing coordinate as well as earlier successes.
+    expect(cookiesRemoveMock.mock.calls).toEqual([
+      ['https://example.com/', 'second'],
+      ['https://example.com/', 'first']
+    ])
     expect(restoreClearIdentitiesMock).not.toHaveBeenCalled()
   })
 

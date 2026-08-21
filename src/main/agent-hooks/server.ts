@@ -1474,8 +1474,20 @@ export class AgentHookServer {
     if (!identity.inheritedFromActivePane) {
       this.maybeTrackAgentPromptSent(effectivePayload, previous)
     }
-    const cachedPayload = resolveCachedClaudeCompactOwnership(previous, effectivePayload)
-    const enriched = this.attachStatusTiming(cachedPayload, now)
+    const cachedPayload = resolveCachedClaudeCompactOwnership(previous, boundaryAwarePayload)
+    const enriched = {
+      ...this.attachStatusTiming(cachedPayload, now),
+      observation: this.stampObservation(cachedPayload, origin, now)
+    }
+    if (
+      typeof enriched.payload.turnCompletedAt === 'number' &&
+      Number.isFinite(enriched.payload.turnCompletedAt)
+    ) {
+      this.activeHookTurnCompletedAtByPaneKey.set(
+        enriched.paneKey,
+        enriched.payload.turnCompletedAt
+      )
+    }
     // Why: an identity-matched event can still leave the aggregate backed only by another restored child; keep liveness reconciliation eligible.
     if (enriched.restoredUnconfirmed) {
       this.runtimeObservedStatusPaneKeys.delete(enriched.paneKey)

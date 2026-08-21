@@ -1,53 +1,17 @@
 import { z } from 'zod'
 import { defineMethod, defineStreamingMethod, type RpcAnyMethod } from '../core'
 import { runFileWatchStream } from './file-watch-stream-lifecycle'
-import { remoteRpcContentBudget } from '../../../../shared/remote-rpc-content-budget'
+import { FILE_MUTATION_METHODS } from './files-mutation-methods'
+import { remoteFileContentBudget } from './files-remote-content-budget'
+import {
+  QUICK_OPEN_REMOTE_QUERY_MAX_CODE_UNITS,
+  QUICK_OPEN_SEARCH_VERSION
+} from '../../../../shared/quick-open-path-search'
+import { limitQuickOpenSearchReplyBySerializedBytes } from '../../../../shared/quick-open-transport-budget'
+import { FileOpen, WorktreeSelector } from './files-target-schemas'
+import { FILE_TERMINAL_ARTIFACT_METHODS } from './files-terminal-artifact-methods'
 
 let filesWatchSubscriptionSeq = 0
-const RUNTIME_FILE_BASE64_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/
-
-function remoteFileContentBudget(
-  clientKind: 'mobile' | 'runtime' | undefined,
-  requestId: string | undefined
-): number | undefined {
-  return clientKind && requestId ? remoteRpcContentBudget(requestId) : undefined
-}
-
-function isValidRuntimeFileBase64(value: unknown): value is string {
-  return (
-    typeof value === 'string' && value.length % 4 !== 1 && RUNTIME_FILE_BASE64_PATTERN.test(value)
-  )
-}
-
-type SshMutationParams = {
-  expectedExecutionHostId?: string
-  expectedSshTargetId?: string
-  expectedSshConnectionGeneration?: number
-}
-
-function sshMutationArguments(
-  params: SshMutationParams
-): [expectedGeneration?: number, expectedTargetId?: string, expectedExecutionHostId?: string] {
-  if (
-    params.expectedExecutionHostId === undefined &&
-    params.expectedSshTargetId === undefined &&
-    params.expectedSshConnectionGeneration === undefined
-  ) {
-    return []
-  }
-  return [
-    params.expectedSshConnectionGeneration,
-    params.expectedSshTargetId,
-    params.expectedExecutionHostId
-  ]
-}
-
-const WorktreeSelector = z.object({
-  worktree: z
-    .unknown()
-    .transform((v) => (typeof v === 'string' ? v : ''))
-    .pipe(z.string().min(1, 'Missing worktree selector'))
-})
 
 const FilePathSearch = WorktreeSelector.extend({
   query: z.string().max(QUICK_OPEN_REMOTE_QUERY_MAX_CODE_UNITS).default(''),
@@ -198,50 +162,7 @@ export const FILE_METHODS: RpcAnyMethod[] = [
         params.nativeChatContext ?? null
       )
   }),
-  defineMethod({
-    name: 'files.readTerminalArtifact',
-    params: TerminalArtifactFile,
-    handler: async (params, { runtime, clientId }) =>
-      runtime.readTerminalArtifactFile(
-        params.worktree,
-        params.grantId,
-        params.absolutePath,
-        clientId
-      )
-  }),
-  defineMethod({
-    name: 'files.readTerminalArtifactPreview',
-    params: TerminalArtifactFile,
-    handler: async (params, { runtime, clientId, clientKind, requestId }) => {
-      const budget = remoteFileContentBudget(clientKind, requestId)
-      return budget === undefined
-        ? runtime.readTerminalArtifactPreview(
-            params.worktree,
-            params.grantId,
-            params.absolutePath,
-            clientId
-          )
-        : runtime.readTerminalArtifactPreview(
-            params.worktree,
-            params.grantId,
-            params.absolutePath,
-            clientId,
-            budget
-          )
-    }
-  }),
-  defineMethod({
-    name: 'files.writeTerminalArtifact',
-    params: TerminalArtifactFileWrite,
-    handler: async (params, { runtime, clientId }) =>
-      runtime.writeTerminalArtifactFile(
-        params.worktree,
-        params.grantId,
-        params.absolutePath,
-        params.content,
-        clientId
-      )
-  }),
+  ...FILE_TERMINAL_ARTIFACT_METHODS,
   defineMethod({
     name: 'files.readPreview',
     params: FileOpen,

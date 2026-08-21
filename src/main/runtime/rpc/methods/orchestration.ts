@@ -69,7 +69,20 @@ async function routeAllMailboxPages(
   }
 }
 
-function getLifecycleGroupRecipientError(type: 'worker_done' | 'heartbeat'): string {
+type DispatchMutationMessageType = 'worker_done' | 'heartbeat' | 'escalation' | 'decision_gate'
+
+function isDispatchMutationMessageType(
+  type: string | undefined
+): type is DispatchMutationMessageType {
+  return (
+    type === 'worker_done' ||
+    type === 'heartbeat' ||
+    type === 'escalation' ||
+    type === 'decision_gate'
+  )
+}
+
+function getLifecycleGroupRecipientError(type: DispatchMutationMessageType): string {
   return `${type} messages belong to one exact Dispatch and cannot target a group address.`
 }
 
@@ -755,13 +768,9 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           if (!authority.valid) {
             const code = authority.code
             const rejection =
-              db.convertLifecycleMessageToRejection(
-                msg.id,
-                'dispatch_capability_invalid',
-                authority.reason
-              ) ?? msg
+              db.convertLifecycleMessageToRejection(msg.id, code, authority.reason) ?? msg
             runtime.notifyMessageArrived(rejection.to_handle, rejection.type)
-            return {
+            return withSendWarnings({
               message: rejection,
               lifecycle: {
                 action: 'rejected',
@@ -781,15 +790,15 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           if (reconciled.action === 'rejected') {
             const rejection = db.getMessageById(msg.id) ?? msg
             runtime.notifyMessageArrived(rejection.to_handle, rejection.type)
-            return { message: rejection, lifecycle: reconciled }
+            return withSendWarnings({ message: rejection, lifecycle: reconciled })
           }
           runtime.notifyMessageArrived(msg.to_handle, msg.type)
-          return msg.type === 'worker_done'
-            ? { message: msg, lifecycle: reconciled }
-            : { message: msg }
+          return withSendWarnings(
+            msg.type === 'worker_done' ? { message: msg, lifecycle: reconciled } : { message: msg }
+          )
         }
         runtime.notifyMessageArrived(msg.to_handle, msg.type)
-        return { message: msg }
+        return withSendWarnings({ message: msg })
       }
 
       // Why: fan out one message per recipient (independent read-tracking) but share a thread_id for correlation (Section 4.5).

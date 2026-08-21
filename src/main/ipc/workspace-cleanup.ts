@@ -15,6 +15,7 @@ import {
   type WorkspaceCleanupSnapshotPruneRecordArgs
 } from '../../shared/workspace-cleanup'
 import { parseExecutionHostId } from '../../shared/execution-host'
+import { getWorkspaceCleanupHostIdentity } from '../../shared/workspace-cleanup-host-identity'
 import { scanWorkspaceCleanup } from './workspace-cleanup-scan'
 import { hasTargetedWorkspaceCleanupScan } from './workspace-cleanup-scan-targets'
 import {
@@ -135,7 +136,11 @@ export function registerWorkspaceCleanupHandlers(
   ipcMain.handle('workspaceCleanup:dismiss', (_event, args: WorkspaceCleanupDismissArgs) => {
     const next = { ...store.getUI().workspaceCleanup?.dismissals }
     for (const worktreeId of args.removedWorktreeIds ?? []) {
-      delete next[worktreeId]
+      for (const [identity, dismissal] of Object.entries(next)) {
+        if (dismissal.worktreeId === worktreeId) {
+          delete next[identity]
+        }
+      }
     }
     for (const dismissal of args.dismissals ?? []) {
       if (

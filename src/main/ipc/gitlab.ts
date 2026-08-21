@@ -1,15 +1,4 @@
 import { ipcMain } from 'electron'
-import { resolve } from 'node:path'
-import { toGitLabJobLogExcerptResult } from '../../shared/gitlab-job-log-excerpt'
-import type {
-  GitLabIssueUpdate,
-  GitLabMRInlineCommentInput,
-  GitLabMRUpdate,
-  GitLabWorkItem
-} from '../../shared/gitlab-types'
-import type { Repo } from '../../shared/repo-types'
-import { getRepoExecutionHostId } from '../../shared/execution-host'
-import type { TaskSourceContext } from '../../shared/task-source-context'
 import type { Store } from '../persistence'
 import {
   diagnoseAuth,

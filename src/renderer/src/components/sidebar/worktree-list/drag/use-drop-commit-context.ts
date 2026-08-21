@@ -4,6 +4,7 @@ import type { WorktreeDropCommitContext } from './drop-commit-context'
 import type { useWorktreeDragRuntime } from './use-runtime'
 import type { useWorktreeDragSession } from './use-session'
 import type { useWorktreeLineageDropCommit } from './use-lineage-drop-commit'
+import type { useWorktreeGroupMembershipDrag } from '../../fork-worktree-groups/use-worktree-group-membership-drag'
 
 /** Bundles the drag session, lineage commits, and viewport callbacks every drop path reads. */
 export function useWorktreeDropCommitContext(args: {
@@ -12,12 +13,14 @@ export function useWorktreeDropCommitContext(args: {
   session: ReturnType<typeof useWorktreeDragSession>
   lineageDrop: ReturnType<typeof useWorktreeLineageDropCommit>
   runtime: ReturnType<typeof useWorktreeDragRuntime>
+  groupMembershipDrag: ReturnType<typeof useWorktreeGroupMembershipDrag>
   onMoveWorktreesToStatus: WorktreeDropCommitContext['onMoveWorktreesToStatus']
   onMoveWorktreesToStatusAtIndex: WorktreeDropCommitContext['onMoveWorktreesToStatusAtIndex']
   onReorderWorktrees: WorktreeDropCommitContext['onReorderWorktrees']
   onPinWorktrees: WorktreeDropCommitContext['onPinWorktrees']
 }): WorktreeDropCommitContext {
-  const { scrollRef, workspaceStatuses, session, lineageDrop, runtime } = args
+  const { scrollRef, workspaceStatuses, session, lineageDrop, runtime, groupMembershipDrag } =
+    args
   const {
     onMoveWorktreesToStatus,
     onMoveWorktreesToStatusAtIndex,
@@ -35,6 +38,8 @@ export function useWorktreeDropCommitContext(args: {
       refreshWorktreeDragSession: session.refreshWorktreeDragSession,
       getEligibleLineageDropTarget: lineageDrop.getEligibleLineageDropTarget,
       commitWorktreeLineageParentDrop: lineageDrop.commitWorktreeLineageParentDrop,
+      trackWorktreeGroupMembershipDragFrame: groupMembershipDrag.trackPointerDragFrame,
+      commitWorktreeGroupMembershipDrop: groupMembershipDrag.commitPointerDrop,
       clearReorderedWorktreeParents: lineageDrop.clearReorderedWorktreeParents,
       clearWorktreeDrag: runtime.clearWorktreeDrag,
       onMoveWorktreesToStatus,
@@ -43,6 +48,8 @@ export function useWorktreeDropCommitContext(args: {
       onPinWorktrees
     }),
     [
+      groupMembershipDrag.commitPointerDrop,
+      groupMembershipDrag.trackPointerDragFrame,
       lineageDrop.clearReorderedWorktreeParents,
       lineageDrop.commitWorktreeLineageParentDrop,
       lineageDrop.getEligibleLineageDropTarget,

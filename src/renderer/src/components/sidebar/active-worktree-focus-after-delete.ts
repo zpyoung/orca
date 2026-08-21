@@ -4,6 +4,7 @@ import { activateAndRevealWorktree } from '@/lib/worktree-activation'
 import { isRuntimeOwnedSshTargetId, parseExecutionHostId } from '../../../../shared/execution-host'
 import type { Repo } from '../../../../shared/repo-types'
 import type { Worktree } from '../../../../shared/worktree/types'
+import { getDeleteStateForWorktreeHost } from './worktree-delete-state-host-match'
 
 type AppStoreState = ReturnType<typeof useAppStore.getState>
 

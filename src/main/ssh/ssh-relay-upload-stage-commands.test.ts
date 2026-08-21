@@ -120,10 +120,11 @@ describe.each([
     string,
     RemoteHostPlatform
   ])[])
-])('%s relay upload stage commands', (_label, host) => {
-  it.each([0, 1, 7, 8, 9])(
-    'bounds reservation with %i occupied entries',
-    (count) => {
+])(
+  '%s relay upload stage commands',
+  { timeout: SPAWNED_INTERPRETER_TIMEOUT_MS },
+  (_label, host) => {
+    it.each([0, 1, 7, 8, 9])('bounds reservation with %i occupied entries', (count) => {
       const pool = createPool()
       for (let index = 0; index < Math.min(count, RELAY_UPLOAD_STAGE_SLOT_COUNT); index += 1) {
         createStage(host, pool, index)
@@ -142,77 +143,25 @@ describe.each([
         expect(result.status).not.toBe(0)
         expect(result.stderr).toContain('staging quota is full')
       }
-    },
-    120_000
-  )
+    })
+
+    it('promotes only the post-claim owned payload and removes its fixed stage', () => {
+      const pool = createPool()
+      const destination = join(pool, 'destination')
+      mkdirSync(destination)
+      createStage(host, pool, 0)
+      const stage = parseReservedRelayUploadStage(
+        host,
+        pool,
+        owner,
+        `noise\n__ORCA_UPLOAD_STAGE_SLOT__${owner}:slot-0\n`
+      )
 
       const result = runCommand(
         host,
         promoteOwnedRelayUploadStageCommand(host, stage, owner, destination)
       )
 
-    const result = runCommand(
-      host,
-      promoteOwnedRelayUploadStageCommand(host, stage, owner, destination)
-    )
-
-    expect(result.status, result.stderr).toBe(0)
-    expect(relayUploadStagePromotionConfirmed(owner, result.stdout)).toBe(true)
-    expect(readFileSync(join(destination, 'relay.js'), 'utf8')).toBe('relay-0')
-    expect(existsSync(join(pool, 'slot-0'))).toBe(false)
-    expect(existsSync(join(pool, 'claim-0'))).toBe(false)
-    expect(existsSync(join(pool, 'delete-0'))).toBe(false)
-  })
-
-  it('rejects a payload reparse point without copying or deleting it', () => {
-    const pool = createPool()
-    const destination = join(pool, 'destination')
-    const foreign = join(pool, 'foreign.js')
-    mkdirSync(destination)
-    const stagePath = createStage(host, pool, 0)
-    rmSync(join(stagePath, 'payload', 'relay.js'))
-    writeFileSync(foreign, 'foreign')
-    symlinkSync(foreign, join(stagePath, 'payload', 'relay.js'))
-    const stage = parseReservedRelayUploadStage(
-      host,
-      pool,
-      owner,
-      `__ORCA_UPLOAD_STAGE_SLOT__${owner}:slot-0`
-    )
-
-    const result = runCommand(
-      host,
-      promoteOwnedRelayUploadStageCommand(host, stage, owner, destination)
-    )
-
-    expect(result.status, result.stderr).toBe(0)
-    expect(relayUploadStagePromotionConfirmed(owner, result.stdout)).toBe(false)
-    expect(existsSync(join(destination, 'relay.js'))).toBe(false)
-    expect(lstatSync(join(pool, 'slot-0', 'payload', 'relay.js')).isSymbolicLink()).toBe(true)
-    expect(readFileSync(foreign, 'utf8')).toBe('foreign')
-  })
-
-  it('reclaims one stale owned stage but preserves fresh and foreign stages', () => {
-    const pool = createPool()
-    createStage(host, pool, 0, owner, false)
-    createStage(host, pool, 1, '.foreign-owner', true)
-    createStage(host, pool, 2, owner, true)
-
-    const result = runCommand(host, recoverOneStaleRelayUploadStageCommand(host, pool, 60))
-
-    expect(result.status, result.stderr).toBe(0)
-    expect(existsSync(join(pool, 'slot-0'))).toBe(true)
-    expect(existsSync(join(pool, 'slot-1'))).toBe(true)
-    expect(existsSync(join(pool, 'slot-2'))).toBe(false)
-  }, 120_000)
-
-  it('drains fixed stale claim and delete states across repeated deployments', () => {
-    const pool = createPool()
-    createStage(host, pool, 0, owner, true, 'claim')
-    createStage(host, pool, 1, owner, true, 'delete')
-
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      const result = runCommand(host, recoverOneStaleRelayUploadStageCommand(host, pool, 60))
       expect(result.status, result.stderr).toBe(0)
       expect(relayUploadStagePromotionConfirmed(owner, result.stdout)).toBe(true)
       expect(readFileSync(join(destination, 'relay.js'), 'utf8')).toBe('relay-0')

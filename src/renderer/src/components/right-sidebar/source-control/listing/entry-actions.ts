@@ -1,5 +1,5 @@
-import type { GitStatusEntry } from '../../../../shared/git-status-types'
-import { isStageableStatusEntry } from './discard-all-sequence'
+import type { GitStatusEntry } from '../../../../../../shared/git-status-types'
+import { isStageableStatusEntry } from '../commit/discard-all-sequence'
 
 /**
  * Per-row Source Control action eligibility, centralized so the stage/unstage/

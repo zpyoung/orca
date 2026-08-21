@@ -11,6 +11,8 @@ import type { AgentType } from '../../shared/agent-status-types'
 import type { Repo } from '../../shared/repo-types'
 import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import { CODEX_PLUGIN_CACHE_ROOT_ID } from './fork-skill-plugin-attribution/skill-plugin-name-resolution'
+import type { SkillProviderRootOverrides } from './skill-provider-destinations'
+import { resolveEnvironmentSkillProviderRoots } from './skill-provider-runtime-roots'
 
 export type SkillScanRoot = Omit<SkillDiscoverySource, 'exists' | 'skippedReason'>
 type SkillDiscoveryPathApi = Pick<typeof posix, 'basename' | 'join'>

@@ -9,10 +9,10 @@ import type {
 import {
   normalizeHostedReviewBaseRef,
   normalizeHostedReviewHeadRef
-} from '../../../../shared/hosted-review-refs'
-import type { GitStatusEntry, GitUpstreamStatus } from '../../../../shared/git-status-types'
-import { summarizeCommitFailure } from './commit-failure-summary'
-import { getStageAllPaths } from './discard-all-sequence'
+} from '../../../../../../shared/hosted-review-refs'
+import type { GitStatusEntry, GitUpstreamStatus } from '../../../../../../shared/git-status-types'
+import { summarizeCommitFailure } from '../commit/commit-failure-summary'
+import { getStageAllPaths } from '../commit/discard-all-sequence'
 
 export type CreatePrIntentRemoteStep =
   | 'publish'

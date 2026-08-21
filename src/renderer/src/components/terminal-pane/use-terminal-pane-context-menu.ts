@@ -9,28 +9,19 @@ import type { TerminalPasteSource } from './terminal-paste-coordinator'
 import { runQuickCommandInNewTab } from '@/lib/run-quick-command-in-new-tab'
 import type { PreparedAgentSessionFork } from './terminal-agent-session-fork'
 import type { AgentSessionContinuationRequest } from '@/lib/agent-session-continuation'
-import { recordCreatedTerminalPaneSplit } from './terminal-pane-split-completion'
-import { splitTerminalPaneWithInheritedCwd } from './terminal-pane-split-with-inherited-cwd'
-import { useAppStore } from '@/store'
-import { resolveProtectedMultilinePasteOptionsForPane } from './terminal-agent-paste-bracketing'
-import { resolveTerminalInputHostPlatform } from './terminal-input-host-platform'
-import { translate } from '@/i18n/i18n'
-import { recordTerminalUserInputForLeaf } from './terminal-input-activity'
-import { copyTerminalHandleForPane } from './terminal-handle-copy'
-import { runCopyPaneId, runTerminalCopy } from './terminal-copy-rejection-guards'
-import { copyTerminalSelection } from './terminal-selection-copy'
-
-const CLOSE_ALL_CONTEXT_MENUS_EVENT = 'orca-close-all-context-menus'
-
-export function recordContextMenuCreatedTerminalPaneSplit(
-  createdPane: unknown,
-  args: {
-    source: 'contextual_tour' | 'context_menu'
-    direction: 'vertical' | 'horizontal'
-  }
-): boolean {
-  return recordCreatedTerminalPaneSplit(createdPane, args)
-}
+import { pasteTerminalPaneMenuClipboard } from './terminal-pane-menu-paste'
+import {
+  copyTerminalPaneMenuPaneId,
+  copyTerminalPaneMenuSelection,
+  copyTerminalPaneMenuTerminalId
+} from './terminal-pane-menu-copy-actions'
+import {
+  continueAgentSessionFromMenuPane,
+  copyAgentSessionContextFromMenuPane,
+  forkAgentSessionFromMenuPane
+} from './terminal-pane-menu-agent-session-actions'
+import { useTerminalPaneSplitActions } from './use-terminal-pane-split-actions'
+import { useTerminalContextMenuTrigger } from './use-terminal-context-menu-trigger'
 
 type UseTerminalPaneContextMenuDeps = {
   managerRef: React.RefObject<PaneManager | null>
@@ -175,155 +166,8 @@ export function useTerminalPaneContextMenu({
   const onCopyPaneId = async (): Promise<void> =>
     copyTerminalPaneMenuPaneId(resolveMenuPane(), tabId)
 
-  const getShortcutPlatform = (): NodeJS.Platform => {
-    if (navigator.userAgent.includes('Mac')) {
-      return 'darwin'
-    }
-    return navigator.userAgent.includes('Windows') ? 'win32' : 'linux'
-  }
-
-  const isPanePasteTargetMounted = (
-    pane: ManagedPane,
-    transport: PtyTransport | undefined,
-    ptyId: string | null
-  ): boolean => {
-    return isTerminalPanePasteTargetCurrent({
-      manager: managerRef.current,
-      paneTransports: paneTransportsRef.current,
-      paneId: pane.id,
-      leafId: pane.leafId,
-      transport,
-      ptyId
-    })
-  }
-
-  const executeMenuPasteText = async (
-    pane: ManagedPane,
-    source: TerminalPasteSource,
-    text: string,
-    options?: TerminalPasteTextOptions
-  ): Promise<boolean> => {
-    const connectionId = getConnectionId(worktreeId) ?? null
-    const transport = paneTransportsRef.current.get(pane.id)
-    const ptyId = transport?.getPtyId() ?? null
-    const shortcutPlatform = getShortcutPlatform()
-    const plan = await planTerminalPasteWithYield({
-      text,
-      source,
-      target: {
-        kind: 'terminal',
-        paneId: pane.id,
-        leafId: pane.leafId,
-        ptyId,
-        runtime: resolveTerminalPasteRuntime({
-          platform: shortcutPlatform,
-          ptyId,
-          connectionId,
-          remotePlatform: getTerminalPasteSshRemotePlatform(connectionId),
-          transport,
-          isWindowsConpty: forceBracketedMultilineTextPaste
-        })
-      },
-      forceBracketedPaste: options?.forceBracketedPaste,
-      forceBracketedPasteForMultiline: options?.forceBracketedPasteForMultiline,
-      windowsInputRecordNewline: options?.windowsInputRecordNewline,
-      terminalBracketedPasteMode: pane.terminal.modes.bracketedPasteMode
-    })
-    const execution = await executeTerminalPastePlan(plan, {
-      pasteText: (pasteText, pasteOptions) =>
-        pasteTerminalText(pane.terminal, pasteText, pasteOptions),
-      writePty: (data) => writeTerminalPastePtyInput(transport, data),
-      isTargetCurrent: () => isPanePasteTargetMounted(pane, transport, ptyId),
-      canContinue: () => isPanePasteTargetMounted(pane, transport, ptyId)
-    })
-    if (execution.status !== 'pasted') {
-      onPasteError(formatTerminalPasteExecutionError(execution.reason))
-      return false
-    }
-    if (text) {
-      recordTerminalUserInputForLeaf(tabId, pane.leafId)
-    }
-    if (options?.recoverImagePasteWebglAtlas) {
-      scheduleImagePasteWebglAtlasRecovery()
-    }
-    return true
-  }
-
-  const onCopyTerminalId = async (): Promise<void> => {
-    const pane = resolveMenuPane()
-    if (!pane) {
-      return
-    }
-    try {
-      await copyTerminalHandleForPane({
-        tabId,
-        leafId: pane.leafId,
-        callRuntime: window.api.runtime.call,
-        writeClipboardText: window.api.ui.writeTerminalClipboardText
-      })
-      toast.success(
-        translate(
-          'auto.components.terminal.pane.use.terminal.pane.context.menu.terminal.id.copied',
-          'Terminal ID copied'
-        )
-      )
-    } catch {
-      toast.error(
-        translate(
-          'auto.components.terminal.pane.use.terminal.pane.context.menu.terminal.id.copy.failed',
-          'Unable to copy terminal ID'
-        )
-      )
-    } finally {
-      pane.terminal.focus()
-    }
-  }
-
-  const pasteResolvedPane = async (
-    source: Extract<TerminalPasteSource, 'context-menu' | 'right-click'>
-  ): Promise<void> => {
-    const pane = resolveMenuPane()
-    if (!pane) {
-      return
-    }
-    const connectionId = getConnectionId(worktreeId) ?? null
-    const state = useAppStore.getState()
-    const runtimeEnvironmentId = getRuntimeEnvironmentIdForWorktree(state, worktreeId)
-    const transport = paneTransportsRef.current.get(pane.id) ?? null
-    const result = await pasteTerminalClipboard({
-      readClipboardText: window.api.ui.readClipboardText,
-      saveClipboardImageAsTempFile: window.api.ui.saveClipboardImageAsTempFile,
-      connectionId,
-      runtimeEnvironmentId,
-      protectedMultilineTextPasteOptions: resolveProtectedMultilinePasteOptionsForPane({
-        isWindowsClient: forceBracketedMultilineTextPaste,
-        hostPlatform: resolveTerminalInputHostPlatform({
-          clientPlatform: getShortcutPlatform(),
-          state,
-          worktreeId,
-          transport
-        }),
-        agentStatusByPaneKey: state.agentStatusByPaneKey,
-        paneForegroundAgentByPaneKey: state.paneForegroundAgentByPaneKey,
-        tabId,
-        leafId: pane.leafId
-      }),
-      pasteText: (text, options) => executeMenuPasteText(pane, source, text, options),
-      onTextPasteError: () =>
-        onPasteError('Paste failed: clipboard text is too large for a safe terminal paste.'),
-      onImagePasteError: (error) => {
-        const detail = error instanceof Error ? error.message : String(error)
-        onPasteError(`Image paste failed: ${detail}`)
-      }
-    })
-    if (result.status !== 'pasted') {
-      return
-    }
-    // Why: Radix returns focus to the menu trigger (the pane container) on
-    // close. Refocus only after a completed paste so rejected async targets
-    // do not steal focus from the user's new control.
-    pane.terminal.focus()
-  }
+  const onCopyTerminalId = async (): Promise<void> =>
+    copyTerminalPaneMenuTerminalId(resolveMenuPane(), tabId)
 
   const onPaste = async (): Promise<void> => pasteResolvedPane('context-menu')
 

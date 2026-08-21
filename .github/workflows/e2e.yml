@@ -259,8 +259,12 @@ jobs:
             echo "Changed startup-readiness specs are owned by the dedicated live lane."
             exit 0
           fi
-          E2E_ENV=(SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 ORCA_E2E_WEB_CLIENT=1)
-          if printf '%s\n' "${TEST_FILES[@]}" | grep -qx 'tests/e2e/ephemeral-vm-provisioned-root.spec.ts'; then
+          E2E_ENV=(SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 ORCA_E2E_WEB_CLIENT=1 ORCA_RELAY_PATH="$GITHUB_WORKSPACE/out/relay")
+          # Second clause: a spec that reads ORCA_E2E_SSH_DOCKER test.skip()s itself without it, so
+          # naming only one trigger silently skipped every other Docker-SSH spec in this lane.
+          # The first clause stays because that spec needs Docker without referencing the variable.
+          if printf '%s\n' "${TEST_FILES[@]}" | grep -qx 'tests/e2e/ephemeral-vm-provisioned-root.spec.ts' \
+            || grep -l 'ORCA_E2E_SSH_DOCKER' "${TEST_FILES[@]}" >/dev/null 2>&1; then
             E2E_ENV+=(ORCA_E2E_SSH_DOCKER=1)
           fi
           E2E_PROJECT_ARGS=()

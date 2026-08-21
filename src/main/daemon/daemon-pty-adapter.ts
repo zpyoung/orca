@@ -4,13 +4,10 @@ import { existsSync, readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { DaemonClient } from './client'
 import { DAEMON_ENDPOINT_LOST_MESSAGE } from './daemon-endpoint-ownership'
-import {
-  getMacDaemonSystemResolverHealth,
-  getMacDaemonTccAttributionHealth,
-  isDaemonStaleForCurrentBundle,
-  parseDaemonPidFile,
-  type ParsedDaemonPid
-} from './daemon-health'
+import { getMacDaemonSystemResolverHealth } from './daemon-health'
+import { getMacDaemonTccAttributionHealth } from './daemon-tcc-attribution'
+import { isDaemonStaleForCurrentBundle } from './daemon-bundle-staleness'
+import { parseDaemonPidFile, type ParsedDaemonPid } from './daemon-pid-file-parse'
 import {
   HistoryManager,
   type HistoryCheckpointResult,

@@ -38,7 +38,8 @@ import type {
   GetProjectViewTableResult,
   GitHubProjectMutationResult,
   GitHubProjectViewError
-} from '../../../../shared/github/project-types'
+} from '../../../../shared/github/project-result-types'
+import type { GetProjectViewTableArgs } from '../../../../shared/github/project-request-types'
 import {
   isGitHubWorkItemsSshRemoteRequiredError,
   sortWorkItemsByNumber,

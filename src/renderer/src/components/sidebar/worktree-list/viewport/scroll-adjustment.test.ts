@@ -3,22 +3,17 @@ import { countRecordKeysByReference } from './use-row-measurement'
 import { shouldAdjustWorktreeSidebarMeasuredRowScroll } from './use-scroll-suppression'
 import { resolvePendingSidebarReveal } from '../navigation/pending-reveal-inputs'
 import {
-  countRecordKeysByReference,
-  resolvePendingSidebarReveal,
-  shouldAdjustWorktreeSidebarMeasuredRowScroll
-} from './worktree-list/worktree-sidebar-scroll-tuning'
-import {
   getScrollTopToRevealBounds,
   WORKTREE_SIDEBAR_REVEAL_TOP_INSET
-} from './worktree-sidebar-reveal'
+} from '../../worktree-sidebar-reveal'
 import {
   extractWorktreeVirtualRowIndexes,
   estimateRenderRowSize,
   GROUP_HEADER_ROW_HEIGHT,
   getActiveStickyHeaderIndexForScroll
-} from './worktree-list-virtual-rows'
-import type { Repo } from '../../../../shared/repo-types'
-import type { Row } from './worktree-list-groups'
+} from './virtual-rows'
+import type { Repo } from '../../../../../../shared/repo-types'
+import type { Row } from '../grouping/row-types'
 
 const repo: Repo = {
   id: 'repo-1',
@@ -138,7 +133,7 @@ describe('getScrollTopToRevealBounds', () => {
         },
         GROUP_HEADER_ROW_HEIGHT
       )
-    ).toBe(76)
+    ).toBe(72)
   })
 
   it('includes extra reveal clearance for the highlight ring', () => {
@@ -153,7 +148,7 @@ describe('getScrollTopToRevealBounds', () => {
         },
         WORKTREE_SIDEBAR_REVEAL_TOP_INSET
       )
-    ).toBe(70)
+    ).toBe(66)
   })
 
   it('does not scroll when the bounds are below the sticky header', () => {
@@ -220,8 +215,8 @@ describe('estimateRenderRowSize', () => {
       secondaryHeaderIndex
     )
 
-    expect(inactiveSize).toBe(28)
-    expect(activeSize).toBe(28)
+    expect(inactiveSize).toBe(32)
+    expect(activeSize).toBe(32)
   })
 
   it('estimates imported worktree line rows with a stable compact height', () => {
@@ -236,7 +231,7 @@ describe('estimateRenderRowSize', () => {
         rangeStartIndex: 1,
         scrollOffset: 99,
         stickyHeaderIndexes: [0, 1],
-        virtualItems: [{ key: 'hdr:second', index: 1, start: 100, end: 128, size: 28, lane: 0 }]
+        virtualItems: [{ key: 'hdr:second', index: 1, start: 100, end: 136, size: 36, lane: 0 }]
       })
     ).toBe(0)
   })
@@ -250,7 +245,7 @@ describe('estimateRenderRowSize', () => {
         rangeStartIndex: 1,
         scrollOffset: 100,
         stickyHeaderIndexes: [0, 1],
-        virtualItems: [{ key: 'hdr:second', index: 1, start: 100, end: 128, size: 28, lane: 0 }]
+        virtualItems: [{ key: 'hdr:second', index: 1, start: 100, end: 136, size: 36, lane: 0 }]
       })
     ).toBe(1)
   })

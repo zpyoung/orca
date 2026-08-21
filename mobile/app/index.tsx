@@ -259,6 +259,17 @@ export default function HomeScreen() {
     () => Object.fromEntries(allClients.map(({ hostId, path }) => [hostId, path])),
     [allClients]
   )
+  const hostPendingPaths = useMemo(
+    () => Object.fromEntries(allClients.map(({ hostId, pendingPath }) => [hostId, pendingPath])),
+    [allClients]
+  )
+  const hostPairingRejected = useMemo(
+    () =>
+      Object.fromEntries(
+        allClients.map(({ hostId, pairingRejected }) => [hostId, pairingRejected])
+      ),
+    [allClients]
+  )
   const disconnectHostClient = useDisconnectHostClient()
   const forgetHostClient = useForgetHostClient()
   const forceReconnectHost = useForceReconnect()

@@ -9,6 +9,7 @@ import {
   normalizeReconcileText,
   type UnconfirmedSend
 } from './mobile-native-chat-draft-reconcile'
+import { rebaseMobileNativeChatPendingBaselines } from './mobile-native-chat-pending-baseline'
 import { retireLandedMobileNativeChatPending } from './mobile-native-chat-pending-retirement'
 import {
   appendMobileNativeChatPending,
@@ -143,10 +144,13 @@ export function useMobileNativeChatDrafts(args: {
         normalizedText,
         baselineOccurrences: countUserTextOccurrences(messagesRef.current, normalizedText),
         baselineTailMessageId: messagesRef.current.at(-1)?.id ?? null,
-        glueBaselineTrusted: !transcriptLoading
+        // Only a settled read makes this a boundary. Anything else — hydrating,
+        // or a read that failed — hands back an empty list that reads as "the
+        // conversation was empty", which lets any row claim this send later.
+        baselineResolved: transcriptSettled
       }
     },
-    [draftKey, pendingKey, transcriptLoading]
+    [draftKey, pendingKey, transcriptSettled]
   )
 
   // Why: over relay the send RPC can take seconds (or lose only its ack), and a
@@ -305,8 +309,13 @@ export function useMobileNativeChatDrafts(args: {
     }
     setPendingBySession((previous) => {
       const current = previous[pendingKey] ?? []
-      const next = retireLandedMobileNativeChatPending(messages, current, landedImagePendingIds)
-      if (next.length === current.length) {
+      // Rebase before retiring: a send captured before the history was known has
+      // to own a real boundary before any row can be judged against it.
+      const rebased = transcriptSettled
+        ? rebaseMobileNativeChatPendingBaselines(messages, current)
+        : current
+      const next = retireLandedMobileNativeChatPending(messages, rebased, landedImagePendingIds)
+      if (next === current) {
         return previous
       }
       if (next.length > 0) {

@@ -260,50 +260,6 @@ export class DaemonClient {
 
     const id = `${NOTIFY_PREFIX}${++this.requestCounter}`
     const msg = { id, type, ...(payload !== undefined ? { payload } : {}) }
-    let encoded: string
-    try {
-      encoded = encodeNdjson(msg)
-    } catch {
-      return false
-    }
-    return await new Promise<boolean>((resolve) => {
-      const socket = this.controlSocket!
-      const generation = this.connectionGeneration
-      let settled = false
-      const settle = (accepted: boolean): void => {
-        if (settled) {
-          return
-        }
-        settled = true
-        clearTimeout(timer)
-        resolve(accepted)
-      }
-      const rejectAndDisconnect = (): void => {
-        if (this.controlSocket === socket && this.connectionGeneration === generation) {
-          this.handleDisconnect(generation)
-        }
-        settle(false)
-      }
-      const timer = setTimeout(rejectAndDisconnect, timeoutMs)
-      try {
-        socket.write(encoded, (error) => (error ? rejectAndDisconnect() : settle(true)))
-      } catch {
-        rejectAndDisconnect()
-      }
-    })
-  }
-
-  onEvent(listener: (event: unknown) => void): () => void {
-    this.eventListeners.push(listener)
-    return () => {
-      const idx = this.eventListeners.indexOf(listener)
-      if (idx !== -1) {
-        this.eventListeners.splice(idx, 1)
-      }
-    }
-
-    const id = `${NOTIFY_PREFIX}${++this.requestCounter}`
-    const msg = { id, type, ...(payload !== undefined ? { payload } : {}) }
     const socket = this.controlSocket
     const generation = this.connectionGeneration
     return await writeNotifyWithSettlement({

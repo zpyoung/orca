@@ -2,8 +2,17 @@ import { describe, expect, it } from 'vitest'
 import type { BrowserPage, BrowserWorkspace } from '../../../../shared/browser-workspace-types'
 import type { Tab, TabContentType } from '../../../../shared/tab-types'
 import type { Worktree } from '../../../../shared/worktree/types'
-import type { SearchableBrowserPage } from '@/lib/browser-palette-search'
-import type { SearchableSimulatorTab } from '@/lib/simulator-palette-search'
+import { buildPaletteTabDocument } from '@/lib/palette-match/tab-document'
+import { PALETTE_QUERY_MAX_TOKENS } from '@/lib/palette-match/palette-query'
+import {
+  buildSearchableBrowserPageDocument,
+  type SearchableBrowserPage
+} from '@/lib/browser-palette-search'
+import {
+  SIMULATOR_TYPE_SEARCH_ALIASES,
+  simulatorPaletteTabTitle,
+  type SearchableSimulatorTab
+} from '@/lib/simulator-palette-search'
 import type { SearchableWorkspaceTab } from '@/lib/workspace-tab-palette-search'
 import {
   OPEN_TAB_SEARCH_QUERY_MAX_BYTES,

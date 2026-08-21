@@ -54,6 +54,27 @@ describe('sendTerminalInputAfterComposition', () => {
     expect(send).toHaveBeenCalledTimes(1)
   })
 
+  // STA-4476: `fallbackMs: null` has no exit of its own, so the disposer is the only thing that
+  // can detach the listeners when compositionend never arrives.
+  it('detaches its listeners and never sends once disposed', () => {
+    const el = document.createElement('div')
+    const send = vi.fn()
+    const removeEventListener = vi.spyOn(el, 'removeEventListener')
+
+    const dispose = sendTerminalInputAfterComposition(el, send, { fallbackMs: null })
+    dispose()
+
+    expect(removeEventListener).toHaveBeenCalledWith('compositionend', expect.any(Function))
+    expect(removeEventListener).toHaveBeenCalledWith(
+      XTERM_COMPOSITION_SESSION_END_EVENT,
+      expect.any(Function)
+    )
+
+    el.dispatchEvent(new Event('compositionend'))
+    vi.runAllTimers()
+    expect(send).not.toHaveBeenCalled()
+  })
+
   it('falls back to sending when no compositionend arrives', () => {
     const el = document.createElement('div')
     const send = vi.fn()

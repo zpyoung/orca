@@ -105,7 +105,10 @@ export async function withCookieMutationLock<T>(owner: object, run: () => Promis
   }
 }
 
-function removableCookieEntries(cookies: readonly Cookie[]): { cookie: Cookie; url: string }[] {
+function removableCookieEntries(
+  cookies: readonly Cookie[],
+  preserveFamilies: ReadonlySet<string>
+): { cookie: Cookie; url: string }[] {
   const removable: { cookie: Cookie; url: string }[] = []
   for (const cookie of cookies) {
     if (isNonTransplantableCookieDomain(cookie.domain ?? '')) {
@@ -197,7 +200,7 @@ export async function removeTransplantableCookies(
       return
     }
 
-    const initialRemovable = removableCookieEntries(initialCookies)
+    const initialRemovable = removableCookieEntries(initialCookies, preserveFamilies)
     if (initialRemovable.length === 0) {
       return
     }

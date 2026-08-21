@@ -133,7 +133,7 @@ describe('WorktreeList lineage child card renderer', () => {
     mockStore.state.activeWorktreeId = 'child'
     const markup = await renderWorktreeListMarkup()
 
-    expect(markup).toContain('aria-activedescendant="worktree-list-option-all%3Achild"')
+    expect(markup).toContain('aria-activedescendant="worktree-list-option-all%3A%7Cchild"')
   })
 
   it('points aria-activedescendant at the pinned row for active pinned workspaces', async () => {

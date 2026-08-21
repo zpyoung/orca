@@ -23,8 +23,21 @@ type EnrichmentOptions = {
   onChanged?: () => void
 }
 
-const inFlightProbesByLocation = new Map<string, Promise<boolean>>()
+type InFlightProbe = {
+  controller: AbortController
+  promise: Promise<boolean>
+}
+
+const inFlightProbesByLocation = new Map<string, InFlightProbe>()
 const probeRetryAfterByLocation = new Map<string, number>()
+// Why a set rather than the current caller's callback: coalesced sweeps come from different call
+// sites (the list IPC handlers and the runtime RPC, which also drops a resolved-worktree cache), so
+// the pass that lands a change has to notify every caller still waiting on it. Callers MUST pass a
+// stable callback reference — the set dedupes by function identity, so a fresh closure per call
+// would grow it (and multiply the broadcast) for the length of a sweep chain that never quiesces.
+const pendingChangeListeners = new Set<() => void>()
+let sweepInFlight: Promise<void> | null = null
+let rerunRequested = false
 
 function getRepoLocationKey(repo: Pick<Repo, 'path' | 'connectionId'>): string {
   return `${repo.connectionId ?? 'local'}\0${repo.path}`
@@ -86,8 +99,17 @@ async function enrichRepoGitRemoteIdentity(store: RepoIdentityStore, repo: Repo)
   const missTtlMs = repo.gitRemoteIdentity
     ? RESOLVED_IDENTITY_REFRESH_TTL_MS
     : NO_IDENTITY_RETRY_TTL_MS
-  const probe = (async () => {
-    const result = await probeGitRemoteIdentity(repo.path, repo.connectionId)
+  const controller = new AbortController()
+  const promise = (async () => {
+    const result = await probeGitRemoteIdentity(repo.path, repo.connectionId, {
+      signal: controller.signal
+    })
+    // Why the signal and not a catch: probeGitRemoteIdentity swallows the AbortError and RESOLVES
+    // `unavailable`, so a retired probe would otherwise re-seed a deadline for a location that no
+    // longer has a repo. Do not simplify this into a rejection path.
+    if (controller.signal.aborted) {
+      return false
+    }
     if (result.status !== 'resolved') {
       // Why: repos without a parseable remote are common; cache misses briefly so
       // list calls stay cheap while still allowing recent remote changes to land.
@@ -122,17 +144,25 @@ function isIdentityRefreshDue(repo: Repo, now: number): boolean {
 }
 
 /**
- * Drop deadlines for locations no longer backed by a repo, so removed repos and
- * retired SSH hosts do not accumulate for the life of the process.
+ * Drop deadlines and abort probes for locations no longer backed by a repo, so removed repos and
+ * retired SSH hosts do not accumulate — or keep a git child alive — for the life of the process.
  */
-function pruneRetryDeadlines(liveRepos: Repo[]): void {
-  const liveKeys = new Set(liveRepos.map(getRepoLocationKey))
+function retireRemovedLocations(allRepos: Repo[]): void {
+  const liveKeys = new Set(
+    allRepos.filter((repo) => repo.kind !== 'folder').map(getRepoLocationKey)
+  )
   for (const locationKey of probeRetryAfterByLocation.keys()) {
-    // A probe still running for a dropped repo needs no exemption: it re-adds its
-    // own deadline on settle, and only live repos are ever candidates, so nothing
-    // reads this entry in between.
     if (!liveKeys.has(locationKey)) {
       probeRetryAfterByLocation.delete(locationKey)
+    }
+  }
+  for (const [locationKey, entry] of inFlightProbesByLocation) {
+    // Why drop it here rather than leave it to the probe's own `.finally`: a probe that never
+    // settles would keep both the entry and its child alive, and re-poison this location if the
+    // same repo is added back.
+    if (!liveKeys.has(locationKey)) {
+      entry.controller.abort()
+      inFlightProbesByLocation.delete(locationKey)
     }
   }
 }
@@ -140,10 +170,6 @@ function pruneRetryDeadlines(liveRepos: Repo[]): void {
 function selectEnrichmentCandidates(store: RepoIdentityStore): Repo[] {
   const now = Date.now()
   const repos = store.getRepos().filter((repo) => repo.kind !== 'folder')
-  // Why here: this is the one place that already enumerates every live repo, and
-  // `getRepos()` builds its list synchronously from in-memory state, so a repo is
-  // never transiently absent mid-sweep and cannot lose its startup delay or backoff.
-  pruneRetryDeadlines(repos)
   // Why: the settled `null` marker stays a candidate on purpose — a repo that
   // gains a remote later must still resolve. Do not tighten this to
   // `=== undefined`; the retry TTL already bounds the cost and `writeIdentity`
@@ -166,8 +192,7 @@ function selectEnrichmentCandidates(store: RepoIdentityStore): Repo[] {
 }
 
 async function enrichMissingRepoGitRemoteIdentitiesInBackground(
-  store: RepoIdentityStore,
-  options: EnrichmentOptions
+  store: RepoIdentityStore
 ): Promise<void> {
   const candidates = selectEnrichmentCandidates(store)
   let changed = false
@@ -238,4 +263,7 @@ export function resetRepoGitRemoteIdentityEnrichmentForTests(): void {
   }
   inFlightProbesByLocation.clear()
   probeRetryAfterByLocation.clear()
+  pendingChangeListeners.clear()
+  sweepInFlight = null
+  rerunRequested = false
 }

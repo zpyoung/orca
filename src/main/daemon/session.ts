@@ -3,24 +3,12 @@ import { SessionOutputPlane, type AttachedClient } from './session-output-plane'
 import { SessionProducerPause } from './session-producer-pause'
 import { SessionShellReadyBarrier } from './session-shell-ready-barrier'
 import {
-  installDeviceAttributesResponder,
-  STARTUP_DA1_RESPONSE,
-  StartupDeviceAttributesQueryFilter
-} from './startup-device-attributes-responder'
-import { isValidPtySize, normalizePtySize } from './daemon-pty-size'
-import { PostReadyFlushGate } from './post-ready-flush-gate'
-import {
-  createShellStartupOutputScanState,
-  drainShellStartupOutputScanState,
-  scanShellStartupOutput,
-  type ShellStartupOutputScanState
-} from '../shell-startup-output-scanner'
-import {
-  createShellPromptReadinessProbe,
-  type ShellPromptReadinessProbe
-} from '../shell-prompt-readiness-probe'
-import { isPowerShellProcess } from '../../shared/shell-process-detection'
-import { killWithDescendantSweep } from '../pty-descendant-termination'
+  SessionTerminationController,
+  IMMEDIATE_KILL_PHYSICAL_EXIT_TIMEOUT_MS
+} from './session-termination-controller'
+import { nudgePowerShellPromptRepaint } from './session-powershell-prompt-repaint'
+import type { SubprocessHandle } from './session-subprocess-handle'
+import type { SessionOptions } from './session-options'
 import type { TuiAgent } from '../../shared/tui-agent'
 import { randomUUID } from 'node:crypto'
 import { PtyStartupIngress } from '../../shared/pty-startup-ingress'
@@ -247,26 +235,9 @@ export class Session {
     }
     const releasedHeldBytes =
       includeSnapshot && opts.teardownSnapshot === true ? this.prepareForFinalSnapshot() : ''
-    const records = this.pendingOutputRecords
-    const overflowed = this.pendingOutputOverflowed
-    this.pendingOutputRecords = []
-    this.pendingOutputBytes = 0
-    this.pendingOutputOverflowed = false
-    // Empty incremental takes are not persisted; advancing them would create a false reattach gap.
-    if (includeSnapshot || records.length > 0 || overflowed) {
-      this.pendingOutputSeq += 1
-    }
-    return {
-      records: includeSnapshot
-        ? releasedHeldBytes
-          ? [{ kind: 'output', data: releasedHeldBytes }]
-          : []
-        : records,
-      ...(includeSnapshot ? { drainedRecords: records } : {}),
-      seq: this.pendingOutputSeq,
-      overflowed,
-      snapshot: includeSnapshot ? this.getSnapshot() : null
-    }
+    return this.output.takePendingOutput(includeSnapshot, releasedHeldBytes, () =>
+      this.getSnapshot()
+    )
   }
 
   getCwd(): string | null {

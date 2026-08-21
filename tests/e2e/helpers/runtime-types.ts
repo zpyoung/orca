@@ -1,6 +1,11 @@
 import type { AppState } from '../../../src/renderer/src/store/types'
 import type { OpenFile, RightSidebarTab } from '../../../src/renderer/src/store/slices/editor'
-import type { ManagedPane } from '../../../src/renderer/src/lib/pane-manager/pane-manager-types'
+import type {
+  ManagedPane,
+  ManagedPaneInternal,
+  PaneRenderingDiagnostics
+} from '../../../src/renderer/src/lib/pane-manager/pane-manager-types'
+import type { GlobalSettings } from '../../../src/shared/global-settings-types'
 import type { BrowserWorkspace } from '../../../src/shared/browser-workspace-types'
 import type { Repo } from '../../../src/shared/repo-types'
 import type { WorkspaceVisibleTabType } from '../../../src/shared/tab-types'

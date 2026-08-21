@@ -262,8 +262,10 @@ export function RpcClientProvider({ children }: { children: ReactNode }) {
     [openEntry]
   )
 
-  const { getKnownState, getState, getReconnectAttempt, getLastConnectedAt, getActivePath } =
-    useMemo(() => createHostClientSelectors(storeRef.current, pendingOpensRef.current), [])
+  const selectors = useMemo(
+    () => createHostClientSelectors(storeRef.current, pendingOpensRef.current),
+    []
+  )
 
   const subscribeHostState = useCallback(
     (hostId: string, listener: (state: ConnectionState) => void) =>
@@ -320,11 +322,7 @@ export function RpcClientProvider({ children }: { children: ReactNode }) {
       refreshHostClient,
       forgetHostClient,
       disconnectHostClient,
-      getState,
-      getKnownState,
-      getReconnectAttempt,
-      getLastConnectedAt,
-      getActivePath,
+      ...selectors,
       subscribeHostState,
       getAllClients,
       subscribeAllHosts,
@@ -339,11 +337,7 @@ export function RpcClientProvider({ children }: { children: ReactNode }) {
       refreshHostClient,
       forgetHostClient,
       disconnectHostClient,
-      getState,
-      getKnownState,
-      getReconnectAttempt,
-      getLastConnectedAt,
-      getActivePath,
+      selectors,
       subscribeHostState,
       getAllClients,
       subscribeAllHosts,

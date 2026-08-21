@@ -2,10 +2,10 @@ import { useCallback, useMemo, useState } from 'react'
 import type {
   SourceControlActionRecipe,
   SourceControlLaunchActionId
-} from '../../../../shared/source-control-ai-actions'
-import type { GitStatusEntry } from '../../../../shared/git-status-types'
-import { buildFixCommitFailurePrompt } from './source-control-ai-prompts'
-import { summarizeCommitFailure } from './commit-failure-summary'
+} from '../../../../../../shared/source-control-ai-actions'
+import type { GitStatusEntry } from '../../../../../../shared/git-status-types'
+import { buildFixCommitFailurePrompt } from './prompts'
+import { summarizeCommitFailure } from '../commit/commit-failure-summary'
 import {
   getDefaultSourceControlRecoveryLaunchCopy,
   launchSourceControlRecoveryAgentWithDefault

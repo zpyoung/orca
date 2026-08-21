@@ -3,6 +3,11 @@ import type {
   RuntimeMobileSessionTabsResult
 } from '../../shared/runtime-types'
 import type { PersistedMobileClientTabSelections } from '../../shared/persisted-state-types'
+import {
+  forgetClosedClientSessionTabsByWorktree,
+  projectWithoutClosedClientSessionTabs
+} from './client-session-tab-closed-selection'
+import type { StoredClientSessionTabSelection } from './client-session-tab-closed-selection'
 import { normalizePersistedMobileClientTabSelections } from './client-session-tab-selection-persistence'
 
 export type ClientSessionTabSelection = {

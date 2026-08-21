@@ -84,8 +84,17 @@ export function createHostClientSelectors(
     getLastConnectedAt: (hostId: string): number | null =>
       entries.get(hostId)?.client.getLastConnectedAt() ?? null,
     getActivePath: (hostId: string): MobileConnectionPath =>
-      clientActivePath(entries.get(hostId)?.client)
+      clientActivePath(entries.get(hostId)?.client),
+    getPendingPath: (hostId: string): MobileConnectionPath | null =>
+      clientPendingPath(entries.get(hostId)?.client),
+    isPairingRejected: (hostId: string): boolean =>
+      clientPairingRejected(entries.get(hostId)?.client)
   }
+}
+
+export function clientPairingRejected(client: RpcClient | undefined): boolean {
+  const logical = client as Partial<StableLogicalRpcClient> | undefined
+  return logical?.isPairingRejected?.() ?? false
 }
 
 export function clientActivePath(client: RpcClient | undefined): MobileConnectionPath {

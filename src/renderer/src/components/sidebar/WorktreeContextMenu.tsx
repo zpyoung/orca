@@ -68,6 +68,7 @@ import {
   useWorktreeGroupDialog,
   WorktreeGroupMenuItems
 } from './fork-worktree-groups/WorktreeGroupMenuItems'
+import { getDeleteStateForWorktreeHost } from './worktree-delete-state-host-match'
 
 type Props = {
   worktree: Worktree

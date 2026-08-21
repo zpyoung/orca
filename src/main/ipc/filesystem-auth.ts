@@ -2,13 +2,13 @@ import { resolve, dirname, basename } from 'node:path'
 import { realpathSync } from 'node:fs'
 import { realpath } from 'node:fs/promises'
 import type { Store } from '../persistence'
-import { isRepoRoot, listRepoWorktrees } from '../repo-worktrees'
-import { computeWorkspaceRoot, getWorktreePathSettings } from './worktree-logic'
-import { isPathInsideOrEqual } from '../../shared/cross-platform-path'
-import { getProjectGroupSubtreeIds } from '../../shared/project-groups'
-import type { FolderWorkspace } from '../../shared/folder-workspace-types'
-import type { ProjectGroup } from '../../shared/project-group-types'
-import type { Repo } from '../../shared/repo-types'
+import { getAllowedRoots } from './filesystem-allowed-roots'
+import { isDescendantOrEqual, isENOENT, normalizeExistingPath } from './filesystem-path-containment'
+import {
+  ensureAuthorizedRootsCache,
+  isPathAllowedByCanonicalRegisteredRoot,
+  isRegisteredWorktreePath
+} from './registered-worktree-roots-cache'
 
 export const PATH_ACCESS_DENIED_MESSAGE =
   'Access denied: path resolves outside allowed directories. If this blocks a legitimate workflow, please file a GitHub issue.'

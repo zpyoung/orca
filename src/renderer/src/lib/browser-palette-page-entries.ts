@@ -1,6 +1,12 @@
+import { getWorktreeHostIdentity } from '../../../shared/worktree/host-qualified-identity'
 import type { BrowserPage, BrowserWorkspace } from '../../../shared/browser-workspace-types'
 import type { Worktree } from '../../../shared/worktree/types'
-import type { SearchableBrowserPage } from './browser-palette-search'
+import type { ExecutionHostId } from '../../../shared/execution-host'
+import { isPaletteCurrentWorktree, resolvePaletteRepoForWorktree } from './palette-repo-resolution'
+import {
+  buildSearchableBrowserPageDocument,
+  type SearchableBrowserPage
+} from './browser-palette-search'
 
 type BrowserPaletteActiveTabType = 'browser' | 'editor' | 'terminal' | 'simulator'
 

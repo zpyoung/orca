@@ -30,11 +30,6 @@ import {
 import { getMacDaemonSystemResolverHealth, checkDaemonHealth } from './daemon-health'
 import {
   getMacDaemonTccAttributionHealth,
-  getDaemonLaunchIdentity,
-  checkDaemonHealth,
-  isDaemonStaleForCurrentBundle,
-  killStaleDaemon,
-  parseDaemonPidFile,
   type MacDaemonTccAttributionHealth
 } from './daemon-tcc-attribution'
 import { getDaemonLaunchIdentity } from './daemon-pid-identity'

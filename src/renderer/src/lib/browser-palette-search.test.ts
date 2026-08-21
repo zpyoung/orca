@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { BrowserPage, BrowserWorkspace } from '../../../shared/browser-workspace-types'
 import type { Worktree } from '../../../shared/worktree/types'
+import { PALETTE_QUERY_MAX_TOKENS } from './palette-match/palette-query'
 import {
   BROWSER_PALETTE_QUERY_MAX_BYTES,
   buildSearchableBrowserPageDocument,

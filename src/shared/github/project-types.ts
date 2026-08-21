@@ -3,10 +3,6 @@
 // import from here directly — do not re-export through `./types.ts` just to
 // match the existing import block; routing through the issue types module
 // would obscure ownership of the Project surface.
-import type { PRComment } from './comment-types'
-import type { GitHubAssignableUser } from './pull-request-types'
-import type { GitHubWorkItemDetails } from './work-item-types'
-import type { GitHubIssueUpdate } from '../issue-mutation-types'
 
 export type GitHubProjectViewLayout = 'TABLE_LAYOUT' | 'BOARD_LAYOUT' | 'ROADMAP_LAYOUT'
 export type GitHubProjectOwnerType = 'organization' | 'user'

@@ -1,17 +1,13 @@
 import type { OpenFile } from '@/store/slices/editor'
-import {
-  resolveTerminalTabTitle,
-  resolveUnifiedTabLabel
-} from '../../../shared/tab-title-resolution'
-import type { Tab, TabContentType, TabGroup } from '../../../shared/tab-types'
-import type { TerminalTab } from '../../../shared/terminal-tab-types'
+import type { PaletteDocument } from './palette-match/palette-document'
+import type { Tab, TabGroup } from '../../../shared/tab-types'
+import type { PaneForegroundAgentEntry } from '@/store/slices/pane-foreground-agent'
+import type { TerminalLayoutSnapshot, TerminalTab } from '../../../shared/terminal-tab-types'
+import type { TuiAgent } from '../../../shared/tui-agent'
 import type { Worktree } from '../../../shared/worktree/types'
-import {
-  buildAgentMetadataTabIndex,
-  collectAgentMetadataFromIndex,
-  type AgentMetadata,
-  type WorkspaceTabAgentMetadataState
-} from './workspace-tab-agent-metadata'
+import type { ExecutionHostId } from '../../../shared/execution-host'
+import type { AgentMetadata, WorkspaceTabAgentMetadataState } from './workspace-tab-agent-metadata'
+import { buildSearchableWorkspaceTabEntries } from './workspace-tab-palette-entry-builder'
 export {
   searchWorkspaceTabs,
   type WorkspaceTabPaletteSearchResult

@@ -7,6 +7,7 @@ import type { SleepingAgentSessionRecord } from '../../../shared/agent-session-r
 import type { Tab, TabGroup } from '../../../shared/tab-types'
 import type { TerminalTab } from '../../../shared/terminal-tab-types'
 import type { Worktree } from '../../../shared/worktree/types'
+import { PALETTE_QUERY_MAX_TOKENS } from './palette-match/palette-query'
 import { buildSearchableWorkspaceTabs, searchWorkspaceTabs } from './workspace-tab-palette-search'
 
 const WT_ROOT = path.join('tmp', 'wt-1')

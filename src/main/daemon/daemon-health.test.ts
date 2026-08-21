@@ -20,8 +20,10 @@ import {
   parseLinuxProcStartTicks,
   startTimeMatches,
   startTimesWithinTolerance
-} from './daemon-health'
-import type { SubprocessHandle } from './session'
+} from './daemon-process-start-time'
+import { parseDaemonPidFile } from './daemon-pid-file-parse'
+import { parseWindowsProcessIdentityJson } from './daemon-process-identity-query'
+import type { SubprocessHandle } from './session-subprocess-handle'
 
 function createMockSubprocess(): SubprocessHandle {
   return {

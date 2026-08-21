@@ -60,6 +60,7 @@ export function buildOrderedGroups(args: {
   repoOrder: Map<string, number> | undefined
   projectOrderBy: ProjectOrderBy
   folderWorkspaces?: readonly RenderableFolderWorkspace[]
+  looseWorktreeIds?: ReadonlySet<string>
 }): OrderedGroupEntry[] {
   const {
     groupBy,
@@ -75,11 +76,15 @@ export function buildOrderedGroups(args: {
     pendingByRepo,
     repoOrder,
     projectOrderBy,
-    folderWorkspaces = []
+    folderWorkspaces = [],
+    looseWorktreeIds
   } = args
 
   const grouped = new Map<string, WorktreeGroupEntry>()
   for (const w of naturalWorktrees) {
+    if (looseWorktreeIds?.has(w.id)) {
+      continue
+    }
     let key: string
     let label: string
     let repo: Repo | undefined

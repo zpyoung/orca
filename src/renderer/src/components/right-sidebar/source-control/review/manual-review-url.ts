@@ -1,5 +1,5 @@
-import type { HostedReviewProvider } from '../../../../shared/hosted-review'
-import type { GitPushTarget } from '../../../../shared/worktree/types'
+import type { HostedReviewProvider } from '../../../../../../shared/hosted-review'
+import type { GitPushTarget } from '../../../../../../shared/worktree/types'
 import {
   branchFromRef,
   normalizeProvider,

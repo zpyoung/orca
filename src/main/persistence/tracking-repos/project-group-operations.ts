@@ -8,6 +8,7 @@ import {
 import { folderWorkspaceKey } from '../../../shared/workspace-scope'
 import type { StoreOwnedPersistedState } from '../loading-store/store-owned-state'
 import { removeWorkspaceSessionOwner } from '../restoring-sessions/session-owner-removal'
+import { releaseDeletedProjectGroupWorktreeMembership } from '../../fork-worktree-groups/project-group-membership-release'
 
 export type ProjectGroupMutationOperations = {
   state: StoreOwnedPersistedState
@@ -102,6 +103,7 @@ export class ProjectGroupPersistenceOperations {
         ? { ...repo, projectGroupId: null }
         : repo
     )
+    releaseDeletedProjectGroupWorktreeMembership(this.state.worktreeMeta, deletedGroupIds)
     const removedFolderWorkspaceKeys = new Set<string>()
     for (const workspace of this.state.folderWorkspaces ?? []) {
       if (deletedGroupIds.has(workspace.projectGroupId)) {

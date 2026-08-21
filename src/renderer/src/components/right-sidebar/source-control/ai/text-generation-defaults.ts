@@ -6,11 +6,11 @@ import {
   DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES,
   type SourceControlActionRecipe,
   type SourceControlTextActionId
-} from '../../../../shared/source-control-ai-actions'
-import type { SourceControlAiWriteTarget } from '../../../../shared/source-control-ai-recipe-save'
-import type { GlobalSettings } from '../../../../shared/global-settings-types'
-import type { Repo } from '../../../../shared/repo-types'
-import { sourceControlActionRecipeMatchesTarget } from './source-control-action-recipe-match'
+} from '../../../../../../shared/source-control-ai-actions'
+import type { SourceControlAiWriteTarget } from '../../../../../../shared/source-control-ai-recipe-save'
+import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
+import type { Repo } from '../../../../../../shared/repo-types'
+import { sourceControlActionRecipeMatchesTarget } from '../../source-control-action-recipe-match'
 
 type TextGenerationRecipeConfiguration = {
   agentId?: SourceControlActionRecipe['agentId']

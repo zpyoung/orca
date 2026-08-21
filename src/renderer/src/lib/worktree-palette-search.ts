@@ -25,9 +25,7 @@ import {
 import type { HostedReviewInfo } from '../../../shared/hosted-review'
 import type { Repo } from '../../../shared/repo-types'
 import type { Worktree } from '../../../shared/worktree/types'
-import { extractWorktreePaletteCommentSnippet } from './worktree-palette-comment-snippet'
-import { isWorktreePaletteQueryTooLarge } from './worktree-palette-query-bounds'
-import { matchWorktreePaletteReview } from './worktree-palette-review-match'
+import { resolvePaletteRepoForWorktree } from './palette-repo-resolution'
 import {
   matchWorktreePaletteTaskUrl,
   parseCmdJTaskSourceUrl

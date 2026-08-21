@@ -2,8 +2,6 @@ export type MobileNativeChatPendingMessage = {
   id: string
   text: string
   expectedOccurrence: number
-  /** Whether the transcript snapshot captured before this send was authoritative. */
-  glueBaselineTrusted: boolean
   /** Local preview URIs carried by the send for its optimistic echo. */
   images?: string[]
   baselineTailMessageId: string | null
@@ -20,7 +18,7 @@ export type MobileNativeChatSendOrigin = {
   normalizedText: string
   baselineOccurrences: number
   baselineTailMessageId: string | null
-  glueBaselineTrusted: boolean
+  baselineResolved: boolean
 }
 
 type PendingByKey = Record<string, MobileNativeChatPendingMessage[]>
@@ -64,7 +62,7 @@ export function appendMobileNativeChatPending(
             ? expectedImageEchoOrdinal
             : origin.baselineOccurrences + earlierOutstanding + 1,
         baselineTailMessageId: origin.baselineTailMessageId,
-        glueBaselineTrusted: origin.glueBaselineTrusted,
+        baselineResolved: origin.baselineResolved,
         ...(images?.length ? { images } : {})
       }
     ]

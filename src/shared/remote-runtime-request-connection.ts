@@ -32,13 +32,7 @@ import {
   type RemoteRuntimeRequestReadyWaiter
 } from './remote-runtime-request-ready-waiters'
 import { openRemoteRuntimeWebSocket } from './remote-runtime-request-websocket'
-import {
-  AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
-  SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
-  WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
-  WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY
-} from './protocol-version'
-
+import { remoteRuntimeClientCapabilities } from './remote-runtime-client-capabilities'
 type ConnectionState = 'closed' | 'awaiting_ready' | 'awaiting_authenticated' | 'ready'
 const IDLE_CLOSE_MS = 60_000
 
@@ -239,12 +233,7 @@ export class RemoteRuntimeRequestConnection {
         serializeRemoteRuntimePayload({
           type: 'e2ee_auth',
           deviceToken: this.pairing.deviceToken,
-          clientCapabilities: [
-            SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
-            AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
-            WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
-            WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY
-          ]
+          clientCapabilities: remoteRuntimeClientCapabilities()
         }),
         sharedKey
       )

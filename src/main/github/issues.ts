@@ -1,15 +1,5 @@
-/* eslint-disable max-lines -- Why: co-locating issue list/create/update/
-comment operations keeps the shared acquire/release + error-classification
-pattern obvious. Each function is short; the file is long because the
-surface is broad. */
 import type { ClassifiedError } from '../../shared/classified-error'
-import type { GitHubCommentResult, PRComment } from '../../shared/github/comment-types'
-import type { GitHubAssignableUser, IssueInfo } from '../../shared/github/pull-request-types'
-import type {
-  GitHubCreateIssueFields,
-  GitHubCreateIssueResult,
-  GitHubIssueUpdate
-} from '../../shared/issue-mutation-types'
+import type { IssueInfo } from '../../shared/github/pull-request-types'
 import type { IssueSourcePreference } from '../../shared/repo-types'
 import { mapIssueInfo } from './mappers'
 import type { LocalGitExecOptions } from './gh-utils'

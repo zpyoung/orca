@@ -1,21 +1,4 @@
-/* eslint-disable max-lines -- Why: field state, base search, AI generation,
-   and cancellation share request guards that need to stay in one hook. */
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { getConnectionId } from '@/lib/connection-context'
-import { useAppStore, type AppState } from '@/store'
-import {
-  cancelRuntimeGeneratePullRequestFields,
-  generateRuntimePullRequestFields,
-  type RuntimeGeneratePullRequestFieldsOverrides,
-  type RuntimeGitContext
-} from '@/runtime/runtime-git-client'
-import {
-  getRuntimeRepoBaseRefDefault,
-  searchRuntimeRepoBaseRefDetails
-} from '@/runtime/runtime-repo-client'
-import type { BaseRefSearchResult, Repo } from '../../../../shared/repo-types'
-import type { HostedReviewCreationEligibility } from '../../../../shared/hosted-review'
-import { normalizeHostedReviewBaseRef } from '../../../../shared/hosted-review-refs'
+import { useCallback, useRef, useState } from 'react'
 import {
   DEFAULT_SOURCE_CONTROL_AI_PR_CREATION_DEFAULTS,
   resolveSourceControlAiForOperation

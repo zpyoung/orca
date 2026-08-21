@@ -20,6 +20,10 @@ import {
   LINEAGE_CHILDREN_INLINE_OFFSET
 } from './indentation'
 import type { LineageToggleHandler } from '../../worktree-lineage-toggle-handler-cache'
+import {
+  getLooseSectionProjectGroupId,
+  isLooseProjectGroupTopRow
+} from '../../fork-worktree-groups/worktree-loose-group-membership'
 import { stopNestedWorktreeCardBubble } from './header-event-guards'
 import type { WorktreeItemRow } from '../listing/renderable-rows'
 import { getWorktreeOptionId } from './option-dom'
@@ -70,7 +74,11 @@ function getWorktreeItemRowGeometry(
   itemRow: WorktreeItemRow,
   nested: boolean
 ): { surfaceInset: number; cardContentIndent: number; lineageChildrenInlineOffset?: number } {
-  const projectGroupId = itemRow.repo?.projectGroupId
+  // Why: the group this row is displayed in, which for a loose
+  // worktree is its own and not its repo's — the repo's group decides
+  // folder-backed indentation for rows that render under the repo.
+  const projectGroupId =
+    getLooseSectionProjectGroupId(itemRow.sectionKey) ?? itemRow.repo?.projectGroupId
   const isFolderBackedRepoChild =
     ctx.groupBy === 'repo' &&
     Boolean(projectGroupId && ctx.folderBackedProjectGroupIds.has(projectGroupId))
@@ -216,6 +224,7 @@ export function renderWorktreeItemRow(
         // Why: pinned worktrees mix repos in one section, so only it needs the leading repo identity chip.
         hostContextLabel={itemRow.hostContextLabel}
         inPinnedSection={itemRow.sectionKey === PINNED_GROUP_KEY}
+        inProjectGroupLooseSection={isLooseProjectGroupTopRow(itemRow.sectionKey, nested)}
         renameRowKey={itemRow.rowKey}
         lineageChildCount={itemRow.lineageChildCount}
         lineageCollapsed={itemRow.lineageCollapsed}

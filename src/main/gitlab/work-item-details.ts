@@ -5,8 +5,7 @@
 import type {
   GitLabAssignableUser,
   GitLabWorkItem,
-  GitLabWorkItemDetails,
-  MRComment
+  GitLabWorkItemDetails
 } from '../../shared/gitlab-types'
 import type { IssueSourcePreference } from '../../shared/repo-types'
 import { mapIssueToWorkItem, mapMRToWorkItem } from './mappers'

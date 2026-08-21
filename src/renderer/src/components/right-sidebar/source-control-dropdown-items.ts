@@ -1,10 +1,5 @@
 // Why: split from source-control-primary-action — primary and dropdown are independent derivations with different priority ladders.
 
-import type { PrimaryActionInputs } from './source-control-primary-action'
-import { canSubmitCommit, resolveCommitDisabledReason } from './source-control-commit-eligibility'
-import type { GitConflictOperation } from '../../../../shared/git-status-types'
-import { shouldForcePushWithLeaseForUpstream } from '../../../../shared/git-upstream-status'
-import { supportsHostedReviewCreation } from '../../../../shared/hosted-review-creation-providers'
 import { translate } from '@/i18n/i18n'
 import type { DropdownActionInputs, DropdownEntry } from './source-control-dropdown-item-types'
 import { deriveDropdownActionContext } from './source-control-dropdown-action-context'

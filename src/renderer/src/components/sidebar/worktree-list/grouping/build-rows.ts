@@ -21,6 +21,10 @@ import {
 import { buildProjectGroupingIndex } from './project-grouping'
 import type { ProjectGroupingModel } from './project-grouping'
 import { appendProjectGroupSections } from './project-group-sections'
+import {
+  collectLooseWorktreesByProjectGroupId,
+  getLooseWorktreeIds
+} from '../../fork-worktree-groups/loose-worktree-section-rows'
 import { getPinnedSectionWorktrees } from '../../pinned-section-worktrees'
 import { emitPinnedGroup } from './pinned-group-rows'
 import {
@@ -178,6 +182,11 @@ export function buildRows(
     return result
   }
 
+  const looseWorktreesByProjectGroupId = collectLooseWorktreesByProjectGroupId(
+    naturalWorktrees,
+    groupBy,
+    projectGroups
+  )
   const orderedGroups = buildOrderedGroups({
     groupBy,
     naturalWorktrees,
@@ -192,7 +201,8 @@ export function buildRows(
     pendingByRepo,
     repoOrder,
     projectOrderBy,
-    folderWorkspaces: renderableFolderWorkspaces
+    folderWorkspaces: renderableFolderWorkspaces,
+    looseWorktreeIds: getLooseWorktreeIds(looseWorktreesByProjectGroupId)
   })
 
   const sectionContext: SectionAppendContext = {
@@ -227,7 +237,8 @@ export function buildRows(
     projectGroups,
     folderWorkspaces: renderableFolderWorkspaces,
     projectOrderBy,
-    repoOrder
+    repoOrder,
+    looseWorktreesByProjectGroupId
   })
 
   return result

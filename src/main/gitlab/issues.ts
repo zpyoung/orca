@@ -1,15 +1,5 @@
-/* eslint-disable max-lines -- Why: parallel to src/main/github/issues.ts —
-co-locating issue list/create/update/comment operations keeps the shared
-acquire/release + error-classification pattern obvious. Each function is
-short; the file is long because the surface is broad. */
 import type { ClassifiedError } from '../../shared/classified-error'
-import type {
-  GitLabAssignableUser,
-  GitLabCommentResult,
-  GitLabIssueInfo,
-  GitLabIssueUpdate,
-  MRComment
-} from '../../shared/gitlab-types'
+import type { GitLabCommentResult, GitLabIssueInfo, MRComment } from '../../shared/gitlab-types'
 import type { IssueSourcePreference } from '../../shared/repo-types'
 import { mapGitLabIssueInfo } from './mappers'
 // prettier-ignore

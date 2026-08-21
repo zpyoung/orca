@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react'
 import type { Worktree } from '../../../../shared/worktree/types'
+import { getWorktreeHostIdentity } from '../../../../shared/worktree/host-qualified-identity'
 import {
   areWorktreeSelectionsEqual,
   getWorktreeSelectionIntent,

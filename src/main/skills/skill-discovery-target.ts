@@ -114,19 +114,29 @@ export async function discoverSkillsOnTarget(
   const refresh = options.refresh === true
   try {
     const outcome = await targetScans.run(
-      scanKey(target, repos),
+      scanKey(target, repos, options.providerRootOverrides),
       { ttlMs: target.kind === 'wsl' ? WSL_RESULT_TTL_MS : 0, refresh },
       async () => {
         if (target.kind === 'wsl') {
           return discoverSkillsInWsl({
             distro: target.distro,
             homeDir: target.homeDir,
-            cwd: target.cwd
+            cwd: target.cwd,
+            providerRootOverrides: options.providerRootOverrides
           })
         }
         return target.cwd
-          ? discoverSkills({ repos: [], cwd: target.cwd, refresh })
-          : discoverSkills({ repos: [...repos], refresh })
+          ? discoverSkills({
+              repos: [],
+              cwd: target.cwd,
+              refresh,
+              providerRootOverrides: options.providerRootOverrides
+            })
+          : discoverSkills({
+              repos: [...repos],
+              refresh,
+              providerRootOverrides: options.providerRootOverrides
+            })
       }
     )
     return outcome.value

@@ -51,7 +51,9 @@ function loadManifestOrExit() {
 }
 
 function classify(manifest, target, mergeHead, outDir) {
-  const differing = gitPaths(git('diff', '--name-only', '-z', mergeHead, target))
+  // rename detection prints only a rename's destination, so the source path would never be
+  // classified and would survive as an orphaned duplicate of the module upstream moved
+  const differing = gitPaths(git('diff', '--name-only', '--no-renames', '-z', mergeHead, target))
   if (differing.length === 0) {
     console.error('no differing paths between merge-head and target-ref; refusing to classify')
     process.exit(2)

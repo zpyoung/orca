@@ -5,10 +5,10 @@ import {
   toSshExecutionHostId,
   type ExecutionHostId,
   type ExecutionHostScope
-} from '../../../../shared/execution-host'
-import type { FolderWorkspacePathStatusRequest } from '../../../../shared/folder-workspace-path-status'
-import type { FolderWorkspace } from '../../../../shared/folder-workspace-types'
-import type { ProjectGroup } from '../../../../shared/project-group-types'
+} from '../../../../../../shared/execution-host'
+import type { FolderWorkspacePathStatusRequest } from '../../../../../../shared/folder-workspace-path-status'
+import type { FolderWorkspace } from '../../../../../../shared/folder-workspace-types'
+import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 
 /** null means "no host filter" — every host is visible. */
 export function getVisibleSidebarHostIdSet(

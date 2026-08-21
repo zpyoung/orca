@@ -220,10 +220,6 @@ import {
 } from '@/lib/worktree-palette-task-url-match'
 import type { SettingsNavTarget } from '@/lib/settings-navigation-types'
 import { getHostDisplayLabelOverrides } from '../../../shared/host-setting-overrides'
-import {
-  getSettingsFocusedExecutionHostId,
-  isRuntimeOwnedSshTargetId
-} from '../../../shared/execution-host'
 import type { GitHubWorkItem } from '../../../shared/github/work-item-types'
 import type { LinearIssue } from '../../../shared/linear/issue-types'
 import type { TerminalTab } from '../../../shared/terminal-tab-types'
@@ -500,13 +496,13 @@ function PaletteOpenTabPrimaryLine({
   title,
   titleRanges,
   secondaryText,
-  secondaryRange,
+  secondaryRanges,
   leadingBadges
 }: {
   title: string
   titleRanges: readonly MatchRange[]
   secondaryText: string
-  secondaryRange: MatchRange | null
+  secondaryRanges: readonly MatchRange[]
   leadingBadges?: React.ReactNode
 }): React.JSX.Element {
   // Why gate on non-empty: empty secondaries (terminals/simulators) used to still
@@ -519,14 +515,14 @@ function PaletteOpenTabPrimaryLine({
         data-slot="palette-open-tab-title"
         className="min-w-0 truncate text-[14px] font-semibold tracking-[-0.01em] text-foreground"
       >
-        <HighlightedText text={title} matchRange={titleRange} />
+        <HighlightedText text={title} matchRanges={titleRanges} />
       </span>
       {leadingBadges}
       {showSecondary ? (
         <>
           <span className="shrink-0 text-muted-foreground/45">·</span>
           <span className="min-w-0 max-w-[34%] truncate text-[12px] font-medium text-muted-foreground/92">
-            <HighlightedText text={secondaryText} matchRange={secondaryRange} />
+            <HighlightedText text={secondaryText} matchRanges={secondaryRanges} />
           </span>
         </>
       ) : null}
@@ -553,13 +549,13 @@ function resolveOpenTabWorktreeRailTooltip({
 
 function PaletteOpenTabWorktreeRailLabel({
   name,
-  matchRange,
+  matchRanges,
   worktree,
   className,
   slot = 'palette-open-tab-worktree'
 }: {
   name: string
-  matchRange: MatchRange | null
+  matchRanges: readonly MatchRange[]
   worktree?: Pick<Worktree, 'branch'> | null
   className?: string
   slot?: string
@@ -598,7 +594,7 @@ function PaletteOpenTabWorktreeRailLabel({
     <Tooltip>
       <TooltipTrigger asChild>
         <span ref={labelRef} data-slot={slot} tabIndex={-1} className={className}>
-          <HighlightedText text={name} matchRange={matchRange} />
+          <HighlightedText text={name} matchRanges={matchRanges} />
         </span>
       </TooltipTrigger>
       <TooltipContent side="top" sideOffset={6} className="max-w-80 break-all">
@@ -3279,7 +3275,7 @@ function WorktreeJumpPaletteContent({
                             )}
                             <PaletteOpenTabWorktreeRailLabel
                               name={worktreeLabel}
-                              matchRange={entry.match.displayNameRange}
+                              matchRanges={entry.match.displayNameRanges}
                               worktree={worktree}
                               slot="palette-worktree-name"
                               className="truncate text-[14px] font-semibold text-foreground"
@@ -3305,7 +3301,7 @@ function WorktreeJumpPaletteContent({
                                 <span className="shrink-0 text-muted-foreground/45">·</span>
                                 <PaletteOpenTabWorktreeRailLabel
                                   name={branch}
-                                  matchRange={entry.match.branchRange}
+                                  matchRanges={entry.match.branchRanges}
                                   worktree={worktree}
                                   slot="palette-worktree-branch"
                                   className="truncate text-[12px] font-medium text-muted-foreground/92"
@@ -3447,8 +3443,20 @@ function WorktreeJumpPaletteContent({
                   hostOptions,
                   hostFilterActive
                 )
-                const WorkspaceTabIcon =
-                  result.contentType === 'terminal' ? SquareTerminal : FileText
+                const workspaceTabFallback =
+                  result.contentType === 'terminal' && result.occupantAgent ? (
+                    <span
+                      className="inline-flex"
+                      data-agent-icon={result.occupantAgent}
+                      aria-hidden="true"
+                    >
+                      <AgentIcon agent={result.occupantAgent} size={14} />
+                    </span>
+                  ) : result.contentType === 'terminal' ? (
+                    <SquareTerminal className="size-3.5" aria-hidden="true" />
+                  ) : (
+                    <FileText className="size-3.5" aria-hidden="true" />
+                  )
                 // Why regardless of query: a searched-for tab is exactly when you need to know it's
                 // still working — the map covers every open tab, not just the recent section.
                 const recentRow = recentTabRowById.get(entry.id) ?? null
@@ -3470,7 +3478,7 @@ function WorktreeJumpPaletteContent({
                             title={result.title}
                             titleRanges={result.titleRanges}
                             secondaryText={result.secondaryText}
-                            secondaryRange={result.secondaryRange}
+                            secondaryRanges={result.secondaryRanges}
                             leadingBadges={
                               <>
                                 {result.isCurrentTab && (
@@ -3496,7 +3504,7 @@ function WorktreeJumpPaletteContent({
                         <div className="flex shrink-0 items-center gap-1.5">
                           <PaletteOpenTabWorktreeRailLabel
                             name={result.worktreeName}
-                            matchRange={result.worktreeRange}
+                            matchRanges={result.worktreeRanges}
                             worktree={workspaceTabWorktree}
                             className="max-w-[280px] truncate text-[12px] font-medium text-muted-foreground"
                           />
@@ -3553,7 +3561,7 @@ function WorktreeJumpPaletteContent({
                             title={result.title}
                             titleRanges={result.titleRanges}
                             secondaryText={result.secondaryText}
-                            secondaryRange={result.secondaryRange}
+                            secondaryRanges={result.secondaryRanges}
                             leadingBadges={
                               <>
                                 {result.isCurrentTab && (
@@ -3579,7 +3587,7 @@ function WorktreeJumpPaletteContent({
                         <div className="flex shrink-0 items-center gap-1.5">
                           <PaletteOpenTabWorktreeRailLabel
                             name={result.worktreeName}
-                            matchRange={result.worktreeRange}
+                            matchRanges={result.worktreeRanges}
                             worktree={simulatorWorktree}
                             className="max-w-[280px] truncate text-[12px] font-medium text-muted-foreground"
                           />
@@ -3635,7 +3643,7 @@ function WorktreeJumpPaletteContent({
                           title={result.title}
                           titleRanges={result.titleRanges}
                           secondaryText={result.secondaryText}
-                          secondaryRange={result.secondaryRange}
+                          secondaryRanges={result.secondaryRanges}
                           leadingBadges={
                             <>
                               {result.isCurrentPage && (
@@ -3661,7 +3669,7 @@ function WorktreeJumpPaletteContent({
                       <div className="flex shrink-0 items-center gap-1.5">
                         <PaletteOpenTabWorktreeRailLabel
                           name={result.worktreeName}
-                          matchRange={result.worktreeRange}
+                          matchRanges={result.worktreeRanges}
                           worktree={browserWorktree}
                           className="max-w-[280px] truncate text-[12px] font-medium text-muted-foreground"
                         />

@@ -10,7 +10,6 @@ import type {
   CreateWorktreeArgs,
   CreateWorktreeResult,
   ForceDeleteWorktreeBranchResult,
-  RemoveWorktreeResult,
   SetupDecision
 } from '../../../../shared/worktree/create-types'
 import type { WorktreeStartupLaunch } from '../../../../shared/worktree/launch-types'
@@ -25,7 +24,10 @@ import type {
   Worktree
 } from '../../../../shared/worktree/types'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
-import type { WorktreeForceDeleteReason } from '../../../../shared/worktree/removal'
+import type {
+  WorktreeForceDeleteReason,
+  WorktreeRemovalTarget
+} from '../../../../shared/worktree/removal'
 import type { TerminalGitHubPRLink } from '../../../../shared/terminal-github-pr-link-detector'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
 import type { RemoveWorktreeOptions } from './worktree-removal-options'
@@ -247,17 +249,7 @@ export type WorktreeSlice = {
   removeWorktree: (
     target: WorktreeRemovalTarget,
     force?: boolean,
-    // 'forget-local' drops the workspace from Orca only (no remote Git/FS work)
-    // for workspaces pinned to a removed/disconnected SSH host. Reuses the same
-    // renderer-side teardown/purge as a normal remove.
-    options?: {
-      mode?: 'remove' | 'forget-local'
-      suppressPreservedBranchToast?: boolean
-      // Why (#11960): only an explicit Force Delete waives the proof that every
-      // PTY stopped; `force` alone is set by the ordinary delete confirmation.
-      allowUnverifiedPtyStop?: boolean
-      snapshotPruneBatchId?: string
-    }
+    options?: RemoveWorktreeOptions
   ) => Promise<({ ok: true } & RendererRemoveWorktreeResult) | { ok: false; error: string }>
   markWorktreesDeleting: (worktrees: readonly (string | WorktreeDeleteStateTarget)[]) => void
   markWorktreesQueuedForDeletion: (

@@ -6,6 +6,7 @@ import {
 } from './migration-dial-state-forwarder'
 import { waitForAuthenticated } from './replacement-session-authentication'
 import { projectMobileRpcRequestParams } from './mobile-rpc-request-projection'
+import { LogicalClientConnectionPath } from './logical-client-connection-path'
 
 export type MobileConnectionPath = 'lan' | 'tailscale' | 'relay'
 

@@ -11,11 +11,11 @@ import { detectLanguage } from '@/lib/language-detect'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
 import { resolveDefaultAgentForNewTab } from '@/lib/agent-tab-shortcuts'
 import { translate } from '@/i18n/i18n'
-import type { GitHistoryItem } from '../../../../shared/git-history'
+import type { GitHistoryItem } from '../../../../../../shared/git-history'
 import type {
   GitBranchChangeEntry,
   GitCommitCompareResult
-} from '../../../../shared/git-diff-compare-types'
+} from '../../../../../../shared/git-diff-compare-types'
 import {
   shouldOpenSourceControlRowAsPreview,
   type SourceControlRowOpenEvent

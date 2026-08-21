@@ -3,8 +3,12 @@ import { useAppStore } from '@/store'
 import { getConnectionId } from '@/lib/connection-context'
 import { getSettingsForWorktreeRuntimeOwner } from '@/lib/worktree-runtime-owner'
 import { getRuntimeGitStatus } from '@/runtime/runtime-git-client'
+import { findRepoForHost } from '@/store/slices/repo-host-identity'
 import type { Repo } from '../../../../shared/repo-types'
 import type { Worktree } from '../../../../shared/worktree/types'
+import type { GitStatusResult } from '../../../../shared/git-status-types'
+import { parseExecutionHostId } from '../../../../shared/execution-host'
+import { getWorktreeHostIdentity } from '../../../../shared/worktree/host-qualified-identity'
 import { isFolderWorkspaceDelete } from './delete-worktree-dialog-copy'
 
 const EMPTY_STATUS_BY_IDENTITY = new Map<string, GitStatusResult['entries']>()

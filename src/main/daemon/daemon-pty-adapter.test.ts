@@ -10,6 +10,8 @@ import {
   waitFor
 } from './daemon-pty-adapter-test-harness'
 import type * as DaemonHealthModule from './daemon-health'
+import type * as DaemonTccAttributionModule from './daemon-tcc-attribution'
+import type * as DaemonBundleStalenessModule from './daemon-bundle-staleness'
 
 const {
   getMacDaemonSystemResolverHealthMock,
@@ -31,8 +33,22 @@ vi.mock('./daemon-health', async (importOriginal) => {
   const actual = await importOriginal<typeof DaemonHealthModule>()
   return {
     ...actual,
-    getMacDaemonSystemResolverHealth: getMacDaemonSystemResolverHealthMock,
-    getMacDaemonTccAttributionHealth: getMacDaemonTccAttributionHealthMock,
+    getMacDaemonSystemResolverHealth: getMacDaemonSystemResolverHealthMock
+  }
+})
+
+vi.mock('./daemon-tcc-attribution', async (importOriginal) => {
+  const actual = await importOriginal<typeof DaemonTccAttributionModule>()
+  return {
+    ...actual,
+    getMacDaemonTccAttributionHealth: getMacDaemonTccAttributionHealthMock
+  }
+})
+
+vi.mock('./daemon-bundle-staleness', async (importOriginal) => {
+  const actual = await importOriginal<typeof DaemonBundleStalenessModule>()
+  return {
+    ...actual,
     isDaemonStaleForCurrentBundle: isDaemonStaleForCurrentBundleMock
   }
 })
@@ -689,7 +705,12 @@ describe('DaemonPtyAdapter (IPtyProvider)', () => {
       lastSubprocess._simulateExit(42)
 
       await waitFor(() => exits.length > 0)
-      expect(exits[0]).toEqual({ id, code: 42, incarnationId: expect.any(String) })
+      expect(exits[0]).toEqual({
+        id,
+        code: 42,
+        incarnationId: expect.any(String),
+        cause: { kind: 'exited', exitCode: 42 }
+      })
     })
   })
 

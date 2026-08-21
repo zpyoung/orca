@@ -41,11 +41,6 @@ export class ManagedCodexHomeTemporarilyUnavailableError extends Error {
   }
 }
 
-function isDefinitiveAbsence(error: unknown): boolean {
-  const code = (error as NodeJS.ErrnoException | null)?.code
-  return code === 'ENOENT' || code === 'ENOTDIR'
-}
-
 function pathsEqual(left: string, right: string): boolean {
   const resolvedLeft = resolve(left)
   const resolvedRight = resolve(right)

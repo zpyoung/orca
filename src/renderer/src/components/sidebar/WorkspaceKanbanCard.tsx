@@ -3,6 +3,7 @@ import { Pin } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import type { Repo } from '../../../../shared/repo-types'
 import type { WorkspaceStatus, Worktree } from '../../../../shared/worktree/types'
+import { getWorktreeHostIdentity } from '../../../../shared/worktree/host-qualified-identity'
 import WorktreeCard from './WorktreeCard'
 import { translate } from '@/i18n/i18n'
 

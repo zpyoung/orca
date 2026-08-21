@@ -44,7 +44,13 @@ import type {
   ListAccessibleProjectsResult,
   ListProjectViewsResult,
   ResolveProjectRefResult
-} from '../../shared/github/project-types'
+} from '../../shared/github/project-result-types'
+import type {
+  GetProjectViewTableArgs,
+  ListAccessibleProjectsArgs,
+  ListProjectViewsArgs,
+  ResolveProjectRefArgs
+} from '../../shared/github/project-request-types'
 import {
   GITHUB_PROJECT_REF_INPUT_TOO_LARGE_ERROR,
   isGitHubProjectRefInputTooLarge

@@ -167,9 +167,6 @@ export type NativeChatGluedUserRow = {
  * optimistic texts concatenated into one transcript user row). Exact single
  * matches stay in the content-key/occurrence path so repeated prompts and
  * send boundaries keep their existing semantics.
- *
- * `userTexts` must already be filtered to rows after the oldest entry's send
- * boundary — this matcher has no clock of its own.
  */
 export function selectPendingIndicesRepresentedByUserRows(
   pending: readonly NativeChatPendingOccurrence[],

@@ -90,9 +90,20 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
         repos: args.visibleReposForRows,
         worktreesByRepo,
         visibleWorktrees: worktrees,
-        filterRepoIds: args.filterRepoIds
+        filterRepoIds: args.filterRepoIds,
+        // Why: must agree with buildRows' `projectGroupsById`, which is built
+        // from this same host-filtered list — not the full `projectGroups` —
+        // or a cross-host group can "exist" here while buildRows can't find it.
+        projectGroups: args.visibleProjectGroupsForRows
       }),
-    [args.filterRepoIds, args.groupBy, args.visibleReposForRows, worktrees, worktreesByRepo]
+    [
+      args.filterRepoIds,
+      args.groupBy,
+      args.visibleProjectGroupsForRows,
+      args.visibleReposForRows,
+      worktrees,
+      worktreesByRepo
+    ]
   )
 
   // Why: subscribe on a flat key array (useShallow) so progress ticks don't rebuild the whole row model.

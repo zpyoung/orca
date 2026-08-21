@@ -42,7 +42,7 @@ import type {
   GetProjectViewTableResult,
   GitHubProjectViewError,
   ListProjectViewsResult
-} from '../../../../shared/github/project-types'
+} from '../../../../shared/github/project-result-types'
 import type { GitHubWorkItem } from '../../../../shared/github/work-item-types'
 import ProjectPicker, { type ResolvedProjectSelection } from './ProjectPicker'
 import ProjectViewList from './ProjectViewList'

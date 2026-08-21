@@ -10,17 +10,9 @@ import { iterateLfScriptLines } from './setup-runner-script-text'
 import { promptGuardShellEnv } from './git/runner'
 import { toLinuxPath } from './wsl'
 import { addWorktreeSetupWslInteropEnv } from './pty/wsl-orca-env'
-import type {
-  HookCommandSourcePolicy,
-  OrcaHooks,
-  SetupRunPolicy
-} from '../shared/orca-yaml-hook-types'
+import type { HookRuntimeTarget } from './hook-runtime-target'
+import type { OrcaHooks } from '../shared/orca-yaml-hook-types'
 import type { Repo } from '../shared/repo-types'
-import type { SetupDecision } from '../shared/worktree/create-types'
-import type {
-  WorktreeDefaultTabsLaunch,
-  WorktreeSetupLaunch
-} from '../shared/worktree/launch-types'
 import type { ProjectExecutionRuntimeResolution } from '../shared/project-execution-runtime'
 
 const HOOK_TIMEOUT = 120_000 // 2 minutes

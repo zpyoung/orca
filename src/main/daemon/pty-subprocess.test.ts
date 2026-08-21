@@ -97,7 +97,7 @@ describe('createPtySubprocess', () => {
     validateWorkingDirectoryMock
   })
 
-  it('spawns node-pty with correct options', () => {
+  it('spawns node-pty with correct options', async () => {
     const proc = mockPtyProcess()
     spawnMock.mockReturnValue(proc)
     const onMacosTccSpawnStrategy = vi.fn()
@@ -362,7 +362,7 @@ describe('createPtySubprocess', () => {
     const { restoreCwdStubs, chdirSpy } = stubMissingDaemonCwd()
 
     try {
-      createPtySubprocess({
+      await createPtySubprocess({
         sessionId: 'test',
         cols: 80,
         rows: 24,
@@ -396,7 +396,7 @@ describe('createPtySubprocess', () => {
     const { restoreCwdStubs, chdirSpy } = stubMissingDaemonCwd()
 
     try {
-      createPtySubprocess({
+      await createPtySubprocess({
         sessionId: 'test',
         cols: 80,
         rows: 24,
@@ -419,11 +419,11 @@ describe('createPtySubprocess', () => {
     )
   })
 
-  it('uses SHELL env or defaults to /bin/zsh on non-Windows', () => {
+  it('uses SHELL env or defaults to /bin/zsh on non-Windows', async () => {
     const proc = mockPtyProcess()
     spawnMock.mockReturnValue(proc)
 
-    createPtySubprocess({ sessionId: 'test', cols: 80, rows: 24 })
+    await createPtySubprocess({ sessionId: 'test', cols: 80, rows: 24 })
 
     const shellArg = spawnMock.mock.calls[0][0]
     expect(typeof shellArg).toBe('string')
@@ -537,7 +537,7 @@ describe('createPtySubprocess', () => {
     expect(spawnMock).not.toHaveBeenCalled()
   })
 
-  it('combines HOMEDRIVE and HOMEPATH for Windows default cwd', () => {
+  it('combines HOMEDRIVE and HOMEPATH for Windows default cwd', async () => {
     const proc = mockPtyProcess()
     spawnMock.mockReturnValue(proc)
     const platform = Object.getOwnPropertyDescriptor(process, 'platform')

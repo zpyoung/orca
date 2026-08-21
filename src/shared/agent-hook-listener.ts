@@ -2721,14 +2721,20 @@ function normalizeClaudeSubagentLifecycleEvent(
   }
   const workingChildEvidence = claudeRosterHasRuntimeWorkingSubagent(roster)
   const hasUnconfirmedChild = claudeRosterHasRestoredSnapshotSubagent(roster)
+  const hasConfirmedDoneGate =
+    cachedLead?.state === 'done' &&
+    cachedLead.interrupted !== true &&
+    (state.claudeRunningNonAgentTaskPaneKeys.has(paneKey) ||
+      state.claudeActiveSessionCronPaneKeys.has(paneKey))
+  const restoredOnlyDoneGate =
+    cachedLead?.state === 'done' && !hasConfirmedDoneGate && hasUnconfirmedChild
   if (roster?.size === 0) {
     state.claudeSubagentRosterByPaneKey.delete(paneKey)
   }
   if (
-    !hasCachedLeadEvidence &&
-    endedChildWork &&
     !workingChildEvidence &&
-    (hasUnconfirmedChild || !endedRuntimeChildWork)
+    (restoredOnlyDoneGate ||
+      (endedChildWork && !hasCachedLeadEvidence && (hasUnconfirmedChild || !endedRuntimeChildWork)))
   ) {
     // Why: a restored-only ending proves no lead boundary, and an unmatched restored sibling proves no current liveness; persist the roster transition without publishing fresh work or completion.
     state.claudeUnconfirmedRestoredStatusPaneKeys.add(paneKey)
@@ -3120,6 +3126,25 @@ function normalizeClaudeEvent(
     state: reportedStateName,
     interrupted
   })
+  // Why: the lead already ended — the pane stays `working` only because background inventory is still registered. `stateStartedAt` is pinned for that whole run, so this end time is the per-turn identity and the later all-clear's pair key.
+  const turnCompletedAt =
+    eventAgentId === undefined &&
+    isTurnBoundary &&
+    reportedStateName === 'done' &&
+    effectiveState === 'working' &&
+    interrupted !== true
+      ? Date.now()
+      : undefined
+
+  state.claudeLeadStateByPaneKey.set(paneKey, {
+    state: reportedStateName,
+    ...(interrupted ? { interrupted } : {}),
+    ...(isWaitingInducing && eventAgentId ? { waitingAgentId: eventAgentId } : {}),
+    ...(isAskUserQuestionWait && waitingToolUseId !== undefined ? { waitingToolUseId } : {}),
+    ...(stateBeforeWait ? { stateBeforeWait } : {}),
+    ...(turnCompletedAt !== undefined ? { turnCompletedAt } : {})
+  })
+
   const effectiveRoster = state.claudeSubagentRosterByPaneKey.get(paneKey)
   if (
     isTurnBoundary &&

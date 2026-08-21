@@ -30,6 +30,7 @@ export function useWorktreePointerDrag(args: {
   markScrollMovement: () => void
   selectedWorktreeIds: ReadonlySet<string>
   selectedWorktrees: readonly Worktree[]
+  canStartWorktreeDragForGroupMembership: (container: HTMLElement, worktreeId: string) => boolean
   workspaceBoardOpen: boolean
   onWorkspaceBoardDragPreviewStart: () => void
   onWorkspaceBoardDragPreviewCommit: () => void
@@ -47,6 +48,7 @@ export function useWorktreePointerDrag(args: {
     markScrollMovement,
     selectedWorktreeIds,
     selectedWorktrees,
+    canStartWorktreeDragForGroupMembership,
     workspaceBoardOpen,
     onWorkspaceBoardDragPreviewStart,
     onWorkspaceBoardDragPreviewCommit,
@@ -174,6 +176,7 @@ export function useWorktreePointerDrag(args: {
         onWorkspaceBoardDragPreviewStart !== NOOP_WORKSPACE_BOARD_DRAG_PREVIEW_CALLBACK
       if (
         rects.length <= 1 &&
+        !canStartWorktreeDragForGroupMembership(container, worktreeId) &&
         !hasWorkspaceKanbanSidebarDropBoard() &&
         !canPreviewWorkspaceBoardOnDrag
       ) {
@@ -212,6 +215,7 @@ export function useWorktreePointerDrag(args: {
       }
     },
     [
+      canStartWorktreeDragForGroupMembership,
       onWorkspaceBoardDragPreviewStart,
       scrollRef,
       selectedWorktreeIds,

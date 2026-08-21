@@ -11,12 +11,20 @@ export const TERMINAL_IME_DEFERRED_NEWLINE_FALLBACK_MS = 200
  * right for it; a cursor chord arriving mid-preedit reproduces the corruption the wait exists to
  * prevent, and a conversion can hold its candidate window open for seconds. Dropping the chord
  * costs one keypress, firing early costs a mangled line.
+ *
+ * Returns a disposer that stops waiting without sending. An indefinite wait has no other exit, so
+ * a caller that can outlive the composition must hold it — otherwise the listeners stay on the
+ * terminal element and a later composition flushes the stale send.
+ *
+ * The wait is scoped to the compositions already open when it starts. A composition the user
+ * begins afterwards is behind this input, not in front of it, so letting it hold the wait would
+ * reorder the two — `한` Enter `글` reaching the terminal as `한글\n`.
  */
 export function sendTerminalInputAfterComposition(
   terminalElement: HTMLElement | null | undefined,
   send: () => void,
   options?: { fallbackMs?: number | null }
-): void {
+): () => void {
   if (!terminalElement) {
     const immediateTimer = window.setTimeout(send, 0)
     return () => window.clearTimeout(immediateTimer)
@@ -42,6 +50,13 @@ export function sendTerminalInputAfterComposition(
     if (fallbackTimer !== undefined) {
       window.clearTimeout(fallbackTimer)
     }
+  }
+
+  const finish = (): void => {
+    if (done) {
+      return
+    }
+    stopWaiting()
     // xterm flushes the committed glyph after compositionend.
     window.setTimeout(send, 0)
   }
@@ -56,6 +71,8 @@ export function sendTerminalInputAfterComposition(
   terminalElement.addEventListener('compositionend', onCompositionEnd)
   terminalElement.addEventListener(XTERM_COMPOSITION_SESSION_END_EVENT, onCompositionSessionEnd)
   const fallbackTimer = fallbackMs === null ? undefined : window.setTimeout(finish, fallbackMs)
+
+  return stopWaiting
 }
 
 export type TerminalImeDeferredNewlineSender = {

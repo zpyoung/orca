@@ -225,6 +225,7 @@ export function startWorkspaceCleanupBackgroundRemoval({
                 pendingSettlementFailures.delete(timeoutFailure)
                 provisionallyBlocked.delete(candidate)
                 removedIds.push(...lateResult.removedIds)
+                removedIdentities.push(...(lateResult.removedIdentities ?? []))
                 preservedBranches.push(...(lateResult.preservedBranches ?? []))
                 reportFailures(lateResult.failures)
                 if (lateResult.failures.length === 0) {
@@ -238,6 +239,7 @@ export function startWorkspaceCleanupBackgroundRemoval({
           }
           const result = outcome.result
           removedIds.push(...result.removedIds)
+          removedIdentities.push(...(result.removedIdentities ?? []))
           preservedBranches.push(...(result.preservedBranches ?? []))
           reportFailures(result.failures)
           if (result.failures.length > 0) {
@@ -248,6 +250,7 @@ export function startWorkspaceCleanupBackgroundRemoval({
           reportFailures([
             {
               worktreeId: candidate.worktreeId,
+              executionHostId: getWorkspaceCleanupCandidateHostId(candidate),
               displayName: candidate.displayName,
               message: error instanceof Error ? error.message : String(error)
             }

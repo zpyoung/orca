@@ -25,6 +25,7 @@ import {
   SkillScanCoalescer,
   type SkillScanOutcome
 } from './skill-scan-coalescer'
+import type { SkillProviderRootOverrides } from './skill-provider-destinations'
 
 export { buildSkillDiscoverySources } from './skill-discovery-sources'
 
@@ -189,15 +190,18 @@ async function scanRootShared(
   root: SkillScanRoot,
   refresh: boolean
 ): Promise<SkillScanOutcome<RootScan>> {
+  const key = rootScanKey(root)
   try {
-    return await rootScans.run(
-      rootScanKey(root),
+    const outcome = await rootScans.run(
+      key,
       { ttlMs: SKILL_ROOT_SCAN_TTL_MS, refresh },
       async (signal) => {
         const exists = await pathExists(root.path)
         return { exists, skills: exists ? await scanRoot(root, signal) : [] }
       }
     )
+    recordLastKnownRootScan(key, outcome.value)
+    return outcome
   } catch (error) {
     if (!isSkillRootUnavailableError(error)) {
       throw error
@@ -209,7 +213,15 @@ async function scanRootShared(
     // The abort case matters as much as the shed one: callers already waiting on
     // a scan that is later abandoned for age see it reject, and re-throwing here
     // would turn one slow root into a failed discovery for every root.
-    return { value: { exists: true, skills: [], unavailable: true }, cached: false }
+    //
+    // Empty skills here is not the same claim as `exists: false`: every consumer
+    // that derives "installed" does it from the skill list, so shipping an empty
+    // one turned an unanswered root into proof the skill is gone. Serve what the
+    // root last held and let `unavailable` carry the uncertainty.
+    return {
+      value: { exists: true, skills: readLastKnownRootScan(key), unavailable: true },
+      cached: false
+    }
   }
 }
 

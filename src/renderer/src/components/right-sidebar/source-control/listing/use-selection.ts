@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef, type RefObject } from 'react'
-import type { GitStatusEntry } from '../../../../shared/git-status-types'
-import type { SourceControlRowOpenEvent } from './source-control-split-open'
+import type { GitStatusEntry } from '../../../../../../shared/git-status-types'
+import type { SourceControlRowOpenEvent } from './split-open'
 
 function isMacPlatform(): boolean {
   return typeof navigator !== 'undefined' && navigator.userAgent.includes('Mac')

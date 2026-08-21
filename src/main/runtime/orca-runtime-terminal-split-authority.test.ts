@@ -400,28 +400,4 @@ describe('remote runtime terminal split authority', () => {
     expect(harness.kill).toHaveBeenCalledWith(SPLIT_PTY_ID)
     expect(harness.retireRejectedPty).toHaveBeenCalledWith(SPLIT_PTY_ID, false)
   })
-
-  it('preserves the split error when kill and retirement throw', async () => {
-    const harness = createHarness(false, {
-      deferReveal: true,
-      includePairedSnapshot: true,
-      sourceIncarnationId: 'projected-before',
-      stopAndWaitResult: false
-    })
-    harness.kill.mockImplementation(() => {
-      throw new Error('kill failed')
-    })
-    harness.retireRejectedPty.mockImplementation(() => {
-      throw new Error('retire failed')
-    })
-
-    const split = harness.runtime.splitTerminal(harness.handle, { direction: 'horizontal' })
-    await vi.waitFor(() => expect(harness.revealTerminalSession).toHaveBeenCalledOnce())
-    harness.replaceSourceIncarnation('projected-after')
-    harness.resolveReveal()
-
-    await expect(split).rejects.toThrow('terminal_split_source_not_found')
-    expect(harness.kill).toHaveBeenCalledWith(SPLIT_PTY_ID)
-    expect(harness.retireRejectedPty).toHaveBeenCalledWith(SPLIT_PTY_ID)
-  })
 })

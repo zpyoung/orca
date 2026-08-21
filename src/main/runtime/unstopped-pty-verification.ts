@@ -5,6 +5,10 @@ import {
   UNSTOPPED_PTY_LIVE_DETAIL_PREFIX,
   UNSTOPPED_PTY_REMOVAL_PREFIX
 } from '../../shared/worktree/removal'
+import {
+  NO_OBSERVING_PROVIDER_REASON,
+  type PtyLivenessVerdict
+} from '../../shared/pty-liveness-verdict'
 import { settleBeforeDeadline } from './settle-before-deadline'
 
 // Floor for the verification window when the sweep ran on a very short budget.

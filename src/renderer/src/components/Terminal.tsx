@@ -57,7 +57,7 @@ import {
 import {
   useAnyBrowserGuestNeedsPaint,
   useWorktreeBrowserPageIds
-} from './browser-pane/browser-guest-paint-retention'
+} from './browser-pane/host-guest/browser-guest-paint-retention'
 import TerminalPaneOverlayLayer from './terminal-pane/TerminalPaneOverlayLayer'
 import {
   collectBrowserWebviewIds,

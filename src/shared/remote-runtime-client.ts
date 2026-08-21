@@ -23,12 +23,7 @@ import {
   type RuntimeRpcResponse
 } from './runtime-rpc-envelope'
 import type { RuntimeStatus } from './runtime-types'
-import {
-  AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
-  SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
-  WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
-  WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY
-} from './protocol-version'
+import { remoteRuntimeClientCapabilities } from './remote-runtime-client-capabilities'
 // Re-export so existing value importers of `RemoteRuntimeClientError` are
 // unaffected; the class lives in a ws-free module so type-only consumers
 // (and mobile's typecheck) don't compile this file's Node-only deps.
@@ -151,12 +146,7 @@ async function sendRemoteRuntimeRequestOnSocket<TResult>(
   const serializedAuth = serializeRemoteRuntimePayload({
     type: 'e2ee_auth',
     deviceToken: pairing.deviceToken,
-    clientCapabilities: [
-      SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
-      AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
-      WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
-      WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY
-    ]
+    clientCapabilities: remoteRuntimeClientCapabilities()
   })
   const pendingRequest = {
     preparedRequest: prepareRemoteRuntimeRequest(new Map(), () =>
@@ -536,12 +526,7 @@ export async function subscribeRemoteRuntimeRequest<TResult>(
   const serializedAuth = serializeRemoteRuntimePayload({
     type: 'e2ee_auth',
     deviceToken: pairing.deviceToken,
-    clientCapabilities: [
-      SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
-      AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
-      WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
-      WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY
-    ]
+    clientCapabilities: remoteRuntimeClientCapabilities()
   })
   return await new Promise((resolve, reject) => {
     const keyPair = generateKeyPair()

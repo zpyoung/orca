@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => {
         path: string
         displayName: string
         isMainWorktree: boolean
-        hostId?: string
+        hostId?: ExecutionHostId
       }
     >(),
     repos: [] as { id: string; displayName: string; connectionId?: string }[],
@@ -98,7 +98,7 @@ function setWorktrees(
     path?: string
     displayName?: string
     isMainWorktree?: boolean
-    hostId?: string
+    hostId?: ExecutionHostId
   }[]
 ): void {
   mocks.state.worktreeMap = new Map(

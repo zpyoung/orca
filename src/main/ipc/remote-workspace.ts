@@ -7,7 +7,6 @@ import type {
   RemoteWorkspacePatchResult,
   RemoteWorkspaceSession
 } from '../../shared/remote-workspace-types'
-import type { SshTarget } from '../../shared/ssh-types'
 import type { WorkspaceSessionState } from '../../shared/workspace-session-state-types'
 import { getRepoIdFromWorktreeId } from '../../shared/worktree/id'
 import { getRemoteWorkspaceNamespace } from './remote-workspace-namespace'

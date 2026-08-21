@@ -14,29 +14,28 @@ import {
   getSettingsFocusedExecutionHostId
 } from '../../../../shared/execution-host'
 import { getActiveSidebarWorkspaceId } from '../../../../shared/workspace-scope'
-import { getPinnedWorktreeDisplayPolicy } from './worktree-list-groups'
-import { selectWorktreeListReviewCacheInputs } from './worktree-list-review-cache-inputs'
+import { getPinnedWorktreeDisplayPolicy } from './worktree-list/grouping/row-types'
+import { selectWorktreeListReviewCacheInputs } from './worktree-list/listing/review-cache-inputs'
 import type { VirtualizedScrollAnchor } from '@/hooks/useVirtualizedScrollAnchor'
-import { SidebarWorktreeListDialogs } from './worktree-list/SidebarWorktreeListDialogs'
-import { SidebarWorktreeListEmptyState } from './worktree-list/SidebarWorktreeListEmptyState'
-import { VirtualizedWorktreeViewport } from './worktree-list/VirtualizedWorktreeViewport'
-import { markSidebarWorktreeActiveImmediately } from './worktree-list/worktree-option-dom'
-import {
-  EMPTY_PROJECT_GROUPS,
-  NOOP_WORKSPACE_BOARD_DRAG_PREVIEW_CALLBACK
-} from './worktree-list/virtualized-worktree-viewport-props'
-import { useAgentSendTargetWorktreeId } from './worktree-list/use-agent-send-target-worktree'
-import { useEffectiveCollapsedGroups } from './worktree-list/use-effective-collapsed-groups'
-import { useProjectGroupDialogs } from './worktree-list/use-project-group-dialogs'
-import { useSidebarExternalWorktreeCards } from './worktree-list/use-sidebar-external-worktree-cards'
-import { useSidebarHostVisibleScope } from './worktree-list/use-sidebar-host-visible-scope'
-import { useSidebarRevealRequests } from './worktree-list/use-sidebar-reveal-requests'
-import { useSidebarSectionRows } from './worktree-list/use-sidebar-section-rows'
-import { useSidebarWorktreeFilters } from './worktree-list/use-sidebar-worktree-filters'
-import { useSidebarWorktreeSelection } from './worktree-list/use-sidebar-worktree-selection'
-import { useSidebarWorktreeSortOrder } from './worktree-list/use-sidebar-worktree-sort-order'
-import { useVisibleSidebarWorktrees } from './worktree-list/use-visible-sidebar-worktrees'
-import { useWorktreeStatusMutations } from './worktree-list/use-worktree-status-mutations'
+import { SidebarWorktreeListDialogs } from './worktree-list/rows/ProjectGroupDialogs'
+import { SidebarWorktreeListEmptyState } from './worktree-list/listing/EmptyState'
+import { VirtualizedWorktreeViewport } from './worktree-list/viewport/VirtualizedWorktreeViewport'
+import { markSidebarWorktreeActiveImmediately } from './worktree-list/rows/option-dom'
+import { EMPTY_PROJECT_GROUPS } from './worktree-list/viewport/viewport-props'
+import { NOOP_WORKSPACE_BOARD_DRAG_PREVIEW_CALLBACK } from './worktree-list/drag/drop-commit-context'
+import { useAgentSendTargetWorktreeId } from './worktree-list/listing/use-agent-send-target'
+import { useEffectiveCollapsedGroups } from './worktree-list/listing/use-collapsed-groups'
+import { useProjectGroupDialogs } from './worktree-list/rows/use-project-group-dialogs'
+import { useSidebarExternalWorktreeCards } from './worktree-list/listing/use-external-worktree-cards'
+import { useSidebarHostVisibleScope } from './worktree-list/listing/use-host-visible-scope'
+import { useSidebarRevealRequests } from './worktree-list/navigation/use-reveal-requests'
+import { useSidebarSectionRows } from './worktree-list/listing/use-section-rows'
+import { useSidebarWorktreeFilters } from './worktree-list/listing/use-filters'
+import { useSidebarWorktreeSelection } from './worktree-list/navigation/use-selection'
+import { useSidebarWorktreeSortOrder } from './worktree-list/listing/use-sort-order'
+import { useVisibleSidebarWorktrees } from './worktree-list/listing/use-visible-worktrees'
+import { useWorktreeStatusMutations } from './worktree-list/drag/use-status-mutations'
+import { shouldFiltersHideAllRows } from './sidebar-empty-state-gate'
 
 type WorktreeListProps = {
   scrollOffsetRef: React.MutableRefObject<number>
@@ -111,7 +110,6 @@ const WorktreeList = React.memo(function WorktreeList({
     sortBy,
     sortedIds,
     repoMap,
-    worktreeMap,
     worktreeLineageById,
     settings,
     agentSendTargetWorktreeId
@@ -128,6 +126,8 @@ const WorktreeList = React.memo(function WorktreeList({
     collapsedGroups,
     agentSendTargetWorktreeId,
     groupBy,
+    pinnedDisplayPolicy,
+    visibleWorktrees,
     repoMap,
     worktreeMap,
     worktreeLineageById,
@@ -135,7 +135,9 @@ const WorktreeList = React.memo(function WorktreeList({
     workspaceStatuses,
     settings,
     visibleProjectGroupsForRows: visibleScope.visibleProjectGroupsForRows,
-    projectGrouping
+    projectGrouping,
+    folderWorkspaces,
+    defaultHostId
   })
   const externalWorktreeCards = useSidebarExternalWorktreeCards({
     repos,
@@ -224,19 +226,23 @@ const WorktreeList = React.memo(function WorktreeList({
   useSidebarRevealRequests({
     groupBy,
     renderedSidebarRowKeys: rowModel.renderedSidebarRowKeys,
-    renderedWorktreeIds: selection.renderedWorktreeIds,
+    renderedWorktreeIdentities: selection.renderedWorktreeIdentities,
     currentSidebarWorktreeId,
+    currentSidebarExecutionHostId: activeWorkspaceExecutionHostId,
     worktreeMap,
+    worktrees: allWorktrees,
     folderWorkspaces,
     hasFilters,
     clearFilters
   })
 
-  const filtersHideAllRows =
-    hasFilters &&
-    visibleWorktrees.length === 0 &&
-    rowModel.placeholderRepoIds.size === 0 &&
-    externalWorktreeCards.importedWorktreesByRepo.size === 0
+  const filtersHideAllRows = shouldFiltersHideAllRows({
+    hasFilters,
+    visibleWorktreeCount: visibleWorktrees.length,
+    visibleFolderWorkspaceCount: visibleScope.visibleFolderWorkspacesForRows.length,
+    placeholderRepoCount: rowModel.placeholderRepoIds.size,
+    importedWorktreeCardCount: externalWorktreeCards.importedWorktreesByRepo.size
+  })
   // Why: when active filters hide every row, the Clear Filters empty state must win over Project Group headers.
   if (rowModel.rows.length === 0 || filtersHideAllRows) {
     return <SidebarWorktreeListEmptyState hasFilters={hasFilters} onClearFilters={clearFilters} />
@@ -270,6 +276,7 @@ const WorktreeList = React.memo(function WorktreeList({
         activeWorktreeId={
           activeView === 'tasks' || activeView === 'activity' ? null : currentSidebarWorktreeId
         }
+        activeWorkspaceExecutionHostId={activeWorkspaceExecutionHostId}
         currentWorktreeId={currentSidebarWorktreeId}
         groupBy={groupBy}
         pinnedDisplayPolicy={pinnedDisplayPolicy}

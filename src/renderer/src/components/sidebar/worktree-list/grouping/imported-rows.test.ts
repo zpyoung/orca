@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { canKeepImportedWorktreesHidden } from './worktree-list/imported-worktrees-card-visibility'
-import { getRenderRowKey } from './worktree-list-virtual-rows'
-import { getWorktreeDragGroups, getWorktreeDragIndexes } from './worktree-list/worktree-drag-groups'
-import { renderRowContainsWorktree } from './worktree-list/render-row-worktree-lookup'
-import type { Repo } from '../../../../shared/repo-types'
-import type { Worktree } from '../../../../shared/worktree/types'
-import type { Row } from './worktree-list-groups'
+import { canKeepImportedWorktreesHidden } from '../rows/notice-rows'
+import { getRenderRowKey } from '../listing/render-row'
+import { getWorktreeDragGroups, getWorktreeDragIndexes } from '../drag/groups'
+import { renderRowContainsWorktree } from '../navigation/render-row-lookup'
+import type { Repo } from '../../../../../../shared/repo-types'
+import type { Worktree } from '../../../../../../shared/worktree/types'
+import type { Row } from './row-types'
 
 const repo: Repo = {
   id: 'repo-1',

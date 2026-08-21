@@ -31,45 +31,6 @@ import type {
   LinearWorkspaceSelection
 } from '../../shared/linear/workspace-types'
 
-// ── Concurrency limiter — max 4 parallel Linear API calls ────────────
-const MAX_CONCURRENT = 4
-let running = 0
-const queue: (() => void)[] = []
-
-export function acquire(): Promise<void> {
-  if (running < MAX_CONCURRENT) {
-    running++
-    return Promise.resolve()
-  }
-  return new Promise((resolve) =>
-    queue.push(() => {
-      running++
-      resolve()
-    })
-  )
-}
-
-export function release(): void {
-  running--
-  const next = queue.shift()
-  if (next) {
-    next()
-  }
-}
-
-// ── Token + workspace storage ────────────────────────────────────────
-// Why: tokens remain encrypted via safeStorage, while workspace metadata stays
-// plaintext so status checks can render connected accounts without decrypting
-// and triggering OS keychain prompts after app updates.
-const LEGACY_WORKSPACE_ID = 'legacy'
-
-type LinearWorkspaceFile = {
-  version: 1
-  activeWorkspaceId: string | null
-  selectedWorkspaceId: LinearWorkspaceSelection | null
-  workspaces: LinearWorkspace[]
-}
-
 export type LinearClientForWorkspace = {
   workspace: LinearWorkspace
   client: LinearClient

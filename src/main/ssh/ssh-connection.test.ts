@@ -3,6 +3,7 @@ import {
   clientInstances,
   eventHandlers,
   resetSshConnectionMocks,
+  VALID_ED25519_HOST_KEY,
   ssh2Mock
 } from './ssh-connection-test-harness'
 import { createCallbacks, createTarget } from './ssh-connection-test-fixtures'

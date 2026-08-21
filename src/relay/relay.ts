@@ -46,7 +46,8 @@ import { createRelayAiVaultService } from './ai-vault-service-factory'
 import { getRemoteHostPlatform } from '../main/ssh/ssh-remote-platform'
 import { parseUnameToRelayPlatform } from '../main/ssh/relay-protocol'
 import { NativeChatHandler } from './fork-native-chat-relay/native-chat-handler'
-import { endpointDirForRelaySocket, RelayAgentHookServer } from './agent-hook-server'
+import { RelayAgentHookServer } from './agent-hook-server'
+import { endpointDirForRelaySocket } from './agent-hook-endpoint-coordinates'
 import { PluginOverlayManager } from './plugin-overlay'
 import {
   AGENT_HOOK_INSTALL_PLUGINS_METHOD,

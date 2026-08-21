@@ -128,23 +128,41 @@ function messageIsAfterPendingTimestamp(
 }
 
 /**
- * Rows a glue match may consume. Glue always starts at the oldest still-open
- * echo, so that echo's send boundary is the floor: unbounded, an older turn
- * whose text happens to split across the queue ("fix the bug" vs "fix the" +
- * "bug") would retire sends issued long after it. A missing message boundary
- * falls back to send time — a fuzzy match must never reach further back than
- * an exact one.
+ * Rows a glue match may consume, each tagged with the sends it landed after.
+ * Unbounded, an older turn whose text happens to split across the queue ("fix
+ * the bug" vs "fix the" + "bug") would retire sends issued long after it — so
+ * every send carries its OWN boundary into the match, not just the oldest one
+ * the run starts at (#14663 pruned newer queued prompts against older rows).
+ * A missing message boundary falls back to send time: a fuzzy match must never
+ * reach further back than an exact one.
  */
-function gluedCandidateMessages(
+function gluedCandidateRows(
   messages: readonly NativeChatMessage[],
-  open: readonly NativeChatPendingSend[]
-): readonly NativeChatMessage[] {
-  const oldest = open[0]
-  if (!oldest) {
+  open: readonly NativeChatPendingSend[],
+  rowsOf: (messages: readonly NativeChatMessage[]) => readonly NativeChatUserRow[]
+): readonly NativeChatGluedUserRow[] {
+  const [oldest, ...newer] = open.map((entry) =>
+    entry.afterMessageId === undefined ? { ...entry, afterMessageId: null } : entry
+  )
+  // Glue needs a run of 2+ sends, so a lone queued echo — by far the common
+  // case while an agent streams — skips the per-send boundary scans entirely.
+  if (!oldest || newer.length === 0) {
     return []
   }
-  const anchor = oldest.afterMessageId === undefined ? { ...oldest, afterMessageId: null } : oldest
-  return messagesAfterPendingBoundary(messages, anchor)
+  const newerRowIds = newer.map(
+    (entry) => new Set(rowsOf(messagesAfterPendingBoundary(messages, entry)).map((row) => row.id))
+  )
+  // The run always starts at the oldest open send, so its rows are the whole
+  // candidate set and index 0 is representable in every one of them.
+  return rowsOf(messagesAfterPendingBoundary(messages, oldest)).map((row) => {
+    const representablePendingIndices = new Set([0])
+    newerRowIds.forEach((ids, index) => {
+      if (ids.has(row.id)) {
+        representablePendingIndices.add(index + 1)
+      }
+    })
+    return { text: row.text, representablePendingIndices }
+  })
 }
 
 /**
@@ -179,7 +197,7 @@ export function prunePendingSends(
   const stillOpen = pending.filter((_, index) => exactKeep[index])
   const gluedRepresented = selectPendingIndicesRepresentedByUserRows(
     stillOpen,
-    advancedNativeChatUserTexts(gluedCandidateMessages(messages, stillOpen))
+    gluedCandidateRows(messages, stillOpen, advancedNativeChatUserRows)
   )
   const next = pending.filter((entry, index) => {
     if (!exactKeep[index]) {
@@ -222,7 +240,7 @@ export function pendingSendsAsMessages(
   const stillVisible = pending.filter((_, index) => exactVisible[index])
   const gluedRepresented = selectPendingIndicesRepresentedByUserRows(
     stillVisible,
-    matchingNativeChatUserTexts(gluedCandidateMessages(existingMessages, stillVisible))
+    gluedCandidateRows(existingMessages, stillVisible, matchingNativeChatUserRows)
   )
   return pending
     .filter((entry, index) => {

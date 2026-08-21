@@ -141,7 +141,8 @@ export async function launchPairedWebClient(
 export async function launchPairedElectronClient(
   offer: RuntimeDesktopPairingOffer,
   testInfo: TestInfo,
-  name: string
+  name: string,
+  options: { extraEnv?: Record<string, string> } = {}
 ): Promise<PairedElectronClient> {
   const userDataDir = mkdtempSync(path.join(os.tmpdir(), 'orca-e2e-paired-desktop-'))
   const directSshProbePath = path.join(userDataDir, 'forbidden-local-ssh-connects.jsonl')

@@ -1,5 +1,9 @@
 import type { Repo } from '../../../shared/repo-types'
 import type { Worktree } from '../../../shared/worktree/types'
+import {
+  composeWorktreeHostIdentity,
+  getWorktreeIdFromHostIdentity
+} from '../../../shared/worktree/host-qualified-identity'
 import type { AppState } from './types'
 
 type WorktreeSnapshot = {

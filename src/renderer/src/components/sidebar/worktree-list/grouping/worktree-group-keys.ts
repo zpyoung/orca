@@ -8,6 +8,10 @@ import { ALL_GROUP_KEY, getPRGroupKey, getProjectGroupHeaderKey } from './group-
 import { buildProjectGroupingIndex, getProjectGroupingForRepo } from './project-grouping'
 import type { ProjectGroupingModel } from './project-grouping'
 import type { WorktreeGroupBy } from './row-types'
+import {
+  getDivertedWorktreeProjectGroupId,
+  getWorktreeGroupRevealSectionKey
+} from '../../fork-worktree-groups/worktree-loose-group-membership'
 
 export function getGroupKeyForWorktree(
   groupBy: WorktreeGroupBy,
@@ -63,7 +67,8 @@ export function getGroupKeysForWorktree(
   const groupIds: string[] = []
   const groupsById = new Map(projectGroups.map((group) => [group.id, group]))
   const visited = new Set<string>()
-  let currentGroupId = repo?.projectGroupId ?? null
+  const divertedGroupId = getDivertedWorktreeProjectGroupId(worktree, groupsById)
+  let currentGroupId = divertedGroupId ?? repo?.projectGroupId ?? null
   while (currentGroupId && !visited.has(currentGroupId)) {
     const group = groupsById.get(currentGroupId)
     if (!group) {
@@ -76,5 +81,8 @@ export function getGroupKeysForWorktree(
     const parentId = group.parentGroupId ?? null
     currentGroupId = parentId && groupsById.has(parentId) ? parentId : null
   }
-  return [...groupIds.map((id) => getProjectGroupHeaderKey(id)), groupKey]
+  return [
+    ...groupIds.map((id) => getProjectGroupHeaderKey(id)),
+    getWorktreeGroupRevealSectionKey(divertedGroupId, groupKey)
+  ]
 }

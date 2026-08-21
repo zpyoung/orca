@@ -5,9 +5,9 @@ import {
   normalizeBrowserNavigationUrl,
   SEARCH_ENGINE_LABELS,
   type SearchEngine
-} from '../../../../shared/browser-url'
-import type { BrowserHistoryEntry } from '../../../../shared/browser-workspace-types'
-import { isClipboardTextByteLengthOverLimit } from '../../../../shared/clipboard-text'
+} from '../../../../../shared/browser-url'
+import type { BrowserHistoryEntry } from '../../../../../shared/browser-workspace-types'
+import { isClipboardTextByteLengthOverLimit } from '../../../../../shared/clipboard-text'
 import { translate } from '@/i18n/i18n'
 
 export const MAX_BROWSER_ADDRESS_BAR_SUGGESTIONS = 8

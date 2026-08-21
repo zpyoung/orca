@@ -39,6 +39,7 @@ describe('CandidateRow', () => {
     act(() => {
       root?.render(
         <CandidateRow
+          identity={getWorkspaceCleanupCandidateIdentity(candidate)}
           candidate={candidate}
           expanded={false}
           last
@@ -70,6 +71,7 @@ describe('CandidateRow', () => {
     act(() => {
       root?.render(
         <CandidateRow
+          identity={getWorkspaceCleanupCandidateIdentity(candidate)}
           candidate={candidate}
           expanded={false}
           last
@@ -105,6 +107,7 @@ describe('CandidateRow', () => {
     act(() => {
       root?.render(
         <CandidateRow
+          identity={getWorkspaceCleanupCandidateIdentity(candidate)}
           candidate={candidate}
           expanded={false}
           last
@@ -126,7 +129,9 @@ describe('CandidateRow', () => {
       )
     })
 
-    const openButton = container?.querySelector(`[aria-label="Open ${candidate.displayName}"]`)
+    const openButton = container?.querySelector(
+      `[aria-label="Open ${getWorkspaceCleanupCandidateAccessibleName(candidate)}"]`
+    )
     expect(openButton?.querySelector('.lucide-external-link')).not.toBeNull()
   })
 
