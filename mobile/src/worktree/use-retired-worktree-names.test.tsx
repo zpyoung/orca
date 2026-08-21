@@ -1,4 +1,3 @@
-/* oxlint-disable react-doctor/no-effect-with-fresh-deps -- Why: the harness builds one deferred client per mount and holds it in the enclosing closure, so it is stable across the renders this test drives. */
 import { createElement } from 'react'
 import { act, create } from 'react-test-renderer'
 import { describe, expect, it } from 'vitest'

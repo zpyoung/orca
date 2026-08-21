@@ -1,4 +1,3 @@
-/* oxlint-disable react-doctor/no-ref-current-in-render -- Why: the sort memo caches its attention map and live-signal latch in refs; an effect would run after the sort that needs them. */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '@/store'
 import { getAllWorktreesFromState } from '@/store/selectors'

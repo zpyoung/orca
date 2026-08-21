@@ -1,5 +1,4 @@
-/* oxlint-disable unicorn/prefer-node-protocol -- Why: mobile keeps the npm `buffer` polyfill because Metro cannot resolve Node builtins; react-doctor does not read mobile/.oxlintrc.json, where the rule is already off. */
-import { Buffer } from 'buffer'
+import { Buffer } from 'node:buffer'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { describe, expect, it, vi } from 'vitest'

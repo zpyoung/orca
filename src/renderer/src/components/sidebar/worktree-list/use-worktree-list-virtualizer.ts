@@ -1,4 +1,3 @@
-/* oxlint-disable react-doctor/no-ref-current-in-render -- Why: latest-value refs feeding the virtualizer's stable callbacks, which must not be rebuilt per render. */
 import { useCallback, useMemo, useRef } from 'react'
 import type React from 'react'
 import {

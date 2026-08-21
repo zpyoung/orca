@@ -106,41 +106,40 @@ send after the rebase onto main".
 
 ## React Doctor changed-lines gate
 
-**What:** two `Array<T>` → `T[]` rewrites and eight file-level `oxlint-disable` directives, all in
-files v1.4.186 introduced. The `Enforce React Doctor on changed lines` job runs the `react-doctor`
-CLI, whose own rule set is neither `.oxlintrc.json` nor `config/oxlint-react-doctor.json`, so it
-blocks lines those two configs deliberately allow:
+**What:** three one-line rewrites in files v1.4.186 introduced — two `Array<T>` uses become `T[]`,
+and one Vitest test imports `Buffer` from `node:buffer` — plus two rule severities added to the
+`reactDoctor` key in `package.json`.
 
-- `unicorn/prefer-node-protocol` and `typescript/array-type` are off for the whole mobile package
-  in `mobile/.oxlintrc.json`; the CLI does not read it.
-- `react-doctor/no-ref-current-in-render` and `react-doctor/no-effect-with-fresh-deps` are absent
-  from `config/oxlint-react-doctor.json`, the repo's curated React Doctor rule list; the CLI runs
-  its full default set anyway.
+The `Enforce React Doctor on changed lines` job runs the `react-doctor` CLI, which reads neither
+`.oxlintrc.json` nor `config/oxlint-react-doctor.json`, so it blocks lines those configs
+deliberately allow. `mobile/.oxlintrc.json` turns `typescript/array-type` and
+`unicorn/prefer-node-protocol` off for the whole mobile package; the three rewrites simply satisfy
+both configs at once, since Metro — the reason mobile avoids the `node:` protocol — never bundles a
+test file.
 
-Each suppressed site is a deliberate, upstream-authored pattern: latest-value refs written during
-render, a render-phase array-identity cache, and test harnesses whose inline ref literals are the
-fixture under test. The `buffer` import stays on the npm polyfill because Metro cannot resolve Node
-builtins in a React Native bundle.
+`react-doctor/no-ref-current-in-render` and `react-doctor/no-effect-with-fresh-deps` default to
+`error` in the CLI but are absent from `config/oxlint-react-doctor.json`, the repo's curated React
+Doctor rule list, where every listed rule runs at `warn`. Both fire only on deliberate,
+upstream-authored patterns: latest-value refs written during render, a render-phase array-identity
+cache, and test harnesses whose inline ref literals are the fixture under test. Setting them to
+`warn` in `package.json` aligns the CLI with the severity the repo already declares, and keeps the
+findings visible in the report instead of silencing them.
 
-**Why upstream, not isolated:** the findings are on upstream's own code. Isolating would mean
-forking ten upstream modules — four of them hot sidebar hooks — to carry one comment each, and
-rewriting the ref patterns to satisfy the heuristic would change upstream behavior the fork has no
-reason to change.
+Inline `oxlint-disable` is not an option here: `check:code-quality:changed` runs Oxlint with
+`--report-unused-disable-directives-severity warn`, and a directive naming a rule that Oxlint has
+not loaded counts as unused, so every added directive becomes a finding in that gate instead.
+
+**Why upstream, not isolated:** the findings are on upstream's own code, and `package.json` is
+already a permanent fork exception. Isolating would mean forking nine upstream modules — four of
+them hot sidebar hooks — and rewriting ref patterns upstream has no reason to change.
 
 **Paths:**
 - `mobile/src/browser/mobile-browser-frameless-stream.test.tsx`
 - `mobile/src/session/pending-terminal-handle-recovery.test.ts`
 - `mobile/src/transport/mobile-relay-rpc-session-liveness.test.ts`
-- `mobile/src/worktree/use-retired-worktree-names.test.tsx`
-- `src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects-file-drop.test.ts`
-- `src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects-window-focus-recovery.test.ts`
-- `src/renderer/src/components/sidebar/worktree-list/use-reused-array-identity.ts`
-- `src/renderer/src/components/sidebar/worktree-list/use-sidebar-worktree-sort-order.ts`
-- `src/renderer/src/components/sidebar/worktree-list/use-worktree-list-virtualizer.ts`
 
-`use-pending-sidebar-reveal.ts` carries the same `no-ref-current-in-render` directive but is
-already a declared seam, so it stays in `seams` with its residual raised to two added lines rather
-than gaining an `exceptions` row.
+The `package.json` severities need no `exceptions` row of their own; the file is already declared
+`permanent`.
 
 **Introduced:** the v1.4.186 sync (2026-08-21), fixing the `static analysis` job on PR #12.
 

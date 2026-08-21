@@ -1,4 +1,3 @@
-/* oxlint-disable react-doctor/no-ref-current-in-render -- Why: latest-args ref, written during render so callbacks read current props without re-subscribing. */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useAppStore } from '@/store'
