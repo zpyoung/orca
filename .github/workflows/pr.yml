@@ -68,8 +68,14 @@ jobs:
             echo "VM runtime persistence is unchanged."
             exit 0
           fi
-          node config/scripts/run-ephemeral-vm-runtime-store-rollback-repro.mjs \
-            config/scripts/ephemeral-vm-runtime-store-cross-version.test.ts
+          # The repro pins upstream commits that live only on upstream branches it
+          # never merged, so a fork clone has no such object and git archive aborts.
+          # Public repo, so the credential-less checkout can still fetch them by sha.
+          repro=config/scripts/run-ephemeral-vm-runtime-store-rollback-repro.mjs
+          for sha in $(grep -oE "_COMMIT = '[0-9a-f]{40}'" "$repro" | grep -oE '[0-9a-f]{40}'); do
+            git cat-file -e "$sha^{commit}" 2>/dev/null || git fetch --no-tags origin "$sha"
+          done
+          node "$repro" config/scripts/ephemeral-vm-runtime-store-cross-version.test.ts
 
       - name: Enforce max-lines ratchet
         run: pnpm run check:max-lines-ratchet
