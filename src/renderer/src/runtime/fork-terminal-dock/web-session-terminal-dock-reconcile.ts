@@ -1,5 +1,5 @@
 import { makePaneKey, parsePaneKey } from '../../../../shared/stable-pane-id'
-import type { TerminalDockPaneState } from '../../../../shared/types'
+import type { TerminalDockPaneState } from '../../../../shared/fork-terminal-dock/terminal-dock-pane-state'
 
 // Why: bounds how long a local dock mutation outranks a stale host echo for its pane —
 // long enough to cover an SSH/relay round trip, short enough that a real host change

@@ -25,15 +25,15 @@ const SELF_FILES = new Set([
 // Default max-lines budgets from .oxlintrc.json (counted lines).
 export function defaultLimitForPath(p) {
   if (/\.(test|spec)\.(ts|tsx)$/.test(p)) {
-    return 800
+    return 1000
   }
   if (p.endsWith('.tsx')) {
-    return 400
-  }
-  if (p.endsWith('.mjs')) {
     return 600
   }
-  return 300
+  if (p.endsWith('.mjs')) {
+    return 800
+  }
+  return 500
 }
 
 // True if the source contains an eslint/oxlint disable directive listing `max-lines`

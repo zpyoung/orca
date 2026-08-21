@@ -2,7 +2,7 @@
 // column-widths.ts — a per-pane resize/toggle would be a noisy settings write.
 import type { AgentType } from '../../../../../shared/agent-status-types'
 import { isTuiAgent } from '../../../../../shared/tui-agent-config'
-import type { TerminalDockPaneState } from '../../../../../shared/types'
+import type { TerminalDockPaneState } from '../../../../../shared/fork-terminal-dock/terminal-dock-pane-state'
 
 const STORAGE_KEY = 'orca.terminalDock.paneState.v1'
 

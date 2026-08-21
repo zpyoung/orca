@@ -1,4 +1,4 @@
-import type { RepoKind } from '../types'
+import type { RepoKind } from '../repo-types'
 
 /**
  * Whether a worktree row can own a `projectGroupId` of its own.

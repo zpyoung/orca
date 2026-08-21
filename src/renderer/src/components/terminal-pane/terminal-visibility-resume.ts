@@ -14,6 +14,7 @@ import {
   resetTerminalLinkifierHoverState
 } from '@/lib/pane-manager/terminal-linkifier-hover-reset'
 import { focusActivePane, type PaneFocusOwnership } from './pane-helpers'
+import { paneFocusOwnershipArgs } from './fork-terminal-dock/pane-focus-ownership-args'
 import { scheduleTabRevealWebglAtlasRecovery } from './terminal-webgl-atlas-recovery'
 import { flushDeferredPaneMetricOptionsIfMeasurable } from '@/lib/pane-manager/pane-fit'
 import { repairPaneWebglCanvasDprMismatch } from '@/lib/pane-manager/terminal-canvas-dpr-repair'
@@ -23,7 +24,7 @@ const WINDOW_WAKE_FLUSH_CHARS = 64 * 1024
 
 export type TerminalHiddenReason = 'surface' | 'tab'
 
-type ResumeTerminalVisibilityArgs = PaneFocusOwnership & {
+type ResumeTerminalVisibilityArgs = Partial<PaneFocusOwnership> & { tabId: string } & {
   manager: PaneManager
   isActive: boolean
   wasVisible: boolean
@@ -46,7 +47,7 @@ type HideTerminalVisibilityResult = {
   renderingSuspended: boolean
 }
 
-type RecoverVisibleTerminalWindowWakeArgs = PaneFocusOwnership & {
+type RecoverVisibleTerminalWindowWakeArgs = Partial<PaneFocusOwnership> & { tabId: string } & {
   manager: PaneManager
   isActive: boolean
   clearGlyphAtlases: boolean
@@ -98,12 +99,16 @@ export function resumeTerminalVisibility({
         manager.fitAllRevealedPanes()
       }
       if (isActive) {
-        focusActivePane(manager, { tabId, paneDockOwnsFocus })
+        focusActivePane(manager, ...paneFocusOwnershipArgs(tabId, paneDockOwnsFocus))
       }
     } else {
       // fitAllRevealedPanes flushes after WebGL reattaches, avoiding a redundant
       // full refresh in the suspended DOM renderer while preserving first paint.
-      resumeTerminalVisibilityHeavy(manager, isActive, { tabId, paneDockOwnsFocus })
+      resumeTerminalVisibilityHeavy(
+        manager,
+        isActive,
+        paneFocusOwnershipArgs(tabId, paneDockOwnsFocus)
+      )
     }
     enforceTerminalViewportIntents(manager)
     if (!shouldUseLightTabResume) {
@@ -179,7 +184,7 @@ export function recoverVisibleTerminalWindowWake({
   // Why: wake re-attaches WebGL — same transient cell-metric wobble guard as the heavy resume.
   manager.fitAllRevealedPanes()
   if (isActive) {
-    focusActivePane(manager, { tabId, paneDockOwnsFocus })
+    focusActivePane(manager, ...paneFocusOwnershipArgs(tabId, paneDockOwnsFocus))
   }
   enforceTerminalViewportIntents(manager)
   if (clearGlyphAtlases) {
@@ -206,7 +211,7 @@ function requestLightTabBacklogRecovery(manager: PaneManager): void {
 function resumeTerminalVisibilityHeavy(
   manager: PaneManager,
   isActive: boolean,
-  ownership: PaneFocusOwnership
+  ownership: [] | [PaneFocusOwnership]
 ): void {
   // Why: hidden panes can accumulate large PTY bursts while Chromium is
   // occluded. Drain a bounded slice before fitting; the scheduler keeps
@@ -227,7 +232,7 @@ function resumeTerminalVisibilityHeavy(
   // grid and garbles diff-painting inline TUIs (grok minimize→restore).
   manager.fitAllRevealedPanes()
   if (isActive) {
-    focusActivePane(manager, ownership)
+    focusActivePane(manager, ...ownership)
   }
 }
 

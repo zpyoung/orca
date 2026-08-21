@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { OrcaRuntimeService } from '../../../orca-runtime'
 import { getDefaultWorkspaceSession } from '../../../../../shared/constants'
-import type { Tab, TerminalTab, WorkspaceSessionState } from '../../../../../shared/types'
+import type { Tab } from '../../../../../shared/tab-types'
+import type { TerminalTab } from '../../../../../shared/terminal-tab-types'
+import type { WorkspaceSessionState } from '../../../../../shared/workspace-session-state-types'
 import { makePaneKey } from '../../../../../shared/stable-pane-id'
 
 // Why: exercises headless persistence, never an authoritative renderer (r4-9).

@@ -28,7 +28,8 @@ import {
   setRendererPtyVisibilityClaim
 } from './pty-renderer-delivery-claims'
 
-type UseTerminalPaneGlobalEffectsArgs = PaneFocusOwnership & {
+type UseTerminalPaneGlobalEffectsArgs = Partial<PaneFocusOwnership> & {
+  tabId: string
   worktreeId: string
   cwd?: string
   isActive: boolean

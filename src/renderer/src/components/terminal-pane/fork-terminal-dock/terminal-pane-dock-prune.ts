@@ -1,4 +1,4 @@
-import type { Tab } from '../../../../../shared/types'
+import type { Tab } from '../../../../../shared/tab-types'
 import { makePaneKey } from '../../../../../shared/stable-pane-id'
 import { removeTerminalDockPaneKeys } from './terminal-dock-pane-state'
 import { getCachedUnifiedTerminalTabForWorktree } from '../terminal-unified-tab-lookup'

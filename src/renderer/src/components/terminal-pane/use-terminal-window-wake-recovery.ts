@@ -5,7 +5,7 @@ import { recoverVisibleTerminalWindowWake } from './terminal-visibility-resume'
 import { recordTerminalFreezeBreadcrumb } from './terminal-freeze-breadcrumbs'
 import type { IDisposable } from '@xterm/xterm'
 
-type UseTerminalWindowWakeRecoveryArgs = PaneFocusOwnership & {
+type UseTerminalWindowWakeRecoveryArgs = Partial<PaneFocusOwnership> & { tabId: string } & {
   isVisible: boolean
   managerRef: React.RefObject<PaneManager | null>
   isActiveRef: React.RefObject<boolean>

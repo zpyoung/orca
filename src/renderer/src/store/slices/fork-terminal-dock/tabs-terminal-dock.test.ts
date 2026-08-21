@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { Tab } from '../../../../../shared/types'
+import type { Tab } from '../../../../../shared/tab-types'
 import type * as AgentStatusModule from '@/lib/agent-status'
 import type * as WorktreeRuntimeOwnerModule from '@/lib/worktree-runtime-owner'
 import type * as WebRuntimeSessionModule from '@/runtime/web-runtime-session'

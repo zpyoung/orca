@@ -1,5 +1,7 @@
 import type { WorktreeMetaUpdateOptions } from '@/store/slices/worktree-helpers'
-import type { ProjectGroup, RepoKind, Worktree } from '../../../../../shared/types'
+import type { ProjectGroup } from '../../../../../shared/project-group-types'
+import type { RepoKind } from '../../../../../shared/repo-types'
+import type { Worktree } from '../../../../../shared/worktree/types'
 import { canWorktreeHoldGroupMembership } from '../../../../../shared/fork-worktree-groups/worktree-group-membership'
 
 export type WorktreeGroupMenuVisibility = {

@@ -1,4 +1,5 @@
-import type { RepoKind, Worktree } from '../../../../../shared/types'
+import type { RepoKind } from '../../../../../shared/repo-types'
+import type { Worktree } from '../../../../../shared/worktree/types'
 import { canWorktreeHoldGroupMembership } from '../../../../../shared/fork-worktree-groups/worktree-group-membership'
 
 /** Hit-test rect for one project-group header row in the sidebar. */

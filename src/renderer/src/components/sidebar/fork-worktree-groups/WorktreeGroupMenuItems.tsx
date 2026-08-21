@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/sidebar/WorktreeContextMenu.tsx
-// FORK-COPY-SHA: 2307f2ebbe1c1e737c0b12d920bb0a208332db2c
+// FORK-COPY-SHA: d802fdc7429f5f9d959b99a73656545bd760eace
 import React, { useCallback, useState } from 'react'
 import { CircleX, FolderInput, FolderPlus } from 'lucide-react'
 import {
@@ -11,7 +11,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { ProjectGroupNameDialog } from '@/components/sidebar/ProjectGroupNameDialog'
 import { useAppStore } from '@/store'
-import type { Repo, Worktree } from '../../../../../shared/types'
+import type { Repo } from '../../../../../shared/repo-types'
+import type { Worktree } from '../../../../../shared/worktree/types'
 import { translate } from '@/i18n/i18n'
 import { parseWorkspaceKey } from '../../../../../shared/workspace-scope'
 import {

@@ -103,3 +103,45 @@ upstream code under a fork glob and hand the fork permanent ownership of a schem
 send after the rebase onto main".
 
 **Status:** pending-upstream. Not yet submitted.
+
+## React Doctor changed-lines gate
+
+**What:** three one-line rewrites in files v1.4.186 introduced — two `Array<T>` uses become `T[]`,
+and one Vitest test imports `Buffer` from `node:buffer` — plus two rule severities added to the
+`reactDoctor` key in `package.json`.
+
+The `Enforce React Doctor on changed lines` job runs the `react-doctor` CLI, which reads neither
+`.oxlintrc.json` nor `config/oxlint-react-doctor.json`, so it blocks lines those configs
+deliberately allow. `mobile/.oxlintrc.json` turns `typescript/array-type` and
+`unicorn/prefer-node-protocol` off for the whole mobile package; the three rewrites simply satisfy
+both configs at once, since Metro — the reason mobile avoids the `node:` protocol — never bundles a
+test file.
+
+`react-doctor/no-ref-current-in-render` and `react-doctor/no-effect-with-fresh-deps` default to
+`error` in the CLI but are absent from `config/oxlint-react-doctor.json`, the repo's curated React
+Doctor rule list, where every listed rule runs at `warn`. Both fire only on deliberate,
+upstream-authored patterns: latest-value refs written during render, a render-phase array-identity
+cache, and test harnesses whose inline ref literals are the fixture under test. Setting them to
+`warn` in `package.json` aligns the CLI with the severity the repo already declares, and keeps the
+findings visible in the report instead of silencing them.
+
+Inline `oxlint-disable` is not an option here: `check:code-quality:changed` runs Oxlint with
+`--report-unused-disable-directives-severity warn`, and a directive naming a rule that Oxlint has
+not loaded counts as unused, so every added directive becomes a finding in that gate instead.
+
+**Why upstream, not isolated:** the findings are on upstream's own code, and `package.json` is
+already a permanent fork exception. Isolating would mean forking nine upstream modules — four of
+them hot sidebar hooks — and rewriting ref patterns upstream has no reason to change.
+
+**Paths:**
+- `mobile/src/browser/mobile-browser-frameless-stream.test.tsx`
+- `mobile/src/session/pending-terminal-handle-recovery.test.ts`
+- `mobile/src/transport/mobile-relay-rpc-session-liveness.test.ts`
+
+The `package.json` severities need no `exceptions` row of their own; the file is already declared
+`permanent`.
+
+**Introduced:** the v1.4.186 sync (2026-08-21), fixing the `static analysis` job on PR #12.
+
+**Status:** pending-upstream. Not yet submitted. Drop any entry upstream resolves on its own — the
+CLI's rule set moves independently of the pinned `react-doctor@0.9.1` version.

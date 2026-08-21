@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/main/native-chat/transcript-tail-reader.ts
-// FORK-COPY-SHA: 2307f2ebbe1c1e737c0b12d920bb0a208332db2c
+// FORK-COPY-SHA: d802fdc7429f5f9d959b99a73656545bd760eace
 import { open, stat } from 'node:fs/promises'
 import type { AgentType, NativeChatMessage } from '../../../shared/native-chat-types'
 import {
@@ -109,8 +109,12 @@ export async function readNativeChatTranscriptTailFile({
     }
     const newestFirst: { message: NativeChatMessage; offset: number }[] = []
     const finalByte = Buffer.allocUnsafe(1)
-    await handle.read(finalByte, 0, 1, consumedTo - 1)
+    const finalProbe = await handle.read(finalByte, 0, 1, consumedTo - 1)
     signal?.throwIfAborted()
+    if (finalProbe.bytesRead < 1) {
+      // File shrank between stat and probe: report empty, the next poll re-stats.
+      return { messages: [], consumedTo: 0, hasMore: false, beforeOffset: 0 }
+    }
     ignoreNextMalformedRecord = finalByte[0] !== 0x0a
     let cursor = consumedTo - (finalByte[0] === 0x0a ? 1 : 0)
     while (cursor > 0 && newestFirst.length <= limit) {
@@ -119,6 +123,11 @@ export async function readNativeChatTranscriptTailFile({
       const buffer = Buffer.allocUnsafe(cursor - start)
       const { bytesRead } = await handle.read(buffer, 0, buffer.length, start)
       signal?.throwIfAborted()
+      // A short read means the file shrank mid-walk: stop paging back rather
+      // than stitch non-adjacent bytes into records.
+      if (bytesRead < buffer.length) {
+        break
+      }
       let segmentEnd = bytesRead
       for (let index = bytesRead - 1; index >= 0 && newestFirst.length <= limit; index--) {
         if (buffer[index] !== 0x0a) {

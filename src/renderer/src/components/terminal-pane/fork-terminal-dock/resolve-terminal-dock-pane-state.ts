@@ -1,4 +1,4 @@
-import type { TerminalDockPaneState } from '../../../../../shared/types'
+import type { TerminalDockPaneState } from '../../../../../shared/fork-terminal-dock/terminal-dock-pane-state'
 import { DEFAULT_TERMINAL_DOCK_PANE_STATE } from './terminal-dock-pane-state'
 
 /** Resolves a pane's dock state under the echo-precedence rule: once the host has ever echoed

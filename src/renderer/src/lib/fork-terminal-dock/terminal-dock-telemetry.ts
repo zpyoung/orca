@@ -1,5 +1,5 @@
 import type { TerminalDockSendOutcome } from '../../../../shared/telemetry-events'
-import type { TuiAgent } from '../../../../shared/types'
+import type { TuiAgent } from '../../../../shared/tui-agent'
 import { track, tuiAgentToAgentKind } from '../telemetry'
 
 // Deliberately open: callers pass an agent id that may not be a known TuiAgent,

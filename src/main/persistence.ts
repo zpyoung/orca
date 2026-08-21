@@ -41,10 +41,22 @@ import { getAutomationLegacyRepoId } from '../shared/automation-run-identity'
 import { normalizeAutomationPrecheck } from '../shared/automation-precheck'
 import { normalizeProxyUrl } from '../shared/network-proxy'
 import { normalizeKagiSessionLink } from '../shared/browser-url'
+import type { FolderWorkspace, WorkspaceKey } from '../shared/folder-workspace-types'
+import type { GlobalSettings, OrcaWorkspaceLayout } from '../shared/global-settings-types'
+import type { NotificationSettings } from '../shared/notification-settings-types'
 import type {
-  PersistedState,
+  OnboardingChecklistState,
+  OnboardingOutcome,
+  OnboardingState
+} from '../shared/onboarding-state-types'
+import type {
+  LegacyPaneKeyAliasEntry,
+  PersistedMobileClientTabSelections,
+  PersistedState
+} from '../shared/persisted-state-types'
+import type { ProjectGroup } from '../shared/project-group-types'
+import type {
   Project,
-  ProjectUpdateArgs,
   ProjectHostSetup,
   ProjectHostSetupCreateArgs,
   ProjectHostSetupCreateResult,
@@ -52,34 +64,28 @@ import type {
   ProjectHostSetupDeleteResult,
   ProjectHostSetupUpdateArgs,
   ProjectHostSetupUpdateResult,
-  RepoProjectHostSetupMethod,
-  Repo,
-  ProjectGroup,
-  FolderWorkspace,
-  SparsePreset,
-  PersistedMobileClientTabSelections,
-  WorktreeMeta,
-  WorktreeLineage,
-  WorkspaceLineage,
-  WorkspaceKey,
-  GlobalSettings,
-  OrcaWorkspaceLayout,
-  NotificationSettings,
-  OnboardingChecklistState,
-  OnboardingOutcome,
-  OnboardingState,
-  LegacyPaneKeyAliasEntry,
-  TerminalPaneLayoutNode,
+  ProjectUpdateArgs,
+  RepoProjectHostSetupMethod
+} from '../shared/project-types'
+import type { Repo } from '../shared/repo-types'
+import type {
   TerminalLayoutSnapshot,
-  TerminalTab,
+  TerminalPaneLayoutNode,
+  TerminalTab
+} from '../shared/terminal-tab-types'
+import type {
   WorkspaceSessionPatch,
   WorkspaceSessionState
-} from '../shared/types'
+} from '../shared/workspace-session-state-types'
+import type { SparsePreset } from '../shared/worktree/create-types'
+import type { WorkspaceLineage, WorktreeLineage } from '../shared/worktree/lineage-types'
+import type { WorktreeMeta } from '../shared/worktree/meta-types'
 import {
   deriveGlobalWindowsRuntimeDefaultFromLegacySettings,
   normalizeProjectRuntimePreference
 } from '../shared/project-execution-runtime'
 import { projectHostSetupProjectionFromRepos } from '../shared/project-host-setup-projection'
+import { carryProjectStateThroughIdentityChange } from '../shared/project-identity-succession'
 import { isPluginPanelTabKey } from '../shared/plugins/plugin-manifest'
 import type { GitRemoteIdentity } from '../shared/git-remote-identity'
 import {
@@ -138,6 +144,10 @@ import {
 import { parseWorkspaceSessionSalvaging } from '../shared/workspace-session-salvage'
 import { normalizeUsagePercentageDisplay } from '../shared/usage-percentage-display'
 import { normalizeStatusBarUsageMode } from '../shared/status-bar-usage-mode'
+import {
+  normalizeCustomWorktreeVisibilitySources,
+  normalizeWorktreeVisibilitySourcePreferences
+} from '../shared/worktree/visibility-sources'
 import { isExistingPersistedProfile } from '../shared/project-order-manual-default-notice'
 import { resolveUsagePercentageDisplayChangeNoticeDismissed } from '../shared/usage-percentage-display-change-notice'
 import { normalizePRBotAuthorOverrides } from '../shared/pr-bot-author-overrides'
@@ -165,11 +175,20 @@ import {
   pruneAutomationRuns
 } from '../shared/automation-run-retention'
 import { pruneWorkspaceSessionBrowserHistory } from '../shared/workspace-session-browser-history'
+import { normalizeRetirableGeneratedName } from './worktree-name-retirement'
+import {
+  addRetiredNames,
+  clampExhaustedTiers,
+  compactRetiredNames,
+  EMPTY_RETIRED_NAME_REGISTRY,
+  isEmptyRetiredNameRegistry,
+  type RetiredNameRegistry
+} from '../shared/worktree/retired-name-registry'
 import {
   FOLDER_WORKSPACE_INSTANCE_SEPARATOR,
   getRepoIdFromWorktreeId,
   getWorktreePathBasenameFromId
-} from '../shared/worktree-id'
+} from '../shared/worktree/id'
 import {
   isPathInsideOrEqual,
   isWindowsAbsolutePathLike,
@@ -177,6 +196,7 @@ import {
 } from '../shared/cross-platform-path'
 import { normalizeTerminalQuickCommands } from '../shared/terminal-quick-commands'
 import { normalizeTaskProviderSettings } from '../shared/task-providers'
+import { mergeWorkspaceCleanupUIState } from '../shared/workspace-cleanup-ui-state'
 import { normalizeAutoRenameBranchFromWorkDefaultOn } from '../shared/auto-rename-branch-from-work-settings'
 import {
   addMobilePairingCustomAddress,
@@ -216,7 +236,11 @@ import {
 } from '../shared/workspace-statuses'
 import { clampMarkdownTocPanelWidth } from '../shared/markdown-toc-panel-width'
 import { clampCombinedDiffFileTreeWidth } from '../shared/combined-diff-file-tree-width'
-import { isLegacyRepoForExternalWorktreeVisibility } from '../shared/worktree-ownership'
+import { isLegacyRepoForExternalWorktreeVisibility } from '../shared/worktree/ownership'
+import {
+  migrateExternalWorktreeVisibilityDefaults,
+  normalizeWorktreeVisibilityDefaults
+} from '../shared/external-worktree-visibility'
 import { sanitizeRepoIcon } from '../shared/repo-icon'
 import { normalizeRepoBadgeColor } from '../shared/repo-badge-color'
 import {
@@ -1477,6 +1501,8 @@ function sanitizeRepoUpdatesForPersistence<
       | 'worktreeBasePath'
       | 'projectHostSetupMethod'
       | 'forkSyncMode'
+      | 'customWorktreeVisibilitySources'
+      | 'worktreeVisibilitySourcePreferences'
     >
   >
 >(updates: T): T {
@@ -1535,6 +1561,26 @@ function sanitizeRepoUpdatesForPersistence<
       delete sanitized.forkSyncMode
     } else {
       sanitized.forkSyncMode = forkSyncMode
+    }
+  }
+  if ('customWorktreeVisibilitySources' in sanitized) {
+    const sources = normalizeCustomWorktreeVisibilitySources(
+      sanitized.customWorktreeVisibilitySources
+    )
+    if (!sources) {
+      delete sanitized.customWorktreeVisibilitySources
+    } else {
+      sanitized.customWorktreeVisibilitySources = sources
+    }
+  }
+  if ('worktreeVisibilitySourcePreferences' in sanitized) {
+    const preferences = normalizeWorktreeVisibilitySourcePreferences(
+      sanitized.worktreeVisibilitySourcePreferences
+    )
+    if (!preferences) {
+      delete sanitized.worktreeVisibilitySourcePreferences
+    } else {
+      sanitized.worktreeVisibilitySourcePreferences = preferences
     }
   }
   return sanitized
@@ -2287,6 +2333,49 @@ const MAX_CLAUDE_LIVE_PTY_SESSION_IDS = 200
 // Why: bound removed-SSH-target history so remove/re-add churn can't grow the file unbounded.
 const MAX_REMOVED_SSH_TARGET_TOMBSTONES = 50
 
+/** Why: retirement never evicts — dropping an entry hands back a name whose agent conversation is
+ *  still on disk — so the row is bounded by compaction instead, and a persisted row is a watermark
+ *  plus whatever sits above it. Accepts the pre-compaction plain-array row too: the feature is
+ *  unreleased, but a developer profile or a fixture can still hold one. */
+function normalizeRetiredNameRegistry(row: unknown): RetiredNameRegistry {
+  const isPlainArray = Array.isArray(row)
+  const rawRow = row as { exhaustedTiers?: unknown; names?: unknown } | null | undefined
+  const rawNames = isPlainArray ? row : Array.isArray(rawRow?.names) ? rawRow.names : []
+  const names = new Set<string>()
+  for (const entry of rawNames) {
+    if (typeof entry !== 'string') {
+      continue
+    }
+    const normalized = normalizeRetirableGeneratedName(entry)
+    if (normalized) {
+      names.add(normalized)
+    }
+  }
+  return compactRetiredNames({
+    exhaustedTiers: isPlainArray ? 0 : clampExhaustedTiers(rawRow?.exhaustedTiers),
+    names: [...names]
+  })
+}
+
+/** Why: a corrupt or hand-edited map must degrade to "nothing retired" rather than throw during
+ *  load — over-retiring costs one name from a 552-entry pool, but a load failure costs the app. */
+function normalizeRetiredNameRegistryMap(value: unknown): Record<string, RetiredNameRegistry> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {}
+  }
+  const byRepo: Record<string, RetiredNameRegistry> = {}
+  for (const [repoId, row] of Object.entries(value as Record<string, unknown>)) {
+    if (!repoId) {
+      continue
+    }
+    const registry = normalizeRetiredNameRegistry(row)
+    if (!isEmptyRetiredNameRegistry(registry)) {
+      byRepo[repoId] = registry
+    }
+  }
+  return byRepo
+}
+
 function normalizeClaudeLivePtySessionIds(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return []
@@ -2441,19 +2530,26 @@ function mergeProjectHostSetupCompatibilityState(
   repos: readonly Repo[]
 ): Pick<PersistedState, 'projects' | 'projectHostSetups'> {
   const projection = projectHostSetupProjectionFromRepos(repos)
-  const existingProjectsById = new Map(
-    (state.projects ?? []).map((project) => [project.id, project])
+  const succession = carryProjectStateThroughIdentityChange(
+    projection.projects,
+    state.projects ?? []
   )
   const currentRepoIds = new Set(repos.map((repo) => repo.id))
   const projectedProjectIds = new Set(projection.projects.map((project) => project.id))
   const projectedSetupIds = new Set(projection.setups.map((setup) => setup.id))
   // Why: legacy/repo-backed setup rows reuse the repo id; keep only independent rows so repo deletion leaves no ghosts.
-  const independentSetups = (state.projectHostSetups ?? []).filter((setup) => {
-    if (projectedSetupIds.has(setup.id)) {
-      return false
-    }
-    return !isRepoBackedProjectHostSetup(setup, currentRepoIds)
-  })
+  const independentSetups = (state.projectHostSetups ?? [])
+    .filter((setup) => {
+      if (projectedSetupIds.has(setup.id)) {
+        return false
+      }
+      return !isRepoBackedProjectHostSetup(setup, currentRepoIds)
+    })
+    // Why: follow the repo's project through a derived-id change so no ghost project row survives.
+    .map((setup) => {
+      const remappedProjectId = succession.remappedProjectIds.get(setup.projectId)
+      return remappedProjectId ? { ...setup, projectId: remappedProjectId } : setup
+    })
   const independentProjectIds = new Set(independentSetups.map((setup) => setup.projectId))
   const independentProjects = (state.projects ?? [])
     .filter(
@@ -2463,18 +2559,8 @@ function mergeProjectHostSetupCompatibilityState(
       ...project,
       sourceRepoIds: project.sourceRepoIds.filter((repoId) => currentRepoIds.has(repoId))
     }))
-  const projectedProjects = projection.projects.map((project) => {
-    const existingProject = existingProjectsById.get(project.id)
-    return existingProject?.localWindowsRuntimePreference
-      ? {
-          ...project,
-          localWindowsRuntimePreference: existingProject.localWindowsRuntimePreference,
-          updatedAt: Math.max(project.updatedAt, existingProject.updatedAt)
-        }
-      : project
-  })
   return {
-    projects: [...projectedProjects, ...independentProjects],
+    projects: [...succession.projects, ...independentProjects],
     projectHostSetups: [...projection.setups, ...independentSetups]
   }
 }
@@ -3187,6 +3273,13 @@ export class Store {
         // Merge with defaults in case new fields were added
         const homeDir = homedir()
         const defaults = getDefaultPersistedState(homeDir)
+        const migratedExternalVisibility = migrateExternalWorktreeVisibilityDefaults(
+          Array.isArray(parsed.repos) ? parsed.repos : [],
+          parsed.settings?.worktreeVisibilityDefaults
+        )
+        if (migratedExternalVisibility.changed) {
+          this.loadNeedsSave = true
+        }
         const migratedTerminalScrollback = migrateTerminalScrollbackRows(parsed.settings)
         if (migratedTerminalScrollback.needsSave) {
           this.loadNeedsSave = true
@@ -3456,6 +3549,7 @@ export class Store {
             parsed.featureInteractionTelemetryBuckets
           ),
           projectGroups: normalizedProjectGroups,
+          repos: migratedExternalVisibility.repos,
           folderWorkspaces: normalizeFolderWorkspaces(
             parsed.folderWorkspaces,
             normalizedProjectGroups
@@ -3474,6 +3568,7 @@ export class Store {
             ...defaults.settings,
             // Why (#7977): keep persisted experimentalNewWorktreeCardStyle:true — v1.4.130's onboarding auto-wrote it as a plain boolean, so it's indistinguishable from a real opt-in; only the default changed.
             ...stripRetiredGlobalSettings(parsed.settings),
+            worktreeVisibilityDefaults: migratedExternalVisibility.defaults,
             prBotAuthorOverrides: normalizePRBotAuthorOverrides(
               parsed.settings?.prBotAuthorOverrides
             ),
@@ -3771,6 +3866,12 @@ export class Store {
                 (alias): alias is string => typeof alias === 'string'
               )
             : [],
+          retiredWorktreeNamesByRepo: normalizeRetiredNameRegistryMap(
+            parsed.retiredWorktreeNamesByRepo
+          ),
+          retiredWorktreeNamesByNamespace: normalizeRetiredNameRegistryMap(
+            parsed.retiredWorktreeNamesByNamespace
+          ),
           sshRemotePtyLeases: (parsed.sshRemotePtyLeases ?? [])
             .map(normalizeSshRemotePtyLease)
             .filter((lease): lease is SshRemotePtyLease => lease !== null),
@@ -4284,6 +4385,10 @@ export class Store {
   }
 
   // ── Repos ──────────────────────────────────────────────────────────
+
+  getProfileStorageDirectory(): string {
+    return dirname(this.dataFile)
+  }
 
   getRepos(): Repo[] {
     return this.state.repos.map((repo) => this.hydrateRepo(repo))
@@ -4802,6 +4907,8 @@ export class Store {
     this.syncProjectHostSetupCompatibilityState()
     // Why: presets are repo-scoped and unreachable once the repo is gone, so drop them with it.
     delete this.state.sparsePresetsByRepo[id]
+    // Same convention: retirements are repo-id-keyed, so they would otherwise orphan forever.
+    delete this.state.retiredWorktreeNamesByRepo?.[id]
     this.pruneWorktreeStateForRepo(id, null)
     this.state.workspaceSession = removeRepoFromWorkspaceSession(this.state.workspaceSession, id)
     this.state.workspaceSessionsByHostId = removeRepoFromHostWorkspaceSessions(
@@ -4817,9 +4924,11 @@ export class Store {
       (r) => !(r.id === id && getRepoExecutionHostId(r) === hostId)
     )
     const idStillPresent = this.state.repos.some((r) => r.id === id)
-    // Why: presets are repo-id-scoped (not host-scoped); drop them only when the last host's copy is gone.
+    // Why: presets and retirements are repo-id-scoped (not host-scoped); drop them only when the
+    // last host's copy is gone.
     if (!idStillPresent) {
       delete this.state.sparsePresetsByRepo[id]
+      delete this.state.retiredWorktreeNamesByRepo?.[id]
     }
     this.syncProjectHostSetupCompatibilityState()
     // Why: prune only this host's worktree metas if the id survives elsewhere; otherwise prune everything (matches removeProject).
@@ -4975,16 +5084,18 @@ export class Store {
         | 'symlinkPaths'
         | 'issueSourcePreference'
         | 'forkSyncMode'
-        | 'externalWorktreeVisibility'
         | 'externalWorktreeVisibilityPromptDismissedAt'
         | 'externalWorktreeInboxBaselinePaths'
         | 'importedExternalWorktreePaths'
-        | 'agentWorktreeVisibility'
+        | 'customWorktreeVisibilitySources'
+        | 'worktreeVisibilitySourcePreferences'
         | 'projectGroupId'
         | 'projectGroupOrder'
         | 'projectHostSetupMethod'
       >
     > & {
+      externalWorktreeVisibility?: Repo['externalWorktreeVisibility'] | null
+      agentWorktreeVisibility?: Repo['agentWorktreeVisibility'] | null
       sourceControlAi?: Repo['sourceControlAi'] | null
       externalWorktreeDiscoverySuppressedAt?: Repo['externalWorktreeDiscoverySuppressedAt'] | null
     },
@@ -4998,6 +5109,20 @@ export class Store {
       return null
     }
     const sanitizedUpdates = sanitizeRepoUpdatesForPersistence(updates)
+    if (
+      'agentWorktreeVisibility' in sanitizedUpdates &&
+      !('worktreeVisibilitySourcePreferences' in sanitizedUpdates) &&
+      (sanitizedUpdates.agentWorktreeVisibility === 'hide' ||
+        sanitizedUpdates.agentWorktreeVisibility === 'show')
+    ) {
+      sanitizedUpdates.worktreeVisibilitySourcePreferences = {
+        ...repo.worktreeVisibilitySourcePreferences,
+        builtIn: {
+          claude: sanitizedUpdates.agentWorktreeVisibility,
+          gsd: sanitizedUpdates.agentWorktreeVisibility
+        }
+      }
+    }
     if ('projectGroupId' in sanitizedUpdates) {
       const nextGroupId = sanitizedUpdates.projectGroupId
       if (
@@ -5031,6 +5156,22 @@ export class Store {
     if ('worktreeBasePath' in sanitizedUpdates && sanitizedUpdates.worktreeBasePath === undefined) {
       delete repo.worktreeBasePath
       delete sanitizedUpdates.worktreeBasePath
+    }
+    if (
+      'externalWorktreeVisibility' in sanitizedUpdates &&
+      (sanitizedUpdates.externalWorktreeVisibility === undefined ||
+        sanitizedUpdates.externalWorktreeVisibility === null)
+    ) {
+      delete repo.externalWorktreeVisibility
+      repo.externalWorktreeVisibilityLegacy = false
+      delete sanitizedUpdates.externalWorktreeVisibility
+    }
+    if (
+      'agentWorktreeVisibility' in sanitizedUpdates &&
+      sanitizedUpdates.agentWorktreeVisibility === null
+    ) {
+      delete repo.agentWorktreeVisibility
+      delete sanitizedUpdates.agentWorktreeVisibility
     }
     if (
       'externalWorktreeVisibility' in sanitizedUpdates &&
@@ -5163,6 +5304,8 @@ export class Store {
       sourceControlAi: rawSourceControlAi,
       projectHostSetupMethod: rawProjectHostSetupMethod,
       forkSyncMode: rawForkSyncMode,
+      customWorktreeVisibilitySources: rawCustomWorktreeVisibilitySources,
+      worktreeVisibilitySourcePreferences: rawWorktreeVisibilitySourcePreferences,
       ...repoWithoutIcon
     } = repo
     const repoIcon = sanitizeRepoIcon(rawRepoIcon)
@@ -5171,6 +5314,12 @@ export class Store {
     const sourceControlAi = normalizeRepoSourceControlAiOverrides(rawSourceControlAi)
     const projectHostSetupMethod = sanitizeRepoProjectHostSetupMethod(rawProjectHostSetupMethod)
     const forkSyncMode = sanitizeForkSyncMode(rawForkSyncMode)
+    const customWorktreeVisibilitySources = normalizeCustomWorktreeVisibilitySources(
+      rawCustomWorktreeVisibilitySources
+    )
+    const worktreeVisibilitySourcePreferences = normalizeWorktreeVisibilitySourcePreferences(
+      rawWorktreeVisibilitySourcePreferences
+    )
     // Why: never spawn git/gh username resolution in hydration — a stuck probe froze Windows startup for minutes (issue #7225); read only cache/persisted value.
     const gitUsername = isFolderRepo(repo)
       ? ''
@@ -5184,6 +5333,10 @@ export class Store {
       ...(sourceControlAi !== undefined ? { sourceControlAi } : {}),
       ...(projectHostSetupMethod !== undefined ? { projectHostSetupMethod } : {}),
       ...(forkSyncMode !== undefined ? { forkSyncMode } : {}),
+      ...(customWorktreeVisibilitySources !== undefined ? { customWorktreeVisibilitySources } : {}),
+      ...(worktreeVisibilitySourcePreferences !== undefined
+        ? { worktreeVisibilitySourcePreferences }
+        : {}),
       kind: isFolderRepo(repo) ? 'folder' : 'git',
       gitUsername,
       hookSettings: {
@@ -5902,6 +6055,14 @@ export class Store {
     if ('disabledTuiAgents' in updates) {
       sanitizedUpdates.disabledTuiAgents = normalizeDisabledTuiAgents(updates.disabledTuiAgents)
     }
+    if ('worktreeVisibilityDefaults' in updates) {
+      sanitizedUpdates.worktreeVisibilityDefaults = {
+        ...this.state.settings.worktreeVisibilityDefaults,
+        ...(normalizeWorktreeVisibilityDefaults(updates.worktreeVisibilityDefaults) ?? {
+          external: 'hide'
+        })
+      }
+    }
     if ('agentDefaultArgs' in updates) {
       sanitizedUpdates.agentDefaultArgs = normalizeTuiAgentArgsRecord(updates.agentDefaultArgs)
       sanitizedUpdates.agentYoloDefaultsMigrated = true
@@ -6166,6 +6327,10 @@ export class Store {
     const nextUI = {
       ...currentUI,
       ...durableUpdates,
+      workspaceCleanup: mergeWorkspaceCleanupUIState(
+        currentUI.workspaceCleanup,
+        durableUpdates.workspaceCleanup
+      ),
       groupBy: durableUpdates.groupBy
         ? normalizeGroupBy(durableUpdates.groupBy)
         : normalizeGroupBy(this.state.ui?.groupBy),
@@ -7096,6 +7261,83 @@ export class Store {
     }
     this.state.claudeLivePtySessionIds = ids.filter((id) => id !== sessionId)
     this.scheduleSave()
+  }
+
+  /** Compacted, so callers get a watermark plus the names above it rather than every spent name.
+   *  Copied because the array is stored state. */
+  getRetiredWorktreeNameRegistry(repoId: string): RetiredNameRegistry {
+    const stored = this.state.retiredWorktreeNamesByRepo?.[repoId]
+    return stored
+      ? { exhaustedTiers: stored.exhaustedTiers, names: [...stored.names] }
+      : EMPTY_RETIRED_NAME_REGISTRY
+  }
+
+  getRetiredWorktreeNameRegistryForNamespace(namespaceKey: string): RetiredNameRegistry {
+    const stored = this.state.retiredWorktreeNamesByNamespace?.[namespaceKey]
+    return stored
+      ? { exhaustedTiers: stored.exhaustedTiers, names: [...stored.names] }
+      : EMPTY_RETIRED_NAME_REGISTRY
+  }
+
+  /** Records a generated workspace name as spent for this repo. Called with the name main actually
+   *  used, not the one the renderer proposed — the create path can advance past it on collision. */
+  addRetiredWorktreeName(repoId: string, name: string): void {
+    const normalized = normalizeRetirableGeneratedName(name)
+    if (!repoId || !normalized) {
+      return
+    }
+    this.applyRetiredWorktreeNames(repoId, [normalized])
+  }
+
+  /** Seeds retirements discovered by the one-time backfill. Merges rather than replaces so a
+   *  concurrent create during backfill is not lost. Returns true when anything was added. */
+  mergeRetiredWorktreeNames(repoId: string, names: Iterable<string>): boolean {
+    if (!repoId) {
+      return false
+    }
+    const incoming = new Set<string>()
+    for (const name of names) {
+      const normalized = normalizeRetirableGeneratedName(name)
+      if (normalized) {
+        incoming.add(normalized)
+      }
+    }
+    return incoming.size > 0 && this.applyRetiredWorktreeNames(repoId, incoming)
+  }
+
+  mergeRetiredWorktreeNamesForNamespace(namespaceKey: string, names: Iterable<string>): boolean {
+    if (!namespaceKey) {
+      return false
+    }
+    const normalized = new Set<string>()
+    for (const name of names) {
+      const candidate = normalizeRetirableGeneratedName(name)
+      if (candidate) {
+        normalized.add(candidate)
+      }
+    }
+    const next = addRetiredNames(
+      this.getRetiredWorktreeNameRegistryForNamespace(namespaceKey),
+      normalized
+    )
+    if (!next) {
+      return false
+    }
+    this.state.retiredWorktreeNamesByNamespace ??= {}
+    this.state.retiredWorktreeNamesByNamespace[namespaceKey] = next
+    this.scheduleSave()
+    return true
+  }
+
+  private applyRetiredWorktreeNames(repoId: string, names: Iterable<string>): boolean {
+    const next = addRetiredNames(this.getRetiredWorktreeNameRegistry(repoId), names)
+    if (!next) {
+      return false
+    }
+    this.state.retiredWorktreeNamesByRepo ??= {}
+    this.state.retiredWorktreeNamesByRepo[repoId] = next
+    this.scheduleSave()
+    return true
   }
 
   getDeletedSshConfigAliases(): string[] {

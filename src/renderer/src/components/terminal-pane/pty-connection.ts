@@ -20,7 +20,7 @@ import { TerminalKittyKeyboardModeTracker } from '../../../../shared/terminal-ki
 import { parseTerminalKittyKeyboardFlags } from '../../../../shared/terminal-kitty-keyboard-flags'
 import { isRuntimeOwnedSshTargetId, parseExecutionHostId } from '../../../../shared/execution-host'
 import { createTerminalZeroDimensionsMessage } from '../../../../shared/terminal-zero-dimensions-diagnostic'
-import { isWorktreeRemovalFenceError } from '../../../../shared/worktree-removal-fence-error'
+import { isWorktreeRemovalFenceError } from '../../../../shared/worktree/removal-fence-error'
 import { parseTerminalOscColorQuery } from '../../../../shared/terminal-osc-color-reply'
 import {
   HIDDEN_STARTUP_RENDERER_QUERY_PENDING_CHARS,
@@ -124,6 +124,7 @@ import {
   POST_REPLAY_MODE_RESET,
   POST_REPLAY_REATTACH_RESET,
   POST_REPLAY_REATTACH_RESET_KEEP_MOUSE,
+  RESET_AFTER_BYTE_GAP,
   RESET_KITTY_KEYBOARD_PROTOCOL,
   RESET_TERMINAL_CURSOR_STYLE
 } from '../../../../shared/terminal-mode-reset-profiles'
@@ -309,8 +310,10 @@ import {
   isExpectedAgentProcess,
   recognizeAgentProcessFromCommandLine
 } from '../../../../shared/agent-process-recognition'
-import type { SetupSplitDirection, TuiAgent } from '../../../../shared/types'
+import type { TuiAgent } from '../../../../shared/tui-agent'
+import type { SetupSplitDirection } from '../../../../shared/worktree/launch-types'
 import { isTuiAgent, TUI_AGENT_CONFIG } from '../../../../shared/tui-agent-config'
+import { resolveDraftPasteReadyTimeoutMs } from '../../../../shared/draft-paste-ready-timeout'
 import { createDraftPasteReadyScanner } from '../../../../shared/draft-paste-ready-scanner'
 import { sendAgentDraftPasteContent } from '@/lib/agent-draft-paste-content'
 import { writeTerminalPastePtyInput } from './terminal-pty-paste-writer'
@@ -349,7 +352,6 @@ const STARTUP_DRAFT_PASTE_QUIET_MS = 1500
 // contain private repo/user names; the terminal itself shows where it opened.
 export const STARTUP_CWD_FALLBACK_NOTICE =
   '\r\n[Orca opened this terminal at the workspace root because its saved start folder no longer exists.]\r\n'
-const STARTUP_DRAFT_PASTE_TIMEOUT_MS = 8000
 const HIDDEN_OUTPUT_RESTORE_PENDING_CHARS = 512 * 1024
 const HIDDEN_OUTPUT_RESTORE_DEFERRED_RETRY_MS = 50
 const HIDDEN_OUTPUT_RESTORE_DEFERRED_RETRY_MAX = 3
@@ -412,7 +414,7 @@ const FOREGROUND_GRID_DRIFT_CHECK_MIN_MS = 250
 // Why: this is only shown if hidden renderer output was skipped and main-owned
 // terminal state is unavailable, so the user has an explicit loss signal.
 const HIDDEN_OUTPUT_RESTORE_UNAVAILABLE_WARNING =
-  '\x18\x1b[0m\r\n[Orca skipped hidden terminal output because main recovery was unavailable.]\r\n'
+  '\r\n[Orca skipped hidden terminal output because main recovery was unavailable.]\r\n'
 type E2eTerminalPtyDataInjectionApi = {
   inject: (paneKey: string, data: string, meta?: PtyDataMeta) => boolean
   keys: () => string[]
@@ -2014,10 +2016,10 @@ export function connectPanePty(
     // "question answered" signal no hook will ever deliver.
     questionAnsweredInference.observeSentTerminalInput(data)
   }
-  let pendingTerminalInputWrite: Promise<void> | null = null
+  let pendingTerminalInputWrite: Promise<boolean | null> | null = null
   let sequencedInterruptStatusBaseline: AgentStatusEntry | null | undefined
   let interruptStatusBaselineSequence = 0
-  const setPendingTerminalInputWrite = (promise: Promise<void>): void => {
+  const setPendingTerminalInputWrite = (promise: Promise<boolean | null>): void => {
     pendingTerminalInputWrite = promise
     void promise.finally(() => {
       if (pendingTerminalInputWrite === promise) {
@@ -2030,7 +2032,9 @@ export function connectPanePty(
     if (!pendingWrite) {
       return interruptInference.flushPending()
     }
-    return pendingWrite.then(() => interruptInference.flushPending())
+    return pendingWrite.then((immediateResult) => {
+      return immediateResult ?? interruptInference.flushPending()
+    })
   }
   // Why: the 133;D confirmation guard and the visible-pane resampler both key off
   // "does this pane expect an agent"; derive each signal once so the two callers
@@ -4165,26 +4169,28 @@ export function connectPanePty(
       clearPendingTerminalInputIntent()
       const writePromise = transport
         .sendInputAccepted(data)
-        .then((accepted) => {
+        .then((accepted): boolean | Promise<boolean> | null => {
           if (accepted) {
             // Why: rejected writes use transport recovery and must not arm a parser probe.
             markAcceptedTerminalInputSent()
             observeAcceptedShellCommandInput(data)
             observeAcceptedTerminalInput(data, acknowledgedIntent)
-            interruptInference.observeInputIntent(
+            const immediateResult = interruptInference.observeInputIntent(
               acknowledgedIntent,
               interruptStatusBaseline,
               capturedBaselineSequence
             )
             observeTitleOnlyInterrupt()
-          } else {
-            // Why: Esc/Ctrl+C are the first keys users press on a frozen pane;
-            // an unbound-transport reject here must arm recovery too.
-            requestRecoveryForUndeliverableInput()
+            return immediateResult ?? null
           }
+          // Why: Esc/Ctrl+C are the first keys users press on a frozen pane;
+          // an unbound-transport reject here must arm recovery too.
+          requestRecoveryForUndeliverableInput()
+          return null
         })
         .catch((err) => {
           console.warn('[agent-interrupt] acknowledged terminal input failed:', err)
+          return null
         })
       setPendingTerminalInputWrite(writePromise)
       return
@@ -4931,7 +4937,7 @@ export function connectPanePty(
       startupDraftHardTimer = setTimeout(() => {
         startupDraftHardTimer = null
         void deliverStartupDraftIfAgentOwnsPty()
-      }, STARTUP_DRAFT_PASTE_TIMEOUT_MS)
+      }, resolveDraftPasteReadyTimeoutMs(startupDraftAgent))
     }
     const armStartupDraftQuietTimer = (): void => {
       if (!startupDraftReadyScanner || startupDraftPasteSettled) {
@@ -6105,6 +6111,17 @@ export function connectPanePty(
         noteHiddenOutputRestoreFloodBackpressure()
         return
       }
+      // Why the emulator too: it carries state across chunks exactly like the
+      // parser does. If the gap swallowed the `ESC[22m` closing a bold run,
+      // every cell written afterwards inherits it. This marker is the one point
+      // where "bytes were dropped" is known, so ground the pen here rather than
+      // relying on each recovery path to remember (STA-4042).
+      // Why after the backpressure return and not before: under flood these
+      // markers arrive continuously, and writing per marker would add work in
+      // exactly the case that guard exists to damp. The flood path repaints via
+      // buildMainModelSnapshotReplayWrites, which grounds the pen itself, so
+      // nothing is lost by skipping it here.
+      writePtyOutputToXterm(RESET_AFTER_BYTE_GAP, true)
       // Why: a marker during an in-flight restore means that snapshot may predate the drop, so a fresh one must follow; capture BEFORE the mark, which starts a restore synchronously on a visible pane.
       const restoreWasInFlight = hiddenOutputRestoreInFlight !== null
       markHiddenOutputRestoreNeeded()
@@ -6358,6 +6375,20 @@ export function connectPanePty(
     // this write already applied.
     liveScrollbackRestore?.dispose()
     liveScrollbackRestore = installTerminalLiveScrollbackRestore(pane.terminal)
+
+    // Why read it live: `?1049` is not a no-op when the pane is already on the
+    // target buffer — xterm still runs restoreCursor and swaps the kitty flag
+    // registers — so the replay prologue must only switch when it truly differs.
+    //
+    // Best-effort by design. xterm parses asynchronously, so this sees only
+    // PARSED writes; a `?1049` transition still queued reads stale. Draining
+    // first with a write sentinel was tried and reverted: it puts the repaint
+    // behind xterm's queue, so a wedged terminal stalls recovery, and it breaks
+    // the disposal/cancellation ordering the restore paths rely on. A stale read
+    // costs one mis-scoped buffer switch; the barrier costs the repaint.
+    function isPaneOnAlternateScreen(): boolean {
+      return pane.terminal.buffer.active.type === 'alternate'
+    }
 
     function writePtyOutputToXterm(
       data: string,
@@ -7005,6 +7036,7 @@ export function connectPanePty(
         cycle: hiddenOutputRestoreRemoteAbandonCycles
       })
       noteHiddenOutputRestoreFloodBackpressure()
+      writePtyOutputToXterm(RESET_AFTER_BYTE_GAP, true)
       return true
     }
 
@@ -7057,6 +7089,13 @@ export function connectPanePty(
         // backpressure must not outlive it — it would re-open recovery and banner a second time.
         clearHiddenOutputRestoreFloodRepaintTimer()
         writeRestoreUnavailableWarning()
+      }
+      // Why an else: the branch above already grounds the gap inside
+      // writeRestoreUnavailableWarning, and the remote re-arm grounds it in
+      // rearmRemoteHiddenOutputRestoreInsteadOfWarning. Only the quiet
+      // flood-abandon reaches neither, and it still drains chunks below.
+      else if (!rearmedRemoteRestore) {
+        writePtyOutputToXterm(RESET_AFTER_BYTE_GAP, true)
       }
       if (hadPendingOverflow) {
         return
@@ -7198,6 +7237,8 @@ export function connectPanePty(
     }
 
     function writeRestoreUnavailableWarning(): void {
+      // The reset must parse before both the warning and any foreground drain.
+      writePtyOutputToXterm(RESET_AFTER_BYTE_GAP, true)
       if (!shouldWritePtyOutputForeground(deps.isVisibleRef.current)) {
         return
       }
@@ -7285,9 +7326,16 @@ export function connectPanePty(
             // Why: an imageless success is not proof the pane is empty; normal replay clears screen and scrollback.
             const snapshotCarriesNoImage =
               snapshot.alternateScreen !== true && snapshot.data === '' && !snapshot.scrollbackAnsi
-            if (!snapshotCarriesNoImage) {
+            if (snapshotCarriesNoImage) {
+              // Why still ground: a restore only runs because bytes were dropped, so
+              // the gap's pen outlives a snapshot that cannot repaint over it. The
+              // live-path constant, not the replay baseline — nothing repaints here,
+              // so the pane is handed back to whatever is still running.
+              writeReplayData(RESET_AFTER_BYTE_GAP)
+            } else {
               for (const replayChunk of buildMainModelSnapshotReplayWrites(snapshot, {
-                skipAltFrame: skippedAltFrame
+                skipAltFrame: skippedAltFrame,
+                paneOnAlternateScreen: isPaneOnAlternateScreen()
               })) {
                 writeReplayData(replayChunk)
               }
@@ -8005,7 +8053,9 @@ export function connectPanePty(
                 snapshotSeq: snapshot.seq
               })
               // Why keep a too-wide frame: preconnect SSH has no live repaint owner or post-restore fit.
-              for (const replayChunk of buildMainModelSnapshotReplayWrites(snapshot)) {
+              for (const replayChunk of buildMainModelSnapshotReplayWrites(snapshot, {
+                paneOnAlternateScreen: isPaneOnAlternateScreen()
+              })) {
                 writeReplayData(replayChunk)
               }
               writeReplayData(reattachReplayResetSequence(modelData))
@@ -8306,7 +8356,8 @@ export function connectPanePty(
               skipAltFrame: shouldSkipAltFrameForWidthMismatch(
                 modelCols,
                 readProposedTerminalCols(pane)
-              )
+              ),
+              paneOnAlternateScreen: isPaneOnAlternateScreen()
             })) {
               writeReplayData(replayChunk)
             }

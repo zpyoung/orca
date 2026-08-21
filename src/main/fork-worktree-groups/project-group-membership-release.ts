@@ -1,4 +1,4 @@
-import type { WorktreeMeta } from '../../shared/types'
+import type { WorktreeMeta } from '../../shared/worktree/meta-types'
 
 export function releaseDeletedProjectGroupWorktreeMembership(
   worktreeMeta: Record<string, WorktreeMeta | undefined>,

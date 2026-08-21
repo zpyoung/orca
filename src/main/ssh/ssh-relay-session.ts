@@ -103,14 +103,14 @@ import {
   type SshAiVaultRelayListParams,
   type SshAiVaultRelayTitleParams
 } from '../../shared/ssh-ai-vault-relay'
+import { isTerminalLeafId, makePaneKey } from '../../shared/stable-pane-id'
+import { isValidTerminalTabId } from '../../shared/terminal-tab-id'
 import {
   NATIVE_CHAT_CHANGED_METHOD,
   NATIVE_CHAT_RELAY_REQUEST_TIMEOUT_MS,
   parseNativeChatRelayPing,
   type NativeChatRelayPing
 } from '../../shared/fork-native-chat-relay/native-chat-relay-protocol'
-import { isTerminalLeafId, makePaneKey } from '../../shared/stable-pane-id'
-import { isValidTerminalTabId } from '../../shared/terminal-tab-id'
 import {
   openSshPtyConsumerSession,
   type OpenSshPtyConsumerSessionOptions,

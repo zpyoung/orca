@@ -8,7 +8,9 @@ import {
   removeTerminalDockPaneKeys
 } from '../../../fork-terminal-dock/terminal-dock-session-tab-props'
 import { getDefaultWorkspaceSession } from '../../../../../shared/constants'
-import type { Tab, TerminalTab, WorkspaceSessionState } from '../../../../../shared/types'
+import type { Tab } from '../../../../../shared/tab-types'
+import type { TerminalTab } from '../../../../../shared/terminal-tab-types'
+import type { WorkspaceSessionState } from '../../../../../shared/workspace-session-state-types'
 import { makePaneKey } from '../../../../../shared/stable-pane-id'
 import type { RuntimeSyncWindowGraph } from '../../../../../shared/runtime-types'
 
