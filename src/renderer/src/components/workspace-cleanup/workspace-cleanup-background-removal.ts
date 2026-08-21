@@ -6,6 +6,7 @@ import type {
   WorkspaceCleanupRemoveResult
 } from '@/store/slices/workspace-cleanup'
 import { translate } from '@/i18n/i18n'
+import { getWorkspaceCleanupCandidateHostId } from '../../../../shared/workspace-cleanup-host-identity'
 import {
   getSkippedAncestorMessage,
   isStrictWorkspaceCleanupDescendant,
@@ -71,7 +72,7 @@ export function startWorkspaceCleanupBackgroundRemoval({
 }: WorkspaceCleanupBackgroundRemovalArgs): void {
   if (candidates.length === 0) {
     try {
-      onResult?.({ removedIds: [], failures: [] })
+      onResult?.({ removedIds: [], removedIdentities: [], failures: [] })
     } catch (callbackError) {
       console.error('Workspace cleanup result callback failed', callbackError)
     }
@@ -80,6 +81,7 @@ export function startWorkspaceCleanupBackgroundRemoval({
 
   const count = candidates.length
   const removedIds: string[] = []
+  const removedIdentities: string[] = []
   const failures: WorkspaceCleanupFailure[] = []
   const preservedBranches: NonNullable<WorkspaceCleanupRemoveResult['preservedBranches']> = []
   const failedCandidates: WorkspaceCleanupCandidate[] = []
@@ -141,6 +143,7 @@ export function startWorkspaceCleanupBackgroundRemoval({
     const provisional = blockers.every((blocker) => provisionallyBlocked.has(blocker))
     const failure: WorkspaceCleanupFailure = {
       worktreeId: candidate.worktreeId,
+      executionHostId: getWorkspaceCleanupCandidateHostId(candidate),
       displayName: candidate.displayName,
       message: getSkippedAncestorMessage(provisional)
     }
@@ -279,6 +282,7 @@ export function startWorkspaceCleanupBackgroundRemoval({
     )
     const result: WorkspaceCleanupRemoveResult = {
       removedIds,
+      removedIdentities,
       failures,
       ...(preservedBranches.length > 0 ? { preservedBranches } : {})
     }

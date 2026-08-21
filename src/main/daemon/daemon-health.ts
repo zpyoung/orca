@@ -1,25 +1,6 @@
-/* oxlint-disable max-lines -- Why: pid validation shares process-identity
-helpers with kill escalation so the SIGKILL safety checks stay co-located. */
-import { execFile, execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { connect, type Socket } from 'node:net'
-import { promisify } from 'node:util'
-import {
-  getProcessOutputFields,
-  iterateProcessOutputLines
-} from '../../shared/process-output-field-scanner'
-import { isStartupDiagnosticsEnabled, logStartupDiagnostic } from '../startup/startup-diagnostics'
 import { encodeNdjson } from './ndjson'
-import {
-  getDaemonPidPath,
-  unlinkDaemonPidFileWhen,
-  unlinkOwnedDaemonPidFile
-} from './daemon-spawner'
-import {
-  endpointIsProvenDead,
-  probeSocketConnect,
-  type SocketProbeOutcome
-} from './daemon-endpoint-probe'
 import {
   PROTOCOL_VERSION,
   type HelloMessage,
@@ -31,38 +12,15 @@ import {
 const HEALTH_CHECK_TIMEOUT_MS = 3_000
 const PS_IDENTITY_TIMEOUT_MS = 2_000
 const RESOLVER_HEALTH_CHECK_TIMEOUT_MS = 3_000
-const KILL_WAIT_MS = 3_000
-const KILL_POLL_MS = 100
-// Why: SIGKILL is delivered on return from an uninterruptible syscall, so confirm the exit
-// rather than assume it — but keep the wait short, it only guards the rare wedged case.
-const SIGKILL_CONFIRM_WAIT_MS = 1_000
-const START_TIME_TOLERANCE_MS = 1_500
 // Why: e2e forces the failed-health preserve path without SIGSTOP races —
 // a stopped daemon also blocks listSessions, so the unhealthy guard cannot
 // verify live sessions until SIGCONT, which is flaky under CI load.
 export const E2E_FORCE_DAEMON_HEALTH_UNREACHABLE_ENV = 'ORCA_E2E_FORCE_DAEMON_HEALTH_UNREACHABLE'
-// Why: on Windows the pid file's startedAtMs is the daemon's self-reported
-// Node start time, while verification reads the OS process creation time —
-// the gap between them is the exe bootstrap, which AV/disk pressure can
-// stretch to seconds. Pid recycling differs by minutes-to-days, so a wide
-// tolerance keeps the guard effective without false mismatches.
-const WIN32_START_TIME_TOLERANCE_MS = 10_000
 
 // 'rejected' means the daemon answered and refused the handshake (bad token,
 // foreign protocol) — it can never be adopted, unlike 'unreachable', which
 // also covers a live-but-wedged daemon that simply missed the RPC budget.
 export type DaemonHealth = 'healthy' | 'unreachable' | 'rejected' | 'pty-spawn-unhealthy'
-
-export type ParsedDaemonPid = {
-  pid: number
-  startedAtMs: number | null
-  entryPath: string | null
-  appVersion: string | null
-  launchNonce: string | null
-  linuxStartTicks: string | null
-  bootId: string | null
-  spawnerExecPath: string | null
-}
 
 export function checkDaemonHealth(socketPath: string, tokenPath: string): Promise<DaemonHealth> {
   return new Promise((resolve) => {

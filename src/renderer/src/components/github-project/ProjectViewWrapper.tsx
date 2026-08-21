@@ -32,13 +32,15 @@ import { useAppStore } from '@/store'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { projectViewCacheKey } from '@/store/slices/github'
 import type {
-  GetProjectViewTableResult,
   GitHubIssueType,
   GitHubProjectFieldMutationValue,
   GitHubProjectRow,
   GitHubProjectTable,
+  GitHubProjectViewSummary
+} from '../../../../shared/github/project-types'
+import type {
+  GetProjectViewTableResult,
   GitHubProjectViewError,
-  GitHubProjectViewSummary,
   ListProjectViewsResult
 } from '../../../../shared/github/project-types'
 import type { GitHubWorkItem } from '../../../../shared/github/work-item-types'

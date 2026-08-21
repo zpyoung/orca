@@ -11,13 +11,13 @@ import type { SocketProbeOutcome } from './daemon-endpoint-probe'
 import {
   checkDaemonHealth,
   E2E_FORCE_DAEMON_HEALTH_UNREACHABLE_ENV,
+  healthCheckDaemon
+} from './daemon-health'
+import { killStaleDaemon } from './daemon-stale-kill'
+import {
   getProcessStartedAtMs,
-  healthCheckDaemon,
-  killStaleDaemon,
   parseLinuxBootTimeSeconds,
   parseLinuxProcStartTicks,
-  parseDaemonPidFile,
-  parseWindowsProcessIdentityJson,
   startTimeMatches,
   startTimesWithinTolerance
 } from './daemon-health'

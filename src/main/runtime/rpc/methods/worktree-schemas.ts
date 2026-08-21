@@ -14,8 +14,21 @@ import {
 import { TaskSourceContextSchema } from '../../../../shared/task-source-context-schema'
 import { WorkspaceLinkedItemSchema } from '../../../../shared/workspace-linked-item-schema'
 import { isWorkspaceLinkedItemSourceContextMatch } from '../../../../shared/workspace-linked-item-source-context'
+import { normalizeExecutionHostId } from '../../../../shared/execution-host'
 
-const OptionalTuiAgent = z
+const OptionalExecutionHostId = z
+  .string()
+  .transform((value, ctx) => {
+    const hostId = normalizeExecutionHostId(value)
+    if (!hostId) {
+      ctx.addIssue({ code: 'custom', message: 'Invalid host id' })
+      return z.NEVER
+    }
+    return hostId
+  })
+  .optional()
+
+export const OptionalTuiAgent = z
   .unknown()
   .superRefine((value, ctx) => {
     if (value !== undefined && !isTuiAgent(value)) {
@@ -25,7 +38,7 @@ const OptionalTuiAgent = z
   .transform((value): TuiAgent | undefined => (isTuiAgent(value) ? value : undefined))
   .optional()
 
-const AutomationWorkspaceProvenanceRequest = z.object({
+export const AutomationWorkspaceProvenanceRequest = z.object({
   automationId: z.string(),
   automationRunId: z.string(),
   dispatchToken: z.string(),
@@ -35,7 +48,7 @@ const AutomationWorkspaceProvenanceRequest = z.object({
 // Why no dispatch token (unlike automation provenance): this is a descriptive
 // origin marker for sidebar filtering, not an authority grant. The host stamps
 // createdAt itself so a client clock can't skew sort order.
-const CliWorkspaceProvenanceRequest = z.object({
+export const CliWorkspaceProvenanceRequest = z.object({
   callerTerminalHandle: OptionalString
 })
 
@@ -79,7 +92,7 @@ export const WorktreeActivate = WorktreeSelector.extend({
 })
 
 /** Shared by WorktreeCreate and WorktreeSet so the two error messages cannot drift. */
-function assertLinkedWorkItemSourceContextMatch(
+export function assertLinkedWorkItemSourceContextMatch(
   params: {
     linkedWorkItem?: z.infer<typeof WorkspaceLinkedItemSchema> | null
     linkedTaskSourceContext?: z.infer<typeof TaskSourceContextSchema> | null
@@ -280,7 +293,7 @@ export const WorktreeSet = WorktreeSelector.extend({
 })
 
 export const WorktreeRemove = WorktreeSelector.extend({
-  hostId: OptionalString,
+  hostId: OptionalExecutionHostId,
   force: OptionalBoolean,
   // Why (#11960): the CLI's --force is an unambiguous force affordance, but the
   // desktop sets `force` for an ordinary confirmed delete too, so the PTY-stop

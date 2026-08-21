@@ -142,9 +142,13 @@ export function registerWorkspaceCleanupHandlers(
         dismissal &&
         dismissal.classifierVersion === WORKSPACE_CLEANUP_CLASSIFIER_VERSION &&
         typeof dismissal.worktreeId === 'string' &&
-        typeof dismissal.fingerprint === 'string'
+        typeof dismissal.fingerprint === 'string' &&
+        (dismissal.executionHostId === undefined || parseExecutionHostId(dismissal.executionHostId))
       ) {
-        next[dismissal.worktreeId] = dismissal
+        const identity = dismissal.executionHostId
+          ? getWorkspaceCleanupHostIdentity(dismissal.executionHostId, dismissal.worktreeId)
+          : dismissal.worktreeId
+        next[identity] = dismissal
       }
     }
     store.updateUI({ workspaceCleanup: { dismissals: next } })

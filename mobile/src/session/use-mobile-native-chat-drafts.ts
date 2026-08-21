@@ -46,6 +46,10 @@ export function useMobileNativeChatDrafts(args: {
    *  transcript still belongs to the previously active tab), so it cannot be
    *  trusted to decline or retire the seed. */
   transcriptLoading?: boolean
+  /** `messages` is this session's own settled history — so an empty one really
+   *  is an empty conversation, not a read that failed or never ran. Only then
+   *  does a send's captured tail describe a real boundary. */
+  transcriptSettled: boolean
 }): {
   composerText: string
   setComposerText: Dispatch<SetStateAction<string>>
@@ -79,7 +83,8 @@ export function useMobileNativeChatDrafts(args: {
     launchDraft,
     launchDraftCreatedAt,
     chatActive = true,
-    transcriptLoading
+    transcriptLoading,
+    transcriptSettled
   } = args
   const draftKey = mobileNativeChatScopeKey(hostId, worktreeId, tabId)
   const pendingKey = draftKey && sessionId ? `${draftKey}\0${sessionId}` : null
@@ -282,7 +287,16 @@ export function useMobileNativeChatDrafts(args: {
     if (pending.length === 0) {
       return
     }
-    const landedImagePreviews = findLandedImagePreviewEchoes(messages, pending)
+    // Only judge a send against a read known to be this session's. Note this
+    // does NOT give an image echo a boundary — the rebase deliberately leaves
+    // those on whatever they captured — so a caption-less photo sent before any
+    // read settled can still claim an older photo turn, exactly as it does on
+    // main. Fixing that needs a tail that excludes older image turns without
+    // excluding the send's own echo, which is a separate change.
+    const landedImagePreviews = findLandedImagePreviewEchoes(
+      messages,
+      pending.filter((item) => item.baselineResolved)
+    )
     const landedImagePendingIds = new Set(landedImagePreviews.map((preview) => preview.pendingId))
     if (landedImagePreviews.length > 0) {
       setImagePreviewsBySession((previous) =>
@@ -302,7 +316,7 @@ export function useMobileNativeChatDrafts(args: {
       delete remaining[pendingKey]
       return remaining
     })
-  }, [messages, pending, pendingKey])
+  }, [messages, pending, pendingKey, transcriptSettled])
 
   return {
     composerText: draftKey ? (drafts[draftKey] ?? '') : '',

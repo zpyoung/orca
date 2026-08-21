@@ -22,6 +22,11 @@ import {
   TAIL_CHUNK_BYTES
 } from './transcript-tail-boundary'
 import {
+  findLastCompleteLineEnd,
+  readTranscriptByteAt,
+  TAIL_CHUNK_BYTES
+} from './transcript-tail-boundary'
+import {
   closeTranscriptHandle,
   wslGatedOpen,
   wslGatedRead,

@@ -517,10 +517,16 @@ export class SshGitProvider implements IGitProvider {
     worktreePath: string,
     pushTarget?: GitPushTarget
   ): Promise<GitUpstreamStatus> {
-    return (await this.mux.request('git.upstreamStatus', {
+    return this.upstreamStatusReadOwner.read(
+      { kind: 'ssh-provider' },
       worktreePath,
-      ...(pushTarget ? { pushTarget } : {})
-    })) as GitUpstreamStatus
+      pushTarget,
+      async () =>
+        (await this.mux.request('git.upstreamStatus', {
+          worktreePath,
+          ...(pushTarget ? { pushTarget } : {})
+        })) as GitUpstreamStatus
+    )
   }
 
   async pushBranch(

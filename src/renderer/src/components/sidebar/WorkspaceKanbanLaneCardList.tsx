@@ -19,7 +19,7 @@ function estimateWorkspaceBoardCardSize(): number {
 type WorkspaceKanbanLaneCardListProps = {
   items: readonly Worktree[]
   repoMap: Map<string, Repo>
-  activeWorktreeId: string | null
+  activeWorktreeIdentity: string | null
   scrollRef: React.RefObject<HTMLDivElement | null>
   selectedWorktreeIds: ReadonlySet<string>
   selectedWorktrees: readonly Worktree[]
@@ -36,7 +36,7 @@ type WorkspaceKanbanLaneCardListProps = {
 function WorkspaceKanbanLaneCardList({
   items,
   repoMap,
-  activeWorktreeId,
+  activeWorktreeIdentity,
   scrollRef,
   selectedWorktreeIds,
   selectedWorktrees,
@@ -47,12 +47,15 @@ function WorkspaceKanbanLaneCardList({
   onAssignWorkspaceStatus
 }: WorkspaceKanbanLaneCardListProps): React.JSX.Element {
   const spacerRef = useRef<HTMLDivElement | null>(null)
-  const itemIds = useMemo(() => items.map((item) => item.id), [items])
+  const itemIds = useMemo(() => items.map(getWorktreeHostIdentity), [items])
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: estimateWorkspaceBoardCardSize,
-    getItemKey: useCallback((index: number) => items[index]?.id ?? index, [items]),
+    getItemKey: useCallback(
+      (index: number) => (items[index] ? getWorktreeHostIdentity(items[index]) : index),
+      [items]
+    ),
     overscan: WORKSPACE_BOARD_CARD_OVERSCAN,
     gap: WORKSPACE_BOARD_CARD_GAP,
     // Why: sync-flushing rich card renders inside the scroll listener stalls the
@@ -70,10 +73,11 @@ function WorkspaceKanbanLaneCardList({
       scrollElement,
       spacerElement,
       getItemIds: () => itemIds,
+      getWorktreeIds: () => items.map((item) => item.id),
       getMeasurements: () => virtualizer.measurementsCache
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- virtualizer is a stable instance (useVirtualizer holds it in useState), and getMeasurements reads measurementsCache off it live.
-  }, [itemIds, scrollRef])
+  }, [itemIds, items, scrollRef])
 
   return (
     <div
@@ -86,7 +90,8 @@ function WorkspaceKanbanLaneCardList({
         if (!worktree) {
           return null
         }
-        const isSelected = selectedWorktreeIds.has(worktree.id)
+        const worktreeIdentity = getWorktreeHostIdentity(worktree)
+        const isSelected = selectedWorktreeIds.has(worktreeIdentity)
         return (
           <div
             key={virtualItem.key}
@@ -99,7 +104,7 @@ function WorkspaceKanbanLaneCardList({
               worktree={worktree}
               laneIndex={virtualItem.index}
               repo={repoMap.get(worktree.repoId)}
-              isActive={activeWorktreeId === worktree.id}
+              isActive={activeWorktreeIdentity === worktreeIdentity}
               isSelected={isSelected}
               nativeDragEnabled={nativeDragEnabled}
               selectedWorktrees={

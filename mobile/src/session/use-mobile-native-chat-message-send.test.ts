@@ -4,6 +4,8 @@
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+// Type-only, so it is erased before the `./mobile-native-chat-send` mock below applies.
+import type { MobileNativeChatSendOutcome } from './mobile-native-chat-send'
 
 const sendWithOutcome = vi.fn()
 const clearInputWrite = vi.fn()
@@ -58,8 +60,8 @@ describe('useMobileNativeChatMessageSend', () => {
         commandSendRef,
         captureSendOrigin,
         readSeededLaunchDraftSeed,
-        clearDraftForSend: () => {},
-        restoreRejectedDraft: () => {},
+        clearDraftForSend,
+        restoreRejectedDraft,
         acceptSend,
         holdUnconfirmedSend,
         onSendError

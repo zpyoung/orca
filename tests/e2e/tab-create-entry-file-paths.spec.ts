@@ -29,7 +29,19 @@ test('new-tab file results prioritize the filename and reveal the full path on h
   await input.fill('secondaryNav')
 
   const row = orcaPage.locator('[role="option"]').filter({ hasText: 'Open file' }).first()
-  await expect(row).toBeVisible()
+  // Keyboard activation avoids the animated tab bar's pointer stability gate.
+  // Re-open and re-type until the file scan has produced an Open file row —
+  // the scan starts when the menu opens and can outlast a single fill.
+  await expect(async () => {
+    if ((await newTab.getAttribute('aria-expanded')) !== 'true') {
+      await newTab.press('Space')
+    }
+    await expect(input).toBeVisible({ timeout: 1_000 })
+    if ((await input.inputValue()) !== 'secondaryNav') {
+      await input.fill('secondaryNav')
+    }
+    await expect(row).toBeVisible({ timeout: 2_000 })
+  }).toPass({ timeout: 20_000 })
   await expect(row).toContainText('SecondaryNav.tsx')
   await expect(row).toContainText('packages/orca/src/renderer/src/components/navigation/')
   const rowText = await row.textContent()

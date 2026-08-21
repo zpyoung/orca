@@ -1,14 +1,10 @@
-/* eslint-disable max-lines -- Why: owns both wrapper-file generation and the matching readiness scanner; splitting would fragment the wrapper/marker contract. */
 /**
- * Shell-ready startup command support for local PTYs.
+ * Shell-ready launch configuration for local PTYs.
  *
- * Why: startup commands must wait until the shell has fully initialized. Provides shell wrapper
- * rcfiles that emit an OSC 777 marker after startup, plus a scanner that detects it.
+ * Why: startup commands must wait until the shell has fully initialized. Picks the args/env
+ * that point each shell at its Orca wrapper (which emits the OSC 777 marker the scanner detects).
  */
-import { tmpdir } from 'node:os'
 import { basename, win32 as pathWin32 } from 'node:path'
-import { mkdirSync, writeFileSync, chmodSync, existsSync } from 'node:fs'
-import type * as pty from 'node-pty'
 import {
   encodePowerShellCommand,
   getPowerShellOsc133Bootstrap,
@@ -21,13 +17,20 @@ import {
 } from '../pty/codex-shell-launch-preflight'
 import { buildStartupCommandSubmission } from '../../shared/startup-command-submission'
 import {
-  getFishShellReadyInitCommand,
-  getZshEnvTemplate,
-  getZshFinalZdotdirRestoreBlock,
-  getZshShellReadyMarkerRegistrationBlock,
-  SHELL_STARTUP_IDENTITY_MARKER_BLOCK,
-  getZshStartupFileSourceBlock
-} from '../shell-templates'
+  encodeShellStartupFeatures,
+  SHELL_STARTUP_FEATURE_ENV,
+  type ShellStartupFeature
+} from '../shell-startup-features'
+import {
+  resolveInheritedZdotdir,
+  resolveInheritedZshenvSourceDir
+} from '../zsh-wrapper-dir-ownership'
+import { ensureShellReadyWrappers } from './local-pty-shell-ready-wrapper-generation'
+import {
+  getShellReadyWrapperRoot,
+  shellReadyWrappersExist,
+  SHELL_READY_MARKER_ESCAPED
+} from './local-pty-shell-ready-wrapper-root'
 export {
   createShellReadyScanState,
   drainShellReadyHeldBytes,
@@ -339,36 +342,71 @@ export type ShellReadyLaunchConfig = {
   supportsReadyMarker: boolean
 }
 
-function getWrappedShellLaunchConfig(
+const UNWRAPPED: ShellReadyLaunchConfig = {
+  args: null,
+  env: {},
+  supportsReadyMarker: false
+}
+
+/** True when the wrapper tree is complete on disk right now. */
+function wrapperTreeUsable(): boolean {
+  const ensured = ensureShellReadyWrappers()
+  return ensured && shellReadyWrappersExist()
+}
+
+/** Args that point bash at Orca's rcfile, or null when it is not usable. */
+export function getBashWrapperLaunchArgs(): string[] | null {
+  return shellReadyWrappersExist()
+    ? ['--rcfile', `${getShellReadyWrapperRoot()}/bash/rcfile`]
+    : null
+}
+
+/**
+ * The one launch-config entry point: args + env for a shell that should start
+ * with exactly `features` enabled. An empty selection is never wrapped.
+ */
+export function getShellLaunchConfig(
   shellPath: string,
-  options: { emitReadyMarker: boolean }
+  features: readonly ShellStartupFeature[]
 ): ShellReadyLaunchConfig {
   const shellName = pathWin32.basename(basename(shellPath)).toLowerCase()
 
   if (shellName === 'zsh') {
-    ensureShellReadyWrappers()
+    if (features.length === 0) {
+      return UNWRAPPED
+    }
+    if (!wrapperTreeUsable()) {
+      // Why plain login zsh: ZDOTDIR pointed at an incomplete wrapper dir makes
+      // zsh skip the user's whole config. Losing Orca's features is recoverable.
+      return { args: ['-l'], env: {}, supportsReadyMarker: false }
+    }
     return {
       args: ['-l'],
       env: {
-        ORCA_ORIG_ZDOTDIR: resolveOriginalZdotdir(),
-        ORCA_ZSHENV_SOURCE_DIR: resolveOriginalZshenvSourceDir(),
+        ORCA_ORIG_ZDOTDIR: resolveInheritedZdotdir(process.env),
+        ORCA_ZSHENV_SOURCE_DIR: resolveInheritedZshenvSourceDir(process.env),
         ZDOTDIR: `${getShellReadyWrapperRoot()}/zsh`,
-        ORCA_SHELL_READY_MARKER: options.emitReadyMarker ? '1' : '0',
-        ORCA_SHELL_STARTUP_IDENTITY: options.emitReadyMarker ? '1' : '0'
+        [SHELL_STARTUP_FEATURE_ENV]: encodeShellStartupFeatures(features)
       },
-      supportsReadyMarker: options.emitReadyMarker
+      supportsReadyMarker: features.includes('ready')
     }
   }
 
   if (shellName === 'bash') {
+    if (features.length === 0) {
+      return UNWRAPPED
+    }
     ensureShellReadyWrappers()
+    const args = getBashWrapperLaunchArgs()
+    if (!args) {
+      return UNWRAPPED
+    }
     return {
-      args: ['--rcfile', `${getShellReadyWrapperRoot()}/bash/rcfile`],
+      args,
       env: {
-        ORCA_SHELL_READY_MARKER: options.emitReadyMarker ? '1' : '0',
-        ORCA_SHELL_STARTUP_IDENTITY: options.emitReadyMarker ? '1' : '0'
+        [SHELL_STARTUP_FEATURE_ENV]: encodeShellStartupFeatures(features)
       },
-      supportsReadyMarker: options.emitReadyMarker
+      supportsReadyMarker: features.includes('ready')
     }
   }
 
@@ -385,8 +423,9 @@ function getWrappedShellLaunchConfig(
     }
   }
 
-  // Why: mirrors daemon/shell-ready.ts; markerless fish stays unwrapped.
-  if (shellName === 'fish' && options.emitReadyMarker) {
+  // Why: mirrors daemon/shell-ready.ts; markerless fish stays unwrapped. The
+  // selection is baked into the init command, so fish needs no feature env var.
+  if (shellName === 'fish' && features.includes('ready')) {
     return {
       args: [
         '-l',
@@ -398,97 +437,5 @@ function getWrappedShellLaunchConfig(
     }
   }
 
-  return {
-    args: null,
-    env: {},
-    supportsReadyMarker: false
-  }
+  return UNWRAPPED
 }
-
-export function getShellReadyLaunchConfig(shellPath: string): ShellReadyLaunchConfig {
-  return getWrappedShellLaunchConfig(shellPath, { emitReadyMarker: true })
-}
-
-export function getMarkerlessShellLaunchConfig(shellPath: string): ShellReadyLaunchConfig {
-  return getWrappedShellLaunchConfig(shellPath, { emitReadyMarker: false })
-}
-
-// ── Startup command writer ──────────────────────────────────────────
-
-export function writeStartupCommandWhenShellReady(
-  readyPromise: Promise<void | ShellReadySignal>,
-  proc: pty.IPty,
-  startupCommand: string,
-  onExit: (cleanup: () => void) => void,
-  // Why: only shells with bracketed-paste active (see isBracketedPasteSafeShell) accept the wrapper; others use the raw path so ESC[200~ isn't echoed.
-  options: { bracketedPasteSafe?: boolean } = {}
-): void {
-  let sent = false
-  let postReadyTimer: ReturnType<typeof setTimeout> | null = null
-  let postReadyDataDisposable: { dispose: () => void } | null = null
-
-  const cleanup = (): void => {
-    sent = true
-    if (postReadyTimer !== null) {
-      clearTimeout(postReadyTimer)
-      postReadyTimer = null
-    }
-    postReadyDataDisposable?.dispose()
-    postReadyDataDisposable = null
-  }
-
-  const flush = (): void => {
-    if (sent) {
-      return
-    }
-    sent = true
-    postReadyDataDisposable?.dispose()
-    postReadyDataDisposable = null
-    if (postReadyTimer !== null) {
-      clearTimeout(postReadyTimer)
-      postReadyTimer = null
-    }
-    // Why: run in the same interactive shell (not `shell -c`) so the session survives after the agent exits.
-    // Why CR on Windows: PSReadLine/cmd.exe submit on `\r`, not LF; POSIX treats either as Enter under ICRNL.
-    const submit = process.platform === 'win32' ? '\r' : '\n'
-    // Why: single write after the ready barrier avoids incremental-paste char drops; multiline is bracketed-paste wrapped so newlines don't submit early.
-    proc.write(
-      buildStartupCommandSubmission(startupCommand, {
-        submit,
-        bracketedPasteSafe: options.bracketedPasteSafe === true
-      })
-    )
-  }
-
-  const schedulePostReadyFlush = (): void => {
-    postReadyTimer = setTimeout(flush, POST_SHELL_READY_STARTUP_COMMAND_DELAY_MS)
-  }
-
-  readyPromise.then((signal) => {
-    if (sent) {
-      return
-    }
-    // Why: marker fires from precmd before the line editor takes the PTY out of ECHO; writing now double-echoes the command, so settle first.
-    if (signal?.postMarkerBytesObserved === true) {
-      schedulePostReadyFlush()
-      return
-    }
-    postReadyDataDisposable = proc.onData(() => {
-      postReadyDataDisposable?.dispose()
-      postReadyDataDisposable = null
-      if (postReadyTimer !== null) {
-        clearTimeout(postReadyTimer)
-      }
-      schedulePostReadyFlush()
-    })
-    postReadyTimer = setTimeout(() => {
-      postReadyDataDisposable?.dispose()
-      postReadyDataDisposable = null
-      postReadyTimer = null
-      flush()
-    }, POST_SHELL_READY_STARTUP_COMMAND_FALLBACK_MS)
-  })
-  onExit(cleanup)
-}
-
-export { STARTUP_COMMAND_READY_MAX_WAIT_MS }

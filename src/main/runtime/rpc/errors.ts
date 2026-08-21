@@ -49,10 +49,13 @@ const RUNTIME_PASSTHROUGH_CODES: ReadonlySet<string> = new Set([
   'terminal_tab_close_timeout',
   'terminal_tab_not_found',
   'terminal_tab_pinned',
+  'agent_prompt_blocked',
+  'agent_prompt_stalled',
   'no_active_terminal',
   'repo_not_found',
   'timeout',
   'invalid_limit',
+  'request_aborted',
   'remote_update_manual_required',
   'remote_update_not_available',
   'remote_update_not_downloaded',
@@ -71,6 +74,9 @@ const STRUCTURED_RUNTIME_PASSTHROUGH_CODES: ReadonlySet<string> = new Set([
   'task_not_startable',
   'dispatch_not_found',
   'dispatch_run_mismatch',
+  'terminal_not_found',
+  'recipient_ambiguous',
+  'recipient_run_mismatch',
   'dispatch_inactive',
   'worker_identity_changed',
   'cursor_invalid',
@@ -158,6 +164,16 @@ export function mapRuntimeError(id: string, meta: RpcEnvelopeMeta, error: unknow
   }
   if (RUNTIME_PASSTHROUGH_CODES.has(message)) {
     return errorResponse(id, meta, message, message)
+  }
+  const skillInstallFailure = classifySkillInstallFailureCode(message)
+  if (skillInstallFailure) {
+    return errorResponse(
+      id,
+      meta,
+      SKILL_INSTALL_RPC_ERROR_CODE,
+      skillInstallFailure.code,
+      skillInstallFailure
+    )
   }
   if (message === 'invalid_terminal_send') {
     return errorResponse(id, meta, 'invalid_argument', 'Missing terminal send payload')

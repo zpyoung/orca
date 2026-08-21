@@ -2,13 +2,10 @@ import type { LinearSearchIssueSummary, LinearSearchResult } from '../../shared/
 import { clampLinearSearchLimit } from '../../shared/linear/agent-access'
 import type { LinearWorkspace } from '../../shared/linear/workspace-types'
 import {
-  acquire,
-  clearToken,
   getClients,
   getPublicFileUrlClient,
   getStatus,
   isAuthError,
-  release,
   type LinearClientForWorkspace
 } from './client'
 import {

@@ -79,7 +79,7 @@ async function enrichRepoGitRemoteIdentity(store: RepoIdentityStore, repo: Repo)
   }
   const inFlight = inFlightProbesByLocation.get(locationKey)
   if (inFlight) {
-    return inFlight
+    return inFlight.promise
   }
   // Why: a failed refresh of an already-resolved repo backs off on the long TTL — an SSH host that
   // is down for the day must not re-probe every five minutes for an identity we already hold.
@@ -101,12 +101,14 @@ async function enrichRepoGitRemoteIdentity(store: RepoIdentityStore, repo: Repo)
     probeRetryAfterByLocation.set(locationKey, Date.now() + RESOLVED_IDENTITY_REFRESH_TTL_MS)
     return writeIdentity(store, repo, result.identity)
   })().finally(() => {
-    if (inFlightProbesByLocation.get(locationKey) === probe) {
+    // Why compare the controller: retirement may already have replaced this location's entry, and
+    // only the probe that owns the current one may clear it.
+    if (inFlightProbesByLocation.get(locationKey)?.controller === controller) {
       inFlightProbesByLocation.delete(locationKey)
     }
   })
-  inFlightProbesByLocation.set(locationKey, probe)
-  return probe
+  inFlightProbesByLocation.set(locationKey, { controller, promise })
+  return promise
 }
 
 function isIdentityRefreshDue(repo: Repo, now: number): boolean {
@@ -177,7 +179,9 @@ async function enrichMissingRepoGitRemoteIdentitiesInBackground(
     }
   }
   if (changed) {
-    options.onChanged?.()
+    for (const listener of pendingChangeListeners) {
+      listener()
+    }
   }
 }
 
@@ -185,16 +189,53 @@ export function enrichMissingRepoGitRemoteIdentities(
   store: RepoIdentityStore,
   options: EnrichmentOptions = {}
 ): void {
-  void enrichMissingRepoGitRemoteIdentitiesInBackground(store, options).catch((error: unknown) => {
-    console.error('[repo-identity] Failed to enrich git remote identities:', error)
-  })
+  // Why outside the in-flight guard: retirement is exactly what a stuck sweep needs, and
+  // `getRepos()` builds its list synchronously from in-memory state, so a repo is never
+  // transiently absent and cannot lose its startup delay or backoff. The try/catch keeps the
+  // no-throw contract this fire-and-forget entry point had when retirement ran inside the pass.
+  try {
+    retireRemovedLocations(store.getRepos())
+  } catch (error: unknown) {
+    console.error('[repo-identity] Failed to retire removed repo locations:', error)
+  }
+  if (options.onChanged) {
+    pendingChangeListeners.add(options.onChanged)
+  }
+  if (sweepInFlight) {
+    // Why: the sweep probes candidates sequentially, so one fresh pass per list IPC piles up behind
+    // a slow probe — queue a single follow-up instead, which still picks up repos added mid-pass.
+    rerunRequested = true
+    return
+  }
+  sweepInFlight = enrichMissingRepoGitRemoteIdentitiesInBackground(store)
+    .catch((error: unknown) => {
+      console.error('[repo-identity] Failed to enrich git remote identities:', error)
+    })
+    .finally(() => {
+      sweepInFlight = null
+      if (rerunRequested) {
+        rerunRequested = false
+        enrichMissingRepoGitRemoteIdentities(store)
+      } else {
+        // Why clear only once the chain quiesces: dropping listeners earlier would leave a
+        // coalesced caller unnotified by the follow-up pass its own call queued.
+        pendingChangeListeners.clear()
+      }
+    })
 }
 
 export async function flushRepoGitRemoteIdentityEnrichmentForTests(): Promise<void> {
-  await Promise.all(inFlightProbesByLocation.values())
+  // A queued rerun replaces sweepInFlight when the current pass settles.
+  while (sweepInFlight) {
+    await sweepInFlight
+  }
+  await Promise.all([...inFlightProbesByLocation.values()].map((entry) => entry.promise))
 }
 
 export function resetRepoGitRemoteIdentityEnrichmentForTests(): void {
+  for (const entry of inFlightProbesByLocation.values()) {
+    entry.controller.abort()
+  }
   inFlightProbesByLocation.clear()
   probeRetryAfterByLocation.clear()
 }

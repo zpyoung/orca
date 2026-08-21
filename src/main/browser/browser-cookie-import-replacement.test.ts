@@ -38,6 +38,7 @@ vi.mock('./browser-cookie-clear-store', () => ({
     cookies: {
       get: (filter: object) => Promise<unknown>
       remove: (url: string, name: string) => Promise<void>
+      set?: (details: Record<string, unknown>) => Promise<void>
     }
   }) => ({
     get: (filter: object) => targetSession.cookies.get(filter),
@@ -180,6 +181,7 @@ describe('validated cookie replacement', () => {
     expect(result.ok).toBe(false)
     expect(cookiesRemoveMock.mock.calls).toEqual([
       ['https://example.com/', 'existing'],
+      ['https://example.com/', 'second'],
       ['https://example.com/', 'first']
     ])
     expect(restoreClearIdentitiesMock).toHaveBeenCalledOnce()
@@ -248,7 +250,8 @@ describe('native Chromium integrity-cookie accounting', () => {
         remove: vi.fn().mockResolvedValue(undefined),
         set: cookiesSetMock
       },
-      clearData: clearDataMock
+      clearData: clearDataMock,
+      getStoragePath: () => join(tmpDir, 'userData', 'Partitions', 'test')
     })
   })
 

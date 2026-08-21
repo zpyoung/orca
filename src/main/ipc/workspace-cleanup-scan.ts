@@ -109,6 +109,7 @@ async function scanRepoWorkspaces(
   args: {
     store: Store
     repo: Repo
+    repoOwnerCount: number
     scannedAt: number
     targetWorktreeIds?: ReadonlySet<string>
     refreshTargetActivity: boolean
@@ -120,6 +121,7 @@ async function scanRepoWorkspaces(
   const {
     store,
     repo,
+    repoOwnerCount,
     scannedAt,
     targetWorktreeIds,
     refreshTargetActivity,

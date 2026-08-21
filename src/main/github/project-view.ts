@@ -22,8 +22,6 @@ import {
   type GhGraphqlErrorShape
 } from './project-view/project-error-classification'
 import type {
-  GetProjectViewTableArgs,
-  GetProjectViewTableResult,
   GitHubProjectField,
   GitHubProjectFieldValue,
   GitHubProjectIteration,
@@ -37,14 +35,14 @@ import type {
   GitHubProjectTable,
   GitHubProjectUser,
   GitHubProjectView,
-  GitHubProjectViewError,
   GitHubProjectViewLayout,
-  GitHubProjectViewSummary,
-  ListAccessibleProjectsArgs,
+  GitHubProjectViewSummary
+} from '../../shared/github/project-types'
+import type {
+  GetProjectViewTableResult,
+  GitHubProjectViewError,
   ListAccessibleProjectsResult,
-  ListProjectViewsArgs,
   ListProjectViewsResult,
-  ResolveProjectRefArgs,
   ResolveProjectRefResult
 } from '../../shared/github/project-types'
 import {

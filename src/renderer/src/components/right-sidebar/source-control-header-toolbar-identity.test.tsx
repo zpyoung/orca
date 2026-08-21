@@ -13,7 +13,7 @@ vi.mock('@/components/ui/tooltip', () => ({
   TooltipTrigger: ({ children }: { children: ReactNode }) => <>{children}</>
 }))
 
-vi.mock('./source-control-header-overflow-menu', () => ({
+vi.mock('./source-control/panel/header-overflow-menu', () => ({
   SourceControlHeaderOverflowMenu: () => <button type="button">More actions</button>
 }))
 

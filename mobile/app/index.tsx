@@ -765,7 +765,9 @@ export default function HomeScreen() {
               state,
               reconnectAttempts: attempts,
               lastConnectedAt,
-              endpoint: item.endpoint
+              endpoint: item.endpoint,
+              pendingPath: hostPendingPaths[item.id] ?? null,
+              pairingRejected: hostPairingRejected[item.id] ?? false
             })
             return (
               <MobileHostCard

@@ -1,23 +1,16 @@
-/* eslint-disable max-lines -- Why: this table is the runtime git RPC contract; splitting it would make method coverage harder to audit. */
 import { defineMethod, type RpcMethod } from '../core'
 import { remoteRpcContentBudget } from '../../../../shared/remote-rpc-content-budget'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { ResolvedSourceControlAiGenerationParams } from '../../../../shared/source-control-ai'
 import {
   GitBranchCompare,
-  GitBranchDiff,
   GitBulkPaths,
   GitCheckIgnored,
   GitCheckout,
   GitCommit,
   GitCommitCompare,
-  GitCommitDiff,
-  GitDiscoverCommitMessageModels,
-  GitDiff,
   GitFilePath,
   GitForkSync,
-  GitGenerateCommitMessage,
-  GitGeneratePullRequestFields,
   GitHistory,
   GitPush,
   GitRebaseFromBase,
@@ -277,62 +270,7 @@ export const GIT_METHODS: RpcMethod[] = [
     handler: async (params, { runtime }) =>
       runtime.commitRuntimeGit(params.worktree, params.message)
   }),
-  defineMethod({
-    name: 'git.generateCommitMessage',
-    params: GitGenerateCommitMessage,
-    handler: async (params, { runtime }) => {
-      const override = buildCommitMessageGenerationOverride(params)
-      if (override === undefined) {
-        return runtime.generateRuntimeCommitMessage(params.worktree)
-      }
-      return runtime.generateRuntimeCommitMessage(params.worktree, override)
-    }
-  }),
-  defineMethod({
-    name: 'git.discoverCommitMessageModels',
-    params: GitDiscoverCommitMessageModels,
-    handler: async (params, { runtime }) =>
-      runtime.discoverRuntimeCommitMessageModels(
-        params.worktree,
-        params.agentId,
-        params.agentCmdOverrides !== undefined
-          ? {
-              agentCmdOverrides: params.agentCmdOverrides as GlobalSettings['agentCmdOverrides']
-            }
-          : {}
-      )
-  }),
-  defineMethod({
-    name: 'git.cancelGenerateCommitMessage',
-    params: WorktreeSelector,
-    handler: async (params, { runtime }) =>
-      runtime.cancelRuntimeGenerateCommitMessage(params.worktree)
-  }),
-  defineMethod({
-    name: 'git.generatePullRequestFields',
-    params: GitGeneratePullRequestFields,
-    handler: async (params, { runtime }) => {
-      const input = {
-        base: params.base,
-        title: params.title,
-        body: params.body,
-        draft: params.draft,
-        provider: params.provider,
-        useTemplate: params.useTemplate
-      }
-      const override = buildCommitMessageGenerationOverride(params)
-      if (override === undefined) {
-        return runtime.generateRuntimePullRequestFields(params.worktree, input)
-      }
-      return runtime.generateRuntimePullRequestFields(params.worktree, input, override)
-    }
-  }),
-  defineMethod({
-    name: 'git.cancelGeneratePullRequestFields',
-    params: WorktreeSelector,
-    handler: async (params, { runtime }) =>
-      runtime.cancelRuntimeGeneratePullRequestFields(params.worktree)
-  }),
+  ...GIT_COMMIT_MESSAGE_GENERATION_METHODS,
   defineMethod({
     name: 'git.stage',
     params: GitFilePath,

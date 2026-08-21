@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ConfirmationDialogProvider } from './components/confirmation-dialog'
+import { BrowserWebAuthnAccountDialog } from './components/browser-webauthn-account-dialog'
 import { LinkRoutingPreferenceDialogProvider } from './components/link-routing-preference-dialog'
 import { SkillFreshnessNudge } from './components/skills/SkillFreshnessNudge'
 import PinnedTabCloseDialog from './components/terminal-pane/PinnedTabCloseDialog'
@@ -60,9 +61,11 @@ function App(): React.JSX.Element {
         {
           '--collapsed-sidebar-header-width': `${layout.collapsedSidebarHeaderWidth}px`,
           // Shared so surfaces can avoid the Windows/Linux window-controls overlay without hardcoding 138px everywhere.
-          '--window-controls-width': hasCustomTitleBar ? '138px' : '0px',
+          '--window-controls-width': WINDOW_CONTROLS_WIDTH,
           // Side-position activity bar uses this to push icons below the Windows/Linux window-controls overlay.
-          '--window-controls-height': hasCustomTitleBar ? '36px' : '0px'
+          '--window-controls-height': WINDOW_CONTROLS_HEIGHT,
+          // Full-bleed surfaces use this to keep the macOS traffic lights uncovered.
+          '--mac-traffic-lights-width': MAC_TRAFFIC_LIGHTS_WIDTH
         } as React.CSSProperties
       }
     >

@@ -14,7 +14,7 @@ import { spawnFreshSshPty } from './ssh-agent-session-create-operation'
 import { mapSshPtyProcessList } from './ssh-agent-session-process-list'
 import {
   requestSshPtyAttach,
-  reattachSshPtySessionWithExitFence,
+  reattachSshPtySessionForSpawn,
   type PtySourceRecoveryRequest,
   type SshPtyAttachResult
 } from './ssh-pty-session-reattach'
@@ -39,6 +39,9 @@ export class SshPtyProvider implements IPtyProvider {
   private readonly agentSessionCapabilities: SshAgentSessionCapabilities
   private spawnExitRaces = new SshPtySpawnExitRaceTracker()
   private readonly outputState: SshPtyProviderOutputState
+
+  requestHostRpc: NonNullable<IPtyProvider['requestHostRpc']> = (method, params, options) =>
+    this.mux.request(method, params as Record<string, unknown>, options)
 
   constructor(
     connectionId: string,
@@ -146,6 +149,10 @@ export class SshPtyProvider implements IPtyProvider {
       acceptLivePty: (id) => this.livePtyIds.add(id),
       toAppPtyId: this.toAppPtyId
     })
+  }
+
+  async deleteWorktreeHistory(worktreeId: string): Promise<void> {
+    await this.mux.request('pty.deleteWorktreeHistory', { worktreeId })
   }
 
   async supportsAgentSessionClaims(options: { signal?: AbortSignal } = {}): Promise<boolean> {

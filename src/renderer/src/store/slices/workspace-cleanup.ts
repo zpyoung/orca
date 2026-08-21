@@ -3,6 +3,7 @@
    one store state contract. */
 import type { StateCreator } from 'zustand'
 import type { AppState } from '../types'
+import type { ExecutionHostId } from '../../../../shared/execution-host'
 import {
   AGENT_STATUS_STALE_AFTER_MS,
   type AgentStatusEntry
@@ -11,7 +12,6 @@ import {
   WORKSPACE_CLEANUP_CLASSIFIER_VERSION,
   WORKSPACE_CLEANUP_TARGET_BATCH_LIMIT,
   applyWorkspaceCleanupPolicy,
-  canQueueWorkspaceCleanupCandidate,
   canSelectWorkspaceCleanupCandidate,
   shouldForceWorkspaceCleanupRemoval,
   shouldHideWorkspaceCleanupCandidate,
@@ -22,6 +22,11 @@ import {
   type WorkspaceCleanupScanProgress,
   type WorkspaceCleanupScanResult
 } from '../../../../shared/workspace-cleanup'
+import {
+  getWorkspaceCleanupCandidateHostId,
+  getWorkspaceCleanupCandidateIdentity,
+  getWorkspaceCleanupHostIdentity
+} from '../../../../shared/workspace-cleanup-host-identity'
 import { mapWithConcurrency } from '../../../../shared/map-with-concurrency'
 import { hydrateWorkspaceCleanupScanFromCache } from './workspace-cleanup-cache-hydration'
 import {
@@ -43,12 +48,16 @@ import type { PreservedBranchCleanup } from '@/lib/preserved-branch-cleanup'
 
 export type WorkspaceCleanupFailure = {
   worktreeId: string
+  /** Which host's row failed; absent only for a row with no host evidence. */
+  executionHostId?: ExecutionHostId
   displayName: string
   message: string
 }
 
 export type WorkspaceCleanupRemoveResult = {
   removedIds: string[]
+  /** Host-qualified keys of the rows actually removed, parallel to removedIds. */
+  removedIdentities: string[]
   failures: WorkspaceCleanupFailure[]
   preservedBranches?: PreservedBranchCleanup[]
 }
@@ -130,7 +139,7 @@ let workspaceCleanupProgressCandidateIndex: {
   scanToken: number
   scanId: string
   candidates: WorkspaceCleanupCandidate[]
-  indexesByWorktreeId: Map<string, number>
+  indexesByIdentity: Map<string, number>
 } | null = null
 
 const SHELL_PROCESS_NAMES = new Set([
@@ -311,6 +320,9 @@ export const createWorkspaceCleanupSlice: StateCreator<AppState, [], [], Workspa
     const now = Date.now()
     const dismissals = candidates.map((candidate) => ({
       worktreeId: candidate.worktreeId,
+      // Why (STA-4343): ignoring one host's row must not hide the same-id row
+      // on another host; the stored host scopes the match.
+      executionHostId: getWorkspaceCleanupCandidateHostId(candidate),
       dismissedAt: now,
       fingerprint: candidate.fingerprint,
       classifierVersion: WORKSPACE_CLEANUP_CLASSIFIER_VERSION
@@ -319,7 +331,12 @@ export const createWorkspaceCleanupSlice: StateCreator<AppState, [], [], Workspa
     set((state) => {
       const nextDismissals = { ...state.workspaceCleanupDismissals }
       for (const dismissal of dismissals) {
-        nextDismissals[dismissal.worktreeId] = dismissal
+        nextDismissals[
+          getWorkspaceCleanupCandidateIdentity({
+            worktreeId: dismissal.worktreeId,
+            executionHostId: dismissal.executionHostId
+          })
+        ] = dismissal
       }
       const nextScan = state.workspaceCleanupScan
         ? {
@@ -358,25 +375,66 @@ export const createWorkspaceCleanupSlice: StateCreator<AppState, [], [], Workspa
 
   removeWorkspaceCleanupCandidates: async (worktreeIds, options) => {
     const removedIds: string[] = []
+    const removedIdentities = new Set<string>()
     const failures: WorkspaceCleanupFailure[] = []
     const preservedBranches: PreservedBranchCleanup[] = []
-    const approvedCandidatesByWorktreeId = new Map(
-      (options?.approvedCandidates ?? []).map((candidate) => [candidate.worktreeId, candidate])
-    )
 
     const preflights = await preflightWorkspaceCleanupCandidates(
       worktreeIds,
       get,
       approvedCandidatesByWorktreeId
     )
-    const candidatesToRemove: WorkspaceCleanupCandidate[] = []
+    const removableTargets: WorkspaceCleanupRemovalTarget[] = []
+    for (const target of targets) {
+      if (target.kind === 'unresolved') {
+        failures.push(target.failure)
+        continue
+      }
+      removableTargets.push(target)
+    }
+
+    const preflights = await preflightWorkspaceCleanupCandidates(
+      removableTargets,
+      get,
+      (candidates, state) =>
+        enrichWorkspaceCleanupCandidates(candidates, state, { applyDismissals: false })
+    )
+    const targetsToRemove: {
+      target: WorkspaceCleanupRemovalTarget
+      candidate: WorkspaceCleanupCandidate
+      sameIdSurvivingHostId?: ExecutionHostId
+      ignoreWorkspaceCleanupScanSurvivors?: boolean
+    }[] = []
 
     for (const preflight of preflights) {
       if (!preflight.ok) {
         failures.push(preflight.failure)
         continue
       }
-      candidatesToRemove.push(preflight.candidate)
+      targetsToRemove.push({
+        target: preflight.target,
+        candidate: preflight.candidate,
+        ...(preflight.sameIdSurvivingHostId
+          ? { sameIdSurvivingHostId: preflight.sameIdSurvivingHostId }
+          : {})
+      })
+    }
+    const scheduledRemovalIdentities = new Set(
+      targetsToRemove.map(({ candidate }) => getWorkspaceCleanupCandidateIdentity(candidate))
+    )
+    for (const pendingRemoval of targetsToRemove) {
+      if (
+        pendingRemoval.sameIdSurvivingHostId &&
+        scheduledRemovalIdentities.has(
+          getWorkspaceCleanupHostIdentity(
+            pendingRemoval.sameIdSurvivingHostId,
+            pendingRemoval.candidate.worktreeId
+          )
+        )
+      ) {
+        delete pendingRemoval.sameIdSurvivingHostId
+        pendingRemoval.ignoreWorkspaceCleanupScanSurvivors = true
+      }
     }
 
     // Why: nested workspaces can belong to different repos; parent removal must
@@ -405,7 +463,9 @@ export const createWorkspaceCleanupSlice: StateCreator<AppState, [], [], Workspa
         continue
       }
       const result = await get().removeWorktree(
-        candidate.worktreeId,
+        // The resolved target names the host whose row the user confirmed; the
+        // removal is routed there instead of to the active workspace's host.
+        { id: candidate.worktreeId, executionHostId: target.executionHostId },
         shouldForceWorkspaceCleanupRemoval(candidate),
         // Why: cleanup reports outcomes in its own summary toasts; per-row
         // preserved-branch warnings would stack one toast per removed row.
@@ -418,16 +478,22 @@ export const createWorkspaceCleanupSlice: StateCreator<AppState, [], [], Workspa
       )
       if (result.ok) {
         removedIds.push(candidate.worktreeId)
+        removedIdentities.add(getWorkspaceCleanupCandidateIdentity(candidate))
         if (result.preservedBranch) {
           preservedBranches.push({
             worktreeId: candidate.worktreeId,
             branchName: result.preservedBranch.branchName,
-            expectedHead: result.preservedBranch.head
+            expectedHead: result.preservedBranch.head,
+            ...(result.preservedBranch.hostId ? { hostId: result.preservedBranch.hostId } : {}),
+            ...(result.preservedBranch.runtimeEnvironmentId
+              ? { runtimeEnvironmentId: result.preservedBranch.runtimeEnvironmentId }
+              : {})
           })
         }
       } else {
         failures.push({
           worktreeId: candidate.worktreeId,
+          ...(target.executionHostId ? { executionHostId: target.executionHostId } : {}),
           displayName: candidate.displayName,
           message: result.error
         })
@@ -467,6 +533,7 @@ export const createWorkspaceCleanupSlice: StateCreator<AppState, [], [], Workspa
 
     return {
       removedIds,
+      removedIdentities: [...removedIdentities],
       failures,
       ...(preservedBranches.length > 0 ? { preservedBranches } : {})
     }
@@ -680,9 +747,12 @@ function mergeWorkspaceCleanupProgressCandidates({
   )
   const merged = [...indexCache.candidates]
   for (const candidate of nextCandidates) {
-    const existingIndex = indexCache.indexesByWorktreeId.get(candidate.worktreeId)
+    // Why (STA-4343): two hosts publish the same `repoId::path` id; keying the
+    // merge on the id alone made one host's row overwrite the other's.
+    const identity = getWorkspaceCleanupCandidateIdentity(candidate)
+    const existingIndex = indexCache.indexesByIdentity.get(identity)
     if (existingIndex === undefined) {
-      indexCache.indexesByWorktreeId.set(candidate.worktreeId, merged.length)
+      indexCache.indexesByIdentity.set(identity, merged.length)
       merged.push(candidate)
       continue
     }
@@ -692,7 +762,7 @@ function mergeWorkspaceCleanupProgressCandidates({
     scanToken,
     scanId: progress.scanId,
     candidates: merged,
-    indexesByWorktreeId: indexCache.indexesByWorktreeId
+    indexesByIdentity: indexCache.indexesByIdentity
   }
   return merged
 }
@@ -703,7 +773,7 @@ function getWorkspaceCleanupProgressCandidateIndex(
   scanToken: number
 ): {
   candidates: WorkspaceCleanupCandidate[]
-  indexesByWorktreeId: Map<string, number>
+  indexesByIdentity: Map<string, number>
 } {
   if (
     workspaceCleanupProgressCandidateIndex?.scanToken === scanToken &&
@@ -715,8 +785,8 @@ function getWorkspaceCleanupProgressCandidateIndex(
 
   return {
     candidates: [...candidates],
-    indexesByWorktreeId: new Map(
-      candidates.map((candidate, index) => [candidate.worktreeId, index])
+    indexesByIdentity: new Map(
+      candidates.map((candidate, index) => [getWorkspaceCleanupCandidateIdentity(candidate), index])
     )
   }
 }
@@ -798,7 +868,7 @@ async function enrichWorkspaceCleanupCandidatesWithCache(
       }
       const inputSignature = getWorkspaceCleanupCandidateInputSignature(candidate)
       const localSignature = getWorkspaceCleanupLocalStateSignature(
-        candidate.worktreeId,
+        candidate,
         state,
         projection,
         options
@@ -875,11 +945,12 @@ function getWorkspaceCleanupCandidateInputSignature(candidate: WorkspaceCleanupC
 }
 
 function getWorkspaceCleanupLocalStateSignature(
-  worktreeId: string,
+  candidate: WorkspaceCleanupCandidate,
   state: AppState,
   projection: WorkspaceCleanupEnrichmentProjection,
   options: EnrichOptions
 ): string {
+  const { worktreeId } = candidate
   const tabs = state.tabsByWorktree[worktreeId] ?? []
   const tabIds = tabs.map((tab) => tab.id)
   const tabIdSet = new Set(tabIds)
@@ -911,7 +982,7 @@ function getWorkspaceCleanupLocalStateSignature(
   const dismissal =
     options.applyDismissals === false
       ? null
-      : (state.workspaceCleanupDismissals[worktreeId] ?? null)
+      : (getWorkspaceCleanupDismissal(candidate, state.workspaceCleanupDismissals) ?? null)
 
   return JSON.stringify({
     active: state.activeWorktreeId === worktreeId,
@@ -1013,7 +1084,12 @@ function applyDismissal(
   candidate: WorkspaceCleanupCandidate,
   dismissals: Record<string, WorkspaceCleanupDismissal>
 ): WorkspaceCleanupCandidate {
-  if (!shouldHideWorkspaceCleanupCandidate(candidate, dismissals[candidate.worktreeId])) {
+  if (
+    !shouldHideWorkspaceCleanupCandidate(
+      candidate,
+      getWorkspaceCleanupDismissal(candidate, dismissals)
+    )
+  ) {
     return candidate
   }
   return applyWorkspaceCleanupPolicy({
@@ -1166,6 +1242,51 @@ function evaluateWorkspaceCleanupPreflight(
     }
   }
   return { ok: true, candidate }
+}
+
+function buildWorkspaceCleanupAgentStatusIndex(
+  state: AppState,
+  includedTabIds?: ReadonlySet<string>
+): Map<string, AgentStatusEntry[]> {
+  const agentStatusesByTabId = new Map<string, AgentStatusEntry[]>()
+  for (const entry of Object.values(state.agentStatusByPaneKey)) {
+    const tabId = getPaneKeyTabId(entry.paneKey)
+    if (includedTabIds && !includedTabIds.has(tabId)) {
+      continue
+    }
+    const entries = agentStatusesByTabId.get(tabId) ?? []
+    entries.push(entry)
+    agentStatusesByTabId.set(tabId, entries)
+  }
+  return agentStatusesByTabId
+}
+
+function hasFreshIndexedLiveAgent(
+  agentStatusesByTabId: ReadonlyMap<string, readonly AgentStatusEntry[]>,
+  tabIds: Set<string>
+): boolean {
+  const now = Date.now()
+  for (const tabId of tabIds) {
+    for (const entry of agentStatusesByTabId.get(tabId) ?? []) {
+      if (
+        isExplicitAgentStatusFresh(entry, now, AGENT_STATUS_STALE_AFTER_MS) &&
+        (entry.state === 'working' || entry.state === 'blocked' || entry.state === 'waiting')
+      ) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
+function pruneWorkspaceCleanupRecord<T>(
+  record: Record<string, T>,
+  removedIds: ReadonlySet<string>
+): Record<string, T> {
+  if (!Object.keys(record).some((id) => removedIds.has(id))) {
+    return record
+  }
+  return Object.fromEntries(Object.entries(record).filter(([id]) => !removedIds.has(id)))
 }
 
 function buildWorkspaceCleanupAgentStatusIndex(

@@ -4,6 +4,8 @@ import type {
   WorkspaceSpaceScanProgress,
   WorkspaceSpaceWorktreeMeasurement
 } from '../../../../shared/workspace-space-types'
+import type { WorktreeRemovalTarget } from '../../../../shared/worktree/removal'
+import { composeWorktreeHostIdentity } from '../../../../shared/worktree/host-qualified-identity'
 import type { AppState } from '../types'
 
 let inFlightScan: Promise<WorkspaceSpaceAnalysis> | null = null
@@ -19,12 +21,14 @@ export type WorkspaceSpaceSlice = {
   /** Stale-while-revalidate seed; true when the persisted analysis filled an empty slice. */
   hydrateWorkspaceSpaceFromCache: () => Promise<boolean>
   refreshWorkspaceSpace: () => Promise<WorkspaceSpaceAnalysis>
-  removeWorkspaceSpaceWorktrees: (worktreeIds: readonly string[]) => void
+  removeWorkspaceSpaceWorktrees: (
+    worktreeTargets: readonly (string | WorktreeRemovalTarget)[]
+  ) => void
 }
 
 function removeDeletedWorktreesFromAnalysis(
   analysis: WorkspaceSpaceAnalysis,
-  deletedWorktreeIds: readonly string[]
+  deletedWorktreeTargets: readonly (string | WorktreeRemovalTarget)[]
 ): WorkspaceSpaceAnalysis {
   const deletedSet = new Set(deletedWorktreeIds)
   const worktrees = analysis.worktrees.filter((worktree) => !deletedSet.has(worktree.worktreeId))
@@ -181,8 +185,8 @@ export const createWorkspaceSpaceSlice: StateCreator<AppState, [], [], Workspace
       })
     return inFlightScan
   },
-  removeWorkspaceSpaceWorktrees: (worktreeIds) => {
-    if (worktreeIds.length > 0) {
+  removeWorkspaceSpaceWorktrees: (worktreeTargets) => {
+    if (worktreeTargets.length > 0) {
       get().recordFeatureInteraction?.('workspace-cleanup')
     }
     set((state) => {

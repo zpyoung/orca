@@ -11,7 +11,7 @@ import { useWorkspaceKanbanSelection } from './use-workspace-kanban-selection'
 type Selection = ReturnType<typeof useWorkspaceKanbanSelection>
 
 function worktree(id: string): Worktree {
-  return { id, repoId: 'repo-a', displayName: id } as Worktree
+  return { id, repoId: 'repo-a', displayName: id, hostId: 'local' } as Worktree
 }
 
 const alpha = worktree('alpha')
@@ -45,15 +45,17 @@ function renderSelection(
 }
 
 function click(worktreeId: string, shiftKey = false): void {
+  const identity = worktreeId.includes('|') ? worktreeId : `local|${worktreeId}`
   act(() => {
     selection.updateSelectionForGesture(
       { metaKey: false, ctrlKey: false, shiftKey } as React.MouseEvent<HTMLElement>,
-      worktreeId
+      identity
     )
   })
 }
 
 function toggleClick(worktreeId: string): void {
+  const identity = worktreeId.includes('|') ? worktreeId : `local|${worktreeId}`
   act(() => {
     selection.updateSelectionForGesture(
       {
@@ -61,13 +63,13 @@ function toggleClick(worktreeId: string): void {
         ctrlKey: !navigator.userAgent.includes('Mac'),
         shiftKey: false
       } as React.MouseEvent<HTMLElement>,
-      worktreeId
+      identity
     )
   })
 }
 
 function selectedIds(): string[] {
-  return [...selection.selectedWorktreeIds].sort()
+  return [...selection.selectedWorktreeIds].map(getWorktreeIdFromHostIdentity).sort()
 }
 
 beforeEach(() => {
@@ -165,5 +167,21 @@ describe('useWorkspaceKanbanSelection', () => {
     renderSelection([alpha, beta], [alpha, beta])
 
     expect(selectedIds()).toEqual(['alpha', 'beta'])
+  })
+
+  it('selects same-id cards independently by host', () => {
+    const local = worktree('shared')
+    const remote = { ...local, hostId: 'ssh:host-b' } as Worktree
+    renderSelection([local, remote], [local, remote])
+
+    click(getWorktreeHostIdentity(local))
+    expect([...selection.selectedWorktreeIds]).toEqual([getWorktreeHostIdentity(local)])
+    expect(selection.selectedWorktrees).toEqual([local])
+
+    toggleClick(getWorktreeHostIdentity(remote))
+    expect(selection.selectedWorktreeIds).toEqual(
+      new Set([getWorktreeHostIdentity(local), getWorktreeHostIdentity(remote)])
+    )
+    expect(selection.selectedWorktrees).toEqual([local, remote])
   })
 })

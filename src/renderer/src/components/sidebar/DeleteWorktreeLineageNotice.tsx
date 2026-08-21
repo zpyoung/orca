@@ -49,7 +49,9 @@ export function DeleteWorktreeLineageNotice({
                 <div className="truncate font-medium text-foreground">{child.displayName}</div>
                 <div className="truncate text-muted-foreground">{child.path}</div>
                 <DeleteWorktreeDirtyChangeHint
-                  changeCount={dirtyChangeCountsByWorktreeId.get(child.id)}
+                  changeCount={dirtyChangeCountsByWorktreeId.get(
+                    child.hostId ? getWorktreeHostIdentity(child) : child.id
+                  )}
                 />
               </div>
             ))}

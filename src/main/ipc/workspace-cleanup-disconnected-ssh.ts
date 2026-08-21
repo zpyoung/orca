@@ -14,6 +14,7 @@ import {
   getWorkspaceCleanupInactivityReasonsForWorkspace,
   isWorkspaceInactiveForCleanup
 } from './workspace-cleanup-candidate'
+import { getRepoOwnedWorktreeMeta, isWorktreeMetaOwnedByRepo } from '../worktree-metadata-ownership'
 
 export function synthesizeDisconnectedSshCleanupCandidates(
   store: Store,

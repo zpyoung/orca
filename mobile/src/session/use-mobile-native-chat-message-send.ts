@@ -126,7 +126,7 @@ export function useMobileNativeChatMessageSend(args: {
       // round trip is visible, and a lost ack must not strand the sent prompt
       // in the box. Only a definite rejection puts the text back.
       if (syncComposer) {
-        clearDraftForSend(origin, text)
+        clearDraftForSend(origin, draftText)
       }
       // Why: a parked launch draft is routinely multi-line, and one Ctrl+U clears
       // only one logical line. Size the clear to the text Orca injected, with
@@ -152,7 +152,7 @@ export function useMobileNativeChatMessageSend(args: {
         })
         if (!cleared) {
           if (syncComposer) {
-            restoreRejectedDraft(origin, text)
+            restoreRejectedDraft(origin, draftText)
           }
           onSendError('Message not sent')
           return 'rejected'
@@ -206,7 +206,7 @@ export function useMobileNativeChatMessageSend(args: {
       }
       if (outcome === 'rejected') {
         if (syncComposer) {
-          restoreRejectedDraft(origin, text)
+          restoreRejectedDraft(origin, draftText)
         }
         onSendError('Message not sent')
         return 'rejected'

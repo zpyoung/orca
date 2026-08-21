@@ -1,34 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { SshPtyProvider } from './ssh-pty-provider'
-import { POWERLEVEL10K_WIZARD_DISABLE_ENV } from '../pty/powerlevel10k-wizard-env'
-import { PTY_STARTUP_INGRESS_VERSION } from '../../shared/pty-startup-ingress'
 import { AGENT_SESSION_EXECUTION_OWNER_PROTOCOL_VERSION } from '../../shared/agent-session-host-authority'
-
-type MockMultiplexer = {
-  request: ReturnType<typeof vi.fn>
-  notify: ReturnType<typeof vi.fn>
-  onNotification: ReturnType<typeof vi.fn>
-  dispose: ReturnType<typeof vi.fn>
-  isDisposed: ReturnType<typeof vi.fn>
-}
-
-function createMockMux(): MockMultiplexer {
-  return {
-    request: vi.fn().mockResolvedValue(undefined),
-    notify: vi.fn(),
-    onNotification: vi.fn(),
-    dispose: vi.fn(),
-    isDisposed: vi.fn().mockReturnValue(false)
-  }
-}
-
-const sourceActivationRequestOptions = expect.objectContaining({
-  beforeResolve: expect.any(Function)
-})
-
-function expectRequest(request: ReturnType<typeof vi.fn>, ...expected: unknown[]): void {
-  expect(request.mock.calls.map((call) => call.slice(0, expected.length))).toContainEqual(expected)
-}
+import {
+  createMockMux,
+  expectRequest,
+  type MockMultiplexer
+} from './ssh-pty-provider-mock-multiplexer'
 
 describe('SshPtyProvider', () => {
   let mux: MockMultiplexer

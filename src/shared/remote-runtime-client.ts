@@ -4,6 +4,7 @@
  * abstraction emerges. */
 import { randomUUID } from 'node:crypto'
 import WebSocket from 'ws'
+import { abortSignalReason, throwIfSignalAborted } from './abort-signal-reason'
 import type { PairingOffer } from './pairing'
 import {
   decrypt,
@@ -90,9 +91,18 @@ export function sendRemoteRuntimeRequest<TResult>(
   method: string,
   params: unknown,
   timeoutMs: number,
-  envelope?: RuntimeOrchestrationEnvelope
+  envelope?: RuntimeOrchestrationEnvelope,
+  signal?: AbortSignal
 ): Promise<RuntimeRpcResponse<TResult>> {
-  return sendRemoteRuntimeRequestOnSocket(pairing, method, params, timeoutMs, envelope)
+  return sendRemoteRuntimeRequestOnSocket(
+    pairing,
+    method,
+    params,
+    timeoutMs,
+    envelope,
+    undefined,
+    signal
+  )
 }
 
 export function sendRemoteRuntimeRequestWithStatusPreflight<TResult>(
@@ -119,8 +129,10 @@ async function sendRemoteRuntimeRequestOnSocket<TResult>(
   params: unknown,
   timeoutMs: number,
   envelope?: RuntimeOrchestrationEnvelope,
-  validateStatus?: (response: RuntimeRpcResponse<RuntimeStatus>) => void
+  validateStatus?: (response: RuntimeRpcResponse<RuntimeStatus>) => void,
+  signal?: AbortSignal
 ): Promise<RuntimeRpcResponse<TResult>> {
+  throwIfSignalAborted(signal)
   if (!isSafeTimerDelayMs(timeoutMs)) {
     throw new RemoteRuntimeClientError(
       'invalid_argument',
@@ -175,6 +187,7 @@ async function sendRemoteRuntimeRequestOnSocket<TResult>(
           : 'runtime'
 
     const cleanupSocketListeners = (): void => {
+      signal?.removeEventListener('abort', onAbort)
       const socket = ws
       if (!socket) {
         return
@@ -201,6 +214,10 @@ async function sendRemoteRuntimeRequestOnSocket<TResult>(
           { pairingStage: getPairingStage() }
         )
       })
+    }
+
+    function onAbort(): void {
+      finish({ ok: false, error: abortSignalReason(signal!) })
     }
 
     function refreshTimeout(): void {
@@ -233,6 +250,12 @@ async function sendRemoteRuntimeRequestOnSocket<TResult>(
       } else {
         resolve(result.response)
       }
+    }
+
+    signal?.addEventListener('abort', onAbort, { once: true })
+    if (signal?.aborted) {
+      onAbort()
+      return
     }
 
     try {

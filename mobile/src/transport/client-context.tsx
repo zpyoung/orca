@@ -76,6 +76,7 @@ export function RpcClientProvider({ children }: { children: ReactNode }) {
       primedHostsRef.current.delete(hostId)
     }
     entry?.unsubState()
+    entry?.unsubConnectionPath()
     storeRef.current.delete(hostId)
     entry?.client.close()
     notifyHostState(hostId, 'disconnected')
@@ -242,6 +243,7 @@ export function RpcClientProvider({ children }: { children: ReactNode }) {
       manualDemandRef.current.add(hostId)
       if (entry) {
         entry.unsubState()
+        entry.unsubConnectionPath()
         entry.client.close()
         storeRef.current.delete(hostId)
       }

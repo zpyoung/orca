@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import Database from '../../sqlite/sync-database'
 import { OrchestrationDb } from './db'
+import { SCHEMA_VERSION } from './db/contract-constants'
 
 const MUTATION_RECEIPT_MAX_ROWS = 10_000
 

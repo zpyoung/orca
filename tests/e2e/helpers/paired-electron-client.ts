@@ -154,7 +154,7 @@ export async function launchPairedElectronClient(
   const homeIsolation = createElectronHomeIsolation({
     inheritedEnv: cleanEnv,
     launchEnv: {},
-    extraEnv: {},
+    extraEnv: options.extraEnv ?? {},
     userDataDir
   })
   const mainPath = path.join(process.cwd(), 'out', 'main', 'index.js')

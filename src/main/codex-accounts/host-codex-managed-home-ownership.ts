@@ -1,5 +1,6 @@
 import { lstatSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { isDefinitiveAbsence } from '../../shared/definitive-filesystem-absence'
 
 type HostCodexManagedHomeOwnershipOptions = {
   candidatePath: string

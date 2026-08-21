@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import Database from '../../sqlite/sync-database'
 import { OrchestrationDb } from './db'
 import { resolveOrchestrationMigrationStartVersion } from './orchestration-schema-version-skew'
+import { SCHEMA_VERSION } from './db/contract-constants'
 
 describe('federation acknowledgment migration', () => {
   let db: OrchestrationDb | undefined

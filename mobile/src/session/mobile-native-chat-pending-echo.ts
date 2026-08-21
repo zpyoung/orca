@@ -7,6 +7,11 @@ export type MobileNativeChatPendingMessage = {
   /** Local preview URIs carried by the send for its optimistic echo. */
   images?: string[]
   baselineTailMessageId: string | null
+  /** Whether the transcript this baseline was captured from was already this
+   *  session's own history. A send issued mid-hydration is captured unresolved
+   *  and rebased onto the first authoritative read instead of reconciling
+   *  against rows that may belong to another tab. */
+  baselineResolved: boolean
 }
 
 export type MobileNativeChatSendOrigin = {

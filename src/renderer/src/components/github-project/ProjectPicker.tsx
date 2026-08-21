@@ -18,8 +18,10 @@ import type {
   GitHubProjectOwnerType,
   GitHubProjectSettings,
   GitHubProjectSummary,
+  GitHubProjectViewSummary
+} from '../../../../shared/github/project-types'
+import type {
   GitHubProjectViewError,
-  GitHubProjectViewSummary,
   ListAccessibleProjectsResult,
   ListProjectViewsResult,
   ResolveProjectRefResult

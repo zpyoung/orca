@@ -7,28 +7,36 @@ type BrowserPaletteActiveTabType = 'browser' | 'editor' | 'terminal' | 'simulato
 export type BuildSearchableBrowserPagesOptions = {
   worktrees: readonly Worktree[]
   repoMap: ReadonlyMap<string, { displayName?: string | null }>
+  repoMapByHostIdentity?: ReadonlyMap<string, { displayName?: string | null }>
   worktreeOrder: ReadonlyMap<string, number>
   browserTabsByWorktree: Record<string, readonly BrowserWorkspace[] | undefined>
   browserPagesByWorkspace: Record<string, readonly BrowserPage[] | undefined>
   activeBrowserTabId: string | null
   activeWorktreeId: string | null
+  activeWorkspaceExecutionHostId?: ExecutionHostId | null
   activeTabType: BrowserPaletteActiveTabType
 }
 
 export function buildSearchableBrowserPages({
   worktrees,
   repoMap,
+  repoMapByHostIdentity,
   worktreeOrder,
   browserTabsByWorktree,
   browserPagesByWorkspace,
   activeBrowserTabId,
   activeWorktreeId,
+  activeWorkspaceExecutionHostId,
   activeTabType
 }: BuildSearchableBrowserPagesOptions): SearchableBrowserPage[] {
   const entries: SearchableBrowserPage[] = []
   for (const worktree of worktrees) {
-    const repoName = repoMap.get(worktree.repoId)?.displayName ?? ''
-    const worktreeSortIndex = worktreeOrder.get(worktree.id) ?? Number.MAX_SAFE_INTEGER
+    const repoName =
+      resolvePaletteRepoForWorktree(worktree, repoMap, repoMapByHostIdentity)?.displayName ?? ''
+    const worktreeSortIndex =
+      worktreeOrder.get(getWorktreeHostIdentity(worktree)) ??
+      worktreeOrder.get(worktree.id) ??
+      Number.MAX_SAFE_INTEGER
     for (const workspace of browserTabsByWorktree[worktree.id] ?? []) {
       for (const page of browserPagesByWorkspace[workspace.id] ?? []) {
         entries.push({
@@ -38,10 +46,16 @@ export function buildSearchableBrowserPages({
           repoName,
           worktreeSortIndex,
           isCurrentPage:
+            isPaletteCurrentWorktree(worktree, activeWorktreeId, activeWorkspaceExecutionHostId) &&
             activeTabType === 'browser' &&
             workspace.id === activeBrowserTabId &&
             workspace.activePageId === page.id,
-          isCurrentWorktree: activeWorktreeId === worktree.id
+          isCurrentWorktree: isPaletteCurrentWorktree(
+            worktree,
+            activeWorktreeId,
+            activeWorkspaceExecutionHostId
+          ),
+          document: buildSearchableBrowserPageDocument({ page, workspace, worktree, repoName })
         })
       }
     }

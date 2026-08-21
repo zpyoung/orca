@@ -96,3 +96,8 @@ export function clientActivePath(client: RpcClient | undefined): MobileConnectio
   // Why: during migration the pending path is what the user is waiting on.
   return logical.getPendingPath?.() ?? logical.getActivePath()
 }
+
+export function clientPendingPath(client: RpcClient | undefined): MobileConnectionPath | null {
+  const logical = client as Partial<StableLogicalRpcClient> | undefined
+  return logical?.getPendingPath?.() ?? null
+}

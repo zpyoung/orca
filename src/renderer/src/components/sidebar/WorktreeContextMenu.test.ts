@@ -67,6 +67,31 @@ describe('selectMenuScopedMap (delete-teardown re-render guard)', () => {
   })
 })
 
+describe('getDeleteStateForWorktreeHost', () => {
+  const local = { id: 'repo::path', hostId: 'local' } as unknown as Worktree
+  const ssh = { id: 'repo::path', hostId: 'ssh:box' } as unknown as Worktree
+  const sshDelete = {
+    isDeleting: true,
+    executionHostId: 'ssh:box' as const,
+    error: null,
+    canForceDelete: false,
+    forceDeleteReason: null
+  }
+
+  it('keeps host-qualified pending state on its matching row only', () => {
+    const states = { [getWorktreeHostIdentity(ssh)]: sshDelete }
+    expect(getDeleteStateForWorktreeHost(ssh, states)).toBe(sshDelete)
+    expect(getDeleteStateForWorktreeHost(local, states)).toBeUndefined()
+  })
+
+  it('retains legacy unqualified state', () => {
+    const legacyDelete = { ...sshDelete, executionHostId: undefined }
+    const states = { [local.id]: legacyDelete }
+    expect(getDeleteStateForWorktreeHost(local, states)).toBe(legacyDelete)
+    expect(getDeleteStateForWorktreeHost(ssh, states)).toBe(legacyDelete)
+  })
+})
+
 describe('shouldUseNativeContextMenu', () => {
   it('uses the browser context menu for marked hovercard content', () => {
     const target = {

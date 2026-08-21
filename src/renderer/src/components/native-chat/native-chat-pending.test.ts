@@ -2,24 +2,26 @@ import { describe, expect, it } from 'vitest'
 import type { NativeChatMessage } from '../../../../shared/native-chat-types'
 import {
   appendPendingSendCache,
-  appendCommandMarkerCache,
-  applyCommandMarkerBoundaries,
-  clearCommandMarkerCacheForTests,
   clearPendingSendCacheForTests,
-  commandMarkersAsMessages,
-  isCommandMarkerId,
   isLaunchPromptMessageId,
   isPendingMessageId,
   launchPromptAsMessage,
   nextNativeChatPendingSendId,
   pendingSendsAsMessages,
   prunePendingSends,
-  readCommandMarkerCache,
   readPendingSendCache,
   shouldPruneLaunchPrompt,
   writePendingSendCache,
   type NativeChatPendingSend
 } from './native-chat-pending'
+import {
+  appendCommandMarkerCache,
+  applyCommandMarkerBoundaries,
+  clearCommandMarkerCacheForTests,
+  commandMarkersAsMessages,
+  isCommandMarkerId,
+  readCommandMarkerCache
+} from './native-chat-command-marker'
 import { stripNoiseMessages } from './native-chat-noise'
 
 function userMessage(id: string, text: string, timestamp = 1): NativeChatMessage {

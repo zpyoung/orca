@@ -38,13 +38,15 @@ function WorkspaceKanbanCard({
   onContextMenuSelect,
   onAssignWorkspaceStatus
 }: WorkspaceKanbanCardProps): React.JSX.Element {
+  const worktreeIdentity = getWorktreeHostIdentity(worktree)
   const contextWorktrees =
     isSelected && selectedWorktrees && selectedWorktrees.length > 0 ? selectedWorktrees : undefined
 
   return (
     <div
       className="relative rounded-lg data-[workspace-board-card-area-selected=true]:ring-1 data-[workspace-board-card-area-selected=true]:ring-worktree-sidebar-ring/40"
-      data-workspace-board-card-id={worktree.id}
+      data-workspace-board-card-id={worktreeIdentity}
+      data-workspace-board-worktree-id={worktree.id}
       data-workspace-board-card-index={laneIndex}
       data-workspace-board-card-mode="detailed"
       data-workspace-board-card-selected={isSelected ? 'true' : 'false'}
@@ -67,7 +69,7 @@ function WorkspaceKanbanCard({
         selectedWorktrees={contextWorktrees}
         nativeDragEnabled={nativeDragEnabled}
         onActivate={onActivate}
-        onSelectionGesture={onSelectionGesture}
+        onSelectionGesture={(event) => onSelectionGesture(event, worktreeIdentity)}
         onContextMenuSelect={(event) => onContextMenuSelect(event, worktree)}
         onAssignWorkspaceStatus={onAssignWorkspaceStatus}
       />

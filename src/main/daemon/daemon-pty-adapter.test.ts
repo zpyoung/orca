@@ -682,7 +682,7 @@ describe('DaemonPtyAdapter (IPtyProvider)', () => {
 
   describe('onExit', () => {
     it('routes exit events from daemon', async () => {
-      const exits: { id: string; code: number }[] = []
+      const exits: { id: string; code: number; cause?: unknown }[] = []
       adapter.onExit((payload) => exits.push(payload))
 
       const { id } = await adapter.spawn({ cols: 80, rows: 24 })

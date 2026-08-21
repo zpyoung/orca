@@ -92,7 +92,7 @@ vi.mock('./WorkspaceKanbanPinDropTarget', () => ({ default: () => <div /> }))
 
 vi.mock('./use-visible-workspace-kanban-worktree-ids', () => ({
   useVisibleWorkspaceKanbanWorktreeIds: ({ allWorktrees }: { allWorktrees: readonly Worktree[] }) =>
-    new Set(allWorktrees.map((worktree) => worktree.id))
+    new Set(allWorktrees.map(getWorktreeHostIdentity))
 }))
 
 vi.mock('./use-workspace-kanban-selection', () => ({
@@ -103,7 +103,7 @@ vi.mock('./use-workspace-kanban-selection', () => ({
   ) => {
     selectionScopeState.current = renderedWorktrees ?? boardWorktrees
     return {
-      selectedWorktreeIds: new Set(selectionState.current.map((worktree) => worktree.id)),
+      selectedWorktreeIds: new Set(selectionState.current.map(getWorktreeHostIdentity)),
       selectedWorktrees: selectionState.current,
       selectionAnchorId: null,
       updateSelectionForGesture: vi.fn(),
@@ -129,7 +129,6 @@ vi.mock('./use-workspace-kanban-column-resize', () => ({
 
 vi.mock('./use-workspace-kanban-create-worktree', () => ({
   useWorkspaceKanbanCreateWorktree: () => ({
-    canCreateWorktree: true,
     createWorktreeForStatus: vi.fn()
   })
 }))
@@ -346,7 +345,7 @@ describe('WorkspaceKanbanDrawer search', () => {
     renderDrawer()
     typeQuery('gamma')
 
-    expect(gridState.current?.selectedWorktreeIds.has(alpha.id)).toBe(true)
+    expect(gridState.current?.selectedWorktreeIds.has(getWorktreeHostIdentity(alpha))).toBe(true)
     expect(gridState.current?.selectedWorktrees).toEqual([gamma])
   })
 

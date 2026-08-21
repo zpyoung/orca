@@ -7,6 +7,7 @@ const cleanup = vi.fn().mockResolvedValue({ status: 'cleaned' })
 globalThis.window = { api: { ephemeralVm: { listRuntimes, cleanup } } }
 
 import { cleanupEphemeralVmRuntimesForDeleted } from './ephemeral-vm-runtime-cleanup'
+import { toSshExecutionHostId } from '../../../shared/execution-host'
 
 function runtime(overrides: Record<string, unknown>): Record<string, unknown> {
   return { id: 'rt', cleanupStatus: 'not_started', ...overrides }

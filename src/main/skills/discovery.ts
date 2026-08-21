@@ -48,14 +48,55 @@ const MAX_CACHED_SKILL_ROOTS = 1_024
 // line grow with the install. Root *ids* are safe to log where labels and paths
 // are not — a repo/plugin id is already a hash.
 export const MAX_LOGGED_ROOT_IDS = 12
+// Why: a root that did not answer holds unknown skills, not zero, so serving what
+// it last held is what stops an installed skill flipping to "Install" while a
+// mount is wedged. Bounded rather than forever: it covers a stall
+// (MAX_JOINABLE_SCAN_AGE_MS) many times over without pinning a permanently dead
+// root to rows that can no longer be checked.
+export const LAST_KNOWN_ROOT_SCAN_RETENTION_MS = 5 * 60_000
 
 type RootScan = { exists: boolean; skills: ScannedSkill[]; unavailable?: boolean }
 
 const rootScans = new SkillScanCoalescer<RootScan>(MAX_CACHED_SKILL_ROOTS)
+/** Last answered scan per root key, read only when a later scan goes unavailable. */
+const lastKnownRootScans = new Map<string, { skills: ScannedSkill[]; recordedAt: number }>()
 
 /** Drop every shared root scan, e.g. after a skill install/update mutates disk. */
 export function clearSkillRootScanCache(): void {
   rootScans.clear()
+  // A mutation invalidates the retained copy too — it is a pre-mutation answer.
+  lastKnownRootScans.clear()
+}
+
+function recordLastKnownRootScan(key: string, scan: RootScan): void {
+  if (!scan.exists) {
+    // Why: a root that scanned as absent is known-empty, so keeping an older copy
+    // would resurrect skills the user actually removed the next time it stalls.
+    lastKnownRootScans.delete(key)
+    return
+  }
+  // Delete first so re-insert refreshes recency under the LRU bound below.
+  lastKnownRootScans.delete(key)
+  lastKnownRootScans.set(key, { skills: scan.skills, recordedAt: Date.now() })
+  while (lastKnownRootScans.size > MAX_CACHED_SKILL_ROOTS) {
+    const oldestKey = lastKnownRootScans.keys().next().value
+    if (oldestKey === undefined) {
+      break
+    }
+    lastKnownRootScans.delete(oldestKey)
+  }
+}
+
+function readLastKnownRootScan(key: string): ScannedSkill[] {
+  const retained = lastKnownRootScans.get(key)
+  if (!retained) {
+    return []
+  }
+  if (Date.now() - retained.recordedAt > LAST_KNOWN_ROOT_SCAN_RETENTION_MS) {
+    lastKnownRootScans.delete(key)
+    return []
+  }
+  return retained.skills
 }
 
 async function pathExists(pathValue: string): Promise<boolean> {
@@ -210,6 +251,7 @@ export async function discoverSkills(args: {
   homeDir?: string
   cwd?: string
   includeCwd?: boolean
+  providerRootOverrides?: SkillProviderRootOverrides
   refresh?: boolean
 }): Promise<SkillDiscoveryResult> {
   const startedAt = Date.now()

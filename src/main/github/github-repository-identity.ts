@@ -26,6 +26,10 @@ export type LocalGitExecOptions = {
   wslDistro?: string
 }
 
+export type GitHubRemoteIdentityProbeOptions = {
+  requireVerifiedSshProbe?: boolean
+}
+
 export function githubRepoContext(
   repoPath: string,
   connectionId?: string | null,
@@ -108,9 +112,17 @@ export async function getOwnerRepoForRemote(
   repoPath: string,
   remoteName: string,
   connectionId?: string | null,
-  localGitOptions: LocalGitExecOptions = {}
+  localGitOptions: LocalGitExecOptions = {},
+  probeOptions: GitHubRemoteIdentityProbeOptions = {}
 ): Promise<OwnerRepo | null> {
   const context = githubRepoContext(repoPath, connectionId, localGitOptions)
+  if (
+    probeOptions.requireVerifiedSshProbe &&
+    context.connectionId &&
+    !getSshGitProvider(context.connectionId)
+  ) {
+    throw new Error(SSH_GIT_PROVIDER_UNAVAILABLE_MESSAGE)
+  }
   const runtimeKey = context.connectionId
     ? `ssh:${context.connectionId}:${getSshGitProviderGeneration(context.connectionId)}`
     : `local:${context.wslDistro ?? 'host'}`
@@ -145,8 +157,15 @@ export async function getOwnerRepoForRemote(
   // for the same repo concurrently. Coalesce missing-remote probes — but only
   // onto one young enough to still answer, so a wedged probe cannot pin the
   // repo's identity for the life of the process (P1-D).
-  return runCoalescedProbe(ownerRepoInFlight, cacheKey, () =>
-    resolveOwnerRepoForRemote(context, remoteName, cacheKey, nextConfigSignature)
+  const inFlightKey = `${cacheKey}\0${probeOptions.requireVerifiedSshProbe ? 'verified' : 'tolerant'}`
+  return runCoalescedProbe(ownerRepoInFlight, inFlightKey, () =>
+    resolveOwnerRepoForRemote(
+      context,
+      remoteName,
+      cacheKey,
+      nextConfigSignature,
+      probeOptions.requireVerifiedSshProbe === true
+    )
   )
 }
 
@@ -154,12 +173,20 @@ async function resolveOwnerRepoForRemote(
   context: GitHubRepoContext,
   remoteName: string,
   cacheKey: string,
-  configSignature?: string
+  configSignature: string | undefined,
+  requireVerifiedSshProbe: boolean
 ): Promise<OwnerRepo | null> {
   const now = Date.now()
   try {
     const remoteUrl = await getRemoteUrlForRepo(context, remoteName)
     if (!remoteUrl) {
+      if (
+        requireVerifiedSshProbe &&
+        context.connectionId &&
+        !getSshGitProvider(context.connectionId)
+      ) {
+        throw new Error(SSH_GIT_PROVIDER_UNAVAILABLE_MESSAGE)
+      }
       // Empty remote URL is stable until git config changes.
       ownerRepoCache.set(cacheKey, {
         value: null,
@@ -181,6 +208,9 @@ async function resolveOwnerRepoForRemote(
     }
     if (classification.kind === 'indeterminate') {
       // Why: a failed ssh -G probe is not a stable "not GitHub" result.
+      if (requireVerifiedSshProbe && context.connectionId) {
+        throw new Error('Remote repository identity is unverifiable.')
+      }
       return null
     }
     const stableConfigSignature = classification.cacheWithGitConfigSignature
@@ -197,6 +227,9 @@ async function resolveOwnerRepoForRemote(
     // Why: only stable "no such remote" misses are safe to hold for minutes.
     // Transient git lock/IO failures must retry on the next lookup.
     if (!isStableMissingGitRemoteError(error)) {
+      if (requireVerifiedSshProbe && context.connectionId) {
+        throw error
+      }
       return null
     }
   }

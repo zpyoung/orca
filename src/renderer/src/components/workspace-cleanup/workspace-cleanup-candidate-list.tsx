@@ -45,7 +45,10 @@ export function WorkspaceCleanupCandidateList<Row extends WorkspaceCleanupListRo
     overscan: WORKSPACE_CLEANUP_ROW_OVERSCAN,
     // Why: stable worktree keys let the virtualizer carry row identity across
     // scan refreshes instead of remounting the window on every streamed row.
-    getItemKey: (index) => rows[index]?.worktreeId ?? index
+    getItemKey: (index) => {
+      const row = rows[index]
+      return row === undefined ? index : getRowKey(row)
+    }
   })
 
   if (!virtualize) {
