@@ -1,0 +1,251 @@
+import { describe, expect, it } from 'vitest'
+import { validateAskSpec } from './ask-question-schema'
+import {
+  isTerminalAskEnvelope,
+  isTerminalAskStatus,
+  type AskPendingEnvelope,
+  type AskStatus
+} from './ask-answer-envelope'
+
+function selectQuestion(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'db_engine',
+    type: 'select',
+    question: 'Which database?',
+    options: [
+      { value: 'postgres', label: 'PostgreSQL' },
+      { value: 'mysql', label: 'MySQL' }
+    ],
+    ...overrides
+  }
+}
+
+function multiselectQuestion(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'features',
+    type: 'multiselect',
+    question: 'Which features?',
+    options: [
+      { value: 'a', label: 'A' },
+      { value: 'b', label: 'B' }
+    ],
+    ...overrides
+  }
+}
+
+function textQuestion(overrides: Record<string, unknown> = {}) {
+  return { id: 'notes', type: 'text', question: 'Any notes?', ...overrides }
+}
+
+function numberQuestion(overrides: Record<string, unknown> = {}) {
+  return { id: 'pool_size', type: 'number', question: 'Pool size?', min: 1, max: 100, ...overrides }
+}
+
+function dateQuestion(overrides: Record<string, unknown> = {}) {
+  return { id: 'start_date', type: 'date', question: 'Start date?', ...overrides }
+}
+
+function confirmQuestion(overrides: Record<string, unknown> = {}) {
+  return { id: 'confirmed', type: 'confirm', question: 'Confirm?', ...overrides }
+}
+
+function specOf(...questions: unknown[]) {
+  return { questions }
+}
+
+describe('validateAskSpec — malformed input', () => {
+  it.each([null, undefined, 42, 'not an object', true, []])(
+    'never throws and rejects %p',
+    (input) => {
+      expect(() => validateAskSpec(input)).not.toThrow()
+      expect(validateAskSpec(input).ok).toBe(false)
+    }
+  )
+
+  it('rejects a spec whose questions field is not an array', () => {
+    const result = validateAskSpec({ questions: 'nope' })
+    expect(result).toEqual({
+      ok: false,
+      errors: [{ path: 'questions', message: 'questions must be an array' }]
+    })
+  })
+})
+
+describe('validateAskSpec — limits', () => {
+  it('accepts up to 10 questions', () => {
+    const questions = Array.from({ length: 10 }, (_, i) => textQuestion({ id: `q${i}` }))
+    expect(validateAskSpec(specOf(...questions)).ok).toBe(true)
+  })
+
+  it('rejects more than 10 questions', () => {
+    const questions = Array.from({ length: 11 }, (_, i) => textQuestion({ id: `q${i}` }))
+    const result = validateAskSpec(specOf(...questions))
+    expect(result.ok).toBe(false)
+    expect(result).toMatchObject({
+      errors: expect.arrayContaining([
+        { path: 'questions', message: 'at most 10 questions allowed' }
+      ])
+    })
+  })
+
+  it('accepts up to 12 options', () => {
+    const options = Array.from({ length: 12 }, (_, i) => ({ value: `v${i}`, label: `L${i}` }))
+    expect(validateAskSpec(specOf(selectQuestion({ options }))).ok).toBe(true)
+  })
+
+  it('rejects more than 12 options, naming the field path', () => {
+    const options = Array.from({ length: 13 }, (_, i) => ({ value: `v${i}`, label: `L${i}` }))
+    const result = validateAskSpec(specOf(selectQuestion({ options })))
+    expect(result).toMatchObject({
+      ok: false,
+      errors: expect.arrayContaining([
+        { path: 'questions[0].options', message: 'at most 12 options allowed' }
+      ])
+    })
+  })
+})
+
+describe('validateAskSpec — id uniqueness', () => {
+  it('rejects a blank or missing id', () => {
+    const result = validateAskSpec(specOf(textQuestion({ id: '' })))
+    expect(result).toMatchObject({
+      ok: false,
+      errors: expect.arrayContaining([
+        { path: 'questions[0].id', message: 'id is required and must be a non-empty string' }
+      ])
+    })
+  })
+
+  it('rejects duplicate ids and names the second occurrence', () => {
+    const result = validateAskSpec(
+      specOf(textQuestion({ id: 'dup' }), numberQuestion({ id: 'dup' }))
+    )
+    expect(result).toMatchObject({
+      ok: false,
+      errors: expect.arrayContaining([
+        { path: "questions[1].id", message: "duplicate question id 'dup'" }
+      ])
+    })
+  })
+})
+
+describe('validateAskSpec — per-type default domain', () => {
+  it.each([
+    ['select: matching option value', selectQuestion({ default: 'postgres' }), true],
+    ['select: value outside option set', selectQuestion({ default: 'sqlite' }), false],
+    ['multiselect: matching option values', multiselectQuestion({ default: ['a', 'b'] }), true],
+    ['multiselect: unknown option value', multiselectQuestion({ default: ['z'] }), false],
+    ['multiselect: not an array', multiselectQuestion({ default: 'a' }), false],
+    ['text: plain string with no constraints', textQuestion({ default: 'anything' }), true],
+    [
+      'text: violates pattern',
+      textQuestion({ pattern: '^[a-z]+$', default: '123' }),
+      false
+    ],
+    [
+      'text: matches pattern',
+      textQuestion({ pattern: '^[a-z]+$', default: 'ok' }),
+      true
+    ],
+    ['text: invalid email format', textQuestion({ format: 'email', default: 'nope' }), false],
+    ['text: valid email format', textQuestion({ format: 'email', default: 'a@b.com' }), true],
+    ['number: within min/max', numberQuestion({ default: 50 }), true],
+    ['number: above max', numberQuestion({ default: 500 }), false],
+    ['number: non-integer when integer required', numberQuestion({ integer: true, default: 1.5 }), false],
+    ['date: valid ISO date', dateQuestion({ default: '2026-01-01' }), true],
+    ['date: non-ISO date', dateQuestion({ default: '01/01/2026' }), false],
+    ['confirm: boolean default', confirmQuestion({ default: true }), true],
+    ['confirm: non-boolean default', confirmQuestion({ default: 'yes' }), false]
+  ])('%s', (_label, question, expectOk) => {
+    const result = validateAskSpec(specOf(question))
+    expect(result.ok).toBe(expectOk)
+    if (!expectOk) {
+      expect(result).toMatchObject({
+        errors: expect.arrayContaining([expect.objectContaining({ path: 'questions[0].default' })])
+      })
+    }
+  })
+
+  it('names a default error at a non-zero index like the spec example', () => {
+    const result = validateAskSpec(specOf(textQuestion(), numberQuestion({ default: 500 })))
+    expect(result).toMatchObject({
+      ok: false,
+      errors: expect.arrayContaining([
+        expect.objectContaining({ path: 'questions[1].default' })
+      ])
+    })
+  })
+})
+
+describe('validateAskSpec — credential refusal', () => {
+  it.each([
+    ['id', textQuestion({ id: 'db-password' })],
+    ['question text', textQuestion({ question: "What's the access token?" })],
+    ['option value', selectQuestion({ options: [{ value: 'secret-value', label: 'A' }] })]
+  ])('rejects a credential-shaped %s', (_label, question) => {
+    const result = validateAskSpec(specOf(question))
+    expect(result.ok).toBe(false)
+  })
+
+  it.each(['masked', 'sensitive'])(
+    'rejects any %s attribute on a question regardless of its value',
+    (attribute) => {
+      const withTrue = validateAskSpec(specOf(textQuestion({ [attribute]: true })))
+      const withFalse = validateAskSpec(specOf(textQuestion({ [attribute]: false })))
+      expect(withTrue.ok).toBe(false)
+      expect(withFalse.ok).toBe(false)
+    }
+  )
+})
+
+describe('validateAskSpec — escape-hatch invariants', () => {
+  it.each([true, false, undefined])(
+    'accepts an option question with required=%s with no opt-in for free text or skip',
+    (required) => {
+      const question = selectQuestion(required === undefined ? {} : { required })
+      const result = validateAskSpec(specOf(question))
+      expect(result.ok).toBe(true)
+    }
+  )
+
+  it('has no schema field capable of disabling the free-text or skip escape hatch', () => {
+    // required is the only knob the schema exposes; there is no allowOther/skippable field to
+    // strip, so attempting one is inert rather than an error.
+    const result = validateAskSpec(
+      specOf(selectQuestion({ required: true, allowOther: false, skippable: false }))
+    )
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.spec.questions[0]).not.toHaveProperty('allowOther')
+      expect(result.spec.questions[0]).not.toHaveProperty('skippable')
+    }
+  })
+})
+
+describe('AskEnvelope — pending variant', () => {
+  it('carries only askId and an instruction, never answers/skipped/summary', () => {
+    const pending: AskPendingEnvelope = {
+      status: 'pending',
+      askId: 'ask_01J',
+      instruction: 'run `orca ask wait --id ask_01J`'
+    }
+    expect(pending).not.toHaveProperty('answers')
+    expect(pending).not.toHaveProperty('skipped')
+    expect(pending).not.toHaveProperty('summary')
+    expect(isTerminalAskEnvelope(pending)).toBe(false)
+  })
+})
+
+describe('isTerminalAskStatus', () => {
+  it.each<[AskStatus, boolean]>([
+    ['registered', false],
+    ['pending', false],
+    ['answered', true],
+    ['partial', true],
+    ['declined', true],
+    ['timed_out', true],
+    ['unavailable', true]
+  ])('%s is terminal: %s', (status, expected) => {
+    expect(isTerminalAskStatus(status)).toBe(expected)
+  })
+})
