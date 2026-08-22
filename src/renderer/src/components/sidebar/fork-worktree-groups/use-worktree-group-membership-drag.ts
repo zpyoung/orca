@@ -2,8 +2,8 @@ import { useCallback, useMemo, useState } from 'react'
 import type React from 'react'
 import { useAppStore } from '@/store'
 import { measureProjectGroupHeaderDragRects } from '../project-group-header-drop'
-import type { VirtualizedWorktreeViewportProps } from '../worktree-list/virtualized-worktree-viewport-props'
-import type { WorktreePointerDrag } from '../worktree-list/worktree-row-drag-state'
+import type { VirtualizedWorktreeViewportProps } from '../worktree-list/viewport/viewport-props'
+import type { WorktreePointerDrag } from '../worktree-list/drag/row-state'
 import { canWorktreeHoldGroupMembership } from '../../../../../shared/fork-worktree-groups/worktree-group-membership'
 import {
   areWorktreeGroupMembershipDragPreviewsEqual,

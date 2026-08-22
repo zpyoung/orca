@@ -1,6 +1,7 @@
 import type { ProjectGroup } from '../../../../../shared/project-group-types'
 import type { Repo } from '../../../../../shared/repo-types'
 import type { Worktree } from '../../../../../shared/worktree/types'
+import { getWorktreeHostIdentity } from '../../../../../shared/worktree/host-qualified-identity'
 import {
   getExecutionHostLabel,
   getWorktreeExecutionHostId,
@@ -49,15 +50,15 @@ export function getLooseWorktreeHostContextLabels(
   defaultHostId: ExecutionHostId,
   groupHostId: ExecutionHostId
 ): Map<string, string> | undefined {
-  const labelsByWorktreeId = new Map<string, string>()
+  const labelsByWorktreeIdentity = new Map<string, string>()
   for (const worktree of worktrees) {
     const hostId = getWorktreeExecutionHostId(worktree, repoMap.get(worktree.repoId), defaultHostId)
     if (hostId !== groupHostId) {
-      labelsByWorktreeId.set(
-        worktree.id,
+      labelsByWorktreeIdentity.set(
+        getWorktreeHostIdentity(worktree),
         hostLabelById?.get(hostId) ?? getExecutionHostLabel(hostId)
       )
     }
   }
-  return labelsByWorktreeId.size > 0 ? labelsByWorktreeId : undefined
+  return labelsByWorktreeIdentity.size > 0 ? labelsByWorktreeIdentity : undefined
 }
