@@ -1,6 +1,12 @@
 import type { StateCreator } from 'zustand'
+import type { setWebRuntimeTabProps } from '@/runtime/web-runtime-session'
+import type { remapPaneKeyTabId } from '@/runtime/web-session-tabs-sync'
 import type { AppState } from '../../types'
 import type { TerminalDockPaneState } from '../../../../../shared/fork-terminal-dock/terminal-dock-pane-state'
+import {
+  clampGutterRows,
+  DEFAULT_GUTTER_ROWS
+} from '../../../../../shared/fork-terminal-dock/terminal-dock-gutter-rows'
 import {
   removeTerminalDockPaneKeys as removeLocalTerminalDockPaneKeys,
   writeTerminalDockPaneState
@@ -25,12 +31,7 @@ export type TabTerminalDockSlice = {
   pruneTerminalDockPaneKeys: (tabId: string, paneKeys: readonly string[]) => void
 }
 
-const DEFAULT_TERMINAL_DOCK_GUTTER_ROWS = 5
-const MIN_TERMINAL_DOCK_GUTTER_ROWS = 3
-const MAX_TERMINAL_DOCK_GUTTER_ROWS = 15
-
-// Why: gutterRows also flows to the host's RPC schema, which enforces the same
-// 3..15 integer contract; clamping here keeps local and host state from diverging.
+// shared wire bounds keep local and host gutter state from diverging
 function normalizeTerminalDockGutterRows(gutterRows: number | undefined): number | undefined {
   if (gutterRows === undefined) {
     return undefined
@@ -38,8 +39,8 @@ function normalizeTerminalDockGutterRows(gutterRows: number | undefined): number
   const rounded =
     typeof gutterRows === 'number' && Number.isFinite(gutterRows)
       ? Math.round(gutterRows)
-      : DEFAULT_TERMINAL_DOCK_GUTTER_ROWS
-  return Math.min(MAX_TERMINAL_DOCK_GUTTER_ROWS, Math.max(MIN_TERMINAL_DOCK_GUTTER_ROWS, rounded))
+      : DEFAULT_GUTTER_ROWS
+  return clampGutterRows(rounded)
 }
 
 function mergeTerminalDockPaneState(
@@ -51,7 +52,7 @@ function mergeTerminalDockPaneState(
     gutterRows:
       normalizeTerminalDockGutterRows(patch.gutterRows) ??
       existing?.gutterRows ??
-      DEFAULT_TERMINAL_DOCK_GUTTER_ROWS
+      DEFAULT_GUTTER_ROWS
   }
 }
 
@@ -92,6 +93,51 @@ function removeTabPaneKeysFromPendingMutations(
   return changed ? next : record
 }
 
+type DockMirrorContext = {
+  environmentId: string
+  worktreeId: string
+}
+
+type DockMirrorPatch = NonNullable<Parameters<typeof setWebRuntimeTabProps>[0]['terminalDock']>
+
+function resolveDockMirrorContext(state: AppState, tabId: string): DockMirrorContext | null {
+  const found = findTabAndWorktree(state.unifiedTabsByWorktree, tabId)
+  if (!found || found.tab.contentType !== 'terminal') {
+    return null
+  }
+  const environmentId = getRuntimeEnvironmentIdForWorktree(state, found.worktreeId)
+  return environmentId ? { environmentId, worktreeId: found.worktreeId } : null
+}
+
+function withDockMirrorModules(
+  state: AppState,
+  tabId: string,
+  mirror: (hostTabId: string, remap: typeof remapPaneKeyTabId) => DockMirrorPatch | null
+): void {
+  const context = resolveDockMirrorContext(state, tabId)
+  if (!context) {
+    return
+  }
+  void Promise.all([
+    import('@/runtime/web-runtime-session'),
+    import('@/runtime/web-session-tabs-sync')
+  ]).then(([runtimeSession, sessionTabsSync]) => {
+    const hostTabId =
+      sessionTabsSync.resolveHostSessionTabIdForWebSessionTab(state, { ...context, tabId }) ??
+      (runtimeSession.isWebTerminalSurfaceTabId(tabId)
+        ? runtimeSession.toHostSessionTabId(tabId)
+        : tabId)
+    const terminalDock = mirror(hostTabId, sessionTabsSync.remapPaneKeyTabId)
+    if (terminalDock) {
+      runtimeSession.setWebRuntimeTabProps({
+        worktreeId: context.worktreeId,
+        tabId,
+        terminalDock
+      })
+    }
+  })
+}
+
 // Why: dock state is host-tracked like color/pin/viewMode, so mirror local sets or they're lost on reconnect and to paired clients.
 // Only the action path mirrors (never reconcile applying a host value), so the echoed snapshot can't re-trigger an outbound RPC.
 // Sends only the single-pane patch (never the whole record) so two clients editing different panes can't clobber each other.
@@ -101,43 +147,12 @@ function mirrorTabTerminalDockToHost(
   tabId: string,
   patch: { paneKey: string; docked?: boolean; gutterRows?: number }
 ): void {
-  const found = findTabAndWorktree(state.unifiedTabsByWorktree, tabId)
-  if (
-    !found ||
-    found.tab.contentType !== 'terminal' ||
-    !getRuntimeEnvironmentIdForWorktree(state, found.worktreeId)
-  ) {
-    return
-  }
-  const worktreeId = found.worktreeId
-  const environmentId = getRuntimeEnvironmentIdForWorktree(state, worktreeId)
-  if (!environmentId) {
-    return
-  }
-  void Promise.all([
-    import('@/runtime/web-runtime-session'),
-    import('@/runtime/web-session-tabs-sync')
-  ]).then(
-    ([
-      { setWebRuntimeTabProps, isWebTerminalSurfaceTabId, toHostSessionTabId },
-      { resolveHostSessionTabIdForWebSessionTab, remapPaneKeyTabId }
-    ]) => {
-      // Why: the paneKey's tab-ID segment must land under the same host tab id the
-      // RPC itself targets, or the host accumulates a second, web-namespaced record.
-      const hostTabId =
-        resolveHostSessionTabIdForWebSessionTab(state, { environmentId, worktreeId, tabId }) ??
-        (isWebTerminalSurfaceTabId(tabId) ? toHostSessionTabId(tabId) : tabId)
-      const hostPaneKey = remapPaneKeyTabId(patch.paneKey, () => hostTabId)
-      if (!hostPaneKey) {
-        return
-      }
-      setWebRuntimeTabProps({
-        worktreeId,
-        tabId,
-        terminalDock: { ...patch, paneKey: hostPaneKey }
-      })
-    }
-  )
+  withDockMirrorModules(state, tabId, (hostTabId, remapPaneKeyTabId) => {
+    // Why: the paneKey's tab-ID segment must land under the same host tab id the
+    // RPC itself targets, or the host accumulates a second, web-namespaced record.
+    const hostPaneKey = remapPaneKeyTabId(patch.paneKey, () => hostTabId)
+    return hostPaneKey ? { ...patch, paneKey: hostPaneKey } : null
+  })
 }
 
 // Why: dock state is host-tracked like color/pin/viewMode, so mirror local pruning
@@ -153,39 +168,12 @@ function mirrorTerminalDockPruneToHost(
   if (removedPaneKeys.length === 0) {
     return
   }
-  const found = findTabAndWorktree(state.unifiedTabsByWorktree, tabId)
-  if (
-    !found ||
-    found.tab.contentType !== 'terminal' ||
-    !getRuntimeEnvironmentIdForWorktree(state, found.worktreeId)
-  ) {
-    return
-  }
-  const worktreeId = found.worktreeId
-  const environmentId = getRuntimeEnvironmentIdForWorktree(state, worktreeId)
-  if (!environmentId) {
-    return
-  }
-  void Promise.all([
-    import('@/runtime/web-runtime-session'),
-    import('@/runtime/web-session-tabs-sync')
-  ]).then(
-    ([
-      { setWebRuntimeTabProps, isWebTerminalSurfaceTabId, toHostSessionTabId },
-      { resolveHostSessionTabIdForWebSessionTab, remapPaneKeyTabId }
-    ]) => {
-      const hostTabId =
-        resolveHostSessionTabIdForWebSessionTab(state, { environmentId, worktreeId, tabId }) ??
-        (isWebTerminalSurfaceTabId(tabId) ? toHostSessionTabId(tabId) : tabId)
-      const hostPaneKeys = removedPaneKeys
-        .map((paneKey) => remapPaneKeyTabId(paneKey, () => hostTabId))
-        .filter((paneKey): paneKey is string => paneKey !== null)
-      if (hostPaneKeys.length === 0) {
-        return
-      }
-      setWebRuntimeTabProps({ worktreeId, tabId, terminalDock: { remove: hostPaneKeys } })
-    }
-  )
+  withDockMirrorModules(state, tabId, (hostTabId, remapPaneKeyTabId) => {
+    const hostPaneKeys = removedPaneKeys
+      .map((paneKey) => remapPaneKeyTabId(paneKey, () => hostTabId))
+      .filter((paneKey): paneKey is string => paneKey !== null)
+    return hostPaneKeys.length > 0 ? { remove: hostPaneKeys } : null
+  })
 }
 
 type DockSet = Parameters<StateCreator<AppState, [], [], TabTerminalDockSlice>>[0]

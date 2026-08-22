@@ -137,6 +137,34 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
     )
   }, [tabId, worktreeId])
 
+  const applyDockState = useCallback(
+    (
+      paneKey: string,
+      patch: { docked?: boolean; gutterRows?: number },
+      beforeApply?: () => void
+    ): boolean => {
+      const unifiedTabId = resolveUnifiedTabId()
+      if (!unifiedTabId) {
+        return false
+      }
+      const persistedState = {
+        docked: patch.docked ?? isPaneDocked(paneKey),
+        gutterRows: patch.gutterRows ?? gutterRowsFor(paneKey)
+      }
+      beforeApply?.()
+      setTabTerminalDockState(unifiedTabId, { paneKey, ...patch })
+      persistLocalDockState(paneKey, persistedState)
+      return true
+    },
+    [
+      gutterRowsFor,
+      isPaneDocked,
+      persistLocalDockState,
+      resolveUnifiedTabId,
+      setTabTerminalDockState
+    ]
+  )
+
   const ensurePaneDockDefault = useCallback(
     (paneKey: string, agent: AgentType): void => {
       noteDetectedAgent(paneKey, agent)
@@ -148,23 +176,18 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       if (!shouldDockTerminalComposerByDefault({ enabled, agent, hasPersistedDecision })) {
         return
       }
-      const unifiedTabId = resolveUnifiedTabId()
-      if (!unifiedTabId) {
-        return
-      }
-      const gutterRows = gutterRowsFor(paneKey)
-      setTabTerminalDockState(unifiedTabId, { paneKey, docked: true, gutterRows })
-      persistLocalDockState(paneKey, { docked: true, gutterRows })
+      applyDockState(paneKey, {
+        docked: true,
+        gutterRows: gutterRowsFor(paneKey)
+      })
     },
     [
+      applyDockState,
       enabled,
       gutterRowsFor,
       hasLocalDockState,
       hostHasEverEchoed,
       noteDetectedAgent,
-      persistLocalDockState,
-      resolveUnifiedTabId,
-      setTabTerminalDockState,
       terminalDockByPaneKey
     ]
   )
@@ -174,14 +197,9 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       if (!enabled) {
         return
       }
-      const unifiedTabId = resolveUnifiedTabId()
-      if (!unifiedTabId) {
-        return
-      }
-      setTabTerminalDockState(unifiedTabId, { paneKey, gutterRows: rows })
-      persistLocalDockState(paneKey, { docked: isPaneDocked(paneKey), gutterRows: rows })
+      applyDockState(paneKey, { gutterRows: rows })
     },
-    [enabled, isPaneDocked, persistLocalDockState, resolveUnifiedTabId, setTabTerminalDockState]
+    [applyDockState, enabled]
   )
 
   const toggleDockForLeaf = useCallback(
@@ -189,34 +207,19 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       if (!enabled || !leafId) {
         return
       }
-      const unifiedTabId = resolveUnifiedTabId()
-      if (!unifiedTabId) {
-        return
-      }
       const paneKey = makePaneKey(tabId, leafId)
       const nextDocked = !isPaneDocked(paneKey)
-      if (!nextDocked) {
-        exitPanePassthrough(paneKey)
+      const beforeApply = nextDocked ? undefined : () => exitPanePassthrough(paneKey)
+      if (!applyDockState(paneKey, { docked: nextDocked }, beforeApply)) {
+        return
       }
-      setTabTerminalDockState(unifiedTabId, { paneKey, docked: nextDocked })
-      persistLocalDockState(paneKey, { docked: nextDocked, gutterRows: gutterRowsFor(paneKey) })
       emitTerminalDockToggled({
         docked: nextDocked,
         agent:
           agentForPane(paneKey) ?? useAppStore.getState().agentStatusByPaneKey[paneKey]?.agentType
       })
     },
-    [
-      agentForPane,
-      enabled,
-      exitPanePassthrough,
-      gutterRowsFor,
-      isPaneDocked,
-      persistLocalDockState,
-      resolveUnifiedTabId,
-      setTabTerminalDockState,
-      tabId
-    ]
+    [agentForPane, applyDockState, enabled, exitPanePassthrough, isPaneDocked, tabId]
   )
 
   const toggleDockForFocusedPane = useCallback((): void => {
@@ -234,24 +237,9 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       if (!isPaneDocked(paneKey)) {
         return
       }
-      const unifiedTabId = resolveUnifiedTabId()
-      if (!unifiedTabId) {
-        return
-      }
-      exitPanePassthrough(paneKey)
-      setTabTerminalDockState(unifiedTabId, { paneKey, docked: false })
-      persistLocalDockState(paneKey, { docked: false, gutterRows: gutterRowsFor(paneKey) })
+      applyDockState(paneKey, { docked: false }, () => exitPanePassthrough(paneKey))
     },
-    [
-      enabled,
-      exitPanePassthrough,
-      gutterRowsFor,
-      isPaneDocked,
-      persistLocalDockState,
-      resolveUnifiedTabId,
-      setTabTerminalDockState,
-      tabId
-    ]
+    [applyDockState, enabled, exitPanePassthrough, isPaneDocked, tabId]
   )
 
   useTerminalDockShortcutListener({

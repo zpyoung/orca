@@ -6,28 +6,15 @@
 // mirrors agent-composer-history-cache's subscribe/notify shape, since the dock
 // and native-chat view can both hold a live mount against the same pane.
 
-import { pinScopeCacheKey, setBoundedScopeCacheEntry } from './agent-composer-scope-cache'
+import { createSubscribableScopeCache } from './agent-composer-scope-cache'
 
-const draftCache = new Map<string, string>()
+const draftCache = createSubscribableScopeCache<string>({
+  createEmptyValue: () => '',
+  isEmpty: (draft) => draft === ''
+})
 
-type DraftCacheListener = (draft: string) => void
-const draftCacheListeners = new Map<string, Set<DraftCacheListener>>()
-
-export function readAgentComposerDraftCache(scopeKey: string): string {
-  return draftCache.get(scopeKey) ?? ''
-}
-
-export function writeAgentComposerDraftCache(scopeKey: string, draft: string): void {
-  // An empty draft carries no state worth retaining; drop the entry so a stale
-  // scope key never resurrects cleared text.
-  if (draft === '') {
-    draftCache.delete(scopeKey)
-  } else {
-    // LRU-bounded so unsent drafts for permanently-removed panes can't accumulate.
-    setBoundedScopeCacheEntry(draftCache, scopeKey, draft)
-  }
-  notifyDraftCacheListeners(scopeKey, draft)
-}
+export const readAgentComposerDraftCache = draftCache.read
+export const writeAgentComposerDraftCache = draftCache.write
 
 /**
  * Subscribes to writes for `scopeKey`. Fires once immediately with the
@@ -35,44 +22,6 @@ export function writeAgentComposerDraftCache(scopeKey: string, draft: string): v
  * after another mount already wrote cannot miss that entry. Returns an
  * unsubscribe function.
  */
-export function subscribeAgentComposerDraftCache(
-  scopeKey: string,
-  listener: DraftCacheListener
-): () => void {
-  const listeners = draftCacheListeners.get(scopeKey) ?? new Set<DraftCacheListener>()
-  draftCacheListeners.set(scopeKey, listeners)
-  listeners.add(listener)
-  const unpin = pinScopeCacheKey(scopeKey)
-  try {
-    listener(readAgentComposerDraftCache(scopeKey))
-  } catch {
-    // a subscriber's exception must never stop this subscribe call from completing
-  }
-  return () => {
-    listeners.delete(listener)
-    if (listeners.size === 0) {
-      draftCacheListeners.delete(scopeKey)
-    }
-    unpin()
-  }
-}
+export const subscribeAgentComposerDraftCache = draftCache.subscribe
 
-function notifyDraftCacheListeners(scopeKey: string, draft: string): void {
-  const listeners = draftCacheListeners.get(scopeKey)
-  if (!listeners) {
-    return
-  }
-  // snapshot: a listener unsubscribing another mid-dispatch must not skip it
-  for (const listener of Array.from(listeners)) {
-    try {
-      listener(draft)
-    } catch {
-      // a subscriber's exception must never block the other listeners
-    }
-  }
-}
-
-export function clearAgentComposerDraftCacheForTests(): void {
-  draftCache.clear()
-  draftCacheListeners.clear()
-}
+export const clearAgentComposerDraftCacheForTests = draftCache.clearForTests

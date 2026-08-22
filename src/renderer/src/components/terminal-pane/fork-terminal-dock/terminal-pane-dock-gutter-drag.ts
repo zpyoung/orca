@@ -1,12 +1,10 @@
 import type { ManagedPane } from '@/lib/pane-manager/pane-manager-types'
 import { holdPtyResizesForPaneSubtrees } from '@/lib/pane-manager/pane-pty-resize-hold'
 import { safeFit } from '@/lib/pane-manager/pane-fit'
-import { MAX_GUTTER_ROWS, MIN_GUTTER_ROWS } from './terminal-dock-pane-state'
+import { clampGutterRows } from '../../../../../shared/fork-terminal-dock/terminal-dock-gutter-rows'
 import { TERMINAL_DOCK_ROW_HEIGHT_PX } from './TerminalDock'
 
-export function clampGutterRows(rows: number): number {
-  return Math.min(MAX_GUTTER_ROWS, Math.max(MIN_GUTTER_ROWS, Math.round(rows)))
-}
+export { clampGutterRows }
 
 export type TerminalDockGutterDragArgs = {
   pane: ManagedPane
