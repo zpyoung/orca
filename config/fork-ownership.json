@@ -1861,6 +1861,11 @@
       "status": "permanent"
     },
     {
+      "path": "config/scripts/release-cut-token-permissions.test.mjs",
+      "status": "permanent",
+      "reason": "Asserts upstream's release-cut job matrix and github.repository == 'stablyai/orca'; the fork publishes macOS-only arm64 artifacts from zpyoung/orca, so upstream's version can never describe this pipeline."
+    },
+    {
       "path": "config/scripts/release-rc-history.mjs",
       "reason": "Fork release-tooling delta for the fork's own RC history.",
       "status": "permanent"
@@ -1876,6 +1881,12 @@
       "status": "permanent"
     },
     {
+      "path": "config/scripts/skill-sharing-release-workflow.test.mjs",
+      "status": "permanent",
+      "reason": "Asserts a Windows/Linux skill-sharing release gate upstream added to release-cut.yml; the fork's release pipeline is macOS-only and has no such job.",
+      "deleted": true
+    },
+    {
       "path": "config/scripts/sync-upstream-file-ownership.mjs",
       "reason": "Fork's own sync classifier; upstream has no such script.",
       "status": "permanent"
@@ -1884,6 +1895,12 @@
       "path": "config/scripts/sync-upstream-file-ownership.test.mjs",
       "reason": "Tests for the fork's own sync classifier; upstream has no such script.",
       "status": "permanent"
+    },
+    {
+      "path": "config/scripts/verify-dev-channel-packaging.test.mjs",
+      "status": "permanent",
+      "reason": "Asserts upstream's Windows hourly/daily/adhoc dev-channel packaging identity; the fork ships no dev channels and no Windows artifacts.",
+      "deleted": true
     },
     {
       "path": "config/scripts/verify-release-required-assets.mjs",

@@ -26,17 +26,15 @@ const EXPECTED_MATRIX = {
     },
   [`${RELEASE_WORKFLOW}#post-release-e2e`]: { actions: 'write' },
   [`${RELEASE_WORKFLOW}#publish-release`]: { contents: 'write' },
-  [`${RELEASE_WORKFLOW}#skill-sharing-linux-floor-release-gate`]: { contents: 'read' },
-  [`${RELEASE_WORKFLOW}#skill-sharing-release-gate`]: { contents: 'read' },
   [`${RELEASE_WORKFLOW}#terminal-rendering-golden`]: { contents: 'read' },
   [`${RELEASE_WORKFLOW}#terminal-rendering-release-evidence`]: { contents: 'read' }
 }
 const PUBLISH_TAG_JOBS = new Set(['build', 'create-release'])
+// Why this list is shorter than upstream's: the fork's release-cut is macOS-only and
+// carries no skill-sharing release gate, so those jobs have no fork counterpart.
 const RELEASE_TAG_EXECUTION_JOBS = [
   'build',
   'create-release',
-  'skill-sharing-linux-floor-release-gate',
-  'skill-sharing-release-gate',
   'terminal-rendering-golden',
   'terminal-rendering-release-evidence'
 ]
@@ -182,7 +180,7 @@ describe('release-cut token permissions', () => {
   })
 
   it('keeps fork, tag, and reusable-workflow boundaries explicit', () => {
-    expect(workflow.jobs.cut.if).toBe("github.repository == 'stablyai/orca'")
+    expect(workflow.jobs.cut.if).toBe("github.repository == 'zpyoung/orca'")
     expect(checkoutRef(workflow.jobs.cut)).toBe(
       "${{ github.event_name == 'schedule' && 'main' || inputs.ref }}"
     )
@@ -199,7 +197,7 @@ describe('release-cut token permissions', () => {
     }
 
     const macWorkflow = readWorkflow('.github/workflows/release-mac-build.yml')
-    expect(macWorkflow.jobs['build-mac'].if).toBe("github.repository == 'stablyai/orca'")
+    expect(macWorkflow.jobs['build-mac'].if).toBe("github.repository == 'zpyoung/orca'")
     expect(checkoutRef(macWorkflow.jobs['build-mac'])).toBe('refs/tags/${{ inputs.tag }}')
 
     const e2eWorkflow = readWorkflow('.github/workflows/e2e.yml')
