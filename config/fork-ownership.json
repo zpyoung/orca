@@ -2712,6 +2712,64 @@
         "import { ASK_REGISTRY_RUNTIME_CAPABILITY } from './fork-ask-question-tool/ask-question-capability'",
         "  ASK_REGISTRY_RUNTIME_CAPABILITY"
       ]
+    },
+    {
+      "path": "src/shared/tui-agent-launch-command.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { appendClaudeSuppressionFlags } from './fork-ask-question-tool/claude-suppression-flag-composition'",
+        "  claudeSuppressionFlags?: string[] | null",
+        "    ...appendClaudeSuppressionFlags({"
+      ]
+    },
+    {
+      "path": "src/shared/tui-agent-startup.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { applyClaudeSuppressionFlagsToResumeCommand } from './fork-ask-question-tool/claude-suppression-flag-composition'",
+        "  claudeSuppressionFlags?: string[] | null",
+        "        command: applyClaudeSuppressionFlagsToResumeCommand({"
+      ]
+    },
+    {
+      "path": "src/cli/specs/index.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { ASK_COMMAND_SPECS } from '../fork-ask-question-tool/specs'",
+        "  ...ASK_COMMAND_SPECS,"
+      ]
+    },
+    {
+      "path": "src/cli/handler-group-manifest.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "    name: 'ask',",
+        "    keys: ['ask', 'ask wait', 'ask cancel'],",
+        "    load: async () => (await import('./fork-ask-question-tool/handlers.js')).ASK_HANDLERS"
+      ]
+    },
+    {
+      "path": "src/cli/args.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "      'ask',",
+        "        'ask',"
+      ]
+    },
+    {
+      "path": "src/cli/help.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "  ask                       Ask the user a question and block until answered",
+        "  ask wait                  Resume blocking on a pending ask",
+        "  ask cancel                Cancel a pending ask as declined"
+      ]
     }
   ],
   "exceptions": [
@@ -4452,6 +4510,30 @@
     "src/shared/protocol-version.ts": {
       "added": 3,
       "removed": 1
+    },
+    "src/shared/tui-agent-launch-command.ts": {
+      "added": 14,
+      "removed": 6
+    },
+    "src/shared/tui-agent-startup.ts": {
+      "added": 16,
+      "removed": 3
+    },
+    "src/cli/specs/index.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/cli/handler-group-manifest.ts": {
+      "added": 5,
+      "removed": 0
+    },
+    "src/cli/args.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/cli/help.ts": {
+      "added": 8,
+      "removed": 0
     }
   }
 }
