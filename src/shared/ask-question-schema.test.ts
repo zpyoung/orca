@@ -187,6 +187,47 @@ describe('validateAskSpec — credential refusal', () => {
     expect(result.ok).toBe(false)
   })
 
+  it.each([
+    'db_password',
+    'auth_token',
+    'user_secret',
+    'my_api_key',
+    'my_private_key',
+    'apiKey'
+  ])('rejects previously-missed credential-shaped id %s', (id) => {
+    const result = validateAskSpec(specOf(textQuestion({ id })))
+    expect(result.ok).toBe(false)
+  })
+
+  it.each([
+    'password',
+    'api_key',
+    'db-password',
+    'secret',
+    'token',
+    'private_key'
+  ])('still rejects credential-shaped id %s (no regression)', (id) => {
+    const result = validateAskSpec(specOf(textQuestion({ id })))
+    expect(result.ok).toBe(false)
+  })
+
+  it('accepts an id where a trigger word is a strict prefix of a longer word', () => {
+    const result = validateAskSpec(specOf(textQuestion({ id: 'tokenize_input' })))
+    expect(result.ok).toBe(true)
+  })
+
+  it('normalizes question text before matching, catching prefixed snake_case', () => {
+    const result = validateAskSpec(specOf(textQuestion({ question: 'What is the db_password?' })))
+    expect(result.ok).toBe(false)
+  })
+
+  it('normalizes option values before matching, catching prefixed snake_case', () => {
+    const result = validateAskSpec(
+      specOf(selectQuestion({ options: [{ value: 'my_api_key', label: 'A' }] }))
+    )
+    expect(result.ok).toBe(false)
+  })
+
   it.each(['masked', 'sensitive'])(
     'rejects any %s attribute on a question regardless of its value',
     (attribute) => {

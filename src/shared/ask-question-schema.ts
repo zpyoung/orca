@@ -96,8 +96,12 @@ export function resolveAskWaitClientTimeoutMs(chunkMs: number | undefined): numb
 const MAX_QUESTIONS = 10
 const MAX_OPTIONS = 12
 const QUESTION_TYPES = new Set(['select', 'multiselect', 'text', 'number', 'date', 'confirm'])
-const CREDENTIAL_PATTERN =
-  /\b(pass(word|phrase)?|secret|token|api[_-]?key|credential|private[_-]?key)\b/i
+const CREDENTIAL_PATTERN = /\b(pass(word|phrase)?|secret|token|api\s?key|credential|private\s?key)\b/i
+
+// `\b` cannot fire across `_` (it's a word character), so prefixed snake_case ids like
+// db_password would otherwise slip the check; normalize separators and case humps to real
+// word boundaries before matching (tech.md C1 REGEX: credential refusal).
+const normalizeCredentialCandidate = (value: string): string => value.replace(/[_-]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2')
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 const FORMAT_PATTERNS: Record<'email' | 'url', RegExp> = {
   email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
@@ -169,7 +173,7 @@ function validateId(raw: unknown, path: string, errors: AskValidationError[], se
     errors.push({ path: `${path}.id`, message: `duplicate question id '${raw}'` })
   }
   seenIds.add(raw)
-  if (CREDENTIAL_PATTERN.test(raw)) {
+  if (CREDENTIAL_PATTERN.test(normalizeCredentialCandidate(raw))) {
     errors.push({ path: `${path}.id`, message: 'credential-shaped id is not permitted' })
   }
   return raw
@@ -180,7 +184,7 @@ function validateQuestionText(raw: unknown, path: string, errors: AskValidationE
     errors.push({ path: `${path}.question`, message: 'question text is required' })
     return ''
   }
-  if (CREDENTIAL_PATTERN.test(raw)) {
+  if (CREDENTIAL_PATTERN.test(normalizeCredentialCandidate(raw))) {
     errors.push({ path: `${path}.question`, message: 'credential-shaped question text is not permitted' })
   }
   return raw
@@ -244,7 +248,7 @@ function validateOption(raw: unknown, path: string, errors: AskValidationError[]
   const value = raw.value
   if (typeof value !== 'string' || value.length === 0) {
     errors.push({ path: `${path}.value`, message: 'option value is required' })
-  } else if (CREDENTIAL_PATTERN.test(value)) {
+  } else if (CREDENTIAL_PATTERN.test(normalizeCredentialCandidate(value))) {
     errors.push({ path: `${path}.value`, message: 'credential-shaped option value is not permitted' })
   }
   const label = raw.label
