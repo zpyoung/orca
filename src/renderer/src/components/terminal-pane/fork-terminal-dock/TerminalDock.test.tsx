@@ -77,6 +77,21 @@ describe('TerminalDock', () => {
     expect(textarea.value).toBe('hello dock')
   })
 
+  it('recovers from a null pty id when a late attach re-renders it in', () => {
+    // The pane's transport has no id until the deferred attach lands, so the dock's first
+    // render is legitimately null; it must come back live on the re-render, not stay stuck.
+    const { rerender } = render(
+      <TerminalDock {...baseProps} targetPtyId={null} disabledReason="No terminal session" />
+    )
+    expect(screen.getByRole('status')).toHaveTextContent('No terminal session')
+    expect(screen.getByRole('textbox')).toBeDisabled()
+
+    rerender(<TerminalDock {...baseProps} targetPtyId="pty-1" disabledReason={null} />)
+
+    expect(screen.getByRole('status')).not.toHaveTextContent('No terminal session')
+    expect(screen.getByRole('textbox')).toBeEnabled()
+  })
+
   it('exposes the composer imperative handle through its own forwarded ref', () => {
     const ref = createRef<AgentComposerHandle>()
     render(<TerminalDock {...baseProps} ref={ref} />)

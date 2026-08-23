@@ -337,6 +337,25 @@ describe('useTerminalPaneDock', () => {
     expect(mocks.setTabTerminalDockState).not.toHaveBeenCalled()
   })
 
+  it('exposes a pty-binding notifier that re-renders the dock host', () => {
+    let renderCount = 0
+    const { result } = renderHook(() => {
+      renderCount += 1
+      return useTerminalPaneDock({
+        tabId: 'tab-1',
+        worktreeId: 'wt-1',
+        enabled: true,
+        managerRef: { current: null },
+        containerRef: { current: null }
+      })
+    })
+    const before = renderCount
+
+    act(() => result.current.notePanePtyBindingChanged())
+
+    expect(renderCount).toBe(before + 1)
+  })
+
   describe('agent latch survives a renderer remount', () => {
     it('rehydrates the client-local agent for a persisted-docked pane with no live status or launch/title evidence yet', () => {
       writeTerminalDockPaneAgent(PANE_KEY, 'claude')

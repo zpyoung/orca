@@ -10,6 +10,7 @@ import { useTerminalDockLocalFallback } from './use-terminal-dock-local-fallback
 import { shouldDockTerminalComposerByDefault } from './terminal-dock-initial-state'
 import { useTerminalDockDisabledReason } from './use-terminal-dock-disabled-reason'
 import { useTerminalDockPassthrough } from './use-terminal-dock-passthrough'
+import { useTerminalDockPtyBindingRevision } from './use-terminal-dock-pty-binding-revision'
 import { useTerminalDockShortcutListener } from './use-terminal-dock-shortcut-listener'
 import type { PtyTransportRecoveryState } from '../pty-transport-types'
 
@@ -58,6 +59,10 @@ export type UseTerminalPaneDockResult = {
    *  prune — drops a closed pane's passthrough membership and auto-exit tracking so neither
    *  lingers for a leaf id that will never be reused. */
   prunePassthroughForRetiredPane: (leafId: string) => void
+  /** Call wherever a pane's transport binds or loses its PTY. The dock reads the id straight
+   *  off the transport during render, and the layout-store write at those same call sites
+   *  dedupes a reattach to an unchanged id — so without this the dock never re-reads. */
+  notePanePtyBindingChanged: () => void
 }
 
 /** Centralizes the terminal dock's TerminalPane-side state: which panes are docked (mirrored
@@ -262,6 +267,7 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
   })
 
   const disabledReasonFor = useTerminalDockDisabledReason({ enabled, tabId })
+  const notePanePtyBindingChanged = useTerminalDockPtyBindingRevision(enabled)
 
   const prunePassthroughForRetiredPane = useCallback(
     (leafId: string): void => {
@@ -297,7 +303,8 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       disabledReasonFor,
       toggleDockForLeaf,
       undockOnConfirmedAgentExit,
-      prunePassthroughForRetiredPane
+      prunePassthroughForRetiredPane,
+      notePanePtyBindingChanged
     }),
     [
       commitGutterRows,
@@ -306,6 +313,7 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       gutterRowsFor,
       isPaneDocked,
       isPanePassthrough,
+      notePanePtyBindingChanged,
       ensurePaneDockDefault,
       resolveDockAgent,
       paneDockOwnsFocus,

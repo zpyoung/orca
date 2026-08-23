@@ -1148,15 +1148,23 @@ function TerminalPane(
     [setTabLayout, tabId]
   )
 
+  const notePanePtyBindingChanged = terminalDock.notePanePtyBindingChanged
   const syncPanePtyLayoutBinding = useCallback(
     (paneId: number, ptyId: string | null): void => {
+      // Why: the write below is deduped when a reattach lands on the id the layout already
+      // holds, so the dock — which reads the id off the transport during render — would never
+      // re-read and would stay on the null it saw while attach was still pending.
+      notePanePtyBindingChanged()
       writePanePtyLayoutBinding(paneId, ptyId, false)
     },
-    [writePanePtyLayoutBinding]
+    [notePanePtyBindingChanged, writePanePtyLayoutBinding]
   )
 
   const clearExitedPanePtyLayoutBinding = useCallback(
     (paneId: number, exitedPtyId: string): void => {
+      // Why before the leaf/id guards: the transport has already dropped its id, so the dock
+      // owes a re-read even when this pane's stored binding was never the exited one.
+      notePanePtyBindingChanged()
       const existingLayout = useAppStore.getState().terminalLayoutsByTabId[tabId] ?? EMPTY_LAYOUT
       const { ptyIdsByLeafId: _existingPtyIdsByLeafId, ...layoutWithoutPtyBindings } =
         existingLayout
@@ -1179,7 +1187,7 @@ function TerminalPane(
         ...(Object.keys(nextBindings).length > 0 ? { ptyIdsByLeafId: nextBindings } : {})
       })
     },
-    [setTabLayout, tabId]
+    [notePanePtyBindingChanged, setTabLayout, tabId]
   )
 
   const {
