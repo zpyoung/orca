@@ -255,8 +255,16 @@ export type WebSessionTabsSyncState = Pick<
   Partial<
     Pick<
       AppState,
+      | 'acknowledgedAgentsByPaneKey'
+      | 'agentLaunchConfigByPaneKey'
       | 'automaticAgentResumeClaimsByTabId'
+      | 'migrationUnsupportedByPtyId'
+      | 'paneForegroundAgentByPaneKey'
       | 'pendingStartupByTabId'
+      | 'recentlyClosedAgentStatusTabIds'
+      | 'recentlyRetiredAgentStatusPaneKeys'
+      | 'retainedAgentsByPaneKey'
+      | 'retentionSuppressedPaneKeys'
       | 'settings'
       | 'terminalDockPendingMutationsByPaneKey'
     >
@@ -3492,8 +3500,32 @@ function applyWebSessionTabsSnapshotWithContext(
     ? { ...prunedTerminalDockPendingMutationsByPaneKey, ...rekeyedHandoffPendingMutationsByPaneKey }
     : prunedTerminalDockPendingMutationsByPaneKey
 
+  // Why: only a host snapshot that omits a tab is a retraction; a tombstone clears the mirror
+  // for every environment at once, and sweeping there erases rows a live sibling still owns.
+  const retractedTabSweepPatch = isWebSessionTabsWorktreeRemovalFrame(snapshot)
+    ? null
+    : buildRetractedMirroredTabSweepPatch(
+        state,
+        worktreeId,
+        nextTabsByWorktree,
+        agentStatusPatch,
+        removedTerminalResourceIds,
+        batchContext
+      )
+  // Why: mirrored ids are stable, so a published-again id proves the tab is not closed —
+  // a lingering closed-tab marker would blackhole its byte-derived status for the whole
+  // session (host-restart subset frames, cross-host collision replays). The close-intent
+  // filter already holds genuinely closing tabs out of the snapshot.
+  const remirroredClosedTabLiftPatch = buildRemirroredClosedTabMarkerLiftPatch(
+    retractedTabSweepPatch?.recentlyClosedAgentStatusTabIds ??
+      state.recentlyClosedAgentStatusTabIds,
+    mirroredTerminalIds
+  )
+
   const patch: Partial<WebSessionTabsSyncState> = {
     ...agentStatusPatch,
+    ...retractedTabSweepPatch,
+    ...remirroredClosedTabLiftPatch,
     ...(nextTerminalDockPendingMutationsByPaneKey !== state.terminalDockPendingMutationsByPaneKey
       ? { terminalDockPendingMutationsByPaneKey: nextTerminalDockPendingMutationsByPaneKey }
       : {}),

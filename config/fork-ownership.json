@@ -586,6 +586,14 @@
       ]
     },
     {
+      "path": "src/renderer/src/components/native-chat/native-chat-command-marker.ts",
+      "feature": "agent-composer",
+      "kind": "import-swap",
+      "lines": [
+        "import { setBoundedScopeCacheEntry } from './fork-agent-composer/agent-composer-scope-cache'"
+      ]
+    },
+    {
       "path": "src/renderer/src/components/native-chat/native-chat-composer-state.test.ts",
       "feature": "agent-composer",
       "kind": "passthrough",
@@ -2218,6 +2226,10 @@
       "added": 15,
       "removed": 17
     },
+    "src/renderer/src/components/native-chat/native-chat-command-marker.ts": {
+      "added": 1,
+      "removed": 1
+    },
     "src/renderer/src/components/native-chat/native-chat-composer-state.test.ts": {
       "added": 139,
       "removed": 49
@@ -2571,8 +2583,8 @@
       "removed": 1
     },
     "src/renderer/src/runtime/web-session-tabs-sync.ts": {
-      "added": 149,
-      "removed": 29
+      "added": 143,
+      "removed": 28
     },
     "src/renderer/src/store/slices/tabs.ts": {
       "added": 20,

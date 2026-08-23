@@ -33223,6 +33223,7 @@ export class OrcaRuntimeService {
       this.reconcileNativeChatLaunchDraftResolutionTombstones(snapshot)
       const launchDraftFencedSnapshot = this.applyNativeChatLaunchDraftResolutionFence(snapshot)
       const fencedSnapshot = this.applyMobileSessionRetirementFences(launchDraftFencedSnapshot)
+      this.releaseRuntimeSessionOwnershipForRendererRetiredTabs(fencedSnapshot, existing)
       // Why: fold the renderer's whole per-tab dock record against the stored
       // snapshot per pane before the tab-level merge below, or an untouched
       // pane's stale renderer echo clobbers another client's newer patch.
