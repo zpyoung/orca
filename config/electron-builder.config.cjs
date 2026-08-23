@@ -255,9 +255,18 @@ module.exports = {
     executableName: 'Orca',
     // Why: Windows installers are signed after electron-builder packaging by
     // SignPath, so the packager cannot infer the updater publisherName.
-    signtoolOptions: {
-      publisherName: 'SignPath Foundation'
-    },
+    //
+    // Why dev channels drop it instead: they ship unsigned, because SignPath's
+    // approval waits are budgeted in hours and cannot fit an hourly cadence.
+    // electron-updater Authenticode-verifies every installer it downloads
+    // against the publisherName baked into the *installed* app's app-update.yml
+    // (NsisUpdater.verifySignature), and skips verification entirely when that
+    // name is absent. An unsigned build that still claimed 'SignPath Foundation'
+    // would therefore reject its own channel's next build — and its way back to
+    // stable with it. Dropping it is what makes dev→dev and dev→stable work.
+    ...(isWinDevChannel
+      ? { verifyUpdateCodeSignature: false }
+      : { signtoolOptions: { publisherName: 'SignPath Foundation' } }),
     extraResources: [
       ...commonExtraResources,
       ...createPackagedRuntimeNodeModuleResources('win32'),
