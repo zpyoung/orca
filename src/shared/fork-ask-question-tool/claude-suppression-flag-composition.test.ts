@@ -64,6 +64,20 @@ describe('appendClaudeSuppressionFlags', () => {
     expect(result.commandWithoutSessionOptions).toBe(override)
   })
 
+  it('skips the colliding flag when the override uses `--flag=value` form', () => {
+    const result = appendClaudeSuppressionFlags({
+      agent: 'claude',
+      shell: 'posix',
+      override: 'claude --disallowedTools=Bash',
+      command: 'claude --disallowedTools=Bash',
+      commandWithoutSessionOptions: 'claude --disallowedTools=Bash',
+      claudeSuppressionFlags: FLAGS
+    })
+
+    expect(result.command).toBe(`claude --disallowedTools=Bash ${systemPromptPair}`)
+    expect(result.command).not.toContain(CLAUDE_ASK_SUPPRESSION_DISALLOWED_TOOLS_VALUE)
+  })
+
   it('never touches a non-Claude agent', () => {
     const result = appendClaudeSuppressionFlags({
       agent: 'codex',
@@ -147,6 +161,18 @@ describe('applyClaudeSuppressionFlagsToResumeCommand', () => {
     })
 
     expect(result).toBe('claude --resume abc --disallowedTools "Bash"')
+  })
+
+  it("leaves a user's `--flag=value` --disallowedTools untouched by a strip", () => {
+    const captured = `claude --resume abc --disallowedTools=Bash ${systemPromptPair}`
+    const result = applyClaudeSuppressionFlagsToResumeCommand({
+      agent: 'claude',
+      shell: 'posix',
+      command: captured,
+      claudeSuppressionFlags: null
+    })
+
+    expect(result).toBe('claude --resume abc --disallowedTools=Bash')
   })
 
   it('never touches a non-Claude agent, injecting or stripping', () => {

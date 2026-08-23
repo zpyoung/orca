@@ -31,9 +31,14 @@ function tokensOf(text: string, shell: AgentStartupShell): readonly string[] {
   return tokenized.ok ? tokenized.tokens : []
 }
 
+// `--flag=value` sets the same flag as a bare `--flag` token, so both count as a collision here.
+function tokenCollidesWithAlias(tokens: readonly string[], alias: string): boolean {
+  return tokens.some((token) => token === alias || token.startsWith(`${alias}=`))
+}
+
 function pairsMissingFrom(scanText: string, shell: AgentStartupShell): readonly SuppressionPair[] {
-  const tokens = new Set(tokensOf(scanText, shell))
-  return SUPPRESSION_PAIRS.filter((pair) => !pair.aliases.some((alias) => tokens.has(alias)))
+  const tokens = tokensOf(scanText, shell)
+  return SUPPRESSION_PAIRS.filter((pair) => !pair.aliases.some((alias) => tokenCollidesWithAlias(tokens, alias)))
 }
 
 function quotedPair(pair: SuppressionPair, shell: AgentStartupShell): string {

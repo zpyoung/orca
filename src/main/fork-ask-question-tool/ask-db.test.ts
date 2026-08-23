@@ -137,6 +137,15 @@ describe('AskDb', () => {
     expect(reopened.getAsk('ask_1')?.expires_at).toBe('2024-01-01T00:01:00.000Z')
   })
 
+  it('clamps expires_at instead of throwing when timeoutMs would overflow Date', () => {
+    db = new AskDb(':memory:')
+    const { row } = db.registerAsk(
+      baseParams({ timeoutMs: Number.MAX_SAFE_INTEGER }),
+      '2024-01-01T00:00:00.000Z'
+    )
+    expect(row.expires_at).toBe(new Date(8_640_000_000_000_000).toISOString())
+  })
+
   it('round-trips the hand-off identity columns', () => {
     db = new AskDb(':memory:')
     const { row } = db.registerAsk(

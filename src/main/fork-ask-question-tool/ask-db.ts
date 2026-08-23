@@ -4,6 +4,9 @@ import type { PersistedAskStatus } from '../../shared/fork-ask-question-tool/ask
 
 const TERMINAL_RETENTION_MS = 24 * 60 * 60 * 1000
 
+// ECMAScript's own Date range limit; ms past this makes `new Date(...).toISOString()` throw RangeError.
+const MAX_DATE_MS = 8_640_000_000_000_000
+
 const CREATE_ASKS_TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS asks (
   ask_id TEXT PRIMARY KEY,
@@ -146,8 +149,13 @@ export class AskDb {
    */
   registerAsk(params: RegisterAskParams, createdAt: string = new Date().toISOString()): RegisterAskResult {
     const seq = this.nextSeq()
+    // C2: registry methods never throw for domain outcomes, so an absurd timeoutMs (e.g. MAX_SAFE_INTEGER)
+    // is clamped to the latest representable deadline rather than overflowing Date and throwing, or
+    // silently becoming "no deadline" (null).
     const expiresAt =
-      params.timeoutMs === null ? null : new Date(Date.parse(createdAt) + params.timeoutMs).toISOString()
+      params.timeoutMs === null
+        ? null
+        : new Date(Math.min(Date.parse(createdAt) + params.timeoutMs, MAX_DATE_MS)).toISOString()
     const handoff = params.handoff
     const result = this.db
       .prepare(
