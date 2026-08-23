@@ -1,0 +1,34 @@
+{
+  "components": {
+    "fork-ask-question-tool": {
+      "askCard": {
+        "cancel": "キャンセル",
+        "submitting": "送信中…",
+        "submit": "送信",
+        "statusAnswered": "回答済み",
+        "statusPartial": "一部回答",
+        "statusDeclined": "却下されました",
+        "statusTimedOut": "タイムアウトしました",
+        "statusUnavailable": "利用できません",
+        "yes": "はい",
+        "no": "いいえ",
+        "otherPlaceholder": "自分の回答を入力",
+        "optionalHint": "(任意)",
+        "requiredError": "この質問は必須です。",
+        "textEmailError": "有効なメールアドレスを入力してください。",
+        "textUrlError": "有効なURLを入力してください。",
+        "textPatternError": "想定される形式と一致しません。",
+        "numberInvalidError": "数値を入力してください。",
+        "numberIntegerError": "整数を入力してください。",
+        "numberMinError": "{{value0}}以上の数値を入力してください。",
+        "numberMaxError": "{{value0}}以下の数値を入力してください。",
+        "dateInvalidError": "有効な日付を入力してください。"
+      },
+      "askPreview": {
+        "hide": "プレビューを隠す",
+        "show": "プレビューを表示",
+        "frameTitle": "質問のプレビュー"
+      }
+    }
+  }
+}

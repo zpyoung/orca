@@ -1,0 +1,34 @@
+{
+  "components": {
+    "fork-ask-question-tool": {
+      "askCard": {
+        "cancel": "Cancelar",
+        "submitting": "Enviando…",
+        "submit": "Enviar",
+        "statusAnswered": "Respondida",
+        "statusPartial": "Respondida parcialmente",
+        "statusDeclined": "Rechazada",
+        "statusTimedOut": "Tiempo agotado",
+        "statusUnavailable": "No disponible",
+        "yes": "Sí",
+        "no": "No",
+        "otherPlaceholder": "Escribe tu propia respuesta",
+        "optionalHint": "(opcional)",
+        "requiredError": "Esta pregunta es obligatoria.",
+        "textEmailError": "Introduce una dirección de correo electrónico válida.",
+        "textUrlError": "Introduce una URL válida.",
+        "textPatternError": "No coincide con el formato esperado.",
+        "numberInvalidError": "Introduce un número.",
+        "numberIntegerError": "Introduce un número entero.",
+        "numberMinError": "Introduce un número de al menos {{value0}}.",
+        "numberMaxError": "Introduce un número de como máximo {{value0}}.",
+        "dateInvalidError": "Introduce una fecha válida."
+      },
+      "askPreview": {
+        "hide": "Ocultar vista previa",
+        "show": "Mostrar vista previa",
+        "frameTitle": "Vista previa de la pregunta"
+      }
+    }
+  }
+}

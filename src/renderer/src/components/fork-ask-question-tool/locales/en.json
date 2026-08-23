@@ -1,0 +1,34 @@
+{
+  "components": {
+    "fork-ask-question-tool": {
+      "askCard": {
+        "cancel": "Cancel",
+        "submitting": "Submitting…",
+        "submit": "Submit",
+        "statusAnswered": "Answered",
+        "statusPartial": "Partially answered",
+        "statusDeclined": "Declined",
+        "statusTimedOut": "Timed out",
+        "statusUnavailable": "Unavailable",
+        "yes": "Yes",
+        "no": "No",
+        "otherPlaceholder": "Add your own answer",
+        "optionalHint": "(optional)",
+        "requiredError": "This question is required.",
+        "textEmailError": "Enter a valid email address.",
+        "textUrlError": "Enter a valid URL.",
+        "textPatternError": "Doesn't match the expected format.",
+        "numberInvalidError": "Enter a number.",
+        "numberIntegerError": "Enter a whole number.",
+        "numberMinError": "Enter a number of at least {{value0}}.",
+        "numberMaxError": "Enter a number of at most {{value0}}.",
+        "dateInvalidError": "Enter a valid date."
+      },
+      "askPreview": {
+        "hide": "Hide preview",
+        "show": "Show preview",
+        "frameTitle": "Question preview"
+      }
+    }
+  }
+}
