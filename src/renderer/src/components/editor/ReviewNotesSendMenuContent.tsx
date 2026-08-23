@@ -31,8 +31,12 @@ import type { DashboardAgentRow as DashboardAgentRowData } from '@/components/da
 import { lastEnteredDoneAt } from '@/components/dashboard/agent-finished-timestamp'
 import { selectLivePtyIdsForWorktree } from '@/components/sidebar/worktree-card-status-inputs'
 import { useWorktreeAgentRows } from '@/components/sidebar/useWorktreeAgentRows'
+import {
+  getAgentRowConversationName,
+  type ConversationNameTab
+} from '../../../../shared/agent-row-conversation-name'
 import type { LaunchSource } from '../../../../shared/telemetry-events'
-import type { AgentStatusState } from '../../../../shared/agent-status-types'
+import type { AgentStatusState, AgentType } from '../../../../shared/agent-status-types'
 import { translate } from '@/i18n/i18n'
 
 type OrderedSendTarget = {
@@ -187,6 +191,7 @@ export function ReviewNotesSendMenuContent({
       {orderedSendTargets.map(({ target, agent }) => (
         <AgentTargetMenuItem
           key={target.paneKey}
+          worktreeId={worktreeId}
           target={target}
           agent={agent}
           now={now}
@@ -232,25 +237,33 @@ function resolveCurrentSendTargetEligibility(
 }
 
 function AgentTargetMenuItem({
+  worktreeId,
   target,
   agent,
   now,
   disabled,
   onSend
 }: {
+  worktreeId: string
   target: NotesSendAgentTarget
   agent: DashboardAgentRowData | null
   now: number
   disabled: boolean
   onSend: (target: NotesSendAgentTarget) => void
 }): React.JSX.Element {
+  const agentType = target.agentType ?? agent?.agentType
+  const sessionTitle = useSendTargetSessionTitle(worktreeId, target, agentType, agent?.tab)
+  const agentLabel = formatAgentTypeLabel(agentType)
   const tabTitle = target.tabTitle.trim()
   const state = asDotState(agent?.state ?? 'idle')
   const timeAgo = agent ? formatAgentRelativeTime(agent, now) : null
+  // Why: the trailing part identifies the session — the agent label once the
+  // title already names it, otherwise the raw tab title as the only distinguisher.
+  const trailing = sessionTitle ? agentLabel : tabTitle
   const secondaryParts = [
     agentStateLabel(state),
     ...(timeAgo ? [timeAgo] : []),
-    ...(tabTitle ? [tabTitle] : [])
+    ...(trailing ? [trailing] : [])
   ]
   return (
     <DropdownMenuItem
@@ -263,17 +276,37 @@ function AgentTargetMenuItem({
       className="min-w-[240px] gap-2 rounded-[7px] px-2 py-1.5 text-[12px] leading-5 font-medium"
     >
       <AgentStateDot state={state} size="sm" className="shrink-0" />
-      <AgentIcon agent={agentTypeToIconAgent(target.agentType ?? agent?.agentType)} size={14} />
+      <AgentIcon agent={agentTypeToIconAgent(agentType)} size={14} />
       <span className="grid min-w-0 flex-1 text-left">
-        <span className="truncate">
-          {formatAgentTypeLabel(target.agentType ?? agent?.agentType)}
-        </span>
+        <span className="truncate">{sessionTitle ?? agentLabel}</span>
         <span className="truncate text-[11px] font-normal text-muted-foreground">
           {secondaryParts.join(' · ')}
         </span>
       </span>
     </DropdownMenuItem>
   )
+}
+
+/**
+ * The send target's session title — the same conversation name the sidebar and
+ * dashboard agent rows label a pane with — or null when the tab carries no
+ * usable name and the caller should fall back to the agent label.
+ */
+function useSendTargetSessionTitle(
+  worktreeId: string,
+  target: NotesSendAgentTarget,
+  agentType: AgentType | null | undefined,
+  fallbackTab: ConversationNameTab | undefined
+): string | null {
+  const generatedTitlesEnabled = useAppStore((s) => s.settings?.tabAutoGenerateTitle === true)
+  const liveTab = useAppStore((s) =>
+    s.tabsByWorktree[worktreeId]?.find((tab) => tab.id === target.tabId)
+  )
+  const tab = liveTab ?? fallbackTab
+  if (!tab) {
+    return null
+  }
+  return getAgentRowConversationName(tab, agentType, generatedTitlesEnabled)
 }
 
 function orderSendTargetsByWorktreeAgentRows(
