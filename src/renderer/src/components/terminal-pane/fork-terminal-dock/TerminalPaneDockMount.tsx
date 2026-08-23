@@ -70,6 +70,9 @@ export function TerminalPaneDockMount(props: TerminalPaneDockMountProps): React.
     () => pane.container.getBoundingClientRect().height
   )
   const [effectiveDockMounted, setEffectiveDockMounted] = useState(false)
+  // Why: React runs the unmount cleanup that zeroes the slot before the layout effect below,
+  // one commit ahead of the state flush — the effect must not re-apply a height already gone.
+  const dockMountedRef = useRef(false)
   const dockContainer = useMemo(() => findDockContainer(pane), [pane])
 
   // Why: getPanes() hands out a fresh pane view per render, so the host's reader
@@ -181,6 +184,7 @@ export function TerminalPaneDockMount(props: TerminalPaneDockMountProps): React.
   const renderedGutterRows = liveGutterRows ?? gutterRows
   const handleMountedChange = useCallback(
     (mounted: boolean) => {
+      dockMountedRef.current = mounted
       if (!mounted) {
         cancelGutterDragRef.current?.()
         cancelGutterDragRef.current = null
@@ -200,7 +204,7 @@ export function TerminalPaneDockMount(props: TerminalPaneDockMountProps): React.
   )
 
   useLayoutEffect(() => {
-    if (!dockContainer || !effectiveDockMounted) {
+    if (!dockContainer || !dockMountedRef.current) {
       return
     }
     const height = terminalDockGutterHeightPx(renderedGutterRows)

@@ -188,6 +188,33 @@ describe('TerminalPaneDockMount', () => {
     expect(onEffectiveMountedChange).toHaveBeenLastCalledWith(false)
   })
 
+  it('resets slot geometry on undock while the host churns the pane view identity', () => {
+    // getPanes() hands down a fresh pane object per render, so the geometry effect re-runs
+    // in the same commit the unmount cleanup zeroed the slot in — it must not undo that.
+    const pane = makeFakePane()
+    const { rerender } = render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={true} />)
+    const dockSlot = pane.container.querySelector('.pane-dock-slot') as HTMLElement
+    expect(dockSlot.style.height).toBe(`${terminalDockGutterHeightPx(DEFAULT_GUTTER_ROWS)}px`)
+
+    rerender(<TerminalPaneDockMount {...baseProps} pane={{ ...pane }} docked={false} />)
+
+    expect(dockSlot.style.height).toBe('0px')
+    expect(pane.container.style.getPropertyValue('--terminal-dock-height')).toBe('0px')
+  })
+
+  it('applies slot geometry on dock while the host churns the pane view identity', () => {
+    const pane = makeFakePane()
+    const { rerender } = render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={false} />)
+    const dockSlot = pane.container.querySelector('.pane-dock-slot') as HTMLElement
+
+    rerender(<TerminalPaneDockMount {...baseProps} pane={{ ...pane }} docked={true} />)
+
+    expect(dockSlot.style.height).toBe(`${terminalDockGutterHeightPx(DEFAULT_GUTTER_ROWS)}px`)
+    expect(pane.container.style.getPropertyValue('--terminal-dock-height')).toBe(
+      `${terminalDockGutterHeightPx(DEFAULT_GUTTER_ROWS)}px`
+    )
+  })
+
   it('holds and releases the PTY resize around a dock/undock edge without throwing', () => {
     const pane = makeFakePane()
     expect(queuePanePtyResizeIfHeld(pane.container, 80, 24)).toBe(false)
