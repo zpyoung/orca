@@ -100,6 +100,38 @@ describe('resolveClaudeAskSuppressionFlags', () => {
     await expect(resolveClaudeAskSuppressionFlags(host)).resolves.toBeNull()
   })
 
+  it('re-probes a below-floor host after the retry interval and picks up an in-place upgrade', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_000)
+    const probe = vi.fn().mockResolvedValue('1.0.0')
+    const host = localHost({ probe })
+
+    await expect(resolveClaudeAskSuppressionFlags(host)).resolves.toBeNull()
+    expect(probe).toHaveBeenCalledTimes(1)
+
+    vi.setSystemTime(1_000 + CLAUDE_ASK_SUPPRESSION_GATE_RETRY_INTERVAL_MS - 1)
+    await expect(resolveClaudeAskSuppressionFlags(host)).resolves.toBeNull()
+    expect(probe).toHaveBeenCalledTimes(1)
+
+    probe.mockResolvedValue('1.2.0')
+    vi.setSystemTime(1_000 + CLAUDE_ASK_SUPPRESSION_GATE_RETRY_INTERVAL_MS)
+    await expect(resolveClaudeAskSuppressionFlags(host)).resolves.toEqual(expectedFlags)
+    expect(probe).toHaveBeenCalledTimes(2)
+  })
+
+  it('never re-probes once a host has cleared the floor, even long past the retry interval', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_000)
+    const probe = vi.fn().mockResolvedValue('1.2.0')
+    const host = localHost({ probe })
+
+    await expect(resolveClaudeAskSuppressionFlags(host)).resolves.toEqual(expectedFlags)
+
+    vi.setSystemTime(1_000 + CLAUDE_ASK_SUPPRESSION_GATE_RETRY_INTERVAL_MS * 10)
+    await expect(resolveClaudeAskSuppressionFlags(host)).resolves.toEqual(expectedFlags)
+    expect(probe).toHaveBeenCalledTimes(1)
+  })
+
   it('caches the verdict so a second call on the same host does not re-probe', async () => {
     const probe = vi.fn().mockResolvedValue('1.2.0')
     const host = localHost({ probe })

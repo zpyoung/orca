@@ -127,10 +127,13 @@ export async function resolveClaudeAskSuppressionFlags(
       record.retryAfterMs = nowMs + CLAUDE_ASK_SUPPRESSION_GATE_RETRY_INTERVAL_MS
       return null
     }
-    record.verdict = hasReachedAppVersion(version, CLAUDE_ASK_SUPPRESSION_VERSION_FLOOR)
-      ? CLAUDE_ASK_SUPPRESSION_FLAGS
-      : null
-    return record.verdict ? [...record.verdict] : null
+    if (hasReachedAppVersion(version, CLAUDE_ASK_SUPPRESSION_VERSION_FLOOR)) {
+      record.verdict = CLAUDE_ASK_SUPPRESSION_FLAGS
+      return [...record.verdict]
+    }
+    // below-floor stays retryable (unlike the sticky above-floor verdict) so an in-place upgrade is still caught
+    record.retryAfterMs = nowMs + CLAUDE_ASK_SUPPRESSION_GATE_RETRY_INTERVAL_MS
+    return null
   } catch {
     record.retryAfterMs = nowMs + CLAUDE_ASK_SUPPRESSION_GATE_RETRY_INTERVAL_MS
     return null
