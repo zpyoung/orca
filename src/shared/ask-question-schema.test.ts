@@ -154,6 +154,10 @@ describe('validateAskSpec — per-type default domain', () => {
     ['number: non-integer when integer required', numberQuestion({ integer: true, default: 1.5 }), false],
     ['date: valid ISO date', dateQuestion({ default: '2026-01-01' }), true],
     ['date: non-ISO date', dateQuestion({ default: '01/01/2026' }), false],
+    ['date: last day of a short month', dateQuestion({ default: '2026-02-28' }), true],
+    ['date: impossible calendar date (S2)', dateQuestion({ default: '2026-02-30' }), false],
+    ['date: day rolls into a different month', dateQuestion({ default: '2026-04-31' }), false],
+    ['date: month out of range', dateQuestion({ default: '2026-13-01' }), false],
     ['confirm: boolean default', confirmQuestion({ default: true }), true],
     ['confirm: non-boolean default', confirmQuestion({ default: 'yes' }), false]
   ])('%s', (_label, question, expectOk) => {
@@ -174,6 +178,34 @@ describe('validateAskSpec — per-type default domain', () => {
         expect.objectContaining({ path: 'questions[1].default' })
       ])
     })
+  })
+})
+
+describe('validateAskSpec — pattern safety (X2)', () => {
+  it('rejects a nested-quantifier pattern promptly instead of hanging', () => {
+    const start = performance.now()
+    const result = validateAskSpec(
+      specOf(textQuestion({ pattern: '^(a+)+$', default: `${'a'.repeat(29)}!` }))
+    )
+    const elapsedMs = performance.now() - start
+    expect(elapsedMs).toBeLessThan(1000)
+    expect(result.ok).toBe(false)
+    expect(result).toMatchObject({
+      errors: expect.arrayContaining([expect.objectContaining({ path: 'questions[0].pattern' })])
+    })
+  })
+
+  it('rejects a pattern longer than the length cap', () => {
+    const result = validateAskSpec(specOf(textQuestion({ pattern: `^${'a'.repeat(201)}$` })))
+    expect(result).toMatchObject({
+      ok: false,
+      errors: expect.arrayContaining([expect.objectContaining({ path: 'questions[0].pattern' })])
+    })
+  })
+
+  it('still accepts an ordinary, non-nested pattern', () => {
+    const result = validateAskSpec(specOf(textQuestion({ pattern: '^[a-z]+$', default: 'ok' })))
+    expect(result.ok).toBe(true)
   })
 })
 
@@ -210,6 +242,22 @@ describe('validateAskSpec — credential refusal', () => {
     const result = validateAskSpec(specOf(textQuestion({ id })))
     expect(result.ok).toBe(false)
   })
+
+  it.each(['DBPassword', 'SECRETKey', 'MYSECRET', 'XPassword'])(
+    'rejects acronym/all-caps credential-shaped id %s (X1)',
+    (id) => {
+      const result = validateAskSpec(specOf(textQuestion({ id })))
+      expect(result.ok).toBe(false)
+    }
+  )
+
+  it.each(['tokenize_input', 'db_engine', 'pool_size', 'secretary_name', 'tokens_per_page'])(
+    'does not over-refuse id %s (X1)',
+    (id) => {
+      const result = validateAskSpec(specOf(textQuestion({ id })))
+      expect(result.ok).toBe(true)
+    }
+  )
 
   it('accepts an id where a trigger word is a strict prefix of a longer word', () => {
     const result = validateAskSpec(specOf(textQuestion({ id: 'tokenize_input' })))
