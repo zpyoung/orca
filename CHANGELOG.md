@@ -1,6 +1,6 @@
 ---
-last_released_commit: bd4ed56737bf9c2723dfde9be20625dcc5d1a6e3
-upstream_synced: v1.4.184
+last_released_commit: 159526393438f85174d324e56361ebeb07098607
+upstream_synced: v1.4.187
 ---
 
 # Changelog
@@ -11,6 +11,40 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.188-rc.0.zy01] - 2026-08-22
+
+Synced to upstream [v1.4.187](https://github.com/stablyai/orca/releases/tag/v1.4.187).
+
+### Added
+- A rich-input composer can now be docked beneath a terminal pane running a supported coding-agent
+  CLI, so a prompt can be drafted, edited, and sent without typing into the TUI, with the terminal
+  still visible underneath as a fallback. Send and Stop are separate controls rather than one button
+  that flips, and the pane quarantines input after its PTY endpoint is replaced so a send cannot land
+  in the wrong session. Behind an experimental flag.
+- `pnpm test:sandbox` runs the test suite in throwaway Docker containers, sharded, either locally or
+  on a remote host. Shards no longer see each other's temp files, git config, or build output.
+
+### Changed
+- File ownership across the fork is now declared in `config/fork-ownership.json` and enforced in CI,
+  instead of being inferred from commit authorship. Each fork change belongs to one of four tiers,
+  and a PR that adds a fork file matching no manifest entry fails the ownership guard. This is what
+  keeps a fork change from being silently reset the next time upstream is merged.
+- The upstream-sync procedure now lives in a git-tracked skill rather than an automation prompt, so
+  there is a single copy under test.
+- Release builds register the `orca://` URL scheme, matching upstream.
+- The release pipeline now runs least-privileged: the workflow's default token grants read-only
+  access to repository contents, with write scoped to the single job that needs it.
+
+### Fixed
+- The workspace sidebar's tighter row spacing is applied again. Upstream moved the module holding it
+  during a refactor, and because the fork still claimed the old path, the build had been shipping
+  upstream's roomier spacing while the fork's copy sat unused. Drop targets line up with the rows as
+  drawn once more.
+- Reconnecting an SSH terminal surfaces the underlying error again, and native-chat panes hosted on
+  a remote machine keep reading transcripts over this fork's relay through upstream's module split.
+- Cross-repo worktree groups, the docked composer, and per-pane chat width all survive upstream's
+  restructuring of the sidebar into ~105 modules; their behavior is unchanged.
 
 ## [1.4.185-rc.0.zy01] - 2026-08-17
 

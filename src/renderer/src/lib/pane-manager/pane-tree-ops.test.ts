@@ -107,6 +107,7 @@ function createPane({
         }) as DOMRect
     } as never,
     xtermContainer: {} as never,
+    dockContainer: {} as never,
     linkTooltip: {} as never,
     terminalGpuAcceleration: 'auto',
     gpuRenderingEnabled: true,

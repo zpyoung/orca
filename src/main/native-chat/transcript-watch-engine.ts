@@ -1,4 +1,8 @@
-import type { NativeChatMessage, NativeChatTurnLifecycle } from '../../shared/native-chat-types'
+import type { NativeChatMessage } from '../../shared/native-chat-types'
+import {
+  mergeNativeChatTranscriptCompanion,
+  type NativeChatTranscriptCompanion
+} from '../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 import {
   boundaryFingerprint,
   readTranscriptFileVersion,
@@ -11,10 +15,10 @@ import {
   type IncrementalTranscriptState
 } from './transcript-incremental-reader'
 import { createTranscriptNativeWatcher } from './transcript-native-watcher'
-import { readNativeChatTranscriptTailFile } from './transcript-tail-reader'
-import { nativeChatTurnLifecycleDecoderForAgent } from './transcript-turn-lifecycle'
+import { nativeChatTranscriptCompanionDecoderForAgent } from './fork-native-chat-session-options/transcript-companion-decoder'
 import type {
   NativeChatTranscriptSubscription,
+  NativeChatTranscriptTailReader,
   SubscribeNativeChatTranscriptArgs
 } from './transcript-watch-contract'
 import { createTranscriptWatchScheduler } from './transcript-watch-scheduler'
@@ -23,6 +27,7 @@ import { WslTranscriptFsError } from './wsl-transcript-fs-gate'
 
 const ROTATION_RETRY_MS = 25
 const MAX_ROTATION_RETRY_MS = 2_000
+
 let activeWatcherCount = 0
 
 export function getActiveNativeChatWatcherCount(): number {
@@ -38,7 +43,7 @@ export function getActiveNativeChatWatcherCount(): number {
 export async function installTranscriptWatcher(
   filePath: string,
   decode: (line: string, fallbackId: string) => NativeChatMessage | null,
-  args: SubscribeNativeChatTranscriptArgs,
+  args: SubscribeNativeChatTranscriptArgs & { tailReader: NativeChatTranscriptTailReader },
   /** Cancels the install probe so an unsubscribe during it detaches the gate
    *  waiter immediately instead of at the 30s deadline. */
   signal?: AbortSignal
@@ -55,7 +60,8 @@ export async function installTranscriptWatcher(
     return null
   }
   const { onAppend, onInitialSnapshot, onReplace, initialLimit, initialMaxBytes } = args
-  const decodeLifecycle = nativeChatTurnLifecycleDecoderForAgent(args.agent)
+  const { tailReader } = args
+  const decodeCompanion = nativeChatTranscriptCompanionDecoderForAgent(args.agent)
 
   const state: IncrementalTranscriptState = {
     offset: 0,
@@ -94,7 +100,7 @@ export async function installTranscriptWatcher(
   }
 
   async function readAndEmitAppends(): Promise<void> {
-    let lifecycle: NativeChatTurnLifecycle | undefined
+    let companion: NativeChatTranscriptCompanion | undefined
     const remaining = await readIncrementalTranscriptMessages(
       filePath,
       state,
@@ -104,14 +110,14 @@ export async function installTranscriptWatcher(
           onAppend(messages)
         }
       },
-      decodeLifecycle ?? undefined,
-      (nextLifecycle) => {
-        lifecycle = nextLifecycle
+      decodeCompanion,
+      (next) => {
+        companion = mergeNativeChatTranscriptCompanion(companion, next)
       },
       gateAbort.signal
     )
-    if (!closed && (remaining.length > 0 || lifecycle)) {
-      onAppend(remaining, lifecycle)
+    if (!closed && (remaining.length > 0 || companion)) {
+      onAppend(remaining, companion)
     }
   }
 
@@ -159,17 +165,20 @@ export async function installTranscriptWatcher(
     if (contentReplaced) {
       resetIncrementalTranscriptState(state)
     }
+    // Why: subscriber callbacks may replace the path before the drain can finish.
+    watchedVersion ??= current
 
     const replacementSnapshot =
       // Why: 0 is a valid window — an explicit undefined check keeps an empty
       // snapshot empty instead of falling back to an unbounded incremental read.
       contentReplaced && !initialDrain && onReplace && initialLimit !== undefined
-        ? await readNativeChatTranscriptTailFile({
+        ? await tailReader({
             filePath,
             limit: initialLimit,
             decode,
-            decodeLifecycle,
-            maxBytes: initialMaxBytes
+            decodeCompanion,
+            maxBytes: initialMaxBytes,
+            signal: gateAbort.signal
           })
         : null
     if (closed) {
@@ -182,7 +191,7 @@ export async function installTranscriptWatcher(
         replacementSnapshot.messages,
         replacementSnapshot.hasMore,
         replacementSnapshot.beforeOffset,
-        replacementSnapshot.lifecycle
+        replacementSnapshot.companion
       )
       await readAndEmitAppends()
       await finishSuccessfulDrain(current)
@@ -191,12 +200,13 @@ export async function installTranscriptWatcher(
 
     const initialSnapshot =
       initialDrain && onInitialSnapshot && initialLimit !== undefined
-        ? await readNativeChatTranscriptTailFile({
+        ? await tailReader({
             filePath,
             limit: initialLimit,
             decode,
-            decodeLifecycle,
-            maxBytes: initialMaxBytes
+            decodeCompanion,
+            maxBytes: initialMaxBytes,
+            signal: gateAbort.signal
           })
         : null
     if (closed) {
@@ -212,26 +222,26 @@ export async function installTranscriptWatcher(
           initialSnapshot.hasMore,
           initialSnapshot.beforeOffset,
           undefined,
-          initialSnapshot.lifecycle
+          initialSnapshot.companion
         )
         await readAndEmitAppends()
       } else {
-        let lifecycle: NativeChatTurnLifecycle | undefined
+        let companion: NativeChatTranscriptCompanion | undefined
         const messages = await readIncrementalTranscriptMessages(
           filePath,
           state,
           decode,
           undefined,
-          decodeLifecycle ?? undefined,
-          (nextLifecycle) => {
-            lifecycle = nextLifecycle
+          decodeCompanion,
+          (next) => {
+            companion = mergeNativeChatTranscriptCompanion(companion, next)
           },
           gateAbort.signal
         )
         if (closed) {
           return
         }
-        onInitialSnapshot(messages, false, 0, undefined, lifecycle)
+        onInitialSnapshot(messages, false, 0, undefined, companion)
       }
     } else {
       initialDrain = false

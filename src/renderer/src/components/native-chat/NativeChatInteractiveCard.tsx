@@ -35,6 +35,7 @@ export function NativeChatInteractiveCard({
   messages,
   transcriptSettled,
   onShowingQuestionChange,
+  onShowingCardChange,
   answerInputRef
 }: {
   paneKey: string
@@ -47,6 +48,8 @@ export function NativeChatInteractiveCard({
   /** Reports whether a question card is on screen so the view can replace the
    *  composer with it (the card's free-text row is the answer input). */
   onShowingQuestionChange?: (showing: boolean) => void
+  /** Reports any visible card without changing native chat's question-only exclusion. */
+  onShowingCardChange?: (showing: boolean) => void
   /** Forwarded to the question card's free-text row so pane-level Paste keeps
    *  a target while the composer is unmounted. */
   answerInputRef?: React.RefObject<HTMLInputElement | null>
@@ -76,14 +79,9 @@ export function NativeChatInteractiveCard({
   // A question answer is a paced multi-step write (body→Enter per question); keep
   // the card up until it settles instead of dismissing on the click, so it doesn't
   // vanish mid-send. `submitting` also gates a second submit racing the first.
-  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const submittingRef = useRef(false)
   const [submitting, setSubmitting] = useState(false)
-  const clearDismissTimer = useCallback((): void => {
-    if (dismissTimerRef.current) {
-      clearTimeout(dismissTimerRef.current)
-      dismissTimerRef.current = null
-    }
+  const resetSubmitting = useCallback((): void => {
     submittingRef.current = false
     setSubmitting(false)
   }, [])
@@ -91,10 +89,10 @@ export function NativeChatInteractiveCard({
   // PTY writes during commit, before an old answer can type into the new prompt.
   useLayoutEffect(
     () => () => {
-      clearDismissTimer()
+      resetSubmitting()
       cancelPending()
     },
-    [canSend, cardKey, cancelPending, clearDismissTimer]
+    [canSend, cardKey, cancelPending, resetSubmitting]
   )
 
   // Forget the dismissal once the prompt clears so a fresh prompt can show.
@@ -102,19 +100,24 @@ export function NativeChatInteractiveCard({
   useEffect(() => {
     if (!present) {
       setDismissedKey(null)
-      clearDismissTimer()
+      resetSubmitting()
     }
-  }, [present, clearDismissTimer])
+  }, [present, resetSubmitting])
 
   // Tell the view when a question card is up so it can hide the composer (this
   // card supplies its own input). Reset on unmount so the composer comes back.
-  const showingQuestion = card?.kind === 'question' && canSend && cardKey !== dismissedKey
+  const showingCard = card != null && canSend && cardKey !== dismissedKey
+  const showingQuestion = showingCard && card.kind === 'question'
   useEffect(() => {
     onShowingQuestionChange?.(showingQuestion)
     return () => onShowingQuestionChange?.(false)
   }, [showingQuestion, onShowingQuestionChange])
+  useLayoutEffect(() => {
+    onShowingCardChange?.(showingCard)
+    return () => onShowingCardChange?.(false)
+  }, [showingCard, onShowingCardChange])
 
-  if (!card || !canSend || cardKey === dismissedKey) {
+  if (!showingCard) {
     return null
   }
   if (card.kind === 'question') {
@@ -131,13 +134,10 @@ export function NativeChatInteractiveCard({
           submittingRef.current = true
           const dismissAnsweredCard = (): void => {
             setDismissedKey(cardKey)
-            submittingRef.current = false
-            setSubmitting(false)
-            dismissTimerRef.current = null
+            resetSubmitting()
           }
           const keepRejectedAnswerVisible = (): void => {
-            submittingRef.current = false
-            setSubmitting(false)
+            resetSubmitting()
           }
           const result = sendAnswer(card.prompt, selections, (delivered) => {
             if (delivered) {
@@ -152,22 +152,12 @@ export function NativeChatInteractiveCard({
             keepRejectedAnswerVisible()
             return
           }
+          // Why: the send now settles from its own real lifecycle (r5-1), not a
+          // nominal timer — dismiss only once `onDeliverySettled` actually fires.
           setSubmitting(true)
-          if (result.waitsForVerifiedDelivery) {
-            // Why: remote acceptance can outlive the keystroke pacing window.
-            // Keep the card until delivery is proven instead of cancelling the
-            // inference callback at the old fixed dismissal deadline.
-            return
-          }
-          // Hold the card until the paced write finishes, then mark it answered
-          // (which hides it and restores the composer).
-          dismissTimerRef.current = setTimeout(() => {
-            cancelPending()
-            dismissAnsweredCard()
-          }, result.settleAfterMs)
         }}
         onCancel={() => {
-          clearDismissTimer()
+          resetSubmitting()
           setDismissedKey(cardKey)
           cancel()
         }}

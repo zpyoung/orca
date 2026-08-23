@@ -15,7 +15,9 @@ import {
   stablePathId,
   type SkillScanRoot
 } from './skill-discovery-sources'
+import { pluginNameForSkill } from './fork-skill-plugin-attribution/skill-plugin-name-resolution'
 import { discoverClaudePluginSkillSourcesInWsl } from './claude-plugin-skill-sources-wsl'
+import type { SkillProviderRootOverrides } from './skill-provider-destinations'
 
 const MAX_MARKDOWN_BYTES = 256 * 1024
 const WSL_SCAN_TIMEOUT_MS = 10_000
@@ -55,7 +57,7 @@ function executeWslSkillDiscovery(distro: string, command: string): Promise<stri
   return new Promise((resolve, reject) => {
     execFile(
       'wsl.exe',
-      ['-d', distro, '--', 'bash', '-c', command],
+      ['-d', distro, '--exec', 'bash', '-c', command],
       {
         encoding: 'utf8',
         maxBuffer: WSL_SCAN_MAX_BUFFER_BYTES,
@@ -131,6 +133,7 @@ export function parseWslSkillDiscoveryOutput(
     const directoryPath = pathPosix.dirname(skillFilePath)
     const summary = summarizeSkillMarkdown(markdown)
     const sourceKind = sourceKindForSkill(root, skillFilePath, pathPosix)
+    const pluginName = pluginNameForSkill(root, skillFilePath, pathPosix)
     skillsByCanonicalPath.set(canonicalSkillFilePath, {
       id: stablePathId(canonicalSkillFilePath),
       name: summary.name ?? pathPosix.basename(directoryPath),
@@ -145,7 +148,8 @@ export function parseWslSkillDiscoveryOutput(
       directoryPath,
       skillFilePath,
       installed: true,
-      updatedAt: Number.isFinite(updatedAtSeconds) ? updatedAtSeconds * 1000 : null
+      updatedAt: Number.isFinite(updatedAtSeconds) ? updatedAtSeconds * 1000 : null,
+      ...(pluginName ? { pluginName } : {})
     })
   }
 
@@ -171,6 +175,7 @@ export async function discoverSkillsInWsl(args: {
   distro: string
   homeDir: string
   cwd: string
+  providerRootOverrides?: SkillProviderRootOverrides
 }): Promise<SkillDiscoveryResult> {
   // Plugin roots are resolved (in JS) from metadata this first wsl.exe call
   // reads, then fed to the scan's own wsl.exe call below — two sequential
@@ -192,7 +197,8 @@ export async function discoverSkillsInWsl(args: {
       homeDir: args.homeDir,
       cwd: args.cwd,
       repos: [],
-      pathApi: pathPosix
+      pathApi: pathPosix,
+      providerRootOverrides: args.providerRootOverrides
     }),
     ...pluginRoots
   ]

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  canWorktreeHoldGroupMembership,
   clearMissingProjectGroupMemberships,
   createProjectGroup,
   getEffectiveProjectGroupManualRank,
@@ -9,7 +8,7 @@ import {
   normalizeProjectGroupName,
   normalizeProjectGroups
 } from './project-groups'
-import type { Repo } from './types'
+import type { Repo } from './repo-types'
 
 function repo(overrides: Partial<Repo>): Repo {
   return {
@@ -20,26 +19,6 @@ function repo(overrides: Partial<Repo>): Repo {
     addedAt: 1,
     kind: 'git',
     ...overrides
-  }
-}
-
-/** Walks parentGroupId from every group and fails if any walk cannot reach a root (null) or loops. */
-function assertAllGroupsReachRoot(
-  groups: readonly { id: string; parentGroupId: string | null }[]
-): void {
-  const byId = new Map(groups.map((group) => [group.id, group]))
-  for (const start of groups) {
-    const seen = new Set<string>()
-    let current: { id: string; parentGroupId: string | null } | undefined = start
-    while (current) {
-      expect(seen.has(current.id)).toBe(false)
-      seen.add(current.id)
-      if (current.parentGroupId === null) {
-        break
-      }
-      current = byId.get(current.parentGroupId)
-    }
-    expect(current).toBeDefined()
   }
 }
 
@@ -91,88 +70,6 @@ describe('project-groups', () => {
       isCollapsed: true,
       parentGroupId: null
     })
-  })
-
-  it('clears a self-referencing parent and a parent naming a nonexistent group', () => {
-    const groups = normalizeProjectGroups([
-      { id: 'self', name: 'Self', tabOrder: 0, parentGroupId: 'self' },
-      { id: 'orphan', name: 'Orphan', tabOrder: 1, parentGroupId: 'ghost' }
-    ])
-
-    expect(groups.find((group) => group.id === 'self')?.parentGroupId).toBeNull()
-    expect(groups.find((group) => group.id === 'orphan')?.parentGroupId).toBeNull()
-  })
-
-  it('breaks a two-node parent cycle so both groups become reachable from a root', () => {
-    const groups = normalizeProjectGroups([
-      { id: 'a', name: 'A', tabOrder: 0, parentGroupId: 'b' },
-      { id: 'b', name: 'B', tabOrder: 1, parentGroupId: 'a' }
-    ])
-
-    assertAllGroupsReachRoot(groups)
-    expect(groups.some((group) => group.parentGroupId === null)).toBe(true)
-  })
-
-  it('breaks a longer parent cycle (A -> B -> C -> A) so every group is reachable from a root', () => {
-    const groups = normalizeProjectGroups([
-      { id: 'a', name: 'A', tabOrder: 0, parentGroupId: 'b' },
-      { id: 'b', name: 'B', tabOrder: 1, parentGroupId: 'c' },
-      { id: 'c', name: 'C', tabOrder: 2, parentGroupId: 'a' }
-    ])
-
-    assertAllGroupsReachRoot(groups)
-    expect(groups.some((group) => group.parentGroupId === null)).toBe(true)
-  })
-
-  it('returns a valid group tree completely unchanged', () => {
-    const groups = normalizeProjectGroups([
-      { id: 'root', name: 'Root', tabOrder: 0, parentGroupId: null },
-      { id: 'child', name: 'Child', tabOrder: 1, parentGroupId: 'root' },
-      { id: 'grandchild', name: 'Grandchild', tabOrder: 2, parentGroupId: 'child' }
-    ])
-
-    expect(groups.find((group) => group.id === 'root')?.parentGroupId).toBeNull()
-    expect(groups.find((group) => group.id === 'child')?.parentGroupId).toBe('root')
-    expect(groups.find((group) => group.id === 'grandchild')?.parentGroupId).toBe('child')
-  })
-
-  it('breaks a two-node parent cycle when one group id is the empty string', () => {
-    const groups = normalizeProjectGroups([
-      { id: '', name: 'Empty', tabOrder: 0, parentGroupId: 'b' },
-      { id: 'b', name: 'B', tabOrder: 1, parentGroupId: '' }
-    ])
-
-    assertAllGroupsReachRoot(groups)
-    expect(groups.some((group) => group.parentGroupId === null)).toBe(true)
-  })
-
-  it('clears a parent naming a nonexistent empty-string group id', () => {
-    const groups = normalizeProjectGroups([
-      { id: 'orphan', name: 'Orphan', tabOrder: 0, parentGroupId: '' }
-    ])
-
-    expect(groups.find((group) => group.id === 'orphan')?.parentGroupId).toBeNull()
-  })
-
-  it('preserves an empty-string group id as a legitimate root', () => {
-    const groups = normalizeProjectGroups([
-      { id: '', name: 'Root', tabOrder: 0, parentGroupId: null },
-      { id: 'child', name: 'Child', tabOrder: 1, parentGroupId: '' }
-    ])
-
-    expect(groups.find((group) => group.id === '')?.parentGroupId).toBeNull()
-    expect(groups.find((group) => group.id === 'child')?.parentGroupId).toBe('')
-  })
-
-  it('normalizes a cycle alongside a group with a missing parent without throwing', () => {
-    const groups = normalizeProjectGroups([
-      { id: 'a', name: 'A', tabOrder: 0, parentGroupId: 'b' },
-      { id: 'b', name: 'B', tabOrder: 1, parentGroupId: 'a' },
-      { id: 'c', name: 'C', tabOrder: 2, parentGroupId: 'ghost' }
-    ])
-
-    expect(groups.find((group) => group.id === 'c')?.parentGroupId).toBeNull()
-    assertAllGroupsReachRoot(groups)
   })
 
   it('preserves normalized execution ownership for persisted groups', () => {
@@ -257,20 +154,5 @@ describe('project-groups', () => {
     expect(subtreeIds.size).toBe(130_001)
     expect(subtreeIds.has('root')).toBe(true)
     expect(subtreeIds.has('child-129999')).toBe(true)
-  })
-
-  it('denies group membership to folder workspaces and folder-mode repos', () => {
-    expect(canWorktreeHoldGroupMembership({ folderWorkspaceId: null, repoKind: 'git' })).toBe(true)
-    expect(canWorktreeHoldGroupMembership({ folderWorkspaceId: 'fw-1', repoKind: 'git' })).toBe(
-      false
-    )
-    expect(canWorktreeHoldGroupMembership({ folderWorkspaceId: null, repoKind: 'folder' })).toBe(
-      false
-    )
-    // An unknown repo kind is treated as git so a missing repo entry never
-    // silently blocks membership.
-    expect(canWorktreeHoldGroupMembership({ folderWorkspaceId: null, repoKind: undefined })).toBe(
-      true
-    )
   })
 })

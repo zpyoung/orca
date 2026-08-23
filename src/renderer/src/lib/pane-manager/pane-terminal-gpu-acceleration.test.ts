@@ -14,6 +14,7 @@ function createPane(): ManagedPaneInternal {
     } as never,
     container: {} as never,
     xtermContainer: {} as never,
+    dockContainer: {} as never,
     linkTooltip: {} as never,
     terminalGpuAcceleration: 'auto',
     gpuRenderingEnabled: true,

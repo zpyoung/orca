@@ -56,13 +56,9 @@ import {
 } from './nested-repo-telemetry'
 
 import { AGENT_HOOK_TARGETS } from './agent-hook-types'
-import type {
-  DiscoveryStatusEmitted,
-  GlobalSettings,
-  OnboardingChecklistState,
-  PathSource,
-  ShellHydrationFailureReason
-} from './types'
+import type { GlobalSettings } from './global-settings-types'
+import type { DiscoveryStatusEmitted, OnboardingChecklistState } from './onboarding-state-types'
+import type { PathSource, ShellHydrationFailureReason } from './shell-path-hydration-types'
 
 // ── Shared property enums ───────────────────────────────────────────────
 
@@ -250,6 +246,7 @@ export const SETTINGS_CHANGED_WHITELIST = [
   'experimentalMobile',
   'experimentalPet',
   'experimentalNativeChat',
+  'experimentalTerminalDock',
   'experimentalActivity',
   'experimentalAgentDashboardPopout',
   'experimentalTerminalAttention',
@@ -389,6 +386,9 @@ export type RuntimeRpcStartErrorClass = z.infer<typeof runtimeRpcStartErrorClass
 const runtimeRpcStartFailedSchema = z
   .object({ error_class: runtimeRpcStartErrorClassSchema })
   .strict()
+
+// Why: classify session-killing 1013 closures as producer size failures or queue backpressure.
+const remoteOutboundBudgetCloseSchema = z.object({ emitter: z.enum(['size', 'queue']) }).strict()
 
 // Why: a deadlocked main thread never crashes, so it produces no crash report and no user report
 // beyond "it froze" — incidence has been unmeasurable. `self_recovered` splits stalls that cleared
@@ -534,6 +534,22 @@ const nativeChatSkillDiscoverySchema = z
     outcome: z.enum(['ready', 'error', 'timeout', 'unavailable']),
     execution_host_kind: z.enum(['local', 'runtime', 'ssh'])
   })
+  .strict()
+
+const terminalDockToggledSchema = z
+  .object({ docked: z.boolean(), agent_kind: agentKindSchema })
+  .strict()
+const terminalDockPassthroughToggledSchema = z
+  .object({ active: z.boolean(), agent_kind: agentKindSchema })
+  .strict()
+export const terminalDockSendOutcomeSchema = z.enum([
+  'observed-cleared',
+  'unobservable',
+  'may-not-have-sent'
+])
+export type TerminalDockSendOutcome = z.infer<typeof terminalDockSendOutcomeSchema>
+const terminalDockSendOutcomeEventSchema = z
+  .object({ outcome: terminalDockSendOutcomeSchema, agent_kind: agentKindSchema })
   .strict()
 
 const telemetryOptedInSchema = z.object({ via: optInViaSchema }).strict()
@@ -781,6 +797,11 @@ const agentHookInstallFailedSchema = z
 const agentHookUnattributedSchema = z
   .object({ reason: z.enum(['empty_pane_key', 'unknown_tab_id']) })
   .strict()
+
+// Why (#11217): loopback hook POSTs reset mid-body by local security software kill agent status for
+// every runtime at once. Count only — the truncated bodies carry user prompts and tool I/O, so
+// nothing derived from them may reach the wire.
+const agentHookTransportBlockedSchema = z.object({ count: z.number().int().nonnegative() }).strict()
 
 // ── Onboarding ──────────────────────────────────────────────────────────
 // Closed enums only — no raw paths/repo names/URLs/error strings (measures activation, not repo debugging).
@@ -1445,12 +1466,14 @@ export const eventSchemas = {
   agent_error: agentErrorSchema,
   agent_hook_install_failed: agentHookInstallFailedSchema,
   agent_hook_unattributed: agentHookUnattributedSchema,
+  agent_hook_transport_blocked: agentHookTransportBlockedSchema,
 
   daemon_start_failed: daemonStartFailedSchema,
   main_thread_hang_detected: mainThreadHangDetectedSchema,
   daemon_lifecycle: daemonLifecycleSchema,
   daemon_audit_eligibility: daemonAuditEligibilitySchema,
   runtime_rpc_start_failed: runtimeRpcStartFailedSchema,
+  remote_outbound_budget_close: remoteOutboundBudgetCloseSchema,
 
   codex_trust_grant: codexTrustGrantSchema,
 
@@ -1462,6 +1485,10 @@ export const eventSchemas = {
   native_chat_picker_item_accepted: nativeChatPickerItemAcceptedSchema,
   native_chat_send_classified: nativeChatSendClassifiedSchema,
   native_chat_skill_discovery: nativeChatSkillDiscoverySchema,
+
+  terminal_dock_toggled: terminalDockToggledSchema,
+  terminal_dock_passthrough_toggled: terminalDockPassthroughToggledSchema,
+  terminal_dock_send_outcome: terminalDockSendOutcomeEventSchema,
 
   telemetry_opted_in: telemetryOptedInSchema,
   telemetry_opted_out: telemetryOptedOutSchema,

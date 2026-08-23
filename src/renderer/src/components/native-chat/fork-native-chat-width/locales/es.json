@@ -1,0 +1,29 @@
+{
+  "auto": {
+    "components": {
+      "settings": {
+        "ExperimentalPane": {
+          "nativeChat": {
+            "widthTitle": "Ancho del chat",
+            "widthCopy": "Establece el ancho de la columna de lectura de todos los paneles de chat.",
+            "widthLabel": "Ancho del chat"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "native-chat": {
+      "width": {
+        "tier": {
+          "narrow": "Estrecho",
+          "comfortable": "Cómodo",
+          "wide": "Amplio",
+          "full": "Completo"
+        },
+        "menuLabel": "Ancho del chat",
+        "menuTooltip": "Ancho del chat (se aplica a todos los paneles de chat)"
+      }
+    }
+  }
+}

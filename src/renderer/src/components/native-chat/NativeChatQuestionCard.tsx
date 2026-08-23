@@ -3,7 +3,7 @@ import { Check, Pencil, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import type { AskAnswerSelection, AskPrompt } from './native-chat-interactive-prompt'
-import { useNativeChatWidthClassName } from './use-native-chat-width'
+import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'
 
 export type NativeChatQuestionCardProps = {
   prompt: AskPrompt

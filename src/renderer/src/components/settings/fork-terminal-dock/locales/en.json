@@ -1,0 +1,24 @@
+{
+  "auto": {
+    "components": {
+      "settings": {
+        "ExperimentalPane": {
+          "terminalDock": {
+            "title": "Terminal dock",
+            "description": "Composer docked beneath a terminal pane for supported coding-agent sessions.",
+            "copy": "Docks a rich input composer beneath a terminal pane running a supported coding-agent CLI, so you can compose and send prompts without typing directly into the terminal. The terminal stays visible, so you can always fall back to typing directly. Experimental and independent of Chat UI while we tune composer behavior.",
+            "toggleLabel": "Toggle terminal dock"
+          }
+        },
+        "experimental": {
+          "search": {
+            "terminalDock": {
+              "title": "Terminal dock",
+              "description": "Composer docked beneath a terminal pane for supported coding-agent sessions."
+            }
+          }
+        }
+      }
+    }
+  }
+}

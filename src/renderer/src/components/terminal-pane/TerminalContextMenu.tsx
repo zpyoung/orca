@@ -9,6 +9,7 @@ import {
   MessageSquare,
   Minimize2,
   PanelBottomClose,
+  PanelBottomOpen,
   PanelsTopLeft,
   PanelRightClose,
   Pencil,
@@ -25,7 +26,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { shouldIgnoreTerminalMenuPointerDownOutside } from './terminal-context-menu-dismiss'
-import type { TerminalQuickCommand } from '../../../../shared/types'
+import type { TerminalQuickCommand } from '../../../../shared/terminal-quick-command-types'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
 import { formatPrimaryShortcutLabel } from '@/hooks/useShortcutLabel'
 import type { KeybindingOverrides } from '../../../../shared/keybindings'
@@ -59,6 +60,9 @@ type TerminalContextMenuProps = {
   canToggleNativeChat: boolean
   isNativeChatView: boolean
   onToggleNativeChat: () => void
+  canToggleTerminalDock: boolean
+  isTerminalDockDocked: boolean
+  onToggleTerminalDock: () => void
   onCopyAgentSessionContext: () => void
   quickCommandHosts: TerminalQuickCommandMenuHost[]
   quickCommandHostLoadFailed: boolean
@@ -98,6 +102,9 @@ export default function TerminalContextMenu({
   canToggleNativeChat,
   isNativeChatView,
   onToggleNativeChat,
+  canToggleTerminalDock,
+  isTerminalDockDocked,
+  onToggleTerminalDock,
   onCopyAgentSessionContext,
   quickCommandHosts,
   quickCommandHostLoadFailed,
@@ -125,13 +132,15 @@ export default function TerminalContextMenu({
       setTitle: formatPrimaryShortcutLabel('terminal.setTitle', keybindings),
       clearPaneTitle: formatPrimaryShortcutLabel('terminal.clearPaneTitle', keybindings),
       close: formatPrimaryShortcutLabel('terminal.closePane', keybindings),
-      nativeChat: nativeChatToggleShortcutLabel(isMacPlatform())
+      nativeChat: nativeChatToggleShortcutLabel(isMacPlatform()),
+      terminalDock: formatPrimaryShortcutLabel('terminal.dock.toggle', keybindings)
     }),
     [keybindings]
   )
   const showEqualizeShortcut = shortcuts.equalize !== 'Unassigned'
   const showSetTitleShortcut = shortcuts.setTitle !== 'Unassigned'
   const showClearPaneTitleShortcut = shortcuts.clearPaneTitle !== 'Unassigned'
+  const showTerminalDockShortcut = shortcuts.terminalDock !== 'Unassigned'
   return (
     <DropdownMenu
       open={open}
@@ -228,6 +237,23 @@ export default function TerminalContextMenu({
                   'Switch to chat view'
                 )}
             <DropdownMenuShortcut>{shortcuts.nativeChat}</DropdownMenuShortcut>
+          </DropdownMenuItem>
+        ) : null}
+        {canToggleTerminalDock ? (
+          <DropdownMenuItem className="whitespace-nowrap" onSelect={onToggleTerminalDock}>
+            {isTerminalDockDocked ? <PanelBottomClose /> : <PanelBottomOpen />}
+            {isTerminalDockDocked
+              ? translate(
+                  'components.terminal.pane.TerminalContextMenu.hideAgentComposer',
+                  'Hide agent composer'
+                )
+              : translate(
+                  'components.terminal.pane.TerminalContextMenu.showAgentComposer',
+                  'Show agent composer'
+                )}
+            {showTerminalDockShortcut ? (
+              <DropdownMenuShortcut>{shortcuts.terminalDock}</DropdownMenuShortcut>
+            ) : null}
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuSeparator />

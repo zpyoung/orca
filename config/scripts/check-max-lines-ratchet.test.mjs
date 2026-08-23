@@ -55,12 +55,12 @@ describe('hasMaxLinesDisable', () => {
 })
 
 describe('defaultLimitForPath', () => {
-  it('uses 800 for tests, 400 for tsx, 600 for mjs, 300 otherwise', () => {
-    expect(defaultLimitForPath('a/b.test.ts')).toBe(800)
-    expect(defaultLimitForPath('a/b.spec.tsx')).toBe(800)
-    expect(defaultLimitForPath('a/b.tsx')).toBe(400)
-    expect(defaultLimitForPath('a/b.mjs')).toBe(600)
-    expect(defaultLimitForPath('a/b.ts')).toBe(300)
+  it('uses 1000 for tests, 600 for tsx, 800 for mjs, 500 otherwise', () => {
+    expect(defaultLimitForPath('a/b.test.ts')).toBe(1000)
+    expect(defaultLimitForPath('a/b.spec.tsx')).toBe(1000)
+    expect(defaultLimitForPath('a/b.tsx')).toBe(600)
+    expect(defaultLimitForPath('a/b.mjs')).toBe(800)
+    expect(defaultLimitForPath('a/b.ts')).toBe(500)
   })
 })
 
@@ -68,12 +68,12 @@ describe('collectMobileBumps', () => {
   it('captures only overrides whose max exceeds the default for the glob', () => {
     const cfg = JSON.stringify({
       overrides: [
-        { files: ['app/h/*/tasks.tsx'], rules: { 'max-lines': ['error', { max: 14682 }] } }, // bump (>400)
+        { files: ['app/h/*/tasks.tsx'], rules: { 'max-lines': ['error', { max: 14682 }] } }, // bump (>600)
         {
           files: ['src/terminal/TerminalWebView.tsx'],
           rules: { 'max-lines': ['error', { max: 379 }] }
-        }, // stricter (<400), skip
-        { files: ['scripts/mock-server.ts'], rules: { 'max-lines': ['error', { max: 407 }] } } // bump (>300)
+        }, // stricter (<600), skip
+        { files: ['scripts/mock-server.ts'], rules: { 'max-lines': ['error', { max: 607 }] } } // bump (>500)
       ]
     })
     expect(collectMobileBumps(cfg)).toEqual([

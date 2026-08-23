@@ -30,6 +30,7 @@ function createPane(
       getBoundingClientRect: () => ({ width: 800, height: 600 })
     } as never,
     xtermContainer: {} as never,
+    dockContainer: {} as never,
     linkTooltip: {} as never,
     terminalGpuAcceleration: 'off',
     gpuRenderingEnabled: false,

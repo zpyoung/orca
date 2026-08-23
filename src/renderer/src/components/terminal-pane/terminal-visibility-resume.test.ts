@@ -42,6 +42,9 @@ vi.mock('@/lib/pane-manager/terminal-linkifier-hover-reset', () => ({
   isTerminalLinkifierHoverActive: (terminal: unknown) => isTerminalLinkifierHoverActive(terminal)
 }))
 
+const paneDockOwnsFocus = vi.fn(() => false)
+const focusOwnership = { tabId: 'tab-1', paneDockOwnsFocus }
+
 type FakeManager = {
   getPanes: ReturnType<typeof vi.fn>
   resumeRendering: ReturnType<typeof vi.fn>
@@ -65,6 +68,7 @@ function createManager(order: string[] = []): FakeManager {
 
 function resumeArgs(manager: FakeManager, shouldUseLightTabResume: boolean) {
   return {
+    ...focusOwnership,
     manager: manager as never as PaneManager,
     isActive: true,
     wasVisible: false,
@@ -89,6 +93,17 @@ describe('resumeTerminalVisibility reveal repaint', () => {
     expect(manager.scheduleRevealRepaint).toHaveBeenCalledTimes(1)
     expect(manager.resumeRendering).not.toHaveBeenCalled()
     expect(scheduleTabRevealWebglAtlasRecovery).toHaveBeenCalledTimes(1)
+  })
+
+  it('threads dock focus ownership through light and heavy resume refocus', async () => {
+    const { focusActivePane } = vi.mocked(await import('./pane-helpers'))
+    const manager = createManager()
+
+    resumeTerminalVisibility(resumeArgs(manager, true))
+    resumeTerminalVisibility(resumeArgs(manager, false))
+
+    expect(focusActivePane).toHaveBeenNthCalledWith(1, manager, focusOwnership)
+    expect(focusActivePane).toHaveBeenNthCalledWith(2, manager, focusOwnership)
   })
 
   it('captures native trim movement before enforcing viewport intent', async () => {
@@ -184,6 +199,7 @@ describe('resumeTerminalVisibility reveal repaint', () => {
   it('fits window wake recovery through the stable path, not the sync fit', () => {
     const manager = createManager()
     recoverVisibleTerminalWindowWake({
+      ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: true,
       clearGlyphAtlases: false
@@ -191,6 +207,20 @@ describe('resumeTerminalVisibility reveal repaint', () => {
 
     expect(manager.fitAllRevealedPanes).toHaveBeenCalledTimes(1)
     expect(manager.fitAllPanes).not.toHaveBeenCalled()
+  })
+
+  it('threads dock focus ownership through window-wake refocus', async () => {
+    const { focusActivePane } = vi.mocked(await import('./pane-helpers'))
+    const manager = createManager()
+
+    recoverVisibleTerminalWindowWake({
+      ...focusOwnership,
+      manager: manager as never as PaneManager,
+      isActive: true,
+      clearGlyphAtlases: false
+    })
+
+    expect(focusActivePane).toHaveBeenCalledWith(manager, focusOwnership)
   })
 
   it('latches viewport intent before refocus recovery flushes streaming output', async () => {
@@ -205,6 +235,7 @@ describe('resumeTerminalVisibility reveal repaint', () => {
     )
 
     recoverVisibleTerminalWindowWake({
+      ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: true,
       clearGlyphAtlases: false
@@ -244,6 +275,7 @@ describe('resumeTerminalVisibility reveal repaint', () => {
     manager.getPanes.mockReturnValue([{ terminal: first }, { terminal: second }])
 
     recoverVisibleTerminalWindowWake({
+      ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: true,
       clearGlyphAtlases: false
@@ -260,6 +292,7 @@ describe('resumeTerminalVisibility reveal repaint', () => {
     isTerminalLinkifierHoverActive.mockReturnValueOnce(true)
 
     recoverVisibleTerminalWindowWake({
+      ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: true,
       clearGlyphAtlases: false
@@ -271,6 +304,7 @@ describe('resumeTerminalVisibility reveal repaint', () => {
   it('schedules the atlas-clearing repaint on genuine wake recovery', () => {
     const manager = createManager()
     recoverVisibleTerminalWindowWake({
+      ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: false,
       clearGlyphAtlases: true
@@ -286,6 +320,7 @@ describe('resumeTerminalVisibility reveal repaint', () => {
     )
     const manager = createManager()
     recoverVisibleTerminalWindowWake({
+      ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: false,
       clearGlyphAtlases: true
@@ -306,6 +341,7 @@ describe('resumeTerminalVisibility reveal repaint', () => {
     )
     const manager = createManager()
     recoverVisibleTerminalWindowWake({
+      ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: false,
       clearGlyphAtlases: false

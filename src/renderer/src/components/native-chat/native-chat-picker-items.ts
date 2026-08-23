@@ -26,7 +26,9 @@ export type NativeChatPickerItem =
       id: string
       name: string
       description: string | null
-      sources: { sourceKind: SkillSourceKind; skillFilePath: string }[]
+      /** Owning plugin, when a single plugin owns every source behind this row. */
+      pluginName?: string
+      sources: { sourceKind: SkillSourceKind; skillFilePath: string; pluginName?: string }[]
     }
 
 export type NativeChatSkillDiscoverySnapshot = {
@@ -47,9 +49,10 @@ export function buildNativeChatPickerItems(
   commands: readonly SlashCommandSuggestion[],
   skills: readonly DiscoveredSkill[],
   query: string,
-  prefix: '/' | '$'
+  prefix: '/' | '$',
+  namespacePluginSkills = false
 ): NativeChatPickerItem[] {
-  const mergedSkills = mergeNativeChatSkills(skills)
+  const mergedSkills = mergeNativeChatSkills(skills, namespacePluginSkills)
   const skillNames = new Set(mergedSkills.map((skill) => skill.name))
   const commandNames = new Set(commands.map((command) => command.name))
   const commandItems = rankItems(
@@ -80,7 +83,8 @@ export function buildNativeChatPickerItems(
 }
 
 function mergeNativeChatSkills(
-  skills: readonly DiscoveredSkill[]
+  skills: readonly DiscoveredSkill[],
+  namespacePluginSkills: boolean
 ): Extract<NativeChatPickerItem, { kind: 'skill' }>[] {
   const exactPaths = new Map<string, DiscoveredSkill>()
   for (const skill of skills) {
@@ -88,26 +92,38 @@ function mergeNativeChatSkills(
       exactPaths.set(skill.skillFilePath, skill)
     }
   }
-  const byName = new Map<string, DiscoveredSkill[]>()
+  const byToken = new Map<string, DiscoveredSkill[]>()
   for (const skill of exactPaths.values()) {
     const safeName = getSafeSkillName(skill)
     if (!safeName) {
       continue
     }
-    byName.set(safeName, [...(byName.get(safeName) ?? []), { ...skill, name: safeName }])
+    // Why: one row per plugin only helps if the rows dispatch differently, so
+    // the split rides the same condition as the namespaced token. Agents that
+    // take a bare name keep the merged row and name the plugins in its subtext.
+    const namespace = namespacePluginSkills ? getNamespaceSafePluginName(skill) : null
+    const token = namespace ? `${namespace}:${safeName}` : safeName
+    byToken.set(token, [...(byToken.get(token) ?? []), { ...skill, name: safeName }])
   }
-  return [...byName.entries()]
-    .map(([name, namedSkills]) => {
+  return [...byToken.entries()]
+    .map(([token, namedSkills]) => {
       const sorted = [...namedSkills].sort(compareDiscoveredSkills)
+      const sources = sorted.map((skill) => {
+        const pluginName = getDisplayPluginName(skill)
+        return {
+          sourceKind: skill.sourceKind,
+          skillFilePath: skill.skillFilePath,
+          ...(pluginName ? { pluginName } : {})
+        }
+      })
+      const pluginNames = [...new Set(sources.flatMap((source) => source.pluginName ?? []))]
       return {
         kind: 'skill' as const,
-        id: `skill:${name}`,
-        name,
+        id: `skill:${token}`,
+        name: token,
         description: sorted[0]?.description ? sanitizePickerText(sorted[0].description, 240) : null,
-        sources: sorted.map((skill) => ({
-          sourceKind: skill.sourceKind,
-          skillFilePath: skill.skillFilePath
-        }))
+        ...(pluginNames.length === 1 ? { pluginName: pluginNames[0] } : {}),
+        sources
       }
     })
     .sort(comparePickerSkills)
@@ -176,6 +192,23 @@ function getSafeSkillName(skill: DiscoveredSkill): string | null {
   return isTokenSafe(directoryName) ? directoryName : null
 }
 
+const MAX_PLUGIN_NAME_DISPLAY_LENGTH = 80
+
+function getDisplayPluginName(skill: DiscoveredSkill): string | undefined {
+  const name = skill.pluginName
+    ? sanitizePickerText(skill.pluginName, MAX_PLUGIN_NAME_DISPLAY_LENGTH)
+    : ''
+  return name || undefined
+}
+
+function getNamespaceSafePluginName(skill: DiscoveredSkill): string | null {
+  // Why: the namespace is spliced into the inserted PTY token, so it is checked
+  // raw like the skill name — a sanitized copy would smuggle a name that no
+  // longer matches the one the agent resolves. A `:` would nest separators.
+  const name = skill.pluginName
+  return name && isTokenSafe(name) && !name.includes(':') ? name : null
+}
+
 function isTokenSafe(value: string): boolean {
   return (
     value.length > 0 &&
@@ -215,7 +248,7 @@ export function applyPickerSuggestion(
 ): { draft: string; caret: number; insertedToken: string } {
   const before = draft.slice(0, caret)
   const after = draft.slice(caret)
-  const match = prefix === '/' ? before.match(/^\/(\S*)$/) : before.match(/(^|\s)\$(\S*)$/)
+  const match = before.match(prefix === '/' ? /(^|\s)\/(\S*)$/ : /(^|\s)\$(\S*)$/)
   if (!match) {
     return { draft, caret, insertedToken: '' }
   }

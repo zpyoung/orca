@@ -5,7 +5,7 @@ import '@testing-library/jest-dom/vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NativeChatMessage } from '../../../../shared/native-chat-types'
-import { applyCommandMarkerBoundaries } from './native-chat-pending'
+import { applyCommandMarkerBoundaries } from './native-chat-command-marker'
 import type { NativeChatInteractiveSend } from './use-native-chat-interactive-send'
 
 const INITIAL_PROMPT = JSON.stringify({
@@ -209,6 +209,27 @@ describe('NativeChatInteractiveCard answer lifecycle', () => {
 
     expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled()
     expect(screen.getByText('Tabs or spaces?')).toBeInTheDocument()
+  })
+
+  it('does not cancel or dismiss on a nominal timer while a slow acceptance is still pending (r5-1)', () => {
+    vi.useFakeTimers()
+    let settleDelivery: ((delivered: boolean) => void) | undefined
+    mocks.sendAnswer.mockImplementation((_prompt, _selections, onDeliverySettled) => {
+      settleDelivery = onDeliverySettled
+      return { settleAfterMs: 500, waitsForVerifiedDelivery: true }
+    })
+    renderCard()
+
+    chooseSpacesAndSubmit()
+    // A real acceptance-gated CR can arm well past the nominal 500ms window.
+    act(() => vi.advanceTimersByTime(10_000))
+
+    expect(mocks.cancelPending).not.toHaveBeenCalled()
+    expect(screen.getByText('Tabs or spaces?')).toBeInTheDocument()
+
+    act(() => settleDelivery?.(true))
+    expect(screen.queryByText('Tabs or spaces?')).not.toBeInTheDocument()
+    vi.useRealTimers()
   })
 })
 

@@ -6,7 +6,7 @@ import {
 } from '../../../../shared/ai-vault-types'
 import {
   ALL_EXECUTION_HOSTS_SCOPE,
-  normalizeExecutionHostScope,
+  requestedExecutionHostScope,
   type ExecutionHostScope
 } from '../../../../shared/execution-host'
 import { useAppStore } from '@/store'
@@ -36,10 +36,13 @@ export const isAiVaultScanCancellation = isAiVaultScanCancelledError
 
 type AiVaultRefreshArgs = { force?: boolean; background?: boolean; reuseLoadedDepth?: boolean }
 
-// Mirrors how the main process routes the scan: this scope answers with a merge
-// of several hosts' legs rather than one scanner's result.
+// Shares main's request resolver, so this is exactly the scope that fans out on
+// the desktop IPC path. Deliberately over-inclusive: the paired web transport
+// drops the scope and serves one host, so 'all' there costs a redundant
+// reconcile. Erring the other way would re-enable the stamp fast-path on a real
+// merge, which is the bug this guard exists to prevent.
 function isMergedAiVaultHostScope(scope: ExecutionHostScope): boolean {
-  return normalizeExecutionHostScope(scope) === ALL_EXECUTION_HOSTS_SCOPE
+  return requestedExecutionHostScope(scope) === ALL_EXECUTION_HOSTS_SCOPE
 }
 
 export function useAiVaultSessionRefresh(
@@ -160,8 +163,6 @@ export function useAiVaultSessionRefresh(
         // is a merge of legs on independent clocks stamped with the newest leg,
         // so a lagging host's leg can change while the merged stamp stands
         // still — there, only the structural reconcile below may decide.
-        // Normalized through the shared helper because that is what the main
-        // process routes on: an empty or unrecognized scope also merges.
         if (
           !isMergedAiVaultHostScope(hostScope) &&
           lastAppliedScanRef.current?.scopeKey === scanKey &&
@@ -265,6 +266,27 @@ export function useAiVaultSessionRefresh(
     }
     void refresh({ force: false, reuseLoadedDepth: true })
   }, [executionHostScope, refresh, scanScopeKey])
+
+  // Why: this panel can query the relay before it is ready — at startup, and again for the window
+  // in which a reconnect leaves the session not-ready — and the query throws 'SSH relay is not
+  // ready'. Nothing else here retries: the remaining triggers are mount, window refocus and a new
+  // agent session id, so a user whose workspace is otherwise working sits on that error
+  // indefinitely. The file explorer already recovers this way for the same reason
+  // (use-file-explorer-tree-load-effects.ts); this panel simply never did.
+  //
+  // Gated on a prior error so a local workspace, or one that already listed fine, does not rescan
+  // every time some other host connects.
+  const sshConnectedGeneration = useAppStore((s) => s.sshConnectedGeneration)
+  const sshGenerationRef = useRef(sshConnectedGeneration)
+  useEffect(() => {
+    if (sshConnectedGeneration <= sshGenerationRef.current) {
+      return
+    }
+    sshGenerationRef.current = sshConnectedGeneration
+    if (error !== null) {
+      void refresh({ background: true, force: false })
+    }
+  }, [sshConnectedGeneration, error, refresh])
 
   // Refocus checks the shared host cache without forcing another transcript scan.
   useEffect(() => {

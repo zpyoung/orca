@@ -54,8 +54,16 @@ export function deriveComposerAutocomplete(
   dismissedTriggerKey: string | null = null
 ): ComposerAutocomplete {
   const before = draft.slice(0, caret)
-  if (before.startsWith('/') && !/\s/.test(before)) {
-    return deriveSlashAutocomplete(before, agentCommands, profile, discovery, dismissedTriggerKey)
+  const slashMatch = before.match(/(?:^|\s)\/(\S*)$/)
+  if (slashMatch) {
+    return deriveSlashAutocomplete(
+      slashMatch[1],
+      before.length - slashMatch[1].length - 1,
+      agentCommands,
+      profile,
+      discovery,
+      dismissedTriggerKey
+    )
   }
   const mentionMatch = before.match(/(?:^|\s)@(\S*)$/)
   if (mentionMatch) {
@@ -81,40 +89,55 @@ export function deriveComposerAutocomplete(
     grouped: false,
     commandsEnabled: false,
     skillsEnabled: true,
-    items: buildNativeChatPickerItems([], discovery.skills, query, '$'),
+    items: buildNativeChatPickerItems(
+      [],
+      discovery.skills,
+      query,
+      '$',
+      profile?.namespacesPluginSkills === true
+    ),
     skillStatus: discovery.status === 'idle' ? 'loading' : discovery.status,
     ...(discovery.errorKind ? { skillErrorKind: discovery.errorKind } : {})
   }
 }
 
+/** The supported TUIs dispatch a command only as the draft's leading token, and
+ *  accepting a command row would replace the whole draft — so a `/` anywhere
+ *  else offers skills alone. */
 function deriveSlashAutocomplete(
-  before: string,
+  query: string,
+  tokenStart: number,
   agentCommands: readonly SlashCommandSuggestion[],
   profile: NativeChatAgentProfile | null,
   discovery: NativeChatSkillDiscoverySnapshot,
   dismissedTriggerKey: string | null
 ): ComposerAutocomplete {
-  const triggerKey = '/:0'
+  const triggerKey = `/:${tokenStart}`
   if (dismissedTriggerKey === triggerKey) {
     return { mode: 'none' }
   }
-  const query = before.slice(1)
   const hasSlashSkills = profile?.skillPrefix === '/'
+  const leadsDraft = tokenStart === 0
+  if (!leadsDraft && !hasSlashSkills) {
+    return { mode: 'none' }
+  }
+  const commands = leadsDraft ? agentCommands : []
   // Why: the caller owns catalog policy (e.g. Grok ships skills-only until a
   // verified catalog lands); this derivation must not re-gate per agent.
   const items = buildNativeChatPickerItems(
-    agentCommands,
+    commands,
     hasSlashSkills ? discovery.skills : [],
     query,
-    '/'
+    '/',
+    profile?.namespacesPluginSkills === true
   )
   return {
     mode: 'slash',
     query,
     triggerKey,
     prefix: '/',
-    grouped: profile?.groupedSlash === true,
-    commandsEnabled: agentCommands.length > 0,
+    grouped: leadsDraft && profile?.groupedSlash === true,
+    commandsEnabled: commands.length > 0,
     skillsEnabled: hasSlashSkills,
     items,
     skillStatus: hasSlashSkills
@@ -178,35 +201,4 @@ export function applyMentionSuggestion(
   const tokenStart = before.length - match[2].length - 1
   const nextBefore = `${before.slice(0, tokenStart)}@${path} `
   return { draft: nextBefore + after, caret: nextBefore.length }
-}
-
-export type HistoryState = { entries: readonly string[]; index: number | null }
-export const EMPTY_HISTORY: HistoryState = { entries: [], index: null }
-
-export function pushHistory(history: HistoryState, sent: string): HistoryState {
-  if (sent.trim() === '' || history.entries.at(-1) === sent) {
-    return { entries: history.entries, index: null }
-  }
-  return { entries: [...history.entries, sent], index: null }
-}
-
-export type HistoryRecall = { history: HistoryState; draft: string | null }
-
-export function recallPrevious(history: HistoryState): HistoryRecall {
-  if (history.entries.length === 0) {
-    return { history, draft: null }
-  }
-  const index = history.index === null ? history.entries.length - 1 : Math.max(0, history.index - 1)
-  return { history: { entries: history.entries, index }, draft: history.entries[index] }
-}
-
-export function recallNext(history: HistoryState): HistoryRecall {
-  if (history.index === null) {
-    return { history, draft: null }
-  }
-  const index = history.index + 1
-  if (index >= history.entries.length) {
-    return { history: { entries: history.entries, index: null }, draft: '' }
-  }
-  return { history: { entries: history.entries, index }, draft: history.entries[index] }
 }

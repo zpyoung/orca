@@ -51,6 +51,7 @@ function createPane(): ManagedPaneInternal {
     } as never,
     container: {} as never,
     xtermContainer: {} as never,
+    dockContainer: {} as never,
     linkTooltip: {} as never,
     terminalGpuAcceleration: 'auto',
     gpuRenderingEnabled: true,
@@ -491,6 +492,7 @@ describe('openTerminal — addon and provider wiring', () => {
       addEventListener: vi.fn(),
       removeEventListener: vi.fn()
     } as unknown as HTMLDivElement
+    const fakeDockContainer = {} as unknown as HTMLDivElement
     const fakeTooltip = {} as unknown as HTMLDivElement
     const fakeTerminalElement = {
       appendChild: vi.fn(),
@@ -558,6 +560,7 @@ describe('openTerminal — addon and provider wiring', () => {
       terminal,
       container: fakePaneContainer,
       xtermContainer: fakeXtermContainer,
+      dockContainer: fakeDockContainer,
       linkTooltip: fakeTooltip,
       terminalGpuAcceleration: 'off',
       gpuRenderingEnabled: false,

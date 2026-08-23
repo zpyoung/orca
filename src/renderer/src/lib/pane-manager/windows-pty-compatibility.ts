@@ -109,3 +109,15 @@ export function isLocalNativeWindowsConpty(
 ): boolean {
   return context.executionHostId === LOCAL_EXECUTION_HOST_ID && isLocalNativeWindowsPty(context)
 }
+
+/**
+ * Whether a non-local pane's ConPTY reliability is unverifiable and must be
+ * demoted the same as pre-21376 local ConPTY. Remote hosts never report a
+ * build number, so a Windows (or unconfirmed) remote host is treated as
+ * unreliable; only a positively known non-Windows remote platform is safe.
+ */
+export function isRemoteWindowsConptyStatusUnverified(
+  remotePlatform: NodeJS.Platform | null | undefined
+): boolean {
+  return remotePlatform === undefined || remotePlatform === null || remotePlatform === 'win32'
+}

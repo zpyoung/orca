@@ -1,4 +1,4 @@
-import type { GlobalSettings } from '../../../../shared/types'
+import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import { Label } from '../ui/label'
 import { Switch } from '../ui/switch'
 import { useAppStore } from '../../store'
@@ -9,6 +9,7 @@ import { HiddenExperimentalGroup } from './HiddenExperimentalGroup'
 import { NumberField, SettingsSwitch } from './SettingsFormControls'
 import { translate } from '@/i18n/i18n'
 import { NativeChatExperimentalSetting } from './NativeChatExperimentalSetting'
+import { TerminalDockExperimentalSetting } from './fork-terminal-dock/TerminalDockExperimentalSetting'
 import { AgentDashboardExperimentalSetting } from './AgentDashboardExperimentalSetting'
 import { EphemeralVmsExperimentalSetting } from './EphemeralVmsExperimentalSetting'
 import {
@@ -44,6 +45,9 @@ export function ExperimentalPane({
   ])
   const showNativeChat = matchesSettingsSearch(searchQuery, [
     getExperimentalSearchEntry().nativeChat
+  ])
+  const showTerminalDock = matchesSettingsSearch(searchQuery, [
+    getExperimentalSearchEntry().terminalDock
   ])
   const showTerminalAttention = matchesSettingsSearch(searchQuery, [
     getExperimentalSearchEntry().terminalAttention
@@ -142,6 +146,10 @@ export function ExperimentalPane({
 
       {showNativeChat ? (
         <NativeChatExperimentalSetting settings={settings} updateSettings={updateSettings} />
+      ) : null}
+
+      {showTerminalDock ? (
+        <TerminalDockExperimentalSetting settings={settings} updateSettings={updateSettings} />
       ) : null}
 
       {showTerminalAttention ? (

@@ -1,0 +1,16 @@
+{
+  "auto": {
+    "components": {
+      "sidebar": {
+        "WorktreeContextMenu": {
+          "3ae4748032": "그룹을 만들고 이 작업 트리를 그룹으로 이동하세요.",
+          "308b16a770": "작업 트리의 새 그룹",
+          "5bf97058a4": "프로젝트를 그룹으로 이동",
+          "a2d9a2b93e": "프로젝트를 그룹에서 제거",
+          "addWorktreeToGroup": "작업 트리를 그룹에 추가",
+          "removeWorktreeFromGroup": "작업 트리를 그룹에서 제거"
+        }
+      }
+    }
+  }
+}

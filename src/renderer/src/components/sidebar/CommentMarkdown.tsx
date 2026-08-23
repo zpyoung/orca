@@ -209,9 +209,6 @@ const CommentMarkdown = React.memo(
     ref
   ) {
     const components = React.useMemo(() => {
-      // Gate on the flag first: the module-level singletons below are
-      // pre-invoked with zero arguments and can never see highlightCode, so
-      // any falsy-onLinkClick fallback must resolve through a factory call.
       if (highlightCode) {
         return variant === 'document'
           ? createDocumentCommentMarkdownComponents(onLinkClick, true)
@@ -246,8 +243,6 @@ const CommentMarkdown = React.memo(
           // direct utility classes on <code>, so these overrides win reliably.
           '[&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:rounded-none',
           'min-w-0 max-w-full [overflow-wrap:anywhere]',
-          // The code renderer applies text-code-accent unconditionally; reset it
-          // inside <pre> so hljs token colors aren't overridden by the accent.
           highlightCode && 'native-chat-code [&_pre_code]:text-inherit',
           className
         )}
