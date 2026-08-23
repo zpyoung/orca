@@ -1,3 +1,4 @@
+import { ASK_REGISTRY_RUNTIME_CAPABILITY } from './fork-ask-question-tool/ask-question-capability'
 import { REMOTE_SERVER_UPDATE_CAPABILITY } from './remote-server-update'
 import {
   SKILL_BUNDLE_INSTALL_CAPABILITY,
@@ -116,10 +117,6 @@ export const SESSION_TABS_AUTHORITATIVE_INVENTORY_RUNTIME_CAPABILITY =
   'session-tabs.authoritative-inventory.v1' as const
 export const AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY =
   'agent-session.session-boundary.v1' as const
-// Why: client → host capability, sent in clientCapabilities (not RUNTIME_CAPABILITIES) — it
-// tells the host this connection owns a surface capable of docking an ask card.
-export const ASK_SURFACE_CLIENT_CAPABILITY = 'ask.surface.v1' as const
-export const ASK_REGISTRY_RUNTIME_CAPABILITY = 'ask.registry.v1' as const
 export { REMOTE_SERVER_UPDATE_CAPABILITY } from './remote-server-update'
 export const AGENT_SESSION_HOST_AUTHORITY_RUNTIME_CAPABILITY =
   'agent-session.host-authority.v1' as const
