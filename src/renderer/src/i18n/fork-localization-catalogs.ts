@@ -64,6 +64,11 @@ import artifactPasswordsES from '../components/artifacts/fork-artifact-passwords
 import artifactPasswordsJA from '../components/artifacts/fork-artifact-passwords/locales/ja.json'
 import artifactPasswordsKO from '../components/artifacts/fork-artifact-passwords/locales/ko.json'
 import artifactPasswordsZH from '../components/artifacts/fork-artifact-passwords/locales/zh.json'
+import askQuestionToolEN from '../components/fork-ask-question-tool/locales/en.json'
+import askQuestionToolES from '../components/fork-ask-question-tool/locales/es.json'
+import askQuestionToolJA from '../components/fork-ask-question-tool/locales/ja.json'
+import askQuestionToolKO from '../components/fork-ask-question-tool/locales/ko.json'
+import askQuestionToolZH from '../components/fork-ask-question-tool/locales/zh.json'
 
 type ForkLocale = 'en' | 'es' | 'ja' | 'ko' | 'zh'
 type ForkCatalog = Record<string, unknown>
@@ -95,7 +100,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     handoffEN,
     dirtyBranchEN,
     sessionInfoEN,
-    artifactPasswordsEN
+    artifactPasswordsEN,
+    askQuestionToolEN
   ],
   es: [
     relayES,
@@ -110,7 +116,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     handoffES,
     dirtyBranchES,
     sessionInfoES,
-    artifactPasswordsES
+    artifactPasswordsES,
+    askQuestionToolES
   ],
   ja: [
     relayJA,
@@ -125,7 +132,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     handoffJA,
     dirtyBranchJA,
     sessionInfoJA,
-    artifactPasswordsJA
+    artifactPasswordsJA,
+    askQuestionToolJA
   ],
   ko: [
     relayKO,
@@ -140,7 +148,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     handoffKO,
     dirtyBranchKO,
     sessionInfoKO,
-    artifactPasswordsKO
+    artifactPasswordsKO,
+    askQuestionToolKO
   ],
   zh: [
     relayZH,
@@ -155,7 +164,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     handoffZH,
     dirtyBranchZH,
     sessionInfoZH,
-    artifactPasswordsZH
+    artifactPasswordsZH,
+    askQuestionToolZH
   ]
 }
 
