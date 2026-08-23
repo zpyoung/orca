@@ -3,12 +3,16 @@
 import type { AgentType } from '../../../../../shared/agent-status-types'
 import { isTuiAgent } from '../../../../../shared/tui-agent-config'
 import type { TerminalDockPaneState } from '../../../../../shared/fork-terminal-dock/terminal-dock-pane-state'
+import {
+  clampGutterRows,
+  DEFAULT_GUTTER_ROWS,
+  MAX_GUTTER_ROWS,
+  MIN_GUTTER_ROWS
+} from '../../../../../shared/fork-terminal-dock/terminal-dock-gutter-rows'
+
+export { DEFAULT_GUTTER_ROWS, MAX_GUTTER_ROWS, MIN_GUTTER_ROWS }
 
 const STORAGE_KEY = 'orca.terminalDock.paneState.v1'
-
-export const DEFAULT_GUTTER_ROWS = 5
-export const MIN_GUTTER_ROWS = 3
-export const MAX_GUTTER_ROWS = 15
 
 export const DEFAULT_TERMINAL_DOCK_PANE_STATE: TerminalDockPaneState = {
   docked: false,
@@ -23,10 +27,6 @@ type StoredMap = Record<string, StoredEntry>
 
 function isUnsafeObjectKey(key: string): boolean {
   return key === '__proto__' || key === 'constructor' || key === 'prototype'
-}
-
-function clampGutterRows(value: number): number {
-  return Math.min(MAX_GUTTER_ROWS, Math.max(MIN_GUTTER_ROWS, Math.round(value)))
 }
 
 function isValidStoredEntry(

@@ -300,6 +300,23 @@ describe('useTerminalPaneDock', () => {
     expect(result.current.isPanePassthrough(PANE_KEY)).toBe(false)
   })
 
+  it('keeps passthrough active when an undock cannot resolve its unified tab', () => {
+    fakeStore.setState({
+      unifiedTabsByWorktree: {
+        'wt-1': [makeUnifiedTab({ terminalDockByPaneKey: undefined })]
+      }
+    })
+    writeTerminalDockPaneState(PANE_KEY, { docked: true, gutterRows: 5 })
+    const { container, result } = renderDockHookWithShortcutTarget()
+    act(() => dispatchPassthroughToggle(container))
+    expect(result.current.isPanePassthrough(PANE_KEY)).toBe(true)
+
+    act(() => fakeStore.setState({ unifiedTabsByWorktree: {} }))
+    act(() => result.current.toggleDockForLeaf(LEAF_ID))
+
+    expect(result.current.isPanePassthrough(PANE_KEY)).toBe(true)
+  })
+
   it('prunes passthrough membership and auto-exit tracking when a pane retires', () => {
     fakeStore.setState({
       agentStatusByPaneKey: { [PANE_KEY]: { state: 'working', agentType: 'claude' } }
@@ -415,6 +432,29 @@ describe('useTerminalPaneDock', () => {
     })
 
     it('writes the localStorage fallback when the gutter is resized', () => {
+      const { result } = renderDockHook(true)
+
+      act(() => result.current.commitGutterRows(PANE_KEY, 9))
+
+      expect(readTerminalDockPaneState(PANE_KEY)).toEqual({ docked: true, gutterRows: 9 })
+    })
+
+    it('resolves persistence values before the store action writes localStorage', () => {
+      const setTabTerminalDockState = vi.fn(
+        (_tabId: string, patch: { paneKey: string; gutterRows?: number }) => {
+          writeTerminalDockPaneState(patch.paneKey, {
+            docked: false,
+            gutterRows: patch.gutterRows ?? DEFAULT_GUTTER_ROWS
+          })
+        }
+      )
+      fakeStore.setState({
+        setTabTerminalDockState,
+        unifiedTabsByWorktree: {
+          'wt-1': [makeUnifiedTab({ terminalDockByPaneKey: undefined })]
+        }
+      })
+      writeTerminalDockPaneState(PANE_KEY, { docked: true, gutterRows: 11 })
       const { result } = renderDockHook(true)
 
       act(() => result.current.commitGutterRows(PANE_KEY, 9))

@@ -305,6 +305,7 @@
       "kind": "registration",
       "lines": [
         "import { parseLegacyNumericPaneKey, parsePaneKey } from '../../../../shared/stable-pane-id'",
+        "} from '../../../../shared/fork-terminal-dock/terminal-dock-gutter-rows'",
         "  terminalDock: z"
       ]
     },
@@ -626,13 +627,18 @@
       "path": "src/renderer/src/components/native-chat/native-chat-runtime-send-launch-draft.test.ts",
       "feature": "agent-composer",
       "kind": "passthrough",
-      "lines": ["const writes = (): string[] => {", "    await vi.advanceTimersByTimeAsync(0)"]
+      "lines": [
+        "} from './fork-agent-composer/native-chat-runtime-clear'",
+        "const writes = (): string[] => {",
+        "    await vi.advanceTimersByTimeAsync(0)"
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/native-chat-runtime-send.test.ts",
       "feature": "agent-composer",
       "kind": "passthrough",
       "lines": [
+        "import { NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT } from './fork-agent-composer/native-chat-runtime-clear'",
         "} from './fork-agent-composer/native-chat-send-outcome'",
         "import { cancelNativeChatPtySends } from './native-chat-pty-send-queue'"
       ]
@@ -642,7 +648,7 @@
       "feature": "agent-composer",
       "kind": "registration",
       "lines": [
-        "} from './fork-agent-composer/native-chat-runtime-clear'",
+        "import { clearConfirmDurationMs } from './fork-agent-composer/native-chat-runtime-clear'",
         "} from './fork-agent-composer/native-chat-typed-command-send'"
       ]
     },
@@ -669,7 +675,7 @@
       "feature": "agent-composer",
       "kind": "registration",
       "lines": [
-        "} from './fork-agent-composer/agent-composer-scope-cache'",
+        "} from './fork-agent-composer/agent-composer-attachment-cache'",
         "import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentComposerField'"
       ]
     },
@@ -2081,7 +2087,7 @@
       "removed": 7
     },
     "src/main/runtime/rpc/methods/session-tabs-schemas.ts": {
-      "added": 40,
+      "added": 47,
       "removed": 1
     },
     "src/main/runtime/rpc/methods/session-tabs.ts": {
@@ -2237,16 +2243,16 @@
       "removed": 8
     },
     "src/renderer/src/components/native-chat/native-chat-runtime-send-launch-draft.test.ts": {
-      "added": 29,
-      "removed": 9
+      "added": 33,
+      "removed": 11
     },
     "src/renderer/src/components/native-chat/native-chat-runtime-send.test.ts": {
-      "added": 484,
-      "removed": 53
+      "added": 486,
+      "removed": 55
     },
     "src/renderer/src/components/native-chat/native-chat-runtime-send.ts": {
-      "added": 58,
-      "removed": 276
+      "added": 53,
+      "removed": 277
     },
     "src/renderer/src/components/native-chat/native-chat-session-option-cache.ts": {
       "added": 32,
@@ -2257,8 +2263,8 @@
       "removed": 0
     },
     "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.ts": {
-      "added": 106,
-      "removed": 23
+      "added": 52,
+      "removed": 36
     },
     "src/renderer/src/components/native-chat/use-native-chat-interactive-send.test.tsx": {
       "added": 38,

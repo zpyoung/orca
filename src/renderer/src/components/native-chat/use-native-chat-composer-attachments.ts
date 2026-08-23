@@ -8,9 +8,15 @@ import {
 } from './native-chat-composer-target'
 import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentComposerField'
 import {
-  pinScopeCacheKey,
-  setBoundedScopeCacheEntry
-} from './fork-agent-composer/agent-composer-scope-cache'
+  readNativeChatAttachmentCache,
+  subscribeNativeChatAttachmentCache,
+  writeNativeChatAttachmentCache
+} from './fork-agent-composer/agent-composer-attachment-cache'
+export {
+  clearNativeChatAttachmentCacheForTests,
+  readNativeChatAttachmentCache,
+  subscribeNativeChatAttachmentCache
+} from './fork-agent-composer/agent-composer-attachment-cache'
 
 export type UseNativeChatComposerAttachmentsArgs = {
   attachmentScopeKey: string
@@ -158,28 +164,6 @@ export function useNativeChatComposerAttachments({
   }
 }
 
-const attachmentCache = new Map<string, AgentComposerImageAttachment[]>()
-
-type AttachmentCacheListener = (attachments: AgentComposerImageAttachment[]) => void
-const attachmentCacheListeners = new Map<string, Set<AttachmentCacheListener>>()
-
-export function readNativeChatAttachmentCache(scopeKey: string): AgentComposerImageAttachment[] {
-  return [...(attachmentCache.get(scopeKey) ?? [])]
-}
-
-function writeNativeChatAttachmentCache(
-  scopeKey: string,
-  attachments: readonly AgentComposerImageAttachment[]
-): void {
-  if (attachments.length === 0) {
-    attachmentCache.delete(scopeKey)
-  } else {
-    // LRU-bounded so pending attachments for permanently-removed panes can't accumulate.
-    setBoundedScopeCacheEntry(attachmentCache, scopeKey, [...attachments])
-  }
-  notifyAttachmentCacheListeners(scopeKey, [...attachments])
-}
-
 export function restoreNativeChatAttachmentCache(
   scopeKey: string,
   attachments: readonly AgentComposerImageAttachment[]
@@ -195,55 +179,4 @@ export function restoreNativeChatAttachmentCache(
   }
   writeNativeChatAttachmentCache(scopeKey, restored)
   return restored
-}
-
-/**
- * Subscribes to writes for `scopeKey`. Fires once immediately with the
- * current value, then on every subsequent write, so a restore from a
- * different host's unmounting hook instance still reaches whichever host is
- * live for this scope. Returns an unsubscribe function.
- */
-export function subscribeNativeChatAttachmentCache(
-  scopeKey: string,
-  listener: AttachmentCacheListener
-): () => void {
-  const listeners = attachmentCacheListeners.get(scopeKey) ?? new Set<AttachmentCacheListener>()
-  attachmentCacheListeners.set(scopeKey, listeners)
-  listeners.add(listener)
-  const unpin = pinScopeCacheKey(scopeKey)
-  try {
-    listener(readNativeChatAttachmentCache(scopeKey))
-  } catch {
-    // a subscriber's exception must never stop this subscribe call from completing
-  }
-  return () => {
-    listeners.delete(listener)
-    if (listeners.size === 0) {
-      attachmentCacheListeners.delete(scopeKey)
-    }
-    unpin()
-  }
-}
-
-function notifyAttachmentCacheListeners(
-  scopeKey: string,
-  attachments: AgentComposerImageAttachment[]
-): void {
-  const listeners = attachmentCacheListeners.get(scopeKey)
-  if (!listeners) {
-    return
-  }
-  // snapshot: a listener unsubscribing another mid-dispatch must not skip it
-  for (const listener of Array.from(listeners)) {
-    try {
-      listener(attachments)
-    } catch {
-      // a subscriber's exception must never block the other listeners
-    }
-  }
-}
-
-export function clearNativeChatAttachmentCacheForTests(): void {
-  attachmentCache.clear()
-  attachmentCacheListeners.clear()
 }

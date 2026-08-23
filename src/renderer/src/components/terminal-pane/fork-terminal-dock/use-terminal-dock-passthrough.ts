@@ -100,19 +100,11 @@ export function useTerminalDockPassthrough(args: {
             agentType: entry?.agentType
           })
         ) {
-          previousAgentStatesRef.current.delete(paneKey)
-          setPaneKeys((previous) => {
-            if (!previous.has(paneKey)) {
-              return previous
-            }
-            const next = new Set(previous)
-            next.delete(paneKey)
-            return next
-          })
+          exitPanePassthrough(paneKey)
         }
       }
     })
-  }, [enabled, paneKeys])
+  }, [enabled, exitPanePassthrough, paneKeys])
 
   const prunePassthroughForRetiredPane = useCallback(
     (leafId: string): void => exitPanePassthrough(makePaneKey(tabId, leafId)),
