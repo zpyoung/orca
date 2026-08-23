@@ -103,6 +103,7 @@ export function supportsBrowserPageFlag(commandPath: string[]): boolean {
     [
       'account',
       'artifacts',
+      'ask',
       'automations',
       'project',
       'repo',
@@ -151,6 +152,7 @@ export function isCommandGroup(commandPath: string[]): boolean {
       [
         'account',
         'artifacts',
+        'ask',
         'automations',
         'project',
         'host',
