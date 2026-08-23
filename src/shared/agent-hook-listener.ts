@@ -26,6 +26,7 @@ import {
 } from './agent-status-types'
 import { normalizeOptionalField } from './agent-status-field-normalization'
 import { isAskUserQuestionTool } from './agent-question-answered-intent'
+import { approvalFullInputFields } from './fork-approval-full-command/approval-full-input'
 import {
   claudeRosterHasRestoredSnapshotSubagent,
   claudeRosterHasRuntimeWorkingSubagent,
@@ -940,8 +941,9 @@ function deriveInteractivePrompt(
   }
   if (eventName === 'PermissionRequest' && typeof toolName === 'string' && toolName.length > 0) {
     try {
+      const summary = summarizeApprovalInput(toolInput)
       return JSON.stringify({
-        approval: { tool: toolName, summary: summarizeApprovalInput(toolInput) }
+        approval: { tool: toolName, summary, ...approvalFullInputFields(toolInput, summary) }
       })
     } catch {
       return undefined

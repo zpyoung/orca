@@ -1,0 +1,20 @@
+{
+  "components": {
+    "native-chat": {
+      "approval": {
+        "copied": "Copied",
+        "copy": "Copy to clipboard",
+        "hideFullCommand": "Hide full command",
+        "showFullCommand": "Show full command",
+        "hideFullInput": "Hide full input",
+        "showFullInput": "Show full input",
+        "copyTruncated": "Copy truncated text",
+        "hideCommand": "Hide command",
+        "showCommand": "Show command",
+        "hideInput": "Hide input",
+        "showInput": "Show input",
+        "truncatedNote": "Truncated — showing {{value0}} of {{value1}} characters."
+      }
+    }
+  }
+}

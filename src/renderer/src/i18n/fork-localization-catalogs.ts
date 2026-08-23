@@ -34,6 +34,11 @@ import skillPluginsES from '../components/native-chat/fork-skill-plugin-attribut
 import skillPluginsJA from '../components/native-chat/fork-skill-plugin-attribution/locales/ja.json'
 import skillPluginsKO from '../components/native-chat/fork-skill-plugin-attribution/locales/ko.json'
 import skillPluginsZH from '../components/native-chat/fork-skill-plugin-attribution/locales/zh.json'
+import approvalInputEN from '../components/native-chat/fork-approval-full-command/locales/en.json'
+import approvalInputES from '../components/native-chat/fork-approval-full-command/locales/es.json'
+import approvalInputJA from '../components/native-chat/fork-approval-full-command/locales/ja.json'
+import approvalInputKO from '../components/native-chat/fork-approval-full-command/locales/ko.json'
+import approvalInputZH from '../components/native-chat/fork-approval-full-command/locales/zh.json'
 
 type ForkLocale = 'en' | 'es' | 'ja' | 'ko' | 'zh'
 type ForkCatalog = Record<string, unknown>
@@ -52,11 +57,56 @@ type ForkCatalogRegistrar = {
 }
 
 const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
-  en: [relayEN, en, worktreeGroupsEN, dockEN, dockSettingsEN, agentComposerEN, skillPluginsEN],
-  es: [relayES, es, worktreeGroupsES, dockES, dockSettingsES, agentComposerES, skillPluginsES],
-  ja: [relayJA, ja, worktreeGroupsJA, dockJA, dockSettingsJA, agentComposerJA, skillPluginsJA],
-  ko: [relayKO, ko, worktreeGroupsKO, dockKO, dockSettingsKO, agentComposerKO, skillPluginsKO],
-  zh: [relayZH, zh, worktreeGroupsZH, dockZH, dockSettingsZH, agentComposerZH, skillPluginsZH]
+  en: [
+    relayEN,
+    en,
+    worktreeGroupsEN,
+    dockEN,
+    dockSettingsEN,
+    agentComposerEN,
+    skillPluginsEN,
+    approvalInputEN
+  ],
+  es: [
+    relayES,
+    es,
+    worktreeGroupsES,
+    dockES,
+    dockSettingsES,
+    agentComposerES,
+    skillPluginsES,
+    approvalInputES
+  ],
+  ja: [
+    relayJA,
+    ja,
+    worktreeGroupsJA,
+    dockJA,
+    dockSettingsJA,
+    agentComposerJA,
+    skillPluginsJA,
+    approvalInputJA
+  ],
+  ko: [
+    relayKO,
+    ko,
+    worktreeGroupsKO,
+    dockKO,
+    dockSettingsKO,
+    agentComposerKO,
+    skillPluginsKO,
+    approvalInputKO
+  ],
+  zh: [
+    relayZH,
+    zh,
+    worktreeGroupsZH,
+    dockZH,
+    dockSettingsZH,
+    agentComposerZH,
+    skillPluginsZH,
+    approvalInputZH
+  ]
 }
 
 export function registerForkLocalizationCatalogs(i18n: ForkCatalogRegistrar): void {

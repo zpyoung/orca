@@ -2,6 +2,7 @@ import { ShieldQuestion } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ChatApproval } from './native-chat-interactive-prompt'
 import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'
+import { ApprovalInputDisclosure } from './fork-approval-full-command/ApprovalInputDisclosure'
 
 export type NativeChatApprovalCardProps = {
   approval: ChatApproval
@@ -29,11 +30,7 @@ export function NativeChatApprovalCard({
             <ShieldQuestion className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             <div className="min-w-0">
               <p className="text-sm font-semibold text-foreground">{approval.title}</p>
-              {approval.detail ? (
-                <p className="mt-0.5 break-words font-mono text-xs text-muted-foreground">
-                  {approval.detail}
-                </p>
-              ) : null}
+              <ApprovalInputDisclosure approval={approval} />
             </div>
           </div>
           <div className="flex flex-wrap gap-2">

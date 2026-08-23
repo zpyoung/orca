@@ -49,3 +49,19 @@ Reviewed every sprint planning. Use `/quirk:artifacts:defer` to append.
 - **Estimated effort**: L
 - **Priority**: P3
 - **Proposed owner**: agent-composer feature owner
+
+## DEFER-5: Mobile's approval sheet still shows only the 200-character preview
+- **Deferred**: 2026-08-22
+- **Session context**: adding the composer approval card's full-command expander
+- **Why deferred**: the host now emits `full`/`fullField` on the approval envelope for every PermissionRequest, but only the desktop card reads them. `mobile/src/session/mobile-native-chat-permission.ts` parses the same envelope and still renders `summary` alone, so a long command is unreadable on mobile exactly as it was. The fields are already on the wire and additive, so the mobile side is a self-contained follow-up (parse two optional strings, add the same disclosure) rather than anything this change blocks.
+- **Estimated effort**: S
+- **Priority**: P3
+- **Proposed owner**: approval-full-command feature owner
+
+## DEFER-6: Approval dismiss key still hashes the truncated preview
+- **Deferred**: 2026-08-22
+- **Session context**: adding the composer approval card's full-command expander
+- **Why deferred**: `nativeChatCardDismissKey` builds `approval:${title}:${detail}` from the 200-character preview, so two different commands sharing a 200-character prefix — same script, different arguments, which is the common case for a scripted run — produce one key, and answering the first hides the second's card. `approval.full` now makes that distinguishable, but the key also feeds the answered-card dismissal state in `NativeChatInteractiveCard`, and changing what it hashes needs its own look at that lifecycle rather than a drive-by in an unrelated change.
+- **Estimated effort**: S
+- **Priority**: P3
+- **Proposed owner**: approval-full-command feature owner

@@ -1,4 +1,6 @@
 import { translate } from '@/i18n/i18n'
+import type { ApprovalFullInputFields } from '../../../../shared/fork-approval-full-command/approval-full-input'
+import { readApprovalFullInputFields } from './fork-approval-full-command/approval-full-input-envelope'
 import {
   buildAskAnswerKeys,
   buildCodexAskAnswerKeys,
@@ -33,7 +35,7 @@ export type ChatApproval = {
   title: string
   detail?: string
   options: { label: string; send: string }[]
-}
+} & ApprovalFullInputFields
 
 export type InteractivePromptCard =
   | { kind: 'question'; prompt: AskPrompt }
@@ -72,6 +74,7 @@ export function parseApprovalFromStatus(
       value0: tool
     }),
     detail: typeof summary === 'string' && summary.length > 0 ? summary : undefined,
+    ...readApprovalFullInputFields(approval),
     options: [
       { label: translate('components.native-chat.approval.allow', 'Allow'), send: '1' },
       { label: translate('components.native-chat.approval.deny', 'Deny'), send: ESCAPE }

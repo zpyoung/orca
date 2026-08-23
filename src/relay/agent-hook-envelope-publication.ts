@@ -4,6 +4,7 @@ import {
   createShedSubagentsField,
   type AgentHookRelayEnvelope
 } from '../shared/agent-hook-relay'
+import { APPROVAL_FULL_INPUT_FIELD } from '../shared/fork-approval-full-command/approval-full-input'
 import type { RelayDispatcher } from './dispatcher'
 
 // Why: shed the biggest, most reconstructible fields first — state/paneKey must survive or the pane
@@ -42,7 +43,8 @@ const COMPACTABLE_INTERACTIVE_PROMPT_FIELDS = new Set([
   'detail',
   'header',
   'question',
-  'summary'
+  'summary',
+  APPROVAL_FULL_INPUT_FIELD
 ])
 
 function fitsProducerFrame(dispatcher: RelayDispatcher, params: Record<string, unknown>): boolean {
