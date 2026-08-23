@@ -345,7 +345,7 @@ export class AskRegistry {
         // No dedicated column holds the unavailable reason; it rides in `summary`, which
         // otherwise carries no per-question content for a status with no real answers.
         return { status: 'unavailable', askId, reason: result.summary, ...result }
-      default:
+      case 'registered':
         throw new Error(`ask ${askId} has non-terminal status ${row.status}`)
     }
   }
