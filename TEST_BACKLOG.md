@@ -30,3 +30,10 @@ Reviewed every 2 weeks. Use `/quirk:artifacts:test-skip` to append.
 - **Reason skipped**: environment — both fail in a full `pnpm test` run on this 8-core host but pass in isolation on this branch, and pass in isolation at origin/main (33096f51b3). Same worker-pool contention class as TEST-1; neither file is touched by the warp-rich-input branch. Observed while verifying the rebase onto origin/main.
 - **Edge cases to cover**: make the Electron cookie-clear assertions load-tolerant, or move the `.electron.test.ts` files into a serial pool
 - **Priority**: P3
+
+## TEST-3: No component-level harness proves a same-id reattach re-renders the dock
+- **File under test**: src/renderer/src/components/terminal-pane/TerminalPane.tsx
+- **Test type**: component / integration
+- **Reason skipped**: no TerminalPane.test.tsx exists anywhere in the repo, and nothing renders <TerminalPane /> — the component owns a PaneManager, xterm instances, and the deferred connect loop, so standing one up is a harness project, not a test. The stale-dock fix is anchored instead by unit tests on the fork hook (use-terminal-dock-pty-binding-revision.test.ts, use-terminal-pane-dock.test.ts) plus the upstream contract test that proves the chokepoint fires on remount (pty-connection-reattach-binding.test.ts:173). The seam those three leave uncovered is the wiring itself: that TerminalPane's syncPanePtyLayoutBinding/clearExitedPanePtyLayoutBinding actually call the notifier. Verified manually in the Electron app instead.
+- **Edge cases to cover**: generation remount, tab-move rehome and web-mirror remount all reattach to the id the layout already holds; pty exit clears the dock without a toggle; multi-pane splits where one pane rebinds and siblings do not
+- **Priority**: P3
