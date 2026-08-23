@@ -2,6 +2,7 @@ import {
   removeOverriddenAgentSessionArgs,
   resolveAgentSessionOptionLaunch
 } from './agent-session-option-launch'
+import { appendClaudeSuppressionFlags } from './fork-ask-question-tool/claude-suppression-flag-composition'
 import type { SessionOptionValue } from './native-chat-session-options'
 import { getTuiAgentLaunchCommand, TUI_AGENT_CONFIG } from './tui-agent-config'
 import {
@@ -30,6 +31,7 @@ export function resolveAgentLaunchCommand(args: {
   sessionOptions?: Record<string, SessionOptionValue>
   sessionOptionsOverrideAgentArgs?: boolean
   isRemote?: boolean
+  claudeSuppressionFlags?: string[] | null
 }): ResolvedAgentLaunchCommand {
   const override = args.cmdOverrides[args.agent]
   const command =
@@ -90,12 +92,18 @@ export function resolveAgentLaunchCommand(args: {
     : command
   return {
     ok: true,
-    command: args.sessionOptionsOverrideAgentArgs
-      ? commandWithOverrides
-      : suffix.suffix
-        ? `${commandWithOptions} ${suffix.suffix}`
-        : commandWithOptions,
-    commandWithoutSessionOptions,
+    ...appendClaudeSuppressionFlags({
+      agent: args.agent,
+      shell: args.shell,
+      override,
+      command: args.sessionOptionsOverrideAgentArgs
+        ? commandWithOverrides
+        : suffix.suffix
+          ? `${commandWithOptions} ${suffix.suffix}`
+          : commandWithOptions,
+      commandWithoutSessionOptions,
+      claudeSuppressionFlags: args.claudeSuppressionFlags
+    }),
     appliedSessionOptions: resolvedOptions.appliedValues
   }
 }

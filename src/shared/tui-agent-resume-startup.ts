@@ -11,6 +11,7 @@ import { resolveStartupShell, type AgentStartupShell } from './tui-agent-startup
 import { TUI_AGENT_CONFIG } from './tui-agent-config'
 import type { TuiAgent } from './tui-agent'
 import { buildAgentResumeLaunchCommand } from './agent-resume-launch-command'
+import { applyClaudeSuppressionFlagsToResumeCommand } from './fork-ask-question-tool/claude-suppression-flag-composition'
 
 export function buildAgentResumeStartupPlan(args: {
   agent: ResumableTuiAgent
@@ -25,6 +26,7 @@ export function buildAgentResumeStartupPlan(args: {
   sessionOptions?: Record<string, SessionOptionValue>
   sessionOptionsOverrideAgentArgs?: boolean
   isRemote?: boolean
+  claudeSuppressionFlags?: string[] | null
 }): AgentStartupPlan | null {
   const argv = getAgentResumeArgv(args.agent, args.providerSession, args.ompResumeFilePath)
   if (!argv) {
@@ -35,7 +37,12 @@ export function buildAgentResumeStartupPlan(args: {
   const baseCommand = resolvedAgentCommand
     ? ({
         ok: true,
-        command: resolvedAgentCommand,
+        command: applyClaudeSuppressionFlagsToResumeCommand({
+          agent: args.agent,
+          shell,
+          command: resolvedAgentCommand,
+          claudeSuppressionFlags: args.claudeSuppressionFlags
+        }),
         commandWithoutSessionOptions: resolvedAgentCommand,
         appliedSessionOptions: {}
       } as const)
@@ -47,7 +54,8 @@ export function buildAgentResumeStartupPlan(args: {
         agentArgs: args.agentArgs,
         sessionOptions: args.sessionOptions,
         sessionOptionsOverrideAgentArgs: args.sessionOptionsOverrideAgentArgs,
-        isRemote: args.isRemote
+        isRemote: args.isRemote,
+        claudeSuppressionFlags: args.claudeSuppressionFlags
       })
   if (!baseCommand.ok) {
     return null

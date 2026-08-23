@@ -1,5 +1,18 @@
 import { hasReachedAppVersion } from '../../shared/app-version'
+import {
+  CLAUDE_ASK_SUPPRESSION_DISALLOWED_TOOLS_FLAG,
+  CLAUDE_ASK_SUPPRESSION_DISALLOWED_TOOLS_VALUE,
+  CLAUDE_ASK_SUPPRESSION_SYSTEM_PROMPT_FLAG,
+  CLAUDE_ASK_SUPPRESSION_SYSTEM_PROMPT_VALUE
+} from '../../shared/fork-ask-question-tool/claude-suppression-flags'
 import { tokenizeStartupCommand, type AgentStartupShell } from '../../shared/tui-agent-startup-shell'
+
+export {
+  CLAUDE_ASK_SUPPRESSION_DISALLOWED_TOOLS_FLAG,
+  CLAUDE_ASK_SUPPRESSION_DISALLOWED_TOOLS_VALUE,
+  CLAUDE_ASK_SUPPRESSION_SYSTEM_PROMPT_FLAG,
+  CLAUDE_ASK_SUPPRESSION_SYSTEM_PROMPT_VALUE
+}
 
 // --append-system-prompt gained its interactive-session behavior in 1.0.51; --disallowedTools
 // is older (0.2.82), so the pair floor is the newer flag's floor.
@@ -8,12 +21,6 @@ export const CLAUDE_ASK_SUPPRESSION_VERSION_FLOOR = '1.0.51'
 // Why: suppress hot-loop re-probing of a broken host while still detecting an in-place Claude
 // Code upgrade during a long Orca session, mirroring GitCapabilityCache's rationale.
 export const CLAUDE_ASK_SUPPRESSION_GATE_RETRY_INTERVAL_MS = 30 * 60_000
-
-export const CLAUDE_ASK_SUPPRESSION_DISALLOWED_TOOLS_FLAG = '--disallowedTools'
-export const CLAUDE_ASK_SUPPRESSION_DISALLOWED_TOOLS_VALUE = 'AskUserQuestion'
-export const CLAUDE_ASK_SUPPRESSION_SYSTEM_PROMPT_FLAG = '--append-system-prompt'
-export const CLAUDE_ASK_SUPPRESSION_SYSTEM_PROMPT_VALUE =
-  'When you need to ask the user a question, run the orca ask CLI (see the orca-ask skill) instead of asking in chat.'
 
 const CLAUDE_ASK_SUPPRESSION_FLAGS = [
   CLAUDE_ASK_SUPPRESSION_DISALLOWED_TOOLS_FLAG,

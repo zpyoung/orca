@@ -51,6 +51,7 @@ export function buildAgentStartupPlan(args: {
   /** Why: SSH remotes deploy the CLI shim as plain `orca`, so the Linux-only
    * `orca-ide` rename must be skipped for remote launches. */
   isRemote?: boolean
+  claudeSuppressionFlags?: string[] | null
 }): AgentStartupPlan | null {
   const { agent, prompt, cmdOverrides, platform, allowEmptyPromptLaunch = false } = args
   const shell = resolveStartupShell(platform, args.shell)
@@ -65,7 +66,8 @@ export function buildAgentStartupPlan(args: {
     agentArgs: usesQuery ? null : args.agentArgs,
     sessionOptions: args.sessionOptions,
     sessionOptionsOverrideAgentArgs: args.sessionOptionsOverrideAgentArgs,
-    isRemote: args.isRemote
+    isRemote: args.isRemote,
+    claudeSuppressionFlags: args.claudeSuppressionFlags
   })
   if (!baseCommand.ok) {
     return null
