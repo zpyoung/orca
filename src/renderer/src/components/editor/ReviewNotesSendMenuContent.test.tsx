@@ -350,6 +350,70 @@ describe('ReviewNotesSendMenuContent', () => {
     setStore()
   })
 
+  it('labels each target with its session title and demotes the agent name', () => {
+    const paneKeyA = makePaneKey(TAB_A, LEAF_A)
+    const paneKeyB = makePaneKey(TAB_B, LEAF_B)
+    setStore({
+      tabsByWorktree: {
+        'wt-1': [
+          tab(TAB_A, { title: '[CC] wt • ttys002', customTitle: 'Summary UI review' }),
+          tab(TAB_B, { title: '✳ Browser send fix' })
+        ]
+      },
+      terminalLayoutsByTabId: {
+        [TAB_A]: leafLayout(LEAF_A, 'pty-a'),
+        [TAB_B]: leafLayout(LEAF_B, 'pty-b')
+      }
+    })
+    harness.noteTargets = [
+      {
+        paneKey: paneKeyA,
+        tabId: TAB_A,
+        leafId: LEAF_A,
+        agentType: 'claude',
+        tabTitle: '[CC] wt • ttys002',
+        status: 'eligible'
+      },
+      {
+        paneKey: paneKeyB,
+        tabId: TAB_B,
+        leafId: LEAF_B,
+        agentType: 'claude',
+        tabTitle: '✳ Browser send fix',
+        status: 'eligible'
+      }
+    ]
+
+    const tree = render()
+    const items = findAllByType(tree, 'DropdownMenuItem')
+
+    expect(items).toHaveLength(2)
+    expect(collectText(items[0])).toBe('Summary UI reviewIdle · Claude')
+    expect(collectText(items[1])).toBe('Browser send fixIdle · Claude')
+  })
+
+  it('falls back to the agent name when the session has no usable title', () => {
+    const paneKey = makePaneKey(TAB_A, LEAF_A)
+    setStore({
+      tabsByWorktree: { 'wt-1': [tab(TAB_A, { title: 'Claude ready' })] },
+      terminalLayoutsByTabId: { [TAB_A]: leafLayout(LEAF_A, 'pty-a') }
+    })
+    harness.noteTargets = [
+      {
+        paneKey,
+        tabId: TAB_A,
+        leafId: LEAF_A,
+        agentType: 'claude',
+        tabTitle: 'Claude ready',
+        status: 'eligible'
+      }
+    ]
+
+    const tree = render()
+
+    expect(collectText(findByType(tree, 'DropdownMenuItem'))).toBe('ClaudeIdle · Claude ready')
+  })
+
   it('enumerates each running agent of the worktree as a send target', () => {
     const statusPaneKey = makePaneKey(TAB_A, LEAF_A)
     setStore({
