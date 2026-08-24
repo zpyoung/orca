@@ -19,6 +19,11 @@ here:
 - **Ownership resolution and verification** — [`references/file-ownership.md`](./references/file-ownership.md)
 - **Releasing** — the `release` skill
 
+Earlier runs record what they learned in
+[`references/sync-lessons.md`](./references/sync-lessons.md). Read it before Step 4. It is written by
+previous runs of this exact procedure, and it exists so you do not spend the budget rediscovering a
+wrong turn one of them already paid for.
+
 Arguments: `--unattended` suppresses every confirmation prompt. It does **not** grant extra
 latitude: an unattended run stops and reports wherever an attended run would ask a human, and the
 decisions this skill routes to a human stay routed to a human.
@@ -110,7 +115,7 @@ ORIGIN_UPSTREAM_OLD=$(git rev-parse origin/upstream)
 ```
 
 `$UPSTREAM_MAIN` is needed for the mirror branch in Step 12, the fork-commit range in Step 2, and
-the informational gap in Step 15. It is never the merge target.
+the informational gap in Step 16. It is never the merge target.
 
 ## Step 2 — Assess
 
@@ -313,7 +318,7 @@ Never, on either gate:
   tolerating one, and it requires reproducing the identical failure at `$ORIGIN_MAIN_OLD`
 
 Each fix is its own commit, its message naming what broke and why the fix is the right one. Every
-fix commit appears in the Step 15 report.
+fix commit appears in the Step 16 report.
 
 ## Step 8 — Verification gate
 
@@ -484,7 +489,7 @@ delete refs matching that exact pattern, and never the backup created by this ru
 
 ## Step 14 — Cut a release
 
-Run this step only if ALL of the following hold. If any fails, skip it and record in Step 15 that no
+Run this step only if ALL of the following hold. If any fails, skip it and record in Step 16 that no
 release was attempted, with the reason.
 
 - No hard fail occurred in Steps 3–11: the backup landed, no unresolvable conflict, commit
@@ -526,7 +531,64 @@ attention" item, but it does NOT invalidate the sync: the PR is already merged a
 carries it, and that stands. Never try to undo the sync because a release failed, and never re-run the skill in the
 same run to force a different outcome.
 
-## Step 15 — Report
+## Step 15 — Record what this run learned
+
+Most runs learn nothing and open no PR here. That is the normal outcome. An empty or padded learning
+PR is worse than none: it teaches the next reader to skim the one place that is supposed to be worth
+reading.
+
+Two things qualify, and the run must have actually hit them:
+
+- **A wrong turn.** This skill led you somewhere wrong, or said nothing where it should have warned,
+  and it cost the run time. Record the check that would have caught it, not the narrative.
+- **A confirmed discovery.** A resolution you proved correct that the next run would otherwise
+  re-derive — a file that always resolves one way and why, a command whose obvious form is subtly
+  wrong against this repo.
+
+Both carry the same bar: **reproducible**. A flaky check, a dropped connection, a one-off
+environment quirk is not a lesson, and writing it up as one puts a false rule in front of every
+later run.
+
+**Off-limits to any run-authored edit:** the `## Hard safety rules` section, and the "Never, on
+either gate" list in the fix policy. Those are what stop a run from buying a green check by
+weakening what it checks — and a run that has just been inconvenienced by one is the worst possible
+author of its revision. If you believe one is wrong, say so as a "needs attention" item in the
+report and leave the text alone.
+
+Where a lesson goes:
+
+- A lesson that is a **rule** — do X, never Y, check Z first — is edited into the step that owns it.
+  A rule parked in an appendix is a rule the next run skims past.
+- Everything else appends to `references/sync-lessons.md`: what happened, what the correct move was,
+  and how to recognize the situation again.
+
+Read what is already written before you add to it. This skill is long and covers a great deal;
+restating an existing rule in different words is how a runbook starts contradicting itself. A lesson
+that refines an existing rule edits that rule rather than settling in beside it.
+
+Open it from its own branch — never `$SYNC_BRANCH`, which has already merged:
+
+```sh
+git fetch origin main
+git checkout -b "sync-lessons/${STABLE_TAG}" origin/main
+# edit .claude/skills/sync-upstream/** only
+git commit -am "docs(sync-skill): <what the next run will do differently>"
+git push -u origin "sync-lessons/${STABLE_TAG}"
+env -u GITHUB_TOKEN gh pr create --repo zpyoung/orca --base main \
+  --title "sync-skill: <the lesson in one line>" --body-file <path to the body file>
+```
+
+The body carries the evidence: the command that misled you, its output, the SHA it happened at, and
+what the edit changes for the next run. A reviewer must be able to check the claim without
+reconstructing the run.
+
+**This PR is never auto-merged and never merged by the run.** Leave it open and name it in the
+report. It blocks nothing — the sync is already merged and any release already dispatched.
+
+Scope is `.claude/skills/sync-upstream/**` and nothing else. A lesson about the release procedure
+belongs to the `release` skill: report it, do not edit it from here.
+
+## Step 16 — Report
 
 - Stable target: `$STABLE_TAG` at `$UPSTREAM_TARGET`
 - PR: `$PR_URL`, and its end state (`merged` | `open — needs attention` | `auto-merge armed`)
@@ -544,6 +606,7 @@ same run to force a different outcome.
 - PR CI: every check that failed, whether it reproduced on re-run or was flake, and every fix commit
   made to turn it green — SHA, subject, and the cause it addressed
 - Release: `nothing to release` | `skipped (<reason>)` | the tag cut and the run dispatched
+- Learned: `nothing` | the lesson in one line and the URL of the skill PR left open for review
 - All "needs attention" items
 
 ## Hard safety rules
@@ -578,3 +641,7 @@ same run to force a different outcome.
 - Never cut a release from work this run could not verify and land. No release after any hard fail,
   none while the PR is still open, none with a dirty tree.
 - One release per run, at most. If the skill reports "nothing to release", that is the end of it.
+- This skill is revised by its own runs, but only through Step 15: a separate branch, a PR the run
+  never merges, and no edit to `## Hard safety rules` or the fix policy's never-list. Never edit the
+  skill on `$SYNC_BRANCH`, and never edit it as a way of getting a check green — a rule rewritten to
+  match what a run did is not a lesson, it is a cover-up.
