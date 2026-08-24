@@ -382,7 +382,7 @@ feature-collision checklist outcomes; what the Step 8 gate covered (and that tes
 PR's own CI); and the backup ref.
 
 Record `PR_NUMBER` and `PR_URL`. If a PR already exists for this branch, reuse it
-(`gh pr view --json number,url`) instead of opening a second one.
+(`env -u GITHUB_TOKEN gh pr view --repo zpyoung/orca --json number,url`) instead of opening a second one.
 
 ## Step 10 — Drive the PR green
 
