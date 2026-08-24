@@ -2792,7 +2792,18 @@
       "path": "src/main/runtime/rpc/methods/index.ts",
       "feature": "ask-question-tool",
       "kind": "registration",
-      "lines": ["import { ASK_METHODS } from './fork-ask-question-tool/ask'", "  ...ASK_METHODS,"]
+      "lines": [
+        "import { ASK_METHODS } from './fork-ask-question-tool/ask'",
+        "  ...ASK_METHODS,"
+      ]
+    },
+    {
+      "path": "src/main/index.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { forwardAskEventsToRenderer } from './fork-ask-question-tool/ask-ipc-forward'"
+      ]
     }
   ],
   "exceptions": [
@@ -3715,7 +3726,7 @@
       "removed": 1
     },
     "src/preload/api-types.ts": {
-      "added": 5,
+      "added": 8,
       "removed": 0
     },
     "src/preload/api/native-chat-api.ts": {
@@ -4570,7 +4581,11 @@
       "added": 5,
       "removed": 1
     },
-    "src/main/runtime/rpc/methods/index.ts": {
+    "src/preload/index.ts": {
+      "added": 30,
+      "removed": 7
+    },
+    "src/main/index.ts": {
       "added": 2,
       "removed": 0
     }
