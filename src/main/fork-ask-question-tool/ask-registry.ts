@@ -69,6 +69,11 @@ export class AskRegistry {
 
   constructor(private readonly db: AskDb) {}
 
+  /** Stable for this instance's lifetime, fresh on every construction — how clients detect a host restart. */
+  getEpoch(): string {
+    return this.epoch
+  }
+
   /** Durably inserts before returning the id, on every path; idempotent on `options.requestId`. */
   async register(spec: AskSpec, origin: AskOrigin, options: AskRegisterOptions): Promise<RegisterResult> {
     const askId = `ask_${randomUUID()}`

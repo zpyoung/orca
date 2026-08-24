@@ -162,4 +162,42 @@ describe('AskDb', () => {
     const updated = db.setHandoffQuestionId('ask_1', 'question_1')
     expect(updated.handoff_question_id).toBe('question_1')
   })
+
+  it('listPending returns non-terminal rows in seq order and excludes every terminal status', () => {
+    db = new AskDb(':memory:')
+    db.registerAsk(baseParams({ askId: 'ask_answered', requestId: 'req_answered' }))
+    db.commitAskResult('ask_answered', { status: 'answered', answersJson: '{}' })
+    db.registerAsk(baseParams({ askId: 'ask_declined', requestId: 'req_declined' }))
+    db.commitAskResult('ask_declined', { status: 'declined', answersJson: '{}' })
+    db.registerAsk(baseParams({ askId: 'ask_timed_out', requestId: 'req_timed_out' }))
+    db.commitAskResult('ask_timed_out', { status: 'timed_out', answersJson: '{}' })
+    db.registerAsk(baseParams({ askId: 'ask_unavailable', requestId: 'req_unavailable' }))
+    db.commitAskResult('ask_unavailable', { status: 'unavailable', answersJson: '{}' })
+    db.registerAsk(baseParams({ askId: 'ask_pending_1', requestId: 'req_pending_1' }))
+    db.registerAsk(baseParams({ askId: 'ask_pending_2', requestId: 'req_pending_2' }))
+
+    const pending = db.listPending()
+
+    expect(pending.map((row) => row.ask_id)).toEqual(['ask_pending_1', 'ask_pending_2'])
+    expect(pending.every((row) => row.status === 'registered')).toBe(true)
+  })
+
+  it('listSinceSeq returns everything above the boundary in seq order, terminal rows included, seq <= n excluded', () => {
+    db = new AskDb(':memory:')
+    db.registerAsk(baseParams({ askId: 'ask_1', requestId: 'req_1' }))
+    const boundary = db.registerAsk(baseParams({ askId: 'ask_2', requestId: 'req_2' }))
+    db.registerAsk(baseParams({ askId: 'ask_3', requestId: 'req_3' }))
+    // Why: committing bumps ask_3's own seq past its registration, so this also proves the
+    // ordering is by seq — not by registration order or insertion order.
+    db.commitAskResult('ask_3', { status: 'answered', answersJson: '{}' })
+    db.registerAsk(baseParams({ askId: 'ask_4', requestId: 'req_4' }))
+
+    const missed = db.listSinceSeq(boundary.row.seq)
+
+    const seqs = missed.map((row) => row.seq)
+    expect(missed.map((row) => row.ask_id)).toEqual(['ask_3', 'ask_4'])
+    expect(seqs).toEqual(seqs.toSorted((a, b) => a - b))
+    expect(missed.every((row) => row.seq > boundary.row.seq)).toBe(true)
+    expect(missed.find((row) => row.ask_id === 'ask_3')?.status).toBe('answered')
+  })
 })

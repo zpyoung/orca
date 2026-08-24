@@ -1,6 +1,6 @@
 import { chmodSync, existsSync } from 'node:fs'
 import Database from '../sqlite/sync-database'
-import type { PersistedAskStatus } from '../../shared/fork-ask-question-tool/ask-answer-envelope'
+import { isTerminalAskStatus, type PersistedAskStatus } from '../../shared/fork-ask-question-tool/ask-answer-envelope'
 
 const TERMINAL_RETENTION_MS = 24 * 60 * 60 * 1000
 
@@ -193,6 +193,31 @@ export class AskDb {
 
   getAsk(askId: string): AskRow | undefined {
     return this.db.prepare('SELECT * FROM asks WHERE ask_id = ?').get(askId) as AskRow | undefined
+  }
+
+  /**
+   * Every ask still awaiting a terminal transition, oldest first. Filters on `isTerminalAskStatus`
+   * rather than `resolved_at IS NULL` — the registry, not this store, is the authority on what
+   * counts as terminal, and duplicating that definition here would silently diverge if a future
+   * status ever resolved without stamping `resolved_at`.
+   *
+   * A pending ask registered before this process's AskRegistry existed — most importantly one
+   * still pending across a host restart — has no other way back into memory: this is what makes
+   * the C8 reload case return the card instead of losing it.
+   */
+  listPending(): AskRow[] {
+    return (this.db.prepare('SELECT * FROM asks ORDER BY seq ASC').all() as AskRow[]).filter(
+      (row) => !isTerminalAskStatus(row.status)
+    )
+  }
+
+  /**
+   * Every row touched since `seq`, oldest first, terminal statuses included — a reconnecting
+   * `ask.subscribe` with a still-valid watermark needs the transitions it missed, and a transition
+   * *to* terminal is exactly what `listPending` excludes by design.
+   */
+  listSinceSeq(seq: number): AskRow[] {
+    return this.db.prepare('SELECT * FROM asks WHERE seq > ? ORDER BY seq ASC').all(seq) as AskRow[]
   }
 
   updatePartial(askId: string, partialJson: string | null): AskRow {

@@ -47,6 +47,7 @@ import { STRUCTURED_AGENT_SESSION_METHODS } from './structured-agent-session'
 import { ARTIFACT_METHODS } from './artifacts'
 import { ARTIFACT_PASSWORD_METHODS } from './fork-artifact-passwords/artifact-password-methods'
 import { AGENT_HOOK_METHODS } from './agent-hooks'
+import { ASK_METHODS } from './fork-ask-question-tool/ask'
 
 // Why: a flat manifest keeps registration order explicit and provides one
 // grep-point for "what methods does the RPC server expose?" — useful when
@@ -57,6 +58,7 @@ export const ALL_RPC_METHODS: readonly RpcAnyMethod[] = [
   ...AI_VAULT_METHODS,
   ...ARTIFACT_METHODS,
   ...ARTIFACT_PASSWORD_METHODS,
+  ...ASK_METHODS,
   ...AUTOMATION_METHODS,
   ...REPO_METHODS,
   ...WORKTREE_METHODS,

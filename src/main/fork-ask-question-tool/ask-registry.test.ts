@@ -29,6 +29,21 @@ describe('AskRegistry', () => {
     expect(db.getAsk(askId)).toBeTruthy()
   })
 
+  describe('getEpoch', () => {
+    it('is stable across calls on one instance and differs across two instances', () => {
+      const registry = new AskRegistry(db)
+      expect(registry.getEpoch()).toBe(registry.getEpoch())
+
+      const otherDb = new AskDb(':memory:')
+      try {
+        const other = new AskRegistry(otherDb)
+        expect(other.getEpoch()).not.toBe(registry.getEpoch())
+      } finally {
+        otherDb.close()
+      }
+    })
+  })
+
   describe('register idempotency', () => {
     it('returns the existing askId on a requestId replay, emitting no second registered event', async () => {
       const registry = new AskRegistry(db)
