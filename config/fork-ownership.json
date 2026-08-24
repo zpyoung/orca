@@ -2804,6 +2804,20 @@
       "lines": [
         "import { forwardAskEventsToRenderer } from './fork-ask-question-tool/ask-ipc-forward'"
       ]
+    },
+    {
+      "path": "src/main/ipc/notifications.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": ["      if (runtime && args.source !== 'test' && args.source !== 'pending-ask') {"]
+    },
+    {
+      "path": "src/shared/notification-settings-types.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "export type NotificationEventSource = 'agent-task-complete' | 'terminal-bell' | 'pending-ask' | 'test'"
+      ]
     }
   ],
   "exceptions": [
@@ -4588,6 +4602,14 @@
     "src/main/index.ts": {
       "added": 2,
       "removed": 0
+    },
+    "src/main/ipc/notifications.ts": {
+      "added": 7,
+      "removed": 2
+    },
+    "src/shared/notification-settings-types.ts": {
+      "added": 6,
+      "removed": 1
     }
   }
 }
