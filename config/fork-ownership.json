@@ -1504,6 +1504,11 @@
       "status": "permanent"
     },
     {
+      "path": ".claude/skills/sync-upstream/references/sync-lessons.md",
+      "reason": "Fork-only record of what past sync runs learned; upstream has no such document.",
+      "status": "permanent"
+    },
+    {
       "path": ".github/scripts/check-fork-ownership.mjs",
       "reason": "The CI guard that enforces this manifest on pull requests \u2014 fork machinery, not upstream code.",
       "status": "permanent"
@@ -1673,6 +1678,11 @@
     {
       "path": "config/scripts/release-rc-history.test.mjs",
       "reason": "Tests for the fork's release-tooling delta above.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/reject-local-vitest-run.mjs",
+      "reason": "Fork-only guard enforcing the sandbox-only test rule for callers outside the Claude Code hook.",
       "status": "permanent"
     },
     {
