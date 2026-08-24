@@ -104,7 +104,10 @@
       "name": "ask-question-tool",
       "purpose": "Lets an agent pause a session to ask the user a structured question and blocks re-asking through Claude's own chat surface once a compatible CLI is available.",
       "globs": [
-        "**/fork-ask-question-tool/**"
+        "**/fork-ask-question-tool/**",
+        "skill-guides/orca-ask.md",
+        "skill-stubs/orca-ask.md",
+        "skills/orca-ask/**"
       ]
     }
   ],
