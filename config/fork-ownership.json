@@ -2787,6 +2787,12 @@
         "  trackAskSurfacePaneSubscription,",
         "          untrackAskSurfacePaneSubscription(runtime, connectionId, params.terminal)"
       ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/index.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": ["import { ASK_METHODS } from './fork-ask-question-tool/ask'", "  ...ASK_METHODS,"]
     }
   ],
   "exceptions": [
@@ -4563,6 +4569,10 @@
     "src/main/runtime/runtime-rpc.ts": {
       "added": 5,
       "removed": 1
+    },
+    "src/main/runtime/rpc/methods/index.ts": {
+      "added": 2,
+      "removed": 0
     }
   }
 }
