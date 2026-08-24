@@ -10,6 +10,7 @@ import { useTerminalDockLocalFallback } from './use-terminal-dock-local-fallback
 import { shouldDockTerminalComposerByDefault } from './terminal-dock-initial-state'
 import { useTerminalDockDisabledReason } from './use-terminal-dock-disabled-reason'
 import { useTerminalDockPassthrough } from './use-terminal-dock-passthrough'
+import { useTerminalDockPtyBindingRevision } from './use-terminal-dock-pty-binding-revision'
 import { useTerminalDockShortcutListener } from './use-terminal-dock-shortcut-listener'
 import type { PtyTransportRecoveryState } from '../pty-transport-types'
 
@@ -58,6 +59,10 @@ export type UseTerminalPaneDockResult = {
    *  prune — drops a closed pane's passthrough membership and auto-exit tracking so neither
    *  lingers for a leaf id that will never be reused. */
   prunePassthroughForRetiredPane: (leafId: string) => void
+  /** Call wherever a pane's transport binds or loses its PTY. The dock reads the id straight
+   *  off the transport during render, and the layout-store write at those same call sites
+   *  dedupes a reattach to an unchanged id — so without this the dock never re-reads. */
+  notePanePtyBindingChanged: () => void
 }
 
 /** Centralizes the terminal dock's TerminalPane-side state: which panes are docked (mirrored
@@ -137,6 +142,34 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
     )
   }, [tabId, worktreeId])
 
+  const applyDockState = useCallback(
+    (
+      paneKey: string,
+      patch: { docked?: boolean; gutterRows?: number },
+      beforeApply?: () => void
+    ): boolean => {
+      const unifiedTabId = resolveUnifiedTabId()
+      if (!unifiedTabId) {
+        return false
+      }
+      const persistedState = {
+        docked: patch.docked ?? isPaneDocked(paneKey),
+        gutterRows: patch.gutterRows ?? gutterRowsFor(paneKey)
+      }
+      beforeApply?.()
+      setTabTerminalDockState(unifiedTabId, { paneKey, ...patch })
+      persistLocalDockState(paneKey, persistedState)
+      return true
+    },
+    [
+      gutterRowsFor,
+      isPaneDocked,
+      persistLocalDockState,
+      resolveUnifiedTabId,
+      setTabTerminalDockState
+    ]
+  )
+
   const ensurePaneDockDefault = useCallback(
     (paneKey: string, agent: AgentType): void => {
       noteDetectedAgent(paneKey, agent)
@@ -148,23 +181,18 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       if (!shouldDockTerminalComposerByDefault({ enabled, agent, hasPersistedDecision })) {
         return
       }
-      const unifiedTabId = resolveUnifiedTabId()
-      if (!unifiedTabId) {
-        return
-      }
-      const gutterRows = gutterRowsFor(paneKey)
-      setTabTerminalDockState(unifiedTabId, { paneKey, docked: true, gutterRows })
-      persistLocalDockState(paneKey, { docked: true, gutterRows })
+      applyDockState(paneKey, {
+        docked: true,
+        gutterRows: gutterRowsFor(paneKey)
+      })
     },
     [
+      applyDockState,
       enabled,
       gutterRowsFor,
       hasLocalDockState,
       hostHasEverEchoed,
       noteDetectedAgent,
-      persistLocalDockState,
-      resolveUnifiedTabId,
-      setTabTerminalDockState,
       terminalDockByPaneKey
     ]
   )
@@ -174,14 +202,9 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       if (!enabled) {
         return
       }
-      const unifiedTabId = resolveUnifiedTabId()
-      if (!unifiedTabId) {
-        return
-      }
-      setTabTerminalDockState(unifiedTabId, { paneKey, gutterRows: rows })
-      persistLocalDockState(paneKey, { docked: isPaneDocked(paneKey), gutterRows: rows })
+      applyDockState(paneKey, { gutterRows: rows })
     },
-    [enabled, isPaneDocked, persistLocalDockState, resolveUnifiedTabId, setTabTerminalDockState]
+    [applyDockState, enabled]
   )
 
   const toggleDockForLeaf = useCallback(
@@ -189,34 +212,19 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       if (!enabled || !leafId) {
         return
       }
-      const unifiedTabId = resolveUnifiedTabId()
-      if (!unifiedTabId) {
-        return
-      }
       const paneKey = makePaneKey(tabId, leafId)
       const nextDocked = !isPaneDocked(paneKey)
-      if (!nextDocked) {
-        exitPanePassthrough(paneKey)
+      const beforeApply = nextDocked ? undefined : () => exitPanePassthrough(paneKey)
+      if (!applyDockState(paneKey, { docked: nextDocked }, beforeApply)) {
+        return
       }
-      setTabTerminalDockState(unifiedTabId, { paneKey, docked: nextDocked })
-      persistLocalDockState(paneKey, { docked: nextDocked, gutterRows: gutterRowsFor(paneKey) })
       emitTerminalDockToggled({
         docked: nextDocked,
         agent:
           agentForPane(paneKey) ?? useAppStore.getState().agentStatusByPaneKey[paneKey]?.agentType
       })
     },
-    [
-      agentForPane,
-      enabled,
-      exitPanePassthrough,
-      gutterRowsFor,
-      isPaneDocked,
-      persistLocalDockState,
-      resolveUnifiedTabId,
-      setTabTerminalDockState,
-      tabId
-    ]
+    [agentForPane, applyDockState, enabled, exitPanePassthrough, isPaneDocked, tabId]
   )
 
   const toggleDockForFocusedPane = useCallback((): void => {
@@ -234,24 +242,9 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       if (!isPaneDocked(paneKey)) {
         return
       }
-      const unifiedTabId = resolveUnifiedTabId()
-      if (!unifiedTabId) {
-        return
-      }
-      exitPanePassthrough(paneKey)
-      setTabTerminalDockState(unifiedTabId, { paneKey, docked: false })
-      persistLocalDockState(paneKey, { docked: false, gutterRows: gutterRowsFor(paneKey) })
+      applyDockState(paneKey, { docked: false }, () => exitPanePassthrough(paneKey))
     },
-    [
-      enabled,
-      exitPanePassthrough,
-      gutterRowsFor,
-      isPaneDocked,
-      persistLocalDockState,
-      resolveUnifiedTabId,
-      setTabTerminalDockState,
-      tabId
-    ]
+    [applyDockState, enabled, exitPanePassthrough, isPaneDocked, tabId]
   )
 
   useTerminalDockShortcutListener({
@@ -262,6 +255,7 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
   })
 
   const disabledReasonFor = useTerminalDockDisabledReason({ enabled, tabId })
+  const notePanePtyBindingChanged = useTerminalDockPtyBindingRevision(enabled)
 
   const prunePassthroughForRetiredPane = useCallback(
     (leafId: string): void => {
@@ -297,7 +291,8 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       disabledReasonFor,
       toggleDockForLeaf,
       undockOnConfirmedAgentExit,
-      prunePassthroughForRetiredPane
+      prunePassthroughForRetiredPane,
+      notePanePtyBindingChanged
     }),
     [
       commitGutterRows,
@@ -306,6 +301,7 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       gutterRowsFor,
       isPaneDocked,
       isPanePassthrough,
+      notePanePtyBindingChanged,
       ensurePaneDockDefault,
       resolveDockAgent,
       paneDockOwnsFocus,

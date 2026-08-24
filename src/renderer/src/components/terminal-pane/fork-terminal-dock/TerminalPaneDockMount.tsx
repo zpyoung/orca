@@ -70,7 +70,20 @@ export function TerminalPaneDockMount(props: TerminalPaneDockMountProps): React.
     () => pane.container.getBoundingClientRect().height
   )
   const [effectiveDockMounted, setEffectiveDockMounted] = useState(false)
+  // Why: React runs the unmount cleanup that zeroes the slot before the layout effect below,
+  // one commit ahead of the state flush — the effect must not re-apply a height already gone.
+  const dockMountedRef = useRef(false)
   const dockContainer = useMemo(() => findDockContainer(pane), [pane])
+  const setDockHeight = useCallback(
+    (height: number): void => {
+      if (!dockContainer) {
+        return
+      }
+      dockContainer.style.height = `${height}px`
+      pane.container.style.setProperty('--terminal-dock-height', `${height}px`)
+    },
+    [dockContainer, pane]
+  )
 
   // Why: getPanes() hands out a fresh pane view per render, so the host's reader
   // closes over a new pane every time. The composer memoizes its whole session-option
@@ -181,6 +194,7 @@ export function TerminalPaneDockMount(props: TerminalPaneDockMountProps): React.
   const renderedGutterRows = liveGutterRows ?? gutterRows
   const handleMountedChange = useCallback(
     (mounted: boolean) => {
+      dockMountedRef.current = mounted
       if (!mounted) {
         cancelGutterDragRef.current?.()
         cancelGutterDragRef.current = null
@@ -191,27 +205,21 @@ export function TerminalPaneDockMount(props: TerminalPaneDockMountProps): React.
         return
       }
       const height = mounted ? terminalDockGutterHeightPx(renderedGutterRows) : 0
-      applyTerminalDockGeometryChange(pane, undefined, () => {
-        dockContainer.style.height = `${height}px`
-        pane.container.style.setProperty('--terminal-dock-height', `${height}px`)
-      })
+      applyTerminalDockGeometryChange(pane, undefined, () => setDockHeight(height))
     },
-    [dockContainer, pane, onEffectiveMountedChange, renderedGutterRows]
+    [dockContainer, onEffectiveMountedChange, pane, renderedGutterRows, setDockHeight]
   )
 
   useLayoutEffect(() => {
-    if (!dockContainer || !effectiveDockMounted) {
+    if (!dockContainer || !dockMountedRef.current) {
       return
     }
     const height = terminalDockGutterHeightPx(renderedGutterRows)
     if (dockContainer.style.height === `${height}px`) {
       return
     }
-    applyTerminalDockGeometryChange(pane, undefined, () => {
-      dockContainer.style.height = `${height}px`
-      pane.container.style.setProperty('--terminal-dock-height', `${height}px`)
-    })
-  }, [dockContainer, effectiveDockMounted, pane, renderedGutterRows])
+    applyTerminalDockGeometryChange(pane, undefined, () => setDockHeight(height))
+  }, [dockContainer, effectiveDockMounted, pane, renderedGutterRows, setDockHeight])
 
   const handleGutterPointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
@@ -220,11 +228,7 @@ export function TerminalPaneDockMount(props: TerminalPaneDockMountProps): React.
         pane,
         startGutterRows: gutterRows,
         onLiveRowsChange: (rows) => {
-          if (dockContainer) {
-            const height = terminalDockGutterHeightPx(rows)
-            dockContainer.style.height = `${height}px`
-            pane.container.style.setProperty('--terminal-dock-height', `${height}px`)
-          }
+          setDockHeight(terminalDockGutterHeightPx(rows))
           setLiveGutterRows(rows)
         },
         onCommit: (rows) => {
@@ -235,7 +239,7 @@ export function TerminalPaneDockMount(props: TerminalPaneDockMountProps): React.
         }
       })
     },
-    [dockContainer, gutterRows, onCommitGutterRows, pane]
+    [gutterRows, onCommitGutterRows, pane, setDockHeight]
   )
 
   if (!docked || !dockContainer) {

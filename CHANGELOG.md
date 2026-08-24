@@ -1,6 +1,6 @@
 ---
-last_released_commit: 159526393438f85174d324e56361ebeb07098607
-upstream_synced: v1.4.187
+last_released_commit: 92a36661eae1b6f6419a74c460dfc18ffa2b7260
+upstream_synced: v1.4.188
 ---
 
 # Changelog
@@ -11,6 +11,28 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.189-rc.0.zy01] - 2026-08-24
+
+Synced to upstream [v1.4.188](https://github.com/stablyai/orca/releases/tag/v1.4.188).
+
+### Fixed
+- Closing the docked composer no longer leaves a dead strip below the terminal. The pane's geometry
+  effect used to re-run after the composer's own cleanup had zeroed the slot and write the gutter
+  height straight back, so the terminal never grew into the space it had just been given.
+- The docked composer no longer shows "No terminal session" over a live pane. It reads the pane's
+  PTY id during render, and a reattach that lands on the id the layout already holds — recovery
+  remount, tab move, web-mirror remount — used to produce no re-render at all, stranding the
+  composer on the value it read while the attach was still pending.
+- The fork's skill release ledger is now declared fork-owned, so a sync can no longer replace it
+  with upstream's rows. Those rows name tags that exist only on `stablyai/orca`, which killed the
+  skill-update roundtrip check across every matrix job the last time a sync took them.
+
+### Changed
+- The agent composer's draft, history, and attachment caches are built from one shared scope cache
+  instead of three copies, the terminal-dock gutter clamp lives in one module rather than six call
+  sites, and the dock-state merge paths are collapsed onto a single routine. Net 195 lines removed,
+  with no behaviour change.
 
 ## [1.4.188-rc.0.zy01] - 2026-08-22
 

@@ -6,6 +6,10 @@ import { sleepingAgentLaunchConfigSchema } from '../../../../shared/workspace-se
 import { RUNTIME_NAVIGATION_TARGETS } from '../../../../shared/runtime-navigation'
 import { TAB_ACTIVATION_INTENTS } from '../../../../shared/tab-activation-intent'
 import { parseLegacyNumericPaneKey, parsePaneKey } from '../../../../shared/stable-pane-id'
+import {
+  MAX_GUTTER_ROWS,
+  MIN_GUTTER_ROWS
+} from '../../../../shared/fork-terminal-dock/terminal-dock-gutter-rows'
 import { OptionalBoolean } from '../schemas'
 
 // Why: paneKey is attacker-reachable (remote client input) and never checked
@@ -159,11 +163,14 @@ export const SetTabProps = WorktreeTabSelector.extend({
     .object({
       paneKey: TerminalDockPaneKeySchema.optional(),
       docked: z.boolean().optional(),
-      gutterRows: z.number().int().min(3).max(15).optional(),
+      gutterRows: z.number().int().min(MIN_GUTTER_ROWS).max(MAX_GUTTER_ROWS).optional(),
       remove: z.array(TerminalDockPaneKeySchema).max(MAX_TERMINAL_DOCK_REMOVE_KEYS).optional()
     })
     .superRefine((value, ctx) => {
-      if (value.paneKey === undefined && (value.docked !== undefined || value.gutterRows !== undefined)) {
+      if (
+        value.paneKey === undefined &&
+        (value.docked !== undefined || value.gutterRows !== undefined)
+      ) {
         ctx.addIssue({ code: 'custom', message: 'Setting docked/gutterRows requires paneKey' })
       }
     })

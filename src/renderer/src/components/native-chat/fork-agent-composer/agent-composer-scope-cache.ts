@@ -65,3 +65,79 @@ export function setBoundedScopeCacheEntry<T>(
 export function clearScopeCachePinsForTests(): void {
   pinnedScopeCounts.clear()
 }
+
+type SubscribableScopeCacheOptions<T> = {
+  createEmptyValue: () => T
+  isEmpty: (value: T) => boolean
+  copyValue?: (value: T) => T
+}
+
+export type SubscribableScopeCache<T> = {
+  read: (scopeKey: string) => T
+  write: (scopeKey: string, value: T) => void
+  subscribe: (scopeKey: string, listener: (value: T) => void) => () => void
+  clearForTests: () => void
+}
+
+/** Creates a bounded per-scope cache whose subscribers receive the current value and every write. */
+export function createSubscribableScopeCache<T>({
+  createEmptyValue,
+  isEmpty,
+  copyValue
+}: SubscribableScopeCacheOptions<T>): SubscribableScopeCache<T> {
+  const cache = new Map<string, T>()
+  const listenersByScopeKey = new Map<string, Set<(value: T) => void>>()
+  const copy = copyValue ?? ((value: T): T => value)
+
+  const read = (scopeKey: string): T =>
+    copy(cache.has(scopeKey) ? cache.get(scopeKey)! : createEmptyValue())
+
+  const notify = (scopeKey: string, value: T): void => {
+    const listeners = listenersByScopeKey.get(scopeKey)
+    if (!listeners) {
+      return
+    }
+    const notificationValue = copy(value)
+    for (const listener of Array.from(listeners)) {
+      try {
+        listener(notificationValue)
+      } catch {
+        // a subscriber's exception must never block the other listeners
+      }
+    }
+  }
+
+  return {
+    read,
+    write: (scopeKey, value) => {
+      if (isEmpty(value)) {
+        cache.delete(scopeKey)
+      } else {
+        setBoundedScopeCacheEntry(cache, scopeKey, copy(value))
+      }
+      notify(scopeKey, value)
+    },
+    subscribe: (scopeKey, listener) => {
+      const listeners = listenersByScopeKey.get(scopeKey) ?? new Set<(value: T) => void>()
+      listenersByScopeKey.set(scopeKey, listeners)
+      listeners.add(listener)
+      const unpin = pinScopeCacheKey(scopeKey)
+      try {
+        listener(read(scopeKey))
+      } catch {
+        // a subscriber's exception must never stop this subscribe call from completing
+      }
+      return () => {
+        listeners.delete(listener)
+        if (listeners.size === 0) {
+          listenersByScopeKey.delete(scopeKey)
+        }
+        unpin()
+      }
+    },
+    clearForTests: () => {
+      cache.clear()
+      listenersByScopeKey.clear()
+    }
+  }
+}

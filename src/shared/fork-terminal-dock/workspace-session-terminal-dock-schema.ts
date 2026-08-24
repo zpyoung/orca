@@ -2,6 +2,7 @@
 // workspace session file.
 
 import { z } from 'zod'
+import { MAX_GUTTER_ROWS, MIN_GUTTER_ROWS } from './terminal-dock-gutter-rows'
 
 // Why: mirrors the unsafe-key guard in workspace-session-sleeping-agents.ts;
 // duplicated locally since that module doesn't export it.
@@ -10,7 +11,7 @@ const isUnsafeTabRecordKey = (value: string): boolean =>
 
 const terminalDockPaneStateSchema = z.object({
   docked: z.boolean(),
-  gutterRows: z.number().int().min(3).max(15)
+  gutterRows: z.number().int().min(MIN_GUTTER_ROWS).max(MAX_GUTTER_ROWS)
 })
 
 // Why: each pane's dock state must validate independently — a single

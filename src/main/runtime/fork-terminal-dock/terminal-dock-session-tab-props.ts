@@ -3,8 +3,9 @@ import type {
   RuntimeMobileSessionTabsSnapshot
 } from '../../../shared/runtime-types'
 import type { TerminalDockPaneState } from '../../../shared/fork-terminal-dock/terminal-dock-pane-state'
+import { DEFAULT_GUTTER_ROWS as DEFAULT_TERMINAL_DOCK_GUTTER_ROWS } from '../../../shared/fork-terminal-dock/terminal-dock-gutter-rows'
 
-export const DEFAULT_TERMINAL_DOCK_GUTTER_ROWS = 5
+export { DEFAULT_TERMINAL_DOCK_GUTTER_ROWS }
 
 // Why: clients now prune retired panes via the removal path below, but this
 // cap remains the backstop for clients that never prune (old clients, or a
