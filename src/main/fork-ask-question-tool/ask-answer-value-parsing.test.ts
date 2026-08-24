@@ -40,6 +40,12 @@ describe('parseTextAnswerValue', () => {
     expect(parseTextAnswerValue(question, 'not-an-email')).toBeNull()
     expect(parseTextAnswerValue(question, 'a@b.com')).toBe('a@b.com')
   })
+
+  it('rejects an answer longer than the pattern test-input bound instead of running the regex on it', () => {
+    const question: AskTextQuestion = { ...base, pattern: '^[a-z]+$' }
+    expect(parseTextAnswerValue(question, 'a'.repeat(201))).toBeNull()
+    expect(parseTextAnswerValue(question, 'a'.repeat(200))).toBe('a'.repeat(200))
+  })
 })
 
 describe('parseNumberAnswerValue', () => {

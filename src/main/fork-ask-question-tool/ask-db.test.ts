@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AskDb, type RegisterAskParams } from './ask-db'
 
 function baseParams(overrides: Partial<RegisterAskParams> = {}): RegisterAskParams {
@@ -94,6 +94,51 @@ describe('AskDb', () => {
 
     expect(purged).toBe(0)
     expect(db.getAsk('ask_1')).toBeDefined()
+  })
+
+  it('sweeps stale rows immediately and again on every interval', () => {
+    vi.useFakeTimers({ now: new Date('2024-01-02T00:00:01.000Z') })
+    db = new AskDb(':memory:')
+    db.registerAsk(baseParams({ askId: 'ask_stale', requestId: 'req_stale' }))
+    db.commitAskResult('ask_stale', { status: 'answered', answersJson: '{}' }, '2024-01-01T00:00:00.000Z')
+
+    db.startPeriodicPurge(1_000)
+    expect(db.getAsk('ask_stale')).toBeUndefined()
+
+    db.registerAsk(baseParams({ askId: 'ask_stale_2', requestId: 'req_stale_2' }))
+    db.commitAskResult('ask_stale_2', { status: 'answered', answersJson: '{}' }, '2024-01-01T00:00:00.000Z')
+    vi.advanceTimersByTime(1_000)
+    expect(db.getAsk('ask_stale_2')).toBeUndefined()
+
+    vi.useRealTimers()
+  })
+
+  it('stops the sweep on close, leaving no live handle behind', () => {
+    vi.useFakeTimers({ now: new Date('2024-01-02T00:00:01.000Z') })
+    // Own instance, closed within the test — the shared `db` var stays for afterEach's cleanup
+    // of a database this test never opened.
+    const owned = new AskDb(':memory:')
+    owned.startPeriodicPurge(1_000)
+    owned.close()
+
+    // If the interval survived close(), running it here would query a closed connection and throw.
+    expect(() => vi.advanceTimersByTime(10_000)).not.toThrow()
+
+    vi.useRealTimers()
+  })
+
+  it('stopPeriodicPurge halts future sweeps without closing the db', () => {
+    vi.useFakeTimers({ now: new Date('2024-01-02T00:00:01.000Z') })
+    db = new AskDb(':memory:')
+    db.startPeriodicPurge(1_000)
+    db.stopPeriodicPurge()
+
+    db.registerAsk(baseParams({ askId: 'ask_stale', requestId: 'req_stale' }))
+    db.commitAskResult('ask_stale', { status: 'answered', answersJson: '{}' }, '2024-01-01T00:00:00.000Z')
+    vi.advanceTimersByTime(5_000)
+
+    expect(db.getAsk('ask_stale')).toBeDefined()
+    vi.useRealTimers()
   })
 
   it('keeps seq monotonic across row changes and across a reopen', () => {

@@ -6,6 +6,12 @@ export type AskAttachedSurfaceRosterHost = {
   hasLocalRendererWindow(): boolean
 }
 
+/** Where a pane losing or regaining its last capable owner is reported, for the ask liveness grace timer (tech.md C2). */
+export type AskPaneLivenessSink = {
+  notePaneDetached(paneKey: string): void
+  notePaneAttached(paneKey: string): void
+}
+
 /**
  * Tracks, per live connection, the panes it currently subscribes a terminal view to and the
  * capabilities it advertised at auth — the facts `ask.register`'s capability gate needs to tell
@@ -17,20 +23,34 @@ export class AskAttachedSurfaceRoster {
   private readonly paneRefcountsByConnection = new Map<string, Map<string, number>>()
   private readonly subscribedPaneByConnectionAndHandle = new Map<string, Map<string, string>>()
 
-  constructor(private readonly host: AskAttachedSurfaceRosterHost) {}
+  constructor(
+    private readonly host: AskAttachedSurfaceRosterHost,
+    private readonly livenessSink?: AskPaneLivenessSink
+  ) {}
 
+  /** Capabilities gate `hasCapableOwner`, so changing them can flip it for every pane this connection already holds. */
   recordConnectionCapabilities(
     connectionId: string,
     capabilities: readonly RuntimeCapability[]
   ): void {
+    const affectedPanes = [...(this.paneRefcountsByConnection.get(connectionId)?.keys() ?? [])]
+    const wasCapable = new Map(affectedPanes.map((paneKey) => [paneKey, this.hasCapableOwner(paneKey)]))
     this.capabilitiesByConnection.set(connectionId, capabilities)
+    for (const paneKey of affectedPanes) {
+      this.reportOwnershipChange(paneKey, wasCapable.get(paneKey) ?? false)
+    }
   }
 
   /** Drops every pane and capability entry for a connection — the dropped-connection safety net. */
   forgetConnection(connectionId: string): void {
+    const affectedPanes = [...(this.paneRefcountsByConnection.get(connectionId)?.keys() ?? [])]
+    const wasCapable = new Map(affectedPanes.map((paneKey) => [paneKey, this.hasCapableOwner(paneKey)]))
     this.capabilitiesByConnection.delete(connectionId)
     this.paneRefcountsByConnection.delete(connectionId)
     this.subscribedPaneByConnectionAndHandle.delete(connectionId)
+    for (const paneKey of affectedPanes) {
+      this.reportOwnershipChange(paneKey, wasCapable.get(paneKey) ?? false)
+    }
   }
 
   /** Remembers the pane a (connection, terminalHandle) subscription resolved to, so cleanup can find it later. */
@@ -62,12 +82,14 @@ export class AskAttachedSurfaceRoster {
   }
 
   trackPaneSubscription(connectionId: string, paneKey: string): void {
+    const wasCapable = this.hasCapableOwner(paneKey)
     let panes = this.paneRefcountsByConnection.get(connectionId)
     if (!panes) {
       panes = new Map()
       this.paneRefcountsByConnection.set(connectionId, panes)
     }
     panes.set(paneKey, (panes.get(paneKey) ?? 0) + 1)
+    this.reportOwnershipChange(paneKey, wasCapable)
   }
 
   untrackPaneSubscription(connectionId: string, paneKey: string): void {
@@ -76,6 +98,7 @@ export class AskAttachedSurfaceRoster {
     if (!panes || count === undefined) {
       return
     }
+    const wasCapable = this.hasCapableOwner(paneKey)
     if (count <= 1) {
       panes.delete(paneKey)
       if (panes.size === 0) {
@@ -83,6 +106,20 @@ export class AskAttachedSurfaceRoster {
       }
     } else {
       panes.set(paneKey, count - 1)
+    }
+    this.reportOwnershipChange(paneKey, wasCapable)
+  }
+
+  /** Notifies the liveness sink only on an actual gain/loss of `paneKey`'s last capable owner. */
+  private reportOwnershipChange(paneKey: string, wasCapable: boolean): void {
+    const isCapable = this.hasCapableOwner(paneKey)
+    if (isCapable === wasCapable) {
+      return
+    }
+    if (isCapable) {
+      this.livenessSink?.notePaneAttached(paneKey)
+    } else {
+      this.livenessSink?.notePaneDetached(paneKey)
     }
   }
 
@@ -104,9 +141,10 @@ export class AskAttachedSurfaceRoster {
 }
 
 export function createAskAttachedSurfaceRoster(
-  host: AskAttachedSurfaceRosterHost
+  host: AskAttachedSurfaceRosterHost,
+  livenessSink?: AskPaneLivenessSink
 ): AskAttachedSurfaceRoster {
-  return new AskAttachedSurfaceRoster(host)
+  return new AskAttachedSurfaceRoster(host, livenessSink)
 }
 
 // Why: terminal.subscribe is driven by test doubles and by callers that predate this feature, so

@@ -1,4 +1,5 @@
 import type { AskAnswer, AskAnswers } from '../../shared/fork-ask-question-tool/ask-answer-envelope'
+import { MAX_PATTERN_TEST_LENGTH } from '../../shared/fork-ask-question-tool/ask-question-field-validation'
 import type {
   AskNumberQuestion,
   AskSpec,
@@ -28,6 +29,9 @@ function isCalendarDate(value: string): boolean {
 /** `question.pattern` was already validated compilable at registration; the try/catch is defense in depth. */
 export function parseTextAnswerValue(question: AskTextQuestion, raw: string): string | null {
   if (question.pattern) {
+    if (raw.length > MAX_PATTERN_TEST_LENGTH) {
+      return null
+    }
     let regex: RegExp
     try {
       regex = new RegExp(question.pattern)

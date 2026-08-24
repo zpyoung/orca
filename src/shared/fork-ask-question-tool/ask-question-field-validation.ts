@@ -13,9 +13,11 @@ import type {
 
 const MAX_OPTIONS = 12
 const MAX_PATTERN_LENGTH = 200
-const MAX_PATTERN_TEST_LENGTH = 200
+export const MAX_PATTERN_TEST_LENGTH = 200
 
-const CREDENTIAL_TRIGGER = '(pass(word|phrase)?|secret|token|api\\s?key|credential|private\\s?key)'
+// `secret key` joins `api key` and `private key` as a named credential term, not just `secret`
+// plus an unrelated word.
+const CREDENTIAL_TRIGGER = '(pass(word|phrase)?|secret\\s?key|secret|token|api\\s?key|credential|private\\s?key)'
 const CREDENTIAL_PATTERN = new RegExp(`\\b${CREDENTIAL_TRIGGER}\\b`, 'i')
 const CREDENTIAL_SUBSTRING_PATTERN = new RegExp(CREDENTIAL_TRIGGER, 'i')
 
@@ -23,23 +25,34 @@ const CREDENTIAL_SUBSTRING_PATTERN = new RegExp(CREDENTIAL_TRIGGER, 'i')
 // capitals, so snake_case, camelCase, and ACRONYMCase credential-shaped values would
 // otherwise slip the check; split all three into real word boundaries before matching
 // (tech.md C1 REGEX: credential refusal).
-function normalizeCredentialCandidate(value: string): string {
-  return value
-    .replace(/[_-]+/g, ' ')
-    .replace(/([A-Z]+)(?=[A-Z][a-z])/g, '$1 ')
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .replace(/([A-Za-z])(\d)/g, '$1 $2')
-    .replace(/(\d)([A-Za-z])/g, '$1 $2')
+//
+// A capital run directly against a lowercase run (`DBpassword`) has no second capital to mark
+// where the trailing word starts, so there is no single correct split point without a
+// dictionary: keeping the last capital with the acronym reads it as `D Bpassword`, keeping it
+// with the word reads it as `DB password`. Return both candidates and let the caller check
+// either, rather than betting on one.
+function normalizeCredentialCandidates(value: string): string[] {
+  const withoutSeparators = value.replace(/[_-]+/g, ' ')
+  const finishSplit = (candidate: string): string =>
+    candidate
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/([A-Za-z])(\d)/g, '$1 $2')
+      .replace(/(\d)([A-Za-z])/g, '$1 $2')
+  return [
+    finishSplit(withoutSeparators.replace(/([A-Z]+)(?=[A-Z][a-z])/g, '$1 ')),
+    finishSplit(withoutSeparators.replace(/([A-Z]+)([a-z])/g, '$1 $2'))
+  ]
 }
 
 function isCredentialShaped(value: string): boolean {
-  const normalized = normalizeCredentialCandidate(value)
-  if (CREDENTIAL_PATTERN.test(normalized)) {
-    return true
-  }
-  // an unbroken capital run (MYSECRET) has no internal boundary for \b to land
-  // on and reads as one opaque token; fall back to a plain substring match.
-  return normalized.split(' ').some((word) => /^[A-Z0-9]+$/.test(word) && CREDENTIAL_SUBSTRING_PATTERN.test(word))
+  return normalizeCredentialCandidates(value).some((normalized) => {
+    if (CREDENTIAL_PATTERN.test(normalized)) {
+      return true
+    }
+    // an unbroken capital run (MYSECRET) has no internal boundary for \b to land
+    // on and reads as one opaque token; fall back to a plain substring match.
+    return normalized.split(' ').some((word) => /^[A-Z0-9]+$/.test(word) && CREDENTIAL_SUBSTRING_PATTERN.test(word))
+  })
 }
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
@@ -57,15 +70,76 @@ function isValidIsoDate(value: string): boolean {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
 }
 
+const MAX_PATTERN_QUANTIFIERS = 10
+
+function isQuantifierChar(char: string | undefined): boolean {
+  return char === '+' || char === '*' || char === '{' || char === '?'
+}
+
+// only `+`, `*`, `{` repeat their subject an unbounded number of times; a trailing `?` repeats
+// its subject at most once, so it can never itself compound an inner quantifier into exponential
+// backtracking (`(a+)?` is linear; only wrapping it in `+`/`*`/`{` makes it dangerous).
+function isCompoundingQuantifierChar(char: string | undefined): boolean {
+  return char === '+' || char === '*' || char === '{'
+}
+
+function splitTopLevelAlternatives(body: string): string[] {
+  const alternatives: string[] = []
+  let depth = 0
+  let inClass = false
+  let start = 0
+  for (let i = 0; i < body.length; i++) {
+    const char = body[i]
+    if (char === '\\') {
+      i++
+      continue
+    }
+    if (inClass) {
+      if (char === ']') {
+        inClass = false
+      }
+      continue
+    }
+    if (char === '[') {
+      inClass = true
+    } else if (char === '(') {
+      depth++
+    } else if (char === ')') {
+      depth--
+    } else if (char === '|' && depth === 0) {
+      alternatives.push(body.slice(start, i))
+      start = i + 1
+    }
+  }
+  alternatives.push(body.slice(start))
+  return alternatives
+}
+
+function hasIdenticalAlternationBranch(body: string): boolean {
+  const seen = new Set<string>()
+  for (const alternative of splitTopLevelAlternatives(body)) {
+    if (seen.has(alternative)) {
+      return true
+    }
+    seen.add(alternative)
+  }
+  return false
+}
+
 /**
- * Rejects "star height >= 2" patterns — a quantified group whose body itself
- * contains a quantifier, e.g. `(a+)+` — the shape behind catastrophic
- * backtracking. A synchronous regex can't be interrupted once it starts
- * matching, so dangerous patterns must be refused before `new RegExp` runs.
+ * Rejects the regex shapes most likely to cause catastrophic backtracking, since a synchronous
+ * regex can't be interrupted once matching starts: "star height >= 2" (a quantified group whose
+ * body itself contains a quantifier, e.g. `(a+)+` or `(a|a?)+`), a quantified group whose
+ * top-level alternation branches are literally identical (e.g. `(a|a)+`), and — as a blunt
+ * fallback for shapes those two miss — a cap on the total number of quantifiers in the pattern.
+ * It does not detect alternation overlap in general (`(a|ab)+` still passes); that needs a real
+ * regex-complexity analyzer, not a single-pass scan.
  */
 function hasNestedQuantifier(pattern: string): boolean {
+  const groupStarts: number[] = []
   const groupHasQuantifier: boolean[] = []
   let inClass = false
+  let quantifierCount = 0
   for (let i = 0; i < pattern.length; i++) {
     const char = pattern[i]
     if (char === '\\') {
@@ -81,21 +155,29 @@ function hasNestedQuantifier(pattern: string): boolean {
     if (char === '[') {
       inClass = true
     } else if (char === '(') {
+      groupStarts.push(i)
       groupHasQuantifier.push(false)
     } else if (char === ')') {
+      const start = groupStarts.pop()
       const bodyHadQuantifier = groupHasQuantifier.pop() ?? false
-      const quantified = pattern[i + 1] === '+' || pattern[i + 1] === '*' || pattern[i + 1] === '{'
-      if (quantified && bodyHadQuantifier) {
+      const compounds = isCompoundingQuantifierChar(pattern[i + 1])
+      if (compounds && bodyHadQuantifier) {
         return true
       }
-      if (groupHasQuantifier.length > 0 && (bodyHadQuantifier || quantified)) {
+      if (compounds && start !== undefined && hasIdenticalAlternationBranch(pattern.slice(start + 1, i))) {
+        return true
+      }
+      if (groupHasQuantifier.length > 0 && (bodyHadQuantifier || compounds)) {
         groupHasQuantifier[groupHasQuantifier.length - 1] = true
       }
-    } else if ((char === '+' || char === '*' || char === '{') && groupHasQuantifier.length > 0) {
-      groupHasQuantifier[groupHasQuantifier.length - 1] = true
+    } else if (isQuantifierChar(char)) {
+      quantifierCount++
+      if (groupHasQuantifier.length > 0) {
+        groupHasQuantifier[groupHasQuantifier.length - 1] = true
+      }
     }
   }
-  return false
+  return quantifierCount > MAX_PATTERN_QUANTIFIERS
 }
 
 export function isPlainObject(value: unknown): value is Record<string, unknown> {

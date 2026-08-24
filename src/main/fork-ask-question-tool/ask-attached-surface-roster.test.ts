@@ -3,13 +3,20 @@ import {
   createAskAttachedSurfaceRoster,
   trackAskSurfacePaneSubscription,
   untrackAskSurfacePaneSubscription,
-  type AskAttachedSurfaceRosterHost
+  type AskAttachedSurfaceRosterHost,
+  type AskPaneLivenessSink
 } from './ask-attached-surface-roster'
 import { ASK_SURFACE_CLIENT_CAPABILITY } from '../../shared/fork-ask-question-tool/ask-question-capability'
 
 function roster(hasLocalRendererWindow = false) {
   const host: AskAttachedSurfaceRosterHost = { hasLocalRendererWindow: () => hasLocalRendererWindow }
   return createAskAttachedSurfaceRoster(host)
+}
+
+function rosterWithLivenessSink(hasLocalRendererWindow = false) {
+  const host: AskAttachedSurfaceRosterHost = { hasLocalRendererWindow: () => hasLocalRendererWindow }
+  const sink: AskPaneLivenessSink = { notePaneDetached: vi.fn(), notePaneAttached: vi.fn() }
+  return { roster: createAskAttachedSurfaceRoster(host, sink), sink }
 }
 
 describe('AskAttachedSurfaceRoster', () => {
@@ -66,6 +73,62 @@ describe('AskAttachedSurfaceRoster', () => {
   it('is satisfied by the local desktop renderer window for any pane, with no roster entry', () => {
     const r = roster(true)
     expect(r.hasCapableOwner('pane:never-subscribed')).toBe(true)
+  })
+})
+
+describe('AskAttachedSurfaceRoster — liveness sink', () => {
+  it('reports a detach when the only capable owner unsubscribes, and an attach on reattach', () => {
+    const { roster: r, sink } = rosterWithLivenessSink()
+    r.recordConnectionCapabilities('conn-1', [ASK_SURFACE_CLIENT_CAPABILITY])
+    // Gaining the pane's first owner is itself a false->true transition worth reporting;
+    // AskRegistry.notePaneAttached is a no-op when no grace timer is running.
+    r.trackPaneSubscription('conn-1', 'pane:1')
+    expect(sink.notePaneAttached).toHaveBeenCalledExactlyOnceWith('pane:1')
+
+    r.untrackPaneSubscription('conn-1', 'pane:1')
+    expect(sink.notePaneDetached).toHaveBeenCalledExactlyOnceWith('pane:1')
+
+    r.trackPaneSubscription('conn-1', 'pane:1')
+    expect(sink.notePaneAttached).toHaveBeenCalledTimes(2)
+  })
+
+  it('reports a detach when a dropped connection was the last capable owner', () => {
+    const { roster: r, sink } = rosterWithLivenessSink()
+    r.recordConnectionCapabilities('conn-1', [ASK_SURFACE_CLIENT_CAPABILITY])
+    r.trackPaneSubscription('conn-1', 'pane:1')
+
+    r.forgetConnection('conn-1')
+    expect(sink.notePaneDetached).toHaveBeenCalledExactlyOnceWith('pane:1')
+  })
+
+  it('does not report a detach while a second capable owner still holds the pane', () => {
+    const { roster: r, sink } = rosterWithLivenessSink()
+    r.recordConnectionCapabilities('conn-1', [ASK_SURFACE_CLIENT_CAPABILITY])
+    r.recordConnectionCapabilities('conn-2', [ASK_SURFACE_CLIENT_CAPABILITY])
+    r.trackPaneSubscription('conn-1', 'pane:1')
+    r.trackPaneSubscription('conn-2', 'pane:1')
+
+    r.untrackPaneSubscription('conn-1', 'pane:1')
+    expect(sink.notePaneDetached).not.toHaveBeenCalled()
+  })
+
+  it('reports a detach when the owning connection loses the ask capability', () => {
+    const { roster: r, sink } = rosterWithLivenessSink()
+    r.recordConnectionCapabilities('conn-1', [ASK_SURFACE_CLIENT_CAPABILITY])
+    r.trackPaneSubscription('conn-1', 'pane:1')
+
+    r.recordConnectionCapabilities('conn-1', [])
+    expect(sink.notePaneDetached).toHaveBeenCalledExactlyOnceWith('pane:1')
+  })
+
+  it('is a no-op when no liveness sink was given', () => {
+    const r = roster()
+    expect(() => {
+      r.recordConnectionCapabilities('conn-1', [ASK_SURFACE_CLIENT_CAPABILITY])
+      r.trackPaneSubscription('conn-1', 'pane:1')
+      r.untrackPaneSubscription('conn-1', 'pane:1')
+      r.forgetConnection('conn-1')
+    }).not.toThrow()
   })
 })
 

@@ -195,6 +195,17 @@ describe('validateAskSpec — pattern safety (X2)', () => {
     })
   })
 
+  it.each(['^(a|a?)+$', '^(a|a)+$'])('rejects the overlapping-alternation pattern %s promptly instead of hanging', (pattern) => {
+    const start = performance.now()
+    const result = validateAskSpec(specOf(textQuestion({ pattern })))
+    const elapsedMs = performance.now() - start
+    expect(elapsedMs).toBeLessThan(1000)
+    expect(result.ok).toBe(false)
+    expect(result).toMatchObject({
+      errors: expect.arrayContaining([expect.objectContaining({ path: 'questions[0].pattern' })])
+    })
+  })
+
   it('rejects a pattern longer than the length cap', () => {
     const result = validateAskSpec(specOf(textQuestion({ pattern: `^${'a'.repeat(201)}$` })))
     expect(result).toMatchObject({
@@ -243,7 +254,7 @@ describe('validateAskSpec — credential refusal', () => {
     expect(result.ok).toBe(false)
   })
 
-  it.each(['DBPassword', 'SECRETKey', 'MYSECRET', 'XPassword'])(
+  it.each(['DBPassword', 'SECRETKey', 'MYSECRET', 'XPassword', 'DBpassword', 'secretkey'])(
     'rejects acronym/all-caps credential-shaped id %s (X1)',
     (id) => {
       const result = validateAskSpec(specOf(textQuestion({ id })))

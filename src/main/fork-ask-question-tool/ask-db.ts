@@ -3,6 +3,7 @@ import Database from '../sqlite/sync-database'
 import { isTerminalAskStatus, type PersistedAskStatus } from '../../shared/fork-ask-question-tool/ask-answer-envelope'
 
 const TERMINAL_RETENTION_MS = 24 * 60 * 60 * 1000
+const DEFAULT_PURGE_INTERVAL_MS = 60 * 60 * 1000
 
 // ECMAScript's own Date range limit; ms past this makes `new Date(...).toISOString()` throw RangeError.
 const MAX_DATE_MS = 8_640_000_000_000_000
@@ -111,6 +112,7 @@ function hardenAskDatabaseFiles(dbPath: (string & {}) | ':memory:'): void {
  */
 export class AskDb {
   private readonly db: Database.Database
+  private purgeTimer: NodeJS.Timeout | null = null
 
   constructor(dbPath: (string & {}) | ':memory:') {
     this.db = new Database(dbPath)
@@ -123,7 +125,26 @@ export class AskDb {
     hardenAskDatabaseFiles(dbPath)
   }
 
+  /**
+   * Runs the 24h retention purge immediately, then on `intervalMs`; `close()` and
+   * `stopPeriodicPurge()` both stop it. Unref'd so a live sweep never keeps the process open.
+   */
+  startPeriodicPurge(intervalMs: number = DEFAULT_PURGE_INTERVAL_MS): void {
+    this.stopPeriodicPurge()
+    this.purgeStaleTerminalRows()
+    this.purgeTimer = setInterval(() => this.purgeStaleTerminalRows(), intervalMs)
+    this.purgeTimer.unref()
+  }
+
+  stopPeriodicPurge(): void {
+    if (this.purgeTimer) {
+      clearInterval(this.purgeTimer)
+      this.purgeTimer = null
+    }
+  }
+
   close(): void {
+    this.stopPeriodicPurge()
     this.db.close()
   }
 
