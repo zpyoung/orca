@@ -1,4 +1,5 @@
 import type { ElectronAPI } from '@electron-toolkit/preload'
+import type { AskRegistryEvent } from '../shared/fork-ask-question-tool/ask-question-schema'
 import type {
   ClaudeAccountsApi,
   CodexAccountsApi,
@@ -65,6 +66,11 @@ import type { FolderWorkspacesApi, SparsePresetsApi, WorktreeApi } from './api/w
 
 // Flattens contracts that share one PreloadApi key: an intersection is not type-identical to the flat shape.
 type Merged<T> = { [K in keyof T]: T[K] }
+
+/** IPC subscription surface for ask registry events (tech.md C8); reads go through `runtime.call('ask.snapshot', …)`. */
+export type AskApi = {
+  onSet: (callback: (event: AskRegistryEvent) => void) => () => void
+}
 
 export type PreloadApi = {
   forkSessionHandoff: ForkSessionHandoffPreloadApi
@@ -150,6 +156,7 @@ export type PreloadApi = {
   gitBash: RuntimeApi['gitBash']
   plugins: PluginsApi
   agentStatus: AgentStatusApi
+  asks: AskApi
   mobile: MobileApi
   speech: SpeechApi
 }
