@@ -109,9 +109,23 @@ export function createAskAttachedSurfaceRoster(
   return new AskAttachedSurfaceRoster(host)
 }
 
+// Why: terminal.subscribe is driven by test doubles and by callers that predate this feature, so
+// neither accessor is guaranteed to exist on the runtime handed in; an untracked pane is correct
+// there, and throwing would take down an unrelated subscribe path.
 type AskSurfacePaneTrackingRuntime = {
-  getTerminalPaneKey(handle: string): string | null
-  getAskServices(): { roster: AskAttachedSurfaceRoster }
+  getTerminalPaneKey?: (handle: string) => string | null
+  getAskServices?: () => { roster: AskAttachedSurfaceRoster }
+}
+
+function resolveTrackingTarget(
+  runtime: AskSurfacePaneTrackingRuntime,
+  terminalHandle: string
+): { roster: AskAttachedSurfaceRoster; paneKey: string } | null {
+  if (typeof runtime.getTerminalPaneKey !== 'function' || typeof runtime.getAskServices !== 'function') {
+    return null
+  }
+  const paneKey = runtime.getTerminalPaneKey(terminalHandle)
+  return paneKey ? { roster: runtime.getAskServices().roster, paneKey } : null
 }
 
 export function trackAskSurfacePaneSubscription(
@@ -122,11 +136,10 @@ export function trackAskSurfacePaneSubscription(
   if (!connectionId) {
     return
   }
-  const paneKey = runtime.getTerminalPaneKey(terminalHandle)
-  if (paneKey) {
-    const roster = runtime.getAskServices().roster
-    roster.trackPaneSubscription(connectionId, paneKey)
-    roster.recordSubscribedPane(connectionId, terminalHandle, paneKey)
+  const target = resolveTrackingTarget(runtime, terminalHandle)
+  if (target) {
+    target.roster.trackPaneSubscription(connectionId, target.paneKey)
+    target.roster.recordSubscribedPane(connectionId, terminalHandle, target.paneKey)
   }
 }
 
@@ -138,8 +151,13 @@ export function untrackAskSurfacePaneSubscription(
   if (!connectionId) {
     return
   }
+  if (typeof runtime.getAskServices !== 'function') {
+    return
+  }
   const roster = runtime.getAskServices().roster
-  const paneKey = roster.takeSubscribedPane(connectionId, terminalHandle) ?? runtime.getTerminalPaneKey(terminalHandle)
+  const paneKey =
+    roster.takeSubscribedPane(connectionId, terminalHandle) ??
+    (typeof runtime.getTerminalPaneKey === 'function' ? runtime.getTerminalPaneKey(terminalHandle) : null)
   if (paneKey) {
     roster.untrackPaneSubscription(connectionId, paneKey)
   }
