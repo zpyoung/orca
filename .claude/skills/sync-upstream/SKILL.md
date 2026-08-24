@@ -179,9 +179,8 @@ SYNC_BRANCH=$(git symbolic-ref --short HEAD)
 git reset --hard "$ORIGIN_MAIN_OLD"
 ```
 
-A fresh worktree has no `node_modules`, and everything from here on needs them — the ownership
-classifier, the verification gate, and any fix. Install before merging, so an install failure is
-never mistaken for a resolution failure:
+A fresh worktree has no `node_modules`, and the verification gate and any fix need them. Install
+before merging, so an install failure is never mistaken for a resolution failure:
 
 ```sh
 pnpm install --frozen-lockfile
@@ -382,7 +381,8 @@ feature-collision checklist outcomes; what the Step 8 gate covered (and that tes
 PR's own CI); and the backup ref.
 
 Record `PR_NUMBER` and `PR_URL`. If a PR already exists for this branch, reuse it
-(`env -u GITHUB_TOKEN gh pr view --repo zpyoung/orca --json number,url`) instead of opening a second one.
+(`env -u GITHUB_TOKEN gh pr view "$SYNC_BRANCH" --repo zpyoung/orca --json number,url`) instead of
+opening a second one.
 
 ## Step 10 — Drive the PR green
 
@@ -440,10 +440,10 @@ against a tag `main` no longer descends from, and it rewrites fork commit SHAs, 
 
 If the merge is refused — branch protection wanting a review, a check that became required
 mid-run — do not work around it. Try arming auto-merge
-(`gh pr merge "$PR_NUMBER" --repo zpyoung/orca --merge --auto`; the fork currently has auto-merge
-disabled in its settings, so expect this to fail and do not enable it to get past a refusal), then
-report "needs attention: PR could not be merged by the run (<reason>)" and skip the release —
-`main` has not moved.
+(`env -u GITHUB_TOKEN gh pr merge "$PR_NUMBER" --repo zpyoung/orca --merge --auto`; the fork
+currently has auto-merge disabled in its settings, so expect this to fail and do not enable it to
+get past a refusal), then report "needs attention: PR could not be merged by the run (<reason>)"
+and skip the release — `main` has not moved.
 
 Then confirm and capture the new tip:
 
