@@ -28,6 +28,14 @@
         "hide": "미리보기 숨기기",
         "show": "미리보기 표시",
         "frameTitle": "질문 미리보기"
+      },
+      "badge": {
+        "pendingCountLabel_one": "대기 중인 질문 {{count}}개",
+        "pendingCountLabel_other": "대기 중인 질문 {{count}}개"
+      },
+      "notification": {
+        "title": "{{worktreeLabel}}에 대기 중인 질문이 있습니다",
+        "body": "답변을 기다리고 있습니다."
       }
     }
   }

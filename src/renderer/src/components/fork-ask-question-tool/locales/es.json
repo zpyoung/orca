@@ -28,6 +28,14 @@
         "hide": "Ocultar vista previa",
         "show": "Mostrar vista previa",
         "frameTitle": "Vista previa de la pregunta"
+      },
+      "badge": {
+        "pendingCountLabel_one": "{{count}} pregunta pendiente",
+        "pendingCountLabel_other": "{{count}} preguntas pendientes"
+      },
+      "notification": {
+        "title": "Pregunta pendiente en {{worktreeLabel}}",
+        "body": "Esperando tu respuesta."
       }
     }
   }

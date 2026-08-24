@@ -28,6 +28,14 @@
         "hide": "Hide preview",
         "show": "Show preview",
         "frameTitle": "Question preview"
+      },
+      "badge": {
+        "pendingCountLabel_one": "{{count}} pending question",
+        "pendingCountLabel_other": "{{count}} pending questions"
+      },
+      "notification": {
+        "title": "Pending question in {{worktreeLabel}}",
+        "body": "Waiting for your answer."
       }
     }
   }

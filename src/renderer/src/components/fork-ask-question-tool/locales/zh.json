@@ -28,6 +28,14 @@
         "hide": "隐藏预览",
         "show": "显示预览",
         "frameTitle": "问题预览"
+      },
+      "badge": {
+        "pendingCountLabel_one": "{{count}} 个待处理的问题",
+        "pendingCountLabel_other": "{{count}} 个待处理的问题"
+      },
+      "notification": {
+        "title": "{{worktreeLabel}} 中有待处理的问题",
+        "body": "正在等待你的回答。"
       }
     }
   }

@@ -28,6 +28,14 @@
         "hide": "プレビューを隠す",
         "show": "プレビューを表示",
         "frameTitle": "質問のプレビュー"
+      },
+      "badge": {
+        "pendingCountLabel_one": "未回答の質問が{{count}}件",
+        "pendingCountLabel_other": "未回答の質問が{{count}}件"
+      },
+      "notification": {
+        "title": "{{worktreeLabel}} に保留中の質問があります",
+        "body": "回答をお待ちしています。"
       }
     }
   }
