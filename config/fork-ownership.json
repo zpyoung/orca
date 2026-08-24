@@ -107,7 +107,8 @@
         "**/fork-ask-question-tool/**",
         "skill-guides/orca-ask.md",
         "skill-stubs/orca-ask.md",
-        "skills/orca-ask/**"
+        "skills/orca-ask/**",
+        "tests/e2e/ask-card.spec.ts"
       ]
     }
   ],
