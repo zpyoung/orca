@@ -3,8 +3,9 @@ import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
 import type { AskAnswers } from '../../../../shared/fork-ask-question-tool/ask-answer-envelope'
 import { isTerminalAskStatus } from '../../../../shared/fork-ask-question-tool/ask-answer-envelope'
+import type { AskPartial } from '../../../../shared/fork-ask-question-tool/ask-question-schema'
 import type { AskCardModel } from './ask-card-model'
-import { initialDraftFor, type AskQuestionDraft } from './ask-question-draft'
+import { initialDraftFor, draftsToPartial, type AskQuestionDraft } from './ask-question-draft'
 import { buildAskSubmission } from './build-ask-submission'
 import { AskQuestionFrame } from './AskQuestionFrame'
 import { AskFieldControl } from './AskFieldControl'
@@ -16,6 +17,8 @@ export type AskCardProps = {
   onCancel: () => void
   /** Whether the submitted answer is still being delivered to the agent. */
   isSubmitting?: boolean
+  /** Fires with the normalized partial on every draft change; callers own debouncing the send. */
+  onDraftChange?: (partial: AskPartial) => void
 }
 
 function buildInitialDrafts(model: AskCardModel): Record<string, AskQuestionDraft> {
@@ -30,7 +33,13 @@ function buildInitialDrafts(model: AskCardModel): Record<string, AskQuestionDraf
  * mounting with `key={model.askId}` — this component keeps its own draft
  * state for the lifetime of the mount and does not reset it on prop changes.
  */
-export function AskCard({ model, onSubmit, onCancel, isSubmitting = false }: AskCardProps): React.JSX.Element {
+export function AskCard({
+  model,
+  onSubmit,
+  onCancel,
+  isSubmitting = false,
+  onDraftChange
+}: AskCardProps): React.JSX.Element {
   const [drafts, setDrafts] = useState<Record<string, AskQuestionDraft>>(() => buildInitialDrafts(model))
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -39,7 +48,9 @@ export function AskCard({ model, onSubmit, onCancel, isSubmitting = false }: Ask
   }
 
   const updateDraft = (questionId: string, next: AskQuestionDraft): void => {
-    setDrafts((prev) => ({ ...prev, [questionId]: next }))
+    const updated = { ...drafts, [questionId]: next }
+    setDrafts(updated)
+    onDraftChange?.(draftsToPartial(updated))
     setErrors((prev) => {
       if (!(questionId in prev)) {
         return prev

@@ -24,6 +24,7 @@ import {
 } from './TerminalPaneRuntimePortals'
 import type { TerminalPaneController } from './use-terminal-pane-controller'
 import { useTerminalPaneDockSurface } from './fork-terminal-dock/use-terminal-pane-dock-surface'
+import { AskTerminalPaneDockPortals } from './fork-ask-question-tool/AskTerminalPaneDockPortals'
 
 export function TerminalPaneSurface({
   controller
@@ -160,6 +161,7 @@ export function TerminalPaneSurface({
         }}
       />
       <TerminalPaneCodexRestartPortals controller={controller} />
+      <AskTerminalPaneDockPortals controller={controller} />
       {/* Why: the reconnect banner already owns SSH recovery UX; the z-50 error
           toast was painting over it (same bottom strip) with the raw ssh:connect failure. */}
       {visibleTerminalError && isActive && !showSshReconnectOverlay && activePane
