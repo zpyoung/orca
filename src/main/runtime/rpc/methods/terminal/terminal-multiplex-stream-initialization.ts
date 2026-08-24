@@ -13,6 +13,7 @@ import type {
   TerminalMultiplexConnection
 } from './terminal-multiplex-connection'
 import type { TerminalMultiplexStream } from './terminal-stream-types'
+import { trackAskSurfacePaneSubscription } from '../../../../fork-ask-question-tool/ask-attached-surface-roster'
 
 export async function initializeMultiplexStream(
   state: TerminalMultiplexConnection,
@@ -93,6 +94,7 @@ export async function initializeMultiplexStream(
     exitWaiterAbort: new AbortController()
   }
   streams.set(request.streamId, stream)
+  trackAskSurfacePaneSubscription(runtime, connectionId, request.terminal)
   stream.unregisterBinaryHandler = registerBinaryStreamHandler(request.streamId, (frame) =>
     state.handleSlotFrame(stream, frame)
   )

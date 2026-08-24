@@ -1,8 +1,13 @@
 import { installRuntimeLinearCommandSurface } from './runtime-linear-command-surface'
 import { OrcaRuntimeWithResolveWaiter } from './orca-runtime-resolve-waiter'
 import type { RuntimeCommandSurfaceHost } from './orca-runtime-core'
+import { askServicesFor, type AskServices } from '../fork-ask-question-tool/ask-services'
 
-class OrcaRuntimeService extends OrcaRuntimeWithResolveWaiter {}
+class OrcaRuntimeService extends OrcaRuntimeWithResolveWaiter {
+  getAskServices(): AskServices {
+    return askServicesFor(this, () => Boolean(this.getAvailableAuthoritativeWindow()))
+  }
+}
 type OrcaRuntimeServiceExport = RuntimeCommandSurfaceHost<OrcaRuntimeService>
 const OrcaRuntimeServiceExport = OrcaRuntimeService as unknown as {
   new (...args: ConstructorParameters<typeof OrcaRuntimeService>): OrcaRuntimeServiceExport

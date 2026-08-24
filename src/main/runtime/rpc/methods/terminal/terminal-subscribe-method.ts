@@ -7,6 +7,7 @@ import {
   runTerminalLeaseSubscription
 } from './terminal-legacy-simple-subscriptions'
 import type { TerminalSubscriptionArgs } from './terminal-legacy-subscription-types'
+import { trackAskSurfacePaneSubscription } from '../../../../fork-ask-question-tool/ask-attached-surface-roster'
 
 export const TERMINAL_SUBSCRIBE_METHODS: RpcAnyMethod[] = [
   // Streams live terminal output over WebSocket; mobile clients pass client+viewport for server-side auto-fit.
@@ -56,6 +57,7 @@ export const TERMINAL_SUBSCRIBE_METHODS: RpcAnyMethod[] = [
       }
 
       const ptyId = leaf.ptyId
+      trackAskSurfacePaneSubscription(runtime, connectionId, params.terminal)
       const clientId = params.client?.id
       const missingHeadlessStateBeforeMobileFit =
         isMobile &&

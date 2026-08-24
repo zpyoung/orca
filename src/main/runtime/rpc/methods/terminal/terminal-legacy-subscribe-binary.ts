@@ -24,6 +24,7 @@ import type { TerminalOutputChunk } from './terminal-stream-types'
 import { publishLegacyBinaryInitialSnapshot } from './terminal-legacy-subscribe-snapshot'
 import { activateLegacyBinarySubscription } from './terminal-legacy-subscribe-live'
 import { registerLegacyBinaryControlFrames } from './terminal-legacy-binary-control-frames'
+import { untrackAskSurfacePaneSubscription } from '../../../../fork-ask-question-tool/ask-attached-surface-roster'
 const TERMINAL_QUERY_REPLAY_MAX_CHARS = 16 * 1024
 export async function runTerminalBinarySubscription(args: TerminalSubscriptionArgs): Promise<void> {
   const { params, runtime, connectionId, sendBinary, signal, emit, ptyId, clientId, isMobile } =
@@ -69,6 +70,7 @@ export async function runTerminalBinarySubscription(args: TerminalSubscriptionAr
       outputBatcher?.flush()
       outputBatcher?.dispose()
       closed = true
+      untrackAskSurfacePaneSubscription(runtime, connectionId, params.terminal)
       unsubscribeData()
       unsubscribeResize()
       unsubscribeFit()

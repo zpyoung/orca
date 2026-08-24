@@ -226,7 +226,7 @@ export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {
         )
       },
       onBinary: (socket, bytes) => this.handleWebSocketBinaryMessage(bytes, socket.ws),
-      onReady: () => {
+      onReady: (socket) => {
         // Why: first authenticated mobile/remote client (direct WS and
         // cloud relay both attach here) starts path-candidate tracking.
         // Activation is a local-host concern: candidate buffers live on the
@@ -234,6 +234,9 @@ export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {
         // legitimately lack this method (its own server activates it).
         this.runtime.activateRecentPtyPathCandidateTracking?.()
         this.mobileRelayPairingProvider?.onDemandStateChanged?.()
+        this.runtime
+          .getAskServices()
+          .roster.recordConnectionCapabilities(socket.connectionId, socket.clientCapabilities)
       },
       onClose: (socket, hasOtherConnections) => {
         if (!socket) {
@@ -243,6 +246,7 @@ export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {
         // Why: subscriptions and binary streams are socket-scoped, but disconnect state is device-scoped across transports.
         this.runtime.cleanupSubscriptionsForConnection(socket.connectionId)
         this.runtime.cancelMobileDictationForConnection(socket.connectionId)
+        this.runtime.getAskServices().roster.forgetConnection(socket.connectionId)
         this.binaryMessageRouter.deleteConnection(socket.connectionId)
         if (!hasOtherConnections) {
           this.runtime.onClientDisconnected(socket.device.deviceToken)
