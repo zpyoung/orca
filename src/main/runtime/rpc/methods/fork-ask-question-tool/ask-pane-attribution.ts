@@ -23,15 +23,26 @@ function resolveLivePaneKey(paneKey: string, runtime: OrcaRuntimeService): strin
     : undefined
 }
 
+// Why: folder workspaces have worktreeId-shaped ids (tech.md C3), so resolving either claim
+// through the same worktree selector covers both without a separate workspace lookup.
+async function isKnownWorktreeId(worktreeId: string, runtime: OrcaRuntimeService): Promise<boolean> {
+  try {
+    await runtime.showManagedWorktree(`id:${worktreeId}`)
+    return true
+  } catch {
+    return false
+  }
+}
+
 /**
- * Resolves who owns an ask (tech.md C3): the server never trusts a `paneKey`/`terminalHandle`
- * env claim without validating it against live runtime state, falling back through
- * terminal handle then worktree/workspace scope to no attribution at all.
+ * Resolves who owns an ask (tech.md C3): the server never trusts a `paneKey`/`terminalHandle`/
+ * `worktreeId`/`workspaceId` env claim without validating it against live runtime state, falling
+ * back through terminal handle then worktree/workspace scope to no attribution at all.
  */
-export function resolveAskAttribution(
+export async function resolveAskAttribution(
   params: AskAttributionParams,
   runtime: OrcaRuntimeService
-): AskAttribution {
+): Promise<AskAttribution> {
   const anyIdentityClaimed = Boolean(
     params.paneKey || params.terminalHandle || params.worktreeId || params.workspaceId
   )
@@ -56,9 +67,13 @@ export function resolveAskAttribution(
     }
   }
 
+  const claimedWorktreeId = params.worktreeId ?? params.workspaceId ?? null
+  const worktreeId =
+    claimedWorktreeId && (await isKnownWorktreeId(claimedWorktreeId, runtime)) ? claimedWorktreeId : null
+
   return {
     paneKey: null,
-    worktreeId: params.worktreeId ?? params.workspaceId ?? null,
+    worktreeId,
     dispatchLookupHandle: params.terminalHandle ?? '',
     anyIdentityClaimed
   }

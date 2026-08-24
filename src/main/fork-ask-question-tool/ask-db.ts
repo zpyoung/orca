@@ -127,6 +127,12 @@ export class AskDb {
     this.db.close()
   }
 
+  /** The store's true head seq — every row committed so far, including ones a 24h purge has since deleted. */
+  currentSeq(): number {
+    const row = this.db.prepare('SELECT value FROM ask_seq WHERE id = 1').get() as { value: number }
+    return row.value
+  }
+
   private nextSeq(): number {
     const row = this.db
       .prepare('UPDATE ask_seq SET value = value + 1 WHERE id = 1 RETURNING value')

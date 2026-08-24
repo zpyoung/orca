@@ -39,18 +39,18 @@ function formatSpecErrors(errors: { path: string; message: string }[]): string {
   return errors.map((error) => (error.path ? `${error.path}: ${error.message}` : error.message)).join('; ')
 }
 
-// Why: the returned seq is the max across every pending row, not just the paneKey-filtered ones
-// a caller asked to see — a narrower watermark could later under-report what a broader resubscribe
-// already covered, which is safe (a harmless duplicate), but the reverse (over-reporting) is not.
+// Why: the watermark is the store's true head seq, not a max over pending (or paneKey-filtered)
+// rows — a resolved ask can hold a higher seq than any pending one, so that max would under-report
+// the head. A watermark too low only replays events the client already has (harmless); one too
+// high silently skips events forever, so the true head is the only safe choice.
 function buildPendingSnapshot(
   db: AskDb,
   epoch: string,
   paneKeyFilter?: string
 ): { asks: AskRegistryEvent[]; maxSeq: number } {
   const rows = db.listPending()
-  const maxSeq = rows.reduce((max, row) => Math.max(max, row.seq), 0)
   const filtered = paneKeyFilter === undefined ? rows : rows.filter((row) => row.pane_key === paneKeyFilter)
-  return { asks: filtered.map((row) => registryEventFromRow(row, epoch)), maxSeq }
+  return { asks: filtered.map((row) => registryEventFromRow(row, epoch)), maxSeq: db.currentSeq() }
 }
 
 let askSubscriptionSeq = 0
@@ -66,7 +66,7 @@ export const ASK_METHODS: readonly RpcAnyMethod[] = [
       if (!validation.ok) {
         throw new Error(formatSpecErrors(validation.errors))
       }
-      const attribution = resolveAskAttribution(params, runtime)
+      const attribution = await resolveAskAttribution(params, runtime)
       const { registry, roster } = runtime.getAskServices()
 
       if (attribution.paneKey && roster.hasCapableOwner(attribution.paneKey)) {

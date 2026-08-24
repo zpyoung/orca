@@ -15,6 +15,7 @@ export type AskAttachedSurfaceRosterHost = {
 export class AskAttachedSurfaceRoster {
   private readonly capabilitiesByConnection = new Map<string, readonly RuntimeCapability[]>()
   private readonly paneRefcountsByConnection = new Map<string, Map<string, number>>()
+  private readonly subscribedPaneByConnectionAndHandle = new Map<string, Map<string, string>>()
 
   constructor(private readonly host: AskAttachedSurfaceRosterHost) {}
 
@@ -29,6 +30,35 @@ export class AskAttachedSurfaceRoster {
   forgetConnection(connectionId: string): void {
     this.capabilitiesByConnection.delete(connectionId)
     this.paneRefcountsByConnection.delete(connectionId)
+    this.subscribedPaneByConnectionAndHandle.delete(connectionId)
+  }
+
+  /** Remembers the pane a (connection, terminalHandle) subscription resolved to, so cleanup can find it later. */
+  recordSubscribedPane(connectionId: string, terminalHandle: string, paneKey: string): void {
+    let handles = this.subscribedPaneByConnectionAndHandle.get(connectionId)
+    if (!handles) {
+      handles = new Map()
+      this.subscribedPaneByConnectionAndHandle.set(connectionId, handles)
+    }
+    handles.set(terminalHandle, paneKey)
+  }
+
+  /**
+   * Pops the pane key recorded for a (connection, terminalHandle) subscription. Cleanup must go
+   * through this rather than re-resolving the handle, because a terminal already torn down by
+   * the time cleanup runs no longer resolves (F6) and would otherwise leave a phantom owner.
+   */
+  takeSubscribedPane(connectionId: string, terminalHandle: string): string | undefined {
+    const handles = this.subscribedPaneByConnectionAndHandle.get(connectionId)
+    const paneKey = handles?.get(terminalHandle)
+    if (!handles || paneKey === undefined) {
+      return undefined
+    }
+    handles.delete(terminalHandle)
+    if (handles.size === 0) {
+      this.subscribedPaneByConnectionAndHandle.delete(connectionId)
+    }
+    return paneKey
   }
 
   trackPaneSubscription(connectionId: string, paneKey: string): void {
@@ -94,7 +124,9 @@ export function trackAskSurfacePaneSubscription(
   }
   const paneKey = runtime.getTerminalPaneKey(terminalHandle)
   if (paneKey) {
-    runtime.getAskServices().roster.trackPaneSubscription(connectionId, paneKey)
+    const roster = runtime.getAskServices().roster
+    roster.trackPaneSubscription(connectionId, paneKey)
+    roster.recordSubscribedPane(connectionId, terminalHandle, paneKey)
   }
 }
 
@@ -106,8 +138,9 @@ export function untrackAskSurfacePaneSubscription(
   if (!connectionId) {
     return
   }
-  const paneKey = runtime.getTerminalPaneKey(terminalHandle)
+  const roster = runtime.getAskServices().roster
+  const paneKey = roster.takeSubscribedPane(connectionId, terminalHandle) ?? runtime.getTerminalPaneKey(terminalHandle)
   if (paneKey) {
-    runtime.getAskServices().roster.untrackPaneSubscription(connectionId, paneKey)
+    roster.untrackPaneSubscription(connectionId, paneKey)
   }
 }

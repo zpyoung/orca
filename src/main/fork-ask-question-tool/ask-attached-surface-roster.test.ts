@@ -95,4 +95,17 @@ describe('trackAskSurfacePaneSubscription / untrackAskSurfacePaneSubscription', 
     expect(() => trackAskSurfacePaneSubscription(runtime, 'conn-1', 'term-1')).not.toThrow()
     expect(() => untrackAskSurfacePaneSubscription(runtime, 'conn-1', 'term-1')).not.toThrow()
   })
+
+  it('F6: untracks by the pane key recorded at subscribe time, even once the terminal no longer resolves', () => {
+    const runtime = fakeRuntime({ 'term-1': 'pane:1' })
+    runtime.askRoster.recordConnectionCapabilities('conn-1', [ASK_SURFACE_CLIENT_CAPABILITY])
+
+    trackAskSurfacePaneSubscription(runtime, 'conn-1', 'term-1')
+    expect(runtime.askRoster.hasCapableOwner('pane:1')).toBe(true)
+
+    // The terminal is torn down before cleanup runs, so it no longer resolves to a pane.
+    runtime.getTerminalPaneKey.mockReturnValue(null)
+    untrackAskSurfacePaneSubscription(runtime, 'conn-1', 'term-1')
+    expect(runtime.askRoster.hasCapableOwner('pane:1')).toBe(false)
+  })
 })

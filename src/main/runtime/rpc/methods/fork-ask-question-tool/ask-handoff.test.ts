@@ -21,6 +21,33 @@ function seedActiveDispatch(orchestrationDb: OrchestrationDb, assigneeHandle: st
   return { run, dispatch }
 }
 
+// Why: worktree scoping (F5) reads worker_dispatches.worktree_id, which only the full
+// worker-start flow populates — createDispatchContext alone never writes a worker_dispatches row.
+function seedActiveWorkerDispatch(
+  orchestrationDb: OrchestrationDb,
+  worktreeId: string,
+  assigneeHandle: string,
+  assigneePaneKey: string
+) {
+  const run = orchestrationDb.createRun({
+    objective: 'test run',
+    coordinatorHandle: 'term_coord',
+    coordinatorPaneKey: COORDINATOR_PANE_KEY
+  })
+  const task = orchestrationDb.createTask({ spec: 'help the human', runId: run.id })
+  const started = orchestrationDb.createStartingWorkerDispatch({ taskId: task.id, startOptions: {} })
+  orchestrationDb.prepareStartingWorkerAuthority({
+    dispatchId: started.dispatch.id,
+    handle: assigneeHandle,
+    paneKey: assigneePaneKey,
+    processIncarnation: `runtime:pty:${assigneeHandle}`,
+    worktreeId,
+    setupState: 'not_applicable',
+    effects: []
+  })
+  return { run, dispatch: started.dispatch }
+}
+
 // Why: the no-UI path only hands off when neither the local renderer nor a roster connection can
 // render the ask (tech.md C4) — every test here registers a pane no surface claims.
 async function registerHandoff(h: AskRpcHarness, requestId = 'req_h1') {
@@ -164,5 +191,77 @@ describe('ask.* coordinator hand-off (C7)', () => {
     restarted.runtime.notifyMessageArrived(`dispatch:${dispatch.id}`, 'status')
     const finalChunk = (await restarted.call('ask.wait', { askId, chunkMs: 5000 })) as AskEnvelope
     expect(finalChunk).toMatchObject({ status: 'answered', askId })
+  })
+
+  it('F2: a direct answer while a hand-off wait is parked wakes it with the terminal envelope', async () => {
+    seedActiveDispatch(h.orchestrationDb, 'term_worker', WORKER_PANE_KEY)
+    const { askId } = await registerHandoff(h)
+    // Creates the coordinator question and parks past it, so the loop below is polling for a reply.
+    const primed = (await h.call('ask.wait', { askId, chunkMs: 10 })) as AskEnvelope
+    expect(primed.status).toBe('pending')
+
+    const waitPromise = h.call('ask.wait', { askId, chunkMs: 5000 })
+    const startedAt = Date.now()
+    // Bypasses the coordinator entirely — commits straight to askDb, never touching the question.
+    const answered = (await h.call('ask.answer', {
+      askId,
+      answers: { q1: { value: 'Ada', source: 'input' } }
+    })) as { committed: boolean }
+    expect(answered.committed).toBe(true)
+
+    const envelope = (await waitPromise) as AskEnvelope
+    // Generous bound: proves the wait woke on the answer's notify rather than sitting out chunkMs.
+    expect(Date.now() - startedAt).toBeLessThan(2000)
+    expect(envelope).toMatchObject({ status: 'answered', askId })
+  })
+
+  it('F3: a crash between createQuestion and setHandoffQuestionId is recovered by adopting the existing question', async () => {
+    seedActiveDispatch(h.orchestrationDb, 'term_worker', WORKER_PANE_KEY)
+    const { askId } = await registerHandoff(h)
+    const row = h.askDb.getAsk(askId)
+
+    // Simulates the crash window: the coordinator question exists, but the process died before
+    // the second write persisted its id back onto the ask row.
+    const created = h.orchestrationDb.createQuestion({
+      runId: row?.handoff_run_id as string,
+      dispatchId: row?.handoff_dispatch_id as string,
+      askerHandle: row?.handoff_asker as string,
+      question: 'a question from the crash window'
+    })
+    expect(h.askDb.getAsk(askId)?.handoff_question_id).toBeNull()
+
+    const createQuestionSpy = vi.spyOn(h.orchestrationDb, 'createQuestion')
+    const chunk = (await h.call('ask.wait', { askId, chunkMs: 10 })) as AskEnvelope
+    expect(chunk.status).toBe('pending')
+    expect(createQuestionSpy).not.toHaveBeenCalled()
+    expect(h.askDb.getAsk(askId)?.handoff_question_id).toBe(created.question.message_id)
+  })
+
+  it('F5: a workspace-scoped hand-off reaches the dispatch for that workspace and not another', async () => {
+    const other = seedActiveWorkerDispatch(
+      h.orchestrationDb,
+      'wt_other',
+      'term_other',
+      'tab_other:cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+    )
+    const target = seedActiveWorkerDispatch(
+      h.orchestrationDb,
+      'wt_target',
+      'term_target',
+      'tab_target:dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+    )
+    h.setKnownWorktree('wt_target')
+
+    const result = (await h.call('ask.register', {
+      spec: textSpec(),
+      requestId: 'req_f5',
+      worktreeId: 'wt_target',
+      cwd: '/repo'
+    })) as { askId?: string; status?: string }
+
+    expect(result.status).toBeUndefined()
+    const row = h.askDb.getAsk(result.askId as string)
+    expect(row?.handoff_dispatch_id).toBe(target.dispatch.id)
+    expect(row?.handoff_dispatch_id).not.toBe(other.dispatch.id)
   })
 })

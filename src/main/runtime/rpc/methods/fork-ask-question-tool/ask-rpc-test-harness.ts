@@ -21,6 +21,8 @@ export type AskRpcHarness = {
   ctx: RpcContext
   hasLocalRendererWindow: { value: boolean }
   setPaneOwner(paneKey: string, terminalHandle: string): void
+  /** Makes a worktreeId/workspaceId resolve as known (F4) — everything else 404s via `showManagedWorktree`. */
+  setKnownWorktree(worktreeId: string): void
   call(name: string, params: Record<string, unknown>, ctxOverride?: Partial<RpcContext>): Promise<unknown>
   /**
    * Starts a streaming method. Its handler resolves only once `stop()` triggers the registered
@@ -46,7 +48,7 @@ export function createAskRpcHarness(): { setup(): AskRpcHarness; cleanup(): void
   let askDb: AskDb
   let opened = false
 
-  function buildInstance(paneOwnersSeed?: Map<string, string>): AskRpcHarness {
+  function buildInstance(paneOwnersSeed?: Map<string, string>, knownWorktreesSeed?: Set<string>): AskRpcHarness {
     const runtime = new OrcaRuntimeService()
     runtime.setOrchestrationDb(orchestrationDb)
 
@@ -69,6 +71,15 @@ export function createAskRpcHarness(): { setup(): AskRpcHarness; cleanup(): void
     })
     vi.spyOn(runtime, 'getTerminalWorktreeIdForPaneKey').mockReturnValue(null)
 
+    const knownWorktrees = knownWorktreesSeed ?? new Set<string>()
+    vi.spyOn(runtime, 'showManagedWorktree').mockImplementation(async (selector: string) => {
+      const worktreeId = selector.startsWith('id:') ? selector.slice(3) : selector
+      if (!knownWorktrees.has(worktreeId)) {
+        throw new Error('selector_not_found')
+      }
+      return { id: worktreeId } as unknown as Awaited<ReturnType<typeof runtime.showManagedWorktree>>
+    })
+
     const ctx: RpcContext = { runtime }
 
     function findMethod(name: string) {
@@ -88,6 +99,7 @@ export function createAskRpcHarness(): { setup(): AskRpcHarness; cleanup(): void
       ctx,
       hasLocalRendererWindow,
       setPaneOwner: (paneKey, terminalHandle) => paneOwners.set(paneKey, terminalHandle),
+      setKnownWorktree: (worktreeId) => knownWorktrees.add(worktreeId),
       call: async (name, params, ctxOverride) => {
         const method = findMethod(name)
         if ('stream' in method) {
@@ -122,7 +134,7 @@ export function createAskRpcHarness(): { setup(): AskRpcHarness; cleanup(): void
           }
         }
       },
-      simulateRestart: () => buildInstance(paneOwners)
+      simulateRestart: () => buildInstance(paneOwners, knownWorktrees)
     }
   }
 
