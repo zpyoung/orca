@@ -117,7 +117,7 @@ describe('ApprovalInputDisclosure', () => {
     expect(screen.queryByText('Show full command')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByText('Show command'))
-    expect(screen.getByText('Truncated — showing 17 of 9,421 characters.')).toBeInTheDocument()
+    expect(screen.getByText(`Truncated — showing 17 of ${(9421).toLocaleString()} characters.`)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Copy truncated text' })).toBeInTheDocument()
   })
 
@@ -149,7 +149,7 @@ describe('ApprovalInputDisclosure', () => {
     expect(screen.queryByText('Show command')).not.toBeInTheDocument()
     expect(screen.queryByText('Show full command')).not.toBeInTheDocument()
     // nothing left to expand into, so the preview itself is the clipped text
-    expect(screen.getByText('Truncated — showing 8 of 4,200 characters.')).toBeInTheDocument()
+    expect(screen.getByText(`Truncated — showing 8 of ${(4200).toLocaleString()} characters.`)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Copy truncated text' })).toBeInTheDocument()
   })
 
