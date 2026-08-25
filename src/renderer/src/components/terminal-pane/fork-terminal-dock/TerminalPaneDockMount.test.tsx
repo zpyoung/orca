@@ -188,6 +188,33 @@ describe('TerminalPaneDockMount', () => {
     expect(onEffectiveMountedChange).toHaveBeenLastCalledWith(false)
   })
 
+  it('resets slot geometry on undock while the host churns the pane view identity', () => {
+    // getPanes() hands down a fresh pane object per render, so the geometry effect re-runs
+    // in the same commit the unmount cleanup zeroed the slot in — it must not undo that.
+    const pane = makeFakePane()
+    const { rerender } = render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={true} />)
+    const dockSlot = pane.container.querySelector('.pane-dock-slot') as HTMLElement
+    expect(dockSlot.style.height).toBe(`${terminalDockGutterHeightPx(DEFAULT_GUTTER_ROWS)}px`)
+
+    rerender(<TerminalPaneDockMount {...baseProps} pane={{ ...pane }} docked={false} />)
+
+    expect(dockSlot.style.height).toBe('0px')
+    expect(pane.container.style.getPropertyValue('--terminal-dock-height')).toBe('0px')
+  })
+
+  it('applies slot geometry on dock while the host churns the pane view identity', () => {
+    const pane = makeFakePane()
+    const { rerender } = render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={false} />)
+    const dockSlot = pane.container.querySelector('.pane-dock-slot') as HTMLElement
+
+    rerender(<TerminalPaneDockMount {...baseProps} pane={{ ...pane }} docked={true} />)
+
+    expect(dockSlot.style.height).toBe(`${terminalDockGutterHeightPx(DEFAULT_GUTTER_ROWS)}px`)
+    expect(pane.container.style.getPropertyValue('--terminal-dock-height')).toBe(
+      `${terminalDockGutterHeightPx(DEFAULT_GUTTER_ROWS)}px`
+    )
+  })
+
   it('holds and releases the PTY resize around a dock/undock edge without throwing', () => {
     const pane = makeFakePane()
     expect(queuePanePtyResizeIfHeld(pane.container, 80, 24)).toBe(false)
@@ -204,66 +231,51 @@ describe('TerminalPaneDockMount', () => {
     unmount()
   })
 
-  it('focuses the composer when the active (focused) pane docks', () => {
+  it.each([
+    { name: 'focuses the composer when the active (focused) pane docks', active: true },
+    { name: 'does not move focus when a background (unfocused) pane docks', active: false }
+  ])('$name', ({ active }) => {
     const pane = makeFakePane()
-    const xtermContainer = pane.container.querySelector('.xterm-container') as HTMLElement
     // Not a textarea: a real xterm helper textarea would collide with the composer's own
     // role=textbox query once docking mounts it.
-    const xtermFocusStandIn = document.createElement('div')
-    xtermFocusStandIn.tabIndex = -1
-    xtermContainer.appendChild(xtermFocusStandIn)
+    const focusOwner = document.createElement(active ? 'div' : 'input')
+    if (active) {
+      focusOwner.tabIndex = -1
+      pane.container.querySelector('.xterm-container')?.appendChild(focusOwner)
+    } else {
+      document.body.appendChild(focusOwner)
+    }
+    act(() => focusOwner.focus())
+
     const { rerender } = render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={false} />)
-    act(() => {
-      xtermFocusStandIn.focus()
-    })
-    expect(document.activeElement).not.toBe(screen.queryByRole('textbox'))
+    expect(document.activeElement).toBe(focusOwner)
 
     rerender(<TerminalPaneDockMount {...baseProps} pane={pane} docked={true} />)
 
-    expect(document.activeElement).toBe(screen.getByRole('textbox'))
+    expect(document.activeElement).toBe(active ? screen.getByRole('textbox') : focusOwner)
   })
 
-  it('does not move focus when a background (unfocused) pane docks', () => {
-    const pane = makeFakePane()
-    const input = document.createElement('input')
-    document.body.appendChild(input)
-    input.focus()
-    const { rerender } = render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={false} />)
-    expect(document.activeElement).toBe(input)
-
-    rerender(<TerminalPaneDockMount {...baseProps} pane={pane} docked={true} />)
-
-    expect(document.activeElement).toBe(input)
-  })
-
-  it('returns focus to xterm when the active pane undocks', () => {
+  it.each([
+    { name: 'returns focus to xterm when the active pane undocks', active: true },
+    { name: 'does not call terminal.focus() when a background pane undocks', active: false }
+  ])('$name', ({ active }) => {
     const pane = makeFakePane()
     const focusSpy = vi.spyOn(pane.terminal, 'focus')
+    const externalFocusOwner = document.createElement(active ? 'div' : 'input')
+    document.body.appendChild(externalFocusOwner)
     const { rerender } = render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={true} />)
     act(() => {
-      screen.getByRole('textbox').focus()
+      if (active) {
+        screen.getByRole('textbox').focus()
+      } else {
+        externalFocusOwner.focus()
+      }
     })
     expect(focusSpy).not.toHaveBeenCalled()
 
     rerender(<TerminalPaneDockMount {...baseProps} pane={pane} docked={false} />)
 
-    expect(focusSpy).toHaveBeenCalledTimes(1)
-  })
-
-  it('does not call terminal.focus() when a background pane undocks', () => {
-    const pane = makeFakePane()
-    const focusSpy = vi.spyOn(pane.terminal, 'focus')
-    const input = document.createElement('input')
-    document.body.appendChild(input)
-    const { rerender } = render(<TerminalPaneDockMount {...baseProps} pane={pane} docked={true} />)
-    act(() => {
-      input.focus()
-    })
-    expect(focusSpy).not.toHaveBeenCalled()
-
-    rerender(<TerminalPaneDockMount {...baseProps} pane={pane} docked={false} />)
-
-    expect(focusSpy).not.toHaveBeenCalled()
+    expect(focusSpy).toHaveBeenCalledTimes(active ? 1 : 0)
   })
 
   it('focuses the composer again when passthrough exits while still docked, in the active pane', () => {
@@ -769,32 +781,22 @@ describe('TerminalPaneDockMount', () => {
 })
 
 describe('terminalPaneUsesConptyBelowWrapMarkers', () => {
-  it('stays false when neither the local windowsPty option nor the remote stamp is set', () => {
-    const pane = makeFakePane()
-    expect(terminalPaneUsesConptyBelowWrapMarkers(pane)).toBe(false)
-  })
+  const cases = [
+    ['no local or remote ConPTY evidence', undefined, undefined, false],
+    ['local ConPTY without a build', { backend: 'conpty' }, undefined, true],
+    ['local ConPTY with a build', { backend: 'conpty', buildNumber: 26100 }, undefined, false],
+    ['remote unverified ConPTY stamp', undefined, 'true', true],
+    ['remote verified ConPTY stamp', undefined, 'false', false]
+  ] as const
 
-  it('demotes a local pane below the ConPTY wrap-marker build threshold', () => {
+  it.each(cases)('%s', (_, windowsPty, remoteStamp, expected) => {
     const pane = makeFakePane()
-    pane.terminal.options = { windowsPty: { backend: 'conpty' } }
-    expect(terminalPaneUsesConptyBelowWrapMarkers(pane)).toBe(true)
-  })
-
-  it('keeps a local pane verified-eligible once a build number is known', () => {
-    const pane = makeFakePane()
-    pane.terminal.options = { windowsPty: { backend: 'conpty', buildNumber: 26100 } }
-    expect(terminalPaneUsesConptyBelowWrapMarkers(pane)).toBe(false)
-  })
-
-  it('demotes a remote/SSH pane stamped with an unverified ConPTY status', () => {
-    const pane = makeFakePane()
-    pane.container.dataset[REMOTE_CONPTY_UNVERIFIED_DATASET_KEY] = 'true'
-    expect(terminalPaneUsesConptyBelowWrapMarkers(pane)).toBe(true)
-  })
-
-  it('keeps a remote/SSH pane stamped verified-eligible', () => {
-    const pane = makeFakePane()
-    pane.container.dataset[REMOTE_CONPTY_UNVERIFIED_DATASET_KEY] = 'false'
-    expect(terminalPaneUsesConptyBelowWrapMarkers(pane)).toBe(false)
+    if (windowsPty) {
+      pane.terminal.options = { windowsPty }
+    }
+    if (remoteStamp) {
+      pane.container.dataset[REMOTE_CONPTY_UNVERIFIED_DATASET_KEY] = remoteStamp
+    }
+    expect(terminalPaneUsesConptyBelowWrapMarkers(pane)).toBe(expected)
   })
 })

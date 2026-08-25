@@ -26,11 +26,7 @@ import {
   resetNativeChatPtySendQueuesForTests,
   waitForNativeChatPtyIdle
 } from './native-chat-pty-send-queue'
-import {
-  clearConfirmDurationMs,
-  NATIVE_CHAT_CLEAR_CONFIRM_MS,
-  NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT
-} from './fork-agent-composer/native-chat-runtime-clear'
+import { clearConfirmDurationMs } from './fork-agent-composer/native-chat-runtime-clear'
 
 export { NATIVE_CHAT_ADVANCE_BUFFER_MS, NATIVE_CHAT_QUESTION_STEP_MS, NATIVE_CHAT_SUBMIT_DELAY_MS }
 export { resetNativeChatPtySendQueuesForTests }
@@ -40,8 +36,6 @@ export {
 } from './fork-agent-composer/native-chat-typed-command-send'
 
 export const NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS = 300
-
-export { NATIVE_CHAT_CLEAR_CONFIRM_MS, NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT }
 
 export type NativeChatSendOptions = {
   /** Bytes that empty the agent's input line. Defaults to a single Ctrl+U. */

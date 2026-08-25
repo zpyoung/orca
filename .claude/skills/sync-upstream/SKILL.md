@@ -1,14 +1,17 @@
 ---
 name: sync-upstream
-description: Use when syncing the zpyoung/orca fork to upstream's latest stable release, or when a sync has failed and needs diagnosing — merges an upstream stable tag into main, resolves file ownership from the manifest, verifies, pushes, and hands off to the release skill. Triggers on "sync upstream", "sync the fork", "merge the stable tag", "sync failed", "typecheck fails after the merge".
+description: Use when syncing the zpyoung/orca fork to upstream's latest stable release, or when a sync has failed and needs diagnosing — merges an upstream stable tag on a run branch, resolves file ownership from the manifest, verifies, opens a PR, drives it green, merges it, and hands off to the release skill. Triggers on "sync upstream", "sync the fork", "merge the stable tag", "sync failed", "typecheck fails after the merge".
 ---
 
 # Syncing the fork with upstream
 
 `zpyoung/orca` is a consumption fork of `stablyai/orca`. A sync merges upstream's latest **stable
-release tag** into `origin/main`, resolves every file to its declared owner, proves the result still
-builds, and pushes only after a remote backup exists and verification passes. Then, if the sync
-landed cleanly and there is anything to release, it cuts a fork release.
+release tag** into a run branch, resolves every file to its declared owner, proves the result still
+builds, and opens a pull request against `main`. The run then drives that PR's checks green, merges
+it, and — if there is anything to release — cuts a fork release.
+
+**`main` is never pushed directly.** Every sync lands through a PR, so the fork ownership guard and
+the rest of PR CI run on the resolution before it reaches `main`.
 
 This skill owns the procedure end to end. Two halves are delegated and must not be re-implemented
 here:
@@ -16,9 +19,18 @@ here:
 - **Ownership resolution and verification** — [`references/file-ownership.md`](./references/file-ownership.md)
 - **Releasing** — the `release` skill
 
+Earlier runs record what they learned in
+[`references/sync-lessons.md`](./references/sync-lessons.md). Read it before Step 4. It is written by
+previous runs of this exact procedure, and it exists so you do not spend the budget rediscovering a
+wrong turn one of them already paid for.
+
 Arguments: `--unattended` suppresses every confirmation prompt. It does **not** grant extra
 latitude: an unattended run stops and reports wherever an attended run would ask a human, and the
 decisions this skill routes to a human stay routed to a human.
+
+The run needs a disposable branch in a workspace of its own; the scheduled automation supplies one by
+creating a fresh worktree per run. This skill never creates, renames, or deletes a branch or a
+worktree — it verifies the one it was handed (Step 4) and works there.
 
 ## Two invariants, both counter-intuitive
 
@@ -102,8 +114,8 @@ UPSTREAM_MAIN=$(git rev-parse upstream/main)
 ORIGIN_UPSTREAM_OLD=$(git rev-parse origin/upstream)
 ```
 
-`$UPSTREAM_MAIN` is needed for the mirror branch in Step 10, the fork-commit range in Step 2, and
-the informational gap in Step 13. It is never the merge target.
+`$UPSTREAM_MAIN` is needed for the mirror branch in Step 12, the fork-commit range in Step 2, and
+the informational gap in Step 16. It is never the merge target.
 
 ## Step 2 — Assess
 
@@ -121,11 +133,13 @@ range and are not fork work. Excluding `upstream/main` as well as `$UPSTREAM_TAR
 `$UPSTREAM_TARGET..origin/main` range reports those as fork work and inflates N by dozens.
 
 - If `git merge-base --is-ancestor "$UPSTREAM_TARGET" origin/main` succeeds, `main` already contains
-  this release. Skip to Step 10 and note "no new stable release (already at $STABLE_TAG)". This is
+  this release. Skip to Step 12 and note "no new stable release (already at $STABLE_TAG)". This is
   the expected outcome on most days and is a success, not a warning.
 - If N is 0 and `git merge-base --is-ancestor origin/main "$UPSTREAM_TARGET"` succeeds, this is a
-  plain fast-forward. Push `git push origin "${UPSTREAM_TARGET}:refs/heads/main"`, skip to Step 10,
-  and note "fast-forward, no merge needed".
+  plain fast-forward — the fork has no commits of its own to defend. Record
+  `resolution=fast-forward`, do Step 4, then set the run branch to the tag
+  (`git reset --hard "$UPSTREAM_TARGET"`) and skip to Step 8. It still lands through a PR; there is
+  no direct push to `main` anywhere in this flow.
 - Otherwise continue.
 
 ## Step 3 — Backup
@@ -150,23 +164,36 @@ Then PROVE the remote backup landed: `git ls-remote origin "refs/heads/${BACKUP_
 `$ORIGIN_MAIN_OLD`. If it does not, STOP — do not merge, do not push anything. Report "needs
 attention: backup push failed, aborted before touching main".
 
-## Step 4 — Choose where to merge
+## Step 4 — Confirm the run workspace
 
-Full verification needs the existing `node_modules`, so it can only run in this checkout.
+The caller supplies the workspace: a fresh worktree on a disposable branch. Verify what you were
+handed and stop rather than adapting to a workspace that fails any of these:
 
-**Path A (verified, can push).** Requires all of: `main` is the current branch
-(`git symbolic-ref --short HEAD` is `main`), `git status --porcelain` is empty, and no
-rebase/merge/cherry-pick is in progress (no `.git/rebase-merge`, `.git/rebase-apply`,
-`.git/MERGE_HEAD`). Reset local main onto the fetched remote state first:
-`git reset --hard $ORIGIN_MAIN_OLD`. Merge in place on `main`.
+- `git symbolic-ref --short HEAD` resolves (HEAD is not detached) and is **not** `main`. Merging on
+  `main` would put the resolution on the branch the PR targets.
+- `git status --porcelain` is empty.
+- No rebase/merge/cherry-pick is in progress (no `.git/rebase-merge`, `.git/rebase-apply`,
+  `.git/MERGE_HEAD`).
+- `git merge-base --is-ancestor HEAD origin/main` succeeds. The branch carries no commits of its
+  own, so the reset below destroys nothing. If it fails, the workspace holds someone's work.
 
-**Path B (probe only, never pushes).** Any Path A condition fails. Do not touch this checkout.
-Create a scratch worktree — `git worktree add <tmpdir>/sync-probe -b __sync_probe $ORIGIN_MAIN_OLD`
-— and do Steps 5 and 6 there to learn whether resolution is even possible. Verification is
-unavailable, so main is not pushed regardless of outcome. Always clean up:
-`git worktree remove --force <tmpdir>/sync-probe` and `git branch -D __sync_probe`. Report "needs
-attention: workspace busy (dirty tree / branch <X> checked out), merge probe result:
-<clean | auto-resolvable | conflicted>, main not pushed".
+Record the branch and align it with the tip Step 2 assessed:
+
+```sh
+SYNC_BRANCH=$(git symbolic-ref --short HEAD)
+git reset --hard "$ORIGIN_MAIN_OLD"
+```
+
+A fresh worktree has no `node_modules`, and everything from here on needs them — the ownership
+classifier, the verification gate, and any fix. Install before merging, so an install failure is
+never mistaken for a resolution failure:
+
+```sh
+pnpm install --frozen-lockfile
+```
+
+If any check or the install fails, STOP and go to Step 13 with "needs attention: unusable run
+workspace (<which check failed>) — nothing merged, nothing pushed".
 
 ## Step 5 — Merge with fork priority
 
@@ -207,7 +234,7 @@ rule applied.
 
 Anything else — rename/rename, rename/delete, submodule conflicts, binary files you cannot attribute
 to a side, or more than 25 conflicted paths in total — is out of scope. Do not guess. Run
-`git merge --abort` and go to Step 11 with "needs attention: merge conflicts require manual
+`git merge --abort` and go to Step 13 with "needs attention: merge conflicts require manual
 resolution (<conflict type> at <paths>)".
 
 After any completed merge, verify no conflict markers survived:
@@ -233,14 +260,14 @@ manifest's declared lines.
 The reference also carries three per-sync checklists that are part of this step, not optional
 extras: **tier-2 forked-copy replay**, **tier-4 pending-upstream review**, and **upstream
 feature-collision review**. Each can surface a decision the reference routes to a human. Under
-`--unattended`, that is a stopping condition: go to Step 11 with "needs attention: <the decision>"
+`--unattended`, that is a stopping condition: go to Step 13 with "needs attention: <the decision>"
 rather than choosing a side.
 
 Commit the ownership resolution as a single follow-up commit on top of the merge; Step 7 expects
 exactly one such extra commit.
 
 If the classifier fails, or `checkout.txt` is empty when the merge was not a no-op, STOP and go to
-Step 11 with "needs attention: ownership resolution failed". Do not fall back to plain `-X ours` —
+Step 13 with "needs attention: ownership resolution failed". Do not fall back to plain `-X ours` —
 that is the known-broken state.
 
 ## Step 7 — Commit accounting
@@ -249,15 +276,51 @@ Merging never replays fork commits, so unlike a rebase it cannot silently drop o
 makes this check strict and cheap: every SHA in FORK_COMMITS must still be present and reachable.
 
 For each SHA recorded in Step 2, `git merge-base --is-ancestor <sha> HEAD` must succeed. If any does
-not, something rewrote history — reset back (`git reset --hard $ORIGIN_MAIN_OLD` on Path A) and go to
-Step 11 with "needs attention: fork commit <sha> <subject> is no longer reachable after merge".
+not, something rewrote history — reset back (`git reset --hard $ORIGIN_MAIN_OLD`) and go to
+Step 13 with "needs attention: fork commit <sha> <subject> is no longer reachable after merge".
 
 Also re-run the Step 2 range against the merged head —
 `git log --oneline --no-merges HEAD --not upstream/main "$UPSTREAM_TARGET"` — and confirm the count
 is still N. A count above N is fine only if the extras are the merge resolution and the Step 6
 ownership commit; a count below N is a hard failure.
 
-## Step 8 — Verification gate (Path A only)
+## The fix policy — how Steps 8 and 10 handle a failure
+
+Both gates run under one rule: fix what can be fixed, escalate only what genuinely needs a person.
+
+**Diagnose before patching.** A failure right after a sync is a resolution failure until proven
+otherwise — the merge kept upstream's side of a file the fork owns, or the fork's side of a file
+upstream reworked. Re-run the Step 6 classifier against the failing path and correct ownership
+first. Patching fork code to silence a symptom whose cause is a mis-resolved file buries the bug and
+re-breaks at the next sync.
+
+A fix may:
+
+- re-resolve a path to its declared owner, and correct the manifest itself — seam lines, residual
+  budgets, tier-2 replay headers — when the declaration is what drifted
+- adapt fork code to an upstream API that changed shape, preserving the fork behavior
+- adopt an upstream test's new expectations where the fork has no stake in the old ones
+- apply mechanical lint/format fixes (`oxlint --fix`, `pnpm format`), committed on their own
+
+Escalate — stop, leave the PR open, report "needs attention" — for:
+
+- any resolution that would cost fork feature functionality: upstream reworked the code a fork
+  feature hangs off, and every fix available loses behavior this fork ships
+- the Step 6 human decisions (feature collision, pending-upstream item, unresolvable conflict)
+- an upstream defect the fork would have to work around
+
+Never, on either gate:
+
+- skip, delete, or narrow a test to make it pass
+- add a `max-lines` disable or a per-file baseline bump — `AGENTS.md` forbids it outright
+- weaken a lint rule, the fork ownership guard, or any other CI gate
+- wave a failure through as unrelated. The Step 8 baseline differential is the only mechanism for
+  tolerating one, and it requires reproducing the identical failure at `$ORIGIN_MAIN_OLD`
+
+Each fix is its own commit, its message naming what broke and why the fix is the right one. Every
+fix commit appears in the Step 16 report.
+
+## Step 8 — Verification gate
 
 Run the gate exactly as [`references/file-ownership.md`](./references/file-ownership.md) § Verifying
 specifies — including the manifest checks (`--verify-seams`, `--verify-residuals`), clearing
@@ -265,8 +328,8 @@ specifies — including the manifest checks (`--verify-seams`, `--verify-residua
 configuration before `pnpm test`. Those are not hygiene; each one deterministically fakes a result
 if skipped.
 
-Order: `pnpm install --frozen-lockfile` (upstream may have changed dependencies) → manifest checks →
-`pnpm typecheck` → `pnpm lint` → `pnpm test`.
+Order: `pnpm install --frozen-lockfile` (re-run it here — the merge may have taken upstream's
+`pnpm-lock.yaml`) → manifest checks → `pnpm typecheck` → `pnpm lint` → `pnpm test`.
 
 Everything up to and including `pnpm lint` is absolute: stop at the first failure and treat it as a
 hard fail. The baseline differential below never applies to them. The reference's rule-tightening
@@ -293,7 +356,7 @@ If `pnpm test` fails:
 4. Re-run only the failing files at the baseline, with the same CLI build and Git-config scrubbing
    the reference specifies. A file that does not exist at the baseline (newly added by upstream)
    counts as "did not fail there".
-5. Return to the merged tree: `git checkout main` (main is at `$MERGED_HEAD`). If you re-installed
+5. Return to the merged tree: `git checkout "$SYNC_BRANCH"` (it is at `$MERGED_HEAD`). If you re-installed
    in (3), run `pnpm install --frozen-lockfile` again. Do this even if the differential errored
    partway — never leave the checkout detached.
 6. Classify at test-name granularity, not file granularity:
@@ -304,29 +367,112 @@ If `pnpm test` fails:
      the resolution. Hard fail. This includes a file that fails on both sides but whose set of
      failing test names GREW after the merge.
 
-On any hard fail, restore and bail: `git reset --hard $ORIGIN_MAIN_OLD`, then go to Step 11 with
-"needs attention: merge resolved but <install|manifest|typecheck|lint|tests> failed — manual
-resolution required; backup at origin/<BACKUP_REF>". Include the first ~20 lines of the failure
-output, and for a test regression name the specific tests that pass at the baseline but fail after.
+A hard fail here is not the end of the run — work it under the fix policy above, then re-run the
+gate from the top. Re-run it whole: a fix for a typecheck error routinely breaks lint, and a
+partial re-run is how a broken tree reaches the PR.
 
-Do not push a tree that failed this gate, and do not "fix" failures in the fork's own code — that is
-out of scope for a sync. The two exceptions are the upstream-defect case and the lint-tightening
-case, both defined in the reference, and both require proving the cause before acting.
+If the policy says escalate, or the same failure survives your fixes, restore and bail:
+`git reset --hard $ORIGIN_MAIN_OLD`, then go to Step 13 with "needs attention: merge resolved but
+<install|manifest|typecheck|lint|tests> failed — manual resolution required; backup at
+origin/<BACKUP_REF>". Include the first ~20 lines of the failure output, and for a test regression
+name the specific tests that pass at the baseline but fail after.
 
-## Step 9 — Push main (Path A only, gate passed)
+Never open a PR from a tree that failed this gate. The gate is cheap compared to a CI round trip,
+and a red PR costs the run its 4-hour budget in Step 10.
 
-The merge only adds commits, so this is a fast-forward for the remote and needs no force:
+## Step 9 — Push the run branch and open the PR
 
 ```sh
-git push origin main:refs/heads/main
+git push -u origin "$SYNC_BRANCH"
 ```
 
-NEVER use `--force` or `--force-with-lease` here. A rejected push means someone pushed to the fork
-mid-run; the correct response is to report, not to overwrite. Report "needs attention: origin/main
-moved during sync, push rejected — re-run to merge on top of the new tip" and leave local main as
-merged (the backup still protects the old state).
+NEVER use `--force` or `--force-with-lease`. The branch is created fresh for this run, so a rejected
+push means the workspace was not fresh after all: STOP and report rather than overwriting.
 
-## Step 10 — Update the fork's `upstream` mirror branch
+Write the PR body to a file and open the PR. Both flags are required — without `env -u GITHUB_TOKEN`
+and an explicit `--repo`, `gh` fails here in a way that misreports its own cause:
+
+```sh
+env -u GITHUB_TOKEN gh pr create --repo zpyoung/orca \
+  --base main --head "$SYNC_BRANCH" \
+  --title "sync: absorb upstream ${STABLE_TAG}" \
+  --body-file <path to the body file>
+```
+
+The body is the reviewer's whole account of the resolution, and the Step 15 report is built from the
+same material. Include: `$STABLE_TAG` at `$UPSTREAM_TARGET`; the resolution mode; the fork-commit
+count N with confirmation every SHA is still reachable; each ownership list and what came from it;
+every `merge-review.txt` path with what the hand review concluded; the tier-2, tier-4, and
+feature-collision checklist outcomes; any test failure the Step 8 differential tolerated, with the
+baseline SHA it was proven against; and the backup ref.
+
+Record `PR_NUMBER` and `PR_URL`. If a PR already exists for this branch, reuse it
+(`gh pr view --json number,url`) instead of opening a second one.
+
+## Step 10 — Drive the PR green
+
+The run owns this PR until every required check passes or the budget runs out. The budget is
+**4 hours** from PR creation; compute the deadline once and honor it.
+
+Poll the rollup rather than the web UI, at roughly two-minute intervals — `gh` shares the account's
+API rate limit, so do not tighten that:
+
+```sh
+env -u GITHUB_TOKEN gh pr view "$PR_NUMBER" --repo zpyoung/orca \
+  --json statusCheckRollup,mergeStateStatus,mergeable
+```
+
+Wait between polls with a background wait or a monitor, never a foreground `sleep`.
+
+**Re-run a failure before believing it.** This suite is genuinely nondeterministic — failures differ
+run to run on identical code. The first time a job fails, re-run it once
+(`env -u GITHUB_TOKEN gh run rerun <run-id> --failed --repo zpyoung/orca`) and only treat it as real
+if it reproduces. A failure that reproduces is signal; a failure that clears was flake, and it is
+still worth naming in the report.
+
+Every real failure goes through the fix policy above: diagnose the cause, fix it if the policy
+allows, commit it on its own, push, and let CI re-run. There is no fixed attempt limit — keep going
+while you are making progress and the budget holds.
+
+Stop and report "needs attention", PR left open, nothing merged, when: the policy says escalate, the
+same check fails after a fix aimed at it, or the deadline passes. Name the check, link the run, and
+state what you tried.
+
+## Step 11 — Merge the PR
+
+Only when every required check is green.
+
+```sh
+env -u GITHUB_TOKEN gh pr merge "$PR_NUMBER" --repo zpyoung/orca --merge
+```
+
+`--merge` is mandatory. `--squash` and `--rebase` both mint new SHAs, which breaks this fork in two
+ways at once: it flattens the merge with `$UPSTREAM_TARGET`, so every later sync re-conflicts
+against a tag `main` no longer descends from, and it rewrites fork commit SHAs, so
+`last_released_commit` dangles and published release tags point into a dead lineage. This is the
+"merge, never rebase" invariant, enforced at the moment it is easiest to violate.
+
+If the merge is refused — branch protection wanting a review, a check that became required
+mid-run — do not work around it. Try arming auto-merge
+(`gh pr merge "$PR_NUMBER" --repo zpyoung/orca --merge --auto`; the fork currently has auto-merge
+disabled in its settings, so expect this to fail and do not enable it to get past a refusal), then
+report "needs attention: PR could not be merged by the run (<reason>)" and skip the release —
+`main` has not moved.
+
+Then confirm and capture the new tip:
+
+```sh
+git fetch origin main
+MAIN_NEW=$(git rev-parse origin/main)
+git merge-base --is-ancestor "$UPSTREAM_TARGET" origin/main   # must succeed
+```
+
+The fork does not delete branches on merge, and this automation opens one a day, so clean up the
+remote branch best-effort: `git push origin --delete "$SYNC_BRANCH"`. A failure here is worth a line
+in the report and nothing more. Leave the local branch and the worktree alone — they belong to the
+caller.
+
+## Step 12 — Update the fork's `upstream` mirror branch
 
 The mirror branch tracks upstream's **trunk**, deliberately — it is a read-only convenience copy of
 `upstream/main`, not a record of what was synced. Do not repoint it at `$STABLE_TAG`.
@@ -335,26 +481,33 @@ If `git merge-base --is-ancestor origin/upstream upstream/main` succeeds, fast-f
 `git push origin upstream/main:refs/heads/upstream`. Otherwise it has diverged — do NOT force.
 Record "needs attention: upstream mirror branch diverged".
 
-## Step 11 — Prune old backups
+## Step 13 — Prune old backups
 
 List `git ls-remote --heads origin 'refs/heads/backup/main-*'`. If more than 10 exist, delete the
 oldest by stamp so 10 remain: `git push origin --delete refs/heads/backup/main-<stamp>`. Only ever
 delete refs matching that exact pattern, and never the backup created by this run.
 
-## Step 12 — Cut a release
+## Step 14 — Cut a release
 
-Run this step only if ALL of the following hold. If any fails, skip it and record in Step 13 that no
+Run this step only if ALL of the following hold. If any fails, skip it and record in Step 16 that no
 release was attempted, with the reason.
 
-- No hard fail occurred in Steps 3–9: the backup landed, no unresolvable conflict, commit accounting
-  passed, the verification gate passed, and the push to `origin/main` succeeded. A Step 10
-  mirror-branch warning does NOT block a release — it does not touch `main`.
-- If a merge happened at all, Step 4 chose **Path A**. Path B never cuts: it could not verify and it
-  never pushed. The Step 2 "no new stable release" short-circuit is fine to release from, since
-  `main` was never modified.
-- `main` is the current branch, `git status --porcelain` is empty, no probe worktree or
-  `__sync_probe` branch remains, and — after `git fetch origin main` — `git rev-parse main` equals
-  `git rev-parse origin/main`.
+- No hard fail occurred in Steps 3–11: the backup landed, no unresolvable conflict, commit
+  accounting passed, the verification gate passed, and **the PR merged**. A Step 12 mirror-branch
+  warning does NOT block a release — it does not touch `main`. An armed-but-unmerged auto-merge
+  does block it: `main` has not moved yet.
+- The working tree is clean and no merge is in progress.
+- The Step 2 "no new stable release" short-circuit is fine to release from — `main` was never
+  modified, and the fork may still have unreleased commits of its own.
+
+The release skill requires a checkout whose content is `origin/main`. This run is on `$SYNC_BRANCH`
+in a worktree, and `main` is very likely checked out in another worktree, so do not try to check out
+the branch. Detach onto the merged tip instead — same content, no branch contention:
+
+```sh
+git fetch origin main
+git checkout --detach origin/main
+```
 
 Do NOT decide for yourself whether there is anything worth releasing, and do not compute a version,
 write `CHANGELOG.md`, tag, or dispatch a workflow by hand. Invoke the `release` skill:
@@ -374,13 +527,71 @@ Dispatch only — do NOT wait for the build. `release-cut.yml` tags, builds, and
 notarization alone runs over an hour. Record the dispatched run and stop.
 
 If the release skill stops on one of its own preconditions or fails partway, that is a "needs
-attention" item, but it does NOT invalidate the sync: `main` is already merged and pushed, and that
-push stands. Never try to undo the sync because a release failed, and never re-run the skill in the
+attention" item, but it does NOT invalidate the sync: the PR is already merged and `main` already
+carries it, and that stands. Never try to undo the sync because a release failed, and never re-run the skill in the
 same run to force a different outcome.
 
-## Step 13 — Report
+## Step 15 — Record what this run learned
+
+Most runs learn nothing and open no PR here. That is the normal outcome. An empty or padded learning
+PR is worse than none: it teaches the next reader to skim the one place that is supposed to be worth
+reading.
+
+Two things qualify, and the run must have actually hit them:
+
+- **A wrong turn.** This skill led you somewhere wrong, or said nothing where it should have warned,
+  and it cost the run time. Record the check that would have caught it, not the narrative.
+- **A confirmed discovery.** A resolution you proved correct that the next run would otherwise
+  re-derive — a file that always resolves one way and why, a command whose obvious form is subtly
+  wrong against this repo.
+
+Both carry the same bar: **reproducible**. A flaky check, a dropped connection, a one-off
+environment quirk is not a lesson, and writing it up as one puts a false rule in front of every
+later run.
+
+**Off-limits to any run-authored edit:** the `## Hard safety rules` section, and the "Never, on
+either gate" list in the fix policy. Those are what stop a run from buying a green check by
+weakening what it checks — and a run that has just been inconvenienced by one is the worst possible
+author of its revision. If you believe one is wrong, say so as a "needs attention" item in the
+report and leave the text alone.
+
+Where a lesson goes:
+
+- A lesson that is a **rule** — do X, never Y, check Z first — is edited into the step that owns it.
+  A rule parked in an appendix is a rule the next run skims past.
+- Everything else appends to `references/sync-lessons.md`: what happened, what the correct move was,
+  and how to recognize the situation again.
+
+Read what is already written before you add to it. This skill is long and covers a great deal;
+restating an existing rule in different words is how a runbook starts contradicting itself. A lesson
+that refines an existing rule edits that rule rather than settling in beside it.
+
+Open it from its own branch — never `$SYNC_BRANCH`, which has already merged:
+
+```sh
+git fetch origin main
+git checkout -b "sync-lessons/${STABLE_TAG}" origin/main
+# edit .claude/skills/sync-upstream/** only
+git commit -am "docs(sync-skill): <what the next run will do differently>"
+git push -u origin "sync-lessons/${STABLE_TAG}"
+env -u GITHUB_TOKEN gh pr create --repo zpyoung/orca --base main \
+  --title "sync-skill: <the lesson in one line>" --body-file <path to the body file>
+```
+
+The body carries the evidence: the command that misled you, its output, the SHA it happened at, and
+what the edit changes for the next run. A reviewer must be able to check the claim without
+reconstructing the run.
+
+**This PR is never auto-merged and never merged by the run.** Leave it open and name it in the
+report. It blocks nothing — the sync is already merged and any release already dispatched.
+
+Scope is `.claude/skills/sync-upstream/**` and nothing else. A lesson about the release procedure
+belongs to the `release` skill: report it, do not edit it from here.
+
+## Step 16 — Report
 
 - Stable target: `$STABLE_TAG` at `$UPSTREAM_TARGET`
+- PR: `$PR_URL`, and its end state (`merged` | `open — needs attention` | `auto-merge armed`)
 - `origin/main`: old SHA → new SHA, and the resolution used (`no new stable release` |
   `fast-forward` | `clean` | `auto-ours` | `auto-ours+tree` | `not changed`)
 - `origin/upstream`: old SHA → new SHA
@@ -392,7 +603,10 @@ same run to force a different outcome.
   Expected to be large; informational only — it is the whole point of tracking stable releases.
 - Verification: pass/fail per step, plus any test failures tolerated as pre-existing and the baseline
   SHA they were proven against
+- PR CI: every check that failed, whether it reproduced on re-run or was flake, and every fix commit
+  made to turn it green — SHA, subject, and the cause it addressed
 - Release: `nothing to release` | `skipped (<reason>)` | the tag cut and the run dispatched
+- Learned: `nothing` | the lesson in one line and the URL of the skill PR left open for review
 - All "needs attention" items
 
 ## Hard safety rules
@@ -400,6 +614,8 @@ same run to force a different outcome.
 - The sync target is ALWAYS a strict `vX.Y.Z` upstream tag. Never merge an `-rc.N` tag, never merge
   `upstream/main`, never merge a commit picked off `main` as a stand-in for a release. If no new
   stable release exists, the correct action is to change nothing.
+- Never push `main` directly. `main` advances only by merging the sync PR, and only with a merge
+  commit — `--squash` and `--rebase` are out of scope for the same reason a rebase is.
 - Never rewrite `origin/main`. This flow is append-only: merge commits go on top, fork commit SHAs
   never change. Any operation that would rewrite fork history (rebase, filter-branch, amend of an
   existing fork commit) is out of scope.
@@ -411,14 +627,21 @@ same run to force a different outcome.
 - A fork commit unreachable after the merge is a hard failure, never a warning to push through.
 - A failing test may be tolerated ONLY by the Step 8 baseline differential, which requires
   reproducing the identical failure at `$ORIGIN_MAIN_OLD`. Never tolerate a failure because it looks
-  environmental, sits in a known-flaky file, or seems unrelated to the diff.
-- On any abort path, leave the repo exactly as found: no in-progress merge (`git merge --abort`),
-  local main back at `$ORIGIN_MAIN_OLD`, the original branch re-checked-out, and no scratch state
-  (`__sync_probe` branch, probe worktree). Never leave the workspace on a different branch than it
-  started on.
+  environmental, sits in a known-flaky file, or seems unrelated to the diff. Re-running a PR check
+  once to rule out flake is not tolerating it — a reproduced failure still has to be fixed.
+- Never buy a green check by weakening what it checks: no skipped or narrowed tests, no `max-lines`
+  disable or baseline bump, no relaxed lint rule, no loosened ownership guard. The fix policy is the
+  whole of what a run may do to a red gate.
+- On any abort path, leave no in-progress merge (`git merge --abort`) and reset the run branch to
+  `$ORIGIN_MAIN_OLD`. The branch and its worktree belong to the caller — never delete them, and
+  never touch `main` on the way out.
 - Releasing is delegated to the `release` skill, always. Never compute a fork version, edit
   `CHANGELOG.md`, create a tag, or dispatch `release-cut.yml` directly — the skill owns the version
   algebra, and a hand-rolled version can regress the published series and break auto-update.
-- Never cut a release from a tree this run could not verify and push. No Path B release, no release
-  after any hard fail, no release with a dirty tree or with `main` out of sync with `origin/main`.
+- Never cut a release from work this run could not verify and land. No release after any hard fail,
+  none while the PR is still open, none with a dirty tree.
 - One release per run, at most. If the skill reports "nothing to release", that is the end of it.
+- This skill is revised by its own runs, but only through Step 15: a separate branch, a PR the run
+  never merges, and no edit to `## Hard safety rules` or the fix policy's never-list. Never edit the
+  skill on `$SYNC_BRANCH`, and never edit it as a way of getting a check green — a rule rewritten to
+  match what a run did is not a lesson, it is a cover-up.

@@ -40,22 +40,17 @@ function makeDockWorktreeSession(
 }
 
 describe('SetTabProps.terminalDock (session.tabs.setTabProps params)', () => {
-  it('parses a single-pane dock patch', () => {
-    const parsed = SetTabProps.parse({
-      worktree: WT,
-      tabId: 'tab-1',
-      terminalDock: { paneKey: 'tab-1:1', docked: true, gutterRows: 6 }
-    })
-    expect(parsed.terminalDock).toEqual({ paneKey: 'tab-1:1', docked: true, gutterRows: 6 })
-  })
-
-  it('accepts a patch with only one of docked/gutterRows set', () => {
-    const parsed = SetTabProps.parse({
-      worktree: WT,
-      tabId: 'tab-1',
-      terminalDock: { paneKey: 'tab-1:1', docked: true }
-    })
-    expect(parsed.terminalDock).toEqual({ paneKey: 'tab-1:1', docked: true })
+  // D4: paneKey is attacker-reachable input, so its shape is bound to the two
+  // formats the host ever mints (makePaneKey's tabId:UUID, or the legacy
+  // tabId:N numeric pane) instead of accepting an arbitrary string.
+  it.each([
+    ['parses a single-pane dock patch', { paneKey: 'tab-1:1', docked: true, gutterRows: 6 }],
+    ['accepts a partial dock patch', { paneKey: 'tab-1:1', docked: true }],
+    ['accepts a paneKey minted by makePaneKey', { paneKey: DOCK_PANE_KEY, docked: true }],
+    ['accepts a legacy numeric pane key', { paneKey: 'tab-1:3', docked: true }]
+  ])('%s', (_, terminalDock) => {
+    const parsed = SetTabProps.parse({ worktree: WT, tabId: 'tab-1', terminalDock })
+    expect(parsed.terminalDock).toEqual(terminalDock)
   })
 
   it('leaves other props unchanged when terminalDock is absent', () => {
@@ -68,118 +63,39 @@ describe('SetTabProps.terminalDock (session.tabs.setTabProps params)', () => {
     expect(parsed.color).toBe('#fff')
   })
 
-  it('rejects a gutterRows value outside 3..15', () => {
-    expect(() =>
-      SetTabProps.parse({
-        worktree: WT,
-        tabId: 'tab-1',
-        terminalDock: { paneKey: 'tab-1:1', gutterRows: 999 }
-      })
-    ).toThrow()
-  })
-
-  it('rejects a missing paneKey', () => {
-    expect(() =>
-      SetTabProps.parse({
-        worktree: WT,
-        tabId: 'tab-1',
-        terminalDock: { docked: true }
-      })
-    ).toThrow()
-  })
-
-  // D4: paneKey is attacker-reachable input, so its shape is bound to the two
-  // formats the host ever mints (makePaneKey's tabId:UUID, or the legacy
-  // tabId:N numeric pane) instead of accepting an arbitrary string.
-  it('accepts a paneKey minted by makePaneKey', () => {
-    const parsed = SetTabProps.parse({
-      worktree: WT,
-      tabId: 'tab-1',
-      terminalDock: { paneKey: DOCK_PANE_KEY, docked: true }
-    })
-    expect(parsed.terminalDock?.paneKey).toBe(DOCK_PANE_KEY)
-  })
-
-  it('accepts a legacy numeric pane key', () => {
-    const parsed = SetTabProps.parse({
-      worktree: WT,
-      tabId: 'tab-1',
-      terminalDock: { paneKey: 'tab-1:3', docked: true }
-    })
-    expect(parsed.terminalDock?.paneKey).toBe('tab-1:3')
-  })
-
-  it('rejects a pane key matching neither the stable nor the legacy numeric format', () => {
-    expect(() =>
-      SetTabProps.parse({
-        worktree: WT,
-        tabId: 'tab-1',
-        terminalDock: { paneKey: 'not-a-pane-key', docked: true }
-      })
-    ).toThrow()
-  })
-
-  it('rejects an overlong pane key', () => {
-    expect(() =>
-      SetTabProps.parse({
-        worktree: WT,
-        tabId: 'tab-1',
-        terminalDock: { paneKey: `tab-1:${'1'.repeat(300)}`, docked: true }
-      })
-    ).toThrow()
+  it.each([
+    ['rejects a gutterRows value outside 3..15', { paneKey: 'tab-1:1', gutterRows: 999 }],
+    ['rejects a missing paneKey', { docked: true }],
+    ['rejects an invalid pane key format', { paneKey: 'not-a-pane-key', docked: true }],
+    ['rejects an overlong pane key', { paneKey: `tab-1:${'1'.repeat(300)}`, docked: true }]
+  ])('%s', (_, terminalDock) => {
+    expect(() => SetTabProps.parse({ worktree: WT, tabId: 'tab-1', terminalDock })).toThrow()
   })
 })
 
 describe('SetTabProps.terminalDock.remove (session.tabs.setTabProps params)', () => {
   const OTHER_PANE_KEY = makePaneKey(DOCK_TAB_ID, '22222222-2222-4222-a222-222222222222')
 
-  it('accepts a removal-only patch with no paneKey', () => {
-    const parsed = SetTabProps.parse({
-      worktree: WT,
-      tabId: 'tab-1',
-      terminalDock: { remove: [DOCK_PANE_KEY, OTHER_PANE_KEY] }
-    })
-    expect(parsed.terminalDock).toEqual({ remove: [DOCK_PANE_KEY, OTHER_PANE_KEY] })
+  it.each([
+    ['accepts a removal-only patch', { remove: [DOCK_PANE_KEY, OTHER_PANE_KEY] }],
+    [
+      'accepts a combined set and removal',
+      { paneKey: DOCK_PANE_KEY, docked: true, remove: [OTHER_PANE_KEY] }
+    ]
+  ])('%s', (_, terminalDock) => {
+    const parsed = SetTabProps.parse({ worktree: WT, tabId: 'tab-1', terminalDock })
+    expect(parsed.terminalDock).toEqual(terminalDock)
   })
 
-  it('accepts a patch carrying both a set and a removal', () => {
-    const parsed = SetTabProps.parse({
-      worktree: WT,
-      tabId: 'tab-1',
-      terminalDock: { paneKey: DOCK_PANE_KEY, docked: true, remove: [OTHER_PANE_KEY] }
-    })
-    expect(parsed.terminalDock).toEqual({
-      paneKey: DOCK_PANE_KEY,
-      docked: true,
-      remove: [OTHER_PANE_KEY]
-    })
-  })
-
-  it('still rejects docked/gutterRows without paneKey when remove is also present', () => {
-    expect(() =>
-      SetTabProps.parse({
-        worktree: WT,
-        tabId: 'tab-1',
-        terminalDock: { docked: true, remove: [OTHER_PANE_KEY] }
-      })
-    ).toThrow()
-  })
-
-  it('rejects an invalid pane key inside the removal list', () => {
-    expect(() =>
-      SetTabProps.parse({
-        worktree: WT,
-        tabId: 'tab-1',
-        terminalDock: { remove: ['not-a-pane-key'] }
-      })
-    ).toThrow()
-  })
-
-  it('rejects a removal list past the cap', () => {
-    const remove = Array.from({ length: 65 }, (_, i) => `tab-1:${i}`)
-    expect(() =>
-      SetTabProps.parse({ worktree: WT, tabId: 'tab-1', terminalDock: { remove } })
-    ).toThrow()
+  it.each([
+    ['rejects set fields without paneKey', { docked: true, remove: [OTHER_PANE_KEY] }],
+    ['rejects an invalid key in the removal list', { remove: ['not-a-pane-key'] }],
+    [
+      'rejects a removal list past the cap',
+      { remove: Array.from({ length: 65 }, (_, i) => `tab-1:${i}`) }
+    ]
+  ])('%s', (_, terminalDock) => {
+    expect(() => SetTabProps.parse({ worktree: WT, tabId: 'tab-1', terminalDock })).toThrow()
   })
 
   it('accepts a removal list at the cap', () => {

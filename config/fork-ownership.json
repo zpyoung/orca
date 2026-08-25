@@ -305,6 +305,7 @@
       "kind": "registration",
       "lines": [
         "import { parseLegacyNumericPaneKey, parsePaneKey } from '../../../../shared/stable-pane-id'",
+        "} from '../../../../shared/fork-terminal-dock/terminal-dock-gutter-rows'",
         "  terminalDock: z"
       ]
     },
@@ -594,6 +595,14 @@
       ]
     },
     {
+      "path": "src/renderer/src/components/native-chat/native-chat-command-marker.ts",
+      "feature": "agent-composer",
+      "kind": "import-swap",
+      "lines": [
+        "import { setBoundedScopeCacheEntry } from './fork-agent-composer/agent-composer-scope-cache'"
+      ]
+    },
+    {
       "path": "src/renderer/src/components/native-chat/native-chat-composer-state.test.ts",
       "feature": "agent-composer",
       "kind": "passthrough",
@@ -635,13 +644,18 @@
       "path": "src/renderer/src/components/native-chat/native-chat-runtime-send-launch-draft.test.ts",
       "feature": "agent-composer",
       "kind": "passthrough",
-      "lines": ["const writes = (): string[] => {", "    await vi.advanceTimersByTimeAsync(0)"]
+      "lines": [
+        "} from './fork-agent-composer/native-chat-runtime-clear'",
+        "const writes = (): string[] => {",
+        "    await vi.advanceTimersByTimeAsync(0)"
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/native-chat-runtime-send.test.ts",
       "feature": "agent-composer",
       "kind": "passthrough",
       "lines": [
+        "import { NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT } from './fork-agent-composer/native-chat-runtime-clear'",
         "} from './fork-agent-composer/native-chat-send-outcome'",
         "import { cancelNativeChatPtySends } from './native-chat-pty-send-queue'"
       ]
@@ -651,7 +665,7 @@
       "feature": "agent-composer",
       "kind": "registration",
       "lines": [
-        "} from './fork-agent-composer/native-chat-runtime-clear'",
+        "import { clearConfirmDurationMs } from './fork-agent-composer/native-chat-runtime-clear'",
         "} from './fork-agent-composer/native-chat-typed-command-send'"
       ]
     },
@@ -678,7 +692,7 @@
       "feature": "agent-composer",
       "kind": "registration",
       "lines": [
-        "} from './fork-agent-composer/agent-composer-scope-cache'",
+        "} from './fork-agent-composer/agent-composer-attachment-cache'",
         "import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentComposerField'"
       ]
     },
@@ -1499,6 +1513,11 @@
       "status": "permanent"
     },
     {
+      "path": ".claude/skills/sync-upstream/references/sync-lessons.md",
+      "reason": "Fork-only record of what past sync runs learned; upstream has no such document.",
+      "status": "permanent"
+    },
+    {
       "path": ".github/scripts/check-fork-ownership.mjs",
       "reason": "The CI guard that enforces this manifest on pull requests \u2014 fork machinery, not upstream code.",
       "status": "permanent"
@@ -1671,6 +1690,11 @@
       "status": "permanent"
     },
     {
+      "path": "config/scripts/reject-local-vitest-run.mjs",
+      "reason": "Fork-only guard enforcing the sandbox-only test rule for callers outside the Claude Code hook.",
+      "status": "permanent"
+    },
+    {
       "path": "config/scripts/run-sandboxed-test-shards.mjs",
       "reason": "Fork's own sandboxed shard runner; upstream runs the suite on the workstation.",
       "status": "permanent"
@@ -1758,6 +1782,21 @@
     {
       "path": "resources/darwin/bin/orca",
       "reason": "CLI shim hardcodes the fork's app-identity path.",
+      "status": "permanent"
+    },
+    {
+      "path": "resources/skills/current-manifest.json",
+      "reason": "Names the current revision of each shipped skill against the fork's own snapshot registry below; upstream's revision numbers index a history this repository does not have.",
+      "status": "permanent"
+    },
+    {
+      "path": "resources/skills/release-mapping.json",
+      "reason": "Release provenance for shipped skills, keyed by tag. Upstream's rows name stablyai/orca tags absent from this remote, so its copy makes the skill-update roundtrip resolve a tag CI cannot check out.",
+      "status": "permanent"
+    },
+    {
+      "path": "resources/skills/snapshot-registry.json",
+      "reason": "Released skill snapshots recorded from the fork's own release tags; upstream's snapshots describe revisions no fork tag ever shipped.",
       "status": "permanent"
     },
     {
@@ -2111,7 +2150,7 @@
       "removed": 7
     },
     "src/main/runtime/rpc/methods/session-tabs-schemas.ts": {
-      "added": 40,
+      "added": 47,
       "removed": 1
     },
     "src/main/runtime/rpc/methods/session-tabs.ts": {
@@ -2242,6 +2281,10 @@
       "added": 15,
       "removed": 17
     },
+    "src/renderer/src/components/native-chat/native-chat-command-marker.ts": {
+      "added": 1,
+      "removed": 1
+    },
     "src/renderer/src/components/native-chat/native-chat-composer-state.test.ts": {
       "added": 139,
       "removed": 49
@@ -2267,16 +2310,16 @@
       "removed": 8
     },
     "src/renderer/src/components/native-chat/native-chat-runtime-send-launch-draft.test.ts": {
-      "added": 29,
-      "removed": 9
+      "added": 33,
+      "removed": 11
     },
     "src/renderer/src/components/native-chat/native-chat-runtime-send.test.ts": {
-      "added": 484,
-      "removed": 53
+      "added": 486,
+      "removed": 55
     },
     "src/renderer/src/components/native-chat/native-chat-runtime-send.ts": {
-      "added": 58,
-      "removed": 276
+      "added": 53,
+      "removed": 277
     },
     "src/renderer/src/components/native-chat/native-chat-session-option-cache.ts": {
       "added": 32,
@@ -2287,8 +2330,8 @@
       "removed": 0
     },
     "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.ts": {
-      "added": 106,
-      "removed": 23
+      "added": 52,
+      "removed": 36
     },
     "src/renderer/src/components/native-chat/use-native-chat-interactive-send.test.tsx": {
       "added": 38,
@@ -2595,8 +2638,8 @@
       "removed": 1
     },
     "src/renderer/src/runtime/web-session-tabs-sync.ts": {
-      "added": 149,
-      "removed": 29
+      "added": 143,
+      "removed": 28
     },
     "src/renderer/src/store/slices/tabs.ts": {
       "added": 20,

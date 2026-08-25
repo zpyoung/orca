@@ -49,3 +49,11 @@ Reviewed every sprint planning. Use `/quirk:artifacts:defer` to append.
 - **Estimated effort**: L
 - **Priority**: P3
 - **Proposed owner**: agent-composer feature owner
+
+## DEFER-5: Local panes show "No terminal session" instead of "Connecting…" during the deferred-attach window
+- **Deferred**: 2026-08-23
+- **Session context**: fixing the dock composer stuck on "No terminal session" while the pane above was live
+- **Why deferred**: connectPanePty defers spawn/attach a frame past mount (pty-connection.ts:9330-9331), so the dock's first render legitimately reads a null pty id. resolveTerminalDockDisabledReason has a 'connecting' phase for exactly this, but only the remote transport emits onRecoveryStateChange (remote-runtime-pty-transport.ts:439) — the local IPC transport never does, so a local pane falls through to the null branch and reads "No terminal session" for that window. Correct copy needs a connecting signal from the local transport, which means a new seam in pty-transport.ts (zero divergence from upstream today) or synthesizing the phase in fork code from mount-vs-bind timing. The stuck-state bug this session fixed is closed either way; this is only wrong wording during a sub-second window.
+- **Estimated effort**: M
+- **Priority**: P3
+- **Proposed owner**: terminal-dock feature owner
