@@ -31,11 +31,11 @@ export function AgentComposerAttachmentThumbnail({
   className
 }: AgentComposerAttachmentThumbnailProps): React.JSX.Element {
   const source = useAttachmentThumbnailSource(path, terminalTabId)
-  const [failed, setFailed] = useState(false)
+  // Remembering which source failed rather than a bare flag lets a later source
+  // render without a reset pass that would first paint the stale failure.
+  const [failedSource, setFailedSource] = useState<string>()
 
-  useEffect(() => setFailed(false), [source])
-
-  if (!source || failed) {
+  if (!source || source === failedSource) {
     return <ImageIcon className={cn('size-3.5 shrink-0', className)} />
   }
 
@@ -43,7 +43,7 @@ export function AgentComposerAttachmentThumbnail({
     <img
       src={source}
       alt={label}
-      onError={() => setFailed(true)}
+      onError={() => setFailedSource(source)}
       className={cn('size-5 shrink-0 rounded-sm border border-border object-cover', className)}
     />
   )
