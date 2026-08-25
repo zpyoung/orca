@@ -16,7 +16,7 @@ import {
   type SkillScanRoot
 } from './skill-discovery-sources'
 import { pluginNameForSkill } from './fork-skill-plugin-attribution/skill-plugin-name-resolution'
-import { discoverClaudePluginSkillSourcesInWsl } from './claude-plugin-skill-sources-wsl'
+import { discoverLiveClaudePluginSkillSourcesInWsl } from './fork-live-plugin-marketplaces/live-plugin-marketplace-sources-wsl'
 import type { SkillProviderRootOverrides } from './skill-provider-destinations'
 
 const MAX_MARKDOWN_BYTES = 256 * 1024
@@ -188,7 +188,7 @@ export async function discoverSkillsInWsl(args: {
   // not abort the mandatory native/home/repo/bundled scan.
   let pluginRoots: SkillScanRoot[] = []
   try {
-    pluginRoots = await discoverClaudePluginSkillSourcesInWsl(args)
+    pluginRoots = await discoverLiveClaudePluginSkillSourcesInWsl(args)
   } catch {
     pluginRoots = []
   }
