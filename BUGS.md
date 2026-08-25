@@ -41,3 +41,13 @@ entries' IDs; manual edits to fix typos are fine.
 - **Description**: `buildPosixCommandPathLookupScript > resolves without mutating alias and function masks in zsh` resolves `node` through the host's zsh, which finds `/usr/local/Cellar/node/25.9.0_1/bin/node` while the test process runs the nvm node it asserts against (`process.execPath`) — a host PATH-ordering dependence, not a code defect. `terminal-ime-xterm-resumed-preedit-visibility.test.ts` fails two cases (`shown: false` vs `true`) for a preedit the IME resumes. Both fail in isolation and on a tree with the working changes stashed; no commit on warp-rich-input touches either area.
 - **Introduced by**: pre-existing / environment
 - **Severity**: low
+
+
+## BUG-4: Live-zsh ZDOTDIR discovery fails on a non-ASCII wrapper path inside the test sandbox
+- **Observed**: 2026-08-24
+- **File**: src/main/providers/local-pty-shell-ready-zsh-zdotdir-discovery.test.ts
+- **Description**: `live zsh subprocess tests > ZDOTDIR discovery with real zsh > loads user .zshrc when the wrapper dir contains a non-ASCII (token-range) path` fails in the Docker test sandbox. It fails in isolation (6-file batch, 1 of 100 cases) as well as under full-suite load, and no renderer or composer change touches it — the container's locale/filesystem encoding is the likely dependence. Every other file that failed the 16-shard full-suite run passed when re-run in isolation, so those are the known load-sensitive class (TEST-1); this one is not.
+- **Introduced by**: pre-existing / sandbox environment
+- **Severity**: low
+- **Proposed fix**: Assert the container's locale in the live-zsh lane, or skip the non-ASCII case when the filesystem encoding cannot represent the path.
+- **Blocker for**: A clean green full-suite baseline on the remote sandbox.

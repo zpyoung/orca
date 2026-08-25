@@ -31,6 +31,8 @@ afterEach(() => cleanup())
 function renderField(draft: string): HTMLTextAreaElement {
   render(
     <AgentComposerField
+      terminalTabId="tab-1"
+      paneKey="pane-1"
       textareaRef={createRef<HTMLTextAreaElement>()}
       draft={draft}
       disabled={false}

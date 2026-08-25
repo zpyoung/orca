@@ -308,6 +308,8 @@ export function useAgentComposerCompose(
     (core.draft.trim() === '' && imageAttachments.length === 0)
 
   const fieldProps: AgentComposerFieldProps = {
+    terminalTabId: props.terminalTabId,
+    paneKey: props.paneKey,
     textareaRef: core.textareaRef,
     draft: core.draft,
     disabled: core.disabled,

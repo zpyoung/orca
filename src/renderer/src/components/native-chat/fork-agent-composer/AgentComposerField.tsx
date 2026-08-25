@@ -6,7 +6,7 @@ import type {
   KeyboardEventHandler,
   RefObject
 } from 'react'
-import { Image as ImageIcon, ImageOff, X } from 'lucide-react'
+import { ImageOff, X } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import { NATIVE_FILE_DROP_TARGET } from '../../../../../shared/native-file-drop'
@@ -15,6 +15,7 @@ import { isNativeChatPastedImagePath } from '../native-chat-image-paste'
 import type { ComposerAutocomplete, NativeChatPickerItem } from '../native-chat-composer-state'
 import { NativeChatMentionHint, NativeChatPickerMenu } from '../NativeChatAutocompleteMenus'
 import { AgentComposerActions } from './AgentComposerActions'
+import { AgentComposerAttachmentThumbnail } from './AgentComposerAttachmentThumbnail'
 import { useNativeChatWidthClassName } from '../fork-native-chat-width/use-native-chat-width'
 import { nativeChatComposerPlaceholder } from '../native-chat-composer-target'
 import type {
@@ -23,6 +24,10 @@ import type {
 } from '../../../../../shared/native-chat-session-options'
 
 export type AgentComposerFieldProps = {
+  /** Identifies which composer a native OS file drop landed on, so a drop
+   *  reaches only this one when several composers are mounted at once. */
+  terminalTabId: string
+  paneKey: string
   textareaRef: RefObject<HTMLTextAreaElement | null>
   draft: string
   disabled: boolean
@@ -66,6 +71,8 @@ export type AgentComposerImageAttachment = {
 }
 
 export function AgentComposerField({
+  terminalTabId,
+  paneKey,
   textareaRef,
   draft,
   disabled,
@@ -135,6 +142,8 @@ export function AgentComposerField({
           ) : null}
           <div
             data-native-file-drop-target={NATIVE_FILE_DROP_TARGET.composer}
+            data-terminal-tab-id={terminalTabId}
+            data-terminal-pane-leaf-id={paneKey}
             className={cn(
               // Why: always-on hairline (token-level border, not focus ring) —
               // no focus/click border flash. The box is a container, not a
@@ -151,34 +160,36 @@ export function AgentComposerField({
                   layout === 'dock' && 'scrollbar-sleek max-h-12 shrink-0 overflow-y-auto'
                 )}
               >
-                {imageAttachments.map((attachment) => (
-                  <div
-                    key={attachment.id}
-                    className="flex max-w-full items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground"
-                    title={attachment.path}
-                  >
-                    <ImageIcon className="size-3.5 shrink-0" />
-                    <span className="max-w-56 truncate">
-                      {isNativeChatPastedImagePath(attachment.path)
-                        ? translate(
-                            'components.native-chat.composer.pastedImageLabel',
-                            'Pasted image'
-                          )
-                        : basename(attachment.path)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => onRemoveImageAttachment(attachment.id)}
-                      aria-label={translate(
-                        'components.native-chat.composer.removeAttachment',
-                        'Remove attachment'
-                      )}
-                      className="flex size-4 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                {imageAttachments.map((attachment) => {
+                  const label = isNativeChatPastedImagePath(attachment.path)
+                    ? translate('components.native-chat.composer.pastedImageLabel', 'Pasted image')
+                    : basename(attachment.path)
+                  return (
+                    <div
+                      key={attachment.id}
+                      className="flex max-w-full items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground"
+                      title={attachment.path}
                     >
-                      <X className="size-3" />
-                    </button>
-                  </div>
-                ))}
+                      <AgentComposerAttachmentThumbnail
+                        path={attachment.path}
+                        label={label}
+                        terminalTabId={terminalTabId}
+                      />
+                      <span className="max-w-56 truncate">{label}</span>
+                      <button
+                        type="button"
+                        onClick={() => onRemoveImageAttachment(attachment.id)}
+                        aria-label={translate(
+                          'components.native-chat.composer.removeAttachment',
+                          'Remove attachment'
+                        )}
+                        className="flex size-4 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </div>
+                  )
+                })}
               </div>
             ) : null}
             <textarea
