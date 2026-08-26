@@ -1,4 +1,5 @@
 import { getAgentCatalog } from '@/lib/agent-catalog'
+import type { resolveSourceControlLaunchAgentScope } from '@/lib/source-control-launch-agent-selection'
 import { isTuiAgentEnabled } from '../../../../shared/tui-agent-selection'
 import type { TuiAgent } from '../../../../shared/types'
 import type { SourceControlAiWriteTarget } from '../../../../shared/source-control-ai-recipe-save'
@@ -98,4 +99,19 @@ export function buildSourceControlAgentStatusCopy(args: {
     return 'No enabled agents were detected on this workspace host.'
   }
   return null
+}
+
+export function buildSourceControlAgentScopeNote(
+  scope: ReturnType<typeof resolveSourceControlLaunchAgentScope>
+): { effectiveAgentLabel: string; globalAgentLabel: string } | null {
+  if (!scope.overridesGlobalAgent) {
+    return null
+  }
+  const catalog = getAgentCatalog()
+  const labelFor = (agentId: TuiAgent | null): string =>
+    catalog.find((entry) => entry.id === agentId)?.label ?? agentId ?? ''
+  return {
+    effectiveAgentLabel: labelFor(scope.effectiveAgentId),
+    globalAgentLabel: labelFor(scope.globalAgentId)
+  }
 }

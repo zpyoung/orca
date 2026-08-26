@@ -2572,6 +2572,10 @@ void app.whenReady().then(async () => {
           let terminalPtyId: string | null = null
           let workspaceId: string
           let workspaceDisplayName: string | null = null
+          const launchSettings = runtimeService.buildAutomationRunLaunchSettings(
+            automation,
+            target.repo
+          )
 
           if (automation.workspaceMode === 'new_per_run') {
             const created = await runtimeService.createManagedWorktree({
@@ -2602,7 +2606,8 @@ void app.whenReady().then(async () => {
               {
                 agent: automation.agentId,
                 prompt: automation.prompt,
-                title: run.title
+                title: run.title,
+                launchOverrides: automation.launchOverrides ?? undefined
               }
             )
             terminalHandle = terminal.handle
@@ -2645,6 +2650,7 @@ void app.whenReady().then(async () => {
             terminalSessionId,
             terminalPaneKey,
             terminalPtyId,
+            launchSettings,
             completion
           }
         }

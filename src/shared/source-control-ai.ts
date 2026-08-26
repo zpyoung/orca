@@ -52,6 +52,8 @@ export type ResolvedSourceControlAiGenerationParams = {
   customPrompt?: string
   commandInputTemplate?: string
   agentArgs?: string
+  recipeAgentArgs?: string
+  launchOptions?: SourceControlActionRecipe['launchOptions']
   customAgentCommand?: string
   agentCommandOverride?: string
 }
@@ -289,6 +291,9 @@ export function normalizeRepoSourceControlAiOverrides(
       }
       if (item.agentArgs === null) {
         normalized.agentArgs = null
+      }
+      if (item.launchOptions === null) {
+        normalized.launchOptions = null
       }
       return Object.keys(normalized).length > 0 ? normalized : undefined
     }
@@ -1090,7 +1095,7 @@ function resolveActionRecipeForTextOperation(
   source: SourceControlAiSettings,
   repoOverrides: RepoSourceControlAiOverrides | null | undefined,
   operation: SourceControlAiOperation
-): { agentId?: TuiAgent | CustomAgentId | null; commandInputTemplate: string; agentArgs?: string } {
+): SourceControlActionRecipe & { commandInputTemplate: string } {
   const globalRecipe = readSourceControlActionDefault(source.actions, operation)
   const repoRecipe = repoOverrides?.actionOverrides?.[operation]
   const repoInstruction = readRepoInstructionOverride(
@@ -1117,6 +1122,13 @@ function resolveActionRecipeForTextOperation(
       : globalRecipe.agentId !== undefined
         ? { agentId: globalRecipe.agentId }
         : {}),
+    ...(repoRecipe?.launchOptions === null
+      ? {}
+      : repoRecipe?.launchOptions
+        ? { launchOptions: repoRecipe.launchOptions }
+        : globalRecipe.launchOptions
+          ? { launchOptions: globalRecipe.launchOptions }
+          : {}),
     ...(repoAgentArgs !== undefined
       ? { agentArgs: repoAgentArgs }
       : globalRecipe.agentArgs !== undefined
@@ -1178,7 +1190,7 @@ export function resolveSourceControlActionRecipe(input: {
       )
     }
   }
-  return {
+  const resolved: SourceControlActionRecipe = {
     ...globalRecipe,
     commandInputTemplate: resolveSourceControlActionCommandTemplate(source.actions, input.actionId),
     ...(repoRecipe.agentId !== undefined ? { agentId: repoRecipe.agentId } : {}),
@@ -1189,8 +1201,13 @@ export function resolveSourceControlActionRecipe(input: {
       ? { agentArgs: repoRecipe.agentArgs.trim() }
       : repoRecipe.agentArgs === null
         ? { agentArgs: '' }
-        : {})
+        : {}),
+    ...(repoRecipe.launchOptions ? { launchOptions: repoRecipe.launchOptions } : {})
   }
+  if (repoRecipe.launchOptions === null) {
+    delete resolved.launchOptions
+  }
+  return resolved
 }
 
 export function resolveSourceControlAiForOperation(
@@ -1251,6 +1268,7 @@ export function resolveSourceControlAiForOperation(
           ),
           commandInputTemplate: actionRecipe.commandInputTemplate,
           ...(actionRecipe.agentArgs !== undefined ? { agentArgs: actionRecipe.agentArgs } : {}),
+          ...(actionRecipe.launchOptions ? { launchOptions: actionRecipe.launchOptions } : {}),
           customAgentCommand
         },
         prCreationDefaults
@@ -1325,6 +1343,7 @@ export function resolveSourceControlAiForOperation(
         ),
         commandInputTemplate: actionRecipe.commandInputTemplate,
         ...(actionRecipe.agentArgs !== undefined ? { agentArgs: actionRecipe.agentArgs } : {}),
+        ...(actionRecipe.launchOptions ? { launchOptions: actionRecipe.launchOptions } : {}),
         ...(customAgentCommand ? { customAgentCommand } : {}),
         ...(agentCommandOverride ? { agentCommandOverride } : {})
       },

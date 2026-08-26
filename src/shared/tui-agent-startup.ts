@@ -1,10 +1,5 @@
 import { isShellProcess } from './agent-detection'
-import {
-  getAgentResumeArgv,
-  type AgentProviderSessionMetadata,
-  type ResumableTuiAgent,
-  type SleepingAgentLaunchConfig
-} from './agent-session-resume'
+import type { SleepingAgentLaunchConfig } from './agent-session-resume'
 import {
   clearEnvCommand,
   commandSeparator,
@@ -51,6 +46,7 @@ export function buildAgentStartupPlan(args: {
   agentEnv?: Record<string, string> | null
   sessionOptions?: Record<string, SessionOptionValue>
   sessionOptionsOverrideAgentArgs?: boolean
+  includeSessionOptionCatalogDefaults?: boolean
   /** Why: SSH remotes deploy the CLI shim as plain `orca`, so the Linux-only
    * `orca-ide` rename must be skipped for remote launches. */
   isRemote?: boolean
@@ -68,6 +64,7 @@ export function buildAgentStartupPlan(args: {
     agentArgs: usesQuery ? null : args.agentArgs,
     sessionOptions: args.sessionOptions,
     sessionOptionsOverrideAgentArgs: args.sessionOptionsOverrideAgentArgs,
+    includeSessionOptionCatalogDefaults: args.includeSessionOptionCatalogDefaults,
     isRemote: args.isRemote
   })
   if (!baseCommand.ok) {
@@ -184,59 +181,6 @@ export function buildAgentStartupPlan(args: {
   }
 }
 
-export function buildAgentResumeStartupPlan(args: {
-  agent: ResumableTuiAgent
-  providerSession: AgentProviderSessionMetadata
-  cmdOverrides: Partial<Record<TuiAgent, string>>
-  platform: NodeJS.Platform
-  shell?: AgentStartupShell
-  agentArgs?: string | null
-  agentEnv?: Record<string, string> | null
-  agentCommand?: string | null
-  ompResumeFilePath?: string | null
-  sessionOptions?: Record<string, SessionOptionValue>
-  /** Why: see buildAgentStartupPlan — remote launches use the plain `orca` shim. */
-  isRemote?: boolean
-}): AgentStartupPlan | null {
-  const argv = getAgentResumeArgv(args.agent, args.providerSession, args.ompResumeFilePath)
-  if (!argv) {
-    return null
-  }
-  const shell = resolveStartupShell(args.platform, args.shell)
-  const config = TUI_AGENT_CONFIG[args.agent]
-  const resolvedAgentCommand = args.agentCommand?.trim()
-  const baseCommand = resolvedAgentCommand
-    ? ({ ok: true, command: resolvedAgentCommand } as const)
-    : resolveAgentLaunchCommand({
-        agent: args.agent,
-        cmdOverrides: args.cmdOverrides,
-        platform: args.platform,
-        shell,
-        agentArgs: args.agentArgs,
-        isRemote: args.isRemote
-      })
-  if (!baseCommand.ok) {
-    return null
-  }
-  const launchConfig = buildSleepingAgentLaunchConfig({
-    ...args,
-    agentCommand: baseCommand.command
-  })
-  const resumeArgs = argv
-    .slice(1)
-    .map((arg) => quoteStartupArg(arg, shell))
-    .join(' ')
-  const launchCommand = resumeArgs ? `${baseCommand.command} ${resumeArgs}` : baseCommand.command
-  return {
-    agent: args.agent,
-    launchCommand,
-    expectedProcess: config.expectedProcess,
-    followupPrompt: null,
-    launchConfig,
-    ...(args.agentEnv ? { env: { ...args.agentEnv } } : {})
-  }
-}
-
 export type AgentDraftLaunchPlan = {
   agent: TuiAgent
   launchCommand: string
@@ -256,6 +200,7 @@ export function buildAgentDraftLaunchPlan(args: {
   agentArgs?: string | null
   agentEnv?: Record<string, string> | null
   sessionOptions?: Record<string, SessionOptionValue>
+  includeSessionOptionCatalogDefaults?: boolean
   /** Why: see buildAgentStartupPlan — remote launches use the plain `orca` shim. */
   isRemote?: boolean
 }): AgentDraftLaunchPlan | null {
@@ -273,6 +218,7 @@ export function buildAgentDraftLaunchPlan(args: {
     shell,
     agentArgs: args.agentArgs,
     sessionOptions: args.sessionOptions,
+    includeSessionOptionCatalogDefaults: args.includeSessionOptionCatalogDefaults,
     isRemote: args.isRemote
   })
   if (!baseCommand.ok) {
@@ -317,6 +263,7 @@ export function buildAgentDraftLaunchPlan(args: {
 }
 
 export { isShellProcess }
+export { buildAgentResumeStartupPlan } from './tui-agent-resume-startup'
 export {
   buildShellCommandFromArgv,
   planAgentCliArgsSuffix,

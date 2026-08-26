@@ -274,7 +274,8 @@ export class AutomationService {
         workspaceDisplayName: launch.workspaceDisplayName ?? null,
         terminalSessionId: launch.terminalSessionId,
         terminalPaneKey: launch.terminalPaneKey ?? null,
-        terminalPtyId: launch.terminalPtyId ?? null
+        terminalPtyId: launch.terminalPtyId ?? null,
+        launchSettings: launch.launchSettings ?? null
       }
       const updated = this.store.updateAutomationRun({
         runId: run.id,

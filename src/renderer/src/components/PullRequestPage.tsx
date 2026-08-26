@@ -3323,11 +3323,13 @@ function ChecksTab({
     async ({
       agent,
       commandInput,
-      agentArgs
+      agentArgs,
+      launchOptions
     }: {
       agent: Parameters<typeof launchWorkItemDirect>[0]['agentOverride']
       commandInput: string
       agentArgs: string
+      launchOptions: Parameters<typeof launchWorkItemDirect>[0]['launchOptions']
     }): Promise<boolean> => {
       if (!targetRepoId) {
         return false
@@ -3340,6 +3342,7 @@ function ChecksTab({
         promptDelivery: 'submit-after-ready',
         agentOverride: agent,
         agentArgs,
+        launchOptions,
         openModalFallback: () => {
           toast.error(
             translate(
@@ -4107,6 +4110,7 @@ function ChecksTab({
       savedAgentId={readSourceControlLaunchRecipeAgentId(fixChecksRecipe)}
       savedCommandInputTemplate={fixChecksRecipe.commandInputTemplate ?? null}
       savedAgentArgs={fixChecksRecipe.agentArgs ?? null}
+      savedLaunchOptions={fixChecksRecipe.launchOptions ?? null}
       onSaveAgentDefault={saveFixChecksActionDefault}
       onLaunched={() => {
         toast.success(

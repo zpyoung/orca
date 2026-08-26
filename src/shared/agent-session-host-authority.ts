@@ -4,6 +4,7 @@ import {
   type AgentProviderSessionMetadata,
   type ResumableTuiAgent
 } from './agent-session-resume'
+import type { SessionOptionValue } from './native-chat-session-options'
 import type { RuntimeTerminalCreate, RuntimeTerminalPresentation } from './runtime-types'
 import { isTerminalLeafId } from './stable-pane-id'
 import { isValidTerminalTabId } from './terminal-tab-id'
@@ -91,6 +92,7 @@ export type AgentLaunchPreferences = {
   model?: string
   effort?: string
   mode?: string
+  optionValues?: Record<string, SessionOptionValue>
 }
 
 export type AgentPromptDelivery = 'auto-submit' | 'draft'

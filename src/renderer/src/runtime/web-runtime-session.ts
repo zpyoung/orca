@@ -18,7 +18,10 @@ import type {
   SleepingAgentLaunchConfig,
   AgentProviderSessionMetadata
 } from '../../../shared/agent-session-resume'
-import { AGENT_SESSION_OMP_RESUME_PATH_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
+import {
+  AGENT_SESSION_OMP_RESUME_PATH_RUNTIME_CAPABILITY,
+  type RuntimeCapability
+} from '../../../shared/protocol-version'
 import type {
   AgentLaunchPreferences,
   AgentPromptDelivery,
@@ -170,6 +173,7 @@ type CreateWebRuntimeSessionTerminalArgs = {
   /** Explicit CLI override; omission leaves the remote host's defaults authoritative. */
   agentArgs?: string | null
   launchPreferences?: AgentLaunchPreferences
+  hostAuthorityCapability?: RuntimeCapability
   providerSession?: AgentProviderSessionMetadata
   viewMode?: 'terminal' | 'chat'
   activate?: boolean
@@ -337,9 +341,11 @@ async function createWebRuntimeSessionTerminalResult(
       }>({
         environmentId,
         ...(hostAuthority ? { hostAuthority } : {}),
-        ...(args.agentSessionKind === 'resume' && agent === 'omp'
-          ? { hostAuthorityCapability: AGENT_SESSION_OMP_RESUME_PATH_RUNTIME_CAPABILITY }
-          : {}),
+        ...(args.hostAuthorityCapability
+          ? { hostAuthorityCapability: args.hostAuthorityCapability }
+          : args.agentSessionKind === 'resume' && agent === 'omp'
+            ? { hostAuthorityCapability: AGENT_SESSION_OMP_RESUME_PATH_RUNTIME_CAPABILITY }
+            : {}),
         legacy: async () => {
           const response = await callEnvironment({
             method: 'session.tabs.createTerminal',

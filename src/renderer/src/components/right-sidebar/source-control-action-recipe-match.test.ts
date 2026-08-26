@@ -168,4 +168,33 @@ describe('sourceControlActionRecipeMatchesTarget', () => {
       })
     ).toBe(true)
   })
+
+  it('returns false when structured launch options differ', () => {
+    const currentSettings = settings()
+    currentSettings.sourceControlAi = {
+      ...currentSettings.sourceControlAi!,
+      actions: {
+        resolveConflicts: {
+          agentId: 'codex',
+          commandInputTemplate: '{basePrompt}',
+          agentArgs: '',
+          launchOptions: { model: 'gpt-5.3', optionValues: { effort: 'high' } }
+        }
+      }
+    }
+
+    expect(
+      sourceControlActionRecipeMatchesTarget({
+        actionId: 'resolveConflicts',
+        target: { type: 'global' },
+        recipe: {
+          agentId: 'codex',
+          commandInputTemplate: '{basePrompt}',
+          agentArgs: '',
+          launchOptions: { model: 'gpt-5.3', optionValues: { effort: 'medium' } }
+        },
+        settings: currentSettings
+      })
+    ).toBe(false)
+  })
 })

@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
+import type { AgentLaunchOptionSelection } from '../../../../shared/agent-launch-overrides'
 import type { LaunchSource } from '../../../../shared/telemetry-events'
 import type {
   SourceControlActionRecipe,
@@ -16,6 +17,7 @@ type UseSourceControlAgentActionStartArgs = {
   commandInput: string
   trimmedCommandInput: string
   agentArgs: string
+  launchOptions?: AgentLaunchOptionSelection
   commandTemplate: string
   saveLaunchRecipe: boolean
   saveTargetValue: string
@@ -37,6 +39,7 @@ type UseSourceControlAgentActionStartArgs = {
     agent: TuiAgent
     commandInput: string
     agentArgs: string
+    launchOptions: AgentLaunchOptionSelection
   }) => boolean | Promise<boolean>
   onSaveAgentDefault?: (
     target: SourceControlAiWriteTarget,
@@ -69,6 +72,7 @@ export function useSourceControlAgentActionStart({
   commandInput,
   trimmedCommandInput,
   agentArgs,
+  launchOptions = {},
   commandTemplate,
   saveLaunchRecipe,
   saveTargetValue,
@@ -105,6 +109,7 @@ export function useSourceControlAgentActionStart({
         selectedAgent,
         commandInput,
         agentArgs,
+        launchOptions,
         promptDelivery,
         detectedAgents: currentDetectedAgents,
         connectionUnavailable,
@@ -114,6 +119,7 @@ export function useSourceControlAgentActionStart({
     },
     [
       agentArgs,
+      launchOptions,
       commandInput,
       connectionUnavailable,
       promptDelivery,
@@ -149,6 +155,7 @@ export function useSourceControlAgentActionStart({
           selectedAgent,
           trimmedCommandInput,
           agentArgs,
+          launchOptions,
           commandTemplate,
           saveTargetValue: saveLaunchRecipe ? (saveTargetValueOverride ?? saveTargetValue) : 'none',
           actionId,
@@ -178,6 +185,7 @@ export function useSourceControlAgentActionStart({
     [
       actionId,
       agentArgs,
+      launchOptions,
       buildPlan,
       commandTemplate,
       connectionUnavailable,

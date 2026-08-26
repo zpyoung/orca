@@ -1,3 +1,7 @@
+import {
+  normalizeAgentLaunchOverrides,
+  type AgentLaunchOptionSelection
+} from '../../../../shared/agent-launch-overrides'
 import { isCustomAgentId } from '../../../../shared/commit-message-agent-spec'
 import {
   normalizeRepoSourceControlAiOverrides,
@@ -16,12 +20,14 @@ type NormalizedSourceControlActionRecipe = {
   agentId: SourceControlActionRecipe['agentId'] | null
   commandInputTemplate: string
   agentArgs: string
+  launchOptions: AgentLaunchOptionSelection
 }
 
 type PersistedSourceControlActionRecipe = {
   agentId?: SourceControlActionRecipe['agentId']
   commandInputTemplate?: string | null
   agentArgs?: string | null
+  launchOptions?: AgentLaunchOptionSelection | null
 }
 
 function normalizeSourceControlActionRecipeForComparison(
@@ -34,8 +40,22 @@ function normalizeSourceControlActionRecipeForComparison(
       typeof recipe?.commandInputTemplate === 'string'
         ? recipe.commandInputTemplate.trim()
         : DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES[actionId],
-    agentArgs: typeof recipe?.agentArgs === 'string' ? recipe.agentArgs.trim() : ''
+    agentArgs: typeof recipe?.agentArgs === 'string' ? recipe.agentArgs.trim() : '',
+    launchOptions: normalizeAgentLaunchOverrides(recipe?.launchOptions) ?? {}
   }
+}
+
+function launchOptionsMatch(
+  left: AgentLaunchOptionSelection,
+  right: AgentLaunchOptionSelection
+): boolean {
+  if (left.model !== right.model) {
+    return false
+  }
+  const leftOptions = left.optionValues ?? {}
+  const rightOptions = right.optionValues ?? {}
+  const keys = new Set([...Object.keys(leftOptions), ...Object.keys(rightOptions)])
+  return [...keys].every((key) => leftOptions[key] === rightOptions[key])
 }
 
 function sourceControlActionRecipesMatch(
@@ -45,7 +65,8 @@ function sourceControlActionRecipesMatch(
   return (
     left.agentId === right.agentId &&
     left.commandInputTemplate === right.commandInputTemplate &&
-    left.agentArgs === right.agentArgs
+    left.agentArgs === right.agentArgs &&
+    launchOptionsMatch(left.launchOptions, right.launchOptions)
   )
 }
 

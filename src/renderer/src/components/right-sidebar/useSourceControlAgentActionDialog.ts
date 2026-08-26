@@ -6,6 +6,7 @@ import {
 } from '@/lib/source-control-launch-agent-selection'
 import { useAppStore } from '@/store'
 import { useRepoById } from '@/store/selectors'
+import type { AgentLaunchOverrides } from '../../../../shared/agent-launch-overrides'
 import { renderSourceControlActionCommandTemplate } from '../../../../shared/source-control-ai-actions'
 import { isTuiAgentEnabled } from '../../../../shared/tui-agent-selection'
 import type { TuiAgent } from '../../../../shared/types'
@@ -14,10 +15,16 @@ import type { UseSourceControlAgentActionDialogResult } from './source-control-a
 import { useSavedSourceControlAgentActionAutoStart } from './useSavedSourceControlAgentActionAutoStart'
 import {
   buildSourceControlAgentSaveTargets,
+  buildSourceControlAgentScopeNote,
   buildSourceControlAgentStatusCopy,
   isSourceControlAgentDetectedAndEnabled
 } from './source-control-agent-action-dialog-support'
 import { useSourceControlAgentActionStart } from './useSourceControlAgentActionStart'
+import {
+  useAgentLaunchOptionSelection,
+  useSourceControlAgentActionDraftEdits,
+  useStableAgentLaunchOptionSelection
+} from './useSourceControlAgentActionDraftEdits'
 
 const DEFAULT_SAVE_TARGET_VALUE = 'global'
 
@@ -28,6 +35,7 @@ export function useSourceControlAgentActionDialog({
   baseCommandInput,
   savedCommandInputTemplate,
   savedAgentArgs,
+  savedLaunchOptions,
   worktreeId,
   groupId,
   connectionId,
@@ -58,7 +66,13 @@ export function useSourceControlAgentActionDialog({
   const [commandTemplate, setCommandTemplate] = useState(
     savedCommandInputTemplate ?? '{basePrompt}'
   )
-  const [agentArgs, setAgentArgs] = useState(savedAgentArgs ?? '')
+  const stableSavedLaunchOptions = useStableAgentLaunchOptionSelection(savedLaunchOptions)
+  const [launchOverrides, setLaunchOverrides] = useState<AgentLaunchOverrides>({
+    ...savedLaunchOptions,
+    ...(savedAgentArgs ? { agentArgs: savedAgentArgs } : {})
+  })
+  const agentArgs = launchOverrides.agentArgs ?? ''
+  const launchOptions = useAgentLaunchOptionSelection(launchOverrides)
   const [selectedAgent, setSelectedAgent] = useState<TuiAgent | null>(savedAgentId ?? null)
   const [detectedAgents, setDetectedAgents] = useState<TuiAgent[]>([])
   const [detecting, setDetecting] = useState(false)
@@ -105,7 +119,10 @@ export function useSourceControlAgentActionDialog({
     wasOpenRef.current = true
     setDetectedOpenCycle(null)
     setCommandTemplate(savedCommandInputTemplate ?? '{basePrompt}')
-    setAgentArgs(savedAgentArgs ?? '')
+    setLaunchOverrides({
+      ...stableSavedLaunchOptions,
+      ...(savedAgentArgs ? { agentArgs: savedAgentArgs } : {})
+    })
     setSelectedAgent(savedAgentId ?? null)
     setSaveLaunchRecipe(true)
     setSaveTargetValue(defaultSaveTargetValue)
@@ -136,6 +153,7 @@ export function useSourceControlAgentActionDialog({
     refreshDetectedAgents,
     savedAgentId,
     savedAgentArgs,
+    stableSavedLaunchOptions,
     savedCommandInputTemplate,
     repoId,
     settings?.defaultTuiAgent
@@ -170,6 +188,7 @@ export function useSourceControlAgentActionDialog({
       commandInput,
       trimmedCommandInput,
       agentArgs,
+      launchOptions,
       commandTemplate,
       saveLaunchRecipe,
       saveTargetValue,
@@ -224,6 +243,7 @@ export function useSourceControlAgentActionDialog({
     savedAgentId,
     savedCommandInputTemplate,
     savedAgentArgs,
+    savedLaunchOptions,
     settings,
     repo,
     repoId,
@@ -251,38 +271,23 @@ export function useSourceControlAgentActionDialog({
     detecting
   })
 
-  // Why: editing any launch field invalidates the previewed delivery plan.
-  const resetPlanAfter = useCallback(
-    <T>(apply: (value: T) => void) =>
-      (value: T): void => {
-        apply(value)
-        resetDeliveryPlan()
-      },
-    [resetDeliveryPlan]
-  )
-  const onSelectedAgentChange = useMemo(() => resetPlanAfter(setSelectedAgent), [resetPlanAfter])
-  const onAgentArgsChange = useMemo(() => resetPlanAfter(setAgentArgs), [resetPlanAfter])
-  const onCommandTemplateChange = useMemo(
-    () => resetPlanAfter(setCommandTemplate),
-    [resetPlanAfter]
-  )
-  const onSaveLaunchRecipeChange = useMemo(
-    () => resetPlanAfter(setSaveLaunchRecipe),
-    [resetPlanAfter]
-  )
+  const {
+    onSelectedAgentChange,
+    onLaunchOverridesChange,
+    onCommandTemplateChange,
+    onSaveLaunchRecipeChange
+  } = useSourceControlAgentActionDraftEdits({
+    resetDeliveryPlan,
+    setSelectedAgent,
+    setLaunchOverrides,
+    setCommandTemplate,
+    setSaveLaunchRecipe
+  })
 
-  const agentScopeNote = useMemo(() => {
-    if (!launchAgentScope.overridesGlobalAgent) {
-      return null
-    }
-    const catalog = getAgentCatalog()
-    const labelFor = (agentId: TuiAgent | null): string =>
-      catalog.find((entry) => entry.id === agentId)?.label ?? agentId ?? ''
-    return {
-      effectiveAgentLabel: labelFor(launchAgentScope.effectiveAgentId),
-      globalAgentLabel: labelFor(launchAgentScope.globalAgentId)
-    }
-  }, [launchAgentScope])
+  const agentScopeNote = useMemo(
+    () => buildSourceControlAgentScopeNote(launchAgentScope),
+    [launchAgentScope]
+  )
 
   return {
     handleOpenChange,
@@ -294,6 +299,7 @@ export function useSourceControlAgentActionDialog({
     detecting,
     statusCopy,
     agentArgs,
+    launchOptions,
     commandTemplate,
     saveLaunchRecipe,
     saveTargetValue,
@@ -304,7 +310,7 @@ export function useSourceControlAgentActionDialog({
     canStart,
     isStarting,
     onSelectedAgentChange,
-    onAgentArgsChange,
+    onLaunchOverridesChange,
     onCommandTemplateChange,
     onSaveLaunchRecipeChange,
     onSaveAgentDefaultChange: setSaveTargetValue,

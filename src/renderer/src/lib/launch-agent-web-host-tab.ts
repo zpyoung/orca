@@ -11,6 +11,8 @@ import type { Tab, TuiAgent } from '../../../shared/types'
 import type { AgentPromptDelivery } from '../../../shared/agent-session-host-authority'
 import { translate } from '@/i18n/i18n'
 import { toAgentLaunchPreferences } from '@/runtime/agent-session-create-operation'
+import { runtimeEnvironmentSupportsCapability } from '@/runtime/runtime-rpc-client'
+import { AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
 
 function removeStaleLocalAgentTabsForWebHostLaunch(worktreeId: string): void {
   const state = useAppStore.getState()
@@ -31,7 +33,7 @@ function removeStaleLocalAgentTabsForWebHostLaunch(worktreeId: string): void {
  * close routes through session.tabs.close on the host, so prune them before
  * the host snapshot.
  */
-export function launchAgentInWebHostTab(args: {
+export async function launchAgentInWebHostTab(args: {
   agent: TuiAgent
   worktreeId: string
   environmentId: string | null
@@ -43,6 +45,7 @@ export function launchAgentInWebHostTab(args: {
   pastePromptAfterReady: string | null
   submitPastedPrompt: boolean
   agentArgs?: string | null
+  useLaunchOverrides?: boolean
   viewMode?: Tab['viewMode']
   onPromptDelivered?: () => void
 }): Promise<{ delivered: boolean; failureNotified: boolean }> {
@@ -58,14 +61,26 @@ export function launchAgentInWebHostTab(args: {
     pastePromptAfterReady,
     submitPastedPrompt,
     agentArgs,
+    useLaunchOverrides,
     viewMode,
     onPromptDelivered
   } = args
   const hasPrompt = prompt.length > 0
-  const launchPreferences = toAgentLaunchPreferences(startupPlan.sessionOptions)
+  // Why: local agent rows cannot be closed once the host owns the tab, so prune
+  // them before the capability probe rather than after its round trip.
+  removeStaleLocalAgentTabsForWebHostLaunch(worktreeId)
+  const includeOptionValues = useLaunchOverrides
+    ? environmentId === null ||
+      (await runtimeEnvironmentSupportsCapability(
+        environmentId,
+        AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY
+      ).catch(() => false))
+    : false
+  const launchPreferences = toAgentLaunchPreferences(startupPlan.sessionOptions, {
+    includeOptionValues
+  })
   const structuredPromptDelivery: AgentPromptDelivery =
     promptDelivery === 'draft' ? 'draft' : 'auto-submit'
-  removeStaleLocalAgentTabsForWebHostLaunch(worktreeId)
   const launch = {
     worktreeId,
     environmentId,
@@ -74,6 +89,9 @@ export function launchAgentInWebHostTab(args: {
     ...(cwd?.trim() ? { cwd } : {}),
     ...(viewMode ? { viewMode } : {}),
     agentSessionKind: 'fresh',
+    ...(useLaunchOverrides
+      ? { hostAuthorityCapability: AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY }
+      : {}),
     ...(hasPrompt
       ? {
           launchAgent: agent,

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { AgentLaunchOptionSelection } from '../../../../shared/agent-launch-overrides'
 import type {
   SourceControlAiSettings,
   SourceControlAiSettingsPatch
@@ -39,7 +40,7 @@ export function useSourceControlActionRecipeDraftState({
       baseValues: persistedActionRecipeValues
     })
   )
-  const [savingActionTemplateIds, setSavingActionTemplateIds] = useState<
+  const [savingActionRecipeIds, setSavingActionRecipeIds] = useState<
     Partial<Record<SourceControlActionId, boolean>>
   >({})
   const actionRecipeDraftSerialized = useMemo(
@@ -50,7 +51,7 @@ export function useSourceControlActionRecipeDraftState({
     () => serializeActionRecipeInputValues(actionRecipeDraftState.baseValues),
     [actionRecipeDraftState.baseValues]
   )
-  const actionTemplateDirty = actionRecipeDraftSerialized !== actionRecipeBaseSerialized
+  const actionRecipeDirty = actionRecipeDraftSerialized !== actionRecipeBaseSerialized
 
   useEffect(() => {
     setActionRecipeDraftState((current) => {
@@ -80,8 +81,8 @@ export function useSourceControlActionRecipeDraftState({
   }, [customPromptDiscardSignal])
 
   useEffect(() => {
-    onCustomPromptDirtyChange?.(actionTemplateDirty)
-  }, [actionTemplateDirty, onCustomPromptDirtyChange])
+    onCustomPromptDirtyChange?.(actionRecipeDirty)
+  }, [actionRecipeDirty, onCustomPromptDirtyChange])
 
   useEffect(
     () => () => {
@@ -116,21 +117,48 @@ export function useSourceControlActionRecipeDraftState({
     }))
   }
 
-  const saveActionTemplateDraft = async (actionId: SourceControlActionId): Promise<void> => {
+  const onActionLaunchOptionsChange = (
+    actionId: SourceControlActionId,
+    launchOptions: AgentLaunchOptionSelection
+  ): void => {
+    setActionRecipeDraftState((current) => ({
+      ...current,
+      values: {
+        ...current.values,
+        [actionId]: { ...current.values[actionId], launchOptions }
+      }
+    }))
+  }
+
+  const resetActionLaunchOptions = (actionId: SourceControlActionId): void => {
+    setActionRecipeDraftState((current) => ({
+      values: {
+        ...current.values,
+        [actionId]: { ...current.values[actionId], launchOptions: {} }
+      },
+      baseValues: {
+        ...current.baseValues,
+        [actionId]: { ...current.baseValues[actionId], launchOptions: {} }
+      }
+    }))
+  }
+
+  const saveActionRecipeDraft = async (actionId: SourceControlActionId): Promise<void> => {
     const nextValue = actionRecipeDraftState.values[actionId]
     if (
       JSON.stringify(nextValue) === JSON.stringify(actionRecipeDraftState.baseValues[actionId]) ||
-      savingActionTemplateIds[actionId]
+      savingActionRecipeIds[actionId]
     ) {
       return
     }
-    setSavingActionTemplateIds((current) => ({ ...current, [actionId]: true }))
+    setSavingActionRecipeIds((current) => ({ ...current, [actionId]: true }))
     try {
       await writeConfig((current) => {
         return {
           actions: setSourceControlActionDefault(current.actions, actionId, {
             commandInputTemplate: nextValue.commandInputTemplate,
-            agentArgs: nextValue.agentArgs
+            agentArgs: nextValue.agentArgs,
+            launchOptions: nextValue.launchOptions
           })
         }
       })
@@ -142,11 +170,11 @@ export function useSourceControlActionRecipeDraftState({
         }
       }))
     } finally {
-      setSavingActionTemplateIds((current) => ({ ...current, [actionId]: false }))
+      setSavingActionRecipeIds((current) => ({ ...current, [actionId]: false }))
     }
   }
 
-  const discardActionTemplateDraft = (actionId: SourceControlActionId): void => {
+  const discardActionRecipeDraft = (actionId: SourceControlActionId): void => {
     setActionRecipeDraftState((current) => ({
       ...current,
       values: {
@@ -175,11 +203,13 @@ export function useSourceControlActionRecipeDraftState({
 
   return {
     actionRecipeDraftState,
-    savingActionTemplateIds,
+    savingActionRecipeIds,
     onActionTemplateChange,
     onActionAgentArgsChange,
-    saveActionTemplateDraft,
-    discardActionTemplateDraft,
+    onActionLaunchOptionsChange,
+    resetActionLaunchOptions,
+    saveActionRecipeDraft,
+    discardActionRecipeDraft,
     appendVariable
   }
 }

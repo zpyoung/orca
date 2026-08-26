@@ -248,6 +248,7 @@ export function SourceControlRecoveryNotice({
     savedAgentId: readSourceControlLaunchRecipeAgentId(recipe),
     savedCommandInputTemplate: recipe?.commandInputTemplate ?? null,
     savedAgentArgs: recipe?.agentArgs ?? null,
+    savedLaunchOptions: recipe?.launchOptions ?? null,
     onSaveAgentDefault: onSaveLaunchActionDefault,
     onOpenSettings: onOpenSourceControlAiSettings,
     onFixWithDefaultAgent: handleFixWithAI,

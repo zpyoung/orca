@@ -58,7 +58,8 @@ export async function launchWorkItemDirect(args: LaunchWorkItemDirectArgs): Prom
     telemetrySource,
     launchSource,
     agentOverride,
-    agentArgs
+    agentArgs,
+    launchOptions
   } = args
   const store = useAppStore.getState()
   const repo = store.repos.find((r) => r.id === repoId)
@@ -275,6 +276,7 @@ export async function launchWorkItemDirect(args: LaunchWorkItemDirectArgs): Prom
       buildDirectWorkItemAgentStartupPlan({
         agent: effectiveAgent,
         agentArgs,
+        launchOptions,
         draftContent,
         promptDelivery,
         settings,

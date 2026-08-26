@@ -1,5 +1,7 @@
-import type { SetupDecision, TuiAgent } from './types'
+import type { AgentLaunchOverrides } from './agent-launch-overrides'
+import type { SessionOptionValue } from './native-chat-session-options'
 import type { TaskSourceContext, WorkspaceRunContext } from './task-source-context'
+import type { SetupDecision, TuiAgent } from './types'
 
 export type AutomationWorkspaceMode = 'existing' | 'new_per_run'
 export type AutomationExecutionTargetType = 'local' | 'ssh'
@@ -87,12 +89,27 @@ export type AutomationPrecheckResult = {
   completedAt: number
 }
 
+export type AutomationRunLaunchValueSource = 'explicit' | 'inherited' | 'raw_args'
+
+export type AutomationRunLaunchSetting = {
+  value?: SessionOptionValue
+  source: AutomationRunLaunchValueSource
+}
+
+/** Launch values retained so run history remains stable after settings change. */
+export type AutomationRunLaunchSettings = {
+  agentId: TuiAgent
+  options: Record<string, AutomationRunLaunchSetting>
+  agentArgs?: { value: string; source: 'explicit' | 'inherited' }
+}
+
 export type Automation = {
   id: string
   name: string
   prompt: string
   precheck: AutomationPrecheck | null
   agentId: TuiAgent
+  launchOverrides?: AgentLaunchOverrides | null
   /** Why: runContext carries the logical project + host setup identity for
    *  multi-host projects; projectId remains only as the legacy repo-id storage
    *  field for pre-host-context automations.
@@ -145,6 +162,7 @@ export type AutomationRun = {
    *  run reopening must target the pane that actually executed the run. */
   terminalPaneKey: string | null
   terminalPtyId: string | null
+  launchSettings?: AutomationRunLaunchSettings | null
   outputSnapshot: AutomationRunOutputSnapshot | null
   precheckResult: AutomationPrecheckResult | null
   usage: AutomationRunUsage | null
@@ -162,6 +180,7 @@ export type AutomationCreateInput = {
   prompt: string
   precheck?: AutomationPrecheck | null
   agentId: TuiAgent
+  launchOverrides?: AgentLaunchOverrides | null
   runContext?: WorkspaceRunContext | null
   sourceContext?: TaskSourceContext | null
   /** @deprecated Legacy repo-id compatibility field required for older stored
@@ -186,6 +205,7 @@ export type AutomationUpdateInput = Partial<
     | 'prompt'
     | 'precheck'
     | 'agentId'
+    | 'launchOverrides'
     | 'runContext'
     | 'sourceContext'
     | 'projectId'
@@ -216,111 +236,25 @@ export type AutomationDispatchResult = {
   terminalSessionId?: string | null
   terminalPaneKey?: string | null
   terminalPtyId?: string | null
+  launchSettings?: AutomationRunLaunchSettings | null
   outputSnapshot?: AutomationRunOutputSnapshot | null
   precheckResult?: AutomationPrecheckResult | null
   usage?: AutomationRunUsage | null
   error?: string | null
 }
 
-export type ExternalAutomationProvider = 'hermes' | 'openclaw'
-export type ExternalAutomationManagerStatus = 'available' | 'unavailable'
-export type ExternalAutomationAction = 'pause' | 'resume' | 'run' | 'delete'
-export type ExternalAutomationRunStatus = 'completed' | 'failed' | 'unknown'
-
-export type ExternalAutomationTarget =
-  | {
-      type: 'local'
-    }
-  | {
-      type: 'ssh'
-      connectionId: string
-    }
-
-export type ExternalAutomationJob = {
-  id: string
-  managerId: string
-  provider: ExternalAutomationProvider
-  name: string
-  schedule: string
-  rawSchedule: string | null
-  enabled: boolean
-  state: string
-  prompt: string | null
-  promptPreview: string
-  nextRunAt: string | null
-  lastRunAt: string | null
-  lastStatus: string | null
-  lastError: string | null
-  workdir: string | null
-  runCount: number
-  runCountSaturated?: true
-  runs: ExternalAutomationRun[]
-}
-
-export type ExternalAutomationRun = {
-  id: string
-  managerId: string
-  provider: ExternalAutomationProvider
-  jobId: string
-  runAt: string | null
-  status: ExternalAutomationRunStatus
-  outputPreview: string | null
-  outputContent: string | null
-  error: string | null
-  outputPath: string | null
-}
-
-export type ExternalAutomationRunsPage = {
-  managerId: string
-  provider: ExternalAutomationProvider
-  target: ExternalAutomationTarget
-  jobId: string
-  page: number
-  pageSize: number
-  total: number
-  totalSaturated?: true
-  runs: ExternalAutomationRun[]
-}
-
-export type ExternalAutomationRunsInput = {
-  managerId: string
-  provider: ExternalAutomationProvider
-  target: ExternalAutomationTarget
-  jobId: string
-  page: number
-  pageSize: number
-}
-
-export type ExternalAutomationCreateInput = {
-  managerId: string
-  provider: ExternalAutomationProvider
-  target: ExternalAutomationTarget
-  name: string
-  prompt: string
-  schedule: string
-  workdir: string | null
-}
-
-export type ExternalAutomationUpdateInput = ExternalAutomationCreateInput & {
-  jobId: string
-}
-
-export type ExternalAutomationManager = {
-  id: string
-  provider: ExternalAutomationProvider
-  label: string
-  targetLabel: string
-  target: ExternalAutomationTarget
-  status: ExternalAutomationManagerStatus
-  error: string | null
-  canManage: boolean
-  jobs: ExternalAutomationJob[]
-}
-
-export type ExternalAutomationActionInput = {
-  managerId: string
-  provider: ExternalAutomationProvider
-  target: ExternalAutomationTarget
-  jobId: string
-  action: ExternalAutomationAction
-}
+export type {
+  ExternalAutomationAction,
+  ExternalAutomationActionInput,
+  ExternalAutomationCreateInput,
+  ExternalAutomationJob,
+  ExternalAutomationManager,
+  ExternalAutomationManagerStatus,
+  ExternalAutomationProvider,
+  ExternalAutomationRun,
+  ExternalAutomationRunsInput,
+  ExternalAutomationRunsPage,
+  ExternalAutomationRunStatus,
+  ExternalAutomationTarget,
+  ExternalAutomationUpdateInput
+} from './external-automations-types'

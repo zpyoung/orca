@@ -1,6 +1,7 @@
 import type {
   Automation,
   AutomationRun,
+  AutomationRunLaunchSettings,
   AutomationRunOutputSnapshot
 } from '../../shared/automations-types'
 import type { AutomationRunTargetResult } from './run-target-resolution'
@@ -13,6 +14,7 @@ export type HeadlessAutomationDispatchLaunch = {
   terminalSessionId: string | null
   terminalPaneKey?: string | null
   terminalPtyId?: string | null
+  launchSettings?: AutomationRunLaunchSettings | null
   completion?: Promise<{
     status: 'completed' | 'dispatch_failed'
     outputSnapshot?: AutomationRunOutputSnapshot | null

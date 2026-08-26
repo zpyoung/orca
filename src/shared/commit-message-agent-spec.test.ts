@@ -142,8 +142,27 @@ describe('COMMIT_MESSAGE_AGENT_SPECS', () => {
   it('exposes thinking levels on the Spark variant (it accepts model_reasoning_effort)', () => {
     const spark = getCommitMessageModel('codex', 'gpt-5.3-codex-spark')
     expect(spark).toBeDefined()
-    expect(spark?.thinkingLevels?.map((l) => l.id)).toEqual(['low', 'medium', 'high', 'xhigh'])
+    expect(spark?.thinkingLevels?.map((l) => l.id)).toEqual([
+      'minimal',
+      'low',
+      'medium',
+      'high',
+      'xhigh'
+    ])
     expect(spark?.defaultThinkingLevel).toBe('low')
+  })
+
+  it('offers codex minimal effort but never leaks it into Copilot --effort', () => {
+    expect(getCommitMessageModel('codex', 'gpt-5.5')?.thinkingLevels?.map((l) => l.id)).toContain(
+      'minimal'
+    )
+    // Discovery-synthesized codex ids share the same reasoning-effort flag.
+    expect(
+      getCommitMessageModel('codex', 'gpt-5.6-sol')?.thinkingLevels?.map((l) => l.id)
+    ).toContain('minimal')
+    expect(
+      getCommitMessageModel('copilot', 'gpt-5-mini')?.thinkingLevels?.map((l) => l.id)
+    ).not.toContain('minimal')
   })
 
   it('omits thinking levels on Claude Haiku (non-reasoning model)', () => {

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { AgentLaunchOptionSelection } from '../../../../shared/agent-launch-overrides'
 import type { GlobalSettings, TuiAgent } from '../../../../shared/types'
 import { CUSTOM_AGENT_ID } from '../../../../shared/commit-message-agent-spec'
 import type {
@@ -15,9 +16,10 @@ import {
   hasOwnActionOverride,
   patchActionTextDraft,
   readActionRecipeTextDraft,
-  type ActionRecipeTextDraft,
   retainCustomCommandDraft,
   retainDivergentActionTextDrafts,
+  toRepoActionLaunchOptions,
+  type ActionRecipeTextDraft,
   withRepoAiActionAgent,
   withRepoAiActionMode,
   withRepoAiActionRecipeText,
@@ -47,7 +49,7 @@ type UseRepositorySourceControlAiGlobalUxArgs = {
 /**
  * Match global Source Control AI save UX for per-repo overrides:
  * - Selects / simple controls persist immediately (optimistic UI)
- * - Action CLI args + command template draft until the per-action Save
+ * - Action launch options, CLI args, and command template draft until the per-action Save
  */
 export function useRepositorySourceControlAiGlobalUx({
   repoId,
@@ -213,6 +215,10 @@ export function useRepositorySourceControlAiGlobalUx({
         : value === CUSTOM_AGENT_ID
           ? CUSTOM_AGENT_ID
           : (value as TuiAgent)
+    setActionTextDrafts((current) => {
+      const draft = current[actionId]
+      return draft ? { ...current, [actionId]: { ...draft, launchOptions: null } } : current
+    })
     commitImmediate(withRepoAiActionAgent(immediateRepoAiRef.current, settings, actionId, agentId))
     persist((base) => withRepoAiActionAgent(base, settings, actionId, agentId))
   }
@@ -228,6 +234,17 @@ export function useRepositorySourceControlAiGlobalUx({
   const updateActionAgentArgs = (actionId: SourceControlActionId, value: string): void => {
     setActionTextDrafts((current) =>
       patchActionTextDraft(current, immediateRepoAiRef.current, actionId, { agentArgs: value })
+    )
+  }
+
+  const updateActionLaunchOptions = (
+    actionId: SourceControlActionId,
+    value: AgentLaunchOptionSelection
+  ): void => {
+    setActionTextDrafts((current) =>
+      patchActionTextDraft(current, immediateRepoAiRef.current, actionId, {
+        launchOptions: toRepoActionLaunchOptions(value)
+      })
     )
   }
 
@@ -309,6 +326,7 @@ export function useRepositorySourceControlAiGlobalUx({
     updateActionAgent,
     updateActionTemplate,
     updateActionAgentArgs,
+    updateActionLaunchOptions,
     appendVariable,
     saveActionRecipeText,
     discardActionRecipeText

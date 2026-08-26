@@ -106,6 +106,7 @@ import { GLOBAL_FLAGS, specPaths } from './args'
 import { RuntimeRpcFailureError } from './runtime-client'
 import { buildWorktree, okFixture, queueFixtures, worktreeListFixture } from './test-fixtures'
 import { encodePairingOffer, PAIRING_OFFER_VERSION } from '../shared/pairing'
+import { AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY } from '../shared/protocol-version'
 
 describe('COMMAND_SPECS collision check', () => {
   it('has no duplicate command or alias paths', () => {
@@ -4165,6 +4166,216 @@ describe('orca cli worktree awareness', () => {
       rrule: 'FREQ=DAILY;BYHOUR=9;BYMINUTE=0',
       dtstart: expect.any(Number)
     })
+  })
+
+  it('preflights and creates automation launch overrides', async () => {
+    queueFixtures(
+      callMock,
+      okFixture('req_status', {
+        capabilities: [AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY]
+      }),
+      okFixture('req_automation_create', {
+        automation: { id: 'auto-1', name: 'Configured review' }
+      })
+    )
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await main(
+      [
+        'automations',
+        'create',
+        '--name',
+        'Configured review',
+        '--trigger',
+        'daily',
+        '--prompt',
+        'Review open changes',
+        '--provider',
+        'claude',
+        '--repo',
+        'id:repo-1',
+        '--model',
+        'sonnet',
+        '--effort',
+        'high',
+        '--agent-args=--verbose',
+        '--json'
+      ],
+      '/tmp/repo'
+    )
+
+    expect(callMock).toHaveBeenNthCalledWith(1, 'status.get')
+    expect(callMock).toHaveBeenNthCalledWith(
+      2,
+      'automation.create',
+      expect.objectContaining({
+        agentId: 'claude',
+        launchOverrides: {
+          model: 'sonnet',
+          optionValues: { effort: 'high' },
+          agentArgs: '--verbose'
+        }
+      })
+    )
+  })
+
+  it('fetches and sparsely merges automation launch overrides on edit', async () => {
+    queueFixtures(
+      callMock,
+      okFixture('req_status', {
+        capabilities: [AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY]
+      }),
+      okFixture('req_show', {
+        automation: {
+          id: 'auto-1',
+          agentId: 'claude',
+          launchOverrides: { model: 'sonnet', optionValues: { effort: 'high' } }
+        }
+      }),
+      okFixture('req_update', {
+        automation: { id: 'auto-1', name: 'Configured review' }
+      })
+    )
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await main(['automations', 'edit', 'auto-1', '--agent-args=--verbose', '--json'], '/tmp/repo')
+
+    expect(callMock).toHaveBeenNthCalledWith(1, 'status.get')
+    expect(callMock).toHaveBeenNthCalledWith(2, 'automation.show', { id: 'auto-1' })
+    expect(callMock).toHaveBeenNthCalledWith(
+      3,
+      'automation.update',
+      expect.objectContaining({
+        id: 'auto-1',
+        updates: expect.objectContaining({
+          launchOverrides: {
+            model: 'sonnet',
+            optionValues: { effort: 'high' },
+            agentArgs: '--verbose'
+          }
+        })
+      })
+    )
+  })
+
+  it('clears structured launch overrides when edit changes provider', async () => {
+    queueFixtures(
+      callMock,
+      okFixture('req_show', {
+        automation: {
+          id: 'auto-1',
+          agentId: 'claude',
+          launchOverrides: {
+            model: 'sonnet',
+            optionValues: { effort: 'high' },
+            agentArgs: '--verbose'
+          }
+        }
+      }),
+      okFixture('req_status', {
+        capabilities: [AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY]
+      }),
+      okFixture('req_update', {
+        automation: { id: 'auto-1', name: 'Configured review' }
+      })
+    )
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await main(['automations', 'edit', 'auto-1', '--provider', 'gemini', '--json'], '/tmp/repo')
+
+    expect(callMock).toHaveBeenNthCalledWith(1, 'automation.show', { id: 'auto-1' })
+    expect(callMock).toHaveBeenNthCalledWith(2, 'status.get')
+    expect(callMock).toHaveBeenNthCalledWith(
+      3,
+      'automation.update',
+      expect.objectContaining({
+        id: 'auto-1',
+        updates: expect.objectContaining({
+          agentId: 'gemini',
+          launchOverrides: { agentArgs: '--verbose' }
+        })
+      })
+    )
+  })
+
+  it('does not merge old structured overrides when provider and model change together', async () => {
+    queueFixtures(
+      callMock,
+      okFixture('req_status', {
+        capabilities: [AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY]
+      }),
+      okFixture('req_show', {
+        automation: {
+          id: 'auto-1',
+          agentId: 'claude',
+          launchOverrides: { model: 'sonnet', optionValues: { effort: 'high' } }
+        }
+      }),
+      okFixture('req_update', {
+        automation: { id: 'auto-1', name: 'Configured review' }
+      })
+    )
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await main(
+      [
+        'automations',
+        'edit',
+        'auto-1',
+        '--provider',
+        'codex',
+        '--model',
+        'gpt-5.3-codex',
+        '--json'
+      ],
+      '/tmp/repo'
+    )
+
+    expect(callMock).toHaveBeenNthCalledWith(
+      3,
+      'automation.update',
+      expect.objectContaining({
+        updates: expect.objectContaining({
+          agentId: 'codex',
+          launchOverrides: { model: 'gpt-5.3-codex' }
+        })
+      })
+    )
+  })
+
+  it('blocks automation launch overrides when the runtime capability is absent', async () => {
+    queueFixtures(callMock, okFixture('req_status', { capabilities: [] }))
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const priorExitCode = process.exitCode
+
+    await main(
+      [
+        'automations',
+        'create',
+        '--name',
+        'Configured review',
+        '--trigger',
+        'daily',
+        '--prompt',
+        'Review open changes',
+        '--provider',
+        'claude',
+        '--repo',
+        'id:repo-1',
+        '--model',
+        'sonnet',
+        '--json'
+      ],
+      '/tmp/repo'
+    )
+
+    expect(callMock).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(String(logSpy.mock.calls[0]?.[0]))).toMatchObject({
+      ok: false,
+      error: { code: 'capability_unsupported' }
+    })
+    expect(process.exitCode).toBe(1)
+    process.exitCode = priorExitCode
   })
 
   it('resolves project and host flags for automation create', async () => {

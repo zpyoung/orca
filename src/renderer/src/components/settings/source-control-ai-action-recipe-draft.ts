@@ -1,3 +1,7 @@
+import type {
+  AgentLaunchOptionSelection,
+  AgentLaunchOverrides
+} from '../../../../shared/agent-launch-overrides'
 import type { SourceControlAiSettings } from '../../../../shared/source-control-ai-types'
 import {
   DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES,
@@ -8,6 +12,7 @@ import {
 export type ActionRecipeDraftValue = {
   commandInputTemplate: string
   agentArgs: string
+  launchOptions: AgentLaunchOptionSelection
 }
 
 export type ActionRecipeDraftState = {
@@ -26,7 +31,23 @@ function readActionRecipeInputValue(
   return {
     commandInputTemplate:
       typeof value === 'string' ? value : DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES[actionId],
-    agentArgs: typeof recipe?.agentArgs === 'string' ? recipe.agentArgs : ''
+    agentArgs: typeof recipe?.agentArgs === 'string' ? recipe.agentArgs : '',
+    launchOptions: recipe?.launchOptions ? structuredClone(recipe.launchOptions) : {}
+  }
+}
+
+export function actionRecipeDraftToAgentLaunchOverrides(
+  value: ActionRecipeDraftValue
+): AgentLaunchOverrides {
+  return { ...value.launchOptions, agentArgs: value.agentArgs }
+}
+
+export function agentLaunchOptionSelectionFromOverrides(
+  value: AgentLaunchOverrides
+): AgentLaunchOptionSelection {
+  return {
+    ...(value.model ? { model: value.model } : {}),
+    ...(value.optionValues ? { optionValues: value.optionValues } : {})
   }
 }
 

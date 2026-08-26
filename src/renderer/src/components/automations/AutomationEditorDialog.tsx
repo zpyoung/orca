@@ -2,10 +2,12 @@ import React from 'react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { getAgentCatalog } from '@/lib/agent-catalog'
 import { filterEnabledTuiAgents } from '../../../../shared/tui-agent-selection'
+import type { AgentLaunchOverrides } from '../../../../shared/agent-launch-overrides'
 import type {
   AutomationSchedulePreset,
   AutomationWorkspaceMode
 } from '../../../../shared/automations-types'
+import type { AutomationLaunchOverridesGate } from './automation-launch-overrides-gate'
 import type {
   GlobalSettings,
   OrcaHooks,
@@ -36,6 +38,7 @@ export type AutomationDraft = {
   name: string
   prompt: string
   agentId: TuiAgent
+  launchOverrides: AgentLaunchOverrides
   projectId: string
   workspaceMode: AutomationWorkspaceMode
   workspaceId: string
@@ -61,6 +64,7 @@ type AutomationEditorDialogProps = {
   isSaving: boolean
   canSave: boolean
   createTarget: AutomationCreateTarget
+  launchOverridesGate: AutomationLaunchOverridesGate
   repos: readonly Repo[]
   projectHostSetups: ProjectHostSetup[]
   automationYamlHooksByRepoKey: Record<string, OrcaHooks | null>
@@ -86,6 +90,7 @@ export function AutomationEditorDialog({
   isSaving,
   canSave,
   createTarget,
+  launchOverridesGate,
   repos,
   projectHostSetups,
   automationYamlHooksByRepoKey,
@@ -173,6 +178,7 @@ export function AutomationEditorDialog({
           isEditingExternal={isEditingExternal}
           isHermesTarget={isHermesTarget}
           isHermesCreate={isHermesCreate}
+          launchOverridesGate={launchOverridesGate}
           isSaving={isSaving}
           canSave={canSave}
           repos={repos}

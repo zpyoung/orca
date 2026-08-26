@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
 
 const mocks = vi.hoisted(() => ({
   createTab: vi.fn(),
@@ -56,6 +57,10 @@ vi.mock('@/lib/telemetry', () => ({
   track: vi.fn(),
   tuiAgentToAgentKind: (agent: string) => agent
 }))
+vi.mock('@/runtime/runtime-rpc-client', () => ({
+  runtimeEnvironmentSupportsCapability: vi.fn().mockResolvedValue(true)
+}))
+
 vi.mock('@/runtime/web-runtime-session', () => ({
   createWebRuntimeSessionTerminal: mocks.createWebRuntimeSessionTerminal,
   isWebRuntimeSessionActive: vi.fn(() => true),
@@ -134,5 +139,27 @@ describe('launchAgentInNewTab paired web runtime', () => {
       viewMode: 'terminal'
     })
     expect(mocks.createTab).not.toHaveBeenCalled()
+  })
+
+  it('gates structured override launches on the host feature capability', async () => {
+    const { launchAgentInNewTab } = await import('./launch-agent-in-new-tab')
+
+    launchAgentInNewTab({
+      agent: 'claude',
+      worktreeId: 'wt-1',
+      sessionOptions: { model: 'sonnet' },
+      agentArgs: '--verbose',
+      includeSessionOptionCatalogDefaults: false
+    })
+
+    await vi.waitFor(() =>
+      expect(mocks.createWebRuntimeSessionTerminal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          hostAuthorityCapability: AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY,
+          agentArgs: '--verbose',
+          launchPreferences: { model: 'sonnet', optionValues: {} }
+        })
+      )
+    )
   })
 })

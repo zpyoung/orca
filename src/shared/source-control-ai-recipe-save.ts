@@ -6,6 +6,7 @@ import {
   DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES,
   SOURCE_CONTROL_ACTION_IDS,
   SOURCE_CONTROL_TEXT_ACTION_IDS,
+  normalizeSourceControlActionRecipe,
   type SourceControlActionId,
   type SourceControlActionRecipe
 } from './source-control-ai-actions'
@@ -41,6 +42,7 @@ type ReadCompatibleActionRecipe = {
   agentId?: SourceControlActionRecipe['agentId']
   commandInputTemplate?: string | null
   agentArgs?: string | null
+  launchOptions?: SourceControlActionRecipe['launchOptions'] | null
 }
 
 const TEXT_ACTION_ID_SET = new Set<SourceControlActionId>(SOURCE_CONTROL_TEXT_ACTION_IDS)
@@ -86,10 +88,18 @@ function normalizeCompleteRecipe(
       : DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES[actionId]
   const rawAgentArgs = recipe.agentArgs
   const agentArgs = typeof rawAgentArgs === 'string' ? rawAgentArgs.trim() : undefined
+  const launchOptions = normalizeSourceControlActionRecipe({
+    launchOptions: recipe.launchOptions
+  })?.launchOptions
   return {
     agentId: recipe.agentId ?? null,
     commandInputTemplate,
-    ...(agentArgs !== undefined ? { agentArgs } : {})
+    ...(agentArgs !== undefined ? { agentArgs } : {}),
+    ...(recipe.launchOptions === null
+      ? { launchOptions: null }
+      : launchOptions
+        ? { launchOptions }
+        : {})
   }
 }
 

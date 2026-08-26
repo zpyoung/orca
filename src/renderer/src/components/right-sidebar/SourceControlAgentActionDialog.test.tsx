@@ -193,7 +193,8 @@ describe('SourceControlAgentActionDialog', () => {
     expect(mocks.onStart).toHaveBeenCalledWith({
       agent: 'codex',
       commandInput: 'Resolve conflicts.',
-      agentArgs: ''
+      agentArgs: '',
+      launchOptions: {}
     })
     expect(mocks.onLaunched).toHaveBeenCalledTimes(1)
     expect(mocks.onSaveAgentDefault).not.toHaveBeenCalled()

@@ -12998,6 +12998,10 @@
             "0d6efe9cf4": "Recommended on macOS when projects or worktrees live in protected folders.",
             "dac08ec03e": "Opening...",
             "6e3d62b816": "Open Full Disk Access"
+          },
+          "AiCommitPrSettingsFields": {
+            "a8a91aa917": "Set by action recipes.",
+            "b66be73624": "Overridden for {{value0}} by its action recipe."
           }
         },
         "tips": {
@@ -14515,6 +14519,10 @@
         },
         "AutomationListLocalRows": {
           "c92c9463c6": "Automation actions"
+        },
+        "AutomationEditorDialogFooter": {
+          "launchSettingsUnsupported": "This automation's host doesn't support launch settings. Update the remote Orca server.",
+          "launchSettingsNotSaved": "Launch settings can't be saved to this host and won't apply to runs."
         }
       },
       "agent": {
@@ -14529,6 +14537,21 @@
         "AgentSettingsDialog": {
           "50cdb57c03": "Manage AI agents, set a default, and customize commands.",
           "fc0268e4ed": "Agents"
+        },
+        "launch": {
+          "AgentLaunchOverridesFields": {
+            "on": "On",
+            "off": "Off",
+            "setByCliArguments": "Set by CLI arguments",
+            "default": "Default",
+            "cliArguments": "CLI arguments",
+            "inheritedHint": "Default: {{value0}}",
+            "model": "Model",
+            "defaultFromSettings": "Default (from Settings)",
+            "staleModel": "Saved model {{value0}} is not in the current model list.",
+            "advanced": "Advanced",
+            "reuseSessionNote": "Applies when the session first starts. Reused runs keep the session's original settings."
+          }
         }
       },
       "activity": {

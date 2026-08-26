@@ -41,6 +41,13 @@ import {
   hasWorkspaceProjectTarget,
   resolveProjectCreateTarget
 } from '../worktree-project-target'
+import {
+  assertAutomationLaunchOverridesRuntimeSupported,
+  getAutomationLaunchOverridesForCreate,
+  getAutomationLaunchOverridesForEdit,
+  hasAutomationLaunchOverrideFlags,
+  resetAutomationLaunchOverridesForAgentChange
+} from './automation-launch-overrides'
 
 type AutomationCreateParams = Omit<AutomationCreateInput, 'projectId' | 'timezone'> & {
   repo?: string
@@ -439,13 +446,17 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
     }
     const target = await resolveDefaultTarget(flags, cwd, client)
     const sourceContext = getSourceContextFlag(flags)
+    const agentId = getProviderFlag(flags)
+    const launchOverrides = getAutomationLaunchOverridesForCreate(flags, agentId)
     const workspaceMode =
       getWorkspaceModeFlag(flags) ?? (target.workspace ? 'existing' : 'new_per_run')
+    await assertAutomationLaunchOverridesRuntimeSupported(client, flags)
     const result = await client.call<{ automation: Automation }>('automation.create', {
       name: getRequiredStringFlag(flags, 'name'),
       prompt: getRequiredStringFlag(flags, 'prompt'),
       precheck: getPrecheckFlag(flags),
-      agentId: getProviderFlag(flags),
+      agentId,
+      ...(launchOverrides ? { launchOverrides } : {}),
       ...(target.runContext ? { runContext: target.runContext } : {}),
       ...(sourceContext !== undefined ? { sourceContext } : {}),
       repo: target.repo,
@@ -464,13 +475,41 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
     const target = await getExplicitTarget(flags, cwd, client)
     const schedule = getScheduleFlag(flags, false)
     const sourceContext = getSourceContextFlag(flags)
+    const id = getRequiredStringFlag(flags, 'id')
+    const agentId = getOptionalProviderFlag(flags)
+    const hasLaunchOverrideFlags = hasAutomationLaunchOverrideFlags(flags)
+    let launchOverrides: AutomationUpdateInput['launchOverrides'] | undefined
+    if (hasLaunchOverrideFlags || agentId) {
+      if (hasLaunchOverrideFlags) {
+        await assertAutomationLaunchOverridesRuntimeSupported(client, flags)
+      }
+      const current = await client.call<{ automation: Automation }>('automation.show', { id })
+      const agentChanged = Boolean(agentId && agentId !== current.result.automation.agentId)
+      const resetOverrides = agentChanged
+        ? resetAutomationLaunchOverridesForAgentChange(current.result.automation.launchOverrides)
+        : undefined
+      if (!hasLaunchOverrideFlags && resetOverrides !== undefined) {
+        await assertAutomationLaunchOverridesRuntimeSupported(client, flags, true)
+      }
+      launchOverrides = hasLaunchOverrideFlags
+        ? getAutomationLaunchOverridesForEdit({
+            flags,
+            agent: agentId ?? current.result.automation.agentId,
+            current:
+              agentChanged && resetOverrides !== undefined
+                ? resetOverrides
+                : current.result.automation.launchOverrides
+          })
+        : resetOverrides
+    }
     const result = await client.call<{ automation: Automation }>('automation.update', {
-      id: getRequiredStringFlag(flags, 'id'),
+      id,
       updates: {
         name: getOptionalStringFlag(flags, 'name'),
         prompt: getOptionalStringFlag(flags, 'prompt'),
         precheck: getPrecheckFlag(flags),
-        agentId: getOptionalProviderFlag(flags),
+        agentId,
+        ...(launchOverrides !== undefined ? { launchOverrides } : {}),
         ...(target.runContext ? { runContext: target.runContext } : {}),
         ...(sourceContext !== undefined ? { sourceContext } : {}),
         repo: target.repo,

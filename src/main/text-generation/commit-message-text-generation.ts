@@ -42,6 +42,7 @@ import {
   type CommitMessagePlan
 } from '../../shared/commit-message-plan'
 import { LOCAL_COMMIT_MESSAGE_HOST_KEY } from '../../shared/commit-message-host-key'
+import { materializeSourceControlTextGenerationParams } from '../../shared/source-control-text-launch-args'
 import {
   resolveSourceControlAiForOperation,
   type ResolvedSourceControlAiGenerationParams
@@ -167,7 +168,10 @@ export function resolveTextGenerationParams(
   operation: SourceControlAiOperation = 'commitMessage',
   repo?: Pick<Repo, 'sourceControlAi'> | null
 ): ResolveCommitMessageSettingsResult {
-  return resolveCommitMessageSettings(settings, discoveryHostKey, operation, repo)
+  const resolved = resolveCommitMessageSettings(settings, discoveryHostKey, operation, repo)
+  return resolved.ok
+    ? { ...resolved, params: materializeSourceControlTextGenerationParams(resolved.params) }
+    : resolved
 }
 
 function formatAgentCliFailureMessage(

@@ -245,6 +245,7 @@ import {
   PullPolicyRemoteActionNotice
 } from './source-control-pull-policy-error-notice'
 import { SourceControlTextGenerationDialog } from './SourceControlTextGenerationDialog'
+import { materializeSourceControlTextGenerationParams } from '../../../../shared/source-control-text-launch-args'
 import { CreateHostedReviewComposer } from './CreateHostedReviewComposer'
 import {
   hasConfiguredCommitMessageGenerationDefaults,
@@ -2195,6 +2196,16 @@ function SourceControlInner(): React.JSX.Element {
       if (!overrides?.sourceControlAiResolvedParams && resolvedCommitMessageAi?.ok !== true) {
         return
       }
+      const resolvedParams =
+        overrides?.sourceControlAiResolvedParams ??
+        (resolvedCommitMessageAi?.ok ? resolvedCommitMessageAi.value.params : undefined)
+      const effectiveOverrides = resolvedParams
+        ? {
+            ...overrides,
+            sourceControlAiResolvedParams:
+              materializeSourceControlTextGenerationParams(resolvedParams)
+          }
+        : overrides
 
       if (
         !overrides?.sourceControlAiResolvedParams &&
@@ -2236,7 +2247,7 @@ function SourceControlInner(): React.JSX.Element {
             worktreePath,
             connectionId
           },
-          overrides
+          effectiveOverrides
         )
 
         if (!result.success) {
@@ -2366,7 +2377,9 @@ function SourceControlInner(): React.JSX.Element {
       setGenerateErrors((prev) => ({ ...prev, [target.worktreeId]: null }))
       try {
         const result = await generateRuntimeCommitMessage(target, {
-          sourceControlAiResolvedParams: resolvedCommitMessageAi.value.params
+          sourceControlAiResolvedParams: materializeSourceControlTextGenerationParams(
+            resolvedCommitMessageAi.value.params
+          )
         })
         if (!result.success) {
           if (!result.canceled) {
@@ -6403,6 +6416,7 @@ function SourceControlInner(): React.JSX.Element {
           getLaunchActionRecipe('resolveConflicts').commandInputTemplate ?? null
         }
         savedAgentArgs={getLaunchActionRecipe('resolveConflicts').agentArgs ?? null}
+        savedLaunchOptions={getLaunchActionRecipe('resolveConflicts').launchOptions ?? null}
         onSaveAgentDefault={saveLaunchActionDefault}
         onOpenSettings={openSourceControlAiSettings}
         onLaunched={() =>

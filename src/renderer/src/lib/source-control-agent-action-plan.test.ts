@@ -109,4 +109,19 @@ describe('planSourceControlAgentActionLaunch', () => {
     expect(result.ok && result.delivery).toBe('draft-native')
     expect(result.ok && result.commandLabel).toContain('--prefill')
   })
+
+  it('keeps catalog defaults out of native draft recipe previews', () => {
+    const result = planSourceControlAgentActionLaunch({
+      agent: 'claude',
+      commandInput: 'Fix checks',
+      promptDelivery: 'draft',
+      detectedAgents: ['claude'],
+      platform: 'darwin',
+      sessionOptions: { model: 'sonnet' },
+      includeSessionOptionCatalogDefaults: false
+    })
+
+    expect(result.ok && result.commandLabel).toContain("'--model' 'sonnet'")
+    expect(result.ok && result.commandLabel).not.toContain('--effort')
+  })
 })

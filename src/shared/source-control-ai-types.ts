@@ -1,3 +1,4 @@
+import type { AgentLaunchOptionSelection } from './agent-launch-overrides'
 import type { CommitMessageAiModelCapability, TuiAgent } from './types'
 import type { CustomAgentId } from './commit-message-agent-spec'
 import type {
@@ -56,6 +57,7 @@ export type RepoSourceControlAiOverrides = {
         agentId?: TuiAgent | CustomAgentId | null
         commandInputTemplate?: string | null
         agentArgs?: string | null
+        launchOptions?: AgentLaunchOptionSelection | null
       }
     >
   >
@@ -71,6 +73,7 @@ export type CompleteSourceControlActionRecipe = {
   agentId: TuiAgent | CustomAgentId | null
   commandInputTemplate: string
   agentArgs?: string
+  launchOptions?: AgentLaunchOptionSelection | null
 }
 
 export type WritableRepoSourceControlAiOverrides = {

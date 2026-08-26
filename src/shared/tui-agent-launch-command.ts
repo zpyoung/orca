@@ -29,6 +29,7 @@ export function resolveAgentLaunchCommand(args: {
   agentArgs?: string | null
   sessionOptions?: Record<string, SessionOptionValue>
   sessionOptionsOverrideAgentArgs?: boolean
+  includeSessionOptionCatalogDefaults?: boolean
   isRemote?: boolean
 }): ResolvedAgentLaunchCommand {
   const override = args.cmdOverrides[args.agent]
@@ -51,7 +52,7 @@ export function resolveAgentLaunchCommand(args: {
     args.agent,
     args.sessionOptions,
     args.sessionOptionsOverrideAgentArgs ? [] : trailingTokens.tokens,
-    !args.sessionOptionsOverrideAgentArgs
+    args.includeSessionOptionCatalogDefaults ?? !args.sessionOptionsOverrideAgentArgs
   )
   if (override && args.sessionOptionsOverrideAgentArgs) {
     const overrideTokens = tokenizeStartupCommand(override, args.shell)

@@ -8,6 +8,10 @@ import {
 } from '@/lib/tui-agent-startup'
 import type { AgentStartedTelemetry } from '@/lib/worktree-activation'
 import type { SleepingAgentLaunchConfig } from '../../../shared/agent-session-resume'
+import {
+  agentLaunchOverridesToSessionOptionValues,
+  type AgentLaunchOptionSelection
+} from '../../../shared/agent-launch-overrides'
 import type { LaunchSource } from '../../../shared/telemetry-events'
 import type { StartupCommandDelivery } from '../../../shared/codex-startup-delivery'
 import type { TuiAgent } from '../../../shared/types'
@@ -22,6 +26,7 @@ import type { PersistedNativeChatSessionOptions } from '../../../shared/native-c
 export function buildDirectWorkItemAgentStartupPlan(args: {
   agent: TuiAgent | null
   agentArgs?: string | null
+  launchOptions?: AgentLaunchOptionSelection | null
   draftContent: string
   promptDelivery: 'draft' | 'submit-after-ready'
   settings:
@@ -54,13 +59,18 @@ export function buildDirectWorkItemAgentStartupPlan(args: {
       ? resolveTuiAgentLaunchArgs(args.agent, args.settings?.agentDefaultArgs)
       : args.agentArgs
   const effectiveAgentEnv = resolveTuiAgentLaunchEnv(args.agent, args.settings?.agentDefaultEnv)
-  const sessionOptions = resolveInitialNativeChatSessionOptions(args.settings, {
-    agent: args.agent,
-    ...(args.promptDelivery === 'draft'
-      ? { promptDelivery: 'draft' as const, launchDraftText: args.draftContent }
-      : {}),
-    nativeChatTranscriptIsLocalReadable: args.nativeChatTranscriptIsLocalReadable
-  })
+  const recipeSessionOptions = args.launchOptions?.model
+    ? agentLaunchOverridesToSessionOptionValues(args.launchOptions)
+    : undefined
+  const sessionOptions =
+    recipeSessionOptions ??
+    resolveInitialNativeChatSessionOptions(args.settings, {
+      agent: args.agent,
+      ...(args.promptDelivery === 'draft'
+        ? { promptDelivery: 'draft' as const, launchDraftText: args.draftContent }
+        : {}),
+      nativeChatTranscriptIsLocalReadable: args.nativeChatTranscriptIsLocalReadable
+    })
   const draftLaunchPlan =
     args.promptDelivery === 'submit-after-ready'
       ? null
@@ -72,7 +82,8 @@ export function buildDirectWorkItemAgentStartupPlan(args: {
           isRemote: args.isRemote,
           agentArgs: effectiveAgentArgs,
           agentEnv: effectiveAgentEnv,
-          sessionOptions
+          sessionOptions,
+          includeSessionOptionCatalogDefaults: recipeSessionOptions ? false : undefined
         })
 
   if (draftLaunchPlan) {
@@ -105,6 +116,7 @@ export function buildDirectWorkItemAgentStartupPlan(args: {
     agentArgs: effectiveAgentArgs,
     agentEnv: effectiveAgentEnv,
     sessionOptions,
+    includeSessionOptionCatalogDefaults: recipeSessionOptions ? false : undefined,
     allowEmptyPromptLaunch: true
   })
   if (startupPlan && args.promptDelivery === 'draft') {

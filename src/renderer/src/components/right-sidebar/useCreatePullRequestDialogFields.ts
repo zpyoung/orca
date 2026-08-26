@@ -26,6 +26,7 @@ import type {
   PullRequestFieldRevisions
 } from '@/store/slices/pull-request-generation'
 import { resolveCreateReviewDraftTitle } from './create-review-draft-title'
+import { materializeSourceControlTextGenerationParams } from '../../../../shared/source-control-text-launch-args'
 
 type PullRequestDraftFields = {
   base: string
@@ -459,11 +460,21 @@ export function useCreatePullRequestDialogFields({
       if (!worktreePath || !base.trim() || effectiveGenerating || generateDisabled) {
         return
       }
+      const resolvedParams =
+        overrides?.sourceControlAiResolvedParams ??
+        (resolvedPullRequestAi?.ok ? resolvedPullRequestAi.value.params : undefined)
+      const effectiveOverrides = resolvedParams
+        ? {
+            ...overrides,
+            sourceControlAiResolvedParams:
+              materializeSourceControlTextGenerationParams(resolvedParams)
+          }
+        : overrides
       if (generation) {
         generation.onGenerate(
           { base, title, body, draft },
           { ...fieldRevisionsRef.current },
-          overrides
+          effectiveOverrides
         )
         return
       }
@@ -498,7 +509,7 @@ export function useCreatePullRequestDialogFields({
             provider: eligibility?.provider,
             useTemplate: resolvedPrDefaults.useTemplate
           },
-          overrides
+          effectiveOverrides
         )
         if (result.branchChangedByPreparation) {
           await onBranchChangedByGeneration?.()
@@ -549,6 +560,7 @@ export function useCreatePullRequestDialogFields({
       generateDisabled,
       onBranchChangedByGeneration,
       resolvedPrDefaults.useTemplate,
+      resolvedPullRequestAi,
       settings,
       title,
       worktreeId,

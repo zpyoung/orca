@@ -8,8 +8,14 @@ import {
 } from '../../../../shared/source-control-ai-actions'
 import type { RepoSourceControlAiOverrides } from '../../../../shared/source-control-ai-types'
 import type { GlobalSettings } from '../../../../shared/types'
+import {
+  readActionRecipeTextDraft,
+  type ActionRecipeTextDraft
+} from './repository-source-control-ai-action-draft'
 import { completeRepoActionRecipe } from './repository-source-control-ai-labels'
 import { SOURCE_CONTROL_TEXT_ACTION_ID_SET } from './source-control-action-recipe-options'
+
+export * from './repository-source-control-ai-action-draft'
 
 type RepoActionRecipe = NonNullable<
   NonNullable<RepoSourceControlAiOverrides['actionOverrides']>[SourceControlActionId]
@@ -166,7 +172,8 @@ export function withRepoAiActionAgent(
   return normalizeRepoAiDraft(
     setActionOverride(base, actionId, {
       ...currentRecipe,
-      agentId
+      agentId,
+      launchOptions: null
     })
   )
 }
@@ -175,7 +182,7 @@ export function withRepoAiActionRecipeText(
   base: RepoSourceControlAiOverrides,
   settings: GlobalSettings | null,
   actionId: SourceControlActionId,
-  text: { commandInputTemplate: string; agentArgs: string }
+  text: ActionRecipeTextDraft
 ): RepoSourceControlAiOverrides {
   const currentRecipe =
     base.actionOverrides?.[actionId] ?? readCompleteRecipeForDraft(base, settings, actionId)
@@ -183,26 +190,12 @@ export function withRepoAiActionRecipeText(
     setActionOverride(base, actionId, {
       ...currentRecipe,
       commandInputTemplate: text.commandInputTemplate,
-      agentArgs: text.agentArgs
+      agentArgs: text.agentArgs,
+      ...(Object.prototype.hasOwnProperty.call(text, 'launchOptions')
+        ? { launchOptions: text.launchOptions }
+        : {})
     })
   )
-}
-
-export type ActionRecipeTextDraft = {
-  commandInputTemplate: string
-  agentArgs: string
-}
-
-export function readActionRecipeTextDraft(
-  value: RepoSourceControlAiOverrides,
-  actionId: SourceControlActionId
-): ActionRecipeTextDraft {
-  const recipe = value.actionOverrides?.[actionId]
-  return {
-    commandInputTemplate:
-      typeof recipe?.commandInputTemplate === 'string' ? recipe.commandInputTemplate : '',
-    agentArgs: typeof recipe?.agentArgs === 'string' ? recipe.agentArgs : ''
-  }
 }
 
 /** Overlay the in-flight custom-command and per-action text drafts onto the optimistic value for display. */
@@ -226,7 +219,10 @@ export function composeDisplayRepoAi(
         [actionId]: {
           ...currentRecipe,
           commandInputTemplate: draft.commandInputTemplate,
-          agentArgs: draft.agentArgs
+          agentArgs: draft.agentArgs,
+          ...(Object.prototype.hasOwnProperty.call(draft, 'launchOptions')
+            ? { launchOptions: draft.launchOptions }
+            : {})
         }
       }
     }
@@ -245,7 +241,8 @@ export function computeActionDirtyById(
       if (!hasOwnActionOverride(immediate.actionOverrides, actionId)) {
         return [actionId, false]
       }
-      const draft = actionTextDrafts[actionId] ?? readActionRecipeTextDraft(immediate, actionId)
+      const actionDraft = actionTextDrafts[actionId]
+      const draft = actionDraft ?? readActionRecipeTextDraft(immediate, actionId)
       // Prefer persisted text as the base; if the override is only optimistic, compare against immediate.
       const compareBase = hasOwnActionOverride(persisted.actionOverrides, actionId)
         ? readActionRecipeTextDraft(persisted, actionId)
@@ -253,7 +250,9 @@ export function computeActionDirtyById(
       return [
         actionId,
         draft.commandInputTemplate !== compareBase.commandInputTemplate ||
-          draft.agentArgs !== compareBase.agentArgs
+          draft.agentArgs !== compareBase.agentArgs ||
+          (actionDraft !== undefined &&
+            JSON.stringify(draft.launchOptions) !== JSON.stringify(compareBase.launchOptions))
       ]
     })
   ) as Record<SourceControlActionId, boolean>
@@ -273,7 +272,8 @@ export function retainDivergentActionTextDrafts(
     const persistedText = readActionRecipeTextDraft(persisted, actionId)
     if (
       draft.commandInputTemplate !== persistedText.commandInputTemplate ||
-      draft.agentArgs !== persistedText.agentArgs
+      draft.agentArgs !== persistedText.agentArgs ||
+      JSON.stringify(draft.launchOptions) !== JSON.stringify(persistedText.launchOptions)
     ) {
       next[actionId] = draft
     }
@@ -299,7 +299,8 @@ export function clearActionTextDraftIfUnchanged(
   if (
     latest &&
     (latest.commandInputTemplate !== saved.commandInputTemplate ||
-      latest.agentArgs !== saved.agentArgs)
+      latest.agentArgs !== saved.agentArgs ||
+      JSON.stringify(latest.launchOptions) !== JSON.stringify(saved.launchOptions))
   ) {
     return current
   }

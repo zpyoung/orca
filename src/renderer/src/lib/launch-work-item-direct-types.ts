@@ -1,4 +1,5 @@
 import type { LinkedWorkItemContext } from '@/lib/linked-work-item-context'
+import type { AgentLaunchOptionSelection } from '../../../shared/agent-launch-overrides'
 import type { TaskProvider, TuiAgent, WorkspaceCreateTelemetrySource } from '../../../shared/types'
 import type { LaunchSource } from '../../../shared/telemetry-events'
 
@@ -28,6 +29,7 @@ export type LaunchWorkItemDirectArgs = {
   telemetrySource?: WorkspaceCreateTelemetrySource
   agentOverride?: TuiAgent
   agentArgs?: string | null
+  launchOptions?: AgentLaunchOptionSelection | null
   promptDelivery?: 'draft' | 'submit-after-ready'
   launchPlatform?: NodeJS.Platform
 }

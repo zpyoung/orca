@@ -2,6 +2,7 @@ import type { Automation, AutomationRun } from '../shared/automations-types'
 import { getAutomationLegacyRepoId } from '../shared/automation-run-identity'
 import { formatAutomationPrecheckTimeout } from '../shared/automation-precheck'
 import { formatAutomationSchedule } from '../shared/automation-schedules'
+import { formatAutomationLaunchOverrides } from './automation-launch-format'
 import type { PublicKnownRuntimeEnvironment } from '../shared/runtime-environments'
 import type {
   RuntimeRepoList,
@@ -190,6 +191,7 @@ export function formatAutomationList(result: { automations: Automation[] }): str
 export function formatAutomationShow(result: { automation: Automation }): string {
   const automation = result.automation
   const runContext = automation.runContext ?? null
+  const launch = formatAutomationLaunchOverrides(automation)
   const projectLines = runContext
     ? [
         `runProjectId: ${runContext.projectId}`,
@@ -204,6 +206,7 @@ export function formatAutomationShow(result: { automation: Automation }): string
     `id: ${automation.id}`,
     `name: ${automation.name}`,
     `provider: ${automation.agentId}`,
+    ...(launch ? [`Launch: ${launch}`] : []),
     `enabled: ${automation.enabled}`,
     `schedule: ${formatAutomationSchedule(automation.rrule)}`,
     `rrule: ${automation.rrule}`,

@@ -660,6 +660,9 @@ describe('createWebRuntimeSessionBrowserTab', () => {
   it('creates an unfocused browser while preserving its requested split', async () => {
     mocks.getState.mockReturnValue({
       settings: { activeRuntimeEnvironmentId: ENVIRONMENT_ID },
+      runtimeStatusByEnvironmentId: new Map([
+        [ENVIRONMENT_ID, { status: { capabilities: ['browser.screencast.v1'] }, checkedAt: 1 }]
+      ]),
       activeWorktreeId: WORKTREE_ID,
       browserPagesByWorkspace: {
         'host-browser-workspace': [
@@ -1172,6 +1175,9 @@ describe('createWebRuntimeSessionBrowserTab', () => {
       settings: { activeRuntimeEnvironmentId: ENVIRONMENT_ID },
       activeWorktreeId: WORKTREE_ID,
       activeWorkspaceExecutionHostId: RUNTIME_EXECUTION_HOST_ID,
+      runtimeStatusByEnvironmentId: new Map([
+        [ENVIRONMENT_ID, { status: { capabilities: ['browser.screencast.v1'] }, checkedAt: 1 }]
+      ]),
       browserPagesByWorkspace: {},
       remoteBrowserPageHandlesByPageId: {},
       unifiedTabsByWorktree: {},

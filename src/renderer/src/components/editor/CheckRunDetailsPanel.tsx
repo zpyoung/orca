@@ -100,6 +100,7 @@ export function CheckRunDetailsPanel({
     savedAgentId,
     savedCommandInputTemplate,
     savedAgentArgs,
+    savedLaunchOptions,
     saveLaunchActionDefault,
     openSourceControlAiSettings,
     fixWithAI
@@ -185,6 +186,7 @@ export function CheckRunDetailsPanel({
                 savedAgentId={savedAgentId}
                 savedCommandInputTemplate={savedCommandInputTemplate}
                 savedAgentArgs={savedAgentArgs}
+                savedLaunchOptions={savedLaunchOptions}
                 onSaveAgentDefault={saveLaunchActionDefault}
                 onOpenSettings={openSourceControlAiSettings}
                 onFixWithDefaultAgent={fixWithAI}

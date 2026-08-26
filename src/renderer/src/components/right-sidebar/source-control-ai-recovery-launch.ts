@@ -1,4 +1,5 @@
 import { toast } from 'sonner'
+import { agentLaunchOverridesToSessionOptionValues } from '../../../../shared/agent-launch-overrides'
 import type { AppState } from '@/store'
 import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
@@ -155,12 +156,17 @@ export async function launchSourceControlRecoveryAgentWithDefault({
     toast.error(copy.noEnabledAgent)
     return false
   }
+  const recipeSessionOptions = savedRecipe.launchOptions?.model
+    ? agentLaunchOverridesToSessionOptionValues(savedRecipe.launchOptions)
+    : undefined
   const result = launchAgentInNewTab({
     agent,
     worktreeId: activeWorktreeId,
     groupId: activeGroupId ?? activeWorktreeId,
     prompt,
     agentArgs: savedRecipe.agentArgs,
+    ...(recipeSessionOptions ? { sessionOptions: recipeSessionOptions } : {}),
+    includeSessionOptionCatalogDefaults: recipeSessionOptions ? false : undefined,
     promptDelivery: 'submit-after-ready',
     launchPlatform: activeSourceControlLaunchPlatform,
     launchSource: 'source_control_recovery'

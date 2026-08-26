@@ -44,7 +44,8 @@ describe('source-control AI recipe saves', () => {
       recipe: {
         agentId: 'claude',
         commandInputTemplate: '{basePrompt}\n\nrepo',
-        agentArgs: '  --model sonnet  '
+        agentArgs: '  --model sonnet  ',
+        launchOptions: { model: 'sonnet', optionValues: { effort: 'high' } }
       }
     })
 
@@ -60,7 +61,8 @@ describe('source-control AI recipe saves', () => {
             commitMessage: {
               agentId: 'claude',
               commandInputTemplate: '{basePrompt}\n\nrepo',
-              agentArgs: '--model sonnet'
+              agentArgs: '--model sonnet',
+              launchOptions: { model: 'sonnet', optionValues: { effort: 'high' } }
             },
             pullRequest: {
               agentId: null,
@@ -94,6 +96,24 @@ describe('source-control AI recipe saves', () => {
       prCreationDefaults: {
         draft: true,
         generateDetailsOnOpen: false
+      }
+    })
+  })
+
+  it('preserves repository null launch options as an explicit inherited-value clear', () => {
+    expect(
+      normalizeWritableRepoSourceControlAiOverrides({
+        actionOverrides: {
+          fixChecks: { launchOptions: null }
+        }
+      })
+    ).toEqual({
+      actionOverrides: {
+        fixChecks: {
+          agentId: null,
+          commandInputTemplate: '{basePrompt}',
+          launchOptions: null
+        }
       }
     })
   })
@@ -134,7 +154,8 @@ describe('source-control AI recipe saves', () => {
       recipe: {
         agentId: 'custom',
         commandInputTemplate: '{basePrompt}\n\nreview',
-        agentArgs: '--verbose'
+        agentArgs: '--verbose',
+        launchOptions: { model: 'sonnet' }
       },
       customAgentCommand: 'review-agent {prompt}'
     })
@@ -147,7 +168,8 @@ describe('source-control AI recipe saves', () => {
     expect(result.sourceControlAi.actions?.pullRequest).toEqual({
       agentId: 'custom',
       commandInputTemplate: '{basePrompt}\n\nreview',
-      agentArgs: '--verbose'
+      agentArgs: '--verbose',
+      launchOptions: { model: 'sonnet' }
     })
     expect(result.sourceControlAi.customAgentCommand).toBe('review-agent {prompt}')
     expect(result.sourceControlAi.enabled).toBe(true)

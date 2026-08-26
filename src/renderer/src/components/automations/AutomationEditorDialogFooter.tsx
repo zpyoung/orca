@@ -3,9 +3,9 @@ import { Info, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import AgentCombobox from '@/components/agent/AgentCombobox'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
+import { isEmptyAgentLaunchOverrides } from '../../../../shared/agent-launch-overrides'
 import type { AutomationWorkspaceMode } from '../../../../shared/automations-types'
 import type {
   GlobalSettings,
@@ -16,8 +16,8 @@ import type {
 } from '../../../../shared/types'
 import type { AgentCatalogEntry } from '@/lib/agent-catalog'
 import { Field } from './automation-page-parts'
-import { AutomationMissedRunGraceField } from './AutomationMissedRunGraceField'
-import { AutomationSessionField } from './AutomationSessionField'
+import { AutomationAgentLaunchFields } from './AutomationAgentLaunchFields'
+import type { AutomationLaunchOverridesGate } from './automation-launch-overrides-gate'
 import { AutomationSetupDecisionField } from './AutomationSetupDecisionField'
 import { CreateFromPicker } from './CreateFromPicker'
 import { WorkspaceCombobox } from './WorkspaceCombobox'
@@ -29,6 +29,7 @@ type AutomationEditorDialogFooterProps = {
   isEditingExternal: boolean
   isHermesTarget: boolean
   isHermesCreate: boolean
+  launchOverridesGate: AutomationLaunchOverridesGate
   isSaving: boolean
   canSave: boolean
   repos: readonly Repo[]
@@ -56,6 +57,7 @@ export function AutomationEditorDialogFooter({
   isEditingExternal,
   isHermesTarget,
   isHermesCreate,
+  launchOverridesGate,
   isSaving,
   canSave,
   repos,
@@ -77,6 +79,19 @@ export function AutomationEditorDialogFooter({
   onOpenChange,
   onSave
 }: AutomationEditorDialogFooterProps): React.JSX.Element {
+  const launchOverridesDisabled = launchOverridesGate !== 'supported'
+  const launchOverridesDisabledReason =
+    launchOverridesGate !== 'unsupported'
+      ? undefined
+      : isEmptyAgentLaunchOverrides(draft.launchOverrides)
+        ? translate(
+            'auto.components.automations.AutomationEditorDialogFooter.launchSettingsUnsupported',
+            "This automation's host doesn't support launch settings. Update the remote Orca server."
+          )
+        : translate(
+            'auto.components.automations.AutomationEditorDialogFooter.launchSettingsNotSaved',
+            "Launch settings can't be saved to this host and won't apply to runs."
+          )
   return (
     <div className="border-t border-border/50 px-5 py-4">
       <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-4">
@@ -212,39 +227,21 @@ export function AutomationEditorDialogFooter({
         <div className="min-h-0">
           <div
             className={cn(
-              'grid gap-3 pt-3 transition-[opacity,transform] duration-150 ease-out sm:grid-cols-2 lg:grid-cols-4',
+              'transition-[opacity,transform] duration-150 ease-out',
               isHermesTarget
                 ? '-translate-y-1 opacity-0 delay-0'
                 : 'translate-y-0 opacity-100 delay-200'
             )}
           >
-            <Field
-              label={translate(
-                'auto.components.automations.AutomationEditorDialog.57b722cbba',
-                'Agent'
-              )}
-            >
-              <AgentCombobox
-                agents={visibleAgents}
-                value={draft.agentId}
-                onValueChange={(agentId) =>
-                  agentId && onDraftChange((current) => ({ ...current, agentId }))
-                }
-                defaultAgent={settings?.defaultTuiAgent ?? null}
-                triggerClassName={`h-9 w-full min-w-0 ${pickerTriggerClassName}`}
-                allowNarrowTrigger
-              />
-            </Field>
-            <AutomationSessionField
+            <AutomationAgentLaunchFields
               draft={draft}
-              toggleItemClassName={modeToggleItemClassName}
-              onDraftChange={onDraftChange}
-            />
-            {isHermesTarget ? null : scheduleField}
-            <AutomationMissedRunGraceField
-              draft={draft}
-              disabled={isHermesTarget}
+              settings={settings}
+              visibleAgents={visibleAgents}
+              scheduleField={isHermesTarget ? null : scheduleField}
               pickerTriggerClassName={pickerTriggerClassName}
+              modeToggleItemClassName={modeToggleItemClassName}
+              launchOverridesDisabled={launchOverridesDisabled}
+              launchOverridesDisabledReason={launchOverridesDisabledReason}
               onDraftChange={onDraftChange}
             />
           </div>

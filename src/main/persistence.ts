@@ -26,12 +26,16 @@ import type {
   AutomationCreateInput,
   AutomationDispatchResult,
   AutomationPrecheckResult,
+  AutomationRunLaunchSetting,
+  AutomationRunLaunchSettings,
+  AutomationRunLaunchValueSource,
   AutomationRunOutputSnapshot,
   AutomationRun,
   AutomationSchedulerOwner,
   AutomationRunTrigger,
   AutomationUpdateInput
 } from '../shared/automations-types'
+import { normalizeAgentLaunchOverrides } from '../shared/agent-launch-overrides'
 import {
   latestAutomationOccurrenceAtOrBefore,
   nextAutomationOccurrenceAfter
@@ -238,6 +242,7 @@ import {
   DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES,
   SOURCE_CONTROL_TEXT_ACTION_IDS
 } from '../shared/source-control-ai-actions'
+import { isTuiAgent } from '../shared/tui-agent-config'
 import { normalizeDisabledTuiAgents } from '../shared/tui-agent-selection'
 import {
   DEFAULT_TUI_AGENT_ARGS,
@@ -985,6 +990,11 @@ function normalizeNotificationSettings(value: unknown): NotificationSettings {
   }
 }
 
+const AUTOMATION_RUN_LAUNCH_OPTIONS_MAX = 16
+const AUTOMATION_RUN_LAUNCH_KEY_MAX = 64
+const AUTOMATION_RUN_LAUNCH_VALUE_MAX = 512
+const AUTOMATION_RUN_LAUNCH_ARGS_MAX = 4096
+
 function normalizeAutomationRunWorkspaceDisplayName(value: string | null): string | null {
   const trimmed = value?.trim()
   return trimmed ? trimmed : null
@@ -1018,6 +1028,69 @@ function normalizeAutomationRunOutputSnapshot(
         ? value.capturedAt
         : Date.now(),
     truncated: value.truncated === true
+  }
+}
+
+const AUTOMATION_RUN_LAUNCH_SOURCES: readonly AutomationRunLaunchValueSource[] = [
+  'explicit',
+  'inherited',
+  'raw_args'
+]
+
+function normalizeAutomationRunLaunchSetting(value: unknown): AutomationRunLaunchSetting | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null
+  }
+  const candidate = value as Record<string, unknown>
+  const source = candidate.source
+  if (
+    typeof source !== 'string' ||
+    !AUTOMATION_RUN_LAUNCH_SOURCES.includes(source as AutomationRunLaunchValueSource)
+  ) {
+    return null
+  }
+  const raw = candidate.value
+  const settingValue =
+    typeof raw === 'boolean'
+      ? raw
+      : typeof raw === 'string' && raw.length <= AUTOMATION_RUN_LAUNCH_VALUE_MAX
+        ? raw
+        : undefined
+  return {
+    ...(settingValue !== undefined ? { value: settingValue } : {}),
+    source: source as AutomationRunLaunchValueSource
+  }
+}
+
+function normalizeAutomationRunLaunchSettings(
+  value: AutomationRunLaunchSettings | null | undefined
+): AutomationRunLaunchSettings | null {
+  if (!value || !isTuiAgent(value.agentId)) {
+    return null
+  }
+  const options: Record<string, AutomationRunLaunchSetting> = {}
+  for (const [key, setting] of Object.entries(value.options ?? {})) {
+    if (!key || key.length > AUTOMATION_RUN_LAUNCH_KEY_MAX) {
+      continue
+    }
+    const normalized = normalizeAutomationRunLaunchSetting(setting)
+    if (normalized) {
+      options[key] = normalized
+    }
+    if (Object.keys(options).length >= AUTOMATION_RUN_LAUNCH_OPTIONS_MAX) {
+      break
+    }
+  }
+  const agentArgs = value.agentArgs
+  const agentArgsValue = typeof agentArgs?.value === 'string' ? agentArgs.value : null
+  return {
+    agentId: value.agentId,
+    options,
+    ...(agentArgsValue !== null &&
+    agentArgsValue.length <= AUTOMATION_RUN_LAUNCH_ARGS_MAX &&
+    (agentArgs?.source === 'explicit' || agentArgs?.source === 'inherited')
+      ? { agentArgs: { value: agentArgsValue, source: agentArgs.source } }
+      : {})
   }
 }
 
@@ -5208,12 +5281,14 @@ export class Store {
     const executionTargetType = repo?.connectionId ? 'ssh' : 'local'
     const schedulerOwner = getAutomationSchedulerOwner(repo)
     const contexts = getAutomationContextsForRepo(repo, this.state.projectHostSetups ?? [])
+    const launchOverrides = normalizeAgentLaunchOverrides(input.launchOverrides)
     const automation: Automation = {
       id: randomUUID(),
       name: input.name.trim() || 'Untitled automation',
       prompt: input.prompt,
       precheck: normalizeAutomationPrecheck(input.precheck),
       agentId: input.agentId,
+      ...(launchOverrides ? { launchOverrides } : {}),
       runContext: input.runContext ?? contexts.runContext,
       sourceContext: input.sourceContext ?? contexts.sourceContext,
       projectId: input.projectId,
@@ -5259,6 +5334,11 @@ export class Store {
     const dtstart = updates.dtstart ?? current.dtstart
     const scheduleChanged = updates.rrule !== undefined || updates.dtstart !== undefined
     const workspaceMode = updates.workspaceMode ?? current.workspaceMode
+    const normalizedLaunchOverrides = Object.hasOwn(updates, 'launchOverrides')
+      ? updates.launchOverrides === null
+        ? null
+        : normalizeAgentLaunchOverrides(updates.launchOverrides)
+      : current.launchOverrides
     const updated: Automation = {
       ...current,
       ...updates,
@@ -5267,6 +5347,7 @@ export class Store {
       precheck: Object.hasOwn(updates, 'precheck')
         ? normalizeAutomationPrecheck(updates.precheck)
         : normalizeAutomationPrecheck(current.precheck),
+      ...(normalizedLaunchOverrides ? { launchOverrides: normalizedLaunchOverrides } : {}),
       projectId: repoId,
       runContext: Object.hasOwn(updates, 'runContext')
         ? (updates.runContext ?? null)
@@ -5310,6 +5391,12 @@ export class Store {
         ? nextAutomationOccurrenceAfter(rrule, dtstart, Date.now())
         : current.nextRunAt,
       updatedAt: Date.now()
+    }
+    if (
+      Object.hasOwn(updates, 'launchOverrides') &&
+      (normalizedLaunchOverrides === null || normalizedLaunchOverrides === undefined)
+    ) {
+      delete updated.launchOverrides
     }
     this.state.automations[index] = updated
     this.flush()
@@ -5357,6 +5444,7 @@ export class Store {
       terminalSessionId: null,
       terminalPaneKey: null,
       terminalPtyId: null,
+      launchSettings: null,
       outputSnapshot: null,
       precheckResult: null,
       usage: null,
@@ -5401,6 +5489,9 @@ export class Store {
       terminalPtyId: Object.hasOwn(result, 'terminalPtyId')
         ? normalizeAutomationRunTerminalPtyId(result.terminalPtyId)
         : normalizeAutomationRunTerminalPtyId(current.terminalPtyId),
+      launchSettings: Object.hasOwn(result, 'launchSettings')
+        ? normalizeAutomationRunLaunchSettings(result.launchSettings)
+        : normalizeAutomationRunLaunchSettings(current.launchSettings),
       outputSnapshot: Object.hasOwn(result, 'outputSnapshot')
         ? normalizeAutomationRunOutputSnapshot(result.outputSnapshot)
         : normalizeAutomationRunOutputSnapshot(current.outputSnapshot),

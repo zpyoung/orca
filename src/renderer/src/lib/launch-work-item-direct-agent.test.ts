@@ -91,6 +91,24 @@ describe('buildDirectWorkItemAgentStartupPlan', () => {
     expect(result.startupPlan?.sessionOptions).toBeUndefined()
   })
 
+  it('applies recipe launch options without catalog or native-chat defaults', () => {
+    const result = buildDirectWorkItemAgentStartupPlan({
+      agent: 'codex',
+      agentArgs: '--model raw-model',
+      launchOptions: { model: 'recipe-model', optionValues: { effort: 'high' } },
+      draftContent: 'Review issue 42',
+      promptDelivery: 'draft',
+      settings: { ...settings, openAgentTabsInChatByDefault: true },
+      launchPlatform: 'darwin',
+      nativeChatTranscriptIsLocalReadable: true
+    })
+
+    expect(result.startupPlan?.launchCommand).toContain("'-m' 'recipe-model'")
+    expect(result.startupPlan?.launchCommand).toContain("'-c' 'model_reasoning_effort=high'")
+    expect(result.startupPlan?.launchCommand).toContain("'--model' 'raw-model'")
+    expect(result.startupPlan?.launchCommand).not.toContain('gpt-5.2-codex')
+  })
+
   it('applies native-chat preferences when the new workspace opens in chat', () => {
     const result = buildDirectWorkItemAgentStartupPlan({
       agent: 'codex',

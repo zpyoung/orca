@@ -5,6 +5,7 @@ import {
   SOURCE_CONTROL_LAUNCH_ACTION_IDS,
   SOURCE_CONTROL_LAUNCH_ACTION_LABELS,
   DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES,
+  normalizeSourceControlActionRecipe,
   readSourceControlActionDefault,
   renderSourceControlActionCommandTemplate,
   resolveSourceControlActionCommandTemplate,
@@ -49,6 +50,25 @@ describe('source-control AI launch action defaults', () => {
         fixCommitFailure: { agentId: 'not-real', commandInputTemplate: 42 }
       })
     ).toBeUndefined()
+  })
+
+  it('sanitizes structured launch options without moving top-level agent args', () => {
+    const launchOptions = JSON.parse(
+      '{"model":" sonnet ","optionValues":{"effort":"high","constructor":"bad","fastMode":42},"agentArgs":"--nested"}'
+    )
+
+    expect(
+      normalizeSourceControlActionRecipe({
+        agentArgs: ' --verbose ',
+        launchOptions
+      })
+    ).toEqual({
+      agentArgs: ' --verbose ',
+      launchOptions: {
+        model: 'sonnet',
+        optionValues: { effort: 'high' }
+      }
+    })
   })
 
   it('normalizes the custom command sentinel for text action recipes', () => {

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type { CommitMessageAiSettings, TuiAgent } from '../../../../shared/types'
 import {
   CUSTOM_AGENT_ID,
@@ -8,6 +8,8 @@ import {
 } from '../../../../shared/commit-message-agent-spec'
 import { getAgentCatalog } from '@/lib/agent-catalog'
 import { useAppStore } from '@/store'
+import { describeTextGenerationRecipeOverrides } from './text-generation-recipe-overrides'
+import type { TextGenerationRecipeOverrides } from './text-generation-recipe-overrides'
 import {
   EMPTY_COMMIT_MESSAGE_AI_SETTINGS,
   readCommitMessageAiSettings,
@@ -26,6 +28,7 @@ export type AiCommitPrSettingsViewModel = {
   activeThinking: string | undefined
   isCustom: boolean
   unsupportedAgentLabel: string | null
+  recipeOverrides: TextGenerationRecipeOverrides
   toggleAi: () => void
   onAgentChange: (newAgentId: string) => void
   onModelChange: (newModelId: string) => void
@@ -44,6 +47,7 @@ export function useAiCommitPrSettings(): AiCommitPrSettingsViewModel {
   }, [])
 
   const config = settings ? readCommitMessageAiSettings(settings) : EMPTY_COMMIT_MESSAGE_AI_SETTINGS
+  const recipeOverrides = useMemo(() => describeTextGenerationRecipeOverrides(settings), [settings])
   const resolvedAgentId = resolveCommitMessageAgentChoice(
     config.agentId,
     settings?.defaultTuiAgent,
@@ -189,6 +193,7 @@ export function useAiCommitPrSettings(): AiCommitPrSettingsViewModel {
     activeThinking,
     isCustom,
     unsupportedAgentLabel,
+    recipeOverrides,
     toggleAi,
     onAgentChange,
     onModelChange,
