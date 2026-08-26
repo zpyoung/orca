@@ -60,6 +60,8 @@ export function useHandoffTargetEnvironment(args: {
   lastAgent: TuiAgent | undefined
   defaultAgent: unknown
   onTranscriptUnavailable: () => void
+  openSession: object | null
+  seedAgent: TuiAgent | null
 }) {
   const {
     open,
@@ -72,7 +74,9 @@ export function useHandoffTargetEnvironment(args: {
     disabledAgents,
     lastAgent,
     defaultAgent,
-    onTranscriptUnavailable
+    onTranscriptUnavailable,
+    openSession,
+    seedAgent
   } = args
   const [selectedAgent, setSelectedAgentState] = useState<TuiAgent | null>(null)
   const selectedAgentRef = useRef<TuiAgent | null>(null)
@@ -115,6 +119,17 @@ export function useHandoffTargetEnvironment(args: {
     selectedAgentRef.current = agent
     setSelectedAgentState(agent)
   }, [])
+
+  // Why during render: a reopened dialog must start from the seed, and doing it in an effect paints
+  // the previous session's agent and capture for one frame.
+  const [seededSession, setSeededSession] = useState<object | null>(null)
+  if (openSession !== seededSession) {
+    setSeededSession(openSession)
+    if (openSession) {
+      setSelectedAgent(seedAgent)
+      setCapturedText(null)
+    }
+  }
 
   useEffect(() => {
     if (!open || !targetWorktreeId) {

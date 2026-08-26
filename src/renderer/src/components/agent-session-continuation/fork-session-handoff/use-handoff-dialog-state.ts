@@ -117,6 +117,21 @@ export function useHandoffDialogState({ open, request }: UseHandoffDialogStateAr
     [sourceTargetWorktreeId, store]
   )
   const onTranscriptUnavailable = useCallback(() => setContextMode('focused'), [])
+  // Why during render: the render sites keep this dialog mounted and toggle `open`, so opening it
+  // has to re-seed every field. Doing that in an effect paints the previous session's values for
+  // one frame; React re-runs the component before painting when the reset happens here instead.
+  const openSession = useMemo(
+    () => (open && request ? { draftIdentity, anchorWorktreeId } : null),
+    [anchorWorktreeId, draftIdentity, open, request]
+  )
+  const openSeed = useMemo(
+    () =>
+      openSession && request
+        ? buildHandoffDialogOpenSeed({ draftIdentity, anchorWorktreeId, request })
+        : null,
+    [anchorWorktreeId, draftIdentity, openSession, request]
+  )
+
   const environment = useHandoffTargetEnvironment({
     open,
     request,
@@ -128,7 +143,9 @@ export function useHandoffDialogState({ open, request }: UseHandoffDialogStateAr
     disabledAgents: store.settings?.disabledTuiAgents,
     lastAgent: store.settings?.forkSessionHandoff?.lastAgent,
     defaultAgent: store.settings?.defaultTuiAgent,
-    onTranscriptUnavailable
+    onTranscriptUnavailable,
+    openSession,
+    seedAgent: openSeed?.selectedAgent ?? null
   })
   const {
     selectedAgent,
@@ -218,31 +235,21 @@ export function useHandoffDialogState({ open, request }: UseHandoffDialogStateAr
     }
   }, [open])
 
-  // Why during render: the render sites keep this dialog mounted and toggle `open`, so opening it
-  // has to re-seed every field. Doing that in an effect paints the previous session's values for
-  // one frame; React re-runs the component before painting when the reset happens here instead.
-  const openSession = useMemo(
-    () => (open && request ? { draftIdentity, anchorWorktreeId } : null),
-    [anchorWorktreeId, draftIdentity, open, request]
-  )
   const [seededSession, setSeededSession] = useState<typeof openSession>(null)
   if (openSession !== seededSession) {
     setSeededSession(openSession)
-    if (openSession !== null && request) {
-      const seed = buildHandoffDialogOpenSeed({ draftIdentity, anchorWorktreeId, request })
-      setTargetWorktreeId(seed.targetWorktreeId)
-      setSelectedAgent(seed.selectedAgent)
+    if (openSeed) {
+      setTargetWorktreeId(openSeed.targetWorktreeId)
       setContextMode('focused')
-      setIncludeToggles(seed.includeToggles)
-      setSelectedTemplateId(seed.templateId)
-      setSteeringNote(seed.steeringNote)
+      setIncludeToggles(openSeed.includeToggles)
+      setSelectedTemplateId(openSeed.templateId)
+      setSteeringNote(openSeed.steeringNote)
       setRelationship('continues')
-      setPreviewPhase(seed.previewPhase)
-      setPreviewBody(seed.previewBody)
+      setPreviewPhase(openSeed.previewPhase)
+      setPreviewBody(openSeed.previewBody)
       setCreateMode(false)
       setCreateName('')
       setCreateBaseBranch('')
-      setCapturedText(null)
       setOperationError(null)
       setWaitRequested(false)
       setBusyDismissed(false)
@@ -250,10 +257,10 @@ export function useHandoffDialogState({ open, request }: UseHandoffDialogStateAr
   }
 
   useEffect(() => {
-    if (openSession !== null) {
+    if (openSeed) {
       launchedRef.current = false
     }
-  }, [openSession])
+  }, [openSeed])
 
   useEffect(() => {
     if (!waitingForIdle || !sourceActivity.available || sourceActivity.busy) {

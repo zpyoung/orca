@@ -36,6 +36,8 @@ vi.mock('@/store', () => ({
 
 import { useHandoffTargetEnvironment } from './use-handoff-target-environment'
 
+const OPEN_SESSION = { session: 'test' }
+
 const request: AgentSessionContinuationRequest = {
   source: { sourceAgent: 'codex', capturedText: 'context' },
   worktreeId: 'wt-a',
@@ -71,13 +73,17 @@ function Harness({
   resolvedTarget = null,
   sourceTarget = null,
   includeToggles = noRepoState,
-  onTranscriptUnavailable = ignoreTranscriptUnavailable
+  onTranscriptUnavailable = ignoreTranscriptUnavailable,
+  openSession = OPEN_SESSION,
+  seedAgent = null
 }: {
   targetWorktreeId: string
   resolvedTarget?: HandoffTargetResolution | null
   sourceTarget?: HandoffTargetResolution | null
   includeToggles?: ForkSessionHandoffIncludeToggles
   onTranscriptUnavailable?: () => void
+  openSession?: object | null
+  seedAgent?: TuiAgent | null
 }): React.JSX.Element {
   const state = useHandoffTargetEnvironment({
     open: true,
@@ -87,6 +93,8 @@ function Harness({
     target: resolvedTarget,
     sourceTarget,
     includeToggles,
+    openSession,
+    seedAgent,
     disabledAgents: [],
     lastAgent: undefined,
     defaultAgent: undefined,
