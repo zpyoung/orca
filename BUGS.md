@@ -65,6 +65,7 @@ entries' IDs; manual edits to fix typos are fine.
 - **Introduced by**: code review of staged session-handoff customization changes
 - **Severity**: low
 - **Proposed fix**: Either keep the prior selection and treat the new template as catalog-only, or warn/confirm before replacing an active selection.
+- **Resolved (2026-08-26)**: the save now adopts the new template only when nothing is selected; with a template already active the note and the selection both survive. Hook-level coverage is tracked as TEST-4.
 
 ## BUG-7: New Template option opens a dead-end naming panel once the catalog is at its limit
 - **Observed**: 2026-08-26

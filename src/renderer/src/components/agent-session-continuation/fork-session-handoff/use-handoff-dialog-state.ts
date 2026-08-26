@@ -378,13 +378,17 @@ export function useHandoffDialogState({ open, request }: UseHandoffDialogStateAr
       if (!template || templateSaveGenerationRef.current !== generation) {
         return false
       }
-      setSelectedTemplateId(template.id)
-      setSteeringNote('')
+      // adopting the new template would drop an already-selected one from the brief, so only take
+      // over the selection when nothing is selected
+      if (!selectedTemplateId) {
+        setSelectedTemplateId(template.id)
+        setSteeringNote('')
+      }
       setOperationError(null)
       changeControl()
       return true
     },
-    [changeControl, steeringNote]
+    [changeControl, selectedTemplateId, steeringNote]
   )
 
   const dismiss = useCallback(() => {
