@@ -93,3 +93,35 @@ entries' IDs; manual edits to fix typos are fine.
 - **Severity**: low
 - **Proposed fix**: Return a reason code alongside applied: false and have the pane surface it as a toast or inline editor error.
 
+
+## BUG-10: Tab close may not release the handoff dialog's store subscription
+- **Observed**: 2026-08-26
+- **File**: src/renderer/src/lib/fork-session-handoff/launch-session-handoff.ts:399
+- **Description**: Raised by the first review pass on this branch and carried unverified into the merge. The delivery waiter subscribes to the app store and clears itself on resolution; the claim is that closing the receiving tab before delivery resolves leaves the subscription attached. Not reproduced in this pass — treat the file pointer as the starting point, not a confirmed line.
+- **Introduced by**: first code-review pass on the session-handoff branch
+- **Severity**: low
+- **Proposed fix**: Confirm the waiter's teardown path runs when the target tab disappears, and add a test that closes the tab mid-wait.
+
+## BUG-11: Start with an unresolvable target is a silent no-op
+- **Observed**: 2026-08-26
+- **File**: src/renderer/src/components/agent-session-continuation/fork-session-handoff/use-handoff-dialog-start.ts:55
+- **Description**: The opening guard returns false when `request`, `selectedAgent`, `target`, or `compositionInputs` is missing, without calling `setOperationError`. Every later failure path in the same function does set one. If the button is ever reachable while the target cannot resolve, the click does nothing and says nothing. `startDisabled` is expected to gate this today, so it is latent rather than live.
+- **Introduced by**: first code-review pass on the session-handoff branch
+- **Severity**: low
+- **Proposed fix**: Set an operation error in the guard, or assert the invariant so an unreachable state fails loudly instead of silently.
+
+## BUG-12: SSH-backed repo-state probes are not cancellable
+- **Observed**: 2026-08-26
+- **File**: src/renderer/src/lib/fork-session-handoff/handoff-repo-state.ts
+- **Description**: The module carries no AbortController or cancellation token, so a repo-state diff started against a slow SSH host keeps running after the user changes target or closes the dialog. The result is discarded by the caller's generation check, but the work and the remote round-trip are not stopped.
+- **Introduced by**: first code-review pass on the session-handoff branch
+- **Severity**: low
+- **Proposed fix**: Thread an AbortSignal through the probe and abort it when the target changes or the dialog closes.
+
+## BUG-13: Lineage badge attribution in split tabs may point at the wrong pane
+- **Observed**: 2026-08-26
+- **File**: src/renderer/src/components/agent-session-continuation/fork-session-handoff/SessionHandoffLineageBadge.tsx
+- **Description**: Raised by the first review pass and carried unverified into the merge. The badge resolves its jump target through `resolveOriginalPaneTarget` and `parsePaneKey`; the claim is that a tab holding several panes can resolve to a sibling rather than the pane that produced the handoff. Not reproduced in this pass.
+- **Introduced by**: first code-review pass on the session-handoff branch
+- **Severity**: low
+- **Proposed fix**: Reproduce with a split tab whose panes ran different agents, then key the badge's target on the recorded pane id rather than the tab.
