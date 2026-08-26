@@ -2873,6 +2873,7 @@ function applyWebSessionTabsSnapshotWithContext(
       return buildTerminalUnifiedTab(
         entry.tab,
         hostGroupIdByTabId.get(entry.hostTabId) ?? targetGroupId,
+        environmentId,
         entry.tab.viewMode ?? existingViewModeByTabId.get(entry.tab.id),
         existingUnifiedTab?.terminalDockByPaneKey
       )
@@ -2894,6 +2895,7 @@ function applyWebSessionTabsSnapshotWithContext(
     return buildTerminalUnifiedTab(
       entry.tab,
       hostGroupIdByTabId.get(entry.hostTabId) ?? targetGroupId,
+      environmentId,
       entry.tab.viewMode ?? existingViewModeByTabId.get(entry.tab.id),
       reconcileTerminalDockByPaneKey(
         rekeyedHandoffDockRecord ?? entry.terminalDockByPaneKey,

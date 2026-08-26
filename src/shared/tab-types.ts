@@ -1,4 +1,5 @@
 import type { AiVaultSessionTitle } from './ai-vault-session-title'
+import type { ExecutionHostId } from './execution-host'
 import type { TerminalDockPaneState } from './fork-terminal-dock/terminal-dock-pane-state'
 
 // ─── Tab Group Layout ───────────────────────────────────────────────

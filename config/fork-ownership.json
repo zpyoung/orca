@@ -154,14 +154,30 @@
       "lines": ["const MACOS_PACKAGED_BUNDLE_ID = 'com.zpyoung.orca'"]
     },
     {
-      "path": "src/main/ipc/pty.ts",
+      "path": "src/main/ipc/pty/ipc/write-input.ts",
       "feature": "terminal-dock",
       "kind": "registration",
       "lines": [
         "  const writePtyProviderInputAcknowledged = (",
         "        return tooLarge ? false : writePtyProviderInputAcknowledgedChunks(settlementWrite, id, data)",
-        "      return allSettled"
+        "      return allSettled",
+        "  const writePtyInputProvablyLive = (args: PtyWritePayload): boolean | Promise<boolean> => {"
       ]
+    },
+    {
+      "path": "src/main/ipc/pty/ipc/write.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "  ipcMain.handle('pty:writeInputAccepted', (event, args: unknown): boolean | Promise<boolean> => {",
+        "      : writePtyInputProvablyLive(args)"
+      ]
+    },
+    {
+      "path": "src/main/ipc/pty/register-handlers.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["  ipcMain.removeHandler('pty:writeInputAccepted')"]
     },
     {
       "path": "src/main/ipc/ssh.ts",
@@ -2244,9 +2260,17 @@
       "added": 1,
       "removed": 1
     },
-    "src/main/ipc/pty.ts": {
-      "added": 96,
+    "src/main/ipc/pty/ipc/write-input.ts": {
+      "added": 85,
       "removed": 1
+    },
+    "src/main/ipc/pty/ipc/write.ts": {
+      "added": 13,
+      "removed": 0
+    },
+    "src/main/ipc/pty/register-handlers.ts": {
+      "added": 1,
+      "removed": 0
     },
     "src/main/ipc/ssh.ts": {
       "added": 35,
@@ -2813,7 +2837,7 @@
       "removed": 1
     },
     "src/renderer/src/runtime/web-session-tabs-sync.ts": {
-      "added": 143,
+      "added": 144,
       "removed": 28
     },
     "src/renderer/src/store/slices/tabs.ts": {

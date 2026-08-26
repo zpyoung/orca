@@ -13,6 +13,7 @@ export function installPtyWriteIpcHandlers(deps: {
   const {
     writePtyInput,
     writePtyInputAccepted,
+    writePtyInputProvablyLive,
     isPtyWritePayload,
     isPtyViewportClaimPayload,
     isPtyWriteEventFromMainWindow
@@ -39,6 +40,18 @@ export function installPtyWriteIpcHandlers(deps: {
     return claimTail
       ? claimTail.then((claimed) => (claimed ? writePtyInputAccepted(args) : false))
       : writePtyInputAccepted(args)
+  })
+  // Why: the composer's acceptance path needs writePtyInput's real boolean (PTY
+  // gone, mobile lease) for local/direct-SSH writes; writeAccepted above answers
+  // a narrower "reached the local PTY" question and reports SSH as always false.
+  ipcMain.handle('pty:writeInputAccepted', (event, args: unknown): boolean | Promise<boolean> => {
+    if (!isPtyWriteEventFromMainWindow(event, mainWindow.webContents) || !isPtyWritePayload(args)) {
+      return false
+    }
+    const claimTail = hostViewportClaimTails.get(args.id)
+    return claimTail
+      ? claimTail.then((claimed) => (claimed ? writePtyInputProvablyLive(args) : false))
+      : writePtyInputProvablyLive(args)
   })
 
   ipcMain.removeAllListeners('pty:claimViewport')

@@ -4,7 +4,8 @@ import type { IPtyProvider } from '../../../providers/types'
 import { isPtyWriteUnavailableError } from '../../../providers/pty-write-unavailable-error'
 import {
   isTerminalInputTooLargeWithDeferredMeasurement,
-  iterateTerminalInputChunks
+  iterateTerminalInputChunks,
+  splitTerminalInputChunks
 } from '../../../../shared/terminal-input'
 import { ptyOwnership } from '../provider/ownership-state'
 import { tryGetProviderForPty } from '../provider/registry'
@@ -36,6 +37,7 @@ export function createPtyWriteInput(deps: {
 }): {
   writePtyInput: (args: PtyWritePayload) => boolean | Promise<boolean>
   writePtyInputAccepted: (args: PtyWritePayload) => boolean | Promise<boolean>
+  writePtyInputProvablyLive: (args: PtyWritePayload) => boolean | Promise<boolean>
   isPtyWritePayload: (value: unknown) => value is PtyWritePayload
   isPtyViewportClaimPayload: (value: unknown) => value is PtyViewportClaimPayload
   isPtyWriteEventFromMainWindow: (
@@ -123,6 +125,62 @@ export function createPtyWriteInput(deps: {
     }
   }
 
+  // Why: the ack'd send path needs per-chunk settlement, not fire-and-forget
+  // dispatch — only providers that expose writeAcknowledged (SSH) opt in; others
+  // fall back to the plain fire-and-forget writer unchanged.
+  const writePtyProviderInputAcknowledged = (
+    provider: IPtyProvider,
+    id: string,
+    data: string
+  ): boolean | Promise<boolean> => {
+    const settlementWrite = (
+      provider as { writeAcknowledged?: (ptyId: string, chunk: string) => Promise<boolean> }
+    ).writeAcknowledged
+    if (!settlementWrite) {
+      return writePtyProviderInput(provider, id, data)
+    }
+    try {
+      const tooLarge = isTerminalInputTooLargeWithDeferredMeasurement(data)
+      if (typeof tooLarge === 'boolean') {
+        return tooLarge ? false : writePtyProviderInputAcknowledgedChunks(settlementWrite, id, data)
+      }
+      return tooLarge
+        .then((result) =>
+          result ? false : writePtyProviderInputAcknowledgedChunks(settlementWrite, id, data)
+        )
+        .catch((error) => {
+          reportUnavailablePtyWrite(id, error)
+          return false
+        })
+    } catch (error) {
+      reportUnavailablePtyWrite(id, error)
+      return false
+    }
+  }
+
+  const writePtyProviderInputAcknowledgedChunks = async (
+    writeChunk: (id: string, chunk: string) => Promise<boolean>,
+    id: string,
+    data: string
+  ): Promise<boolean> => {
+    try {
+      const chunks = splitTerminalInputChunks(data)
+      if (chunks.length === 0) {
+        return await writeChunk(id, data)
+      }
+      let allSettled = true
+      for (const chunk of chunks) {
+        if (!(await writeChunk(id, chunk))) {
+          allSettled = false
+        }
+      }
+      return allSettled
+    } catch (error) {
+      reportUnavailablePtyWrite(id, error)
+      return false
+    }
+  }
+
   const isPtyWritePayload = (value: unknown): value is PtyWritePayload =>
     typeof value === 'object' &&
     value !== null &&
@@ -169,6 +227,31 @@ export function createPtyWriteInput(deps: {
     }
   }
 
+  // Why: a disposed or backpressured SSH mux can silently drop provider.write's
+  // fire-and-forget notify, so this path settles over the transport instead of
+  // trusting write()'s void return — kept separate from writePtyInput so the
+  // fire-and-forget keystroke path never gains an await.
+  const writePtyInputProvablyLive = (args: PtyWritePayload): boolean | Promise<boolean> => {
+    if (runtime?.getDriver(args.id).kind === 'mobile') {
+      return false
+    }
+    const provider = ptyOwnership.has(args.id) ? tryGetProviderForPty(args.id) : undefined
+    if (!provider) {
+      return false
+    }
+    try {
+      const now = performance.now()
+      lastInputAtByPty.set(args.id, now)
+      interactiveOutputCharsByPty.set(args.id, 0)
+      if (visibleRendererPtys.has(args.id)) {
+        clearHiddenRendererResizeOutput(args.id)
+      }
+      return writePtyProviderInputAcknowledged(provider, args.id, args.data)
+    } catch {
+      return false
+    }
+  }
+
   const writePtyInputAccepted = (args: PtyWritePayload): boolean | Promise<boolean> => {
     if (runtime?.getDriver(args.id).kind === 'mobile') {
       return false
@@ -197,6 +280,7 @@ export function createPtyWriteInput(deps: {
   return {
     writePtyInput,
     writePtyInputAccepted,
+    writePtyInputProvablyLive,
     isPtyWritePayload,
     isPtyViewportClaimPayload,
     isPtyWriteEventFromMainWindow
