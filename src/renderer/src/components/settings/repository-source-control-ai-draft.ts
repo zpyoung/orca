@@ -7,7 +7,7 @@ import {
   type SourceControlActionId
 } from '../../../../shared/source-control-ai-actions'
 import type { RepoSourceControlAiOverrides } from '../../../../shared/source-control-ai-types'
-import type { GlobalSettings } from '../../../../shared/types'
+import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import {
   readActionRecipeTextDraft,
   type ActionRecipeTextDraft
@@ -25,7 +25,7 @@ export function hasOwnActionOverride(
   overrides: RepoSourceControlAiOverrides['actionOverrides'],
   actionId: SourceControlActionId
 ): boolean {
-  return Object.prototype.hasOwnProperty.call(overrides ?? {}, actionId)
+  return Object.hasOwn(overrides ?? {}, actionId)
 }
 
 export function triStateValue(value: boolean | null | undefined): 'inherit' | 'on' | 'off' {
@@ -191,7 +191,7 @@ export function withRepoAiActionRecipeText(
       ...currentRecipe,
       commandInputTemplate: text.commandInputTemplate,
       agentArgs: text.agentArgs,
-      ...(Object.prototype.hasOwnProperty.call(text, 'launchOptions')
+      ...(Object.hasOwn(text, 'launchOptions')
         ? { launchOptions: text.launchOptions }
         : {})
     })
@@ -220,7 +220,7 @@ export function composeDisplayRepoAi(
           ...currentRecipe,
           commandInputTemplate: draft.commandInputTemplate,
           agentArgs: draft.agentArgs,
-          ...(Object.prototype.hasOwnProperty.call(draft, 'launchOptions')
+          ...(Object.hasOwn(draft, 'launchOptions')
             ? { launchOptions: draft.launchOptions }
             : {})
         }

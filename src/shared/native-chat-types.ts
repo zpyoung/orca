@@ -95,6 +95,20 @@ export type NativeChatTurnLifecycle = {
   timestamp: number | null
 }
 
+/** The model and effort an agent recorded for itself in its own session log.
+ *  Provider-authored evidence about a running session, written per turn — so it
+ *  outlives the scrollback and reflects a switch made outside Orca. */
+export type NativeChatSessionOptionObservation = {
+  /** The provider's own model id, verbatim. Mapping to a catalog id needs the
+   *  host's discovered model list, which only the renderer holds. */
+  model?: string
+  /** The provider's own effort id, which both supported agents already spell
+   *  the way the catalog does. */
+  effort?: string
+  /** Provider timestamp; null only when the record omitted one. */
+  observedAt: number | null
+}
+
 export const NATIVE_CHAT_SESSION_STATUSES = [
   'loading',
   'ready',

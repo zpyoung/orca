@@ -1,17 +1,24 @@
 /* eslint-disable max-lines -- Why: split-tab group state updates layout, focus, and tab membership atomically in one slice to avoid split-brain. */
 import type { StateCreator } from 'zustand'
 import type { AppState } from '../types'
+import { toVisibleTabType } from '../../../../shared/tab-types'
 import type {
   Tab,
   TabContentType,
   TabGroup,
   TabGroupLayoutNode,
-  TerminalTab,
-  TuiAgent,
-  WorkspaceSessionState,
   WorkspaceVisibleTabType
-} from '../../../../shared/types'
+} from '../../../../shared/tab-types'
+import type { TerminalTab } from '../../../../shared/terminal-tab-types'
+import type { TuiAgent } from '../../../../shared/tui-agent'
+import type { WorkspaceSessionState } from '../../../../shared/workspace-session-state-types'
 import { emitNativeChatToggled } from '@/lib/native-chat-telemetry'
+import {
+  createTabTerminalDockActions,
+  removeTabPaneKeysFromPendingMutations,
+  TAB_TERMINAL_DOCK_INITIAL_STATE,
+  type TabTerminalDockSlice
+} from './fork-terminal-dock/tab-terminal-dock-state'
 import {
   dedupeTabOrder,
   ensureGroup,
@@ -58,7 +65,7 @@ function replaceWorkspaceRecordKeys<T>(
   }
 }
 
-export type TabsSlice = {
+export type TabsSlice = TabTerminalDockSlice & {
   unifiedTabsByWorktree: Record<string, Tab[]>
   // Why: id of the tab whose inline title editor should open; shortcut (tab.rename) sets it, the tab clears it on consume.
   renamingTabId: string | null
@@ -413,13 +420,6 @@ function collapseGroupLayout(
       [worktreeId]: siblingId ?? fallbackGroupId ?? activeGroupIdByWorktree[worktreeId]
     }
   }
-}
-
-function toVisibleTabType(contentType: TabContentType): WorkspaceVisibleTabType {
-  if (contentType === 'browser' || contentType === 'terminal' || contentType === 'simulator') {
-    return contentType
-  }
-  return 'editor'
 }
 
 function deriveActiveSurfaceForWorktree(
@@ -832,6 +832,7 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
   groupsByWorktree: {},
   activeGroupIdByWorktree: {},
   layoutByWorktree: {},
+  ...TAB_TERMINAL_DOCK_INITIAL_STATE,
 
   createUnifiedTab: (worktreeId, contentType, init) => {
     const id = init?.id ?? createBrowserUuid()
@@ -860,6 +861,8 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
         }
       }
 
+      const shouldActivate = init?.activate ?? true
+      const createdAt = Date.now()
       created = {
         id,
         entityId: init?.entityId ?? id,
@@ -875,13 +878,14 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
         customLabel: init?.customLabel ?? null,
         color: init?.color ?? null,
         sortOrder: nextOrder.length,
-        createdAt: Date.now(),
+        createdAt,
+        // Why: creating an active tab is a focus event; Cmd+J recency reads lastFocusedAt.
+        ...(shouldActivate ? { lastFocusedAt: createdAt } : {}),
         isPreview: init?.isPreview,
         isPinned: init?.isPinned
       }
 
       nextOrder = dedupeTabOrder([...nextOrder, created.id])
-      const shouldActivate = init?.activate ?? true
       const nextActiveTabId = shouldActivate ? created.id : (group.activeTabId ?? created.id)
       const sanitizedRecent = sanitizeRecentTabIds(group.recentTabIds, nextOrder)
       // Why: automation-created browser tabs must paint without stealing the visible group selection from the user's current tab.
@@ -931,6 +935,7 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
       const currentLayout =
         state.layoutByWorktree[worktreeId] ??
         ({ type: 'leaf', groupId: target.sourceGroupId } as const)
+      const createdAt = Date.now()
       const createdTab: Tab = {
         id,
         entityId: init?.entityId ?? id,
@@ -946,7 +951,9 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
         customLabel: init?.customLabel ?? null,
         color: init?.color ?? null,
         sortOrder: 0,
-        createdAt: Date.now(),
+        createdAt,
+        // Why: creating an active tab is a focus event; Cmd+J recency reads lastFocusedAt.
+        ...(shouldActivate ? { lastFocusedAt: createdAt } : {}),
         isPreview: init?.isPreview,
         isPinned: init?.isPinned
       }
@@ -1065,14 +1072,18 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
             })()
           : state.unreadTerminalTabs
       return {
-        unifiedTabsByWorktree: opts?.preservePreview
-          ? state.unifiedTabsByWorktree
-          : {
-              ...state.unifiedTabsByWorktree,
-              [worktreeId]: (state.unifiedTabsByWorktree[worktreeId] ?? []).map((item) =>
-                item.id === tabId ? { ...item, isPreview: false } : item
-              )
-            },
+        unifiedTabsByWorktree: {
+          ...state.unifiedTabsByWorktree,
+          [worktreeId]: (state.unifiedTabsByWorktree[worktreeId] ?? []).map((item) =>
+            item.id === tabId
+              ? {
+                  ...item,
+                  isPreview: opts?.preservePreview ? item.isPreview : false,
+                  lastFocusedAt: Date.now()
+                }
+              : item
+          )
+        },
         groupsByWorktree: {
           ...state.groupsByWorktree,
           [worktreeId]: (state.groupsByWorktree[worktreeId] ?? []).map((group) =>
@@ -1147,6 +1158,12 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
         nextUnreadTerminalTabs = { ...current.unreadTerminalTabs }
         delete nextUnreadTerminalTabs[terminalEntityId]
       }
+      // Why: pending-mutation timestamps live outside the closed tab's own record, so drop
+      // its pane keys here or they linger in the store until they happen to age out.
+      const nextTerminalDockPendingMutationsByPaneKey = removeTabPaneKeysFromPendingMutations(
+        current.terminalDockPendingMutationsByPaneKey,
+        tabId
+      )
       let nextGroups = (current.groupsByWorktree[worktreeId] ?? []).map((candidate) =>
         candidate.id === group.id
           ? {
@@ -1188,6 +1205,10 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
         // Why: skip writing unreadTerminalTabs when the reference is unchanged, avoiding a no-op alloc that re-runs full-state selectors.
         ...(nextUnreadTerminalTabs !== current.unreadTerminalTabs
           ? { unreadTerminalTabs: nextUnreadTerminalTabs }
+          : {}),
+        ...(nextTerminalDockPendingMutationsByPaneKey !==
+        current.terminalDockPendingMutationsByPaneKey
+          ? { terminalDockPendingMutationsByPaneKey: nextTerminalDockPendingMutationsByPaneKey }
           : {}),
         // Why: closing the last tab can leave the worktree selected but render-empty, so write the landing-state fallback directly.
         ...(shouldDeactivateWorktree
@@ -1320,6 +1341,8 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
       mirrorTabViewModeToHost(get(), tabId, committed.to)
     }
   },
+
+  ...createTabTerminalDockActions(set, get),
 
   setRenamingTabId: (tabId) => {
     set({ renamingTabId: tabId })

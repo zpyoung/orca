@@ -28,6 +28,8 @@ const transientDownloadErrorCodes = new Set([
   'EAI_AGAIN',
   'ECONNREFUSED',
   'ECONNRESET',
+  // GitHub release CDN can refuse HTTP/2 streams under load; retry like socket resets.
+  'ERR_HTTP2_STREAM_ERROR',
   'ENETDOWN',
   'ENETRESET',
   'ENETUNREACH',

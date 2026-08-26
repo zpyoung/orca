@@ -5,7 +5,7 @@ import { useState } from 'react'
 import type * as ReactModule from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentLaunchOverrides } from '../../../../shared/agent-launch-overrides'
-import type { TuiAgent } from '../../../../shared/types'
+import type { TuiAgent } from '../../../../shared/tui-agent'
 
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string, values?: Record<string, string | number>) =>

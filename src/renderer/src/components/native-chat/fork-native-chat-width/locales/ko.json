@@ -1,0 +1,29 @@
+{
+  "auto": {
+    "components": {
+      "settings": {
+        "ExperimentalPane": {
+          "nativeChat": {
+            "widthTitle": "채팅 너비",
+            "widthCopy": "모든 채팅 창의 읽기 열 너비를 설정합니다.",
+            "widthLabel": "채팅 너비"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "native-chat": {
+      "width": {
+        "tier": {
+          "narrow": "좁게",
+          "comfortable": "편안하게",
+          "wide": "넓게",
+          "full": "전체"
+        },
+        "menuLabel": "채팅 너비",
+        "menuTooltip": "채팅 너비(모든 채팅 창에 적용됨)"
+      }
+    }
+  }
+}

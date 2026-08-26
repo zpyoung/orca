@@ -1,5 +1,5 @@
 import { TUI_AGENT_CONFIG } from '../../../shared/tui-agent-config'
-import type { TuiAgent } from '../../../shared/types'
+import type { TuiAgent } from '../../../shared/tui-agent'
 
 /** Mark a background agent workspace trusted when its provider supports preflight trust. */
 export async function markAgentBackgroundWorkspaceTrusted(args: {

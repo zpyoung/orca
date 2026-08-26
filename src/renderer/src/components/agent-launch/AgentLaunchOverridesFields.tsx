@@ -15,7 +15,7 @@ import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import type { AgentLaunchOverrides } from '../../../../shared/agent-launch-overrides'
 import type { SessionOptionValue } from '../../../../shared/native-chat-session-options'
-import type { TuiAgent } from '../../../../shared/types'
+import type { TuiAgent } from '../../../../shared/tui-agent'
 import {
   buildAgentLaunchOverridesFieldState,
   type AgentLaunchFieldEntry,

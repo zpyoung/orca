@@ -11,7 +11,8 @@ import {
   resolveStartupShell,
   type AgentStartupShell
 } from '../../../shared/tui-agent-startup-shell'
-import type { GlobalSettings, TuiAgent } from '../../../shared/types'
+import type { GlobalSettings } from '../../../shared/global-settings-types'
+import type { TuiAgent } from '../../../shared/tui-agent'
 import { resolveLocalWindowsAgentStartupShell } from '../../../shared/windows-terminal-shell'
 
 type LaunchSettings = Pick<

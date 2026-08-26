@@ -7,6 +7,7 @@ import {
   type PasteTerminalTextDetail
 } from '@/constants/terminal'
 import type { PaneManager } from '@/lib/pane-manager/pane-manager'
+import type { PaneFocusOwnership } from './pane-helpers'
 import type { PtyTransport } from './pty-transport'
 import type { IDisposable } from '@xterm/xterm'
 import { handleTerminalFileDrop } from './terminal-drop-handler'
@@ -27,7 +28,7 @@ import {
   setRendererPtyVisibilityClaim
 } from './pty-renderer-delivery-claims'
 
-type UseTerminalPaneGlobalEffectsArgs = {
+type UseTerminalPaneGlobalEffectsArgs = Partial<PaneFocusOwnership> & {
   tabId: string
   worktreeId: string
   cwd?: string
@@ -62,6 +63,7 @@ function reportRendererPtyVisibility(
 
 export function useTerminalPaneGlobalEffects({
   tabId,
+  paneDockOwnsFocus,
   worktreeId,
   cwd,
   isActive,
@@ -120,6 +122,8 @@ export function useTerminalPaneGlobalEffects({
     containerRef
   })
   useTerminalWindowWakeRecovery({
+    tabId,
+    paneDockOwnsFocus,
     isVisible: rendererVisible,
     managerRef,
     isActiveRef,
@@ -155,6 +159,8 @@ export function useTerminalPaneGlobalEffects({
         (wasVisible || hiddenReasonRef.current === 'tab')
       resumeTerminalVisibility({
         manager,
+        tabId,
+        paneDockOwnsFocus,
         isActive,
         wasVisible,
         shouldUseLightTabResume,
@@ -168,18 +174,18 @@ export function useTerminalPaneGlobalEffects({
       hiddenReasonRef.current = null
       applyPendingFollowOutputRequests()
       return
-    } else {
-      const hiddenState = hideTerminalVisibility({
-        manager,
-        wasVisible,
-        wasWorktreeActive,
-        isWorktreeActive,
-        hasCompletedVisibleResume: hasCompletedVisibleResumeRef.current,
-        captureViewportPositions
-      })
-      renderingSuspendedByVisibilityRef.current = hiddenState.renderingSuspended
-      hiddenReasonRef.current = hiddenState.hiddenReason
     }
+    const hiddenState = hideTerminalVisibility({
+      manager,
+      wasVisible,
+      wasWorktreeActive,
+      isWorktreeActive,
+      hasCompletedVisibleResume: hasCompletedVisibleResumeRef.current,
+      captureViewportPositions
+    })
+    renderingSuspendedByVisibilityRef.current = hiddenState.renderingSuspended
+    hiddenReasonRef.current = hiddenState.hiddenReason
+
     wasVisibleRef.current = false
     wasWorktreeActiveRef.current = isWorktreeActive
     // eslint-disable-next-line react-hooks/exhaustive-deps

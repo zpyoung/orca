@@ -1,7 +1,7 @@
 import { getAgentCatalog } from '@/lib/agent-catalog'
 import type { resolveSourceControlLaunchAgentScope } from '@/lib/source-control-launch-agent-selection'
 import { isTuiAgentEnabled } from '../../../../shared/tui-agent-selection'
-import type { TuiAgent } from '../../../../shared/types'
+import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { SourceControlAiWriteTarget } from '../../../../shared/source-control-ai-recipe-save'
 import { translate } from '@/i18n/i18n'
 import type { SourceControlAgentActionDeliveryPlanState } from './SourceControlAgentActionDialogForm'

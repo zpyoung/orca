@@ -51,6 +51,7 @@ function createPane(): ManagedPaneInternal {
     } as never,
     container: {} as never,
     xtermContainer: {} as never,
+    dockContainer: {} as never,
     linkTooltip: {} as never,
     terminalGpuAcceleration: 'auto',
     gpuRenderingEnabled: true,
@@ -430,6 +431,19 @@ describe('attachLigatures', () => {
     expect(pane.terminal.refresh).toHaveBeenCalledWith(0, 23)
     expect(pane.ligaturesAddon).not.toBeNull()
   })
+
+  it('defers a retained WebGL rebuild while hidden', () => {
+    const pane = createPane()
+    const retainedAddon = { dispose: vi.fn() } as never
+    pane.webglAddon = retainedAddon
+    pane.webglAttachmentDeferred = true
+
+    attachLigatures(pane)
+
+    expect(pane.webglAddon).toBe(retainedAddon)
+    expect(pane.webglRebuildDeferred).toBe(true)
+    expect(pane.terminal.refresh).not.toHaveBeenCalled()
+  })
 })
 
 describe('openTerminal — addon and provider wiring', () => {
@@ -478,6 +492,7 @@ describe('openTerminal — addon and provider wiring', () => {
       addEventListener: vi.fn(),
       removeEventListener: vi.fn()
     } as unknown as HTMLDivElement
+    const fakeDockContainer = {} as unknown as HTMLDivElement
     const fakeTooltip = {} as unknown as HTMLDivElement
     const fakeTerminalElement = {
       appendChild: vi.fn(),
@@ -545,6 +560,7 @@ describe('openTerminal — addon and provider wiring', () => {
       terminal,
       container: fakePaneContainer,
       xtermContainer: fakeXtermContainer,
+      dockContainer: fakeDockContainer,
       linkTooltip: fakeTooltip,
       terminalGpuAcceleration: 'off',
       gpuRenderingEnabled: false,

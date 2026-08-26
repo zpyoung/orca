@@ -1,0 +1,29 @@
+{
+  "auto": {
+    "components": {
+      "settings": {
+        "ExperimentalPane": {
+          "nativeChat": {
+            "widthTitle": "Chat width",
+            "widthCopy": "Set the reading column width for every chat pane.",
+            "widthLabel": "Chat width"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "native-chat": {
+      "width": {
+        "tier": {
+          "narrow": "Narrow",
+          "comfortable": "Comfortable",
+          "wide": "Wide",
+          "full": "Full"
+        },
+        "menuLabel": "Chat width",
+        "menuTooltip": "Chat width (applies to all chat panes)"
+      }
+    }
+  }
+}

@@ -7,7 +7,8 @@ import {
   getTuiAgentDefaultArgs,
   resolveTuiAgentLaunchArgs
 } from '../../../../shared/tui-agent-launch-defaults'
-import type { GlobalSettings, TuiAgent } from '../../../../shared/types'
+import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import type { TuiAgent } from '../../../../shared/tui-agent'
 
 /** Render launch overrides for a source-control action recipe draft. */
 export function SourceControlAgentLaunchOverridesFields(props: {

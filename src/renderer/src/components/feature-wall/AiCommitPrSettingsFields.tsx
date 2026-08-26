@@ -11,7 +11,7 @@ import {
   SOURCE_CONTROL_TEXT_ACTION_IDS,
   type SourceControlTextActionId
 } from '../../../../shared/source-control-ai-actions'
-import type { CommitMessageAiSettings } from '../../../../shared/types'
+import type { CommitMessageAiSettings } from '../../../../shared/commit-message-ai-types'
 import { AgentIcon } from '@/lib/agent-catalog'
 import { cn } from '@/lib/utils'
 import { Input } from '../ui/input'

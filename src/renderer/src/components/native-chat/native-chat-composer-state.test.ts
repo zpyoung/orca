@@ -7,12 +7,8 @@ import {
   classifyNativeChatSend,
   deriveComposerAutocomplete,
   editReplacesTriggerToken,
-  EMPTY_HISTORY,
   filterSlashCommands,
   isSlashCommandDraft,
-  pushHistory,
-  recallNext,
-  recallPrevious,
   slashCommandDispatchText,
   type SlashCommandSuggestion
 } from './native-chat-composer-state'
@@ -37,7 +33,6 @@ function skill(overrides: Partial<DiscoveredSkill>): DiscoveredSkill {
     directoryPath: '/repo/.agents/skills/typescript',
     skillFilePath: '/repo/.agents/skills/typescript/SKILL.md',
     installed: true,
-    fileCount: 1,
     updatedAt: null,
     ...overrides
   }
@@ -67,8 +62,48 @@ describe('deriveComposerAutocomplete — slash', () => {
     expect(deriveComposerAutocomplete('/clear now', 10, COMMANDS).mode).toBe('none')
   })
 
-  it('does not fire slash mode mid-line', () => {
+  it('offers skills but not commands for a mid-draft `/`', () => {
+    const profile = getNativeChatAgentProfile('claude')
+    const skills = [skill({ name: 'browser' })]
+    const result = deriveComposerAutocomplete('please run /bro', 15, COMMANDS, skills, profile)
+    expect(result.mode).toBe('slash')
+    if (result.mode !== 'slash') {
+      return
+    }
+    expect(result.query).toBe('bro')
+    expect(result.items.map((item) => item.kind)).toEqual(['skill'])
+    expect(result.commandsEnabled).toBe(false)
+    expect(result.skillsEnabled).toBe(true)
+    expect(result.grouped).toBe(false)
+    expect(result.triggerKey).toBe('/:11')
+  })
+
+  it('treats a leading space as mid-draft, since the TUI sees prose', () => {
+    const profile = getNativeChatAgentProfile('claude')
+    const result = deriveComposerAutocomplete(' /cl', 4, COMMANDS, [skill({})], profile)
+    expect(result.mode).toBe('slash')
+    if (result.mode !== 'slash') {
+      return
+    }
+    expect(result.commandsEnabled).toBe(false)
+    expect(result.triggerKey).toBe('/:1')
+  })
+
+  it('stays closed for a mid-draft `/` when the agent has no slash skills', () => {
     expect(deriveComposerAutocomplete('hi /clear', 9, COMMANDS).mode).toBe('none')
+    const codex = getNativeChatAgentProfile('codex')
+    expect(deriveComposerAutocomplete('hi /cl', 6, COMMANDS, [skill({})], codex).mode).toBe('none')
+  })
+
+  it('keys dismissal to the trigger position, so a later `/` reopens', () => {
+    const profile = getNativeChatAgentProfile('claude')
+    const skills = [skill({ name: 'browser' })]
+    expect(
+      deriveComposerAutocomplete('/', 1, COMMANDS, skills, profile, undefined, '/:0').mode
+    ).toBe('none')
+    expect(
+      deriveComposerAutocomplete('run /bro', 8, COMMANDS, skills, profile, undefined, '/:0').mode
+    ).toBe('slash')
   })
 })
 
@@ -132,50 +167,6 @@ describe('isSlashCommandDraft', () => {
     expect(isSlashCommandDraft('/clear')).toBe(true)
     expect(isSlashCommandDraft('  /compact')).toBe(true)
     expect(isSlashCommandDraft('please run /clear')).toBe(false)
-  })
-})
-
-describe('history recall', () => {
-  it('up-arrow on empty composer recalls the last sent input', () => {
-    const history = pushHistory(EMPTY_HISTORY, 'first')
-    const recall = recallPrevious(history)
-    expect(recall.draft).toBe('first')
-    expect(recall.history.index).toBe(0)
-  })
-
-  it('walks backward and clamps at the oldest entry', () => {
-    let history = pushHistory(EMPTY_HISTORY, 'a')
-    history = pushHistory(history, 'b')
-    const first = recallPrevious(history)
-    expect(first.draft).toBe('b')
-    const second = recallPrevious(first.history)
-    expect(second.draft).toBe('a')
-    const third = recallPrevious(second.history)
-    expect(third.draft).toBe('a') // clamped
-  })
-
-  it('down-arrow walks forward and returns to a live empty draft', () => {
-    let history = pushHistory(EMPTY_HISTORY, 'a')
-    history = pushHistory(history, 'b')
-    const up1 = recallPrevious(history) // 'b'
-    const up2 = recallPrevious(up1.history) // 'a'
-    const down = recallNext(up2.history) // 'b'
-    expect(down.draft).toBe('b')
-    const back = recallNext(down.history) // live
-    expect(back.draft).toBe('')
-    expect(back.history.index).toBeNull()
-  })
-
-  it('does not record blank sends or immediate duplicates', () => {
-    let history = pushHistory(EMPTY_HISTORY, '   ')
-    expect(history.entries).toHaveLength(0)
-    history = pushHistory(history, 'x')
-    history = pushHistory(history, 'x')
-    expect(history.entries).toHaveLength(1)
-  })
-
-  it('recall on empty history is a no-op', () => {
-    expect(recallPrevious(EMPTY_HISTORY).draft).toBeNull()
   })
 })
 
@@ -278,6 +269,92 @@ describe('native skill and command picker', () => {
     ])
   })
 
+  it('splits same-named plugin skills into one namespaced row per plugin', () => {
+    const collidingPlugins = [
+      skill({
+        name: 'render',
+        pluginName: 'quirk',
+        sourceKind: 'plugin',
+        skillFilePath: '/plugins/quirk/skills/render/SKILL.md'
+      }),
+      skill({
+        name: 'render',
+        pluginName: 'warp',
+        sourceKind: 'plugin',
+        skillFilePath: '/plugins/warp/skills/render/SKILL.md'
+      })
+    ]
+    const items = buildNativeChatPickerItems([], collidingPlugins, '', '/', true)
+    expect(items.map((item) => item.name)).toEqual(['quirk:render', 'warp:render'])
+    expect(items.map((item) => (item.kind === 'skill' ? item.pluginName : null))).toEqual([
+      'quirk',
+      'warp'
+    ])
+    expect(applyPickerSuggestion('/ren', 4, items[0], '/').draft).toBe('/quirk:render ')
+  })
+
+  it('merges same-named plugin skills for an agent that takes a bare skill name', () => {
+    const collidingPlugins = [
+      skill({
+        name: 'render',
+        pluginName: 'quirk',
+        sourceKind: 'plugin',
+        skillFilePath: '/plugins/quirk/skills/render/SKILL.md'
+      }),
+      skill({
+        name: 'render',
+        pluginName: 'warp',
+        sourceKind: 'plugin',
+        skillFilePath: '/plugins/warp/skills/render/SKILL.md'
+      })
+    ]
+    const items = buildNativeChatPickerItems([], collidingPlugins, '', '$')
+    expect(items.map((item) => item.name)).toEqual(['render'])
+    expect(items[0].kind === 'skill' ? items[0].pluginName : 'set').toBeUndefined()
+    expect(items[0].kind === 'skill' ? items[0].sources.map((s) => s.pluginName) : []).toEqual([
+      'quirk',
+      'warp'
+    ])
+  })
+
+  it('namespaces a plugin skill past a same-named command instead of colliding', () => {
+    const items = buildNativeChatPickerItems(
+      COMMANDS,
+      [
+        skill({
+          name: 'clear',
+          pluginName: 'quirk',
+          sourceKind: 'plugin',
+          skillFilePath: '/plugins/quirk/skills/clear/SKILL.md'
+        })
+      ],
+      'clear',
+      '/',
+      true
+    )
+    expect(items.map((item) => item.name)).toEqual(['clear', 'quirk:clear'])
+    expect(items[0].kind === 'command' ? items[0].skillCollision : true).toBe(false)
+  })
+
+  it('falls back to the bare name when a plugin name is not token safe', () => {
+    const items = buildNativeChatPickerItems(
+      [],
+      [
+        skill({
+          name: 'render',
+          pluginName: 'two words',
+          sourceKind: 'plugin',
+          skillFilePath: '/plugins/spaced/skills/render/SKILL.md'
+        })
+      ],
+      '',
+      '/',
+      true
+    )
+    expect(items.map((item) => item.name)).toEqual(['render'])
+    expect(items[0].kind === 'skill' ? items[0].pluginName : null).toBe('two words')
+  })
+
   it('keeps a long token-safe name intact for insertion instead of truncating it', () => {
     const longName = `skill-${'x'.repeat(100)}`
     const items = buildNativeChatPickerItems(
@@ -332,6 +409,18 @@ describe('native skill and command picker', () => {
     )
     expect(result.draft).toBe('/browser  trailing')
     expect(result.caret).toBe('/browser '.length)
+  })
+
+  it('replaces a mid-draft /token without disturbing the text before it', () => {
+    const result = applyPickerSuggestion(
+      'please run /bro now',
+      15,
+      { kind: 'skill', id: 'skill:browser', name: 'browser', description: null, sources: [] },
+      '/'
+    )
+    expect(result.draft).toBe('please run /browser  now')
+    expect(result.caret).toBe('please run /browser '.length)
+    expect(result.insertedToken).toBe('/browser')
   })
 
   it('classifies sends only from the origin tag and exact command catalog', () => {

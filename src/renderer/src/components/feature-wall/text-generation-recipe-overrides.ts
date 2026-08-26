@@ -4,7 +4,7 @@ import {
   type SourceControlTextActionId
 } from '../../../../shared/source-control-ai-actions'
 import { resolveSourceControlActionRecipe } from '../../../../shared/source-control-ai'
-import type { GlobalSettings } from '../../../../shared/types'
+import type { GlobalSettings } from '../../../../shared/global-settings-types'
 
 export type TextGenerationRecipeOverrides = {
   modelOverriddenBy: SourceControlTextActionId[]

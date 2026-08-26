@@ -1,4 +1,5 @@
 /* eslint-disable max-lines */
+import { toast } from 'sonner'
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import type {
   BrowserTabCreateResult,
@@ -20,6 +21,7 @@ import type {
 } from '../../../shared/agent-session-resume'
 import {
   AGENT_SESSION_OMP_RESUME_PATH_RUNTIME_CAPABILITY,
+  BROWSER_TAB_CREATE_KNOWN_ID_RUNTIME_CAPABILITY,
   type RuntimeCapability
 } from '../../../shared/protocol-version'
 import type {
@@ -28,7 +30,8 @@ import type {
   RuntimeCreateAgentSessionResult,
   RuntimeEnsureAgentSessionResult
 } from '../../../shared/agent-session-host-authority'
-import type { TerminalPaneLayoutNode, TuiAgent } from '../../../shared/types'
+import type { TerminalPaneLayoutNode } from '../../../shared/terminal-tab-types'
+import type { TuiAgent } from '../../../shared/tui-agent'
 import { createBrowserUuid } from '../lib/browser-uuid'
 import { getRuntimeEnvironmentIdForWorktree } from '../lib/worktree-runtime-owner'
 import { useAppStore } from '../store'
@@ -69,7 +72,6 @@ import { translate } from '../i18n/i18n'
 import { getRuntimeEnvironmentRevision } from './runtime-environment-revision'
 import { parsePaneKey } from '../../../shared/stable-pane-id'
 import { toRuntimeExecutionHostId } from '../../../shared/execution-host'
-import { assertRuntimeManagedBrowserCreationAvailable } from '../lib/client-creation-action-policy'
 import {
   claimWebSessionBrowserPlacementGroupCleanup,
   forgetWebSessionBrowserPlacement,
@@ -78,6 +80,7 @@ import {
   recordWebSessionBrowserPlacement,
   releaseWebSessionBrowserPlacementGroup
 } from './web-session-browser-placement'
+import { assertRuntimeManagedBrowserCreationAvailable } from '../lib/client-creation-action-policy'
 import { hasMaterializedWebRuntimeBrowserPage } from './web-runtime-browser-materialization'
 import {
   pauseAfterE2eWebRuntimeBrowserCreate,
@@ -468,6 +471,8 @@ export async function createWebRuntimeSessionBrowserTab(args: {
   clientTargetGroupId?: string
   clientTargetGroupCreated?: boolean
   focusOnCreate?: boolean
+  /** Wait until a renderer-backed host can publish the new page in its session snapshot. */
+  waitForRegistration?: boolean
   selectWorktree?: boolean
   stagedTitle?: string
   stagedFocusAddressBar?: boolean
@@ -485,6 +490,10 @@ export async function createWebRuntimeSessionBrowserTab(args: {
   const shouldFocusOnCreate = args.focusOnCreate !== false
   const shouldSelectWorktree = args.selectWorktree !== false
   const provisionalPageId = createBrowserUuid()
+  const hostSupportsKnownPageId = useAppStore
+    .getState()
+    .runtimeStatusByEnvironmentId?.get(environmentId)
+    ?.status?.capabilities?.includes(BROWSER_TAB_CREATE_KNOWN_ID_RUNTIME_CAPABILITY)
   let unsubscribeFocusGuard = (): void => {}
   let guardedPageId = provisionalPageId
   let createdPageId: string | null = null
@@ -522,11 +531,15 @@ export async function createWebRuntimeSessionBrowserTab(args: {
         if (
           state.activeBrowserTabIdByWorktree === previousState.activeBrowserTabIdByWorktree &&
           state.activeFileIdByWorktree === previousState.activeFileIdByWorktree &&
+          // Why: resolveWebSessionVisibleTabId now reads group state, so a group-only focus move
+          // must re-evaluate it.
+          state.activeGroupIdByWorktree === previousState.activeGroupIdByWorktree &&
           state.activeTabIdByWorktree === previousState.activeTabIdByWorktree &&
           state.activeTabType === previousState.activeTabType &&
           state.activeTabTypeByWorktree === previousState.activeTabTypeByWorktree &&
           state.activeWorktreeId === previousState.activeWorktreeId &&
           state.activeWorkspaceExecutionHostId === previousState.activeWorkspaceExecutionHostId &&
+          state.groupsByWorktree === previousState.groupsByWorktree &&
           state.unifiedTabsByWorktree === previousState.unifiedTabsByWorktree
         ) {
           return
@@ -543,23 +556,44 @@ export async function createWebRuntimeSessionBrowserTab(args: {
       })
     }
     createAttempted = true
+    const navigateAfterCreate =
+      args.waitForRegistration === true && args.url && args.url !== 'about:blank'
     const created = unwrapRuntimeRpcResult(
       (await callEnvironment({
         method: 'browser.tabCreate',
         params: {
           worktree: toRuntimeWorktreeSelector(args.worktreeId),
-          url: args.url,
+          url: navigateAfterCreate ? undefined : args.url,
+          ...(hostSupportsKnownPageId ? { page: provisionalPageId } : {}),
           profileId: args.profileId ?? undefined,
           activate: shouldFocusOnCreate,
           // Why: place the new browser in the clicked split group so the host snapshot is authoritative for it (no left-snap).
           ...(args.targetGroupId ? { targetGroupId: args.targetGroupId } : {}),
           // Why: web clients need the local tab now; waiting for host webview registration makes the workspace appear to close.
-          waitForRegistration: false
+          waitForRegistration: args.waitForRegistration ?? false
         },
         timeoutMs: 15_000
       })) as RuntimeRpcResponse<BrowserTabCreateResult>
     )
     createdPageId = created.browserPageId
+    if (navigateAfterCreate) {
+      void callEnvironment({
+        method: 'browser.goto',
+        params: {
+          worktree: toRuntimeWorktreeSelector(args.worktreeId),
+          page: created.browserPageId,
+          url: args.url
+        },
+        timeoutMs: 15_000
+      })
+        .then((response) => unwrapRuntimeRpcResult(response))
+        .catch((error) => {
+          console.warn(
+            '[web-runtime-session] created browser tab navigation failed:',
+            error instanceof Error ? error.message : String(error)
+          )
+        })
+    }
     await pauseAfterE2eWebRuntimeBrowserCreate(created.browserPageId)
     if (created.browserPageId !== provisionalPageId) {
       moveWebSessionBrowserPlacement({
@@ -638,7 +672,11 @@ export async function createWebRuntimeSessionBrowserTab(args: {
   } catch (error) {
     unsubscribeFocusGuard()
     let recoveryError: unknown = null
-    const createOutcomeUnknown = !createdPageId && !isDefinitiveBrowserCreateFailure(error)
+    const createFailureDefinitive = isDefinitiveBrowserCreateFailure(error)
+    const cleanupPageId =
+      createdPageId ??
+      (!createFailureDefinitive && hostSupportsKnownPageId ? provisionalPageId : null)
+    const createOutcomeUnknown = !cleanupPageId && !createFailureDefinitive
     const ownsClientGroupCleanup = args.clientTargetGroupId
       ? releaseWebSessionBrowserPlacementGroup({
           environmentId,
@@ -655,14 +693,14 @@ export async function createWebRuntimeSessionBrowserTab(args: {
         remotePageId: guardedPageId
       })
     }
-    if (createdPageId) {
+    if (cleanupPageId) {
       try {
         const closeResult = unwrapRuntimeRpcResult(
           (await callEnvironment({
             method: 'browser.tabClose',
             params: {
               worktree: toRuntimeWorktreeSelector(args.worktreeId),
-              page: createdPageId
+              page: cleanupPageId
             },
             timeoutMs: 15_000
           })) as RuntimeRpcResponse<{ closed: boolean }>
@@ -680,17 +718,25 @@ export async function createWebRuntimeSessionBrowserTab(args: {
             useAppStore.getState(),
             environmentId,
             args.worktreeId,
-            createdPageId
+            cleanupPageId
           )
         ) {
           throw new Error('The closed browser tab remained materialized in the client.')
         }
       } catch (cleanupError) {
-        recoveryError = cleanupError
-        console.warn(
-          '[web-runtime-session] failed to clean up unreconciled browser tab:',
-          cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
-        )
+        if (
+          !createdPageId &&
+          hostSupportsKnownPageId &&
+          hasRuntimeRpcErrorCode(cleanupError, 'browser_tab_not_found')
+        ) {
+          recoveryError = null
+        } else {
+          recoveryError = cleanupError
+          console.warn(
+            '[web-runtime-session] failed to clean up unreconciled browser tab:',
+            cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+          )
+        }
       }
     }
     if (shouldFocusOnCreate) {
@@ -815,7 +861,7 @@ export async function refreshWebRuntimeSessionTabsSnapshot(
       // Why: eager refreshes can resolve after the user switched worktrees; update tabs without stealing focus.
       const patch = applyFreshWebSessionTabsSnapshot(state, snapshot, environmentId)
       return patch === state ? state : patch
-    })
+    }, snapshot)
   } catch (error) {
     if (options.errorMode === 'throw') {
       throw error
@@ -1207,10 +1253,11 @@ export function splitWebRuntimeTerminal(
     })
     .catch((error) => {
       releasePendingMirrorSuppression()
-      console.warn(
-        '[web-runtime-session] failed to split terminal:',
-        error instanceof Error ? error.message : String(error)
-      )
+      const message = error instanceof Error ? error.message : String(error)
+      // Why: a split that fails only in the console leaves the user with a pane that silently
+      // never appears.
+      toast.error(message)
+      console.warn('[web-runtime-session] failed to split terminal:', message)
     })
   return true
 }
@@ -1369,6 +1416,7 @@ export function setWebRuntimeTabProps(args: {
   color?: string | null
   isPinned?: boolean
   viewMode?: 'terminal' | 'chat'
+  terminalDock?: { paneKey?: string; docked?: boolean; gutterRows?: number; remove?: string[] }
 }): boolean {
   const environmentId =
     getRuntimeEnvironmentIdForWorktree(useAppStore.getState(), args.worktreeId) ?? null
@@ -1392,7 +1440,8 @@ export function setWebRuntimeTabProps(args: {
           tabId: hostTabId,
           ...(args.color !== undefined ? { color: args.color } : {}),
           ...(args.isPinned !== undefined ? { isPinned: args.isPinned } : {}),
-          ...(args.viewMode !== undefined ? { viewMode: args.viewMode } : {})
+          ...(args.viewMode !== undefined ? { viewMode: args.viewMode } : {}),
+          ...(args.terminalDock !== undefined ? { terminalDock: args.terminalDock } : {})
         },
         timeoutMs: 15_000
       })

@@ -103,14 +103,14 @@ import {
   type SshAiVaultRelayListParams,
   type SshAiVaultRelayTitleParams
 } from '../../shared/ssh-ai-vault-relay'
+import { isTerminalLeafId, makePaneKey } from '../../shared/stable-pane-id'
+import { isValidTerminalTabId } from '../../shared/terminal-tab-id'
 import {
   NATIVE_CHAT_CHANGED_METHOD,
   NATIVE_CHAT_RELAY_REQUEST_TIMEOUT_MS,
   parseNativeChatRelayPing,
   type NativeChatRelayPing
-} from '../../shared/native-chat-relay-protocol'
-import { isTerminalLeafId, makePaneKey } from '../../shared/stable-pane-id'
-import { isValidTerminalTabId } from '../../shared/terminal-tab-id'
+} from '../../shared/fork-native-chat-relay/native-chat-relay-protocol'
 import {
   openSshPtyConsumerSession,
   type OpenSshPtyConsumerSessionOptions,
@@ -444,7 +444,7 @@ export class SshRelaySession {
   async requestAiVaultSessionList(
     params: SshAiVaultRelayListParams,
     options: { signal?: AbortSignal; timeoutMs?: number } = {}
-  ): Promise<unknown | null> {
+  ): Promise<unknown> {
     if (this.aiVaultListMethodSupported === false) {
       return null
     }
@@ -471,7 +471,7 @@ export class SshRelaySession {
   async requestAiVaultSessionTitles(
     params: SshAiVaultRelayTitleParams,
     options: { signal?: AbortSignal; timeoutMs?: number } = {}
-  ): Promise<unknown | null> {
+  ): Promise<unknown> {
     if (this.aiVaultTitleMethodSupported === false) {
       return null
     }
@@ -1474,7 +1474,7 @@ export class SshRelaySession {
     })
   }
 
-  // Why: ship plugin/extension source from Orca so agent-event changes don't force a relay redeploy (agent-status-over-ssh.md §4/§8). Best-effort.
+  // Why: ship plugin/extension source from Orca so agent-event changes don't force a relay redeploy — the relay is versioned independently. Best-effort: failure only costs agent status on this host.
   private async installPluginsOnRelay(mux: SshChannelMultiplexer): Promise<void> {
     if (!isRemoteAgentHooksEnabled() || !this.areAgentStatusHooksEnabled()) {
       return
@@ -1540,6 +1540,7 @@ export class SshRelaySession {
         compactTrigger?: unknown
         toolUseId?: unknown
         toolAgentId?: unknown
+        teammateName?: unknown
         toolAgentType?: unknown
         isReplay?: unknown
         providerSession?: unknown
@@ -1551,7 +1552,7 @@ export class SshRelaySession {
       if (typeof envelope.paneKey !== 'string') {
         return
       }
-      // Why: forward env/version verbatim so cross-build warn-once diagnostics fire on remote events too (agent-status-over-ssh.md §3).
+      // Why: forward the agent CLI's env/version verbatim (not the relay's) so warn-once protocol-mismatch diagnostics fire for remote events too.
       agentHookServer.ingestRemote(
         {
           paneKey: envelope.paneKey,
@@ -1572,6 +1573,8 @@ export class SshRelaySession {
           compactTrigger: envelope.compactTrigger,
           toolUseId: typeof envelope.toolUseId === 'string' ? envelope.toolUseId : undefined,
           toolAgentId: typeof envelope.toolAgentId === 'string' ? envelope.toolAgentId : undefined,
+          teammateName:
+            typeof envelope.teammateName === 'string' ? envelope.teammateName : undefined,
           toolAgentType:
             typeof envelope.toolAgentType === 'string' ? envelope.toolAgentType : undefined,
           isReplay: envelope.isReplay === true ? true : undefined,

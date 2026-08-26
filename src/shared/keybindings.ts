@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Why: keep the shortcut registry, parser, formatter, and conflict detector in one shared module so main/renderer/browser/Settings can't drift. */
-import type { TuiAgent } from './types'
+import type { TuiAgent } from './tui-agent'
 import { ALL_TUI_AGENTS, TUI_AGENT_DISPLAY_NAMES } from './tui-agent-display-names'
 
 export type KeybindingScope =
@@ -115,6 +115,8 @@ export type KeybindingActionId =
   | 'terminal.splitRight'
   | 'terminal.splitDown'
   | 'terminal.switchInputSource'
+  | 'terminal.dock.toggle'
+  | 'terminal.dock.passthrough'
   | PluginKeybindingActionId
 
 export type KeybindingOverrides = Partial<Record<KeybindingActionId, string[]>>
@@ -298,10 +300,20 @@ export const KEYBINDING_DEFINITIONS: readonly KeybindingDefinition[] = [
   },
   {
     id: 'workspace.openBoard',
-    title: 'Open Workspace Board',
+    title: 'Toggle Workspace Board',
     group: 'Global',
     scope: 'global',
-    searchKeywords: ['shortcut', 'global', 'workspace', 'board', 'kanban', 'worktree'],
+    searchKeywords: [
+      'shortcut',
+      'global',
+      'workspace',
+      'board',
+      'kanban',
+      'worktree',
+      'toggle',
+      'open',
+      'close'
+    ],
     // Why: configurable but unbound by default, to not take a global chord from terminal/browser/editor users.
     defaultBindings: platformBindings([]),
     allowInTerminal: true
@@ -1090,6 +1102,22 @@ export const KEYBINDING_DEFINITIONS: readonly KeybindingDefinition[] = [
     },
     // Why: macOS uses Shift+Space as an input-source shortcut; Orca otherwise rejects Shift-only bindings to avoid stealing typed text.
     allowShiftOnlyKeybindings: true
+  },
+  {
+    id: 'terminal.dock.toggle',
+    title: 'Toggle agent composer dock',
+    group: 'Terminal Panes',
+    scope: 'terminal',
+    searchKeywords: ['shortcut', 'terminal', 'dock', 'composer', 'agent', 'toggle'],
+    defaultBindings: platformBindings(['Mod+Shift+K'])
+  },
+  {
+    id: 'terminal.dock.passthrough',
+    title: 'Toggle terminal passthrough mode',
+    group: 'Terminal Panes',
+    scope: 'terminal',
+    searchKeywords: ['shortcut', 'terminal', 'dock', 'passthrough', 'raw', 'toggle'],
+    defaultBindings: platformBindings(['Mod+Shift+P'])
   },
   ...buildAgentTabKeybindingDefinitions()
 ]

@@ -26,6 +26,7 @@ describe('runtime terminal owner routing', () => {
   const runtimeTransportCall = vi.fn()
   const localWrite = vi.fn()
   const localWriteAccepted = vi.fn()
+  const localWriteInputAccepted = vi.fn()
   const localForeground = vi.fn()
   const localHasChildren = vi.fn()
   const localInspect = vi.fn()
@@ -47,6 +48,7 @@ describe('runtime terminal owner routing', () => {
         pty: {
           write: localWrite,
           writeAccepted: localWriteAccepted,
+          writeInputAccepted: localWriteInputAccepted,
           getForegroundProcess: localForeground,
           hasChildProcesses: localHasChildren,
           inspectProcess: localInspect

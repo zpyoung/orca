@@ -3,7 +3,7 @@ import { resolveAgentLaunchOverrides } from './agent-launch-overrides'
 import { isCustomAgentId } from './commit-message-agent-spec'
 import { quoteStartupArg, tokenizeStartupCommand } from './tui-agent-startup-shell'
 import type { ResolvedSourceControlAiGenerationParams } from './source-control-ai'
-import type { TuiAgent } from './types'
+import type { TuiAgent } from './tui-agent'
 
 /** Build one-shot recipe arguments with structured values first and raw values last. */
 export function resolveSourceControlTextLaunchAgentArgs(args: {

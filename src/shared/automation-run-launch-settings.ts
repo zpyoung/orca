@@ -7,7 +7,7 @@ import {
 import type { AutomationRunLaunchSetting, AutomationRunLaunchSettings } from './automations-types'
 import type { SessionOptionValue } from './native-chat-session-options'
 import type { AgentStartupShell } from './tui-agent-startup-shell'
-import type { TuiAgent } from './types'
+import type { TuiAgent } from './tui-agent'
 
 function pickedValues(
   overrides: AgentLaunchOverrides | null | undefined

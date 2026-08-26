@@ -35,29 +35,8 @@ describe('selectNativeChatViewState', () => {
   })
 
   it('maps error with its message', () => {
-    const state = selectNativeChatViewState(
-      session({ messages: [], status: 'error', error: 'boom' })
-    )
+    const state = selectNativeChatViewState(session({ status: 'error', error: 'boom' }))
     expect(state).toEqual({ kind: 'error', message: 'boom' })
-  })
-
-  // A read that fails while the pane already has content (an optimistic first
-  // send, or retained transcript) must not blank it — the user could otherwise
-  // only recover their own message by toggling to the terminal and back. The
-  // failure still has to be reported, or a permanently broken pane looks healthy.
-  it('keeps rendering messages when the read settled into an error, and reports it', () => {
-    expect(selectNativeChatViewState(session({ status: 'error', error: 'boom' }))).toEqual({
-      kind: 'ready',
-      isWorking: false,
-      error: 'boom'
-    })
-  })
-
-  it('carries no error on a healthy conversation', () => {
-    expect(selectNativeChatViewState(session({ status: 'ready' }))).toEqual({
-      kind: 'ready',
-      isWorking: false
-    })
   })
 
   it('maps empty when there are no messages', () => {

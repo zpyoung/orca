@@ -38,7 +38,7 @@ function createMockElement(className = ''): TestElement {
     },
     replaceChild: (nextChild: TestElement, oldChild: TestElement): TestElement => {
       const index = element.children.indexOf(oldChild)
-      if (index >= 0) {
+      if (index !== -1) {
         element.children[index] = nextChild
       } else {
         element.children.push(nextChild)
@@ -60,6 +60,7 @@ function createPane(id: number, container = createMockElement('pane')): ManagedP
     stablePaneId: leafId,
     container,
     xtermContainer: createMockElement(),
+    dockContainer: createMockElement(),
     linkTooltip: createMockElement(),
     terminal: {} as never,
     fitAddon: {} as never,

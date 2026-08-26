@@ -12,7 +12,8 @@ export type NativeChatTranscriptRetention = {
     identity: string
     messages: NativeChatMessage[]
     settled: boolean
-    loading: boolean
+    /** Omitted by callers that retain on any unsettled read, including a failed one. */
+    loading?: boolean
   }) => NativeChatMessage[]
 }
 
@@ -24,7 +25,7 @@ export function createNativeChatTranscriptRetention(): NativeChatTranscriptReten
     capture(identity, messages) {
       captured = { identity, messages }
     },
-    visible({ identity, messages, settled, loading }) {
+    visible({ identity, messages, settled, loading = true }) {
       if (settled) {
         return messages
       }

@@ -1,7 +1,8 @@
 import type { AgentLaunchOverrides } from './agent-launch-overrides'
 import type { SessionOptionValue } from './native-chat-session-options'
+import type { TuiAgent } from './tui-agent'
+import type { SetupDecision } from './worktree/create-types'
 import type { TaskSourceContext, WorkspaceRunContext } from './task-source-context'
-import type { SetupDecision, TuiAgent } from './types'
 
 export type AutomationWorkspaceMode = 'existing' | 'new_per_run'
 export type AutomationExecutionTargetType = 'local' | 'ssh'

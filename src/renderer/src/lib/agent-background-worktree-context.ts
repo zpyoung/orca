@@ -1,6 +1,7 @@
 import { useAppStore } from '@/store'
 import type { AppState } from '@/store'
-import type { Repo, Worktree } from '../../../shared/types'
+import type { Repo } from '../../../shared/repo-types'
+import type { Worktree } from '../../../shared/worktree/types'
 
 /** Resolve the renderer-owned workspace context required for a background agent launch. */
 export function resolveAgentBackgroundWorktreeContext(worktreeId: string): {

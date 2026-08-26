@@ -577,4 +577,107 @@ describe('parseWorkspaceSession', () => {
       expect(result.value.unifiedTabs?.wt[0].viewMode).toBe('terminal')
     }
   })
+
+  function sessionWithUnifiedTabDock(terminalDockByPaneKey: unknown) {
+    return parseWorkspaceSession({
+      activeRepoId: null,
+      activeWorktreeId: 'wt',
+      activeTabId: null,
+      tabsByWorktree: {},
+      terminalLayoutsByTabId: {},
+      unifiedTabs: {
+        wt: [
+          {
+            id: 'tab1',
+            entityId: 'tab1',
+            groupId: 'group1',
+            worktreeId: 'wt',
+            contentType: 'terminal',
+            label: 'Claude',
+            customLabel: null,
+            color: null,
+            sortOrder: 0,
+            createdAt: 0,
+            terminalDockByPaneKey
+          }
+        ]
+      }
+    })
+  }
+
+  it('preserves a valid terminalDockByPaneKey record on a unified tab', () => {
+    const result = sessionWithUnifiedTabDock({
+      'pane-1': { docked: true, gutterRows: 6 },
+      'pane-2': { docked: false, gutterRows: 3 }
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.value.unifiedTabs?.wt[0].terminalDockByPaneKey).toEqual({
+        'pane-1': { docked: true, gutterRows: 6 },
+        'pane-2': { docked: false, gutterRows: 3 }
+      })
+    }
+  })
+
+  it('round-trips the user-undock decision and tolerates a record written before it existed', () => {
+    const result = sessionWithUnifiedTabDock({
+      'pane-1': { docked: false, gutterRows: 6, userUndocked: true },
+      'pane-2': { docked: false, gutterRows: 6 },
+      'pane-3': { docked: false, gutterRows: 6, userUndocked: 'yes' }
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.value.unifiedTabs?.wt[0].terminalDockByPaneKey).toEqual({
+        'pane-1': { docked: false, gutterRows: 6, userUndocked: true },
+        'pane-2': { docked: false, gutterRows: 6 }
+      })
+    }
+  })
+
+  it('drops a malformed terminalDockByPaneKey entry while parsing the rest of the tab', () => {
+    const result = sessionWithUnifiedTabDock({
+      'pane-1': { docked: true, gutterRows: 6 },
+      'pane-2': { docked: true, gutterRows: 999 }
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.value.unifiedTabs?.wt[0].terminalDockByPaneKey).toEqual({
+        'pane-1': { docked: true, gutterRows: 6 }
+      })
+    }
+  })
+
+  it('hydrates an explicitly empty terminalDockByPaneKey record as {} not undefined', () => {
+    // the empty record is the host-has-echoed sentinel that suppresses the
+    // stale localStorage fallback across a restart
+    const result = sessionWithUnifiedTabDock({})
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.value.unifiedTabs?.wt[0].terminalDockByPaneKey).toEqual({})
+    }
+  })
+
+  it('hydrates a record that lost every entry to corruption as undefined', () => {
+    const result = sessionWithUnifiedTabDock({ 'pane-1': { docked: 'nope' } })
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.value.unifiedTabs?.wt[0].terminalDockByPaneKey).toBeUndefined()
+    }
+  })
+
+  it('filters unsafe object keys out of terminalDockByPaneKey', () => {
+    // Why: an object literal's `__proto__` key sets the prototype instead of
+    // an own property; JSON.parse mirrors how a corrupted session file would
+    // actually carry the key.
+    const maliciousRecord = JSON.parse(
+      '{"__proto__": {"docked": true, "gutterRows": 6}, "pane-1": {"docked": true, "gutterRows": 6}}'
+    )
+    const result = sessionWithUnifiedTabDock(maliciousRecord)
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      const record = result.value.unifiedTabs?.wt[0].terminalDockByPaneKey
+      expect(record).toEqual({ 'pane-1': { docked: true, gutterRows: 6 } })
+      expect(Object.hasOwn(record ?? {}, '__proto__')).toBe(false)
+    }
+  })
 })

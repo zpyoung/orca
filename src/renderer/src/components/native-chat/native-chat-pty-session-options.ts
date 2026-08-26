@@ -16,6 +16,8 @@ import {
   setTrackedSessionOption
 } from '../../../../shared/native-chat-session-option-state'
 import {
+  clearNativeChatSessionOptionReport,
+  markNativeChatSessionOptionReport,
   readNativeChatSessionOptionCache,
   writeNativeChatSessionOptionCache
 } from './native-chat-session-option-cache'
@@ -38,7 +40,9 @@ type PersistSelection = (args: {
 
 export type NativeChatPtySessionOptionsSurface = SessionOptionsSurface & {
   recordOutgoingCommand(command: string): void
-  reportSessionOptions(values: Record<string, SessionOptionValue>): void
+  /** `observedAt` dates the evidence. Omit it for a scrape, which reads a frame
+   *  with no timestamp of its own; a session log stamps every record. */
+  reportSessionOptions(values: Record<string, SessionOptionValue>, observedAt?: number | null): void
   replaceModels(models: CatalogModel[]): void
 }
 
@@ -66,14 +70,26 @@ export function createNativeChatPtySessionOptions(
   // The enrichment cache only ever holds probe output, so being handed a list at all
   // means `isDefault` below names the account's real default rather than the seed guess.
   let modelsAreDiscovered = args.initialModels !== undefined
-  let record =
-    readNativeChatSessionOptionCache(args.scopeKey, args.fallbackScopeKey) ??
-    createNativeChatSessionOptionRecord(args.agent)
+  const cached = readNativeChatSessionOptionCache(args.scopeKey, args.fallbackScopeKey)
+  let record = cached ?? createNativeChatSessionOptionRecord(args.agent)
   if (record.agent !== args.agent) {
     record = createNativeChatSessionOptionRecord(args.agent)
   }
+  if (record !== cached) {
+    clearNativeChatSessionOptionReport(args.scopeKey)
+  }
 
-  if (args.reportedValues && applyNativeChatReportedSessionOptions(record, args.reportedValues)) {
+  /** The one gate every agent report passes: this surface is rebuilt on each host
+   *  render, and the frame it reads is repainted only on resize, so re-applying an
+   *  unchanged report would revert every pick dispatched since that paint. */
+  const applyReport = (
+    values: Record<string, SessionOptionValue>,
+    observedAt?: number | null
+  ): boolean =>
+    markNativeChatSessionOptionReport(args.scopeKey, values) &&
+    applyNativeChatReportedSessionOptions(record, values, observedAt)
+
+  if (args.reportedValues && applyReport(args.reportedValues)) {
     writeNativeChatSessionOptionCache(args.scopeKey, record)
   }
   /** Why: an authoritative probe proved this id gone; left tracked it would re-enter
@@ -133,7 +149,8 @@ export function createNativeChatPtySessionOptions(
       optionId,
       value,
       source,
-      resolveEffectiveNativeChatModelId(catalog, activeModels(), record)
+      resolveEffectiveNativeChatModelId(catalog, activeModels(), record),
+      Date.now()
     )
 
   /** The sole answer to "may this id become the persisted `-m` launch flag?", read at
@@ -195,8 +212,8 @@ export function createNativeChatPtySessionOptions(
         args.onAgentPicker?.()
       }
     },
-    reportSessionOptions: (values) => {
-      if (applyNativeChatReportedSessionOptions(record, values)) {
+    reportSessionOptions: (values, observedAt) => {
+      if (applyReport(values, observedAt)) {
         publish()
       }
     },

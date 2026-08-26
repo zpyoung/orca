@@ -42,12 +42,9 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { OpenFile } from '@/store/slices/editor'
-import type {
-  DiffComment,
-  GitBranchChangeEntry,
-  GitDiffResult,
-  GitStatusEntry
-} from '../../../../shared/types'
+import type { DiffComment } from '../../../../shared/diff-comment-types'
+import type { GitBranchChangeEntry, GitDiffResult } from '../../../../shared/git-diff-compare-types'
+import type { GitStatusEntry } from '../../../../shared/git-status-types'
 import { Check, Copy, MessageSquare, PanelLeftOpen, Sparkles, Trash2, WrapText } from 'lucide-react'
 import { toast } from 'sonner'
 import { DiffSectionItem } from './DiffSectionItem'
@@ -1183,10 +1180,7 @@ export default function CombinedDiffViewer({
       if (!detail || detail.worktreeId !== file.worktreeId) {
         return
       }
-      const hasRuntimeOwnerFilter = Object.prototype.hasOwnProperty.call(
-        detail,
-        'runtimeEnvironmentId'
-      )
+      const hasRuntimeOwnerFilter = Object.hasOwn(detail, 'runtimeEnvironmentId')
       const targetRuntimeOwner = detail.runtimeEnvironmentId?.trim() || null
       const fileRuntimeOwner = file.runtimeEnvironmentId?.trim() || null
       if (hasRuntimeOwnerFilter && targetRuntimeOwner !== fileRuntimeOwner) {

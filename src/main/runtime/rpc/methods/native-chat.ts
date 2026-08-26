@@ -10,6 +10,7 @@ import {
   type NativeChatTranscriptSubscription,
   type SubscribeNativeChatTranscriptArgs
 } from '../../../native-chat/transcript-watch'
+import { nativeChatCompanionFrameFields } from '../../../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 import { defineMethod, defineStreamingMethod, type RpcAnyMethod, type RpcContext } from '../core'
 import { sanitizeNativeChatRpcImageBlock } from './native-chat-rpc-image-block'
 
@@ -138,7 +139,7 @@ function sanitizeToolInput(
   const result: Record<string, unknown> = {}
   let count = 0
   for (const key in value) {
-    if (!Object.prototype.hasOwnProperty.call(value, key)) {
+    if (!Object.hasOwn(value, key)) {
       continue
     }
     if (count >= MOBILE_TOOL_INPUT_ITEMS_CAP || budget.remaining <= 0) {
@@ -148,7 +149,7 @@ function sanitizeToolInput(
     let boundedKey = key.slice(0, Math.min(key.length, budget.remaining, 128))
     // Why: sibling keys sharing a >=128-char (or budget-truncated) prefix collapse
     // to the same bounded key; suffix collisions so neither field is silently lost.
-    if (Object.prototype.hasOwnProperty.call(result, boundedKey)) {
+    if (Object.hasOwn(result, boundedKey)) {
       boundedKey = `${boundedKey}~${count}`
     }
     budget.remaining -= boundedKey.length
@@ -221,7 +222,7 @@ export const NATIVE_CHAT_METHODS: readonly RpcAnyMethod[] = [
             messages: windowForClient(result.messages, clientKind, limit),
             hasMore: result.hasMore,
             beforeOffset: result.beforeOffset,
-            ...(result.lifecycle ? { lifecycle: result.lifecycle } : {})
+            ...nativeChatCompanionFrameFields(result.companion)
           }
         : result
     }
@@ -273,7 +274,7 @@ export const NATIVE_CHAT_METHODS: readonly RpcAnyMethod[] = [
         sessionId: params.sessionId,
         transcriptPath: params.transcriptPath,
         initialLimit: limit,
-        onInitialSnapshot: (messages, hasMore, beforeOffset, error, lifecycle) => {
+        onInitialSnapshot: (messages, hasMore, beforeOffset, error, companion) => {
           if (closed) {
             return
           }
@@ -285,10 +286,10 @@ export const NATIVE_CHAT_METHODS: readonly RpcAnyMethod[] = [
             hasMore,
             beforeOffset,
             ...(error ? { error } : {}),
-            ...(lifecycle ? { lifecycle } : {})
+            ...nativeChatCompanionFrameFields(companion)
           })
         },
-        onReplace: (messages, hasMore, beforeOffset, lifecycle) => {
+        onReplace: (messages, hasMore, beforeOffset, companion) => {
           if (closed) {
             return
           }
@@ -297,17 +298,17 @@ export const NATIVE_CHAT_METHODS: readonly RpcAnyMethod[] = [
             messages: windowForClient(messages, clientKind, limit),
             hasMore,
             beforeOffset,
-            ...(lifecycle ? { lifecycle } : {})
+            ...nativeChatCompanionFrameFields(companion)
           })
         },
-        onAppend: (messages, lifecycle) => {
+        onAppend: (messages, companion) => {
           if (closed) {
             return
           }
           emit({
             type: 'appended',
             messages: sanitizeAppendForClient(messages, clientKind),
-            ...(lifecycle ? { lifecycle } : {})
+            ...nativeChatCompanionFrameFields(companion)
           })
         }
       }

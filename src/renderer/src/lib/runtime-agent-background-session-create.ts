@@ -1,5 +1,5 @@
 import type { AgentLaunchOverrides } from '../../../shared/agent-launch-overrides'
-import type { TuiAgent } from '../../../shared/types'
+import type { TuiAgent } from '../../../shared/tui-agent'
 import type { AgentStartupPlan } from './tui-agent-startup'
 import { createRuntimeAgentBackgroundTerminal } from './runtime-agent-background-create'
 import { toRemoteRuntimePtyId } from '@/runtime/runtime-terminal-stream'

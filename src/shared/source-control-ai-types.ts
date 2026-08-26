@@ -1,5 +1,6 @@
 import type { AgentLaunchOptionSelection } from './agent-launch-overrides'
-import type { CommitMessageAiModelCapability, TuiAgent } from './types'
+import type { CommitMessageAiModelCapability } from './commit-message-ai-types'
+import type { TuiAgent } from './tui-agent'
 import type { CustomAgentId } from './commit-message-agent-spec'
 import type {
   SourceControlAiActionDefaults,

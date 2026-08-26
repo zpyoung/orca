@@ -3,7 +3,7 @@ import type {
   AgentLaunchOptionSelection,
   AgentLaunchOverrides
 } from '../../../../shared/agent-launch-overrides'
-import type { TuiAgent } from '../../../../shared/types'
+import type { TuiAgent } from '../../../../shared/tui-agent'
 import { agentLaunchOptionSelectionFromOverrides } from '../settings/source-control-ai-action-recipe-draft'
 
 /**

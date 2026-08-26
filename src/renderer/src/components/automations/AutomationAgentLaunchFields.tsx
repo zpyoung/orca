@@ -1,42 +1,50 @@
-import React from 'react'
 import AgentCombobox from '@/components/agent/AgentCombobox'
 import { AgentLaunchOverridesFields } from '@/components/agent-launch/AgentLaunchOverridesFields'
+import { isEmptyAgentLaunchOverrides } from '../../../../shared/agent-launch-overrides'
 import {
   getTuiAgentDefaultArgs,
   resolveTuiAgentLaunchArgs
 } from '../../../../shared/tui-agent-launch-defaults'
-import type { GlobalSettings, TuiAgent } from '../../../../shared/types'
+import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { AgentCatalogEntry } from '@/lib/agent-catalog'
 import { translate } from '@/i18n/i18n'
-import { Field } from './automation-page-parts'
-import { AutomationMissedRunGraceField } from './AutomationMissedRunGraceField'
-import { AutomationSessionField } from './AutomationSessionField'
+import { AUTOMATION_EDITOR_SECTION_LABEL_CLASS, Field } from './automation-page-parts'
+import type { AutomationLaunchOverridesGate } from './automation-launch-overrides-gate'
 import type { AutomationDraft } from './AutomationEditorDialog'
 
 type AutomationAgentLaunchFieldsProps = {
   draft: AutomationDraft
   settings: GlobalSettings | null
   visibleAgents: AgentCatalogEntry[]
-  scheduleField: React.ReactNode
   pickerTriggerClassName: string
-  modeToggleItemClassName: string
-  launchOverridesDisabled: boolean
-  launchOverridesDisabledReason?: string
+  launchOverridesGate: AutomationLaunchOverridesGate
   onDraftChange: (updater: (current: AutomationDraft) => AutomationDraft) => void
 }
 
-/** Render Orca automation agent, session, schedule, and launch settings. */
+/** Render the Orca automation agent picker and its model/effort/args launch settings. */
 export function AutomationAgentLaunchFields({
   draft,
   settings,
   visibleAgents,
-  scheduleField,
   pickerTriggerClassName,
-  modeToggleItemClassName,
-  launchOverridesDisabled,
-  launchOverridesDisabledReason,
+  launchOverridesGate,
   onDraftChange
 }: AutomationAgentLaunchFieldsProps): React.JSX.Element {
+  const launchOverridesDisabledReason =
+    launchOverridesGate !== 'unsupported'
+      ? undefined
+      : isEmptyAgentLaunchOverrides(draft.launchOverrides)
+        ? translate(
+            'auto.components.automations.AutomationEditorDialogFooter.launchSettingsUnsupported',
+            "This automation's host doesn't support launch settings. Update the remote Orca server."
+          )
+        : translate(
+            'auto.components.automations.AutomationEditorDialogFooter.launchSettingsNotSaved',
+            "Launch settings can't be saved to this host and won't apply to runs."
+          )
+
+  // Why: model/effort ids are agent-specific, so only raw args survive an agent switch.
   const changeAgent = (agentId: TuiAgent): void => {
     onDraftChange((current) => ({
       ...current,
@@ -49,37 +57,20 @@ export function AutomationAgentLaunchFields({
 
   return (
     <>
-      <div className="grid gap-3 pt-3 transition-[opacity,transform] duration-150 ease-out sm:grid-cols-2 lg:grid-cols-4">
-        <Field
-          label={translate(
-            'auto.components.automations.AutomationEditorDialog.57b722cbba',
-            'Agent'
-          )}
-        >
-          <AgentCombobox
-            agents={visibleAgents}
-            value={draft.agentId}
-            onValueChange={(agentId) => agentId && changeAgent(agentId)}
-            defaultAgent={settings?.defaultTuiAgent ?? null}
-            triggerClassName={`h-9 w-full min-w-0 ${pickerTriggerClassName}`}
-            allowNarrowTrigger
-          />
-        </Field>
-        <AutomationSessionField
-          draft={draft}
-          toggleItemClassName={modeToggleItemClassName}
-          onDraftChange={onDraftChange}
+      <Field
+        labelClassName={AUTOMATION_EDITOR_SECTION_LABEL_CLASS}
+        label={translate('auto.components.automations.AutomationEditorDialog.57b722cbba', 'Agent')}
+      >
+        <AgentCombobox
+          agents={visibleAgents}
+          value={draft.agentId}
+          onValueChange={(agentId) => agentId && changeAgent(agentId)}
+          defaultAgent={settings?.defaultTuiAgent ?? null}
+          triggerClassName={`h-9 w-full min-w-0 ${pickerTriggerClassName}`}
+          allowNarrowTrigger
         />
-        {scheduleField}
-        <AutomationMissedRunGraceField
-          draft={draft}
-          disabled={false}
-          pickerTriggerClassName={pickerTriggerClassName}
-          onDraftChange={onDraftChange}
-        />
-      </div>
+      </Field>
       <AgentLaunchOverridesFields
-        className="pt-3"
         agent={draft.agentId}
         value={draft.launchOverrides}
         onChange={(updater) =>
@@ -91,7 +82,7 @@ export function AutomationAgentLaunchFields({
         agentArgsPlaceholder={getTuiAgentDefaultArgs(draft.agentId)}
         inheritedAgentArgs={resolveTuiAgentLaunchArgs(draft.agentId, settings?.agentDefaultArgs)}
         reuseSessionNote={draft.workspaceMode === 'existing' && draft.reuseSession}
-        disabled={launchOverridesDisabled}
+        disabled={launchOverridesGate !== 'supported'}
         disabledReason={launchOverridesDisabledReason}
         idPrefix="automation-launch"
       />

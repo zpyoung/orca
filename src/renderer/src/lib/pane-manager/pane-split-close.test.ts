@@ -92,6 +92,7 @@ function createPane(id: number, webglAddon: unknown): ManagedPaneInternal {
     } as never,
     container: container as unknown as HTMLElement,
     xtermContainer: {} as never,
+    dockContainer: {} as never,
     linkTooltip: {} as never,
     terminalGpuAcceleration: 'auto',
     gpuRenderingEnabled: true,

@@ -41,6 +41,7 @@ describe('Claude plugin skill sources', () => {
     expect(roots).toEqual([
       expect.objectContaining({
         label: 'Claude plugin compound-engineering',
+        pluginName: 'compound-engineering',
         path: join('/home/alice/.claude/plugins/cache/compound/3.14.3', 'skills'),
         sourceKind: 'plugin',
         providers: ['claude'],

@@ -3,7 +3,7 @@ import type { StartupCommandDelivery } from '../../../shared/codex-startup-deliv
 import type { SessionOptionValue } from '../../../shared/native-chat-session-options'
 import { AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
 import type { RuntimeTerminalCreate } from '../../../shared/runtime-types'
-import type { TuiAgent } from '../../../shared/types'
+import type { TuiAgent } from '../../../shared/tui-agent'
 import {
   createAgentSessionCreateOperation,
   toAgentLaunchPreferences,

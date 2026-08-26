@@ -1,0 +1,16 @@
+{
+  "auto": {
+    "components": {
+      "sidebar": {
+        "WorktreeContextMenu": {
+          "3ae4748032": "Create a group and move this worktree into it.",
+          "308b16a770": "New group from worktree",
+          "5bf97058a4": "Move project to group",
+          "a2d9a2b93e": "Remove project from group",
+          "addWorktreeToGroup": "Add worktree to group",
+          "removeWorktreeFromGroup": "Remove worktree from group"
+        }
+      }
+    }
+  }
+}

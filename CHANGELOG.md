@@ -1,6 +1,6 @@
 ---
-last_released_commit: 4102ac6b1e948a8d97ac9ceac976d7f8d4bb0b41
-upstream_synced: v1.4.182
+last_released_commit: ad73d7e6c3de62b8b29c30d032027f38ad934ae7
+upstream_synced: v1.4.188
 ---
 
 # Changelog
@@ -11,6 +11,88 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.189-rc.0.zy02] - 2026-08-26
+
+Synced to upstream [v1.4.188](https://github.com/stablyai/orca/releases/tag/v1.4.188).
+
+### Changed
+- Upstream syncs now land through a pull request rather than pushing `main` directly, so the fork
+  ownership guard and the rest of PR CI run on every resolution before `main` moves. The sync
+  procedure also gained a fix policy that separates failures a run may resolve on its own from ones
+  that have to stop and ask a person.
+- `pnpm test` no longer starts Vitest on a developer machine. It refuses unless it is running in CI,
+  in a container, or under an explicit opt-out, and points at the sandboxed shard runner instead;
+  where it does run, the worker pool is capped at half the host's cores.
+
+## [1.4.189-rc.0.zy01] - 2026-08-24
+
+Synced to upstream [v1.4.188](https://github.com/stablyai/orca/releases/tag/v1.4.188).
+
+### Fixed
+- Closing the docked composer no longer leaves a dead strip below the terminal. The pane's geometry
+  effect used to re-run after the composer's own cleanup had zeroed the slot and write the gutter
+  height straight back, so the terminal never grew into the space it had just been given.
+- The docked composer no longer shows "No terminal session" over a live pane. It reads the pane's
+  PTY id during render, and a reattach that lands on the id the layout already holds — recovery
+  remount, tab move, web-mirror remount — used to produce no re-render at all, stranding the
+  composer on the value it read while the attach was still pending.
+- The fork's skill release ledger is now declared fork-owned, so a sync can no longer replace it
+  with upstream's rows. Those rows name tags that exist only on `stablyai/orca`, which killed the
+  skill-update roundtrip check across every matrix job the last time a sync took them.
+
+### Changed
+- The agent composer's draft, history, and attachment caches are built from one shared scope cache
+  instead of three copies, the terminal-dock gutter clamp lives in one module rather than six call
+  sites, and the dock-state merge paths are collapsed onto a single routine. Net 195 lines removed,
+  with no behaviour change.
+
+## [1.4.188-rc.0.zy01] - 2026-08-22
+
+Synced to upstream [v1.4.187](https://github.com/stablyai/orca/releases/tag/v1.4.187).
+
+### Added
+- A rich-input composer can now be docked beneath a terminal pane running a supported coding-agent
+  CLI, so a prompt can be drafted, edited, and sent without typing into the TUI, with the terminal
+  still visible underneath as a fallback. Send and Stop are separate controls rather than one button
+  that flips, and the pane quarantines input after its PTY endpoint is replaced so a send cannot land
+  in the wrong session. Behind an experimental flag.
+- `pnpm test:sandbox` runs the test suite in throwaway Docker containers, sharded, either locally or
+  on a remote host. Shards no longer see each other's temp files, git config, or build output.
+
+### Changed
+- File ownership across the fork is now declared in `config/fork-ownership.json` and enforced in CI,
+  instead of being inferred from commit authorship. Each fork change belongs to one of four tiers,
+  and a PR that adds a fork file matching no manifest entry fails the ownership guard. This is what
+  keeps a fork change from being silently reset the next time upstream is merged.
+- The upstream-sync procedure now lives in a git-tracked skill rather than an automation prompt, so
+  there is a single copy under test.
+- Release builds register the `orca://` URL scheme, matching upstream.
+- The release pipeline now runs least-privileged: the workflow's default token grants read-only
+  access to repository contents, with write scoped to the single job that needs it.
+
+### Fixed
+- The workspace sidebar's tighter row spacing is applied again. Upstream moved the module holding it
+  during a refactor, and because the fork still claimed the old path, the build had been shipping
+  upstream's roomier spacing while the fork's copy sat unused. Drop targets line up with the rows as
+  drawn once more.
+- Reconnecting an SSH terminal surfaces the underlying error again, and native-chat panes hosted on
+  a remote machine keep reading transcripts over this fork's relay through upstream's module split.
+- Cross-repo worktree groups, the docked composer, and per-pane chat width all survive upstream's
+  restructuring of the sidebar into ~105 modules; their behavior is unchanged.
+
+## [1.4.185-rc.0.zy01] - 2026-08-17
+
+Synced to upstream [v1.4.184](https://github.com/stablyai/orca/releases/tag/v1.4.184).
+
+### Changed
+- Native Chat continues to read transcripts over this fork's SSH relay. Upstream replaced that path
+  with a WSL filesystem admission gate, which this build does not adopt, so reading transcripts from
+  a remote host behaves exactly as it did before the sync.
+- The workspace sidebar keeps this fork's tighter row spacing rather than upstream's roomier
+  virtual-row gap, so drag-and-drop drop targets stay aligned with the rows as drawn.
+- Index checks in two fork-owned files were rewritten to satisfy lint rules upstream newly enabled.
+  No behavior changes; it keeps future upstream syncs from stalling on a toolchain change alone.
 
 ## [1.4.183-rc.0.zy01] - 2026-08-14
 

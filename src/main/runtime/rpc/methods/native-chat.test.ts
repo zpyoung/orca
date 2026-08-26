@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { NativeChatMessage } from '../../../../shared/native-chat-types'
+import type { NativeChatTranscriptCompanion } from '../../../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
 import type { RpcContext } from '../core'
 
 // Stub the bounded tail reader so the handler returns a deterministic transcript with
@@ -8,17 +9,11 @@ const OVERSIZED = 'x'.repeat(5000)
 const cachedResult = vi.hoisted(() => ({
   value: {
     messages: [] as NativeChatMessage[],
-    // Optional so truncation-gating fixtures can omit it; lifecycle tests set it explicitly.
-    lifecycle: undefined as
-      | { state: 'working' | 'completed' | 'interrupted'; turnId: string; timestamp: number | null }
-      | undefined
+    // Optional so truncation-gating fixtures can omit it; companion tests set it explicitly.
+    companion: undefined as NativeChatTranscriptCompanion | undefined
   } as {
     messages: NativeChatMessage[]
-    lifecycle?: {
-      state: 'working' | 'completed' | 'interrupted'
-      turnId: string
-      timestamp: number | null
-    }
+    companion?: NativeChatTranscriptCompanion
   }
 }))
 const tailRead = vi.hoisted(() => ({ signal: undefined as AbortSignal | undefined }))
@@ -29,30 +24,15 @@ const watcher = vi.hoisted(() => ({
       hasMore: boolean,
       beforeOffset: number,
       error?: string,
-      lifecycle?: {
-        state: 'working' | 'completed' | 'interrupted'
-        turnId: string
-        timestamp: number | null
-      }
+      companion?: NativeChatTranscriptCompanion
     ) => void
     onReplace?: (
       messages: NativeChatMessage[],
       hasMore: boolean,
       beforeOffset: number,
-      lifecycle?: {
-        state: 'working' | 'completed' | 'interrupted'
-        turnId: string
-        timestamp: number | null
-      }
+      companion?: NativeChatTranscriptCompanion
     ) => void
-    onAppend: (
-      messages: NativeChatMessage[],
-      lifecycle?: {
-        state: 'working' | 'completed' | 'interrupted'
-        turnId: string
-        timestamp: number | null
-      }
-    ) => void
+    onAppend: (messages: NativeChatMessage[], companion?: NativeChatTranscriptCompanion) => void
   },
   watching: true,
   setupSignal: undefined as AbortSignal | undefined,
@@ -70,7 +50,7 @@ vi.mock('../../../native-chat/transcript-watch', () => ({
       messages: messages.slice(-limit),
       hasMore: messages.length > limit,
       beforeOffset: 123,
-      ...(cachedResult.value.lifecycle ? { lifecycle: cachedResult.value.lifecycle } : {})
+      ...(cachedResult.value.companion ? { companion: cachedResult.value.companion } : {})
     })
   },
   subscribeNativeChatTranscript: (
@@ -558,9 +538,11 @@ describe('nativeChat.subscribe initial snapshot', () => {
       timestamp: 1_720_000_000_000
     }
     const callbacks = activeWatcherArgs()
-    callbacks.onInitialSnapshot?.([makeMessage('snap')], false, 3, undefined, completed)
-    callbacks.onAppend([], completed)
-    callbacks.onReplace?.([makeMessage('repl')], false, 9, completed)
+    callbacks.onInitialSnapshot?.([makeMessage('snap')], false, 3, undefined, {
+      lifecycle: completed
+    })
+    callbacks.onAppend([], { lifecycle: completed })
+    callbacks.onReplace?.([makeMessage('repl')], false, 9, { lifecycle: completed })
 
     expect(emitted).toEqual([
       {
@@ -682,7 +664,7 @@ describe('nativeChat.readSession lifecycle payload', () => {
       turnId: 'turn-read-1',
       timestamp: 1_720_000_000_100
     }
-    cachedResult.value = { messages: [makeMessage('done')], lifecycle }
+    cachedResult.value = { messages: [makeMessage('done')], companion: { lifecycle } }
     const result = await readSessionHandler()(
       { agent: 'claude', sessionId: 's' },
       ctxWith('runtime')

@@ -1,7 +1,7 @@
 import type { AgentLaunchOverrides } from '../../../shared/agent-launch-overrides'
 import type { ParsedAgentStatusPayload } from '../../../shared/agent-status-types'
 import type { LaunchSource } from '../../../shared/telemetry-events'
-import type { TuiAgent } from '../../../shared/types'
+import type { TuiAgent } from '../../../shared/tui-agent'
 import type { AgentStartupPlan } from '@/lib/tui-agent-startup'
 import type { AgentStartupShell } from '../../../shared/tui-agent-startup-shell'
 import type { AutomationTerminalOwnership } from '@/lib/automation-terminal-ownership'

@@ -6,9 +6,39 @@ import {
   type NativeChatSessionOptionRecord,
   type TrackedNativeChatSessionOption
 } from '../../../../shared/native-chat-session-option-state'
-import { setBoundedScopeCacheEntry } from './native-chat-composer-scope-cache'
+import { setBoundedScopeCacheEntry } from './fork-agent-composer/agent-composer-scope-cache'
 
 const sessionOptionCache = new Map<string, NativeChatSessionOptionRecord>()
+// The values last taken from an agent report, per scope. Claude paints its model
+// descriptor once and repaints it only on resize, so re-reading the same frame is
+// not new evidence — and a frame painted before a `/effort` cannot have observed it.
+const appliedReportByScope = new Map<string, string>()
+
+function reportFingerprint(values: Record<string, SessionOptionValue>): string {
+  return JSON.stringify(Object.entries(values).sort(([left], [right]) => left.localeCompare(right)))
+}
+
+/** Forgets the scope's last report, so the next one seeds the record it belongs to. */
+export function clearNativeChatSessionOptionReport(scopeKey: string): void {
+  appliedReportByScope.delete(scopeKey)
+}
+
+/**
+ * Whether this report is new evidence for `scopeKey`, marking it applied when it is.
+ * Only a report that *changes* may be folded into the record: replaying an identical
+ * one would revert every pick the user has dispatched since it was painted.
+ */
+export function markNativeChatSessionOptionReport(
+  scopeKey: string,
+  values: Record<string, SessionOptionValue>
+): boolean {
+  const fingerprint = reportFingerprint(values)
+  if (appliedReportByScope.get(scopeKey) === fingerprint) {
+    return false
+  }
+  setBoundedScopeCacheEntry(appliedReportByScope, scopeKey, fingerprint)
+  return true
+}
 
 export function readNativeChatSessionOptionCache(
   scopeKey: string,
@@ -52,4 +82,5 @@ export function seedNativeChatAppliedSessionOptions(
 
 export function clearNativeChatSessionOptionCacheForTests(): void {
   sessionOptionCache.clear()
+  appliedReportByScope.clear()
 }

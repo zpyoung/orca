@@ -4,7 +4,9 @@ import {
   type AgentLaunchOptionSelection
 } from '../../../../shared/agent-launch-overrides'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
-import type { GlobalSettings, Repo, TuiAgent } from '../../../../shared/types'
+import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import type { Repo } from '../../../../shared/repo-types'
+import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { LaunchSource } from '../../../../shared/telemetry-events'
 import type {
   SourceControlActionRecipe,

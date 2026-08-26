@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { getAgentCatalog } from '@/lib/agent-catalog'
 import type { AutomationRun } from '../../../../shared/automations-types'
-import type { Worktree } from '../../../../shared/types'
+import type { Worktree } from '../../../../shared/worktree/types'
 import {
   formatAutomationDateTime,
   getAutomationRunStatusLabel,
