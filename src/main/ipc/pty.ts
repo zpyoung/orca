@@ -1,16 +1,3 @@
-/* eslint-disable max-lines -- Why: PTY IPC is centralized in one main-process module so spawn env scoping, lifecycle cleanup, process inspection, and renderer IPC stay behind one audited boundary. */
-import { join, delimiter } from 'node:path'
-import { randomUUID } from 'node:crypto'
-import { statSync } from 'node:fs'
-import {
-  type BrowserWindow,
-  type IpcMainEvent,
-  type IpcMainInvokeEvent,
-  type WebContents,
-  ipcMain,
-  app,
-  powerMonitor
-} from 'electron'
 export { getBashShellReadyRcfileContent } from '../providers/local-pty-shell-ready-bash-rcfile'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { PtyBindingSourceExpectation, Store } from '../persistence'

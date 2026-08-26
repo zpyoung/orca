@@ -42,6 +42,8 @@ export type Tab = {
   entityId: string // ID of the backing content (terminal tab ID, file path, browser workspace ID)
   groupId: string
   worktreeId: string
+  /** Owning execution host when the same worktree id is visible from multiple hosts. */
+  executionHostId?: ExecutionHostId
   contentType: TabContentType
   label: string // display title (auto-derived from PTY or filename)
   generatedLabel?: string | null
