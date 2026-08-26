@@ -21,11 +21,6 @@ vi.mock('@/components/ui/dialog', () => ({
   DialogHeader: ({ children }: { children?: ReactNode }) => <header>{children}</header>,
   DialogTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>
 }))
-vi.mock('@/components/ui/collapsible', () => ({
-  Collapsible: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  CollapsibleTrigger: ({ children }: { children?: ReactNode }) => <>{children}</>,
-  CollapsibleContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>
-}))
 vi.mock('./HandoffDestinationControls', () => ({
   HandoffDestinationControls: ({ disabled }: { disabled: boolean }) => (
     <div data-testid="destination" data-disabled={disabled ? 'true' : 'false'} />
@@ -162,6 +157,25 @@ describe('fork session handoff dialog', () => {
       button.textContent?.includes('Start New Session')
     )
     expect(startButton?.disabled).toBe(false)
+  })
+
+  it('links the mobile preview disclosure to its region', async () => {
+    mocks.state = state()
+    await act(async () =>
+      root.render(<AgentSessionContinuationDialog open request={request} onOpenChange={vi.fn()} />)
+    )
+
+    const trigger = container.querySelector<HTMLButtonElement>(
+      'button[aria-controls="handoff-brief-preview-panel"]'
+    )
+    const panel = container.querySelector('#handoff-brief-preview-panel')
+    expect(trigger?.getAttribute('aria-expanded')).toBe('true')
+    expect(panel?.getAttribute('role')).toBe('region')
+    expect(panel?.getAttribute('aria-label')).toBe('Brief preview')
+
+    await act(async () => trigger?.click())
+    expect(trigger?.getAttribute('aria-expanded')).toBe('false')
+    expect(panel?.classList.contains('hidden')).toBe(true)
   })
 
   it('explains missing live-pane controls and closes only after launch success', async () => {

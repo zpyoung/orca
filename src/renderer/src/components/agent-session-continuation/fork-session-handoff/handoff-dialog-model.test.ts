@@ -92,6 +92,16 @@ describe('handoff dialog model', () => {
     ])
   })
 
+  it('falls back for malformed catalogs and drops malformed rows from arrays', () => {
+    expect(getHandoffTemplates({ invalid: true } as never)).toHaveLength(3)
+    expect(
+      getHandoffTemplates([
+        { id: 'valid', name: ' Name ', body: ' Body ' },
+        { id: 'blank', name: '', body: 'Missing name' }
+      ])
+    ).toEqual([{ id: 'valid', name: 'Name', body: 'Body' }])
+  })
+
   it('keeps host and secret warnings additive', () => {
     const hit = {
       ruleId: 'github-token',

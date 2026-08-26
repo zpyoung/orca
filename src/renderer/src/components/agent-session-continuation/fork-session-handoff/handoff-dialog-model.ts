@@ -1,5 +1,6 @@
 import { translate } from '@/i18n/i18n'
 import { getAgentCatalog, type AgentCatalogEntry } from '@/lib/agent-catalog'
+export { getHandoffTemplates } from '@/lib/fork-session-handoff/handoff-template-catalog'
 import type { HandoffPreviewPhase } from '@/lib/fork-session-handoff/handoff-preview-detach'
 import {
   composeHandoffBrief,
@@ -15,10 +16,7 @@ import {
   resolveHandoffTarget,
   type HandoffTargetResolution
 } from '@/lib/fork-session-handoff/handoff-target-resolution'
-import type {
-  ForkSessionHandoffSettings,
-  ForkSessionHandoffTemplate
-} from '../../../../../shared/fork-session-handoff/handoff-settings-types'
+import type { ForkSessionHandoffSettings } from '../../../../../shared/fork-session-handoff/handoff-settings-types'
 import type { TuiAgent } from '../../../../../shared/tui-agent'
 import type { HandoffDialogWarning } from './HandoffWarningsBanner'
 
@@ -49,35 +47,6 @@ export function selectHandoffDialogStoreInputs(state: AppState): HandoffDialogSt
     settings: state.settings,
     worktreesByRepo: state.worktreesByRepo
   }
-}
-
-function getDefaultHandoffTemplates(): ForkSessionHandoffTemplate[] {
-  return [
-    {
-      id: 'continue-implementation',
-      name: translate(
-        'components.agentSessionContinuation.forkSessionHandoff.templateContinueImplementation',
-        'Continue implementation'
-      ),
-      body: 'Continue the implementation from the stopping point. Verify existing changes before making new ones.'
-    },
-    {
-      id: 'review-completed-work',
-      name: translate(
-        'components.agentSessionContinuation.forkSessionHandoff.templateReviewCompletedWork',
-        'Review what was done'
-      ),
-      body: 'Review the work already completed. Focus on correctness, regressions, and missing tests before changing code.'
-    },
-    {
-      id: 'debug-failure',
-      name: translate(
-        'components.agentSessionContinuation.forkSessionHandoff.templateDebugFailure',
-        'Debug the failure'
-      ),
-      body: 'Reproduce and diagnose the latest failure. Use the available status and changed paths to isolate the cause.'
-    }
-  ]
 }
 
 export function chooseHandoffAgent(
@@ -302,10 +271,4 @@ export function getHandoffContextDisabledReason(
         'components.agentSessionContinuation.forkSessionHandoff.contextUnavailable',
         'A full saved transcript is not reachable on this target. Focused context will be used.'
       )
-}
-
-export function getHandoffTemplates(
-  configured: ForkSessionHandoffTemplate[] | undefined
-): ForkSessionHandoffTemplate[] {
-  return configured !== undefined ? configured : getDefaultHandoffTemplates()
 }

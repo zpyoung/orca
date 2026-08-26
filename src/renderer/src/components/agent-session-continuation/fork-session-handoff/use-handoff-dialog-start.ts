@@ -6,10 +6,7 @@ import type { HandoffPreviewPhase } from '@/lib/fork-session-handoff/handoff-pre
 import type { HandoffTargetResolution } from '@/lib/fork-session-handoff/handoff-target-resolution'
 import { launchForkSessionHandoff } from '@/lib/fork-session-handoff/launch-session-handoff'
 import { useAppStore } from '@/store'
-import type {
-  ForkSessionHandoffIncludeToggles,
-  ForkSessionHandoffSettings
-} from '../../../../../shared/fork-session-handoff/handoff-settings-types'
+import type { ForkSessionHandoffIncludeToggles } from '../../../../../shared/fork-session-handoff/handoff-settings-types'
 import type { ForkHandoffRelationship } from '../../../../../shared/fork-session-handoff/session-lineage-types'
 import type { TuiAgent } from '../../../../../shared/tui-agent'
 import { clearHandoffDraft, type HandoffDraftSourceIdentity } from './handoff-draft-preservation'
@@ -43,7 +40,6 @@ type UseHandoffDialogStartArgs = {
   draftIdentity: HandoffDraftSourceIdentity
   includeToggles: ForkSessionHandoffIncludeToggles
   selectedTemplateId: string | null
-  settings: ForkSessionHandoffSettings | undefined
   launchedRef: { current: boolean }
   setTargetWorktreeId: (worktreeId: string) => void
   setCreateMode: (createMode: boolean) => void
@@ -117,7 +113,6 @@ export function useHandoffDialogStart(args: UseHandoffDialogStartArgs): () => Pr
         // writing the built-in catalog back would freeze its translated names and pin the
         // defaults against future changes.
         settings: {
-          ...args.settings,
           lastAgent: args.selectedAgent,
           includeToggles: args.includeToggles,
           lastTemplateId: args.selectedTemplateId

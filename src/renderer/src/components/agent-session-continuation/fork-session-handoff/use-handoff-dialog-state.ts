@@ -16,6 +16,7 @@ import {
   type HandoffPreviewPhase
 } from '@/lib/fork-session-handoff/handoff-preview-detach'
 import { estimateHandoffTokens } from '@/lib/fork-session-handoff/handoff-token-estimate'
+import { saveHandoffTemplate } from '@/lib/fork-session-handoff/handoff-template-mutations'
 import { scanHandoffBriefForSecrets } from '@/lib/fork-session-handoff/handoff-secret-scan'
 import {
   getHandoffAnchorRepoId,
@@ -103,6 +104,7 @@ export function useHandoffDialogState({ open, request }: UseHandoffDialogStateAr
   const [waitingForIdle, setWaitingForIdle] = useState(false)
   const [busyDismissed, setBusyDismissed] = useState(false)
   const launchedRef = useRef(false)
+  const templateSaveGenerationRef = useRef(0)
 
   const target = useMemo(
     () => (targetWorktreeId ? resolveHandoffTarget(store, targetWorktreeId) : null),
@@ -167,6 +169,11 @@ export function useHandoffDialogState({ open, request }: UseHandoffDialogStateAr
     [anchorWorktreeId, forkSource?.sourceWorktreeId, includeToggles.openEditorTabs, openFiles]
   )
   const selectedTemplate = templates.find((template) => template.id === selectedTemplateId) ?? null
+  useEffect(() => {
+    if (selectedTemplateId && !selectedTemplate) {
+      setSelectedTemplateId(null)
+    }
+  }, [selectedTemplate, selectedTemplateId])
   const compositionInputs = useMemo<HandoffBriefInputs | null>(
     () =>
       source
@@ -200,6 +207,12 @@ export function useHandoffDialogState({ open, request }: UseHandoffDialogStateAr
   )
   const effectivePreviewBody =
     previewPhase.phase === 'attached' ? (composition?.editableBody ?? '') : previewBody
+
+  useEffect(() => {
+    if (!open) {
+      templateSaveGenerationRef.current += 1
+    }
+  }, [open])
 
   useEffect(() => {
     if (!open || !request) {
@@ -347,7 +360,35 @@ export function useHandoffDialogState({ open, request }: UseHandoffDialogStateAr
     applyHandoffPreviewEvent({ type: 'observed-idle' }, setPreviewPhase)
   }, [forkSource, request?.source, setCapturedText])
 
+  const saveSteeringNoteAsTemplate = useCallback(
+    async (name: string): Promise<boolean> => {
+      const generation = ++templateSaveGenerationRef.current
+      let template
+      try {
+        template = await saveHandoffTemplate({
+          name,
+          body: steeringNote,
+          update: (updates) => useAppStore.getState().updateSettingsOrThrow(updates),
+          readTemplates: () => useAppStore.getState().settings?.forkSessionHandoff?.templates
+        })
+      } catch (error) {
+        setOperationError(error instanceof Error ? error.message : String(error))
+        return false
+      }
+      if (!template || templateSaveGenerationRef.current !== generation) {
+        return false
+      }
+      setSelectedTemplateId(template.id)
+      setSteeringNote('')
+      setOperationError(null)
+      changeControl()
+      return true
+    },
+    [changeControl, steeringNote]
+  )
+
   const dismiss = useCallback(() => {
+    templateSaveGenerationRef.current += 1
     if (launchedRef.current || !request) {
       return
     }
@@ -374,7 +415,7 @@ export function useHandoffDialogState({ open, request }: UseHandoffDialogStateAr
     targetWorktreeId
   ])
 
-  const start = useHandoffDialogStart({
+  const launchHandoff = useHandoffDialogStart({
     request,
     forkSource,
     selectedAgent,
@@ -393,7 +434,6 @@ export function useHandoffDialogState({ open, request }: UseHandoffDialogStateAr
     draftIdentity,
     includeToggles,
     selectedTemplateId,
-    settings: store.settings?.forkSessionHandoff,
     launchedRef,
     setTargetWorktreeId,
     setCreateMode,
@@ -402,6 +442,13 @@ export function useHandoffDialogState({ open, request }: UseHandoffDialogStateAr
     setOperationError,
     setStarting
   })
+  const start = useCallback(async (): Promise<boolean> => {
+    const started = await launchHandoff()
+    if (started) {
+      templateSaveGenerationRef.current += 1
+    }
+    return started
+  }, [launchHandoff])
 
   return {
     targets,
@@ -442,6 +489,7 @@ export function useHandoffDialogState({ open, request }: UseHandoffDialogStateAr
       changeControl()
     },
     steeringNote,
+    saveSteeringNoteAsTemplate,
     setSteeringNote: (note: string) => {
       setSteeringNote(note)
       changeControl()

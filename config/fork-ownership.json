@@ -1376,7 +1376,9 @@
       "lines": [
         "} from '@/components/native-chat/fork-native-chat-relay/native-chat-runtime-contract'",
         "  const readNativeChatSession = async (",
-        "    readSession: readNativeChatSession,"
+        "    readSession: readNativeChatSession,",
+        "import { mergeForkSessionHandoffSettings } from '../../../shared/fork-session-handoff/handoff-settings-merge'",
+        "    ...mergeForkSessionHandoffSettings(base, updates),"
       ]
     },
     {
@@ -1603,6 +1605,39 @@
       "kind": "import-swap",
       "lines": [
         "import { prepareAgentSessionContinuationFromPane } from '@/components/agent-session-continuation/fork-session-handoff/prepare-handoff-from-pane'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/Settings.tsx",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { ForkSessionHandoffSettingsSection } from './fork-session-handoff/ForkSessionHandoffSettingsSection'",
+        "                <ForkSessionHandoffSettingsSection />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/hooks/useSettingsNavigationMetadata.ts",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { getForkSessionHandoffNavSections } from '@/components/settings/fork-session-handoff/handoff-settings-nav-section'",
+        "    ...getForkSessionHandoffNavSections(),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/settings-navigation-types.ts",
+      "feature": "session-handoff",
+      "kind": "passthrough",
+      "lines": ["  'session-handoff',"]
+    },
+    {
+      "path": "src/main/persistence/applying-settings/settings-update.ts",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { mergeForkSessionHandoffSettings } from '../../../shared/fork-session-handoff/handoff-settings-merge'",
+        "    ...mergeForkSessionHandoffSettings(operations.state.settings, sanitizedUpdates)"
       ]
     }
   ],
@@ -2766,7 +2801,7 @@
       "removed": 1
     },
     "src/renderer/src/web/web-preload-api.ts": {
-      "added": 29,
+      "added": 31,
       "removed": 17
     },
     "src/shared/constants.ts": {
@@ -2774,7 +2809,7 @@
       "removed": 0
     },
     "src/shared/global-settings-types.ts": {
-      "added": 7,
+      "added": 9,
       "removed": 0
     },
     "src/shared/keybindings.ts": {
@@ -2904,6 +2939,22 @@
     "src/renderer/src/components/native-chat/native-chat-attachment-upload.ts": {
       "added": 2,
       "removed": 0
+    },
+    "src/renderer/src/components/settings/Settings.tsx": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/renderer/src/hooks/useSettingsNavigationMetadata.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/lib/settings-navigation-types.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/main/persistence/applying-settings/settings-update.ts": {
+      "added": 3,
+      "removed": 1
     }
   }
 }

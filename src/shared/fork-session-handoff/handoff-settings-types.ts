@@ -7,6 +7,26 @@ export type ForkSessionHandoffTemplate = {
   body: string
 }
 
+/** An atomic write-only change to the persisted template catalog. */
+export type ForkSessionHandoffTemplateMutation =
+  | {
+      type: 'add'
+      template: ForkSessionHandoffTemplate
+      seedTemplates: ForkSessionHandoffTemplate[]
+    }
+  | {
+      type: 'update'
+      id: string
+      patch: Pick<ForkSessionHandoffTemplate, 'name' | 'body'>
+      seedTemplates: ForkSessionHandoffTemplate[]
+    }
+  | {
+      type: 'remove'
+      id: string
+      seedTemplates: ForkSessionHandoffTemplate[]
+    }
+  | { type: 'reset' }
+
 /** Controls which optional workspace context Orca adds to a handoff brief. */
 export type ForkSessionHandoffIncludeToggles = {
   repoState: boolean
@@ -20,6 +40,8 @@ export type ForkSessionHandoffSettings = {
   includeToggles?: ForkSessionHandoffIncludeToggles
   lastTemplateId?: string | null
   templates?: ForkSessionHandoffTemplate[]
+  /** Write-only transport field; the settings merge applies and removes it before persistence. */
+  templateMutation?: ForkSessionHandoffTemplateMutation
 }
 
 export const DEFAULT_FORK_SESSION_HANDOFF_INCLUDE_TOGGLES: ForkSessionHandoffIncludeToggles = {

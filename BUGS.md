@@ -57,3 +57,36 @@ entries' IDs; manual edits to fix typos are fine.
 - **Proposed fix**: Assert the container's locale in the live-zsh lane, or skip the non-ASCII case when the filesystem encoding cannot represent the path.
 - **Blocker for**: A clean green full-suite baseline on the remote sandbox.
 - **Addendum (2026-08-25)**: the referenced test file was deleted upstream by c72a4eecdd (zsh wrapper collapsed to one .zshenv plus a precmd hook), which reached this fork with v1.4.189. Confirm the non-ASCII case still exists in the reworked live-zsh lane before acting on this entry.
+
+## BUG-6: Saving a steering note as a template silently drops the already-selected template from the brief
+- **Observed**: 2026-08-26
+- **File**: src/renderer/src/components/agent-session-continuation/fork-session-handoff/use-handoff-dialog-state.ts:381
+- **Description**: saveSteeringNoteAsTemplate calls setSelectedTemplateId(newId) and setSteeringNote(''), replacing whatever template was already selected. Repro: select 'Debug the failure', add a steering note, save the note as a new template 'Flaky triage' -- the brief loses the 'Debug the failure' block with no warning. The user's intent was to add a template, not swap the active one.
+- **Introduced by**: code review of staged session-handoff customization changes
+- **Severity**: low
+- **Proposed fix**: Either keep the prior selection and treat the new template as catalog-only, or warn/confirm before replacing an active selection.
+
+## BUG-7: New Template option opens a dead-end naming panel once the catalog is at its limit
+- **Observed**: 2026-08-26
+- **File**: src/renderer/src/components/agent-session-continuation/fork-session-handoff/HandoffNotesControls.tsx:46
+- **Description**: At HANDOFF_TEMPLATES_MAX the 'New Template' select option stays selectable and opens the naming panel, but canSave is permanently false so the user can never complete the action. The only explanation is a title attribute on the select item, which is invisible once the panel is open. A test asserts the current behavior ('opens template creation at the catalog limit while keeping save disabled'), so changing it means changing that test too.
+- **Introduced by**: code review of staged session-handoff customization changes
+- **Severity**: low
+- **Proposed fix**: Disable the option at the limit, or render a visible at-limit message inside the naming panel next to the disabled save button.
+
+## BUG-8: A patch carrying both templates and templateMutation discards the explicit templates write
+- **Observed**: 2026-08-26
+- **File**: src/shared/fork-session-handoff/handoff-settings-merge.ts:93
+- **Description**: When a patch supplies both a templates array and a templateMutation, the merge computes the mutation against currentSettings.templates and then overwrites the caller's explicit templates value. The explicit write is silently lost. No caller batches them today, so this is latent, but it is a trap for any future caller that does.
+- **Introduced by**: code review of staged session-handoff customization changes
+- **Severity**: low
+- **Proposed fix**: Apply the mutation against the patch's templates when both are present, or reject the combination explicitly rather than silently preferring one.
+
+## BUG-9: A server-side rejected template mutation fails silently in the settings editor
+- **Observed**: 2026-08-26
+- **File**: src/shared/fork-session-handoff/handoff-settings-merge.ts:40
+- **Description**: A rejected add/update (empty name or body, duplicate id, at the catalog limit) returns applied: false with no reason. HandoffTemplatesPane.saveEditor then returns false and the editor just stays open, while persistTemplateMutation only toasts on a thrown error -- so the user sees nothing. Currently unreachable because canSave/atLimit gate every path client-side, but the rejection channel carries no signal a caller could surface.
+- **Introduced by**: code review of staged session-handoff customization changes
+- **Severity**: low
+- **Proposed fix**: Return a reason code alongside applied: false and have the pane surface it as a toast or inline editor error.
+

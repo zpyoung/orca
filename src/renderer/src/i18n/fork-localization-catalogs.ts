@@ -24,6 +24,11 @@ import dockSettingsES from '../components/settings/fork-terminal-dock/locales/es
 import dockSettingsJA from '../components/settings/fork-terminal-dock/locales/ja.json'
 import dockSettingsKO from '../components/settings/fork-terminal-dock/locales/ko.json'
 import dockSettingsZH from '../components/settings/fork-terminal-dock/locales/zh.json'
+import handoffSettingsEN from '../components/settings/fork-session-handoff/locales/en.json'
+import handoffSettingsES from '../components/settings/fork-session-handoff/locales/es.json'
+import handoffSettingsJA from '../components/settings/fork-session-handoff/locales/ja.json'
+import handoffSettingsKO from '../components/settings/fork-session-handoff/locales/ko.json'
+import handoffSettingsZH from '../components/settings/fork-session-handoff/locales/zh.json'
 import agentComposerEN from '../components/native-chat/fork-agent-composer/locales/en.json'
 import agentComposerES from '../components/native-chat/fork-agent-composer/locales/es.json'
 import agentComposerJA from '../components/native-chat/fork-agent-composer/locales/ja.json'
@@ -63,6 +68,7 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     worktreeGroupsEN,
     dockEN,
     dockSettingsEN,
+    handoffSettingsEN,
     agentComposerEN,
     skillPluginsEN,
     handoffEN
@@ -73,6 +79,7 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     worktreeGroupsES,
     dockES,
     dockSettingsES,
+    handoffSettingsES,
     agentComposerES,
     skillPluginsES,
     handoffES
@@ -83,6 +90,7 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     worktreeGroupsJA,
     dockJA,
     dockSettingsJA,
+    handoffSettingsJA,
     agentComposerJA,
     skillPluginsJA,
     handoffJA
@@ -93,6 +101,7 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     worktreeGroupsKO,
     dockKO,
     dockSettingsKO,
+    handoffSettingsKO,
     agentComposerKO,
     skillPluginsKO,
     handoffKO
@@ -103,6 +112,7 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     worktreeGroupsZH,
     dockZH,
     dockSettingsZH,
+    handoffSettingsZH,
     agentComposerZH,
     skillPluginsZH,
     handoffZH

@@ -2,7 +2,6 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { ChevronDown, Loader2, MessageSquarePlus } from 'lucide-react'
 import { closeUnfocusedMonacoFindOrPreventDialogDismiss } from '@/components/editor/monaco-find-widget'
 import { Button } from '@/components/ui/button'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import {
   Dialog,
   DialogContent,
@@ -13,6 +12,7 @@ import {
 } from '@/components/ui/dialog'
 import { translate } from '@/i18n/i18n'
 import { getAgentLabel } from '@/lib/agent-catalog'
+import { cn } from '@/lib/utils'
 import type { AgentSessionContinuationRequest } from '@/lib/agent-session-continuation'
 import { HandoffContentControls } from './HandoffContentControls'
 import { HandoffDestinationControls } from './HandoffDestinationControls'
@@ -27,6 +27,7 @@ import { useHandoffDialogState } from './use-handoff-dialog-state'
 const HandoffPreviewEditor = lazy(() =>
   import('./HandoffPreviewEditor').then((module) => ({ default: module.HandoffPreviewEditor }))
 )
+const HANDOFF_PREVIEW_PANEL_ID = 'handoff-brief-preview-panel'
 
 type AgentSessionContinuationDialogProps = {
   open: boolean
@@ -40,13 +41,13 @@ export function AgentSessionContinuationDialog({
   onOpenChange
 }: AgentSessionContinuationDialogProps): React.JSX.Element {
   const state = useHandoffDialogState({ open, request })
-  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(true)
   const contentRef = useRef<HTMLDivElement>(null)
   const forkSource = (request as ForkSessionHandoffRequest | null)?.forkSource
 
   useEffect(() => {
     if (open) {
-      setPreviewOpen(false)
+      setPreviewOpen(true)
     }
   }, [open])
 
@@ -173,31 +174,39 @@ export function AgentSessionContinuationDialog({
               steeringNote={state.steeringNote}
               onTemplateChange={state.setSelectedTemplateId}
               onSteeringNoteChange={state.setSteeringNote}
+              onSaveSteeringNoteAsTemplate={state.saveSteeringNoteAsTemplate}
             />
           </div>
 
-          <Collapsible
-            open={previewOpen}
-            onOpenChange={setPreviewOpen}
-            className="min-h-0 min-w-0 md:contents"
-          >
-            <CollapsibleTrigger asChild>
-              <Button type="button" variant="ghost" className="m-3 justify-between md:hidden">
-                {translate(
-                  'components.agentSessionContinuation.forkSessionHandoff.showPreview',
-                  'Brief preview'
-                )}
-                <ChevronDown
-                  aria-hidden="true"
-                  className={
-                    previewOpen ? 'rotate-180 transition-transform' : 'transition-transform'
-                  }
-                />
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent
-              forceMount
-              className="scrollbar-sleek hidden min-h-0 min-w-0 overflow-y-auto p-4 data-[state=open]:block md:block"
+          <div className="flex min-h-0 min-w-0 flex-col">
+            <Button
+              type="button"
+              variant="ghost"
+              aria-expanded={previewOpen}
+              aria-controls={HANDOFF_PREVIEW_PANEL_ID}
+              onClick={() => setPreviewOpen((current) => !current)}
+              className="m-3 justify-between md:hidden"
+            >
+              {translate(
+                'components.agentSessionContinuation.forkSessionHandoff.showPreview',
+                'Brief preview'
+              )}
+              <ChevronDown
+                aria-hidden="true"
+                className={previewOpen ? 'rotate-180 transition-transform' : 'transition-transform'}
+              />
+            </Button>
+            <div
+              id={HANDOFF_PREVIEW_PANEL_ID}
+              role="region"
+              aria-label={translate(
+                'components.agentSessionContinuation.forkSessionHandoff.preview',
+                'Brief preview'
+              )}
+              className={cn(
+                'scrollbar-sleek min-h-0 min-w-0 flex-1 overflow-y-auto p-4 md:block',
+                previewOpen ? 'block' : 'hidden'
+              )}
             >
               <Suspense fallback={null}>
                 <HandoffPreviewEditor
@@ -212,8 +221,8 @@ export function AgentSessionContinuationDialog({
                   onDismiss={dismiss}
                 />
               </Suspense>
-            </CollapsibleContent>
-          </Collapsible>
+            </div>
+          </div>
         </div>
 
         <div className="shrink-0 border-t border-border px-4 pt-3">

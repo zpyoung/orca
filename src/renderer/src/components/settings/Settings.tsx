@@ -57,6 +57,7 @@ import { ExperimentalPane } from './ExperimentalPane'
 import { PluginsSettingsSection } from './PluginsSettingsSection'
 import { AgentsPane } from './AgentsPane'
 import { OrchestrationPane } from './OrchestrationPane'
+import { ForkSessionHandoffSettingsSection } from './fork-session-handoff/ForkSessionHandoffSettingsSection'
 import { ArtifactsSettingsPane } from './ArtifactsSettingsPane'
 import { ShareSkillsSettingsPane } from './ShareSkillsSettingsPane'
 import { AutomationsSettingsPane } from './AutomationsSettingsPane'
@@ -1570,6 +1571,8 @@ function Settings(): React.JSX.Element {
                     />
                   ) : null}
                 </SettingsSection>
+
+                <ForkSessionHandoffSettingsSection />
 
                 {showDesktopOnlySettings ? (
                   <SettingsSection
