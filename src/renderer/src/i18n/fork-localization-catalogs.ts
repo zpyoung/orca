@@ -34,6 +34,11 @@ import skillPluginsES from '../components/native-chat/fork-skill-plugin-attribut
 import skillPluginsJA from '../components/native-chat/fork-skill-plugin-attribution/locales/ja.json'
 import skillPluginsKO from '../components/native-chat/fork-skill-plugin-attribution/locales/ko.json'
 import skillPluginsZH from '../components/native-chat/fork-skill-plugin-attribution/locales/zh.json'
+import handoffEN from '../components/agent-session-continuation/fork-session-handoff/locales/en.json'
+import handoffES from '../components/agent-session-continuation/fork-session-handoff/locales/es.json'
+import handoffJA from '../components/agent-session-continuation/fork-session-handoff/locales/ja.json'
+import handoffKO from '../components/agent-session-continuation/fork-session-handoff/locales/ko.json'
+import handoffZH from '../components/agent-session-continuation/fork-session-handoff/locales/zh.json'
 
 type ForkLocale = 'en' | 'es' | 'ja' | 'ko' | 'zh'
 type ForkCatalog = Record<string, unknown>
@@ -52,11 +57,56 @@ type ForkCatalogRegistrar = {
 }
 
 const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
-  en: [relayEN, en, worktreeGroupsEN, dockEN, dockSettingsEN, agentComposerEN, skillPluginsEN],
-  es: [relayES, es, worktreeGroupsES, dockES, dockSettingsES, agentComposerES, skillPluginsES],
-  ja: [relayJA, ja, worktreeGroupsJA, dockJA, dockSettingsJA, agentComposerJA, skillPluginsJA],
-  ko: [relayKO, ko, worktreeGroupsKO, dockKO, dockSettingsKO, agentComposerKO, skillPluginsKO],
-  zh: [relayZH, zh, worktreeGroupsZH, dockZH, dockSettingsZH, agentComposerZH, skillPluginsZH]
+  en: [
+    relayEN,
+    en,
+    worktreeGroupsEN,
+    dockEN,
+    dockSettingsEN,
+    agentComposerEN,
+    skillPluginsEN,
+    handoffEN
+  ],
+  es: [
+    relayES,
+    es,
+    worktreeGroupsES,
+    dockES,
+    dockSettingsES,
+    agentComposerES,
+    skillPluginsES,
+    handoffES
+  ],
+  ja: [
+    relayJA,
+    ja,
+    worktreeGroupsJA,
+    dockJA,
+    dockSettingsJA,
+    agentComposerJA,
+    skillPluginsJA,
+    handoffJA
+  ],
+  ko: [
+    relayKO,
+    ko,
+    worktreeGroupsKO,
+    dockKO,
+    dockSettingsKO,
+    agentComposerKO,
+    skillPluginsKO,
+    handoffKO
+  ],
+  zh: [
+    relayZH,
+    zh,
+    worktreeGroupsZH,
+    dockZH,
+    dockSettingsZH,
+    agentComposerZH,
+    skillPluginsZH,
+    handoffZH
+  ]
 }
 
 export function registerForkLocalizationCatalogs(i18n: ForkCatalogRegistrar): void {

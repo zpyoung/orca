@@ -32,7 +32,7 @@ import {
   VAULT_GROUP_HEADER_ROW_HEIGHT,
   VAULT_SESSION_ROW_HEIGHT
 } from './ai-vault-virtual-rows'
-import { canContinueAiVaultSessionInNewSession } from './ai-vault-session-continuation'
+import { resolveAiVaultSessionHandoffWorktreeId } from '@/components/agent-session-continuation/fork-session-handoff/ai-vault-handoff-action'
 
 const VAULT_ROW_OVERSCAN = 8
 const VAULT_EXPANDED_SESSION_ROW_ESTIMATED_HEIGHT = 420
@@ -314,9 +314,8 @@ function AiVaultVirtualRow({
   const resumeState = row.type === 'session' ? getSessionResumeState(row.session) : null
   const resumeActions = row.type === 'session' ? getSessionResumeActions(row.session) : null
   const continuationWorktreeId =
-    row.type === 'session' &&
-    canContinueAiVaultSessionInNewSession(row.session, resumeState?.worktreeId)
-      ? resumeState?.worktreeId
+    row.type === 'session'
+      ? resolveAiVaultSessionHandoffWorktreeId(row.session, resumeActions)
       : null
   // Gate resume on real content: a zero-turn transcript would resume into an
   // empty conversation, so it is never offered as normally resumable.
