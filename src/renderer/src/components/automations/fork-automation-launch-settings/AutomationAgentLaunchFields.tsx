@@ -36,11 +36,11 @@ export function AutomationAgentLaunchFields({
       ? undefined
       : isEmptyAgentLaunchOverrides(draft.launchOverrides)
         ? translate(
-            'auto.components.automations.AutomationEditorDialogFooter.launchSettingsUnsupported',
+            'auto.components.automations.AutomationAgentLaunchFields.launchSettingsUnsupported',
             "This automation's host doesn't support launch settings. Update the remote Orca server."
           )
         : translate(
-            'auto.components.automations.AutomationEditorDialogFooter.launchSettingsNotSaved',
+            'auto.components.automations.AutomationAgentLaunchFields.launchSettingsNotSaved',
             "Launch settings can't be saved to this host and won't apply to runs."
           )
 

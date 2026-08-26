@@ -1,0 +1,14 @@
+{
+  "auto": {
+    "components": {
+      "feature": {
+        "wall": {
+          "AiCommitPrSettingsFields": {
+            "a8a91aa917": "Definido por recetas de acciones.",
+            "b66be73624": "Su receta de acciones lo reemplaza para {{value0}}."
+          }
+        }
+      }
+    }
+  }
+}

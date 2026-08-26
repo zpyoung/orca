@@ -39,6 +39,21 @@ import dirtyBranchES from '../components/right-sidebar/fork-dirty-branch-indicat
 import dirtyBranchJA from '../components/right-sidebar/fork-dirty-branch-indicator/locales/ja.json'
 import dirtyBranchKO from '../components/right-sidebar/fork-dirty-branch-indicator/locales/ko.json'
 import dirtyBranchZH from '../components/right-sidebar/fork-dirty-branch-indicator/locales/zh.json'
+import launchFieldsEN from '../components/fork-automation-launch-settings/locales/en.json'
+import launchFieldsES from '../components/fork-automation-launch-settings/locales/es.json'
+import launchFieldsJA from '../components/fork-automation-launch-settings/locales/ja.json'
+import launchFieldsKO from '../components/fork-automation-launch-settings/locales/ko.json'
+import launchFieldsZH from '../components/fork-automation-launch-settings/locales/zh.json'
+import automationLaunchEN from '../components/automations/fork-automation-launch-settings/locales/en.json'
+import automationLaunchES from '../components/automations/fork-automation-launch-settings/locales/es.json'
+import automationLaunchJA from '../components/automations/fork-automation-launch-settings/locales/ja.json'
+import automationLaunchKO from '../components/automations/fork-automation-launch-settings/locales/ko.json'
+import automationLaunchZH from '../components/automations/fork-automation-launch-settings/locales/zh.json'
+import recipeOverridesEN from '../components/feature-wall/fork-automation-launch-settings/locales/en.json'
+import recipeOverridesES from '../components/feature-wall/fork-automation-launch-settings/locales/es.json'
+import recipeOverridesJA from '../components/feature-wall/fork-automation-launch-settings/locales/ja.json'
+import recipeOverridesKO from '../components/feature-wall/fork-automation-launch-settings/locales/ko.json'
+import recipeOverridesZH from '../components/feature-wall/fork-automation-launch-settings/locales/zh.json'
 
 type ForkLocale = 'en' | 'es' | 'ja' | 'ko' | 'zh'
 type ForkCatalog = Record<string, unknown>
@@ -65,7 +80,10 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     dockSettingsEN,
     agentComposerEN,
     skillPluginsEN,
-    dirtyBranchEN
+    dirtyBranchEN,
+    launchFieldsEN,
+    automationLaunchEN,
+    recipeOverridesEN
   ],
   es: [
     relayES,
@@ -75,7 +93,10 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     dockSettingsES,
     agentComposerES,
     skillPluginsES,
-    dirtyBranchES
+    dirtyBranchES,
+    launchFieldsES,
+    automationLaunchES,
+    recipeOverridesES
   ],
   ja: [
     relayJA,
@@ -85,7 +106,10 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     dockSettingsJA,
     agentComposerJA,
     skillPluginsJA,
-    dirtyBranchJA
+    dirtyBranchJA,
+    launchFieldsJA,
+    automationLaunchJA,
+    recipeOverridesJA
   ],
   ko: [
     relayKO,
@@ -95,7 +119,10 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     dockSettingsKO,
     agentComposerKO,
     skillPluginsKO,
-    dirtyBranchKO
+    dirtyBranchKO,
+    launchFieldsKO,
+    automationLaunchKO,
+    recipeOverridesKO
   ],
   zh: [
     relayZH,
@@ -105,7 +132,10 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     dockSettingsZH,
     agentComposerZH,
     skillPluginsZH,
-    dirtyBranchZH
+    dirtyBranchZH,
+    launchFieldsZH,
+    automationLaunchZH,
+    recipeOverridesZH
   ]
 }
 

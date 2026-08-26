@@ -32,7 +32,7 @@ function formatOptionValue(label: string, value: SessionOptionValue): string {
     return label
   }
   if (value === false) {
-    return `${label}: ${translate('auto.components.agent.launch.AgentLaunchOverridesFields.off', 'Off')}`
+    return `${label}: ${translate('auto.components.automations.AutomationRunLaunchDisplay.off', 'Off')}`
   }
   return `${label}: ${value}`
 }
