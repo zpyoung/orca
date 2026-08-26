@@ -18,22 +18,31 @@ export function useNativeChatPasteBridge({
   questionAnswerInputRef
 }: NativeChatPasteBridgeRefs): () => void {
   const pasteClipboardIntoComposer = useCallback(() => {
-    if (composerRef.current) {
+    const answerInput = questionAnswerInputRef?.current
+    // Both targets can be mounted at once — the terminal dock keeps its composer
+    // up beside an active card instead of unmounting it — so route by focus
+    // rather than by whichever one happens to exist.
+    const answerInputFocused = answerInput != null && document.activeElement === answerInput
+    if (composerRef.current && !answerInputFocused) {
       composerRef.current.pasteFromClipboard()
       return
     }
-    const answerInput = questionAnswerInputRef?.current
     if (!answerInput) {
       return
     }
-    // Text-only on purpose: the answer input takes no image attachments.
+    // The answer input takes no image attachments, so it gets the text. An
+    // image-only clipboard would otherwise vanish here: with no event in hand,
+    // empty text is the only signal that the paste was an image, and the
+    // composer's paste path is what knows how to save and attach one.
     void (async () => {
       const text = await window.api.ui
         .readClipboardText({ maxBytes: TEXT_CONTROL_PASTE_MAX_BYTES })
         .catch(() => '')
       if (text.length > 0) {
         await pasteTextIntoTextControl(answerInput, text, { source: 'programmatic' })
+        return
       }
+      composerRef.current?.pasteFromClipboard()
     })()
   }, [composerRef, questionAnswerInputRef])
 

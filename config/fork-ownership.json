@@ -609,6 +609,15 @@
       ]
     },
     {
+      "path": "src/renderer/src/components/native-chat/native-chat-attachment-upload.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": [
+        "import { rememberUploadedAttachmentPreviewSources } from './fork-agent-composer/agent-composer-attachment-preview'",
+        "    rememberUploadedAttachmentPreviewSources(owner, paths, resolvedPaths, skipped, failed)"
+      ]
+    },
+    {
       "path": "src/renderer/src/components/native-chat/native-chat-command-marker.ts",
       "feature": "agent-composer",
       "kind": "import-swap",
@@ -1996,6 +2005,42 @@
       "path": "tests/e2e/cross-version-wire/release-checkout.ts",
       "reason": "Encodes the fork's own (tagless) release-history shape for cross-version wire tests.",
       "status": "permanent"
+    },
+    {
+      "path": "src/shared/native-file-drop.ts",
+      "reason": "Gives the composer drop payload the tabId/paneLeafId its terminal sibling already carries, so a broadcast drop reaches only the composer it landed on. Upstream's shared drop contract, read by preload, main, and every drop consumer — a forked copy would not reroute them.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#composer-file-drop-pane-scoping"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-file-attachment-actions.ts",
+      "reason": "Ignores a composer file drop addressed to a different composer; unaddressed payloads still attach. Correctness fix to upstream routing, not fork-specific behavior.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#composer-file-drop-pane-scoping"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-file-attachment-actions.test.tsx",
+      "reason": "Covers the composer file-drop pane scoping fix: addressed, cross-pane, cross-tab, and unaddressed drops. Ships with the fix it exercises.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#composer-file-drop-pane-scoping"
+    },
+    {
+      "path": "src/shared/native-file-drop.test.ts",
+      "reason": "Adds composer tab/pane routing cases alongside the existing terminal ones, covering the composer drop payload change in the same file.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#composer-file-drop-pane-scoping"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-paste-bridge.ts",
+      "reason": "Routes pane-level Paste by focus instead of by which target happens to be mounted, and hands an image-only clipboard back to the composer so the app-menu path cannot claim a paste and then drop it. Upstream unmounts the composer behind a question card, so composer-wins was safe there; a host that keeps both mounted sent every Paste to the composer and starved the card's answer input.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#pane-paste-routing-by-focus"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-paste-bridge.test.tsx",
+      "reason": "Covers the pane-paste focus routing fix: composer-only, answer-input-only, both mounted with either focused, an image-only clipboard at the focused answer input, and neither mounted. Ships with the fix it exercises.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#pane-paste-routing-by-focus"
     }
   ],
   "residuals": {
@@ -2228,8 +2273,8 @@
       "removed": 10
     },
     "src/renderer/src/components/native-chat/NativeChatComposer.tsx": {
-      "added": 184,
-      "removed": 345
+      "added": 188,
+      "removed": 346
     },
     "src/renderer/src/components/native-chat/NativeChatInteractiveCard.test.tsx": {
       "added": 21,
@@ -2722,6 +2767,10 @@
     "src/renderer/src/components/sidebar/worktree-list/drag/use-drop-commit-context.ts": {
       "added": 8,
       "removed": 1
+    },
+    "src/renderer/src/components/native-chat/native-chat-attachment-upload.ts": {
+      "added": 2,
+      "removed": 0
     }
   }
 }

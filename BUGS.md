@@ -47,3 +47,13 @@ entries' IDs; manual edits to fix typos are fine.
 - **File**: config/fork-ownership.json
 - **Description**: TerminalPane.tsx carries ~128 lines of fork-authored terminal-dock wiring (imports, useTerminalPaneDock, the dock-mount JSX block, focus-ownership call sites) but is declared only as an `exceptions` entry whose reason describes an unrelated upstream fix ("Corrects effectiveChatViewMode"). No `seams` entry names the dock lines, and `residuals` is schema-illegal for exception paths, so nothing records or bounds the dock footprint. The guard passes because an exception path is checked for existence only, never content — confirmed in .github/scripts/check-fork-ownership.mjs (checkStaleEntries is the only check that touches an exception path). The wiring has ridden this unrelated exception since bbfba96abc and survived the v1.4.186 and v1.4.187 syncs without ever being described. Consequence: a sync has no declared spec of what the dock wiring should look like, and any accidental loss of those lines is invisible to CI. Needs an owner decision — split the dock wiring into its own manifest entry, or restate the exception reason to cover the file's real fork footprint.
 - **Severity**: medium
+
+## BUG-5: Live-zsh ZDOTDIR discovery fails on a non-ASCII wrapper path inside the test sandbox
+- **Observed**: 2026-08-24
+- **File**: src/main/providers/local-pty-shell-ready-zsh-zdotdir-discovery.test.ts
+- **Description**: `live zsh subprocess tests > ZDOTDIR discovery with real zsh > loads user .zshrc when the wrapper dir contains a non-ASCII (token-range) path` fails in the Docker test sandbox. It fails in isolation (6-file batch, 1 of 100 cases) as well as under full-suite load, and no renderer or composer change touches it — the container's locale/filesystem encoding is the likely dependence. Every other file that failed the 16-shard full-suite run passed when re-run in isolation, so those are the known load-sensitive class (TEST-1); this one is not.
+- **Introduced by**: pre-existing / sandbox environment
+- **Severity**: low
+- **Proposed fix**: Assert the container's locale in the live-zsh lane, or skip the non-ASCII case when the filesystem encoding cannot represent the path.
+- **Blocker for**: A clean green full-suite baseline on the remote sandbox.
+- **Addendum (2026-08-25)**: the referenced test file was deleted upstream by c72a4eecdd (zsh wrapper collapsed to one .zshenv plus a precmd hook), which reached this fork with v1.4.189. Confirm the non-ASCII case still exists in the reworked live-zsh lane before acting on this entry.

@@ -10,6 +10,7 @@ import { getConnectionIdFromState } from '@/lib/connection-context'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
 import type { AppState } from '@/store/types'
 import { reportTerminalDropUploadSkipsAndFailures } from '../terminal-pane/terminal-drop-upload-report'
+import { rememberUploadedAttachmentPreviewSources } from './fork-agent-composer/agent-composer-attachment-preview'
 import {
   findTerminalTabWorktreeId,
   resolveNativeChatFileLinkContext
@@ -114,6 +115,7 @@ export async function uploadNativeChatAttachmentPaths(
       expectedSshConnectionGeneration: owner.expectedSshConnectionGeneration
     })
     reportTerminalDropUploadSkipsAndFailures(skipped, failed)
+    rememberUploadedAttachmentPreviewSources(owner, paths, resolvedPaths, skipped, failed)
     return resolvedPaths
   } catch (err) {
     toast.error(extractIpcErrorMessage(err, 'Failed to upload files.'))
