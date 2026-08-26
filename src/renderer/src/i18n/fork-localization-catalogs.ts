@@ -44,6 +44,11 @@ import handoffES from '../components/agent-session-continuation/fork-session-han
 import handoffJA from '../components/agent-session-continuation/fork-session-handoff/locales/ja.json'
 import handoffKO from '../components/agent-session-continuation/fork-session-handoff/locales/ko.json'
 import handoffZH from '../components/agent-session-continuation/fork-session-handoff/locales/zh.json'
+import dirtyBranchEN from '../components/right-sidebar/fork-dirty-branch-indicator/locales/en.json'
+import dirtyBranchES from '../components/right-sidebar/fork-dirty-branch-indicator/locales/es.json'
+import dirtyBranchJA from '../components/right-sidebar/fork-dirty-branch-indicator/locales/ja.json'
+import dirtyBranchKO from '../components/right-sidebar/fork-dirty-branch-indicator/locales/ko.json'
+import dirtyBranchZH from '../components/right-sidebar/fork-dirty-branch-indicator/locales/zh.json'
 
 type ForkLocale = 'en' | 'es' | 'ja' | 'ko' | 'zh'
 type ForkCatalog = Record<string, unknown>
@@ -71,7 +76,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     handoffSettingsEN,
     agentComposerEN,
     skillPluginsEN,
-    handoffEN
+    handoffEN,
+    dirtyBranchEN
   ],
   es: [
     relayES,
@@ -82,7 +88,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     handoffSettingsES,
     agentComposerES,
     skillPluginsES,
-    handoffES
+    handoffES,
+    dirtyBranchES
   ],
   ja: [
     relayJA,
@@ -93,7 +100,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     handoffSettingsJA,
     agentComposerJA,
     skillPluginsJA,
-    handoffJA
+    handoffJA,
+    dirtyBranchJA
   ],
   ko: [
     relayKO,
@@ -104,7 +112,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     handoffSettingsKO,
     agentComposerKO,
     skillPluginsKO,
-    handoffKO
+    handoffKO,
+    dirtyBranchKO
   ],
   zh: [
     relayZH,
@@ -115,7 +124,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     handoffSettingsZH,
     agentComposerZH,
     skillPluginsZH,
-    handoffZH
+    handoffZH,
+    dirtyBranchZH
   ]
 }
 

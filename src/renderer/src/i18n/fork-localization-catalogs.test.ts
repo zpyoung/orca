@@ -24,7 +24,7 @@ describe('registerForkLocalizationCatalogs', () => {
     const englishCatalogs = addResourceBundle.mock.calls
       .filter(([language]) => language === 'en')
       .map(([, , catalog]) => catalog)
-    expect(englishCatalogs).toHaveLength(9)
+    expect(englishCatalogs).toHaveLength(10)
     expect(englishCatalogs).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -52,7 +52,7 @@ describe('registerForkLocalizationCatalogs', () => {
     const spanishCatalogs = addResourceBundle.mock.calls
       .filter(([language]) => language === 'es')
       .map(([, , catalog]) => catalog)
-    expect(spanishCatalogs).toHaveLength(9)
+    expect(spanishCatalogs).toHaveLength(10)
     expect(spanishCatalogs).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ components: expect.any(Object) }),
