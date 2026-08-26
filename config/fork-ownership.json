@@ -42,6 +42,11 @@
       "name": "skill-plugin-attribution",
       "purpose": "Attributes each discovered skill to the plugin that owns it, so the composer's skill picker can name the plugin and disambiguate a skill offered by more than one.",
       "globs": ["**/fork-skill-plugin-attribution/**"]
+    },
+    {
+      "name": "dirty-branch-indicator",
+      "purpose": "Marks the right sidebar's Source Control tab while the active worktree has uncommitted changes, so a dirty branch is visible without opening the panel.",
+      "globs": ["**/fork-dirty-branch-indicator/**"]
     }
   ],
   "seams": [
@@ -755,6 +760,17 @@
       "feature": "agent-composer",
       "kind": "registration",
       "lines": ["import type { HistoryState } from './fork-agent-composer/agent-composer-history'"]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/use-right-sidebar-activity-items.ts",
+      "feature": "dirty-branch-indicator",
+      "kind": "registration",
+      "lines": [
+        "import { useSourceControlDirtyItemOverride } from './fork-dirty-branch-indicator/use-source-control-dirty-item-override'",
+        "  const sourceControlDirtyItemOverride = useSourceControlDirtyItemOverride()",
+        "        ...sourceControlDirtyItemOverride,",
+        "      sourceControlDirtyItemOverride,"
+      ]
     },
     {
       "path": "src/renderer/src/components/settings/ExperimentalPane.test.tsx",
@@ -2305,6 +2321,10 @@
     "src/renderer/src/components/native-chat/use-native-chat-typed-insertion.ts": {
       "added": 1,
       "removed": 1
+    },
+    "src/renderer/src/components/right-sidebar/use-right-sidebar-activity-items.ts": {
+      "added": 5,
+      "removed": 0
     },
     "src/renderer/src/components/settings/ExperimentalPane.test.tsx": {
       "added": 31,
