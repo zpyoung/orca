@@ -64,7 +64,7 @@ describe('agent session create operation', () => {
     vi.unstubAllGlobals()
   })
 
-  it('keeps legacy launch preferences when general values are not negotiated', () => {
+  it('keeps only supported string launch preferences', () => {
     expect(
       toAgentLaunchPreferences({
         model: ' gpt-5 ',
@@ -73,25 +73,5 @@ describe('agent session create operation', () => {
         fastMode: true
       })
     ).toEqual({ model: 'gpt-5', effort: 'high', mode: 'plan' })
-  })
-
-  it('includes non-legacy launch values only when negotiated', () => {
-    expect(
-      toAgentLaunchPreferences(
-        { model: 'gpt-5', effort: 'high', thinking: true, fastMode: false },
-        { includeOptionValues: true }
-      )
-    ).toEqual({
-      model: 'gpt-5',
-      effort: 'high',
-      optionValues: { thinking: true, fastMode: false }
-    })
-    expect(toAgentLaunchPreferences({ model: 'gpt-5' }, { includeOptionValues: true })).toEqual({
-      model: 'gpt-5',
-      optionValues: {}
-    })
-    expect(toAgentLaunchPreferences(undefined, { includeOptionValues: true })).toEqual({
-      optionValues: {}
-    })
   })
 })

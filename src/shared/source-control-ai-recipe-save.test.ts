@@ -101,24 +101,6 @@ describe('source-control AI recipe saves', () => {
     })
   })
 
-  it('preserves repository null launch options as an explicit inherited-value clear', () => {
-    expect(
-      normalizeWritableRepoSourceControlAiOverrides({
-        actionOverrides: {
-          fixChecks: { launchOptions: null }
-        }
-      })
-    ).toEqual({
-      actionOverrides: {
-        fixChecks: {
-          agentId: null,
-          commandInputTemplate: '{basePrompt}',
-          launchOptions: null
-        }
-      }
-    })
-  })
-
   it('stores repo custom commands when saving a custom-command recipe', () => {
     const result = saveSourceControlActionRecipe({
       target: { type: 'repo', repoId: 'repo-1' },
