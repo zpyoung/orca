@@ -1,4 +1,4 @@
-import { readFile, stat } from 'node:fs/promises'
+import { open, stat } from 'node:fs/promises'
 import {
   discoverClaudePluginSkillSources,
   getClaudePluginMetadataPaths
@@ -18,7 +18,14 @@ async function readMarketplaceFile(pathValue: string): Promise<string | null> {
     if (!fileStat.isFile() || fileStat.size > MAX_MARKETPLACE_METADATA_BYTES) {
       return null
     }
-    return await readFile(pathValue, 'utf8')
+    const file = await open(pathValue, 'r')
+    try {
+      const buffer = Buffer.alloc(fileStat.size)
+      const { bytesRead } = await file.read(buffer, 0, buffer.length, 0)
+      return buffer.toString('utf8', 0, bytesRead)
+    } finally {
+      await file.close()
+    }
   } catch {
     return null
   }
