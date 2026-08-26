@@ -1,5 +1,5 @@
 ---
-last_released_commit: 92a36661eae1b6f6419a74c460dfc18ffa2b7260
+last_released_commit: ad73d7e6c3de62b8b29c30d032027f38ad934ae7
 upstream_synced: v1.4.188
 ---
 
@@ -11,6 +11,19 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.189-rc.0.zy02] - 2026-08-26
+
+Synced to upstream [v1.4.188](https://github.com/stablyai/orca/releases/tag/v1.4.188).
+
+### Changed
+- Upstream syncs now land through a pull request rather than pushing `main` directly, so the fork
+  ownership guard and the rest of PR CI run on every resolution before `main` moves. The sync
+  procedure also gained a fix policy that separates failures a run may resolve on its own from ones
+  that have to stop and ask a person.
+- `pnpm test` no longer starts Vitest on a developer machine. It refuses unless it is running in CI,
+  in a container, or under an explicit opt-out, and points at the sandboxed shard runner instead;
+  where it does run, the worker pool is capped at half the host's cores.
 
 ## [1.4.189-rc.0.zy01] - 2026-08-24
 
