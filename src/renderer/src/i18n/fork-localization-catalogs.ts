@@ -34,6 +34,11 @@ import skillPluginsES from '../components/native-chat/fork-skill-plugin-attribut
 import skillPluginsJA from '../components/native-chat/fork-skill-plugin-attribution/locales/ja.json'
 import skillPluginsKO from '../components/native-chat/fork-skill-plugin-attribution/locales/ko.json'
 import skillPluginsZH from '../components/native-chat/fork-skill-plugin-attribution/locales/zh.json'
+import dirtyBranchEN from '../components/right-sidebar/fork-dirty-branch-indicator/locales/en.json'
+import dirtyBranchES from '../components/right-sidebar/fork-dirty-branch-indicator/locales/es.json'
+import dirtyBranchJA from '../components/right-sidebar/fork-dirty-branch-indicator/locales/ja.json'
+import dirtyBranchKO from '../components/right-sidebar/fork-dirty-branch-indicator/locales/ko.json'
+import dirtyBranchZH from '../components/right-sidebar/fork-dirty-branch-indicator/locales/zh.json'
 
 type ForkLocale = 'en' | 'es' | 'ja' | 'ko' | 'zh'
 type ForkCatalog = Record<string, unknown>
@@ -52,11 +57,56 @@ type ForkCatalogRegistrar = {
 }
 
 const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
-  en: [relayEN, en, worktreeGroupsEN, dockEN, dockSettingsEN, agentComposerEN, skillPluginsEN],
-  es: [relayES, es, worktreeGroupsES, dockES, dockSettingsES, agentComposerES, skillPluginsES],
-  ja: [relayJA, ja, worktreeGroupsJA, dockJA, dockSettingsJA, agentComposerJA, skillPluginsJA],
-  ko: [relayKO, ko, worktreeGroupsKO, dockKO, dockSettingsKO, agentComposerKO, skillPluginsKO],
-  zh: [relayZH, zh, worktreeGroupsZH, dockZH, dockSettingsZH, agentComposerZH, skillPluginsZH]
+  en: [
+    relayEN,
+    en,
+    worktreeGroupsEN,
+    dockEN,
+    dockSettingsEN,
+    agentComposerEN,
+    skillPluginsEN,
+    dirtyBranchEN
+  ],
+  es: [
+    relayES,
+    es,
+    worktreeGroupsES,
+    dockES,
+    dockSettingsES,
+    agentComposerES,
+    skillPluginsES,
+    dirtyBranchES
+  ],
+  ja: [
+    relayJA,
+    ja,
+    worktreeGroupsJA,
+    dockJA,
+    dockSettingsJA,
+    agentComposerJA,
+    skillPluginsJA,
+    dirtyBranchJA
+  ],
+  ko: [
+    relayKO,
+    ko,
+    worktreeGroupsKO,
+    dockKO,
+    dockSettingsKO,
+    agentComposerKO,
+    skillPluginsKO,
+    dirtyBranchKO
+  ],
+  zh: [
+    relayZH,
+    zh,
+    worktreeGroupsZH,
+    dockZH,
+    dockSettingsZH,
+    agentComposerZH,
+    skillPluginsZH,
+    dirtyBranchZH
+  ]
 }
 
 export function registerForkLocalizationCatalogs(i18n: ForkCatalogRegistrar): void {
