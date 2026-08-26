@@ -164,12 +164,15 @@ export const SetTabProps = WorktreeTabSelector.extend({
       paneKey: TerminalDockPaneKeySchema.optional(),
       docked: z.boolean().optional(),
       gutterRows: z.number().int().min(MIN_GUTTER_ROWS).max(MAX_GUTTER_ROWS).optional(),
+      userUndocked: z.boolean().optional(),
       remove: z.array(TerminalDockPaneKeySchema).max(MAX_TERMINAL_DOCK_REMOVE_KEYS).optional()
     })
     .superRefine((value, ctx) => {
       if (
         value.paneKey === undefined &&
-        (value.docked !== undefined || value.gutterRows !== undefined)
+        (value.docked !== undefined ||
+          value.gutterRows !== undefined ||
+          value.userUndocked !== undefined)
       ) {
         ctx.addIssue({ code: 'custom', message: 'Setting docked/gutterRows requires paneKey' })
       }

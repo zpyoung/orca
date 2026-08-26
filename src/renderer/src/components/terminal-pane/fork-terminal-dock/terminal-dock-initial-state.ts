@@ -1,11 +1,14 @@
 import type { AgentType } from '../../../../../shared/agent-status-types'
 import { isTuiAgent } from '../../../../../shared/tui-agent-config'
 
-/** Launch-time decision; an existing host or local entry is always authoritative. */
+/** Decides whether a recognized agent session should open its composer dock. */
 export function shouldDockTerminalComposerByDefault(args: {
   enabled: boolean
+  autoDockNewPanes: boolean
   agent: AgentType | null | undefined
   hasPersistedDecision: boolean
 }): boolean {
-  return args.enabled && isTuiAgent(args.agent) && !args.hasPersistedDecision
+  return (
+    args.enabled && args.autoDockNewPanes && isTuiAgent(args.agent) && !args.hasPersistedDecision
+  )
 }
