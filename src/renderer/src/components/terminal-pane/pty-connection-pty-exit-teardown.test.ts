@@ -1,6 +1,8 @@
 import type * as React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { makePaneKey } from '../../../../shared/stable-pane-id'
 import { sendTerminalInputThroughPane } from './pty-connection-test-dom'
+import { flushAsyncTicks } from './pty-connection-test-async'
 import {
   LEAF_1,
   LEAF_2,
@@ -127,6 +129,38 @@ vi.mock('./pty-dispatcher', async (importOriginal) => {
 
 function createDeps(overrides: Record<string, unknown> = {}) {
   return buildPaneConnectionDeps(() => mockStoreState, overrides)
+}
+
+function installSleepingCodexResumeState(restoredPtyId?: string) {
+  const paneKey = makePaneKey('tab-1', LEAF_1)
+  const launchConfig = {
+    agentCommand: "codex '--model' 'gpt-5'",
+    agentArgs: '--model gpt-5',
+    agentEnv: { CODEX_PROFILE: 'captured' }
+  }
+  mockStoreState = {
+    ...mockStoreState,
+    tabsByWorktree: {
+      'wt-1': [{ id: 'tab-1', ...(restoredPtyId ? { ptyId: restoredPtyId } : {}) }]
+    },
+    settings: { ...mockStoreState.settings, agentCmdOverrides: {} },
+    agentStatusByPaneKey: {},
+    sleepingAgentSessionsByPaneKey: {
+      [paneKey]: {
+        paneKey,
+        tabId: 'tab-1',
+        worktreeId: 'wt-1',
+        agent: 'codex',
+        providerSession: { key: 'session_id', id: 'codex-session-1' },
+        prompt: 'finish the task',
+        state: 'working',
+        capturedAt: 1,
+        updatedAt: 1,
+        launchConfig
+      }
+    }
+  } as StoreState
+  return launchConfig
 }
 
 describe('connectPanePty', () => {
@@ -311,24 +345,60 @@ describe('connectPanePty', () => {
     expect(manager.closePane).toHaveBeenCalledWith(2)
   })
 
-  it('keeps a worktree sole terminal mounted when its freshly-spawned PTY exits before input (direnv failure)', async () => {
+  it('retains a failed local startup when its freshly-spawned PTY exits before input', async () => {
     // Why (regression): a failing .envrc direnv makes the sole terminal's shell exit immediately; routing to onPtyExitRef would close the tab and bounce the user to Landing, so keep it mounted.
+    const { connectPanePty } = await import('./pty-connection')
+    const transport = createMockTransport('tab-pty')
+    transportFactoryQueue.push(transport)
+    const manager = createManager(1)
+    const deps = createDeps({ onPaneProcessDied: vi.fn() })
+
+    connectPanePty(createPane(1) as never, manager as never, deps as never)
+    const onPtySpawn = createdTransportOptions[0]?.onPtySpawn as
+      | ((ptyId: string) => void)
+      | undefined
+    const onPtyExit = createdTransportOptions[0]?.onPtyExit as
+      | ((ptyId: string, exitCode?: number) => void)
+      | undefined
+    expect(onPtySpawn).toBeTypeOf('function')
+    expect(onPtyExit).toBeTypeOf('function')
+
+    // A genuine fresh spawn (onPtySpawn fires only for non-reattach spawns) the user never typed into.
+    onPtySpawn?.('tab-pty')
+    onPtyExit?.('tab-pty', 1)
+
+    expect(deps.onPaneProcessDied).toHaveBeenCalledWith({
+      paneId: 1,
+      exitCode: 1,
+      startup: null,
+      reason: 'process-failed'
+    })
+    expect(deps.onPtyExitRef.current).not.toHaveBeenCalled()
+    expect(manager.closePane).not.toHaveBeenCalled()
+  })
+
+  it('keeps a worktree sole terminal mounted when only a captured shortcut preceded the exit', async () => {
+    // Why (regression): captured shortcuts refresh the redraw window, but that must not
+    // count as "the user typed into this pane" — otherwise Shift+Enter before a direnv
+    // failure closes the tab and bounces the user to Landing.
     const { connectPanePty } = await import('./pty-connection')
     const transport = createMockTransport('tab-pty')
     transportFactoryQueue.push(transport)
     const manager = createManager(1)
     const deps = createDeps()
 
-    connectPanePty(createPane(1) as never, manager as never, deps as never)
+    const binding = connectPanePty(
+      createPane(1) as never,
+      manager as never,
+      deps as never
+    ) as unknown as { markShortcutTerminalInputSent: () => void }
     const onPtySpawn = createdTransportOptions[0]?.onPtySpawn as
       | ((ptyId: string) => void)
       | undefined
     const onPtyExit = createdTransportOptions[0]?.onPtyExit as ((ptyId: string) => void) | undefined
-    expect(onPtySpawn).toBeTypeOf('function')
-    expect(onPtyExit).toBeTypeOf('function')
 
-    // A genuine fresh spawn (onPtySpawn fires only for non-reattach spawns) the user never typed into.
     onPtySpawn?.('tab-pty')
+    binding.markShortcutTerminalInputSent()
     onPtyExit?.('tab-pty')
 
     expect(deps.onPtyExitRef.current).not.toHaveBeenCalled()
@@ -360,21 +430,318 @@ describe('connectPanePty', () => {
     expect(manager.closePane).not.toHaveBeenCalled()
   })
 
+  it('tears down a failed local terminal after user input', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const pane = createPane(1)
+    const transport = createMockTransport('tab-pty')
+    transportFactoryQueue.push(transport)
+    const manager = createManager(1)
+    const deps = createDeps({ onPaneProcessDied: vi.fn() })
+
+    connectPanePty(pane as never, manager as never, deps as never)
+    const onPtySpawn = createdTransportOptions[0]?.onPtySpawn as
+      | ((ptyId: string) => void)
+      | undefined
+    const onPtyExit = createdTransportOptions[0]?.onPtyExit as
+      | ((ptyId: string, exitCode?: number) => void)
+      | undefined
+
+    onPtySpawn?.('tab-pty')
+    sendTerminalInputThroughPane(pane, 'exit\r')
+    onPtyExit?.('tab-pty', 1)
+
+    expect(deps.onPaneProcessDied).not.toHaveBeenCalled()
+    expect(deps.onPtyExitRef.current).toHaveBeenCalledWith('tab-pty')
+    expect(manager.closePane).not.toHaveBeenCalled()
+  })
+
+  it('does not classify an interrupt as startup failure when exit races its write acknowledgement', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const pane = createPane(1)
+    const transport = createMockTransport('tab-pty')
+    transport.sendInputAccepted?.mockImplementation(() => new Promise<boolean>(() => {}))
+    transportFactoryQueue.push(transport)
+    const manager = createManager(1)
+    const deps = createDeps({ onPaneProcessDied: vi.fn() })
+
+    connectPanePty(pane as never, manager as never, deps as never)
+    const onPtySpawn = createdTransportOptions[0]?.onPtySpawn as
+      | ((ptyId: string) => void)
+      | undefined
+    const onPtyExit = createdTransportOptions[0]?.onPtyExit as
+      | ((ptyId: string, exitCode?: number) => void)
+      | undefined
+
+    onPtySpawn?.('tab-pty')
+    sendTerminalInputThroughPane(pane, '\u0003')
+    onPtyExit?.('tab-pty', 1)
+
+    expect(deps.onPaneProcessDied).not.toHaveBeenCalled()
+    expect(deps.onPtyExitRef.current).toHaveBeenCalledWith('tab-pty')
+    expect(manager.closePane).not.toHaveBeenCalled()
+  })
+
+  it('resets startup-retention input state for a replacement fresh PTY', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const pane = createPane(1)
+    const transport = createMockTransport('first-pty')
+    transportFactoryQueue.push(transport)
+    const manager = createManager(1)
+    const deps = createDeps({ onPaneProcessDied: vi.fn() })
+
+    connectPanePty(pane as never, manager as never, deps as never)
+    const onPtySpawn = createdTransportOptions[0]?.onPtySpawn as
+      | ((ptyId: string) => void)
+      | undefined
+    const onPtyExit = createdTransportOptions[0]?.onPtyExit as
+      | ((ptyId: string, exitCode?: number) => void)
+      | undefined
+
+    onPtySpawn?.('first-pty')
+    sendTerminalInputThroughPane(pane, 'prior session input\r')
+    transport.getPtyId.mockReturnValue('replacement-pty')
+    onPtySpawn?.('replacement-pty')
+    onPtyExit?.('replacement-pty', 1)
+
+    expect(deps.onPaneProcessDied).toHaveBeenCalledWith({
+      paneId: 1,
+      exitCode: 1,
+      startup: null,
+      reason: 'process-failed'
+    })
+    expect(deps.onPtyExitRef.current).not.toHaveBeenCalled()
+    expect(manager.closePane).not.toHaveBeenCalled()
+  })
+
+  it('ignores a prior PTY write acknowledgement after a replacement fresh spawn', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const pane = createPane(1)
+    const transport = createMockTransport('first-pty')
+    let settleWrite: ((accepted: boolean) => void) | undefined
+    transport.sendInputAccepted?.mockImplementation(
+      () =>
+        new Promise<boolean>((resolve) => {
+          settleWrite = resolve
+        })
+    )
+    transportFactoryQueue.push(transport)
+    const manager = createManager(1)
+    const deps = createDeps({ onPaneProcessDied: vi.fn() })
+
+    connectPanePty(pane as never, manager as never, deps as never)
+    const onPtySpawn = createdTransportOptions[0]?.onPtySpawn as
+      | ((ptyId: string) => void)
+      | undefined
+    const onPtyExit = createdTransportOptions[0]?.onPtyExit as
+      | ((ptyId: string, exitCode?: number) => void)
+      | undefined
+
+    onPtySpawn?.('first-pty')
+    sendTerminalInputThroughPane(pane, '\u0003')
+    transport.getPtyId.mockReturnValue('replacement-pty')
+    onPtySpawn?.('replacement-pty')
+    settleWrite?.(true)
+    await Promise.resolve()
+    onPtyExit?.('replacement-pty', 1)
+
+    expect(deps.onPaneProcessDied).toHaveBeenCalledWith({
+      paneId: 1,
+      exitCode: 1,
+      startup: null,
+      reason: 'process-failed'
+    })
+    expect(deps.onPtyExitRef.current).not.toHaveBeenCalled()
+    expect(manager.closePane).not.toHaveBeenCalled()
+  })
+
+  it('keeps a freshly-spawned failed local split pane visible before input', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const transport = createMockTransport('tab-pty')
+    transportFactoryQueue.push(transport)
+    const manager = createManager(2)
+    const deps = createDeps({ onPaneProcessDied: vi.fn() })
+
+    connectPanePty(createPane(1) as never, manager as never, deps as never)
+    const onPtySpawn = createdTransportOptions[0]?.onPtySpawn as
+      | ((ptyId: string) => void)
+      | undefined
+    const onPtyExit = createdTransportOptions[0]?.onPtyExit as
+      | ((ptyId: string, exitCode?: number) => void)
+      | undefined
+    onPtySpawn?.('tab-pty')
+    onPtyExit?.('tab-pty', 1)
+
+    expect(deps.onPaneProcessDied).toHaveBeenCalledWith({
+      paneId: 1,
+      exitCode: 1,
+      startup: null,
+      reason: 'process-failed'
+    })
+    expect(manager.closePane).not.toHaveBeenCalled()
+  })
+
+  it('classifies the Git Bash capacity failure before retaining its pane', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const capturedDataCallback: { current: ((data: string) => void) | null } = { current: null }
+    const transport = createMockTransport('tab-pty')
+    transport.connect.mockImplementation(async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+      capturedDataCallback.current = callbacks.onData ?? null
+      return 'tab-pty'
+    })
+    transportFactoryQueue.push(transport)
+    const manager = createManager(1)
+    const startup = { command: 'codex --resume session-1' }
+    const deps = createDeps({ onPaneProcessDied: vi.fn(), startup })
+
+    connectPanePty(createPane(1) as never, manager as never, deps as never)
+    const onPtySpawn = createdTransportOptions[0]?.onPtySpawn as
+      | ((ptyId: string) => void)
+      | undefined
+    const onPtyExit = createdTransportOptions[0]?.onPtyExit as
+      | ((ptyId: string, exitCode?: number) => void)
+      | undefined
+
+    onPtySpawn?.('tab-pty')
+    capturedDataCallback.current?.(
+      'console device allocation failure - too many consoles in use, max consoles is 128'
+    )
+    onPtyExit?.('tab-pty', 1)
+
+    expect(deps.onPaneProcessDied).toHaveBeenCalledWith({
+      paneId: 1,
+      exitCode: 1,
+      startup,
+      reason: 'git-bash-console-capacity'
+    })
+    expect(deps.onPtyExitRef.current).not.toHaveBeenCalled()
+    expect(manager.closePane).not.toHaveBeenCalled()
+  })
+
+  it('retains the cold-restore resume startup when its replacement hits capacity', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const callbacks: ConnectCallbacks[] = []
+    const transport = createMockTransport('resume-pty')
+    transport.connect.mockImplementation(async (options: { callbacks: ConnectCallbacks }) => {
+      callbacks.push(options.callbacks)
+      return 'resume-pty'
+    })
+    transportFactoryQueue.push(transport)
+    const launchConfig = installSleepingCodexResumeState()
+    const deps = createDeps({
+      startup: { command: 'codex stale-startup' },
+      onPaneProcessDied: vi.fn()
+    })
+
+    connectPanePty(createPane(1) as never, createManager(1) as never, deps as never)
+    await flushAsyncTicks(20)
+    const onPtySpawn = createdTransportOptions[0]?.onPtySpawn as
+      | ((ptyId: string) => void)
+      | undefined
+    onPtySpawn?.('resume-pty')
+    callbacks[0]?.onData?.('too many consoles in use, max consoles is 128')
+    const onPtyExit = createdTransportOptions[0]?.onPtyExit as
+      | ((ptyId: string, exitCode?: number) => void)
+      | undefined
+    onPtyExit?.('resume-pty', 1)
+
+    expect(deps.onPaneProcessDied).toHaveBeenCalledWith({
+      paneId: 1,
+      exitCode: 1,
+      startup: expect.objectContaining({
+        command: expect.stringContaining("'resume' 'codex-session-1'"),
+        launchConfig,
+        resumeProviderSession: { key: 'session_id', id: 'codex-session-1' },
+        launchAgent: 'codex',
+        showSessionRestoredBanner: true
+      }),
+      reason: 'git-bash-console-capacity'
+    })
+  })
+
+  it('does not carry capacity detection into a cold-restore replacement', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const callbacks: ConnectCallbacks[] = []
+    let currentPtyId = 'lost-pty'
+    const transport = createMockTransport(currentPtyId)
+    transport.getPtyId.mockImplementation(() => currentPtyId)
+    transport.connect.mockImplementation(
+      async (options: { sessionId?: string; callbacks: ConnectCallbacks }) => {
+        callbacks.push(options.callbacks)
+        if (options.sessionId) {
+          options.callbacks.onData?.('too many consoles in use, max consoles is 128')
+          return { id: currentPtyId, sessionExpired: true }
+        }
+        currentPtyId = 'resume-pty'
+        return currentPtyId
+      }
+    )
+    transportFactoryQueue.push(transport)
+    installSleepingCodexResumeState('lost-pty')
+    const deps = createDeps({
+      onPaneProcessDied: vi.fn(),
+      restoredLeafId: LEAF_1,
+      restoredPtyIdByLeafId: { [LEAF_1]: 'lost-pty' }
+    })
+
+    connectPanePty(createPane(1) as never, createManager(1) as never, deps as never)
+    await flushAsyncTicks(30)
+    expect(callbacks).toHaveLength(2)
+    const onPtySpawn = createdTransportOptions[0]?.onPtySpawn as
+      | ((ptyId: string) => void)
+      | undefined
+    onPtySpawn?.('resume-pty')
+    const onPtyExit = createdTransportOptions[0]?.onPtyExit as
+      | ((ptyId: string, exitCode?: number) => void)
+      | undefined
+    onPtyExit?.('resume-pty', 1)
+
+    expect(deps.onPaneProcessDied).toHaveBeenCalledWith({
+      paneId: 1,
+      exitCode: 1,
+      startup: null,
+      reason: 'process-failed'
+    })
+  })
+
+  it('does not retain a failed direct-SSH terminal locally', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    mockStoreState = {
+      ...mockStoreState,
+      repos: [{ ...mockStoreState.repos[0], connectionId: 'ssh-1' }]
+    } as StoreState
+    const transport = createMockTransport('tab-pty')
+    transportFactoryQueue.push(transport)
+    const manager = createManager(1)
+    const deps = createDeps({ onPaneProcessDied: vi.fn() })
+
+    connectPanePty(createPane(1) as never, manager as never, deps as never)
+    const onPtyExit = createdTransportOptions[0]?.onPtyExit as
+      | ((ptyId: string, exitCode?: number) => void)
+      | undefined
+    onPtyExit?.('tab-pty', 1)
+
+    expect(deps.onPaneProcessDied).not.toHaveBeenCalled()
+    expect(deps.onPtyExitRef.current).toHaveBeenCalledWith('tab-pty')
+  })
+
   it('tears down the sole terminal when a reattached (not freshly spawned) PTY exits', async () => {
     // Why: reattach/coldRestore skip onPtySpawn, so a now-dead previously-live session must still route through onPtyExitRef; the keep-mounted guard is only for brand-new shells.
     const { connectPanePty } = await import('./pty-connection')
     const transport = createMockTransport('tab-pty')
     transportFactoryQueue.push(transport)
     const manager = createManager(1)
-    const deps = createDeps()
+    const deps = createDeps({ onPaneProcessDied: vi.fn() })
 
     connectPanePty(createPane(1) as never, manager as never, deps as never)
-    const onPtyExit = createdTransportOptions[0]?.onPtyExit as ((ptyId: string) => void) | undefined
+    const onPtyExit = createdTransportOptions[0]?.onPtyExit as
+      | ((ptyId: string, exitCode?: number) => void)
+      | undefined
     expect(onPtyExit).toBeTypeOf('function')
 
     // No onPtySpawn call: simulates a reattach to a persisted session.
-    onPtyExit?.('tab-pty')
+    onPtyExit?.('tab-pty', 1)
 
+    expect(deps.onPaneProcessDied).not.toHaveBeenCalled()
     expect(deps.onPtyExitRef.current).toHaveBeenCalledWith('tab-pty')
     expect(manager.closePane).not.toHaveBeenCalled()
   })

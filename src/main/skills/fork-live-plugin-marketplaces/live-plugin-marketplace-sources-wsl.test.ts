@@ -1,8 +1,9 @@
+import type { WslResult } from '../../wsl/wsl-runner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const execFileMock = vi.hoisted(() => vi.fn())
+const runWslProcessMock = vi.hoisted(() => vi.fn())
 
-vi.mock('node:child_process', () => ({ execFile: execFileMock }))
+vi.mock('../../wsl/wsl-runner', () => ({ runWslProcess: runWslProcessMock }))
 
 import { discoverLiveClaudePluginSkillSourcesInWsl } from './live-plugin-marketplace-sources-wsl'
 
@@ -27,15 +28,12 @@ function absent(index: number): string {
   return record('F', String(index), '0', '')
 }
 
-function queueResponse(callIndex: number, stdout: string): void {
-  execFileMock.mockImplementationOnce(() => {
-    queueMicrotask(() => {
-      const callback = execFileMock.mock.calls[callIndex]?.[3] as
-        | ((error: Error | null, stdout: string) => void)
-        | undefined
-      callback?.(null, stdout)
-    })
-  })
+function wslResult(stdout: string): WslResult {
+  return { environmentResolved: true, code: 0, stdout, stderr: '', timedOut: false }
+}
+
+function queueResponse(_callIndex: number, stdout: string): void {
+  runWslProcessMock.mockResolvedValueOnce(wslResult(stdout))
 }
 
 function metadataResponse(
@@ -67,9 +65,7 @@ function directoryMarketplaces(): string {
 }
 
 function decodeScript(callIndex: number): string {
-  const args = execFileMock.mock.calls[callIndex]?.[1] as string[]
-  const encoded = /printf %s '([^']+)'/.exec(args[5] ?? '')?.[1]
-  return Buffer.from(encoded ?? '', 'base64').toString('utf8')
+  return (runWslProcessMock.mock.calls[callIndex]?.[0].script as string | undefined) ?? ''
 }
 
 function decodeMetadataPaths(callIndex: number): string[] {
@@ -87,7 +83,7 @@ function discover(): Promise<{ path: string }[]> {
 }
 
 describe('live Claude plugin skill sources in WSL', () => {
-  beforeEach(() => execFileMock.mockReset())
+  beforeEach(() => runWslProcessMock.mockReset())
 
   it('batches known_marketplaces.json into the metadata read and stops at one call without a directory marketplace', async () => {
     queueResponse(
@@ -104,7 +100,7 @@ describe('live Claude plugin skill sources in WSL', () => {
 
     const roots = await discover()
 
-    expect(execFileMock).toHaveBeenCalledTimes(1)
+    expect(runWslProcessMock).toHaveBeenCalledTimes(1)
     // the module slices this batch by position, so order is part of the contract
     expect(decodeMetadataPaths(0)).toEqual([
       `${HOME_DIR}/.claude/plugins/installed_plugins.json`,
@@ -122,7 +118,7 @@ describe('live Claude plugin skill sources in WSL', () => {
 
     const roots = await discover()
 
-    expect(execFileMock).toHaveBeenCalledTimes(2)
+    expect(runWslProcessMock).toHaveBeenCalledTimes(2)
     expect(roots.map((root) => root.path)).toEqual([`${LIVE_DIR}/skills`])
   })
 
@@ -172,29 +168,32 @@ describe('live Claude plugin skill sources in WSL', () => {
     expect(decodeScript(1)).toContain(
       `'/home/alice/AI Agent/quirk'\\''s marketplace/.claude-plugin/marketplace.json'`
     )
-    expect(execFileMock.mock.calls[1]?.[1]).not.toContain(LIVE_DIR)
+    expect(runWslProcessMock.mock.calls[1]?.[0].args).toBeUndefined()
   })
 
-  it('invokes wsl.exe with --exec so the guest never expands the script', async () => {
+  it('runs through the WSL runner as a bash script that needs no login PATH', async () => {
     queueResponse(0, metadataResponse(null))
 
     await discover()
 
-    const args = execFileMock.mock.calls[0]?.[1] as string[]
-    expect(args.slice(0, 5)).toEqual(['-d', 'Ubuntu', '--exec', 'bash', '-c'])
-    expect(args).not.toContain('--')
+    // Why assert the spec, not an argv: the runner owns --exec and the payload
+    // transport now, and picking either per call site is what it exists to stop.
+    expect(runWslProcessMock.mock.calls[0]?.[0]).toMatchObject({
+      distro: 'Ubuntu',
+      loginPath: 'none',
+      shell: 'bash'
+    })
   })
 
   it('keeps the cached root when the manifest read fails', async () => {
     queueResponse(0, metadataResponse(directoryMarketplaces()))
-    execFileMock.mockImplementationOnce(() => {
-      queueMicrotask(() => {
-        const callback = execFileMock.mock.calls[1]?.[3] as
-          | ((error: Error | null, stdout: string) => void)
-          | undefined
-        callback?.(new Error('wsl.exe timed out'), '')
-      })
-    })
+    runWslProcessMock.mockResolvedValueOnce({
+      environmentResolved: true,
+      code: null,
+      stdout: '',
+      stderr: '',
+      timedOut: true
+    } satisfies WslResult)
 
     const roots = await discover()
 
