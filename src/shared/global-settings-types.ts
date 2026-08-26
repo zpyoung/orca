@@ -26,6 +26,7 @@ import type { CtrlTabOrderMode } from './tab-types'
 import type { TerminalColorOverrides } from './terminal-color-overrides'
 import type { TerminalQuickCommand } from './terminal-quick-command-types'
 import type { TuiAgent } from './tui-agent'
+import type { ForkSessionHandoffSettings } from './fork-session-handoff/handoff-settings-types'
 import type {
   AgentDashboardMode,
   BranchPrefixStrategy,
@@ -214,6 +215,7 @@ export type GlobalSettings = {
   nativeChatWidth?: NativeChatWidthTier
   /** Last explicit native-chat model + option selections; live panes need an applied/dispatched record before showing a value. */
   nativeChatSessionOptions?: PersistedNativeChatSessionOptions
+  forkSessionHandoff?: ForkSessionHandoffSettings
   /** Extra launcher rows for the worktree "Open in" submenu. VS Code is always shown first. */
   openInApplications?: OpenInApplication[]
   /** Deprecated: migration/backward-compat only. Use PersistedUIState.rightSidebarOpen. */

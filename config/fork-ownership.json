@@ -49,6 +49,11 @@
       "globs": ["**/fork-skill-plugin-attribution/**"]
     },
     {
+      "name": "session-handoff",
+      "purpose": "Customizable Continue-in-New-Session handoff with a rich editable brief, target-worktree selection, host-aware warnings, delivery recovery, and one-hop session lineage.",
+      "globs": ["**/fork-session-handoff/**"]
+    },
+    {
       "name": "dirty-branch-indicator",
       "purpose": "Marks the right sidebar's Source Control tab while the active worktree has uncommitted changes, so a dirty branch is visible without opening the panel.",
       "globs": ["**/fork-dirty-branch-indicator/**"]
@@ -459,7 +464,12 @@
       "path": "src/preload/index.ts",
       "feature": "native-chat-relay",
       "kind": "passthrough",
-      "lines": ["const readNativeChatSession = (", "    readSession: readNativeChatSession,"]
+      "lines": [
+        "import { buildForkSessionHandoffApi } from './fork-session-handoff/session-handoff-preload-api'",
+        "const readNativeChatSession = (",
+        "  forkSessionHandoff: buildForkSessionHandoffApi(),",
+        "    readSession: readNativeChatSession,"
+      ]
     },
     {
       "path": "src/relay/relay.ts",
@@ -1382,7 +1392,9 @@
       "lines": [
         "} from '@/components/native-chat/fork-native-chat-relay/native-chat-runtime-contract'",
         "  const readNativeChatSession = async (",
-        "    readSession: readNativeChatSession,"
+        "    readSession: readNativeChatSession,",
+        "import { mergeForkSessionHandoffSettings } from '../../../shared/fork-session-handoff/handoff-settings-merge'",
+        "    ...mergeForkSessionHandoffSettings(base, updates),"
       ]
     },
     {
@@ -1400,9 +1412,11 @@
       "kind": "passthrough",
       "lines": [
         "import type { NativeChatWidthTier } from './fork-native-chat-width/native-chat-width-tier'",
+        "import type { ForkSessionHandoffSettings } from './fork-session-handoff/handoff-settings-types'",
         "  experimentalTerminalDock?: boolean",
         "  dockTerminalComposerByDefault?: boolean",
-        "  nativeChatWidth?: NativeChatWidthTier"
+        "  nativeChatWidth?: NativeChatWidthTier",
+        "  forkSessionHandoff?: ForkSessionHandoffSettings"
       ]
     },
     {
@@ -1528,6 +1542,119 @@
       "feature": "worktree-groups",
       "kind": "passthrough",
       "lines": ["  projectGroupId?: string | null"]
+    },
+    {
+      "path": "src/main/ipc/register-core-handlers.test.ts",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "vi.mock('../fork-session-handoff/session-lineage-ipc', () => ({",
+        "  registerForkSessionHandoffHandlers: vi.fn()"
+      ]
+    },
+    {
+      "path": "src/main/ipc/register-core-handlers.ts",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { registerForkSessionHandoffHandlers } from '../fork-session-handoff/session-lineage-ipc'",
+        "  registerForkSessionHandoffHandlers()"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/dashboard/DashboardAgentRow.tsx",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { SessionHandoffLineageBadge } from '@/components/agent-session-continuation/fork-session-handoff/SessionHandoffLineageBadge'",
+        "        <SessionHandoffLineageBadge paneKey={agent.paneKey} />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/AiVaultPanel.tsx",
+      "feature": "session-handoff",
+      "kind": "import-swap",
+      "lines": [
+        "import { AgentSessionContinuationDialog } from '@/components/agent-session-continuation/fork-session-handoff/AgentSessionContinuationDialog'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/AiVaultSessionRow.tsx",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { ForkAiVaultLineageLine } from '@/components/agent-session-continuation/fork-session-handoff/ForkAiVaultLineageLine'",
+        "          <ForkAiVaultLineageLine session={session} />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/AiVaultSessionVirtualList.tsx",
+      "feature": "session-handoff",
+      "kind": "import-swap",
+      "lines": [
+        "import { resolveAiVaultSessionHandoffWorktreeId } from '@/components/agent-session-continuation/fork-session-handoff/ai-vault-handoff-action'",
+        "      ? resolveAiVaultSessionHandoffWorktreeId(row.session, resumeActions)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/ai-vault-session-launch-actions.ts",
+      "feature": "session-handoff",
+      "kind": "import-swap",
+      "lines": [
+        "import { prepareAiVaultSessionContinuation } from '@/components/agent-session-continuation/fork-session-handoff/prepare-handoff-from-vault'",
+        "import { resolveAiVaultSessionHandoffLaunchTargetOrNotify } from '@/components/agent-session-continuation/fork-session-handoff/ai-vault-handoff-action'",
+        "      const targetId = resolveAiVaultSessionHandoffLaunchTargetOrNotify({"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-card-compact-agent-row.tsx",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { SessionHandoffLineageBadge } from '@/components/agent-session-continuation/fork-session-handoff/SessionHandoffLineageBadge'",
+        "      <SessionHandoffLineageBadge paneKey={agent.paneKey} />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/terminal-pane-menu-agent-session-actions.ts",
+      "feature": "session-handoff",
+      "kind": "import-swap",
+      "lines": [
+        "import { prepareAgentSessionContinuationFromPane } from '@/components/agent-session-continuation/fork-session-handoff/prepare-handoff-from-pane'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/Settings.tsx",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { ForkSessionHandoffSettingsSection } from './fork-session-handoff/ForkSessionHandoffSettingsSection'",
+        "                <ForkSessionHandoffSettingsSection />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/hooks/useSettingsNavigationMetadata.ts",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { getForkSessionHandoffNavSections } from '@/components/settings/fork-session-handoff/handoff-settings-nav-section'",
+        "    ...getForkSessionHandoffNavSections(),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/settings-navigation-types.ts",
+      "feature": "session-handoff",
+      "kind": "passthrough",
+      "lines": ["  'session-handoff',"]
+    },
+    {
+      "path": "src/main/persistence/applying-settings/settings-update.ts",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { mergeForkSessionHandoffSettings } from '../../../shared/fork-session-handoff/handoff-settings-merge'",
+        "    ...mergeForkSessionHandoffSettings(operations.state.settings, sanitizedUpdates)"
+      ]
     }
   ],
   "exceptions": [
@@ -1990,7 +2117,7 @@
     },
     {
       "path": "src/renderer/src/components/terminal-pane/TerminalPane.tsx",
-      "reason": "Corrects effectiveChatViewMode; a cosmetic/logic fix to upstream's chat-header controls, not a fork feature.",
+      "reason": "Corrects effectiveChatViewMode and temporarily owns the session-handoff dialog import because a path cannot be both an exception and a seam. Convert the import to a session-handoff seam when the pending upstream fix lands.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#chat-header-controls-fix"
     },
@@ -2258,7 +2385,7 @@
       "removed": 0
     },
     "src/preload/index.ts": {
-      "added": 18,
+      "added": 20,
       "removed": 7
     },
     "src/relay/relay.ts": {
@@ -2694,7 +2821,7 @@
       "removed": 1
     },
     "src/renderer/src/web/web-preload-api.ts": {
-      "added": 29,
+      "added": 31,
       "removed": 17
     },
     "src/shared/constants.ts": {
@@ -2702,7 +2829,7 @@
       "removed": 0
     },
     "src/shared/global-settings-types.ts": {
-      "added": 7,
+      "added": 9,
       "removed": 0
     },
     "src/shared/keybindings.ts": {
@@ -2793,9 +2920,61 @@
       "added": 8,
       "removed": 1
     },
+    "src/main/ipc/register-core-handlers.test.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/main/ipc/register-core-handlers.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/dashboard/DashboardAgentRow.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/right-sidebar/AiVaultPanel.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/right-sidebar/AiVaultSessionRow.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/right-sidebar/AiVaultSessionVirtualList.tsx": {
+      "added": 3,
+      "removed": 4
+    },
+    "src/renderer/src/components/right-sidebar/ai-vault-session-launch-actions.ts": {
+      "added": 3,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/worktree-card-compact-agent-row.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/terminal-pane/terminal-pane-menu-agent-session-actions.ts": {
+      "added": 1,
+      "removed": 1
+    },
     "src/renderer/src/components/native-chat/native-chat-attachment-upload.ts": {
       "added": 2,
       "removed": 0
+    },
+    "src/renderer/src/components/settings/Settings.tsx": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/renderer/src/hooks/useSettingsNavigationMetadata.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/lib/settings-navigation-types.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/main/persistence/applying-settings/settings-update.ts": {
+      "added": 3,
+      "removed": 1
     }
   }
 }

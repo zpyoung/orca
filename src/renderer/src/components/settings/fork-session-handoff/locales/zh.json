@@ -1,0 +1,43 @@
+{
+  "components": {
+    "settings": {
+      "forkSessionHandoff": {
+        "title": "会话交接",
+        "description": "创建可复用的指令，以便在新的智能体会话中继续工作。",
+        "searchTitle": "会话交接",
+        "searchDescription": "创建可复用的指令模板，以便在新的智能体会话中继续工作。",
+        "keywordHandoff": "交接",
+        "keywordSession": "会话",
+        "keywordTemplate": "模板",
+        "keywordReusable": "复用",
+        "keywordPrompt": "提示词",
+        "keywordInstructions": "指令",
+        "templates": "模板",
+        "templatesDescription": "将保存的指令块添加到任意新会话交接简报中。",
+        "add": "添加模板",
+        "editTemplate": "编辑 {{name}}",
+        "removeTemplate": "删除 {{name}}",
+        "limitReached": "已达到模板数量上限。",
+        "count": "已使用 {{count}} / {{limit}} 个模板",
+        "reset": "恢复默认值",
+        "addTitle": "添加模板",
+        "editTitle": "编辑模板",
+        "editorDescription": "向新智能体会话的简报添加可复用指令。",
+        "name": "名称",
+        "duplicateName": "已有其他模板使用此名称。两个模板仍都可用。",
+        "body": "指令",
+        "variables": "变量：{{gitStatus}}、{{changedPaths}} 和 {{openEditorTabs}}。也支持全大写别名。",
+        "cancel": "取消",
+        "saving": "正在保存…",
+        "save": "保存模板",
+        "saveFailed": "无法保存模板",
+        "deleteTitle": "删除“{{name}}”？",
+        "deleteDescription": "此模板将不再显示在交接对话框中。",
+        "delete": "删除",
+        "resetTitle": "重置交接模板？",
+        "resetDescription": "自定义模板和编辑内容将被移除，并恢复最新的内置默认值。",
+        "resetConfirm": "恢复默认值"
+      }
+    }
+  }
+}

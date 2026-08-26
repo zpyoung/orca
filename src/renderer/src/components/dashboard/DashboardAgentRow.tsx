@@ -14,6 +14,7 @@ import type { DashboardAgentRow as DashboardAgentRowData } from './useDashboardD
 import { getAgentRowPrimaryText } from '@/lib/agent-row-primary-text'
 import { useAgentRowConversationName } from './use-agent-row-conversation-name'
 import { lastEnteredDoneAt } from './agent-finished-timestamp'
+import { SessionHandoffLineageBadge } from '@/components/agent-session-continuation/fork-session-handoff/SessionHandoffLineageBadge'
 
 // Why: narrow the dashboard's rollup states to shared dot states, defaulting unknowns to 'idle' so a row never crashes.
 function asDotState(state: AgentStatusState | 'idle'): AgentDotState {
@@ -280,6 +281,7 @@ const DashboardAgentRow = React.memo(function DashboardAgentRow({
             {model}
           </span>
         )}
+        <SessionHandoffLineageBadge paneKey={agent.paneKey} />
         {/* Why: "+N" badge shows the hidden child count when collapsed; redundant once children are expanded below. */}
         {hasChildDisclosure && !childAgentsExpanded && (
           <span

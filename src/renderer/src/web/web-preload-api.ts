@@ -32,6 +32,7 @@ import type {
   GlobalSettings,
   WorktreeVisibilityDefaults
 } from '../../../shared/global-settings-types'
+import { mergeForkSessionHandoffSettings } from '../../../shared/fork-session-handoff/handoff-settings-merge'
 import type { OnboardingState } from '../../../shared/onboarding-state-types'
 import type { PersistedUIState } from '../../../shared/persisted-ui-state-types'
 import {
@@ -4256,6 +4257,7 @@ function mergeSettings(
       ...base.notifications,
       ...updates.notifications
     },
+    ...mergeForkSessionHandoffSettings(base, updates),
     githubProjects: {
       ...(base.githubProjects ?? defaults.githubProjects),
       ...updates.githubProjects
