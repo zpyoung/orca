@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  buildWslCodexAvailabilityArgs,
+  buildWslCodexAvailabilityScript,
   buildWslCodexAppServerArgs,
   buildWslCodexIdentityProbe,
   buildWslCodexLoginArgs
