@@ -17,7 +17,7 @@ import {
   type SkillScanRoot
 } from './skill-discovery-sources'
 import { pluginNameForSkill } from './fork-skill-plugin-attribution/skill-plugin-name-resolution'
-import { discoverClaudePluginSkillSources } from './claude-plugin-skill-sources'
+import { discoverLiveClaudePluginSkillSources } from './fork-live-plugin-marketplaces/live-plugin-marketplace-sources'
 import { findSkillFiles } from './skill-root-file-walk'
 import { runSkillCandidateTasks } from './skill-candidate-concurrency'
 import {
@@ -274,7 +274,7 @@ export async function discoverSkills(args: {
     // Why: plugin discovery is native-chat data keyed to an explicit workspace.
     // Untargeted scans (Settings) keep their pre-picker inventory and cost.
     ...(args.cwd && args.includeCwd !== false
-      ? await discoverClaudePluginSkillSources({ homeDir, cwd: args.cwd })
+      ? await discoverLiveClaudePluginSkillSources({ homeDir, cwd: args.cwd })
       : [])
   ]
   const scans = await Promise.all(roots.map((root) => scanRootShared(root, refresh)))

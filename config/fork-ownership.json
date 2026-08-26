@@ -39,6 +39,11 @@
       "globs": ["**/fork-native-chat-session-options/**"]
     },
     {
+      "name": "live-plugin-marketplaces",
+      "purpose": "Points the skill picker at a directory-sourced marketplace's live plugin directory, the one the Claude Code harness loads, instead of the frozen cache copy that goes stale between `claude plugin update` runs.",
+      "globs": ["**/fork-live-plugin-marketplaces/**"]
+    },
+    {
       "name": "skill-plugin-attribution",
       "purpose": "Attributes each discovered skill to the plugin that owns it, so the composer's skill picker can name the plugin and disambiguate a skill offered by more than one.",
       "globs": ["**/fork-skill-plugin-attribution/**"]
@@ -373,6 +378,24 @@
       "lines": [
         "import { pluginNameForSkill } from './fork-skill-plugin-attribution/skill-plugin-name-resolution'",
         "      ...(pluginName ? { pluginName } : {})"
+      ]
+    },
+    {
+      "path": "src/main/skills/discovery.ts",
+      "feature": "live-plugin-marketplaces",
+      "kind": "import-swap",
+      "lines": [
+        "import { discoverLiveClaudePluginSkillSources } from './fork-live-plugin-marketplaces/live-plugin-marketplace-sources'",
+        "      ? await discoverLiveClaudePluginSkillSources({ homeDir, cwd: args.cwd })"
+      ]
+    },
+    {
+      "path": "src/main/skills/skill-discovery-wsl.ts",
+      "feature": "live-plugin-marketplaces",
+      "kind": "import-swap",
+      "lines": [
+        "import { discoverLiveClaudePluginSkillSourcesInWsl } from './fork-live-plugin-marketplaces/live-plugin-marketplace-sources-wsl'",
+        "    pluginRoots = await discoverLiveClaudePluginSkillSourcesInWsl(args)"
       ]
     },
     {
@@ -2129,16 +2152,16 @@
       "removed": 6
     },
     "src/main/skills/discovery.ts": {
-      "added": 3,
-      "removed": 0
+      "added": 5,
+      "removed": 2
     },
     "src/main/skills/skill-discovery-sources.ts": {
       "added": 2,
       "removed": 1
     },
     "src/main/skills/skill-discovery-wsl.ts": {
-      "added": 4,
-      "removed": 1
+      "added": 6,
+      "removed": 3
     },
     "src/main/ssh/ssh-relay-session.ts": {
       "added": 38,
