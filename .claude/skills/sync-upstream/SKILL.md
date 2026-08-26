@@ -192,7 +192,7 @@ never mistaken for a resolution failure:
 pnpm install --frozen-lockfile
 ```
 
-If any check or the install fails, STOP and go to Step 13 with "needs attention: unusable run
+If any check or the install fails, STOP and go to Step 16 with "needs attention: unusable run
 workspace (<which check failed>) — nothing merged, nothing pushed".
 
 ## Step 5 — Merge with fork priority
@@ -234,7 +234,7 @@ rule applied.
 
 Anything else — rename/rename, rename/delete, submodule conflicts, binary files you cannot attribute
 to a side, or more than 25 conflicted paths in total — is out of scope. Do not guess. Run
-`git merge --abort` and go to Step 13 with "needs attention: merge conflicts require manual
+`git merge --abort` and go to Step 16 with "needs attention: merge conflicts require manual
 resolution (<conflict type> at <paths>)".
 
 After any completed merge, verify no conflict markers survived:
@@ -260,7 +260,7 @@ manifest's declared lines.
 The reference also carries three per-sync checklists that are part of this step, not optional
 extras: **tier-2 forked-copy replay**, **tier-4 pending-upstream review**, and **upstream
 feature-collision review**. Each can surface a decision the reference routes to a human. Under
-`--unattended`, that is a stopping condition: go to Step 13 with "needs attention: <the decision>"
+`--unattended`, that is a stopping condition: go to Step 16 with "needs attention: <the decision>"
 rather than choosing a side.
 
 Commit the ownership resolution as a single follow-up commit on top of the merge; Step 7 expects
@@ -372,7 +372,7 @@ gate from the top. Re-run it whole: a fix for a typecheck error routinely breaks
 partial re-run is how a broken tree reaches the PR.
 
 If the policy says escalate, or the same failure survives your fixes, restore and bail:
-`git reset --hard $ORIGIN_MAIN_OLD`, then go to Step 13 with "needs attention: merge resolved but
+`git reset --hard $ORIGIN_MAIN_OLD`, then go to Step 16 with "needs attention: merge resolved but
 <install|manifest|typecheck|lint|tests> failed — manual resolution required; backup at
 origin/<BACKUP_REF>". Include the first ~20 lines of the failure output, and for a test regression
 name the specific tests that pass at the baseline but fail after.
