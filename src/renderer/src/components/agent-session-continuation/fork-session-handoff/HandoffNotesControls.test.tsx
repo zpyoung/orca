@@ -130,6 +130,7 @@ describe('HandoffNotesControls template capture', () => {
     await user.type(screen.getByLabelText('Template name'), 'At limit')
 
     expect(screen.getByRole('button', { name: 'Save template' })).toBeDisabled()
+    expect(screen.getByRole('alert')).toHaveTextContent('The template limit has been reached.')
   })
 
   it('disables conflicting controls while a save is pending', async () => {
