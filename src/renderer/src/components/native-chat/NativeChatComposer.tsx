@@ -155,7 +155,10 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       setNotice: core.setNotice
     })
 
-    const { pickAttachment } = useNativeChatFileAttachmentActions(attachExternalPaths)
+    const { pickAttachment } = useNativeChatFileAttachmentActions(attachExternalPaths, {
+      terminalTabId,
+      paneKey
+    })
     const [dictationPressed, setDictationPressed] = useState(false)
     const { toggleDictation, startHoldDictation, stopHoldDictation } =
       useNativeChatDictationActions({ textareaRef: core.textareaRef, setDictationPressed })

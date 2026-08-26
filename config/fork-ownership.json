@@ -39,6 +39,11 @@
       "globs": ["**/fork-native-chat-session-options/**"]
     },
     {
+      "name": "live-plugin-marketplaces",
+      "purpose": "Points the skill picker at a directory-sourced marketplace's live plugin directory, the one the Claude Code harness loads, instead of the frozen cache copy that goes stale between `claude plugin update` runs.",
+      "globs": ["**/fork-live-plugin-marketplaces/**"]
+    },
+    {
       "name": "skill-plugin-attribution",
       "purpose": "Attributes each discovered skill to the plugin that owns it, so the composer's skill picker can name the plugin and disambiguate a skill offered by more than one.",
       "globs": ["**/fork-skill-plugin-attribution/**"]
@@ -381,6 +386,24 @@
       ]
     },
     {
+      "path": "src/main/skills/discovery.ts",
+      "feature": "live-plugin-marketplaces",
+      "kind": "import-swap",
+      "lines": [
+        "import { discoverLiveClaudePluginSkillSources } from './fork-live-plugin-marketplaces/live-plugin-marketplace-sources'",
+        "      ? await discoverLiveClaudePluginSkillSources({ homeDir, cwd: args.cwd })"
+      ]
+    },
+    {
+      "path": "src/main/skills/skill-discovery-wsl.ts",
+      "feature": "live-plugin-marketplaces",
+      "kind": "import-swap",
+      "lines": [
+        "import { discoverLiveClaudePluginSkillSourcesInWsl } from './fork-live-plugin-marketplaces/live-plugin-marketplace-sources-wsl'",
+        "    pluginRoots = await discoverLiveClaudePluginSkillSourcesInWsl(args)"
+      ]
+    },
+    {
       "path": "src/main/ssh/ssh-relay-session.ts",
       "feature": "native-chat-relay",
       "kind": "registration",
@@ -593,6 +616,15 @@
         "import { NativeChatConversation } from './fork-native-chat-relay/NativeChatConversation'",
         "} from './fork-native-chat-relay/native-chat-runtime-owner'",
         "  const sshConnectionId = useAppStore((s) => selectNativeChatSshConnectionId(s, terminalTabId))"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-attachment-upload.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": [
+        "import { rememberUploadedAttachmentPreviewSources } from './fork-agent-composer/agent-composer-attachment-preview'",
+        "    rememberUploadedAttachmentPreviewSources(owner, paths, resolvedPaths, skipped, failed)"
       ]
     },
     {
@@ -1364,6 +1396,7 @@
         "import type { NativeChatWidthTier } from './fork-native-chat-width/native-chat-width-tier'",
         "import type { ForkSessionHandoffSettings } from './fork-session-handoff/handoff-settings-types'",
         "  experimentalTerminalDock?: boolean",
+        "  dockTerminalComposerByDefault?: boolean",
         "  nativeChatWidth?: NativeChatWidthTier",
         "  forkSessionHandoff?: ForkSessionHandoffSettings"
       ]
@@ -1456,7 +1489,11 @@
       "path": "src/shared/telemetry-events.ts",
       "feature": "terminal-dock",
       "kind": "registration",
-      "lines": ["  'experimentalTerminalDock',", "const terminalDockToggledSchema = z"]
+      "lines": [
+        "  'experimentalTerminalDock',",
+        "  'dockTerminalComposerByDefault',",
+        "const terminalDockToggledSchema = z"
+      ]
     },
     {
       "path": "src/shared/workspace-session-schema.test.ts",
@@ -1593,6 +1630,11 @@
     {
       "path": ".claude/skills/sync-upstream/references/file-ownership.md",
       "reason": "Fork-only sync skill reference; upstream has no such document.",
+      "status": "permanent"
+    },
+    {
+      "path": ".claude/skills/sync-upstream/references/sync-lessons.md",
+      "reason": "Fork-only record of what past sync runs learned; upstream has no such document.",
       "status": "permanent"
     },
     {
@@ -1765,6 +1807,11 @@
     {
       "path": "config/scripts/release-rc-history.test.mjs",
       "reason": "Tests for the fork's release-tooling delta above.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/reject-local-vitest-run.mjs",
+      "reason": "Fork-only guard enforcing the sandbox-only test rule for callers outside the Claude Code hook.",
       "status": "permanent"
     },
     {
@@ -2055,6 +2102,42 @@
       "path": "tests/e2e/cross-version-wire/release-checkout.ts",
       "reason": "Encodes the fork's own (tagless) release-history shape for cross-version wire tests.",
       "status": "permanent"
+    },
+    {
+      "path": "src/shared/native-file-drop.ts",
+      "reason": "Gives the composer drop payload the tabId/paneLeafId its terminal sibling already carries, so a broadcast drop reaches only the composer it landed on. Upstream's shared drop contract, read by preload, main, and every drop consumer — a forked copy would not reroute them.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#composer-file-drop-pane-scoping"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-file-attachment-actions.ts",
+      "reason": "Ignores a composer file drop addressed to a different composer; unaddressed payloads still attach. Correctness fix to upstream routing, not fork-specific behavior.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#composer-file-drop-pane-scoping"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-file-attachment-actions.test.tsx",
+      "reason": "Covers the composer file-drop pane scoping fix: addressed, cross-pane, cross-tab, and unaddressed drops. Ships with the fix it exercises.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#composer-file-drop-pane-scoping"
+    },
+    {
+      "path": "src/shared/native-file-drop.test.ts",
+      "reason": "Adds composer tab/pane routing cases alongside the existing terminal ones, covering the composer drop payload change in the same file.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#composer-file-drop-pane-scoping"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-paste-bridge.ts",
+      "reason": "Routes pane-level Paste by focus instead of by which target happens to be mounted, and hands an image-only clipboard back to the composer so the app-menu path cannot claim a paste and then drop it. Upstream unmounts the composer behind a question card, so composer-wins was safe there; a host that keeps both mounted sent every Paste to the composer and starved the card's answer input.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#pane-paste-routing-by-focus"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-paste-bridge.test.tsx",
+      "reason": "Covers the pane-paste focus routing fix: composer-only, answer-input-only, both mounted with either focused, an image-only clipboard at the focused answer input, and neither mounted. Ships with the fix it exercises.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#pane-paste-routing-by-focus"
     }
   ],
   "residuals": {
@@ -2187,7 +2270,7 @@
       "removed": 7
     },
     "src/main/runtime/rpc/methods/session-tabs-schemas.ts": {
-      "added": 47,
+      "added": 50,
       "removed": 1
     },
     "src/main/runtime/rpc/methods/session-tabs.ts": {
@@ -2211,16 +2294,16 @@
       "removed": 6
     },
     "src/main/skills/discovery.ts": {
-      "added": 3,
-      "removed": 0
+      "added": 5,
+      "removed": 2
     },
     "src/main/skills/skill-discovery-sources.ts": {
       "added": 2,
       "removed": 1
     },
     "src/main/skills/skill-discovery-wsl.ts": {
-      "added": 4,
-      "removed": 1
+      "added": 6,
+      "removed": 3
     },
     "src/main/ssh/ssh-relay-session.ts": {
       "added": 38,
@@ -2287,8 +2370,8 @@
       "removed": 10
     },
     "src/renderer/src/components/native-chat/NativeChatComposer.tsx": {
-      "added": 184,
-      "removed": 345
+      "added": 188,
+      "removed": 346
     },
     "src/renderer/src/components/native-chat/NativeChatInteractiveCard.test.tsx": {
       "added": 21,
@@ -2687,7 +2770,7 @@
       "removed": 17
     },
     "src/shared/constants.ts": {
-      "added": 3,
+      "added": 4,
       "removed": 0
     },
     "src/shared/global-settings-types.ts": {
@@ -2743,11 +2826,11 @@
       "removed": 0
     },
     "src/shared/telemetry-events.ts": {
-      "added": 21,
+      "added": 22,
       "removed": 0
     },
     "src/shared/workspace-session-schema.test.ts": {
-      "added": 88,
+      "added": 103,
       "removed": 0
     },
     "src/shared/workspace-session-schema.ts": {
@@ -2817,6 +2900,10 @@
     "src/renderer/src/components/terminal-pane/terminal-pane-menu-agent-session-actions.ts": {
       "added": 1,
       "removed": 1
+    },
+    "src/renderer/src/components/native-chat/native-chat-attachment-upload.ts": {
+      "added": 2,
+      "removed": 0
     }
   }
 }

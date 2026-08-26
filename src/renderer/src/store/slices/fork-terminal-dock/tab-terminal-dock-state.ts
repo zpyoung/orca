@@ -25,7 +25,7 @@ export type TabTerminalDockSlice = {
   /** Patch one pane's docked-composer state on a tab; mirrors the single-pane patch to the host. */
   setTabTerminalDockState: (
     tabId: string,
-    patch: { paneKey: string; docked?: boolean; gutterRows?: number }
+    patch: { paneKey: string; docked?: boolean; gutterRows?: number; userUndocked?: boolean }
   ) => void
   /** Drop retired pane keys from a tab's dock record and mirror the removal to the host. */
   pruneTerminalDockPaneKeys: (tabId: string, paneKeys: readonly string[]) => void
@@ -45,14 +45,16 @@ function normalizeTerminalDockGutterRows(gutterRows: number | undefined): number
 
 function mergeTerminalDockPaneState(
   existing: TerminalDockPaneState | undefined,
-  patch: { docked?: boolean; gutterRows?: number }
+  patch: { docked?: boolean; gutterRows?: number; userUndocked?: boolean }
 ): TerminalDockPaneState {
+  const userUndocked = patch.userUndocked ?? existing?.userUndocked
   return {
     docked: patch.docked ?? existing?.docked ?? false,
     gutterRows:
       normalizeTerminalDockGutterRows(patch.gutterRows) ??
       existing?.gutterRows ??
-      DEFAULT_GUTTER_ROWS
+      DEFAULT_GUTTER_ROWS,
+    ...(userUndocked !== undefined ? { userUndocked } : {})
   }
 }
 
@@ -145,7 +147,7 @@ function withDockMirrorModules(
 function mirrorTabTerminalDockToHost(
   state: AppState,
   tabId: string,
-  patch: { paneKey: string; docked?: boolean; gutterRows?: number }
+  patch: { paneKey: string; docked?: boolean; gutterRows?: number; userUndocked?: boolean }
 ): void {
   withDockMirrorModules(state, tabId, (hostTabId, remapPaneKeyTabId) => {
     // Why: the paneKey's tab-ID segment must land under the same host tab id the

@@ -145,3 +145,67 @@ The `package.json` severities need no `exceptions` row of their own; the file is
 
 **Status:** pending-upstream. Not yet submitted. Drop any entry upstream resolves on its own — the
 CLI's rule set moves independently of the pinned `react-doctor@0.9.1` version.
+
+## Composer file-drop pane scoping
+
+**What:** a native OS file drop on a composer is broadcast to every renderer subscriber, and
+`useNativeChatFileAttachmentActions` took any payload whose target was `composer` — so one drop
+attached to every mounted composer. `NativeFileDropPayload`'s `composer` variant now carries the
+optional `tabId` / `paneLeafId` its `terminal` sibling already had, `resolveNativeFileDropPath`
+returns them from the composer branch, and the hook ignores a drop addressed to a different
+composer. A payload carrying neither id is still accepted, so a producer that cannot resolve pane
+identity keeps working.
+
+**Why upstream, not isolated:** this is a correctness fix to upstream's own drop routing, and the
+payload shape is upstream's shared contract that preload, main, and every drop consumer read.
+Isolating it would mean a forked copy of the shared type that upstream's own consumers still
+bypass, leaving the mis-routing in place for every non-composer surface.
+
+**Paths:**
+- `src/shared/native-file-drop.ts`
+- `src/renderer/src/components/native-chat/use-native-chat-file-attachment-actions.ts`
+- `src/shared/native-file-drop.test.ts`
+- `src/renderer/src/components/native-chat/use-native-chat-file-attachment-actions.test.tsx`
+
+**Depends on:** the composer emits its own identity via `data-terminal-tab-id` /
+`data-terminal-pane-leaf-id` on the drop-target div in
+`src/renderer/src/components/native-chat/fork-agent-composer/AgentComposerField.tsx`, which is
+fork-owned. An upstream PR built from this entry must move those two attributes onto upstream's
+equivalent composer field, or the ids never reach `resolveNativeFileDropPath` and every drop stays
+unaddressed (accepted everywhere, exactly as before).
+
+**Status:** pending-upstream. Not yet submitted.
+
+## Pane paste routing by focus
+
+**What:** `useNativeChatPasteBridge` resolved the app-menu Paste target by asking which one was
+mounted — composer first, the question card's answer input only as a fallback. It now prefers the
+answer input whenever that input holds focus, and falls back to the mount-order rule otherwise.
+
+**Why upstream, not isolated:** the old rule is only safe because `NativeChatView` unmounts the
+composer while a question card is up, so the two targets are mutually exclusive there. That is an
+invariant of one host, not of the bridge, and the bridge is the shared thing every host calls. A
+host that legitimately keeps its composer mounted beside a card — the fork's terminal dock does,
+because the card is an overlay above a gutter the composer still occupies — sends every Paste into
+the composer and starves the focused answer input. Forking a copy of the bridge would leave the
+same trap set for the next host upstream adds.
+
+The DOM paste path is deliberately unchanged: `handlePaste` intercepts only clipboard images and
+lets text fall through to the focused control, so an image pasted at the answer input keeps
+attaching to the composer beside it instead of being dropped on the floor.
+
+The app-menu path has no event to inspect, so it reads the clipboard as text and treats an empty
+read as the image signal: with the answer input focused, empty text hands the paste to the mounted
+composer's `pasteFromClipboard`, which is what knows how to save and attach an image. Without that
+fallback an image-only Cmd+V at the answer input would be claimed and then silently discarded.
+
+**Paths:**
+- `src/renderer/src/components/native-chat/use-native-chat-paste-bridge.ts`
+- `src/renderer/src/components/native-chat/use-native-chat-paste-bridge.test.tsx`
+
+**Depends on:** nothing upstream-side. The fork's dock supplies the answer-input ref from
+`src/renderer/src/components/terminal-pane/fork-terminal-dock/TerminalDock.tsx`; upstream's own
+caller passes the same ref it already had, so the change is inert for `NativeChatView` and only
+takes effect for a host that mounts both targets at once.
+
+**Status:** pending-upstream. Not yet submitted.

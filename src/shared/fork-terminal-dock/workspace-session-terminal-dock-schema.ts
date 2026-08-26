@@ -11,7 +11,8 @@ const isUnsafeTabRecordKey = (value: string): boolean =>
 
 const terminalDockPaneStateSchema = z.object({
   docked: z.boolean(),
-  gutterRows: z.number().int().min(MIN_GUTTER_ROWS).max(MAX_GUTTER_ROWS)
+  gutterRows: z.number().int().min(MIN_GUTTER_ROWS).max(MAX_GUTTER_ROWS),
+  userUndocked: z.boolean().optional()
 })
 
 // Why: each pane's dock state must validate independently — a single

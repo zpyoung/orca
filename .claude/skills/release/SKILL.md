@@ -15,10 +15,9 @@ Arguments: `--yes` skips the confirmation prompt (for unattended automation runs
 
 ## 1. Check preconditions
 
-Stop and report if any fail. Do not write anything before all four pass.
+Stop and report if any fail. Do not write anything until every one of them passes.
 
 ```sh
-git rev-parse --abbrev-ref HEAD        # must be: main
 git status --porcelain                 # must be empty
 git fetch origin main
 git fetch upstream
@@ -26,9 +25,15 @@ git rev-list --count origin/main..HEAD # must be: 0  (nothing unpushed)
 git rev-list --count HEAD..origin/main # must be: 0  (nothing unpulled)
 ```
 
-**Both** counts are required. `origin/main..HEAD` alone is also `0` when local `main` is *behind*
+**Both** counts are required. `origin/main..HEAD` alone is also `0` when local `HEAD` is *behind*
 `origin/main`, which would let the skill compute and commit against stale state and then fail the
 push as non-fast-forward.
+
+What this skill needs is a clean checkout whose content **is** `origin/main` — the two counts prove
+exactly that, and they hold on a detached `HEAD` as readily as on the branch. Do not additionally
+require `HEAD` to be the branch `main`: the sync automation runs in a per-run worktree and reaches
+this skill detached at `origin/main`, because `main` is checked out in another worktree and git will
+not hand the same branch to two of them.
 
 ## 2. Resolve the release inputs
 
@@ -197,7 +202,7 @@ included, then ask for confirmation.
 ```sh
 git add CHANGELOG.md
 git commit -m "docs(changelog): release ${TAG}"
-git push origin main
+git push origin HEAD:refs/heads/main
 
 gh workflow run release-cut.yml \
   --repo zpyoung/orca \
@@ -206,6 +211,10 @@ gh workflow run release-cut.yml \
   -f version="${VERSION_BASE}" \
   -f version_suffix="${VERSION_SUFFIX}"
 ```
+
+Push `HEAD`, not the branch name: the refspec form is correct whether the run is on `main` or
+detached at it, and it still fast-forwards `origin/main` either way. A rejected push means
+`origin/main` moved mid-run — report it, never force.
 
 `--repo` is **not optional**. The clone has an `upstream` remote and no `gh repo set-default`, so a
 bare `gh` command resolves to `stablyai/orca`, not the fork. The dispatch then fails `HTTP 403`

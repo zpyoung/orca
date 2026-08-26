@@ -251,8 +251,14 @@ absorbed a line the fork was carrying, and the seam should be re-read before the
 Re-baseline by rerunning the recorder and committing the new numbers with the resolution, never as a
 sweep to make the check quiet.
 
-`pnpm typecheck` and `pnpm lint` are absolute — no baseline differential. `pnpm test` is
-baseline-differential: a failure counts only if the same test passes at the pre-merge SHA.
+`pnpm typecheck` and `pnpm lint` are absolute: a failure is a failure. Neither is run against a
+baseline for comparison, and there is nothing to compare against — the tree either compiles and
+lints or it does not.
+
+The gate does **not** run the test suite. Vitest cannot run on this machine, and the remote host it
+would run on reports failures the code did not cause. `SKILL.md` § Step 8 has the reasoning; the
+short version is that PR CI runs the same suite on clean hosted runners as a required check, so the
+sync PR is where a test failure is found and fixed.
 
 The one exception to lint being absolute is the rule-tightening case above, and it is an exception
 about *how the tree is fixed*, not about tolerating a failure: lint must still pass before the push.
@@ -261,9 +267,11 @@ Traps that fake results:
 
 - `rm -f config/*.tsbuildinfo` before every typecheck. Composite projects cache errors across
   `git checkout` swaps.
-- `pnpm test` never builds the CLI, and ambient Git configuration can alter fixture commits.
-  Build the CLI first, then replace global/system config with one controlled empty file while also
-  stripping every inherited Git-config environment channel:
+- Running the suite locally to diagnose something is a deliberate detour, not part of the gate — and
+  it goes through `pnpm test:sandbox` (`AGENTS.md`), which a `PreToolUse` hook enforces. Two traps
+  bite whichever way it is invoked: the run never builds the CLI, and ambient Git configuration can
+  alter fixture commits. Build the CLI first, then replace global/system config with one controlled
+  empty file while also stripping every inherited Git-config environment channel:
 
   ```sh
   empty_git_config=$(mktemp)
