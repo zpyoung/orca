@@ -83,6 +83,7 @@ entries' IDs; manual edits to fix typos are fine.
 - **Introduced by**: code review of staged session-handoff customization changes
 - **Severity**: low
 - **Proposed fix**: Apply the mutation against the patch's templates when both are present, or reject the combination explicitly rather than silently preferring one.
+- **Resolved (2026-08-26)**: the mutation now composes onto the patch's templates, so a batched write and mutation both land.
 
 ## BUG-9: A server-side rejected template mutation fails silently in the settings editor
 - **Observed**: 2026-08-26

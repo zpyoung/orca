@@ -93,7 +93,9 @@ export function mergeForkSessionHandoffSettings(
       ? undefined
       : normalizeHandoffTemplates(persistedPatch.templates)
     : currentSettings.templates
-  const mutation = applyTemplateMutation(currentSettings.templates, templateMutation)
+  // a patch carrying both an explicit templates array and a mutation means both, so the mutation
+  // composes onto that write instead of being computed against the pre-patch list
+  const mutation = applyTemplateMutation(templates, templateMutation)
   if (mutation.applied) {
     templates = mutation.templates
   }

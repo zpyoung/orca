@@ -175,4 +175,19 @@ describe('mergeForkSessionHandoffSettings', () => {
       })
     }
   })
+
+  it('composes a mutation onto an explicit templates write in the same patch', () => {
+    const current = {
+      forkSessionHandoff: { templates: [originalTemplate] }
+    } as GlobalSettings
+
+    expect(
+      applyPatch(current, {
+        forkSessionHandoff: {
+          templates: [addedTemplate],
+          templateMutation: { type: 'add', template: originalTemplate, seedTemplates: [] }
+        }
+      }).forkSessionHandoff
+    ).toEqual({ templates: [addedTemplate, originalTemplate] })
+  })
 })
