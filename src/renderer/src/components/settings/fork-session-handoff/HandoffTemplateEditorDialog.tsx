@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -40,14 +40,6 @@ export function HandoffTemplateEditorDialog({
   const [name, setName] = useState(template.name)
   const [body, setBody] = useState(template.body)
   const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    if (open) {
-      setName(template.name)
-      setBody(template.body)
-      setSaving(false)
-    }
-  }, [open, template])
 
   const trimmedName = name.trim()
   const trimmedBody = body.trim()

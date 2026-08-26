@@ -31,7 +31,8 @@ import {
 } from '../../../../../shared/fork-session-handoff/handoff-settings-types'
 import type { ForkHandoffRelationship } from '../../../../../shared/fork-session-handoff/session-lineage-types'
 import type { TuiAgent } from '../../../../../shared/tui-agent'
-import { preserveHandoffDraft, restoreHandoffDraft } from './handoff-draft-preservation'
+import { buildHandoffDialogOpenSeed } from './handoff-dialog-open-seed'
+import { preserveHandoffDraft } from './handoff-draft-preservation'
 import type { ForkSessionHandoffRequest } from './prepare-handoff-from-pane'
 import type { HandoffDestinationOption } from './HandoffDestinationControls'
 import {
@@ -101,7 +102,7 @@ export function useHandoffDialogState({ open, request }: UseHandoffDialogStateAr
   const [createBaseBranch, setCreateBaseBranch] = useState('')
   const [operationError, setOperationError] = useState<string | null>(null)
   const [starting, setStarting] = useState(false)
-  const [waitingForIdle, setWaitingForIdle] = useState(false)
+  const [waitRequested, setWaitRequested] = useState(false)
   const [busyDismissed, setBusyDismissed] = useState(false)
   const launchedRef = useRef(false)
   const templateSaveGenerationRef = useRef(0)
@@ -143,6 +144,9 @@ export function useHandoffDialogState({ open, request }: UseHandoffDialogStateAr
     repoStateLoading,
     repoStateError
   } = environment
+  // Why derived: the capture is what ends the wait, so clearing a separate flag would mean an
+  // effect resetting the same state its own guard reads.
+  const waitingForIdle = waitRequested && capturedText === null
   const sourceActivity = useMemo(
     () => resolveHandoffSourceActivity(forkSource, sourceStore),
     [forkSource, sourceStore]
@@ -214,54 +218,47 @@ export function useHandoffDialogState({ open, request }: UseHandoffDialogStateAr
     }
   }, [open])
 
-  useEffect(() => {
-    if (!open || !request) {
-      return
+  // Why during render: the render sites keep this dialog mounted and toggle `open`, so opening it
+  // has to re-seed every field. Doing that in an effect paints the previous session's values for
+  // one frame; React re-runs the component before painting when the reset happens here instead.
+  const openSession = useMemo(
+    () => (open && request ? { draftIdentity, anchorWorktreeId } : null),
+    [anchorWorktreeId, draftIdentity, open, request]
+  )
+  const [seededSession, setSeededSession] = useState<typeof openSession>(null)
+  if (openSession !== seededSession) {
+    setSeededSession(openSession)
+    if (openSession !== null && request) {
+      const seed = buildHandoffDialogOpenSeed({ draftIdentity, anchorWorktreeId, request })
+      setTargetWorktreeId(seed.targetWorktreeId)
+      setSelectedAgent(seed.selectedAgent)
+      setContextMode('focused')
+      setIncludeToggles(seed.includeToggles)
+      setSelectedTemplateId(seed.templateId)
+      setSteeringNote(seed.steeringNote)
+      setRelationship('continues')
+      setPreviewPhase(seed.previewPhase)
+      setPreviewBody(seed.previewBody)
+      setCreateMode(false)
+      setCreateName('')
+      setCreateBaseBranch('')
+      setCapturedText(null)
+      setOperationError(null)
+      setWaitRequested(false)
+      setBusyDismissed(false)
     }
-    const restored = restoreHandoffDraft(draftIdentity)
-    // Why: settings.set() returns a freshly deserialized object, so reading preferences
-    // through a dependency would re-run this reset — and wipe the draft — on any unrelated
-    // settings write while the dialog is open.
-    const preferences = useAppStore.getState().settings?.forkSessionHandoff
-    const nextAgent =
-      restored?.selectedAgent ?? preferences?.lastAgent ?? request.source.sourceAgent
-    const restoredTarget =
-      restored?.targetWorktreeId &&
-      resolveHandoffTarget(useAppStore.getState(), restored.targetWorktreeId)
-        ? restored.targetWorktreeId
-        : anchorWorktreeId
-    launchedRef.current = false
-    setTargetWorktreeId(restoredTarget)
-    setSelectedAgent(nextAgent ?? null)
-    setContextMode('focused')
-    setIncludeToggles(
-      restored?.includeToggles ??
-        preferences?.includeToggles ??
-        DEFAULT_FORK_SESSION_HANDOFF_INCLUDE_TOGGLES
-    )
-    setSelectedTemplateId(restored?.templateId ?? preferences?.lastTemplateId ?? null)
-    setSteeringNote(restored?.steeringNote ?? '')
-    setRelationship('continues')
-    setPreviewPhase(
-      restored?.preview.phase === 'detached'
-        ? { phase: 'detached', staleReasons: restored.preview.staleReasons }
-        : INITIAL_HANDOFF_PREVIEW_PHASE
-    )
-    setPreviewBody(restored?.preview.phase === 'detached' ? restored.preview.editedBody : '')
-    setCreateMode(false)
-    setCreateName('')
-    setCreateBaseBranch('')
-    setCapturedText(null)
-    setOperationError(null)
-    setWaitingForIdle(false)
-    setBusyDismissed(false)
-  }, [anchorWorktreeId, draftIdentity, open, request, setCapturedText, setSelectedAgent])
+  }
+
+  useEffect(() => {
+    if (openSession !== null) {
+      launchedRef.current = false
+    }
+  }, [openSession])
 
   useEffect(() => {
     if (!waitingForIdle || !sourceActivity.available || sourceActivity.busy) {
       return
     }
-    setWaitingForIdle(false)
     setCapturedText(captureHandoffSource(forkSource, request?.source ?? null))
     applyHandoffPreviewEvent({ type: 'observed-idle' }, setPreviewPhase)
   }, [
@@ -350,11 +347,11 @@ export function useHandoffDialogState({ open, request }: UseHandoffDialogStateAr
   }, [composition?.editableBody])
   const waitForIdle = useCallback(() => {
     if (sourceActivity.available) {
-      setWaitingForIdle(true)
+      setWaitRequested(true)
     }
   }, [sourceActivity.available])
   const captureAnyway = useCallback(() => {
-    setWaitingForIdle(false)
+    setWaitRequested(false)
     setBusyDismissed(true)
     setCapturedText(captureHandoffSource(forkSource, request?.source ?? null))
     applyHandoffPreviewEvent({ type: 'observed-idle' }, setPreviewPhase)

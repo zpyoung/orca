@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
-import { ChevronDown, Loader2, MessageSquarePlus } from 'lucide-react'
+import { useRef } from 'react'
+import { Loader2, MessageSquarePlus } from 'lucide-react'
 import { closeUnfocusedMonacoFindOrPreventDialogDismiss } from '@/components/editor/monaco-find-widget'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,22 +12,15 @@ import {
 } from '@/components/ui/dialog'
 import { translate } from '@/i18n/i18n'
 import { getAgentLabel } from '@/lib/agent-catalog'
-import { cn } from '@/lib/utils'
 import type { AgentSessionContinuationRequest } from '@/lib/agent-session-continuation'
 import { HandoffContentControls } from './HandoffContentControls'
 import { HandoffDestinationControls } from './HandoffDestinationControls'
 import { HandoffNotesControls } from './HandoffNotesControls'
+import { HandoffPreviewColumn } from './HandoffPreviewColumn'
 import { getHandoffPreviewEditorRoot } from './handoff-preview-editor-slot'
 import { HandoffWarningsBanner } from './HandoffWarningsBanner'
 import type { ForkSessionHandoffRequest } from './prepare-handoff-from-pane'
 import { useHandoffDialogState } from './use-handoff-dialog-state'
-
-// Why: TerminalPane imports this dialog, so a static Monaco import reaches every consumer's
-// module graph — including node-environment tests that have no `window`.
-const HandoffPreviewEditor = lazy(() =>
-  import('./HandoffPreviewEditor').then((module) => ({ default: module.HandoffPreviewEditor }))
-)
-const HANDOFF_PREVIEW_PANEL_ID = 'handoff-brief-preview-panel'
 
 type AgentSessionContinuationDialogProps = {
   open: boolean
@@ -41,15 +34,8 @@ export function AgentSessionContinuationDialog({
   onOpenChange
 }: AgentSessionContinuationDialogProps): React.JSX.Element {
   const state = useHandoffDialogState({ open, request })
-  const [previewOpen, setPreviewOpen] = useState(true)
   const contentRef = useRef<HTMLDivElement>(null)
   const forkSource = (request as ForkSessionHandoffRequest | null)?.forkSource
-
-  useEffect(() => {
-    if (open) {
-      setPreviewOpen(true)
-    }
-  }, [open])
 
   const dismiss = (): void => {
     if (state.starting) {
@@ -178,51 +164,17 @@ export function AgentSessionContinuationDialog({
             />
           </div>
 
-          <div className="flex min-h-0 min-w-0 flex-col">
-            <Button
-              type="button"
-              variant="ghost"
-              aria-expanded={previewOpen}
-              aria-controls={HANDOFF_PREVIEW_PANEL_ID}
-              onClick={() => setPreviewOpen((current) => !current)}
-              className="m-3 justify-between md:hidden"
-            >
-              {translate(
-                'components.agentSessionContinuation.forkSessionHandoff.showPreview',
-                'Brief preview'
-              )}
-              <ChevronDown
-                aria-hidden="true"
-                className={previewOpen ? 'rotate-180 transition-transform' : 'transition-transform'}
-              />
-            </Button>
-            <div
-              id={HANDOFF_PREVIEW_PANEL_ID}
-              role="region"
-              aria-label={translate(
-                'components.agentSessionContinuation.forkSessionHandoff.preview',
-                'Brief preview'
-              )}
-              className={cn(
-                'scrollbar-sleek min-h-0 min-w-0 flex-1 overflow-y-auto p-4 md:block',
-                previewOpen ? 'block' : 'hidden'
-              )}
-            >
-              <Suspense fallback={null}>
-                <HandoffPreviewEditor
-                  value={state.previewBody}
-                  safetyBlock={state.safetyBlock}
-                  charCount={state.charCount}
-                  tokenEstimate={state.tokenEstimate}
-                  secretHits={state.secretHits}
-                  detached={state.previewDetached}
-                  onChange={state.editPreview}
-                  onRegenerate={state.regeneratePreview}
-                  onDismiss={dismiss}
-                />
-              </Suspense>
-            </div>
-          </div>
+          <HandoffPreviewColumn
+            value={state.previewBody}
+            safetyBlock={state.safetyBlock}
+            charCount={state.charCount}
+            tokenEstimate={state.tokenEstimate}
+            secretHits={state.secretHits}
+            detached={state.previewDetached}
+            onChange={state.editPreview}
+            onRegenerate={state.regeneratePreview}
+            onDismiss={dismiss}
+          />
         </div>
 
         <div className="shrink-0 border-t border-border px-4 pt-3">

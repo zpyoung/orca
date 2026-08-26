@@ -193,6 +193,7 @@ export function HandoffTemplatesPane(): React.JSX.Element {
 
       {editor ? (
         <HandoffTemplateEditorDialog
+          key={`${editor.mode}:${editor.template.id}`}
           open
           mode={editor.mode}
           template={editor.template}
