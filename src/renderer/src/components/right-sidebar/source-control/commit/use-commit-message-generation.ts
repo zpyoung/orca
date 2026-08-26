@@ -16,6 +16,7 @@ import {
   type CommitMessageGenerationRecord
 } from '@/store/slices/commit-message-generation'
 import { isCustomAgentId } from '../../../../../../shared/commit-message-agent-spec'
+import { materializeSourceControlTextGenerationParams } from '../../../../../../shared/fork-automation-launch-settings/source-control-text-launch-args'
 import { hasConfiguredCommitMessageGenerationDefaults } from '../ai/text-generation-defaults'
 import type { SourceControlAi } from '../ai/use-ai'
 import type { SourceControlStoreActions } from '../listing/use-store-actions'
@@ -91,6 +92,16 @@ export function useSourceControlCommitMessageGeneration({
       if (!overrides?.sourceControlAiResolvedParams && resolvedCommitMessageAi?.ok !== true) {
         return
       }
+      const resolvedParams =
+        overrides?.sourceControlAiResolvedParams ??
+        (resolvedCommitMessageAi?.ok ? resolvedCommitMessageAi.value.params : undefined)
+      const effectiveOverrides = resolvedParams
+        ? {
+            ...overrides,
+            sourceControlAiResolvedParams:
+              materializeSourceControlTextGenerationParams(resolvedParams)
+          }
+        : overrides
 
       if (
         !overrides?.sourceControlAiResolvedParams &&
@@ -132,7 +143,7 @@ export function useSourceControlCommitMessageGeneration({
             worktreePath,
             connectionId
           },
-          overrides
+          effectiveOverrides
         )
 
         if (!result.success) {

@@ -1,4 +1,8 @@
 import { planSourceControlAgentActionLaunch } from '@/lib/source-control-agent-action-plan'
+import {
+  agentLaunchOverridesToSessionOptionValues,
+  type AgentLaunchOptionSelection
+} from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import { useAppStore } from '@/store'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { SourceControlAgentActionDeliveryPlanState } from './SourceControlAgentActionDialogForm'
@@ -9,6 +13,7 @@ type BuildSourceControlAgentDeliveryPlanArgs = {
   selectedAgent: TuiAgent | null
   commandInput: string
   agentArgs: string
+  launchOptions?: AgentLaunchOptionSelection | null
   promptDelivery: 'auto-submit' | 'draft' | 'submit-after-ready'
   detectedAgents: TuiAgent[]
   connectionUnavailable: boolean
@@ -22,6 +27,7 @@ export function buildSourceControlAgentDeliveryPlan({
   selectedAgent,
   commandInput,
   agentArgs,
+  launchOptions,
   promptDelivery,
   detectedAgents,
   connectionUnavailable,
@@ -32,18 +38,24 @@ export function buildSourceControlAgentDeliveryPlan({
     return buildSourceControlAgentConnectionErrorPlan()
   }
   const settings = useAppStore.getState().settings
+  const recipeSessionOptions = launchOptions?.model
+    ? agentLaunchOverridesToSessionOptionValues(launchOptions)
+    : undefined
   const result = planSourceControlAgentActionLaunch({
     agent: selectedAgent,
     commandInput,
     agentArgs,
-    sessionOptions: selectedAgent
-      ? resolveInitialNativeChatSessionOptions(settings, {
-          agent: selectedAgent,
-          promptDelivery,
-          launchDraftText: commandInput.trim(),
-          nativeChatTranscriptIsLocalReadable: !isRemote
-        })
-      : undefined,
+    sessionOptions:
+      recipeSessionOptions ??
+      (selectedAgent
+        ? resolveInitialNativeChatSessionOptions(settings, {
+            agent: selectedAgent,
+            promptDelivery,
+            launchDraftText: commandInput.trim(),
+            nativeChatTranscriptIsLocalReadable: !isRemote
+          })
+        : undefined),
+    includeSessionOptionCatalogDefaults: recipeSessionOptions ? false : undefined,
     promptDelivery,
     detectedAgents,
     disabledAgents: settings?.disabledTuiAgents,

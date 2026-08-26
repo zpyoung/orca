@@ -111,6 +111,7 @@ export function useCheckRunDetailsFixWithAI(args: {
   savedAgentId: ReturnType<typeof readSourceControlLaunchRecipeAgentId>
   savedCommandInputTemplate: string | null
   savedAgentArgs: string | null
+  savedLaunchOptions: SourceControlActionRecipe['launchOptions'] | null
   saveLaunchActionDefault: (
     target: SourceControlAiWriteTarget,
     actionId: SourceControlLaunchActionId,
@@ -225,6 +226,7 @@ export function useCheckRunDetailsFixWithAI(args: {
     savedAgentId: readSourceControlLaunchRecipeAgentId(fixChecksRecipe),
     savedCommandInputTemplate: fixChecksRecipe.commandInputTemplate ?? null,
     savedAgentArgs: fixChecksRecipe.agentArgs ?? null,
+    savedLaunchOptions: fixChecksRecipe.launchOptions ?? null,
     saveLaunchActionDefault,
     openSourceControlAiSettings,
     fixWithAI

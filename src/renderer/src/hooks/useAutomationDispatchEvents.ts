@@ -13,6 +13,7 @@ import type {
   AutomationPrecheckResult
 } from '../../../shared/automations-types'
 import { getAutomationRunRepoId } from '../../../shared/automation-run-identity'
+import { buildAutomationRunLaunchSettings } from '../../../shared/fork-automation-launch-settings/automation-run-launch-settings'
 import {
   didAutomationPrecheckPass,
   formatAutomationPrecheckFailure
@@ -585,6 +586,7 @@ export function useAutomationDispatchEvents(): void {
             agent: automation.agentId,
             worktreeId: worktree.id,
             prompt: automation.prompt,
+            launchOverrides: automation.launchOverrides ?? null,
             launchSource: 'unknown',
             title: run.title,
             onData: (chunk) => {
@@ -620,6 +622,15 @@ export function useAutomationDispatchEvents(): void {
             releaseTerminalOwnership()
           }
           const launchedTabId = result.tabId
+          const launchSettings = buildAutomationRunLaunchSettings({
+            agentId: automation.agentId,
+            overrides: automation.launchOverrides,
+            effectiveAgentArgs: result.effectiveAgentArgs ?? '',
+            agentArgsSource: automation.launchOverrides?.agentArgs?.trim()
+              ? 'explicit'
+              : 'inherited',
+            shell: result.startupShell
+          })
           observeAgentStatus(result.paneKey, dispatchStartedAt)
           try {
             await markDispatchResult({
@@ -630,6 +641,7 @@ export function useAutomationDispatchEvents(): void {
               terminalSessionId: launchedTabId,
               terminalPaneKey: result.paneKey,
               terminalPtyId: result.ptyId,
+              launchSettings,
               precheckResult,
               error: null
             })

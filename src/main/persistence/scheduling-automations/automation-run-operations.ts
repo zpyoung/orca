@@ -18,6 +18,7 @@ import {
   normalizeAutomationRunTerminalPtyId,
   normalizeAutomationRunWorkspaceDisplayName
 } from './automation-context-migration'
+import { normalizeAutomationRunLaunchSettings } from './fork-automation-launch-settings/automation-run-launch-settings-normalization'
 
 export type AutomationRunOperations = {
   state: StoreOwnedPersistedState
@@ -70,6 +71,7 @@ export function createAutomationRun(
     terminalSessionId: null,
     terminalPaneKey: null,
     terminalPtyId: null,
+    launchSettings: null,
     outputSnapshot: null,
     precheckResult: null,
     usage: null,
@@ -122,6 +124,9 @@ export function updateAutomationRun(
     terminalPtyId: Object.hasOwn(result, 'terminalPtyId')
       ? normalizeAutomationRunTerminalPtyId(result.terminalPtyId)
       : normalizeAutomationRunTerminalPtyId(current.terminalPtyId),
+    launchSettings: Object.hasOwn(result, 'launchSettings')
+      ? normalizeAutomationRunLaunchSettings(result.launchSettings)
+      : normalizeAutomationRunLaunchSettings(current.launchSettings),
     outputSnapshot: Object.hasOwn(result, 'outputSnapshot')
       ? normalizeAutomationRunOutputSnapshot(result.outputSnapshot)
       : normalizeAutomationRunOutputSnapshot(current.outputSnapshot),

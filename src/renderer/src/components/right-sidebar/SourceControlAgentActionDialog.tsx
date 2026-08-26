@@ -6,6 +6,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
+import type { AgentLaunchOptionSelection } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type {
   SourceControlActionRecipe,
   SourceControlLaunchActionId
@@ -25,6 +26,7 @@ export type SourceControlAgentActionDialogProps = {
   baseCommandInput: string
   savedCommandInputTemplate?: string | null
   savedAgentArgs?: string | null
+  savedLaunchOptions?: AgentLaunchOptionSelection | null
   worktreeId?: string | null
   groupId?: string | null
   connectionId?: string | null
@@ -52,6 +54,7 @@ export type SourceControlAgentActionDialogProps = {
     agent: TuiAgent
     commandInput: string
     agentArgs: string
+    launchOptions: AgentLaunchOptionSelection
   }) => boolean | Promise<boolean>
 }
 
@@ -79,6 +82,7 @@ export function SourceControlAgentActionDialog(
     detecting,
     statusCopy,
     agentArgs,
+    launchOptions,
     commandTemplate,
     saveLaunchRecipe,
     saveTargetValue,
@@ -89,7 +93,7 @@ export function SourceControlAgentActionDialog(
     canStart,
     isStarting,
     onSelectedAgentChange,
-    onAgentArgsChange,
+    onLaunchOverridesChange,
     onCommandTemplateChange,
     onSaveLaunchRecipeChange,
     onSaveAgentDefaultChange,
@@ -116,6 +120,7 @@ export function SourceControlAgentActionDialog(
             detecting={detecting}
             statusCopy={statusCopy}
             agentArgs={agentArgs}
+            launchOptions={launchOptions}
             commandTemplate={commandTemplate}
             savedCommandInputTemplate={savedCommandInputTemplate}
             saveLaunchRecipe={saveLaunchRecipe}
@@ -129,7 +134,7 @@ export function SourceControlAgentActionDialog(
             isStarting={isStarting}
             startLabel={startLabel}
             onSelectedAgentChange={onSelectedAgentChange}
-            onAgentArgsChange={onAgentArgsChange}
+            onLaunchOverridesChange={onLaunchOverridesChange}
             onCommandTemplateChange={onCommandTemplateChange}
             onSaveLaunchRecipeChange={onSaveLaunchRecipeChange}
             onSaveAgentDefaultChange={onSaveAgentDefaultChange}

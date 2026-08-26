@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { getAgentCatalog } from '@/lib/agent-catalog'
 import type { AutomationRun } from '../../../../shared/automations-types'
 import type { Worktree } from '../../../../shared/worktree/types'
 import {
@@ -14,6 +15,10 @@ import {
   getAutomationUsageStatusLabel
 } from './automation-usage-model'
 import { getAutomationRunWorkspaceDisplay } from './automation-run-workspace-display'
+import {
+  automationRunLaunchDisplayText,
+  formatAutomationRunLaunchSettings
+} from './fork-automation-launch-settings/automation-run-launch-display'
 import { translate } from '@/i18n/i18n'
 
 type AutomationRunHistoryProps = {
@@ -40,6 +45,7 @@ export function AutomationRunHistory({
     const completed = runs.filter((run) => run.status === 'completed').length
     return `${runs.length} ${runs.length === 1 ? 'run' : 'runs'} · ${completed} completed`
   }, [runs])
+  const agentCatalog = useMemo(() => getAgentCatalog(), [])
 
   const selectedRunId =
     selectedRunState.automationId === automationId ? selectedRunState.runId : null
@@ -79,6 +85,12 @@ export function AutomationRunHistory({
               worktree: runWorktree
             })
             const usageLabel = getAutomationUsageStatusLabel(run.usage)
+            const launchAgentId = run.launchSettings?.agentId
+            const launchAgentLabel =
+              agentCatalog.find((agent) => agent.id === launchAgentId)?.label ?? launchAgentId
+            const launchDisplay = launchAgentLabel
+              ? formatAutomationRunLaunchSettings(run.launchSettings, launchAgentLabel)
+              : null
             return (
               <button
                 key={run.id}
@@ -98,6 +110,20 @@ export function AutomationRunHistory({
                   <div className="mt-1 truncate text-xs text-muted-foreground">
                     {workspaceLabel.detailLabel}
                   </div>
+                  {launchDisplay ? (
+                    <div
+                      className="mt-1 truncate text-[11px] text-muted-foreground"
+                      title={automationRunLaunchDisplayText(launchDisplay)}
+                    >
+                      <span>{launchDisplay.summary}</span>
+                      {launchDisplay.agentArgs ? (
+                        <>
+                          <span> · </span>
+                          <span className="font-mono">{launchDisplay.agentArgs}</span>
+                        </>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
                 <div
                   className={

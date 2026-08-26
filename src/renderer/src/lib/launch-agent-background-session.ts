@@ -1,5 +1,6 @@
 import { useAppStore } from '@/store'
 import { buildAgentStartupPlan } from '@/lib/tui-agent-startup'
+import { resolveAgentBackgroundLaunchSettings } from '@/lib/fork-automation-launch-settings/agent-background-launch-settings'
 import type {
   LaunchAgentBackgroundSessionArgs,
   LaunchAgentBackgroundSessionResult
@@ -23,14 +24,12 @@ import { subscribeToPtyData } from '@/components/terminal-pane/pty-data-sidecar-
 import { callRuntimeRpc, getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import { getSettingsForWorktreeRuntimeOwner } from '@/lib/worktree-runtime-owner'
 import { retireProvider } from '@/lib/retire-unowned-background-terminal'
-import { createRuntimeAgentBackgroundTerminal } from '@/lib/runtime-agent-background-create'
-import {
-  subscribeToRuntimeTerminalData,
-  toRemoteRuntimePtyId
-} from '@/runtime/runtime-terminal-stream'
+import { createRuntimeAgentBackgroundSession } from '@/lib/fork-automation-launch-settings/runtime-agent-background-session-create'
+import { subscribeToRuntimeTerminalData } from '@/runtime/runtime-terminal-stream'
 import { createSshBackgroundStartupDelivery } from '@/lib/ssh-background-startup-delivery'
 import { shouldUseShellReadyStartupDelivery } from '../../../shared/codex-startup-delivery'
 import { isMainTerminalSideEffectAuthorityForPty } from '@/components/terminal-pane/terminal-side-effect-facts-handler'
+import { resolveStartupShell } from '../../../shared/tui-agent-startup-shell'
 import { resolveLocalWindowsAgentStartupShell } from '../../../shared/windows-terminal-shell'
 import { runBestEffortAgentBackgroundCleanups } from '@/lib/agent-background-session-cleanup'
 import type { bindAutomationTerminal } from '@/lib/automation-terminal-ownership'
@@ -44,16 +43,24 @@ import { isWslUncPath } from '../../../shared/wsl-paths'
 export async function launchAgentBackgroundSession(
   args: LaunchAgentBackgroundSessionArgs
 ): Promise<LaunchAgentBackgroundSessionResult | null> {
-  const { agent, worktreeId, prompt, launchSource, title, onData, onExit, onAgentStatus } = args
+  const {
+    agent,
+    worktreeId,
+    prompt,
+    launchOverrides,
+    launchSource,
+    title,
+    onData,
+    onExit,
+    onAgentStatus
+  } = args
   const store = useAppStore.getState()
-  // Folder workspaces exist only in getKnownWorktreeById (#2989).
   const worktree = store.getKnownWorktreeById(worktreeId)
   const repo = worktree ? store.repos.find((entry) => entry.id === worktree.repoId) : null
   if (!worktree) {
     throw new Error('The target workspace is no longer available.')
   }
   const cmdOverrides = store.settings?.agentCmdOverrides ?? {}
-  const agentArgs = resolveTuiAgentLaunchArgs(agent, store.settings?.agentDefaultArgs)
   const agentEnv = resolveTuiAgentLaunchEnv(agent, store.settings?.agentDefaultEnv)
   // Folder launch ownership cannot be derived from a repo row (#2989).
   const launchHost = resolveAgentBackgroundLaunchHost({
@@ -75,10 +82,18 @@ export async function launchAgentBackgroundSession(
     }
   }
   const { platform: launchPlatform, isRemote } = launchHost
-  const startupShell = resolveLocalWindowsAgentStartupShell({
-    platform: launchPlatform,
-    isRemote,
-    terminalWindowsShell: store.settings?.terminalWindowsShell
+  const startupShell = resolveStartupShell(
+    launchPlatform,
+    resolveLocalWindowsAgentStartupShell({
+      platform: launchPlatform,
+      isRemote,
+      terminalWindowsShell: store.settings?.terminalWindowsShell
+    })
+  )
+  const inheritedAgentArgs = resolveTuiAgentLaunchArgs(agent, store.settings?.agentDefaultArgs)
+  const { agentArgs, sessionOptions } = resolveAgentBackgroundLaunchSettings({
+    inheritedAgentArgs,
+    overrides: launchOverrides
   })
   const trimmedPrompt = prompt?.trim() ?? ''
   const hasPrompt = trimmedPrompt.length > 0
@@ -91,6 +106,8 @@ export async function launchAgentBackgroundSession(
     cmdOverrides,
     agentArgs,
     agentEnv,
+    sessionOptions,
+    includeSessionOptionCatalogDefaults: launchOverrides == null ? undefined : false,
     platform: launchPlatform,
     shell: startupShell,
     isRemote,
@@ -173,27 +190,22 @@ export async function launchAgentBackgroundSession(
     if (runtimeTarget.kind === 'environment') {
       // Why: runtime environments execute on the server; using local pty.spawn
       // would silently run automation on the client for a remote workspace.
-      const created = await createRuntimeAgentBackgroundTerminal({
+      const created = await createRuntimeAgentBackgroundSession({
         environmentId: runtimeTarget.environmentId,
         worktreeId,
         tabId: reservedTabId,
         leafId,
         agent,
         ...(hasPrompt && !isFollowupPath ? { prompt: trimmedPrompt } : {}),
-        ...(startupPlan.sessionOptions ? { sessionOptions: startupPlan.sessionOptions } : {}),
-        legacy: {
-          command: startupPlan.launchCommand,
-          env: paneEnv,
-          ...(startupPlan.startupCommandDelivery
-            ? { startupCommandDelivery: startupPlan.startupCommandDelivery }
-            : {}),
-          launchConfig: startupPlan.launchConfig,
-          launchToken,
-          ...(title ? { title } : {})
-        }
+        startupPlan,
+        launchOverrides,
+        effectiveAgentArgs: agentArgs,
+        paneEnv,
+        launchToken,
+        title
       })
-      runtimeTerminalHandle = created.terminal.handle
-      ptyId = toRemoteRuntimePtyId(runtimeTerminalHandle, runtimeTarget.environmentId)
+      runtimeTerminalHandle = created.runtimeTerminalHandle
+      ptyId = created.ptyId
     } else {
       const result = await window.api.pty.spawn({
         cols: 120,
@@ -297,7 +309,15 @@ export async function launchAgentBackgroundSession(
       scheduleAgentBackgroundDraft(tab.id, pasteDraftAfterLaunch, agent)
     }
 
-    return { tabId: tab.id, paneKey, ptyId, startupPlan, terminalOwnership }
+    return {
+      tabId: tab.id,
+      paneKey,
+      ptyId,
+      startupPlan,
+      startupShell,
+      effectiveAgentArgs: agentArgs,
+      terminalOwnership
+    }
   } catch (error) {
     // Why: terminal creation and stream subscription are separate remote calls.
     // A failure between them must not strand an invisible runtime terminal.

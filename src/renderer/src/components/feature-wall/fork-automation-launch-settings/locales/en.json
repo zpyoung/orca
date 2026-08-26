@@ -1,0 +1,14 @@
+{
+  "auto": {
+    "components": {
+      "feature": {
+        "wall": {
+          "AiCommitPrSettingsFields": {
+            "a8a91aa917": "Set by action recipes.",
+            "b66be73624": "Overridden for {{value0}} by its action recipe."
+          }
+        }
+      }
+    }
+  }
+}

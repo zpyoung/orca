@@ -4700,6 +4700,15 @@ export default function ChecksPanel(): React.JSX.Element {
               }).agentArgs ?? null)
             : null
         }
+        savedLaunchOptions={
+          agentComposerState
+            ? (resolveSourceControlActionRecipe({
+                settings,
+                repo,
+                actionId: agentComposerState.actionId
+              }).launchOptions ?? null)
+            : null
+        }
         onSaveAgentDefault={saveLaunchActionDefault}
         // Why: claims the ack payload when the tab exists; the host writes still wait for delivery.
         onLaunchAccepted={handleLaunchAccepted}

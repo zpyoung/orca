@@ -49,6 +49,7 @@ export function SourceControlDialogLayer({
   savedResolveConflictsAgentId,
   savedResolveConflictsCommandInputTemplate,
   savedResolveConflictsAgentArgs,
+  savedResolveConflictsLaunchOptions,
   onSaveAgentDefault,
   onOpenSourceControlAiSettings,
   commitGenerationDialogOpen,
@@ -91,6 +92,7 @@ export function SourceControlDialogLayer({
   savedResolveConflictsAgentId: AgentDialogProps['savedAgentId']
   savedResolveConflictsCommandInputTemplate: AgentDialogProps['savedCommandInputTemplate']
   savedResolveConflictsAgentArgs: AgentDialogProps['savedAgentArgs']
+  savedResolveConflictsLaunchOptions: AgentDialogProps['savedLaunchOptions']
   onSaveAgentDefault: AgentDialogProps['onSaveAgentDefault']
   onOpenSourceControlAiSettings: AgentDialogProps['onOpenSettings']
   commitGenerationDialogOpen: boolean
@@ -201,6 +203,7 @@ export function SourceControlDialogLayer({
         savedAgentId={savedResolveConflictsAgentId}
         savedCommandInputTemplate={savedResolveConflictsCommandInputTemplate}
         savedAgentArgs={savedResolveConflictsAgentArgs}
+        savedLaunchOptions={savedResolveConflictsLaunchOptions}
         onSaveAgentDefault={onSaveAgentDefault}
         onOpenSettings={onOpenSourceControlAiSettings}
         onLaunched={() =>

@@ -3,6 +3,7 @@ import type {
   AutomationRun,
   AutomationRunOutputSnapshot
 } from '../../shared/automations-types'
+import type { AutomationRunLaunchSettings } from '../../shared/fork-automation-launch-settings/automation-run-launch-settings'
 import type { AutomationRunTargetResult } from './run-target-resolution'
 
 const MAX_HEADLESS_OUTPUT_SNAPSHOT_CHARS = 256 * 1024
@@ -13,6 +14,7 @@ export type HeadlessAutomationDispatchLaunch = {
   terminalSessionId: string | null
   terminalPaneKey?: string | null
   terminalPtyId?: string | null
+  launchSettings?: AutomationRunLaunchSettings | null
   completion?: Promise<{
     status: 'completed' | 'dispatch_failed'
     outputSnapshot?: AutomationRunOutputSnapshot | null

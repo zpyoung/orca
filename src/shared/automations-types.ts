@@ -1,3 +1,5 @@
+import type { AgentLaunchOverrides } from './fork-automation-launch-settings/agent-launch-overrides'
+import type { AutomationRunLaunchSettings } from './fork-automation-launch-settings/automation-run-launch-settings'
 import type { TuiAgent } from './tui-agent'
 import type { SetupDecision } from './worktree/create-types'
 import type { TaskSourceContext, WorkspaceRunContext } from './task-source-context'
@@ -94,6 +96,7 @@ export type Automation = {
   prompt: string
   precheck: AutomationPrecheck | null
   agentId: TuiAgent
+  launchOverrides?: AgentLaunchOverrides | null
   /** Why: runContext carries the logical project + host setup identity for
    *  multi-host projects; projectId remains only as the legacy repo-id storage
    *  field for pre-host-context automations.
@@ -146,6 +149,7 @@ export type AutomationRun = {
    *  run reopening must target the pane that actually executed the run. */
   terminalPaneKey: string | null
   terminalPtyId: string | null
+  launchSettings?: AutomationRunLaunchSettings | null
   outputSnapshot: AutomationRunOutputSnapshot | null
   precheckResult: AutomationPrecheckResult | null
   usage: AutomationRunUsage | null
@@ -163,6 +167,7 @@ export type AutomationCreateInput = {
   prompt: string
   precheck?: AutomationPrecheck | null
   agentId: TuiAgent
+  launchOverrides?: AgentLaunchOverrides | null
   runContext?: WorkspaceRunContext | null
   sourceContext?: TaskSourceContext | null
   /** @deprecated Legacy repo-id compatibility field required for older stored
@@ -187,6 +192,7 @@ export type AutomationUpdateInput = Partial<
     | 'prompt'
     | 'precheck'
     | 'agentId'
+    | 'launchOverrides'
     | 'runContext'
     | 'sourceContext'
     | 'projectId'
@@ -217,6 +223,7 @@ export type AutomationDispatchResult = {
   terminalSessionId?: string | null
   terminalPaneKey?: string | null
   terminalPtyId?: string | null
+  launchSettings?: AutomationRunLaunchSettings | null
   outputSnapshot?: AutomationRunOutputSnapshot | null
   precheckResult?: AutomationPrecheckResult | null
   usage?: AutomationRunUsage | null

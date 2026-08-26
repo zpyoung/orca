@@ -113,11 +113,13 @@ export function SourceControlAiActionRecipeDefaults({
   const openSettingsTarget = useAppStore((state) => state.openSettingsTarget)
   const {
     actionRecipeDraftState,
-    savingActionTemplateIds,
+    savingActionRecipeIds,
     onActionTemplateChange,
     onActionAgentArgsChange,
-    saveActionTemplateDraft,
-    discardActionTemplateDraft,
+    onActionLaunchOptionsChange,
+    resetActionLaunchOptions,
+    saveActionRecipeDraft,
+    discardActionRecipeDraft,
     appendVariable
   } = useSourceControlActionRecipeDraftState({
     config,
@@ -141,9 +143,13 @@ export function SourceControlAiActionRecipeDefaults({
       await writeConfig((current) => {
         previousActions = current.actions
         return {
-          actions: setSourceControlActionDefault(current.actions, actionId, { agentId })
+          actions: setSourceControlActionDefault(current.actions, actionId, {
+            agentId,
+            launchOptions: undefined
+          })
         }
       })
+      resetActionLaunchOptions(actionId)
     } catch (error) {
       console.error('Failed to save Source Control AI action agent default', error)
       try {
@@ -206,7 +212,7 @@ export function SourceControlAiActionRecipeDefaults({
               draftValue={actionRecipeDraftState.values[actionId]}
               baseValue={actionRecipeDraftState.baseValues[actionId]}
               defaultTuiAgent={defaultTuiAgent}
-              isSavingTemplate={savingActionTemplateIds[actionId] === true}
+              isSavingRecipe={savingActionRecipeIds[actionId] === true}
               repoOverrideNote={
                 <SourceControlActionRepoOverrideNote
                   summary={overrideSummary}
@@ -216,9 +222,10 @@ export function SourceControlAiActionRecipeDefaults({
               onAgentChange={(id, value) => void onActionAgentChange(id, value)}
               onTemplateChange={onActionTemplateChange}
               onAgentArgsChange={onActionAgentArgsChange}
+              onLaunchOptionsChange={onActionLaunchOptionsChange}
               onAppendVariable={appendVariable}
-              onDiscard={discardActionTemplateDraft}
-              onSave={(id) => void saveActionTemplateDraft(id)}
+              onDiscard={discardActionRecipeDraft}
+              onSave={(id) => void saveActionRecipeDraft(id)}
             />
           )
         })}

@@ -5,6 +5,7 @@ import type {
   AutomationUpdateInput
 } from '../../../shared/automations-types'
 import type { PersistedState } from '../../../shared/persisted-state-types'
+import { normalizeAgentLaunchOverrides } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import { normalizeAutomationPrecheck } from '../../../shared/automation-precheck'
 import { nextAutomationOccurrenceAfter } from '../../../shared/automation-schedules'
 import type { StoreOwnedPersistedState } from '../loading-store/store-owned-state'
@@ -36,12 +37,14 @@ export function createAutomation(
   const executionTargetType = repo?.connectionId ? 'ssh' : 'local'
   const schedulerOwner = getAutomationSchedulerOwner(repo)
   const contexts = getAutomationContextsForRepo(repo, operations.state.projectHostSetups ?? [])
+  const launchOverrides = normalizeAgentLaunchOverrides(input.launchOverrides)
   const automation: Automation = {
     id: randomUUID(),
     name: input.name.trim() || 'Untitled automation',
     prompt: input.prompt,
     precheck: normalizeAutomationPrecheck(input.precheck),
     agentId: input.agentId,
+    ...(launchOverrides ? { launchOverrides } : {}),
     runContext: input.runContext ?? contexts.runContext,
     sourceContext: input.sourceContext ?? contexts.sourceContext,
     projectId: input.projectId,
@@ -96,6 +99,11 @@ export function updateAutomation(
   const dtstart = updates.dtstart ?? current.dtstart
   const scheduleChanged = updates.rrule !== undefined || updates.dtstart !== undefined
   const workspaceMode = updates.workspaceMode ?? current.workspaceMode
+  const normalizedLaunchOverrides = Object.hasOwn(definedUpdates, 'launchOverrides')
+    ? definedUpdates.launchOverrides === null
+      ? null
+      : normalizeAgentLaunchOverrides(definedUpdates.launchOverrides)
+    : current.launchOverrides
   const updated: Automation = {
     ...current,
     ...definedUpdates,
@@ -103,6 +111,7 @@ export function updateAutomation(
     precheck: Object.hasOwn(definedUpdates, 'precheck')
       ? normalizeAutomationPrecheck(definedUpdates.precheck)
       : normalizeAutomationPrecheck(current.precheck),
+    ...(normalizedLaunchOverrides ? { launchOverrides: normalizedLaunchOverrides } : {}),
     projectId: repoId,
     runContext: Object.hasOwn(definedUpdates, 'runContext')
       ? (definedUpdates.runContext ?? null)
@@ -149,6 +158,9 @@ export function updateAutomation(
       ? nextAutomationOccurrenceAfter(rrule, dtstart, Date.now())
       : current.nextRunAt,
     updatedAt: Date.now()
+  }
+  if (Object.hasOwn(definedUpdates, 'launchOverrides') && !normalizedLaunchOverrides) {
+    delete updated.launchOverrides
   }
   operations.state.automations[index] = updated
   operations.flush()

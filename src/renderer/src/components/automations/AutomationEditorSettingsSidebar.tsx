@@ -1,4 +1,3 @@
-import AgentCombobox from '@/components/agent/AgentCombobox'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import {
@@ -12,6 +11,8 @@ import type { Repo } from '../../../../shared/repo-types'
 import type { Worktree } from '../../../../shared/worktree/types'
 import type { AgentCatalogEntry } from '@/lib/agent-catalog'
 import { AUTOMATION_EDITOR_SECTION_LABEL_CLASS, Field } from './automation-page-parts'
+import { AutomationAgentLaunchFields } from './fork-automation-launch-settings/AutomationAgentLaunchFields'
+import type { AutomationLaunchOverridesGate } from './fork-automation-launch-settings/automation-launch-overrides-gate'
 import { AutomationMissedRunGraceField } from './AutomationMissedRunGraceField'
 import { AutomationPrecheckFields } from './AutomationPrecheckFields'
 import AutomationProjectCombobox from './AutomationProjectCombobox'
@@ -33,6 +34,7 @@ type AutomationEditorSettingsSidebarProps = {
   settings: GlobalSettings | null
   draft: AutomationDraft
   visibleAgents: AgentCatalogEntry[]
+  launchOverridesGate: AutomationLaunchOverridesGate
   pickerTriggerClassName: string
   segmentedGroupClassName: string
   segmentedItemClassName: string
@@ -54,6 +56,7 @@ export function AutomationEditorSettingsSidebar({
   settings,
   draft,
   visibleAgents,
+  launchOverridesGate,
   pickerTriggerClassName,
   segmentedGroupClassName,
   segmentedItemClassName,
@@ -84,24 +87,14 @@ export function AutomationEditorSettingsSidebar({
                   : 'translate-y-0 opacity-100 delay-200'
               )}
             >
-              <Field
-                labelClassName={AUTOMATION_EDITOR_SECTION_LABEL_CLASS}
-                label={translate(
-                  'auto.components.automations.AutomationEditorDialog.57b722cbba',
-                  'Agent'
-                )}
-              >
-                <AgentCombobox
-                  agents={visibleAgents}
-                  value={draft.agentId}
-                  onValueChange={(agentId) =>
-                    agentId && onDraftChange((current) => ({ ...current, agentId }))
-                  }
-                  defaultAgent={settings?.defaultTuiAgent ?? null}
-                  triggerClassName={`h-9 w-full min-w-0 ${pickerTriggerClassName}`}
-                  allowNarrowTrigger
-                />
-              </Field>
+              <AutomationAgentLaunchFields
+                draft={draft}
+                settings={settings}
+                visibleAgents={visibleAgents}
+                pickerTriggerClassName={pickerTriggerClassName}
+                launchOverridesGate={launchOverridesGate}
+                onDraftChange={onDraftChange}
+              />
             </div>
           </div>
         </div>

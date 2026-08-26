@@ -1,4 +1,5 @@
 import { toast } from 'sonner'
+import { agentLaunchOverridesToSessionOptionValues } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import { getConnectionId } from '@/lib/connection-context'
 import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
 import { findGithubPrWorkspaceAttachment } from '@/lib/github-work-item-workspace-attachment'
@@ -196,12 +197,17 @@ export async function startFixChecksAgent(args: StartFixChecksAgentArgs): Promis
       )
       return false
     }
+    const recipeSessionOptions = recipe.launchOptions?.model
+      ? agentLaunchOverridesToSessionOptionValues(recipe.launchOptions)
+      : undefined
     const result = launchAgentInNewTab({
       agent,
       worktreeId: targetWorktreeId,
       groupId: args.groupId ?? targetWorktreeId,
       prompt: commandInput,
       agentArgs: recipe.agentArgs,
+      ...(recipeSessionOptions ? { sessionOptions: recipeSessionOptions } : {}),
+      includeSessionOptionCatalogDefaults: recipeSessionOptions ? false : undefined,
       promptDelivery: 'submit-after-ready',
       launchPlatform,
       launchSource: args.launchSource
@@ -243,6 +249,7 @@ export async function startFixChecksAgent(args: StartFixChecksAgentArgs): Promis
     telemetrySource: args.telemetrySource,
     promptDelivery: 'submit-after-ready',
     agentArgs: recipe.agentArgs,
+    launchOptions: recipe.launchOptions,
     ...(agentOverride.kind === 'agent' ? { agentOverride: agentOverride.agent } : {}),
     openModalFallback: args.openModalFallback
   })

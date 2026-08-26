@@ -156,6 +156,7 @@ export function SourceControlTextGenerationDialog({
         baseParams?.agentId ?? '',
         baseParams?.commandInputTemplate ?? '',
         baseParams?.agentArgs ?? '',
+        baseParams?.launchOptions ?? null,
         baseParams?.customAgentCommand ?? ''
       ])
     : 'closed'

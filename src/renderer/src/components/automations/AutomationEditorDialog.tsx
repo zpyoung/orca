@@ -2,10 +2,12 @@ import React from 'react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { getAgentCatalog } from '@/lib/agent-catalog'
 import { filterEnabledTuiAgents } from '../../../../shared/tui-agent-selection'
+import type { AgentLaunchOverrides } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type {
   AutomationSchedulePreset,
   AutomationWorkspaceMode
 } from '../../../../shared/automations-types'
+import type { AutomationLaunchOverridesGate } from './fork-automation-launch-settings/automation-launch-overrides-gate'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { OrcaHooks } from '../../../../shared/orca-yaml-hook-types'
 import type { ProjectHostSetup } from '../../../../shared/project-types'
@@ -34,6 +36,7 @@ export type AutomationDraft = {
   name: string
   prompt: string
   agentId: TuiAgent
+  launchOverrides: AgentLaunchOverrides
   projectId: string
   workspaceMode: AutomationWorkspaceMode
   workspaceId: string
@@ -59,6 +62,7 @@ type AutomationEditorDialogProps = {
   isSaving: boolean
   canSave: boolean
   createTarget: AutomationCreateTarget
+  launchOverridesGate: AutomationLaunchOverridesGate
   repos: readonly Repo[]
   projectHostSetups: readonly ProjectHostSetup[]
   automationYamlHooksByRepoKey: Record<string, OrcaHooks | null>
@@ -84,6 +88,7 @@ export function AutomationEditorDialog({
   isSaving,
   canSave,
   createTarget,
+  launchOverridesGate,
   repos,
   projectHostSetups,
   automationYamlHooksByRepoKey,
@@ -181,6 +186,7 @@ export function AutomationEditorDialog({
             settings={settings}
             draft={draft}
             visibleAgents={visibleAgents}
+            launchOverridesGate={launchOverridesGate}
             pickerTriggerClassName={AUTOMATION_EDITOR_PICKER_TRIGGER_CLASS}
             segmentedGroupClassName={AUTOMATION_EDITOR_SEGMENTED_GROUP_CLASS}
             segmentedItemClassName={AUTOMATION_EDITOR_SEGMENTED_ITEM_CLASS}

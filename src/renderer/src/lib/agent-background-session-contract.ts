@@ -1,13 +1,16 @@
+import type { AgentLaunchOverrides } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { ParsedAgentStatusPayload } from '../../../shared/agent-status-types'
 import type { LaunchSource } from '../../../shared/telemetry-events'
 import type { TuiAgent } from '../../../shared/tui-agent'
 import type { AgentStartupPlan } from '@/lib/tui-agent-startup'
+import type { AgentStartupShell } from '../../../shared/tui-agent-startup-shell'
 import type { AutomationTerminalOwnership } from '@/lib/automation-terminal-ownership'
 
 export type LaunchAgentBackgroundSessionArgs = {
   agent: TuiAgent
   worktreeId: string
   prompt?: string
+  launchOverrides?: AgentLaunchOverrides | null
   launchSource?: LaunchSource
   title?: string
   onData?: (chunk: string) => void
@@ -20,5 +23,7 @@ export type LaunchAgentBackgroundSessionResult = {
   paneKey: string
   ptyId: string
   startupPlan: AgentStartupPlan
+  startupShell: AgentStartupShell
+  effectiveAgentArgs: string
   terminalOwnership: AutomationTerminalOwnership | null
 }

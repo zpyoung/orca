@@ -2,6 +2,7 @@
  * orchestration while the form, list, and detail presentation live in sibling files. */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { normalizeAgentLaunchOverrides } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import { filterEnabledTuiAgents, isTuiAgentEnabled } from '../../../../shared/tui-agent-selection'
 import { installWindowVisibilityInterval } from '@/lib/window-visibility-interval'
 import { useAppStore } from '@/store'
@@ -106,6 +107,11 @@ import {
 } from './external-automation-display'
 import { buildExternalAutomationListEntries } from './external-automation-list-entries'
 import { shouldCloseDetailForLostSelection } from './automation-detail-selection'
+import {
+  buildAutomationLaunchOverridesCreateFields,
+  buildAutomationLaunchOverridesUpdateFields
+} from './fork-automation-launch-settings/automation-launch-overrides-save'
+import { useAutomationLaunchOverridesGate } from './fork-automation-launch-settings/useAutomationLaunchOverridesGate'
 import { useAutomationListSearch } from './use-automation-list-search'
 import { useAutomationListView } from './use-automation-list-view'
 import {
@@ -258,6 +264,7 @@ export default function AutomationsPage(): React.JSX.Element {
     name: '',
     prompt: '',
     agentId: defaultAgent,
+    launchOverrides: {},
     projectId: '',
     workspaceMode: 'existing',
     workspaceId: '',
@@ -439,6 +446,31 @@ export default function AutomationsPage(): React.JSX.Element {
     () => getAutomationHostTargetFromKey(automationHostTargetKey),
     [automationHostTargetKey]
   )
+  const automationLaunchOverridesTarget = useMemo(() => {
+    const editingAutomation = editingAutomationId
+      ? (automations.find((automation) => automation.id === editingAutomationId) ?? null)
+      : null
+    if (editingAutomation) {
+      return getAutomationOwnerTarget(editingAutomation, automationHostTarget)
+    }
+    const runContext = buildAutomationRunContextForRepo({
+      repoId: draft.projectId,
+      repos,
+      projectHostSetups
+    })
+    return getAutomationTargetFromHostId(runContext?.hostId)
+  }, [
+    automationHostTarget,
+    automations,
+    draft.projectId,
+    editingAutomationId,
+    projectHostSetups,
+    repos
+  ])
+  const launchOverridesGate = useAutomationLaunchOverridesGate({
+    open: createOpen && createTarget === 'orca',
+    target: automationLaunchOverridesTarget
+  })
 
   useEffect(() => {
     for (const [workspaceId, worktree] of worktreeMap) {
@@ -1041,6 +1073,7 @@ export default function AutomationsPage(): React.JSX.Element {
       dayOfWeek: template.dayOfWeek ?? current.dayOfWeek,
       customSchedule: '',
       agentId: template.agentId ?? current.agentId,
+      launchOverrides: {},
       missedRunGraceMinutes: template.missedRunGraceMinutes ?? current.missedRunGraceMinutes,
       scheduleWarning: null
     }))
@@ -1069,6 +1102,7 @@ export default function AutomationsPage(): React.JSX.Element {
       name: '',
       prompt: '',
       agentId: defaultAgent,
+      launchOverrides: {},
       projectId: target.projectId,
       workspaceMode: 'existing',
       workspaceId: target.workspaceId,
@@ -1124,6 +1158,7 @@ export default function AutomationsPage(): React.JSX.Element {
       name: latest.name,
       prompt: latest.prompt,
       agentId: latest.agentId,
+      launchOverrides: normalizeAgentLaunchOverrides(latest.launchOverrides) ?? {},
       projectId: getAutomationRunRepoId(latest),
       workspaceMode: latest.workspaceMode,
       workspaceId: latest.workspaceId ?? '',
@@ -1175,6 +1210,7 @@ export default function AutomationsPage(): React.JSX.Element {
       name: job.name,
       prompt: job.prompt ?? job.promptPreview,
       agentId: 'hermes',
+      launchOverrides: {},
       projectId,
       workspaceMode: 'existing',
       workspaceId,
@@ -1381,6 +1417,14 @@ export default function AutomationsPage(): React.JSX.Element {
         ? Math.max(0, rawMissedRunGraceMinutes)
         : 720
       const precheck = buildDraftPrecheck(draft)
+      const launchOverridesCreateFields = buildAutomationLaunchOverridesCreateFields(
+        draft.launchOverrides,
+        launchOverridesGate
+      )
+      const launchOverridesUpdateFields = buildAutomationLaunchOverridesUpdateFields(
+        draft.launchOverrides,
+        launchOverridesGate
+      )
       const runContext = buildAutomationRunContextForRepo({
         repoId: draft.projectId,
         repos,
@@ -1435,6 +1479,7 @@ export default function AutomationsPage(): React.JSX.Element {
         prompt: draft.prompt,
         precheck,
         agentId: draft.agentId,
+        ...launchOverridesUpdateFields,
         runContext,
         projectId: draft.projectId,
         workspaceMode: draft.workspaceMode,
@@ -1462,6 +1507,7 @@ export default function AutomationsPage(): React.JSX.Element {
             prompt: draft.prompt,
             precheck,
             agentId: draft.agentId,
+            ...launchOverridesCreateFields,
             runContext,
             projectId: draft.projectId,
             workspaceMode: draft.workspaceMode,
@@ -1927,6 +1973,7 @@ export default function AutomationsPage(): React.JSX.Element {
         canSave={canSaveDraft}
         isEditingExternal={editingExternalTarget !== null}
         createTarget={createTarget}
+        launchOverridesGate={launchOverridesGate}
         repos={repos}
         projectHostSetups={projectHostSetups}
         automationYamlHooksByRepoKey={automationYamlHooksByRepoKey}

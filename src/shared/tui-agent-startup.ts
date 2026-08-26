@@ -52,6 +52,7 @@ export function buildAgentStartupPlan(args: {
   agentEnv?: Record<string, string> | null
   sessionOptions?: Record<string, SessionOptionValue>
   sessionOptionsOverrideAgentArgs?: boolean
+  includeSessionOptionCatalogDefaults?: boolean
   /** Why: SSH remotes deploy the CLI shim as plain `orca`, so the Linux-only
    * `orca-ide` rename must be skipped for remote launches. */
   isRemote?: boolean
@@ -69,6 +70,7 @@ export function buildAgentStartupPlan(args: {
     agentArgs: usesQuery ? null : args.agentArgs,
     sessionOptions: args.sessionOptions,
     sessionOptionsOverrideAgentArgs: args.sessionOptionsOverrideAgentArgs,
+    includeSessionOptionCatalogDefaults: args.includeSessionOptionCatalogDefaults,
     isRemote: args.isRemote
   })
   if (!baseCommand.ok) {
@@ -252,6 +254,7 @@ export function buildAgentDraftLaunchPlan(args: {
   agentArgs?: string | null
   agentEnv?: Record<string, string> | null
   sessionOptions?: Record<string, SessionOptionValue>
+  includeSessionOptionCatalogDefaults?: boolean
   /** Why: see buildAgentStartupPlan — remote launches use the plain `orca` shim. */
   isRemote?: boolean
 }): AgentDraftLaunchPlan | null {
@@ -269,6 +272,7 @@ export function buildAgentDraftLaunchPlan(args: {
     shell,
     agentArgs: args.agentArgs,
     sessionOptions: args.sessionOptions,
+    includeSessionOptionCatalogDefaults: args.includeSessionOptionCatalogDefaults,
     isRemote: args.isRemote
   })
   if (!baseCommand.ok) {

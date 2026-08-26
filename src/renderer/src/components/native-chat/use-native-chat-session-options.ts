@@ -30,6 +30,7 @@ import {
   resolveNativeChatModelDiscoveryContext
 } from './native-chat-session-option-discovery'
 import { readClaudeSessionOptionsFromTerminalScreen } from './claude-terminal-session-options'
+import { retireAutomationLaunchModelsMissingFromDiscovery } from './fork-automation-launch-settings/retire-automation-launch-models'
 
 const EMPTY_SNAPSHOT: SessionOptionDescriptor[] = []
 const subscribeEmpty = (): (() => void) => () => {}
@@ -83,6 +84,17 @@ export async function retirePersistedModelMissingFromDiscovery(
       ? clearNativeChatSessionOptionModel(persisted, agent)
       : null
   })
+}
+
+async function retireModelsMissingFromDiscovery(
+  agent: AgentType,
+  hostKey: string,
+  models: readonly CatalogModel[]
+): Promise<void> {
+  await Promise.all([
+    retirePersistedModelMissingFromDiscovery(agent, models),
+    retireAutomationLaunchModelsMissingFromDiscovery(agent, hostKey, models)
+  ])
 }
 
 export function useNativeChatSessionOptions(args: {
@@ -268,14 +280,18 @@ export function useNativeChatSessionOptions(args: {
           }
         }
         // A failed settings write must not surface as an unhandled rejection.
-        void retirePersistedModelMissingFromDiscovery(agent, models).catch(() => undefined)
+        void retireModelsMissingFromDiscovery(agent, discoveryContext.hostKey, models).catch(
+          () => undefined
+        )
       }
     )
     // Why: the subscription never replays, so a probe that settled before this
     // pane mounted would leave a retired persisted model in place forever.
     const cached = readNativeChatEnrichedModels(agent, discoveryContext.hostKey)
     if (cached) {
-      void retirePersistedModelMissingFromDiscovery(agent, cached).catch(() => undefined)
+      void retireModelsMissingFromDiscovery(agent, discoveryContext.hostKey, cached).catch(
+        () => undefined
+      )
     }
     ensureNativeChatModelEnrichment({
       agent,

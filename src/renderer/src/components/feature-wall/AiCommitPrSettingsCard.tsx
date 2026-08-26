@@ -17,6 +17,7 @@ export function AiCommitPrSettingsCard(): JSX.Element | null {
     activeThinking,
     isCustom,
     unsupportedAgentLabel,
+    recipeOverrides,
     toggleAi,
     onAgentChange,
     onModelChange,
@@ -60,6 +61,7 @@ export function AiCommitPrSettingsCard(): JSX.Element | null {
             activeThinking={activeThinking}
             isCustom={isCustom}
             unsupportedAgentLabel={unsupportedAgentLabel}
+            recipeOverrides={recipeOverrides}
             onAgentChange={onAgentChange}
             onModelChange={onModelChange}
             onThinkingChange={onThinkingChange}

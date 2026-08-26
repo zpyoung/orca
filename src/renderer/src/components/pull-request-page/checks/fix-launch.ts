@@ -53,6 +53,7 @@ export async function startFixChecksFromDialog(args: {
   agent: Parameters<typeof launchWorkItemDirect>[0]['agentOverride']
   commandInput: string
   agentArgs: string
+  launchOptions: Parameters<typeof launchWorkItemDirect>[0]['launchOptions']
 }): Promise<boolean> {
   if (!args.targetRepoId) {
     return false
@@ -65,6 +66,7 @@ export async function startFixChecksFromDialog(args: {
     promptDelivery: 'submit-after-ready',
     agentOverride: args.agent,
     agentArgs: args.agentArgs,
+    launchOptions: args.launchOptions,
     openModalFallback: () => {
       toast.error(
         translate(

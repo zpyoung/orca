@@ -44,10 +44,11 @@ export function createAgentSessionCreateOperation(): AgentSessionCreateOperation
 }
 
 export function toAgentLaunchPreferences(
-  sessionOptions: Record<string, SessionOptionValue> | null | undefined
+  sessionOptions: Record<string, SessionOptionValue> | null | undefined,
+  options: { includeOptionValues?: boolean } = {}
 ): AgentLaunchPreferences | undefined {
   if (!sessionOptions) {
-    return undefined
+    return options.includeOptionValues ? { optionValues: {} } : undefined
   }
   const readString = (key: keyof AgentLaunchPreferences): string | undefined => {
     const value = sessionOptions[key]
@@ -56,10 +57,14 @@ export function toAgentLaunchPreferences(
   const model = readString('model')
   const effort = readString('effort')
   const mode = readString('mode')
+  const optionValues = Object.fromEntries(
+    Object.entries(sessionOptions).filter(([id]) => !['model', 'effort', 'mode'].includes(id))
+  )
   const preferences: AgentLaunchPreferences = {
     ...(model ? { model } : {}),
     ...(effort ? { effort } : {}),
-    ...(mode ? { mode } : {})
+    ...(mode ? { mode } : {}),
+    ...(options.includeOptionValues ? { optionValues } : {})
   }
   return Object.keys(preferences).length > 0 ? preferences : undefined
 }

@@ -3,6 +3,7 @@ import { ArrowLeft, Eye, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
+import { getAgentCatalog } from '@/lib/agent-catalog'
 import type {
   Automation,
   ExternalAutomationAction,
@@ -33,6 +34,7 @@ import {
   getAutomationRunStatusVariant
 } from './automation-page-parts'
 import { getAutomationRunContent } from './automation-run-content'
+import { formatAutomationRunLaunchSettings } from './fork-automation-launch-settings/automation-run-launch-display'
 import type { AutomationTargetAvailability } from './automation-target-availability'
 import type { AutomationRunViewState } from './automation-run-view-state'
 import type { AutomationRunWorkspaceDisplay } from './automation-run-workspace-display'
@@ -118,6 +120,15 @@ export function AutomationsDetailPane({
   openAutomationRunPage,
   onBackToList
 }: AutomationsDetailPaneProps): React.JSX.Element {
+  const runLaunchAgentId = selectedAutomationRunPage?.launchSettings?.agentId
+  const runLaunchAgentLabel =
+    getAgentCatalog().find((agent) => agent.id === runLaunchAgentId)?.label ?? runLaunchAgentId
+  const runLaunchDisplay = runLaunchAgentLabel
+    ? formatAutomationRunLaunchSettings(
+        selectedAutomationRunPage?.launchSettings,
+        runLaunchAgentLabel
+      )
+    : null
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {selectedExternal ? (
@@ -227,15 +238,21 @@ export function AutomationsDetailPane({
                     translate(
                       'auto.components.automations.AutomationsPage.noWorkspace',
                       'No workspace'
-                    )
+                    ),
+                  ...(runLaunchDisplay ? [runLaunchDisplay.summary] : [])
                 ]}
                 detail={
-                  selectedAutomationRunPage.outputSnapshot?.truncated
-                    ? translate(
-                        'auto.components.automations.AutomationsPage.latestSavedOutput',
-                        'Latest saved output'
-                      )
-                    : null
+                  [
+                    selectedAutomationRunPage.outputSnapshot?.truncated
+                      ? translate(
+                          'auto.components.automations.AutomationsPage.latestSavedOutput',
+                          'Latest saved output'
+                        )
+                      : null,
+                    runLaunchDisplay?.agentArgs
+                  ]
+                    .filter((value): value is string => Boolean(value))
+                    .join(' · ') || null
                 }
                 statusLabel={getAutomationRunStatusLabel(selectedAutomationRunPage.status)}
                 statusVariant={getAutomationRunStatusVariant(selectedAutomationRunPage.status)}

@@ -5,6 +5,7 @@ import {
   isCustomAgentId
 } from './commit-message-agent-spec'
 import { planCustomCommand, tokenizeCustomCommandTemplate } from './commit-message-prompt'
+import { applyCommitMessageRecipeEffortOverrides } from './fork-automation-launch-settings/commit-message-recipe-effort-overrides'
 import type { TuiAgent } from './tui-agent'
 
 // Why: planning is a pure transformation from "user request + prompt text"
@@ -317,9 +318,16 @@ export function planCommitMessageGeneration(
     recipeArgs: agentArgs.args,
     singletonOptions: spec.singletonOptions ?? DEFAULT_SINGLETON_OPTIONS
   })
+  // Why: effort flags are not plain singletons — Codex hides its behind
+  // `-c model_reasoning_effort=`, which spec aliases cannot express.
+  const withEffort = applyCommitMessageRecipeEffortOverrides(
+    input.agentId,
+    merged.generatedArgs,
+    merged.recipeArgs
+  )
   const args = insertAdditionalAgentArgs({
-    baseArgs: merged.generatedArgs,
-    agentArgs: merged.recipeArgs,
+    baseArgs: withEffort.generatedArgs,
+    agentArgs: withEffort.recipeArgs,
     promptDelivery: spec.promptDelivery,
     prompt: argvPrompt
   })

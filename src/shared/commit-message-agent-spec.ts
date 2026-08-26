@@ -99,6 +99,13 @@ const OPENAI_THINKING_LEVELS: ThinkingLevel[] = [
   { id: 'xhigh', label: 'Extra High' }
 ]
 
+// Why: `codex exec` forwards the level to `model_reasoning_effort`, which
+// accepts minimal; Copilot's `--effort` shares OPENAI_THINKING_LEVELS and does not.
+const CODEX_THINKING_LEVELS: ThinkingLevel[] = [
+  { id: 'minimal', label: 'Minimal' },
+  ...OPENAI_THINKING_LEVELS
+]
+
 const CLAUDE_THINKING_LEVELS: ThinkingLevel[] = [
   { id: 'low', label: 'Low' },
   { id: 'medium', label: 'Medium' },
@@ -140,11 +147,10 @@ function* iterateModelOutputLines(output: string): Generator<string> {
 }
 
 function withOpenAiThinking(
-  id: string
+  id: string,
+  levels: ThinkingLevel[] = OPENAI_THINKING_LEVELS
 ): Pick<CommitMessageModel, 'thinkingLevels' | 'defaultThinkingLevel'> {
-  return /(?:gpt-5|codex)/i.test(id)
-    ? { thinkingLevels: OPENAI_THINKING_LEVELS, defaultThinkingLevel: 'low' }
-    : {}
+  return /(?:gpt-5|codex)/i.test(id) ? { thinkingLevels: levels, defaultThinkingLevel: 'low' } : {}
 }
 
 export function parseClaudeModels(stdout: string): CommitMessageModel[] {
@@ -410,25 +416,25 @@ export const COMMIT_MESSAGE_AGENT_SPECS: Partial<Record<TuiAgent, CommitMessageA
       {
         id: 'gpt-5.5',
         label: 'GPT-5.5',
-        thinkingLevels: OPENAI_THINKING_LEVELS,
+        thinkingLevels: CODEX_THINKING_LEVELS,
         defaultThinkingLevel: 'low'
       },
       {
         id: 'gpt-5.4',
         label: 'GPT-5.4',
-        thinkingLevels: OPENAI_THINKING_LEVELS,
+        thinkingLevels: CODEX_THINKING_LEVELS,
         defaultThinkingLevel: 'low'
       },
       {
         id: 'gpt-5.4-mini',
         label: 'GPT-5.4 Mini',
-        thinkingLevels: OPENAI_THINKING_LEVELS,
+        thinkingLevels: CODEX_THINKING_LEVELS,
         defaultThinkingLevel: 'low'
       },
       {
         id: 'gpt-5.3-codex',
         label: 'GPT-5.3 Codex',
-        thinkingLevels: OPENAI_THINKING_LEVELS,
+        thinkingLevels: CODEX_THINKING_LEVELS,
         defaultThinkingLevel: 'low'
       },
       {
@@ -438,13 +444,13 @@ export const COMMIT_MESSAGE_AGENT_SPECS: Partial<Record<TuiAgent, CommitMessageA
         // tier, not the effort flag.
         id: 'gpt-5.3-codex-spark',
         label: 'GPT-5.3 Codex Spark',
-        thinkingLevels: OPENAI_THINKING_LEVELS,
+        thinkingLevels: CODEX_THINKING_LEVELS,
         defaultThinkingLevel: 'low'
       },
       {
         id: 'gpt-5.2',
         label: 'GPT-5.2',
-        thinkingLevels: OPENAI_THINKING_LEVELS,
+        thinkingLevels: CODEX_THINKING_LEVELS,
         defaultThinkingLevel: 'low'
       }
     ],
@@ -775,7 +781,10 @@ export function getCommitMessageModel(
   return {
     id: modelId,
     label: labelFromModelId(modelId),
-    ...withOpenAiThinking(modelId)
+    ...withOpenAiThinking(
+      modelId,
+      agentId === 'codex' ? CODEX_THINKING_LEVELS : OPENAI_THINKING_LEVELS
+    )
   }
 }
 

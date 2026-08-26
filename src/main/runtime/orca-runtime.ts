@@ -69,6 +69,13 @@ import type {
   RuntimeEnsureAgentSessionResult
 } from '../../shared/agent-session-host-authority'
 import {
+  agentLaunchOverridesToSessionOptionValues,
+  type AgentLaunchOverrides
+} from '../../shared/fork-automation-launch-settings/agent-launch-overrides'
+import type { AutomationRunLaunchSettings } from '../../shared/fork-automation-launch-settings/automation-run-launch-settings'
+import { resolveAutomationRunLaunchSettings } from './fork-automation-launch-settings/automation-run-launch-settings'
+import type { SessionOptionValue } from '../../shared/native-chat-session-options'
+import {
   AGENT_SESSION_MAX_NEW_OPERATION_AGE_MS,
   AGENT_SESSION_OPERATION_FUTURE_SKEW_MS,
   parseAgentSessionOperationTimestamp
@@ -4086,6 +4093,7 @@ export class OrcaRuntimeService {
       prompt: input.prompt,
       precheck: input.precheck,
       agentId: input.agentId,
+      launchOverrides: input.launchOverrides,
       runContext: input.runContext,
       sourceContext: input.sourceContext,
       projectId: target.projectId,
@@ -4119,6 +4127,9 @@ export class OrcaRuntimeService {
     }
     if (hasRuntimeAutomationUpdateValue(updates, 'agentId')) {
       patch.agentId = updates.agentId
+    }
+    if (hasRuntimeAutomationUpdateValue(updates, 'launchOverrides')) {
+      patch.launchOverrides = updates.launchOverrides
     }
     if (hasRuntimeAutomationUpdateValue(updates, 'runContext')) {
       patch.runContext = updates.runContext
@@ -23848,12 +23859,16 @@ export class OrcaRuntimeService {
     repo: Repo,
     agent: TuiAgent,
     prompt: string | undefined,
-    launchPreferences?: AgentLaunchPreferences
+    launchPreferences?: AgentLaunchPreferences,
+    launchOverrides?: AgentLaunchOverrides
   ): { agent: TuiAgent; startup: WorktreeStartupLaunch; followup?: WorktreeStartupFollowup } {
     if (!this.store) {
       throw new Error('runtime_unavailable')
     }
     const settings = this.store.getSettings()
+    if (launchPreferences && launchOverrides) {
+      throw new Error('Launch preferences and launch overrides cannot be combined.')
+    }
     if (!isTuiAgentEnabled(agent, settings.disabledTuiAgents)) {
       throw new Error('Selected agent is disabled. Choose an enabled agent before creating.')
     }
@@ -23866,15 +23881,21 @@ export class OrcaRuntimeService {
       isRemote,
       terminalWindowsShell: settings.terminalWindowsShell
     })
-    const sessionOptions = this.toAgentSessionOptions(launchPreferences)
+    const sessionOptions = launchOverrides
+      ? agentLaunchOverridesToSessionOptionValues(launchOverrides)
+      : this.toAgentSessionOptions(launchPreferences)
+    const inheritedAgentArgs = resolveTuiAgentLaunchArgs(agent, settings.agentDefaultArgs)
     const startupPlan = buildAgentStartupPlan({
       agent,
       prompt: prompt ?? '',
       cmdOverrides: settings.agentCmdOverrides ?? {},
-      agentArgs: resolveTuiAgentLaunchArgs(agent, settings.agentDefaultArgs),
+      agentArgs: launchOverrides?.agentArgs?.trim()
+        ? launchOverrides.agentArgs
+        : inheritedAgentArgs,
       agentEnv: resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
       sessionOptions,
       sessionOptionsOverrideAgentArgs: Boolean(sessionOptions),
+      includeSessionOptionCatalogDefaults: launchOverrides ? false : undefined,
       platform: agentLaunchPlatform,
       shell: queuedShell,
       isRemote,
@@ -23902,6 +23923,22 @@ export class OrcaRuntimeService {
           }
         : {})
     }
+  }
+
+  /** Snapshot the launch settings using the target host's actual shell and defaults. */
+  buildAutomationRunLaunchSettings(
+    automation: Automation,
+    repo: Repo
+  ): AutomationRunLaunchSettings | null {
+    if (!this.store) {
+      throw new Error('runtime_unavailable')
+    }
+    return resolveAutomationRunLaunchSettings({
+      automation,
+      settings: this.store.getSettings(),
+      platform: this.getAgentLaunchPlatformForRepo(repo),
+      isRemote: repoIsRemote(repo)
+    })
   }
 
   private markLocalWorkspaceTrustedForAgent(agent: TuiAgent, workspacePath: string): void {
@@ -24320,6 +24357,7 @@ export class OrcaRuntimeService {
     createdWithAgent?: TuiAgent
     startupAgent?: TuiAgent
     startupLaunchPreferences?: AgentLaunchPreferences
+    startupLaunchOverrides?: AgentLaunchOverrides
     startupPrompt?: string
     pendingFirstAgentMessageRename?: boolean
     automationProvenance?: AutomationWorkspaceProvenance
@@ -24357,7 +24395,8 @@ export class OrcaRuntimeService {
             repo,
             args.startupAgent,
             args.startupPrompt,
-            args.startupLaunchPreferences
+            args.startupLaunchPreferences,
+            args.startupLaunchOverrides
           )
         : null
     const draftStartup =
@@ -27788,11 +27827,12 @@ export class OrcaRuntimeService {
 
   private toAgentSessionOptions(
     preferences: AgentLaunchPreferences | undefined
-  ): Record<string, string> | undefined {
+  ): Record<string, SessionOptionValue> | undefined {
     if (!preferences) {
       return undefined
     }
-    const options = {
+    const options: Record<string, SessionOptionValue> = {
+      ...preferences.optionValues,
       ...(preferences.model ? { model: preferences.model } : {}),
       ...(preferences.effort ? { effort: preferences.effort } : {}),
       ...(preferences.mode ? { mode: preferences.mode } : {})
@@ -27915,6 +27955,9 @@ export class OrcaRuntimeService {
           request.launchPreferences?.model ?? null,
           request.launchPreferences?.effort ?? null,
           request.launchPreferences?.mode ?? null,
+          Object.entries(request.launchPreferences?.optionValues ?? {}).sort(([left], [right]) =>
+            left.localeCompare(right)
+          ),
           request.startupCwd ?? null,
           request.presentation ?? null,
           request.placement?.tabId ?? null,
@@ -27981,6 +28024,9 @@ export class OrcaRuntimeService {
             request.launchPreferences?.model ?? null,
             request.launchPreferences?.effort ?? null,
             request.launchPreferences?.mode ?? null,
+            Object.entries(request.launchPreferences?.optionValues ?? {}).sort(([left], [right]) =>
+              left.localeCompare(right)
+            ),
             startupCwd ?? null,
             request.presentation ?? null,
             request.placement?.tabId ?? null,
@@ -28011,6 +28057,8 @@ export class OrcaRuntimeService {
             : resolveTuiAgentLaunchArgs(request.agent, settings.agentDefaultArgs),
         agentEnv: resolveTuiAgentLaunchEnv(request.agent, settings.agentDefaultEnv),
         sessionOptions: this.toAgentSessionOptions(request.launchPreferences),
+        includeSessionOptionCatalogDefaults:
+          request.launchPreferences?.optionValues === undefined ? undefined : false,
         platform,
         shell,
         isRemote
@@ -28665,14 +28713,25 @@ export class OrcaRuntimeService {
 
   async launchAgentTerminal(
     worktreeSelector: string,
-    opts: { agent: TuiAgent; prompt: string; title?: string }
+    opts: {
+      agent: TuiAgent
+      prompt: string
+      title?: string
+      launchOverrides?: AgentLaunchOverrides
+    }
   ): Promise<RuntimeTerminalCreate> {
     const worktree = await this.resolveWorktreeSelector(worktreeSelector)
     const repo = this.store?.getRepo(worktree.repoId)
     if (!repo) {
       throw new Error('Repository for the selected workspace is no longer available.')
     }
-    const startup = this.buildStartupForAgent(repo, opts.agent, opts.prompt)
+    const startup = this.buildStartupForAgent(
+      repo,
+      opts.agent,
+      opts.prompt,
+      undefined,
+      opts.launchOverrides
+    )
     if (repo.connectionId) {
       await this.markRemoteWorkspaceTrustedForAgent(opts.agent, repo.connectionId, worktree.path)
     } else {
