@@ -2,9 +2,10 @@ import { useCallback, useRef } from 'react'
 import type { TerminalDockPaneState } from '../../../../../shared/fork-terminal-dock/terminal-dock-pane-state'
 import { resolveTerminalDockPaneState } from './resolve-terminal-dock-pane-state'
 import {
-  hasTerminalDockPaneState,
   readTerminalDockPaneState,
-  writeTerminalDockPaneState
+  readTerminalDockPaneUserUndocked,
+  writeTerminalDockPaneState,
+  writeTerminalDockPaneUserUndocked
 } from './terminal-dock-pane-state'
 
 export type TerminalDockLocalFallback = {
@@ -16,8 +17,10 @@ export type TerminalDockLocalFallback = {
     hostState: TerminalDockPaneState | undefined,
     hostHasEverEchoed: boolean
   ) => TerminalDockPaneState
-  /** Whether the client has an explicit fallback entry for this pane. */
-  hasLocalDockState: (paneKey: string) => boolean
+  /** Whether the user explicitly closed this pane's dock. */
+  userUndockedFor: (paneKey: string) => boolean
+  /** Records or clears the user decision that suppresses automatic docking. */
+  noteUserUndock: (paneKey: string, value: boolean) => void
   /** Write-through target for every dock-state change — keeps the cached copy and the
    *  on-disk copy both current so a later resolution never reads stale data. */
   persistLocalDockState: (paneKey: string, state: TerminalDockPaneState) => void
@@ -53,10 +56,14 @@ export function useTerminalDockLocalFallback(): TerminalDockLocalFallback {
     [localFallbackFor]
   )
 
-  const hasLocalDockState = useCallback(
-    (paneKey: string): boolean => hasTerminalDockPaneState(paneKey),
+  const userUndockedFor = useCallback(
+    (paneKey: string): boolean => readTerminalDockPaneUserUndocked(paneKey),
     []
   )
+
+  const noteUserUndock = useCallback((paneKey: string, value: boolean): void => {
+    writeTerminalDockPaneUserUndocked(paneKey, value)
+  }, [])
 
   const persistLocalDockState = useCallback(
     (paneKey: string, state: TerminalDockPaneState): void => {
@@ -70,5 +77,11 @@ export function useTerminalDockLocalFallback(): TerminalDockLocalFallback {
     cacheRef.current.delete(paneKey)
   }, [])
 
-  return { resolvedStateFor, hasLocalDockState, persistLocalDockState, forgetPane }
+  return {
+    resolvedStateFor,
+    userUndockedFor,
+    noteUserUndock,
+    persistLocalDockState,
+    forgetPane
+  }
 }

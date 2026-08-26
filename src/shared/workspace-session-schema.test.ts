@@ -619,6 +619,21 @@ describe('parseWorkspaceSession', () => {
     }
   })
 
+  it('round-trips the user-undock decision and tolerates a record written before it existed', () => {
+    const result = sessionWithUnifiedTabDock({
+      'pane-1': { docked: false, gutterRows: 6, userUndocked: true },
+      'pane-2': { docked: false, gutterRows: 6 },
+      'pane-3': { docked: false, gutterRows: 6, userUndocked: 'yes' }
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.value.unifiedTabs?.wt[0].terminalDockByPaneKey).toEqual({
+        'pane-1': { docked: false, gutterRows: 6, userUndocked: true },
+        'pane-2': { docked: false, gutterRows: 6 }
+      })
+    }
+  })
+
   it('drops a malformed terminalDockByPaneKey entry while parsing the rest of the tab', () => {
     const result = sessionWithUnifiedTabDock({
       'pane-1': { docked: true, gutterRows: 6 },

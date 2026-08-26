@@ -208,6 +208,8 @@ export type GlobalSettings = {
   experimentalNativeChat?: boolean
   /** Experimental per-pane docked composer for agent terminals; off by default. */
   experimentalTerminalDock?: boolean
+  /** Open the terminal composer automatically for new agent sessions; mounted panes are unchanged. */
+  dockTerminalComposerByDefault?: boolean
   /** Reading-column width for every native chat pane; optional for legacy settings. */
   nativeChatWidth?: NativeChatWidthTier
   /** Last explicit native-chat model + option selections; live panes need an applied/dispatched record before showing a value. */
