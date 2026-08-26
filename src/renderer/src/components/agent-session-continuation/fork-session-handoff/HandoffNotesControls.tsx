@@ -192,6 +192,14 @@ export function HandoffNotesControls({
             )}
             onChange={(event) => setTemplateName(event.target.value)}
           />
+          {atTemplateLimit ? (
+            <p className="text-[11px] text-destructive" role="alert">
+              {translate(
+                'components.agentSessionContinuation.forkSessionHandoff.templateLimitReached',
+                'The template limit has been reached.'
+              )}
+            </p>
+          ) : null}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" size="sm" onClick={cancelNaming}>
               {translate(

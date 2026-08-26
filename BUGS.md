@@ -73,6 +73,7 @@ entries' IDs; manual edits to fix typos are fine.
 - **Introduced by**: code review of staged session-handoff customization changes
 - **Severity**: low
 - **Proposed fix**: Disable the option at the limit, or render a visible at-limit message inside the naming panel next to the disabled save button.
+- **Resolved (2026-08-26)**: the naming panel now renders the visible `templateLimitReached` message above the disabled save button, so the state is explained rather than silent.
 
 ## BUG-8: A patch carrying both templates and templateMutation discards the explicit templates write
 - **Observed**: 2026-08-26
