@@ -1,5 +1,5 @@
 import { toast } from 'sonner'
-import { agentLaunchOverridesToSessionOptionValues } from '../../../shared/agent-launch-overrides'
+import { agentLaunchOverridesToSessionOptionValues } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import { getConnectionId } from '@/lib/connection-context'
 import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
 import { findGithubPrWorkspaceAttachment } from '@/lib/github-work-item-workspace-attachment'

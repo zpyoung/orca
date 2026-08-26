@@ -48,7 +48,7 @@ import {
   getAutomationLaunchOverridesForEdit,
   hasAutomationLaunchOverrideFlags,
   resetAutomationLaunchOverridesForAgentChange
-} from './automation-launch-overrides'
+} from './fork-automation-launch-settings/automation-launch-overrides'
 
 type AutomationCreateParams = Omit<AutomationCreateInput, 'projectId' | 'timezone'> & {
   repo?: string

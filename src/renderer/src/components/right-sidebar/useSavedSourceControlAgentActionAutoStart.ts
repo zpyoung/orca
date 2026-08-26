@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { AgentLaunchOptionSelection } from '../../../../shared/agent-launch-overrides'
-import { useStableAgentLaunchOptionSelection } from './useSourceControlAgentActionDraftEdits'
+import type { AgentLaunchOptionSelection } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
+import { useStableAgentLaunchOptionSelection } from './fork-automation-launch-settings/useSourceControlAgentActionDraftEdits'
 import type {
   SourceControlActionRecipe,
   SourceControlLaunchActionId

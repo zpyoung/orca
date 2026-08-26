@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { AgentLaunchOptionSelection } from '../../../../shared/agent-launch-overrides'
+import type { AgentLaunchOptionSelection } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type {
   SourceControlAiSettings,
   SourceControlAiSettingsPatch

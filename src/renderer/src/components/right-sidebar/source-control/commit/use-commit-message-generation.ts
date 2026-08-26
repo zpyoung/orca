@@ -16,7 +16,7 @@ import {
   type CommitMessageGenerationRecord
 } from '@/store/slices/commit-message-generation'
 import { isCustomAgentId } from '../../../../../../shared/commit-message-agent-spec'
-import { materializeSourceControlTextGenerationParams } from '../../../../../../shared/source-control-text-launch-args'
+import { materializeSourceControlTextGenerationParams } from '../../../../../../shared/fork-automation-launch-settings/source-control-text-launch-args'
 import { hasConfiguredCommitMessageGenerationDefaults } from '../ai/text-generation-defaults'
 import type { SourceControlAi } from '../ai/use-ai'
 import type { SourceControlStoreActions } from '../listing/use-store-actions'

@@ -71,8 +71,9 @@ import type {
 import {
   agentLaunchOverridesToSessionOptionValues,
   type AgentLaunchOverrides
-} from '../../shared/agent-launch-overrides'
-import { buildAutomationRunLaunchSettings as buildRunLaunchSettings } from '../../shared/automation-run-launch-settings'
+} from '../../shared/fork-automation-launch-settings/agent-launch-overrides'
+import type { AutomationRunLaunchSettings } from '../../shared/fork-automation-launch-settings/automation-run-launch-settings'
+import { resolveAutomationRunLaunchSettings } from './fork-automation-launch-settings/automation-run-launch-settings'
 import type { SessionOptionValue } from '../../shared/native-chat-session-options'
 import {
   AGENT_SESSION_MAX_NEW_OPERATION_AGE_MS,
@@ -265,7 +266,6 @@ import type {
   Automation,
   AutomationCreateInput,
   AutomationRun,
-  AutomationRunLaunchSettings,
   AutomationUpdateInput,
   AutomationWorkspaceMode
 } from '../../shared/automations-types'
@@ -552,8 +552,7 @@ import type { PtyIncarnationId } from '../../shared/pty-incarnation'
 import {
   buildAgentDraftLaunchPlan,
   buildAgentResumeStartupPlan,
-  buildAgentStartupPlan,
-  resolveStartupShell
+  buildAgentStartupPlan
 } from '../../shared/tui-agent-startup'
 import { repoIsRemote } from '../../shared/agent-launch-remote'
 import {
@@ -23934,32 +23933,11 @@ export class OrcaRuntimeService {
     if (!this.store) {
       throw new Error('runtime_unavailable')
     }
-    const settings = this.store.getSettings()
-    const platform = this.getAgentLaunchPlatformForRepo(repo)
-    const isRemote = repoIsRemote(repo)
-    // Why: the snapshot re-tokenizes the same raw arguments the launch does, so it
-    // needs the platform-resolved shell, not just the Windows shell preference.
-    const shell = resolveStartupShell(
-      platform,
-      resolveLocalWindowsAgentStartupShell({
-        platform,
-        isRemote,
-        terminalWindowsShell: settings.terminalWindowsShell
-      })
-    )
-    const inheritedAgentArgs = resolveTuiAgentLaunchArgs(
-      automation.agentId,
-      settings.agentDefaultArgs
-    )
-    const effectiveAgentArgs = automation.launchOverrides?.agentArgs?.trim()
-      ? automation.launchOverrides.agentArgs
-      : inheritedAgentArgs
-    return buildRunLaunchSettings({
-      agentId: automation.agentId,
-      overrides: automation.launchOverrides,
-      effectiveAgentArgs,
-      agentArgsSource: automation.launchOverrides?.agentArgs?.trim() ? 'explicit' : 'inherited',
-      shell
+    return resolveAutomationRunLaunchSettings({
+      automation,
+      settings: this.store.getSettings(),
+      platform: this.getAgentLaunchPlatformForRepo(repo),
+      isRemote: repoIsRemote(repo)
     })
   }
 

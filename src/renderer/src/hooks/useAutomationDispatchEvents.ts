@@ -13,7 +13,7 @@ import type {
   AutomationPrecheckResult
 } from '../../../shared/automations-types'
 import { getAutomationRunRepoId } from '../../../shared/automation-run-identity'
-import { buildAutomationRunLaunchSettings } from '../../../shared/automation-run-launch-settings'
+import { buildAutomationRunLaunchSettings } from '../../../shared/fork-automation-launch-settings/automation-run-launch-settings'
 import {
   didAutomationPrecheckPass,
   formatAutomationPrecheckFailure

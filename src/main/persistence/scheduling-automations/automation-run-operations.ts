@@ -18,7 +18,7 @@ import {
   normalizeAutomationRunTerminalPtyId,
   normalizeAutomationRunWorkspaceDisplayName
 } from './automation-context-migration'
-import { normalizeAutomationRunLaunchSettings } from './automation-run-launch-settings-normalization'
+import { normalizeAutomationRunLaunchSettings } from './fork-automation-launch-settings/automation-run-launch-settings-normalization'
 
 export type AutomationRunOperations = {
   state: StoreOwnedPersistedState

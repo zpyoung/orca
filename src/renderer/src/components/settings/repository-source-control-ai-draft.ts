@@ -7,15 +7,10 @@ import {
   type SourceControlActionId
 } from '../../../../shared/source-control-ai-actions'
 import type { RepoSourceControlAiOverrides } from '../../../../shared/source-control-ai-types'
+import type { AgentLaunchOptionSelection } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
-import {
-  readActionRecipeTextDraft,
-  type ActionRecipeTextDraft
-} from './repository-source-control-ai-action-draft'
 import { completeRepoActionRecipe } from './repository-source-control-ai-labels'
 import { SOURCE_CONTROL_TEXT_ACTION_ID_SET } from './source-control-action-recipe-options'
-
-export * from './repository-source-control-ai-action-draft'
 
 type RepoActionRecipe = NonNullable<
   NonNullable<RepoSourceControlAiOverrides['actionOverrides']>[SourceControlActionId]
@@ -191,11 +186,30 @@ export function withRepoAiActionRecipeText(
       ...currentRecipe,
       commandInputTemplate: text.commandInputTemplate,
       agentArgs: text.agentArgs,
-      ...(Object.hasOwn(text, 'launchOptions')
-        ? { launchOptions: text.launchOptions }
-        : {})
+      ...(Object.hasOwn(text, 'launchOptions') ? { launchOptions: text.launchOptions } : {})
     })
   )
+}
+
+export type ActionRecipeTextDraft = {
+  commandInputTemplate: string
+  agentArgs: string
+  launchOptions?: AgentLaunchOptionSelection | null
+}
+
+export function readActionRecipeTextDraft(
+  value: RepoSourceControlAiOverrides,
+  actionId: SourceControlActionId
+): ActionRecipeTextDraft {
+  const recipe = value.actionOverrides?.[actionId]
+  return {
+    commandInputTemplate:
+      typeof recipe?.commandInputTemplate === 'string' ? recipe.commandInputTemplate : '',
+    agentArgs: typeof recipe?.agentArgs === 'string' ? recipe.agentArgs : '',
+    ...(recipe?.launchOptions !== undefined
+      ? { launchOptions: structuredClone(recipe.launchOptions) }
+      : {})
+  }
 }
 
 /** Overlay the in-flight custom-command and per-action text drafts onto the optimistic value for display. */
@@ -220,9 +234,7 @@ export function composeDisplayRepoAi(
           ...currentRecipe,
           commandInputTemplate: draft.commandInputTemplate,
           agentArgs: draft.agentArgs,
-          ...(Object.hasOwn(draft, 'launchOptions')
-            ? { launchOptions: draft.launchOptions }
-            : {})
+          ...(Object.hasOwn(draft, 'launchOptions') ? { launchOptions: draft.launchOptions } : {})
         }
       }
     }

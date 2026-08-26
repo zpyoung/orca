@@ -3,7 +3,7 @@ import { Terminal } from 'lucide-react'
 import type {
   AgentLaunchOptionSelection,
   AgentLaunchOverrides
-} from '../../../../shared/agent-launch-overrides'
+} from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import { CUSTOM_AGENT_ID } from '../../../../shared/commit-message-agent-spec'
 import type {
@@ -15,7 +15,7 @@ import {
   SOURCE_CONTROL_ACTION_LABELS,
   type SourceControlActionId
 } from '../../../../shared/source-control-ai-actions'
-import { AgentLaunchOverridesFields } from '../agent-launch/AgentLaunchOverridesFields'
+import { AgentLaunchOverridesFields } from '../fork-automation-launch-settings/AgentLaunchOverridesFields'
 import { Label } from '../ui/label'
 import { Button } from '../ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'

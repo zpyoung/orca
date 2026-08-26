@@ -1,7 +1,7 @@
 import {
   normalizeAgentLaunchOverrides,
   type AgentLaunchOptionSelection
-} from '../../../../shared/agent-launch-overrides'
+} from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import { isCustomAgentId } from '../../../../shared/commit-message-agent-spec'
 import {
   normalizeRepoSourceControlAiOverrides,

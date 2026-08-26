@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { AgentLaunchOptionSelection } from '../../../../shared/agent-launch-overrides'
+import type { AgentLaunchOptionSelection } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import { CUSTOM_AGENT_ID } from '../../../../shared/commit-message-agent-spec'
@@ -19,7 +19,6 @@ import {
   readActionRecipeTextDraft,
   retainCustomCommandDraft,
   retainDivergentActionTextDrafts,
-  toRepoActionLaunchOptions,
   type ActionRecipeTextDraft,
   withRepoAiActionAgent,
   withRepoAiActionMode,
@@ -28,6 +27,7 @@ import {
   withRepoAiEnabled,
   withRepoAiHostedReviewDefault
 } from './repository-source-control-ai-draft'
+import { toRepoActionLaunchOptions } from './fork-automation-launch-settings/repository-source-control-ai-action-draft'
 import {
   ACTION_MODE_INHERIT,
   DEFAULT_AGENT_VALUE,

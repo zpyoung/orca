@@ -11,7 +11,7 @@ import type { SleepingAgentLaunchConfig } from '../../../shared/agent-session-re
 import {
   agentLaunchOverridesToSessionOptionValues,
   type AgentLaunchOptionSelection
-} from '../../../shared/agent-launch-overrides'
+} from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { LaunchSource } from '../../../shared/telemetry-events'
 import type { StartupCommandDelivery } from '../../../shared/codex-startup-delivery'
 import type { TuiAgent } from '../../../shared/tui-agent'

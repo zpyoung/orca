@@ -9,8 +9,8 @@ import {
 } from '../../../../shared/commit-message-agent-spec'
 import { getAgentCatalog } from '@/lib/agent-catalog'
 import { useAppStore } from '@/store'
-import { describeTextGenerationRecipeOverrides } from './text-generation-recipe-overrides'
-import type { TextGenerationRecipeOverrides } from './text-generation-recipe-overrides'
+import { describeTextGenerationRecipeOverrides } from './fork-automation-launch-settings/text-generation-recipe-overrides'
+import type { TextGenerationRecipeOverrides } from './fork-automation-launch-settings/text-generation-recipe-overrides'
 import {
   EMPTY_COMMIT_MESSAGE_AI_SETTINGS,
   readCommitMessageAiSettings,

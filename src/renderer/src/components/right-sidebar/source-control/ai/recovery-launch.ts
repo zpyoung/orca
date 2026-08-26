@@ -1,5 +1,5 @@
 import { toast } from 'sonner'
-import { agentLaunchOverridesToSessionOptionValues } from '../../../../../../shared/agent-launch-overrides'
+import { agentLaunchOverridesToSessionOptionValues } from '../../../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { AppState } from '@/store'
 import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'

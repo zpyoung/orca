@@ -1,5 +1,5 @@
-import type { AgentLaunchOverrides } from './agent-launch-overrides'
-import type { SessionOptionValue } from './native-chat-session-options'
+import type { AgentLaunchOverrides } from './fork-automation-launch-settings/agent-launch-overrides'
+import type { AutomationRunLaunchSettings } from './fork-automation-launch-settings/automation-run-launch-settings'
 import type { TuiAgent } from './tui-agent'
 import type { SetupDecision } from './worktree/create-types'
 import type { TaskSourceContext, WorkspaceRunContext } from './task-source-context'
@@ -88,20 +88,6 @@ export type AutomationPrecheckResult = {
   error: string | null
   startedAt: number
   completedAt: number
-}
-
-export type AutomationRunLaunchValueSource = 'explicit' | 'inherited' | 'raw_args'
-
-export type AutomationRunLaunchSetting = {
-  value?: SessionOptionValue
-  source: AutomationRunLaunchValueSource
-}
-
-/** Launch values retained so run history remains stable after settings change. */
-export type AutomationRunLaunchSettings = {
-  agentId: TuiAgent
-  options: Record<string, AutomationRunLaunchSetting>
-  agentArgs?: { value: string; source: 'explicit' | 'inherited' }
 }
 
 export type Automation = {

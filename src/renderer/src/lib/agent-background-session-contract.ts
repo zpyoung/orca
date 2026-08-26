@@ -1,4 +1,4 @@
-import type { AgentLaunchOverrides } from '../../../shared/agent-launch-overrides'
+import type { AgentLaunchOverrides } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { ParsedAgentStatusPayload } from '../../../shared/agent-status-types'
 import type { LaunchSource } from '../../../shared/telemetry-events'
 import type { TuiAgent } from '../../../shared/tui-agent'

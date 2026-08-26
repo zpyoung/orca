@@ -18,7 +18,7 @@ import { getAutomationRunWorkspaceDisplay } from './automation-run-workspace-dis
 import {
   automationRunLaunchDisplayText,
   formatAutomationRunLaunchSettings
-} from './automation-run-launch-display'
+} from './fork-automation-launch-settings/automation-run-launch-display'
 import { translate } from '@/i18n/i18n'
 
 type AutomationRunHistoryProps = {

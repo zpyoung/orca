@@ -34,7 +34,7 @@ import {
   getAutomationRunStatusVariant
 } from './automation-page-parts'
 import { getAutomationRunContent } from './automation-run-content'
-import { formatAutomationRunLaunchSettings } from './automation-run-launch-display'
+import { formatAutomationRunLaunchSettings } from './fork-automation-launch-settings/automation-run-launch-display'
 import type { AutomationTargetAvailability } from './automation-target-availability'
 import type { AutomationRunViewState } from './automation-run-view-state'
 import type { AutomationRunWorkspaceDisplay } from './automation-run-workspace-display'

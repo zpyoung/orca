@@ -11,7 +11,7 @@ import {
 import AgentCombobox from '@/components/agent/AgentCombobox'
 import { Button } from '@/components/ui/button'
 import { DialogFooter } from '@/components/ui/dialog'
-import { SourceControlAgentLaunchOverridesFields } from './SourceControlAgentLaunchOverridesFields'
+import { SourceControlAgentLaunchOverridesFields } from './fork-automation-launch-settings/SourceControlAgentLaunchOverridesFields'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils'
 import type {
   AgentLaunchOptionSelection,
   AgentLaunchOverrides
-} from '../../../../shared/agent-launch-overrides'
+} from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { SourceControlLaunchActionId } from '../../../../shared/source-control-ai-actions'
 import type { SourceControlAiWriteTarget } from '../../../../shared/source-control-ai-recipe-save'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'

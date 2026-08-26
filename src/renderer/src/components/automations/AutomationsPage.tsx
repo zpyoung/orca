@@ -2,7 +2,7 @@
  * orchestration while the form, list, and detail presentation live in sibling files. */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { normalizeAgentLaunchOverrides } from '../../../../shared/agent-launch-overrides'
+import { normalizeAgentLaunchOverrides } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import { filterEnabledTuiAgents, isTuiAgentEnabled } from '../../../../shared/tui-agent-selection'
 import { installWindowVisibilityInterval } from '@/lib/window-visibility-interval'
 import { useAppStore } from '@/store'
@@ -110,8 +110,8 @@ import { shouldCloseDetailForLostSelection } from './automation-detail-selection
 import {
   buildAutomationLaunchOverridesCreateFields,
   buildAutomationLaunchOverridesUpdateFields
-} from './automation-launch-overrides-save'
-import { useAutomationLaunchOverridesGate } from './useAutomationLaunchOverridesGate'
+} from './fork-automation-launch-settings/automation-launch-overrides-save'
+import { useAutomationLaunchOverridesGate } from './fork-automation-launch-settings/useAutomationLaunchOverridesGate'
 import { useAutomationListSearch } from './use-automation-list-search'
 import { useAutomationListView } from './use-automation-list-view'
 import {

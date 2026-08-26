@@ -30,7 +30,7 @@ import {
   resolveNativeChatModelDiscoveryContext
 } from './native-chat-session-option-discovery'
 import { readClaudeSessionOptionsFromTerminalScreen } from './claude-terminal-session-options'
-import { retireAutomationLaunchModelsMissingFromDiscovery } from './retire-automation-launch-models'
+import { retireAutomationLaunchModelsMissingFromDiscovery } from './fork-automation-launch-settings/retire-automation-launch-models'
 
 const EMPTY_SNAPSHOT: SessionOptionDescriptor[] = []
 const subscribeEmpty = (): (() => void) => () => {}

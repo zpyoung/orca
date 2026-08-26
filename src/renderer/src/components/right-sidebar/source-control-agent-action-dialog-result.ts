@@ -2,7 +2,7 @@ import type { getAgentCatalog } from '@/lib/agent-catalog'
 import type {
   AgentLaunchOptionSelection,
   AgentLaunchOverrides
-} from '../../../../shared/agent-launch-overrides'
+} from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { useAppStore } from '@/store'
 import type { useRepoById } from '@/store/selectors'
 import type { TuiAgent } from '../../../../shared/tui-agent'

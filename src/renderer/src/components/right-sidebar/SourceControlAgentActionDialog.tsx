@@ -6,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
-import type { AgentLaunchOptionSelection } from '../../../../shared/agent-launch-overrides'
+import type { AgentLaunchOptionSelection } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type {
   SourceControlActionRecipe,
   SourceControlLaunchActionId

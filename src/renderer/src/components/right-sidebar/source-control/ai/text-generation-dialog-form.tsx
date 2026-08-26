@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react'
 import { RefreshCw, Save, Sparkles, Terminal, TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DialogFooter } from '@/components/ui/dialog'
-import { AgentLaunchOverridesFields } from '@/components/agent-launch/AgentLaunchOverridesFields'
+import { AgentLaunchOverridesFields } from '@/components/fork-automation-launch-settings/AgentLaunchOverridesFields'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select'
 import { getAgentCatalog, AgentIcon } from '@/lib/agent-catalog'
 import { planSourceControlTextGeneration } from '@/lib/source-control-generation-plan'
-import type { AgentLaunchOverrides } from '../../../../../../shared/agent-launch-overrides'
+import type { AgentLaunchOverrides } from '../../../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import {
   CUSTOM_AGENT_ID,
   isCustomAgentId,

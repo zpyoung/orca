@@ -5,7 +5,7 @@ import type {
   AutomationUpdateInput
 } from '../../../shared/automations-types'
 import type { PersistedState } from '../../../shared/persisted-state-types'
-import { normalizeAgentLaunchOverrides } from '../../../shared/agent-launch-overrides'
+import { normalizeAgentLaunchOverrides } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import { normalizeAutomationPrecheck } from '../../../shared/automation-precheck'
 import { nextAutomationOccurrenceAfter } from '../../../shared/automation-schedules'
 import type { StoreOwnedPersistedState } from '../loading-store/store-owned-state'

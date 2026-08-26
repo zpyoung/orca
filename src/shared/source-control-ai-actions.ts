@@ -1,7 +1,7 @@
 import {
   normalizeAgentLaunchOverrides,
   type AgentLaunchOptionSelection
-} from './agent-launch-overrides'
+} from './fork-automation-launch-settings/agent-launch-overrides'
 import { isCustomAgentId, type CustomAgentId } from './commit-message-agent-spec'
 import { isTuiAgent } from './tui-agent-config'
 import type { TuiAgent } from './tui-agent'

@@ -1,4 +1,4 @@
-import type { AgentLaunchOptionSelection } from './agent-launch-overrides'
+import type { AgentLaunchOptionSelection } from './fork-automation-launch-settings/agent-launch-overrides'
 import type { CommitMessageAiModelCapability } from './commit-message-ai-types'
 import type { TuiAgent } from './tui-agent'
 import type { CustomAgentId } from './commit-message-agent-spec'

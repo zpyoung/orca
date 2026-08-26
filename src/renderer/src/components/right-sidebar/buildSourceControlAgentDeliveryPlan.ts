@@ -2,7 +2,7 @@ import { planSourceControlAgentActionLaunch } from '@/lib/source-control-agent-a
 import {
   agentLaunchOverridesToSessionOptionValues,
   type AgentLaunchOptionSelection
-} from '../../../../shared/agent-launch-overrides'
+} from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import { useAppStore } from '@/store'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { SourceControlAgentActionDeliveryPlanState } from './SourceControlAgentActionDialogForm'

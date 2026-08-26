@@ -3,10 +3,10 @@ import {
   getCommitMessageAgentCapability,
   isCustomAgentId
 } from '../../../../../../shared/commit-message-agent-spec'
-import type { AgentLaunchOptionSelection } from '../../../../../../shared/agent-launch-overrides'
-import { normalizeAgentLaunchOverrides } from '../../../../../../shared/agent-launch-overrides'
+import type { AgentLaunchOptionSelection } from '../../../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
+import { normalizeAgentLaunchOverrides } from '../../../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { ResolvedSourceControlAiGenerationParams } from '../../../../../../shared/source-control-ai'
-import { resolveSourceControlTextLaunchAgentArgs } from '../../../../../../shared/source-control-text-launch-args'
+import { resolveSourceControlTextLaunchAgentArgs } from '../../../../../../shared/fork-automation-launch-settings/source-control-text-launch-args'
 import type { GlobalSettings } from '../../../../../../shared/global-settings-types'
 
 export type CommitMessageGenerationAgentChoice =

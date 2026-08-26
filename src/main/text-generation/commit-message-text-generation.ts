@@ -45,7 +45,7 @@ import {
 } from '../../shared/commit-message-plan'
 import type { CommandTemplateBackslash } from '../../shared/commit-message-prompt'
 import { LOCAL_COMMIT_MESSAGE_HOST_KEY } from '../../shared/commit-message-host-key'
-import { materializeSourceControlTextGenerationParams } from '../../shared/source-control-text-launch-args'
+import { materializeSourceControlTextGenerationParams } from '../../shared/fork-automation-launch-settings/source-control-text-launch-args'
 import {
   resolveSourceControlAiForOperation,
   type ResolvedSourceControlAiGenerationParams

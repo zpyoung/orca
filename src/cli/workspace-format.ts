@@ -2,7 +2,7 @@ import type { Automation, AutomationRun } from '../shared/automations-types'
 import { getAutomationLegacyRepoId } from '../shared/automation-run-identity'
 import { formatAutomationPrecheckTimeout } from '../shared/automation-precheck'
 import { formatAutomationSchedule } from '../shared/automation-schedules'
-import { formatAutomationLaunchOverrides } from './automation-launch-format'
+import { formatAutomationLaunchOverrides } from './fork-automation-launch-settings/automation-launch-format'
 import type { PublicKnownRuntimeEnvironment } from '../shared/runtime-environments'
 import type {
   RuntimeRepoList,

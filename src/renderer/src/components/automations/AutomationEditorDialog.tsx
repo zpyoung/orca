@@ -2,12 +2,12 @@ import React from 'react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { getAgentCatalog } from '@/lib/agent-catalog'
 import { filterEnabledTuiAgents } from '../../../../shared/tui-agent-selection'
-import type { AgentLaunchOverrides } from '../../../../shared/agent-launch-overrides'
+import type { AgentLaunchOverrides } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type {
   AutomationSchedulePreset,
   AutomationWorkspaceMode
 } from '../../../../shared/automations-types'
-import type { AutomationLaunchOverridesGate } from './automation-launch-overrides-gate'
+import type { AutomationLaunchOverridesGate } from './fork-automation-launch-settings/automation-launch-overrides-gate'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { OrcaHooks } from '../../../../shared/orca-yaml-hook-types'
 import type { ProjectHostSetup } from '../../../../shared/project-types'

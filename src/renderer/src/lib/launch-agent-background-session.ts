@@ -1,6 +1,6 @@
 import { useAppStore } from '@/store'
 import { buildAgentStartupPlan } from '@/lib/tui-agent-startup'
-import { resolveAgentBackgroundLaunchSettings } from '@/lib/agent-background-launch-settings'
+import { resolveAgentBackgroundLaunchSettings } from '@/lib/fork-automation-launch-settings/agent-background-launch-settings'
 import type {
   LaunchAgentBackgroundSessionArgs,
   LaunchAgentBackgroundSessionResult
@@ -24,7 +24,7 @@ import { subscribeToPtyData } from '@/components/terminal-pane/pty-data-sidecar-
 import { callRuntimeRpc, getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import { getSettingsForWorktreeRuntimeOwner } from '@/lib/worktree-runtime-owner'
 import { retireProvider } from '@/lib/retire-unowned-background-terminal'
-import { createRuntimeAgentBackgroundSession } from '@/lib/runtime-agent-background-session-create'
+import { createRuntimeAgentBackgroundSession } from '@/lib/fork-automation-launch-settings/runtime-agent-background-session-create'
 import { subscribeToRuntimeTerminalData } from '@/runtime/runtime-terminal-stream'
 import { createSshBackgroundStartupDelivery } from '@/lib/ssh-background-startup-delivery'
 import { shouldUseShellReadyStartupDelivery } from '../../../shared/codex-startup-delivery'

@@ -6,7 +6,7 @@ import {
 } from '@/lib/source-control-launch-agent-selection'
 import { useAppStore } from '@/store'
 import { useRepoById } from '@/store/selectors'
-import type { AgentLaunchOverrides } from '../../../../shared/agent-launch-overrides'
+import type { AgentLaunchOverrides } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import { renderSourceControlActionCommandTemplate } from '../../../../shared/source-control-ai-actions'
 import { isTuiAgentEnabled } from '../../../../shared/tui-agent-selection'
 import type { TuiAgent } from '../../../../shared/tui-agent'
@@ -24,7 +24,7 @@ import {
   useAgentLaunchOptionSelection,
   useSourceControlAgentActionDraftEdits,
   useStableAgentLaunchOptionSelection
-} from './useSourceControlAgentActionDraftEdits'
+} from './fork-automation-launch-settings/useSourceControlAgentActionDraftEdits'
 
 const DEFAULT_SAVE_TARGET_VALUE = 'global'
 

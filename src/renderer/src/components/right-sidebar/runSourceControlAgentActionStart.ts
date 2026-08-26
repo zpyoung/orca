@@ -2,7 +2,7 @@ import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
 import {
   agentLaunchOverridesToSessionOptionValues,
   type AgentLaunchOptionSelection
-} from '../../../../shared/agent-launch-overrides'
+} from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { Repo } from '../../../../shared/repo-types'

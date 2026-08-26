@@ -10,7 +10,7 @@ import type { HostedReviewCreationEligibility } from '../../../../shared/hosted-
 import type { ResolveSourceControlAiResult } from '../../../../shared/source-control-ai'
 import type { SourceControlAiPrCreationDefaults } from '../../../../shared/source-control-ai-types'
 import type { PullRequestFieldRevisions } from '@/store/slices/pull-request-generation'
-import { materializeSourceControlTextGenerationParams } from '../../../../shared/source-control-text-launch-args'
+import { materializeSourceControlTextGenerationParams } from '../../../../shared/fork-automation-launch-settings/source-control-text-launch-args'
 import { stripBaseRef } from './create-pull-request-base-ref-normalization'
 import type {
   GenerationSeed,

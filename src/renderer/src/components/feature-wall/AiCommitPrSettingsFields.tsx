@@ -7,10 +7,7 @@ import {
   type CommitMessageAgentCapability,
   type CommitMessageModelCapability
 } from '../../../../shared/commit-message-agent-spec'
-import {
-  SOURCE_CONTROL_TEXT_ACTION_IDS,
-  type SourceControlTextActionId
-} from '../../../../shared/source-control-ai-actions'
+import { SOURCE_CONTROL_TEXT_ACTION_IDS } from '../../../../shared/source-control-ai-actions'
 import type { CommitMessageAiSettings } from '../../../../shared/commit-message-ai-types'
 import { AgentIcon } from '@/lib/agent-catalog'
 import { cn } from '@/lib/utils'
@@ -19,10 +16,8 @@ import { Label } from '../ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { translate } from '@/i18n/i18n'
 import { commitMessageAgentLabel } from './ai-commit-pr-settings-helpers'
-import {
-  formatTextGenerationRecipeOverrideActions,
-  type TextGenerationRecipeOverrides
-} from './text-generation-recipe-overrides'
+import type { TextGenerationRecipeOverrides } from './fork-automation-launch-settings/text-generation-recipe-overrides'
+import { RecipeOverrideNote } from './fork-automation-launch-settings/RecipeOverrideNote'
 
 const EMPTY_RECIPE_OVERRIDES: TextGenerationRecipeOverrides = {
   modelOverriddenBy: [],
@@ -43,31 +38,6 @@ type AiCommitPrSettingsFieldsProps = {
   onModelChange: (newModelId: string) => void
   onThinkingChange: (newLevelId: string) => void
   writeConfig: (patch: Partial<CommitMessageAiSettings>) => void
-}
-
-function RecipeOverrideNote({
-  actionIds
-}: {
-  actionIds: SourceControlTextActionId[]
-}): JSX.Element | null {
-  if (actionIds.length === 0) {
-    return null
-  }
-  const allActions = actionIds.length === SOURCE_CONTROL_TEXT_ACTION_IDS.length
-  return (
-    <p className="text-[11px] leading-snug text-muted-foreground">
-      {allActions
-        ? translate(
-            'auto.components.feature.wall.AiCommitPrSettingsFields.a8a91aa917',
-            'Set by action recipes.'
-          )
-        : translate(
-            'auto.components.feature.wall.AiCommitPrSettingsFields.b66be73624',
-            'Overridden for {{value0}} by its action recipe.',
-            { value0: formatTextGenerationRecipeOverrideActions(actionIds) }
-          )}
-    </p>
-  )
 }
 
 export function AiCommitPrSettingsFields({

@@ -1,7 +1,7 @@
 import type {
   AgentLaunchOptionSelection,
   AgentLaunchOverrides
-} from '../../../../shared/agent-launch-overrides'
+} from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { SourceControlAiSettings } from '../../../../shared/source-control-ai-types'
 import {
   DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES,

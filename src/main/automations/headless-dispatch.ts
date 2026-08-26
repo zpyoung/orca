@@ -1,9 +1,9 @@
 import type {
   Automation,
   AutomationRun,
-  AutomationRunLaunchSettings,
   AutomationRunOutputSnapshot
 } from '../../shared/automations-types'
+import type { AutomationRunLaunchSettings } from '../../shared/fork-automation-launch-settings/automation-run-launch-settings'
 import type { AutomationRunTargetResult } from './run-target-resolution'
 
 const MAX_HEADLESS_OUTPUT_SNAPSHOT_CHARS = 256 * 1024

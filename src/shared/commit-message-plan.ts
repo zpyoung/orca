@@ -5,7 +5,7 @@ import {
   isCustomAgentId
 } from './commit-message-agent-spec'
 import { planCustomCommand, tokenizeCustomCommandTemplate } from './commit-message-prompt'
-import { applyCommitMessageRecipeEffortOverrides } from './commit-message-recipe-effort-overrides'
+import { applyCommitMessageRecipeEffortOverrides } from './fork-automation-launch-settings/commit-message-recipe-effort-overrides'
 import type { TuiAgent } from './tui-agent'
 
 // Why: planning is a pure transformation from "user request + prompt text"
