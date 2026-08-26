@@ -1,8 +1,6 @@
 import { useAppStore } from '@/store'
 import { buildAgentStartupPlan } from '@/lib/tui-agent-startup'
 import { resolveAgentBackgroundLaunchSettings } from '@/lib/agent-background-launch-settings'
-import { resolveAgentBackgroundWorktreeContext } from '@/lib/agent-background-worktree-context'
-import { markAgentBackgroundWorkspaceTrusted } from '@/lib/agent-background-workspace-trust'
 import type {
   LaunchAgentBackgroundSessionArgs,
   LaunchAgentBackgroundSessionResult
@@ -10,6 +8,10 @@ import type {
 import { tuiAgentToAgentKind } from '@/lib/telemetry'
 import { scheduleAgentBackgroundDraft } from '@/lib/agent-background-draft-delivery'
 import { requestBackgroundTerminalWorktreeMount } from '@/components/terminal/background-terminal-worktree-mount'
+import {
+  resolveTuiAgentLaunchArgs,
+  resolveTuiAgentLaunchEnv
+} from '../../../shared/tui-agent-launch-defaults'
 import { TUI_AGENT_CONFIG } from '../../../shared/tui-agent-config'
 import { resolveAgentBackgroundLaunchHost } from '@/lib/agent-background-session-launch-host'
 import { makePaneKey } from '../../../shared/stable-pane-id'
@@ -27,6 +29,8 @@ import { subscribeToRuntimeTerminalData } from '@/runtime/runtime-terminal-strea
 import { createSshBackgroundStartupDelivery } from '@/lib/ssh-background-startup-delivery'
 import { shouldUseShellReadyStartupDelivery } from '../../../shared/codex-startup-delivery'
 import { isMainTerminalSideEffectAuthorityForPty } from '@/components/terminal-pane/terminal-side-effect-facts-handler'
+import { resolveStartupShell } from '../../../shared/tui-agent-startup-shell'
+import { resolveLocalWindowsAgentStartupShell } from '../../../shared/windows-terminal-shell'
 import { runBestEffortAgentBackgroundCleanups } from '@/lib/agent-background-session-cleanup'
 import type { bindAutomationTerminal } from '@/lib/automation-terminal-ownership'
 import {
@@ -50,7 +54,14 @@ export async function launchAgentBackgroundSession(
     onExit,
     onAgentStatus
   } = args
-  const { store, worktree, repo } = resolveAgentBackgroundWorktreeContext(worktreeId)
+  const store = useAppStore.getState()
+  const worktree = store.getKnownWorktreeById(worktreeId)
+  const repo = worktree ? store.repos.find((entry) => entry.id === worktree.repoId) : null
+  if (!worktree) {
+    throw new Error('The target workspace is no longer available.')
+  }
+  const cmdOverrides = store.settings?.agentCmdOverrides ?? {}
+  const agentEnv = resolveTuiAgentLaunchEnv(agent, store.settings?.agentDefaultEnv)
   // Folder launch ownership cannot be derived from a repo row (#2989).
   const launchHost = resolveAgentBackgroundLaunchHost({
     store,
@@ -58,20 +69,32 @@ export async function launchAgentBackgroundSession(
     worktreePath: worktree.path,
     repo
   })
-  await markAgentBackgroundWorkspaceTrusted({
-    agent,
-    workspacePath: worktree.path,
-    connectionId: launchHost.connectionId
-  })
+  const preflight = TUI_AGENT_CONFIG[agent].preflightTrust
+  if (preflight && worktree.path && window.api.agentTrust?.markTrusted) {
+    try {
+      await window.api.agentTrust.markTrusted({
+        preset: preflight,
+        workspacePath: worktree.path,
+        ...(launchHost.connectionId ? { connectionId: launchHost.connectionId } : {})
+      })
+    } catch {
+      // Best-effort: the user can still accept the trust prompt.
+    }
+  }
   const { platform: launchPlatform, isRemote } = launchHost
-  const { cmdOverrides, agentArgs, agentEnv, sessionOptions, startupShell } =
-    resolveAgentBackgroundLaunchSettings({
-      agent,
-      overrides: launchOverrides,
-      settings: store.settings,
+  const startupShell = resolveStartupShell(
+    launchPlatform,
+    resolveLocalWindowsAgentStartupShell({
       platform: launchPlatform,
-      isRemote
+      isRemote,
+      terminalWindowsShell: store.settings?.terminalWindowsShell
     })
+  )
+  const inheritedAgentArgs = resolveTuiAgentLaunchArgs(agent, store.settings?.agentDefaultArgs)
+  const { agentArgs, sessionOptions } = resolveAgentBackgroundLaunchSettings({
+    inheritedAgentArgs,
+    overrides: launchOverrides
+  })
   const trimmedPrompt = prompt?.trim() ?? ''
   const hasPrompt = trimmedPrompt.length > 0
   const isFollowupPath = TUI_AGENT_CONFIG[agent].promptInjectionMode === 'stdin-after-start'
