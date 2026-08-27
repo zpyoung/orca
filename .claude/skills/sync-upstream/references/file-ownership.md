@@ -231,6 +231,31 @@ git show <target-ref>:.oxlintrc.json > .oxlintrc.json
 pnpm exec oxlint; cp /tmp/oxlintrc.baseline.json .oxlintrc.json
 ```
 
+## When upstream ratchets a chokepoint
+
+The same shape reaches the fork through tests rather than the linter, and the local gate cannot see
+it at all. Upstream routes a whole class of call onto one module, then pins it with a boundary test
+that scans every source file and asserts the offender list is empty and its count has not grown.
+v1.4.190 did this twice — `runWslProcess` for `wsl.exe` and `runProcess`/`spawnProcess` for child
+processes — and the fork's one non-conforming file failed five checks from that single cause.
+
+The tell is a boundary or ratchet test naming a `fork-*` path in its diff, e.g.
+`expected [ Array(1) ] to deeply equal []` with a fork file as the only received element. Read the
+detector to see what it matches before changing anything: it may key on a string literal, so a
+doc comment mentioning the binary can be a false positive, and it may mask calls that already pin
+the right option.
+
+Migrating the fork file is in scope and is the whole fix — never allowlist a fork path to quiet the
+ratchet. Take the idiom from the upstream sibling the fork file was modelled on, which upstream
+migrated in the same release, and carry every option it pins across; a payload authored for bash
+must keep saying so, because the new runner's default interpreter is usually `sh`.
+
+Two follow-on effects are easy to miss. A fork file that bypasses the new chokepoint also bypasses
+the **mock** in upstream's own tests, so an upstream test can fail with a parse error far from the
+fork — the fork's direct call skipped a queued mock response and the next consumer read the wrong
+frame. And the fork's own tests mock whatever the fork used to call, so they have to move to the new
+module too.
+
 ## Verifying
 
 Two manifest checks run against the new release, and the second one is where a sync goes quietly

@@ -262,6 +262,28 @@ feature-collision review**. Each can surface a decision the reference routes to 
 `--unattended`, that is a stopping condition: go to Step 13 with "needs attention: <the decision>"
 rather than choosing a side.
 
+**`ours.txt` is the list that loses work silently, so audit it.** An exception wins the whole file,
+which also discards every unrelated upstream change under that path — no conflict, no marker, and
+both manifest checks still pass. Diff each restored path over the old-to-new tag range and replay
+what the fork does not actually own:
+
+```sh
+while read -r p; do
+  [ -z "$p" ] && continue
+  git diff --numstat "$PREV_TAG" "$UPSTREAM_TARGET" -- "$p"
+done < <out-dir>/ours.txt
+```
+
+Every path this prints is a decision. Three-way merge it with the previous tag as base
+(`git merge-file --diff3 -p ours base theirs`) rather than hand-picking hunks; the fork's own lines
+and upstream's usually sit in different regions and merge cleanly. Take upstream's side unless the
+exception's `reason` is what the change would undo — a fork build artifact, a fork identity file, or
+a record the reason says upstream's copy actively breaks.
+
+`package.json` is the one that fails loudest and least obviously: `pnpm-lock.yaml` is upstream-owned
+and resolves to the tag, so a dependency the exception dropped makes `pnpm install --frozen-lockfile`
+fail in Step 8 with a lockfile error that names nothing about ownership.
+
 Commit the ownership resolution as a single follow-up commit on top of the merge; Step 7 expects
 exactly one such extra commit.
 
@@ -407,11 +429,28 @@ Wait between polls with a background wait or a monitor, never a foreground `slee
 This is where the test suite runs, so a failing `tests node <version> <shard>/<total>` check is the
 run's problem to resolve, exactly like any other check.
 
+**Read a failing job's log through the API, not `gh run view`.** While any job in the run is still
+going, `gh run view --log-failed` answers `run <id> is still in progress; logs will be available
+when it is complete` and prints nothing — and a 16-way shard matrix is almost never all-settled when
+the first failure appears. Fetch the one job instead, which works immediately:
+
+```sh
+env -u GITHUB_TOKEN gh api "repos/zpyoung/orca/actions/jobs/<job-id>/logs" > job.log
+```
+
+The job id is the trailing number of the `link` field in `gh pr checks`. Strip the ANSI codes
+(`sed 's/\x1b\[[0-9;]*m//g'`) before grepping for `FAIL `, and read the whole failure — one root
+cause routinely fails several shards, and the file named in the first `##[error]` is often not the
+file that has to change.
+
 **Re-run a failure before believing it.** This suite is genuinely nondeterministic — failures differ
 run to run on identical code. The first time a job fails, re-run it once
 (`env -u GITHUB_TOKEN gh run rerun <run-id> --failed --repo zpyoung/orca`) and only treat it as real
 if it reproduces. A failure that reproduces is signal; a failure that clears was flake, and it is
-still worth naming in the report.
+still worth naming in the report. A shard matrix gives you a cheaper first read than a re-run:
+the same shard number failing on **both** Node versions is deterministic, and one version alone is
+the flake shape. `gh run rerun` refuses with `cannot be rerun; This workflow is already running`
+until every job has settled, so wait for the run rather than retrying the command.
 
 **A reproduced CI failure is the fork's to fix, even if the merge did not cause it.** There is no
 tolerance mechanism here and there is no need for one: these are clean hosted runners, so the
