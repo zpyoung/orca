@@ -45,10 +45,13 @@ jobs:
           set -euo pipefail
           # Why --no-renames: name-only rename detection can report only the destination.
           # A code file moved under docs/ must still expose its code-side deletion.
-          CHANGED="$(git diff --name-only --no-renames --diff-filter=ACDMR --merge-base "$BASE_SHA" "$HEAD_SHA")"
+          # Why a file and not a pipe: the scope script reads fd 0 with readFileSync, which
+          # throws EAGAIN once the payload outgrows the 64K pipe buffer, as a sync PR's does.
+          CHANGED_PATHS="$RUNNER_TEMP/pr-changed-paths.txt"
+          git diff --name-only --no-renames --diff-filter=ACDMR --merge-base "$BASE_SHA" "$HEAD_SHA" > "$CHANGED_PATHS"
           echo "Changed paths:"
-          printf '%s\n' "$CHANGED"
-          SHOULD_RUN="$(printf '%s\n' "$CHANGED" | node config/scripts/pr-code-change-scope.mjs)"
+          cat "$CHANGED_PATHS"
+          SHOULD_RUN="$(node config/scripts/pr-code-change-scope.mjs < "$CHANGED_PATHS")"
           echo "should_run=$SHOULD_RUN" >> "$GITHUB_OUTPUT"
           echo "should_run=$SHOULD_RUN"
 
