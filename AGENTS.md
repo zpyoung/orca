@@ -7,7 +7,11 @@ All UI work — layout, color, typography, spacing, component selection, UX beha
 Use the `$electron` skill and Playwright CDP for rendered Orca UI checks. Do not use computer-use for Orca UI validation.
 
 # Style
-## Concise/Brief Non-obviosu comments ONLY
+## Reuse Before Reimplementing
+
+Before writing new logic at any scale — a function, component, IPC channel, state store, or whole subsystem/flow — check whether an existing implementation already does the job (or nearly does). Extend or generalize it instead of building a parallel version; only write from scratch when nothing fits. Keep the check proportionate: a quick search for trivial code, a real one before building anything substantial.
+
+## Concise/Brief Non-obvious Comments ONLY
   * DO NOT: be verbose, explain the obvious, walk through the code ("WHY not HOW")
   * BE CONCISE. 1 LINE if possible
 
@@ -84,6 +88,12 @@ seam file whose measured diff no longer matches its recorded budget (residual bu
 
 Fork edits to an upstream-owned file are not blocked by the guard — but an undeclared edit is
 reverted at the next sync, so declare it.
+
+# Verifying Changes
+
+- **Typecheck**: `pnpm tc` (or `tc:node` / `tc:cli` / `tc:web`)
+- **Test**: `pnpm test:sandbox --shards=16 --jobs=8` — never `pnpm test`; see Running Tests below
+- **Lint**: `oxlint`, or `pnpm run check:code-quality:changed` for changed files (full `pnpm lint` is slow); format with `pnpm format`
 
 # Considerations
 ## Running Tests: Remote Sandbox Only

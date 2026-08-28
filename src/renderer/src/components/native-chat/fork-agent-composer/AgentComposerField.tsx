@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/NativeChatComposerField.tsx
-// FORK-COPY-SHA: 6e4f817101daa18d82824b69243d9079baa9c416
+// FORK-COPY-SHA: 54076453b2725b39e07f07acd438d47b593d0d10
 import type {
   ClipboardEventHandler,
   CompositionEventHandler,

@@ -21,13 +21,15 @@ import { isValidTerminalTabId } from './terminal-tab-id'
 import { parseExecutionHostId, type ExecutionHostId } from './execution-host'
 import { isTuiAgent } from './tui-agent-config'
 import { terminalDockByPaneKeySchema } from './fork-terminal-dock/workspace-session-terminal-dock-schema'
-import { persistedOpenFileSchema } from './workspace-session-editor-schema'
 import { isWorkspaceKey } from './workspace-scope'
 import {
   browserHistoryEntriesSchema,
   browserPageSchema,
   browserWorkspaceSchema
 } from './workspace-session-browser-schema'
+import { clientHostedBrowserCloseIntentSchema } from './client-hosted-browser-close-intent'
+import { persistedClientHostedBrowserPageSchema } from './client-hosted-browser-page-record'
+import { persistedOpenFileSchema } from './workspace-session-editor-schema'
 import { sleepingAgentSessionsByPaneKeySchema } from './workspace-session-sleeping-agents'
 import { salvagedField, salvagedOptional, salvagingArray, salvagingRecord } from './zod-salvage'
 
@@ -149,6 +151,8 @@ const tabSchema = z.object({
   color: z.string().nullable(),
   sortOrder: z.number(),
   createdAt: z.number(),
+  // Why: corrupt optional recency must not discard the whole persisted tab.
+  lastFocusedAt: z.number().finite().nonnegative().optional().catch(undefined),
   isPreview: z.boolean().optional(),
   isPinned: z.boolean().optional(),
   // Why: persist the per-tab native-chat view mode so 'chat' survives reload /
@@ -245,6 +249,14 @@ export const workspaceSessionStateSchema: z.ZodType<WorkspaceSessionState> = z.o
   activeBrowserTabIdByWorktree: salvagedOptional(
     'activeBrowserTabIdByWorktree',
     salvagingRecord(worktreeIdSchema, z.string().nullable())
+  ),
+  clientHostedBrowserPagesByWorktree: salvagedOptional(
+    'clientHostedBrowserPagesByWorktree',
+    salvagingRecord(worktreeIdSchema, salvagingArray(persistedClientHostedBrowserPageSchema))
+  ),
+  clientHostedBrowserCloseIntentsByEnvironment: salvagedOptional(
+    'clientHostedBrowserCloseIntentsByEnvironment',
+    salvagingRecord(z.string().min(1), salvagingArray(clientHostedBrowserCloseIntentSchema))
   ),
   activeTabTypeByWorktree: salvagedOptional(
     'activeTabTypeByWorktree',

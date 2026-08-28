@@ -180,14 +180,22 @@
       "lines": ["  ipcMain.removeHandler('pty:writeInputAccepted')"]
     },
     {
+      "path": "src/main/ipc/ssh-relay-session-callbacks.ts",
+      "feature": "native-chat-relay",
+      "kind": "registration",
+      "lines": [
+        "import { notifySshRelayReady } from './fork-native-chat-relay/ssh-relay-ready-notifier'",
+        "    notifySshRelayReady(tid)"
+      ]
+    },
+    {
       "path": "src/main/ipc/ssh.ts",
       "feature": "native-chat-relay",
       "kind": "registration",
       "lines": [
         "import type { NativeChatRelayPing } from '../../shared/fork-native-chat-relay/native-chat-relay-protocol'",
-        "} from './fork-native-chat-relay/ssh-relay-ready-notifier'",
-        "export async function requestActiveSshNativeChat(",
-        "    notifySshRelayReady(tid)"
+        "import { onSshRelayReady } from './fork-native-chat-relay/ssh-relay-ready-notifier'",
+        "export async function requestActiveSshNativeChat("
       ]
     },
     {
@@ -341,7 +349,7 @@
       ]
     },
     {
-      "path": "src/main/runtime/rpc/methods/session-tabs.ts",
+      "path": "src/main/runtime/rpc/methods/session-tab-mutation-methods.ts",
       "feature": "terminal-dock",
       "kind": "registration",
       "lines": [
@@ -488,12 +496,12 @@
       ]
     },
     {
-      "path": "src/relay/relay.ts",
+      "path": "src/relay/relay-runtime-services.ts",
       "feature": "native-chat-relay",
       "kind": "registration",
       "lines": [
         "import { NativeChatHandler } from './fork-native-chat-relay/native-chat-handler'",
-        "  const _nativeChatHandler = new NativeChatHandler(dispatcher)"
+        "      new NativeChatHandler(dispatcher)"
       ]
     },
     {
@@ -766,6 +774,12 @@
       ]
     },
     {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-live-session-pending.test.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": ["vi.mock('./fork-native-chat-relay/native-chat-session-transport', () => ({"]
+    },
+    {
       "path": "src/renderer/src/components/native-chat/use-native-chat-picker-command-dispatch.test.tsx",
       "feature": "agent-composer",
       "kind": "passthrough",
@@ -901,14 +915,27 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/sidebar/WorktreeContextMenu.tsx",
+      "path": "src/renderer/src/components/sidebar/WorktreeContextMenuOverlays.tsx",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": ["      {model.worktreeGroupDialog.dialog}"]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/WorktreeContextMenuView.tsx",
       "feature": "worktree-groups",
       "kind": "registration",
       "lines": [
-        "} from './fork-worktree-groups/WorktreeGroupMenuItems'",
-        "  const worktreeGroupDialog = useWorktreeGroupDialog({",
-        "              <WorktreeGroupMenuItems",
-        "      {worktreeGroupDialog.dialog}"
+        "import { WorktreeGroupMenuItems } from './fork-worktree-groups/WorktreeGroupMenuItems'",
+        "              <WorktreeGroupMenuItems"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/use-worktree-context-menu-model.tsx",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "import { useWorktreeGroupDialog } from './fork-worktree-groups/WorktreeGroupMenuItems'",
+        "  const worktreeGroupDialog = useWorktreeGroupDialog({"
       ]
     },
     {
@@ -1402,16 +1429,29 @@
       ]
     },
     {
-      "path": "src/renderer/src/web/web-preload-api.ts",
+      "path": "src/renderer/src/web/preload-api/web-native-chat-api.ts",
       "feature": "native-chat-relay",
       "kind": "passthrough",
       "lines": [
         "} from '@/components/native-chat/fork-native-chat-relay/native-chat-runtime-contract'",
         "  const readNativeChatSession = async (",
-        "    readSession: readNativeChatSession,",
-        "import { mergeForkSessionHandoffSettings } from '../../../shared/fork-session-handoff/handoff-settings-merge'",
+        "    readSession: readNativeChatSession,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/web/preload-api/web-preference-normalization.ts",
+      "feature": "session-handoff",
+      "kind": "passthrough",
+      "lines": [
+        "import { mergeForkSessionHandoffSettings } from '../../../../shared/fork-session-handoff/handoff-settings-merge'",
         "    ...mergeForkSessionHandoffSettings(base, updates),"
       ]
+    },
+    {
+      "path": "src/renderer/src/web/preload-api/web-terminal-api.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    writeInputAccepted: () => Promise.resolve(false),"]
     },
     {
       "path": "src/shared/constants.ts",
@@ -1493,7 +1533,7 @@
       ]
     },
     {
-      "path": "src/shared/runtime-types.ts",
+      "path": "src/shared/runtime-session-contracts.ts",
       "feature": "skill-plugin-attribution",
       "kind": "registration",
       "lines": [
@@ -1560,11 +1600,11 @@
       "lines": ["  projectGroupId?: string | null"]
     },
     {
-      "path": "src/main/ipc/register-core-handlers.test.ts",
+      "path": "src/main/ipc/register-core-handlers/register-core-handlers.test.ts",
       "feature": "session-handoff",
       "kind": "registration",
       "lines": [
-        "vi.mock('../fork-session-handoff/session-lineage-ipc', () => ({",
+        "vi.mock('../../fork-session-handoff/session-lineage-ipc', () => ({",
         "  registerForkSessionHandoffHandlers: vi.fn()"
       ]
     },
@@ -1578,11 +1618,11 @@
       ]
     },
     {
-      "path": "src/main/ipc/register-core-handlers.ts",
+      "path": "src/main/ipc/register-core-handlers/register-core-handlers.ts",
       "feature": "session-handoff",
       "kind": "registration",
       "lines": [
-        "import { registerForkSessionHandoffHandlers } from '../fork-session-handoff/session-lineage-ipc'",
+        "import { registerForkSessionHandoffHandlers } from '../../fork-session-handoff/session-lineage-ipc'",
         "  registerForkSessionHandoffHandlers()"
       ]
     },
@@ -2169,12 +2209,6 @@
       "ledger": "docs/fork-upstreaming.md#retention-fix"
     },
     {
-      "path": "src/shared/workspace-session-editor-schema.ts",
-      "reason": "Upstream's workspace-session-schema.ts sits one line under the 300-line cap, so the editor schemas were split into their own module to make room. A plain refactor of upstream's own file, not fork behavior.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#workspace-session-schema-split"
-    },
-    {
       "path": "tests/e2e/cross-version-wire/release-checkout.ts",
       "reason": "Encodes the fork's own (tagless) release-history shape for cross-version wire tests.",
       "status": "permanent"
@@ -2226,8 +2260,8 @@
       "removed": 4
     },
     "AGENTS.md": {
-      "added": 89,
-      "removed": 0
+      "added": 90,
+      "removed": 1
     },
     "CLAUDE.md": {
       "added": 17,
@@ -2281,8 +2315,20 @@
       "added": 1,
       "removed": 0
     },
+    "src/main/ipc/register-core-handlers/register-core-handlers.test.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/main/ipc/register-core-handlers/register-core-handlers.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/ipc/ssh-relay-session-callbacks.ts": {
+      "added": 2,
+      "removed": 0
+    },
     "src/main/ipc/ssh.ts": {
-      "added": 35,
+      "added": 31,
       "removed": 0
     },
     "src/main/ipc/worktree-logic.test.ts": {
@@ -2331,7 +2377,11 @@
     },
     "src/main/native-chat/transcript-watch.ts": {
       "added": 30,
-      "removed": 212
+      "removed": 252
+    },
+    "src/main/persistence/applying-settings/settings-update.ts": {
+      "added": 3,
+      "removed": 1
     },
     "src/main/persistence/tracking-repos/project-group-operations.ts": {
       "added": 2,
@@ -2353,12 +2403,12 @@
       "added": 8,
       "removed": 7
     },
-    "src/main/runtime/rpc/methods/session-tabs-schemas.ts": {
-      "added": 50,
+    "src/main/runtime/rpc/methods/session-tab-mutation-methods.ts": {
+      "added": 2,
       "removed": 1
     },
-    "src/main/runtime/rpc/methods/session-tabs.ts": {
-      "added": 2,
+    "src/main/runtime/rpc/methods/session-tabs-schemas.ts": {
+      "added": 50,
       "removed": 1
     },
     "src/main/runtime/rpc/methods/worktree-schemas.ts": {
@@ -2406,8 +2456,8 @@
       "removed": 0
     },
     "src/preload/api/native-chat-api.ts": {
-      "added": 50,
-      "removed": 27
+      "added": 53,
+      "removed": 30
     },
     "src/preload/api/pty-api.ts": {
       "added": 1,
@@ -2421,9 +2471,9 @@
       "added": 20,
       "removed": 7
     },
-    "src/relay/relay.ts": {
-      "added": 4,
-      "removed": 0
+    "src/relay/relay-runtime-services.ts": {
+      "added": 3,
+      "removed": 1
     },
     "src/renderer/src/assets/main.css": {
       "added": 1,
@@ -2436,6 +2486,10 @@
     "src/renderer/src/components/dashboard-popout/AgentMapWorkspaceContextMenu.test.tsx": {
       "added": 1,
       "removed": 1
+    },
+    "src/renderer/src/components/dashboard/DashboardAgentRow.tsx": {
+      "added": 2,
+      "removed": 0
     },
     "src/renderer/src/components/native-chat/NativeChatApprovalCard.tsx": {
       "added": 4,
@@ -2482,8 +2536,12 @@
       "removed": 4
     },
     "src/renderer/src/components/native-chat/NativeChatView.tsx": {
-      "added": 15,
-      "removed": 17
+      "added": 16,
+      "removed": 18
+    },
+    "src/renderer/src/components/native-chat/native-chat-attachment-upload.ts": {
+      "added": 2,
+      "removed": 0
     },
     "src/renderer/src/components/native-chat/native-chat-command-marker.ts": {
       "added": 1,
@@ -2545,6 +2603,10 @@
       "added": 16,
       "removed": 2
     },
+    "src/renderer/src/components/native-chat/use-native-chat-live-session-pending.test.ts": {
+      "added": 6,
+      "removed": 0
+    },
     "src/renderer/src/components/native-chat/use-native-chat-picker-command-dispatch.test.tsx": {
       "added": 128,
       "removed": 28
@@ -2577,6 +2639,22 @@
       "added": 1,
       "removed": 1
     },
+    "src/renderer/src/components/right-sidebar/AiVaultPanel.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/right-sidebar/AiVaultSessionRow.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/right-sidebar/AiVaultSessionVirtualList.tsx": {
+      "added": 3,
+      "removed": 4
+    },
+    "src/renderer/src/components/right-sidebar/ai-vault-session-launch-actions.ts": {
+      "added": 3,
+      "removed": 2
+    },
     "src/renderer/src/components/right-sidebar/use-right-sidebar-activity-items.ts": {
       "added": 5,
       "removed": 0
@@ -2593,6 +2671,10 @@
       "added": 6,
       "removed": 1
     },
+    "src/renderer/src/components/settings/Settings.tsx": {
+      "added": 3,
+      "removed": 0
+    },
     "src/renderer/src/components/settings/experimental-search.ts": {
       "added": 5,
       "removed": 0
@@ -2605,9 +2687,13 @@
       "added": 5,
       "removed": 2
     },
-    "src/renderer/src/components/sidebar/WorktreeContextMenu.tsx": {
-      "added": 20,
-      "removed": 48
+    "src/renderer/src/components/sidebar/WorktreeContextMenuOverlays.tsx": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/components/sidebar/WorktreeContextMenuView.tsx": {
+      "added": 11,
+      "removed": 50
     },
     "src/renderer/src/components/sidebar/WorktreeList.tsx": {
       "added": 10,
@@ -2621,53 +2707,25 @@
       "added": 8,
       "removed": 1
     },
+    "src/renderer/src/components/sidebar/use-worktree-context-menu-model.tsx": {
+      "added": 8,
+      "removed": 3
+    },
+    "src/renderer/src/components/sidebar/worktree-card-compact-agent-row.tsx": {
+      "added": 2,
+      "removed": 0
+    },
     "src/renderer/src/components/sidebar/worktree-drag-units.ts": {
       "added": 8,
       "removed": 6
-    },
-    "src/renderer/src/components/sidebar/worktree-list/viewport/VirtualizedWorktreeViewport.tsx": {
-      "added": 8,
-      "removed": 1
-    },
-    "src/renderer/src/components/sidebar/worktree-list/navigation/pending-reveal-inputs.ts": {
-      "added": 5,
-      "removed": 1
-    },
-    "src/renderer/src/components/sidebar/worktree-list/listing/use-collapsed-groups.ts": {
-      "added": 7,
-      "removed": 5
-    },
-    "src/renderer/src/components/sidebar/worktree-list/navigation/use-pending-reveal.ts": {
-      "added": 1,
-      "removed": 0
-    },
-    "src/renderer/src/components/sidebar/worktree-list/listing/use-section-rows.ts": {
-      "added": 13,
-      "removed": 2
-    },
-    "src/renderer/src/components/sidebar/worktree-list/drag/use-runtime.ts": {
-      "added": 13,
-      "removed": 2
-    },
-    "src/renderer/src/components/sidebar/worktree-list/drag/use-pointer-drag.ts": {
-      "added": 4,
-      "removed": 0
-    },
-    "src/renderer/src/components/sidebar/worktree-list/viewport/viewport-props.ts": {
-      "added": 4,
-      "removed": 0
-    },
-    "src/renderer/src/components/sidebar/worktree-list/drag/groups.ts": {
-      "added": 7,
-      "removed": 4
     },
     "src/renderer/src/components/sidebar/worktree-list/drag/drop-commit-context.ts": {
       "added": 6,
       "removed": 1
     },
-    "src/renderer/src/components/sidebar/worktree-list/rows/item-row.tsx": {
-      "added": 10,
-      "removed": 1
+    "src/renderer/src/components/sidebar/worktree-list/drag/groups.ts": {
+      "added": 7,
+      "removed": 4
     },
     "src/renderer/src/components/sidebar/worktree-list/drag/pointer-commit.ts": {
       "added": 10,
@@ -2677,9 +2735,69 @@
       "added": 14,
       "removed": 0
     },
+    "src/renderer/src/components/sidebar/worktree-list/drag/use-drop-commit-context.ts": {
+      "added": 8,
+      "removed": 1
+    },
+    "src/main/index.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/sidebar/worktree-list/drag/use-pointer-drag.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/renderer/src/components/sidebar/worktree-list/drag/use-runtime.ts": {
+      "added": 13,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/worktree-list/grouping/build-rows.ts": {
+      "added": 13,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/worktree-list/grouping/project-group-sections.ts": {
+      "added": 15,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/grouping/worktree-group-keys.ts": {
+      "added": 10,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/worktree-list/grouping/worktree-grouping.ts": {
+      "added": 6,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/listing/use-collapsed-groups.ts": {
+      "added": 7,
+      "removed": 5
+    },
+    "src/renderer/src/components/sidebar/worktree-list/listing/use-section-rows.ts": {
+      "added": 13,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/worktree-list/navigation/pending-reveal-inputs.ts": {
+      "added": 5,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/navigation/use-pending-reveal.ts": {
+      "added": 1,
+      "removed": 0
+    },
     "src/renderer/src/components/sidebar/worktree-list/rows/SectionHeader.tsx": {
       "added": 11,
       "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/rows/item-row.tsx": {
+      "added": 10,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/viewport/VirtualizedWorktreeViewport.tsx": {
+      "added": 8,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/viewport/viewport-props.ts": {
+      "added": 4,
+      "removed": 0
     },
     "src/renderer/src/components/sidebar/worktree-list/viewport/virtual-row-context.ts": {
       "added": 3,
@@ -2713,8 +2831,12 @@
       "added": 84,
       "removed": 4
     },
+    "src/renderer/src/components/terminal-pane/terminal-pane-menu-agent-session-actions.ts": {
+      "added": 1,
+      "removed": 1
+    },
     "src/renderer/src/components/terminal-pane/terminal-visibility-resume.test.ts": {
-      "added": 36,
+      "added": 37,
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/terminal-visibility-resume.ts": {
@@ -2730,12 +2852,16 @@
       "removed": 2
     },
     "src/renderer/src/components/terminal-pane/use-terminal-window-wake-recovery.test.ts": {
-      "added": 8,
+      "added": 12,
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/use-terminal-window-wake-recovery.ts": {
       "added": 12,
       "removed": 3
+    },
+    "src/renderer/src/hooks/useSettingsNavigationMetadata.ts": {
+      "added": 2,
+      "removed": 0
     },
     "src/renderer/src/i18n/i18n.ts": {
       "added": 3,
@@ -2825,6 +2951,10 @@
       "added": 12,
       "removed": 0
     },
+    "src/renderer/src/lib/settings-navigation-types.ts": {
+      "added": 1,
+      "removed": 0
+    },
     "src/renderer/src/lib/terminal-title-contrast.ts": {
       "added": 3,
       "removed": 3
@@ -2846,16 +2976,24 @@
       "removed": 1
     },
     "src/renderer/src/runtime/web-session-tabs-sync.ts": {
-      "added": 144,
-      "removed": 28
+      "added": 124,
+      "removed": 7
     },
     "src/renderer/src/store/slices/tabs.ts": {
       "added": 20,
       "removed": 1
     },
-    "src/renderer/src/web/web-preload-api.ts": {
-      "added": 31,
+    "src/renderer/src/web/preload-api/web-native-chat-api.ts": {
+      "added": 30,
       "removed": 17
+    },
+    "src/renderer/src/web/preload-api/web-preference-normalization.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/web/preload-api/web-terminal-api.ts": {
+      "added": 2,
+      "removed": 0
     },
     "src/shared/constants.ts": {
       "added": 4,
@@ -2901,7 +3039,7 @@
       "added": 3,
       "removed": 1
     },
-    "src/shared/runtime-types.ts": {
+    "src/shared/runtime-session-contracts.ts": {
       "added": 4,
       "removed": 0
     },
@@ -2922,8 +3060,8 @@
       "removed": 0
     },
     "src/shared/workspace-session-schema.ts": {
-      "added": 4,
-      "removed": 17
+      "added": 3,
+      "removed": 1
     },
     "src/shared/worktree/meta-types.ts": {
       "added": 3,
@@ -2932,86 +3070,6 @@
     "src/shared/worktree/types.ts": {
       "added": 3,
       "removed": 0
-    },
-    "src/renderer/src/components/sidebar/worktree-list/grouping/worktree-grouping.ts": {
-      "added": 6,
-      "removed": 1
-    },
-    "src/renderer/src/components/sidebar/worktree-list/grouping/build-rows.ts": {
-      "added": 13,
-      "removed": 2
-    },
-    "src/renderer/src/components/sidebar/worktree-list/grouping/project-group-sections.ts": {
-      "added": 15,
-      "removed": 1
-    },
-    "src/renderer/src/components/sidebar/worktree-list/grouping/worktree-group-keys.ts": {
-      "added": 10,
-      "removed": 2
-    },
-    "src/renderer/src/components/sidebar/worktree-list/drag/use-drop-commit-context.ts": {
-      "added": 8,
-      "removed": 1
-    },
-    "src/main/index.ts": {
-      "added": 2,
-      "removed": 0
-    },
-    "src/main/ipc/register-core-handlers.test.ts": {
-      "added": 4,
-      "removed": 0
-    },
-    "src/main/ipc/register-core-handlers.ts": {
-      "added": 2,
-      "removed": 0
-    },
-    "src/renderer/src/components/dashboard/DashboardAgentRow.tsx": {
-      "added": 2,
-      "removed": 0
-    },
-    "src/renderer/src/components/right-sidebar/AiVaultPanel.tsx": {
-      "added": 1,
-      "removed": 1
-    },
-    "src/renderer/src/components/right-sidebar/AiVaultSessionRow.tsx": {
-      "added": 2,
-      "removed": 0
-    },
-    "src/renderer/src/components/right-sidebar/AiVaultSessionVirtualList.tsx": {
-      "added": 3,
-      "removed": 4
-    },
-    "src/renderer/src/components/right-sidebar/ai-vault-session-launch-actions.ts": {
-      "added": 3,
-      "removed": 2
-    },
-    "src/renderer/src/components/sidebar/worktree-card-compact-agent-row.tsx": {
-      "added": 2,
-      "removed": 0
-    },
-    "src/renderer/src/components/terminal-pane/terminal-pane-menu-agent-session-actions.ts": {
-      "added": 1,
-      "removed": 1
-    },
-    "src/renderer/src/components/native-chat/native-chat-attachment-upload.ts": {
-      "added": 2,
-      "removed": 0
-    },
-    "src/renderer/src/components/settings/Settings.tsx": {
-      "added": 3,
-      "removed": 0
-    },
-    "src/renderer/src/hooks/useSettingsNavigationMetadata.ts": {
-      "added": 2,
-      "removed": 0
-    },
-    "src/renderer/src/lib/settings-navigation-types.ts": {
-      "added": 1,
-      "removed": 0
-    },
-    "src/main/persistence/applying-settings/settings-update.ts": {
-      "added": 3,
-      "removed": 1
     }
   }
 }
