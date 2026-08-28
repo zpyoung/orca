@@ -93,13 +93,16 @@ export function captureHandoffSource(
 export function buildHandoffParentIdentity(
   request: AgentSessionContinuationRequest,
   forkSource: ForkSessionHandoffSource | undefined,
-  providerSessionId: string | null
+  providerSessionId: string | null,
+  // Why the sent brief's path wins: lineage rows match a Vault session by file
+  // identity, so recording a stale reported path would never pair with one.
+  sentTranscriptPath: string | null = null
 ): LineageEndpointIdentity {
   return {
     paneKey: forkSource?.sourcePaneKey ?? null,
     agent: forkSource?.vaultAgent ?? request.source.sourceAgent,
     providerSessionId: forkSource?.vaultSessionId ?? providerSessionId,
-    transcriptPath: request.source.transcriptPath ?? null,
+    transcriptPath: sentTranscriptPath ?? request.source.transcriptPath ?? null,
     worktreeId: forkSource?.sourceWorktreeId ?? null,
     title: request.source.sourceTitle ?? null
   }

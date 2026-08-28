@@ -8,6 +8,7 @@ import {
 } from '@/lib/fork-session-handoff/handoff-target-resolution'
 import {
   resolveTranscriptReachability,
+  type HandoffTranscriptProbeOutcome,
   type HandoffTranscriptReachability
 } from '@/lib/fork-session-handoff/handoff-transcript-reachability'
 import { useAppStore } from '@/store'
@@ -41,11 +42,26 @@ function getTranscriptProbeKey(args: {
   }
   return JSON.stringify([
     args.request.source.transcriptPath?.trim() ?? '',
+    resolveProbeAgent(args.request, args.forkSource),
+    resolveProbeSessionId(args.forkSource),
+    args.forkSource?.sourcePaneKey ?? null,
+    args.request.source.sourceWorkingDirectory ?? null,
     args.forkSource?.sourceExecutionHostId ?? null,
     args.target.worktreeId,
     args.target.sshConnectionId,
     args.target.runtimeEnvironmentId
   ])
+}
+
+function resolveProbeAgent(
+  request: AgentSessionContinuationRequest,
+  forkSource: ForkSessionHandoffSource | undefined
+): string | null {
+  return forkSource?.vaultAgent ?? request.source.sourceAgent ?? null
+}
+
+function resolveProbeSessionId(forkSource: ForkSessionHandoffSource | undefined): string | null {
+  return forkSource?.providerSessionId ?? forkSource?.vaultSessionId ?? null
 }
 
 export function useHandoffTargetEnvironment(args: {
@@ -84,15 +100,17 @@ export function useHandoffTargetEnvironment(args: {
   const [detectingAgents, setDetectingAgents] = useState(true)
   const [agentDetectionFailed, setAgentDetectionFailed] = useState(false)
   const transcriptProbeKey = getTranscriptProbeKey({ open, request, forkSource, target })
-  const [transcriptProbe, setTranscriptProbe] = useState<{
-    key: string | null
-    verdict: HandoffTranscriptReachability
-  }>({ key: null, verdict: 'none' })
+  const [transcriptProbe, setTranscriptProbe] = useState<
+    HandoffTranscriptProbeOutcome & { key: string | null }
+  >({ key: null, verdict: 'none', transcriptPath: null })
   const transcriptReachabilityLoading = Boolean(
     transcriptProbeKey && transcriptProbe.key !== transcriptProbeKey
   )
-  const transcriptReachability =
-    transcriptProbe.key === transcriptProbeKey ? transcriptProbe.verdict : 'none'
+  const transcriptMatchesProbe = transcriptProbe.key === transcriptProbeKey
+  const transcriptReachability: HandoffTranscriptReachability = transcriptMatchesProbe
+    ? transcriptProbe.verdict
+    : 'none'
+  const transcriptResolvedPath = transcriptMatchesProbe ? transcriptProbe.transcriptPath : null
   const [capturedText, setCapturedText] = useState<string | null>(null)
   const [repoState, setRepoState] =
     useState<Awaited<ReturnType<typeof fetchHandoffRepoState>>>(null)
@@ -193,24 +211,30 @@ export function useHandoffTargetEnvironment(args: {
     const probedRequest = requestRef.current
     const probedTarget = targetRef.current
     if (!probedRequest || !probedTarget || !transcriptProbeKey) {
-      setTranscriptProbe({ key: null, verdict: 'none' })
+      setTranscriptProbe({ key: null, verdict: 'none', transcriptPath: null })
       return
     }
     const probedForkSource = forkSourceRef.current
     let current = true
     void resolveTranscriptReachability({
+      agent: resolveProbeAgent(probedRequest, probedForkSource),
+      sessionId: resolveProbeSessionId(probedForkSource),
       transcriptPath: probedRequest.source.transcriptPath ?? null,
+      paneKey: probedForkSource?.sourcePaneKey ?? null,
+      workspacePath: probedRequest.source.sourceWorkingDirectory ?? null,
       sourceExecutionHostId: probedForkSource?.sourceExecutionHostId ?? null,
       target: probedTarget
-    }).then((verdict) => {
+    }).then((outcome) => {
       if (!current) {
         return
       }
-      setTranscriptProbe({ key: transcriptProbeKey, verdict })
-      if (verdict !== 'usable') {
+      setTranscriptProbe({ key: transcriptProbeKey, ...outcome })
+      if (outcome.verdict !== 'usable') {
         onTranscriptUnavailable()
       }
-      if (verdict === 'unreachable') {
+      // An unverified transcript is as unusable as an absent one, so both fall
+      // back to the bounded capture.
+      if (outcome.verdict === 'unreachable' || outcome.verdict === 'unverifiable') {
         setCapturedText(captureHandoffSource(probedForkSource, probedRequest.source))
       }
     })
@@ -265,6 +289,7 @@ export function useHandoffTargetEnvironment(args: {
     agentDetectionFailed,
     transcriptReachability,
     transcriptReachabilityLoading,
+    transcriptResolvedPath,
     capturedText,
     setCapturedText,
     repoState,

@@ -292,6 +292,7 @@ import {
 } from './claude-accounts/live-pty-gate'
 import { StarNagService } from './star-nag/service'
 import { agentHookServer, type AgentHookProviderSessionIdentity } from './agent-hooks/server'
+import { recordForkPaneTranscriptObservation } from './fork-session-handoff/pane-transcript-history'
 import { createHookProviderSessionInvalidator } from './agent-hooks/hook-provider-session-invalidation'
 import { createHookStatusSessionTabsInvalidator } from './agent-hooks/hook-status-session-tabs-invalidation'
 import { wslHookRelayManager } from './agent-hooks/wsl-hook-relay-manager'
@@ -2576,6 +2577,7 @@ void app.whenReady().then(async () => {
   agentHookServer.subscribeEnrichedStatus((enriched) => {
     agentSessionRecorder.onStatus(enriched)
   })
+  agentHookServer.subscribeEnrichedStatus(recordForkPaneTranscriptObservation)
   agentHookServer.subscribePaneStatusClear((clear) => {
     agentSessionRecorder.onCleared(clear)
   })

@@ -17,6 +17,7 @@ function source(): ForkSessionHandoffSource {
     sourceWorktreeId: 'wt-1',
     anchorWorktreeId: 'wt-1',
     sourceExecutionHostId: 'local',
+    providerSessionId: null,
     vaultSessionId: null,
     vaultAgent: null,
     capturePaneScrollback: () => 'capture'
