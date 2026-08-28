@@ -14,6 +14,7 @@ import {
 } from './workspace-lineage-menu-actions'
 import { parseWorkspaceKey } from '../../../../shared/workspace-scope'
 import { getDeleteStateForWorktreeHost } from './worktree-delete-state-host-match'
+import { useWorktreeGroupDialog } from './fork-worktree-groups/WorktreeGroupMenuItems'
 import {
   CLOSE_ALL_CONTEXT_MENUS_EVENT,
   EMPTY_BROWSER_TABS_BY_WORKTREE,
@@ -59,7 +60,6 @@ export function useWorktreeContextMenuModel({
   const setWorktreesPinnedAndReveal = useAppStore((s) => s.setWorktreesPinnedAndReveal)
   const workspaceStatuses = useAppStore((s) => s.workspaceStatuses)
   const openModal = useAppStore((s) => s.openModal)
-  const projectGroups = useAppStore((s) => s.projectGroups)
   const createProjectGroup = useAppStore((s) => s.createProjectGroup)
   const moveProjectToGroup = useAppStore((s) => s.moveProjectToGroup)
   const repo = useRepoById(worktree.repoId)
@@ -78,6 +78,10 @@ export function useWorktreeContextMenuModel({
   )
   const [createGroupDialogOpen, setCreateGroupDialogOpen] = useState(false)
   const createGroupDialogActiveRef = useRef(false)
+  const worktreeGroupDialog = useWorktreeGroupDialog({
+    worktree,
+    dialogActiveRef: createGroupDialogActiveRef
+  })
   const [parentPicker, setParentPicker] = useState<{
     childWorktreeId: string
     anchorElement: HTMLElement
@@ -248,6 +252,7 @@ export function useWorktreeContextMenuModel({
       !lifecycleStartedRef.current ||
       menuOpen ||
       createGroupDialogOpen ||
+      worktreeGroupDialog.open ||
       createGroupDialogActiveRef.current ||
       parentPicker !== null ||
       pendingParentPickerRef.current !== null
@@ -262,7 +267,7 @@ export function useWorktreeContextMenuModel({
       onLifecycleComplete?.()
     }, 0)
     return () => window.clearTimeout(timer)
-  }, [createGroupDialogOpen, menuOpen, onLifecycleComplete, parentPicker])
+  }, [createGroupDialogOpen, menuOpen, onLifecycleComplete, parentPicker, worktreeGroupDialog.open])
 
   useEffect(() => {
     const closeMenu = (): void => setMenuOpenState(false)
@@ -403,7 +408,6 @@ export function useWorktreeContextMenuModel({
     onContextMenuSelect,
     parentPicker,
     parentPickerOpen,
-    projectGroups,
     ptyIdsByTabId,
     removesProject,
     repo,
@@ -419,6 +423,7 @@ export function useWorktreeContextMenuModel({
     tabsByWorktree,
     validParentWorktreeId,
     worktree,
+    worktreeGroupDialog,
     workspaceStatuses
   }
 }

@@ -2758,29 +2758,33 @@ function applyWebSessionTabsSnapshotWithContext(
     terminalSurfaceTabs.map((tab) => toWebTerminalSurfaceTabId(tab.parentTabId))
   )
   const nextHostTerminalTabIds = new Set(terminalSurfaceTabs.map((tab) => tab.parentTabId))
-  // Why: also captures the provisional tab's replacement host tab id, so the dock
-  // record it carries can be re-keyed to the replacement instead of dropped.
-  const exactProvisionalHandoffEntries = currentTerminalTabs
-    .filter((tab) => !isMirroredTerminalSurfaceId(tab.id))
-    .map((tab): [string, string] | null => {
-      if (nextHostTerminalTabIds.has(tab.id)) {
-        return [tab.id, tab.id]
-      }
-      const handoff = {
-        environmentId,
-        worktreeId,
-        provisionalTabId: tab.id
-      }
-      const hostTabId = resolveWebAgentSessionHandoff(handoff)
-      const isHandoff =
-        hostTabId !== null &&
-        (nextHostTerminalTabIds.has(hostTabId) ||
-          isWebAgentSessionHandoffPostCreateSnapshotConfirmed(handoff))
-      return isHandoff && hostTabId !== null ? [tab.id, hostTabId] : null
-    })
-    .filter((entry): entry is [string, string] => entry !== null)
-  const exactProvisionalHandoffs = new Set(exactProvisionalHandoffEntries.map(([id]) => id))
-  const provisionalHandoffHostTabIdByProvisionalTabId = new Map(exactProvisionalHandoffEntries)
+  const provisionalHandoffHostTabIds = new Map<string, string>()
+  for (const tab of currentTerminalTabs) {
+    if (isMirroredTerminalSurfaceId(tab.id)) {
+      continue
+    }
+    if (nextHostTerminalTabIds.has(tab.id)) {
+      provisionalHandoffHostTabIds.set(tab.id, tab.id)
+      continue
+    }
+    const handoff = {
+      environmentId,
+      worktreeId,
+      provisionalTabId: tab.id
+    }
+    const hostTabId = resolveWebAgentSessionHandoff(handoff)
+    if (
+      hostTabId !== null &&
+      (nextHostTerminalTabIds.has(hostTabId) ||
+        isWebAgentSessionHandoffPostCreateSnapshotConfirmed(handoff))
+    ) {
+      provisionalHandoffHostTabIds.set(tab.id, hostTabId)
+    }
+  }
+  const exactProvisionalHandoffs = new Set(provisionalHandoffHostTabIds.keys())
+  // Why: the replacement host tab id, so a provisional tab's dock record can be
+  // re-keyed to the replacement instead of dropped.
+  const provisionalHandoffHostTabIdByProvisionalTabId = provisionalHandoffHostTabIds
   const retainedTerminalTabs = currentTerminalTabs.filter(
     (tab) =>
       !shouldReplaceTerminalTab(

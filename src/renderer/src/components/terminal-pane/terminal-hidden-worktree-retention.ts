@@ -31,17 +31,20 @@ import { createWorktreeTabBucketProjection } from '@/lib/worktree-tab-bucket-pro
 export const TERMINAL_HIDDEN_WORKTREE_RETENTION_LIMIT = 4
 export const TERMINAL_HIDDEN_WORKTREE_RETENTION_TTL_MS = 15 * 60_000
 
-type TerminalWorktreeParkingTab = Pick<TerminalTab, 'id' | 'ptyId' | 'pendingActivationSpawn'>
-
-export function getTerminalWorktreeParkingInputsKey(
-  tabsByWorktree: Readonly<Record<string, readonly TerminalWorktreeParkingTab[]>>
-): string {
-  return JSON.stringify(
-    Object.entries(tabsByWorktree).map(([worktreeId, tabs]) => [
-      worktreeId,
-      tabs.map((tab) => [tab.id, tab.ptyId, tab.pendingActivationSpawn])
-    ])
-  )
+export function createTerminalWorktreeTopologyProjection(
+  onInspectBucket?: (worktreeId: string) => void
+) {
+  return createWorktreeTabBucketProjection<TerminalTab, TerminalTab>({
+    projectTab: (tab) => tab,
+    isSameProjectedTab: (previousTab, nextTab) =>
+      previousTab.id === nextTab.id &&
+      previousTab.ptyId === nextTab.ptyId &&
+      previousTab.worktreeId === nextTab.worktreeId &&
+      previousTab.pendingActivationSpawn === nextTab.pendingActivationSpawn &&
+      previousTab.generation === nextTab.generation &&
+      previousTab.startupCwd === nextTab.startupCwd,
+    onInspectBucket
+  })
 }
 
 export function hasPendingRetentionSpawnWork(

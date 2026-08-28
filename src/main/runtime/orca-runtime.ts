@@ -15792,9 +15792,9 @@ export class OrcaRuntimeService {
     options?: {
       hostExitConfirmed?: boolean
       cause?: TerminalExitCause
-      /** The provider's own physical-exit callback fired. Accepted here so the PTY IPC modules
-       *  split out by #15172 typecheck; the reconciliation that consumes it is STA-4612 (#15212),
-       *  which is deliberately not part of this release. */
+      /** The provider's own physical-exit callback fired. Separate from `hostExitConfirmed`, which
+       *  also drives the SSH surface decision and the liveness verdict: node-pty reports real exits
+       *  as -1, so the numeric code alone cannot tell a dead process from a failed stop. */
       providerExitObserved?: boolean
     }
   ): void {

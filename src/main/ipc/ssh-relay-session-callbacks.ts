@@ -28,6 +28,7 @@ import {
   connectionSupportsFolderDownload,
   publishRelayOverride
 } from './ssh-renderer-broadcast'
+import { notifySshRelayReady } from './fork-native-chat-relay/ssh-relay-ready-notifier'
 
 export function configureRelaySessionCallbacks(session: SshRelaySession): void {
   session.setOnTerminalRelayError((tid, err) => {
@@ -151,6 +152,7 @@ export function configureRelaySessionCallbacks(session: SshRelaySession): void {
 
   // Why: fires after both establish() and reconnect() reach 'ready'; re-create persisted port forwards so they survive restarts and blips.
   session.setOnReady((tid) => {
+    notifySshRelayReady(tid)
     const state = relayLostBackoff.get(tid)
     if (state) {
       if (state.stabilizedTimer) {

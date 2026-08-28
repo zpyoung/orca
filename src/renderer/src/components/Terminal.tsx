@@ -113,7 +113,7 @@ import {
   TERMINAL_HIDDEN_WORKTREE_RETENTION_TTL_MS,
   countEvictionExemptTabRoutes,
   formatEvictionExemptRouteCounts,
-  getTerminalWorktreeParkingInputsKey,
+  createTerminalWorktreeTopologyProjection,
   hasPendingRetentionSpawnWork,
   selectForceParkEvictableTabIds,
   selectRetentionForceParkedTerminalWorktrees,
@@ -336,10 +336,11 @@ function Terminal(): React.JSX.Element | null {
     getResolvedExecutionHostIdForWorktree(s, renderedActiveWorktreeId)
   )
   const activeView = useAppStore((s) => s.activeView)
-  const tabsByWorktree = useAppStore((s) => s.tabsByWorktree)
-  const terminalWorktreeParkingInputsKey = useMemo(
-    () => getTerminalWorktreeParkingInputsKey(tabsByWorktree),
-    [tabsByWorktree]
+  // Why: terminal titles are leaf chrome. The root host only subscribes to
+  // mount/parking semantics; a real transition publishes fresh tab objects,
+  // while LiveTerminalTabBar reads title-only updates from the active bucket.
+  const tabsByWorktree = useAppStore((s) =>
+    terminalTopologyProjectionRef.current!.project(s.tabsByWorktree)
   )
   const pendingStartupByTabId = useAppStore((s) => s.pendingStartupByTabId)
   const terminalParkingEnabled = useAppStore((s) => s.settings?.terminalHiddenViewParking !== false)
@@ -1204,7 +1205,7 @@ function Terminal(): React.JSX.Element | null {
     pendingStartupByTabId,
     pairedRuntimeParkingEnvironmentIds,
     renderedActiveWorktreeId,
-    terminalWorktreeParkingInputsKey,
+    tabsByWorktree,
     terminalParkingEnabled,
     terminalParkingRevision,
     terminalProviderSnapshotCapabilityRevision,

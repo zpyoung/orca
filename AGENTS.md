@@ -89,6 +89,12 @@ seam file whose measured diff no longer matches its recorded budget (residual bu
 Fork edits to an upstream-owned file are not blocked by the guard — but an undeclared edit is
 reverted at the next sync, so declare it.
 
+# Verifying Changes
+
+- **Typecheck**: `pnpm tc` (or `tc:node` / `tc:cli` / `tc:web`)
+- **Test**: `pnpm test:sandbox --shards=16 --jobs=8` — never `pnpm test`; see Running Tests below
+- **Lint**: `oxlint`, or `pnpm run check:code-quality:changed` for changed files (full `pnpm lint` is slow); format with `pnpm format`
+
 # Considerations
 ## Running Tests: Remote Sandbox Only
 

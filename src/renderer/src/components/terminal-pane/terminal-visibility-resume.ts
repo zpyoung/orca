@@ -15,7 +15,6 @@ import {
 } from '@/lib/pane-manager/terminal-linkifier-hover-reset'
 import { focusActivePane, type PaneFocusOwnership } from './pane-helpers'
 import { paneFocusOwnershipArgs } from './fork-terminal-dock/pane-focus-ownership-args'
-import { scheduleTabRevealWebglAtlasRecovery } from './terminal-webgl-atlas-recovery'
 import { flushDeferredPaneMetricOptionsIfMeasurable } from '@/lib/pane-manager/pane-fit'
 import { repairPaneWebglCanvasDprMismatch } from '@/lib/pane-manager/terminal-canvas-dpr-repair'
 import { presentPaneViewport } from '@/lib/pane-manager/pane-webgl-renderer'
