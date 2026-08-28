@@ -97,7 +97,12 @@ export function useHandoffDialogStart(args: UseHandoffDialogStartArgs): () => Pr
         launchSource: args.request.launchSource,
         lineage: {
           relationship: args.relationship,
-          parent: buildHandoffParentIdentity(args.request, args.forkSource, args.providerSessionId)
+          parent: buildHandoffParentIdentity(
+            args.request,
+            args.forkSource,
+            args.providerSessionId,
+            args.compositionInputs.source.transcriptPath ?? null
+          )
         }
       })
       if (!result.ok) {

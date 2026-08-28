@@ -2,8 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import type {
   AgentSessionContinuationContextMode,
-  AgentSessionContinuationRequest,
-  AgentSessionContinuationSource
+  AgentSessionContinuationRequest
 } from '@/lib/agent-session-continuation'
 import {
   assembleHandoffBriefForSend,
@@ -40,8 +39,10 @@ import {
   getHandoffAgentCatalog,
   getHandoffContextDisabledReason,
   getHandoffTemplates,
+  handoffInlinedCapture,
   isHandoffContextEmpty,
   isHandoffStartDisabled,
+  resolveHandoffDialogSource,
   selectHandoffDialogStoreInputs,
   visibleHandoffCompositionWarnings
 } from './handoff-dialog-model'
@@ -155,6 +156,7 @@ export function useHandoffDialogState({ open, request }: UseHandoffDialogStateAr
     agentDetectionFailed,
     transcriptReachability,
     transcriptReachabilityLoading,
+    transcriptResolvedPath,
     capturedText,
     setCapturedText,
     repoState,
@@ -168,15 +170,9 @@ export function useHandoffDialogState({ open, request }: UseHandoffDialogStateAr
     () => resolveHandoffSourceActivity(forkSource, sourceStore),
     [forkSource, sourceStore]
   )
-  const source = useMemo<AgentSessionContinuationSource | null>(
-    () =>
-      request
-        ? {
-            ...request.source,
-            capturedText: capturedText ?? request.source.capturedText
-          }
-        : null,
-    [capturedText, request]
+  const source = useMemo(
+    () => resolveHandoffDialogSource(request, capturedText, transcriptResolvedPath),
+    [capturedText, request, transcriptResolvedPath]
   )
   const openEditorTabs = useMemo(
     () =>
@@ -202,7 +198,7 @@ export function useHandoffDialogState({ open, request }: UseHandoffDialogStateAr
             source,
             contextMode,
             transcriptUsableOnTarget: transcriptReachability === 'usable',
-            inlinedCapture: transcriptReachability === 'unreachable' ? capturedText : null,
+            inlinedCapture: handoffInlinedCapture(transcriptReachability, capturedText),
             repoState: includeToggles.repoState ? repoState : null,
             openEditorTabs,
             template: selectedTemplate,

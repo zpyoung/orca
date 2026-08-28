@@ -31,7 +31,9 @@ import type { HandoffPreviewPhase } from '@/lib/fork-session-handoff/handoff-pre
 import {
   buildHandoffWarnings,
   createAndSelectInlineHandoffTarget,
+  getHandoffContextDisabledReason,
   getHandoffTemplates,
+  handoffInlinedCapture,
   isHandoffContextEmpty,
   isHandoffStartDisabled,
   persistHandoffPreferencesBestEffort,
@@ -121,6 +123,40 @@ describe('handoff dialog model', () => {
     })
 
     expect(warnings).toEqual([{ kind: 'host-changed' }, { kind: 'secret-hits', hits: [hit] }])
+  })
+
+  // F1: an undecided probe and an absent transcript get different wording, so
+  // the dialog must not fold "could not verify" into "not on this target".
+  it.each([
+    ['unreachable', 'transcript-unreachable'],
+    ['unverifiable', 'transcript-unverifiable']
+  ] as const)('warns distinctly for a %s transcript', (reachability, kind) => {
+    expect(
+      buildHandoffWarnings({
+        sourceBusy: false,
+        hostChanged: false,
+        secretHits: [],
+        transcriptReachability: reachability,
+        compositionWarnings: [],
+        previewPhase: { phase: 'attached' },
+        operationErrors: []
+      })
+    ).toEqual([{ kind }])
+    expect(getHandoffContextDisabledReason(reachability)).toBeTruthy()
+  })
+
+  it('separates the disabled-context wording for the two failure verdicts', () => {
+    expect(getHandoffContextDisabledReason('usable')).toBeNull()
+    expect(getHandoffContextDisabledReason('unverifiable')).not.toBe(
+      getHandoffContextDisabledReason('unreachable')
+    )
+  })
+
+  it('inlines the bounded capture whenever the transcript will not travel', () => {
+    expect(handoffInlinedCapture('unreachable', 'capture')).toBe('capture')
+    expect(handoffInlinedCapture('unverifiable', 'capture')).toBe('capture')
+    expect(handoffInlinedCapture('usable', 'capture')).toBeNull()
+    expect(handoffInlinedCapture('none', 'capture')).toBeNull()
   })
 
   it('lets a nonempty detached preview supply otherwise missing context', () => {

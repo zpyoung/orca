@@ -10,6 +10,7 @@ export type ForkSessionHandoffSource = {
   sourceWorktreeId: string | null
   anchorWorktreeId: string
   sourceExecutionHostId: string | null
+  providerSessionId: string | null
   vaultSessionId: string | null
   vaultAgent: TuiAgent | null
   capturePaneScrollback: (() => string) | null
@@ -35,13 +36,15 @@ export function prepareAgentSessionContinuationFromPane(
   }
 
   const sourcePaneKey = makePaneKey(args.tabId, args.pane.leafId)
+  const state = useAppStore.getState()
   return {
     ...request,
     forkSource: {
       sourcePaneKey,
       sourceWorktreeId: args.worktreeId,
       anchorWorktreeId: args.worktreeId,
-      sourceExecutionHostId: getExecutionHostIdForWorktree(useAppStore.getState(), args.worktreeId),
+      sourceExecutionHostId: getExecutionHostIdForWorktree(state, args.worktreeId),
+      providerSessionId: state.agentStatusByPaneKey[sourcePaneKey]?.providerSession?.id ?? null,
       vaultSessionId: null,
       vaultAgent: null,
       capturePaneScrollback: () => args.pane.serializeAddon.serialize({ scrollback: 800 })

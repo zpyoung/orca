@@ -61,4 +61,28 @@ describe('buildForkSessionHandoffApi', () => {
 
     expect(invoke).toHaveBeenCalledWith('forkSessionHandoff:lineageEnrich', args)
   })
+
+  it('invokes the transcript probe channel with the source identity', async () => {
+    const request = {
+      agent: 'claude',
+      sessionId: 'session-1',
+      transcriptPath: '/tmp/parent.jsonl',
+      paneKey: 'tab-1:leaf-1',
+      workspacePath: '/workspace/repo',
+      connectionId: null
+    }
+    invoke.mockResolvedValue({
+      outcome: 'found',
+      transcriptPath: '/tmp/parent.jsonl',
+      provenance: 'reported'
+    })
+
+    await expect(buildForkSessionHandoffApi().resolveTranscript(request)).resolves.toEqual({
+      outcome: 'found',
+      transcriptPath: '/tmp/parent.jsonl',
+      provenance: 'reported'
+    })
+
+    expect(invoke).toHaveBeenCalledWith('forkSessionHandoff:resolveTranscript', request)
+  })
 })
