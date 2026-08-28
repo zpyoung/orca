@@ -36,25 +36,23 @@ import { mergeForkSessionHandoffSettings } from '../../../shared/fork-session-ha
 import type { OnboardingState } from '../../../shared/onboarding-state-types'
 import type { PersistedUIState } from '../../../shared/persisted-ui-state-types'
 import {
-  omitPairingLocalUiFields,
-  type PairedUiState,
-  type PairingLocalUiField
-} from '../../../shared/pairing-local-ui-fields'
-import type { MemorySnapshot, StatsSummary } from '../../../shared/process-stats-types'
-import type { Repo } from '../../../shared/repo-types'
-import type {
-  WorkspaceSessionPatch,
-  WorkspaceSessionState
-} from '../../../shared/workspace-session-state-types'
-import type {
-  ForceDeleteWorktreeBranchResult,
-  RemoveWorktreeResult
-} from '../../../shared/worktree/create-types'
-import type { WorkspaceLineage, WorktreeLineage } from '../../../shared/worktree/lineage-types'
-import type { DetectedWorktreeListResult, Worktree } from '../../../shared/worktree/types'
-import type { SkillDiscoveryResult } from '../../../shared/skills'
-import type { SkillFreshnessInventory } from '../../../shared/skill-freshness'
-import type { SshConnectionState, SshTarget } from '../../../shared/ssh-types'
+  createAccountsApi,
+  createGrokAccountsApi,
+  createMiniMaxCredentialsApi
+} from './preload-api/web-agent-accounts-api'
+import { createAgentHooksApi } from './preload-api/web-agent-hooks-api'
+import { createWebAgentStatusApi } from './preload-api/web-agent-status-api'
+import { createWebAiVaultApi } from './preload-api/web-ai-vault-api'
+import { createWebAppApi } from './preload-api/web-app-api'
+import { createBrowserApi, createEmulatorApi } from './preload-api/web-browser-api'
+import { createCliApi } from './preload-api/web-cli-api'
+import { createWebDiagnosticsApi } from './preload-api/web-diagnostics-api'
+import { createFallbackProxy, withFallback } from './preload-api/web-fallback-api'
+import { createFileApi } from './preload-api/web-filesystem-api'
+import { createGitApi } from './preload-api/web-git-api'
+import { createWebGithubCacheApi } from './preload-api/web-github-cache-api'
+import { createGitHubApi } from './preload-api/web-github-api'
+import { createGitLabApi } from './preload-api/web-gitlab-api'
 import {
   getDefaultOnboardingState,
   getDefaultSettings,
@@ -523,362 +521,30 @@ const WEB_KEYBINDING_PLATFORMS: readonly KeybindingPlatform[] = ['darwin', 'linu
 const webKeybindingListeners = new Set<(snapshot: KeybindingFileSnapshot) => void>()
 
 export function installWebPreloadApi(): void {
-  activeEnvironment = readStoredWebRuntimeEnvironment()
+  webRuntimeState.activeEnvironment = readStoredWebRuntimeEnvironment()
   const webWindow = window as unknown as { __ORCA_WEB_CLIENT__?: boolean }
   webWindow.__ORCA_WEB_CLIENT__ = true
   window.electron = createFallbackProxy(['electron']) as Window['electron']
   window.api = withFallback(createWebPreloadApi(), []) as PreloadApi
 }
 
-async function writeWebClipboardText(text: string): Promise<void> {
-  await assertClipboardTextWriteWithinLimitWithYield(text)
-  const clipboard = navigator.clipboard
-  if (typeof clipboard?.writeText === 'function') {
-    try {
-      await clipboard.writeText(text)
-      return
-    } catch (error) {
-      // Preserve the current user-activation turn for the synchronous fallback.
-      if (copyClipboardTextViaExecCommand(text)) {
-        return
-      }
-      throw error
-    }
-  }
-  if (!copyClipboardTextViaExecCommand(text)) {
-    throw new Error('Clipboard write is unavailable in this browser context')
-  }
-}
-
 function createWebPreloadApi(): Partial<PreloadApi> {
-  const webOrcaProfileAuthStatus = () =>
-    Promise.resolve({
-      activeProfileId: DEFAULT_LOCAL_ORCA_PROFILE_ID,
-      configured: false,
-      state: 'unconfigured' as const,
-      persistence: 'none' as const,
-      setupMessage: 'Orca Cloud sign-in is not available in the browser fallback.'
-    })
-
   return {
-    app: {
-      getIdentity: () =>
-        Promise.resolve({
-          name: 'Orca',
-          isDev: false,
-          devLabel: null,
-          devBranch: null,
-          devWorktreeName: null,
-          devRepoRoot: null,
-          dockBadgeLabel: null
-        }),
-      getFeatureWallAssetBaseUrl: () => Promise.resolve('/'),
-      relaunch: () => Promise.resolve(window.location.reload()),
-      restart: () => Promise.resolve(window.location.reload()),
-      reload: () => Promise.resolve(window.location.reload()),
-      stageBeforeUnloadSync: ({ sessions, ui }) => {
-        // Why: beforeunload cannot await the paired runtime, so the web adapter
-        // guarantees immediate browser-local durability for the final snapshot.
-        for (const { state, hostId } of sessions) {
-          writeJson(sessionStorageKeyForHost(hostId), sanitizeWebRuntimeWorkspaceSession(state))
-        }
-        writeJson(UI_STORAGE_KEY, mergeWebUIState(readLocalWebUIState(), ui))
-      },
-      // Staging already wrote through to browser storage, so there is nothing left to join.
-      awaitBeforeUnloadCheckpoint: () => Promise.resolve(),
-      awaitFirstWindowStartupServices: () => Promise.resolve(),
-      recoverLegacyWorkerTerminalsForRendererStartup: () => Promise.resolve(),
-      startupDiagnostic: () => Promise.resolve(),
-      getKeyboardInputSourceId: () => Promise.resolve(null),
-      // The web client cannot inspect local Mission Control shortcuts.
-      getMacCapturedDigitRowChords: () => Promise.resolve([]),
-      getKeyboardLayoutSnapshot: () => Promise.resolve(null),
-      onKeyboardLayoutChanged: () => () => undefined,
-      setUnreadDockBadgeCount: () => Promise.resolve(),
-      getFloatingTerminalCwd: () => Promise.resolve(''),
-      getFloatingMarkdownDirectory: () => Promise.resolve(''),
-      pickFloatingMarkdownDocument: () => Promise.resolve(null),
-      pickFloatingWorkspaceDirectory: () => Promise.resolve(null),
-      // Browser fallback has no app-owned userData dir; reject so the sentinel can't claim sensitive evidence was persisted.
-      writeTerminalRenderDesyncEvidence: () =>
-        Promise.reject(
-          new Error('Terminal render evidence is unavailable in the browser fallback.')
-        )
-    },
-    starNag: {
-      onShow: () => noopUnsubscribe,
-      onHide: () => noopUnsubscribe,
-      dismiss: () => Promise.resolve(),
-      later: () => Promise.resolve(),
-      complete: () => Promise.resolve(),
-      disable: () => Promise.resolve(),
-      openWeb: () => Promise.resolve(),
-      starOrca: () => Promise.resolve(false),
-      forceShow: () => Promise.resolve(),
-      agentValueMoment: () => Promise.resolve({ status: 'skipped' }),
-      showAgentValueMoment: () => Promise.resolve(),
-      onboardingCompleted: () => Promise.resolve()
-    },
-    platform: {
-      get: () => ({
-        platform: getBrowserPlatform(),
-        osRelease: '',
-        arch: '',
-        shell: '',
-        displayServer: null
-      })
-    },
-    workspacePorts: {
-      // Why: browser-local workspaces have no host process to inspect; return capability state instead of the generic undefined fallback.
-      scan: () =>
-        Promise.resolve({
-          platform: getBrowserPlatform(),
-          scannedAt: Date.now(),
-          ports: [],
-          unavailableReason: 'Workspace port scanning is unavailable for browser-local workspaces.'
-        }),
-      kill: () =>
-        Promise.resolve({
-          ok: false,
-          reason: 'Workspace port management is unavailable for browser-local workspaces.'
-        }),
-      onAdvertisedUrlChanged: () => noopUnsubscribe
-    },
-    orcaProfiles: {
-      list: () =>
-        Promise.resolve({
-          activeProfileId: DEFAULT_LOCAL_ORCA_PROFILE_ID,
-          profiles: [createDefaultLocalOrcaProfile(0)],
-          multiProfileUi: false
-        }),
-      authStatus: webOrcaProfileAuthStatus,
-      createLocal: () =>
-        Promise.resolve({
-          activeProfileId: DEFAULT_LOCAL_ORCA_PROFILE_ID,
-          profiles: [createDefaultLocalOrcaProfile(0)],
-          profile: createDefaultLocalOrcaProfile(0)
-        }),
-      createCloudLinked: async () => ({
-        status: 'unconfigured',
-        auth: await webOrcaProfileAuthStatus()
-      }),
-      switchProfile: () => Promise.resolve({ status: 'already-active' }),
-      transferProject: (args) =>
-        Promise.resolve({
-          status: 'duplicate-target',
-          sourceProfileId: args.sourceProfileId,
-          targetProfileId: args.targetProfileId,
-          sourceRepoId: args.repoId,
-          duplicateRepoId: args.repoId
-        }),
-      findProjectProfiles: async () => ({ projects: [] }),
-      connectCurrent: async () => ({
-        status: 'unconfigured',
-        auth: await webOrcaProfileAuthStatus()
-      }),
-      refreshAuth: async () => ({
-        status: 'unconfigured',
-        auth: await webOrcaProfileAuthStatus()
-      }),
-      signOutCurrent: async () => ({
-        status: 'signed-out',
-        auth: await webOrcaProfileAuthStatus(),
-        activeProfileId: DEFAULT_LOCAL_ORCA_PROFILE_ID,
-        profiles: [createDefaultLocalOrcaProfile(0)]
-      }),
-      selectOrg: async () => ({
-        status: 'unconfigured',
-        auth: await webOrcaProfileAuthStatus()
-      }),
-      orgMembersList: async () => ({ status: 'unconfigured' }),
-      orgMemberInvite: async () => ({ status: 'unconfigured' }),
-      orgInviteRevoke: async () => ({ status: 'unconfigured' }),
-      orgMemberChangeRole: async () => ({ status: 'unconfigured' }),
-      orgMemberRemove: async () => ({ status: 'unconfigured' })
-    },
-    e2e: {
-      getConfig: () => webE2EConfig
-    },
-    settings: {
-      get: async () => getRuntimeBackedStoredSettings(),
-      // Why: localStorage-backed settings are synchronous, so the pre-hydration kill-switch read works the same as desktop.
-      getSync: () => settingsForActiveVisibilityOwner(getStoredSettings()),
-      set: async (updates) => {
-        const sanitizedUpdates = { ...updates }
-        const runtimeEnvironment = requireActiveEnvironmentOrNull()
-        delete sanitizedUpdates.activeRuntimeEnvironmentId
-        if (
-          'worktreeVisibilityDefaults' in sanitizedUpdates &&
-          runtimeEnvironment &&
-          runtimeEnvironment.id !== worktreeVisibilityDefaultsRuntimeEnvironmentId
-        ) {
-          delete sanitizedUpdates.worktreeVisibilityDefaults
-        }
-        if ('worktreeVisibilityDefaults' in sanitizedUpdates) {
-          sanitizedUpdates.worktreeVisibilityDefaults = {
-            ...settingsForActiveVisibilityOwner(getStoredSettings()).worktreeVisibilityDefaults,
-            ...sanitizedUpdates.worktreeVisibilityDefaults
-          }
-        }
-        if ('computerAwakeMode' in sanitizedUpdates) {
-          Object.assign(
-            sanitizedUpdates,
-            computerAwakeSettingsForMode(
-              normalizeComputerAwakeMode(
-                sanitizedUpdates.computerAwakeMode,
-                sanitizedUpdates.keepComputerAwakeWhileAgentsRun
-              )
-            )
-          )
-        } else if ('keepComputerAwakeWhileAgentsRun' in sanitizedUpdates) {
-          Object.assign(
-            sanitizedUpdates,
-            computerAwakeSettingsForMode(
-              sanitizedUpdates.keepComputerAwakeWhileAgentsRun ? 'auto' : 'off'
-            )
-          )
-        }
-        if ('autoRenameBranchFromWorkDefaultedOn' in sanitizedUpdates) {
-          sanitizedUpdates.autoRenameBranchFromWorkDefaultedOn = true
-        }
-        if ('terminalCursorStyle' in sanitizedUpdates) {
-          Object.assign(
-            sanitizedUpdates,
-            normalizeTerminalCursorStyleDefault(
-              { terminalCursorStyle: sanitizedUpdates.terminalCursorStyle },
-              { preserveExplicitValue: true }
-            )
-          )
-        }
-        const localUpdates = { ...sanitizedUpdates }
-        if (runtimeEnvironment) {
-          delete localUpdates.worktreeVisibilityDefaults
-        }
-        const next = mergeSettings(getStoredSettings(), localUpdates, {
-          preserveAutoRenameBranchFromWorkUpdate: 'autoRenameBranchFromWork' in sanitizedUpdates
-        })
-        writeStoredSettings(next)
-        return settingsForActiveVisibilityOwner(
-          await syncRuntimeBackedSettings(sanitizedUpdates, next)
-        )
-      },
-      setActiveRuntimeEnvironmentPreference: async ({ environmentId }) => {
-        const requestedEnvironmentId = environmentId?.trim() || null
-        const activeRuntimeEnvironmentId = requestedEnvironmentId
-          ? resolveEnvironment(requestedEnvironmentId).id
-          : null
-        const next = mergeSettings(getStoredSettings(), {
-          activeRuntimeEnvironmentId
-        })
-        writeStoredSettings(next, activeRuntimeEnvironmentId)
-        return next
-      },
-      updatePRBotAuthorOverride: (args) => updateRuntimePRBotAuthorOverride(args),
-      listFonts: () => Promise.resolve([]),
-      onChanged: () => noopUnsubscribe
-    } satisfies Partial<WebSettingsApi> as unknown as WebSettingsApi,
-    agentAwake: {
-      getStatus: async () => {
-        const settings = getStoredSettings()
-        return {
-          mode: normalizeComputerAwakeMode(
-            settings.computerAwakeMode,
-            settings.keepComputerAwakeWhileAgentsRun
-          ),
-          active: false
-        }
-      },
-      onChanged: () => noopUnsubscribe
-    },
+    ...createWebAppApi(),
+    ...createWebStarNagApi(),
+    ...createWebPlatformApi(),
+    ...createWebWorkspacePortsApi(),
+    ...createWebOrcaProfilesApi(),
+    ...createWebE2EApi(),
+    ...createWebSettingsApi(),
     keybindings: createWebKeybindingsApi(),
     ui: createWebUiApi(),
-    crashReports: {
-      getLatestPending: () => Promise.resolve(null),
-      getLatestReport: () => Promise.resolve(null),
-      dismiss: () => Promise.resolve(null),
-      recordRendererError: () => Promise.resolve({ ok: true, report: null, deduped: true }),
-      recordBreadcrumb: () => {},
-      submit: () =>
-        Promise.resolve({
-          ok: false,
-          status: null,
-          error: translate('auto.web.web.preload.api.fb290366b2', 'Unavailable on web.')
-        }),
-      copyLatestDiagnostics: () =>
-        Promise.resolve({
-          ok: false,
-          error: translate('auto.web.web.preload.api.fb290366b2', 'Unavailable on web.')
-        }),
-      // Why: no Electron process on web; the caller falls back to performance.memory.
-      readHeapStatistics: () => null
-    },
-    diagnostics: {
-      getStatus: () =>
-        Promise.resolve({
-          localFileEnabled: false,
-          bundleEnabled: false,
-          traceFilePath: '',
-          traceFamilySize: 0
-        }),
-      collectBundle: () => Promise.reject(new Error('Review files are unavailable on web.')),
-      openBundlePreview: () => Promise.reject(new Error('Review files are unavailable on web.')),
-      discardBundlePreview: () => Promise.resolve(),
-      uploadBundle: () => Promise.reject(new Error('Sending diagnostics is unavailable on web.')),
-      deleteBundle: () => Promise.reject(new Error('Sent diagnostics are unavailable on web.'))
-    },
-    session: {
-      // Mirrors desktop bridge: non-local hosts persist under a host-suffixed key so their sessions stay isolated from local.
-      get: (hostId) => Promise.resolve(getStoredWorkspaceSession(hostId)),
-      set: async (session, hostId) => {
-        writeJson(sessionStorageKeyForHost(hostId), sanitizeWebRuntimeWorkspaceSession(session))
-      },
-      patch: async (patch: WorkspaceSessionPatch, hostId) => {
-        writeJson(
-          sessionStorageKeyForHost(hostId),
-          sanitizeWebRuntimeWorkspaceSession({
-            ...getStoredWorkspaceSession(hostId),
-            ...patch
-          })
-        )
-      },
-      // localStorage writes synchronously, so there is no deferred web flush.
-      flush: async () => {},
-      readTerminalScrollback: () => null,
-      setSync: (session, hostId) => {
-        writeJson(sessionStorageKeyForHost(hostId), sanitizeWebRuntimeWorkspaceSession(session))
-      }
-    },
-    onboarding: {
-      get: () => Promise.resolve(getStoredOnboarding()),
-      update: async (updates) => {
-        const current = getStoredOnboarding()
-        const next: OnboardingState = {
-          ...current,
-          ...updates,
-          flowVersion: ONBOARDING_FLOW_VERSION,
-          checklist: {
-            ...current.checklist,
-            ...updates.checklist
-          }
-        }
-        writeJson(ONBOARDING_STORAGE_KEY, next)
-        return next
-      }
-    },
-    cache: {
-      getGitHub: () =>
-        Promise.resolve(
-          readJson(GITHUB_CACHE_STORAGE_KEY, {
-            pr: {},
-            issue: {}
-          })
-        ),
-      setGitHub: async ({ cache }) => {
-        writeJson(GITHUB_CACHE_STORAGE_KEY, cache)
-      }
-    },
-    runtime: createRuntimeApi(),
-    nativeChat: createNativeChatApi(),
+    ...createWebDiagnosticsApi(),
+    ...createWebWorkspaceSessionApi(),
+    ...createWebOnboardingApi(),
+    ...createWebGithubCacheApi(),
+    runtime: createWebRuntimeApi(),
+    nativeChat: createWebNativeChatApi(),
     runtimeEnvironments: createRuntimeEnvironmentsApi(),
     repos: createReposApi(),
     worktrees: createWorktreesApi(),
@@ -903,7 +569,7 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     memory: {
       getSnapshot: () => Promise.resolve(createEmptyMemorySnapshot())
     },
-    aiVault: createAiVaultApi(),
+    aiVault: createWebAiVaultApi(),
     preflight: createPreflightApi(),
     notifications: createNotificationsApi(),
     rateLimits: createRateLimitsApi(),
@@ -914,8 +580,6 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     cli: createCliApi(),
     agentHooks: createAgentHooksApi(),
     macosTccPrompts: createMacosTccPromptsApi(),
-    // Why: the desktop derives this from the host filesystem, which the web
-    // client has no view of; reporting synced keeps the warning banner silent.
     codexConfigSync: {
       status: () =>
         Promise.resolve({ state: 'synced', reason: null, systemConfigPath: '' } as const)
@@ -937,45 +601,9 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     gitBash: {
       isAvailable: () => callRuntimeResult<boolean>('host.gitBash.isAvailable').catch(() => false)
     },
-    agentStatus: {
-      onSet: () => noopUnsubscribe,
-      onClear: () => noopUnsubscribe,
-      getSnapshot: () => Promise.resolve([]),
-      inferInterrupt: () => Promise.resolve(false),
-      inferQuestionAnswered: () => Promise.resolve(false),
-      onMigrationUnsupported: () => noopUnsubscribe,
-      onMigrationUnsupportedClear: () => noopUnsubscribe,
-      onLegacyWorkerTerminalRecovery: () => noopUnsubscribe,
-      getMigrationUnsupportedSnapshot: () => Promise.resolve([]),
-      drop: () => {},
-      dropByTabPrefix: () => {},
-      retirePaneAuthority: () => {},
-      restorePaneAuthority: () => {},
-      transferPaneAuthority: () => {}
-    },
-    mobile: {
-      listNetworkInterfaces: () => Promise.resolve({ interfaces: [] }),
-      getPairingQR: () => Promise.resolve({ available: false }),
-      getWindowsFirewallStatus: () => Promise.resolve({ supported: false }),
-      repairWindowsFirewall: () => Promise.resolve({ ok: false, reason: 'unsupported' }),
-      openWindowsNetworkSettings: () => Promise.resolve(false),
-      getRuntimePairingUrl: () => Promise.resolve({ available: false }),
-      listDevices: () => Promise.resolve({ devices: [] }),
-      revokeDevice: () => Promise.resolve({ revoked: false }),
-      listRuntimeAccessGrants: () => Promise.resolve({ grants: [] }),
-      revokeRuntimeAccess: () => Promise.resolve({ revoked: false }),
-      isWebSocketReady: () =>
-        Promise.resolve({ ready: Boolean(activeEnvironment), endpoint: null }),
-      getRelayStatus: () => Promise.resolve({ status: 'offline' as const }),
-      onRelayStatusChanged: () => noopUnsubscribe,
-      consumePendingUnpairedDeviceAuthFailure: () => Promise.resolve(false),
-      onUnpairedDeviceAuthFailure: () => noopUnsubscribe
-    },
-    telemetryTrack: () => Promise.resolve(),
-    telemetrySetOptIn: () => Promise.resolve(),
-    telemetryGetConsentState: () =>
-      Promise.resolve({ optedIn: false, source: 'default', blockedByEnv: false } as never),
-    telemetryAcknowledgeBanner: () => Promise.resolve()
+    ...createWebAgentStatusApi(),
+    ...createWebMobileApi(),
+    ...createWebTelemetryApi()
   }
 }
 

@@ -9,6 +9,7 @@ import {
   type TerminalColdParkPolicyOverrides
 } from './terminal-hidden-view-parking'
 import type { TerminalTab } from '../../../../shared/terminal-tab-types'
+import { createWorktreeTabBucketProjection } from '@/lib/worktree-tab-bucket-projection'
 
 // Why these sizes: a retained hidden pane costs a measured ~2.5MB of V8 heap
 // at the 5k-row default scrollback and ~19MB at 50k (plus per-pane queues),
