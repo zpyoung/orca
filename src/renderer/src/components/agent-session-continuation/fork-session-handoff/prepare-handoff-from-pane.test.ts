@@ -7,7 +7,18 @@ import {
   prepareAgentSessionContinuationFromPane
 } from './prepare-handoff-from-pane'
 
-vi.mock('@/store', () => ({ useAppStore: { getState: () => ({ marker: 'state' }) } }))
+const { storeState } = vi.hoisted(() => ({
+  storeState: {
+    marker: 'state',
+    agentStatusByPaneKey: {
+      'tab-1:11111111-1111-4111-8111-111111111111': {
+        providerSession: { key: 'session_id', id: 'provider-session-1' }
+      }
+    }
+  }
+}))
+
+vi.mock('@/store', () => ({ useAppStore: { getState: () => storeState } }))
 vi.mock('@/lib/worktree-runtime-owner', () => ({
   getExecutionHostIdForWorktree: vi.fn(() => 'ssh:dev-box')
 }))
@@ -49,15 +60,13 @@ describe('prepareAgentSessionContinuationFromPane', () => {
     })
 
     expect(prepareUpstreamAgentSessionContinuationFromPane).toHaveBeenCalledOnce()
-    expect(getExecutionHostIdForWorktree).toHaveBeenCalledWith(
-      { marker: 'state' },
-      'repo::/worktree'
-    )
+    expect(getExecutionHostIdForWorktree).toHaveBeenCalledWith(storeState, 'repo::/worktree')
     expect(result?.forkSource).toMatchObject({
       sourcePaneKey: 'tab-1:11111111-1111-4111-8111-111111111111',
       sourceWorktreeId: 'repo::/worktree',
       anchorWorktreeId: 'repo::/worktree',
       sourceExecutionHostId: 'ssh:dev-box',
+      providerSessionId: 'provider-session-1',
       vaultSessionId: null,
       vaultAgent: null
     })

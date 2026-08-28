@@ -40,6 +40,7 @@ describe('prepareAiVaultSessionContinuation', () => {
       sourceWorktreeId: null,
       anchorWorktreeId: 'repo::/target',
       sourceExecutionHostId: 'runtime:env-1',
+      providerSessionId: 'provider-session-1',
       vaultSessionId: 'provider-session-1',
       vaultAgent: 'codex',
       capturePaneScrollback: null
@@ -87,6 +88,7 @@ describe('prepareAiVaultSessionContinuation', () => {
         sourceWorktreeId: null,
         anchorWorktreeId: 'folder:folder-1',
         sourceExecutionHostId: 'ssh:source-host',
+        providerSessionId: 'archived-session-1',
         vaultSessionId: 'archived-session-1',
         vaultAgent: 'claude',
         capturePaneScrollback: null

@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentSessionContinuationRequest } from '@/lib/agent-session-continuation'
 import type { HandoffTargetResolution } from '@/lib/fork-session-handoff/handoff-target-resolution'
+import type { HandoffTranscriptProbeOutcome as TranscriptProbeOutcome } from '@/lib/fork-session-handoff/handoff-transcript-reachability'
 import type { ForkSessionHandoffIncludeToggles } from '../../../../../shared/fork-session-handoff/handoff-settings-types'
 import type { TuiAgent } from '../../../../../shared/tui-agent'
 
@@ -106,6 +107,8 @@ function Harness({
       data-agent={state.selectedAgent ?? ''}
       data-transcript-loading={state.transcriptReachabilityLoading ? 'true' : 'false'}
       data-transcript-reachability={state.transcriptReachability}
+      data-transcript-path={state.transcriptResolvedPath ?? ''}
+      data-captured={state.capturedText ?? ''}
       data-repo-loading={state.repoStateLoading ? 'true' : 'false'}
     />
   )
@@ -121,7 +124,10 @@ describe('handoff target environment', () => {
     ).IS_REACT_ACT_ENVIRONMENT = true
     vi.clearAllMocks()
     mocks.detect.mockResolvedValue({ agents: ['codex'], selectedAgent: null })
-    mocks.resolveTranscriptReachability.mockResolvedValue('none')
+    mocks.resolveTranscriptReachability.mockResolvedValue({
+      verdict: 'none',
+      transcriptPath: null
+    })
     mocks.fetchHandoffRepoState.mockResolvedValue(null)
     mocks.getState.mockReturnValue({})
     container = document.createElement('div')
@@ -162,9 +168,9 @@ describe('handoff target environment', () => {
   })
 
   it('keeps the full transcript mode until a reachability probe rejects it', async () => {
-    let resolveProbe: (verdict: 'usable') => void = () => {}
+    let resolveProbe: (outcome: TranscriptProbeOutcome) => void = () => {}
     mocks.resolveTranscriptReachability.mockReturnValueOnce(
-      new Promise<'usable'>((resolve) => {
+      new Promise<TranscriptProbeOutcome>((resolve) => {
         resolveProbe = resolve
       })
     )
@@ -184,16 +190,21 @@ describe('handoff target environment', () => {
     expect(container.firstElementChild?.getAttribute('data-transcript-loading')).toBe('true')
     expect(onTranscriptUnavailable).not.toHaveBeenCalled()
 
-    await act(async () => resolveProbe('usable'))
+    await act(async () =>
+      resolveProbe({ verdict: 'usable', transcriptPath: '/home/ada/.claude/session.jsonl' })
+    )
     expect(container.firstElementChild?.getAttribute('data-transcript-loading')).toBe('false')
     expect(container.firstElementChild?.getAttribute('data-transcript-reachability')).toBe('usable')
+    expect(container.firstElementChild?.getAttribute('data-transcript-path')).toBe(
+      '/home/ada/.claude/session.jsonl'
+    )
     expect(onTranscriptUnavailable).not.toHaveBeenCalled()
   })
 
   it('forces focused context only after a non-usable verdict', async () => {
-    let resolveProbe: (verdict: 'unreachable') => void = () => {}
+    let resolveProbe: (outcome: TranscriptProbeOutcome) => void = () => {}
     mocks.resolveTranscriptReachability.mockReturnValueOnce(
-      new Promise<'unreachable'>((resolve) => {
+      new Promise<TranscriptProbeOutcome>((resolve) => {
         resolveProbe = resolve
       })
     )
@@ -211,10 +222,31 @@ describe('handoff target environment', () => {
     )
     expect(onTranscriptUnavailable).not.toHaveBeenCalled()
 
-    await act(async () => resolveProbe('unreachable'))
+    await act(async () => resolveProbe({ verdict: 'unreachable', transcriptPath: null }))
     expect(onTranscriptUnavailable).toHaveBeenCalledTimes(1)
     expect(container.firstElementChild?.getAttribute('data-transcript-loading')).toBe('false')
   })
+
+  // An unverified transcript is as unusable as an absent one, so it must reach
+  // the same bounded-capture fallback instead of leaving the brief empty.
+  it.each(['unreachable', 'unverifiable'] as const)(
+    'captures bounded context after a %s verdict',
+    async (verdict) => {
+      mocks.resolveTranscriptReachability.mockResolvedValue({ verdict, transcriptPath: null })
+      const destination = target('wt-destination')
+
+      await act(async () =>
+        root.render(
+          <Harness targetWorktreeId={destination.worktreeId} resolvedTarget={destination} />
+        )
+      )
+
+      expect(container.firstElementChild?.getAttribute('data-transcript-reachability')).toBe(
+        verdict
+      )
+      expect(container.firstElementChild?.getAttribute('data-captured')).toBe('context')
+    }
+  )
 
   it('fetches repository state from the source while detecting agents on the destination', async () => {
     const destination = target('wt-destination', { sshConnectionId: 'destination-host' })

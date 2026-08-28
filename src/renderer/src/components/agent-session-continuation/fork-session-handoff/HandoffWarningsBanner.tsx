@@ -8,6 +8,7 @@ export type HandoffDialogWarning =
   | { kind: 'host-changed' }
   | { kind: 'secret-hits'; hits: SecretScanHit[] }
   | { kind: 'transcript-unreachable' }
+  | { kind: 'transcript-unverifiable' }
   | { kind: 'no-transcript-context' }
   | { kind: 'diff-truncated' }
   | { kind: 'no-context' }
@@ -155,6 +156,17 @@ function warningPresentation(warning: Exclude<HandoffDialogWarning, { kind: 'sou
         translate(
           'components.agentSessionContinuation.forkSessionHandoff.transcriptUnreachable',
           'The transcript is not reachable from the target. A bounded capture will be used when available.'
+        )
+      )
+    case 'transcript-unverifiable':
+      return row(
+        <AlertTriangle
+          aria-hidden="true"
+          className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+        />,
+        translate(
+          'components.agentSessionContinuation.forkSessionHandoff.transcriptUnverifiable',
+          'The transcript could not be verified on the target. A bounded capture will be used when available.'
         )
       )
     case 'no-transcript-context':

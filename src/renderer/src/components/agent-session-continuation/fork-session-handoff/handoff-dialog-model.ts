@@ -1,5 +1,9 @@
 import { translate } from '@/i18n/i18n'
 import { getAgentCatalog, type AgentCatalogEntry } from '@/lib/agent-catalog'
+import type {
+  AgentSessionContinuationRequest,
+  AgentSessionContinuationSource
+} from '@/lib/agent-session-continuation'
 export { getHandoffTemplates } from '@/lib/fork-session-handoff/handoff-template-catalog'
 import type { HandoffPreviewPhase } from '@/lib/fork-session-handoff/handoff-preview-detach'
 import {
@@ -84,6 +88,9 @@ export function buildHandoffWarnings(args: {
   }
   if (args.transcriptReachability === 'unreachable') {
     warnings.push({ kind: 'transcript-unreachable' })
+  }
+  if (args.transcriptReachability === 'unverifiable') {
+    warnings.push({ kind: 'transcript-unverifiable' })
   }
   for (const code of args.compositionWarnings) {
     if (code === 'no-transcript-context' || code === 'diff-truncated' || code === 'no-context') {
@@ -262,11 +269,42 @@ export function getHandoffAgentCatalog(detectedAgents: TuiAgent[]): AgentCatalog
   return getAgentCatalog().filter((entry) => detectedAgents.includes(entry.id))
 }
 
+/** The dialog's live view of the source: the capture the user took and the path
+ *  the host actually resolved both override what the request arrived with. */
+export function resolveHandoffDialogSource(
+  request: AgentSessionContinuationRequest | null,
+  capturedText: string | null,
+  transcriptResolvedPath: string | null
+): AgentSessionContinuationSource | null {
+  return request
+    ? {
+        ...request.source,
+        capturedText: capturedText ?? request.source.capturedText,
+        transcriptPath: transcriptResolvedPath ?? request.source.transcriptPath
+      }
+    : null
+}
+
+/** The bounded capture stands in whenever the saved transcript will not travel —
+ *  absent and unverified both qualify, since neither can be referenced. */
+export function handoffInlinedCapture(
+  reachability: HandoffTranscriptReachability,
+  capturedText: string | null
+): string | null {
+  return reachability === 'unreachable' || reachability === 'unverifiable' ? capturedText : null
+}
+
 export function getHandoffContextDisabledReason(
   reachability: HandoffTranscriptReachability
 ): string | null {
-  return reachability === 'usable'
-    ? null
+  if (reachability === 'usable') {
+    return null
+  }
+  return reachability === 'unverifiable'
+    ? translate(
+        'components.agentSessionContinuation.forkSessionHandoff.contextUnverifiable',
+        'A full saved transcript could not be verified on this target. Focused context will be used.'
+      )
     : translate(
         'components.agentSessionContinuation.forkSessionHandoff.contextUnavailable',
         'A full saved transcript is not reachable on this target. Focused context will be used.'
