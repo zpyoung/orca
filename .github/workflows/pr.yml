@@ -87,7 +87,20 @@ jobs:
         run: pnpm run check:code-quality:changed -- "${{ github.event.pull_request.base.sha }}"
 
       - name: Enforce React Doctor on changed lines
-        run: pnpm run check:react-doctor:changed -- "${{ github.event.pull_request.base.sha }}"
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          # Why the merge's upstream side: a sync PR merges a whole upstream tag, so
+          # diffing against main marks every upstream line changed and turns this
+          # changed-lines gate into a whole-repo scan of code the fork never wrote.
+          BASE="$BASE_SHA"
+          SYNC_MERGE="$(git rev-list --merges --max-count=1 "$BASE_SHA..HEAD")"
+          if [ -n "$SYNC_MERGE" ]; then
+            BASE="$(git rev-parse "$SYNC_MERGE^2")"
+          fi
+          echo "react-doctor base: $BASE"
+          pnpm run check:react-doctor:changed -- "$BASE"
 
       - name: Check Zustand selector fan-out budget
         run: pnpm run check:zustand-selector-fanout
@@ -562,6 +575,17 @@ jobs:
           fetch-depth: 0
           filter: blob:none
           persist-credentials: false
+
+      # This fork publishes only prerelease tags, so a stable tag a placement
+      # baseline pins by name resolves on upstream's remote and nowhere else.
+      # Record what the dynamic resolver picks first: fetching a stable tag would
+      # otherwise silently move the sibling journey off the fork's own last build.
+      - name: Resolve cross-version baselines
+        run: |
+          set -euo pipefail
+          echo "ORCA_CROSS_VERSION_BASELINE_REF=$(git tag --list 'v[0-9]*' | sort -V | tail -1)" >> "$GITHUB_ENV"
+          git fetch --no-tags https://github.com/stablyai/orca.git \
+            'refs/tags/v1.4.184:refs/tags/v1.4.184'
 
       - uses: ./.github/actions/install-node-dependencies
         with:
