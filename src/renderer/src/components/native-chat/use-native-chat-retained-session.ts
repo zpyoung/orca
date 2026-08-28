@@ -4,6 +4,7 @@ import {
   encodeNativeChatTranscriptIdentity
 } from '../../../../shared/native-chat-transcript-retention'
 import {
+  isNativeChatTranscriptUnsettled,
   useNativeChatLiveSession,
   type NativeChatLiveSession,
   type UseNativeChatLiveSessionArgs
@@ -54,7 +55,7 @@ export function useNativeChatRetainedSession(
     identity,
     messages: session.messages,
     settled: readPhase === 'ready',
-    loading: readPhase === 'loading'
+    loading: isNativeChatTranscriptUnsettled(readPhase)
   })
   // A retrying or errored base read still carries live subscribe appends, so falling
   // through to them beats showing nothing — but only for a list already proven ours.

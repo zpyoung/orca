@@ -25,6 +25,12 @@ vi.mock('./native-chat-session-transport', () => ({
   getNativeChatSessionTransport: () => transport
 }))
 
+// The retained-session hook reads through the relay's own transport copy, which
+// the upstream-path mock above never intercepts.
+vi.mock('./fork-native-chat-relay/native-chat-session-transport', () => ({
+  getNativeChatSessionTransport: () => transport
+}))
+
 import {
   isNativeChatTranscriptUnsettled,
   NOTFOUND_RETRY_WINDOW_MS,

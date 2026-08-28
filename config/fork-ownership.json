@@ -774,6 +774,12 @@
       ]
     },
     {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-live-session-pending.test.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": ["vi.mock('./fork-native-chat-relay/native-chat-session-transport', () => ({"]
+    },
+    {
       "path": "src/renderer/src/components/native-chat/use-native-chat-picker-command-dispatch.test.tsx",
       "feature": "agent-composer",
       "kind": "passthrough",
@@ -2587,6 +2593,10 @@
     "src/renderer/src/components/native-chat/use-native-chat-interactive-send.ts": {
       "added": 16,
       "removed": 2
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-live-session-pending.test.ts": {
+      "added": 6,
+      "removed": 0
     },
     "src/renderer/src/components/native-chat/use-native-chat-picker-command-dispatch.test.tsx": {
       "added": 128,
