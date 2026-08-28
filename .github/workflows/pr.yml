@@ -91,16 +91,34 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
-          # Why the merge's upstream side: a sync PR merges a whole upstream tag, so
-          # diffing against main marks every upstream line changed and turns this
-          # changed-lines gate into a whole-repo scan of code the fork never wrote.
-          BASE="$BASE_SHA"
-          SYNC_MERGE="$(git rev-list --merges --max-count=1 "$BASE_SHA..HEAD")"
-          if [ -n "$SYNC_MERGE" ]; then
-            BASE="$(git rev-parse "$SYNC_MERGE^2")"
+          # A sync PR merges an entire upstream tag that the base branch does not
+          # carry, so every upstream line reads as changed and this changed-lines
+          # gate becomes a whole-repo scan of code the fork never wrote. Judge it
+          # from the tag the sync merged instead; ordinary PRs keep the shared
+          # script, whose resolver pins the base branch and ignores any argument.
+          PARENTS="$(git rev-list --parents -n 1 HEAD | cut -d' ' -f2-)"
+          UPSTREAM_SIDE=''
+          if [ "$(echo "$PARENTS" | wc -w)" -ge 2 ]; then
+            MAIN_TIP="$(echo "$PARENTS" | cut -d' ' -f1)"
+            PR_HEAD="$(echo "$PARENTS" | cut -d' ' -f2)"
+            # The tag arrives in the first merge on the branch; later merges carry
+            # the base branch catching up, and those parents are already in main.
+            SYNC_MERGE="$(git rev-list --merges "$MAIN_TIP..$PR_HEAD" | tail -1)"
+            if [ -n "$SYNC_MERGE" ]; then
+              CANDIDATE="$(git rev-parse "$SYNC_MERGE^2")"
+              if ! git merge-base --is-ancestor "$CANDIDATE" "$MAIN_TIP"; then
+                UPSTREAM_SIDE="$CANDIDATE"
+              fi
+            fi
           fi
-          echo "react-doctor base: $BASE"
-          pnpm run check:react-doctor:changed -- "$BASE"
+          if [ -z "$UPSTREAM_SIDE" ]; then
+            pnpm run check:react-doctor:changed -- "$BASE_SHA"
+          else
+            echo "sync PR: judging fork lines added since $UPSTREAM_SIDE"
+            pnpm dlx react-doctor@0.9.1 . --yes --scope lines --base "$UPSTREAM_SIDE" \
+              --include-untracked --no-dead-code --no-supply-chain --no-telemetry \
+              --blocking error
+          fi
 
       - name: Check Zustand selector fan-out budget
         run: pnpm run check:zustand-selector-fanout
