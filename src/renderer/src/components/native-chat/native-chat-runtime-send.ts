@@ -4,7 +4,6 @@
 
 import { sendRuntimePtyInput } from '@/runtime/runtime-terminal-inspection'
 import type { getSettingsForAgentTabRuntimeOwner } from '@/lib/agent-paste-draft'
-import { runBodyAcceptedThen } from './fork-agent-composer/native-chat-runtime-send-acceptance'
 import { enqueueNativeChatBodySend } from './fork-agent-composer/native-chat-body-send'
 import type { SendOutcome } from './fork-agent-composer/native-chat-send-outcome'
 import {
@@ -16,11 +15,7 @@ import {
   NATIVE_CHAT_QUESTION_STEP_MS,
   NATIVE_CHAT_SUBMIT_DELAY_MS
 } from '../../../../shared/native-chat-answer-stepping'
-import {
-  buildNativeChatImagePasteBytes,
-  buildNativeChatPasteBytes,
-  NATIVE_CHAT_SUBMIT
-} from './native-chat-send'
+import { buildNativeChatPasteBytes, NATIVE_CHAT_SUBMIT } from './native-chat-send'
 import {
   cancelNativeChatPtySends,
   resetNativeChatPtySendQueuesForTests,
@@ -34,8 +29,6 @@ export {
   sendNativeChatTypedCommand,
   typeNativeChatCommand
 } from './fork-agent-composer/native-chat-typed-command-send'
-
-export const NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS = 300
 
 export type NativeChatSendOptions = {
   /** Bytes that empty the agent's input line. Defaults to a single Ctrl+U. */
@@ -115,46 +108,6 @@ export async function sendNativeChatMessageVerified(
     return false
   }
   return sendNativeChatMessageVerifiedQueued(settings, ptyId, text, signal)
-}
-
-export function sendNativeChatMessageWithImageAttachments(
-  settings: RuntimeSettings,
-  ptyId: string,
-  text: string,
-  imagePaths: readonly string[],
-  options?: NativeChatSendOptions
-): NativeChatSendHandle {
-  if (imagePaths.length === 0) {
-    return sendNativeChatMessage(settings, ptyId, text, options)
-  }
-  const trimmedText = text.trim()
-  return enqueueNativeChatBodySend({
-    settings,
-    ptyId,
-    options,
-    durationMs:
-      (trimmedText.length > 0
-        ? NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS + NATIVE_CHAT_SUBMIT_DELAY_MS
-        : NATIVE_CHAT_SUBMIT_DELAY_MS) + clearConfirmDurationMs(options),
-    chunks: imagePaths.map(buildNativeChatImagePasteBytes),
-    afterAccepted: ({ isCancelled, markSubmitted, reportOutcome, delayGuarded, submit }) => {
-      if (trimmedText.length === 0) {
-        submit()
-        return
-      }
-      delayGuarded(NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS, () => {
-        runBodyAcceptedThen(
-          settings,
-          ptyId,
-          [buildNativeChatPasteBytes(text)],
-          isCancelled,
-          markSubmitted,
-          reportOutcome,
-          submit
-        )
-      })
-    }
-  })
 }
 
 /** Submit a TUI prompt with no body (Enter only) — e.g. a plain submit when the

@@ -13,16 +13,18 @@ vi.mock('@/runtime/runtime-terminal-inspection', () => ({
 }))
 
 import {
-  NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS,
   NATIVE_CHAT_SUBMIT_DELAY_MS,
   resetNativeChatPtySendQueuesForTests,
-  sendNativeChatMessage,
-  sendNativeChatMessageWithImageAttachments
+  sendNativeChatMessage
 } from './native-chat-runtime-send'
 import {
   NATIVE_CHAT_CLEAR_CONFIRM_MS,
   NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT
 } from './fork-agent-composer/native-chat-runtime-clear'
+import {
+  NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS,
+  sendNativeChatMessageWithImageAttachments
+} from './native-chat-runtime-image-send'
 import { buildNativeChatPasteBytes, NATIVE_CHAT_SUBMIT } from './native-chat-send'
 import {
   AGENT_TUI_CLEAR_INPUT_MAX,

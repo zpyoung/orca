@@ -16,11 +16,9 @@ import {
   sendNativeChatTypedCommand,
   sendNativeChatMessageVerified,
   typeNativeChatCommand,
-  sendNativeChatMessageWithImageAttachments,
   submitNativeChatPrompt,
   sendNativeChatAskAnswer,
   resetNativeChatPtySendQueuesForTests,
-  NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS,
   NATIVE_CHAT_SUBMIT_DELAY_MS,
   NATIVE_CHAT_QUESTION_STEP_MS,
   NATIVE_CHAT_ADVANCE_BUFFER_MS
@@ -30,11 +28,11 @@ import {
   NATIVE_CHAT_SUBMIT_OBSERVATION_MAX_READS,
   NATIVE_CHAT_SUBMIT_OBSERVATION_POLL_MS
 } from './fork-agent-composer/native-chat-send-outcome'
+import { buildNativeChatPasteBytes, NATIVE_CHAT_SUBMIT } from './native-chat-send'
 import {
-  buildNativeChatImagePasteBytes,
-  buildNativeChatPasteBytes,
-  NATIVE_CHAT_SUBMIT
-} from './native-chat-send'
+  NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS,
+  sendNativeChatMessageWithImageAttachments
+} from './native-chat-runtime-image-send'
 import { cancelNativeChatPtySends } from './native-chat-pty-send-queue'
 
 const SETTINGS = {} as Parameters<typeof sendNativeChatMessage>[0]
@@ -699,11 +697,9 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
       NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS + NATIVE_CHAT_SUBMIT_DELAY_MS
     )
 
+    const framedImageWithSeparator = '\x1b[200~/tmp/orca-paste-image.png\x1b[201~ '
     await vi.advanceTimersByTimeAsync(0)
-    expectWriteOrder([
-      NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
-      buildNativeChatImagePasteBytes('/tmp/orca-paste-image.png')
-    ])
+    expectWriteOrder([NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT, framedImageWithSeparator])
 
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS)
     expect(sendRuntimePtyInputAcceptance).toHaveBeenLastCalledWith(
@@ -722,7 +718,7 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
     expect(totalWriteCalls()).toBe(4)
   })
 
-  it('waits the normal submit gap for an attachment-only send', async () => {
+  it('waits the normal submit gap for an attachment-only send, with no trailing separator', async () => {
     const handle = sendNativeChatMessageWithImageAttachments(SETTINGS, PTY, '', [
       '/tmp/orca-paste-image.png'
     ])
@@ -732,7 +728,7 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
     await vi.advanceTimersByTimeAsync(0)
     expectWriteOrder([
       NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
-      buildNativeChatImagePasteBytes('/tmp/orca-paste-image.png')
+      '\x1b[200~/tmp/orca-paste-image.png\x1b[201~'
     ])
 
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS - 1)
@@ -747,6 +743,27 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
     )
   })
 
+  it('treats whitespace-only prompt input as attachment-only', async () => {
+    sendNativeChatMessageWithImageAttachments(SETTINGS, PTY, '   ', ['/tmp/orca-paste-image.png'])
+    await vi.advanceTimersByTimeAsync(0)
+
+    expectWriteOrder([
+      NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
+      '\x1b[200~/tmp/orca-paste-image.png\x1b[201~'
+    ])
+  })
+
+  it('keeps multiple image frames bare and separates only the final frame from prompt text', async () => {
+    sendNativeChatMessageWithImageAttachments(SETTINGS, PTY, 'hello', ['/tmp/a.png', '/tmp/b.png'])
+    await vi.advanceTimersByTimeAsync(0)
+
+    expectWriteOrder([
+      NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
+      '\x1b[200~/tmp/a.png\x1b[201~',
+      '\x1b[200~/tmp/b.png\x1b[201~ '
+    ])
+  })
+
   it('cancels deferred prompt and Enter writes after the attachment path', async () => {
     const handle = sendNativeChatMessageWithImageAttachments(SETTINGS, PTY, 'describe', [
       '/tmp/orca-paste-image.png'
@@ -758,7 +775,7 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
     // Pre-clear + image body + cancel clear; no Enter.
     expectWriteOrder([
       NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
-      buildNativeChatImagePasteBytes('/tmp/orca-paste-image.png'),
+      '\x1b[200~/tmp/orca-paste-image.png\x1b[201~ ',
       NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT
     ])
     expect(
