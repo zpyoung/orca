@@ -293,6 +293,15 @@ export const NATIVE_CHAT_METHODS: readonly RpcAnyMethod[] = [
             ...nativeChatCompanionFrameFields(companion)
           })
         },
+        ...(params.capabilities?.transcriptPending === 1
+          ? {
+              onTranscriptPending: () => {
+                if (!closed) {
+                  emit({ type: 'snapshot', messages: [], hasMore: false, pending: true })
+                }
+              }
+            }
+          : {}),
         onReplace: (messages, hasMore, beforeOffset, companion) => {
           if (closed) {
             return

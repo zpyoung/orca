@@ -32,7 +32,6 @@ import {
 } from './workspace-session-browser-schema'
 import { clientHostedBrowserCloseIntentSchema } from './client-hosted-browser-close-intent'
 import { persistedClientHostedBrowserPageSchema } from './client-hosted-browser-page-record'
-import { persistedOpenFileSchema } from './workspace-session-editor-schema'
 import { sleepingAgentSessionsByPaneKeySchema } from './workspace-session-sleeping-agents'
 import { salvagedField, salvagedOptional, salvagingArray, salvagingRecord } from './zod-salvage'
 

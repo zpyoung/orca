@@ -1,10 +1,7 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react'
 import { translate } from '@/i18n/i18n'
-import {
-  sendNativeChatMessage,
-  sendNativeChatMessageWithImageAttachments,
-  submitNativeChatPrompt
-} from '../native-chat-runtime-send'
+import { sendNativeChatMessage, submitNativeChatPrompt } from '../native-chat-runtime-send'
+import { sendNativeChatMessageWithImageAttachments } from '../native-chat-runtime-image-send'
 import type { NativeChatSendHandle, NativeChatSendOptions } from '../native-chat-runtime-send'
 import { pushHistory } from './agent-composer-history'
 import {

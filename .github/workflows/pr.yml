@@ -902,49 +902,28 @@ jobs:
           if [ "$ROOT_DIRECTORY_GUARD" != "success" ]; then
             exit 1
           fi
+          # Why here too: the ownership guard is ungated, so a docs-only PR still runs
+          # it, and a path that never reads its result would let an undeclared manifest
+          # change through the one check that exists to catch it.
+          if [ "$FORK_OWNERSHIP_GUARD" != "success" ]; then
+            exit 1
+          fi
           if [ "$SHOULD_RUN" != "true" ]; then
             echo "Docs-only change; expensive PR checks skipped."
-            if [ "$ROOT_DIRECTORY_GUARD" != "success" ]; then
-              exit 1
-            fi
-            # Why here too: the ownership guard is ungated, so a docs-only PR still
-            # runs it, and a docs-only path that never reads its result would let an
-            # undeclared manifest change through the one check that exists to catch it.
-            if [ "$FORK_OWNERSHIP_GUARD" != "success" ]; then
-              exit 1
-            fi
-            for result in \
-              "$STATIC_ANALYSIS" \
-              "$TYPECHECK" \
-              "$GIT_COMPATIBILITY" \
-              "$XTERM_PATCH_SYNC" \
-              "$SHELL_CONTRACTS" \
-              "$TEST" \
-              "$MANAGED_HOOK_NODE18" \
-              "$PACKAGE" \
-              "$PACKAGE_WINDOWS"; do
-              if [ "$result" != "skipped" ]; then
-                exit 1
-              fi
-            done
-            exit 0
           fi
-          # Require success when the PR has code-relevant changes
-          for result in \
-            "$CODE_PATHS" \
-            "$STATIC_ANALYSIS" \
-            "$ROOT_DIRECTORY_GUARD" \
-            "$FORK_OWNERSHIP_GUARD" \
-            "$TYPECHECK" \
-            "$GIT_COMPATIBILITY" \
-            "$XTERM_PATCH_SYNC" \
-            "$SHELL_CONTRACTS" \
-            "$TEST" \
-            "$MANAGED_HOOK_NODE18" \
-            "$PACKAGE" \
-            "$PACKAGE_WINDOWS"; do
-            if [ "$result" != "success" ]; then
-              exit 1
+          failed=0
+          check_job() {
+            local name="$1" result="$2" should="$3"
+            if [ "$should" = "true" ]; then
+              if [ "$result" != "success" ]; then
+                echo "$name: expected success, got $result"
+                failed=1
+              fi
+            else
+              if [ "$result" != "skipped" ]; then
+                echo "$name: expected skipped, got $result"
+                failed=1
+              fi
             fi
           }
           # Require success when the PR has code-relevant changes

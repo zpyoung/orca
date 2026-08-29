@@ -1,4 +1,5 @@
 import { normalizeAutoRenameBranchFromWorkDefaultOn } from '../../../../shared/auto-rename-branch-from-work-settings'
+import { mergeForkSessionHandoffSettings } from '../../../../shared/fork-session-handoff/handoff-settings-merge'
 import {
   getDefaultSettings,
   normalizeAgentActivityDisplayMode,
@@ -133,6 +134,7 @@ export function mergeSettings(
       ...base.notifications,
       ...updates.notifications
     },
+    ...mergeForkSessionHandoffSettings(base, updates),
     githubProjects: {
       ...(base.githubProjects ?? defaults.githubProjects),
       ...updates.githubProjects

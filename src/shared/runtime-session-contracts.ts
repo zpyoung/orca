@@ -10,6 +10,7 @@ import type {
 } from './runtime-capability-degradation'
 import type { TabGroupLayoutNode } from './tab-types'
 import type { TerminalColorOverrides } from './terminal-color-overrides'
+import type { TerminalDockPaneState } from './fork-terminal-dock/terminal-dock-pane-state'
 import type { TerminalLayoutSnapshot, TerminalPaneLayoutNode } from './terminal-tab-types'
 import type { TuiAgent } from './tui-agent'
 
@@ -178,6 +179,9 @@ export type RuntimeMobileSessionTerminalTab = {
   color?: string | null
   isPinned?: boolean
   viewMode?: 'terminal' | 'chat'
+  /** Per-pane docked-composer state, keyed by pane key. Host-persisted so
+   *  paired clients converge. */
+  terminalDockByPaneKey?: Record<string, TerminalDockPaneState>
   launchDraft?: string
   launchDraftCreatedAt?: number
   isActive: boolean

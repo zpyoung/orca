@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-session-transport.ts
-// FORK-COPY-SHA: 6e4f817101daa18d82824b69243d9079baa9c416
+// FORK-COPY-SHA: ce4df07736baa38d742613bd68d5a3d845f79d25
 import type {
   NativeChatApi,
   NativeChatAppendedMessages,
@@ -141,7 +141,14 @@ function createRuntimeNativeChatTransport(environmentId: string): NativeChatSess
             {
               selector: environmentId,
               method: 'nativeChat.subscribe',
-              params: { subscriptionId, agent, sessionId, transcriptPath, limit },
+              params: {
+                subscriptionId,
+                agent,
+                sessionId,
+                transcriptPath,
+                limit,
+                capabilities: { transcriptPending: 1 }
+              },
               timeoutMs: 15_000
             },
             {
@@ -172,6 +179,7 @@ function createRuntimeNativeChatTransport(environmentId: string): NativeChatSess
                   error?: string
                   lifecycle?: unknown
                   sessionOptions?: unknown
+                  pending?: boolean
                 }
                 const companion = parseRuntimeNativeChatCompanionFields(frame)
                 // Seeds the paging cursor: a snapshot supersedes the seed read
@@ -180,6 +188,9 @@ function createRuntimeNativeChatTransport(environmentId: string): NativeChatSess
                   typeof frame?.beforeOffset === 'number' && Number.isFinite(frame.beforeOffset)
                     ? { beforeOffset: frame.beforeOffset }
                     : {}
+                // No transcript behind this window yet — forwarded so the view can
+                // stop spinning, but it is not the settled initial read.
+                const pending = frame?.pending === true
                 if (
                   (frame?.type === 'appended' ||
                     frame?.type === 'snapshot' ||
@@ -187,14 +198,17 @@ function createRuntimeNativeChatTransport(environmentId: string): NativeChatSess
                   Array.isArray(frame.messages)
                 ) {
                   if (!receivedInitial) {
-                    receivedInitial = true
+                    if (!pending) {
+                      receivedInitial = true
+                    }
                     onFrame({
                       type: 'snapshot',
                       messages: frame.messages,
                       hasMore: frame.hasMore ?? frame.messages.length >= (limit ?? 300),
                       ...offset,
                       ...(frame.error ? { error: frame.error } : {}),
-                      ...companion
+                      ...companion,
+                      ...(pending ? { pending: true } : {})
                     })
                   } else if (frame.type === 'snapshot') {
                     onFrame({
@@ -203,7 +217,8 @@ function createRuntimeNativeChatTransport(environmentId: string): NativeChatSess
                       hasMore: frame.hasMore ?? false,
                       ...offset,
                       ...(frame.error ? { error: frame.error } : {}),
-                      ...companion
+                      ...companion,
+                      ...(pending ? { pending: true } : {})
                     })
                   } else {
                     onFrame(

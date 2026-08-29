@@ -50,15 +50,7 @@ type SettingsSidebarProps = {
   searchInputRef?: RefObject<HTMLInputElement | null>
   searchAutoFocus?: boolean
   onBack: () => void
-  onSelectSection: (
-    sectionId: string,
-    modifiers: {
-      metaKey: boolean
-      ctrlKey: boolean
-      shiftKey: boolean
-      altKey: boolean
-    }
-  ) => void
+  onSelectSection: (sectionId: string) => void
 }
 
 function SettingsSearchField({

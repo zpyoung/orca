@@ -29,6 +29,7 @@ import {
   shouldRemoveProjectFromContextMenu
 } from './worktree-context-menu-policy'
 import { useWorktreeContextMenuCommands } from './use-worktree-context-menu-commands'
+import { useWorktreeGroupDialog } from './fork-worktree-groups/WorktreeGroupMenuItems'
 import { useWorktreeParentPickerTransition } from './use-worktree-parent-picker-transition'
 import { useWorktreeContextMenuSecondaryActions } from './use-worktree-context-menu-secondary-actions'
 
@@ -78,6 +79,10 @@ export function useWorktreeContextMenuModel({
   )
   const [createGroupDialogOpen, setCreateGroupDialogOpen] = useState(false)
   const createGroupDialogActiveRef = useRef(false)
+  const worktreeGroupDialog = useWorktreeGroupDialog({
+    worktree,
+    dialogActiveRef: createGroupDialogActiveRef
+  })
   const [parentPicker, setParentPicker] = useState<{
     childWorktreeId: string
     anchorElement: HTMLElement
@@ -248,6 +253,7 @@ export function useWorktreeContextMenuModel({
       !lifecycleStartedRef.current ||
       menuOpen ||
       createGroupDialogOpen ||
+      worktreeGroupDialog.open ||
       createGroupDialogActiveRef.current ||
       parentPicker !== null ||
       pendingParentPickerRef.current !== null
@@ -262,7 +268,7 @@ export function useWorktreeContextMenuModel({
       onLifecycleComplete?.()
     }, 0)
     return () => window.clearTimeout(timer)
-  }, [createGroupDialogOpen, menuOpen, onLifecycleComplete, parentPicker])
+  }, [createGroupDialogOpen, menuOpen, onLifecycleComplete, parentPicker, worktreeGroupDialog.open])
 
   useEffect(() => {
     const closeMenu = (): void => setMenuOpenState(false)
@@ -418,6 +424,7 @@ export function useWorktreeContextMenuModel({
     suppressOpeningPointerEvent,
     tabsByWorktree,
     validParentWorktreeId,
+    worktreeGroupDialog,
     worktree,
     workspaceStatuses
   }
