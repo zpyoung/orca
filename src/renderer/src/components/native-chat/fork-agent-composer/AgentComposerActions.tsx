@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/NativeChatComposerActions.tsx
-// FORK-COPY-SHA: 6e4f817101daa18d82824b69243d9079baa9c416
+// FORK-COPY-SHA: ce4df07736baa38d742613bd68d5a3d845f79d25
 import { ArrowUp, Mic, Plus, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'

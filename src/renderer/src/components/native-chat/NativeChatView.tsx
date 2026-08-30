@@ -4,6 +4,7 @@ import { useAppStore } from '../../store'
 import { useNativeChatLaunchDraftSignal } from './use-native-chat-launch-draft-adoption'
 import { useNativeChatRetainedSession } from './use-native-chat-retained-session'
 import { selectNativeChatViewState } from './fork-native-chat-relay/native-chat-view-state'
+import { isNativeChatTranscriptUnsettled } from './fork-native-chat-relay/use-native-chat-live-session'
 import { NativeChatComposer, type NativeChatComposerHandle } from './NativeChatComposer'
 import { useNativeChatFontScale } from './use-native-chat-font-scale'
 import { useNativeChatCanSend } from './use-native-chat-can-send'
@@ -145,7 +146,9 @@ function NativeChatResolvedView({
     terminalTabId,
     agent,
     messages: session.messages,
-    transcriptLoading: session.readPhase === 'loading'
+    // 'awaiting' counts too: adopting a prefill against a transcript that hasn't
+    // flushed would re-offer a prompt the user already submitted.
+    transcriptLoading: isNativeChatTranscriptUnsettled(session.readPhase)
   })
   // The live-session merge reconciles hooks with replayable transcript turn
   // boundaries; all working consumers must use that one lifecycle decision.

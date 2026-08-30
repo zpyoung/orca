@@ -21,8 +21,8 @@ test('@golden opens an unstaged file diff from Source Control', async ({
   registerPostElectronShutdownCleanup(async () => cleanupGoldenWorktree(testRepoPath, fixture))
 
   await waitForSessionReady(orcaPage)
-  await openGoldenSourceControl(orcaPage, testRepoPath, fixture)
   seedGoldenSourceEdit(fixture.worktreePath)
+  await openGoldenSourceControl(orcaPage, testRepoPath, fixture)
 
   const changedFile = orcaPage
     .locator('[data-testid="source-control-entry"]')
@@ -43,7 +43,7 @@ test('@golden opens an unstaged file diff from Source Control', async ({
   ).toBeVisible()
   await expect(orcaPage.locator('.editor-header-path').first()).toHaveAttribute(
     'title',
-    `${realpathSync(path.join(fixture.worktreePath, GOLDEN_CHANGED_PATH))} (diff)`
+    `${realpathSync(path.join(fixture.worktreePath, GOLDEN_CHANGED_PATH)).replaceAll('\\', '/')} (diff)`
   )
 
   const probe = orcaPage.getByRole('button', { name: /Source Control/ })

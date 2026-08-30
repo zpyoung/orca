@@ -1,4 +1,4 @@
-import type { AgentHookEventPayload } from '../../shared/agent-hook-listener'
+import type { AgentHookEventPayload } from '../../shared/agent-hook-listener/listener-event'
 
 const MAX_PATHS_PER_PANE = 5
 const MAX_TRACKED_PANES = 256
