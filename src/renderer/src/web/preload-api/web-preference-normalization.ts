@@ -6,6 +6,7 @@ import {
 } from '../../../../shared/constants'
 import { normalizeContextualTourIds } from '../../../../shared/contextual-tours'
 import type { ContextualTourId } from '../../../../shared/contextual-tours'
+import { mergeForkSessionHandoffSettings } from '../../../../shared/fork-session-handoff/handoff-settings-merge'
 import { normalizeFeatureInteractions } from '../../../../shared/feature-interactions'
 import type {
   FeatureInteractionId,
@@ -133,6 +134,7 @@ export function mergeSettings(
       ...base.notifications,
       ...updates.notifications
     },
+    ...mergeForkSessionHandoffSettings(base, updates),
     githubProjects: {
       ...(base.githubProjects ?? defaults.githubProjects),
       ...updates.githubProjects

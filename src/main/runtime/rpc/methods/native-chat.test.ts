@@ -33,6 +33,7 @@ const watcher = vi.hoisted(() => ({
       companion?: NativeChatTranscriptCompanion
     ) => void
     onAppend: (messages: NativeChatMessage[], companion?: NativeChatTranscriptCompanion) => void
+    onTranscriptPending?: () => void
   },
   watching: true,
   setupSignal: undefined as AbortSignal | undefined,

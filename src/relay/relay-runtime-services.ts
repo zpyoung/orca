@@ -13,6 +13,7 @@ import { AgentExecHandler } from './agent-exec-handler'
 import { WorkspaceSessionHandler } from './workspace-session-handler'
 import { AiVaultHandler } from './ai-vault-handler'
 import { createRelayAiVaultService } from './ai-vault-service-factory'
+import { NativeChatHandler } from './fork-native-chat-relay/native-chat-handler'
 import { registerRelayPluginHostCallHandlers } from './plugin-host-call-handler'
 import { SshPtyConsumerSessionAdapter } from './ssh-pty-consumer-session-adapter'
 import { RelayPtySourcePublication } from './relay-pty-source-publication'
@@ -77,7 +78,8 @@ export class RelayRuntimeServices {
       new AiVaultHandler(dispatcher, {
         hostPlatform,
         service: this.aiVaultService ?? undefined
-      })
+      }),
+      new NativeChatHandler(dispatcher)
     ]
 
     registerRelayPluginHostCallHandlers(

@@ -2772,29 +2772,30 @@ function applyWebSessionTabsSnapshotWithContext(
     terminalSurfaceTabs.map((tab) => toWebTerminalSurfaceTabId(tab.parentTabId))
   )
   const nextHostTerminalTabIds = new Set(terminalSurfaceTabs.map((tab) => tab.parentTabId))
-  // Why: also captures the provisional tab's replacement host tab id, so the dock
-  // record it carries can be re-keyed to the replacement instead of dropped.
-  const exactProvisionalHandoffEntries = currentTerminalTabs
-    .filter((tab) => !isMirroredTerminalSurfaceId(tab.id))
-    .map((tab): [string, string] | null => {
-      if (nextHostTerminalTabIds.has(tab.id)) {
-        return [tab.id, tab.id]
-      }
-      const handoff = {
-        environmentId,
-        worktreeId,
-        provisionalTabId: tab.id
-      }
-      const hostTabId = resolveWebAgentSessionHandoff(handoff)
-      const isHandoff =
-        hostTabId !== null &&
-        (nextHostTerminalTabIds.has(hostTabId) ||
-          isWebAgentSessionHandoffPostCreateSnapshotConfirmed(handoff))
-      return isHandoff && hostTabId !== null ? [tab.id, hostTabId] : null
-    })
-    .filter((entry): entry is [string, string] => entry !== null)
-  const exactProvisionalHandoffs = new Set(exactProvisionalHandoffEntries.map(([id]) => id))
-  const provisionalHandoffHostTabIdByProvisionalTabId = new Map(exactProvisionalHandoffEntries)
+  const provisionalHandoffHostTabIds = new Map<string, string>()
+  for (const tab of currentTerminalTabs) {
+    if (isMirroredTerminalSurfaceId(tab.id)) {
+      continue
+    }
+    if (nextHostTerminalTabIds.has(tab.id)) {
+      provisionalHandoffHostTabIds.set(tab.id, tab.id)
+      continue
+    }
+    const handoff = {
+      environmentId,
+      worktreeId,
+      provisionalTabId: tab.id
+    }
+    const hostTabId = resolveWebAgentSessionHandoff(handoff)
+    if (
+      hostTabId !== null &&
+      (nextHostTerminalTabIds.has(hostTabId) ||
+        isWebAgentSessionHandoffPostCreateSnapshotConfirmed(handoff))
+    ) {
+      provisionalHandoffHostTabIds.set(tab.id, hostTabId)
+    }
+  }
+  const exactProvisionalHandoffs = new Set(provisionalHandoffHostTabIds.keys())
   const retainedTerminalTabs = currentTerminalTabs.filter(
     (tab) =>
       !shouldReplaceTerminalTab(
@@ -3009,7 +3010,7 @@ function applyWebSessionTabsSnapshotWithContext(
   // the handoff; carry it forward re-keyed to the replacement tab id.
   const provisionalDockRecordByHostTabId = new Map<string, Record<string, TerminalDockPaneState>>()
   const provisionalPendingMutationsByHostTabId = new Map<string, Record<string, number>>()
-  for (const [provisionalTabId, hostTabId] of provisionalHandoffHostTabIdByProvisionalTabId) {
+  for (const [provisionalTabId, hostTabId] of provisionalHandoffHostTabIds) {
     const provisionalDockRecord =
       existingUnifiedTerminalTabById.get(provisionalTabId)?.terminalDockByPaneKey
     if (provisionalDockRecord) {
@@ -4192,32 +4193,6 @@ function settleEmptyHostInventoryOnlyIfHostHasNoTerminals(
   })
 }
 
-/**
- * An inventory that published nothing is the one shape carrying no host
- * evidence at all: `settles.length === publishedSnapshotCount` is `0 === 0`, so
- * a live host answering `[]` before its renderer's first publish used to be
- * upgraded into an environment-wide "the host has spoken" — draining parked
- * resumes into forking a second agent onto a PTY the host still runs.
- *
- * The distinguisher has to be host readiness, not list emptiness: a host with
- * genuinely zero terminals must still settle or its panes park forever. Only
- * `none` settles; `live` and `unverifiable` leave waiters for the next
- * inventory or per-worktree frame.
- */
-function settleEmptyHostInventoryOnlyIfHostHasNoTerminals(environmentId: string): void {
-  const probedGeneration = getRuntimeEnvironmentConnectionGeneration(environmentId)
-  void probeHostLiveTerminals(environmentId, undefined, probedGeneration).then((verdict) => {
-    // Why: the probe is a round trip, and a reconnect in between would make its
-    // answer speak for a connection whose PTYs nobody listed.
-    if (
-      verdict === 'none' &&
-      getRuntimeEnvironmentConnectionGeneration(environmentId) === probedGeneration
-    ) {
-      markHostSessionMirrorHydrated(environmentId)
-    }
-  })
-}
-
 function createHostSessionMirrorSettle(
   verdict: HostSessionMirrorPatchVerdict
 ): HostSessionMirrorSettle {
@@ -4246,8 +4221,16 @@ function createHostSessionMirrorSettle(
     const { frames, fullInventory } = verdict
     const settles = frames.filter(({ decision }) => decision.settlesHostMirror)
     if (fullInventory && settles.length === fullInventory.publishedSnapshotCount) {
+      const fence = fenceByEnvironment.get(fullInventory.environmentId)
+      if (!fence || !hostSessionMirrorSettleFenceIsCurrent(fence)) {
+        return
+      }
       if (fullInventory.publishedSnapshotCount === 0) {
-        settleEmptyHostInventoryOnlyIfHostHasNoTerminals(fullInventory.environmentId)
+        if (fullInventory.authoritative) {
+          markHostSessionMirrorHydrated(fullInventory.environmentId)
+        } else {
+          settleEmptyHostInventoryOnlyIfHostHasNoTerminals(fence)
+        }
         return
       }
       markHostSessionMirrorHydrated(fullInventory.environmentId)

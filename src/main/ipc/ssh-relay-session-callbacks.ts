@@ -2,6 +2,7 @@ import type { SshRelaySession } from '../ssh/ssh-relay-session'
 import { rotateSshProviderAuthority } from '../ssh/ssh-provider-authority'
 import { getSshTargetRegistryStore } from '../ssh/ssh-target-registry'
 import { activeSessions } from './ssh-active-relay-sessions'
+import { notifySshRelayReady } from './fork-native-chat-relay/ssh-relay-ready-notifier'
 import { testingTargets } from './ssh-connect-attempt-registry'
 import { relayGracePeriodForTarget } from './ssh-connection-state-callbacks'
 import {
@@ -151,6 +152,7 @@ export function configureRelaySessionCallbacks(session: SshRelaySession): void {
 
   // Why: fires after both establish() and reconnect() reach 'ready'; re-create persisted port forwards so they survive restarts and blips.
   session.setOnReady((tid) => {
+    notifySshRelayReady(tid)
     const state = relayLostBackoff.get(tid)
     if (state) {
       if (state.stabilizedTimer) {

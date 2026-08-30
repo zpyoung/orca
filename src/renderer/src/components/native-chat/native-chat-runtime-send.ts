@@ -16,7 +16,12 @@ import {
   NATIVE_CHAT_QUESTION_STEP_MS,
   NATIVE_CHAT_SUBMIT_DELAY_MS
 } from '../../../../shared/native-chat-answer-stepping'
-import { buildNativeChatPasteBytes, NATIVE_CHAT_SUBMIT } from './native-chat-send'
+import {
+  buildNativeChatImagePasteBytes,
+  buildNativeChatPasteBytes,
+  NATIVE_CHAT_SUBMIT
+} from './native-chat-send'
+import { imagePasteWritesFollowedByText } from '../../../../shared/image-paste-following-text'
 import {
   cancelNativeChatPtySends,
   resetNativeChatPtySendQueuesForTests,
@@ -132,7 +137,10 @@ export function sendNativeChatMessageWithImageAttachments(
       (trimmedText.length > 0
         ? NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS + NATIVE_CHAT_SUBMIT_DELAY_MS
         : NATIVE_CHAT_SUBMIT_DELAY_MS) + clearConfirmDurationMs(options),
-    chunks: imagePaths.map(buildNativeChatImagePasteBytes),
+    chunks: imagePasteWritesFollowedByText(
+      imagePaths.map(buildNativeChatImagePasteBytes),
+      trimmedText.length > 0
+    ),
     afterAccepted: ({ isCancelled, markSubmitted, reportOutcome, delayGuarded, submit }) => {
       if (trimmedText.length === 0) {
         submit()

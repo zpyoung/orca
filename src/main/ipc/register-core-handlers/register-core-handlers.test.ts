@@ -224,11 +224,11 @@ vi.mock('../settings', () => ({
   registerSettingsHandlers: registerSettingsHandlersMock
 }))
 
-vi.mock('../fork-session-handoff/session-lineage-ipc', () => ({
+vi.mock('../../fork-session-handoff/session-lineage-ipc', () => ({
   registerForkSessionHandoffHandlers: vi.fn()
 }))
 
-vi.mock('./skills', () => ({
+vi.mock('../skills', () => ({
   registerSkillsHandlers: registerSkillsHandlersMock
 }))
 

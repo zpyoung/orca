@@ -13,6 +13,7 @@ import {
   useWorkspaceLineageMenuActions
 } from './workspace-lineage-menu-actions'
 import { parseWorkspaceKey } from '../../../../shared/workspace-scope'
+import { useWorktreeGroupDialog } from './fork-worktree-groups/WorktreeGroupMenuItems'
 import { getDeleteStateForWorktreeHost } from './worktree-delete-state-host-match'
 import {
   CLOSE_ALL_CONTEXT_MENUS_EVENT,
@@ -78,6 +79,10 @@ export function useWorktreeContextMenuModel({
   )
   const [createGroupDialogOpen, setCreateGroupDialogOpen] = useState(false)
   const createGroupDialogActiveRef = useRef(false)
+  const worktreeGroupDialog = useWorktreeGroupDialog({
+    worktree,
+    dialogActiveRef: createGroupDialogActiveRef
+  })
   const [parentPicker, setParentPicker] = useState<{
     childWorktreeId: string
     anchorElement: HTMLElement
@@ -248,6 +253,7 @@ export function useWorktreeContextMenuModel({
       !lifecycleStartedRef.current ||
       menuOpen ||
       createGroupDialogOpen ||
+      worktreeGroupDialog.open ||
       createGroupDialogActiveRef.current ||
       parentPicker !== null ||
       pendingParentPickerRef.current !== null
@@ -262,7 +268,7 @@ export function useWorktreeContextMenuModel({
       onLifecycleComplete?.()
     }, 0)
     return () => window.clearTimeout(timer)
-  }, [createGroupDialogOpen, menuOpen, onLifecycleComplete, parentPicker])
+  }, [createGroupDialogOpen, menuOpen, onLifecycleComplete, parentPicker, worktreeGroupDialog.open])
 
   useEffect(() => {
     const closeMenu = (): void => setMenuOpenState(false)
@@ -419,6 +425,7 @@ export function useWorktreeContextMenuModel({
     tabsByWorktree,
     validParentWorktreeId,
     worktree,
+    worktreeGroupDialog,
     workspaceStatuses
   }
 }

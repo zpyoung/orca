@@ -18,9 +18,6 @@ inline src/main/github/project-view.ts
 inline src/main/index.ts
 inline src/main/ipc/filesystem-watcher.ts
 inline src/main/ipc/filesystem.ts
-inline src/main/ipc/github.ts
-inline src/main/ipc/repos.ts
-inline src/main/ipc/ssh.ts
 inline src/main/ipc/worktree-remote.ts
 inline src/main/providers/local-pty-provider.ts
 inline src/main/rate-limits/service.ts
@@ -80,8 +77,6 @@ inline src/renderer/src/store/slices/tabs.ts
 inline src/renderer/src/store/slices/ui.ts
 inline src/shared/keybindings.ts
 inline src/shared/telemetry-events.ts
-inline src/shared/text-search.ts
-inline tests/e2e/helpers/terminal.ts
 mobile-config app/h/*/index.tsx
 mobile-config app/h/*/session/*.tsx
 mobile-config app/h/*/source-control/*.tsx
@@ -89,6 +84,5 @@ mobile-config app/h/*/tasks.tsx
 mobile-config app/index.tsx
 mobile-config src/browser/MobileBrowserPane.tsx
 mobile-config src/components/NewWorktreeModal.tsx
-mobile-config src/components/mobile-rich-markdown-editor-html.ts
 mobile-config src/terminal/terminal-webview-html.ts
 mobile-config src/transport/rpc-client.ts

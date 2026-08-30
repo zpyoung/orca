@@ -9,6 +9,7 @@ import type {
   RuntimeDegradation
 } from './runtime-capability-degradation'
 import type { TabGroupLayoutNode } from './tab-types'
+import type { TerminalDockPaneState } from './fork-terminal-dock/terminal-dock-pane-state'
 import type { TerminalColorOverrides } from './terminal-color-overrides'
 import type { TerminalLayoutSnapshot, TerminalPaneLayoutNode } from './terminal-tab-types'
 import type { TuiAgent } from './tui-agent'
@@ -178,6 +179,7 @@ export type RuntimeMobileSessionTerminalTab = {
   color?: string | null
   isPinned?: boolean
   viewMode?: 'terminal' | 'chat'
+  terminalDockByPaneKey?: Record<string, TerminalDockPaneState>
   launchDraft?: string
   launchDraftCreatedAt?: number
   isActive: boolean

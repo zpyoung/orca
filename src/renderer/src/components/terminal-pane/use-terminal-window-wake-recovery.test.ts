@@ -216,6 +216,7 @@ describe('useTerminalWindowWakeRecovery', () => {
     vi.stubGlobal('devicePixelRatio', 1)
     const { unmount } = renderHook(() =>
       useTerminalWindowWakeRecovery({
+        ...focusOwnership,
         isVisible: true,
         managerRef: { current: resizeManager },
         isActiveRef: { current: true },
@@ -245,6 +246,7 @@ describe('useTerminalWindowWakeRecovery', () => {
     vi.stubGlobal('devicePixelRatio', 1)
     renderHook(() =>
       useTerminalWindowWakeRecovery({
+        ...focusOwnership,
         isVisible: true,
         managerRef,
         isActiveRef: { current: true },
@@ -272,6 +274,7 @@ describe('useTerminalWindowWakeRecovery', () => {
     repairPaneWebglCanvasDprMock.mockReturnValueOnce('deferred').mockReturnValue('repaired')
     renderHook(() =>
       useTerminalWindowWakeRecovery({
+        ...focusOwnership,
         isVisible: true,
         managerRef: { current: { getPanes: () => [pane] } as unknown as PaneManager },
         isActiveRef: { current: true },
@@ -302,6 +305,7 @@ describe('useTerminalWindowWakeRecovery', () => {
     repairPaneWebglCanvasDprMock.mockReturnValue('deferred')
     renderHook(() =>
       useTerminalWindowWakeRecovery({
+        ...focusOwnership,
         isVisible: true,
         managerRef: { current: { getPanes: () => [pane] } as unknown as PaneManager },
         isActiveRef: { current: true },

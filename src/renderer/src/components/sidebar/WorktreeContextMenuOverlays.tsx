@@ -21,6 +21,7 @@ export function WorktreeContextMenuOverlays({ model }: { model: WorktreeContextM
         onOpenChange={model.handleCreateGroupDialogOpenChange}
         onSubmit={model.handleSubmitNewProjectGroup}
       />
+      {model.worktreeGroupDialog.dialog}
       {model.parentPicker ? (
         <WorktreeParentPickerPopover
           open={model.parentPickerOpen}

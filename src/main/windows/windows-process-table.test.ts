@@ -184,7 +184,7 @@ describe('PowerShell fallback when the native binding is absent', () => {
   })
 })
 
-describe('wedge cooldown', () => {
+describe('sticky wedge', () => {
   let platform: PropertyDescriptor | undefined
 
   beforeEach(() => {

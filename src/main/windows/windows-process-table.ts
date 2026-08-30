@@ -53,9 +53,10 @@ type WindowsProcessTreeModule = {
 
 const requireFromMain = createRequire(__filename)
 
-let cachedModule: WindowsProcessTreeModule | null | undefined
-let moduleLoader: () => WindowsProcessTreeModule | null = loadWindowsProcessTree
-let cimScan: () => Promise<WindowsProcessRow[]> = readWindowsProcessRowsWithCim
+// Why injectable: `createRequire` bypasses the module mocker, and the two
+// resolution steps below are the exact thing #15749 shipped untested -- the
+// relay suites replaced the loader wholesale, so nothing exercised the require.
+let requireNative: (specifier: string) => unknown = requireFromMain
 
 /**
  * The bare addon a relay host receives, with no npm package around it.
@@ -307,14 +308,6 @@ export function __setWindowsProcessTreeRequireForTests(
   moduleLoader = loadWindowsProcessTree
   cachedModule = undefined
   resetNativeReaderState()
-  snapshotReader.reset()
-}
-
-/** Test-only: substitute the no-binding PowerShell scan, which spawns a child. */
-export function __setWindowsProcessTableCimScanForTests(
-  scan?: () => Promise<WindowsProcessRow[]>
-): void {
-  cimScan = scan ?? readWindowsProcessRowsWithCim
   snapshotReader.reset()
 }
 

@@ -23,7 +23,6 @@ import { terminalSurfaceTombstoneSchema } from './terminal-surface-tombstone-sch
 import { parseExecutionHostId, type ExecutionHostId } from './execution-host'
 import { isTuiAgent } from './tui-agent-config'
 import { terminalDockByPaneKeySchema } from './fork-terminal-dock/workspace-session-terminal-dock-schema'
-import { persistedOpenFileSchema } from './workspace-session-editor-schema'
 import { isWorkspaceKey } from './workspace-scope'
 import {
   browserHistoryEntriesSchema,

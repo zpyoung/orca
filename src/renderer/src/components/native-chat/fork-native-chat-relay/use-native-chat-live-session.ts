@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/use-native-chat-live-session.ts
-// FORK-COPY-SHA: 6e4f817101daa18d82824b69243d9079baa9c416
+// FORK-COPY-SHA: ce4df07736baa38d742613bd68d5a3d845f79d25
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   NATIVE_CHAT_SOURCE_PRIORITY,
@@ -70,8 +70,18 @@ function nextSubscriptionId(): string {
 
 export type ReadState =
   | { phase: 'loading' }
+  /** The host reported no transcript behind this window yet: rendered, but not a
+   *  settled read, so nothing may treat the empty list as real history. */
+  | { phase: 'awaiting' }
   | { phase: 'ready'; messages: NativeChatMessage[] }
   | { phase: 'error'; error: string }
+
+/** True while no transcript read has settled — 'loading' and 'awaiting' alike.
+ *  Consumers that must not act on `messages` as real history use this, not a
+ *  bare `!== 'ready'`, which would also swallow the error surface. */
+export function isNativeChatTranscriptUnsettled(phase: ReadState['phase']): boolean {
+  return phase === 'loading' || phase === 'awaiting'
+}
 
 /**
  * Renderer hook that streams a NativeChatSession for a pane: windowed
@@ -142,6 +152,9 @@ export function useNativeChatLiveSession(
     let cancelled = false
     // Set by the first authoritative frame so the readSession seed below can't clobber a live snapshot.
     let frameArrived = false
+    // Set once the host reports no transcript on disk yet, which makes a notFound
+    // read known-good news rather than a failure worth surfacing.
+    let transcriptPending = false
     limitRef.current = NATIVE_CHAT_INITIAL_LIMIT
     oldestOffsetRef.current = null
     setRead({ phase: 'loading' })
@@ -161,7 +174,7 @@ export function useNativeChatLiveSession(
         }),
       // A not-yet-flushed transcript: stay in 'loading' and retry with backoff instead of a permanent error (#8401).
       isPending: (result) => Boolean(result && 'error' in result && result.notFound),
-      isSuperseded: () => frameArrived,
+      isSuperseded: () => frameArrived || transcriptPending,
       onResult: (result) => {
         if (result && 'error' in result) {
           setRead({ phase: 'error', error: result.error })
@@ -197,6 +210,14 @@ export function useNativeChatLiveSession(
             setLoadingEarlier(false)
             if ('error' in frame && frame.error) {
               setRead({ phase: 'error', error: frame.error })
+              return
+            }
+            if (frame.type === 'snapshot' && frame.pending === true) {
+              // No transcript exists yet (an agent that hasn't flushed, or was never
+              // prompted). Move off 'loading' so the view stops spinning, but keep
+              // an in-flight seed and appended tail eligible — this is not a read.
+              transcriptPending = true
+              setRead({ phase: 'awaiting' })
               return
             }
             transcriptCompanionControl.replace(nativeChatCompanionFromFrame(frame))

@@ -27,6 +27,12 @@ Never use vague names like `helpers`, `utils`, `common`, `misc`, or `shared-stuf
 
 ## Type Declarations: Prefer `.ts` Over `.d.ts`
 
+# Verifying Changes
+
+- **Typecheck**: `pnpm tc` (or `tc:node` / `tc:cli` / `tc:web`)
+- **Test**: `pnpm test:sandbox` — never `pnpm test`; see [Running Tests](#running-tests-remote-sandbox-only)
+- **Lint**: `oxlint`, or `pnpm run check:code-quality:changed` for changed files (full `pnpm lint` is slow); format with `pnpm format`
+
 # Fork Feature Structure
 
 This fork tracks upstream stable tags, and every sync resolves file ownership from
