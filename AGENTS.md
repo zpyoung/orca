@@ -7,9 +7,15 @@ All UI work — layout, color, typography, spacing, component selection, UX beha
 Use the `$electron` skill and Playwright CDP for rendered Orca UI checks. Do not use computer-use for Orca UI validation.
 
 # Style
-## Concise/Brief Non-obviosu comments ONLY
-  * DO NOT: be verbose, explain the obvious, walk through the code ("WHY not HOW")
-  * BE CONCISE. 1 LINE if possible
+
+## Reuse Before Reimplementing
+
+Before writing new logic at any scale — a function, component, IPC channel, state store, or whole subsystem/flow — check whether an existing implementation already does the job (or nearly does). Extend or generalize it instead of building a parallel version; only write from scratch when nothing fits. Keep the check proportionate: a quick search for trivial code, a real one before building anything substantial.
+
+## Concise/Brief Non-obvious Comments ONLY
+
+- DO NOT: be verbose, explain the obvious, walk through the code ("WHY not HOW")
+- BE CONCISE. 1 LINE if possible
 
 ## Lint Rules: Do Not Disable Max Lines
 

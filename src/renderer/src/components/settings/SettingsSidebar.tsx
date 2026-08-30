@@ -116,12 +116,7 @@ function isVisibleInstallStatus(
 type SettingsSetupGuideRowProps = {
   progress: SettingsSetupGuideProgress
   setupActive: boolean
-  onSelect: (modifiers: {
-    metaKey: boolean
-    ctrlKey: boolean
-    shiftKey: boolean
-    altKey: boolean
-  }) => void
+  onSelect: () => void
 }
 
 function SettingsSetupGuideNavRow({
@@ -138,14 +133,7 @@ function SettingsSetupGuideNavRow({
         'Onboarding checklist, {{value0}} of {{value1}} done. Show setup guide.',
         { value0: progress.doneCount, value1: progress.total }
       )}
-      onClick={(event) =>
-        onSelect({
-          metaKey: event.metaKey,
-          ctrlKey: event.ctrlKey,
-          shiftKey: event.shiftKey,
-          altKey: event.altKey
-        })
-      }
+      onClick={() => onSelect()}
       className={cn(
         'flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-worktree-sidebar-ring/50',
         setupActive
@@ -238,7 +226,7 @@ export function SettingsSidebar({
           <SettingsSetupGuideNavRow
             progress={setupGuideProgress}
             setupActive={setupActive}
-            onSelect={(modifiers) => onSelectSection('setup-guide', modifiers)}
+            onSelect={() => onSelectSection('setup-guide')}
           />
         </div>
       ) : null}
@@ -262,14 +250,7 @@ export function SettingsSidebar({
                         key={section.id}
                         aria-current={isActive ? 'page' : undefined}
                         data-current={isActive ? 'true' : undefined}
-                        onClick={(event) =>
-                          onSelectSection(section.id, {
-                            metaKey: event.metaKey,
-                            ctrlKey: event.ctrlKey,
-                            shiftKey: event.shiftKey,
-                            altKey: event.altKey
-                          })
-                        }
+                        onClick={() => onSelectSection(section.id)}
                         className={navItemClassName(isActive)}
                       >
                         <Icon className="size-4 shrink-0" />
@@ -305,14 +286,7 @@ export function SettingsSidebar({
                       key={section.id}
                       aria-current={isActive ? 'page' : undefined}
                       data-current={isActive ? 'true' : undefined}
-                      onClick={(event) =>
-                        onSelectSection(section.id, {
-                          metaKey: event.metaKey,
-                          ctrlKey: event.ctrlKey,
-                          shiftKey: event.shiftKey,
-                          altKey: event.altKey
-                        })
-                      }
+                      onClick={() => onSelectSection(section.id)}
                       className={navItemClassName(isActive)}
                     >
                       <RepoIconGlyph
