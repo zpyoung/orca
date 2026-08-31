@@ -173,11 +173,16 @@ export function useNativeChatLiveSession(
           ...(sshConnectionId ? { sshConnectionId } : {})
         }),
       // A not-yet-flushed transcript: stay in 'loading' and retry with backoff instead of a permanent error (#8401).
-      isPending: (result) => Boolean(result && 'error' in result && result.notFound),
-      isSuperseded: () => frameArrived || transcriptPending,
+      isPending: (result) =>
+        !transcriptPending && Boolean(result && 'error' in result && result.notFound),
+      isSuperseded: () => frameArrived,
       onResult: (result) => {
         if (result && 'error' in result) {
-          setRead({ phase: 'error', error: result.error })
+          // The live resolve-poll stream owns recovery once it confirms the file is
+          // missing, so a notFound here is known-good news, not a failure to surface.
+          if (!(transcriptPending && result.notFound)) {
+            setRead({ phase: 'error', error: result.error })
+          }
           return
         }
         const messages = result?.messages ?? []
@@ -217,7 +222,6 @@ export function useNativeChatLiveSession(
               // prompted). Move off 'loading' so the view stops spinning, but keep
               // an in-flight seed and appended tail eligible — this is not a read.
               transcriptPending = true
-              cancelSeedRead()
               setRead({ phase: 'awaiting' })
               return
             }
