@@ -65,45 +65,6 @@ and density".
 
 **Status:** pending-upstream. Not yet submitted.
 
-## Chat header controls fix
-
-**What:** `TerminalPane.tsx` gates `activePaneIsChatLeaf` on `effectiveChatViewMode` rather than
-`isChatViewMode`. With the experimental native-chat flag off, a tab can still carry
-`viewMode: 'chat'`, and the header must not offer chat-only controls while the chat surface itself
-is suppressed.
-
-**Why upstream, not isolated:** a correctness fix to upstream's own chat/terminal header-control
-gating, unrelated to any of the fork's four features (it landed inside the `native-chat-width`
-feature commit as an incidental fix, not width functionality).
-
-**Paths:**
-- `src/renderer/src/components/terminal-pane/TerminalPane.tsx`
-
-**Introduced:** commit `9ac7e7c423` (2026-08-06), "feat(native-chat): configurable reading-column
-width" (the fix rode in on this commit; it is not part of the width feature itself).
-
-**Status:** pending-upstream. Not yet submitted.
-
-## Workspace session schema split
-
-**What:** the persisted-open-file schemas move out of `workspace-session-schema.ts` into a new
-`workspace-session-editor-schema.ts`, which the original then imports. No schema changes — the
-`persistedOpenFileSchema` object is byte-identical, only relocated.
-
-**Why upstream, not isolated:** `workspace-session-schema.ts` sits at 299 code lines against a
-300-line cap, so the terminal-dock feature's two seam lines (a fork import and one `tabSchema`
-field) do not fit without a split. The split itself is upstream's own file being reorganized, and
-the extracted module holds no fork content — isolating it into a `fork-` directory would put
-upstream code under a fork glob and hand the fork permanent ownership of a schema it did not write.
-
-**Paths:**
-- `src/shared/workspace-session-editor-schema.ts`
-
-**Introduced:** commit `e63c56e90c` (2026-08-18), "fix(composer): reintegrate the codex typed-command
-send after the rebase onto main".
-
-**Status:** pending-upstream. Not yet submitted.
-
 ## React Doctor changed-lines gate
 
 **What:** three one-line rewrites in files v1.4.186 introduced — two `Array<T>` uses become `T[]`,
@@ -117,9 +78,11 @@ deliberately allow. `mobile/.oxlintrc.json` turns `typescript/array-type` and
 both configs at once, since Metro — the reason mobile avoids the `node:` protocol — never bundles a
 test file.
 
-`react-doctor/no-ref-current-in-render` and `react-doctor/no-effect-with-fresh-deps` default to
-`error` in the CLI but are absent from `config/oxlint-react-doctor.json`, the repo's curated React
-Doctor rule list, where every listed rule runs at `warn`. Both fire only on deliberate,
+`react-doctor/no-ref-current-in-render`, `react-doctor/no-effect-with-fresh-deps` and
+`react-doctor/no-prop-callback-in-render` default to `error` in the CLI but are absent from
+`config/oxlint-react-doctor.json`, the repo's curated React Doctor rule list, where every listed
+rule runs at `warn`. `react-doctor/effect-needs-cleanup` is stranger still: it *is* on that list at
+`warn`, so the CLI running it at `error` contradicts the severity the repo declares for it. Both fire only on deliberate,
 upstream-authored patterns: latest-value refs written during render, a render-phase array-identity
 cache, and test harnesses whose inline ref literals are the fixture under test. Setting them to
 `warn` in `package.json` aligns the CLI with the severity the repo already declares, and keeps the
@@ -137,11 +100,26 @@ them hot sidebar hooks — and rewriting ref patterns upstream has no reason to 
 - `mobile/src/browser/mobile-browser-frameless-stream.test.tsx`
 - `mobile/src/session/pending-terminal-handle-recovery.test.ts`
 - `mobile/src/transport/mobile-relay-rpc-session-liveness.test.ts`
+- `mobile/src/browser/mobile-browser-frame-state.ts`
+- `mobile/src/diagnostics/connection-diagnostics-submission.ts`
+- `src/renderer/src/components/right-sidebar/checks-panel/use-checks-list-state.tsx`
 
 The `package.json` severities need no `exceptions` row of their own; the file is already declared
 `permanent`.
 
+The v1.4.193 sync added the last three. The first two are the same shape as the originals — a
+`node:buffer` import and a template literal, on lines the merge touched. The third is different in
+kind: `use-checks-list-state.tsx` wrote `autoExpandedContextRef` *inside* a `setExpandedCheckKeys`
+updater, and React may run an updater more than once, so the write is hoisted into the effect that
+queues it. That one is a genuine correctness fix to upstream's hook and worth submitting on its own
+merits, not just to clear the gate.
+
 **Introduced:** the v1.4.186 sync (2026-08-21), fixing the `static analysis` job on PR #12.
+The v1.4.193 sync added the last two severities. That release lands a new 48-file
+`right-sidebar/checks-panel/` subsystem, so every line in it is a changed line and the CLI reported
+20+ findings there under those two rules. Upstream's own `package.json` downgrades neither, and the
+CLI's rule set has moved since upstream merged that code, so upstream `main` would fail this gate
+today as well — the findings are upstream's to resolve, not the fork's to rewrite blind.
 
 **Status:** pending-upstream. Not yet submitted. Drop any entry upstream resolves on its own — the
 CLI's rule set moves independently of the pinned `react-doctor@0.9.1` version.

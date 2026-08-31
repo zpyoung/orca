@@ -82,6 +82,9 @@ export type NativeChatAppendedPayload = {
         hasMore: boolean
         beforeOffset?: number
         error?: string
+        /** No transcript exists behind this window yet — render it, but do not
+         *  treat it as a settled read of the session's history. */
+        pending?: boolean
       }
     | {
         type: 'replacement'
@@ -217,6 +220,18 @@ async function handleSubscribe(event: IpcMainEvent, args: NativeChatSubscribeArg
     sessionId,
     transcriptPath,
     initialLimit: limit,
+    onTranscriptPending: () => {
+      if (sender.isDestroyed()) {
+        return
+      }
+      // `pending` marks a window with no transcript behind it yet; clients that
+      // don't know the flag still stop spinning on the empty snapshot.
+      const payload: NativeChatAppendedPayload = {
+        subscriptionId,
+        frame: { type: 'snapshot', messages: [], hasMore: false, pending: true }
+      }
+      sender.send('nativeChat:appended', payload)
+    },
     onInitialSnapshot: (messages, hasMore, beforeOffset, error, companion) => {
       if (sender.isDestroyed()) {
         return

@@ -133,7 +133,12 @@ export type TabsSlice = TabTerminalDockSlice & {
   activateTab: (tabId: string, opts?: { preservePreview?: boolean; worktreeId?: string }) => void
   closeUnifiedTab: (
     tabId: string,
-    opts?: { recordInteraction?: boolean; terminalRetirementHandled?: boolean }
+    opts?: {
+      /** Keep the worktree selected even if this empties it — for closes the user did not ask for. */
+      preserveWorktreeSelection?: boolean
+      recordInteraction?: boolean
+      terminalRetirementHandled?: boolean
+    }
   ) => { closedTabId: string; wasLastTab: boolean; worktreeId: string } | null
   reorderUnifiedTabs: (
     groupId: string,
@@ -713,7 +718,7 @@ export function projectWorktreeTabModelReconciliation(
     if (tab.contentType === 'browser') {
       return liveBrowserIds.has(tab.entityId)
     }
-    if (tab.contentType === 'simulator') {
+    if (tab.contentType === 'simulator' || tab.contentType === 'agent-session') {
       return true
     }
     return liveEditorIds.has(tab.entityId)
@@ -1198,7 +1203,10 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
         nextLayoutByWorktree = collapsedState.layoutByWorktree
         nextActiveGroupIdByWorktree = collapsedState.activeGroupIdByWorktree
       }
+      // Why: the landing fallback answers "the user emptied this worktree". An unwound create
+      // never added a tab, so it must leave the selection exactly as the click found it.
       const shouldDeactivateWorktree =
+        !opts?.preserveWorktreeSelection &&
         current.activeWorktreeId === worktreeId &&
         nextTabs.length === 0 &&
         (current.tabsByWorktree[worktreeId] ?? []).length === 0 &&
