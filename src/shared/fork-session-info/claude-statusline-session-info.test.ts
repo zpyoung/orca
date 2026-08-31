@@ -57,12 +57,12 @@ describe('parseClaudeSessionInfoStatusLineBody', () => {
   })
 
   it('preserves rate limits when session telemetry is absent', () => {
-    expect(
-      parseClaudeSessionInfoStatusLineBody(
-        form({ rate_limits: { five_hour: { used_percentage: 8 } } }, ''),
-        123
-      )
-    ).toMatchObject({ fiveHour: { used_percentage: 8 }, telemetry: undefined })
+    const parsed = parseClaudeSessionInfoStatusLineBody(
+      form({ rate_limits: { five_hour: { used_percentage: 8 } } }, ''),
+      123
+    )
+    expect(parsed).toMatchObject({ fiveHour: { used_percentage: 8 } })
+    expect(parsed?.telemetry).toBeUndefined()
   })
 
   it('rejects malformed, unbounded, and out-of-range telemetry fields', () => {

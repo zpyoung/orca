@@ -1,4 +1,3 @@
-import { wrapWindowsPowerShellEncodedCommand } from '../agent-hooks/installer-utils'
 import { getManagedStatusLineScript as getUpstreamStatusLineScript } from '../claude/statusline-script'
 
 export const SESSION_INFO_STATUSLINE_CHAIN_ENV = 'ORCA_SESSION_INFO_STATUSLINE_CHAIN_ACTIVE'
@@ -48,53 +47,18 @@ function getPosixChainBlock(): string {
   ].join('\n')
 }
 
-function getWindowsRelayCommand(): string {
-  const runnerRelativePath = `.orca\\agent-hooks\\${WINDOWS_STATUSLINE_CHAIN_RUNNER}`
-  return wrapWindowsPowerShellEncodedCommand(
-    [
-      `$runner = Join-Path $env:USERPROFILE '${runnerRelativePath}';`,
-      '$payload = $env:ORCA_STATUSLINE_PAYLOAD_FILE;',
-      'if (-not (Test-Path -LiteralPath $runner -PathType Leaf) -or -not (Test-Path -LiteralPath $payload -PathType Leaf)) { exit 0 };',
-      '$output = [IO.Path]::GetTempFileName();',
-      '$process = $null; $outputStream = $null;',
-      'try {',
-      '  $psi = [Diagnostics.ProcessStartInfo]::new();',
-      '  $psi.FileName = $env:ComSpec;',
-      '  $psi.Arguments = \'/d /s /c ""%ORCA_CHAIN_RUNNER_PATH%" < "%ORCA_CHAIN_PAYLOAD_PATH%""\';',
-      '  $psi.UseShellExecute = $false; $psi.CreateNoWindow = $true;',
-      '  $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true;',
-      `  $psi.EnvironmentVariables['${SESSION_INFO_STATUSLINE_CHAIN_ENV}'] = '1';`,
-      "  $psi.EnvironmentVariables['ORCA_CHAIN_RUNNER_PATH'] = $runner;",
-      "  $psi.EnvironmentVariables['ORCA_CHAIN_PAYLOAD_PATH'] = $payload;",
-      '  $process = [Diagnostics.Process]::new(); $process.StartInfo = $psi;',
-      '  if (-not $process.Start()) { exit 0 };',
-      '  $outputStream = [IO.File]::Create($output);',
-      '  $stdoutTask = $process.StandardOutput.BaseStream.CopyToAsync($outputStream);',
-      '  $stderrTask = $process.StandardError.BaseStream.CopyToAsync([IO.Stream]::Null);',
-      '  if (-not $process.WaitForExit(1000)) {',
-      '    try { & "$env:SystemRoot\\System32\\taskkill.exe" /PID $process.Id /T /F *> $null } catch {};',
-      '    $null = $process.WaitForExit(100);',
-      '    exit 0;',
-      '  };',
-      '  $stdoutReady = $stdoutTask.Wait(100); $stderrReady = $stderrTask.Wait(100);',
-      '  $outputStream.Flush(); $outputStream.Dispose(); $outputStream = $null;',
-      '  if ($process.ExitCode -eq 0 -and $stdoutReady -and $stderrReady) {',
-      '    $source = [IO.File]::OpenRead($output);',
-      '    try { $source.CopyTo([Console]::OpenStandardOutput()) } finally { $source.Dispose() };',
-      '  };',
-      '} catch {',
-      '} finally {',
-      '  if ($null -ne $outputStream) { $outputStream.Dispose() };',
-      '  if ($null -ne $process) { $process.Dispose() };',
-      '  Remove-Item -LiteralPath $output -Force -ErrorAction SilentlyContinue;',
-      '}'
-    ].join(' ')
-  )
-}
-
 function getWindowsChainBlock(): string {
   const runner = `%USERPROFILE%\\.orca\\agent-hooks\\${WINDOWS_STATUSLINE_CHAIN_RUNNER}`
-  return `if not defined ${SESSION_INFO_STATUSLINE_CHAIN_ENV} if exist "${runner}" ${getWindowsRelayCommand()} 2>nul`
+  const output = '%TEMP%\\orca-statusline-chain-%ORCA_STATUSLINE_PANE_ID%.out'
+  return [
+    `if not defined ${SESSION_INFO_STATUSLINE_CHAIN_ENV} if exist "${runner}" (`,
+    // the guard must be set before the child spawns so a user command that re-enters stops here
+    `  set "${SESSION_INFO_STATUSLINE_CHAIN_ENV}=1"`,
+    `  "%ComSpec%" /d /s /c ""${runner}" < "%ORCA_STATUSLINE_PAYLOAD_FILE%"" >"${output}" 2>nul`,
+    `  if not errorlevel 1 type "${output}" 2>nul`,
+    `  del "${output}" 2>nul`,
+    ')'
+  ].join('\r\n')
 }
 
 /** Include context telemetry for API-key sessions as well as subscriber rate limits. */

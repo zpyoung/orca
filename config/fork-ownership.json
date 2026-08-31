@@ -1646,7 +1646,9 @@
       "kind": "registration",
       "lines": [
         "vi.mock('../../fork-session-handoff/session-lineage-ipc', () => ({",
-        "  registerForkSessionHandoffHandlers: vi.fn()"
+        "  registerForkSessionHandoffHandlers: vi.fn()",
+        "vi.mock('../../fork-session-info/session-info-ipc', () => ({",
+        "  registerSessionInfoIpcHandlers: vi.fn()"
       ]
     },
     {
@@ -3162,7 +3164,7 @@
       "removed": 0
     },
     "src/main/ipc/register-core-handlers/register-core-handlers.test.ts": {
-      "added": 4,
+      "added": 8,
       "removed": 0
     },
     "src/main/ipc/register-core-handlers/register-core-handlers.ts": {

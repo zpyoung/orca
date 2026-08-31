@@ -143,23 +143,21 @@ describe('session info chained statusline script', () => {
     expect(script).toContain('*\'"context_window"\'*')
   })
 
-  it('injects bounded Windows Process APIs after capture and before throttle', () => {
+  it('chains through cmd builtins after capture and before throttle, spawning no interpreter', () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
     const script = getManagedStatusLineScript('local')
     const capture = script.indexOf('ORCA_STATUSLINE_PAYLOAD_FILE%" 2>nul')
     const chain = script.indexOf(SESSION_INFO_STATUSLINE_CHAIN_ENV)
     const throttle = script.indexOf('set "ORCA_STATUSLINE_STAMP_FILE=')
-    const encoded = script.match(/-EncodedCommand (\S+)/)?.[1]
-    const decoded = Buffer.from(encoded ?? '', 'base64').toString('utf16le')
 
     expect(capture).toBeLessThan(chain)
     expect(chain).toBeLessThan(throttle)
-    expect(decoded).toContain('[Diagnostics.ProcessStartInfo]::new()')
-    expect(decoded).toContain('$process.WaitForExit(1000)')
-    expect(decoded).toContain('taskkill.exe')
-    expect(decoded).toContain('/T /F')
-    expect(decoded).toContain('RedirectStandardError = $true')
-    expect(decoded).toContain("EnvironmentVariables['ORCA_SESSION_INFO_STATUSLINE_CHAIN_ACTIVE']")
+    expect(script).not.toMatch(/powershell(\.exe)?/i)
+    expect(script).toContain('"%ComSpec%" /d /s /c ""%USERPROFILE%')
+    expect(script).toContain('< "%ORCA_STATUSLINE_PAYLOAD_FILE%""')
+    expect(script).toContain(`  set "${SESSION_INFO_STATUSLINE_CHAIN_ENV}=1"`)
+    expect(script).toContain('if not errorlevel 1 type "%TEMP%\\orca-statusline-chain-')
+    expect(script).toContain('del "%TEMP%\\orca-statusline-chain-')
     expect(script).toContain('context_window')
   })
 })

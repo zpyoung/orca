@@ -32,6 +32,9 @@ function state(
       [`tab-1:${SIBLING_LEAF}`]: status(`tab-1:${SIBLING_LEAF}`)
     },
     folderWorkspaces: [],
+    // upstream routes an unknown worktree id to local regardless of settings, so the
+    // fixture must publish the repo the id derives from for runtime ownership to resolve
+    repos: [{ id: 'worktree-1' }],
     settings: { activeRuntimeEnvironmentId: null },
     terminalLayoutsByTabId: {
       'tab-1': {

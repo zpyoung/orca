@@ -228,6 +228,10 @@ vi.mock('../../fork-session-handoff/session-lineage-ipc', () => ({
   registerForkSessionHandoffHandlers: vi.fn()
 }))
 
+vi.mock('../../fork-session-info/session-info-ipc', () => ({
+  registerSessionInfoIpcHandlers: vi.fn()
+}))
+
 vi.mock('../skills', () => ({
   registerSkillsHandlers: registerSkillsHandlersMock
 }))
