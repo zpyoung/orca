@@ -17,9 +17,13 @@ import { lastEnteredDoneAt } from './agent-finished-timestamp'
 import { SessionHandoffLineageBadge } from '@/components/agent-session-continuation/fork-session-handoff/SessionHandoffLineageBadge'
 
 // Why: narrow the dashboard's rollup states to shared dot states, defaulting unknowns to 'idle' so a row never crashes.
-function asDotState(state: AgentStatusState | 'idle'): AgentDotState {
+function asDotState(
+  state: AgentStatusState | 'idle',
+  workingMode?: DashboardAgentRowData['entry']['workingMode']
+): AgentDotState {
   switch (state) {
     case 'working':
+      return workingMode === 'monitoring' ? 'monitoring' : 'working'
     case 'blocked':
     case 'waiting':
     case 'done':
@@ -144,12 +148,14 @@ const DashboardAgentRow = React.memo(function DashboardAgentRow({
   const conversationName = useAgentRowConversationName(agent)
   const prompt = conversationName ?? getAgentRowPrimaryText(agent.entry)
   // Why: prompt is '' when unknown, so fall back to the state label to keep the row labeled.
-  const displayLabel = prompt || agentStateLabel(asDotState(agent.state))
+  const displayLabel = prompt || agentStateLabel(asDotState(agent.state, agent.entry.workingMode))
   const model = agent.entry.model?.trim() ?? ''
-  const isWorking = agent.state === 'working'
+  const isMonitoring = agent.state === 'working' && agent.entry.workingMode === 'monitoring'
+  const isWorking = agent.state === 'working' && !isMonitoring
   // Why: 'working' names the running tool and 'waiting' names what an approval is blocked on;
   // anywhere else a leftover tool line reads as still-running. See showsAgentToolPreview.
-  const showsTool = showsAgentToolPreview(agent.state)
+  // Monitoring is excluded too: the lead turn is over, so its last tool line is stale.
+  const showsTool = showsAgentToolPreview(agent.state) && !isMonitoring
   const toolName = showsTool ? (agent.entry.toolName?.trim() ?? '') : ''
   const toolInput = showsTool ? (agent.entry.toolInput?.trim() ?? '') : ''
   const lastAssistantMessage = agent.entry.lastAssistantMessage?.trim() ?? ''
@@ -165,7 +171,9 @@ const DashboardAgentRow = React.memo(function DashboardAgentRow({
         }`
       : [formatAgentTypeLabel(agent.agentType), model].filter(Boolean).join(' · ')
   // Why: interrupted is a terminal outcome, so surface it in the leading state dot.
-  const dotState: AgentDotState = isInterrupted ? 'interrupted' : asDotState(agent.state)
+  const dotState: AgentDotState = isInterrupted
+    ? 'interrupted'
+    : asDotState(agent.state, agent.entry.workingMode)
   const dotTooltipLabel = stateDotTooltipLabel(agent, dotState)
 
   // Why: always show the chevron so the row's right edge doesn't flicker as content grows/shrinks.
@@ -246,7 +254,7 @@ const DashboardAgentRow = React.memo(function DashboardAgentRow({
               className="inline-flex shrink-0 items-center justify-center"
               aria-label={dotTooltipLabel}
             >
-              <AgentStateDot state={dotState} size={stateDotSize} />
+              <AgentStateDot state={dotState} size={stateDotSize} title={null} />
             </span>
           </TooltipTrigger>
           <TooltipContent side="top" sideOffset={4}>

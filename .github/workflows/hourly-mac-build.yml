@@ -137,6 +137,7 @@ jobs:
         if: steps.freshness.outputs.should_build == 'true'
         uses: pnpm/action-setup@v6
         with:
+          version: 10.24.0
           run_install: false
 
       - name: Setup Node.js
@@ -289,7 +290,6 @@ jobs:
           (SmartScreen will warn about an unknown publisher). Every later switch,
           including back to Stable, works in-app from there."
           echo "tag=$TAG" >>"$GITHUB_OUTPUT"
-
 
       - name: Publish hourly macOS artifacts
         if: steps.freshness.outputs.should_build == 'true'
