@@ -589,7 +589,6 @@ function TerminalPane(
     managerRef,
     containerRef
   })
-  const toggleTabViewMode = useAppStore((store) => store.toggleTabViewMode)
   const setTabViewMode = useAppStore((store) => store.setTabViewMode)
   const savedLayout = useAppStore((store) => store.terminalLayoutsByTabId[tabId] ?? EMPTY_LAYOUT)
   const terminalTab = useAppStore((store) =>
@@ -735,38 +734,6 @@ function TerminalPane(
   useEffect(() => {
     onPaneRetiredRef.current = prunePassthroughForRetiredPane
   }, [prunePassthroughForRetiredPane])
-  const canToggleChatForLeaf = useCallback(
-    (leafId: string | null): boolean => {
-      // Scope the "always allow toggling back" rule to the leaf showing chat; must not make an unsupported sibling look eligible.
-      const isChatViewForLeaf = effectiveChatViewMode && leafId !== null && chatLeafId === leafId
-      return (nativeChatEnabled && isChatViewForLeaf) || isChatEligibleForLeaf(leafId)
-    },
-    [chatLeafId, effectiveChatViewMode, isChatEligibleForLeaf, nativeChatEnabled]
-  )
-  const toggleNativeChatForLeaf = useCallback(
-    (leafId: string) => {
-      if (!unifiedTabId) {
-        return
-      }
-      if (effectiveChatViewMode && chatLeafId === leafId) {
-        setChatLeafId(null)
-        toggleTabViewMode(unifiedTabId)
-        return
-      }
-      setChatLeafId(leafId)
-      if (!effectiveChatViewMode) {
-        toggleTabViewMode(unifiedTabId)
-      }
-    },
-    [unifiedTabId, effectiveChatViewMode, chatLeafId, toggleTabViewMode]
-  )
-  const handleToggleNativeChat = useCallback(() => {
-    const activeLeafId = managerRef.current?.getActivePane()?.leafId ?? null
-    if (!activeLeafId) {
-      return
-    }
-    toggleNativeChatForLeaf(activeLeafId)
-  }, [toggleNativeChatForLeaf])
   // Stable identity: this reaches the session-option surface's useMemo deps, so an
   // inline arrow would rebuild the surface on every TerminalPane render.
   const switchNativeChatToTerminal = useCallback(() => {
@@ -3078,12 +3045,8 @@ function TerminalPane(
     leafId: chatPane?.leafId ?? null,
     leafIds: getNativeChatLeafIds()
   })
-  // effectiveChatViewMode, not isChatViewMode: with the experimental flag off the
-  // tab can still carry viewMode 'chat', and the header must not offer chat-only
-  // controls while the chat surface is suppressed.
-  const activePaneIsChatLeaf = Boolean(
-    effectiveChatViewMode && activePane?.leafId && activePane.leafId === chatLeafId
-  )
+  const structuredChatAgent = structuredSessionAgent ?? chatPaneResolvedAgent ?? chatPaneLaunchAgent
+  const structuredChatTarget = useMemo(() => ({ kind: 'local' as const }), [])
   // A split can host different agents, so continuation resolves the specific leaf before using tab-wide hints.
   const resolveAgentForLeaf = (leafId: string | null): string | null => {
     const detectedAgent = leafId ? (tabAgentTypeByLeaf[leafId] ?? null) : null
@@ -3105,9 +3068,6 @@ function TerminalPane(
   const contextMenuCanContinueInNewSession = canContinueAgentSessionInNewSession(
     resolveAgentForLeaf(contextMenuLeafId)
   )
-  // Each toggle gates on its own leaf (header=active, menu=opened-over), so mixed splits show it only where chat can render.
-  const activePaneCanToggleChat = canToggleChatForLeaf(activePane?.leafId ?? null)
-  const contextMenuCanToggleChat = canToggleChatForLeaf(contextMenuLeafId)
   // Mirrors the dock's own mount gate, so the menu never offers a toggle for a pane
   // where no dock could render.
   const contextMenuDockPaneKey = contextMenuLeafId ? makePaneKey(tabId, contextMenuLeafId) : null
@@ -3365,9 +3325,6 @@ function TerminalPane(
         canContinueAgentSessionInNewSession={contextMenuCanContinueInNewSession}
         onContinueAgentSessionInNewSession={contextMenu.onContinueAgentSessionInNewSession}
         onForkAgentSession={() => void contextMenu.onForkAgentSession()}
-        canToggleNativeChat={contextMenuCanToggleChat}
-        isNativeChatView={contextMenuIsChatView}
-        onToggleNativeChat={handleContextMenuToggleNativeChat}
         canToggleTerminalDock={contextMenuCanToggleDock}
         isTerminalDockDocked={Boolean(
           contextMenuDockPaneKey && terminalDock.isPaneDocked(contextMenuDockPaneKey)

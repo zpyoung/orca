@@ -207,6 +207,8 @@ export type GlobalSettings = {
   openAgentTabsInChatByDefault?: boolean
   /** Experimental native chat surface for Claude/Codex sessions; off by default. */
   experimentalNativeChat?: boolean
+  /** Opt-in updated structured runtime; off keeps the existing PTY-backed native chat path. */
+  experimentalStructuredNativeChat?: boolean
   /** Experimental per-pane docked composer for agent terminals; off by default. */
   experimentalTerminalDock?: boolean
   /** Open the terminal composer automatically for new agent sessions; mounted panes are unchanged. */

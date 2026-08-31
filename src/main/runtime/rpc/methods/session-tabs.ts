@@ -77,29 +77,6 @@ export const SESSION_TAB_METHODS: RpcAnyMethod[] = [
       })
     }
   }),
-  defineMethod({
-    name: 'session.tabs.updatePaneLayout',
-    params: UpdatePaneLayout,
-    handler: async (params, { runtime }) =>
-      runtime.updateMobileSessionPaneLayout(params.worktree, {
-        tabId: params.tabId,
-        root: params.root,
-        expandedLeafId: params.expandedLeafId ?? null,
-        titlesByLeafId: params.titlesByLeafId
-      })
-  }),
-  defineMethod({
-    name: 'session.tabs.setTabProps',
-    params: SetTabProps,
-    handler: async (params, { runtime }) =>
-      runtime.setMobileSessionTabProps(params.worktree, {
-        tabId: params.tabId,
-        ...(params.color !== undefined ? { color: params.color } : {}),
-        ...(params.isPinned !== undefined ? { isPinned: params.isPinned } : {}),
-        ...(params.viewMode !== undefined ? { viewMode: params.viewMode } : {}),
-        ...(params.terminalDock !== undefined ? { terminalDock: params.terminalDock } : {})
-      })
-  }),
   defineStreamingMethod({
     name: 'session.tabs.subscribe',
     params: WorktreeTabSelector,

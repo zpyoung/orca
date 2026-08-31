@@ -2870,14 +2870,16 @@ function applyWebSessionTabsSnapshotWithContext(
     .filter((entry): entry is [string, string] => entry !== null)
   const exactProvisionalHandoffs = new Set(exactProvisionalHandoffEntries.map(([id]) => id))
   const provisionalHandoffHostTabIdByProvisionalTabId = new Map(exactProvisionalHandoffEntries)
-  const retainedTerminalTabs = currentTerminalTabs.filter(
-    (tab) =>
-      !shouldReplaceTerminalTab(
-        tab,
-        environmentId,
-        nextRemotePtyIds,
-        nextMirroredTerminalIds,
-        exactProvisionalHandoffs
+  const retainedTerminalTabs = reconcilesNonAgentTabs
+    ? currentTerminalTabs.filter(
+        (tab) =>
+          !shouldReplaceTerminalTab(
+            tab,
+            environmentId,
+            nextRemotePtyIds,
+            nextMirroredTerminalIds,
+            exactProvisionalHandoffs
+          )
       )
     : currentTerminalTabs
   const mirroredTerminalTabs = buildMirroredTerminalTabs(
@@ -3366,7 +3368,7 @@ function applyWebSessionTabsSnapshotWithContext(
     // Why: an entity-identical replacement (provisional terminal → mirrored surface, local
     // editor → host editor tab) is a rename — its position and focus must carry over.
     const rekeyedTabIds = new Map<string, string>()
-    for (const [provisionalTabId, hostTabId] of provisionalHandoffHostTabIds) {
+    for (const [provisionalTabId, hostTabId] of provisionalHandoffHostTabIdByProvisionalTabId) {
       const mirroredId = toWebTerminalSurfaceTabId(hostTabId)
       if (mirroredId !== provisionalTabId) {
         rekeyedTabIds.set(provisionalTabId, mirroredId)
@@ -4350,20 +4352,6 @@ function settleEmptyHostInventoryOnlyIfHostHasNoTerminals(
  * `none` settles; `live` and `unverifiable` leave waiters for the next
  * inventory or per-worktree frame.
  */
-function settleEmptyHostInventoryOnlyIfHostHasNoTerminals(environmentId: string): void {
-  const probedGeneration = getRuntimeEnvironmentConnectionGeneration(environmentId)
-  void probeHostLiveTerminals(environmentId, undefined, probedGeneration).then((verdict) => {
-    // Why: the probe is a round trip, and a reconnect in between would make its
-    // answer speak for a connection whose PTYs nobody listed.
-    if (
-      verdict === 'none' &&
-      getRuntimeEnvironmentConnectionGeneration(environmentId) === probedGeneration
-    ) {
-      markHostSessionMirrorHydrated(environmentId)
-    }
-  })
-}
-
 function createHostSessionMirrorSettle(
   verdict: HostSessionMirrorPatchVerdict
 ): HostSessionMirrorSettle {
@@ -4392,8 +4380,16 @@ function createHostSessionMirrorSettle(
     const { frames, fullInventory } = verdict
     const settles = frames.filter(({ decision }) => decision.settlesHostMirror)
     if (fullInventory && settles.length === fullInventory.publishedSnapshotCount) {
+      const fence = fenceByEnvironment.get(fullInventory.environmentId)
+      if (!fence || !hostSessionMirrorSettleFenceIsCurrent(fence)) {
+        return
+      }
       if (fullInventory.publishedSnapshotCount === 0) {
-        settleEmptyHostInventoryOnlyIfHostHasNoTerminals(fullInventory.environmentId)
+        if (fullInventory.authoritative) {
+          markHostSessionMirrorHydrated(fullInventory.environmentId)
+        } else {
+          settleEmptyHostInventoryOnlyIfHostHasNoTerminals(fence)
+        }
         return
       }
       markHostSessionMirrorHydrated(fullInventory.environmentId)

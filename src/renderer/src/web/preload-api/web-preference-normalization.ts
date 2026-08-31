@@ -24,6 +24,7 @@ import { normalizeDisabledTuiAgents } from '../../../../shared/tui-agent-selecti
 import { normalizeUiLanguage } from '../../../../shared/ui-language'
 import { normalizeUsagePercentageDisplay } from '../../../../shared/usage-percentage-display'
 import { mergeWorkspaceCleanupUIState } from '../../../../shared/workspace-cleanup-ui-state'
+import { mergeForkSessionHandoffSettings } from '../../../../shared/fork-session-handoff/handoff-settings-merge'
 
 export function mergeWebUIState(
   base: PersistedUIState,
@@ -133,6 +134,7 @@ export function mergeSettings(
       ...base.notifications,
       ...updates.notifications
     },
+    ...mergeForkSessionHandoffSettings(base, updates),
     githubProjects: {
       ...(base.githubProjects ?? defaults.githubProjects),
       ...updates.githubProjects

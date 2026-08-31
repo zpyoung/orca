@@ -1,24 +1,36 @@
-import type { NativeChatApi, NativeChatAppendedMessages } from '../../../../preload/api-types'
+import type {
+  NativeChatApi,
+  NativeChatAppendedMessages,
+  NativeChatReadSessionArgs
+} from '../../../../preload/api-types'
+import type { AgentType } from '../../../../shared/native-chat-types'
 import { buildNativeChatUnsubscribe } from '../../../../shared/native-chat-stream-unsubscribe'
 import {
   parseRuntimeNativeChatReadSessionResult,
-  parseRuntimeNativeChatTurnLifecycle
-} from '@/components/native-chat/native-chat-runtime-contract'
+  parseRuntimeNativeChatCompanionFields
+} from '@/components/native-chat/fork-native-chat-relay/native-chat-runtime-contract'
 import { translate } from '@/i18n/i18n'
 import { callRuntimeResult } from './web-runtime-calls'
 import { getClientForEnvironment, requireActiveEnvironmentOrNull } from './web-runtime-session'
 
 export function createWebNativeChatApi(): NativeChatApi {
+  const readNativeChatSession = async (
+    argsOrAgent: NativeChatReadSessionArgs | AgentType,
+    sessionId?: string,
+    limit?: number,
+    transcriptPath?: string
+  ) => {
+    const args =
+      typeof argsOrAgent === 'string'
+        ? { agent: argsOrAgent, sessionId: sessionId ?? '', limit, transcriptPath }
+        : argsOrAgent
+    return parseRuntimeNativeChatReadSessionResult(
+      await callRuntimeResult<unknown>('nativeChat.readSession', args)
+    )
+  }
+
   return {
-    readSession: async (agent, sessionId, limit, transcriptPath) =>
-      parseRuntimeNativeChatReadSessionResult(
-        await callRuntimeResult<unknown>('nativeChat.readSession', {
-          agent,
-          sessionId,
-          limit,
-          transcriptPath
-        })
-      ),
+    readSession: readNativeChatSession,
     subscribe: (args, onFrame) => {
       // No paired runtime yet: return a no-op teardown so the chat view mounts cleanly; only the not-paired case is swallowed.
       const environment = requireActiveEnvironmentOrNull()
@@ -71,9 +83,10 @@ export function createWebNativeChatApi(): NativeChatApi {
                 hasMore?: boolean
                 error?: string
                 lifecycle?: unknown
+                sessionOptions?: unknown
                 pending?: boolean
               }
-              const lifecycle = parseRuntimeNativeChatTurnLifecycle(result?.lifecycle)
+              const companion = parseRuntimeNativeChatCompanionFields(result)
               // No transcript behind this window yet — forwarded so the view can stop spinning, but it is not the settled initial read.
               const pending = result?.pending === true
               if (
@@ -91,7 +104,7 @@ export function createWebNativeChatApi(): NativeChatApi {
                     messages: result.messages,
                     hasMore: result.hasMore ?? result.messages.length >= (args.limit ?? 300),
                     ...(result.error ? { error: result.error } : {}),
-                    ...(lifecycle ? { lifecycle } : {}),
+                    ...companion,
                     ...(pending ? { pending: true } : {})
                   })
                 } else if (result.type === 'snapshot') {
@@ -100,7 +113,7 @@ export function createWebNativeChatApi(): NativeChatApi {
                     messages: result.messages,
                     hasMore: result.hasMore ?? false,
                     ...(result.error ? { error: result.error } : {}),
-                    ...(lifecycle ? { lifecycle } : {}),
+                    ...companion,
                     ...(pending ? { pending: true } : {})
                   })
                 } else {
@@ -110,12 +123,12 @@ export function createWebNativeChatApi(): NativeChatApi {
                           type: 'replacement',
                           messages: result.messages,
                           hasMore: result.hasMore ?? false,
-                          ...(lifecycle ? { lifecycle } : {})
+                          ...companion
                         }
                       : {
                           type: 'appended',
                           messages: result.messages,
-                          ...(lifecycle ? { lifecycle } : {})
+                          ...companion
                         }
                   )
                 }

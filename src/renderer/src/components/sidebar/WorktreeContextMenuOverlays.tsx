@@ -29,6 +29,7 @@ export function WorktreeContextMenuOverlays({ model }: { model: WorktreeContextM
           onOpenChange={model.handleParentPickerOpenChange}
         />
       ) : null}
+      {model.worktreeGroupDialog.dialog}
     </>
   )
 }

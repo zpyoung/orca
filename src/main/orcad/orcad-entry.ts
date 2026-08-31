@@ -5,11 +5,11 @@
  * desktop uses, installs a PTY controller via `registerHeadlessPtyRuntime`, and
  * serves runtime RPC. See docs/design/node-only-runtime-backend.html.
  *
- * The desktop-only surfaces are deliberately left uninstalled: no notifications, no
- * renderer window, no browser panes. Most are declared rather than faked — see
- * `runtime-desktop-surface.ts` and `pty-host-bindings.ts`. The renderer window is the
- * exception: `registerPtyHandlers` takes a non-null `BrowserWindow`, so the headless
- * path still fakes one that reports itself destroyed.
+ * Desktop UI surfaces stay uninstalled: no notifications, no renderer window. The
+ * renderer window is faked as a destroyed one because `registerPtyHandlers` takes a
+ * non-null `BrowserWindow`. Browser automation is different — it is installed through
+ * the runtime factory, but only when an Electron serve sidecar or an operator-supplied
+ * Chromium proves available at startup.
  */
 import process from 'node:process'
 import { setAppEnvironment, type AppEnvironment } from '../../shared/app-environment'

@@ -54,9 +54,6 @@ type TerminalContextMenuProps = {
   canContinueAgentSessionInNewSession: boolean
   onContinueAgentSessionInNewSession: () => void
   onForkAgentSession: () => void
-  canToggleNativeChat: boolean
-  isNativeChatView: boolean
-  onToggleNativeChat: () => void
   canToggleTerminalDock: boolean
   isTerminalDockDocked: boolean
   onToggleTerminalDock: () => void
@@ -96,9 +93,6 @@ export default function TerminalContextMenu({
   canContinueAgentSessionInNewSession,
   onContinueAgentSessionInNewSession,
   onForkAgentSession,
-  canToggleNativeChat,
-  isNativeChatView,
-  onToggleNativeChat,
   canToggleTerminalDock,
   isTerminalDockDocked,
   onToggleTerminalDock,
@@ -129,7 +123,6 @@ export default function TerminalContextMenu({
       setTitle: formatPrimaryShortcutLabel('terminal.setTitle', keybindings),
       clearPaneTitle: formatPrimaryShortcutLabel('terminal.clearPaneTitle', keybindings),
       close: formatPrimaryShortcutLabel('terminal.closePane', keybindings),
-      nativeChat: nativeChatToggleShortcutLabel(isMacPlatform()),
       terminalDock: formatPrimaryShortcutLabel('terminal.dock.toggle', keybindings)
     }),
     [keybindings]
@@ -221,21 +214,6 @@ export default function TerminalContextMenu({
             'Copy Context'
           )}
         </DropdownMenuItem>
-        {canToggleNativeChat ? (
-          <DropdownMenuItem onSelect={onToggleNativeChat}>
-            {isNativeChatView ? <SquareTerminal /> : <MessageSquare />}
-            {isNativeChatView
-              ? translate(
-                  'components.tab.bar.SortableTabContextMenu.switchToTerminalView',
-                  'Switch to terminal view'
-                )
-              : translate(
-                  'components.tab.bar.SortableTabContextMenu.switchToChatView',
-                  'Switch to chat view'
-                )}
-            <DropdownMenuShortcut>{shortcuts.nativeChat}</DropdownMenuShortcut>
-          </DropdownMenuItem>
-        ) : null}
         {canToggleTerminalDock ? (
           <DropdownMenuItem className="whitespace-nowrap" onSelect={onToggleTerminalDock}>
             {isTerminalDockDocked ? <PanelBottomClose /> : <PanelBottomOpen />}

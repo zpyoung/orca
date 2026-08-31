@@ -11,6 +11,8 @@ export function createPtyApi(): NonNullable<Partial<PreloadApi>['pty']> {
     spawn: () => Promise.reject(new Error('Local PTYs are unavailable in the web client.')),
     write: () => {},
     writeAccepted: () => Promise.resolve(false),
+    // web panes have no local PTY transport; the acceptance path must not claim delivery
+    writeInputAccepted: () => Promise.resolve(false),
     resize: () => {},
     claimViewport: () => {},
     reportGeometry: () => {},

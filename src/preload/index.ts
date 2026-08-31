@@ -1105,9 +1105,17 @@ const api = {
       ipcRenderer.invoke('pty:writeAccepted', { id, data }),
     writeInputAccepted: (id: string, data: string): Promise<boolean> =>
       ipcRenderer.invoke('pty:writeInputAccepted', { id, data }),
-    onWriteUnavailable: (callback: (payload: { id: string }) => void): (() => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, payload: { id: string }): void =>
-        callback(payload)
+    onWriteUnavailable: (
+      callback: (payload: {
+        id: string
+        /** Set only when a durable agent-session lease refused the write; absent otherwise. */
+        agentSessionRefusal?: AgentSessionPtyWriteRefusal
+      }) => void
+    ): (() => void) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        payload: { id: string; agentSessionRefusal?: AgentSessionPtyWriteRefusal }
+      ): void => callback(payload)
       ipcRenderer.on('pty:writeUnavailable', handler)
       return () => ipcRenderer.removeListener('pty:writeUnavailable', handler)
     },

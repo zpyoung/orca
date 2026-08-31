@@ -13,7 +13,9 @@ import { cloneDefaultWorkspaceStatuses } from './workspace-statuses'
 import { DEFAULT_WORKTREE_CARD_PROPERTIES } from './worktree/card-properties'
 import { DEFAULT_USAGE_PERCENTAGE_DISPLAY } from './usage-percentage-display'
 import { DEFAULT_STATUS_BAR_USAGE_MODE } from './status-bar-usage-mode'
-import { DEFAULT_NATIVE_CHAT_WIDTH_TIER } from './fork-native-chat-width/native-chat-width-default'
+import { buildDefaultSettings } from './default-global-settings'
+import { DEFAULT_SETUP_AGENT_STARTUP_POLICY } from './setup-agent-startup-policy'
+import { DEFAULT_BROWSER_PAGE_ZOOM_LEVEL } from './browser-page-zoom'
 
 export { DEFAULT_STATUS_BAR_ITEMS } from './status-bar-defaults'
 export {
@@ -172,73 +174,6 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     terminalFontFamily: defaultTerminalFontFamily(),
     terminalInactivePaneOpacity: DEFAULT_TERMINAL_INACTIVE_PANE_OPACITY,
     terminalRightClickToPaste: getDefaultTerminalRightClickToPaste(),
-    terminalRightClickToPasteDefaultedForPlatform: true,
-    terminalWindowsShell: 'powershell.exe',
-    terminalWindowsWslDistro: null,
-    localAccountRuntime: 'auto',
-    localAccountRuntimeDefaultedToAutoForAllUsers: true,
-    localAccountWslDistro: null,
-    localWindowsRuntimeDefault: { kind: 'windows-host' },
-    // Why: prefer modern PowerShell when installed, falling back to inbox Windows PowerShell.
-    terminalWindowsPowerShellImplementation: 'auto',
-    terminalMouseHideWhileTyping: false,
-    terminalQuickCommands: getDefaultTerminalQuickCommands(),
-    // Why: opt-in only, matching Ghostty's default (upgrades never enable it unexpectedly).
-    terminalFocusFollowsMouse: false,
-    windowBackgroundBlur: false,
-    minimizeToTrayOnClose: false,
-    // Why: default-on everywhere so it round-trips across platforms; only darwin acts on it.
-    showMenuBarIcon: true,
-    terminalClipboardOnSelect: false,
-    // Why: default on so Zellij/tmux/nvim copy works out of the box. Query
-    // replies stay disabled and payload size is capped in the OSC 52 handler.
-    // This default only covers new profiles; existing ones persisted `false`
-    // and are flipped once by the stamp below (shared/osc52-clipboard-settings.ts,
-    // applied by both the Electron store and the web client's localStorage store).
-    terminalAllowOsc52Clipboard: true,
-    terminalAllowOsc52ClipboardDefaultedOnForAllUsers: true,
-    claudeAgentTeamsMode: 'off',
-    setupScriptLaunchMode: 'new-tab',
-    terminalScrollbackRows: DESKTOP_TERMINAL_SCROLLBACK_ROWS_DEFAULT,
-    httpProxyUrl: '',
-    httpProxyBypassRules: '',
-    electronHttp1CompatibilityMode: false,
-    openLinksInApp: false,
-    localhostWorktreeLabelsEnabled: false,
-    openLinksInAppPreferencePrompted: false,
-    openLinksInAppModifierInverts: false,
-    terminalLinkActionPopoverEnabled: true,
-    openAgentTabsInChatByDefault: false,
-    experimentalNativeChat: false,
-    experimentalTerminalDock: false,
-    dockTerminalComposerByDefault: true,
-    nativeChatWidth: DEFAULT_NATIVE_CHAT_WIDTH_TIER,
-    nativeChatSessionOptions: {},
-    openInApplications: [...DEFAULT_OPEN_IN_APPLICATIONS],
-    rightSidebarOpenByDefault: true,
-    showGitIgnoredFiles: true,
-    sourceControlViewMode: 'list',
-    sourceControlGroupOrder: DEFAULT_SOURCE_CONTROL_GROUP_ORDER,
-    sourceControlCompareAgainstUpstream: false,
-    showTitlebarAppName: true,
-    showTasksButton: true,
-    showAutomationsButton: true,
-    artifactsEnabled: true,
-    artifactSharingEnabled: false,
-    agentSkillSharingEnabled: false,
-    showArtifactsButton: false,
-    showSkillsButton: false,
-    showMobileButton: true,
-    showPinnedWorktreesInGroups: false,
-    ctrlTabOrderMode: 'mru',
-    // Why: Orca-first keeps core shortcuts working from a focused terminal; TUI-ownership users opt in.
-    terminalShortcutPolicy: 'orca-first',
-    floatingTerminalEnabled: true,
-    floatingTerminalDefaultedForAllUsers: true,
-    floatingTerminalCwd: '~',
-    floatingTerminalTrustedCwds: [],
-    floatingTerminalCwdMigratedToAppWorkspace: true,
-    floatingTerminalTriggerLocation: 'floating-button',
     notifications: getDefaultNotificationSettings(),
     voice: getDefaultVoiceSettings()
   })
