@@ -27,6 +27,8 @@
     "../src/main/claude/hook-settings.ts",
     "../src/main/claude/hook-service.ts",
     "../src/main/claude/statusline-script.ts",
+    "../src/main/fork-session-info/session-info-statusline-chain-script.ts",
+    "../src/main/fork-session-info/session-info-statusline-chaining.ts",
     "../src/main/claude-accounts/keychain.ts",
     "../src/main/codex/codex-app-server-capability-cache.ts",
     "../src/main/codex/codex-app-server-capability-signal.ts",

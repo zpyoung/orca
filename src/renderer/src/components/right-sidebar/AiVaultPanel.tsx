@@ -50,6 +50,7 @@ import { usePersistedAiVaultViewOptions } from './use-persisted-ai-vault-view-op
 import { AgentSessionContinuationDialog } from '@/components/agent-session-continuation/fork-session-handoff/AgentSessionContinuationDialog'
 import { AiVaultScanIssueBanners } from './AiVaultScanIssueBanners'
 import { useAiVaultSessionDeleteAction } from './ai-vault-session-delete-action'
+import { useSessionInfoVaultNavigation } from './fork-session-info/session-info-vault-navigation'
 
 export default function AiVaultPanel(): React.JSX.Element {
   const activeWorktreeId = useActiveWorktreeId()
@@ -88,6 +89,7 @@ export default function AiVaultPanel(): React.JSX.Element {
     setAllAgentsEnabled,
     resetViewOptions
   } = usePersistedAiVaultViewOptions()
+  useSessionInfoVaultNavigation(setQuery, setAgentEnabled)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set())
   const userChangedScopeRef = useRef(false)
   const preferredScopeRef = useRef<AiVaultScope>(DEFAULT_AI_VAULT_SCOPE)

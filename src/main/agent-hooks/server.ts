@@ -84,6 +84,7 @@ import {
   parseClaudeStatusLineBody,
   type ClaudeStatusLineRateLimits
 } from '../../shared/claude-statusline-rate-limits'
+import { sessionInfoService } from '../fork-session-info/session-info-service'
 import {
   AGENT_STATUS_STALE_AFTER_MS,
   type AgentStatusClearIpcPayload,
@@ -1613,6 +1614,7 @@ export class AgentHookServer {
   // Why: every status emit must reach plugins too, so a new early-return path
   // upstream cannot silently leave the plugin tap behind the main-window fanout.
   private emitEnrichedStatus(enriched: EnrichedAgentHookEventPayload): void {
+    sessionInfoService.observeAgentHook(enriched)
     this.onAgentStatus?.(enriched)
     for (const listener of this.enrichedStatusListeners) {
       try {
@@ -2605,6 +2607,7 @@ export class AgentHookServer {
       try {
         const body = await readRequestBody(req)
         if (pathname === CLAUDE_STATUSLINE_PATHNAME) {
+          sessionInfoService.ingestStatusLineBody(body)
           const statusLineEvent = parseClaudeStatusLineBody(body)
           if (statusLineEvent) {
             this.onClaudeStatusLine?.(statusLineEvent)
@@ -2981,6 +2984,7 @@ export class AgentHookServer {
     this.clearAssistantMessageRetry(resolvedPaneKey)
     this.clearCodexSubagentPoll(resolvedPaneKey)
     clearPaneCacheState(this.state, resolvedPaneKey)
+    sessionInfoService.clearPane(resolvedPaneKey)
     this.activeHookTurnCompletedAtByPaneKey.delete(resolvedPaneKey)
     this.currentAuthorityObservations.delete(resolvedPaneKey)
     this.promptSentDedupeByPaneKey.delete(resolvedPaneKey)

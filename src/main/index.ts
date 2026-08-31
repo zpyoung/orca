@@ -304,6 +304,7 @@ import {
 } from './claude-accounts/live-pty-gate'
 import { StarNagService } from './star-nag/service'
 import { agentHookServer, type AgentHookProviderSessionIdentity } from './agent-hooks/server'
+import { ingestSessionInfoPlanWindows as ingestPlanWindows } from './fork-session-info/session-info-plan-window-correlation'
 import { recordForkPaneTranscriptObservation } from './fork-session-handoff/pane-transcript-history'
 import { createHookProviderSessionInvalidator } from './agent-hooks/hook-provider-session-invalidation'
 import { createHookStatusSessionTabsInvalidator } from './agent-hooks/hook-status-session-tabs-invalidation'
@@ -2740,9 +2741,7 @@ void app.whenReady().then(async () => {
     claudeRuntimeAuth!.prepareForRateLimitFetch(target)
   )
   // Why: live Claude sessions stream usage windows through their statusLine command; feeding them here avoids OAuth usage-endpoint polling (and its 429s).
-  agentHookServer.setClaudeStatusLineListener((event) => {
-    rateLimits?.ingestLiveClaudeRateLimits(event)
-  })
+  agentHookServer.setClaudeStatusLineListener((event) => ingestPlanWindows(rateLimits, event))
   rateLimits.setOpenCodeGoConfigResolver(() => {
     const settings = store!.getSettings()
     return {

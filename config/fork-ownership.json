@@ -57,6 +57,11 @@
       "name": "dirty-branch-indicator",
       "purpose": "Marks the right sidebar's Source Control tab while the active worktree has uncommitted changes, so a dirty branch is visible without opening the panel.",
       "globs": ["**/fork-dirty-branch-indicator/**"]
+    },
+    {
+      "name": "session-info",
+      "purpose": "Shows provider-neutral details, live context, usage, diagnostics, and safe actions for the exact focused agent terminal session while preserving user-owned statuslines.",
+      "globs": ["**/fork-session-info/**"]
     }
   ],
   "seams": [
@@ -492,7 +497,9 @@
         "import { buildForkSessionHandoffApi } from './fork-session-handoff/session-handoff-preload-api'",
         "const readNativeChatSession = (",
         "  forkSessionHandoff: buildForkSessionHandoffApi(),",
-        "    readSession: readNativeChatSession,"
+        "    readSession: readNativeChatSession,",
+        "import { buildForkSessionInfoApi } from './fork-session-info/session-info-preload-api'",
+        "  forkSessionInfo: buildForkSessionInfoApi(),"
       ]
     },
     {
@@ -846,7 +853,9 @@
         "import { useSourceControlDirtyItemOverride } from './fork-dirty-branch-indicator/use-source-control-dirty-item-override'",
         "  const sourceControlDirtyItemOverride = useSourceControlDirtyItemOverride()",
         "        ...sourceControlDirtyItemOverride,",
-        "      sourceControlDirtyItemOverride,"
+        "      sourceControlDirtyItemOverride,",
+        "import { getSessionInfoActivityItem } from './fork-session-info/session-info-activity-item'",
+        "      getSessionInfoActivityItem(),"
       ]
     },
     {
@@ -1637,7 +1646,9 @@
       "kind": "registration",
       "lines": [
         "vi.mock('../../fork-session-handoff/session-lineage-ipc', () => ({",
-        "  registerForkSessionHandoffHandlers: vi.fn()"
+        "  registerForkSessionHandoffHandlers: vi.fn()",
+        "vi.mock('../../fork-session-info/session-info-ipc', () => ({",
+        "  registerSessionInfoIpcHandlers: vi.fn()"
       ]
     },
     {
@@ -1655,7 +1666,9 @@
       "kind": "registration",
       "lines": [
         "import { registerForkSessionHandoffHandlers } from '../../fork-session-handoff/session-lineage-ipc'",
-        "  registerForkSessionHandoffHandlers()"
+        "  registerForkSessionHandoffHandlers()",
+        "import { registerSessionInfoIpcHandlers } from '../../fork-session-info/session-info-ipc'",
+        "  registerSessionInfoIpcHandlers()"
       ]
     },
     {
@@ -1752,6 +1765,89 @@
         "import { mergeForkSessionHandoffSettings } from '../../../shared/fork-session-handoff/handoff-settings-merge'",
         "    ...mergeForkSessionHandoffSettings(operations.state.settings, sanitizedUpdates)"
       ]
+    },
+    {
+      "path": "config/tsconfig.cli.json",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "    \"../src/main/fork-session-info/session-info-statusline-chain-script.ts\",",
+        "    \"../src/main/fork-session-info/session-info-statusline-chaining.ts\","
+      ]
+    },
+    {
+      "path": "src/main/agent-hooks/server.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "import { sessionInfoService } from '../fork-session-info/session-info-service'",
+        "    sessionInfoService.observeAgentHook(enriched)",
+        "          sessionInfoService.ingestStatusLineBody(body)",
+        "    sessionInfoService.clearPane(resolvedPaneKey)"
+      ]
+    },
+    {
+      "path": "src/main/claude/hook-service.ts",
+      "feature": "session-info",
+      "kind": "import-swap",
+      "lines": [
+        "  finalizeManagedStatusLineRemoval,",
+        "  getManagedStatusLineScript,",
+        "  removeManagedStatusLine",
+        "} from '../fork-session-info/session-info-statusline-chaining'",
+        "    finalizeManagedStatusLineRemoval(getStatusLineScriptFileName(this.options.settings))"
+      ]
+    },
+    {
+      "path": "src/main/index.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "import { ingestSessionInfoPlanWindows as ingestPlanWindows } from './fork-session-info/session-info-plan-window-correlation'",
+        "  agentHookServer.setClaudeStatusLineListener((event) => ingestPlanWindows(rateLimits, event))"
+      ]
+    },
+    {
+      "path": "src/main/persistence/applying-settings/ui-selection-normalization.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": ["    tab === 'session-info' ||"]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/client-ui-schemas.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": ["  'session-info',"]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/AiVaultPanel.tsx",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "import { useSessionInfoVaultNavigation } from './fork-session-info/session-info-vault-navigation'",
+        "  useSessionInfoVaultNavigation(setQuery, setAgentEnabled)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/right-sidebar-panel-content.tsx",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "const SessionInfoPanel = lazy(() => import('./fork-session-info/SessionInfoPanel'))",
+        "        {effectiveTab === 'session-info' && <SessionInfoPanel />}"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/right-sidebar-route.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": ["    tab === 'session-info' ||"]
+    },
+    {
+      "path": "src/shared/ui-chrome-types.ts",
+      "feature": "session-info",
+      "kind": "passthrough",
+      "lines": ["  | 'session-info'"]
     }
   ],
   "exceptions": [
@@ -2281,7 +2377,7 @@
     },
     {
       "path": "src/shared/native-file-drop.ts",
-      "reason": "Gives the composer drop payload the tabId/paneLeafId its terminal sibling already carries, so a broadcast drop reaches only the composer it landed on. Upstream's shared drop contract, read by preload, main, and every drop consumer — a forked copy would not reroute them.",
+      "reason": "Gives the composer drop payload the tabId/paneLeafId its terminal sibling already carries, so a broadcast drop reaches only the composer it landed on. Upstream's shared drop contract, read by preload, main, and every drop consumer \u2014 a forked copy would not reroute them.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#composer-file-drop-pane-scoping"
     },
@@ -2314,6 +2410,12 @@
       "reason": "Covers the pane-paste focus routing fix: composer-only, answer-input-only, both mounted with either focused, an image-only clipboard at the focused answer input, and neither mounted. Ships with the fix it exercises.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#pane-paste-routing-by-focus"
+    },
+    {
+      "path": "src/main/rate-limits/service.ts",
+      "reason": "Returns the selected-account acceptance verdict from live Claude rate-limit ingestion so pane telemetry can correlate plan windows without duplicating or bypassing the account guard.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#live-claude-rate-limit-ingest-acceptance"
     }
   ],
   "residuals": {
@@ -2518,7 +2620,7 @@
       "removed": 0
     },
     "src/preload/index.ts": {
-      "added": 20,
+      "added": 22,
       "removed": 7
     },
     "src/relay/relay-runtime-services.ts": {
@@ -2678,7 +2780,7 @@
       "removed": 1
     },
     "src/renderer/src/components/right-sidebar/use-right-sidebar-activity-items.ts": {
-      "added": 5,
+      "added": 7,
       "removed": 0
     },
     "src/renderer/src/components/settings/ExperimentalPane.test.tsx": {
@@ -3062,11 +3164,11 @@
       "removed": 0
     },
     "src/main/ipc/register-core-handlers/register-core-handlers.test.ts": {
-      "added": 4,
+      "added": 8,
       "removed": 0
     },
     "src/main/ipc/register-core-handlers/register-core-handlers.ts": {
-      "added": 2,
+      "added": 4,
       "removed": 0
     },
     "src/renderer/src/components/dashboard/DashboardAgentRow.tsx": {
@@ -3116,6 +3218,46 @@
     "src/main/persistence/applying-settings/settings-update.ts": {
       "added": 3,
       "removed": 1
+    },
+    "config/tsconfig.cli.json": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/agent-hooks/server.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/main/claude/hook-service.ts": {
+      "added": 6,
+      "removed": 2
+    },
+    "src/main/index.ts": {
+      "added": 4,
+      "removed": 3
+    },
+    "src/main/persistence/applying-settings/ui-selection-normalization.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/main/runtime/rpc/methods/client-ui-schemas.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/components/right-sidebar/AiVaultPanel.tsx": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/renderer/src/components/right-sidebar/right-sidebar-panel-content.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/store/right-sidebar-route.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/shared/ui-chrome-types.ts": {
+      "added": 1,
+      "removed": 0
     }
   }
 }
