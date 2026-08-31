@@ -4,6 +4,7 @@ import type {
   SessionInfoHooksAndMcp,
   SessionInfoStatusLineChainStatus
 } from '../../../../../shared/fork-session-info/session-info-types'
+import type { McpConfigInspection, McpServerSummary } from '../../../../../shared/mcp-config'
 import { getForkSessionInfoApi } from './session-info-renderer-api'
 
 export type HooksAndMcpLoadState = {
@@ -15,6 +16,19 @@ export type HooksAndMcpLoadState = {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+/** Flatten every config scope's servers, keeping the first scope that defines each name. */
+function dedupeServersByName(inspections: McpConfigInspection[]): McpServerSummary[] {
+  const byName = new Map<string, McpServerSummary>()
+  for (const inspection of inspections) {
+    for (const server of inspection.servers) {
+      if (!byName.has(server.name)) {
+        byName.set(server.name, server)
+      }
+    }
+  }
+  return [...byName.values()]
 }
 
 /** Return whether the focused session owns Claude's local statusline capability. */
@@ -87,9 +101,7 @@ export function useHooksAndMcp({
           value: {
             hookStatus,
             statusLine,
-            ...(inspections
-              ? { mcpServers: inspections.flatMap((inspection) => inspection.servers) }
-              : {}),
+            ...(inspections ? { mcpServers: dedupeServersByName(inspections) } : {}),
             updatedAt: Date.now()
           },
           error: errors.length > 0 ? errors.join(' · ') : undefined,

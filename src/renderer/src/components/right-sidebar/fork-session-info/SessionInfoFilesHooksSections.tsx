@@ -150,9 +150,9 @@ export function SessionInfoHooksSection({
           </p>
           {value.mcpServers.length ? (
             <ul className="space-y-1">
-              {value.mcpServers.map((server, index) => (
+              {value.mcpServers.map((server) => (
                 <li
-                  key={`${server.name}:${index}`}
+                  key={server.name}
                   className="rounded-md border border-border/60 bg-muted/30 px-2 py-1.5"
                 >
                   <p className="truncate text-xs text-foreground" title={server.name}>
