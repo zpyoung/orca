@@ -1,0 +1,43 @@
+{
+  "components": {
+    "settings": {
+      "forkSessionHandoff": {
+        "title": "セッション引き継ぎ",
+        "description": "新しいセッションで作業を続けるための再利用可能な指示を作成します。",
+        "searchTitle": "セッション引き継ぎ",
+        "searchDescription": "新しいセッションで作業を続けるための再利用可能な指示テンプレートを作成します。",
+        "keywordHandoff": "引き継ぎ",
+        "keywordSession": "セッション",
+        "keywordTemplate": "テンプレート",
+        "keywordReusable": "再利用",
+        "keywordPrompt": "プロンプト",
+        "keywordInstructions": "指示",
+        "templates": "テンプレート",
+        "templatesDescription": "保存した指示ブロックを新しいセッションへの引き継ぎ概要に追加します。",
+        "add": "テンプレートを追加",
+        "editTemplate": "{{name}}を編集",
+        "removeTemplate": "{{name}}を削除",
+        "limitReached": "テンプレート数の上限に達しました。",
+        "count": "{{limit}}件中{{count}}件のテンプレート",
+        "reset": "デフォルトに戻す",
+        "addTitle": "テンプレートを追加",
+        "editTitle": "テンプレートを編集",
+        "editorDescription": "新しいセッションの概要に再利用可能な指示を追加します。",
+        "name": "名前",
+        "duplicateName": "同じ名前のテンプレートがあります。両方のテンプレートを利用できます。",
+        "body": "指示",
+        "variables": "変数: {{gitStatus}}、{{changedPaths}}、{{openEditorTabs}}。大文字の別名も使用できます。",
+        "cancel": "キャンセル",
+        "saving": "保存中…",
+        "save": "テンプレートを保存",
+        "saveFailed": "テンプレートを保存できませんでした",
+        "deleteTitle": "「{{name}}」を削除しますか？",
+        "deleteDescription": "このテンプレートは引き継ぎダイアログで利用できなくなります。",
+        "delete": "削除",
+        "resetTitle": "引き継ぎテンプレートをリセットしますか？",
+        "resetDescription": "カスタムテンプレートと編集内容が削除され、最新のデフォルトが復元されます。",
+        "resetConfirm": "デフォルトに戻す"
+      }
+    }
+  }
+}

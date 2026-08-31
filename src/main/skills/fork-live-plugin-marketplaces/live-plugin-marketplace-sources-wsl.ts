@@ -1,6 +1,5 @@
-import { execFile } from 'node:child_process'
 import { posix as pathPosix } from 'node:path'
-import { buildWslExecArgs } from '../../../shared/wsl-login-shell-command'
+import { runWslProcess } from '../../wsl/wsl-runner'
 import {
   buildWslClaudePluginMetadataCommand,
   parseWslClaudePluginMetadataOutput
@@ -17,28 +16,25 @@ import {
 } from './live-plugin-marketplace-registry'
 
 const WSL_METADATA_TIMEOUT_MS = 5_000
-const WSL_METADATA_MAX_BUFFER_BYTES = 32 * 1024 * 1024
+const WSL_METADATA_MAX_OUTPUT_BYTES = 32 * 1024 * 1024
 
-function executeWslMetadataRead(distro: string, command: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile(
-      'wsl.exe',
-      buildWslExecArgs(distro, ['bash', '-c', command]),
-      {
-        encoding: 'utf8',
-        maxBuffer: WSL_METADATA_MAX_BUFFER_BYTES,
-        timeout: WSL_METADATA_TIMEOUT_MS,
-        windowsHide: true
-      },
-      (error, stdout) => {
-        if (error) {
-          reject(error)
-          return
-        }
-        resolve(stdout)
-      }
-    )
+async function executeWslMetadataRead(distro: string, script: string): Promise<string> {
+  // Why bash: the payload is the sibling metadata reader's, authored for bash.
+  const result = await runWslProcess({
+    distro,
+    // 'none': base64/printf/stat over $HOME paths, no bare tool to find.
+    loginPath: 'none',
+    script,
+    shell: 'bash',
+
+    timeoutMs: WSL_METADATA_TIMEOUT_MS,
+    maxOutputBytes: WSL_METADATA_MAX_OUTPUT_BYTES
   })
+  // Truncated-but-well-formed output would otherwise parse as real metadata.
+  if (result.code !== 0 || result.timedOut) {
+    throw new Error('live-plugin-marketplace-sources-wsl-read-failed')
+  }
+  return result.stdout
 }
 
 async function readMetadataInDistro(

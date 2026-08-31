@@ -26,7 +26,8 @@ import {
   isKnownAiVaultResumeWorkspaceTarget,
   type AiVaultSessionResumeTargetState
 } from './ai-vault-session-resume'
-import { prepareAiVaultSessionContinuation } from './ai-vault-session-continuation'
+import { prepareAiVaultSessionContinuation } from '@/components/agent-session-continuation/fork-session-handoff/prepare-handoff-from-vault'
+import { resolveAiVaultSessionHandoffLaunchTargetOrNotify } from '@/components/agent-session-continuation/fork-session-handoff/ai-vault-handoff-action'
 import type { AgentSessionContinuationRequest } from '@/lib/agent-session-continuation'
 import { findWorktreeById } from '@/store/slices/worktree-helpers'
 
@@ -152,7 +153,7 @@ export function useAiVaultSessionLaunchActions({
 
   const handleContinueInNewSession = useCallback(
     (session: AiVaultSession, targetWorktreeId: string): void => {
-      const targetId = resolveAiVaultSessionLaunchTargetOrNotify({
+      const targetId = resolveAiVaultSessionHandoffLaunchTargetOrNotify({
         sessionFilePath: session.filePath,
         sessionExecutionHostId: session.executionHostId,
         activeWorktreeId: activeWorktreeId ?? activeWorktree?.id ?? null,

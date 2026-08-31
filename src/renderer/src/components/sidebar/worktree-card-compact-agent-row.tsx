@@ -12,6 +12,7 @@ import { formatAgentToolPreview } from '@/lib/agent-row-tool-preview'
 import { useAgentRowConversationName } from '@/components/dashboard/use-agent-row-conversation-name'
 import { lastEnteredDoneAt } from '@/components/dashboard/agent-finished-timestamp'
 import CacheTimer, { usePromptCacheCountdownForPane } from './CacheTimer'
+import { SessionHandoffLineageBadge } from '@/components/agent-session-continuation/fork-session-handoff/SessionHandoffLineageBadge'
 
 function formatShortTimeAgo(ts: number, now: number): string {
   const delta = now - ts
@@ -221,6 +222,7 @@ export const CompactAgentRow = React.memo(function CompactAgentRow({
           {model}
         </span>
       )}
+      <SessionHandoffLineageBadge paneKey={agent.paneKey} />
       {hasChildDisclosure && !childAgentsExpanded && (
         <span
           className={cn(

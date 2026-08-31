@@ -33,6 +33,7 @@ import {
 } from '../../protected-secret-persistence'
 import { normalizeNotificationSettings } from './onboarding-normalization'
 import { retireLegacyInstructionsForClearedTextActionRecipes } from './source-control-settings'
+import { mergeForkSessionHandoffSettings } from '../../../shared/fork-session-handoff/handoff-settings-merge'
 import {
   buildWorkspaceDirHistoryForUpdate,
   stripRetiredGlobalSettings
@@ -234,7 +235,8 @@ export function updateSettings(
       ...operations.state.settings.notifications,
       ...sanitizedUpdates.notifications
     }),
-    ...(mergedTelemetry !== undefined ? { telemetry: mergedTelemetry } : {})
+    ...(mergedTelemetry !== undefined ? { telemetry: mergedTelemetry } : {}),
+    ...mergeForkSessionHandoffSettings(operations.state.settings, sanitizedUpdates)
   }
   operations.scheduleSave()
   const changedUpdates = {} as Partial<GlobalSettings> & Record<string, unknown>

@@ -23,6 +23,7 @@ import {
   SessionMetadata
 } from './ai-vault-session-row-display'
 import type { AgentStatusState } from '../../../../shared/agent-status-types'
+import { ForkAiVaultLineageLine } from '@/components/agent-session-continuation/fork-session-handoff/ForkAiVaultLineageLine'
 
 export function VaultSessionRow({
   session,
@@ -206,6 +207,7 @@ export function VaultSessionRow({
             worktreeInfo={worktreeInfo}
             vaultScope={vaultScope}
           />
+          <ForkAiVaultLineageLine session={session} />
           {detailsExpanded ? (
             <SessionInlineDetails
               id={detailsId}

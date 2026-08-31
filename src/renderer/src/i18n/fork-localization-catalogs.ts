@@ -24,6 +24,11 @@ import dockSettingsES from '../components/settings/fork-terminal-dock/locales/es
 import dockSettingsJA from '../components/settings/fork-terminal-dock/locales/ja.json'
 import dockSettingsKO from '../components/settings/fork-terminal-dock/locales/ko.json'
 import dockSettingsZH from '../components/settings/fork-terminal-dock/locales/zh.json'
+import handoffSettingsEN from '../components/settings/fork-session-handoff/locales/en.json'
+import handoffSettingsES from '../components/settings/fork-session-handoff/locales/es.json'
+import handoffSettingsJA from '../components/settings/fork-session-handoff/locales/ja.json'
+import handoffSettingsKO from '../components/settings/fork-session-handoff/locales/ko.json'
+import handoffSettingsZH from '../components/settings/fork-session-handoff/locales/zh.json'
 import agentComposerEN from '../components/native-chat/fork-agent-composer/locales/en.json'
 import agentComposerES from '../components/native-chat/fork-agent-composer/locales/es.json'
 import agentComposerJA from '../components/native-chat/fork-agent-composer/locales/ja.json'
@@ -34,6 +39,11 @@ import skillPluginsES from '../components/native-chat/fork-skill-plugin-attribut
 import skillPluginsJA from '../components/native-chat/fork-skill-plugin-attribution/locales/ja.json'
 import skillPluginsKO from '../components/native-chat/fork-skill-plugin-attribution/locales/ko.json'
 import skillPluginsZH from '../components/native-chat/fork-skill-plugin-attribution/locales/zh.json'
+import handoffEN from '../components/agent-session-continuation/fork-session-handoff/locales/en.json'
+import handoffES from '../components/agent-session-continuation/fork-session-handoff/locales/es.json'
+import handoffJA from '../components/agent-session-continuation/fork-session-handoff/locales/ja.json'
+import handoffKO from '../components/agent-session-continuation/fork-session-handoff/locales/ko.json'
+import handoffZH from '../components/agent-session-continuation/fork-session-handoff/locales/zh.json'
 import dirtyBranchEN from '../components/right-sidebar/fork-dirty-branch-indicator/locales/en.json'
 import dirtyBranchES from '../components/right-sidebar/fork-dirty-branch-indicator/locales/es.json'
 import dirtyBranchJA from '../components/right-sidebar/fork-dirty-branch-indicator/locales/ja.json'
@@ -63,8 +73,10 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     worktreeGroupsEN,
     dockEN,
     dockSettingsEN,
+    handoffSettingsEN,
     agentComposerEN,
     skillPluginsEN,
+    handoffEN,
     dirtyBranchEN
   ],
   es: [
@@ -73,8 +85,10 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     worktreeGroupsES,
     dockES,
     dockSettingsES,
+    handoffSettingsES,
     agentComposerES,
     skillPluginsES,
+    handoffES,
     dirtyBranchES
   ],
   ja: [
@@ -83,8 +97,10 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     worktreeGroupsJA,
     dockJA,
     dockSettingsJA,
+    handoffSettingsJA,
     agentComposerJA,
     skillPluginsJA,
+    handoffJA,
     dirtyBranchJA
   ],
   ko: [
@@ -93,8 +109,10 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     worktreeGroupsKO,
     dockKO,
     dockSettingsKO,
+    handoffSettingsKO,
     agentComposerKO,
     skillPluginsKO,
+    handoffKO,
     dirtyBranchKO
   ],
   zh: [
@@ -103,8 +121,10 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     worktreeGroupsZH,
     dockZH,
     dockSettingsZH,
+    handoffSettingsZH,
     agentComposerZH,
     skillPluginsZH,
+    handoffZH,
     dirtyBranchZH
   ]
 }

@@ -1,6 +1,6 @@
 ---
-last_released_commit: ad73d7e6c3de62b8b29c30d032027f38ad934ae7
-upstream_synced: v1.4.188
+last_released_commit: 6e7ab8595d701c7380e32def36b60a544058dff8
+upstream_synced: v1.4.190
 ---
 
 # Changelog
@@ -11,6 +11,48 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.191-rc.0.zy01] - 2026-08-26
+
+Synced to upstream [v1.4.190](https://github.com/stablyai/orca/releases/tag/v1.4.190).
+
+### Added
+- Continue a coding-agent session in a new one. A continuation dialog composes a handoff brief from
+  the source pane or an AI Vault session, previews and edits it, scans it for secrets, resolves the
+  target environment, and launches the receiving agent. Parent and child sessions are linked, and
+  the relationship shows as a badge on agent rows and in the vault. Briefs can be built from a
+  user-editable template catalog, with its own Settings pane and per-template steering notes.
+- The right sidebar's Source Control glyph now carries a dot whenever the active worktree has
+  uncommitted changes, and the count rides in the button title so the tooltip and the accessible
+  name both carry it — color is never the only signal. Rows inside an expanded submodule are left
+  out of the count so expanding one cannot make the number jump, and a truncated `git status`
+  reports "N+" rather than a total it cannot know.
+- Composer attachment chips show the image itself instead of a generic icon, so a composer holding
+  several images is readable at a glance. On an SSH worktree the chip reads the client-local file
+  the upload came from, since the remote path it attaches is not readable on the client.
+- A setting controls whether the terminal composer docks itself automatically. It defaults to on,
+  and turning it off suppresses automatic docking without closing composers that are already
+  mounted. An explicit decision to undock now persists across clients, while an agent exiting can
+  still bring the composer back.
+
+### Fixed
+- The skill picker scanned the frozen cache copy of a `directory`-sourced Claude Code marketplace
+  rather than the live directory the harness actually loads plugins from, so it offered whatever
+  skill set existed at the last `claude plugin update`. Directory marketplaces now resolve to their
+  live `skills` directory; `github` and `git` marketplaces are untouched, because their cache copy
+  is what the harness loads. A malformed registry degrades to the cached roots rather than dropping
+  a plugin.
+- A native file drop was broadcast to every mounted composer, so one drop attached to all of them.
+  A drop now carries the tab and pane it landed on, and a composer ignores one addressed elsewhere.
+- Live plugin-marketplace discovery inside WSL kept working across upstream's move to a single
+  `wsl.exe` runner. The read now goes through that runner instead of spawning `wsl.exe` itself.
+
+### Changed
+- The upstream sync no longer runs the test suite locally before opening its pull request. That run
+  went to a single shared Docker host, where sharding it produced timeout, perf-budget, and
+  temp-file failures on a different random subset each time — none of them caused by the code. The
+  pull request's own CI, which runs the same suite on clean hosted runners, is now the only test
+  gate.
 
 ## [1.4.189-rc.0.zy02] - 2026-08-26
 
