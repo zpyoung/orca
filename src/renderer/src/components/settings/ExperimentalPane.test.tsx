@@ -324,6 +324,46 @@ describe('ExperimentalPane', () => {
     secondRender.root.unmount()
   })
 
+  // The two controls are nested, but each still writes only its own key.
+  it('never writes one Chat UI child setting while changing the other', async () => {
+    const updateSettings = vi.fn()
+    const settings = {
+      ...getDefaultSettings('/tmp'),
+      experimentalNativeChat: true,
+      experimentalStructuredNativeChat: false,
+      openAgentTabsInChatByDefault: true
+    }
+    const { root, container } = await renderExperimentalPane({ updateSettings, settings })
+
+    const structuredSwitch = container.querySelector<HTMLButtonElement>(
+      '#experimental-native-chat button[role="switch"][aria-label="Toggle updated structured native chat"]'
+    )
+    if (!structuredSwitch) {
+      throw new Error('Structured native chat switch was not rendered')
+    }
+
+    await act(async () => {
+      structuredSwitch.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(updateSettings).toHaveBeenCalledWith({ experimentalStructuredNativeChat: true })
+
+    const terminalChatOption = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[data-slot="select-item"]')
+    ).find((button) => button.getAttribute('data-value') === 'terminal-chat')
+    if (!terminalChatOption) {
+      throw new Error('Terminal chat default-view option was not rendered')
+    }
+
+    await act(async () => {
+      terminalChatOption.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(updateSettings).toHaveBeenCalledWith({ openAgentTabsInChatByDefault: false })
+    expect(updateSettings).toHaveBeenCalledTimes(2)
+    root.unmount()
+  })
+
   it('renders the agent sleep idle duration as configurable minutes', async () => {
     const updateSettings = vi.fn()
     const settings = {

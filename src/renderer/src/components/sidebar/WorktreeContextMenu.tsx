@@ -1,5 +1,5 @@
-/* eslint-disable max-lines -- Why: this menu keeps row targeting, batch actions, and ctrl-click event guards together so nested worktree menus share one event policy. */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React from 'react'
+import WorktreeContextMenuView from './WorktreeContextMenuView'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1097,12 +1097,18 @@ export {
   CLOSE_ALL_CONTEXT_MENUS_EVENT,
   WORKTREE_CONTEXT_MENU_SCOPE_ATTR,
   WORKTREE_NATIVE_CONTEXT_MENU_ATTR,
-  isContextWorktreeDeletable,
   getWorktreeParentPickerAnchor,
   getWorktreeParentPickerLabel,
+  hasWorktreeParentLink,
+  isContextWorktreeDeletable,
   isWorktreeParentPickerDisabled,
+  planWorkspaceStatusAssignment,
+  selectMenuScopedMap,
+  shouldContinueDeleteSiblingPositionRestore,
+  shouldIgnoreNestedWorktreeContextMenuScope,
   shouldRemoveProjectFromContextMenu,
-  shouldUseNativeContextMenu,
+  shouldRevealWorktreeDeveloperMenu,
   shouldSuppressContextMenuFollowUpClick,
-  shouldIgnoreNestedWorktreeContextMenuScope
-}
+  shouldUseNativeContextMenu,
+  type WorkspaceStatusAssignmentPlan
+} from './worktree-context-menu-policy'

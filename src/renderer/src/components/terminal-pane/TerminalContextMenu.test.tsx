@@ -146,6 +146,12 @@ describe('TerminalContextMenu', () => {
     expect(onContinueAgentSessionInNewSession).toHaveBeenCalledTimes(1)
   })
 
+  it('does not expose a native/terminal view switch in the terminal menu', () => {
+    renderMenu()
+
+    expect(items.list.some((item) => childrenText(item.children).includes('Switch to'))).toBe(false)
+  })
+
   it('shows one shortcut per terminal menu action on Windows', () => {
     vi.stubGlobal('navigator', {
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'

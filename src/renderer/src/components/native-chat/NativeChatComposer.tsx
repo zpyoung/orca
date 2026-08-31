@@ -28,6 +28,8 @@ import type {
   NativeChatComposerHandle,
   NativeChatComposerProps
 } from './native-chat-composer-types'
+import { dispatchNativeChatStructuredComposerText } from './native-chat-structured-composer-dispatch'
+import { useNativeChatPtyComposerSend } from './use-native-chat-pty-composer-send'
 
 export type {
   NativeChatComposerHandle,
@@ -181,7 +183,7 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
         setHistory: core.setHistory
       })
 
-    const { surface: sessionOptionsSurface, snapshot: sessionOptionsSnapshot } =
+    const { surface: ptySessionOptionsSurface, snapshot: ptySessionOptionsSnapshot } =
       useNativeChatSessionOptions({
         agent,
         terminalTabId,
@@ -191,6 +193,8 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
         readTerminalScreen,
         reportedSessionOptions
       })
+    const sessionOptionsSurface = structuredTransport?.optionsSurface ?? ptySessionOptionsSurface
+    const sessionOptionsSnapshot = structuredTransport?.optionSnapshot ?? ptySessionOptionsSnapshot
 
     const dispatchPickerCommand = useNativeChatPickerCommandDispatch({
       agent,
@@ -214,6 +218,16 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       restoreImageAttachments,
       setNotice: core.setNotice
     })
+    const dispatchPickerCommand = useCallback(
+      (command: Parameters<typeof dispatchPtyPickerCommand>[0]) => {
+        if (structuredTransport) {
+          sendStructured(`/${command.name}`)
+          return
+        }
+        dispatchPtyPickerCommand(command)
+      },
+      [dispatchPtyPickerCommand, sendStructured, structuredTransport]
+    )
 
     const bridges: AgentComposerHostBridges = {
       autocomplete: picker.autocomplete,

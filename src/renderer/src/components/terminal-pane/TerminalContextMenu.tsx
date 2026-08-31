@@ -6,14 +6,12 @@ import {
   Eraser,
   GitFork,
   Maximize2,
-  MessageSquare,
   Minimize2,
   PanelBottomClose,
   PanelBottomOpen,
   PanelsTopLeft,
   PanelRightClose,
   Pencil,
-  SquareTerminal,
   TextSelect,
   X
 } from 'lucide-react'
@@ -31,7 +29,6 @@ import type { ExecutionHostId } from '../../../../shared/execution-host'
 import { formatPrimaryShortcutLabel } from '@/hooks/useShortcutLabel'
 import type { KeybindingOverrides } from '../../../../shared/keybindings'
 import { translate } from '@/i18n/i18n'
-import { isMacPlatform, nativeChatToggleShortcutLabel } from '../native-chat/native-chat-shortcut'
 import { AgentSessionContinuationMenuItem } from './AgentSessionContinuationMenuItem'
 import type { TerminalQuickCommandMenuHost } from '@/hooks/use-terminal-quick-command-hosts'
 import { TerminalQuickCommandsSubmenu } from './TerminalQuickCommandsSubmenu'

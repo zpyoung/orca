@@ -25,6 +25,7 @@ export type AgentComposerActionsProps = {
   onStop?: () => void
   sessionOptionsSurface: SessionOptionsSurface | null
   sessionOptionsSnapshot: SessionOptionDescriptor[]
+  sessionOptionsPickerRequest?: NativeChatOptionPickerRequest | null
 }
 
 export function AgentComposerActions({
@@ -75,6 +76,7 @@ export function AgentComposerActions({
           surface={sessionOptionsSurface}
           snapshot={sessionOptionsSnapshot}
           isWorking={isWorking}
+          pickerRequest={sessionOptionsPickerRequest}
         />
         <Tooltip>
           <TooltipTrigger asChild>

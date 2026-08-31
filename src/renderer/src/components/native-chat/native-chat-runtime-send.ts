@@ -16,11 +16,7 @@ import {
   NATIVE_CHAT_QUESTION_STEP_MS,
   NATIVE_CHAT_SUBMIT_DELAY_MS
 } from '../../../../shared/native-chat-answer-stepping'
-import {
-  buildNativeChatImagePasteBytes,
-  buildNativeChatPasteBytes,
-  NATIVE_CHAT_SUBMIT
-} from './native-chat-send'
+import { buildNativeChatPasteBytes, NATIVE_CHAT_SUBMIT } from './native-chat-send'
 import {
   cancelNativeChatPtySends,
   resetNativeChatPtySendQueuesForTests,

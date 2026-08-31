@@ -63,6 +63,7 @@ export type AgentComposerFieldProps = {
   onStop?: () => void
   sessionOptionsSurface: SessionOptionsSurface | null
   sessionOptionsSnapshot: SessionOptionDescriptor[]
+  sessionOptionsPickerRequest?: NativeChatOptionPickerRequest | null
 }
 
 export type AgentComposerImageAttachment = {
@@ -245,6 +246,7 @@ export function AgentComposerField({
                 onStop={onStop}
                 sessionOptionsSurface={sessionOptionsSurface}
                 sessionOptionsSnapshot={sessionOptionsSnapshot}
+                sessionOptionsPickerRequest={sessionOptionsPickerRequest}
               />
             </div>
           </div>

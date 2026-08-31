@@ -3,6 +3,7 @@ import { translate } from '@/i18n/i18n'
 import { NativeChatWidthSetting } from './fork-native-chat-width/NativeChatWidthSetting'
 import { Label } from '../ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { NativeChatSupportedAgents } from './NativeChatSupportedAgents'
 import { SearchableSetting } from './SearchableSetting'
 import { SettingsSwitch } from './SettingsFormControls'
 import { getExperimentalSearchEntry } from './experimental-search'
@@ -19,8 +20,9 @@ export function NativeChatExperimentalSetting({
   updateSettings
 }: NativeChatExperimentalSettingProps): React.JSX.Element {
   const nativeChatEnabled = settings.experimentalNativeChat === true
-  const openByDefault = settings.openAgentTabsInChatByDefault === true
-  const defaultView: NativeChatDefaultView = openByDefault ? 'native-chat' : 'terminal-chat'
+  const structuredNativeChatEnabled = settings.experimentalStructuredNativeChat === true
+  const defaultView: NativeChatDefaultView =
+    settings.openAgentTabsInChatByDefault === true ? 'native-chat' : 'terminal-chat'
 
   return (
     <SearchableSetting
@@ -41,9 +43,10 @@ export function NativeChatExperimentalSetting({
           <p className="text-xs text-muted-foreground">
             {translate(
               'auto.components.settings.ExperimentalPane.nativeChat.copy',
-              'Adds a Chat UI view you can switch to from supported agent terminal panes. Experimental while we tune transcript fidelity, streaming, and terminal parity.'
+              'Enables the experimental Chat UI for newly created supported local sessions. Existing terminal sessions keep the terminal chat path while we tune transcript fidelity, streaming, and parity.'
             )}
           </p>
+          <NativeChatSupportedAgents />
         </div>
         <SettingsSwitch
           checked={nativeChatEnabled}

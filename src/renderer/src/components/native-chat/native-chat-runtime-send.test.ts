@@ -16,11 +16,9 @@ import {
   sendNativeChatTypedCommand,
   sendNativeChatMessageVerified,
   typeNativeChatCommand,
-  sendNativeChatMessageWithImageAttachments,
   submitNativeChatPrompt,
   sendNativeChatAskAnswer,
   resetNativeChatPtySendQueuesForTests,
-  NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS,
   NATIVE_CHAT_SUBMIT_DELAY_MS,
   NATIVE_CHAT_QUESTION_STEP_MS,
   NATIVE_CHAT_ADVANCE_BUFFER_MS
@@ -702,7 +700,7 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
     await vi.advanceTimersByTimeAsync(0)
     expectWriteOrder([
       NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
-      buildNativeChatImagePasteBytes('/tmp/orca-paste-image.png')
+      framedImageWithSeparator
     ])
 
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS)
@@ -732,7 +730,7 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
     await vi.advanceTimersByTimeAsync(0)
     expectWriteOrder([
       NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
-      buildNativeChatImagePasteBytes('/tmp/orca-paste-image.png')
+      '\x1b[200~/tmp/orca-paste-image.png\x1b[201~'
     ])
 
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS - 1)
@@ -758,7 +756,7 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
     // Pre-clear + image body + cancel clear; no Enter.
     expectWriteOrder([
       NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
-      buildNativeChatImagePasteBytes('/tmp/orca-paste-image.png'),
+      '\x1b[200~/tmp/orca-paste-image.png\x1b[201~ ',
       NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT
     ])
     expect(

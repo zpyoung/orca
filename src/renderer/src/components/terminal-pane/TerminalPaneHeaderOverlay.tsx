@@ -1,11 +1,5 @@
 import type { CSSProperties, RefObject } from 'react'
-import {
-  MessageSquare,
-  MessageSquarePlus,
-  SquareSplitVertical,
-  SquareTerminal,
-  X
-} from 'lucide-react'
+import { MessageSquarePlus, SquareSplitVertical, X } from 'lucide-react'
 import type { ManagedPane, PaneManager } from '@/lib/pane-manager/pane-manager'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -43,14 +37,6 @@ type TerminalPaneHeaderOverlayProps = {
   hiddenStartupStyle: CSSProperties
   managerRef: RefObject<PaneManager | null>
   paneTransportsRef: RefObject<Map<number, PtyTransport>>
-  /** When true, this pane can toggle the native chat view; renders a chat/terminal
-   *  toggle as the first button in the pane header actions row (beside split/close).
-   *  The caller gates it to the active pane to avoid duplicating it across splits. */
-  canToggleNativeChat?: boolean
-  /** True when the active pane is currently showing the native chat view. */
-  isChatViewMode?: boolean
-  /** Flip the active pane between the terminal and the native chat view. */
-  onToggleNativeChat?: () => void
   canContinueAgentSessionInNewSession?: boolean
   onContinueAgentSessionInNewSession?: (pane: ManagedPane) => void
   onSplitPane: (pane: ManagedPane, direction: 'vertical' | 'horizontal') => void
@@ -86,9 +72,6 @@ export default function TerminalPaneHeaderOverlay({
   hiddenStartupStyle,
   managerRef,
   paneTransportsRef,
-  canToggleNativeChat,
-  isChatViewMode,
-  onToggleNativeChat,
   canContinueAgentSessionInNewSession,
   onContinueAgentSessionInNewSession,
   onSplitPane,
