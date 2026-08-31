@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- Why: runtime graph sync and mobile session-tab publication share the same injected renderer state and terminal registry. Keeping them together prevents a second store/registry reader from drifting. */
+import { focusPaneOrDockComposer } from '@/components/terminal-pane/fork-terminal-dock/dock-composer-focus-redirect'
 import {
   collectLeafIdsInOrder,
   serializePaneTree,
@@ -279,14 +280,16 @@ export function focusRuntimeTerminalSurface(tabId: string, leafId?: string | nul
     return false
   }
   if (!leafId) {
-    manager.getActivePane()?.terminal.focus()
+    focusPaneOrDockComposer(manager.getActivePane())
     return true
   }
   const resolution = resolveLeafIdForManager(tabId, leafId, manager)
   if (resolution.status !== 'resolved') {
     return false
   }
-  manager.setActivePane(resolution.numericPaneId, { focus: true })
+  const pane = manager.getPanes().find((candidate) => candidate.id === resolution.numericPaneId)
+  manager.setActivePane(resolution.numericPaneId, { focus: false })
+  focusPaneOrDockComposer(pane)
   scheduleRuntimeGraphSync()
   return true
 }

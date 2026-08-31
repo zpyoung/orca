@@ -35,7 +35,7 @@
     },
     {
       "name": "native-chat-session-options",
-      "purpose": "Reads the model and effort an agent recorded for itself on its own transcript turns, so the composer's pills pre-fill from the session log instead of a screen scrape that scrolls away.",
+      "purpose": "Pre-fills the composer's model and effort from agent session logs, and re-reads Claude's startup frame as it paints when no log value exists.",
       "globs": ["**/fork-native-chat-session-options/**"]
     },
     {
@@ -825,6 +825,9 @@
       "kind": "registration",
       "lines": [
         "import { nativeChatReportedValuesFromObservation } from './fork-native-chat-session-options/native-chat-session-option-observation'",
+        "  hasDispatchedNativeChatSessionOption,",
+        "  useClaudeStartupFrameRevision",
+        "} from './fork-native-chat-session-options/use-claude-startup-frame-revision'",
         "import type { NativeChatSessionOptionObservation } from '../../../../shared/native-chat-types'"
       ]
     },
@@ -1128,6 +1131,25 @@
       ]
     },
     {
+      "path": "src/renderer/src/components/terminal-pane/focus-terminal-pane-event.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "    querySelector: vi.fn(() => null)",
+        "    expect(manager.setActivePane).toHaveBeenCalledWith(7, { focus: false })"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/focus-terminal-pane-event.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { focusPaneOrDockComposer } from './fork-terminal-dock/dock-composer-focus-redirect'",
+        "  manager.setActivePane(resolution.numericPaneId, { focus: false })",
+        "  focusPaneOrDockComposer(pane)"
+      ]
+    },
+    {
       "path": "src/renderer/src/components/terminal-pane/pane-helpers.test.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
@@ -1141,8 +1163,10 @@
       "feature": "terminal-dock",
       "kind": "registration",
       "lines": [
+        "import { focusPaneOrDockComposer } from './fork-terminal-dock/dock-composer-focus-redirect'",
         "import { makePaneKey, type PaneKey } from '../../../../shared/stable-pane-id'",
-        "    const activeDock ="
+        "    const activeDock =",
+        "    focusPaneOrDockComposer(activePane)"
       ]
     },
     {
@@ -1216,6 +1240,15 @@
       "feature": "native-chat-relay",
       "kind": "passthrough",
       "lines": ["export type ConnectionOwnerState = Pick<"]
+    },
+    {
+      "path": "src/renderer/src/lib/focus-terminal-tab-surface.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { findDockComposerTextarea } from '@/components/terminal-pane/fork-terminal-dock/dock-composer-focus-redirect'",
+        "  const dockComposer = findDockComposerTextarea(helper)"
+      ]
     },
     {
       "path": "src/renderer/src/lib/pane-manager/pane-container-listener-lifecycle.test.ts",
@@ -1379,6 +1412,8 @@
       "feature": "terminal-dock",
       "kind": "registration",
       "lines": [
+        "import { focusPaneOrDockComposer } from '@/components/terminal-pane/fork-terminal-dock/dock-composer-focus-redirect'",
+        "  manager.setActivePane(resolution.numericPaneId, { focus: false })",
         "    terminalDockSyncEnabled: publication.terminalDockSyncEnabled,",
         "        ? { terminalDockByPaneKey: unifiedTab.terminalDockByPaneKey }"
       ]
@@ -2670,8 +2705,8 @@
       "removed": 1
     },
     "src/renderer/src/components/native-chat/use-native-chat-session-options.ts": {
-      "added": 57,
-      "removed": 8
+      "added": 74,
+      "removed": 11
     },
     "src/renderer/src/components/native-chat/use-native-chat-typed-insertion.ts": {
       "added": 1,
@@ -2801,12 +2836,20 @@
       "added": 5,
       "removed": 0
     },
+    "src/renderer/src/components/terminal-pane/focus-terminal-pane-event.test.ts": {
+      "added": 9,
+      "removed": 4
+    },
+    "src/renderer/src/components/terminal-pane/focus-terminal-pane-event.ts": {
+      "added": 11,
+      "removed": 7
+    },
     "src/renderer/src/components/terminal-pane/pane-helpers.test.ts": {
       "added": 27,
       "removed": 4
     },
     "src/renderer/src/components/terminal-pane/pane-helpers.ts": {
-      "added": 26,
+      "added": 25,
       "removed": 6
     },
     "src/renderer/src/components/terminal-pane/terminal-input-quarantine.ts": {
@@ -2844,6 +2887,10 @@
     "src/renderer/src/lib/connection-owner-resolution.ts": {
       "added": 1,
       "removed": 1
+    },
+    "src/renderer/src/lib/focus-terminal-tab-surface.ts": {
+      "added": 8,
+      "removed": 5
     },
     "src/renderer/src/lib/pane-manager/pane-container-listener-lifecycle.test.ts": {
       "added": 1,
@@ -2938,8 +2985,8 @@
       "removed": 11
     },
     "src/renderer/src/runtime/sync-runtime-graph.ts": {
-      "added": 19,
-      "removed": 2
+      "added": 24,
+      "removed": 4
     },
     "src/renderer/src/runtime/web-runtime-session.ts": {
       "added": 3,
