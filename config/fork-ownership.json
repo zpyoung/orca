@@ -561,7 +561,7 @@
       "kind": "registration",
       "lines": [
         "} from './fork-agent-composer/AgentComposer'",
-        "import { seedHistory } from './fork-agent-composer/agent-composer-history'"
+        "import { pushHistory, seedHistory } from './fork-agent-composer/agent-composer-history'"
       ]
     },
     {
@@ -2496,7 +2496,7 @@
       "removed": 13
     },
     "src/renderer/src/components/native-chat/NativeChatComposer.tsx": {
-      "added": 209,
+      "added": 208,
       "removed": 292
     },
     "src/renderer/src/components/native-chat/NativeChatInteractiveCard.test.tsx": {
