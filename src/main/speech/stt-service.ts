@@ -1,5 +1,3 @@
-/* eslint-disable max-lines -- Why: speech worker ownership, warm reuse, and
-timeout teardown stay co-located so dictation lifecycle state cannot drift. */
 import { Worker } from 'node:worker_threads'
 import { getCatalogModel } from './model-catalog'
 import type { ModelManager } from './model-manager'

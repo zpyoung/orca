@@ -2043,6 +2043,11 @@
       "status": "permanent"
     },
     {
+      "path": "src/main/speech/stt-service.ts",
+      "status": "permanent",
+      "reason": "Drops upstream's `eslint-disable max-lines`, which is inert under the fork's raised .oxlintrc.json ceilings (500 for .ts vs upstream's 300). The changed-lines code-quality check fails on the unused directive; keeping upstream's copy would fail static analysis on every sync that touches this file."
+    },
+    {
       "path": "src/main/updater-prerelease-feed.ts",
       "reason": "Fork's own prerelease update feed.",
       "status": "permanent"
