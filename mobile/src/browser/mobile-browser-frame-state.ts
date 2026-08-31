@@ -1,4 +1,4 @@
-import { Buffer } from 'buffer'
+import { Buffer } from 'node:buffer'
 import type { GestureResponderEvent, Image, View } from 'react-native'
 import type { RpcFailure, RpcSuccess } from '../transport/types'
 import type {

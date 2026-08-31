@@ -84,7 +84,7 @@ function formatReportWithTruncatedNewestEvent(
   maxBytes: number
 ): string {
   const history = `Recent connection history (1 newest event; ${events.length - 1} older omitted):`
-  const prefix = [...header, history].join('\n') + '\n'
+  const prefix = `${[...header, history].join('\n')}\n`
   const availableBytes = maxBytes - utf8Bytes(prefix)
   if (availableBytes <= 0) {
     return truncateUtf8(prefix, maxBytes)

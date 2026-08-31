@@ -98,9 +98,19 @@ them hot sidebar hooks — and rewriting ref patterns upstream has no reason to 
 - `mobile/src/browser/mobile-browser-frameless-stream.test.tsx`
 - `mobile/src/session/pending-terminal-handle-recovery.test.ts`
 - `mobile/src/transport/mobile-relay-rpc-session-liveness.test.ts`
+- `mobile/src/browser/mobile-browser-frame-state.ts`
+- `mobile/src/diagnostics/connection-diagnostics-submission.ts`
+- `src/renderer/src/components/right-sidebar/checks-panel/use-checks-list-state.tsx`
 
 The `package.json` severities need no `exceptions` row of their own; the file is already declared
 `permanent`.
+
+The v1.4.193 sync added the last three. The first two are the same shape as the originals — a
+`node:buffer` import and a template literal, on lines the merge touched. The third is different in
+kind: `use-checks-list-state.tsx` wrote `autoExpandedContextRef` *inside* a `setExpandedCheckKeys`
+updater, and React may run an updater more than once, so the write is hoisted into the effect that
+queues it. That one is a genuine correctness fix to upstream's hook and worth submitting on its own
+merits, not just to clear the gate.
 
 **Introduced:** the v1.4.186 sync (2026-08-21), fixing the `static analysis` job on PR #12.
 

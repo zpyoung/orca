@@ -82,14 +82,17 @@ export function useChecksListState({
       }
       return next
     })
+    const autoExpandKey =
+      autoExpandedContextRef.current === checkDetailsContextKey
+        ? null
+        : (rows.find((row) => isFailedCheck(row.check))?.key ?? null)
+    if (autoExpandedContextRef.current !== checkDetailsContextKey) {
+      autoExpandedContextRef.current = checkDetailsContextKey
+    }
     setExpandedCheckKeys((current) => {
       const next = new Set([...current].filter((key) => validKeys.has(key)))
-      if (autoExpandedContextRef.current !== checkDetailsContextKey) {
-        const firstFailed = rows.find((row) => isFailedCheck(row.check))
-        if (firstFailed) {
-          next.add(firstFailed.key)
-        }
-        autoExpandedContextRef.current = checkDetailsContextKey
+      if (autoExpandKey !== null) {
+        next.add(autoExpandKey)
       }
       return next
     })

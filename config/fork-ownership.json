@@ -1991,6 +1991,24 @@
       "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate"
     },
     {
+      "path": "mobile/src/browser/mobile-browser-frame-state.ts",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate",
+      "reason": "React Doctor gate: imports Buffer from `node:buffer`. Mobile disables unicorn/prefer-node-protocol for Metro's sake, but React Doctor does not read mobile/.oxlintrc.json and blocks the changed line."
+    },
+    {
+      "path": "mobile/src/diagnostics/connection-diagnostics-submission.ts",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate",
+      "reason": "React Doctor gate: rewrites a string concatenation as a template literal to satisfy eslint/prefer-template on the changed line."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/use-checks-list-state.tsx",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate",
+      "reason": "React Doctor gate: hoists an autoExpandedContextRef write out of a setExpandedCheckKeys updater. React may invoke an updater more than once, so the ref write belongs in the effect that queues it — a correctness fix to upstream's own hook, not fork behavior."
+    },
+    {
       "path": "mobile/src/session/pending-terminal-handle-recovery.test.ts",
       "reason": "React Doctor gate: rewrites `Array<T>` as `T[]`. The mobile package turns typescript/array-type off, but React Doctor does not read mobile/.oxlintrc.json and blocks the changed line.",
       "status": "pending-upstream",
