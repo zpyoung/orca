@@ -1,4 +1,5 @@
 import type { PaneManager } from '@/lib/pane-manager/pane-manager'
+import { focusPaneOrDockComposer } from './fork-terminal-dock/dock-composer-focus-redirect'
 import { makePaneKey, type PaneKey } from '../../../../shared/stable-pane-id'
 
 export type PaneFocusOwnership = {
@@ -28,9 +29,7 @@ export function focusActivePane(manager: PaneManager, ownership?: PaneFocusOwner
     if (shouldPreserveEditableFocus(activeElement) && !activeDock) {
       return
     }
-    activePane.container
-      .querySelector<HTMLTextAreaElement>('[data-terminal-dock] textarea:not(:disabled)')
-      ?.focus()
+    focusPaneOrDockComposer(activePane)
     return
   }
   if (shouldPreserveEditableFocus(activeElement)) {

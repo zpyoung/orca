@@ -16,6 +16,8 @@ import type { ComposerAutocomplete, NativeChatPickerItem } from '../native-chat-
 import { NativeChatMentionHint, NativeChatPickerMenu } from '../NativeChatAutocompleteMenus'
 import { AgentComposerActions } from './AgentComposerActions'
 import { AgentComposerAttachmentThumbnail } from './AgentComposerAttachmentThumbnail'
+import { ComposerMarkdownOverlay } from './ComposerMarkdownOverlay'
+import { COMPOSER_TEXT_CLASS } from './composer-markdown-style'
 import { useNativeChatWidthClassName } from '../fork-native-chat-width/use-native-chat-width'
 import { nativeChatComposerPlaceholder } from '../native-chat-composer-target'
 import type {
@@ -113,13 +115,12 @@ export function AgentComposerField({
 
   return (
     <div className={cn('bg-background', layout === 'dock' ? 'h-full min-h-0' : 'shrink-0')}>
-      {/* Extra bottom padding keeps the input box off the window rim. */}
-      <div className={cn('px-3 pt-2 sm:px-4', layout === 'dock' ? 'h-full min-h-0 pb-2' : 'pb-4')}>
+      {/* Extra bottom padding keeps the chat input box off the window rim. */}
+      <div className={cn(layout === 'dock' ? 'h-full min-h-0' : 'px-3 pb-4 pt-2 sm:px-4')}>
         <div
           className={cn(
-            'relative mx-auto w-full',
-            layout === 'dock' && 'flex h-full min-h-0 flex-col',
-            widthClassName
+            'relative w-full',
+            layout === 'dock' ? 'flex h-full min-h-0 flex-col' : cn('mx-auto', widthClassName)
           )}
         >
           {autocomplete.mode === 'slash' || autocomplete.mode === 'skill' ? (
@@ -148,9 +149,11 @@ export function AgentComposerField({
               // Why: always-on hairline (token-level border, not focus ring) —
               // no focus/click border flash. The box is a container, not a
               // focus target.
-              'rounded-lg border border-border p-1.5 shadow-xs',
+              'border border-border p-1.5 shadow-xs',
               'bg-muted/50 dark:bg-input/40',
-              layout === 'dock' && 'flex min-h-0 flex-1 flex-col overflow-hidden'
+              layout === 'dock'
+                ? 'flex min-h-0 flex-1 flex-col overflow-hidden rounded-none'
+                : 'rounded-lg'
             )}
           >
             {imageAttachments.length > 0 ? (
@@ -192,43 +195,53 @@ export function AgentComposerField({
                 })}
               </div>
             ) : null}
-            <textarea
-              ref={textareaRef}
-              value={draft}
-              disabled={disabled}
-              rows={2}
-              onChange={(e) => onDraftChange(e.target.value, e.currentTarget)}
-              onKeyDown={onKeyDown}
-              onCompositionStart={onCompositionStart}
-              onCompositionEnd={onCompositionEnd}
-              onPaste={onPaste}
-              onSelect={(e) => onTextareaSelect(e.currentTarget)}
-              aria-expanded={autocomplete.mode === 'slash' || autocomplete.mode === 'skill'}
-              aria-controls={
-                autocomplete.mode === 'slash' || autocomplete.mode === 'skill'
-                  ? pickerListboxId
-                  : undefined
-              }
-              aria-activedescendant={
-                (autocomplete.mode === 'slash' || autocomplete.mode === 'skill') &&
-                autocomplete.items.length > 0
-                  ? `${pickerListboxId}-option-${Math.min(activeSuggestion, autocomplete.items.length - 1)}`
-                  : undefined
-              }
-              placeholder={nativeChatComposerPlaceholder(hasPty, canSend)}
-              // Why: coarse-pointer min-height follows the app's touch target convention.
-              // field-sizing:content grows the field with the draft; the 8lh cap (plus
-              // py-1) turns further growth into internal scrolling, and scrollbar-sleek
-              // keeps that gutter off the heavy native scrollbar. Both are layout-driven,
-              // so re-wrap on window/pane resize is handled without a measure pass.
-              className={cn(
-                'scrollbar-sleek w-full resize-none bg-transparent px-2 py-1 text-sm outline-none',
-                layout === 'dock'
-                  ? 'scrollbar-sleek min-h-0 flex-1 overflow-y-auto'
-                  : 'min-h-12 [field-sizing:content] max-h-[calc(8lh+0.5rem)] pointer-coarse:min-h-14',
-                'placeholder:text-muted-foreground/60 disabled:cursor-not-allowed disabled:opacity-50'
-              )}
-            />
+            <div className={cn('relative', layout === 'dock' && 'flex min-h-0 flex-1 flex-col')}>
+              <ComposerMarkdownOverlay
+                text={draft}
+                layout={layout}
+                disabled={disabled}
+                textareaRef={textareaRef}
+              />
+              <textarea
+                ref={textareaRef}
+                value={draft}
+                disabled={disabled}
+                rows={2}
+                onChange={(e) => onDraftChange(e.target.value, e.currentTarget)}
+                onKeyDown={onKeyDown}
+                onCompositionStart={onCompositionStart}
+                onCompositionEnd={onCompositionEnd}
+                onPaste={onPaste}
+                onSelect={(e) => onTextareaSelect(e.currentTarget)}
+                aria-expanded={autocomplete.mode === 'slash' || autocomplete.mode === 'skill'}
+                aria-controls={
+                  autocomplete.mode === 'slash' || autocomplete.mode === 'skill'
+                    ? pickerListboxId
+                    : undefined
+                }
+                aria-activedescendant={
+                  (autocomplete.mode === 'slash' || autocomplete.mode === 'skill') &&
+                  autocomplete.items.length > 0
+                    ? `${pickerListboxId}-option-${Math.min(activeSuggestion, autocomplete.items.length - 1)}`
+                    : undefined
+                }
+                placeholder={nativeChatComposerPlaceholder(hasPty, canSend)}
+                // Why: coarse-pointer min-height follows the app's touch target convention.
+                // field-sizing:content grows the field with the draft; the 8lh cap (plus
+                // py-1) turns further growth into internal scrolling, and scrollbar-sleek
+                // keeps that gutter off the heavy native scrollbar. Both are layout-driven,
+                // so re-wrap on window/pane resize is handled without a measure pass.
+                className={cn(
+                  COMPOSER_TEXT_CLASS,
+                  'scrollbar-sleek relative resize-none bg-transparent outline-none',
+                  'text-transparent caret-foreground selection:bg-ring/35',
+                  layout === 'dock'
+                    ? 'scrollbar-sleek min-h-0 flex-1 overflow-y-auto'
+                    : 'min-h-12 [field-sizing:content] max-h-[calc(8lh+0.5rem)] pointer-coarse:min-h-14',
+                  'placeholder:text-muted-foreground/60 disabled:cursor-not-allowed disabled:opacity-50'
+                )}
+              />
+            </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2 pt-0.5">
               <AgentComposerActions
                 attachDisabled={attachDisabled}

@@ -147,6 +147,12 @@ describe('TerminalDock', () => {
     expect(status.firstElementChild).toHaveClass('invisible')
   })
 
+  it('uses a 180px default gutter with 240/280 auto-undock thresholds', () => {
+    expect(terminalDockGutterHeightPx(DEFAULT_GUTTER_ROWS)).toBe(180)
+    expect(terminalDockAutoUndockLowThresholdPx(DEFAULT_GUTTER_ROWS)).toBe(240)
+    expect(terminalDockAutoUndockHighThresholdPx(DEFAULT_GUTTER_ROWS)).toBe(280)
+  })
+
   it('keeps the gutter height fixed regardless of draft length', () => {
     render(<TerminalDock {...baseProps} />)
     const dock = screen.getByRole('status').closest('[data-terminal-dock]') as HTMLElement
