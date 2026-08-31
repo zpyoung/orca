@@ -14,6 +14,10 @@ import type {
 } from '../../../../shared/native-chat-session-options'
 import type { NativeChatSessionOptionObservation } from '../../../../shared/native-chat-types'
 import { nativeChatReportedValuesFromObservation } from './fork-native-chat-session-options/native-chat-session-option-observation'
+import {
+  hasDispatchedNativeChatSessionOption,
+  useClaudeStartupFrameRevision
+} from './fork-native-chat-session-options/use-claude-startup-frame-revision'
 import { useAppStore } from '../../store'
 import {
   createNativeChatPtySessionOptions,
@@ -176,6 +180,12 @@ export function useNativeChatSessionOptions(args: {
     targetPtyId,
     terminalTabId
   ])
+  const startupFrameRevision = useClaudeStartupFrameRevision({
+    agent,
+    terminalTabId,
+    targetPtyId,
+    surface
+  })
 
   useEffect(() => {
     if (!surface || !discoveryContext || !reportedSessionOptions) {
@@ -228,7 +238,11 @@ export function useNativeChatSessionOptions(args: {
         // Why: discovery can land after this read. Keeping the screen that
         // parsed lets it re-resolve against the host's real ids later, when the
         // frame itself may have already scrolled out of the buffer.
-        if (cancelled) {
+        if (
+          cancelled ||
+          observedFromLogRef.current ||
+          hasDispatchedNativeChatSessionOption(surface)
+        ) {
           return
         }
         reportedScreenRef.current = screen
@@ -240,7 +254,7 @@ export function useNativeChatSessionOptions(args: {
     return () => {
       cancelled = true
     }
-  }, [agent, discoveryContext, readTerminalScreen, surface, targetPtyId])
+  }, [agent, discoveryContext, readTerminalScreen, startupFrameRevision, surface, targetPtyId])
 
   useEffect(() => {
     if (!surface || !discoveryContext) {

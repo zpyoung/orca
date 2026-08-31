@@ -99,4 +99,14 @@ describe('agent composer autogrow', () => {
     // value change, so a re-wrap from a window/pane resize would strand it.
     expect(renderField('a\n'.repeat(6)).style.height).toBe('')
   })
+
+  it('layers the native caret and selection over the Markdown mirror', () => {
+    const textarea = renderField('**bold**')
+    const overlay = textarea.parentElement?.querySelector('[data-composer-markdown-overlay]')
+
+    expect(overlay).not.toBeNull()
+    expect(textarea.className).toContain('text-transparent')
+    expect(textarea.className).toContain('caret-foreground')
+    expect(textarea.className).toContain('selection:bg-ring/35')
+  })
 })
