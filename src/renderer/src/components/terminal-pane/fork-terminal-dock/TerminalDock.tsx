@@ -15,7 +15,7 @@ import { useNativeChatPasteBridge } from '../../native-chat/use-native-chat-past
 // composer's own card padding and action row, which don't scale with rows.
 export const TERMINAL_DOCK_ROW_HEIGHT_PX = 20
 const ROW_HEIGHT_PX = TERMINAL_DOCK_ROW_HEIGHT_PX
-const CHROME_HEIGHT_PX = 96
+const CHROME_HEIGHT_PX = 80
 
 // A gutter that fits exactly is still useless — the terminal above it is the
 // ground truth the user watches their text land in, so undocking must leave

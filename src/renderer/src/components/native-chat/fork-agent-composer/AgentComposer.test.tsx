@@ -71,6 +71,23 @@ describe('AgentComposer bare mount', () => {
     expect(textarea.value).toBe('')
   })
 
+  it('sends the raw Markdown draft without normalizing it', () => {
+    const draft = 'Fix **auth** in `login.ts`  \n@src/main.ts'
+    render(
+      <AgentComposer
+        terminalTabId="tab-markdown"
+        paneKey="pane-markdown"
+        targetPtyId="pty-1"
+        agent="claude"
+      />
+    )
+
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: draft } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    expect(mocks.sendNativeChatMessage.mock.calls[0]?.[2]).toBe(draft)
+  })
+
   it('never requires anything beyond core props to render the composer field', () => {
     render(
       <AgentComposer terminalTabId="tab-2" paneKey="pane-2" targetPtyId={null} agent="codex" />
