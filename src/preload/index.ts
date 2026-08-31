@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer, webFrame, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { preloadE2EConfig } from './e2e-config'
 import { buildForkSessionHandoffApi } from './fork-session-handoff/session-handoff-preload-api'
+import { buildForkSessionInfoApi } from './fork-session-info/session-info-preload-api'
 import { glApi } from './gitlab'
 import type { AppIdentity } from '../shared/app-identity'
 import type { MacCapturedDigitRowChord } from '../shared/macos-symbolic-hotkeys'
@@ -547,6 +548,7 @@ const readNativeChatSession = (
 
 const api = {
   forkSessionHandoff: buildForkSessionHandoffApi(),
+  forkSessionInfo: buildForkSessionInfoApi(),
   app: {
     getIdentity: (): Promise<AppIdentity> => ipcRenderer.invoke('app:getIdentity'),
     getFeatureWallAssetBaseUrl: (): Promise<string> =>

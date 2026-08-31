@@ -19,6 +19,7 @@ fork-specific functionality. Isolating it would leave upstream carrying the blan
 indefinitely while the fork carries a parallel, diverging copy of the same hook.
 
 **Paths:**
+
 - `src/renderer/src/components/native-chat/use-native-chat-retained-session.ts`
 - `src/renderer/src/components/native-chat/use-native-chat-retained-session.test.ts`
 - `src/shared/native-chat-transcript-retention.ts`
@@ -50,6 +51,7 @@ feature; isolating a cosmetic tweak like this only doubles the maintenance surfa
 upstream could take outright.
 
 **Paths (own `exceptions` rows):**
+
 - `src/renderer/src/components/sidebar/repo-header-action-button-class.ts`
 - `src/renderer/src/components/sidebar/worktree-list/viewport/virtual-rows.ts`
 - `src/renderer/src/components/sidebar/worktree-list/viewport/scroll-adjustment.test.ts`
@@ -58,6 +60,7 @@ upstream could take outright.
 - `src/renderer/src/components/sidebar/worktree-card-surface.tsx`
 
 **Paths (density lines folded into the `worktree-groups` seam declaration):**
+
 - `src/renderer/src/components/sidebar/WorktreeList.tsx` (2 lines)
 
 **Introduced:** commit `7436d38a21` (2026-07-25), "style(sidebar): tighten workspace list spacing
@@ -77,6 +80,7 @@ gating, unrelated to any of the fork's four features (it landed inside the `nati
 feature commit as an incidental fix, not width functionality).
 
 **Paths:**
+
 - `src/renderer/src/components/terminal-pane/TerminalPane.tsx`
 
 **Introduced:** commit `9ac7e7c423` (2026-08-06), "feat(native-chat): configurable reading-column
@@ -97,6 +101,7 @@ the extracted module holds no fork content — isolating it into a `fork-` direc
 upstream code under a fork glob and hand the fork permanent ownership of a schema it did not write.
 
 **Paths:**
+
 - `src/shared/workspace-session-editor-schema.ts`
 
 **Introduced:** commit `e63c56e90c` (2026-08-18), "fix(composer): reintegrate the codex typed-command
@@ -134,6 +139,7 @@ already a permanent fork exception. Isolating would mean forking nine upstream m
 them hot sidebar hooks — and rewriting ref patterns upstream has no reason to change.
 
 **Paths:**
+
 - `mobile/src/browser/mobile-browser-frameless-stream.test.tsx`
 - `mobile/src/session/pending-terminal-handle-recovery.test.ts`
 - `mobile/src/transport/mobile-relay-rpc-session-liveness.test.ts`
@@ -162,6 +168,7 @@ Isolating it would mean a forked copy of the shared type that upstream's own con
 bypass, leaving the mis-routing in place for every non-composer surface.
 
 **Paths:**
+
 - `src/shared/native-file-drop.ts`
 - `src/renderer/src/components/native-chat/use-native-chat-file-attachment-actions.ts`
 - `src/shared/native-file-drop.test.ts`
@@ -200,6 +207,7 @@ composer's `pasteFromClipboard`, which is what knows how to save and attach an i
 fallback an image-only Cmd+V at the answer input would be claimed and then silently discarded.
 
 **Paths:**
+
 - `src/renderer/src/components/native-chat/use-native-chat-paste-bridge.ts`
 - `src/renderer/src/components/native-chat/use-native-chat-paste-bridge.test.tsx`
 
@@ -207,5 +215,28 @@ fallback an image-only Cmd+V at the answer input would be claimed and then silen
 `src/renderer/src/components/terminal-pane/fork-terminal-dock/TerminalDock.tsx`; upstream's own
 caller passes the same ref it already had, so the change is inert for `NativeChatView` and only
 takes effect for a host that mounts both targets at once.
+
+**Status:** pending-upstream. Not yet submitted.
+
+## Live Claude rate-limit ingest acceptance
+
+**What:** `RateLimitService.ingestLiveClaudeRateLimits` returns whether a statusline payload was
+attributed to the selected Claude account and contained usable plan-window data. A deduplicated
+payload still returns `true` because the existing live-session snapshot already represents it;
+missing auth context, account mismatches, and empty windows return `false`.
+
+**Why upstream, not isolated:** acceptance is decided by the service's private selected-account
+snapshot, window parser, and dedupe state. A parallel fork wrapper cannot know whether the service
+dropped a payload without duplicating those internals and risking a different attribution verdict.
+Returning the decision lets any consumer correlate related pane telemetry without exposing account
+paths or weakening the existing wrong-account guard.
+
+**Paths:**
+
+- `src/main/rate-limits/service.ts`
+
+**Depends on:** the fork-owned Session Info correlation adapter in
+`src/main/fork-session-info/session-info-plan-window-correlation.ts` consumes the result. An
+upstream PR can test and land the return contract without that consumer.
 
 **Status:** pending-upstream. Not yet submitted.

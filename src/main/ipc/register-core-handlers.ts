@@ -38,6 +38,7 @@ import { setTrustedBrowserRendererWebContentsId } from './browser-renderer-trust
 import { registerSessionHandlers } from './session'
 import { registerSettingsHandlers } from './settings'
 import { registerForkSessionHandoffHandlers } from '../fork-session-handoff/session-lineage-ipc'
+import { registerSessionInfoIpcHandlers } from '../fork-session-info/session-info-ipc'
 import { registerDiagnosticsHandlers } from './diagnostics'
 import { registerSkillsHandlers } from './skills'
 import { registerWorkspaceSpaceHandlers } from './workspace-space'
@@ -177,6 +178,7 @@ export function registerCoreHandlers(
   registerComputerUsePermissionHandlers()
   registerSettingsHandlers(store, agentAwakeService)
   registerForkSessionHandoffHandlers()
+  registerSessionInfoIpcHandlers()
   registerSkillsHandlers(store, runtime)
   if (automations) {
     registerAutomationHandlers(store, automations)

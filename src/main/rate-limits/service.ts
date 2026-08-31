@@ -1492,8 +1492,8 @@ export class RateLimitService {
     }
   }
 
-  /** Live usage windows forwarded from a Claude session's statusLine command. */
-  ingestLiveClaudeRateLimits(event: ClaudeStatusLineRateLimits): void {
+  /** Ingest live Claude plan windows and report whether the selected account accepted them. */
+  ingestLiveClaudeRateLimits(event: ClaudeStatusLineRateLimits): boolean {
     // Why: attribution needs the selected account's config dir; until a fetch cycle captures it, drop posts rather than guess the account.
     const snapshot = this.lastClaudeAuthSnapshot
     if (!snapshot) {
@@ -1501,7 +1501,7 @@ export class RateLimitService {
       console.debug('[rate-limits] dropped live Claude usage: no auth snapshot yet', {
         eventConfigDir: event.configDir
       })
-      return
+      return false
     }
     // Why: sessions of other accounts (or other runtimes) report their own quota; mixing them into the active account's bar would lie.
     if (normalizeClaudeConfigDir(event.configDir) !== snapshot.configDir) {
@@ -1509,12 +1509,12 @@ export class RateLimitService {
         eventConfigDir: event.configDir,
         snapshotConfigDir: snapshot.configDir
       })
-      return
+      return false
     }
     const freshSession = mapClaudeUsageWindow(event.fiveHour ?? undefined, 300)
     const freshWeekly = mapClaudeUsageWindow(event.sevenDay ?? undefined, 10080)
     if (!freshSession && !freshWeekly) {
-      return
+      return false
     }
     const previous = this.state.claude
     // Why: statusline payloads can carry a single window; an absent one means "no update", not "cleared" — keep the other bar populated.
@@ -1527,7 +1527,7 @@ export class RateLimitService {
       isSameUsageWindow(previous.session, session) &&
       isSameUsageWindow(previous.weekly, weekly)
     ) {
-      return
+      return true
     }
     this.activeFailureStreakByProvider.claude = 0
     this.updateState({
@@ -1550,6 +1550,7 @@ export class RateLimitService {
         }
       }
     })
+    return true
   }
 
   private trackActiveFailureStreak(

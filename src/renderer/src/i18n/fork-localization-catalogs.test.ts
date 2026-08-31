@@ -24,7 +24,7 @@ describe('registerForkLocalizationCatalogs', () => {
     const englishCatalogs = addResourceBundle.mock.calls
       .filter(([language]) => language === 'en')
       .map(([, , catalog]) => catalog)
-    expect(englishCatalogs).toHaveLength(10)
+    expect(englishCatalogs).toHaveLength(11)
     expect(englishCatalogs).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -44,7 +44,8 @@ describe('registerForkLocalizationCatalogs', () => {
             settings: expect.objectContaining({ forkSessionHandoff: expect.any(Object) })
           })
         }),
-        expect.objectContaining({ auto: expect.any(Object) })
+        expect.objectContaining({ auto: expect.any(Object) }),
+        expect.objectContaining({ 'fork.sessionInfo.title': expect.any(String) })
       ])
     )
 
@@ -52,7 +53,7 @@ describe('registerForkLocalizationCatalogs', () => {
     const spanishCatalogs = addResourceBundle.mock.calls
       .filter(([language]) => language === 'es')
       .map(([, , catalog]) => catalog)
-    expect(spanishCatalogs).toHaveLength(10)
+    expect(spanishCatalogs).toHaveLength(11)
     expect(spanishCatalogs).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ components: expect.any(Object) }),
@@ -64,7 +65,8 @@ describe('registerForkLocalizationCatalogs', () => {
             settings: expect.objectContaining({ forkSessionHandoff: expect.any(Object) })
           })
         }),
-        expect.objectContaining({ auto: expect.any(Object) })
+        expect.objectContaining({ auto: expect.any(Object) }),
+        expect.objectContaining({ 'fork.sessionInfo.title': expect.any(String) })
       ])
     )
   })
