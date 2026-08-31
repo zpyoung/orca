@@ -44,6 +44,7 @@ export function ArtifactPasswordPanel({
   const [passphrase, setPassphrase] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [confirmation, setConfirmation] = useState<Confirmation>(null)
+  const [loadingDetails, setLoadingDetails] = useState(false)
   const sequence = useRef(0)
 
   // Why: reset during render, not in an effect — an effect paints one frame of the
@@ -61,15 +62,21 @@ export function ArtifactPasswordPanel({
     setDetails(null)
     if (!shareUrl) {
       setPassphrase(null)
+      setLoadingDetails(false)
       return
     }
+    setLoadingDetails(true)
     void callRuntimeRpc<ArtifactCloudOperation<ArtifactPublishedLink | null>>(
       LOCAL_RUNTIME,
       'artifacts.getPublishedLink',
       { sourceKey }
     )
       .then((result) => {
-        if (sequence.current === requestSequence && result.status === 'ok') {
+        if (sequence.current !== requestSequence) {
+          return
+        }
+        setLoadingDetails(false)
+        if (result.status === 'ok') {
           setDetails(result.value)
           if (result.value?.protection?.rotationCleanupPending) {
             setError(
@@ -83,6 +90,7 @@ export function ArtifactPasswordPanel({
       })
       .catch(() => {
         if (sequence.current === requestSequence) {
+          setLoadingDetails(false)
           setError(
             translate(
               'auto.components.artifacts.ArtifactPasswordPanel.statusFailed',
@@ -331,6 +339,14 @@ export function ArtifactPasswordPanel({
             </Button>
           </div>
         </div>
+      ) : loadingDetails ? (
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Loader2 className="size-3.5 animate-spin" />
+          {translate(
+            'auto.components.artifacts.ArtifactPasswordPanel.checkingProtection',
+            'Checking protection status…'
+          )}
+        </p>
       ) : shareUrl ? (
         <p className="text-xs text-muted-foreground">
           {translate(

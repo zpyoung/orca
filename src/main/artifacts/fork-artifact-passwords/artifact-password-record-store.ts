@@ -242,6 +242,46 @@ function decryptPassphrase(blob: string): string | null {
 }
 
 /** Persists artifact passphrases fail-closed through Electron safeStorage. */
+function currentRecordFromEntry(
+  sourceKey: string,
+  entry: StoredArtifactPasswordEntry | null | undefined
+): ArtifactPasswordRecord | null {
+  const current = entry?.current
+  if (!current) {
+    return null
+  }
+  return {
+    sourceKey,
+    slug: current.slug,
+    displayName: current.displayName,
+    sourceContentType: current.sourceContentType,
+    expiresAt: current.expiresAt,
+    passphrase: decryptPassphrase(current.passphraseBlob),
+    ...(current.rotationCleanup ? { rotationCleanup: current.rotationCleanup } : {}),
+    ...(current.removalState ? { removalState: current.removalState } : {}),
+    ...(current.completedCreateIntentId
+      ? { completedCreateIntentId: current.completedCreateIntentId }
+      : {})
+  }
+}
+
+function pendingRecordFromEntry(
+  entry: StoredArtifactPasswordEntry | null | undefined
+): ArtifactPasswordPending | null {
+  const pending = entry?.pending
+  if (!pending) {
+    return null
+  }
+  return {
+    mode: pending.mode,
+    displayName: pending.displayName,
+    sourceContentType: pending.sourceContentType,
+    passphrase: decryptPassphrase(pending.passphraseBlob),
+    ...(pending.previous ? { previous: pending.previous } : {}),
+    ...(pending.created ? { created: pending.created } : {})
+  }
+}
+
 export class ArtifactPasswordRecordStore {
   constructor(private readonly userDataPath: string) {}
 
@@ -250,23 +290,7 @@ export class ArtifactPasswordRecordStore {
     sourceKey: string,
     scope: ArtifactShareScope
   ): ArtifactPasswordRecord | null {
-    const entry = this.getEntry(profileId, sourceKey, scope)
-    if (!entry?.current) {
-      return null
-    }
-    return {
-      sourceKey,
-      slug: entry.current.slug,
-      displayName: entry.current.displayName,
-      sourceContentType: entry.current.sourceContentType,
-      expiresAt: entry.current.expiresAt,
-      passphrase: decryptPassphrase(entry.current.passphraseBlob),
-      ...(entry.current.rotationCleanup ? { rotationCleanup: entry.current.rotationCleanup } : {}),
-      ...(entry.current.removalState ? { removalState: entry.current.removalState } : {}),
-      ...(entry.current.completedCreateIntentId
-        ? { completedCreateIntentId: entry.current.completedCreateIntentId }
-        : {})
-    }
+    return currentRecordFromEntry(sourceKey, this.getEntry(profileId, sourceKey, scope))
   }
 
   getPending(
@@ -274,25 +298,16 @@ export class ArtifactPasswordRecordStore {
     sourceKey: string,
     scope: ArtifactShareScope
   ): ArtifactPasswordPending | null {
-    const pending = this.getEntry(profileId, sourceKey, scope)?.pending
-    if (!pending) {
-      return null
-    }
-    return {
-      mode: pending.mode,
-      displayName: pending.displayName,
-      sourceContentType: pending.sourceContentType,
-      passphrase: decryptPassphrase(pending.passphraseBlob),
-      ...(pending.previous ? { previous: pending.previous } : {}),
-      ...(pending.created ? { created: pending.created } : {})
-    }
+    return pendingRecordFromEntry(this.getEntry(profileId, sourceKey, scope))
   }
 
+  // Why: every artifacts-list refresh walks these twice over, so they map the entries already
+  // parsed here rather than re-reading and re-validating the file once per record.
   listCurrent(profileId: string, scope: ArtifactShareScope): readonly ArtifactPasswordRecord[] {
     const file = readFile(profileId, this.userDataPath)
     return Object.values(file.entries)
-      .filter((entry) => sameScope(entry.scope, scope) && entry.current)
-      .map((entry) => this.getCurrent(profileId, entry.sourceKey, scope))
+      .filter((entry) => sameScope(entry.scope, scope))
+      .map((entry) => currentRecordFromEntry(entry.sourceKey, entry))
       .filter((entry): entry is ArtifactPasswordRecord => entry !== null)
   }
 
@@ -302,9 +317,9 @@ export class ArtifactPasswordRecordStore {
   ): readonly (ArtifactPasswordPending & { sourceKey: string })[] {
     const file = readFile(profileId, this.userDataPath)
     return Object.values(file.entries)
-      .filter((entry) => sameScope(entry.scope, scope) && entry.pending)
+      .filter((entry) => sameScope(entry.scope, scope))
       .map((entry) => {
-        const pending = this.getPending(profileId, entry.sourceKey, scope)
+        const pending = pendingRecordFromEntry(entry)
         return pending ? { ...pending, sourceKey: entry.sourceKey } : null
       })
       .filter((entry): entry is ArtifactPasswordPending & { sourceKey: string } => entry !== null)
@@ -446,22 +461,26 @@ export class ArtifactPasswordRecordStore {
     this.write(profileId, file)
   }
 
+  /** Drops matching records and reports their source keys, so callers can clear paired journals. */
   remove(
     profileId: string,
     scope: ArtifactShareScope,
     match: { sourceKey?: string; slug?: string }
-  ): void {
+  ): string[] {
     const file = readFile(profileId, this.userDataPath)
+    const removed: string[] = []
     for (const [key, entry] of Object.entries(file.entries)) {
       if (
         sameScope(entry.scope, scope) &&
         ((match.sourceKey !== undefined && entry.sourceKey === match.sourceKey) ||
           (match.slug !== undefined && entry.current?.slug === match.slug))
       ) {
+        removed.push(entry.sourceKey)
         delete file.entries[key]
       }
     }
     this.write(profileId, file)
+    return removed
   }
 
   clear(profileId: string): void {
