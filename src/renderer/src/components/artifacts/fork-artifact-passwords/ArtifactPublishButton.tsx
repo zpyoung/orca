@@ -1,4 +1,4 @@
-// Forked from src/renderer/src/components/artifacts/ArtifactPublishButton.tsx at da585e8b14.
+// Forked from src/renderer/src/components/artifacts/ArtifactPublishButton.tsx at ee1e002d00.
 import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, Loader2, Share2 } from 'lucide-react'
 import type { ArtifactWriteRequest } from '../../../../../shared/artifacts'
@@ -305,7 +305,7 @@ export function ArtifactPublishButton({
                 ? translate('auto.components.artifacts.ArtifactPublishButton.sharing', 'Sharing…')
                 : translate(
                     'auto.components.artifacts.ArtifactPublishButton.sharePublicLink',
-                    'Share public link'
+                    'Generate link'
                   )}
             </Button>
           )}

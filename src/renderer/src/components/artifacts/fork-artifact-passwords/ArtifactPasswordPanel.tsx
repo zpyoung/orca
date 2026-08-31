@@ -46,10 +46,14 @@ export function ArtifactPasswordPanel({
   const [confirmation, setConfirmation] = useState<Confirmation>(null)
   const sequence = useRef(0)
 
-  useEffect(() => {
+  // Why: reset during render, not in an effect — an effect paints one frame of the
+  // previous artifact's passphrase before clearing it.
+  const [shownSourceKey, setShownSourceKey] = useState(sourceKey)
+  if (shownSourceKey !== sourceKey) {
+    setShownSourceKey(sourceKey)
     setPassphrase(null)
     setCopied(false)
-  }, [sourceKey])
+  }
 
   useEffect(() => {
     const requestSequence = ++sequence.current
