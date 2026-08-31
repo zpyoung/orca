@@ -26,7 +26,7 @@ import {
   isArtifactSharingEnabled
 } from '../../shared/artifact-sharing-gate'
 import { getDefaultSettings } from '../../shared/constants'
-import { ArtifactCloudService } from './artifact-cloud-service'
+import { ArtifactCloudService } from './fork-artifact-passwords/artifact-password-cloud-service'
 
 const createdPaths: string[] = []
 const apiUrl = 'http://localhost:3000'
@@ -176,7 +176,10 @@ describe('ArtifactCloudService record authorization', () => {
       service.getPublishedLink({ sourceKey: writeRequest.sourceKey, apiUrl, authToken: 'token-a' })
     ).resolves.toEqual({
       status: 'ok',
-      value: { shareUrl: 'https://share.onorca.dev/a/artifact-a' }
+      value: {
+        shareUrl: 'https://share.onorca.dev/a/artifact-a',
+        protection: { state: 'unprotected' }
+      }
     })
     await expect(
       service.getPublishedLink({ sourceKey: '/repo/other.html', apiUrl, authToken: 'token-a' })
@@ -545,7 +548,10 @@ describe('ArtifactCloudService publish capability gate', () => {
       service.getPublishedLink({ sourceKey: writeRequest.sourceKey, apiUrl, authToken: 'token-a' })
     ).resolves.toEqual({
       status: 'ok',
-      value: { shareUrl: 'https://share.onorca.dev/a/artifact-a' }
+      value: {
+        shareUrl: 'https://share.onorca.dev/a/artifact-a',
+        protection: { state: 'unprotected' }
+      }
     })
     await expect(
       service.unshare({ sourceKey: writeRequest.sourceKey, apiUrl, authToken: 'token-a' })

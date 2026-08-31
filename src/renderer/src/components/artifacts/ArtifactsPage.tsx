@@ -6,7 +6,7 @@ import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
 import { ArtifactCollection } from './ArtifactCollection'
-import { ArtifactDetailDrawer } from './ArtifactDetailDrawer'
+import { ArtifactDetailDrawer } from './fork-artifact-passwords/ArtifactDetailDrawer'
 import { ArtifactsPageSkeleton } from './ArtifactsPageSkeleton'
 import {
   ArtifactsPageAuthState,

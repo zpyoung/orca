@@ -18,7 +18,7 @@ import { useDiffNavigation } from './diff-navigation-context'
 import { useShortcutKeyDetails } from '@/hooks/useShortcutLabel'
 import { ShortcutKeyCombo } from '@/components/ShortcutKeyCombo'
 import type { ArtifactWriteRequest } from '../../../../shared/artifacts'
-import { ArtifactPublishButton } from '@/components/artifacts/ArtifactPublishButton'
+import { ArtifactPublishButton } from '@/components/artifacts/fork-artifact-passwords/ArtifactPublishButton'
 import { markdownArtifactSourceKey } from './markdown-artifact-upload'
 
 type EditorPanelHeaderProps = {

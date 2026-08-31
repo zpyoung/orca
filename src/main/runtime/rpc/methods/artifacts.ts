@@ -4,6 +4,7 @@ import {
   artifactWriteRequestByteLength
 } from '../../../../shared/artifacts'
 import { defineMethod, type RpcAnyMethod } from '../core'
+import { listArtifactsForClient } from './fork-artifact-passwords/artifact-password-client-projection'
 
 const CloudOptions = {
   apiUrl: z.string().max(2_048).optional(),
@@ -15,18 +16,19 @@ const ListOptions = z.object({
   cursor: z.string().min(1).max(2_048).optional()
 })
 
-const SourceRequest = z.object({
+export const SourceRequest = z.object({
   sourceKey: z.string().min(1).max(32_768),
   ...CloudOptions
 })
 
-const WriteRequest = z
+export const WriteRequest = z
   .object({
     sourceKey: z.string().min(1).max(32_768),
     content: z.string().min(1).max(ARTIFACT_CLI_MAX_RPC_BYTES),
     contentType: z.enum(['text/html', 'text/markdown']),
     fileName: z.string().min(1).max(512),
     title: z.string().max(512).optional(),
+    protection: z.never().optional(),
     ...CloudOptions
   })
   .refine((request) => artifactWriteRequestByteLength(request) <= ARTIFACT_CLI_MAX_RPC_BYTES, {
@@ -37,7 +39,8 @@ export const ARTIFACT_METHODS: readonly RpcAnyMethod[] = [
   defineMethod({
     name: 'artifacts.list',
     params: ListOptions,
-    handler: (params, { runtime }) => runtime.listArtifacts(params)
+    handler: (params, { runtime, clientKind }) =>
+      listArtifactsForClient(runtime, params, clientKind)
   }),
   defineMethod({
     name: 'artifacts.getPublishedLink',

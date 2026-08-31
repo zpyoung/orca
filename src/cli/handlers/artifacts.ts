@@ -21,6 +21,7 @@ import type { CommandHandler, HandlerContext } from '../dispatch'
 import { RuntimeClientError } from '../runtime-client'
 import { formatArtifactListPage, formatArtifactShared } from '../artifact-format'
 import { printResult } from '../format'
+import { artifactShareRpcMethod } from '../fork-artifact-passwords/artifact-password-cli'
 
 function stringFlag(ctx: HandlerContext, name: string): string | undefined {
   const value = ctx.flags.get(name)
@@ -180,7 +181,7 @@ export const ARTIFACT_HANDLERS: Record<string, CommandHandler> = {
   'artifacts share': async (ctx) => {
     rejectRemoteSelectionFlags(ctx)
     const response = await ctx.client.call<ArtifactCloudOperation<ArtifactListItem>>(
-      'artifacts.share',
+      artifactShareRpcMethod(ctx.flags),
       await readArtifactRequest(ctx)
     )
     const value = requireOperation(response.result)

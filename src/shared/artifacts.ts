@@ -1,3 +1,10 @@
+import type {
+  ArtifactLocalDetails,
+  ArtifactProtectionPublication,
+  ArtifactProtectionRequest,
+  ArtifactPublishedProtection
+} from './fork-artifact-passwords/artifact-password-types'
+
 export const ARTIFACT_CLI_MAX_RPC_BYTES = 800 * 1024
 
 export function artifactWriteRequestByteLength(request: ArtifactWriteRequest): number {
@@ -21,6 +28,8 @@ export type ArtifactMetadata = {
 export type ArtifactListItem = {
   artifact: ArtifactMetadata
   shareUrl: string
+  local?: ArtifactLocalDetails
+  protection?: ArtifactProtectionPublication
 }
 
 export type ArtifactListPage = {
@@ -34,6 +43,7 @@ export type ArtifactWriteRequest = {
   contentType: 'text/html' | 'text/markdown'
   fileName: string
   title?: string
+  protection?: ArtifactProtectionRequest
   apiUrl?: string
   authToken?: string
 }
@@ -41,10 +51,12 @@ export type ArtifactWriteRequest = {
 export type ArtifactPublishResult = {
   change: 'created' | 'updated'
   item: ArtifactListItem
+  protection?: ArtifactProtectionPublication
 }
 
 export type ArtifactPublishedLink = {
   shareUrl: string
+  protection?: ArtifactPublishedProtection
 }
 
 export type ArtifactCloudOptions = {

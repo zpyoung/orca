@@ -11,6 +11,7 @@ import {
 import { translate } from '@/i18n/i18n'
 import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
 import { useAppStore } from '@/store'
+import { showCompletedArtifactPublish } from './fork-artifact-passwords/artifact-password-publish-feedback'
 
 const LOCAL_RUNTIME = { kind: 'local' } as const
 
@@ -40,7 +41,8 @@ export function validateArtifactPublishRequest(
 }
 
 export async function publishArtifactFromSurface(
-  createRequest: () => Promise<ArtifactWriteRequest>
+  createRequest: () => Promise<ArtifactWriteRequest>,
+  rpcMethod = 'artifacts.publish'
 ): Promise<ArtifactPublishResult | null> {
   try {
     if (!(await ensureArtifactAccountConnected())) {
@@ -50,11 +52,11 @@ export async function publishArtifactFromSurface(
       const request = validateArtifactPublishRequest(await createRequest())
       const result = await callRuntimeRpc<ArtifactCloudOperation<ArtifactPublishResult>>(
         LOCAL_RUNTIME,
-        'artifacts.publish',
+        rpcMethod,
         request
       )
       if (result.status === 'ok') {
-        showArtifactPublishedToast(result.value)
+        showCompletedArtifactPublish(result.value, showArtifactPublishedToast)
         return result.value
       }
       if (result.status === 'unconfigured') {
