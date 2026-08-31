@@ -111,6 +111,30 @@ inline `VAR=1 pnpm test` prefix does not, because it never reaches the hook proc
 
 The `shell` and `e2e` lanes have not been run anywhere yet — treat a green run there as unproven.
 
+## Typechecking: Scope It to What You Changed
+
+Never run `pnpm typecheck` on this machine. It spawns three concurrent `tsc --noEmit` runs over the
+whole repo, and with several worktrees open at once that is enough to saturate every core. The full
+sweep belongs to the `typecheck` job in [`.github/workflows/pr.yml`](./.github/workflows/pr.yml),
+which runs it against a cached `.tsbuildinfo` graph.
+
+Locally, run only the project that owns the files you touched:
+
+| Changed path | Command |
+| --- | --- |
+| `src/main/**`, `src/preload/**`, `src/relay/**`, `src/types/**` | `pnpm typecheck:node` |
+| `src/renderer/**` | `pnpm typecheck:web` |
+| `src/cli/**` | `pnpm typecheck:cli` |
+| `tests/**` | `pnpm typecheck:e2e` |
+
+`src/shared/**` is included by the node, web, and cli projects alike, and the cli project also pulls
+in a fixed list of `src/main` modules named in `config/tsconfig.cli.json`. When a change spans more
+than one project, run them one after another — never concurrently.
+
+For a single file, prefer the editor's TypeScript language server over spawning `tsc` at all; it
+answers from a graph that is already resident. `tsc --noEmit <file>` is not a substitute, because it
+drops the project's `paths` aliases and JSX settings and reports errors that do not exist.
+
 ## Worktree Safety
 
 Always use the primary working directory (the worktree) for all file reads and edits. Never follow absolute paths from subagent results that point to the main repo.

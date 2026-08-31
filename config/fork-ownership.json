@@ -69,7 +69,8 @@
         "## Seams",
         "## Precedence",
         "## CI enforcement",
-        "## Running Tests: Remote Sandbox Only"
+        "## Running Tests: Remote Sandbox Only",
+        "## Typechecking: Scope It to What You Changed"
       ]
     },
     {
@@ -1985,7 +1986,7 @@
       "removed": 4
     },
     "AGENTS.md": {
-      "added": 89,
+      "added": 113,
       "removed": 0
     },
     "CLAUDE.md": {
