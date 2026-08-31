@@ -62,7 +62,12 @@ jobs:
           CHANGED="$(git diff --name-only --no-renames --diff-filter=ACDMR --merge-base "$BASE_SHA" "$HEAD_SHA")"
           echo "Changed paths:"
           printf '%s\n' "$CHANGED"
-          printf '%s\n' "$CHANGED" | node config/scripts/pr-code-change-scope.mjs | tee -a "$GITHUB_OUTPUT"
+          # Why a file, not a pipe: the scope script reads stdin with readFileSync(0), which
+          # throws EAGAIN once the payload exceeds the 64KB pipe buffer. A sync PR changes
+          # thousands of paths (~330KB), so the pipe form fails every time on those.
+          printf '%s\n' "$CHANGED" > "$RUNNER_TEMP/changed-paths.txt"
+          node config/scripts/pr-code-change-scope.mjs \
+            < "$RUNNER_TEMP/changed-paths.txt" | tee -a "$GITHUB_OUTPUT"
 
   static_analysis:
     name: static analysis
