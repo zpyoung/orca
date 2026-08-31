@@ -321,7 +321,11 @@ export class ArtifactPasswordCoordinator {
   }
 
   forget(auth: ArtifactPasswordAuthContext, match: { sourceKey?: string; slug?: string }): void {
-    this.records.remove(auth.profileId, auth.scope, match)
+    // Why: a staged removal outlives its passphrase record otherwise, and the next share of that
+    // source key replays it — republishing the plaintext of an artifact the user just deleted.
+    for (const sourceKey of this.records.remove(auth.profileId, auth.scope, match)) {
+      this.removals.discardIntent(sourceKey, auth)
+    }
   }
 
   private async preparePublishMutation(
@@ -373,10 +377,13 @@ export class ArtifactPasswordCoordinator {
     if (existing && existing.mode !== mode) {
       throw new Error('A different protected artifact operation must finish first.')
     }
-    const passphrase = existing?.passphrase ?? generateArtifactPassphrase()
-    if (!passphrase) {
+    // Why: a staged record with no passphrase means safeStorage could not decrypt it. Minting a
+    // replacement here would encrypt under a key that is never persisted, because the staging
+    // branch below only runs for a brand-new record.
+    if (existing && !existing.passphrase) {
       throw new Error('The pending artifact passphrase is unavailable on this device.')
     }
+    const passphrase = existing?.passphrase ?? generateArtifactPassphrase()
     const protectedArtifact = await protectArtifactWriteRequest(request, passphrase)
     auth.assertCurrent()
     if (!existing) {

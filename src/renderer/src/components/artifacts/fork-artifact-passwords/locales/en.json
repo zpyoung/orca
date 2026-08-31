@@ -28,7 +28,8 @@
           "removeDescription": "The same link will become public. Anyone with the link will be able to read the file.",
           "cancel": "Cancel",
           "rotateConfirm": "Create new link",
-          "removeConfirm": "Make public"
+          "removeConfirm": "Make public",
+          "checkingProtection": "Checking protection status…"
         },
         "ArtifactProtectedDetail": {
           "unavailable": "The passphrase is unavailable on this device. Open the source file to rotate protection, or delete the artifact.",

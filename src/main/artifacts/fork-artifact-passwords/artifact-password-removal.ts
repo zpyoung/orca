@@ -71,15 +71,34 @@ export class ArtifactPasswordRemovalCoordinator {
     auth: ArtifactPasswordRemovalAuth,
     intent: ArtifactCreateIntent
   ): void {
-    this.records.markRemoval(auth.profileId, sourceKey, auth.scope, 'applied')
+    // Why: the record can legitimately be gone — an unshare/delete forgets it, and recovery
+    // replays a removal whose record a concurrent publish already cleared. Marking is only the
+    // crash fence for the record that still exists; without one, dropping the intent is the
+    // whole job, and insisting on the mark bricks the source key for every later share.
+    if (this.records.getCurrent(auth.profileId, sourceKey, auth.scope)) {
+      this.records.markRemoval(auth.profileId, sourceKey, auth.scope, 'applied')
+    }
+    this.discardIntent(sourceKey, auth, intent.idempotencyKey)
+    this.records.remove(auth.profileId, auth.scope, { sourceKey })
+  }
+
+  /** Drops a staged removal journal entry without touching the passphrase record. */
+  discardIntent(
+    sourceKey: string,
+    auth: ArtifactPasswordRemovalAuth,
+    idempotencyKey?: string
+  ): void {
+    const key = idempotencyKey ?? this.get(sourceKey, auth)?.idempotencyKey
+    if (!key) {
+      return
+    }
     removeArtifactCreateIntent(
       auth.profileId,
       this.userDataPath,
       removalIntentSourceKey(sourceKey),
       auth.scope,
-      intent.idempotencyKey
+      key
     )
-    this.records.remove(auth.profileId, auth.scope, { sourceKey })
   }
 
   async retryWithExecute(

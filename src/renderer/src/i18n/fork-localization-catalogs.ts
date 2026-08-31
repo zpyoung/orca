@@ -54,6 +54,11 @@ import sessionInfoES from '../components/right-sidebar/fork-session-info/locales
 import sessionInfoJA from '../components/right-sidebar/fork-session-info/locales/ja.json'
 import sessionInfoKO from '../components/right-sidebar/fork-session-info/locales/ko.json'
 import sessionInfoZH from '../components/right-sidebar/fork-session-info/locales/zh.json'
+import artifactPasswordsEN from '../components/artifacts/fork-artifact-passwords/locales/en.json'
+import artifactPasswordsES from '../components/artifacts/fork-artifact-passwords/locales/es.json'
+import artifactPasswordsJA from '../components/artifacts/fork-artifact-passwords/locales/ja.json'
+import artifactPasswordsKO from '../components/artifacts/fork-artifact-passwords/locales/ko.json'
+import artifactPasswordsZH from '../components/artifacts/fork-artifact-passwords/locales/zh.json'
 
 type ForkLocale = 'en' | 'es' | 'ja' | 'ko' | 'zh'
 type ForkCatalog = Record<string, unknown>
@@ -83,7 +88,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     skillPluginsEN,
     handoffEN,
     dirtyBranchEN,
-    sessionInfoEN
+    sessionInfoEN,
+    artifactPasswordsEN
   ],
   es: [
     relayES,
@@ -96,7 +102,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     skillPluginsES,
     handoffES,
     dirtyBranchES,
-    sessionInfoES
+    sessionInfoES,
+    artifactPasswordsES
   ],
   ja: [
     relayJA,
@@ -109,7 +116,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     skillPluginsJA,
     handoffJA,
     dirtyBranchJA,
-    sessionInfoJA
+    sessionInfoJA,
+    artifactPasswordsJA
   ],
   ko: [
     relayKO,
@@ -122,7 +130,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     skillPluginsKO,
     handoffKO,
     dirtyBranchKO,
-    sessionInfoKO
+    sessionInfoKO,
+    artifactPasswordsKO
   ],
   zh: [
     relayZH,
@@ -135,7 +144,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     skillPluginsZH,
     handoffZH,
     dirtyBranchZH,
-    sessionInfoZH
+    sessionInfoZH,
+    artifactPasswordsZH
   ]
 }
 

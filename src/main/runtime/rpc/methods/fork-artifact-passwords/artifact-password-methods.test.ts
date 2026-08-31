@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ARTIFACT_PASSWORD_METHODS } from './artifact-password-methods'
+import { DESKTOP_RENDERER_CLIENT_ID } from './artifact-password-local-caller'
 import { WriteRequest } from '../artifacts'
 
 const validRequest = {
@@ -38,7 +39,7 @@ describe('artifact password RPC methods', () => {
     ).toBe(false)
   })
   it.each(['mobile', 'runtime'] as const)(
-    'blocks all password operations from %s clients',
+    'blocks all password operations from paired %s clients',
     (clientKind) => {
       const runtime = {
         getPublishedArtifactLink: vi.fn(),
@@ -56,7 +57,11 @@ describe('artifact password RPC methods', () => {
                 fileName: 'report.html'
               }
         expect(() =>
-          method.handler(params, { runtime, clientKind } as never, (() => {}) as never)
+          method.handler(
+            params,
+            { runtime, clientKind, clientId: 'paired-device-token' } as never,
+            (() => {}) as never
+          )
         ).toThrow(/local Orca desktop and CLI/)
       }
       expect(runtime.getPublishedArtifactLink).not.toHaveBeenCalled()
@@ -76,4 +81,35 @@ describe('artifact password RPC methods', () => {
       }).success
     ).toBe(false)
   })
+
+  // Why: the desktop renderer dispatches every RPC as clientKind 'runtime', so a clientKind-only
+  // gate rejects the whole desktop UI and leaves the CLI as the feature's only caller.
+  it('admits the desktop renderer and in-process CLI callers', () => {
+    const runtime = {
+      getPublishedArtifactLink: vi.fn().mockResolvedValue({ status: 'ok', value: null }),
+      publishArtifact: vi.fn().mockResolvedValue({ status: 'ok', value: null }),
+      shareArtifact: vi.fn().mockResolvedValue({ status: 'ok', value: null })
+    }
+    const callers = [
+      { clientKind: undefined },
+      { clientKind: 'runtime' as const, clientId: DESKTOP_RENDERER_CLIENT_ID }
+    ]
+    for (const caller of callers) {
+      for (const method of ARTIFACT_PASSWORD_METHODS) {
+        const params =
+          method.name === 'artifacts.revealPassphrase'
+            ? { sourceKey: '/repo/report.html' }
+            : {
+                sourceKey: '/repo/report.html',
+                content: '<h1>secret</h1>',
+                contentType: 'text/html' as const,
+                fileName: 'report.html'
+              }
+        expect(() =>
+          method.handler(params, { runtime, ...caller } as never, (() => {}) as never)
+        ).not.toThrow()
+      }
+    }
+  })
+
 })
