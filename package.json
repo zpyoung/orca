@@ -334,7 +334,9 @@
   "reactDoctor": {
     "rules": {
       "react-doctor/js-combine-iterations": "off",
+      "react-doctor/effect-needs-cleanup": "warn",
       "react-doctor/no-effect-with-fresh-deps": "warn",
+      "react-doctor/no-prop-callback-in-render": "warn",
       "react-doctor/no-ref-current-in-render": "warn"
     }
   }

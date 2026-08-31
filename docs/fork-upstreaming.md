@@ -78,9 +78,11 @@ deliberately allow. `mobile/.oxlintrc.json` turns `typescript/array-type` and
 both configs at once, since Metro — the reason mobile avoids the `node:` protocol — never bundles a
 test file.
 
-`react-doctor/no-ref-current-in-render` and `react-doctor/no-effect-with-fresh-deps` default to
-`error` in the CLI but are absent from `config/oxlint-react-doctor.json`, the repo's curated React
-Doctor rule list, where every listed rule runs at `warn`. Both fire only on deliberate,
+`react-doctor/no-ref-current-in-render`, `react-doctor/no-effect-with-fresh-deps` and
+`react-doctor/no-prop-callback-in-render` default to `error` in the CLI but are absent from
+`config/oxlint-react-doctor.json`, the repo's curated React Doctor rule list, where every listed
+rule runs at `warn`. `react-doctor/effect-needs-cleanup` is stranger still: it *is* on that list at
+`warn`, so the CLI running it at `error` contradicts the severity the repo declares for it. Both fire only on deliberate,
 upstream-authored patterns: latest-value refs written during render, a render-phase array-identity
 cache, and test harnesses whose inline ref literals are the fixture under test. Setting them to
 `warn` in `package.json` aligns the CLI with the severity the repo already declares, and keeps the
@@ -113,6 +115,11 @@ queues it. That one is a genuine correctness fix to upstream's hook and worth su
 merits, not just to clear the gate.
 
 **Introduced:** the v1.4.186 sync (2026-08-21), fixing the `static analysis` job on PR #12.
+The v1.4.193 sync added the last two severities. That release lands a new 48-file
+`right-sidebar/checks-panel/` subsystem, so every line in it is a changed line and the CLI reported
+20+ findings there under those two rules. Upstream's own `package.json` downgrades neither, and the
+CLI's rule set has moved since upstream merged that code, so upstream `main` would fail this gate
+today as well — the findings are upstream's to resolve, not the fork's to rewrite blind.
 
 **Status:** pending-upstream. Not yet submitted. Drop any entry upstream resolves on its own — the
 CLI's rule set moves independently of the pinned `react-doctor@0.9.1` version.
