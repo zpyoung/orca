@@ -1,4 +1,4 @@
-import type { AgentHookEventPayload } from '../../shared/agent-hook-listener'
+import type { AgentHookEventPayload } from '../../shared/agent-hook-listener/listener-event'
 import { parseClaudeSessionInfoStatusLineBody } from '../../shared/fork-session-info/claude-statusline-session-info'
 import type {
   SessionInfoIdentityTelemetry,
