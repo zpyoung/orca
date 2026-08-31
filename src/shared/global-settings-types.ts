@@ -26,6 +26,7 @@ import type { CtrlTabOrderMode } from './tab-types'
 import type { TerminalColorOverrides } from './terminal-color-overrides'
 import type { TerminalQuickCommand } from './terminal-quick-command-types'
 import type { TuiAgent } from './tui-agent'
+import type { ForkSessionHandoffSettings } from './fork-session-handoff/handoff-settings-types'
 import type {
   AgentDashboardMode,
   BranchPrefixStrategy,
@@ -206,12 +207,17 @@ export type GlobalSettings = {
   openAgentTabsInChatByDefault?: boolean
   /** Experimental native chat surface for Claude/Codex sessions; off by default. */
   experimentalNativeChat?: boolean
+  /** Opt-in updated structured runtime; off keeps the existing PTY-backed native chat path. */
+  experimentalStructuredNativeChat?: boolean
   /** Experimental per-pane docked composer for agent terminals; off by default. */
   experimentalTerminalDock?: boolean
+  /** Open the terminal composer automatically for new agent sessions; mounted panes are unchanged. */
+  dockTerminalComposerByDefault?: boolean
   /** Reading-column width for every native chat pane; optional for legacy settings. */
   nativeChatWidth?: NativeChatWidthTier
   /** Last explicit native-chat model + option selections; live panes need an applied/dispatched record before showing a value. */
   nativeChatSessionOptions?: PersistedNativeChatSessionOptions
+  forkSessionHandoff?: ForkSessionHandoffSettings
   /** Extra launcher rows for the worktree "Open in" submenu. VS Code is always shown first. */
   openInApplications?: OpenInApplication[]
   /** Deprecated: migration/backward-compat only. Use PersistedUIState.rightSidebarOpen. */
@@ -235,6 +241,10 @@ export type GlobalSettings = {
   artifactSharingEnabled?: boolean
   /** Capability gate for agent/CLI skill publishing; manual reviewed publishing remains available. */
   agentSkillSharingEnabled?: boolean
+  /** How deep dispatched workers may nest. 1 = workers cannot dispatch sub-workers.
+   *  Renderer-writable only: omitted from the SettingsUpdate RPC schema so a worker
+   *  cannot raise its own cap via `orca settings update`. */
+  nestedWorkerMaxDepth?: number
   /** Only toggles the sidebar shortcut; Artifacts stay reachable from Settings. */
   showArtifactsButton?: boolean
   /** Only toggles the sidebar shortcut; Skills stay reachable from Settings. */
@@ -249,6 +259,14 @@ export type GlobalSettings = {
   terminalShortcutPolicy?: TerminalShortcutPolicy
   /** Floating Workspace: global surface for terminal/browser/markdown tabs outside repo/worktree context. */
   floatingTerminalEnabled: boolean
+  /** Main-side new-page kill switch for paired Electron client-hosted browser placement. */
+  browserClientHostedRemoteEnabled?: boolean
+  /** Routes SSH-workspace browser pages through the workspace's SSH host; off = plain local browsing. */
+  browserSshWorkspaceRoutingEnabled?: boolean
+  /** Per-target opt-outs recorded from the routing error card's "Browse from this device instead". */
+  browserSshWorkspaceRoutingDisabledTargetIds?: string[]
+  /** Targets whose forwarding preflight the user overrode via "Try anyway" (e.g. PermitOpen allows their sites); skips the probe, never changes egress. */
+  browserSshWorkspaceRoutingProbeSkippedTargetIds?: string[]
   /** One-shot migration flag for the floating-workspace default-on rollout; after migration an explicit off sticks. */
   floatingTerminalDefaultedForAllUsers?: boolean
   /** Start dir for new floating-workspace terminal tabs; empty or '~' = home dir. */

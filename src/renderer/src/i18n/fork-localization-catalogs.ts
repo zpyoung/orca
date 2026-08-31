@@ -24,6 +24,11 @@ import dockSettingsES from '../components/settings/fork-terminal-dock/locales/es
 import dockSettingsJA from '../components/settings/fork-terminal-dock/locales/ja.json'
 import dockSettingsKO from '../components/settings/fork-terminal-dock/locales/ko.json'
 import dockSettingsZH from '../components/settings/fork-terminal-dock/locales/zh.json'
+import handoffSettingsEN from '../components/settings/fork-session-handoff/locales/en.json'
+import handoffSettingsES from '../components/settings/fork-session-handoff/locales/es.json'
+import handoffSettingsJA from '../components/settings/fork-session-handoff/locales/ja.json'
+import handoffSettingsKO from '../components/settings/fork-session-handoff/locales/ko.json'
+import handoffSettingsZH from '../components/settings/fork-session-handoff/locales/zh.json'
 import agentComposerEN from '../components/native-chat/fork-agent-composer/locales/en.json'
 import agentComposerES from '../components/native-chat/fork-agent-composer/locales/es.json'
 import agentComposerJA from '../components/native-chat/fork-agent-composer/locales/ja.json'
@@ -34,6 +39,21 @@ import skillPluginsES from '../components/native-chat/fork-skill-plugin-attribut
 import skillPluginsJA from '../components/native-chat/fork-skill-plugin-attribution/locales/ja.json'
 import skillPluginsKO from '../components/native-chat/fork-skill-plugin-attribution/locales/ko.json'
 import skillPluginsZH from '../components/native-chat/fork-skill-plugin-attribution/locales/zh.json'
+import handoffEN from '../components/agent-session-continuation/fork-session-handoff/locales/en.json'
+import handoffES from '../components/agent-session-continuation/fork-session-handoff/locales/es.json'
+import handoffJA from '../components/agent-session-continuation/fork-session-handoff/locales/ja.json'
+import handoffKO from '../components/agent-session-continuation/fork-session-handoff/locales/ko.json'
+import handoffZH from '../components/agent-session-continuation/fork-session-handoff/locales/zh.json'
+import dirtyBranchEN from '../components/right-sidebar/fork-dirty-branch-indicator/locales/en.json'
+import dirtyBranchES from '../components/right-sidebar/fork-dirty-branch-indicator/locales/es.json'
+import dirtyBranchJA from '../components/right-sidebar/fork-dirty-branch-indicator/locales/ja.json'
+import dirtyBranchKO from '../components/right-sidebar/fork-dirty-branch-indicator/locales/ko.json'
+import dirtyBranchZH from '../components/right-sidebar/fork-dirty-branch-indicator/locales/zh.json'
+import sessionInfoEN from '../components/right-sidebar/fork-session-info/locales/en.json'
+import sessionInfoES from '../components/right-sidebar/fork-session-info/locales/es.json'
+import sessionInfoJA from '../components/right-sidebar/fork-session-info/locales/ja.json'
+import sessionInfoKO from '../components/right-sidebar/fork-session-info/locales/ko.json'
+import sessionInfoZH from '../components/right-sidebar/fork-session-info/locales/zh.json'
 
 type ForkLocale = 'en' | 'es' | 'ja' | 'ko' | 'zh'
 type ForkCatalog = Record<string, unknown>
@@ -52,11 +72,71 @@ type ForkCatalogRegistrar = {
 }
 
 const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
-  en: [relayEN, en, worktreeGroupsEN, dockEN, dockSettingsEN, agentComposerEN, skillPluginsEN],
-  es: [relayES, es, worktreeGroupsES, dockES, dockSettingsES, agentComposerES, skillPluginsES],
-  ja: [relayJA, ja, worktreeGroupsJA, dockJA, dockSettingsJA, agentComposerJA, skillPluginsJA],
-  ko: [relayKO, ko, worktreeGroupsKO, dockKO, dockSettingsKO, agentComposerKO, skillPluginsKO],
-  zh: [relayZH, zh, worktreeGroupsZH, dockZH, dockSettingsZH, agentComposerZH, skillPluginsZH]
+  en: [
+    relayEN,
+    en,
+    worktreeGroupsEN,
+    dockEN,
+    dockSettingsEN,
+    handoffSettingsEN,
+    agentComposerEN,
+    skillPluginsEN,
+    handoffEN,
+    dirtyBranchEN,
+    sessionInfoEN
+  ],
+  es: [
+    relayES,
+    es,
+    worktreeGroupsES,
+    dockES,
+    dockSettingsES,
+    handoffSettingsES,
+    agentComposerES,
+    skillPluginsES,
+    handoffES,
+    dirtyBranchES,
+    sessionInfoES
+  ],
+  ja: [
+    relayJA,
+    ja,
+    worktreeGroupsJA,
+    dockJA,
+    dockSettingsJA,
+    handoffSettingsJA,
+    agentComposerJA,
+    skillPluginsJA,
+    handoffJA,
+    dirtyBranchJA,
+    sessionInfoJA
+  ],
+  ko: [
+    relayKO,
+    ko,
+    worktreeGroupsKO,
+    dockKO,
+    dockSettingsKO,
+    handoffSettingsKO,
+    agentComposerKO,
+    skillPluginsKO,
+    handoffKO,
+    dirtyBranchKO,
+    sessionInfoKO
+  ],
+  zh: [
+    relayZH,
+    zh,
+    worktreeGroupsZH,
+    dockZH,
+    dockSettingsZH,
+    handoffSettingsZH,
+    agentComposerZH,
+    skillPluginsZH,
+    handoffZH,
+    dirtyBranchZH,
+    sessionInfoZH
+  ]
 }
 
 export function registerForkLocalizationCatalogs(i18n: ForkCatalogRegistrar): void {

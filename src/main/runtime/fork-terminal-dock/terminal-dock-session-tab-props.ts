@@ -18,6 +18,7 @@ export type TerminalDockPropsPatch = {
   paneKey?: string
   docked?: boolean
   gutterRows?: number
+  userUndocked?: boolean
   remove?: readonly string[]
 }
 
@@ -49,13 +50,15 @@ export function selectTerminalDockEvictionKeys(
  *  prefers unverified keys so an unverified flood can't displace it. */
 export function mergeTerminalDockByPaneKey(
   existing: Record<string, TerminalDockPaneState> | undefined,
-  patch: { paneKey: string; docked?: boolean; gutterRows?: number },
+  patch: { paneKey: string; docked?: boolean; gutterRows?: number; userUndocked?: boolean },
   livePaneKeys?: ReadonlySet<string>
 ): Record<string, TerminalDockPaneState> {
   const current = existing?.[patch.paneKey]
+  const nextUserUndocked = patch.userUndocked ?? current?.userUndocked
   const nextEntry: TerminalDockPaneState = {
     docked: patch.docked ?? current?.docked ?? false,
-    gutterRows: patch.gutterRows ?? current?.gutterRows ?? DEFAULT_TERMINAL_DOCK_GUTTER_ROWS
+    gutterRows: patch.gutterRows ?? current?.gutterRows ?? DEFAULT_TERMINAL_DOCK_GUTTER_ROWS,
+    ...(nextUserUndocked !== undefined ? { userUndocked: nextUserUndocked } : {})
   }
   const existingKeys = existing ? Object.keys(existing) : []
   // Why: only a brand-new key can grow the record, so eviction is scoped to
@@ -115,7 +118,8 @@ export function applyTerminalDockByPaneKeyPatch(
     {
       paneKey: patch.paneKey,
       docked: patch.docked,
-      gutterRows: patch.gutterRows
+      gutterRows: patch.gutterRows,
+      userUndocked: patch.userUndocked
     },
     livePaneKeys
   )
@@ -141,7 +145,11 @@ export function terminalDockPaneStatesEqual(
     return true
   }
   return (
-    a !== undefined && b !== undefined && a.docked === b.docked && a.gutterRows === b.gutterRows
+    a !== undefined &&
+    b !== undefined &&
+    a.docked === b.docked &&
+    a.gutterRows === b.gutterRows &&
+    (a.userUndocked ?? false) === (b.userUndocked ?? false)
   )
 }
 

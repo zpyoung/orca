@@ -77,10 +77,16 @@ function makeSnapshot(
 import type * as WebRuntimeSessionModule from '../web-runtime-session'
 
 import {
-  hasTerminalDockPaneState,
   readTerminalDockPaneState,
   writeTerminalDockPaneState
 } from '../../components/terminal-pane/fork-terminal-dock/terminal-dock-pane-state'
+
+const TERMINAL_DOCK_STORAGE_KEY = 'orca.terminalDock.paneState.v1'
+
+function hasStoredPaneEntry(paneKey: string): boolean {
+  const raw = window.localStorage.getItem(TERMINAL_DOCK_STORAGE_KEY)
+  return raw !== null && Object.hasOwn(JSON.parse(raw) as Record<string, unknown>, paneKey)
+}
 
 const setWebRuntimeTabPropsMock = vi.fn()
 vi.mock('../web-runtime-session', async (importOriginal) => {
@@ -405,7 +411,7 @@ describe('applyWebSessionTabsSnapshot dock pane-key mapping', () => {
       )
 
       const finalPaneKey = makePaneKey(toWebTerminalSurfaceTabId(hostTabId), LEAF_ID)
-      expect(hasTerminalDockPaneState(provisionalPaneKey)).toBe(false)
+      expect(hasStoredPaneEntry(provisionalPaneKey)).toBe(false)
       expect(readTerminalDockPaneState(finalPaneKey)).toEqual({ docked: true, gutterRows: 9 })
     })
 
@@ -445,7 +451,7 @@ describe('applyWebSessionTabsSnapshot dock pane-key mapping', () => {
         NOW
       )
 
-      expect(hasTerminalDockPaneState(provisionalPaneKey)).toBe(false)
+      expect(hasStoredPaneEntry(provisionalPaneKey)).toBe(false)
       expect(readTerminalDockPaneState(finalPaneKey)).toEqual({ docked: false, gutterRows: 3 })
     })
 
@@ -486,7 +492,7 @@ describe('applyWebSessionTabsSnapshot dock pane-key mapping', () => {
 
       const finalPaneKey = makePaneKey(toWebTerminalSurfaceTabId(hostTabId), LEAF_ID)
       expect(readTerminalDockPaneState(provisionalPaneKey)).toEqual({ docked: true, gutterRows: 9 })
-      expect(hasTerminalDockPaneState(finalPaneKey)).toBe(false)
+      expect(hasStoredPaneEntry(finalPaneKey)).toBe(false)
     })
   })
 })

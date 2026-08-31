@@ -23,6 +23,7 @@ import {
   SessionMetadata
 } from './ai-vault-session-row-display'
 import type { AgentStatusState } from '../../../../shared/agent-status-types'
+import { ForkAiVaultLineageLine } from '@/components/agent-session-continuation/fork-session-handoff/ForkAiVaultLineageLine'
 
 export function VaultSessionRow({
   session,
@@ -96,6 +97,7 @@ export function VaultSessionRow({
       writeAiVaultSessionDragData(event.dataTransfer, {
         agent: session.agent,
         sessionId: session.sessionId,
+        ...(session.structuredSession ? { structuredSession: session.structuredSession } : {}),
         title: session.title,
         command: resumeStartup.command,
         sessionFilePath: session.filePath,
@@ -206,6 +208,7 @@ export function VaultSessionRow({
             worktreeInfo={worktreeInfo}
             vaultScope={vaultScope}
           />
+          <ForkAiVaultLineageLine session={session} />
           {detailsExpanded ? (
             <SessionInlineDetails
               id={detailsId}

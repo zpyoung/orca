@@ -47,7 +47,8 @@ describe('SetTabProps.terminalDock (session.tabs.setTabProps params)', () => {
     ['parses a single-pane dock patch', { paneKey: 'tab-1:1', docked: true, gutterRows: 6 }],
     ['accepts a partial dock patch', { paneKey: 'tab-1:1', docked: true }],
     ['accepts a paneKey minted by makePaneKey', { paneKey: DOCK_PANE_KEY, docked: true }],
-    ['accepts a legacy numeric pane key', { paneKey: 'tab-1:3', docked: true }]
+    ['accepts a legacy numeric pane key', { paneKey: 'tab-1:3', docked: true }],
+    ['accepts the user-undock decision', { paneKey: 'tab-1:1', docked: false, userUndocked: true }]
   ])('%s', (_, terminalDock) => {
     const parsed = SetTabProps.parse({ worktree: WT, tabId: 'tab-1', terminalDock })
     expect(parsed.terminalDock).toEqual(terminalDock)
@@ -145,6 +146,28 @@ describe('mergeTerminalDockByPaneKey (host merge semantics)', () => {
     })
     expect(mergeTerminalDockByPaneKey(undefined, { paneKey: 'pane-3', docked: true })).toEqual({
       'pane-3': { docked: true, gutterRows: DEFAULT_TERMINAL_DOCK_GUTTER_ROWS }
+    })
+  })
+
+  // the flag is what tells every client the undock was a user decision, so an
+  // agent-exit patch (docked only) must leave it exactly as it found it
+  it('carries the user-undock decision and never drops it on a docked-only patch', () => {
+    const undocked = mergeTerminalDockByPaneKey(
+      { 'pane-1': { docked: true, gutterRows: 6 } },
+      { paneKey: 'pane-1', docked: false, userUndocked: true }
+    )
+    expect(undocked).toEqual({ 'pane-1': { docked: false, gutterRows: 6, userUndocked: true } })
+    expect(mergeTerminalDockByPaneKey(undocked, { paneKey: 'pane-1', docked: false })).toEqual({
+      'pane-1': { docked: false, gutterRows: 6, userUndocked: true }
+    })
+    expect(
+      mergeTerminalDockByPaneKey(undocked, { paneKey: 'pane-1', docked: true, userUndocked: false })
+    ).toEqual({ 'pane-1': { docked: true, gutterRows: 6, userUndocked: false } })
+  })
+
+  it('omits the flag entirely for a pane no user ever undocked', () => {
+    expect(mergeTerminalDockByPaneKey(undefined, { paneKey: 'pane-1', docked: true })).toEqual({
+      'pane-1': { docked: true, gutterRows: DEFAULT_TERMINAL_DOCK_GUTTER_ROWS }
     })
   })
 })

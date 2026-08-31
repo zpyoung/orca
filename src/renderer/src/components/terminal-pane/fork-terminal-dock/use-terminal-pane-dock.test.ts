@@ -8,12 +8,19 @@ import {
   DEFAULT_GUTTER_ROWS,
   readTerminalDockPaneState,
   writeTerminalDockPaneAgent,
-  writeTerminalDockPaneState
+  writeTerminalDockPaneState,
+  writeTerminalDockPaneUserUndocked
 } from './terminal-dock-pane-state'
 
 type FakeState = {
   unifiedTabsByWorktree: Record<string, Tab[]>
-  settings: { experimentalTerminalDock?: boolean; keybindings?: unknown } | undefined
+  settings:
+    | {
+        experimentalTerminalDock?: boolean
+        dockTerminalComposerByDefault?: boolean
+        keybindings?: unknown
+      }
+    | undefined
   keybindings: Record<string, string[]>
   agentStatusByPaneKey: Record<string, { state?: string; agentType?: string } | undefined>
   setTabTerminalDockState: (
@@ -75,7 +82,10 @@ beforeEach(() => {
       'wt-1': [
         makeUnifiedTab({ terminalDockByPaneKey: { [PANE_KEY]: { docked: true, gutterRows: 5 } } })
       ]
-    }
+    },
+    settings: { experimentalTerminalDock: true },
+    keybindings: {},
+    agentStatusByPaneKey: {}
   })
 })
 
@@ -214,11 +224,188 @@ describe('useTerminalPaneDock', () => {
         'wt-1': [makeUnifiedTab({ terminalDockByPaneKey: undefined })]
       }
     })
-    writeTerminalDockPaneState(PANE_KEY, { docked: false, gutterRows: 7 })
+    writeTerminalDockPaneUserUndocked(PANE_KEY, true)
     const { result } = renderDockHook(true)
 
     act(() => result.current.ensurePaneDockDefault(PANE_KEY, 'claude'))
 
+    expect(mocks.setTabTerminalDockState).not.toHaveBeenCalled()
+  })
+
+  it('auto-docks after the render-time agent latch writes the first local entry', () => {
+    fakeStore.setState({
+      unifiedTabsByWorktree: {
+        'wt-1': [makeUnifiedTab({ terminalDockByPaneKey: undefined })]
+      }
+    })
+    const { result } = renderDockHook(true)
+
+    act(() => {
+      result.current.resolveDockAgent(PANE_KEY, 'claude')
+      result.current.ensurePaneDockDefault(PANE_KEY, 'claude')
+    })
+
+    expect(mocks.setTabTerminalDockState).toHaveBeenCalledExactlyOnceWith('unified-1', {
+      paneKey: PANE_KEY,
+      docked: true,
+      gutterRows: DEFAULT_GUTTER_ROWS
+    })
+  })
+
+  it('auto-docks again after a confirmed agent exit in the same pane', () => {
+    fakeStore.setState({
+      unifiedTabsByWorktree: {
+        'wt-1': [makeUnifiedTab({ terminalDockByPaneKey: undefined })]
+      }
+    })
+    const { result } = renderDockHook(true)
+
+    act(() => result.current.ensurePaneDockDefault(PANE_KEY, 'claude'))
+    act(() => result.current.undockOnConfirmedAgentExit(LEAF_ID))
+    act(() => result.current.ensurePaneDockDefault(PANE_KEY, 'claude'))
+
+    expect(mocks.setTabTerminalDockState).toHaveBeenNthCalledWith(3, 'unified-1', {
+      paneKey: PANE_KEY,
+      docked: true,
+      gutterRows: DEFAULT_GUTTER_ROWS
+    })
+  })
+
+  it('does not auto-dock again after the user closes the dock', () => {
+    fakeStore.setState({
+      unifiedTabsByWorktree: {
+        'wt-1': [makeUnifiedTab({ terminalDockByPaneKey: undefined })]
+      }
+    })
+    const { result } = renderDockHook(true)
+
+    act(() => result.current.ensurePaneDockDefault(PANE_KEY, 'claude'))
+    act(() => result.current.toggleDockForLeaf(LEAF_ID))
+    vi.mocked(mocks.setTabTerminalDockState).mockClear()
+    act(() => result.current.ensurePaneDockDefault(PANE_KEY, 'claude'))
+
+    expect(mocks.setTabTerminalDockState).not.toHaveBeenCalled()
+  })
+
+  it('clears the user decision when the dock is reopened manually', () => {
+    fakeStore.setState({
+      unifiedTabsByWorktree: {
+        'wt-1': [makeUnifiedTab({ terminalDockByPaneKey: undefined })]
+      }
+    })
+    const { result } = renderDockHook(true)
+
+    act(() => result.current.ensurePaneDockDefault(PANE_KEY, 'claude'))
+    act(() => result.current.toggleDockForLeaf(LEAF_ID))
+    act(() => result.current.toggleDockForLeaf(LEAF_ID))
+    act(() => result.current.undockOnConfirmedAgentExit(LEAF_ID))
+    act(() => result.current.ensurePaneDockDefault(PANE_KEY, 'claude'))
+
+    expect(mocks.setTabTerminalDockState).toHaveBeenNthCalledWith(5, 'unified-1', {
+      paneKey: PANE_KEY,
+      docked: true,
+      gutterRows: DEFAULT_GUTTER_ROWS
+    })
+  })
+
+  // a second client has none of the first client's localStorage, so only the host record
+  // can carry the undock decision across
+  it('does not auto-dock a pane another client marked user-undocked', () => {
+    fakeStore.setState({
+      unifiedTabsByWorktree: {
+        'wt-1': [
+          makeUnifiedTab({
+            terminalDockByPaneKey: {
+              [PANE_KEY]: { docked: false, gutterRows: 5, userUndocked: true }
+            }
+          })
+        ]
+      }
+    })
+    const { result } = renderDockHook(true)
+
+    act(() => result.current.ensurePaneDockDefault(PANE_KEY, 'claude'))
+
+    expect(mocks.setTabTerminalDockState).not.toHaveBeenCalled()
+  })
+
+  it('auto-docks a pane the host undocked without a user decision', () => {
+    fakeStore.setState({
+      unifiedTabsByWorktree: {
+        'wt-1': [
+          makeUnifiedTab({
+            terminalDockByPaneKey: { [PANE_KEY]: { docked: false, gutterRows: 5 } }
+          })
+        ]
+      }
+    })
+    const { result } = renderDockHook(true)
+
+    act(() => result.current.ensurePaneDockDefault(PANE_KEY, 'claude'))
+
+    expect(mocks.setTabTerminalDockState).toHaveBeenCalledExactlyOnceWith('unified-1', {
+      paneKey: PANE_KEY,
+      docked: true,
+      gutterRows: 5
+    })
+  })
+
+  it('does not rewrite a pane that is already docked', () => {
+    const { result } = renderDockHook(true)
+
+    act(() => result.current.ensurePaneDockDefault(PANE_KEY, 'claude'))
+
+    expect(mocks.setTabTerminalDockState).not.toHaveBeenCalled()
+  })
+
+  it('does not auto-dock a fresh pane when automatic opening is off', () => {
+    fakeStore.setState({
+      settings: {
+        experimentalTerminalDock: true,
+        dockTerminalComposerByDefault: false
+      },
+      unifiedTabsByWorktree: {
+        'wt-1': [makeUnifiedTab({ terminalDockByPaneKey: undefined })]
+      }
+    })
+    const { result } = renderDockHook(true)
+
+    act(() => result.current.ensurePaneDockDefault(PANE_KEY, 'claude'))
+
+    expect(mocks.setTabTerminalDockState).not.toHaveBeenCalled()
+  })
+
+  it('keeps a persisted dock mounted and focus-owning when automatic opening is off', () => {
+    fakeStore.setState({
+      settings: {
+        experimentalTerminalDock: true,
+        dockTerminalComposerByDefault: false
+      }
+    })
+    const { result } = renderDockHook(true)
+
+    act(() => result.current.setPaneDockMounted(PANE_KEY, true))
+
+    expect(result.current.isPaneDocked(PANE_KEY)).toBe(true)
+    expect(result.current.paneDockOwnsFocus(PANE_KEY)).toBe(true)
+    expect(mocks.setTabTerminalDockState).not.toHaveBeenCalled()
+  })
+
+  it('keeps a mounted dock open when automatic opening is disabled mid-session', () => {
+    const { result } = renderDockHook(true)
+    act(() => result.current.setPaneDockMounted(PANE_KEY, true))
+
+    act(() => {
+      fakeStore.setState({
+        settings: {
+          experimentalTerminalDock: true,
+          dockTerminalComposerByDefault: false
+        }
+      })
+    })
+
+    expect(result.current.isPaneDocked(PANE_KEY)).toBe(true)
+    expect(result.current.paneDockOwnsFocus(PANE_KEY)).toBe(true)
     expect(mocks.setTabTerminalDockState).not.toHaveBeenCalled()
   })
 
@@ -276,7 +463,8 @@ describe('useTerminalPaneDock', () => {
 
     expect(mocks.setTabTerminalDockState).toHaveBeenCalledExactlyOnceWith('unified-1', {
       paneKey: PANE_KEY,
-      docked: false
+      docked: false,
+      userUndocked: true
     })
   })
 
@@ -342,7 +530,8 @@ describe('useTerminalPaneDock', () => {
 
     expect(mocks.setTabTerminalDockState).toHaveBeenCalledExactlyOnceWith('unified-1', {
       paneKey: `tab-1:${otherLeafId}`,
-      docked: true
+      docked: true,
+      userUndocked: false
     })
   })
 
@@ -447,7 +636,11 @@ describe('useTerminalPaneDock', () => {
 
       act(() => dispatchDockToggle(container))
 
-      expect(readTerminalDockPaneState(PANE_KEY)).toEqual({ docked: false, gutterRows: 7 })
+      expect(readTerminalDockPaneState(PANE_KEY)).toEqual({
+        docked: false,
+        gutterRows: 7,
+        userUndocked: true
+      })
     })
 
     it('writes the localStorage fallback when the gutter is resized', () => {

@@ -35,13 +35,33 @@
     },
     {
       "name": "native-chat-session-options",
-      "purpose": "Reads the model and effort an agent recorded for itself on its own transcript turns, so the composer's pills pre-fill from the session log instead of a screen scrape that scrolls away.",
+      "purpose": "Pre-fills the composer's model and effort from agent session logs, and re-reads Claude's startup frame as it paints when no log value exists.",
       "globs": ["**/fork-native-chat-session-options/**"]
+    },
+    {
+      "name": "live-plugin-marketplaces",
+      "purpose": "Points the skill picker at a directory-sourced marketplace's live plugin directory, the one the Claude Code harness loads, instead of the frozen cache copy that goes stale between `claude plugin update` runs.",
+      "globs": ["**/fork-live-plugin-marketplaces/**"]
     },
     {
       "name": "skill-plugin-attribution",
       "purpose": "Attributes each discovered skill to the plugin that owns it, so the composer's skill picker can name the plugin and disambiguate a skill offered by more than one.",
       "globs": ["**/fork-skill-plugin-attribution/**"]
+    },
+    {
+      "name": "session-handoff",
+      "purpose": "Customizable Continue-in-New-Session handoff with a rich editable brief, target-worktree selection, host-aware warnings, delivery recovery, and one-hop session lineage.",
+      "globs": ["**/fork-session-handoff/**"]
+    },
+    {
+      "name": "dirty-branch-indicator",
+      "purpose": "Marks the right sidebar's Source Control tab while the active worktree has uncommitted changes, so a dirty branch is visible without opening the panel.",
+      "globs": ["**/fork-dirty-branch-indicator/**"]
+    },
+    {
+      "name": "session-info",
+      "purpose": "Shows provider-neutral details, live context, usage, diagnostics, and safe actions for the exact focused agent terminal session while preserving user-owned statuslines.",
+      "globs": ["**/fork-session-info/**"]
     }
   ],
   "seams": [
@@ -140,14 +160,30 @@
       "lines": ["const MACOS_PACKAGED_BUNDLE_ID = 'com.zpyoung.orca'"]
     },
     {
-      "path": "src/main/ipc/pty.ts",
+      "path": "src/main/ipc/pty/ipc/write-input.ts",
       "feature": "terminal-dock",
       "kind": "registration",
       "lines": [
         "  const writePtyProviderInputAcknowledged = (",
         "        return tooLarge ? false : writePtyProviderInputAcknowledgedChunks(settlementWrite, id, data)",
-        "      return allSettled"
+        "      return allSettled",
+        "  const writePtyInputProvablyLive = (args: PtyWritePayload): boolean | Promise<boolean> => {"
       ]
+    },
+    {
+      "path": "src/main/ipc/pty/ipc/write.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "  ipcMain.handle('pty:writeInputAccepted', (event, args: unknown): boolean | Promise<boolean> => {",
+        "      : writePtyInputProvablyLive(args)"
+      ]
+    },
+    {
+      "path": "src/main/ipc/pty/register-handlers.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["  ipcMain.removeHandler('pty:writeInputAccepted')"]
     },
     {
       "path": "src/main/ipc/ssh.ts",
@@ -155,8 +191,16 @@
       "kind": "registration",
       "lines": [
         "import type { NativeChatRelayPing } from '../../shared/fork-native-chat-relay/native-chat-relay-protocol'",
-        "} from './fork-native-chat-relay/ssh-relay-ready-notifier'",
-        "export async function requestActiveSshNativeChat(",
+        "import { onSshRelayReady } from './fork-native-chat-relay/ssh-relay-ready-notifier'",
+        "export async function requestActiveSshNativeChat("
+      ]
+    },
+    {
+      "path": "src/main/ipc/ssh-relay-session-callbacks.ts",
+      "feature": "native-chat-relay",
+      "kind": "registration",
+      "lines": [
+        "import { notifySshRelayReady } from './fork-native-chat-relay/ssh-relay-ready-notifier'",
         "    notifySshRelayReady(tid)"
       ]
     },
@@ -311,7 +355,7 @@
       ]
     },
     {
-      "path": "src/main/runtime/rpc/methods/session-tabs.ts",
+      "path": "src/main/runtime/rpc/methods/session-tab-mutation-methods.ts",
       "feature": "terminal-dock",
       "kind": "registration",
       "lines": [
@@ -377,6 +421,24 @@
       ]
     },
     {
+      "path": "src/main/skills/discovery.ts",
+      "feature": "live-plugin-marketplaces",
+      "kind": "import-swap",
+      "lines": [
+        "import { discoverLiveClaudePluginSkillSources } from './fork-live-plugin-marketplaces/live-plugin-marketplace-sources'",
+        "      ? await discoverLiveClaudePluginSkillSources({ homeDir, cwd: args.cwd })"
+      ]
+    },
+    {
+      "path": "src/main/skills/skill-discovery-wsl.ts",
+      "feature": "live-plugin-marketplaces",
+      "kind": "import-swap",
+      "lines": [
+        "import { discoverLiveClaudePluginSkillSourcesInWsl } from './fork-live-plugin-marketplaces/live-plugin-marketplace-sources-wsl'",
+        "    pluginRoots = await discoverLiveClaudePluginSkillSourcesInWsl(args)"
+      ]
+    },
+    {
       "path": "src/main/ssh/ssh-relay-session.ts",
       "feature": "native-chat-relay",
       "kind": "registration",
@@ -432,15 +494,22 @@
       "path": "src/preload/index.ts",
       "feature": "native-chat-relay",
       "kind": "passthrough",
-      "lines": ["const readNativeChatSession = (", "    readSession: readNativeChatSession,"]
+      "lines": [
+        "import { buildForkSessionHandoffApi } from './fork-session-handoff/session-handoff-preload-api'",
+        "const readNativeChatSession = (",
+        "  forkSessionHandoff: buildForkSessionHandoffApi(),",
+        "    readSession: readNativeChatSession,",
+        "import { buildForkSessionInfoApi } from './fork-session-info/session-info-preload-api'",
+        "  forkSessionInfo: buildForkSessionInfoApi(),"
+      ]
     },
     {
-      "path": "src/relay/relay.ts",
+      "path": "src/relay/relay-runtime-services.ts",
       "feature": "native-chat-relay",
       "kind": "registration",
       "lines": [
         "import { NativeChatHandler } from './fork-native-chat-relay/native-chat-handler'",
-        "  const _nativeChatHandler = new NativeChatHandler(dispatcher)"
+        "      new NativeChatHandler(dispatcher)"
       ]
     },
     {
@@ -500,7 +569,7 @@
       "kind": "registration",
       "lines": [
         "} from './fork-agent-composer/AgentComposer'",
-        "import { seedHistory } from './fork-agent-composer/agent-composer-history'"
+        "import { pushHistory, seedHistory } from './fork-agent-composer/agent-composer-history'"
       ]
     },
     {
@@ -584,6 +653,15 @@
         "import { NativeChatConversation } from './fork-native-chat-relay/NativeChatConversation'",
         "} from './fork-native-chat-relay/native-chat-runtime-owner'",
         "  const sshConnectionId = useAppStore((s) => selectNativeChatSshConnectionId(s, terminalTabId))"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-attachment-upload.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": [
+        "import { rememberUploadedAttachmentPreviewSources } from './fork-agent-composer/agent-composer-attachment-preview'",
+        "    rememberUploadedAttachmentPreviewSources(owner, paths, resolvedPaths, skipped, failed)"
       ]
     },
     {
@@ -756,6 +834,9 @@
       "kind": "registration",
       "lines": [
         "import { nativeChatReportedValuesFromObservation } from './fork-native-chat-session-options/native-chat-session-option-observation'",
+        "  hasDispatchedNativeChatSessionOption,",
+        "  useClaudeStartupFrameRevision",
+        "} from './fork-native-chat-session-options/use-claude-startup-frame-revision'",
         "import type { NativeChatSessionOptionObservation } from '../../../../shared/native-chat-types'"
       ]
     },
@@ -764,6 +845,19 @@
       "feature": "agent-composer",
       "kind": "registration",
       "lines": ["import type { HistoryState } from './fork-agent-composer/agent-composer-history'"]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/use-right-sidebar-activity-items.ts",
+      "feature": "dirty-branch-indicator",
+      "kind": "registration",
+      "lines": [
+        "import { useSourceControlDirtyItemOverride } from './fork-dirty-branch-indicator/use-source-control-dirty-item-override'",
+        "  const sourceControlDirtyItemOverride = useSourceControlDirtyItemOverride()",
+        "        ...sourceControlDirtyItemOverride,",
+        "      sourceControlDirtyItemOverride,",
+        "import { getSessionInfoActivityItem } from './fork-session-info/session-info-activity-item'",
+        "      getSessionInfoActivityItem(),"
+      ]
     },
     {
       "path": "src/renderer/src/components/settings/ExperimentalPane.test.tsx",
@@ -828,15 +922,30 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/sidebar/WorktreeContextMenu.tsx",
+      "path": "src/renderer/src/components/sidebar/use-worktree-context-menu-model.tsx",
       "feature": "worktree-groups",
       "kind": "registration",
       "lines": [
-        "} from './fork-worktree-groups/WorktreeGroupMenuItems'",
+        "import { useWorktreeGroupDialog } from './fork-worktree-groups/WorktreeGroupMenuItems'",
         "  const worktreeGroupDialog = useWorktreeGroupDialog({",
-        "              <WorktreeGroupMenuItems",
-        "      {worktreeGroupDialog.dialog}"
+        "      worktreeGroupDialog.open ||",
+        "    worktreeGroupDialog,"
       ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/WorktreeContextMenuView.tsx",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "import { WorktreeGroupMenuItems } from './fork-worktree-groups/WorktreeGroupMenuItems'",
+        "              <WorktreeGroupMenuItems"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/WorktreeContextMenuOverlays.tsx",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": ["      {model.worktreeGroupDialog.dialog}"]
     },
     {
       "path": "src/renderer/src/components/sidebar/WorktreeList.tsx",
@@ -1042,7 +1151,27 @@
       "kind": "registration",
       "lines": [
         "import { NativeChatWidthMenu } from '@/components/native-chat/fork-native-chat-width/NativeChatWidthMenu'",
+        "  isChatViewMode?: boolean",
         "                  {isChatViewMode && isActivePane ? <NativeChatWidthMenu /> : null}"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/focus-terminal-pane-event.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "    querySelector: vi.fn(() => null)",
+        "    expect(manager.setActivePane).toHaveBeenCalledWith(7, { focus: false })"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/focus-terminal-pane-event.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { focusPaneOrDockComposer } from './fork-terminal-dock/dock-composer-focus-redirect'",
+        "  manager.setActivePane(resolution.numericPaneId, { focus: false })",
+        "  focusPaneOrDockComposer(pane)"
       ]
     },
     {
@@ -1059,8 +1188,10 @@
       "feature": "terminal-dock",
       "kind": "registration",
       "lines": [
+        "import { focusPaneOrDockComposer } from './fork-terminal-dock/dock-composer-focus-redirect'",
         "import { makePaneKey, type PaneKey } from '../../../../shared/stable-pane-id'",
-        "    const activeDock ="
+        "    const activeDock =",
+        "    focusPaneOrDockComposer(activePane)"
       ]
     },
     {
@@ -1134,6 +1265,15 @@
       "feature": "native-chat-relay",
       "kind": "passthrough",
       "lines": ["export type ConnectionOwnerState = Pick<"]
+    },
+    {
+      "path": "src/renderer/src/lib/focus-terminal-tab-surface.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { findDockComposerTextarea } from '@/components/terminal-pane/fork-terminal-dock/dock-composer-focus-redirect'",
+        "  const dockComposer = findDockComposerTextarea(helper)"
+      ]
     },
     {
       "path": "src/renderer/src/lib/pane-manager/pane-container-listener-lifecycle.test.ts",
@@ -1297,6 +1437,8 @@
       "feature": "terminal-dock",
       "kind": "registration",
       "lines": [
+        "import { focusPaneOrDockComposer } from '@/components/terminal-pane/fork-terminal-dock/dock-composer-focus-redirect'",
+        "  manager.setActivePane(resolution.numericPaneId, { focus: false })",
         "    terminalDockSyncEnabled: publication.terminalDockSyncEnabled,",
         "        ? { terminalDockByPaneKey: unifiedTab.terminalDockByPaneKey }"
       ]
@@ -1329,9 +1471,9 @@
       ]
     },
     {
-      "path": "src/renderer/src/web/web-preload-api.ts",
+      "path": "src/renderer/src/web/preload-api/web-native-chat-api.ts",
       "feature": "native-chat-relay",
-      "kind": "passthrough",
+      "kind": "import-swap",
       "lines": [
         "} from '@/components/native-chat/fork-native-chat-relay/native-chat-runtime-contract'",
         "  const readNativeChatSession = async (",
@@ -1339,7 +1481,22 @@
       ]
     },
     {
-      "path": "src/shared/constants.ts",
+      "path": "src/renderer/src/web/preload-api/web-preference-normalization.ts",
+      "feature": "session-handoff",
+      "kind": "passthrough",
+      "lines": [
+        "import { mergeForkSessionHandoffSettings } from '../../../../shared/fork-session-handoff/handoff-settings-merge'",
+        "    ...mergeForkSessionHandoffSettings(base, updates),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/web/preload-api/web-terminal-api.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    writeInputAccepted: () => Promise.resolve(false),"]
+    },
+    {
+      "path": "src/shared/default-global-settings.ts",
       "feature": "native-chat-width",
       "kind": "passthrough",
       "lines": [
@@ -1353,8 +1510,11 @@
       "kind": "passthrough",
       "lines": [
         "import type { NativeChatWidthTier } from './fork-native-chat-width/native-chat-width-tier'",
+        "import type { ForkSessionHandoffSettings } from './fork-session-handoff/handoff-settings-types'",
         "  experimentalTerminalDock?: boolean",
-        "  nativeChatWidth?: NativeChatWidthTier"
+        "  dockTerminalComposerByDefault?: boolean",
+        "  nativeChatWidth?: NativeChatWidthTier",
+        "  forkSessionHandoff?: ForkSessionHandoffSettings"
       ]
     },
     {
@@ -1415,7 +1575,7 @@
       ]
     },
     {
-      "path": "src/shared/runtime-types.ts",
+      "path": "src/shared/runtime-mobile-session-tab-contracts.ts",
       "feature": "skill-plugin-attribution",
       "kind": "registration",
       "lines": [
@@ -1445,7 +1605,11 @@
       "path": "src/shared/telemetry-events.ts",
       "feature": "terminal-dock",
       "kind": "registration",
-      "lines": ["  'experimentalTerminalDock',", "const terminalDockToggledSchema = z"]
+      "lines": [
+        "  'experimentalTerminalDock',",
+        "  'dockTerminalComposerByDefault',",
+        "const terminalDockToggledSchema = z"
+      ]
     },
     {
       "path": "src/shared/workspace-session-schema.test.ts",
@@ -1476,6 +1640,215 @@
       "feature": "worktree-groups",
       "kind": "passthrough",
       "lines": ["  projectGroupId?: string | null"]
+    },
+    {
+      "path": "src/main/ipc/register-core-handlers/register-core-handlers.test.ts",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "vi.mock('../../fork-session-handoff/session-lineage-ipc', () => ({",
+        "  registerForkSessionHandoffHandlers: vi.fn()",
+        "vi.mock('../../fork-session-info/session-info-ipc', () => ({",
+        "  registerSessionInfoIpcHandlers: vi.fn()"
+      ]
+    },
+    {
+      "path": "src/main/index.ts",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { recordForkPaneTranscriptObservation } from './fork-session-handoff/pane-transcript-history'",
+        "  agentHookServer.subscribeEnrichedStatus(recordForkPaneTranscriptObservation)"
+      ]
+    },
+    {
+      "path": "src/main/ipc/register-core-handlers/register-core-handlers.ts",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { registerForkSessionHandoffHandlers } from '../../fork-session-handoff/session-lineage-ipc'",
+        "  registerForkSessionHandoffHandlers()",
+        "import { registerSessionInfoIpcHandlers } from '../../fork-session-info/session-info-ipc'",
+        "  registerSessionInfoIpcHandlers()"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/dashboard/DashboardAgentRow.tsx",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { SessionHandoffLineageBadge } from '@/components/agent-session-continuation/fork-session-handoff/SessionHandoffLineageBadge'",
+        "        <SessionHandoffLineageBadge paneKey={agent.paneKey} />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/AiVaultPanel.tsx",
+      "feature": "session-handoff",
+      "kind": "import-swap",
+      "lines": [
+        "import { AgentSessionContinuationDialog } from '@/components/agent-session-continuation/fork-session-handoff/AgentSessionContinuationDialog'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/AiVaultSessionRow.tsx",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { ForkAiVaultLineageLine } from '@/components/agent-session-continuation/fork-session-handoff/ForkAiVaultLineageLine'",
+        "          <ForkAiVaultLineageLine session={session} />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/AiVaultSessionVirtualList.tsx",
+      "feature": "session-handoff",
+      "kind": "import-swap",
+      "lines": [
+        "import { resolveAiVaultSessionHandoffWorktreeId } from '@/components/agent-session-continuation/fork-session-handoff/ai-vault-handoff-action'",
+        "      ? resolveAiVaultSessionHandoffWorktreeId(row.session, resumeActions)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/ai-vault-session-launch-actions.ts",
+      "feature": "session-handoff",
+      "kind": "import-swap",
+      "lines": [
+        "import { prepareAiVaultSessionContinuation } from '@/components/agent-session-continuation/fork-session-handoff/prepare-handoff-from-vault'",
+        "import { resolveAiVaultSessionHandoffLaunchTargetOrNotify } from '@/components/agent-session-continuation/fork-session-handoff/ai-vault-handoff-action'",
+        "      const targetId = resolveAiVaultSessionHandoffLaunchTargetOrNotify({"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-card-compact-agent-row.tsx",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { SessionHandoffLineageBadge } from '@/components/agent-session-continuation/fork-session-handoff/SessionHandoffLineageBadge'",
+        "      <SessionHandoffLineageBadge paneKey={agent.paneKey} />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/terminal-pane-menu-agent-session-actions.ts",
+      "feature": "session-handoff",
+      "kind": "import-swap",
+      "lines": [
+        "import { prepareAgentSessionContinuationFromPane } from '@/components/agent-session-continuation/fork-session-handoff/prepare-handoff-from-pane'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/Settings.tsx",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { ForkSessionHandoffSettingsSection } from './fork-session-handoff/ForkSessionHandoffSettingsSection'",
+        "                <ForkSessionHandoffSettingsSection />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/hooks/useSettingsNavigationMetadata.ts",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { getForkSessionHandoffNavSections } from '@/components/settings/fork-session-handoff/handoff-settings-nav-section'",
+        "    ...getForkSessionHandoffNavSections(),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/settings-navigation-types.ts",
+      "feature": "session-handoff",
+      "kind": "passthrough",
+      "lines": ["  'session-handoff',"]
+    },
+    {
+      "path": "src/main/persistence/applying-settings/settings-update.ts",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { mergeForkSessionHandoffSettings } from '../../../shared/fork-session-handoff/handoff-settings-merge'",
+        "    ...mergeForkSessionHandoffSettings(operations.state.settings, sanitizedUpdates)"
+      ]
+    },
+    {
+      "path": "config/tsconfig.cli.json",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "    \"../src/main/fork-session-info/session-info-statusline-chain-script.ts\",",
+        "    \"../src/main/fork-session-info/session-info-statusline-chaining.ts\","
+      ]
+    },
+    {
+      "path": "src/main/agent-hooks/server.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "import { sessionInfoService } from '../fork-session-info/session-info-service'",
+        "    sessionInfoService.observeAgentHook(enriched)",
+        "          sessionInfoService.ingestStatusLineBody(body)",
+        "    sessionInfoService.clearPane(resolvedPaneKey)"
+      ]
+    },
+    {
+      "path": "src/main/claude/hook-service.ts",
+      "feature": "session-info",
+      "kind": "import-swap",
+      "lines": [
+        "  finalizeManagedStatusLineRemoval,",
+        "  getManagedStatusLineScript,",
+        "  removeManagedStatusLine",
+        "} from '../fork-session-info/session-info-statusline-chaining'",
+        "    finalizeManagedStatusLineRemoval(getStatusLineScriptFileName(this.options.settings))"
+      ]
+    },
+    {
+      "path": "src/main/index.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "import { ingestSessionInfoPlanWindows as ingestPlanWindows } from './fork-session-info/session-info-plan-window-correlation'",
+        "  agentHookServer.setClaudeStatusLineListener((event) => ingestPlanWindows(rateLimits, event))"
+      ]
+    },
+    {
+      "path": "src/main/persistence/applying-settings/ui-selection-normalization.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": ["    tab === 'session-info' ||"]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/client-ui-schemas.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": ["  'session-info',"]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/AiVaultPanel.tsx",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "import { useSessionInfoVaultNavigation } from './fork-session-info/session-info-vault-navigation'",
+        "  useSessionInfoVaultNavigation(setQuery, setAgentEnabled)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/right-sidebar-panel-content.tsx",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "const SessionInfoPanel = lazy(() => import('./fork-session-info/SessionInfoPanel'))",
+        "        {effectiveTab === 'session-info' && <SessionInfoPanel />}"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/right-sidebar-route.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": ["    tab === 'session-info' ||"]
+    },
+    {
+      "path": "src/shared/ui-chrome-types.ts",
+      "feature": "session-info",
+      "kind": "passthrough",
+      "lines": ["  | 'session-info'"]
     }
   ],
   "exceptions": [
@@ -1750,6 +2123,24 @@
       "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate"
     },
     {
+      "path": "mobile/src/browser/mobile-browser-frame-state.ts",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate",
+      "reason": "React Doctor gate: imports Buffer from `node:buffer`. Mobile disables unicorn/prefer-node-protocol for Metro's sake, but React Doctor does not read mobile/.oxlintrc.json and blocks the changed line."
+    },
+    {
+      "path": "mobile/src/diagnostics/connection-diagnostics-submission.ts",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate",
+      "reason": "React Doctor gate: rewrites a string concatenation as a template literal to satisfy eslint/prefer-template on the changed line."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/use-checks-list-state.tsx",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate",
+      "reason": "React Doctor gate: hoists an autoExpandedContextRef write out of a setExpandedCheckKeys updater. React may invoke an updater more than once, so the ref write belongs in the effect that queues it — a correctness fix to upstream's own hook, not fork behavior."
+    },
+    {
       "path": "mobile/src/session/pending-terminal-handle-recovery.test.ts",
       "reason": "React Doctor gate: rewrites `Array<T>` as `T[]`. The mobile package turns typescript/array-type off, but React Doctor does not read mobile/.oxlintrc.json and blocks the changed line.",
       "status": "pending-upstream",
@@ -1800,6 +2191,11 @@
       "path": "src/main/updater-prerelease-feed.test.ts",
       "reason": "Tests for the fork's own prerelease update feed.",
       "status": "permanent"
+    },
+    {
+      "path": "src/main/speech/stt-service.ts",
+      "status": "permanent",
+      "reason": "Drops upstream's `eslint-disable max-lines`, which is inert under the fork's raised .oxlintrc.json ceilings (500 for .ts vs upstream's 300). The changed-lines code-quality check fails on the unused directive; keeping upstream's copy would fail static analysis on every sync that touches this file."
     },
     {
       "path": "src/main/updater-prerelease-feed.ts",
@@ -1857,6 +2253,18 @@
       "reason": "Superseded by the fork draft cache's own test.",
       "status": "permanent",
       "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-runtime-image-send.ts",
+      "status": "permanent",
+      "deleted": true,
+      "reason": "Upstream extracted the image-attachment send out of native-chat-runtime-send.ts; the fork's copy still owns that function for the agent-composer core, so restoring upstream's module would ship two send paths over one PTY."
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-pty-composer-send.ts",
+      "status": "permanent",
+      "deleted": true,
+      "reason": "Upstream's chat-only PTY send hook; fork-agent-composer's useAgentComposerSend already serves both the chat pane and the terminal dock."
     },
     {
       "path": "src/renderer/src/components/native-chat/native-chat-draft-cache.ts",
@@ -1938,9 +2346,8 @@
     },
     {
       "path": "src/renderer/src/components/terminal-pane/TerminalPane.tsx",
-      "reason": "Corrects effectiveChatViewMode; a cosmetic/logic fix to upstream's chat-header controls, not a fork feature.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#chat-header-controls-fix"
+      "reason": "Carries the terminal-dock mount and the session-handoff dialog import; a path cannot be both an exception and a seam, so the whole file is fork-owned. Nothing here is upstream-bound.",
+      "status": "permanent"
     },
     {
       "path": "src/renderer/src/i18n/fork-localization-catalogs.test.ts",
@@ -1965,15 +2372,51 @@
       "ledger": "docs/fork-upstreaming.md#retention-fix"
     },
     {
-      "path": "src/shared/workspace-session-editor-schema.ts",
-      "reason": "Upstream's workspace-session-schema.ts sits one line under the 300-line cap, so the editor schemas were split into their own module to make room. A plain refactor of upstream's own file, not fork behavior.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#workspace-session-schema-split"
-    },
-    {
       "path": "tests/e2e/cross-version-wire/release-checkout.ts",
       "reason": "Encodes the fork's own (tagless) release-history shape for cross-version wire tests.",
       "status": "permanent"
+    },
+    {
+      "path": "src/shared/native-file-drop.ts",
+      "reason": "Gives the composer drop payload the tabId/paneLeafId its terminal sibling already carries, so a broadcast drop reaches only the composer it landed on. Upstream's shared drop contract, read by preload, main, and every drop consumer \u2014 a forked copy would not reroute them.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#composer-file-drop-pane-scoping"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-file-attachment-actions.ts",
+      "reason": "Ignores a composer file drop addressed to a different composer; unaddressed payloads still attach. Correctness fix to upstream routing, not fork-specific behavior.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#composer-file-drop-pane-scoping"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-file-attachment-actions.test.tsx",
+      "reason": "Covers the composer file-drop pane scoping fix: addressed, cross-pane, cross-tab, and unaddressed drops. Ships with the fix it exercises.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#composer-file-drop-pane-scoping"
+    },
+    {
+      "path": "src/shared/native-file-drop.test.ts",
+      "reason": "Adds composer tab/pane routing cases alongside the existing terminal ones, covering the composer drop payload change in the same file.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#composer-file-drop-pane-scoping"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-paste-bridge.ts",
+      "reason": "Routes pane-level Paste by focus instead of by which target happens to be mounted, and hands an image-only clipboard back to the composer so the app-menu path cannot claim a paste and then drop it. Upstream unmounts the composer behind a question card, so composer-wins was safe there; a host that keeps both mounted sent every Paste to the composer and starved the card's answer input.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#pane-paste-routing-by-focus"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-paste-bridge.test.tsx",
+      "reason": "Covers the pane-paste focus routing fix: composer-only, answer-input-only, both mounted with either focused, an image-only clipboard at the focused answer input, and neither mounted. Ships with the fix it exercises.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#pane-paste-routing-by-focus"
+    },
+    {
+      "path": "src/main/rate-limits/service.ts",
+      "reason": "Returns the selected-account acceptance verdict from live Claude rate-limit ingestion so pane telemetry can correlate plan windows without duplicating or bypassing the account guard.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#live-claude-rate-limit-ingest-acceptance"
     }
   ],
   "residuals": {
@@ -1987,7 +2430,7 @@
     },
     "AGENTS.md": {
       "added": 113,
-      "removed": 0
+      "removed": 1
     },
     "CLAUDE.md": {
       "added": 17,
@@ -2029,12 +2472,20 @@
       "added": 1,
       "removed": 1
     },
-    "src/main/ipc/pty.ts": {
-      "added": 96,
+    "src/main/ipc/pty/ipc/write-input.ts": {
+      "added": 90,
       "removed": 1
     },
+    "src/main/ipc/pty/ipc/write.ts": {
+      "added": 13,
+      "removed": 0
+    },
+    "src/main/ipc/pty/register-handlers.ts": {
+      "added": 1,
+      "removed": 0
+    },
     "src/main/ipc/ssh.ts": {
-      "added": 35,
+      "added": 31,
       "removed": 0
     },
     "src/main/ipc/worktree-logic.test.ts": {
@@ -2083,7 +2534,7 @@
     },
     "src/main/native-chat/transcript-watch.ts": {
       "added": 30,
-      "removed": 212
+      "removed": 252
     },
     "src/main/persistence/tracking-repos/project-group-operations.ts": {
       "added": 2,
@@ -2094,8 +2545,8 @@
       "removed": 0
     },
     "src/main/runtime/orca-runtime.ts": {
-      "added": 140,
-      "removed": 11
+      "added": 143,
+      "removed": 14
     },
     "src/main/runtime/rpc/methods/native-chat.test.ts": {
       "added": 14,
@@ -2106,10 +2557,10 @@
       "removed": 7
     },
     "src/main/runtime/rpc/methods/session-tabs-schemas.ts": {
-      "added": 47,
+      "added": 50,
       "removed": 1
     },
-    "src/main/runtime/rpc/methods/session-tabs.ts": {
+    "src/main/runtime/rpc/methods/session-tab-mutation-methods.ts": {
       "added": 2,
       "removed": 1
     },
@@ -2130,16 +2581,16 @@
       "removed": 6
     },
     "src/main/skills/discovery.ts": {
-      "added": 3,
-      "removed": 0
+      "added": 5,
+      "removed": 2
     },
     "src/main/skills/skill-discovery-sources.ts": {
       "added": 2,
       "removed": 1
     },
     "src/main/skills/skill-discovery-wsl.ts": {
-      "added": 4,
-      "removed": 1
+      "added": 6,
+      "removed": 3
     },
     "src/main/ssh/ssh-relay-session.ts": {
       "added": 38,
@@ -2158,8 +2609,8 @@
       "removed": 0
     },
     "src/preload/api/native-chat-api.ts": {
-      "added": 50,
-      "removed": 27
+      "added": 53,
+      "removed": 30
     },
     "src/preload/api/pty-api.ts": {
       "added": 1,
@@ -2170,12 +2621,12 @@
       "removed": 0
     },
     "src/preload/index.ts": {
-      "added": 18,
+      "added": 22,
       "removed": 7
     },
-    "src/relay/relay.ts": {
-      "added": 4,
-      "removed": 0
+    "src/relay/relay-runtime-services.ts": {
+      "added": 3,
+      "removed": 1
     },
     "src/renderer/src/assets/main.css": {
       "added": 1,
@@ -2203,11 +2654,11 @@
     },
     "src/renderer/src/components/native-chat/NativeChatComposer.test.tsx": {
       "added": 26,
-      "removed": 10
+      "removed": 13
     },
     "src/renderer/src/components/native-chat/NativeChatComposer.tsx": {
-      "added": 184,
-      "removed": 345
+      "added": 208,
+      "removed": 292
     },
     "src/renderer/src/components/native-chat/NativeChatInteractiveCard.test.tsx": {
       "added": 21,
@@ -2234,8 +2685,8 @@
       "removed": 4
     },
     "src/renderer/src/components/native-chat/NativeChatView.tsx": {
-      "added": 15,
-      "removed": 17
+      "added": 16,
+      "removed": 18
     },
     "src/renderer/src/components/native-chat/native-chat-command-marker.ts": {
       "added": 1,
@@ -2250,8 +2701,8 @@
       "removed": 41
     },
     "src/renderer/src/components/native-chat/native-chat-composer-types.ts": {
-      "added": 12,
-      "removed": 33
+      "added": 15,
+      "removed": 36
     },
     "src/renderer/src/components/native-chat/native-chat-pending.ts": {
       "added": 1,
@@ -2266,16 +2717,16 @@
       "removed": 8
     },
     "src/renderer/src/components/native-chat/native-chat-runtime-send-launch-draft.test.ts": {
-      "added": 33,
-      "removed": 11
+      "added": 35,
+      "removed": 15
     },
     "src/renderer/src/components/native-chat/native-chat-runtime-send.test.ts": {
-      "added": 486,
-      "removed": 55
+      "added": 496,
+      "removed": 81
     },
     "src/renderer/src/components/native-chat/native-chat-runtime-send.ts": {
-      "added": 53,
-      "removed": 277
+      "added": 68,
+      "removed": 235
     },
     "src/renderer/src/components/native-chat/native-chat-session-option-cache.ts": {
       "added": 32,
@@ -2322,12 +2773,16 @@
       "removed": 1
     },
     "src/renderer/src/components/native-chat/use-native-chat-session-options.ts": {
-      "added": 57,
-      "removed": 8
+      "added": 74,
+      "removed": 11
     },
     "src/renderer/src/components/native-chat/use-native-chat-typed-insertion.ts": {
       "added": 1,
       "removed": 1
+    },
+    "src/renderer/src/components/right-sidebar/use-right-sidebar-activity-items.ts": {
+      "added": 7,
+      "removed": 0
     },
     "src/renderer/src/components/settings/ExperimentalPane.test.tsx": {
       "added": 31,
@@ -2338,8 +2793,8 @@
       "removed": 0
     },
     "src/renderer/src/components/settings/NativeChatExperimentalSetting.tsx": {
-      "added": 6,
-      "removed": 1
+      "added": 5,
+      "removed": 0
     },
     "src/renderer/src/components/settings/experimental-search.ts": {
       "added": 5,
@@ -2352,10 +2807,6 @@
     "src/renderer/src/components/sidebar/WorktreeCard.tsx": {
       "added": 5,
       "removed": 2
-    },
-    "src/renderer/src/components/sidebar/WorktreeContextMenu.tsx": {
-      "added": 20,
-      "removed": 48
     },
     "src/renderer/src/components/sidebar/WorktreeList.tsx": {
       "added": 10,
@@ -2446,15 +2897,23 @@
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/TerminalPaneHeaderOverlay.tsx": {
-      "added": 5,
+      "added": 8,
       "removed": 0
+    },
+    "src/renderer/src/components/terminal-pane/focus-terminal-pane-event.test.ts": {
+      "added": 9,
+      "removed": 4
+    },
+    "src/renderer/src/components/terminal-pane/focus-terminal-pane-event.ts": {
+      "added": 11,
+      "removed": 7
     },
     "src/renderer/src/components/terminal-pane/pane-helpers.test.ts": {
       "added": 27,
       "removed": 4
     },
     "src/renderer/src/components/terminal-pane/pane-helpers.ts": {
-      "added": 26,
+      "added": 25,
       "removed": 6
     },
     "src/renderer/src/components/terminal-pane/terminal-input-quarantine.ts": {
@@ -2462,7 +2921,7 @@
       "removed": 4
     },
     "src/renderer/src/components/terminal-pane/terminal-visibility-resume.test.ts": {
-      "added": 36,
+      "added": 37,
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/terminal-visibility-resume.ts": {
@@ -2478,7 +2937,7 @@
       "removed": 2
     },
     "src/renderer/src/components/terminal-pane/use-terminal-window-wake-recovery.test.ts": {
-      "added": 8,
+      "added": 12,
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/use-terminal-window-wake-recovery.ts": {
@@ -2492,6 +2951,10 @@
     "src/renderer/src/lib/connection-owner-resolution.ts": {
       "added": 1,
       "removed": 1
+    },
+    "src/renderer/src/lib/focus-terminal-tab-surface.ts": {
+      "added": 8,
+      "removed": 5
     },
     "src/renderer/src/lib/pane-manager/pane-container-listener-lifecycle.test.ts": {
       "added": 1,
@@ -2586,31 +3049,27 @@
       "removed": 11
     },
     "src/renderer/src/runtime/sync-runtime-graph.ts": {
-      "added": 19,
-      "removed": 2
+      "added": 24,
+      "removed": 4
     },
     "src/renderer/src/runtime/web-runtime-session.ts": {
       "added": 3,
       "removed": 1
     },
     "src/renderer/src/runtime/web-session-tabs-sync.ts": {
-      "added": 143,
-      "removed": 28
+      "added": 157,
+      "removed": 32
     },
     "src/renderer/src/store/slices/tabs.ts": {
       "added": 20,
       "removed": 1
     },
-    "src/renderer/src/web/web-preload-api.ts": {
-      "added": 29,
-      "removed": 17
-    },
-    "src/shared/constants.ts": {
-      "added": 3,
+    "src/shared/default-global-settings.ts": {
+      "added": 4,
       "removed": 0
     },
     "src/shared/global-settings-types.ts": {
-      "added": 5,
+      "added": 9,
       "removed": 0
     },
     "src/shared/keybindings.ts": {
@@ -2649,7 +3108,7 @@
       "added": 3,
       "removed": 1
     },
-    "src/shared/runtime-types.ts": {
+    "src/shared/runtime-mobile-session-tab-contracts.ts": {
       "added": 4,
       "removed": 0
     },
@@ -2662,16 +3121,16 @@
       "removed": 0
     },
     "src/shared/telemetry-events.ts": {
-      "added": 21,
+      "added": 22,
       "removed": 0
     },
     "src/shared/workspace-session-schema.test.ts": {
-      "added": 88,
-      "removed": 0
+      "added": 103,
+      "removed": 3
     },
     "src/shared/workspace-session-schema.ts": {
-      "added": 4,
-      "removed": 17
+      "added": 3,
+      "removed": 1
     },
     "src/shared/worktree/meta-types.ts": {
       "added": 3,
@@ -2700,6 +3159,106 @@
     "src/renderer/src/components/sidebar/worktree-list/drag/use-drop-commit-context.ts": {
       "added": 8,
       "removed": 1
+    },
+    "src/main/index.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/ipc/register-core-handlers/register-core-handlers.test.ts": {
+      "added": 8,
+      "removed": 0
+    },
+    "src/main/ipc/register-core-handlers/register-core-handlers.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/renderer/src/components/dashboard/DashboardAgentRow.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/right-sidebar/AiVaultPanel.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/right-sidebar/AiVaultSessionRow.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/right-sidebar/AiVaultSessionVirtualList.tsx": {
+      "added": 3,
+      "removed": 4
+    },
+    "src/renderer/src/components/right-sidebar/ai-vault-session-launch-actions.ts": {
+      "added": 3,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/worktree-card-compact-agent-row.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/terminal-pane/terminal-pane-menu-agent-session-actions.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/native-chat-attachment-upload.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/settings/Settings.tsx": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/renderer/src/hooks/useSettingsNavigationMetadata.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/lib/settings-navigation-types.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/main/persistence/applying-settings/settings-update.ts": {
+      "added": 3,
+      "removed": 1
+    },
+    "config/tsconfig.cli.json": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/agent-hooks/server.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/main/claude/hook-service.ts": {
+      "added": 6,
+      "removed": 2
+    },
+    "src/main/index.ts": {
+      "added": 4,
+      "removed": 3
+    },
+    "src/main/persistence/applying-settings/ui-selection-normalization.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/main/runtime/rpc/methods/client-ui-schemas.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/components/right-sidebar/AiVaultPanel.tsx": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/renderer/src/components/right-sidebar/right-sidebar-panel-content.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/store/right-sidebar-route.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/shared/ui-chrome-types.ts": {
+      "added": 1,
+      "removed": 0
     }
   }
 }

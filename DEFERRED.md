@@ -57,3 +57,11 @@ Reviewed every sprint planning. Use `/quirk:artifacts:defer` to append.
 - **Estimated effort**: M
 - **Priority**: P3
 - **Proposed owner**: terminal-dock feature owner
+
+## DEFER-6: Evaluate whether focused handoffs open transcript references
+- **Deferred**: 2026-08-24
+- **Session context**: implementing customizable session handoffs with focused context as the default
+- **Why deferred**: Orca has no cross-platform signal that a receiving agent opened the referenced transcript. The approved design excludes runtime instrumentation and requires a periodic live-agent evaluation with a synthetic transcript fact instead of a CI check.
+- **Estimated effort**: M
+- **Priority**: P2
+- **Proposed owner**: session-handoff feature owner

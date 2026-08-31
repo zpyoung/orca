@@ -24,15 +24,24 @@ function visit(node: unknown, cb: (node: ReactElementLike) => void): void {
   }
 }
 
-function findSwitch(node: unknown): ReactElementLike {
+function findSwitch(node: unknown, ariaLabel: string): ReactElementLike | null {
   let found: ReactElementLike | null = null
   visit(node, (entry) => {
-    if (typeof entry.props.checked === 'boolean' && typeof entry.props.onChange === 'function') {
+    if (
+      entry.props.ariaLabel === ariaLabel &&
+      typeof entry.props.checked === 'boolean' &&
+      typeof entry.props.onChange === 'function'
+    ) {
       found = entry
     }
   })
+  return found
+}
+
+function requireSwitch(node: unknown, ariaLabel: string): ReactElementLike {
+  const found = findSwitch(node, ariaLabel)
   if (!found) {
-    throw new Error('terminal dock switch not found')
+    throw new Error(`${ariaLabel} switch not found`)
   }
   return found
 }
@@ -48,7 +57,7 @@ describe('TerminalDockExperimentalSetting', () => {
       updateSettings: vi.fn()
     })
 
-    expect(findSwitch(element).props.checked).toBe(false)
+    expect(requireSwitch(element, 'Toggle terminal dock').props.checked).toBe(false)
   })
 
   it('reflects the persisted flag', () => {
@@ -57,7 +66,7 @@ describe('TerminalDockExperimentalSetting', () => {
       updateSettings: vi.fn()
     })
 
-    expect(findSwitch(element).props.checked).toBe(true)
+    expect(requireSwitch(element, 'Toggle terminal dock').props.checked).toBe(true)
   })
 
   it('labels the setting in the settings pane', () => {
@@ -74,7 +83,7 @@ describe('TerminalDockExperimentalSetting', () => {
       settings: terminalDockSettings(),
       updateSettings
     })
-    const onChange = findSwitch(element).props.onChange as () => void
+    const onChange = requireSwitch(element, 'Toggle terminal dock').props.onChange as () => void
 
     onChange()
 
@@ -87,10 +96,72 @@ describe('TerminalDockExperimentalSetting', () => {
       settings: terminalDockSettings({ experimentalTerminalDock: true }),
       updateSettings
     })
-    const onChange = findSwitch(element).props.onChange as () => void
+    const onChange = requireSwitch(element, 'Toggle terminal dock').props.onChange as () => void
 
     onChange()
 
     expect(updateSettings).toHaveBeenCalledWith({ experimentalTerminalDock: false })
+  })
+
+  it('hides automatic opening while the terminal dock is off', () => {
+    const element = TerminalDockExperimentalSetting({
+      settings: terminalDockSettings(),
+      updateSettings: vi.fn()
+    })
+
+    expect(findSwitch(element, 'Toggle automatic terminal dock opening')).toBeNull()
+  })
+
+  it.each([
+    ['an older settings blob', undefined],
+    ['an explicit enabled value', true]
+  ])('shows automatic opening as checked for %s', (_, dockTerminalComposerByDefault) => {
+    const element = TerminalDockExperimentalSetting({
+      settings: terminalDockSettings({
+        experimentalTerminalDock: true,
+        dockTerminalComposerByDefault
+      }),
+      updateSettings: vi.fn()
+    })
+
+    expect(requireSwitch(element, 'Toggle automatic terminal dock opening').props.checked).toBe(
+      true
+    )
+  })
+
+  it('shows automatic opening as unchecked when disabled', () => {
+    const element = TerminalDockExperimentalSetting({
+      settings: terminalDockSettings({
+        experimentalTerminalDock: true,
+        dockTerminalComposerByDefault: false
+      }),
+      updateSettings: vi.fn()
+    })
+
+    expect(requireSwitch(element, 'Toggle automatic terminal dock opening').props.checked).toBe(
+      false
+    )
+  })
+
+  it.each([
+    [true, false],
+    [false, true]
+  ])('toggles automatic opening from %s to %s', (current, expected) => {
+    const updateSettings = vi.fn()
+    const element = TerminalDockExperimentalSetting({
+      settings: terminalDockSettings({
+        experimentalTerminalDock: true,
+        dockTerminalComposerByDefault: current
+      }),
+      updateSettings
+    })
+    const onChange = requireSwitch(element, 'Toggle automatic terminal dock opening').props
+      .onChange as () => void
+
+    onChange()
+
+    expect(updateSettings).toHaveBeenCalledWith({
+      dockTerminalComposerByDefault: expected
+    })
   })
 })

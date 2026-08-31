@@ -3,19 +3,25 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   DEFAULT_GUTTER_ROWS,
-  hasTerminalDockPaneState,
   MAX_GUTTER_ROWS,
   MAX_STORED_PANE_ENTRIES,
   MIN_GUTTER_ROWS,
   readTerminalDockPaneAgent,
   readTerminalDockPaneState,
+  readTerminalDockPaneUserUndocked,
   rekeyTerminalDockPaneKeys,
   removeTerminalDockPaneKeys,
   writeTerminalDockPaneAgent,
-  writeTerminalDockPaneState
+  writeTerminalDockPaneState,
+  writeTerminalDockPaneUserUndocked
 } from './terminal-dock-pane-state'
 
 const STORAGE_KEY = 'orca.terminalDock.paneState.v1'
+
+function hasStoredPaneEntry(paneKey: string): boolean {
+  const raw = window.localStorage.getItem(STORAGE_KEY)
+  return raw !== null && Object.hasOwn(JSON.parse(raw) as Record<string, unknown>, paneKey)
+}
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -31,12 +37,6 @@ describe('readTerminalDockPaneState', () => {
       docked: false,
       gutterRows: DEFAULT_GUTTER_ROWS
     })
-  })
-
-  it('distinguishes absent state from an explicit undocked decision', () => {
-    expect(hasTerminalDockPaneState('pane-1')).toBe(false)
-    writeTerminalDockPaneState('pane-1', { docked: false, gutterRows: 5 })
-    expect(hasTerminalDockPaneState('pane-1')).toBe(true)
   })
 
   it('round-trips a written value through localStorage', () => {
@@ -120,6 +120,42 @@ describe('readTerminalDockPaneState', () => {
   })
 })
 
+describe('terminal dock user-undock decision', () => {
+  it('defaults to false when absent or written only by the agent latch', () => {
+    expect(readTerminalDockPaneUserUndocked('pane-1')).toBe(false)
+    writeTerminalDockPaneAgent('pane-1', 'claude')
+    expect(readTerminalDockPaneUserUndocked('pane-1')).toBe(false)
+  })
+
+  it('survives a later agent write', () => {
+    writeTerminalDockPaneUserUndocked('pane-1', true)
+    writeTerminalDockPaneAgent('pane-1', 'claude')
+    expect(readTerminalDockPaneUserUndocked('pane-1')).toBe(true)
+  })
+
+  it('preserves the agent when the user decision is written', () => {
+    writeTerminalDockPaneAgent('pane-1', 'claude')
+    writeTerminalDockPaneUserUndocked('pane-1', true)
+    expect(readTerminalDockPaneAgent('pane-1')).toBe('claude')
+  })
+
+  it('survives a later dock-state write', () => {
+    writeTerminalDockPaneUserUndocked('pane-1', true)
+    writeTerminalDockPaneState('pane-1', { docked: false, gutterRows: 8 })
+    expect(readTerminalDockPaneUserUndocked('pane-1')).toBe(true)
+  })
+
+  it('preserves dock state when the user decision is written', () => {
+    writeTerminalDockPaneState('pane-1', { docked: true, gutterRows: 8 })
+    writeTerminalDockPaneUserUndocked('pane-1', true)
+    expect(readTerminalDockPaneState('pane-1')).toEqual({
+      docked: true,
+      gutterRows: 8,
+      userUndocked: true
+    })
+  })
+})
+
 describe('terminal dock pane agent latch', () => {
   it('returns null when nothing has been recorded for the pane', () => {
     expect(readTerminalDockPaneAgent('pane-1')).toBeNull()
@@ -199,8 +235,8 @@ describe('rekeyTerminalDockPaneKeys', () => {
 
     rekeyTerminalDockPaneKeys('provisional-1', 'web-terminal-host-1')
 
-    expect(hasTerminalDockPaneState('provisional-1:leaf-a')).toBe(false)
-    expect(hasTerminalDockPaneState('provisional-1:leaf-b')).toBe(false)
+    expect(hasStoredPaneEntry('provisional-1:leaf-a')).toBe(false)
+    expect(hasStoredPaneEntry('provisional-1:leaf-b')).toBe(false)
     expect(readTerminalDockPaneState('web-terminal-host-1:leaf-a')).toEqual({
       docked: true,
       gutterRows: 6
@@ -218,7 +254,7 @@ describe('rekeyTerminalDockPaneKeys', () => {
 
     rekeyTerminalDockPaneKeys('provisional-1', 'web-terminal-host-1')
 
-    expect(hasTerminalDockPaneState('provisional-1:leaf-a')).toBe(false)
+    expect(hasStoredPaneEntry('provisional-1:leaf-a')).toBe(false)
     expect(readTerminalDockPaneState('web-terminal-host-1:leaf-a')).toEqual({
       docked: false,
       gutterRows: 9
@@ -229,14 +265,14 @@ describe('rekeyTerminalDockPaneKeys', () => {
     writeTerminalDockPaneState('other-tab:leaf-c', { docked: true, gutterRows: 4 })
     rekeyTerminalDockPaneKeys('provisional-1', 'web-terminal-host-1')
     expect(readTerminalDockPaneState('other-tab:leaf-c')).toEqual({ docked: true, gutterRows: 4 })
-    expect(hasTerminalDockPaneState('web-terminal-host-1:leaf-c')).toBe(false)
+    expect(hasStoredPaneEntry('web-terminal-host-1:leaf-c')).toBe(false)
   })
 
   it('rejects unsafe tab ids', () => {
     writeTerminalDockPaneState('__proto__:leaf-a', { docked: true, gutterRows: 6 })
     rekeyTerminalDockPaneKeys('__proto__', 'web-terminal-host-1')
     rekeyTerminalDockPaneKeys('provisional-1', '__proto__')
-    expect(hasTerminalDockPaneState('web-terminal-host-1:leaf-a')).toBe(false)
+    expect(hasStoredPaneEntry('web-terminal-host-1:leaf-a')).toBe(false)
   })
 })
 
@@ -253,9 +289,9 @@ describe('writeTerminalDockPaneState bound', () => {
     }
     writeTerminalDockPaneState('pane-overflow', { docked: true, gutterRows: 5 })
 
-    expect(hasTerminalDockPaneState(evictedKey)).toBe(false)
-    expect(hasTerminalDockPaneState(retainedKey)).toBe(true)
-    expect(hasTerminalDockPaneState('pane-overflow')).toBe(true)
+    expect(hasStoredPaneEntry(evictedKey)).toBe(false)
+    expect(hasStoredPaneEntry(retainedKey)).toBe(true)
+    expect(hasStoredPaneEntry('pane-overflow')).toBe(true)
     const raw = window.localStorage.getItem(STORAGE_KEY)
     expect(Object.keys(JSON.parse(raw as string))).toHaveLength(MAX_STORED_PANE_ENTRIES)
   })

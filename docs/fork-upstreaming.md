@@ -19,6 +19,7 @@ fork-specific functionality. Isolating it would leave upstream carrying the blan
 indefinitely while the fork carries a parallel, diverging copy of the same hook.
 
 **Paths:**
+
 - `src/renderer/src/components/native-chat/use-native-chat-retained-session.ts`
 - `src/renderer/src/components/native-chat/use-native-chat-retained-session.test.ts`
 - `src/shared/native-chat-transcript-retention.ts`
@@ -50,6 +51,7 @@ feature; isolating a cosmetic tweak like this only doubles the maintenance surfa
 upstream could take outright.
 
 **Paths (own `exceptions` rows):**
+
 - `src/renderer/src/components/sidebar/repo-header-action-button-class.ts`
 - `src/renderer/src/components/sidebar/worktree-list/viewport/virtual-rows.ts`
 - `src/renderer/src/components/sidebar/worktree-list/viewport/scroll-adjustment.test.ts`
@@ -58,49 +60,11 @@ upstream could take outright.
 - `src/renderer/src/components/sidebar/worktree-card-surface.tsx`
 
 **Paths (density lines folded into the `worktree-groups` seam declaration):**
+
 - `src/renderer/src/components/sidebar/WorktreeList.tsx` (2 lines)
 
 **Introduced:** commit `7436d38a21` (2026-07-25), "style(sidebar): tighten workspace list spacing
 and density".
-
-**Status:** pending-upstream. Not yet submitted.
-
-## Chat header controls fix
-
-**What:** `TerminalPane.tsx` gates `activePaneIsChatLeaf` on `effectiveChatViewMode` rather than
-`isChatViewMode`. With the experimental native-chat flag off, a tab can still carry
-`viewMode: 'chat'`, and the header must not offer chat-only controls while the chat surface itself
-is suppressed.
-
-**Why upstream, not isolated:** a correctness fix to upstream's own chat/terminal header-control
-gating, unrelated to any of the fork's four features (it landed inside the `native-chat-width`
-feature commit as an incidental fix, not width functionality).
-
-**Paths:**
-- `src/renderer/src/components/terminal-pane/TerminalPane.tsx`
-
-**Introduced:** commit `9ac7e7c423` (2026-08-06), "feat(native-chat): configurable reading-column
-width" (the fix rode in on this commit; it is not part of the width feature itself).
-
-**Status:** pending-upstream. Not yet submitted.
-
-## Workspace session schema split
-
-**What:** the persisted-open-file schemas move out of `workspace-session-schema.ts` into a new
-`workspace-session-editor-schema.ts`, which the original then imports. No schema changes — the
-`persistedOpenFileSchema` object is byte-identical, only relocated.
-
-**Why upstream, not isolated:** `workspace-session-schema.ts` sits at 299 code lines against a
-300-line cap, so the terminal-dock feature's two seam lines (a fork import and one `tabSchema`
-field) do not fit without a split. The split itself is upstream's own file being reorganized, and
-the extracted module holds no fork content — isolating it into a `fork-` directory would put
-upstream code under a fork glob and hand the fork permanent ownership of a schema it did not write.
-
-**Paths:**
-- `src/shared/workspace-session-editor-schema.ts`
-
-**Introduced:** commit `e63c56e90c` (2026-08-18), "fix(composer): reintegrate the codex typed-command
-send after the rebase onto main".
 
 **Status:** pending-upstream. Not yet submitted.
 
@@ -117,9 +81,11 @@ deliberately allow. `mobile/.oxlintrc.json` turns `typescript/array-type` and
 both configs at once, since Metro — the reason mobile avoids the `node:` protocol — never bundles a
 test file.
 
-`react-doctor/no-ref-current-in-render` and `react-doctor/no-effect-with-fresh-deps` default to
-`error` in the CLI but are absent from `config/oxlint-react-doctor.json`, the repo's curated React
-Doctor rule list, where every listed rule runs at `warn`. Both fire only on deliberate,
+`react-doctor/no-ref-current-in-render`, `react-doctor/no-effect-with-fresh-deps` and
+`react-doctor/no-prop-callback-in-render` default to `error` in the CLI but are absent from
+`config/oxlint-react-doctor.json`, the repo's curated React Doctor rule list, where every listed
+rule runs at `warn`. `react-doctor/effect-needs-cleanup` is stranger still: it *is* on that list at
+`warn`, so the CLI running it at `error` contradicts the severity the repo declares for it. Both fire only on deliberate,
 upstream-authored patterns: latest-value refs written during render, a render-phase array-identity
 cache, and test harnesses whose inline ref literals are the fixture under test. Setting them to
 `warn` in `package.json` aligns the CLI with the severity the repo already declares, and keeps the
@@ -134,14 +100,119 @@ already a permanent fork exception. Isolating would mean forking nine upstream m
 them hot sidebar hooks — and rewriting ref patterns upstream has no reason to change.
 
 **Paths:**
+
 - `mobile/src/browser/mobile-browser-frameless-stream.test.tsx`
 - `mobile/src/session/pending-terminal-handle-recovery.test.ts`
 - `mobile/src/transport/mobile-relay-rpc-session-liveness.test.ts`
+- `mobile/src/browser/mobile-browser-frame-state.ts`
+- `mobile/src/diagnostics/connection-diagnostics-submission.ts`
+- `src/renderer/src/components/right-sidebar/checks-panel/use-checks-list-state.tsx`
 
 The `package.json` severities need no `exceptions` row of their own; the file is already declared
 `permanent`.
 
+The v1.4.193 sync added the last three. The first two are the same shape as the originals — a
+`node:buffer` import and a template literal, on lines the merge touched. The third is different in
+kind: `use-checks-list-state.tsx` wrote `autoExpandedContextRef` *inside* a `setExpandedCheckKeys`
+updater, and React may run an updater more than once, so the write is hoisted into the effect that
+queues it. That one is a genuine correctness fix to upstream's hook and worth submitting on its own
+merits, not just to clear the gate.
+
 **Introduced:** the v1.4.186 sync (2026-08-21), fixing the `static analysis` job on PR #12.
+The v1.4.193 sync added the last two severities. That release lands a new 48-file
+`right-sidebar/checks-panel/` subsystem, so every line in it is a changed line and the CLI reported
+20+ findings there under those two rules. Upstream's own `package.json` downgrades neither, and the
+CLI's rule set has moved since upstream merged that code, so upstream `main` would fail this gate
+today as well — the findings are upstream's to resolve, not the fork's to rewrite blind.
 
 **Status:** pending-upstream. Not yet submitted. Drop any entry upstream resolves on its own — the
 CLI's rule set moves independently of the pinned `react-doctor@0.9.1` version.
+
+## Composer file-drop pane scoping
+
+**What:** a native OS file drop on a composer is broadcast to every renderer subscriber, and
+`useNativeChatFileAttachmentActions` took any payload whose target was `composer` — so one drop
+attached to every mounted composer. `NativeFileDropPayload`'s `composer` variant now carries the
+optional `tabId` / `paneLeafId` its `terminal` sibling already had, `resolveNativeFileDropPath`
+returns them from the composer branch, and the hook ignores a drop addressed to a different
+composer. A payload carrying neither id is still accepted, so a producer that cannot resolve pane
+identity keeps working.
+
+**Why upstream, not isolated:** this is a correctness fix to upstream's own drop routing, and the
+payload shape is upstream's shared contract that preload, main, and every drop consumer read.
+Isolating it would mean a forked copy of the shared type that upstream's own consumers still
+bypass, leaving the mis-routing in place for every non-composer surface.
+
+**Paths:**
+
+- `src/shared/native-file-drop.ts`
+- `src/renderer/src/components/native-chat/use-native-chat-file-attachment-actions.ts`
+- `src/shared/native-file-drop.test.ts`
+- `src/renderer/src/components/native-chat/use-native-chat-file-attachment-actions.test.tsx`
+
+**Depends on:** the composer emits its own identity via `data-terminal-tab-id` /
+`data-terminal-pane-leaf-id` on the drop-target div in
+`src/renderer/src/components/native-chat/fork-agent-composer/AgentComposerField.tsx`, which is
+fork-owned. An upstream PR built from this entry must move those two attributes onto upstream's
+equivalent composer field, or the ids never reach `resolveNativeFileDropPath` and every drop stays
+unaddressed (accepted everywhere, exactly as before).
+
+**Status:** pending-upstream. Not yet submitted.
+
+## Pane paste routing by focus
+
+**What:** `useNativeChatPasteBridge` resolved the app-menu Paste target by asking which one was
+mounted — composer first, the question card's answer input only as a fallback. It now prefers the
+answer input whenever that input holds focus, and falls back to the mount-order rule otherwise.
+
+**Why upstream, not isolated:** the old rule is only safe because `NativeChatView` unmounts the
+composer while a question card is up, so the two targets are mutually exclusive there. That is an
+invariant of one host, not of the bridge, and the bridge is the shared thing every host calls. A
+host that legitimately keeps its composer mounted beside a card — the fork's terminal dock does,
+because the card is an overlay above a gutter the composer still occupies — sends every Paste into
+the composer and starves the focused answer input. Forking a copy of the bridge would leave the
+same trap set for the next host upstream adds.
+
+The DOM paste path is deliberately unchanged: `handlePaste` intercepts only clipboard images and
+lets text fall through to the focused control, so an image pasted at the answer input keeps
+attaching to the composer beside it instead of being dropped on the floor.
+
+The app-menu path has no event to inspect, so it reads the clipboard as text and treats an empty
+read as the image signal: with the answer input focused, empty text hands the paste to the mounted
+composer's `pasteFromClipboard`, which is what knows how to save and attach an image. Without that
+fallback an image-only Cmd+V at the answer input would be claimed and then silently discarded.
+
+**Paths:**
+
+- `src/renderer/src/components/native-chat/use-native-chat-paste-bridge.ts`
+- `src/renderer/src/components/native-chat/use-native-chat-paste-bridge.test.tsx`
+
+**Depends on:** nothing upstream-side. The fork's dock supplies the answer-input ref from
+`src/renderer/src/components/terminal-pane/fork-terminal-dock/TerminalDock.tsx`; upstream's own
+caller passes the same ref it already had, so the change is inert for `NativeChatView` and only
+takes effect for a host that mounts both targets at once.
+
+**Status:** pending-upstream. Not yet submitted.
+
+## Live Claude rate-limit ingest acceptance
+
+**What:** `RateLimitService.ingestLiveClaudeRateLimits` returns whether a statusline payload was
+attributed to the selected Claude account and contained usable plan-window data. A deduplicated
+payload still returns `true` because the existing live-session snapshot already represents it;
+missing auth context, account mismatches, and empty windows return `false`.
+
+**Why upstream, not isolated:** acceptance is decided by the service's private selected-account
+snapshot, window parser, and dedupe state. A parallel fork wrapper cannot know whether the service
+dropped a payload without duplicating those internals and risking a different attribution verdict.
+Returning the decision lets any consumer correlate related pane telemetry without exposing account
+paths or weakening the existing wrong-account guard.
+
+**Paths:**
+
+- `src/main/rate-limits/service.ts`
+
+**Depends on:** the fork-owned Session Info correlation adapter in
+`src/main/fork-session-info/session-info-plan-window-correlation.ts` consumes the result. An
+upstream PR can test and land the return contract without that consumer.
+
+**Status:** pending-upstream. Not yet submitted.

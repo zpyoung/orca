@@ -7,7 +7,10 @@
             "title": "Terminal dock",
             "description": "Composer docked beneath a terminal pane for supported coding-agent sessions.",
             "copy": "Docks a rich input composer beneath a terminal pane running a supported coding-agent CLI, so you can compose and send prompts without typing directly into the terminal. The terminal stays visible, so you can always fall back to typing directly. Experimental and independent of Chat UI while we tune composer behavior.",
-            "toggleLabel": "Toggle terminal dock"
+            "toggleLabel": "Toggle terminal dock",
+            "autoOpenTitle": "Open automatically for new sessions",
+            "autoOpenCopy": "Open the composer dock automatically when a supported coding-agent session starts.",
+            "autoOpenToggleLabel": "Toggle automatic terminal dock opening"
           }
         },
         "experimental": {

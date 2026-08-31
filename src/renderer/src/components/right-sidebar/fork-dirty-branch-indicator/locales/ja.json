@@ -1,0 +1,11 @@
+{
+  "components": {
+    "rightSidebar": {
+      "dirtyBranchIndicator": {
+        "oneChange": "ソース管理 — 未コミットの変更 1 件",
+        "manyChanges": "ソース管理 — 未コミットの変更 {{value0}} 件",
+        "cappedChanges": "ソース管理 — 未コミットの変更 {{value0}} 件以上"
+      }
+    }
+  }
+}

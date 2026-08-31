@@ -247,6 +247,8 @@ export const SETTINGS_CHANGED_WHITELIST = [
   'experimentalPet',
   'experimentalNativeChat',
   'experimentalTerminalDock',
+  'dockTerminalComposerByDefault',
+  'experimentalStructuredNativeChat',
   'experimentalActivity',
   'experimentalAgentDashboardPopout',
   'experimentalTerminalAttention',

@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from 'react'
 import { useAppStore } from '../../store'
 import { sendNativeChatTypedCommand } from './native-chat-runtime-send'
 import { isSlashCommandDraft } from '../../../../shared/native-chat-slash-commands'
@@ -23,11 +23,13 @@ import { useNativeChatDictationActions } from './use-native-chat-dictation-actio
 import { useNativeChatSessionOptionCommand } from './use-native-chat-session-option-command'
 import { useNativeChatPickerState } from './use-native-chat-picker-state'
 import { useNativeChatPickerCommandDispatch } from './use-native-chat-picker-command-dispatch'
-import { seedHistory } from './fork-agent-composer/agent-composer-history'
+import { pushHistory, seedHistory } from './fork-agent-composer/agent-composer-history'
 import type {
   NativeChatComposerHandle,
   NativeChatComposerProps
 } from './native-chat-composer-types'
+import { isStructuredAgentSessionComposerCommand } from '../../../../shared/structured-agent-session-composer'
+import { dispatchNativeChatStructuredComposerText } from './native-chat-structured-composer-dispatch'
 
 export type {
   NativeChatComposerHandle,
@@ -70,7 +72,8 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       readTerminalScreen,
       launchDraft,
       launchDraftResolved = false,
-      reportedSessionOptions
+      reportedSessionOptions,
+      structuredTransport
     },
     ref
   ): React.JSX.Element {
@@ -80,6 +83,7 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       targetPtyId,
       agent,
       canSend,
+      allowWithoutTarget: Boolean(structuredTransport),
       sendDisabled,
       layout,
       isWorking,
@@ -129,6 +133,7 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       removeImageAttachment
     } = useNativeChatComposerAttachments({
       attachmentScopeKey: paneKey,
+      allowWithoutTarget: Boolean(structuredTransport),
       caret: core.caret,
       resolveTarget: core.resolveTarget,
       textareaRef: core.textareaRef,
@@ -139,6 +144,7 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
 
     const { attachExternalPaths, resolveAttachmentOwner } = useNativeChatExternalAttachments({
       terminalTabId,
+      structuredWorktreeId: structuredTransport?.worktreeId,
       disabled: core.disabled,
       attachResolvedPaths,
       setNotice: core.setNotice
@@ -155,7 +161,10 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       setNotice: core.setNotice
     })
 
-    const { pickAttachment } = useNativeChatFileAttachmentActions(attachExternalPaths)
+    const { pickAttachment } = useNativeChatFileAttachmentActions(attachExternalPaths, {
+      terminalTabId,
+      paneKey
+    })
     const [dictationPressed, setDictationPressed] = useState(false)
     const { toggleDictation, startHoldDictation, stopHoldDictation } =
       useNativeChatDictationActions({ textareaRef: core.textareaRef, setDictationPressed })
@@ -178,7 +187,7 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
         setHistory: core.setHistory
       })
 
-    const { surface: sessionOptionsSurface, snapshot: sessionOptionsSnapshot } =
+    const { surface: ptySessionOptionsSurface, snapshot: ptySessionOptionsSnapshot } =
       useNativeChatSessionOptions({
         agent,
         terminalTabId,
@@ -188,8 +197,39 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
         readTerminalScreen,
         reportedSessionOptions
       })
+    const sessionOptionsSurface = structuredTransport?.optionsSurface ?? ptySessionOptionsSurface
+    const sessionOptionsSnapshot = structuredTransport?.optionSnapshot ?? ptySessionOptionsSnapshot
 
-    const dispatchPickerCommand = useNativeChatPickerCommandDispatch({
+    const sendStructured = useCallback(
+      (text: string, attachments = imageAttachments): void => {
+        if (!structuredTransport) {
+          return
+        }
+        if (attachments.length > 0 && isStructuredAgentSessionComposerCommand(text, agent)) {
+          structuredTransport.onError('Remove attachments before using a chat-session command.')
+          return
+        }
+        void dispatchNativeChatStructuredComposerText(structuredTransport, text, attachments)
+          .then(({ accepted, error }) => {
+            structuredTransport.onError(error)
+            if (!accepted) {
+              return
+            }
+            emitNativeChatMessageSent({ agent, runtime: structuredTransport.runtime })
+            core.setHistory((previous) => pushHistory(previous, text))
+            core.setDraft('')
+            core.setCaret(0)
+            picker.clearSkillOrigin()
+            clearImageAttachments()
+          })
+          .catch((error) =>
+            structuredTransport.onError(error instanceof Error ? error.message : String(error))
+          )
+      },
+      [agent, clearImageAttachments, core, imageAttachments, picker, structuredTransport]
+    )
+
+    const dispatchPtyPickerCommand = useNativeChatPickerCommandDispatch({
       agent,
       disabled: core.disabled,
       isDispatchingSessionOption,
@@ -199,7 +239,7 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       readTerminalScreen,
       resolveTarget: core.resolveTarget,
       onSlashCommand,
-      sessionOptionsSurface,
+      sessionOptionsSurface: ptySessionOptionsSurface,
       trackPendingSend: core.trackPendingSend,
       setHistory: core.setHistory,
       setDraft: core.setDraft,
@@ -211,8 +251,28 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       restoreImageAttachments,
       setNotice: core.setNotice
     })
+    const dispatchPickerCommand = useCallback(
+      (command: Parameters<typeof dispatchPtyPickerCommand>[0]) => {
+        if (structuredTransport) {
+          sendStructured(`/${command.name}`)
+          return
+        }
+        dispatchPtyPickerCommand(command)
+      },
+      [dispatchPtyPickerCommand, sendStructured, structuredTransport]
+    )
 
     const bridges: AgentComposerHostBridges = {
+      // A structured session sends over its own journal transport, never the PTY.
+      ...(structuredTransport
+        ? {
+            sendOverride: () => {
+              if ((core.draft.trim() !== '' || imageAttachments.length > 0) && !core.disabled) {
+                sendStructured(core.draft, imageAttachments)
+              }
+            }
+          }
+        : {}),
       autocomplete: picker.autocomplete,
       pickerListboxId: picker.listboxId,
       classifySend: picker.classifySend,
@@ -250,7 +310,7 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       sessionOptionsSnapshot,
       isDispatchingSessionOption,
       onSlashCommand,
-      onCommandDispatched: (command) => sessionOptionsSurface?.recordOutgoingCommand(command),
+      onCommandDispatched: (command) => ptySessionOptionsSurface?.recordOutgoingCommand(command),
       // Codex's TUI only autocompletes a slash command it sees typed; a pasted
       // one lands as literal text.
       sendTypedCommand: (target, text) =>
@@ -288,6 +348,11 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       [core.focus, core.insertTypedText, handlePaste, pasteFromClipboard]
     )
 
-    return <AgentComposerField {...fieldProps} />
+    return (
+      <AgentComposerField
+        {...fieldProps}
+        sessionOptionsPickerRequest={structuredTransport?.optionPickerRequest ?? null}
+      />
+    )
   }
 )

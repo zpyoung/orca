@@ -2,8 +2,7 @@ import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 import {
   buildAiVaultResumeCopyCommandForWorktree,
-  buildAiVaultResumeStartupForWorktree,
-  type AiVaultResumeStartup
+  buildAiVaultResumeStartupForWorktree
 } from '@/lib/ai-vault-resume-command'
 import { launchAiVaultSessionInNewTab } from '@/lib/launch-ai-vault-session'
 import {
@@ -26,9 +25,11 @@ import {
   isKnownAiVaultResumeWorkspaceTarget,
   type AiVaultSessionResumeTargetState
 } from './ai-vault-session-resume'
-import { prepareAiVaultSessionContinuation } from './ai-vault-session-continuation'
+import { prepareAiVaultSessionContinuation } from '@/components/agent-session-continuation/fork-session-handoff/prepare-handoff-from-vault'
+import { resolveAiVaultSessionHandoffLaunchTargetOrNotify } from '@/components/agent-session-continuation/fork-session-handoff/ai-vault-handoff-action'
 import type { AgentSessionContinuationRequest } from '@/lib/agent-session-continuation'
 import { findWorktreeById } from '@/store/slices/worktree-helpers'
+import { activateAiVaultStructuredSession } from '@/lib/activate-ai-vault-structured-session'
 
 export function useAiVaultSessionLaunchActions({
   activeWorktree,
@@ -40,14 +41,7 @@ export function useAiVaultSessionLaunchActions({
   activeWorktreeId: string | null
   targetState: AiVaultSessionResumeTargetState
   agentCmdOverrides?: Partial<Record<AiVaultAgent, string | null>>
-}): {
-  buildResumeStartup: (session: AiVaultSession, worktreeId?: string | null) => AiVaultResumeStartup
-  copyResumeCommand: (session: AiVaultSession, worktreeId?: string | null) => Promise<void>
-  handleResume: (session: AiVaultSession, targetWorktreeId?: string) => void
-  handleContinueInNewSession: (session: AiVaultSession, targetWorktreeId: string) => void
-  continuationRequest: AgentSessionContinuationRequest | null
-  handleContinuationDialogOpenChange: (open: boolean) => void
-} {
+}) {
   const [continuationRequest, setContinuationRequest] =
     useState<AgentSessionContinuationRequest | null>(null)
 
@@ -93,6 +87,10 @@ export function useAiVaultSessionLaunchActions({
 
   const handleResume = useCallback(
     (session: AiVaultSession, targetWorktreeId?: string): void => {
+      if (session.structuredSession) {
+        void activateAiVaultStructuredSession(session)
+        return
+      }
       const targetId = resolveAiVaultSessionLaunchTargetOrNotify({
         sessionFilePath: session.filePath,
         sessionExecutionHostId: session.executionHostId,
@@ -152,7 +150,7 @@ export function useAiVaultSessionLaunchActions({
 
   const handleContinueInNewSession = useCallback(
     (session: AiVaultSession, targetWorktreeId: string): void => {
-      const targetId = resolveAiVaultSessionLaunchTargetOrNotify({
+      const targetId = resolveAiVaultSessionHandoffLaunchTargetOrNotify({
         sessionFilePath: session.filePath,
         sessionExecutionHostId: session.executionHostId,
         activeWorktreeId: activeWorktreeId ?? activeWorktree?.id ?? null,

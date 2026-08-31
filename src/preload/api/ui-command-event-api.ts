@@ -36,6 +36,10 @@ import type {
 export type UiCommandEventApi = {
   get: () => Promise<PersistedUIState>
   set: (args: Partial<PersistedUIState>) => Promise<void>
+  /** Like set, but REJECTS when the update did not reach the host (the web preload's set
+   *  swallows transport failures for offline use). The diff writer needs the distinction:
+   *  folding an unacked patch into its baseline would silently stop retrying it (STA-5781). */
+  setWithAck?: (args: Partial<PersistedUIState>) => Promise<void>
   recordFeatureInteraction: (id: FeatureInteractionId) => Promise<PersistedUIState>
   onStateChanged: (callback: (ui: PersistedUIState) => void) => () => void
   onOpenSettings: (callback: () => void) => () => void
@@ -59,6 +63,7 @@ export type UiCommandEventApi = {
   onDeleteCurrentWorkspace: (callback: () => void) => () => void
   onOpenWorkspaceBoard: (callback: () => void) => () => void
   onOpenTasks: (callback: () => void) => () => void
+  onToggleAgentDashboard: (callback: () => void) => () => void
   onJumpToWorktreeIndex: (callback: (index: number) => void) => () => void
   onJumpToTabIndex: (callback: (index: number) => void) => () => void
   onWorktreeHistoryNavigate: (callback: (direction: 'back' | 'forward') => void) => () => void

@@ -43,6 +43,7 @@ import { createBrowserUuid } from '@/lib/browser-uuid'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
 import { folderWorkspaceKey } from '../../../../shared/workspace-scope'
+import { getActiveExecutionHostIdForWorktree } from '@/lib/unified-tab-host-ownership'
 import {
   addAdditionalValidWorkspaceKeys,
   type WorkspaceSessionHydrationOptions
@@ -80,6 +81,7 @@ export type TabsSlice = TabTerminalDockSlice & {
         Tab,
         | 'id'
         | 'entityId'
+        | 'executionHostId'
         | 'label'
         | 'generatedLabel'
         | 'quickCommandLabel'
@@ -106,6 +108,7 @@ export type TabsSlice = TabTerminalDockSlice & {
         Tab,
         | 'id'
         | 'entityId'
+        | 'executionHostId'
         | 'label'
         | 'generatedLabel'
         | 'quickCommandLabel'
@@ -130,7 +133,12 @@ export type TabsSlice = TabTerminalDockSlice & {
   activateTab: (tabId: string, opts?: { preservePreview?: boolean; worktreeId?: string }) => void
   closeUnifiedTab: (
     tabId: string,
-    opts?: { recordInteraction?: boolean; terminalRetirementHandled?: boolean }
+    opts?: {
+      /** Keep the worktree selected even if this empties it — for closes the user did not ask for. */
+      preserveWorktreeSelection?: boolean
+      recordInteraction?: boolean
+      terminalRetirementHandled?: boolean
+    }
   ) => { closedTabId: string; wasLastTab: boolean; worktreeId: string } | null
   reorderUnifiedTabs: (
     groupId: string,
@@ -160,7 +168,8 @@ export type TabsSlice = TabTerminalDockSlice & {
   createEmptySplitGroup: (
     worktreeId: string,
     sourceGroupId: string,
-    direction: TabSplitDirection
+    direction: TabSplitDirection,
+    opts?: { activate?: boolean }
   ) => string | null
   moveUnifiedTabToGroup: (
     tabId: string,
@@ -709,7 +718,7 @@ export function projectWorktreeTabModelReconciliation(
     if (tab.contentType === 'browser') {
       return liveBrowserIds.has(tab.entityId)
     }
-    if (tab.contentType === 'simulator') {
+    if (tab.contentType === 'simulator' || tab.contentType === 'agent-session') {
       return true
     }
     return liveEditorIds.has(tab.entityId)
@@ -863,11 +872,14 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
 
       const shouldActivate = init?.activate ?? true
       const createdAt = Date.now()
+      const executionHostId =
+        init?.executionHostId ?? getActiveExecutionHostIdForWorktree(state, worktreeId)
       created = {
         id,
         entityId: init?.entityId ?? id,
         groupId: group.id,
         worktreeId,
+        ...(executionHostId ? { executionHostId } : {}),
         contentType,
         label:
           init?.label ?? (contentType === 'terminal' ? `Terminal ${existingTabs.length + 1}` : id),
@@ -936,11 +948,14 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
         state.layoutByWorktree[worktreeId] ??
         ({ type: 'leaf', groupId: target.sourceGroupId } as const)
       const createdAt = Date.now()
+      const executionHostId =
+        init?.executionHostId ?? getActiveExecutionHostIdForWorktree(state, worktreeId)
       const createdTab: Tab = {
         id,
         entityId: init?.entityId ?? id,
         groupId: newGroupId,
         worktreeId,
+        ...(executionHostId ? { executionHostId } : {}),
         contentType,
         label:
           init?.label ?? (contentType === 'terminal' ? `Terminal ${existingTabs.length + 1}` : id),
@@ -1188,7 +1203,10 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
         nextLayoutByWorktree = collapsedState.layoutByWorktree
         nextActiveGroupIdByWorktree = collapsedState.activeGroupIdByWorktree
       }
+      // Why: the landing fallback answers "the user emptied this worktree". An unwound create
+      // never added a tab, so it must leave the selection exactly as the click found it.
       const shouldDeactivateWorktree =
+        !opts?.preserveWorktreeSelection &&
         current.activeWorktreeId === worktreeId &&
         nextTabs.length === 0 &&
         (current.tabsByWorktree[worktreeId] ?? []).length === 0 &&
@@ -1655,7 +1673,7 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
     return true
   },
 
-  createEmptySplitGroup: (worktreeId, sourceGroupId, direction) => {
+  createEmptySplitGroup: (worktreeId, sourceGroupId, direction, opts) => {
     const newGroupId = createBrowserUuid()
     const newGroup: TabGroup = {
       id: newGroupId,
@@ -1663,6 +1681,7 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
       activeTabId: null,
       tabOrder: []
     }
+    const shouldActivate = opts?.activate !== false
     set((state) => {
       const existing = state.groupsByWorktree[worktreeId] ?? []
       const currentLayout =
@@ -1679,7 +1698,14 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
           ...state.layoutByWorktree,
           [worktreeId]: replaceLeaf(currentLayout, sourceGroupId, replacement)
         },
-        activeGroupIdByWorktree: { ...state.activeGroupIdByWorktree, [worktreeId]: newGroupId }
+        ...(shouldActivate
+          ? {
+              activeGroupIdByWorktree: {
+                ...state.activeGroupIdByWorktree,
+                [worktreeId]: newGroupId
+              }
+            }
+          : {})
       }
     })
     get().recordFeatureInteraction?.('terminal-panes')
@@ -1980,6 +2006,7 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
     const { tab, worktreeId } = foundTab
     return get().createUnifiedTab(worktreeId, tab.contentType, {
       entityId: init?.entityId ?? tab.entityId,
+      executionHostId: tab.executionHostId,
       label: init?.label ?? tab.label,
       generatedLabel: init?.generatedLabel ?? tab.generatedLabel,
       quickCommandLabel: init?.quickCommandLabel ?? tab.quickCommandLabel,

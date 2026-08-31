@@ -184,9 +184,8 @@ SYNC_BRANCH=$(git symbolic-ref --short HEAD)
 git reset --hard "$ORIGIN_MAIN_OLD"
 ```
 
-A fresh worktree has no `node_modules`, and everything from here on needs them — the ownership
-classifier, the verification gate, and any fix. Install before merging, so an install failure is
-never mistaken for a resolution failure:
+A fresh worktree has no `node_modules`, and the verification gate and any fix need them. Install
+before merging, so an install failure is never mistaken for a resolution failure:
 
 ```sh
 pnpm install --frozen-lockfile
@@ -263,6 +262,28 @@ feature-collision review**. Each can surface a decision the reference routes to 
 `--unattended`, that is a stopping condition: go to Step 13 with "needs attention: <the decision>"
 rather than choosing a side.
 
+**`ours.txt` is the list that loses work silently, so audit it.** An exception wins the whole file,
+which also discards every unrelated upstream change under that path — no conflict, no marker, and
+both manifest checks still pass. Diff each restored path over the old-to-new tag range and replay
+what the fork does not actually own:
+
+```sh
+while read -r p; do
+  [ -z "$p" ] && continue
+  git diff --numstat "$PREV_TAG" "$UPSTREAM_TARGET" -- "$p"
+done < <out-dir>/ours.txt
+```
+
+Every path this prints is a decision. Three-way merge it with the previous tag as base
+(`git merge-file --diff3 -p ours base theirs`) rather than hand-picking hunks; the fork's own lines
+and upstream's usually sit in different regions and merge cleanly. Take upstream's side unless the
+exception's `reason` is what the change would undo — a fork build artifact, a fork identity file, or
+a record the reason says upstream's copy actively breaks.
+
+`package.json` is the one that fails loudest and least obviously: `pnpm-lock.yaml` is upstream-owned
+and resolves to the tag, so a dependency the exception dropped makes `pnpm install --frozen-lockfile`
+fail in Step 8 with a lockfile error that names nothing about ownership.
+
 Commit the ownership resolution as a single follow-up commit on top of the merge; Step 7 expects
 exactly one such extra commit.
 
@@ -314,71 +335,51 @@ Never, on either gate:
 - skip, delete, or narrow a test to make it pass
 - add a `max-lines` disable or a per-file baseline bump — `AGENTS.md` forbids it outright
 - weaken a lint rule, the fork ownership guard, or any other CI gate
-- wave a failure through as unrelated. The Step 8 baseline differential is the only mechanism for
-  tolerating one, and it requires reproducing the identical failure at `$ORIGIN_MAIN_OLD`
+- wave a failure through as unrelated. A red check is red until a re-run clears it or a fix turns it
+  green; "probably pre-existing" is a thing to prove in Step 10, not a reason to move on
 
 Each fix is its own commit, its message naming what broke and why the fix is the right one. Every
 fix commit appears in the Step 16 report.
 
 ## Step 8 — Verification gate
 
+This gate is the cheap, local half of verification. It proves the tree coheres before a PR exists;
+**PR CI owns the test suite** (Step 10). Do not run `pnpm test` here — see below.
+
 Run the gate exactly as [`references/file-ownership.md`](./references/file-ownership.md) § Verifying
-specifies — including the manifest checks (`--verify-seams`, `--verify-residuals`), clearing
-`config/*.tsbuildinfo` before every typecheck, and building the CLI plus neutralizing inherited Git
-configuration before `pnpm test`. Those are not hygiene; each one deterministically fakes a result
-if skipped.
+specifies, including the manifest checks (`--verify-seams`, `--verify-residuals`) and clearing
+`config/*.tsbuildinfo` before every typecheck. Those are not hygiene; each one deterministically
+fakes a result if skipped.
 
 Order: `pnpm install --frozen-lockfile` (re-run it here — the merge may have taken upstream's
-`pnpm-lock.yaml`) → manifest checks → `pnpm typecheck` → `pnpm lint` → `pnpm test`.
+`pnpm-lock.yaml`) → manifest checks → `pnpm typecheck` → `pnpm lint`.
 
-Everything up to and including `pnpm lint` is absolute: stop at the first failure and treat it as a
-hard fail. The baseline differential below never applies to them. The reference's rule-tightening
-carve-out is the one exception, and it is an exception about *how the tree is fixed*, not about
-tolerating a failure — lint must still pass before the push, and the mechanical `oxlint --fix` it
-permits is committed separately from the merge and the ownership commit.
+Every step is absolute: stop at the first failure and treat it as a hard fail. The reference's
+rule-tightening carve-out is the one exception, and it is an exception about *how the tree is
+fixed*, not about tolerating a failure — lint must still pass before the push, and the mechanical
+`oxlint --fix` it permits is committed separately from the merge and the ownership commit.
 
-`pnpm test` is baseline-differential. A test that already fails on the pre-merge fork tree is not
-evidence the resolution broke anything — some tests are coupled to the machine (PATH, toolchain
-versions, locale) rather than to the code. Only a test the merge **newly** breaks is a gate failure.
-This suite also has genuinely nondeterministic failures that differ run to run, so re-run a lone
-failure before treating it as signal.
-
-If `pnpm test` fails:
-
-1. Parse the failing test FILE paths and test NAMES from the vitest output. If more than 10 distinct
-   files fail, skip the differential and treat it as a hard fail — breakage that broad is not an
-   environment quirk.
-2. Record the merged head: `MERGED_HEAD=$(git rev-parse HEAD)`.
-3. Switch to the pre-merge baseline, which preserves the untracked `node_modules`:
-   `git checkout --detach $ORIGIN_MAIN_OLD`. Then, only if
-   `git diff --quiet $ORIGIN_MAIN_OLD $MERGED_HEAD -- pnpm-lock.yaml` reports a difference, run
-   `pnpm install --frozen-lockfile` so the baseline runs against its own dependency set.
-4. Re-run only the failing files at the baseline, with the same CLI build and Git-config scrubbing
-   the reference specifies. A file that does not exist at the baseline (newly added by upstream)
-   counts as "did not fail there".
-5. Return to the merged tree: `git checkout "$SYNC_BRANCH"` (it is at `$MERGED_HEAD`). If you re-installed
-   in (3), run `pnpm install --frozen-lockfile` again. Do this even if the differential errored
-   partway — never leave the checkout detached.
-6. Classify at test-name granularity, not file granularity:
-   - Every failing test name also fails at the baseline → all pre-existing. The gate PASSES.
-     Continue to Step 9 and report each tolerated failure as "pre-existing (also fails at
-     $ORIGIN_MAIN_OLD)".
-   - Any test name that passes at the baseline but fails after the merge → REGRESSION introduced by
-     the resolution. Hard fail. This includes a file that fails on both sides but whose set of
-     failing test names GREW after the merge.
+**Why no tests here.** Vitest cannot run on the machine this skill runs on; `AGENTS.md` routes every
+local run through a remote Docker host, and that host is a single shared box. Sharded across it the
+suite reports failures the code did not cause — timeouts, perf budgets, and temp-file races that
+land on a different random subset each run and clear the moment the same files run alone. Chasing
+them costs the run an hour and answers a question PR CI answers properly: the `test` matrix in
+`.github/workflows/pr.yml` runs the same suite on clean hosted runners, sharded 16 ways across two
+Node versions, and it is a required check for `verify`. A local pass never authorized a merge, and a
+local failure was never trustworthy on its own — so the local run buys nothing the PR does not.
 
 A hard fail here is not the end of the run — work it under the fix policy above, then re-run the
-gate from the top. Re-run it whole: a fix for a typecheck error routinely breaks lint, and a
-partial re-run is how a broken tree reaches the PR.
+gate from the top. Re-run it whole: a fix for a typecheck error routinely breaks lint, and a partial
+re-run is how a broken tree reaches the PR.
 
 If the policy says escalate, or the same failure survives your fixes, restore and bail:
 `git reset --hard $ORIGIN_MAIN_OLD`, then go to Step 13 with "needs attention: merge resolved but
-<install|manifest|typecheck|lint|tests> failed — manual resolution required; backup at
-origin/<BACKUP_REF>". Include the first ~20 lines of the failure output, and for a test regression
-name the specific tests that pass at the baseline but fail after.
+<install|manifest|typecheck|lint> failed — manual resolution required; backup at
+origin/<BACKUP_REF>". Include the first ~20 lines of the failure output.
 
-Never open a PR from a tree that failed this gate. The gate is cheap compared to a CI round trip,
-and a red PR costs the run its 4-hour budget in Step 10.
+Never open a PR from a tree that failed this gate. Typecheck and lint are seconds of work that would
+otherwise cost a CI round trip, and a red PR spends the run's 4-hour Step 10 budget on something the
+merge already knew.
 
 ## Step 9 — Push the run branch and open the PR
 
@@ -399,15 +400,16 @@ env -u GITHUB_TOKEN gh pr create --repo zpyoung/orca \
   --body-file <path to the body file>
 ```
 
-The body is the reviewer's whole account of the resolution, and the Step 15 report is built from the
+The body is the reviewer's whole account of the resolution, and the Step 16 report is built from the
 same material. Include: `$STABLE_TAG` at `$UPSTREAM_TARGET`; the resolution mode; the fork-commit
 count N with confirmation every SHA is still reachable; each ownership list and what came from it;
 every `merge-review.txt` path with what the hand review concluded; the tier-2, tier-4, and
-feature-collision checklist outcomes; any test failure the Step 8 differential tolerated, with the
-baseline SHA it was proven against; and the backup ref.
+feature-collision checklist outcomes; what the Step 8 gate covered (and that tests are left to this
+PR's own CI); and the backup ref.
 
 Record `PR_NUMBER` and `PR_URL`. If a PR already exists for this branch, reuse it
-(`gh pr view --json number,url`) instead of opening a second one.
+(`env -u GITHUB_TOKEN gh pr view "$SYNC_BRANCH" --repo zpyoung/orca --json number,url`) instead of
+opening a second one.
 
 ## Step 10 — Drive the PR green
 
@@ -424,11 +426,39 @@ env -u GITHUB_TOKEN gh pr view "$PR_NUMBER" --repo zpyoung/orca \
 
 Wait between polls with a background wait or a monitor, never a foreground `sleep`.
 
+This is where the test suite runs, so a failing `tests node <version> <shard>/<total>` check is the
+run's problem to resolve, exactly like any other check.
+
+**Read a failing job's log through the API, not `gh run view`.** While any job in the run is still
+going, `gh run view --log-failed` answers `run <id> is still in progress; logs will be available
+when it is complete` and prints nothing — and a 16-way shard matrix is almost never all-settled when
+the first failure appears. Fetch the one job instead, which works immediately:
+
+```sh
+env -u GITHUB_TOKEN gh api "repos/zpyoung/orca/actions/jobs/<job-id>/logs" > job.log
+```
+
+The job id is the trailing number of the `link` field in `gh pr checks`. Strip the ANSI codes
+(`sed 's/\x1b\[[0-9;]*m//g'`) before grepping for `FAIL `, and read the whole failure — one root
+cause routinely fails several shards, and the file named in the first `##[error]` is often not the
+file that has to change.
+
 **Re-run a failure before believing it.** This suite is genuinely nondeterministic — failures differ
 run to run on identical code. The first time a job fails, re-run it once
 (`env -u GITHUB_TOKEN gh run rerun <run-id> --failed --repo zpyoung/orca`) and only treat it as real
 if it reproduces. A failure that reproduces is signal; a failure that clears was flake, and it is
-still worth naming in the report.
+still worth naming in the report. A shard matrix gives you a cheaper first read than a re-run:
+the same shard number failing on **both** Node versions is deterministic, and one version alone is
+the flake shape. `gh run rerun` refuses with `cannot be rerun; This workflow is already running`
+until every job has settled, so wait for the run rather than retrying the command.
+
+**A reproduced CI failure is the fork's to fix, even if the merge did not cause it.** There is no
+tolerance mechanism here and there is no need for one: these are clean hosted runners, so the
+machine-coupling that a local run has to argue away does not apply. If you believe a failure
+pre-dates the sync, prove it — find the same job failing the same way on another PR, or on the run
+`main` produced for its own tip — and then report it as "needs attention: pre-existing failure
+blocking the sync PR", PR left open. Pre-existing is a reason to escalate, never a reason to merge
+past a red required check.
 
 Every real failure goes through the fix policy above: diagnose the cause, fix it if the policy
 allows, commit it on its own, push, and let CI re-run. There is no fixed attempt limit — keep going
@@ -454,10 +484,10 @@ against a tag `main` no longer descends from, and it rewrites fork commit SHAs, 
 
 If the merge is refused — branch protection wanting a review, a check that became required
 mid-run — do not work around it. Try arming auto-merge
-(`gh pr merge "$PR_NUMBER" --repo zpyoung/orca --merge --auto`; the fork currently has auto-merge
-disabled in its settings, so expect this to fail and do not enable it to get past a refusal), then
-report "needs attention: PR could not be merged by the run (<reason>)" and skip the release —
-`main` has not moved.
+(`env -u GITHUB_TOKEN gh pr merge "$PR_NUMBER" --repo zpyoung/orca --merge --auto`; the fork
+currently has auto-merge disabled in its settings, so expect this to fail and do not enable it to
+get past a refusal), then report "needs attention: PR could not be merged by the run (<reason>)"
+and skip the release — `main` has not moved.
 
 Then confirm and capture the new tip:
 
@@ -601,8 +631,8 @@ belongs to the `release` skill: report it, do not edit it from here.
   `merge-review.txt` path and what the hand review concluded
 - Unreleased upstream work deliberately NOT taken: `git rev-list --count HEAD..upstream/main`.
   Expected to be large; informational only — it is the whole point of tracking stable releases.
-- Verification: pass/fail per step, plus any test failures tolerated as pre-existing and the baseline
-  SHA they were proven against
+- Verification: pass/fail per Step 8 step (install, manifest, typecheck, lint) — tests are reported
+  under PR CI below, not here
 - PR CI: every check that failed, whether it reproduced on re-run or was flake, and every fix commit
   made to turn it green — SHA, subject, and the cause it addressed
 - Release: `nothing to release` | `skipped (<reason>)` | the tag cut and the run dispatched
@@ -625,10 +655,11 @@ belongs to the `release` skill: report it, do not edit it from here.
   the merge, then Step 6 resolves everything else back to `$UPSTREAM_TARGET`. Tree conflicts are
   limited to the two cases in Step 5. Never hand-edit a conflicted file to invent a merge.
 - A fork commit unreachable after the merge is a hard failure, never a warning to push through.
-- A failing test may be tolerated ONLY by the Step 8 baseline differential, which requires
-  reproducing the identical failure at `$ORIGIN_MAIN_OLD`. Never tolerate a failure because it looks
-  environmental, sits in a known-flaky file, or seems unrelated to the diff. Re-running a PR check
-  once to rule out flake is not tolerating it — a reproduced failure still has to be fixed.
+- Tests are PR CI's job, not the local gate's. Never re-add `pnpm test` to Step 8 to "check first",
+  and never treat its absence as licence to open a PR from a tree Step 8 rejected.
+- A failing check is never tolerated. Re-running one once to rule out flake is not tolerating it — a
+  reproduced failure is either fixed under the fix policy or escalated with the PR left open, even
+  when it provably pre-dates the sync.
 - Never buy a green check by weakening what it checks: no skipped or narrowed tests, no `max-lines`
   disable or baseline bump, no relaxed lint rule, no loosened ownership guard. The fix policy is the
   whole of what a run may do to a red gate.

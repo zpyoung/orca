@@ -31,7 +31,7 @@ export type UseTerminalPaneDockResult = {
   isPanePassthrough: (paneKey: string) => boolean
   setPaneDockMounted: (paneKey: string, mounted: boolean) => void
   exitPanePassthrough: (paneKey: string) => void
-  /** Docks a recognized agent pane once, unless either persistence source has a decision. */
+  /** Docks a recognized agent pane unless the setting is off or the user closed it. */
   ensurePaneDockDefault: (paneKey: string, agent: AgentType) => void
   /** The agent to render the dock with for this pane: `detectedAgent` when it's a live,
    *  recognized TUI agent; otherwise the last agent this pane was recognized as, but only
@@ -78,9 +78,12 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
         ?.terminalDockByPaneKey
   )
   const setTabTerminalDockState = useAppStore((store) => store.setTabTerminalDockState)
+  const autoDockNewPanes = useAppStore(
+    (store) => store.settings?.dockTerminalComposerByDefault !== false
+  )
 
   const [mountedPaneKeys, setMountedPaneKeys] = useState<ReadonlySet<string>>(() => new Set())
-  const { resolvedStateFor, hasLocalDockState, persistLocalDockState, forgetPane } =
+  const { resolvedStateFor, userUndockedFor, noteUserUndock, persistLocalDockState, forgetPane } =
     useTerminalDockLocalFallback()
   // Why: "ever echoed" is per-tab, not per-pane — a modern host's record simply omitting one
   // pane still means default (not local fallback) governs that pane, per resolveTerminalDockPaneState.
@@ -145,7 +148,7 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
   const applyDockState = useCallback(
     (
       paneKey: string,
-      patch: { docked?: boolean; gutterRows?: number },
+      patch: { docked?: boolean; gutterRows?: number; userUndocked?: boolean },
       beforeApply?: () => void
     ): boolean => {
       const unifiedTabId = resolveUnifiedTabId()
@@ -154,7 +157,8 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       }
       const persistedState = {
         docked: patch.docked ?? isPaneDocked(paneKey),
-        gutterRows: patch.gutterRows ?? gutterRowsFor(paneKey)
+        gutterRows: patch.gutterRows ?? gutterRowsFor(paneKey),
+        ...(patch.userUndocked !== undefined ? { userUndocked: patch.userUndocked } : {})
       }
       beforeApply?.()
       setTabTerminalDockState(unifiedTabId, { paneKey, ...patch })
@@ -173,12 +177,21 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
   const ensurePaneDockDefault = useCallback(
     (paneKey: string, agent: AgentType): void => {
       noteDetectedAgent(paneKey, agent)
-      // Local fallback only counts before the host has ever echoed — once it has, a stale
-      // local entry for a pane the host record omits must not suppress the default.
+      if (isPaneDocked(paneKey)) {
+        return
+      }
+      // Why: the host record is the only copy a second client can see — a client-local
+      // flag alone would re-dock a pane this user closed from somewhere else.
       const hasPersistedDecision =
-        Object.hasOwn(terminalDockByPaneKey ?? {}, paneKey) ||
-        (!hostHasEverEchoed && hasLocalDockState(paneKey))
-      if (!shouldDockTerminalComposerByDefault({ enabled, agent, hasPersistedDecision })) {
+        terminalDockByPaneKey?.[paneKey]?.userUndocked === true || userUndockedFor(paneKey)
+      if (
+        !shouldDockTerminalComposerByDefault({
+          enabled,
+          autoDockNewPanes,
+          agent,
+          hasPersistedDecision
+        })
+      ) {
         return
       }
       applyDockState(paneKey, {
@@ -188,12 +201,13 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
     },
     [
       applyDockState,
+      autoDockNewPanes,
       enabled,
       gutterRowsFor,
-      hasLocalDockState,
-      hostHasEverEchoed,
+      isPaneDocked,
       noteDetectedAgent,
-      terminalDockByPaneKey
+      terminalDockByPaneKey,
+      userUndockedFor
     ]
   )
 
@@ -214,8 +228,15 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
       }
       const paneKey = makePaneKey(tabId, leafId)
       const nextDocked = !isPaneDocked(paneKey)
-      const beforeApply = nextDocked ? undefined : () => exitPanePassthrough(paneKey)
-      if (!applyDockState(paneKey, { docked: nextDocked }, beforeApply)) {
+      const beforeApply = (): void => {
+        noteUserUndock(paneKey, !nextDocked)
+        if (!nextDocked) {
+          exitPanePassthrough(paneKey)
+        }
+      }
+      if (
+        !applyDockState(paneKey, { docked: nextDocked, userUndocked: !nextDocked }, beforeApply)
+      ) {
         return
       }
       emitTerminalDockToggled({
@@ -224,7 +245,15 @@ export function useTerminalPaneDock(args: UseTerminalPaneDockArgs): UseTerminalP
           agentForPane(paneKey) ?? useAppStore.getState().agentStatusByPaneKey[paneKey]?.agentType
       })
     },
-    [agentForPane, applyDockState, enabled, exitPanePassthrough, isPaneDocked, tabId]
+    [
+      agentForPane,
+      applyDockState,
+      enabled,
+      exitPanePassthrough,
+      isPaneDocked,
+      noteUserUndock,
+      tabId
+    ]
   )
 
   const toggleDockForFocusedPane = useCallback((): void => {

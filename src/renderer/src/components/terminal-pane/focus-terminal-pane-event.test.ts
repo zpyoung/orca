@@ -22,11 +22,15 @@ class MockClassList {
 }
 
 function createPaneElement(): HTMLElement {
-  return { classList: new MockClassList() } as unknown as HTMLElement
+  return {
+    classList: new MockClassList(),
+    querySelector: vi.fn(() => null)
+  } as unknown as HTMLElement
 }
 
 function createManager(args?: { numericPaneId?: number | null; leafId?: TerminalLeafId }) {
   const container = createPaneElement()
+  const terminal = { focus: vi.fn() }
   const numericPaneId = args?.numericPaneId ?? 7
   const leafId = args?.leafId ?? LEAF_ID
   return {
@@ -37,7 +41,8 @@ function createManager(args?: { numericPaneId?: number | null; leafId?: Terminal
         {
           id: 7,
           leafId,
-          container
+          container,
+          terminal
         }
       ]),
       setActivePane: vi.fn()
@@ -66,7 +71,7 @@ describe('handleFocusTerminalPaneDetail', () => {
       }
     )
 
-    expect(manager.setActivePane).toHaveBeenCalledWith(7, { focus: true })
+    expect(manager.setActivePane).toHaveBeenCalledWith(7, { focus: false })
     expect(container.classList.contains('pane-focus-rim-flash')).toBe(true)
     expect(acknowledgeAgents).toHaveBeenCalledWith([`tab-1:${LEAF_ID}`])
     expect(surfaceStaleAgentRow).not.toHaveBeenCalled()
@@ -91,7 +96,7 @@ describe('handleFocusTerminalPaneDetail', () => {
       }
     )
 
-    expect(manager.setActivePane).toHaveBeenCalledWith(7, { focus: true })
+    expect(manager.setActivePane).toHaveBeenCalledWith(7, { focus: false })
     expect(scrollToBottomIfOutputSinceLastView).toHaveBeenCalledWith(7)
   })
 

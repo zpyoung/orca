@@ -1,11 +1,9 @@
+import { findDockComposerTextarea } from '@/components/terminal-pane/fork-terminal-dock/dock-composer-focus-redirect'
 import { refreshTerminalImeInputContext } from '@/components/terminal-pane/terminal-ime-input-context-refresh'
 
 /**
- * Move keyboard focus into the xterm instance for a freshly-mounted terminal
- * tab. Handles the two-step race where React must first mount the new
- * TerminalPane/xterm before the hidden .xterm-helper-textarea exists —
- * double-rAF waits for that commit so focus lands on the new tab instead of
- * whatever surface (menu trigger, body, previous tab) just relinquished it.
+ * Moves keyboard focus into the preferred input surface for a freshly mounted terminal tab.
+ * The dock composer wins when enabled; otherwise focus falls back to xterm.
  */
 function cssAttributeString(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
@@ -25,6 +23,11 @@ function focusTerminalHelper(helper: HTMLElement, options: FocusTerminalTabSurfa
     if (active !== helper && active !== null && active !== document.body) {
       return
     }
+  }
+  const dockComposer = findDockComposerTextarea(helper)
+  if (dockComposer) {
+    dockComposer.focus()
+    return
   }
   helper.focus()
   if (options.refreshImeContext) {

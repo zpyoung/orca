@@ -47,3 +47,81 @@ entries' IDs; manual edits to fix typos are fine.
 - **File**: config/fork-ownership.json
 - **Description**: TerminalPane.tsx carries ~128 lines of fork-authored terminal-dock wiring (imports, useTerminalPaneDock, the dock-mount JSX block, focus-ownership call sites) but is declared only as an `exceptions` entry whose reason describes an unrelated upstream fix ("Corrects effectiveChatViewMode"). No `seams` entry names the dock lines, and `residuals` is schema-illegal for exception paths, so nothing records or bounds the dock footprint. The guard passes because an exception path is checked for existence only, never content — confirmed in .github/scripts/check-fork-ownership.mjs (checkStaleEntries is the only check that touches an exception path). The wiring has ridden this unrelated exception since bbfba96abc and survived the v1.4.186 and v1.4.187 syncs without ever being described. Consequence: a sync has no declared spec of what the dock wiring should look like, and any accidental loss of those lines is invisible to CI. Needs an owner decision — split the dock wiring into its own manifest entry, or restate the exception reason to cover the file's real fork footprint.
 - **Severity**: medium
+
+## BUG-5: Live-zsh ZDOTDIR discovery fails on a non-ASCII wrapper path inside the test sandbox
+- **Observed**: 2026-08-24
+- **File**: src/main/providers/local-pty-shell-ready-zsh-zdotdir-discovery.test.ts
+- **Description**: `live zsh subprocess tests > ZDOTDIR discovery with real zsh > loads user .zshrc when the wrapper dir contains a non-ASCII (token-range) path` fails in the Docker test sandbox. It fails in isolation (6-file batch, 1 of 100 cases) as well as under full-suite load, and no renderer or composer change touches it — the container's locale/filesystem encoding is the likely dependence. Every other file that failed the 16-shard full-suite run passed when re-run in isolation, so those are the known load-sensitive class (TEST-1); this one is not.
+- **Introduced by**: pre-existing / sandbox environment
+- **Severity**: low
+- **Proposed fix**: Assert the container's locale in the live-zsh lane, or skip the non-ASCII case when the filesystem encoding cannot represent the path.
+- **Blocker for**: A clean green full-suite baseline on the remote sandbox.
+- **Addendum (2026-08-25)**: the referenced test file was deleted upstream by c72a4eecdd (zsh wrapper collapsed to one .zshenv plus a precmd hook), which reached this fork with v1.4.189. Confirm the non-ASCII case still exists in the reworked live-zsh lane before acting on this entry.
+
+## BUG-6: Saving a steering note as a template silently drops the already-selected template from the brief
+- **Observed**: 2026-08-26
+- **File**: src/renderer/src/components/agent-session-continuation/fork-session-handoff/use-handoff-dialog-state.ts:381
+- **Description**: saveSteeringNoteAsTemplate calls setSelectedTemplateId(newId) and setSteeringNote(''), replacing whatever template was already selected. Repro: select 'Debug the failure', add a steering note, save the note as a new template 'Flaky triage' -- the brief loses the 'Debug the failure' block with no warning. The user's intent was to add a template, not swap the active one.
+- **Introduced by**: code review of staged session-handoff customization changes
+- **Severity**: low
+- **Proposed fix**: Either keep the prior selection and treat the new template as catalog-only, or warn/confirm before replacing an active selection.
+- **Resolved (2026-08-26)**: the save now adopts the new template only when nothing is selected; with a template already active the note and the selection both survive. Hook-level coverage is tracked as TEST-4.
+
+## BUG-7: New Template option opens a dead-end naming panel once the catalog is at its limit
+- **Observed**: 2026-08-26
+- **File**: src/renderer/src/components/agent-session-continuation/fork-session-handoff/HandoffNotesControls.tsx:46
+- **Description**: At HANDOFF_TEMPLATES_MAX the 'New Template' select option stays selectable and opens the naming panel, but canSave is permanently false so the user can never complete the action. The only explanation is a title attribute on the select item, which is invisible once the panel is open. A test asserts the current behavior ('opens template creation at the catalog limit while keeping save disabled'), so changing it means changing that test too.
+- **Introduced by**: code review of staged session-handoff customization changes
+- **Severity**: low
+- **Proposed fix**: Disable the option at the limit, or render a visible at-limit message inside the naming panel next to the disabled save button.
+- **Resolved (2026-08-26)**: the naming panel now renders the visible `templateLimitReached` message above the disabled save button, so the state is explained rather than silent.
+
+## BUG-8: A patch carrying both templates and templateMutation discards the explicit templates write
+- **Observed**: 2026-08-26
+- **File**: src/shared/fork-session-handoff/handoff-settings-merge.ts:93
+- **Description**: When a patch supplies both a templates array and a templateMutation, the merge computes the mutation against currentSettings.templates and then overwrites the caller's explicit templates value. The explicit write is silently lost. No caller batches them today, so this is latent, but it is a trap for any future caller that does.
+- **Introduced by**: code review of staged session-handoff customization changes
+- **Severity**: low
+- **Proposed fix**: Apply the mutation against the patch's templates when both are present, or reject the combination explicitly rather than silently preferring one.
+- **Resolved (2026-08-26)**: the mutation now composes onto the patch's templates, so a batched write and mutation both land.
+
+## BUG-9: A server-side rejected template mutation fails silently in the settings editor
+- **Observed**: 2026-08-26
+- **File**: src/shared/fork-session-handoff/handoff-settings-merge.ts:40
+- **Description**: A rejected add/update (empty name or body, duplicate id, at the catalog limit) returns applied: false with no reason. HandoffTemplatesPane.saveEditor then returns false and the editor just stays open, while persistTemplateMutation only toasts on a thrown error -- so the user sees nothing. Currently unreachable because canSave/atLimit gate every path client-side, but the rejection channel carries no signal a caller could surface.
+- **Introduced by**: code review of staged session-handoff customization changes
+- **Severity**: low
+- **Proposed fix**: Return a reason code alongside applied: false and have the pane surface it as a toast or inline editor error.
+
+
+## BUG-10: Tab close may not release the handoff dialog's store subscription
+- **Observed**: 2026-08-26
+- **File**: src/renderer/src/lib/fork-session-handoff/launch-session-handoff.ts:399
+- **Description**: Raised by the first review pass on this branch and carried unverified into the merge. The delivery waiter subscribes to the app store and clears itself on resolution; the claim is that closing the receiving tab before delivery resolves leaves the subscription attached. Not reproduced in this pass — treat the file pointer as the starting point, not a confirmed line.
+- **Introduced by**: first code-review pass on the session-handoff branch
+- **Severity**: low
+- **Proposed fix**: Confirm the waiter's teardown path runs when the target tab disappears, and add a test that closes the tab mid-wait.
+
+## BUG-11: Start with an unresolvable target is a silent no-op
+- **Observed**: 2026-08-26
+- **File**: src/renderer/src/components/agent-session-continuation/fork-session-handoff/use-handoff-dialog-start.ts:55
+- **Description**: The opening guard returns false when `request`, `selectedAgent`, `target`, or `compositionInputs` is missing, without calling `setOperationError`. Every later failure path in the same function does set one. If the button is ever reachable while the target cannot resolve, the click does nothing and says nothing. `startDisabled` is expected to gate this today, so it is latent rather than live.
+- **Introduced by**: first code-review pass on the session-handoff branch
+- **Severity**: low
+- **Proposed fix**: Set an operation error in the guard, or assert the invariant so an unreachable state fails loudly instead of silently.
+
+## BUG-12: SSH-backed repo-state probes are not cancellable
+- **Observed**: 2026-08-26
+- **File**: src/renderer/src/lib/fork-session-handoff/handoff-repo-state.ts
+- **Description**: The module carries no AbortController or cancellation token, so a repo-state diff started against a slow SSH host keeps running after the user changes target or closes the dialog. The result is discarded by the caller's generation check, but the work and the remote round-trip are not stopped.
+- **Introduced by**: first code-review pass on the session-handoff branch
+- **Severity**: low
+- **Proposed fix**: Thread an AbortSignal through the probe and abort it when the target changes or the dialog closes.
+
+## BUG-13: Lineage badge attribution in split tabs may point at the wrong pane
+- **Observed**: 2026-08-26
+- **File**: src/renderer/src/components/agent-session-continuation/fork-session-handoff/SessionHandoffLineageBadge.tsx
+- **Description**: Raised by the first review pass and carried unverified into the merge. The badge resolves its jump target through `resolveOriginalPaneTarget` and `parsePaneKey`; the claim is that a tab holding several panes can resolve to a sibling rather than the pane that produced the handoff. Not reproduced in this pass.
+- **Introduced by**: first code-review pass on the session-handoff branch
+- **Severity**: low
+- **Proposed fix**: Reproduce with a split tab whose panes ran different agents, then key the badge's target on the recorded pane id rather than the tab.

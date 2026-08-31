@@ -20,6 +20,7 @@ import {
   type NormalizedClaudeAccountSelectionTarget
 } from '../claude-accounts/runtime-selection'
 import { fetchGeminiRateLimits } from './gemini-usage-fetcher'
+import { deriveAntigravityRateLimits } from './antigravity-usage-mirror'
 import { fetchKimiRateLimits } from './kimi-fetcher'
 import type { KimiHomeResolution } from '../kimi/kimi-runtime-home'
 import { fetchGrokRateLimits } from './grok-fetcher'
@@ -1491,8 +1492,8 @@ export class RateLimitService {
     }
   }
 
-  /** Live usage windows forwarded from a Claude session's statusLine command. */
-  ingestLiveClaudeRateLimits(event: ClaudeStatusLineRateLimits): void {
+  /** Ingest live Claude plan windows and report whether the selected account accepted them. */
+  ingestLiveClaudeRateLimits(event: ClaudeStatusLineRateLimits): boolean {
     // Why: attribution needs the selected account's config dir; until a fetch cycle captures it, drop posts rather than guess the account.
     const snapshot = this.lastClaudeAuthSnapshot
     if (!snapshot) {
@@ -1500,7 +1501,7 @@ export class RateLimitService {
       console.debug('[rate-limits] dropped live Claude usage: no auth snapshot yet', {
         eventConfigDir: event.configDir
       })
-      return
+      return false
     }
     // Why: sessions of other accounts (or other runtimes) report their own quota; mixing them into the active account's bar would lie.
     if (normalizeClaudeConfigDir(event.configDir) !== snapshot.configDir) {
@@ -1508,12 +1509,12 @@ export class RateLimitService {
         eventConfigDir: event.configDir,
         snapshotConfigDir: snapshot.configDir
       })
-      return
+      return false
     }
     const freshSession = mapClaudeUsageWindow(event.fiveHour ?? undefined, 300)
     const freshWeekly = mapClaudeUsageWindow(event.sevenDay ?? undefined, 10080)
     if (!freshSession && !freshWeekly) {
-      return
+      return false
     }
     const previous = this.state.claude
     // Why: statusline payloads can carry a single window; an absent one means "no update", not "cleared" — keep the other bar populated.
@@ -1526,7 +1527,7 @@ export class RateLimitService {
       isSameUsageWindow(previous.session, session) &&
       isSameUsageWindow(previous.weekly, weekly)
     ) {
-      return
+      return true
     }
     this.activeFailureStreakByProvider.claude = 0
     this.updateState({
@@ -1549,6 +1550,7 @@ export class RateLimitService {
         }
       }
     })
+    return true
   }
 
   private trackActiveFailureStreak(
@@ -1766,11 +1768,8 @@ export class RateLimitService {
             status: 'error'
           } satisfies ProviderRateLimits)
 
-    // Why: Antigravity shares Gemini credentials today; mirror the Gemini snapshot so its status-bar UI gets a real lifecycle instead of null.
-    const antigravity: ProviderRateLimits = {
-      ...gemini,
-      provider: 'antigravity'
-    }
+    // Why: Antigravity can only borrow a *successful* Gemini read; a Gemini failure is not an Antigravity failure.
+    const antigravity = deriveAntigravityRateLimits(gemini)
 
     const opencodeGo =
       opencodeGoResult.status === 'fulfilled'

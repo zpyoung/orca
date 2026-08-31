@@ -58,6 +58,7 @@ import { getAppearancePaneSearchEntries } from '@/components/settings/appearance
 import { getInputPaneSearchEntries } from '@/components/settings/input-search'
 import { getTerminalPaneSearchEntries } from '@/components/settings/terminal-search'
 import { getQuickCommandsPaneSearchEntries } from '@/components/settings/quick-commands-search'
+import { getForkSessionHandoffNavSections } from '@/components/settings/fork-session-handoff/handoff-settings-nav-section'
 import { getBrowserPaneCombinedSearchEntries } from '@/components/settings/browser-pane-search'
 import { getNotificationsPaneSearchEntries } from '@/components/settings/notifications-search'
 import { getOrchestrationPaneSearchEntries } from '@/components/settings/orchestration-search'
@@ -202,7 +203,9 @@ export function buildSettingsNavigationMetadata({
         'Coordinate multiple coding agents through Orca.'
       ),
       icon: Network,
-      searchEntries: getOrchestrationPaneSearchEntries(),
+      searchEntries: getOrchestrationPaneSearchEntries({
+        includeNestedWorkerDepth: !isWebClient
+      }),
       group: 'capabilities'
     },
     // Why: only surfaced once Linear is connected — a capability that needs a
@@ -423,6 +426,7 @@ export function buildSettingsNavigationMetadata({
       searchEntries: getQuickCommandsPaneSearchEntries(),
       group: 'workflows'
     },
+    ...getForkSessionHandoffNavSections(),
     ...(showDesktopOnlySettings
       ? [
           {

@@ -41,12 +41,30 @@ describe('electron-builder config', () => {
         '!tests{,/**/*}',
         '!examples{,/**/*}',
         '!pr-evidence{,/**/*}',
+        '!{.claude,.grok,.agents,.codex}{,/**/*}',
         '!Casks{,/**/*}',
         '!{AGENTS.md,CLAUDE.md,DEVELOPING.md,bundle-size-progress.md,ORCHESTRATION_IMPLEMENTATION_CHECKLIST.md,ORCHESTRATION_STRUCTURED_OUTPUT_DESIGN.md}',
         '!out/**/*.test.js',
         '!resources/plugins/launch/**'
       ])
     )
+  })
+
+  it('keeps local agent tooling out of app.asar', () => {
+    const matcher = new FileMatcher('/app', '/dest', (value) => value, electronBuilderConfig.files)
+    matcher.prependPattern('**/*')
+    const isPacked = matcher.createFilter()
+    const packs = (repoPath) => isPacked(join('/app', repoPath), { isDirectory: () => false })
+
+    for (const toolingPath of [
+      '.grok/skills/review-and-submit/review-and-submit/SKILL.md',
+      '.claude/skills/review-and-submit/review-and-submit/SKILL.md',
+      '.agents/skills/electron/SKILL.md',
+      '.codex/sessions/session.json'
+    ]) {
+      expect(packs(toolingPath)).toBe(false)
+    }
+    expect(packs('out/main/index.js')).toBe(true)
   })
 
   // Why: `files` is an all-negation list, so electron-builder's default `**/*` packs
@@ -363,7 +381,7 @@ describe('electron-builder config', () => {
     }
   })
 
-  it('includes @parcel/watcher in the packaged runtime closure', () => {
+  it('includes external main dependencies in the packaged runtime closure', () => {
     // Why: the main process imports '@parcel/watcher' for filesystem change
     // events; if it is absent from the packaged closure the serve host silently
     // stops propagating file changes to clients (regression guard for #4851).
@@ -375,6 +393,7 @@ describe('electron-builder config', () => {
         target.startsWith(join('node_modules', '@parcel', 'watcher-'))
       )
     ).toBe(true)
+    expect(packagedTargets).toContain(join('node_modules', 'proper-lockfile'))
   })
 
   it('prunes non-target @parcel/watcher platform subpackages from packaged runtime resources', async () => {
@@ -496,6 +515,19 @@ describe('electron-builder config', () => {
         await writeFile(
           join(unpackedMainDir, 'daemon-entry.js'),
           'console.error("Usage: daemon-entry <socket>"); process.exit(1)\n',
+          'utf8'
+        )
+        const unpackedCliDir = join(resourcesDir, 'app.asar.unpacked', 'out', 'cli')
+        await mkdir(join(unpackedCliDir, 'handlers'), { recursive: true })
+        await writeFile(join(unpackedCliDir, 'handlers', 'skills.js'), '', 'utf8')
+        await writeFile(
+          join(unpackedCliDir, 'index.js'),
+          [
+            'const args = process.argv.slice(2)',
+            "if (args[1] === 'list') console.log(JSON.stringify({ topics: [{ name: 'orca-cli' }, { name: 'computer-use' }] }))",
+            "else if (args[1] === 'get') console.log(`---\\nname: ${args[2]}\\n---`)",
+            'else console.log(JSON.stringify({ executed: false }))'
+          ].join('\n'),
           'utf8'
         )
         await writeFile(launcherPath, '#!/usr/bin/env bash\n', { encoding: 'utf8', mode: 0o644 })

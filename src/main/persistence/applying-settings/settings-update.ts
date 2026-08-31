@@ -1,5 +1,6 @@
 import type { GlobalSettings } from '../../../shared/global-settings-types'
 import { normalizeDisabledTuiAgents } from '../../../shared/tui-agent-selection'
+import { resolveNestedWorkerMaxDepth } from '../../../shared/nested-worker-depth'
 import {
   normalizeTuiAgentArgsRecord,
   normalizeTuiAgentEnvRecord
@@ -16,7 +17,7 @@ import { normalizeAppIconId } from '../../../shared/app-icon'
 import { normalizeUiLanguage } from '../../../shared/ui-language'
 import { normalizeWorktreeVisibilityDefaults } from '../../../shared/external-worktree-visibility'
 import { normalizePRBotAuthorOverrides } from '../../../shared/pr-bot-author-overrides'
-import type { StoreOwnedPersistedState } from '../loading-store/store-owned-state'
+import type { PersistedState } from '../../../shared/persisted-state-types'
 import {
   addMobilePairingCustomAddress,
   normalizeMobilePairingCustomAddress,
@@ -33,13 +34,14 @@ import {
 } from '../../protected-secret-persistence'
 import { normalizeNotificationSettings } from './onboarding-normalization'
 import { retireLegacyInstructionsForClearedTextActionRecipes } from './source-control-settings'
+import { mergeForkSessionHandoffSettings } from '../../../shared/fork-session-handoff/handoff-settings-merge'
 import {
   buildWorkspaceDirHistoryForUpdate,
   stripRetiredGlobalSettings
 } from './terminal-settings-migrations'
 
 export type SettingsMutationOperations = {
-  state: StoreOwnedPersistedState
+  state: PersistedState
   removeRetainedBlob: (
     slot: Parameters<ProtectedSecretPersistence['removeRetainedBlob']>[0]
   ) => void
@@ -72,6 +74,11 @@ export function updateSettings(
   }
   if ('agentSkillSharingEnabled' in updates) {
     sanitizedUpdates.agentSkillSharingEnabled = updates.agentSkillSharingEnabled === true
+  }
+  if ('nestedWorkerMaxDepth' in updates) {
+    sanitizedUpdates.nestedWorkerMaxDepth = resolveNestedWorkerMaxDepth({
+      nestedWorkerMaxDepth: updates.nestedWorkerMaxDepth
+    })
   }
   if ('disabledTuiAgents' in updates) {
     sanitizedUpdates.disabledTuiAgents = normalizeDisabledTuiAgents(updates.disabledTuiAgents)
@@ -234,7 +241,8 @@ export function updateSettings(
       ...operations.state.settings.notifications,
       ...sanitizedUpdates.notifications
     }),
-    ...(mergedTelemetry !== undefined ? { telemetry: mergedTelemetry } : {})
+    ...(mergedTelemetry !== undefined ? { telemetry: mergedTelemetry } : {}),
+    ...mergeForkSessionHandoffSettings(operations.state.settings, sanitizedUpdates)
   }
   operations.scheduleSave()
   const changedUpdates = {} as Partial<GlobalSettings> & Record<string, unknown>

@@ -25,6 +25,13 @@ vi.mock('@/components/ui/tooltip', () => ({
 vi.mock('../../native-chat/NativeChatSessionOptionPickers', () => ({
   NativeChatSessionOptionPickers: () => <div data-testid="session-option-pickers" />
 }))
+vi.mock('../../native-chat/native-chat-attachment-upload', () => ({
+  // The dock test builds no worktree/connection state, so owner resolution would
+  // answer 'not-ready' and short-circuit every attach before routing is exercised.
+  resolveNativeChatAttachmentOwner: () => ({ kind: 'local' }),
+  nativeChatWorktreeNotReadyNotice: () => 'Worktree not ready',
+  uploadNativeChatAttachmentPaths: vi.fn()
+}))
 
 const mocks = vi.hoisted(() => ({
   sendHandle: { cancel: vi.fn(), settleAfterMs: 0 },
@@ -49,7 +56,14 @@ import { DEFAULT_GUTTER_ROWS, MAX_GUTTER_ROWS, MIN_GUTTER_ROWS } from './termina
 beforeAll(() => {
   Object.defineProperty(window, 'api', {
     configurable: true,
-    value: { ui: { onFileDrop: () => () => {} } }
+    value: {
+      ui: {
+        onFileDrop: () => () => {},
+        saveClipboardImageAsTempFile: () => Promise.resolve(PASTED_IMAGE_PATH),
+        readClipboardText: () => Promise.resolve('')
+      },
+      shell: { pickAttachment: () => Promise.resolve(null) }
+    }
   })
 })
 
@@ -57,6 +71,12 @@ afterEach(() => {
   cleanup()
   vi.clearAllMocks()
 })
+
+const PASTED_IMAGE_PATH = '/tmp/orca-paste-1-abc.png'
+
+function imageClipboardData(): DataTransfer {
+  return { items: [{ kind: 'file', type: 'image/png' }] } as unknown as DataTransfer
+}
 
 const baseProps = {
   terminalTabId: 'tab-1',
@@ -127,6 +147,12 @@ describe('TerminalDock', () => {
     expect(status.firstElementChild).toHaveClass('invisible')
   })
 
+  it('uses a 180px default gutter with 240/280 auto-undock thresholds', () => {
+    expect(terminalDockGutterHeightPx(DEFAULT_GUTTER_ROWS)).toBe(180)
+    expect(terminalDockAutoUndockLowThresholdPx(DEFAULT_GUTTER_ROWS)).toBe(240)
+    expect(terminalDockAutoUndockHighThresholdPx(DEFAULT_GUTTER_ROWS)).toBe(280)
+  })
+
   it('keeps the gutter height fixed regardless of draft length', () => {
     render(<TerminalDock {...baseProps} />)
     const dock = screen.getByRole('status').closest('[data-terminal-dock]') as HTMLElement
@@ -139,6 +165,32 @@ describe('TerminalDock', () => {
     expect(dock.style.height).toBe(`${terminalDockGutterHeightPx(5)}px`)
     expect(textarea).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto')
     expect(textarea.closest('.overflow-hidden')).not.toBeNull()
+  })
+
+  it('claims paste for the composer instead of letting the terminal pane swallow it', () => {
+    render(<TerminalDock {...baseProps} />)
+    const dock = screen.getByRole('status').closest('[data-terminal-dock]')
+    expect(dock).toHaveAttribute('data-native-chat-root', 'true')
+  })
+
+  it('holds a pasted image as a chip and writes nothing to the pty until send', async () => {
+    render(<TerminalDock {...baseProps} />)
+
+    fireEvent.paste(screen.getByRole('textbox'), { clipboardData: imageClipboardData() })
+    expect(await screen.findByText('Pasted image')).toBeInTheDocument()
+    expect(mocks.sendNativeChatMessage).not.toHaveBeenCalled()
+  })
+
+  it('keeps the gutter height fixed when attachment chips appear', async () => {
+    render(<TerminalDock {...baseProps} />)
+    const dock = screen.getByRole('status').closest('[data-terminal-dock]') as HTMLElement
+    const emptyHeight = dock.style.height
+
+    fireEvent.paste(screen.getByRole('textbox'), { clipboardData: imageClipboardData() })
+    const chip = await screen.findByText('Pasted image')
+
+    expect(dock.style.height).toBe(emptyHeight)
+    expect(chip.closest('.overflow-y-auto')).toHaveClass('max-h-12', 'shrink-0')
   })
 
   it('unmounts below the low threshold', () => {
