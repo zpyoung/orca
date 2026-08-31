@@ -280,6 +280,26 @@ and upstream's usually sit in different regions and merge cleanly. Take upstream
 exception's `reason` is what the change would undo — a fork build artifact, a fork identity file, or
 a record the reason says upstream's copy actively breaks.
 
+**First ask whether the fork's side diverges at all.** An exception is a standing claim, and nothing
+re-checks that the claim is still true, so a path can keep winning long after the fork stopped
+differing from upstream there. Where the fork's side is byte-identical to the previous tag, there is
+no fork content to weigh and no decision to make — take upstream's file wholesale:
+
+```sh
+while read -r p; do
+  [ -z "$p" ] && continue
+  git cat-file -e "${PREV_TAG}:${p}" 2>/dev/null || continue
+  git diff --quiet "$PREV_TAG" "$MERGE_HEAD_PRE" -- "$p" && echo "stale exception: $p"
+done < <out-dir>/ours.txt
+```
+
+Run this before the numstat loop; it removes paths from the decision list rather than adding them.
+
+The same staleness also hides *inside* a path that does diverge, where it reads as deliberate fork
+intent. Before defending a hunk the fork appears to have deleted, check whether a fork commit ever
+touched it — `git log -S'<symbol>' -- <path>` returning only upstream commits means the exception
+discarded upstream's addition at some earlier sync and no one chose anything.
+
 `package.json` is the one that fails loudest and least obviously: `pnpm-lock.yaml` is upstream-owned
 and resolves to the tag, so a dependency the exception dropped makes `pnpm install --frozen-lockfile`
 fail in Step 8 with a lockfile error that names nothing about ownership.
