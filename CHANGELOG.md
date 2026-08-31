@@ -1,6 +1,6 @@
 ---
-last_released_commit: 6e7ab8595d701c7380e32def36b60a544058dff8
-upstream_synced: v1.4.190
+last_released_commit: 34cd71050c9e3143b5ef6c3cf2cbec3de21f427e
+upstream_synced: v1.4.193
 ---
 
 # Changelog
@@ -11,6 +11,38 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.194-rc.0.zy01] - 2026-08-31
+
+Synced to upstream [v1.4.193](https://github.com/stablyai/orca/releases/tag/v1.4.193).
+
+### Added
+- The docked terminal composer now renders Markdown as you type, over a draft that stays raw
+  underneath, so styling never rewrites what will actually be sent.
+
+### Changed
+- Focus goes to an enabled dock composer before falling back to the terminal beneath it, so typing
+  after a reveal or reattach lands where the composer is showing.
+- Upstream's updated structured native-chat session (Codex, off by default behind
+  **Use updated structured native chat**) now runs through this fork's shared agent composer rather
+  than a second chat-only one, so the chat pane and the terminal dock keep one draft, history, and
+  attachment path.
+
+### Fixed
+- Continue-in-new-session no longer hands over a stale transcript. A fork-owned probe authorizes
+  against the Vault's agent-source roots and walks an ordered candidate chain — reported path,
+  session id, pane history, then project scan — recording where each answer came from. Ambiguous
+  project scans are refused rather than guessed, an unreachable host now reports `unverifiable`
+  instead of `missing`, and the same chain runs against SSH targets.
+- Claude's startup options repaint as PTY output settles, so the model and effort pills stop showing
+  a stale selection from the previous session.
+- Switching a pane's PTY resets the reported screen state, and composer scroll sync now initializes
+  once the textarea ref attaches — fixing a desynced overlay on the first paint after a switch.
+- Inline Markdown scanning is bounded per line, so a long draft no longer degrades typing latency.
+- The packaged CLI can resolve `claude-accounts/keychain` again; it was missing from the fork's
+  `asarUnpack` list, which a restored packaging check caught.
+- `use-checks-list-state` no longer writes a ref inside a state updater. React may run an updater
+  more than once, so the write moved into the effect that queues it.
 
 ## [1.4.191-rc.0.zy01] - 2026-08-26
 
