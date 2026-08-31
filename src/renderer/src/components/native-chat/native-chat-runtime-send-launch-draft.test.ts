@@ -16,7 +16,8 @@ import {
   NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS,
   NATIVE_CHAT_SUBMIT_DELAY_MS,
   resetNativeChatPtySendQueuesForTests,
-  sendNativeChatMessage
+  sendNativeChatMessage,
+  sendNativeChatMessageWithImageAttachments
 } from './native-chat-runtime-send'
 import {
   NATIVE_CHAT_CLEAR_CONFIRM_MS,

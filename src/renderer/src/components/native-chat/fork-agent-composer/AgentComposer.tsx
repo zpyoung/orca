@@ -81,6 +81,7 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
     paneKey,
     targetPtyId,
     canSend = true,
+    allowWithoutTarget = false,
     isWorking = false,
     onStop,
     onOptimisticSendCanceled
@@ -115,8 +116,8 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
     return { ptyId: targetPtyId, settings: getSettingsForAgentTabRuntimeOwner(terminalTabId) }
   }, [targetPtyId, terminalTabId])
 
-  const hasPty = targetPtyId !== null
-  const disabled = targetPtyId === null || !canSend
+  const hasPty = allowWithoutTarget || targetPtyId !== null
+  const disabled = (!allowWithoutTarget && targetPtyId === null) || !canSend
 
   const syncCaret = useCallback((element: HTMLTextAreaElement) => {
     setCaret(element.selectionStart ?? element.value.length)
@@ -205,6 +206,8 @@ export type AgentComposerHostBridges = {
   isDispatchingSessionOption?: boolean
 
   onSlashCommand?: (command: string) => void
+  /** Replaces the PTY send entirely; for a host whose transport is not a PTY. */
+  sendOverride?: () => void
   /** Notified with the dispatched text when a send classifies as a command. */
   onCommandDispatched?: (command: string) => void
   /** Sends a classified command as typed keystrokes rather than a paste, for
@@ -235,7 +238,8 @@ export function useAgentComposerCompose(
   const imageAttachments = bridges?.imageAttachments ?? EMPTY_ATTACHMENTS
   const autocomplete = bridges?.autocomplete ?? DEFAULT_AUTOCOMPLETE
 
-  const send = useAgentComposerSend(core, props, bridges, imageAttachments)
+  const ptySend = useAgentComposerSend(core, props, bridges, imageAttachments)
+  const send = bridges?.sendOverride ?? ptySend
 
   const handleDraftChange = useCallback(
     (value: string, element: HTMLTextAreaElement) => {

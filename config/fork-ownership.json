@@ -185,8 +185,16 @@
       "kind": "registration",
       "lines": [
         "import type { NativeChatRelayPing } from '../../shared/fork-native-chat-relay/native-chat-relay-protocol'",
-        "} from './fork-native-chat-relay/ssh-relay-ready-notifier'",
-        "export async function requestActiveSshNativeChat(",
+        "import { onSshRelayReady } from './fork-native-chat-relay/ssh-relay-ready-notifier'",
+        "export async function requestActiveSshNativeChat("
+      ]
+    },
+    {
+      "path": "src/main/ipc/ssh-relay-session-callbacks.ts",
+      "feature": "native-chat-relay",
+      "kind": "registration",
+      "lines": [
+        "import { notifySshRelayReady } from './fork-native-chat-relay/ssh-relay-ready-notifier'",
         "    notifySshRelayReady(tid)"
       ]
     },
@@ -341,7 +349,7 @@
       ]
     },
     {
-      "path": "src/main/runtime/rpc/methods/session-tabs.ts",
+      "path": "src/main/runtime/rpc/methods/session-tab-mutation-methods.ts",
       "feature": "terminal-dock",
       "kind": "registration",
       "lines": [
@@ -488,12 +496,12 @@
       ]
     },
     {
-      "path": "src/relay/relay.ts",
+      "path": "src/relay/relay-runtime-services.ts",
       "feature": "native-chat-relay",
       "kind": "registration",
       "lines": [
         "import { NativeChatHandler } from './fork-native-chat-relay/native-chat-handler'",
-        "  const _nativeChatHandler = new NativeChatHandler(dispatcher)"
+        "      new NativeChatHandler(dispatcher)"
       ]
     },
     {
@@ -901,15 +909,30 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/sidebar/WorktreeContextMenu.tsx",
+      "path": "src/renderer/src/components/sidebar/use-worktree-context-menu-model.tsx",
       "feature": "worktree-groups",
       "kind": "registration",
       "lines": [
-        "} from './fork-worktree-groups/WorktreeGroupMenuItems'",
+        "import { useWorktreeGroupDialog } from './fork-worktree-groups/WorktreeGroupMenuItems'",
         "  const worktreeGroupDialog = useWorktreeGroupDialog({",
-        "              <WorktreeGroupMenuItems",
-        "      {worktreeGroupDialog.dialog}"
+        "      worktreeGroupDialog.open ||",
+        "    worktreeGroupDialog,"
       ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/WorktreeContextMenuView.tsx",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "import { WorktreeGroupMenuItems } from './fork-worktree-groups/WorktreeGroupMenuItems'",
+        "              <WorktreeGroupMenuItems"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/WorktreeContextMenuOverlays.tsx",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": ["      {model.worktreeGroupDialog.dialog}"]
     },
     {
       "path": "src/renderer/src/components/sidebar/WorktreeList.tsx",
@@ -1115,6 +1138,7 @@
       "kind": "registration",
       "lines": [
         "import { NativeChatWidthMenu } from '@/components/native-chat/fork-native-chat-width/NativeChatWidthMenu'",
+        "  isChatViewMode?: boolean",
         "                  {isChatViewMode && isActivePane ? <NativeChatWidthMenu /> : null}"
       ]
     },
@@ -1402,19 +1426,32 @@
       ]
     },
     {
-      "path": "src/renderer/src/web/web-preload-api.ts",
+      "path": "src/renderer/src/web/preload-api/web-native-chat-api.ts",
       "feature": "native-chat-relay",
-      "kind": "passthrough",
+      "kind": "import-swap",
       "lines": [
         "} from '@/components/native-chat/fork-native-chat-relay/native-chat-runtime-contract'",
         "  const readNativeChatSession = async (",
-        "    readSession: readNativeChatSession,",
-        "import { mergeForkSessionHandoffSettings } from '../../../shared/fork-session-handoff/handoff-settings-merge'",
+        "    readSession: readNativeChatSession,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/web/preload-api/web-preference-normalization.ts",
+      "feature": "session-handoff",
+      "kind": "passthrough",
+      "lines": [
+        "import { mergeForkSessionHandoffSettings } from '../../../../shared/fork-session-handoff/handoff-settings-merge'",
         "    ...mergeForkSessionHandoffSettings(base, updates),"
       ]
     },
     {
-      "path": "src/shared/constants.ts",
+      "path": "src/renderer/src/web/preload-api/web-terminal-api.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    writeInputAccepted: () => Promise.resolve(false),"]
+    },
+    {
+      "path": "src/shared/default-global-settings.ts",
       "feature": "native-chat-width",
       "kind": "passthrough",
       "lines": [
@@ -1493,7 +1530,7 @@
       ]
     },
     {
-      "path": "src/shared/runtime-types.ts",
+      "path": "src/shared/runtime-mobile-session-tab-contracts.ts",
       "feature": "skill-plugin-attribution",
       "kind": "registration",
       "lines": [
@@ -1560,11 +1597,11 @@
       "lines": ["  projectGroupId?: string | null"]
     },
     {
-      "path": "src/main/ipc/register-core-handlers.test.ts",
+      "path": "src/main/ipc/register-core-handlers/register-core-handlers.test.ts",
       "feature": "session-handoff",
       "kind": "registration",
       "lines": [
-        "vi.mock('../fork-session-handoff/session-lineage-ipc', () => ({",
+        "vi.mock('../../fork-session-handoff/session-lineage-ipc', () => ({",
         "  registerForkSessionHandoffHandlers: vi.fn()"
       ]
     },
@@ -1578,11 +1615,11 @@
       ]
     },
     {
-      "path": "src/main/ipc/register-core-handlers.ts",
+      "path": "src/main/ipc/register-core-handlers/register-core-handlers.ts",
       "feature": "session-handoff",
       "kind": "registration",
       "lines": [
-        "import { registerForkSessionHandoffHandlers } from '../fork-session-handoff/session-lineage-ipc'",
+        "import { registerForkSessionHandoffHandlers } from '../../fork-session-handoff/session-lineage-ipc'",
         "  registerForkSessionHandoffHandlers()"
       ]
     },
@@ -2063,6 +2100,18 @@
       "deleted": true
     },
     {
+      "path": "src/renderer/src/components/native-chat/native-chat-runtime-image-send.ts",
+      "status": "permanent",
+      "deleted": true,
+      "reason": "Upstream extracted the image-attachment send out of native-chat-runtime-send.ts; the fork's copy still owns that function for the agent-composer core, so restoring upstream's module would ship two send paths over one PTY."
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-pty-composer-send.ts",
+      "status": "permanent",
+      "deleted": true,
+      "reason": "Upstream's chat-only PTY send hook; fork-agent-composer's useAgentComposerSend already serves both the chat pane and the terminal dock."
+    },
+    {
       "path": "src/renderer/src/components/native-chat/native-chat-draft-cache.ts",
       "reason": "Superseded by agent-composer-draft-cache, which subscribes so concurrent composer hosts converge.",
       "status": "permanent",
@@ -2142,9 +2191,8 @@
     },
     {
       "path": "src/renderer/src/components/terminal-pane/TerminalPane.tsx",
-      "reason": "Corrects effectiveChatViewMode and temporarily owns the session-handoff dialog import because a path cannot be both an exception and a seam. Convert the import to a session-handoff seam when the pending upstream fix lands.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#chat-header-controls-fix"
+      "reason": "Carries the terminal-dock mount and the session-handoff dialog import; a path cannot be both an exception and a seam, so the whole file is fork-owned. Nothing here is upstream-bound.",
+      "status": "permanent"
     },
     {
       "path": "src/renderer/src/i18n/fork-localization-catalogs.test.ts",
@@ -2167,12 +2215,6 @@
       "reason": "Retention bug fix's shared companion: the loading param whose error-phase exclusion is the actual fix.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#retention-fix"
-    },
-    {
-      "path": "src/shared/workspace-session-editor-schema.ts",
-      "reason": "Upstream's workspace-session-schema.ts sits one line under the 300-line cap, so the editor schemas were split into their own module to make room. A plain refactor of upstream's own file, not fork behavior.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#workspace-session-schema-split"
     },
     {
       "path": "tests/e2e/cross-version-wire/release-checkout.ts",
@@ -2227,7 +2269,7 @@
     },
     "AGENTS.md": {
       "added": 89,
-      "removed": 0
+      "removed": 1
     },
     "CLAUDE.md": {
       "added": 17,
@@ -2263,14 +2305,14 @@
     },
     "src/main/ipc/native-chat.ts": {
       "added": 58,
-      "removed": 20
+      "removed": 32
     },
     "src/main/ipc/notification-system-settings-link.ts": {
       "added": 1,
       "removed": 1
     },
     "src/main/ipc/pty/ipc/write-input.ts": {
-      "added": 85,
+      "added": 90,
       "removed": 1
     },
     "src/main/ipc/pty/ipc/write.ts": {
@@ -2282,7 +2324,7 @@
       "removed": 0
     },
     "src/main/ipc/ssh.ts": {
-      "added": 35,
+      "added": 31,
       "removed": 0
     },
     "src/main/ipc/worktree-logic.test.ts": {
@@ -2331,7 +2373,7 @@
     },
     "src/main/native-chat/transcript-watch.ts": {
       "added": 30,
-      "removed": 212
+      "removed": 252
     },
     "src/main/persistence/tracking-repos/project-group-operations.ts": {
       "added": 2,
@@ -2342,8 +2384,8 @@
       "removed": 0
     },
     "src/main/runtime/orca-runtime.ts": {
-      "added": 140,
-      "removed": 11
+      "added": 143,
+      "removed": 14
     },
     "src/main/runtime/rpc/methods/native-chat.test.ts": {
       "added": 14,
@@ -2357,7 +2399,7 @@
       "added": 50,
       "removed": 1
     },
-    "src/main/runtime/rpc/methods/session-tabs.ts": {
+    "src/main/runtime/rpc/methods/session-tab-mutation-methods.ts": {
       "added": 2,
       "removed": 1
     },
@@ -2406,8 +2448,8 @@
       "removed": 0
     },
     "src/preload/api/native-chat-api.ts": {
-      "added": 50,
-      "removed": 27
+      "added": 53,
+      "removed": 30
     },
     "src/preload/api/pty-api.ts": {
       "added": 1,
@@ -2421,9 +2463,9 @@
       "added": 20,
       "removed": 7
     },
-    "src/relay/relay.ts": {
-      "added": 4,
-      "removed": 0
+    "src/relay/relay-runtime-services.ts": {
+      "added": 3,
+      "removed": 1
     },
     "src/renderer/src/assets/main.css": {
       "added": 1,
@@ -2451,11 +2493,11 @@
     },
     "src/renderer/src/components/native-chat/NativeChatComposer.test.tsx": {
       "added": 26,
-      "removed": 10
+      "removed": 13
     },
     "src/renderer/src/components/native-chat/NativeChatComposer.tsx": {
-      "added": 188,
-      "removed": 346
+      "added": 209,
+      "removed": 292
     },
     "src/renderer/src/components/native-chat/NativeChatInteractiveCard.test.tsx": {
       "added": 21,
@@ -2482,8 +2524,8 @@
       "removed": 4
     },
     "src/renderer/src/components/native-chat/NativeChatView.tsx": {
-      "added": 15,
-      "removed": 17
+      "added": 16,
+      "removed": 18
     },
     "src/renderer/src/components/native-chat/native-chat-command-marker.ts": {
       "added": 1,
@@ -2498,8 +2540,8 @@
       "removed": 41
     },
     "src/renderer/src/components/native-chat/native-chat-composer-types.ts": {
-      "added": 12,
-      "removed": 33
+      "added": 15,
+      "removed": 36
     },
     "src/renderer/src/components/native-chat/native-chat-pending.ts": {
       "added": 1,
@@ -2514,16 +2556,16 @@
       "removed": 8
     },
     "src/renderer/src/components/native-chat/native-chat-runtime-send-launch-draft.test.ts": {
-      "added": 33,
-      "removed": 11
+      "added": 35,
+      "removed": 15
     },
     "src/renderer/src/components/native-chat/native-chat-runtime-send.test.ts": {
-      "added": 486,
-      "removed": 55
+      "added": 495,
+      "removed": 80
     },
     "src/renderer/src/components/native-chat/native-chat-runtime-send.ts": {
-      "added": 53,
-      "removed": 277
+      "added": 68,
+      "removed": 235
     },
     "src/renderer/src/components/native-chat/native-chat-session-option-cache.ts": {
       "added": 32,
@@ -2590,8 +2632,8 @@
       "removed": 0
     },
     "src/renderer/src/components/settings/NativeChatExperimentalSetting.tsx": {
-      "added": 6,
-      "removed": 1
+      "added": 5,
+      "removed": 0
     },
     "src/renderer/src/components/settings/experimental-search.ts": {
       "added": 5,
@@ -2604,10 +2646,6 @@
     "src/renderer/src/components/sidebar/WorktreeCard.tsx": {
       "added": 5,
       "removed": 2
-    },
-    "src/renderer/src/components/sidebar/WorktreeContextMenu.tsx": {
-      "added": 20,
-      "removed": 48
     },
     "src/renderer/src/components/sidebar/WorktreeList.tsx": {
       "added": 10,
@@ -2698,7 +2736,7 @@
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/TerminalPaneHeaderOverlay.tsx": {
-      "added": 5,
+      "added": 8,
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/pane-helpers.test.ts": {
@@ -2714,7 +2752,7 @@
       "removed": 4
     },
     "src/renderer/src/components/terminal-pane/terminal-visibility-resume.test.ts": {
-      "added": 36,
+      "added": 37,
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/terminal-visibility-resume.ts": {
@@ -2730,7 +2768,7 @@
       "removed": 2
     },
     "src/renderer/src/components/terminal-pane/use-terminal-window-wake-recovery.test.ts": {
-      "added": 8,
+      "added": 12,
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/use-terminal-window-wake-recovery.ts": {
@@ -2846,18 +2884,14 @@
       "removed": 1
     },
     "src/renderer/src/runtime/web-session-tabs-sync.ts": {
-      "added": 144,
-      "removed": 28
+      "added": 157,
+      "removed": 32
     },
     "src/renderer/src/store/slices/tabs.ts": {
       "added": 20,
       "removed": 1
     },
-    "src/renderer/src/web/web-preload-api.ts": {
-      "added": 31,
-      "removed": 17
-    },
-    "src/shared/constants.ts": {
+    "src/shared/default-global-settings.ts": {
       "added": 4,
       "removed": 0
     },
@@ -2901,7 +2935,7 @@
       "added": 3,
       "removed": 1
     },
-    "src/shared/runtime-types.ts": {
+    "src/shared/runtime-mobile-session-tab-contracts.ts": {
       "added": 4,
       "removed": 0
     },
@@ -2919,11 +2953,11 @@
     },
     "src/shared/workspace-session-schema.test.ts": {
       "added": 103,
-      "removed": 0
+      "removed": 3
     },
     "src/shared/workspace-session-schema.ts": {
-      "added": 4,
-      "removed": 17
+      "added": 3,
+      "removed": 1
     },
     "src/shared/worktree/meta-types.ts": {
       "added": 3,
@@ -2957,11 +2991,11 @@
       "added": 2,
       "removed": 0
     },
-    "src/main/ipc/register-core-handlers.test.ts": {
+    "src/main/ipc/register-core-handlers/register-core-handlers.test.ts": {
       "added": 4,
       "removed": 0
     },
-    "src/main/ipc/register-core-handlers.ts": {
+    "src/main/ipc/register-core-handlers/register-core-handlers.ts": {
       "added": 2,
       "removed": 0
     },

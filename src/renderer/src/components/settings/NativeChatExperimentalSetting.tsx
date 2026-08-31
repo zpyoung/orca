@@ -62,7 +62,7 @@ export function NativeChatExperimentalSetting({
         />
       </div>
       {nativeChatEnabled ? (
-        <div className="ml-4 space-y-3 border-l border-border pl-4">
+        <div className="ml-4 space-y-4 border-l border-border pl-4">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 shrink space-y-0.5">
               <Label>
@@ -112,6 +112,45 @@ export function NativeChatExperimentalSetting({
               </SelectContent>
             </Select>
           </div>
+
+          {/* Structured chat rides the Chat UI default view; it has no entry path under Terminal
+              chat. Hidden only — the opt-in keeps its persisted value for when Chat UI returns. */}
+          {defaultView === 'native-chat' ? (
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 shrink space-y-0.5">
+                <Label>
+                  {translate(
+                    'auto.components.settings.ExperimentalPane.nativeChat.structuredTitle',
+                    'Use updated structured native chat'
+                  )}
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  {translate(
+                    'auto.components.settings.ExperimentalPane.nativeChat.structuredCopy',
+                    'Opt in to the host-owned structured Codex runtime. Off keeps the existing terminal-backed chat path.'
+                  )}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {translate(
+                    'auto.components.settings.ExperimentalPane.nativeChat.structuredScope',
+                    'Local macOS and Linux sessions only for now. Windows, WSL, and remote execution hosts (including SSH) continue to use terminal chat.'
+                  )}
+                </p>
+              </div>
+              <SettingsSwitch
+                checked={structuredNativeChatEnabled}
+                ariaLabel={translate(
+                  'auto.components.settings.ExperimentalPane.nativeChat.structuredToggleLabel',
+                  'Toggle updated structured native chat'
+                )}
+                onChange={() =>
+                  updateSettings({
+                    experimentalStructuredNativeChat: !structuredNativeChatEnabled
+                  })
+                }
+              />
+            </div>
+          ) : null}
           <NativeChatWidthSetting
             value={settings.nativeChatWidth}
             onChange={(nativeChatWidth) => updateSettings({ nativeChatWidth })}

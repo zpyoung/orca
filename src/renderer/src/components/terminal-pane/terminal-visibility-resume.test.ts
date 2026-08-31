@@ -247,6 +247,28 @@ describe('resumeTerminalVisibility reveal repaint', () => {
     expect(focusActivePane).toHaveBeenCalledWith(manager, focusOwnership)
   })
 
+  it('repairs WebGL canvas backing-store dpr on window wake', () => {
+    // Clamshell undock: dpr changes while the pane stayed "visible" with a
+    // stale backing store; tab-reveal is not in the path.
+    const first = { terminal: { name: 'pane-a' } }
+    const second = { terminal: { name: 'pane-b' } }
+    const manager = createManager()
+    manager.getPanes.mockReturnValue([first, second])
+    repairPaneWebglCanvasDprMismatch.mockReturnValueOnce(true)
+
+    recoverVisibleTerminalWindowWake({
+      ...focusOwnership,
+      manager: manager as never as PaneManager,
+      isActive: true,
+      clearGlyphAtlases: false
+    })
+
+    expect(repairPaneWebglCanvasDprMismatch).toHaveBeenCalledTimes(2)
+    expect(repairPaneWebglCanvasDprMismatch).toHaveBeenNthCalledWith(1, first)
+    expect(repairPaneWebglCanvasDprMismatch).toHaveBeenNthCalledWith(2, second)
+    expect(presentPaneViewport).toHaveBeenCalledWith(first)
+  })
+
   it('latches viewport intent before refocus recovery flushes streaming output', async () => {
     const terminal = { name: 'streaming-terminal' }
     const manager = createManager()

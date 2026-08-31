@@ -1,10 +1,10 @@
 import type { NativeChatStructuredComposerTransport } from './native-chat-composer-types'
-import type { NativeChatComposerImageAttachment } from './NativeChatComposerField'
+import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentComposerField'
 
 export async function dispatchNativeChatStructuredComposerText(
   transport: NativeChatStructuredComposerTransport,
   text: string,
-  attachments: readonly NativeChatComposerImageAttachment[] = []
+  attachments: readonly AgentComposerImageAttachment[] = []
 ): Promise<{ accepted: boolean; error: string | null }> {
   const command = await transport.dispatchCommand(text)
   if (command.handled) {

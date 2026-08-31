@@ -74,9 +74,6 @@ vi.mock('./native-chat-runtime-send', () => ({
   typeNativeChatCommand: (...args: unknown[]) => mocks.typeNativeChatCommand(...args),
   submitNativeChatPrompt: vi.fn()
 }))
-vi.mock('./native-chat-runtime-image-send', () => ({
-  sendNativeChatMessageWithImageAttachments: vi.fn()
-}))
 vi.mock('./claude-model-switch-confirmation', () => ({
   createClaudeModelSwitchConfirmationObserver: (...args: unknown[]) =>
     mocks.createClaudeModelSwitchConfirmationObserver(...args)

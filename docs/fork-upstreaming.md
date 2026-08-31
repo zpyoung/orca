@@ -65,45 +65,6 @@ and density".
 
 **Status:** pending-upstream. Not yet submitted.
 
-## Chat header controls fix
-
-**What:** `TerminalPane.tsx` gates `activePaneIsChatLeaf` on `effectiveChatViewMode` rather than
-`isChatViewMode`. With the experimental native-chat flag off, a tab can still carry
-`viewMode: 'chat'`, and the header must not offer chat-only controls while the chat surface itself
-is suppressed.
-
-**Why upstream, not isolated:** a correctness fix to upstream's own chat/terminal header-control
-gating, unrelated to any of the fork's four features (it landed inside the `native-chat-width`
-feature commit as an incidental fix, not width functionality).
-
-**Paths:**
-- `src/renderer/src/components/terminal-pane/TerminalPane.tsx`
-
-**Introduced:** commit `9ac7e7c423` (2026-08-06), "feat(native-chat): configurable reading-column
-width" (the fix rode in on this commit; it is not part of the width feature itself).
-
-**Status:** pending-upstream. Not yet submitted.
-
-## Workspace session schema split
-
-**What:** the persisted-open-file schemas move out of `workspace-session-schema.ts` into a new
-`workspace-session-editor-schema.ts`, which the original then imports. No schema changes — the
-`persistedOpenFileSchema` object is byte-identical, only relocated.
-
-**Why upstream, not isolated:** `workspace-session-schema.ts` sits at 299 code lines against a
-300-line cap, so the terminal-dock feature's two seam lines (a fork import and one `tabSchema`
-field) do not fit without a split. The split itself is upstream's own file being reorganized, and
-the extracted module holds no fork content — isolating it into a `fork-` directory would put
-upstream code under a fork glob and hand the fork permanent ownership of a schema it did not write.
-
-**Paths:**
-- `src/shared/workspace-session-editor-schema.ts`
-
-**Introduced:** commit `e63c56e90c` (2026-08-18), "fix(composer): reintegrate the codex typed-command
-send after the rebase onto main".
-
-**Status:** pending-upstream. Not yet submitted.
-
 ## React Doctor changed-lines gate
 
 **What:** three one-line rewrites in files v1.4.186 introduced — two `Array<T>` uses become `T[]`,

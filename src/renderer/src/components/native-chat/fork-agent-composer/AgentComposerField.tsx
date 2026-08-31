@@ -22,6 +22,7 @@ import type {
   SessionOptionDescriptor,
   SessionOptionsSurface
 } from '../../../../../shared/native-chat-session-options'
+import type { NativeChatOptionPickerRequest } from '../native-chat-composer-types'
 
 export type AgentComposerFieldProps = {
   /** Identifies which composer a native OS file drop landed on, so a drop
@@ -108,7 +109,8 @@ export function AgentComposerField({
   onSend,
   onStop,
   sessionOptionsSurface,
-  sessionOptionsSnapshot
+  sessionOptionsSnapshot,
+  sessionOptionsPickerRequest
 }: AgentComposerFieldProps): React.JSX.Element {
   const widthClassName = useNativeChatWidthClassName()
 

@@ -47,7 +47,6 @@ import {
   emptyNativeChatContextMenuActions,
   useNativeChatContextMenu
 } from './use-native-chat-context-menu'
-import { resolveNativeChatFileLinkContext } from './native-chat-file-link'
 import {
   selectNativeChatRuntimeEnvironmentId,
   selectNativeChatSshConnectionId
