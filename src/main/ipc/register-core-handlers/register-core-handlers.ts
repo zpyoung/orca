@@ -38,6 +38,7 @@ import { setTrustedBrowserRendererWebContentsId } from '../browser-renderer-trus
 import { registerSessionHandlers } from '../session'
 import { registerSettingsHandlers } from '../settings'
 import { registerForkSessionHandoffHandlers } from '../../fork-session-handoff/session-lineage-ipc'
+import { registerSessionInfoIpcHandlers } from '../../fork-session-info/session-info-ipc'
 import { registerDiagnosticsHandlers } from '../diagnostics'
 import { registerSkillsHandlers } from '../skills'
 import { registerSkillDeleteIpcHandlers } from '../skill-delete/handlers'
@@ -178,6 +179,7 @@ export function registerCoreHandlers(
   registerComputerUsePermissionHandlers()
   registerSettingsHandlers(store, agentAwakeService)
   registerForkSessionHandoffHandlers()
+  registerSessionInfoIpcHandlers()
   registerSkillsHandlers(store, runtime)
   registerSkillDeleteIpcHandlers(store, runtime)
   if (automations) {

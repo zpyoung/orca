@@ -23,7 +23,11 @@ import {
   buildWindowsHookStdinDrainEpilogue,
   WINDOWS_HOOK_STDIN_DRAIN_LABEL
 } from '../agent-hooks/hook-stdin-contract'
-import { getManagedStatusLineScript } from './statusline-script'
+import {
+  finalizeManagedStatusLineRemoval,
+  getManagedStatusLineScript,
+  removeManagedStatusLine
+} from '../fork-session-info/session-info-statusline-chaining'
 import {
   applyManagedHooks,
   applyManagedStatusLine,
@@ -43,7 +47,6 @@ import {
   getStatusLineSlotState,
   hasSameManagedHookInvocation,
   removeManagedHooks,
-  removeManagedStatusLine,
   type ClaudeCompatibleHookSettings
 } from './hook-settings'
 
@@ -329,6 +332,7 @@ export class ClaudeHookService {
     if (hooksChanged || statusLineChanged) {
       writeHooksJson(configPath, nextConfig)
     }
+    finalizeManagedStatusLineRemoval(getStatusLineScriptFileName(this.options.settings))
     if (this.options.agent === 'claude') {
       try {
         // Why: an Orca-level uninstall resets the opt-out memory so a later re-enable installs the statusline again.

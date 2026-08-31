@@ -49,6 +49,11 @@ import dirtyBranchES from '../components/right-sidebar/fork-dirty-branch-indicat
 import dirtyBranchJA from '../components/right-sidebar/fork-dirty-branch-indicator/locales/ja.json'
 import dirtyBranchKO from '../components/right-sidebar/fork-dirty-branch-indicator/locales/ko.json'
 import dirtyBranchZH from '../components/right-sidebar/fork-dirty-branch-indicator/locales/zh.json'
+import sessionInfoEN from '../components/right-sidebar/fork-session-info/locales/en.json'
+import sessionInfoES from '../components/right-sidebar/fork-session-info/locales/es.json'
+import sessionInfoJA from '../components/right-sidebar/fork-session-info/locales/ja.json'
+import sessionInfoKO from '../components/right-sidebar/fork-session-info/locales/ko.json'
+import sessionInfoZH from '../components/right-sidebar/fork-session-info/locales/zh.json'
 
 type ForkLocale = 'en' | 'es' | 'ja' | 'ko' | 'zh'
 type ForkCatalog = Record<string, unknown>
@@ -77,7 +82,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     agentComposerEN,
     skillPluginsEN,
     handoffEN,
-    dirtyBranchEN
+    dirtyBranchEN,
+    sessionInfoEN
   ],
   es: [
     relayES,
@@ -89,7 +95,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     agentComposerES,
     skillPluginsES,
     handoffES,
-    dirtyBranchES
+    dirtyBranchES,
+    sessionInfoES
   ],
   ja: [
     relayJA,
@@ -101,7 +108,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     agentComposerJA,
     skillPluginsJA,
     handoffJA,
-    dirtyBranchJA
+    dirtyBranchJA,
+    sessionInfoJA
   ],
   ko: [
     relayKO,
@@ -113,7 +121,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     agentComposerKO,
     skillPluginsKO,
     handoffKO,
-    dirtyBranchKO
+    dirtyBranchKO,
+    sessionInfoKO
   ],
   zh: [
     relayZH,
@@ -125,7 +134,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     agentComposerZH,
     skillPluginsZH,
     handoffZH,
-    dirtyBranchZH
+    dirtyBranchZH,
+    sessionInfoZH
   ]
 }
 
