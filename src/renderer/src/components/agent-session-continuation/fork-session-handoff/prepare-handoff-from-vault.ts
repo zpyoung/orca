@@ -15,6 +15,7 @@ export function prepareAiVaultSessionContinuation(
       sourceWorktreeId: null,
       anchorWorktreeId: args.targetWorktreeId,
       sourceExecutionHostId: args.session.executionHostId,
+      providerSessionId: args.session.sessionId,
       vaultSessionId: args.session.sessionId,
       vaultAgent: args.session.agent,
       capturePaneScrollback: null

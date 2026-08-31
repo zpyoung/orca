@@ -1,4 +1,8 @@
 import type { ForkSessionHandoffLineageRecord } from '../../../../shared/fork-session-handoff/session-lineage-types'
+import type {
+  ForkHandoffTranscriptProbeRequest,
+  ForkHandoffTranscriptProbeResult
+} from '../../../../shared/fork-session-handoff/session-transcript-probe-types'
 
 export type ForkSessionHandoffRendererApi = {
   lineageList: () => Promise<ForkSessionHandoffLineageRecord[]>
@@ -8,6 +12,9 @@ export type ForkSessionHandoffRendererApi = {
     paneKey?: string | null
     providerSessionId?: string | null
   }) => Promise<void>
+  resolveTranscript: (
+    request: ForkHandoffTranscriptProbeRequest
+  ) => Promise<ForkHandoffTranscriptProbeResult>
 }
 
 /** Returns the fork-owned session handoff API without widening the upstream preload surface. */

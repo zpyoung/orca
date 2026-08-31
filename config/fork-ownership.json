@@ -1578,6 +1578,15 @@
       ]
     },
     {
+      "path": "src/main/index.ts",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { recordForkPaneTranscriptObservation } from './fork-session-handoff/pane-transcript-history'",
+        "  agentHookServer.subscribeEnrichedStatus(recordForkPaneTranscriptObservation)"
+      ]
+    },
+    {
       "path": "src/main/ipc/register-core-handlers.ts",
       "feature": "session-handoff",
       "kind": "registration",
@@ -3044,6 +3053,10 @@
       "added": 8,
       "removed": 1
     },
+    "src/main/index.ts": {
+      "added": 2,
+      "removed": 0
+    },
     "src/main/ipc/register-core-handlers.test.ts": {
       "added": 4,
       "removed": 0
@@ -3113,7 +3126,7 @@
       "removed": 2
     },
     "src/main/index.ts": {
-      "added": 2,
+      "added": 4,
       "removed": 3
     },
     "src/main/persistence/applying-settings/ui-selection-normalization.ts": {
