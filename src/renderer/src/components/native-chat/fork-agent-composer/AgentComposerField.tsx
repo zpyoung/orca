@@ -24,6 +24,7 @@ import type {
   SessionOptionDescriptor,
   SessionOptionsSurface
 } from '../../../../../shared/native-chat-session-options'
+import type { NativeChatOptionPickerRequest } from '../native-chat-composer-types'
 
 export type AgentComposerFieldProps = {
   /** Identifies which composer a native OS file drop landed on, so a drop
@@ -65,6 +66,7 @@ export type AgentComposerFieldProps = {
   onStop?: () => void
   sessionOptionsSurface: SessionOptionsSurface | null
   sessionOptionsSnapshot: SessionOptionDescriptor[]
+  sessionOptionsPickerRequest?: NativeChatOptionPickerRequest | null
 }
 
 export type AgentComposerImageAttachment = {
@@ -109,7 +111,8 @@ export function AgentComposerField({
   onSend,
   onStop,
   sessionOptionsSurface,
-  sessionOptionsSnapshot
+  sessionOptionsSnapshot,
+  sessionOptionsPickerRequest
 }: AgentComposerFieldProps): React.JSX.Element {
   const widthClassName = useNativeChatWidthClassName()
 
@@ -258,6 +261,7 @@ export function AgentComposerField({
                 onStop={onStop}
                 sessionOptionsSurface={sessionOptionsSurface}
                 sessionOptionsSnapshot={sessionOptionsSnapshot}
+                sessionOptionsPickerRequest={sessionOptionsPickerRequest}
               />
             </div>
           </div>

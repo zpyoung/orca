@@ -14,6 +14,10 @@ const {
 const { verifyLinuxGlibcFloor } = require('./scripts/verify-linux-glibc-floor.cjs')
 const { writeMacBuildCompatibility } = require('./scripts/mac-build-compatibility.cjs')
 const { verifyPackagedPluginResources } = require('./scripts/verify-packaged-plugin-resources.cjs')
+const {
+  verifyPackagedNodePtyJobOwnership
+} = require('./scripts/verify-packaged-node-pty-job-ownership.cjs')
+const { verifySkillsCliRuntime } = require('./scripts/verify-skills-cli-runtime.cjs')
 
 const isMacRelease = process.env.ORCA_MAC_RELEASE === '1'
 const isLinuxArm64Release = process.env.ORCA_LINUX_ARM64_RELEASE === '1'
@@ -93,6 +97,9 @@ module.exports = {
     // it is gitignored, but exclude it defensively so a stray local capture at
     // package time never bloats app.asar.
     '!pr-evidence{,/**/*}',
+    // Why: local agent/tooling directories may contain worktree symlink loops;
+    // they are never runtime inputs and must not be traversed by electron-builder.
+    '!{.claude,.grok,.agents,.codex}{,/**/*}',
     '!Casks{,/**/*}',
     '!{AGENTS.md,CLAUDE.md,DEVELOPING.md,bundle-size-progress.md,ORCHESTRATION_IMPLEMENTATION_CHECKLIST.md,ORCHESTRATION_STRUCTURED_OUTPUT_DESIGN.md}',
     '!out/**/*.test.js',
@@ -148,6 +155,7 @@ module.exports = {
     'out/main/agent-hooks/**',
     'out/main/antigravity/**',
     'out/main/claude/**',
+    'out/main/claude-accounts/keychain.js',
     'out/main/codex/**',
     'out/main/copilot/**',
     'out/main/cursor/**',
@@ -158,6 +166,7 @@ module.exports = {
     'out/main/win32-utils.js',
     'out/main/daemon-entry.js',
     'out/main/session-scanner-service-entry.js',
+    'out/main/wsl-transcript-fs-process-entry.js',
     'out/main/session-scanner-opencode-sqlite-worker-entry.js',
     'out/main/plugin-host-entry.js',
     'out/main/computer-sidecar.js',
@@ -218,7 +227,23 @@ module.exports = {
     // arm64=3, universal=4 (universal contains the host slice, so run it).
     const archEnumByNodeArch = { ia32: 0, x64: 1, armv7l: 2, arm64: 3 }
     const hostArchEnum = archEnumByNodeArch[process.arch]
-    if (context.arch === hostArchEnum || context.arch === 4) {
+    const canExecuteTargetArch = context.arch === hostArchEnum || context.arch === 4
+    if (context.electronPlatformName === 'win32') {
+      if (process.platform === 'win32' && canExecuteTargetArch) {
+        verifyPackagedNodePtyJobOwnership(resourcesDir)
+      } else {
+        console.log('[verify-packaged-node-pty] skipped cross-platform or cross-arch package')
+      }
+    }
+    verifySkillsCliRuntime(join(resourcesDir, 'app.asar.unpacked', 'out'), resourcesDir, {
+      executeCommands: canExecuteTargetArch
+    })
+    if (!canExecuteTargetArch) {
+      console.log(
+        `[verify-skills-cli-runtime] skipped command probes on cross-arch slice (target ${context.arch}, host ${process.arch})`
+      )
+    }
+    if (canExecuteTargetArch) {
       verifyPackagedDaemonEntryBoots(resourcesDir)
     } else {
       // Why: a cross-arch slice can't be booted by the host Node, but the

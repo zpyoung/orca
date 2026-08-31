@@ -77,9 +77,6 @@ function renderMenu(overrides: Record<string, unknown> = {}): string {
     canContinueAgentSessionInNewSession: false,
     onContinueAgentSessionInNewSession: vi.fn(),
     onForkAgentSession: vi.fn(),
-    canToggleNativeChat: false,
-    isNativeChatView: false,
-    onToggleNativeChat: vi.fn(),
     canToggleTerminalDock: false,
     isTerminalDockDocked: false,
     onToggleTerminalDock: vi.fn(),
@@ -144,6 +141,12 @@ describe('TerminalContextMenu', () => {
 
     handoffItem?.onSelect?.()
     expect(onContinueAgentSessionInNewSession).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not expose a native/terminal view switch in the terminal menu', () => {
+    renderMenu()
+
+    expect(items.list.some((item) => childrenText(item.children).includes('Switch to'))).toBe(false)
   })
 
   it('shows one shortcut per terminal menu action on Windows', () => {

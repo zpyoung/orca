@@ -147,6 +147,7 @@ jobs:
         if: steps.freshness.outputs.should_build == 'true'
         uses: pnpm/action-setup@v6
         with:
+          version: 10.24.0
           run_install: false
 
       - name: Setup Node.js
@@ -307,7 +308,6 @@ jobs:
             --notes-file "$notes_file"
           echo "tag=$TAG" >>"$GITHUB_OUTPUT"
           echo "notes_file=$notes_file" >>"$GITHUB_OUTPUT"
-
 
       - name: Publish daily macOS artifacts
         if: steps.freshness.outputs.should_build == 'true'
