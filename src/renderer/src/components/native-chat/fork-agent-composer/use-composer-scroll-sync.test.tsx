@@ -1,21 +1,35 @@
 // @vitest-environment happy-dom
 
-import { useRef } from 'react'
+import { useRef, type RefObject } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { useComposerScrollSync } from './use-composer-scroll-sync'
 
+// Mirrors the real tree: the hook lives in a child that React commits *before* it
+// attaches the sibling textarea's ref, so a mount-time layout effect sees null.
+function Mirror({
+  textareaRef,
+  text
+}: {
+  textareaRef: RefObject<HTMLTextAreaElement | null>
+  text: string
+}): React.JSX.Element {
+  const overlayRef = useComposerScrollSync(textareaRef, text)
+  return (
+    <div ref={overlayRef} data-testid="overlay">
+      {text}
+    </div>
+  )
+}
+
 function ScrollSyncHarness({ text }: { text: string }): React.JSX.Element {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const overlayRef = useComposerScrollSync(textareaRef, text)
 
   return (
-    <>
+    <div>
+      <Mirror textareaRef={textareaRef} text={text} />
       <textarea ref={textareaRef} data-testid="textarea" value={text} readOnly />
-      <div ref={overlayRef} data-testid="overlay">
-        {text}
-      </div>
-    </>
+    </div>
   )
 }
 

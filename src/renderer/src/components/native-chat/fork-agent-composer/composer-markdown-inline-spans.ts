@@ -75,8 +75,8 @@ function tokenizeInlineCode(
     let closingStart = openingEnd
 
     while (closingStart < end) {
-      closingStart = text.indexOf('`', closingStart)
-      if (closingStart === -1 || closingStart >= end) {
+      closingStart = boundedIndexOf(text, '`', closingStart, end)
+      if (closingStart === -1) {
         break
       }
       const closingEnd = endOfRun(text, closingStart, end, '`')
@@ -112,8 +112,8 @@ function tokenizeLinks(
   let cursor = start
 
   while (cursor < end) {
-    const opening = text.indexOf('[', cursor)
-    if (opening === -1 || opening >= end) {
+    const opening = boundedIndexOf(text, '[', cursor, end)
+    if (opening === -1) {
       break
     }
     if (isEscaped(text, opening) || containsPosition(codeRanges, opening)) {
@@ -147,18 +147,19 @@ function tokenizeLinks(
   }
 
   const urlBlockers = mergeTextRanges([...codeRanges, ...linkRanges])
+  // Scanning the line rather than the whole draft: this runs per line, so an
+  // unbounded search made a long draft quadratic on every keystroke.
+  const line = text.slice(start, end)
   const urlPattern = /https?:\/\/[^\s<]+/g
-  urlPattern.lastIndex = start
-  let match = urlPattern.exec(text)
-  while (match && match.index < end) {
-    const urlStart = match.index
-    let urlEnd = Math.min(urlPattern.lastIndex, end)
-    urlEnd = trimBareUrlEnd(text, urlStart, urlEnd)
+  let match = urlPattern.exec(line)
+  while (match) {
+    const urlStart = start + match.index
+    const urlEnd = trimBareUrlEnd(text, urlStart, start + urlPattern.lastIndex)
     if (urlEnd > urlStart && !intersectsAny({ start: urlStart, end: urlEnd }, urlBlockers)) {
       addDecoration(decorations, urlStart, urlEnd, 'link-url')
       opaqueRanges.push({ start: urlStart, end: urlEnd })
     }
-    match = urlPattern.exec(text)
+    match = urlPattern.exec(line)
   }
 
   return { opaqueRanges: mergeTextRanges(opaqueRanges), linkRanges }
@@ -172,8 +173,8 @@ function findLinkTransition(
 ): number {
   let cursor = start
   while (cursor < end - 1) {
-    const transition = text.indexOf('](', cursor)
-    if (transition === -1 || transition >= end - 1) {
+    const transition = boundedIndexOf(text, '](', cursor, end)
+    if (transition === -1) {
       return -1
     }
     if (!isEscaped(text, transition) && !containsPosition(codeRanges, transition)) {
@@ -334,8 +335,8 @@ function findClosingDelimiter(
   let cursor = start
   while (cursor <= end - delimiter.length) {
     spendComposerMarkdownParseBudget(budget)
-    const closing = text.indexOf(delimiter, cursor)
-    if (closing === -1 || closing > end - delimiter.length) {
+    const closing = boundedIndexOf(text, delimiter, cursor, end)
+    if (closing === -1) {
       return -1
     }
     if (
@@ -445,6 +446,18 @@ function addDecorationExcluding(
       addDecoration(decorations, cursor, end, kind)
     }
   }
+}
+
+/**
+ * First `needle` lying wholly within `[from, end)`, or -1.
+ * Bounding the search is what keeps a per-line tokenizer linear in the whole draft.
+ */
+function boundedIndexOf(text: string, needle: string, from: number, end: number): number {
+  if (from < 0 || from + needle.length > end) {
+    return -1
+  }
+  const found = text.slice(from, end).indexOf(needle)
+  return found === -1 ? -1 : from + found
 }
 
 function endOfRun(text: string, start: number, end: number, character: string): number {

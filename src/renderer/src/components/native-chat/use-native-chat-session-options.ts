@@ -125,6 +125,7 @@ export function useNativeChatSessionOptions(args: {
     // A new pty is a new session; nothing the old one logged describes it.
     observedPtyRef.current = targetPtyId
     observedFromLogRef.current = null
+    reportedScreenRef.current = null
   }
   const discoveryContext = useMemo(
     () => resolveNativeChatModelDiscoveryContext(terminalTabId),
@@ -209,7 +210,6 @@ export function useNativeChatSessionOptions(args: {
       return
     }
     let cancelled = false
-    reportedScreenRef.current = null
     const reportCurrentValues = async (): Promise<void> => {
       let authoritativeScreen: string | null = null
       if (targetPtyId && window.api?.pty?.getMainBufferSnapshot) {
