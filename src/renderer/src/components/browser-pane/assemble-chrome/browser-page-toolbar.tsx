@@ -19,7 +19,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { ArtifactPublishButton } from '@/components/artifacts/ArtifactPublishButton'
+import { ArtifactPublishButton } from '@/components/artifacts/fork-artifact-passwords/ArtifactPublishButton'
 import { translate } from '@/i18n/i18n'
 import type { BrowserReloadTrigger } from '../navigate/browser-reload-action'
 import BrowserAddressBar from './BrowserAddressBar'

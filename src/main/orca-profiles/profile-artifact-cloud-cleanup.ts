@@ -4,6 +4,7 @@ import type { OrcaProfileCloudSummary, OrcaProfileSummary } from '../../shared/o
 import { bestEffortFsyncDirectorySync, writeDurableSecureJsonFile } from '../../shared/secure-file'
 import { clearArtifactCreateIntents } from '../artifacts/artifact-create-intent-store'
 import { clearArtifactShareRecords } from '../artifacts/artifact-share-record-store'
+import { clearArtifactPasswordRecords } from '../artifacts/fork-artifact-passwords/artifact-password-record-store'
 import { getOrcaProfileDirectory } from './profile-storage-paths'
 
 type ArtifactCloudCleanupMarker = {
@@ -104,6 +105,7 @@ export function completeArtifactCloudCleanupIfCommitted(
   }
   clearArtifactCreateIntents(profileId, userDataPath)
   clearArtifactShareRecords(profileId, userDataPath)
+  clearArtifactPasswordRecords(profileId, userDataPath)
   rmSync(cleanupMarkerPath(profileId, userDataPath), { force: true })
   bestEffortFsyncDirectorySync(getOrcaProfileDirectory(profileId, userDataPath))
 }
