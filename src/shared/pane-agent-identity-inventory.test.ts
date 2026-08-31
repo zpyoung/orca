@@ -50,6 +50,10 @@ const INVENTORY: readonly InventoryGroup[] = [
         'src/renderer/src/components/agent-session-continuation/AgentSessionContinuationDialog.tsx',
         2
       ],
+      [
+        'src/renderer/src/components/agent-session-continuation/fork-session-handoff/AgentSessionContinuationDialog.tsx',
+        2
+      ],
       ['src/renderer/src/components/automations/AutomationListLocalRows.tsx', 2],
       'src/renderer/src/components/automations/automation-draft-model.ts',
       ['src/renderer/src/components/automations/automation-list-search-rows.ts', 2],

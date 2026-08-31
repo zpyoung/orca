@@ -14,7 +14,10 @@ type Schema = { parse: (value: unknown) => Record<string, unknown> }
 
 // This contract needs a release from before client placement shipped; a rolling
 // stable baseline eventually contains every additive feature under test.
-const LEGACY_BROWSER_PLACEMENT_RELEASE_REF = 'v1.4.184'
+// The fork publishes no stable tags, so this pins its own release from the same
+// point: built on upstream v1.4.183, before client placement and the v1.4.185
+// tab-create rename. Upstream's vX.Y.Z tags do not exist on this remote.
+const LEGACY_BROWSER_PLACEMENT_RELEASE_REF = 'v1.4.183-rc.0.zy01'
 
 // v1.4.185 moved the tab-create schema and renamed it. Keeping both locations
 // avoids coupling an intentional legacy-baseline bump to that unrelated refactor.

@@ -220,6 +220,18 @@ async function handleSubscribe(event: IpcMainEvent, args: NativeChatSubscribeArg
     sessionId,
     transcriptPath,
     initialLimit: limit,
+    onTranscriptPending: () => {
+      if (sender.isDestroyed()) {
+        return
+      }
+      // `pending` marks a window with no transcript behind it yet; clients that
+      // don't know the flag still stop spinning on the empty snapshot.
+      const payload: NativeChatAppendedPayload = {
+        subscriptionId,
+        frame: { type: 'snapshot', messages: [], hasMore: false, pending: true }
+      }
+      sender.send('nativeChat:appended', payload)
+    },
     onInitialSnapshot: (messages, hasMore, beforeOffset, error, companion) => {
       if (sender.isDestroyed()) {
         return

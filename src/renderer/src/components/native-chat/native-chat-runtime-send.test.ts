@@ -699,9 +699,9 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
       NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS + NATIVE_CHAT_SUBMIT_DELAY_MS
     )
 
-    const framedImageWithSeparator = `${buildNativeChatImagePasteBytes('/tmp/orca-paste-image.png')} `
+    const framedImage = buildNativeChatImagePasteBytes('/tmp/orca-paste-image.png')
     await vi.advanceTimersByTimeAsync(0)
-    expectWriteOrder([NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT, framedImageWithSeparator])
+    expectWriteOrder([NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT, framedImage])
 
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS)
     expect(sendRuntimePtyInputAcceptance).toHaveBeenLastCalledWith(
@@ -756,7 +756,7 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
     // Pre-clear + image body + cancel clear; no Enter.
     expectWriteOrder([
       NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
-      '\x1b[200~/tmp/orca-paste-image.png\x1b[201~ ',
+      buildNativeChatImagePasteBytes('/tmp/orca-paste-image.png'),
       NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT
     ])
     expect(

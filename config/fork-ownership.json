@@ -2305,7 +2305,7 @@
     },
     "src/main/ipc/native-chat.ts": {
       "added": 58,
-      "removed": 32
+      "removed": 20
     },
     "src/main/ipc/notification-system-settings-link.ts": {
       "added": 1,
@@ -2560,8 +2560,8 @@
       "removed": 15
     },
     "src/renderer/src/components/native-chat/native-chat-runtime-send.test.ts": {
-      "added": 495,
-      "removed": 80
+      "added": 496,
+      "removed": 81
     },
     "src/renderer/src/components/native-chat/native-chat-runtime-send.ts": {
       "added": 68,
