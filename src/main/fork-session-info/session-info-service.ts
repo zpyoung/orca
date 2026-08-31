@@ -138,7 +138,8 @@ export class SessionInfoService {
   clearPane(paneKey: string): void {
     this.activeSessionByPaneKey.delete(paneKey)
     this.telemetryByPaneKey.delete(paneKey)
-    this.scanGenerationByPaneKey.set(paneKey, (this.scanGenerationByPaneKey.get(paneKey) ?? 0) + 1)
+    // deleting invalidates in-flight scans too: their captured generation can never equal undefined
+    this.scanGenerationByPaneKey.delete(paneKey)
     const cleared = { paneKey, provider: '', updatedAt: Date.now() }
     this.notify(cleared)
   }

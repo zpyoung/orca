@@ -55,15 +55,21 @@ function buildIdentity(
 ): SessionInfoIdentityTelemetry | undefined {
   const model = record(payload.model)
   const outputStyle = record(payload.output_style)
-  const identity: SessionInfoIdentityTelemetry = {
-    sessionId: boundedString(payload.session_id, MAX_ID_LENGTH),
-    transcriptPath: boundedString(payload.transcript_path, MAX_PATH_LENGTH),
-    cwd: boundedString(payload.cwd, MAX_PATH_LENGTH),
-    modelId: boundedString(model?.id, MAX_ID_LENGTH),
-    modelDisplayName: boundedString(model?.display_name, MAX_ID_LENGTH),
-    agentVersion: boundedString(payload.version, MAX_ID_LENGTH),
-    outputStyle: boundedString(outputStyle?.name, MAX_ID_LENGTH),
-    updatedAt
+  const fields: [keyof SessionInfoIdentityTelemetry, string | undefined][] = [
+    ['sessionId', boundedString(payload.session_id, MAX_ID_LENGTH)],
+    ['transcriptPath', boundedString(payload.transcript_path, MAX_PATH_LENGTH)],
+    ['cwd', boundedString(payload.cwd, MAX_PATH_LENGTH)],
+    ['modelId', boundedString(model?.id, MAX_ID_LENGTH)],
+    ['modelDisplayName', boundedString(model?.display_name, MAX_ID_LENGTH)],
+    ['agentVersion', boundedString(payload.version, MAX_ID_LENGTH)],
+    ['outputStyle', boundedString(outputStyle?.name, MAX_ID_LENGTH)]
+  ]
+  // an absent field must stay absent, or merging a later tick overwrites what the pane already knows
+  const identity: SessionInfoIdentityTelemetry = { updatedAt }
+  for (const [key, value] of fields) {
+    if (value !== undefined) {
+      Object.assign(identity, { [key]: value })
+    }
   }
   return Object.keys(identity).length > 1 ? identity : undefined
 }

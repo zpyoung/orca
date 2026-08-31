@@ -56,11 +56,14 @@ export function SessionInfoAccordion({
     (Boolean(selection.workspaceRoot) &&
       (selection.isLocalExecution || Boolean(selection.connectionId)))
   const loadHooks = hooksState.load
+  const hooksStatus = hooksState.status
+  const hooksOpen = openSections.includes('hooks')
+  // a focused-session change resets the load state to idle, which is what re-arms this load
   useEffect(() => {
-    if (showHooks && openSections.includes('hooks')) {
+    if (showHooks && hooksOpen && hooksStatus === 'idle') {
       loadHooks()
     }
-  }, [loadHooks, openSections, showHooks])
+  }, [hooksOpen, hooksStatus, loadHooks, showHooks])
 
   return (
     <Accordion type="multiple" value={openSections} onValueChange={onOpenSectionsChange}>

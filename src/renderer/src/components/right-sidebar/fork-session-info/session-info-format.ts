@@ -1,11 +1,28 @@
 import { getIntlLocale } from '@/i18n/i18n'
 
+const timestampFormatters = new Map<string, Intl.DateTimeFormat>()
+
 function timestampFormatter(timeStyle: 'short' | 'medium'): Intl.DateTimeFormat {
-  return new Intl.DateTimeFormat(getIntlLocale(), { dateStyle: 'medium', timeStyle })
+  const locale = getIntlLocale()
+  const key = `${locale}:${timeStyle}`
+  let formatter = timestampFormatters.get(key)
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle })
+    timestampFormatters.set(key, formatter)
+  }
+  return formatter
 }
 
+const countFormatters = new Map<string, Intl.NumberFormat>()
+
 export function formatCount(value: number): string {
-  return new Intl.NumberFormat(getIntlLocale(), { notation: 'compact' }).format(Math.max(0, value))
+  const locale = getIntlLocale()
+  let formatter = countFormatters.get(locale)
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(locale, { notation: 'compact' })
+    countFormatters.set(locale, formatter)
+  }
+  return formatter.format(Math.max(0, value))
 }
 
 export function formatPercentage(value: number): string {

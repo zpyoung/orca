@@ -125,7 +125,7 @@ export function getManagedStatusLineScript(target: 'local' | 'posix' = 'local'):
     return `${upstream.slice(0, index)}${getWindowsChainBlock()}\r\n${upstream.slice(index)}`
   }
 
-  const anchor = 'payload=${payload%?}\n'
+  const anchor = 'if [ -z "$payload" ]; then\n  exit 0\nfi\n'
   const index = upstream.indexOf(anchor)
   if (index === -1) {
     return upstream
