@@ -3,7 +3,7 @@ ARG BASE_IMAGE=ubuntu:24.04
 FROM ${BASE_IMAGE}
 
 ARG NODE_MAJOR=24
-ARG PNPM_VERSION=10.24.0
+ARG PNPM_VERSION=12.0.0
 ARG NODE_GYP_VERSION=11.5.0
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -86,10 +86,10 @@ RUN useradd --create-home --shell /bin/bash runner \
 USER runner
 WORKDIR /work
 
-COPY --chown=runner:runner package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY --chown=runner:runner package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY --chown=runner:runner config/patches ./config/patches
 
-RUN pnpm install --no-frozen-lockfile --prefer-frozen-lockfile=false --ignore-scripts
+RUN pnpm install --no-frozen-lockfile --no-prefer-frozen-lockfile --ignore-scripts
 
 COPY --chown=runner:runner config/scripts ./config/scripts
 

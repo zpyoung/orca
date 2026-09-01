@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { translate } from '@/i18n/i18n'
+import { NATIVE_FILE_DROP_MAX_PATHS } from '../../../../shared/native-file-drop'
 import { isNativeChatImageAttachmentPath } from './native-chat-image-paste'
 import {
   formatNativeChatFileReference,
@@ -22,6 +23,8 @@ export type UseNativeChatComposerAttachmentsArgs = {
   attachmentScopeKey: string
   allowWithoutTarget?: boolean
   caret: number
+  disabled: boolean
+  isComposing: () => boolean
   resolveTarget: () => NativeChatResolvedTarget | null
   textareaRef: RefObject<HTMLTextAreaElement | null>
   setCaret: (caret: number) => void
@@ -33,6 +36,8 @@ export function useNativeChatComposerAttachments({
   attachmentScopeKey,
   allowWithoutTarget = false,
   caret,
+  disabled,
+  isComposing,
   resolveTarget,
   textareaRef,
   setCaret,
@@ -43,6 +48,7 @@ export function useNativeChatComposerAttachments({
   appendImageAttachments: (paths: string[]) => void
   attachResolvedPaths: (paths: string[]) => void
   clearImageAttachments: () => void
+  flushPendingAttachments: () => void
   restoreImageAttachments: (attachments: readonly AgentComposerImageAttachment[]) => void
   removeImageAttachment: (id: string) => void
 } {
@@ -50,6 +56,17 @@ export function useNativeChatComposerAttachments({
     readNativeChatAttachmentCache(attachmentScopeKey)
   )
   const imageAttachmentCounter = useRef(0)
+  const pendingResolvedPathsRef = useRef<string[]>([])
+  const pendingPathLimitRejectedRef = useRef(false)
+  const disabledRef = useRef(disabled)
+
+  useLayoutEffect(() => {
+    disabledRef.current = disabled
+    if (disabled) {
+      pendingResolvedPathsRef.current = []
+      pendingPathLimitRejectedRef.current = false
+    }
+  }, [disabled])
 
   // Reload chips from the cache when the composer is reused for a different pane
   // (scope-key change), adjusting state during render rather than in an effect.
@@ -110,17 +127,15 @@ export function useNativeChatComposerAttachments({
         setCaret(before.length + insertion.length)
         return next
       })
-      setNotice(null)
-      requestAnimationFrame(() => textareaRef.current?.focus())
     },
-    [caret, setCaret, setDraft, setNotice, textareaRef]
+    [caret, setCaret, setDraft, textareaRef]
   )
 
   // Attach paths the TARGET AGENT can read: local paths for local worktrees,
   // already-uploaded remote paths for SSH worktrees (the composer uploads
   // before calling this — see native-chat-attachment-upload.ts).
-  const attachResolvedPaths = useCallback(
-    (paths: string[]) => {
+  const applyResolvedPaths = useCallback(
+    (paths: string[], focus: boolean, preserveNotice = false) => {
       const target = resolveTarget()
       if (
         (!target && !allowWithoutTarget) ||
@@ -141,8 +156,10 @@ export function useNativeChatComposerAttachments({
       // diverge and removing a chip needs no TUI un-paste.
       appendImageAttachments(imagePaths)
       insertFileReferences(filePaths)
-      if (imagePaths.length > 0) {
+      if (!preserveNotice) {
         setNotice(null)
+      }
+      if (focus && paths.length > 0) {
         requestAnimationFrame(() => textareaRef.current?.focus())
       }
     },
@@ -155,6 +172,42 @@ export function useNativeChatComposerAttachments({
       textareaRef
     ]
   )
+
+  const attachResolvedPaths = useCallback(
+    (paths: string[]) => {
+      if (paths.length === 0 || disabledRef.current) {
+        return
+      }
+      if (isComposing()) {
+        if (paths.length > NATIVE_FILE_DROP_MAX_PATHS - pendingResolvedPathsRef.current.length) {
+          // Reject the whole completion so ordered path batches are never partially applied.
+          pendingPathLimitRejectedRef.current = true
+          setNotice(
+            translate(
+              'components.native-chat.composer.pendingAttachmentLimit',
+              'Too many attachments are waiting. Finish composing before attaching more.'
+            )
+          )
+          return
+        }
+        pendingResolvedPathsRef.current.push(...paths)
+        return
+      }
+      applyResolvedPaths(paths, true)
+    },
+    [applyResolvedPaths, isComposing, setNotice]
+  )
+
+  const flushPendingAttachments = useCallback(() => {
+    const paths = pendingResolvedPathsRef.current
+    const preserveNotice = pendingPathLimitRejectedRef.current
+    pendingResolvedPathsRef.current = []
+    pendingPathLimitRejectedRef.current = false
+    if (paths.length === 0 || disabledRef.current) {
+      return
+    }
+    applyResolvedPaths(paths, false, preserveNotice)
+  }, [applyResolvedPaths])
 
   const restoreImageAttachments = useCallback(
     (attachments: readonly AgentComposerImageAttachment[]) => {
@@ -170,6 +223,7 @@ export function useNativeChatComposerAttachments({
     appendImageAttachments,
     attachResolvedPaths,
     clearImageAttachments: () => updateImageAttachments(() => []),
+    flushPendingAttachments,
     restoreImageAttachments,
     removeImageAttachment: (id) =>
       updateImageAttachments((prev) => prev.filter((attachment) => attachment.id !== id))

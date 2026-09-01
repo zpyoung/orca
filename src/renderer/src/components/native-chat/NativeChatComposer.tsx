@@ -50,8 +50,8 @@ export type {
  * session-option wiring) and builds its bridges from the exact same core
  * state it renders, so draft and caret never desync from another host.
  */
-export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeChatComposerProps>(
-  function NativeChatComposer(
+const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatComposerProps>(
+  function NativeChatComposerPane(
     {
       terminalTabId,
       paneKey,
@@ -70,8 +70,7 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       onSlashCommand,
       onSwitchToTerminal,
       readTerminalScreen,
-      launchDraft,
-      launchDraftResolved = false,
+      launchSeed,
       reportedSessionOptions,
       structuredTransport
     },
@@ -104,8 +103,9 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
     useNativeChatLaunchDraftAdoption({
       terminalTabId,
       agent,
-      launchDraft,
-      launchDraftResolved,
+      launchDraft: launchSeed?.launchDraft,
+      launchDraftResolved: launchSeed?.launchDraftResolved === true,
+      ownsTabWideLaunchDraft: launchSeed?.ownsTabWideLaunchDraft === true,
       draft: core.draft,
       setDraft: core.setDraft,
       setCaret: core.setCaret
@@ -129,12 +129,15 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       imageAttachments,
       attachResolvedPaths,
       clearImageAttachments,
+      flushPendingAttachments,
       restoreImageAttachments,
       removeImageAttachment
     } = useNativeChatComposerAttachments({
       attachmentScopeKey: paneKey,
       allowWithoutTarget: Boolean(structuredTransport),
       caret: core.caret,
+      disabled: core.disabled,
+      isComposing: core.imeEnterGesture.isComposing,
       resolveTarget: core.resolveTarget,
       textareaRef: core.textareaRef,
       setCaret: core.setCaret,
@@ -273,6 +276,7 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
             }
           }
         : {}),
+      flushPendingAttachments,
       autocomplete: picker.autocomplete,
       pickerListboxId: picker.listboxId,
       classifySend: picker.classifySend,
@@ -319,8 +323,8 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
           : null,
       buildSendOptions: () =>
         resolveNativeChatLaunchDraftSend({
-          launchDraft,
-          launchDraftResolved,
+          launchDraft: launchSeed?.launchDraft,
+          launchDraftResolved: launchSeed?.launchDraftResolved === true,
           agent,
           readScreen: () => readTerminalScreen?.() ?? null
         }).sendOptions,
@@ -354,5 +358,11 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
         sessionOptionsPickerRequest={structuredTransport?.optionPickerRequest ?? null}
       />
     )
+  }
+)
+
+export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeChatComposerProps>(
+  function NativeChatComposer(props, ref): React.JSX.Element {
+    return <NativeChatComposerPane key={props.paneKey} {...props} ref={ref} />
   }
 )

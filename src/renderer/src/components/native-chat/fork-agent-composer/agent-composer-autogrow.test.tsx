@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 // FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-composer-autogrow.test.tsx
-// FORK-COPY-SHA: 6e4f817101daa18d82824b69243d9079baa9c416
+// FORK-COPY-SHA: 07f4356a1678f6170a439527cd043f59b84343f0
 
 /** The composer grows with the draft up to 8 lines, then scrolls internally.
  *  Sizing is layout-driven (field-sizing + an lh-relative cap) rather than a JS
@@ -25,11 +25,13 @@ vi.mock('../NativeChatAutocompleteMenus', () => ({
 }))
 
 import { AgentComposerField } from './AgentComposerField'
+import { useImeEnterGestureOwnership } from '@/lib/ime-composition-keyboard-event'
 
 afterEach(() => cleanup())
 
-function renderField(draft: string): HTMLTextAreaElement {
-  render(
+function TestField({ draft }: { draft: string }): React.JSX.Element {
+  const imeEnterGesture = useImeEnterGestureOwnership()
+  return (
     <AgentComposerField
       terminalTabId="tab-1"
       paneKey="pane-1"
@@ -48,11 +50,11 @@ function renderField(draft: string): HTMLTextAreaElement {
       dictationDisabled={false}
       isDictating={false}
       isDictationHoldMode={false}
+      imeEnterGesture={imeEnterGesture}
       onDraftChange={vi.fn()}
       onTextareaSelect={vi.fn()}
       onKeyDown={vi.fn()}
-      onCompositionStart={vi.fn()}
-      onCompositionEnd={vi.fn()}
+      onImeSettled={vi.fn()}
       onPaste={vi.fn()}
       pickerListboxId="picker"
       onChoosePickerItem={vi.fn()}
@@ -68,6 +70,10 @@ function renderField(draft: string): HTMLTextAreaElement {
       sessionOptionsSnapshot={[]}
     />
   )
+}
+
+function renderField(draft: string): HTMLTextAreaElement {
+  render(<TestField draft={draft} />)
   return screen.getByRole('textbox') as HTMLTextAreaElement
 }
 

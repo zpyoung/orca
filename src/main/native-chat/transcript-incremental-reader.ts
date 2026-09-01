@@ -17,6 +17,16 @@ export type IncrementalTranscriptState = {
   droppingOversizedRecord: boolean
 }
 
+export function createIncrementalTranscriptState(): IncrementalTranscriptState {
+  return {
+    offset: 0,
+    pendingChunks: [],
+    pendingStart: 0,
+    pendingBytes: 0,
+    droppingOversizedRecord: false
+  }
+}
+
 export function resetIncrementalTranscriptState(state: IncrementalTranscriptState): void {
   state.offset = 0
   state.pendingChunks.length = 0

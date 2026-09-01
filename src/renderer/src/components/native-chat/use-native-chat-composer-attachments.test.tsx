@@ -42,6 +42,8 @@ function Probe({
     attachmentScopeKey: scopeKey,
     allowWithoutTarget: structured,
     caret,
+    disabled: false,
+    isComposing: () => false,
     resolveTarget: () => (structured ? null : target),
     textareaRef,
     setCaret,

@@ -10,6 +10,7 @@ import {
   type SetStateAction
 } from 'react'
 import { sendRuntimePtyInput } from '@/runtime/runtime-terminal-inspection'
+import { useImeEnterGestureOwnership } from '@/lib/ime-composition-keyboard-event'
 import { getSettingsForAgentTabRuntimeOwner } from '@/lib/agent-paste-draft'
 import type { NativeChatSendHandle, NativeChatSendOptions } from '../native-chat-runtime-send'
 import { useNativeChatSendLifecycle } from '../use-native-chat-send-lifecycle'
@@ -51,7 +52,7 @@ type PasteEventLike = Parameters<AgentComposerHandle['handlePasteEvent']>[0]
 
 export type AgentComposerCoreState = {
   textareaRef: RefObject<HTMLTextAreaElement | null>
-  isComposingRef: RefObject<boolean>
+  imeEnterGesture: ReturnType<typeof useImeEnterGestureOwnership>
   draft: string
   setDraft: (next: string | ((previous: string) => string)) => void
   caret: number
@@ -92,7 +93,7 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
   const [activeSuggestion, setActiveSuggestion] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const isComposingRef = useRef(false)
+  const imeEnterGesture = useImeEnterGestureOwnership()
   const { cancelPendingSends, trackPendingSend } = useNativeChatSendLifecycle(
     terminalTabId,
     targetPtyId,
@@ -148,7 +149,7 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
 
   return {
     textareaRef,
-    isComposingRef,
+    imeEnterGesture,
     draft,
     setDraft,
     caret,
@@ -175,6 +176,8 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
  *  this still gets a working compose-and-send composer. */
 export type AgentComposerHostBridges = {
   autocomplete?: ComposerAutocomplete
+  /** Applies attachments the host deferred while an IME composition was live. */
+  flushPendingAttachments?: () => void
   pickerListboxId?: string
   classifySend?: (draft: string) => NativeChatSendClassification
   clearSkillOrigin?: () => void
@@ -257,7 +260,7 @@ export function useAgentComposerCompose(
     activeSuggestion: core.activeSuggestion,
     draft: core.draft,
     history: core.history,
-    isComposing: () => core.isComposingRef.current,
+    isComposing: core.imeEnterGesture.isComposing,
     completePickerItem: bridges?.completeItem ?? noop,
     dispatchPickerCommand: bridges?.dispatchPickerCommand ?? noop,
     dismissPicker: bridges?.dismissPicker ?? noop,
@@ -340,14 +343,12 @@ export function useAgentComposerCompose(
       core.setActiveSuggestion(0)
     },
     onKeyDown: handleKeyDown,
-    onCompositionStart: () => {
-      core.isComposingRef.current = true
-    },
-    onCompositionEnd: (event) => {
-      core.isComposingRef.current = false
-      if (event.currentTarget.value !== core.draft) {
-        handleDraftChange(event.currentTarget.value, event.currentTarget)
+    imeEnterGesture: core.imeEnterGesture,
+    onImeSettled: (element) => {
+      if (element.value !== core.draft) {
+        handleDraftChange(element.value, element)
       }
+      bridges?.flushPendingAttachments?.()
     },
     onPaste: (event) => handlePasteEvent(event),
     pickerListboxId: bridges?.pickerListboxId ?? generatedListboxId,

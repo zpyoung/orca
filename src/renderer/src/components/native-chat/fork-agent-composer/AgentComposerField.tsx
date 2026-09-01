@@ -1,11 +1,8 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/NativeChatComposerField.tsx
-// FORK-COPY-SHA: 6e4f817101daa18d82824b69243d9079baa9c416
-import type {
-  ClipboardEventHandler,
-  CompositionEventHandler,
-  KeyboardEventHandler,
-  RefObject
-} from 'react'
+// FORK-COPY-SHA: 07f4356a1678f6170a439527cd043f59b84343f0
+import type { ClipboardEventHandler, KeyboardEventHandler, RefObject } from 'react'
+import { useLayoutEffect, useRef } from 'react'
+import type { useImeEnterGestureOwnership } from '@/lib/ime-composition-keyboard-event'
 import { ImageOff, X } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
@@ -50,8 +47,8 @@ export type AgentComposerFieldProps = {
   onDraftChange: (value: string, element: HTMLTextAreaElement) => void
   onTextareaSelect: (element: HTMLTextAreaElement) => void
   onKeyDown: KeyboardEventHandler<HTMLTextAreaElement>
-  onCompositionStart: CompositionEventHandler<HTMLTextAreaElement>
-  onCompositionEnd: CompositionEventHandler<HTMLTextAreaElement>
+  imeEnterGesture: ReturnType<typeof useImeEnterGestureOwnership>
+  onImeSettled: (element: HTMLTextAreaElement) => void
   onPaste: ClipboardEventHandler<HTMLTextAreaElement>
   pickerListboxId: string
   onChoosePickerItem: (item: NativeChatPickerItem) => void
@@ -72,6 +69,27 @@ export type AgentComposerFieldProps = {
 export type AgentComposerImageAttachment = {
   id: string
   path: string
+}
+
+/**
+ * Applies a draft clear that was dropped mid-composition: everything the field held when the
+ * IME started is what the clear was meant to erase, so only the composed segment survives.
+ * Diffed from both ends because an IME edits at the caret, which need not be the end.
+ */
+function imeComposedSegment(base: string, settled: string): string {
+  const limit = Math.min(base.length, settled.length)
+  let prefix = 0
+  while (prefix < limit && base[prefix] === settled[prefix]) {
+    prefix += 1
+  }
+  let suffix = 0
+  while (
+    suffix < limit - prefix &&
+    base[base.length - 1 - suffix] === settled[settled.length - 1 - suffix]
+  ) {
+    suffix += 1
+  }
+  return settled.slice(prefix, settled.length - suffix)
 }
 
 export function AgentComposerField({
@@ -96,8 +114,8 @@ export function AgentComposerField({
   onDraftChange,
   onTextareaSelect,
   onKeyDown,
-  onCompositionStart,
-  onCompositionEnd,
+  imeEnterGesture,
+  onImeSettled,
   onPaste,
   pickerListboxId,
   onChoosePickerItem,
@@ -115,6 +133,37 @@ export function AgentComposerField({
   sessionOptionsPickerRequest
 }: AgentComposerFieldProps): React.JSX.Element {
   const widthClassName = useNativeChatWidthClassName()
+  // Value the IME started from, and whether a programmatic clear was dropped on top of it.
+  const compositionBaseRef = useRef('')
+  const droppedDraftClearRef = useRef(false)
+
+  // Browser owns the provisional value; React synchronizes drafts only between IME sessions.
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current
+    if (!textarea) {
+      return
+    }
+    if (imeEnterGesture.isComposing()) {
+      // Why: a clear (an async structured send confirming) would otherwise be lost outright and
+      // the sent text would ride along into the next message. Only clears are carved out of
+      // browser ownership; every other programmatic draft still loses to the live composition.
+      droppedDraftClearRef.current ||= draft === '' && textarea.value !== ''
+      return
+    }
+    droppedDraftClearRef.current = false
+    if (textarea.value === draft) {
+      return
+    }
+    textarea.value = draft
+  }, [draft, imeEnterGesture, textareaRef])
+
+  const settleImeValue = (element: HTMLTextAreaElement): void => {
+    if (droppedDraftClearRef.current) {
+      droppedDraftClearRef.current = false
+      element.value = imeComposedSegment(compositionBaseRef.current, element.value)
+    }
+    onImeSettled(element)
+  }
 
   return (
     <div className={cn('bg-background', layout === 'dock' ? 'h-full min-h-0' : 'shrink-0')}>
@@ -207,13 +256,34 @@ export function AgentComposerField({
               />
               <textarea
                 ref={textareaRef}
-                value={draft}
+                defaultValue={draft}
                 disabled={disabled}
                 rows={2}
                 onChange={(e) => onDraftChange(e.target.value, e.currentTarget)}
-                onKeyDown={onKeyDown}
-                onCompositionStart={onCompositionStart}
-                onCompositionEnd={onCompositionEnd}
+                onKeyDown={(event) => {
+                  if (!imeEnterGesture.ownsKeyDown(event)) {
+                    onKeyDown(event)
+                  }
+                }}
+                onKeyUp={imeEnterGesture.onKeyUp}
+                onBlur={(event) => {
+                  const compositionWasActive = imeEnterGesture.isComposing()
+                  imeEnterGesture.reset()
+                  if (compositionWasActive) {
+                    settleImeValue(event.currentTarget)
+                  }
+                }}
+                onCompositionStart={(event) => {
+                  compositionBaseRef.current = event.currentTarget.value
+                  imeEnterGesture.setComposing(true)
+                }}
+                onCompositionEnd={(event) => {
+                  const compositionWasActive = imeEnterGesture.isComposing()
+                  imeEnterGesture.setComposing(false)
+                  if (compositionWasActive) {
+                    settleImeValue(event.currentTarget)
+                  }
+                }}
                 onPaste={onPaste}
                 onSelect={(e) => onTextareaSelect(e.currentTarget)}
                 aria-expanded={autocomplete.mode === 'slash' || autocomplete.mode === 'skill'}

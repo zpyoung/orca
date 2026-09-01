@@ -11,7 +11,7 @@ import {
 } from './transcript-tail-reader'
 
 export { readNativeChatTranscriptTail } from './transcript-tail-reader'
-export { getActiveNativeChatWatcherCount } from './transcript-watch-engine'
+export { getActiveNativeChatWatcherCount } from './transcript-watcher-count'
 export type {
   NativeChatTranscriptSubscription,
   SubscribeNativeChatTranscriptArgs

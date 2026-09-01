@@ -216,3 +216,30 @@ paths or weakening the existing wrong-account guard.
 upstream PR can test and land the return contract without that consumer.
 
 **Status:** pending-upstream. Not yet submitted.
+
+## Changed-lines type-aware scan reaches into mobile/
+
+**What:** the `type-aware code quality` scan in `config/scripts/check-changed-code-quality.mjs` no
+longer runs over changed files under `mobile/`.
+
+**Why upstream, not isolated:** the scan pins `config/oxlint-code-quality-type-aware.json`, and the
+comment on the sibling scan directly above it already states why that is wrong — pinning the root
+config applies root rules to `mobile/`, which has its own workspace, lockfile and `.oxlintrc.json`.
+`mobile/node_modules` is not installed in the job that runs this gate, so every React Native and
+`react-test-renderer` type resolves as an `error` type and `typescript/no-redundant-type-constituents`
+fires on the resolution failure rather than on the code. The full-tree audit that owns this rule set
+(`pnpm run audit:code-quality:type-aware`) already scopes itself to `src config tests`, so `mobile/`
+was never in the intended scope; only the changed-lines gate leaked into it.
+
+The bug is latent for upstream and only surfaces on a PR whose diff adds lines to a `mobile/` test:
+v1.4.194 added `mobile/src/session/use-mobile-terminal-inventory-recovery.test.ts`, and at least four
+other pre-existing mobile files trip the same rule the moment their lines are touched.
+
+Isolating is the wrong shape: this is one predicate inside upstream's own gate runner, and a forked
+copy of the runner would have to be replayed on every release that touches it.
+
+**Paths:**
+
+- `config/scripts/check-changed-code-quality.mjs`
+
+**Status:** pending-upstream. Not yet submitted.

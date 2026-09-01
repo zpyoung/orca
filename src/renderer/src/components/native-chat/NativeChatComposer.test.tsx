@@ -15,8 +15,11 @@ const mocks = vi.hoisted(() => ({
   fieldProps: null as {
     onSend?: () => void
     onStop?: () => void
-    onCompositionStart?: () => void
-    onCompositionEnd?: (event: { currentTarget: HTMLTextAreaElement }) => void
+    imeEnterGesture?: {
+      isComposing: () => boolean
+      setComposing: (active: boolean) => void
+    }
+    onImeSettled?: (element: HTMLTextAreaElement) => void
     sessionOptionsSurface?: SessionOptionsSurface | null
     sessionOptionsSnapshot?: SessionOptionDescriptor[]
     attachDisabled?: boolean
@@ -450,8 +453,9 @@ describe('NativeChatComposer', () => {
     mocks.setDraft.mockClear()
 
     act(() => {
-      mocks.fieldProps?.onCompositionStart?.()
-      mocks.fieldProps?.onCompositionEnd?.({ currentTarget: textarea })
+      mocks.fieldProps?.imeEnterGesture?.setComposing(true)
+      mocks.fieldProps?.imeEnterGesture?.setComposing(false)
+      mocks.fieldProps?.onImeSettled?.(textarea)
     })
 
     expect(mocks.setDraft).toHaveBeenCalledOnce()
@@ -471,7 +475,7 @@ describe('NativeChatComposer', () => {
     textarea.value = 'hello'
     mocks.setDraft.mockClear()
 
-    act(() => mocks.fieldProps?.onCompositionEnd?.({ currentTarget: textarea }))
+    act(() => mocks.fieldProps?.onImeSettled?.(textarea))
 
     expect(mocks.setDraft).not.toHaveBeenCalled()
   })
