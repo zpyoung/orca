@@ -15,7 +15,13 @@ export const OXLINT_SCANS = [
   },
   {
     label: 'type-aware code quality',
-    args: ['--type-aware', '--config', 'config/oxlint-code-quality-type-aware.json']
+    args: ['--type-aware', '--config', 'config/oxlint-code-quality-type-aware.json'],
+    // Same reason the scan above takes no --config: pinning the root config reaches into
+    // mobile/, which has its own workspace, lockfile and .oxlintrc.json. Its React Native
+    // types are not installed at the root, so every one resolves as an 'error' type and
+    // the type-aware rules fire on the resolution failure rather than on the code. The
+    // full-tree audit that owns this rule set already scopes itself to src/config/tests.
+    excludeWorkspaces: ['mobile']
   },
   {
     label: 'React Doctor',
@@ -263,6 +269,16 @@ function printDiagnostic(diagnostic, root) {
   console.error(`${file}:${line} ${code}: ${diagnostic.message}`)
 }
 
+export function filesForScan(files, scan) {
+  const excluded = scan.excludeWorkspaces
+  if (!excluded || excluded.length === 0) {
+    return files
+  }
+  return files.filter(
+    (file) => !excluded.some((workspace) => file === workspace || file.startsWith(`${workspace}/`))
+  )
+}
+
 function runOxlintScan(root, scan, files) {
   const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
   const result = spawnSync(pnpm, ['exec', 'oxlint', ...scan.args, '--format', 'json', ...files], {
@@ -295,7 +311,12 @@ export function main(
 
   let failures = 0
   for (const scan of OXLINT_SCANS) {
-    const diagnostics = runOxlintScan(root, scan, files).filter((diagnostic) =>
+    const scanFiles = filesForScan(files, scan)
+    if (scanFiles.length === 0) {
+      console.log(`${scan.label}: 0 new finding(s) across 0 changed file(s).`)
+      continue
+    }
+    const diagnostics = runOxlintScan(root, scan, scanFiles).filter((diagnostic) =>
       diagnosticTouchesAddedLines(diagnostic, rangesByFile, root, baseBlocks)
     )
     for (const diagnostic of diagnostics) {
@@ -303,7 +324,7 @@ export function main(
     }
     failures += diagnostics.length
     console.log(
-      `${scan.label}: ${diagnostics.length} new finding(s) across ${files.length} changed file(s).`
+      `${scan.label}: ${diagnostics.length} new finding(s) across ${scanFiles.length} changed file(s).`
     )
   }
 
