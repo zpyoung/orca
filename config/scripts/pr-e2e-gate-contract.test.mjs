@@ -130,7 +130,13 @@ describe('PR E2E gate contract', () => {
     for (const job of prWorkflow.jobs.verify.needs) {
       const envVar = job.replaceAll('-', '_').toUpperCase()
       expect(verifyStep.env[envVar]).toBe(`\${{ needs.${job}.result }}`)
-      if (job === 'code_paths' || job === 'root_directory_guard') {
+      // fork_ownership_guard is ungated like root_directory_guard: it runs on every PR,
+      // so it is checked unconditionally above rather than through the SHOULD_RUN loop.
+      if (
+        job === 'code_paths' ||
+        job === 'root_directory_guard' ||
+        job === 'fork_ownership_guard'
+      ) {
         continue
       }
       expect(successLoop).toContain(`"$${envVar}"`)

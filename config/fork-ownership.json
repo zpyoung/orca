@@ -278,6 +278,47 @@
       ]
     },
     {
+      "path": "config/scripts/pr-e2e-gate-contract.test.mjs",
+      "feature": "fork-infra",
+      "kind": "registration",
+      "lines": [
+        "        job === 'fork_ownership_guard'"
+      ]
+    },
+    {
+      "path": "config/scripts/pr-code-change-scope.test.mjs",
+      "feature": "fork-infra",
+      "kind": "registration",
+      "lines": [
+        "        job === 'fork_ownership_guard'"
+      ]
+    },
+    {
+      "path": "src/shared/pane-agent-identity-inventory.test.ts",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "        'src/renderer/src/components/agent-session-continuation/fork-session-handoff/AgentSessionContinuationDialog.tsx',"
+      ]
+    },
+    {
+      "path": "tests/e2e/cross-version-wire/cross-version-browser-placement.unit.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "const LEGACY_BROWSER_PLACEMENT_RELEASE_REF = 'v1.4.183-rc.0.zy01'"
+      ]
+    },
+    {
+      "path": "tests/e2e/cross-version-wire/release-checkout.unit.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "      ref: 'v1.4.191-rc.0.zy01',",
+        "    const checkout = await materializeReleaseCheckout('v1.4.191-rc.0.zy01', { cacheRoot })"
+      ]
+    },
+    {
       "path": "src/main/native-chat/transcript-watch-engine-wsl-lifecycle.test.ts",
       "feature": "native-chat-relay",
       "kind": "passthrough",
@@ -2641,6 +2682,12 @@
       "ledger": "docs/fork-upstreaming.md#pane-paste-routing-by-focus"
     },
     {
+      "path": "config/scripts/check-changed-code-quality.mjs",
+      "reason": "Stops the changed-lines type-aware scan pinning the root oxlint config over mobile/, whose workspace deps are absent in the gate job so every React Native type resolves as an error type.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#changed-lines-type-aware-scan-reaches-into-mobile"
+    },
+    {
       "path": "src/main/rate-limits/service.ts",
       "reason": "Returns the selected-account acceptance verdict from live Claude rate-limit ingestion so pane telemetry can correlate plan windows without duplicating or bypassing the account guard.",
       "status": "pending-upstream",
@@ -2752,6 +2799,11 @@
       "added": 28,
       "removed": 8
     },
+    "config/scripts/pr-e2e-gate-contract.test.mjs": { "added": 7, "removed": 1 },
+    "config/scripts/pr-code-change-scope.test.mjs": { "added": 7, "removed": 1 },
+    "src/shared/pane-agent-identity-inventory.test.ts": { "added": 4, "removed": 0 },
+    "tests/e2e/cross-version-wire/cross-version-browser-placement.unit.test.ts": { "added": 4, "removed": 1 },
+    "tests/e2e/cross-version-wire/release-checkout.unit.test.ts": { "added": 11, "removed": 11 },
     "src/main/native-chat/transcript-watch-engine-wsl-lifecycle.test.ts": { "added": 11, "removed": 0 },
     "src/main/native-chat/transcript-watch-engine.ts": { "added": 36, "removed": 33 },
     "src/main/native-chat/transcript-watch.test.ts": {
