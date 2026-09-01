@@ -740,6 +740,15 @@
       "lines": ["      discovery.skills,", "  if (!leadsDraft && !hasSlashSkills) {"]
     },
     {
+      "path": "src/renderer/src/components/native-chat/native-chat-structured-send-composition-clear.test.tsx",
+      "feature": "agent-composer",
+      "kind": "import-swap",
+      "lines": [
+        "vi.mock('./fork-agent-composer/AgentComposerActions', () => ({",
+        "  AgentComposerActions: () => <div data-testid=\"composer-actions\" />"
+      ]
+    },
+    {
       "path": "src/renderer/src/components/native-chat/native-chat-structured-composer-dispatch.ts",
       "feature": "agent-composer",
       "kind": "import-swap",
@@ -2927,7 +2936,7 @@
       "added": 10,
       "removed": 2
     },
-    "src/renderer/src/components/native-chat/NativeChatComposer.test.tsx": { "added": 38, "removed": 90 },
+    "src/renderer/src/components/native-chat/NativeChatComposer.test.tsx": { "added": 34, "removed": 82 },
     "src/renderer/src/components/native-chat/NativeChatComposer.tsx": { "added": 209, "removed": 279 },
     "src/renderer/src/components/native-chat/NativeChatInteractiveCard.test.tsx": {
       "added": 21,
@@ -2966,6 +2975,7 @@
       "added": 33,
       "removed": 41
     },
+    "src/renderer/src/components/native-chat/native-chat-structured-send-composition-clear.test.tsx": { "added": 2, "removed": 2 },
     "src/renderer/src/components/native-chat/native-chat-structured-composer-dispatch.ts": { "added": 2, "removed": 2 },
     "src/renderer/src/components/native-chat/native-chat-composer-types.ts": {
       "added": 15,
