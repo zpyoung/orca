@@ -297,11 +297,14 @@ it surfaces as an unrelated-looking CI failure hours later. List them before com
 ```sh
 python3 - <out-dir>/checkout.txt "$PREV_TAG" "$MERGE_HEAD_PRE" <<'EOF'
 import subprocess, sys
-paths = [p for p in open(sys.argv[1]).read().split('\n') if p]
+paths = [p.strip() for p in open(sys.argv[1]).read().split('\n')]
+paths = [p for p in paths if p]
 def tree(ref):
-    out = subprocess.run(['git', 'ls-tree', '-r', '--format=%(path)\t%(objectname)', ref],
-                         capture_output=True, text=True).stdout
-    return dict(line.split('\t', 1) for line in out.splitlines() if '\t' in line)
+    r = subprocess.run(['git', 'ls-tree', '-r', '--format=%(path)\t%(objectname)', ref],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        sys.exit(f'git ls-tree failed for {ref}: {r.stderr.strip()}')
+    return dict(line.split('\t', 1) for line in r.stdout.splitlines() if '\t' in line)
 prev, fork = tree(sys.argv[2]), tree(sys.argv[3])
 for p in paths:
     if p in prev and p in fork and prev[p] != fork[p]:
@@ -309,9 +312,10 @@ for p in paths:
 EOF
 ```
 
-Every path it prints is a fork edit the reset just threw away. Restore it from `$MERGE_HEAD_PRE`
-(three-way merged against the tag, since upstream may have changed the same file), then **declare it
-as a seam** — that is what stops the next sync reverting it again. v1.4.194 printed seven, and all
+It exits non-zero if either ref cannot be read, so an empty print means no undeclared edits rather
+than a failed lookup. Every path it prints is a fork edit the reset just threw away. Restore it from
+`$MERGE_HEAD_PRE` (three-way merged against the tag, since upstream may have changed the same file),
+then **declare it as a seam** — that is what stops the next sync reverting it again. v1.4.194 printed seven, and all
 seven were real: two cross-version tests pinning fork release refs, two PR-workflow contract tests
 that must know `fork_ownership_guard` is ungated, a ratchet inventory counting a fork dialog, an
 import repointed at a forked copy, and a relay test mocking the fork's transport.
