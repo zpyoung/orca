@@ -1,6 +1,6 @@
 ---
-last_released_commit: 34cd71050c9e3143b5ef6c3cf2cbec3de21f427e
-upstream_synced: v1.4.193
+last_released_commit: 7f45b360ad8f63d4b7252f2b06fec42e8efcd34c
+upstream_synced: v1.4.194
 ---
 
 # Changelog
@@ -11,6 +11,39 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.195-rc.0.zy01] - 2026-09-01
+
+Synced to upstream [v1.4.194](https://github.com/stablyai/orca/releases/tag/v1.4.194).
+
+### Added
+- A Session Info sidebar for the focused agent terminal, showing live context, usage, identity,
+  activity, files, hooks, and MCP servers for that exact session and pane. A custom Claude
+  statusline survives, because the fork chains its own telemetry rather than replacing it, and MCP
+  servers are deduplicated by name across config scopes.
+- Shared artifacts can be passphrase-protected. Content is encrypted in the browser before upload,
+  the passphrase is stored locally, and protecting, rotating, removing, and recovering protection
+  all work from the CLI, the RPC layer, and the desktop UI.
+
+### Fixed
+- Passphrase protection is now reachable from the desktop app at all. Every protect, rotate,
+  make-public and reveal action threw for the renderer, whose IPC bridge dispatches as a runtime
+  client, so only the CLI could use the feature. The same pass fixed a replacement passphrase being
+  minted under a key that was never persisted, a removal that could brick a source key for later
+  shares, a stale removal intent that could republish a deleted artifact's plaintext, protection
+  state leaking into results that paired clients are meant not to see, an unregistered locale
+  bundle that left every non-English catalog empty, an "unknown on this version" message shown
+  while the status lookup was still in flight, and a re-validation of the whole store once per
+  record on every list refresh.
+- The changed-lines type-aware code-quality scan no longer reaches into `mobile/`. It pinned the
+  root oxlint config over a workspace that has its own config, lockfile, and uninstalled
+  dependencies, so every React Native type resolved as an error type and the rule fired on the
+  resolution failure rather than on the code. Filed for upstream.
+
+### Changed
+- The remote test sandbox follows upstream onto pnpm 12 and off the deleted `.npmrc`.
+- Contributor docs now describe the forked Native Chat architecture and its runtime changes, and
+  point local typechecking at the per-project commands so a full sweep cannot saturate the machine.
 
 ## [1.4.194-rc.0.zy01] - 2026-08-31
 
