@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- Why: this is the single source of truth for every telemetry event schema, enum, and the cohort-injection set predicates. Splitting it would scatter the .strict() / Zod-first doctrine across files and break the EventMap derivation that makes adding an event a one-line change. */
 // Single source of truth for telemetry event names, schemas, and enums.
 // Zod-first: `EventMap` is `z.infer`-derived from the same `eventSchemas` record the runtime validator consumes — no parallel union to drift.
 // `.strict()` on every object schema is the runtime "no extra keys"; free-form strings carry an explicit `.max(N)` cap.

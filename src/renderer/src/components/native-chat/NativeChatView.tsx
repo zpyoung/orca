@@ -55,9 +55,9 @@ import { useNativeChatPasteBridge } from './use-native-chat-paste-bridge'
 import { useNativeChatFileLinkClick } from './use-native-chat-file-link-click'
 import type { NativeChatResolvedViewProps, NativeChatViewProps } from './native-chat-view-types'
 import { NativeChatStructuredSession } from './NativeChatStructuredSession'
+import { NativeChatResolvedView } from './NativeChatResolvedView'
 import { useNativeChatStatusEntry } from './use-native-chat-status-entry'
-import { useNativeChatFileLinkContext } from './use-native-chat-file-link-context'
-import { NativeChatOrchestrationPausedNotice } from './NativeChatOrchestrationPausedNotice'
+import type { NativeChatViewProps } from './native-chat-view-types'
 
 export type { NativeChatViewProps } from './native-chat-view-types'
 
@@ -76,6 +76,7 @@ function NativeChatBridgeView({
   targetPtyId = null,
   launchAgent,
   resolvedAgent,
+  ownsTabWideLaunchDraft,
   onSwitchToTerminal,
   readTerminalScreen,
   contextMenuActions,
@@ -102,6 +103,7 @@ function NativeChatBridgeView({
           isVisible={isVisible}
           targetPtyId={targetPtyId}
           terminalTabId={terminalTabId}
+          ownsTabWideLaunchDraft={ownsTabWideLaunchDraft}
           onSwitchToTerminal={onSwitchToTerminal}
           readTerminalScreen={readTerminalScreen}
           contextMenuActions={contextMenuActions}

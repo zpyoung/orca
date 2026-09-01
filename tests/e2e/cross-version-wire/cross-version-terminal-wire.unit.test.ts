@@ -51,6 +51,7 @@ const EXPECTED_JOURNEY_FRAMES = [
   'C>H Input',
   'C>H Unsubscribe'
 ]
+const SNAPSHOT_START_OCCURRENCES = ['initial', 'reveal', 'reconnect'] as const
 
 let baselineRef: string
 let current: TerminalWireBuild
@@ -81,6 +82,23 @@ function expectJourneyActuallyRan(record: JourneyRecord): void {
   expect(record.subscribedEvents).toHaveLength(2)
   expect(record.snapshotStarts).toHaveLength(3)
   expect(record.missingRuntimeMethods).toEqual([])
+}
+
+function expectSnapshotStartFieldsRemainPublished(args: {
+  older: readonly Record<string, unknown>[]
+  newer: readonly Record<string, unknown>[]
+  olderLabel: string
+  newerLabel: string
+}): void {
+  const skewByOccurrence = comparePublishedFieldOccurrences(args)
+  for (const [index, skew] of skewByOccurrence.entries()) {
+    const occurrence = SNAPSHOT_START_OCCURRENCES[index] ?? `occurrence ${index + 1}`
+    expect(
+      skew.removed,
+      `${args.newerLabel} stopped publishing ${occurrence} SnapshotStart fields ` +
+        `${args.olderLabel} publishes (it added: ${skew.added.join(', ') || 'nothing'})`
+    ).toEqual([])
+  }
 }
 
 function expectWireCompatible(record: JourneyRecord): void {

@@ -48,11 +48,11 @@ function renderField(draft: string): HTMLTextAreaElement {
       dictationDisabled={false}
       isDictating={false}
       isDictationHoldMode={false}
+      imeEnterGesture={imeEnterGesture}
       onDraftChange={vi.fn()}
       onTextareaSelect={vi.fn()}
       onKeyDown={vi.fn()}
-      onCompositionStart={vi.fn()}
-      onCompositionEnd={vi.fn()}
+      onImeSettled={vi.fn()}
       onPaste={vi.fn()}
       pickerListboxId="picker"
       onChoosePickerItem={vi.fn()}
@@ -68,6 +68,10 @@ function renderField(draft: string): HTMLTextAreaElement {
       sessionOptionsSnapshot={[]}
     />
   )
+}
+
+function renderField(draft: string): HTMLTextAreaElement {
+  render(<TestField draft={draft} />)
   return screen.getByRole('textbox') as HTMLTextAreaElement
 }
 

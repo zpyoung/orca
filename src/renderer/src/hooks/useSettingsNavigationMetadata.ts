@@ -1,4 +1,3 @@
-/* oxlint-disable max-lines */
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
@@ -71,57 +70,30 @@ import {
   getRuntimeEnvironmentsSearchEntry,
   getWebRuntimeEnvironmentsSearchEntry
 } from '@/components/settings/runtime-environments-search'
-import { getSshPaneSearchEntries } from '@/components/settings/ssh-search'
-import { getMobileSettingsPaneSearchEntries } from '@/components/settings/mobile-settings-search'
-import { getMobileEmulatorSearchEntries } from '@/components/settings/mobile-emulator-search'
-import { getComputerUsePaneSearchEntries } from '@/components/settings/computer-use-search'
-import { getVoicePaneSearchEntries } from '@/components/settings/voice-pane-search'
-import { getDeveloperPermissionsPaneSearchEntries } from '@/components/settings/developer-permissions-search'
-import { getPrivacyPaneSearchEntries } from '@/components/settings/privacy-search'
-import { getAdvancedPaneSearchEntries } from '@/components/settings/advanced-search'
-import { getShortcutsPaneSearchEntries } from '@/components/settings/shortcuts-search'
-import { getStatsPaneSearchEntries } from '@/components/stats/stats-search'
-import { getExperimentalPaneSearchEntries } from '@/components/settings/experimental-search'
-import { getPluginsPaneSearchEntries } from '@/components/settings/plugins-search'
-import { getRepositoryPaneSearchEntries } from '@/components/settings/repository-search'
-import { buildSettingsProjectList } from '@/components/settings/settings-project-list'
+import { getTerminalPaneSearchEntries } from '@/components/settings/terminal-search'
+import { isMacUserAgent, isWindowsUserAgent } from '@/components/terminal-pane/pane-helpers'
+import { useLinearProviderConnected } from '@/hooks/useLinearProviderConnected'
+import { getClientCreationActionPolicy } from '@/lib/client-creation-action-policy'
+import type { SettingsNavSection } from '@/lib/settings-navigation-types'
 import { isWebClientLocation } from '@/lib/web-client-location'
 import {
   isWindowsTerminalCapabilityHost,
   useWindowsTerminalCapabilities
 } from '@/lib/windows-terminal-capabilities'
-import { useWindowsTerminalCapabilityOwnerKey } from './useWindowsTerminalCapabilityOwnerKey'
 import { getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
-import { useLinearProviderConnected } from '@/hooks/useLinearProviderConnected'
-import { translate } from '@/i18n/i18n'
-import { getClientCreationActionPolicy } from '@/lib/client-creation-action-policy'
+import { useAppStore } from '@/store'
+import type { Repo } from '../../../shared/repo-types'
+import {
+  buildCapabilitySettingsSections,
+  buildSetupSettingsSections
+} from './settings-navigation-capability-sections'
+import type { SettingsNavigationBuildOptions } from './settings-navigation-build-options'
+import { buildInterfaceSettingsSections } from './settings-navigation-interface-sections'
+import { buildRemoteSettingsSections } from './settings-navigation-remote-sections'
+import { buildWorkflowSettingsSections } from './settings-navigation-workflow-sections'
+import { useWindowsTerminalCapabilityOwnerKey } from './useWindowsTerminalCapabilityOwnerKey'
 
 export { isWebClientLocation } from '@/lib/web-client-location'
-
-function getDevToolsPaneSearchEntries(): SettingsNavSection['searchEntries'] {
-  return [
-    {
-      title: translate(
-        'auto.hooks.useSettingsNavigationMetadata.devSearchNotificationPlayground',
-        'Notification playground'
-      ),
-      description: translate(
-        'auto.hooks.useSettingsNavigationMetadata.devSearchNotificationPlaygroundDescription',
-        'Trigger representative toast and notification UI states.'
-      ),
-      keywords: [
-        translate('auto.hooks.useSettingsNavigationMetadata.devSearchKeywordDev', 'dev'),
-        translate('auto.hooks.useSettingsNavigationMetadata.devSearchKeywordToast', 'toast'),
-        translate('auto.hooks.useSettingsNavigationMetadata.devSearchKeywordSonner', 'sonner'),
-        translate('auto.hooks.useSettingsNavigationMetadata.devSearchKeywordError', 'error'),
-        translate(
-          'auto.hooks.useSettingsNavigationMetadata.devSearchKeywordNotification',
-          'notification'
-        )
-      ]
-    }
-  ]
-}
 
 export function buildSettingsNavigationMetadata({
   isMac,
@@ -146,7 +118,6 @@ export function buildSettingsNavigationMetadata({
   isLinearConnected?: boolean
   repos: readonly Repo[]
 }): SettingsNavSection[] {
-  const showDesktopOnlySettings = !isWebClient
   const terminalPaneSearchEntries = getTerminalPaneSearchEntries({
     isWindows,
     isWindowsTerminalHost,
@@ -161,7 +132,22 @@ export function buildSettingsNavigationMetadata({
       reposById.set(repo.id, repo)
     }
   }
+  const options: SettingsNavigationBuildOptions = {
+    isMac,
+    isWindows,
+    isLocalWindowsHost,
+    isWindowsTerminalHost,
+    isWebClient,
+    managedBrowserCreationEnabled,
+    mobileEmulatorCreationEnabled,
+    isDev,
+    isLinearConnected,
+    repos
+  }
 
+  // Why: this array's order must mirror SETTINGS_NAV_GROUPS so the Settings
+  // sidebar and the Cmd+J palette both read top-to-bottom in the same grouped
+  // order — keep each new entry beside its group's siblings.
   return [
     // Why: this array's order must mirror SETTINGS_NAV_GROUPS so the Settings
     // sidebar and the Cmd+J palette both read top-to-bottom in the same grouped

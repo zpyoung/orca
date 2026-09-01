@@ -50,8 +50,8 @@ export type {
  * session-option wiring) and builds its bridges from the exact same core
  * state it renders, so draft and caret never desync from another host.
  */
-export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeChatComposerProps>(
-  function NativeChatComposer(
+const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatComposerProps>(
+  function NativeChatComposerPane(
     {
       terminalTabId,
       paneKey,
@@ -170,7 +170,6 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
       useNativeChatDictationActions({ textareaRef: core.textareaRef, setDictationPressed })
     const dictationState = useAppStore((store) => store.dictationState)
     const voiceSettings = useAppStore((store) => store.settings?.voice)
-    const isDictationHoldMode = voiceSettings?.dictationMode === 'hold'
     const dictationDisabled = voiceSettings?.enabled !== true || !voiceSettings.sttModel
     const isDictating =
       dictationPressed ||
@@ -354,5 +353,11 @@ export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeCha
         sessionOptionsPickerRequest={structuredTransport?.optionPickerRequest ?? null}
       />
     )
+  }
+)
+
+export const NativeChatComposer = forwardRef<NativeChatComposerHandle, NativeChatComposerProps>(
+  function NativeChatComposer(props, ref): React.JSX.Element {
+    return <NativeChatComposerPane key={props.paneKey} {...props} ref={ref} />
   }
 )
