@@ -243,3 +243,38 @@ copy of the runner would have to be replayed on every release that touches it.
 - `config/scripts/check-changed-code-quality.mjs`
 
 **Status:** pending-upstream. Not yet submitted.
+
+## Structured session history page races the reap tombstone
+
+**What:** the `create → send → stream → approval → cancel → reconnect → page history` case in
+`src/main/runtime/structured-agent-session-integration.test.ts` awaits `drainStreamedEvents()` after
+the runtime takeover, before it reads the first history page.
+
+**Why upstream, not isolated:** the test asserts a durable-journal invariant, and the write it
+depends on is asynchronous. `turn/started` appends the `turn-lifecycle:turn-1` status row
+("Codex is working…"); the fake Codex never sends `turn/completed`, so that row is still live when
+`agentSession.ensure` takes the session over. The reap runs `closeCodexPublishedSession`, whose
+`ended` branch tombstones every running turn, and that tombstone goes through the deferred event
+sink — writes queue and land on a promise chain that `agentSession.history` does not await. On an
+unloaded machine the chain drains inside `ensure`'s remaining awaits and the page shows six rows; on
+a loaded CI runner it does not, and the page still carries the status row at index 1:
+
+```
+- Expected            + Received
+  [                     [
+    "message",            "message",
+                        +  "status",
+    "message",            "message",
+```
+
+The barrier already exists and the test's own helper documents it — "Real clients see these rows
+arrive on the subscription; a test has to wait for them" — the takeover path is the one place the
+test reads the journal without it. Isolating is the wrong shape: this is one missing await inside
+upstream's own test, and a forked copy would have to be replayed on every release that touches the
+file.
+
+**Paths:**
+
+- `src/main/runtime/structured-agent-session-integration.test.ts`
+
+**Status:** pending-upstream. Not yet submitted.

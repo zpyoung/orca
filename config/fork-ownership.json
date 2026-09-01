@@ -2711,6 +2711,12 @@
       "reason": "Returns the selected-account acceptance verdict from live Claude rate-limit ingestion so pane telemetry can correlate plan windows without duplicating or bypassing the account guard.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#live-claude-rate-limit-ingest-acceptance"
+    },
+    {
+      "path": "src/main/runtime/structured-agent-session-integration.test.ts",
+      "reason": "Awaits the deferred event sink before the history page read: the takeover's reap tombstones the running turn's status row asynchronously, so on a loaded runner the page still carries it and the ordering assertion fails.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#structured-session-history-page-races-the-reap-tombstone"
     }
   ],
   "residuals": {
