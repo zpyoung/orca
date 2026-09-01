@@ -1,5 +1,3 @@
-import { Worker } from 'node:worker_threads'
-import { getCatalogModel } from './model-catalog'
 import type { ModelManager } from './model-manager'
 import { startSttDictation } from './stt-session-start'
 import { createSttSessionState, type SttSessionState } from './stt-session-state'

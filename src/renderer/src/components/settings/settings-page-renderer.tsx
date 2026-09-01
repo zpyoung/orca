@@ -52,6 +52,7 @@ import {
   renderPluginsSettingsSection
 } from './settings-advanced-section-renderers'
 import { renderProjectSettingsSections } from './settings-project-section-renderer'
+import { ForkSessionHandoffSettingsSection } from './fork-session-handoff/ForkSessionHandoffSettingsSection'
 
 export function renderSettingsLoading(
   interactions: SettingsInteractionController
@@ -131,6 +132,7 @@ export function renderSettingsPage(context: SettingsRenderContext): React.JSX.El
                 {renderTasksSettingsSection(context)}
                 {renderTerminalSettingsSection(context)}
                 {renderQuickCommandsSettingsSection(context)}
+                <ForkSessionHandoffSettingsSection />
                 {renderBrowserSettingsSection(context)}
                 {renderMobileEmulatorSettingsSection(context)}
                 {renderFloatingWorkspaceSettingsSection(context)}

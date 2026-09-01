@@ -14,7 +14,8 @@ import {
   readIncrementalTranscriptMessages,
   resetIncrementalTranscriptState
 } from './transcript-incremental-reader'
-import { createTranscriptNativeWatcher } from './transcript-native-watcher'
+import { emitTranscriptUnavailableSnapshot } from './transcript-unavailable-snapshot'
+import { transcriptWatcherPathIsInstallable } from './transcript-watcher-install-probe'
 import { nativeChatTranscriptCompanionDecoderForAgent } from './fork-native-chat-session-options/transcript-companion-decoder'
 import type {
   NativeChatTranscriptSubscription,
@@ -31,27 +32,11 @@ import {
 import { observeWslTranscriptRunningState } from './wsl-transcript-running-observer'
 import { trackActiveNativeChatWatcher } from './transcript-watcher-count'
 
-const ROTATION_RETRY_MS = 25
-const MAX_ROTATION_RETRY_MS = 2_000
-
-let activeWatcherCount = 0
-
-export function getActiveNativeChatWatcherCount(): number {
-  return activeWatcherCount
-}
-
-/**
- * Install the live-tail engine on an already-resolved file path. Returns null
- * when the file doesn't exist yet, so the caller falls back to resolve-polling.
- * A failed native watch still installs a reconciliation-only subscription: some
- * remote filesystems allow stat/read while rejecting fs.watch entirely.
- */
+/** Install a live tail, or return null when the resolved file is not readable yet. */
 export async function installTranscriptWatcher(
   filePath: string,
   decode: (line: string, fallbackId: string) => NativeChatMessage | null,
   args: SubscribeNativeChatTranscriptArgs & { tailReader: NativeChatTranscriptTailReader },
-  /** Cancels the install probe so an unsubscribe during it detaches the gate
-   *  waiter immediately instead of at the 30s deadline. */
   signal?: AbortSignal
 ): Promise<NativeChatTranscriptSubscription | null> {
   const isWslPath = isWslTranscriptWatcherPath(filePath)

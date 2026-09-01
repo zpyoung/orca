@@ -322,13 +322,7 @@ describe('PR Checks skip wiring', () => {
     expect(verifyStep.run).toContain('expected skipped')
     expect(verifyStep.run).toContain('expected success')
     for (const job of prWorkflow.jobs.verify.needs) {
-      // fork_ownership_guard is ungated like root_directory_guard: it runs on every PR,
-      // so it is checked unconditionally rather than through the SHOULD_RUN loop.
-      if (
-        job === 'code_paths' ||
-        job === 'root_directory_guard' ||
-        job === 'fork_ownership_guard'
-      ) {
+      if (job === 'code_paths' || job === 'root_directory_guard') {
         continue
       }
       const envVar = `${job.replaceAll('-', '_').toUpperCase()}_SHOULD_RUN`

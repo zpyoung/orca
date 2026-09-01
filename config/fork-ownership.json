@@ -278,6 +278,15 @@
       ]
     },
     {
+      "path": "src/main/native-chat/transcript-watch-engine-wsl-lifecycle.test.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": [
+        "const stubTailReader = (): never => {",
+        "      tailReader: stubTailReader,"
+      ]
+    },
+    {
       "path": "src/main/native-chat/transcript-watch-engine.ts",
       "feature": "native-chat-relay",
       "kind": "passthrough",
@@ -651,7 +660,7 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/native-chat/NativeChatView.tsx",
+      "path": "src/renderer/src/components/native-chat/NativeChatResolvedView.tsx",
       "feature": "native-chat-relay",
       "kind": "registration",
       "lines": [
@@ -688,6 +697,15 @@
       "feature": "agent-composer",
       "kind": "registration",
       "lines": ["      discovery.skills,", "  if (!leadsDraft && !hasSlashSkills) {"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-structured-composer-dispatch.ts",
+      "feature": "agent-composer",
+      "kind": "import-swap",
+      "lines": [
+        "import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentComposerField'",
+        "  attachments: readonly AgentComposerImageAttachment[] = []"
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/native-chat-composer-types.ts",
@@ -1449,7 +1467,7 @@
       ]
     },
     {
-      "path": "src/renderer/src/runtime/web-runtime-session.ts",
+      "path": "src/renderer/src/runtime/web-runtime-terminal-actions.ts",
       "feature": "terminal-dock",
       "kind": "registration",
       "lines": [
@@ -1607,13 +1625,30 @@
       ]
     },
     {
-      "path": "src/shared/telemetry-events.ts",
+      "path": "src/shared/telemetry-property-schemas.ts",
       "feature": "terminal-dock",
       "kind": "registration",
       "lines": [
         "  'experimentalTerminalDock',",
-        "  'dockTerminalComposerByDefault',",
-        "const terminalDockToggledSchema = z"
+        "  'dockTerminalComposerByDefault',"
+      ]
+    },
+    {
+      "path": "src/shared/telemetry-event-registry.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "} from './fork-terminal-dock/telemetry-terminal-dock-schemas'",
+        "  terminal_dock_toggled: terminalDockToggledSchema,"
+      ]
+    },
+    {
+      "path": "src/shared/telemetry-events.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "export { terminalDockSendOutcomeSchema } from './fork-terminal-dock/telemetry-terminal-dock-schemas'",
+        "export type { TerminalDockSendOutcome } from './fork-terminal-dock/telemetry-terminal-dock-schemas'"
       ]
     },
     {
@@ -1927,7 +1962,7 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/settings/Settings.tsx",
+      "path": "src/renderer/src/components/settings/settings-page-renderer.tsx",
       "feature": "session-handoff",
       "kind": "registration",
       "lines": [
@@ -1936,7 +1971,7 @@
       ]
     },
     {
-      "path": "src/renderer/src/hooks/useSettingsNavigationMetadata.ts",
+      "path": "src/renderer/src/hooks/settings-navigation-workflow-sections.ts",
       "feature": "session-handoff",
       "kind": "registration",
       "lines": [
@@ -2385,11 +2420,6 @@
       "status": "permanent"
     },
     {
-      "path": "src/main/speech/stt-service.ts",
-      "status": "permanent",
-      "reason": "Drops upstream's `eslint-disable max-lines`, which is inert under the fork's raised .oxlintrc.json ceilings (500 for .ts vs upstream's 300). The changed-lines code-quality check fails on the unused directive; keeping upstream's copy would fail static analysis on every sync that touches this file."
-    },
-    {
       "path": "src/main/updater-prerelease-feed.ts",
       "reason": "Fork's own prerelease update feed.",
       "status": "permanent"
@@ -2413,6 +2443,12 @@
     {
       "path": "src/renderer/src/components/native-chat/NativeChatComposerActions.tsx",
       "reason": "Replaced by the host-agnostic AgentComposerActions in fork-agent-composer; restoring upstream's copy would reintroduce a second, chat-only action bar.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-composer-composition.test.tsx",
+      "reason": "Exercises upstream's NativeChatComposerField, which this fork deletes in favour of the host-agnostic AgentComposerField; the fork's equivalent coverage lives in fork-agent-composer.",
       "status": "permanent",
       "deleted": true
     },
@@ -2716,18 +2752,13 @@
       "added": 28,
       "removed": 8
     },
-    "src/main/native-chat/transcript-watch-engine.ts": {
-      "added": 37,
-      "removed": 33
-    },
+    "src/main/native-chat/transcript-watch-engine-wsl-lifecycle.test.ts": { "added": 11, "removed": 0 },
+    "src/main/native-chat/transcript-watch-engine.ts": { "added": 36, "removed": 33 },
     "src/main/native-chat/transcript-watch.test.ts": {
       "added": 117,
       "removed": 17
     },
-    "src/main/native-chat/transcript-watch.ts": {
-      "added": 30,
-      "removed": 252
-    },
+    "src/main/native-chat/transcript-watch.ts": { "added": 30, "removed": 268 },
     "src/main/persistence/tracking-repos/project-group-operations.ts": {
       "added": 2,
       "removed": 0
@@ -2844,14 +2875,8 @@
       "added": 10,
       "removed": 2
     },
-    "src/renderer/src/components/native-chat/NativeChatComposer.test.tsx": {
-      "added": 26,
-      "removed": 13
-    },
-    "src/renderer/src/components/native-chat/NativeChatComposer.tsx": {
-      "added": 208,
-      "removed": 292
-    },
+    "src/renderer/src/components/native-chat/NativeChatComposer.test.tsx": { "added": 38, "removed": 90 },
+    "src/renderer/src/components/native-chat/NativeChatComposer.tsx": { "added": 209, "removed": 279 },
     "src/renderer/src/components/native-chat/NativeChatInteractiveCard.test.tsx": {
       "added": 21,
       "removed": 0
@@ -2876,10 +2901,7 @@
       "added": 4,
       "removed": 4
     },
-    "src/renderer/src/components/native-chat/NativeChatView.tsx": {
-      "added": 16,
-      "removed": 18
-    },
+    "src/renderer/src/components/native-chat/NativeChatResolvedView.tsx": { "added": 16, "removed": 18 },
     "src/renderer/src/components/native-chat/native-chat-command-marker.ts": {
       "added": 1,
       "removed": 1
@@ -2892,6 +2914,7 @@
       "added": 33,
       "removed": 41
     },
+    "src/renderer/src/components/native-chat/native-chat-structured-composer-dispatch.ts": { "added": 2, "removed": 2 },
     "src/renderer/src/components/native-chat/native-chat-composer-types.ts": {
       "added": 15,
       "removed": 36
@@ -2924,14 +2947,8 @@
       "added": 32,
       "removed": 1
     },
-    "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.test.tsx": {
-      "added": 59,
-      "removed": 0
-    },
-    "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.ts": {
-      "added": 52,
-      "removed": 36
-    },
+    "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.test.tsx": { "added": 78, "removed": 114 },
+    "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.ts": { "added": 64, "removed": 36 },
     "src/renderer/src/components/native-chat/use-native-chat-interactive-send.test.tsx": {
       "added": 38,
       "removed": 1
@@ -3244,10 +3261,7 @@
       "added": 24,
       "removed": 4
     },
-    "src/renderer/src/runtime/web-runtime-session.ts": {
-      "added": 3,
-      "removed": 1
-    },
+    "src/renderer/src/runtime/web-runtime-terminal-actions.ts": { "added": 3, "removed": 1 },
     "src/renderer/src/runtime/web-session-tabs-sync.ts": {
       "added": 157,
       "removed": 32
@@ -3312,10 +3326,9 @@
       "added": 4,
       "removed": 0
     },
-    "src/shared/telemetry-events.ts": {
-      "added": 22,
-      "removed": 0
-    },
+    "src/shared/telemetry-property-schemas.ts": { "added": 2, "removed": 0 },
+    "src/shared/telemetry-event-registry.ts": { "added": 9, "removed": 0 },
+    "src/shared/telemetry-events.ts": { "added": 2, "removed": 0 },
     "src/shared/workspace-session-schema.test.ts": {
       "added": 103,
       "removed": 3
@@ -3422,14 +3435,8 @@
     "src/renderer/src/components/editor/EditorPanelHeader.test.tsx": { "added": 1, "removed": 1 },
     "src/renderer/src/components/editor/EditorPanelHeader.tsx": { "added": 1, "removed": 1 },
     "src/shared/artifacts.ts": { "added": 12, "removed": 0 },
-    "src/renderer/src/components/settings/Settings.tsx": {
-      "added": 3,
-      "removed": 0
-    },
-    "src/renderer/src/hooks/useSettingsNavigationMetadata.ts": {
-      "added": 2,
-      "removed": 0
-    },
+    "src/renderer/src/components/settings/settings-page-renderer.tsx": { "added": 2, "removed": 0 },
+    "src/renderer/src/hooks/settings-navigation-workflow-sections.ts": { "added": 2, "removed": 0 },
     "src/renderer/src/lib/settings-navigation-types.ts": {
       "added": 1,
       "removed": 0

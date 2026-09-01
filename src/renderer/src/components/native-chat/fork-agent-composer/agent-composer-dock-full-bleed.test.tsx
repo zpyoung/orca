@@ -25,6 +25,15 @@ vi.mock('../fork-native-chat-width/use-native-chat-width', () => ({
 
 import { AgentComposerField } from './AgentComposerField'
 
+// A field-only render needs no live IME gesture; every hook is inert here.
+const stubImeEnterGesture = {
+  isComposing: () => false,
+  ownsKeyDown: () => false,
+  onKeyUp: () => {},
+  reset: () => {},
+  setComposing: () => {}
+}
+
 afterEach(() => cleanup())
 
 function renderField(layout?: 'dock'): {
@@ -55,8 +64,8 @@ function renderField(layout?: 'dock'): {
       onDraftChange={vi.fn()}
       onTextareaSelect={vi.fn()}
       onKeyDown={vi.fn()}
-      onCompositionStart={vi.fn()}
-      onCompositionEnd={vi.fn()}
+      imeEnterGesture={stubImeEnterGesture}
+      onImeSettled={vi.fn()}
       onPaste={vi.fn()}
       pickerListboxId="picker"
       onChoosePickerItem={vi.fn()}

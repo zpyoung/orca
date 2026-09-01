@@ -7,6 +7,7 @@ import { getGitProviderApiBudgetSearchEntries } from '@/components/settings/git-
 import { getGitPaneSearchEntries } from '@/components/settings/git-search'
 import { getMobileEmulatorSearchEntries } from '@/components/settings/mobile-emulator-search'
 import { getQuickCommandsPaneSearchEntries } from '@/components/settings/quick-commands-search'
+import { getForkSessionHandoffNavSections } from '@/components/settings/fork-session-handoff/handoff-settings-nav-section'
 import { getShareSkillsSettingsSearchEntries } from '@/components/settings/share-skills-settings-search'
 import { getTasksPaneSearchEntries } from '@/components/settings/tasks-search'
 import { translate } from '@/i18n/i18n'
@@ -121,6 +122,7 @@ export function buildWorkflowSettingsSections(
       searchEntries: getQuickCommandsPaneSearchEntries(),
       group: 'workflows'
     },
+    ...getForkSessionHandoffNavSections(),
     ...(showDesktopOnlySettings
       ? [
           {

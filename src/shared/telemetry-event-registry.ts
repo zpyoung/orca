@@ -56,6 +56,11 @@ import {
   telemetryOptedOutSchema
 } from './telemetry-native-feature-event-schemas'
 import {
+  terminalDockPassthroughToggledSchema,
+  terminalDockSendOutcomeEventSchema,
+  terminalDockToggledSchema
+} from './fork-terminal-dock/telemetry-terminal-dock-schemas'
+import {
   activationChecklistItemCompletedSchema,
   onboardingAgentPickedSchema,
   onboardingCompletedSchema,
@@ -136,6 +141,10 @@ export const eventSchemas = {
   native_chat_picker_item_accepted: nativeChatPickerItemAcceptedSchema,
   native_chat_send_classified: nativeChatSendClassifiedSchema,
   native_chat_skill_discovery: nativeChatSkillDiscoverySchema,
+
+  terminal_dock_toggled: terminalDockToggledSchema,
+  terminal_dock_passthrough_toggled: terminalDockPassthroughToggledSchema,
+  terminal_dock_send_outcome: terminalDockSendOutcomeEventSchema,
 
   telemetry_opted_in: telemetryOptedInSchema,
   telemetry_opted_out: telemetryOptedOutSchema,

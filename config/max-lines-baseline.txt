@@ -16,8 +16,6 @@ inline src/main/runtime/orca-runtime-files.ts
 inline src/main/runtime/orca-runtime.test.ts
 inline src/main/runtime/orca-runtime.ts
 inline src/main/runtime/rpc/methods/orchestration.ts
-inline src/main/runtime/runtime-rpc.ts
-inline src/main/source-control/hosted-review-creation.ts
 inline src/main/ssh/ssh-channel-multiplexer.ts
 inline src/main/ssh/ssh-connection.ts
 inline src/main/ssh/ssh-relay-deploy.ts
@@ -46,13 +44,9 @@ inline src/renderer/src/store/slices/linear.ts
 inline src/renderer/src/store/slices/tabs.ts
 inline src/renderer/src/store/slices/ui.ts
 inline src/shared/keybindings.ts
-inline src/shared/telemetry-events.ts
-mobile-config app/h/*/index.tsx
 mobile-config app/h/*/session/*.tsx
 mobile-config app/h/*/source-control/*.tsx
 mobile-config app/h/*/tasks.tsx
 mobile-config app/index.tsx
-mobile-config src/browser/MobileBrowserPane.tsx
-mobile-config src/components/NewWorktreeModal.tsx
 mobile-config src/terminal/terminal-webview-html.ts
 mobile-config src/transport/rpc-client.ts

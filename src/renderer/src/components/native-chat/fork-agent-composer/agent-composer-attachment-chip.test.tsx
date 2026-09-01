@@ -33,6 +33,15 @@ vi.mock('../NativeChatAutocompleteMenus', () => ({
 
 import { AgentComposerField } from './AgentComposerField'
 
+// A field-only render needs no live IME gesture; every hook is inert here.
+const stubImeEnterGesture = {
+  isComposing: () => false,
+  ownsKeyDown: () => false,
+  onKeyUp: () => {},
+  reset: () => {},
+  setComposing: () => {}
+}
+
 beforeEach(() => {
   Object.defineProperty(window, 'api', {
     configurable: true,
@@ -69,8 +78,8 @@ function renderFieldWithAttachments(imageAttachments: AgentComposerImageAttachme
       onDraftChange={vi.fn()}
       onTextareaSelect={vi.fn()}
       onKeyDown={vi.fn()}
-      onCompositionStart={vi.fn()}
-      onCompositionEnd={vi.fn()}
+      imeEnterGesture={stubImeEnterGesture}
+      onImeSettled={vi.fn()}
       onPaste={vi.fn()}
       pickerListboxId="picker"
       onChoosePickerItem={vi.fn()}

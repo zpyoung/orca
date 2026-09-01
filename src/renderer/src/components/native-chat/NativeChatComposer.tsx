@@ -70,8 +70,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       onSlashCommand,
       onSwitchToTerminal,
       readTerminalScreen,
-      launchDraft,
-      launchDraftResolved = false,
+      launchSeed,
       reportedSessionOptions,
       structuredTransport
     },
@@ -104,8 +103,9 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
     useNativeChatLaunchDraftAdoption({
       terminalTabId,
       agent,
-      launchDraft,
-      launchDraftResolved,
+      launchDraft: launchSeed?.launchDraft,
+      launchDraftResolved: launchSeed?.launchDraftResolved === true,
+      ownsTabWideLaunchDraft: launchSeed?.ownsTabWideLaunchDraft === true,
       draft: core.draft,
       setDraft: core.setDraft,
       setCaret: core.setCaret
@@ -129,12 +129,15 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       imageAttachments,
       attachResolvedPaths,
       clearImageAttachments,
+      flushPendingAttachments,
       restoreImageAttachments,
       removeImageAttachment
     } = useNativeChatComposerAttachments({
       attachmentScopeKey: paneKey,
       allowWithoutTarget: Boolean(structuredTransport),
       caret: core.caret,
+      disabled: core.disabled,
+      isComposing: core.imeEnterGesture.isComposing,
       resolveTarget: core.resolveTarget,
       textareaRef: core.textareaRef,
       setCaret: core.setCaret,
@@ -170,6 +173,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       useNativeChatDictationActions({ textareaRef: core.textareaRef, setDictationPressed })
     const dictationState = useAppStore((store) => store.dictationState)
     const voiceSettings = useAppStore((store) => store.settings?.voice)
+    const isDictationHoldMode = voiceSettings?.dictationMode === 'hold'
     const dictationDisabled = voiceSettings?.enabled !== true || !voiceSettings.sttModel
     const isDictating =
       dictationPressed ||
@@ -272,6 +276,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
             }
           }
         : {}),
+      flushPendingAttachments,
       autocomplete: picker.autocomplete,
       pickerListboxId: picker.listboxId,
       classifySend: picker.classifySend,
@@ -318,8 +323,8 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
           : null,
       buildSendOptions: () =>
         resolveNativeChatLaunchDraftSend({
-          launchDraft,
-          launchDraftResolved,
+          launchDraft: launchSeed?.launchDraft,
+          launchDraftResolved: launchSeed?.launchDraftResolved === true,
           agent,
           readScreen: () => readTerminalScreen?.() ?? null
         }).sendOptions,

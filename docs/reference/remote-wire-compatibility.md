@@ -134,40 +134,6 @@ before a feature shipped, as `cross-version-browser-placement.unit.test.ts` does
 `LEGACY_BROWSER_PLACEMENT_RELEASE_REF`. It does not rot on a cut, but it is
 hand-maintained, so prefer deriving.
 
-### Never write down what the old side has
-
-The baseline is whichever release tag is newest, so it moves on every cut. An
-expectation of the form "the old side does not have X" — a `not.toHaveProperty`, a
-`not.toContain`, a hard-coded field list — stops being true the first time a release
-ships X. The suite then reddens on whatever pull request is in flight, with no code
-change anywhere, and the job trains people to ignore it. That is worse than no test,
-because a rolling baseline eventually contains every additive field the wire has, and
-adding one is the sanctioned way to evolve it.
-
-Derive the expectation from the baseline that was actually checked out:
-
-- for a published frame, pair each build against a client of its own version and
-  compare the skewed pairing against that same-version reference, so the expectation
-  is whatever that build publishes today (`publishedFieldNames` in
-  `tests/e2e/cross-version-wire/published-field-shape.ts`);
-- for a negotiated surface, read the old build's advertised capabilities and
-  registered method names from its checkout, and assert they agree with each other
-  rather than asserting the old build lacks them;
-- for a "client too old to know X", derive that client's advertised list by removing
-  X from the baseline's own list, so the gate stays exercised after X ships.
-
-Name the direction in the assertion. `new client against old server` and `old client
-against new server` fail for different reasons, and the host is the only side that
-authors a published frame — the terminal `terminalOwner` false positive on 2026-08-29
-was misread as a new client sending an unknown field when the old server was
-publishing it. Two things are still safe to state literally: the current build's own
-contract, and an invariant that holds for every version.
-
-Pinning a legacy ref is the fallback when a contract genuinely needs a release from
-before a feature shipped, as `cross-version-browser-placement.unit.test.ts` does with
-`LEGACY_BROWSER_PLACEMENT_RELEASE_REF`. It does not rot on a cut, but it is
-hand-maintained, so prefer deriving.
-
 `tests/e2e/cross-version-wire/cross-version-agent-session-wire.unit.test.ts` pairs the
 same two builds over the structured `agentSession.*` surface. Because a released build
 cannot name a capability string its own source never contains, the old side's advertised

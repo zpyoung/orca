@@ -2,14 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '../../store'
 import { useNativeChatLaunchDraftSignal } from './use-native-chat-launch-draft-adoption'
 import { useNativeChatRetainedSession } from './use-native-chat-retained-session'
-import { isNativeChatTranscriptUnsettled } from './use-native-chat-live-session'
-import { selectNativeChatViewState } from './native-chat-view-state'
-import { NativeChatMessageList } from './NativeChatMessageList'
+import { isNativeChatTranscriptUnsettled } from './fork-native-chat-relay/use-native-chat-live-session'
+import { selectNativeChatViewState } from './fork-native-chat-relay/native-chat-view-state'
 import { NativeChatComposer, type NativeChatComposerHandle } from './NativeChatComposer'
 import { useNativeChatFontScale } from './use-native-chat-font-scale'
 import { useNativeChatCanSend } from './use-native-chat-can-send'
 import { NativeChatInteractiveCard } from './NativeChatInteractiveCard'
 import { NativeChatEmptyState } from './NativeChatEmptyState'
+import { NativeChatConversation } from './fork-native-chat-relay/NativeChatConversation'
+import { useNativeChatLaunchPromptOverlay } from './fork-native-chat-relay/use-native-chat-launch-prompt-overlay'
 import { useNativeChatInteractiveSend } from './use-native-chat-interactive-send'
 import {
   shouldClearNativeChatWorkingSuppression,
@@ -17,7 +18,6 @@ import {
 } from './native-chat-working-suppression'
 import {
   appendPendingSendCache,
-  launchPromptAsMessage,
   pendingSendsAsMessages,
   nextNativeChatPendingSendId,
   prunePendingSends,
@@ -46,7 +46,10 @@ import {
   emptyNativeChatContextMenuActions,
   useNativeChatContextMenu
 } from './use-native-chat-context-menu'
-import { selectNativeChatRuntimeEnvironmentId } from './native-chat-runtime-owner'
+import {
+  selectNativeChatRuntimeEnvironmentId,
+  selectNativeChatSshConnectionId
+} from './fork-native-chat-relay/native-chat-runtime-owner'
 import { useNativeChatPasteBridge } from './use-native-chat-paste-bridge'
 import { useNativeChatFileLinkClick } from './use-native-chat-file-link-click'
 import type { NativeChatResolvedViewProps } from './native-chat-view-types'
@@ -59,7 +62,6 @@ export function NativeChatResolvedView({
   agent,
   sessionId,
   transcriptPath,
-  isVisible,
   targetPtyId,
   terminalTabId,
   ownsTabWideLaunchDraft,
@@ -73,13 +75,14 @@ export function NativeChatResolvedView({
   const runtimeEnvironmentId = useAppStore((s) =>
     selectNativeChatRuntimeEnvironmentId(s, terminalTabId)
   )
+  const sshConnectionId = useAppStore((s) => selectNativeChatSshConnectionId(s, terminalTabId))
   const session = useNativeChatRetainedSession({
     paneKey,
     agent,
     sessionId,
     transcriptPath,
     runtimeEnvironmentId,
-    enabled: isVisible
+    sshConnectionId
   })
   const launchPrompt = useAppStore((s) => s.nativeChatLaunchPromptByTabId[terminalTabId] ?? null)
   const clearNativeChatLaunchPrompt = useAppStore((s) => s.clearNativeChatLaunchPrompt)
@@ -208,16 +211,10 @@ export function NativeChatResolvedView({
     [commandMarkerScope]
   )
 
-  const launchPromptMessage = useMemo(
-    () => launchPromptAsMessage(paneLaunchPrompt, session.messages),
-    [paneLaunchPrompt, session.messages]
+  const { launchPromptMessage, sessionWithLaunchPrompt } = useNativeChatLaunchPromptOverlay(
+    paneLaunchPrompt,
+    session
   )
-  const sessionWithLaunchPrompt = useMemo<typeof session>(() => {
-    if (!launchPromptMessage) {
-      return session
-    }
-    return { ...session, messages: [...session.messages, launchPromptMessage] }
-  }, [launchPromptMessage, session])
 
   const sessionAfterCommandBoundaries = useMemo<typeof session>(() => {
     const messages = applyCommandMarkerBoundaries(sessionWithLaunchPrompt.messages, commandMarkers)
@@ -354,14 +351,14 @@ export function NativeChatResolvedView({
         ) : viewState.kind === 'empty' ? (
           <NativeChatEmptyState kind="empty" agent={agent} />
         ) : (
-          <NativeChatMessageList
+          <NativeChatConversation
             session={sessionWithPending}
             isWorking={isWorking}
-            expandSignal={false}
             fontScale={fontScale.scale}
             onLinkClick={nativeChatFileLinkClick}
             allowFileUriLinks={fileLinkContext !== null}
             failedDeliveryMessageIds={failedLaunchPromptMessageIds}
+            readError={viewState.error}
           />
         )}
       </div>
@@ -395,6 +392,7 @@ export function NativeChatResolvedView({
           onSlashCommand={onSlashCommand}
           onSwitchToTerminal={onSwitchToTerminal}
           readTerminalScreen={readTerminalScreen}
+          reportedSessionOptions={session.sessionOptions}
           launchSeed={{ ...launchDraftSignal, ownsTabWideLaunchDraft }}
         />
       )}
