@@ -21,25 +21,24 @@ const { resetTransport, subscriptions, transport } = vi.hoisted(() => {
   return { resetTransport, subscriptions, transport }
 })
 
-vi.mock('./native-chat-session-transport', () => ({
+vi.mock('./fork-native-chat-relay/native-chat-session-transport', () => ({
   getNativeChatSessionTransport: () => transport
 }))
 
 import {
   isNativeChatTranscriptUnsettled,
-  NOTFOUND_RETRY_WINDOW_MS,
   useNativeChatLiveSession,
   type NativeChatLiveSession,
   type UseNativeChatLiveSessionArgs
-} from './use-native-chat-live-session'
+} from './fork-native-chat-relay/use-native-chat-live-session'
+import { NOTFOUND_RETRY_WINDOW_MS } from './fork-native-chat-relay/native-chat-read-retry'
 import { useNativeChatRetainedSession } from './use-native-chat-retained-session'
 
 const BASE_ARGS: UseNativeChatLiveSessionArgs = {
   paneKey: 'tab-1:leaf-1',
   agent: 'claude',
   sessionId: 'session-1',
-  transcriptPath: '/home/agent/session-1.jsonl',
-  enabled: true
+  transcriptPath: '/home/agent/session-1.jsonl'
 }
 
 /** The frame the host emits once it has waited out the flush grace period. */

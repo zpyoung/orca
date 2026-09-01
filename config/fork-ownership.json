@@ -740,6 +740,16 @@
       "lines": ["      discovery.skills,", "  if (!leadsDraft && !hasSlashSkills) {"]
     },
     {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-live-session-pending.test.ts",
+      "feature": "native-chat-relay",
+      "kind": "import-swap",
+      "lines": [
+        "vi.mock('./fork-native-chat-relay/native-chat-session-transport', () => ({",
+        "} from './fork-native-chat-relay/use-native-chat-live-session'",
+        "import { NOTFOUND_RETRY_WINDOW_MS } from './fork-native-chat-relay/native-chat-read-retry'"
+      ]
+    },
+    {
       "path": "src/renderer/src/components/native-chat/native-chat-structured-send-composition-clear.test.tsx",
       "feature": "agent-composer",
       "kind": "import-swap",
@@ -2975,6 +2985,7 @@
       "added": 33,
       "removed": 41
     },
+    "src/renderer/src/components/native-chat/use-native-chat-live-session-pending.test.ts": { "added": 4, "removed": 5 },
     "src/renderer/src/components/native-chat/native-chat-structured-send-composition-clear.test.tsx": { "added": 2, "removed": 2 },
     "src/renderer/src/components/native-chat/native-chat-structured-composer-dispatch.ts": { "added": 2, "removed": 2 },
     "src/renderer/src/components/native-chat/native-chat-composer-types.ts": {
