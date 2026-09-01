@@ -212,7 +212,7 @@ import type {
   ArtifactPublishResult,
   ArtifactWriteRequest
 } from '../../shared/artifacts'
-import type { ArtifactCloudService } from '../artifacts/artifact-cloud-service'
+import type { ArtifactCloudService } from '../artifacts/fork-artifact-passwords/artifact-password-cloud-service'
 import type {
   SkillCloudDownloadGrant,
   SkillCloudOperation,
@@ -6127,7 +6127,7 @@ export class OrcaRuntimeService {
   }
 
   getPublishedArtifactLink(
-    request: ArtifactCloudOptions & { sourceKey: string }
+    request: ArtifactCloudOptions & { sourceKey: string; revealPassphrase?: boolean }
   ): Promise<ArtifactCloudOperation<ArtifactPublishedLink | null>> {
     return this.requireArtifactService().getPublishedLink(request)
   }

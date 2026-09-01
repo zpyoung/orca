@@ -8,7 +8,7 @@ vi.mock('electron', () => ({
   safeStorage: { isEncryptionAvailable: () => false }
 }))
 
-import { ArtifactCloudService } from './artifact-cloud-service'
+import { ArtifactCloudService } from './fork-artifact-passwords/artifact-password-cloud-service'
 
 const createdPaths: string[] = []
 const apiUrl = 'http://localhost:3000'

@@ -59,6 +59,11 @@
       "globs": ["**/fork-dirty-branch-indicator/**"]
     },
     {
+      "name": "artifact-passwords",
+      "purpose": "Encrypts shared artifact content before upload and manages local passphrases and protection lifecycle.",
+      "globs": ["**/fork-artifact-passwords/**"]
+    },
+    {
       "name": "session-info",
       "purpose": "Shows provider-neutral details, live context, usage, diagnostics, and safe actions for the exact focused agent terminal session while preserving user-owned statuslines.",
       "globs": ["**/fork-session-info/**"]
@@ -1642,6 +1647,66 @@
       "lines": ["  projectGroupId?: string | null"]
     },
     {
+      "path": "src/cli/args.ts",
+      "feature": "artifact-passwords",
+      "kind": "passthrough",
+      "lines": ["  'protect',"]
+    },
+    {
+      "path": "src/cli/artifact-format.ts",
+      "feature": "artifact-passwords",
+      "kind": "registration",
+      "lines": [
+        "  formatArtifactListRowWithPassword,",
+        "  formatArtifactSharedWithPassword",
+        "} from './fork-artifact-passwords/artifact-password-cli'",
+        "  return artifacts.map(formatArtifactListRowWithPassword).join('\\n\\n')",
+        "  return formatArtifactSharedWithPassword(item)"
+      ]
+    },
+    {
+      "path": "src/cli/handlers/artifacts.ts",
+      "feature": "artifact-passwords",
+      "kind": "registration",
+      "lines": [
+        "import { artifactShareRpcMethod } from '../fork-artifact-passwords/artifact-password-cli'",
+        "      artifactShareRpcMethod(ctx.flags),"
+      ]
+    },
+    {
+      "path": "src/cli/specs/artifacts.ts",
+      "feature": "artifact-passwords",
+      "kind": "passthrough",
+      "lines": [
+        "    usage: 'orca artifacts share <file> [--protect] [--api-url <url>] [--json]',",
+        "    allowedFlags: [...GLOBAL_FLAGS, ...CLOUD_FLAGS, 'file', 'protect'],"
+      ]
+    },
+    {
+      "path": "src/main/artifacts/artifact-cloud-recovery.test.ts",
+      "feature": "artifact-passwords",
+      "kind": "import-swap",
+      "lines": [
+        "import { ArtifactCloudService } from './fork-artifact-passwords/artifact-password-cloud-service'"
+      ]
+    },
+    {
+      "path": "src/main/artifacts/artifact-cloud-service-races.test.ts",
+      "feature": "artifact-passwords",
+      "kind": "import-swap",
+      "lines": [
+        "import { ArtifactCloudService } from './fork-artifact-passwords/artifact-password-cloud-service'"
+      ]
+    },
+    {
+      "path": "src/main/artifacts/artifact-cloud-service.test.ts",
+      "feature": "artifact-passwords",
+      "kind": "import-swap",
+      "lines": [
+        "import { ArtifactCloudService } from './fork-artifact-passwords/artifact-password-cloud-service'"
+      ]
+    },
+    {
       "path": "src/main/ipc/register-core-handlers/register-core-handlers.test.ts",
       "feature": "session-handoff",
       "kind": "registration",
@@ -1650,6 +1715,133 @@
         "  registerForkSessionHandoffHandlers: vi.fn()",
         "vi.mock('../../fork-session-info/session-info-ipc', () => ({",
         "  registerSessionInfoIpcHandlers: vi.fn()"
+      ]
+    },
+    {
+      "path": "src/main/index.ts",
+      "feature": "artifact-passwords",
+      "kind": "import-swap",
+      "lines": [
+        "import { ArtifactCloudService } from './artifacts/fork-artifact-passwords/artifact-password-cloud-service'"
+      ]
+    },
+    {
+      "path": "src/main/orca-profiles/profile-artifact-cloud-cleanup.ts",
+      "feature": "artifact-passwords",
+      "kind": "registration",
+      "lines": [
+        "import { clearArtifactPasswordRecords } from '../artifacts/fork-artifact-passwords/artifact-password-record-store'",
+        "  clearArtifactPasswordRecords(profileId, userDataPath)"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/artifacts.ts",
+      "feature": "artifact-passwords",
+      "kind": "registration",
+      "lines": [
+        "import { withArtifactProtectionProjection } from './fork-artifact-passwords/artifact-password-client-projection'",
+        "export const SourceRequest = z.object({",
+        "export const WriteRequest = z",
+        "    protection: z.never().optional(),",
+        "export const ARTIFACT_METHODS: readonly RpcAnyMethod[] = withArtifactProtectionProjection(["
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/index.ts",
+      "feature": "artifact-passwords",
+      "kind": "registration",
+      "lines": [
+        "import { ARTIFACT_PASSWORD_METHODS } from './fork-artifact-passwords/artifact-password-methods'",
+        "  ...ARTIFACT_PASSWORD_METHODS,"
+      ]
+    },
+    {
+      "path": "src/relay/remote-artifact-cli-input.ts",
+      "feature": "artifact-passwords",
+      "kind": "passthrough",
+      "lines": ["const BOOLEAN_FLAGS = new Set(['help', 'json', 'protect'])"]
+    },
+    {
+      "path": "src/renderer/src/components/artifacts/ArtifactDetailHeader.tsx",
+      "feature": "artifact-passwords",
+      "kind": "passthrough",
+      "lines": [
+        "import { ArtifactLinkAudience } from './fork-artifact-passwords/artifact-protection-display'",
+        "            <ArtifactLinkAudience item={item} />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/artifacts/ArtifactListRows.tsx",
+      "feature": "artifact-passwords",
+      "kind": "registration",
+      "lines": [
+        "import { ArtifactNameWithProtection } from './fork-artifact-passwords/artifact-protection-display'",
+        "                <ArtifactNameWithProtection item={item} name={name} />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/artifacts/ArtifactsPage.tsx",
+      "feature": "artifact-passwords",
+      "kind": "import-swap",
+      "lines": [
+        "import { ArtifactDetailDrawer } from './fork-artifact-passwords/ArtifactDetailDrawer'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/artifacts/artifact-display-labels.ts",
+      "feature": "artifact-passwords",
+      "kind": "passthrough",
+      "lines": [
+        "    item.local?.displayName ||",
+        "  if ((item.local?.sourceContentType ?? item.artifact.sourceContentType) === 'text/markdown') {",
+        "  if ((item.local?.sourceContentType ?? item.artifact.sourceContentType) === 'text/html') {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/artifacts/artifact-publish-flow.ts",
+      "feature": "artifact-passwords",
+      "kind": "passthrough",
+      "lines": [
+        "import { showCompletedArtifactPublish } from './fork-artifact-passwords/artifact-password-publish-feedback'",
+        "  rpcMethod = 'artifacts.publish'",
+        "        rpcMethod,",
+        "        showCompletedArtifactPublish(result.value, showArtifactPublishedToast)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/browser-pane/assemble-chrome/browser-page-toolbar.tsx",
+      "feature": "artifact-passwords",
+      "kind": "import-swap",
+      "lines": [
+        "import { ArtifactPublishButton } from '@/components/artifacts/fork-artifact-passwords/ArtifactPublishButton'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/editor/EditorPanelHeader.test.tsx",
+      "feature": "artifact-passwords",
+      "kind": "import-swap",
+      "lines": [
+        "vi.mock('@/components/artifacts/fork-artifact-passwords/ArtifactPublishButton', () => ({"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/editor/EditorPanelHeader.tsx",
+      "feature": "artifact-passwords",
+      "kind": "import-swap",
+      "lines": [
+        "import { ArtifactPublishButton } from '@/components/artifacts/fork-artifact-passwords/ArtifactPublishButton'"
+      ]
+    },
+    {
+      "path": "src/shared/artifacts.ts",
+      "feature": "artifact-passwords",
+      "kind": "passthrough",
+      "lines": [
+        "} from './fork-artifact-passwords/artifact-password-types'",
+        "  local?: ArtifactLocalDetails",
+        "  protection?: ArtifactProtectionPublication",
+        "  protection?: ArtifactProtectionRequest",
+        "  protection?: ArtifactPublishedProtection"
       ]
     },
     {
@@ -2545,8 +2737,8 @@
       "removed": 0
     },
     "src/main/runtime/orca-runtime.ts": {
-      "added": 143,
-      "removed": 14
+      "added": 145,
+      "removed": 16
     },
     "src/main/runtime/rpc/methods/native-chat.test.ts": {
       "added": 14,
@@ -3161,8 +3353,8 @@
       "removed": 1
     },
     "src/main/index.ts": {
-      "added": 2,
-      "removed": 0
+      "added": 3,
+      "removed": 1
     },
     "src/main/ipc/register-core-handlers/register-core-handlers.test.ts": {
       "added": 8,
@@ -3204,6 +3396,32 @@
       "added": 2,
       "removed": 0
     },
+    "src/cli/args.ts": { "added": 1, "removed": 0 },
+    "src/cli/artifact-format.ts": { "added": 6, "removed": 7 },
+    "src/cli/handlers/artifacts.ts": { "added": 2, "removed": 1 },
+    "src/cli/specs/artifacts.ts": { "added": 2, "removed": 2 },
+    "src/main/artifacts/artifact-cloud-recovery.test.ts": { "added": 1, "removed": 1 },
+    "src/main/artifacts/artifact-cloud-service-races.test.ts": { "added": 1, "removed": 1 },
+    "src/main/artifacts/artifact-cloud-service.test.ts": { "added": 9, "removed": 3 },
+    "src/main/orca-profiles/profile-artifact-cloud-cleanup.ts": { "added": 2, "removed": 0 },
+    "src/main/runtime/rpc/methods/artifacts.ts": { "added": 6, "removed": 4 },
+    "src/main/runtime/rpc/methods/index.ts": { "added": 2, "removed": 0 },
+    "src/relay/remote-artifact-cli-input.ts": { "added": 1, "removed": 1 },
+    "src/renderer/src/components/artifacts/ArtifactDetailHeader.tsx": { "added": 3, "removed": 13 },
+    "src/renderer/src/components/artifacts/ArtifactListRows.tsx": { "added": 2, "removed": 3 },
+    "src/renderer/src/components/artifacts/ArtifactsPage.tsx": { "added": 1, "removed": 1 },
+    "src/renderer/src/components/artifacts/artifact-display-labels.ts": {
+      "added": 8,
+      "removed": 3
+    },
+    "src/renderer/src/components/artifacts/artifact-publish-flow.ts": { "added": 5, "removed": 3 },
+    "src/renderer/src/components/browser-pane/assemble-chrome/browser-page-toolbar.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/editor/EditorPanelHeader.test.tsx": { "added": 1, "removed": 1 },
+    "src/renderer/src/components/editor/EditorPanelHeader.tsx": { "added": 1, "removed": 1 },
+    "src/shared/artifacts.ts": { "added": 12, "removed": 0 },
     "src/renderer/src/components/settings/Settings.tsx": {
       "added": 3,
       "removed": 0
@@ -3233,8 +3451,8 @@
       "removed": 2
     },
     "src/main/index.ts": {
-      "added": 4,
-      "removed": 3
+      "added": 5,
+      "removed": 4
     },
     "src/main/persistence/applying-settings/ui-selection-normalization.ts": {
       "added": 1,

@@ -4,6 +4,7 @@ import {
   artifactWriteRequestByteLength
 } from '../../../../shared/artifacts'
 import { defineMethod, type RpcAnyMethod } from '../core'
+import { withArtifactProtectionProjection } from './fork-artifact-passwords/artifact-password-client-projection'
 
 const CloudOptions = {
   apiUrl: z.string().max(2_048).optional(),
@@ -15,25 +16,26 @@ const ListOptions = z.object({
   cursor: z.string().min(1).max(2_048).optional()
 })
 
-const SourceRequest = z.object({
+export const SourceRequest = z.object({
   sourceKey: z.string().min(1).max(32_768),
   ...CloudOptions
 })
 
-const WriteRequest = z
+export const WriteRequest = z
   .object({
     sourceKey: z.string().min(1).max(32_768),
     content: z.string().min(1).max(ARTIFACT_CLI_MAX_RPC_BYTES),
     contentType: z.enum(['text/html', 'text/markdown']),
     fileName: z.string().min(1).max(512),
     title: z.string().max(512).optional(),
+    protection: z.never().optional(),
     ...CloudOptions
   })
   .refine((request) => artifactWriteRequestByteLength(request) <= ARTIFACT_CLI_MAX_RPC_BYTES, {
     message: 'Artifact request exceeds the local RPC size limit.'
   })
 
-export const ARTIFACT_METHODS: readonly RpcAnyMethod[] = [
+export const ARTIFACT_METHODS: readonly RpcAnyMethod[] = withArtifactProtectionProjection([
   defineMethod({
     name: 'artifacts.list',
     params: ListOptions,
@@ -69,4 +71,4 @@ export const ARTIFACT_METHODS: readonly RpcAnyMethod[] = [
     params: z.object({ id: z.string().min(1), ...CloudOptions }),
     handler: (params, { runtime }) => runtime.deleteArtifact(params.id, params)
   })
-]
+])
