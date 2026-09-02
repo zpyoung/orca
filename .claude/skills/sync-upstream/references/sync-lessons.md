@@ -40,10 +40,13 @@ worktree copy — and list what replaced it with
 `git ls-tree -r --name-only "$UPSTREAM_TARGET" -- <path-without-.ts>/`.
 
 Two adjacent tells worth knowing. A seam path that no longer exists in the tag at all is the same
-situation one step further along; check with `comm -23` of the manifest's seam paths against
-`git ls-tree -r --name-only "$UPSTREAM_TARGET"`. And a residual that drifts by exactly one or two
-lines is *not* this — that is ordinary `-X ours` hunk damage, where upstream added a parameter or an
-import the fork's side discarded, and it is repaired in place.
+situation one step further along; compare the manifest's seam paths against
+`git ls-tree -r --name-only "$UPSTREAM_TARGET"` as sets — in Python, or with `LC_ALL=C` on both the
+`sort`s *and* the `comm`. Under the default macOS locale `comm` reports paths as missing that the
+tag plainly contains; v1.4.195 got 120 false positives that way, against a true answer of zero. And
+a residual that drifts by exactly one or two lines is *not* this — that is ordinary `-X ours` hunk
+damage, where upstream added a parameter or an import the fork's side discarded, and it is repaired
+in place.
 
 **The right move.** Re-home the seam, do not defend the monolith:
 

@@ -228,8 +228,12 @@ auto-resolvable, and only in the fork's favor:
 - **"deleted by us / modified by them"** (the fork deleted it, upstream modified it) → honor the
   fork's deletion: `git rm -f <path>`.
 
-Then `git commit --no-edit`. Record `resolution=auto-ours+tree` and log every path touched with the
-rule applied.
+Then `git commit --no-edit --no-verify`. Record `resolution=auto-ours+tree` and log every path
+touched with the rule applied. `--no-verify` is required, not a shortcut: husky's pre-commit hook
+runs `oxlint` over the staged tree, and the `-X ours` tree is exactly the tree Step 6 exists to
+repair — it routinely carries a duplicate declaration or a broken brace pair, so the hook rejects
+the merge commit and lint-staged reverts your resolution. Step 8 is this run's lint gate, and it
+runs on the repaired tree.
 
 Anything else — rename/rename, rename/delete, submodule conflicts, binary files you cannot attribute
 to a side, or more than 25 conflicted paths in total — is out of scope. Do not guess. Run
@@ -324,8 +328,22 @@ import repointed at a forked copy, and a relay test mocking the fork's transport
 and resolves to the tag, so a dependency the exception dropped makes `pnpm install --frozen-lockfile`
 fail in Step 8 with a lockfile error that names nothing about ownership.
 
-Commit the ownership resolution as a single follow-up commit on top of the merge; Step 7 expects
-exactly one such extra commit.
+**A reset upstream test may pin an upstream release tag this remote does not have.** The
+cross-version-wire harness resolves refs against git, so a constant naming a bare `vX.Y.Z` aborts
+the whole suite in PR CI — three releases have now added one. Sweep after the reset:
+
+```sh
+git grep -nE "'v[0-9]+\.[0-9]+\.[0-9]+'" -- tests/e2e/cross-version-wire/
+```
+
+A hit only matters where the string reaches `materializeReleaseCheckout`; fixture inputs to
+`selectLatestStableReleaseTag` are pure and stay as they are. For a real one, pick the fork release
+that contains that upstream tag and nothing newer (`merge-base --is-ancestor` both ways), prove the
+modules the harness loads are byte-identical across the two, repoint the constant, and declare it as
+a seam beside its siblings.
+
+Commit the ownership resolution as a single follow-up commit on top of the merge, again with
+`--no-verify` for the reason in Step 5; Step 7 expects exactly one such extra commit.
 
 If the classifier fails, or `checkout.txt` is empty when the merge was not a no-op, STOP and go to
 Step 13 with "needs attention: ownership resolution failed". Do not fall back to plain `-X ours` —
@@ -361,6 +379,10 @@ A fix may:
   budgets, tier-2 replay headers — when the declaration is what drifted
 - adapt fork code to an upstream API that changed shape, preserving the fork behavior
 - adopt an upstream test's new expectations where the fork has no stake in the old ones
+- resolve a React Doctor finding on upstream code the release introduced. Every upstream line is a
+  changed line on a sync PR, so `static analysis` reports findings upstream's own CI never sees.
+  Rewrite upstream's code to satisfy the rule and declare the file `pending-upstream` under the
+  existing ledger section — never add it to a suppression list
 - apply mechanical lint/format fixes (`oxlint --fix`, `pnpm format`), committed on their own
 
 Escalate — stop, leave the PR open, report "needs attention" — for:
