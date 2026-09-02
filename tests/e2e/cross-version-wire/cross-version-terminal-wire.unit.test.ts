@@ -27,8 +27,10 @@ import {
 
 // Why: a cold CI run extracts the baseline checkout before the first journey.
 const SUITE_TIMEOUT_MS = 180_000
-// Last stable release before SnapshotStart began publishing terminal mode metadata.
-const TERMINAL_MODE_METADATA_LEGACY_REF = 'v1.4.190'
+// Last fork release before SnapshotStart began publishing terminal mode metadata. Upstream pins
+// v1.4.190, whose tag does not exist on this remote; this release carries that tag's wire modules
+// byte-for-byte.
+const TERMINAL_MODE_METADATA_LEGACY_REF = 'v1.4.191-rc.0.zy01'
 
 /**
  * The frames one journey must produce, named rather than numbered so a diff reads
