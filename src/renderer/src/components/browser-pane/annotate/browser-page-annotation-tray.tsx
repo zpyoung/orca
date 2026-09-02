@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { CircleCheck, Copy, MessageSquarePlus, Pencil, Send, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -55,14 +55,14 @@ export function BrowserPageAnnotationTray({
   const [editIntent, setEditIntent] = useState<BrowserAnnotationIntent>('change')
 
   // Why: a delete or clear while a row is mid-edit must not leave edit state pointing at nothing.
-  useEffect(() => {
-    if (
-      editingAnnotationId &&
-      !browserAnnotations.some((annotation) => annotation.id === editingAnnotationId)
-    ) {
-      setEditingAnnotationId(null)
-    }
-  }, [browserAnnotations, editingAnnotationId])
+  // Adjusted during render, not in an effect, so the tray never paints a frame still in edit mode
+  // for an annotation that is already gone.
+  if (
+    editingAnnotationId &&
+    !browserAnnotations.some((annotation) => annotation.id === editingAnnotationId)
+  ) {
+    setEditingAnnotationId(null)
+  }
 
   const handleStartEdit = (annotation: BrowserPageAnnotation): void => {
     setEditingAnnotationId(annotation.id)

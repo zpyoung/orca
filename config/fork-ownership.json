@@ -2430,6 +2430,12 @@
       "reason": "React Doctor gate: rewrites a string concatenation as a template literal to satisfy eslint/prefer-template on the changed line."
     },
     {
+      "path": "src/renderer/src/components/browser-pane/annotate/browser-page-annotation-tray.tsx",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate",
+      "reason": "React Doctor gate: clears editingAnnotationId during render instead of in an effect when the annotation leaves the browserAnnotations prop, so the tray never paints a frame still editing an annotation that is gone."
+    },
+    {
       "path": "src/renderer/src/components/right-sidebar/checks-panel/use-checks-list-state.tsx",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate",
