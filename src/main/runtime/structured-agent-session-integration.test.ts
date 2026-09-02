@@ -609,6 +609,10 @@ describe('a structured codex session over agentSession.*', () => {
     expect(resumed.page.items.map(textOf)).toContain('Two files.')
 
     // ── page history ────────────────────────────────────────────────────────
+    // The takeover reaped the old child, and that tombstones the running turn's
+    // status row through the deferred sink. History reads the journal, so the
+    // tombstone has to land before the page is asked for.
+    await drainStreamedEvents()
     const tail = await historyPage('tail', { limit: 2 })
     expect(tail.ok).toBe(true)
     if (!tail.ok) {

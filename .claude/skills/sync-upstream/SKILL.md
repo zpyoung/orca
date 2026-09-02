@@ -274,11 +274,51 @@ while read -r p; do
 done < <out-dir>/ours.txt
 ```
 
-Every path this prints is a decision. Three-way merge it with the previous tag as base
-(`git merge-file --diff3 -p ours base theirs`) rather than hand-picking hunks; the fork's own lines
-and upstream's usually sit in different regions and merge cleanly. Take upstream's side unless the
-exception's `reason` is what the change would undo — a fork build artifact, a fork identity file, or
-a record the reason says upstream's copy actively breaks.
+Every path this prints is a decision, and the decision is **always** a three-way merge with the
+previous tag as base (`git merge-file --diff3 -p ours base theirs`) — never a judgement read off the
+exception's `reason`. The fork's own lines and upstream's usually sit in different regions and merge
+cleanly, so the merge costs nothing and is the only thing that actually separates the delta the fork
+owns from the file it happens to live in. Resolve a genuine conflict in the fork's favour only where
+the exception's `reason` is what upstream's side would undo — a fork build artifact, a fork identity
+file, or a record the reason says upstream's copy actively breaks.
+
+A `reason` that reads like whole-file ownership ("the fork's release-tooling delta", "fork-specific
+thresholds") is exactly where this goes wrong: it is describing a *delta*, and the exception is
+keeping the whole file. v1.4.194 lost four that way — the Electron installer's staging-transaction
+rework, the packaged-runtime contract's move off `package.json`'s `pnpm` block, release-cut's new
+permission row, and `pr.yml`'s new real-IME lane. Every one passed both manifest checks, the local
+gate, and the ownership guard, and every one failed in PR CI instead.
+
+**`checkout.txt` reverts undeclared fork edits, so sweep it.** A fork edit to an upstream-owned
+file that no `seams` entry declares is invisible to every check — the guard permits it, and
+ownership resolution then correctly resets the file to the tag and drops it. Nothing reports this;
+it surfaces as an unrelated-looking CI failure hours later. List them before committing:
+
+```sh
+python3 - <out-dir>/checkout.txt "$PREV_TAG" "$MERGE_HEAD_PRE" <<'EOF'
+import subprocess, sys
+paths = [p.strip() for p in open(sys.argv[1]).read().split('\n')]
+paths = [p for p in paths if p]
+def tree(ref):
+    r = subprocess.run(['git', 'ls-tree', '-r', '--format=%(path)\t%(objectname)', ref],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        sys.exit(f'git ls-tree failed for {ref}: {r.stderr.strip()}')
+    return dict(line.split('\t', 1) for line in r.stdout.splitlines() if '\t' in line)
+prev, fork = tree(sys.argv[2]), tree(sys.argv[3])
+for p in paths:
+    if p in prev and p in fork and prev[p] != fork[p]:
+        print(p)
+EOF
+```
+
+It exits non-zero if either ref cannot be read, so an empty print means no undeclared edits rather
+than a failed lookup. Every path it prints is a fork edit the reset just threw away. Restore it from
+`$MERGE_HEAD_PRE` (three-way merged against the tag, since upstream may have changed the same file),
+then **declare it as a seam** — that is what stops the next sync reverting it again. v1.4.194 printed seven, and all
+seven were real: two cross-version tests pinning fork release refs, two PR-workflow contract tests
+that must know `fork_ownership_guard` is ungated, a ratchet inventory counting a fork dialog, an
+import repointed at a forked copy, and a relay test mocking the fork's transport.
 
 `package.json` is the one that fails loudest and least obviously: `pnpm-lock.yaml` is upstream-owned
 and resolves to the tag, so a dependency the exception dropped makes `pnpm install --frozen-lockfile`
