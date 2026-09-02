@@ -41,6 +41,7 @@ import {
   addWorktree,
   assertWorktreeCleanForRemoval,
   listWorktrees,
+  listWorktreesSharedStrict,
   listWorktreesStrict,
   removeWorktree
 } from '../git/worktree'
@@ -441,6 +442,8 @@ const {
 vi.mock('../git/worktree', () => ({
   listWorktrees: vi.fn().mockResolvedValue(MOCK_GIT_WORKTREES),
   listWorktreesStrict: vi.fn().mockResolvedValue(MOCK_GIT_WORKTREES),
+  listWorktreesSharedStrict: vi.fn().mockResolvedValue(MOCK_GIT_WORKTREES),
+  describeCreatedWorktree: vi.fn().mockResolvedValue(undefined),
   assertWorktreeCleanForRemoval: vi.fn().mockResolvedValue(undefined),
   addSparseWorktree: addSparseWorktreeMock,
   addWorktree: addWorktreeMock,
@@ -736,6 +739,11 @@ function resetRuntimeTestMocks(): void {
   forgetRemoteWatcherRemovalSnapshotMock.mockReset()
   vi.mocked(listWorktrees).mockResolvedValue(MOCK_GIT_WORKTREES)
   vi.mocked(listWorktreesStrict).mockResolvedValue(MOCK_GIT_WORKTREES)
+  // Why delegate: production reads both from one repo state, so a test that stubs the listing must
+  // see the same rows through the create path's strict read.
+  vi.mocked(listWorktreesSharedStrict).mockImplementation((repoPath, options) =>
+    options ? listWorktrees(repoPath, options) : listWorktrees(repoPath)
+  )
   scanLocalRepoWorktreesForResolutionMock
     .mockReset()
     .mockImplementation(async (repoPath: string, options: { wslDistro?: string }) => {
@@ -1648,6 +1656,7 @@ function makeRuntimeStoreWithWorkspaceSession(
   runtimeStore: typeof store & {
     getWorkspaceSession: (hostId?: string) => WorkspaceSessionState
     setWorkspaceSession: ReturnType<typeof vi.fn>
+    flushOrThrow: ReturnType<typeof vi.fn>
     persistPtyBinding: ReturnType<typeof vi.fn>
   }
   getSession: () => WorkspaceSessionState
@@ -1662,6 +1671,9 @@ function makeRuntimeStoreWithWorkspaceSession(
     getWorkspaceSession: (hostId?: string) =>
       hostId === undefined || hostId === ownerHostId ? session : getDefaultWorkspaceSession(),
     setWorkspaceSession: vi.fn(setSession),
+    // Headless close is a durable transaction; keep the in-memory fixture's
+    // persistence contract equivalent to the production store.
+    flushOrThrow: vi.fn(),
     persistPtyBinding: vi.fn(
       (args: { worktreeId: string; tabId: string; leafId: string; ptyId: string }) => {
         const tabs = session.tabsByWorktree[args.worktreeId] ?? []
@@ -3125,6 +3137,21 @@ describe('OrcaRuntimeService', () => {
       graphStatus: 'reloading',
       rendererGraphEpoch: 1
     })
+  })
+
+  it('relays terminal browser launches only while headless owns the graph', () => {
+    const runtime = createRuntime()
+    electronMocks.BrowserWindow.fromId.mockImplementation((windowId: number) =>
+      windowId === TEST_WINDOW_ID ? ({ isDestroyed: () => false } as never) : null
+    )
+
+    expect(runtime.shouldRelayTerminalBrowserOpens()).toBe(false)
+
+    runtime.syncWindowGraph(HEADLESS_RUNTIME_WINDOW_ID, { tabs: [], leaves: [] })
+    expect(runtime.shouldRelayTerminalBrowserOpens()).toBe(true)
+
+    runtime.attachWindow(TEST_WINDOW_ID)
+    expect(runtime.shouldRelayTerminalBrowserOpens()).toBe(false)
   })
 
   it('marks live headless PTYs for renderer reattach before desktop promotion', () => {
@@ -7839,6 +7866,24 @@ describe('OrcaRuntimeService', () => {
     const checkDetailsSignal = new AbortController().signal
 
     await runtime.getRepoPRForBranch('id:repo-1', 'feature/wsl', 42, 43)
+    await runtime.getRepoPRForBranch(
+      'id:repo-1',
+      'feature/wsl-manual',
+      42,
+      43,
+      undefined,
+      undefined,
+      'manual'
+    )
+    await runtime.getRepoPRForBranch(
+      'id:repo-1',
+      'feature/wsl-active',
+      42,
+      43,
+      undefined,
+      undefined,
+      'active'
+    )
     await runtime.getRepoWorkItem('id:repo-1', 42, 'pr')
     await runtime.getRepoWorkItemByOwnerRepo('id:repo-1', prRepo, 42, 'pr')
     await runtime.getRepoWorkItemDetails('id:repo-1', 42, 'pr')
@@ -7909,6 +7954,22 @@ describe('OrcaRuntimeService', () => {
       {
         localGitExecOptions: localGitOptions
       }
+    )
+    expect(getPRForBranchOutcomeMock).toHaveBeenCalledWith(
+      TEST_REPO_PATH,
+      'feature/wsl-manual',
+      42,
+      null,
+      null,
+      { localGitExecOptions: { ...localGitOptions, admissionTier: 'interactive' } }
+    )
+    expect(getPRForBranchOutcomeMock).toHaveBeenCalledWith(
+      TEST_REPO_PATH,
+      'feature/wsl-active',
+      42,
+      null,
+      null,
+      { localGitExecOptions: { ...localGitOptions, admissionTier: 'background' } }
     )
     expect(getGitHubWorkItemMock).toHaveBeenCalledWith(
       TEST_REPO_PATH,
@@ -8188,7 +8249,8 @@ describe('OrcaRuntimeService', () => {
         head: 'feature/ssh',
         title: 'Feature SSH'
       }),
-      'ssh-1'
+      'ssh-1',
+      { localGitExecOptions: { admissionTier: 'interactive' } }
     )
     expect(createStackedHostedReviewMock).toHaveBeenCalledWith(
       '/remote/repo',
@@ -8198,7 +8260,7 @@ describe('OrcaRuntimeService', () => {
         head: 'feature/ssh'
       }),
       'ssh-1',
-      {}
+      { localGitExecOptions: { admissionTier: 'interactive' } }
     )
   })
 
@@ -8277,7 +8339,7 @@ describe('OrcaRuntimeService', () => {
         repoPath: TEST_REPO_PATH,
         connectionId: null,
         branch: 'feature/wsl',
-        localGitExecOptions: { wslDistro: 'Ubuntu' }
+        localGitExecOptions: { wslDistro: 'Ubuntu', admissionTier: 'interactive' }
       })
     )
     expect(getHostedReviewForBranchMock).toHaveBeenCalledWith(
@@ -8286,7 +8348,7 @@ describe('OrcaRuntimeService', () => {
         connectionId: null,
         branch: 'feature/wsl',
         linkedGitHubPR: 76,
-        localGitExecOptions: { wslDistro: 'Ubuntu' }
+        localGitExecOptions: { wslDistro: 'Ubuntu', admissionTier: 'background' }
       })
     )
     expect(createHostedReviewMock).toHaveBeenCalledWith(
@@ -8297,7 +8359,7 @@ describe('OrcaRuntimeService', () => {
         title: 'Feature WSL'
       }),
       null,
-      { localGitExecOptions: { wslDistro: 'Ubuntu' } }
+      { localGitExecOptions: { wslDistro: 'Ubuntu', admissionTier: 'interactive' } }
     )
     expect(createStackedHostedReviewMock).toHaveBeenCalledWith(
       TEST_REPO_PATH,
@@ -8307,7 +8369,7 @@ describe('OrcaRuntimeService', () => {
         head: 'feature/wsl'
       }),
       null,
-      { localGitExecOptions: { wslDistro: 'Ubuntu' } }
+      { localGitExecOptions: { wslDistro: 'Ubuntu', admissionTier: 'interactive' } }
     )
   })
 
@@ -9345,6 +9407,10 @@ describe('OrcaRuntimeService', () => {
 
     try {
       const repo = await runtime.cloneRepo('https://example.com/repo-badge-color.git', '/tmp')
+      expect(spawnSpy).toHaveBeenCalledWith(
+        expect.arrayContaining(['clone']),
+        expect.objectContaining({ admissionTier: 'interactive' })
+      )
       expect(repo.badgeColor).toBe(DEFAULT_REPO_BADGE_COLOR)
       expect(added).toEqual([
         expect.objectContaining({
@@ -21384,6 +21450,94 @@ describe('OrcaRuntimeService', () => {
     expect(getSession().terminalTopologyRevisionByRepoId?.[TEST_REPO_ID] ?? 0).toBe(0)
   })
 
+  it('does not acknowledge another adoption until the staged owner is durable', async () => {
+    const session = {
+      ...getDefaultWorkspaceSession(),
+      activeRepoId: TEST_REPO_ID,
+      activeWorktreeId: TEST_WORKTREE_ID,
+      tabsByWorktree: { [TEST_WORKTREE_ID]: [] }
+    }
+    const { runtimeStore, getSession } = makeRuntimeStoreWithWorkspaceSession(session)
+    const firstWrite = deferred<void>()
+    const firstWriteStarted = deferred<void>()
+    let flushCount = 0
+    const flushPendingOrThrowAsync = vi.fn(() => {
+      flushCount += 1
+      if (flushCount === 1) {
+        firstWriteStarted.resolve()
+        return firstWrite.promise
+      }
+      return Promise.resolve()
+    })
+    const listProcesses = vi.fn(async () => [
+      {
+        id: 'pty-serialized-adoption',
+        incarnationId: 'inc-serialized-adoption',
+        terminalHandle: 'term_serialized_adoption',
+        title: 'Serialized adoption',
+        cwd: TEST_WORKTREE_PATH,
+        worktreeId: TEST_WORKTREE_ID,
+        wslDistro: null
+      }
+    ])
+    const runtime = new OrcaRuntimeService({
+      ...runtimeStore,
+      flushPendingOrThrowAsync
+    } as never)
+    runtime.setPtyController({
+      write: vi.fn(() => true),
+      kill: vi.fn(() => true),
+      getForegroundProcess: async () => null,
+      listProcesses
+    })
+    const before = await runtime.listTerminals(`id:${TEST_WORKTREE_ID}`)
+    const request = {
+      worktree: `id:${TEST_WORKTREE_ID}`,
+      expectedTopologyRevision: before.topologyRevisions?.[TEST_WORKTREE_ID] ?? 0,
+      claims: [
+        {
+          terminal: 'term_serialized_adoption',
+          ptyId: 'pty-serialized-adoption',
+          incarnationId: 'inc-serialized-adoption',
+          tabId: 'tab-serialized-adoption',
+          leafId: HEADLESS_LEAF_ID
+        }
+      ]
+    }
+
+    const first = runtime.adoptTerminalOrphans(request)
+    await firstWriteStarted.promise
+    const inventoryCountWhileStaged = listProcesses.mock.calls.length
+    let secondSettled = false
+    const second = runtime.adoptTerminalOrphans(request)
+    void second.then(
+      () => {
+        secondSettled = true
+      },
+      () => {
+        secondSettled = true
+      }
+    )
+    await new Promise<void>((resolve) => setImmediate(resolve))
+
+    expect(secondSettled).toBe(false)
+    expect(listProcesses).toHaveBeenCalledTimes(inventoryCountWhileStaged)
+    expect(flushPendingOrThrowAsync).toHaveBeenCalledOnce()
+
+    const firstFailure = expect(first).rejects.toThrow('disk unavailable')
+    firstWrite.reject(new Error('disk unavailable'))
+    await firstFailure
+    const adopted = await second
+
+    expect(adopted.adopted).toBe(true)
+    expect(listProcesses).toHaveBeenCalledTimes(inventoryCountWhileStaged + 1)
+    expect(flushPendingOrThrowAsync).toHaveBeenCalledTimes(2)
+    expect(getSession().tabsByWorktree[TEST_WORKTREE_ID]).toEqual([
+      expect.objectContaining({ id: 'tab-serialized-adoption' })
+    ])
+    expect(getSession().terminalTopologyRevisionByRepoId?.[TEST_REPO_ID]).toBe(1)
+  })
+
   function publishLegacyWorkerReveal(
     runtime: OrcaRuntimeService,
     identity: { worktreeId: string; tabId: string; leafId: string; ptyId: string },
@@ -29804,6 +29958,7 @@ describe('OrcaRuntimeService', () => {
     )
     const runtime = new OrcaRuntimeService({
       ...store,
+      flushOrThrow: vi.fn(),
       getRepos: () => [remoteRepo],
       getRepo: (id: string) => (id === TEST_REPO_ID ? remoteRepo : undefined),
       getWorkspaceSession
@@ -29859,7 +30014,8 @@ describe('OrcaRuntimeService', () => {
       getRepo: (id: string) => (id === TEST_REPO_ID ? remoteRepo : undefined),
       getWorkspaceSession: (hostId?: string | null) =>
         hostId === 'ssh:ssh-1' ? sshSession : localSession,
-      setWorkspaceSession
+      setWorkspaceSession,
+      flushOrThrow: vi.fn()
     } as never)
     runtime.setPtyController({
       write: () => true,
@@ -30646,7 +30802,7 @@ describe('OrcaRuntimeService', () => {
     const acknowledged = makeDeferred()
     const closeTerminalTab = vi.fn(() => acknowledged.promise)
     const kill = vi.fn(() => true)
-    const runtime = new OrcaRuntimeService(runtimeStore as never)
+    const runtime = new OrcaRuntimeService({ ...runtimeStore, flushOrThrow: vi.fn() } as never)
     runtime.setNotifier({ closeTerminal: vi.fn(), closeTerminalTab } as never)
     runtime.setPtyController({
       write: () => true,

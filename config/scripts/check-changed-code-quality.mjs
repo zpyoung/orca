@@ -29,6 +29,15 @@ export const OXLINT_SCANS = [
   }
 ]
 
+const SUPPRESSED_REACT_DOCTOR_DIAGNOSTICS = new Map([
+  [
+    'react-doctor(no-derived-state-effect)',
+    new Set([
+      'src/renderer/src/components/editor/combined-diff/review-controls/use-combined-diff-view-preferences.ts'
+    ])
+  ]
+])
+
 export function parseAddedLineRanges(diff) {
   const ranges = []
   const hunkPattern = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/

@@ -8,7 +8,7 @@
  *  has no layout engine, so real pixel growth is covered by app validation. */
 
 import { createRef } from 'react'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/i18n/i18n', () => ({
@@ -27,9 +27,20 @@ vi.mock('../NativeChatAutocompleteMenus', () => ({
 import { AgentComposerField } from './AgentComposerField'
 import { useImeEnterGestureOwnership } from '@/lib/ime-composition-keyboard-event'
 
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
 
-function TestField({ draft }: { draft: string }): React.JSX.Element {
+const EMPTY_IMAGE_ATTACHMENTS: { id: string; path: string }[] = []
+
+function TestField({
+  draft,
+  imageAttachments = EMPTY_IMAGE_ATTACHMENTS
+}: {
+  draft: string
+  imageAttachments?: { id: string; path: string }[]
+}): React.JSX.Element {
   const imeEnterGesture = useImeEnterGestureOwnership()
   return (
     <AgentComposerField
@@ -43,7 +54,7 @@ function TestField({ draft }: { draft: string }): React.JSX.Element {
       autocomplete={{ mode: 'none' }}
       activeSuggestion={0}
       notice={null}
-      imageAttachments={[]}
+      imageAttachments={imageAttachments}
       sendButtonDisabled={false}
       isWorking={false}
       attachDisabled={false}
@@ -114,5 +125,17 @@ describe('agent composer autogrow', () => {
     expect(textarea.className).toContain('text-transparent')
     expect(textarea.className).toContain('caret-foreground')
     expect(textarea.className).toContain('selection:bg-ring/35')
+  })
+})
+
+describe('native chat composer image attachments', () => {
+  it('renders a thumbnail and opens a full-size preview when clicked', async () => {
+    vi.stubGlobal('IntersectionObserver', undefined)
+    render(<TestField draft="" imageAttachments={[{ id: 'image-1', path: '/tmp/example.png' }]} />)
+
+    expect(await screen.findByRole('img', { name: 'example.png' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'View image: example.png' }))
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(screen.getByRole('dialog').textContent).toContain('example.png')
   })
 })

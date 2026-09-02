@@ -38,6 +38,7 @@ describe('install-electron-package-binary', () => {
       expect(readFileSync(join(projectDir, 'electron-get.log'), 'utf8')).toMatch(
         /cacheRoot=.*orca-electron-.*cache/
       )
+      expect(readFileSync(join(projectDir, 'electron-get.log'), 'utf8')).toContain('force=true')
       expect(readFileSync(join(projectDir, 'node_modules', 'electron', 'path.txt'), 'utf8')).toBe(
         'electron'
       )
@@ -74,6 +75,29 @@ describe('install-electron-package-binary', () => {
       )
       expect(result.stdout).toContain('Repaired Electron path.txt -> electron')
       expect(existsSync(join(projectDir, 'electron-get.log'))).toBe(false)
+    } finally {
+      rmSync(projectDir, { recursive: true, force: true })
+    }
+  })
+
+  it('reuses a configured persistent cache without forcing a fresh download', () => {
+    const projectDir = mkTempProject()
+    const cacheRoot = join(projectDir, 'electron-cache')
+
+    try {
+      writeFakeElectronPackage(projectDir)
+      writeFakeElectronGet(projectDir)
+      writeFakeExtractor(projectDir, { createExecutable: true })
+
+      const result = runInstallScript(projectDir, {
+        ORCA_ELECTRON_PACKAGE_CACHE_ROOT: cacheRoot
+      })
+
+      expect(result.status, result.stderr).toBe(0)
+      expect(readFileSync(join(projectDir, 'electron-get.log'), 'utf8')).toContain(
+        `cacheRoot=${cacheRoot} platform=linux arch=x64 force=false`
+      )
+      expect(existsSync(cacheRoot)).toBe(true)
     } finally {
       rmSync(projectDir, { recursive: true, force: true })
     }
@@ -382,6 +406,8 @@ function runInstallScript(projectDir, extraEnv = {}) {
     encoding: 'utf8',
     env: {
       ...process.env,
+      ELECTRON_CACHE: undefined,
+      ORCA_ELECTRON_PACKAGE_CACHE_ROOT: undefined,
       npm_config_platform: 'linux',
       npm_config_arch: 'x64',
       ORCA_ELECTRON_PACKAGE_EXTRACTOR: join(projectDir, 'fake-extractor.cjs'),
@@ -447,7 +473,7 @@ exports.downloadArtifact = async function downloadArtifact(details) {
   downloadAttempt += 1
   appendFileSync(
     'electron-get.log',
-    'cacheRoot=' + details.cacheRoot + ' platform=' + details.platform + ' arch=' + details.arch + '\\n'
+    'cacheRoot=' + details.cacheRoot + ' platform=' + details.platform + ' arch=' + details.arch + ' force=' + details.force + '\\n'
   )
   if (${JSON.stringify(downloadNeverSettles)}) {
     return new Promise(() => {})
