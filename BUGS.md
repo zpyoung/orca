@@ -125,3 +125,11 @@ entries' IDs; manual edits to fix typos are fine.
 - **Introduced by**: first code-review pass on the session-handoff branch
 - **Severity**: low
 - **Proposed fix**: Reproduce with a split tab whose panes ran different agents, then key the badge's target on the recorded pane id rather than the tab.
+
+## BUG-14: Stuck-draft recovery never matches a fork release tag
+- **Observed**: 2026-09-02
+- **File**: config/scripts/publish-complete-draft-releases.mjs:10
+- **Description**: `DESKTOP_RC_TAG_PATTERN = /^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$/` rejects the fork's `.zyNN` suffix, so `isReleaseCutDraft` returns false for every tag this fork cuts. The `publish_drafts` step in `release-cut.yml` exists to unstick a complete-but-undrafted RC before deciding whether to cut another tag; on this fork it always reports `published_count=0, skipped_count=0` and the recovery is dead code. Found while diagnosing the pnpm-pin release failures — those drafts are artifact-less so they *should* be skipped, but they were never even considered.
+- **Introduced by**: the fork's `.zyNN` version-suffix scheme, which postdates the upstream pattern
+- **Severity**: low
+- **Proposed fix**: Widen the pattern to accept an optional `.zyNN` identifier (`/^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+(\.[0-9A-Za-z]+)?$/`) and cover it with a case in the script's tests. Verify `verifyRequiredReleaseAssets` still refuses an artifact-less draft before relying on it.
