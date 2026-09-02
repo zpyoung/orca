@@ -1,6 +1,6 @@
 ---
-last_released_commit: 7f45b360ad8f63d4b7252f2b06fec42e8efcd34c
-upstream_synced: v1.4.194
+last_released_commit: 028efe682bb83e32a1ded4c8dce81572d7f4e083
+upstream_synced: v1.4.195
 ---
 
 # Changelog
@@ -11,6 +11,31 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.196-rc.0.zy01] - 2026-09-02
+
+Synced to upstream [v1.4.195](https://github.com/stablyai/orca/releases/tag/v1.4.195).
+
+### Fixed
+- The Session Info sidebar still reports Claude's hook status. Upstream removed the `agentHooks`
+  IPC surface as dead code — it had no callers left there, but the fork's panel read
+  `claudeStatus()` from it. The row now goes over the fork's own Session Info bridge, which reaches
+  the same unchanged main-process service.
+- The browser annotation tray no longer paints a frame still in edit mode for an annotation that
+  has just been deleted or cleared. The edit state is reset while rendering instead of afterwards
+  in an effect. Filed for upstream.
+
+### Changed
+- The fork's composer picks up upstream's app-menu Select All fix. Upstream landed it in the chat
+  composer it replaced, so it is replayed into the shared composer core, where it reaches the
+  docked terminal composer as well.
+- Upstream's new attachment preview is deliberately not adopted: the fork already renders image
+  thumbnails in its own composer chips, and swapping in upstream's component would reconcile that
+  away. Only the per-attachment connection id it introduced was taken.
+- The release pipeline gains upstream's `release-preflight` gate ahead of macOS signing, minus the
+  two skill-sharing gates this fork's macOS-only pipeline does not define.
+- Two cross-version and updater tests now exercise the fork's own release feed and tags instead of
+  upstream's, which do not exist on this remote.
 
 ## [1.4.195-rc.0.zy01] - 2026-09-01
 
