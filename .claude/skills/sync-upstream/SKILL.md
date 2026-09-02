@@ -293,6 +293,20 @@ rework, the packaged-runtime contract's move off `package.json`'s `pnpm` block, 
 permission row, and `pr.yml`'s new real-IME lane. Every one passed both manifest checks, the local
 gate, and the ownership guard, and every one failed in PR CI instead.
 
+The release workflows are the worse case, because PR CI is not their safety net either — nothing in
+`pr.yml` runs `release-cut.yml` or `release-mac-build.yml`, so an exception that discards an upstream
+toolchain bump there stays green until someone cuts a release. Give them a targeted pass:
+
+```sh
+git diff "$PREV_TAG" "$UPSTREAM_TARGET" -- .github/ | grep -E '^[-+].*(uses:|version:|node-version|packageManager)'
+```
+
+Upstream's move from `pnpm/action-setup@v6` + `version: 10.24.0` to `pnpm/setup@v2` + `install: false`
+is the one that has already cost two releases: `packageManager` is upstream-owned and reached
+`pnpm@12.0.0`, while the fork's exception-owned copies kept the pin, and `action-setup` hard-errors on
+`Multiple versions of pnpm specified`. Replay a toolchain bump into the fork's copies unless the
+exception's `reason` is specifically about that toolchain.
+
 **`checkout.txt` reverts undeclared fork edits, so sweep it.** A fork edit to an upstream-owned
 file that no `seams` entry declares is invisible to every check — the guard permits it, and
 ownership resolution then correctly resets the file to the tag and drops it. Nothing reports this;
