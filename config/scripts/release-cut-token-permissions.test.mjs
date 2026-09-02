@@ -31,6 +31,7 @@ const EXPECTED_MATRIX = {
     },
   [`${RELEASE_WORKFLOW}#post-release-e2e`]: { actions: 'write' },
   [`${RELEASE_WORKFLOW}#publish-release`]: { contents: 'write' },
+  [`${RELEASE_WORKFLOW}#release-preflight`]: { contents: 'read' },
   [`${RELEASE_WORKFLOW}#terminal-rendering-golden`]: { contents: 'read' },
   [`${RELEASE_WORKFLOW}#terminal-rendering-release-evidence`]: { contents: 'read' }
 }

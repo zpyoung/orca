@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/NativeChatComposerField.tsx
-// FORK-COPY-SHA: 07f4356a1678f6170a439527cd043f59b84343f0
+// FORK-COPY-SHA: bc2f593ebba70a0ee6ff900129e4918f57b143aa
 import type { ClipboardEventHandler, KeyboardEventHandler, RefObject } from 'react'
 import { useLayoutEffect, useRef } from 'react'
 import type { useImeEnterGestureOwnership } from '@/lib/ime-composition-keyboard-event'
@@ -69,6 +69,7 @@ export type AgentComposerFieldProps = {
 export type AgentComposerImageAttachment = {
   id: string
   path: string
+  connectionId?: string
 }
 
 /**

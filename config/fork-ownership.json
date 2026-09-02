@@ -2519,6 +2519,12 @@
       "deleted": true
     },
     {
+      "path": "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.tsx",
+      "reason": "Chip renderer for the deleted NativeChatComposerField, whose attachment type it imports; the fork's AgentComposerField renders AgentComposerAttachmentThumbnail instead, so upstream's copy is unreferenced and does not compile.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
       "path": "src/renderer/src/components/native-chat/native-chat-composer-autogrow.test.tsx",
       "reason": "Superseded by the fork copy's test in fork-agent-composer.",
       "status": "permanent",
@@ -2953,7 +2959,7 @@
       "removed": 2
     },
     "src/renderer/src/components/native-chat/NativeChatComposer.test.tsx": { "added": 34, "removed": 82 },
-    "src/renderer/src/components/native-chat/NativeChatComposer.tsx": { "added": 209, "removed": 279 },
+    "src/renderer/src/components/native-chat/NativeChatComposer.tsx": { "added": 209, "removed": 280 },
     "src/renderer/src/components/native-chat/NativeChatInteractiveCard.test.tsx": {
       "added": 21,
       "removed": 0
@@ -3027,7 +3033,7 @@
       "removed": 1
     },
     "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.test.tsx": { "added": 78, "removed": 114 },
-    "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.ts": { "added": 64, "removed": 36 },
+    "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.ts": { "added": 67, "removed": 36 },
     "src/renderer/src/components/native-chat/use-native-chat-interactive-send.test.tsx": {
       "added": 38,
       "removed": 1

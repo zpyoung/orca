@@ -376,6 +376,13 @@ function TerminalPane(
   const sshConnectionUnavailable = Boolean(
     sshReconnectTargetId && sshReconnectStatus && sshReconnectStatus !== 'connected'
   )
+  const sshReconnectOwnsTerminalErrors = Boolean(
+    sshReconnectTargetId && sshReconnectStatus && sshReconnectStatus !== 'connected'
+  )
+  const sshReconnectOwnsTerminalErrorsRef = useRef(sshReconnectOwnsTerminalErrors)
+  useLayoutEffect(() => {
+    sshReconnectOwnsTerminalErrorsRef.current = sshReconnectOwnsTerminalErrors
+  }, [sshReconnectOwnsTerminalErrors])
   useEffect(() => {
     if (!sshReconnectEnvironmentId) {
       return
@@ -1214,6 +1221,17 @@ function TerminalPane(
   )
 
   const notePanePtyBindingChanged = terminalDock.notePanePtyBindingChanged
+  const writePanePtyLayoutBinding = useCallback(
+    (paneId: number, ptyId: string | null, repairActiveLeafOnClear: boolean): void => {
+      const leafId = managerRef.current?.getLeafId(paneId)
+      if (!leafId) {
+        return
+      }
+      writePanePtyLayoutBindingForLeaf(leafId, ptyId, repairActiveLeafOnClear, paneId)
+    },
+    [managerRef, writePanePtyLayoutBindingForLeaf]
+  )
+
   const syncPanePtyLayoutBinding = useCallback(
     (paneId: number, ptyId: string | null): void => {
       // Why: the write below is deduped when a reattach lands on the id the layout already
@@ -1225,10 +1243,20 @@ function TerminalPane(
     [notePanePtyBindingChanged, writePanePtyLayoutBinding]
   )
 
-  const clearExitedPanePtyLayoutBinding = useCallback(
-    (paneId: number, exitedPtyId: string): void => {
-      // Why before the leaf/id guards: the transport has already dropped its id, so the dock
-      // owes a re-read even when this pane's stored binding was never the exited one.
+  const syncPanePtyLayoutBindingForLeaf = useCallback(
+    (leafId: string, ptyId: string | null, sourcePaneId: number): void => {
+      // Why: same dedupe as the paneId path above — a reattach onto the id the layout already
+      // holds writes nothing, so the dock would never re-read the transport's new id.
+      notePanePtyBindingChanged()
+      writePanePtyLayoutBindingForLeaf(leafId, ptyId, false, sourcePaneId)
+    },
+    [notePanePtyBindingChanged, writePanePtyLayoutBindingForLeaf]
+  )
+
+  const clearExitedPanePtyLayoutBindingForLeaf = useCallback(
+    (leafId: string, exitedPtyId: string): void => {
+      // Why before the binding guard: the transport has already dropped its id, so the dock
+      // owes a re-read even when this leaf's stored binding was never the exited one.
       notePanePtyBindingChanged()
       const existingLayout = useAppStore.getState().terminalLayoutsByTabId[tabId] ?? EMPTY_LAYOUT
       const { ptyIdsByLeafId: _existingPtyIdsByLeafId, ...layoutWithoutPtyBindings } =
@@ -1256,13 +1284,16 @@ function TerminalPane(
 
   const clearExitedPanePtyLayoutBinding = useCallback(
     (paneId: number, exitedPtyId: string): void => {
+      // Why before the leaf lookup: the transport has already dropped its id, so the dock owes a
+      // re-read even when this pane no longer resolves to a leaf.
+      notePanePtyBindingChanged()
       const leafId = managerRef.current?.getLeafId(paneId)
       if (!leafId) {
         return
       }
       clearExitedPanePtyLayoutBindingForLeaf(leafId, exitedPtyId)
     },
-    [clearExitedPanePtyLayoutBindingForLeaf, managerRef]
+    [clearExitedPanePtyLayoutBindingForLeaf, managerRef, notePanePtyBindingChanged]
   )
 
   const {

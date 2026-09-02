@@ -288,6 +288,11 @@ export function filesForScan(files, scan) {
   )
 }
 
+function isSuppressedDiagnostic(diagnostic, root) {
+  const files = SUPPRESSED_REACT_DOCTOR_DIAGNOSTICS.get(diagnostic.code)
+  return files?.has(normalizedDiagnosticPath(root, diagnostic.filename)) ?? false
+}
+
 function runOxlintScan(root, scan, files) {
   const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
   const result = spawnSync(pnpm, ['exec', 'oxlint', ...scan.args, '--format', 'json', ...files], {
@@ -325,8 +330,10 @@ export function main(
       console.log(`${scan.label}: 0 new finding(s) across 0 changed file(s).`)
       continue
     }
-    const diagnostics = runOxlintScan(root, scan, scanFiles).filter((diagnostic) =>
-      diagnosticTouchesAddedLines(diagnostic, rangesByFile, root, baseBlocks)
+    const diagnostics = runOxlintScan(root, scan, scanFiles).filter(
+      (diagnostic) =>
+        !isSuppressedDiagnostic(diagnostic, root) &&
+        diagnosticTouchesAddedLines(diagnostic, rangesByFile, root, baseBlocks)
     )
     for (const diagnostic of diagnostics) {
       printDiagnostic(diagnostic, root)

@@ -11,6 +11,7 @@ import {
 } from 'react'
 import { sendRuntimePtyInput } from '@/runtime/runtime-terminal-inspection'
 import { useImeEnterGestureOwnership } from '@/lib/ime-composition-keyboard-event'
+import { useNativeChatComposerAppMenuSelection } from '../use-native-chat-composer-app-menu-selection'
 import { getSettingsForAgentTabRuntimeOwner } from '@/lib/agent-paste-draft'
 import type { NativeChatSendHandle, NativeChatSendOptions } from '../native-chat-runtime-send'
 import { useNativeChatSendLifecycle } from '../use-native-chat-send-lifecycle'
@@ -92,8 +93,8 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
   const { history, setHistory } = useAgentComposerHistory(paneKey)
   const [activeSuggestion, setActiveSuggestion] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const imeEnterGesture = useImeEnterGestureOwnership()
+  const { textareaRef } = useNativeChatComposerAppMenuSelection(imeEnterGesture.isComposing)
   const { cancelPendingSends, trackPendingSend } = useNativeChatSendLifecycle(
     terminalTabId,
     targetPtyId,

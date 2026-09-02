@@ -229,6 +229,33 @@ describe('install-electron-package-binary', () => {
     }
   })
 
+  it('keeps a persistent cache root while retrying transient failures', () => {
+    const projectDir = mkTempProject()
+    const cacheRoot = join(projectDir, 'electron-cache')
+
+    try {
+      writeFakeElectronPackage(projectDir)
+      writeFakeElectronGet(projectDir, {
+        downloadFailures: 1,
+        downloadErrorCode: 'ECONNRESET'
+      })
+      writeFakeExtractor(projectDir, { createExecutable: true })
+      mkdirSync(cacheRoot, { recursive: true })
+      writeFileSync(join(cacheRoot, 'preserved.marker'), 'keep me')
+
+      const result = runInstallScript(projectDir, {
+        ORCA_ELECTRON_PACKAGE_CACHE_ROOT: cacheRoot,
+        ORCA_ELECTRON_PACKAGE_RETRY_DELAYS_MS: '0,0'
+      })
+
+      expect(result.status, result.stderr).toBe(0)
+      expect(existsSync(join(cacheRoot, 'preserved.marker'))).toBe(true)
+      expect(readFileSync(join(projectDir, 'electron-get.log'), 'utf8').trim().split('\n')).toHaveLength(2)
+    } finally {
+      rmSync(projectDir, { recursive: true, force: true })
+    }
+  })
+
   it('retries a refused HTTP/2 stream from the release CDN', () => {
     const projectDir = mkTempProject()
 

@@ -1044,14 +1044,12 @@ jobs:
     needs:
       - cut
       - terminal-rendering-golden
-      - skill-sharing-release-gate
-      - skill-sharing-linux-floor-release-gate
+    # Why shorter than upstream's gate list: the fork's release-cut is macOS-only and carries no
+    # skill-sharing release gates, and a needs edge to an absent job rejects the whole workflow.
     if: >-
       always() &&
       needs.cut.outputs.should_release == 'true' &&
-      needs.terminal-rendering-golden.result == 'success' &&
-      needs.skill-sharing-release-gate.result == 'success' &&
-      needs.skill-sharing-linux-floor-release-gate.result == 'success'
+      needs.terminal-rendering-golden.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -1063,6 +1061,7 @@ jobs:
     needs:
       - cut
       - create-release
+      - release-preflight
     # Fork: mac-only. Windows/Linux builds are disabled (no SignPath on this fork).
     # macOS is built + signed by build-mac -> release-mac-build.yml.
     if: false

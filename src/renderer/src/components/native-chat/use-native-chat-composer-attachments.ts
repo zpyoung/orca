@@ -46,7 +46,7 @@ export function useNativeChatComposerAttachments({
 }: UseNativeChatComposerAttachmentsArgs): {
   imageAttachments: AgentComposerImageAttachment[]
   appendImageAttachments: (paths: string[]) => void
-  attachResolvedPaths: (paths: string[]) => void
+  attachResolvedPaths: (paths: string[], connectionId?: string | null) => void
   clearImageAttachments: () => void
   flushPendingAttachments: () => void
   restoreImageAttachments: (attachments: readonly AgentComposerImageAttachment[]) => void
@@ -233,7 +233,10 @@ export function useNativeChatComposerAttachments({
 
   return {
     imageAttachments,
-    appendImageAttachments,
+    // the fork's hosts attach local paths only; upstream's per-path connectionId is carried by
+    // attachResolvedPaths, which is the path a remote upload actually takes
+    appendImageAttachments: (paths: string[]) =>
+      appendImageAttachments(paths.map((path) => ({ path }))),
     attachResolvedPaths,
     clearImageAttachments: () => updateImageAttachments(() => []),
     flushPendingAttachments,
