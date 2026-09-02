@@ -120,7 +120,7 @@ describe('fetchNewerReleaseTagsWithReadiness', () => {
 
     netFetchMock.mockImplementation(
       (url: string, init?: { method?: string; redirect?: string }) => {
-        if (url === 'https://github.com/stablyai/orca/releases.atom') {
+        if (url === 'https://github.com/zpyoung/orca/releases.atom') {
           return Promise.resolve({
             ok: true,
             status: 200,
@@ -154,7 +154,7 @@ describe('fetchNewerReleaseTagsWithReadiness', () => {
   it.each([301, 307, 308])('accepts a GitHub %s asset redirect as ready', async (status) => {
     setPlatformForTest('win32')
     netFetchMock.mockImplementation((url: string, init?: { method?: string }) => {
-      if (url === 'https://github.com/stablyai/orca/releases.atom') {
+      if (url === 'https://github.com/zpyoung/orca/releases.atom') {
         return Promise.resolve({
           ok: true,
           status: 200,
@@ -185,7 +185,7 @@ describe('fetchNewerReleaseTagsWithReadiness', () => {
   it('reports a GitHub asset request error as unavailable', async () => {
     setPlatformForTest('win32')
     netFetchMock.mockImplementation((url: string, init?: { method?: string }) => {
-      if (url === 'https://github.com/stablyai/orca/releases.atom') {
+      if (url === 'https://github.com/zpyoung/orca/releases.atom') {
         return Promise.resolve({
           ok: true,
           status: 200,
@@ -222,7 +222,7 @@ describe('fetchNewerReleaseTagsWithReadiness', () => {
       resolveAsset = () => resolve({ ok: false, status: 503 })
     })
     netFetchMock.mockImplementation((url: string, init?: { method?: string }) => {
-      if (url === 'https://github.com/stablyai/orca/releases.atom') {
+      if (url === 'https://github.com/zpyoung/orca/releases.atom') {
         return Promise.resolve({
           ok: true,
           status: 200,
