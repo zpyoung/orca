@@ -1,4 +1,6 @@
 import { ipcMain } from 'electron'
+import type { AgentHookInstallStatus } from '../../shared/agent-hook-types'
+import { claudeHookService } from '../claude/hook-service'
 import { FORK_SESSION_INFO_CHANNELS } from '../../shared/fork-session-info/session-info-channels'
 import type {
   SessionInfoPaneTelemetry,
@@ -27,13 +29,15 @@ export function registerSessionInfoIpcHandlers(
   chaining: SessionInfoChaining = {
     status: getSessionInfoStatusLineChainStatus,
     enable: enableSessionInfoStatusLineChaining
-  }
+  },
+  readClaudeHookStatus: () => AgentHookInstallStatus = () => claudeHookService.getStatus()
 ): void {
   const unsubscribeBySenderId = new Map<number, () => void>()
   const destroyWiredSenderIds = new Set<number>()
   ipcMain.handle(FORK_SESSION_INFO_CHANNELS.snapshot, () => service.getSnapshot())
   ipcMain.handle(FORK_SESSION_INFO_CHANNELS.chainStatus, () => chaining.status())
   ipcMain.handle(FORK_SESSION_INFO_CHANNELS.enableChaining, () => chaining.enable())
+  ipcMain.handle(FORK_SESSION_INFO_CHANNELS.claudeHookStatus, () => readClaudeHookStatus())
   ipcMain.on(FORK_SESSION_INFO_CHANNELS.subscribe, (event) => {
     const senderId = event.sender.id
     unsubscribeBySenderId.get(senderId)?.()

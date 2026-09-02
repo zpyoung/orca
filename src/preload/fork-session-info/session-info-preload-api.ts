@@ -1,5 +1,6 @@
 import { ipcRenderer } from 'electron'
 import { FORK_SESSION_INFO_CHANNELS } from '../../shared/fork-session-info/session-info-channels'
+import type { AgentHookInstallStatus } from '../../shared/agent-hook-types'
 import type {
   SessionInfoPaneTelemetry,
   SessionInfoStatusLineChainStatus,
@@ -11,6 +12,7 @@ export type ForkSessionInfoApi = {
   onUpdate: (listener: (telemetry: SessionInfoPaneTelemetry) => void) => () => void
   getStatusLineChainStatus: () => Promise<SessionInfoStatusLineChainStatus>
   enableStatusLineChaining: () => Promise<SessionInfoStatusLineChainStatus>
+  getClaudeHookStatus: () => Promise<AgentHookInstallStatus>
 }
 
 /** Build the narrow bridge for pane telemetry and explicit statusline consent. */
@@ -44,6 +46,7 @@ export function buildForkSessionInfoApi(): ForkSessionInfoApi {
       }
     },
     getStatusLineChainStatus: () => ipcRenderer.invoke(FORK_SESSION_INFO_CHANNELS.chainStatus),
-    enableStatusLineChaining: () => ipcRenderer.invoke(FORK_SESSION_INFO_CHANNELS.enableChaining)
+    enableStatusLineChaining: () => ipcRenderer.invoke(FORK_SESSION_INFO_CHANNELS.enableChaining),
+    getClaudeHookStatus: () => ipcRenderer.invoke(FORK_SESSION_INFO_CHANNELS.claudeHookStatus)
   }
 }

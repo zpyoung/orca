@@ -70,8 +70,8 @@ export function useHooksAndMcp({
     setState({ status: 'loading', enablingStatusLine: false })
     const api = getForkSessionInfoApi()
     const hookRequest =
-      agentType === 'claude' && isLocalExecution
-        ? window.api.agentHooks.claudeStatus()
+      api && agentType === 'claude' && isLocalExecution
+        ? api.getClaudeHookStatus()
         : Promise.resolve(undefined)
     const mcpRequest =
       workspaceRoot && canInspectMcp
