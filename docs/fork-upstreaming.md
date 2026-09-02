@@ -107,6 +107,7 @@ them hot sidebar hooks — and rewriting ref patterns upstream has no reason to 
 - `mobile/src/browser/mobile-browser-frame-state.ts`
 - `mobile/src/diagnostics/connection-diagnostics-submission.ts`
 - `src/renderer/src/components/right-sidebar/checks-panel/use-checks-list-state.tsx`
+- `src/renderer/src/components/browser-pane/annotate/browser-page-annotation-tray.tsx`
 
 The `package.json` severities need no `exceptions` row of their own; the file is already declared
 `permanent`.
@@ -124,6 +125,14 @@ The v1.4.193 sync added the last two severities. That release lands a new 48-fil
 20+ findings there under those two rules. Upstream's own `package.json` downgrades neither, and the
 CLI's rule set has moved since upstream merged that code, so upstream `main` would fail this gate
 today as well — the findings are upstream's to resolve, not the fork's to rewrite blind.
+
+The v1.4.195 sync added `browser-page-annotation-tray.tsx`. v1.4.195 introduced the annotation
+edit tray whole, so every line in it is a changed line, and its effect that clears
+`editingAnnotationId` when the annotation leaves the `browserAnnotations` prop trips
+`no-adjust-state-on-prop-change`. Adjusting the same state during render is the pattern React
+documents for this, it is what the repo already does elsewhere (the composer core's scope-key
+reset), and it removes a frame the tray would otherwise paint still in edit mode for an annotation
+that is already gone — a small correctness gain, not just gate appeasement.
 
 **Status:** pending-upstream. Not yet submitted. Drop any entry upstream resolves on its own — the
 CLI's rule set moves independently of the pinned `react-doctor@0.9.1` version.

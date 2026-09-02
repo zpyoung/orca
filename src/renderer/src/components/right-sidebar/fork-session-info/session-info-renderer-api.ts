@@ -1,3 +1,4 @@
+import type { AgentHookInstallStatus } from '../../../../../shared/agent-hook-types'
 import type {
   SessionInfoPaneTelemetry,
   SessionInfoStatusLineChainStatus,
@@ -9,6 +10,7 @@ export type ForkSessionInfoRendererApi = {
   onUpdate: (listener: (telemetry: SessionInfoPaneTelemetry) => void) => () => void
   getStatusLineChainStatus: () => Promise<SessionInfoStatusLineChainStatus>
   enableStatusLineChaining: () => Promise<SessionInfoStatusLineChainStatus>
+  getClaudeHookStatus: () => Promise<AgentHookInstallStatus>
 }
 
 /** Returns the optional fork API without widening the upstream preload surface. */

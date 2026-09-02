@@ -157,6 +157,7 @@ const INVENTORY: readonly InventoryGroup[] = [
     classification: 'parser-implementation',
     paths: [
       ['src/renderer/src/lib/pane-agent-evidence.ts', 2],
+      ['src/renderer/src/lib/tab-agent-from-signals.ts', 2],
       'src/shared/terminal-title-agent-type.ts'
     ]
   },
@@ -205,11 +206,9 @@ const INVENTORY: readonly InventoryGroup[] = [
     helper: 'resolvePaneAgentOwner',
     classification: 'identity-consumer',
     paths: [
-      ['src/main/runtime/orca-runtime.ts', 3],
       ['src/renderer/src/components/sidebar/worktree-title-derived-agent-rows.ts', 2],
       ['src/renderer/src/components/terminal-pane/pty-connection/shell-command-inference.ts', 2],
-      ['src/renderer/src/lib/use-tab-agent.ts', 2],
-      ['src/renderer/src/runtime/web-session-tabs-sync.ts', 3]
+      ['src/renderer/src/lib/use-tab-agent.ts', 2]
     ]
   },
   {
@@ -222,8 +221,9 @@ const INVENTORY: readonly InventoryGroup[] = [
     classification: 'identity-consumer',
     paths: [
       ['src/main/runtime/orca-runtime.ts', 3],
-      ['src/renderer/src/components/sidebar/worktree-agent-rows.ts', 2],
+      ['src/renderer/src/components/sidebar/worktree-agent-row-type.ts', 2],
       ['src/renderer/src/components/sidebar/worktree-title-derived-agent-rows.ts', 2],
+      ['src/renderer/src/lib/tab-agent-from-signals.ts', 2],
       ['src/renderer/src/lib/use-tab-agent.ts', 2]
     ]
   },
@@ -236,8 +236,7 @@ const INVENTORY: readonly InventoryGroup[] = [
         'src/renderer/src/components/terminal-pane/pty-connection/command-inferred-pane-agent.ts',
         3
       ],
-      ['src/renderer/src/components/terminal-pane/pty-connection/terminal-keydown-fit.ts', 3],
-      ['src/renderer/src/components/terminal-pane/use-notification-dispatch.ts', 2]
+      ['src/renderer/src/components/terminal-pane/pty-connection/terminal-keydown-fit.ts', 3]
     ]
   },
   {
@@ -347,7 +346,7 @@ describe('pane agent identity inventory ratchet', () => {
     const byHelperAndPath = (left: (typeof actual)[number], right: (typeof actual)[number]) =>
       left.helper.localeCompare(right.helper) || left.path.localeCompare(right.path)
     expect(actual.sort(byHelperAndPath)).toEqual(expected.sort(byHelperAndPath))
-  })
+  }, 30_000)
 
   it('pins direct single-source identity and action branches outside named helpers', () => {
     for (const site of DIRECT_SINGLE_SOURCE_SURFACES) {

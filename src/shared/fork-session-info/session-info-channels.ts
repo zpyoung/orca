@@ -4,5 +4,6 @@ export const FORK_SESSION_INFO_CHANNELS = {
   subscribe: 'forkSessionInfo:subscribe',
   unsubscribe: 'forkSessionInfo:unsubscribe',
   chainStatus: 'forkSessionInfo:chainStatus',
-  enableChaining: 'forkSessionInfo:enableChaining'
+  enableChaining: 'forkSessionInfo:enableChaining',
+  claudeHookStatus: 'forkSessionInfo:claudeHookStatus'
 } as const

@@ -73,9 +73,7 @@ function ImageAttachmentRefs({ blocks }: { blocks: NativeChatBlock[] }): React.J
   )
 }
 
-/** Inline controls for an agent message (mobile AgentControls parity): copy the
- *  message's prose, and scroll so this message's top aligns to the viewport top.
- *  Reveals on hover / keyboard focus like the prior copy affordance. */
+/** Footer controls for an agent message: copy its prose or align it to the viewport top. */
 function AgentControls({
   markdown,
   onScrollToTop,
@@ -249,19 +247,12 @@ function MessageRow({
     <div
       ref={rowRef}
       className={cn(
-        'group relative max-w-full text-sm leading-relaxed text-foreground',
+        'group relative max-w-full select-text text-sm leading-relaxed text-foreground',
         // Reasoning is the agent thinking aloud — quieter, italic, like an aside.
         isReasoning && nativeChatReasoningClassName(),
         isSystem && 'text-xs text-muted-foreground'
       )}
     >
-      {showControls ? (
-        <AgentControls
-          markdown={markdown}
-          onScrollToTop={scrollToTop}
-          className="absolute -top-8 right-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-        />
-      ) : null}
       <ImageAttachmentRefs blocks={prose} />
       {markdown ? (
         <CommentMarkdown
@@ -274,6 +265,13 @@ function MessageRow({
         />
       ) : null}
       {tools.length > 0 ? <NativeChatToolRun blocks={tools} expandSignal={expandSignal} /> : null}
+      {showControls ? (
+        <AgentControls
+          markdown={markdown}
+          onScrollToTop={scrollToTop}
+          className="pointer-events-none mt-1 -mb-5 w-fit select-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
+        />
+      ) : null}
     </div>
   )
 }
