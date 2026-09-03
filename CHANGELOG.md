@@ -1,5 +1,5 @@
 ---
-last_released_commit: 028efe682bb83e32a1ded4c8dce81572d7f4e083
+last_released_commit: d5be7dc01d01aed26d671f5818c2b1a351b58c37
 upstream_synced: v1.4.195
 ---
 
@@ -11,6 +11,36 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.196-rc.0.zy02] - 2026-09-03
+
+Synced to upstream [v1.4.195](https://github.com/stablyai/orca/releases/tag/v1.4.195).
+
+Re-cut of `1.4.196-rc.0.zy01`, which created a tag and a draft but never produced a build. That
+draft and `1.4.195-rc.0.zy01`'s are left in place; neither was ever published, and neither carries
+artifacts.
+
+### Fixed
+- Releases build again. Both release workflows pinned pnpm 10.24.0 while `packageManager` — which
+  the fork takes from upstream — had moved to pnpm 12, and the setup action refuses that
+  combination outright rather than picking one. Every cut since 2026-09-01 therefore tagged a
+  version and then died before building anything, leaving a draft release with no installers in
+  it. The workflows now use the same action upstream and the fork's own PR CI already use, which
+  reads the version from `packageManager` instead of pinning its own. The macOS build had not
+  failed yet only because it runs behind the jobs that did.
+
+### Changed
+- The sync procedure gained what the last two syncs cost. The merge and ownership commits now
+  bypass the pre-commit hook, which otherwise lints a deliberately half-resolved tree and reverts
+  the resolution it was about to repair. Reset upstream tests are swept for pinned upstream
+  release tags absent from this fork's remote — the third such constant aborted an entire PR CI
+  suite. Static-analysis findings on upstream code a release introduces are now in scope for the
+  sync's fix policy, since every upstream line reads as a changed line on a sync PR. And release
+  workflows get a toolchain pass of their own: nothing in PR CI runs them, so a fork exception
+  that discards an upstream toolchain bump stays green until someone cuts a release, which is
+  exactly how the pnpm pin above survived.
+- `BUGS.md` records that the pipeline's stuck-draft recovery matches bare `-rc.N` tags only, so
+  this fork's `.zyNN` releases are never candidates for it. No behavior change.
 
 ## [1.4.196-rc.0.zy01] - 2026-09-02
 
