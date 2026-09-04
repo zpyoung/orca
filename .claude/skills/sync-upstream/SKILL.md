@@ -286,6 +286,23 @@ owns from the file it happens to live in. Resolve a genuine conflict in the fork
 the exception's `reason` is what upstream's side would undo — a fork build artifact, a fork identity
 file, or a record the reason says upstream's copy actively breaks.
 
+**A four-digit removal on an `ours.txt` path is a module split, not lost fork work.** The numstat
+above is the only tell an exception ever gets: `--verify-residuals` reads `seams` alone, so a split
+that lands on an exception-owned file is invisible to every manifest check. v1.4.197 split three at
+once — `src/main/updater.ts` (2,353 lines to a 94-line barrel), `src/main/rate-limits/service.ts`
+(2,182 to 10) and `TerminalPane.tsx` (3,505 to 15) — and the exception would have defended all three
+monoliths while the merge added the new modules beside them. Do not three-way merge one of these;
+re-home it by the recipe in [`references/sync-lessons.md`](./references/sync-lessons.md), which now
+covers the exception case as well as the seam case.
+
+**Before designing the re-home, read the test files that arrived beside the split.** A release that
+dissolves a monolith tends to pin the result, and the pins are exact equalities — a `toHaveLength`,
+a `_SHA256` of a flattened hook or listener order, a `LISTENER_BUDGET` compared with `toBe`. If the
+fork feature that lived in the monolith necessarily adds hooks or store subscriptions inside the
+pinned file set, no re-home satisfies them and re-baselining the constants is the baseline bump the
+fix policy forbids. That is a confirmed feature collision: stop and raise it, rather than spending
+the hour first.
+
 A `reason` that reads like whole-file ownership ("the fork's release-tooling delta", "fork-specific
 thresholds") is exactly where this goes wrong: it is describing a *delta*, and the exception is
 keeping the whole file. v1.4.194 lost four that way — the Electron installer's staging-transaction
