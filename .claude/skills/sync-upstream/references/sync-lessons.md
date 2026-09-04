@@ -28,7 +28,8 @@ with its own module state. Nothing complained: the merge was conflict-free after
 `pnpm typecheck` was clean. This is the third such release (v1.4.186 and v1.4.187 were the others),
 so expect a fourth.
 
-**The tell.** `--verify-residuals` is the only check that sees it, and the drift is not subtle:
+**The tell, for a seam.** `--verify-residuals` is the only check that sees it, and the drift is not
+subtle:
 
 ```
 src/main/ipc/pty.ts: recorded +96/-1, measured +8111/-38
@@ -48,7 +49,25 @@ a residual that drifts by exactly one or two lines is *not* this — that is ord
 damage, where upstream added a parameter or an import the fork's side discarded, and it is repaired
 in place.
 
-**The right move.** Re-home the seam, do not defend the monolith:
+**The tell, for an exception.** There isn't one — not from the manifest. `--verify-residuals` reads
+`seams` only, so a split that lands on an exception-owned path passes every check while the fork
+keeps the whole monolith and the merge adds the new modules beside it. The `ours.txt` audit in
+Step 6 is what catches it, and the signature is a four-digit removal against a file the fork
+supposedly owns:
+
+```
+29    2288  src/main/updater.ts
+8     2180  src/main/rate-limits/service.ts
+7     3497  src/renderer/src/components/terminal-pane/TerminalPane.tsx
+```
+
+v1.4.197 did all three at once, so a release splitting several exception files in one go is normal
+rather than exceptional. Confirm the same way as for a seam — `git show "${UPSTREAM_TARGET}:<path>"
+| wc -l` against the worktree copy — and note that the fork's *own* delta stays small: those three
+were 2/2, 7/6 and 134/14 lines. A small fork delta against a huge upstream removal is the whole
+shape.
+
+**The right move.** Re-home the seam or the exception, do not defend the monolith:
 
 1. Recover the fork's real footprint by diffing the pre-merge fork tip against the **previous** tag
    (`git diff -U6 "$PREV_TAG" "$MERGE_HEAD_PRE" -- <path>`). The recorded residual tells you how
@@ -70,3 +89,38 @@ verify rather than assume they need editing. And `config/max-lines-baseline.txt`
 short inline arrays the repo's formatter keeps on one line, turning a 30-line edit into a
 650-line diff that buries the actual change. Edit the file as text.
 
+
+## A split that arrives with its own parity ratchets
+
+**What happened.** v1.4.197's `TerminalPane.tsx` split shipped three new test files beside the 74 it
+created — `terminal-pane-hook-order-parity.test.ts`, `terminal-pane-listener-order-parity.test.ts`
+and `terminal-pane-store-subscription-budget.test.tsx`. Each pins the refactor with an exact
+equality: 204 flattened render hooks and a SHA-256 of their order, 24 DOM listeners and a SHA-256 of
+theirs, and `expect(perPane).toBe(17)` for store subscriptions. The fork's `terminal-dock` feature
+had lived inside that monolith as 134 added lines, and its integration adds four `useAppStore`
+subscriptions and roughly thirty hooks *inside the pinned file set*. No re-home satisfies the pins.
+
+**The tell.** The split's new files include tests whose constants are exact rather than upper
+bounds. Grep the new siblings before planning any of the work:
+
+```sh
+comm -13 <(git ls-tree -r --name-only "$PREV_TAG" -- <dir>/ | LC_ALL=C sort) \
+         <(git ls-tree -r --name-only "$UPSTREAM_TARGET" -- <dir>/ | LC_ALL=C sort) \
+  | xargs git grep -lE '_SHA256|_BUDGET|toHaveLength\([0-9]' --
+```
+
+The escape hatch worth checking, because it sometimes works: read each pin's *file pattern*. The
+hook-order pattern here covers `TerminalPane.tsx` and `use-terminal-pane-*.ts` only, so
+`TerminalPaneSurface.tsx` and the runtime portals are outside it, and a fork mount rendered from the
+surface costs nothing. It did not rescue this one, because the budget test mounts
+`useTerminalPaneController` directly and the dock's cross-cutting calls — the
+`notePanePtyBindingChanged()` in the layout-binding callbacks, the `paneDockOwnsFocus()` focus
+guards, the retired-pane ref — have to sit in the controller chain.
+
+**The right move.** Stop and raise it as a confirmed feature collision. Re-baselining a pinned SHA
+or budget so a fork feature fits is the baseline bump the fix policy forbids, and it also hands the
+fork permanent ownership of an upstream performance ratchet — every later upstream refactor of that
+subsystem then re-conflicts, and the fork stops getting the regression protection the ratchet
+exists for. **Do not mistake this for the ordinary re-home above**: the difference is not size, it
+is whether the pins can be satisfied at all. Establish that first, from the test files, before
+touching a line.
