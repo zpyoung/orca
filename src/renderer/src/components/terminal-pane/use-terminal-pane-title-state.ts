@@ -17,6 +17,7 @@ export function useTerminalPaneTitleState(controller: TerminalPaneFoundation) {
   const {
     containerRef,
     managerRef,
+    tabId,
     paneTransportsRef,
     setPtyRecoveryStatesByPaneId,
     setSessionStateSaveFailureOpen,

@@ -14,6 +14,10 @@ import {
   ProviderFrameRow
 } from './NativeChatTranscriptChrome'
 import type { RuntimeFileOperationArgs } from '@/runtime/runtime-file-client'
+import {
+  nativeChatReasoningClassName,
+  nativeChatUserMessageClassName
+} from './fork-native-chat-coloring/native-chat-message-coloring'
 
 /** One message: its prose first, then a collapsible run folding all of the
  *  turn's tool activity. Monochrome per STYLEGUIDE: user prompts read as a
@@ -86,7 +90,7 @@ export const MessageRow = memo(function MessageRow({
       <div ref={rowRef} className="flex flex-col items-end gap-0.5">
         {/* User turns get a distinct muted fill (not the card/canvas color) so
             the prompt reads apart from the assistant's body copy. */}
-        <div className="max-w-[85%] rounded-lg rounded-tr-sm bg-muted px-3.5 py-2.5 text-sm text-foreground">
+        <div className={nativeChatUserMessageClassName()}>
           {markdown ? (
             <>
               <NativeChatImageAttachments
@@ -100,6 +104,7 @@ export const MessageRow = memo(function MessageRow({
                 className="text-sm"
                 onLinkClick={onLinkClick}
                 allowFileUriLinks={allowFileUriLinks}
+                highlightCode
               />
             </>
           ) : (
@@ -132,7 +137,7 @@ export const MessageRow = memo(function MessageRow({
       className={cn(
         'group relative max-w-full select-text text-sm leading-relaxed text-foreground',
         // Reasoning is the agent thinking aloud — quieter, italic, like an aside.
-        isReasoning && 'border-l-2 border-border/60 pl-3 italic text-muted-foreground',
+        isReasoning && nativeChatReasoningClassName(),
         isSystem && 'text-xs text-muted-foreground'
       )}
     >
@@ -149,6 +154,7 @@ export const MessageRow = memo(function MessageRow({
           onLinkClick={onLinkClick}
           allowFileUriLinks={allowFileUriLinks}
           linkifyFilePaths={onLinkClick !== undefined}
+          highlightCode
         />
       ) : null}
       {tools.length > 0 ? (

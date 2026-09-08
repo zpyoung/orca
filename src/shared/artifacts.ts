@@ -5,6 +5,10 @@ import type {
   ArtifactPublishedProtection
 } from './fork-artifact-passwords/artifact-password-types'
 
+/** Maximum UTF-8 bytes accepted for a manually shared artifact. */
+export const ARTIFACT_MAX_CONTENT_BYTES = 10 * 1024 * 1024
+
+/** Legacy CLI/SSH envelope cap; those transports still have ~1 MiB control frames. */
 export const ARTIFACT_CLI_MAX_RPC_BYTES = 800 * 1024
 
 /** Allows JSON escaping while staying below the cloud API's 11 MiB body budget. */

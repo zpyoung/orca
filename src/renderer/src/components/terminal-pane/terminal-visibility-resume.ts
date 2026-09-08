@@ -109,7 +109,7 @@ export function resumeTerminalVisibility({
     } else {
       // fitAllRevealedPanes flushes after WebGL reattaches, avoiding a redundant
       // full refresh in the suspended DOM renderer while preserving first paint.
-      resumeTerminalVisibilityHeavy(
+      repairedDpr = resumeTerminalVisibilityHeavy(
         manager,
         isActive,
         paneFocusOwnershipArgs(tabId, paneDockOwnsFocus)
@@ -238,8 +238,8 @@ function requestLightTabBacklogRecovery(manager: PaneManager): void {
 function resumeTerminalVisibilityHeavy(
   manager: PaneManager,
   isActive: boolean,
-  ownership: [] | [PaneFocusOwnership]
-): void {
+  ownershipArgs: [] | [PaneFocusOwnership] = []
+): boolean {
   // Why: hidden panes can accumulate large PTY bursts while Chromium is
   // occluded. Drain a bounded slice before fitting; the scheduler keeps
   // ordering and continues the rest asynchronously so return-to-app does
@@ -268,7 +268,7 @@ function resumeTerminalVisibilityHeavy(
   // grid and garbles diff-painting inline TUIs (grok minimize→restore).
   manager.fitAllRevealedPanes()
   if (isActive) {
-    focusActivePane(manager, ...ownership)
+    focusActivePane(manager, ...ownershipArgs)
   }
   return repairedDpr
 }

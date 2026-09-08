@@ -48,6 +48,7 @@ export const getExperimentalPaneSearchEntries = createLocalizedCatalog(
       ]
     },
     getNativeChatExperimentalSearchEntry(),
+    getTerminalDockExperimentalSearchEntry(),
     {
       title: translate(
         'auto.components.settings.experimental.search.agentDashboard.title',
@@ -92,8 +93,6 @@ export const getExperimentalPaneSearchEntries = createLocalizedCatalog(
         )
       ]
     },
-    getNativeChatExperimentalSearchEntry(),
-    getTerminalDockExperimentalSearchEntry(),
     {
       title: translate(
         'auto.components.settings.experimental.search.9e4ddf776d',
@@ -204,17 +203,14 @@ export function getExperimentalSearchEntry() {
     nativeChat: findEntry(
       translate('auto.components.settings.experimental.search.nativeChat.title', 'Chat UI')
     ),
+    terminalDock: findEntry(
+      translate('auto.components.settings.experimental.search.terminalDock.title', 'Terminal dock')
+    ),
     agentDashboard: findEntry(
       translate(
         'auto.components.settings.experimental.search.agentDashboard.title',
         'Agent Dashboard'
       )
-    ),
-    nativeChat: findEntry(
-      translate('auto.components.settings.experimental.search.nativeChat.title', 'Chat UI')
-    ),
-    terminalDock: findEntry(
-      translate('auto.components.settings.experimental.search.terminalDock.title', 'Terminal dock')
     ),
     terminalAttention: findEntry(
       translate('auto.components.settings.experimental.search.9e4ddf776d', 'Terminal attention')

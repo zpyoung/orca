@@ -28,10 +28,23 @@ import {
 } from '../../../../shared/native-chat-tool-activity'
 import { nativeChatToolRunIconName } from '../../../../shared/native-chat-tool-icon'
 import { NativeChatDiffView } from './NativeChatDiffView'
+import { NativeChatToolIcon, NativeChatToolRunIcon } from './NativeChatToolIcon'
 import {
   NativeChatToolCategoryDots,
   NativeChatToolName
 } from './fork-native-chat-coloring/native-chat-tool-category-glyphs'
+
+function activeToolLabel(call: Extract<NativeChatBlock, { type: 'tool-call' }>): string {
+  const { key, toolName, preview } = describeActiveToolCall(call)
+  const copy = NATIVE_CHAT_TOOL_ACTIVITY_COPY[key]
+  return key === 'runningPreview'
+    ? translate('components.native-chat.tool.runningPreview', copy, { preview })
+    : key === 'runningCommand'
+      ? translate('components.native-chat.tool.runningCommand', copy)
+      : key === 'runningNamedPreview'
+        ? translate('components.native-chat.tool.runningNamedPreview', copy, { toolName, preview })
+        : translate('components.native-chat.tool.runningNamed', copy, { toolName })
+}
 
 /** A single inline tool line — `▸ ToolName  preview` — that expands in place to
  *  show the call's diff/input or the result's body. Tool calls read as flat
@@ -83,6 +96,14 @@ function ToolLine({
         )}
         aria-expanded={hasDetail ? expanded : undefined}
       >
+        {isCall ? (
+          /* Decorative category glyph; the word beside it is the row's name. */
+          <NativeChatToolIcon rowWord={name} className="text-muted-foreground" />
+        ) : (
+          /* A result's word is translated copy, not a tool name, so there is no
+             category to read from it. The empty slot keeps rows aligned. */
+          <span aria-hidden className="size-4 shrink-0" />
+        )}
         <NativeChatToolName name={name} />
         {preview ? (
           <span
@@ -238,27 +259,50 @@ export function NativeChatToolRun({
     // Extra top margin sets the tool run apart from the assistant prose above it
     // so the turn's activity doesn't crowd the message text.
     <div className="mt-3">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="group flex w-full items-center gap-1.5 py-0.5 text-left"
-      >
-        <NativeChatToolCategoryDots blocks={blocks} />
-        <span className="shrink-0 font-mono text-[11px] font-bold text-muted-foreground transition-colors group-hover:text-foreground/80">
-          {callCount}×
-        </span>
-        <span className="min-w-0 truncate font-mono text-[11px] text-muted-foreground transition-colors group-hover:text-foreground/80">
-          {summary || fallbackLabel}
-        </span>
-        {/* Chevron on the right, revealed on hover when collapsed and pointing
-            down when open — matches Codex's tool-run disclosure. */}
-        <ChevronRight
-          className={cn(
-            'size-3.5 shrink-0 text-muted-foreground transition-all',
-            open ? 'rotate-90 opacity-100' : 'opacity-0 group-hover:opacity-100'
-          )}
-        />
-      </button>
+      {latestActiveCall ? (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="group flex min-h-6 w-full items-center gap-1.5 rounded-md py-0.5 text-left text-sm leading-relaxed text-muted-foreground hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
+          aria-expanded={open}
+          aria-live="polite"
+        >
+          <NativeChatToolIcon rowWord={latestActiveCall.name} className="text-muted-foreground" />
+          <span className="min-w-0 flex-1 animate-pulse truncate text-foreground/85 motion-reduce:animate-none">
+            {activeToolLabel(latestActiveCall)}
+          </span>
+          {open ? <ChevronRight className="size-3.5 rotate-90 text-muted-foreground" /> : null}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="group flex min-h-6 w-full items-center gap-1.5 py-0.5 text-left"
+          aria-expanded={open}
+        >
+          {structuredActivityUi && settledHeaderIcon ? (
+            <NativeChatToolRunIcon iconName={settledHeaderIcon} className="text-muted-foreground" />
+          ) : null}
+          <NativeChatToolCategoryDots blocks={blocks} />
+          <span className="shrink-0 font-mono text-[11px] font-bold text-muted-foreground transition-colors group-hover:text-foreground/80">
+            {callCount}×
+          </span>
+          <span className="min-w-0 truncate font-mono text-[11px] text-muted-foreground transition-colors group-hover:text-foreground/80">
+            {summary || fallbackLabel}
+          </span>
+          {/* Completion reads as a trailing mark so the leading glyph can stay fixed. */}
+          {structuredActivityUi ? (
+            <Check aria-hidden className="size-3 shrink-0 text-muted-foreground" />
+          ) : null}
+          {/* Chevron is revealed on hover when collapsed and points down when open. */}
+          <ChevronRight
+            className={cn(
+              'size-3.5 shrink-0 text-muted-foreground transition-all',
+              open ? 'rotate-90 opacity-100' : 'opacity-0 group-hover:opacity-100'
+            )}
+          />
+        </button>
+      )}
       {open ? (
         <div className="mt-1">
           {(() => {

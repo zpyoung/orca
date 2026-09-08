@@ -4,13 +4,13 @@ import { useNativeChatLaunchDraftSignal } from './use-native-chat-launch-draft-a
 import { useNativeChatRetainedSession } from './use-native-chat-retained-session'
 import { isNativeChatTranscriptUnsettled } from './fork-native-chat-relay/use-native-chat-live-session'
 import { selectNativeChatViewState } from './fork-native-chat-relay/native-chat-view-state'
+import { NativeChatConversation } from './fork-native-chat-relay/NativeChatConversation'
+import { useNativeChatLaunchPromptOverlay } from './fork-native-chat-relay/use-native-chat-launch-prompt-overlay'
 import { NativeChatComposer, type NativeChatComposerHandle } from './NativeChatComposer'
 import { useNativeChatFontScale } from './use-native-chat-font-scale'
 import { useNativeChatCanSend } from './use-native-chat-can-send'
 import { NativeChatInteractiveCard } from './NativeChatInteractiveCard'
 import { NativeChatEmptyState } from './NativeChatEmptyState'
-import { NativeChatConversation } from './fork-native-chat-relay/NativeChatConversation'
-import { useNativeChatLaunchPromptOverlay } from './fork-native-chat-relay/use-native-chat-launch-prompt-overlay'
 import { useNativeChatInteractiveSend } from './use-native-chat-interactive-send'
 import {
   shouldClearNativeChatWorkingSuppression,
@@ -79,6 +79,7 @@ export function NativeChatResolvedView({
     selectNativeChatRuntimeEnvironmentId(s, terminalTabId)
   )
   const sshConnectionId = useAppStore((s) => selectNativeChatSshConnectionId(s, terminalTabId))
+  const keybindings = useAppStore((s) => s.keybindings)
   const session = useNativeChatRetainedSession({
     paneKey,
     agent,

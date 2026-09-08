@@ -60,6 +60,11 @@ type TerminalContextMenuProps = {
   canToggleTerminalDock: boolean
   isTerminalDockDocked: boolean
   onToggleTerminalDock: () => void
+  /** True when this pane may switch between the terminal and native chat views.
+   *  Structured sessions are excluded — they have no terminal underneath. */
+  canToggleNativeChat: boolean
+  isNativeChatView: boolean
+  onToggleNativeChat: () => void
   onCopyAgentSessionContext: () => void
   quickCommandHosts: TerminalQuickCommandMenuHost[]
   quickCommandHostLoadFailed: boolean
@@ -101,6 +106,9 @@ export default function TerminalContextMenu({
   canToggleTerminalDock,
   isTerminalDockDocked,
   onToggleTerminalDock,
+  canToggleNativeChat,
+  isNativeChatView,
+  onToggleNativeChat,
   onCopyAgentSessionContext,
   quickCommandHosts,
   quickCommandHostLoadFailed,
@@ -130,6 +138,7 @@ export default function TerminalContextMenu({
       setTitle: formatPrimaryShortcutLabel('terminal.setTitle', keybindings),
       clearPaneTitle: formatPrimaryShortcutLabel('terminal.clearPaneTitle', keybindings),
       close: formatPrimaryShortcutLabel('terminal.closePane', keybindings),
+      nativeChat: nativeChatToggleShortcutLabel(isMacPlatform()),
       terminalDock: formatPrimaryShortcutLabel('terminal.dock.toggle', keybindings)
     }),
     [keybindings]
@@ -214,13 +223,6 @@ export default function TerminalContextMenu({
             'Fork Agent Session…'
           )}
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={onCopyAgentSessionContext}>
-          <ClipboardCopy />
-          {translate(
-            'auto.components.terminal.pane.TerminalContextMenu.cff67afad1',
-            'Copy Context'
-          )}
-        </DropdownMenuItem>
         {canToggleTerminalDock ? (
           <DropdownMenuItem className="whitespace-nowrap" onSelect={onToggleTerminalDock}>
             {isTerminalDockDocked ? <PanelBottomClose /> : <PanelBottomOpen />}
@@ -236,6 +238,28 @@ export default function TerminalContextMenu({
             {showTerminalDockShortcut ? (
               <DropdownMenuShortcut>{shortcuts.terminalDock}</DropdownMenuShortcut>
             ) : null}
+          </DropdownMenuItem>
+        ) : null}
+        <DropdownMenuItem onSelect={onCopyAgentSessionContext}>
+          <ClipboardCopy />
+          {translate(
+            'auto.components.terminal.pane.TerminalContextMenu.cff67afad1',
+            'Copy Context'
+          )}
+        </DropdownMenuItem>
+        {canToggleNativeChat ? (
+          <DropdownMenuItem onSelect={onToggleNativeChat}>
+            {isNativeChatView ? <SquareTerminal /> : <MessageSquare />}
+            {isNativeChatView
+              ? translate(
+                  'components.tab.bar.SortableTabContextMenu.switchToTerminalView',
+                  'Switch to terminal view'
+                )
+              : translate(
+                  'components.tab.bar.SortableTabContextMenu.switchToChatView',
+                  'Switch to chat view'
+                )}
+            <DropdownMenuShortcut>{shortcuts.nativeChat}</DropdownMenuShortcut>
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuSeparator />

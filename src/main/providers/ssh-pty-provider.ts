@@ -47,6 +47,10 @@ export class SshPtyProvider implements IPtyProvider {
   write = (id: string, data: string): boolean => this.rpcOperations.write(id, data)
   writeWithSettlement = (id: string, data: string): Promise<boolean> =>
     this.rpcOperations.writeWithSettlement(id, data)
+  /** Ack-path only: resolves once the relay transport actually settles the
+   *  frame — false if writer disposal or backpressure rejection drops it. */
+  writeAcknowledged = (id: string, data: string): Promise<boolean> =>
+    this.rpcOperations.writeAcknowledged(id, data)
   resize = (id: string, cols: number, rows: number): void =>
     this.rpcOperations.resize(id, cols, rows)
   sendSignal = (id: string, signal: string): Promise<void> =>
@@ -245,25 +249,6 @@ export class SshPtyProvider implements IPtyProvider {
       rememberPtyIncarnation: (ptyId, incarnationId) =>
         this.outputState.rememberPtyIncarnation(ptyId, incarnationId)
     })
-  }
-
-  write(id: string, data: string): boolean {
-    return writeToSshPty(this.mux, this.toRelayPtyId(id), data)
-  }
-
-  writeWithSettlement(id: string, data: string): Promise<boolean> {
-    return writeToSshPtyWithSettlement(this.mux, this.toRelayPtyId(id), data)
-  }
-
-  /** Ack-path only: resolves once the relay transport actually settles the
-   *  frame — false if writer disposal or backpressure rejection drops it. */
-  writeAcknowledged(id: string, data: string): Promise<boolean> {
-    const params = { id: this.toRelayPtyId(id), data }
-    return new Promise((resolve) => this.mux.notifyWithSettlement('pty.data', params, (r) => resolve(r.ok)))
-  }
-
-  resize(id: string, cols: number, rows: number): void {
-    this.mux.notify('pty.resize', { id: this.toRelayPtyId(id), cols, rows })
   }
 
   async shutdown(id: string, opts: Parameters<IPtyProvider['shutdown']>[1]): Promise<void> {

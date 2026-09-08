@@ -16,6 +16,12 @@ export function createSshPtyProviderRpcOperations({ mux, toRelayPtyId }: SshPtyP
     write: (id: string, data: string): boolean => writeToSshPty(mux, toRelayPtyId(id), data),
     writeWithSettlement: (id: string, data: string): Promise<boolean> =>
       writeToSshPtyWithSettlement(mux, toRelayPtyId(id), data),
+    // Ack-path only: resolves once the relay transport actually settles the frame —
+    // false if writer disposal or backpressure rejection drops it.
+    writeAcknowledged: (id: string, data: string): Promise<boolean> =>
+      new Promise((resolve) =>
+        mux.notifyWithSettlement('pty.data', { id: toRelayPtyId(id), data }, (r) => resolve(r.ok))
+      ),
     resize: (id: string, cols: number, rows: number): void => {
       mux.notify('pty.resize', { id: toRelayPtyId(id), cols, rows })
     },

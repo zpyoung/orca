@@ -228,10 +228,12 @@ const CommentMarkdown = React.memo(
         ? createDocumentCommentMarkdownComponents(onLinkClick)
         : createCompactCommentMarkdownComponents(onLinkClick, expandImages)
     }, [expandImages, variant, onLinkClick, highlightCode])
-    const activeRemarkPlugins = React.useMemo(
-      () => (githubRepo ? [...remarkPlugins, remarkGitHubReferences(githubRepo)] : remarkPlugins),
-      [githubRepo]
-    )
+    const activeRemarkPlugins = React.useMemo(() => {
+      const plugins = linkifyFilePaths
+        ? [...remarkPlugins, remarkNativeChatFileLinks]
+        : remarkPlugins
+      return githubRepo ? [...plugins, remarkGitHubReferences(githubRepo)] : plugins
+    }, [githubRepo, linkifyFilePaths])
     const activeRehypePlugins = React.useMemo(
       () => (highlightCode ? [...rehypePlugins, rehypeHighlight] : rehypePlugins),
       [highlightCode]

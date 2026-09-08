@@ -131,7 +131,10 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       clearImageAttachments,
       flushPendingAttachments,
       restoreImageAttachments,
-      removeImageAttachment
+      removeImageAttachment,
+      beginPendingImageAttachment,
+      resolvePendingImageAttachment,
+      dropPendingImageAttachment
     } = useNativeChatComposerAttachments({
       attachmentScopeKey: paneKey,
       allowWithoutTarget: Boolean(structuredTransport),
@@ -159,6 +162,9 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       caret: core.caret,
       resolveAttachmentOwner,
       attachResolvedPaths,
+      beginPendingImageAttachment,
+      resolvePendingImageAttachment,
+      dropPendingImageAttachment,
       insertTypedText: core.insertTypedText,
       setCaret: core.setCaret,
       setNotice: core.setNotice

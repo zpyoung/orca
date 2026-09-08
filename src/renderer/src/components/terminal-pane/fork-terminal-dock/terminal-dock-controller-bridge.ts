@@ -1,4 +1,4 @@
-import type { PtyTransportRecoveryState } from '../pty-connection-types'
+import type { PtyTransportRecoveryState } from '../pty-transport-types'
 
 /**
  * Publishes the dock's controller-facing surface for one terminal tab.

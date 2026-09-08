@@ -3,9 +3,9 @@ import { emitNativeChatMessageSent } from '@/lib/native-chat-telemetry'
 import { isStructuredAgentSessionComposerCommand } from '../../../../shared/structured-agent-session-composer'
 import type { AgentType } from '../../../../shared/agent-status-types'
 import { dispatchNativeChatStructuredComposerText } from './native-chat-structured-composer-dispatch'
-import { pushHistory, type HistoryState } from './native-chat-composer-state'
+import { pushHistory, type HistoryState } from './fork-agent-composer/agent-composer-history'
 import type { NativeChatStructuredComposerTransport } from './native-chat-composer-types'
-import type { NativeChatComposerImageAttachment } from './NativeChatComposerField'
+import type { AgentComposerImageAttachment as NativeChatComposerImageAttachment } from './fork-agent-composer/AgentComposerField'
 
 export type UseNativeChatStructuredComposerSendArgs = {
   agent: AgentType

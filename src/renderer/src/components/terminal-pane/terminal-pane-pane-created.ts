@@ -30,7 +30,6 @@ import type { TerminalPaneManagerOptionsContext } from './terminal-pane-mount-co
 import { installTerminalPaneInputHandling } from './terminal-pane-pane-input'
 import { installTerminalPaneLinkHandling } from './terminal-pane-pane-links'
 import { scheduleRuntimeGraphSync } from '@/runtime/sync-runtime-graph'
-import { useAppStore } from '@/store'
 import { getExecutionHostIdForWorktree } from '@/lib/worktree-runtime-owner'
 import { resolveRemoteDockConptyUnverified } from './fork-terminal-dock/terminal-dock-remote-conpty'
 import { REMOTE_CONPTY_UNVERIFIED_DATASET_KEY } from './fork-terminal-dock/TerminalPaneDockMount'

@@ -304,8 +304,29 @@ export function useNativeChatComposerAttachments({
     flushPendingAttachments,
     restoreImageAttachments,
     removeImageAttachment: (id) =>
-      updateImageAttachments((prev) => prev.filter((attachment) => attachment.id !== id))
+      updateImageAttachments((prev) => removeAttachmentById(prev, id)),
+    beginPendingImageAttachment,
+    resolvePendingImageAttachment,
+    dropPendingImageAttachment
   }
+}
+
+/** Object URLs minted from a clipboard blob leak until revoked; data URLs don't. */
+function releaseAttachmentPreview(attachment: AgentComposerImageAttachment): void {
+  if (attachment.previewUrl?.startsWith('blob:')) {
+    URL.revokeObjectURL(attachment.previewUrl)
+  }
+}
+
+function removeAttachmentById(
+  attachments: readonly AgentComposerImageAttachment[],
+  id: string
+): AgentComposerImageAttachment[] {
+  const removed = attachments.find((attachment) => attachment.id === id)
+  if (removed) {
+    releaseAttachmentPreview(removed)
+  }
+  return attachments.filter((attachment) => attachment.id !== id)
 }
 
 export function restoreNativeChatAttachmentCache(

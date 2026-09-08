@@ -40,14 +40,11 @@ export function ExperimentalPane({
   const showNativeChat = matchesSettingsSearch(searchQuery, [
     getExperimentalSearchEntry().nativeChat
   ])
-  const showAgentDashboard = matchesSettingsSearch(searchQuery, [
-    getExperimentalSearchEntry().agentDashboard
-  ])
-  const showNativeChat = matchesSettingsSearch(searchQuery, [
-    getExperimentalSearchEntry().nativeChat
-  ])
   const showTerminalDock = matchesSettingsSearch(searchQuery, [
     getExperimentalSearchEntry().terminalDock
+  ])
+  const showAgentDashboard = matchesSettingsSearch(searchQuery, [
+    getExperimentalSearchEntry().agentDashboard
   ])
   const showTerminalAttention = matchesSettingsSearch(searchQuery, [
     getExperimentalSearchEntry().terminalAttention

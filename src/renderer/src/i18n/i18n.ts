@@ -6,7 +6,7 @@ import i18next, {
 } from 'i18next'
 import { initReactI18next } from 'react-i18next'
 
-import en from './locales/en.json'
+import enRuntimeRequired from './en-runtime-required.json'
 import { registerForkLocalizationCatalogs } from './fork-localization-catalogs'
 import { isPseudoLocalizationLocale, pseudoLocalizeString } from './pseudo-localization'
 import { DEFAULT_LOCALE, resolveUiLocale } from './supported-languages'
