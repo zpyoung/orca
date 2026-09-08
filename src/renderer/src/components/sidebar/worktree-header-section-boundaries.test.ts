@@ -4,6 +4,7 @@ import {
   getProjectGroupHeaderSectionEndByGroupId,
   getRepoHeaderSectionEndByRepoId
 } from './worktree-header-section-boundaries'
+import { estimateRenderRowSize } from './worktree-list/viewport/virtual-rows'
 import type { RenderRow } from './worktree-list/listing/render-row'
 
 const repoHeader = (id: string): RenderRow =>
@@ -20,10 +21,20 @@ const groupHeader = (id: string): RenderRow =>
   }) as RenderRow
 const item = { type: 'item' } as RenderRow
 
-// Estimated starts: first header 28, later headers 32, items 116.
+// Why summed rather than written out: this fork overrides the sidebar row-height constants
+// (docs/fork-upstreaming.md#sidebar-density), and the assertions below are about which
+// successor row ends a section, not about any particular pixel total.
+function startOfRow(source: readonly RenderRow[], index: number): number {
+  let offset = 0
+  for (let i = 0; i < index; i++) {
+    offset += estimateRenderRowSize(source, i, 0, null)
+  }
+  return offset
+}
+
 const rows = [repoHeader('a'), item, repoHeader('b'), item, repoHeader('c'), item]
-const startOfB = 28 + 116
-const startOfC = startOfB + 32 + 116
+const startOfB = startOfRow(rows, 2)
+const startOfC = startOfRow(rows, 4)
 
 describe('getRepoHeaderSectionEndByRepoId', () => {
   it('ends a section at the successor from the header’s own bucket', () => {
@@ -74,10 +85,12 @@ describe('getRepoHeaderSectionEndByRepoId', () => {
   })
 })
 
+const groupRows = [groupHeader('a'), item, groupHeader('b'), item, groupHeader('c'), item]
+
 describe('getProjectGroupHeaderSectionEndByGroupId', () => {
   it('ends a section at the successor from the group’s own bucket', () => {
     const ends = getProjectGroupHeaderSectionEndByGroupId({
-      rows: [groupHeader('a'), item, groupHeader('b'), item, groupHeader('c'), item],
+      rows: groupRows,
       firstHeaderIndex: 0,
       sidebarProjectGroupHeaderIdsByBucket: new Map([
         ['root', ['a', 'b']],
@@ -90,6 +103,6 @@ describe('getProjectGroupHeaderSectionEndByGroupId', () => {
       ])
     })
 
-    expect(ends.get('a')).toBe(startOfC)
+    expect(ends.get('a')).toBe(startOfRow(groupRows, 4))
   })
 })

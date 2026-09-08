@@ -475,7 +475,7 @@ describe('useNativeChatLiveSession — transport routing', () => {
 
   it("self-heals a stale 'working' hook once the turn-complete marker lands", async () => {
     useAppStore.setState({
-      agentStatusByPaneKey: { [PANE]: { state: 'working', stateStartedAt: 1 } as never }
+      agentStatusByPaneKey: { [PANE]: { state: 'working', stateStartedAt: 1, updatedAt: Date.now() } as never }
     })
     const transport = getMockTransport('env-1')
     await render({ paneKey: PANE, agent: AGENT, sessionId: SESSION, runtimeEnvironmentId: 'env-1' })
@@ -493,7 +493,7 @@ describe('useNativeChatLiveSession — transport routing', () => {
 
   it('applies a lifecycle-only append after the final message frame', async () => {
     useAppStore.setState({
-      agentStatusByPaneKey: { [PANE]: { state: 'working', stateStartedAt: 1 } as never }
+      agentStatusByPaneKey: { [PANE]: { state: 'working', stateStartedAt: 1, updatedAt: Date.now() } as never }
     })
     const transport = getMockTransport('env-1')
     await render({ paneKey: PANE, agent: AGENT, sessionId: SESSION, runtimeEnvironmentId: 'env-1' })
@@ -520,7 +520,7 @@ describe('useNativeChatLiveSession — transport routing', () => {
 
   it('applies a terminal-side interruption frame without a local Stop action', async () => {
     useAppStore.setState({
-      agentStatusByPaneKey: { [PANE]: { state: 'working', stateStartedAt: 1 } as never }
+      agentStatusByPaneKey: { [PANE]: { state: 'working', stateStartedAt: 1, updatedAt: Date.now() } as never }
     })
     const transport = getMockTransport('env-1')
     await render({ paneKey: PANE, agent: AGENT, sessionId: SESSION, runtimeEnvironmentId: 'env-1' })
@@ -547,7 +547,7 @@ describe('useNativeChatLiveSession — transport routing', () => {
 
   it('does not let an older pagination read rewind a live completion', async () => {
     useAppStore.setState({
-      agentStatusByPaneKey: { [PANE]: { state: 'working', stateStartedAt: 1 } as never }
+      agentStatusByPaneKey: { [PANE]: { state: 'working', stateStartedAt: 1, updatedAt: Date.now() } as never }
     })
     const transport = getMockTransport('env-1')
     const many = Array.from({ length: NATIVE_CHAT_INITIAL_LIMIT }, (_unused, index) =>
@@ -593,7 +593,7 @@ describe('useNativeChatLiveSession — transport routing', () => {
 
   it('reconciles completion from a reconnect snapshot', async () => {
     useAppStore.setState({
-      agentStatusByPaneKey: { [PANE]: { state: 'working', stateStartedAt: 10 } as never }
+      agentStatusByPaneKey: { [PANE]: { state: 'working', stateStartedAt: 10, updatedAt: Date.now() } as never }
     })
     const transport = getMockTransport('env-1')
     await render({ paneKey: PANE, agent: AGENT, sessionId: SESSION, runtimeEnvironmentId: 'env-1' })
@@ -621,7 +621,7 @@ describe('useNativeChatLiveSession — transport routing', () => {
 
   it('reconciles interruption from a reconnect snapshot', async () => {
     useAppStore.setState({
-      agentStatusByPaneKey: { [PANE]: { state: 'working', stateStartedAt: 10 } as never }
+      agentStatusByPaneKey: { [PANE]: { state: 'working', stateStartedAt: 10, updatedAt: Date.now() } as never }
     })
     const transport = getMockTransport('env-1')
     await render({ paneKey: PANE, agent: AGENT, sessionId: SESSION, runtimeEnvironmentId: 'env-1' })
@@ -808,7 +808,7 @@ describe('useNativeChatLiveSession — notFound retry (#8401)', () => {
     const transport = getMockTransport('env-1', { autoSnapshot: false })
     transport.readSession.mockResolvedValue({ error: 'No transcript found', notFound: true })
     useAppStore.setState({
-      agentStatusByPaneKey: { [PANE]: { state: 'working', stateStartedAt: 1 } }
+      agentStatusByPaneKey: { [PANE]: { state: 'working', stateStartedAt: 1, updatedAt: Date.now() } }
     } as never)
 
     await render({ paneKey: PANE, agent: AGENT, sessionId: SESSION, runtimeEnvironmentId: 'env-1' })
