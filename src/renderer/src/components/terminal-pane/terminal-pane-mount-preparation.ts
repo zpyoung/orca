@@ -177,7 +177,10 @@ export function prepareTerminalPaneMount(
         return
       }
       if (focusActive) {
-        fitAndFocusPanes(manager)
+        fitAndFocusPanes(manager, {
+          tabId: deps.tabId,
+          paneDockOwnsFocus: refs.paneDockOwnsFocusRef.current
+        })
       } else {
         fitPanes(manager)
       }

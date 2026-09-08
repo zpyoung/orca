@@ -4,6 +4,10 @@ import { OrcaRuntimeWithWriteOrchestrationPointerPty } from './orca-runtime-writ
 import type { RuntimeMobileSessionTabsSnapshot } from '../../shared/runtime-types'
 import type { WorkspaceSessionState } from '../../shared/workspace-session-state-types'
 import { getMobileSessionSnapshotTabIdentityKeys } from './mobile-session-tab-merge'
+import {
+  buildRendererDockByPaneKeyBaseline,
+  mergeRendererTerminalDockAcrossSnapshot
+} from './fork-terminal-dock/terminal-dock-session-tab-props'
 
 export class OrcaRuntimeWithSyncMobileSessionTabs extends OrcaRuntimeWithWriteOrchestrationPointerPty {
   // Returns the worktrees whose stored snapshot object changed during this
@@ -159,7 +163,18 @@ export class OrcaRuntimeWithSyncMobileSessionTabs extends OrcaRuntimeWithWriteOr
       const launchDraftFencedSnapshot = this.nativeChatDraftResolutions.applyFence(snapshot)
       const fencedSnapshot = this.applyMobileSessionRetirementFences(launchDraftFencedSnapshot)
       this.releaseRuntimeSessionOwnershipForRendererRetiredTabs(fencedSnapshot, existing)
-      const nextSnapshot = this.mergePreservedHeadlessMobileSessionTabs(fencedSnapshot, existing)
+      // Why: fold the renderer's whole per-tab dock record against the stored
+      // snapshot per pane before the tab-level merge below, or an untouched
+      // pane's stale renderer echo clobbers another client's newer patch.
+      const dockMergedSnapshot = mergeRendererTerminalDockAcrossSnapshot(
+        fencedSnapshot,
+        existing,
+        accepted?.rendererDockByPaneKeyByParentTabId
+      )
+      const nextSnapshot = this.mergePreservedHeadlessMobileSessionTabs(
+        dockMergedSnapshot,
+        existing
+      )
       // Why: clients drop same-epoch frames whose version isn't strictly newer,
       // and main-local touches may already have emitted a higher version than
       // the renderer's counter — keep the stored version strictly monotonic so
@@ -179,7 +194,8 @@ export class OrcaRuntimeWithSyncMobileSessionTabs extends OrcaRuntimeWithWriteOr
         rendererTabCount: fencedSnapshot.tabs.length,
         rendererTabIdentityKeys: new Set(
           fencedSnapshot.tabs.flatMap((tab) => getMobileSessionSnapshotTabIdentityKeys(tab))
-        )
+        ),
+        rendererDockByPaneKeyByParentTabId: buildRendererDockByPaneKeyBaseline(fencedSnapshot.tabs)
       })
     }
     for (const [worktreeId, existing] of [...this.mobileSessionTabsByWorktree.entries()]) {

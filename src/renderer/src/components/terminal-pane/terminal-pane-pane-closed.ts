@@ -15,6 +15,7 @@ import {
   discardDeferredSplitPaneHandoffForKey
 } from './deferred-split-pane-handoff'
 import type { PaneClosedHandlerContext } from './terminal-pane-mount-context'
+import { pruneTerminalDockPaneKeysEverywhere } from './fork-terminal-dock/terminal-pane-dock-prune'
 
 export function createTerminalPaneClosedHandler(
   context: Omit<PaneClosedHandlerContext, 'paneId' | 'closedPane'>
@@ -84,6 +85,18 @@ export function createTerminalPaneClosedHandler(
     binding?.dispose()
     panePtyBindingsRef.current.delete(paneId)
     const leafId = closedPane?.leafId
+    if (leafId) {
+      deps.onPaneRetiredRef?.current?.(leafId)
+      const dockPruneState = useAppStore.getState()
+      pruneTerminalDockPaneKeysEverywhere({
+        unifiedTabsByWorktree: dockPruneState.unifiedTabsByWorktree,
+        worktreeId,
+        tabId,
+        leafId,
+        experimentalTerminalDockEnabled: settingsRef.current?.experimentalTerminalDock === true,
+        pruneStoreDockPaneKeys: dockPruneState.pruneTerminalDockPaneKeys
+      })
+    }
     const deferredSplitHandoff = context.deferredSplitHandoffs.get(paneId)
     if (deferredSplitHandoff) {
       // Explicit pane removal is terminal for the split intent; only a

@@ -10,17 +10,31 @@ import type {
   TerminalPaneLayoutNode
 } from '../../shared/terminal-tab-types'
 import { cloneTerminalLayoutSnapshot } from './mobile-session-layout-projection'
+import { randomUUID } from 'node:crypto'
+import type { Tab } from '../../shared/tab-types'
+import {
+  terminalDockPatchFragment,
+  type TerminalDockPropsPatch
+} from './fork-terminal-dock/terminal-dock-session-tab-props'
 
 export class OrcaRuntimeWithPersistHeadlessSessionTabProps extends OrcaRuntimeWithCloseHeadlessMobileTerminalTab {
   protected persistHeadlessSessionTabProps(
     worktreeId: string,
     tabId: string,
-    props: { color?: string | null; isPinned?: boolean; viewMode?: 'terminal' | 'chat' }
+    props: {
+      color?: string | null
+      isPinned?: boolean
+      viewMode?: 'terminal' | 'chat'
+      terminalDock?: TerminalDockPropsPatch
+    }
   ): void {
     const session = this.getWorkspaceSessionForWorktree(worktreeId)
     if (!session || !this.store?.setWorkspaceSession) {
       return
     }
+    const livePaneKeys = props.terminalDock
+      ? this.getLiveTerminalDockPaneKeysForTab(tabId)
+      : undefined
     const tabs = session.tabsByWorktree[worktreeId]
     const nextSession: WorkspaceSessionState = { ...session }
     let changed = false
@@ -51,10 +65,46 @@ export class OrcaRuntimeWithPersistHeadlessSessionTabProps extends OrcaRuntimeWi
             ? {
                 ...tab,
                 ...(props.color !== undefined ? { color: props.color } : {}),
-                ...(props.isPinned !== undefined ? { isPinned: props.isPinned } : {})
+                ...(props.isPinned !== undefined ? { isPinned: props.isPinned } : {}),
+                ...terminalDockPatchFragment(
+                  tab.terminalDockByPaneKey,
+                  props.terminalDock,
+                  livePaneKeys
+                )
               }
             : tab
         )
+      }
+    } else if (props.terminalDock) {
+      // legacy sessions have no unified tab to carry the dock record — mint one
+      // so the patch actually persists instead of acking a no-op.
+      const legacyTab = tabs?.find((tab) => tab.id === tabId)
+      const dockFragment = terminalDockPatchFragment(undefined, props.terminalDock, livePaneKeys)
+      if (legacyTab && dockFragment.terminalDockByPaneKey) {
+        changed = true
+        const mintedTab: Tab = {
+          id: legacyTab.id,
+          entityId: legacyTab.id,
+          groupId: randomUUID(),
+          worktreeId,
+          contentType: 'terminal',
+          label: legacyTab.title,
+          customLabel: legacyTab.customTitle,
+          color: props.color !== undefined ? props.color : legacyTab.color,
+          sortOrder: legacyTab.sortOrder,
+          createdAt: legacyTab.createdAt,
+          isPinned: props.isPinned !== undefined ? props.isPinned : legacyTab.isPinned,
+          ...(props.viewMode !== undefined
+            ? { viewMode: props.viewMode }
+            : legacyTab.viewMode !== undefined
+              ? { viewMode: legacyTab.viewMode }
+              : {}),
+          ...dockFragment
+        }
+        nextSession.unifiedTabs = {
+          ...session.unifiedTabs,
+          [worktreeId]: [...(unifiedTabs ?? []), mintedTab]
+        }
       }
     }
 
@@ -67,12 +117,20 @@ export class OrcaRuntimeWithPersistHeadlessSessionTabProps extends OrcaRuntimeWi
   protected applyHeadlessSessionTabPropsToSnapshot(
     worktreeId: string,
     tabId: string,
-    props: { color?: string | null; isPinned?: boolean; viewMode?: 'terminal' | 'chat' }
+    props: {
+      color?: string | null
+      isPinned?: boolean
+      viewMode?: 'terminal' | 'chat'
+      terminalDock?: TerminalDockPropsPatch
+    }
   ): void {
     const snapshot = this.mobileSessionTabsByWorktree.get(worktreeId)
     if (!snapshot) {
       return
     }
+    const livePaneKeys = props.terminalDock
+      ? this.getLiveTerminalDockPaneKeysForTab(tabId)
+      : undefined
     let changed = false
     const tabs = snapshot.tabs.map((tab) => {
       if (this.getMobileSessionTopLevelTabId(tab) !== tabId) {
@@ -83,7 +141,10 @@ export class OrcaRuntimeWithPersistHeadlessSessionTabProps extends OrcaRuntimeWi
         ...tab,
         ...(props.color !== undefined ? { color: props.color } : {}),
         ...(props.isPinned !== undefined ? { isPinned: props.isPinned } : {}),
-        ...(props.viewMode !== undefined ? { viewMode: props.viewMode } : {})
+        ...(props.viewMode !== undefined ? { viewMode: props.viewMode } : {}),
+        ...(tab.type === 'terminal'
+          ? terminalDockPatchFragment(tab.terminalDockByPaneKey, props.terminalDock, livePaneKeys)
+          : {})
       }
     })
     if (!changed) {
@@ -97,6 +158,20 @@ export class OrcaRuntimeWithPersistHeadlessSessionTabProps extends OrcaRuntimeWi
     }
     this.storeMobileSessionSnapshot(worktreeId, nextSnapshot)
     this.emitMobileSessionTabsSnapshot(nextSnapshot)
+  }
+
+  // Why: the host's own PTY registry (ptysById) is the one source of "panes
+  // this tab actually has" that a remote client can't forge — it's populated
+  // from spawn-time bindings, not RPC input, and keeps a disconnected/
+  // reconnecting pane's paneKey until the PTY is actually torn down.
+  protected getLiveTerminalDockPaneKeysForTab(tabId: string): Set<string> {
+    const liveKeys = new Set<string>()
+    for (const pty of this.ptysById.values()) {
+      if (pty.tabId === tabId && pty.paneKey) {
+        liveKeys.add(pty.paneKey)
+      }
+    }
+    return liveKeys
   }
 
   protected getMobileSessionTopLevelTabId(tab: RuntimeMobileSessionSnapshotTab): string {

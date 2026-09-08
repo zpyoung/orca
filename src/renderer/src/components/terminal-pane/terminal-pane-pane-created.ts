@@ -30,6 +30,10 @@ import type { TerminalPaneManagerOptionsContext } from './terminal-pane-mount-co
 import { installTerminalPaneInputHandling } from './terminal-pane-pane-input'
 import { installTerminalPaneLinkHandling } from './terminal-pane-pane-links'
 import { scheduleRuntimeGraphSync } from '@/runtime/sync-runtime-graph'
+import { useAppStore } from '@/store'
+import { getExecutionHostIdForWorktree } from '@/lib/worktree-runtime-owner'
+import { resolveRemoteDockConptyUnverified } from './fork-terminal-dock/terminal-dock-remote-conpty'
+import { REMOTE_CONPTY_UNVERIFIED_DATASET_KEY } from './fork-terminal-dock/TerminalPaneDockMount'
 
 export type PaneCreatedSetupContext = TerminalPaneManagerOptionsContext
 
@@ -47,6 +51,16 @@ export function createTerminalPaneCreatedHandler(
     const { settingsRef, paneCwdRef, paneKittyKeyboardModesRef, replayingPanesRef, managerRef } =
       deps
     const { deferredSplitHandoffs } = context
+    // Why: windowsPty only covers a local pane, so a remote/SSH pane needs this
+    // separate stamp for the dock's ConPTY-below-wrap-markers demotion check.
+    const dockConptyState = useAppStore.getState()
+    const remoteConptyUnverified = resolveRemoteDockConptyUnverified({
+      executionHostId: getExecutionHostIdForWorktree(dockConptyState, deps.worktreeId),
+      state: dockConptyState
+    })
+    if (remoteConptyUnverified !== null) {
+      pane.container.dataset[REMOTE_CONPTY_UNVERIFIED_DATASET_KEY] = String(remoteConptyUnverified)
+    }
     const paneKey = makePaneKey(deps.tabId, pane.leafId)
     const restoredPtyId = ptyDeps.restoredPtyIdByLeafId?.[pane.leafId]
     const hasAuthoritativeSpawnHint = Boolean(spawnHints?.cwd || spawnHints?.ptyId || restoredPtyId)

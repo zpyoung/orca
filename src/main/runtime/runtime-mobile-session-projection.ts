@@ -263,6 +263,7 @@ export function projectRuntimeMobileSessionTabs(
       ...(tab.color != null ? { color: tab.color } : {}),
       ...(tab.isPinned ? { isPinned: true } : {}),
       ...(tab.viewMode ? { viewMode: tab.viewMode } : {}),
+      ...(tab.terminalDockByPaneKey ? { terminalDockByPaneKey: tab.terminalDockByPaneKey } : {}),
       ...(tab.launchDraft ? { launchDraft: tab.launchDraft } : {}),
       ...(tab.launchDraftCreatedAt !== undefined
         ? { launchDraftCreatedAt: tab.launchDraftCreatedAt }

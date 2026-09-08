@@ -14,6 +14,8 @@ import {
 import { isTerminalTabPresent } from '@/store/slices/terminal-tab-retirement'
 import { e2eConfig } from '@/lib/e2e-config'
 import { useAppStore } from '@/store'
+import { collectTerminalDockPaneKeysForTabTeardown } from './fork-terminal-dock/terminal-pane-dock-prune'
+import { removeTerminalDockPaneKeys } from './fork-terminal-dock/terminal-dock-pane-state'
 
 export function cleanupTerminalPaneMount(args: {
   manager: PaneManager
@@ -122,6 +124,19 @@ export function cleanupTerminalPaneMount(args: {
   }
   panePtyBindingsRef.current.clear()
   paneTransportsRef.current.clear()
+  // Why: a genuinely closed tab (not a rehome/remount) leaves no per-pane retirement
+  // callback to prune the dock localStorage record — enumerate its panes here so
+  // entries don't accumulate one-per-closed-tab until the record's write quota dies.
+  const teardownDockPaneKeys = collectTerminalDockPaneKeysForTabTeardown({
+    tabId,
+    tabStillExists,
+    experimentalTerminalDockEnabled:
+      useAppStore.getState().settings?.experimentalTerminalDock === true,
+    paneLeafIds: manager.getPanes().map((pane) => pane.leafId)
+  })
+  if (teardownDockPaneKeys.length > 0) {
+    removeTerminalDockPaneKeys(new Set(teardownDockPaneKeys))
+  }
   manager.destroy()
   managerRef.current = null
   if (e2eConfig.exposeStore && window.__paneManagers?.get(tabId) === manager) {

@@ -8,7 +8,7 @@ import type {
   ArtifactPublishResult,
   ArtifactWriteRequest
 } from '../../shared/artifacts'
-import type { ArtifactCloudService } from '../artifacts/artifact-cloud-service'
+import type { ArtifactCloudService } from '../artifacts/fork-artifact-passwords/artifact-password-cloud-service'
 
 export class RuntimeArtifactController {
   private service: ArtifactCloudService | null = null
@@ -22,7 +22,7 @@ export class RuntimeArtifactController {
   }
 
   getPublishedLink(
-    request: ArtifactCloudOptions & { sourceKey: string }
+    request: ArtifactCloudOptions & { sourceKey: string; revealPassphrase?: boolean }
   ): Promise<ArtifactCloudOperation<ArtifactPublishedLink | null>> {
     return this.requireService().getPublishedLink(request)
   }

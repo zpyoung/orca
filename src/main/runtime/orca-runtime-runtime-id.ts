@@ -49,6 +49,7 @@ import {
 } from './orca-runtime-postlude'
 import { RuntimeTerminalWait as RuntimeTerminalWaitController } from './runtime-terminal-wait'
 import type { PtyLivenessVerdict } from '../../shared/pty-liveness-verdict'
+import type { TerminalDockPaneState } from '../../shared/fork-terminal-dock/terminal-dock-pane-state'
 
 export class OrcaRuntimeWithRuntimeId {
   protected readonly runtimeId = randomUUID()
@@ -138,6 +139,13 @@ export class OrcaRuntimeWithRuntimeId {
       rendererVersion: number
       rendererTabCount: number
       rendererTabIdentityKeys: ReadonlySet<string>
+      // Why: the baseline mergeRendererTerminalDockAcrossSnapshot diffs the next
+      // publication against, so an untouched pane's stale echo can't win over a
+      // value another client patched into the stored snapshot in between.
+      rendererDockByPaneKeyByParentTabId: ReadonlyMap<
+        string,
+        Record<string, TerminalDockPaneState> | undefined
+      >
     }
   >()
 

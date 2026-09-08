@@ -14,7 +14,7 @@ import type {
 } from './runtime-legacy-worker-terminal-recovery-types'
 import { getLatestPtyTitle } from './runtime-worktree-status-projection'
 import type { AutomationService } from '../automations/service'
-import type { ArtifactCloudService } from '../artifacts/artifact-cloud-service'
+import type { ArtifactCloudService } from '../artifacts/fork-artifact-passwords/artifact-password-cloud-service'
 import type {
   ArtifactCloudOperation,
   ArtifactCloudOptions,
@@ -192,7 +192,7 @@ export class OrcaRuntimeWithHasExactPersistedTerminalSurfaceIdentity extends Orc
   }
 
   getPublishedArtifactLink(
-    request: ArtifactCloudOptions & { sourceKey: string }
+    request: ArtifactCloudOptions & { sourceKey: string; revealPassphrase?: boolean }
   ): Promise<ArtifactCloudOperation<ArtifactPublishedLink | null>> {
     return this.artifacts.getPublishedLink(request)
   }

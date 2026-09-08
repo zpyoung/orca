@@ -7,12 +7,22 @@ import {
   deriveHeadlessLegacyTerminalLeafId,
   isPersistedTerminalLeafActive
 } from './mobile-session-layout-projection'
+import type { TerminalDockPaneState } from '../../shared/fork-terminal-dock/terminal-dock-pane-state'
 
 export function buildHeadlessMobileSessionTerminalTabs(
   worktreeId: string,
   persistedTabs: readonly TerminalTab[],
   session: WorkspaceSessionState
 ): RuntimeMobileSessionTerminalTab[] {
+  // Why: the dock record lives only on the unified Tab, not the legacy
+  // TerminalTab this hydration path otherwise rebuilds from.
+  const terminalDockByPaneKeyByTabId = new Map<string, Record<string, TerminalDockPaneState>>()
+  for (const unifiedTab of session.unifiedTabs?.[worktreeId] ?? []) {
+    if (unifiedTab.terminalDockByPaneKey) {
+      terminalDockByPaneKeyByTabId.set(unifiedTab.id, unifiedTab.terminalDockByPaneKey)
+      terminalDockByPaneKeyByTabId.set(unifiedTab.entityId, unifiedTab.terminalDockByPaneKey)
+    }
+  }
   return [...persistedTabs]
     .sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt - b.createdAt)
     .flatMap((tab, index) => {
@@ -21,6 +31,7 @@ export function buildHeadlessMobileSessionTerminalTabs(
       if (leafIds.length === 0) {
         leafIds.push(deriveHeadlessLegacyTerminalLeafId(tab.id))
       }
+      const terminalDockByPaneKey = terminalDockByPaneKeyByTabId.get(tab.id)
       return leafIds.flatMap((leafId) => {
         const ptyId = layout?.ptyIdsByLeafId?.[leafId] ?? (leafIds.length === 1 ? tab.ptyId : null)
         const title =
@@ -43,6 +54,7 @@ export function buildHeadlessMobileSessionTerminalTabs(
             ...(tab.color != null ? { color: tab.color } : {}),
             ...(tab.isPinned ? { isPinned: true } : {}),
             ...(tab.viewMode ? { viewMode: tab.viewMode } : {}),
+            ...(terminalDockByPaneKey ? { terminalDockByPaneKey } : {}),
             isActive: isPersistedTerminalLeafActive(session, worktreeId, tab.id, leafId, layout)
           }
         ]
