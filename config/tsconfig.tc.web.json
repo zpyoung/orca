@@ -6,6 +6,8 @@
     "../src/renderer/src/**/*.tsx",
     "../src/preload/api-types.ts",
     "../src/preload/api/**/*",
+    "../src/preload/fork-session-handoff/**/*",
+    "../src/preload/fork-session-info/**/*",
     "../src/preload/browser-client-page-renderer-requests.ts",
     "../src/preload/browser-find-subscriptions.ts",
     "../src/preload/close-active-tab-payload-admission.ts",

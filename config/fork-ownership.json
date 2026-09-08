@@ -1819,6 +1819,24 @@
       ]
     },
     {
+      "path": "config/tsconfig.tc.web.json",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "    \"../src/preload/fork-session-handoff/**/*\",",
+        "    \"../src/preload/fork-session-info/**/*\","
+      ]
+    },
+    {
+      "path": "config/tsconfig.web.json",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "    \"../src/preload/fork-session-handoff/**/*\",",
+        "    \"../src/preload/fork-session-info/**/*\","
+      ]
+    },
+    {
       "path": "src/shared/keybindings/types.ts",
       "feature": "terminal-dock",
       "kind": "registration",
@@ -3044,6 +3062,14 @@
       "removed": 0
     },
     "config/tsconfig.cli.json": {
+      "added": 2,
+      "removed": 0
+    },
+    "config/tsconfig.tc.web.json": {
+      "added": 2,
+      "removed": 0
+    },
+    "config/tsconfig.web.json": {
       "added": 2,
       "removed": 0
     },
