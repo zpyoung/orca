@@ -4,13 +4,10 @@ import type { TerminalPaneVisibilitySnapshot } from './terminal-pane-lifecycle-p
 import type { ReplayingPanesRef } from './replay-guard'
 import type { installTerminalLinkPointerGesture } from './terminal-link-pointer-gesture'
 import type { installHttpLinkClickFallback } from './terminal-url-link-hit-testing'
-import type { UseTerminalPaneLifecycleDeps } from './terminal-pane-lifecycle-types'
 
 /** Mutable registries owned by one mounted pane surface. */
 export function useTerminalPaneLifecycleRefs() {
   return {
-    paneDockOwnsFocusRef:
-      useRef<UseTerminalPaneLifecycleDeps['paneDockOwnsFocus']>(undefined),
     systemPrefersDarkRef: useRef(false),
     previousVisibleForReconcileRef: useRef<TerminalPaneVisibilitySnapshot | null>(null),
     linkProviderDisposablesRef: useRef(new Map<number, IDisposable>()),

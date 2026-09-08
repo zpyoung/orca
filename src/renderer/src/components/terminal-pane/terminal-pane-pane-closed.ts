@@ -16,6 +16,7 @@ import {
 } from './deferred-split-pane-handoff'
 import type { PaneClosedHandlerContext } from './terminal-pane-mount-context'
 import { pruneTerminalDockPaneKeysEverywhere } from './fork-terminal-dock/terminal-pane-dock-prune'
+import { notifyTerminalDockPaneRetired } from './fork-terminal-dock/terminal-dock-controller-bridge'
 
 export function createTerminalPaneClosedHandler(
   context: Omit<PaneClosedHandlerContext, 'paneId' | 'closedPane'>
@@ -86,7 +87,7 @@ export function createTerminalPaneClosedHandler(
     panePtyBindingsRef.current.delete(paneId)
     const leafId = closedPane?.leafId
     if (leafId) {
-      deps.onPaneRetiredRef?.current?.(leafId)
+      notifyTerminalDockPaneRetired(tabId, leafId)
       const dockPruneState = useAppStore.getState()
       pruneTerminalDockPaneKeysEverywhere({
         unifiedTabsByWorktree: dockPruneState.unifiedTabsByWorktree,

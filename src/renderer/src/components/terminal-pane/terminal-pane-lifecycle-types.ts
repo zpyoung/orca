@@ -19,7 +19,6 @@ import type { ReplayingPanesRef } from './replay-guard'
 import type { TerminalLinkActionRequester } from './terminal-link-action-request'
 import type { TerminalLinkRoutingPreferenceRequester } from './terminal-url-link-hit-testing'
 import type { SessionRestoredBannerReason } from './session-restored-banner-pane-state'
-import type { PaneFocusOwnership } from './pane-helpers'
 
 export type TerminalPaneStartup = Exclude<PtyPaneStartup, null>
 
@@ -36,7 +35,6 @@ export type TerminalPaneIssueCommandSplit = {
 
 export type UseTerminalPaneLifecycleDeps = {
   tabId: string
-  paneDockOwnsFocus: PaneFocusOwnership['paneDockOwnsFocus']
   worktreeId: string
   cwd?: string
   startup?: TerminalPaneStartup | null
@@ -74,10 +72,6 @@ export type UseTerminalPaneLifecycleDeps = {
   isVisibleRef: React.RefObject<boolean>
   onPtyExitRef: React.RefObject<(ptyId: string, exitCode?: number) => void>
   onAgentExitedRef: React.RefObject<(leafId: string) => void>
-  /** Fires when a pane retires (close, retire, or detach-to-a-new-tab) with its leaf id —
-   *  lets dock-adjacent local state (e.g. passthrough membership) prune itself alongside the
-   *  store-side dock-state prune this hook already performs at the same point. */
-  onPaneRetiredRef?: React.RefObject<(leafId: string) => void>
   onPtyErrorRef?: React.RefObject<(paneId: number, message: string) => void>
   onPtyErrorClearedRef?: React.RefObject<(paneId: number, message?: string) => void>
   onPaneProcessDied?: (processExit: PaneProcessExit) => void

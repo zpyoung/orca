@@ -17,6 +17,7 @@ import {
   type NativeChatLeafRoute
 } from '../native-chat/native-chat-leaf-routing'
 import type { TerminalPaneTitleController } from './use-terminal-pane-title-state'
+import { notifyTerminalDockConfirmedAgentExit } from './fork-terminal-dock/terminal-dock-controller-bridge'
 
 export function useTerminalPaneChatState(controller: TerminalPaneTitleController) {
   const {
@@ -205,9 +206,12 @@ export function useTerminalPaneChatState(controller: TerminalPaneTitleController
     ]
   )
   useEffect(() => {
-    onAgentExitedRef.current = handleConfirmedAgentExit
+    onAgentExitedRef.current = (leafId: string) => {
+      handleConfirmedAgentExit(leafId)
+      notifyTerminalDockConfirmedAgentExit(tabId, leafId)
+    }
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- Preserve the pre-split dependency contract.
-  }, [handleConfirmedAgentExit])
+  }, [handleConfirmedAgentExit, tabId])
   const canToggleChatForLeaf = useCallback(
     (leafId: string | null): boolean => {
       // A structured session renders its own transcript with no TUI beneath it,

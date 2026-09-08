@@ -10,6 +10,8 @@ import { stripSshReconnectOwnedErrorLines } from './TerminalErrorToast'
 import { updateTerminalRemoteRuntimeRecoveryUiState } from './terminal-remote-runtime-recovery-ui-state'
 import type { PtyTransportRecoveryState } from './pty-transport-types'
 import type { TerminalPaneFoundation } from './use-terminal-pane-foundation'
+import { updateTerminalDockRawRecoveryPhaseByPaneId } from './fork-terminal-dock/terminal-pane-dock-recovery-phase'
+import { publishTerminalDockRawRecoveryPhase } from './fork-terminal-dock/terminal-dock-controller-bridge'
 
 export function useTerminalPaneTitleState(controller: TerminalPaneFoundation) {
   const {
@@ -117,6 +119,12 @@ export function useTerminalPaneTitleState(controller: TerminalPaneFoundation) {
     (paneId: number, state: PtyTransportRecoveryState | null) => {
       setPtyRecoveryStatesByPaneId((previous) =>
         updateTerminalRemoteRuntimeRecoveryUiState(previous, paneId, state)
+      )
+      // Why: the dock's disabled-reason resolver needs every phase (offline, ended, disposed,
+      // connecting included) — ptyRecoveryStatesByPaneId is the recovery banner's own filtered
+      // view and must not be widened, so the dock reads this separate, unfiltered track instead.
+      publishTerminalDockRawRecoveryPhase(tabId, (previous) =>
+        updateTerminalDockRawRecoveryPhaseByPaneId(previous, paneId, state)
       )
     }
   )

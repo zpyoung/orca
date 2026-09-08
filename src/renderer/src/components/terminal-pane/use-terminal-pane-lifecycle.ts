@@ -57,7 +57,6 @@ export function useTerminalPaneLifecycle(deps: UseTerminalPaneLifecycleDeps): vo
   )
   const systemPrefersDarkRef = refs.systemPrefersDarkRef
   systemPrefersDarkRef.current = deps.systemPrefersDark
-  refs.paneDockOwnsFocusRef.current = deps.paneDockOwnsFocus
 
   useEffect(() => {
     const onWakeHibernatedAgents = (event: Event): void => {

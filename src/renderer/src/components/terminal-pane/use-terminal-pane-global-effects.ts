@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import {
   FOCUS_TERMINAL_PANE_EVENT,
   PASTE_TERMINAL_TEXT_EVENT,
@@ -7,7 +7,6 @@ import {
   type PasteTerminalTextDetail
 } from '@/constants/terminal'
 import type { PaneManager } from '@/lib/pane-manager/pane-manager'
-import type { PaneFocusOwnership } from './pane-helpers'
 import type { PtyTransport } from './pty-transport'
 import type { IDisposable } from '@xterm/xterm'
 import { handleTerminalFileDrop } from './terminal-drop-handler'
@@ -27,8 +26,10 @@ import {
   releaseRendererPtyVisibilityClaim,
   setRendererPtyVisibilityClaim
 } from './pty-renderer-delivery-claims'
+import { terminalDockPaneOwnsFocus } from './fork-terminal-dock/terminal-dock-controller-bridge'
+import type { PaneKey } from '../../../../shared/stable-pane-id'
 
-type UseTerminalPaneGlobalEffectsArgs = Partial<PaneFocusOwnership> & {
+type UseTerminalPaneGlobalEffectsArgs = {
   tabId: string
   worktreeId: string
   cwd?: string
@@ -63,7 +64,6 @@ function reportRendererPtyVisibility(
 
 export function useTerminalPaneGlobalEffects({
   tabId,
-  paneDockOwnsFocus,
   worktreeId,
   cwd,
   isActive,
@@ -79,6 +79,12 @@ export function useTerminalPaneGlobalEffects({
   isVisibleRef,
   toggleExpandPane
 }: UseTerminalPaneGlobalEffectsArgs): void {
+  // Why: the dock's hooks run in TerminalPaneSurface (upstream's parity ratchets pin the
+  // controller chain's hook order), so focus ownership is read back through the bridge.
+  const paneDockOwnsFocus = useCallback(
+    (paneKey: PaneKey): boolean => terminalDockPaneOwnsFocus(tabId, paneKey),
+    [tabId]
+  )
   const worktreeIdRef = useRef(worktreeId)
   worktreeIdRef.current = worktreeId
   const cwdRef = useRef(cwd)

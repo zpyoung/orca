@@ -5,6 +5,7 @@ import { resolveTerminalLayoutActiveLeafId } from './terminal-layout-leaf-ids'
 import { shouldIgnoreStalePanePtyLayoutBinding } from './pty-connection/pane-pty-layout-binding'
 import { useExpandCollapseActions } from './expand-collapse'
 import type { TerminalPaneLayoutController } from './use-terminal-pane-layout-persistence'
+import { noteTerminalDockPanePtyBindingChanged } from './fork-terminal-dock/terminal-dock-controller-bridge'
 
 export function useTerminalPaneLayoutBindings(controller: TerminalPaneLayoutController) {
   const {
@@ -91,18 +92,28 @@ export function useTerminalPaneLayoutBindings(controller: TerminalPaneLayoutCont
   )
   const syncPanePtyLayoutBinding = useCallback(
     (paneId: number, ptyId: string | null): void => {
+      // Why: the write below is deduped when a reattach lands on the id the layout already
+      // holds, so the dock — which reads the id off the transport during render — would never
+      // re-read and would stay on the null it saw while attach was still pending.
+      noteTerminalDockPanePtyBindingChanged(tabId)
       writePanePtyLayoutBinding(paneId, ptyId, false)
     },
-    [writePanePtyLayoutBinding]
+    [tabId, writePanePtyLayoutBinding]
   )
   const syncPanePtyLayoutBindingForLeaf = useCallback(
     (leafId: string, ptyId: string | null, sourcePaneId: number): void => {
+      // Why: same dedupe as the paneId path above — a reattach onto the id the layout already
+      // holds writes nothing, so the dock would never re-read the transport's new id.
+      noteTerminalDockPanePtyBindingChanged(tabId)
       writePanePtyLayoutBindingForLeaf(leafId, ptyId, false, sourcePaneId)
     },
-    [writePanePtyLayoutBindingForLeaf]
+    [tabId, writePanePtyLayoutBindingForLeaf]
   )
   const clearExitedPanePtyLayoutBindingForLeaf = useCallback(
     (leafId: string, exitedPtyId: string): void => {
+      // Why before the binding guard: the transport has already dropped its id, so the dock
+      // owes a re-read even when this leaf's stored binding was never the exited one.
+      noteTerminalDockPanePtyBindingChanged(tabId)
       const existingLayout = useAppStore.getState().terminalLayoutsByTabId[tabId] ?? EMPTY_LAYOUT
       const { ptyIdsByLeafId: _existingPtyIdsByLeafId, ...layoutWithoutPtyBindings } =
         existingLayout
@@ -126,13 +137,16 @@ export function useTerminalPaneLayoutBindings(controller: TerminalPaneLayoutCont
   )
   const clearExitedPanePtyLayoutBinding = useCallback(
     (paneId: number, exitedPtyId: string): void => {
+      // Why before the leaf lookup: the transport has already dropped its id, so the dock owes a
+      // re-read even when this pane no longer resolves to a leaf.
+      noteTerminalDockPanePtyBindingChanged(tabId)
       const leafId = managerRef.current?.getLeafId(paneId)
       if (!leafId) {
         return
       }
       clearExitedPanePtyLayoutBindingForLeaf(leafId, exitedPtyId)
     },
-    [clearExitedPanePtyLayoutBindingForLeaf, managerRef]
+    [clearExitedPanePtyLayoutBindingForLeaf, managerRef, tabId]
   )
 
   const {

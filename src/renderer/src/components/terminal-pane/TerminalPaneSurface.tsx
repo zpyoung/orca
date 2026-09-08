@@ -1,7 +1,7 @@
 import { createPortal } from 'react-dom'
 import TerminalSearch from '@/components/TerminalSearch'
 import { DaemonActionDialog } from '@/components/shared/useDaemonActions'
-import { AgentSessionContinuationDialog } from '@/components/agent-session-continuation/AgentSessionContinuationDialog'
+import { AgentSessionContinuationDialog } from '@/components/agent-session-continuation/fork-session-handoff/AgentSessionContinuationDialog'
 import { WORKSPACE_FILE_PATH_MIME, WORKSPACE_FILE_PATHS_MIME } from '@/lib/workspace-file-drag'
 import CloseTerminalDialog from './CloseTerminalDialog'
 import TerminalContextMenu from './TerminalContextMenu'
@@ -23,6 +23,7 @@ import {
   TerminalPaneSshReconnectPortals
 } from './TerminalPaneRuntimePortals'
 import type { TerminalPaneController } from './use-terminal-pane-controller'
+import { useTerminalPaneDockSurface } from './fork-terminal-dock/use-terminal-pane-dock-surface'
 
 export function TerminalPaneSurface({
   controller
@@ -109,6 +110,8 @@ export function TerminalPaneSurface({
     visibleTerminalError,
     worktreeId
   } = controller
+  const { dockMounts, contextMenuProps: terminalDockMenuProps } =
+    useTerminalPaneDockSurface(controller)
 
   return (
     <>
@@ -214,7 +217,9 @@ export function TerminalPaneSurface({
         paneIds={sessionRestoredBannerPaneIds}
       />
       <TerminalPaneNativeChatPortal controller={controller} />
+      {dockMounts}
       <TerminalContextMenu
+        {...terminalDockMenuProps}
         open={contextMenu.open}
         onOpenChange={contextMenu.setOpen}
         menuPoint={contextMenu.point}
