@@ -1,60 +1,7 @@
-/* eslint-disable max-lines -- Why: this file owns the loopback HTTP adapter, the on-disk last-status persistence layer (hydrate, sanitize, TTL, atomic write, drop), and the relay ingest path in one place so the cache lifecycle (set → schedule → drain) lives next to the surfaces that mutate it. Splitting would force mutual `private` accessor scaffolding for a single class. */
-// Why: this main-process adapter keeps listener internals in shared/ (`src/shared/agent-hook-listener.ts`) so the relay can host the same pipeline without Electron; parsing that drifts back into this file stops applying to SSH panes.
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
-import { createHash, randomBytes, randomUUID } from 'node:crypto'
-import { chmodSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
-
-import { track } from '../telemetry/client'
-import { getCohortAtEmit } from '../telemetry/cohort-classifier'
-import { AGENT_KIND_VALUES, type AgentKind } from '../../shared/telemetry-events'
-import {
-  ORCA_HOOK_PROTOCOL_VERSION,
-  ORCA_HOOK_RAW_JSON_TRANSPORT
-} from '../../shared/agent-hook-types'
-import {
-  clearAllListenerCaches,
-  clearPaneCacheState,
-  paneHasStateClaims,
-  createHookListenerState,
-  movePaneCacheState,
-  type HookListenerState
-} from '../../shared/agent-hook-listener/listener-state'
-import {
-  clearClaudeAnsweredQuestionWait,
-  markClaudeLeadTurnInterrupted,
-  reapRestoredClaudeSubagentsForDeadPane,
-  seedClaudeLeadTurnFromPersistedStatus,
-  seedClaudeSubagentRosterFromSnapshots
-} from '../../shared/agent-hook-listener/providers/claude-roster-state'
-import {
-  getEndpointFileName,
-  writeEndpointFile
-} from '../../shared/agent-hook-listener/endpoint-publication'
-import {
-  hasCodexTranscriptSubagents,
-  markCodexLeadTurnInterrupted,
-  reconcileRemoteCodexState,
-  seedCodexStateFromSnapshot
-} from '../../shared/agent-hook-listener/providers/codex-state'
-import {
-  hasPendingAgentResultText,
-  preparePendingGrokResultDiscovery
-} from '../../shared/agent-hook-listener/grok-result-discovery'
-import {
-  HOOK_REQUEST_SLOWLORIS_MS,
-  MAX_PANE_KEY_LEN,
-  normalizeClaudePromptId,
-  warnOnHookEnvOrVersionMismatch
-} from '../../shared/agent-hook-listener/listener-limits'
-import { isNewTurnEvent } from '../../shared/agent-hook-listener/provider-event-routing'
+// This main-process adapter keeps listener internals in shared/ so the relay can host the same pipeline without Electron.
+import { clearAllListenerCaches } from '../../shared/agent-hook-listener/listener-state'
 import { normalizeHookPayload } from '../../shared/agent-hook-listener'
-import { mergeAgentHookRequestHeaders } from '../../shared/agent-hook-listener/hook-envelope'
-import {
-  parseFormEncodedBody,
-  readRequestBody
-} from '../../shared/agent-hook-listener/request-body'
-import { resolveHookSource } from '../../shared/agent-hook-listener/source-routing'
+import { parseFormEncodedBody } from '../../shared/agent-hook-listener/request-body'
 import type { AgentHookEventPayload } from '../../shared/agent-hook-listener/listener-event'
 import {
   canAcceptClaudeCompactCompletion,
@@ -130,6 +77,13 @@ import {
 } from '../../shared/agent-hook-spool'
 import { CodexSubagentPollScheduler } from '../../shared/codex-subagent-poll-scheduler'
 
+export type {
+  AgentHookAuthorityAttestation,
+  AgentHookAuthorityEvidence,
+  AgentHookProviderSessionIdentity,
+  AgentHookStatusChangeEntry,
+  EnrichedAgentHookEventPayload
+} from './server/server-types'
 export type { AgentHookSource }
 
 // Why: server-side enrichment — receivedAt = latest event arrival, stateStartedAt = when the current state first appeared; extra fields ride the shared map untouched (it only writes/clears).
@@ -3544,3 +3498,5 @@ export const _internals = {
     agentHookServer._resetConnectionTimestampWatermarksForTests()
   }
 }
+
+export type { HookListenerState } from '../../shared/agent-hook-listener/listener-state'

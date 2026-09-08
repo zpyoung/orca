@@ -3,15 +3,6 @@ import { needsWorktreeDragGroup } from '../../fork-worktree-groups/worktree-drag
 import type { HostSectionRow } from '../../host-section-rows'
 import type { WorktreeDragGroup } from '../../worktree-manual-order'
 
-// A pinned duplicate of a worktree that also renders in its natural group is not its own drag slot.
-function getNaturalWorktreeIds(rows: readonly HostSectionRow[]): Set<string> {
-  return new Set(
-    rows.flatMap((row) =>
-      row.type === 'item' && row.sectionKey !== PINNED_GROUP_KEY ? [row.worktree.id] : []
-    )
-  )
-}
-
 export function getWorktreeDragGroups(rows: HostSectionRow[]): WorktreeDragGroup[] {
   const groups: WorktreeDragGroup[] = []
   let current: { key: string; ids: string[] } | null = null

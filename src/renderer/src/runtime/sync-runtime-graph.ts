@@ -17,48 +17,41 @@ import { resolveLeafIdForManager } from '@/lib/pane-manager/pane-key-resolution'
 import { getSystemPrefersDark, resolveEffectiveTerminalAppearance } from '@/lib/terminal-theme'
 import { sanitizeTerminalLayoutPaneTitles } from '@/lib/terminal-pane-title-sanitization'
 import type { AppState } from '@/store/types'
-import type {
-  RuntimeMobileSessionBrowserTab,
-  RuntimeMobileSessionFileTab,
-  RuntimeMobileSessionMarkdownTab,
-  RuntimeMobileSessionTabGroup,
-  RuntimeMobileSessionSnapshotTab,
-  RuntimeMobileTerminalTheme,
-  RuntimeMobileSessionTabsSnapshot,
-  RuntimeRendererSyncWindowGraph
-} from '../../../shared/runtime-types'
-import { isTerminalLeafId, makePaneKey, parsePaneKey } from '../../../shared/stable-pane-id'
-import { isWebTerminalSurfaceTabId } from '../../../shared/terminal-surface-id'
-import { isClaudeManagementTitle } from '../../../shared/agent-detection'
-import { parseWorkspaceKey } from '../../../shared/workspace-scope'
-import type { Tab, TabGroup, TabGroupLayoutNode } from '../../../shared/tab-types'
-import type {
-  TerminalLayoutSnapshot,
-  TerminalPaneLayoutNode,
-  TerminalTab
-} from '../../../shared/terminal-tab-types'
-import { resolveTerminalTabTitle } from '../../../shared/tab-title-resolution'
+import { resolveLeafIdForManager } from '@/lib/pane-manager/pane-key-resolution'
 import {
-  isNativeChatTabWideFallbackSafe,
-  nativeChatLaunchAgentForLeaf,
-  resolveNativeChatActiveLayoutLeafId
-} from '../components/native-chat/native-chat-leaf-routing'
+  syncRuntimeGraph,
+  setTrailingGraphSyncScheduler
+} from './sync-runtime-graph/graph-publication'
 import {
-  getActiveTabNavOrder,
-  getGroupVisibleTabOrder,
-  type VisibleTabRef
-} from '../components/tab-bar/group-tab-order'
-import { resolveTerminalLayoutRoot } from './remote-terminal-layout-resolution'
-import { parseRemoteRuntimePtyId } from './runtime-terminal-stream'
-import { applyNativeChatLaunchDraftResolved } from './native-chat-launch-draft-runtime-resolution'
+  findRegisteredTerminalTab,
+  graphState,
+  registeredTerminalTabKey,
+  RUNTIME_GRAPH_SYNC_COALESCE_MS
+} from './sync-runtime-graph/graph-state'
+import {
+  AGENT_STATUS_SYNC_UPDATED_AT_BUCKET_MS_FOR_TESTS,
+  buildRuntimeMobileAgentStatusProjectionForTests,
+  resetRuntimeMobileAgentStatusProjectionCacheForTests
+} from './sync-runtime-graph/agent-status-projection'
+import {
+  canSkipRuntimeMobileSessionSyncKeyBuild,
+  getRuntimeMobileSessionSyncKey,
+  runtimeMobileSessionSyncKeysEqual
+} from './sync-runtime-graph/sync-key'
+import { buildMobileSessionTabSnapshots } from './sync-runtime-graph/mobile-session-snapshots'
+import { resetRuntimeMobileSyncProjectionCachesForTests } from './sync-runtime-graph/sync-projections'
+import type { RegisteredTerminalTab } from './sync-runtime-graph/types'
 
-type RegisteredTerminalTab = {
-  tabId: string
-  worktreeId: string
-  getManager: () => PaneManager | null
-  getContainer: () => HTMLDivElement | null
-  getPtyIdForPane: (paneId: number) => string | null
-  getTabWideAgentHintLeafId: () => string | null
+export type { RegisteredTerminalTab, RuntimeMobileSessionSyncKey } from './sync-runtime-graph/types'
+export {
+  AGENT_STATUS_SYNC_UPDATED_AT_BUCKET_MS_FOR_TESTS,
+  buildRuntimeMobileAgentStatusProjectionForTests,
+  resetRuntimeMobileAgentStatusProjectionCacheForTests,
+  resetRuntimeMobileSyncProjectionCachesForTests,
+  canSkipRuntimeMobileSessionSyncKeyBuild,
+  getRuntimeMobileSessionSyncKey,
+  runtimeMobileSessionSyncKeysEqual,
+  buildMobileSessionTabSnapshots
 }
 
 type OpenFileByWorktreeAndId = Map<string, Map<string, AppState['openFiles'][number]>>
@@ -298,7 +291,7 @@ const mobileSessionPublicationEpoch = `renderer:${createBrowserUuid()}`
 const publishedMobileSessionSnapshotByWorktree = new Map<string, RuntimeMobileSessionTabsSnapshot>()
 
 export function setRuntimeGraphStoreStateGetter(getter: (() => AppState) | null): void {
-  getStoreState = getter
+  graphState.getStoreState = getter
 }
 
 /** True while the target TerminalPane is mounted (lifecycle effect ran). */
@@ -308,16 +301,16 @@ export function hasRegisteredRuntimeTerminalTab(tabId: string, worktreeId?: stri
 
 export function registerRuntimeTerminalTab(tab: RegisteredTerminalTab): () => void {
   const key = registeredTerminalTabKey(tab.worktreeId, tab.tabId)
-  registeredTabs.set(key, tab)
-  tabRegisteredAt.set(key, Date.now())
+  graphState.registeredTabs.set(key, tab)
+  graphState.tabRegisteredAt.set(key, Date.now())
   scheduleRuntimeGraphSync()
   return () => {
-    // Why: React can mount a replacement surface before the prior effect cleans up; stale cleanup must not erase the successor's registry.
-    if (registeredTabs.get(key) !== tab) {
+    // React can mount a replacement before the old effect cleans up.
+    if (graphState.registeredTabs.get(key) !== tab) {
       return
     }
-    registeredTabs.delete(key)
-    tabRegisteredAt.delete(key)
+    graphState.registeredTabs.delete(key)
+    graphState.tabRegisteredAt.delete(key)
     scheduleRuntimeGraphSync()
   }
 }
@@ -348,9 +341,9 @@ export function focusRuntimeTerminalSurface(
 }
 
 export function setRuntimeGraphSyncEnabled(enabled: boolean): void {
-  syncEnabled = enabled
+  graphState.syncEnabled = enabled
   if (!enabled) {
-    syncPendingAfterFlight = false
+    graphState.syncPendingAfterFlight = false
     clearScheduledRuntimeGraphSync()
     return
   }
@@ -358,43 +351,42 @@ export function setRuntimeGraphSyncEnabled(enabled: boolean): void {
 }
 
 function clearScheduledRuntimeGraphSync(): void {
-  if (syncTimer !== null) {
-    clearTimeout(syncTimer)
-    syncTimer = null
+  if (graphState.syncTimer !== null) {
+    clearTimeout(graphState.syncTimer)
+    graphState.syncTimer = null
   }
-  syncScheduled = false
+  graphState.syncScheduled = false
 }
 
 export function scheduleRuntimeGraphSync(): void {
-  if (!syncEnabled || syncScheduled) {
+  if (!graphState.syncEnabled || graphState.syncScheduled) {
     return
   }
-  if (syncInFlight) {
-    syncPendingAfterFlight = true
+  if (graphState.syncInFlight) {
+    graphState.syncPendingAfterFlight = true
     return
   }
-  syncScheduled = true
-  // Why: a frame-sized timer collapses separate title/status IPC tasks into one graph publish without tying publication to paint frames.
-  syncTimer = setTimeout(() => {
-    syncTimer = null
-    syncScheduled = false
+  graphState.syncScheduled = true
+  // Collapse separate title/status tasks into one frame-sized graph publication.
+  graphState.syncTimer = setTimeout(() => {
+    graphState.syncTimer = null
+    graphState.syncScheduled = false
     void runRuntimeGraphSync()
   }, RUNTIME_GRAPH_SYNC_COALESCE_MS)
 }
 
 async function runRuntimeGraphSync(): Promise<void> {
-  if (syncInFlight) {
-    syncPendingAfterFlight = true
+  if (graphState.syncInFlight) {
+    graphState.syncPendingAfterFlight = true
     return
   }
-  syncInFlight = true
+  graphState.syncInFlight = true
   try {
     await syncRuntimeGraph()
   } finally {
-    syncInFlight = false
-    if (syncPendingAfterFlight) {
-      syncPendingAfterFlight = false
-      // Why: coalesce updates that arrived during one in-flight sync into a single trailing graph instead of stacking concurrent IPC calls.
+    graphState.syncInFlight = false
+    if (graphState.syncPendingAfterFlight) {
+      graphState.syncPendingAfterFlight = false
       scheduleRuntimeGraphSync()
     }
   }

@@ -14,6 +14,7 @@ import {
   isTrustedCompactImageSrc,
   type CommentMarkdownLinkClickHandler
 } from './comment-markdown-element-renderers'
+import { remarkNativeChatFileLinks } from './comment-markdown-native-chat-file-links'
 
 export type { CommentMarkdownLinkClickHandler } from './comment-markdown-element-renderers'
 
@@ -186,6 +187,7 @@ type CommentMarkdownProps = React.ComponentPropsWithoutRef<'div'> & {
   githubRepo?: GitHubRepoReference | null
   onLinkClick?: CommentMarkdownLinkClickHandler
   allowFileUriLinks?: boolean
+  linkifyFilePaths?: boolean
   expandImages?: boolean
   highlightCode?: boolean
 }
@@ -202,6 +204,7 @@ const CommentMarkdown = React.memo(
       githubRepo,
       onLinkClick,
       allowFileUriLinks = false,
+      linkifyFilePaths = false,
       expandImages = false,
       highlightCode = false,
       ...rest

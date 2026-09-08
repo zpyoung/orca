@@ -1,44 +1,6 @@
-/* eslint-disable max-lines -- Why: centralizes polling, stale-data handling, account-switch fetch semantics, and renderer push coordination in one place */
-import type { BrowserWindow } from 'electron'
-import type {
-  CodexRateLimitResetResult,
-  RateLimitState,
-  ProviderRateLimits,
-  InactiveAccountUsage,
-  RateLimitRuntimeTarget
-} from '../../shared/rate-limit-types'
-import { fetchClaudeRateLimits, fetchManagedAccountUsage } from './claude-fetcher'
-import type { InactiveClaudeAccountInfo } from './claude-fetcher'
-import { mapClaudeUsageWindow } from './claude-usage-window'
-import type { ClaudeStatusLineRateLimits } from '../../shared/claude-statusline-rate-limits'
-import { consumeCodexRateLimitResetCredit, fetchCodexRateLimits } from './codex-fetcher'
-import type { ClaudeRuntimeAuthPreparation } from '../claude-accounts/runtime-auth-service'
-import type { NetworkProxySettings } from '../../shared/network-proxy'
-import {
-  normalizeClaudeAccountSelectionTarget,
-  type ClaudeAccountSelectionTarget,
-  type NormalizedClaudeAccountSelectionTarget
-} from '../claude-accounts/runtime-selection'
-import { fetchGeminiRateLimits } from './gemini-usage-fetcher'
-import { deriveAntigravityRateLimits } from './antigravity-usage-mirror'
-import { fetchKimiRateLimits } from './kimi-fetcher'
-import type { KimiHomeResolution } from '../kimi/kimi-runtime-home'
-import { fetchGrokRateLimits } from './grok-fetcher'
-import { readGrokAuthSession } from './grok-auth'
-import { hasMiniMaxSessionCookie } from '../minimax/minimax-cookie-store'
-import { fetchMiniMaxRateLimits } from './minimax-fetcher'
-import { fetchOpenCodeGoRateLimits } from './opencode-go-usage-fetcher'
-import {
-  normalizeCodexAccountSelectionTarget,
-  type CodexAccountSelectionTarget,
-  type NormalizedCodexAccountSelectionTarget
-} from '../codex-accounts/runtime-selection'
-import type { CodexRateLimitHomeResolution } from '../codex-accounts/runtime-home-service'
+import { RateLimitServiceConfiguration } from './service/service-configuration'
 
-export type InactiveCodexAccountInfo = {
-  id: string
-  resolveHome: () => { kind: 'ready'; managedHomePath: string } | { kind: 'skip' }
-}
+export type { InactiveCodexAccountInfo } from './service/service-types'
 
 type CodexHomePathResolver = (target?: CodexAccountSelectionTarget) => CodexRateLimitHomeResolution
 type KimiHomeResolver = () => Promise<KimiHomeResolution>

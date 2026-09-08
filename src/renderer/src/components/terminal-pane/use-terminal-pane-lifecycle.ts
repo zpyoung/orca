@@ -1,19 +1,5 @@
-/* eslint-disable max-lines -- Why: terminal pane lifecycle wiring is intentionally co-located so PTY attach, theme sync, and runtime graph publication remain consistent for live terminals. */
-import { useEffect, useRef } from 'react'
-import type { IDisposable, Terminal } from '@xterm/xterm'
-import type { ParsedAgentStatusPayload } from '../../../../shared/agent-status-types'
-import type { TerminalKittyKeyboardModeTracker } from '../../../../shared/terminal-kitty-keyboard-mode-tracker'
-import {
-  PaneManager,
-  type PaneExternalDropHandler,
-  type PaneExternalDropResolver
-} from '@/lib/pane-manager/pane-manager'
-import { consumePendingWebRuntimeSplitMirrorTelemetry } from '@/runtime/web-runtime-session'
-import {
-  normalizeTerminalFastScrollSensitivity,
-  normalizeTerminalScrollSensitivity,
-  resolveTerminalCursorInactiveStyle
-} from '@/lib/pane-manager/pane-terminal-options'
+import { useEffect } from 'react'
+import type { IDisposable } from '@xterm/xterm'
 import { normalizeDesktopTerminalScrollbackRows } from '../../../../shared/terminal-scrollback-policy'
 import {
   configureTerminalOutputBacklogCap,
@@ -95,47 +81,12 @@ import {
 import { REMOTE_CONPTY_UNVERIFIED_DATASET_KEY } from './fork-terminal-dock/TerminalPaneDockMount'
 import { applyExpandedLayoutTo, restoreExpandedLayoutFrom } from './expand-collapse'
 import { applyTerminalAppearance } from './terminal-appearance'
-import { createOsc52OscHandler } from './osc52-clipboard'
-import {
-  showOsc52ClipboardBlockedToast,
-  showOsc52ClipboardFailedToast
-} from './osc52-clipboard-toast'
-import { copyTerminalSelection } from './terminal-selection-copy'
-import { parseOsc7 } from './parse-osc7'
-import { guardParserHandler } from './terminal-parser-handler-guard'
-import { resolveTerminalJisYenInput } from './terminal-jis-yen-input'
-import {
-  isNonLatinControlChordKeyup,
-  resolveNonLatinControlChordInput
-} from './terminal-non-latin-control-chord'
-import { installTerminalImeCompositionTracker } from './terminal-ime-composition-tracker'
-import { installTerminalImeComposerPlaceholderMask } from './terminal-ime-composer-placeholder-mask'
-import { isCurrentPlatformIosWeb } from '@/lib/ios-web-platform'
-import { installTerminalImeLinuxCandidateState } from './terminal-ime-linux-candidate-state'
-import {
-  armTerminalImePendingCandidateKeyRelease,
-  clearTerminalImePendingCandidateKeyRelease,
-  createTerminalImePendingCandidateKeyReleases,
-  shouldApplyTerminalImePendingCandidateKeyRelease
-} from './terminal-ime-candidate-key-release-guard'
-import { installTerminalImeNativeTextForwarder } from './terminal-ime-native-text-forwarder'
-import { installTerminalIosHangulPreedit } from './terminal-ios-hangul-preedit'
-import { createTerminalIosHangulPreeditRenderer } from './terminal-ios-hangul-preedit-overlay'
-import {
-  shouldBypassXtermKeyboardEvent,
-  shouldHandleTerminalInterruptKeyboardEvent,
-  shouldPreventDefaultTerminalImeCandidateKey,
-  shouldSuppressTerminalImeKeyboardEvent,
-  shouldSuppressTerminalInterruptKeyup,
-  shouldSuppressTerminalModifierKeyboardEvent,
-  TERMINAL_INTERRUPT_INPUT
-} from './xterm-bypass-policy'
-import type { PaneCwdMap } from './resolve-split-cwd'
 import { installMouseHideWhileTyping } from './mouse-hide-while-typing'
-import type { EffectiveMacOptionAsAlt } from '@/lib/keyboard-layout/detect-option-as-alt'
-import { connectPanePty } from './pty-connection'
-import type { PtyTransport } from './pty-transport'
-import type { PtyTransportRecoveryState } from './pty-transport-types'
+import {
+  applyTerminalScrollbackRowsToMountedPanes,
+  getPreviousVisibleForTerminalPane,
+  isTerminalPaneVisibilityResume
+} from './terminal-pane-lifecycle-primitives'
 import {
   reconcileMissingSessions,
   type ReconcilableBinding
@@ -180,25 +131,35 @@ import {
   resolveTerminalPaneSplitSourceId
 } from './terminal-pane-split-request-routing'
 
-export function resetTerminalKeyboardProtocolAfterInterrupt(terminal: Terminal): void {
-  // Guarded output path so a throwing xterm can't escape the key handler.
-  writeTerminalOutput(terminal, RESET_KITTY_KEYBOARD_PROTOCOL, {
-    foreground: true,
-    // Queue the reset so it can't flush a PTY backlog inside the key handler.
-    latencySensitive: false
-  })
-}
+export {
+  applyTerminalScrollbackRowsToMountedPanes,
+  clearQueuedInitialCwdAfterFirstPane,
+  createQueuedStartupConsumer,
+  getPreviousVisibleForTerminalPane,
+  isTerminalPaneVisibilityResume,
+  mapRestoredPaneTitlesByPaneId,
+  paneOwnsQueuedStartup,
+  replayLayoutWithOneShotParkIntent,
+  resetTerminalKeyboardProtocolAfterInterrupt,
+  resolvePaneLinkCwd,
+  resolvePaneSeedCwd,
+  resolveQueuedInitialCwd,
+  recordRuntimeCreatedTerminalPaneSplit,
+  shouldDetachPaneTransportOnUnmount,
+  terminalSelectionExceedsPrimaryLimit,
+  splitPaneWithOneShotStartup
+} from './terminal-pane-lifecycle-primitives'
+export {
+  applyTerminalPaneCloseRequest,
+  retireMountedTerminalPaneSurface,
+  suppressIntentionalPaneCloseExit
+} from './terminal-pane-lifecycle-close'
+export type { UseTerminalPaneLifecycleDeps } from './terminal-pane-lifecycle-types'
 
-export function recordRuntimeCreatedTerminalPaneSplit(
-  createdPane: unknown,
-  args: {
-    source: TerminalPaneSplitSource
-    direction: 'vertical' | 'horizontal'
-    telemetrySuppressed?: boolean
-  }
-): boolean {
-  return recordCreatedTerminalPaneSplit(createdPane, args)
-}
+/** Coordinates mount, visibility, and live appearance effects for terminal panes. */
+export function useTerminalPaneLifecycle(deps: UseTerminalPaneLifecycleDeps): void {
+  const refs = useTerminalPaneLifecycleRefs()
+  useTerminalPaneMountLifecycle(deps, refs)
 
 type TerminalScrollbackPaneManager = {
   getPanes(): { terminal: Pick<Terminal, 'options'> }[]
@@ -788,7 +749,7 @@ export function useTerminalPaneLifecycle({
   onExternalPaneDrop
 }: UseTerminalPaneLifecycleDeps): void {
   const terminalScrollbackRows = normalizeDesktopTerminalScrollbackRows(
-    settings?.terminalScrollbackRows
+    deps.settings?.terminalScrollbackRows
   )
   // Why here: backlog cap scales with the scrollback setting; set it where the setting is read to stay in lockstep.
   configureTerminalOutputBacklogCap(settings?.terminalScrollbackRows)
@@ -819,55 +780,116 @@ export function useTerminalPaneLifecycle({
   const queuedInitialCwdRef = useRef<string | null | undefined>(undefined)
   const restoredViewportBlankingPanesRef = useRef(new Set<number>())
 
-  const applyAppearance = (manager: PaneManager): void => {
-    const currentSettings = settingsRef.current
-    if (!currentSettings) {
+  useEffect(() => {
+    const onWakeHibernatedAgents = (event: Event): void => {
+      const detail = (event as CustomEvent<{ worktreeId: string; wokenClaimKeys?: Set<string> }>)
+        .detail
+      if (!detail || detail.worktreeId !== deps.worktreeId) {
+        return
+      }
+      for (const panePtyBinding of deps.panePtyBindingsRef.current.values()) {
+        const claimKey = (panePtyBinding as IDisposableWithWake).wakeHibernatedAgentIfArmed?.(
+          detail.wokenClaimKeys
+        )
+        if (claimKey) {
+          detail.wokenClaimKeys?.add(claimKey)
+        }
+      }
+    }
+    window.addEventListener('orca:wake-hibernated-agents-worktree', onWakeHibernatedAgents)
+    return () =>
+      window.removeEventListener('orca:wake-hibernated-agents-worktree', onWakeHibernatedAgents)
+  }, [deps.worktreeId, deps.panePtyBindingsRef])
+
+  useEffect(() => {
+    const previousIsVisible = getPreviousVisibleForTerminalPane({
+      previous: refs.previousVisibleForReconcileRef.current,
+      tabId: deps.tabId,
+      cwd: deps.cwd
+    })
+    refs.previousVisibleForReconcileRef.current = {
+      tabId: deps.tabId,
+      cwd: deps.cwd,
+      isVisible: deps.isVisible
+    }
+    deps.isVisibleRef.current = deps.isVisible
+    const resumedFromHidden = isTerminalPaneVisibilityResume({
+      previousIsVisible,
+      isVisible: deps.isVisible
+    })
+    for (const panePtyBinding of deps.panePtyBindingsRef.current.values()) {
+      const binding = panePtyBinding as IDisposableWithVisibility
+      binding.syncProcessTracking?.()
+      if (resumedFromHidden) {
+        binding.noteVisibilityResume?.()
+      }
+    }
+    if (resumedFromHidden && typeof window.api.pty.hasPty === 'function') {
+      reconcileMissingSessions({
+        bindings: deps.panePtyBindingsRef.current.values() as Iterable<ReconcilableBinding>,
+        hasPty: window.api.pty.hasPty
+      })
+    }
+  }, [
+    deps.cwd,
+    deps.isVisible,
+    deps.isVisibleRef,
+    deps.panePtyBindingsRef,
+    deps.tabId,
+    refs.previousVisibleForReconcileRef
+  ])
+
+  useEffect(() => {
+    if (!deps.isActive || !deps.isVisible || typeof window === 'undefined') {
+      return
+    }
+    const onWindowFocus = (): void => {
+      const activePane = deps.managerRef.current?.getActivePane()
+      if (!activePane) {
+        return
+      }
+      const binding = deps.panePtyBindingsRef.current.get(activePane.id) as
+        | (IDisposable & { sampleForegroundAgentOnFocus?: () => void })
+        | undefined
+      binding?.sampleForegroundAgentOnFocus?.()
+    }
+    window.addEventListener('focus', onWindowFocus)
+    return () => window.removeEventListener('focus', onWindowFocus)
+  }, [deps.isActive, deps.isVisible, deps.managerRef, deps.panePtyBindingsRef])
+
+  useEffect(() => {
+    const manager = deps.managerRef.current
+    const currentSettings = deps.settingsRef.current
+    if (!manager || !deps.settings || !currentSettings) {
       return
     }
     applyTerminalAppearance(
       manager,
       currentSettings,
       systemPrefersDarkRef.current,
-      paneFontSizesRef.current,
-      paneTransportsRef.current,
-      effectiveMacOptionAsAltRef.current,
-      paneMode2031Ref.current,
-      paneLastThemeModeRef.current
+      deps.paneFontSizesRef.current,
+      deps.paneTransportsRef.current,
+      deps.effectiveMacOptionAsAltRef.current,
+      deps.paneMode2031Ref.current,
+      deps.paneLastThemeModeRef.current
     )
-  }
+  }, [
+    deps.settings,
+    deps.systemPrefersDark,
+    deps.effectiveMacOptionAsAlt,
+    deps.managerRef,
+    deps.settingsRef,
+    deps.paneFontSizesRef,
+    deps.paneTransportsRef,
+    deps.effectiveMacOptionAsAltRef,
+    deps.paneMode2031Ref,
+    deps.paneLastThemeModeRef,
+    systemPrefersDarkRef
+  ])
 
-  // Initialize PaneManager instance once
   useEffect(() => {
-    const container = containerRef.current
-    if (!container) {
-      return
-    }
-    const expandedStyleSnapshots = expandedStyleSnapshotRef.current
-    const paneTransports = paneTransportsRef.current
-    const panePtyBindings = panePtyBindingsRef.current
-    const linkDisposables = linkProviderDisposablesRef.current
-    const terminalHandleLinkDisposables = terminalHandleLinkDisposablesRef.current
-    const linkifierClickPrimingDisposables = linkifierClickPrimingDisposablesRef.current
-    const linkPointerGestures = linkPointerGesturesRef.current
-    const fileLinkClickFallbackDisposables = fileLinkClickFallbackDisposablesRef.current
-    const httpLinkClickFallbackDisposables = httpLinkClickFallbackDisposablesRef.current
-    const selectionDisposables = selectionDisposablesRef.current
-    const selectionCaptureTimers = selectionCaptureTimersRef.current
-    const mouseHideDisposables = mouseHideDisposablesRef.current
-    const imeCompositionDisposables = imeCompositionDisposablesRef.current
-    const imeNativeTextForwarderDisposables = imeNativeTextForwarderDisposablesRef.current
-    const worktreePath =
-      useAppStore
-        .getState()
-        .allWorktrees()
-        .find((candidate) => candidate.id === worktreeId)?.path ??
-      cwd ??
-      ''
-    const defaultTabCwd = cwd ?? worktreePath
-    const initialCwdResolution = resolveQueuedInitialCwd(
-      queuedInitialCwdRef.current,
-      () => useAppStore.getState().consumeTabInitialCwd(tabId),
-      defaultTabCwd
+    deps.managerRef.current?.setTerminalGpuAcceleration(
+      deps.settings?.terminalGpuAcceleration ?? 'auto'
     )
     queuedInitialCwdRef.current = initialCwdResolution.queuedInitialCwd
     const startupCwd = initialCwdResolution.startupCwd
@@ -2175,91 +2197,29 @@ export function useTerminalPaneLifecycle({
   }, [worktreeId, panePtyBindingsRef])
 
   useEffect(() => {
-    const previousIsVisible = getPreviousVisibleForTerminalPane({
-      previous: previousVisibleForReconcileRef.current,
-      tabId,
-      cwd
-    })
-    previousVisibleForReconcileRef.current = { tabId, cwd, isVisible }
-    isVisibleRef.current = isVisible
-    const resumedFromHidden = isTerminalPaneVisibilityResume({ previousIsVisible, isVisible })
-    for (const panePtyBinding of panePtyBindingsRef.current.values()) {
-      const bindingWithVisibility = panePtyBinding as IDisposable & {
-        syncProcessTracking?: () => void
-        noteVisibilityResume?: () => void
-      }
-      bindingWithVisibility.syncProcessTracking?.()
-      // Why: visible-resume repairs dropped hidden resizes but must not fit against xterm's transient hidden DOM fallback.
-      if (resumedFromHidden) {
-        bindingWithVisibility.noteVisibilityResume?.()
-      }
-    }
-    if (resumedFromHidden && typeof window.api.pty.hasPty === 'function') {
-      // Why: a single-PTY liveness check preserves missed-exit recovery without a daemon-wide listSessions.
-      reconcileMissingSessions({
-        bindings: panePtyBindingsRef.current.values() as Iterable<ReconcilableBinding>,
-        hasPty: window.api.pty.hasPty
-      })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- refs are stable but visibility/identity changes must still refresh PTY process tracking
-  }, [cwd, isVisible, isVisibleRef, panePtyBindingsRef, tabId])
-
-  useEffect(() => {
-    if (!isActive || !isVisible || typeof window === 'undefined') {
-      return
-    }
-    const onWindowFocus = (): void => {
-      const activePane = managerRef.current?.getActivePane()
-      if (!activePane) {
-        return
-      }
-      const binding = panePtyBindingsRef.current.get(activePane.id) as
-        | (IDisposable & { sampleForegroundAgentOnFocus?: () => void })
-        | undefined
-      // Why: window refocus doesn't change the active leaf (no onActivePaneChange), so re-sample to revoke stale launch identity before the next Windows Shift+Enter.
-      binding?.sampleForegroundAgentOnFocus?.()
-    }
-    window.addEventListener('focus', onWindowFocus)
-    return () => window.removeEventListener('focus', onWindowFocus)
-  }, [isActive, isVisible, managerRef, panePtyBindingsRef])
-
-  useEffect(() => {
-    const manager = managerRef.current
-    if (!manager || !settings) {
-      return
-    }
-    applyAppearance(manager)
-    // Why: effectiveMacOptionAsAlt can change mid-session (layout switch or override flip); re-apply macOptionIsMeta live on every pane.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings, systemPrefersDark, effectiveMacOptionAsAlt])
-
-  useEffect(() => {
-    managerRef.current?.setTerminalGpuAcceleration(settings?.terminalGpuAcceleration ?? 'auto')
-  }, [settings?.terminalGpuAcceleration, managerRef])
-
-  useEffect(() => {
-    const manager = managerRef.current
+    const manager = deps.managerRef.current
     if (!manager) {
       return
     }
-    // Why: live row-retention changes are xterm option updates only — must not recreate/replay/refit/resize/signal the PTY.
     applyTerminalScrollbackRowsToMountedPanes(manager, terminalScrollbackRows)
-  }, [managerRef, terminalScrollbackRows])
+  }, [deps.managerRef, terminalScrollbackRows])
 
   useEffect(() => {
-    const manager = managerRef.current
+    const manager = deps.managerRef.current
     if (!manager) {
       return
     }
-    const hide = settings?.terminalMouseHideWhileTyping ?? false
+    const hide = deps.settings?.terminalMouseHideWhileTyping ?? false
     for (const pane of manager.getPanes()) {
-      const existing = mouseHideDisposablesRef.current.get(pane.id)
+      const existing = refs.mouseHideDisposablesRef.current.get(pane.id)
       if (hide && !existing) {
-        const disposable = installMouseHideWhileTyping(pane.terminal, pane.container)
-        mouseHideDisposablesRef.current.set(pane.id, disposable)
+        refs.mouseHideDisposablesRef.current.set(
+          pane.id,
+          installMouseHideWhileTyping(pane.terminal, pane.container)
+        )
       } else if (!hide && existing) {
         existing.dispose()
-        mouseHideDisposablesRef.current.delete(pane.id)
+        refs.mouseHideDisposablesRef.current.delete(pane.id)
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

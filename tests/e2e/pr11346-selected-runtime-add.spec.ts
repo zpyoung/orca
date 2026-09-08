@@ -1,3 +1,4 @@
+import { openSidebarProjectDialog } from './helpers/sidebar-project-dialog'
 import { rmSync } from 'node:fs'
 import path from 'node:path'
 import type { ElectronApplication, Locator, Page, TestInfo } from '@stablyai/playwright-test'

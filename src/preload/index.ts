@@ -1,5 +1,4 @@
-/* eslint-disable max-lines -- Why: preload is the audited renderer/Electron IPC contract; co-locating the surface eases security and type-drift review. */
-import { contextBridge, ipcRenderer, webFrame, webUtils } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { preloadE2EConfig } from './e2e-config'
 import { buildForkSessionHandoffApi } from './fork-session-handoff/session-handoff-preload-api'
@@ -367,18 +366,18 @@ import {
   registerRendererRestartIpcRelays
 } from './renderer-restart-wiring'
 
-// Why: the sync checkpoint only stages; this joins its durable write so a
-// navigating path can abort instead of losing the staged session.
-async function awaitBeforeUnloadCheckpoint(): Promise<void> {
-  const result = (await ipcRenderer.invoke('app:await-before-unload-checkpoint')) as {
-    ok?: unknown
-  }
-  if (result?.ok !== true) {
-    throw new Error('Failed to persist renderer state before unload.')
-  }
-}
+installNativeFileDropHandlers()
+installBrowserFindListener()
 
-type NativeFileDropCallback = (data: NativeFileDropPayload) => void
+// Custom APIs for renderer. Each domain bridge owns its IPC contract.
+const telemetryTrackApi: PreloadApi['telemetryTrack'] = (name, props) =>
+  ipcRenderer.invoke('telemetry:track', name, props)
+const telemetrySetOptInApi: PreloadApi['telemetrySetOptIn'] = (optedIn) =>
+  ipcRenderer.invoke('telemetry:setOptIn', optedIn)
+const telemetryAcknowledgeBannerApi: PreloadApi['telemetryAcknowledgeBanner'] = () =>
+  ipcRenderer.invoke('telemetry:acknowledgeBanner')
+const telemetryGetConsentStateApi: PreloadApi['telemetryGetConsentState'] = () =>
+  ipcRenderer.invoke('telemetry:getConsentState')
 
 const nativeFileDropCallbacks: NativeFileDropCallback[] = []
 let nativeFileDropListenerRegistered = false
@@ -5330,6 +5329,5 @@ if (process.contextIsolated) {
   }
 } else {
   window.electron = electronAPI
-  // @ts-expect-error (define in dts)
   window.api = api
 }

@@ -6,12 +6,14 @@ import {
   Eraser,
   GitFork,
   Maximize2,
+  MessageSquare,
   Minimize2,
   PanelBottomClose,
   PanelBottomOpen,
   PanelsTopLeft,
   PanelRightClose,
   Pencil,
+  SquareTerminal,
   TextSelect,
   X
 } from 'lucide-react'
@@ -29,6 +31,7 @@ import type { ExecutionHostId } from '../../../../shared/execution-host'
 import { formatPrimaryShortcutLabel } from '@/hooks/useShortcutLabel'
 import type { KeybindingOverrides } from '../../../../shared/keybindings'
 import { translate } from '@/i18n/i18n'
+import { isMacPlatform, nativeChatToggleShortcutLabel } from '../native-chat/native-chat-shortcut'
 import { AgentSessionContinuationMenuItem } from './AgentSessionContinuationMenuItem'
 import type { TerminalQuickCommandMenuHost } from '@/hooks/use-terminal-quick-command-hosts'
 import { TerminalQuickCommandsSubmenu } from './TerminalQuickCommandsSubmenu'
@@ -70,6 +73,8 @@ type TerminalContextMenuProps = {
   canClearPaneTitle: boolean
   onCopyTerminalId: () => void
   onCopyPaneId: () => void
+  canCopyAgentSessionId: boolean
+  onCopyAgentSessionId: () => void
 }
 
 export default function TerminalContextMenu({
@@ -108,7 +113,9 @@ export default function TerminalContextMenu({
   onClearPaneTitle,
   canClearPaneTitle,
   onCopyTerminalId,
-  onCopyPaneId
+  onCopyPaneId,
+  canCopyAgentSessionId,
+  onCopyAgentSessionId
 }: TerminalContextMenuProps): React.JSX.Element {
   // Why: one primary binding prevents Windows/Linux shortcut labels from forcing row wraps.
   const shortcuts = useMemo(
@@ -300,6 +307,15 @@ export default function TerminalContextMenu({
             {showClearPaneTitleShortcut ? (
               <DropdownMenuShortcut>{shortcuts.clearPaneTitle}</DropdownMenuShortcut>
             ) : null}
+          </DropdownMenuItem>
+        ) : null}
+        {canCopyAgentSessionId ? (
+          <DropdownMenuItem onSelect={onCopyAgentSessionId}>
+            <Copy />
+            {translate(
+              'components.terminalPane.TerminalContextMenu.copySessionId',
+              'Copy Session ID'
+            )}
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuItem onSelect={onCopyTerminalId}>
