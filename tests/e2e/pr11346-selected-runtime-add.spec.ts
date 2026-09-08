@@ -23,10 +23,7 @@ import {
 } from './pr11346-selected-runtime-identity-oracle'
 
 async function selectRuntimeHost(page: Page, runtimeName: string): Promise<Locator> {
-  await page
-    .getByRole('button', { name: /Add Project/i })
-    .first()
-    .click()
+  await openSidebarProjectDialog(page)
   const dialog = page.getByRole('dialog', { name: /Add a project/i })
   await expect(dialog).toBeVisible()
   const hostPicker = dialog.getByRole('combobox')

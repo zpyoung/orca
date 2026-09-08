@@ -169,6 +169,7 @@ export function buildMobileSessionWorktreeInputs(
       activeTabId !== null && terminalTabIds.includes(activeTabId) ? activeTabId : null,
     activeBrowserWorkspaceId: state.activeBrowserTabIdByWorktree?.[worktreeId] ?? null,
     generatedTitlesEnabled: publication.generatedTitlesEnabled,
+    terminalDockSyncEnabled: publication.terminalDockSyncEnabled,
     terminalTheme: publication.terminalTheme,
     mountedSurfaceCaptureByTabId
   }

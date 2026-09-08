@@ -24,6 +24,7 @@ import { isRealHomeCodexHookLaneUsable } from '../codex/codex-real-home-hook-ins
 import { resolveHostCodexSessionSourceHome } from '../codex/codex-session-source-home'
 import { browserManager } from '../browser/browser-manager'
 import { mainProcessState as state } from './main-process-state'
+import { ingestSessionInfoPlanWindows as ingestPlanWindows } from '../fork-session-info/session-info-plan-window-correlation'
 
 export function initializeMainProcessAccountServices(): void {
   const store = state.store
@@ -90,9 +91,7 @@ export function initializeMainProcessAccountServices(): void {
     state.claudeRuntimeAuth!.prepareForRateLimitFetch(target)
   )
   // Why: live Claude sessions stream usage windows through their statusLine command; feeding them here avoids OAuth usage-endpoint polling (and its 429s).
-  agentHookServer.setClaudeStatusLineListener((event) => {
-    state.rateLimits!.ingestLiveClaudeRateLimits(event)
-  })
+  agentHookServer.setClaudeStatusLineListener((event) => ingestPlanWindows(state.rateLimits, event))
   state.rateLimits.setOpenCodeGoConfigResolver(() => {
     const settings = store.getSettings()
     return {

@@ -820,12 +820,14 @@ function missingNativeDepsFromProbe(output: string): RelayNativeDepName[] | unde
 }
 
 /**
- * `ok` — the probe answered and both deps loaded. `blocked` — the probe answered and named deps
- * that failed to load. `unverifiable` — the probe never answered, which is evidence about the
- * transport, not about the deps.
+ * `ok` — the probe answered and both deps loaded. `blocked` — the probe answered with a marker
+ * naming deps that failed to load. `unverifiable` — the probe never answered, or answered nothing
+ * that names a dep; both are evidence about the probe, not about the deps.
  *
  * Why `unverifiable` is not `blocked`: repairing on it does `rm -rf node_modules/node-pty` and a
- * node-gyp source build (no Linux prebuild) against a relay that was never shown to be broken.
+ * node-gyp source build (no Linux prebuild) against a relay that was never shown to be broken. An
+ * unparseable answer is the worse half of that — it is deterministic and per-host, so a node that
+ * cannot start (bad NODE_OPTIONS, OOM, exit 127) deleted both modules on every reconnect forever.
  * Same verdict discipline as `src/main/orcad/node-pty-precondition.ts` and
  * docs/reference/ssh-execution-boundary.md — loss of contact is not evidence.
  */
@@ -858,14 +860,34 @@ async function probeRequiredNativeDeps(
           remoteDir,
           `(${escapedNode} -e ${shellEscape(probeJs)} || echo MISSING)`
         )
-    const probe = await execHostCommand(conn, hostPlatform, command, { signal })
-    return probe.includes('ORCA-NATIVE-DEPS-OK')
-      ? { status: 'ok', missing: [] }
-      : { status: 'blocked', missing: missingNativeDepsFromProbe(probe) }
-  } catch {
+    const probe = await execHostCommand(conn, hostPlatform, command, {
+      signal,
+      onStderr: (text) => {
+        probeStderr = text
+      }
+    })
+    if (probe.includes('ORCA-NATIVE-DEPS-OK')) {
+      return { status: 'ok', missing: [] }
+    }
+    const missing = missingNativeDepsFromProbe(probe)
+    if (!missing) {
+      console.warn(
+        `[ssh-relay][NATIVE-DEPS-PROBE-UNPARSEABLE] Probe at ${remoteDir} answered without naming a dep; launching as-is. stdout=${probe.trim().slice(-200)} stderr=${probeStderr.trim().slice(-500)}`
+      )
+      return { status: 'unverifiable', missing: [] }
+    }
+    return { status: 'blocked', missing }
+  } catch (error) {
     signal?.throwIfAborted()
     // Why: an unanswered probe says nothing about the deps; reporting MISSING here reset and
     // recompiled healthy relays, turning one dropped exec channel into a multi-minute reconnect.
+    // Why: the wrongful rebuild was the only visible symptom, so without this line a dropped exec
+    // channel leaves no trace at all.
+    console.warn(
+      `[ssh-relay] Native deps probe unanswered at ${remoteDir}; treating as unverifiable: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    )
     return { status: 'unverifiable', missing: [] }
   }
 }

@@ -74,6 +74,8 @@ export const ptySessionControlApi = {
   },
   writeAccepted: (id: string, data: string): Promise<boolean> =>
     ipcRenderer.invoke('pty:writeAccepted', { id, data }),
+  writeInputAccepted: (id: string, data: string): Promise<boolean> =>
+    ipcRenderer.invoke('pty:writeInputAccepted', { id, data }),
   onWriteUnavailable: (
     callback: (payload: {
       id: string

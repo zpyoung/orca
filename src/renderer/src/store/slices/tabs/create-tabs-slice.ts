@@ -11,12 +11,17 @@ import { createTabsMoveActions } from './tabs-move-actions'
 import { createTabsDropActions } from './tabs-drop-actions'
 import { createTabsSecondaryActions } from './tabs-secondary-actions'
 import { createTabsSessionActions } from './tabs-session-actions'
+import {
+  createTabTerminalDockActions,
+  TAB_TERMINAL_DOCK_INITIAL_STATE
+} from '../fork-terminal-dock/tab-terminal-dock-state'
 
 export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, get) => ({
   unifiedTabsByWorktree: {},
   groupsByWorktree: {},
   activeGroupIdByWorktree: {},
   layoutByWorktree: {},
+  ...TAB_TERMINAL_DOCK_INITIAL_STATE,
   ...createTabsCreateActions(set, get),
   ...createTabsFocusActions(set, get),
   ...createTabsCloseActions(set, get),
@@ -26,5 +31,6 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
   ...createTabsMoveActions(set, get),
   ...createTabsDropActions(set, get),
   ...createTabsSecondaryActions(set, get),
-  ...createTabsSessionActions(set, get)
+  ...createTabsSessionActions(set, get),
+  ...createTabTerminalDockActions(set, get)
 })

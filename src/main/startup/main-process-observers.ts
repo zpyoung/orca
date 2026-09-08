@@ -20,6 +20,7 @@ import { CodexUsageStore } from '../codex-usage/store'
 import { OpenCodeUsageStore } from '../opencode-usage/store'
 import { installRepoMaintenanceIdleGate } from '../repo-maintenance-idle-gate'
 import { mainProcessState as state } from './main-process-state'
+import { recordForkPaneTranscriptObservation } from '../fork-session-handoff/pane-transcript-history'
 
 export function initializeMainProcessObservers(): void {
   const store = state.store
@@ -156,6 +157,7 @@ export function initializeMainProcessObservers(): void {
   // hook-only agents and count any spinner TUI as an agent (#10201).
   const agentSessionRecorder = new AgentSessionTransitionRecorder(state.stats)
   agentHookServer.subscribeEnrichedStatus((enriched) => agentSessionRecorder.onStatus(enriched))
+  agentHookServer.subscribeEnrichedStatus(recordForkPaneTranscriptObservation)
   agentHookServer.subscribePaneStatusClear((clear) => agentSessionRecorder.onCleared(clear))
   state.claudeUsage = new ClaudeUsageStore(store)
   state.codexUsage = new CodexUsageStore(store)

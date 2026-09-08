@@ -122,6 +122,7 @@ export type MobileSessionPublicationInputs = {
   editorDraftVersionByFileId: ReadonlyMap<string, string>
   agentStatusByWorktreeId: MobileSessionAgentStatusByWorktree
   generatedTitlesEnabled: boolean
+  terminalDockSyncEnabled: boolean
   terminalTheme: RuntimeMobileTerminalTheme | undefined
 }
 /**
@@ -180,6 +181,7 @@ export type MobileSessionWorktreeInputs = {
   activeTerminalTabId: string | null
   activeBrowserWorkspaceId: string | null
   generatedTitlesEnabled: boolean
+  terminalDockSyncEnabled: boolean
   terminalTheme: RuntimeMobileTerminalTheme | undefined
   mountedSurfaceCaptureByTabId: ReadonlyMap<string, MountedTerminalSurfaceCapture>
 }

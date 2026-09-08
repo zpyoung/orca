@@ -181,14 +181,10 @@ export async function createDraftRelease({
     throw new Error('token is required')
   }
 
-  const releases = await fetchRepoReleases(repo, token, fetchImpl)
-  const existingRelease = releases.find((release) => release?.tag_name === tag)
-  if (existingRelease && existingRelease.draft !== true) {
-    log(`Release ${tag} already exists and is published.`)
-    return
-  }
-
-  const previousTag = latestPreviousPublishedDesktopReleaseTag(releases, tag)
+  const previousTag = latestPreviousPublishedDesktopReleaseTag(
+    await fetchRepoReleases(repo, token, fetchImpl),
+    tag
+  )
   const generateNotesBody = {
     tag_name: tag,
     target_commitish: tag,
@@ -218,81 +214,19 @@ export async function createDraftRelease({
     typeof releaseNotes.name === 'string' && releaseNotes.name.length > 0 ? releaseNotes.name : tag
   const prerelease = tag.includes('-rc.')
 
-  if (existingRelease) {
-    if (!Number.isInteger(existingRelease.id)) {
-      throw new Error(`Draft release ${tag} is missing a GitHub release id`)
-    }
-    // Why: the listing is a snapshot; the draft can be published while notes
-    // generate, and patching then overwrites a live release body.
-    const currentRelease = await githubJson(
-      fetchImpl,
-      `https://api.github.com/repos/${repo}/releases/${existingRelease.id}`,
-      token
-    )
-    if (currentRelease?.draft !== true) {
-      log(`Release ${tag} was published while notes were generated; leaving it unchanged.`)
-      return
-    }
-    // Why: the PATCH endpoint supports no conditional/versioned update, so the
-    // GET above cannot close the window. The PATCH response reports the state we
-    // actually wrote to; if publication won, put the published body back.
-    const patchedRelease = await githubJson(
-      fetchImpl,
-      `https://api.github.com/repos/${repo}/releases/${existingRelease.id}`,
-      token,
-      {
-        method: 'PATCH',
-        body: JSON.stringify({ body })
-      }
-    )
-    if (patchedRelease?.draft !== true) {
-      const publishedBody = typeof currentRelease.body === 'string' ? currentRelease.body : ''
-      if (publishedBody === body) {
-        log(`Release ${tag} was published while notes were patched; its body is unchanged.`)
-        return
-      }
-      // Why: the rollback must not clobber a body written after our PATCH, so
-      // restore only while the release still carries exactly what we wrote.
-      const releaseBeforeRollback = await githubJson(
-        fetchImpl,
-        `https://api.github.com/repos/${repo}/releases/${existingRelease.id}`,
-        token
-      )
-      if (releaseBeforeRollback?.body !== body) {
-        log(
-          `Release ${tag} was published and its body changed again while notes were patched; leaving the newer body in place.`
-        )
-        return
-      }
-      await githubJson(
-        fetchImpl,
-        `https://api.github.com/repos/${repo}/releases/${existingRelease.id}`,
-        token,
-        {
-          method: 'PATCH',
-          body: JSON.stringify({ body: publishedBody })
-        }
-      )
-      log(
-        `Release ${tag} was published while notes were patched; restored its published body and left the generated notes unapplied.`
-      )
-      return
-    }
-  } else {
-    // Why: GitHub's generated release notes can exceed the release body API
-    // limit, so create with a bounded body. Omit target_commitish because the
-    // release-cut tag already exists and GitHub rejects the tag name there.
-    await githubJson(fetchImpl, `https://api.github.com/repos/${repo}/releases`, token, {
-      method: 'POST',
-      body: JSON.stringify({
-        tag_name: tag,
-        name,
-        body,
-        draft: true,
-        prerelease
-      })
+  // Why: GitHub's generated release notes can exceed the release body API
+  // limit, so create with a bounded body. Omit target_commitish because the
+  // release-cut tag already exists and GitHub rejects the tag name there.
+  await githubJson(fetchImpl, `https://api.github.com/repos/${repo}/releases`, token, {
+    method: 'POST',
+    body: JSON.stringify({
+      tag_name: tag,
+      name,
+      body,
+      draft: true,
+      prerelease
     })
-  }
+  })
 
   const source = changelogSection ? 'changelog + generated notes' : 'generated notes'
   if (fullBody.length !== body.length) {

@@ -14,6 +14,7 @@ import { drainAgentHookSpool, type SpoolRecord } from '../../../shared/agent-hoo
 import { clearAllListenerCaches } from '../../../shared/agent-hook-listener/listener-state'
 import { trackEmptyPaneKeyHook } from './server-transport-rules'
 import { AgentHookServerRuntimeEnv } from './server-runtime-env'
+import { sessionInfoService } from '../../fork-session-info/session-info-service'
 
 export abstract class AgentHookServerLifecycle extends AgentHookServerRuntimeEnv {
   /** Start the loopback listener after hydration and spool replay have settled. */
@@ -73,6 +74,7 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerRuntimeEnv
       try {
         const body = await readRequestBody(req)
         if (pathname === CLAUDE_STATUSLINE_PATHNAME) {
+          sessionInfoService.ingestStatusLineBody(body)
           const statusLineEvent = parseClaudeStatusLineBody(body)
           if (statusLineEvent) {
             this.onClaudeStatusLine?.(statusLineEvent)

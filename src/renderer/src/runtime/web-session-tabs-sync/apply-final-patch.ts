@@ -6,6 +6,7 @@ import {
   buildRetractedMirroredTabSweepPatch
 } from './agent-status-primitives'
 import { isWebSessionTabsWorktreeRemovalFrame } from './session-tabs-inventory-absence'
+import { pruneExpiredTerminalDockPendingMutations } from '../fork-terminal-dock/web-session-terminal-dock-reconcile'
 
 type FinalPatchContext = ReturnType<typeof applyActiveStateUpdates>
 
@@ -49,7 +50,8 @@ export function buildWebSessionTabsFinalPatch(
     nextActiveBrowserTabId,
     nextActiveFileId,
     nextActiveTabType,
-    nextActiveTabTypeByWorktree
+    nextActiveTabTypeByWorktree,
+    rekeyedHandoffPendingMutationsByPaneKey
   } = context
 
   const agentStatusPatch = buildMirroredAgentStatusPatch(
@@ -77,10 +79,21 @@ export function buildWebSessionTabsFinalPatch(
     mirroredTerminalIds
   )
 
+  const prunedTerminalDockPendingMutationsByPaneKey = pruneExpiredTerminalDockPendingMutations(
+    state.terminalDockPendingMutationsByPaneKey,
+    now
+  )
+  const nextTerminalDockPendingMutationsByPaneKey = rekeyedHandoffPendingMutationsByPaneKey
+    ? { ...prunedTerminalDockPendingMutationsByPaneKey, ...rekeyedHandoffPendingMutationsByPaneKey }
+    : prunedTerminalDockPendingMutationsByPaneKey
+
   const patch: Partial<WebSessionTabsSyncState> = {
     ...agentStatusPatch,
     ...retractedTabSweepPatch,
     ...remirroredClosedTabLiftPatch,
+    ...(nextTerminalDockPendingMutationsByPaneKey !== state.terminalDockPendingMutationsByPaneKey
+      ? { terminalDockPendingMutationsByPaneKey: nextTerminalDockPendingMutationsByPaneKey }
+      : {}),
     ...(nextOpenFiles !== state.openFiles ? { openFiles: nextOpenFiles } : {}),
     ...(nextTabsByWorktree !== state.tabsByWorktree ? { tabsByWorktree: nextTabsByWorktree } : {}),
     ...(nextBrowserTabsByWorktree !== state.browserTabsByWorktree

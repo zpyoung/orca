@@ -7,6 +7,7 @@ import { getRemoteRuntimePtyEnvironmentId, toRemoteRuntimePtyId } from '../runti
 import { toWebTerminalSurfaceTabId } from '../web-runtime-session'
 import type { MirroredTerminalTab, TerminalSurface, ReadyTerminalSurface } from './state'
 import { chooseRemoteTerminalLayout, isTerminalSurfaceTab } from './terminal-surfaces'
+import { remapTerminalDockRecordTabId } from '../fork-terminal-dock/web-session-terminal-dock-reconcile'
 
 function pendingBindingBelongsToEnvironment(
   ptyId: string,
@@ -160,6 +161,15 @@ export function buildMirroredTerminalTabs(
     // Why: viewMode echoes back through host snapshots, so prefer the client's record during the echo window and adopt the host value only without a prior tab.
     const hostViewModeSurface = surfaces.find((surface) => surface.viewMode)
     const viewMode = existing ? existing.viewMode : hostViewModeSurface?.viewMode
+    // Why: TerminalTab has no dock field to carry client precedence, so only the raw host
+    // value is resolved here; the caller applies existing-tab precedence at the Tab level.
+    const hostTerminalDockByPaneKey = surfaces.find(
+      (surface) => surface.terminalDockByPaneKey
+    )?.terminalDockByPaneKey
+    const mirroredTerminalDockByPaneKey = remapTerminalDockRecordTabId(
+      hostTerminalDockByPaneKey,
+      toWebTerminalSurfaceTabId
+    )
     return {
       tab: {
         id: localTabId,
@@ -185,7 +195,10 @@ export function buildMirroredTerminalTabs(
       hostTabId: parentTabId,
       ptyIds,
       layout,
-      ...(retainedSurfaceByPrunedLeafId ? { retainedSurfaceByPrunedLeafId } : {})
+      ...(retainedSurfaceByPrunedLeafId ? { retainedSurfaceByPrunedLeafId } : {}),
+      ...(mirroredTerminalDockByPaneKey
+        ? { terminalDockByPaneKey: mirroredTerminalDockByPaneKey }
+        : {})
     }
   })
 }

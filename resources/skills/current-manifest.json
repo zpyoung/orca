@@ -10,12 +10,12 @@
       "files": [
         {
           "path": "SKILL.md",
-          "size": 3465,
+          "size": 3667,
           "executable": false,
           "classification": "text",
-          "exactSha256": "a3fcca06875e354a470e7daef5619172a3615fbbf82900ff3e0a65636fc694c6",
-          "textNormalizedSha256": "a3fcca06875e354a470e7daef5619172a3615fbbf82900ff3e0a65636fc694c6",
-          "identitySha256": "a3fcca06875e354a470e7daef5619172a3615fbbf82900ff3e0a65636fc694c6"
+          "exactSha256": "c4a11596b7c0338f4c991b24ba7ba453d93fb8dc045c642c517e7ae6d3c88467",
+          "textNormalizedSha256": "c4a11596b7c0338f4c991b24ba7ba453d93fb8dc045c642c517e7ae6d3c88467",
+          "identitySha256": "c4a11596b7c0338f4c991b24ba7ba453d93fb8dc045c642c517e7ae6d3c88467"
         }
       ]
     },
@@ -46,12 +46,12 @@
       "files": [
         {
           "path": "SKILL.md",
-          "size": 4150,
+          "size": 3944,
           "executable": false,
           "classification": "text",
-          "exactSha256": "6dcbd69045c74787be3385198750c67223709c5fa63a2ba3cfbbe0403e1219f5",
-          "textNormalizedSha256": "6dcbd69045c74787be3385198750c67223709c5fa63a2ba3cfbbe0403e1219f5",
-          "identitySha256": "6dcbd69045c74787be3385198750c67223709c5fa63a2ba3cfbbe0403e1219f5"
+          "exactSha256": "cdd5d9c8a95837a6cc24d68b150a117684afe9bbb2d763de2cc7fba1da1ed163",
+          "textNormalizedSha256": "cdd5d9c8a95837a6cc24d68b150a117684afe9bbb2d763de2cc7fba1da1ed163",
+          "identitySha256": "cdd5d9c8a95837a6cc24d68b150a117684afe9bbb2d763de2cc7fba1da1ed163"
         }
       ]
     },
@@ -136,12 +136,12 @@
       "files": [
         {
           "path": "SKILL.md",
-          "size": 4398,
+          "size": 4220,
           "executable": false,
           "classification": "text",
-          "exactSha256": "19ffdc1fe0d2c97dae845e8d636edb16781453ce2ec26f65a323c492ef90da18",
-          "textNormalizedSha256": "19ffdc1fe0d2c97dae845e8d636edb16781453ce2ec26f65a323c492ef90da18",
-          "identitySha256": "19ffdc1fe0d2c97dae845e8d636edb16781453ce2ec26f65a323c492ef90da18"
+          "exactSha256": "9ca228137b9a442b98c761aa07adecc2265708132ab175ad7e22b163fdc0bd7f",
+          "textNormalizedSha256": "9ca228137b9a442b98c761aa07adecc2265708132ab175ad7e22b163fdc0bd7f",
+          "identitySha256": "9ca228137b9a442b98c761aa07adecc2265708132ab175ad7e22b163fdc0bd7f"
         }
       ]
     }

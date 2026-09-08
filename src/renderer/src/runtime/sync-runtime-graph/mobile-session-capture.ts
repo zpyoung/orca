@@ -172,6 +172,7 @@ export function canReuseMobileSessionSnapshot(
     previous.activeTerminalTabId === next.activeTerminalTabId &&
     previous.activeBrowserWorkspaceId === next.activeBrowserWorkspaceId &&
     previous.generatedTitlesEnabled === next.generatedTitlesEnabled &&
+    previous.terminalDockSyncEnabled === next.terminalDockSyncEnabled &&
     previous.terminalTheme === next.terminalTheme &&
     narrowedEntriesEqual(previous.terminalLayoutByTabId, next.terminalLayoutByTabId) &&
     narrowedEntriesEqual(previous.paneTitlesByTabId, next.paneTitlesByTabId) &&

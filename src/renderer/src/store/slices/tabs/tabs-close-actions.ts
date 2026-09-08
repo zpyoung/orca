@@ -8,6 +8,7 @@ import {
   sanitizeRecentTabIds
 } from '../tab-group-state'
 import { buildActiveSurfacePatch } from './tabs-surface'
+import { removeTabPaneKeysFromPendingMutations } from '../fork-terminal-dock/tab-terminal-dock-state'
 
 export function createTabsCloseActions(
   set: TabsSliceSet,
@@ -61,6 +62,12 @@ export function createTabsCloseActions(
           nextUnreadTerminalTabs = { ...current.unreadTerminalTabs }
           delete nextUnreadTerminalTabs[terminalEntityId]
         }
+        // Why: pending-mutation timestamps live outside the closed tab's own record, so drop
+        // its pane keys here or they linger in the store until they happen to age out.
+        const nextTerminalDockPendingMutationsByPaneKey = removeTabPaneKeysFromPendingMutations(
+          current.terminalDockPendingMutationsByPaneKey,
+          tabId
+        )
         let nextGroups = (current.groupsByWorktree[worktreeId] ?? []).map((candidate) =>
           candidate.id === group.id
             ? {
@@ -105,6 +112,10 @@ export function createTabsCloseActions(
           // Why: skip writing unreadTerminalTabs when the reference is unchanged, avoiding a no-op alloc that re-runs full-state selectors.
           ...(nextUnreadTerminalTabs !== current.unreadTerminalTabs
             ? { unreadTerminalTabs: nextUnreadTerminalTabs }
+            : {}),
+          ...(nextTerminalDockPendingMutationsByPaneKey !==
+          current.terminalDockPendingMutationsByPaneKey
+            ? { terminalDockPendingMutationsByPaneKey: nextTerminalDockPendingMutationsByPaneKey }
             : {}),
           // Why: closing the last tab can leave the worktree selected but render-empty, so write the landing-state fallback directly.
           ...(shouldDeactivateWorktree

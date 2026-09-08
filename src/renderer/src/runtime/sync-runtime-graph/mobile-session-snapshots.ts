@@ -52,6 +52,7 @@ export function buildMobileSessionTabSnapshots(
       state.tabsByWorktree
     ),
     generatedTitlesEnabled: state.settings?.tabAutoGenerateTitle === true,
+    terminalDockSyncEnabled: state.settings?.experimentalTerminalDock === true,
     terminalTheme: getMobileTerminalTheme(state, systemPrefersDark)
   }
   const liveFolderWorkspaceIds = new Set(
@@ -122,7 +123,13 @@ export function buildMobileSessionTabSnapshots(
         ) {
           continue
         }
-        tabs.push(...buildMobileTerminalSurfaceTabs(inputs, terminal, item.tabId))
+        tabs.push(
+          ...buildMobileTerminalSurfaceTabs(
+            inputs,
+            terminal,
+            item.tabId ? unifiedTabById.get(item.tabId) : undefined
+          )
+        )
       } else if (item.type === 'editor') {
         const file = openFilesForWorktree?.get(item.id)
         if (!file || !isMobilePublishableOpenFile(file)) {

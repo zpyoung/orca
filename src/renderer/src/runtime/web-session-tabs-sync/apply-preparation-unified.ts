@@ -8,6 +8,15 @@ import {
 } from '../web-session-focus-intent'
 import { isWebSessionBrowserPlacementGroupReserved } from '../web-session-browser-placement'
 import { buildHostToLocalTabIdMap, updateHostSessionTabIdMappings } from './layout-groups'
+import type { TerminalDockPaneState } from '../../../../shared/fork-terminal-dock/terminal-dock-pane-state'
+import { rekeyTerminalDockPaneKeys } from '@/components/terminal-pane/fork-terminal-dock/terminal-dock-pane-state'
+import {
+  pendingMutationsForTabId,
+  reconcileTerminalDockByPaneKey,
+  remapPendingMutationTimestampsTabId,
+  remapTerminalDockRecordTabId,
+  TERMINAL_DOCK_ECHO_WINDOW_MS
+} from '../fork-terminal-dock/web-session-terminal-dock-reconcile'
 
 export function prepareWebSessionTabsSnapshotUnified(
   base: ReturnType<typeof prepareWebSessionTabsSnapshotBrowser>
@@ -33,16 +42,89 @@ export function prepareWebSessionTabsSnapshotUnified(
     retainedUnifiedTabs,
     existingViewModeByTabId,
     hostGroupIdByTabId,
-    targetGroupId
+    targetGroupId,
+    now,
+    currentUnifiedTabs,
+    provisionalHandoffHostTabIds
   } = base
-  const mirroredTerminalUnifiedTabs = mirroredTerminalTabs.map((entry) =>
-    buildTerminalUnifiedTab(
+  // Existing state remains the fallback for old hosts that omit the field. A published host
+  // record wins so independently updating paired clients converge instead of pinning stale state.
+  const existingUnifiedTerminalTabById = new Map(
+    currentUnifiedTabs
+      .filter((tab) => tab.contentType === 'terminal')
+      .map((tab) => [tab.id, tab] as const)
+  )
+  // Why: the kill switch gates adoption of host dock state, not its presence — a flag-off
+  // client still carries forward whatever it already holds so it can't clobber a flag-on
+  // peer's persisted record.
+  const hostTerminalDockSyncEnabled = state.settings?.experimentalTerminalDock === true
+  // Why: a provisional tab's optimistic dock record has no unified tab under the
+  // replacement id yet, so it would otherwise be lost the instant the host confirms
+  // the handoff; carry it forward re-keyed to the replacement tab id.
+  const provisionalDockRecordByHostTabId = new Map<string, Record<string, TerminalDockPaneState>>()
+  const provisionalPendingMutationsByHostTabId = new Map<string, Record<string, number>>()
+  for (const [provisionalTabId, hostTabId] of provisionalHandoffHostTabIds) {
+    const provisionalDockRecord =
+      existingUnifiedTerminalTabById.get(provisionalTabId)?.terminalDockByPaneKey
+    if (provisionalDockRecord) {
+      provisionalDockRecordByHostTabId.set(hostTabId, provisionalDockRecord)
+    }
+    const provisionalPendingMutations = pendingMutationsForTabId(
+      state.terminalDockPendingMutationsByPaneKey,
+      provisionalTabId
+    )
+    if (provisionalPendingMutations) {
+      provisionalPendingMutationsByHostTabId.set(hostTabId, provisionalPendingMutations)
+    }
+    // Why: this is the localStorage twin of the in-memory rekey above — old hosts that never
+    // echo the dock field rely on it surviving under the pane's final identity after a reload.
+    if (hostTerminalDockSyncEnabled) {
+      rekeyTerminalDockPaneKeys(provisionalTabId, toWebTerminalSurfaceTabId(hostTabId))
+    }
+  }
+  const terminalDockPendingMutationsByPaneKey = state.terminalDockPendingMutationsByPaneKey
+  const isTerminalDockPaneKeyPending = (paneKey: string): boolean => {
+    const mutatedAt = terminalDockPendingMutationsByPaneKey?.[paneKey]
+    return mutatedAt !== undefined && now - mutatedAt < TERMINAL_DOCK_ECHO_WINDOW_MS
+  }
+  let rekeyedHandoffPendingMutationsByPaneKey: Record<string, number> | undefined
+  const mirroredTerminalUnifiedTabs = mirroredTerminalTabs.map((entry) => {
+    const existingUnifiedTab = existingUnifiedTerminalTabById.get(entry.tab.id)
+    if (!hostTerminalDockSyncEnabled) {
+      return buildTerminalUnifiedTab(
+        entry.tab,
+        hostGroupIdByTabId.get(entry.hostTabId) ?? targetGroupId,
+        environmentId,
+        entry.tab.viewMode ?? existingViewModeByTabId.get(entry.tab.id),
+        existingUnifiedTab?.terminalDockByPaneKey
+      )
+    }
+    const handoffDockRecord = provisionalDockRecordByHostTabId.get(entry.hostTabId)
+    const rekeyedHandoffDockRecord = handoffDockRecord
+      ? remapTerminalDockRecordTabId(handoffDockRecord, () => entry.tab.id)
+      : undefined
+    const handoffPendingMutations = provisionalPendingMutationsByHostTabId.get(entry.hostTabId)
+    const rekeyedHandoffPendingMutations = handoffPendingMutations
+      ? remapPendingMutationTimestampsTabId(handoffPendingMutations, () => entry.tab.id)
+      : undefined
+    if (rekeyedHandoffPendingMutations) {
+      rekeyedHandoffPendingMutationsByPaneKey = {
+        ...rekeyedHandoffPendingMutationsByPaneKey,
+        ...rekeyedHandoffPendingMutations
+      }
+    }
+    return buildTerminalUnifiedTab(
       entry.tab,
       hostGroupIdByTabId.get(entry.hostTabId) ?? targetGroupId,
       environmentId,
-      entry.tab.viewMode ?? existingViewModeByTabId.get(entry.tab.id)
+      entry.tab.viewMode ?? existingViewModeByTabId.get(entry.tab.id),
+      reconcileTerminalDockByPaneKey(
+        rekeyedHandoffDockRecord ?? entry.terminalDockByPaneKey,
+        existingUnifiedTab?.terminalDockByPaneKey,
+        isTerminalDockPaneKeyPending
+      )
     )
-  )
+  })
   const mirroredBrowserUnifiedTabs = mirroredBrowserTabs.map((entry) => entry.unifiedTab)
   const mirroredEditorUnifiedTabs = mirroredEditorTabs.map((entry) => entry.unifiedTab)
   const mirroredAgentUnifiedTabs = mirroredAgentTabs.map((entry) => entry.unifiedTab)
@@ -273,6 +355,7 @@ export function prepareWebSessionTabsSnapshotUnified(
     intentUnifiedTabId,
     nextActiveUnifiedTabId,
     mirroredUnifiedIds,
-    hostToLocalTabId
+    hostToLocalTabId,
+    rekeyedHandoffPendingMutationsByPaneKey
   }
 }

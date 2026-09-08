@@ -10,13 +10,15 @@ import { toRuntimeExecutionHostId } from '../../../../shared/execution-host'
 import type { ReadyEditorSurface, MirroredEditorTab } from './state'
 import type { WebSessionExistingTabIndex } from '../web-session-existing-tab-index'
 import { isReadyEditorTab, localEditorFileId, editorSourceFileId } from './terminal-surfaces'
+import type { TerminalDockPaneState } from '../../../../shared/fork-terminal-dock/terminal-dock-pane-state'
 
 export function buildTerminalUnifiedTab(
   tab: TerminalTab,
   groupId: string,
   environmentId: string,
   // Why: viewMode is host-tracked but the client's optimistic toggle must win during the echo window; callers pass the reconciled value.
-  viewMode?: Tab['viewMode']
+  viewMode?: Tab['viewMode'],
+  terminalDockByPaneKey?: Record<string, TerminalDockPaneState>
 ): Tab {
   return {
     id: tab.id,
@@ -35,7 +37,8 @@ export function buildTerminalUnifiedTab(
     createdAt: tab.createdAt,
     isPreview: false,
     isPinned: tab.isPinned === true,
-    ...(viewMode ? { viewMode } : {})
+    ...(viewMode ? { viewMode } : {}),
+    ...(terminalDockByPaneKey ? { terminalDockByPaneKey } : {})
   }
 }
 

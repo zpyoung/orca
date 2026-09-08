@@ -18,6 +18,7 @@ import type { Tab } from '../../../../shared/tab-types'
 import type { TerminalLayoutSnapshot, TerminalTab } from '../../../../shared/terminal-tab-types'
 import type { OpenFile } from '../../store/slices/editor'
 import type { RuntimeBrowserPlacement } from '../../../../shared/runtime-browser-placement'
+import type { TerminalDockPaneState } from '../../../../shared/fork-terminal-dock/terminal-dock-pane-state'
 
 export const WEB_SESSION_GROUP_PREFIX = 'web-session-tabs:'
 export const WEB_SESSION_TABS_VISIBILITY_RESUME_STAGGER_MS = 100
@@ -153,6 +154,9 @@ export type MirroredTerminalTab = {
   ptyIds: string[]
   layout: TerminalLayoutSnapshot
   retainedSurfaceByPrunedLeafId?: ReadonlyMap<string, TerminalSurface>
+  // Why: TerminalTab carries no dock field (host-side only, echoed on Tab), so the
+  // host value rides alongside tab instead of on it.
+  terminalDockByPaneKey?: Record<string, TerminalDockPaneState>
 }
 export type MirroredBrowserTab = {
   workspace: BrowserWorkspace
@@ -210,6 +214,8 @@ export type WebSessionTabsSyncState = Pick<
       | 'recentlyRetiredAgentStatusPaneKeys'
       | 'retainedAgentsByPaneKey'
       | 'retentionSuppressedPaneKeys'
+      | 'settings'
+      | 'terminalDockPendingMutationsByPaneKey'
     >
   >
 

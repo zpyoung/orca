@@ -213,10 +213,125 @@ import {
 } from './terminal-remote-runtime-recovery-ui-state'
 import { updateTerminalDockRawRecoveryPhaseByPaneId } from './fork-terminal-dock/terminal-pane-dock-recovery-phase'
 
-export type { TerminalPaneHandle } from './terminal-pane-types'
+const NATIVE_CHAT_ROOT_SELECTOR = '[data-native-chat-root="true"]'
+
+function isInsideNativeChatRoot(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(NATIVE_CHAT_ROOT_SELECTOR) !== null
+}
+
+// Why: registry lives in a leaf module to break the slice → TerminalPane → store → slice import cycle that leaves createTerminalSlice undefined at init.
+import { shutdownBufferCaptures } from './shutdown-buffer-captures'
+import { mergeCapturedLeafState } from './merge-captured-leaf-state'
+import { pasteTerminalText } from './terminal-bracketed-paste'
+import {
+  executeTerminalPastePlan,
+  planTerminalPasteWithYield,
+  type TerminalPasteSource,
+  type TerminalPasteTextOptions
+} from './terminal-paste-coordinator'
+import {
+  appendPaneTerminalError,
+  clearPaneTerminalError,
+  mapPaneTerminalErrors,
+  terminalErrorForPane,
+  type TerminalErrorsByPaneId
+} from './terminal-error-accumulation'
+import { formatTerminalPasteExecutionError } from './terminal-paste-errors'
+import { resolveTerminalPasteRuntime } from './terminal-paste-runtime'
+import { getTerminalPasteSshRemotePlatform } from './terminal-paste-ssh-platform'
+import {
+  isTerminalPanePasteFocusCurrent,
+  isTerminalPanePasteTargetCurrent
+} from './terminal-paste-target-state'
+import { writeTerminalPastePtyInput } from './terminal-pty-paste-writer'
+import {
+  applyTerminalPaneAttentionToManager,
+  subscribeTerminalPaneAttention
+} from './terminal-pane-attention-subscriptions'
+import { getCachedTerminalTabForWorktree } from './terminal-tab-lookup'
+import {
+  getCachedTerminalGroupIdForWorktree,
+  getCachedUnifiedTerminalTabForWorktree
+} from './terminal-unified-tab-lookup'
+import { resolveNativeChatLeafTitleAgent } from './native-chat-leaf-title-agent'
+import { selectTerminalPaneHostState } from './terminal-pane-host-state'
+import {
+  isXtermHelperTextarea,
+  releaseTerminalFocusForOutsidePointerDown,
+  releaseTerminalFocusForWindowBlur,
+  resyncTerminalFocusForWindowFocus,
+  setRegularTerminalInputFocusAttribute
+} from './regular-terminal-focus-ownership'
+import { useTerminalQuickCommandHosts } from '@/hooks/use-terminal-quick-command-hosts'
+import { refreshTerminalImeInputContext } from './terminal-ime-input-context-refresh'
+
+type TerminalPaneProps = {
+  tabId: string
+  worktreeId: string
+  cwd?: string
+  isActive: boolean
+  isVisible?: boolean
+  isWorktreeActive?: boolean
+  // When set (Activity portal), isolates one split pane as a transient override that doesn't touch expandedPaneId or persist the layout.
+  isolatedPaneKey?: string | null
+  // Why: ephemeral one-off command terminals don't need the header's prominent split affordance (split shortcuts still work).
+  showSplitButton?: boolean
+  onPtyExit: (ptyId: string, exitCode?: number) => void
+  onCloseTab: () => void
+}
+
+export type TerminalPaneHandle = {
+  closeActivePane: () => void
+}
+
+type TerminalQuickCommandEditorDialogProps = {
+  command: TerminalQuickCommand
+  hostId: ExecutionHostId
+  onOpenChange: (open: boolean) => void
+  onSave: (command: TerminalQuickCommand) => void
+}
+
+function TerminalQuickCommandEditorDialog({
+  command,
+  hostId,
+  onOpenChange,
+  onSave
+}: TerminalQuickCommandEditorDialogProps): React.JSX.Element {
+  const repos = useAppStore((store) => store.repos)
+  const hostRepos = hostId.startsWith('runtime:')
+    ? repos.filter((repo) => getRepoExecutionHostId(repo) === hostId)
+    : repos
+
+  return (
+    <TerminalQuickCommandDialog
+      open
+      mode="add"
+      command={command}
+      repos={hostRepos}
+      onOpenChange={onOpenChange}
+      onSave={onSave}
+    />
+  )
+}
+
+function formatClipboardImagePasteError(error: unknown): string {
+  const detail = error instanceof Error ? error.message : String(error)
+  return `Image paste failed: ${detail}`
+}
 
 function TerminalPane(
-  props: TerminalPaneProps,
+  {
+    tabId,
+    worktreeId,
+    cwd,
+    isActive,
+    isVisible = true,
+    isWorktreeActive = isVisible,
+    isolatedPaneKey = null,
+    showSplitButton = true,
+    onPtyExit,
+    onCloseTab
+  }: TerminalPaneProps,
   ref: React.ForwardedRef<TerminalPaneHandle>
 ): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)

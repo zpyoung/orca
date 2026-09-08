@@ -18,7 +18,7 @@ import { callRuntimeEnvironment } from '../ipc/runtime-environment-transport-rou
 import { mainProcessState as state } from './main-process-state'
 import { prepareCodexRuntimeHomeForLaunch } from './codex-launch-preparation'
 import type { RuntimeDesktopWindowStatus } from '../../shared/runtime-types'
-import { ArtifactCloudService } from '../artifacts/artifact-cloud-service'
+import { ArtifactCloudService } from '../artifacts/fork-artifact-passwords/artifact-password-cloud-service'
 import { SkillCloudService } from '../skills/skill-cloud-service'
 import { isArtifactSharingEnabled } from '../../shared/artifact-sharing-gate'
 

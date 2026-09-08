@@ -66,5 +66,21 @@ export const KEYBINDING_DEFINITION_CORE_4: readonly KeybindingDefinition[] = [
     },
     // Why: macOS uses Shift+Space as an input-source shortcut; Orca otherwise rejects Shift-only bindings to avoid stealing typed text.
     allowShiftOnlyKeybindings: true
+  },
+  {
+    id: 'terminal.dock.toggle',
+    title: 'Toggle agent composer dock',
+    group: 'Terminal Panes',
+    scope: 'terminal',
+    searchKeywords: ['shortcut', 'terminal', 'dock', 'composer', 'agent', 'toggle'],
+    defaultBindings: platformBindings(['Mod+Shift+K'])
+  },
+  {
+    id: 'terminal.dock.passthrough',
+    title: 'Toggle terminal passthrough mode',
+    group: 'Terminal Panes',
+    scope: 'terminal',
+    searchKeywords: ['shortcut', 'terminal', 'dock', 'passthrough', 'raw', 'toggle'],
+    defaultBindings: platformBindings(['Mod+Shift+P'])
   }
 ]

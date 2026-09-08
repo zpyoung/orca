@@ -3,6 +3,7 @@ import { sanitizeTerminalLayoutPaneTitles } from '@/lib/terminal-pane-title-sani
 import type { AppState } from '@/store/types'
 import type { RuntimeMobileSessionSnapshotTab } from '../../../../shared/runtime-types'
 import type { TerminalLayoutSnapshot } from '../../../../shared/terminal-tab-types'
+import type { Tab } from '../../../../shared/tab-types'
 import {
   isNativeChatTabWideFallbackSafe,
   nativeChatLaunchAgentForLeaf
@@ -23,8 +24,9 @@ import { resolveTerminalLayoutRoot } from '../remote-terminal-layout-resolution'
 export function buildMobileTerminalSurfaceTabs(
   inputs: MobileSessionWorktreeInputs,
   terminal: NonNullable<AppState['tabsByWorktree'][string]>[number],
-  unifiedTabId?: string
+  unifiedTab?: Tab
 ): RuntimeMobileSessionSnapshotTab[] {
+  const unifiedTabId = unifiedTab?.id
   const capture = inputs.mountedSurfaceCaptureByTabId.get(terminal.id)
   const isDesktopTabActive = unifiedTabId
     ? isUnifiedTabActiveInActiveGroup(inputs, unifiedTabId)
@@ -118,6 +120,11 @@ export function buildMobileTerminalSurfaceTabs(
             launchDraft: publishedLaunchDraft.text,
             launchDraftCreatedAt: publishedLaunchDraft.createdAt
           }
+        : {}),
+      // Why: the kill switch withholds publication rather than publishing a delete, so a
+      // flag-off client can't clobber a flag-on peer's persisted record on the far side.
+      ...(inputs.terminalDockSyncEnabled && unifiedTab?.terminalDockByPaneKey
+        ? { terminalDockByPaneKey: unifiedTab.terminalDockByPaneKey }
         : {}),
       parentLayout,
       isActive: isDesktopTabActive && leafId === activeLeafId

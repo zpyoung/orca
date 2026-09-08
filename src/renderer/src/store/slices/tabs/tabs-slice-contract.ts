@@ -8,10 +8,11 @@ import type {
 } from '../../../../../shared/tab-types'
 import type { WorkspaceSessionState } from '../../../../../shared/workspace-session-state-types'
 import type { WorkspaceSessionHydrationOptions } from '@/lib/workspace-session-hydration-keys'
+import type { TabTerminalDockSlice } from '../fork-terminal-dock/tab-terminal-dock-state'
 
 export type TabSplitDirection = 'left' | 'right' | 'up' | 'down'
 
-export type TabsSlice = {
+export type TabsSlice = TabTerminalDockSlice & {
   unifiedTabsByWorktree: Record<string, Tab[]>
   groupsByWorktree: Record<string, TabGroup[]>
   activeGroupIdByWorktree: Record<string, string>
