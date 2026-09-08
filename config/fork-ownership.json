@@ -1314,7 +1314,16 @@
       "kind": "passthrough",
       "lines": [
         "import { paneFocusOwnershipArgs } from './fork-terminal-dock/pane-focus-ownership-args'",
-        "    focusActivePane(manager, ...paneFocusOwnershipArgs(tabId, paneDockOwnsFocus))"
+        "      repairedDpr = resumeTerminalVisibilityHeavy(manager, isActive, paneFocusOwnershipArgs(tabId))"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "    tabId,",
+        "        tabId,"
       ]
     },
     {
@@ -1349,8 +1358,8 @@
       "feature": "terminal-dock",
       "kind": "registration",
       "lines": [
-        "import { terminalDockPaneOwnsFocus } from './fork-terminal-dock/terminal-dock-controller-bridge'",
-        "          paneDockOwnsFocus: (paneKey: string) => terminalDockPaneOwnsFocus(deps.tabId, paneKey)"
+        "import { paneFocusOwnershipArgs } from './fork-terminal-dock/pane-focus-ownership-args'",
+        "        fitAndFocusPanes(manager, ...paneFocusOwnershipArgs(deps.tabId))"
       ]
     },
     {
@@ -1367,8 +1376,8 @@
       "feature": "terminal-dock",
       "kind": "passthrough",
       "lines": [
-        "import { useEffect, useRef } from 'react'",
-        "import type { PaneFocusOwnership } from './pane-helpers'"
+        "  tabId: string",
+        "  }, [isActiveRef, isVisible, isVisibleRef, managerRef, panePtyBindingsRef, tabId])"
       ]
     },
     {
@@ -2904,6 +2913,12 @@
     {
       "path": "src/renderer/src/components/sidebar/project-header-drop.test.ts",
       "reason": "Tests updated for the sidebar-density header-height change.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#sidebar-density"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-header-section-boundaries.test.ts",
+      "reason": "Tests updated for the sidebar-density row-height fix above.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#sidebar-density"
     },
