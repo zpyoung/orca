@@ -3449,8 +3449,8 @@
       "removed": 83
     },
     "src/renderer/src/components/native-chat/NativeChatComposer.tsx": {
-      "added": 230,
-      "removed": 287
+      "added": 232,
+      "removed": 282
     },
     "src/renderer/src/components/native-chat/NativeChatInteractiveCard.test.tsx": {
       "added": 21,
@@ -3537,7 +3537,7 @@
       "removed": 114
     },
     "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.ts": {
-      "added": 72,
+      "added": 84,
       "removed": 48
     },
     "src/renderer/src/components/native-chat/use-native-chat-interactive-send.test.tsx": {
@@ -3797,7 +3797,7 @@
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/terminal-pane-mount-preparation.ts": {
-      "added": 5,
+      "added": 2,
       "removed": 1
     },
     "src/renderer/src/components/terminal-pane/terminal-pane-pane-closed.ts": {
@@ -3813,8 +3813,12 @@
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/terminal-visibility-resume.ts": {
-      "added": 21,
-      "removed": 8
+      "added": 15,
+      "removed": 6
+    },
+    "src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects.ts": {
+      "added": 2,
+      "removed": 0
     },
     "src/renderer/src/components/terminal-pane/use-terminal-pane-chat-state.ts": {
       "added": 6,
@@ -3837,8 +3841,8 @@
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/use-terminal-window-wake-recovery.ts": {
-      "added": 12,
-      "removed": 3
+      "added": 5,
+      "removed": 1
     },
     "src/renderer/src/hooks/settings-navigation-workflow-sections.ts": {
       "added": 2,
@@ -4085,8 +4089,8 @@
       "removed": 0
     },
     "src/shared/pane-agent-identity-inventory.test.ts": {
-      "added": 5,
-      "removed": 1
+      "added": 4,
+      "removed": 0
     },
     "src/shared/project-groups.ts": {
       "added": 3,
