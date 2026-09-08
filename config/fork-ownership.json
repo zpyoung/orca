@@ -1737,6 +1737,88 @@
       ]
     },
     {
+      "path": "src/main/updater/updater-release-feed.ts",
+      "feature": "fork-infra",
+      "kind": "registration",
+      "lines": [
+        "    const url = 'https://github.com/zpyoung/orca/releases/latest/download'"
+      ]
+    },
+    {
+      "path": "src/main/updater/updater-setup.ts",
+      "feature": "fork-infra",
+      "kind": "registration",
+      "lines": [
+        "        url: 'https://github.com/zpyoung/orca/releases/latest/download'"
+      ]
+    },
+    {
+      "path": "src/main/rate-limits/service/service-fetch-policy.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "  /** Ingest live Claude plan windows and report whether the selected account accepted them. */",
+        "  ingestLiveClaudeRateLimits(event: ClaudeStatusLineRateLimits): boolean {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/TerminalPaneSurface.tsx",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { useTerminalPaneDockSurface } from './fork-terminal-dock/use-terminal-pane-dock-surface'",
+        "  const { dockMounts, contextMenuProps: terminalDockMenuProps } =",
+        "      {dockMounts}",
+        "        {...terminalDockMenuProps}"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-title-state.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { publishTerminalDockRawRecoveryPhase } from './fork-terminal-dock/terminal-dock-controller-bridge'",
+        "      publishTerminalDockRawRecoveryPhase(tabId, (previous) =>"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-chat-state.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { notifyTerminalDockConfirmedAgentExit } from './fork-terminal-dock/terminal-dock-controller-bridge'",
+        "      notifyTerminalDockConfirmedAgentExit(tabId, leafId)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-layout-bindings.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { noteTerminalDockPanePtyBindingChanged } from './fork-terminal-dock/terminal-dock-controller-bridge'",
+        "      noteTerminalDockPanePtyBindingChanged(tabId)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-mobile-actions.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { terminalDockPaneOwnsFocus } from './fork-terminal-dock/terminal-dock-controller-bridge'",
+        "        if (!terminalDockPaneOwnsFocus(tabId, makePaneKey(tabId, pane.leafId))) {",
+        "      if (!terminalDockPaneOwnsFocus(tabId, makePaneKey(tabId, clickedPane.leafId))) {"
+      ]
+    },
+    {
+      "path": "src/preload/api-types.ts",
+      "feature": "session-handoff",
+      "kind": "passthrough",
+      "lines": [
+        "  forkSessionHandoff: ForkSessionHandoffPreloadApi",
+        "  forkSessionInfo: ForkSessionInfoApi"
+      ]
+    },
+    {
       "path": "src/shared/keybindings/types.ts",
       "feature": "terminal-dock",
       "kind": "registration",
@@ -2688,11 +2770,6 @@
       "status": "permanent"
     },
     {
-      "path": "src/main/updater.ts",
-      "reason": "Fork's own update feed and channel selection.",
-      "status": "permanent"
-    },
-    {
       "path": "src/renderer/src/components/native-chat/NativeChatComposerActions.test.tsx",
       "reason": "Superseded by the fork copy's test in fork-agent-composer.",
       "status": "permanent",
@@ -2837,11 +2914,6 @@
       "ledger": "docs/fork-upstreaming.md#sidebar-density"
     },
     {
-      "path": "src/renderer/src/components/terminal-pane/TerminalPane.tsx",
-      "reason": "Carries the terminal-dock mount and the session-handoff dialog import; a path cannot be both an exception and a seam, so the whole file is fork-owned. Nothing here is upstream-bound.",
-      "status": "permanent"
-    },
-    {
       "path": "src/renderer/src/i18n/fork-localization-catalogs.test.ts",
       "reason": "Tests for the fork i18n aggregation machinery.",
       "status": "permanent"
@@ -2909,12 +2981,6 @@
       "reason": "Stops the changed-lines type-aware scan pinning the root oxlint config over mobile/, whose workspace deps are absent in the gate job so every React Native type resolves as an error type.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#changed-lines-type-aware-scan-reaches-into-mobile"
-    },
-    {
-      "path": "src/main/rate-limits/service.ts",
-      "reason": "Returns the selected-account acceptance verdict from live Claude rate-limit ingestion so pane telemetry can correlate plan windows without duplicating or bypassing the account guard.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#live-claude-rate-limit-ingest-acceptance"
     },
     {
       "path": "src/main/runtime/structured-agent-session-integration.test.ts",
@@ -3128,6 +3194,10 @@
       "added": 6,
       "removed": 0
     },
+    "src/main/rate-limits/service/service-fetch-policy.ts": {
+      "added": 7,
+      "removed": 6
+    },
     "src/main/runtime/orca-runtime-close-headless-mobile-terminal-tab.ts": {
       "added": 17,
       "removed": 5
@@ -3227,6 +3297,14 @@
     "src/main/updater.publishing-window-feed.test.ts": {
       "added": 5,
       "removed": 5
+    },
+    "src/main/updater/updater-release-feed.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/main/updater/updater-setup.ts": {
+      "added": 1,
+      "removed": 1
     },
     "src/preload/api-types.ts": {
       "added": 5,
@@ -3640,6 +3718,10 @@
       "added": 5,
       "removed": 0
     },
+    "src/renderer/src/components/terminal-pane/TerminalPaneSurface.tsx": {
+      "added": 6,
+      "removed": 1
+    },
     "src/renderer/src/components/terminal-pane/focus-terminal-pane-event.test.ts": {
       "added": 9,
       "removed": 4
@@ -3687,6 +3769,22 @@
     "src/renderer/src/components/terminal-pane/terminal-visibility-resume.ts": {
       "added": 21,
       "removed": 8
+    },
+    "src/renderer/src/components/terminal-pane/use-terminal-pane-chat-state.ts": {
+      "added": 6,
+      "removed": 2
+    },
+    "src/renderer/src/components/terminal-pane/use-terminal-pane-layout-bindings.ts": {
+      "added": 17,
+      "removed": 3
+    },
+    "src/renderer/src/components/terminal-pane/use-terminal-pane-mobile-actions.ts": {
+      "added": 16,
+      "removed": 3
+    },
+    "src/renderer/src/components/terminal-pane/use-terminal-pane-title-state.ts": {
+      "added": 9,
+      "removed": 0
     },
     "src/renderer/src/components/terminal-pane/use-terminal-window-wake-recovery.test.ts": {
       "added": 12,
