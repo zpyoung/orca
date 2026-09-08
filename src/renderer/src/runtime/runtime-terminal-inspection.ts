@@ -4,7 +4,6 @@ import { makePaneKey, type PaneKey } from '../../../shared/stable-pane-id'
 import { isTerminalInputTooLargeWithDeferredMeasurement } from '../../../shared/terminal-input'
 import { useAppStore } from '../store'
 import {
-  RuntimeRpcCallError,
   callRuntimeRpc,
   getActiveRuntimeTarget,
   type RuntimeClientTarget

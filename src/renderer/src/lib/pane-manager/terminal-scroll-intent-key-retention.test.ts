@@ -67,6 +67,7 @@ function createPane(id: number, leafId: TerminalLeafId): ManagedPaneInternal {
     terminal: { focus: vi.fn() } as never,
     container: container as unknown as HTMLElement,
     xtermContainer: {} as never,
+    dockContainer: {} as never,
     linkTooltip: {} as never,
     terminalGpuAcceleration: 'auto',
     gpuRenderingEnabled: false,

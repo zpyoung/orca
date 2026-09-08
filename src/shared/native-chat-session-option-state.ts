@@ -152,7 +152,10 @@ export function flattenNativeChatSessionOptionRecord(
 export function applyNativeChatReportedSessionOptions(
   record: NativeChatSessionOptionRecord,
   values: Record<string, SessionOptionValue>,
-  observedAt?: number | null
+  observedAt?: number | null,
+  /** Ids the provider reported back. Omitted means every value is a report, which
+   *  is what a surface that only ever learns values by reading them sends. */
+  confirmed?: readonly string[]
 ): boolean {
   const sourceFor = (id: string): TrackedNativeChatSessionOption['source'] =>
     confirmed === undefined || confirmed.includes(id) ? 'reported' : 'dispatched'

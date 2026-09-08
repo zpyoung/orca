@@ -82,6 +82,7 @@ export function applyStructuredAgentSessionOptions(
       model: result.current.model,
       ...(result.current.effort ? { effort: result.current.effort } : {})
     },
+    undefined,
     result.current.confirmed ?? []
   )
   return { ...state, catalog: structuredAgentSessionOptionCatalog(seed, result) }
