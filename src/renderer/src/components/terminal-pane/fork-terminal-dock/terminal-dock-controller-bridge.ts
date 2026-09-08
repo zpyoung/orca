@@ -32,6 +32,11 @@ export function registerTerminalDockControllerBridge(
   }
 }
 
+/** Whether a Surface has published a dock for this tab yet. */
+export function hasTerminalDockControllerBridge(tabId: string): boolean {
+  return bridgeByTabId.has(tabId)
+}
+
 export function terminalDockPaneOwnsFocus(tabId: string, paneKey: string): boolean {
   return bridgeByTabId.get(tabId)?.paneDockOwnsFocus(paneKey) ?? false
 }

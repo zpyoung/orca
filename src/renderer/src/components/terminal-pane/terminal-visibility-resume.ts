@@ -29,7 +29,8 @@ const WINDOW_WAKE_FLUSH_CHARS = 64 * 1024
 
 export type TerminalHiddenReason = 'surface' | 'tab'
 
-type ResumeTerminalVisibilityArgs = Partial<PaneFocusOwnership> & { tabId: string } & {
+type ResumeTerminalVisibilityArgs = {
+  tabId: string
   manager: PaneManager
   isActive: boolean
   wasVisible: boolean
@@ -52,7 +53,8 @@ type HideTerminalVisibilityResult = {
   renderingSuspended: boolean
 }
 
-type RecoverVisibleTerminalWindowWakeArgs = Partial<PaneFocusOwnership> & { tabId: string } & {
+type RecoverVisibleTerminalWindowWakeArgs = {
+  tabId: string
   manager: PaneManager
   isActive: boolean
   clearGlyphAtlases: boolean
@@ -61,7 +63,6 @@ type RecoverVisibleTerminalWindowWakeArgs = Partial<PaneFocusOwnership> & { tabI
 export function resumeTerminalVisibility({
   manager,
   tabId,
-  paneDockOwnsFocus,
   isActive,
   wasVisible,
   shouldUseLightTabResume,
@@ -104,16 +105,12 @@ export function resumeTerminalVisibility({
         manager.fitAllRevealedPanes()
       }
       if (isActive) {
-        focusActivePane(manager, ...paneFocusOwnershipArgs(tabId, paneDockOwnsFocus))
+        focusActivePane(manager, ...paneFocusOwnershipArgs(tabId))
       }
     } else {
       // fitAllRevealedPanes flushes after WebGL reattaches, avoiding a redundant
       // full refresh in the suspended DOM renderer while preserving first paint.
-      repairedDpr = resumeTerminalVisibilityHeavy(
-        manager,
-        isActive,
-        paneFocusOwnershipArgs(tabId, paneDockOwnsFocus)
-      )
+      repairedDpr = resumeTerminalVisibilityHeavy(manager, isActive, paneFocusOwnershipArgs(tabId))
     }
     enforceTerminalViewportIntents(manager)
     if (!shouldUseLightTabResume) {
@@ -181,7 +178,6 @@ export function hideTerminalVisibility({
 export function recoverVisibleTerminalWindowWake({
   manager,
   tabId,
-  paneDockOwnsFocus,
   isActive,
   clearGlyphAtlases
 }: RecoverVisibleTerminalWindowWakeArgs): void {
@@ -211,7 +207,7 @@ export function recoverVisibleTerminalWindowWake({
   // Why: wake re-attaches WebGL — same transient cell-metric wobble guard as the heavy resume.
   manager.fitAllRevealedPanes()
   if (isActive) {
-    focusActivePane(manager, ...paneFocusOwnershipArgs(tabId, paneDockOwnsFocus))
+    focusActivePane(manager, ...paneFocusOwnershipArgs(tabId))
   }
   enforceTerminalViewportIntents(manager)
   if (clearGlyphAtlases) {

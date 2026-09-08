@@ -39,12 +39,6 @@ export {
   retireMountedTerminalPaneSurface,
   suppressIntentionalPaneCloseExit
 } from './terminal-pane-lifecycle-close'
-import { useAppStore } from '@/store'
-import { getExecutionHostIdForWorktree } from '@/lib/worktree-runtime-owner'
-import {
-  resolveRemoteDockConptyUnverified,
-  restampRemoteDockConptyUnverifiedForLivePanes
-} from './fork-terminal-dock/terminal-dock-remote-conpty'
 export type { UseTerminalPaneLifecycleDeps } from './terminal-pane-lifecycle-types'
 
 /** Coordinates mount, visibility, and live appearance effects for terminal panes. */
@@ -198,25 +192,6 @@ export function useTerminalPaneLifecycle(deps: UseTerminalPaneLifecycleDeps): vo
       }
     }
   }, [deps.settings?.terminalMouseHideWhileTyping, deps.managerRef, refs.mouseHideDisposablesRef])
-
-  // Why: reactive (not read-once at pane creation) — a pane created before SSH/runtime
-  // platform hydration must still pick up a later-confirmed verdict, not stay stranded.
-  const { managerRef, setPaneLayoutRevision, worktreeId } = deps
-  const remoteConptyUnverified = useAppStore((store) =>
-    resolveRemoteDockConptyUnverified({
-      executionHostId: getExecutionHostIdForWorktree(store, worktreeId),
-      state: store
-    })
-  )
-  useEffect(() => {
-    const manager = managerRef.current
-    if (!manager) {
-      return
-    }
-    if (restampRemoteDockConptyUnverifiedForLivePanes(manager, remoteConptyUnverified)) {
-      setPaneLayoutRevision((revision) => revision + 1)
-    }
-  }, [managerRef, remoteConptyUnverified, setPaneLayoutRevision])
 }
 
 type IDisposableWithWake = IDisposable & {

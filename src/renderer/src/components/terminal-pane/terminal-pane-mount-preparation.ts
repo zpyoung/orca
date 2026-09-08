@@ -32,7 +32,7 @@ import {
   resolveTerminalHomePathFromEnv,
   extractUncHost
 } from './terminal-pane-lifecycle-primitives'
-import { terminalDockPaneOwnsFocus } from './fork-terminal-dock/terminal-dock-controller-bridge'
+import { paneFocusOwnershipArgs } from './fork-terminal-dock/pane-focus-ownership-args'
 
 export type TerminalPaneMountPreparation = {
   container: HTMLDivElement
@@ -178,10 +178,7 @@ export function prepareTerminalPaneMount(
         return
       }
       if (focusActive) {
-        fitAndFocusPanes(manager, {
-          tabId: deps.tabId,
-          paneDockOwnsFocus: (paneKey: string) => terminalDockPaneOwnsFocus(deps.tabId, paneKey)
-        })
+        fitAndFocusPanes(manager, ...paneFocusOwnershipArgs(deps.tabId))
       } else {
         fitPanes(manager)
       }

@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useSyncExternalStore } from 'react'
 import { useAppStore } from '@/store'
+import { getExecutionHostIdForWorktree } from '@/lib/worktree-runtime-owner'
 import { makePaneKey } from '../../../../../shared/stable-pane-id'
 import type { TerminalPaneController } from '../use-terminal-pane-controller'
 import { TerminalPaneDockMount } from './TerminalPaneDockMount'
 import { useTerminalPaneDock } from './use-terminal-pane-dock'
+import {
+  resolveRemoteDockConptyUnverified,
+  restampRemoteDockConptyUnverifiedForLivePanes
+} from './terminal-dock-remote-conpty'
 import {
   getTerminalDockRawRecoveryPhases,
   registerTerminalDockControllerBridge,
@@ -36,6 +41,7 @@ export function useTerminalPaneDockSurface(controller: TerminalPaneController): 
     managerRef,
     paneTransportsRef,
     resolveAgentForLeaf,
+    setPaneLayoutRevision,
     sshReconnectStatus,
     sshReconnectTargetId,
     tabId,
@@ -76,6 +82,25 @@ export function useTerminalPaneDockSurface(controller: TerminalPaneController): 
       undockOnConfirmedAgentExit
     ]
   )
+  // Why reactive, and why here: a pane created before SSH/runtime platform hydration must
+  // still pick up a later-confirmed verdict. The subscription lives in the Surface because
+  // upstream pins the controller chain's per-pane store-subscription count.
+  const remoteConptyUnverified = useAppStore((store) =>
+    resolveRemoteDockConptyUnverified({
+      executionHostId: getExecutionHostIdForWorktree(store, worktreeId),
+      state: store
+    })
+  )
+  useEffect(() => {
+    const manager = managerRef.current
+    if (!manager) {
+      return
+    }
+    if (restampRemoteDockConptyUnverifiedForLivePanes(manager, remoteConptyUnverified)) {
+      setPaneLayoutRevision((revision) => revision + 1)
+    }
+  }, [managerRef, remoteConptyUnverified, setPaneLayoutRevision])
+
   // Why: the dock's disabled reason needs this regardless of tab visibility — a hidden pane's
   // composer must not stay enabled against a dead SSH connection just because the reconnect
   // banner (which only shows for the active, visible pane) isn't currently rendering.

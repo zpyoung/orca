@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import {
   FOCUS_TERMINAL_PANE_EVENT,
   PASTE_TERMINAL_TEXT_EVENT,
@@ -26,8 +26,6 @@ import {
   releaseRendererPtyVisibilityClaim,
   setRendererPtyVisibilityClaim
 } from './pty-renderer-delivery-claims'
-import { terminalDockPaneOwnsFocus } from './fork-terminal-dock/terminal-dock-controller-bridge'
-import type { PaneKey } from '../../../../shared/stable-pane-id'
 
 type UseTerminalPaneGlobalEffectsArgs = {
   tabId: string
@@ -79,12 +77,6 @@ export function useTerminalPaneGlobalEffects({
   isVisibleRef,
   toggleExpandPane
 }: UseTerminalPaneGlobalEffectsArgs): void {
-  // Why: the dock's hooks run in TerminalPaneSurface (upstream's parity ratchets pin the
-  // controller chain's hook order), so focus ownership is read back through the bridge.
-  const paneDockOwnsFocus = useCallback(
-    (paneKey: PaneKey): boolean => terminalDockPaneOwnsFocus(tabId, paneKey),
-    [tabId]
-  )
   const worktreeIdRef = useRef(worktreeId)
   worktreeIdRef.current = worktreeId
   const cwdRef = useRef(cwd)
@@ -129,7 +121,6 @@ export function useTerminalPaneGlobalEffects({
   })
   useTerminalWindowWakeRecovery({
     tabId,
-    paneDockOwnsFocus,
     isVisible: rendererVisible,
     managerRef,
     isActiveRef,
@@ -166,7 +157,6 @@ export function useTerminalPaneGlobalEffects({
       resumeTerminalVisibility({
         manager,
         tabId,
-        paneDockOwnsFocus,
         isActive,
         wasVisible,
         shouldUseLightTabResume,
