@@ -299,7 +299,7 @@ describe('install-electron-package-binary', () => {
       writeFakeElectronPackage(projectDir)
       writeFakeElectronGet(projectDir, {
         downloadFailures: 1,
-        downloadErrorResponseStatus: 503
+        downloadHttpStatus: 503
       })
       writeFakeExtractor(projectDir, { createExecutable: true })
 

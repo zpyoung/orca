@@ -242,8 +242,17 @@ export function useAgentComposerCompose(
   const imageAttachments = bridges?.imageAttachments ?? EMPTY_ATTACHMENTS
   const autocomplete = bridges?.autocomplete ?? DEFAULT_AUTOCOMPLETE
 
+  // A pasted image has no agent-readable path until its save lands; sending
+  // mid-save would ship the message without the image the chip promises.
+  const hasPendingAttachment = imageAttachments.some((attachment) => attachment.pending)
   const ptySend = useAgentComposerSend(core, props, bridges, imageAttachments)
-  const send = bridges?.sendOverride ?? ptySend
+  const hostSend = bridges?.sendOverride ?? ptySend
+  const send = useCallback(() => {
+    if (hasPendingAttachment) {
+      return
+    }
+    hostSend()
+  }, [hasPendingAttachment, hostSend])
 
   const handleDraftChange = useCallback(
     (value: string, element: HTMLTextAreaElement) => {
@@ -313,6 +322,7 @@ export function useAgentComposerCompose(
   const sendButtonDisabled =
     core.disabled ||
     props.sendDisabled ||
+    hasPendingAttachment ||
     (core.draft.trim() === '' && imageAttachments.length === 0)
 
   const fieldProps: AgentComposerFieldProps = {

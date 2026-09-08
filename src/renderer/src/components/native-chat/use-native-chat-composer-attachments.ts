@@ -58,6 +58,9 @@ export function useNativeChatComposerAttachments({
   const [imageAttachments, setImageAttachments] = useState<AgentComposerImageAttachment[]>(() =>
     readNativeChatAttachmentCache(attachmentScopeKey)
   )
+  // The live list this host renders: the shared cache's settled chips plus any chip whose
+  // save is still in flight here.
+  const workingRef = useRef<AgentComposerImageAttachment[]>(imageAttachments)
   const imageAttachmentCounter = useRef(0)
   const pendingResolvedPathsRef = useRef<{ path: string; connectionId?: string | null }[]>([])
   const pendingPathLimitRejectedRef = useRef(false)
@@ -78,22 +81,31 @@ export function useNativeChatComposerAttachments({
   const lastScopeKey = useRef(attachmentScopeKey)
   if (lastScopeKey.current !== attachmentScopeKey) {
     lastScopeKey.current = attachmentScopeKey
-    setImageAttachments(readNativeChatAttachmentCache(attachmentScopeKey))
+    const adopted = readNativeChatAttachmentCache(attachmentScopeKey)
+    workingRef.current = adopted
+    setImageAttachments(adopted)
   }
 
   // A restore performed by another host's unmounting hook instance (e.g. a
   // cancelled send during a dock/native-chat transition) must reach whichever
   // host is live for this scope, not just the mount that wrote it.
   useEffect(
-    () => subscribeNativeChatAttachmentCache(attachmentScopeKey, setImageAttachments),
+    () =>
+      subscribeNativeChatAttachmentCache(attachmentScopeKey, (cached) => {
+        // The cache carries settled chips only, so a chip still saving in THIS host has to
+        // survive another host's write rather than be replaced by it.
+        const next = [...cached, ...workingRef.current.filter((attachment) => attachment.pending)]
+        workingRef.current = next
+        setImageAttachments(next)
+      }),
     [attachmentScopeKey]
   )
 
   const updateImageAttachments = useCallback(
     (updater: (previous: AgentComposerImageAttachment[]) => AgentComposerImageAttachment[]) => {
-      // resolve against the cache's current value, not this mount's possibly-stale state;
-      // the write's own notification (via the subscription above) updates this mount's state
-      const next = updater(readNativeChatAttachmentCache(attachmentScopeKey))
+      const next = updater(workingRef.current)
+      workingRef.current = next
+      setImageAttachments(next)
       writeNativeChatAttachmentCache(attachmentScopeKey, next)
     },
     [attachmentScopeKey]

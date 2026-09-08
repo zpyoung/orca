@@ -28,7 +28,10 @@ import type {
   NativeChatComposerHandle,
   NativeChatComposerProps
 } from './native-chat-composer-types'
-import { isStructuredAgentSessionComposerCommand } from '../../../../shared/structured-agent-session-composer'
+import {
+  isStructuredAgentSessionComposerCommand,
+  structuredSlashCommands
+} from '../../../../shared/structured-agent-session-composer'
 import { dispatchNativeChatStructuredComposerText } from './native-chat-structured-composer-dispatch'
 
 export type {
@@ -111,7 +114,11 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       setCaret: core.setCaret
     })
 
-    const agentCommands = useMemo(() => getVerifiedNativeChatCommands(agent), [agent])
+    const agentCommands = useMemo(
+      () =>
+        structuredTransport ? structuredSlashCommands(agent) : getVerifiedNativeChatCommands(agent),
+      [agent, structuredTransport]
+    )
     const picker = useNativeChatPickerState({
       agent,
       terminalTabId,
