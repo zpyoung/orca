@@ -17,52 +17,9 @@ export type ParsedArgs = {
   positionalFlagConflicts?: string[]
 }
 
-export const GLOBAL_FLAGS = ['help', 'json', 'pairing-code', 'environment']
-const GLOBAL_VALUE_FLAGS = new Set(['pairing-code', 'environment'])
-export const BOOLEAN_FLAGS = new Set([
-  'all',
-  'attachments',
-  'children',
-  'comments',
-  'connect',
-  'current',
-  'dry-run',
-  'enter',
-  'focus',
-  'force',
-  'full',
-  'help',
-  'inject',
-  'include-archived',
-  'include-visual-layouts',
-  'interrupt',
-  'json',
-  'local',
-  'messages',
-  'me',
-  'mobile',
-  'mobile-pairing',
-  'no-pairing',
-  'screen',
-  'parent-current',
-  'protect',
-  'provision',
-  'ready',
-  'recipe-json',
-  'relations',
-  'reinstall',
-  'restore-window',
-  'return-preamble',
-  'run-hooks',
-  'show-profile',
-  'staged',
-  'tab',
-  'tasks',
-  'text-stdin',
-  'unread',
-  'value-stdin',
-  'wait'
-])
+export const GLOBAL_FLAGS = CLI_GLOBAL_FLAGS
+const GLOBAL_VALUE_FLAGS = new Set(CLI_GLOBAL_VALUE_FLAGS)
+export const BOOLEAN_FLAGS = CLI_BOOLEAN_FLAGS
 
 export const REPEATED_FLAG_SEPARATOR = '\u0000'
 const REPEATABLE_STRING_FLAGS = new Set(['label', 'skill'])
