@@ -2827,6 +2827,12 @@
       "deleted": true
     },
     {
+      "path": "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.test.tsx",
+      "reason": "Tests the deleted NativeChatImageAttachmentPreview above.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
       "path": "src/renderer/src/components/native-chat/native-chat-composer-autogrow.test.tsx",
       "reason": "Superseded by the fork copy's test in fork-agent-composer.",
       "status": "permanent",

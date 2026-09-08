@@ -77,7 +77,11 @@ vi.mock('./native-chat-runtime-send', () => ({
   sendNativeChatMessageVerified: (...args: unknown[]) =>
     mocks.sendNativeChatMessageVerified(...args),
   typeNativeChatCommand: (...args: unknown[]) => mocks.typeNativeChatCommand(...args),
-  submitNativeChatPrompt: vi.fn()
+  submitNativeChatPrompt: vi.fn(),
+  // The fork keeps the image-attachment send here rather than in upstream's extracted
+  // native-chat-runtime-image-send module, so its mock belongs on this module too.
+  sendNativeChatMessageWithImageAttachments: (...args: unknown[]) =>
+    mocks.sendNativeChatMessageWithImageAttachments(...args)
 }))
 vi.mock('./claude-model-switch-confirmation', () => ({
   createClaudeModelSwitchConfirmationObserver: (...args: unknown[]) =>

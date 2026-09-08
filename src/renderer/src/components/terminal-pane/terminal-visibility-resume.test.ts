@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PaneManager } from '@/lib/pane-manager/pane-manager'
+import { registerTerminalDockControllerBridge } from './fork-terminal-dock/terminal-dock-controller-bridge'
 import {
   recoverVisibleTerminalWindowWake,
   resumeTerminalVisibility
@@ -46,7 +47,33 @@ vi.mock('@/lib/pane-manager/terminal-linkifier-hover-reset', () => ({
 }))
 
 const paneDockOwnsFocus = vi.fn(() => false)
-const focusOwnership = { tabId: 'tab-1', paneDockOwnsFocus }
+// Ownership now comes from the dock's module bridge rather than an argument, so the
+// callers thread only the tab id and a registered dock is what makes one appear.
+const focusOwnership = { tabId: 'tab-1' }
+let unregisterDockBridge: (() => void) | null = null
+
+beforeEach(() => {
+  unregisterDockBridge = registerTerminalDockControllerBridge('tab-1', {
+    paneDockOwnsFocus,
+    notePanePtyBindingChanged: vi.fn(),
+    undockOnConfirmedAgentExit: vi.fn(),
+    prunePassthroughForRetiredPane: vi.fn()
+  })
+})
+
+afterEach(() => {
+  unregisterDockBridge?.()
+  unregisterDockBridge = null
+})
+
+/** Asserts the call threaded this tab's dock ownership, whose lookup routes to the bridge. */
+function expectThreadedOwnership(ownership: unknown): void {
+  const threaded = ownership as { tabId: string; paneDockOwnsFocus: (key: string) => boolean }
+  expect(threaded.tabId).toBe('tab-1')
+  paneDockOwnsFocus.mockClear()
+  threaded.paneDockOwnsFocus('tab-1:leaf-1')
+  expect(paneDockOwnsFocus).toHaveBeenCalledWith('tab-1:leaf-1')
+}
 
 type FakeManager = {
   getPanes: ReturnType<typeof vi.fn>
@@ -110,8 +137,10 @@ describe('resumeTerminalVisibility reveal repaint', () => {
     resumeTerminalVisibility(resumeArgs(manager, true))
     resumeTerminalVisibility(resumeArgs(manager, false))
 
-    expect(focusActivePane).toHaveBeenNthCalledWith(1, manager, focusOwnership)
-    expect(focusActivePane).toHaveBeenNthCalledWith(2, manager, focusOwnership)
+    expect(focusActivePane).toHaveBeenNthCalledWith(1, manager, expect.anything())
+    expect(focusActivePane).toHaveBeenNthCalledWith(2, manager, expect.anything())
+    expectThreadedOwnership(vi.mocked(focusActivePane).mock.calls[0]?.[1])
+    expectThreadedOwnership(vi.mocked(focusActivePane).mock.calls[1]?.[1])
   })
 
   it('captures native trim movement before enforcing viewport intent', async () => {
@@ -267,7 +296,8 @@ describe('resumeTerminalVisibility reveal repaint', () => {
       clearGlyphAtlases: false
     })
 
-    expect(focusActivePane).toHaveBeenCalledWith(manager, focusOwnership)
+    expect(focusActivePane).toHaveBeenCalledWith(manager, expect.anything())
+    expectThreadedOwnership(vi.mocked(focusActivePane).mock.calls.at(-1)?.[1])
   })
 
   it('repairs WebGL canvas backing-store dpr on window wake', () => {

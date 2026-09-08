@@ -92,9 +92,23 @@ export function useNativeChatComposerAttachments({
   useEffect(
     () =>
       subscribeNativeChatAttachmentCache(attachmentScopeKey, (cached) => {
-        // The cache carries settled chips only, so a chip still saving in THIS host has to
-        // survive another host's write rather than be replaced by it.
-        const next = [...cached, ...workingRef.current.filter((attachment) => attachment.pending)]
+        // The cache answers which settled chips exist; this host keeps their order and their
+        // blob preview, which only it can revoke and which the cache deliberately drops.
+        const cachedById = new Map(cached.map((attachment) => [attachment.id, attachment]))
+        const known = new Set(workingRef.current.map((attachment) => attachment.id))
+        const next = [
+          ...workingRef.current.flatMap((attachment) => {
+            if (attachment.pending) {
+              return [attachment]
+            }
+            const settled = cachedById.get(attachment.id)
+            if (!settled) {
+              return []
+            }
+            return [attachment.previewUrl ? { ...settled, previewUrl: attachment.previewUrl } : settled]
+          }),
+          ...cached.filter((attachment) => !known.has(attachment.id))
+        ]
         workingRef.current = next
         setImageAttachments(next)
       }),
