@@ -2919,6 +2919,11 @@
       "status": "permanent"
     },
     {
+      "path": "src/renderer/src/i18n/en-runtime-required.json",
+      "reason": "Generated from this tree's en.json by generate-runtime-required-english-catalog.mjs; the fork's catalog differs from upstream's, so upstream's copy fails its own --check here.",
+      "status": "permanent"
+    },
+    {
       "path": "src/renderer/src/i18n/fork-localization-catalogs.ts",
       "reason": "Fork i18n aggregation machinery merges isolated feature catalogs at runtime.",
       "status": "permanent"

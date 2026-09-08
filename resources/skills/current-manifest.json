@@ -4,9 +4,9 @@
     {
       "name": "computer-use",
       "sourcePath": "skills/computer-use",
-      "releaseRevision": 1,
-      "packageDigest": "d1b4850c9a9ee9a32b855176c31cd357608bfedc845319c97e89960296303430",
-      "gitTreeSha": "2072384f53670cb61d93f4f6264ad2d8f6b5239c",
+      "releaseRevision": 2,
+      "packageDigest": "ddc9f910985ae67ab693263026d99c68dc34b6f0c12b444b620cd0e19c3df36a",
+      "gitTreeSha": "f0561c41d1f709a953684aef5d5368f8c58d269f",
       "files": [
         {
           "path": "SKILL.md",
@@ -40,9 +40,9 @@
     {
       "name": "orca-cli",
       "sourcePath": "skills/orca-cli",
-      "releaseRevision": 3,
-      "packageDigest": "d5648df9c29b479bbbe0dea68f0506b2b0bad0827ce551451fb8f300c113b305",
-      "gitTreeSha": "ee3a35c76f875ea6ebaf68947af13ba6346b13f2",
+      "releaseRevision": 4,
+      "packageDigest": "d1b830256e3fda11408320631722e07bb4bbadf99d19c94f1e00f73b7bc8462d",
+      "gitTreeSha": "cdf89459f89dddf347ee2759ff884c369051f06a",
       "files": [
         {
           "path": "SKILL.md",
@@ -130,9 +130,9 @@
     {
       "name": "orchestration",
       "sourcePath": "skills/orchestration",
-      "releaseRevision": 1,
-      "packageDigest": "ef5d5a744cdc700c51b4870cd2536b65b0b33d19413dfe238d43efdd01b5d14c",
-      "gitTreeSha": "9aa26fde93c0592e5983cdca1ccd33b402802255",
+      "releaseRevision": 2,
+      "packageDigest": "689e31d84256aded123c801eaa87413474943a9a30d96bff9a19d0a321aefb54",
+      "gitTreeSha": "902cc33dd65730b32ac234dd0ae7166d75498b46",
       "files": [
         {
           "path": "SKILL.md",

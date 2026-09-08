@@ -274,9 +274,9 @@ describe('release checkout materialization', () => {
       }
     }
     const checkouts = await Promise.all([
-      materializeReleaseCheckout('v1.4.191-rc.0.zy01', { cacheRoot }),
-      materializeReleaseCheckout('v1.4.191-rc.0.zy01', { cacheRoot }),
-      materializeReleaseCheckout('v1.4.191-rc.0.zy01', { cacheRoot })
+      materializeReleaseCheckout('v1.4.191-rc.0.zy01', options),
+      materializeReleaseCheckout('v1.4.191-rc.0.zy01', options),
+      materializeReleaseCheckout('v1.4.191-rc.0.zy01', options)
     ])
 
     expect(publications).toBe(1)

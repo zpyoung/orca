@@ -201,21 +201,22 @@ export function useTerminalPaneLifecycle(deps: UseTerminalPaneLifecycleDeps): vo
 
   // Why: reactive (not read-once at pane creation) — a pane created before SSH/runtime
   // platform hydration must still pick up a later-confirmed verdict, not stay stranded.
+  const { managerRef, setPaneLayoutRevision, worktreeId } = deps
   const remoteConptyUnverified = useAppStore((store) =>
     resolveRemoteDockConptyUnverified({
-      executionHostId: getExecutionHostIdForWorktree(store, deps.worktreeId),
+      executionHostId: getExecutionHostIdForWorktree(store, worktreeId),
       state: store
     })
   )
   useEffect(() => {
-    const manager = deps.managerRef.current
+    const manager = managerRef.current
     if (!manager) {
       return
     }
     if (restampRemoteDockConptyUnverifiedForLivePanes(manager, remoteConptyUnverified)) {
-      deps.setPaneLayoutRevision((revision) => revision + 1)
+      setPaneLayoutRevision((revision) => revision + 1)
     }
-  }, [deps.managerRef, remoteConptyUnverified, deps.setPaneLayoutRevision])
+  }, [managerRef, remoteConptyUnverified, setPaneLayoutRevision])
 }
 
 type IDisposableWithWake = IDisposable & {
