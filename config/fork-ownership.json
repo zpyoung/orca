@@ -1304,8 +1304,8 @@
       "feature": "terminal-dock",
       "kind": "passthrough",
       "lines": [
-        "const paneDockOwnsFocus = vi.fn(() => false)",
-        "const focusOwnership = { tabId: 'tab-1', paneDockOwnsFocus }"
+        "import { registerTerminalDockControllerBridge } from './fork-terminal-dock/terminal-dock-controller-bridge'",
+        "function expectThreadedOwnership(ownership: unknown): void {"
       ]
     },
     {
@@ -1367,8 +1367,8 @@
       "feature": "terminal-dock",
       "kind": "passthrough",
       "lines": [
-        "  const paneDockOwnsFocus = vi.fn(() => false)",
-        "  const focusOwnership = { tabId: 'tab-1', paneDockOwnsFocus }"
+        "  // The hook forwards the tab id alone; the dock's bridge is what resolves ownership.",
+        "  const focusOwnership = { tabId: 'tab-1' }"
       ]
     },
     {
@@ -3451,8 +3451,8 @@
       "removed": 2
     },
     "src/renderer/src/components/native-chat/NativeChatComposer.test.tsx": {
-      "added": 34,
-      "removed": 83
+      "added": 37,
+      "removed": 82
     },
     "src/renderer/src/components/native-chat/NativeChatComposer.tsx": {
       "added": 232,
@@ -3543,7 +3543,7 @@
       "removed": 114
     },
     "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.ts": {
-      "added": 84,
+      "added": 98,
       "removed": 48
     },
     "src/renderer/src/components/native-chat/use-native-chat-interactive-send.test.tsx": {
@@ -3815,7 +3815,7 @@
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/terminal-visibility-resume.test.ts": {
-      "added": 37,
+      "added": 67,
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/terminal-visibility-resume.ts": {
