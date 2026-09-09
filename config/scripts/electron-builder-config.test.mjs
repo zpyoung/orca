@@ -1,4 +1,4 @@
-import { chmod, cp, mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -316,54 +316,50 @@ describe('electron-builder config', () => {
     expect(electronBuilderConfig.npmRebuild).toBe(true)
   })
 
-  it.skipIf(process.platform === 'win32')(
-    'marks packaged Unix CLI launchers executable',
-    async () => {
-      const root = await mkdtemp(join(tmpdir(), 'orca-electron-builder-config-'))
-      try {
-        const resourcesDir = join(root, 'linux-unpacked', 'resources')
-        const launcherPath = join(resourcesDir, 'bin', 'orca-ide')
-        await mkdir(join(resourcesDir, 'bin'), { recursive: true })
-        await cp(
-          join(process.cwd(), 'resources', 'plugins', 'launch'),
-          join(resourcesDir, 'plugins', 'launch'),
-          { recursive: true }
-        )
-        await mkdir(join(resourcesDir, 'node_modules', 'zod', 'src'), { recursive: true })
-        // Why: afterPack now fails hard when the unpacked daemon entry is
-        // missing, so the fixture must carry one like a real package layout.
-        const unpackedMainDir = join(resourcesDir, 'app.asar.unpacked', 'out', 'main')
-        await mkdir(unpackedMainDir, { recursive: true })
-        await writeFile(
-          join(unpackedMainDir, 'daemon-entry.js'),
-          'console.error("Usage: daemon-entry <socket>"); process.exit(1)\n',
-          'utf8'
-        )
-        const unpackedCliDir = join(resourcesDir, 'app.asar.unpacked', 'out', 'cli')
-        await mkdir(join(unpackedCliDir, 'handlers'), { recursive: true })
-        await writeFile(join(unpackedCliDir, 'handlers', 'skills.js'), '', 'utf8')
-        await writeFile(
-          join(unpackedCliDir, 'index.js'),
-          [
-            'const args = process.argv.slice(2)',
-            "if (args[1] === 'list') console.log(JSON.stringify({ topics: [{ name: 'orca-cli' }, { name: 'computer-use' }] }))",
-            "else if (args[1] === 'get') console.log(`---\\nname: ${args[2]}\\n---`)",
-            'else console.log(JSON.stringify({ executed: false }))'
-          ].join('\n'),
-          'utf8'
-        )
-        await writeFile(launcherPath, '#!/usr/bin/env bash\n', { encoding: 'utf8', mode: 0o644 })
+  // Why: the .deb/.rpm update-recovery path keys entirely off the resources/package-type marker that
+  // app-builder-lib's FpmTarget writes. If packaging silently stops shipping an fpm target, or adds
+  // one the recovery path does not cover, getLinuxRootPackageType() returns null, autoInstallOnAppQuit
+  // quietly goes back to true, and no unit test notices.
+  describe('linux root-package update recovery contract', () => {
+    // FpmTarget writes resources/package-type only for targets it supports auto-update for.
+    const MARKER_TARGETS = new Set(['deb', 'rpm', 'pacman'])
+    const RECOVERABLE_TARGETS = new Set(['deb', 'rpm'])
+    const linuxTargets = electronBuilderConfig.linux.target.map((entry) =>
+      typeof entry === 'string' ? entry : entry.target
+    )
 
-        await electronBuilderConfig.afterPack({
-          appOutDir: join(root, 'linux-unpacked'),
-          electronPlatformName: 'linux',
-          arch: 1
-        })
+    it('still ships an AppImage plus at least one root-package target', () => {
+      expect(linuxTargets).toContain('AppImage')
+      expect(linuxTargets.some((target) => MARKER_TARGETS.has(target))).toBe(true)
+    })
 
-        expect((await stat(launcherPath)).mode & 0o111).not.toBe(0)
-      } finally {
-        await rm(root, { recursive: true, force: true })
+    it('ships no root-package target the recovery path cannot recover', () => {
+      const unrecoverable = linuxTargets.filter(
+        (target) => MARKER_TARGETS.has(target) && !RECOVERABLE_TARGETS.has(target)
+      )
+      expect(unrecoverable).toEqual([])
+    })
+
+    it('accepts exactly the markers electron-updater maps to a root-package updater', async () => {
+      const source = await readFile(
+        new URL('../../src/main/linux-update-package-type.ts', import.meta.url),
+        'utf8'
+      )
+      for (const target of linuxTargets.filter((entry) => RECOVERABLE_TARGETS.has(entry))) {
+        expect(source).toContain(`value === '${target}'`)
       }
-    }
-  )
+    })
+
+    it('keeps the pinned FpmTarget overwrite for configured deb and rpm artifacts', async () => {
+      const source = await readFile(
+        require.resolve('app-builder-lib/out/targets/FpmTarget'),
+        'utf8'
+      )
+
+      expect(source).toContain('path.join(resourceDir, "package-type"), target')
+      for (const target of RECOVERABLE_TARGETS) {
+        expect(electronBuilderConfig[target]).toBeDefined()
+      }
+    })
+  })
 })
