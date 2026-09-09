@@ -24,6 +24,11 @@ import dockSettingsES from '../components/settings/fork-terminal-dock/locales/es
 import dockSettingsJA from '../components/settings/fork-terminal-dock/locales/ja.json'
 import dockSettingsKO from '../components/settings/fork-terminal-dock/locales/ko.json'
 import dockSettingsZH from '../components/settings/fork-terminal-dock/locales/zh.json'
+import sidebarSeparatorEN from '../components/settings/fork-sidebar-section-separator/locales/en.json'
+import sidebarSeparatorES from '../components/settings/fork-sidebar-section-separator/locales/es.json'
+import sidebarSeparatorJA from '../components/settings/fork-sidebar-section-separator/locales/ja.json'
+import sidebarSeparatorKO from '../components/settings/fork-sidebar-section-separator/locales/ko.json'
+import sidebarSeparatorZH from '../components/settings/fork-sidebar-section-separator/locales/zh.json'
 import handoffSettingsEN from '../components/settings/fork-session-handoff/locales/en.json'
 import handoffSettingsES from '../components/settings/fork-session-handoff/locales/es.json'
 import handoffSettingsJA from '../components/settings/fork-session-handoff/locales/ja.json'
@@ -83,6 +88,7 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     worktreeGroupsEN,
     dockEN,
     dockSettingsEN,
+    sidebarSeparatorEN,
     handoffSettingsEN,
     agentComposerEN,
     skillPluginsEN,
@@ -97,6 +103,7 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     worktreeGroupsES,
     dockES,
     dockSettingsES,
+    sidebarSeparatorES,
     handoffSettingsES,
     agentComposerES,
     skillPluginsES,
@@ -111,6 +118,7 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     worktreeGroupsJA,
     dockJA,
     dockSettingsJA,
+    sidebarSeparatorJA,
     handoffSettingsJA,
     agentComposerJA,
     skillPluginsJA,
@@ -125,6 +133,7 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     worktreeGroupsKO,
     dockKO,
     dockSettingsKO,
+    sidebarSeparatorKO,
     handoffSettingsKO,
     agentComposerKO,
     skillPluginsKO,
@@ -139,6 +148,7 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     worktreeGroupsZH,
     dockZH,
     dockSettingsZH,
+    sidebarSeparatorZH,
     handoffSettingsZH,
     agentComposerZH,
     skillPluginsZH,

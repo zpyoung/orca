@@ -25,6 +25,7 @@ import {
   getTypographyEntries,
   getZoomEntries
 } from './appearance-search'
+import { getSidebarSectionSeparatorEntry } from './fork-sidebar-section-separator/section-separator-search'
 import { getTerminalAppearanceSearchEntries } from './terminal-search'
 import { TerminalAppearanceSection } from './TerminalAppearanceSection'
 import type { UseGhosttyImportReturn } from './useGhosttyImport'
@@ -156,6 +157,7 @@ export function AppearancePane({
     },
     ...getStatusBarEntries(),
     ...getSidebarEntries(),
+    getSidebarSectionSeparatorEntry(),
     ...getLayoutEntries(),
     getLeftSidebarAppearanceEntry(),
     getWorkspaceCardLayoutEntry()
