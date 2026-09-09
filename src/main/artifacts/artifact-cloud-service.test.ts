@@ -43,7 +43,10 @@ const cloudB: OrcaProfileCloudSummary = {
   linkedAt: 2
 }
 
-function createResponse(slug = 'artifact-a', expiresAt = '2026-09-06T00:00:00.000Z'): Response {
+// relative so the store's expiry pruning never drops the fixture as the real clock advances
+const FUTURE_EXPIRES_AT = new Date(Date.now() + 30 * 86_400_000).toISOString()
+
+function createResponse(slug = 'artifact-a', expiresAt = FUTURE_EXPIRES_AT): Response {
   return new Response(
     JSON.stringify({
       artifact: {

@@ -325,6 +325,9 @@ function jsonResponse(body: object, status: number): Response {
   })
 }
 
+// relative so the store's expiry pruning never drops the fixture as the real clock advances
+const FUTURE_EXPIRES_AT = new Date(Date.now() + 30 * 86_400_000).toISOString()
+
 function createResponseBody(slug: string): object {
   return {
     artifact: {
@@ -336,7 +339,7 @@ function createResponseBody(slug: string): object {
       renderedContentType: 'text/html',
       createdAt: '2026-08-06T00:00:00.000Z',
       updatedAt: '2026-08-06T00:00:00.000Z',
-      expiresAt: '2026-09-06T00:00:00.000Z',
+      expiresAt: FUTURE_EXPIRES_AT,
       byteSize: 17,
       deletedAt: null
     },
