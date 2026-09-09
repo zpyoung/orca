@@ -3451,8 +3451,8 @@
       "removed": 2
     },
     "src/renderer/src/components/native-chat/NativeChatComposer.test.tsx": {
-      "added": 37,
-      "removed": 82
+      "added": 38,
+      "removed": 83
     },
     "src/renderer/src/components/native-chat/NativeChatComposer.tsx": {
       "added": 232,

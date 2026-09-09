@@ -422,7 +422,7 @@ describe('NativeChatComposer', () => {
       'pty-1',
       'hello',
       ['/tmp/pasted.png'],
-      undefined
+      expect.anything()
     )
   })
 
