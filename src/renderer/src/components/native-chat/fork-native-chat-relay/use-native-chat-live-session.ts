@@ -1,11 +1,12 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/use-native-chat-live-session.ts
-// FORK-COPY-SHA: bc2f593ebba70a0ee6ff900129e4918f57b143aa
+// FORK-COPY-SHA: e0826956fcfc532f5a1e55b5e081f2e57e553c43
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   NATIVE_CHAT_SOURCE_PRIORITY,
   type AgentType,
   type NativeChatMessage,
   type NativeChatSession,
+  type NativeChatTurnLifecycle,
   type NativeChatSessionOptionObservation
 } from '../../../../../shared/native-chat-types'
 import { nativeChatCompanionFromFrame } from '../../../../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
@@ -43,6 +44,8 @@ export type UseNativeChatLiveSessionArgs = {
 
 /** A live session plus the older-history pagination controls the view needs. */
 export type NativeChatLiveSession = NativeChatSession & {
+  /** Latest provider turn boundary, used to settle orphaned running tool rows. */
+  transcriptLifecycle?: NativeChatTurnLifecycle
   /** True when an older page may still exist (the last read filled the window). */
   hasMore: boolean
   /** Whether an older-history page is currently loading. */
@@ -120,7 +123,8 @@ export function useNativeChatLiveSession(
   // Appended messages accumulate separately from the snapshot so pagination doesn't lose in-flight appends; merged by id and capped to the read window (#6).
   const [appended, setAppended] = useState<NativeChatMessage[]>([])
   // Id-dedup merger backing `appended`; caches the id→index map so each live frame costs O(incoming), not O(existing) (#18).
-  const appendMergerRef = useRef(createNativeChatMerger(NATIVE_CHAT_SOURCE_PRIORITY))
+  const appendMergerRef = useRef<ReturnType<typeof createNativeChatMerger>>(undefined!)
+  appendMergerRef.current ??= createNativeChatMerger(NATIVE_CHAT_SOURCE_PRIORITY)
 
   const [hookState, hookStateStartedAt, hookHasWorkingSubagents] = useNativeChatHookStatus(paneKey)
 

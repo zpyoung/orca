@@ -366,21 +366,53 @@
       ]
     },
     {
-      "path": "src/main/providers/ssh-pty-provider.ts",
+      "path": "src/main/providers/ssh-pty-provider-rpc-operations.ts",
       "feature": "terminal-dock",
       "kind": "registration",
-      "lines": [
-        "    const params = { id: this.toRelayPtyId(id), data }",
-        "  writeAcknowledged(id: string, data: string): Promise<boolean> {"
-      ]
+      "lines": ["    writeAcknowledged: (id: string, data: string): Promise<boolean> =>"]
     },
     {
-      "path": "src/main/runtime/orca-runtime.ts",
+      "path": "src/main/runtime/orca-runtime-persist-headless-session-tab-props.ts",
       "feature": "terminal-dock",
       "kind": "registration",
       "lines": [
         "} from './fork-terminal-dock/terminal-dock-session-tab-props'",
         "          ...dockFragment"
+      ]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-sync-mobile-session-tabs.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "} from './fork-terminal-dock/terminal-dock-session-tab-props'",
+        "      const dockMergedSnapshot = mergeRendererTerminalDockAcrossSnapshot("
+      ]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-close-headless-mobile-terminal-tab.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import type { TerminalDockPropsPatch } from './fork-terminal-dock/terminal-dock-session-tab-props'",
+        "      terminalDock?: TerminalDockPropsPatch"
+      ]
+    },
+    {
+      "path": "src/main/runtime/runtime-artifact-controller.ts",
+      "feature": "artifact-passwords",
+      "kind": "import-swap",
+      "lines": [
+        "import type { ArtifactCloudService } from '../artifacts/fork-artifact-passwords/artifact-password-cloud-service'"
+      ]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-has-exact-persisted-terminal-surface-identity.ts",
+      "feature": "artifact-passwords",
+      "kind": "import-swap",
+      "lines": [
+        "import type { ArtifactCloudService } from '../artifacts/fork-artifact-passwords/artifact-password-cloud-service'",
+        "    request: ArtifactCloudOptions & { sourceKey: string; revealPassphrase?: boolean }"
       ]
     },
     {
@@ -548,17 +580,20 @@
       ]
     },
     {
-      "path": "src/preload/index.ts",
+      "path": "src/preload/api/native-chat-bridge.ts",
       "feature": "native-chat-relay",
       "kind": "passthrough",
       "lines": [
-        "import { buildForkSessionHandoffApi } from './fork-session-handoff/session-handoff-preload-api'",
         "const readNativeChatSession = (",
-        "  forkSessionHandoff: buildForkSessionHandoffApi(),",
-        "    readSession: readNativeChatSession,",
-        "import { buildForkSessionInfoApi } from './fork-session-info/session-info-preload-api'",
-        "  forkSessionInfo: buildForkSessionInfoApi(),"
+        "  readSession: readNativeChatSession,",
+        "      sshConnectionId?: string"
       ]
+    },
+    {
+      "path": "src/preload/api/pty-bridge-session-control.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["  writeInputAccepted: (id: string, data: string): Promise<boolean> =>"]
     },
     {
       "path": "src/relay/relay-runtime-services.ts",
@@ -642,34 +677,14 @@
       "lines": ["          resetSubmitting()", "  if (!showingCard) {"]
     },
     {
-      "path": "src/renderer/src/components/native-chat/NativeChatMessageList.tsx",
+      "path": "src/renderer/src/components/native-chat/NativeChatMessageRow.tsx",
       "feature": "native-chat-coloring",
-      "kind": "passthrough",
+      "kind": "registration",
       "lines": [
         "  nativeChatReasoningClassName,",
         "  nativeChatUserMessageClassName",
         "        <div className={nativeChatUserMessageClassName()}>",
-        "        isReasoning && nativeChatReasoningClassName(),",
-        "                highlightCode",
-        "          highlightCode"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/NativeChatMessageList.tsx",
-      "feature": "native-chat-relay",
-      "kind": "import-swap",
-      "lines": [
-        "import type { NativeChatLiveSession } from './fork-native-chat-relay/use-native-chat-live-session'"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/NativeChatMessageList.tsx",
-      "feature": "native-chat-width",
-      "kind": "passthrough",
-      "lines": [
-        "import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'",
-        "  const widthClassName = useNativeChatWidthClassName()",
-        "          className={cn('mx-auto flex w-full flex-col gap-5', widthClassName)}"
+        "        isReasoning && nativeChatReasoningClassName(),"
       ]
     },
     {
@@ -680,17 +695,6 @@
         "import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'",
         "  const widthClassName = useNativeChatWidthClassName()",
         "      <div className={cn('mx-auto w-full px-3 pt-2 pb-4 sm:px-4', widthClassName)}>"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/NativeChatToolRun.tsx",
-      "feature": "native-chat-coloring",
-      "kind": "import-swap",
-      "lines": [
-        "  NativeChatToolCategoryDots,",
-        "  NativeChatToolName",
-        "        <NativeChatToolName name={name} />",
-        "        <NativeChatToolCategoryDots blocks={blocks} />"
       ]
     },
     {
@@ -1292,8 +1296,8 @@
       "feature": "terminal-dock",
       "kind": "passthrough",
       "lines": [
-        "const paneDockOwnsFocus = vi.fn(() => false)",
-        "const focusOwnership = { tabId: 'tab-1', paneDockOwnsFocus }"
+        "import { registerTerminalDockControllerBridge } from './fork-terminal-dock/terminal-dock-controller-bridge'",
+        "function expectThreadedOwnership(ownership: unknown): void {"
       ]
     },
     {
@@ -1302,22 +1306,49 @@
       "kind": "passthrough",
       "lines": [
         "import { paneFocusOwnershipArgs } from './fork-terminal-dock/pane-focus-ownership-args'",
-        "    focusActivePane(manager, ...paneFocusOwnershipArgs(tabId, paneDockOwnsFocus))"
+        "      repairedDpr = resumeTerminalVisibilityHeavy(manager, isActive, paneFocusOwnershipArgs(tabId))"
       ]
     },
     {
       "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects.ts",
       "feature": "terminal-dock",
-      "kind": "registration",
-      "lines": ["import type { PaneFocusOwnership } from './pane-helpers'", "  paneDockOwnsFocus,"]
+      "kind": "passthrough",
+      "lines": ["    tabId,", "        tabId,"]
     },
     {
-      "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-lifecycle.ts",
+      "path": "src/renderer/src/components/terminal-pane/terminal-pane-mount-cleanup.ts",
       "feature": "terminal-dock",
       "kind": "registration",
       "lines": [
         "import { removeTerminalDockPaneKeys } from './fork-terminal-dock/terminal-dock-pane-state'",
-        "import { REMOTE_CONPTY_UNVERIFIED_DATASET_KEY } from './fork-terminal-dock/TerminalPaneDockMount'"
+        "  const teardownDockPaneKeys = collectTerminalDockPaneKeysForTabTeardown({"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/terminal-pane-pane-created.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { REMOTE_CONPTY_UNVERIFIED_DATASET_KEY } from './fork-terminal-dock/TerminalPaneDockMount'",
+        "      pane.container.dataset[REMOTE_CONPTY_UNVERIFIED_DATASET_KEY] = String(remoteConptyUnverified)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/terminal-pane-pane-closed.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { notifyTerminalDockPaneRetired } from './fork-terminal-dock/terminal-dock-controller-bridge'",
+        "      pruneTerminalDockPaneKeysEverywhere({"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/terminal-pane-mount-preparation.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { paneFocusOwnershipArgs } from './fork-terminal-dock/pane-focus-ownership-args'",
+        "        fitAndFocusPanes(manager, ...paneFocusOwnershipArgs(deps.tabId))"
       ]
     },
     {
@@ -1325,8 +1356,8 @@
       "feature": "terminal-dock",
       "kind": "passthrough",
       "lines": [
-        "  const paneDockOwnsFocus = vi.fn(() => false)",
-        "  const focusOwnership = { tabId: 'tab-1', paneDockOwnsFocus }"
+        "  // The hook forwards the tab id alone; the dock's bridge is what resolves ownership.",
+        "  const focusOwnership = { tabId: 'tab-1' }"
       ]
     },
     {
@@ -1334,8 +1365,8 @@
       "feature": "terminal-dock",
       "kind": "passthrough",
       "lines": [
-        "import { useEffect, useRef } from 'react'",
-        "import type { PaneFocusOwnership } from './pane-helpers'"
+        "  tabId: string",
+        "  }, [isActiveRef, isVisible, isVisibleRef, managerRef, panePtyBindingsRef, tabId])"
       ]
     },
     {
@@ -1525,10 +1556,38 @@
       "kind": "registration",
       "lines": [
         "import { focusPaneOrDockComposer } from '@/components/terminal-pane/fork-terminal-dock/dock-composer-focus-redirect'",
-        "  manager.setActivePane(resolution.numericPaneId, { focus: false })",
-        "    terminalDockSyncEnabled: publication.terminalDockSyncEnabled,",
-        "        ? { terminalDockByPaneKey: unifiedTab.terminalDockByPaneKey }"
+        "  manager.setActivePane(resolution.numericPaneId, { focus: false })"
       ]
+    },
+    {
+      "path": "src/renderer/src/runtime/sync-runtime-graph/types.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["  terminalDockSyncEnabled: boolean"]
+    },
+    {
+      "path": "src/renderer/src/runtime/sync-runtime-graph/mobile-session-inputs.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["    terminalDockSyncEnabled: publication.terminalDockSyncEnabled,"]
+    },
+    {
+      "path": "src/renderer/src/runtime/sync-runtime-graph/mobile-session-snapshots.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["    terminalDockSyncEnabled: state.settings?.experimentalTerminalDock === true,"]
+    },
+    {
+      "path": "src/renderer/src/runtime/sync-runtime-graph/mobile-session-terminal-tabs.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["      ...(inputs.terminalDockSyncEnabled && unifiedTab?.terminalDockByPaneKey"]
+    },
+    {
+      "path": "src/renderer/src/runtime/sync-runtime-graph/mobile-session-capture.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["    previous.terminalDockSyncEnabled === next.terminalDockSyncEnabled &&"]
     },
     {
       "path": "src/renderer/src/runtime/web-runtime-terminal-actions.ts",
@@ -1544,17 +1603,78 @@
       "feature": "terminal-dock",
       "kind": "registration",
       "lines": [
-        "} from './fork-terminal-dock/web-session-terminal-dock-reconcile'",
-        "import { rekeyTerminalDockPaneKeys } from '@/components/terminal-pane/fork-terminal-dock/terminal-dock-pane-state'"
+        "export { remapPaneKeyTabId } from './fork-terminal-dock/web-session-terminal-dock-reconcile'"
       ]
     },
     {
-      "path": "src/renderer/src/store/slices/tabs.ts",
+      "path": "src/renderer/src/runtime/web-session-tabs-sync/apply-preparation-unified.ts",
       "feature": "terminal-dock",
       "kind": "registration",
       "lines": [
-        "} from './fork-terminal-dock/tab-terminal-dock-state'",
-        "  type TabTerminalDockSlice"
+        "import { rekeyTerminalDockPaneKeys } from '@/components/terminal-pane/fork-terminal-dock/terminal-dock-pane-state'",
+        "} from '../fork-terminal-dock/web-session-terminal-dock-reconcile'",
+        "  let rekeyedHandoffPendingMutationsByPaneKey: Record<string, number> | undefined"
+      ]
+    },
+    {
+      "path": "src/renderer/src/runtime/web-session-tabs-sync/apply-final-patch.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { pruneExpiredTerminalDockPendingMutations } from '../fork-terminal-dock/web-session-terminal-dock-reconcile'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/runtime/web-session-tabs-sync/terminal-build.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { remapTerminalDockRecordTabId } from '../fork-terminal-dock/web-session-terminal-dock-reconcile'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/runtime/web-session-tabs-sync/state.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "      | 'terminalDockPendingMutationsByPaneKey'",
+        "  terminalDockByPaneKey?: Record<string, TerminalDockPaneState>"
+      ]
+    },
+    {
+      "path": "src/renderer/src/runtime/web-session-tabs-sync/tab-builders.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "  terminalDockByPaneKey?: Record<string, TerminalDockPaneState>",
+        "    ...(terminalDockByPaneKey ? { terminalDockByPaneKey } : {})"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/tabs/tabs-slice-contract.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import type { TabTerminalDockSlice } from '../fork-terminal-dock/tab-terminal-dock-state'",
+        "export type TabsSlice = TabTerminalDockSlice & {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/tabs/create-tabs-slice.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "  ...TAB_TERMINAL_DOCK_INITIAL_STATE,",
+        "  ...createTabTerminalDockActions(set, get)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/tabs/tabs-close-actions.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { removeTabPaneKeysFromPendingMutations } from '../fork-terminal-dock/tab-terminal-dock-state'",
+        "        const nextTerminalDockPendingMutationsByPaneKey = removeTabPaneKeysFromPendingMutations("
       ]
     },
     {
@@ -1607,10 +1727,112 @@
       ]
     },
     {
-      "path": "src/shared/keybindings.ts",
+      "path": "src/main/updater/updater-release-feed.ts",
+      "feature": "fork-infra",
+      "kind": "registration",
+      "lines": ["    const url = 'https://github.com/zpyoung/orca/releases/latest/download'"]
+    },
+    {
+      "path": "src/main/updater/updater-setup.ts",
+      "feature": "fork-infra",
+      "kind": "registration",
+      "lines": ["        url: 'https://github.com/zpyoung/orca/releases/latest/download'"]
+    },
+    {
+      "path": "src/main/rate-limits/service/service-fetch-policy.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "  /** Ingest live Claude plan windows and report whether the selected account accepted them. */",
+        "  ingestLiveClaudeRateLimits(event: ClaudeStatusLineRateLimits): boolean {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/TerminalPaneSurface.tsx",
       "feature": "terminal-dock",
       "kind": "registration",
-      "lines": ["  | 'terminal.dock.toggle'", "    id: 'terminal.dock.toggle',"]
+      "lines": [
+        "import { useTerminalPaneDockSurface } from './fork-terminal-dock/use-terminal-pane-dock-surface'",
+        "  const { dockMounts, contextMenuProps: terminalDockMenuProps } =",
+        "      {dockMounts}",
+        "        {...terminalDockMenuProps}"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-title-state.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { publishTerminalDockRawRecoveryPhase } from './fork-terminal-dock/terminal-dock-controller-bridge'",
+        "      publishTerminalDockRawRecoveryPhase(tabId, (previous) =>"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-chat-state.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { notifyTerminalDockConfirmedAgentExit } from './fork-terminal-dock/terminal-dock-controller-bridge'",
+        "      notifyTerminalDockConfirmedAgentExit(tabId, leafId)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-layout-bindings.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { noteTerminalDockPanePtyBindingChanged } from './fork-terminal-dock/terminal-dock-controller-bridge'",
+        "      noteTerminalDockPanePtyBindingChanged(tabId)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-mobile-actions.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { terminalDockPaneOwnsFocus } from './fork-terminal-dock/terminal-dock-controller-bridge'",
+        "        if (!terminalDockPaneOwnsFocus(tabId, makePaneKey(tabId, pane.leafId))) {",
+        "      if (!terminalDockPaneOwnsFocus(tabId, makePaneKey(tabId, clickedPane.leafId))) {"
+      ]
+    },
+    {
+      "path": "src/preload/api-types.ts",
+      "feature": "session-handoff",
+      "kind": "passthrough",
+      "lines": [
+        "  forkSessionHandoff: ForkSessionHandoffPreloadApi",
+        "  forkSessionInfo: ForkSessionInfoApi"
+      ]
+    },
+    {
+      "path": "config/tsconfig.tc.web.json",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "    \"../src/preload/fork-session-handoff/**/*\",",
+        "    \"../src/preload/fork-session-info/**/*\","
+      ]
+    },
+    {
+      "path": "config/tsconfig.web.json",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "    \"../src/preload/fork-session-handoff/**/*\",",
+        "    \"../src/preload/fork-session-info/**/*\","
+      ]
+    },
+    {
+      "path": "src/shared/keybindings/types.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["  | 'terminal.dock.toggle'", "  | 'terminal.dock.passthrough'"]
+    },
+    {
+      "path": "src/shared/keybindings/definitions-core-4.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["    id: 'terminal.dock.toggle',", "    id: 'terminal.dock.passthrough',"]
     },
     {
       "path": "src/shared/local-build-compatibility-contract.json",
@@ -1745,9 +1967,9 @@
       "lines": ["  projectGroupId?: string | null"]
     },
     {
-      "path": "src/cli/args.ts",
-      "feature": "artifact-passwords",
-      "kind": "passthrough",
+      "path": "src/shared/cli-argument-boundary.ts",
+      "feature": "fork-infra",
+      "kind": "registration",
       "lines": ["  'protect',"]
     },
     {
@@ -1816,11 +2038,29 @@
       ]
     },
     {
-      "path": "src/main/index.ts",
+      "path": "src/main/startup/main-process-runtime-service.ts",
       "feature": "artifact-passwords",
       "kind": "import-swap",
       "lines": [
-        "import { ArtifactCloudService } from './artifacts/fork-artifact-passwords/artifact-password-cloud-service'"
+        "import { ArtifactCloudService } from '../artifacts/fork-artifact-passwords/artifact-password-cloud-service'"
+      ]
+    },
+    {
+      "path": "src/main/startup/main-process-observers.ts",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { recordForkPaneTranscriptObservation } from '../fork-session-handoff/pane-transcript-history'",
+        "  agentHookServer.subscribeEnrichedStatus(recordForkPaneTranscriptObservation)"
+      ]
+    },
+    {
+      "path": "src/main/startup/main-process-account-services.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "import { ingestSessionInfoPlanWindows as ingestPlanWindows } from '../fork-session-info/session-info-plan-window-correlation'",
+        "  agentHookServer.setClaudeStatusLineListener((event) => ingestPlanWindows(state.rateLimits, event))"
       ]
     },
     {
@@ -1943,15 +2183,6 @@
       ]
     },
     {
-      "path": "src/main/index.ts",
-      "feature": "session-handoff",
-      "kind": "registration",
-      "lines": [
-        "import { recordForkPaneTranscriptObservation } from './fork-session-handoff/pane-transcript-history'",
-        "  agentHookServer.subscribeEnrichedStatus(recordForkPaneTranscriptObservation)"
-      ]
-    },
-    {
       "path": "src/main/ipc/register-core-handlers/register-core-handlers.ts",
       "feature": "session-handoff",
       "kind": "registration",
@@ -2067,13 +2298,29 @@
       ]
     },
     {
-      "path": "src/main/agent-hooks/server.ts",
+      "path": "src/main/agent-hooks/server/server-status-update.ts",
       "feature": "session-info",
       "kind": "registration",
       "lines": [
-        "import { sessionInfoService } from '../fork-session-info/session-info-service'",
-        "    sessionInfoService.observeAgentHook(enriched)",
-        "          sessionInfoService.ingestStatusLineBody(body)",
+        "import { sessionInfoService } from '../../fork-session-info/session-info-service'",
+        "    sessionInfoService.observeAgentHook(enriched)"
+      ]
+    },
+    {
+      "path": "src/main/agent-hooks/server/server-lifecycle.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "import { sessionInfoService } from '../../fork-session-info/session-info-service'",
+        "          sessionInfoService.ingestStatusLineBody(body)"
+      ]
+    },
+    {
+      "path": "src/main/agent-hooks/server/server-tab-cleanup.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "import { sessionInfoService } from '../../fork-session-info/session-info-service'",
         "    sessionInfoService.clearPane(resolvedPaneKey)"
       ]
     },
@@ -2087,15 +2334,6 @@
         "  removeManagedStatusLine",
         "} from '../fork-session-info/session-info-statusline-chaining'",
         "    finalizeManagedStatusLineRemoval(getStatusLineScriptFileName(this.options.settings))"
-      ]
-    },
-    {
-      "path": "src/main/index.ts",
-      "feature": "session-info",
-      "kind": "registration",
-      "lines": [
-        "import { ingestSessionInfoPlanWindows as ingestPlanWindows } from './fork-session-info/session-info-plan-window-correlation'",
-        "  agentHookServer.setClaudeStatusLineListener((event) => ingestPlanWindows(rateLimits, event))"
       ]
     },
     {
@@ -2221,7 +2459,7 @@
     },
     {
       "path": ".github/scripts/check-fork-ownership.mjs",
-      "reason": "The CI guard that enforces this manifest on pull requests \u2014 fork machinery, not upstream code.",
+      "reason": "The CI guard that enforces this manifest on pull requests — fork machinery, not upstream code.",
       "status": "permanent"
     },
     {
@@ -2353,7 +2591,7 @@
     },
     {
       "path": "config/scripts/fork-ownership-manifest.mjs",
-      "reason": "The manifest loader/matcher itself \u2014 fork machinery, not upstream code.",
+      "reason": "The manifest loader/matcher itself — fork machinery, not upstream code.",
       "status": "permanent"
     },
     {
@@ -2497,7 +2735,7 @@
     },
     {
       "path": "package.json",
-      "reason": "Fork identity, versioning, and script wiring \u2014 replaces the old FORK_OWNED_ALWAYS authorship carve-out.",
+      "reason": "Fork identity, versioning, and script wiring — replaces the old FORK_OWNED_ALWAYS authorship carve-out.",
       "status": "permanent"
     },
     {
@@ -2546,11 +2784,6 @@
       "status": "permanent"
     },
     {
-      "path": "src/main/updater.ts",
-      "reason": "Fork's own update feed and channel selection.",
-      "status": "permanent"
-    },
-    {
       "path": "src/renderer/src/components/native-chat/NativeChatComposerActions.test.tsx",
       "reason": "Superseded by the fork copy's test in fork-agent-composer.",
       "status": "permanent",
@@ -2577,6 +2810,12 @@
     {
       "path": "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.tsx",
       "reason": "Chip renderer for the deleted NativeChatComposerField, whose attachment type it imports; the fork's AgentComposerField renders AgentComposerAttachmentThumbnail instead, so upstream's copy is unreferenced and does not compile.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.test.tsx",
+      "reason": "Tests the deleted NativeChatImageAttachmentPreview above.",
       "status": "permanent",
       "deleted": true
     },
@@ -2671,6 +2910,12 @@
       "ledger": "docs/fork-upstreaming.md#sidebar-density"
     },
     {
+      "path": "src/renderer/src/components/sidebar/worktree-header-section-boundaries.test.ts",
+      "reason": "Tests updated for the sidebar-density row-height fix above.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#sidebar-density"
+    },
+    {
       "path": "src/renderer/src/components/sidebar/repo-header-action-button-class.ts",
       "reason": "Sidebar-density fix: insets the repo-header action-button focus ring so the shorter h-6 row's overflow-hidden no longer clips it.",
       "status": "pending-upstream",
@@ -2695,13 +2940,13 @@
       "ledger": "docs/fork-upstreaming.md#sidebar-density"
     },
     {
-      "path": "src/renderer/src/components/terminal-pane/TerminalPane.tsx",
-      "reason": "Carries the terminal-dock mount and the session-handoff dialog import; a path cannot be both an exception and a seam, so the whole file is fork-owned. Nothing here is upstream-bound.",
+      "path": "src/renderer/src/i18n/fork-localization-catalogs.test.ts",
+      "reason": "Tests for the fork i18n aggregation machinery.",
       "status": "permanent"
     },
     {
-      "path": "src/renderer/src/i18n/fork-localization-catalogs.test.ts",
-      "reason": "Tests for the fork i18n aggregation machinery.",
+      "path": "src/renderer/src/i18n/en-runtime-required.json",
+      "reason": "Generated from this tree's en.json by generate-runtime-required-english-catalog.mjs; the fork's catalog differs from upstream's, so upstream's copy fails its own --check here.",
       "status": "permanent"
     },
     {
@@ -2728,7 +2973,7 @@
     },
     {
       "path": "src/shared/native-file-drop.ts",
-      "reason": "Gives the composer drop payload the tabId/paneLeafId its terminal sibling already carries, so a broadcast drop reaches only the composer it landed on. Upstream's shared drop contract, read by preload, main, and every drop consumer \u2014 a forked copy would not reroute them.",
+      "reason": "Gives the composer drop payload the tabId/paneLeafId its terminal sibling already carries, so a broadcast drop reaches only the composer it landed on. Upstream's shared drop contract, read by preload, main, and every drop consumer — a forked copy would not reroute them.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#composer-file-drop-pane-scoping"
     },
@@ -2767,12 +3012,6 @@
       "reason": "Stops the changed-lines type-aware scan pinning the root oxlint config over mobile/, whose workspace deps are absent in the gate job so every React Native type resolves as an error type.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#changed-lines-type-aware-scan-reaches-into-mobile"
-    },
-    {
-      "path": "src/main/rate-limits/service.ts",
-      "reason": "Returns the selected-account acceptance verdict from live Claude rate-limit ingestion so pane telemetry can correlate plan windows without duplicating or bypassing the account guard.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#live-claude-rate-limit-ingest-acceptance"
     },
     {
       "path": "src/main/runtime/structured-agent-session-integration.test.ts",
@@ -2818,9 +3057,69 @@
       "added": 1,
       "removed": 1
     },
+    "config/scripts/pr-code-change-scope.test.mjs": {
+      "added": 7,
+      "removed": 1
+    },
+    "config/scripts/pr-e2e-gate-contract.test.mjs": {
+      "added": 7,
+      "removed": 1
+    },
     "config/scripts/pr-workflow-parallelism.test.mjs": {
       "added": 1,
       "removed": 0
+    },
+    "config/tsconfig.cli.json": {
+      "added": 2,
+      "removed": 0
+    },
+    "config/tsconfig.tc.web.json": {
+      "added": 2,
+      "removed": 0
+    },
+    "config/tsconfig.web.json": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/cli/artifact-format.ts": {
+      "added": 6,
+      "removed": 7
+    },
+    "src/cli/handlers/artifacts.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/cli/specs/artifacts.ts": {
+      "added": 2,
+      "removed": 2
+    },
+    "src/main/agent-hooks/server/server-lifecycle.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/agent-hooks/server/server-status-update.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/agent-hooks/server/server-tab-cleanup.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/artifacts/artifact-cloud-recovery.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/main/artifacts/artifact-cloud-service-races.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/main/artifacts/artifact-cloud-service.test.ts": {
+      "added": 9,
+      "removed": 3
+    },
+    "src/main/claude/hook-service.ts": {
+      "added": 6,
+      "removed": 2
     },
     "src/main/ipc/native-chat-subscribe-lifecycle.test.ts": {
       "added": 7,
@@ -2844,6 +3143,18 @@
     },
     "src/main/ipc/pty/register-handlers.ts": {
       "added": 1,
+      "removed": 0
+    },
+    "src/main/ipc/register-core-handlers/register-core-handlers.test.ts": {
+      "added": 8,
+      "removed": 0
+    },
+    "src/main/ipc/register-core-handlers/register-core-handlers.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/main/ipc/ssh-relay-session-callbacks.ts": {
+      "added": 2,
       "removed": 0
     },
     "src/main/ipc/ssh.ts": {
@@ -2886,39 +3197,73 @@
       "added": 28,
       "removed": 8
     },
-    "config/scripts/pr-e2e-gate-contract.test.mjs": { "added": 7, "removed": 1 },
-    "config/scripts/pr-code-change-scope.test.mjs": { "added": 7, "removed": 1 },
-    "src/shared/pane-agent-identity-inventory.test.ts": { "added": 4, "removed": 0 },
-    "tests/e2e/cross-version-wire/cross-version-browser-placement.unit.test.ts": {
-      "added": 4,
-      "removed": 1
-    },
-    "tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts": {
-      "added": 4,
-      "removed": 2
-    },
-    "tests/e2e/cross-version-wire/release-checkout.unit.test.ts": { "added": 11, "removed": 11 },
     "src/main/native-chat/transcript-watch-engine-wsl-lifecycle.test.ts": {
       "added": 11,
       "removed": 0
     },
-    "src/main/native-chat/transcript-watch-engine.ts": { "added": 36, "removed": 33 },
+    "src/main/native-chat/transcript-watch-engine.ts": {
+      "added": 36,
+      "removed": 33
+    },
     "src/main/native-chat/transcript-watch.test.ts": {
       "added": 117,
       "removed": 17
     },
-    "src/main/native-chat/transcript-watch.ts": { "added": 30, "removed": 268 },
+    "src/main/native-chat/transcript-watch.ts": {
+      "added": 30,
+      "removed": 268
+    },
+    "src/main/orca-profiles/profile-artifact-cloud-cleanup.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/persistence/applying-settings/settings-update.ts": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/main/persistence/applying-settings/ui-selection-normalization.ts": {
+      "added": 1,
+      "removed": 0
+    },
     "src/main/persistence/tracking-repos/project-group-operations.ts": {
       "added": 2,
       "removed": 0
     },
-    "src/main/providers/ssh-pty-provider.ts": {
-      "added": 7,
+    "src/main/providers/ssh-pty-provider-rpc-operations.ts": {
+      "added": 6,
       "removed": 0
     },
-    "src/main/runtime/orca-runtime.ts": {
-      "added": 145,
-      "removed": 16
+    "src/main/rate-limits/service/service-fetch-policy.ts": {
+      "added": 7,
+      "removed": 6
+    },
+    "src/main/runtime/orca-runtime-close-headless-mobile-terminal-tab.ts": {
+      "added": 17,
+      "removed": 5
+    },
+    "src/main/runtime/orca-runtime-has-exact-persisted-terminal-surface-identity.ts": {
+      "added": 2,
+      "removed": 2
+    },
+    "src/main/runtime/orca-runtime-persist-headless-session-tab-props.ts": {
+      "added": 79,
+      "removed": 4
+    },
+    "src/main/runtime/orca-runtime-sync-mobile-session-tabs.ts": {
+      "added": 18,
+      "removed": 2
+    },
+    "src/main/runtime/rpc/methods/artifacts.ts": {
+      "added": 6,
+      "removed": 4
+    },
+    "src/main/runtime/rpc/methods/client-ui-schemas.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/main/runtime/rpc/methods/index.ts": {
+      "added": 2,
+      "removed": 0
     },
     "src/main/runtime/rpc/methods/native-chat.test.ts": {
       "added": 14,
@@ -2928,12 +3273,12 @@
       "added": 8,
       "removed": 7
     },
-    "src/main/runtime/rpc/methods/session-tabs-schemas.ts": {
-      "added": 50,
-      "removed": 1
-    },
     "src/main/runtime/rpc/methods/session-tab-mutation-methods.ts": {
       "added": 2,
+      "removed": 1
+    },
+    "src/main/runtime/rpc/methods/session-tabs-schemas.ts": {
+      "added": 50,
       "removed": 1
     },
     "src/main/runtime/rpc/methods/worktree-schemas.ts": {
@@ -2943,6 +3288,10 @@
     "src/main/runtime/rpc/methods/worktree.ts": {
       "added": 7,
       "removed": 1
+    },
+    "src/main/runtime/runtime-artifact-controller.ts": {
+      "added": 2,
+      "removed": 2
     },
     "src/main/skills/claude-plugin-skill-sources.test.ts": {
       "added": 1,
@@ -2968,6 +3317,18 @@
       "added": 38,
       "removed": 0
     },
+    "src/main/startup/main-process-account-services.ts": {
+      "added": 2,
+      "removed": 3
+    },
+    "src/main/startup/main-process-observers.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/startup/main-process-runtime-service.ts": {
+      "added": 1,
+      "removed": 1
+    },
     "src/main/telemetry/client.ts": {
       "added": 2,
       "removed": 1
@@ -2976,28 +3337,44 @@
       "added": 5,
       "removed": 5
     },
-    "src/preload/api-types.ts": {
+    "src/main/updater/updater-release-feed.ts": {
       "added": 1,
+      "removed": 1
+    },
+    "src/main/updater/updater-setup.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/preload/api-types.ts": {
+      "added": 5,
       "removed": 0
     },
     "src/preload/api/native-chat-api.ts": {
       "added": 53,
       "removed": 30
     },
+    "src/preload/api/native-chat-bridge.ts": {
+      "added": 16,
+      "removed": 7
+    },
     "src/preload/api/pty-api.ts": {
       "added": 1,
+      "removed": 0
+    },
+    "src/preload/api/pty-bridge-session-control.ts": {
+      "added": 2,
       "removed": 0
     },
     "src/preload/api/ui-command-event-api.ts": {
       "added": 2,
       "removed": 0
     },
-    "src/preload/index.ts": {
-      "added": 22,
-      "removed": 7
-    },
     "src/relay/relay-runtime-services.ts": {
       "added": 3,
+      "removed": 1
+    },
+    "src/relay/remote-artifact-cli-input.ts": {
+      "added": 1,
       "removed": 1
     },
     "src/renderer/src/assets/main.css": {
@@ -3008,7 +3385,43 @@
       "added": 19,
       "removed": 1
     },
+    "src/renderer/src/components/artifacts/ArtifactDetailHeader.tsx": {
+      "added": 3,
+      "removed": 13
+    },
+    "src/renderer/src/components/artifacts/ArtifactListRows.tsx": {
+      "added": 2,
+      "removed": 3
+    },
+    "src/renderer/src/components/artifacts/ArtifactsPage.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/artifacts/artifact-display-labels.ts": {
+      "added": 8,
+      "removed": 3
+    },
+    "src/renderer/src/components/artifacts/artifact-publish-flow.ts": {
+      "added": 5,
+      "removed": 3
+    },
+    "src/renderer/src/components/browser-pane/assemble-chrome/browser-page-toolbar.tsx": {
+      "added": 1,
+      "removed": 1
+    },
     "src/renderer/src/components/dashboard-popout/AgentMapWorkspaceContextMenu.test.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/dashboard/DashboardAgentRow.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/editor/EditorPanelHeader.test.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/editor/EditorPanelHeader.tsx": {
       "added": 1,
       "removed": 1
     },
@@ -3025,12 +3438,12 @@
       "removed": 2
     },
     "src/renderer/src/components/native-chat/NativeChatComposer.test.tsx": {
-      "added": 34,
-      "removed": 82
+      "added": 38,
+      "removed": 83
     },
     "src/renderer/src/components/native-chat/NativeChatComposer.tsx": {
-      "added": 209,
-      "removed": 280
+      "added": 232,
+      "removed": 282
     },
     "src/renderer/src/components/native-chat/NativeChatInteractiveCard.test.tsx": {
       "added": 21,
@@ -3040,25 +3453,25 @@
       "added": 20,
       "removed": 30
     },
-    "src/renderer/src/components/native-chat/NativeChatMessageList.tsx": {
-      "added": 12,
-      "removed": 4
+    "src/renderer/src/components/native-chat/NativeChatMessageRow.tsx": {
+      "added": 8,
+      "removed": 2
     },
     "src/renderer/src/components/native-chat/NativeChatQuestionCard.tsx": {
       "added": 3,
       "removed": 1
     },
-    "src/renderer/src/components/native-chat/NativeChatToolRun.tsx": {
-      "added": 6,
-      "removed": 3
+    "src/renderer/src/components/native-chat/NativeChatResolvedView.tsx": {
+      "added": 16,
+      "removed": 18
     },
     "src/renderer/src/components/native-chat/NativeChatView.test.tsx": {
       "added": 4,
       "removed": 4
     },
-    "src/renderer/src/components/native-chat/NativeChatResolvedView.tsx": {
-      "added": 16,
-      "removed": 18
+    "src/renderer/src/components/native-chat/native-chat-attachment-upload.ts": {
+      "added": 2,
+      "removed": 0
     },
     "src/renderer/src/components/native-chat/native-chat-command-marker.ts": {
       "added": 1,
@@ -3071,18 +3484,6 @@
     "src/renderer/src/components/native-chat/native-chat-composer-state.ts": {
       "added": 33,
       "removed": 41
-    },
-    "src/renderer/src/components/native-chat/use-native-chat-live-session-pending.test.ts": {
-      "added": 4,
-      "removed": 5
-    },
-    "src/renderer/src/components/native-chat/native-chat-structured-send-composition-clear.test.tsx": {
-      "added": 2,
-      "removed": 2
-    },
-    "src/renderer/src/components/native-chat/native-chat-structured-composer-dispatch.ts": {
-      "added": 2,
-      "removed": 2
     },
     "src/renderer/src/components/native-chat/native-chat-composer-types.ts": {
       "added": 15,
@@ -3116,13 +3517,21 @@
       "added": 32,
       "removed": 1
     },
+    "src/renderer/src/components/native-chat/native-chat-structured-composer-dispatch.ts": {
+      "added": 2,
+      "removed": 2
+    },
+    "src/renderer/src/components/native-chat/native-chat-structured-send-composition-clear.test.tsx": {
+      "added": 2,
+      "removed": 2
+    },
     "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.test.tsx": {
       "added": 78,
       "removed": 114
     },
     "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.ts": {
-      "added": 67,
-      "removed": 36
+      "added": 98,
+      "removed": 48
     },
     "src/renderer/src/components/native-chat/use-native-chat-interactive-send.test.tsx": {
       "added": 38,
@@ -3131,6 +3540,10 @@
     "src/renderer/src/components/native-chat/use-native-chat-interactive-send.ts": {
       "added": 16,
       "removed": 2
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-live-session-pending.test.ts": {
+      "added": 4,
+      "removed": 5
     },
     "src/renderer/src/components/native-chat/use-native-chat-picker-command-dispatch.test.tsx": {
       "added": 128,
@@ -3164,6 +3577,26 @@
       "added": 1,
       "removed": 1
     },
+    "src/renderer/src/components/right-sidebar/AiVaultPanel.tsx": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/renderer/src/components/right-sidebar/AiVaultSessionRow.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/right-sidebar/AiVaultSessionVirtualList.tsx": {
+      "added": 3,
+      "removed": 4
+    },
+    "src/renderer/src/components/right-sidebar/ai-vault-session-launch-actions.ts": {
+      "added": 3,
+      "removed": 2
+    },
+    "src/renderer/src/components/right-sidebar/right-sidebar-panel-content.tsx": {
+      "added": 2,
+      "removed": 0
+    },
     "src/renderer/src/components/right-sidebar/use-right-sidebar-activity-items.ts": {
       "added": 7,
       "removed": 0
@@ -3184,6 +3617,10 @@
       "added": 5,
       "removed": 0
     },
+    "src/renderer/src/components/settings/settings-page-renderer.tsx": {
+      "added": 2,
+      "removed": 0
+    },
     "src/renderer/src/components/sidebar/CommentMarkdown.tsx": {
       "added": 15,
       "removed": 2
@@ -3191,6 +3628,14 @@
     "src/renderer/src/components/sidebar/WorktreeCard.tsx": {
       "added": 5,
       "removed": 2
+    },
+    "src/renderer/src/components/sidebar/WorktreeContextMenuOverlays.tsx": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/components/sidebar/WorktreeContextMenuView.tsx": {
+      "added": 11,
+      "removed": 50
     },
     "src/renderer/src/components/sidebar/WorktreeList.tsx": {
       "added": 10,
@@ -3204,53 +3649,25 @@
       "added": 8,
       "removed": 1
     },
+    "src/renderer/src/components/sidebar/use-worktree-context-menu-model.tsx": {
+      "added": 8,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-card-compact-agent-row.tsx": {
+      "added": 18,
+      "removed": 1
+    },
     "src/renderer/src/components/sidebar/worktree-drag-units.ts": {
       "added": 8,
       "removed": 6
-    },
-    "src/renderer/src/components/sidebar/worktree-list/viewport/VirtualizedWorktreeViewport.tsx": {
-      "added": 8,
-      "removed": 1
-    },
-    "src/renderer/src/components/sidebar/worktree-list/navigation/pending-reveal-inputs.ts": {
-      "added": 5,
-      "removed": 1
-    },
-    "src/renderer/src/components/sidebar/worktree-list/listing/use-collapsed-groups.ts": {
-      "added": 7,
-      "removed": 5
-    },
-    "src/renderer/src/components/sidebar/worktree-list/navigation/use-pending-reveal.ts": {
-      "added": 1,
-      "removed": 0
-    },
-    "src/renderer/src/components/sidebar/worktree-list/listing/use-section-rows.ts": {
-      "added": 13,
-      "removed": 2
-    },
-    "src/renderer/src/components/sidebar/worktree-list/drag/use-runtime.ts": {
-      "added": 13,
-      "removed": 2
-    },
-    "src/renderer/src/components/sidebar/worktree-list/drag/use-pointer-drag.ts": {
-      "added": 4,
-      "removed": 0
-    },
-    "src/renderer/src/components/sidebar/worktree-list/viewport/viewport-props.ts": {
-      "added": 4,
-      "removed": 0
-    },
-    "src/renderer/src/components/sidebar/worktree-list/drag/groups.ts": {
-      "added": 7,
-      "removed": 4
     },
     "src/renderer/src/components/sidebar/worktree-list/drag/drop-commit-context.ts": {
       "added": 6,
       "removed": 1
     },
-    "src/renderer/src/components/sidebar/worktree-list/rows/item-row.tsx": {
-      "added": 10,
-      "removed": 1
+    "src/renderer/src/components/sidebar/worktree-list/drag/groups.ts": {
+      "added": 7,
+      "removed": 4
     },
     "src/renderer/src/components/sidebar/worktree-list/drag/pointer-commit.ts": {
       "added": 10,
@@ -3260,9 +3677,65 @@
       "added": 14,
       "removed": 0
     },
+    "src/renderer/src/components/sidebar/worktree-list/drag/use-drop-commit-context.ts": {
+      "added": 8,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/drag/use-pointer-drag.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/renderer/src/components/sidebar/worktree-list/drag/use-runtime.ts": {
+      "added": 13,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/worktree-list/grouping/build-rows.ts": {
+      "added": 13,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/worktree-list/grouping/project-group-sections.ts": {
+      "added": 15,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/grouping/worktree-group-keys.ts": {
+      "added": 10,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/worktree-list/grouping/worktree-grouping.ts": {
+      "added": 6,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/listing/use-collapsed-groups.ts": {
+      "added": 7,
+      "removed": 5
+    },
+    "src/renderer/src/components/sidebar/worktree-list/listing/use-section-rows.ts": {
+      "added": 13,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/worktree-list/navigation/pending-reveal-inputs.ts": {
+      "added": 5,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/navigation/use-pending-reveal.ts": {
+      "added": 1,
+      "removed": 0
+    },
     "src/renderer/src/components/sidebar/worktree-list/rows/SectionHeader.tsx": {
       "added": 13,
       "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/rows/item-row.tsx": {
+      "added": 10,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/viewport/VirtualizedWorktreeViewport.tsx": {
+      "added": 8,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/viewport/viewport-props.ts": {
+      "added": 4,
+      "removed": 0
     },
     "src/renderer/src/components/sidebar/worktree-list/viewport/virtual-row-context.ts": {
       "added": 3,
@@ -3281,8 +3754,12 @@
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/TerminalPaneHeaderOverlay.tsx": {
-      "added": 8,
+      "added": 5,
       "removed": 0
+    },
+    "src/renderer/src/components/terminal-pane/TerminalPaneSurface.tsx": {
+      "added": 6,
+      "removed": 1
     },
     "src/renderer/src/components/terminal-pane/focus-terminal-pane-event.test.ts": {
       "added": 9,
@@ -3304,29 +3781,65 @@
       "added": 84,
       "removed": 4
     },
+    "src/renderer/src/components/terminal-pane/terminal-pane-menu-agent-session-actions.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/terminal-pane/terminal-pane-mount-cleanup.ts": {
+      "added": 15,
+      "removed": 0
+    },
+    "src/renderer/src/components/terminal-pane/terminal-pane-mount-preparation.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/renderer/src/components/terminal-pane/terminal-pane-pane-closed.ts": {
+      "added": 15,
+      "removed": 0
+    },
+    "src/renderer/src/components/terminal-pane/terminal-pane-pane-created.ts": {
+      "added": 13,
+      "removed": 0
+    },
     "src/renderer/src/components/terminal-pane/terminal-visibility-resume.test.ts": {
-      "added": 37,
+      "added": 67,
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/terminal-visibility-resume.ts": {
-      "added": 21,
-      "removed": 8
+      "added": 15,
+      "removed": 6
     },
     "src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects.ts": {
-      "added": 7,
-      "removed": 1
+      "added": 2,
+      "removed": 0
     },
-    "src/renderer/src/components/terminal-pane/use-terminal-pane-lifecycle.ts": {
-      "added": 81,
+    "src/renderer/src/components/terminal-pane/use-terminal-pane-chat-state.ts": {
+      "added": 6,
       "removed": 2
+    },
+    "src/renderer/src/components/terminal-pane/use-terminal-pane-layout-bindings.ts": {
+      "added": 17,
+      "removed": 3
+    },
+    "src/renderer/src/components/terminal-pane/use-terminal-pane-mobile-actions.ts": {
+      "added": 16,
+      "removed": 3
+    },
+    "src/renderer/src/components/terminal-pane/use-terminal-pane-title-state.ts": {
+      "added": 9,
+      "removed": 0
     },
     "src/renderer/src/components/terminal-pane/use-terminal-window-wake-recovery.test.ts": {
       "added": 12,
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/use-terminal-window-wake-recovery.ts": {
-      "added": 12,
-      "removed": 3
+      "added": 5,
+      "removed": 1
+    },
+    "src/renderer/src/hooks/settings-navigation-workflow-sections.ts": {
+      "added": 2,
+      "removed": 0
     },
     "src/renderer/src/i18n/i18n.ts": {
       "added": 3,
@@ -3420,6 +3933,10 @@
       "added": 12,
       "removed": 0
     },
+    "src/renderer/src/lib/settings-navigation-types.ts": {
+      "added": 1,
+      "removed": 0
+    },
     "src/renderer/src/lib/terminal-title-contrast.ts": {
       "added": 3,
       "removed": 3
@@ -3429,21 +3946,96 @@
       "removed": 0
     },
     "src/renderer/src/runtime/runtime-terminal-inspection.ts": {
-      "added": 74,
+      "added": 73,
       "removed": 11
     },
     "src/renderer/src/runtime/sync-runtime-graph.ts": {
-      "added": 24,
-      "removed": 4
+      "added": 5,
+      "removed": 2
     },
-    "src/renderer/src/runtime/web-runtime-terminal-actions.ts": { "added": 3, "removed": 1 },
-    "src/renderer/src/runtime/web-session-tabs-sync.ts": {
-      "added": 157,
-      "removed": 32
+    "src/renderer/src/runtime/sync-runtime-graph/mobile-session-capture.ts": {
+      "added": 1,
+      "removed": 0
     },
-    "src/renderer/src/store/slices/tabs.ts": {
-      "added": 20,
+    "src/renderer/src/runtime/sync-runtime-graph/mobile-session-inputs.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/runtime/sync-runtime-graph/mobile-session-snapshots.ts": {
+      "added": 8,
       "removed": 1
+    },
+    "src/renderer/src/runtime/sync-runtime-graph/mobile-session-terminal-tabs.ts": {
+      "added": 8,
+      "removed": 1
+    },
+    "src/renderer/src/runtime/sync-runtime-graph/types.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/runtime/web-runtime-terminal-actions.ts": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/renderer/src/runtime/web-session-tabs-sync.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/runtime/web-session-tabs-sync/apply-final-patch.ts": {
+      "added": 14,
+      "removed": 1
+    },
+    "src/renderer/src/runtime/web-session-tabs-sync/apply-preparation-unified.ts": {
+      "added": 89,
+      "removed": 6
+    },
+    "src/renderer/src/runtime/web-session-tabs-sync/state.ts": {
+      "added": 6,
+      "removed": 0
+    },
+    "src/renderer/src/runtime/web-session-tabs-sync/tab-builders.ts": {
+      "added": 5,
+      "removed": 2
+    },
+    "src/renderer/src/runtime/web-session-tabs-sync/terminal-build.ts": {
+      "added": 14,
+      "removed": 1
+    },
+    "src/renderer/src/store/right-sidebar-route.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/store/slices/tabs/create-tabs-slice.ts": {
+      "added": 7,
+      "removed": 1
+    },
+    "src/renderer/src/store/slices/tabs/tabs-close-actions.ts": {
+      "added": 11,
+      "removed": 0
+    },
+    "src/renderer/src/store/slices/tabs/tabs-slice-contract.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/renderer/src/web/preload-api/web-native-chat-api.ts": {
+      "added": 30,
+      "removed": 17
+    },
+    "src/renderer/src/web/preload-api/web-preference-normalization.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/web/preload-api/web-terminal-api.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/shared/artifacts.ts": {
+      "added": 12,
+      "removed": 0
+    },
+    "src/shared/cli-argument-boundary.ts": {
+      "added": 1,
+      "removed": 0
     },
     "src/shared/default-global-settings.ts": {
       "added": 5,
@@ -3453,24 +4045,12 @@
       "added": 10,
       "removed": 0
     },
-    "src/renderer/src/components/sidebar/worktree-list/rows/virtual-row-dispatch.tsx": {
-      "added": 9,
+    "src/shared/keybindings/definitions-core-4.ts": {
+      "added": 16,
       "removed": 0
     },
-    "src/renderer/src/components/settings/AppearanceWindowSidebarSection.tsx": {
-      "added": 6,
-      "removed": 0
-    },
-    "src/renderer/src/components/settings/AppearancePane.tsx": {
+    "src/shared/keybindings/types.ts": {
       "added": 2,
-      "removed": 0
-    },
-    "src/renderer/src/components/settings/appearance-search.ts": {
-      "added": 2,
-      "removed": 0
-    },
-    "src/shared/keybindings.ts": {
-      "added": 18,
       "removed": 0
     },
     "src/shared/local-build-compatibility-contract.json": {
@@ -3501,6 +4081,10 @@
       "added": 14,
       "removed": 0
     },
+    "src/shared/pane-agent-identity-inventory.test.ts": {
+      "added": 4,
+      "removed": 0
+    },
     "src/shared/project-groups.ts": {
       "added": 3,
       "removed": 1
@@ -3517,9 +4101,22 @@
       "added": 4,
       "removed": 0
     },
-    "src/shared/telemetry-property-schemas.ts": { "added": 2, "removed": 0 },
-    "src/shared/telemetry-event-registry.ts": { "added": 9, "removed": 0 },
-    "src/shared/telemetry-events.ts": { "added": 2, "removed": 0 },
+    "src/shared/telemetry-event-registry.ts": {
+      "added": 9,
+      "removed": 0
+    },
+    "src/shared/telemetry-events.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/shared/telemetry-property-schemas.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/shared/ui-chrome-types.ts": {
+      "added": 1,
+      "removed": 0
+    },
     "src/shared/workspace-session-schema.test.ts": {
       "added": 103,
       "removed": 3
@@ -3536,144 +4133,32 @@
       "added": 3,
       "removed": 0
     },
-    "src/renderer/src/components/sidebar/worktree-list/grouping/worktree-grouping.ts": {
-      "added": 6,
-      "removed": 1
-    },
-    "src/renderer/src/components/sidebar/worktree-list/grouping/build-rows.ts": {
-      "added": 13,
-      "removed": 2
-    },
-    "src/renderer/src/components/sidebar/worktree-list/grouping/project-group-sections.ts": {
-      "added": 15,
-      "removed": 1
-    },
-    "src/renderer/src/components/sidebar/worktree-list/grouping/worktree-group-keys.ts": {
-      "added": 10,
-      "removed": 2
-    },
-    "src/renderer/src/components/sidebar/worktree-list/drag/use-drop-commit-context.ts": {
-      "added": 8,
-      "removed": 1
-    },
-    "src/main/index.ts": {
-      "added": 3,
-      "removed": 1
-    },
-    "src/main/ipc/register-core-handlers/register-core-handlers.test.ts": {
-      "added": 8,
-      "removed": 0
-    },
-    "src/main/ipc/register-core-handlers/register-core-handlers.ts": {
+    "tests/e2e/cross-version-wire/cross-version-browser-placement.unit.test.ts": {
       "added": 4,
-      "removed": 0
-    },
-    "src/renderer/src/components/dashboard/DashboardAgentRow.tsx": {
-      "added": 2,
-      "removed": 0
-    },
-    "src/renderer/src/components/right-sidebar/AiVaultPanel.tsx": {
-      "added": 1,
       "removed": 1
     },
-    "src/renderer/src/components/right-sidebar/AiVaultSessionRow.tsx": {
-      "added": 2,
-      "removed": 0
-    },
-    "src/renderer/src/components/right-sidebar/AiVaultSessionVirtualList.tsx": {
-      "added": 3,
-      "removed": 4
-    },
-    "src/renderer/src/components/right-sidebar/ai-vault-session-launch-actions.ts": {
-      "added": 3,
-      "removed": 2
-    },
-    "src/renderer/src/components/sidebar/worktree-card-compact-agent-row.tsx": {
-      "added": 2,
-      "removed": 0
-    },
-    "src/renderer/src/components/terminal-pane/terminal-pane-menu-agent-session-actions.ts": {
-      "added": 1,
-      "removed": 1
-    },
-    "src/renderer/src/components/native-chat/native-chat-attachment-upload.ts": {
-      "added": 2,
-      "removed": 0
-    },
-    "src/cli/args.ts": { "added": 1, "removed": 0 },
-    "src/cli/artifact-format.ts": { "added": 6, "removed": 7 },
-    "src/cli/handlers/artifacts.ts": { "added": 2, "removed": 1 },
-    "src/cli/specs/artifacts.ts": { "added": 2, "removed": 2 },
-    "src/main/artifacts/artifact-cloud-recovery.test.ts": { "added": 5, "removed": 2 },
-    "src/main/artifacts/artifact-cloud-service-races.test.ts": { "added": 5, "removed": 2 },
-    "src/main/artifacts/artifact-cloud-service.test.ts": { "added": 13, "removed": 4 },
-    "src/main/orca-profiles/profile-artifact-cloud-cleanup.ts": { "added": 2, "removed": 0 },
-    "src/main/runtime/rpc/methods/artifacts.ts": { "added": 6, "removed": 4 },
-    "src/main/runtime/rpc/methods/index.ts": { "added": 2, "removed": 0 },
-    "src/relay/remote-artifact-cli-input.ts": { "added": 1, "removed": 1 },
-    "src/renderer/src/components/artifacts/ArtifactDetailHeader.tsx": { "added": 3, "removed": 13 },
-    "src/renderer/src/components/artifacts/ArtifactListRows.tsx": { "added": 2, "removed": 3 },
-    "src/renderer/src/components/artifacts/ArtifactsPage.tsx": { "added": 1, "removed": 1 },
-    "src/renderer/src/components/artifacts/artifact-display-labels.ts": {
-      "added": 8,
-      "removed": 3
-    },
-    "src/renderer/src/components/artifacts/artifact-publish-flow.ts": { "added": 5, "removed": 3 },
-    "src/renderer/src/components/browser-pane/assemble-chrome/browser-page-toolbar.tsx": {
-      "added": 1,
-      "removed": 1
-    },
-    "src/renderer/src/components/editor/EditorPanelHeader.test.tsx": { "added": 1, "removed": 1 },
-    "src/renderer/src/components/editor/EditorPanelHeader.tsx": { "added": 1, "removed": 1 },
-    "src/shared/artifacts.ts": { "added": 12, "removed": 0 },
-    "src/renderer/src/components/settings/settings-page-renderer.tsx": { "added": 2, "removed": 0 },
-    "src/renderer/src/hooks/settings-navigation-workflow-sections.ts": { "added": 2, "removed": 0 },
-    "src/renderer/src/lib/settings-navigation-types.ts": {
-      "added": 1,
-      "removed": 0
-    },
-    "src/main/persistence/applying-settings/settings-update.ts": {
-      "added": 3,
-      "removed": 1
-    },
-    "config/tsconfig.cli.json": {
-      "added": 2,
-      "removed": 0
-    },
-    "src/main/agent-hooks/server.ts": {
+    "tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts": {
       "added": 4,
-      "removed": 0
-    },
-    "src/main/claude/hook-service.ts": {
-      "added": 6,
       "removed": 2
     },
-    "src/main/index.ts": {
-      "added": 5,
-      "removed": 4
+    "tests/e2e/cross-version-wire/release-checkout.unit.test.ts": {
+      "added": 11,
+      "removed": 14
     },
-    "src/main/persistence/applying-settings/ui-selection-normalization.ts": {
-      "added": 1,
+    "src/renderer/src/components/sidebar/worktree-list/rows/virtual-row-dispatch.tsx": {
+      "added": 9,
       "removed": 0
     },
-    "src/main/runtime/rpc/methods/client-ui-schemas.ts": {
-      "added": 1,
+    "src/renderer/src/components/settings/AppearanceWindowSidebarSection.tsx": {
+      "added": 6,
       "removed": 0
     },
-    "src/renderer/src/components/right-sidebar/AiVaultPanel.tsx": {
-      "added": 3,
-      "removed": 1
-    },
-    "src/renderer/src/components/right-sidebar/right-sidebar-panel-content.tsx": {
+    "src/renderer/src/components/settings/AppearancePane.tsx": {
       "added": 2,
       "removed": 0
     },
-    "src/renderer/src/store/right-sidebar-route.ts": {
-      "added": 1,
-      "removed": 0
-    },
-    "src/shared/ui-chrome-types.ts": {
-      "added": 1,
+    "src/renderer/src/components/settings/appearance-search.ts": {
+      "added": 2,
       "removed": 0
     }
   }

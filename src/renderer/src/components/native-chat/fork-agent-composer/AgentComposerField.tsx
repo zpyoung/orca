@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/NativeChatComposerField.tsx
-// FORK-COPY-SHA: bc2f593ebba70a0ee6ff900129e4918f57b143aa
+// FORK-COPY-SHA: e0826956fcfc532f5a1e55b5e081f2e57e553c43
 import type { ClipboardEventHandler, KeyboardEventHandler, RefObject } from 'react'
 import { useLayoutEffect, useRef } from 'react'
 import type { useImeEnterGestureOwnership } from '@/lib/ime-composition-keyboard-event'
@@ -68,8 +68,14 @@ export type AgentComposerFieldProps = {
 
 export type AgentComposerImageAttachment = {
   id: string
+  /** Empty while `pending`: the clipboard image has no agent-readable path yet. */
   path: string
   connectionId?: string
+  /** Clipboard thumbnail (blob/data URL) rendered before — and after — the file
+   *  lands, so the chip never waits on a disk round-trip to show something. */
+  previewUrl?: string
+  /** True while the pasted image is still being written to disk or uploaded. */
+  pending?: boolean
 }
 
 /**

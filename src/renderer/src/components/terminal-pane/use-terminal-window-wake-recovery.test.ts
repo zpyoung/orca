@@ -34,8 +34,8 @@ import {
 
 describe('useTerminalWindowWakeRecovery', () => {
   const manager = {} as PaneManager
-  const paneDockOwnsFocus = vi.fn(() => false)
-  const focusOwnership = { tabId: 'tab-1', paneDockOwnsFocus }
+  // The hook forwards the tab id alone; the dock's bridge is what resolves ownership.
+  const focusOwnership = { tabId: 'tab-1' }
   let systemResumedCallback: (() => void) | null = null
   const unsubscribeSystemResumed = vi.fn()
   const onSystemResumed = vi.fn((callback: () => void) => {

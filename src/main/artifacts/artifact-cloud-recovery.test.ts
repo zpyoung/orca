@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('electron', () => ({
   app: { isPackaged: false },
@@ -21,7 +21,14 @@ const writeRequest = {
   authToken: 'token-a'
 }
 
+beforeEach(() => {
+  // Keep fixed response expirations independent of the runner's wall clock.
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime('2026-08-07T00:00:00.000Z')
+})
+
 afterEach(async () => {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
   await Promise.all(
     createdPaths.splice(0).map((path) => rm(path, { recursive: true, force: true }))
@@ -325,9 +332,6 @@ function jsonResponse(body: object, status: number): Response {
   })
 }
 
-// relative so the store's expiry pruning never drops the fixture as the real clock advances
-const FUTURE_EXPIRES_AT = new Date(Date.now() + 30 * 86_400_000).toISOString()
-
 function createResponseBody(slug: string): object {
   return {
     artifact: {
@@ -339,7 +343,7 @@ function createResponseBody(slug: string): object {
       renderedContentType: 'text/html',
       createdAt: '2026-08-06T00:00:00.000Z',
       updatedAt: '2026-08-06T00:00:00.000Z',
-      expiresAt: FUTURE_EXPIRES_AT,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       byteSize: 17,
       deletedAt: null
     },

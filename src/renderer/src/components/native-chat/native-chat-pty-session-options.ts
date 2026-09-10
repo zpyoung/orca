@@ -114,7 +114,8 @@ export function createNativeChatPtySessionOptions(
     catalog,
     models: activeModels(),
     record,
-    mode: args.mode
+    mode: args.mode,
+    liveTransport: 'catalog'
   })
   const listeners = new Set<(value: SessionOptionDescriptor[]) => void>()
 
@@ -124,7 +125,8 @@ export function createNativeChatPtySessionOptions(
       catalog,
       models: activeModels(),
       record,
-      mode: args.mode
+      mode: args.mode,
+      liveTransport: 'catalog'
     })
     for (const listener of listeners) {
       listener(snapshot)

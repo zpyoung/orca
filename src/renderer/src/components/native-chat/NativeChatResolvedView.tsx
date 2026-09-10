@@ -4,13 +4,13 @@ import { useNativeChatLaunchDraftSignal } from './use-native-chat-launch-draft-a
 import { useNativeChatRetainedSession } from './use-native-chat-retained-session'
 import { isNativeChatTranscriptUnsettled } from './fork-native-chat-relay/use-native-chat-live-session'
 import { selectNativeChatViewState } from './fork-native-chat-relay/native-chat-view-state'
+import { NativeChatConversation } from './fork-native-chat-relay/NativeChatConversation'
+import { useNativeChatLaunchPromptOverlay } from './fork-native-chat-relay/use-native-chat-launch-prompt-overlay'
 import { NativeChatComposer, type NativeChatComposerHandle } from './NativeChatComposer'
 import { useNativeChatFontScale } from './use-native-chat-font-scale'
 import { useNativeChatCanSend } from './use-native-chat-can-send'
 import { NativeChatInteractiveCard } from './NativeChatInteractiveCard'
 import { NativeChatEmptyState } from './NativeChatEmptyState'
-import { NativeChatConversation } from './fork-native-chat-relay/NativeChatConversation'
-import { useNativeChatLaunchPromptOverlay } from './fork-native-chat-relay/use-native-chat-launch-prompt-overlay'
 import { useNativeChatInteractiveSend } from './use-native-chat-interactive-send'
 import {
   shouldClearNativeChatWorkingSuppression,
@@ -55,6 +55,9 @@ import { useNativeChatFileLinkClick } from './use-native-chat-file-link-click'
 import type { NativeChatResolvedViewProps } from './native-chat-view-types'
 import { useNativeChatFileLinkContext } from './use-native-chat-file-link-context'
 import { NativeChatOrchestrationPausedNotice } from './NativeChatOrchestrationPausedNotice'
+import { matchNativeChatSplitShortcut } from './native-chat-split-shortcut'
+import { getShortcutPlatform } from '@/lib/shortcut-platform'
+import { formatShortcutLabel } from '@/hooks/useShortcutLabel'
 
 /** Renders the bridge UI after NativeChatSessionGate resolves its agent session. */
 export function NativeChatResolvedView({
@@ -76,6 +79,7 @@ export function NativeChatResolvedView({
     selectNativeChatRuntimeEnvironmentId(s, terminalTabId)
   )
   const sshConnectionId = useAppStore((s) => selectNativeChatSshConnectionId(s, terminalTabId))
+  const keybindings = useAppStore((s) => s.keybindings)
   const session = useNativeChatRetainedSession({
     paneKey,
     agent,
@@ -103,6 +107,10 @@ export function NativeChatResolvedView({
   // The agent's in-progress reply preview (hook), shown as a live streaming
   // bubble while it works — before the completed turn flushes to the transcript.
   const hookPreview = useAppStore((s) => s.agentStatusByPaneKey[paneKey]?.lastAssistantMessage)
+  // Tool stdout/errors ride the same field for status-card previews; they are not the reply.
+  const hookPreviewIsToolOutput = useAppStore(
+    (s) => s.agentStatusByPaneKey[paneKey]?.lastAssistantMessageIsToolOutput === true
+  )
   // Why: Stop suppression must clear on a newer working epoch even when status
   // never leaves 'working' (interrupt + immediate next turn coalesced).
   const hookWorkingEpoch = useAppStore(
@@ -129,6 +137,11 @@ export function NativeChatResolvedView({
   })
   const contextMenu = useNativeChatContextMenu({
     rootRef,
+    onSwitchToTerminal,
+    splitShortcutLabels: {
+      right: formatShortcutLabel('terminal.splitRight', keybindings),
+      down: formatShortcutLabel('terminal.splitDown', keybindings)
+    },
     actions: {
       onPaste: pasteClipboardIntoComposer,
       ...(contextMenuActions ?? emptyNativeChatContextMenuActions)
@@ -243,9 +256,16 @@ export function NativeChatResolvedView({
           ? [...sessionAfterCommandBoundaries.messages, ...pendingMessages]
           : sessionAfterCommandBoundaries.messages,
       previewText: hookPreview,
-      working: liveWorking
+      working: liveWorking,
+      previewIsToolOutput: hookPreviewIsToolOutput
     })
-  }, [sessionAfterCommandBoundaries.messages, pendingMessages, hookPreview, liveWorking])
+  }, [
+    sessionAfterCommandBoundaries.messages,
+    pendingMessages,
+    hookPreview,
+    liveWorking,
+    hookPreviewIsToolOutput
+  ])
   const sessionWithPending = useMemo<typeof session>(() => {
     if (pending.length === 0 && commandMarkers.length === 0 && !streamingText) {
       return sessionAfterCommandBoundaries
@@ -322,6 +342,19 @@ export function NativeChatResolvedView({
         }
       }}
       onKeyDownCapture={(event) => {
+        const splitDirection = event.repeat
+          ? null
+          : matchNativeChatSplitShortcut(event, getShortcutPlatform(), keybindings)
+        if (splitDirection && contextMenuActions) {
+          event.preventDefault()
+          event.stopPropagation()
+          if (splitDirection === 'right') {
+            contextMenuActions.onSplitRight()
+          } else {
+            contextMenuActions.onSplitDown()
+          }
+          return
+        }
         // Backspace/Delete outside an input focuses the composer (like typing)
         // but inserts nothing — let the now-focused field handle the keystroke.
         if (shouldFocusNativeChatComposerFromEditingKey(event)) {
@@ -355,6 +388,8 @@ export function NativeChatResolvedView({
             session={sessionWithPending}
             isWorking={isWorking}
             fontScale={fontScale.scale}
+            workingStartedAt={hookWorkingEpoch}
+            showTurnStatus={false}
             onLinkClick={nativeChatFileLinkClick}
             allowFileUriLinks={fileLinkContext !== null}
             failedDeliveryMessageIds={failedLaunchPromptMessageIds}
