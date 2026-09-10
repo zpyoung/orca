@@ -177,7 +177,38 @@ the 4-hour budget from now rather than from the PR's creation. Append your accou
 than replacing it. At Step 11 the branch to delete is that one.
 
 If any of the five fails, the PR is not a safe base — leave it open, say so in the report, and run
-the normal procedure from Step 3.
+the normal procedure from Step 3. **One exception: the "built on today's main" check.** An open sync
+PR goes stale the moment anything else merges, and something else will — that check failed on
+2026-09-10 because a fork feature had landed overnight, and GitHub had already flipped the PR to
+`mergeable: false`, `mergeable_state: "dirty"`. Re-running from Step 3 there would throw away a
+resolution that was otherwise complete and green. Merge `main` **into** the PR branch instead and
+resolve, then continue at Step 10:
+
+```sh
+git reset --hard "$PR_HEAD"
+git merge --no-edit origin/main
+```
+
+This merge is fork-against-fork, so `-X ours` is wrong here — it would discard whatever landed on
+`main`, which is exactly the work you are trying to keep. Expect two shapes of conflict:
+
+- **`config/fork-ownership.json` conflicts on nearly every entry.** The two sides reflowed the
+  `residuals` block to different widths, so a textual merge reports formatting as content — 9 hunks
+  on 2026-09-10. Merge it as parsed JSON instead: key `features` by `name`, `seams` by
+  `(path, feature, kind)` (one path legitimately carries several seams, and a sync branch can hold
+  exact duplicate entries that must be collapsed rather than treated as conflicts), and
+  `exceptions`/`residuals` by `path`. Per key: `ours == theirs` take it; `theirs == base` take ours,
+  which honors a deletion the sync made; `ours == base` take theirs; anything else is hand review.
+  That produced **zero** value-level conflicts on the same merge. Format only that one file
+  afterwards (`npx oxfmt --write config/fork-ownership.json`), never `pnpm format`.
+- **Never merge residual numbers.** The two sides measured against different tags, so the merged
+  value is meaningless either way. Re-measure with `--verify-residuals "$UPSTREAM_TARGET"` and
+  re-baseline what it flags. A budget that *shrank* is the normal case here and means the new
+  release absorbed a line the fork was carrying — on 2026-09-10 upstream's own fixture fix
+  superseded a workaround `main` had landed for the same bug, and taking upstream's side dropped
+  three budgets from `+5/-2`, `+5/-2`, `+13/-4` to `+1/-1`, `+1/-1`, `+9/-3`.
+
+Then re-run the Step 8 gate whole before pushing: the merge can break a file neither side broke.
 
 ## Step 3 — Backup
 
@@ -565,13 +596,21 @@ the same shard number failing on **both** Node versions is deterministic, and on
 the flake shape. `gh run rerun` refuses with `cannot be rerun; This workflow is already running`
 until every job has settled, so wait for the run rather than retrying the command.
 
-**A CI failure can come from a poisoned Actions cache, not from the tree.** A cancelled run still
-saves whatever caches its completed steps produced, so a run killed mid-way can publish a
-`native-modules-*` entry built *before* the patched native rebuild finished. Every later run on the
-same key restores it, `rebuild-native-deps.mjs` sees the addon load and skips the rebuild, and a
+**A CI failure can come from a poisoned Actions cache, not from the tree.** A `native-modules-*`
+entry can hold the published prebuild rather than the patched build. Every later run on the same key
+restores it, `rebuild-native-deps.mjs` sees the addon load and skips the rebuild, and a
 patched-source guard then rejects it. v1.4.198 added exactly such a guard
 (`ensure-native-runtime.mjs`: "the loaded addon still calls ReadProcessMemory"), and it failed
 `real WSL terminal` on two consecutive runs of the same PR — reproducing, but not from the diff.
+
+**The poison is self-perpetuating, and a green job is what writes it.** Do not look for a cancelled
+run: on 2026-09-10 the entry that failed the job had been written the previous afternoon by the
+*successful* WSL job that the previous run's cache deletion had just produced. `rebuild-native-deps.mjs`
+decides to skip from `probeElectronNativeModules`, which tests only whether the addon loads, while
+the patched-source check runs later in `ensure-native-runtime.mjs` — so a restored prebuild loads,
+the rebuild is skipped, and the guard rejects it. That file is byte-identical to upstream, so this is
+an upstream defect: deleting the entry unblocks the run but does not stop the next one inheriting a
+fresh bad entry. Expect to do this every sync until upstream's skip decision consults the guard.
 
 The tell is a failure whose whole path is byte-identical to the tag. Prove that before anything else,
 and diff the *real* paths — the patches live in `config/patches/`, not `patches/`, and a diff of a
@@ -590,8 +629,8 @@ env -u GITHUB_TOKEN gh api "repos/zpyoung/orca/actions/caches?per_page=100" \
   --jq '.actions_caches[] | select(.key|test("native-modules")) | "\(.id) | \(.key) | \(.ref) | \(.created_at)"'
 ```
 
-An entry whose `created_at` falls inside a **cancelled** run of this same PR is the poison. Delete
-just that entry and re-run the job:
+The poison is the entry whose key the failing log names as restored — not whichever entry looks
+suspect from its `created_at`. Delete just that entry and re-run the job:
 
 ```sh
 env -u GITHUB_TOKEN gh api -X DELETE "repos/zpyoung/orca/actions/caches/<id>"
@@ -601,6 +640,12 @@ Delete only the one entry the failing log names, only after the run has settled 
 Windows job can re-save it, and only once the byte-identical check above has ruled out the diff.
 Then re-run the job. If it passes, the cache was the cause; if it fails again on a clean cache, the
 defect is real and that is the evidence to escalate with.
+
+`gh run rerun --job <id>` answers `job <id> cannot be rerun` while any job in the run is still
+going, and on a sync PR the e2e lane holds the run open for its full 45 minutes — so queue the
+re-run behind a wait on run status rather than retrying the command. If you are pushing a fix
+anyway, do that instead: the new run re-runs the job for free. Re-running a job also re-runs its
+dependents, which is why `verify` cannot be re-run on its own and does not need to be.
 
 Whether clearing a cache belongs on the fix policy's list of what a fix *may* do is a question for
 the skill's owner, not for a run to settle — raise it, do not assume it.
