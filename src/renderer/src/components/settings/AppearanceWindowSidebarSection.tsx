@@ -21,6 +21,7 @@ import {
 } from './appearance-search'
 import { USAGE_PERCENTAGE_DISPLAY_SETTING_ID } from './appearance-usage-percentage-search'
 import { LeftSidebarAppearanceSetting } from './LeftSidebarAppearanceSetting'
+import { SidebarSectionSeparatorSetting } from './fork-sidebar-section-separator/SidebarSectionSeparatorSetting'
 import {
   getLeftSidebarAppearanceEntry,
   getShowPinnedWorktreesInGroupsEntry,
@@ -124,6 +125,11 @@ export function AppearanceWindowSidebarSection({
           <LeftSidebarAppearanceSetting settings={settings} updateSettings={updateSettings} />
         </SearchableSetting>
 
+        <SidebarSectionSeparatorSetting
+          settings={settings}
+          updateSettings={updateSettings}
+          forceVisible={forceVisiblePrimary}
+        />
         <SearchableSetting
           title={statusBarTitle}
           keywords={statusBarKeywords}

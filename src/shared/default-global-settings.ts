@@ -43,6 +43,7 @@ export function buildDefaultSettings(args: {
     branchPrefixCustom: '',
     theme: 'system',
     leftSidebarAppearanceMode: 'default',
+    sidebarSectionSeparators: true,
     leftSidebarTintColor: DEFAULT_LEFT_SIDEBAR_TINT_COLOR,
     leftSidebarTintOpacity: DEFAULT_LEFT_SIDEBAR_TINT_OPACITY,
     uiLanguage: UI_LANGUAGE_SYSTEM,

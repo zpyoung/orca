@@ -67,6 +67,11 @@
       "name": "session-info",
       "purpose": "Shows provider-neutral details, live context, usage, diagnostics, and safe actions for the exact focused agent terminal session while preserving user-owned statuslines.",
       "globs": ["**/fork-session-info/**"]
+    },
+    {
+      "name": "sidebar-section-separator",
+      "purpose": "Draws a hairline between top-level sidebar sections, behind a user setting.",
+      "globs": ["**/fork-sidebar-section-separator/**"]
     }
   ],
   "seams": [
@@ -281,17 +286,13 @@
       "path": "config/scripts/pr-e2e-gate-contract.test.mjs",
       "feature": "fork-infra",
       "kind": "registration",
-      "lines": [
-        "        job === 'fork_ownership_guard'"
-      ]
+      "lines": ["        job === 'fork_ownership_guard'"]
     },
     {
       "path": "config/scripts/pr-code-change-scope.test.mjs",
       "feature": "fork-infra",
       "kind": "registration",
-      "lines": [
-        "        job === 'fork_ownership_guard'"
-      ]
+      "lines": ["        job === 'fork_ownership_guard'"]
     },
     {
       "path": "src/shared/pane-agent-identity-inventory.test.ts",
@@ -305,17 +306,13 @@
       "path": "tests/e2e/cross-version-wire/cross-version-browser-placement.unit.test.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": [
-        "const LEGACY_BROWSER_PLACEMENT_RELEASE_REF = 'v1.4.183-rc.0.zy01'"
-      ]
+      "lines": ["const LEGACY_BROWSER_PLACEMENT_RELEASE_REF = 'v1.4.183-rc.0.zy01'"]
     },
     {
       "path": "tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": [
-        "const TERMINAL_MODE_METADATA_LEGACY_REF = 'v1.4.191-rc.0.zy01'"
-      ]
+      "lines": ["const TERMINAL_MODE_METADATA_LEGACY_REF = 'v1.4.191-rc.0.zy01'"]
     },
     {
       "path": "tests/e2e/cross-version-wire/release-checkout.unit.test.ts",
@@ -330,10 +327,7 @@
       "path": "src/main/native-chat/transcript-watch-engine-wsl-lifecycle.test.ts",
       "feature": "native-chat-relay",
       "kind": "passthrough",
-      "lines": [
-        "const stubTailReader = (): never => {",
-        "      tailReader: stubTailReader,"
-      ]
+      "lines": ["const stubTailReader = (): never => {", "      tailReader: stubTailReader,"]
     },
     {
       "path": "src/main/native-chat/transcript-watch-engine.ts",
@@ -375,9 +369,7 @@
       "path": "src/main/providers/ssh-pty-provider-rpc-operations.ts",
       "feature": "terminal-dock",
       "kind": "registration",
-      "lines": [
-        "    writeAcknowledged: (id: string, data: string): Promise<boolean> =>"
-      ]
+      "lines": ["    writeAcknowledged: (id: string, data: string): Promise<boolean> =>"]
     },
     {
       "path": "src/main/runtime/orca-runtime-persist-headless-session-tab-props.ts",
@@ -601,9 +593,7 @@
       "path": "src/preload/api/pty-bridge-session-control.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
-      "lines": [
-        "  writeInputAccepted: (id: string, data: string): Promise<boolean> =>"
-      ]
+      "lines": ["  writeInputAccepted: (id: string, data: string): Promise<boolean> =>"]
     },
     {
       "path": "src/relay/relay-runtime-services.ts",
@@ -1195,7 +1185,9 @@
       "kind": "passthrough",
       "lines": [
         "  worktreeGroupMembershipDragPreview: WorktreeGroupMembershipDragPreview",
-        "          'group relative flex h-6 w-full items-center gap-1.5 pr-2 text-left transition-all',"
+        "          'group relative flex h-6 w-full items-center gap-1.5 pr-2 text-left transition-all',",
+        "  sectionSeparatorClass?: string | false",
+        "        args.sectionSeparatorClass,"
       ]
     },
     {
@@ -1321,10 +1313,7 @@
       "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
-      "lines": [
-        "    tabId,",
-        "        tabId,"
-      ]
+      "lines": ["    tabId,", "        tabId,"]
     },
     {
       "path": "src/renderer/src/components/terminal-pane/terminal-pane-mount-cleanup.ts",
@@ -1574,41 +1563,31 @@
       "path": "src/renderer/src/runtime/sync-runtime-graph/types.ts",
       "feature": "terminal-dock",
       "kind": "registration",
-      "lines": [
-        "  terminalDockSyncEnabled: boolean"
-      ]
+      "lines": ["  terminalDockSyncEnabled: boolean"]
     },
     {
       "path": "src/renderer/src/runtime/sync-runtime-graph/mobile-session-inputs.ts",
       "feature": "terminal-dock",
       "kind": "registration",
-      "lines": [
-        "    terminalDockSyncEnabled: publication.terminalDockSyncEnabled,"
-      ]
+      "lines": ["    terminalDockSyncEnabled: publication.terminalDockSyncEnabled,"]
     },
     {
       "path": "src/renderer/src/runtime/sync-runtime-graph/mobile-session-snapshots.ts",
       "feature": "terminal-dock",
       "kind": "registration",
-      "lines": [
-        "    terminalDockSyncEnabled: state.settings?.experimentalTerminalDock === true,"
-      ]
+      "lines": ["    terminalDockSyncEnabled: state.settings?.experimentalTerminalDock === true,"]
     },
     {
       "path": "src/renderer/src/runtime/sync-runtime-graph/mobile-session-terminal-tabs.ts",
       "feature": "terminal-dock",
       "kind": "registration",
-      "lines": [
-        "      ...(inputs.terminalDockSyncEnabled && unifiedTab?.terminalDockByPaneKey"
-      ]
+      "lines": ["      ...(inputs.terminalDockSyncEnabled && unifiedTab?.terminalDockByPaneKey"]
     },
     {
       "path": "src/renderer/src/runtime/sync-runtime-graph/mobile-session-capture.ts",
       "feature": "terminal-dock",
       "kind": "registration",
-      "lines": [
-        "    previous.terminalDockSyncEnabled === next.terminalDockSyncEnabled &&"
-      ]
+      "lines": ["    previous.terminalDockSyncEnabled === next.terminalDockSyncEnabled &&"]
     },
     {
       "path": "src/renderer/src/runtime/web-runtime-terminal-actions.ts",
@@ -1729,7 +1708,8 @@
       "kind": "passthrough",
       "lines": [
         "import { DEFAULT_NATIVE_CHAT_WIDTH_TIER } from './fork-native-chat-width/native-chat-width-default'",
-        "    nativeChatWidth: DEFAULT_NATIVE_CHAT_WIDTH_TIER,"
+        "    nativeChatWidth: DEFAULT_NATIVE_CHAT_WIDTH_TIER,",
+        "    sidebarSectionSeparators: true,"
       ]
     },
     {
@@ -1742,24 +1722,21 @@
         "  experimentalTerminalDock?: boolean",
         "  dockTerminalComposerByDefault?: boolean",
         "  nativeChatWidth?: NativeChatWidthTier",
-        "  forkSessionHandoff?: ForkSessionHandoffSettings"
+        "  forkSessionHandoff?: ForkSessionHandoffSettings",
+        "  sidebarSectionSeparators?: boolean"
       ]
     },
     {
       "path": "src/main/updater/updater-release-feed.ts",
       "feature": "fork-infra",
       "kind": "registration",
-      "lines": [
-        "    const url = 'https://github.com/zpyoung/orca/releases/latest/download'"
-      ]
+      "lines": ["    const url = 'https://github.com/zpyoung/orca/releases/latest/download'"]
     },
     {
       "path": "src/main/updater/updater-setup.ts",
       "feature": "fork-infra",
       "kind": "registration",
-      "lines": [
-        "        url: 'https://github.com/zpyoung/orca/releases/latest/download'"
-      ]
+      "lines": ["        url: 'https://github.com/zpyoung/orca/releases/latest/download'"]
     },
     {
       "path": "src/main/rate-limits/service/service-fetch-policy.ts",
@@ -1849,19 +1826,13 @@
       "path": "src/shared/keybindings/types.ts",
       "feature": "terminal-dock",
       "kind": "registration",
-      "lines": [
-        "  | 'terminal.dock.toggle'",
-        "  | 'terminal.dock.passthrough'"
-      ]
+      "lines": ["  | 'terminal.dock.toggle'", "  | 'terminal.dock.passthrough'"]
     },
     {
       "path": "src/shared/keybindings/definitions-core-4.ts",
       "feature": "terminal-dock",
       "kind": "registration",
-      "lines": [
-        "    id: 'terminal.dock.toggle',",
-        "    id: 'terminal.dock.passthrough',"
-      ]
+      "lines": ["    id: 'terminal.dock.toggle',", "    id: 'terminal.dock.passthrough',"]
     },
     {
       "path": "src/shared/local-build-compatibility-contract.json",
@@ -1945,10 +1916,7 @@
       "path": "src/shared/telemetry-property-schemas.ts",
       "feature": "terminal-dock",
       "kind": "registration",
-      "lines": [
-        "  'experimentalTerminalDock',",
-        "  'dockTerminalComposerByDefault',"
-      ]
+      "lines": ["  'experimentalTerminalDock',", "  'dockTerminalComposerByDefault',"]
     },
     {
       "path": "src/shared/telemetry-event-registry.ts",
@@ -2002,9 +1970,7 @@
       "path": "src/shared/cli-argument-boundary.ts",
       "feature": "fork-infra",
       "kind": "registration",
-      "lines": [
-        "  'protect',"
-      ]
+      "lines": ["  'protect',"]
     },
     {
       "path": "src/cli/artifact-format.ts",
@@ -2217,32 +2183,6 @@
       ]
     },
     {
-      "path": "src/main/startup/main-process-runtime-service.ts",
-      "feature": "artifact-passwords",
-      "kind": "import-swap",
-      "lines": [
-        "import { ArtifactCloudService } from '../artifacts/fork-artifact-passwords/artifact-password-cloud-service'"
-      ]
-    },
-    {
-      "path": "src/main/startup/main-process-observers.ts",
-      "feature": "session-handoff",
-      "kind": "registration",
-      "lines": [
-        "import { recordForkPaneTranscriptObservation } from '../fork-session-handoff/pane-transcript-history'",
-        "  agentHookServer.subscribeEnrichedStatus(recordForkPaneTranscriptObservation)"
-      ]
-    },
-    {
-      "path": "src/main/startup/main-process-account-services.ts",
-      "feature": "session-info",
-      "kind": "registration",
-      "lines": [
-        "import { ingestSessionInfoPlanWindows as ingestPlanWindows } from '../fork-session-info/session-info-plan-window-correlation'",
-        "  agentHookServer.setClaudeStatusLineListener((event) => ingestPlanWindows(state.rateLimits, event))"
-      ]
-    },
-    {
       "path": "src/main/ipc/register-core-handlers/register-core-handlers.ts",
       "feature": "session-handoff",
       "kind": "registration",
@@ -2437,6 +2377,53 @@
       "feature": "session-info",
       "kind": "passthrough",
       "lines": ["  | 'session-info'"]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/rows/virtual-row-dispatch.tsx",
+      "feature": "sidebar-section-separator",
+      "kind": "registration",
+      "lines": [
+        "import { sidebarSectionSeparatorClass } from '../../fork-sidebar-section-separator/section-separator-class'",
+        "      sectionSeparatorClass: sidebarSectionSeparatorClass({",
+        "        settings: ctx.item.settings,",
+        "        rows: ctx.renderRows,",
+        "        index: vItem.index,",
+        "        firstHeaderIndex: ctx.firstHeaderIndex,",
+        "        isActiveStickyHeader: ctx.activeStickyHeaderIndexRef.current === vItem.index,",
+        "        projectGroupDepth: row.projectGroupDepth",
+        "      }),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/AppearanceWindowSidebarSection.tsx",
+      "feature": "sidebar-section-separator",
+      "kind": "registration",
+      "lines": [
+        "import { SidebarSectionSeparatorSetting } from './fork-sidebar-section-separator/SidebarSectionSeparatorSetting'",
+        "        <SidebarSectionSeparatorSetting",
+        "          settings={settings}",
+        "          updateSettings={updateSettings}",
+        "          forceVisible={forceVisiblePrimary}",
+        "        />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/AppearancePane.tsx",
+      "feature": "sidebar-section-separator",
+      "kind": "registration",
+      "lines": [
+        "import { getSidebarSectionSeparatorEntry } from './fork-sidebar-section-separator/section-separator-search'",
+        "    getSidebarSectionSeparatorEntry(),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/appearance-search.ts",
+      "feature": "sidebar-section-separator",
+      "kind": "registration",
+      "lines": [
+        "import { getSidebarSectionSeparatorEntry } from './fork-sidebar-section-separator/section-separator-search'",
+        "    getSidebarSectionSeparatorEntry(),"
+      ]
     }
   ],
   "exceptions": [
@@ -2472,7 +2459,7 @@
     },
     {
       "path": ".github/scripts/check-fork-ownership.mjs",
-      "reason": "The CI guard that enforces this manifest on pull requests \u2014 fork machinery, not upstream code.",
+      "reason": "The CI guard that enforces this manifest on pull requests — fork machinery, not upstream code.",
       "status": "permanent"
     },
     {
@@ -2604,7 +2591,7 @@
     },
     {
       "path": "config/scripts/fork-ownership-manifest.mjs",
-      "reason": "The manifest loader/matcher itself \u2014 fork machinery, not upstream code.",
+      "reason": "The manifest loader/matcher itself — fork machinery, not upstream code.",
       "status": "permanent"
     },
     {
@@ -2748,7 +2735,7 @@
     },
     {
       "path": "package.json",
-      "reason": "Fork identity, versioning, and script wiring \u2014 replaces the old FORK_OWNED_ALWAYS authorship carve-out.",
+      "reason": "Fork identity, versioning, and script wiring — replaces the old FORK_OWNED_ALWAYS authorship carve-out.",
       "status": "permanent"
     },
     {
@@ -2986,7 +2973,7 @@
     },
     {
       "path": "src/shared/native-file-drop.ts",
-      "reason": "Gives the composer drop payload the tabId/paneLeafId its terminal sibling already carries, so a broadcast drop reaches only the composer it landed on. Upstream's shared drop contract, read by preload, main, and every drop consumer \u2014 a forked copy would not reroute them.",
+      "reason": "Gives the composer drop payload the tabId/paneLeafId its terminal sibling already carries, so a broadcast drop reaches only the composer it landed on. Upstream's shared drop contract, read by preload, main, and every drop consumer — a forked copy would not reroute them.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#composer-file-drop-pane-scoping"
     },
@@ -3735,7 +3722,7 @@
       "removed": 0
     },
     "src/renderer/src/components/sidebar/worktree-list/rows/SectionHeader.tsx": {
-      "added": 11,
+      "added": 13,
       "removed": 1
     },
     "src/renderer/src/components/sidebar/worktree-list/rows/item-row.tsx": {
@@ -4051,11 +4038,11 @@
       "removed": 0
     },
     "src/shared/default-global-settings.ts": {
-      "added": 4,
+      "added": 5,
       "removed": 0
     },
     "src/shared/global-settings-types.ts": {
-      "added": 9,
+      "added": 10,
       "removed": 0
     },
     "src/shared/keybindings/definitions-core-4.ts": {
@@ -4157,6 +4144,22 @@
     "tests/e2e/cross-version-wire/release-checkout.unit.test.ts": {
       "added": 11,
       "removed": 14
+    },
+    "src/renderer/src/components/sidebar/worktree-list/rows/virtual-row-dispatch.tsx": {
+      "added": 9,
+      "removed": 0
+    },
+    "src/renderer/src/components/settings/AppearanceWindowSidebarSection.tsx": {
+      "added": 6,
+      "removed": 0
+    },
+    "src/renderer/src/components/settings/AppearancePane.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/settings/appearance-search.ts": {
+      "added": 2,
+      "removed": 0
     }
   }
 }
