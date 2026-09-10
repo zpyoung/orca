@@ -21,6 +21,9 @@ const writeRequest = {
   authToken: 'token-a'
 }
 
+// relative so the store's expiry pruning never drops the fixture as the real clock advances
+const FUTURE_EXPIRES_AT = new Date(Date.now() + 30 * 86_400_000).toISOString()
+
 function createResponse(slug: string): Response {
   return new Response(
     JSON.stringify({
@@ -33,7 +36,7 @@ function createResponse(slug: string): Response {
         renderedContentType: 'text/html',
         createdAt: '2026-08-06T00:00:00.000Z',
         updatedAt: '2026-08-06T00:00:00.000Z',
-        expiresAt: '2026-09-06T00:00:00.000Z',
+        expiresAt: FUTURE_EXPIRES_AT,
         byteSize: 12,
         deletedAt: null
       },

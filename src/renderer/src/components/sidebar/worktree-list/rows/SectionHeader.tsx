@@ -85,6 +85,7 @@ export function renderWorktreeSectionHeaderRow(args: {
   isActiveStickyHeader: boolean
   hasStickyHost: boolean
   hasHeaderTopSpacing: boolean
+  sectionSeparatorClass?: string | false
   measureVirtualRowElement: (element: HTMLDivElement | null) => void
 }): React.JSX.Element {
   const { ctx, row, vItem, isActiveStickyHeader } = args
@@ -192,6 +193,7 @@ export function renderWorktreeSectionHeaderRow(args: {
         'left-0 right-0',
         // Why: drop the inter-group spacer once the header pins so it sits flush at top (see getActiveStickyHeaderIndexForScroll).
         args.hasHeaderTopSpacing && !isActiveStickyHeader && 'pt-1',
+        args.sectionSeparatorClass,
         isActiveStickyHeader
           ? cn(
               'sticky z-20 bg-worktree-sidebar',

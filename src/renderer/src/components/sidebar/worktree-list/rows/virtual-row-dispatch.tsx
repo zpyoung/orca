@@ -29,6 +29,7 @@ import {
   type WorktreeItemRowContext
 } from './item-row'
 import { renderWorktreeSectionHeaderRow, type SectionHeaderRowContext } from './SectionHeader'
+import { sidebarSectionSeparatorClass } from '../../fork-sidebar-section-separator/section-separator-class'
 import type { WorktreeRowDragState } from '../drag/row-state'
 
 export type WorktreeVirtualRowContext = {
@@ -166,6 +167,14 @@ export function renderWorktreeVirtualRow(
         rows: ctx.renderRows,
         index: vItem.index,
         firstHeaderIndex: ctx.firstHeaderIndex
+      }),
+      sectionSeparatorClass: sidebarSectionSeparatorClass({
+        settings: ctx.item.settings,
+        rows: ctx.renderRows,
+        index: vItem.index,
+        firstHeaderIndex: ctx.firstHeaderIndex,
+        isActiveStickyHeader: ctx.activeStickyHeaderIndexRef.current === vItem.index,
+        projectGroupDepth: row.projectGroupDepth
       }),
       measureVirtualRowElement: ctx.measureVirtualRowElement
     })
