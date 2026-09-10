@@ -1,6 +1,6 @@
 ---
-last_released_commit: d5be7dc01d01aed26d671f5818c2b1a351b58c37
-upstream_synced: v1.4.195
+last_released_commit: 9351b616a5514127ad64db2d99f2d8b9ba95ad38
+upstream_synced: v1.4.198
 ---
 
 # Changelog
@@ -11,6 +11,31 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.199-rc.0.zy01] - 2026-09-10
+
+Synced to upstream [v1.4.198](https://github.com/stablyai/orca/releases/tag/v1.4.198), absorbing
+v1.4.196, v1.4.197 and v1.4.198 in one span.
+
+### Added
+- Optional divider lines between the sidebar's top-level projects and groups, switchable from
+  Appearance and findable through settings search. They do not affect layout, and default to on, so
+  an existing sidebar looks the same until the setting is turned off.
+
+### Changed
+- The fork's seams survived upstream's largest module split yet. v1.4.198 broke `main/index.ts`, the
+  chat composer and the terminal pane into separate modules; nine seam barrels were re-homed onto the
+  new files, and the terminal dock now reaches the pane through a controller bridge inside
+  `TerminalPaneSurface` rather than riding its lifecycle hook. That also keeps the dock clear of
+  upstream's per-pane listener budget and leaves a dock-less tab on upstream's own single-argument
+  focus call. No behavior change.
+- The fork's preload API types are covered by the renderer typecheck projects, which had not been
+  seeing them.
+
+### Fixed
+- The sidebar-separator setting has the French catalog it was missing. v1.4.198 adds French to the
+  locale set and the setting was written before it, so its keys had no French bundle to resolve from
+  and the catalog gate rejected the merged tree.
 
 ## [1.4.196-rc.0.zy02] - 2026-09-03
 
