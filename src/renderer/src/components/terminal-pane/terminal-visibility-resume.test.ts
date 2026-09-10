@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PaneManager } from '@/lib/pane-manager/pane-manager'
+import { registerTerminalDockControllerBridge } from './fork-terminal-dock/terminal-dock-controller-bridge'
 import {
   recoverVisibleTerminalWindowWake,
   resumeTerminalVisibility
@@ -9,8 +10,11 @@ vi.mock('@/lib/pane-manager/pane-manager-registry', () => ({
   resetAndRefreshAllTerminalWebglAtlases: vi.fn()
 }))
 const presentPaneViewport = vi.fn()
+const presentPaneViewportPreservingSynchronizedOutput = vi.fn()
 vi.mock('@/lib/pane-manager/pane-webgl-renderer', () => ({
-  presentPaneViewport: (pane: unknown) => presentPaneViewport(pane)
+  presentPaneViewport: (pane: unknown) => presentPaneViewport(pane),
+  presentPaneViewportPreservingSynchronizedOutput: (pane: unknown) =>
+    presentPaneViewportPreservingSynchronizedOutput(pane)
 }))
 vi.mock('@/lib/pane-manager/pane-terminal-output-scheduler', () => ({
   flushTerminalOutput: vi.fn(),
@@ -43,7 +47,33 @@ vi.mock('@/lib/pane-manager/terminal-linkifier-hover-reset', () => ({
 }))
 
 const paneDockOwnsFocus = vi.fn(() => false)
-const focusOwnership = { tabId: 'tab-1', paneDockOwnsFocus }
+// Ownership now comes from the dock's module bridge rather than an argument, so the
+// callers thread only the tab id and a registered dock is what makes one appear.
+const focusOwnership = { tabId: 'tab-1' }
+let unregisterDockBridge: (() => void) | null = null
+
+beforeEach(() => {
+  unregisterDockBridge = registerTerminalDockControllerBridge('tab-1', {
+    paneDockOwnsFocus,
+    notePanePtyBindingChanged: vi.fn(),
+    undockOnConfirmedAgentExit: vi.fn(),
+    prunePassthroughForRetiredPane: vi.fn()
+  })
+})
+
+afterEach(() => {
+  unregisterDockBridge?.()
+  unregisterDockBridge = null
+})
+
+/** Asserts the call threaded this tab's dock ownership, whose lookup routes to the bridge. */
+function expectThreadedOwnership(ownership: unknown): void {
+  const threaded = ownership as { tabId: string; paneDockOwnsFocus: (key: string) => boolean }
+  expect(threaded.tabId).toBe('tab-1')
+  paneDockOwnsFocus.mockClear()
+  threaded.paneDockOwnsFocus('tab-1:leaf-1')
+  expect(paneDockOwnsFocus).toHaveBeenCalledWith('tab-1:leaf-1')
+}
 
 type FakeManager = {
   getPanes: ReturnType<typeof vi.fn>
@@ -84,6 +114,10 @@ describe('resumeTerminalVisibility reveal repaint', () => {
     repairPaneWebglCanvasDprMismatch.mockReturnValue(false)
   })
 
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('schedules an atlas-preserving present on a light tab reveal', () => {
     // The light path is the "click the tab that was not open" gesture: it has
     // no rendering resume or fit, so without this repaint a hidden-while-
@@ -103,8 +137,10 @@ describe('resumeTerminalVisibility reveal repaint', () => {
     resumeTerminalVisibility(resumeArgs(manager, true))
     resumeTerminalVisibility(resumeArgs(manager, false))
 
-    expect(focusActivePane).toHaveBeenNthCalledWith(1, manager, focusOwnership)
-    expect(focusActivePane).toHaveBeenNthCalledWith(2, manager, focusOwnership)
+    expect(focusActivePane).toHaveBeenNthCalledWith(1, manager, expect.anything())
+    expect(focusActivePane).toHaveBeenNthCalledWith(2, manager, expect.anything())
+    expectThreadedOwnership(vi.mocked(focusActivePane).mock.calls[0]?.[1])
+    expectThreadedOwnership(vi.mocked(focusActivePane).mock.calls[1]?.[1])
   })
 
   it('captures native trim movement before enforcing viewport intent', async () => {
@@ -163,7 +199,10 @@ describe('resumeTerminalVisibility reveal repaint', () => {
     expect(flushDeferredPaneMetricOptionsIfMeasurable).not.toHaveBeenCalled()
   })
 
-  it('defers a heavy-reveal dpr present until the shared atlas recovery', async () => {
+  it('rebuilds the atlas synchronously when a heavy reveal repaired a dpr mismatch', async () => {
+    // A repaired backing store leaves the shared atlas holding glyphs rasterized
+    // at the old dpr. Waiting two frames for the settled rebuild would paint
+    // those wrong-size glyphs first, so this path stays synchronous.
     const pane = { terminal: {} }
     const manager = createManager()
     manager.getPanes.mockReturnValue([pane])
@@ -175,15 +214,28 @@ describe('resumeTerminalVisibility reveal repaint', () => {
     resumeTerminalVisibility(resumeArgs(manager, false))
 
     expect(repairPaneWebglCanvasDprMismatch).toHaveBeenCalledWith(pane)
-    expect(presentPaneViewport).not.toHaveBeenCalled()
     expect(resetAndRefreshAllTerminalWebglAtlases).toHaveBeenCalledTimes(1)
-    const atlasResetCallOrder = resetAndRefreshAllTerminalWebglAtlases.mock.invocationCallOrder[0]
-    if (atlasResetCallOrder === undefined) {
-      throw new Error('Shared atlas recovery call order missing')
-    }
-    expect(repairPaneWebglCanvasDprMismatch.mock.invocationCallOrder[0]).toBeLessThan(
-      atlasResetCallOrder
+    expect(resetAndRefreshAllTerminalWebglAtlases).toHaveBeenCalledWith('visibility-resume-dpr')
+    expect(presentPaneViewportPreservingSynchronizedOutput).not.toHaveBeenCalled()
+    expect(manager.scheduleRevealRepaint).toHaveBeenCalledTimes(1)
+  })
+
+  it('presents immediately on a heavy reveal so no pre-hide pixels survive the settle', async () => {
+    // Without this present the canvas composites pre-hide pixels until the
+    // settled rebuild lands two frames later, which under load is not two frames.
+    const pane = { terminal: {} }
+    const manager = createManager()
+    manager.getPanes.mockReturnValue([pane])
+    const { resetAndRefreshAllTerminalWebglAtlases } = vi.mocked(
+      await import('@/lib/pane-manager/pane-manager-registry')
     )
+
+    resumeTerminalVisibility(resumeArgs(manager, false))
+
+    expect(presentPaneViewportPreservingSynchronizedOutput).toHaveBeenCalledWith(pane)
+    // The expensive registry-wide rebuild is still deferred to the settled frame.
+    expect(resetAndRefreshAllTerminalWebglAtlases).not.toHaveBeenCalled()
+    expect(manager.scheduleRevealRepaint).toHaveBeenCalledTimes(1)
   })
 
   it('does not fit on a light tab reveal', () => {
@@ -244,7 +296,8 @@ describe('resumeTerminalVisibility reveal repaint', () => {
       clearGlyphAtlases: false
     })
 
-    expect(focusActivePane).toHaveBeenCalledWith(manager, focusOwnership)
+    expect(focusActivePane).toHaveBeenCalledWith(manager, expect.anything())
+    expectThreadedOwnership(vi.mocked(focusActivePane).mock.calls.at(-1)?.[1])
   })
 
   it('repairs WebGL canvas backing-store dpr on window wake', () => {

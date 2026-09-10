@@ -9,11 +9,23 @@ const attachmentCache = createSubscribableScopeCache<AgentComposerImageAttachmen
 
 export const readNativeChatAttachmentCache = attachmentCache.read
 
+/**
+ * Caches only what another mount may safely adopt.
+ *
+ * A pending chip's save resolves into the host that started it, so restoring one elsewhere
+ * would strand it pending forever. Preview URLs can retain the whole clipboard Blob for the
+ * lifetime of the scope, and a settled chip reloads from its authorized path anyway.
+ */
 export function writeNativeChatAttachmentCache(
   scopeKey: string,
   attachments: readonly AgentComposerImageAttachment[]
 ): void {
-  attachmentCache.write(scopeKey, [...attachments])
+  attachmentCache.write(
+    scopeKey,
+    attachments
+      .filter((attachment) => !attachment.pending)
+      .map(({ previewUrl: _previewUrl, ...attachment }) => attachment)
+  )
 }
 
 /**

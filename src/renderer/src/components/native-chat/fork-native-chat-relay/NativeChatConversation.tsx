@@ -9,6 +9,8 @@ export function NativeChatConversation({
   session,
   isWorking,
   fontScale,
+  workingStartedAt,
+  showTurnStatus,
   onLinkClick,
   allowFileUriLinks,
   failedDeliveryMessageIds,
@@ -17,6 +19,8 @@ export function NativeChatConversation({
   session: NativeChatLiveSession
   isWorking: boolean
   fontScale: number
+  workingStartedAt?: number | null
+  showTurnStatus?: boolean
   onLinkClick?: CommentMarkdownLinkClickHandler
   allowFileUriLinks: boolean
   failedDeliveryMessageIds?: ReadonlySet<string>
@@ -30,6 +34,8 @@ export function NativeChatConversation({
         isWorking={isWorking}
         expandSignal={false}
         fontScale={fontScale}
+        workingStartedAt={workingStartedAt}
+        showTurnStatus={showTurnStatus}
         onLinkClick={onLinkClick}
         allowFileUriLinks={allowFileUriLinks}
         failedDeliveryMessageIds={failedDeliveryMessageIds}
