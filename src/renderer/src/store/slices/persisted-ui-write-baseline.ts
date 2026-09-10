@@ -20,6 +20,10 @@ export type PersistedUIWriteBaseline = {
   sortBy: PersistedUIState['sortBy']
   projectOrderBy: PersistedUIState['projectOrderBy']
   showSleepingWorkspaces: boolean
+  workspaceActivityWindow: PersistedUIState['workspaceActivityWindow']
+  workspaceActivityCustomDays: NonNullable<PersistedUIState['workspaceActivityCustomDays']>
+  hideCompletedReviewWorkspaces: boolean
+  hidePassingCheckWorkspaces: boolean
   hideDefaultBranchWorkspace: boolean
   hideAutomationGeneratedWorkspaces: boolean
   hideCliCreatedWorkspaces: boolean
@@ -43,6 +47,10 @@ const PERSISTED_UI_WRITE_BASELINE_FIELD_SET = {
   rightSidebarWidth: true,
   markdownTocPanelWidth: true,
   combinedDiffFileTreeWidth: true,
+  workspaceActivityWindow: true,
+  workspaceActivityCustomDays: true,
+  hideCompletedReviewWorkspaces: true,
+  hidePassingCheckWorkspaces: true,
   groupBy: true,
   sortBy: true,
   projectOrderBy: true,

@@ -23,6 +23,8 @@ import type {
 } from './ui-chrome-types'
 import type { WorkspaceStatusDefinition } from './worktree/types'
 import type { PersistedAutomationHostFilter } from './automation-host-filter'
+import type { PersistedWorkspaceActivityWindowState } from './fork-workspace-activity-window/workspace-activity-window'
+import type { PersistedWorkspaceReviewFilterState } from './fork-workspace-review-filters/workspace-review-filters'
 
 export type PersistedUIState = {
   lastActiveRepoId: string | null
@@ -204,4 +206,5 @@ export type PersistedUIState = {
   contextualToursSeenIds?: ContextualTourId[]
   /** Whether this profile may receive automatic contextual tours; missing = renderer hasn't classified the profile yet. */
   contextualToursAutoEligible?: boolean
-}
+} & PersistedWorkspaceActivityWindowState &
+  PersistedWorkspaceReviewFilterState

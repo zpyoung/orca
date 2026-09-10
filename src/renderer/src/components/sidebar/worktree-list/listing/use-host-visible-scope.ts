@@ -7,6 +7,8 @@ import {
   type ExecutionHostId
 } from '../../../../../../shared/execution-host'
 import type { SidebarWorktreeFilters } from './use-filters'
+import { useWorkspaceActivityFilter } from '../../fork-workspace-activity-window/use-workspace-activity-filter'
+import { filterFolderWorkspacesForActivityScope } from '../../fork-workspace-activity-window/workspace-activity-folder-filter'
 import { filterFolderWorkspacesFromOtherDevices } from '../../workspace-creator-visibility'
 import {
   filterFolderWorkspacesForVisibleHosts,
@@ -27,6 +29,7 @@ export function useSidebarHostVisibleScope(args: {
   const { filterState, defaultHostId, repos, projectGroups, folderWorkspaces } = args
   const { visibleWorkspaceHostIds, workspaceHostScope, hideWorkspacesFromOtherDevices } =
     filterState
+  const activityContext = useWorkspaceActivityFilter()
   const visibleHostIdSet = useMemo(
     () => getVisibleSidebarHostIdSet(visibleWorkspaceHostIds, workspaceHostScope),
     [visibleWorkspaceHostIds, workspaceHostScope]
@@ -45,28 +48,40 @@ export function useSidebarHostVisibleScope(args: {
     () => filterProjectGroupsForVisibleHosts(projectGroups, visibleHostIdSet, defaultHostId),
     [defaultHostId, projectGroups, visibleHostIdSet]
   )
-  const visibleFolderWorkspacesForRows = useMemo(() => {
-    const hostVisibleWorkspaces = filterFolderWorkspacesForVisibleHosts(
+  const { visibleFolderWorkspaces: visibleFolderWorkspacesForRows, activityHiddenFolderCount } =
+    useMemo(() => {
+      const hostVisibleWorkspaces = filterFolderWorkspacesForVisibleHosts(
+        folderWorkspaces,
+        projectGroups,
+        visibleHostIdSet,
+        defaultHostId
+      )
+      const deviceVisibleWorkspaces = hideWorkspacesFromOtherDevices
+        ? filterFolderWorkspacesFromOtherDevices(
+            hostVisibleWorkspaces,
+            args.pairedDeviceIdsByEnvironment
+          )
+        : hostVisibleWorkspaces
+      return filterFolderWorkspacesForActivityScope({
+        folderWorkspaces: deviceVisibleWorkspaces,
+        projectGroups,
+        defaultHostId,
+        context: activityContext
+      })
+    }, [
+      activityContext,
+      args.pairedDeviceIdsByEnvironment,
+      defaultHostId,
       folderWorkspaces,
+      hideWorkspacesFromOtherDevices,
       projectGroups,
-      visibleHostIdSet,
-      defaultHostId
-    )
-    if (!hideWorkspacesFromOtherDevices) {
-      return hostVisibleWorkspaces
-    }
-    return filterFolderWorkspacesFromOtherDevices(
-      hostVisibleWorkspaces,
-      args.pairedDeviceIdsByEnvironment
-    )
-  }, [
-    args.pairedDeviceIdsByEnvironment,
-    defaultHostId,
-    folderWorkspaces,
-    hideWorkspacesFromOtherDevices,
-    projectGroups,
-    visibleHostIdSet
-  ])
+      visibleHostIdSet
+    ])
 
-  return { visibleReposForRows, visibleProjectGroupsForRows, visibleFolderWorkspacesForRows }
+  return {
+    visibleReposForRows,
+    visibleProjectGroupsForRows,
+    visibleFolderWorkspacesForRows,
+    activityHiddenFolderCount
+  }
 }

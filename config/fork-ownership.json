@@ -67,6 +67,16 @@
       "name": "session-info",
       "purpose": "Shows provider-neutral details, live context, usage, diagnostics, and safe actions for the exact focused agent terminal session while preserving user-owned statuslines.",
       "globs": ["**/fork-session-info/**"]
+    },
+    {
+      "name": "workspace-activity-window",
+      "purpose": "Adds a persisted workspace activity-window filter, activity-aware folder visibility, and hidden-count feedback to the workspace sidebar.",
+      "globs": ["**/fork-workspace-activity-window/**"]
+    },
+    {
+      "name": "workspace-review-filters",
+      "purpose": "Adds persisted workspace review filters for completed pull requests and passing checks across sidebar and workspace views.",
+      "globs": ["**/fork-workspace-review-filters/**"]
     }
   ],
   "seams": [
@@ -281,17 +291,13 @@
       "path": "config/scripts/pr-e2e-gate-contract.test.mjs",
       "feature": "fork-infra",
       "kind": "registration",
-      "lines": [
-        "        job === 'fork_ownership_guard'"
-      ]
+      "lines": ["        job === 'fork_ownership_guard'"]
     },
     {
       "path": "config/scripts/pr-code-change-scope.test.mjs",
       "feature": "fork-infra",
       "kind": "registration",
-      "lines": [
-        "        job === 'fork_ownership_guard'"
-      ]
+      "lines": ["        job === 'fork_ownership_guard'"]
     },
     {
       "path": "src/shared/pane-agent-identity-inventory.test.ts",
@@ -305,17 +311,13 @@
       "path": "tests/e2e/cross-version-wire/cross-version-browser-placement.unit.test.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": [
-        "const LEGACY_BROWSER_PLACEMENT_RELEASE_REF = 'v1.4.183-rc.0.zy01'"
-      ]
+      "lines": ["const LEGACY_BROWSER_PLACEMENT_RELEASE_REF = 'v1.4.183-rc.0.zy01'"]
     },
     {
       "path": "tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
-      "lines": [
-        "const TERMINAL_MODE_METADATA_LEGACY_REF = 'v1.4.191-rc.0.zy01'"
-      ]
+      "lines": ["const TERMINAL_MODE_METADATA_LEGACY_REF = 'v1.4.191-rc.0.zy01'"]
     },
     {
       "path": "tests/e2e/cross-version-wire/release-checkout.unit.test.ts",
@@ -330,10 +332,7 @@
       "path": "src/main/native-chat/transcript-watch-engine-wsl-lifecycle.test.ts",
       "feature": "native-chat-relay",
       "kind": "passthrough",
-      "lines": [
-        "const stubTailReader = (): never => {",
-        "      tailReader: stubTailReader,"
-      ]
+      "lines": ["const stubTailReader = (): never => {", "      tailReader: stubTailReader,"]
     },
     {
       "path": "src/main/native-chat/transcript-watch-engine.ts",
@@ -1696,10 +1695,7 @@
       "path": "src/shared/telemetry-property-schemas.ts",
       "feature": "terminal-dock",
       "kind": "registration",
-      "lines": [
-        "  'experimentalTerminalDock',",
-        "  'dockTerminalComposerByDefault',"
-      ]
+      "lines": ["  'experimentalTerminalDock',", "  'dockTerminalComposerByDefault',"]
     },
     {
       "path": "src/shared/telemetry-event-registry.ts",
@@ -2134,6 +2130,258 @@
       ]
     },
     {
+      "path": "src/main/persistence/applying-settings/ui-state-read.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { normalizeWorkspaceActivityUI } from '../../../shared/fork-workspace-activity-window/workspace-activity-ui'",
+        "  const workspaceActivityUI = normalizeWorkspaceActivityUI(uiState)",
+        "import { normalizeWorkspaceReviewUI } from '../../../shared/fork-workspace-review-filters/workspace-review-ui'",
+        "  const workspaceReviewUI = normalizeWorkspaceReviewUI(uiState)"
+      ]
+    },
+    {
+      "path": "src/main/persistence/applying-settings/ui-state-update.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { mergeWorkspaceActivityUI } from '../../../shared/fork-workspace-activity-window/workspace-activity-ui'",
+        "  const nextActivityUI = mergeWorkspaceActivityUI(operations.state.ui, sanitizedUpdates)",
+        "    ...nextActivityUI,",
+        "    ...nextReviewUI,",
+        "import { mergeWorkspaceReviewUI } from '../../../shared/fork-workspace-review-filters/workspace-review-ui'"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/client-ui-schemas.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "    ...WorkspaceActivityUIUpdateFields,",
+        "    ...WorkspaceReviewUIUpdateFields,",
+        "import { WorkspaceActivityUIUpdateFields } from './fork-workspace-activity-window/workspace-activity-ui-schema'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/app-shell/use-persisted-ui-writer.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "      workspaceActivityWindow: s.workspaceActivityWindow,",
+        "      workspaceActivityCustomDays: s.workspaceActivityCustomDays,",
+        "      hideCompletedReviewWorkspaces: s.hideCompletedReviewWorkspaces,",
+        "      hidePassingCheckWorkspaces: s.hidePassingCheckWorkspaces,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/SidebarFilter.tsx",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "    forkFilterCount > 0 ||",
+        "    clearForkFilters()",
+        "import { WorkspaceActivityWindowControl } from './fork-workspace-activity-window/WorkspaceActivityWindowControl'",
+        "import { useWorkspaceFilterChrome } from './fork-workspace-activity-window/use-workspace-filter-chrome'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/SidebarWorkspaceFilterSection.tsx",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "      <WorkspaceReviewFilterRows />",
+        "import { WorkspaceActivityWindowControl } from './fork-workspace-activity-window/WorkspaceActivityWindowControl'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/WorktreeList.tsx",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "    activityHiddenCount: activityHiddenWorktreeCount,",
+        "        <WorkspaceActivityHiddenCountRow count={activityHiddenCount} />",
+        "import { WorkspaceActivityHiddenCountRow } from './fork-workspace-activity-window/WorkspaceActivityHiddenCountRow'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/sidebar-filter-actions.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { getForkFilterCount } from './fork-workspace-activity-window/workspace-filter-chrome'",
+        "    getForkFilterCount(state) > 0 ||"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/use-visible-workspace-kanban-worktree-ids.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  const workspaceActivity = useWorkspaceActivityFilter()",
+        "  const workspaceReview = useWorkspaceReviewFilter()",
+        "import { useWorkspaceActivityFilter } from './fork-workspace-activity-window/use-workspace-activity-filter'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/use-worktree-card-controller.ts",
+      "feature": "workspace-review-filters",
+      "kind": "import-swap",
+      "lines": [
+        "import { useWorktreeCardReviewDetails } from './fork-workspace-review-filters/use-worktree-card-review-details'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/visible-worktree-kinds.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  Partial<WorkspaceReviewFilterState>",
+        "import type { WorkspaceActivityWindowState } from '../../../../shared/fork-workspace-activity-window/workspace-activity-window'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/visible-worktrees.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  isSelectedActivityWorkspace,",
+        "  filterWorktreesByActivity",
+        "} from './fork-workspace-activity-window/workspace-activity-filter'",
+        "  workspaceActivity?: WorkspaceActivityFilterContext",
+        "  all = filterWorktreesByActivity(all, opts.workspaceActivity, opts.repoMap)",
+        "  workspaceReview?: WorkspaceReviewFilterContext",
+        "  all = filterWorktreesByReview(all, opts.workspaceReview, opts.repoMap)",
+        "import type { WorkspaceActivityFilterContext } from './fork-workspace-activity-window/workspace-activity-filter'",
+        "import { getWorkspaceActivityFilterContext } from './fork-workspace-activity-window/use-workspace-activity-filter'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/listing/use-filters.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { useWorkspaceFilterChrome } from '../../fork-workspace-activity-window/use-workspace-filter-chrome'",
+        "  const { state: forkState, clearFilters: clearForkFilters } = useWorkspaceFilterChrome()",
+        "      ...forkState",
+        "    clearForkFilters()"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/listing/use-host-visible-scope.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  const activityContext = useWorkspaceActivityFilter()",
+        "    activityHiddenFolderCount",
+        "import { useWorkspaceActivityFilter } from '../../fork-workspace-activity-window/use-workspace-activity-filter'",
+        "import { filterFolderWorkspacesForActivityScope } from '../../fork-workspace-activity-window/workspace-activity-folder-filter'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/listing/use-visible-worktrees.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  const workspaceActivity = useWorkspaceActivityFilter()",
+        "      workspaceActivity,",
+        "  const workspaceReview = useWorkspaceReviewFilter()",
+        "      workspaceReview,",
+        "import { computeActivityVisibility } from '../../fork-workspace-activity-window/compute-activity-visibility'",
+        "import { useWorkspaceActivityFilter } from '../../fork-workspace-activity-window/use-workspace-activity-filter'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/startup-ui-hydration.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { hydrateWorkspaceActivityWindow } from '../../../shared/fork-workspace-activity-window/workspace-activity-window'",
+        "    ...hydrateWorkspaceActivityWindow({}),",
+        "import { hydrateWorkspaceReviewFilters } from '../../../shared/fork-workspace-review-filters/workspace-review-filters'",
+        "    ...hydrateWorkspaceReviewFilters({}),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/persisted-ui-write-baseline.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  workspaceActivityWindow: PersistedUIState['workspaceActivityWindow']",
+        "  workspaceActivityCustomDays: NonNullable<PersistedUIState['workspaceActivityCustomDays']>",
+        "  workspaceActivityWindow: true,",
+        "  workspaceActivityCustomDays: true,",
+        "  hideCompletedReviewWorkspaces: boolean",
+        "  hidePassingCheckWorkspaces: boolean",
+        "  hideCompletedReviewWorkspaces: true,",
+        "  hidePassingCheckWorkspaces: true,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/ui.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  ...createWorkspaceActivityWindowSlice(set),",
+        "        ...hydrateWorkspaceActivityWindow(ui),",
+        "import {",
+        "  createWorkspaceReviewFiltersSlice,",
+        "  type WorkspaceReviewFiltersSlice",
+        "} from './fork-workspace-review-filters/workspace-review-filters-state'",
+        "  ...createWorkspaceReviewFiltersSlice(set),",
+        "        ...hydrateWorkspaceReviewFilters(ui),",
+        "import { hydrateWorkspaceActivityWindow } from '../../../../shared/fork-workspace-activity-window/workspace-activity-window'",
+        "} from './fork-workspace-activity-window/workspace-activity-window-state'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/worktrees/session/set-active-folder-workspace.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { markWorkspaceActivityExitOnActivation } from '../../fork-workspace-activity-window/workspace-activity-exit-stamp'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/worktrees/session/set-active-worktree.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { markWorkspaceActivityExitOnActivation } from '../../fork-workspace-activity-window/workspace-activity-exit-stamp'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/web/preload-api/web-preference-normalization.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  const activity = normalizeWebWorkspaceActivity(base, safeUpdates)",
+        "    ...activity,",
+        "  const review = normalizeWebWorkspaceReviewFilters(base, safeUpdates)",
+        "    ...review,",
+        "import { normalizeWebWorkspaceActivity } from './fork-workspace-activity-window/web-workspace-activity-preference'"
+      ]
+    },
+    {
+      "path": "src/shared/pairing-local-ui-fields.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  ...WORKSPACE_ACTIVITY_WINDOW_UI_KEYS,",
+        "  ...WORKSPACE_REVIEW_FILTER_UI_KEYS",
+        "import { WORKSPACE_ACTIVITY_WINDOW_UI_KEYS } from './fork-workspace-activity-window/pairing-local-activity-fields'"
+      ]
+    },
+    {
+      "path": "src/shared/persisted-ui-state-types.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "} & PersistedWorkspaceActivityWindowState &",
+        "  PersistedWorkspaceReviewFilterState",
+        "import type { PersistedWorkspaceActivityWindowState } from './fork-workspace-activity-window/workspace-activity-window'"
+      ]
+    },
+    {
       "path": "src/renderer/src/store/right-sidebar-route.ts",
       "feature": "session-info",
       "kind": "registration",
@@ -2144,6 +2392,46 @@
       "feature": "session-info",
       "kind": "passthrough",
       "lines": ["  | 'session-info'"]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/client-ui-pairing-local-fields.test.ts",
+      "feature": "workspace-activity-window",
+      "kind": "passthrough",
+      "lines": [
+        "import { WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES } from '../../../../shared/fork-workspace-activity-window/pairing-local-activity-fixture'",
+        "    ...WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES,",
+        "import { WORKSPACE_REVIEW_PAIRING_LOCAL_SAMPLES } from '../../../../shared/fork-workspace-review-filters/pairing-local-review-fixture'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/persisted-ui-write-baseline.test.ts",
+      "feature": "workspace-activity-window",
+      "kind": "passthrough",
+      "lines": [
+        "import { WORKSPACE_ACTIVITY_WRITE_BASELINE_SAMPLE } from '../../../../shared/fork-workspace-activity-window/workspace-activity-window'",
+        "    ...WORKSPACE_ACTIVITY_WRITE_BASELINE_SAMPLE,",
+        "import { WORKSPACE_REVIEW_FILTER_WRITE_BASELINE_SAMPLE } from '../../../../shared/fork-workspace-review-filters/workspace-review-filters'",
+        "    ...WORKSPACE_REVIEW_FILTER_WRITE_BASELINE_SAMPLE,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/web/web-preload-api-ui.test.ts",
+      "feature": "workspace-activity-window",
+      "kind": "passthrough",
+      "lines": [
+        "import { WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES } from '../../../shared/fork-workspace-activity-window/pairing-local-activity-fixture'",
+        "    ...WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES,",
+        "import { WORKSPACE_REVIEW_PAIRING_LOCAL_SAMPLES } from '../../../shared/fork-workspace-review-filters/pairing-local-review-fixture'",
+        "    ...WORKSPACE_REVIEW_PAIRING_LOCAL_SAMPLES"
+      ]
+    },
+    {
+      "path": "src/shared/pairing-local-ui-fields.test.ts",
+      "feature": "workspace-activity-window",
+      "kind": "passthrough",
+      "lines": [
+        "import { omitPairingLocalUiFields, PAIRING_LOCAL_UI_FIELDS } from './pairing-local-ui-fields'"
+      ]
     }
   ],
   "exceptions": [
@@ -2179,7 +2467,7 @@
     },
     {
       "path": ".github/scripts/check-fork-ownership.mjs",
-      "reason": "The CI guard that enforces this manifest on pull requests \u2014 fork machinery, not upstream code.",
+      "reason": "The CI guard that enforces this manifest on pull requests — fork machinery, not upstream code.",
       "status": "permanent"
     },
     {
@@ -2311,7 +2599,7 @@
     },
     {
       "path": "config/scripts/fork-ownership-manifest.mjs",
-      "reason": "The manifest loader/matcher itself \u2014 fork machinery, not upstream code.",
+      "reason": "The manifest loader/matcher itself — fork machinery, not upstream code.",
       "status": "permanent"
     },
     {
@@ -2455,7 +2743,7 @@
     },
     {
       "path": "package.json",
-      "reason": "Fork identity, versioning, and script wiring \u2014 replaces the old FORK_OWNED_ALWAYS authorship carve-out.",
+      "reason": "Fork identity, versioning, and script wiring — replaces the old FORK_OWNED_ALWAYS authorship carve-out.",
       "status": "permanent"
     },
     {
@@ -2686,7 +2974,7 @@
     },
     {
       "path": "src/shared/native-file-drop.ts",
-      "reason": "Gives the composer drop payload the tabId/paneLeafId its terminal sibling already carries, so a broadcast drop reaches only the composer it landed on. Upstream's shared drop contract, read by preload, main, and every drop consumer \u2014 a forked copy would not reroute them.",
+      "reason": "Gives the composer drop payload the tabId/paneLeafId its terminal sibling already carries, so a broadcast drop reaches only the composer it landed on. Upstream's shared drop contract, read by preload, main, and every drop consumer — a forked copy would not reroute them.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#composer-file-drop-pane-scoping"
     },
@@ -2844,19 +3132,46 @@
       "added": 28,
       "removed": 8
     },
-    "config/scripts/pr-e2e-gate-contract.test.mjs": { "added": 7, "removed": 1 },
-    "config/scripts/pr-code-change-scope.test.mjs": { "added": 7, "removed": 1 },
-    "src/shared/pane-agent-identity-inventory.test.ts": { "added": 4, "removed": 0 },
-    "tests/e2e/cross-version-wire/cross-version-browser-placement.unit.test.ts": { "added": 4, "removed": 1 },
-    "tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts": { "added": 4, "removed": 2 },
-    "tests/e2e/cross-version-wire/release-checkout.unit.test.ts": { "added": 11, "removed": 11 },
-    "src/main/native-chat/transcript-watch-engine-wsl-lifecycle.test.ts": { "added": 11, "removed": 0 },
-    "src/main/native-chat/transcript-watch-engine.ts": { "added": 36, "removed": 33 },
+    "config/scripts/pr-e2e-gate-contract.test.mjs": {
+      "added": 7,
+      "removed": 1
+    },
+    "config/scripts/pr-code-change-scope.test.mjs": {
+      "added": 7,
+      "removed": 1
+    },
+    "src/shared/pane-agent-identity-inventory.test.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "tests/e2e/cross-version-wire/cross-version-browser-placement.unit.test.ts": {
+      "added": 4,
+      "removed": 1
+    },
+    "tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts": {
+      "added": 4,
+      "removed": 2
+    },
+    "tests/e2e/cross-version-wire/release-checkout.unit.test.ts": {
+      "added": 11,
+      "removed": 11
+    },
+    "src/main/native-chat/transcript-watch-engine-wsl-lifecycle.test.ts": {
+      "added": 11,
+      "removed": 0
+    },
+    "src/main/native-chat/transcript-watch-engine.ts": {
+      "added": 36,
+      "removed": 33
+    },
     "src/main/native-chat/transcript-watch.test.ts": {
       "added": 117,
       "removed": 17
     },
-    "src/main/native-chat/transcript-watch.ts": { "added": 30, "removed": 268 },
+    "src/main/native-chat/transcript-watch.ts": {
+      "added": 30,
+      "removed": 268
+    },
     "src/main/persistence/tracking-repos/project-group-operations.ts": {
       "added": 2,
       "removed": 0
@@ -2973,8 +3288,14 @@
       "added": 10,
       "removed": 2
     },
-    "src/renderer/src/components/native-chat/NativeChatComposer.test.tsx": { "added": 34, "removed": 82 },
-    "src/renderer/src/components/native-chat/NativeChatComposer.tsx": { "added": 209, "removed": 280 },
+    "src/renderer/src/components/native-chat/NativeChatComposer.test.tsx": {
+      "added": 34,
+      "removed": 82
+    },
+    "src/renderer/src/components/native-chat/NativeChatComposer.tsx": {
+      "added": 209,
+      "removed": 280
+    },
     "src/renderer/src/components/native-chat/NativeChatInteractiveCard.test.tsx": {
       "added": 21,
       "removed": 0
@@ -2999,7 +3320,10 @@
       "added": 4,
       "removed": 4
     },
-    "src/renderer/src/components/native-chat/NativeChatResolvedView.tsx": { "added": 16, "removed": 18 },
+    "src/renderer/src/components/native-chat/NativeChatResolvedView.tsx": {
+      "added": 16,
+      "removed": 18
+    },
     "src/renderer/src/components/native-chat/native-chat-command-marker.ts": {
       "added": 1,
       "removed": 1
@@ -3012,9 +3336,18 @@
       "added": 33,
       "removed": 41
     },
-    "src/renderer/src/components/native-chat/use-native-chat-live-session-pending.test.ts": { "added": 4, "removed": 5 },
-    "src/renderer/src/components/native-chat/native-chat-structured-send-composition-clear.test.tsx": { "added": 2, "removed": 2 },
-    "src/renderer/src/components/native-chat/native-chat-structured-composer-dispatch.ts": { "added": 2, "removed": 2 },
+    "src/renderer/src/components/native-chat/use-native-chat-live-session-pending.test.ts": {
+      "added": 4,
+      "removed": 5
+    },
+    "src/renderer/src/components/native-chat/native-chat-structured-send-composition-clear.test.tsx": {
+      "added": 2,
+      "removed": 2
+    },
+    "src/renderer/src/components/native-chat/native-chat-structured-composer-dispatch.ts": {
+      "added": 2,
+      "removed": 2
+    },
     "src/renderer/src/components/native-chat/native-chat-composer-types.ts": {
       "added": 15,
       "removed": 36
@@ -3047,8 +3380,14 @@
       "added": 32,
       "removed": 1
     },
-    "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.test.tsx": { "added": 78, "removed": 114 },
-    "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.ts": { "added": 67, "removed": 36 },
+    "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.test.tsx": {
+      "added": 78,
+      "removed": 114
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.ts": {
+      "added": 67,
+      "removed": 36
+    },
     "src/renderer/src/components/native-chat/use-native-chat-interactive-send.test.tsx": {
       "added": 38,
       "removed": 1
@@ -3118,8 +3457,8 @@
       "removed": 2
     },
     "src/renderer/src/components/sidebar/WorktreeList.tsx": {
-      "added": 10,
-      "removed": 9
+      "added": 24,
+      "removed": 12
     },
     "src/renderer/src/components/sidebar/comment-markdown-element-renderers.tsx": {
       "added": 6,
@@ -3361,7 +3700,10 @@
       "added": 24,
       "removed": 4
     },
-    "src/renderer/src/runtime/web-runtime-terminal-actions.ts": { "added": 3, "removed": 1 },
+    "src/renderer/src/runtime/web-runtime-terminal-actions.ts": {
+      "added": 3,
+      "removed": 1
+    },
     "src/renderer/src/runtime/web-session-tabs-sync.ts": {
       "added": 157,
       "removed": 32
@@ -3426,9 +3768,18 @@
       "added": 4,
       "removed": 0
     },
-    "src/shared/telemetry-property-schemas.ts": { "added": 2, "removed": 0 },
-    "src/shared/telemetry-event-registry.ts": { "added": 9, "removed": 0 },
-    "src/shared/telemetry-events.ts": { "added": 2, "removed": 0 },
+    "src/shared/telemetry-property-schemas.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/shared/telemetry-event-registry.ts": {
+      "added": 9,
+      "removed": 0
+    },
+    "src/shared/telemetry-events.ts": {
+      "added": 2,
+      "removed": 0
+    },
     "src/shared/workspace-session-schema.test.ts": {
       "added": 103,
       "removed": 3
@@ -3466,8 +3817,8 @@
       "removed": 1
     },
     "src/main/index.ts": {
-      "added": 3,
-      "removed": 1
+      "added": 5,
+      "removed": 4
     },
     "src/main/ipc/register-core-handlers/register-core-handlers.test.ts": {
       "added": 8,
@@ -3482,7 +3833,7 @@
       "removed": 0
     },
     "src/renderer/src/components/right-sidebar/AiVaultPanel.tsx": {
-      "added": 1,
+      "added": 3,
       "removed": 1
     },
     "src/renderer/src/components/right-sidebar/AiVaultSessionRow.tsx": {
@@ -3509,34 +3860,94 @@
       "added": 2,
       "removed": 0
     },
-    "src/cli/args.ts": { "added": 1, "removed": 0 },
-    "src/cli/artifact-format.ts": { "added": 6, "removed": 7 },
-    "src/cli/handlers/artifacts.ts": { "added": 2, "removed": 1 },
-    "src/cli/specs/artifacts.ts": { "added": 2, "removed": 2 },
-    "src/main/artifacts/artifact-cloud-recovery.test.ts": { "added": 1, "removed": 1 },
-    "src/main/artifacts/artifact-cloud-service-races.test.ts": { "added": 1, "removed": 1 },
-    "src/main/artifacts/artifact-cloud-service.test.ts": { "added": 9, "removed": 3 },
-    "src/main/orca-profiles/profile-artifact-cloud-cleanup.ts": { "added": 2, "removed": 0 },
-    "src/main/runtime/rpc/methods/artifacts.ts": { "added": 6, "removed": 4 },
-    "src/main/runtime/rpc/methods/index.ts": { "added": 2, "removed": 0 },
-    "src/relay/remote-artifact-cli-input.ts": { "added": 1, "removed": 1 },
-    "src/renderer/src/components/artifacts/ArtifactDetailHeader.tsx": { "added": 3, "removed": 13 },
-    "src/renderer/src/components/artifacts/ArtifactListRows.tsx": { "added": 2, "removed": 3 },
-    "src/renderer/src/components/artifacts/ArtifactsPage.tsx": { "added": 1, "removed": 1 },
+    "src/cli/args.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/cli/artifact-format.ts": {
+      "added": 6,
+      "removed": 7
+    },
+    "src/cli/handlers/artifacts.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/cli/specs/artifacts.ts": {
+      "added": 2,
+      "removed": 2
+    },
+    "src/main/artifacts/artifact-cloud-recovery.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/main/artifacts/artifact-cloud-service-races.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/main/artifacts/artifact-cloud-service.test.ts": {
+      "added": 9,
+      "removed": 3
+    },
+    "src/main/orca-profiles/profile-artifact-cloud-cleanup.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/runtime/rpc/methods/artifacts.ts": {
+      "added": 6,
+      "removed": 4
+    },
+    "src/main/runtime/rpc/methods/index.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/relay/remote-artifact-cli-input.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/artifacts/ArtifactDetailHeader.tsx": {
+      "added": 3,
+      "removed": 13
+    },
+    "src/renderer/src/components/artifacts/ArtifactListRows.tsx": {
+      "added": 2,
+      "removed": 3
+    },
+    "src/renderer/src/components/artifacts/ArtifactsPage.tsx": {
+      "added": 1,
+      "removed": 1
+    },
     "src/renderer/src/components/artifacts/artifact-display-labels.ts": {
       "added": 8,
       "removed": 3
     },
-    "src/renderer/src/components/artifacts/artifact-publish-flow.ts": { "added": 5, "removed": 3 },
+    "src/renderer/src/components/artifacts/artifact-publish-flow.ts": {
+      "added": 5,
+      "removed": 3
+    },
     "src/renderer/src/components/browser-pane/assemble-chrome/browser-page-toolbar.tsx": {
       "added": 1,
       "removed": 1
     },
-    "src/renderer/src/components/editor/EditorPanelHeader.test.tsx": { "added": 1, "removed": 1 },
-    "src/renderer/src/components/editor/EditorPanelHeader.tsx": { "added": 1, "removed": 1 },
-    "src/shared/artifacts.ts": { "added": 12, "removed": 0 },
-    "src/renderer/src/components/settings/settings-page-renderer.tsx": { "added": 2, "removed": 0 },
-    "src/renderer/src/hooks/settings-navigation-workflow-sections.ts": { "added": 2, "removed": 0 },
+    "src/renderer/src/components/editor/EditorPanelHeader.test.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/editor/EditorPanelHeader.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/shared/artifacts.ts": {
+      "added": 12,
+      "removed": 0
+    },
+    "src/renderer/src/components/settings/settings-page-renderer.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/hooks/settings-navigation-workflow-sections.ts": {
+      "added": 2,
+      "removed": 0
+    },
     "src/renderer/src/lib/settings-navigation-types.ts": {
       "added": 1,
       "removed": 0
@@ -3557,21 +3968,13 @@
       "added": 6,
       "removed": 2
     },
-    "src/main/index.ts": {
-      "added": 5,
-      "removed": 4
-    },
     "src/main/persistence/applying-settings/ui-selection-normalization.ts": {
       "added": 1,
       "removed": 0
     },
     "src/main/runtime/rpc/methods/client-ui-schemas.ts": {
-      "added": 1,
+      "added": 5,
       "removed": 0
-    },
-    "src/renderer/src/components/right-sidebar/AiVaultPanel.tsx": {
-      "added": 3,
-      "removed": 1
     },
     "src/renderer/src/components/right-sidebar/right-sidebar-panel-content.tsx": {
       "added": 2,
@@ -3584,6 +3987,106 @@
     "src/shared/ui-chrome-types.ts": {
       "added": 1,
       "removed": 0
+    },
+    "src/main/persistence/applying-settings/ui-state-read.ts": {
+      "added": 6,
+      "removed": 0
+    },
+    "src/main/persistence/applying-settings/ui-state-update.ts": {
+      "added": 7,
+      "removed": 0
+    },
+    "src/renderer/src/app-shell/use-persisted-ui-writer.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/renderer/src/components/sidebar/SidebarFilter.tsx": {
+      "added": 11,
+      "removed": 19
+    },
+    "src/renderer/src/components/sidebar/SidebarWorkspaceFilterSection.tsx": {
+      "added": 4,
+      "removed": 11
+    },
+    "src/renderer/src/components/sidebar/sidebar-filter-actions.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/use-visible-workspace-kanban-worktree-ids.ts": {
+      "added": 11,
+      "removed": 3
+    },
+    "src/renderer/src/components/sidebar/use-worktree-card-controller.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/visible-worktree-kinds.ts": {
+      "added": 7,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/visible-worktrees.ts": {
+      "added": 19,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/listing/use-filters.ts": {
+      "added": 13,
+      "removed": 5
+    },
+    "src/renderer/src/components/sidebar/worktree-list/listing/use-host-visible-scope.ts": {
+      "added": 36,
+      "removed": 21
+    },
+    "src/renderer/src/components/sidebar/worktree-list/listing/use-visible-worktrees.ts": {
+      "added": 21,
+      "removed": 5
+    },
+    "src/renderer/src/lib/startup-ui-hydration.ts": {
+      "added": 4,
+      "removed": 2
+    },
+    "src/renderer/src/store/slices/persisted-ui-write-baseline.ts": {
+      "added": 8,
+      "removed": 0
+    },
+    "src/renderer/src/store/slices/ui.ts": {
+      "added": 16,
+      "removed": 8
+    },
+    "src/renderer/src/store/slices/worktrees/session/set-active-folder-workspace.ts": {
+      "added": 10,
+      "removed": 0
+    },
+    "src/renderer/src/store/slices/worktrees/session/set-active-worktree.ts": {
+      "added": 17,
+      "removed": 0
+    },
+    "src/renderer/src/web/preload-api/web-preference-normalization.ts": {
+      "added": 25,
+      "removed": 2
+    },
+    "src/shared/pairing-local-ui-fields.ts": {
+      "added": 5,
+      "removed": 2
+    },
+    "src/shared/persisted-ui-state-types.ts": {
+      "added": 4,
+      "removed": 1
+    },
+    "src/main/runtime/rpc/methods/client-ui-pairing-local-fields.test.ts": {
+      "added": 5,
+      "removed": 1
+    },
+    "src/renderer/src/store/slices/persisted-ui-write-baseline.test.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/renderer/src/web/web-preload-api-ui.test.ts": {
+      "added": 10,
+      "removed": 2
+    },
+    "src/shared/pairing-local-ui-fields.test.ts": {
+      "added": 5,
+      "removed": 1
     }
   }
 }

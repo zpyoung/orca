@@ -9,7 +9,11 @@ describe('pairing-local UI fields', () => {
       'automationHostFilter',
       'hideWorkspacesFromOtherDevices',
       'manualRepoOrder',
-      'workspaceHostOrder'
+      'workspaceHostOrder',
+      'workspaceActivityWindow',
+      'workspaceActivityCustomDays',
+      'hideCompletedReviewWorkspaces',
+      'hidePassingCheckWorkspaces'
     ])
   })
 

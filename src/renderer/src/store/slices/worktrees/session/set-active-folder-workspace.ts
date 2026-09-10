@@ -8,6 +8,7 @@ import {
   folderWorkspaceMatchesHost
 } from '../listing/detected-worktree-meta'
 import { shouldDeferActivationTerminalPrep } from './activation-terminal-prep'
+import { markWorkspaceActivityExitOnActivation } from '../../fork-workspace-activity-window/workspace-activity-exit-stamp'
 
 export function createSetActiveFolderWorkspace(
   set: WorktreeSliceSet,
@@ -19,6 +20,8 @@ export function createSetActiveFolderWorkspace(
     if (!workspace) {
       return
     }
+    const previousWorkspaceId = get().activeWorktreeId
+    const previousHostId = get().activeWorkspaceExecutionHostId
     if (shouldDeferActivationTerminalPrep()) {
       markInputQuietSchedulerInput()
     }
@@ -122,6 +125,13 @@ export function createSetActiveFolderWorkspace(
           : s.folderWorkspaces
       }
     })
+    markWorkspaceActivityExitOnActivation(
+      get,
+      previousWorkspaceId,
+      previousHostId,
+      workspaceKey,
+      executionHostId ?? null
+    )
     if (workspace.isUnread) {
       void get().updateFolderWorkspace(
         folderWorkspaceId,

@@ -1,10 +1,11 @@
 import {
   DEFAULT_HIDE_SLEEPING_WORKSPACES,
-  DEFAULT_SHOW_SLEEPING_WORKSPACES,
   DEFAULT_STATUS_BAR_ITEMS,
   DEFAULT_WORKTREE_CARD_PROPERTIES
 } from '../../../shared/constants'
 import type { PersistedUIState } from '../../../shared/persisted-ui-state-types'
+import { hydrateWorkspaceActivityWindow } from '../../../shared/fork-workspace-activity-window/workspace-activity-window'
+import { hydrateWorkspaceReviewFilters } from '../../../shared/fork-workspace-review-filters/workspace-review-filters'
 
 export function hydratePersistedUIAfterStartupRead({
   persistedUI,
@@ -47,7 +48,8 @@ export function getStartupErrorFallbackUI(uiHydrated: boolean): PersistedUIState
     projectOrderBy: 'manual',
     showActiveOnly: false,
     hideSleepingWorkspaces: DEFAULT_HIDE_SLEEPING_WORKSPACES,
-    showSleepingWorkspaces: DEFAULT_SHOW_SLEEPING_WORKSPACES,
+    ...hydrateWorkspaceActivityWindow({}),
+    ...hydrateWorkspaceReviewFilters({}),
     hideDefaultBranchWorkspace: false,
     hideCliCreatedWorkspaces: false,
     hideDetachedHeadWorkspaces: false,

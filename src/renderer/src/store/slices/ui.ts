@@ -75,9 +75,7 @@ import {
   resolveVisibleTaskProvider
 } from '../../../../shared/task-providers'
 import {
-  DEFAULT_HIDE_SLEEPING_WORKSPACES,
   DEFAULT_AGENT_ACTIVITY_DISPLAY_MODE,
-  DEFAULT_SHOW_SLEEPING_WORKSPACES,
   DEFAULT_STATUS_BAR_ITEMS,
   DEFAULT_WORKTREE_CARD_PROPERTIES,
   getWorktreeCardModeUpdates,
@@ -145,6 +143,16 @@ import {
   diffPersistedUIWriteFields,
   type PersistedUIWriteBaseline
 } from './persisted-ui-write-baseline'
+import { hydrateWorkspaceActivityWindow } from '../../../../shared/fork-workspace-activity-window/workspace-activity-window'
+import {
+  createWorkspaceActivityWindowSlice,
+  type WorkspaceActivityWindowSlice
+} from './fork-workspace-activity-window/workspace-activity-window-state'
+import {
+  createWorkspaceReviewFiltersSlice,
+  type WorkspaceReviewFiltersSlice
+} from './fork-workspace-review-filters/workspace-review-filters-state'
+import { hydrateWorkspaceReviewFilters } from '../../../../shared/fork-workspace-review-filters/workspace-review-filters'
 
 export type PendingSidebarWorktreeReveal = {
   worktreeId: string
@@ -1072,7 +1080,8 @@ export type UISlice = {
   setBrowserDefaultZoomLevel: (level: number) => void
   browserKagiSessionLink: string | null
   setBrowserKagiSessionLink: (link: string | null) => void
-}
+} & WorkspaceActivityWindowSlice &
+  WorkspaceReviewFiltersSlice
 
 export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get) => ({
   sidebarOpen: true,
@@ -2128,6 +2137,8 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
     window.api.ui.set({ groupBy: g, collapsedGroups: [] }).catch(console.error)
     set({ groupBy: g, collapsedGroups: new Set<string>() })
   },
+  ...createWorkspaceActivityWindowSlice(set),
+  ...createWorkspaceReviewFiltersSlice(set),
 
   sortBy: 'recent',
   setSortBy: (s) => set({ sortBy: s }),
@@ -2138,9 +2149,6 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
 
   showActiveOnly: false,
   setShowActiveOnly: (v) => set({ showActiveOnly: v }),
-
-  showSleepingWorkspaces: DEFAULT_SHOW_SLEEPING_WORKSPACES,
-  setShowSleepingWorkspaces: (v) => set({ showSleepingWorkspaces: v }),
 
   workspaceHostScope: 'all',
   // Why: host scope is presentation/filtering only — must never trigger resource teardown (terminals, browser pages).
@@ -2630,8 +2638,8 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
         projectOrderBy: ui.projectOrderBy,
         // Why: Active-only was retired; force the old flag off so an old profile can't invisibly narrow the workspace list.
         showActiveOnly: false,
-        // Why: ignore older positive-form keys so old profiles start from the new default (sleeping workspaces visible).
-        showSleepingWorkspaces: !(ui.hideSleepingWorkspaces ?? DEFAULT_HIDE_SLEEPING_WORKSPACES),
+        ...hydrateWorkspaceActivityWindow(ui),
+        ...hydrateWorkspaceReviewFilters(ui),
         workspaceHostScope: normalizeExecutionHostScope(ui.workspaceHostScope),
         visibleWorkspaceHostIds: normalizeHydratedVisibleWorkspaceHostIds(ui),
         workspaceHostOrder: normalizeExecutionHostOrder(ui.workspaceHostOrder),

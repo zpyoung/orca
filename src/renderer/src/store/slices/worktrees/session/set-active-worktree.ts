@@ -28,6 +28,7 @@ import {
   pendingActivationTerminalPrepCancels,
   shouldDeferActivationTerminalPrep
 } from './activation-terminal-prep'
+import { markWorkspaceActivityExitOnActivation } from '../../fork-workspace-activity-window/workspace-activity-exit-stamp'
 
 export function createSetActiveWorktree(
   set: WorktreeSliceSet,
@@ -42,6 +43,8 @@ export function createSetActiveWorktree(
       return false
     }
     const workspaceScope = worktreeId ? parseWorkspaceKey(worktreeId) : null
+    const previousWorkspaceId = get().activeWorktreeId
+    const previousHostId = get().activeWorkspaceExecutionHostId
     if (worktreeId && shouldDeferActivationTerminalPrep()) {
       markInputQuietSchedulerInput()
     }
@@ -205,6 +208,20 @@ export function createSetActiveWorktree(
         ...tabsByWorktreeUpdate
       }
     })
+    const accepted =
+      worktreeId === null ||
+      Boolean(
+        get().getKnownWorktreeById(worktreeId, get().activeWorkspaceExecutionHostId ?? undefined)
+      )
+    if (accepted) {
+      markWorkspaceActivityExitOnActivation(
+        get,
+        previousWorkspaceId,
+        previousHostId,
+        get().activeWorktreeId,
+        get().activeWorkspaceExecutionHostId
+      )
+    }
 
     if (worktreeId && shouldPrepareTerminalTabs) {
       const prepareTerminalTabs = (): void => {

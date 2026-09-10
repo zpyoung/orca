@@ -5,6 +5,8 @@ import {
   type PairingLocalUiField
 } from '../../../shared/pairing-local-ui-fields'
 import type { PersistedUIState } from '../../../shared/persisted-ui-state-types'
+import { WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES } from '../../../shared/fork-workspace-activity-window/pairing-local-activity-fixture'
+import { WORKSPACE_REVIEW_PAIRING_LOCAL_SAMPLES } from '../../../shared/fork-workspace-review-filters/pairing-local-review-fixture'
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import type { ManualRepoOrderEntry } from '../../../shared/ui-chrome-types'
 import {
@@ -464,13 +466,19 @@ describe('web UI preload API', () => {
     automationHostFilter: { kind: 'host', hostKey: 'browser-local-host-key' },
     hideWorkspacesFromOtherDevices: true,
     manualRepoOrder: [{ hostId: 'runtime:web-env-1', repoId: 'repo-b' }],
-    workspaceHostOrder: ['runtime:web-env-1', 'local']
+    workspaceHostOrder: ['runtime:web-env-1', 'local'],
+    ...WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES,
+    ...WORKSPACE_REVIEW_PAIRING_LOCAL_SAMPLES
   }
   const hostUiSamples: Record<PairingLocalUiField, unknown> = {
     automationHostFilter: { kind: 'all' },
     hideWorkspacesFromOtherDevices: false,
     manualRepoOrder: [{ hostId: 'local', repoId: 'repo-a' }],
-    workspaceHostOrder: ['local', 'ssh:box']
+    workspaceHostOrder: ['local', 'ssh:box'],
+    workspaceActivityWindow: 'all',
+    workspaceActivityCustomDays: 30,
+    hideCompletedReviewWorkspaces: false,
+    hidePassingCheckWorkspaces: false
   }
 
   it.each(PAIRING_LOCAL_UI_FIELDS.map((field) => [field] as const))(

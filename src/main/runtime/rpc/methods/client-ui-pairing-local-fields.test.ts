@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { getDefaultUIState } from '../../../../shared/constants'
 import { PAIRING_LOCAL_UI_FIELDS } from '../../../../shared/pairing-local-ui-fields'
+import { WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES } from '../../../../shared/fork-workspace-activity-window/pairing-local-activity-fixture'
+import { WORKSPACE_REVIEW_PAIRING_LOCAL_SAMPLES } from '../../../../shared/fork-workspace-review-filters/pairing-local-review-fixture'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import type { RpcRequest } from '../core'
 import { RpcDispatcher } from '../dispatcher'
@@ -44,7 +46,9 @@ describe('client UI RPC pairing-local field seams', () => {
     manualRepoOrder: [
       { hostId: 'runtime:web-11111111-2222-3333-4444-555555555555', repoId: 'repo-a' }
     ],
-    workspaceHostOrder: ['runtime:web-11111111-2222-3333-4444-555555555555', 'local']
+    workspaceHostOrder: ['runtime:web-11111111-2222-3333-4444-555555555555', 'local'],
+    ...WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES,
+    ...WORKSPACE_REVIEW_PAIRING_LOCAL_SAMPLES
   }
 
   it.each(PAIRING_LOCAL_UI_FIELDS.map((field) => [field] as const))(

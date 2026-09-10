@@ -65,3 +65,26 @@ Reviewed every sprint planning. Use `/quirk:artifacts:defer` to append.
 - **Estimated effort**: M
 - **Priority**: P2
 - **Proposed owner**: session-handoff feature owner
+
+## DEFER-7: Branch-age filter from git committerdate
+- **Deferred**: 2026-09-09
+- **Session context**: designing the sidebar workspace activity window (recency filtering)
+- **Why deferred**: the activity clock the filter uses is Orca-side (`lastActivityAt`/`lastVisitedAt`); a branch's real commit recency is captured nowhere. `repo-base-ref-search.ts:36-42` builds a `for-each-ref --sort=-committerdate` argv but its `--format` only captures refname, so the date is used for git's own sort order and discarded. Adding it means a new capture plus a sidecar cache, because `user-data-path.ts:29` records that anything refreshed on a poll cycle must not live in `orca-data.json` — that is why `githubCache` was moved out. It is also N/A for folder workspaces and unreachable on a disconnected SSH host, where `docs/reference/ssh-execution-boundary.md` requires the verdict be `unverifiable` rather than stale. Revisit once someone wants "this branch hasn't moved in 90 days" as distinct from "I haven't worked here in 90 days".
+- **Estimated effort**: M
+- **Priority**: P3
+- **Proposed owner**: workspace-activity-window feature owner
+
+## DEFER-8: Dirty/uncommitted-changes filter needs a sidebar-wide git status sweep
+- **Deferred**: 2026-09-09
+- **Session context**: designing the sidebar workspace activity window (recency filtering)
+- **Why deferred**: `gitStatusByWorktree` (`editor-git-slice.ts:27`) is populated lazily and keyed off `activeWorktreeId` — every reader is active-workspace-scoped (`use-worktree-context.ts:42`, `use-checks-panel-controller-state.tsx:65`), so there is no sidebar-wide dirty signal to filter on. `fork-dirty-branch-indicator` does not supply one either; it is a right-sidebar source-control icon override. PR/CI state is the counter-example that already works this way (`refresh-sweep-actions.ts:70` sweeps every worktree, prioritized by `lastActivityAt`), so that sweep is the pattern to copy — but it costs real IPC per workspace and a round trip per remote workspace on SSH hosts.
+- **Estimated effort**: L
+- **Priority**: P3
+- **Proposed owner**: workspace-activity-window feature owner
+
+## DEFER-9: Fold the activity-window hidden count into a single visibility pass
+- **Deferred**: 2026-09-10
+- **Why deferred**: computeActivityVisibility (src/renderer/src/components/sidebar/fork-workspace-activity-window/compute-activity-visibility.ts:16) runs computeVisibleWorktrees twice on every recompute — once filtered, once with the activity context stripped — purely to derive the hidden count, including the sort and lineage-ancestor injection both times, on a path that also re-keys on agentStatusEpoch. Folding the count into one pass changes ancestor-reinjection semantics, so it is not a mechanical refactor and was out of scope for the review-fix pass. Found during /code-review high --fix on branch zpyoung/project-filters (reviewer finding 10).
+- **Estimated effort**: M
+- **Priority**: P3
+

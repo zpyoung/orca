@@ -1,6 +1,7 @@
 import { ALL_EXECUTION_HOSTS_SCOPE } from '../../../../shared/execution-host'
 import { DEFAULT_SHOW_SLEEPING_WORKSPACES } from '../../../../shared/constants'
 import type { SidebarFilterState } from './visible-worktree-kinds'
+import { getForkFilterCount } from './fork-workspace-activity-window/workspace-filter-chrome'
 
 /**
  * Whether the sidebar is currently filtered, and what "clear filters" should undo.
@@ -11,7 +12,7 @@ import type { SidebarFilterState } from './visible-worktree-kinds'
 
 export function sidebarHasActiveFilters(state: SidebarFilterState): boolean {
   return (
-    state.showSleepingWorkspaces !== DEFAULT_SHOW_SLEEPING_WORKSPACES ||
+    getForkFilterCount(state) > 0 ||
     state.filterRepoIds.length > 0 ||
     state.hideDefaultBranchWorkspace ||
     state.hideAutomationGeneratedWorkspaces ||

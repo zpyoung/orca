@@ -1,4 +1,6 @@
 import type { PersistedUIState } from './persisted-ui-state-types'
+import { WORKSPACE_ACTIVITY_WINDOW_UI_KEYS } from './fork-workspace-activity-window/pairing-local-activity-fields'
+import { WORKSPACE_REVIEW_FILTER_UI_KEYS } from './fork-workspace-review-filters/pairing-local-review-fields'
 
 // UI state each side of a pairing owns for itself. These fields describe a client's own view —
 // which workspaces it hides, what order it puts repos and host sections in — and are keyed to hosts
@@ -11,9 +13,10 @@ export const PAIRING_LOCAL_UI_FIELDS = [
   'automationHostFilter',
   'hideWorkspacesFromOtherDevices',
   'manualRepoOrder',
-  'workspaceHostOrder'
+  'workspaceHostOrder',
+  ...WORKSPACE_ACTIVITY_WINDOW_UI_KEYS,
+  ...WORKSPACE_REVIEW_FILTER_UI_KEYS
 ] as const satisfies readonly (keyof PersistedUIState)[]
-
 export type PairingLocalUiField = (typeof PAIRING_LOCAL_UI_FIELDS)[number]
 
 // What a paired client actually receives over the UI RPCs, so reading a pairing-local field off a
