@@ -143,12 +143,6 @@
       "lines": ["      appId: 'com.zpyoung.orca',"]
     },
     {
-      "path": "config/scripts/pr-workflow-parallelism.test.mjs",
-      "feature": "fork-infra",
-      "kind": "registration",
-      "lines": ["      'fork_ownership_guard',"]
-    },
-    {
       "path": "src/main/ipc/native-chat-subscribe-lifecycle.test.ts",
       "feature": "native-chat-relay",
       "kind": "passthrough",
@@ -284,12 +278,6 @@
     },
     {
       "path": "config/scripts/pr-e2e-gate-contract.test.mjs",
-      "feature": "fork-infra",
-      "kind": "registration",
-      "lines": ["        job === 'fork_ownership_guard'"]
-    },
-    {
-      "path": "config/scripts/pr-code-change-scope.test.mjs",
       "feature": "fork-infra",
       "kind": "registration",
       "lines": ["        job === 'fork_ownership_guard'"]
@@ -2600,6 +2588,44 @@
       "status": "permanent"
     },
     {
+      "path": "config/scripts/client-hosted-browser-package-coverage.test.mjs",
+      "reason": "Contracts for the fork's PR packaging policy; upstream's Windows PR job must not be required by a macOS-only release fork.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/pr-code-change-scope.test.mjs",
+      "reason": "Retains upstream classifier behavior while dropping source-pinning assertions for the Windows PR job absent from the fork-owned workflow.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/pr-workflow-parallelism.test.mjs",
+      "reason": "Contracts for the fork-owned PR job graph, which omits Windows packaging and must not restore upstream's exact aggregate dependency list.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/skills-cli-package-workflow.test.mjs",
+      "reason": "Asserts the Windows packaged CLI job removed from the fork's PR lane; the fork ships only macOS artifacts.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/win32-test-lane-registration.test.mjs",
+      "reason": "Requires registration in the Windows PR job that this macOS-only release fork deliberately does not run.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/windows-pty-native-capability-workflow.test.mjs",
+      "reason": "Asserts the removed Windows PR packaging lane and pins its smoke-driver source; the fork retains platform behavior tests instead.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/wsl-e2e-lane-contract.test.mjs",
+      "reason": "Retains WSL routing and reusable-lane contracts without requiring the Windows PR job omitted by this macOS-only release fork.",
+      "status": "permanent"
+    },
+    {
       "path": "config/scripts/install-electron-package-binary.mjs",
       "reason": "Fork release-tooling delta for packaging the fork's own Electron binary.",
       "status": "permanent"
@@ -3057,17 +3083,9 @@
       "added": 1,
       "removed": 1
     },
-    "config/scripts/pr-code-change-scope.test.mjs": {
-      "added": 7,
-      "removed": 1
-    },
     "config/scripts/pr-e2e-gate-contract.test.mjs": {
       "added": 7,
       "removed": 1
-    },
-    "config/scripts/pr-workflow-parallelism.test.mjs": {
-      "added": 1,
-      "removed": 0
     },
     "config/tsconfig.cli.json": {
       "added": 2,
