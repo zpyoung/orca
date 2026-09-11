@@ -89,6 +89,16 @@ describe('RepositoryLedgerSection', () => {
     setInput(value)
     expect(saveButton()?.disabled).toBe(true)
   })
+  it('keeps the rejected save visible and the controls usable', async () => {
+    await render()
+    setInput('30')
+    mocks.request.mockRejectedValueOnce(new Error('Ledger revision is stale'))
+    await act(async () => saveButton()!.click())
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe('Ledger revision is stale')
+    expect(container.querySelector('input')?.disabled).toBe(false)
+    // The reload restores the server value, so Save is idle rather than stuck pending.
+    expect(container.querySelector('input')?.value).toBe('90')
+  })
   it('says so when the project has no ledger yet', async () => {
     mocks.request.mockResolvedValue({ ledger: null })
     await render()

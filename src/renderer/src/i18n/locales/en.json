@@ -74,7 +74,14 @@
         "loading": "Reading this project’s ledger…",
         "save": "Save",
         "saved": "Saved",
-        "noLedger": "This project has no ledger yet. File an entry to create one."
+        "noLedger": "This project has no ledger yet. File an entry to create one.",
+        "keyword": {
+          "ledger": "ledger",
+          "stale": "stale",
+          "triage": "triage",
+          "bug": "bug",
+          "deferred": "deferred"
+        }
       }
     }
   },

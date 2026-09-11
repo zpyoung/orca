@@ -15,8 +15,8 @@ function ownerKey(owner: Pick<LedgerOwner, 'tier' | 'id'>): string {
 }
 
 export function buildLedgerOwnerLabels(
-  projects: readonly Project[],
-  groups: readonly ProjectGroup[]
+  projects: readonly Project[] = [],
+  groups: readonly ProjectGroup[] = []
 ): Map<string, string> {
   const labels = new Map<string, string>()
   for (const project of projects) {
@@ -44,13 +44,20 @@ export function useLedgerOwnerLabels(
     const target: RuntimeClientTarget = environmentId
       ? { kind: 'environment', environmentId }
       : { kind: 'local' }
-    void Promise.all([
+    // Why: one tier's catalog failing must not cost the other tier its names.
+    void Promise.allSettled([
       callRuntimeRpc<{ projects: Project[] }>(target, 'project.list'),
       callRuntimeRpc<{ groups: ProjectGroup[] }>(target, 'projectGroup.list')
     ])
       .then(([projects, groups]) => {
         if (!cancelled) {
-          setLabels({ key, labels: buildLedgerOwnerLabels(projects.projects, groups.groups) })
+          setLabels({
+            key,
+            labels: buildLedgerOwnerLabels(
+              projects.status === 'fulfilled' ? projects.value.projects : undefined,
+              groups.status === 'fulfilled' ? groups.value.groups : undefined
+            )
+          })
         }
       })
       .catch(() => {})
@@ -59,8 +66,8 @@ export function useLedgerOwnerLabels(
     }
   }, [enabled, environmentId, generation, key])
   const resolved = labels?.key === key ? labels.labels : null
-  // Why: the chooser's refresh calls this from inside its own load callback, so a
-  // new identity per resolve would re-trigger that load and never settle.
+  // Why: callers hold this in effect and callback dependency lists, so a new identity
+  // per resolve would re-trigger their loads and never settle.
   const reload = useCallback(() => setGeneration((current) => current + 1), [])
   return useMemo(
     () => ({

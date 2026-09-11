@@ -38,7 +38,6 @@ export function LedgerChooser({ environmentId, onOpen }: LedgerChooserProps): Re
     const requestGeneration = ++generation.current
     setLoading(true)
     setError(null)
-    reloadOwnerLabels()
     try {
       const response = await ledgerRequest({ operation: 'catalog' }, selectedEnvironmentId)
       if (requestGeneration === generation.current) {
@@ -53,7 +52,7 @@ export function LedgerChooser({ environmentId, onOpen }: LedgerChooserProps): Re
         setLoading(false)
       }
     }
-  }, [ledgerRequest, reloadOwnerLabels, selectedEnvironmentId])
+  }, [ledgerRequest, selectedEnvironmentId])
   useEffect(() => {
     setSelectedEnvironmentId(environmentId)
   }, [environmentId])
@@ -89,7 +88,15 @@ export function LedgerChooser({ environmentId, onOpen }: LedgerChooserProps): Re
               ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              reloadOwnerLabels()
+              void load()
+            }}
+            disabled={loading}
+          >
             <RefreshCw className="mr-2 size-4" />
             Refresh
           </Button>

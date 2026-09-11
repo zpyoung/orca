@@ -33,7 +33,7 @@ export function RepositoryLedgerSection({
   const [saved, setSaved] = useState(false)
   const generation = useRef(0)
   const host = parseExecutionHostId(getRepoExecutionHostId(repo))
-  const environmentId = host?.kind === 'runtime' ? host.id : undefined
+  const environmentId = host?.kind === 'runtime' ? host.environmentId : undefined
   const projectId = getProjectIdentityKey(repo)
 
   const load = useCallback(async () => {
@@ -94,12 +94,12 @@ export function RepositoryLedgerSection({
       if (requestGeneration !== generation.current) {
         return
       }
-      setError(cause instanceof Error ? cause.message : String(cause))
+      const message = cause instanceof Error ? cause.message : String(cause)
+      // Why: load() clears the error before its first await, so it has to be re-stated afterwards.
       await load()
+      setError(message)
     } finally {
-      if (requestGeneration === generation.current) {
-        setPending(false)
-      }
+      setPending(false)
     }
   }
 

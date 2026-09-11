@@ -6328,7 +6328,7 @@ const WorktreeList = React.memo(function WorktreeList({
       const host = parseExecutionHostId(getRepoExecutionHostId(repo))
       openLedgerPage({
         target: { owner: { tier: 'project', id: getProjectIdentityKey(repo) } },
-        ...(host?.kind === 'runtime' ? { environmentId: host.id } : {}),
+        ...(host?.kind === 'runtime' ? { environmentId: host.environmentId } : {}),
         title: `${repo.displayName} ledger`
       })
     },
@@ -6340,7 +6340,7 @@ const WorktreeList = React.memo(function WorktreeList({
       const host = 'executionHostId' in group ? parseExecutionHostId(group.executionHostId) : null
       openLedgerPage({
         target: { owner: { tier: 'group', id: group.id } },
-        ...(host?.kind === 'runtime' ? { environmentId: host.id } : {}),
+        ...(host?.kind === 'runtime' ? { environmentId: host.environmentId } : {}),
         title: `${group.name} ledger`
       })
     },
