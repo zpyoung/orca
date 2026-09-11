@@ -10,14 +10,24 @@ function textSpec() {
   return { questions: [{ id: 'q1', type: 'text', question: 'What is your name?' }] }
 }
 
-function seedActiveDispatch(orchestrationDb: OrchestrationDb, assigneeHandle: string, assigneePaneKey: string) {
+function seedActiveDispatch(
+  orchestrationDb: OrchestrationDb,
+  assigneeHandle: string,
+  assigneePaneKey: string
+) {
   const run = orchestrationDb.createRun({
     objective: 'test run',
     coordinatorHandle: 'term_coord',
     coordinatorPaneKey: COORDINATOR_PANE_KEY
   })
   const task = orchestrationDb.createTask({ spec: 'help the human', runId: run.id })
-  const dispatch = orchestrationDb.createDispatchContext(task.id, assigneeHandle, assigneePaneKey)
+  const dispatch = orchestrationDb.createDispatchContext({
+    taskId: task.id,
+    assigneeHandle,
+    assigneePaneKey,
+    creator: { kind: 'system' },
+    maxDepth: Number.MAX_SAFE_INTEGER
+  })
   return { run, dispatch }
 }
 
@@ -35,7 +45,12 @@ function seedActiveWorkerDispatch(
     coordinatorPaneKey: COORDINATOR_PANE_KEY
   })
   const task = orchestrationDb.createTask({ spec: 'help the human', runId: run.id })
-  const started = orchestrationDb.createStartingWorkerDispatch({ taskId: task.id, startOptions: {} })
+  const started = orchestrationDb.createStartingWorkerDispatch({
+    creator: { kind: 'system' },
+    maxDepth: Number.MAX_SAFE_INTEGER,
+    taskId: task.id,
+    startOptions: {}
+  })
   orchestrationDb.prepareStartingWorkerAuthority({
     dispatchId: started.dispatch.id,
     handle: assigneeHandle,

@@ -2714,6 +2714,7 @@
       "kind": "registration",
       "lines": [
         "import { ASK_REGISTRY_RUNTIME_CAPABILITY } from './fork-ask-question-tool/ask-question-capability'",
+        "  AUTOMATION_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY,",
         "  ASK_REGISTRY_RUNTIME_CAPABILITY"
       ]
     },
@@ -2724,7 +2725,17 @@
       "lines": [
         "import { appendClaudeSuppressionFlags } from './fork-ask-question-tool/claude-suppression-flag-composition'",
         "  claudeSuppressionFlags?: string[] | null",
-        "    ...appendClaudeSuppressionFlags({"
+        "    ...appendClaudeSuppressionFlags({",
+        "      agent: args.agent,",
+        "      shell: args.shell,",
+        "      override,",
+        "      command: args.sessionOptionsOverrideAgentArgs",
+        "        ? commandWithOverrides",
+        "        : suffix.suffix",
+        "          ? `${commandWithOptions} ${suffix.suffix}`",
+        "          : commandWithOptions,",
+        "      commandWithoutSessionOptions,",
+        "      claudeSuppressionFlags: args.claudeSuppressionFlags"
       ]
     },
     {
@@ -2732,9 +2743,9 @@
       "feature": "ask-question-tool",
       "kind": "registration",
       "lines": [
-        "import { applyClaudeSuppressionFlagsToResumeCommand } from './fork-ask-question-tool/claude-suppression-flag-composition'",
         "  claudeSuppressionFlags?: string[] | null",
-        "        command: applyClaudeSuppressionFlagsToResumeCommand({"
+        "    isRemote: args.isRemote,",
+        "    claudeSuppressionFlags: args.claudeSuppressionFlags"
       ]
     },
     {
@@ -2766,33 +2777,6 @@
       ]
     },
     {
-      "path": "src/cli/help.ts",
-      "feature": "ask-question-tool",
-      "kind": "registration",
-      "lines": [
-        "  ask                       Ask the user a question and block until answered",
-        "  ask wait                  Resume blocking on a pending ask",
-        "  ask cancel                Cancel a pending ask as declined"
-      ]
-    },
-    {
-      "path": "src/main/runtime/runtime-rpc.ts",
-      "feature": "ask-question-tool",
-      "kind": "registration",
-      "lines": [
-        "        this.runtime.getAskServices().roster.forgetConnection(socket.connectionId)"
-      ]
-    },
-    {
-      "path": "src/main/runtime/rpc/methods/terminal.ts",
-      "feature": "ask-question-tool",
-      "kind": "registration",
-      "lines": [
-        "  trackAskSurfacePaneSubscription,",
-        "          untrackAskSurfacePaneSubscription(runtime, connectionId, params.terminal)"
-      ]
-    },
-    {
       "path": "src/main/runtime/rpc/methods/index.ts",
       "feature": "ask-question-tool",
       "kind": "registration",
@@ -2802,18 +2786,16 @@
       ]
     },
     {
-      "path": "src/main/index.ts",
-      "feature": "ask-question-tool",
-      "kind": "registration",
-      "lines": [
-        "import { forwardAskEventsToRenderer } from './fork-ask-question-tool/ask-ipc-forward'"
-      ]
-    },
-    {
       "path": "src/main/ipc/notifications.ts",
       "feature": "ask-question-tool",
       "kind": "registration",
       "lines": [
+        "      // pending-ask text already ran through translate() in the renderer; skip rebuilding it here",
+        "      const notificationOptions =",
+        "        args.source === 'pending-ask' && args.title && args.body",
+        "          ? { title: args.title, body: args.body }",
+        "          : buildNotificationOptions(args)",
+        "      // no mobile push for pending asks in v1",
         "      if (runtime && args.source !== 'test' && args.source !== 'pending-ask') {"
       ]
     },
@@ -2822,15 +2804,243 @@
       "feature": "ask-question-tool",
       "kind": "registration",
       "lines": [
-        "export type NotificationEventSource = 'agent-task-complete' | 'terminal-bell' | 'pending-ask' | 'test'"
+        "export type NotificationEventSource = 'agent-task-complete' | 'terminal-bell' | 'pending-ask' | 'test'",
+        "  /** Read only for source 'pending-ask', whose text is built in the renderer so it goes",
+        "   *  through translate(). Every other source must leave these unset: it builds its own",
+        "   *  title/body in buildNotificationOptions, which does not read these fields at all. */",
+        "  title?: string",
+        "  body?: string"
       ]
     },
     {
-      "path": "src/renderer/src/hooks/useIpcEvents.ts",
+      "path": "config/scripts/generate-bundled-skill-guides.mjs",
       "feature": "ask-question-tool",
       "kind": "registration",
       "lines": [
-        "    unsubs.push(wireAskIpcEvents(useAppStore))"
+        "  'orca-ask',",
+        "  'orca-ask': [],",
+        "  'orca-ask',"
+      ]
+    },
+    {
+      "path": "src/cli/bundled-skill-guides.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "    name: \"orca-ask\",",
+        "    markdown: ORCA_ASK_MARKDOWN,",
+        "    fullMarkdown: ORCA_ASK_MARKDOWN,"
+      ]
+    },
+    {
+      "path": "src/cli/root-help-text-primary.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "  'Ask:',",
+        "  '  ask                       Ask the user a question and block until answered',",
+        "  '  ask wait                  Resume blocking on a pending ask',",
+        "  '  ask cancel                Cancel a pending ask as declined',",
+        "  '',"
+      ]
+    },
+    {
+      "path": "src/cli/root-help-text-secondary.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "  '  orca ask --spec <json|@file> [--timeout-ms <n>] [--chunk-ms <n>] [--json]',",
+        "  '  orca ask wait --id <ask_id> [--chunk-ms <n>] [--json]',",
+        "  '  orca ask cancel --id <ask_id> [--json]',"
+      ]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { askServicesFor, type AskServices } from '../fork-ask-question-tool/ask-services'",
+        "class OrcaRuntimeService extends OrcaRuntimeWithResolveWaiter {",
+        "  getAskServices(): AskServices {",
+        "    return askServicesFor(this, () => Boolean(this.getAvailableAuthoritativeWindow()))"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/terminal/terminal-legacy-simple-subscriptions.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { untrackAskSurfacePaneSubscription } from '../../../../fork-ask-question-tool/ask-attached-surface-roster'",
+        "      untrackAskSurfacePaneSubscription(runtime, connectionId, params.terminal)",
+        "      untrackAskSurfacePaneSubscription(runtime, connectionId, params.terminal)"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/terminal/terminal-legacy-subscribe-binary.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { untrackAskSurfacePaneSubscription } from '../../../../fork-ask-question-tool/ask-attached-surface-roster'",
+        "      untrackAskSurfacePaneSubscription(runtime, connectionId, params.terminal)"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/terminal/terminal-multiplex-cleanup.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { untrackAskSurfacePaneSubscription } from '../../../../fork-ask-question-tool/ask-attached-surface-roster'",
+        "  const { runtime, connectionId, streams, pendingPtyWaitControllers, emit, signal } = state",
+        "    untrackAskSurfacePaneSubscription(runtime, connectionId, stream.terminal)"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/terminal/terminal-multiplex-stream-initialization.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { trackAskSurfacePaneSubscription } from '../../../../fork-ask-question-tool/ask-attached-surface-roster'",
+        "  trackAskSurfacePaneSubscription(runtime, connectionId, request.terminal)"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/terminal/terminal-subscribe-method.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { trackAskSurfacePaneSubscription } from '../../../../fork-ask-question-tool/ask-attached-surface-roster'",
+        "      trackAskSurfacePaneSubscription(runtime, connectionId, params.terminal)"
+      ]
+    },
+    {
+      "path": "src/main/runtime/runtime-rpc/runtime-rpc-lifecycle.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "      onReady: (socket) => {",
+        "        this.runtime",
+        "          .getAskServices()",
+        "          .roster.recordConnectionCapabilities(socket.connectionId, socket.clientCapabilities)",
+        "        this.runtime.getAskServices().roster.forgetConnection(socket.connectionId)"
+      ]
+    },
+    {
+      "path": "src/main/startup/main-process-runtime-service.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { forwardAskEventsToRenderer } from '../fork-ask-question-tool/ask-ipc-forward'",
+        "import { getDashboardPopoutWindow } from '../window/dashboard-popout-window'",
+        "  forwardAskEventsToRenderer(",
+        "    runtime.getAskServices().registry,",
+        "    () => state.mainWindow,",
+        "    getDashboardPopoutWindow"
+      ]
+    },
+    {
+      "path": "src/preload/api-types.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import type { AskRegistryEvent } from '../shared/fork-ask-question-tool/ask-question-schema'",
+        "/** IPC subscription surface for ask registry events (tech.md C8); reads go through `runtime.call('ask.snapshot', …)`. */",
+        "export type AskApi = {",
+        "  onSet: (callback: (event: AskRegistryEvent) => void) => () => void",
+        "  asks: AskApi"
+      ]
+    },
+    {
+      "path": "src/preload/index.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { buildForkAskApi } from './fork-ask-question-tool/ask-preload-api'",
+        "  asks: buildForkAskApi(),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatResolvedView.tsx",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { AskCard } from '../fork-ask-question-tool/AskCard'",
+        "import { useAskPaneDock } from '../fork-ask-question-tool/use-ask-pane-dock'",
+        "  const askDock = useAskPaneDock(paneKey)",
+        "      {askDock.model ? (",
+        "        <AskCard",
+        "          key={askDock.model.askId}",
+        "          model={askDock.model}",
+        "          onSubmit={askDock.onSubmit}",
+        "          onCancel={askDock.onCancel}",
+        "          isSubmitting={askDock.isSubmitting}",
+        "          onDraftChange={askDock.onDraftChange}",
+        "        />",
+        "      ) : null}",
+        "      {questionActive || askDock.model ? null : ("
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/TerminalPaneSurface.tsx",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { AskTerminalPaneDockPortals } from './fork-ask-question-tool/AskTerminalPaneDockPortals'",
+        "      <AskTerminalPaneDockPortals controller={controller} />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/hooks/ipc-events/app-lifetime-ipc-bridge.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { wireAskIpcEvents } from '@/components/fork-ask-question-tool/wire-ask-ipc-events'",
+        "  unsubs.push(wireAskIpcEvents(useAppStore))"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/index.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { createAsksSlice } from './slices/fork-ask-question-tool/asks'",
+        "      ...createTerminalQuickCommandHostsSlice(...a),",
+        "      ...createAsksSlice(...a)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/store-test-helpers.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { createAsksSlice } from './fork-ask-question-tool/asks'",
+        "    ...createTerminalQuickCommandHostsSlice(...a),",
+        "    ...createAsksSlice(...a)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/types.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import type { AsksSlice } from './slices/fork-ask-question-tool/asks'",
+        "  TerminalQuickCommandHostsSlice &",
+        "  AsksSlice"
+      ]
+    },
+    {
+      "path": "src/shared/tui-agent-resume-startup.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { applyClaudeSuppressionFlagsToResumeCommand } from './fork-ask-question-tool/claude-suppression-flag-composition'",
+        "  claudeSuppressionFlags?: string[] | null",
+        "        command: applyClaudeSuppressionFlagsToResumeCommand({",
+        "          agent: args.agent,",
+        "          shell,",
+        "          command: resolvedAgentCommand,",
+        "          claudeSuppressionFlags: args.claudeSuppressionFlags",
+        "        isRemote: args.isRemote,",
+        "        claudeSuppressionFlags: args.claudeSuppressionFlags"
       ]
     }
   ],
@@ -3461,6 +3671,10 @@
       "added": 9,
       "removed": 9
     },
+    "config/scripts/generate-bundled-skill-guides.mjs": {
+      "added": 3,
+      "removed": 0
+    },
     "config/scripts/mac-build-compatibility.test.mjs": {
       "added": 1,
       "removed": 1
@@ -3489,17 +3703,41 @@
       "added": 2,
       "removed": 0
     },
+    "src/cli/args.ts": {
+      "added": 2,
+      "removed": 0
+    },
     "src/cli/artifact-format.ts": {
       "added": 6,
       "removed": 7
+    },
+    "src/cli/bundled-skill-guides.ts": {
+      "added": 10,
+      "removed": 0
+    },
+    "src/cli/handler-group-manifest.ts": {
+      "added": 5,
+      "removed": 0
     },
     "src/cli/handlers/artifacts.ts": {
       "added": 2,
       "removed": 1
     },
+    "src/cli/root-help-text-primary.ts": {
+      "added": 5,
+      "removed": 0
+    },
+    "src/cli/root-help-text-secondary.ts": {
+      "added": 3,
+      "removed": 0
+    },
     "src/cli/specs/artifacts.ts": {
       "added": 2,
       "removed": 2
+    },
+    "src/cli/specs/index.ts": {
+      "added": 2,
+      "removed": 0
     },
     "src/main/agent-hooks/server/server-lifecycle.ts": {
       "added": 2,
@@ -3540,6 +3778,10 @@
     "src/main/ipc/notification-system-settings-link.ts": {
       "added": 1,
       "removed": 1
+    },
+    "src/main/ipc/notifications.ts": {
+      "added": 7,
+      "removed": 2
     },
     "src/main/ipc/pty/ipc/write-input.ts": {
       "added": 90,
@@ -3661,6 +3903,10 @@
       "added": 18,
       "removed": 2
     },
+    "src/main/runtime/orca-runtime.ts": {
+      "added": 6,
+      "removed": 1
+    },
     "src/main/runtime/rpc/methods/artifacts.ts": {
       "added": 6,
       "removed": 4
@@ -3670,7 +3916,7 @@
       "removed": 0
     },
     "src/main/runtime/rpc/methods/index.ts": {
-      "added": 2,
+      "added": 4,
       "removed": 0
     },
     "src/main/runtime/rpc/methods/native-chat.test.ts": {
@@ -3689,6 +3935,26 @@
       "added": 50,
       "removed": 1
     },
+    "src/main/runtime/rpc/methods/terminal/terminal-legacy-simple-subscriptions.ts": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/main/runtime/rpc/methods/terminal/terminal-legacy-subscribe-binary.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/runtime/rpc/methods/terminal/terminal-multiplex-cleanup.ts": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/main/runtime/rpc/methods/terminal/terminal-multiplex-stream-initialization.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/runtime/rpc/methods/terminal/terminal-subscribe-method.ts": {
+      "added": 2,
+      "removed": 0
+    },
     "src/main/runtime/rpc/methods/worktree-schemas.ts": {
       "added": 2,
       "removed": 1
@@ -3700,6 +3966,10 @@
     "src/main/runtime/runtime-artifact-controller.ts": {
       "added": 2,
       "removed": 2
+    },
+    "src/main/runtime/runtime-rpc/runtime-rpc-lifecycle.ts": {
+      "added": 5,
+      "removed": 1
     },
     "src/main/skills/claude-plugin-skill-sources.test.ts": {
       "added": 1,
@@ -3734,7 +4004,7 @@
       "removed": 0
     },
     "src/main/startup/main-process-runtime-service.ts": {
-      "added": 1,
+      "added": 8,
       "removed": 1
     },
     "src/main/telemetry/client.ts": {
@@ -3754,7 +4024,7 @@
       "removed": 1
     },
     "src/preload/api-types.ts": {
-      "added": 8,
+      "added": 12,
       "removed": 0
     },
     "src/preload/api/native-chat-api.ts": {
@@ -3775,6 +4045,10 @@
     },
     "src/preload/api/ui-command-event-api.ts": {
       "added": 2,
+      "removed": 0
+    },
+    "src/preload/index.ts": {
+      "added": 6,
       "removed": 0
     },
     "src/relay/relay-runtime-services.ts": {
@@ -3870,8 +4144,8 @@
       "removed": 1
     },
     "src/renderer/src/components/native-chat/NativeChatResolvedView.tsx": {
-      "added": 16,
-      "removed": 18
+      "added": 30,
+      "removed": 19
     },
     "src/renderer/src/components/native-chat/NativeChatView.test.tsx": {
       "added": 4,
@@ -4009,6 +4283,14 @@
       "added": 7,
       "removed": 0
     },
+    "src/renderer/src/components/settings/AppearancePane.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/settings/AppearanceWindowSidebarSection.tsx": {
+      "added": 6,
+      "removed": 0
+    },
     "src/renderer/src/components/settings/ExperimentalPane.test.tsx": {
       "added": 31,
       "removed": 0
@@ -4019,6 +4301,10 @@
     },
     "src/renderer/src/components/settings/NativeChatExperimentalSetting.tsx": {
       "added": 5,
+      "removed": 0
+    },
+    "src/renderer/src/components/settings/appearance-search.ts": {
+      "added": 2,
       "removed": 0
     },
     "src/renderer/src/components/settings/experimental-search.ts": {
@@ -4137,6 +4423,10 @@
       "added": 10,
       "removed": 1
     },
+    "src/renderer/src/components/sidebar/worktree-list/rows/virtual-row-dispatch.tsx": {
+      "added": 9,
+      "removed": 0
+    },
     "src/renderer/src/components/sidebar/worktree-list/viewport/VirtualizedWorktreeViewport.tsx": {
       "added": 8,
       "removed": 1
@@ -4166,7 +4456,7 @@
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/TerminalPaneSurface.tsx": {
-      "added": 6,
+      "added": 8,
       "removed": 1
     },
     "src/renderer/src/components/terminal-pane/focus-terminal-pane-event.test.ts": {
@@ -4217,13 +4507,13 @@
       "added": 15,
       "removed": 6
     },
-    "src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects.ts": {
-      "added": 2,
-      "removed": 0
-    },
     "src/renderer/src/components/terminal-pane/use-terminal-pane-chat-state.ts": {
       "added": 6,
       "removed": 2
+    },
+    "src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects.ts": {
+      "added": 2,
+      "removed": 0
     },
     "src/renderer/src/components/terminal-pane/use-terminal-pane-layout-bindings.ts": {
       "added": 17,
@@ -4244,6 +4534,10 @@
     "src/renderer/src/components/terminal-pane/use-terminal-window-wake-recovery.ts": {
       "added": 5,
       "removed": 1
+    },
+    "src/renderer/src/hooks/ipc-events/app-lifetime-ipc-bridge.ts": {
+      "added": 2,
+      "removed": 0
     },
     "src/renderer/src/hooks/settings-navigation-workflow-sections.ts": {
       "added": 2,
@@ -4409,9 +4703,17 @@
       "added": 14,
       "removed": 1
     },
+    "src/renderer/src/store/index.ts": {
+      "added": 3,
+      "removed": 1
+    },
     "src/renderer/src/store/right-sidebar-route.ts": {
       "added": 1,
       "removed": 0
+    },
+    "src/renderer/src/store/slices/store-test-helpers.ts": {
+      "added": 3,
+      "removed": 1
     },
     "src/renderer/src/store/slices/tabs/create-tabs-slice.ts": {
       "added": 7,
@@ -4423,6 +4725,10 @@
     },
     "src/renderer/src/store/slices/tabs/tabs-slice-contract.ts": {
       "added": 2,
+      "removed": 1
+    },
+    "src/renderer/src/store/types.ts": {
+      "added": 3,
       "removed": 1
     },
     "src/renderer/src/web/preload-api/web-native-chat-api.ts": {
@@ -4489,11 +4795,19 @@
       "added": 14,
       "removed": 0
     },
+    "src/shared/notification-settings-types.ts": {
+      "added": 6,
+      "removed": 1
+    },
     "src/shared/pane-agent-identity-inventory.test.ts": {
       "added": 4,
       "removed": 0
     },
     "src/shared/project-groups.ts": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/shared/protocol-version.ts": {
       "added": 3,
       "removed": 1
     },
@@ -4520,6 +4834,18 @@
     "src/shared/telemetry-property-schemas.ts": {
       "added": 2,
       "removed": 0
+    },
+    "src/shared/tui-agent-launch-command.ts": {
+      "added": 14,
+      "removed": 6
+    },
+    "src/shared/tui-agent-resume-startup.ts": {
+      "added": 10,
+      "removed": 2
+    },
+    "src/shared/tui-agent-startup.ts": {
+      "added": 3,
+      "removed": 1
     },
     "src/shared/ui-chrome-types.ts": {
       "added": 1,
@@ -4552,86 +4878,6 @@
     "tests/e2e/cross-version-wire/release-checkout.unit.test.ts": {
       "added": 11,
       "removed": 14
-    },
-    "src/renderer/src/components/sidebar/worktree-list/rows/virtual-row-dispatch.tsx": {
-      "added": 9,
-      "removed": 0
-    },
-    "src/renderer/src/components/settings/AppearanceWindowSidebarSection.tsx": {
-      "added": 6,
-      "removed": 0
-    },
-    "src/renderer/src/components/settings/AppearancePane.tsx": {
-      "added": 2,
-      "removed": 0
-    },
-    "src/renderer/src/components/settings/appearance-search.ts": {
-      "added": 2,
-      "removed": 0
-    },
-    "src/shared/protocol-version.ts": {
-      "added": 3,
-      "removed": 1
-    },
-    "src/shared/tui-agent-launch-command.ts": {
-      "added": 14,
-      "removed": 6
-    },
-    "src/shared/tui-agent-startup.ts": {
-      "added": 16,
-      "removed": 3
-    },
-    "src/cli/specs/index.ts": {
-      "added": 2,
-      "removed": 0
-    },
-    "src/cli/handler-group-manifest.ts": {
-      "added": 5,
-      "removed": 0
-    },
-    "src/cli/args.ts": {
-      "added": 2,
-      "removed": 0
-    },
-    "src/cli/help.ts": {
-      "added": 8,
-      "removed": 0
-    },
-    "src/main/runtime/orca-runtime.ts": {
-      "added": 145,
-      "removed": 11
-    },
-    "src/main/runtime/rpc/methods/terminal.ts": {
-      "added": 10,
-      "removed": 0
-    },
-    "src/main/runtime/runtime-rpc.ts": {
-      "added": 5,
-      "removed": 1
-    },
-    "src/preload/index.ts": {
-      "added": 30,
-      "removed": 7
-    },
-    "src/main/index.ts": {
-      "added": 2,
-      "removed": 0
-    },
-    "src/main/ipc/notifications.ts": {
-      "added": 7,
-      "removed": 2
-    },
-    "src/shared/notification-settings-types.ts": {
-      "added": 6,
-      "removed": 1
-    },
-    "src/renderer/src/components/native-chat/NativeChatView.tsx": {
-      "added": 29,
-      "removed": 18
-    },
-    "src/renderer/src/hooks/useIpcEvents.ts": {
-      "added": 2,
-      "removed": 0
     }
   }
 }
