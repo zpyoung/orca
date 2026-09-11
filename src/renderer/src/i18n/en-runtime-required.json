@@ -1858,6 +1858,9 @@
         "SetupScriptPromptCard": {
           "dcaa645da5": "ok"
         },
+        "SidebarFilter": {
+          "638a2d221d": "Hide sleeping"
+        },
         "SidebarHeader": {
           "49f62c5665": "Workspace board",
           "5c9c7c16aa": "Add a project to create workspaces",
@@ -1879,6 +1882,9 @@
         "SidebarToolbar": {
           "19e32d0e5f": "Open folder picker to add a project",
           "abc62b6328": "Add Project"
+        },
+        "SidebarWorkspaceFilterSection": {
+          "ed1611b65b": "Hide sleeping"
         },
         "SidebarWorkspaceOptionsMenu": {
           "2d4f0eb933": "Default",

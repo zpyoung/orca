@@ -25,7 +25,8 @@ import { normalizeUiLanguage } from '../../../../shared/ui-language'
 import { normalizeUsagePercentageDisplay } from '../../../../shared/usage-percentage-display'
 import { mergeWorkspaceCleanupUIState } from '../../../../shared/workspace-cleanup-ui-state'
 import { mergeForkSessionHandoffSettings } from '../../../../shared/fork-session-handoff/handoff-settings-merge'
-
+import { normalizeWebWorkspaceActivity } from './fork-workspace-activity-window/web-workspace-activity-preference'
+import { normalizeWebWorkspaceReviewFilters } from './fork-workspace-review-filters/web-workspace-review-preference'
 export function mergeWebUIState(
   base: PersistedUIState,
   updates: Partial<PersistedUIState>
@@ -35,9 +36,14 @@ export function mergeWebUIState(
       featureInteractionTelemetryBuckets?: unknown
     }
   void _reserved
+  const activity = normalizeWebWorkspaceActivity(base, safeUpdates)
+  const review = normalizeWebWorkspaceReviewFilters(base, safeUpdates)
   return {
     ...base,
     ...safeUpdates,
+    ...activity,
+    ...review,
+    showInactiveWorkspaces: activity.showSleepingWorkspaces,
     workspaceCleanup: mergeWorkspaceCleanupUIState(
       base.workspaceCleanup,
       safeUpdates.workspaceCleanup
@@ -63,6 +69,14 @@ export function mergeHostWebUIState(
   local: PersistedUIState,
   incoming: PairedUiState
 ): PersistedUIState {
+  // The window is pairing-local but the legacy sleeping booleans are shared, so fold only those
+  // off the host response — passing all of `incoming` would adopt a window value that leaked.
+  const activity = normalizeWebWorkspaceActivity(local, {
+    hideSleepingWorkspaces: incoming.hideSleepingWorkspaces,
+    showSleepingWorkspaces: incoming.showSleepingWorkspaces,
+    showInactiveWorkspaces: incoming.showInactiveWorkspaces
+  })
+  const review = normalizeWebWorkspaceReviewFilters(local, {})
   // Why `satisfies Record<...>` rather than a `Pick<...>` annotation: every member is optional in
   // PersistedUIState, so Pick would accept a literal that silently skipped a newly added member.
   const pinned = {
@@ -77,7 +91,14 @@ export function mergeHostWebUIState(
     agentsReadFilter: local.agentsReadFilter,
     agentsGroupBy: local.agentsGroupBy,
     activityClearedAtByPaneKey: local.activityClearedAtByPaneKey,
-    manuallyUnreadTurnsByPaneKey: local.manuallyUnreadTurnsByPaneKey
+    manuallyUnreadTurnsByPaneKey: local.manuallyUnreadTurnsByPaneKey,
+    workspaceActivityWindow: activity.workspaceActivityWindow,
+    workspaceActivityCustomDays: activity.workspaceActivityCustomDays,
+    hideSleepingWorkspaces: activity.workspaceActivityWindow === 'live-only',
+    showSleepingWorkspaces: activity.showSleepingWorkspaces,
+    showInactiveWorkspaces: activity.showSleepingWorkspaces,
+    hideCompletedReviewWorkspaces: review.hideCompletedReviewWorkspaces,
+    hidePassingCheckWorkspaces: review.hidePassingCheckWorkspaces
   } satisfies Record<PairingLocalUiField, unknown> & Partial<PersistedUIState>
   return { ...mergeWebUIState(local, incoming), ...pinned }
 }

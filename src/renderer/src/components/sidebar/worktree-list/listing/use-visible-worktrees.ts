@@ -5,7 +5,10 @@ import { getWorktreeIdsWithLiveAgent } from '@/lib/worktree-activity-state'
 import type { Repo } from '../../../../../../shared/repo-types'
 import type { WorktreeLineage } from '../../../../../../shared/worktree/lineage-types'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
-import { computeVisibleWorktrees } from '../../visible-worktrees'
+import { computeVisibleWorktrees, type VisibleWorktreeOptions } from '../../visible-worktrees'
+import { computeActivityVisibility } from '../../fork-workspace-activity-window/compute-activity-visibility'
+import { useWorkspaceActivityFilter } from '../../fork-workspace-activity-window/use-workspace-activity-filter'
+import { useWorkspaceReviewFilter } from '../../fork-workspace-review-filters/use-workspace-review-filter'
 import {
   EMPTY_PAIRED_DEVICE_IDS_BY_ENVIRONMENT,
   getPairedDeviceIdsByEnvironment
@@ -46,6 +49,8 @@ export function useVisibleSidebarWorktrees(args: {
     visibleWorkspaceHostIds,
     workspaceHostScope
   } = filterState
+  const workspaceActivity = useWorkspaceActivityFilter()
+  const workspaceReview = useWorkspaceReviewFilter()
   const worktreesByRepo = useAppStore((s) => s.worktreesByRepo)
   const agentStatusEpoch = useAppStore((s) => (!showSleepingWorkspaces ? s.agentStatusEpoch : 0))
   // Why: skip the clock entirely when the epoch is the opt-out sentinel, so a
@@ -75,7 +80,7 @@ export function useVisibleSidebarWorktrees(args: {
     // Keyed on the epoch, not `agentStatusNow`: two bumps in one millisecond
     // share a sample, so the timestamp alone would not re-key this memo.
     void agentStatusEpoch
-    return computeVisibleWorktrees(worktreesByRepo, sortedIds, {
+    const options: VisibleWorktreeOptions = {
       filterRepoIds,
       showSleepingWorkspaces,
       tabsByWorktree,
@@ -100,11 +105,16 @@ export function useVisibleSidebarWorktrees(args: {
       workspaceHostScope,
       visibleWorkspaceHostIds,
       defaultHostId,
+      workspaceActivity,
+      workspaceReview,
       worktreeLineageById,
       forcedVisibleWorktreeIds: args.agentSendTargetWorktreeId
         ? [args.agentSendTargetWorktreeId]
         : undefined
-    })
+    }
+    return computeActivityVisibility(options, (nextOptions) =>
+      computeVisibleWorktrees(worktreesByRepo, sortedIds, nextOptions)
+    )
   }, [
     args.agentSendTargetWorktreeId,
     agentStatusEpoch,
@@ -124,6 +134,8 @@ export function useVisibleSidebarWorktrees(args: {
     tabsByWorktree,
     ptyIdsByTabId,
     browserTabsByWorktree,
+    workspaceActivity,
+    workspaceReview,
     sortedIds,
     worktreeLineageById,
     worktreesByRepo,
@@ -132,7 +144,11 @@ export function useVisibleSidebarWorktrees(args: {
   // Why: agentStatusEpoch bumps recompute this memo even when membership and
   // order are unchanged; keeping the previous identity stops the whole
   // rows/sectionRows/renderedWorktrees chain from churning per epoch.
-  const visibleWorktrees = useReusedArrayIdentity(recomputedVisibleWorktrees)
+  const visibleWorktrees = useReusedArrayIdentity(recomputedVisibleWorktrees.worktrees)
 
-  return { visibleWorktrees, pairedDeviceIdsByEnvironment }
+  return {
+    visibleWorktrees,
+    activityHiddenCount: recomputedVisibleWorktrees.activityHiddenCount,
+    pairedDeviceIdsByEnvironment
+  }
 }

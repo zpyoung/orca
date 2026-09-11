@@ -116,8 +116,7 @@ export function useHandoffTargetEnvironment(args: {
     useState<Awaited<ReturnType<typeof fetchHandoffRepoState>>>(null)
   const [repoStateLoading, setRepoStateLoading] = useState(false)
   const [repoStateError, setRepoStateError] = useState<string | null>(null)
-  const detectorRef =
-    useRef<ReturnType<typeof createHandoffAgentDetectionGeneration>>(undefined!)
+  const detectorRef = useRef<ReturnType<typeof createHandoffAgentDetectionGeneration>>(undefined!)
   detectorRef.current ??= createHandoffAgentDetectionGeneration()
   const detectionRequestRef = useRef(0)
   // Why: resolveHandoffTarget rebuilds its result on every unrelated store write, so effects
