@@ -4,21 +4,13 @@ import {
   getAgentSessionOptionCatalog,
   type CatalogModel
 } from '../../../../shared/agent-session-option-catalog'
-import {
-  clearNativeChatSessionOptionModel,
-  updateNativeChatSessionOptionDefaults
-} from '../../../../shared/native-chat-session-option-defaults'
-import type {
-  PersistedNativeChatSessionOptions,
-  SessionOptionDescriptor
-} from '../../../../shared/native-chat-session-options'
+import type { SessionOptionDescriptor } from '../../../../shared/native-chat-session-options'
 import type { NativeChatSessionOptionObservation } from '../../../../shared/native-chat-types'
 import { nativeChatReportedValuesFromObservation } from './fork-native-chat-session-options/native-chat-session-option-observation'
 import {
   hasDispatchedNativeChatSessionOption,
   useClaudeStartupFrameRevision
 } from './fork-native-chat-session-options/use-claude-startup-frame-revision'
-import { useAppStore } from '../../store'
 import {
   createNativeChatPtySessionOptions,
   type NativeChatPtySessionOptionsSurface
@@ -34,35 +26,12 @@ import {
   resolveNativeChatModelDiscoveryContext
 } from './native-chat-session-option-discovery'
 import { readClaudeSessionOptionsFromTerminalScreen } from './claude-terminal-session-options'
+import { enqueueSessionOptionSettingsWrite } from './native-chat-session-option-settings-write'
 
 const EMPTY_SNAPSHOT: SessionOptionDescriptor[] = []
 const subscribeEmpty = (): (() => void) => () => {}
 const getEmptySnapshot = (): SessionOptionDescriptor[] => EMPTY_SNAPSHOT
-
-/**
- * Why: every nativeChatSessionOptions writer — a pick from any pane, a probe
- * retirement — serializes on this one chain and re-reads live settings at apply
- * time. updateSettings shallow-merges the whole object, so an interleaved write
- * from a snapshot captured earlier would silently clobber a concurrent pick.
- * The update runs against the settled base and may return null to skip writing.
- */
-let settingsWrite: Promise<unknown> = Promise.resolve()
-function enqueueSessionOptionSettingsWrite(
-  update: (
-    base: PersistedNativeChatSessionOptions | undefined
-  ) => PersistedNativeChatSessionOptions | null
-): Promise<void> {
-  const write = settingsWrite
-    .catch(() => undefined)
-    .then(() => {
-      const next = update(useAppStore.getState().settings?.nativeChatSessionOptions)
-      return next
-        ? useAppStore.getState().updateSettings({ nativeChatSessionOptions: next })
-        : undefined
-    })
-  settingsWrite = write
-  return write
-}
+const CLIENT_SETTINGS_TARGET = { kind: 'local' } as const
 
 /**
  * Why: the picker drops a retired model, but the persisted default is what launches
@@ -81,11 +50,10 @@ export async function retirePersistedModelMissingFromDiscovery(
   if (models.length === 0) {
     return
   }
-  await enqueueSessionOptionSettingsWrite((persisted) => {
-    const modelId = persisted?.[agent]?.model
-    return typeof modelId === 'string' && modelId && !models.some((model) => model.id === modelId)
-      ? clearNativeChatSessionOptionModel(persisted, agent)
-      : null
+  await enqueueSessionOptionSettingsWrite(CLIENT_SETTINGS_TARGET, {
+    type: 'clear-model-if-missing',
+    agent,
+    availableModelIds: models.map((model) => model.id)
   })
 }
 
@@ -161,16 +129,12 @@ export function useNativeChatSessionOptions(args: {
       dispatchCommand,
       onAgentPicker,
       persistSelection: ({ modelId, optionId, value, adoptModelAsLaunchDefault }) =>
-        enqueueSessionOptionSettingsWrite((persisted) =>
-          updateNativeChatSessionOptionDefaults({
-            persisted,
-            agent,
-            modelId,
-            optionId,
-            value,
-            adoptModelAsLaunchDefault
-          })
-        )
+        // Paired PTY launches still assemble their launch preferences from client settings.
+        enqueueSessionOptionSettingsWrite(CLIENT_SETTINGS_TARGET, {
+          type: 'apply-picks',
+          agent,
+          picks: [{ modelId, optionId, value, adoptModelAsLaunchDefault }]
+        })
     })
   }, [
     agent,

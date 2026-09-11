@@ -138,37 +138,6 @@ that is already gone — a small correctness gain, not just gate appeasement.
 **Status:** pending-upstream. Not yet submitted. Drop any entry upstream resolves on its own — the
 CLI's rule set moves independently of the pinned `react-doctor@0.9.1` version.
 
-## Composer file-drop pane scoping
-
-**What:** a native OS file drop on a composer is broadcast to every renderer subscriber, and
-`useNativeChatFileAttachmentActions` took any payload whose target was `composer` — so one drop
-attached to every mounted composer. `NativeFileDropPayload`'s `composer` variant now carries the
-optional `tabId` / `paneLeafId` its `terminal` sibling already had, `resolveNativeFileDropPath`
-returns them from the composer branch, and the hook ignores a drop addressed to a different
-composer. A payload carrying neither id is still accepted, so a producer that cannot resolve pane
-identity keeps working.
-
-**Why upstream, not isolated:** this is a correctness fix to upstream's own drop routing, and the
-payload shape is upstream's shared contract that preload, main, and every drop consumer read.
-Isolating it would mean a forked copy of the shared type that upstream's own consumers still
-bypass, leaving the mis-routing in place for every non-composer surface.
-
-**Paths:**
-
-- `src/shared/native-file-drop.ts`
-- `src/renderer/src/components/native-chat/use-native-chat-file-attachment-actions.ts`
-- `src/shared/native-file-drop.test.ts`
-- `src/renderer/src/components/native-chat/use-native-chat-file-attachment-actions.test.tsx`
-
-**Depends on:** the composer emits its own identity via `data-terminal-tab-id` /
-`data-terminal-pane-leaf-id` on the drop-target div in
-`src/renderer/src/components/native-chat/fork-agent-composer/AgentComposerField.tsx`, which is
-fork-owned. An upstream PR built from this entry must move those two attributes onto upstream's
-equivalent composer field, or the ids never reach `resolveNativeFileDropPath` and every drop stays
-unaddressed (accepted everywhere, exactly as before).
-
-**Status:** pending-upstream. Not yet submitted.
-
 ## Pane paste routing by focus
 
 **What:** `useNativeChatPasteBridge` resolved the app-menu Paste target by asking which one was
@@ -219,7 +188,8 @@ paths or weakening the existing wrong-account guard.
 
 **Paths:**
 
-- `src/main/rate-limits/service.ts`
+- `src/main/rate-limits/service/service-fetch-policy.ts` — declared in `seams`, not `exceptions`,
+  since v1.4.186 split the service; the manifest therefore carries no `ledger` back-pointer for it.
 
 **Depends on:** the fork-owned Session Info correlation adapter in
 `src/main/fork-session-info/session-info-plan-window-correlation.ts` consumes the result. An

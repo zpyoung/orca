@@ -94,7 +94,13 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
   const [activeSuggestion, setActiveSuggestion] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
   const imeEnterGesture = useImeEnterGestureOwnership()
-  const { textareaRef } = useNativeChatComposerAppMenuSelection(imeEnterGesture.isComposing)
+  // Why: v1.4.200 widened the app-menu ref to NativeChatComposerInput for upstream's
+  // contenteditable editor. This composer's field is a real <textarea>, so the ref
+  // only ever holds one, and the overlay and scroll sync need the element itself.
+  const { textareaRef: composerInputRef } = useNativeChatComposerAppMenuSelection(
+    imeEnterGesture.isComposing
+  )
+  const textareaRef = composerInputRef as RefObject<HTMLTextAreaElement | null>
   const { cancelPendingSends, trackPendingSend } = useNativeChatSendLifecycle(
     terminalTabId,
     targetPtyId,

@@ -26,6 +26,7 @@ import {
   releaseRendererPtyVisibilityClaim,
   setRendererPtyVisibilityClaim
 } from './pty-renderer-delivery-claims'
+import { activePaneIsCoveredByNativeChat } from './native-chat-covered-pane'
 
 type UseTerminalPaneGlobalEffectsArgs = {
   tabId: string
@@ -33,6 +34,7 @@ type UseTerminalPaneGlobalEffectsArgs = {
   cwd?: string
   isActive: boolean
   isVisible: boolean
+  isChatViewMode?: boolean
   isWorktreeActive?: boolean
   isSyncFitEnabled: boolean
   paneCount: number
@@ -66,6 +68,7 @@ export function useTerminalPaneGlobalEffects({
   cwd,
   isActive,
   isVisible,
+  isChatViewMode = false,
   isWorktreeActive = isVisible,
   isSyncFitEnabled,
   paneCount,
@@ -122,6 +125,7 @@ export function useTerminalPaneGlobalEffects({
   useTerminalWindowWakeRecovery({
     tabId,
     isVisible: rendererVisible,
+    isChatViewMode,
     managerRef,
     isActiveRef,
     isVisibleRef,
@@ -158,6 +162,9 @@ export function useTerminalPaneGlobalEffects({
         manager,
         tabId,
         isActive,
+        // Why: chat mode is tab-wide, but only the chat leaf's xterm is covered;
+        // a split terminal leaf that is active must still regain focus on reveal.
+        isChatViewMode: isChatViewMode && activePaneIsCoveredByNativeChat(manager),
         wasVisible,
         shouldUseLightTabResume,
         captureViewportPositions,
@@ -185,7 +192,7 @@ export function useTerminalPaneGlobalEffects({
     wasVisibleRef.current = false
     wasWorktreeActiveRef.current = isWorktreeActive
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, isWorktreeActive, rendererVisible])
+  }, [isActive, isChatViewMode, isWorktreeActive, rendererVisible])
 
   useEffect(() => {
     const ptyId = isActive && isVisible && isWorktreeActive ? activeLeafPtyId : null

@@ -50,13 +50,25 @@ export function buildNativeChatPickerItems(
   skills: readonly DiscoveredSkill[],
   query: string,
   prefix: '/' | '$',
+  sessionSkillNames?: readonly string[],
   namespacePluginSkills = false
 ): NativeChatPickerItem[] {
-  const mergedSkills = mergeNativeChatSkills(skills, namespacePluginSkills)
+  const unclassifiedNames = new Set(
+    commands.filter((command) => command.kindUnspecified).map((command) => command.name)
+  )
+  const mergedSkills = mergeNativeChatSkills(
+    skills,
+    sessionSkillNames,
+    unclassifiedNames,
+    namespacePluginSkills
+  )
   const skillNames = new Set(mergedSkills.map((skill) => skill.name))
-  const commandNames = new Set(commands.map((command) => command.name))
+  const resolvedCommands = commands.filter(
+    (command) => !(command.kindUnspecified && skillNames.has(command.name))
+  )
+  const commandNames = new Set(resolvedCommands.map((command) => command.name))
   const commandItems = rankItems(
-    commands.map((command, index) => ({
+    resolvedCommands.map((command, index) => ({
       item: {
         kind: 'command' as const,
         // Why: the name is the dispatch token and the catalog is curated, so
@@ -84,6 +96,8 @@ export function buildNativeChatPickerItems(
 
 function mergeNativeChatSkills(
   skills: readonly DiscoveredSkill[],
+  sessionSkillNames: readonly string[] | undefined,
+  unclassifiedNames: ReadonlySet<string>,
   namespacePluginSkills: boolean
 ): Extract<NativeChatPickerItem, { kind: 'skill' }>[] {
   const exactPaths = new Map<string, DiscoveredSkill>()
@@ -92,41 +106,77 @@ function mergeNativeChatSkills(
       exactPaths.set(skill.skillFilePath, skill)
     }
   }
-  const byToken = new Map<string, DiscoveredSkill[]>()
+  const byName = new Map<string, DiscoveredSkill[]>()
   for (const skill of exactPaths.values()) {
     const safeName = getSafeSkillName(skill)
     if (!safeName) {
       continue
     }
-    // Why: one row per plugin only helps if the rows dispatch differently, so
-    // the split rides the same condition as the namespaced token. Agents that
-    // take a bare name keep the merged row and name the plugins in its subtext.
-    const namespace = namespacePluginSkills ? getNamespaceSafePluginName(skill) : null
-    const token = namespace ? `${namespace}:${safeName}` : safeName
-    byToken.set(token, [...(byToken.get(token) ?? []), { ...skill, name: safeName }])
+    byName.set(safeName, [...(byName.get(safeName) ?? []), { ...skill, name: safeName }])
   }
-  return [...byToken.entries()]
-    .map(([token, namedSkills]) => {
-      const sorted = [...namedSkills].sort(compareDiscoveredSkills)
-      const sources = sorted.map((skill) => {
-        const pluginName = getDisplayPluginName(skill)
-        return {
-          sourceKind: skill.sourceKind,
-          skillFilePath: skill.skillFilePath,
-          ...(pluginName ? { pluginName } : {})
-        }
-      })
-      const pluginNames = [...new Set(sources.flatMap((source) => source.pluginName ?? []))]
-      return {
-        kind: 'skill' as const,
-        id: `skill:${token}`,
-        name: token,
-        description: sorted[0]?.description ? sanitizePickerText(sorted[0].description, 240) : null,
-        ...(pluginNames.length === 1 ? { pluginName: pluginNames[0] } : {}),
-        sources
-      }
-    })
+
+  // Why: when the running session reports its own skills, that report is the
+  // authority on which ones exist — a disk scan cannot see what the session
+  // actually loaded (plugin roots, setting-source filters), and a scanned root
+  // the session ignored must not be offered. The scan stays the source of
+  // description and scope for the names both know about.
+  const names =
+    sessionSkillNames !== undefined
+      ? [
+          ...sessionSkillNames.filter(isTokenSafe),
+          ...[...byName.keys()].filter((name) => unclassifiedNames.has(name))
+        ]
+      : [...byName.keys()]
+  return [...new Set(names)]
+    .flatMap((name) => pickerSkills(name, byName.get(name) ?? [], namespacePluginSkills))
     .sort(comparePickerSkills)
+}
+
+/** One row per plugin only helps if the rows dispatch differently, so the split
+ *  rides the same condition as the namespaced token. Agents that take a bare
+ *  name keep the merged row and name the plugins in its subtext. */
+function pickerSkills(
+  name: string,
+  namedSkills: readonly DiscoveredSkill[],
+  namespacePluginSkills: boolean
+): Extract<NativeChatPickerItem, { kind: 'skill' }>[] {
+  if (!namespacePluginSkills) {
+    return [pickerSkill(name, namedSkills)]
+  }
+  const byToken = new Map<string, DiscoveredSkill[]>()
+  for (const skill of namedSkills) {
+    const namespace = getNamespaceSafePluginName(skill)
+    const token = namespace ? `${namespace}:${name}` : name
+    byToken.set(token, [...(byToken.get(token) ?? []), skill])
+  }
+  if (byToken.size === 0) {
+    return [pickerSkill(name, [])]
+  }
+  return [...byToken.entries()].map(([token, group]) => pickerSkill(token, group))
+}
+
+function pickerSkill(
+  name: string,
+  namedSkills: readonly DiscoveredSkill[]
+): Extract<NativeChatPickerItem, { kind: 'skill' }> {
+  const sorted = [...namedSkills].sort(compareDiscoveredSkills)
+  const sources = sorted.map((skill) => {
+    const pluginName = getDisplayPluginName(skill)
+    return {
+      sourceKind: skill.sourceKind,
+      skillFilePath: skill.skillFilePath,
+      ...(pluginName ? { pluginName } : {})
+    }
+  })
+  const pluginNames = [...new Set(sources.flatMap((source) => source.pluginName ?? []))]
+  return {
+    kind: 'skill' as const,
+    id: `skill:${name}`,
+    name,
+    description: sorted[0]?.description ? sanitizePickerText(sorted[0].description, 240) : null,
+    ...(pluginNames.length === 1 ? { pluginName: pluginNames[0] } : {}),
+    sources
+  }
 }
 
 function rankItems<T extends NativeChatPickerItem>(
@@ -230,12 +280,21 @@ function compareDiscoveredSkills(a: DiscoveredSkill, b: DiscoveredSkill): number
   )
 }
 
+// A session-reported skill this host could not locate on disk sorts last: it is
+// real and invocable, but carries no scope or description to rank on.
+const UNLOCATED_SCOPE_PRIORITY = Object.keys(SCOPE_PRIORITY).length
+
+function skillScopePriority(item: Extract<NativeChatPickerItem, { kind: 'skill' }>): number {
+  const sourceKind = item.sources[0]?.sourceKind
+  return sourceKind === undefined ? UNLOCATED_SCOPE_PRIORITY : SCOPE_PRIORITY[sourceKind]
+}
+
 function comparePickerSkills(
   a: Extract<NativeChatPickerItem, { kind: 'skill' }>,
   b: Extract<NativeChatPickerItem, { kind: 'skill' }>
 ): number {
   return (
-    SCOPE_PRIORITY[a.sources[0].sourceKind] - SCOPE_PRIORITY[b.sources[0].sourceKind] ||
+    skillScopePriority(a) - skillScopePriority(b) ||
     compareBaseSensitivityLocaleText(a.name, b.name)
   )
 }
@@ -248,6 +307,8 @@ export function applyPickerSuggestion(
 ): { draft: string; caret: number; insertedToken: string } {
   const before = draft.slice(0, caret)
   const after = draft.slice(caret)
+  // Why: this fork's composer offers the slash picker mid-draft, not only on a
+  // draft that starts with it, so the token is matched after any whitespace.
   const match = before.match(prefix === '/' ? /(^|\s)\/(\S*)$/ : /(^|\s)\$(\S*)$/)
   if (!match) {
     return { draft, caret, insertedToken: '' }
