@@ -66,6 +66,16 @@
         "title": "Show Menu Bar Icon",
         "description": "Keep an Orca shortcut and activity indicator in the macOS menu bar."
       }
+    },
+    "repository": {
+      "ledger": {
+        "staleTitle": "Ledger Staleness",
+        "staleDescription": "How many days without activity before a ledger entry is flagged stale for review.",
+        "loading": "Reading this project’s ledger…",
+        "save": "Save",
+        "saved": "Saved",
+        "noLedger": "This project has no ledger yet. File an entry to create one."
+      }
     }
   },
   "menu": {
@@ -15433,7 +15443,13 @@
       "untitled": "Untitled",
       "filedHere": "Filed here",
       "typeLabel": "Type",
-      "stateLabel": "State"
+      "stateLabel": "State",
+      "scopeLabel": "Ledger scope",
+      "scope": {
+        "worktree": "Worktree",
+        "folder": "Folder"
+      },
+      "filedIn": "Filed in"
     }
   }
 }

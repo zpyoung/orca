@@ -29,7 +29,7 @@ export function LedgerEntryList({
 }: LedgerEntryListProps): React.JSX.Element {
   return (
     <div className="min-h-0 flex-1 overflow-auto scrollbar-sleek p-6">
-      <div className="mx-auto grid max-w-5xl gap-2">
+      <div className="grid gap-2">
         {busy && !entries.length ? (
           <p className="text-sm text-muted-foreground">Loading ledger…</p>
         ) : null}

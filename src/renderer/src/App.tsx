@@ -2420,11 +2420,11 @@ function App(): React.JSX.Element {
                                 ) : (
                                   <LedgerChooser
                                     environmentId={ledgerPageData.environmentId}
-                                    onOpen={(ledger, selectedEnvironmentId) =>
+                                    onOpen={(ledger, selectedEnvironmentId, title) =>
                                       useAppStore.getState().openLedgerPage({
                                         environmentId: selectedEnvironmentId,
                                         target: { ledgerId: ledger.ledgerId },
-                                        title: `${ledger.runtime.runtimeId} ledger`
+                                        title
                                       })
                                     }
                                   />

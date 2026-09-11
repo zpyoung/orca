@@ -21,9 +21,14 @@ import {
 const types: LedgerEntryType[] = ['bug', 'deferred', 'test-gap', 'proposal', 'decision']
 const states: LedgerState[] = ['open', 'resolved', 'archived']
 
+function tierLabel(tier: LedgerOwner['tier']): string {
+  return tier === 'project' ? 'Project' : 'Group'
+}
+
 export type LedgerPageControlsProps = {
   title: string
   ledger: LedgerSummary | null
+  ownerLabel: string | null
   target?: LedgerTarget
   busy: boolean
   ledgerError: string | null
@@ -41,9 +46,9 @@ export type LedgerPageControlsProps = {
   sort: string
   query: string
   selected: Map<string, number>
-  staleDays: string
   filters: LedgerFilters
   onOpen: () => void
+  onOpenSettings: (() => void) | null
   onRefresh: () => void
   onTriage: () => void
   onNew: () => void
@@ -52,12 +57,12 @@ export type LedgerPageControlsProps = {
   onFilterChange: (key: string, value: string) => void
   onDetail: (id: string) => void
   onMutate: (request: LedgerRequest) => void
-  onStaleDays: (value: string) => void
 }
 
 export function LedgerPageControls({
   title,
   ledger,
+  ownerLabel,
   target,
   busy,
   ledgerError,
@@ -75,8 +80,8 @@ export function LedgerPageControls({
   sort,
   query,
   selected,
-  staleDays,
   onOpen,
+  onOpenSettings,
   onRefresh,
   onTriage,
   onNew,
@@ -84,8 +89,7 @@ export function LedgerPageControls({
   onAttachTo,
   onFilterChange,
   onDetail,
-  onMutate,
-  onStaleDays
+  onMutate
 }: LedgerPageControlsProps): React.JSX.Element {
   const mutationTarget = ledger ? { ledgerId: ledger.ledgerId } : target
   return (
@@ -95,21 +99,35 @@ export function LedgerPageControls({
           <Button variant="link" size="sm" onClick={onOpen}>
             Open ledger
           </Button>
-          <h1 className="text-lg font-semibold">{title}</h1>
+          <h1 className="text-lg font-semibold">
+            {ownerLabel ?? ledger?.owner?.id ?? ledger?.formerOwner?.id ?? title}
+          </h1>
           {ledger ? (
-            <p className="break-words text-xs text-muted-foreground">
-              {ledger.tier} · {ledger.ledgerId} · runtime {ledger.runtime.runtimeId} · profile{' '}
-              {ledger.runtime.profileId} · revision {ledger.revision}
-              <br />
-              {ledger.owner
-                ? `Owner ${ledger.owner.id}`
-                : `Detached · former owner ${ledger.formerOwner?.id ?? 'unknown'}`}
-            </p>
+            <>
+              <p className="break-words text-sm text-muted-foreground">
+                {ledger.owner
+                  ? tierLabel(ledger.tier)
+                  : `Detached ${tierLabel(ledger.tier).toLowerCase()} ledger`}{' '}
+                · {ledger.entryCount} {ledger.entryCount === 1 ? 'entry' : 'entries'} · revision{' '}
+                {ledger.revision}
+              </p>
+              <p
+                className="break-words font-mono text-xs text-muted-foreground/70"
+                title={`runtime ${ledger.runtime.runtimeId} · profile ${ledger.runtime.profileId}`}
+              >
+                {ledger.ledgerId}
+              </p>
+            </>
           ) : (
             <p className="text-sm text-muted-foreground">This owner has no ledger yet.</p>
           )}
         </div>
         <div className="flex flex-wrap gap-2">
+          {onOpenSettings ? (
+            <Button size="sm" variant="outline" onClick={onOpenSettings}>
+              Ledger settings
+            </Button>
+          ) : null}
           <Button size="sm" variant="outline" onClick={onRefresh} disabled={busy}>
             Refresh
           </Button>
@@ -323,41 +341,6 @@ export function LedgerPageControls({
           </>
         ) : null}
       </section>
-      {ledger ? (
-        <section className="flex items-center gap-2 border-b px-6 py-2">
-          <label htmlFor="ledger-stale-days" className="text-sm">
-            Stale after days
-          </label>
-          <Input
-            id="ledger-stale-days"
-            type="number"
-            min={0}
-            className="w-24"
-            value={staleDays}
-            onChange={(event) => onStaleDays(event.target.value)}
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={
-              busy ||
-              !staleDays.trim() ||
-              !Number.isSafeInteger(Number(staleDays)) ||
-              Number(staleDays) < 0
-            }
-            onClick={() =>
-              onMutate({
-                operation: 'settings',
-                target: mutationTarget,
-                ifLedgerRevision: ledger.revision,
-                staleAfterDays: Number(staleDays)
-              })
-            }
-          >
-            Save threshold
-          </Button>
-        </section>
-      ) : null}
     </>
   )
 }

@@ -12,10 +12,15 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { useAppStore } from '@/store'
+import { useLedgerOwnerLabels } from './ledger-owner-labels'
 
 export type LedgerChooserProps = {
   environmentId?: string
-  onOpen: (ledger: LedgerSummary, environmentId?: string) => void
+  onOpen: (ledger: LedgerSummary, environmentId: string | undefined, title: string) => void
+}
+
+function ledgerTierLabel(tier: LedgerSummary['tier']): string {
+  return tier === 'project' ? 'Project' : 'Group'
 }
 
 /** Catalog navigation deliberately lists detached ledgers too; it never creates an empty ledger. */
@@ -27,10 +32,13 @@ export function LedgerChooser({ environmentId, onOpen }: LedgerChooserProps): Re
   const runtimeEnvironments = useAppStore((state) => state.runtimeEnvironments)
   const [selectedEnvironmentId, setSelectedEnvironmentId] = useState(environmentId)
   const ledgerRequest = useAppStore((state) => state.ledgerRequest)
+  const ownerLabels = useLedgerOwnerLabels(selectedEnvironmentId)
+  const reloadOwnerLabels = ownerLabels.reload
   const load = useCallback(async () => {
     const requestGeneration = ++generation.current
     setLoading(true)
     setError(null)
+    reloadOwnerLabels()
     try {
       const response = await ledgerRequest({ operation: 'catalog' }, selectedEnvironmentId)
       if (requestGeneration === generation.current) {
@@ -45,7 +53,7 @@ export function LedgerChooser({ environmentId, onOpen }: LedgerChooserProps): Re
         setLoading(false)
       }
     }
-  }, [ledgerRequest, selectedEnvironmentId])
+  }, [ledgerRequest, reloadOwnerLabels, selectedEnvironmentId])
   useEffect(() => {
     setSelectedEnvironmentId(environmentId)
   }, [environmentId])
@@ -102,27 +110,42 @@ export function LedgerChooser({ environmentId, onOpen }: LedgerChooserProps): Re
         </p>
       ) : null}
       <div className="grid gap-2">
-        {ledgers.map((ledger) => (
-          <Card key={ledger.ledgerId} className="rounded-lg">
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="flex size-8 items-center justify-center rounded-md bg-muted">
-                {ledger.owner ? <FolderOpen className="size-4" /> : <Archive className="size-4" />}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-mono text-sm">{ledger.ledgerId}</p>
-                <p className="text-xs text-muted-foreground">
-                  {ledger.owner
-                    ? `${ledger.owner.tier} · ${ledger.owner.id}`
-                    : `Detached from ${ledger.formerOwner?.tier ?? 'owner'}`}{' '}
-                  · {ledger.entryCount} entries
-                </p>
-              </div>
-              <Button size="sm" onClick={() => onOpen(ledger, selectedEnvironmentId)}>
-                Open
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
+        {ledgers.map((ledger) => {
+          const ownerName =
+            ownerLabels.lookup(ledger.owner) ??
+            ownerLabels.lookup(ledger.formerOwner) ??
+            ledger.owner?.id ??
+            ledger.formerOwner?.id ??
+            'Unknown owner'
+          return (
+            <Card key={ledger.ledgerId} className="rounded-lg">
+              <CardContent className="flex items-center gap-3 p-4">
+                <div className="flex size-8 items-center justify-center rounded-md bg-muted">
+                  {ledger.owner ? (
+                    <FolderOpen className="size-4" />
+                  ) : (
+                    <Archive className="size-4" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{ownerName}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {ledger.owner
+                      ? ledgerTierLabel(ledger.owner.tier)
+                      : `Detached ${ledgerTierLabel(ledger.formerOwner?.tier ?? ledger.tier).toLowerCase()} ledger`}{' '}
+                    · {ledger.entryCount} {ledger.entryCount === 1 ? 'entry' : 'entries'}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => onOpen(ledger, selectedEnvironmentId, `${ownerName} ledger`)}
+                >
+                  Open
+                </Button>
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
     </section>
   )

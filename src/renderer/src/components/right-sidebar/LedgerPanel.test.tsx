@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => ({
   store: {
     activeWorktreeId: 'worktree-a' as string | null,
     activeWorkspaceKey: null as string | null,
+    folderWorkspaces: [] as { id: string; name: string; projectGroupId?: string }[],
+    repos: [] as { id: string; projectGroupId?: string }[],
+    getKnownWorktreeById: (id: string) => ({ id, repoId: 'repo-a', displayName: 'Worktree A' }),
     ledgerEntries: ['full-page-entry'],
     ledgerSummary: { ledgerId: 'full-page' },
     loadLedger: vi.fn()
@@ -135,6 +138,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.store.activeWorktreeId = 'worktree-a'
   mocks.store.activeWorkspaceKey = null
+  mocks.store.repos = [{ id: 'repo-a', projectGroupId: 'group-a' }]
+  mocks.store.folderWorkspaces = [{ id: 'folder-a', name: 'Folder A', projectGroupId: 'group-a' }]
   mocks.environmentId = undefined
   mocks.request.mockResolvedValue(response())
   mocks.catalog.mockResolvedValue({ groups: [], projects: [] })
@@ -164,9 +169,14 @@ describe('LedgerPanel', () => {
     })
     await render()
     expect(mocks.request).toHaveBeenCalledWith(
-      { operation: 'list', target: { workspaceId: 'folder:folder-a' }, filters: {} },
+      {
+        operation: 'list',
+        target: { workspaceId: 'folder:folder-a' },
+        filters: { workspaceId: 'folder:folder-a' }
+      },
       undefined
     )
+    await click('Group')
     expect(container.textContent).toContain('Filed here')
   })
   it('offers creation without guessing an owner for an uncreated ledger', async () => {
@@ -193,7 +203,7 @@ describe('LedgerPanel', () => {
     await render()
     expect(container.textContent).toContain('Group · actual-group')
     expect(container.textContent).toContain('Panel entry')
-    expect(container.textContent).toContain('Filed here')
+    expect(container.textContent).not.toContain('Filed here')
     expect(container.textContent).not.toContain('full-page-entry')
     expect(mocks.store.ledgerEntries).toEqual(['full-page-entry'])
     expect(mocks.store.ledgerSummary).toEqual({ ledgerId: 'full-page' })
@@ -201,7 +211,10 @@ describe('LedgerPanel', () => {
   })
   it('names the response owner using the owning runtime catalog', async () => {
     mocks.environmentId = 'paired'
-    mocks.catalog.mockResolvedValue({ groups: [{ id: 'actual-group', name: 'Actual group name' }] })
+    mocks.catalog.mockResolvedValue({
+      projects: [],
+      groups: [{ id: 'actual-group', name: 'Actual group name' }]
+    })
     await render()
     expect(mocks.catalog).toHaveBeenCalledWith(
       { kind: 'environment', environmentId: 'paired' },
@@ -220,7 +233,11 @@ describe('LedgerPanel', () => {
     await render()
     expect(mocks.runtimeSettings).toHaveBeenCalledWith('worktree-a')
     expect(mocks.request).toHaveBeenCalledWith(
-      { operation: 'list', target: { workspaceId: 'worktree-a' }, filters: {} },
+      {
+        operation: 'list',
+        target: { workspaceId: 'worktree-a' },
+        filters: { workspaceId: 'worktree-a' }
+      },
       'paired'
     )
     await click('New')
@@ -253,10 +270,61 @@ describe('LedgerPanel', () => {
     expect(container.textContent).not.toContain('Panel entry')
     await render(true)
     expect(mocks.request).toHaveBeenLastCalledWith(
-      { operation: 'list', target: { workspaceId: 'worktree-b' }, filters: {} },
+      {
+        operation: 'list',
+        target: { workspaceId: 'worktree-b' },
+        filters: { workspaceId: 'worktree-b' }
+      },
       undefined
     )
     expect(container.querySelector('[data-dialog]')).toBeNull()
+  })
+  it('defaults to this worktree and widens to the project and group ledgers on demand', async () => {
+    await render()
+    expect(mocks.request).toHaveBeenLastCalledWith(
+      {
+        operation: 'list',
+        target: { workspaceId: 'worktree-a' },
+        filters: { workspaceId: 'worktree-a' }
+      },
+      undefined
+    )
+    await click('Project')
+    expect(mocks.request).toHaveBeenLastCalledWith(
+      { operation: 'list', target: { workspaceId: 'worktree-a' }, filters: {} },
+      undefined
+    )
+    await click('Group')
+    expect(mocks.request).toHaveBeenLastCalledWith(
+      { operation: 'list', target: { workspaceId: 'worktree-a', group: true }, filters: {} },
+      undefined
+    )
+    await click('New')
+    await act(async () => {
+      await mocks.form!.onSubmit('bug', { title: 'Group bug' })
+    })
+    expect(mocks.request).toHaveBeenCalledWith(
+      {
+        operation: 'file',
+        type: 'bug',
+        content: { title: 'Group bug' },
+        target: { workspaceId: 'worktree-a', group: true }
+      },
+      undefined
+    )
+  })
+  it('hides the group tier when the workspace belongs to no group', async () => {
+    mocks.store.repos = [{ id: 'repo-a' }]
+    await render()
+    const labels = [...container.querySelectorAll('[aria-pressed]')].map((node) => node.textContent)
+    expect(labels).toEqual(['Worktree', 'Project'])
+  })
+  it('hides the project tier for a folder workspace', async () => {
+    mocks.store.activeWorktreeId = null
+    mocks.store.activeWorkspaceKey = 'folder:folder-a'
+    await render()
+    const labels = [...container.querySelectorAll('[aria-pressed]')].map((node) => node.textContent)
+    expect(labels).toEqual(['Folder', 'Group'])
   })
   it('refetches on visible selection changes and closes detail', async () => {
     await render()
@@ -277,7 +345,11 @@ describe('LedgerPanel', () => {
     await render()
     expect(container.querySelector('[data-dialog]')).toBeNull()
     expect(mocks.request).toHaveBeenLastCalledWith(
-      { operation: 'list', target: { workspaceId: 'worktree-a' }, filters: {} },
+      {
+        operation: 'list',
+        target: { workspaceId: 'worktree-a' },
+        filters: { workspaceId: 'worktree-a' }
+      },
       'paired-b'
     )
   })
@@ -332,7 +404,13 @@ describe('LedgerPanel', () => {
         select.dispatchEvent(new Event('change', { bubbles: true }))
       })
     }
-    const filters = { type: 'decision', state: 'resolved', reviewed: false, stale: true }
+    const filters = {
+      type: 'decision',
+      state: 'resolved',
+      reviewed: false,
+      stale: true,
+      workspaceId: 'worktree-a'
+    }
     expect(mocks.request).toHaveBeenLastCalledWith(
       { operation: 'list', target: { workspaceId: 'worktree-a' }, filters },
       undefined

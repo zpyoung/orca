@@ -15,6 +15,8 @@ import { LedgerEntryForm } from './LedgerEntryForm'
 import { LedgerEntryList } from './LedgerEntryList'
 import { LedgerConfirmationDialog, type LedgerConfirmation } from './LedgerConfirmationDialog'
 import { LedgerPageControls } from './LedgerPageControls'
+import { useLedgerOwnerLabels } from './ledger-owner-labels'
+import { getLedgerSettingsNavigation } from './ledger-settings-navigation'
 import { LedgerTriagePanel } from './LedgerTriagePanel'
 
 export type LedgerPageProps = { target?: LedgerTarget; environmentId?: string; title?: string }
@@ -33,6 +35,9 @@ export function LedgerPage({
   const loadLedger = useAppStore((store) => store.loadLedger)
   const ledgerRequest = useAppStore((store) => store.ledgerRequest)
   const openLedgerPage = useAppStore((store) => store.openLedgerPage)
+  const openSettingsPage = useAppStore((store) => store.openSettingsPage)
+  const openSettingsTarget = useAppStore((store) => store.openSettingsTarget)
+  const repos = useAppStore((store) => store.repos)
   const [type, setType] = useState<LedgerEntryType | 'all'>('all')
   const [state, setState] = useState<LedgerState | 'all'>('all')
   const [reviewed, setReviewed] = useState('all')
@@ -50,18 +55,17 @@ export function LedgerPage({
   const [error, setError] = useState<string | null>(null)
   const [matches, setMatches] = useState<LedgerEntry[]>([])
   const [confirmation, setConfirmation] = useState<LedgerConfirmation | null>(null)
-  const [staleDays, setStaleDays] = useState('90')
   const [attachTo, setAttachTo] = useState('')
   const [attachCandidates, setAttachCandidates] = useState<(LedgerOwner & { label: string })[]>([])
   const [catalogError, setCatalogError] = useState<string | null>(null)
   const generation = useRef(0)
+  const ownerLabels = useLedgerOwnerLabels(environmentId)
   const currentSelection = selectionKey === JSON.stringify([environmentId ?? null, target ?? null])
   const ledger = currentSelection ? summary : null
   const ledgerEntries = currentSelection ? entries : EMPTY_LEDGER_ENTRIES
   const ledgerId = ledger?.ledgerId
   const ledgerOwner = ledger?.owner
   const ledgerTier = ledger?.tier
-  const staleAfterDays = ledger?.staleAfterDays
   const busy = pending || loading || !currentSelection
   const mutationTarget = ledger ? { ledgerId: ledger.ledgerId } : target
   const filters = useMemo<LedgerFilters>(
@@ -100,11 +104,6 @@ export function LedgerPage({
       generation.current = effectGeneration + 1
     }
   }, [environmentId, target])
-  useEffect(() => {
-    if (staleAfterDays !== undefined) {
-      setStaleDays(String(staleAfterDays))
-    }
-  }, [ledgerId, staleAfterDays])
   useEffect(() => {
     if (!ledgerId || ledgerOwner || !ledgerTier) {
       return
@@ -160,6 +159,10 @@ export function LedgerPage({
               : b.updatedAt.localeCompare(a.updatedAt)
         ),
     [ledgerEntries, query, sort]
+  )
+  const settingsNavigation = useMemo(
+    () => getLedgerSettingsNavigation(ledger?.owner ?? null, repos),
+    [ledger?.owner, repos]
   )
   const perform = async (request: LedgerRequest): Promise<void> => {
     const expectedGeneration = generation.current
@@ -278,6 +281,7 @@ export function LedgerPage({
       <LedgerPageControls
         title={title}
         ledger={ledger}
+        ownerLabel={ownerLabels.lookup(ledger?.owner ?? ledger?.formerOwner)}
         target={target}
         busy={busy}
         ledgerError={ledgerError}
@@ -295,9 +299,16 @@ export function LedgerPage({
         sort={sort}
         query={query}
         selected={selected}
-        staleDays={staleDays}
         filters={filters}
         onOpen={() => openLedgerPage({ environmentId })}
+        onOpenSettings={
+          settingsNavigation
+            ? () => {
+                openSettingsTarget(settingsNavigation)
+                openSettingsPage()
+              }
+            : null
+        }
         onRefresh={() => void refresh()}
         onTriage={() => setTriageOpen(true)}
         onNew={() => {
@@ -310,7 +321,6 @@ export function LedgerPage({
         onFilterChange={updateFilter}
         onDetail={setDetailId}
         onMutate={(request) => void mutate(request)}
-        onStaleDays={setStaleDays}
       />
       <LedgerEntryList
         entries={visible}

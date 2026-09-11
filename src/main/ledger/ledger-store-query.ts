@@ -1,4 +1,5 @@
 import type { LedgerEntry, LedgerFilters } from '../../shared/ledger'
+import { isSameWorkspaceId } from '../../shared/workspace-scope'
 
 export function ledgerEntryMatches(
   entry: LedgerEntry,
@@ -15,7 +16,8 @@ export function ledgerEntryMatches(
     (!filters.state || entry.state === filters.state) &&
     (filters.reviewed === undefined || entry.reviewed === filters.reviewed) &&
     (filters.stale === undefined || stale === filters.stale) &&
-    (filters.workspaceId === undefined || entry.origin.workspaceId === filters.workspaceId) &&
+    (filters.workspaceId === undefined ||
+      isSameWorkspaceId(entry.origin.workspaceId, filters.workspaceId)) &&
     (filters.branch === undefined || entry.origin.branch === filters.branch)
   )
 }

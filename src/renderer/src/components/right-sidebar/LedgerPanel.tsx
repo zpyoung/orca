@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Loader2, Plus, RefreshCw } from 'lucide-react'
 import type { LedgerEntry, LedgerFilters, LedgerRequest } from '../../../../shared/ledger'
 import { getActiveSidebarWorkspaceId } from '../../../../shared/workspace-scope'
+import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
 import { Button } from '@/components/ui/button'
@@ -13,10 +14,16 @@ import { LedgerTriagePanel } from '../ledger/LedgerTriagePanel'
 import { useLedgerRequest } from '../ledger/use-ledger-request'
 import { getRightSidebarWorktreeRuntimeSettings } from './file-explorer-runtime-owner'
 import {
+  getLedgerPanelFilters,
   getLedgerPanelScope,
+  getLedgerPanelTarget,
+  getLedgerPanelTiers,
   isLedgerEntryFiledHere,
-  type LedgerPanelScope
+  type LedgerPanelScope,
+  type LedgerPanelTier
 } from './ledger-panel-scope'
+import { LedgerPanelScopeTabs, ledgerPanelTierLabel } from './LedgerPanelScopeTabs'
+import { getLedgerPanelWorkspaceIdentity } from './ledger-panel-workspace-identity'
 import { getLedgerPanelState, type LedgerPanelState } from './ledger-panel-state'
 import { LedgerPanelRow } from './LedgerPanelRow'
 import { useLedgerOwnerName } from './use-ledger-owner-name'
@@ -61,17 +68,18 @@ export default function LedgerPanel({ isVisible }: { isVisible: boolean }): Reac
         getActiveSidebarWorkspaceId(state.activeWorkspaceKey, state.activeWorktreeId)
       ).activeRuntimeEnvironmentId
   )
+  const { name: workspaceName, hasGroup } = useAppStore(
+    useShallow((state) => getLedgerPanelWorkspaceIdentity(workspaceId, state))
+  )
   const scope = useMemo(
-    () =>
-      getLedgerPanelScope(workspaceId, {
-        activeRuntimeEnvironmentId: environmentId
-      }),
-    [workspaceId, environmentId]
+    () => getLedgerPanelScope(workspaceId, { activeRuntimeEnvironmentId: environmentId }, hasGroup),
+    [workspaceId, environmentId, hasGroup]
   )
   return (
     <ScopedLedgerPanel
       key={JSON.stringify([workspaceId, environmentId])}
       scope={scope}
+      workspaceName={workspaceName}
       isVisible={isVisible}
     />
   )
@@ -79,11 +87,14 @@ export default function LedgerPanel({ isVisible }: { isVisible: boolean }): Reac
 
 function ScopedLedgerPanel({
   scope,
+  workspaceName,
   isVisible
 }: {
   scope: LedgerPanelScope | null
+  workspaceName: string | null
   isVisible: boolean
 }): React.JSX.Element {
+  const [selectedTier, setTier] = useState<LedgerPanelTier>('workspace')
   const [filters, setFilters] = useState<LedgerFilters>({})
   const [query, setQuery] = useState('')
   const [detailId, setDetailId] = useState<string | null>(null)
@@ -93,11 +104,19 @@ function ScopedLedgerPanel({
   const [pending, setPending] = useState(false)
   const [mutationError, setMutationError] = useState<string | null>(null)
   const [showSpinner, setShowSpinner] = useState(false)
+  const tiers = getLedgerPanelTiers(scope)
+  // Why: group membership arrives after hydration, so a selected tier can stop being offered.
+  const tier = tiers.includes(selectedTier) ? selectedTier : 'workspace'
+  const target = useMemo(() => (scope ? getLedgerPanelTarget(scope, tier) : null), [scope, tier])
+  const scopedFilters = useMemo(
+    () => (scope ? getLedgerPanelFilters(scope, tier, filters) : filters),
+    [scope, tier, filters]
+  )
   const { ledger, entries, loading, error, perform, refresh } = useLedgerRequest({
-    target: scope?.target ?? null,
+    target,
     environmentId: scope?.environmentId,
     isVisible,
-    filters
+    filters: scopedFilters
   })
   const ownerName = useLedgerOwnerName(ledger?.owner ?? null, scope?.environmentId, isVisible)
   useEffect(() => {
@@ -187,6 +206,16 @@ function ScopedLedgerPanel({
             </Button>
           </div>
         </div>
+        <LedgerPanelScopeTabs
+          tiers={tiers}
+          value={tier}
+          isFolderWorkspace={Boolean(scope?.isFolderWorkspace)}
+          disabled={!scope}
+          onChange={(next) => {
+            setDetailId(null)
+            setTier(next)
+          }}
+        />
         {ledger ? (
           <p className="break-words text-xs text-muted-foreground">
             {ledger.tier === 'project'
@@ -194,6 +223,14 @@ function ScopedLedgerPanel({
               : translate('ledger.panel.group', 'Group')}
             {' · '}
             {ownerName ?? ledger.owner?.id ?? translate('ledger.panel.detached', 'Detached')}
+            {tier === 'workspace' ? (
+              <>
+                <br />
+                {translate('ledger.panel.filedIn', 'Filed in')}{' '}
+                {workspaceName ??
+                  ledgerPanelTierLabel(tier, Boolean(scope?.isFolderWorkspace)).toLocaleLowerCase()}
+              </>
+            ) : null}
           </p>
         ) : null}
         <div className="flex items-center gap-2">
@@ -241,7 +278,10 @@ function ScopedLedgerPanel({
             <LedgerPanelRow
               key={entry.id}
               entry={entry}
-              filedHere={isLedgerEntryFiledHere(entry.origin, scope?.target.workspaceId ?? null)}
+              filedHere={
+                tier !== 'workspace' &&
+                isLedgerEntryFiledHere(entry.origin, scope?.workspaceId ?? null)
+              }
               onOpen={(selected) => {
                 setMutationError(null)
                 setDetailId(selected.id)
@@ -250,7 +290,7 @@ function ScopedLedgerPanel({
           ))
         )}
       </div>
-      {scope && isVisible ? (
+      {scope && target && isVisible ? (
         <>
           <LedgerEntryDetail
             entry={detail}
@@ -259,7 +299,7 @@ function ScopedLedgerPanel({
               setEditing(entry)
               setFormOpen(true)
             }}
-            target={scope.target}
+            target={target}
             onMutate={mutate}
             pending={pending}
             error={mutationError}
@@ -281,9 +321,9 @@ function ScopedLedgerPanel({
           <LedgerTriagePanel
             open={triageOpen}
             onOpenChange={setTriageOpen}
-            target={scope.target}
+            target={target}
             environmentId={scope.environmentId}
-            filters={filters}
+            filters={scopedFilters}
             onChanged={refresh}
           />
         </>

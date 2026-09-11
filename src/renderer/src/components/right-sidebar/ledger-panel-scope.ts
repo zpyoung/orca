@@ -1,33 +1,58 @@
-import type { LedgerOrigin, LedgerTarget } from '../../../../shared/ledger'
+import type { LedgerFilters, LedgerOrigin, LedgerTarget } from '../../../../shared/ledger'
 import type { GlobalSettings } from '../../../../shared/types'
-import { folderWorkspaceKey } from '../../../../shared/workspace-scope'
+import { isSameWorkspaceId } from '../../../../shared/workspace-scope'
 
-export type LedgerPanelScope = { target: LedgerTarget; environmentId?: string }
+/** Which records the panel shows: this checkout only, the whole project ledger, or the group ledger. */
+export type LedgerPanelTier = 'workspace' | 'project' | 'group'
+
+export type LedgerPanelScope = {
+  workspaceId: string
+  isFolderWorkspace: boolean
+  hasGroup: boolean
+  environmentId?: string
+}
 
 export function getLedgerPanelScope(
-  activeWorktreeId: string | null,
-  runtimeSettings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'>
+  activeWorkspaceId: string | null,
+  runtimeSettings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'>,
+  hasGroup: boolean
 ): LedgerPanelScope | null {
-  if (!activeWorktreeId) {
+  if (!activeWorkspaceId) {
     return null
   }
   const environmentId = runtimeSettings.activeRuntimeEnvironmentId
   return {
-    target: { workspaceId: activeWorktreeId },
+    workspaceId: activeWorkspaceId,
+    isFolderWorkspace: activeWorkspaceId.startsWith('folder:'),
+    hasGroup,
     ...(environmentId ? { environmentId } : {})
   }
 }
 
+/** A folder workspace has no project tier; its own ledger is the group's. */
+export function getLedgerPanelTiers(scope: LedgerPanelScope | null): LedgerPanelTier[] {
+  if (scope?.isFolderWorkspace) {
+    return ['workspace', 'group']
+  }
+  return scope?.hasGroup ? ['workspace', 'project', 'group'] : ['workspace', 'project']
+}
+
+export function getLedgerPanelTarget(scope: LedgerPanelScope, tier: LedgerPanelTier): LedgerTarget {
+  return {
+    workspaceId: scope.workspaceId,
+    ...(tier === 'group' ? { group: true } : {})
+  }
+}
+
+/** The workspace tier reads the same ledger as its owner and narrows by filing origin. */
+export function getLedgerPanelFilters(
+  scope: LedgerPanelScope,
+  tier: LedgerPanelTier,
+  filters: LedgerFilters
+): LedgerFilters {
+  return tier === 'workspace' ? { ...filters, workspaceId: scope.workspaceId } : filters
+}
+
 export function isLedgerEntryFiledHere(origin: LedgerOrigin, workspaceId: string | null): boolean {
-  if (!workspaceId || !origin.workspaceId) {
-    return false
-  }
-  if (workspaceId === origin.workspaceId) {
-    return true
-  }
-  if (!workspaceId.startsWith('folder:') && !origin.workspaceId.startsWith('folder:')) {
-    return false
-  }
-  const normalize = (id: string) => folderWorkspaceKey(id.startsWith('folder:') ? id.slice(7) : id)
-  return normalize(workspaceId) === normalize(origin.workspaceId)
+  return isSameWorkspaceId(workspaceId, origin.workspaceId)
 }

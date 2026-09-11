@@ -39,3 +39,23 @@ export function getActiveSidebarWorkspaceId(
   }
   return activeWorktreeId
 }
+
+// Why: folder workspace ids reach the ledger both bare (CLI) and `folder:`-prefixed (UI),
+// so origin/filter comparison has to happen on the scoped key, not the raw string.
+export function isSameWorkspaceId(
+  left: string | null | undefined,
+  right: string | null | undefined
+): boolean {
+  if (!left || !right) {
+    return false
+  }
+  if (left === right) {
+    return true
+  }
+  if (!left.startsWith('folder:') && !right.startsWith('folder:')) {
+    return false
+  }
+  const key = (id: string) =>
+    folderWorkspaceKey(id.startsWith('folder:') ? id.slice('folder:'.length) : id)
+  return key(left) === key(right)
+}
