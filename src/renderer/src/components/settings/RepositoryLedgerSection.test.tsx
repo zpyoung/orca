@@ -2,7 +2,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Repo } from '../../../../shared/types'
+import type { Repo } from '../../../../shared/repo-types'
 import { RepositoryLedgerSection } from './RepositoryLedgerSection'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true

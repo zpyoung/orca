@@ -1,0 +1,43 @@
+{
+  "components": {
+    "settings": {
+      "forkSessionHandoff": {
+        "title": "Transferencia de sesión",
+        "description": "Crea instrucciones reutilizables para continuar el trabajo en una nueva sesión de agente.",
+        "searchTitle": "Transferencia de sesión",
+        "searchDescription": "Crea plantillas de instrucciones reutilizables para continuar el trabajo en una nueva sesión de agente.",
+        "keywordHandoff": "transferencia",
+        "keywordSession": "sesión",
+        "keywordTemplate": "plantilla",
+        "keywordReusable": "reutilizable",
+        "keywordPrompt": "instrucción",
+        "keywordInstructions": "instrucciones",
+        "templates": "Plantillas",
+        "templatesDescription": "Añade un bloque de instrucciones guardado a cualquier transferencia a una sesión nueva.",
+        "add": "Añadir plantilla",
+        "editTemplate": "Editar {{name}}",
+        "removeTemplate": "Eliminar {{name}}",
+        "limitReached": "Se alcanzó el límite de plantillas.",
+        "count": "{{count}} de {{limit}} plantillas",
+        "reset": "Restablecer valores predeterminados",
+        "addTitle": "Añadir plantilla",
+        "editTitle": "Editar plantilla",
+        "editorDescription": "Añade instrucciones reutilizables al resumen para una nueva sesión de agente.",
+        "name": "Nombre",
+        "duplicateName": "Otra plantilla usa este nombre. Ambas seguirán disponibles.",
+        "body": "Instrucciones",
+        "variables": "Variables: {{gitStatus}}, {{changedPaths}} y {{openEditorTabs}}. También se admiten alias en MAYÚSCULAS.",
+        "cancel": "Cancelar",
+        "saving": "Guardando…",
+        "save": "Guardar plantilla",
+        "saveFailed": "No se pudieron guardar las plantillas",
+        "deleteTitle": "¿Eliminar “{{name}}”?",
+        "deleteDescription": "Esta plantilla dejará de estar disponible en el diálogo de transferencia.",
+        "delete": "Eliminar",
+        "resetTitle": "¿Restablecer las plantillas de transferencia?",
+        "resetDescription": "Se eliminarán las plantillas personalizadas y los cambios. Volverán los valores predeterminados más recientes.",
+        "resetConfirm": "Restablecer valores predeterminados"
+      }
+    }
+  }
+}

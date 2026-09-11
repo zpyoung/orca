@@ -1,0 +1,13 @@
+{
+  "fork": {
+    "sidebarSectionSeparator": {
+      "title": "Sidebar section separators",
+      "description": "Show divider lines between top-level projects and groups.",
+      "keywordSidebar": "sidebar",
+      "keywordSeparator": "separator",
+      "keywordDivider": "divider",
+      "keywordProject": "project",
+      "keywordGroup": "group"
+    }
+  }
+}

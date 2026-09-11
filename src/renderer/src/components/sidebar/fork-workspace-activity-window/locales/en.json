@@ -1,0 +1,22 @@
+{
+  "auto": {
+    "components": {
+      "sidebar": {
+        "WorkspaceActivityWindowControl": {
+          "activityWindow": "Activity window",
+          "all": "All",
+          "live-only": "Live only",
+          "today": "Past 24 hours",
+          "week": "Past 7 days",
+          "month": "Past 30 days",
+          "custom": "Custom",
+          "customDays": "Custom days",
+          "customDaysError": "Enter a positive whole number."
+        },
+        "WorkspaceActivityHiddenCountRow": {
+          "hidden": "{{count}} workspaces hidden by activity window"
+        }
+      }
+    }
+  }
+}

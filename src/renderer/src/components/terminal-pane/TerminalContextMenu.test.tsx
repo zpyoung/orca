@@ -80,6 +80,9 @@ function renderMenu(overrides: Record<string, unknown> = {}): string {
     canToggleNativeChat: false,
     isNativeChatView: false,
     onToggleNativeChat: vi.fn(),
+    canToggleTerminalDock: false,
+    isTerminalDockDocked: false,
+    onToggleTerminalDock: vi.fn(),
     onCopyAgentSessionContext: vi.fn(),
     quickCommandHosts: [
       { hostId: 'local' as const, label: 'Local Linux', repoCommands: [], globalCommands: [] }
@@ -95,6 +98,8 @@ function renderMenu(overrides: Record<string, unknown> = {}): string {
     canClearPaneTitle: false,
     onCopyTerminalId: vi.fn(),
     onCopyPaneId: vi.fn(),
+    canCopyAgentSessionId: false,
+    onCopyAgentSessionId: vi.fn(),
     ...overrides
   }
   return renderToStaticMarkup(React.createElement(TerminalContextMenu, props))
@@ -141,6 +146,35 @@ describe('TerminalContextMenu', () => {
 
     handoffItem?.onSelect?.()
     expect(onContinueAgentSessionInNewSession).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not expose a native/terminal view switch in the terminal menu', () => {
+    renderMenu()
+
+    expect(items.list.some((item) => childrenText(item.children).includes('Switch to'))).toBe(false)
+  })
+
+  it('shows Copy Session ID only for panes with provider identity', () => {
+    const onCopyAgentSessionId = vi.fn()
+    renderMenu({ canCopyAgentSessionId: true, onCopyAgentSessionId })
+
+    const item = items.list.find(
+      (candidate) => childrenText(candidate.children) === 'Copy Session ID'
+    )
+    expect(item).toBeDefined()
+    expect(
+      items.list
+        .map((candidate) => childrenText(candidate.children))
+        .filter((label) => ['Copy Session ID', 'Copy Terminal ID', 'Copy Pane ID'].includes(label))
+    ).toEqual(['Copy Session ID', 'Copy Terminal ID', 'Copy Pane ID'])
+    item?.onSelect?.()
+    expect(onCopyAgentSessionId).toHaveBeenCalledTimes(1)
+
+    items.list = []
+    renderMenu({ canCopyAgentSessionId: false })
+    expect(
+      items.list.some((candidate) => childrenText(candidate.children) === 'Copy Session ID')
+    ).toBe(false)
   })
 
   it('shows one shortcut per terminal menu action on Windows', () => {
@@ -265,5 +299,44 @@ describe('TerminalContextMenu', () => {
 
     expect(rendered).toContain('Loading host…')
     expect(rendered).not.toContain('Add Quick Command…')
+  })
+
+  it('omits the agent composer item when the pane cannot host a dock', () => {
+    const rendered = renderMenu({ canToggleTerminalDock: false })
+
+    expect(rendered).not.toContain('Show agent composer')
+    expect(rendered).not.toContain('Hide agent composer')
+  })
+
+  it('offers to show the agent composer for an undocked pane', () => {
+    const onToggleTerminalDock = vi.fn()
+    const rendered = renderMenu({
+      canToggleTerminalDock: true,
+      isTerminalDockDocked: false,
+      onToggleTerminalDock
+    })
+
+    expect(rendered).toContain('Show agent composer')
+    items.list
+      .find((item) => childrenText(item.children).includes('Show agent composer'))
+      ?.onSelect?.()
+
+    expect(onToggleTerminalDock).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers to hide the agent composer once the pane is docked', () => {
+    const rendered = renderMenu({ canToggleTerminalDock: true, isTerminalDockDocked: true })
+
+    expect(rendered).toContain('Hide agent composer')
+    expect(rendered).not.toContain('Show agent composer')
+  })
+
+  it('renders the dock toggle shortcut so the menu teaches it', () => {
+    renderMenu({
+      canToggleTerminalDock: true,
+      keybindings: { 'terminal.dock.toggle': ['Mod+Shift+K'] } as KeybindingOverrides
+    })
+
+    expect(shortcuts.list).toContain('Ctrl+Shift+K')
   })
 })

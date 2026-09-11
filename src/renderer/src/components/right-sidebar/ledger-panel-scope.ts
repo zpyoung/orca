@@ -1,5 +1,5 @@
 import type { LedgerFilters, LedgerOrigin, LedgerTarget } from '../../../../shared/ledger'
-import type { GlobalSettings } from '../../../../shared/types'
+import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import { isSameWorkspaceId } from '../../../../shared/workspace-scope'
 
 /** Which records the panel shows: this checkout only, the whole project ledger, or the group ledger. */

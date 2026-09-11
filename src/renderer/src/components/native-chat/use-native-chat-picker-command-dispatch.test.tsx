@@ -1,15 +1,13 @@
 // @vitest-environment happy-dom
 
-import { act, renderHook } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { EMPTY_HISTORY } from './native-chat-composer-state'
+import { act, cleanup, renderHook } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const sendNativeChatMessage = vi.fn()
-const sendNativeChatTypedCommand = vi.fn()
-
-vi.mock('./native-chat-runtime-send', () => ({
-  sendNativeChatMessage: (...args: unknown[]) => sendNativeChatMessage(...args),
-  sendNativeChatTypedCommand: (...args: unknown[]) => sendNativeChatTypedCommand(...args)
+vi.mock('@/i18n/i18n', () => ({
+  translate: (_key: string, fallback: string) => fallback
+}))
+vi.mock('@/runtime/runtime-terminal-inspection', () => ({
+  isRemoteRuntimePtyId: () => false
 }))
 vi.mock('@/lib/native-chat-telemetry', () => ({
   emitNativeChatMessageSent: vi.fn(),
@@ -17,57 +15,159 @@ vi.mock('@/lib/native-chat-telemetry', () => ({
   emitNativeChatSendClassified: vi.fn()
 }))
 
+const sendNativeChatMessage = vi.fn()
+const sendNativeChatTypedCommand = vi.fn()
+vi.mock('./native-chat-runtime-send', () => ({
+  sendNativeChatMessage: (...args: unknown[]) => sendNativeChatMessage(...args),
+  sendNativeChatTypedCommand: (...args: unknown[]) => sendNativeChatTypedCommand(...args)
+}))
+
+// Isolates this hook's wiring from buildComposerSendOptions' own behavior
+// (covered by composer-send-options' own tests); captures what the hook asks
+// it to build instead.
+const buildComposerSendOptions = vi.fn(
+  (args: {
+    text: string
+    tier: string
+    readTerminalScreen?: () => string | null
+    onOutcome: (outcome: string) => void
+  }) => ({ clearInput: `clear:${args.text}`, onOutcome: args.onOutcome })
+)
+vi.mock('./fork-agent-composer/composer-send-options', () => ({
+  buildComposerSendOptions: (args: Parameters<typeof buildComposerSendOptions>[0]) =>
+    buildComposerSendOptions(args)
+}))
+
 import { useNativeChatPickerCommandDispatch } from './use-native-chat-picker-command-dispatch'
+import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentComposerField'
 
 const COMMAND = {
   kind: 'command' as const,
-  id: 'command:status',
-  name: 'status',
-  description: 'Show status',
+  id: 'command:clear',
+  name: 'clear',
+  description: 'Clear history',
   skillCollision: false
 }
 
-function renderDispatch(agent: 'codex' | 'claude' | 'openclaude') {
-  return renderHook(() =>
+function setup(overrides: Partial<Parameters<typeof useNativeChatPickerCommandDispatch>[0]> = {}) {
+  const callbacks = {
+    onSendOutcome: vi.fn(),
+    restoreImageAttachments: vi.fn(),
+    setDraft: vi.fn(),
+    setCaret: vi.fn(),
+    setNotice: vi.fn(),
+    setHistory: vi.fn(),
+    setActiveSuggestion: vi.fn(),
+    clearImageAttachments: vi.fn(),
+    clearSkillOrigin: vi.fn(),
+    trackPendingSend: vi.fn(),
+    onSlashCommand: vi.fn()
+  }
+  const attachments: AgentComposerImageAttachment[] = [{ id: 'img-1', path: '/tmp/a.png' }]
+  const hook = renderHook(() =>
     useNativeChatPickerCommandDispatch({
-      agent,
+      agent: 'claude',
       disabled: false,
       isDispatchingSessionOption: false,
-      resolveTarget: () => ({ settings: {}, ptyId: 'pty-1' }),
+      paneKey: 'pane-dock-picker',
+      sendTier: 'verified',
+      readTerminalScreen: () => null,
+      resolveTarget: () => ({ ptyId: 'pty-1', settings: {} as never }),
       sessionOptionsSurface: null,
-      trackPendingSend: vi.fn(),
-      setHistory: vi.fn((update) => update(EMPTY_HISTORY)),
-      setDraft: vi.fn(),
-      setCaret: vi.fn(),
-      setActiveSuggestion: vi.fn(),
-      clearSkillOrigin: vi.fn(),
-      clearImageAttachments: vi.fn(),
-      setNotice: vi.fn()
+      imageAttachments: attachments,
+      ...callbacks,
+      ...overrides
     })
   )
+  return { hook, callbacks, attachments }
 }
 
 describe('useNativeChatPickerCommandDispatch', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
     const handle = { cancel: vi.fn(), settleAfterMs: 0 }
     sendNativeChatMessage.mockReturnValue(handle)
     sendNativeChatTypedCommand.mockReturnValue(handle)
   })
 
+  afterEach(() => {
+    cleanup()
+    vi.clearAllMocks()
+  })
+
   it('types Codex autocomplete commands', () => {
-    const hook = renderDispatch('codex')
+    const { hook } = setup({ agent: 'codex' })
+
     act(() => hook.result.current(COMMAND))
 
-    expect(sendNativeChatTypedCommand).toHaveBeenCalledWith({}, 'pty-1', '/status')
+    expect(sendNativeChatTypedCommand).toHaveBeenCalledWith({}, 'pty-1', '/clear')
     expect(sendNativeChatMessage).not.toHaveBeenCalled()
   })
 
   it.each(['claude', 'openclaude'] as const)('keeps %s autocomplete commands pasted', (agent) => {
-    const hook = renderDispatch(agent)
+    const { hook } = setup({ agent })
+
     act(() => hook.result.current(COMMAND))
 
-    expect(sendNativeChatMessage).toHaveBeenCalledWith({}, 'pty-1', '/status')
+    expect(sendNativeChatMessage).toHaveBeenCalledWith({}, 'pty-1', '/clear', expect.anything())
     expect(sendNativeChatTypedCommand).not.toHaveBeenCalled()
+  })
+
+  it('builds send options through the same tiered pipeline as a normal send', () => {
+    const { hook } = setup()
+
+    act(() => hook.result.current(COMMAND))
+
+    expect(buildComposerSendOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ text: '/clear', tier: 'verified' })
+    )
+    expect(sendNativeChatMessage).toHaveBeenCalledWith(
+      {},
+      'pty-1',
+      '/clear',
+      expect.objectContaining({ onOutcome: expect.any(Function) })
+    )
+  })
+
+  it('reports through the host outcome pipeline and restores draft+attachments on may-not-have-sent', () => {
+    const { hook, callbacks, attachments } = setup()
+
+    act(() => hook.result.current(COMMAND))
+    const options = buildComposerSendOptions.mock.calls.at(-1)?.[0] as {
+      onOutcome: (outcome: string) => void
+    }
+    act(() => options.onOutcome('may-not-have-sent'))
+
+    expect(callbacks.onSendOutcome).toHaveBeenCalledExactlyOnceWith('may-not-have-sent')
+    expect(callbacks.restoreImageAttachments).toHaveBeenCalledExactlyOnceWith(attachments)
+    expect(callbacks.setDraft).toHaveBeenLastCalledWith('/clear\n\n')
+    expect(callbacks.setNotice).toHaveBeenLastCalledWith(
+      'Send may not have completed. Check the terminal before retrying.'
+    )
+  })
+
+  it('leaves the normal picker success path unchanged when no outcome fires', () => {
+    const { hook, callbacks } = setup()
+
+    act(() => hook.result.current(COMMAND))
+
+    expect(callbacks.setHistory).toHaveBeenCalledTimes(1)
+    expect(callbacks.setDraft).toHaveBeenCalledExactlyOnceWith('')
+    expect(callbacks.setCaret).toHaveBeenCalledExactlyOnceWith(0)
+    expect(callbacks.setActiveSuggestion).toHaveBeenCalledExactlyOnceWith(0)
+    expect(callbacks.clearSkillOrigin).toHaveBeenCalledTimes(1)
+    expect(callbacks.clearImageAttachments).toHaveBeenCalledTimes(1)
+    expect(callbacks.setNotice).toHaveBeenCalledExactlyOnceWith(null)
+    expect(callbacks.trackPendingSend).toHaveBeenCalledTimes(1)
+    expect(callbacks.onSendOutcome).not.toHaveBeenCalled()
+    expect(callbacks.restoreImageAttachments).not.toHaveBeenCalled()
+  })
+
+  it('does not dispatch while disabled or another session option is in flight', () => {
+    const { hook, callbacks } = setup({ disabled: true })
+
+    act(() => hook.result.current(COMMAND))
+
+    expect(sendNativeChatMessage).not.toHaveBeenCalled()
+    expect(callbacks.trackPendingSend).not.toHaveBeenCalled()
   })
 })

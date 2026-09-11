@@ -1,0 +1,16 @@
+{
+  "auto": {
+    "components": {
+      "sidebar": {
+        "WorktreeContextMenu": {
+          "3ae4748032": "创建一个组并将该工作树移入其中。",
+          "308b16a770": "来自工作树的新组",
+          "5bf97058a4": "将项目移至组",
+          "a2d9a2b93e": "从组中移除项目",
+          "addWorktreeToGroup": "将工作树添加到组",
+          "removeWorktreeFromGroup": "从组中移除工作树"
+        }
+      }
+    }
+  }
+}

@@ -3,7 +3,7 @@ import { Check, Pencil, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import type { AskAnswerSelection, AskPrompt } from './native-chat-interactive-prompt'
-import { useNativeChatWidthClassName } from './use-native-chat-width'
+import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'
 
 export type NativeChatQuestionCardProps = {
   prompt: AskPrompt
@@ -11,6 +11,7 @@ export type NativeChatQuestionCardProps = {
   isSubmitting?: boolean
   /** Deliver the chosen answer (per-question option indices + free text). */
   onAnswer: (selections: AskAnswerSelection[]) => void
+  allowOther?: boolean | readonly boolean[]
   /** Dismiss the prompt (sends Escape to the agent). */
   onCancel: () => void
   /** Exposes the free-text row so pane-level Paste can target it while the
@@ -21,7 +22,7 @@ export type NativeChatQuestionCardProps = {
 /**
  * Native renderer for an agent's AskUserQuestion prompt: a numbered pick-list
  * (mobile/Claude-Code parity) with a header + close, a hover-highlighted row per
- * option, and an always-present free-text row for a custom answer. Single-select
+ * option, and an optional free-text row for a custom answer. Single-select
  * commits on click; multi-select toggles and confirms via the trailing action.
  * Multi-question prompts step through tabs across the top. Neutral shadcn tokens.
  */
@@ -29,6 +30,7 @@ export function NativeChatQuestionCard({
   prompt,
   isSubmitting = false,
   onAnswer,
+  allowOther = true,
   onCancel,
   answerInputRef
 }: NativeChatQuestionCardProps): React.JSX.Element {
@@ -42,6 +44,7 @@ export function NativeChatQuestionCard({
   const total = prompt.questions.length
   const isLast = index === total - 1
   const q = prompt.questions[index]!
+  const questionAllowsOther = Array.isArray(allowOther) ? (allowOther[index] ?? false) : allowOther
 
   const setOther = (qi: number, value: string): void => {
     setOtherText((prev) => {
@@ -186,26 +189,32 @@ export function NativeChatQuestionCard({
               />
             ))}
             <div className="flex items-center gap-3 px-3.5 py-2.5">
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                <Pencil className="size-3.5" />
-              </span>
-              <input
-                ref={answerInputRef}
-                disabled={isSubmitting}
-                value={otherText[index]}
-                onChange={(e) => setOther(index, e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    confirm(true)
-                  }
-                }}
-                placeholder={translate(
-                  'components.native-chat.question.otherPlaceholder',
-                  'Type your answer'
-                )}
-                className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/60 disabled:cursor-default disabled:opacity-50"
-              />
+              {questionAllowsOther ? (
+                <>
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                    <Pencil className="size-3.5" />
+                  </span>
+                  <input
+                    ref={answerInputRef}
+                    disabled={isSubmitting}
+                    value={otherText[index]}
+                    onChange={(e) => setOther(index, e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        confirm(true)
+                      }
+                    }}
+                    placeholder={translate(
+                      'components.native-chat.question.otherPlaceholder',
+                      'Type your answer'
+                    )}
+                    className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/60 disabled:cursor-default disabled:opacity-50"
+                  />
+                </>
+              ) : (
+                <span className="flex-1" />
+              )}
               <button
                 type="button"
                 disabled={isSubmitting}

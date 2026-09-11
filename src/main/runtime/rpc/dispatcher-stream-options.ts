@@ -3,6 +3,7 @@ import type { TerminalStreamFrame } from '../../../shared/terminal-stream-protoc
 import type { PairingRpcContext } from './core'
 
 export type RpcDispatchStreamingOptions = {
+  authenticatedCallerFingerprint?: string
   connectionId?: string
   signal?: AbortSignal
   clientId?: string
@@ -10,10 +11,14 @@ export type RpcDispatchStreamingOptions = {
   clientKind?: 'mobile' | 'runtime'
   clientCapabilities?: readonly RuntimeCapability[]
   authenticatedCredential?: string
+  updateClientCapabilities?: (capabilities: readonly RuntimeCapability[]) => void
   pairing?: PairingRpcContext
   sendBinary?: (bytes: Uint8Array<ArrayBufferLike>) => boolean | void
   registerBinaryStreamHandler?: (
     streamId: number,
     handler: (frame: TerminalStreamFrame) => void
+  ) => () => void
+  registerBinaryMessageHandler?: (
+    handler: (bytes: Uint8Array<ArrayBufferLike>) => void
   ) => () => void
 }

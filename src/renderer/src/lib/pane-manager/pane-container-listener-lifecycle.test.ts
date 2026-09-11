@@ -11,6 +11,7 @@ function makePane(): ManagedPaneInternal {
     terminal: { dispose: vi.fn() } as never,
     container: { removeEventListener: vi.fn() } as never,
     xtermContainer: {} as never,
+    dockContainer: {} as never,
     linkTooltip: {} as never,
     terminalGpuAcceleration: 'auto',
     gpuRenderingEnabled: false,

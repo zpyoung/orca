@@ -1,0 +1,253 @@
+@theme inline {
+  --color-tool-read: var(--tool-read);
+  --color-tool-write: var(--tool-write);
+  --color-tool-exec: var(--tool-exec);
+  --color-tool-search: var(--tool-search);
+  --color-tool-net: var(--tool-net);
+  --color-code-accent: var(--code-accent);
+  --color-code-accent-surface: var(--code-accent-surface);
+  --color-chat-user-surface: var(--chat-user-surface);
+}
+
+:root {
+  --tool-read: #2f6a96;
+  --tool-write: #8a6100;
+  --tool-exec: #24707a;
+  --tool-search: #4f4fc4;
+  --tool-net: #6a4fb0;
+  --code-accent: #a01e6a;
+  --code-accent-surface: color-mix(in srgb, var(--code-accent) 12%, var(--background));
+  --chat-user-surface: color-mix(in srgb, var(--tool-read) 13%, var(--background));
+  --hljs-keyword: #cf222e;
+  --hljs-string: #0a3069;
+  --hljs-number: #0550ae;
+  --hljs-comment: #6e7781;
+  --hljs-function: #8250df;
+  --hljs-title: #8250df;
+  --hljs-built-in: #0550ae;
+  --hljs-type: #0550ae;
+  --hljs-attr: #0550ae;
+  --hljs-selector-class: #0550ae;
+  --hljs-variable: #953800;
+  --hljs-meta: #6e7781;
+  --hljs-tag: #116329;
+  --hljs-name: #116329;
+  --hljs-params: #953800;
+  --hljs-literal: #0550ae;
+  --hljs-regexp: #0a3069;
+  --hljs-operator: #cf222e;
+  --hljs-property: #0550ae;
+}
+
+.dark {
+  --tool-read: #8ab4d8;
+  --tool-write: #e3b341;
+  --tool-exec: #79bfc4;
+  --tool-search: #9a9ae6;
+  --tool-net: #b39ddb;
+  --code-accent: #f191c5;
+  --code-accent-surface: color-mix(in srgb, var(--code-accent) 12%, var(--background));
+  --chat-user-surface: color-mix(in srgb, var(--tool-read) 13%, var(--background));
+  --hljs-keyword: #ff7b72;
+  --hljs-string: #a5d6ff;
+  --hljs-number: #79c0ff;
+  --hljs-comment: #8b949e;
+  --hljs-function: #d2a8ff;
+  --hljs-title: #d2a8ff;
+  --hljs-built-in: #79c0ff;
+  --hljs-type: #79c0ff;
+  --hljs-attr: #79c0ff;
+  --hljs-selector-class: #79c0ff;
+  --hljs-variable: #ffa657;
+  --hljs-meta: #8b949e;
+  --hljs-tag: #7ee787;
+  --hljs-name: #7ee787;
+  --hljs-params: #ffa657;
+  --hljs-literal: #79c0ff;
+  --hljs-regexp: #a5d6ff;
+  --hljs-operator: #ff7b72;
+  --hljs-property: #79c0ff;
+}
+
+/* rich-markdown-editor.css's hljs rules are scoped to .rich-markdown-code-block-wrapper,
+   a wrapper chat never renders, so chat needs a parallel scoped set over the same tokens. */
+
+.native-chat-code .hljs-keyword {
+  color: var(--hljs-keyword);
+}
+.native-chat-code .hljs-string {
+  color: var(--hljs-string);
+}
+.native-chat-code .hljs-number {
+  color: var(--hljs-number);
+}
+.native-chat-code .hljs-comment {
+  color: var(--hljs-comment);
+  font-style: italic;
+}
+.native-chat-code .hljs-function {
+  color: var(--hljs-function);
+}
+.native-chat-code .hljs-title {
+  color: var(--hljs-title);
+}
+.native-chat-code .hljs-built_in {
+  color: var(--hljs-built-in);
+}
+.native-chat-code .hljs-type {
+  color: var(--hljs-type);
+}
+.native-chat-code .hljs-attr {
+  color: var(--hljs-attr);
+}
+.native-chat-code .hljs-selector-class {
+  color: var(--hljs-selector-class);
+}
+.native-chat-code .hljs-variable {
+  color: var(--hljs-variable);
+}
+.native-chat-code .hljs-meta {
+  color: var(--hljs-meta);
+}
+.native-chat-code .hljs-tag {
+  color: var(--hljs-tag);
+}
+.native-chat-code .hljs-name {
+  color: var(--hljs-name);
+}
+.native-chat-code .hljs-params {
+  color: var(--hljs-params);
+}
+.native-chat-code .hljs-literal {
+  color: var(--hljs-literal);
+}
+.native-chat-code .hljs-regexp {
+  color: var(--hljs-regexp);
+}
+.native-chat-code .hljs-operator {
+  color: var(--hljs-operator);
+}
+.native-chat-code .hljs-property {
+  color: var(--hljs-property);
+}
+
+/* Why: CodeBlockLowlight's decoration plugin adds hljs class spans directly
+   inside the <pre> contentDOM — there is no <code> wrapper when using a
+   React NodeView, so selectors must target pre > .hljs-* directly. */
+.rich-markdown-code-block-wrapper .hljs-keyword {
+  color: var(--hljs-keyword);
+}
+.rich-markdown-code-block-wrapper .hljs-string {
+  color: var(--hljs-string);
+}
+.rich-markdown-code-block-wrapper .hljs-number {
+  color: var(--hljs-number);
+}
+.rich-markdown-code-block-wrapper .hljs-comment {
+  color: var(--hljs-comment);
+  font-style: italic;
+}
+.rich-markdown-code-block-wrapper .hljs-function {
+  color: var(--hljs-function);
+}
+.rich-markdown-code-block-wrapper .hljs-title {
+  color: var(--hljs-title);
+}
+.rich-markdown-code-block-wrapper .hljs-built_in {
+  color: var(--hljs-built-in);
+}
+.rich-markdown-code-block-wrapper .hljs-type {
+  color: var(--hljs-type);
+}
+.rich-markdown-code-block-wrapper .hljs-attr {
+  color: var(--hljs-attr);
+}
+.rich-markdown-code-block-wrapper .hljs-selector-class {
+  color: var(--hljs-selector-class);
+}
+.rich-markdown-code-block-wrapper .hljs-variable {
+  color: var(--hljs-variable);
+}
+.rich-markdown-code-block-wrapper .hljs-meta {
+  color: var(--hljs-meta);
+}
+.rich-markdown-code-block-wrapper .hljs-tag {
+  color: var(--hljs-tag);
+}
+.rich-markdown-code-block-wrapper .hljs-name {
+  color: var(--hljs-name);
+}
+.rich-markdown-code-block-wrapper .hljs-params {
+  color: var(--hljs-params);
+}
+.rich-markdown-code-block-wrapper .hljs-literal {
+  color: var(--hljs-literal);
+}
+.rich-markdown-code-block-wrapper .hljs-regexp {
+  color: var(--hljs-regexp);
+}
+.rich-markdown-code-block-wrapper .hljs-operator {
+  color: var(--hljs-operator);
+}
+.rich-markdown-code-block-wrapper .hljs-property {
+  color: var(--hljs-property);
+}
+
+.dark .rich-markdown-code-block-wrapper .hljs-keyword {
+  color: var(--hljs-keyword);
+}
+.dark .rich-markdown-code-block-wrapper .hljs-string {
+  color: var(--hljs-string);
+}
+.dark .rich-markdown-code-block-wrapper .hljs-number {
+  color: var(--hljs-number);
+}
+.dark .rich-markdown-code-block-wrapper .hljs-comment {
+  color: var(--hljs-comment);
+  font-style: italic;
+}
+.dark .rich-markdown-code-block-wrapper .hljs-function {
+  color: var(--hljs-function);
+}
+.dark .rich-markdown-code-block-wrapper .hljs-title {
+  color: var(--hljs-title);
+}
+.dark .rich-markdown-code-block-wrapper .hljs-built_in {
+  color: var(--hljs-built-in);
+}
+.dark .rich-markdown-code-block-wrapper .hljs-type {
+  color: var(--hljs-type);
+}
+.dark .rich-markdown-code-block-wrapper .hljs-attr {
+  color: var(--hljs-attr);
+}
+.dark .rich-markdown-code-block-wrapper .hljs-selector-class {
+  color: var(--hljs-selector-class);
+}
+.dark .rich-markdown-code-block-wrapper .hljs-variable {
+  color: var(--hljs-variable);
+}
+.dark .rich-markdown-code-block-wrapper .hljs-meta {
+  color: var(--hljs-meta);
+}
+.dark .rich-markdown-code-block-wrapper .hljs-tag {
+  color: var(--hljs-tag);
+}
+.dark .rich-markdown-code-block-wrapper .hljs-name {
+  color: var(--hljs-name);
+}
+.dark .rich-markdown-code-block-wrapper .hljs-params {
+  color: var(--hljs-params);
+}
+.dark .rich-markdown-code-block-wrapper .hljs-literal {
+  color: var(--hljs-literal);
+}
+.dark .rich-markdown-code-block-wrapper .hljs-regexp {
+  color: var(--hljs-regexp);
+}
+.dark .rich-markdown-code-block-wrapper .hljs-operator {
+  color: var(--hljs-operator);
+}
+.dark .rich-markdown-code-block-wrapper .hljs-property {
+  color: var(--hljs-property);
+}

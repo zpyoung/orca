@@ -22,6 +22,7 @@ function createPane(id: number, container: HTMLElement): ManagedPaneInternal {
     terminal: {} as never,
     container,
     xtermContainer: {} as never,
+    dockContainer: {} as never,
     linkTooltip: {} as never,
     terminalGpuAcceleration: 'auto',
     gpuRenderingEnabled: true,

@@ -56,23 +56,13 @@ beforeEach(() => {
 })
 
 describe('getNativeChatSessionTransport — selection', () => {
-  // The adapter has dropped an argument before (an ssh read silently ran against
-  // local disk), so this asserts the whole object reaches the bridge.
-  it('returns the local adapter for a null owner and forwards every readSession arg', async () => {
+  it('returns the local adapter for a null owner and forwards readSession args', async () => {
     nativeChatReadSession.mockResolvedValue({ messages: [] })
     const transport = getNativeChatSessionTransport(null)
 
-    const args = {
-      agent: 'claude' as const,
-      sessionId: 'sess-1',
-      limit: 40,
-      transcriptPath: '/t/path',
-      sshConnectionId: 'ssh:host-1',
-      beforeOffset: 4_096
-    }
-    await transport.readSession(args)
+    await transport.readSession('claude', 'sess-1', 40, '/t/path')
 
-    expect(nativeChatReadSession).toHaveBeenCalledWith(args)
+    expect(nativeChatReadSession).toHaveBeenCalledWith('claude', 'sess-1', 40, '/t/path')
     expect(runtimeEnvironmentsCall).not.toHaveBeenCalled()
   })
 
@@ -81,24 +71,12 @@ describe('getNativeChatSessionTransport — selection', () => {
     runtimeEnvironmentsCall.mockResolvedValue(okEnvelope({ messages: [] }))
     const transport = getNativeChatSessionTransport(ENV)
 
-    await transport.readSession({
-      agent: 'claude',
-      sessionId: 'sess-1',
-      limit: 40,
-      transcriptPath: '/t/path',
-      beforeOffset: 4_096
-    })
+    await transport.readSession('claude', 'sess-1', 40, '/t/path')
 
     expect(runtimeEnvironmentsCall).toHaveBeenCalledWith({
       selector: ENV,
       method: 'nativeChat.readSession',
-      params: {
-        agent: 'claude',
-        sessionId: 'sess-1',
-        limit: 40,
-        transcriptPath: '/t/path',
-        beforeOffset: 4_096
-      },
+      params: { agent: 'claude', sessionId: 'sess-1', limit: 40, transcriptPath: '/t/path' },
       timeoutMs: 15_000
     })
     expect(nativeChatReadSession).not.toHaveBeenCalled()
@@ -117,12 +95,12 @@ describe('getNativeChatSessionTransport — selection', () => {
       )
     const transport = getNativeChatSessionTransport(ENV)
 
-    await expect(transport.readSession({ agent: 'claude', sessionId: 'sess-1' })).resolves.toEqual({
+    await expect(transport.readSession('claude', 'sess-1')).resolves.toEqual({
       messages: [message('valid')],
       lifecycle
     })
     // An invalid lifecycle payload is dropped, leaving prose recovery to settle.
-    await expect(transport.readSession({ agent: 'claude', sessionId: 'sess-1' })).resolves.toEqual({
+    await expect(transport.readSession('claude', 'sess-1')).resolves.toEqual({
       messages: [message('invalid')]
     })
   })
@@ -135,7 +113,7 @@ describe('getNativeChatSessionTransport — selection', () => {
     )
     const transport = getNativeChatSessionTransport(ENV)
 
-    await expect(transport.readSession({ agent: 'codex', sessionId: 'sess-1' })).resolves.toEqual({
+    await expect(transport.readSession('codex', 'sess-1')).resolves.toEqual({
       messages: [message('interrupted')],
       lifecycle
     })
@@ -151,7 +129,7 @@ describe('getNativeChatSessionTransport — selection', () => {
     )
     const transport = getNativeChatSessionTransport(ENV)
 
-    await expect(transport.readSession({ agent: 'claude', sessionId: 'sess-1' })).resolves.toEqual({
+    await expect(transport.readSession('claude', 'sess-1')).resolves.toEqual({
       messages: [message('no-ts')],
       lifecycle: { state: 'completed', turnId: 'turn-3', timestamp: null }
     })
@@ -162,7 +140,7 @@ describe('getNativeChatSessionTransport — selection', () => {
     nativeChatReadSession.mockResolvedValue({ messages: [] })
     const transport = getNativeChatSessionTransport(ENV)
 
-    await transport.readSession({ agent: 'claude', sessionId: 'sess-1', limit: 40 })
+    await transport.readSession('claude', 'sess-1', 40, undefined)
 
     expect(nativeChatReadSession).toHaveBeenCalledOnce()
     expect(runtimeEnvironmentsCall).not.toHaveBeenCalled()
@@ -202,6 +180,13 @@ describe('runtime subscribe', () => {
 
     transport.subscribe({ subscriptionId: 's-1', agent: 'claude', sessionId: 'sess-1' }, onFrame)
     await Promise.resolve()
+
+    expect(runtimeEnvironmentsSubscribe).toHaveBeenCalledWith(
+      expect.objectContaining({
+        params: expect.objectContaining({ capabilities: { transcriptPending: 1 } })
+      }),
+      expect.any(Object)
+    )
 
     deliver({ type: 'appended', messages: [message('m-1')] })
     deliver({ type: 'snapshot', messages: [message('m-snapshot')] })
@@ -306,6 +291,39 @@ describe('runtime subscribe', () => {
       messages: [],
       hasMore: false,
       error: 'boom'
+    })
+  })
+
+  it('forwards the pending flag and still treats the real snapshot as the initial frame', async () => {
+    markRuntimeEnvironmentCompatible(ENV)
+    const { deliver } = stubSubscribe()
+    const onFrame = vi.fn()
+    const transport = getNativeChatSessionTransport(ENV)
+
+    transport.subscribe(
+      { subscriptionId: 's-1', agent: 'claude', sessionId: 'sess-1', limit: 1 },
+      onFrame
+    )
+    await Promise.resolve()
+
+    // The host's unflushed-transcript frame, then the flush that follows it.
+    deliver({ type: 'snapshot', messages: [], hasMore: false, pending: true })
+    deliver({ type: 'snapshot', messages: [message('m-1')] })
+
+    expect(onFrame).toHaveBeenNthCalledWith(1, {
+      type: 'snapshot',
+      messages: [],
+      hasMore: false,
+      pending: true
+    })
+    // Dropping `pending` would settle an empty read; carrying it onto the real
+    // snapshot would keep the view unsettled over real history. hasMore proves the
+    // pending frame did not consume the initial slot — only the initial branch
+    // infers a filled window from the limit.
+    expect(onFrame).toHaveBeenNthCalledWith(2, {
+      type: 'snapshot',
+      messages: [message('m-1')],
+      hasMore: true
     })
   })
 
@@ -520,7 +538,7 @@ describe('runtime readSession error mapping', () => {
     })
     const transport = getNativeChatSessionTransport(ENV)
 
-    const result = await transport.readSession({ agent: 'claude', sessionId: 'sess-1', limit: 40 })
+    const result = await transport.readSession('claude', 'sess-1', 40, undefined)
 
     expect(result).toEqual({ error: expect.stringContaining('too old') })
   })

@@ -23,6 +23,7 @@ import {
   SessionMetadata
 } from './ai-vault-session-row-display'
 import type { AgentStatusState } from '../../../../shared/agent-status-types'
+import { ForkAiVaultLineageLine } from '@/components/agent-session-continuation/fork-session-handoff/ForkAiVaultLineageLine'
 
 export function VaultSessionRow({
   session,
@@ -39,6 +40,7 @@ export function VaultSessionRow({
   onJumpToWorktree,
   onResume,
   onContinueInNewSession,
+  onResumeInNewChat,
   resumeLabel,
   resumeActions,
   onResumeInWorktree,
@@ -65,6 +67,7 @@ export function VaultSessionRow({
   onJumpToWorktree?: () => void
   onResume: () => void
   onContinueInNewSession?: () => void
+  onResumeInNewChat?: () => void
   resumeLabel: string
   resumeActions: AiVaultSessionResumeActions
   onResumeInWorktree: () => void
@@ -96,6 +99,7 @@ export function VaultSessionRow({
       writeAiVaultSessionDragData(event.dataTransfer, {
         agent: session.agent,
         sessionId: session.sessionId,
+        ...(session.structuredSession ? { structuredSession: session.structuredSession } : {}),
         title: session.title,
         command: resumeStartup.command,
         sessionFilePath: session.filePath,
@@ -172,6 +176,7 @@ export function VaultSessionRow({
               onJumpToWorktree={onJumpToWorktree}
               onResume={onResume}
               onContinueInNewSession={onContinueInNewSession}
+              onResumeInNewChat={onResumeInNewChat}
               onCopyResume={onCopyResume}
               onCopyId={onCopyId}
               onCopyPath={onCopyPath}
@@ -206,6 +211,7 @@ export function VaultSessionRow({
             worktreeInfo={worktreeInfo}
             vaultScope={vaultScope}
           />
+          <ForkAiVaultLineageLine session={session} />
           {detailsExpanded ? (
             <SessionInlineDetails
               id={detailsId}
@@ -216,6 +222,7 @@ export function VaultSessionRow({
               onResumeInWorktree={onResumeInWorktree}
               onResumeInNewTab={onResumeInNewTab}
               onContinueInNewSession={onContinueInNewSession}
+              onResumeInNewChat={onResumeInNewChat}
               onOpenLog={onOpenLog}
             />
           ) : null}
@@ -231,6 +238,7 @@ export function VaultSessionRow({
           onJumpToWorktree={onJumpToWorktree}
           onResume={onResume}
           onContinueInNewSession={onContinueInNewSession}
+          onResumeInNewChat={onResumeInNewChat}
           onCopyResume={onCopyResume}
           onCopyId={onCopyId}
           onCopyPath={onCopyPath}

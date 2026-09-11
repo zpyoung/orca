@@ -1,0 +1,4716 @@
+{
+  "features": [
+    {
+      "name": "worktree-groups",
+      "purpose": "Lets a worktree join a project group independently of its repo's own group membership, so cross-repo worktrees can share a sidebar section.",
+      "globs": ["**/fork-worktree-groups/**"]
+    },
+    {
+      "name": "native-chat-relay",
+      "purpose": "Reads and live-tails native-chat transcripts for an agent running on a plain ssh: host over the SSH relay, since the desktop process cannot see that host's disk.",
+      "globs": ["**/fork-native-chat-relay/**", "docs/architecture/native-chat.md"]
+    },
+    {
+      "name": "native-chat-coloring",
+      "purpose": "Renders native-chat tool calls with category glyphs/dots and syntax-highlighted code blocks instead of monochrome text.",
+      "globs": [
+        "**/fork-native-chat-coloring/**",
+        "src/renderer/src/assets/fork-native-chat-coloring.css"
+      ]
+    },
+    {
+      "name": "native-chat-width",
+      "purpose": "Lets the user pick the reading-column width for every native-chat pane instead of a fixed max-width.",
+      "globs": ["**/fork-native-chat-width/**"]
+    },
+    {
+      "name": "terminal-dock",
+      "purpose": "Docks a rich agent composer beneath a terminal pane running a supported coding-agent CLI, so a prompt can be composed and sent without typing into the TUI, with the terminal still visible as a fallback.",
+      "globs": ["**/fork-terminal-dock/**"]
+    },
+    {
+      "name": "agent-composer",
+      "purpose": "A host-agnostic composer core extracted from the native-chat composer, so the same draft, history, attachment, and tiered-send behavior serves both the chat pane and the terminal dock.",
+      "globs": ["**/fork-agent-composer/**"]
+    },
+    {
+      "name": "native-chat-session-options",
+      "purpose": "Pre-fills the composer's model and effort from agent session logs, and re-reads Claude's startup frame as it paints when no log value exists.",
+      "globs": ["**/fork-native-chat-session-options/**"]
+    },
+    {
+      "name": "live-plugin-marketplaces",
+      "purpose": "Points the skill picker at a directory-sourced marketplace's live plugin directory, the one the Claude Code harness loads, instead of the frozen cache copy that goes stale between `claude plugin update` runs.",
+      "globs": ["**/fork-live-plugin-marketplaces/**"]
+    },
+    {
+      "name": "skill-plugin-attribution",
+      "purpose": "Attributes each discovered skill to the plugin that owns it, so the composer's skill picker can name the plugin and disambiguate a skill offered by more than one.",
+      "globs": ["**/fork-skill-plugin-attribution/**"]
+    },
+    {
+      "name": "session-handoff",
+      "purpose": "Customizable Continue-in-New-Session handoff with a rich editable brief, target-worktree selection, host-aware warnings, delivery recovery, and one-hop session lineage.",
+      "globs": ["**/fork-session-handoff/**"]
+    },
+    {
+      "name": "dirty-branch-indicator",
+      "purpose": "Marks the right sidebar's Source Control tab while the active worktree has uncommitted changes, so a dirty branch is visible without opening the panel.",
+      "globs": ["**/fork-dirty-branch-indicator/**"]
+    },
+    {
+      "name": "artifact-passwords",
+      "purpose": "Encrypts shared artifact content before upload and manages local passphrases and protection lifecycle.",
+      "globs": ["**/fork-artifact-passwords/**"]
+    },
+    {
+      "name": "session-info",
+      "purpose": "Shows provider-neutral details, live context, usage, diagnostics, and safe actions for the exact focused agent terminal session while preserving user-owned statuslines.",
+      "globs": ["**/fork-session-info/**"]
+    },
+    {
+      "name": "sidebar-section-separator",
+      "purpose": "Draws a hairline between top-level sidebar sections, behind a user setting.",
+      "globs": ["**/fork-sidebar-section-separator/**"]
+    },
+    {
+      "name": "workspace-activity-window",
+      "purpose": "Adds a persisted workspace activity-window filter, activity-aware folder visibility, and hidden-count feedback to the workspace sidebar.",
+      "globs": ["**/fork-workspace-activity-window/**"]
+    },
+    {
+      "name": "workspace-review-filters",
+      "purpose": "Adds persisted workspace review filters for completed pull requests and passing checks across sidebar and workspace views.",
+      "globs": ["**/fork-workspace-review-filters/**"]
+    }
+  ],
+  "seams": [
+    {
+      "path": ".gitignore",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["!docs/fork-upstreaming.md"]
+    },
+    {
+      "path": ".oxlintrc.json",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "        \"max-lines\": [\"error\", { \"max\": 500, \"skipBlankLines\": true, \"skipComments\": true }]",
+        "        \"max-lines\": [\"error\", { \"max\": 1000, \"skipBlankLines\": true, \"skipComments\": true }]"
+      ]
+    },
+    {
+      "path": "AGENTS.md",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "# Fork Feature Structure",
+        "## Seams",
+        "## Precedence",
+        "## CI enforcement",
+        "## Running Tests: Remote Sandbox Only",
+        "## Typechecking: Scope It to What You Changed"
+      ]
+    },
+    {
+      "path": "CLAUDE.md",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "for brevity\". Route it via the `typed-artifacts` skill (auto-loads on",
+        "those phrases) or use one of:"
+      ]
+    },
+    {
+      "path": "config/localization-coverage-allowlist.json",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    \"filePath\": \"src/renderer/src/components/sidebar/WorktreeCard.tsx\","]
+    },
+    {
+      "path": "config/scripts/build-notification-status-macos.mjs",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["const bundleId = readArg('--bundle-id') ?? 'com.zpyoung.orca'"]
+    },
+    {
+      "path": "config/scripts/check-max-lines-ratchet.mjs",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    return 1000", "  return 500"]
+    },
+    {
+      "path": "config/scripts/check-max-lines-ratchet.test.mjs",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["  it('uses 1000 for tests, 600 for tsx, 800 for mjs, 500 otherwise', () => {"]
+    },
+    {
+      "path": "config/scripts/mac-build-compatibility.test.mjs",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["      appId: 'com.zpyoung.orca',"]
+    },
+    {
+      "path": "src/main/ipc/native-chat-subscribe-lifecycle.test.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": ["        beforeOffset: 0,"]
+    },
+    {
+      "path": "src/main/ipc/native-chat.ts",
+      "feature": "native-chat-relay",
+      "kind": "registration",
+      "lines": [
+        "} from './fork-native-chat-relay/native-chat-ssh-subscription'",
+        "  if (args.sshConnectionId) {"
+      ]
+    },
+    {
+      "path": "src/main/ipc/notification-system-settings-link.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["const MACOS_PACKAGED_BUNDLE_ID = 'com.zpyoung.orca'"]
+    },
+    {
+      "path": "src/main/ipc/pty/ipc/write-input.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "  const writePtyProviderInputAcknowledged = (",
+        "        return tooLarge ? false : writePtyProviderInputAcknowledgedChunks(settlementWrite, id, data)",
+        "      return allSettled",
+        "  const writePtyInputProvablyLive = (args: PtyWritePayload): boolean | Promise<boolean> => {"
+      ]
+    },
+    {
+      "path": "src/main/ipc/pty/ipc/write.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "  ipcMain.handle('pty:writeInputAccepted', (event, args: unknown): boolean | Promise<boolean> => {",
+        "      : writePtyInputProvablyLive(args)"
+      ]
+    },
+    {
+      "path": "src/main/ipc/pty/register-handlers.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["  ipcMain.removeHandler('pty:writeInputAccepted')"]
+    },
+    {
+      "path": "src/main/ipc/ssh.ts",
+      "feature": "native-chat-relay",
+      "kind": "registration",
+      "lines": [
+        "import type { NativeChatRelayPing } from '../../shared/fork-native-chat-relay/native-chat-relay-protocol'",
+        "import { onSshRelayReady } from './fork-native-chat-relay/ssh-relay-ready-notifier'",
+        "export async function requestActiveSshNativeChat("
+      ]
+    },
+    {
+      "path": "src/main/ipc/ssh-relay-session-callbacks.ts",
+      "feature": "native-chat-relay",
+      "kind": "registration",
+      "lines": [
+        "import { notifySshRelayReady } from './fork-native-chat-relay/ssh-relay-ready-notifier'",
+        "    notifySshRelayReady(tid)"
+      ]
+    },
+    {
+      "path": "src/main/ipc/worktree-logic.test.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": ["      projectGroupId: null,"]
+    },
+    {
+      "path": "src/main/ipc/worktree-metadata-merge.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": ["    projectGroupId: meta?.projectGroupId ?? null,"]
+    },
+    {
+      "path": "src/main/local-builds/local-build-candidate.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    appId: 'com.zpyoung.orca',"]
+    },
+    {
+      "path": "src/main/local-builds/local-build-compatibility-contract.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["      appId: 'com.zpyoung.orca',"]
+    },
+    {
+      "path": "src/main/macos-tcc-prompt-watch.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    expect(event?.responsibleIdentifier).toBe('com.zpyoung.orca')"]
+    },
+    {
+      "path": "src/main/macos-tcc-prompt-watch.ts",
+      "feature": "fork-infra",
+      "kind": "registration",
+      "lines": [
+        "  'com.zpyoung.orca',",
+        "  'com.zpyoung.orca.helper',",
+        "  'com.zpyoung.orca.dev',",
+        "  'com.zpyoung.orca.dev.helper',",
+        "  'com.zpyoung.orca.local',",
+        "  'com.zpyoung.orca.local.helper'"
+      ]
+    },
+    {
+      "path": "src/main/native-chat/transcript-incremental-reader.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": ["const MAX_NATIVE_CHAT_TRANSCRIPT_RECORD_BYTES = 2 * 1024 * 1024"]
+    },
+    {
+      "path": "src/main/native-chat/transcript-tail-reader.ts",
+      "feature": "native-chat-session-options",
+      "kind": "registration",
+      "lines": [
+        "} from './fork-native-chat-session-options/transcript-companion-decoder'",
+        "} from '../../shared/fork-native-chat-session-options/native-chat-transcript-companion'"
+      ]
+    },
+    {
+      "path": "src/main/native-chat/transcript-watch-contract.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": [
+        "export type NativeChatTranscriptTailReader = (args: {",
+        "  tailReader?: NativeChatTranscriptTailReader",
+        "  initialMaxBytes?: number"
+      ]
+    },
+    {
+      "path": "config/scripts/pr-e2e-gate-contract.test.mjs",
+      "feature": "fork-infra",
+      "kind": "registration",
+      "lines": ["        job === 'fork_ownership_guard'"]
+    },
+    {
+      "path": "src/shared/pane-agent-identity-inventory.test.ts",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "        'src/renderer/src/components/agent-session-continuation/fork-session-handoff/AgentSessionContinuationDialog.tsx',"
+      ]
+    },
+    {
+      "path": "tests/e2e/cross-version-wire/cross-version-browser-placement.unit.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["const LEGACY_BROWSER_PLACEMENT_RELEASE_REF = 'v1.4.183-rc.0.zy01'"]
+    },
+    {
+      "path": "tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["const TERMINAL_MODE_METADATA_LEGACY_REF = 'v1.4.191-rc.0.zy01'"]
+    },
+    {
+      "path": "tests/e2e/cross-version-wire/release-checkout.unit.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": [
+        "      ref: 'v1.4.191-rc.0.zy01',",
+        "    const checkout = await materializeReleaseCheckout('v1.4.191-rc.0.zy01', { cacheRoot })"
+      ]
+    },
+    {
+      "path": "src/main/native-chat/transcript-watch-engine-wsl-lifecycle.test.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": ["const stubTailReader = (): never => {", "      tailReader: stubTailReader,"]
+    },
+    {
+      "path": "src/main/native-chat/transcript-watch-engine.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": [
+        "  args: SubscribeNativeChatTranscriptArgs & { tailReader: NativeChatTranscriptTailReader },",
+        "            maxBytes: initialMaxBytes,"
+      ]
+    },
+    {
+      "path": "src/main/native-chat/transcript-watch.test.ts",
+      "feature": "native-chat-session-options",
+      "kind": "passthrough",
+      "lines": [
+        "import type { NativeChatTranscriptCompanion } from '../../shared/fork-native-chat-session-options/native-chat-transcript-companion'",
+        "import type {"
+      ]
+    },
+    {
+      "path": "src/main/native-chat/transcript-watch.ts",
+      "feature": "native-chat-relay",
+      "kind": "import-swap",
+      "lines": [
+        "import { subscribeNativeChatTranscriptWithDecoder } from './fork-native-chat-relay/transcript-watch-subscription'",
+        "    { ...args, tailReader: defaultTailReader },"
+      ]
+    },
+    {
+      "path": "src/main/persistence/tracking-repos/project-group-operations.ts",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "import { releaseDeletedProjectGroupWorktreeMembership } from '../../fork-worktree-groups/project-group-membership-release'",
+        "    releaseDeletedProjectGroupWorktreeMembership(this.state.worktreeMeta, deletedGroupIds)"
+      ]
+    },
+    {
+      "path": "src/main/providers/ssh-pty-provider-rpc-operations.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["    writeAcknowledged: (id: string, data: string): Promise<boolean> =>"]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-persist-headless-session-tab-props.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "} from './fork-terminal-dock/terminal-dock-session-tab-props'",
+        "          ...dockFragment"
+      ]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-sync-mobile-session-tabs.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "} from './fork-terminal-dock/terminal-dock-session-tab-props'",
+        "      const dockMergedSnapshot = mergeRendererTerminalDockAcrossSnapshot("
+      ]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-close-headless-mobile-terminal-tab.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import type { TerminalDockPropsPatch } from './fork-terminal-dock/terminal-dock-session-tab-props'",
+        "      terminalDock?: TerminalDockPropsPatch"
+      ]
+    },
+    {
+      "path": "src/main/runtime/runtime-artifact-controller.ts",
+      "feature": "artifact-passwords",
+      "kind": "import-swap",
+      "lines": [
+        "import type { ArtifactCloudService } from '../artifacts/fork-artifact-passwords/artifact-password-cloud-service'"
+      ]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-has-exact-persisted-terminal-surface-identity.ts",
+      "feature": "artifact-passwords",
+      "kind": "import-swap",
+      "lines": [
+        "import type { ArtifactCloudService } from '../artifacts/fork-artifact-passwords/artifact-password-cloud-service'",
+        "    request: ArtifactCloudOptions & { sourceKey: string; revealPassphrase?: boolean }"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/native-chat.test.ts",
+      "feature": "native-chat-session-options",
+      "kind": "passthrough",
+      "lines": [
+        "import type { NativeChatTranscriptCompanion } from '../../../../shared/fork-native-chat-session-options/native-chat-transcript-companion'",
+        "    companion?: NativeChatTranscriptCompanion"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/native-chat.ts",
+      "feature": "native-chat-session-options",
+      "kind": "registration",
+      "lines": [
+        "import { nativeChatCompanionFrameFields } from '../../../../shared/fork-native-chat-session-options/native-chat-transcript-companion'",
+        "        onAppend: (messages, companion) => {"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/session-tabs-schemas.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { parseLegacyNumericPaneKey, parsePaneKey } from '../../../../shared/stable-pane-id'",
+        "} from '../../../../shared/fork-terminal-dock/terminal-dock-gutter-rows'",
+        "  terminalDock: z"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/session-tab-mutation-methods.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "        ...(params.terminalDock !== undefined ? { terminalDock: params.terminalDock } : {})",
+        "        ...(params.viewMode !== undefined ? { viewMode: params.viewMode } : {}),"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/worktree-schemas.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": ["  projectGroupId: z.union([z.string(), z.null()]).optional()"]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/worktree.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": [
+        "        ...(clientKind === 'mobile' ? {} : { projectGroupId: params.projectGroupId }),",
+        "    handler: async (params, { runtime, clientKind }) => ({"
+      ]
+    },
+    {
+      "path": "src/main/skills/claude-plugin-skill-sources.test.ts",
+      "feature": "skill-plugin-attribution",
+      "kind": "passthrough",
+      "lines": ["        pluginName: 'compound-engineering',"]
+    },
+    {
+      "path": "src/main/skills/claude-plugin-skill-sources.ts",
+      "feature": "skill-plugin-attribution",
+      "kind": "registration",
+      "lines": [
+        "import { safePluginName } from './fork-skill-plugin-attribution/skill-plugin-name-resolution'",
+        "        label: `Claude plugin ${pluginName}`,"
+      ]
+    },
+    {
+      "path": "src/main/skills/discovery.ts",
+      "feature": "skill-plugin-attribution",
+      "kind": "registration",
+      "lines": [
+        "import { pluginNameForSkill } from './fork-skill-plugin-attribution/skill-plugin-name-resolution'",
+        "        ...(pluginName ? { pluginName } : {}),"
+      ]
+    },
+    {
+      "path": "src/main/skills/skill-discovery-sources.ts",
+      "feature": "skill-plugin-attribution",
+      "kind": "registration",
+      "lines": [
+        "import { CODEX_PLUGIN_CACHE_ROOT_ID } from './fork-skill-plugin-attribution/skill-plugin-name-resolution'",
+        "      CODEX_PLUGIN_CACHE_ROOT_ID,"
+      ]
+    },
+    {
+      "path": "src/main/skills/skill-discovery-wsl.ts",
+      "feature": "skill-plugin-attribution",
+      "kind": "registration",
+      "lines": [
+        "import { pluginNameForSkill } from './fork-skill-plugin-attribution/skill-plugin-name-resolution'",
+        "      ...(pluginName ? { pluginName } : {})"
+      ]
+    },
+    {
+      "path": "src/main/skills/discovery.ts",
+      "feature": "live-plugin-marketplaces",
+      "kind": "import-swap",
+      "lines": [
+        "import { discoverLiveClaudePluginSkillSources } from './fork-live-plugin-marketplaces/live-plugin-marketplace-sources'",
+        "      ? await discoverLiveClaudePluginSkillSources({ homeDir, cwd: args.cwd })"
+      ]
+    },
+    {
+      "path": "src/main/skills/skill-discovery-wsl.ts",
+      "feature": "live-plugin-marketplaces",
+      "kind": "import-swap",
+      "lines": [
+        "import { discoverLiveClaudePluginSkillSourcesInWsl } from './fork-live-plugin-marketplaces/live-plugin-marketplace-sources-wsl'",
+        "    pluginRoots = await discoverLiveClaudePluginSkillSourcesInWsl(args)"
+      ]
+    },
+    {
+      "path": "src/main/ssh/ssh-relay-session.ts",
+      "feature": "native-chat-relay",
+      "kind": "registration",
+      "lines": [
+        "} from '../../shared/fork-native-chat-relay/native-chat-relay-protocol'",
+        "  async requestNativeChat(",
+        "  onNativeChatChanged(handler: (ping: NativeChatRelayPing) => void): () => void {"
+      ]
+    },
+    {
+      "path": "src/main/telemetry/client.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["const TELEMETRY_ENABLED = false"]
+    },
+    {
+      "path": "src/main/updater.publishing-window-feed.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["      url: 'https://github.com/zpyoung/orca/releases/latest/download'"]
+    },
+    {
+      "path": "src/preload/api-types.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": ["  NativeChatReadSessionArgs,"]
+    },
+    {
+      "path": "src/preload/api/native-chat-api.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": [
+        "import type { NativeChatCompanionFrameFields } from '../../shared/fork-native-chat-session-options/native-chat-transcript-companion'",
+        "export type NativeChatReadSessionArgs = {"
+      ]
+    },
+    {
+      "path": "src/preload/api/pty-api.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["  writeInputAccepted: (id: string, data: string) => Promise<boolean>"]
+    },
+    {
+      "path": "src/preload/api/ui-command-event-api.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "import type { TerminalDockPaneState } from '../../shared/fork-terminal-dock/terminal-dock-pane-state'",
+        "      terminalDockByPaneKey?: Record<string, TerminalDockPaneState>"
+      ]
+    },
+    {
+      "path": "src/preload/api/native-chat-bridge.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": [
+        "const readNativeChatSession = (",
+        "  readSession: readNativeChatSession,",
+        "      sshConnectionId?: string"
+      ]
+    },
+    {
+      "path": "src/preload/api/pty-bridge-session-control.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["  writeInputAccepted: (id: string, data: string): Promise<boolean> =>"]
+    },
+    {
+      "path": "src/relay/relay-runtime-services.ts",
+      "feature": "native-chat-relay",
+      "kind": "registration",
+      "lines": [
+        "import { NativeChatHandler } from './fork-native-chat-relay/native-chat-handler'",
+        "      new NativeChatHandler(dispatcher)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/assets/main.css",
+      "feature": "native-chat-coloring",
+      "kind": "passthrough",
+      "lines": ["@import './fork-native-chat-coloring.css';"]
+    },
+    {
+      "path": "src/renderer/src/assets/terminal.css",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [".pane-dock-slot {", "  bottom: var(--terminal-dock-height, 0px);"]
+    },
+    {
+      "path": "src/renderer/src/components/dashboard-popout/AgentMapWorkspaceContextMenu.test.tsx",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": [
+        "    const createGroup = await screen.findByText('New group from worktree', {}, { timeout: 5_000 })"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatApprovalCard.tsx",
+      "feature": "native-chat-width",
+      "kind": "passthrough",
+      "lines": [
+        "import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'",
+        "  const widthClassName = useNativeChatWidthClassName()",
+        "      <div className={cn('mx-auto w-full px-3 pt-2 pb-1 sm:px-4', widthClassName)}>"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatAutocompleteMenus.test.tsx",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": ["                  pluginName: 'warp'", "              id: 'skill:render',"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatAutocompleteMenus.tsx",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": ["    if (plugins.length > 1) {", "        { plugins: plugins.join(', ') }"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatComposer.test.tsx",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": [
+        "vi.mock('./fork-agent-composer/AgentComposerField', () => ({",
+        "vi.mock('./fork-agent-composer/use-agent-composer-draft', () => ({"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatComposer.tsx",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": [
+        "} from './fork-agent-composer/AgentComposer'",
+        "import { seedHistory } from './fork-agent-composer/agent-composer-history'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatInteractiveCard.test.tsx",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": ["    vi.useRealTimers()", "    vi.useFakeTimers()"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatInteractiveCard.tsx",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": ["          resetSubmitting()", "  if (!showingCard) {"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatMessageRow.tsx",
+      "feature": "native-chat-coloring",
+      "kind": "registration",
+      "lines": [
+        "  nativeChatReasoningClassName,",
+        "  nativeChatUserMessageClassName",
+        "        <div className={nativeChatUserMessageClassName()}>",
+        "        isReasoning && nativeChatReasoningClassName(),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatQuestionCard.tsx",
+      "feature": "native-chat-width",
+      "kind": "passthrough",
+      "lines": [
+        "import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'",
+        "  const widthClassName = useNativeChatWidthClassName()",
+        "      <div className={cn('mx-auto w-full px-3 pt-2 pb-4 sm:px-4', widthClassName)}>"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatView.test.tsx",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": [
+        "import { useAgentComposerDraft } from './fork-agent-composer/use-agent-composer-draft'",
+        "import { clearAgentComposerDraftCacheForTests } from './fork-agent-composer/agent-composer-draft-cache'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatResolvedView.tsx",
+      "feature": "native-chat-relay",
+      "kind": "registration",
+      "lines": [
+        "import { NativeChatConversation } from './fork-native-chat-relay/NativeChatConversation'",
+        "} from './fork-native-chat-relay/native-chat-runtime-owner'",
+        "  const sshConnectionId = useAppStore((s) => selectNativeChatSshConnectionId(s, terminalTabId))"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-attachment-upload.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": [
+        "import { rememberUploadedAttachmentPreviewSources } from './fork-agent-composer/agent-composer-attachment-preview'",
+        "    rememberUploadedAttachmentPreviewSources(owner, paths, resolvedPaths, skipped, failed)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-command-marker.ts",
+      "feature": "agent-composer",
+      "kind": "import-swap",
+      "lines": [
+        "import { setBoundedScopeCacheEntry } from './fork-agent-composer/agent-composer-scope-cache'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-composer-state.test.ts",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": ["          pluginName: 'quirk',", "          pluginName: 'two words',"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-composer-state.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": [
+        "      discovery.skills,",
+        "  if (!leadsDraft && !hasSlashSkills) {",
+        "} from './fork-agent-composer/agent-composer-history'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-live-session-pending.test.ts",
+      "feature": "native-chat-relay",
+      "kind": "import-swap",
+      "lines": [
+        "vi.mock('./fork-native-chat-relay/native-chat-session-transport', () => ({",
+        "} from './fork-native-chat-relay/use-native-chat-live-session'",
+        "import { NOTFOUND_RETRY_WINDOW_MS } from './fork-native-chat-relay/native-chat-read-retry'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-structured-send-composition-clear.test.tsx",
+      "feature": "agent-composer",
+      "kind": "import-swap",
+      "lines": [
+        "vi.mock('./fork-agent-composer/AgentComposerActions', () => ({",
+        "  AgentComposerActions: () => <div data-testid=\"composer-actions\" />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-structured-composer-dispatch.ts",
+      "feature": "agent-composer",
+      "kind": "import-swap",
+      "lines": [
+        "import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentComposerField'",
+        "  attachments: readonly AgentComposerImageAttachment[] = []"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-composer-types.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": ["} from './fork-agent-composer/agent-composer-types'", "import type {"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-pending.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": [
+        "import { setBoundedScopeCacheEntry } from './fork-agent-composer/agent-composer-scope-cache'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-picker-items.ts",
+      "feature": "skill-plugin-attribution",
+      "kind": "registration",
+      "lines": ["      pluginName?: string", "  namespacePluginSkills = false"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-pty-session-options.ts",
+      "feature": "native-chat-session-options",
+      "kind": "registration",
+      "lines": ["  ): boolean =>", "  const applyReport = ("]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-runtime-send-launch-draft.test.ts",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": [
+        "} from './fork-agent-composer/native-chat-runtime-clear'",
+        "const writes = (): string[] => {",
+        "    await vi.advanceTimersByTimeAsync(0)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-runtime-send.test.ts",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": [
+        "import { NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT } from './fork-agent-composer/native-chat-runtime-clear'",
+        "} from './fork-agent-composer/native-chat-send-outcome'",
+        "import { cancelNativeChatPtySends } from './native-chat-pty-send-queue'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-runtime-send.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": [
+        "import { clearConfirmDurationMs } from './fork-agent-composer/native-chat-runtime-clear'",
+        "} from './fork-agent-composer/native-chat-typed-command-send'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-session-option-cache.ts",
+      "feature": "native-chat-session-options",
+      "kind": "registration",
+      "lines": [
+        "import { setBoundedScopeCacheEntry } from './fork-agent-composer/agent-composer-scope-cache'",
+        "): boolean {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.test.tsx",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": [
+        "  it('observes a restore performed after a replacement host mounted (dock/native-chat handoff)', async () => {",
+        "    expect(() => {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": [
+        "} from './fork-agent-composer/agent-composer-attachment-cache'",
+        "import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentComposerField'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-interactive-send.test.tsx",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": ["    onOutcome('observed-cleared')", "    onOutcome('may-not-have-sent')"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-interactive-send.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": [
+        "import type { SendOutcome } from './fork-agent-composer/native-chat-send-outcome'",
+        "          inFlightRef.current = null"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-picker-command-dispatch.test.tsx",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": [
+        "import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentComposerField'",
+        "vi.mock('./fork-agent-composer/composer-send-options', () => ({"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-picker-command-dispatch.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": [
+        "import type { ComposerSendTier } from './fork-agent-composer/composer-send-tier'",
+        "import type { SendOutcome } from './fork-agent-composer/native-chat-send-outcome'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-picker-state.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": ["        ? /(?:^|\\s)\\/\\S*$/.test(beforeCaret)"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-send-lifecycle.test.tsx",
+      "feature": "agent-composer",
+      "kind": "passthrough",
+      "lines": ["    rerender({})", "      { initialProps: {} }"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-send-lifecycle.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": [
+        "import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'",
+        "        handle.cancel()"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-session-option-command.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": [
+        "import { pushHistory, type HistoryState } from './fork-agent-composer/agent-composer-history'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-session-options.ts",
+      "feature": "native-chat-session-options",
+      "kind": "registration",
+      "lines": [
+        "import { nativeChatReportedValuesFromObservation } from './fork-native-chat-session-options/native-chat-session-option-observation'",
+        "  hasDispatchedNativeChatSessionOption,",
+        "  useClaudeStartupFrameRevision",
+        "} from './fork-native-chat-session-options/use-claude-startup-frame-revision'",
+        "import type { NativeChatSessionOptionObservation } from '../../../../shared/native-chat-types'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-typed-insertion.ts",
+      "feature": "agent-composer",
+      "kind": "registration",
+      "lines": ["import type { HistoryState } from './fork-agent-composer/agent-composer-history'"]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/use-right-sidebar-activity-items.ts",
+      "feature": "dirty-branch-indicator",
+      "kind": "registration",
+      "lines": [
+        "import { useSourceControlDirtyItemOverride } from './fork-dirty-branch-indicator/use-source-control-dirty-item-override'",
+        "  const sourceControlDirtyItemOverride = useSourceControlDirtyItemOverride()",
+        "        ...sourceControlDirtyItemOverride,",
+        "      sourceControlDirtyItemOverride,",
+        "import { getSessionInfoActivityItem } from './fork-session-info/session-info-activity-item'",
+        "      getSessionInfoActivityItem(),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/ExperimentalPane.test.tsx",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["      'Terminal dock'", "    expect(markup).toContain('Terminal dock')"]
+    },
+    {
+      "path": "src/renderer/src/components/settings/ExperimentalPane.tsx",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { TerminalDockExperimentalSetting } from './fork-terminal-dock/TerminalDockExperimentalSetting'",
+        "      {showTerminalDock ? ("
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/NativeChatExperimentalSetting.tsx",
+      "feature": "native-chat-width",
+      "kind": "registration",
+      "lines": [
+        "import { NativeChatWidthSetting } from './fork-native-chat-width/NativeChatWidthSetting'",
+        "          <NativeChatWidthSetting",
+        "            value={settings.nativeChatWidth}",
+        "            onChange={(nativeChatWidth) => updateSettings({ nativeChatWidth })}"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/experimental-search.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { getTerminalDockExperimentalSearchEntry } from './fork-terminal-dock/terminal-dock-experimental-search-entry'",
+        "    terminalDock: findEntry("
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/CommentMarkdown.tsx",
+      "feature": "native-chat-coloring",
+      "kind": "passthrough",
+      "lines": [
+        "import rehypeHighlight from 'rehype-highlight'",
+        "  highlightCode?: boolean",
+        "      highlightCode = false,",
+        "      if (highlightCode) {",
+        "          ? createDocumentCommentMarkdownComponents(onLinkClick, true)",
+        "    }, [expandImages, variant, onLinkClick, highlightCode])",
+        "      () => (highlightCode ? [...rehypePlugins, rehypeHighlight] : rehypePlugins),",
+        "          highlightCode && 'native-chat-code [&_pre_code]:text-inherit',",
+        "          rehypePlugins={activeRehypePlugins}"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/WorktreeCard.tsx",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": [
+        "type ForkWorktreeCardProps = WorktreeCardProps & { inProjectGroupLooseSection?: boolean }",
+        "  inProjectGroupLooseSection = false,",
+        "    inPinnedSection: inPinnedSection || inProjectGroupLooseSection,",
+        "}: ForkWorktreeCardProps): React.JSX.Element {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/use-worktree-context-menu-model.tsx",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "import { useWorktreeGroupDialog } from './fork-worktree-groups/WorktreeGroupMenuItems'",
+        "  const worktreeGroupDialog = useWorktreeGroupDialog({",
+        "      worktreeGroupDialog.open ||",
+        "    worktreeGroupDialog,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/WorktreeContextMenuView.tsx",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "import { WorktreeGroupMenuItems } from './fork-worktree-groups/WorktreeGroupMenuItems'",
+        "              <WorktreeGroupMenuItems"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/WorktreeContextMenuOverlays.tsx",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": ["      {model.worktreeGroupDialog.dialog}"]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/WorktreeList.tsx",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": ["        visibleProjectGroupsForRows={visibleScope.visibleProjectGroupsForRows}"]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/comment-markdown-element-renderers.tsx",
+      "feature": "native-chat-coloring",
+      "kind": "passthrough",
+      "lines": [
+        "  highlightCode?: boolean",
+        "      ) : highlightCode ? (",
+        "        <code className=\"rounded bg-code-accent-surface px-1.5 py-0.5 font-mono text-[0.92em] text-code-accent [overflow-wrap:anywhere]\">"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/empty-project-placeholder-repos.ts",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "import { hasOnlyWorktreesGroupedElsewhere } from './fork-worktree-groups/empty-project-placeholder-membership'",
+        "  projectGroups?: readonly ProjectGroup[]"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-drag-units.ts",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "import { needsWorktreeDragGroup } from './fork-worktree-groups/worktree-drag-group-key'",
+        "    if (needsWorktreeDragGroup(current?.key ?? null, row.sectionKey)) {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/drag/drop-commit-context.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": ["  trackWorktreeGroupMembershipDragFrame: (drag: WorktreePointerDrag) => boolean"]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/drag/groups.ts",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "import { needsWorktreeDragGroup } from '../../fork-worktree-groups/worktree-drag-group-key'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/drag/pointer-commit.ts",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": ["  if (ctx.commitWorktreeGroupMembershipDrop(event, drag)) {"]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/drag/pointer-flush.ts",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": ["  if (ctx.trackWorktreeGroupMembershipDragFrame(drag)) {"]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/drag/use-drop-commit-context.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": [
+        "  groupMembershipDrag: ReturnType<typeof useWorktreeGroupMembershipDrag>",
+        "      trackWorktreeGroupMembershipDragFrame: groupMembershipDrag.trackPointerDragFrame,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/drag/use-pointer-drag.ts",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": ["        !canStartWorktreeDragForGroupMembership(container, worktreeId) &&"]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/drag/use-runtime.ts",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": ["    onWorktreePointerDragCleanup?.()"]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/grouping/build-rows.ts",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "} from '../../fork-worktree-groups/loose-worktree-section-rows'",
+        "  const looseWorktreesByProjectGroupId = collectLooseWorktreesByProjectGroupId(",
+        "    looseWorktreeIds: getLooseWorktreeIds(looseWorktreesByProjectGroupId)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/grouping/project-group-sections.ts",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "} from '../../fork-worktree-groups/loose-worktree-section-rows'",
+        "    const looseWorktreeCount = looseWorktreesByProjectGroupId.get(groupId)?.length ?? 0",
+        "      appendLooseWorktreeSectionRows(ctx, {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/grouping/worktree-group-keys.ts",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "} from '../../fork-worktree-groups/worktree-loose-group-membership'",
+        "  const divertedGroupId = getDivertedWorktreeProjectGroupId(worktree, groupsById)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/grouping/worktree-grouping.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": [
+        "  looseWorktreeIds?: ReadonlySet<string>",
+        "    if (looseWorktreeIds?.has(w.id)) {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/listing/use-collapsed-groups.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": ["  visibleProjectGroupsForRows: readonly ProjectGroup[]"]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/listing/use-section-rows.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": ["        projectGroups: args.visibleProjectGroupsForRows"]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/navigation/pending-reveal-inputs.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": ["  visibleProjectGroupsForRows: readonly ProjectGroup[]"]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/navigation/use-pending-reveal.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": ["    args.visibleProjectGroupsForRows,"]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/rows/SectionHeader.tsx",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": [
+        "  worktreeGroupMembershipDragPreview: WorktreeGroupMembershipDragPreview",
+        "          'group relative flex h-6 w-full items-center gap-1.5 pr-2 text-left transition-all',",
+        "  sectionSeparatorClass?: string | false",
+        "        args.sectionSeparatorClass,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/rows/item-row.tsx",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": [
+        "    getLooseSectionProjectGroupId(itemRow.sectionKey) ?? itemRow.repo?.projectGroupId"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/viewport/VirtualizedWorktreeViewport.tsx",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "  const groupMembershipDrag = useWorktreeGroupMembershipDrag({ scrollRef, viewport: props })"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/viewport/viewport-props.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": ["  visibleProjectGroupsForRows: readonly ProjectGroup[]"]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/viewport/virtual-row-context.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": ["  worktreeGroupMembershipDragPreview: WorktreeGroupMembershipDragPreview"]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/TerminalContextMenu.test.tsx",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["      onToggleTerminalDock", "    isTerminalDockDocked: false,"]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/TerminalContextMenu.tsx",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["  onToggleTerminalDock,", "  isTerminalDockDocked,"]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/TerminalPaneHeaderOverlay.test.tsx",
+      "feature": "native-chat-width",
+      "kind": "passthrough",
+      "lines": ["vi.mock('../../store', () => ({"]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/TerminalPaneHeaderOverlay.tsx",
+      "feature": "native-chat-width",
+      "kind": "registration",
+      "lines": [
+        "import { NativeChatWidthMenu } from '@/components/native-chat/fork-native-chat-width/NativeChatWidthMenu'",
+        "  isChatViewMode?: boolean",
+        "                  {isChatViewMode && isActivePane ? <NativeChatWidthMenu /> : null}"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/focus-terminal-pane-event.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "    querySelector: vi.fn(() => null)",
+        "    expect(manager.setActivePane).toHaveBeenCalledWith(7, { focus: false })"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/focus-terminal-pane-event.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { focusPaneOrDockComposer } from './fork-terminal-dock/dock-composer-focus-redirect'",
+        "  manager.setActivePane(resolution.numericPaneId, { focus: false })",
+        "  focusPaneOrDockComposer(pane)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/pane-helpers.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "    const composer = { focus: vi.fn() }",
+        "    return { manager, terminal, composer }"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/pane-helpers.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { focusPaneOrDockComposer } from './fork-terminal-dock/dock-composer-focus-redirect'",
+        "import { makePaneKey, type PaneKey } from '../../../../shared/stable-pane-id'",
+        "    const activeDock =",
+        "    focusPaneOrDockComposer(activePane)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/terminal-input-quarantine.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["  cb: QuarantineListener", "  quarantineListeners.clear()"]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/terminal-visibility-resume.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "import { registerTerminalDockControllerBridge } from './fork-terminal-dock/terminal-dock-controller-bridge'",
+        "function expectThreadedOwnership(ownership: unknown): void {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/terminal-visibility-resume.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "import { paneFocusOwnershipArgs } from './fork-terminal-dock/pane-focus-ownership-args'",
+        "        paneFocusOwnershipArgs(tabId)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    tabId,", "        tabId,"]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/terminal-pane-mount-cleanup.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { removeTerminalDockPaneKeys } from './fork-terminal-dock/terminal-dock-pane-state'",
+        "  const teardownDockPaneKeys = collectTerminalDockPaneKeysForTabTeardown({"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/terminal-pane-pane-created.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { REMOTE_CONPTY_UNVERIFIED_DATASET_KEY } from './fork-terminal-dock/TerminalPaneDockMount'",
+        "      pane.container.dataset[REMOTE_CONPTY_UNVERIFIED_DATASET_KEY] = String(remoteConptyUnverified)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/terminal-pane-pane-closed.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { notifyTerminalDockPaneRetired } from './fork-terminal-dock/terminal-dock-controller-bridge'",
+        "      pruneTerminalDockPaneKeysEverywhere({"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/terminal-pane-mount-preparation.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { paneFocusOwnershipArgs } from './fork-terminal-dock/pane-focus-ownership-args'",
+        "        fitAndFocusPanes(manager, ...paneFocusOwnershipArgs(deps.tabId))"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/use-terminal-window-wake-recovery.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "  // The hook forwards the tab id alone; the dock's bridge is what resolves ownership.",
+        "  const focusOwnership = { tabId: 'tab-1' }"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/use-terminal-window-wake-recovery.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "  tabId: string",
+        "  }, [isActiveRef, isChatViewMode, isVisible, isVisibleRef, managerRef, panePtyBindingsRef, tabId])"
+      ]
+    },
+    {
+      "path": "src/renderer/src/i18n/i18n.ts",
+      "feature": "native-chat-width",
+      "kind": "registration",
+      "lines": [
+        "import { registerForkLocalizationCatalogs } from './fork-localization-catalogs'",
+        "registerForkLocalizationCatalogs(i18n)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/connection-owner-resolution.ts",
+      "feature": "native-chat-relay",
+      "kind": "passthrough",
+      "lines": ["export type ConnectionOwnerState = Pick<"]
+    },
+    {
+      "path": "src/renderer/src/lib/focus-terminal-tab-surface.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { findDockComposerTextarea } from '@/components/terminal-pane/fork-terminal-dock/dock-composer-focus-redirect'",
+        "  const dockComposer = findDockComposerTextarea(helper)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-container-listener-lifecycle.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-dom-creation.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "import { shouldFocusTerminalFromPanePointerDown } from './pane-pointer-focus'",
+        "describe('createPaneDOM dock slot', () => {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-dom-creation.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["    dockContainer,", "  container.appendChild(dockContainer)"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-drag-reorder.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-drop-no-op.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-fit-resize-observer.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-initial-fit-lifecycle.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-lifecycle.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,", "      dockContainer: fakeDockContainer,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-manager-types.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "  dockContainer: HTMLElement",
+        "  /** Empty strip beneath xtermContainer reserved for portaling a composer; see terminal.css. */"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-reveal-repaint.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-split-close.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-split-scroll.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-terminal-gpu-acceleration.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-tree-ops.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-tree-reparent-frame.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: createMockElement(),"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-webgl-context-recovery.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-webgl-refresh-lifecycle.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/pane-webgl-renderer.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/windows-pty-compatibility.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "  isRemoteWindowsConptyStatusUnverified,",
+        "describe('isRemoteWindowsConptyStatusUnverified', () => {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/windows-pty-compatibility.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "  remotePlatform: NodeJS.Platform | null | undefined",
+        "export function isRemoteWindowsConptyStatusUnverified("
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/terminal-title-contrast.ts",
+      "feature": "native-chat-coloring",
+      "kind": "passthrough",
+      "lines": [
+        "export type RgbaColor = { r: number; g: number; b: number; a: number }",
+        "export function parseCssRgbColor(color: string | undefined): RgbaColor | null {",
+        "export function contrastRatio("
+      ]
+    },
+    {
+      "path": "src/renderer/src/runtime/runtime-terminal-inspection.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "  const localWriteInputAccepted = vi.fn()",
+        "          writeInputAccepted: localWriteInputAccepted,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/runtime/runtime-terminal-inspection.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["} from './runtime-rpc-client'", "  data: string,"]
+    },
+    {
+      "path": "src/renderer/src/runtime/sync-runtime-graph.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { focusPaneOrDockComposer } from '@/components/terminal-pane/fork-terminal-dock/dock-composer-focus-redirect'",
+        "  manager.setActivePane(resolution.numericPaneId, { focus: false })"
+      ]
+    },
+    {
+      "path": "src/renderer/src/runtime/sync-runtime-graph/types.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["  terminalDockSyncEnabled: boolean"]
+    },
+    {
+      "path": "src/renderer/src/runtime/sync-runtime-graph/mobile-session-inputs.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["    terminalDockSyncEnabled: publication.terminalDockSyncEnabled,"]
+    },
+    {
+      "path": "src/renderer/src/runtime/sync-runtime-graph/mobile-session-snapshots.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["    terminalDockSyncEnabled: state.settings?.experimentalTerminalDock === true,"]
+    },
+    {
+      "path": "src/renderer/src/runtime/sync-runtime-graph/mobile-session-terminal-tabs.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["      ...(inputs.terminalDockSyncEnabled && unifiedTab?.terminalDockByPaneKey"]
+    },
+    {
+      "path": "src/renderer/src/runtime/sync-runtime-graph/mobile-session-capture.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["    previous.terminalDockSyncEnabled === next.terminalDockSyncEnabled &&"]
+    },
+    {
+      "path": "src/renderer/src/runtime/web-runtime-terminal-actions.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "          ...(args.terminalDock !== undefined ? { terminalDock: args.terminalDock } : {})",
+        "  terminalDock?: { paneKey?: string; docked?: boolean; gutterRows?: number; remove?: string[] }"
+      ]
+    },
+    {
+      "path": "src/renderer/src/runtime/web-session-tabs-sync.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "export { remapPaneKeyTabId } from './fork-terminal-dock/web-session-terminal-dock-reconcile'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/runtime/web-session-tabs-sync/apply-preparation-unified.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { rekeyTerminalDockPaneKeys } from '@/components/terminal-pane/fork-terminal-dock/terminal-dock-pane-state'",
+        "} from '../fork-terminal-dock/web-session-terminal-dock-reconcile'",
+        "  let rekeyedHandoffPendingMutationsByPaneKey: Record<string, number> | undefined"
+      ]
+    },
+    {
+      "path": "src/renderer/src/runtime/web-session-tabs-sync/apply-final-patch.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { pruneExpiredTerminalDockPendingMutations } from '../fork-terminal-dock/web-session-terminal-dock-reconcile'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/runtime/web-session-tabs-sync/terminal-build.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { remapTerminalDockRecordTabId } from '../fork-terminal-dock/web-session-terminal-dock-reconcile'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/runtime/web-session-tabs-sync/state.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "      | 'terminalDockPendingMutationsByPaneKey'",
+        "  terminalDockByPaneKey?: Record<string, TerminalDockPaneState>"
+      ]
+    },
+    {
+      "path": "src/renderer/src/runtime/web-session-tabs-sync/tab-builders.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "  terminalDockByPaneKey?: Record<string, TerminalDockPaneState>",
+        "    ...(terminalDockByPaneKey ? { terminalDockByPaneKey } : {})"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/tabs/tabs-slice-contract.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import type { TabTerminalDockSlice } from '../fork-terminal-dock/tab-terminal-dock-state'",
+        "export type TabsSlice = TabTerminalDockSlice & {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/tabs/create-tabs-slice.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "  ...TAB_TERMINAL_DOCK_INITIAL_STATE,",
+        "  ...createTabTerminalDockActions(set, get)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/tabs/tabs-close-actions.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { removeTabPaneKeysFromPendingMutations } from '../fork-terminal-dock/tab-terminal-dock-state'",
+        "        const nextTerminalDockPendingMutationsByPaneKey = removeTabPaneKeysFromPendingMutations("
+      ]
+    },
+    {
+      "path": "src/renderer/src/web/preload-api/web-native-chat-api.ts",
+      "feature": "native-chat-relay",
+      "kind": "import-swap",
+      "lines": [
+        "} from '@/components/native-chat/fork-native-chat-relay/native-chat-runtime-contract'",
+        "  const readNativeChatSession = async (",
+        "    readSession: readNativeChatSession,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/web/preload-api/web-preference-normalization.ts",
+      "feature": "session-handoff",
+      "kind": "passthrough",
+      "lines": [
+        "import { mergeForkSessionHandoffSettings } from '../../../../shared/fork-session-handoff/handoff-settings-merge'",
+        "    ...mergeForkSessionHandoffSettings(base, updates),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/web/preload-api/web-terminal-api.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    writeInputAccepted: () => Promise.resolve(false),"]
+    },
+    {
+      "path": "src/shared/default-global-settings.ts",
+      "feature": "native-chat-width",
+      "kind": "passthrough",
+      "lines": [
+        "import { DEFAULT_NATIVE_CHAT_WIDTH_TIER } from './fork-native-chat-width/native-chat-width-default'",
+        "    nativeChatWidth: DEFAULT_NATIVE_CHAT_WIDTH_TIER,",
+        "    sidebarSectionSeparators: true,"
+      ]
+    },
+    {
+      "path": "src/shared/global-settings-types.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "import type { NativeChatWidthTier } from './fork-native-chat-width/native-chat-width-tier'",
+        "import type { ForkSessionHandoffSettings } from './fork-session-handoff/handoff-settings-types'",
+        "  experimentalTerminalDock?: boolean",
+        "  dockTerminalComposerByDefault?: boolean",
+        "  nativeChatWidth?: NativeChatWidthTier",
+        "  forkSessionHandoff?: ForkSessionHandoffSettings",
+        "  sidebarSectionSeparators?: boolean"
+      ]
+    },
+    {
+      "path": "src/main/updater/updater-release-feed.ts",
+      "feature": "fork-infra",
+      "kind": "registration",
+      "lines": ["    const url = 'https://github.com/zpyoung/orca/releases/latest/download'"]
+    },
+    {
+      "path": "src/main/updater/updater-setup.ts",
+      "feature": "fork-infra",
+      "kind": "registration",
+      "lines": ["        url: 'https://github.com/zpyoung/orca/releases/latest/download'"]
+    },
+    {
+      "path": "src/main/rate-limits/service/service-fetch-policy.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "  /** Ingest live Claude plan windows and report whether the selected account accepted them. */",
+        "  ingestLiveClaudeRateLimits(event: ClaudeStatusLineRateLimits): boolean {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/TerminalPaneSurface.tsx",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { useTerminalPaneDockSurface } from './fork-terminal-dock/use-terminal-pane-dock-surface'",
+        "  const { dockMounts, contextMenuProps: terminalDockMenuProps } =",
+        "      {dockMounts}",
+        "        {...terminalDockMenuProps}"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-title-state.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { publishTerminalDockRawRecoveryPhase } from './fork-terminal-dock/terminal-dock-controller-bridge'",
+        "      publishTerminalDockRawRecoveryPhase(tabId, (previous) =>"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-chat-state.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { notifyTerminalDockConfirmedAgentExit } from './fork-terminal-dock/terminal-dock-controller-bridge'",
+        "      notifyTerminalDockConfirmedAgentExit(tabId, leafId)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-layout-bindings.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { noteTerminalDockPanePtyBindingChanged } from './fork-terminal-dock/terminal-dock-controller-bridge'",
+        "      noteTerminalDockPanePtyBindingChanged(tabId)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-mobile-actions.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { terminalDockPaneOwnsFocus } from './fork-terminal-dock/terminal-dock-controller-bridge'",
+        "        if (!terminalDockPaneOwnsFocus(tabId, makePaneKey(tabId, pane.leafId))) {",
+        "      if (!terminalDockPaneOwnsFocus(tabId, makePaneKey(tabId, clickedPane.leafId))) {"
+      ]
+    },
+    {
+      "path": "src/preload/api-types.ts",
+      "feature": "session-handoff",
+      "kind": "passthrough",
+      "lines": [
+        "  forkSessionHandoff: ForkSessionHandoffPreloadApi",
+        "  forkSessionInfo: ForkSessionInfoApi"
+      ]
+    },
+    {
+      "path": "config/tsconfig.tc.web.json",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "    \"../src/preload/fork-session-handoff/**/*\",",
+        "    \"../src/preload/fork-session-info/**/*\","
+      ]
+    },
+    {
+      "path": "config/tsconfig.web.json",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "    \"../src/preload/fork-session-handoff/**/*\",",
+        "    \"../src/preload/fork-session-info/**/*\","
+      ]
+    },
+    {
+      "path": "src/shared/keybindings/types.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["  | 'terminal.dock.toggle'", "  | 'terminal.dock.passthrough'"]
+    },
+    {
+      "path": "src/shared/keybindings/definitions-core-4.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["    id: 'terminal.dock.toggle',", "    id: 'terminal.dock.passthrough',"]
+    },
+    {
+      "path": "src/shared/local-build-compatibility-contract.json",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["  \"appId\": \"com.zpyoung.orca\","]
+    },
+    {
+      "path": "src/shared/local-build-compatibility-contract.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["  appId: 'com.zpyoung.orca',"]
+    },
+    {
+      "path": "src/shared/local-build-compatibility.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["    appId: 'com.zpyoung.orca',"]
+    },
+    {
+      "path": "src/shared/native-chat-agent-profiles.ts",
+      "feature": "native-chat-session-options",
+      "kind": "registration",
+      "lines": ["    skillSourceOwner: 'grok',", "    skillSourceOwner: 'codex',"]
+    },
+    {
+      "path": "src/shared/native-chat-session-option-state.test.ts",
+      "feature": "native-chat-session-options",
+      "kind": "passthrough",
+      "lines": ["      value: 'max',", "      source: 'dispatched',"]
+    },
+    {
+      "path": "src/shared/native-chat-session-option-state.ts",
+      "feature": "native-chat-session-options",
+      "kind": "registration",
+      "lines": ["    [optionId]: tracked", "    record.model = tracked"]
+    },
+    {
+      "path": "src/shared/native-chat-types.ts",
+      "feature": "native-chat-session-options",
+      "kind": "registration",
+      "lines": ["  model?: string", "  effort?: string"]
+    },
+    {
+      "path": "src/shared/project-groups.ts",
+      "feature": "worktree-groups",
+      "kind": "registration",
+      "lines": [
+        "import { breakProjectGroupParentCycles } from './fork-worktree-groups/project-group-parent-cycles'",
+        "  breakProjectGroupParentCycles(groups)"
+      ]
+    },
+    {
+      "path": "src/shared/runtime-mobile-session-tab-contracts.ts",
+      "feature": "skill-plugin-attribution",
+      "kind": "registration",
+      "lines": [
+        "import type { TerminalDockPaneState } from './fork-terminal-dock/terminal-dock-pane-state'",
+        "  terminalDockByPaneKey?: Record<string, TerminalDockPaneState>"
+      ]
+    },
+    {
+      "path": "src/shared/skills.ts",
+      "feature": "skill-plugin-attribution",
+      "kind": "registration",
+      "lines": [
+        "  /** Set when the root is one plugin's skills directory. A shared plugin cache",
+        "  /** Owning plugin, for plugin-sourced skills. Absent in every other scope. */"
+      ]
+    },
+    {
+      "path": "src/shared/tab-types.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "import type { TerminalDockPaneState } from './fork-terminal-dock/terminal-dock-pane-state'",
+        "  terminalDockByPaneKey?: Record<string, TerminalDockPaneState>"
+      ]
+    },
+    {
+      "path": "src/shared/telemetry-property-schemas.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": ["  'experimentalTerminalDock',", "  'dockTerminalComposerByDefault',"]
+    },
+    {
+      "path": "src/shared/telemetry-event-registry.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "} from './fork-terminal-dock/telemetry-terminal-dock-schemas'",
+        "  terminal_dock_toggled: terminalDockToggledSchema,"
+      ]
+    },
+    {
+      "path": "src/shared/telemetry-events.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "export { terminalDockSendOutcomeSchema } from './fork-terminal-dock/telemetry-terminal-dock-schemas'",
+        "export type { TerminalDockSendOutcome } from './fork-terminal-dock/telemetry-terminal-dock-schemas'"
+      ]
+    },
+    {
+      "path": "src/shared/workspace-session-schema.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "            terminalDockByPaneKey",
+        "        'pane-1': { docked: true, gutterRows: 6 }"
+      ]
+    },
+    {
+      "path": "src/shared/workspace-session-schema.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import { terminalDockByPaneKeySchema } from './fork-terminal-dock/workspace-session-terminal-dock-schema'",
+        "import { persistedOpenFileSchema } from './workspace-session-editor-schema'"
+      ]
+    },
+    {
+      "path": "src/shared/worktree/meta-types.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": ["  projectGroupId?: string | null"]
+    },
+    {
+      "path": "src/shared/worktree/types.ts",
+      "feature": "worktree-groups",
+      "kind": "passthrough",
+      "lines": ["  projectGroupId?: string | null"]
+    },
+    {
+      "path": "src/shared/cli-argument-boundary.ts",
+      "feature": "fork-infra",
+      "kind": "registration",
+      "lines": ["  'protect',"]
+    },
+    {
+      "path": "src/cli/artifact-format.ts",
+      "feature": "artifact-passwords",
+      "kind": "registration",
+      "lines": [
+        "  formatArtifactListRowWithPassword,",
+        "  formatArtifactSharedWithPassword",
+        "} from './fork-artifact-passwords/artifact-password-cli'",
+        "  return artifacts.map(formatArtifactListRowWithPassword).join('\\n\\n')",
+        "  return formatArtifactSharedWithPassword(item)"
+      ]
+    },
+    {
+      "path": "src/cli/handlers/artifacts.ts",
+      "feature": "artifact-passwords",
+      "kind": "registration",
+      "lines": [
+        "import { artifactShareRpcMethod } from '../fork-artifact-passwords/artifact-password-cli'",
+        "      artifactShareRpcMethod(ctx.flags),"
+      ]
+    },
+    {
+      "path": "src/cli/specs/artifacts.ts",
+      "feature": "artifact-passwords",
+      "kind": "passthrough",
+      "lines": [
+        "    usage: 'orca artifacts share <file> [--protect] [--api-url <url>] [--json]',",
+        "    allowedFlags: [...GLOBAL_FLAGS, ...CLOUD_FLAGS, 'file', 'protect'],"
+      ]
+    },
+    {
+      "path": "src/main/artifacts/artifact-cloud-recovery.test.ts",
+      "feature": "artifact-passwords",
+      "kind": "import-swap",
+      "lines": [
+        "import { ArtifactCloudService } from './fork-artifact-passwords/artifact-password-cloud-service'"
+      ]
+    },
+    {
+      "path": "src/main/artifacts/artifact-cloud-service-races.test.ts",
+      "feature": "artifact-passwords",
+      "kind": "import-swap",
+      "lines": [
+        "import { ArtifactCloudService } from './fork-artifact-passwords/artifact-password-cloud-service'"
+      ]
+    },
+    {
+      "path": "src/main/artifacts/artifact-cloud-service.test.ts",
+      "feature": "artifact-passwords",
+      "kind": "import-swap",
+      "lines": [
+        "import { ArtifactCloudService } from './fork-artifact-passwords/artifact-password-cloud-service'"
+      ]
+    },
+    {
+      "path": "src/main/ipc/register-core-handlers/register-core-handlers.test.ts",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "vi.mock('../../fork-session-handoff/session-lineage-ipc', () => ({",
+        "  registerForkSessionHandoffHandlers: vi.fn()",
+        "vi.mock('../../fork-session-info/session-info-ipc', () => ({",
+        "  registerSessionInfoIpcHandlers: vi.fn()"
+      ]
+    },
+    {
+      "path": "src/main/startup/main-process-runtime-service.ts",
+      "feature": "artifact-passwords",
+      "kind": "import-swap",
+      "lines": [
+        "import { ArtifactCloudService } from '../artifacts/fork-artifact-passwords/artifact-password-cloud-service'"
+      ]
+    },
+    {
+      "path": "src/main/startup/main-process-observers.ts",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { recordForkPaneTranscriptObservation } from '../fork-session-handoff/pane-transcript-history'",
+        "  agentHookServer.subscribeEnrichedStatus(recordForkPaneTranscriptObservation)"
+      ]
+    },
+    {
+      "path": "src/main/startup/main-process-account-services.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "import { ingestSessionInfoPlanWindows as ingestPlanWindows } from '../fork-session-info/session-info-plan-window-correlation'",
+        "  agentHookServer.setClaudeStatusLineListener((event) => ingestPlanWindows(state.rateLimits, event))"
+      ]
+    },
+    {
+      "path": "src/main/orca-profiles/profile-artifact-cloud-cleanup.ts",
+      "feature": "artifact-passwords",
+      "kind": "registration",
+      "lines": [
+        "import { clearArtifactPasswordRecords } from '../artifacts/fork-artifact-passwords/artifact-password-record-store'",
+        "  clearArtifactPasswordRecords(profileId, userDataPath)"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/artifacts.ts",
+      "feature": "artifact-passwords",
+      "kind": "registration",
+      "lines": [
+        "import { withArtifactProtectionProjection } from './fork-artifact-passwords/artifact-password-client-projection'",
+        "export const SourceRequest = z.object({",
+        "export const WriteRequest = z",
+        "    protection: z.never().optional(),",
+        "export const ARTIFACT_METHODS: readonly RpcAnyMethod[] = withArtifactProtectionProjection(["
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/index.ts",
+      "feature": "artifact-passwords",
+      "kind": "registration",
+      "lines": [
+        "import { ARTIFACT_PASSWORD_METHODS } from './fork-artifact-passwords/artifact-password-methods'",
+        "  ...ARTIFACT_PASSWORD_METHODS,"
+      ]
+    },
+    {
+      "path": "src/relay/remote-artifact-cli-input.ts",
+      "feature": "artifact-passwords",
+      "kind": "passthrough",
+      "lines": ["const BOOLEAN_FLAGS = new Set(['help', 'json', 'protect'])"]
+    },
+    {
+      "path": "src/renderer/src/components/artifacts/ArtifactDetailHeader.tsx",
+      "feature": "artifact-passwords",
+      "kind": "passthrough",
+      "lines": [
+        "import { ArtifactLinkAudience } from './fork-artifact-passwords/artifact-protection-display'",
+        "            <ArtifactLinkAudience item={item} />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/artifacts/ArtifactListRows.tsx",
+      "feature": "artifact-passwords",
+      "kind": "registration",
+      "lines": [
+        "import { ArtifactNameWithProtection } from './fork-artifact-passwords/artifact-protection-display'",
+        "                <ArtifactNameWithProtection item={item} name={name} />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/artifacts/ArtifactsPage.tsx",
+      "feature": "artifact-passwords",
+      "kind": "import-swap",
+      "lines": [
+        "import { ArtifactDetailDrawer } from './fork-artifact-passwords/ArtifactDetailDrawer'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/artifacts/artifact-display-labels.ts",
+      "feature": "artifact-passwords",
+      "kind": "passthrough",
+      "lines": [
+        "    item.local?.displayName ||",
+        "  if ((item.local?.sourceContentType ?? item.artifact.sourceContentType) === 'text/markdown') {",
+        "  if ((item.local?.sourceContentType ?? item.artifact.sourceContentType) === 'text/html') {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/artifacts/artifact-publish-flow.ts",
+      "feature": "artifact-passwords",
+      "kind": "passthrough",
+      "lines": [
+        "import { showCompletedArtifactPublish } from './fork-artifact-passwords/artifact-password-publish-feedback'",
+        "  rpcMethod = 'artifacts.publish'",
+        "        rpcMethod,",
+        "        showCompletedArtifactPublish(result.value, showArtifactPublishedToast)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/browser-pane/assemble-chrome/browser-page-toolbar.tsx",
+      "feature": "artifact-passwords",
+      "kind": "import-swap",
+      "lines": [
+        "import { ArtifactPublishButton } from '@/components/artifacts/fork-artifact-passwords/ArtifactPublishButton'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/editor/EditorPanelHeader.test.tsx",
+      "feature": "artifact-passwords",
+      "kind": "import-swap",
+      "lines": [
+        "vi.mock('@/components/artifacts/fork-artifact-passwords/ArtifactPublishButton', () => ({"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/editor/EditorPanelHeader.tsx",
+      "feature": "artifact-passwords",
+      "kind": "import-swap",
+      "lines": [
+        "import { ArtifactPublishButton } from '@/components/artifacts/fork-artifact-passwords/ArtifactPublishButton'"
+      ]
+    },
+    {
+      "path": "src/shared/artifacts.ts",
+      "feature": "artifact-passwords",
+      "kind": "passthrough",
+      "lines": [
+        "} from './fork-artifact-passwords/artifact-password-types'",
+        "  local?: ArtifactLocalDetails",
+        "  protection?: ArtifactProtectionPublication",
+        "  protection?: ArtifactProtectionRequest",
+        "  protection?: ArtifactPublishedProtection"
+      ]
+    },
+    {
+      "path": "src/main/ipc/register-core-handlers/register-core-handlers.ts",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { registerForkSessionHandoffHandlers } from '../../fork-session-handoff/session-lineage-ipc'",
+        "  registerForkSessionHandoffHandlers()",
+        "import { registerSessionInfoIpcHandlers } from '../../fork-session-info/session-info-ipc'",
+        "  registerSessionInfoIpcHandlers()"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/dashboard/DashboardAgentRow.tsx",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { SessionHandoffLineageBadge } from '@/components/agent-session-continuation/fork-session-handoff/SessionHandoffLineageBadge'",
+        "        <SessionHandoffLineageBadge paneKey={agent.paneKey} />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/AiVaultPanel.tsx",
+      "feature": "session-handoff",
+      "kind": "import-swap",
+      "lines": [
+        "import { AgentSessionContinuationDialog } from '@/components/agent-session-continuation/fork-session-handoff/AgentSessionContinuationDialog'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/AiVaultSessionRow.tsx",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { ForkAiVaultLineageLine } from '@/components/agent-session-continuation/fork-session-handoff/ForkAiVaultLineageLine'",
+        "          <ForkAiVaultLineageLine session={session} />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/AiVaultVirtualRow.tsx",
+      "feature": "session-handoff",
+      "kind": "import-swap",
+      "lines": [
+        "import { resolveAiVaultSessionHandoffWorktreeId } from '@/components/agent-session-continuation/fork-session-handoff/ai-vault-handoff-action'",
+        "      ? resolveAiVaultSessionHandoffWorktreeId(row.session, resumeActions)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/ai-vault-session-launch-actions.ts",
+      "feature": "session-handoff",
+      "kind": "import-swap",
+      "lines": [
+        "import { prepareAiVaultSessionContinuation } from '@/components/agent-session-continuation/fork-session-handoff/prepare-handoff-from-vault'",
+        "import { resolveAiVaultSessionHandoffLaunchTargetOrNotify } from '@/components/agent-session-continuation/fork-session-handoff/ai-vault-handoff-action'",
+        "      const targetId = resolveAiVaultSessionHandoffLaunchTargetOrNotify({"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-card-compact-agent-row.tsx",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { SessionHandoffLineageBadge } from '@/components/agent-session-continuation/fork-session-handoff/SessionHandoffLineageBadge'",
+        "      <SessionHandoffLineageBadge paneKey={agent.paneKey} />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/terminal-pane-menu-agent-session-actions.ts",
+      "feature": "session-handoff",
+      "kind": "import-swap",
+      "lines": [
+        "import { prepareAgentSessionContinuationFromPane } from '@/components/agent-session-continuation/fork-session-handoff/prepare-handoff-from-pane'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/settings-page-renderer.tsx",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { ForkSessionHandoffSettingsSection } from './fork-session-handoff/ForkSessionHandoffSettingsSection'",
+        "                <ForkSessionHandoffSettingsSection />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/hooks/settings-navigation-workflow-sections.ts",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { getForkSessionHandoffNavSections } from '@/components/settings/fork-session-handoff/handoff-settings-nav-section'",
+        "    ...getForkSessionHandoffNavSections(),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/settings-navigation-types.ts",
+      "feature": "session-handoff",
+      "kind": "passthrough",
+      "lines": ["  'session-handoff',"]
+    },
+    {
+      "path": "src/main/persistence/applying-settings/settings-update.ts",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { mergeForkSessionHandoffSettings } from '../../../shared/fork-session-handoff/handoff-settings-merge'",
+        "    ...mergeForkSessionHandoffSettings(operations.state.settings, sanitizedUpdates)"
+      ]
+    },
+    {
+      "path": "config/tsconfig.cli.json",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "    \"../src/main/fork-session-info/session-info-statusline-chain-script.ts\",",
+        "    \"../src/main/fork-session-info/session-info-statusline-chaining.ts\","
+      ]
+    },
+    {
+      "path": "src/main/agent-hooks/server/server-status-update.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "import { sessionInfoService } from '../../fork-session-info/session-info-service'",
+        "    sessionInfoService.observeAgentHook(enriched)"
+      ]
+    },
+    {
+      "path": "src/main/agent-hooks/server/server-lifecycle.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "import { sessionInfoService } from '../../fork-session-info/session-info-service'",
+        "          sessionInfoService.ingestStatusLineBody(body)"
+      ]
+    },
+    {
+      "path": "src/main/agent-hooks/server/server-tab-cleanup.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "import { sessionInfoService } from '../../fork-session-info/session-info-service'",
+        "    sessionInfoService.clearPane(resolvedPaneKey)"
+      ]
+    },
+    {
+      "path": "src/main/claude/hook-service.ts",
+      "feature": "session-info",
+      "kind": "import-swap",
+      "lines": [
+        "  finalizeManagedStatusLineRemoval,",
+        "  getManagedStatusLineScript,",
+        "  removeManagedStatusLine",
+        "} from '../fork-session-info/session-info-statusline-chaining'",
+        "    finalizeManagedStatusLineRemoval(getStatusLineScriptFileName(this.options.settings))"
+      ]
+    },
+    {
+      "path": "src/main/persistence/applying-settings/ui-selection-normalization.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": ["    tab === 'session-info' ||"]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/client-ui-schemas.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": ["  'session-info',"]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/AiVaultPanel.tsx",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "import { useSessionInfoVaultNavigation } from './fork-session-info/session-info-vault-navigation'",
+        "  useSessionInfoVaultNavigation(setQuery, setAgentEnabled)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/right-sidebar-panel-content.tsx",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "const SessionInfoPanel = lazy(() => import('./fork-session-info/SessionInfoPanel'))",
+        "        {effectiveTab === 'session-info' && <SessionInfoPanel />}"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/right-sidebar-route.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": ["    tab === 'session-info' ||"]
+    },
+    {
+      "path": "src/shared/ui-chrome-types.ts",
+      "feature": "session-info",
+      "kind": "passthrough",
+      "lines": ["  | 'session-info'"]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/rows/virtual-row-dispatch.tsx",
+      "feature": "sidebar-section-separator",
+      "kind": "registration",
+      "lines": [
+        "import { sidebarSectionSeparatorClass } from '../../fork-sidebar-section-separator/section-separator-class'",
+        "      sectionSeparatorClass: sidebarSectionSeparatorClass({",
+        "        settings: ctx.item.settings,",
+        "        rows: ctx.renderRows,",
+        "        index: vItem.index,",
+        "        firstHeaderIndex: ctx.firstHeaderIndex,",
+        "        isActiveStickyHeader: ctx.activeStickyHeaderIndexRef.current === vItem.index,",
+        "        projectGroupDepth: row.projectGroupDepth",
+        "      }),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/AppearanceWindowSidebarSection.tsx",
+      "feature": "sidebar-section-separator",
+      "kind": "registration",
+      "lines": [
+        "import { SidebarSectionSeparatorSetting } from './fork-sidebar-section-separator/SidebarSectionSeparatorSetting'",
+        "        <SidebarSectionSeparatorSetting",
+        "          settings={settings}",
+        "          updateSettings={updateSettings}",
+        "          forceVisible={forceVisiblePrimary}",
+        "        />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/AppearancePane.tsx",
+      "feature": "sidebar-section-separator",
+      "kind": "registration",
+      "lines": [
+        "import { getSidebarSectionSeparatorEntry } from './fork-sidebar-section-separator/section-separator-search'",
+        "    getSidebarSectionSeparatorEntry(),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/appearance-search.ts",
+      "feature": "sidebar-section-separator",
+      "kind": "registration",
+      "lines": [
+        "import { getSidebarSectionSeparatorEntry } from './fork-sidebar-section-separator/section-separator-search'",
+        "    getSidebarSectionSeparatorEntry(),"
+      ]
+    },
+    {
+      "path": "src/main/providers/ssh-pty-provider.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "  writeAcknowledged = (id: string, data: string): Promise<boolean> =>",
+        "    this.rpcOperations.writeAcknowledged(id, data)"
+      ]
+    },
+    {
+      "path": "src/main/runtime/mobile-session-terminal-projection.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import type { TerminalDockPaneState } from '../../shared/fork-terminal-dock/terminal-dock-pane-state'",
+        "      const terminalDockByPaneKey = terminalDockByPaneKeyByTabId.get(tab.id)"
+      ]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-publish-pty-backed-mobile-session-terminal.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "    const terminalDockByPaneKey =",
+        "      ...(terminalDockByPaneKey ? { terminalDockByPaneKey } : {}),"
+      ]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-runtime-id.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import type { TerminalDockPaneState } from '../../shared/fork-terminal-dock/terminal-dock-pane-state'",
+        "      rendererDockByPaneKeyByParentTabId: ReadonlyMap<"
+      ]
+    },
+    {
+      "path": "src/main/runtime/runtime-mobile-session-projection.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "      ...(tab.terminalDockByPaneKey ? { terminalDockByPaneKey: tab.terminalDockByPaneKey } : {}),"
+      ]
+    },
+    {
+      "path": "src/preload/index.ts",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { buildForkSessionHandoffApi } from './fork-session-handoff/session-handoff-preload-api'",
+        "  forkSessionHandoff: buildForkSessionHandoffApi(),"
+      ]
+    },
+    {
+      "path": "src/preload/index.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "import { buildForkSessionInfoApi } from './fork-session-info/session-info-preload-api'",
+        "  forkSessionInfo: buildForkSessionInfoApi(),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatMessageList.tsx",
+      "feature": "native-chat-relay",
+      "kind": "import-swap",
+      "lines": [
+        "import type { NativeChatLiveSession } from './fork-native-chat-relay/use-native-chat-live-session'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatMessageList.tsx",
+      "feature": "native-chat-width",
+      "kind": "registration",
+      "lines": [
+        "import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'",
+        "  const widthClassName = useNativeChatWidthClassName()"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatToolRun.tsx",
+      "feature": "native-chat-coloring",
+      "kind": "registration",
+      "lines": [
+        "        <ForkNativeChatToolName name={name}>",
+        "          <NativeChatToolCategoryDots blocks={blocks} />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-structured-composer-send.ts",
+      "feature": "agent-composer",
+      "kind": "import-swap",
+      "lines": [
+        "import { pushHistory, type HistoryState } from './fork-agent-composer/agent-composer-history'",
+        "import type { AgentComposerImageAttachment as NativeChatComposerImageAttachment } from './fork-agent-composer/AgentComposerField'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/terminal-scroll-intent-key-retention.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.tsx",
+      "feature": "agent-composer",
+      "kind": "import-swap",
+      "lines": [
+        "import type { AgentComposerImageAttachment as NativeChatComposerImageAttachment } from './fork-agent-composer/AgentComposerField'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.test.tsx",
+      "feature": "agent-composer",
+      "kind": "import-swap",
+      "lines": [
+        "import type { AgentComposerImageAttachment as NativeChatComposerImageAttachment } from './fork-agent-composer/AgentComposerField'"
+      ]
+    },
+    {
+      "path": "src/shared/structured-agent-session-options.ts",
+      "feature": "native-chat-session-options",
+      "kind": "passthrough",
+      "lines": ["    undefined,"]
+    },
+    {
+      "path": "src/main/persistence/applying-settings/ui-state-read.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { normalizeWorkspaceActivityUI } from '../../../shared/fork-workspace-activity-window/workspace-activity-ui'",
+        "  const workspaceActivityUI = normalizeWorkspaceActivityUI(uiState)",
+        "import { normalizeWorkspaceReviewUI } from '../../../shared/fork-workspace-review-filters/workspace-review-ui'",
+        "  const workspaceReviewUI = normalizeWorkspaceReviewUI(uiState)"
+      ]
+    },
+    {
+      "path": "src/main/persistence/applying-settings/ui-state-update.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { mergeWorkspaceActivityUI } from '../../../shared/fork-workspace-activity-window/workspace-activity-ui'",
+        "  const nextActivityUI = mergeWorkspaceActivityUI(operations.state.ui, sanitizedUpdates)",
+        "    ...nextActivityUI,",
+        "    ...nextReviewUI,",
+        "import { mergeWorkspaceReviewUI } from '../../../shared/fork-workspace-review-filters/workspace-review-ui'"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/client-ui-schemas.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "    ...WorkspaceActivityUIUpdateFields,",
+        "    ...WorkspaceReviewUIUpdateFields,",
+        "import { WorkspaceActivityUIUpdateFields } from './fork-workspace-activity-window/workspace-activity-ui-schema'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/app-shell/use-persisted-ui-writer.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "      workspaceActivityWindow: s.workspaceActivityWindow,",
+        "      workspaceActivityCustomDays: s.workspaceActivityCustomDays,",
+        "      hideCompletedReviewWorkspaces: s.hideCompletedReviewWorkspaces,",
+        "      hidePassingCheckWorkspaces: s.hidePassingCheckWorkspaces,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/SidebarFilter.tsx",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "    forkFilterCount > 0 ||",
+        "    clearForkFilters()",
+        "import { WorkspaceActivityWindowControl } from './fork-workspace-activity-window/WorkspaceActivityWindowControl'",
+        "import { useWorkspaceFilterChrome } from './fork-workspace-activity-window/use-workspace-filter-chrome'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/SidebarWorkspaceFilterSection.tsx",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "      <WorkspaceReviewFilterRows />",
+        "import { WorkspaceActivityWindowControl } from './fork-workspace-activity-window/WorkspaceActivityWindowControl'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/WorktreeList.tsx",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "    activityHiddenCount: activityHiddenWorktreeCount,",
+        "        <WorkspaceActivityHiddenCountRow count={activityHiddenCount} />",
+        "import { WorkspaceActivityHiddenCountRow } from './fork-workspace-activity-window/WorkspaceActivityHiddenCountRow'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/sidebar-filter-actions.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { getForkFilterCount } from './fork-workspace-activity-window/workspace-filter-chrome'",
+        "    getForkFilterCount(state) > 0 ||"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/use-visible-workspace-kanban-worktree-ids.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  const workspaceActivity = useWorkspaceActivityFilter()",
+        "  const workspaceReview = useWorkspaceReviewFilter()",
+        "import { useWorkspaceActivityFilter } from './fork-workspace-activity-window/use-workspace-activity-filter'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/use-worktree-card-controller.ts",
+      "feature": "workspace-review-filters",
+      "kind": "import-swap",
+      "lines": [
+        "import { useWorktreeCardReviewDetails } from './fork-workspace-review-filters/use-worktree-card-review-details'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/visible-worktree-kinds.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  Partial<WorkspaceReviewFilterState>",
+        "import type { WorkspaceActivityWindowState } from '../../../../shared/fork-workspace-activity-window/workspace-activity-window'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/visible-worktrees.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  isSelectedActivityWorkspace,",
+        "  filterWorktreesByActivity",
+        "} from './fork-workspace-activity-window/workspace-activity-filter'",
+        "  workspaceActivity?: WorkspaceActivityFilterContext",
+        "  all = filterWorktreesByActivity(all, opts.workspaceActivity, opts.repoMap)",
+        "  workspaceReview?: WorkspaceReviewFilterContext",
+        "  all = filterWorktreesByReview(all, opts.workspaceReview, opts.repoMap)",
+        "import type { WorkspaceActivityFilterContext } from './fork-workspace-activity-window/workspace-activity-filter'",
+        "import { getWorkspaceActivityFilterContext } from './fork-workspace-activity-window/use-workspace-activity-filter'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/listing/use-filters.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { useWorkspaceFilterChrome } from '../../fork-workspace-activity-window/use-workspace-filter-chrome'",
+        "  const { state: forkState, clearFilters: clearForkFilters } = useWorkspaceFilterChrome()",
+        "      ...forkState",
+        "    clearForkFilters()"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/listing/use-host-visible-scope.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  const activityContext = useWorkspaceActivityFilter()",
+        "    activityHiddenFolderCount",
+        "import { useWorkspaceActivityFilter } from '../../fork-workspace-activity-window/use-workspace-activity-filter'",
+        "import { filterFolderWorkspacesForActivityScope } from '../../fork-workspace-activity-window/workspace-activity-folder-filter'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/listing/use-visible-worktrees.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  const workspaceActivity = useWorkspaceActivityFilter()",
+        "      workspaceActivity,",
+        "  const workspaceReview = useWorkspaceReviewFilter()",
+        "      workspaceReview,",
+        "import { computeActivityVisibility } from '../../fork-workspace-activity-window/compute-activity-visibility'",
+        "import { useWorkspaceActivityFilter } from '../../fork-workspace-activity-window/use-workspace-activity-filter'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/startup-ui-hydration.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { hydrateWorkspaceActivityWindow } from '../../../shared/fork-workspace-activity-window/workspace-activity-window'",
+        "    ...hydrateWorkspaceActivityWindow({}),",
+        "import { hydrateWorkspaceReviewFilters } from '../../../shared/fork-workspace-review-filters/workspace-review-filters'",
+        "    ...hydrateWorkspaceReviewFilters({}),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/persisted-ui-write-baseline.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  workspaceActivityWindow: PersistedUIState['workspaceActivityWindow']",
+        "  workspaceActivityCustomDays: NonNullable<PersistedUIState['workspaceActivityCustomDays']>",
+        "  workspaceActivityWindow: true,",
+        "  workspaceActivityCustomDays: true,",
+        "  hideCompletedReviewWorkspaces: boolean",
+        "  hidePassingCheckWorkspaces: boolean",
+        "  hideCompletedReviewWorkspaces: true,",
+        "  hidePassingCheckWorkspaces: true,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/ui.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import type { UISlice as UpstreamUISlice } from './ui/ui-slice-contract'",
+        "  createWorkspaceActivityWindowSlice,",
+        "  type WorkspaceActivityWindowSlice",
+        "} from './fork-workspace-activity-window/workspace-activity-window-state'",
+        "  createWorkspaceReviewFiltersSlice,",
+        "  type WorkspaceReviewFiltersSlice",
+        "} from './fork-workspace-review-filters/workspace-review-filters-state'",
+        "export type UISlice = UpstreamUISlice & WorkspaceActivityWindowSlice & WorkspaceReviewFiltersSlice",
+        "    ...createWorkspaceActivityWindowSlice(set),",
+        "    ...createWorkspaceReviewFiltersSlice(set)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/worktrees/session/set-active-folder-workspace.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { workspaceActivityExitPatchForActivation } from '../../fork-workspace-activity-window/workspace-activity-exit-stamp'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/worktrees/session/set-active-worktree.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { workspaceActivityExitPatchForActivation } from '../../fork-workspace-activity-window/workspace-activity-exit-stamp'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/web/preload-api/web-preference-normalization.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  const activity = normalizeWebWorkspaceActivity(base, safeUpdates)",
+        "    ...activity,",
+        "  const review = normalizeWebWorkspaceReviewFilters(base, safeUpdates)",
+        "    ...review,",
+        "import { normalizeWebWorkspaceActivity } from './fork-workspace-activity-window/web-workspace-activity-preference'"
+      ]
+    },
+    {
+      "path": "src/shared/pairing-local-ui-fields.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  ...WORKSPACE_ACTIVITY_WINDOW_UI_KEYS,",
+        "  ...WORKSPACE_REVIEW_FILTER_UI_KEYS",
+        "import { WORKSPACE_ACTIVITY_WINDOW_UI_KEYS } from './fork-workspace-activity-window/pairing-local-activity-fields'"
+      ]
+    },
+    {
+      "path": "src/shared/persisted-ui-state-types.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "} & PersistedWorkspaceActivityWindowState &",
+        "  PersistedWorkspaceReviewFilterState",
+        "import type { PersistedWorkspaceActivityWindowState } from './fork-workspace-activity-window/workspace-activity-window'"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/client-ui-pairing-local-fields.test.ts",
+      "feature": "workspace-activity-window",
+      "kind": "passthrough",
+      "lines": [
+        "import { WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES } from '../../../../shared/fork-workspace-activity-window/pairing-local-activity-fixture'",
+        "    ...WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES,",
+        "import { WORKSPACE_REVIEW_PAIRING_LOCAL_SAMPLES } from '../../../../shared/fork-workspace-review-filters/pairing-local-review-fixture'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/persisted-ui-write-baseline.test.ts",
+      "feature": "workspace-activity-window",
+      "kind": "passthrough",
+      "lines": [
+        "import { WORKSPACE_ACTIVITY_WRITE_BASELINE_SAMPLE } from '../../../../shared/fork-workspace-activity-window/workspace-activity-window'",
+        "    ...WORKSPACE_ACTIVITY_WRITE_BASELINE_SAMPLE,",
+        "import { WORKSPACE_REVIEW_FILTER_WRITE_BASELINE_SAMPLE } from '../../../../shared/fork-workspace-review-filters/workspace-review-filters'",
+        "    ...WORKSPACE_REVIEW_FILTER_WRITE_BASELINE_SAMPLE,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/web/web-preload-api-ui.test.ts",
+      "feature": "workspace-activity-window",
+      "kind": "passthrough",
+      "lines": [
+        "import { WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES } from '../../../shared/fork-workspace-activity-window/pairing-local-activity-fixture'",
+        "    ...WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES,",
+        "import { WORKSPACE_REVIEW_PAIRING_LOCAL_SAMPLES } from '../../../shared/fork-workspace-review-filters/pairing-local-review-fixture'",
+        "    ...WORKSPACE_REVIEW_PAIRING_LOCAL_SAMPLES"
+      ]
+    },
+    {
+      "path": "src/shared/pairing-local-ui-fields.test.ts",
+      "feature": "workspace-activity-window",
+      "kind": "passthrough",
+      "lines": [
+        "import { omitPairingLocalUiFields, PAIRING_LOCAL_UI_FIELDS } from './pairing-local-ui-fields'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/ui/ui-slice-hydration-actions.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { hydrateWorkspaceActivityWindow } from '../../../../../shared/fork-workspace-activity-window/workspace-activity-window'",
+        "import { hydrateWorkspaceReviewFilters } from '../../../../../shared/fork-workspace-review-filters/workspace-review-filters'",
+        "          ...hydrateWorkspaceActivityWindow(ui),",
+        "          ...hydrateWorkspaceReviewFilters(ui),"
+      ]
+    }
+  ],
+  "exceptions": [
+    {
+      "path": ".claude/hooks/require-sandboxed-tests.mjs",
+      "reason": "Fork-only guard keeping vitest on the remote sandbox host; upstream runs tests locally.",
+      "status": "permanent"
+    },
+    {
+      "path": ".claude/settings.json",
+      "reason": "Fork-only agent hook wiring; upstream ships no project settings file.",
+      "status": "permanent"
+    },
+    {
+      "path": ".claude/skills/release/SKILL.md",
+      "reason": "Fork-only release skill; upstream has no equivalent automation.",
+      "status": "permanent"
+    },
+    {
+      "path": ".claude/skills/sync-upstream/SKILL.md",
+      "reason": "Fork-only sync skill documenting how this fork merges upstream tags.",
+      "status": "permanent"
+    },
+    {
+      "path": ".claude/skills/sync-upstream/references/file-ownership.md",
+      "reason": "Fork-only sync skill reference; upstream has no such document.",
+      "status": "permanent"
+    },
+    {
+      "path": ".claude/skills/sync-upstream/references/sync-lessons.md",
+      "reason": "Fork-only record of what past sync runs learned; upstream has no such document.",
+      "status": "permanent"
+    },
+    {
+      "path": ".github/scripts/check-fork-ownership.mjs",
+      "reason": "The CI guard that enforces this manifest on pull requests — fork machinery, not upstream code.",
+      "status": "permanent"
+    },
+    {
+      "path": ".github/workflows/pr.yml",
+      "reason": "Carries the fork_ownership_guard job and other fork-only gating that upstream's PR workflow does not run.",
+      "status": "permanent"
+    },
+    {
+      "path": ".github/workflows/readme-downloads-badge.yml",
+      "reason": "Generates the fork's own README download-count badge.",
+      "status": "permanent"
+    },
+    {
+      "path": ".github/workflows/release-cut.yml",
+      "reason": "Fork release-cut pipeline; upstream has no equivalent workflow.",
+      "status": "permanent"
+    },
+    {
+      "path": ".github/workflows/release-mac-build.yml",
+      "reason": "Fork's macOS build pipeline for its own release channel.",
+      "status": "permanent"
+    },
+    {
+      "path": ".github/workflows/track-community-prs.yaml",
+      "reason": "Upstream-org community-PR triage automation the fork must not run.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": ".nvmrc",
+      "reason": "Fork toolchain pin; upstream carries no equivalent file.",
+      "status": "permanent"
+    },
+    {
+      "path": "BUGS.md",
+      "reason": "Fork-only defect log; upstream has no counterpart.",
+      "status": "permanent"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "reason": "Fork release history; upstream's changelog is a different document.",
+      "status": "permanent"
+    },
+    {
+      "path": "DEFERRED.md",
+      "reason": "Fork-only out-of-scope work log; upstream has no counterpart.",
+      "status": "permanent"
+    },
+    {
+      "path": "TEST_BACKLOG.md",
+      "reason": "Fork-only skipped-test log; upstream has no counterpart.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/dev-app-update.yml",
+      "reason": "Update feed points at the fork's own release bucket, not upstream's.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/docker/test-sandbox/Dockerfile",
+      "reason": "Fork-only test-sandbox image; upstream has no containerized test lane.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/docker/test-sandbox/README.md",
+      "reason": "Fork-only test-sandbox documentation; upstream has no containerized test lane.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/docker/test-sandbox/entrypoint.sh",
+      "reason": "Fork-only test-sandbox entrypoint; upstream has no containerized test lane.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/electron-builder.config.cjs",
+      "reason": "Fork ships macOS-only arm64 artifacts under com.zpyoung.orca; upstream's multi-platform matrix must not win.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/fork-ownership.json",
+      "reason": "The manifest declares itself so a sync never resets or removes its own source of truth.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/max-lines-baseline.txt",
+      "reason": "Fork's own max-lines ratchet baseline diverges from upstream's file sizes.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/reliability-gates.jsonc",
+      "reason": "Fork-specific reliability gate thresholds.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/check-fork-ownership.test.mjs",
+      "reason": "Tests for the fork ownership CI guard above.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/create-draft-release.mjs",
+      "reason": "Fork release-tooling delta for the fork's own release process.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/create-draft-release.test.mjs",
+      "reason": "Tests for the fork's release-tooling delta above.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/electron-builder-config.test.mjs",
+      "reason": "Tests the fork's arm64-only electron-builder config, not upstream's matrix.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/electron-builder-mac-channel-config.test.mjs",
+      "reason": "Tests the multi-channel builder matrix the fork's arm64-only config removed.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/fork-localization-catalog-check.mjs",
+      "reason": "Fork localization wrapper validates isolated feature catalogs while composing the upstream verifier.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/fork-localization-catalog-check.test.mjs",
+      "reason": "Tests for the fork localization wrapper.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/fork-ownership-manifest.mjs",
+      "reason": "The manifest loader/matcher itself — fork machinery, not upstream code.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/fork-ownership-manifest.test.mjs",
+      "reason": "Tests for the manifest loader; a fork-added test matching no other entry would otherwise fail the guard's own coverage rule.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/client-hosted-browser-package-coverage.test.mjs",
+      "reason": "Contracts for the fork's PR packaging policy; upstream's Windows PR job must not be required by a macOS-only release fork.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/pr-code-change-scope.test.mjs",
+      "reason": "Retains upstream classifier behavior while dropping source-pinning assertions for the Windows PR job absent from the fork-owned workflow.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/pr-workflow-parallelism.test.mjs",
+      "reason": "Contracts for the fork-owned PR job graph, which omits Windows packaging and must not restore upstream's exact aggregate dependency list.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/skills-cli-package-workflow.test.mjs",
+      "reason": "Asserts the Windows packaged CLI job removed from the fork's PR lane; the fork ships only macOS artifacts.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/win32-test-lane-registration.test.mjs",
+      "reason": "Requires registration in the Windows PR job that this macOS-only release fork deliberately does not run.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/windows-pty-native-capability-workflow.test.mjs",
+      "reason": "Asserts the removed Windows PR packaging lane and pins its smoke-driver source; the fork retains platform behavior tests instead.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/wsl-e2e-lane-contract.test.mjs",
+      "reason": "Retains WSL routing and reusable-lane contracts without requiring the Windows PR job omitted by this macOS-only release fork.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/shared/windows-lane-tree-removal-boundary.test.ts",
+      "reason": "Scans teardown source for the Windows PR job deliberately removed by this macOS-only release fork; platform removal behavior tests remain.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/install-electron-package-binary.mjs",
+      "reason": "Fork release-tooling delta for packaging the fork's own Electron binary.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/install-electron-package-binary.test.mjs",
+      "reason": "Tests for the fork's release-tooling delta above.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/package-electron-runtime-contract.test.mjs",
+      "reason": "Tests the fork's own packaged Electron runtime contract.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/release-cut-token-permissions.test.mjs",
+      "status": "permanent",
+      "reason": "Asserts upstream's release-cut job matrix and github.repository == 'stablyai/orca'; the fork publishes macOS-only arm64 artifacts from zpyoung/orca, so upstream's version can never describe this pipeline."
+    },
+    {
+      "path": "config/scripts/release-rc-history.mjs",
+      "reason": "Fork release-tooling delta for the fork's own RC history.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/release-rc-history.test.mjs",
+      "reason": "Tests for the fork's release-tooling delta above.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/reject-local-vitest-run.mjs",
+      "reason": "Fork-only guard enforcing the sandbox-only test rule for callers outside the Claude Code hook.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/run-sandboxed-test-shards.mjs",
+      "reason": "Fork's own sandboxed shard runner; upstream runs the suite on the workstation.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/skill-sharing-release-workflow.test.mjs",
+      "status": "permanent",
+      "reason": "Asserts a Windows/Linux skill-sharing release gate upstream added to release-cut.yml; the fork's release pipeline is macOS-only and has no such job.",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/sync-upstream-file-ownership.mjs",
+      "reason": "Fork's own sync classifier; upstream has no such script.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/sync-upstream-file-ownership.test.mjs",
+      "reason": "Tests for the fork's own sync classifier; upstream has no such script.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/verify-dev-channel-packaging.test.mjs",
+      "status": "permanent",
+      "reason": "Asserts upstream's Windows hourly/daily/adhoc dev-channel packaging identity; the fork ships no dev channels and no Windows artifacts.",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/verify-release-required-assets.mjs",
+      "reason": "Fork release-tooling delta verifying the fork's own release asset set.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/verify-release-required-assets.test.mjs",
+      "reason": "Tests for the fork's release-tooling delta above.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/verify-skill-update-roundtrip.mjs",
+      "reason": "Fork release-tooling delta for the fork's skill-update packaging.",
+      "status": "permanent"
+    },
+    {
+      "path": "docs/STYLEGUIDE.md",
+      "reason": "Fork-maintained design-system doc; edits here are fork policy, not upstream's.",
+      "status": "permanent"
+    },
+    {
+      "path": "docs/assets/readme-downloads.svg",
+      "reason": "Fork's own README badge artifact.",
+      "status": "permanent"
+    },
+    {
+      "path": "docs/fork-upstreaming.md",
+      "reason": "The upstreaming ledger declares itself so a sync never removes it.",
+      "status": "permanent"
+    },
+    {
+      "path": "mobile/src/browser/mobile-browser-frameless-stream.test.tsx",
+      "reason": "React Doctor gate: imports Buffer from `node:buffer`. Mobile disables unicorn/prefer-node-protocol for Metro's sake, but this file is a Vitest test that Metro never bundles, and React Doctor does not read mobile/.oxlintrc.json.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate"
+    },
+    {
+      "path": "mobile/src/browser/mobile-browser-frame-state.ts",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate",
+      "reason": "React Doctor gate: imports Buffer from `node:buffer`. Mobile disables unicorn/prefer-node-protocol for Metro's sake, but React Doctor does not read mobile/.oxlintrc.json and blocks the changed line."
+    },
+    {
+      "path": "mobile/src/diagnostics/connection-diagnostics-submission.ts",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate",
+      "reason": "React Doctor gate: rewrites a string concatenation as a template literal to satisfy eslint/prefer-template on the changed line."
+    },
+    {
+      "path": "src/renderer/src/components/browser-pane/annotate/browser-page-annotation-tray.tsx",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate",
+      "reason": "React Doctor gate: clears editingAnnotationId during render instead of in an effect when the annotation leaves the browserAnnotations prop, so the tray never paints a frame still editing an annotation that is gone."
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/use-checks-list-state.tsx",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate",
+      "reason": "React Doctor gate: hoists an autoExpandedContextRef write out of a setExpandedCheckKeys updater. React may invoke an updater more than once, so the ref write belongs in the effect that queues it — a correctness fix to upstream's own hook, not fork behavior."
+    },
+    {
+      "path": "mobile/src/session/pending-terminal-handle-recovery.test.ts",
+      "reason": "React Doctor gate: rewrites `Array<T>` as `T[]`. The mobile package turns typescript/array-type off, but React Doctor does not read mobile/.oxlintrc.json and blocks the changed line.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate"
+    },
+    {
+      "path": "mobile/src/transport/mobile-relay-rpc-session-liveness.test.ts",
+      "reason": "React Doctor gate: rewrites `Array<T>` as `T[]`. The mobile package turns typescript/array-type off, but React Doctor does not read mobile/.oxlintrc.json and blocks the changed line.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate"
+    },
+    {
+      "path": "package.json",
+      "reason": "Fork identity, versioning, and script wiring — replaces the old FORK_OWNED_ALWAYS authorship carve-out.",
+      "status": "permanent"
+    },
+    {
+      "path": "proposals.md",
+      "reason": "Fork-only architecture proposal log; upstream has no counterpart.",
+      "status": "permanent"
+    },
+    {
+      "path": "resources/darwin/bin/orca",
+      "reason": "CLI shim hardcodes the fork's app-identity path.",
+      "status": "permanent"
+    },
+    {
+      "path": "resources/skills/current-manifest.json",
+      "reason": "Names the current revision of each shipped skill against the fork's own snapshot registry below; upstream's revision numbers index a history this repository does not have.",
+      "status": "permanent"
+    },
+    {
+      "path": "resources/skills/release-mapping.json",
+      "reason": "Release provenance for shipped skills, keyed by tag. Upstream's rows name stablyai/orca tags absent from this remote, so its copy makes the skill-update roundtrip resolve a tag CI cannot check out.",
+      "status": "permanent"
+    },
+    {
+      "path": "resources/skills/snapshot-registry.json",
+      "reason": "Released skill snapshots recorded from the fork's own release tags; upstream's snapshots describe revisions no fork tag ever shipped.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/main/updater-prerelease-feed-readiness.test.ts",
+      "reason": "Tests for the fork's own prerelease update feed readiness.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/main/updater-prerelease-feed.test.ts",
+      "reason": "Tests for the fork's own prerelease update feed.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/main/updater-prerelease-feed.ts",
+      "reason": "Fork's own prerelease update feed.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/main/updater.check-failure.test.ts",
+      "reason": "Tests for the fork's own update-check failure handling.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatComposerActions.test.tsx",
+      "reason": "Superseded by the fork copy's test in fork-agent-composer.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatComposerActions.tsx",
+      "reason": "Replaced by the host-agnostic AgentComposerActions in fork-agent-composer; restoring upstream's copy would reintroduce a second, chat-only action bar.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-composer-composition.test.tsx",
+      "reason": "Exercises upstream's NativeChatComposerField, which this fork deletes in favour of the host-agnostic AgentComposerField; the fork's equivalent coverage lives in fork-agent-composer.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatComposerField.tsx",
+      "reason": "Replaced by the host-agnostic AgentComposerField in fork-agent-composer; restoring upstream's copy would reintroduce a second, chat-only composer field.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-composer-autogrow.test.tsx",
+      "reason": "Superseded by the fork copy's test in fork-agent-composer.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-runtime-image-send.ts",
+      "status": "permanent",
+      "deleted": true,
+      "reason": "Upstream extracted the image-attachment send out of native-chat-runtime-send.ts; the fork's copy still owns that function for the agent-composer core, so restoring upstream's module would ship two send paths over one PTY."
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-pty-composer-send.ts",
+      "status": "permanent",
+      "deleted": true,
+      "reason": "Upstream's chat-only PTY send hook; fork-agent-composer's useAgentComposerSend already serves both the chat pane and the terminal dock."
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-draft.ts",
+      "reason": "Superseded by useAgentComposerDraft, which serves both the chat pane and the dock.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-live-session-visibility.test.ts",
+      "reason": "The tag visibility test assumes hidden panes disable reads, but the retained-session relay path must stay subscribed across SSH relay reconnects; it cannot assert both contracts.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-retained-session.test.ts",
+      "reason": "Tests for the retention-fix hook above. Also carries native-chat-relay SSH-connection test cases from commit c137a9e97d that exercise the sshConnectionId identity field; those are not part of the upstream-bound fix and must be dropped when the upstream PR is prepared, since sshConnectionId does not exist upstream.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#retention-fix"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-retained-session.ts",
+      "reason": "Retention bug fix: excludes the error phase from the loading-state check so a transient read failure does not blank a retained transcript. Belongs upstream, not isolated as a fork feature. Also carries the native-chat-relay SSH-identity line `args.sshConnectionId ?? null,` and its two-line comment from commit c137a9e97d; those are not part of the upstream-bound fix and must be dropped when the upstream PR is prepared, since sshConnectionId does not exist upstream.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#retention-fix"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/project-group-header-drop.test.ts",
+      "reason": "Tests updated for the sidebar-density header-height change.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#sidebar-density"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/project-header-drop.test.ts",
+      "reason": "Tests updated for the sidebar-density header-height change.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#sidebar-density"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-header-section-boundaries.test.ts",
+      "reason": "Tests updated for the sidebar-density row-height fix above.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#sidebar-density"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/repo-header-action-button-class.ts",
+      "reason": "Sidebar-density fix: insets the repo-header action-button focus ring so the shorter h-6 row's overflow-hidden no longer clips it.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#sidebar-density"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-card-surface.tsx",
+      "reason": "Sidebar-density preference: preserves compact workspace-card padding after upstream split card rendering into its surface module.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#sidebar-density"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/viewport/scroll-adjustment.test.ts",
+      "reason": "Tests for the sidebar-density row-height fix above.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#sidebar-density"
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/viewport/virtual-rows.ts",
+      "reason": "Sidebar-density fix: corrects the host-header row-height estimate so it matches the rendered h-8 + pt-1 height at the tighter 2px row gap.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#sidebar-density"
+    },
+    {
+      "path": "src/renderer/src/i18n/fork-localization-catalogs.test.ts",
+      "reason": "Tests for the fork i18n aggregation machinery.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/renderer/src/i18n/en-runtime-required.json",
+      "reason": "Generated from this tree's en.json by generate-runtime-required-english-catalog.mjs; the fork's catalog differs from upstream's, so upstream's copy fails its own --check here.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/renderer/src/i18n/fork-localization-catalogs.ts",
+      "reason": "Fork i18n aggregation machinery merges isolated feature catalogs at runtime.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/shared/native-chat-transcript-retention.test.ts",
+      "reason": "Tests for the retention-fix shared companion above.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#retention-fix"
+    },
+    {
+      "path": "src/shared/native-chat-transcript-retention.ts",
+      "reason": "Retention bug fix's shared companion: the loading param whose error-phase exclusion is the actual fix.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#retention-fix"
+    },
+    {
+      "path": "tests/e2e/cross-version-wire/release-checkout.ts",
+      "reason": "Encodes the fork's own (tagless) release-history shape for cross-version wire tests.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-file-attachment-actions.test.tsx",
+      "reason": "Hook-level coverage of upstream's composer drop scoping against the fork's own composer field, which publishes the scope key in place of the deleted upstream field.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-paste-bridge.ts",
+      "reason": "Routes pane-level Paste by focus instead of by which target happens to be mounted, and hands an image-only clipboard back to the composer so the app-menu path cannot claim a paste and then drop it. Upstream unmounts the composer behind a question card, so composer-wins was safe there; a host that keeps both mounted sent every Paste to the composer and starved the card's answer input.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#pane-paste-routing-by-focus"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-paste-bridge.test.tsx",
+      "reason": "Covers the pane-paste focus routing fix: composer-only, answer-input-only, both mounted with either focused, an image-only clipboard at the focused answer input, and neither mounted. Ships with the fix it exercises.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#pane-paste-routing-by-focus"
+    },
+    {
+      "path": "config/scripts/check-changed-code-quality.mjs",
+      "reason": "Stops the changed-lines type-aware scan pinning the root oxlint config over mobile/, whose workspace deps are absent in the gate job so every React Native type resolves as an error type.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#changed-lines-type-aware-scan-reaches-into-mobile"
+    },
+    {
+      "path": "src/main/runtime/structured-agent-session-integration.test.ts",
+      "reason": "Awaits the deferred event sink before the history page read: the takeover's reap tombstones the running turn's status row asynchronously, so on a loaded runner the page still carries it and the ordering assertion fails.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#structured-session-history-page-races-the-reap-tombstone"
+    }
+  ],
+  "residuals": {
+    ".gitignore": {
+      "added": 14,
+      "removed": 2
+    },
+    ".oxlintrc.json": {
+      "added": 4,
+      "removed": 4
+    },
+    "AGENTS.md": {
+      "added": 113,
+      "removed": 1
+    },
+    "CLAUDE.md": {
+      "added": 17,
+      "removed": 0
+    },
+    "config/localization-coverage-allowlist.json": {
+      "added": 7,
+      "removed": 0
+    },
+    "config/scripts/build-notification-status-macos.mjs": {
+      "added": 1,
+      "removed": 1
+    },
+    "config/scripts/check-max-lines-ratchet.mjs": {
+      "added": 4,
+      "removed": 4
+    },
+    "config/scripts/check-max-lines-ratchet.test.mjs": {
+      "added": 9,
+      "removed": 9
+    },
+    "config/scripts/mac-build-compatibility.test.mjs": {
+      "added": 1,
+      "removed": 1
+    },
+    "config/scripts/pr-e2e-gate-contract.test.mjs": {
+      "added": 7,
+      "removed": 1
+    },
+    "config/tsconfig.cli.json": {
+      "added": 2,
+      "removed": 0
+    },
+    "config/tsconfig.tc.web.json": {
+      "added": 2,
+      "removed": 0
+    },
+    "config/tsconfig.web.json": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/cli/artifact-format.ts": {
+      "added": 6,
+      "removed": 7
+    },
+    "src/cli/handlers/artifacts.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/cli/specs/artifacts.ts": {
+      "added": 2,
+      "removed": 2
+    },
+    "src/main/agent-hooks/server/server-lifecycle.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/agent-hooks/server/server-status-update.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/agent-hooks/server/server-tab-cleanup.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/artifacts/artifact-cloud-recovery.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/main/artifacts/artifact-cloud-service-races.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/main/artifacts/artifact-cloud-service.test.ts": {
+      "added": 9,
+      "removed": 3
+    },
+    "src/main/claude/hook-service.ts": {
+      "added": 6,
+      "removed": 2
+    },
+    "src/main/ipc/native-chat-subscribe-lifecycle.test.ts": {
+      "added": 7,
+      "removed": 4
+    },
+    "src/main/ipc/native-chat.ts": {
+      "added": 58,
+      "removed": 20
+    },
+    "src/main/ipc/notification-system-settings-link.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/main/ipc/pty/ipc/write-input.ts": {
+      "added": 90,
+      "removed": 1
+    },
+    "src/main/ipc/pty/ipc/write.ts": {
+      "added": 13,
+      "removed": 0
+    },
+    "src/main/ipc/pty/register-handlers.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/main/ipc/register-core-handlers/register-core-handlers.test.ts": {
+      "added": 8,
+      "removed": 0
+    },
+    "src/main/ipc/register-core-handlers/register-core-handlers.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/main/ipc/ssh-relay-session-callbacks.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/ipc/ssh.ts": {
+      "added": 31,
+      "removed": 0
+    },
+    "src/main/ipc/worktree-logic.test.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/ipc/worktree-metadata-merge.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/main/local-builds/local-build-candidate.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/main/local-builds/local-build-compatibility-contract.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/main/macos-tcc-prompt-watch.test.ts": {
+      "added": 10,
+      "removed": 10
+    },
+    "src/main/macos-tcc-prompt-watch.ts": {
+      "added": 6,
+      "removed": 6
+    },
+    "src/main/native-chat/transcript-incremental-reader.ts": {
+      "added": 11,
+      "removed": 10
+    },
+    "src/main/native-chat/transcript-tail-reader.ts": {
+      "added": 25,
+      "removed": 23
+    },
+    "src/main/native-chat/transcript-watch-contract.ts": {
+      "added": 28,
+      "removed": 8
+    },
+    "src/main/native-chat/transcript-watch-engine-wsl-lifecycle.test.ts": {
+      "added": 11,
+      "removed": 0
+    },
+    "src/main/native-chat/transcript-watch-engine.ts": {
+      "added": 36,
+      "removed": 33
+    },
+    "src/main/native-chat/transcript-watch.test.ts": {
+      "added": 117,
+      "removed": 17
+    },
+    "src/main/native-chat/transcript-watch.ts": {
+      "added": 30,
+      "removed": 268
+    },
+    "src/main/orca-profiles/profile-artifact-cloud-cleanup.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/persistence/applying-settings/settings-update.ts": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/main/persistence/applying-settings/ui-selection-normalization.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/main/persistence/tracking-repos/project-group-operations.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/providers/ssh-pty-provider-rpc-operations.ts": {
+      "added": 8,
+      "removed": 0
+    },
+    "src/main/rate-limits/service/service-fetch-policy.ts": {
+      "added": 7,
+      "removed": 6
+    },
+    "src/main/runtime/orca-runtime-close-headless-mobile-terminal-tab.ts": {
+      "added": 17,
+      "removed": 5
+    },
+    "src/main/runtime/orca-runtime-has-exact-persisted-terminal-surface-identity.ts": {
+      "added": 2,
+      "removed": 2
+    },
+    "src/main/runtime/orca-runtime-persist-headless-session-tab-props.ts": {
+      "added": 79,
+      "removed": 4
+    },
+    "src/main/runtime/orca-runtime-sync-mobile-session-tabs.ts": {
+      "added": 18,
+      "removed": 2
+    },
+    "src/main/runtime/rpc/methods/artifacts.ts": {
+      "added": 6,
+      "removed": 4
+    },
+    "src/main/runtime/rpc/methods/client-ui-schemas.ts": {
+      "added": 5,
+      "removed": 0
+    },
+    "src/main/runtime/rpc/methods/index.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/runtime/rpc/methods/native-chat.test.ts": {
+      "added": 14,
+      "removed": 32
+    },
+    "src/main/runtime/rpc/methods/native-chat.ts": {
+      "added": 8,
+      "removed": 7
+    },
+    "src/main/runtime/rpc/methods/session-tab-mutation-methods.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/main/runtime/rpc/methods/session-tabs-schemas.ts": {
+      "added": 50,
+      "removed": 1
+    },
+    "src/main/runtime/rpc/methods/worktree-schemas.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/main/runtime/rpc/methods/worktree.ts": {
+      "added": 7,
+      "removed": 1
+    },
+    "src/main/runtime/runtime-artifact-controller.ts": {
+      "added": 2,
+      "removed": 2
+    },
+    "src/main/skills/claude-plugin-skill-sources.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/main/skills/claude-plugin-skill-sources.ts": {
+      "added": 7,
+      "removed": 6
+    },
+    "src/main/skills/discovery.ts": {
+      "added": 5,
+      "removed": 2
+    },
+    "src/main/skills/skill-discovery-sources.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/main/skills/skill-discovery-wsl.ts": {
+      "added": 6,
+      "removed": 3
+    },
+    "src/main/ssh/ssh-relay-session.ts": {
+      "added": 38,
+      "removed": 0
+    },
+    "src/main/startup/main-process-account-services.ts": {
+      "added": 2,
+      "removed": 3
+    },
+    "src/main/startup/main-process-observers.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/startup/main-process-runtime-service.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/main/telemetry/client.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/main/updater.publishing-window-feed.test.ts": {
+      "added": 5,
+      "removed": 5
+    },
+    "src/main/updater/updater-release-feed.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/main/updater/updater-setup.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/preload/api-types.ts": {
+      "added": 5,
+      "removed": 0
+    },
+    "src/preload/api/native-chat-api.ts": {
+      "added": 53,
+      "removed": 30
+    },
+    "src/preload/api/native-chat-bridge.ts": {
+      "added": 16,
+      "removed": 7
+    },
+    "src/preload/api/pty-api.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/preload/api/pty-bridge-session-control.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/preload/api/ui-command-event-api.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/relay/relay-runtime-services.ts": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/relay/remote-artifact-cli-input.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/assets/main.css": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/assets/terminal.css": {
+      "added": 19,
+      "removed": 1
+    },
+    "src/renderer/src/components/artifacts/ArtifactDetailHeader.tsx": {
+      "added": 3,
+      "removed": 13
+    },
+    "src/renderer/src/components/artifacts/ArtifactListRows.tsx": {
+      "added": 2,
+      "removed": 3
+    },
+    "src/renderer/src/components/artifacts/ArtifactsPage.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/artifacts/artifact-display-labels.ts": {
+      "added": 8,
+      "removed": 3
+    },
+    "src/renderer/src/components/artifacts/artifact-publish-flow.ts": {
+      "added": 5,
+      "removed": 3
+    },
+    "src/renderer/src/components/browser-pane/assemble-chrome/browser-page-toolbar.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/dashboard-popout/AgentMapWorkspaceContextMenu.test.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/dashboard/DashboardAgentRow.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/editor/EditorPanelHeader.test.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/editor/EditorPanelHeader.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/NativeChatApprovalCard.tsx": {
+      "added": 4,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/NativeChatAutocompleteMenus.test.tsx": {
+      "added": 66,
+      "removed": 0
+    },
+    "src/renderer/src/components/native-chat/NativeChatAutocompleteMenus.tsx": {
+      "added": 10,
+      "removed": 2
+    },
+    "src/renderer/src/components/native-chat/NativeChatComposer.test.tsx": {
+      "added": 38,
+      "removed": 83
+    },
+    "src/renderer/src/components/native-chat/NativeChatComposer.tsx": {
+      "added": 201,
+      "removed": 277
+    },
+    "src/renderer/src/components/native-chat/NativeChatInteractiveCard.test.tsx": {
+      "added": 21,
+      "removed": 0
+    },
+    "src/renderer/src/components/native-chat/NativeChatInteractiveCard.tsx": {
+      "added": 20,
+      "removed": 30
+    },
+    "src/renderer/src/components/native-chat/NativeChatMessageRow.tsx": {
+      "added": 8,
+      "removed": 2
+    },
+    "src/renderer/src/components/native-chat/NativeChatQuestionCard.tsx": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/NativeChatResolvedView.tsx": {
+      "added": 16,
+      "removed": 17
+    },
+    "src/renderer/src/components/native-chat/NativeChatView.test.tsx": {
+      "added": 4,
+      "removed": 4
+    },
+    "src/renderer/src/components/native-chat/native-chat-attachment-upload.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/native-chat/native-chat-command-marker.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/native-chat-composer-state.test.ts": {
+      "added": 141,
+      "removed": 49
+    },
+    "src/renderer/src/components/native-chat/native-chat-composer-state.ts": {
+      "added": 35,
+      "removed": 41
+    },
+    "src/renderer/src/components/native-chat/native-chat-composer-types.ts": {
+      "added": 15,
+      "removed": 36
+    },
+    "src/renderer/src/components/native-chat/native-chat-pending.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/native-chat-picker-items.ts": {
+      "added": 71,
+      "removed": 15
+    },
+    "src/renderer/src/components/native-chat/native-chat-pty-session-options.ts": {
+      "added": 25,
+      "removed": 8
+    },
+    "src/renderer/src/components/native-chat/native-chat-runtime-send-launch-draft.test.ts": {
+      "added": 35,
+      "removed": 15
+    },
+    "src/renderer/src/components/native-chat/native-chat-runtime-send.test.ts": {
+      "added": 496,
+      "removed": 81
+    },
+    "src/renderer/src/components/native-chat/native-chat-runtime-send.ts": {
+      "added": 68,
+      "removed": 235
+    },
+    "src/renderer/src/components/native-chat/native-chat-session-option-cache.ts": {
+      "added": 32,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/native-chat-structured-composer-dispatch.ts": {
+      "added": 2,
+      "removed": 2
+    },
+    "src/renderer/src/components/native-chat/native-chat-structured-send-composition-clear.test.tsx": {
+      "added": 12,
+      "removed": 3
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.test.tsx": {
+      "added": 78,
+      "removed": 114
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.ts": {
+      "added": 98,
+      "removed": 47
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-interactive-send.test.tsx": {
+      "added": 38,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-interactive-send.ts": {
+      "added": 16,
+      "removed": 2
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-live-session-pending.test.ts": {
+      "added": 4,
+      "removed": 5
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-picker-command-dispatch.test.tsx": {
+      "added": 128,
+      "removed": 28
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-picker-command-dispatch.ts": {
+      "added": 48,
+      "removed": 6
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-picker-state.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-send-lifecycle.test.tsx": {
+      "added": 59,
+      "removed": 0
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-send-lifecycle.ts": {
+      "added": 22,
+      "removed": 3
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-session-option-command.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-session-options.ts": {
+      "added": 74,
+      "removed": 11
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-typed-insertion.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/right-sidebar/AiVaultPanel.tsx": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/renderer/src/components/right-sidebar/AiVaultSessionRow.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/right-sidebar/AiVaultVirtualRow.tsx": {
+      "added": 3,
+      "removed": 4
+    },
+    "src/renderer/src/components/right-sidebar/ai-vault-session-launch-actions.ts": {
+      "added": 3,
+      "removed": 2
+    },
+    "src/renderer/src/components/right-sidebar/right-sidebar-panel-content.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/right-sidebar/use-right-sidebar-activity-items.ts": {
+      "added": 7,
+      "removed": 0
+    },
+    "src/renderer/src/components/settings/ExperimentalPane.test.tsx": {
+      "added": 31,
+      "removed": 0
+    },
+    "src/renderer/src/components/settings/ExperimentalPane.tsx": {
+      "added": 8,
+      "removed": 0
+    },
+    "src/renderer/src/components/settings/NativeChatExperimentalSetting.tsx": {
+      "added": 5,
+      "removed": 0
+    },
+    "src/renderer/src/components/settings/experimental-search.ts": {
+      "added": 5,
+      "removed": 0
+    },
+    "src/renderer/src/components/settings/settings-page-renderer.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/sidebar/CommentMarkdown.tsx": {
+      "added": 15,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/WorktreeCard.tsx": {
+      "added": 5,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/WorktreeContextMenuOverlays.tsx": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/components/sidebar/WorktreeContextMenuView.tsx": {
+      "added": 11,
+      "removed": 50
+    },
+    "src/renderer/src/components/sidebar/WorktreeList.tsx": {
+      "added": 24,
+      "removed": 12
+    },
+    "src/renderer/src/components/sidebar/comment-markdown-element-renderers.tsx": {
+      "added": 6,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/empty-project-placeholder-repos.ts": {
+      "added": 8,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/use-worktree-context-menu-model.tsx": {
+      "added": 8,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-card-compact-agent-row.tsx": {
+      "added": 18,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-drag-units.ts": {
+      "added": 8,
+      "removed": 6
+    },
+    "src/renderer/src/components/sidebar/worktree-list/drag/drop-commit-context.ts": {
+      "added": 6,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/drag/groups.ts": {
+      "added": 7,
+      "removed": 4
+    },
+    "src/renderer/src/components/sidebar/worktree-list/drag/pointer-commit.ts": {
+      "added": 10,
+      "removed": 0
+    },
+    "src/renderer/src/components/sidebar/worktree-list/drag/pointer-flush.ts": {
+      "added": 14,
+      "removed": 0
+    },
+    "src/renderer/src/components/sidebar/worktree-list/drag/use-drop-commit-context.ts": {
+      "added": 8,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/drag/use-pointer-drag.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/renderer/src/components/sidebar/worktree-list/drag/use-runtime.ts": {
+      "added": 13,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/worktree-list/grouping/build-rows.ts": {
+      "added": 13,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/worktree-list/grouping/project-group-sections.ts": {
+      "added": 15,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/grouping/worktree-group-keys.ts": {
+      "added": 10,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/worktree-list/grouping/worktree-grouping.ts": {
+      "added": 6,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/listing/use-collapsed-groups.ts": {
+      "added": 7,
+      "removed": 5
+    },
+    "src/renderer/src/components/sidebar/worktree-list/listing/use-section-rows.ts": {
+      "added": 13,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/worktree-list/navigation/pending-reveal-inputs.ts": {
+      "added": 5,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/navigation/use-pending-reveal.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/components/sidebar/worktree-list/rows/SectionHeader.tsx": {
+      "added": 13,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/rows/item-row.tsx": {
+      "added": 10,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/viewport/VirtualizedWorktreeViewport.tsx": {
+      "added": 8,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/viewport/viewport-props.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/renderer/src/components/sidebar/worktree-list/viewport/virtual-row-context.ts": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/renderer/src/components/terminal-pane/TerminalContextMenu.test.tsx": {
+      "added": 42,
+      "removed": 0
+    },
+    "src/renderer/src/components/terminal-pane/TerminalContextMenu.tsx": {
+      "added": 27,
+      "removed": 1
+    },
+    "src/renderer/src/components/terminal-pane/TerminalPaneHeaderOverlay.test.tsx": {
+      "added": 33,
+      "removed": 0
+    },
+    "src/renderer/src/components/terminal-pane/TerminalPaneHeaderOverlay.tsx": {
+      "added": 5,
+      "removed": 0
+    },
+    "src/renderer/src/components/terminal-pane/TerminalPaneSurface.tsx": {
+      "added": 6,
+      "removed": 1
+    },
+    "src/renderer/src/components/terminal-pane/focus-terminal-pane-event.test.ts": {
+      "added": 9,
+      "removed": 4
+    },
+    "src/renderer/src/components/terminal-pane/focus-terminal-pane-event.ts": {
+      "added": 11,
+      "removed": 7
+    },
+    "src/renderer/src/components/terminal-pane/pane-helpers.test.ts": {
+      "added": 27,
+      "removed": 4
+    },
+    "src/renderer/src/components/terminal-pane/pane-helpers.ts": {
+      "added": 25,
+      "removed": 8
+    },
+    "src/renderer/src/components/terminal-pane/terminal-input-quarantine.ts": {
+      "added": 84,
+      "removed": 4
+    },
+    "src/renderer/src/components/terminal-pane/terminal-pane-menu-agent-session-actions.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/terminal-pane/terminal-pane-mount-cleanup.ts": {
+      "added": 15,
+      "removed": 0
+    },
+    "src/renderer/src/components/terminal-pane/terminal-pane-mount-preparation.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/renderer/src/components/terminal-pane/terminal-pane-pane-closed.ts": {
+      "added": 15,
+      "removed": 0
+    },
+    "src/renderer/src/components/terminal-pane/terminal-pane-pane-created.ts": {
+      "added": 13,
+      "removed": 0
+    },
+    "src/renderer/src/components/terminal-pane/terminal-visibility-resume.test.ts": {
+      "added": 73,
+      "removed": 1
+    },
+    "src/renderer/src/components/terminal-pane/terminal-visibility-resume.ts": {
+      "added": 19,
+      "removed": 6
+    },
+    "src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/terminal-pane/use-terminal-pane-chat-state.ts": {
+      "added": 6,
+      "removed": 2
+    },
+    "src/renderer/src/components/terminal-pane/use-terminal-pane-layout-bindings.ts": {
+      "added": 17,
+      "removed": 3
+    },
+    "src/renderer/src/components/terminal-pane/use-terminal-pane-mobile-actions.ts": {
+      "added": 16,
+      "removed": 3
+    },
+    "src/renderer/src/components/terminal-pane/use-terminal-pane-title-state.ts": {
+      "added": 9,
+      "removed": 0
+    },
+    "src/renderer/src/components/terminal-pane/use-terminal-window-wake-recovery.test.ts": {
+      "added": 13,
+      "removed": 0
+    },
+    "src/renderer/src/components/terminal-pane/use-terminal-window-wake-recovery.ts": {
+      "added": 5,
+      "removed": 1
+    },
+    "src/renderer/src/hooks/settings-navigation-workflow-sections.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/i18n/i18n.ts": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/renderer/src/lib/connection-owner-resolution.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/lib/focus-terminal-tab-surface.ts": {
+      "added": 8,
+      "removed": 5
+    },
+    "src/renderer/src/lib/pane-manager/pane-container-listener-lifecycle.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-dom-creation.test.ts": {
+      "added": 53,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-dom-creation.ts": {
+      "added": 6,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-drag-reorder.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-drop-no-op.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-fit-resize-observer.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-initial-fit-lifecycle.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-lifecycle.test.ts": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-manager-types.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-reveal-repaint.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-split-close.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-split-scroll.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-terminal-gpu-acceleration.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-tree-ops.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-tree-reparent-frame.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-webgl-context-recovery.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-webgl-refresh-lifecycle.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/pane-webgl-renderer.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/windows-pty-compatibility.test.ts": {
+      "added": 17,
+      "removed": 0
+    },
+    "src/renderer/src/lib/pane-manager/windows-pty-compatibility.ts": {
+      "added": 12,
+      "removed": 0
+    },
+    "src/renderer/src/lib/settings-navigation-types.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/terminal-title-contrast.ts": {
+      "added": 3,
+      "removed": 3
+    },
+    "src/renderer/src/runtime/runtime-terminal-inspection.test.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/runtime/runtime-terminal-inspection.ts": {
+      "added": 73,
+      "removed": 11
+    },
+    "src/renderer/src/runtime/sync-runtime-graph.ts": {
+      "added": 5,
+      "removed": 2
+    },
+    "src/renderer/src/runtime/sync-runtime-graph/mobile-session-capture.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/runtime/sync-runtime-graph/mobile-session-inputs.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/runtime/sync-runtime-graph/mobile-session-snapshots.ts": {
+      "added": 8,
+      "removed": 1
+    },
+    "src/renderer/src/runtime/sync-runtime-graph/mobile-session-terminal-tabs.ts": {
+      "added": 8,
+      "removed": 1
+    },
+    "src/renderer/src/runtime/sync-runtime-graph/types.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/runtime/web-runtime-terminal-actions.ts": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/renderer/src/runtime/web-session-tabs-sync.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/runtime/web-session-tabs-sync/apply-final-patch.ts": {
+      "added": 14,
+      "removed": 1
+    },
+    "src/renderer/src/runtime/web-session-tabs-sync/apply-preparation-unified.ts": {
+      "added": 89,
+      "removed": 6
+    },
+    "src/renderer/src/runtime/web-session-tabs-sync/state.ts": {
+      "added": 6,
+      "removed": 0
+    },
+    "src/renderer/src/runtime/web-session-tabs-sync/tab-builders.ts": {
+      "added": 5,
+      "removed": 2
+    },
+    "src/renderer/src/runtime/web-session-tabs-sync/terminal-build.ts": {
+      "added": 14,
+      "removed": 1
+    },
+    "src/renderer/src/store/right-sidebar-route.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/store/slices/tabs/create-tabs-slice.ts": {
+      "added": 7,
+      "removed": 1
+    },
+    "src/renderer/src/store/slices/tabs/tabs-close-actions.ts": {
+      "added": 11,
+      "removed": 0
+    },
+    "src/renderer/src/store/slices/tabs/tabs-slice-contract.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/renderer/src/web/preload-api/web-native-chat-api.ts": {
+      "added": 30,
+      "removed": 17
+    },
+    "src/renderer/src/web/preload-api/web-preference-normalization.ts": {
+      "added": 25,
+      "removed": 2
+    },
+    "src/renderer/src/web/preload-api/web-terminal-api.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/shared/artifacts.ts": {
+      "added": 12,
+      "removed": 0
+    },
+    "src/shared/cli-argument-boundary.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/shared/default-global-settings.ts": {
+      "added": 5,
+      "removed": 0
+    },
+    "src/shared/global-settings-types.ts": {
+      "added": 10,
+      "removed": 0
+    },
+    "src/shared/keybindings/definitions-core-4.ts": {
+      "added": 16,
+      "removed": 0
+    },
+    "src/shared/keybindings/types.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/shared/local-build-compatibility-contract.json": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/shared/local-build-compatibility-contract.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/shared/local-build-compatibility.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/shared/native-chat-agent-profiles.ts": {
+      "added": 12,
+      "removed": 4
+    },
+    "src/shared/native-chat-session-option-state.test.ts": {
+      "added": 65,
+      "removed": 0
+    },
+    "src/shared/native-chat-session-option-state.ts": {
+      "added": 42,
+      "removed": 4
+    },
+    "src/shared/native-chat-types.ts": {
+      "added": 14,
+      "removed": 0
+    },
+    "src/shared/pane-agent-identity-inventory.test.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/shared/project-groups.ts": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/shared/runtime-mobile-session-tab-contracts.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/shared/skills.ts": {
+      "added": 5,
+      "removed": 0
+    },
+    "src/shared/tab-types.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/shared/telemetry-event-registry.ts": {
+      "added": 9,
+      "removed": 0
+    },
+    "src/shared/telemetry-events.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/shared/telemetry-property-schemas.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/shared/ui-chrome-types.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/shared/workspace-session-schema.test.ts": {
+      "added": 103,
+      "removed": 3
+    },
+    "src/shared/workspace-session-schema.ts": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/shared/worktree/meta-types.ts": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/shared/worktree/types.ts": {
+      "added": 3,
+      "removed": 0
+    },
+    "tests/e2e/cross-version-wire/cross-version-browser-placement.unit.test.ts": {
+      "added": 4,
+      "removed": 1
+    },
+    "tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts": {
+      "added": 4,
+      "removed": 2
+    },
+    "tests/e2e/cross-version-wire/release-checkout.unit.test.ts": {
+      "added": 11,
+      "removed": 14
+    },
+    "src/renderer/src/components/sidebar/worktree-list/rows/virtual-row-dispatch.tsx": {
+      "added": 9,
+      "removed": 0
+    },
+    "src/renderer/src/components/settings/AppearanceWindowSidebarSection.tsx": {
+      "added": 6,
+      "removed": 0
+    },
+    "src/renderer/src/components/settings/AppearancePane.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/settings/appearance-search.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/providers/ssh-pty-provider.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/main/runtime/mobile-session-terminal-projection.ts": {
+      "added": 12,
+      "removed": 0
+    },
+    "src/main/runtime/orca-runtime-publish-pty-backed-mobile-session-terminal.ts": {
+      "added": 11,
+      "removed": 0
+    },
+    "src/main/runtime/orca-runtime-runtime-id.ts": {
+      "added": 8,
+      "removed": 0
+    },
+    "src/main/runtime/runtime-mobile-session-projection.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/preload/index.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/renderer/src/components/native-chat/NativeChatMessageList.tsx": {
+      "added": 5,
+      "removed": 2
+    },
+    "src/renderer/src/components/native-chat/NativeChatToolRun.tsx": {
+      "added": 7,
+      "removed": 2
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-structured-composer-send.ts": {
+      "added": 2,
+      "removed": 2
+    },
+    "src/renderer/src/lib/pane-manager/terminal-scroll-intent-key-retention.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.test.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/shared/structured-agent-session-options.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/main/persistence/applying-settings/ui-state-read.ts": {
+      "added": 6,
+      "removed": 0
+    },
+    "src/main/persistence/applying-settings/ui-state-update.ts": {
+      "added": 7,
+      "removed": 0
+    },
+    "src/renderer/src/app-shell/use-persisted-ui-writer.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/renderer/src/components/sidebar/SidebarFilter.tsx": {
+      "added": 11,
+      "removed": 19
+    },
+    "src/renderer/src/components/sidebar/SidebarWorkspaceFilterSection.tsx": {
+      "added": 4,
+      "removed": 11
+    },
+    "src/renderer/src/components/sidebar/sidebar-filter-actions.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/use-visible-workspace-kanban-worktree-ids.ts": {
+      "added": 11,
+      "removed": 3
+    },
+    "src/renderer/src/components/sidebar/use-worktree-card-controller.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/visible-worktree-kinds.ts": {
+      "added": 7,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/visible-worktrees.ts": {
+      "added": 19,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/listing/use-filters.ts": {
+      "added": 13,
+      "removed": 5
+    },
+    "src/renderer/src/components/sidebar/worktree-list/listing/use-host-visible-scope.ts": {
+      "added": 36,
+      "removed": 21
+    },
+    "src/renderer/src/components/sidebar/worktree-list/listing/use-visible-worktrees.ts": {
+      "added": 21,
+      "removed": 5
+    },
+    "src/renderer/src/lib/startup-ui-hydration.ts": {
+      "added": 4,
+      "removed": 2
+    },
+    "src/renderer/src/store/slices/persisted-ui-write-baseline.ts": {
+      "added": 8,
+      "removed": 0
+    },
+    "src/renderer/src/store/slices/ui.ts": {
+      "added": 14,
+      "removed": 4
+    },
+    "src/renderer/src/store/slices/worktrees/session/set-active-folder-workspace.ts": {
+      "added": 11,
+      "removed": 1
+    },
+    "src/renderer/src/store/slices/worktrees/session/set-active-worktree.ts": {
+      "added": 19,
+      "removed": 2
+    },
+    "src/shared/pairing-local-ui-fields.ts": {
+      "added": 5,
+      "removed": 2
+    },
+    "src/shared/persisted-ui-state-types.ts": {
+      "added": 4,
+      "removed": 1
+    },
+    "src/main/runtime/rpc/methods/client-ui-pairing-local-fields.test.ts": {
+      "added": 5,
+      "removed": 1
+    },
+    "src/renderer/src/store/slices/persisted-ui-write-baseline.test.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/renderer/src/web/web-preload-api-ui.test.ts": {
+      "added": 10,
+      "removed": 2
+    },
+    "src/shared/pairing-local-ui-fields.test.ts": {
+      "added": 5,
+      "removed": 1
+    },
+    "src/renderer/src/store/slices/ui/ui-slice-hydration-actions.ts": {
+      "added": 4,
+      "removed": 3
+    }
+  }
+}

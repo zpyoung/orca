@@ -10,18 +10,24 @@ import {
   nativeChatComposerTargetIsRemote,
   type NativeChatResolvedTarget
 } from './native-chat-composer-target'
-import {
-  pushHistory,
-  type HistoryState,
-  type NativeChatPickerItem
-} from './native-chat-composer-state'
+import { pushHistory, type HistoryState } from './fork-agent-composer/agent-composer-history'
+import type { NativeChatPickerItem } from './native-chat-composer-state'
 import type { NativeChatSendLifecycle } from './use-native-chat-send-lifecycle'
 import type { NativeChatPtySessionOptionsSurface } from './native-chat-pty-session-options'
+import type { SendOutcome } from './fork-agent-composer/native-chat-send-outcome'
+import { buildComposerSendOptions } from './fork-agent-composer/composer-send-options'
+import { createComposerPayloadRestore } from './fork-agent-composer/use-agent-composer-send'
+import type { ComposerSendTier } from './fork-agent-composer/composer-send-tier'
+import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentComposerField'
 
 export function useNativeChatPickerCommandDispatch(args: {
   agent: AgentType
   disabled: boolean
   isDispatchingSessionOption: boolean
+  paneKey: string
+  sendTier?: ComposerSendTier
+  onSendOutcome?: (outcome: SendOutcome) => void
+  readTerminalScreen?: () => string | null
   resolveTarget: () => NativeChatResolvedTarget | null
   onSlashCommand?: (command: string) => void
   sessionOptionsSurface: NativeChatPtySessionOptionsSurface | null
@@ -30,14 +36,20 @@ export function useNativeChatPickerCommandDispatch(args: {
   setDraft: (value: string) => void
   setCaret: Dispatch<SetStateAction<number>>
   setActiveSuggestion: Dispatch<SetStateAction<number>>
+  imageAttachments: readonly AgentComposerImageAttachment[]
   clearSkillOrigin: () => void
   clearImageAttachments: () => void
+  restoreImageAttachments: (attachments: readonly AgentComposerImageAttachment[]) => void
   setNotice: Dispatch<SetStateAction<string | null>>
 }): (command: Extract<NativeChatPickerItem, { kind: 'command' }>) => void {
   const {
     agent,
     disabled,
     isDispatchingSessionOption,
+    paneKey,
+    sendTier,
+    onSendOutcome,
+    readTerminalScreen,
     resolveTarget,
     onSlashCommand,
     sessionOptionsSurface,
@@ -46,8 +58,10 @@ export function useNativeChatPickerCommandDispatch(args: {
     setDraft,
     setCaret,
     setActiveSuggestion,
+    imageAttachments,
     clearSkillOrigin,
     clearImageAttachments,
+    restoreImageAttachments,
     setNotice
   } = args
   return useCallback(
@@ -57,10 +71,32 @@ export function useNativeChatPickerCommandDispatch(args: {
       if (!target || disabled || isDispatchingSessionOption) {
         return
       }
+      const restorePayload = createComposerPayloadRestore({
+        paneKey,
+        text,
+        imageAttachments,
+        setDraft,
+        setCaret,
+        setNotice,
+        restoreImageAttachments
+      })
+      // Same tiered send-options pipeline as a normal chat send, so a picker
+      // command reports exactly once and restores on `may-not-have-sent`.
+      const sendOptions = buildComposerSendOptions({
+        text,
+        tier: sendTier ?? 'input',
+        readTerminalScreen,
+        onOutcome: (outcome) => {
+          if (outcome === 'may-not-have-sent') {
+            restorePayload()
+          }
+          onSendOutcome?.(outcome)
+        }
+      })
       trackPendingSend(
         agent === 'codex'
           ? sendNativeChatTypedCommand(target.settings, target.ptyId, text)
-          : sendNativeChatMessage(target.settings, target.ptyId, text)
+          : sendNativeChatMessage(target.settings, target.ptyId, text, sendOptions)
       )
       emitNativeChatPickerItemAccepted({ agent, itemKind: 'command' })
       // Why: picker dispatch is a catalog-verified command send; it must leave
@@ -86,9 +122,15 @@ export function useNativeChatPickerCommandDispatch(args: {
       clearImageAttachments,
       clearSkillOrigin,
       disabled,
+      imageAttachments,
       isDispatchingSessionOption,
+      onSendOutcome,
       onSlashCommand,
+      paneKey,
+      readTerminalScreen,
       resolveTarget,
+      restoreImageAttachments,
+      sendTier,
       sessionOptionsSurface,
       setActiveSuggestion,
       setCaret,

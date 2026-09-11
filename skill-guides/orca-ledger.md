@@ -30,18 +30,8 @@ or the code itself when it does not.
 
 ## Start Here
 
-Choose the executable once for the current session:
-
-- If the `ORCA_CLI_COMMAND` environment variable is set, use its value. Orca exports this
-  for managed WSL sessions.
-- Otherwise, in a dev checkout whose session exposes `ORCA_DEV_REPO_ROOT`, use `orca-dev`.
-- Otherwise, on Linux outside an Orca-managed terminal, use `orca-ide`. Never use bare
-  `orca` there because it normally resolves to the GNOME screen reader.
-- Otherwise, use `orca`.
-
-In every command block, `ORCA` is a documentation placeholder. Replace it with the chosen
-executable before running the command; do not create a shell variable or run `ORCA`
-literally. This substitution works the same way in POSIX shells, PowerShell, and cmd.exe.
+`ORCA` is a placeholder for the executable you resolved in the stub; substitute it before
+running. Do not create a shell variable or run `ORCA` literally.
 
 ```text
 ORCA status --json

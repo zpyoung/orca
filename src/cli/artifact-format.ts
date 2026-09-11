@@ -1,15 +1,14 @@
 import type { ArtifactListItem, ArtifactListPage } from '../shared/artifacts'
+import {
+  formatArtifactListRowWithPassword,
+  formatArtifactSharedWithPassword
+} from './fork-artifact-passwords/artifact-password-cli'
 
 export function formatArtifactList(artifacts: readonly ArtifactListItem[]): string {
   if (artifacts.length === 0) {
     return 'No shared artifacts.'
   }
-  return artifacts
-    .map(({ artifact, shareUrl }) => {
-      const name = artifact.title || artifact.originalFileName || artifact.slug
-      return `${name}\n  id: ${artifact.slug}\n  updated: ${artifact.updatedAt}\n  url: ${shareUrl}`
-    })
-    .join('\n\n')
+  return artifacts.map(formatArtifactListRowWithPassword).join('\n\n')
 }
 
 export function formatArtifactListPage(page: ArtifactListPage): string {
@@ -18,5 +17,5 @@ export function formatArtifactListPage(page: ArtifactListPage): string {
 }
 
 export function formatArtifactShared(item: ArtifactListItem): string {
-  return item.shareUrl
+  return formatArtifactSharedWithPassword(item)
 }

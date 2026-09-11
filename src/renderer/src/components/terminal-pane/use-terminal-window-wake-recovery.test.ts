@@ -2,13 +2,28 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import type { PaneManager } from '@/lib/pane-manager/pane-manager'
+import type { PaneWebglCanvasDprRepairState } from '@/lib/pane-manager/terminal-canvas-dpr-repair'
 
-const { recoverVisibleTerminalWindowWakeMock } = vi.hoisted(() => ({
-  recoverVisibleTerminalWindowWakeMock: vi.fn()
+const {
+  recoverVisibleTerminalWindowWakeMock,
+  repairPaneWebglCanvasDprMock,
+  presentPaneViewportMock
+} = vi.hoisted(() => ({
+  recoverVisibleTerminalWindowWakeMock: vi.fn(),
+  repairPaneWebglCanvasDprMock: vi.fn<() => PaneWebglCanvasDprRepairState>(() => 'current'),
+  presentPaneViewportMock: vi.fn()
 }))
 
 vi.mock('./terminal-visibility-resume', () => ({
   recoverVisibleTerminalWindowWake: recoverVisibleTerminalWindowWakeMock
+}))
+
+vi.mock('@/lib/pane-manager/terminal-canvas-dpr-repair', () => ({
+  repairPaneWebglCanvasDpr: repairPaneWebglCanvasDprMock
+}))
+
+vi.mock('@/lib/pane-manager/pane-webgl-renderer', () => ({
+  presentPaneViewport: presentPaneViewportMock
 }))
 
 import { useTerminalWindowWakeRecovery } from './use-terminal-window-wake-recovery'
@@ -19,6 +34,8 @@ import {
 
 describe('useTerminalWindowWakeRecovery', () => {
   const manager = {} as PaneManager
+  // The hook forwards the tab id alone; the dock's bridge is what resolves ownership.
+  const focusOwnership = { tabId: 'tab-1' }
   let systemResumedCallback: (() => void) | null = null
   const unsubscribeSystemResumed = vi.fn()
   const onSystemResumed = vi.fn((callback: () => void) => {
@@ -29,6 +46,9 @@ describe('useTerminalWindowWakeRecovery', () => {
   beforeEach(() => {
     systemResumedCallback = null
     recoverVisibleTerminalWindowWakeMock.mockClear()
+    repairPaneWebglCanvasDprMock.mockClear()
+    presentPaneViewportMock.mockClear()
+    repairPaneWebglCanvasDprMock.mockReturnValue('current')
     unsubscribeSystemResumed.mockClear()
     onSystemResumed.mockClear()
     resetTerminalFreezeBreadcrumbsForTesting()
@@ -43,11 +63,17 @@ describe('useTerminalWindowWakeRecovery', () => {
     delete (window as unknown as { api?: unknown }).api
   })
 
-  function renderWakeRecoveryHook(isVisible = true) {
+  function renderWakeRecoveryHook(
+    isVisible = true,
+    isChatViewMode = false,
+    wakeManager: PaneManager = manager
+  ) {
     return renderHook(() =>
       useTerminalWindowWakeRecovery({
+        ...focusOwnership,
         isVisible,
-        managerRef: { current: manager },
+        isChatViewMode,
+        managerRef: { current: wakeManager },
         isActiveRef: { current: true },
         isVisibleRef: { current: true }
       })
@@ -63,8 +89,10 @@ describe('useTerminalWindowWakeRecovery', () => {
     window.dispatchEvent(new Event('focus'))
     expect(recoverVisibleTerminalWindowWakeMock).toHaveBeenCalledTimes(1)
     expect(recoverVisibleTerminalWindowWakeMock).toHaveBeenNthCalledWith(1, {
+      ...focusOwnership,
       manager,
       isActive: true,
+      isChatViewMode: false,
       clearGlyphAtlases: false
     })
 
@@ -73,8 +101,10 @@ describe('useTerminalWindowWakeRecovery', () => {
 
     expect(recoverVisibleTerminalWindowWakeMock).toHaveBeenCalledTimes(2)
     expect(recoverVisibleTerminalWindowWakeMock).toHaveBeenNthCalledWith(2, {
+      ...focusOwnership,
       manager,
       isActive: true,
+      isChatViewMode: false,
       clearGlyphAtlases: true
     })
   })
@@ -89,8 +119,31 @@ describe('useTerminalWindowWakeRecovery', () => {
     document.dispatchEvent(new Event('visibilitychange'))
 
     expect(recoverVisibleTerminalWindowWakeMock).toHaveBeenLastCalledWith({
+      ...focusOwnership,
       manager,
       isActive: true,
+      isChatViewMode: false,
+      clearGlyphAtlases: false
+    })
+  })
+
+  it.each([
+    ['covered chat leaf', true],
+    ['split terminal leaf', false]
+  ])('routes chat coverage into wake recovery only for the %s', (_label, covered) => {
+    const chatManager = {
+      getActivePane: () => ({ container: { querySelector: () => (covered ? {} : null) } }),
+      getPanes: () => []
+    } as unknown as PaneManager
+    renderWakeRecoveryHook(true, true, chatManager)
+
+    window.dispatchEvent(new Event('focus'))
+
+    expect(recoverVisibleTerminalWindowWakeMock).toHaveBeenLastCalledWith({
+      ...focusOwnership,
+      manager: chatManager,
+      isActive: true,
+      isChatViewMode: covered,
       clearGlyphAtlases: false
     })
   })
@@ -117,7 +170,9 @@ describe('useTerminalWindowWakeRecovery', () => {
     const reassertPtySizeAfterWindowWake = vi.fn()
     renderHook(() =>
       useTerminalWindowWakeRecovery({
+        ...focusOwnership,
         isVisible: true,
+        isChatViewMode: false,
         managerRef: { current: manager },
         isActiveRef: { current: true },
         isVisibleRef: { current: true },
@@ -144,7 +199,9 @@ describe('useTerminalWindowWakeRecovery', () => {
     const reassertPtySizeAfterWindowWake = vi.fn()
     renderHook(() =>
       useTerminalWindowWakeRecovery({
+        ...focusOwnership,
         isVisible: true,
+        isChatViewMode: false,
         managerRef: { current: manager },
         isActiveRef: { current: true },
         isVisibleRef: { current: true },
@@ -179,5 +236,127 @@ describe('useTerminalWindowWakeRecovery', () => {
     renderWakeRecoveryHook(false)
 
     expect(onSystemResumed).not.toHaveBeenCalled()
+  })
+
+  it('repairs WebGL canvas dpr on window resize without wiping the glyph atlas', () => {
+    // Chromium emits resize when devicePixelRatio changes (undock / monitor
+    // move) even if the CSS box is unchanged.
+    const pane = { id: 1, terminal: {} }
+    const resizeManager = { getPanes: () => [pane] } as unknown as PaneManager
+    repairPaneWebglCanvasDprMock.mockReturnValue('repaired')
+    vi.stubGlobal('devicePixelRatio', 1)
+    const { unmount } = renderHook(() =>
+      useTerminalWindowWakeRecovery({
+        ...focusOwnership,
+        isVisible: true,
+        isChatViewMode: false,
+        managerRef: { current: resizeManager },
+        isActiveRef: { current: true },
+        isVisibleRef: { current: true }
+      })
+    )
+
+    window.dispatchEvent(new Event('resize'))
+    expect(repairPaneWebglCanvasDprMock).not.toHaveBeenCalled()
+
+    vi.stubGlobal('devicePixelRatio', 2)
+    window.dispatchEvent(new Event('resize'))
+
+    expect(repairPaneWebglCanvasDprMock).toHaveBeenCalledWith(pane)
+    expect(presentPaneViewportMock).toHaveBeenCalledWith(pane)
+    expect(recoverVisibleTerminalWindowWakeMock).not.toHaveBeenCalled()
+
+    unmount()
+    vi.stubGlobal('devicePixelRatio', 3)
+    window.dispatchEvent(new Event('resize'))
+    expect(repairPaneWebglCanvasDprMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('retains a dpr transition until the visible manager is available', () => {
+    const pane = { id: 1, terminal: {} }
+    const managerRef: { current: PaneManager | null } = { current: null }
+    vi.stubGlobal('devicePixelRatio', 1)
+    renderHook(() =>
+      useTerminalWindowWakeRecovery({
+        ...focusOwnership,
+        isVisible: true,
+        isChatViewMode: false,
+        managerRef,
+        isActiveRef: { current: true },
+        isVisibleRef: { current: true }
+      })
+    )
+
+    vi.stubGlobal('devicePixelRatio', 2)
+    window.dispatchEvent(new Event('resize'))
+    expect(repairPaneWebglCanvasDprMock).not.toHaveBeenCalled()
+
+    managerRef.current = { getPanes: () => [pane] } as unknown as PaneManager
+    window.dispatchEvent(new Event('resize'))
+    expect(repairPaneWebglCanvasDprMock).toHaveBeenCalledWith(pane)
+  })
+
+  it('deduplicates a deferred dpr retry and consumes it after repair succeeds', () => {
+    const pane = { id: 1, terminal: {} }
+    const callbacks: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callbacks.push(callback)
+      return callbacks.length
+    })
+    vi.stubGlobal('devicePixelRatio', 1)
+    repairPaneWebglCanvasDprMock.mockReturnValueOnce('deferred').mockReturnValue('repaired')
+    renderHook(() =>
+      useTerminalWindowWakeRecovery({
+        ...focusOwnership,
+        isVisible: true,
+        isChatViewMode: false,
+        managerRef: { current: { getPanes: () => [pane] } as unknown as PaneManager },
+        isActiveRef: { current: true },
+        isVisibleRef: { current: true }
+      })
+    )
+
+    vi.stubGlobal('devicePixelRatio', 2)
+    window.dispatchEvent(new Event('resize'))
+    window.dispatchEvent(new Event('resize'))
+    expect(repairPaneWebglCanvasDprMock).toHaveBeenCalledTimes(1)
+    expect(callbacks).toHaveLength(1)
+
+    callbacks.shift()?.(performance.now())
+    expect(presentPaneViewportMock).toHaveBeenCalledWith(pane)
+    window.dispatchEvent(new Event('resize'))
+    expect(repairPaneWebglCanvasDprMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('caps a deferred dpr transition at sixteen animation-frame retries', () => {
+    const pane = { id: 1, terminal: {} }
+    const callbacks: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callbacks.push(callback)
+      return callbacks.length
+    })
+    vi.stubGlobal('devicePixelRatio', 1)
+    repairPaneWebglCanvasDprMock.mockReturnValue('deferred')
+    renderHook(() =>
+      useTerminalWindowWakeRecovery({
+        ...focusOwnership,
+        isVisible: true,
+        isChatViewMode: false,
+        managerRef: { current: { getPanes: () => [pane] } as unknown as PaneManager },
+        isActiveRef: { current: true },
+        isVisibleRef: { current: true }
+      })
+    )
+
+    vi.stubGlobal('devicePixelRatio', 2)
+    window.dispatchEvent(new Event('resize'))
+    let callbackCount = 0
+    while (callbacks.length > 0) {
+      callbacks.shift()?.(performance.now())
+      callbackCount += 1
+    }
+
+    expect(callbackCount).toBe(16)
+    expect(repairPaneWebglCanvasDprMock).toHaveBeenCalledTimes(17)
   })
 })

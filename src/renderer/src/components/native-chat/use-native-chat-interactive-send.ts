@@ -20,6 +20,7 @@ import {
   sendNativeChatMessage,
   type NativeChatSendHandle
 } from './native-chat-runtime-send'
+import type { SendOutcome } from './fork-agent-composer/native-chat-send-outcome'
 import { inferQuestionAnsweredFromCurrentStatus } from '../terminal-pane/agent-question-answered-inference'
 
 // ESC is the agent-TUI interrupt/cancel key over the PTY (matches how the
@@ -128,6 +129,15 @@ export function useNativeChatInteractiveSend(
             onDeliverySettled?.(delivered)
           }
         : undefined
+      // Why: Grok/OMP answers have no selector state machine to infer from —
+      // forward the send's own outcome so a cancelled/failed answer is still
+      // observable instead of dismissing the card on a nominal timer (r5-1).
+      const onOutcome = (outcome: SendOutcome): void => {
+        if (settledHandle && inFlightRef.current === settledHandle) {
+          inFlightRef.current = null
+        }
+        onDeliverySettled?.(outcome !== 'may-not-have-sent')
+      }
       const handle: NativeChatSendHandle = stepsAnswer
         ? sendNativeChatAskAnswer(
             settings,
@@ -137,15 +147,19 @@ export function useNativeChatInteractiveSend(
               : buildAskAnswerKeys(prompt, selections),
             onSettled
           )
-        : sendNativeChatMessage(settings, targetPtyId, formatAskAnswer(prompt, selections))
+        : sendNativeChatMessage(settings, targetPtyId, formatAskAnswer(prompt, selections), {
+            onOutcome
+          })
       // Why: native-chat answer writes bypass xterm.onData. Infer only after
       // every paced selector write has fired, so an early digit in a multi-step
       // answer cannot dismiss the wait or cancel the remaining writes.
       settledHandle = handle
       inFlightRef.current = handle
+      // Why: both branches now settle from the send's real lifecycle (r5-1),
+      // so the card must always wait for it rather than a nominal timer.
       return {
         settleAfterMs: handle.settleAfterMs,
-        waitsForVerifiedDelivery: onSettled !== undefined
+        waitsForVerifiedDelivery: handle.settleAfterMs > 0
       }
     },
     [terminalTabId, paneKey, targetPtyId, agent, cancelInFlight]

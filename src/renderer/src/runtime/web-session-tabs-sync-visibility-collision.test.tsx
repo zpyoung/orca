@@ -38,6 +38,7 @@ vi.mock('./web-runtime-session', async (importOriginal) => {
 })
 
 import { useAppStore } from '@/store'
+import type { PublicKnownRuntimeEnvironment } from '../../../shared/runtime-environments'
 import type { AppState } from '@/store/types'
 import { replaceRuntimeEnvironmentRevisions } from './runtime-environment-revision'
 import { toRemoteRuntimePtyId } from './runtime-terminal-stream'
@@ -221,7 +222,7 @@ function seedRemoteMirrorState(): void {
   const runtimeEnvironments = [
     { id: ENV_A, createdAt: 100, pairingRevision: REVISION_A },
     { id: ENV_B, createdAt: 200, pairingRevision: REVISION_B }
-  ] as AppState['runtimeEnvironments']
+  ] as PublicKnownRuntimeEnvironment[]
   replaceRuntimeEnvironmentRevisions(runtimeEnvironments)
   useAppStore.setState(
     {
@@ -314,7 +315,8 @@ describe('useWebSessionTabsSync visibility collision recovery', () => {
     })
     await publish(findGlobalSubscription(ENV_A, 1), {
       type: 'snapshots',
-      snapshots: []
+      snapshots: [],
+      authoritative: true
     })
 
     const state = useAppStore.getState()
@@ -385,7 +387,8 @@ describe('useWebSessionTabsSync visibility collision recovery', () => {
     })
     await publish(findGlobalSubscription(ENV_A, 1), {
       type: 'snapshots',
-      snapshots: []
+      snapshots: [],
+      authoritative: true
     })
 
     const state = useAppStore.getState()
@@ -431,7 +434,8 @@ describe('useWebSessionTabsSync visibility collision recovery', () => {
     })
     await publish(findGlobalSubscription(ENV_A, 1), {
       type: 'snapshots',
-      snapshots: []
+      snapshots: [],
+      authoritative: true
     })
     const tabId = toWebTerminalSurfaceTabId('host-tab-b')
     expect(useAppStore.getState().tabsByWorktree[WORKTREE]?.map((tab) => tab.id)).toEqual([tabId])
@@ -479,7 +483,8 @@ describe('useWebSessionTabsSync visibility collision recovery', () => {
     }
     await publish(findGlobalSubscription(ENV_A, 1), {
       type: 'snapshots',
-      snapshots: [unrelatedSnapshot]
+      snapshots: [unrelatedSnapshot],
+      authoritative: true
     })
     const hostBTabId = toWebTerminalSurfaceTabId('host-tab-b')
     expect(useAppStore.getState().tabsByWorktree[WORKTREE]?.map((tab) => tab.id)).toEqual([
@@ -538,7 +543,8 @@ describe('useWebSessionTabsSync visibility collision recovery', () => {
 
     await publish(findGlobalSubscription(ENV_B, 1), {
       type: 'snapshots',
-      snapshots: []
+      snapshots: [],
+      authoritative: true
     })
     expect(_getWebSessionTabsTrackingCountsForTest().freshness).toBe(1)
     expect(useAppStore.getState().tabsByWorktree[WORKTREE]?.map((tab) => tab.id)).toEqual([
@@ -574,7 +580,8 @@ describe('useWebSessionTabsSync visibility collision recovery', () => {
     })
     await publish(findGlobalSubscription(ENV_A, 1), {
       type: 'snapshots',
-      snapshots: []
+      snapshots: [],
+      authoritative: true
     })
 
     slowInventory.resolve(makeTerminalSnapshot('-b'))
@@ -611,7 +618,8 @@ describe('useWebSessionTabsSync visibility collision recovery', () => {
     })
     await publish(findGlobalSubscription(ENV_A, 1), {
       type: 'snapshots',
-      snapshots: []
+      snapshots: [],
+      authoritative: true
     })
 
     expect(useAppStore.getState().tabsByWorktree[WORKTREE]).toBeUndefined()

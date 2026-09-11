@@ -1,0 +1,13 @@
+{
+  "fork": {
+    "sidebarSectionSeparator": {
+      "title": "Separadores de secciones de la barra lateral",
+      "description": "Muestra líneas divisorias entre proyectos y grupos de nivel superior.",
+      "keywordSidebar": "barra lateral",
+      "keywordSeparator": "separador",
+      "keywordDivider": "divisor",
+      "keywordProject": "proyecto",
+      "keywordGroup": "grupo"
+    }
+  }
+}

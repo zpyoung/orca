@@ -1,4 +1,6 @@
-import type { FolderWorkspace, Project, ProjectGroup } from '../../../shared/types'
+import type { FolderWorkspace } from '../../../shared/folder-workspace-types'
+import type { Project } from '../../../shared/project-types'
+import type { ProjectGroup } from '../../../shared/project-group-types'
 import type { RuntimeWorktreeListResult } from '../../../shared/runtime-types'
 import { callRuntimeRpc, type RuntimeClientTarget } from './runtime-rpc-client'
 

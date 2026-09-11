@@ -1,6 +1,7 @@
 import type { SettingsSearchEntry } from './settings-search'
 import { getTerminalAppearanceSearchEntries } from './terminal-search'
 import { getLeftSidebarAppearanceEntry, getSidebarEntries } from './appearance-sidebar-search'
+import { getSidebarSectionSeparatorEntry } from './fork-sidebar-section-separator/section-separator-search'
 import { createLocalizedCatalog } from '@/i18n/localized-catalog'
 import { translate } from '@/i18n/i18n'
 import { translateSearchKeyword } from './settings-search-keywords'
@@ -50,6 +51,7 @@ export const getLanguageEntries = createLocalizedCatalog((): SettingsSearchEntry
       ...translateSearchKeyword('settings.appearance.language.korean', '한국어'),
       ...translateSearchKeyword('settings.appearance.language.japanese', '日本語'),
       ...translateSearchKeyword('settings.appearance.language.spanish', 'Español'),
+      ...translateSearchKeyword('settings.appearance.language.french', 'Français'),
       // Why: the native word for "language" only reaches search via the localized
       // title in its own UI locale — index each here so speakers can find (and
       // switch to) their language whatever the current interface locale is.
@@ -58,6 +60,7 @@ export const getLanguageEntries = createLocalizedCatalog((): SettingsSearchEntry
       '언어', // Korean
       '言語', // Japanese
       'Idioma', // Spanish
+      'Langue', // French
       ...translateSearchKeyword(
         'auto.components.settings.appearance.search.language.locale',
         'locale'
@@ -239,6 +242,7 @@ function buildAppearancePaneSearchEntries(
     ...getLayoutEntries(),
     ...getTitlebarEntries(),
     ...getStatusBarEntries(),
+    getSidebarSectionSeparatorEntry(),
     ...getSidebarEntries(),
     ...getAppIconEntries(),
     ...getSystemTrayEntries(options),

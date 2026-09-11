@@ -1,5 +1,5 @@
 import type { LedgerOwner } from '../../../../shared/ledger'
-import type { Repo } from '../../../../shared/types'
+import type { Repo } from '../../../../shared/repo-types'
 import { getProjectIdentityKey } from '../../../../shared/project-host-setup-projection'
 import type { SettingsNavigationTarget } from '@/lib/settings-navigation-types'
 import { getRepositoryLedgerSectionId } from '../settings/repository-settings-targets'

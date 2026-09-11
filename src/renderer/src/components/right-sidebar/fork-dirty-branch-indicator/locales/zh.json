@@ -1,0 +1,11 @@
+{
+  "components": {
+    "rightSidebar": {
+      "dirtyBranchIndicator": {
+        "oneChange": "源代码控制 — 1 项未提交的更改",
+        "manyChanges": "源代码控制 — {{value0}} 项未提交的更改",
+        "cappedChanges": "源代码控制 — {{value0}} 项以上未提交的更改"
+      }
+    }
+  }
+}

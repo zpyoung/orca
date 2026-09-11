@@ -55,6 +55,7 @@ function createPane(
     xtermContainer: {
       getBoundingClientRect: () => options.rect ?? ({ width: 800, height: 600 } as DOMRect)
     } as never,
+    dockContainer: {} as never,
     linkTooltip: {} as never,
     terminalGpuAcceleration: 'auto',
     gpuRenderingEnabled: true,

@@ -1,5 +1,9 @@
 import { LedgerError, type LedgerOwner, type LedgerRequest } from '../../shared/ledger'
-import type { Project, ProjectGroup, FolderWorkspace, Worktree, Repo } from '../../shared/types'
+import type { Project } from '../../shared/project-types'
+import type { ProjectGroup } from '../../shared/project-group-types'
+import type { FolderWorkspace } from '../../shared/folder-workspace-types'
+import type { Worktree } from '../../shared/worktree/types'
+import type { Repo } from '../../shared/repo-types'
 import { folderWorkspaceKey } from '../../shared/workspace-scope'
 
 export type LedgerCatalog = {

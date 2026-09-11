@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { FolderWorkspace, Repo, Worktree } from '../../../../shared/types'
+import type { FolderWorkspace } from '../../../../shared/folder-workspace-types'
+import type { Repo } from '../../../../shared/repo-types'
+import type { Worktree } from '../../../../shared/worktree/types'
 import { getLedgerPanelWorkspaceIdentity } from './ledger-panel-workspace-identity'
 
 const groupedFolder = { id: 'f1', name: 'Notes', projectGroupId: 'g1' } as FolderWorkspace

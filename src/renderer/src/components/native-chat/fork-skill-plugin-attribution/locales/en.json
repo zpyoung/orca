@@ -1,0 +1,9 @@
+{
+  "components": {
+    "native-chat": {
+      "composer": {
+        "skillMultiplePlugins": "{{plugins}} - agent resolves"
+      }
+    }
+  }
+}

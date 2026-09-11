@@ -6,28 +6,36 @@ export type NativeChatAgentProfile = {
   groupedSlash: boolean
   /** OpenClaude reads Claude-owned roots, so this can differ from the agent. */
   skillSourceOwner: AgentType
+  /** Whether the TUI dispatches a plugin skill as `<plugin>:<skill>`. Only set
+   *  where that syntax is verified — an unverified guess would insert a token
+   *  the agent cannot resolve, so the rest fall back to the bare skill name. */
+  namespacesPluginSkills: boolean
 }
 
 const NATIVE_CHAT_AGENT_PROFILES: Partial<Record<AgentType, NativeChatAgentProfile>> = {
   codex: {
     skillPrefix: '$',
     groupedSlash: false,
-    skillSourceOwner: 'codex'
+    skillSourceOwner: 'codex',
+    namespacesPluginSkills: false
   },
   claude: {
     skillPrefix: '/',
     groupedSlash: true,
-    skillSourceOwner: 'claude'
+    skillSourceOwner: 'claude',
+    namespacesPluginSkills: true
   },
   openclaude: {
     skillPrefix: '/',
     groupedSlash: true,
-    skillSourceOwner: 'claude'
+    skillSourceOwner: 'claude',
+    namespacesPluginSkills: true
   },
   grok: {
     skillPrefix: '/',
     groupedSlash: true,
-    skillSourceOwner: 'grok'
+    skillSourceOwner: 'grok',
+    namespacesPluginSkills: false
   }
 }
 

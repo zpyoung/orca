@@ -5,7 +5,8 @@ import type {
   LedgerLocation,
   LedgerLocationBase
 } from '../../../../shared/ledger'
-import type { FolderWorkspace, Project } from '../../../../shared/types'
+import type { FolderWorkspace } from '../../../../shared/folder-workspace-types'
+import type { Project } from '../../../../shared/project-types'
 import { readLedgerCatalog, type LedgerCatalog } from '@/runtime/runtime-ledger-catalog-client'
 import type { RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
 import { Button } from '@/components/ui/button'

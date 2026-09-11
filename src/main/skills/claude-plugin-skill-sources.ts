@@ -1,7 +1,7 @@
 import { open, stat } from 'node:fs/promises'
 import { basename, isAbsolute, join, relative, sep, type posix } from 'node:path'
 import { stablePathId, type SkillScanRoot } from './skill-discovery-sources'
-import { stripUnsafeDisplayCharacters } from '../../shared/skill-display-text'
+import { safePluginName } from './fork-skill-plugin-attribution/skill-plugin-name-resolution'
 
 const MAX_PLUGIN_METADATA_BYTES = 4 * 1024 * 1024
 
@@ -144,10 +144,9 @@ function selectActiveInstall(
   )
 }
 
-function safePluginLabel(pluginId: string, pathApi: SkillDiscoveryPathApi): string {
+function pluginNameFromId(pluginId: string, pathApi: SkillDiscoveryPathApi): string {
   const packageName = pluginId.split('@')[0] || pathApi.basename(pluginId)
-  const safeLabel = stripUnsafeDisplayCharacters(packageName).slice(0, 80)
-  return safeLabel || 'plugin'
+  return safePluginName(packageName) ?? 'plugin'
 }
 
 export function resolveClaudePluginSkillSources(args: {
@@ -172,13 +171,15 @@ export function resolveClaudePluginSkillSources(args: {
     }
     const skillsPath = pathApi.join(install.installPath, 'skills')
     if (!roots.has(skillsPath)) {
+      const pluginName = pluginNameFromId(pluginId, pathApi)
       roots.set(skillsPath, {
         id: `claude-plugin-${stablePathId(skillsPath)}`,
-        label: `Claude plugin ${safePluginLabel(pluginId, pathApi)}`,
+        label: `Claude plugin ${pluginName}`,
         path: skillsPath,
         sourceKind: 'plugin',
         providers: ['claude'],
-        owner: 'claude'
+        owner: 'claude',
+        pluginName
       })
     }
   }

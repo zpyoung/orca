@@ -4,15 +4,13 @@ import {
   getAgentSessionOptionCatalog,
   type CatalogModel
 } from '../../../../shared/agent-session-option-catalog'
+import type { SessionOptionDescriptor } from '../../../../shared/native-chat-session-options'
+import type { NativeChatSessionOptionObservation } from '../../../../shared/native-chat-types'
+import { nativeChatReportedValuesFromObservation } from './fork-native-chat-session-options/native-chat-session-option-observation'
 import {
-  clearNativeChatSessionOptionModel,
-  updateNativeChatSessionOptionDefaults
-} from '../../../../shared/native-chat-session-option-defaults'
-import type {
-  PersistedNativeChatSessionOptions,
-  SessionOptionDescriptor
-} from '../../../../shared/native-chat-session-options'
-import { useAppStore } from '../../store'
+  hasDispatchedNativeChatSessionOption,
+  useClaudeStartupFrameRevision
+} from './fork-native-chat-session-options/use-claude-startup-frame-revision'
 import {
   createNativeChatPtySessionOptions,
   type NativeChatPtySessionOptionsSurface
@@ -28,35 +26,12 @@ import {
   resolveNativeChatModelDiscoveryContext
 } from './native-chat-session-option-discovery'
 import { readClaudeSessionOptionsFromTerminalScreen } from './claude-terminal-session-options'
+import { enqueueSessionOptionSettingsWrite } from './native-chat-session-option-settings-write'
 
 const EMPTY_SNAPSHOT: SessionOptionDescriptor[] = []
 const subscribeEmpty = (): (() => void) => () => {}
 const getEmptySnapshot = (): SessionOptionDescriptor[] => EMPTY_SNAPSHOT
-
-/**
- * Why: every nativeChatSessionOptions writer — a pick from any pane, a probe
- * retirement — serializes on this one chain and re-reads live settings at apply
- * time. updateSettings shallow-merges the whole object, so an interleaved write
- * from a snapshot captured earlier would silently clobber a concurrent pick.
- * The update runs against the settled base and may return null to skip writing.
- */
-let settingsWrite: Promise<unknown> = Promise.resolve()
-function enqueueSessionOptionSettingsWrite(
-  update: (
-    base: PersistedNativeChatSessionOptions | undefined
-  ) => PersistedNativeChatSessionOptions | null
-): Promise<void> {
-  const write = settingsWrite
-    .catch(() => undefined)
-    .then(() => {
-      const next = update(useAppStore.getState().settings?.nativeChatSessionOptions)
-      return next
-        ? useAppStore.getState().updateSettings({ nativeChatSessionOptions: next })
-        : undefined
-    })
-  settingsWrite = write
-  return write
-}
+const CLIENT_SETTINGS_TARGET = { kind: 'local' } as const
 
 /**
  * Why: the picker drops a retired model, but the persisted default is what launches
@@ -75,11 +50,10 @@ export async function retirePersistedModelMissingFromDiscovery(
   if (models.length === 0) {
     return
   }
-  await enqueueSessionOptionSettingsWrite((persisted) => {
-    const modelId = persisted?.[agent]?.model
-    return typeof modelId === 'string' && modelId && !models.some((model) => model.id === modelId)
-      ? clearNativeChatSessionOptionModel(persisted, agent)
-      : null
+  await enqueueSessionOptionSettingsWrite(CLIENT_SETTINGS_TARGET, {
+    type: 'clear-model-if-missing',
+    agent,
+    availableModelIds: models.map((model) => model.id)
   })
 }
 
@@ -90,15 +64,37 @@ export function useNativeChatSessionOptions(args: {
   dispatchCommand: NativeChatSessionOptionDispatchCommand
   onAgentPicker?: () => void
   readTerminalScreen?: () => string | null
+  /** What the agent recorded about itself in its own session log. Authoritative
+   *  over the screen scrape: it is written per turn, so it outlives the scrollback
+   *  and reflects a switch made outside the composer. */
+  reportedSessionOptions?: NativeChatSessionOptionObservation | null
 }): {
   surface: NativeChatPtySessionOptionsSurface | null
   snapshot: SessionOptionDescriptor[]
 } {
-  const { agent, terminalTabId, targetPtyId, dispatchCommand, onAgentPicker, readTerminalScreen } =
-    args
+  const {
+    agent,
+    terminalTabId,
+    targetPtyId,
+    dispatchCommand,
+    onAgentPicker,
+    readTerminalScreen,
+    reportedSessionOptions
+  } = args
   // The screen text that last parsed into reported values, so a later model
   // discovery can re-resolve it against the host's real ids.
   const reportedScreenRef = useRef<string | null>(null)
+  // The observation this pty's session log last supplied. Set at all means the log
+  // has answered, which retires the screen scrape; the value itself lets a later
+  // model discovery re-resolve it against the host's real ids.
+  const observedFromLogRef = useRef<NativeChatSessionOptionObservation | null>(null)
+  const observedPtyRef = useRef<string | null>(targetPtyId)
+  if (observedPtyRef.current !== targetPtyId) {
+    // A new pty is a new session; nothing the old one logged describes it.
+    observedPtyRef.current = targetPtyId
+    observedFromLogRef.current = null
+    reportedScreenRef.current = null
+  }
   const discoveryContext = useMemo(
     () => resolveNativeChatModelDiscoveryContext(terminalTabId),
     [terminalTabId]
@@ -133,16 +129,12 @@ export function useNativeChatSessionOptions(args: {
       dispatchCommand,
       onAgentPicker,
       persistSelection: ({ modelId, optionId, value, adoptModelAsLaunchDefault }) =>
-        enqueueSessionOptionSettingsWrite((persisted) =>
-          updateNativeChatSessionOptionDefaults({
-            persisted,
-            agent,
-            modelId,
-            optionId,
-            value,
-            adoptModelAsLaunchDefault
-          })
-        )
+        // Paired PTY launches still assemble their launch preferences from client settings.
+        enqueueSessionOptionSettingsWrite(CLIENT_SETTINGS_TARGET, {
+          type: 'apply-picks',
+          agent,
+          picks: [{ modelId, optionId, value, adoptModelAsLaunchDefault }]
+        })
     })
   }, [
     agent,
@@ -153,13 +145,35 @@ export function useNativeChatSessionOptions(args: {
     targetPtyId,
     terminalTabId
   ])
+  const startupFrameRevision = useClaudeStartupFrameRevision({
+    agent,
+    terminalTabId,
+    targetPtyId,
+    surface
+  })
 
   useEffect(() => {
-    if (!surface || agent !== 'claude') {
+    if (!surface || !discoveryContext || !reportedSessionOptions) {
+      return
+    }
+    const values = nativeChatReportedValuesFromObservation({
+      observation: reportedSessionOptions,
+      agent,
+      models: readNativeChatEnrichedModels(agent, discoveryContext.hostKey) ?? []
+    })
+    if (values) {
+      observedFromLogRef.current = reportedSessionOptions
+      surface.reportSessionOptions(values, reportedSessionOptions.observedAt)
+    }
+  }, [agent, discoveryContext, reportedSessionOptions, surface])
+
+  useEffect(() => {
+    // Why: the log is per-turn evidence and the frame is not, so once the log has
+    // answered for this pty, re-reading a frame painted before it can only rewind.
+    if (!surface || agent !== 'claude' || observedFromLogRef.current) {
       return
     }
     let cancelled = false
-    reportedScreenRef.current = null
     const reportCurrentValues = async (): Promise<void> => {
       let authoritativeScreen: string | null = null
       if (targetPtyId && window.api?.pty?.getMainBufferSnapshot) {
@@ -188,7 +202,11 @@ export function useNativeChatSessionOptions(args: {
         // Why: discovery can land after this read. Keeping the screen that
         // parsed lets it re-resolve against the host's real ids later, when the
         // frame itself may have already scrolled out of the buffer.
-        if (cancelled) {
+        if (
+          cancelled ||
+          observedFromLogRef.current ||
+          hasDispatchedNativeChatSessionOption(surface)
+        ) {
           return
         }
         reportedScreenRef.current = screen
@@ -200,7 +218,7 @@ export function useNativeChatSessionOptions(args: {
     return () => {
       cancelled = true
     }
-  }, [agent, discoveryContext, readTerminalScreen, surface, targetPtyId])
+  }, [agent, discoveryContext, readTerminalScreen, startupFrameRevision, surface, targetPtyId])
 
   useEffect(() => {
     if (!surface || !discoveryContext) {
@@ -211,12 +229,21 @@ export function useNativeChatSessionOptions(args: {
       discoveryContext.hostKey,
       (models) => {
         surface.replaceModels(models)
+        const observation = observedFromLogRef.current
         const screen = agent === 'claude' ? reportedScreenRef.current : null
-        const reportedValues = screen
-          ? readClaudeSessionOptionsFromTerminalScreen(screen, models)
-          : null
-        if (reportedValues) {
-          surface.reportSessionOptions(reportedValues)
+        // Why: both readings resolved against the seed families before the probe
+        // landed. Re-resolving now is what upgrades `opus` to the host's real
+        // `opus[1m]` — the frame itself may already have scrolled out of reach.
+        if (observation) {
+          const values = nativeChatReportedValuesFromObservation({ observation, agent, models })
+          if (values) {
+            surface.reportSessionOptions(values, observation.observedAt)
+          }
+        } else if (screen) {
+          const reportedValues = readClaudeSessionOptionsFromTerminalScreen(screen, models)
+          if (reportedValues) {
+            surface.reportSessionOptions(reportedValues)
+          }
         }
         // A failed settings write must not surface as an unhandled rejection.
         void retirePersistedModelMissingFromDiscovery(agent, models).catch(() => undefined)

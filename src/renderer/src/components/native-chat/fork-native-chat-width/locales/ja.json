@@ -1,0 +1,29 @@
+{
+  "auto": {
+    "components": {
+      "settings": {
+        "ExperimentalPane": {
+          "nativeChat": {
+            "widthTitle": "チャットの幅",
+            "widthCopy": "すべてのチャットペインの読み取り列の幅を設定します。",
+            "widthLabel": "チャットの幅"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "native-chat": {
+      "width": {
+        "tier": {
+          "narrow": "狭い",
+          "comfortable": "ゆったり",
+          "wide": "広い",
+          "full": "全幅"
+        },
+        "menuLabel": "チャットの幅",
+        "menuTooltip": "チャットの幅（すべてのチャットペインに適用されます）"
+      }
+    }
+  }
+}

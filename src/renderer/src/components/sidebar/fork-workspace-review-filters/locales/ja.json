@@ -1,0 +1,12 @@
+{
+  "auto": {
+    "components": {
+      "sidebar": {
+        "WorkspaceReviewFilterRows": {
+          "hideCompleted": "マージ済み/クローズ済みレビューを非表示",
+          "hidePassing": "合格したチェックを非表示"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "components": {
+    "rightSidebar": {
+      "dirtyBranchIndicator": {
+        "oneChange": "Source Control — 1 uncommitted change",
+        "manyChanges": "Source Control — {{value0}} uncommitted changes",
+        "cappedChanges": "Source Control — {{value0}}+ uncommitted changes"
+      }
+    }
+  }
+}

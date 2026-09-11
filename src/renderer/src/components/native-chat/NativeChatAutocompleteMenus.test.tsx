@@ -59,6 +59,72 @@ describe('NativeChatPickerMenu', () => {
     expect(screen.getByText('Project')).toBeTruthy()
   })
 
+  it('names the owning plugin instead of the generic plugin scope', () => {
+    render(
+      <NativeChatPickerMenu
+        autocomplete={autocomplete({
+          items: [
+            {
+              kind: 'skill',
+              id: 'skill:quirk:render',
+              name: 'quirk:render',
+              description: 'Render a page',
+              pluginName: 'quirk',
+              sources: [
+                {
+                  sourceKind: 'plugin',
+                  skillFilePath: '/plugins/quirk/skills/render/SKILL.md',
+                  pluginName: 'quirk'
+                }
+              ]
+            }
+          ]
+        })}
+        activeIndex={0}
+        listboxId="picker"
+        onChoose={vi.fn()}
+        onRetry={vi.fn()}
+      />
+    )
+    expect(screen.getByText('quirk')).toBeTruthy()
+    expect(screen.queryByText('Plugin')).toBeNull()
+  })
+
+  it('lists the competing plugins on a row that stayed merged', () => {
+    render(
+      <NativeChatPickerMenu
+        autocomplete={autocomplete({
+          prefix: '$',
+          items: [
+            {
+              kind: 'skill',
+              id: 'skill:render',
+              name: 'render',
+              description: 'Render a page',
+              sources: [
+                {
+                  sourceKind: 'plugin',
+                  skillFilePath: '/plugins/quirk/skills/render/SKILL.md',
+                  pluginName: 'quirk'
+                },
+                {
+                  sourceKind: 'plugin',
+                  skillFilePath: '/plugins/warp/skills/render/SKILL.md',
+                  pluginName: 'warp'
+                }
+              ]
+            }
+          ]
+        })}
+        activeIndex={0}
+        listboxId="picker"
+        onChoose={vi.fn()}
+        onRetry={vi.fn()}
+      />
+    )
+    expect(screen.getAllByText('quirk, warp - agent resolves').length).toBeGreaterThan(0)
+  })
+
   it('completes a command on pointer down instead of dispatching it internally', () => {
     const onChoose = vi.fn()
     const value = autocomplete()
@@ -87,6 +153,24 @@ describe('NativeChatPickerMenu', () => {
     )
     expect(screen.getByRole('option', { name: /clear/i })).toBeTruthy()
     expect(screen.getAllByText('Loading skills...')).toHaveLength(2)
+  })
+
+  it('renders a retryable error instead of the loading spinner when discovery fails', () => {
+    const onRetry = vi.fn()
+    render(
+      <NativeChatPickerMenu
+        autocomplete={autocomplete({ items: [], skillStatus: 'error', skillErrorKind: 'host' })}
+        activeIndex={0}
+        listboxId="picker"
+        onChoose={vi.fn()}
+        onRetry={onRetry}
+      />
+    )
+
+    expect(screen.getAllByText('Could not load skills from this host')).toHaveLength(2)
+    expect(screen.queryByText('Loading skills...')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(onRetry).toHaveBeenCalledOnce()
   })
 
   it('uses command-only empty copy for a picker without skill support', () => {

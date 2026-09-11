@@ -1,25 +1,19 @@
-import React, { useMemo } from 'react'
+import React from 'react'
 import {
   CalendarClock,
   GitBranch,
   GitCommitHorizontal,
   MonitorSmartphone,
-  Moon,
   SquareTerminal
 } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
-import { getIndexedAllWorktrees } from '@/store/worktree-repo-index'
+import { WorkspaceActivityWindowControl } from './fork-workspace-activity-window/WorkspaceActivityWindowControl'
+import { WorkspaceReviewFilterRows } from './fork-workspace-review-filters/WorkspaceReviewFilterRows'
 import { FilterToggleRow } from './FilterToggleRow'
-import {
-  getPairedDeviceIdsByEnvironment,
-  isFolderWorkspaceFromOtherDevice,
-  isWorkspaceFromOtherDevice
-} from './workspace-creator-visibility'
 
 const SidebarWorkspaceFilterSection = React.memo(function SidebarWorkspaceFilterSection() {
   const showSleepingWorkspaces = useAppStore((s) => s.showSleepingWorkspaces)
-  const setShowSleepingWorkspaces = useAppStore((s) => s.setShowSleepingWorkspaces)
   const hideDefaultBranchWorkspace = useAppStore((s) => s.hideDefaultBranchWorkspace)
   const setHideDefaultBranchWorkspace = useAppStore((s) => s.setHideDefaultBranchWorkspace)
   const hideAutomationGeneratedWorkspaces = useAppStore((s) => s.hideAutomationGeneratedWorkspaces)
@@ -32,41 +26,16 @@ const SidebarWorkspaceFilterSection = React.memo(function SidebarWorkspaceFilter
   const setHideDetachedHeadWorkspaces = useAppStore((s) => s.setHideDetachedHeadWorkspaces)
   const hideWorkspacesFromOtherDevices = useAppStore((s) => s.hideWorkspacesFromOtherDevices)
   const setHideWorkspacesFromOtherDevices = useAppStore((s) => s.setHideWorkspacesFromOtherDevices)
-  const worktreesByRepo = useAppStore((s) => s.worktreesByRepo)
-  const folderWorkspaces = useAppStore((s) => s.folderWorkspaces)
   const runtimeEnvironments = useAppStore((s) => s.runtimeEnvironments)
-  const runtimeStatusByEnvironmentId = useAppStore((s) => s.runtimeStatusByEnvironmentId)
+  const runtimeEnvironmentCatalogHydrated = useAppStore((s) => s.runtimeEnvironmentCatalogHydrated)
   const alwaysShowDefaultBranchWorkspace = useAppStore((s) => s.alwaysShowDefaultBranchWorkspace)
   const setAlwaysShowDefaultBranchWorkspace = useAppStore(
     (s) => s.setAlwaysShowDefaultBranchWorkspace
   )
-  const showOtherClientFilter = useMemo(() => {
-    if (hideWorkspacesFromOtherDevices) {
-      return true
-    }
-    const pairedDeviceIds = getPairedDeviceIdsByEnvironment(
-      runtimeEnvironments,
-      runtimeStatusByEnvironmentId
-    )
-    const worktrees = getIndexedAllWorktrees(worktreesByRepo)
-    return (
-      worktrees.some(
-        (worktree) => !worktree.isArchived && isWorkspaceFromOtherDevice(worktree, pairedDeviceIds)
-      ) ||
-      folderWorkspaces.some((workspace) => {
-        if (workspace.isArchived) {
-          return false
-        }
-        return isFolderWorkspaceFromOtherDevice(workspace, pairedDeviceIds)
-      })
-    )
-  }, [
-    folderWorkspaces,
-    hideWorkspacesFromOtherDevices,
-    runtimeEnvironments,
-    runtimeStatusByEnvironmentId,
-    worktreesByRepo
-  ])
+  const showOtherClientFilter =
+    !runtimeEnvironmentCatalogHydrated ||
+    runtimeEnvironments.length > 0 ||
+    hideWorkspacesFromOtherDevices
 
   return (
     <>
@@ -75,15 +44,7 @@ const SidebarWorkspaceFilterSection = React.memo(function SidebarWorkspaceFilter
           {translate('auto.components.sidebar.SidebarWorkspaceFilterSection.82594419ba', 'Filters')}
         </span>
       </div>
-      <FilterToggleRow
-        icon={<Moon className="size-3.5" />}
-        label={translate(
-          'auto.components.sidebar.SidebarWorkspaceFilterSection.ed1611b65b',
-          'Hide sleeping'
-        )}
-        checked={!showSleepingWorkspaces}
-        onChange={(hideSleeping) => setShowSleepingWorkspaces(!hideSleeping)}
-      />
+      <WorkspaceActivityWindowControl />
       {/* Why gated: the exemption only has an effect while sleeping workspaces
           are being swept, so it stays hidden until its parent row is on. */}
       {!showSleepingWorkspaces && (
@@ -102,6 +63,7 @@ const SidebarWorkspaceFilterSection = React.memo(function SidebarWorkspaceFilter
           onChange={setAlwaysShowDefaultBranchWorkspace}
         />
       )}
+      <WorkspaceReviewFilterRows />
       <FilterToggleRow
         icon={<GitBranch className="size-3.5" />}
         label={translate(

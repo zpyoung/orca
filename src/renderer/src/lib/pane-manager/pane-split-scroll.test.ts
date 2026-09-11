@@ -57,6 +57,7 @@ function createPane(bufferType: 'normal' | 'alternate'): {
       querySelectorAll: vi.fn(() => [])
     } as never,
     xtermContainer: {} as never,
+    dockContainer: {} as never,
     linkTooltip: {} as never,
     terminalGpuAcceleration: 'auto',
     gpuRenderingEnabled: true,

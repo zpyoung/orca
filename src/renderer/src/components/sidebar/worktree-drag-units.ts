@@ -1,5 +1,7 @@
 import type { WorktreeDragGroup } from './worktree-manual-order'
-import { PINNED_GROUP_KEY } from './worktree-list-groups'
+import { PINNED_GROUP_KEY } from './worktree-list/grouping/group-keys'
+import { getNaturalWorktreeIds } from './natural-worktree-ids'
+import { needsWorktreeDragGroup } from './fork-worktree-groups/worktree-drag-group-key'
 
 export type WorktreeDragUnitGroup = WorktreeDragGroup & {
   units: { worktreeId: string; worktreeIds: string[] }[]
@@ -19,11 +21,7 @@ export function getWorktreeDragUnitGroups(
 ): WorktreeDragUnitGroup[] {
   const groups: WorktreeDragUnitGroup[] = []
   let current: { key: string; units: WorktreeDragUnitGroup['units'] } | null = null
-  const naturalWorktreeIds = new Set(
-    rows.flatMap((row) =>
-      row.type === 'item' && row.sectionKey !== PINNED_GROUP_KEY ? [row.worktree.id] : []
-    )
-  )
+  const naturalWorktreeIds = getNaturalWorktreeIds(rows)
 
   for (const row of rows) {
     if (row.type === 'header') {
@@ -47,9 +45,7 @@ export function getWorktreeDragUnitGroups(
     if (row.sectionKey === PINNED_GROUP_KEY && naturalWorktreeIds.has(row.worktree.id)) {
       continue
     }
-    // Why: a header's key is not always its items' sectionKey (loose worktrees
-    // carry `<group>::loose`), and every other drag consumer keys off sectionKey.
-    if (!current || current.key !== row.sectionKey) {
+    if (needsWorktreeDragGroup(current?.key ?? null, row.sectionKey)) {
       current = { key: row.sectionKey, units: [] }
       groups.push({
         key: current.key,
@@ -57,11 +53,12 @@ export function getWorktreeDragUnitGroups(
         worktreeIds: current.units.map((unit) => unit.worktreeId)
       })
     }
-    if (row.depth > 0 && current.units.length > 0) {
-      current.units.at(-1)!.worktreeIds.push(row.worktree.id)
+    const currentGroup = current!
+    if (row.depth > 0 && currentGroup.units.length > 0) {
+      currentGroup.units.at(-1)!.worktreeIds.push(row.worktree.id)
       continue
     }
-    current.units.push({ worktreeId: row.worktree.id, worktreeIds: [row.worktree.id] })
+    currentGroup.units.push({ worktreeId: row.worktree.id, worktreeIds: [row.worktree.id] })
   }
 
   return groups

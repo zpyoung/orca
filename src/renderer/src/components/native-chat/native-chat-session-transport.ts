@@ -38,42 +38,26 @@ export function toRuntimeNativeChatErrorMessage(err: unknown): string {
   return RUNTIME_NATIVE_CHAT_READ_ERROR
 }
 
-/** The web preload bridge answers `subscribe` with a Promise instead of the
- *  desktop's sync unsubscribe fn; calling that as a function crashed the view (R6). */
-function toSyncUnsubscribe(handle: unknown): () => void {
-  return () => {
-    if (typeof handle === 'function') {
-      ;(handle as () => void)()
-      return
-    }
-    if (handle && typeof (handle as { then?: unknown }).then === 'function') {
-      void (handle as Promise<unknown>).then((resolved) => {
-        if (typeof resolved === 'function') {
-          ;(resolved as () => void)()
-        }
-      })
-    }
-  }
-}
-
 /** Delegates straight to the local Electron IPC bridge. On the web client
  *  `window.api.nativeChat` already bridges to the paired runtime, so web keeps
- *  using this adapter (R3). */
+ *  using this adapter (R3). Preserves whatever `subscribe` returns (sync fn on
+ *  desktop, promise on the web bridge) — the hook's teardown handles both (R6). */
 const localNativeChatTransport: NativeChatSessionTransport = {
-  readSession: (args) => window.api.nativeChat.readSession(args),
-  subscribe: (args, onFrame) => toSyncUnsubscribe(window.api.nativeChat.subscribe(args, onFrame))
+  readSession: (agent, sessionId, limit, transcriptPath) =>
+    window.api.nativeChat.readSession(agent, sessionId, limit, transcriptPath),
+  subscribe: (args, onFrame) => window.api.nativeChat.subscribe(args, onFrame)
 }
 
 function createRuntimeNativeChatTransport(environmentId: string): NativeChatSessionTransport {
   const target: RuntimeClientTarget = { kind: 'environment', environmentId }
 
   return {
-    readSession: async ({ agent, sessionId, limit, transcriptPath, beforeOffset }) => {
+    readSession: async (agent, sessionId, limit, transcriptPath) => {
       try {
         const result = await callRuntimeRpc<unknown>(
           target,
           'nativeChat.readSession',
-          { agent, sessionId, limit, transcriptPath, beforeOffset },
+          { agent, sessionId, limit, transcriptPath },
           { timeoutMs: 15_000 }
         )
         return parseRuntimeNativeChatReadSessionResult(result)
@@ -121,7 +105,14 @@ function createRuntimeNativeChatTransport(environmentId: string): NativeChatSess
             {
               selector: environmentId,
               method: 'nativeChat.subscribe',
-              params: { subscriptionId, agent, sessionId, transcriptPath, limit },
+              params: {
+                subscriptionId,
+                agent,
+                sessionId,
+                transcriptPath,
+                limit,
+                capabilities: { transcriptPending: 1 }
+              },
               timeoutMs: 15_000
             },
             {
@@ -148,17 +139,14 @@ function createRuntimeNativeChatTransport(environmentId: string): NativeChatSess
                   type?: string
                   messages?: NativeChatAppendedMessages
                   hasMore?: boolean
-                  beforeOffset?: number
                   error?: string
                   lifecycle?: unknown
+                  pending?: boolean
                 }
                 const lifecycle = parseRuntimeNativeChatTurnLifecycle(frame?.lifecycle)
-                // Seeds the paging cursor: a snapshot supersedes the seed read
-                // that carried the offset, so dropping it here retires paging.
-                const offset =
-                  typeof frame?.beforeOffset === 'number' && Number.isFinite(frame.beforeOffset)
-                    ? { beforeOffset: frame.beforeOffset }
-                    : {}
+                // No transcript behind this window yet — forwarded so the view can
+                // stop spinning, but it is not the settled initial read.
+                const pending = frame?.pending === true
                 if (
                   (frame?.type === 'appended' ||
                     frame?.type === 'snapshot' ||
@@ -166,23 +154,25 @@ function createRuntimeNativeChatTransport(environmentId: string): NativeChatSess
                   Array.isArray(frame.messages)
                 ) {
                   if (!receivedInitial) {
-                    receivedInitial = true
+                    if (!pending) {
+                      receivedInitial = true
+                    }
                     onFrame({
                       type: 'snapshot',
                       messages: frame.messages,
                       hasMore: frame.hasMore ?? frame.messages.length >= (limit ?? 300),
-                      ...offset,
                       ...(frame.error ? { error: frame.error } : {}),
-                      ...(lifecycle ? { lifecycle } : {})
+                      ...(lifecycle ? { lifecycle } : {}),
+                      ...(pending ? { pending: true } : {})
                     })
                   } else if (frame.type === 'snapshot') {
                     onFrame({
                       type: 'snapshot',
                       messages: frame.messages,
                       hasMore: frame.hasMore ?? false,
-                      ...offset,
                       ...(frame.error ? { error: frame.error } : {}),
-                      ...(lifecycle ? { lifecycle } : {})
+                      ...(lifecycle ? { lifecycle } : {}),
+                      ...(pending ? { pending: true } : {})
                     })
                   } else {
                     onFrame(
@@ -191,7 +181,6 @@ function createRuntimeNativeChatTransport(environmentId: string): NativeChatSess
                             type: 'replacement',
                             messages: frame.messages,
                             hasMore: frame.hasMore ?? false,
-                            ...offset,
                             ...(lifecycle ? { lifecycle } : {})
                           }
                         : {

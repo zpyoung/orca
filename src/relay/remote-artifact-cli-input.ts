@@ -9,7 +9,7 @@ export type PreparedRemoteArtifactCliInput = {
   artifactInput?: RemoteArtifactInput
 }
 
-const BOOLEAN_FLAGS = new Set(['help', 'json'])
+const BOOLEAN_FLAGS = new Set(['help', 'json', 'protect'])
 const VALUE_FLAGS = new Set(['api-url', 'environment', 'file', 'pairing-code'])
 
 function parseArtifactInvocation(argv: string[]): { command: string; file?: string } | null {

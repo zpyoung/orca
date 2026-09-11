@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { LedgerOwner } from '../../../../shared/ledger'
-import type { Project, ProjectGroup } from '../../../../shared/types'
+import type { Project } from '../../../../shared/project-types'
+import type { ProjectGroup } from '../../../../shared/project-group-types'
 import { callRuntimeRpc, type RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
 
 export type LedgerOwnerLabels = {

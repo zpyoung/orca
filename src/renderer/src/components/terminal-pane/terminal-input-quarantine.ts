@@ -32,6 +32,44 @@ type QuarantineEntry = {
 
 const quarantineByTabId = new Map<string, QuarantineEntry>()
 
+type QuarantineListener = (armed: boolean) => void
+
+const quarantineListeners = new Map<string, Set<QuarantineListener>>()
+const quarantineExpiryTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+function invokeQuarantineListener(listener: QuarantineListener, armed: boolean): void {
+  try {
+    listener(armed)
+  } catch {
+    // a subscriber's exception must never block the safety decision or the other listeners
+  }
+}
+
+function notifyQuarantineListeners(tabId: string, armed: boolean): void {
+  const listeners = quarantineListeners.get(tabId)
+  if (!listeners) {
+    return
+  }
+  // snapshot: a listener unsubscribing another mid-dispatch must not skip it
+  for (const listener of Array.from(listeners)) {
+    invokeQuarantineListener(listener, armed)
+  }
+}
+
+function clearQuarantineExpiryTimer(tabId: string): void {
+  const timer = quarantineExpiryTimers.get(tabId)
+  if (timer !== undefined) {
+    clearTimeout(timer)
+    quarantineExpiryTimers.delete(tabId)
+  }
+}
+
+function releaseQuarantine(tabId: string): void {
+  quarantineByTabId.delete(tabId)
+  clearQuarantineExpiryTimer(tabId)
+  notifyQuarantineListeners(tabId, false)
+}
+
 function containsLineTerminator(data: string): boolean {
   return LINE_TERMINATORS.some((terminator) => data.includes(terminator))
 }
@@ -44,14 +82,51 @@ export function armTerminalInputQuarantine(tabId: string, now: number = Date.now
   // closed mid-quarantine would otherwise leave one behind forever.
   for (const [otherTabId, entry] of quarantineByTabId) {
     if (now - entry.armedAt >= QUARANTINE_MAX_MS) {
-      quarantineByTabId.delete(otherTabId)
+      releaseQuarantine(otherTabId)
     }
   }
+  clearQuarantineExpiryTimer(tabId)
   quarantineByTabId.set(tabId, { armedAt: now, lastInputAt: null })
+  // Real wall-clock, independent of the injected `now`: this is the only path
+  // that releases a pane nobody is typing into, so it cannot depend on a
+  // caller ever supplying a later `now`.
+  quarantineExpiryTimers.set(
+    tabId,
+    setTimeout(() => releaseQuarantine(tabId), QUARANTINE_MAX_MS)
+  )
+  notifyQuarantineListeners(tabId, true)
 }
 
 export function isTerminalInputQuarantined(tabId: string): boolean {
   return quarantineByTabId.has(tabId)
+}
+
+/**
+ * Notifies `cb` with the arm state of `tabId`'s quarantine: `true` when it
+ * arms, `false` when it releases (line terminator, idle gap, absolute cap, or
+ * the expiry timer). A tab already armed at subscribe time fires `true`
+ * immediately, so a late subscriber cannot miss a live quarantine. Returns an
+ * unsubscribe function.
+ */
+export function subscribeTerminalInputQuarantine(
+  tabId: string,
+  cb: QuarantineListener
+): () => void {
+  let listeners = quarantineListeners.get(tabId)
+  if (!listeners) {
+    listeners = new Set()
+    quarantineListeners.set(tabId, listeners)
+  }
+  listeners.add(cb)
+  if (quarantineByTabId.has(tabId)) {
+    invokeQuarantineListener(cb, true)
+  }
+  return () => {
+    listeners.delete(cb)
+    if (listeners.size === 0) {
+      quarantineListeners.delete(tabId)
+    }
+  }
 }
 
 /**
@@ -69,20 +144,25 @@ export function shouldDropQuarantinedTerminalInput(
     return false
   }
   if (now - entry.armedAt >= QUARANTINE_MAX_MS) {
-    quarantineByTabId.delete(tabId)
+    releaseQuarantine(tabId)
     return false
   }
   if (entry.lastInputAt !== null && now - entry.lastInputAt >= QUARANTINE_IDLE_MS) {
-    quarantineByTabId.delete(tabId)
+    releaseQuarantine(tabId)
     return false
   }
   entry.lastInputAt = now
   if (containsLineTerminator(data)) {
-    quarantineByTabId.delete(tabId)
+    releaseQuarantine(tabId)
   }
   return true
 }
 
 export function _resetTerminalInputQuarantineForTests(): void {
+  for (const timer of quarantineExpiryTimers.values()) {
+    clearTimeout(timer)
+  }
+  quarantineExpiryTimers.clear()
   quarantineByTabId.clear()
+  quarantineListeners.clear()
 }

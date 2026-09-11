@@ -42,7 +42,7 @@ vi.mock('./EditorPanelMarkdownActionsMenu', () => ({
   EditorPanelMarkdownActionsMenu: () => null
 }))
 
-vi.mock('@/components/artifacts/ArtifactPublishButton', () => ({
+vi.mock('@/components/artifacts/fork-artifact-passwords/ArtifactPublishButton', () => ({
   ArtifactPublishButton: () => <button data-artifact-publish />
 }))
 
