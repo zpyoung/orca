@@ -45,6 +45,7 @@ export function AskOptionQuestion({
           label={option.label}
           description={option.description}
           preview={option.preview}
+          multiple={question.type === 'multiselect'}
           selected={draft.selected.includes(option.value)}
           disabled={disabled}
           onSelect={() => toggle(option.value)}
@@ -69,6 +70,7 @@ function AskOptionRow({
   label,
   description,
   preview,
+  multiple,
   selected,
   disabled,
   onSelect
@@ -76,6 +78,7 @@ function AskOptionRow({
   label: string
   description?: string
   preview?: { format: 'markdown' | 'html'; content: string }
+  multiple: boolean
   selected: boolean
   disabled: boolean
   onSelect: () => void
@@ -92,12 +95,18 @@ function AskOptionRow({
         className="flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors disabled:pointer-events-none hover:bg-accent"
       >
         <span
+          aria-hidden
           className={cn(
-            'flex size-5 shrink-0 items-center justify-center rounded-full border border-input',
+            'flex size-5 shrink-0 items-center justify-center border border-input',
+            multiple ? 'rounded-[4px]' : 'rounded-full',
             selected ? 'border-primary bg-primary text-primary-foreground' : 'text-transparent'
           )}
         >
-          <Check className="size-3" strokeWidth={3} />
+          {multiple ? (
+            <Check className="size-3" strokeWidth={3} />
+          ) : (
+            <span className="size-2 rounded-full bg-current" />
+          )}
         </span>
         <span className="min-w-0">
           <span className="block break-words text-sm text-foreground">{label}</span>
@@ -109,14 +118,20 @@ function AskOptionRow({
       {preview ? (
         <Collapsible open={previewOpen} onOpenChange={setPreviewOpen} className="px-3 pb-2">
           <CollapsibleTrigger asChild>
-            <button type="button" className="text-xs text-muted-foreground underline-offset-2 hover:underline">
+            <button
+              type="button"
+              className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+            >
               {previewOpen
                 ? translate('components.fork-ask-question-tool.askPreview.hide', 'Hide preview')
                 : translate('components.fork-ask-question-tool.askPreview.show', 'Show preview')}
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <AskPreviewFrame preview={preview} className="mt-2 h-40 w-full rounded-md border border-border" />
+            <AskPreviewFrame
+              preview={preview}
+              className="mt-2 h-40 w-full rounded-md border border-border"
+            />
           </CollapsibleContent>
         </Collapsible>
       ) : null}
