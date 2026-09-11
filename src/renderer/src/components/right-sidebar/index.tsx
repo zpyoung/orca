@@ -26,6 +26,7 @@ import { ActivityBarPositionMenu } from './activity-bar-position-menu'
 import { RightSidebarTopActivityBar } from './right-sidebar-top-activity-bar'
 import { useRightSidebarActivityItems } from './use-right-sidebar-activity-items'
 import { useRightSidebarTabRouting } from './use-right-sidebar-tab-routing'
+import { useAskPanelFocus } from './fork-ask-question-tool/use-ask-panel-focus'
 import { useWindowWidth } from './use-window-width'
 
 const ACTIVITY_BAR_SIDE_WIDTH = 40
@@ -51,13 +52,14 @@ function RightSidebarInner(): React.JSX.Element {
     pluginFetchStatus,
     installedPluginTabKeys
   } = useRightSidebarActivityItems({ rightSidebarOpen })
-  const { effectiveTab, selectActivityTab } = useRightSidebarTabRouting({
+  const { effectiveTab: routedTab, selectActivityTab } = useRightSidebarTabRouting({
     visibleItems,
     activeFolderWorkspaceKey,
     pluginSystemEnabled,
     pluginFetchStatus,
     installedPluginTabKeys
   })
+  const effectiveTab = useAskPanelFocus(routedTab, visibleItems)
 
   const activityBarSideWidth = activityBarPosition === 'side' ? ACTIVITY_BAR_SIDE_WIDTH : 0
   const windowWidth = useWindowWidth()

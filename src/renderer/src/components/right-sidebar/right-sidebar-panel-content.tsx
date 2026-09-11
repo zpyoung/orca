@@ -9,6 +9,7 @@ const ChecksPanel = lazy(() => import('./ChecksPanel'))
 const PortsPanel = lazy(() => import('./PortsPanel'))
 const AiVaultPanel = lazy(() => import('./AiVaultPanel'))
 const SessionInfoPanel = lazy(() => import('./fork-session-info/SessionInfoPanel'))
+const AskQuestionsPanel = lazy(() => import('./fork-ask-question-tool/AskQuestionsPanel'))
 const FolderWorkspaceWorktreesPanel = lazy(() => import('./FolderWorkspaceWorktreesPanel'))
 const FolderWorkspacePrChecksPanel = lazy(() => import('./FolderWorkspacePrChecksPanel'))
 const PluginPanel = lazy(() => import('./PluginPanel'))
@@ -36,6 +37,7 @@ export function RightSidebarPanelContent({
         )}
         {effectiveTab === 'vault' && <AiVaultPanel />}
         {effectiveTab === 'session-info' && <SessionInfoPanel />}
+        {effectiveTab === 'ask' && <AskQuestionsPanel />}
         {effectiveTab === 'workspaces' && <FolderWorkspaceWorktreesPanel />}
         {effectiveTab === 'pr-checks' && (
           <FolderWorkspacePrChecksPanel

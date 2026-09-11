@@ -38,6 +38,11 @@
       "notification": {
         "title": "{{worktreeLabel}} 中有待处理的问题",
         "body": "正在等待你的回答。"
+      },
+      "askPanel": {
+        "title": "问题",
+        "empty": "没有问题",
+        "emptyDescription": "等待你回答的问题会显示在这里。"
       }
     }
   }

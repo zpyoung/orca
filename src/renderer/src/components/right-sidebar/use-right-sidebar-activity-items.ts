@@ -17,6 +17,7 @@ import { translate } from '@/i18n/i18n'
 import { AgentSessionHistoryIcon } from './agent-session-history-icon'
 import { useSourceControlDirtyItemOverride } from './fork-dirty-branch-indicator/use-source-control-dirty-item-override'
 import { getSessionInfoActivityItem } from './fork-session-info/session-info-activity-item'
+import { useAskActivityItems } from './fork-ask-question-tool/ask-activity-item'
 import type { ActivityBarItem } from './activity-bar-buttons'
 
 export type RightSidebarActivityItems = {
@@ -62,6 +63,7 @@ export function useRightSidebarActivityItems({
   )
 
   const sourceControlDirtyItemOverride = useSourceControlDirtyItemOverride()
+  const askActivityItems = useAskActivityItems()
 
   const activityItems = useMemo<ActivityBarItem[]>(
     () => [
@@ -119,9 +121,11 @@ export function useRightSidebarActivityItems({
       },
       // Why: plugin panels append after the built-in tabs so core navigation
       // keeps stable positions regardless of which plugins are installed.
-      ...getPluginPanelActivityItems(visiblePluginPanels, pluginPanelErrors)
+      ...getPluginPanelActivityItems(visiblePluginPanels, pluginPanelErrors),
+      ...askActivityItems
     ],
     [
+      askActivityItems,
       checksShortcut,
       explorerShortcut,
       pluginPanelErrors,

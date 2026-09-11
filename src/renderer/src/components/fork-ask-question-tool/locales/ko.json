@@ -38,6 +38,11 @@
       "notification": {
         "title": "{{worktreeLabel}}에 대기 중인 질문이 있습니다",
         "body": "답변을 기다리고 있습니다."
+      },
+      "askPanel": {
+        "title": "질문",
+        "empty": "질문 없음",
+        "emptyDescription": "답변을 기다리는 질문이 여기에 표시됩니다."
       }
     }
   }

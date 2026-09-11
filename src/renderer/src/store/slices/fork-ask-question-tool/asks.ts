@@ -47,6 +47,10 @@ export type AsksSlice = {
   /** Removes a resolved ask from its pane so the next queued one becomes the head. No-op for an
    * unknown pane or askId. */
   dismissAsk: (paneKey: string, askId: string) => void
+  /** `rightSidebarOpen` as it stood when the ask panel forced the sidebar open, so the panel can
+   * put it back. Null while the panel is not holding a restore target. */
+  askFocusRestoreOpen: boolean | null
+  setAskFocusRestoreOpen: (value: boolean | null) => void
 }
 
 type AsksSet = Parameters<StateCreator<AppState, [], [], AsksSlice>>[0]
@@ -100,6 +104,9 @@ export const createAsksSlice: StateCreator<AppState, [], [], AsksSlice> = (set, 
   askWatermark: null,
   _askEventBuffer: [],
   _dismissTimers: {},
+  askFocusRestoreOpen: null,
+
+  setAskFocusRestoreOpen: (value) => set({ askFocusRestoreOpen: value }),
 
   hydrateAsks: async () => {
     let snapshot: AskSnapshotResult
@@ -195,13 +202,24 @@ export const createAsksSlice: StateCreator<AppState, [], [], AsksSlice> = (set, 
   }
 })
 
+const NO_ASKS: readonly AskCardModel[] = []
+
+/** Everything queued on a pane, head first. A stable empty array keeps shallow-equality selectors
+ * from re-rendering on every store write when the pane has nothing. */
+export function selectPaneAskQueue(
+  state: Pick<AsksSlice, 'pendingAsksByPaneKey'>,
+  paneKey: string | null
+): readonly AskCardModel[] {
+  return paneKey ? (state.pendingAsksByPaneKey[paneKey] ?? NO_ASKS) : NO_ASKS
+}
+
 /** The card the pane renders. A terminal entry stays head for `ASK_DISMISS_DELAY_MS` so its result
  * flashes before `dismissAsk` advances the queue. */
 export function selectHeadAsk(
   state: Pick<AsksSlice, 'pendingAsksByPaneKey'>,
-  paneKey: string
+  paneKey: string | null
 ): AskCardModel | null {
-  return state.pendingAsksByPaneKey[paneKey]?.[0] ?? null
+  return paneKey ? (state.pendingAsksByPaneKey[paneKey]?.[0] ?? null) : null
 }
 
 /** Non-terminal asks across every pane; the sidebar badge reads this. */

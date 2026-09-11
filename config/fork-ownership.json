@@ -2687,36 +2687,6 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/native-chat/NativeChatResolvedView.tsx",
-      "feature": "ask-question-tool",
-      "kind": "registration",
-      "lines": [
-        "import { AskCard } from '../fork-ask-question-tool/AskCard'",
-        "import { useAskPaneDock } from '../fork-ask-question-tool/use-ask-pane-dock'",
-        "  const askDock = useAskPaneDock(paneKey)",
-        "      {askDock.model ? (",
-        "        <AskCard",
-        "          key={askDock.model.askId}",
-        "          model={askDock.model}",
-        "          onSubmit={askDock.onSubmit}",
-        "          onCancel={askDock.onCancel}",
-        "          isSubmitting={askDock.isSubmitting}",
-        "          onDraftChange={askDock.onDraftChange}",
-        "        />",
-        "      ) : null}",
-        "      {questionActive || askDock.model ? null : ("
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/terminal-pane/TerminalPaneSurface.tsx",
-      "feature": "ask-question-tool",
-      "kind": "registration",
-      "lines": [
-        "import { AskTerminalPaneDockPortals } from './fork-ask-question-tool/AskTerminalPaneDockPortals'",
-        "      <AskTerminalPaneDockPortals controller={controller} />"
-      ]
-    },
-    {
       "path": "src/renderer/src/hooks/ipc-events/app-lifetime-ipc-bridge.ts",
       "feature": "ask-question-tool",
       "kind": "registration",
@@ -2770,6 +2740,69 @@
         "          isRemote: args.isRemote",
         "        isRemote: args.isRemote,",
         "        claudeSuppressionFlags: args.claudeSuppressionFlags"
+      ]
+    },
+    {
+      "path": "src/shared/ui-chrome-types.ts",
+      "feature": "ask-question-tool",
+      "kind": "passthrough",
+      "lines": ["  | 'ask'"]
+    },
+    {
+      "path": "src/renderer/src/store/right-sidebar-route.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": ["    tab === 'ask' ||"]
+    },
+    {
+      "path": "src/main/persistence/applying-settings/ui-selection-normalization.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": ["    tab === 'ask' ||"]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/client-ui-schemas.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": ["  'ask',"]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/right-sidebar-panel-content.tsx",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "const AskQuestionsPanel = lazy(() => import('./fork-ask-question-tool/AskQuestionsPanel'))",
+        "        {effectiveTab === 'ask' && <AskQuestionsPanel />}"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/use-right-sidebar-activity-items.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { useAskActivityItems } from './fork-ask-question-tool/ask-activity-item'",
+        "  const askActivityItems = useAskActivityItems()",
+        "      ...askActivityItems",
+        "      askActivityItems,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/index.tsx",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { useAskPanelFocus } from './fork-ask-question-tool/use-ask-panel-focus'",
+        "  const { effectiveTab: routedTab, selectActivityTab } = useRightSidebarTabRouting({",
+        "  const effectiveTab = useAskPanelFocus(routedTab, visibleItems)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/app-shell/AppBackgroundServices.tsx",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { AskEscalationGate } from '../components/fork-ask-question-tool/AskEscalationGate'",
+        "      <AskEscalationGate />"
       ]
     }
   ],
@@ -3601,7 +3634,7 @@
       "removed": 1
     },
     "src/main/persistence/applying-settings/ui-selection-normalization.ts": {
-      "added": 1,
+      "added": 2,
       "removed": 0
     },
     "src/main/persistence/tracking-repos/project-group-operations.ts": {
@@ -3641,7 +3674,7 @@
       "removed": 4
     },
     "src/main/runtime/rpc/methods/client-ui-schemas.ts": {
-      "added": 1,
+      "added": 2,
       "removed": 0
     },
     "src/main/runtime/rpc/methods/index.ts": {
@@ -3796,6 +3829,10 @@
       "added": 19,
       "removed": 1
     },
+    "src/renderer/src/app-shell/AppBackgroundServices.tsx": {
+      "added": 2,
+      "removed": 0
+    },
     "src/renderer/src/components/artifacts/ArtifactDetailHeader.tsx": {
       "added": 3,
       "removed": 13
@@ -3873,8 +3910,8 @@
       "removed": 1
     },
     "src/renderer/src/components/native-chat/NativeChatResolvedView.tsx": {
-      "added": 30,
-      "removed": 19
+      "added": 16,
+      "removed": 18
     },
     "src/renderer/src/components/native-chat/NativeChatView.test.tsx": {
       "added": 4,
@@ -4004,13 +4041,17 @@
       "added": 3,
       "removed": 2
     },
+    "src/renderer/src/components/right-sidebar/index.tsx": {
+      "added": 3,
+      "removed": 1
+    },
     "src/renderer/src/components/right-sidebar/right-sidebar-panel-content.tsx": {
-      "added": 2,
+      "added": 4,
       "removed": 0
     },
     "src/renderer/src/components/right-sidebar/use-right-sidebar-activity-items.ts": {
-      "added": 7,
-      "removed": 0
+      "added": 12,
+      "removed": 1
     },
     "src/renderer/src/components/settings/AppearancePane.tsx": {
       "added": 2,
@@ -4185,7 +4226,7 @@
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/TerminalPaneSurface.tsx": {
-      "added": 8,
+      "added": 6,
       "removed": 1
     },
     "src/renderer/src/components/terminal-pane/focus-terminal-pane-event.test.ts": {
@@ -4437,7 +4478,7 @@
       "removed": 1
     },
     "src/renderer/src/store/right-sidebar-route.ts": {
-      "added": 1,
+      "added": 2,
       "removed": 0
     },
     "src/renderer/src/store/slices/store-test-helpers.ts": {
@@ -4577,7 +4618,7 @@
       "removed": 1
     },
     "src/shared/ui-chrome-types.ts": {
-      "added": 1,
+      "added": 2,
       "removed": 0
     },
     "src/shared/workspace-session-schema.test.ts": {

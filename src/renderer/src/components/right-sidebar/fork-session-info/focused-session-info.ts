@@ -45,7 +45,20 @@ type FocusedSessionState = Pick<
   | 'getKnownWorktreeById'
 >
 
-export function resolveFocusedSession(state: FocusedSessionState): FocusedSessionSelection {
+export type FocusedPaneState = Pick<
+  AppState,
+  'activeTabId' | 'activeTabType' | 'activeWorktreeId' | 'tabsByWorktree' | 'terminalLayoutsByTabId'
+>
+
+export type FocusedPaneSelection = {
+  tabId: string | null
+  leafId: string | null
+  paneKey: string | null
+}
+
+/** Just the focused terminal pane, without the workspace, runtime and WSL lookups the full
+ *  selection performs — callers that only need to know which pane is in front. */
+export function resolveFocusedPane(state: FocusedPaneState): FocusedPaneSelection {
   const activeTabBelongsToWorkspace = Boolean(
     state.activeWorktreeId &&
     state.activeTabId &&
@@ -56,6 +69,16 @@ export function resolveFocusedSession(state: FocusedSessionState): FocusedSessio
   const layout = tabId ? state.terminalLayoutsByTabId[tabId] : undefined
   const leafId = layout?.activeLeafId ?? null
   const paneKey = tabId && leafId && isTerminalLeafId(leafId) ? makePaneKey(tabId, leafId) : null
+  return { tabId, leafId: paneKey ? leafId : null, paneKey }
+}
+
+export function useFocusedPaneKey(): string | null {
+  return useAppStore((state) => resolveFocusedPane(state).paneKey)
+}
+
+export function resolveFocusedSession(state: FocusedSessionState): FocusedSessionSelection {
+  const { tabId, leafId, paneKey } = resolveFocusedPane(state)
+  const layout = tabId ? state.terminalLayoutsByTabId[tabId] : undefined
   const status = paneKey ? (state.agentStatusByPaneKey[paneKey] ?? null) : null
   const workspaceScope = parseWorkspaceKey(state.activeWorktreeId ?? '')
   const folderWorkspace =
@@ -81,7 +104,7 @@ export function resolveFocusedSession(state: FocusedSessionState): FocusedSessio
 
   return {
     tabId,
-    leafId: paneKey ? leafId : null,
+    leafId,
     paneKey,
     status,
     paneLabel: leafId ? (layout?.titlesByLeafId?.[leafId] ?? status?.terminalTitle ?? null) : null,

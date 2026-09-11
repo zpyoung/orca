@@ -38,6 +38,11 @@
       "notification": {
         "title": "Pending question in {{worktreeLabel}}",
         "body": "Waiting for your answer."
+      },
+      "askPanel": {
+        "title": "Questions",
+        "empty": "No questions",
+        "emptyDescription": "A question waiting on your answer appears here."
       }
     }
   }

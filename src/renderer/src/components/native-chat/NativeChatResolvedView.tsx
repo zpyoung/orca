@@ -7,8 +7,6 @@ import { selectNativeChatViewState } from './fork-native-chat-relay/native-chat-
 import { NativeChatConversation } from './fork-native-chat-relay/NativeChatConversation'
 import { useNativeChatLaunchPromptOverlay } from './fork-native-chat-relay/use-native-chat-launch-prompt-overlay'
 import { NativeChatComposer, type NativeChatComposerHandle } from './NativeChatComposer'
-import { AskCard } from '../fork-ask-question-tool/AskCard'
-import { useAskPaneDock } from '../fork-ask-question-tool/use-ask-pane-dock'
 import { useNativeChatFontScale } from './use-native-chat-font-scale'
 import { useNativeChatCanSend } from './use-native-chat-can-send'
 import { NativeChatInteractiveCard } from './NativeChatInteractiveCard'
@@ -126,7 +124,6 @@ export function NativeChatResolvedView({
   const previousWorkingEpochRef = useRef<number | null>(null)
   // True while a question card owns the input region, so the composer is hidden.
   const [questionActive, setQuestionActive] = useState(false)
-  const askDock = useAskPaneDock(paneKey)
   const rootRef = useRef<HTMLDivElement>(null)
   const composerRef = useRef<NativeChatComposerHandle>(null)
   // The question card's free-text row; keeps Paste working while the card
@@ -415,17 +412,7 @@ export function NativeChatResolvedView({
       {/* canSend reflects the mobile presence-lock: when a mobile client holds
           the pty, the composer shows its guarded state instead of racing the
           mobile driver (R8). */}
-      {askDock.model ? (
-        <AskCard
-          key={askDock.model.askId}
-          model={askDock.model}
-          onSubmit={askDock.onSubmit}
-          onCancel={askDock.onCancel}
-          isSubmitting={askDock.isSubmitting}
-          onDraftChange={askDock.onDraftChange}
-        />
-      ) : null}
-      {questionActive || askDock.model ? null : (
+      {questionActive ? null : (
         <NativeChatComposer
           ref={composerRef}
           terminalTabId={terminalTabId}

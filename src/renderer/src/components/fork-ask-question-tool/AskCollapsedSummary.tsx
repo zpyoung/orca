@@ -32,7 +32,7 @@ export function AskCollapsedSummary({
   result: AskRegistryResult
 }): React.JSX.Element {
   return (
-    <div className="flex min-h-0 max-h-[28rem] flex-col overflow-hidden rounded-lg border border-input bg-card shadow-floating">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
       <p className="shrink-0 px-4 pt-4 text-sm font-medium text-foreground">
         {statusLabel(status)}
       </p>

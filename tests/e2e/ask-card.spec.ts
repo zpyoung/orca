@@ -26,6 +26,15 @@ async function setupAskPane(page: Page): Promise<{ paneKey: string }> {
   return waitForActivePaneHookDescriptor(page)
 }
 
+/** The sidebar route the ask panel is showing, plus the tab the user's own route still points at
+ * — the override must never write itself into the second one. */
+async function readSidebarRoute(page: Page): Promise<{ stored: string; open: boolean }> {
+  return page.evaluate(() => ({
+    stored: String(window.__store?.getState().rightSidebarTab),
+    open: Boolean(window.__store?.getState().rightSidebarOpen)
+  }))
+}
+
 /** Directly seeds a pending, single-text-question ask onto a pane, mirroring the registry event
  * that would otherwise arrive over `ask:set` IPC. */
 async function seedPendingAsk(
@@ -152,15 +161,54 @@ async function replayAskHydration(page: Page): Promise<void> {
 }
 
 test.describe('Ask card', () => {
-  test('renders a card in the pane when a pending ask is seeded', async ({ orcaPage }) => {
+  test('takes the right sidebar for a pending ask on the focused pane', async ({ orcaPage }) => {
     const { paneKey } = await setupAskPane(orcaPage)
     const askId = `e2e-ask-render-${randomUUID()}`
     const question = 'Ready to deploy the release build?'
+    const before = await readSidebarRoute(orcaPage)
 
     await seedPendingAsk(orcaPage, { paneKey, askId, questionId: 'q1', question })
 
     await expect(orcaPage.getByText(question)).toBeVisible({ timeout: 10_000 })
     await expect(orcaPage.getByRole('textbox', { name: question })).toBeVisible()
+    await expect(orcaPage.getByRole('button', { name: /Questions/ })).toBeVisible()
+
+    // The override renders the panel without touching the persisted route, so the tab the user
+    // chose is still the one on record while the question is up.
+    const during = await readSidebarRoute(orcaPage)
+    expect(during.open).toBe(true)
+    expect(during.stored).toBe(before.stored)
+    expect(during.stored).not.toBe('ask')
+  })
+
+  test('gives the sidebar back to the previous tab once the ask clears', async ({ orcaPage }) => {
+    const { paneKey } = await setupAskPane(orcaPage)
+    const epoch = `e2e-handback-${randomUUID()}`
+    const askId = `e2e-ask-handback-${randomUUID()}`
+    const question = 'Retire the old stack?'
+
+    await orcaPage.evaluate(() => window.__store?.getState().setRightSidebarTab('source-control'))
+    await applyAskEvent(
+      orcaPage,
+      textAsk({ seq: 1, epoch, askId, paneKey, questionId: 'q1', question })
+    )
+    await expect(orcaPage.getByRole('textbox', { name: question })).toBeVisible({ timeout: 10_000 })
+
+    await applyAskEvent(orcaPage, {
+      seq: 2,
+      epoch,
+      askId,
+      paneKey,
+      status: 'declined',
+      partial: {},
+      result: { answers: {}, skipped: ['q1'], summary: 'Declined.' }
+    })
+
+    // The rail item outlives the answer by ASK_DISMISS_DELAY_MS so the summary can be read.
+    await expect(orcaPage.getByRole('button', { name: /Questions/ })).toHaveCount(0, {
+      timeout: ASK_DISMISS_DELAY_MS + 10_000
+    })
+    expect((await readSidebarRoute(orcaPage)).stored).toBe('source-control')
   })
 
   test('answering resolves the blocked wait and collapses the card', async ({ orcaPage }) => {
@@ -283,7 +331,7 @@ test.describe('Ask card', () => {
     await expect(orcaPage.getByText('Declined.')).toHaveCount(0)
   })
 
-  test('scrolls a full ten-question card instead of growing off the top of the pane', async ({
+  test('scrolls a full ten-question card instead of growing past the panel', async ({
     orcaPage
   }) => {
     const { paneKey } = await setupAskPane(orcaPage)
@@ -324,8 +372,13 @@ test.describe('Ask card', () => {
       const submit = Array.from(document.querySelectorAll('button')).find(
         (button) => button.textContent?.trim() === 'Submit'
       )
-      const card = submit?.closest('div[class*="max-h-"]')
-      const body = card?.querySelector<HTMLElement>('.overflow-y-auto')
+      // Walk up to the card root rather than matching a utility class, so the assertion does
+      // not re-break the next time the shell's classes change.
+      let node = submit?.parentElement ?? null
+      while (node && !node.querySelector('.overflow-y-auto')) {
+        node = node.parentElement
+      }
+      const body = node?.querySelector<HTMLElement>('.overflow-y-auto')
       return body ? { scrollHeight: body.scrollHeight, clientHeight: body.clientHeight } : null
     })
 

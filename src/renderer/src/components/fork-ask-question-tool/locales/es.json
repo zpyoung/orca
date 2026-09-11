@@ -38,6 +38,11 @@
       "notification": {
         "title": "Pregunta pendiente en {{worktreeLabel}}",
         "body": "Esperando tu respuesta."
+      },
+      "askPanel": {
+        "title": "Preguntas",
+        "empty": "Sin preguntas",
+        "emptyDescription": "Aquí aparece una pregunta que espera tu respuesta."
       }
     }
   }

@@ -276,13 +276,13 @@ describe('AskCard — height and scrolling', () => {
     }))
   }
 
-  it('caps its own height and scrolls the question list rather than growing off the pane', () => {
+  it('fills its host and scrolls the question list rather than growing past it', () => {
     const { container } = render(
       <AskCard model={modelFor(tenQuestions())} onSubmit={vi.fn()} onCancel={vi.fn()} />
     )
 
     const root = container.firstElementChild
-    expect(root).toHaveClass('max-h-[28rem]')
+    expect(root).toHaveClass('h-full', 'min-h-0', 'overflow-hidden')
     expect(root).toHaveClass('flex-col')
     // happy-dom computes no real scrollHeight, so this asserts the structure that makes the cap
     // work; tests/e2e/ask-card.spec.ts is what proves it against real layout.
@@ -318,7 +318,7 @@ describe('AskCard — height and scrolling', () => {
     )
 
     expect(screen.getByText('Answered')).toBeInTheDocument()
-    expect(container.firstElementChild).toHaveClass('max-h-[28rem]')
+    expect(container.firstElementChild).toHaveClass('h-full', 'min-h-0', 'overflow-hidden')
     expect(container.querySelector('.overflow-y-auto')).toHaveClass('min-h-0', 'flex-1')
   })
 })

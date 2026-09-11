@@ -24,8 +24,11 @@ export type AskPaneDock = {
  * `AskCard` requires, and wires submit/cancel through the runtime RPC bridge. A head entry with
  * no spec yet is not a bug — a status-only event can arrive before the one carrying the spec —
  * so it narrows to `null` and the caller renders nothing (tech.md § C8).
+ *
+ * `paneKey` is nullable so a host that renders outside any pane — the right-sidebar panel, which
+ * follows whichever session is focused — can call it unconditionally.
  */
-export function useAskPaneDock(paneKey: string): AskPaneDock {
+export function useAskPaneDock(paneKey: string | null): AskPaneDock {
   const entry = useAppStore((state) => selectHeadAsk(state, paneKey))
   const model = useMemo<AskCardModel | null>(() => {
     if (!entry?.spec) {
@@ -51,7 +54,9 @@ export function useAskPaneDock(paneKey: string): AskPaneDock {
       setSubmittingAskId(askId)
       void window.api.runtime
         .call({ method: 'ask.answer', params: { askId, answers, skipped } })
-        .then((response) => unwrapRuntimeRpcResult(response as RuntimeRpcResponse<{ committed: boolean }>))
+        .then((response) =>
+          unwrapRuntimeRpcResult(response as RuntimeRpcResponse<{ committed: boolean }>)
+        )
         .catch((error: unknown) => console.error('Failed to submit ask answer:', error))
         .finally(() => setSubmittingAskId((current) => (current === askId ? null : current)))
     },

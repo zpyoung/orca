@@ -38,6 +38,11 @@
       "notification": {
         "title": "{{worktreeLabel}} に保留中の質問があります",
         "body": "回答をお待ちしています。"
+      },
+      "askPanel": {
+        "title": "質問",
+        "empty": "質問はありません",
+        "emptyDescription": "回答を待っている質問がここに表示されます。"
       }
     }
   }

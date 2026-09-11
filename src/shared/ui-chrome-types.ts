@@ -90,6 +90,7 @@ export type RightSidebarTab =
   | 'search'
   | 'vault'
   | 'session-info'
+  | 'ask'
   | 'workspaces'
   | 'pr-checks'
   | 'source-control'
