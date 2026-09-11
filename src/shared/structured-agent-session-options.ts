@@ -76,10 +76,15 @@ export function applyStructuredAgentSessionOptions(
   seed: AgentSessionOptionCatalog,
   result: AgentSessionOptionsResult
 ): StructuredAgentSessionOptionState {
-  applyNativeChatReportedSessionOptions(state.record, {
-    model: result.current.model,
-    ...(result.current.effort ? { effort: result.current.effort } : {})
-  })
+  applyNativeChatReportedSessionOptions(
+    state.record,
+    {
+      model: result.current.model,
+      ...(result.current.effort ? { effort: result.current.effort } : {})
+    },
+    undefined,
+    result.current.confirmed ?? []
+  )
   return { ...state, catalog: structuredAgentSessionOptionCatalog(seed, result) }
 }
 

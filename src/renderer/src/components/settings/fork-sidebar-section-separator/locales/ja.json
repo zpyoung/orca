@@ -1,0 +1,13 @@
+{
+  "fork": {
+    "sidebarSectionSeparator": {
+      "title": "サイドバーのセパレーター",
+      "description": "トップレベルのプロジェクトとグループの間に区切り線を表示します。",
+      "keywordSidebar": "サイドバー",
+      "keywordSeparator": "セパレーター",
+      "keywordDivider": "区切り",
+      "keywordProject": "プロジェクト",
+      "keywordGroup": "グループ"
+    }
+  }
+}

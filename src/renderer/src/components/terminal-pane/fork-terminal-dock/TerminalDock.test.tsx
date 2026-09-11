@@ -75,7 +75,11 @@ afterEach(() => {
 const PASTED_IMAGE_PATH = '/tmp/orca-paste-1-abc.png'
 
 function imageClipboardData(): DataTransfer {
-  return { items: [{ kind: 'file', type: 'image/png' }] } as unknown as DataTransfer
+  return {
+    items: [
+      { kind: 'file', type: 'image/png', getAsFile: () => new Blob([], { type: 'image/png' }) }
+    ]
+  } as unknown as DataTransfer
 }
 
 const baseProps = {

@@ -28,7 +28,10 @@ import type {
   NativeChatComposerHandle,
   NativeChatComposerProps
 } from './native-chat-composer-types'
-import { isStructuredAgentSessionComposerCommand } from '../../../../shared/structured-agent-session-composer'
+import {
+  isStructuredAgentSessionComposerCommand,
+  structuredSlashCommands
+} from '../../../../shared/structured-agent-session-composer'
 import { dispatchNativeChatStructuredComposerText } from './native-chat-structured-composer-dispatch'
 
 export type {
@@ -111,7 +114,11 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       setCaret: core.setCaret
     })
 
-    const agentCommands = useMemo(() => getVerifiedNativeChatCommands(agent), [agent])
+    const agentCommands = useMemo(
+      () =>
+        structuredTransport ? structuredSlashCommands(agent) : getVerifiedNativeChatCommands(agent),
+      [agent, structuredTransport]
+    )
     const picker = useNativeChatPickerState({
       agent,
       terminalTabId,
@@ -131,7 +138,10 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       clearImageAttachments,
       flushPendingAttachments,
       restoreImageAttachments,
-      removeImageAttachment
+      removeImageAttachment,
+      beginPendingImageAttachment,
+      resolvePendingImageAttachment,
+      dropPendingImageAttachment
     } = useNativeChatComposerAttachments({
       attachmentScopeKey: paneKey,
       allowWithoutTarget: Boolean(structuredTransport),
@@ -159,6 +169,9 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       caret: core.caret,
       resolveAttachmentOwner,
       attachResolvedPaths,
+      beginPendingImageAttachment,
+      resolvePendingImageAttachment,
+      dropPendingImageAttachment,
       insertTypedText: core.insertTypedText,
       setCaret: core.setCaret,
       setNotice: core.setNotice

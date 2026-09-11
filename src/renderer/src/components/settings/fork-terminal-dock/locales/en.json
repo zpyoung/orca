@@ -17,7 +17,14 @@
           "search": {
             "terminalDock": {
               "title": "Terminal dock",
-              "description": "Composer docked beneath a terminal pane for supported coding-agent sessions."
+              "description": "Composer docked beneath a terminal pane for supported coding-agent sessions.",
+              "terminal": "terminal",
+              "dock": "dock",
+              "composer": "composer",
+              "compose": "compose",
+              "prompt": "prompt",
+              "agent": "agent",
+              "cli": "cli"
             }
           }
         }

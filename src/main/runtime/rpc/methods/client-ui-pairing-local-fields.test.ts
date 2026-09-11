@@ -47,6 +47,14 @@ describe('client UI RPC pairing-local field seams', () => {
       { hostId: 'runtime:web-11111111-2222-3333-4444-555555555555', repoId: 'repo-a' }
     ],
     workspaceHostOrder: ['runtime:web-11111111-2222-3333-4444-555555555555', 'local'],
+    agentsVisibleHostIds: ['runtime:web-11111111-2222-3333-4444-555555555555'],
+    agentsFilterRepoIds: ['repo-a'],
+    agentsShowChildAgents: true,
+    agentsCompactMode: false,
+    agentsReadFilter: 'unread',
+    agentsGroupBy: 'project',
+    activityClearedAtByPaneKey: { 'tab-1:leaf-1': 123 },
+    manuallyUnreadTurnsByPaneKey: { 'tab-1:leaf-1': 321 },
     ...WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES,
     ...WORKSPACE_REVIEW_PAIRING_LOCAL_SAMPLES
   }

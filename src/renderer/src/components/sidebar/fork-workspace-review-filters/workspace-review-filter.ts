@@ -4,6 +4,7 @@ import { getWorktreeGitIdentityDisplay } from '@/lib/worktree-git-identity-displ
 import { getGitHubPRCacheKey } from '@/store/slices/github-cache-key'
 import { getHostedReviewCacheKey } from '@/store/slices/hosted-review-cache-identity'
 import type { AppState } from '@/store/types'
+import type { GlobalSettings } from '../../../../../shared/global-settings-types'
 import { resolveWorkspaceReview } from './workspace-review-resolution'
 
 export type WorkspaceReviewFilterContext = {
@@ -11,7 +12,9 @@ export type WorkspaceReviewFilterContext = {
   hidePassingCheckWorkspaces: boolean
   prCache: AppState['prCache'] | null
   hostedReviewCache: AppState['hostedReviewCache'] | null
-  settings: AppState['settings']
+  // The only settings field the cache keys read, kept primitive so an unrelated settings write
+  // cannot re-key the sidebar's visibility scan.
+  activeRuntimeEnvironmentId: GlobalSettings['activeRuntimeEnvironmentId'] | null
 }
 
 function cacheEntries(worktree: Worktree, repo: Repo, context: WorkspaceReviewFilterContext) {
@@ -20,10 +23,11 @@ function cacheEntries(worktree: Worktree, repo: Repo, context: WorkspaceReviewFi
   if (!branchName) {
     return undefined
   }
+  const settings = { activeRuntimeEnvironmentId: context.activeRuntimeEnvironmentId }
   const hostedKey = getHostedReviewCacheKey(
     repo.path,
     branchName,
-    context.settings,
+    settings,
     repo.id,
     repo.connectionId,
     repo.executionHostId,
@@ -33,7 +37,7 @@ function cacheEntries(worktree: Worktree, repo: Repo, context: WorkspaceReviewFi
     repo.path,
     repo.id,
     branchName,
-    context.settings,
+    settings,
     repo.connectionId,
     repo.executionHostId,
     true

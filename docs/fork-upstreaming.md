@@ -57,6 +57,7 @@ upstream could take outright.
 - `src/renderer/src/components/sidebar/worktree-list/viewport/scroll-adjustment.test.ts`
 - `src/renderer/src/components/sidebar/project-group-header-drop.test.ts`
 - `src/renderer/src/components/sidebar/project-header-drop.test.ts`
+- `src/renderer/src/components/sidebar/worktree-header-section-boundaries.test.ts`
 - `src/renderer/src/components/sidebar/worktree-card-surface.tsx`
 
 **Paths (density lines folded into the `worktree-groups` seam declaration):**

@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-incremental-assembler.ts
-// FORK-COPY-SHA: bc2f593ebba70a0ee6ff900129e4918f57b143aa
+// FORK-COPY-SHA: e0826956fcfc532f5a1e55b5e081f2e57e553c43
 // Incremental native-chat assembler. The full `assembleNativeChatSession` does
 // an O(n log n) Map-build + sort on every call; on the hot streaming path the
 // agent emits many small append batches over a growing transcript, so the full
@@ -14,8 +14,16 @@
 // Correctness invariant: applyAppends output deep-equals a full rebuild over
 // base ++ all-appends for every prefix (locked by the oracle differential test).
 
+import {
+  hasImagePromptMarker,
+  isImageSourceUserTurn
+} from '../../../../../shared/native-chat-image-transcript-markers'
 import type { NativeChatMessage } from '../../../../../shared/native-chat-types'
-import { compareMessages, mergeOne } from '../native-chat-session-assembler'
+import {
+  compareMessages,
+  mergeOne,
+  sortForImageNormalization
+} from '../native-chat-session-assembler'
 
 export type IncrementalChatAssembler = {
   byId: Map<string, NativeChatMessage>
@@ -39,7 +47,7 @@ export function reset(
   for (const message of base) {
     mergeOne(assembler.byId, assembler.byTurn, message)
   }
-  assembler.messages = Array.from(assembler.byId.values()).sort(compareMessages)
+  assembler.messages = [...sortForImageNormalization(Array.from(assembler.byId.values()))]
   return assembler.messages
 }
 
@@ -68,12 +76,12 @@ export function applyAppends(
   if (grewByBatch && isTailAppend(assembler.messages, incoming)) {
     // Every incoming message is new and sorts at/after the tail: splice the
     // batch in its own sorted order without touching the existing prefix.
-    const tail = [...incoming].sort(compareMessages)
+    const tail = [...sortForImageNormalization(incoming)]
     assembler.messages = [...assembler.messages, ...tail]
     return assembler.messages
   }
 
-  assembler.messages = Array.from(assembler.byId.values()).sort(compareMessages)
+  assembler.messages = [...sortForImageNormalization(Array.from(assembler.byId.values()))]
   return assembler.messages
 }
 
@@ -88,6 +96,14 @@ function isTailAppend(
   const last = current.at(-1)
   if (!last) {
     return true
+  }
+  if (
+    hasImagePromptMarker(last) &&
+    incoming[0]?.source === last.source &&
+    incoming[0]?.timestamp === last.timestamp &&
+    isImageSourceUserTurn(incoming[0]!)
+  ) {
+    return false
   }
   for (const message of incoming) {
     // Null timestamp (sorts to the front) can never be a tail append.

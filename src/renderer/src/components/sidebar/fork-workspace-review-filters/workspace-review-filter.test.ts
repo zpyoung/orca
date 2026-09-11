@@ -63,7 +63,7 @@ const context = (
   hidePassingCheckWorkspaces: hidePassing,
   hostedReviewCache,
   prCache: {},
-  settings
+  activeRuntimeEnvironmentId: null
 })
 
 describe('filterWorktreesByReview', () => {

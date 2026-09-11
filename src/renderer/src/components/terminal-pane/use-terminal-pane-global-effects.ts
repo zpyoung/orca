@@ -7,7 +7,6 @@ import {
   type PasteTerminalTextDetail
 } from '@/constants/terminal'
 import type { PaneManager } from '@/lib/pane-manager/pane-manager'
-import type { PaneFocusOwnership } from './pane-helpers'
 import type { PtyTransport } from './pty-transport'
 import type { IDisposable } from '@xterm/xterm'
 import { handleTerminalFileDrop } from './terminal-drop-handler'
@@ -28,7 +27,7 @@ import {
   setRendererPtyVisibilityClaim
 } from './pty-renderer-delivery-claims'
 
-type UseTerminalPaneGlobalEffectsArgs = Partial<PaneFocusOwnership> & {
+type UseTerminalPaneGlobalEffectsArgs = {
   tabId: string
   worktreeId: string
   cwd?: string
@@ -63,7 +62,6 @@ function reportRendererPtyVisibility(
 
 export function useTerminalPaneGlobalEffects({
   tabId,
-  paneDockOwnsFocus,
   worktreeId,
   cwd,
   isActive,
@@ -123,7 +121,6 @@ export function useTerminalPaneGlobalEffects({
   })
   useTerminalWindowWakeRecovery({
     tabId,
-    paneDockOwnsFocus,
     isVisible: rendererVisible,
     managerRef,
     isActiveRef,
@@ -160,7 +157,6 @@ export function useTerminalPaneGlobalEffects({
       resumeTerminalVisibility({
         manager,
         tabId,
-        paneDockOwnsFocus,
         isActive,
         wasVisible,
         shouldUseLightTabResume,
