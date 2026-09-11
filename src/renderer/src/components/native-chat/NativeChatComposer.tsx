@@ -21,6 +21,7 @@ import { useNativeChatSessionOptions } from './use-native-chat-session-options'
 import { useNativeChatFileAttachmentActions } from './use-native-chat-file-attachment-actions'
 import { useNativeChatDictationActions } from './use-native-chat-dictation-actions'
 import { useNativeChatSessionOptionCommand } from './use-native-chat-session-option-command'
+import { useNativeChatComposerCatalog } from './use-native-chat-composer-catalog'
 import { useNativeChatPickerState } from './use-native-chat-picker-state'
 import { useNativeChatPickerCommandDispatch } from './use-native-chat-picker-command-dispatch'
 import { pushHistory, seedHistory } from './fork-agent-composer/agent-composer-history'
@@ -114,10 +115,9 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       setCaret: core.setCaret
     })
 
-    const agentCommands = useMemo(
-      () =>
-        structuredTransport ? structuredSlashCommands(agent) : getVerifiedNativeChatCommands(agent),
-      [agent, structuredTransport]
+    const { agentCommands, sessionSkillNames } = useNativeChatComposerCatalog(
+      agent,
+      structuredTransport
     )
     const picker = useNativeChatPickerState({
       agent,

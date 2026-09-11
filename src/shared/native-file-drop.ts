@@ -57,6 +57,7 @@ export type NativeFileDropRejectedPayload = {
 export type NativeFileDropPathEntry = {
   nativeFileDropTarget?: string
   nativeFileDropDir?: string
+  composerScopeKey?: string
   terminalTabId?: string
   terminalPaneLeafId?: string
 }
@@ -111,9 +112,11 @@ export function resolveNativeFileDropPath(
   let foundExplorer = false
   let destinationDir: string | undefined
   let terminalPaneLeafId: string | undefined
+  let composerScopeKey: string | undefined
 
   for (const entry of path) {
     terminalPaneLeafId ??= entry.terminalPaneLeafId
+    composerScopeKey ??= entry.composerScopeKey
     const target = entry.nativeFileDropTarget
     if (target === NATIVE_FILE_DROP_TARGET.terminal) {
       return { target, tabId: entry.terminalTabId, paneLeafId: terminalPaneLeafId }
@@ -217,6 +220,14 @@ export function createNativeFileDropPayload(
     }
   }
 
+  if (resolution?.target === NATIVE_FILE_DROP_TARGET.composer) {
+    return {
+      paths: [...paths],
+      target: resolution.target,
+      ...(resolution.scopeKey ? { scopeKey: resolution.scopeKey } : {})
+    }
+  }
+
   const target = resolution?.target ?? NATIVE_FILE_DROP_TARGET.editor
   if (resolution?.target === NATIVE_FILE_DROP_TARGET.composer) {
     return {
@@ -277,6 +288,9 @@ export function isNativeFileDropPayload(value: unknown): value is NativeFileDrop
   }
   if (target === NATIVE_FILE_DROP_TARGET.fileExplorer) {
     return typeof payload.destinationDir === 'string'
+  }
+  if (target === NATIVE_FILE_DROP_TARGET.composer) {
+    return isOptionalNativeFileDropString(payload.scopeKey)
   }
 
   return (

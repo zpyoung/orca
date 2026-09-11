@@ -22,9 +22,16 @@ export type NativeChatStructuredComposerTransport = {
   optionsSurface: SessionOptionsSurface
   optionSnapshot: SessionOptionDescriptor[]
   optionPickerRequest?: NativeChatOptionPickerRequest | null
+  /** The `/` surface the running session reports. Absent keeps the curated
+   *  per-agent catalog, which is what an older host leaves the client with. */
+  sessionCommands?: readonly AgentSessionSlashCommand[]
   worktreeId?: string
   onError: (message: string | null) => void
   runtime: 'local' | 'remote'
+  /** The session behind this composer; a real user send relinquishes orchestration ownership. */
+  sessionId: string
+  /** Owning runtime for that report; null is the local runtime. */
+  runtimeEnvironmentId: string | null
 }
 
 export type NativeChatComposerProps = AgentComposerCoreProps & {

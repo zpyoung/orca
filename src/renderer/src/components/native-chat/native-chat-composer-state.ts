@@ -51,7 +51,8 @@ export function deriveComposerAutocomplete(
   skills: readonly DiscoveredSkill[] = [],
   profile: NativeChatAgentProfile | null = null,
   discovery: NativeChatSkillDiscoverySnapshot = { ...EMPTY_DISCOVERY, skills },
-  dismissedTriggerKey: string | null = null
+  dismissedTriggerKey: string | null = null,
+  sessionSkillNames?: readonly string[]
 ): ComposerAutocomplete {
   const before = draft.slice(0, caret)
   const slashMatch = before.match(/(?:^|\s)\/(\S*)$/)
@@ -110,7 +111,8 @@ function deriveSlashAutocomplete(
   agentCommands: readonly SlashCommandSuggestion[],
   profile: NativeChatAgentProfile | null,
   discovery: NativeChatSkillDiscoverySnapshot,
-  dismissedTriggerKey: string | null
+  dismissedTriggerKey: string | null,
+  sessionSkillNames: readonly string[] | undefined
 ): ComposerAutocomplete {
   const triggerKey = `/:${tokenStart}`
   if (dismissedTriggerKey === triggerKey) {

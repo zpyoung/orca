@@ -33,6 +33,7 @@ type ResumeTerminalVisibilityArgs = {
   tabId: string
   manager: PaneManager
   isActive: boolean
+  isChatViewMode: boolean
   wasVisible: boolean
   shouldUseLightTabResume: boolean
   captureViewportPositions: (useRememberedSnapshots: boolean) => Map<number, ScrollState>
@@ -57,6 +58,7 @@ type RecoverVisibleTerminalWindowWakeArgs = {
   tabId: string
   manager: PaneManager
   isActive: boolean
+  isChatViewMode: boolean
   clearGlyphAtlases: boolean
 }
 
@@ -64,6 +66,7 @@ export function resumeTerminalVisibility({
   manager,
   tabId,
   isActive,
+  isChatViewMode,
   wasVisible,
   shouldUseLightTabResume,
   captureViewportPositions,
@@ -179,6 +182,7 @@ export function recoverVisibleTerminalWindowWake({
   manager,
   tabId,
   isActive,
+  isChatViewMode,
   clearGlyphAtlases
 }: RecoverVisibleTerminalWindowWakeArgs): void {
   // Why: macOS screensaver/display wake can leave xterm visible but with a

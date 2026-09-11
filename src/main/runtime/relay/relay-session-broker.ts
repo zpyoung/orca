@@ -1,3 +1,4 @@
+import { relayStatusCellUrl } from '../../../shared/mobile-relay-status'
 import type { PairingRelay } from '../../../shared/mobile-relay-pairing-offer'
 import type {
   DeviceCredentialInstalled,

@@ -3,29 +3,16 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import type { AgentStatusState } from '../../../../shared/agent-status-types'
 import type { AiVaultScope, AiVaultSession } from '../../../../shared/ai-vault-types'
 import type { AiVaultResumeStartup } from '@/lib/ai-vault-resume-command'
-import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { getActiveStickyHeaderIndexForScroll } from '../sidebar/worktree-list/viewport/virtual-rows'
-import { VaultGroupHeader } from './AiVaultPanelControls'
 import { EmptyState, SessionLoadingState } from './AiVaultSessionListStates'
-import { VaultSessionRow } from './AiVaultSessionRow'
 import type { AiVaultSessionGroup } from './ai-vault-session-filters'
 import type { AiVaultOriginalPaneTarget } from './ai-vault-original-pane'
-import {
-  aiVaultSessionResumeLabel,
-  aiVaultSessionRowResumeGating,
-  type AiVaultSessionResumeActions,
-  type AiVaultSessionResumeState
+import type {
+  AiVaultSessionResumeActions,
+  AiVaultSessionResumeState
 } from './ai-vault-session-resume'
-import {
-  canJumpToAiVaultSessionWorktree,
-  isAiVaultSessionInCurrentWorktree,
-  type AiVaultSessionWorktreeInfo
-} from './ai-vault-session-worktree'
-import {
-  canOpenAiVaultSessionLogInOrca,
-  canUseLocalAiVaultSessionPathActions
-} from './ai-vault-session-path-actions'
+import type { AiVaultSessionWorktreeInfo } from './ai-vault-session-worktree'
 import {
   extractVaultVirtualRowIndexes,
   getVaultStickyHeaderIndexes,
@@ -36,10 +23,6 @@ import { resolveAiVaultSessionHandoffWorktreeId } from '@/components/agent-sessi
 
 const VAULT_ROW_OVERSCAN = 8
 const VAULT_EXPANDED_SESSION_ROW_ESTIMATED_HEIGHT = 420
-
-type AiVaultListRow =
-  | { type: 'group'; group: AiVaultSessionGroup }
-  | { type: 'session'; groupKey: string; session: AiVaultSession }
 
 export function AiVaultSessionVirtualList({
   groups,
@@ -56,11 +39,13 @@ export function AiVaultSessionVirtualList({
   getWorktreeInfo,
   getSessionResumeState,
   getSessionResumeActions,
+  getSessionResumeInChat,
   onToggleGroup,
   onJumpToOriginalPane,
   onJumpToWorktree,
   onResume,
   onContinueInNewSession,
+  onResumeInNewChat,
   onCopyResume,
   onCopyId,
   onCopyPath,
@@ -83,11 +68,13 @@ export function AiVaultSessionVirtualList({
   getWorktreeInfo: (session: AiVaultSession) => AiVaultSessionWorktreeInfo | null
   getSessionResumeState: (session: AiVaultSession) => AiVaultSessionResumeState
   getSessionResumeActions: (session: AiVaultSession) => AiVaultSessionResumeActions
+  getSessionResumeInChat: (session: AiVaultSession) => AiVaultResumeInChatEligibility
   onToggleGroup: (key: string) => void
   onJumpToOriginalPane: (session: AiVaultSession) => void
   onJumpToWorktree: (worktreeId: string) => void
   onResume: (session: AiVaultSession, worktreeId: string) => void
   onContinueInNewSession: (session: AiVaultSession, worktreeId: string) => void
+  onResumeInNewChat: (session: AiVaultSession, worktreeId: string) => void
   onCopyResume: (session: AiVaultSession, worktreeId?: string | null) => void
   onCopyId: (session: AiVaultSession) => void
   onCopyPath: (session: AiVaultSession) => void
@@ -219,12 +206,14 @@ export function AiVaultSessionVirtualList({
               getWorktreeInfo={getWorktreeInfo}
               getSessionResumeState={getSessionResumeState}
               getSessionResumeActions={getSessionResumeActions}
+              getSessionResumeInChat={getSessionResumeInChat}
               onToggleGroup={onToggleGroup}
               onToggleSessionDetails={toggleSessionDetails}
               onJumpToOriginalPane={onJumpToOriginalPane}
               onJumpToWorktree={onJumpToWorktree}
               onResume={onResume}
               onContinueInNewSession={onContinueInNewSession}
+              onResumeInNewChat={onResumeInNewChat}
               onCopyResume={onCopyResume}
               onCopyId={onCopyId}
               onCopyPath={onCopyPath}

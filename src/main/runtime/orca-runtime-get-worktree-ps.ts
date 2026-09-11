@@ -1,4 +1,5 @@
 // @ts-nocheck -- mechanically split from OrcaRuntimeService; behavior is covered by AST equivalence and characterization tests.
+import { collectRuntimeWorktreeAgentSources } from './runtime-worktree-agent-sources'
 import { OrcaRuntimeWithStructuredAgentSessionRecoverTuiOwner } from './orca-runtime-structured-agent-session-recover-tui-owner'
 import { DEFAULT_WORKTREE_PS_LIMIT } from './orca-runtime-postlude'
 import type { RuntimeWorktreePsResult } from '../../shared/runtime-types'
@@ -9,11 +10,14 @@ import {
   applyRuntimeWorktreePsTerminalActivity
 } from './runtime-worktree-ps-activity'
 import { attachRuntimeWorktreeAgentRows } from './runtime-worktree-agent-rows'
+import { getStructuredAgentSessionHost } from '../native-chat/agent-session-wire/structured-agent-session-registry'
 import { compareWorktreePs } from './runtime-worktree-status-projection'
 import type { AgentSessionRecord } from '../../shared/agent-session-record'
 import type { Repo } from '../../shared/repo-types'
 import { enrichMissingRepoGitRemoteIdentities } from '../repo-git-remote-identity-enrichment'
 import { ensureStructuredAgentSessionHost as installStructuredAgentSessionHost } from './structured-agent-session-runtime'
+import { maybeAutoRenameWorkspaceOnFirstStructuredTurn } from '../agent-hooks/first-work-structured-session-rename'
+import { firstWorkRenameDeps } from '../agent-hooks/first-work-rename-runtime'
 import { getProfileUserDataPath } from '../orca-profiles/profile-storage-paths'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import { buildWorktreeListingPage } from './worktree-listing-host-scope'
@@ -100,11 +104,15 @@ export class OrcaRuntimeWithGetWorktreePs extends OrcaRuntimeWithStructuredAgent
       summaries,
       pathIndex: runtimeWorktreeSummaryPathIndex,
       missingWorktreeIds: missingRuntimeWorktreeIds,
-      mirroredWorktreeIdByTabId,
-      connectedPtyEvidence,
       workingTerminalEvidenceByWorktreeId,
-      retainedSnapshots: this.agentRows.values(),
-      hookSnapshots: this.getAgentStatusSnapshotFn?.() ?? [],
+      rowSources: collectRuntimeWorktreeAgentSources({
+        mirroredWorktreeIdByTabId,
+        connectedPtyEvidence,
+        retainedSnapshots: this.agentRows.values(),
+        hookSnapshots: this.getAgentStatusSnapshotFn?.() ?? [],
+        // Broadcast history outlives closed sessions; only the host roster is eligible.
+        structuredSummaries: getStructuredAgentSessionHost()?.liveSessionStatusSummaries() ?? []
+      }),
       orchestrationByPaneKey: this.agentOrchestrationProjection.buildByPaneKey(),
       getSummary: (summaryMap, pathIndex, missingIds, worktreeId) =>
         this.getSummaryForRuntimeWorktreeId(summaryMap, pathIndex, missingIds, worktreeId)
@@ -156,6 +164,15 @@ export class OrcaRuntimeWithGetWorktreePs extends OrcaRuntimeWithStructuredAgent
         claudeStructuredAuthPolicyForSettings(this.requireStore().getSettings()),
       // Same gate and same settings as agentSession.createSupport, re-read on every acquisition.
       getClaudeManagedAccountGateSettings: () => this.requireStore().getSettings(),
+      // Structured chat has no agent CLI hooks, so this projection is what the first-work
+      // workspace rename listens to instead of `agentStatus:set`.
+      onSessionStatusChanged: (summary, options) => {
+        void maybeAutoRenameWorkspaceOnFirstStructuredTurn(
+          summary,
+          options,
+          firstWorkRenameDeps(this.requireStore(), this)
+        )
+      },
       handoffTransport: this.createStructuredAgentSessionHandoffTransport()
     })
   }

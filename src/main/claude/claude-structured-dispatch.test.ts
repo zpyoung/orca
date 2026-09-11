@@ -7,6 +7,7 @@ import { dispatchClaudeTurn, resolveClaudeReplayWaiter } from './claude-structur
 import { readClaudeImage } from './claude-structured-dispatch-content'
 import type { ClaudeSession } from './claude-structured-session-state'
 import { ClaudeBackgroundTaskTracker } from './claude-background-task-tracker'
+import { ClaudeSlashCommandCatalog } from './claude-slash-command-catalog'
 
 function sessionFor(send = vi.fn().mockResolvedValue(undefined)): ClaudeSession {
   return {
@@ -21,6 +22,7 @@ function sessionFor(send = vi.fn().mockResolvedValue(undefined)): ClaudeSession 
     retiredDispatchWaiters: [],
     replayContentFallbackBlocked: false,
     backgroundTasks: new ClaudeBackgroundTaskTracker(),
+    commands: new ClaudeSlashCommandCatalog(),
     dispatchSequence: 0,
     optionMutationSequence: 0,
     options: new Map(),
@@ -49,6 +51,28 @@ function userReplayFrame(uuid: string, text: string): Record<string, unknown> {
 }
 
 describe('Claude structured dispatch image limits', () => {
+  it.each(['isMeta', 'isSynthetic', 'isCompactSummary'])(
+    'does not acknowledge a dispatch with %s context even when the client uuid matches',
+    async (flag) => {
+      const session = sessionFor()
+      const dispatched = dispatchClaudeTurn(
+        session,
+        { clientMessageId: 'client-1', body: userMessage([{ type: 'text', text: '/example' }]) },
+        1000
+      )
+      await vi.waitFor(() => expect(session.dispatchWaiters).toHaveLength(1))
+      const sentUuid = session.dispatchWaiters[0]!.sentUuid
+      const replay = userReplayFrame(sentUuid, '/example')
+      expect(resolveClaudeReplayWaiter(session, { ...replay, [flag]: true })).toBe(false)
+      expect(session.dispatchWaiters).toHaveLength(1)
+      expect(resolveClaudeReplayWaiter(session, replay)).toBe(true)
+      await expect(dispatched).resolves.toMatchObject({
+        state: 'accepted',
+        providerIdentity: { uuid: sentUuid }
+      })
+    }
+  )
+
   it('recovers the active identity when a timed-out replay arrives late', async () => {
     const session = sessionFor()
     const dispatched = dispatchClaudeTurn(
@@ -63,6 +87,60 @@ describe('Claude structured dispatch image limits', () => {
     expect(resolveClaudeReplayWaiter(session, userReplayFrame(sentUuid!, 'one'))).toBe(true)
     expect(session.activeTurnId).toBe(sentUuid)
     expect(session.activeTurnSequence).toBe(session.dispatchSequence)
+  })
+
+  it('settles the send a timed-out replay proves was delivered', async () => {
+    const session = sessionFor()
+    const settled = vi.fn()
+    const dispatched = dispatchClaudeTurn(
+      session,
+      { clientMessageId: 'client-1', body: userMessage([{ type: 'text', text: 'one' }]) },
+      500
+    )
+    await vi.waitFor(() => expect(session.dispatchWaiters).toHaveLength(1))
+    const sentUuid = (session.dispatchWaiters[0] as { sentUuid?: string }).sentUuid
+    await expect(dispatched).resolves.toMatchObject({ state: 'unknown' })
+
+    resolveClaudeReplayWaiter(session, userReplayFrame(sentUuid!, 'one'), settled)
+    expect(settled).toHaveBeenCalledWith({
+      clientMessageId: 'client-1',
+      providerIdentity: { provider: 'claude', sessionId: 'provider-session', uuid: sentUuid }
+    })
+  })
+
+  it('settles a superseded dispatch even though it no longer owns the turn identity', async () => {
+    const session = sessionFor()
+    const settled = vi.fn()
+    const first = dispatchClaudeTurn(
+      session,
+      { clientMessageId: 'client-1', body: userMessage([{ type: 'text', text: 'one' }]) },
+      500
+    )
+    await vi.waitFor(() => expect(session.dispatchWaiters).toHaveLength(1))
+    const firstUuid = (session.dispatchWaiters[0] as { sentUuid?: string }).sentUuid
+    await expect(first).resolves.toMatchObject({ state: 'unknown' })
+
+    const second = dispatchClaudeTurn(
+      session,
+      { clientMessageId: 'client-2', body: userMessage([{ type: 'text', text: 'two' }]) },
+      100
+    )
+    await vi.waitFor(() => expect(session.dispatchWaiters).toHaveLength(1))
+    const secondUuid = (session.dispatchWaiters[0] as { sentUuid?: string }).sentUuid
+
+    // The stale replay must not claim the active turn, but the message it names
+    // did land, so the send it came from is delivered and must stop reading as
+    // unconfirmed — that banner is what makes a user resend a duplicate.
+    expect(resolveClaudeReplayWaiter(session, userReplayFrame(firstUuid!, 'one'), settled)).toBe(
+      false
+    )
+    expect(settled).toHaveBeenCalledWith({
+      clientMessageId: 'client-1',
+      providerIdentity: { provider: 'claude', sessionId: 'provider-session', uuid: firstUuid }
+    })
+    resolveClaudeReplayWaiter(session, userReplayFrame(secondUuid!, 'two'), settled)
+    await expect(second).resolves.toMatchObject({ state: 'accepted' })
+    expect(settled).toHaveBeenCalledTimes(1)
   })
 
   it('never lets a late replay for dispatch A resolve dispatch B', async () => {
@@ -343,6 +421,73 @@ describe('Claude structured dispatch image limits', () => {
         uuid: 'command-result-uuid'
       }
     })
+  })
+
+  it('accepts a slash command sent with an attachment from its result receipt', async () => {
+    const session = sessionFor()
+    const dispatched = dispatchClaudeTurn(
+      session,
+      {
+        clientMessageId: 'client-1',
+        body: userMessage([
+          { type: 'text', text: '/permissions' },
+          { type: 'image-ref', url: 'https://example.test/a.png' }
+        ])
+      },
+      100
+    )
+    await vi.waitFor(() => expect(session.dispatchWaiters).toHaveLength(1))
+    // The mapper moves the image ahead of the prompt, so Claude runs the command and replies
+    // with a result receipt instead of a user replay.
+    expect(
+      resolveClaudeReplayWaiter(session, {
+        type: 'result',
+        subtype: 'success',
+        session_id: 'provider-session',
+        uuid: 'command-result-uuid'
+      })
+    ).toBe(false)
+
+    await expect(dispatched).resolves.toMatchObject({
+      state: 'accepted',
+      providerIdentity: { uuid: 'command-result-uuid' }
+    })
+    // The sent order is the fix: the waiter's verdict alone was already what it is today.
+    expect(session.connection.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: {
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'url', url: 'https://example.test/a.png' } },
+            { type: 'text', text: '/permissions' }
+          ]
+        }
+      })
+    )
+  })
+
+  it('does not take a result receipt for leading whitespace Claude never reads as a command', async () => {
+    const session = sessionFor()
+    const dispatched = dispatchClaudeTurn(
+      session,
+      {
+        clientMessageId: 'client-1',
+        body: userMessage([{ type: 'text', text: '  /permissions' }])
+      },
+      100
+    )
+    await vi.waitFor(() => expect(session.dispatchWaiters).toHaveLength(1))
+
+    expect(
+      resolveClaudeReplayWaiter(session, {
+        type: 'result',
+        subtype: 'success',
+        session_id: 'provider-session',
+        uuid: 'unrelated-result-uuid'
+      })
+    ).toBe(false)
+
+    await expect(dispatched).resolves.toMatchObject({ state: 'unknown' })
   })
 
   it('correlates a later slash-command result by user_message_uuid despite a timed-out slash waiter', async () => {

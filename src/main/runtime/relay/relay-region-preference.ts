@@ -2,8 +2,6 @@ import { existsSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { z } from 'zod'
-import { cancelUnreadResponseBody } from '../../lib/unread-response-body'
-import { readFetchResponseJsonWithinLimit } from '../../../shared/fetch-response-body'
 import { hardenExistingSecureFile, writeSecureJsonFile } from '../../../shared/secure-file'
 import {
   measureOriginLatency,
@@ -23,7 +21,6 @@ export { RELAY_REGIONS, type RelayRegion } from './relay-region-probe'
 
 const RELAY_REGION_CACHE_FILENAME = 'orca-relay-region-preference.json'
 const CACHE_MAX_BYTES = 8 * 1024
-const CATALOG_MAX_BYTES = 16 * 1024
 const CACHE_TTL_MS = 24 * 60 * 60_000
 // A withheld hint is cheap to revisit but expensive to re-measure on every
 // reconnect, so it is remembered for far less time than a chosen region.
@@ -54,6 +51,7 @@ type RelayRegionPreferenceOptions = {
   diagnosticOverride?: string
   probe?: RelayProbe
   requestTimeoutMs?: number
+  logEvent?: RelayRegionLogSink
 }
 
 export class RelayRegionPreferenceResolver {

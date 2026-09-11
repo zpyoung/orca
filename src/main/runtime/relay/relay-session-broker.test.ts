@@ -79,6 +79,7 @@ vi.mock('../rpc/relay-transport', () => ({
     stop = vi.fn().mockResolvedValue(undefined)
     setGeneration = vi.fn()
     metadataFor = vi.fn()
+    hasConnection = vi.fn(() => false)
     openConnection = vi.fn().mockResolvedValue(undefined)
 
     constructor() {
@@ -109,6 +110,33 @@ describe('RelaySessionBroker lifecycle ownership', () => {
       assignmentEpoch: 1,
       leaseExpiresAt: 60_000
     })
+  })
+
+  it('publishes the assigned cell with the status and drops it on close', async () => {
+    fakes.controlConnect.mockResolvedValue({
+      type: 'host-hello-ack',
+      v: 1,
+      generation: 1,
+      controlResumeSecret: 'A'.repeat(43),
+      leaseExpiresAt: 1_000_000,
+      activeConnIds: [],
+      pendingConns: []
+    } satisfies RelayHostHelloAckMessage)
+    const onStatus = vi.fn()
+
+    const broker = await RelaySessionBroker.connect(brokerOptions({ onStatus }))
+
+    expect(onStatus.mock.calls).toContainEqual(['connecting', undefined])
+    expect(onStatus).toHaveBeenLastCalledWith('registered', 'https://relay.example.test')
+
+    // Why: the pool publishes offline while it still holds the assignment it is
+    // about to rotate; forwarding that cell leaves the UI naming a dead one.
+    fakes.controls[0]!.options.onClose(1006)
+    expect(onStatus.mock.calls).toContainEqual(['offline', undefined])
+    expect(onStatus.mock.calls).toContainEqual(['draining', 'https://relay.example.test'])
+
+    broker.closeNow()
+    expect(onStatus).toHaveBeenLastCalledWith('offline')
   })
 
   it('closes partially opened resources without publishing stale state', async () => {
@@ -387,7 +415,9 @@ describe('RelaySessionBroker lifecycle ownership', () => {
     expect(fakes.controls[2]!.options.previousGeneration).toBeUndefined()
     expect(fakes.controls[2]!.options.controlResumeSecret).toBeUndefined()
     expect(fakes.transports).toHaveLength(2)
-    await vi.waitFor(() => expect(onStatus).toHaveBeenLastCalledWith('registered'))
+    await vi.waitFor(() =>
+      expect(onStatus).toHaveBeenLastCalledWith('registered', 'https://relay.example.test')
+    )
     expect(broker.endpoint?.cellUrl).toBe('https://relay.example.test')
   })
 

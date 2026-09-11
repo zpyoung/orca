@@ -54,9 +54,12 @@ export function buildNativeChatPickerItems(
 ): NativeChatPickerItem[] {
   const mergedSkills = mergeNativeChatSkills(skills, namespacePluginSkills)
   const skillNames = new Set(mergedSkills.map((skill) => skill.name))
-  const commandNames = new Set(commands.map((command) => command.name))
+  const resolvedCommands = commands.filter(
+    (command) => !(command.kindUnspecified && skillNames.has(command.name))
+  )
+  const commandNames = new Set(resolvedCommands.map((command) => command.name))
   const commandItems = rankItems(
-    commands.map((command, index) => ({
+    resolvedCommands.map((command, index) => ({
       item: {
         kind: 'command' as const,
         // Why: the name is the dispatch token and the catalog is curated, so
@@ -127,6 +130,23 @@ function mergeNativeChatSkills(
       }
     })
     .sort(comparePickerSkills)
+}
+
+function pickerSkill(
+  name: string,
+  namedSkills: readonly DiscoveredSkill[]
+): Extract<NativeChatPickerItem, { kind: 'skill' }> {
+  const sorted = [...namedSkills].sort(compareDiscoveredSkills)
+  return {
+    kind: 'skill' as const,
+    id: `skill:${name}`,
+    name,
+    description: sorted[0]?.description ? sanitizePickerText(sorted[0].description, 240) : null,
+    sources: sorted.map((skill) => ({
+      sourceKind: skill.sourceKind,
+      skillFilePath: skill.skillFilePath
+    }))
+  }
 }
 
 function rankItems<T extends NativeChatPickerItem>(
@@ -230,12 +250,21 @@ function compareDiscoveredSkills(a: DiscoveredSkill, b: DiscoveredSkill): number
   )
 }
 
+// A session-reported skill this host could not locate on disk sorts last: it is
+// real and invocable, but carries no scope or description to rank on.
+const UNLOCATED_SCOPE_PRIORITY = Object.keys(SCOPE_PRIORITY).length
+
+function skillScopePriority(item: Extract<NativeChatPickerItem, { kind: 'skill' }>): number {
+  const sourceKind = item.sources[0]?.sourceKind
+  return sourceKind === undefined ? UNLOCATED_SCOPE_PRIORITY : SCOPE_PRIORITY[sourceKind]
+}
+
 function comparePickerSkills(
   a: Extract<NativeChatPickerItem, { kind: 'skill' }>,
   b: Extract<NativeChatPickerItem, { kind: 'skill' }>
 ): number {
   return (
-    SCOPE_PRIORITY[a.sources[0].sourceKind] - SCOPE_PRIORITY[b.sources[0].sourceKind] ||
+    skillScopePriority(a) - skillScopePriority(b) ||
     compareBaseSensitivityLocaleText(a.name, b.name)
   )
 }

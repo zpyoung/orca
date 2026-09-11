@@ -26,7 +26,7 @@ export type UseNativeChatComposerAttachmentsArgs = {
   disabled: boolean
   isComposing: () => boolean
   resolveTarget: () => NativeChatResolvedTarget | null
-  textareaRef: RefObject<HTMLTextAreaElement | null>
+  textareaRef: RefObject<NativeChatComposerInput | null>
   setCaret: (caret: number) => void
   setDraft: (updater: (previous: string) => string) => void
   setNotice: (notice: string | null) => void

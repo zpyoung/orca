@@ -101,6 +101,7 @@ function resumeArgs(manager: FakeManager, shouldUseLightTabResume: boolean) {
     ...focusOwnership,
     manager: manager as never as PaneManager,
     isActive: true,
+    isChatViewMode: false,
     wasVisible: false,
     shouldUseLightTabResume,
     captureViewportPositions: vi.fn(() => new Map()),
@@ -246,6 +247,32 @@ describe('resumeTerminalVisibility reveal repaint', () => {
     expect(manager.fitAllPanes).not.toHaveBeenCalled()
   })
 
+  it.each([
+    ['light', true],
+    ['heavy', false]
+  ])('does not focus the covered terminal on a %s chat reveal', async (_path, lightResume) => {
+    const manager = createManager()
+    const args = resumeArgs(manager, lightResume)
+    args.isChatViewMode = true
+    const { focusActivePane } = vi.mocked(await import('./pane-helpers'))
+
+    resumeTerminalVisibility(args)
+
+    expect(focusActivePane).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['light', true],
+    ['heavy', false]
+  ])('keeps focusing an active terminal on a %s reveal', async (_path, lightResume) => {
+    const manager = createManager()
+    const { focusActivePane } = vi.mocked(await import('./pane-helpers'))
+
+    resumeTerminalVisibility(resumeArgs(manager, lightResume))
+
+    expect(focusActivePane).toHaveBeenCalledWith(manager)
+  })
+
   it('checks each pane for a stale WebGL backing on a light tab reveal', () => {
     const first = { terminal: { name: 'pane-a' } }
     const second = { terminal: { name: 'pane-b' } }
@@ -278,6 +305,7 @@ describe('resumeTerminalVisibility reveal repaint', () => {
       ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: true,
+      isChatViewMode: false,
       clearGlyphAtlases: false
     })
 
@@ -313,6 +341,7 @@ describe('resumeTerminalVisibility reveal repaint', () => {
       ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: true,
+      isChatViewMode: false,
       clearGlyphAtlases: false
     })
 
@@ -337,6 +366,7 @@ describe('resumeTerminalVisibility reveal repaint', () => {
       ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: true,
+      isChatViewMode: false,
       clearGlyphAtlases: false
     })
 
@@ -377,6 +407,7 @@ describe('resumeTerminalVisibility reveal repaint', () => {
       ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: true,
+      isChatViewMode: false,
       clearGlyphAtlases: false
     })
 
@@ -394,6 +425,7 @@ describe('resumeTerminalVisibility reveal repaint', () => {
       ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: true,
+      isChatViewMode: false,
       clearGlyphAtlases: false
     })
 
@@ -406,6 +438,7 @@ describe('resumeTerminalVisibility reveal repaint', () => {
       ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: false,
+      isChatViewMode: false,
       clearGlyphAtlases: true
     })
 
@@ -422,6 +455,7 @@ describe('resumeTerminalVisibility reveal repaint', () => {
       ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: false,
+      isChatViewMode: false,
       clearGlyphAtlases: true
     })
 
@@ -443,6 +477,7 @@ describe('resumeTerminalVisibility reveal repaint', () => {
       ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: false,
+      isChatViewMode: false,
       clearGlyphAtlases: false
     })
 
