@@ -28,7 +28,7 @@ import {
   pendingActivationTerminalPrepCancels,
   shouldDeferActivationTerminalPrep
 } from './activation-terminal-prep'
-import { markWorkspaceActivityExitOnActivation } from '../../fork-workspace-activity-window/workspace-activity-exit-stamp'
+import { workspaceActivityExitPatchForActivation } from '../../fork-workspace-activity-window/workspace-activity-exit-stamp'
 
 export function createSetActiveWorktree(
   set: WorktreeSliceSet,
@@ -77,7 +77,14 @@ export function createSetActiveWorktree(
           activeWorkspaceKey: null,
           activeWorkspaceExecutionHostId: null,
           // Why: clearing/activating a worktree must dismiss the background-creation panel so the user isn't stranded on it.
-          activePendingCreationId: null
+          activePendingCreationId: null,
+          ...workspaceActivityExitPatchForActivation(
+            s,
+            previousWorkspaceId,
+            previousHostId,
+            null,
+            null
+          )
         }
       }
 
@@ -205,23 +212,16 @@ export function createSetActiveWorktree(
         ...(nextFolderWorkspaces !== s.folderWorkspaces
           ? { folderWorkspaces: nextFolderWorkspaces }
           : {}),
-        ...tabsByWorktreeUpdate
+        ...tabsByWorktreeUpdate,
+        ...workspaceActivityExitPatchForActivation(
+          s,
+          previousWorkspaceId,
+          previousHostId,
+          worktreeId,
+          executionHostId ?? null
+        )
       }
     })
-    const accepted =
-      worktreeId === null ||
-      Boolean(
-        get().getKnownWorktreeById(worktreeId, get().activeWorkspaceExecutionHostId ?? undefined)
-      )
-    if (accepted) {
-      markWorkspaceActivityExitOnActivation(
-        get,
-        previousWorkspaceId,
-        previousHostId,
-        get().activeWorktreeId,
-        get().activeWorkspaceExecutionHostId
-      )
-    }
 
     if (worktreeId && shouldPrepareTerminalTabs) {
       const prepareTerminalTabs = (): void => {

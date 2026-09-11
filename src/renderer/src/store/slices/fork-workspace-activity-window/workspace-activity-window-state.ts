@@ -85,19 +85,33 @@ export const createWorkspaceActivityWindowSlice = (
   },
   workspaceActivityExitStamps: {},
   markWorkspaceActivityExit: (workspaceId, hostId, exitedAt) => {
-    set((s) => {
-      const now = exitedAt ?? Date.now()
-      const previous =
-        getWorktreeVisitTimestamp(s.workspaceActivityExitStamps, { id: workspaceId, hostId }) ?? 0
-      if (!(now > previous)) {
-        return {}
-      }
-      return {
-        workspaceActivityExitStamps: {
-          ...s.workspaceActivityExitStamps,
-          [getWorktreeVisitKey(workspaceId, hostId)]: now
-        }
-      }
-    })
+    set((s) =>
+      stampWorkspaceActivityExit(s.workspaceActivityExitStamps, workspaceId, hostId, exitedAt)
+    )
   }
 })
+
+/**
+ * Patch recording a workspace departure, or `{}` when a newer stamp already stands.
+ *
+ * Separate from the action so an activation reducer can fold the stamp into its own commit.
+ * `stamps` is optional because the isolated worktree-slice test harness composes no UI slice.
+ */
+export function stampWorkspaceActivityExit(
+  stamps: Readonly<Record<string, number>> | undefined,
+  workspaceId: string,
+  hostId?: ExecutionHostId,
+  exitedAt?: number
+): Partial<WorkspaceActivityWindowSlice> {
+  const now = exitedAt ?? Date.now()
+  const previous = getWorktreeVisitTimestamp(stamps, { id: workspaceId, hostId }) ?? 0
+  if (!(now > previous)) {
+    return {}
+  }
+  return {
+    workspaceActivityExitStamps: {
+      ...stamps,
+      [getWorktreeVisitKey(workspaceId, hostId)]: now
+    }
+  }
+}
