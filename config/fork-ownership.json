@@ -2626,6 +2626,12 @@
       "status": "permanent"
     },
     {
+      "path": "src/shared/windows-lane-tree-removal-boundary.test.ts",
+      "reason": "Scans teardown source for the Windows PR job deliberately removed by this macOS-only release fork; platform removal behavior tests remain.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
       "path": "config/scripts/install-electron-package-binary.mjs",
       "reason": "Fork release-tooling delta for packaging the fork's own Electron binary.",
       "status": "permanent"
