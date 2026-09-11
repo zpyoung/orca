@@ -1,60 +1,26 @@
+import { useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from '@/store'
+import { useNow } from '@/hooks/use-now'
 import { getActiveSidebarWorkspaceId } from '../../../../../shared/workspace-scope'
 import type { AppState } from '@/store/types'
-import type { WorkspaceActivityFilterContext } from './workspace-activity-filter'
+import {
+  workspaceActivityWindowDays,
+  type WorkspaceActivityFilterContext
+} from './workspace-activity-filter'
 import { hydrateWorkspaceActivityWindow } from '../../../../../shared/fork-workspace-activity-window/workspace-activity-window'
 
 export type { WorkspaceActivityFilterContext } from './workspace-activity-filter'
 
-type ActivitySelectorInputs = Pick<
-  AppState,
-  | 'workspaceActivityWindow'
-  | 'workspaceActivityCustomDays'
-  | 'lastVisitedAtByWorktreeId'
-  | 'workspaceActivityExitStamps'
-  | 'activeWorkspaceKey'
-  | 'activeWorktreeId'
-  | 'activeWorkspaceExecutionHostId'
-  | 'worktreesByRepo'
-  | 'folderWorkspaces'
-  | 'repos'
->
+type WorkspaceActivityFilterInputs = Omit<WorkspaceActivityFilterContext, 'now'>
 
-let previousInputs: ActivitySelectorInputs | undefined
-let previousContext: WorkspaceActivityFilterContext | undefined
+// Why: a time-based window must age workspaces out on a quiet sidebar, so the
+// cutoff re-evaluates on the shared minute clock instead of waiting for store traffic.
+export const WORKSPACE_ACTIVITY_CUTOFF_TICK_MS = 60_000
 
-export function getWorkspaceActivityFilterContext(state: AppState): WorkspaceActivityFilterContext {
-  const inputs = previousInputs
-  if (
-    inputs &&
-    previousContext &&
-    inputs.workspaceActivityWindow === state.workspaceActivityWindow &&
-    inputs.workspaceActivityCustomDays === state.workspaceActivityCustomDays &&
-    inputs.lastVisitedAtByWorktreeId === state.lastVisitedAtByWorktreeId &&
-    inputs.workspaceActivityExitStamps === state.workspaceActivityExitStamps &&
-    inputs.activeWorkspaceKey === state.activeWorkspaceKey &&
-    inputs.activeWorktreeId === state.activeWorktreeId &&
-    inputs.activeWorkspaceExecutionHostId === state.activeWorkspaceExecutionHostId &&
-    inputs.worktreesByRepo === state.worktreesByRepo &&
-    inputs.folderWorkspaces === state.folderWorkspaces &&
-    inputs.repos === state.repos
-  ) {
-    return previousContext
-  }
+function selectWorkspaceActivityFilterInputs(state: AppState): WorkspaceActivityFilterInputs {
   const hydrated = hydrateWorkspaceActivityWindow(state)
-  previousInputs = {
-    workspaceActivityWindow: state.workspaceActivityWindow,
-    workspaceActivityCustomDays: state.workspaceActivityCustomDays,
-    lastVisitedAtByWorktreeId: state.lastVisitedAtByWorktreeId,
-    workspaceActivityExitStamps: state.workspaceActivityExitStamps,
-    activeWorkspaceKey: state.activeWorkspaceKey,
-    activeWorktreeId: state.activeWorktreeId,
-    activeWorkspaceExecutionHostId: state.activeWorkspaceExecutionHostId,
-    worktreesByRepo: state.worktreesByRepo,
-    folderWorkspaces: state.folderWorkspaces,
-    repos: state.repos
-  }
-  previousContext = {
+  return {
     workspaceActivityWindow: hydrated.workspaceActivityWindow,
     workspaceActivityCustomDays: hydrated.workspaceActivityCustomDays,
     lastVisitedAtByWorktreeId: state.lastVisitedAtByWorktreeId,
@@ -63,12 +29,29 @@ export function getWorkspaceActivityFilterContext(state: AppState): WorkspaceAct
       state.activeWorkspaceKey,
       state.activeWorktreeId
     ),
-    selectedHostId: state.activeWorkspaceExecutionHostId ?? null,
-    now: Date.now()
+    selectedHostId: state.activeWorkspaceExecutionHostId ?? null
   }
-  return previousContext
 }
 
+/** Pure snapshot for non-hook callers; every call reads the clock and the given state afresh. */
+export function getWorkspaceActivityFilterContext(state: AppState): WorkspaceActivityFilterContext {
+  return { ...selectWorkspaceActivityFilterInputs(state), now: Date.now() }
+}
+
+/**
+ * Referentially stable activity context for the sidebar visibility memos: it changes only when
+ * one of its inputs changes or, for a time-based window, when the cutoff clock ticks.
+ */
 export function useWorkspaceActivityFilter(): WorkspaceActivityFilterContext {
-  return useAppStore(getWorkspaceActivityFilterContext)
+  const inputs = useAppStore(useShallow(selectWorkspaceActivityFilterInputs))
+  const timeBased =
+    workspaceActivityWindowDays(
+      inputs.workspaceActivityWindow,
+      inputs.workspaceActivityCustomDays
+    ) !== null
+  const tick = useNow(WORKSPACE_ACTIVITY_CUTOFF_TICK_MS, timeBased)
+  // Why: `now` only feeds a cutoff, so a window without one pins it and stays identity-stable
+  // across the shared clock's unrelated ticks. The clock catches up one frame after enabling.
+  const now = timeBased ? tick : 0
+  return useMemo(() => ({ ...inputs, now }), [inputs, now])
 }

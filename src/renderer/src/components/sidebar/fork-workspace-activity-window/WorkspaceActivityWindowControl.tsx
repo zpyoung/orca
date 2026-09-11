@@ -11,7 +11,10 @@ import {
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import type { WorkspaceActivityWindow } from '../../../../../shared/fork-workspace-activity-window/workspace-activity-window'
-import { isValidWorkspaceActivityCustomDays } from '../../../../../shared/fork-workspace-activity-window/workspace-activity-window'
+import {
+  isValidWorkspaceActivityCustomDays,
+  isWorkspaceActivityWindow
+} from '../../../../../shared/fork-workspace-activity-window/workspace-activity-window'
 
 export function WorkspaceActivityWindowControl() {
   const controlId = useId()
@@ -89,7 +92,14 @@ export function WorkspaceActivityWindowControl() {
           'Activity window'
         )}
       </Label>
-      <Select value={window} onValueChange={(value) => setWindow(value as WorkspaceActivityWindow)}>
+      <Select
+        value={window}
+        onValueChange={(value) => {
+          if (isWorkspaceActivityWindow(value)) {
+            setWindow(value)
+          }
+        }}
+      >
         <SelectTrigger id={windowId} size="sm" className="h-8 text-xs">
           <SelectValue />
         </SelectTrigger>
