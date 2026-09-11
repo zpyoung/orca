@@ -52,6 +52,19 @@
         "orca-per-workspace-env": 1,
         "orchestration": 2
       }
+    },
+    {
+      "appVersion": "1.4.201-rc.0.zy01",
+      "skills": {
+        "computer-use": 3,
+        "linear-tickets": 2,
+        "orca-cli": 5,
+        "orca-emulator": 2,
+        "orca-emulator-android": 2,
+        "orca-linear": 2,
+        "orca-per-workspace-env": 2,
+        "orchestration": 3
+      }
     }
   ]
 }
