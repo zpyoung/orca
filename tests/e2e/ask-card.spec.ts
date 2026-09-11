@@ -331,9 +331,7 @@ test.describe('Ask card', () => {
     await expect(orcaPage.getByText('Declined.')).toHaveCount(0)
   })
 
-  test('scrolls a full ten-question card instead of growing past the panel', async ({
-    orcaPage
-  }) => {
+  test('scrolls a long card and keeps Submit pinned inside the panel', async ({ orcaPage }) => {
     const { paneKey } = await setupAskPane(orcaPage)
     const askId = `e2e-ask-tall-${randomUUID()}`
 
@@ -348,7 +346,9 @@ test.describe('Ask card', () => {
                 paneKey: pane,
                 status: 'pending',
                 spec: {
-                  questions: Array.from({ length: 10 }, (_, index) => ({
+                  // Enough to overflow a full-height sidebar on any display this runs on — ten
+                  // fit without scrolling now that the card is not capped at 28rem.
+                  questions: Array.from({ length: 40 }, (_, index) => ({
                     id: `q${index}`,
                     type: 'text' as const,
                     question: `Tall card question ${index}?`
@@ -379,10 +379,21 @@ test.describe('Ask card', () => {
         node = node.parentElement
       }
       const body = node?.querySelector<HTMLElement>('.overflow-y-auto')
-      return body ? { scrollHeight: body.scrollHeight, clientHeight: body.clientHeight } : null
+      if (!body || !submit) {
+        return null
+      }
+      return {
+        scrollHeight: body.scrollHeight,
+        clientHeight: body.clientHeight,
+        submitBottom: submit.getBoundingClientRect().bottom,
+        viewportHeight: window.innerHeight
+      }
     })
 
     expect(metrics).not.toBeNull()
+    // The questions scroll…
     expect(metrics!.scrollHeight).toBeGreaterThan(metrics!.clientHeight)
+    // …and the footer stays on screen rather than being pushed out of the panel with them.
+    expect(metrics!.submitBottom).toBeLessThanOrEqual(metrics!.viewportHeight)
   })
 })

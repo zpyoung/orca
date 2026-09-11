@@ -149,3 +149,10 @@ entries' IDs; manual edits to fix typos are fine.
 - **Severity**: medium
 - **Proposed fix**: Mount it in the sidebar worktree row / tab header alongside the other per-worktree indicators, declared as a fork seam in config/fork-ownership.json.
 
+
+## BUG-17: two ask e2e tests fail on a clean baseline, so the lane never proved the answer path
+- **Observed**: 2026-09-11
+- **File**: tests/e2e/ask-card.spec.ts:214
+- **Description**: 'answering resolves the blocked wait and collapses the card' and 'restores a pending ask with its partial draft intact after a renderer remount' both fail under `--project=electron-headless`. Confirmed pre-existing: they fail identically on a throwaway worktree at 0dfa466215, which still has the old terminal-pane dock and none of the right-sidebar work. In the first, the card renders and Submit is clicked (verified in the failure screenshot: field filled, footer visible) but `installAskRpcRecorder`'s poll never sees an `ask.answer` call — consistent with `window.api` being a frozen contextBridge object, so the `window.api.runtime.call = ...` reassignment silently no-ops. The remaining four tests in the file pass. Matches the AGENTS.md note that the e2e lane "has not been run anywhere yet".
+- **Severity**: medium
+- **Proposed fix**: Record RPC calls through a seam the renderer reads at call time rather than reassigning a contextBridge property — e.g. expose a test-only hook on `window.__store` or wrap at the preload boundary under an env flag. Then re-check the remount test, which may share the same cause.
