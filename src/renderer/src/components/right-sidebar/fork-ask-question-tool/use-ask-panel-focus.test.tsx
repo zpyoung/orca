@@ -154,6 +154,29 @@ describe('useAskPanelFocus', () => {
     expect(result.current).toBe('explorer')
   })
 
+  it('keeps the sidebar open when the user navigates away from a forced-open panel', () => {
+    act(() => {
+      useAppStore.setState({ rightSidebarOpen: false })
+    })
+    const { result, rerender } = renderFocus()
+
+    seed({ 'pane-a': [card('ask-1')] })
+    rerender()
+    expect(useAppStore.getState().rightSidebarOpen).toBe(true)
+    expect(useAppStore.getState().askFocusRestoreOpen).toBe(false)
+
+    act(() => {
+      useAppStore.setState((s) => ({
+        rightSidebarRouteRequestId: s.rightSidebarRouteRequestId + 1
+      }))
+    })
+    rerender()
+    expect(result.current).toBe('explorer')
+    // The click chose a tab, not a collapse.
+    expect(useAppStore.getState().rightSidebarOpen).toBe(true)
+    expect(useAppStore.getState().askFocusRestoreOpen).toBeNull()
+  })
+
   it('opens a collapsed sidebar and re-collapses it once the ask clears', () => {
     act(() => {
       useAppStore.setState({ rightSidebarOpen: false })

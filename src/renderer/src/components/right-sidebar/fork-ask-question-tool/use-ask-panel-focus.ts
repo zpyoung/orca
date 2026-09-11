@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { useAppStore } from '@/store'
 import { selectHeadAsk } from '@/store/slices/fork-ask-question-tool/asks'
 import type { ActiveRightSidebarTab } from '@/store/slices/editor'
@@ -13,8 +13,8 @@ export const ASK_PANEL_TAB = 'ask' satisfies ActiveRightSidebarTab
  * ask, and gives it back when the ask resolves.
  *
  * The override is layered over the routed tab rather than written to `rightSidebarTab` on
- * purpose: that field is persisted to disk and mirrored to paired mobile/web clients, and the
- * sidebar already renders a fallback for a hidden tab "without overwriting the stored route"
+ * purpose: that field is persisted and mirrored to paired mobile/web clients, and the sidebar
+ * already renders a fallback for a hidden tab "without overwriting the stored route"
  * (use-right-sidebar-tab-routing.ts). Leaving the stored route alone makes the hand-back exact
  * and free — once the item is gone the routed tab is whatever the user last chose.
  *
@@ -37,45 +37,34 @@ export function useAskPanelFocus(
   const isAwaitingAnswer = headAsk !== null && !isTerminalAskStatus(headAsk.status)
   const itemVisible = visibleItems.some((item) => item.id === ASK_PANEL_TAB)
 
-  const [latchedAskId, setLatchedAskId] = useState<string | null>(null)
   // A set, not one id: with a question waiting on two panes, dismissing the second would
   // otherwise overwrite the first and re-steal focus the moment you switched back to it.
   const dismissedAskIdsRef = useRef<Set<string>>(new Set())
+  const armedAskIdRef = useRef<string | null>(null)
   const lastRouteRequestIdRef = useRef(routeRequestId)
+  const userOwnsSidebarRef = useRef(false)
 
+  // Derived in render rather than through effects so the panel never paints one frame of the
+  // old tab first. Every write below is idempotent, so a double-invoked render lands identically.
+  //
   // Why the nonce and not `rightSidebarTab`: with the override showing Questions over a stored
   // Explorer route, clicking Explorer re-sets a value that is already current and changes no
   // state. `setRightSidebarTab` bumps this counter unconditionally, so it is the only reliable
   // signal that the user made a deliberate choice.
-  useEffect(() => {
-    if (routeRequestId === lastRouteRequestIdRef.current) {
-      return
-    }
+  if (routeRequestId !== lastRouteRequestIdRef.current) {
     lastRouteRequestIdRef.current = routeRequestId
-    if (latchedAskId !== null) {
-      dismissedAskIdsRef.current.add(latchedAskId)
-      setLatchedAskId(null)
+    if (armedAskIdRef.current !== null) {
+      dismissedAskIdsRef.current.add(armedAskIdRef.current)
+      userOwnsSidebarRef.current = true
     }
-  }, [routeRequestId, latchedAskId])
-
-  useEffect(() => {
-    if (!isAwaitingAnswer || askId === null || !itemVisible) {
-      return
-    }
-    if (dismissedAskIdsRef.current.has(askId) || latchedAskId === askId) {
-      return
-    }
-    setLatchedAskId(askId)
-  }, [askId, isAwaitingAnswer, itemVisible, latchedAskId])
-
-  useEffect(() => {
-    if (latchedAskId === null || (itemVisible && latchedAskId === askId)) {
-      return
-    }
-    setLatchedAskId(null)
-  }, [askId, itemVisible, latchedAskId])
-
-  const latched = itemVisible && latchedAskId !== null && latchedAskId === askId
+  }
+  const dismissed = askId !== null && dismissedAskIdsRef.current.has(askId)
+  if (isAwaitingAnswer && askId !== null && !dismissed) {
+    armedAskIdRef.current = askId
+  }
+  // `armedAskIdRef` is what holds the panel through the resolved-result flash: the ask is no
+  // longer awaiting an answer but is still queued, and its summary needs somewhere to render.
+  const latched = itemVisible && askId !== null && !dismissed && armedAskIdRef.current === askId
 
   // Read through refs, not deps: a manual collapse while the panel holds focus should stick, and
   // re-running this on every `rightSidebarOpen` change would reopen it under the user.
@@ -86,17 +75,22 @@ export function useAskPanelFocus(
 
   useEffect(() => {
     if (latched) {
+      userOwnsSidebarRef.current = false
       if (!sidebarOpenRef.current && restoreOpenRef.current === null) {
         setAskFocusRestoreOpen(false)
         setRightSidebarOpen(true)
       }
       return
     }
-    // `false` is the only value this hook ever stores, so it is also the only one it undoes.
-    if (restoreOpenRef.current === false) {
-      setRightSidebarOpen(false)
-      setAskFocusRestoreOpen(null)
+    if (restoreOpenRef.current === null) {
+      return
     }
+    // Picking a tab hands the sidebar back to the user, open state included. Only an ask that
+    // cleared on its own gets to undo the open this hook forced.
+    if (restoreOpenRef.current === false && !userOwnsSidebarRef.current) {
+      setRightSidebarOpen(false)
+    }
+    setAskFocusRestoreOpen(null)
   }, [latched, setAskFocusRestoreOpen, setRightSidebarOpen])
 
   return latched ? ASK_PANEL_TAB : routedTab
