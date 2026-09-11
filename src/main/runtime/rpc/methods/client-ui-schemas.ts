@@ -186,7 +186,8 @@ const TopLevelViewSchema = z.enum([
   'space',
   'skills',
   'artifacts',
-  'mobile'
+  'mobile',
+  'ledger'
 ])
 const UiUpdateFields = z
   .object({

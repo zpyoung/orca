@@ -8,6 +8,7 @@ import {
 import type { Range } from '@tanstack/react-virtual'
 import {
   AlertTriangle,
+  BookOpen,
   ChevronDown,
   CircleX,
   Ellipsis,
@@ -69,6 +70,9 @@ import type {
   WorkspaceStatus,
   WorkspaceStatusDefinition
 } from '../../../../shared/types'
+import type { LedgerRemovalPreview } from '../../../../shared/ledger'
+import { getProjectIdentityKey } from '../../../../shared/project-host-setup-projection'
+import { requestLedger } from '@/runtime/runtime-ledger-client'
 import { DEFAULT_SHOW_SLEEPING_WORKSPACES } from '../../../../shared/constants'
 import { buildWorktreeComparator, compareWorktreeSortLabel } from './smart-sort'
 import {
@@ -244,6 +248,7 @@ import {
 import { persistWorktreeSortOrderByHost } from '@/lib/worktree-sort-order-persistence'
 import {
   getRepoExecutionHostId,
+  parseExecutionHostId,
   getSettingsFocusedExecutionHostId,
   getWorktreeExecutionHostId,
   type ExecutionHostId
@@ -340,6 +345,9 @@ type ProjectGroupDeleteDialogState = {
   groupId: string
   groupName: string
   removeContainedProjects: boolean
+  ledgerPreview: LedgerRemovalPreview[]
+  ledgerPreviewLoading: boolean
+  ledgerPreviewError: string | null
 }
 
 // Why: epoch-driven recomputes often produce arrays whose contents and order are unchanged; reusing the previous identity when element-wise equal keeps downstream memos and React.memo'd cards bailing out. Safe only because elements (Worktree objects / id strings) are immutably REPLACED on change — never wrap arrays of mutated-in-place objects.
@@ -661,6 +669,8 @@ type VirtualizedWorktreeViewportProps = {
   collapsedGroups: Set<string>
   handleCreateForRepo: (projectId: string) => void
   handleOpenRepoSettings: (projectId: string, sectionId?: string) => void
+  handleOpenProjectLedger: (repo: Repo) => void
+  handleOpenGroupLedger: (group: ProjectGroup) => void
   handleOpenWorktreeVisibility: (projectId: string) => void
   handleShowImportedWorktrees: (projectId: string) => void
   handleKeepImportedWorktreesHidden: (projectId: string) => void
@@ -1459,6 +1469,8 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
   collapsedGroups,
   handleCreateForRepo,
   handleOpenRepoSettings,
+  handleOpenProjectLedger,
+  handleOpenGroupLedger,
   handleOpenWorktreeVisibility,
   handleShowImportedWorktrees,
   handleKeepImportedWorktreesHidden,
@@ -4690,6 +4702,16 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
                             <DropdownMenuItem
                               onSelect={() => {
                                 if (row.projectGroup?.id) {
+                                  handleOpenGroupLedger(row.projectGroup)
+                                }
+                              }}
+                            >
+                              <BookOpen className="size-3.5" />
+                              Open ledger
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onSelect={() => {
+                                if (row.projectGroup?.id) {
                                   handleRenameProjectGroup(row.projectGroup.id, row.label)
                                 }
                               }}
@@ -4814,6 +4836,16 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
                             onClick={stopRepoHeaderMenuEvent}
                             onKeyDown={stopRepoHeaderMenuEvent}
                           >
+                            <DropdownMenuItem
+                              onSelect={() => {
+                                if (row.repo) {
+                                  handleOpenProjectLedger(row.repo)
+                                }
+                              }}
+                            >
+                              <BookOpen className="size-3.5" />
+                              Open ledger
+                            </DropdownMenuItem>
                             <DropdownMenuItem
                               onSelect={() => {
                                 if (row.repo) {
@@ -5499,6 +5531,7 @@ const WorktreeList = React.memo(function WorktreeList({
   const filterRepoIds = useAppStore((s) => s.filterRepoIds)
   const openModal = useAppStore((s) => s.openModal)
   const openSettingsPage = useAppStore((s) => s.openSettingsPage)
+  const openLedgerPage = useAppStore((s) => s.openLedgerPage)
   const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
   const updateWorktreeMeta = useAppStore((s) => s.updateWorktreeMeta)
   const updateWorktreesMeta = useAppStore((s) => s.updateWorktreesMeta)
@@ -6264,7 +6297,9 @@ const WorktreeList = React.memo(function WorktreeList({
 
   // Why: full-page nav views aren't scoped to a worktree, so no sidebar card should look selected.
   const selectedSidebarWorktreeId =
-    activeView === 'tasks' || activeView === 'activity' ? null : currentSidebarWorktreeId
+    activeView === 'tasks' || activeView === 'activity' || activeView === 'ledger'
+      ? null
+      : currentSidebarWorktreeId
 
   // Why layout effect: the Cmd/Ctrl+1–9 handler can fire right after commit; publishing after paint would leave the shortcut cache stale.
   useLayoutEffect(() => {
@@ -6286,6 +6321,30 @@ const WorktreeList = React.memo(function WorktreeList({
       openSettingsPage()
     },
     [openSettingsPage, openSettingsTarget]
+  )
+
+  const handleOpenProjectLedger = useCallback(
+    (repo: Repo) => {
+      const host = parseExecutionHostId(getRepoExecutionHostId(repo))
+      openLedgerPage({
+        target: { owner: { tier: 'project', id: getProjectIdentityKey(repo) } },
+        ...(host?.kind === 'runtime' ? { environmentId: host.id } : {}),
+        title: `${repo.displayName} ledger`
+      })
+    },
+    [openLedgerPage]
+  )
+
+  const handleOpenGroupLedger = useCallback(
+    (group: ProjectGroup) => {
+      const host = 'executionHostId' in group ? parseExecutionHostId(group.executionHostId) : null
+      openLedgerPage({
+        target: { owner: { tier: 'group', id: group.id } },
+        ...(host?.kind === 'runtime' ? { environmentId: host.id } : {}),
+        title: `${group.name} ledger`
+      })
+    },
+    [openLedgerPage]
   )
 
   const handleOpenWorktreeVisibility = useCallback(
@@ -6485,6 +6544,7 @@ const WorktreeList = React.memo(function WorktreeList({
     useState<ProjectGroupNameDialogState | null>(null)
   const [projectGroupDeleteDialog, setProjectGroupDeleteDialog] =
     useState<ProjectGroupDeleteDialogState | null>(null)
+  const [ledgerPreviewGeneration, setLedgerPreviewGeneration] = useState(0)
 
   const handleCreateGroupFromRepo = useCallback((repo: Repo) => {
     setProjectGroupNameDialog({ type: 'create-from-repo', repo })
@@ -6546,18 +6606,87 @@ const WorktreeList = React.memo(function WorktreeList({
     projectGroupDeleteProjectCount > 0 && projectGroupDeleteDialog?.removeContainedProjects === true
 
   const handleDeleteProjectGroup = useCallback((groupId: string, groupName: string) => {
-    setProjectGroupDeleteDialog({ groupId, groupName, removeContainedProjects: false })
+    setProjectGroupDeleteDialog({
+      groupId,
+      groupName,
+      removeContainedProjects: false,
+      ledgerPreview: [],
+      ledgerPreviewLoading: true,
+      ledgerPreviewError: null
+    })
   }, [])
+
+  const ledgerPreviewGroupId = projectGroupDeleteDialog?.groupId
+  const ledgerPreviewRemoveProjects = projectGroupDeleteDialog?.removeContainedProjects
+  useEffect(() => {
+    if (!ledgerPreviewGroupId) {
+      return
+    }
+    let cancelled = false
+    const group = projectGroups.find((candidate) => candidate.id === ledgerPreviewGroupId)
+    const parsedHost = group?.executionHostId ? parseExecutionHostId(group.executionHostId) : null
+    setProjectGroupDeleteDialog((current) =>
+      current ? { ...current, ledgerPreviewLoading: true, ledgerPreviewError: null } : current
+    )
+    void requestLedger(
+      {
+        operation: 'removal-preview',
+        removal: {
+          projectGroupId: ledgerPreviewGroupId,
+          removeContainedProjects: ledgerPreviewRemoveProjects
+        }
+      },
+      parsedHost?.kind === 'runtime' ? parsedHost.environmentId : undefined
+    )
+      .then((response) => {
+        if (cancelled) {
+          return
+        }
+        setProjectGroupDeleteDialog((current) =>
+          current
+            ? {
+                ...current,
+                ledgerPreview: response.removalPreview ?? [],
+                ledgerPreviewLoading: false,
+                ledgerPreviewError: null
+              }
+            : current
+        )
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return
+        }
+        setProjectGroupDeleteDialog((current) =>
+          current
+            ? {
+                ...current,
+                ledgerPreviewLoading: false,
+                ledgerPreviewError:
+                  error instanceof Error ? error.message : 'Ledger preview unavailable'
+              }
+            : current
+        )
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [ledgerPreviewGeneration, ledgerPreviewGroupId, ledgerPreviewRemoveProjects, projectGroups])
 
   const handleConfirmDeleteProjectGroup = useCallback(async () => {
     if (!projectGroupDeleteDialog) {
       return
     }
+    let closeDialog = true
     try {
       const result = await deleteProjectGroupWithContainedProjects(
         projectGroupDeleteDialog.groupId,
         {
-          removeContainedProjects: projectGroupRemoveContainedProjects
+          removeContainedProjects: projectGroupRemoveContainedProjects,
+          expectedLedgers: projectGroupDeleteDialog.ledgerPreview.map(({ ledgerId, revision }) => ({
+            ledgerId,
+            revision
+          }))
         }
       )
       // Why: a missing group is already the desired end state, so only a real delete failure warrants a toast.
@@ -6597,9 +6726,29 @@ const WorktreeList = React.memo(function WorktreeList({
           }
         )
       }
+    } catch (error) {
+      const code = (error as { code?: string })?.code
+      if (code === 'conflict' || (error instanceof Error && error.message.includes('conflict'))) {
+        closeDialog = false
+        setProjectGroupDeleteDialog((current) =>
+          current
+            ? {
+                ...current,
+                ledgerPreview: [],
+                ledgerPreviewLoading: true,
+                ledgerPreviewError: null
+              }
+            : current
+        )
+        setLedgerPreviewGeneration((generation) => generation + 1)
+      } else {
+        throw error
+      }
     } finally {
       // Why: deleting contained projects can unmount this dialog before its close handler runs, so the parent owns cleanup.
-      setProjectGroupDeleteDialog(null)
+      if (closeDialog) {
+        setProjectGroupDeleteDialog(null)
+      }
     }
   }, [
     deleteProjectGroupWithContainedProjects,
@@ -7079,6 +7228,9 @@ const WorktreeList = React.memo(function WorktreeList({
           }
         }}
         onConfirm={handleConfirmDeleteProjectGroup}
+        ledgerPreview={projectGroupDeleteDialog?.ledgerPreview}
+        ledgerPreviewLoading={projectGroupDeleteDialog?.ledgerPreviewLoading}
+        ledgerPreviewError={projectGroupDeleteDialog?.ledgerPreviewError}
       />
       <VirtualizedWorktreeViewport
         key={viewportResetKey}
@@ -7092,6 +7244,8 @@ const WorktreeList = React.memo(function WorktreeList({
         collapsedGroups={effectiveCollapsedGroups}
         handleCreateForRepo={handleCreateForRepo}
         handleOpenRepoSettings={handleOpenRepoSettings}
+        handleOpenProjectLedger={handleOpenProjectLedger}
+        handleOpenGroupLedger={handleOpenGroupLedger}
         handleOpenWorktreeVisibility={handleOpenWorktreeVisibility}
         handleShowImportedWorktrees={handleShowImportedWorktrees}
         handleKeepImportedWorktreesHidden={handleKeepImportedWorktreesHidden}

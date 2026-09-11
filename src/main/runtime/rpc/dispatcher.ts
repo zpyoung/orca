@@ -41,7 +41,10 @@ export class RpcDispatcher {
     this.legacyOrchestration = new OrchestrationLegacyCompatibility(runtime)
   }
 
-  async dispatch(request: RpcRequest, options?: { signal?: AbortSignal }): Promise<RpcResponse> {
+  async dispatch(
+    request: RpcRequest,
+    options?: { signal?: AbortSignal; authenticatedCredential?: string }
+  ): Promise<RpcResponse> {
     const meta = this.meta()
     const method = this.registry.get(request.method)
     if (!method) {
@@ -98,6 +101,7 @@ export class RpcDispatcher {
           orchestrationCapability: request.orchestrationCapability,
           authenticatedCallerFingerprint:
             mutation?.identity.callerFingerprint ?? authenticatedCallerFingerprint(request),
+          authenticatedCredential: options?.authenticatedCredential,
           recordMutationReceipt: mutation?.recordReceipt,
           orchestrationMutation: mutation?.identity,
           legacyCoordinatorRunId,
@@ -191,6 +195,7 @@ export class RpcDispatcher {
             orchestrationCapability: request.orchestrationCapability,
             authenticatedCallerFingerprint:
               mutation?.identity.callerFingerprint ?? authenticatedCallerFingerprint(request),
+            authenticatedCredential: options?.authenticatedCredential,
             recordMutationReceipt: mutation?.recordReceipt,
             orchestrationMutation: mutation?.identity,
             pairing: options?.pairing,

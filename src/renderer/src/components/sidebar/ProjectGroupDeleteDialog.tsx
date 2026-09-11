@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { translate } from '@/i18n/i18n'
+import type { LedgerRemovalPreview } from '../../../../shared/ledger'
 
 type ProjectGroupDeleteDialogProps = {
   open: boolean
@@ -21,7 +22,11 @@ type ProjectGroupDeleteDialogProps = {
   onRemoveContainedProjectsChange: (removeContainedProjects: boolean) => void
   onOpenChange: (open: boolean) => void
   onConfirm: () => Promise<void> | void
+  ledgerPreview?: LedgerRemovalPreview[]
+  ledgerPreviewLoading?: boolean
+  ledgerPreviewError?: string | null
 }
+const EMPTY_LEDGER_PREVIEW: LedgerRemovalPreview[] = []
 
 export function ProjectGroupDeleteDialog({
   open,
@@ -31,7 +36,10 @@ export function ProjectGroupDeleteDialog({
   removeContainedProjects,
   onRemoveContainedProjectsChange,
   onOpenChange,
-  onConfirm
+  onConfirm,
+  ledgerPreview = EMPTY_LEDGER_PREVIEW,
+  ledgerPreviewLoading = false,
+  ledgerPreviewError = null
 }: ProjectGroupDeleteDialogProps): React.JSX.Element {
   const [deleting, setDeleting] = useState(false)
   const [wasOpen, setWasOpen] = useState(open)
@@ -181,6 +189,24 @@ export function ProjectGroupDeleteDialog({
             </div>
           </div>
         )}
+        <div className="rounded-md border border-border/70 bg-muted/35 px-3 py-2 text-xs">
+          <div className="font-medium text-foreground">Ledger records retained</div>
+          {ledgerPreviewLoading ? (
+            <div className="mt-1 text-muted-foreground">Checking affected ledgers…</div>
+          ) : ledgerPreviewError ? (
+            <div className="mt-1 text-destructive" role="alert">
+              {ledgerPreviewError}
+            </div>
+          ) : ledgerPreview.length === 0 ? (
+            <div className="mt-1 text-muted-foreground">No affected ledgers.</div>
+          ) : (
+            <div className="mt-1 text-muted-foreground">
+              {ledgerPreview.reduce((total, ledger) => total + ledger.entryCount, 0)} entries across{' '}
+              {ledgerPreview.length} ledger{ledgerPreview.length === 1 ? '' : 's'} will be retained
+              and detached as needed.
+            </div>
+          )}
+        </div>
         <DialogFooter>
           <Button
             type="button"
@@ -198,7 +224,7 @@ export function ProjectGroupDeleteDialog({
             variant="destructive"
             size="sm"
             className="text-xs"
-            disabled={deleting}
+            disabled={deleting || ledgerPreviewLoading || Boolean(ledgerPreviewError)}
             onClick={handleConfirm}
           >
             {deleting

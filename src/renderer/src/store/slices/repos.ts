@@ -201,8 +201,14 @@ export type FolderWorkspacePathStatusCacheEntry = {
   requestSnapshot: string
 }
 
+export type DeleteProjectGroupOptions = {
+  expectedLedgers?: { ledgerId: string; revision: number }[]
+  removeContainedProjects?: boolean
+}
+
 export type DeleteProjectGroupWithContainedProjectsOptions = {
   removeContainedProjects: boolean
+  expectedLedgers?: { ledgerId: string; revision: number }[]
 }
 
 type AllHostCatalogFetchOptions = {
@@ -1779,7 +1785,7 @@ export type RepoSlice = {
     groupId: string,
     updates: Partial<Pick<ProjectGroup, 'name' | 'isCollapsed' | 'tabOrder' | 'color'>>
   ) => Promise<boolean>
-  deleteProjectGroup: (groupId: string) => Promise<boolean>
+  deleteProjectGroup: (groupId: string, options?: DeleteProjectGroupOptions) => Promise<boolean>
   deleteProjectGroupWithContainedProjects: (
     groupId: string,
     options: DeleteProjectGroupWithContainedProjectsOptions
@@ -1793,7 +1799,11 @@ export type RepoSlice = {
   // options.errorFeedback defaults to 'silent' so bulk/background callers keep their own aggregate reporting.
   removeProject: (
     projectId: string,
-    options?: { hostId?: ExecutionHostId; errorFeedback?: 'toast' | 'silent' }
+    options?: {
+      hostId?: ExecutionHostId
+      errorFeedback?: 'toast' | 'silent'
+      expectedLedgers?: { ledgerId: string; revision: number }[]
+    }
   ) => Promise<void>
   updateProject: (projectId: string, updates: ProjectUpdate) => Promise<boolean>
   // options.hostId targets a specific host's row + RPC target when the id exists on multiple hosts; else the focused host is assumed.
@@ -2809,18 +2819,30 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
     }
   },
 
-  deleteProjectGroup: async (groupId) => {
+  deleteProjectGroup: async (groupId, options) => {
     try {
       // Why: project groups are focused-host-scoped by design (see updateProjectGroup).
       const target = getActiveRuntimeTarget(get().settings)
       const deleted =
         target.kind === 'local'
-          ? await window.api.projectGroups.delete({ groupId })
+          ? await window.api.projectGroups.delete({
+              groupId,
+              ...(options?.expectedLedgers ? { expectedLedgers: options.expectedLedgers } : {}),
+              ...(options?.removeContainedProjects !== undefined
+                ? { removeContainedProjects: options.removeContainedProjects }
+                : {})
+            })
           : (
               await callRuntimeRpc<{ deleted: boolean }>(
                 target,
                 'projectGroup.delete',
-                { groupId },
+                {
+                  groupId,
+                  ...(options?.expectedLedgers ? { expectedLedgers: options.expectedLedgers } : {}),
+                  ...(options?.removeContainedProjects !== undefined
+                    ? { removeContainedProjects: options.removeContainedProjects }
+                    : {})
+                },
                 { timeoutMs: 15_000 }
               )
             ).deleted
@@ -2844,6 +2866,9 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       })
       return true
     } catch (err) {
+      if ((err as { code?: string })?.code === 'conflict') {
+        throw err
+      }
       console.error('Failed to delete project group:', err)
       return false
     }
@@ -2862,7 +2887,10 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       }
     }
 
-    const deleted = await get().deleteProjectGroup(groupId)
+    const deleted = await get().deleteProjectGroup(groupId, {
+      expectedLedgers: options.expectedLedgers,
+      removeContainedProjects: options.removeContainedProjects
+    })
     if (!deleted) {
       return {
         status: 'group-delete-failed',
@@ -2873,38 +2901,8 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       }
     }
 
-    if (!options.removeContainedProjects) {
-      return {
-        status: 'deleted-group',
-        groupId,
-        requestedProjectIds,
-        removedProjectIds: [],
-        failedProjectRemovals: []
-      }
-    }
-
-    const removedProjectIds: string[] = []
+    const removedProjectIds = options.removeContainedProjects ? targets.projectIds : []
     const failedProjectRemovals: ProjectRemovalFailure[] = []
-    for (const projectId of targets.projectIds) {
-      const existedBeforeRemoval = get().repos.some((repo) => repo.id === projectId)
-      try {
-        if (existedBeforeRemoval) {
-          await get().removeProject(projectId)
-        }
-      } catch (err) {
-        console.error('Failed to remove contained project:', err)
-      }
-      const stillExists = get().repos.some((repo) => repo.id === projectId)
-      if (stillExists) {
-        failedProjectRemovals.push({
-          projectId,
-          reason: 'Project remained in Orca after removeProject completed.'
-        })
-      } else {
-        removedProjectIds.push(projectId)
-      }
-    }
-
     return {
       status: 'deleted-group',
       groupId,
@@ -3404,9 +3402,24 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       try {
         await (target.kind === 'local'
           ? idExistsOnOtherHost
-            ? window.api.repos.removeForHost({ repoId: projectId, hostId: ownerHostId })
-            : window.api.repos.remove({ repoId: projectId })
-          : callRuntimeRpc(target, 'repo.rm', { repo: projectId }, { timeoutMs: 15_000 }))
+            ? window.api.repos.removeForHost({
+                repoId: projectId,
+                hostId: ownerHostId,
+                ...(options?.expectedLedgers ? { expectedLedgers: options.expectedLedgers } : {})
+              })
+            : window.api.repos.remove({
+                repoId: projectId,
+                ...(options?.expectedLedgers ? { expectedLedgers: options.expectedLedgers } : {})
+              })
+          : callRuntimeRpc(
+              target,
+              'repo.rm',
+              {
+                repo: projectId,
+                ...(options?.expectedLedgers ? { expectedLedgers: options.expectedLedgers } : {})
+              },
+              { timeoutMs: 15_000 }
+            ))
       } catch (err) {
         // Why: the owner already dropped this project, so purge the local ghost row instead of aborting (#11994).
         if (!hasRuntimeRpcErrorCode(err, 'repo_not_found')) {

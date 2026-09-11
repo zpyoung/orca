@@ -2872,6 +2872,10 @@ export class Store {
     }
   }
 
+  getDataFile(): string {
+    return this.dataFile
+  }
+
   private adaptFlatFolderScanProjectGroups(): boolean {
     // Why: older folder imports kept a real parent path but flat repos; upgrade that shape into v1 sparse folder scopes.
     const groups = this.state.projectGroups ?? []

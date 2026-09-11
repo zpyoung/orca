@@ -342,6 +342,8 @@ const SkillsPage = lazy(() => import('./components/skills/SkillsPage'))
 const ArtifactsPage = lazy(() => import('./components/artifacts/ArtifactsPage'))
 const WorkspaceSpacePage = lazy(() => import('./components/workspace-space/WorkspaceSpacePage'))
 const MobilePage = lazy(() => import('./components/mobile/MobilePage'))
+const LedgerPage = lazy(() => import('./components/ledger/LedgerPage'))
+const LedgerChooser = lazy(() => import('./components/ledger/LedgerChooser'))
 const QuickOpen = lazy(() => import('./components/QuickOpen'))
 const WorktreeJumpPalette = lazy(() => import('./components/WorktreeJumpPalette'))
 const WorkspaceCleanupDialog = lazy(
@@ -510,6 +512,7 @@ function App(): React.JSX.Element {
   )
 
   const activeView = useAppStore((s) => s.activeView)
+  const ledgerPageData = useAppStore((s) => s.ledgerPageData)
   const activeModal = useAppStore((s) => s.activeModal)
   const featureTipsSeenIds = useAppStore((s) => s.featureTipsSeenIds)
   const featureInteractions = useAppStore((s) => s.featureInteractions)
@@ -1723,6 +1726,7 @@ function App(): React.JSX.Element {
             return claim('view.tasks', () => store.openTaskPage())
           }
         ],
+        ['view.ledger', () => claim('view.ledger', () => useAppStore.getState().openLedgerPage())],
         [
           'sidebar.right.toggle',
           () =>
@@ -2410,6 +2414,22 @@ function App(): React.JSX.Element {
                               {activeView === 'activity' ? <ActivityPrototypePage /> : null}
                               {activeView === 'space' ? <WorkspaceSpacePage /> : null}
                               {activeView === 'mobile' ? <MobilePage /> : null}
+                              {activeView === 'ledger' ? (
+                                ledgerPageData.target ? (
+                                  <LedgerPage {...ledgerPageData} />
+                                ) : (
+                                  <LedgerChooser
+                                    environmentId={ledgerPageData.environmentId}
+                                    onOpen={(ledger, selectedEnvironmentId) =>
+                                      useAppStore.getState().openLedgerPage({
+                                        environmentId: selectedEnvironmentId,
+                                        target: { ledgerId: ledger.ledgerId },
+                                        title: `${ledger.runtime.runtimeId} ledger`
+                                      })
+                                    }
+                                  />
+                                )
+                              ) : null}
                               {activeView === 'terminal' &&
                               creationLayoutActive &&
                               activePendingCreationId ? (

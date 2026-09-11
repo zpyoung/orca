@@ -3436,6 +3436,7 @@ export type TopLevelView =
   | 'skills'
   | 'artifacts'
   | 'mobile'
+  | 'ledger'
 
 export type PersistedUIState = {
   lastActiveRepoId: string | null

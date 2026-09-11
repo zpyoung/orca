@@ -258,6 +258,7 @@ import type {
 import type { AiVaultSessionTitlesArgs } from '../shared/ai-vault-session-title'
 import type { AiVaultPrepareSessionResumeArgs } from '../shared/ai-vault-resume-preparation'
 import type { AgentType } from '../shared/native-chat-types'
+import type { LedgerResponse } from '../shared/ledger'
 import { ORCA_UPDATER_QUIT_AND_INSTALL_ABORTED_EVENT } from '../shared/updater-renderer-events'
 import {
   ORCA_INTERNAL_FILE_DRAG_TYPE,
@@ -493,6 +494,26 @@ ipcRenderer.on('ui:findInBrowserPage', (_event, source: unknown) => {
 
 // Custom APIs for renderer
 const api = {
+  ledger: {
+    request: async (
+      request: Parameters<PreloadApi['ledger']['request']>[0],
+      environmentId?: string
+    ) => {
+      const response = (await ipcRenderer.invoke('ledger:request', request, environmentId)) as
+        | { ok: true; result: LedgerResponse }
+        | { ok: false; error: { code: string; message: string; details?: unknown } }
+      if (!response?.ok) {
+        const error = new Error(response?.error?.message ?? 'Ledger request failed') as Error & {
+          code?: string
+          details?: unknown
+        }
+        error.code = response?.error?.code
+        error.details = response?.error?.details
+        throw error
+      }
+      return response.result
+    }
+  },
   app: {
     getIdentity: (): Promise<AppIdentity> => ipcRenderer.invoke('app:getIdentity'),
     getFeatureWallAssetBaseUrl: (): Promise<string> =>

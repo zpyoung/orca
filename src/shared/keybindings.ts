@@ -40,6 +40,7 @@ export type KeybindingActionId =
   | 'workspace.selectByIndex'
   | 'voice.dictation'
   | 'view.tasks'
+  | 'view.ledger'
   | 'sidebar.left.toggle'
   | 'sidebar.right.toggle'
   | 'sidebar.explorer.toggle'
@@ -340,6 +341,14 @@ export const KEYBINDING_DEFINITIONS: readonly KeybindingDefinition[] = [
     group: 'Global',
     scope: 'global',
     searchKeywords: ['shortcut', 'tasks', 'github issues', 'linear'],
+    defaultBindings: platformBindings([])
+  },
+  {
+    id: 'view.ledger',
+    title: 'Open Ledger',
+    group: 'Global',
+    scope: 'global',
+    searchKeywords: ['shortcut', 'ledger', 'observations', 'records'],
     defaultBindings: platformBindings([])
   },
   {

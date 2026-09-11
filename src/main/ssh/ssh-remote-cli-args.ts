@@ -2,6 +2,7 @@ import { RemoteCliArgumentError, type ParsedRemoteCli } from './ssh-remote-cli-a
 
 const REMOTE_BOOLEAN_FLAGS = new Set([
   'all',
+  'group',
   'attachments',
   'children',
   'comments',

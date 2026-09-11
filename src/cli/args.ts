@@ -25,6 +25,7 @@ export const BOOLEAN_FLAGS = new Set([
   'focus',
   'force',
   'full',
+  'group',
   'help',
   'inject',
   'include-archived',
@@ -203,6 +204,7 @@ export function isCommandGroup(commandPath: string[]): boolean {
       [
         'account',
         'artifacts',
+        'ledger',
         'automations',
         'project',
         'repo',

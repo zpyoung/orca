@@ -114,7 +114,7 @@ import { getGitCloneFailureMessage } from '../../shared/git-clone-failure-messag
 import { GIT_FETCH_SKIP_AUTO_MAINTENANCE_CONFIG_ARGS } from '../../shared/git-fetch-auto-maintenance'
 import { createHash, randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
-import { isAbsolute, join, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { mkdir, readFile, readdir, rm, stat } from 'node:fs/promises'
 import { resolveWorktreeCreateBase } from '../worktree-create-base'
 import { resolveWorktreeAddBaseRef } from '../../shared/worktree-base-ref'
@@ -460,7 +460,7 @@ import {
 } from '../../shared/cross-platform-path'
 import { findRuntimeWorkspaceFileOwner } from '../../shared/runtime-workspace-file-owner'
 import { resolveTerminalStartupCwd } from '../../shared/terminal-startup-cwd'
-import { isWslUncPath, parseWslUncPath } from '../../shared/wsl-paths'
+import { isWslUncPath, parseWslUncPath, toWindowsWslPath } from '../../shared/wsl-paths'
 import {
   folderWorkspaceKey,
   parseWorkspaceKey,
@@ -1018,6 +1018,7 @@ import {
   mergeRuntimeFolderWorkspace
 } from './runtime-folder-workspace'
 import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
+import { isWindowsRemoteHost } from '../ssh/ssh-remote-platform'
 import {
   assertFolderWorkspacePathUsable,
   getFolderWorkspacePathStatus,
@@ -1050,6 +1051,15 @@ import {
 } from '../speech/speech-model-deletion'
 import type { CommitMessageAgentEnvironmentResolvers } from '../text-generation/commit-message-agent-environment'
 import { scanNestedRepos } from '../project-groups/nested-repo-discovery'
+import { LedgerRuntimeService, ledgerDirectoryForStore } from '../ledger/ledger-service'
+import type { LedgerHostIo, LedgerHostWorkspace } from '../ledger/ledger-host-context'
+import {
+  LedgerError,
+  type LedgerLocation,
+  type LedgerRequest,
+  type LedgerResponse
+} from '../../shared/ledger'
+import { normalizeLedgerLocation } from '../../shared/ledger-locations'
 import {
   createNestedProjectGroupResolver,
   resolveNestedRepoSelection
@@ -1095,6 +1105,7 @@ export type CodexRateLimitResetRpcResult = {
 )
 
 type RuntimeStore = {
+  getDataFile?: Store['getDataFile']
   getRepos: Store['getRepos']
   getRepo: Store['getRepo']
   addRepo: Store['addRepo']
@@ -2697,6 +2708,8 @@ export class OrcaRuntimeService {
   private readonly runtimeId = randomUUID()
   private readonly startedAt = Date.now()
   private readonly store: RuntimeStore | null
+  private readonly ledgerService: LedgerRuntimeService | null
+  private ledgerCatalogReconcileQueue: Promise<void> = Promise.resolve()
   private managedHookReconciliationGeneration = 0
   private managedHookReconciliationTail: Promise<void> = Promise.resolve()
   private readonly orchestrationEnvironmentTransport: OrchestrationEnvironmentTransport | null
@@ -3329,6 +3342,39 @@ export class OrcaRuntimeService {
     }
   ) {
     this.store = store
+    this.ledgerService = store?.getDataFile
+      ? new LedgerRuntimeService({
+          directory: ledgerDirectoryForStore(
+            store.getDataFile(),
+            basename(dirname(store.getDataFile()))
+          ),
+          runtime: { runtimeId: this.runtimeId, profileId: basename(dirname(store.getDataFile())) },
+          catalog: async () => ({
+            projects: this.listProjects(),
+            groups: this.listProjectGroups(),
+            folders: this.listFolderWorkspaces(),
+            worktrees: await this.listLedgerWorktrees(),
+            repos: this.listRepos()
+          }),
+          resolveHost: (workspaceId) => this.resolveLedgerHost(workspaceId),
+          normalizeUiLocation: (location) => this.normalizeLedgerLocationForUi(location),
+          verify: (evidence) => {
+            const authority = this.verifyOrchestrationCompatibilityCaller(evidence)
+            if (!authority) {
+              return null
+            }
+            const terminal = this.getOrchestrationDispatchAuthority(authority.terminalHandle)
+            if (!terminal || terminal.processIncarnation !== authority.processIncarnation) {
+              return null
+            }
+            const pty = this.ptysById.get(terminal.ptyId)
+            if (!pty || !isTuiAgent(pty.launchAgent)) {
+              return null
+            }
+            return { kind: 'agent', tool: pty.launchAgent, model: null, providerSessionId: null }
+          }
+        })
+      : null
     // Why: per-device tab selections must survive host restarts, or every phone snaps back to the first tab on return.
     const persistedClientTabSelections = store?.getMobileClientTabSelections?.()
     if (persistedClientTabSelections) {
@@ -3387,6 +3433,11 @@ export class OrcaRuntimeService {
       for (const state of this.headlessTerminals.values()) {
         state.emulator.applyPushedViewAttributes(attributes)
       }
+    })
+    queueMicrotask(() => {
+      this.ledgerService?.reconcileCatalog().catch((error) => {
+        console.error('[ledger] initial catalog reconciliation failed', error)
+      })
     })
   }
 
@@ -4877,6 +4928,9 @@ export class OrcaRuntimeService {
         (process.env.ORCA_E2E_DISABLE_PAIRED_TERMINAL_PARKING !== '1' ||
           capability !== TERMINAL_PAIRED_PARKING_RUNTIME_CAPABILITY)
     )
+    if (this.ledgerService && !capabilities.includes('ledger.v1')) {
+      capabilities.push('ledger.v1')
+    }
     if (hasOffscreen) {
       capabilities.push(BROWSER_HEADLESS_RUNTIME_CAPABILITY)
     }
@@ -5194,6 +5248,7 @@ export class OrcaRuntimeService {
   }
 
   private notifyWorktreesChanged(repoId: string): void {
+    this.queueLedgerCatalogReconciliation()
     this.notifier?.worktreesChanged(repoId)
     this.emitClientEvent({ type: 'worktreesChanged', repoId })
   }
@@ -5221,8 +5276,20 @@ export class OrcaRuntimeService {
   }
 
   private notifyReposChanged(): void {
+    this.queueLedgerCatalogReconciliation()
     this.notifier?.reposChanged()
     this.emitClientEvent({ type: 'reposChanged' })
+  }
+
+  private queueLedgerCatalogReconciliation(): void {
+    if (!this.ledgerService) {
+      return
+    }
+    this.ledgerCatalogReconcileQueue = this.ledgerCatalogReconcileQueue
+      .then(() => this.ledgerService!.reconcileCatalog())
+      .catch((error) => {
+        console.error('[ledger] catalog reconciliation failed', error)
+      })
   }
 
   // Why: SSH state changes originate in main's ssh handlers, not in runtime
@@ -18192,6 +18259,212 @@ export class OrcaRuntimeService {
     return this.store?.getProjects?.() ?? []
   }
 
+  private async listLedgerWorktrees(): Promise<Worktree[]> {
+    return this.listResolvedWorktrees()
+  }
+
+  private async resolveLedgerHost(
+    workspaceId: string
+  ): Promise<{ workspace: LedgerHostWorkspace; io: LedgerHostIo } | null> {
+    const worktree = (await this.listLedgerWorktrees()).find((item) => item.id === workspaceId)
+    const folder = this.listFolderWorkspaces().find(
+      (item) => item.id === workspaceId || folderWorkspaceKey(item.id) === workspaceId
+    )
+    const repo = worktree ? this.store?.getRepo(worktree.repoId) : undefined
+    const rootPath = worktree?.path ?? folder?.folderPath
+    if (!rootPath) {
+      return null
+    }
+    const connectionId = repo?.connectionId ?? folder?.connectionId ?? null
+    const provider = connectionId ? getSshFilesystemProvider(connectionId) : null
+    const gitProvider = connectionId ? getSshGitProvider(connectionId) : null
+    if (connectionId && (!provider || !gitProvider)) {
+      return null
+    }
+    const remotePlatform = gitProvider?.getHostPlatform() ?? null
+    const folderWslDistro =
+      process.platform === 'win32' && !connectionId && folder
+        ? parseWslUncPath(folder.folderPath)?.distro
+        : undefined
+    const localGitOptions =
+      repo && !connectionId
+        ? getLocalProjectWorktreeGitOptions(this.requireStore(), repo)
+        : { wslDistro: folderWslDistro }
+    const localRootPath = toLocalWorktreeRuntimePath(rootPath, localGitOptions)
+    const localAccess = getLocalWorktreePathAccess(localGitOptions)
+    const workspace: LedgerHostWorkspace = {
+      workspaceId,
+      rootPath: localRootPath,
+      host: connectionId ?? 'local',
+      platform: remotePlatform
+        ? isWindowsRemoteHost(remotePlatform)
+          ? 'win32'
+          : 'posix'
+        : localGitOptions.wslDistro
+          ? 'posix'
+          : process.platform === 'win32'
+            ? 'win32'
+            : 'posix',
+      ...(worktree?.projectId ? { projectId: worktree.projectId } : {}),
+      ...(worktree?.branch ? { branch: worktree.branch } : {}),
+      isGit: Boolean(worktree)
+    }
+    const io: LedgerHostIo = provider
+      ? {
+          readFile: async (path) => {
+            const result: unknown = await provider.readFile(path)
+            if (
+              !result ||
+              typeof result !== 'object' ||
+              !('content' in result) ||
+              typeof result.content !== 'string'
+            ) {
+              throw new Error('SSH file provider returned non-text content')
+            }
+            return result.content
+          },
+          listDirectory: async (path) =>
+            (await provider.readDir(path)).map((entry) => ({
+              name: entry.name,
+              isDirectory: entry.isDirectory
+            })),
+          observeRevision: async () => {
+            const result = await gitProvider!.exec(['rev-parse', 'HEAD'], rootPath)
+            return result.stdout.trim() || null
+          }
+        }
+      : {
+          readFile: async (path) => {
+            const content = await localAccess.readPath(
+              toLocalWorktreeRuntimePath(path, localGitOptions)
+            )
+            if (typeof content !== 'string') {
+              throw new Error('Local file reader returned non-text content')
+            }
+            return content
+          },
+          listDirectory: async (path) => {
+            const runtimePath = toLocalWorktreeRuntimePath(path, localGitOptions)
+            const fsPath =
+              process.platform === 'win32' && localGitOptions.wslDistro
+                ? toWindowsWslPath(runtimePath, localGitOptions.wslDistro)
+                : runtimePath
+            return (await readdir(fsPath, { withFileTypes: true })).map((entry) => ({
+              name: entry.name,
+              isDirectory: entry.isDirectory()
+            }))
+          },
+          observeRevision: async () => {
+            try {
+              const result = await gitExecFileAsync(['rev-parse', 'HEAD'], {
+                cwd: rootPath,
+                ...localGitOptions
+              })
+              return result.stdout.trim() || null
+            } catch {
+              return null
+            }
+          }
+        }
+    return { workspace, io }
+  }
+
+  private async normalizeLedgerLocationForUi(location: LedgerLocation): Promise<LedgerLocation> {
+    const repos = this.listRepos()
+    const project =
+      location.base.kind === 'project'
+        ? this.listProjects().find((item) => item.id === location.base.id)
+        : undefined
+    if (location.base.kind === 'project' && !project) {
+      throw new LedgerError('owner-missing', 'Location project is not live')
+    }
+    const candidates =
+      location.base.kind === 'project'
+        ? repos.filter((repo) => project!.sourceRepoIds.includes(repo.id))
+        : []
+    if (location.base.kind === 'workspace') {
+      const resolved = await this.resolveLedgerHost(location.base.id)
+      if (!resolved) {
+        throw new LedgerError('workspace-missing', 'Location workspace is not live')
+      }
+      if (location.base.host && location.base.host !== resolved.workspace.host) {
+        throw new LedgerError('workspace-missing', 'Location host is not registered')
+      }
+      return normalizeLedgerLocation(location, {
+        base: { kind: 'workspace', id: location.base.id, host: resolved.workspace.host },
+        rootPath: resolved.workspace.rootPath,
+        platform: resolved.workspace.platform,
+        host: resolved.workspace.host
+      })
+    }
+    if (!candidates.length) {
+      throw new LedgerError('owner-missing', 'Location project has no registered source repository')
+    }
+    const hosts = [...new Set(candidates.map((repo) => repo.connectionId ?? 'local'))]
+    if (location.base.host && !hosts.includes(location.base.host)) {
+      throw new LedgerError('workspace-missing', 'Location host is not registered')
+    }
+    if (!location.base.host && hosts.length > 1) {
+      throw new LedgerError('owner-ambiguous', 'Location project host is ambiguous')
+    }
+    const host = location.base.host ?? hosts[0]
+    const scoped = candidates.filter((repo) => (repo.connectionId ?? 'local') === host)
+    const contexts = scoped.map((repo) => {
+      const connectionId = repo.connectionId ?? null
+      const gitProvider = connectionId ? getSshGitProvider(connectionId) : null
+      const remotePlatform = gitProvider?.getHostPlatform()
+      if (connectionId && !remotePlatform) {
+        throw new LedgerError('workspace-missing', 'Location host platform is unavailable')
+      }
+      const localGitOptions = !connectionId
+        ? getLocalProjectWorktreeGitOptions(this.requireStore(), repo)
+        : undefined
+      const platform = remotePlatform
+        ? isWindowsRemoteHost(remotePlatform)
+          ? ('win32' as const)
+          : ('posix' as const)
+        : localGitOptions?.wslDistro
+          ? ('posix' as const)
+          : process.platform === 'win32'
+            ? ('win32' as const)
+            : ('posix' as const)
+      return { repo, rootPath: toLocalWorktreeRuntimePath(repo.path, localGitOptions), platform }
+    })
+    const absolute = contexts.find(
+      (context) =>
+        !normalizeLedgerLocation(location, {
+          base: { kind: 'project', id: project!.id, host },
+          rootPath: context.rootPath,
+          platform: context.platform,
+          host
+        }).external
+    )
+    const selected = absolute ?? contexts[0]
+    return normalizeLedgerLocation(location, {
+      base: { kind: 'project', id: project!.id, host },
+      rootPath: selected.rootPath,
+      platform: selected.platform,
+      host
+    })
+  }
+
+  executeLedgerRequest(
+    request: LedgerRequest,
+    evidence?: OrchestrationCompatibilityEvidence
+  ): Promise<LedgerResponse> {
+    if (!this.ledgerService) {
+      return Promise.reject(new Error('runtime_unavailable'))
+    }
+    return this.ledgerService.executeLedgerRequest(request, evidence)
+  }
+
+  executeLedgerUiRequest(request: LedgerRequest): Promise<LedgerResponse> {
+    if (!this.ledgerService) {
+      return Promise.reject(new Error('runtime_unavailable'))
+    }
+    return this.ledgerService.executeLedgerUiRequest(request)
+  }
+
   updateProject(projectId: string, updates: ProjectUpdateArgs['updates']): Project {
     if (!this.store?.updateProject) {
       throw new Error('runtime_unavailable')
@@ -18382,15 +18655,66 @@ export class OrcaRuntimeService {
     return updated
   }
 
-  async deleteProjectGroup(groupId: string): Promise<{ deleted: boolean }> {
-    if (!this.store?.deleteProjectGroup) {
+  async deleteProjectGroup(
+    groupId: string,
+    options?: {
+      expectedLedgers?: { ledgerId: string; revision: number }[]
+      removeContainedProjects?: boolean
+    }
+  ): Promise<{ deleted: boolean; ledgers?: unknown[] }> {
+    const store = this.store
+    if (!store?.deleteProjectGroup) {
       throw new Error('runtime_unavailable')
     }
-    const deleted = this.store.deleteProjectGroup(groupId)
+    const groupIds = new Set<string>([groupId])
+    const pendingGroups = [groupId]
+    while (pendingGroups.length) {
+      const parent = pendingGroups.pop()!
+      for (const child of this.listProjectGroups()) {
+        if (child.parentGroupId === parent && !groupIds.has(child.id)) {
+          groupIds.add(child.id)
+          pendingGroups.push(child.id)
+        }
+      }
+    }
+    const reposBefore = this.listRepos()
+      .filter((repo) => repo.projectGroupId && groupIds.has(repo.projectGroupId))
+      .map((repo) => ({ id: repo.id, hostId: getRepoExecutionHostId(repo) }))
+    const operation = () => {
+      if (options?.removeContainedProjects) {
+        for (const repo of reposBefore) {
+          const remaining = store
+            .getRepos()
+            .some(
+              (candidate) =>
+                candidate.id === repo.id && getRepoExecutionHostId(candidate) !== repo.hostId
+            )
+          if (remaining) {
+            store.removeProjectForHost?.(repo.id, repo.hostId)
+          } else {
+            store.removeProject?.(repo.id)
+          }
+        }
+      }
+      return store.deleteProjectGroup!(groupId)
+    }
+    const removed = this.ledgerService
+      ? await this.ledgerService.withCatalogRemoval(
+          { projectGroupId: groupId, removeContainedProjects: options?.removeContainedProjects },
+          options?.expectedLedgers,
+          operation
+        )
+      : { result: operation(), ledgers: [] }
+    const deleted = removed.result
     if (deleted) {
       this.notifyReposChanged()
     }
-    return { deleted }
+    return {
+      deleted,
+      ...(deleted && removed.ledgers.length
+        ? { ledgers: removed.ledgers.map((item) => ({ ...item, detached: true })) }
+        : {})
+    }
   }
 
   async moveProjectToGroup(
@@ -19169,31 +19493,50 @@ export class OrcaRuntimeService {
     return updated
   }
 
-  async removeProject(repoSelector: string): Promise<{ removed: true }> {
-    if (!this.store?.removeProject) {
+  async removeProject(
+    repoSelector: string,
+    options?: { expectedLedgers?: { ledgerId: string; revision: number }[] }
+  ): Promise<{ removed: true; ledgers?: unknown[] }> {
+    const store = this.store
+    if (!store?.removeProject) {
       throw new Error('runtime_unavailable')
     }
     const repo = await this.resolveRepoSelector(repoSelector)
     // Why: removeProject is id-only, but the same id may be registered on a sibling
     // execution host; a path:/name: selector resolves one row and must remove only it.
     const hostId = getRepoExecutionHostId(repo)
-    const idExistsOnOtherHost = this.store
+    const idExistsOnOtherHost = store
       .getRepos()
       .some((entry) => entry.id === repo.id && getRepoExecutionHostId(entry) !== hostId)
-    if (idExistsOnOtherHost) {
-      if (!this.store.removeProjectForHost) {
-        throw new Error('runtime_unavailable')
+    const operation = () => {
+      if (idExistsOnOtherHost) {
+        if (!store.removeProjectForHost) {
+          throw new Error('runtime_unavailable')
+        }
+        store.removeProjectForHost(repo.id, hostId)
+      } else {
+        store.removeProject!(repo.id)
       }
-      this.store.removeProjectForHost(repo.id, hostId)
-    } else {
-      this.store.removeProject(repo.id)
+      return true as const
     }
+    const removed = this.ledgerService
+      ? await this.ledgerService.withCatalogRemoval(
+          { repoId: repo.id },
+          options?.expectedLedgers,
+          operation
+        )
+      : { result: operation(), ledgers: [] }
     this.terminalTopologyRevisionByRepoId.delete(repo.id)
     this.invalidateResolvedWorktreeCache()
     this.invalidateWorktreeScanCacheForRepo(repo.id)
     invalidateAuthorizedRootsCache()
     this.notifyReposChanged()
-    return { removed: true }
+    return {
+      removed: true,
+      ...(removed.ledgers.length
+        ? { ledgers: removed.ledgers.map((item) => ({ ...item, detached: true })) }
+        : {})
+    }
   }
 
   async inspectTerminalProcess(
@@ -29338,6 +29681,7 @@ export class OrcaRuntimeService {
     this.clientSessionTabSelections.migrateWorktree(oldWorktreeId, newWorktreeId)
     this.invalidateResolvedWorktreeCache()
     this.invalidateWorktreeScanCacheForRepo(repoId)
+    this.queueLedgerCatalogReconciliation()
     this.notifier?.worktreesChanged(repoId, { oldWorktreeId, newWorktreeId })
     // Mirror notifyBranchRenamed so in-process onClientEvent listeners also see the rename.
     this.emitClientEvent({ type: 'worktreesChanged', repoId })

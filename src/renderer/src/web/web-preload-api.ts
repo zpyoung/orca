@@ -154,6 +154,7 @@ import {
   parseRuntimeNativeChatTurnLifecycle
 } from '@/components/native-chat/native-chat-runtime-contract'
 import { createWebFileMutationMethods } from './web-file-mutation-methods'
+import { createWebLedgerApi } from './web-ledger-api'
 
 const SETTINGS_STORAGE_KEY = 'orca.web.settings.v1'
 const UI_STORAGE_KEY = 'orca.web.ui.v1'
@@ -545,6 +546,11 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     })
 
   return {
+    ledger: createWebLedgerApi({
+      selectEnvironment: (environmentId) =>
+        environmentId ? resolveEnvironment(environmentId) : requireActiveEnvironment(),
+      call: (environment, method, params) => callEnvironmentEnvelope(environment.id, method, params)
+    }),
     app: {
       getIdentity: () =>
         Promise.resolve({

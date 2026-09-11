@@ -31,6 +31,7 @@ import type {
   VisibleWorkspaceHostIds,
   TopLevelView
 } from '../../../../shared/types'
+import type { LedgerTarget } from '../../../../shared/ledger'
 import {
   applyManualRepoOrder,
   normalizeManualRepoOrder
@@ -619,6 +620,7 @@ export type UISlice = {
     | 'skills'
     | 'artifacts'
     | 'mobile'
+    | 'ledger'
   previousViewBeforeSettings:
     | 'terminal'
     | 'tasks'
@@ -628,6 +630,7 @@ export type UISlice = {
     | 'skills'
     | 'artifacts'
     | 'mobile'
+    | 'ledger'
   previousViewBeforeActivity:
     | 'terminal'
     | 'settings'
@@ -637,6 +640,7 @@ export type UISlice = {
     | 'skills'
     | 'artifacts'
     | 'mobile'
+    | 'ledger'
   previousViewBeforeAutomations:
     | 'terminal'
     | 'settings'
@@ -646,6 +650,7 @@ export type UISlice = {
     | 'skills'
     | 'artifacts'
     | 'mobile'
+    | 'ledger'
   previousViewBeforeSpace:
     | 'terminal'
     | 'settings'
@@ -655,6 +660,7 @@ export type UISlice = {
     | 'skills'
     | 'artifacts'
     | 'mobile'
+    | 'ledger'
   previousViewBeforeSkills:
     | 'terminal'
     | 'settings'
@@ -664,6 +670,7 @@ export type UISlice = {
     | 'space'
     | 'artifacts'
     | 'mobile'
+    | 'ledger'
   previousViewBeforeMobile:
     | 'terminal'
     | 'settings'
@@ -673,6 +680,7 @@ export type UISlice = {
     | 'space'
     | 'skills'
     | 'artifacts'
+    | 'ledger'
   previousViewBeforeArtifacts:
     | 'terminal'
     | 'settings'
@@ -682,7 +690,13 @@ export type UISlice = {
     | 'space'
     | 'skills'
     | 'mobile'
+    | 'ledger'
+    | 'ledger'
+  previousViewBeforeLedger: Exclude<TopLevelView, 'ledger'>
   setActiveView: (view: UISlice['activeView']) => void
+  ledgerPageData: { target?: LedgerTarget; environmentId?: string; title?: string }
+  openLedgerPage: (data?: UISlice['ledgerPageData']) => void
+  closeLedgerPage: () => void
   taskPageData: {
     preselectedRepoId?: string
     prefilledName?: string
@@ -1260,6 +1274,8 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   previousViewBeforeSkills: 'terminal',
   previousViewBeforeMobile: 'terminal',
   previousViewBeforeArtifacts: 'terminal',
+  previousViewBeforeLedger: 'terminal',
+  ledgerPageData: {},
   setActiveView: (view) => set({ activeView: view }),
   taskPageData: {},
   taskResumeState: undefined,
@@ -1517,6 +1533,16 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
     set((state) => ({
       activeView: state.previousViewBeforeArtifacts
     })),
+  openLedgerPage: (data = {}) =>
+    set((state) => ({
+      activeView: 'ledger',
+      previousViewBeforeLedger:
+        state.activeView === 'ledger'
+          ? state.previousViewBeforeLedger
+          : (state.activeView as Exclude<TopLevelView, 'ledger'>),
+      ledgerPageData: data
+    })),
+  closeLedgerPage: () => set((state) => ({ activeView: state.previousViewBeforeLedger })),
   openMobilePage: () =>
     set((state) => ({
       activeView: 'mobile',

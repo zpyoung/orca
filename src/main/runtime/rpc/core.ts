@@ -97,6 +97,8 @@ export type RpcContext = {
   orchestrationCompatibilityCallerAuthority?: OrchestrationCompatibilityCallerAuthority
   // Why: federation pins the authenticated saved-environment caller without exposing its token to handlers or storage.
   authenticatedCallerFingerprint?: string
+  /** Authenticated paired device credential; never sourced from request params. */
+  authenticatedCredential?: string
   pairing?: PairingRpcContext
   // Why: mobile terminal traffic bypasses JSON streaming; undefined on Unix/socket and non-E2EE WebSocket paths.
   sendBinary?: (bytes: Uint8Array<ArrayBufferLike>) => boolean | void

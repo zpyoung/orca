@@ -114,6 +114,7 @@ import type {
   PluginPanelEntry
 } from '../shared/plugins/plugin-panel-bridge'
 import type { PluginConsentRequest } from '../shared/plugins/plugin-consent-request'
+import type { LedgerRequest, LedgerResponse } from '../shared/ledger'
 import type { PluginLanguagePackRegistration } from '../shared/plugins/plugin-language-pack-artifact'
 import type { PluginChangeEvent } from '../shared/plugins/plugin-change-event'
 import type { PluginManifest } from '../shared/plugins/plugin-manifest'
@@ -1135,6 +1136,9 @@ export type PluginMarketplaceHostInstallPreview = {
 }
 
 export type PreloadApi = {
+  ledger: {
+    request: (request: LedgerRequest, environmentId?: string) => Promise<LedgerResponse>
+  }
   app: AppApi
   orcaProfiles: {
     list: () => Promise<OrcaProfileListResult>
