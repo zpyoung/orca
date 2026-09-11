@@ -52,6 +52,9 @@ export function valueFlag(ctx: HandlerContext, name: string): string | undefined
 }
 
 export function revision(ctx: HandlerContext, name: string): number {
+  if (!ctx.flags.has(name)) {
+    throw new RuntimeClientError('invalid_argument', `Missing required --${name}`)
+  }
   const value = stringFlag(ctx, name)
   const parsed = value === undefined ? Number.NaN : Number(value)
   if (!Number.isSafeInteger(parsed) || parsed < 1) {
@@ -75,9 +78,23 @@ export function enumFlag<T extends string>(
   return value as T
 }
 
+export async function resolveWorkspaceFlag(ctx: HandlerContext): Promise<string | undefined> {
+  const workspaceId = stringFlag(ctx, 'workspace')
+  if (ctx.flags.has('workspace') && workspaceId === undefined) {
+    throw new RuntimeClientError('invalid_argument', '--workspace requires a value')
+  }
+  if (workspaceId === undefined) {
+    return undefined
+  }
+  return workspaceId === 'active' || workspaceId === 'current'
+    ? (await resolveCurrentWorktreeSelector(ctx.cwd, ctx.client)).slice(3)
+    : workspaceId
+}
+
 export async function target(
   ctx: HandlerContext,
-  allowLedger: boolean
+  allowLedger: boolean,
+  resolvedWorkspaceId?: string
 ): Promise<LedgerRequest['target']> {
   const group = ctx.flags.has('group')
   const selector = stringFlag(ctx, 'group-selector')
@@ -102,23 +119,16 @@ export async function target(
       '--ledger is mutually exclusive with --group and --group-selector'
     )
   }
-  const workspaceId = stringFlag(ctx, 'workspace')
-  if (ctx.flags.has('workspace') && workspaceId === undefined) {
-    throw new RuntimeClientError('invalid_argument', '--workspace requires a value')
-  }
   if (ctx.flags.has('ledger') && stringFlag(ctx, 'ledger') === undefined) {
     throw new RuntimeClientError('invalid_argument', '--ledger requires a value')
   }
-  if (ctx.flags.has('ledger') && workspaceId !== undefined) {
+  if (ctx.flags.has('ledger') && ctx.flags.has('workspace')) {
     throw new RuntimeClientError(
       'invalid_argument',
       '--ledger is mutually exclusive with --workspace'
     )
   }
-  const selectedWorkspace =
-    workspaceId === 'active' || workspaceId === 'current'
-      ? (await resolveCurrentWorktreeSelector(ctx.cwd, ctx.client)).slice(3)
-      : workspaceId
+  const selectedWorkspace = resolvedWorkspaceId ?? (await resolveWorkspaceFlag(ctx))
   if (!selectedWorkspace && !(allowLedger && stringFlag(ctx, 'ledger'))) {
     return {
       workspaceId: (await resolveCurrentWorktreeSelector(ctx.cwd, ctx.client)).slice(3),
@@ -171,7 +181,10 @@ export function validateRequiredContent(
   }
 }
 
-export function filters(ctx: HandlerContext): LedgerRequest['filters'] {
+export function filters(
+  ctx: HandlerContext,
+  resolvedWorkspaceId?: string
+): LedgerRequest['filters'] {
   const reviewed = valueFlag(ctx, 'reviewed')
   const stale = valueFlag(ctx, 'stale')
   if (reviewed !== undefined && reviewed !== 'true' && reviewed !== 'false') {
@@ -187,7 +200,7 @@ export function filters(ctx: HandlerContext): LedgerRequest['filters'] {
     ...(state ? { state } : {}),
     ...(reviewed !== undefined ? { reviewed: reviewed === 'true' } : {}),
     ...(stale !== undefined ? { stale: stale === 'true' } : {}),
-    ...(stringFlag(ctx, 'workspace') ? { workspaceId: stringFlag(ctx, 'workspace') } : {}),
+    ...(resolvedWorkspaceId ? { workspaceId: resolvedWorkspaceId } : {}),
     ...(stringFlag(ctx, 'branch') ? { branch: stringFlag(ctx, 'branch') } : {})
   }
 }

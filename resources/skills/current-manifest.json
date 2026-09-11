@@ -92,6 +92,24 @@
       ]
     },
     {
+      "name": "orca-ledger",
+      "sourcePath": "skills/orca-ledger",
+      "releaseRevision": 1,
+      "packageDigest": "cf67d13d05d799374bdd6e575ece24928b090f332bb93afbe9aac381c3c74485",
+      "gitTreeSha": "5c02158d150dd46bf770b7e85c15b6cbd893224f",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "size": 4319,
+          "executable": false,
+          "classification": "text",
+          "exactSha256": "ee5e1023455f2d83f50348301f5a3ba9055ff44d4415bb3f69a4d27aa60ad324",
+          "textNormalizedSha256": "ee5e1023455f2d83f50348301f5a3ba9055ff44d4415bb3f69a4d27aa60ad324",
+          "identitySha256": "ee5e1023455f2d83f50348301f5a3ba9055ff44d4415bb3f69a4d27aa60ad324"
+        }
+      ]
+    },
+    {
       "name": "orca-linear",
       "sourcePath": "skills/orca-linear",
       "releaseRevision": 8,

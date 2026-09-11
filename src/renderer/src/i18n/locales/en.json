@@ -11487,7 +11487,8 @@
             "fc3095d2ed": "explorer",
             "aiVaultSessionHistory": "Agents",
             "folderWorkspaces": "Attached worktrees",
-            "parentPrChecks": "PR Checks"
+            "parentPrChecks": "PR Checks",
+            "ledger": "Ledger"
           },
           "right": {
             "panel": {
@@ -15382,6 +15383,57 @@
       "unassignedInstruction": "Assign a dictation shortcut before starting voice dictation in a focused pane.",
       "settingsInstruction": "Change the model, dictation mode, or shortcut anytime in",
       "settingsLink": "Settings → Voice"
+    }
+  },
+  "ledger": {
+    "panel": {
+      "noWorkspace": "Open a workspace to see its ledger.",
+      "loading": "Loading ledger…",
+      "empty": "No entries match this view.",
+      "ownerAmbiguous": "Ledger scope could not be resolved to a single project.",
+      "groupMissing": "This workspace has no group.",
+      "workspaceMissing": "This workspace is not live in this runtime.",
+      "ownerMissing": "The owning project or group no longer exists.",
+      "failed": "Ledger could not be loaded.",
+      "mutationFailed": "Ledger change failed.",
+      "title": "Ledger",
+      "refresh": "Refresh ledger",
+      "triage": "Triage",
+      "new": "New",
+      "project": "Project",
+      "group": "Group",
+      "detached": "Detached",
+      "search": "Search ledger",
+      "searchPlaceholder": "Search title or ID",
+      "newEntry": "New entry",
+      "retry": "Retry",
+      "filters": "Filters",
+      "type": {
+        "bug": "Bug",
+        "deferred": "Deferred",
+        "testGap": "Test gap",
+        "proposal": "Proposal",
+        "decision": "Decision"
+      },
+      "allTypes": "All types",
+      "state": {
+        "open": "Open",
+        "resolved": "Resolved",
+        "archived": "Archived"
+      },
+      "allStates": "All states",
+      "review": "Review",
+      "allReviews": "All review statuses",
+      "reviewed": "Reviewed",
+      "unreviewed": "Unreviewed",
+      "freshness": "Freshness",
+      "allFreshness": "All entries",
+      "stale": "Stale",
+      "notStale": "Not stale",
+      "untitled": "Untitled",
+      "filedHere": "Filed here",
+      "typeLabel": "Type",
+      "stateLabel": "State"
     }
   }
 }

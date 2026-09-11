@@ -75,6 +75,7 @@ describe('bundled skill guide generator', () => {
       'linear-tickets': ['ORCA linear --help', 'ORCA linear issue --current --full --json'],
       'orca-emulator': ['ORCA emulator list --json'],
       'orca-emulator-android': ['ORCA emulator devices --json'],
+      'orca-ledger': ['ORCA ledger list --json', 'ORCA ledger review --json'],
       'orca-linear': ['ORCA linear --help', 'ORCA linear issue --current --full --json'],
       'orca-per-workspace-env': ['ORCA vm recipe doctor <recipe-id> --repo-path <repo> --json'],
       orchestration: ['ORCA orchestration task-list --json', 'ORCA terminal list --json']
@@ -111,7 +112,13 @@ describe('bundled skill guide generator', () => {
   })
 
   it('keeps CLI guide examples safe across shells and Linux command names', async () => {
-    for (const name of ['orca-cli', 'computer-use', 'orca-emulator', 'orca-emulator-android']) {
+    for (const name of [
+      'orca-cli',
+      'computer-use',
+      'orca-emulator',
+      'orca-emulator-android',
+      'orca-ledger'
+    ]) {
       const source = await readFile(path.join(projectDir, 'skill-guides', `${name}.md`), 'utf8')
 
       expect(source).toContain('ORCA_CLI_COMMAND')

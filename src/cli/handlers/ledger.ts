@@ -8,6 +8,7 @@ import {
   filters,
   LEDGER_STATES,
   LEDGER_TYPES,
+  resolveWorkspaceFlag,
   revision,
   target,
   validateRequiredContent
@@ -42,12 +43,13 @@ export const LEDGER_HANDLERS: Record<string, CommandHandler> = {
     )
   },
   'ledger list': async (ctx) => {
+    const workspaceId = await resolveWorkspaceFlag(ctx)
     printLedgerResult(
       ctx,
       await request(ctx, {
         operation: 'list',
-        target: await target(ctx, true),
-        filters: filters(ctx)
+        target: await target(ctx, true, workspaceId),
+        filters: filters(ctx, workspaceId)
       })
     )
   },
@@ -94,12 +96,13 @@ export const LEDGER_HANDLERS: Record<string, CommandHandler> = {
     )
   },
   'ledger review': async (ctx) => {
+    const workspaceId = await resolveWorkspaceFlag(ctx)
     printLedgerResult(
       ctx,
       await request(ctx, {
         operation: 'review',
-        target: await target(ctx, true),
-        filters: filters(ctx)
+        target: await target(ctx, true, workspaceId),
+        filters: filters(ctx, workspaceId)
       })
     )
   },

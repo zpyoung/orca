@@ -29,6 +29,10 @@ describe('normalizeRightSidebarTab', () => {
     expect(normalizeRightSidebarTab('pr-checks')).toBe('pr-checks')
   })
 
+  it('preserves the ledger tab across restarts', () => {
+    expect(normalizeRightSidebarTab('ledger')).toBe('ledger')
+  })
+
   it('preserves well-formed plugin panel tabs', () => {
     expect(normalizeRightSidebarTab('plugin:orca-samples.my-plugin/dashboard')).toBe(
       'plugin:orca-samples.my-plugin/dashboard'

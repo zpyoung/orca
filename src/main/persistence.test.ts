@@ -6563,6 +6563,18 @@ describe('Store', () => {
     expect(store.getUI().rightSidebarTab).toBe('checks')
   })
 
+  it('persists and hydrates the Ledger sidebar tab across restarts', async () => {
+    const store = await createStore()
+    store.updateUI({ rightSidebarTab: 'ledger' })
+    store.flush()
+
+    const persisted = JSON.parse(readFileSync(dataFile(), 'utf-8')) as PersistedState
+    expect(persisted.ui.rightSidebarTab).toBe('ledger')
+
+    const restoredStore = await createStore()
+    expect(restoredStore.getUI().rightSidebarTab).toBe('ledger')
+  })
+
   it('preserves explicit rightSidebarExplorerView in persisted UI', async () => {
     writeDataFile({
       schemaVersion: 1,
