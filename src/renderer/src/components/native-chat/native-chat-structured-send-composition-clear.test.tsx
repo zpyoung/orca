@@ -1,4 +1,3 @@
-import { changePrompt, promptValue } from './native-chat-prompt-editor.test-support'
 // @vitest-environment happy-dom
 
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
@@ -106,6 +105,16 @@ function textarea(): HTMLTextAreaElement {
 
 function pressEnter(input: HTMLTextAreaElement): void {
   fireEvent.keyDown(input, { key: 'Enter', keyCode: 13, isComposing: false })
+}
+
+// Why: this fork's composer field is a real <textarea>, so it is driven by change
+// events rather than by upstream's tiptap prompt-editor helpers.
+function changePrompt(input: HTMLTextAreaElement, value: string): void {
+  fireEvent.change(input, { target: { value } })
+}
+
+function promptValue(input: HTMLTextAreaElement): string {
+  return input.value
 }
 
 let paneCounter = 0

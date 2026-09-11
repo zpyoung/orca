@@ -270,7 +270,10 @@ describe('resumeTerminalVisibility reveal repaint', () => {
 
     resumeTerminalVisibility(resumeArgs(manager, lightResume))
 
-    expect(focusActivePane).toHaveBeenCalledWith(manager)
+    // Why: this fork always threads dock focus ownership as the second argument,
+    // so the upstream case is asserted on the manager plus that ownership record.
+    expect(focusActivePane).toHaveBeenCalledWith(manager, expect.anything())
+    expectThreadedOwnership(vi.mocked(focusActivePane).mock.calls.at(-1)?.[1])
   })
 
   it('checks each pane for a stale WebGL backing on a light tab reveal', () => {

@@ -307,7 +307,9 @@ export function applyPickerSuggestion(
 ): { draft: string; caret: number; insertedToken: string } {
   const before = draft.slice(0, caret)
   const after = draft.slice(caret)
-  const match = prefix === '/' ? before.match(/^\/(\S*)$/) : before.match(/(^|\s)\$(\S*)$/)
+  // Why: this fork's composer offers the slash picker mid-draft, not only on a
+  // draft that starts with it, so the token is matched after any whitespace.
+  const match = before.match(prefix === '/' ? /(^|\s)\/(\S*)$/ : /(^|\s)\$(\S*)$/)
   if (!match) {
     return { draft, caret, insertedToken: '' }
   }

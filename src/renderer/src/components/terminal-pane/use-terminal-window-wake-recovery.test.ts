@@ -140,6 +140,7 @@ describe('useTerminalWindowWakeRecovery', () => {
     window.dispatchEvent(new Event('focus'))
 
     expect(recoverVisibleTerminalWindowWakeMock).toHaveBeenLastCalledWith({
+      ...focusOwnership,
       manager: chatManager,
       isActive: true,
       isChatViewMode: covered,

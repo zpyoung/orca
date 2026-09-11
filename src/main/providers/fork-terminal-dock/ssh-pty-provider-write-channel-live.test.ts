@@ -4,8 +4,9 @@
 // disposal must resolve the ack false.
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { SshPtyProvider } from '../ssh-pty-provider'
+import type { MultiplexerWriteSettlement } from '../../ssh/ssh-multiplexer-transport-writer'
 
-type SettledCallback = (result: { ok: true } | { ok: false; error: Error }) => void
+type SettledCallback = (result: MultiplexerWriteSettlement) => void
 
 type MockMultiplexer = {
   request: ReturnType<typeof vi.fn>
@@ -40,7 +41,7 @@ describe('SshPtyProvider.writeAcknowledged', () => {
   it('resolves true once the transport settles the frame', async () => {
     mux.notifyWithSettlement.mockImplementation(
       (_method: string, _params: unknown, onSettled: SettledCallback) => {
-        onSettled({ ok: true })
+        onSettled({ outcome: 'accepted' })
       }
     )
     await expect(provider.writeAcknowledged(scopedPty1, 'hello')).resolves.toBe(true)
@@ -54,7 +55,11 @@ describe('SshPtyProvider.writeAcknowledged', () => {
   it('resolves false when writer disposal drops the frame before drain', async () => {
     mux.notifyWithSettlement.mockImplementation(
       (_method: string, _params: unknown, onSettled: SettledCallback) => {
-        onSettled({ ok: false, error: new Error('Multiplexer writer disposed') })
+        onSettled({
+          outcome: 'refused',
+          reason: 'transport_disposed',
+          error: new Error('Multiplexer writer disposed')
+        })
       }
     )
     await expect(provider.writeAcknowledged(scopedPty1, 'hello')).resolves.toBe(false)
@@ -64,7 +69,8 @@ describe('SshPtyProvider.writeAcknowledged', () => {
     mux.notifyWithSettlement.mockImplementation(
       (_method: string, _params: unknown, onSettled: SettledCallback) => {
         onSettled({
-          ok: false,
+          outcome: 'refused',
+          reason: 'transport_queue_full',
           error: new Error('Multiplexer ordinary write queue exceeded its bounded capacity')
         })
       }

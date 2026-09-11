@@ -3893,8 +3893,8 @@
       "removed": 1
     },
     "src/renderer/src/components/native-chat/native-chat-picker-items.ts": {
-      "added": 68,
-      "removed": 14
+      "added": 71,
+      "removed": 15
     },
     "src/renderer/src/components/native-chat/native-chat-pty-session-options.ts": {
       "added": 25,
@@ -3921,8 +3921,8 @@
       "removed": 2
     },
     "src/renderer/src/components/native-chat/native-chat-structured-send-composition-clear.test.tsx": {
-      "added": 2,
-      "removed": 2
+      "added": 12,
+      "removed": 3
     },
     "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.test.tsx": {
       "added": 78,
@@ -4201,8 +4201,8 @@
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/terminal-visibility-resume.test.ts": {
-      "added": 69,
-      "removed": 0
+      "added": 73,
+      "removed": 1
     },
     "src/renderer/src/components/terminal-pane/terminal-visibility-resume.ts": {
       "added": 19,
@@ -4229,7 +4229,7 @@
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/use-terminal-window-wake-recovery.test.ts": {
-      "added": 12,
+      "added": 13,
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/use-terminal-window-wake-recovery.ts": {
