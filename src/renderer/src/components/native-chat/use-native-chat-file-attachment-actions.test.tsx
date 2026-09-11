@@ -27,48 +27,44 @@ beforeEach(() => {
 
 afterEach(() => vi.clearAllMocks())
 
-const IDENTITY = { terminalTabId: 'tab-1', paneKey: 'pane-1' }
+const SCOPE_KEY = 'tab-1:pane-1'
 
-function composerDrop(routing: { tabId?: string; paneLeafId?: string }): NativeFileDropPayload {
-  return { paths: ['/tmp/a.png'], target: NATIVE_FILE_DROP_TARGET.composer, ...routing }
+function composerDrop(scopeKey?: string): NativeFileDropPayload {
+  return {
+    paths: ['/tmp/a.png'],
+    target: NATIVE_FILE_DROP_TARGET.composer,
+    ...(scopeKey ? { scopeKey } : {})
+  }
 }
 
 describe('useNativeChatFileAttachmentActions', () => {
   it('attaches a drop addressed to this composer', () => {
     const attach = vi.fn()
-    renderHook(() => useNativeChatFileAttachmentActions(attach, IDENTITY))
+    renderHook(() => useNativeChatFileAttachmentActions(SCOPE_KEY, attach))
 
-    emitDrop(composerDrop({ tabId: 'tab-1', paneLeafId: 'pane-1' }))
+    emitDrop(composerDrop(SCOPE_KEY))
     expect(attach).toHaveBeenCalledWith(['/tmp/a.png'])
   })
 
-  it('ignores a drop addressed to a different composer on the same tab', () => {
+  it('ignores a drop addressed to a different composer', () => {
     const attach = vi.fn()
-    renderHook(() => useNativeChatFileAttachmentActions(attach, IDENTITY))
+    renderHook(() => useNativeChatFileAttachmentActions(SCOPE_KEY, attach))
 
-    emitDrop(composerDrop({ tabId: 'tab-1', paneLeafId: 'pane-2' }))
+    emitDrop(composerDrop('tab-1:pane-2'))
     expect(attach).not.toHaveBeenCalled()
   })
 
-  it('ignores a drop addressed to a composer on another tab', () => {
+  it('ignores an unaddressed drop rather than attaching it everywhere', () => {
     const attach = vi.fn()
-    renderHook(() => useNativeChatFileAttachmentActions(attach, IDENTITY))
+    renderHook(() => useNativeChatFileAttachmentActions(SCOPE_KEY, attach))
 
-    emitDrop(composerDrop({ tabId: 'tab-2', paneLeafId: 'pane-1' }))
+    emitDrop(composerDrop())
     expect(attach).not.toHaveBeenCalled()
-  })
-
-  it('still attaches an unaddressed drop so a producer without pane identity keeps working', () => {
-    const attach = vi.fn()
-    renderHook(() => useNativeChatFileAttachmentActions(attach, IDENTITY))
-
-    emitDrop(composerDrop({}))
-    expect(attach).toHaveBeenCalledWith(['/tmp/a.png'])
   })
 
   it('ignores drops aimed at a non-composer surface', () => {
     const attach = vi.fn()
-    renderHook(() => useNativeChatFileAttachmentActions(attach, IDENTITY))
+    renderHook(() => useNativeChatFileAttachmentActions(SCOPE_KEY, attach))
 
     emitDrop({ paths: ['/tmp/a.png'], target: NATIVE_FILE_DROP_TARGET.editor })
     expect(attach).not.toHaveBeenCalled()

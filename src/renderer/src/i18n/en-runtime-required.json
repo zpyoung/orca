@@ -2615,9 +2615,7 @@
   "components": {
     "native-chat": {
       "composer": {
-        "effort": "Effort",
-        "imagePreviewUnavailable": "Preview unavailable",
-        "imageSaving": "Saving pasted image…"
+        "effort": "Effort"
       },
       "question": {
         "other": "Other…"

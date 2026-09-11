@@ -65,6 +65,7 @@ export function NativeChatResolvedView({
   agent,
   sessionId,
   transcriptPath,
+  isVisible,
   targetPtyId,
   terminalTabId,
   ownsTabWideLaunchDraft,

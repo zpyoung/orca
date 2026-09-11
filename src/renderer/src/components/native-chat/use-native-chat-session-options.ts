@@ -4,21 +4,13 @@ import {
   getAgentSessionOptionCatalog,
   type CatalogModel
 } from '../../../../shared/agent-session-option-catalog'
-import {
-  clearNativeChatSessionOptionModel,
-  updateNativeChatSessionOptionDefaults
-} from '../../../../shared/native-chat-session-option-defaults'
-import type {
-  PersistedNativeChatSessionOptions,
-  SessionOptionDescriptor
-} from '../../../../shared/native-chat-session-options'
+import type { SessionOptionDescriptor } from '../../../../shared/native-chat-session-options'
 import type { NativeChatSessionOptionObservation } from '../../../../shared/native-chat-types'
 import { nativeChatReportedValuesFromObservation } from './fork-native-chat-session-options/native-chat-session-option-observation'
 import {
   hasDispatchedNativeChatSessionOption,
   useClaudeStartupFrameRevision
 } from './fork-native-chat-session-options/use-claude-startup-frame-revision'
-import { useAppStore } from '../../store'
 import {
   createNativeChatPtySessionOptions,
   type NativeChatPtySessionOptionsSurface

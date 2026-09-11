@@ -208,5 +208,5 @@ export function useTerminalWindowWakeRecovery({
       }
       unsubscribeSystemResumed?.()
     }
-  }, [isActiveRef, isVisible, isVisibleRef, managerRef, panePtyBindingsRef, tabId])
+  }, [isActiveRef, isChatViewMode, isVisible, isVisibleRef, managerRef, panePtyBindingsRef, tabId])
 }

@@ -16,10 +16,7 @@ import type { Worktree } from '../../../../shared/worktree/types'
 import { translate } from '@/i18n/i18n'
 import { agentLabel } from './ai-vault-session-filters'
 import { parseWorkspaceKey } from '../../../../shared/workspace-scope'
-import {
-  isKnownAiVaultResumeWorkspaceTarget,
-  type AiVaultSessionResumeTargetState
-} from './ai-vault-session-resume'
+import type { AiVaultSessionResumeTargetState } from './ai-vault-session-resume'
 import { prepareAiVaultSessionContinuation } from '@/components/agent-session-continuation/fork-session-handoff/prepare-handoff-from-vault'
 import { resolveAiVaultSessionHandoffLaunchTargetOrNotify } from '@/components/agent-session-continuation/fork-session-handoff/ai-vault-handoff-action'
 import type { AgentSessionContinuationRequest } from '@/lib/agent-session-continuation'

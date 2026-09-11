@@ -649,7 +649,7 @@
       "kind": "registration",
       "lines": [
         "} from './fork-agent-composer/AgentComposer'",
-        "import { pushHistory, seedHistory } from './fork-agent-composer/agent-composer-history'"
+        "import { seedHistory } from './fork-agent-composer/agent-composer-history'"
       ]
     },
     {
@@ -731,7 +731,11 @@
       "path": "src/renderer/src/components/native-chat/native-chat-composer-state.ts",
       "feature": "agent-composer",
       "kind": "registration",
-      "lines": ["      discovery.skills,", "  if (!leadsDraft && !hasSlashSkills) {"]
+      "lines": [
+        "      discovery.skills,",
+        "  if (!leadsDraft && !hasSlashSkills) {",
+        "} from './fork-agent-composer/agent-composer-history'"
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/use-native-chat-live-session-pending.test.ts",
@@ -779,7 +783,7 @@
       "path": "src/renderer/src/components/native-chat/native-chat-picker-items.ts",
       "feature": "skill-plugin-attribution",
       "kind": "registration",
-      "lines": ["      pluginName?: string", "        id: `skill:${token}`,"]
+      "lines": ["      pluginName?: string", "  namespacePluginSkills = false"]
     },
     {
       "path": "src/renderer/src/components/native-chat/native-chat-pty-session-options.ts",
@@ -1294,7 +1298,7 @@
       "kind": "passthrough",
       "lines": [
         "import { paneFocusOwnershipArgs } from './fork-terminal-dock/pane-focus-ownership-args'",
-        "      repairedDpr = resumeTerminalVisibilityHeavy(manager, isActive, paneFocusOwnershipArgs(tabId))"
+        "        paneFocusOwnershipArgs(tabId)"
       ]
     },
     {
@@ -2208,7 +2212,7 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/right-sidebar/AiVaultSessionVirtualList.tsx",
+      "path": "src/renderer/src/components/right-sidebar/AiVaultVirtualRow.tsx",
       "feature": "session-handoff",
       "kind": "import-swap",
       "lines": [
@@ -2411,6 +2415,135 @@
       "lines": [
         "import { getSidebarSectionSeparatorEntry } from './fork-sidebar-section-separator/section-separator-search'",
         "    getSidebarSectionSeparatorEntry(),"
+      ]
+    },
+    {
+      "path": "src/main/providers/ssh-pty-provider.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "  writeAcknowledged = (id: string, data: string): Promise<boolean> =>",
+        "    this.rpcOperations.writeAcknowledged(id, data)"
+      ]
+    },
+    {
+      "path": "src/main/runtime/mobile-session-terminal-projection.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import type { TerminalDockPaneState } from '../../shared/fork-terminal-dock/terminal-dock-pane-state'",
+        "      const terminalDockByPaneKey = terminalDockByPaneKeyByTabId.get(tab.id)"
+      ]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-publish-pty-backed-mobile-session-terminal.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "    const terminalDockByPaneKey =",
+        "      ...(terminalDockByPaneKey ? { terminalDockByPaneKey } : {}),"
+      ]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-runtime-id.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import type { TerminalDockPaneState } from '../../shared/fork-terminal-dock/terminal-dock-pane-state'",
+        "      rendererDockByPaneKeyByParentTabId: ReadonlyMap<"
+      ]
+    },
+    {
+      "path": "src/main/runtime/runtime-mobile-session-projection.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "      ...(tab.terminalDockByPaneKey ? { terminalDockByPaneKey: tab.terminalDockByPaneKey } : {}),"
+      ]
+    },
+    {
+      "path": "src/preload/index.ts",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { buildForkSessionHandoffApi } from './fork-session-handoff/session-handoff-preload-api'",
+        "  forkSessionHandoff: buildForkSessionHandoffApi(),"
+      ]
+    },
+    {
+      "path": "src/preload/index.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "import { buildForkSessionInfoApi } from './fork-session-info/session-info-preload-api'",
+        "  forkSessionInfo: buildForkSessionInfoApi(),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatMessageList.tsx",
+      "feature": "native-chat-relay",
+      "kind": "import-swap",
+      "lines": [
+        "import type { NativeChatLiveSession } from './fork-native-chat-relay/use-native-chat-live-session'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatMessageList.tsx",
+      "feature": "native-chat-width",
+      "kind": "registration",
+      "lines": [
+        "import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'",
+        "  const widthClassName = useNativeChatWidthClassName()"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatToolRun.tsx",
+      "feature": "native-chat-coloring",
+      "kind": "registration",
+      "lines": [
+        "        <ForkNativeChatToolName name={name}>",
+        "          <NativeChatToolCategoryDots blocks={blocks} />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-structured-composer-send.ts",
+      "feature": "agent-composer",
+      "kind": "import-swap",
+      "lines": [
+        "import { pushHistory, type HistoryState } from './fork-agent-composer/agent-composer-history'",
+        "import type { AgentComposerImageAttachment as NativeChatComposerImageAttachment } from './fork-agent-composer/AgentComposerField'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/terminal-scroll-intent-key-retention.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "    dockContainer: {} as never,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.tsx",
+      "feature": "agent-composer",
+      "kind": "import-swap",
+      "lines": [
+        "import type { AgentComposerImageAttachment as NativeChatComposerImageAttachment } from './fork-agent-composer/AgentComposerField'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.test.tsx",
+      "feature": "agent-composer",
+      "kind": "import-swap",
+      "lines": [
+        "import type { AgentComposerImageAttachment as NativeChatComposerImageAttachment } from './fork-agent-composer/AgentComposerField'"
+      ]
+    },
+    {
+      "path": "src/shared/structured-agent-session-options.ts",
+      "feature": "native-chat-session-options",
+      "kind": "passthrough",
+      "lines": [
+        "    undefined,"
       ]
     }
   ],
@@ -2840,38 +2973,8 @@
       "deleted": true
     },
     {
-      "path": "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.tsx",
-      "reason": "Chip renderer for the deleted NativeChatComposerField, whose attachment type it imports; the fork's AgentComposerField renders AgentComposerAttachmentThumbnail instead, so upstream's copy is unreferenced and does not compile.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.test.tsx",
-      "reason": "Tests the deleted NativeChatImageAttachmentPreview above.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
       "path": "src/renderer/src/components/native-chat/native-chat-composer-autogrow.test.tsx",
       "reason": "Superseded by the fork copy's test in fork-agent-composer.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-composer-scope-cache.test.ts",
-      "reason": "Superseded by the fork scope cache's own test.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-composer-scope-cache.ts",
-      "reason": "Superseded by agent-composer-scope-cache, which keys by composer scope rather than chat pane.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-draft-cache.test.ts",
-      "reason": "Superseded by the fork draft cache's own test.",
       "status": "permanent",
       "deleted": true
     },
@@ -2886,24 +2989,6 @@
       "status": "permanent",
       "deleted": true,
       "reason": "Upstream's chat-only PTY send hook; fork-agent-composer's useAgentComposerSend already serves both the chat pane and the terminal dock."
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-draft-cache.ts",
-      "reason": "Superseded by agent-composer-draft-cache, which subscribes so concurrent composer hosts converge.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-composer-keydown.test.tsx",
-      "reason": "Superseded by the fork copy's test in fork-agent-composer.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-composer-keydown.ts",
-      "reason": "Replaced by useAgentComposerKeydown in fork-agent-composer, which adds the docked composer's history recall.",
-      "status": "permanent",
-      "deleted": true
     },
     {
       "path": "src/renderer/src/components/native-chat/use-native-chat-draft.ts",
@@ -3004,28 +3089,9 @@
       "status": "permanent"
     },
     {
-      "path": "src/shared/native-file-drop.ts",
-      "reason": "Gives the composer drop payload the tabId/paneLeafId its terminal sibling already carries, so a broadcast drop reaches only the composer it landed on. Upstream's shared drop contract, read by preload, main, and every drop consumer — a forked copy would not reroute them.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#composer-file-drop-pane-scoping"
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-file-attachment-actions.ts",
-      "reason": "Ignores a composer file drop addressed to a different composer; unaddressed payloads still attach. Correctness fix to upstream routing, not fork-specific behavior.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#composer-file-drop-pane-scoping"
-    },
-    {
       "path": "src/renderer/src/components/native-chat/use-native-chat-file-attachment-actions.test.tsx",
-      "reason": "Covers the composer file-drop pane scoping fix: addressed, cross-pane, cross-tab, and unaddressed drops. Ships with the fix it exercises.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#composer-file-drop-pane-scoping"
-    },
-    {
-      "path": "src/shared/native-file-drop.test.ts",
-      "reason": "Adds composer tab/pane routing cases alongside the existing terminal ones, covering the composer drop payload change in the same file.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#composer-file-drop-pane-scoping"
+      "reason": "Hook-level coverage of upstream's composer drop scoping against the fork's own composer field, which publishes the scope key in place of the deleted upstream field.",
+      "status": "permanent"
     },
     {
       "path": "src/renderer/src/components/native-chat/use-native-chat-paste-bridge.ts",
@@ -3254,7 +3320,7 @@
       "removed": 0
     },
     "src/main/providers/ssh-pty-provider-rpc-operations.ts": {
-      "added": 6,
+      "added": 8,
       "removed": 0
     },
     "src/main/rate-limits/service/service-fetch-policy.ts": {
@@ -3466,8 +3532,8 @@
       "removed": 83
     },
     "src/renderer/src/components/native-chat/NativeChatComposer.tsx": {
-      "added": 232,
-      "removed": 282
+      "added": 201,
+      "removed": 277
     },
     "src/renderer/src/components/native-chat/NativeChatInteractiveCard.test.tsx": {
       "added": 21,
@@ -3487,7 +3553,7 @@
     },
     "src/renderer/src/components/native-chat/NativeChatResolvedView.tsx": {
       "added": 16,
-      "removed": 18
+      "removed": 17
     },
     "src/renderer/src/components/native-chat/NativeChatView.test.tsx": {
       "added": 4,
@@ -3502,11 +3568,11 @@
       "removed": 1
     },
     "src/renderer/src/components/native-chat/native-chat-composer-state.test.ts": {
-      "added": 139,
+      "added": 141,
       "removed": 49
     },
     "src/renderer/src/components/native-chat/native-chat-composer-state.ts": {
-      "added": 33,
+      "added": 35,
       "removed": 41
     },
     "src/renderer/src/components/native-chat/native-chat-composer-types.ts": {
@@ -3518,8 +3584,8 @@
       "removed": 1
     },
     "src/renderer/src/components/native-chat/native-chat-picker-items.ts": {
-      "added": 48,
-      "removed": 15
+      "added": 68,
+      "removed": 14
     },
     "src/renderer/src/components/native-chat/native-chat-pty-session-options.ts": {
       "added": 25,
@@ -3609,7 +3675,7 @@
       "added": 2,
       "removed": 0
     },
-    "src/renderer/src/components/right-sidebar/AiVaultSessionVirtualList.tsx": {
+    "src/renderer/src/components/right-sidebar/AiVaultVirtualRow.tsx": {
       "added": 3,
       "removed": 4
     },
@@ -3799,7 +3865,7 @@
     },
     "src/renderer/src/components/terminal-pane/pane-helpers.ts": {
       "added": 25,
-      "removed": 6
+      "removed": 8
     },
     "src/renderer/src/components/terminal-pane/terminal-input-quarantine.ts": {
       "added": 84,
@@ -3826,11 +3892,11 @@
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/terminal-visibility-resume.test.ts": {
-      "added": 67,
+      "added": 69,
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/terminal-visibility-resume.ts": {
-      "added": 15,
+      "added": 19,
       "removed": 6
     },
     "src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects.ts": {
@@ -4183,6 +4249,58 @@
     },
     "src/renderer/src/components/settings/appearance-search.ts": {
       "added": 2,
+      "removed": 0
+    },
+    "src/main/providers/ssh-pty-provider.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/main/runtime/mobile-session-terminal-projection.ts": {
+      "added": 12,
+      "removed": 0
+    },
+    "src/main/runtime/orca-runtime-publish-pty-backed-mobile-session-terminal.ts": {
+      "added": 11,
+      "removed": 0
+    },
+    "src/main/runtime/orca-runtime-runtime-id.ts": {
+      "added": 8,
+      "removed": 0
+    },
+    "src/main/runtime/runtime-mobile-session-projection.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/preload/index.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/renderer/src/components/native-chat/NativeChatMessageList.tsx": {
+      "added": 5,
+      "removed": 2
+    },
+    "src/renderer/src/components/native-chat/NativeChatToolRun.tsx": {
+      "added": 7,
+      "removed": 2
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-structured-composer-send.ts": {
+      "added": 2,
+      "removed": 2
+    },
+    "src/renderer/src/lib/pane-manager/terminal-scroll-intent-key-retention.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.test.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/shared/structured-agent-session-options.ts": {
+      "added": 1,
       "removed": 0
     }
   }

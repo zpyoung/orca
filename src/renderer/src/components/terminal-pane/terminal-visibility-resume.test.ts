@@ -321,11 +321,27 @@ describe('resumeTerminalVisibility reveal repaint', () => {
       ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: true,
+      isChatViewMode: false,
       clearGlyphAtlases: false
     })
 
     expect(focusActivePane).toHaveBeenCalledWith(manager, expect.anything())
     expectThreadedOwnership(vi.mocked(focusActivePane).mock.calls.at(-1)?.[1])
+  })
+
+  it('does not focus the covered terminal during chat window-wake recovery', async () => {
+    const manager = createManager()
+    const { focusActivePane } = vi.mocked(await import('./pane-helpers'))
+
+    recoverVisibleTerminalWindowWake({
+      ...focusOwnership,
+      manager: manager as never as PaneManager,
+      isActive: true,
+      isChatViewMode: true,
+      clearGlyphAtlases: false
+    })
+
+    expect(focusActivePane).not.toHaveBeenCalled()
   })
 
   it('repairs WebGL canvas backing-store dpr on window wake', () => {

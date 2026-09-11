@@ -16,11 +16,7 @@ export const NATIVE_FILE_DROP_TARGET = {
 export type NativeDropResolution =
   | { target: typeof NATIVE_FILE_DROP_TARGET.editor }
   | { target: typeof NATIVE_FILE_DROP_TARGET.terminal; tabId?: string; paneLeafId?: string }
-  | {
-      target: typeof NATIVE_FILE_DROP_TARGET.composer
-      tabId?: string
-      paneLeafId?: string
-    }
+  | { target: typeof NATIVE_FILE_DROP_TARGET.composer; scopeKey?: string }
   | { target: typeof NATIVE_FILE_DROP_TARGET.fileExplorer; destinationDir: string }
   | { target: typeof NATIVE_FILE_DROP_TARGET.projectSidebar }
   | { target: 'rejected' }
@@ -33,12 +29,7 @@ export type NativeFileDropPayload =
       tabId?: string
       paneLeafId?: string
     }
-  | {
-      paths: string[]
-      target: typeof NATIVE_FILE_DROP_TARGET.composer
-      tabId?: string
-      paneLeafId?: string
-    }
+  | { paths: string[]; target: typeof NATIVE_FILE_DROP_TARGET.composer; scopeKey?: string }
   | {
       paths: string[]
       target: typeof NATIVE_FILE_DROP_TARGET.fileExplorer
@@ -122,7 +113,9 @@ export function resolveNativeFileDropPath(
       return { target, tabId: entry.terminalTabId, paneLeafId: terminalPaneLeafId }
     }
     if (target === NATIVE_FILE_DROP_TARGET.composer) {
-      return { target, tabId: entry.terminalTabId, paneLeafId: entry.terminalPaneLeafId }
+      // Composer drops fan out window-wide, so carry the receiving composer's
+      // scope key the way a terminal drop carries its pane leaf id.
+      return { target, ...(composerScopeKey ? { scopeKey: composerScopeKey } : {}) }
     }
     if (target === NATIVE_FILE_DROP_TARGET.editor) {
       return { target }
@@ -229,14 +222,6 @@ export function createNativeFileDropPayload(
   }
 
   const target = resolution?.target ?? NATIVE_FILE_DROP_TARGET.editor
-  if (resolution?.target === NATIVE_FILE_DROP_TARGET.composer) {
-    return {
-      paths: [...paths],
-      target: resolution.target,
-      ...(resolution.tabId ? { tabId: resolution.tabId } : {}),
-      ...(resolution.paneLeafId ? { paneLeafId: resolution.paneLeafId } : {})
-    }
-  }
   if (resolution?.target === NATIVE_FILE_DROP_TARGET.terminal) {
     return {
       paths: [...paths],
@@ -275,12 +260,6 @@ export function isNativeFileDropPayload(value: unknown): value is NativeFileDrop
   }
 
   if (target === NATIVE_FILE_DROP_TARGET.terminal) {
-    return (
-      isOptionalNativeFileDropString(payload.tabId) &&
-      isOptionalNativeFileDropString(payload.paneLeafId)
-    )
-  }
-  if (target === NATIVE_FILE_DROP_TARGET.composer) {
     return (
       isOptionalNativeFileDropString(payload.tabId) &&
       isOptionalNativeFileDropString(payload.paneLeafId)

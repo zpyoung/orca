@@ -49,37 +49,20 @@ describe('resolveNativeFileDropPath', () => {
     })
   })
 
-  it('preserves composer tab and pane routing so a drop reaches only that composer', () => {
+  it('carries the innermost composer scope key and omits an absent one', () => {
     expect(
       resolveNativeFileDropPath([
+        { composerScopeKey: 'pane-inner' },
         {
           nativeFileDropTarget: NATIVE_FILE_DROP_TARGET.composer,
-          terminalTabId: 'tab-1',
-          terminalPaneLeafId: 'pane-1'
-        },
-        {
-          nativeFileDropTarget: NATIVE_FILE_DROP_TARGET.terminal,
-          terminalTabId: 'tab-1'
+          composerScopeKey: 'pane-outer'
         }
       ])
-    ).toEqual({
-      target: NATIVE_FILE_DROP_TARGET.composer,
-      tabId: 'tab-1',
-      paneLeafId: 'pane-1'
-    })
-  })
+    ).toEqual({ target: NATIVE_FILE_DROP_TARGET.composer, scopeKey: 'pane-inner' })
 
-  it('leaves an unmarked composer drop unaddressed rather than borrowing an ancestor id', () => {
     expect(
-      resolveNativeFileDropPath([
-        { terminalTabId: 'tab-1', terminalPaneLeafId: 'leaf-1' },
-        { nativeFileDropTarget: NATIVE_FILE_DROP_TARGET.composer }
-      ])
-    ).toEqual({
-      target: NATIVE_FILE_DROP_TARGET.composer,
-      tabId: undefined,
-      paneLeafId: undefined
-    })
+      resolveNativeFileDropPath([{ nativeFileDropTarget: NATIVE_FILE_DROP_TARGET.composer }])
+    ).toEqual({ target: NATIVE_FILE_DROP_TARGET.composer })
   })
 
   it('uses the nearest file-explorer destination and fails closed without one', () => {
@@ -164,29 +147,6 @@ describe('createNativeFileDropPayload', () => {
       paths: ['/tmp/a'],
       tabId: 'tab-1',
       target: NATIVE_FILE_DROP_TARGET.terminal
-    })
-  })
-
-  it('preserves composer tab and pane routing in accepted payloads', () => {
-    expect(
-      createNativeFileDropPayload(
-        { target: NATIVE_FILE_DROP_TARGET.composer, tabId: 'tab-1', paneLeafId: 'pane-1' },
-        ['/tmp/a']
-      )
-    ).toEqual({
-      paneLeafId: 'pane-1',
-      paths: ['/tmp/a'],
-      tabId: 'tab-1',
-      target: NATIVE_FILE_DROP_TARGET.composer
-    })
-  })
-
-  it('omits composer routing keys entirely when the drop was unaddressed', () => {
-    expect(
-      createNativeFileDropPayload({ target: NATIVE_FILE_DROP_TARGET.composer }, ['/tmp/a'])
-    ).toEqual({
-      paths: ['/tmp/a'],
-      target: NATIVE_FILE_DROP_TARGET.composer
     })
   })
 

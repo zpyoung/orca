@@ -39,8 +39,9 @@ import { NativeChatSubagentRun } from './NativeChatSubagentRun'
 import { NativeChatToolIcon, NativeChatToolRunIcon } from './NativeChatToolIcon'
 import {
   NativeChatToolCategoryDots,
-  NativeChatToolName
+  NativeChatToolName as ForkNativeChatToolName
 } from './fork-native-chat-coloring/native-chat-tool-category-glyphs'
+import { nativeChatToolActivityLabel } from './native-chat-tool-activity-label'
 
 /** Stable empty default: a fresh array literal per render breaks memoization. */
 const NO_SUBAGENT_GROUPS: NativeChatSubagentGroupBlock[] = []
@@ -110,7 +111,9 @@ function ToolLine({
              category to read from it. The empty slot keeps rows aligned. */
           <span aria-hidden className="size-4 shrink-0" />
         )}
-        <NativeChatToolName name={name} />
+        <ForkNativeChatToolName name={name}>
+          {isCall ? <NativeChatToolName name={name} mcpIdentity={block.mcpIdentity} /> : name}
+        </ForkNativeChatToolName>
         {preview ? (
           <span
             className="min-w-0 truncate font-mono text-[11px] text-muted-foreground transition-colors group-hover:text-foreground/70"

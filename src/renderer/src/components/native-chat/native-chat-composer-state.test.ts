@@ -325,7 +325,7 @@ describe('native skill and command picker', () => {
         skillFilePath: '/plugins/warp/skills/render/SKILL.md'
       })
     ]
-    const items = buildNativeChatPickerItems([], collidingPlugins, '', '/', true)
+    const items = buildNativeChatPickerItems([], collidingPlugins, '', '/', undefined, true)
     expect(items.map((item) => item.name)).toEqual(['quirk:render', 'warp:render'])
     expect(items.map((item) => (item.kind === 'skill' ? item.pluginName : null))).toEqual([
       'quirk',
@@ -371,6 +371,7 @@ describe('native skill and command picker', () => {
       ],
       'clear',
       '/',
+      undefined,
       true
     )
     expect(items.map((item) => item.name)).toEqual(['clear', 'quirk:clear'])
@@ -390,6 +391,7 @@ describe('native skill and command picker', () => {
       ],
       '',
       '/',
+      undefined,
       true
     )
     expect(items.map((item) => item.name)).toEqual(['render'])

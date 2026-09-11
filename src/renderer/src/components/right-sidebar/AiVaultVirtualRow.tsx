@@ -21,7 +21,7 @@ import {
   canOpenAiVaultSessionLogInOrca,
   canUseLocalAiVaultSessionPathActions
 } from './ai-vault-session-path-actions'
-import { canContinueAiVaultSessionInNewSession } from './ai-vault-session-continuation'
+import { resolveAiVaultSessionHandoffWorktreeId } from '@/components/agent-session-continuation/fork-session-handoff/ai-vault-handoff-action'
 import type { AiVaultResumeInChatEligibility } from './ai-vault-session-resume-in-chat'
 
 export type AiVaultListRow =
@@ -107,9 +107,8 @@ export function AiVaultVirtualRow({
   const resumeActions = row.type === 'session' ? getSessionResumeActions(row.session) : null
   const resumeInChat = row.type === 'session' ? getSessionResumeInChat(row.session) : null
   const continuationWorktreeId =
-    row.type === 'session' &&
-    canContinueAiVaultSessionInNewSession(row.session, resumeState?.worktreeId)
-      ? resumeState?.worktreeId
+    row.type === 'session'
+      ? resolveAiVaultSessionHandoffWorktreeId(row.session, resumeActions)
       : null
   // Gate resume on real content: a zero-turn transcript would resume into an
   // empty conversation, so it is never offered as normally resumable.

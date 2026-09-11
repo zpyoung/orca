@@ -577,6 +577,9 @@ describe('Electron runtime package contract', () => {
     expect(packageScripts['test:e2e:terminal-rendering-golden']).not.toContain(
       'terminal-long-table-scroll-restore.spec.ts'
     )
+    const goldenCommand = packageScripts['test:e2e:terminal-rendering-golden']
+    expect(goldenCommand).toContain('--project electron-headless')
+    expect(goldenCommand).toContain('--project electron-headful')
     expect(packageScripts['test:e2e:terminal-rendering-release-evidence']).toContain(
       'terminal-opencode-emoji-table-rendering.spec.ts'
     )

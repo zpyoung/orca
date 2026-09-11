@@ -3,9 +3,7 @@ import { ArrowDown } from 'lucide-react'
 import type { CommentMarkdownLinkClickHandler } from '@/components/sidebar/CommentMarkdown'
 import { translate } from '@/i18n/i18n'
 import type { NativeChatLiveSession } from './fork-native-chat-relay/use-native-chat-live-session'
-import { orderNativeChatMessages } from './native-chat-message-grouping'
-import { stripNoiseMessages } from './native-chat-noise'
-import { foldToolMessages } from './native-chat-tool-fold'
+import { createNativeChatMessageListProjection } from './native-chat-message-list-projection'
 import { isNearBottom, shouldShowJumpToLatest, type ScrollGeometry } from './native-chat-autoscroll'
 import { nativeChatTaskListState } from './native-chat-task-list-state'
 import { nativeChatTaskListPredecessors } from './native-chat-task-list-history'
@@ -17,6 +15,18 @@ import { NativeChatWorkingStatus } from './NativeChatWorkingStatus'
 import { useNativeChatTurnStatus } from './use-native-chat-turn-status'
 import { NativeChatTypingIndicatorRow } from './NativeChatTypingIndicatorRow'
 import type { RuntimeFileOperationArgs } from '@/runtime/runtime-file-client'
+import type { NativeChatTurnActivity } from './native-chat-turn-activity'
+import { NativeChatTurnActivityLine } from './NativeChatTurnActivityLine'
+
+import type { AgentJournalRenderItem } from '../../../../shared/agent-session-journal-types'
+import {
+  nativeChatTurnDiffs,
+  type NativeChatDiffReveal,
+  type NativeChatDiffTarget,
+  type NativeChatTurnDiff
+} from './native-chat-turn-diffs'
+import { NativeChatTurnDiffRollup } from './NativeChatTurnDiffRollup'
+import { NativeChatResolutionReceipt } from './NativeChatResolutionReceipt'
 import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'
 import { cn } from '@/lib/utils'
 
@@ -58,6 +68,22 @@ export function NativeChatMessageList({
   turnActivity?: NativeChatTurnActivity | null
   runtimeContext?: RuntimeFileOperationArgs | null
 }): React.JSX.Element {
+  const [revealedDiff, setRevealedDiff] = useState<NativeChatDiffReveal | null>(null)
+  const revealDiff = useCallback((target: NativeChatDiffTarget) => {
+    setRevealedDiff((current) => ({ ...target, requestId: (current?.requestId ?? 0) + 1 }))
+  }, [])
+  const receipts = useMemo(
+    () =>
+      new Map(
+        journalItems?.flatMap((item) =>
+          (item.body.kind === 'approval' || item.body.kind === 'question') &&
+          item.body.resolution.state !== 'pending'
+            ? [[item.itemId, item.body] as const]
+            : []
+        )
+      ),
+    [journalItems]
+  )
   const widthClassName = useNativeChatWidthClassName()
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
@@ -207,27 +233,18 @@ export function NativeChatMessageList({
   }, [handleScroll, scrollToBottom])
 
   return (
-    <div className="relative min-h-0 flex-1">
-      <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        className="scrollbar-sleek h-full overflow-y-auto [scrollbar-gutter:stable_both-edges] px-3 pt-10 pb-4 sm:px-4"
-      >
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      <div className="relative min-h-0 flex-1">
         <div
-          ref={contentRef}
-          // Why: matches composer column (max-w-4xl) with 5px horizontal inset
-          // on each side so content is slightly narrower than the input box.
-          className={cn('mx-auto flex w-full flex-col gap-5 px-[5px]', widthClassName)}
-          // Why: `zoom` scales the chat transcript's text and layout together,
-          // scoped to this container so the rest of the app is untouched. It's
-          // the desktop analog of the mobile pinch-zoom (Chromium/Electron only).
-          style={{ zoom: fontScale }}
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="scrollbar-sleek h-full overflow-y-auto [scrollbar-gutter:stable_both-edges] px-3 pt-10 pb-4 sm:px-4"
         >
           <div
             ref={contentRef}
             // Why: matches composer column (max-w-4xl) with 5px horizontal inset
             // on each side so content is slightly narrower than the input box.
-            className="mx-auto flex w-full max-w-4xl flex-col gap-5 px-[5px]"
+            className={cn('mx-auto flex w-full flex-col gap-5 px-[5px]', widthClassName)}
             // Why: `zoom` scales the chat transcript's text and layout together,
             // scoped to this container so the rest of the app is untouched. It's
             // the desktop analog of the mobile pinch-zoom (Chromium/Electron only).

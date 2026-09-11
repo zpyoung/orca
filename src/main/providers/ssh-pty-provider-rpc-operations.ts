@@ -17,11 +17,13 @@ export function createSshPtyProviderRpcOperations({ mux, toRelayPtyId }: SshPtyP
     write: (id: string, data: string): boolean => writeToSshPty(mux, toRelayPtyId(id), data),
     writeWithSettlement: (id: string, data: string): Promise<WriteSettlement> =>
       writeToSshPtyWithSettlement(mux, toRelayPtyId(id), data),
-    // Ack-path only: resolves once the relay transport actually settles the frame —
-    // false if writer disposal or backpressure rejection drops it.
+    // Ack-path only: true just for `accepted`. `unverifiable` means the bytes reached
+    // the transport without settling, which is not an acknowledgement the caller can act on.
     writeAcknowledged: (id: string, data: string): Promise<boolean> =>
       new Promise((resolve) =>
-        mux.notifyWithSettlement('pty.data', { id: toRelayPtyId(id), data }, (r) => resolve(r.ok))
+        mux.notifyWithSettlement('pty.data', { id: toRelayPtyId(id), data }, (r) =>
+          resolve(r.outcome === 'accepted')
+        )
       ),
     resize: (id: string, cols: number, rows: number): void => {
       mux.notify('pty.resize', { id: toRelayPtyId(id), cols, rows })

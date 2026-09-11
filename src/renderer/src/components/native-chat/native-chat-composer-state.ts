@@ -14,6 +14,13 @@ import {
 } from './native-chat-picker-items'
 
 export type { SlashCommandSuggestion }
+export {
+  EMPTY_HISTORY,
+  pushHistory,
+  recallNext,
+  recallPrevious,
+  type HistoryState
+} from './fork-agent-composer/agent-composer-history'
 export { filterSlashCommands, isSlashCommandDraft, applySlashSuggestion, slashCommandDispatchText }
 export {
   applyPickerSuggestion,
@@ -63,7 +70,8 @@ export function deriveComposerAutocomplete(
       agentCommands,
       profile,
       discovery,
-      dismissedTriggerKey
+      dismissedTriggerKey,
+      sessionSkillNames
     )
   }
   const mentionMatch = before.match(/(?:^|\s)@(\S*)$/)
@@ -95,6 +103,7 @@ export function deriveComposerAutocomplete(
       discovery.skills,
       query,
       '$',
+      sessionSkillNames,
       profile?.namespacesPluginSkills === true
     ),
     skillStatus: discovery.status === 'idle' ? 'loading' : discovery.status,
@@ -131,6 +140,7 @@ function deriveSlashAutocomplete(
     hasSlashSkills ? discovery.skills : [],
     query,
     '/',
+    hasSlashSkills ? sessionSkillNames : [],
     profile?.namespacesPluginSkills === true
   )
   return {
