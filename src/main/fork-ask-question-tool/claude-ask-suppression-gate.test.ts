@@ -6,6 +6,7 @@ import {
   CLAUDE_ASK_SUPPRESSION_SYSTEM_PROMPT_FLAG,
   CLAUDE_ASK_SUPPRESSION_SYSTEM_PROMPT_VALUE,
   clearClaudeAskSuppressionGateForTests,
+  peekClaudeAskSuppressionFlags,
   resolveClaudeAskSuppressionFlags,
   type AskGateHostKey
 } from './claude-ask-suppression-gate'
@@ -167,8 +168,18 @@ describe('resolveClaudeAskSuppressionFlags', () => {
     const providerB = {}
     const probeA = vi.fn().mockResolvedValue('1.2.0')
     const probeB = vi.fn().mockResolvedValue('1.0.0')
-    const hostA: AskGateHostKey = { kind: 'ssh', sshProvider: providerA, shell: 'posix', probe: probeA }
-    const hostB: AskGateHostKey = { kind: 'ssh', sshProvider: providerB, shell: 'posix', probe: probeB }
+    const hostA: AskGateHostKey = {
+      kind: 'ssh',
+      sshProvider: providerA,
+      shell: 'posix',
+      probe: probeA
+    }
+    const hostB: AskGateHostKey = {
+      kind: 'ssh',
+      sshProvider: providerB,
+      shell: 'posix',
+      probe: probeB
+    }
 
     await expect(resolveClaudeAskSuppressionFlags(hostA)).resolves.toEqual(expectedFlags)
     await expect(resolveClaudeAskSuppressionFlags(hostB)).resolves.toBeNull()
@@ -189,5 +200,57 @@ describe('resolveClaudeAskSuppressionFlags', () => {
 
     await expect(resolveClaudeAskSuppressionFlags(sshHost)).resolves.toEqual(expectedFlags)
     await expect(resolveClaudeAskSuppressionFlags(nativeHost)).resolves.toBeNull()
+  })
+})
+
+describe('peekClaudeAskSuppressionFlags', () => {
+  it('reports pending and starts the probe for a host it has never decided', async () => {
+    const probe = vi.fn().mockResolvedValue('1.2.0')
+    const host = localHost({ probe })
+
+    expect(peekClaudeAskSuppressionFlags(host)).toBe('pending')
+
+    await vi.waitFor(() => expect(probe).toHaveBeenCalledTimes(1))
+    expect(peekClaudeAskSuppressionFlags(host)).toEqual(expectedFlags)
+  })
+
+  it('answers a decided host without probing again', async () => {
+    const probe = vi.fn().mockResolvedValue('1.2.0')
+    const host = localHost({ probe })
+    await resolveClaudeAskSuppressionFlags(host)
+
+    expect(peekClaudeAskSuppressionFlags(host)).toEqual(expectedFlags)
+    expect(probe).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports null, not pending, once a probe has concluded below the floor', async () => {
+    const host = localHost({ probe: vi.fn().mockResolvedValue('1.0.50') })
+    await resolveClaudeAskSuppressionFlags(host)
+
+    expect(peekClaudeAskSuppressionFlags(host)).toBeNull()
+  })
+
+  it('keeps answering null across a lapsed retry cooldown while it re-probes', async () => {
+    const probe = vi.fn().mockResolvedValue('1.0.50')
+    const host = localHost({ probe })
+    await resolveClaudeAskSuppressionFlags(host)
+
+    vi.useFakeTimers()
+    vi.setSystemTime(Date.now() + CLAUDE_ASK_SUPPRESSION_GATE_RETRY_INTERVAL_MS + 1)
+    // The cooldown has lapsed, so this both re-probes and must still report the last
+    // concluded answer rather than reverting to 'pending'.
+    expect(peekClaudeAskSuppressionFlags(host)).toBeNull()
+    vi.useRealTimers()
+
+    await vi.waitFor(() => expect(probe).toHaveBeenCalledTimes(2))
+  })
+
+  it('does not re-probe a failed host while its retry cooldown is live', async () => {
+    const probe = vi.fn().mockRejectedValue(new Error('ENOENT'))
+    const host = localHost({ probe })
+    await resolveClaudeAskSuppressionFlags(host)
+
+    expect(peekClaudeAskSuppressionFlags(host)).toBeNull()
+    expect(probe).toHaveBeenCalledTimes(1)
   })
 })

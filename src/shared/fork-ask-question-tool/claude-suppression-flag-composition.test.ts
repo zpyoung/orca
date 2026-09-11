@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import {
   CLAUDE_ASK_SUPPRESSION_DISALLOWED_TOOLS_FLAG,
   CLAUDE_ASK_SUPPRESSION_DISALLOWED_TOOLS_VALUE,
@@ -9,6 +9,11 @@ import {
   appendClaudeSuppressionFlags,
   applyClaudeSuppressionFlagsToResumeCommand
 } from './claude-suppression-flag-composition'
+import { setLocalClaudeSuppressionVerdictReader } from './claude-suppression-verdict'
+
+afterEach(() => {
+  setLocalClaudeSuppressionVerdictReader(null)
+})
 
 const FLAGS = [
   CLAUDE_ASK_SUPPRESSION_DISALLOWED_TOOLS_FLAG,
@@ -101,6 +106,33 @@ describe('appendClaudeSuppressionFlags', () => {
     expect(result).toEqual({ command: "claude 'fix it'", commandWithoutSessionOptions: 'claude' })
   })
 
+  it('takes the ambient local verdict when the caller supplies none', () => {
+    setLocalClaudeSuppressionVerdictReader(() => FLAGS)
+
+    const result = appendClaudeSuppressionFlags({
+      agent: 'claude',
+      shell: 'posix',
+      command: 'claude',
+      commandWithoutSessionOptions: 'claude'
+    })
+
+    expect(result.command).toBe(`claude ${disallowedPair} ${systemPromptPair}`)
+  })
+
+  it('ignores the ambient local verdict for a remote launch', () => {
+    setLocalClaudeSuppressionVerdictReader(() => FLAGS)
+
+    const result = appendClaudeSuppressionFlags({
+      agent: 'claude',
+      shell: 'posix',
+      command: 'claude',
+      commandWithoutSessionOptions: 'claude',
+      isRemote: true
+    })
+
+    expect(result).toEqual({ command: 'claude', commandWithoutSessionOptions: 'claude' })
+  })
+
   it('is byte-identical when claudeSuppressionFlags is null', () => {
     const result = appendClaudeSuppressionFlags({
       agent: 'claude',
@@ -173,6 +205,33 @@ describe('applyClaudeSuppressionFlagsToResumeCommand', () => {
     })
 
     expect(result).toBe('claude --resume abc --disallowedTools=Bash')
+  })
+
+  it('leaves the captured command untouched while the verdict is still pending', () => {
+    const captured = `claude --resume abc ${disallowedPair} ${systemPromptPair}`
+
+    // A cold restore runs before the probe lands; stripping here un-suppresses every
+    // restored session on every boot.
+    expect(
+      applyClaudeSuppressionFlagsToResumeCommand({
+        agent: 'claude',
+        shell: 'posix',
+        command: captured
+      })
+    ).toBe(captured)
+  })
+
+  it('strips once the ambient verdict concludes the binary cannot take the flags', () => {
+    setLocalClaudeSuppressionVerdictReader(() => null)
+    const captured = `claude --resume abc ${disallowedPair} ${systemPromptPair}`
+
+    expect(
+      applyClaudeSuppressionFlagsToResumeCommand({
+        agent: 'claude',
+        shell: 'posix',
+        command: captured
+      })
+    ).toBe('claude --resume abc')
   })
 
   it('never touches a non-Claude agent, injecting or stripping', () => {

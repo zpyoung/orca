@@ -4,7 +4,12 @@ import {
   CLAUDE_ASK_SUPPRESSION_SYSTEM_PROMPT_FLAG,
   CLAUDE_ASK_SUPPRESSION_SYSTEM_PROMPT_VALUE
 } from './claude-suppression-flags'
-import { quoteStartupArg, tokenizeStartupCommand, type AgentStartupShell } from '../tui-agent-startup-shell'
+import {
+  quoteStartupArg,
+  tokenizeStartupCommand,
+  type AgentStartupShell
+} from '../tui-agent-startup-shell'
+import { resolveClaudeSuppressionVerdict } from './claude-suppression-verdict'
 import type { TuiAgent } from '../tui-agent'
 
 type SuppressionPair = {
@@ -38,7 +43,9 @@ function tokenCollidesWithAlias(tokens: readonly string[], alias: string): boole
 
 function pairsMissingFrom(scanText: string, shell: AgentStartupShell): readonly SuppressionPair[] {
   const tokens = tokensOf(scanText, shell)
-  return SUPPRESSION_PAIRS.filter((pair) => !pair.aliases.some((alias) => tokenCollidesWithAlias(tokens, alias)))
+  return SUPPRESSION_PAIRS.filter(
+    (pair) => !pair.aliases.some((alias) => tokenCollidesWithAlias(tokens, alias))
+  )
 }
 
 function quotedPair(pair: SuppressionPair, shell: AgentStartupShell): string {
@@ -64,21 +71,35 @@ export type ClaudeLaunchCommandFlagsInput = {
   override?: string | null
   command: string
   commandWithoutSessionOptions: string
+  /** Omit to take this process's ambient local verdict; pass a value only when the
+   *  caller knows the launch host itself. */
   claudeSuppressionFlags?: string[] | null
+  isRemote?: boolean
 }
 
 /**
  * Appends Orca's AskUserQuestion suppression flags to a Claude launch command.
  * Skips a flag already present in the effective command (the user's override,
  * else the resolved command) rather than duplicating or rewriting it, and is a
- * no-op for any agent but `claude` or when no flags are supplied — preserving
- * today's output byte-for-byte in both cases.
+ * no-op for any agent but `claude` or for any verdict short of flags to inject —
+ * preserving today's output byte-for-byte in both cases.
  */
-export function appendClaudeSuppressionFlags(
-  args: ClaudeLaunchCommandFlagsInput
-): { command: string; commandWithoutSessionOptions: string } {
-  const identity = { command: args.command, commandWithoutSessionOptions: args.commandWithoutSessionOptions }
-  if (args.agent !== 'claude' || !args.claudeSuppressionFlags?.length) {
+export function appendClaudeSuppressionFlags(args: ClaudeLaunchCommandFlagsInput): {
+  command: string
+  commandWithoutSessionOptions: string
+} {
+  const identity = {
+    command: args.command,
+    commandWithoutSessionOptions: args.commandWithoutSessionOptions
+  }
+  if (args.agent !== 'claude') {
+    return identity
+  }
+  const verdict = resolveClaudeSuppressionVerdict({
+    explicit: args.claudeSuppressionFlags,
+    isRemote: args.isRemote
+  })
+  if (verdict === 'pending' || !verdict?.length) {
     return identity
   }
   const pairs = pairsMissingFrom(args.override || args.command, args.shell)
@@ -96,18 +117,28 @@ export function appendClaudeSuppressionFlags(
  * token pairs Orca itself injected, matched against its own literal flag and
  * value — a user-authored flag, even one with the same name, is left alone
  * unless its value is byte-identical to Orca's, so this can only remove what
- * Orca put there.
+ * Orca put there. A pending verdict leaves the capture exactly as it is.
  */
 export function applyClaudeSuppressionFlagsToResumeCommand(args: {
   agent: TuiAgent
   shell: AgentStartupShell
   command: string
   claudeSuppressionFlags?: string[] | null
+  isRemote?: boolean
 }): string {
   if (args.agent !== 'claude') {
     return args.command
   }
-  if (args.claudeSuppressionFlags?.length) {
+  const verdict = resolveClaudeSuppressionVerdict({
+    explicit: args.claudeSuppressionFlags,
+    isRemote: args.isRemote
+  })
+  // A cold restore resumes before the version probe lands, and stripping on an unread verdict
+  // would un-suppress every restored session on every boot.
+  if (verdict === 'pending') {
+    return args.command
+  }
+  if (verdict?.length) {
     return appendPairs(args.command, pairsMissingFrom(args.command, args.shell), args.shell)
   }
   return SUPPRESSION_PAIRS.reduce(

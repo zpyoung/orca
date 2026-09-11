@@ -41,7 +41,8 @@ export function buildAgentResumeStartupPlan(args: {
           agent: args.agent,
           shell,
           command: resolvedAgentCommand,
-          claudeSuppressionFlags: args.claudeSuppressionFlags
+          claudeSuppressionFlags: args.claudeSuppressionFlags,
+          isRemote: args.isRemote
         }),
         commandWithoutSessionOptions: resolvedAgentCommand,
         appliedSessionOptions: {}

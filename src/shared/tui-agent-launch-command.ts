@@ -102,7 +102,8 @@ export function resolveAgentLaunchCommand(args: {
           ? `${commandWithOptions} ${suffix.suffix}`
           : commandWithOptions,
       commandWithoutSessionOptions,
-      claudeSuppressionFlags: args.claudeSuppressionFlags
+      claudeSuppressionFlags: args.claudeSuppressionFlags,
+      isRemote: args.isRemote
     }),
     appliedSessionOptions: resolvedOptions.appliedValues
   }

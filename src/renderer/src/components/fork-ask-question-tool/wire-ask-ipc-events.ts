@@ -1,4 +1,5 @@
 import type { AsksSlice } from '@/store/slices/fork-ask-question-tool/asks'
+import { wireClaudeSuppressionVerdict } from './claude-suppression-verdict-bridge'
 
 type AskStore = { getState: () => Pick<AsksSlice, 'hydrateAsks' | 'applyAskRegistryEvent'> }
 
@@ -9,7 +10,12 @@ type AskStore = { getState: () => Pick<AsksSlice, 'hydrateAsks' | 'applyAskRegis
  */
 export function wireAskIpcEvents(store: AskStore): () => void {
   void store.getState().hydrateAsks()
-  return window.api.asks.onSet((event) => {
+  const stopVerdict = wireClaudeSuppressionVerdict(window.api.asks)
+  const stopAskEvents = window.api.asks.onSet((event) => {
     store.getState().applyAskRegistryEvent(event)
   })
+  return () => {
+    stopAskEvents()
+    stopVerdict()
+  }
 }

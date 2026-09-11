@@ -1,5 +1,6 @@
 import type { ElectronAPI } from '@electron-toolkit/preload'
 import type { AskRegistryEvent } from '../shared/fork-ask-question-tool/ask-question-schema'
+import type { ClaudeSuppressionVerdict } from '../shared/fork-ask-question-tool/claude-suppression-verdict'
 import type {
   ClaudeAccountsApi,
   CodexAccountsApi,
@@ -70,6 +71,8 @@ type Merged<T> = { [K in keyof T]: T[K] }
 /** IPC subscription surface for ask registry events (tech.md C8); reads go through `runtime.call('ask.snapshot', …)`. */
 export type AskApi = {
   onSet: (callback: (event: AskRegistryEvent) => void) => () => void
+  getSuppressionVerdict: () => Promise<ClaudeSuppressionVerdict>
+  onSuppressionVerdict: (callback: (verdict: ClaudeSuppressionVerdict) => void) => () => void
 }
 
 export type PreloadApi = {

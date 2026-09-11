@@ -15,7 +15,12 @@ function makeEvent(overrides: Partial<AskRegistryEvent> = {}): AskRegistryEvent 
 
 function stubAsksApi(disposer: () => void) {
   const onSet = vi.fn<(callback: (event: AskRegistryEvent) => void) => () => void>(() => disposer)
-  vi.stubGlobal('window', { api: { asks: { onSet } } })
+  const asks = {
+    onSet,
+    getSuppressionVerdict: vi.fn().mockResolvedValue('pending' as const),
+    onSuppressionVerdict: vi.fn(() => vi.fn())
+  }
+  vi.stubGlobal('window', { api: { asks } })
   return onSet
 }
 
@@ -42,7 +47,10 @@ describe('wireAskIpcEvents', () => {
     const disposer = vi.fn()
     stubAsksApi(disposer)
     const store = {
-      getState: () => ({ hydrateAsks: vi.fn().mockResolvedValue(undefined), applyAskRegistryEvent: vi.fn() })
+      getState: () => ({
+        hydrateAsks: vi.fn().mockResolvedValue(undefined),
+        applyAskRegistryEvent: vi.fn()
+      })
     }
 
     const dispose = wireAskIpcEvents(store)

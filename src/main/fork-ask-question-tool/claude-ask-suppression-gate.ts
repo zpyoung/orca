@@ -5,7 +5,11 @@ import {
   CLAUDE_ASK_SUPPRESSION_SYSTEM_PROMPT_FLAG,
   CLAUDE_ASK_SUPPRESSION_SYSTEM_PROMPT_VALUE
 } from '../../shared/fork-ask-question-tool/claude-suppression-flags'
-import { tokenizeStartupCommand, type AgentStartupShell } from '../../shared/tui-agent-startup-shell'
+import {
+  tokenizeStartupCommand,
+  type AgentStartupShell
+} from '../../shared/tui-agent-startup-shell'
+import type { ClaudeSuppressionVerdict } from '../../shared/fork-ask-question-tool/claude-suppression-verdict'
 
 export {
   CLAUDE_ASK_SUPPRESSION_DISALLOWED_TOOLS_FLAG,
@@ -52,6 +56,10 @@ export type AskGateHostKey = AskGateHostIdentity & {
 type AskGateHostRecord = {
   verdict?: string[] | null
   retryAfterMs?: number
+  /** Last concluded answer, kept across retry cooldowns. Without it a decided host reverts to
+   *  'pending' the moment its cooldown lapses, which would stop a resume from stripping flags it
+   *  had already concluded the binary cannot parse. */
+  decided?: string[] | null
 }
 
 /** Per-host verdict cache, modeled on CodexAppServerCapabilityCache: one resolved value per
@@ -71,7 +79,7 @@ export class ClaudeAskSuppressionGateCache {
       }
       return record
     }
-    const key = host.wslDistro ? `wsl:${host.wslDistro}` : 'local'
+    const key = host.wslDistro === undefined ? 'local' : `wsl:${host.wslDistro}`
     let record = this.localRecords.get(key)
     if (!record) {
       record = {}
@@ -125,24 +133,48 @@ export async function resolveClaudeAskSuppressionFlags(
   try {
     const argv = buildProbeArgv(host)
     if (!argv) {
-      record.retryAfterMs = nowMs + CLAUDE_ASK_SUPPRESSION_GATE_RETRY_INTERVAL_MS
-      return null
+      return concludeUndecidable(record, nowMs)
     }
     const stdout = await host.probe(argv)
     const version = stdout.match(/\d+\.\d+\.\d+/)?.[0]
     if (!version) {
-      record.retryAfterMs = nowMs + CLAUDE_ASK_SUPPRESSION_GATE_RETRY_INTERVAL_MS
-      return null
+      return concludeUndecidable(record, nowMs)
     }
     if (hasReachedAppVersion(version, CLAUDE_ASK_SUPPRESSION_VERSION_FLOOR)) {
       record.verdict = CLAUDE_ASK_SUPPRESSION_FLAGS
+      record.decided = CLAUDE_ASK_SUPPRESSION_FLAGS
       return [...record.verdict]
     }
     // below-floor stays retryable (unlike the sticky above-floor verdict) so an in-place upgrade is still caught
-    record.retryAfterMs = nowMs + CLAUDE_ASK_SUPPRESSION_GATE_RETRY_INTERVAL_MS
-    return null
+    return concludeUndecidable(record, nowMs)
   } catch {
-    record.retryAfterMs = nowMs + CLAUDE_ASK_SUPPRESSION_GATE_RETRY_INTERVAL_MS
-    return null
+    return concludeUndecidable(record, nowMs)
   }
+}
+
+function concludeUndecidable(record: AskGateHostRecord, nowMs: number): null {
+  record.retryAfterMs = nowMs + CLAUDE_ASK_SUPPRESSION_GATE_RETRY_INTERVAL_MS
+  record.decided = null
+  return null
+}
+
+/**
+ * Synchronous view of one host's verdict, for the launch-composition path that cannot await a
+ * probe. Answers immediately for any host that has concluded once; for a host that never has, it
+ * starts the probe in the background and reports `'pending'` — which injects nothing and strips
+ * nothing, leaving that launch exactly as it is today.
+ */
+export function peekClaudeAskSuppressionFlags(host: AskGateHostKey): ClaudeSuppressionVerdict {
+  const record = claudeAskSuppressionGateCache.recordFor(host)
+  const cooldownLapsed = record.retryAfterMs === undefined || Date.now() >= record.retryAfterMs
+  if (record.verdict === undefined && cooldownLapsed) {
+    void resolveClaudeAskSuppressionFlags(host)
+  }
+  if (record.verdict !== undefined) {
+    return record.verdict ? [...record.verdict] : null
+  }
+  if (record.decided === undefined) {
+    return 'pending'
+  }
+  return record.decided ? [...record.decided] : null
 }
