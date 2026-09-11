@@ -3844,7 +3844,7 @@
     },
     "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.ts": {
       "added": 98,
-      "removed": 48
+      "removed": 47
     },
     "src/renderer/src/components/native-chat/use-native-chat-interactive-send.test.tsx": {
       "added": 38,
