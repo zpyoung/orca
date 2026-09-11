@@ -36,6 +36,7 @@ import { useSidebarWorktreeSortOrder } from './worktree-list/listing/use-sort-or
 import { useVisibleSidebarWorktrees } from './worktree-list/listing/use-visible-worktrees'
 import { useWorktreeStatusMutations } from './worktree-list/drag/use-status-mutations'
 import { shouldFiltersHideAllRows } from './sidebar-empty-state-gate'
+import { WorkspaceActivityHiddenCountRow } from './fork-workspace-activity-window/WorkspaceActivityHiddenCountRow'
 import { buildWorktreeManualOrderCatalog } from './worktree-manual-order-catalog'
 
 type WorktreeListProps = {
@@ -110,7 +111,11 @@ const WorktreeList = React.memo(function WorktreeList({
     () => buildWorktreeManualOrderCatalog({ worktrees: allWorktrees, folderWorkspaces }),
     [allWorktrees, folderWorkspaces]
   )
-  const { visibleWorktrees, pairedDeviceIdsByEnvironment } = useVisibleSidebarWorktrees({
+  const {
+    visibleWorktrees,
+    activityHiddenCount: activityHiddenWorktreeCount,
+    pairedDeviceIdsByEnvironment
+  } = useVisibleSidebarWorktrees({
     filterState,
     sortBy,
     sortedIds,
@@ -246,7 +251,7 @@ const WorktreeList = React.memo(function WorktreeList({
     hasFilters,
     clearFilters
   })
-
+  const activityHiddenCount = activityHiddenWorktreeCount + visibleScope.activityHiddenFolderCount
   const filtersHideAllRows = shouldFiltersHideAllRows({
     hasFilters,
     visibleWorktreeCount: visibleWorktrees.length,
@@ -256,7 +261,12 @@ const WorktreeList = React.memo(function WorktreeList({
   })
   // Why: when active filters hide every row, the Clear Filters empty state must win over Project Group headers.
   if (rowModel.rows.length === 0 || filtersHideAllRows) {
-    return <SidebarWorktreeListEmptyState hasFilters={hasFilters} onClearFilters={clearFilters} />
+    return (
+      <>
+        <SidebarWorktreeListEmptyState hasFilters={hasFilters} onClearFilters={clearFilters} />
+        <WorkspaceActivityHiddenCountRow count={activityHiddenCount} />
+      </>
+    )
   }
 
   return (
@@ -357,6 +367,7 @@ const WorktreeList = React.memo(function WorktreeList({
         scrollOffsetRef={scrollOffsetRef}
         scrollAnchorRef={scrollAnchorRef}
       />
+      <WorkspaceActivityHiddenCountRow count={activityHiddenCount} />
     </>
   )
 })

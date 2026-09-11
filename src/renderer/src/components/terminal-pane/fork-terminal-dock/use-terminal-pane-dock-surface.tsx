@@ -151,12 +151,12 @@ export function useTerminalPaneDockSurface(controller: TerminalPaneController): 
     contextMenuProps: {
       canToggleTerminalDock: Boolean(
         experimentalTerminalDockEnabled &&
-          !effectiveChatViewMode &&
-          contextMenuDockPaneKey &&
-          terminalDock.resolveDockAgent(
-            contextMenuDockPaneKey,
-            resolveAgentForLeaf(contextMenuLeafId)
-          )
+        !effectiveChatViewMode &&
+        contextMenuDockPaneKey &&
+        terminalDock.resolveDockAgent(
+          contextMenuDockPaneKey,
+          resolveAgentForLeaf(contextMenuLeafId)
+        )
       ),
       isTerminalDockDocked: Boolean(
         contextMenuDockPaneKey && terminalDock.isPaneDocked(contextMenuDockPaneKey)

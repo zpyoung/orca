@@ -12,6 +12,8 @@ import {
   getPairedDeviceIdsByEnvironment
 } from './workspace-creator-visibility'
 import { getWorktreeHostIdentity } from '../../../../shared/worktree/host-qualified-identity'
+import { useWorkspaceActivityFilter } from './fork-workspace-activity-window/use-workspace-activity-filter'
+import { useWorkspaceReviewFilter } from './fork-workspace-review-filters/use-workspace-review-filter'
 
 type UseVisibleWorkspaceKanbanWorktreeIdsParams = {
   allWorktrees: readonly Worktree[]
@@ -26,6 +28,8 @@ export function useVisibleWorkspaceKanbanWorktreeIds({
   allWorktrees,
   repoMap
 }: UseVisibleWorkspaceKanbanWorktreeIdsParams): ReadonlySet<string> {
+  const workspaceActivity = useWorkspaceActivityFilter()
+  const workspaceReview = useWorkspaceReviewFilter()
   const worktreesByRepo = useAppStore((s) => s.worktreesByRepo)
   const showSleepingWorkspaces = useAppStore((s) => s.showSleepingWorkspaces)
   const hideDefaultBranchWorkspace = useAppStore((s) => s.hideDefaultBranchWorkspace)
@@ -91,10 +95,12 @@ export function useVisibleWorkspaceKanbanWorktreeIds({
           ? getPairedDeviceIdsByEnvironment(runtimeEnvironments, runtimeStatusByEnvironmentId)
           : EMPTY_PAIRED_DEVICE_IDS_BY_ENVIRONMENT,
         alwaysShowDefaultBranchWorkspace,
-        repoMap,
         workspaceHostScope,
         visibleWorkspaceHostIds,
         defaultHostId: getSettingsFocusedExecutionHostId(settings),
+        repoMap,
+        workspaceActivity,
+        workspaceReview,
         worktreeLineageById: {},
         // Why: the board has no nested lineage presentation. Ancestor injection
         // would make filtered-out parents appear as ordinary cards.
@@ -115,12 +121,14 @@ export function useVisibleWorkspaceKanbanWorktreeIds({
     visibleWorkspaceHostIds,
     settings,
     ptyIdsByTabId,
-    repoMap,
     runtimeEnvironments,
     runtimeStatusByEnvironmentId,
     showSleepingWorkspaces,
     tabsByWorktree,
+    workspaceActivity,
+    workspaceReview,
     worktreeIdsWithLiveAgent,
-    worktreesByRepo
+    worktreesByRepo,
+    repoMap
   ])
 }

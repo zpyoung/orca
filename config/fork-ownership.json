@@ -72,6 +72,16 @@
       "name": "sidebar-section-separator",
       "purpose": "Draws a hairline between top-level sidebar sections, behind a user setting.",
       "globs": ["**/fork-sidebar-section-separator/**"]
+    },
+    {
+      "name": "workspace-activity-window",
+      "purpose": "Adds a persisted workspace activity-window filter, activity-aware folder visibility, and hidden-count feedback to the workspace sidebar.",
+      "globs": ["**/fork-workspace-activity-window/**"]
+    },
+    {
+      "name": "workspace-review-filters",
+      "purpose": "Adds persisted workspace review filters for completed pull requests and passing checks across sidebar and workspace views.",
+      "globs": ["**/fork-workspace-review-filters/**"]
     }
   ],
   "seams": [
@@ -2518,9 +2528,7 @@
       "path": "src/renderer/src/lib/pane-manager/terminal-scroll-intent-key-retention.test.ts",
       "feature": "terminal-dock",
       "kind": "passthrough",
-      "lines": [
-        "    dockContainer: {} as never,"
-      ]
+      "lines": ["    dockContainer: {} as never,"]
     },
     {
       "path": "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.tsx",
@@ -2542,8 +2550,309 @@
       "path": "src/shared/structured-agent-session-options.ts",
       "feature": "native-chat-session-options",
       "kind": "passthrough",
+      "lines": ["    undefined,"]
+    },
+    {
+      "path": "src/main/persistence/applying-settings/ui-state-read.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
       "lines": [
-        "    undefined,"
+        "import { normalizeWorkspaceActivityUI } from '../../../shared/fork-workspace-activity-window/workspace-activity-ui'",
+        "  const workspaceActivityUI = normalizeWorkspaceActivityUI(uiState)",
+        "import { normalizeWorkspaceReviewUI } from '../../../shared/fork-workspace-review-filters/workspace-review-ui'",
+        "  const workspaceReviewUI = normalizeWorkspaceReviewUI(uiState)"
+      ]
+    },
+    {
+      "path": "src/main/persistence/applying-settings/ui-state-update.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { mergeWorkspaceActivityUI } from '../../../shared/fork-workspace-activity-window/workspace-activity-ui'",
+        "  const nextActivityUI = mergeWorkspaceActivityUI(operations.state.ui, sanitizedUpdates)",
+        "    ...nextActivityUI,",
+        "    ...nextReviewUI,",
+        "import { mergeWorkspaceReviewUI } from '../../../shared/fork-workspace-review-filters/workspace-review-ui'"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/client-ui-schemas.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "    ...WorkspaceActivityUIUpdateFields,",
+        "    ...WorkspaceReviewUIUpdateFields,",
+        "import { WorkspaceActivityUIUpdateFields } from './fork-workspace-activity-window/workspace-activity-ui-schema'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/app-shell/use-persisted-ui-writer.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "      workspaceActivityWindow: s.workspaceActivityWindow,",
+        "      workspaceActivityCustomDays: s.workspaceActivityCustomDays,",
+        "      hideCompletedReviewWorkspaces: s.hideCompletedReviewWorkspaces,",
+        "      hidePassingCheckWorkspaces: s.hidePassingCheckWorkspaces,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/SidebarFilter.tsx",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "    forkFilterCount > 0 ||",
+        "    clearForkFilters()",
+        "import { WorkspaceActivityWindowControl } from './fork-workspace-activity-window/WorkspaceActivityWindowControl'",
+        "import { useWorkspaceFilterChrome } from './fork-workspace-activity-window/use-workspace-filter-chrome'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/SidebarWorkspaceFilterSection.tsx",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "      <WorkspaceReviewFilterRows />",
+        "import { WorkspaceActivityWindowControl } from './fork-workspace-activity-window/WorkspaceActivityWindowControl'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/WorktreeList.tsx",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "    activityHiddenCount: activityHiddenWorktreeCount,",
+        "        <WorkspaceActivityHiddenCountRow count={activityHiddenCount} />",
+        "import { WorkspaceActivityHiddenCountRow } from './fork-workspace-activity-window/WorkspaceActivityHiddenCountRow'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/sidebar-filter-actions.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { getForkFilterCount } from './fork-workspace-activity-window/workspace-filter-chrome'",
+        "    getForkFilterCount(state) > 0 ||"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/use-visible-workspace-kanban-worktree-ids.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  const workspaceActivity = useWorkspaceActivityFilter()",
+        "  const workspaceReview = useWorkspaceReviewFilter()",
+        "import { useWorkspaceActivityFilter } from './fork-workspace-activity-window/use-workspace-activity-filter'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/use-worktree-card-controller.ts",
+      "feature": "workspace-review-filters",
+      "kind": "import-swap",
+      "lines": [
+        "import { useWorktreeCardReviewDetails } from './fork-workspace-review-filters/use-worktree-card-review-details'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/visible-worktree-kinds.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  Partial<WorkspaceReviewFilterState>",
+        "import type { WorkspaceActivityWindowState } from '../../../../shared/fork-workspace-activity-window/workspace-activity-window'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/visible-worktrees.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  isSelectedActivityWorkspace,",
+        "  filterWorktreesByActivity",
+        "} from './fork-workspace-activity-window/workspace-activity-filter'",
+        "  workspaceActivity?: WorkspaceActivityFilterContext",
+        "  all = filterWorktreesByActivity(all, opts.workspaceActivity, opts.repoMap)",
+        "  workspaceReview?: WorkspaceReviewFilterContext",
+        "  all = filterWorktreesByReview(all, opts.workspaceReview, opts.repoMap)",
+        "import type { WorkspaceActivityFilterContext } from './fork-workspace-activity-window/workspace-activity-filter'",
+        "import { getWorkspaceActivityFilterContext } from './fork-workspace-activity-window/use-workspace-activity-filter'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/listing/use-filters.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { useWorkspaceFilterChrome } from '../../fork-workspace-activity-window/use-workspace-filter-chrome'",
+        "  const { state: forkState, clearFilters: clearForkFilters } = useWorkspaceFilterChrome()",
+        "      ...forkState",
+        "    clearForkFilters()"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/listing/use-host-visible-scope.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  const activityContext = useWorkspaceActivityFilter()",
+        "    activityHiddenFolderCount",
+        "import { useWorkspaceActivityFilter } from '../../fork-workspace-activity-window/use-workspace-activity-filter'",
+        "import { filterFolderWorkspacesForActivityScope } from '../../fork-workspace-activity-window/workspace-activity-folder-filter'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/listing/use-visible-worktrees.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  const workspaceActivity = useWorkspaceActivityFilter()",
+        "      workspaceActivity,",
+        "  const workspaceReview = useWorkspaceReviewFilter()",
+        "      workspaceReview,",
+        "import { computeActivityVisibility } from '../../fork-workspace-activity-window/compute-activity-visibility'",
+        "import { useWorkspaceActivityFilter } from '../../fork-workspace-activity-window/use-workspace-activity-filter'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/startup-ui-hydration.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { hydrateWorkspaceActivityWindow } from '../../../shared/fork-workspace-activity-window/workspace-activity-window'",
+        "    ...hydrateWorkspaceActivityWindow({}),",
+        "import { hydrateWorkspaceReviewFilters } from '../../../shared/fork-workspace-review-filters/workspace-review-filters'",
+        "    ...hydrateWorkspaceReviewFilters({}),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/persisted-ui-write-baseline.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  workspaceActivityWindow: PersistedUIState['workspaceActivityWindow']",
+        "  workspaceActivityCustomDays: NonNullable<PersistedUIState['workspaceActivityCustomDays']>",
+        "  workspaceActivityWindow: true,",
+        "  workspaceActivityCustomDays: true,",
+        "  hideCompletedReviewWorkspaces: boolean",
+        "  hidePassingCheckWorkspaces: boolean",
+        "  hideCompletedReviewWorkspaces: true,",
+        "  hidePassingCheckWorkspaces: true,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/ui.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import type { UISlice as UpstreamUISlice } from './ui/ui-slice-contract'",
+        "  createWorkspaceActivityWindowSlice,",
+        "  type WorkspaceActivityWindowSlice",
+        "} from './fork-workspace-activity-window/workspace-activity-window-state'",
+        "  createWorkspaceReviewFiltersSlice,",
+        "  type WorkspaceReviewFiltersSlice",
+        "} from './fork-workspace-review-filters/workspace-review-filters-state'",
+        "export type UISlice = UpstreamUISlice & WorkspaceActivityWindowSlice & WorkspaceReviewFiltersSlice",
+        "    ...createWorkspaceActivityWindowSlice(set),",
+        "    ...createWorkspaceReviewFiltersSlice(set)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/worktrees/session/set-active-folder-workspace.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { workspaceActivityExitPatchForActivation } from '../../fork-workspace-activity-window/workspace-activity-exit-stamp'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/worktrees/session/set-active-worktree.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { workspaceActivityExitPatchForActivation } from '../../fork-workspace-activity-window/workspace-activity-exit-stamp'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/web/preload-api/web-preference-normalization.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  const activity = normalizeWebWorkspaceActivity(base, safeUpdates)",
+        "    ...activity,",
+        "  const review = normalizeWebWorkspaceReviewFilters(base, safeUpdates)",
+        "    ...review,",
+        "import { normalizeWebWorkspaceActivity } from './fork-workspace-activity-window/web-workspace-activity-preference'"
+      ]
+    },
+    {
+      "path": "src/shared/pairing-local-ui-fields.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  ...WORKSPACE_ACTIVITY_WINDOW_UI_KEYS,",
+        "  ...WORKSPACE_REVIEW_FILTER_UI_KEYS",
+        "import { WORKSPACE_ACTIVITY_WINDOW_UI_KEYS } from './fork-workspace-activity-window/pairing-local-activity-fields'"
+      ]
+    },
+    {
+      "path": "src/shared/persisted-ui-state-types.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "} & PersistedWorkspaceActivityWindowState &",
+        "  PersistedWorkspaceReviewFilterState",
+        "import type { PersistedWorkspaceActivityWindowState } from './fork-workspace-activity-window/workspace-activity-window'"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/client-ui-pairing-local-fields.test.ts",
+      "feature": "workspace-activity-window",
+      "kind": "passthrough",
+      "lines": [
+        "import { WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES } from '../../../../shared/fork-workspace-activity-window/pairing-local-activity-fixture'",
+        "    ...WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES,",
+        "import { WORKSPACE_REVIEW_PAIRING_LOCAL_SAMPLES } from '../../../../shared/fork-workspace-review-filters/pairing-local-review-fixture'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/persisted-ui-write-baseline.test.ts",
+      "feature": "workspace-activity-window",
+      "kind": "passthrough",
+      "lines": [
+        "import { WORKSPACE_ACTIVITY_WRITE_BASELINE_SAMPLE } from '../../../../shared/fork-workspace-activity-window/workspace-activity-window'",
+        "    ...WORKSPACE_ACTIVITY_WRITE_BASELINE_SAMPLE,",
+        "import { WORKSPACE_REVIEW_FILTER_WRITE_BASELINE_SAMPLE } from '../../../../shared/fork-workspace-review-filters/workspace-review-filters'",
+        "    ...WORKSPACE_REVIEW_FILTER_WRITE_BASELINE_SAMPLE,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/web/web-preload-api-ui.test.ts",
+      "feature": "workspace-activity-window",
+      "kind": "passthrough",
+      "lines": [
+        "import { WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES } from '../../../shared/fork-workspace-activity-window/pairing-local-activity-fixture'",
+        "    ...WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES,",
+        "import { WORKSPACE_REVIEW_PAIRING_LOCAL_SAMPLES } from '../../../shared/fork-workspace-review-filters/pairing-local-review-fixture'",
+        "    ...WORKSPACE_REVIEW_PAIRING_LOCAL_SAMPLES"
+      ]
+    },
+    {
+      "path": "src/shared/pairing-local-ui-fields.test.ts",
+      "feature": "workspace-activity-window",
+      "kind": "passthrough",
+      "lines": [
+        "import { omitPairingLocalUiFields, PAIRING_LOCAL_UI_FIELDS } from './pairing-local-ui-fields'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/ui/ui-slice-hydration-actions.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { hydrateWorkspaceActivityWindow } from '../../../../../shared/fork-workspace-activity-window/workspace-activity-window'",
+        "import { hydrateWorkspaceReviewFilters } from '../../../../../shared/fork-workspace-review-filters/workspace-review-filters'",
+        "          ...hydrateWorkspaceActivityWindow(ui),",
+        "          ...hydrateWorkspaceReviewFilters(ui),"
       ]
     }
   ],
@@ -3348,7 +3657,7 @@
       "removed": 4
     },
     "src/main/runtime/rpc/methods/client-ui-schemas.ts": {
-      "added": 1,
+      "added": 5,
       "removed": 0
     },
     "src/main/runtime/rpc/methods/index.ts": {
@@ -3621,7 +3930,7 @@
     },
     "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.ts": {
       "added": 98,
-      "removed": 48
+      "removed": 47
     },
     "src/renderer/src/components/native-chat/use-native-chat-interactive-send.test.tsx": {
       "added": 38,
@@ -3728,8 +4037,8 @@
       "removed": 50
     },
     "src/renderer/src/components/sidebar/WorktreeList.tsx": {
-      "added": 10,
-      "removed": 9
+      "added": 24,
+      "removed": 12
     },
     "src/renderer/src/components/sidebar/comment-markdown-element-renderers.tsx": {
       "added": 6,
@@ -4112,8 +4421,8 @@
       "removed": 17
     },
     "src/renderer/src/web/preload-api/web-preference-normalization.ts": {
-      "added": 2,
-      "removed": 0
+      "added": 25,
+      "removed": 2
     },
     "src/renderer/src/web/preload-api/web-terminal-api.ts": {
       "added": 2,
@@ -4302,6 +4611,106 @@
     "src/shared/structured-agent-session-options.ts": {
       "added": 1,
       "removed": 0
+    },
+    "src/main/persistence/applying-settings/ui-state-read.ts": {
+      "added": 6,
+      "removed": 0
+    },
+    "src/main/persistence/applying-settings/ui-state-update.ts": {
+      "added": 7,
+      "removed": 0
+    },
+    "src/renderer/src/app-shell/use-persisted-ui-writer.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/renderer/src/components/sidebar/SidebarFilter.tsx": {
+      "added": 11,
+      "removed": 19
+    },
+    "src/renderer/src/components/sidebar/SidebarWorkspaceFilterSection.tsx": {
+      "added": 4,
+      "removed": 11
+    },
+    "src/renderer/src/components/sidebar/sidebar-filter-actions.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/use-visible-workspace-kanban-worktree-ids.ts": {
+      "added": 11,
+      "removed": 3
+    },
+    "src/renderer/src/components/sidebar/use-worktree-card-controller.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/visible-worktree-kinds.ts": {
+      "added": 7,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/visible-worktrees.ts": {
+      "added": 19,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/listing/use-filters.ts": {
+      "added": 13,
+      "removed": 5
+    },
+    "src/renderer/src/components/sidebar/worktree-list/listing/use-host-visible-scope.ts": {
+      "added": 36,
+      "removed": 21
+    },
+    "src/renderer/src/components/sidebar/worktree-list/listing/use-visible-worktrees.ts": {
+      "added": 21,
+      "removed": 5
+    },
+    "src/renderer/src/lib/startup-ui-hydration.ts": {
+      "added": 4,
+      "removed": 2
+    },
+    "src/renderer/src/store/slices/persisted-ui-write-baseline.ts": {
+      "added": 8,
+      "removed": 0
+    },
+    "src/renderer/src/store/slices/ui.ts": {
+      "added": 14,
+      "removed": 4
+    },
+    "src/renderer/src/store/slices/worktrees/session/set-active-folder-workspace.ts": {
+      "added": 11,
+      "removed": 1
+    },
+    "src/renderer/src/store/slices/worktrees/session/set-active-worktree.ts": {
+      "added": 19,
+      "removed": 2
+    },
+    "src/shared/pairing-local-ui-fields.ts": {
+      "added": 5,
+      "removed": 2
+    },
+    "src/shared/persisted-ui-state-types.ts": {
+      "added": 4,
+      "removed": 1
+    },
+    "src/main/runtime/rpc/methods/client-ui-pairing-local-fields.test.ts": {
+      "added": 5,
+      "removed": 1
+    },
+    "src/renderer/src/store/slices/persisted-ui-write-baseline.test.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/renderer/src/web/web-preload-api-ui.test.ts": {
+      "added": 10,
+      "removed": 2
+    },
+    "src/shared/pairing-local-ui-fields.test.ts": {
+      "added": 5,
+      "removed": 1
+    },
+    "src/renderer/src/store/slices/ui/ui-slice-hydration-actions.ts": {
+      "added": 4,
+      "removed": 3
     }
   }
 }

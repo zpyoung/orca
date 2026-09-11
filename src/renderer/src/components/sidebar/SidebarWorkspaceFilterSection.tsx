@@ -4,16 +4,16 @@ import {
   GitBranch,
   GitCommitHorizontal,
   MonitorSmartphone,
-  Moon,
   SquareTerminal
 } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
+import { WorkspaceActivityWindowControl } from './fork-workspace-activity-window/WorkspaceActivityWindowControl'
+import { WorkspaceReviewFilterRows } from './fork-workspace-review-filters/WorkspaceReviewFilterRows'
 import { FilterToggleRow } from './FilterToggleRow'
 
 const SidebarWorkspaceFilterSection = React.memo(function SidebarWorkspaceFilterSection() {
   const showSleepingWorkspaces = useAppStore((s) => s.showSleepingWorkspaces)
-  const setShowSleepingWorkspaces = useAppStore((s) => s.setShowSleepingWorkspaces)
   const hideDefaultBranchWorkspace = useAppStore((s) => s.hideDefaultBranchWorkspace)
   const setHideDefaultBranchWorkspace = useAppStore((s) => s.setHideDefaultBranchWorkspace)
   const hideAutomationGeneratedWorkspaces = useAppStore((s) => s.hideAutomationGeneratedWorkspaces)
@@ -44,15 +44,7 @@ const SidebarWorkspaceFilterSection = React.memo(function SidebarWorkspaceFilter
           {translate('auto.components.sidebar.SidebarWorkspaceFilterSection.82594419ba', 'Filters')}
         </span>
       </div>
-      <FilterToggleRow
-        icon={<Moon className="size-3.5" />}
-        label={translate(
-          'auto.components.sidebar.SidebarWorkspaceFilterSection.ed1611b65b',
-          'Hide sleeping'
-        )}
-        checked={!showSleepingWorkspaces}
-        onChange={(hideSleeping) => setShowSleepingWorkspaces(!hideSleeping)}
-      />
+      <WorkspaceActivityWindowControl />
       {/* Why gated: the exemption only has an effect while sleeping workspaces
           are being swept, so it stays hidden until its parent row is on. */}
       {!showSleepingWorkspaces && (
@@ -71,6 +63,7 @@ const SidebarWorkspaceFilterSection = React.memo(function SidebarWorkspaceFilter
           onChange={setAlwaysShowDefaultBranchWorkspace}
         />
       )}
+      <WorkspaceReviewFilterRows />
       <FilterToggleRow
         icon={<GitBranch className="size-3.5" />}
         label={translate(

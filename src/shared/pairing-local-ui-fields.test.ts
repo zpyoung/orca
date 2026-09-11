@@ -18,7 +18,11 @@ describe('pairing-local UI fields', () => {
       'agentsReadFilter',
       'agentsGroupBy',
       'activityClearedAtByPaneKey',
-      'manuallyUnreadTurnsByPaneKey'
+      'manuallyUnreadTurnsByPaneKey',
+      'workspaceActivityWindow',
+      'workspaceActivityCustomDays',
+      'hideCompletedReviewWorkspaces',
+      'hidePassingCheckWorkspaces'
     ])
   })
 

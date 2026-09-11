@@ -133,3 +133,11 @@ entries' IDs; manual edits to fix typos are fine.
 - **Introduced by**: the fork's `.zyNN` version-suffix scheme, which postdates the upstream pattern
 - **Severity**: low
 - **Proposed fix**: Widen the pattern to accept an optional `.zyNN` identifier (`/^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+(\.[0-9A-Za-z]+)?$/`) and cover it with a case in the script's tests. Verify `verifyRequiredReleaseAssets` still refuses an artifact-less draft before relying on it.
+
+## BUG-15: Activity-window cutoff never advances on a quiet sidebar
+- **Observed**: 2026-09-10
+- **File**: src/renderer/src/components/sidebar/fork-workspace-activity-window/use-workspace-activity-filter.ts:25
+- **Description**: getWorkspaceActivityFilterContext memoizes on a module-global previousInputs/previousContext pair and only recomputes now: Date.now() when one of its keys changes identity. Three of those keys (worktreesByRepo, repos, folderWorkspaces) are compared but never read into the context, so the cutoff advances only as a side effect of unrelated store traffic. With the window on 'Past 24 hours' and nothing else changing, a workspace that should age out stays visible indefinitely. Second defect in the same module: previousInputs/previousContext are module-level, so they survive across createUIStore() instances and can leak state between tests. Found during /code-review high --fix on branch zpyoung/project-filters (reviewer finding 11).
+- **Severity**: medium
+- **Resolved (2026-09-11)**: the hook now memoizes per instance through useShallow and re-keys `now` on the shared minute clock while a time-based window is active; the non-hook selector is pure and reads the clock on every call.
+

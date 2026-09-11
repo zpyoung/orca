@@ -106,7 +106,9 @@ export function useNativeChatComposerAttachments({
             if (!settled) {
               return []
             }
-            return [attachment.previewUrl ? { ...settled, previewUrl: attachment.previewUrl } : settled]
+            return [
+              attachment.previewUrl ? { ...settled, previewUrl: attachment.previewUrl } : settled
+            ]
           }),
           ...cached.filter((attachment) => !known.has(attachment.id))
         ]
@@ -330,8 +332,7 @@ export function useNativeChatComposerAttachments({
       }),
     flushPendingAttachments,
     restoreImageAttachments,
-    removeImageAttachment: (id) =>
-      updateImageAttachments((prev) => removeAttachmentById(prev, id)),
+    removeImageAttachment: (id) => updateImageAttachments((prev) => removeAttachmentById(prev, id)),
     beginPendingImageAttachment,
     resolvePendingImageAttachment,
     dropPendingImageAttachment

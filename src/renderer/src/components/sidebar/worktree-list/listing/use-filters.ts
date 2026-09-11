@@ -1,12 +1,16 @@
 import { useCallback, useMemo } from 'react'
 import { useAppStore } from '@/store'
+import type { AppState } from '@/store'
 import { DEFAULT_SHOW_SLEEPING_WORKSPACES } from '../../../../../../shared/constants'
 import { computeClearFilterActions, sidebarHasActiveFilters } from '../../visible-worktrees'
+import { useWorkspaceFilterChrome } from '../../fork-workspace-activity-window/use-workspace-filter-chrome'
+import type { SidebarFilterState } from '../../visible-worktree-kinds'
 
 export type SidebarWorktreeFilters = ReturnType<typeof useSidebarWorktreeFilters>
 
 // Every sidebar filter, plus the single escape hatch that resets all of them.
 export function useSidebarWorktreeFilters() {
+  const { state: forkState, clearFilters: clearForkFilters } = useWorkspaceFilterChrome()
   const showSleepingWorkspaces = useAppStore((s) => s.showSleepingWorkspaces)
   const filterRepoIds = useAppStore((s) => s.filterRepoIds)
   const hideDefaultBranchWorkspace = useAppStore((s) => s.hideDefaultBranchWorkspace)
@@ -17,7 +21,6 @@ export function useSidebarWorktreeFilters() {
   const alwaysShowDefaultBranchWorkspace = useAppStore((s) => s.alwaysShowDefaultBranchWorkspace)
   const visibleWorkspaceHostIds = useAppStore((s) => s.visibleWorkspaceHostIds)
   const workspaceHostScope = useAppStore((s) => s.workspaceHostScope)
-
   const setShowSleepingWorkspaces = useAppStore((s) => s.setShowSleepingWorkspaces)
   const setHideDefaultBranchWorkspace = useAppStore((s) => s.setHideDefaultBranchWorkspace)
   const setHideAutomationGeneratedWorkspaces = useAppStore(
@@ -33,7 +36,9 @@ export function useSidebarWorktreeFilters() {
   const setVisibleWorkspaceHostIds = useAppStore((s) => s.setVisibleWorkspaceHostIds)
 
   // Why: count hideDefaultBranchWorkspace as a filter so the Clear Filters escape hatch stays reachable when it alone empties the list.
-  const filterState = useMemo(
+  const filterState = useMemo<
+    SidebarFilterState & Pick<AppState, 'visibleWorkspaceHostIds' | 'workspaceHostScope'>
+  >(
     () => ({
       showSleepingWorkspaces,
       filterRepoIds,
@@ -44,7 +49,8 @@ export function useSidebarWorktreeFilters() {
       hideWorkspacesFromOtherDevices,
       alwaysShowDefaultBranchWorkspace,
       visibleWorkspaceHostIds,
-      workspaceHostScope
+      workspaceHostScope,
+      ...forkState
     }),
     [
       showSleepingWorkspaces,
@@ -56,12 +62,14 @@ export function useSidebarWorktreeFilters() {
       hideWorkspacesFromOtherDevices,
       alwaysShowDefaultBranchWorkspace,
       visibleWorkspaceHostIds,
-      workspaceHostScope
+      workspaceHostScope,
+      forkState
     ]
   )
 
   const clearFilters = useCallback(() => {
     const actions = computeClearFilterActions(filterState)
+    clearForkFilters()
     if (actions.resetShowSleepingWorkspaces) {
       setShowSleepingWorkspaces(DEFAULT_SHOW_SLEEPING_WORKSPACES)
     }
@@ -90,6 +98,7 @@ export function useSidebarWorktreeFilters() {
       setVisibleWorkspaceHostIds(null)
     }
   }, [
+    clearForkFilters,
     setShowSleepingWorkspaces,
     setFilterRepoIds,
     setHideDefaultBranchWorkspace,
@@ -101,6 +110,5 @@ export function useSidebarWorktreeFilters() {
     setVisibleWorkspaceHostIds,
     filterState
   ])
-
   return { filterState, hasFilters: sidebarHasActiveFilters(filterState), clearFilters }
 }

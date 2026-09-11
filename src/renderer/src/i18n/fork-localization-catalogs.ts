@@ -64,6 +64,16 @@ import artifactPasswordsES from '../components/artifacts/fork-artifact-passwords
 import artifactPasswordsJA from '../components/artifacts/fork-artifact-passwords/locales/ja.json'
 import artifactPasswordsKO from '../components/artifacts/fork-artifact-passwords/locales/ko.json'
 import artifactPasswordsZH from '../components/artifacts/fork-artifact-passwords/locales/zh.json'
+import activityWindowEN from '../components/sidebar/fork-workspace-activity-window/locales/en.json'
+import activityWindowES from '../components/sidebar/fork-workspace-activity-window/locales/es.json'
+import activityWindowJA from '../components/sidebar/fork-workspace-activity-window/locales/ja.json'
+import activityWindowKO from '../components/sidebar/fork-workspace-activity-window/locales/ko.json'
+import activityWindowZH from '../components/sidebar/fork-workspace-activity-window/locales/zh.json'
+import reviewFiltersEN from '../components/sidebar/fork-workspace-review-filters/locales/en.json'
+import reviewFiltersES from '../components/sidebar/fork-workspace-review-filters/locales/es.json'
+import reviewFiltersJA from '../components/sidebar/fork-workspace-review-filters/locales/ja.json'
+import reviewFiltersKO from '../components/sidebar/fork-workspace-review-filters/locales/ko.json'
+import reviewFiltersZH from '../components/sidebar/fork-workspace-review-filters/locales/zh.json'
 
 type ForkLocale = 'en' | 'es' | 'ja' | 'ko' | 'zh'
 type ForkCatalog = Record<string, unknown>
@@ -95,7 +105,9 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     handoffEN,
     dirtyBranchEN,
     sessionInfoEN,
-    artifactPasswordsEN
+    artifactPasswordsEN,
+    activityWindowEN,
+    reviewFiltersEN
   ],
   es: [
     relayES,
@@ -110,7 +122,9 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     handoffES,
     dirtyBranchES,
     sessionInfoES,
-    artifactPasswordsES
+    artifactPasswordsES,
+    activityWindowES,
+    reviewFiltersES
   ],
   ja: [
     relayJA,
@@ -125,7 +139,9 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     handoffJA,
     dirtyBranchJA,
     sessionInfoJA,
-    artifactPasswordsJA
+    artifactPasswordsJA,
+    activityWindowJA,
+    reviewFiltersJA
   ],
   ko: [
     relayKO,
@@ -140,7 +156,9 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     handoffKO,
     dirtyBranchKO,
     sessionInfoKO,
-    artifactPasswordsKO
+    artifactPasswordsKO,
+    activityWindowKO,
+    reviewFiltersKO
   ],
   zh: [
     relayZH,
@@ -155,7 +173,9 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     handoffZH,
     dirtyBranchZH,
     sessionInfoZH,
-    artifactPasswordsZH
+    artifactPasswordsZH,
+    activityWindowZH,
+    reviewFiltersZH
   ]
 }
 

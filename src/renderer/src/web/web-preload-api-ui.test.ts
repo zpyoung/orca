@@ -5,6 +5,8 @@ import {
   type PairingLocalUiField
 } from '../../../shared/pairing-local-ui-fields'
 import type { PersistedUIState } from '../../../shared/persisted-ui-state-types'
+import { WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES } from '../../../shared/fork-workspace-activity-window/pairing-local-activity-fixture'
+import { WORKSPACE_REVIEW_PAIRING_LOCAL_SAMPLES } from '../../../shared/fork-workspace-review-filters/pairing-local-review-fixture'
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import type { ManualRepoOrderEntry } from '../../../shared/ui-chrome-types'
 import {
@@ -473,7 +475,9 @@ describe('web UI preload API', () => {
     agentsReadFilter: 'unread',
     agentsGroupBy: 'project',
     activityClearedAtByPaneKey: { 'tab-1:leaf-1': 123 },
-    manuallyUnreadTurnsByPaneKey: { 'tab-1:leaf-1': 321 }
+    manuallyUnreadTurnsByPaneKey: { 'tab-1:leaf-1': 321 },
+    ...WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES,
+    ...WORKSPACE_REVIEW_PAIRING_LOCAL_SAMPLES
   }
   const hostUiSamples: Record<PairingLocalUiField, unknown> = {
     automationHostFilter: { kind: 'all' },
@@ -488,7 +492,11 @@ describe('web UI preload API', () => {
     agentsReadFilter: 'all',
     agentsGroupBy: 'status',
     activityClearedAtByPaneKey: { 'tab-2:leaf-2': 456 },
-    manuallyUnreadTurnsByPaneKey: { 'tab-2:leaf-2': 654 }
+    manuallyUnreadTurnsByPaneKey: { 'tab-2:leaf-2': 654 },
+    workspaceActivityWindow: 'all',
+    workspaceActivityCustomDays: 30,
+    hideCompletedReviewWorkspaces: false,
+    hidePassingCheckWorkspaces: false
   }
 
   it.each(PAIRING_LOCAL_UI_FIELDS.map((field) => [field] as const))(

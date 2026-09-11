@@ -1,0 +1,22 @@
+{
+  "auto": {
+    "components": {
+      "sidebar": {
+        "WorkspaceActivityWindowControl": {
+          "activityWindow": "활동 기간",
+          "all": "모두",
+          "live-only": "활성만",
+          "today": "지난 24시간",
+          "week": "지난 7일",
+          "month": "지난 30일",
+          "custom": "사용자 지정",
+          "customDays": "사용자 지정 일수",
+          "customDaysError": "양의 정수를 입력하세요."
+        },
+        "WorkspaceActivityHiddenCountRow": {
+          "hidden": "활동 기간으로 숨긴 워크스페이스 {{count}}개"
+        }
+      }
+    }
+  }
+}

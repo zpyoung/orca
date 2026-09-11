@@ -9,6 +9,7 @@ import {
 } from '../listing/detected-worktree-meta'
 import { shouldDeferActivationTerminalPrep } from './activation-terminal-prep'
 import { deriveActiveSurfaceForWorktree } from '../../tabs/tabs-surface'
+import { workspaceActivityExitPatchForActivation } from '../../fork-workspace-activity-window/workspace-activity-exit-stamp'
 
 export function createSetActiveFolderWorkspace(
   set: WorktreeSliceSet,
@@ -20,6 +21,8 @@ export function createSetActiveFolderWorkspace(
     if (!workspace) {
       return
     }
+    const previousWorkspaceId = get().activeWorktreeId
+    const previousHostId = get().activeWorkspaceExecutionHostId
     if (shouldDeferActivationTerminalPrep()) {
       markInputQuietSchedulerInput()
     }
@@ -59,7 +62,14 @@ export function createSetActiveFolderWorkspace(
                 ? { ...entry, isUnread: false }
                 : entry
             )
-          : s.folderWorkspaces
+          : s.folderWorkspaces,
+        ...workspaceActivityExitPatchForActivation(
+          s,
+          previousWorkspaceId,
+          previousHostId,
+          workspaceKey,
+          executionHostId ?? null
+        )
       }
     })
     if (workspace.isUnread) {
