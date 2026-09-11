@@ -50,12 +50,24 @@ describe('AskTerminalPaneDock', () => {
 
   it('renders the head ask and leaves a queued second ask unrendered', () => {
     storeState.pendingAsksByPaneKey['pane-a'] = [
-      card({ askId: 'ask-1', spec: { questions: [{ id: 'name', type: 'text', question: 'First?' }] } }),
-      card({ askId: 'ask-2', spec: { questions: [{ id: 'name', type: 'text', question: 'Second?' }] } })
+      card({
+        askId: 'ask-1',
+        spec: { questions: [{ id: 'name', type: 'text', question: 'First?' }] }
+      }),
+      card({
+        askId: 'ask-2',
+        spec: { questions: [{ id: 'name', type: 'text', question: 'Second?' }] }
+      })
     ]
     render(<AskTerminalPaneDock paneKey="pane-a" />)
     expect(screen.getByRole('textbox', { name: 'First?' })).toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: 'Second?' })).not.toBeInTheDocument()
+  })
+
+  it('bounds the dock to the pane so a tall card cannot grow off the top', () => {
+    storeState.pendingAsksByPaneKey['pane-a'] = [card()]
+    const { container } = render(<AskTerminalPaneDock paneKey="pane-a" />)
+    expect(container.firstElementChild).toHaveClass('max-h-[min(72%,28rem)]')
   })
 
   it('submits the answer through ask.answer for the head askId', () => {
@@ -64,7 +76,9 @@ describe('AskTerminalPaneDock', () => {
     storeState.pendingAsksByPaneKey['pane-a'] = [card()]
 
     render(<AskTerminalPaneDock paneKey="pane-a" />)
-    fireEvent.change(screen.getByRole('textbox', { name: 'Project name?' }), { target: { value: 'orca' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Project name?' }), {
+      target: { value: 'orca' }
+    })
     fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
 
     expect(call).toHaveBeenCalledWith({

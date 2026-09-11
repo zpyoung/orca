@@ -5,6 +5,8 @@
         "cancel": "取消",
         "submitting": "正在提交…",
         "submit": "提交",
+        "header_one": "{{count}} 个问题",
+        "header_other": "{{count}} 个问题",
         "statusAnswered": "已回答",
         "statusPartial": "部分回答",
         "statusDeclined": "已拒绝",

@@ -6,7 +6,10 @@ import type {
   AskRegistryResult,
   AskSpec
 } from '../../../../../shared/fork-ask-question-tool/ask-question-schema'
-import { isTerminalAskStatus, type AskStatus } from '../../../../../shared/fork-ask-question-tool/ask-answer-envelope'
+import {
+  isTerminalAskStatus,
+  type AskStatus
+} from '../../../../../shared/fork-ask-question-tool/ask-answer-envelope'
 import type { RuntimeRpcResponse } from '../../../../../shared/runtime-rpc-envelope'
 import { unwrapRuntimeRpcResult } from '@/runtime/runtime-rpc-result'
 
@@ -23,8 +26,12 @@ export type AskCardModel = {
 type AskWatermark = { seq: number; epoch: string }
 type AskSnapshotResult = { asks: AskRegistryEvent[]; seq: number; epoch: string }
 
+/** How long a terminal card stays visible before its pane's queue auto-advances. */
+export const ASK_DISMISS_DELAY_MS = 4000
+
 export type AsksSlice = {
-  /** Per-pane FIFO; index 0 is the ask the card renders. */
+  /** Per-pane FIFO; index 0 is the ask the card renders. A terminal entry occupies index 0 for
+   * at most `ASK_DISMISS_DELAY_MS` before `dismissAsk` drops it and the next queued ask surfaces. */
   pendingAsksByPaneKey: Record<string, AskCardModel[]>
   /** Null until `hydrateAsks` resolves once; also the "is hydrated" gate for `applyAskRegistryEvent`. */
   askWatermark: AskWatermark | null
@@ -33,9 +40,17 @@ export type AsksSlice = {
   /** Seeds pending asks, their partials, and the watermark via `ask.snapshot`, then replays
    * anything `applyAskRegistryEvent` buffered while this call was in flight. */
   hydrateAsks: () => Promise<void>
+  /** Pending auto-dismiss timers keyed by askId; slice state so a fresh store starts clean. */
+  _dismissTimers: Record<string, ReturnType<typeof setTimeout>>
   /** Applies one live registry event under the hydration-ordering rules in tech.md § C8. */
   applyAskRegistryEvent: (event: AskRegistryEvent) => void
+  /** Removes a resolved ask from its pane so the next queued one becomes the head. No-op for an
+   * unknown pane or askId. */
+  dismissAsk: (paneKey: string, askId: string) => void
 }
+
+type AsksSet = Parameters<StateCreator<AppState, [], [], AsksSlice>>[0]
+type AsksGet = Parameters<StateCreator<AppState, [], [], AsksSlice>>[1]
 
 /**
  * Merges a registry event onto the previously known card. A field the event omits keeps its
@@ -56,13 +71,35 @@ function mergeAskCard(previous: AskCardModel | undefined, event: AskRegistryEven
 function upsertCard(bucket: AskCardModel[], event: AskRegistryEvent): AskCardModel[] {
   const index = bucket.findIndex((card) => card.askId === event.askId)
   const card = mergeAskCard(index === -1 ? undefined : bucket[index], event)
-  return index === -1 ? [...bucket, card] : bucket.map((existing, i) => (i === index ? card : existing))
+  return index === -1
+    ? [...bucket, card]
+    : bucket.map((existing, i) => (i === index ? card : existing))
+}
+
+/**
+ * Arms the auto-dismiss for a card that just went terminal. The timer lives in the store rather
+ * than a component effect: an effect's cleanup fires on unmount, so switching tabs mid-flash would
+ * leave the resolved card wedged at the head forever.
+ */
+function scheduleAskDismiss(set: AsksSet, get: AsksGet, paneKey: string, askId: string): void {
+  if (askId in get()._dismissTimers) {
+    return
+  }
+  const timer = setTimeout(() => get().dismissAsk(paneKey, askId), ASK_DISMISS_DELAY_MS)
+  set({ _dismissTimers: { ...get()._dismissTimers, [askId]: timer } })
+}
+
+function clearDismissTimers(timers: Record<string, ReturnType<typeof setTimeout>>): void {
+  for (const timer of Object.values(timers)) {
+    clearTimeout(timer)
+  }
 }
 
 export const createAsksSlice: StateCreator<AppState, [], [], AsksSlice> = (set, get) => ({
   pendingAsksByPaneKey: {},
   askWatermark: null,
   _askEventBuffer: [],
+  _dismissTimers: {},
 
   hydrateAsks: async () => {
     let snapshot: AskSnapshotResult
@@ -85,10 +122,12 @@ export const createAsksSlice: StateCreator<AppState, [], [], AsksSlice> = (set, 
     }
 
     const buffered = get()._askEventBuffer
+    clearDismissTimers(get()._dismissTimers)
     set({
       pendingAsksByPaneKey: seeded,
       askWatermark: { seq: snapshot.seq, epoch: snapshot.epoch },
-      _askEventBuffer: []
+      _askEventBuffer: [],
+      _dismissTimers: {}
     })
     for (const event of buffered) {
       get().applyAskRegistryEvent(event)
@@ -105,7 +144,8 @@ export const createAsksSlice: StateCreator<AppState, [], [], AsksSlice> = (set, 
       return
     }
     if (event.epoch !== watermark.epoch) {
-      set({ pendingAsksByPaneKey: {}, askWatermark: null, _askEventBuffer: [] })
+      clearDismissTimers(state._dismissTimers)
+      set({ pendingAsksByPaneKey: {}, askWatermark: null, _askEventBuffer: [], _dismissTimers: {} })
       void get().hydrateAsks()
       return
     }
@@ -122,9 +162,41 @@ export const createAsksSlice: StateCreator<AppState, [], [], AsksSlice> = (set, 
             },
       askWatermark: { seq: event.seq, epoch: event.epoch }
     })
+    if (event.paneKey !== null && isTerminalAskStatus(event.status)) {
+      scheduleAskDismiss(set, get, event.paneKey, event.askId)
+    }
+  },
+
+  dismissAsk: (paneKey, askId) => {
+    const state = get()
+    const timer = state._dismissTimers[askId]
+    if (timer !== undefined) {
+      clearTimeout(timer)
+    }
+    const nextTimers = { ...state._dismissTimers }
+    delete nextTimers[askId]
+
+    const bucket = state.pendingAsksByPaneKey[paneKey]
+    const remaining = bucket?.filter((card) => card.askId !== askId)
+    if (!bucket || !remaining || remaining.length === bucket.length) {
+      if (timer !== undefined) {
+        set({ _dismissTimers: nextTimers })
+      }
+      return
+    }
+
+    const nextByPaneKey = { ...state.pendingAsksByPaneKey }
+    if (remaining.length === 0) {
+      delete nextByPaneKey[paneKey]
+    } else {
+      nextByPaneKey[paneKey] = remaining
+    }
+    set({ pendingAsksByPaneKey: nextByPaneKey, _dismissTimers: nextTimers })
   }
 })
 
+/** The card the pane renders. A terminal entry stays head for `ASK_DISMISS_DELAY_MS` so its result
+ * flashes before `dismissAsk` advances the queue. */
 export function selectHeadAsk(
   state: Pick<AsksSlice, 'pendingAsksByPaneKey'>,
   paneKey: string

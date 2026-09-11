@@ -66,13 +66,20 @@ describe('AskCard — select', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
 
     const answers = onSubmit.mock.calls[0]?.[0] as AskAnswers
-    expect(answers.db_engine).toEqual({ value: 'mysql', label: 'MySQL', note: undefined, source: 'option' })
+    expect(answers.db_engine).toEqual({
+      value: 'mysql',
+      label: 'MySQL',
+      note: undefined,
+      source: 'option'
+    })
   })
 
   it('takes the free-text escape hatch when no option is picked', () => {
     const { onSubmit } = renderCard([dbQuestion])
 
-    fireEvent.change(screen.getByPlaceholderText('Add your own answer'), { target: { value: 'CockroachDB' } })
+    fireEvent.change(screen.getByPlaceholderText('Add your own answer'), {
+      target: { value: 'CockroachDB' }
+    })
     fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
 
     const answers = onSubmit.mock.calls[0]?.[0] as AskAnswers
@@ -95,7 +102,9 @@ describe('AskCard — select', () => {
     expect(onSubmit).not.toHaveBeenCalled()
     expect(screen.getByRole('alert')).toHaveTextContent('This question is required.')
 
-    fireEvent.change(screen.getByPlaceholderText('Add your own answer'), { target: { value: 'CockroachDB' } })
+    fireEvent.change(screen.getByPlaceholderText('Add your own answer'), {
+      target: { value: 'CockroachDB' }
+    })
     fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
 
     const answers = onSubmit.mock.calls[0]?.[0] as AskAnswers
@@ -127,7 +136,9 @@ describe('AskCard — text', () => {
   it('submits the typed value', () => {
     const { onSubmit } = renderCard([textQuestion])
 
-    fireEvent.change(screen.getByRole('textbox', { name: 'Project name?' }), { target: { value: 'orca' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Project name?' }), {
+      target: { value: 'orca' }
+    })
     fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
 
     expect(onSubmit).toHaveBeenCalledWith({ name: { value: 'orca', source: 'input' } }, [])
@@ -147,12 +158,21 @@ describe('AskCard — text', () => {
 })
 
 describe('AskCard — number', () => {
-  const poolSize: AskNumberQuestion = { id: 'pool_size', type: 'number', question: 'Pool size?', min: 1, max: 10, integer: true }
+  const poolSize: AskNumberQuestion = {
+    id: 'pool_size',
+    type: 'number',
+    question: 'Pool size?',
+    min: 1,
+    max: 10,
+    integer: true
+  }
 
   it('submits a valid integer within range', () => {
     const { onSubmit } = renderCard([poolSize])
 
-    fireEvent.change(screen.getByRole('spinbutton', { name: 'Pool size?' }), { target: { value: '5' } })
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Pool size?' }), {
+      target: { value: '5' }
+    })
     fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
 
     expect(onSubmit).toHaveBeenCalledWith({ pool_size: { value: 5, source: 'input' } }, [])
@@ -171,7 +191,12 @@ describe('AskCard — number', () => {
 })
 
 describe('AskCard — date', () => {
-  const dueDate: AskDateQuestion = { id: 'due', type: 'date', question: 'Due date?', required: true }
+  const dueDate: AskDateQuestion = {
+    id: 'due',
+    type: 'date',
+    question: 'Due date?',
+    required: true
+  }
 
   it('submits a valid ISO date', () => {
     const { onSubmit } = renderCard([dueDate])
@@ -210,7 +235,12 @@ describe('AskCard — confirm', () => {
 
 describe('AskCard — cancel', () => {
   it('calls onCancel without validating anything', () => {
-    const required: AskTextQuestion = { id: 'name', type: 'text', question: 'Name?', required: true }
+    const required: AskTextQuestion = {
+      id: 'name',
+      type: 'text',
+      question: 'Name?',
+      required: true
+    }
     const { onCancel, onSubmit } = renderCard([required])
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
@@ -234,5 +264,61 @@ describe('AskCard — collapsed summary', () => {
     expect(screen.getByText('Database: PostgreSQL')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Submit' })).not.toBeInTheDocument()
     expect(screen.getByText('Answered')).toBeInTheDocument()
+  })
+})
+
+describe('AskCard — height and scrolling', () => {
+  function tenQuestions(): AskQuestion[] {
+    return Array.from({ length: 10 }, (_, index) => ({
+      id: `q${index}`,
+      type: 'text' as const,
+      question: `Question ${index}?`
+    }))
+  }
+
+  it('caps its own height and scrolls the question list rather than growing off the pane', () => {
+    const { container } = render(
+      <AskCard model={modelFor(tenQuestions())} onSubmit={vi.fn()} onCancel={vi.fn()} />
+    )
+
+    const root = container.firstElementChild
+    expect(root).toHaveClass('max-h-[28rem]')
+    expect(root).toHaveClass('flex-col')
+    // happy-dom computes no real scrollHeight, so this asserts the structure that makes the cap
+    // work; tests/e2e/ask-card.spec.ts is what proves it against real layout.
+    expect(container.querySelector('.overflow-y-auto')).toHaveClass('min-h-0', 'flex-1')
+  })
+
+  it('keeps Submit reachable with a full ten-question spec', () => {
+    renderCard(tenQuestions())
+    expect(screen.getByRole('button', { name: 'Submit' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+  })
+
+  it('labels the card with its question count', () => {
+    renderCard([dbQuestion])
+    expect(screen.getByText('1 question')).toBeInTheDocument()
+    cleanup()
+
+    renderCard([dbQuestion, fruitsQuestion, { id: 'go', type: 'confirm', question: 'Go?' }])
+    expect(screen.getByText('3 questions')).toBeInTheDocument()
+  })
+
+  it('scrolls a long collapsed summary instead of stretching the card', () => {
+    const summary = Array.from({ length: 200 }, (_, i) => `line ${i}`).join('\n')
+    const { container } = render(
+      <AskCard
+        model={modelFor([dbQuestion], {
+          status: 'answered',
+          result: { answers: {}, skipped: [], summary }
+        })}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('Answered')).toBeInTheDocument()
+    expect(container.firstElementChild).toHaveClass('max-h-[28rem]')
+    expect(container.querySelector('.overflow-y-auto')).toHaveClass('min-h-0', 'flex-1')
   })
 })

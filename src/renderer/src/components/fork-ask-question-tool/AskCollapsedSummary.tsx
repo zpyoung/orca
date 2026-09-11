@@ -7,7 +7,10 @@ function statusLabel(status: AskStatus): string {
     case 'answered':
       return translate('components.fork-ask-question-tool.askCard.statusAnswered', 'Answered')
     case 'partial':
-      return translate('components.fork-ask-question-tool.askCard.statusPartial', 'Partially answered')
+      return translate(
+        'components.fork-ask-question-tool.askCard.statusPartial',
+        'Partially answered'
+      )
     case 'declined':
       return translate('components.fork-ask-question-tool.askCard.statusDeclined', 'Declined')
     case 'timed_out':
@@ -29,9 +32,11 @@ export function AskCollapsedSummary({
   result: AskRegistryResult
 }): React.JSX.Element {
   return (
-    <div className="rounded-lg border border-input bg-card p-4 shadow-xs">
-      <p className="text-sm font-medium text-foreground">{statusLabel(status)}</p>
-      <pre className="mt-1 whitespace-pre-wrap break-words font-sans text-xs text-muted-foreground">
+    <div className="flex min-h-0 max-h-[28rem] flex-col overflow-hidden rounded-lg border border-input bg-card shadow-floating">
+      <p className="shrink-0 px-4 pt-4 text-sm font-medium text-foreground">
+        {statusLabel(status)}
+      </p>
+      <pre className="scrollbar-sleek min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap break-words px-4 pb-4 pt-1 font-sans text-xs text-muted-foreground">
         {result.summary}
       </pre>
     </div>

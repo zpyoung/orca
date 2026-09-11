@@ -11,8 +11,8 @@ export function AskTerminalPaneDock({ paneKey }: { paneKey: string }): React.JSX
     return null
   }
   return (
-    <div className="pointer-events-none absolute inset-x-3 bottom-3 z-40 flex justify-center">
-      <div className="pointer-events-auto w-full max-w-xl">
+    <div className="pointer-events-none absolute inset-x-3 bottom-3 z-40 flex max-h-[min(72%,28rem)] flex-col items-center justify-end">
+      <div className="pointer-events-auto flex min-h-0 w-full max-w-xl flex-col">
         <AskCard
           key={model.askId}
           model={model}

@@ -133,3 +133,11 @@ entries' IDs; manual edits to fix typos are fine.
 - **Introduced by**: the fork's `.zyNN` version-suffix scheme, which postdates the upstream pattern
 - **Severity**: low
 - **Proposed fix**: Widen the pattern to accept an optional `.zyNN` identifier (`/^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+(\.[0-9A-Za-z]+)?$/`) and cover it with a case in the script's tests. Verify `verifyRequiredReleaseAssets` still refuses an artifact-less draft before relying on it.
+
+## BUG-15: ask-services pulls electron into the node-only runtime graph, failing pnpm lint
+- **Observed**: 2026-08-31
+- **File**: src/main/fork-ask-question-tool/ask-services.ts:21
+- **Description**: check:runtime-electron-ratchet fails on the branch as committed (8d1dd7eb0e): 'src/main/fork-ask-question-tool/ask-services.ts' is a new module reachable from the Orca runtime that imports electron, via the lazy require('electron') for app.getPath('userData'). The ratchet is static, so the lazy require does not exempt it. pnpm lint aborts at that gate, so the four localization/skill verifiers after it never run in a single lint invocation, and PR CI will fail. Reproduced independently of any working-tree change (clean HEAD).
+- **Severity**: high
+- **Proposed fix**: Route the userData path through a port in src/main/host/ (the ratchet's prescribed escape) so ask-services depends on the port instead of electron, or move the db-path resolution out of the runtime import graph.
+

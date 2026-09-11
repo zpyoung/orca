@@ -1,8 +1,14 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { create } from 'zustand'
 import type { AskRegistryEvent } from '../../../../../shared/fork-ask-question-tool/ask-question-schema'
 import type { RuntimeRpcResponse } from '../../../../../shared/runtime-rpc-envelope'
-import { createAsksSlice, selectHeadAsk, selectPendingAskCount, type AsksSlice } from './asks'
+import {
+  ASK_DISMISS_DELAY_MS,
+  createAsksSlice,
+  selectHeadAsk,
+  selectPendingAskCount,
+  type AsksSlice
+} from './asks'
 
 type SnapshotResult = { asks: AskRegistryEvent[]; seq: number; epoch: string }
 
@@ -47,9 +53,21 @@ function stubDeferredSnapshot() {
   return { call, resolve }
 }
 
+beforeEach(() => {
+  vi.useFakeTimers()
+})
+
 afterEach(() => {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
 })
+
+async function hydratedStore(seq = 0) {
+  stubSnapshotResult({ asks: [], seq, epoch: 'epoch-a' })
+  const store = createSliceStore()
+  await store.getState().hydrateAsks()
+  return store
+}
 
 describe('asks slice', () => {
   it('starts unhydrated with no pending asks', () => {
@@ -84,9 +102,11 @@ describe('asks slice', () => {
 
     const hydration = store.getState().hydrateAsks()
     store.getState().applyAskRegistryEvent(makeEvent({ seq: 1, status: 'registered' }))
-    store.getState().applyAskRegistryEvent(
-      makeEvent({ seq: 2, status: 'partial', partial: { q1: { confirm: false } } })
-    )
+    store
+      .getState()
+      .applyAskRegistryEvent(
+        makeEvent({ seq: 2, status: 'partial', partial: { q1: { confirm: false } } })
+      )
 
     expect(store.getState().pendingAsksByPaneKey).toEqual({})
 
@@ -151,10 +171,123 @@ describe('asks slice', () => {
     await store.getState().hydrateAsks()
 
     store.getState().applyAskRegistryEvent(makeEvent({ askId: 'ask-1', paneKey: 'pane-a', seq: 1 }))
-    store.getState().applyAskRegistryEvent(
-      makeEvent({ askId: 'ask-2', paneKey: 'pane-b', seq: 2, status: 'answered' })
-    )
+    store
+      .getState()
+      .applyAskRegistryEvent(
+        makeEvent({ askId: 'ask-2', paneKey: 'pane-b', seq: 2, status: 'answered' })
+      )
 
     expect(selectPendingAskCount(store.getState())).toBe(1)
+  })
+})
+
+describe('asks slice — terminal auto-dismiss', () => {
+  it('keeps the resolved card at the head until the flash window elapses', async () => {
+    const store = await hydratedStore()
+
+    store.getState().applyAskRegistryEvent(makeEvent({ askId: 'ask-1', seq: 1 }))
+    store.getState().applyAskRegistryEvent(makeEvent({ askId: 'ask-2', seq: 2 }))
+    store.getState().applyAskRegistryEvent(
+      makeEvent({
+        askId: 'ask-1',
+        seq: 3,
+        status: 'declined',
+        result: { answers: {}, skipped: [], summary: 'Declined.' }
+      })
+    )
+
+    expect(selectHeadAsk(store.getState(), 'pane-a')?.askId).toBe('ask-1')
+
+    vi.advanceTimersByTime(ASK_DISMISS_DELAY_MS - 1)
+    expect(selectHeadAsk(store.getState(), 'pane-a')?.askId).toBe('ask-1')
+  })
+
+  it('drops the resolved card and surfaces the next queued ask once the window elapses', async () => {
+    const store = await hydratedStore()
+
+    store.getState().applyAskRegistryEvent(makeEvent({ askId: 'ask-1', seq: 1 }))
+    store.getState().applyAskRegistryEvent(makeEvent({ askId: 'ask-2', seq: 2 }))
+    store
+      .getState()
+      .applyAskRegistryEvent(makeEvent({ askId: 'ask-1', seq: 3, status: 'answered' }))
+
+    vi.advanceTimersByTime(ASK_DISMISS_DELAY_MS)
+
+    expect(selectHeadAsk(store.getState(), 'pane-a')?.askId).toBe('ask-2')
+    expect(store.getState().pendingAsksByPaneKey['pane-a'].map((card) => card.askId)).toEqual([
+      'ask-2'
+    ])
+    expect(store.getState()._dismissTimers).toEqual({})
+  })
+
+  it('clears the pane key entirely when the dismissed card was the last one', async () => {
+    const store = await hydratedStore()
+
+    store.getState().applyAskRegistryEvent(makeEvent({ askId: 'ask-1', seq: 1 }))
+    store
+      .getState()
+      .applyAskRegistryEvent(makeEvent({ askId: 'ask-1', seq: 2, status: 'timed_out' }))
+
+    vi.advanceTimersByTime(ASK_DISMISS_DELAY_MS)
+
+    expect(store.getState().pendingAsksByPaneKey).toEqual({})
+  })
+
+  it('schedules one dismiss per ask even when several terminal events arrive', async () => {
+    const store = await hydratedStore()
+
+    store.getState().applyAskRegistryEvent(makeEvent({ askId: 'ask-1', seq: 1 }))
+    store
+      .getState()
+      .applyAskRegistryEvent(makeEvent({ askId: 'ask-1', seq: 2, status: 'answered' }))
+    const armed = store.getState()._dismissTimers['ask-1']
+    store.getState().applyAskRegistryEvent(
+      makeEvent({
+        askId: 'ask-1',
+        seq: 3,
+        status: 'answered',
+        result: { answers: {}, skipped: [], summary: 'Done.' }
+      })
+    )
+
+    expect(store.getState()._dismissTimers['ask-1']).toBe(armed)
+  })
+
+  it('schedules nothing for a terminal event with no pane', async () => {
+    const store = await hydratedStore()
+
+    store
+      .getState()
+      .applyAskRegistryEvent(makeEvent({ paneKey: null, seq: 1, status: 'unavailable' }))
+
+    expect(store.getState()._dismissTimers).toEqual({})
+  })
+
+  it('no-ops for an unknown pane or askId without creating a phantom key', async () => {
+    const store = await hydratedStore()
+    store.getState().applyAskRegistryEvent(makeEvent({ askId: 'ask-1', seq: 1 }))
+
+    store.getState().dismissAsk('pane-missing', 'ask-1')
+    store.getState().dismissAsk('pane-a', 'ask-missing')
+
+    expect(Object.keys(store.getState().pendingAsksByPaneKey)).toEqual(['pane-a'])
+    expect(selectHeadAsk(store.getState(), 'pane-a')?.askId).toBe('ask-1')
+  })
+
+  it('clears armed timers when an epoch mismatch discards the slice', async () => {
+    const call = stubSnapshotResult({ asks: [], seq: 0, epoch: 'epoch-a' })
+    const store = createSliceStore()
+    await store.getState().hydrateAsks()
+
+    store.getState().applyAskRegistryEvent(makeEvent({ askId: 'ask-1', seq: 1 }))
+    store
+      .getState()
+      .applyAskRegistryEvent(makeEvent({ askId: 'ask-1', seq: 2, status: 'answered' }))
+    expect(Object.keys(store.getState()._dismissTimers)).toEqual(['ask-1'])
+
+    call.mockResolvedValueOnce(successResponse({ asks: [], seq: 1, epoch: 'epoch-b' }))
+    store.getState().applyAskRegistryEvent(makeEvent({ epoch: 'epoch-b', seq: 99 }))
+
+    expect(store.getState()._dismissTimers).toEqual({})
   })
 })

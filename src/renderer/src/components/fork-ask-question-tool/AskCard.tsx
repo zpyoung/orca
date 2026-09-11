@@ -21,9 +21,22 @@ export type AskCardProps = {
   onDraftChange?: (partial: AskPartial) => void
 }
 
+function questionCountLabel(count: number): string {
+  return count === 1
+    ? translate('components.fork-ask-question-tool.askCard.header_one', '{{count}} question', {
+        count
+      })
+    : translate('components.fork-ask-question-tool.askCard.header_other', '{{count}} questions', {
+        count
+      })
+}
+
 function buildInitialDrafts(model: AskCardModel): Record<string, AskQuestionDraft> {
   return Object.fromEntries(
-    model.spec.questions.map((question) => [question.id, initialDraftFor(model.partial[question.id])])
+    model.spec.questions.map((question) => [
+      question.id,
+      initialDraftFor(model.partial[question.id])
+    ])
   )
 }
 
@@ -40,7 +53,9 @@ export function AskCard({
   isSubmitting = false,
   onDraftChange
 }: AskCardProps): React.JSX.Element {
-  const [drafts, setDrafts] = useState<Record<string, AskQuestionDraft>>(() => buildInitialDrafts(model))
+  const [drafts, setDrafts] = useState<Record<string, AskQuestionDraft>>(() =>
+    buildInitialDrafts(model)
+  )
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   if (isTerminalAskStatus(model.status) && model.result) {
@@ -71,8 +86,11 @@ export function AskCard({
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-input bg-card shadow-xs">
-      <div className="divide-y divide-border/60">
+    <div className="flex min-h-0 max-h-[28rem] flex-col overflow-hidden rounded-lg border border-input bg-card shadow-floating">
+      <div className="shrink-0 border-b border-border px-4 py-2 text-xs font-medium text-muted-foreground">
+        {questionCountLabel(model.spec.questions.length)}
+      </div>
+      <div className="scrollbar-sleek min-h-0 flex-1 divide-y divide-border/60 overflow-y-auto">
         {model.spec.questions.map((question) => (
           <AskQuestionFrame key={question.id} question={question} error={errors[question.id]}>
             <AskFieldControl
@@ -85,7 +103,7 @@ export function AskCard({
           </AskQuestionFrame>
         ))}
       </div>
-      <div className="flex items-center justify-end gap-2 border-t border-border p-3">
+      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border p-3">
         <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>
           {translate('components.fork-ask-question-tool.askCard.cancel', 'Cancel')}
         </Button>

@@ -5,6 +5,8 @@
         "cancel": "Cancelar",
         "submitting": "Enviando…",
         "submit": "Enviar",
+        "header_one": "{{count}} pregunta",
+        "header_other": "{{count}} preguntas",
         "statusAnswered": "Respondida",
         "statusPartial": "Respondida parcialmente",
         "statusDeclined": "Rechazada",

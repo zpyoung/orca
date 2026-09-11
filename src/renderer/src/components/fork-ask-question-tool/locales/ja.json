@@ -5,6 +5,8 @@
         "cancel": "キャンセル",
         "submitting": "送信中…",
         "submit": "送信",
+        "header_one": "{{count}}件の質問",
+        "header_other": "{{count}}件の質問",
         "statusAnswered": "回答済み",
         "statusPartial": "一部回答",
         "statusDeclined": "却下されました",

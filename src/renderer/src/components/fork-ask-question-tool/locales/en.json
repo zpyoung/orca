@@ -5,6 +5,8 @@
         "cancel": "Cancel",
         "submitting": "Submitting…",
         "submit": "Submit",
+        "header_one": "{{count}} question",
+        "header_other": "{{count}} questions",
         "statusAnswered": "Answered",
         "statusPartial": "Partially answered",
         "statusDeclined": "Declined",

@@ -5,6 +5,8 @@
         "cancel": "취소",
         "submitting": "제출 중…",
         "submit": "제출",
+        "header_one": "질문 {{count}}개",
+        "header_other": "질문 {{count}}개",
         "statusAnswered": "답변 완료",
         "statusPartial": "일부 답변됨",
         "statusDeclined": "거부됨",
