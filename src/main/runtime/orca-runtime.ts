@@ -18707,6 +18707,17 @@ export class OrcaRuntimeService {
       : { result: operation(), ledgers: [] }
     const deleted = removed.result
     if (deleted) {
+      if (options?.removeContainedProjects) {
+        // Why: contained projects are dropped straight from the store here, so they never pass
+        // through removeProject's invalidations and would leave authorized roots and worktree
+        // caches pointing at forgotten checkouts.
+        for (const repo of reposBefore) {
+          this.terminalTopologyRevisionByRepoId.delete(repo.id)
+          this.invalidateWorktreeScanCacheForRepo(repo.id)
+        }
+        this.invalidateResolvedWorktreeCache()
+        invalidateAuthorizedRootsCache()
+      }
       this.notifyReposChanged()
     }
     return {

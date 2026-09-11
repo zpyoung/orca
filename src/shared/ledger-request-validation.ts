@@ -227,5 +227,11 @@ function validateOperation(q: LedgerRequest): void {
         invalidValidation('invalid-request', 'delete-entries requires selections')
       }
       break
+    case 'list':
+    case 'review':
+    case 'import':
+    case 'catalog':
+    case 'removal-preview':
+      break
   }
 }

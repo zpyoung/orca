@@ -178,9 +178,7 @@ export function LedgerPage({
         openLedgerPage({ environmentId })
         return
       }
-      if (response.matches) {
-        setMatches(response.matches)
-      }
+      setMatches(response.matches ?? [])
       setSelected(new Map())
       await refresh()
     } catch (cause) {

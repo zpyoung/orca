@@ -201,6 +201,14 @@ export type FolderWorkspacePathStatusCacheEntry = {
   requestSnapshot: string
 }
 
+// Electron IPC strips custom error properties, so the code also arrives prefixed onto the message.
+function isLedgerRemovalConflict(error: unknown): boolean {
+  return (
+    (error as { code?: string } | null)?.code === 'conflict' ||
+    (error instanceof Error && error.message.includes('conflict'))
+  )
+}
+
 export type DeleteProjectGroupOptions = {
   expectedLedgers?: { ledgerId: string; revision: number }[]
   removeContainedProjects?: boolean
@@ -2866,7 +2874,7 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       })
       return true
     } catch (err) {
-      if ((err as { code?: string })?.code === 'conflict') {
+      if (options?.expectedLedgers && isLedgerRemovalConflict(err)) {
         throw err
       }
       console.error('Failed to delete project group:', err)
@@ -3567,6 +3575,11 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
         }
       })
     } catch (err) {
+      // Why: the caller re-reads the ledger retention preview and retries, so a stale-preview
+      // rejection must not be reported as a completed removal.
+      if (options?.expectedLedgers && isLedgerRemovalConflict(err)) {
+        throw err
+      }
       console.error('Failed to remove repo:', err)
       // Why: bulk and background callers aggregate their own failures, so only opted-in single-project entry points toast (#11994).
       if (options?.errorFeedback === 'toast') {

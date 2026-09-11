@@ -6,6 +6,7 @@ import { homedir } from 'node:os'
 import { z } from 'zod'
 import type { Store } from '../persistence'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
+import { LedgerError } from '../../shared/ledger'
 import type {
   BaseRefSearchResult,
   Project,
@@ -821,6 +822,16 @@ const ProjectGroupSelectorArgs = z.object({
   groupId: z.string().min(1)
 })
 
+const ExpectedLedgersArg = z
+  .array(z.object({ ledgerId: z.string().min(1).max(256), revision: z.number().int().positive() }))
+  .max(10_000)
+  .optional()
+
+const ProjectGroupDeleteArgs = ProjectGroupSelectorArgs.extend({
+  expectedLedgers: ExpectedLedgersArg,
+  removeContainedProjects: z.boolean().optional()
+})
+
 const ProjectGroupMoveProjectArgs = z.object({
   projectId: z.string().min(1),
   groupId: z.string().nullable(),
@@ -1273,7 +1284,26 @@ async function runNestedRepoScanForIpc(
   }
 }
 
-export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): void {
+type RepoRemovalRuntime = Pick<OrcaRuntimeService, 'deleteProjectGroup' | 'removeProject'>
+
+// Why: Electron IPC drops custom error properties, so a ledger conflict code only reaches the
+// renderer if it rides in the message the renderer is allowed to see.
+async function withLedgerErrorCode<T>(action: () => Promise<T>): Promise<T> {
+  try {
+    return await action()
+  } catch (error) {
+    if (error instanceof LedgerError) {
+      throw new Error(`${error.code}: ${error.message}`)
+    }
+    throw error
+  }
+}
+
+export function registerRepoHandlers(
+  mainWindow: BrowserWindow,
+  store: Store,
+  runtime?: RepoRemovalRuntime
+): void {
   // Remove previously registered handlers so we can re-register on macOS app re-activation (new window).
   ipcMain.removeHandler('repos:list')
   ipcMain.removeHandler('repos:listForExecutionHost')
@@ -1612,13 +1642,26 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
     return updated
   })
 
-  ipcMain.handle('projectGroups:delete', (_event, rawArgs: unknown): boolean => {
+  ipcMain.handle('projectGroups:delete', async (_event, rawArgs: unknown): Promise<boolean> => {
     const args = parseProjectGroupIpcArgs(
-      ProjectGroupSelectorArgs,
+      ProjectGroupDeleteArgs,
       rawArgs,
       'invalid_project_group_delete_args'
     )
-    const deleted = store.deleteProjectGroup(args.groupId)
+    // Why: the runtime owns contained-project removal and the ledger retention guard; the
+    // store-only path cannot honour either and would silently report a successful delete.
+    const deleted = runtime
+      ? (
+          await withLedgerErrorCode(() =>
+            runtime.deleteProjectGroup(args.groupId, {
+              ...(args.expectedLedgers ? { expectedLedgers: args.expectedLedgers } : {}),
+              ...(args.removeContainedProjects !== undefined
+                ? { removeContainedProjects: args.removeContainedProjects }
+                : {})
+            })
+          )
+        ).deleted
+      : store.deleteProjectGroup(args.groupId)
     if (deleted) {
       notifyReposChanged(mainWindow)
     }
@@ -2079,11 +2122,25 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
     }
   )
 
-  ipcMain.handle('repos:remove', async (_event, args: { repoId: string }) => {
-    store.removeProject(args.repoId)
-    invalidateAuthorizedRootsCache()
-    notifyReposChanged(mainWindow)
-  })
+  ipcMain.handle(
+    'repos:remove',
+    async (
+      _event,
+      args: { repoId: string; expectedLedgers?: { ledgerId: string; revision: number }[] }
+    ) => {
+      // Why: the runtime resolves a bare id and rejects one registered on two hosts, so only route
+      // through it when the caller actually asked for the ledger retention guard.
+      if (runtime && args.expectedLedgers) {
+        await withLedgerErrorCode(() =>
+          runtime.removeProject(args.repoId, { expectedLedgers: args.expectedLedgers })
+        )
+      } else {
+        store.removeProject(args.repoId)
+        invalidateAuthorizedRootsCache()
+      }
+      notifyReposChanged(mainWindow)
+    }
+  )
 
   // Why: forget a project on one execution host without disturbing the same repo id on other hosts (SSH-workspace forget flow).
   ipcMain.handle(

@@ -294,7 +294,19 @@ export function LedgerEntryForm({
             <Select
               disabled={Boolean(entry) || pending}
               value={type}
-              onValueChange={(value) => setForm({ type: value as LedgerEntryType })}
+              onValueChange={(value) => {
+                const next = value as LedgerEntryType
+                // Why: fields that don't exist on the new type would still be submitted as content,
+                // but wiping the whole draft also throws away the shared title the user just typed.
+                setForm((current) => ({
+                  ...Object.fromEntries(
+                    Object.entries(current).filter(
+                      ([key]) => fields[next].includes(key) || formKeys.has(key)
+                    )
+                  ),
+                  type: next
+                }))
+              }}
             >
               <SelectTrigger id="ledger-entry-type">
                 <SelectValue />

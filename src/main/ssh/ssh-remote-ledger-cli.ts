@@ -17,6 +17,18 @@ const LEDGER_COMMANDS = new Set([
   'ledger revert',
   'ledger import'
 ])
+const POSITIONAL_ID_OPERATIONS = new Set(['show', 'edit', 'state', 'revert'])
+
+function remoteCliBoolean(flags: ParsedRemoteCli['flags'], name: string): boolean | undefined {
+  const value = optionalRemoteCliString(flags, name)
+  if (value === undefined) {
+    return undefined
+  }
+  if (value !== 'true' && value !== 'false') {
+    throw new RemoteCliArgumentError('invalid_argument', `--${name} must be true or false`)
+  }
+  return value === 'true'
+}
 
 export async function tryDispatchRemoteLedgerCli(
   dispatcher: RpcDispatcher,
@@ -24,12 +36,14 @@ export async function tryDispatchRemoteLedgerCli(
   env: Record<string, string>,
   envelope: RuntimeOrchestrationEnvelope
 ): Promise<RpcResponse | null> {
-  const command = parsed.commandPath.join(' ')
-  if (!LEDGER_COMMANDS.has(command)) {
+  // Why: the entry id is a positional token, so only the leading two segments name the command.
+  const command = parsed.commandPath.slice(0, 2).join(' ')
+  const operation = parsed.commandPath[1]
+  const maxSegments = POSITIONAL_ID_OPERATIONS.has(operation) ? 3 : 2
+  if (!LEDGER_COMMANDS.has(command) || parsed.commandPath.length > maxSegments) {
     return null
   }
 
-  const operation = parsed.commandPath[1]
   const hasGroup = parsed.flags.has('group')
   const groupSelector = optionalRemoteCliString(parsed.flags, 'group-selector')
   const ledgerId = optionalRemoteCliString(parsed.flags, 'ledger')
@@ -119,17 +133,33 @@ export async function tryDispatchRemoteLedgerCli(
     }
   }
   const request: Record<string, unknown> = { operation, target }
-  const id = optionalRemoteCliString(parsed.flags, 'id') ?? parsed.commandPath[2]
+  const id =
+    optionalRemoteCliString(parsed.flags, 'id') ??
+    (POSITIONAL_ID_OPERATIONS.has(operation) ? parsed.commandPath[2] : undefined)
   if (id) {
     request.id = id
   }
   const type = optionalRemoteCliString(parsed.flags, 'type')
-  if (type) {
-    request.type = type
-  }
   const state = optionalRemoteCliString(parsed.flags, 'state')
-  if (state) {
-    request.state = state
+  if (operation === 'list' || operation === 'review') {
+    const branch = optionalRemoteCliString(parsed.flags, 'branch')
+    const reviewed = remoteCliBoolean(parsed.flags, 'reviewed')
+    const stale = remoteCliBoolean(parsed.flags, 'stale')
+    request.filters = {
+      ...(type ? { type } : {}),
+      ...(state ? { state } : {}),
+      ...(reviewed !== undefined ? { reviewed } : {}),
+      ...(stale !== undefined ? { stale } : {}),
+      ...(workspaceFlag ? { workspaceId } : {}),
+      ...(branch ? { branch } : {})
+    }
+  } else {
+    if (type) {
+      request.type = type
+    }
+    if (state) {
+      request.state = state
+    }
   }
   if (Object.keys(content).length > 0) {
     request.content = content

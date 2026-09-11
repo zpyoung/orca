@@ -435,7 +435,10 @@ describe('repo RPC methods', () => {
       name: 'Core',
       isCollapsed: true
     })
-    expect(runtime.deleteProjectGroup).toHaveBeenCalledWith(group.id)
+    expect(runtime.deleteProjectGroup).toHaveBeenCalledWith(group.id, {
+      expectedLedgers: undefined,
+      removeContainedProjects: undefined
+    })
     expect(runtime.moveProjectToGroup).toHaveBeenCalledWith('repo-1', group.id, 2)
     expect(runtime.listFolderWorkspaces).toHaveBeenCalled()
     expect(runtime.createFolderWorkspace).toHaveBeenCalledWith({

@@ -6684,7 +6684,6 @@ const WorktreeList = React.memo(function WorktreeList({
     if (!projectGroupDeleteDialog) {
       return
     }
-    let closeDialog = true
     try {
       const result = await deleteProjectGroupWithContainedProjects(
         projectGroupDeleteDialog.groupId,
@@ -6736,7 +6735,6 @@ const WorktreeList = React.memo(function WorktreeList({
     } catch (error) {
       const code = (error as { code?: string })?.code
       if (code === 'conflict' || (error instanceof Error && error.message.includes('conflict'))) {
-        closeDialog = false
         setProjectGroupDeleteDialog((current) =>
           current
             ? {
@@ -6749,14 +6747,14 @@ const WorktreeList = React.memo(function WorktreeList({
         )
         setLedgerPreviewGeneration((generation) => generation + 1)
       } else {
-        throw error
-      }
-    } finally {
-      // Why: deleting contained projects can unmount this dialog before its close handler runs, so the parent owns cleanup.
-      if (closeDialog) {
         setProjectGroupDeleteDialog(null)
       }
+      // Why: the dialog closes itself when onConfirm resolves, so a conflict must reach it as a
+      // rejection or the retry preview it just refreshed is thrown away unseen.
+      throw error
     }
+    // Why: deleting contained projects can unmount this dialog before its close handler runs, so the parent owns cleanup.
+    setProjectGroupDeleteDialog(null)
   }, [
     deleteProjectGroupWithContainedProjects,
     projectGroupRemoveContainedProjects,
