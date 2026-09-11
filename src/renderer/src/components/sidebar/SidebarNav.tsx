@@ -113,7 +113,9 @@ const SidebarNav = React.memo(function SidebarNav() {
           className={cn('size-4 shrink-0', !ledgerActive && 'text-worktree-sidebar-foreground/30')}
           strokeWidth={ledgerActive ? 2.25 : 1.75}
         />
-        <span className="flex-1">Ledger</span>
+        <span className="flex-1">
+          {translate('auto.components.sidebar.SidebarNav.ledger', 'Ledger')}
+        </span>
       </button>
       {showArtifactsButton ? (
         <ContextMenu>

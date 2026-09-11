@@ -311,6 +311,7 @@ import { buildSidebarHostOptions } from './sidebar-host-options'
 import { HostSectionHeaderMenu } from './HostSectionHeaderMenu'
 import { ProjectHeaderActions } from './ProjectHeaderActions'
 import { translate } from '@/i18n/i18n'
+import { pageOwnerLedgerTitle } from '../ledger/ledger-page-copy'
 import { folderWorkspaceKey, getActiveSidebarWorkspaceId } from '../../../../shared/workspace-scope'
 import { getHostDisplayLabelOverrides } from '../../../../shared/host-setting-overrides'
 import {
@@ -4707,7 +4708,10 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
                               }}
                             >
                               <BookOpen className="size-3.5" />
-                              Open ledger
+                              {translate(
+                                'auto.components.sidebar.WorktreeList.openLedger',
+                                'Open ledger'
+                              )}
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onSelect={() => {
@@ -4844,7 +4848,10 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
                               }}
                             >
                               <BookOpen className="size-3.5" />
-                              Open ledger
+                              {translate(
+                                'auto.components.sidebar.WorktreeList.openLedger',
+                                'Open ledger'
+                              )}
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onSelect={() => {
@@ -6329,7 +6336,7 @@ const WorktreeList = React.memo(function WorktreeList({
       openLedgerPage({
         target: { owner: { tier: 'project', id: getProjectIdentityKey(repo) } },
         ...(host?.kind === 'runtime' ? { environmentId: host.environmentId } : {}),
-        title: `${repo.displayName} ledger`
+        title: pageOwnerLedgerTitle(repo.displayName)
       })
     },
     [openLedgerPage]
@@ -6341,7 +6348,7 @@ const WorktreeList = React.memo(function WorktreeList({
       openLedgerPage({
         target: { owner: { tier: 'group', id: group.id } },
         ...(host?.kind === 'runtime' ? { environmentId: host.environmentId } : {}),
-        title: `${group.name} ledger`
+        title: pageOwnerLedgerTitle(group.name)
       })
     },
     [openLedgerPage]

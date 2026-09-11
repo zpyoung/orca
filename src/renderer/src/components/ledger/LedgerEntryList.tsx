@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
+import { translate } from '@/i18n/i18n'
 
 export type LedgerEntryListProps = {
   entries: LedgerEntry[]
@@ -31,18 +32,22 @@ export function LedgerEntryList({
     <div className="min-h-0 flex-1 overflow-auto scrollbar-sleek p-6">
       <div className="grid gap-2">
         {busy && !entries.length ? (
-          <p className="text-sm text-muted-foreground">Loading ledger…</p>
+          <p className="text-sm text-muted-foreground">
+            {translate('ledger.panel.loading', 'Loading ledger…')}
+          </p>
         ) : null}
         {!busy && !entries.length ? (
           <p className="py-12 text-center text-sm text-muted-foreground">
-            No entries match these filters.
+            {translate('ledger.list.empty', 'No entries match these filters.')}
           </p>
         ) : null}
         {entries.map((entry) => (
           <Card key={entry.id}>
             <CardContent className="flex items-start gap-3 p-4">
               <Checkbox
-                aria-label={`Select ${entry.id}`}
+                aria-label={translate('ledger.list.selectEntry', 'Select {{id}}', {
+                  id: entry.id
+                })}
                 checked={selected.has(entry.id)}
                 disabled={busy}
                 onCheckedChange={(checked) => onSelect(entry, checked === true)}
@@ -52,16 +57,21 @@ export function LedgerEntryList({
                   <span className="font-mono text-sm">{entry.id}</span>
                   <Badge variant="outline">{entry.type}</Badge>
                   <Badge variant="secondary">{entry.state}</Badge>
-                  {entry.reviewed ? <Badge>reviewed</Badge> : null}
+                  {entry.reviewed ? (
+                    <Badge>{translate('ledger.list.reviewedBadge', 'reviewed')}</Badge>
+                  ) : null}
                 </div>
                 <p className="mt-1 truncate text-sm">{String(entry.content.title)}</p>
                 <p className="text-xs text-muted-foreground">
-                  revision {entry.revision} · {new Date(entry.updatedAt).toLocaleString()}
+                  {translate('ledger.list.revisionLine', 'revision {{revision}} · {{updated}}', {
+                    revision: entry.revision,
+                    updated: new Date(entry.updatedAt).toLocaleString()
+                  })}
                 </p>
               </button>
               <div className="flex flex-wrap gap-1">
                 <Button size="xs" variant="ghost" disabled={busy} onClick={() => onEdit(entry)}>
-                  Edit {entry.id}
+                  {translate('ledger.list.edit', 'Edit {{id}}', { id: entry.id })}
                 </Button>
                 <Button
                   size="xs"
@@ -75,7 +85,7 @@ export function LedgerEntryList({
                     })
                   }
                 >
-                  Review {entry.id}
+                  {translate('ledger.list.review', 'Review {{id}}', { id: entry.id })}
                 </Button>
                 <Button
                   size="xs"
@@ -83,15 +93,22 @@ export function LedgerEntryList({
                   className="text-destructive"
                   disabled={busy}
                   onClick={() =>
-                    onConfirm(`Permanently delete ${entry.id} and its history?`, {
-                      operation: 'delete-entries',
-                      target,
-                      selections: [{ id: entry.id, revision: entry.revision }],
-                      confirmed: true
-                    })
+                    onConfirm(
+                      translate(
+                        'ledger.list.deleteConfirm',
+                        'Permanently delete {{id}} and its history?',
+                        { id: entry.id }
+                      ),
+                      {
+                        operation: 'delete-entries',
+                        target,
+                        selections: [{ id: entry.id, revision: entry.revision }],
+                        confirmed: true
+                      }
+                    )
                   }
                 >
-                  Delete {entry.id}
+                  {translate('ledger.list.delete', 'Delete {{id}}', { id: entry.id })}
                 </Button>
               </div>
             </CardContent>

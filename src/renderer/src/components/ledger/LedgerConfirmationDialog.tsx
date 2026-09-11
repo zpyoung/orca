@@ -1,6 +1,7 @@
 import type { LedgerEntry, LedgerRequest } from '../../../../shared/ledger'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { translate } from '@/i18n/i18n'
 
 export type LedgerConfirmation = {
   message: string
@@ -27,17 +28,23 @@ export function LedgerConfirmationDialog({
     <Dialog open={Boolean(confirmation)} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Confirm ledger action</DialogTitle>
+          <DialogTitle>{translate('ledger.confirm.title', 'Confirm ledger action')}</DialogTitle>
         </DialogHeader>
         <p className="text-sm">{confirmation?.message}</p>
         {confirmation?.entries.map((entry) => (
           <p key={entry.id} className="text-sm">
-            {entry.id} · revision {entry.revision} · {String(entry.content.title)}
+            {translate('ledger.confirm.entryRow', '{{id}} · revision {{revision}} · {{title}}', {
+              id: entry.id,
+              revision: entry.revision,
+              title: String(entry.content.title)
+            })}
           </p>
         ))}
         {confirmation?.request.ifLedgerRevision !== undefined ? (
           <p className="text-xs text-muted-foreground">
-            Ledger revision {confirmation.request.ifLedgerRevision}
+            {translate('ledger.confirm.ledgerRevision', 'Ledger revision {{revision}}', {
+              revision: confirmation.request.ifLedgerRevision
+            })}
           </p>
         ) : null}
         {confirmation?.error ? (
@@ -47,7 +54,7 @@ export function LedgerConfirmationDialog({
         ) : null}
         <div className="flex justify-end gap-2">
           <Button variant="outline" disabled={pending} onClick={() => onOpenChange(false)}>
-            Cancel
+            {translate('ledger.confirm.cancel', 'Cancel')}
           </Button>
           <Button
             variant={
@@ -56,7 +63,7 @@ export function LedgerConfirmationDialog({
             disabled={pending || confirmation?.blocked}
             onClick={onConfirm}
           >
-            Confirm
+            {translate('ledger.confirm.confirm', 'Confirm')}
           </Button>
         </div>
       </DialogContent>

@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
+import { translate } from '@/i18n/i18n'
 import { LedgerEntryFields } from './LedgerEntryFields'
 
 const types: LedgerEntryType[] = ['bug', 'deferred', 'test-gap', 'proposal', 'decision']
@@ -131,14 +132,18 @@ export function LedgerEntryForm({
     catalog?.projects.forEach((project: Project) =>
       options.push({
         key: JSON.stringify(['project', project.id]),
-        label: `Project: ${project.displayName}`,
+        label: translate('ledger.form.projectBase', 'Project: {{name}}', {
+          name: project.displayName
+        }),
         base: { kind: 'project', id: project.id }
       })
     )
     catalog?.folderWorkspaces.forEach((workspace: FolderWorkspace) =>
       options.push({
         key: JSON.stringify(['workspace', workspace.id]),
-        label: `Workspace: ${workspace.name}`,
+        label: translate('ledger.form.workspaceBase', 'Workspace: {{name}}', {
+          name: workspace.name
+        }),
         base: { kind: 'workspace', id: workspace.id, host: workspace.connectionId ?? 'local' }
       })
     )
@@ -151,7 +156,10 @@ export function LedgerEntryForm({
     ) {
       options.unshift({
         key: `existing:${entry?.id ?? 'entry'}`,
-        label: `Historical ${existing.kind}: ${existing.id}`,
+        label: translate('ledger.form.historicalBase', 'Historical {{kind}}: {{id}}', {
+          kind: existing.kind,
+          id: existing.id
+        }),
         base: existing
       })
     }
@@ -265,16 +273,24 @@ export function LedgerEntryForm({
     >
       <DialogContent className="max-h-[90vh] overflow-y-auto scrollbar-sleek sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{entry ? `Edit ${entry.id}` : 'New ledger entry'}</DialogTitle>
+          <DialogTitle>
+            {entry
+              ? translate('ledger.form.editTitle', 'Edit {{id}}', { id: entry.id })
+              : translate('ledger.form.newTitle', 'New ledger entry')}
+          </DialogTitle>
         </DialogHeader>
         {entry ? (
           <p className="text-xs text-muted-foreground">
-            Source revision: {entry.revision}. Save will be checked against this revision.
+            {translate(
+              'ledger.form.sourceRevision',
+              'Source revision: {{revision}}. Save will be checked against this revision.',
+              { revision: entry.revision }
+            )}
           </p>
         ) : null}
         <div className="grid gap-4">
           <div className="grid gap-2">
-            <Label htmlFor="ledger-entry-type">Type</Label>
+            <Label htmlFor="ledger-entry-type">{translate('ledger.panel.typeLabel', 'Type')}</Label>
             <Select
               disabled={Boolean(entry) || pending}
               value={type}
@@ -311,10 +327,14 @@ export function LedgerEntryForm({
           ) : null}
           <div className="flex justify-end gap-2">
             <Button disabled={pending} variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {translate('ledger.form.cancel', 'Cancel')}
             </Button>
             <Button disabled={pending || Boolean(catalogError)} onClick={() => void submit()}>
-              {pending ? 'Saving…' : entry ? 'Save' : 'Create'}
+              {pending
+                ? translate('ledger.form.saving', 'Saving…')
+                : entry
+                  ? translate('ledger.form.save', 'Save')
+                  : translate('ledger.form.create', 'Create')}
             </Button>
           </div>
         </div>

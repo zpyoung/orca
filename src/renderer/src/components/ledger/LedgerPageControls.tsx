@@ -17,13 +17,53 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
+import {
+  controlsAllStates,
+  controlsAllTypes,
+  controlsAttach,
+  controlsAttachConfirm,
+  controlsAttachmentOwner,
+  controlsAttachPlaceholder,
+  controlsBranchFilter,
+  controlsBranchPlaceholder,
+  controlsBulkState,
+  controlsBulkStateConfirm,
+  controlsDeleteLedger,
+  controlsDeleteLedgerConfirm,
+  controlsDeleteSelected,
+  controlsDeleteSelectedConfirm,
+  controlsNewEntry,
+  controlsNoLedger,
+  controlsNotStale,
+  controlsOpenLedger,
+  controlsRefresh,
+  controlsReviewed,
+  controlsReviewedAll,
+  controlsReviewFilter,
+  controlsReviewSelected,
+  controlsRuntimeTitle,
+  controlsSearchEntries,
+  controlsSearchPlaceholder,
+  controlsSettings,
+  controlsSimilarEntries,
+  controlsSortLabel,
+  controlsSortSequence,
+  controlsSortTitle,
+  controlsSortUpdated,
+  controlsStale,
+  controlsStaleAll,
+  controlsStaleFilter,
+  controlsStateFilter,
+  controlsSummaryLine,
+  controlsTriage,
+  controlsTypeFilter,
+  controlsUnreviewed,
+  controlsWorkspaceFilter,
+  controlsWorkspacePlaceholder
+} from './ledger-page-controls-copy'
 
 const types: LedgerEntryType[] = ['bug', 'deferred', 'test-gap', 'proposal', 'decision']
 const states: LedgerState[] = ['open', 'resolved', 'archived']
-
-function tierLabel(tier: LedgerOwner['tier']): string {
-  return tier === 'project' ? 'Project' : 'Group'
-}
 
 export type LedgerPageControlsProps = {
   title: string
@@ -97,7 +137,7 @@ export function LedgerPageControls({
       <header className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b px-6 py-4">
         <div className="min-w-0">
           <Button variant="link" size="sm" onClick={onOpen}>
-            Open ledger
+            {controlsOpenLedger()}
           </Button>
           <h1 className="text-lg font-semibold">
             {ownerLabel ?? ledger?.owner?.id ?? ledger?.formerOwner?.id ?? title}
@@ -105,37 +145,33 @@ export function LedgerPageControls({
           {ledger ? (
             <>
               <p className="break-words text-sm text-muted-foreground">
-                {ledger.owner
-                  ? tierLabel(ledger.tier)
-                  : `Detached ${tierLabel(ledger.tier).toLowerCase()} ledger`}{' '}
-                · {ledger.entryCount} {ledger.entryCount === 1 ? 'entry' : 'entries'} · revision{' '}
-                {ledger.revision}
+                {controlsSummaryLine(ledger)}
               </p>
               <p
                 className="break-words font-mono text-xs text-muted-foreground/70"
-                title={`runtime ${ledger.runtime.runtimeId} · profile ${ledger.runtime.profileId}`}
+                title={controlsRuntimeTitle(ledger.runtime.runtimeId, ledger.runtime.profileId)}
               >
                 {ledger.ledgerId}
               </p>
             </>
           ) : (
-            <p className="text-sm text-muted-foreground">This owner has no ledger yet.</p>
+            <p className="text-sm text-muted-foreground">{controlsNoLedger()}</p>
           )}
         </div>
         <div className="flex flex-wrap gap-2">
           {onOpenSettings ? (
             <Button size="sm" variant="outline" onClick={onOpenSettings}>
-              Ledger settings
+              {controlsSettings()}
             </Button>
           ) : null}
           <Button size="sm" variant="outline" onClick={onRefresh} disabled={busy}>
-            Refresh
+            {controlsRefresh()}
           </Button>
           <Button size="sm" variant="outline" onClick={onTriage} disabled={busy || !ledger}>
-            Triage
+            {controlsTriage()}
           </Button>
           <Button size="sm" disabled={busy || !target} onClick={onNew}>
-            New entry
+            {controlsNewEntry()}
           </Button>
           {ledger ? (
             <Button
@@ -143,7 +179,7 @@ export function LedgerPageControls({
               variant="destructive"
               disabled={busy}
               onClick={() =>
-                onConfirm('Permanently delete this ledger, every entry body, and all history?', {
+                onConfirm(controlsDeleteLedgerConfirm(), {
                   operation: 'delete-ledger',
                   target: mutationTarget,
                   ifLedgerRevision: ledger.revision,
@@ -151,7 +187,7 @@ export function LedgerPageControls({
                 })
               }
             >
-              Delete ledger
+              {controlsDeleteLedger()}
             </Button>
           ) : null}
         </div>
@@ -159,8 +195,8 @@ export function LedgerPageControls({
       {ledger?.owner === null ? (
         <section className="flex flex-wrap items-center gap-2 border-b px-6 py-3">
           <Select value={attachTo} onValueChange={onAttachTo}>
-            <SelectTrigger aria-label="Attachment owner">
-              <SelectValue placeholder={`Attach ${ledger.tier}`} />
+            <SelectTrigger aria-label={controlsAttachmentOwner()}>
+              <SelectValue placeholder={controlsAttachPlaceholder(ledger.tier)} />
             </SelectTrigger>
             <SelectContent>
               {attachCandidates.map((item) => (
@@ -175,7 +211,9 @@ export function LedgerPageControls({
             disabled={busy || !attachTo}
             onClick={() =>
               onConfirm(
-                `Attach ${attachCandidates.find((item) => item.id === attachTo)?.label ?? attachTo}? Project attachment asserts the same codebase.`,
+                controlsAttachConfirm(
+                  attachCandidates.find((item) => item.id === attachTo)?.label ?? attachTo
+                ),
                 {
                   operation: 'attach',
                   target: mutationTarget,
@@ -186,7 +224,7 @@ export function LedgerPageControls({
               )
             }
           >
-            Attach
+            {controlsAttach()}
           </Button>
           {catalogError ? (
             <p role="alert" className="text-sm text-destructive">
@@ -202,7 +240,7 @@ export function LedgerPageControls({
       ) : null}
       {matches.length ? (
         <aside className="border-b px-6 py-3 text-sm">
-          Similar entries (advisory):{' '}
+          {controlsSimilarEntries()}{' '}
           {matches.map((entry) => (
             <Button key={entry.id} variant="link" size="sm" onClick={() => onDetail(entry.id)}>
               {entry.id}: {String(entry.content.title)}
@@ -213,17 +251,17 @@ export function LedgerPageControls({
       <section className="flex flex-wrap items-center gap-2 border-b px-6 py-3">
         <Input
           className="w-48"
-          aria-label="Search entries"
-          placeholder="Search title or ID"
+          aria-label={controlsSearchEntries()}
+          placeholder={controlsSearchPlaceholder()}
           value={query}
           onChange={(event) => onFilterChange('query', event.target.value)}
         />
         <Select value={type} onValueChange={(value) => onFilterChange('type', value)}>
-          <SelectTrigger size="sm" aria-label="Entry type filter">
+          <SelectTrigger size="sm" aria-label={controlsTypeFilter()}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All types</SelectItem>
+            <SelectItem value="all">{controlsAllTypes()}</SelectItem>
             {types.map((item) => (
               <SelectItem key={item} value={item}>
                 {item}
@@ -232,11 +270,11 @@ export function LedgerPageControls({
           </SelectContent>
         </Select>
         <Select value={state} onValueChange={(value) => onFilterChange('state', value)}>
-          <SelectTrigger size="sm" aria-label="Entry state filter">
+          <SelectTrigger size="sm" aria-label={controlsStateFilter()}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All states</SelectItem>
+            <SelectItem value="all">{controlsAllStates()}</SelectItem>
             {states.map((item) => (
               <SelectItem key={item} value={item}>
                 {item}
@@ -245,46 +283,46 @@ export function LedgerPageControls({
           </SelectContent>
         </Select>
         <Select value={reviewed} onValueChange={(value) => onFilterChange('reviewed', value)}>
-          <SelectTrigger size="sm" aria-label="Review filter">
+          <SelectTrigger size="sm" aria-label={controlsReviewFilter()}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Reviewed: all</SelectItem>
-            <SelectItem value="yes">Reviewed</SelectItem>
-            <SelectItem value="no">Unreviewed</SelectItem>
+            <SelectItem value="all">{controlsReviewedAll()}</SelectItem>
+            <SelectItem value="yes">{controlsReviewed()}</SelectItem>
+            <SelectItem value="no">{controlsUnreviewed()}</SelectItem>
           </SelectContent>
         </Select>
         <Select value={stale} onValueChange={(value) => onFilterChange('stale', value)}>
-          <SelectTrigger size="sm" aria-label="Stale filter">
+          <SelectTrigger size="sm" aria-label={controlsStaleFilter()}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Stale: all</SelectItem>
-            <SelectItem value="yes">Stale</SelectItem>
-            <SelectItem value="no">Not stale</SelectItem>
+            <SelectItem value="all">{controlsStaleAll()}</SelectItem>
+            <SelectItem value="yes">{controlsStale()}</SelectItem>
+            <SelectItem value="no">{controlsNotStale()}</SelectItem>
           </SelectContent>
         </Select>
         <Select value={sort} onValueChange={(value) => onFilterChange('sort', value)}>
-          <SelectTrigger size="sm" aria-label="Entry sort">
+          <SelectTrigger size="sm" aria-label={controlsSortLabel()}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="updated">Newest activity</SelectItem>
-            <SelectItem value="sequence">Sequence</SelectItem>
-            <SelectItem value="title">Title</SelectItem>
+            <SelectItem value="updated">{controlsSortUpdated()}</SelectItem>
+            <SelectItem value="sequence">{controlsSortSequence()}</SelectItem>
+            <SelectItem value="title">{controlsSortTitle()}</SelectItem>
           </SelectContent>
         </Select>
         <Input
           className="w-40"
-          aria-label="Origin workspace filter"
-          placeholder="Origin workspace"
+          aria-label={controlsWorkspaceFilter()}
+          placeholder={controlsWorkspacePlaceholder()}
           value={workspace}
           onChange={(event) => onFilterChange('workspace', event.target.value)}
         />
         <Input
           className="w-36"
-          aria-label="Origin branch filter"
-          placeholder="Origin branch"
+          aria-label={controlsBranchFilter()}
+          placeholder={controlsBranchPlaceholder()}
           value={branch}
           onChange={(event) => onFilterChange('branch', event.target.value)}
         />
@@ -302,7 +340,7 @@ export function LedgerPageControls({
                 })
               }
             >
-              Review ({selected.size})
+              {controlsReviewSelected(selected.size)}
             </Button>
             {(['resolved', 'archived'] as const).map((next) => (
               <Button
@@ -311,7 +349,7 @@ export function LedgerPageControls({
                 variant="outline"
                 disabled={busy}
                 onClick={() =>
-                  onConfirm(`Set ${selected.size} displayed entries to ${next}?`, {
+                  onConfirm(controlsBulkStateConfirm(selected.size, next), {
                     operation: 'bulk-state',
                     target: mutationTarget,
                     state: next,
@@ -320,7 +358,7 @@ export function LedgerPageControls({
                   })
                 }
               >
-                {next === 'resolved' ? 'Resolve selected' : 'Archive selected'}
+                {controlsBulkState(next)}
               </Button>
             ))}
             <Button
@@ -328,7 +366,7 @@ export function LedgerPageControls({
               variant="destructive"
               disabled={busy}
               onClick={() =>
-                onConfirm(`Permanently delete ${selected.size} entries and their histories?`, {
+                onConfirm(controlsDeleteSelectedConfirm(selected.size), {
                   operation: 'delete-entries',
                   target: mutationTarget,
                   selections: [...selected].map(([id, revision]) => ({ id, revision })),
@@ -336,7 +374,7 @@ export function LedgerPageControls({
                 })
               }
             >
-              Delete selected
+              {controlsDeleteSelected()}
             </Button>
           </>
         ) : null}

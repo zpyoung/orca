@@ -26,6 +26,29 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
+import {
+  detailAfter,
+  detailBefore,
+  detailChangedFields,
+  detailClose,
+  detailContentSection,
+  detailEdit,
+  detailEntrySection,
+  detailFullHistory,
+  detailHistoryRevision,
+  detailLatestActor,
+  detailModel,
+  detailOriginSection,
+  detailProviderSession,
+  detailRevert,
+  detailRevertLabel,
+  detailRevertPlaceholder,
+  detailReview,
+  detailReviewedBadge,
+  detailRevisionCount,
+  detailRevisionOption,
+  detailSummaryLine
+} from './ledger-entry-detail-copy'
 
 export type LedgerEntryDetailProps = {
   entry: LedgerEntry | null
@@ -82,22 +105,20 @@ function HistoryItem({ change }: { change: LedgerChange }): React.JSX.Element {
   return (
     <article className="rounded-md border p-3">
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <Badge variant="outline">revision {change.revision}</Badge>
+        <Badge variant="outline">{detailHistoryRevision(change.revision)}</Badge>
         <span className="text-muted-foreground">{actorLabel(change.actor)}</span>
         <span className="text-muted-foreground">{new Date(change.at).toLocaleString()}</span>
       </div>
-      <p className="mt-2 text-xs text-muted-foreground">
-        Changed: {change.changedFields.length ? change.changedFields.join(', ') : 'none'}
-      </p>
+      <p className="mt-2 text-xs text-muted-foreground">{detailChangedFields(change)}</p>
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
         <details className="rounded border bg-muted/30 p-2">
-          <summary className="cursor-pointer text-xs font-medium">Before</summary>
+          <summary className="cursor-pointer text-xs font-medium">{detailBefore()}</summary>
           <pre className="mt-2 max-h-48 overflow-auto scrollbar-sleek whitespace-pre-wrap break-words font-mono text-[11px]">
             {readable(change.before)}
           </pre>
         </details>
         <details className="rounded border bg-muted/30 p-2">
-          <summary className="cursor-pointer text-xs font-medium">After</summary>
+          <summary className="cursor-pointer text-xs font-medium">{detailAfter()}</summary>
           <pre className="mt-2 max-h-48 overflow-auto scrollbar-sleek whitespace-pre-wrap break-words font-mono text-[11px]">
             {readable(change.after)}
           </pre>
@@ -167,12 +188,9 @@ export function LedgerEntryDetail({
             <DialogTitle className="font-mono">{entry.id}</DialogTitle>
             <Badge variant="outline">{entry.type}</Badge>
             <Badge variant="secondary">{entry.state}</Badge>
-            {entry.reviewed ? <Badge>reviewed</Badge> : null}
+            {entry.reviewed ? <Badge>{detailReviewedBadge()}</Badge> : null}
           </div>
-          <DialogDescription>
-            Revision {entry.revision} · sequence {entry.sequence} · updated{' '}
-            {new Date(entry.updatedAt).toLocaleString()}
-          </DialogDescription>
+          <DialogDescription>{detailSummaryLine(entry)}</DialogDescription>
         </DialogHeader>
 
         <div className="min-h-0 space-y-5 overflow-y-auto scrollbar-sleek pr-1">
@@ -188,7 +206,7 @@ export function LedgerEntryDetail({
           <section className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-md border p-3">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Entry
+                {detailEntrySection()}
               </h3>
               <dl className="mt-2">
                 <ContentValue name="state" value={entry.state} />
@@ -198,7 +216,7 @@ export function LedgerEntryDetail({
             </div>
             <div className="rounded-md border p-3">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Origin
+                {detailOriginSection()}
               </h3>
               <dl className="mt-2">
                 <ContentValue name="workspace" value={entry.origin.workspaceId} />
@@ -224,7 +242,7 @@ export function LedgerEntryDetail({
           </section>
 
           <section>
-            <h3 className="text-sm font-semibold">Content</h3>
+            <h3 className="text-sm font-semibold">{detailContentSection()}</h3>
             <dl className="mt-1">
               {Object.entries(entry.content).map(([name, value]) => (
                 <ContentValue key={name} name={name} value={value} />
@@ -233,17 +251,17 @@ export function LedgerEntryDetail({
           </section>
 
           <section className="rounded-md border p-3">
-            <h3 className="text-sm font-semibold">Latest content actor</h3>
+            <h3 className="text-sm font-semibold">{detailLatestActor()}</h3>
             <p className="mt-1 text-sm">{actorLabel(entry.latestContentActor)}</p>
             <dl className="mt-2 grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
               <div>
-                <dt>model</dt>
+                <dt>{detailModel()}</dt>
                 <dd className="font-mono text-foreground">
                   {entry.latestContentActor.model ?? '—'}
                 </dd>
               </div>
               <div>
-                <dt>provider session</dt>
+                <dt>{detailProviderSession()}</dt>
                 <dd className="break-all font-mono text-foreground">
                   {entry.latestContentActor.providerSessionId ?? '—'}
                 </dd>
@@ -253,9 +271,9 @@ export function LedgerEntryDetail({
 
           <section>
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold">Full history</h3>
+              <h3 className="text-sm font-semibold">{detailFullHistory()}</h3>
               <span className="text-xs text-muted-foreground">
-                {entry.history.length} revision{entry.history.length === 1 ? '' : 's'}
+                {detailRevisionCount(entry.history.length)}
               </span>
             </div>
             <div className="mt-2 grid gap-2">
@@ -278,7 +296,7 @@ export function LedgerEntryDetail({
               disabled={pending}
             >
               <Pencil className="mr-2 size-4" />
-              Edit
+              {detailEdit()}
             </Button>
             <Button
               variant="outline"
@@ -293,7 +311,7 @@ export function LedgerEntryDetail({
               disabled={pending || entry.reviewed}
             >
               <Check className="mr-2 size-4" />
-              Review
+              {detailReview()}
             </Button>
             {(['open', 'resolved', 'archived'] as const).map((state) => (
               <Button
@@ -309,13 +327,13 @@ export function LedgerEntryDetail({
             {priorRevisions.length ? (
               <div className="flex gap-2">
                 <Select value={revertRevision} onValueChange={setRevertRevision} disabled={pending}>
-                  <SelectTrigger size="sm" aria-label="Revision to revert to">
-                    <SelectValue placeholder="Revert to…" />
+                  <SelectTrigger size="sm" aria-label={detailRevertLabel()}>
+                    <SelectValue placeholder={detailRevertPlaceholder()} />
                   </SelectTrigger>
                   <SelectContent>
                     {priorRevisions.map((change) => (
                       <SelectItem key={change.revision} value={String(change.revision)}>
-                        Revision {change.revision}
+                        {detailRevisionOption(change.revision)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -335,13 +353,13 @@ export function LedgerEntryDetail({
                   disabled={pending || !revertRevision}
                 >
                   <RotateCcw className="mr-2 size-4" />
-                  Revert
+                  {detailRevert()}
                 </Button>
               </div>
             ) : null}
           </div>
           <Button variant="outline" onClick={onClose} disabled={pending}>
-            Close
+            {detailClose()}
           </Button>
         </DialogFooter>
       </DialogContent>

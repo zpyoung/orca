@@ -6,6 +6,28 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
+  triageAdvisoryNote,
+  triageApprove,
+  triageArchive,
+  triageBulkDescription,
+  triageCancel,
+  triageCandidatesLabel,
+  triageClose,
+  triageConfirmAction,
+  triageConfirmRow,
+  triageDescription,
+  triageEmpty,
+  triageEvidenceLine,
+  triageHiddenSelections,
+  triageLoading,
+  triageOriginLine,
+  triageReasonLine,
+  triageResolve,
+  triageSelectEntryLabel,
+  triageStaleBadge,
+  triageTitle
+} from './ledger-triage-panel-copy'
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -221,11 +243,8 @@ export function LedgerTriagePanel({
     <Dialog open={open} onOpenChange={close}>
       <DialogContent className="max-h-[88vh] overflow-auto scrollbar-sleek sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Operation review</DialogTitle>
-          <DialogDescription>
-            Advisory triage for the selected runtime, target, and filters. No entries are
-            auto-resolved.
-          </DialogDescription>
+          <DialogTitle>{triageTitle()}</DialogTitle>
+          <DialogDescription>{triageDescription()}</DialogDescription>
         </DialogHeader>
         {error ? (
           <div
@@ -242,19 +261,18 @@ export function LedgerTriagePanel({
             className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground"
           >
             <Loader2 className="size-4 animate-spin" />
-            Loading review candidates…
+            {triageLoading()}
           </div>
         ) : null}
         {!loading && !error && !candidates.length ? (
           <p role="status" className="py-10 text-center text-sm text-muted-foreground">
-            No review candidates match these filters.
+            {triageEmpty()}
           </p>
         ) : null}
         {!loading && candidates.length ? (
-          <div className="grid gap-2" aria-label="Review candidates">
+          <div className="grid gap-2" aria-label={triageCandidatesLabel()}>
             {candidates.map((candidate) => {
               const entry = candidate.entry
-              const evidence = candidate.evidence
               return (
                 <article key={`${entry.id}:${entry.revision}`} className="rounded-lg border p-3">
                   <div className="flex items-start gap-3">
@@ -262,38 +280,22 @@ export function LedgerTriagePanel({
                       checked={selected.has(entry.id)}
                       onCheckedChange={(checked) => toggle(candidate, checked === true)}
                       disabled={pending}
-                      aria-label={`Select ${entry.id} revision ${entry.revision}`}
+                      aria-label={triageSelectEntryLabel(entry.id, entry.revision)}
                     />
                     <div className="min-w-0 flex-1 space-y-2 break-words">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-sm">{entry.id}</span>
                         <Badge variant="outline">{entry.type}</Badge>
                         <Badge variant="secondary">{entry.state}</Badge>
-                        {candidate.stale ? <Badge variant="outline">stale</Badge> : null}
+                        {candidate.stale ? (
+                          <Badge variant="outline">{triageStaleBadge()}</Badge>
+                        ) : null}
                       </div>
                       <p className="font-medium">{titleOf(candidate)}</p>
+                      <p className="text-xs text-muted-foreground">{triageReasonLine(candidate)}</p>
+                      <p className="text-xs text-muted-foreground">{triageOriginLine(candidate)}</p>
                       <p className="text-xs text-muted-foreground">
-                        Reason: {candidate.reason} · current state: {entry.state} · revision{' '}
-                        {entry.revision} · updated {new Date(entry.updatedAt).toLocaleString()}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Origin baseline: {entry.origin.revision ?? 'unavailable'} · observed
-                        revision: {evidence?.observedRevision ?? 'unavailable'} · observed time:{' '}
-                        {evidence?.observedAt
-                          ? new Date(evidence.observedAt).toLocaleString()
-                          : 'unavailable'}{' '}
-                        · file:{' '}
-                        {evidence?.fileExists === undefined
-                          ? 'unavailable'
-                          : evidence.fileExists
-                            ? 'present'
-                            : 'missing'}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Evidence:{' '}
-                        {evidence?.available
-                          ? (evidence.note ?? 'available')
-                          : (evidence?.note ?? 'unavailable')}
+                        {triageEvidenceLine(candidate)}
                       </p>
                     </div>
                   </div>
@@ -303,12 +305,11 @@ export function LedgerTriagePanel({
           </div>
         ) : null}
         <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
-          This review is advisory. It never resolves, archives, or otherwise changes entries without
-          an explicit action and confirmation.
+          {triageAdvisoryNote()}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => close(false)} disabled={pending}>
-            Close
+            {triageClose()}
           </Button>
           <Button
             variant="outline"
@@ -316,14 +317,14 @@ export function LedgerTriagePanel({
             disabled={pending || !selected.size || loading}
           >
             <Check className="mr-2 size-4" />
-            Approve review{selected.size ? ` (${selected.size})` : ''}
+            {triageApprove(selected.size)}
           </Button>
           <Button
             variant="outline"
             onClick={() => openBulkConfirmation('resolved')}
             disabled={pending || !selected.size || loading}
           >
-            Resolve
+            {triageResolve()}
           </Button>
           <Button
             variant="destructive"
@@ -331,7 +332,7 @@ export function LedgerTriagePanel({
             disabled={pending || !selected.size || loading}
           >
             <Archive className="mr-2 size-4" />
-            Archive
+            {triageArchive()}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -345,13 +346,8 @@ export function LedgerTriagePanel({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              Confirm {confirmation?.state === 'archived' ? 'archive' : 'resolve'}
-            </DialogTitle>
-            <DialogDescription>
-              This bulk action requires confirmation and will use the listed immutable id/revision
-              snapshots.
-            </DialogDescription>
+            <DialogTitle>{triageConfirmAction(confirmation?.state)}</DialogTitle>
+            <DialogDescription>{triageBulkDescription()}</DialogDescription>
           </DialogHeader>
           {error ? (
             <div
@@ -365,27 +361,29 @@ export function LedgerTriagePanel({
             <ul className="grid gap-2">
               {displayedConfirmation.map((candidate) => (
                 <li key={candidate.entry.id} className="font-mono">
-                  {candidate.entry.id} · {titleOf(candidate)} · revision {candidate.entry.revision}
+                  {triageConfirmRow(
+                    candidate.entry.id,
+                    titleOf(candidate),
+                    candidate.entry.revision
+                  )}
                 </li>
               ))}
               {confirmation && displayedConfirmation.length < confirmation.selections.length ? (
-                <li className="text-destructive">
-                  Some selected entries are no longer displayed; they will not be acted on.
-                </li>
+                <li className="text-destructive">{triageHiddenSelections()}</li>
               ) : null}
             </ul>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmation(null)} disabled={pending}>
-              Cancel
+              {triageCancel()}
             </Button>
             <Button
               variant={confirmation?.state === 'archived' ? 'destructive' : 'default'}
               onClick={() => void runBulk()}
               disabled={pending || !confirmation?.selections.length}
             >
-              {pending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}Confirm{' '}
-              {confirmation?.state === 'archived' ? 'archive' : 'resolve'}
+              {pending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+              {triageConfirmAction(confirmation?.state)}
             </Button>
           </DialogFooter>
         </DialogContent>

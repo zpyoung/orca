@@ -12,6 +12,12 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { translate } from '@/i18n/i18n'
 import type { LedgerRemovalPreview } from '../../../../shared/ledger'
+import {
+  retentionChecking,
+  retentionNone,
+  retentionSummary,
+  retentionTitle
+} from '../ledger/ledger-retention-notice-copy'
 
 type ProjectGroupDeleteDialogProps = {
   open: boolean
@@ -190,20 +196,21 @@ export function ProjectGroupDeleteDialog({
           </div>
         )}
         <div className="rounded-md border border-border/70 bg-muted/35 px-3 py-2 text-xs">
-          <div className="font-medium text-foreground">Ledger records retained</div>
+          <div className="font-medium text-foreground">{retentionTitle()}</div>
           {ledgerPreviewLoading ? (
-            <div className="mt-1 text-muted-foreground">Checking affected ledgers…</div>
+            <div className="mt-1 text-muted-foreground">{retentionChecking()}</div>
           ) : ledgerPreviewError ? (
             <div className="mt-1 text-destructive" role="alert">
               {ledgerPreviewError}
             </div>
           ) : ledgerPreview.length === 0 ? (
-            <div className="mt-1 text-muted-foreground">No affected ledgers.</div>
+            <div className="mt-1 text-muted-foreground">{retentionNone()}</div>
           ) : (
             <div className="mt-1 text-muted-foreground">
-              {ledgerPreview.reduce((total, ledger) => total + ledger.entryCount, 0)} entries across{' '}
-              {ledgerPreview.length} ledger{ledgerPreview.length === 1 ? '' : 's'} will be retained
-              and detached as needed.
+              {retentionSummary(
+                ledgerPreview.reduce((total, ledger) => total + ledger.entryCount, 0),
+                ledgerPreview.length
+              )}
             </div>
           )}
         </div>

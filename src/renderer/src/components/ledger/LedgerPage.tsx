@@ -16,6 +16,7 @@ import { LedgerEntryList } from './LedgerEntryList'
 import { LedgerConfirmationDialog, type LedgerConfirmation } from './LedgerConfirmationDialog'
 import { LedgerPageControls } from './LedgerPageControls'
 import { useLedgerOwnerLabels } from './ledger-owner-labels'
+import { pageStaleRevisions } from './ledger-page-copy'
 import { getLedgerSettingsNavigation } from './ledger-settings-navigation'
 import { LedgerTriagePanel } from './LedgerTriagePanel'
 
@@ -242,7 +243,7 @@ export function LedgerPage({
         const refreshed = freshEntries.filter((entry) => ids.includes(entry.id))
         setConfirmation({
           ...snapshot,
-          error: `${message}. Review the refreshed revisions before confirming again.`,
+          error: pageStaleRevisions(message),
           blocked: refreshed.length !== ids.length,
           entries: refreshed,
           request: {

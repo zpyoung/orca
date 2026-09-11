@@ -8,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
+import { translate } from '@/i18n/i18n'
 
 type FormValue = Record<string, unknown>
 type LocationOption = {
@@ -60,7 +61,7 @@ export function LedgerEntryFields({
             <Label>{field}</Label>
             <Input
               disabled={pending}
-              placeholder="Repository-relative path"
+              placeholder={translate('ledger.fields.pathPlaceholder', 'Repository-relative path')}
               value={String(form.locationPath ?? '')}
               onChange={(event) => onUpdate('locationPath', event.target.value)}
             />
@@ -69,7 +70,7 @@ export function LedgerEntryFields({
               type="number"
               min={1}
               step={1}
-              placeholder="Line (optional)"
+              placeholder={translate('ledger.fields.linePlaceholder', 'Line (optional)')}
               value={String(form.locationLine ?? '')}
               onChange={(event) => onUpdate('locationLine', event.target.value)}
             />
@@ -79,7 +80,12 @@ export function LedgerEntryFields({
               onValueChange={(value) => onUpdate('locationBaseKey', value)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Location base (required)" />
+                <SelectValue
+                  placeholder={translate(
+                    'ledger.fields.locationBasePlaceholder',
+                    'Location base (required)'
+                  )}
+                />
               </SelectTrigger>
               <SelectContent>
                 {locationOptions.map((option) => (
@@ -96,12 +102,15 @@ export function LedgerEntryFields({
                 checked={Boolean(form.locationExternal)}
                 onChange={(event) => onUpdate('locationExternal', event.target.checked)}
               />
-              External location
+              {translate('ledger.fields.externalLocation', 'External location')}
             </label>
             {form.locationExternal ? (
               <Input
                 disabled={pending}
-                placeholder="External host (required)"
+                placeholder={translate(
+                  'ledger.fields.externalHostPlaceholder',
+                  'External host (required)'
+                )}
                 value={String(form.locationHost ?? '')}
                 onChange={(event) => onUpdate('locationHost', event.target.value)}
               />
@@ -130,7 +139,11 @@ export function LedgerEntryFields({
                 onValueChange={(value) => onUpdate(field, value)}
               >
                 <SelectTrigger id={`ledger-${field}`}>
-                  <SelectValue placeholder={`Select ${field}`} />
+                  <SelectValue
+                    placeholder={translate('ledger.fields.selectPlaceholder', 'Select {{field}}', {
+                      field
+                    })}
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {(field === 'severity'
