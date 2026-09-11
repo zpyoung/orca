@@ -141,3 +141,11 @@ entries' IDs; manual edits to fix typos are fine.
 - **Severity**: high
 - **Proposed fix**: Route the userData path through a port in src/main/host/ (the ratchet's prescribed escape) so ask-services depends on the port instead of electron, or move the db-path resolution out of the runtime import graph.
 
+## BUG-16: AskPendingCountBadge is never mounted, so the pending-ask count is unobservable
+- **Observed**: 2026-09-11
+- **File**: src/renderer/src/components/fork-ask-question-tool/AskPendingCountBadge.tsx:21
+- **Description**: The badge component and its unit test exist and pass, but a repo-wide grep for AskPendingCountBadge and selectPendingAskCount finds no render site outside the component and its own test. The 'badge the count' half of commit 7cb8a3b837 therefore ships dead: no surface in the app ever displays the cross-pane pending-ask count, and manual testing cannot observe it.
+- **Introduced by**: 7cb8a3b837
+- **Severity**: medium
+- **Proposed fix**: Mount it in the sidebar worktree row / tab header alongside the other per-worktree indicators, declared as a fork seam in config/fork-ownership.json.
+

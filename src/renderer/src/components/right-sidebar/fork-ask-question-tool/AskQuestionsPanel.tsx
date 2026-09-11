@@ -6,7 +6,7 @@ import { useFocusedPaneKey } from '../fork-session-info/focused-session-info'
 
 function NoQuestionsState(): React.JSX.Element {
   return (
-    <div className="flex min-h-full flex-col items-center justify-center px-5 py-12 text-center">
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-5 py-12 text-center">
       <div className="mb-3 flex size-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
         <MessageCircleQuestionMark className="size-4" />
       </div>
@@ -35,16 +35,16 @@ export default function AskQuestionsPanel(): React.JSX.Element {
     return <NoQuestionsState />
   }
 
+  // No wrapper: the card is already the flex child that has to shrink, and nesting a second
+  // identical flex column would give its footer somewhere to overflow to.
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-      <AskCard
-        key={model.askId}
-        model={model}
-        onSubmit={onSubmit}
-        onCancel={onCancel}
-        isSubmitting={isSubmitting}
-        onDraftChange={onDraftChange}
-      />
-    </div>
+    <AskCard
+      key={model.askId}
+      model={model}
+      onSubmit={onSubmit}
+      onCancel={onCancel}
+      isSubmitting={isSubmitting}
+      onDraftChange={onDraftChange}
+    />
   )
 }
