@@ -97,10 +97,19 @@ export type FolderWorkspacePathStatusCacheEntry = {
   requestSnapshot: string
 }
 
+export type ExpectedLedgerRevision = { ledgerId: string; revision: number }
+
+export type DeleteProjectGroupOptions = {
+  hostId?: ExecutionHostId
+  expectedLedgers?: ExpectedLedgerRevision[]
+  removeContainedProjects?: boolean
+}
+
 export type DeleteProjectGroupWithContainedProjectsOptions = {
   removeContainedProjects: boolean
   // hostId disambiguates which host's group row to delete when the id exists on multiple hosts.
   hostId?: ExecutionHostId
+  expectedLedgers?: ExpectedLedgerRevision[]
 }
 
 export type AllHostCatalogFetchOptions = {
@@ -234,7 +243,7 @@ export type RepoSlice = {
     updates: Partial<Pick<ProjectGroup, 'name' | 'isCollapsed' | 'tabOrder' | 'color'>>,
     options?: { hostId?: ExecutionHostId }
   ) => Promise<boolean>
-  deleteProjectGroup: (groupId: string, options?: { hostId?: ExecutionHostId }) => Promise<boolean>
+  deleteProjectGroup: (groupId: string, options?: DeleteProjectGroupOptions) => Promise<boolean>
   deleteProjectGroupWithContainedProjects: (
     groupId: string,
     options: DeleteProjectGroupWithContainedProjectsOptions
@@ -248,7 +257,11 @@ export type RepoSlice = {
   // options.errorFeedback defaults to 'silent' so bulk/background callers keep their own aggregate reporting.
   removeProject: (
     projectId: string,
-    options?: { hostId?: ExecutionHostId; errorFeedback?: 'toast' | 'silent' }
+    options?: {
+      hostId?: ExecutionHostId
+      errorFeedback?: 'toast' | 'silent'
+      expectedLedgers?: ExpectedLedgerRevision[]
+    }
   ) => Promise<void>
   updateProject: (projectId: string, updates: ProjectUpdate) => Promise<boolean>
   // options.hostId targets a specific host's row + RPC target when the id exists on multiple hosts; else the focused host is assumed.

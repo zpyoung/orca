@@ -72,6 +72,20 @@ const ProjectGroupSelector = z.object({
   groupId: requiredString('Missing group id')
 })
 
+const ExpectedLedgers = z.object({
+  expectedLedgers: z
+    .array(
+      z
+        .object({
+          ledgerId: z.string().min(1).max(256),
+          revision: z.number().int().safe().positive()
+        })
+        .strict()
+    )
+    .max(10_000)
+    .optional()
+})
+
 const ProjectGroupMoveProject = z.object({
   repo: requiredString('Missing repo selector'),
   groupId: OptionalString.nullable(),
@@ -144,8 +158,14 @@ export const REPO_METHODS: RpcMethod[] = [
   }),
   defineMethod({
     name: 'projectGroup.delete',
-    params: ProjectGroupSelector,
-    handler: async (params, { runtime }) => runtime.deleteProjectGroup(params.groupId)
+    params: ProjectGroupSelector.merge(
+      ExpectedLedgers.extend({ removeContainedProjects: z.boolean().optional() })
+    ),
+    handler: async (params, { runtime }) =>
+      runtime.deleteProjectGroup(params.groupId, {
+        expectedLedgers: params.expectedLedgers,
+        removeContainedProjects: params.removeContainedProjects
+      })
   }),
   defineMethod({
     name: 'projectGroup.moveProject',
@@ -242,8 +262,9 @@ export const REPO_METHODS: RpcMethod[] = [
   }),
   defineMethod({
     name: 'repo.rm',
-    params: RepoSelector,
-    handler: async (params, { runtime }) => runtime.removeProject(params.repo)
+    params: RepoSelector.merge(ExpectedLedgers),
+    handler: async (params, { runtime }) =>
+      runtime.removeProject(params.repo, { expectedLedgers: params.expectedLedgers })
   }),
   defineMethod({
     name: 'repo.reorder',

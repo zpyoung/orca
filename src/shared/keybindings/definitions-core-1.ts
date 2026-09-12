@@ -178,6 +178,14 @@ export const KEYBINDING_DEFINITION_CORE_1: readonly KeybindingDefinition[] = [
     defaultBindings: platformBindings([])
   },
   {
+    id: 'view.ledger',
+    title: 'Open Ledger',
+    group: 'Global',
+    scope: 'global',
+    searchKeywords: ['shortcut', 'ledger', 'observations', 'records'],
+    defaultBindings: platformBindings([])
+  },
+  {
     id: 'sidebar.left.toggle',
     title: 'Toggle Sidebar',
     group: 'Global',

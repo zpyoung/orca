@@ -58,6 +58,7 @@ import type { DiagnosticsApi, MemoryApi, StatsApi, TelemetryApi } from './api/te
 import type { UiCommandEventApi } from './api/ui-command-event-api'
 import type { UiWindowApi } from './api/ui-window-api'
 import type { UpdaterApi } from './api/updater-api'
+import type { LedgerApi } from './api/ledger-api'
 import type { WorkspaceCleanupApi, WorkspaceSpaceApi } from './api/workspace-cleanup-api'
 import type { LocalhostWorktreeLabelsApi, WorkspacePortsApi } from './api/workspace-port-api'
 import type { WorkspaceSessionApi } from './api/workspace-session-api'
@@ -69,6 +70,7 @@ type Merged<T> = { [K in keyof T]: T[K] }
 export type PreloadApi = {
   forkSessionHandoff: ForkSessionHandoffPreloadApi
   forkSessionInfo: ForkSessionInfoApi
+  ledger: LedgerApi
   app: AppApi
   orcaProfiles: OrcaProfileApi
   platform: PlatformApi

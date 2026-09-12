@@ -34,6 +34,20 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     load: async () => (await import('./handlers/artifacts.js')).ARTIFACT_HANDLERS
   },
   {
+    name: 'ledger',
+    keys: [
+      'ledger file',
+      'ledger list',
+      'ledger show',
+      'ledger edit',
+      'ledger state',
+      'ledger review',
+      'ledger revert',
+      'ledger import'
+    ],
+    load: async () => (await import('./handlers/ledger.js')).LEDGER_HANDLERS
+  },
+  {
     name: 'automations',
     keys: [
       'automations list',

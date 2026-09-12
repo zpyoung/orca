@@ -88,3 +88,11 @@ Reviewed every sprint planning. Use `/quirk:artifacts:defer` to append.
 - **Estimated effort**: M
 - **Priority**: P3
 
+
+## DEFER-10: 60 upstream files carry undeclared ledger edits that the next sync reverts
+- **Deferred**: 2026-09-12
+- **Session context**: fixing the failing checks on PR #55 (typed project and group ledgers)
+- **Why deferred**: the `fork ownership guard` does not block a fork edit to an upstream-owned file, so PR #55 is green with 60 upstream files modified but declared in neither `seams` nor `exceptions` in `config/fork-ownership.json`. Per `AGENTS.md`, an undeclared edit is reset to the upstream tag at the next sync and silently reverted — `src/shared/top-level-view.ts` (the `'ledger'` member of `TopLevelView`), `src/main/runtime/rpc/core.ts`, `src/renderer/src/store/types.ts`, and `src/shared/keybindings/definitions-core-1.ts` are representative. Declaring them means ~60 new seam entries with verbatim `lines` plus a `residuals` budget each, which is a large change unrelated to the failing checks and has its own seam-integrity failure modes. Regenerate the list with `git diff --name-only --diff-filter=M <base> HEAD`, intersected with `git ls-tree -r --name-only <upstream tag>`, minus the declared seam and exception paths.
+- **Estimated effort**: L
+- **Priority**: P2
+- **Proposed owner**: project-ledger feature owner

@@ -95,6 +95,10 @@ export class Store {
     return dirname(this.runtime.dataFile)
   }
 
+  getDataFile(): string {
+    return this.runtime.dataFile
+  }
+
   freezeWrites(): void {
     this.runtime.writesFrozen = true
     if (this.runtime.writeTimer) {

@@ -8,6 +8,7 @@ import {
   installNativeFileDropHandlers
 } from './preload-runtime-support'
 import { appApi } from './api/app-bridge'
+import { ledgerApi } from './api/ledger-bridge'
 import { orcaProfilesApi } from './api/orca-profiles-bridge'
 import { platformApi } from './api/platform-bridge'
 import { wslApi } from './api/wsl-bridge'
@@ -103,6 +104,7 @@ const telemetryGetConsentStateApi: PreloadApi['telemetryGetConsentState'] = () =
 const api = {
   forkSessionHandoff: buildForkSessionHandoffApi(),
   forkSessionInfo: buildForkSessionInfoApi(),
+  ledger: ledgerApi,
   app: appApi,
   orcaProfiles: orcaProfilesApi,
   platform: platformApi,

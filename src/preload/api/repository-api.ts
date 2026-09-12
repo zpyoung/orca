@@ -33,7 +33,10 @@ export type RepositoryApi = {
     kind?: 'git' | 'folder'
     displayName?: string
   }) => Promise<{ repo: Repo } | { error: string }>
-  remove: (args: { repoId: string }) => Promise<void>
+  remove: (args: {
+    repoId: string
+    expectedLedgers?: { ledgerId: string; revision: number }[]
+  }) => Promise<void>
   // Forget a project on one execution host only, leaving the same repo id on other hosts intact.
   removeForHost: (args: { repoId: string; hostId: string }) => Promise<void>
   reorder: (args: { orderedIds: string[] }) => Promise<{ status: 'applied' | 'rejected' }>
@@ -143,7 +146,11 @@ export type ProjectGroupsApi = {
     groupId: string
     updates: Partial<Pick<ProjectGroup, 'name' | 'isCollapsed' | 'tabOrder' | 'color'>>
   }) => Promise<ProjectGroup | null>
-  delete: (args: { groupId: string }) => Promise<boolean>
+  delete: (args: {
+    groupId: string
+    expectedLedgers?: { ledgerId: string; revision: number }[]
+    removeContainedProjects?: boolean
+  }) => Promise<boolean>
   moveProject: (args: {
     projectId: string
     groupId: string | null

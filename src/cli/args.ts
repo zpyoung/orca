@@ -151,6 +151,7 @@ export function isCommandGroup(commandPath: string[]): boolean {
       [
         'account',
         'artifacts',
+        'ledger',
         'automations',
         'project',
         'host',

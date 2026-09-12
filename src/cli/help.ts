@@ -1,6 +1,7 @@
 import type { CommandSpec } from './args'
 import { findCommandSpec, isCommandGroup, supportsBrowserPageFlag } from './args'
 import { unknownCommandData } from './command-suggestion'
+import { describeLedgerFlag } from './ledger-flag-help'
 import { formatSkillsCommandFlagHelp } from './skills-command-flag-help'
 import { ROOT_HELP_TEXT_PRIMARY } from './root-help-text-primary'
 import { ROOT_HELP_TEXT_SECONDARY } from './root-help-text-secondary'
@@ -177,6 +178,12 @@ function formatCommandFlagHelp(flag: string, commandPath: string[]): string {
   }
   if (flag === 'key' && command === 'computer press-key') {
     return '--key <key>            Single key, e.g. Return, Escape, Tab, Left, or PageUp'
+  }
+  if (command.startsWith('ledger ')) {
+    const ledgerHelp = describeLedgerFlag(command, flag)
+    if (ledgerHelp) {
+      return ledgerHelp
+    }
   }
   return formatFlagHelp(flag)
 }

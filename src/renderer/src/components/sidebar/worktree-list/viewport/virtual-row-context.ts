@@ -96,6 +96,7 @@ export function buildWorktreeVirtualRowContext(args: BuildArgs): WorktreeVirtual
             args.worktreeVisibilityDefaultsByHost
           ),
         onOpenRepoSettings: props.handleOpenRepoSettings,
+        onOpenProjectLedger: props.handleOpenProjectLedger,
         onOpenWorktreeVisibility: props.handleOpenWorktreeVisibility,
         onCreateGroupFromRepo: props.handleCreateGroupFromRepo,
         onMoveProjectToGroup: props.handleMoveProjectToGroup,
@@ -105,6 +106,7 @@ export function buildWorktreeVirtualRowContext(args: BuildArgs): WorktreeVirtual
       },
       onRenameProjectGroup: props.handleRenameProjectGroup,
       onDeleteProjectGroup: props.handleDeleteProjectGroup,
+      onOpenGroupLedger: props.handleOpenGroupLedger,
       onCreateFolderWorkspace: props.handleCreateFolderWorkspace,
       onWorkspaceStatusDragOver: statusDrag.handleWorkspaceStatusDragOver,
       onWorkspaceStatusDragLeave: statusDrag.handleWorkspaceStatusDragLeave,

@@ -14,6 +14,7 @@ import { createUiSurfaceActions } from './ui/ui-slice-surface-actions'
 import { createUiPersistenceActions } from './ui/ui-slice-persistence-actions'
 import { createUiHydrationActions } from './ui/ui-slice-hydration-actions'
 import { createUiUpdateActions } from './ui/ui-slice-update-actions'
+import { createUiLedgerPageActions } from './ui/ui-slice-ledger-page-actions'
 import {
   createWorkspaceActivityWindowSlice,
   type WorkspaceActivityWindowSlice
@@ -48,6 +49,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
     ...createUiPersistenceActions(set, get),
     ...createUiHydrationActions(set, get),
     ...createUiUpdateActions(set, get),
+    ...createUiLedgerPageActions(set),
     ...createWorkspaceActivityWindowSlice(set),
     ...createWorkspaceReviewFiltersSlice(set)
   }) as UISlice

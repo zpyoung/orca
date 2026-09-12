@@ -252,6 +252,7 @@ export function createAppCommandHandlers(
         return claim('view.tasks', () => store.openTaskPage())
       }
     ],
+    ['view.ledger', () => claim('view.ledger', () => useAppStore.getState().openLedgerPage())],
     [
       'sidebar.right.toggle',
       () =>

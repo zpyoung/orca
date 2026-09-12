@@ -22,6 +22,7 @@ import type { RepoSlice } from './repo-state'
 import { ERROR_TOAST_DURATION } from './repo-state'
 import { mergeProjectCompatibilityForHostRepoChange } from './repo-catalog-identity'
 import { settingsForRepoOwner } from './owner-routing'
+import { isLedgerRemovalConflict } from './ledger-removal-conflict'
 
 export function worktreeBelongsToHost(worktree: { hostId?: string }, hostId: string): boolean {
   return (worktree.hostId ?? LOCAL_EXECUTION_HOST_ID) === hostId
@@ -83,12 +84,24 @@ export function createRepoRemovalActions(
         const idExistsOnOtherHost = get().repos.some(
           (repo) => repo.id === projectId && getRepoExecutionHostId(repo) !== ownerHostId
         )
+        const expectedLedgers = options?.expectedLedgers
+          ? { expectedLedgers: options.expectedLedgers }
+          : {}
         try {
           await (target.kind === 'local'
             ? idExistsOnOtherHost
-              ? window.api.repos.removeForHost({ repoId: projectId, hostId: ownerHostId })
-              : window.api.repos.remove({ repoId: projectId })
-            : callRuntimeRpc(target, 'repo.rm', { repo: projectId }, { timeoutMs: 15_000 }))
+              ? window.api.repos.removeForHost({
+                  repoId: projectId,
+                  hostId: ownerHostId,
+                  ...expectedLedgers
+                })
+              : window.api.repos.remove({ repoId: projectId, ...expectedLedgers })
+            : callRuntimeRpc(
+                target,
+                'repo.rm',
+                { repo: projectId, ...expectedLedgers },
+                { timeoutMs: 15_000 }
+              ))
         } catch (err) {
           // Why: the owner already dropped this project, so purge the local ghost row instead of aborting (#11994).
           if (!hasRuntimeRpcErrorCode(err, 'repo_not_found')) {
@@ -267,6 +280,11 @@ export function createRepoRemovalActions(
           }
         })
       } catch (err) {
+        // Why: the caller re-reads the ledger retention preview and retries, so a stale-preview
+        // rejection must not be reported as a completed removal.
+        if (options?.expectedLedgers && isLedgerRemovalConflict(err)) {
+          throw err
+        }
         console.error('Failed to remove repo:', err)
         // Why: bulk and background callers aggregate their own failures, so only opted-in single-project entry points toast (#11994).
         if (options?.errorFeedback === 'toast') {

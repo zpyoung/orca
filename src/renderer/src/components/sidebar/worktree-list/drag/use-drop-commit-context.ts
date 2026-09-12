@@ -19,8 +19,7 @@ export function useWorktreeDropCommitContext(args: {
   onReorderWorktrees: WorktreeDropCommitContext['onReorderWorktrees']
   onPinWorktrees: WorktreeDropCommitContext['onPinWorktrees']
 }): WorktreeDropCommitContext {
-  const { scrollRef, workspaceStatuses, session, lineageDrop, runtime, groupMembershipDrag } =
-    args
+  const { scrollRef, workspaceStatuses, session, lineageDrop, runtime, groupMembershipDrag } = args
   const {
     onMoveWorktreesToStatus,
     onMoveWorktreesToStatusAtIndex,

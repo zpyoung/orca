@@ -13,11 +13,23 @@ import {
 import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import type { RuntimeStore } from './runtime-store-contract'
 import { folderWorkspaceKey } from '../../shared/workspace-scope'
+import { getRepoExecutionHostId } from '../../shared/execution-host'
+import { invalidateAuthorizedRootsCache } from '../ipc/filesystem-auth'
+import {
+  markDetachedLedgers,
+  type DetachedLedgerRemoval,
+  type ExpectedLedgerRevision,
+  type LedgerCatalogRemoval
+} from './runtime-ledger-catalog-removal'
 
 type RuntimeProjectGroupDependencies = {
   getStore: () => RuntimeStore | null
   resolveRepo: (selector: string) => Promise<Repo>
   notifyReposChanged: () => void
+  forgetTerminalTopology?: (repoId: string) => void
+  invalidateResolvedWorktrees?: () => void
+  invalidateWorktreeScan?: (repoId: string) => void
+  withCatalogRemoval?: LedgerCatalogRemoval
   resolveFolderConnectionId: (workspace: FolderWorkspace) => string | null
   teardownFolderWorkspacePtys: (worktreeId: string, connectionId: string | null) => Promise<void>
   cleanupRemovedFolderWorkspaceState: (worktreeId: string) => void
@@ -93,16 +105,75 @@ export class RuntimeProjectGroupController {
     return updated
   }
 
-  async deleteGroup(groupId: string): Promise<{ deleted: boolean }> {
+  async deleteGroup(
+    groupId: string,
+    options?: { expectedLedgers?: ExpectedLedgerRevision[]; removeContainedProjects?: boolean }
+  ): Promise<{ deleted: boolean; ledgers?: DetachedLedgerRemoval[] }> {
     const store = this.deps.getStore()
     if (!store?.deleteProjectGroup) {
       throw new Error('runtime_unavailable')
     }
-    const deleted = store.deleteProjectGroup(groupId)
+    const groupIds = new Set<string>([groupId])
+    const pendingGroups = [groupId]
+    while (pendingGroups.length) {
+      const parent = pendingGroups.pop()!
+      for (const child of this.listGroups()) {
+        if (child.parentGroupId === parent && !groupIds.has(child.id)) {
+          groupIds.add(child.id)
+          pendingGroups.push(child.id)
+        }
+      }
+    }
+    const reposBefore = store
+      .getRepos()
+      .filter((repo) => repo.projectGroupId && groupIds.has(repo.projectGroupId))
+      .map((repo) => ({ id: repo.id, hostId: getRepoExecutionHostId(repo) }))
+    const operation = (): boolean => {
+      if (options?.removeContainedProjects) {
+        for (const repo of reposBefore) {
+          const remaining = store
+            .getRepos()
+            .some(
+              (candidate) =>
+                candidate.id === repo.id && getRepoExecutionHostId(candidate) !== repo.hostId
+            )
+          if (remaining) {
+            store.removeProjectForHost?.(repo.id, repo.hostId)
+          } else {
+            store.removeProject?.(repo.id)
+          }
+        }
+      }
+      return store.deleteProjectGroup!(groupId)
+    }
+    const removed = this.deps.withCatalogRemoval
+      ? await this.deps.withCatalogRemoval(
+          { projectGroupId: groupId, removeContainedProjects: options?.removeContainedProjects },
+          options?.expectedLedgers,
+          operation
+        )
+      : { result: operation(), ledgers: [] }
+    const deleted = removed.result
     if (deleted) {
+      if (options?.removeContainedProjects) {
+        // Why: contained projects are dropped straight from the store here, so they never pass
+        // through removeProject's invalidations and would leave authorized roots and worktree
+        // caches pointing at forgotten checkouts.
+        for (const repo of reposBefore) {
+          this.deps.forgetTerminalTopology?.(repo.id)
+          this.deps.invalidateWorktreeScan?.(repo.id)
+        }
+        this.deps.invalidateResolvedWorktrees?.()
+        invalidateAuthorizedRootsCache()
+      }
       this.deps.notifyReposChanged()
     }
-    return { deleted }
+    return {
+      deleted,
+      ...(deleted && removed.ledgers.length
+        ? { ledgers: markDetachedLedgers(removed.ledgers) }
+        : {})
+    }
   }
 
   async moveProject(repoSelector: string, groupId: string | null, order?: number): Promise<Repo> {

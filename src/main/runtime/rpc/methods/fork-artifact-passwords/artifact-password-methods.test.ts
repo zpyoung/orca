@@ -111,5 +111,4 @@ describe('artifact password RPC methods', () => {
       }
     }
   })
-
 })

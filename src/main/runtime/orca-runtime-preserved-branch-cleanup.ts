@@ -38,6 +38,11 @@ import { RuntimeRepositorySparsePresets } from './runtime-repository-sparse-pres
 import { RuntimeRepositoryRefQueries } from './runtime-repository-ref-queries'
 import { RuntimeServerEnvironmentCommands } from './runtime-server-environment-commands'
 import { RuntimeRepositoryForkBackfill } from './runtime-repository-fork-backfill'
+import type {
+  ExpectedLedgerRevision,
+  LedgerCatalogRemovalResult,
+  LedgerCatalogRemovalTarget
+} from './runtime-ledger-catalog-removal'
 import { RuntimeWorkspaceSessionController } from './runtime-workspace-session-controller'
 import { RuntimeAiVaultCommands } from './runtime-ai-vault-commands'
 import { ClaudeAgentTeamsService } from './claude-agent-teams-service'
@@ -223,6 +228,11 @@ export class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeWithTermin
     getStore: () => this.store,
     resolveRepo: (selector) => this.resolveRepoSelector(selector),
     notifyReposChanged: () => this.notifyReposChanged(),
+    forgetTerminalTopology: (repoId) => this.terminalTopologyRevisionByRepoId.delete(repoId),
+    invalidateResolvedWorktrees: () => this.invalidateResolvedWorktreeCache(),
+    invalidateWorktreeScan: (repoId) => this.invalidateWorktreeScanCacheForRepo(repoId),
+    withCatalogRemoval: (removal, expectedLedgers, mutate) =>
+      this.withLedgerCatalogRemoval(removal, expectedLedgers, mutate),
     resolveFolderConnectionId: (workspace) => this.resolveFolderWorkspaceConnectionId(workspace),
     teardownFolderWorkspacePtys: (worktreeId, connectionId) =>
       teardownFolderWorkspacePtys(
@@ -269,8 +279,20 @@ export class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeWithTermin
     forgetTerminalTopology: (repoId) => this.terminalTopologyRevisionByRepoId.delete(repoId),
     invalidateResolvedWorktrees: () => this.invalidateResolvedWorktreeCache(),
     invalidateWorktreeScan: (repoId) => this.invalidateWorktreeScanCacheForRepo(repoId),
-    notifyReposChanged: () => this.notifyReposChanged()
+    notifyReposChanged: () => this.notifyReposChanged(),
+    withCatalogRemoval: (removal, expectedLedgers, mutate) =>
+      this.withLedgerCatalogRemoval(removal, expectedLedgers, mutate)
   })
+
+  // Why: catalog removals run before the ledger layer joins the class chain, so the retention
+  // guard is a hook the ledger mixin overrides rather than a dependency this layer can construct.
+  protected withLedgerCatalogRemoval<T>(
+    _removal: LedgerCatalogRemovalTarget,
+    _expectedLedgers: ExpectedLedgerRevision[] | undefined,
+    mutate: () => T
+  ): Promise<LedgerCatalogRemovalResult<T>> {
+    return Promise.resolve({ result: mutate(), ledgers: [] })
+  }
 
   protected readonly repositorySparsePresets = new RuntimeRepositorySparsePresets({
     getStore: () => this.store,
