@@ -171,6 +171,9 @@
         "discussions": "open discussions",
         "policy": "repository policy",
         "unknown": "provider readiness"
+      },
+      "indicator": {
+        "tooltip": "PR Sitter · {{state}}"
       }
     }
   }

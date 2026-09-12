@@ -8,6 +8,7 @@ import { WorktreeCardPortsDetails } from './WorktreeCardPorts'
 import type { WorktreeCardPresentation } from './worktree-card-presentation'
 import { WorktreeCardSecondaryRows } from './worktree-card-secondary-rows'
 import { WorktreeCardStatusSlot } from './WorktreeCardStatusSlot'
+import { HostedReviewSitterWorktreeIndicator } from '../../fork-hosted-review-sitter/HostedReviewSitterWorktreeIndicator'
 import type { WorktreeCardController } from './use-worktree-card-controller'
 
 export function WorktreeCardParentContent({
@@ -152,6 +153,7 @@ export function WorktreeCardParentContent({
           />
         </div>
       ) : null}
+      <HostedReviewSitterWorktreeIndicator worktreeId={worktree.id} />
 
       {/* Content area */}
       <div

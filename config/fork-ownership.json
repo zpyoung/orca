@@ -259,6 +259,15 @@
       ]
     },
     {
+      "path": "src/renderer/src/components/sidebar/worktree-card-parent-content.tsx",
+      "feature": "hosted-review-sitter",
+      "kind": "registration",
+      "lines": [
+        "import { HostedReviewSitterWorktreeIndicator } from '../../fork-hosted-review-sitter/HostedReviewSitterWorktreeIndicator'",
+        "      <HostedReviewSitterWorktreeIndicator worktreeId={worktree.id} />"
+      ]
+    },
+    {
       "path": "src/renderer/src/lib/agent-launch-routing-caller-census.test.ts",
       "feature": "hosted-review-sitter",
       "kind": "registration",
@@ -3315,6 +3324,10 @@
     "src/renderer/src/components/right-sidebar/checks-panel/use-checks-panel-check-and-review-actions.tsx": {
       "added": 1,
       "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-card-parent-content.tsx": {
+      "added": 2,
+      "removed": 0
     },
     "src/renderer/src/lib/agent-launch-routing-caller-census.test.ts": {
       "added": 1,

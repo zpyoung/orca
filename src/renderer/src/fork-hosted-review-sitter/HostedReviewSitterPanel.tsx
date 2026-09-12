@@ -28,6 +28,7 @@ import type {
   HostedReviewSitterLedger,
   HostedReviewSitterProvider
 } from '../../../shared/fork-hosted-review-sitter/types'
+import { isActiveHostedReviewSitter } from './active-sitter-registry'
 import { HostedReviewSitterEnrollmentForm } from './HostedReviewSitterEnrollmentForm'
 import { HostedReviewSitterStatusContent } from './HostedReviewSitterStatusContent'
 import { hostedReviewSitterStatusLabel } from './hosted-review-sitter-format'
@@ -90,16 +91,6 @@ function sameHostedReview(
     entry.definition.repoId === repoId &&
     entry.definition.provider === reviewProvider &&
     entry.definition.reviewNumber === reviewNumber
-  )
-}
-
-function isActiveHostedReviewSitter(entry: HostedReviewSitterListEntry): boolean {
-  return (
-    entry.definition.enabled &&
-    entry.status.enabled &&
-    entry.status.state !== 'merged' &&
-    entry.status.state !== 'closed' &&
-    entry.status.state !== 'disabled'
   )
 }
 
