@@ -111,7 +111,7 @@ vi.mock('@/store', () => ({
   )
 }))
 
-vi.mock('@/lib/fix-checks-agent-launch', () => ({
+vi.mock('@/fork-hosted-review-sitter/fix-checks-agent-launch', () => ({
   startFixChecksAgent: (...args: unknown[]) => startFixChecksAgent(...args)
 }))
 

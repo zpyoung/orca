@@ -32,6 +32,7 @@ import { usePullRequestDetails } from './use-details'
 import { PullRequestPageHeader } from './header'
 import { PullRequestPageTabs } from './tabs-shell'
 import { syncPullRequestFileViewed } from './viewed-sync'
+import { HostedReviewSitterPullRequestPanel } from '../../../fork-hosted-review-sitter/HostedReviewSitterPullRequestPanel'
 
 export default function PullRequestPage({
   workItem,
@@ -344,6 +345,11 @@ export default function PullRequestPage({
           onUse={onUse}
         />
       )}
+      <HostedReviewSitterPullRequestPanel
+        workItem={workItem}
+        effectiveRepoId={effectiveRepoId}
+        attachedWorkspace={attachedWorkspace}
+      />
 
       <div className="min-h-0 flex-1">
         {error ? (

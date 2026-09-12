@@ -17,6 +17,7 @@ import { ConflictingFilesSection, MergeConflictNotice } from './conflict-summary
 import { ChecksList } from './checks-list'
 import { PRCommentsList } from './comments-list'
 import { translate } from '@/i18n/i18n'
+import { HostedReviewSitterPanel } from '../../../fork-hosted-review-sitter/HostedReviewSitterPanel'
 import type { ChecksPanelReview } from '../checks-panel-review'
 import type { ChecksPanelHostedReviewModifierDestination } from '../checks-panel-hosted-review-click-routing'
 import type { ChecksPanelActiveContentModel } from './active-content-props'
@@ -211,6 +212,7 @@ export function ChecksPanelActiveContent({
           />
         )}
       </div>
+      <HostedReviewSitterPanel model={model} />
 
       {shouldShowReviewTriageStrip && sourceControlAiActionsVisible && (
         <PRTriageStrip

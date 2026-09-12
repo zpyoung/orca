@@ -70,6 +70,8 @@ function installBeforeQuitHandler(): void {
         message: 'before-quit allowed for update install'
       })
     }
+    state.hostedReviewSitter?.stopForShutdown()
+    state.hostedReviewSitter = null
     state.isQuitting = true
     state.desktopRelayService?.fenceAndCloseNow()
     state.runtimeRpc?.setMobileRelayPairingProvider(null)

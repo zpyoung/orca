@@ -32,6 +32,7 @@ import type { SshProfileOperations } from './ssh-profile-operations'
 import type { RetiredWorktreeNamePersistence } from './retired-worktree-name-persistence'
 import type { SshLeaseRecoveryOperations } from './ssh-lease-recovery-operations'
 import type { WriteFlushBarrierOperations } from './write-flush-barriers'
+import type { HostedReviewSitterDefinitionPersistence } from '../../fork-hosted-review-sitter/definition-store'
 
 export type StoreOptions = StoreRuntimeOptions
 export type PtyBindingSourceExpectation = {
@@ -122,6 +123,7 @@ export interface Store
     SshProfileOperations,
     RetiredWorktreeNamePersistence,
     SshLeaseRecoveryOperations,
+    HostedReviewSitterDefinitionPersistence,
     WriteFlushBarrierOperations {}
 
 for (const OperationClass of STORE_DOMAIN_OPERATION_CLASSES) {

@@ -69,6 +69,8 @@ type Merged<T> = { [K in keyof T]: T[K] }
 export type PreloadApi = {
   forkSessionHandoff: ForkSessionHandoffPreloadApi
   forkSessionInfo: ForkSessionInfoApi
+  hostedReviewSitter: HostedReviewSitterApi
+  hostedReviewAgent: HostedReviewAgentApi
   app: AppApi
   orcaProfiles: OrcaProfileApi
   platform: PlatformApi
@@ -206,6 +208,10 @@ export type {
 } from './api/telemetry-api'
 import type { ForkSessionHandoffPreloadApi } from './fork-session-handoff/session-handoff-preload-api'
 import type { ForkSessionInfoApi } from './fork-session-info/session-info-preload-api'
+import type {
+  HostedReviewAgentApi,
+  HostedReviewSitterApi
+} from '../shared/fork-hosted-review-sitter/api'
 
 declare global {
   // oxlint-disable-next-line typescript-eslint/consistent-type-definitions -- declaration merging requires interface

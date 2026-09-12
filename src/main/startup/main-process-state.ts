@@ -44,6 +44,7 @@ import {
 } from '../crash-reporting/gpu-crash-fallback-decision'
 import type { GpuCrashDiagnosticsRecorder } from '../crash-reporting/gpu-crash-diagnostics'
 import { createWebContentsTimedFlag } from './web-contents-timed-flag'
+import type { HostedReviewSitterService } from '../fork-hosted-review-sitter/service'
 
 /** Mutable composition-root state shared by startup, window, serve, and quit phases. */
 export const mainProcessState = {
@@ -62,6 +63,7 @@ export const mainProcessState = {
   claudeRuntimeAuth: null as ClaudeRuntimeAuthService | null,
   runtime: null as OrcaRuntimeService | null,
   rateLimits: null as RateLimitService | null,
+  hostedReviewSitter: null as HostedReviewSitterService | null,
   runtimeRpc: null as OrcaRuntimeRpcServer | null,
   serveReadinessPublisher: new ServeReadinessPublisher(),
   desktopRelayService: null as DesktopRelayService | null,

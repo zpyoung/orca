@@ -1,0 +1,177 @@
+{
+  "fork": {
+    "hostedReviewSitter": {
+      "activeElsewhere": {
+        "one": "{{count}} sitter is active on another review.",
+        "many": "{{count}} sitters are active on other reviews."
+      },
+      "stopEffect": "Stopping prevents new actions; an in-flight provider operation may finish.",
+      "enrollment": {
+        "descriptionGitLab": "Watch this merge request and choose which actions Orca may take.",
+        "descriptionGitHub": "Watch this pull request and choose which actions Orca may take.",
+        "askAuthority": "Ask may prepare and commit fixes in this worktree; Orca waits for approval before publishing them. It also waits before triggering CI, updating the branch, or merging.",
+        "branchUpdate": "Branch update",
+        "updateMergeBase": "Merge base into branch (recommended)",
+        "updateRebase": "Rebase onto base",
+        "rebaseWarning": "Rebasing rewrites commit SHAs, may dismiss approvals, and force-pushes the rewritten branch.",
+        "mergeMethod": "Merge method",
+        "mergeDefault": "Repository default",
+        "mergeCommit": "Merge commit",
+        "mergeSquash": "Squash and merge",
+        "mergeRebase": "Rebase and merge",
+        "activeBudget": "Active-time budget (hours)",
+        "budgetHelp": "Counts only while Orca is running. Default: 4 hours.",
+        "arm": "Arm PR Sitter",
+        "reviewNotOpen": "Only an open review can be armed.",
+        "branchRequired": "A checked-out branch is required to arm PR Sitter.",
+        "worktreeUnavailable": "The worktree path is unavailable.",
+        "rearm": "Re-arm PR Sitter"
+      },
+      "error": {
+        "stopAllFailed": "PR Sitter could not stop all active sitters.",
+        "noResponse": "The PR Sitter service did not respond.",
+        "activityUnavailable": "Activity unavailable: {{error}}",
+        "launchFixFailed": "Could not start the AI agent for these checks."
+      },
+      "global": {
+        "title": "PR Sitter safety",
+        "stopAll": "Stop all PR Sitters",
+        "unavailable": "PR Sitter unavailable"
+      },
+      "unavailable": {
+        "pairedRuntime": "PR Sitter is not available for peer-hosted workspaces.",
+        "missingApi": "This Orca host does not provide the PR Sitter service.",
+        "title": "Unavailable.",
+        "noSourceWorkspace": "Link or create a source workspace for this pull request before configuring PR Sitter.",
+        "sourceRepository": "The linked source workspace repository is unavailable."
+      },
+      "title": "PR Sitter",
+      "loading": "Loading sitter status…",
+      "ledger": {
+        "loading": "Loading activity…",
+        "empty": "No activity yet.",
+        "title": "Activity ledger",
+        "preparedCommit": "Prepared commit {{sha}}",
+        "resultingHead": "Resulting head {{sha}}",
+        "rerunAccepted": "Provider accepted the re-run request",
+        "actionState": "{{action}} · {{state}}",
+        "approvedAction": "Approved {{action}}",
+        "rejectedAction": "Rejected {{action}}",
+        "head": "Head {{sha}}",
+        "discrepancyState": "{{kind}} · {{state}}",
+        "fixPublished": "Fix published for {{check}}",
+        "fixHeads": "Prepared {{preparedSha}}; resulting head {{headSha}}",
+        "activeTime": "Recorded {{duration}} active time",
+        "checkpoint": "Periodic checkpoint",
+        "paused": "Paused",
+        "shutdown": "Orca closed",
+        "reviewMerged": "Review merged",
+        "reviewClosed": "Review closed"
+      },
+      "status": {
+        "activeBudgetRemaining": "Active budget remaining",
+        "watching": "Watching",
+        "held": "Held",
+        "acting": "Acting",
+        "escalated": "Escalated",
+        "budgetExhausted": "Budget exhausted",
+        "merged": "Merged",
+        "closed": "Closed",
+        "disabled": "Stopped",
+        "waitingForGates": "Waiting for {{blockers}}.",
+        "requiredCheckFailed": "Required check failed: {{check}}.",
+        "failureUnverifiableForCheck": "The failure for {{check}} could not be verified.",
+        "fixDidNotResolve": "The same failure returned after Orca fixed {{check}}.",
+        "actionOutcomeAmbiguous": "Orca could not verify the outcome of {{action}}.",
+        "awaitingApproval": "Awaiting approval.",
+        "localChanges": "Held: local changes in the worktree.",
+        "foreignAgent": "Held: another agent is using this worktree.",
+        "contentionUnverifiable": "Held: worktree activity could not be verified.",
+        "actionInFlight": "An action is in progress.",
+        "refreshingMergeGates": "Refreshing merge gates on the current head.",
+        "checksUnverifiable": "Waiting for complete check results.",
+        "readinessUnverifiable": "Waiting for provider readiness.",
+        "mergeQueue": "Watching the review in the merge queue.",
+        "draft": "Waiting for draft status to clear.",
+        "budgetExhaustedReason": "The active-time budget was exhausted.",
+        "approvalRejected": "The current action was rejected.",
+        "abandonedFix": "A fix session stopped with uncommitted work.",
+        "ambiguousAction": "A provider action may have completed, but Orca could not verify it.",
+        "repeatedFailure": "The same failure returned after an Orca-authored fix.",
+        "failureUnverifiable": "The reproduced failure could not be verified safely.",
+        "discrepancyEscalated": "A review problem needs a person.",
+        "conflictResolutionDisabled": "Merge conflicts need a person because conflict resolution is off.",
+        "capabilityOff": "The required action is disabled by this sitter policy.",
+        "identityMismatch": "The provider review no longer matches this sitter.",
+        "reviewClosedReason": "The review is no longer open.",
+        "alreadyCompleted": "The current action was already completed.",
+        "conflictsDetected": "Merge conflicts were detected.",
+        "queueEjected": "The review was removed from the merge queue.",
+        "resolved": "The earlier problem is no longer present.",
+        "approved": "Approved.",
+        "stoppedReason": "PR Sitter is stopped."
+      },
+      "action": {
+        "head": "Head",
+        "commit": "Commit",
+        "approve": "Approve this action",
+        "rerunCheck": "Re-run failed check",
+        "prepareFix": "Prepare check fix",
+        "publishFix": "Publish check fix",
+        "prepareConflictResolution": "Prepare conflict resolution",
+        "publishConflictResolution": "Publish conflict resolution",
+        "updateBranch": "Update branch",
+        "merge": "Merge review",
+        "enqueue": "Enter merge queue"
+      },
+      "stopCurrent": "Stop this sitter",
+      "actionState": {
+        "attempted": "Attempted",
+        "running": "Running",
+        "completed": "Completed",
+        "failed": "Failed"
+      },
+      "discrepancy": {
+        "checkFailure": "Check failure",
+        "mergeConflict": "Merge conflict",
+        "queueEjected": "Merge queue ejection",
+        "fixDidNotResolve": "Fix did not resolve failure",
+        "ambiguousAction": "Ambiguous action",
+        "unverifiableFailure": "Unverifiable failure",
+        "awaitingApproval": "Awaiting approval"
+      },
+      "discrepancyStatus": {
+        "open": "Open",
+        "acknowledged": "Acknowledged",
+        "resolved": "Resolved",
+        "escalated": "Escalated"
+      },
+      "capability": {
+        "updateBranch": "Update branch",
+        "resolveConflicts": "Resolve conflicts",
+        "fixChecks": "Fix checks",
+        "merge": "Merge"
+      },
+      "capabilityMode": {
+        "off": "Off",
+        "gated": "Ask",
+        "on": "On"
+      },
+      "duration": {
+        "minutes": "{{minutes}}m",
+        "hours": "{{hours}}h",
+        "hoursMinutes": "{{hours}}h {{minutes}}m"
+      },
+      "blocker": {
+        "approvals": "approvals",
+        "checks": "checks",
+        "behind": "branch update",
+        "conflicts": "conflicts",
+        "draft": "draft status",
+        "discussions": "open discussions",
+        "policy": "repository policy",
+        "unknown": "provider readiness"
+      }
+    }
+  }
+}

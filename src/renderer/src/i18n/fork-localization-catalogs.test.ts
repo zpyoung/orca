@@ -1,73 +1,57 @@
+import i18next from 'i18next'
 import { describe, expect, it, vi } from 'vitest'
+
+vi.mock('../fork-hosted-review-sitter/localization-catalog', () => ({
+  hostedReviewSitterCatalogs: {
+    en: {
+      'fork.hostedReviewSitter.fixture.immediate': 'sitter English',
+      'fork.hostedReviewSitter.fixture.override': 'sitter English override'
+    },
+    es: {
+      'fork.hostedReviewSitter.fixture.lazy': 'sitter Spanish',
+      'fork.hostedReviewSitter.fixture.override': 'sitter Spanish override'
+    },
+    ja: {},
+    ko: {},
+    zh: {}
+  }
+}))
 
 import { registerForkLocalizationCatalogs } from './fork-localization-catalogs'
 
 describe('registerForkLocalizationCatalogs', () => {
-  it('merges English immediately and a lazy locale when i18next loads it', () => {
-    const addResourceBundle = vi.fn()
-    let loaded: ((resources: Record<string, Record<string, unknown>>) => void) | undefined
-    const i18n = {
-      addResourceBundle,
-      on: vi.fn(
-        (
-          _event: string,
-          listener: (resources: Record<string, Record<string, unknown>>) => void
-        ) => {
-          loaded = listener
-          return i18n
+  it('merges immediate and lazy fork catalogs without replacing unrelated resources', async () => {
+    const instance = i18next.createInstance()
+    await instance.init({
+      lng: 'en',
+      fallbackLng: false,
+      resources: {
+        en: {
+          translation: {
+            'consumer.existing': 'existing English',
+            'fork.hostedReviewSitter.fixture.override': 'upstream English'
+          }
+        },
+        es: {
+          translation: {
+            'consumer.existing': 'existing Spanish',
+            'fork.hostedReviewSitter.fixture.override': 'upstream Spanish'
+          }
         }
-      )
-    }
+      }
+    })
 
-    registerForkLocalizationCatalogs(i18n)
+    registerForkLocalizationCatalogs(instance)
 
-    const englishCatalogs = addResourceBundle.mock.calls
-      .filter(([language]) => language === 'en')
-      .map(([, , catalog]) => catalog)
-    expect(englishCatalogs).toHaveLength(13)
-    expect(englishCatalogs).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          components: expect.objectContaining({
-            'native-chat': expect.objectContaining({ state: expect.any(Object) })
-          })
-        }),
-        expect.objectContaining({
-          components: expect.objectContaining({
-            agentSessionContinuation: expect.objectContaining({
-              forkSessionHandoff: expect.any(Object)
-            })
-          })
-        }),
-        expect.objectContaining({
-          components: expect.objectContaining({
-            settings: expect.objectContaining({ forkSessionHandoff: expect.any(Object) })
-          })
-        }),
-        expect.objectContaining({ auto: expect.any(Object) }),
-        expect.objectContaining({ 'fork.sessionInfo.title': expect.any(String) })
-      ])
-    )
+    expect(instance.t('fork.hostedReviewSitter.fixture.immediate')).toBe('sitter English')
+    expect(instance.t('fork.hostedReviewSitter.fixture.override')).toBe('sitter English override')
+    expect(instance.t('consumer.existing')).toBe('existing English')
 
-    loaded?.({ es: { translation: true } })
-    const spanishCatalogs = addResourceBundle.mock.calls
-      .filter(([language]) => language === 'es')
-      .map(([, , catalog]) => catalog)
-    expect(spanishCatalogs).toHaveLength(13)
-    expect(spanishCatalogs).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ components: expect.any(Object) }),
-        expect.objectContaining({
-          forkSessionHandoff: expect.objectContaining({ lineage: expect.any(Object) })
-        }),
-        expect.objectContaining({
-          components: expect.objectContaining({
-            settings: expect.objectContaining({ forkSessionHandoff: expect.any(Object) })
-          })
-        }),
-        expect.objectContaining({ auto: expect.any(Object) }),
-        expect.objectContaining({ 'fork.sessionInfo.title': expect.any(String) })
-      ])
-    )
+    await instance.changeLanguage('es')
+    instance.emit('loaded', { es: { translation: true } })
+
+    expect(instance.t('fork.hostedReviewSitter.fixture.lazy')).toBe('sitter Spanish')
+    expect(instance.t('fork.hostedReviewSitter.fixture.override')).toBe('sitter Spanish override')
+    expect(instance.t('consumer.existing')).toBe('existing Spanish')
   })
 })

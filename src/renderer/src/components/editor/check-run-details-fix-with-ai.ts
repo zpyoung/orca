@@ -10,7 +10,7 @@ import {
 } from './check-run-details-fix-context'
 import { openSourceControlAiSettingsTarget } from '@/components/right-sidebar/source-control-ai-settings-navigation'
 import { getConnectionId } from '@/lib/connection-context'
-import { startFixChecksAgent } from '@/lib/fix-checks-agent-launch'
+import { startFixChecksAgent } from '@/fork-hosted-review-sitter/fix-checks-agent-launch'
 import { readSourceControlLaunchRecipeAgentId } from '@/lib/source-control-launch-agent-selection'
 import { resolveSourceControlLaunchPlatform } from '@/lib/source-control-launch-platform'
 import { useAppStore } from '@/store'

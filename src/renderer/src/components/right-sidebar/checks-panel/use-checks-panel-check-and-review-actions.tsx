@@ -9,7 +9,7 @@ import {
 } from '../../pr-checks-fix-prompt'
 
 import { loadGitLabJobLogDetails } from '@/runtime/gitlab-job-trace-client'
-import { startFixChecksAgent } from '@/lib/fix-checks-agent-launch'
+import { startFixChecksAgent } from '@/fork-hosted-review-sitter/fix-checks-agent-launch'
 import { openChecksPanelHostedReviewUrl } from '../checks-panel-hosted-review-click-routing'
 import { isMacPlatform } from '../../terminal-pane/terminal-link-open-hints'
 import { translate } from '@/i18n/i18n'

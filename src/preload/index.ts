@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { buildForkSessionHandoffApi } from './fork-session-handoff/session-handoff-preload-api'
 import { buildForkSessionInfoApi } from './fork-session-info/session-info-preload-api'
+import { buildHostedReviewSitterApi } from './fork-hosted-review-sitter/hosted-review-sitter-preload-api'
+import { buildHostedReviewAgentApi } from './fork-hosted-review-sitter/hosted-review-agent-preload-api'
 import type { PreloadApi } from './api-types'
 import {
   installBrowserFindListener,
@@ -103,6 +105,8 @@ const telemetryGetConsentStateApi: PreloadApi['telemetryGetConsentState'] = () =
 const api = {
   forkSessionHandoff: buildForkSessionHandoffApi(),
   forkSessionInfo: buildForkSessionInfoApi(),
+  hostedReviewSitter: buildHostedReviewSitterApi(),
+  hostedReviewAgent: buildHostedReviewAgentApi(),
   app: appApi,
   orcaProfiles: orcaProfilesApi,
   platform: platformApi,

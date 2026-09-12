@@ -54,6 +54,12 @@ export function registerGitHandlers(
   dispatcher.onRequest('git.rebaseFromBase', (p, context) =>
     handlers.sync.rebaseFromBase(p, context)
   )
+  dispatcher.onRequest('git.pushHostedReviewCommit', (p, context) =>
+    handlers.sync.hostedReviewSitter.pushCommit(p, context)
+  )
+  dispatcher.onRequest('git.hostedReviewBranchUpdate', (p, context) =>
+    handlers.sync.hostedReviewSitter.updateBranch(p, context)
+  )
   dispatcher.onRequest('git.branchDiff', (p, context) => handlers.objectDiff.branchDiff(p, context))
   dispatcher.onRequest('git.commitDiff', (p, context) => handlers.objectDiff.commitDiff(p, context))
   dispatcher.onRequest('git.listWorktrees', (p, context) =>

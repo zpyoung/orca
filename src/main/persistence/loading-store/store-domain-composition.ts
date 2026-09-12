@@ -63,6 +63,10 @@ import {
   SshLeaseRecoveryOperations,
   installSshLeaseRecoveryOperationsContext
 } from './ssh-lease-recovery-operations'
+import {
+  HostedReviewSitterDefinitionPersistence,
+  installHostedReviewSitterDefinitionPersistenceContext
+} from '../../fork-hosted-review-sitter/definition-store'
 
 export type StoreDomains = {
   adaptation: LoadedStateAdaptationOperations
@@ -87,6 +91,7 @@ export type StoreDomains = {
   sshProfiles: SshProfileOperations
   retiredWorktreeNames: RetiredWorktreeNamePersistence
   sshLeases: SshLeaseRecoveryOperations
+  hostedReviewSitters: HostedReviewSitterDefinitionPersistence
 }
 
 export const STORE_DOMAIN_OPERATION_CLASSES = [
@@ -105,6 +110,7 @@ export const STORE_DOMAIN_OPERATION_CLASSES = [
   SshProfileOperations,
   RetiredWorktreeNamePersistence,
   SshLeaseRecoveryOperations,
+  HostedReviewSitterDefinitionPersistence,
   WriteFlushBarrierOperations
 ] as const
 
@@ -125,6 +131,7 @@ export function installStoreDomainContexts(target: object, domains: StoreDomains
   installRetiredWorktreeNamePersistenceContext(target, domains.retiredWorktreeNames)
   installSshLeaseRecoveryOperationsContext(target, domains.sshLeases)
   installWriteFlushBarrierOperationsContext(target, domains.flushBarriers)
+  installHostedReviewSitterDefinitionPersistenceContext(target, domains.hostedReviewSitters)
 }
 
 export function createStoreDomains(runtime: StoreRuntimeState): StoreDomains {
@@ -151,6 +158,7 @@ export function createStoreDomains(runtime: StoreRuntimeState): StoreDomains {
   const automations = new AutomationPersistence(runtime, flushBarriers, preferences)
   const mobileTabSelections = new MobileTabSelectionPersistence(runtime, scheduling)
   const sparsePresets = new SparsePresetPersistence(runtime, scheduling)
+  const hostedReviewSitters = new HostedReviewSitterDefinitionPersistence(runtime, scheduling)
   const ptyBindings = new PtyBindingPersistenceOperations(runtime, sessions)
   const sshProfiles = new SshProfileOperations(runtime, scheduling, flushBarriers, repos)
   const retiredWorktreeNames = new RetiredWorktreeNamePersistence(runtime, scheduling)
@@ -182,6 +190,7 @@ export function createStoreDomains(runtime: StoreRuntimeState): StoreDomains {
     ptyBindings,
     sshProfiles,
     retiredWorktreeNames,
-    sshLeases
+    sshLeases,
+    hostedReviewSitters
   }
 }
