@@ -82,12 +82,14 @@ export function useAskPanelFocus(
       }
       return
     }
-    if (restoreOpenRef.current === null) {
+    // `false` is the only value this hook ever stores, so it is also the only one it undoes —
+    // anything else means it is not holding a restore target and must not touch the sidebar.
+    if (restoreOpenRef.current !== false) {
       return
     }
     // Picking a tab hands the sidebar back to the user, open state included. Only an ask that
     // cleared on its own gets to undo the open this hook forced.
-    if (restoreOpenRef.current === false && !userOwnsSidebarRef.current) {
+    if (!userOwnsSidebarRef.current) {
       setRightSidebarOpen(false)
     }
     setAskFocusRestoreOpen(null)

@@ -66,3 +66,10 @@ Reviewed every 2 weeks. Use `/quirk:artifacts:test-skip` to append.
 - **Edge cases to cover**: Raise the per-test budget to something the sandbox container can meet, or cache/parallelize the AST scan; then confirm it passes in a --shards=16 --jobs=8 full run, not only in isolation.
 - **Priority**: P3
 
+
+## TEST-8: tabs-terminal-dock's host-mirror assertions flake in isolation, not just under load
+- **File under test**: src/renderer/src/store/slices/fork-terminal-dock/tabs-terminal-dock.test.ts
+- **Test type**: unit
+- **Reason skipped**: flaky — the `terminal dock state` cases that `vi.waitFor` on `setWebRuntimeTabPropsMock` fail intermittently at `--shards=1 --jobs=1` with no competing work. Measured on the remote sandbox: 2 of 3 runs failed at e57ecedc8f, and 3 of 3 failed on a throwaway worktree at 0dfa466215, which predates the right-sidebar ask work entirely. Failing more often on the older tree rules out the ask changes as the cause. Distinct from TEST-1 (contention-only) and TEST-7 (deterministic budget miss): this one fails at minimum concurrency and is not reproducible on demand.
+- **Edge cases to cover**: Find what the waitFor is racing — most likely the mirror dispatch is scheduled off a timer or microtask the test does not drive — and await that seam instead of polling the mock. Then run the file 10x at --shards=1 to confirm the flake is gone.
+- **Priority**: P2
