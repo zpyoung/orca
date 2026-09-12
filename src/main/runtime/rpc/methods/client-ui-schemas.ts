@@ -38,6 +38,7 @@ const STATIC_RIGHT_SIDEBAR_TABS = [
   'search',
   'vault',
   'session-info',
+  'ask',
   'workspaces',
   'pr-checks',
   'source-control',

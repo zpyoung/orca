@@ -58,3 +58,18 @@ Reviewed every 2 weeks. Use `/quirk:artifacts:test-skip` to append.
 - **Reason skipped**: environment — vitest cannot run on this machine (sandbox-only lane) and this worktree has no `ORCA_SANDBOX_DOCKER_HOST` configured, so a new test file could not be executed before landing. `sidebarSectionSeparatorClass` is a pure predicate over `(settings, row, index, context)` and is cheap to cover once a runner is reachable; the fork convention already puts fork tests beside fork code, so the file has an obvious home. Nothing in CI currently fails if a suppression rule regresses.
 - **Edge cases to cover**: setting disabled returns no class; the first header in the list gets no separator; a header immediately beneath a host header gets none; the pinned sticky-header branch returns none; nested headers (`projectGroupDepth > 0`) get none; a top-level header after a normal row does get the hairline; the collapsed-Pinned case (`followsCollapsedPinnedHeader`) pins whichever behavior is decided to be intended
 - **Priority**: P3
+
+## TEST-7: no-top-level-translate times out deterministically in the remote sandbox
+- **File under test**: src/renderer/src/i18n/no-top-level-translate.test.ts
+- **Test type**: unit
+- **Reason skipped**: environment — the test walks every renderer .ts/.tsx and builds a TypeScript AST per file under an explicit 15_000ms budget. In the remote Docker sandbox it takes 39s with the ask-card changes applied and 62s on clean HEAD with them reverted, so it times out on every run even at --shards=4 --only=2 with no competing shards. Distinct from TEST-1: that class is intermittent under worker-pool contention, while this fails at minimum concurrency and is slower without the diff than with it — a budget-vs-host mismatch, not the diff.
+- **Edge cases to cover**: Raise the per-test budget to something the sandbox container can meet, or cache/parallelize the AST scan; then confirm it passes in a --shards=16 --jobs=8 full run, not only in isolation.
+- **Priority**: P3
+
+
+## TEST-8: tabs-terminal-dock's host-mirror assertions flake in isolation, not just under load
+- **File under test**: src/renderer/src/store/slices/fork-terminal-dock/tabs-terminal-dock.test.ts
+- **Test type**: unit
+- **Reason skipped**: flaky — the `terminal dock state` cases that `vi.waitFor` on `setWebRuntimeTabPropsMock` fail intermittently at `--shards=1 --jobs=1` with no competing work. Measured on the remote sandbox: 2 of 3 runs failed at e57ecedc8f, and 3 of 3 failed on a throwaway worktree at 0dfa466215, which predates the right-sidebar ask work entirely. Failing more often on the older tree rules out the ask changes as the cause. Distinct from TEST-1 (contention-only) and TEST-7 (deterministic budget miss): this one fails at minimum concurrency and is not reproducible on demand.
+- **Edge cases to cover**: Find what the waitFor is racing — most likely the mirror dispatch is scheduled off a timer or microtask the test does not drive — and await that seam instead of polling the mock. Then run the file 10x at --shards=1 to confirm the flake is gone.
+- **Priority**: P2

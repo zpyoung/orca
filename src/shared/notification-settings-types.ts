@@ -21,7 +21,7 @@ export type NotificationSettings = {
   customSoundVolume: number
 }
 
-export type NotificationEventSource = 'agent-task-complete' | 'terminal-bell' | 'test'
+export type NotificationEventSource = 'agent-task-complete' | 'terminal-bell' | 'pending-ask' | 'test'
 
 export type NotificationDispatchRequest = {
   source: NotificationEventSource
@@ -43,6 +43,11 @@ export type NotificationDispatchRequest = {
   agentToolInput?: string
   agentLastAssistantMessage?: string
   agentInterrupted?: boolean
+  /** Read only for source 'pending-ask', whose text is built in the renderer so it goes
+   *  through translate(). Every other source must leave these unset: it builds its own
+   *  title/body in buildNotificationOptions, which does not read these fields at all. */
+  title?: string
+  body?: string
 }
 
 export type NotificationDispatchResult = {

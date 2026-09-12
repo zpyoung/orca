@@ -1,4 +1,5 @@
 import type { CommandSpec } from '../args'
+import { ASK_COMMAND_SPECS } from '../fork-ask-question-tool/specs'
 import { ACCOUNT_COMMAND_SPECS } from './account'
 import { BROWSER_ADVANCED_COMMAND_SPECS } from './browser-advanced'
 import { BROWSER_BASIC_COMMAND_SPECS } from './browser-basic'
@@ -21,6 +22,7 @@ import { LEDGER_COMMAND_SPECS } from './ledger'
 
 export const COMMAND_SPECS: CommandSpec[] = [
   ...CORE_COMMAND_SPECS,
+  ...ASK_COMMAND_SPECS,
   ...ARTIFACT_COMMAND_SPECS,
   ...ACCOUNT_COMMAND_SPECS,
   ...PROJECT_COMMAND_SPECS,

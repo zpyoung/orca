@@ -141,3 +141,27 @@ entries' IDs; manual edits to fix typos are fine.
 - **Severity**: medium
 - **Resolved (2026-09-11)**: the hook now memoizes per instance through useShallow and re-keys `now` on the shared minute clock while a time-based window is active; the non-hook selector is pure and reads the clock on every call.
 
+## BUG-16: ask-services pulls electron into the node-only runtime graph, failing pnpm lint
+- **Observed**: 2026-08-31
+- **File**: src/main/fork-ask-question-tool/ask-services.ts:21
+- **Description**: check:runtime-electron-ratchet fails on the branch as committed (8d1dd7eb0e): 'src/main/fork-ask-question-tool/ask-services.ts' is a new module reachable from the Orca runtime that imports electron, via the lazy require('electron') for app.getPath('userData'). The ratchet is static, so the lazy require does not exempt it. pnpm lint aborts at that gate, so the four localization/skill verifiers after it never run in a single lint invocation, and PR CI will fail. Reproduced independently of any working-tree change (clean HEAD).
+- **Severity**: high
+- **Proposed fix**: Route the userData path through a port in src/main/host/ (the ratchet's prescribed escape) so ask-services depends on the port instead of electron, or move the db-path resolution out of the runtime import graph.
+- **Resolved (2026-09-12)**: ask-services resolves the db path through the shared `getAppEnvironment()` port instead of requiring electron; the ratchet gate passes.
+
+## BUG-17: AskPendingCountBadge is never mounted, so the pending-ask count is unobservable
+- **Observed**: 2026-09-11
+- **File**: src/renderer/src/components/fork-ask-question-tool/AskPendingCountBadge.tsx:21
+- **Description**: The badge component and its unit test exist and pass, but a repo-wide grep for AskPendingCountBadge and selectPendingAskCount finds no render site outside the component and its own test. The 'badge the count' half of commit 7cb8a3b837 therefore ships dead: no surface in the app ever displays the cross-pane pending-ask count, and manual testing cannot observe it.
+- **Introduced by**: 7cb8a3b837
+- **Severity**: medium
+- **Proposed fix**: Mount it in the sidebar worktree row / tab header alongside the other per-worktree indicators, declared as a fork seam in config/fork-ownership.json.
+
+
+## BUG-18: two ask e2e tests fail on a clean baseline, so the lane never proved the answer path
+- **Observed**: 2026-09-11
+- **File**: tests/e2e/ask-card.spec.ts:214
+- **Description**: 'answering resolves the blocked wait and collapses the card' and 'restores a pending ask with its partial draft intact after a renderer remount' both fail under `--project=electron-headless`. Confirmed pre-existing: they fail identically on a throwaway worktree at 0dfa466215, which still has the old terminal-pane dock and none of the right-sidebar work. In the first, the card renders and Submit is clicked (verified in the failure screenshot: field filled, footer visible) but `installAskRpcRecorder`'s poll never sees an `ask.answer` call — consistent with `window.api` being a frozen contextBridge object, so the `window.api.runtime.call = ...` reassignment silently no-ops. The remaining four tests in the file pass. Matches the AGENTS.md note that the e2e lane "has not been run anywhere yet".
+- **Severity**: medium
+- **Proposed fix**: Record RPC calls through a seam the renderer reads at call time rather than reassigning a contextBridge property — e.g. expose a test-only hook on `window.__store` or wrap at the preload boundary under an env flag. Then re-check the remount test, which may share the same cause.
+- **Resolved (2026-09-12)**: both tests now register a real ask over `ask.register` and assert the registry's own answered event and persisted draft, so nothing reassigns the frozen contextBridge API.

@@ -6,6 +6,7 @@ import { updateViewportForClient } from './terminal-viewport-update'
 import { watchSubscriptionLifetime } from './terminal-input-delivery'
 import type { TerminalSubscriptionArgs } from './terminal-legacy-subscription-types'
 import { allocateTerminalSubscriptionStreamId } from './terminal-subscription-stream-id'
+import { untrackAskSurfacePaneSubscription } from '../../../../fork-ask-question-tool/ask-attached-surface-roster'
 
 export async function runTerminalLeaseSubscription(args: TerminalSubscriptionArgs): Promise<void> {
   const { params, runtime, connectionId, signal, emit, ptyId, clientId } = args
@@ -25,6 +26,7 @@ export async function runTerminalLeaseSubscription(args: TerminalSubscriptionArg
     () => {
       stopWatchingLifetime()
       closed = true
+      untrackAskSurfacePaneSubscription(runtime, connectionId, params.terminal)
       runtime.handleMobileUnsubscribe(ptyId, clientId)
       emit({ type: 'end' })
       resolveStream()
@@ -92,6 +94,7 @@ export async function runTerminalJsonSubscription(args: TerminalSubscriptionArgs
     () => {
       stopWatchingLifetime()
       closed = true
+      untrackAskSurfacePaneSubscription(runtime, connectionId, params.terminal)
       outputBatcher?.flush()
       outputBatcher?.dispose()
       unsubscribeData()

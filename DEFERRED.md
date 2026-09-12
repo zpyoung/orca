@@ -96,3 +96,10 @@ Reviewed every sprint planning. Use `/quirk:artifacts:defer` to append.
 - **Estimated effort**: L
 - **Priority**: P2
 - **Proposed owner**: project-ledger feature owner
+## DEFER-11: AskUserQuestion suppression does not reach SSH-remote Claude launches
+- **Deferred**: 2026-09-11
+- **Session context**: wiring tech.md C6 so the suppression gate actually feeds launch composition
+- **Why deferred**: the verdict is a version read of the binary the launch will run, and for a remote launch that binary lives on the far host. Main can only run fixed relay RPCs there (`mux.request('preflight.detectAgents', …)`), so probing `claude --version` needs a new method — a wire-compatibility change that has to be capability-negotiated per `docs/reference/remote-wire-compatibility.md`, because an older host silently drops what it does not know. A remote launch therefore resolves to `'pending'`: no flags injected, no captured command stripped, byte-identical to today. The gate already keys SSH hosts by provider identity (`AskGateHostKey`), so the remaining work is the probe channel plus threading the explicit verdict at the launch sites that know their connection id.
+- **Estimated effort**: M
+- **Priority**: P3
+- **Proposed owner**: ask-question-tool feature owner

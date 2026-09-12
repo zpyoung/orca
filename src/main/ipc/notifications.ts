@@ -130,10 +130,15 @@ export function registerNotificationHandlers(store: Store, runtime?: OrcaRuntime
         return { delivered: false, reason: 'source-disabled' }
       }
 
-      const notificationOptions = buildNotificationOptions(args)
+      // pending-ask text already ran through translate() in the renderer; skip rebuilding it here
+      const notificationOptions =
+        args.source === 'pending-ask' && args.title && args.body
+          ? { title: args.title, body: args.body }
+          : buildNotificationOptions(args)
 
       // Why: desktop focus only means this computer sees the worktree; the paired phone may still need the alert.
-      if (runtime && args.source !== 'test') {
+      // no mobile push for pending asks in v1
+      if (runtime && args.source !== 'test' && args.source !== 'pending-ask') {
         const dedupeKey = args.worktreeId ?? args.worktreeLabel ?? 'global'
         if (reserveNotificationCooldown(recentMobileNotifications, dedupeKey, Date.now())) {
           runtime.dispatchMobileNotification({

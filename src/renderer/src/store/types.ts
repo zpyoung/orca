@@ -43,6 +43,7 @@ import type { NewIssueDraftSlice } from './slices/new-issue-draft'
 import type { TaskCreationDraftsSlice } from './slices/task-creation-drafts'
 import type { RemoteServerUpdatesSlice } from './slices/remote-server-updates'
 import type { TerminalQuickCommandHostsSlice } from './slices/terminal-quick-command-hosts'
+import type { AsksSlice } from './slices/fork-ask-question-tool/asks'
 import type { LedgerSlice } from './slices/ledger'
 
 export type AppState = RepoSlice &
@@ -88,4 +89,5 @@ export type AppState = RepoSlice &
   TaskCreationDraftsSlice &
   RemoteServerUpdatesSlice &
   TerminalQuickCommandHostsSlice &
-  LedgerSlice
+  LedgerSlice &
+  AsksSlice

@@ -23,6 +23,11 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     load: async () => (await import('./handlers/account.js')).ACCOUNT_HANDLERS
   },
   {
+    name: 'ask',
+    keys: ['ask', 'ask wait', 'ask cancel'],
+    load: async () => (await import('./fork-ask-question-tool/handlers.js')).ASK_HANDLERS
+  },
+  {
     name: 'artifacts',
     keys: [
       'artifacts list',

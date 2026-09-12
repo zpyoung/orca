@@ -38,6 +38,24 @@
       ]
     },
     {
+      "name": "orca-ask",
+      "sourcePath": "skills/orca-ask",
+      "releaseRevision": 1,
+      "packageDigest": "077d3ebec8860f9557282b6abb5ffa9f197933fc165f3ef2242c3344550baac0",
+      "gitTreeSha": "dfc8dcb2fbb9ba204c77a3bd0e8a80d414152fef",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "size": 3497,
+          "executable": false,
+          "classification": "text",
+          "exactSha256": "1539e71fceafbb06881e5d61d5806dc69390d462318edbd477137fcabfc086de",
+          "textNormalizedSha256": "1539e71fceafbb06881e5d61d5806dc69390d462318edbd477137fcabfc086de",
+          "identitySha256": "1539e71fceafbb06881e5d61d5806dc69390d462318edbd477137fcabfc086de"
+        }
+      ]
+    },
+    {
       "name": "orca-cli",
       "sourcePath": "skills/orca-cli",
       "releaseRevision": 5,

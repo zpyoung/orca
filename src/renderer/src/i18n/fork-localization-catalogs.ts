@@ -74,6 +74,11 @@ import reviewFiltersES from '../components/sidebar/fork-workspace-review-filters
 import reviewFiltersJA from '../components/sidebar/fork-workspace-review-filters/locales/ja.json'
 import reviewFiltersKO from '../components/sidebar/fork-workspace-review-filters/locales/ko.json'
 import reviewFiltersZH from '../components/sidebar/fork-workspace-review-filters/locales/zh.json'
+import askQuestionToolEN from '../components/fork-ask-question-tool/locales/en.json'
+import askQuestionToolES from '../components/fork-ask-question-tool/locales/es.json'
+import askQuestionToolJA from '../components/fork-ask-question-tool/locales/ja.json'
+import askQuestionToolKO from '../components/fork-ask-question-tool/locales/ko.json'
+import askQuestionToolZH from '../components/fork-ask-question-tool/locales/zh.json'
 
 type ForkLocale = 'en' | 'es' | 'ja' | 'ko' | 'zh'
 type ForkCatalog = Record<string, unknown>
@@ -107,7 +112,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     sessionInfoEN,
     artifactPasswordsEN,
     activityWindowEN,
-    reviewFiltersEN
+    reviewFiltersEN,
+    askQuestionToolEN
   ],
   es: [
     relayES,
@@ -124,7 +130,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     sessionInfoES,
     artifactPasswordsES,
     activityWindowES,
-    reviewFiltersES
+    reviewFiltersES,
+    askQuestionToolES
   ],
   ja: [
     relayJA,
@@ -141,7 +148,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     sessionInfoJA,
     artifactPasswordsJA,
     activityWindowJA,
-    reviewFiltersJA
+    reviewFiltersJA,
+    askQuestionToolJA
   ],
   ko: [
     relayKO,
@@ -158,7 +166,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     sessionInfoKO,
     artifactPasswordsKO,
     activityWindowKO,
-    reviewFiltersKO
+    reviewFiltersKO,
+    askQuestionToolKO
   ],
   zh: [
     relayZH,
@@ -175,7 +184,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     sessionInfoZH,
     artifactPasswordsZH,
     activityWindowZH,
-    reviewFiltersZH
+    reviewFiltersZH,
+    askQuestionToolZH
   ]
 }
 

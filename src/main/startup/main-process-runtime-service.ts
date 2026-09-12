@@ -1,4 +1,4 @@
-import { app } from 'electron'
+import { app, ipcMain } from 'electron'
 import { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { getLocalPtyProvider, getSshPtyProvider, clearProviderPtyState } from '../ipc/pty'
 import { agentHookServer } from '../agent-hooks/server'
@@ -16,6 +16,9 @@ import { getPreferredPairingOffer } from '../../shared/runtime-environments'
 import { fingerprintOrchestrationPeer } from '../runtime/orchestration/environment-transport'
 import { callRuntimeEnvironment } from '../ipc/runtime-environment-transport-routing'
 import { mainProcessState as state } from './main-process-state'
+import { forwardAskEventsToRenderer } from '../fork-ask-question-tool/ask-ipc-forward'
+import { startClaudeSuppressionVerdictPublisher } from '../fork-ask-question-tool/claude-suppression-verdict-publisher'
+import { getDashboardPopoutWindow } from '../window/dashboard-popout-window'
 import { prepareCodexRuntimeHomeForLaunch } from './codex-launch-preparation'
 import type { RuntimeDesktopWindowStatus } from '../../shared/runtime-types'
 import { ArtifactCloudService } from '../artifacts/fork-artifact-passwords/artifact-password-cloud-service'
@@ -129,6 +132,16 @@ export function initializeMainProcessRuntime(): OrcaRuntimeService {
   agentHookServer.subscribeEnrichedStatus((enriched) =>
     recordObservedAgentStatusPaneIdentity(observedPaneIdentities, enriched.paneKey, runtime)
   )
+  forwardAskEventsToRenderer(
+    runtime.getAskServices().registry,
+    () => state.mainWindow,
+    getDashboardPopoutWindow
+  )
+  startClaudeSuppressionVerdictPublisher({
+    store,
+    ipcMain,
+    getWindows: () => [state.mainWindow, getDashboardPopoutWindow()]
+  })
   // Why before anything can attach: a client host that reattaches to a restarted runtime is only
   // handed its pages back if the runtime found them first.
   runtime.rehydrateClientHostedBrowserPages()
