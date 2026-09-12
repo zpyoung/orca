@@ -18,6 +18,7 @@ describe('web preload API composition', () => {
     installWebPreloadApi()
 
     expect(Object.keys(globals.window.api)).toEqual([
+      'ledger',
       'app',
       'starNag',
       'platform',

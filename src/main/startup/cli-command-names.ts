@@ -40,6 +40,7 @@ export const CLI_COMMAND_NAMES = [
   'intercept',
   'is',
   'keypress',
+  'ledger',
   'linear',
   'mouse',
   'network',
