@@ -95,17 +95,17 @@
       "name": "orca-ledger",
       "sourcePath": "skills/orca-ledger",
       "releaseRevision": 1,
-      "packageDigest": "3e88e8bb67be11dc12e2415e407c09c055c4bcef3cf82d8549630ffafc65fcb2",
-      "gitTreeSha": "241e774fcaa86f1be764afe0f02c2865b94fa61f",
+      "packageDigest": "c5dd4cda2c3463d3f3af9633c5faaf63b9c7b62340612deb0cb0215b5cc35ea6",
+      "gitTreeSha": "c36a4e8681a136746c00e7aed3dab7779da5f1bc",
       "files": [
         {
           "path": "SKILL.md",
-          "size": 3194,
+          "size": 3179,
           "executable": false,
           "classification": "text",
-          "exactSha256": "446962c22285dd22bc71255b1776af5938cad27843e2db6d2a38e0c71e2f6d70",
-          "textNormalizedSha256": "446962c22285dd22bc71255b1776af5938cad27843e2db6d2a38e0c71e2f6d70",
-          "identitySha256": "446962c22285dd22bc71255b1776af5938cad27843e2db6d2a38e0c71e2f6d70"
+          "exactSha256": "c419852107ef8be2d9d9322f4049c29f1237b9963b89b24c4e112b3bb954373c",
+          "textNormalizedSha256": "c419852107ef8be2d9d9322f4049c29f1237b9963b89b24c4e112b3bb954373c",
+          "identitySha256": "c419852107ef8be2d9d9322f4049c29f1237b9963b89b24c4e112b3bb954373c"
         }
       ]
     },

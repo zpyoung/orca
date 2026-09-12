@@ -181,7 +181,7 @@ export function mutateLedgerEntry(
     }
     const targetSnapshot = historySnapshot(target)
     for (const field of editableFields[entry.type]) {
-      if (Object.prototype.hasOwnProperty.call(targetSnapshot.content, field)) {
+      if (Object.hasOwn(targetSnapshot.content, field)) {
         content[field] = cloneLedger(targetSnapshot.content[field])
       } else {
         delete content[field]

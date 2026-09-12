@@ -82,6 +82,40 @@
       "name": "workspace-review-filters",
       "purpose": "Adds persisted workspace review filters for completed pull requests and passing checks across sidebar and workspace views.",
       "globs": ["**/fork-workspace-review-filters/**"]
+    },
+    {
+      "name": "project-ledger",
+      "purpose": "Records typed project and group engineering observations (bug, deferred item, test gap, proposal, decision) in a durable profile-side ledger reachable from the CLI, the desktop UI, and the local and remote runtimes.",
+      "globs": [
+        "skills/orca-ledger/**",
+        "skill-guides/orca-ledger.md",
+        "skill-stubs/orca-ledger.md",
+        "src/cli/handlers/ledger*.ts",
+        "src/cli/ledger-flag-help.ts",
+        "src/cli/specs/ledger.ts",
+        "src/main/ipc/ledger.ts",
+        "src/main/ipc/repos/ledger-removal-guard.ts",
+        "src/main/ledger/**",
+        "src/main/runtime/orca-runtime-ledger.ts",
+        "src/main/runtime/rpc/ledger-ui-attestation*.ts",
+        "src/main/runtime/rpc/methods/ledger.ts",
+        "src/main/runtime/runtime-ledger-catalog-removal.ts",
+        "src/main/ssh/ssh-remote-ledger-cli.ts",
+        "src/preload/api/ledger-*.ts",
+        "src/renderer/src/components/ledger/**",
+        "src/renderer/src/components/right-sidebar/ledger-panel-*.ts",
+        "src/renderer/src/components/right-sidebar/LedgerPanel*.tsx",
+        "src/renderer/src/components/right-sidebar/use-ledger-owner-name.ts",
+        "src/renderer/src/components/settings/repository-ledger-search-entries.ts",
+        "src/renderer/src/components/settings/RepositoryLedgerSection*.tsx",
+        "src/renderer/src/runtime/runtime-ledger-*.ts",
+        "src/renderer/src/store/repos/ledger-removal-conflict.ts",
+        "src/renderer/src/store/slices/ledger.ts",
+        "src/renderer/src/store/slices/ui/ui-slice-contract-ledger-page.ts",
+        "src/renderer/src/store/slices/ui/ui-slice-ledger-page-actions.ts",
+        "src/renderer/src/web/web-ledger-api.ts",
+        "src/shared/ledger*.ts"
+      ]
     }
   ],
   "seams": [
@@ -3545,11 +3579,11 @@
       "removed": 0
     },
     "src/main/ipc/register-core-handlers/register-core-handlers.test.ts": {
-      "added": 8,
+      "added": 12,
       "removed": 0
     },
     "src/main/ipc/register-core-handlers/register-core-handlers.ts": {
-      "added": 4,
+      "added": 6,
       "removed": 0
     },
     "src/main/ipc/ssh-relay-session-callbacks.ts": {
@@ -3621,8 +3655,8 @@
       "removed": 1
     },
     "src/main/persistence/applying-settings/ui-selection-normalization.ts": {
-      "added": 1,
-      "removed": 0
+      "added": 3,
+      "removed": 1
     },
     "src/main/persistence/tracking-repos/project-group-operations.ts": {
       "added": 2,
@@ -3657,11 +3691,11 @@
       "removed": 4
     },
     "src/main/runtime/rpc/methods/client-ui-schemas.ts": {
-      "added": 5,
-      "removed": 0
+      "added": 9,
+      "removed": 2
     },
     "src/main/runtime/rpc/methods/index.ts": {
-      "added": 2,
+      "added": 4,
       "removed": 0
     },
     "src/main/runtime/rpc/methods/native-chat.test.ts": {
@@ -3745,7 +3779,7 @@
       "removed": 1
     },
     "src/preload/api-types.ts": {
-      "added": 5,
+      "added": 7,
       "removed": 0
     },
     "src/preload/api/native-chat-api.ts": {
@@ -3993,12 +4027,12 @@
       "removed": 2
     },
     "src/renderer/src/components/right-sidebar/right-sidebar-panel-content.tsx": {
-      "added": 2,
+      "added": 6,
       "removed": 0
     },
     "src/renderer/src/components/right-sidebar/use-right-sidebar-activity-items.ts": {
-      "added": 7,
-      "removed": 0
+      "added": 14,
+      "removed": 1
     },
     "src/renderer/src/components/settings/ExperimentalPane.test.tsx": {
       "added": 31,
@@ -4037,8 +4071,8 @@
       "removed": 50
     },
     "src/renderer/src/components/sidebar/WorktreeList.tsx": {
-      "added": 24,
-      "removed": 12
+      "added": 56,
+      "removed": 14
     },
     "src/renderer/src/components/sidebar/comment-markdown-element-renderers.tsx": {
       "added": 6,
@@ -4061,7 +4095,7 @@
       "removed": 6
     },
     "src/renderer/src/components/sidebar/worktree-list/drag/drop-commit-context.ts": {
-      "added": 6,
+      "added": 3,
       "removed": 1
     },
     "src/renderer/src/components/sidebar/worktree-list/drag/groups.ts": {
@@ -4077,7 +4111,7 @@
       "removed": 0
     },
     "src/renderer/src/components/sidebar/worktree-list/drag/use-drop-commit-context.ts": {
-      "added": 8,
+      "added": 7,
       "removed": 1
     },
     "src/renderer/src/components/sidebar/worktree-list/drag/use-pointer-drag.ts": {
@@ -4121,7 +4155,7 @@
       "removed": 0
     },
     "src/renderer/src/components/sidebar/worktree-list/rows/SectionHeader.tsx": {
-      "added": 13,
+      "added": 21,
       "removed": 1
     },
     "src/renderer/src/components/sidebar/worktree-list/rows/item-row.tsx": {
@@ -4133,11 +4167,11 @@
       "removed": 1
     },
     "src/renderer/src/components/sidebar/worktree-list/viewport/viewport-props.ts": {
-      "added": 4,
+      "added": 6,
       "removed": 0
     },
     "src/renderer/src/components/sidebar/worktree-list/viewport/virtual-row-context.ts": {
-      "added": 3,
+      "added": 5,
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/TerminalContextMenu.test.tsx": {
@@ -4401,8 +4435,8 @@
       "removed": 1
     },
     "src/renderer/src/store/right-sidebar-route.ts": {
-      "added": 1,
-      "removed": 0
+      "added": 3,
+      "removed": 1
     },
     "src/renderer/src/store/slices/tabs/create-tabs-slice.ts": {
       "added": 7,
@@ -4433,7 +4467,7 @@
       "removed": 0
     },
     "src/shared/cli-argument-boundary.ts": {
-      "added": 1,
+      "added": 2,
       "removed": 0
     },
     "src/shared/default-global-settings.ts": {
@@ -4449,7 +4483,7 @@
       "removed": 0
     },
     "src/shared/keybindings/types.ts": {
-      "added": 2,
+      "added": 3,
       "removed": 0
     },
     "src/shared/local-build-compatibility-contract.json": {
@@ -4513,7 +4547,7 @@
       "removed": 0
     },
     "src/shared/ui-chrome-types.ts": {
-      "added": 1,
+      "added": 3,
       "removed": 0
     },
     "src/shared/workspace-session-schema.test.ts": {
@@ -4581,7 +4615,7 @@
       "removed": 0
     },
     "src/preload/index.ts": {
-      "added": 4,
+      "added": 6,
       "removed": 0
     },
     "src/renderer/src/components/native-chat/NativeChatMessageList.tsx": {
@@ -4673,7 +4707,7 @@
       "removed": 0
     },
     "src/renderer/src/store/slices/ui.ts": {
-      "added": 14,
+      "added": 16,
       "removed": 4
     },
     "src/renderer/src/store/slices/worktrees/session/set-active-folder-workspace.ts": {

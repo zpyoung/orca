@@ -106,7 +106,7 @@ export function parseLedgerImportSources(
   if (ambiguous.size) {
     for (const anchor of ambiguous) {
       const index = records.findIndex((record) => record.anchor === anchor)
-      if (index >= 0) {
+      if (index !== -1) {
         records.splice(index, 1)
       }
       if (!skipped.some((skip) => skip.anchor === anchor && skip.reason.includes('duplicate'))) {

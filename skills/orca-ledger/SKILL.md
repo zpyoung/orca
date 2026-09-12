@@ -3,9 +3,9 @@ name: orca-ledger
 description: >-
   Use Orca's ledger CLI through `orca ledger ...` commands to keep a durable,
   typed record of engineering observations on a project or group: file a bug,
-  deferred item, test gap, proposal, or decision with `orca ledger file --type
-  <type> ...`, list and show entries with their revision and history, edit
-  content or change lifecycle state under an optimistic `--if-revision <n>`
+  deferred item, test gap, proposal, or decision with `orca ledger file
+  --type`, list and show entries with their revision and history, edit
+  content or change lifecycle state under an optimistic `--if-revision`
   precondition, revert to an earlier revision, triage what is unreviewed or
   stale with `orca ledger review --json`, and pull legacy BUGS.md,
   DEFERRED.md, TEST_BACKLOG.md, proposals.md, and docs/adr files in with

@@ -34,9 +34,17 @@ export const OXLINT_SCANS = [
 const SUPPRESSED_REACT_DOCTOR_DIAGNOSTICS = new Map([
   [
     'react-doctor(no-adjust-state-on-prop-change)',
+    // The ledger surfaces below reset a draft and re-hydrate from runtime IPC when the
+    // selected entry, owner scope, or panel visibility changes. An inline disable cannot
+    // cover them: react-doctor lives only in config/oxlint-react-doctor.json, so the
+    // directive reads as unused under the root-config scan in this same gate.
     new Set([
       'src/renderer/src/components/use-task-page-github-issue-draft.ts',
-      'src/renderer/src/components/use-task-page-jira-creation-state.ts'
+      'src/renderer/src/components/use-task-page-jira-creation-state.ts',
+      'src/renderer/src/components/ledger/LedgerEntryDetail.tsx',
+      'src/renderer/src/components/ledger/LedgerEntryForm.tsx',
+      'src/renderer/src/components/ledger/LedgerTriagePanel.tsx',
+      'src/renderer/src/components/right-sidebar/LedgerPanel.tsx'
     ])
   ],
   [

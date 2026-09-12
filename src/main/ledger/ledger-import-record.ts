@@ -67,7 +67,7 @@ export function applyLedgerImportRecord(
 
   const nextContent = cloneValue(entry.content)
   for (const key of Object.keys(baseline)) {
-    if (!Object.prototype.hasOwnProperty.call(source.content, key)) {
+    if (!Object.hasOwn(source.content, key)) {
       delete nextContent[key]
     }
   }

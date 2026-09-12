@@ -153,7 +153,7 @@ export function entryId(ctx: HandlerContext): string {
   const commandIndex = raw.findIndex(
     (arg) => arg === 'show' || arg === 'edit' || arg === 'state' || arg === 'revert'
   )
-  const value = commandIndex >= 0 ? raw[commandIndex + 1] : undefined
+  const value = commandIndex !== -1 ? raw[commandIndex + 1] : undefined
   if (value && !value.startsWith('--')) {
     return value
   }
