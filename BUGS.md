@@ -133,3 +133,11 @@ entries' IDs; manual edits to fix typos are fine.
 - **Introduced by**: the fork's `.zyNN` version-suffix scheme, which postdates the upstream pattern
 - **Severity**: low
 - **Proposed fix**: Widen the pattern to accept an optional `.zyNN` identifier (`/^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+(\.[0-9A-Za-z]+)?$/`) and cover it with a case in the script's tests. Verify `verifyRequiredReleaseAssets` still refuses an artifact-less draft before relying on it.
+
+## BUG-15: PR Sitter French locale never loads
+- **Observed**: 2026-09-12
+- **File**: src/renderer/src/fork-hosted-review-sitter/localization-catalog.ts:8
+- **Description**: locales/fr.json exists on disk and 'fr' is a live app locale (src/renderer/src/i18n/i18n.ts:30 registers fr: () => import('./locales/fr.json')), but localization-catalog.ts imports only en/es/ja/ko/zh and exports hostedReviewSitterCatalogs = { en, es, ja, ko, zh }. French users silently get English fallback for every PR Sitter string. Nothing catches it: verify:localization-coverage passes because it checks for hardcoded strings, not catalog wiring.
+- **Severity**: low
+- **Proposed fix**: Add 'import fr from ./locales/fr.json' and include fr in the exported hostedReviewSitterCatalogs object. Consider a test asserting the catalog key set matches the locales/ directory listing, so the next added locale cannot silently miss.
+

@@ -15,8 +15,7 @@ import type {
   HostedReviewMergeMethod,
   HostedReviewSitterCapabilities,
   HostedReviewSitterCapability,
-  HostedReviewSitterCapabilityMode,
-  HostedReviewSitterProvider
+  HostedReviewSitterCapabilityMode
 } from '../../../shared/fork-hosted-review-sitter/types'
 import {
   hostedReviewSitterCapabilityLabel,
@@ -73,7 +72,6 @@ function CapabilityControl({
 }
 
 export type HostedReviewSitterEnrollmentFormProps = {
-  provider: HostedReviewSitterProvider
   capabilities: HostedReviewSitterCapabilities
   branchUpdateMode: HostedReviewBranchUpdateMode
   mergeMethod: 'default' | HostedReviewMergeMethod
@@ -91,7 +89,6 @@ export type HostedReviewSitterEnrollmentFormProps = {
 }
 
 export function HostedReviewSitterEnrollmentForm({
-  provider,
   capabilities,
   branchUpdateMode,
   mergeMethod,
@@ -136,17 +133,6 @@ export function HostedReviewSitterEnrollmentForm({
           </p>
         </div>
       ) : null}
-      <p className="text-[11px] leading-relaxed text-muted-foreground">
-        {provider === 'gitlab'
-          ? translate(
-              'fork.hostedReviewSitter.enrollment.descriptionGitLab',
-              'Watch this merge request and choose which actions Orca may take.'
-            )
-          : translate(
-              'fork.hostedReviewSitter.enrollment.descriptionGitHub',
-              'Watch this pull request and choose which actions Orca may take.'
-            )}
-      </p>
       <div className="space-y-1.5">
         {CAPABILITIES.map((capability) => (
           <CapabilityControl

@@ -1,6 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Bot, Loader2 } from 'lucide-react'
+import { Bot, ChevronRight, Loader2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from '@/components/ui/dialog'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
@@ -128,6 +136,7 @@ function HostedReviewSitterPanelContent({
   const [mutationError, setMutationError] = useState<string | null>(null)
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [ledgerOpen, setLedgerOpen] = useState(false)
+  const [configOpen, setConfigOpen] = useState(false)
   const [capabilities, setCapabilities] = useState<HostedReviewSitterCapabilities>({
     ...DEFAULT_CAPABILITIES
   })
@@ -192,6 +201,7 @@ function HostedReviewSitterPanelContent({
     setMergeMethod('default')
     setActiveBudgetHours(DEFAULT_ACTIVE_BUDGET_HOURS)
     setLedgerOpen(false)
+    setConfigOpen(false)
     if (!api || !supportedProvider) {
       return
     }
@@ -313,85 +323,115 @@ function HostedReviewSitterPanelContent({
 
   return (
     <section
-      className="border-b border-border bg-muted/10 px-3 py-3"
+      className="border-b border-border bg-muted/10 px-3 py-2"
       aria-label={translate('fork.hostedReviewSitter.title', 'PR Sitter')}
     >
-      <div className="flex items-center gap-2">
-        <Bot className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-        <span className="text-xs font-medium text-foreground">
-          {translate('fork.hostedReviewSitter.title', 'PR Sitter')}
-        </span>
-        {currentEntry ? (
-          <Badge variant={statusIsError ? 'destructive' : 'outline'} className="h-5 text-[10px]">
-            {hostedReviewSitterStatusLabel(currentEntry.status.state)}
-          </Badge>
-        ) : null}
-      </div>
+      <Dialog open={configOpen} onOpenChange={setConfigOpen}>
+        <DialogTrigger asChild>
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            <Bot className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+            <span className="text-xs font-medium text-foreground">
+              {translate('fork.hostedReviewSitter.title', 'PR Sitter')}
+            </span>
+            {currentEntry ? (
+              <Badge
+                variant={statusIsError ? 'destructive' : 'outline'}
+                className="h-5 text-[10px]"
+              >
+                {hostedReviewSitterStatusLabel(currentEntry.status.state)}
+              </Badge>
+            ) : null}
+            {entries === null && !unavailableReason ? (
+              <Loader2 className="size-3 shrink-0 animate-spin text-muted-foreground" aria-hidden />
+            ) : null}
+            <ChevronRight className="ml-auto size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          </button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{translate('fork.hostedReviewSitter.title', 'PR Sitter')}</DialogTitle>
+            <DialogDescription>
+              {reviewProvider === 'gitlab'
+                ? translate(
+                    'fork.hostedReviewSitter.enrollment.descriptionGitLab',
+                    'Watch this merge request and choose which actions Orca may take.'
+                  )
+                : translate(
+                    'fork.hostedReviewSitter.enrollment.descriptionGitHub',
+                    'Watch this pull request and choose which actions Orca may take.'
+                  )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="scrollbar-sleek max-h-[60vh] overflow-y-auto">
+            {unavailableReason ? (
+              <div
+                className="mt-2 rounded-md border border-border bg-background/60 px-2.5 py-2 text-[11px] leading-relaxed text-muted-foreground"
+                role="status"
+              >
+                <span className="font-medium text-foreground">
+                  {translate('fork.hostedReviewSitter.unavailable.title', 'Unavailable.')}
+                </span>{' '}
+                {unavailableReason}
+              </div>
+            ) : entries === null ? (
+              <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <Loader2 className="size-3 animate-spin" aria-hidden />
+                {translate('fork.hostedReviewSitter.loading', 'Loading sitter status…')}
+              </div>
+            ) : (
+              <>
+                {currentEntry ? (
+                  <HostedReviewSitterStatusContent
+                    status={currentEntry.status}
+                    ledger={ledger}
+                    ledgerOpen={ledgerOpen}
+                    busy={busyAction !== null}
+                    stopping={busyAction === 'stop'}
+                    approving={busyAction === 'approve'}
+                    canApprove={canApprove}
+                    active={currentEntryIsActive}
+                    onLedgerOpenChange={setLedgerOpen}
+                    onStop={stopCurrent}
+                    onApprove={approveCurrentAction}
+                  />
+                ) : null}
+                {!currentEntryIsActive ? (
+                  <HostedReviewSitterEnrollmentForm
+                    capabilities={capabilities}
+                    branchUpdateMode={branchUpdateMode}
+                    mergeMethod={mergeMethod}
+                    activeBudgetHours={activeBudgetHours}
+                    activeElsewhereCount={activeEntries.length}
+                    blockedReason={armBlockedReason}
+                    busy={busyAction !== null}
+                    arming={busyAction === 'arm'}
+                    rearming={currentEntry !== null}
+                    onCapabilitiesChange={setCapabilities}
+                    onBranchUpdateModeChange={setBranchUpdateMode}
+                    onMergeMethodChange={setMergeMethod}
+                    onActiveBudgetHoursChange={setActiveBudgetHours}
+                    onArm={arm}
+                  />
+                ) : null}
+              </>
+            )}
 
-      {unavailableReason ? (
-        <div
-          className="mt-2 rounded-md border border-border bg-background/60 px-2.5 py-2 text-[11px] leading-relaxed text-muted-foreground"
-          role="status"
-        >
-          <span className="font-medium text-foreground">
-            {translate('fork.hostedReviewSitter.unavailable.title', 'Unavailable.')}
-          </span>{' '}
-          {unavailableReason}
-        </div>
-      ) : entries === null ? (
-        <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <Loader2 className="size-3 animate-spin" aria-hidden />
-          {translate('fork.hostedReviewSitter.loading', 'Loading sitter status…')}
-        </div>
-      ) : (
-        <>
-          {currentEntry ? (
-            <HostedReviewSitterStatusContent
-              status={currentEntry.status}
-              ledger={ledger}
-              ledgerOpen={ledgerOpen}
-              busy={busyAction !== null}
-              stopping={busyAction === 'stop'}
-              approving={busyAction === 'approve'}
-              canApprove={canApprove}
-              active={currentEntryIsActive}
-              onLedgerOpenChange={setLedgerOpen}
-              onStop={stopCurrent}
-              onApprove={approveCurrentAction}
-            />
-          ) : null}
-          {!currentEntryIsActive ? (
-            <HostedReviewSitterEnrollmentForm
-              provider={reviewProvider}
-              capabilities={capabilities}
-              branchUpdateMode={branchUpdateMode}
-              mergeMethod={mergeMethod}
-              activeBudgetHours={activeBudgetHours}
-              activeElsewhereCount={activeEntries.length}
-              blockedReason={armBlockedReason}
-              busy={busyAction !== null}
-              arming={busyAction === 'arm'}
-              rearming={currentEntry !== null}
-              onCapabilitiesChange={setCapabilities}
-              onBranchUpdateModeChange={setBranchUpdateMode}
-              onMergeMethodChange={setMergeMethod}
-              onActiveBudgetHoursChange={setActiveBudgetHours}
-              onArm={arm}
-            />
-          ) : null}
-        </>
-      )}
-
-      {mutationError ? (
-        <div className="mt-2 text-[10px] leading-relaxed text-destructive" role="alert">
-          {mutationError}
-        </div>
-      ) : null}
-      {serviceError && entries !== null ? (
-        <div className="mt-2 text-[10px] leading-relaxed text-destructive" role="alert">
-          {serviceError}
-        </div>
-      ) : null}
+            {mutationError ? (
+              <div className="mt-2 text-[10px] leading-relaxed text-destructive" role="alert">
+                {mutationError}
+              </div>
+            ) : null}
+            {serviceError && entries !== null ? (
+              <div className="mt-2 text-[10px] leading-relaxed text-destructive" role="alert">
+                {serviceError}
+              </div>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   )
 }
