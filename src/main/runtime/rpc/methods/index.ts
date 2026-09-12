@@ -45,6 +45,7 @@ import { UPDATER_METHODS } from './updater'
 import { AGENT_SESSION_METHODS } from './agent-session'
 import { STRUCTURED_AGENT_SESSION_METHODS } from './structured-agent-session'
 import { ARTIFACT_METHODS } from './artifacts'
+import { LEDGER_METHODS } from './ledger'
 import { ARTIFACT_PASSWORD_METHODS } from './fork-artifact-passwords/artifact-password-methods'
 import { AGENT_HOOK_METHODS } from './agent-hooks'
 import { ASK_METHODS } from './fork-ask-question-tool/ask'
@@ -57,6 +58,7 @@ export const ALL_RPC_METHODS: readonly RpcAnyMethod[] = [
   ...AGENT_HOOK_METHODS,
   ...AI_VAULT_METHODS,
   ...ARTIFACT_METHODS,
+  ...LEDGER_METHODS,
   ...ARTIFACT_PASSWORD_METHODS,
   ...ASK_METHODS,
   ...AUTOMATION_METHODS,

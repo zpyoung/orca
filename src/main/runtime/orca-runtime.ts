@@ -1,9 +1,9 @@
 import { installRuntimeLinearCommandSurface } from './runtime-linear-command-surface'
-import { OrcaRuntimeWithResolveWaiter } from './orca-runtime-resolve-waiter'
+import { OrcaRuntimeWithLedger } from './orca-runtime-ledger'
 import type { RuntimeCommandSurfaceHost } from './orca-runtime-core'
 import { askServicesFor, type AskServices } from '../fork-ask-question-tool/ask-services'
 
-class OrcaRuntimeService extends OrcaRuntimeWithResolveWaiter {
+class OrcaRuntimeService extends OrcaRuntimeWithLedger {
   getAskServices(): AskServices {
     return askServicesFor(this, () => Boolean(this.getAvailableAuthoritativeWindow()))
   }

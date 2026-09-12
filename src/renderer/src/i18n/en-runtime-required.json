@@ -2744,6 +2744,24 @@
       "map": "Agent Map"
     }
   },
+  "ledger": {
+    "chooser": {
+      "summary_one": "{{tier}} · {{count}} entry",
+      "summary_other": "{{tier}} · {{count}} entries"
+    },
+    "controls": {
+      "summary_one": "{{tier}} · {{count}} entry · revision {{revision}}",
+      "summary_other": "{{tier}} · {{count}} entries · revision {{revision}}"
+    },
+    "detail": {
+      "revisionCount_one": "{{count}} revision",
+      "revisionCount_other": "{{count}} revisions"
+    },
+    "retention": {
+      "summary_one": "{{entryCount}} entries across {{count}} ledger will be retained and detached as needed.",
+      "summary_other": "{{entryCount}} entries across {{count}} ledgers will be retained and detached as needed."
+    }
+  },
   "runtimeRpc": {
     "startupFailure": {
       "guidance": {

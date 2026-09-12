@@ -4,6 +4,12 @@ import type { Repo } from '../../shared/repo-types'
 import { invalidateAuthorizedRootsCache } from '../ipc/filesystem-auth'
 import { prepareLocalWorktreeRootForRepo } from '../worktree-root-preparation'
 import type { RuntimeStore } from './runtime-store-contract'
+import {
+  markDetachedLedgers,
+  type DetachedLedgerRemoval,
+  type ExpectedLedgerRevision,
+  type LedgerCatalogRemoval
+} from './runtime-ledger-catalog-removal'
 
 type RuntimeRepositorySettingsDependencies = {
   getStore: () => RuntimeStore | null
@@ -12,6 +18,7 @@ type RuntimeRepositorySettingsDependencies = {
   invalidateResolvedWorktrees: () => void
   invalidateWorktreeScan: (repoId: string) => void
   notifyReposChanged: () => void
+  withCatalogRemoval?: LedgerCatalogRemoval
 }
 
 type RepositoryUpdates = Partial<
@@ -100,7 +107,10 @@ export class RuntimeRepositorySettingsController {
     return updated
   }
 
-  async remove(repoSelector: string): Promise<{ removed: true }> {
+  async remove(
+    repoSelector: string,
+    options?: { expectedLedgers?: ExpectedLedgerRevision[] }
+  ): Promise<{ removed: true; ledgers?: DetachedLedgerRemoval[] }> {
     const store = this.deps.getStore()
     if (!store?.removeProject) {
       throw new Error('runtime_unavailable')
@@ -110,20 +120,29 @@ export class RuntimeRepositorySettingsController {
     const idExistsOnOtherHost = store
       .getRepos()
       .some((entry) => entry.id === repo.id && getRepoExecutionHostId(entry) !== hostId)
-    if (idExistsOnOtherHost) {
-      if (!store.removeProjectForHost) {
-        throw new Error('runtime_unavailable')
+    const operation = (): true => {
+      if (idExistsOnOtherHost) {
+        if (!store.removeProjectForHost) {
+          throw new Error('runtime_unavailable')
+        }
+        store.removeProjectForHost(repo.id, hostId)
+      } else {
+        store.removeProject!(repo.id)
       }
-      store.removeProjectForHost(repo.id, hostId)
-    } else {
-      store.removeProject(repo.id)
+      return true
     }
+    const removed = this.deps.withCatalogRemoval
+      ? await this.deps.withCatalogRemoval({ repoId: repo.id }, options?.expectedLedgers, operation)
+      : { result: operation(), ledgers: [] }
     this.deps.forgetTerminalTopology(repo.id)
     this.deps.invalidateResolvedWorktrees()
     this.deps.invalidateWorktreeScan(repo.id)
     invalidateAuthorizedRootsCache()
     this.deps.notifyReposChanged()
-    return { removed: true }
+    return {
+      removed: true,
+      ...(removed.ledgers.length ? { ledgers: markDetachedLedgers(removed.ledgers) } : {})
+    }
   }
 
   reorder(orderedIds: string[]): { status: 'applied' | 'rejected' } {

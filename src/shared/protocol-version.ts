@@ -221,6 +221,7 @@ export const ELECTRON_REMOTE_RUNTIME_CLIENT_CAPABILITIES = [
 ] as const
 
 export const RUNTIME_CAPABILITIES = [
+  'ledger.v1',
   'runtime.status.compat.v1',
   'runtime.environments.v1',
   REMOTE_RUNTIME_SHARED_CONTROL_CAPABILITY,

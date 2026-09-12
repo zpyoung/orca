@@ -137,6 +137,10 @@ const {
 vi.mock('electron', () => ({
   app: {
     getPath: getPathMock
+  },
+  ipcMain: {
+    handle: vi.fn(),
+    removeHandler: vi.fn()
   }
 }))
 

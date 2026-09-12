@@ -93,6 +93,40 @@
       "name": "workspace-review-filters",
       "purpose": "Adds persisted workspace review filters for completed pull requests and passing checks across sidebar and workspace views.",
       "globs": ["**/fork-workspace-review-filters/**"]
+    },
+    {
+      "name": "project-ledger",
+      "purpose": "Records typed project and group engineering observations (bug, deferred item, test gap, proposal, decision) in a durable profile-side ledger reachable from the CLI, the desktop UI, and the local and remote runtimes.",
+      "globs": [
+        "skills/orca-ledger/**",
+        "skill-guides/orca-ledger.md",
+        "skill-stubs/orca-ledger.md",
+        "src/cli/handlers/ledger*.ts",
+        "src/cli/ledger-flag-help.ts",
+        "src/cli/specs/ledger.ts",
+        "src/main/ipc/ledger.ts",
+        "src/main/ipc/repos/ledger-removal-guard.ts",
+        "src/main/ledger/**",
+        "src/main/runtime/orca-runtime-ledger.ts",
+        "src/main/runtime/rpc/ledger-ui-attestation*.ts",
+        "src/main/runtime/rpc/methods/ledger.ts",
+        "src/main/runtime/runtime-ledger-catalog-removal.ts",
+        "src/main/ssh/ssh-remote-ledger-cli.ts",
+        "src/preload/api/ledger-*.ts",
+        "src/renderer/src/components/ledger/**",
+        "src/renderer/src/components/right-sidebar/ledger-panel-*.ts",
+        "src/renderer/src/components/right-sidebar/LedgerPanel*.tsx",
+        "src/renderer/src/components/right-sidebar/use-ledger-owner-name.ts",
+        "src/renderer/src/components/settings/repository-ledger-search-entries.ts",
+        "src/renderer/src/components/settings/RepositoryLedgerSection*.tsx",
+        "src/renderer/src/runtime/runtime-ledger-*.ts",
+        "src/renderer/src/store/repos/ledger-removal-conflict.ts",
+        "src/renderer/src/store/slices/ledger.ts",
+        "src/renderer/src/store/slices/ui/ui-slice-contract-ledger-page.ts",
+        "src/renderer/src/store/slices/ui/ui-slice-ledger-page-actions.ts",
+        "src/renderer/src/web/web-ledger-api.ts",
+        "src/shared/ledger*.ts"
+      ]
     }
   ],
   "seams": [
@@ -2578,7 +2612,7 @@
       "kind": "registration",
       "lines": [
         "import { askServicesFor, type AskServices } from '../fork-ask-question-tool/ask-services'",
-        "class OrcaRuntimeService extends OrcaRuntimeWithResolveWaiter {",
+        "class OrcaRuntimeService extends OrcaRuntimeWithLedger {",
         "  getAskServices(): AskServices {",
         "    return askServicesFor(this, () => Boolean(this.getAvailableAuthoritativeWindow()))"
       ]
@@ -2702,7 +2736,6 @@
       "kind": "registration",
       "lines": [
         "import { createAsksSlice } from './slices/fork-ask-question-tool/asks'",
-        "        ...createTerminalQuickCommandHostsSlice(...a),",
         "        ...createAsksSlice(...a)"
       ]
     },
@@ -2712,7 +2745,6 @@
       "kind": "registration",
       "lines": [
         "import { createAsksSlice } from './fork-ask-question-tool/asks'",
-        "    ...createTerminalQuickCommandHostsSlice(...a),",
         "    ...createAsksSlice(...a)"
       ]
     },
@@ -2722,7 +2754,6 @@
       "kind": "registration",
       "lines": [
         "import type { AsksSlice } from './slices/fork-ask-question-tool/asks'",
-        "  TerminalQuickCommandHostsSlice &",
         "  AsksSlice"
       ]
     },
@@ -3849,7 +3880,7 @@
       "removed": 9
     },
     "config/scripts/generate-bundled-skill-guides.mjs": {
-      "added": 3,
+      "added": 6,
       "removed": 0
     },
     "config/scripts/mac-build-compatibility.test.mjs": {
@@ -3873,7 +3904,7 @@
       "removed": 0
     },
     "src/cli/args.ts": {
-      "added": 2,
+      "added": 3,
       "removed": 0
     },
     "src/cli/artifact-format.ts": {
@@ -3881,11 +3912,11 @@
       "removed": 7
     },
     "src/cli/bundled-skill-guides.ts": {
-      "added": 11,
+      "added": 22,
       "removed": 0
     },
     "src/cli/handler-group-manifest.ts": {
-      "added": 5,
+      "added": 19,
       "removed": 0
     },
     "src/cli/handlers/artifacts.ts": {
@@ -3893,7 +3924,7 @@
       "removed": 1
     },
     "src/cli/root-help-text-primary.ts": {
-      "added": 5,
+      "added": 15,
       "removed": 0
     },
     "src/cli/root-help-text-secondary.ts": {
@@ -3905,8 +3936,8 @@
       "removed": 2
     },
     "src/cli/specs/index.ts": {
-      "added": 2,
-      "removed": 0
+      "added": 5,
+      "removed": 1
     },
     "src/main/agent-hooks/server/server-lifecycle.ts": {
       "added": 2,
@@ -3965,11 +3996,11 @@
       "removed": 0
     },
     "src/main/ipc/register-core-handlers/register-core-handlers.test.ts": {
-      "added": 8,
+      "added": 12,
       "removed": 0
     },
     "src/main/ipc/register-core-handlers/register-core-handlers.ts": {
-      "added": 4,
+      "added": 6,
       "removed": 0
     },
     "src/main/ipc/ssh-relay-session-callbacks.ts": {
@@ -4041,7 +4072,15 @@
       "removed": 1
     },
     "src/main/persistence/applying-settings/ui-selection-normalization.ts": {
-      "added": 2,
+      "added": 4,
+      "removed": 1
+    },
+    "src/main/persistence/applying-settings/ui-state-read.ts": {
+      "added": 6,
+      "removed": 0
+    },
+    "src/main/persistence/applying-settings/ui-state-update.ts": {
+      "added": 7,
       "removed": 0
     },
     "src/main/persistence/tracking-repos/project-group-operations.ts": {
@@ -4052,9 +4091,17 @@
       "added": 8,
       "removed": 0
     },
+    "src/main/providers/ssh-pty-provider.ts": {
+      "added": 4,
+      "removed": 0
+    },
     "src/main/rate-limits/service/service-fetch-policy.ts": {
       "added": 7,
       "removed": 6
+    },
+    "src/main/runtime/mobile-session-terminal-projection.ts": {
+      "added": 12,
+      "removed": 0
     },
     "src/main/runtime/orca-runtime-close-headless-mobile-terminal-tab.ts": {
       "added": 17,
@@ -4068,24 +4115,36 @@
       "added": 79,
       "removed": 4
     },
+    "src/main/runtime/orca-runtime-publish-pty-backed-mobile-session-terminal.ts": {
+      "added": 11,
+      "removed": 0
+    },
+    "src/main/runtime/orca-runtime-runtime-id.ts": {
+      "added": 8,
+      "removed": 0
+    },
     "src/main/runtime/orca-runtime-sync-mobile-session-tabs.ts": {
       "added": 18,
       "removed": 2
     },
     "src/main/runtime/orca-runtime.ts": {
-      "added": 6,
-      "removed": 1
+      "added": 7,
+      "removed": 2
     },
     "src/main/runtime/rpc/methods/artifacts.ts": {
       "added": 6,
       "removed": 4
     },
+    "src/main/runtime/rpc/methods/client-ui-pairing-local-fields.test.ts": {
+      "added": 5,
+      "removed": 1
+    },
     "src/main/runtime/rpc/methods/client-ui-schemas.ts": {
-      "added": 6,
-      "removed": 0
+      "added": 10,
+      "removed": 2
     },
     "src/main/runtime/rpc/methods/index.ts": {
-      "added": 4,
+      "added": 6,
       "removed": 0
     },
     "src/main/runtime/rpc/methods/native-chat.test.ts": {
@@ -4136,6 +4195,10 @@
       "added": 2,
       "removed": 2
     },
+    "src/main/runtime/runtime-mobile-session-projection.ts": {
+      "added": 1,
+      "removed": 0
+    },
     "src/main/runtime/runtime-rpc/runtime-rpc-lifecycle.ts": {
       "added": 7,
       "removed": 1
@@ -4165,7 +4228,7 @@
       "removed": 0
     },
     "src/main/startup/cli-command-names.ts": {
-      "added": 1,
+      "added": 2,
       "removed": 0
     },
     "src/main/startup/main-process-account-services.ts": {
@@ -4197,7 +4260,7 @@
       "removed": 1
     },
     "src/preload/api-types.ts": {
-      "added": 15,
+      "added": 17,
       "removed": 0
     },
     "src/preload/api/native-chat-api.ts": {
@@ -4221,7 +4284,7 @@
       "removed": 0
     },
     "src/preload/index.ts": {
-      "added": 6,
+      "added": 8,
       "removed": 0
     },
     "src/relay/relay-runtime-services.ts": {
@@ -4232,6 +4295,14 @@
       "added": 1,
       "removed": 1
     },
+    "src/renderer/src/app-shell/AppBackgroundServices.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/app-shell/use-persisted-ui-writer.ts": {
+      "added": 4,
+      "removed": 0
+    },
     "src/renderer/src/assets/main.css": {
       "added": 1,
       "removed": 0
@@ -4239,10 +4310,6 @@
     "src/renderer/src/assets/terminal.css": {
       "added": 19,
       "removed": 1
-    },
-    "src/renderer/src/app-shell/AppBackgroundServices.tsx": {
-      "added": 2,
-      "removed": 0
     },
     "src/renderer/src/components/artifacts/ArtifactDetailHeader.tsx": {
       "added": 3,
@@ -4304,6 +4371,14 @@
       "added": 201,
       "removed": 277
     },
+    "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.test.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.tsx": {
+      "added": 1,
+      "removed": 1
+    },
     "src/renderer/src/components/native-chat/NativeChatInteractiveCard.test.tsx": {
       "added": 21,
       "removed": 0
@@ -4311,6 +4386,10 @@
     "src/renderer/src/components/native-chat/NativeChatInteractiveCard.tsx": {
       "added": 20,
       "removed": 30
+    },
+    "src/renderer/src/components/native-chat/NativeChatMessageList.tsx": {
+      "added": 5,
+      "removed": 2
     },
     "src/renderer/src/components/native-chat/NativeChatMessageRow.tsx": {
       "added": 8,
@@ -4323,6 +4402,10 @@
     "src/renderer/src/components/native-chat/NativeChatResolvedView.tsx": {
       "added": 16,
       "removed": 17
+    },
+    "src/renderer/src/components/native-chat/NativeChatToolRun.tsx": {
+      "added": 7,
+      "removed": 2
     },
     "src/renderer/src/components/native-chat/NativeChatView.test.tsx": {
       "added": 4,
@@ -4432,6 +4515,10 @@
       "added": 74,
       "removed": 11
     },
+    "src/renderer/src/components/native-chat/use-native-chat-structured-composer-send.ts": {
+      "added": 2,
+      "removed": 2
+    },
     "src/renderer/src/components/native-chat/use-native-chat-typed-insertion.ts": {
       "added": 1,
       "removed": 1
@@ -4444,6 +4531,10 @@
       "added": 2,
       "removed": 0
     },
+    "src/renderer/src/components/right-sidebar/AiVaultVirtualRow.tsx": {
+      "added": 3,
+      "removed": 4
+    },
     "src/renderer/src/components/right-sidebar/ai-vault-session-launch-actions.ts": {
       "added": 3,
       "removed": 2
@@ -4453,12 +4544,12 @@
       "removed": 1
     },
     "src/renderer/src/components/right-sidebar/right-sidebar-panel-content.tsx": {
-      "added": 4,
+      "added": 8,
       "removed": 0
     },
     "src/renderer/src/components/right-sidebar/use-right-sidebar-activity-items.ts": {
-      "added": 12,
-      "removed": 1
+      "added": 19,
+      "removed": 2
     },
     "src/renderer/src/components/settings/AppearancePane.tsx": {
       "added": 2,
@@ -4496,6 +4587,14 @@
       "added": 15,
       "removed": 2
     },
+    "src/renderer/src/components/sidebar/SidebarFilter.tsx": {
+      "added": 11,
+      "removed": 19
+    },
+    "src/renderer/src/components/sidebar/SidebarWorkspaceFilterSection.tsx": {
+      "added": 4,
+      "removed": 11
+    },
     "src/renderer/src/components/sidebar/WorktreeCard.tsx": {
       "added": 5,
       "removed": 2
@@ -4509,8 +4608,8 @@
       "removed": 50
     },
     "src/renderer/src/components/sidebar/WorktreeList.tsx": {
-      "added": 24,
-      "removed": 12
+      "added": 56,
+      "removed": 14
     },
     "src/renderer/src/components/sidebar/comment-markdown-element-renderers.tsx": {
       "added": 6,
@@ -4520,8 +4619,28 @@
       "added": 8,
       "removed": 1
     },
+    "src/renderer/src/components/sidebar/sidebar-filter-actions.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/use-visible-workspace-kanban-worktree-ids.ts": {
+      "added": 11,
+      "removed": 3
+    },
+    "src/renderer/src/components/sidebar/use-worktree-card-controller.ts": {
+      "added": 1,
+      "removed": 1
+    },
     "src/renderer/src/components/sidebar/use-worktree-context-menu-model.tsx": {
       "added": 8,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/visible-worktree-kinds.ts": {
+      "added": 7,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/visible-worktrees.ts": {
+      "added": 19,
       "removed": 1
     },
     "src/renderer/src/components/sidebar/worktree-card-compact-agent-row.tsx": {
@@ -4533,7 +4652,7 @@
       "removed": 6
     },
     "src/renderer/src/components/sidebar/worktree-list/drag/drop-commit-context.ts": {
-      "added": 6,
+      "added": 3,
       "removed": 1
     },
     "src/renderer/src/components/sidebar/worktree-list/drag/groups.ts": {
@@ -4549,7 +4668,7 @@
       "removed": 0
     },
     "src/renderer/src/components/sidebar/worktree-list/drag/use-drop-commit-context.ts": {
-      "added": 8,
+      "added": 7,
       "removed": 1
     },
     "src/renderer/src/components/sidebar/worktree-list/drag/use-pointer-drag.ts": {
@@ -4580,9 +4699,21 @@
       "added": 7,
       "removed": 5
     },
+    "src/renderer/src/components/sidebar/worktree-list/listing/use-filters.ts": {
+      "added": 13,
+      "removed": 5
+    },
+    "src/renderer/src/components/sidebar/worktree-list/listing/use-host-visible-scope.ts": {
+      "added": 36,
+      "removed": 21
+    },
     "src/renderer/src/components/sidebar/worktree-list/listing/use-section-rows.ts": {
       "added": 13,
       "removed": 2
+    },
+    "src/renderer/src/components/sidebar/worktree-list/listing/use-visible-worktrees.ts": {
+      "added": 21,
+      "removed": 5
     },
     "src/renderer/src/components/sidebar/worktree-list/navigation/pending-reveal-inputs.ts": {
       "added": 5,
@@ -4593,7 +4724,7 @@
       "removed": 0
     },
     "src/renderer/src/components/sidebar/worktree-list/rows/SectionHeader.tsx": {
-      "added": 13,
+      "added": 21,
       "removed": 1
     },
     "src/renderer/src/components/sidebar/worktree-list/rows/item-row.tsx": {
@@ -4609,11 +4740,11 @@
       "removed": 1
     },
     "src/renderer/src/components/sidebar/worktree-list/viewport/viewport-props.ts": {
-      "added": 4,
+      "added": 6,
       "removed": 0
     },
     "src/renderer/src/components/sidebar/worktree-list/viewport/virtual-row-context.ts": {
-      "added": 3,
+      "added": 5,
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/TerminalContextMenu.test.tsx": {
@@ -4804,6 +4935,10 @@
       "added": 1,
       "removed": 0
     },
+    "src/renderer/src/lib/pane-manager/terminal-scroll-intent-key-retention.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
     "src/renderer/src/lib/pane-manager/windows-pty-compatibility.test.ts": {
       "added": 17,
       "removed": 0
@@ -4815,6 +4950,10 @@
     "src/renderer/src/lib/settings-navigation-types.ts": {
       "added": 1,
       "removed": 0
+    },
+    "src/renderer/src/lib/startup-ui-hydration.ts": {
+      "added": 4,
+      "removed": 2
     },
     "src/renderer/src/lib/terminal-title-contrast.ts": {
       "added": 3,
@@ -4881,15 +5020,23 @@
       "removed": 1
     },
     "src/renderer/src/store/index.ts": {
-      "added": 3,
+      "added": 5,
       "removed": 1
     },
     "src/renderer/src/store/right-sidebar-route.ts": {
-      "added": 2,
+      "added": 4,
+      "removed": 1
+    },
+    "src/renderer/src/store/slices/persisted-ui-write-baseline.test.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/renderer/src/store/slices/persisted-ui-write-baseline.ts": {
+      "added": 8,
       "removed": 0
     },
     "src/renderer/src/store/slices/store-test-helpers.ts": {
-      "added": 3,
+      "added": 5,
       "removed": 1
     },
     "src/renderer/src/store/slices/tabs/create-tabs-slice.ts": {
@@ -4904,8 +5051,24 @@
       "added": 2,
       "removed": 1
     },
+    "src/renderer/src/store/slices/ui.ts": {
+      "added": 16,
+      "removed": 4
+    },
+    "src/renderer/src/store/slices/ui/ui-slice-hydration-actions.ts": {
+      "added": 4,
+      "removed": 3
+    },
+    "src/renderer/src/store/slices/worktrees/session/set-active-folder-workspace.ts": {
+      "added": 11,
+      "removed": 1
+    },
+    "src/renderer/src/store/slices/worktrees/session/set-active-worktree.ts": {
+      "added": 19,
+      "removed": 2
+    },
     "src/renderer/src/store/types.ts": {
-      "added": 3,
+      "added": 5,
       "removed": 1
     },
     "src/renderer/src/web/preload-api/web-native-chat-api.ts": {
@@ -4920,12 +5083,16 @@
       "added": 2,
       "removed": 0
     },
+    "src/renderer/src/web/web-preload-api-ui.test.ts": {
+      "added": 10,
+      "removed": 2
+    },
     "src/shared/artifacts.ts": {
       "added": 12,
       "removed": 0
     },
     "src/shared/cli-argument-boundary.ts": {
-      "added": 1,
+      "added": 2,
       "removed": 0
     },
     "src/shared/default-global-settings.ts": {
@@ -4941,7 +5108,7 @@
       "removed": 0
     },
     "src/shared/keybindings/types.ts": {
-      "added": 2,
+      "added": 3,
       "removed": 0
     },
     "src/shared/local-build-compatibility-contract.json": {
@@ -4976,16 +5143,28 @@
       "added": 6,
       "removed": 1
     },
+    "src/shared/pairing-local-ui-fields.test.ts": {
+      "added": 5,
+      "removed": 1
+    },
+    "src/shared/pairing-local-ui-fields.ts": {
+      "added": 5,
+      "removed": 2
+    },
     "src/shared/pane-agent-identity-inventory.test.ts": {
       "added": 4,
       "removed": 0
+    },
+    "src/shared/persisted-ui-state-types.ts": {
+      "added": 4,
+      "removed": 1
     },
     "src/shared/project-groups.ts": {
       "added": 3,
       "removed": 1
     },
     "src/shared/protocol-version.ts": {
-      "added": 3,
+      "added": 4,
       "removed": 1
     },
     "src/shared/runtime-mobile-session-tab-contracts.ts": {
@@ -4994,6 +5173,10 @@
     },
     "src/shared/skills.ts": {
       "added": 5,
+      "removed": 0
+    },
+    "src/shared/structured-agent-session-options.ts": {
+      "added": 1,
       "removed": 0
     },
     "src/shared/tab-types.ts": {
@@ -5025,7 +5208,7 @@
       "removed": 1
     },
     "src/shared/ui-chrome-types.ts": {
-      "added": 2,
+      "added": 4,
       "removed": 0
     },
     "src/shared/workspace-session-schema.test.ts": {
@@ -5055,158 +5238,6 @@
     "tests/e2e/cross-version-wire/release-checkout.unit.test.ts": {
       "added": 11,
       "removed": 14
-    },
-    "src/renderer/src/components/right-sidebar/AiVaultVirtualRow.tsx": {
-      "added": 3,
-      "removed": 4
-    },
-    "src/main/providers/ssh-pty-provider.ts": {
-      "added": 4,
-      "removed": 0
-    },
-    "src/main/runtime/mobile-session-terminal-projection.ts": {
-      "added": 12,
-      "removed": 0
-    },
-    "src/main/runtime/orca-runtime-publish-pty-backed-mobile-session-terminal.ts": {
-      "added": 11,
-      "removed": 0
-    },
-    "src/main/runtime/orca-runtime-runtime-id.ts": {
-      "added": 8,
-      "removed": 0
-    },
-    "src/main/runtime/runtime-mobile-session-projection.ts": {
-      "added": 1,
-      "removed": 0
-    },
-    "src/renderer/src/components/native-chat/NativeChatMessageList.tsx": {
-      "added": 5,
-      "removed": 2
-    },
-    "src/renderer/src/components/native-chat/NativeChatToolRun.tsx": {
-      "added": 7,
-      "removed": 2
-    },
-    "src/renderer/src/components/native-chat/use-native-chat-structured-composer-send.ts": {
-      "added": 2,
-      "removed": 2
-    },
-    "src/renderer/src/lib/pane-manager/terminal-scroll-intent-key-retention.test.ts": {
-      "added": 1,
-      "removed": 0
-    },
-    "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.tsx": {
-      "added": 1,
-      "removed": 1
-    },
-    "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.test.tsx": {
-      "added": 1,
-      "removed": 1
-    },
-    "src/shared/structured-agent-session-options.ts": {
-      "added": 1,
-      "removed": 0
-    },
-    "src/main/persistence/applying-settings/ui-state-read.ts": {
-      "added": 6,
-      "removed": 0
-    },
-    "src/main/persistence/applying-settings/ui-state-update.ts": {
-      "added": 7,
-      "removed": 0
-    },
-    "src/renderer/src/app-shell/use-persisted-ui-writer.ts": {
-      "added": 4,
-      "removed": 0
-    },
-    "src/renderer/src/components/sidebar/SidebarFilter.tsx": {
-      "added": 11,
-      "removed": 19
-    },
-    "src/renderer/src/components/sidebar/SidebarWorkspaceFilterSection.tsx": {
-      "added": 4,
-      "removed": 11
-    },
-    "src/renderer/src/components/sidebar/sidebar-filter-actions.ts": {
-      "added": 2,
-      "removed": 1
-    },
-    "src/renderer/src/components/sidebar/use-visible-workspace-kanban-worktree-ids.ts": {
-      "added": 11,
-      "removed": 3
-    },
-    "src/renderer/src/components/sidebar/use-worktree-card-controller.ts": {
-      "added": 1,
-      "removed": 1
-    },
-    "src/renderer/src/components/sidebar/visible-worktree-kinds.ts": {
-      "added": 7,
-      "removed": 2
-    },
-    "src/renderer/src/components/sidebar/visible-worktrees.ts": {
-      "added": 19,
-      "removed": 1
-    },
-    "src/renderer/src/components/sidebar/worktree-list/listing/use-filters.ts": {
-      "added": 13,
-      "removed": 5
-    },
-    "src/renderer/src/components/sidebar/worktree-list/listing/use-host-visible-scope.ts": {
-      "added": 36,
-      "removed": 21
-    },
-    "src/renderer/src/components/sidebar/worktree-list/listing/use-visible-worktrees.ts": {
-      "added": 21,
-      "removed": 5
-    },
-    "src/renderer/src/lib/startup-ui-hydration.ts": {
-      "added": 4,
-      "removed": 2
-    },
-    "src/renderer/src/store/slices/persisted-ui-write-baseline.ts": {
-      "added": 8,
-      "removed": 0
-    },
-    "src/renderer/src/store/slices/ui.ts": {
-      "added": 14,
-      "removed": 4
-    },
-    "src/renderer/src/store/slices/worktrees/session/set-active-folder-workspace.ts": {
-      "added": 11,
-      "removed": 1
-    },
-    "src/renderer/src/store/slices/worktrees/session/set-active-worktree.ts": {
-      "added": 19,
-      "removed": 2
-    },
-    "src/shared/pairing-local-ui-fields.ts": {
-      "added": 5,
-      "removed": 2
-    },
-    "src/shared/persisted-ui-state-types.ts": {
-      "added": 4,
-      "removed": 1
-    },
-    "src/main/runtime/rpc/methods/client-ui-pairing-local-fields.test.ts": {
-      "added": 5,
-      "removed": 1
-    },
-    "src/renderer/src/store/slices/persisted-ui-write-baseline.test.ts": {
-      "added": 4,
-      "removed": 0
-    },
-    "src/renderer/src/web/web-preload-api-ui.test.ts": {
-      "added": 10,
-      "removed": 2
-    },
-    "src/shared/pairing-local-ui-fields.test.ts": {
-      "added": 5,
-      "removed": 1
-    },
-    "src/renderer/src/store/slices/ui/ui-slice-hydration-actions.ts": {
-      "added": 4,
-      "removed": 3
     }
   }
 }

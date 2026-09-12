@@ -13,8 +13,13 @@ import { invalidateAuthorizedRootsCache } from '../registered-worktree-roots-cac
 import { notifyReposChanged } from './repos-changed-notification'
 import { ProjectUpdateIpcArgs, parseProjectGroupIpcArgs } from './repo-ipc-arg-schemas'
 import { listReposForExecutionHost } from './host-repo-catalog-snapshot'
+import { withLedgerErrorCode, type RepoRemovalRuntime } from './ledger-removal-guard'
 
-export function registerRepoCatalogHandlers(mainWindow: BrowserWindow, store: Store): void {
+export function registerRepoCatalogHandlers(
+  mainWindow: BrowserWindow,
+  store: Store,
+  runtime?: RepoRemovalRuntime
+): void {
   // Why one shared reference: enrichment dedupes coalesced callers by callback identity, so a fresh
   // closure per list call would stack up (and re-broadcast) for the length of a slow sweep.
   const broadcastReposChanged = (): void => notifyReposChanged(mainWindow)
@@ -85,11 +90,25 @@ export function registerRepoCatalogHandlers(mainWindow: BrowserWindow, store: St
     }
   )
 
-  ipcMain.handle('repos:remove', async (_event, args: { repoId: string }) => {
-    store.removeProject(args.repoId)
-    invalidateAuthorizedRootsCache()
-    notifyReposChanged(mainWindow)
-  })
+  ipcMain.handle(
+    'repos:remove',
+    async (
+      _event,
+      args: { repoId: string; expectedLedgers?: { ledgerId: string; revision: number }[] }
+    ) => {
+      // Why: the runtime resolves a bare id and rejects one registered on two hosts, so only route
+      // through it when the caller actually asked for the ledger retention guard.
+      if (runtime && args.expectedLedgers) {
+        await withLedgerErrorCode(() =>
+          runtime.removeProject(args.repoId, { expectedLedgers: args.expectedLedgers })
+        )
+      } else {
+        store.removeProject(args.repoId)
+        invalidateAuthorizedRootsCache()
+      }
+      notifyReposChanged(mainWindow)
+    }
+  )
 
   // Why: forget a project on one execution host without disturbing the same repo id on other hosts (SSH-workspace forget flow).
   ipcMain.handle(

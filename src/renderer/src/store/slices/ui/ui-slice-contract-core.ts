@@ -113,6 +113,7 @@ export type UiViewHistory =
   | 'skills'
   | 'artifacts'
   | 'mobile'
+  | 'ledger'
 
 export type UISliceCore = {
   sidebarOpen: boolean

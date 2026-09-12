@@ -7,15 +7,20 @@ import { notifyReposChanged } from './repos-changed-notification'
 import {
   ProjectGroupCancelNestedScanArgs,
   ProjectGroupCreateArgs,
+  ProjectGroupDeleteArgs,
   ProjectGroupMoveProjectArgs,
   ProjectGroupScanNestedArgs,
-  ProjectGroupSelectorArgs,
   ProjectGroupUpdateArgs,
   parseProjectGroupIpcArgs
 } from './repo-ipc-arg-schemas'
+import { withLedgerErrorCode, type RepoRemovalRuntime } from './ledger-removal-guard'
 import { activeNestedRepoScans, runNestedRepoScanForIpc } from './nested-repo-scan-ipc'
 
-export function registerProjectGroupHandlers(mainWindow: BrowserWindow, store: Store): void {
+export function registerProjectGroupHandlers(
+  mainWindow: BrowserWindow,
+  store: Store,
+  runtime?: RepoRemovalRuntime
+): void {
   ipcMain.handle('projectGroups:list', () => store.getProjectGroups())
 
   ipcMain.handle('projectGroups:create', (_event, rawArgs: unknown): ProjectGroup => {
@@ -48,13 +53,26 @@ export function registerProjectGroupHandlers(mainWindow: BrowserWindow, store: S
     return updated
   })
 
-  ipcMain.handle('projectGroups:delete', (_event, rawArgs: unknown): boolean => {
+  ipcMain.handle('projectGroups:delete', async (_event, rawArgs: unknown): Promise<boolean> => {
     const args = parseProjectGroupIpcArgs(
-      ProjectGroupSelectorArgs,
+      ProjectGroupDeleteArgs,
       rawArgs,
       'invalid_project_group_delete_args'
     )
-    const deleted = store.deleteProjectGroup(args.groupId)
+    // Why: the runtime owns contained-project removal and the ledger retention guard; the
+    // store-only path cannot honour either and would silently report a successful delete.
+    const deleted = runtime
+      ? (
+          await withLedgerErrorCode(() =>
+            runtime.deleteProjectGroup(args.groupId, {
+              ...(args.expectedLedgers ? { expectedLedgers: args.expectedLedgers } : {}),
+              ...(args.removeContainedProjects !== undefined
+                ? { removeContainedProjects: args.removeContainedProjects }
+                : {})
+            })
+          )
+        ).deleted
+      : store.deleteProjectGroup(args.groupId)
     if (deleted) {
       notifyReposChanged(mainWindow)
     }

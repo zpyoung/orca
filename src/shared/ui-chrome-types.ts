@@ -96,6 +96,7 @@ export type RightSidebarTab =
   | 'source-control'
   | 'checks'
   | 'ports'
+  | 'ledger'
   // Plugin-contributed panels are keyed `plugin:<pluginId>/<panelId>` so the
   // static union stays closed while plugin tabs remain type-representable.
   | `plugin:${string}`
@@ -122,3 +123,4 @@ export type TopLevelView =
   | 'skills'
   | 'artifacts'
   | 'mobile'
+  | 'ledger'

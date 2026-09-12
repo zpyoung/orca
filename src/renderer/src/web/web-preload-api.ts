@@ -36,10 +36,14 @@ import { createWebPlatformApi } from './preload-api/web-platform-api'
 import { createRateLimitsApi } from './preload-api/web-rate-limits-api'
 import { createReposApi } from './preload-api/web-repositories-api'
 import { createHooksApi, createRuntimeNamespaceApi } from './preload-api/web-review-api'
-import { callRuntimeResult } from './preload-api/web-runtime-calls'
+import { callEnvironmentEnvelope, callRuntimeResult } from './preload-api/web-runtime-calls'
 import { createWebRuntimeApi } from './preload-api/web-runtime-api'
 import { createRuntimeEnvironmentsApi } from './preload-api/web-runtime-environments-api'
-import { webRuntimeState } from './preload-api/web-runtime-session'
+import {
+  requireActiveEnvironment,
+  resolveEnvironment,
+  webRuntimeState
+} from './preload-api/web-runtime-session'
 import { createWebSettingsApi } from './preload-api/web-settings-api'
 import { createShellApi } from './preload-api/web-shell-api'
 import { createWebStarNagApi } from './preload-api/web-star-nag-api'
@@ -51,6 +55,7 @@ import { createWebWorkspacePortsApi } from './preload-api/web-workspace-ports-ap
 import { createWebWorkspaceSessionApi } from './preload-api/web-workspace-session-api'
 import { createWorktreesApi } from './preload-api/web-worktrees-api'
 import { readStoredWebRuntimeEnvironment } from './web-runtime-environment'
+import { createWebLedgerApi } from './web-ledger-api'
 
 export function installWebPreloadApi(): void {
   webRuntimeState.activeEnvironment = readStoredWebRuntimeEnvironment()
@@ -62,6 +67,11 @@ export function installWebPreloadApi(): void {
 
 function createWebPreloadApi(): Partial<PreloadApi> {
   return {
+    ledger: createWebLedgerApi({
+      selectEnvironment: (environmentId) =>
+        environmentId ? resolveEnvironment(environmentId) : requireActiveEnvironment(),
+      call: (environment, method, params) => callEnvironmentEnvelope(environment.id, method, params)
+    }),
     ...createWebAppApi(),
     ...createWebStarNagApi(),
     ...createWebPlatformApi(),

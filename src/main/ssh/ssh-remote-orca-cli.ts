@@ -27,6 +27,7 @@ import {
 } from './ssh-remote-cli-args'
 import { buildRemoteCliError } from './ssh-remote-cli-error-response'
 import { getRemoteLinearHelp, tryDispatchRemoteLinearCli } from './ssh-remote-linear-cli'
+import { tryDispatchRemoteLedgerCli } from './ssh-remote-ledger-cli'
 import {
   getRemoteOrchestrationPayload,
   resolveRemoteOrchestrationSender
@@ -166,6 +167,15 @@ async function dispatchRemoteCli(
   const linearResponse = await tryDispatchRemoteLinearCli(dispatcher, parsed, env, stdin)
   if (linearResponse) {
     return linearResponse
+  }
+  const ledgerResponse = await tryDispatchRemoteLedgerCli(
+    dispatcher,
+    parsed,
+    env,
+    compatibilityEnvelope
+  )
+  if (ledgerResponse) {
+    return ledgerResponse
   }
   switch (command) {
     case 'status': {

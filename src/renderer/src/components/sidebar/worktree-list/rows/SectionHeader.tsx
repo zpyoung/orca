@@ -63,6 +63,7 @@ export type SectionHeaderRowContext = {
   projectActions: RepoHeaderProjectActions
   onRenameProjectGroup: (groupId: string, currentName: string, hostId?: ExecutionHostId) => void
   onDeleteProjectGroup: (groupId: string, groupName: string, hostId?: ExecutionHostId) => void
+  onOpenGroupLedger: (group: ProjectGroup) => void
   onCreateFolderWorkspace: (projectGroup: ProjectGroup) => void
   onWorkspaceStatusDragOver: (event: React.DragEvent, status: WorkspaceStatus) => void
   onWorkspaceStatusDragLeave: (event: React.DragEvent) => void
@@ -103,6 +104,8 @@ export function renderWorktreeSectionHeaderRow(args: {
     row.projectGroup && 'createdFrom' in row.projectGroup
       ? getProjectGroupHostId(row.projectGroup)
       : undefined
+  const projectGroupForHeader =
+    row.projectGroup && 'createdFrom' in row.projectGroup ? row.projectGroup : undefined
   const repoHeaderIndex =
     projectIdForHeader !== undefined
       ? headerDrag.repoHeaderIndexByRepoId.get(projectIdForHeader)
@@ -378,6 +381,11 @@ export function renderWorktreeSectionHeaderRow(args: {
               label={row.label}
               onRename={ctx.onRenameProjectGroup}
               onDelete={ctx.onDeleteProjectGroup}
+              onOpenLedger={
+                projectGroupForHeader
+                  ? () => ctx.onOpenGroupLedger(projectGroupForHeader)
+                  : undefined
+              }
             />
           ) : null}
 
