@@ -22,7 +22,22 @@ import {
 import type { HostedReviewSitterJournalStore } from './journal-store'
 
 const ACTIVE_TIME_CHECKPOINT_MS = 15_000
-const MAX_UNOBSERVED_ACTIVE_DELTA_MS = ACTIVE_TIME_CHECKPOINT_MS * 2
+const ACTIVE_TIME_LEDGER_INTERVAL_MS = 60_000
+// must exceed the append interval, or a coalesced span is clipped and budget is undercounted
+const MAX_UNOBSERVED_ACTIVE_DELTA_MS = ACTIVE_TIME_LEDGER_INTERVAL_MS * 2
+
+/**
+ * Whether an active-time span is long enough to earn its own ledger row.
+ *
+ * Sampling stays on the shorter checkpoint cadence so budget exhaustion is noticed promptly, but a
+ * periodic tick only writes once a minute; `pause` and `shutdown` always flush what has accrued.
+ */
+export function shouldAppendActiveTimeCheckpoint(
+  source: 'tick' | 'pause' | 'shutdown',
+  elapsedMs: number
+): boolean {
+  return source !== 'tick' || elapsedMs >= ACTIVE_TIME_LEDGER_INTERVAL_MS
+}
 
 export type HostedReviewSitterRunner = {
   definition: HostedReviewSitterDefinition
@@ -261,10 +276,12 @@ export class HostedReviewSitterLedgerLifecycle {
       return
     }
     const now = performance.now()
-    const activeMs = Math.min(
-      MAX_UNOBSERVED_ACTIVE_DELTA_MS,
-      Math.max(0, Math.floor(now - runner.activeCheckpointAtMs))
-    )
+    const elapsedMs = Math.max(0, Math.floor(now - runner.activeCheckpointAtMs))
+    // leaving activeCheckpointAtMs untouched lets the span keep accruing into the next append
+    if (!shouldAppendActiveTimeCheckpoint(source, elapsedMs)) {
+      return
+    }
+    const activeMs = Math.min(MAX_UNOBSERVED_ACTIVE_DELTA_MS, elapsedMs)
     if (activeMs <= 0) {
       return
     }

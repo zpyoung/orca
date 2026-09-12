@@ -194,6 +194,63 @@ describe('PR sitter desired-action safety policy', () => {
     })
   })
 
+  it('resolves conflicts that were already present when the sitter was armed', () => {
+    // conflicts usually stop CI from building a merge commit, so the checks never go green at this
+    // head — a gate that waits for green here can never be satisfied.
+    const conflicted = review({
+      conflicts: 'present',
+      checks: [check({ state: 'pending', failureSignature: null })],
+      providerReadiness: { verdict: 'blocked', blockers: ['conflicts'] }
+    })
+    expect(computeDesiredAction(conflicted, sitter(), ledger())).toMatchObject({
+      kind: 'prepare-conflict-resolution'
+    })
+  })
+
+  it('resolves standing conflicts when provider readiness is unverifiable', () => {
+    const conflicted = review({
+      conflicts: 'present',
+      checks: [check({ state: 'pending', failureSignature: null })],
+      providerReadiness: { verdict: 'unknown', blockers: [] }
+    })
+    expect(computeDesiredAction(conflicted, sitter(), ledger())).toMatchObject({
+      kind: 'prepare-conflict-resolution'
+    })
+  })
+
+  it('resolves standing conflicts when the review reports no checks at all', () => {
+    const conflicted = review({
+      conflicts: 'present',
+      checks: [],
+      providerReadiness: { verdict: 'blocked', blockers: ['conflicts'] }
+    })
+    expect(computeDesiredAction(conflicted, sitter(), ledger())).toMatchObject({
+      kind: 'prepare-conflict-resolution'
+    })
+  })
+
+  it('still holds conflict resolution on a draft review', () => {
+    const conflicted = review({
+      draft: true,
+      conflicts: 'present',
+      checks: [check({ state: 'pending', failureSignature: null })],
+      providerReadiness: { verdict: 'blocked', blockers: ['conflicts'] }
+    })
+    expect(computeDesiredAction(conflicted, sitter(), ledger())).toBeNull()
+  })
+
+  it('still prefers fixing a red check over conflicts when the base has not moved', () => {
+    const conflicted = review({
+      conflicts: 'present',
+      behindBase: false,
+      checks: [check({ state: 'failed', failureSignature: 'failure:test' })],
+      providerReadiness: { verdict: 'blocked', blockers: ['conflicts', 'checks'] }
+    })
+    expect(computeDesiredAction(conflicted, sitter(), ledger())).toMatchObject({
+      kind: 'rerun-check'
+    })
+  })
+
   it('requires one fresh rerun observation before preparing a fix', () => {
     const initial = review({
       checks: [check({ state: 'failed', failureSignature: 'failure:test' })],

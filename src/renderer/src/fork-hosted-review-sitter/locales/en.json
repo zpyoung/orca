@@ -158,6 +158,7 @@
         "on": "On"
       },
       "duration": {
+        "seconds": "{{seconds}}s",
         "minutes": "{{minutes}}m",
         "hours": "{{hours}}h",
         "hoursMinutes": "{{hours}}h {{minutes}}m"

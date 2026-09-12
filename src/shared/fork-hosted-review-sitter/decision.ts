@@ -28,7 +28,6 @@ type FailedCheckGroup = {
   checks: readonly HostedReviewCheckSnapshot[]
 }
 
-const CONFLICT_READY_BLOCKERS: readonly HostedReviewReadinessBlocker[] = ['behind', 'conflicts']
 const UPDATE_READY_BLOCKERS: readonly HostedReviewReadinessBlocker[] = ['behind']
 
 function currentRequiredChecks(review: HostedReviewSnapshot): readonly HostedReviewCheckSnapshot[] {
@@ -478,10 +477,10 @@ export function computeDesiredAction(
 
   const checksGreen = areCurrentHeadRequiredChecksGreen(review)
   const failures = failedCheckGroups(review)
-  const conflictOtherwiseReady =
-    !review.draft &&
-    ((checksGreen && readinessAllowsOnly(review, CONFLICT_READY_BLOCKERS)) ||
-      (review.behindBase && failures.length > 0))
+  // conflicts usually stop CI from building a merge commit, so waiting for green checks or a
+  // settled readiness verdict before resolving them never terminates. A red check still comes
+  // first unless the base moved, since that is what made it red.
+  const conflictOtherwiseReady = !review.draft && (failures.length === 0 || review.behindBase)
   if (review.conflicts === 'present' && conflictOtherwiseReady) {
     return desiredConflictAction(review, ledger)
   }

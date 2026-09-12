@@ -142,6 +142,12 @@ export function hostedReviewSitterStatusLabel(state: HostedReviewSitterStatusSta
 }
 
 export function formatHostedReviewSitterDuration(milliseconds: number): string {
+  // active-time checkpoints are sub-minute; rounding them up read as a full minute of budget each.
+  if (milliseconds < 60_000) {
+    return translate('fork.hostedReviewSitter.duration.seconds', '{{seconds}}s', {
+      seconds: Math.max(0, Math.ceil(milliseconds / 1_000))
+    })
+  }
   const totalMinutes = Math.max(0, Math.ceil(milliseconds / 60_000))
   const hours = Math.floor(totalMinutes / 60)
   const minutes = totalMinutes % 60
