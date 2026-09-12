@@ -158,28 +158,43 @@ export function createAskAttachedSurfaceRoster(
 // there, and throwing would take down an unrelated subscribe path.
 type AskSurfacePaneTrackingRuntime = {
   getTerminalPaneKey?: (handle: string) => string | null
-  getAskServices?: () => { roster: AskAttachedSurfaceRoster }
+  getAskServices?: () => { roster: AskAttachedSurfaceRoster } | undefined
+}
+
+// `in` before `typeof`: the cross-version wire harness proxies every unknown member as a
+// "missing runtime method" and answers it with a function returning undefined.
+function hasRuntimeMethod<K extends keyof AskSurfacePaneTrackingRuntime>(
+  runtime: AskSurfacePaneTrackingRuntime,
+  name: K
+): runtime is AskSurfacePaneTrackingRuntime & Required<Pick<AskSurfacePaneTrackingRuntime, K>> {
+  return name in runtime && typeof runtime[name] === 'function'
 }
 
 /** The connection-level roster, or null on a runtime (test double, remote proxy) that carries no ask services. */
 export function askRosterFor(
   runtime: Pick<AskSurfacePaneTrackingRuntime, 'getAskServices'>
 ): AskAttachedSurfaceRoster | null {
-  return typeof runtime.getAskServices === 'function' ? runtime.getAskServices().roster : null
+  return hasRuntimeMethod(runtime, 'getAskServices')
+    ? (runtime.getAskServices()?.roster ?? null)
+    : null
+}
+
+function resolvePaneKeyForHandle(
+  runtime: AskSurfacePaneTrackingRuntime,
+  terminalHandle: string
+): string | null {
+  return hasRuntimeMethod(runtime, 'getTerminalPaneKey')
+    ? runtime.getTerminalPaneKey(terminalHandle)
+    : null
 }
 
 function resolveTrackingTarget(
   runtime: AskSurfacePaneTrackingRuntime,
   terminalHandle: string
 ): { roster: AskAttachedSurfaceRoster; paneKey: string } | null {
-  if (
-    typeof runtime.getTerminalPaneKey !== 'function' ||
-    typeof runtime.getAskServices !== 'function'
-  ) {
-    return null
-  }
-  const paneKey = runtime.getTerminalPaneKey(terminalHandle)
-  return paneKey ? { roster: runtime.getAskServices().roster, paneKey } : null
+  const roster = askRosterFor(runtime)
+  const paneKey = roster ? resolvePaneKeyForHandle(runtime, terminalHandle) : null
+  return roster && paneKey ? { roster, paneKey } : null
 }
 
 export function trackAskSurfacePaneSubscription(
@@ -205,15 +220,13 @@ export function untrackAskSurfacePaneSubscription(
   if (!connectionId) {
     return
   }
-  if (typeof runtime.getAskServices !== 'function') {
+  const roster = askRosterFor(runtime)
+  if (!roster) {
     return
   }
-  const roster = runtime.getAskServices().roster
   const paneKey =
     roster.takeSubscribedPane(connectionId, terminalHandle) ??
-    (typeof runtime.getTerminalPaneKey === 'function'
-      ? runtime.getTerminalPaneKey(terminalHandle)
-      : null)
+    resolvePaneKeyForHandle(runtime, terminalHandle)
   if (paneKey) {
     roster.untrackPaneSubscription(connectionId, paneKey)
   }

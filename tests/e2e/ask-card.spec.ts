@@ -11,7 +11,7 @@ const ASK_DISMISS_DELAY_MS = 4000
 
 type RuntimeRpcReply<T> = { ok: true; result: T } | { ok: false; error?: { message?: string } }
 
-async function setupAskPane(page: Page): Promise<{ paneKey: string }> {
+async function setupAskPane(page: Page): Promise<{ paneKey: string; worktreeId: string }> {
   await waitForSessionReady(page)
   await waitForActiveWorktree(page)
   await ensureTerminalVisible(page)
@@ -83,31 +83,72 @@ function textAsk(args: {
   }
 }
 
-/** Registers a real ask on `paneKey` over the same RPC the CLI uses. The contextBridge API is
+type RegisterAskOutcome = { askId: string } | { error: string; retryable: boolean }
+
+/** Registers a real ask on the pane over the same RPC the CLI uses. The contextBridge API is
  * deep-frozen, so nothing here can be intercepted from the page; the card, the answer, and the
- * draft all have to travel the production path and be observed where the registry reports them. */
+ * draft all have to travel the production path and be observed where the registry reports them.
+ * Attribution needs main to have bound the pane to its live PTY, which can trail the renderer's
+ * own layout on a slow host, so an `unavailable` answer is retried until the deadline. */
 async function registerAsk(
   page: Page,
-  args: { paneKey: string; questionId: string; question: string }
+  args: { paneKey: string; worktreeId: string; questionId: string; question: string }
 ): Promise<string> {
-  return page.evaluate(async ({ paneKey, questionId, question }) => {
-    const response = (await window.api.runtime.call({
-      method: 'ask.register',
-      params: {
-        spec: { questions: [{ id: questionId, type: 'text', question }] },
-        requestId: `e2e-ask-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  const requestId = `e2e-ask-${randomUUID()}`
+  const deadline = Date.now() + 15_000
+  let outcome: RegisterAskOutcome
+  do {
+    outcome = await page.evaluate(
+      async ({
         paneKey,
-        cwd: '/'
-      }
-    })) as RuntimeRpcReply<{ askId?: string; status?: string; reason?: string }>
-    if (!response.ok) {
-      throw new Error(`ask.register failed: ${response.error?.message ?? 'unknown error'}`)
+        worktreeId,
+        questionId,
+        question,
+        requestId
+      }): Promise<RegisterAskOutcome> => {
+        const call = (method: string, params: unknown) =>
+          window.api.runtime.call({ method, params })
+        const active = (await call('terminal.resolveActive', {})) as RuntimeRpcReply<{
+          handle: string | null
+        }>
+        const terminalHandle = active.ok ? (active.result.handle ?? undefined) : undefined
+        const response = (await call('ask.register', {
+          spec: { questions: [{ id: questionId, type: 'text', question }] },
+          requestId,
+          paneKey,
+          ...(terminalHandle ? { terminalHandle } : {}),
+          worktreeId,
+          cwd: '/'
+        })) as RuntimeRpcReply<{ askId?: string; status?: string; reason?: string }>
+        if (!response.ok) {
+          return {
+            error: `ask.register failed: ${response.error?.message ?? 'unknown error'}`,
+            retryable: false
+          }
+        }
+        if (response.result.askId) {
+          return { askId: response.result.askId }
+        }
+        const terminals = await call('terminal.list', {})
+        return {
+          error:
+            `ask.register registered nothing: ${JSON.stringify(response.result)}; ` +
+            `paneKey=${paneKey}; resolveActive=${JSON.stringify(active)}; ` +
+            `terminal.list=${JSON.stringify(terminals).slice(0, 2000)}`,
+          retryable: true
+        }
+      },
+      { ...args, requestId }
+    )
+    if ('askId' in outcome) {
+      return outcome.askId
     }
-    if (!response.result.askId) {
-      throw new Error(`ask.register registered nothing: ${JSON.stringify(response.result)}`)
+    if (!outcome.retryable) {
+      break
     }
-    return response.result.askId
-  }, args)
+    await page.waitForTimeout(250)
+  } while (Date.now() < deadline)
+  throw new Error(outcome.error)
 }
 
 async function cancelAsk(page: Page, askId: string): Promise<void> {
@@ -209,12 +250,12 @@ test.describe('Ask card', () => {
   })
 
   test('answering resolves the blocked wait and collapses the card', async ({ orcaPage }) => {
-    const { paneKey } = await setupAskPane(orcaPage)
+    const { paneKey, worktreeId } = await setupAskPane(orcaPage)
     const questionId = 'q1'
     const question = 'What should the release notes say?'
     const answerText = 'Fixed the release build pipeline.'
 
-    const askId = await registerAsk(orcaPage, { paneKey, questionId, question })
+    const askId = await registerAsk(orcaPage, { paneKey, worktreeId, questionId, question })
     const field = orcaPage.getByRole('textbox', { name: question })
     await expect(field).toBeVisible({ timeout: 10_000 })
     await field.fill(answerText)
@@ -238,12 +279,12 @@ test.describe('Ask card', () => {
   test('restores a pending ask with its partial draft intact after a renderer remount', async ({
     orcaPage
   }) => {
-    const { paneKey } = await setupAskPane(orcaPage)
+    const { paneKey, worktreeId } = await setupAskPane(orcaPage)
     const questionId = 'q1'
     const question = 'Which branch should this ship from?'
     const draftText = 'release/1.4 pending one more fix'
 
-    const askId = await registerAsk(orcaPage, { paneKey, questionId, question })
+    const askId = await registerAsk(orcaPage, { paneKey, worktreeId, questionId, question })
     const field = orcaPage.getByRole('textbox', { name: question })
     await expect(field).toBeVisible({ timeout: 10_000 })
     await field.fill(draftText)
