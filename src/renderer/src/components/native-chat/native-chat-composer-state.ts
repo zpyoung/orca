@@ -14,6 +14,13 @@ import {
 } from './native-chat-picker-items'
 
 export type { SlashCommandSuggestion }
+export {
+  EMPTY_HISTORY,
+  pushHistory,
+  recallNext,
+  recallPrevious,
+  type HistoryState
+} from './fork-agent-composer/agent-composer-history'
 export { filterSlashCommands, isSlashCommandDraft, applySlashSuggestion, slashCommandDispatchText }
 export {
   applyPickerSuggestion,
@@ -51,7 +58,8 @@ export function deriveComposerAutocomplete(
   skills: readonly DiscoveredSkill[] = [],
   profile: NativeChatAgentProfile | null = null,
   discovery: NativeChatSkillDiscoverySnapshot = { ...EMPTY_DISCOVERY, skills },
-  dismissedTriggerKey: string | null = null
+  dismissedTriggerKey: string | null = null,
+  sessionSkillNames?: readonly string[]
 ): ComposerAutocomplete {
   const before = draft.slice(0, caret)
   const slashMatch = before.match(/(?:^|\s)\/(\S*)$/)
@@ -62,7 +70,8 @@ export function deriveComposerAutocomplete(
       agentCommands,
       profile,
       discovery,
-      dismissedTriggerKey
+      dismissedTriggerKey,
+      sessionSkillNames
     )
   }
   const mentionMatch = before.match(/(?:^|\s)@(\S*)$/)
@@ -94,6 +103,7 @@ export function deriveComposerAutocomplete(
       discovery.skills,
       query,
       '$',
+      sessionSkillNames,
       profile?.namespacesPluginSkills === true
     ),
     skillStatus: discovery.status === 'idle' ? 'loading' : discovery.status,
@@ -110,7 +120,8 @@ function deriveSlashAutocomplete(
   agentCommands: readonly SlashCommandSuggestion[],
   profile: NativeChatAgentProfile | null,
   discovery: NativeChatSkillDiscoverySnapshot,
-  dismissedTriggerKey: string | null
+  dismissedTriggerKey: string | null,
+  sessionSkillNames: readonly string[] | undefined
 ): ComposerAutocomplete {
   const triggerKey = `/:${tokenStart}`
   if (dismissedTriggerKey === triggerKey) {
@@ -129,6 +140,7 @@ function deriveSlashAutocomplete(
     hasSlashSkills ? discovery.skills : [],
     query,
     '/',
+    hasSlashSkills ? sessionSkillNames : [],
     profile?.namespacesPluginSkills === true
   )
   return {

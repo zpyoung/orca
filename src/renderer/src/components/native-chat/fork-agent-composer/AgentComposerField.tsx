@@ -24,9 +24,9 @@ import type {
 import type { NativeChatOptionPickerRequest } from '../native-chat-composer-types'
 
 export type AgentComposerFieldProps = {
-  /** Identifies which composer a native OS file drop landed on, so a drop
-   *  reaches only this one when several composers are mounted at once. */
   terminalTabId: string
+  /** Published as `data-composer-scope-key` so a native OS file drop reaches
+   *  only the composer it landed on. */
   paneKey: string
   textareaRef: RefObject<HTMLTextAreaElement | null>
   draft: string
@@ -202,8 +202,7 @@ export function AgentComposerField({
           ) : null}
           <div
             data-native-file-drop-target={NATIVE_FILE_DROP_TARGET.composer}
-            data-terminal-tab-id={terminalTabId}
-            data-terminal-pane-leaf-id={paneKey}
+            data-composer-scope-key={paneKey}
             className={cn(
               // Why: always-on hairline (token-level border, not focus ring) —
               // no focus/click border flash. The box is a container, not a

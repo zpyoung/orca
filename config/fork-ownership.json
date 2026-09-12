@@ -83,6 +83,16 @@
         "skills/orca-ask/**",
         "tests/e2e/ask-card.spec.ts"
       ]
+    },
+    {
+      "name": "workspace-activity-window",
+      "purpose": "Adds a persisted workspace activity-window filter, activity-aware folder visibility, and hidden-count feedback to the workspace sidebar.",
+      "globs": ["**/fork-workspace-activity-window/**"]
+    },
+    {
+      "name": "workspace-review-filters",
+      "purpose": "Adds persisted workspace review filters for completed pull requests and passing checks across sidebar and workspace views.",
+      "globs": ["**/fork-workspace-review-filters/**"]
     }
   ],
   "seams": [
@@ -152,12 +162,6 @@
       "feature": "fork-infra",
       "kind": "passthrough",
       "lines": ["      appId: 'com.zpyoung.orca',"]
-    },
-    {
-      "path": "config/scripts/pr-workflow-parallelism.test.mjs",
-      "feature": "fork-infra",
-      "kind": "registration",
-      "lines": ["      'fork_ownership_guard',"]
     },
     {
       "path": "src/main/ipc/native-chat-subscribe-lifecycle.test.ts",
@@ -295,12 +299,6 @@
     },
     {
       "path": "config/scripts/pr-e2e-gate-contract.test.mjs",
-      "feature": "fork-infra",
-      "kind": "registration",
-      "lines": ["        job === 'fork_ownership_guard'"]
-    },
-    {
-      "path": "config/scripts/pr-code-change-scope.test.mjs",
       "feature": "fork-infra",
       "kind": "registration",
       "lines": ["        job === 'fork_ownership_guard'"]
@@ -672,7 +670,7 @@
       "kind": "registration",
       "lines": [
         "} from './fork-agent-composer/AgentComposer'",
-        "import { pushHistory, seedHistory } from './fork-agent-composer/agent-composer-history'"
+        "import { seedHistory } from './fork-agent-composer/agent-composer-history'"
       ]
     },
     {
@@ -754,7 +752,11 @@
       "path": "src/renderer/src/components/native-chat/native-chat-composer-state.ts",
       "feature": "agent-composer",
       "kind": "registration",
-      "lines": ["      discovery.skills,", "  if (!leadsDraft && !hasSlashSkills) {"]
+      "lines": [
+        "      discovery.skills,",
+        "  if (!leadsDraft && !hasSlashSkills) {",
+        "} from './fork-agent-composer/agent-composer-history'"
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/use-native-chat-live-session-pending.test.ts",
@@ -802,7 +804,7 @@
       "path": "src/renderer/src/components/native-chat/native-chat-picker-items.ts",
       "feature": "skill-plugin-attribution",
       "kind": "registration",
-      "lines": ["      pluginName?: string", "        id: `skill:${token}`,"]
+      "lines": ["      pluginName?: string", "  namespacePluginSkills = false"]
     },
     {
       "path": "src/renderer/src/components/native-chat/native-chat-pty-session-options.ts",
@@ -1317,7 +1319,7 @@
       "kind": "passthrough",
       "lines": [
         "import { paneFocusOwnershipArgs } from './fork-terminal-dock/pane-focus-ownership-args'",
-        "      repairedDpr = resumeTerminalVisibilityHeavy(manager, isActive, paneFocusOwnershipArgs(tabId))"
+        "        paneFocusOwnershipArgs(tabId)"
       ]
     },
     {
@@ -1377,7 +1379,7 @@
       "kind": "passthrough",
       "lines": [
         "  tabId: string",
-        "  }, [isActiveRef, isVisible, isVisibleRef, managerRef, panePtyBindingsRef, tabId])"
+        "  }, [isActiveRef, isChatViewMode, isVisible, isVisibleRef, managerRef, panePtyBindingsRef, tabId])"
       ]
     },
     {
@@ -2231,15 +2233,6 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/right-sidebar/AiVaultSessionVirtualList.tsx",
-      "feature": "session-handoff",
-      "kind": "import-swap",
-      "lines": [
-        "import { resolveAiVaultSessionHandoffWorktreeId } from '@/components/agent-session-continuation/fork-session-handoff/ai-vault-handoff-action'",
-        "      ? resolveAiVaultSessionHandoffWorktreeId(row.session, resumeActions)"
-      ]
-    },
-    {
       "path": "src/renderer/src/components/right-sidebar/ai-vault-session-launch-actions.ts",
       "feature": "session-handoff",
       "kind": "import-swap",
@@ -2701,8 +2694,8 @@
       "kind": "registration",
       "lines": [
         "import { createAsksSlice } from './slices/fork-ask-question-tool/asks'",
-        "      ...createTerminalQuickCommandHostsSlice(...a),",
-        "      ...createAsksSlice(...a)"
+        "        ...createTerminalQuickCommandHostsSlice(...a),",
+        "        ...createAsksSlice(...a)"
       ]
     },
     {
@@ -2803,6 +2796,443 @@
       "lines": [
         "import { AskEscalationGate } from '../components/fork-ask-question-tool/AskEscalationGate'",
         "      <AskEscalationGate />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/AiVaultVirtualRow.tsx",
+      "feature": "session-handoff",
+      "kind": "import-swap",
+      "lines": [
+        "import { resolveAiVaultSessionHandoffWorktreeId } from '@/components/agent-session-continuation/fork-session-handoff/ai-vault-handoff-action'",
+        "      ? resolveAiVaultSessionHandoffWorktreeId(row.session, resumeActions)"
+      ]
+    },
+    {
+      "path": "src/main/providers/ssh-pty-provider.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "  writeAcknowledged = (id: string, data: string): Promise<boolean> =>",
+        "    this.rpcOperations.writeAcknowledged(id, data)"
+      ]
+    },
+    {
+      "path": "src/main/runtime/mobile-session-terminal-projection.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import type { TerminalDockPaneState } from '../../shared/fork-terminal-dock/terminal-dock-pane-state'",
+        "      const terminalDockByPaneKey = terminalDockByPaneKeyByTabId.get(tab.id)"
+      ]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-publish-pty-backed-mobile-session-terminal.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "    const terminalDockByPaneKey =",
+        "      ...(terminalDockByPaneKey ? { terminalDockByPaneKey } : {}),"
+      ]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-runtime-id.ts",
+      "feature": "terminal-dock",
+      "kind": "registration",
+      "lines": [
+        "import type { TerminalDockPaneState } from '../../shared/fork-terminal-dock/terminal-dock-pane-state'",
+        "      rendererDockByPaneKeyByParentTabId: ReadonlyMap<"
+      ]
+    },
+    {
+      "path": "src/main/runtime/runtime-mobile-session-projection.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": [
+        "      ...(tab.terminalDockByPaneKey ? { terminalDockByPaneKey: tab.terminalDockByPaneKey } : {}),"
+      ]
+    },
+    {
+      "path": "src/preload/index.ts",
+      "feature": "session-handoff",
+      "kind": "registration",
+      "lines": [
+        "import { buildForkSessionHandoffApi } from './fork-session-handoff/session-handoff-preload-api'",
+        "  forkSessionHandoff: buildForkSessionHandoffApi(),"
+      ]
+    },
+    {
+      "path": "src/preload/index.ts",
+      "feature": "session-info",
+      "kind": "registration",
+      "lines": [
+        "import { buildForkSessionInfoApi } from './fork-session-info/session-info-preload-api'",
+        "  forkSessionInfo: buildForkSessionInfoApi(),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatMessageList.tsx",
+      "feature": "native-chat-relay",
+      "kind": "import-swap",
+      "lines": [
+        "import type { NativeChatLiveSession } from './fork-native-chat-relay/use-native-chat-live-session'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatMessageList.tsx",
+      "feature": "native-chat-width",
+      "kind": "registration",
+      "lines": [
+        "import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'",
+        "  const widthClassName = useNativeChatWidthClassName()"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatToolRun.tsx",
+      "feature": "native-chat-coloring",
+      "kind": "registration",
+      "lines": [
+        "        <ForkNativeChatToolName name={name}>",
+        "          <NativeChatToolCategoryDots blocks={blocks} />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-structured-composer-send.ts",
+      "feature": "agent-composer",
+      "kind": "import-swap",
+      "lines": [
+        "import { pushHistory, type HistoryState } from './fork-agent-composer/agent-composer-history'",
+        "import type { AgentComposerImageAttachment as NativeChatComposerImageAttachment } from './fork-agent-composer/AgentComposerField'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/pane-manager/terminal-scroll-intent-key-retention.test.ts",
+      "feature": "terminal-dock",
+      "kind": "passthrough",
+      "lines": ["    dockContainer: {} as never,"]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.tsx",
+      "feature": "agent-composer",
+      "kind": "import-swap",
+      "lines": [
+        "import type { AgentComposerImageAttachment as NativeChatComposerImageAttachment } from './fork-agent-composer/AgentComposerField'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.test.tsx",
+      "feature": "agent-composer",
+      "kind": "import-swap",
+      "lines": [
+        "import type { AgentComposerImageAttachment as NativeChatComposerImageAttachment } from './fork-agent-composer/AgentComposerField'"
+      ]
+    },
+    {
+      "path": "src/shared/structured-agent-session-options.ts",
+      "feature": "native-chat-session-options",
+      "kind": "passthrough",
+      "lines": ["    undefined,"]
+    },
+    {
+      "path": "src/main/persistence/applying-settings/ui-state-read.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { normalizeWorkspaceActivityUI } from '../../../shared/fork-workspace-activity-window/workspace-activity-ui'",
+        "  const workspaceActivityUI = normalizeWorkspaceActivityUI(uiState)",
+        "import { normalizeWorkspaceReviewUI } from '../../../shared/fork-workspace-review-filters/workspace-review-ui'",
+        "  const workspaceReviewUI = normalizeWorkspaceReviewUI(uiState)"
+      ]
+    },
+    {
+      "path": "src/main/persistence/applying-settings/ui-state-update.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { mergeWorkspaceActivityUI } from '../../../shared/fork-workspace-activity-window/workspace-activity-ui'",
+        "  const nextActivityUI = mergeWorkspaceActivityUI(operations.state.ui, sanitizedUpdates)",
+        "    ...nextActivityUI,",
+        "    ...nextReviewUI,",
+        "import { mergeWorkspaceReviewUI } from '../../../shared/fork-workspace-review-filters/workspace-review-ui'"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/client-ui-schemas.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "    ...WorkspaceActivityUIUpdateFields,",
+        "    ...WorkspaceReviewUIUpdateFields,",
+        "import { WorkspaceActivityUIUpdateFields } from './fork-workspace-activity-window/workspace-activity-ui-schema'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/app-shell/use-persisted-ui-writer.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "      workspaceActivityWindow: s.workspaceActivityWindow,",
+        "      workspaceActivityCustomDays: s.workspaceActivityCustomDays,",
+        "      hideCompletedReviewWorkspaces: s.hideCompletedReviewWorkspaces,",
+        "      hidePassingCheckWorkspaces: s.hidePassingCheckWorkspaces,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/SidebarFilter.tsx",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "    forkFilterCount > 0 ||",
+        "    clearForkFilters()",
+        "import { WorkspaceActivityWindowControl } from './fork-workspace-activity-window/WorkspaceActivityWindowControl'",
+        "import { useWorkspaceFilterChrome } from './fork-workspace-activity-window/use-workspace-filter-chrome'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/SidebarWorkspaceFilterSection.tsx",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "      <WorkspaceReviewFilterRows />",
+        "import { WorkspaceActivityWindowControl } from './fork-workspace-activity-window/WorkspaceActivityWindowControl'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/WorktreeList.tsx",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "    activityHiddenCount: activityHiddenWorktreeCount,",
+        "        <WorkspaceActivityHiddenCountRow count={activityHiddenCount} />",
+        "import { WorkspaceActivityHiddenCountRow } from './fork-workspace-activity-window/WorkspaceActivityHiddenCountRow'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/sidebar-filter-actions.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { getForkFilterCount } from './fork-workspace-activity-window/workspace-filter-chrome'",
+        "    getForkFilterCount(state) > 0 ||"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/use-visible-workspace-kanban-worktree-ids.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  const workspaceActivity = useWorkspaceActivityFilter()",
+        "  const workspaceReview = useWorkspaceReviewFilter()",
+        "import { useWorkspaceActivityFilter } from './fork-workspace-activity-window/use-workspace-activity-filter'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/use-worktree-card-controller.ts",
+      "feature": "workspace-review-filters",
+      "kind": "import-swap",
+      "lines": [
+        "import { useWorktreeCardReviewDetails } from './fork-workspace-review-filters/use-worktree-card-review-details'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/visible-worktree-kinds.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  Partial<WorkspaceReviewFilterState>",
+        "import type { WorkspaceActivityWindowState } from '../../../../shared/fork-workspace-activity-window/workspace-activity-window'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/visible-worktrees.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  isSelectedActivityWorkspace,",
+        "  filterWorktreesByActivity",
+        "} from './fork-workspace-activity-window/workspace-activity-filter'",
+        "  workspaceActivity?: WorkspaceActivityFilterContext",
+        "  all = filterWorktreesByActivity(all, opts.workspaceActivity, opts.repoMap)",
+        "  workspaceReview?: WorkspaceReviewFilterContext",
+        "  all = filterWorktreesByReview(all, opts.workspaceReview, opts.repoMap)",
+        "import type { WorkspaceActivityFilterContext } from './fork-workspace-activity-window/workspace-activity-filter'",
+        "import { getWorkspaceActivityFilterContext } from './fork-workspace-activity-window/use-workspace-activity-filter'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/listing/use-filters.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { useWorkspaceFilterChrome } from '../../fork-workspace-activity-window/use-workspace-filter-chrome'",
+        "  const { state: forkState, clearFilters: clearForkFilters } = useWorkspaceFilterChrome()",
+        "      ...forkState",
+        "    clearForkFilters()"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/listing/use-host-visible-scope.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  const activityContext = useWorkspaceActivityFilter()",
+        "    activityHiddenFolderCount",
+        "import { useWorkspaceActivityFilter } from '../../fork-workspace-activity-window/use-workspace-activity-filter'",
+        "import { filterFolderWorkspacesForActivityScope } from '../../fork-workspace-activity-window/workspace-activity-folder-filter'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/worktree-list/listing/use-visible-worktrees.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  const workspaceActivity = useWorkspaceActivityFilter()",
+        "      workspaceActivity,",
+        "  const workspaceReview = useWorkspaceReviewFilter()",
+        "      workspaceReview,",
+        "import { computeActivityVisibility } from '../../fork-workspace-activity-window/compute-activity-visibility'",
+        "import { useWorkspaceActivityFilter } from '../../fork-workspace-activity-window/use-workspace-activity-filter'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/startup-ui-hydration.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { hydrateWorkspaceActivityWindow } from '../../../shared/fork-workspace-activity-window/workspace-activity-window'",
+        "    ...hydrateWorkspaceActivityWindow({}),",
+        "import { hydrateWorkspaceReviewFilters } from '../../../shared/fork-workspace-review-filters/workspace-review-filters'",
+        "    ...hydrateWorkspaceReviewFilters({}),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/persisted-ui-write-baseline.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  workspaceActivityWindow: PersistedUIState['workspaceActivityWindow']",
+        "  workspaceActivityCustomDays: NonNullable<PersistedUIState['workspaceActivityCustomDays']>",
+        "  workspaceActivityWindow: true,",
+        "  workspaceActivityCustomDays: true,",
+        "  hideCompletedReviewWorkspaces: boolean",
+        "  hidePassingCheckWorkspaces: boolean",
+        "  hideCompletedReviewWorkspaces: true,",
+        "  hidePassingCheckWorkspaces: true,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/ui.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import type { UISlice as UpstreamUISlice } from './ui/ui-slice-contract'",
+        "  createWorkspaceActivityWindowSlice,",
+        "  type WorkspaceActivityWindowSlice",
+        "} from './fork-workspace-activity-window/workspace-activity-window-state'",
+        "  createWorkspaceReviewFiltersSlice,",
+        "  type WorkspaceReviewFiltersSlice",
+        "} from './fork-workspace-review-filters/workspace-review-filters-state'",
+        "export type UISlice = UpstreamUISlice & WorkspaceActivityWindowSlice & WorkspaceReviewFiltersSlice",
+        "    ...createWorkspaceActivityWindowSlice(set),",
+        "    ...createWorkspaceReviewFiltersSlice(set)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/worktrees/session/set-active-folder-workspace.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { workspaceActivityExitPatchForActivation } from '../../fork-workspace-activity-window/workspace-activity-exit-stamp'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/worktrees/session/set-active-worktree.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { workspaceActivityExitPatchForActivation } from '../../fork-workspace-activity-window/workspace-activity-exit-stamp'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/web/preload-api/web-preference-normalization.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  const activity = normalizeWebWorkspaceActivity(base, safeUpdates)",
+        "    ...activity,",
+        "  const review = normalizeWebWorkspaceReviewFilters(base, safeUpdates)",
+        "    ...review,",
+        "import { normalizeWebWorkspaceActivity } from './fork-workspace-activity-window/web-workspace-activity-preference'"
+      ]
+    },
+    {
+      "path": "src/shared/pairing-local-ui-fields.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "  ...WORKSPACE_ACTIVITY_WINDOW_UI_KEYS,",
+        "  ...WORKSPACE_REVIEW_FILTER_UI_KEYS",
+        "import { WORKSPACE_ACTIVITY_WINDOW_UI_KEYS } from './fork-workspace-activity-window/pairing-local-activity-fields'"
+      ]
+    },
+    {
+      "path": "src/shared/persisted-ui-state-types.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "} & PersistedWorkspaceActivityWindowState &",
+        "  PersistedWorkspaceReviewFilterState",
+        "import type { PersistedWorkspaceActivityWindowState } from './fork-workspace-activity-window/workspace-activity-window'"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/client-ui-pairing-local-fields.test.ts",
+      "feature": "workspace-activity-window",
+      "kind": "passthrough",
+      "lines": [
+        "import { WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES } from '../../../../shared/fork-workspace-activity-window/pairing-local-activity-fixture'",
+        "    ...WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES,",
+        "import { WORKSPACE_REVIEW_PAIRING_LOCAL_SAMPLES } from '../../../../shared/fork-workspace-review-filters/pairing-local-review-fixture'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/persisted-ui-write-baseline.test.ts",
+      "feature": "workspace-activity-window",
+      "kind": "passthrough",
+      "lines": [
+        "import { WORKSPACE_ACTIVITY_WRITE_BASELINE_SAMPLE } from '../../../../shared/fork-workspace-activity-window/workspace-activity-window'",
+        "    ...WORKSPACE_ACTIVITY_WRITE_BASELINE_SAMPLE,",
+        "import { WORKSPACE_REVIEW_FILTER_WRITE_BASELINE_SAMPLE } from '../../../../shared/fork-workspace-review-filters/workspace-review-filters'",
+        "    ...WORKSPACE_REVIEW_FILTER_WRITE_BASELINE_SAMPLE,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/web/web-preload-api-ui.test.ts",
+      "feature": "workspace-activity-window",
+      "kind": "passthrough",
+      "lines": [
+        "import { WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES } from '../../../shared/fork-workspace-activity-window/pairing-local-activity-fixture'",
+        "    ...WORKSPACE_ACTIVITY_PAIRING_LOCAL_SAMPLES,",
+        "import { WORKSPACE_REVIEW_PAIRING_LOCAL_SAMPLES } from '../../../shared/fork-workspace-review-filters/pairing-local-review-fixture'",
+        "    ...WORKSPACE_REVIEW_PAIRING_LOCAL_SAMPLES"
+      ]
+    },
+    {
+      "path": "src/shared/pairing-local-ui-fields.test.ts",
+      "feature": "workspace-activity-window",
+      "kind": "passthrough",
+      "lines": [
+        "import { omitPairingLocalUiFields, PAIRING_LOCAL_UI_FIELDS } from './pairing-local-ui-fields'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/ui/ui-slice-hydration-actions.ts",
+      "feature": "workspace-activity-window",
+      "kind": "registration",
+      "lines": [
+        "import { hydrateWorkspaceActivityWindow } from '../../../../../shared/fork-workspace-activity-window/workspace-activity-window'",
+        "import { hydrateWorkspaceReviewFilters } from '../../../../../shared/fork-workspace-review-filters/workspace-review-filters'",
+        "          ...hydrateWorkspaceActivityWindow(ui),",
+        "          ...hydrateWorkspaceReviewFilters(ui),"
       ]
     }
   ],
@@ -3188,38 +3618,8 @@
       "deleted": true
     },
     {
-      "path": "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.tsx",
-      "reason": "Chip renderer for the deleted NativeChatComposerField, whose attachment type it imports; the fork's AgentComposerField renders AgentComposerAttachmentThumbnail instead, so upstream's copy is unreferenced and does not compile.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.test.tsx",
-      "reason": "Tests the deleted NativeChatImageAttachmentPreview above.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
       "path": "src/renderer/src/components/native-chat/native-chat-composer-autogrow.test.tsx",
       "reason": "Superseded by the fork copy's test in fork-agent-composer.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-composer-scope-cache.test.ts",
-      "reason": "Superseded by the fork scope cache's own test.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-composer-scope-cache.ts",
-      "reason": "Superseded by agent-composer-scope-cache, which keys by composer scope rather than chat pane.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-draft-cache.test.ts",
-      "reason": "Superseded by the fork draft cache's own test.",
       "status": "permanent",
       "deleted": true
     },
@@ -3234,24 +3634,6 @@
       "status": "permanent",
       "deleted": true,
       "reason": "Upstream's chat-only PTY send hook; fork-agent-composer's useAgentComposerSend already serves both the chat pane and the terminal dock."
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-draft-cache.ts",
-      "reason": "Superseded by agent-composer-draft-cache, which subscribes so concurrent composer hosts converge.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-composer-keydown.test.tsx",
-      "reason": "Superseded by the fork copy's test in fork-agent-composer.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-composer-keydown.ts",
-      "reason": "Replaced by useAgentComposerKeydown in fork-agent-composer, which adds the docked composer's history recall.",
-      "status": "permanent",
-      "deleted": true
     },
     {
       "path": "src/renderer/src/components/native-chat/use-native-chat-draft.ts",
@@ -3352,28 +3734,9 @@
       "status": "permanent"
     },
     {
-      "path": "src/shared/native-file-drop.ts",
-      "reason": "Gives the composer drop payload the tabId/paneLeafId its terminal sibling already carries, so a broadcast drop reaches only the composer it landed on. Upstream's shared drop contract, read by preload, main, and every drop consumer — a forked copy would not reroute them.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#composer-file-drop-pane-scoping"
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-file-attachment-actions.ts",
-      "reason": "Ignores a composer file drop addressed to a different composer; unaddressed payloads still attach. Correctness fix to upstream routing, not fork-specific behavior.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#composer-file-drop-pane-scoping"
-    },
-    {
       "path": "src/renderer/src/components/native-chat/use-native-chat-file-attachment-actions.test.tsx",
-      "reason": "Covers the composer file-drop pane scoping fix: addressed, cross-pane, cross-tab, and unaddressed drops. Ships with the fix it exercises.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#composer-file-drop-pane-scoping"
-    },
-    {
-      "path": "src/shared/native-file-drop.test.ts",
-      "reason": "Adds composer tab/pane routing cases alongside the existing terminal ones, covering the composer drop payload change in the same file.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#composer-file-drop-pane-scoping"
+      "reason": "Hook-level coverage of upstream's composer drop scoping against the fork's own composer field, which publishes the scope key in place of the deleted upstream field.",
+      "status": "permanent"
     },
     {
       "path": "src/renderer/src/components/native-chat/use-native-chat-paste-bridge.ts",
@@ -3398,6 +3761,50 @@
       "reason": "Awaits the deferred event sink before the history page read: the takeover's reap tombstones the running turn's status row asynchronously, so on a loaded runner the page still carries it and the ordering assertion fails.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#structured-session-history-page-races-the-reap-tombstone"
+    },
+    {
+      "path": "config/scripts/client-hosted-browser-package-coverage.test.mjs",
+      "reason": "Contracts for the fork's PR packaging policy; upstream's Windows PR job must not be required by a macOS-only release fork.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/pr-code-change-scope.test.mjs",
+      "reason": "Retains upstream classifier behavior while dropping source-pinning assertions for the Windows PR job absent from the fork-owned workflow.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/pr-workflow-parallelism.test.mjs",
+      "reason": "Contracts for the fork-owned PR job graph, which omits Windows packaging and must not restore upstream's exact aggregate dependency list.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/skills-cli-package-workflow.test.mjs",
+      "reason": "Asserts the Windows packaged CLI job removed from the fork's PR lane; the fork ships only macOS artifacts.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/win32-test-lane-registration.test.mjs",
+      "reason": "Requires registration in the Windows PR job that this macOS-only release fork deliberately does not run.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/windows-pty-native-capability-workflow.test.mjs",
+      "reason": "Asserts the removed Windows PR packaging lane and pins its smoke-driver source; the fork retains platform behavior tests instead.",
+      "status": "permanent",
+      "deleted": true
+    },
+    {
+      "path": "config/scripts/wsl-e2e-lane-contract.test.mjs",
+      "reason": "Retains WSL routing and reusable-lane contracts without requiring the Windows PR job omitted by this macOS-only release fork.",
+      "status": "permanent"
+    },
+    {
+      "path": "src/shared/windows-lane-tree-removal-boundary.test.ts",
+      "reason": "Scans teardown source for the Windows PR job deliberately removed by this macOS-only release fork; platform removal behavior tests remain.",
+      "status": "permanent",
+      "deleted": true
     }
   ],
   "residuals": {
@@ -3441,17 +3848,9 @@
       "added": 1,
       "removed": 1
     },
-    "config/scripts/pr-code-change-scope.test.mjs": {
-      "added": 7,
-      "removed": 1
-    },
     "config/scripts/pr-e2e-gate-contract.test.mjs": {
       "added": 7,
       "removed": 1
-    },
-    "config/scripts/pr-workflow-parallelism.test.mjs": {
-      "added": 1,
-      "removed": 0
     },
     "config/tsconfig.cli.json": {
       "added": 2,
@@ -3474,7 +3873,7 @@
       "removed": 7
     },
     "src/cli/bundled-skill-guides.ts": {
-      "added": 10,
+      "added": 11,
       "removed": 0
     },
     "src/cli/handler-group-manifest.ts": {
@@ -3642,7 +4041,7 @@
       "removed": 0
     },
     "src/main/providers/ssh-pty-provider-rpc-operations.ts": {
-      "added": 6,
+      "added": 8,
       "removed": 0
     },
     "src/main/rate-limits/service/service-fetch-policy.ts": {
@@ -3674,7 +4073,7 @@
       "removed": 4
     },
     "src/main/runtime/rpc/methods/client-ui-schemas.ts": {
-      "added": 2,
+      "added": 6,
       "removed": 0
     },
     "src/main/runtime/rpc/methods/index.ts": {
@@ -3890,8 +4289,8 @@
       "removed": 83
     },
     "src/renderer/src/components/native-chat/NativeChatComposer.tsx": {
-      "added": 232,
-      "removed": 282
+      "added": 201,
+      "removed": 277
     },
     "src/renderer/src/components/native-chat/NativeChatInteractiveCard.test.tsx": {
       "added": 21,
@@ -3911,7 +4310,7 @@
     },
     "src/renderer/src/components/native-chat/NativeChatResolvedView.tsx": {
       "added": 16,
-      "removed": 18
+      "removed": 17
     },
     "src/renderer/src/components/native-chat/NativeChatView.test.tsx": {
       "added": 4,
@@ -3926,11 +4325,11 @@
       "removed": 1
     },
     "src/renderer/src/components/native-chat/native-chat-composer-state.test.ts": {
-      "added": 139,
+      "added": 141,
       "removed": 49
     },
     "src/renderer/src/components/native-chat/native-chat-composer-state.ts": {
-      "added": 33,
+      "added": 35,
       "removed": 41
     },
     "src/renderer/src/components/native-chat/native-chat-composer-types.ts": {
@@ -3942,7 +4341,7 @@
       "removed": 1
     },
     "src/renderer/src/components/native-chat/native-chat-picker-items.ts": {
-      "added": 48,
+      "added": 71,
       "removed": 15
     },
     "src/renderer/src/components/native-chat/native-chat-pty-session-options.ts": {
@@ -3970,8 +4369,8 @@
       "removed": 2
     },
     "src/renderer/src/components/native-chat/native-chat-structured-send-composition-clear.test.tsx": {
-      "added": 2,
-      "removed": 2
+      "added": 12,
+      "removed": 3
     },
     "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.test.tsx": {
       "added": 78,
@@ -3979,7 +4378,7 @@
     },
     "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.ts": {
       "added": 98,
-      "removed": 48
+      "removed": 47
     },
     "src/renderer/src/components/native-chat/use-native-chat-interactive-send.test.tsx": {
       "added": 38,
@@ -4032,10 +4431,6 @@
     "src/renderer/src/components/right-sidebar/AiVaultSessionRow.tsx": {
       "added": 2,
       "removed": 0
-    },
-    "src/renderer/src/components/right-sidebar/AiVaultSessionVirtualList.tsx": {
-      "added": 3,
-      "removed": 4
     },
     "src/renderer/src/components/right-sidebar/ai-vault-session-launch-actions.ts": {
       "added": 3,
@@ -4102,8 +4497,8 @@
       "removed": 50
     },
     "src/renderer/src/components/sidebar/WorktreeList.tsx": {
-      "added": 10,
-      "removed": 9
+      "added": 24,
+      "removed": 12
     },
     "src/renderer/src/components/sidebar/comment-markdown-element-renderers.tsx": {
       "added": 6,
@@ -4243,7 +4638,7 @@
     },
     "src/renderer/src/components/terminal-pane/pane-helpers.ts": {
       "added": 25,
-      "removed": 6
+      "removed": 8
     },
     "src/renderer/src/components/terminal-pane/terminal-input-quarantine.ts": {
       "added": 84,
@@ -4270,11 +4665,11 @@
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/terminal-visibility-resume.test.ts": {
-      "added": 67,
-      "removed": 0
+      "added": 73,
+      "removed": 1
     },
     "src/renderer/src/components/terminal-pane/terminal-visibility-resume.ts": {
-      "added": 15,
+      "added": 19,
       "removed": 6
     },
     "src/renderer/src/components/terminal-pane/use-terminal-pane-chat-state.ts": {
@@ -4298,7 +4693,7 @@
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/use-terminal-window-wake-recovery.test.ts": {
-      "added": 12,
+      "added": 13,
       "removed": 0
     },
     "src/renderer/src/components/terminal-pane/use-terminal-window-wake-recovery.ts": {
@@ -4506,8 +4901,8 @@
       "removed": 17
     },
     "src/renderer/src/web/preload-api/web-preference-normalization.ts": {
-      "added": 2,
-      "removed": 0
+      "added": 25,
+      "removed": 2
     },
     "src/renderer/src/web/preload-api/web-terminal-api.ts": {
       "added": 2,
@@ -4648,6 +5043,158 @@
     "tests/e2e/cross-version-wire/release-checkout.unit.test.ts": {
       "added": 11,
       "removed": 14
+    },
+    "src/renderer/src/components/right-sidebar/AiVaultVirtualRow.tsx": {
+      "added": 3,
+      "removed": 4
+    },
+    "src/main/providers/ssh-pty-provider.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/main/runtime/mobile-session-terminal-projection.ts": {
+      "added": 12,
+      "removed": 0
+    },
+    "src/main/runtime/orca-runtime-publish-pty-backed-mobile-session-terminal.ts": {
+      "added": 11,
+      "removed": 0
+    },
+    "src/main/runtime/orca-runtime-runtime-id.ts": {
+      "added": 8,
+      "removed": 0
+    },
+    "src/main/runtime/runtime-mobile-session-projection.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/components/native-chat/NativeChatMessageList.tsx": {
+      "added": 5,
+      "removed": 2
+    },
+    "src/renderer/src/components/native-chat/NativeChatToolRun.tsx": {
+      "added": 7,
+      "removed": 2
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-structured-composer-send.ts": {
+      "added": 2,
+      "removed": 2
+    },
+    "src/renderer/src/lib/pane-manager/terminal-scroll-intent-key-retention.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.test.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/shared/structured-agent-session-options.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/main/persistence/applying-settings/ui-state-read.ts": {
+      "added": 6,
+      "removed": 0
+    },
+    "src/main/persistence/applying-settings/ui-state-update.ts": {
+      "added": 7,
+      "removed": 0
+    },
+    "src/renderer/src/app-shell/use-persisted-ui-writer.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/renderer/src/components/sidebar/SidebarFilter.tsx": {
+      "added": 11,
+      "removed": 19
+    },
+    "src/renderer/src/components/sidebar/SidebarWorkspaceFilterSection.tsx": {
+      "added": 4,
+      "removed": 11
+    },
+    "src/renderer/src/components/sidebar/sidebar-filter-actions.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/use-visible-workspace-kanban-worktree-ids.ts": {
+      "added": 11,
+      "removed": 3
+    },
+    "src/renderer/src/components/sidebar/use-worktree-card-controller.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/visible-worktree-kinds.ts": {
+      "added": 7,
+      "removed": 2
+    },
+    "src/renderer/src/components/sidebar/visible-worktrees.ts": {
+      "added": 19,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/worktree-list/listing/use-filters.ts": {
+      "added": 13,
+      "removed": 5
+    },
+    "src/renderer/src/components/sidebar/worktree-list/listing/use-host-visible-scope.ts": {
+      "added": 36,
+      "removed": 21
+    },
+    "src/renderer/src/components/sidebar/worktree-list/listing/use-visible-worktrees.ts": {
+      "added": 21,
+      "removed": 5
+    },
+    "src/renderer/src/lib/startup-ui-hydration.ts": {
+      "added": 4,
+      "removed": 2
+    },
+    "src/renderer/src/store/slices/persisted-ui-write-baseline.ts": {
+      "added": 8,
+      "removed": 0
+    },
+    "src/renderer/src/store/slices/ui.ts": {
+      "added": 14,
+      "removed": 4
+    },
+    "src/renderer/src/store/slices/worktrees/session/set-active-folder-workspace.ts": {
+      "added": 11,
+      "removed": 1
+    },
+    "src/renderer/src/store/slices/worktrees/session/set-active-worktree.ts": {
+      "added": 19,
+      "removed": 2
+    },
+    "src/shared/pairing-local-ui-fields.ts": {
+      "added": 5,
+      "removed": 2
+    },
+    "src/shared/persisted-ui-state-types.ts": {
+      "added": 4,
+      "removed": 1
+    },
+    "src/main/runtime/rpc/methods/client-ui-pairing-local-fields.test.ts": {
+      "added": 5,
+      "removed": 1
+    },
+    "src/renderer/src/store/slices/persisted-ui-write-baseline.test.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/renderer/src/web/web-preload-api-ui.test.ts": {
+      "added": 10,
+      "removed": 2
+    },
+    "src/shared/pairing-local-ui-fields.test.ts": {
+      "added": 5,
+      "removed": 1
+    },
+    "src/renderer/src/store/slices/ui/ui-slice-hydration-actions.ts": {
+      "added": 4,
+      "removed": 3
     }
   }
 }

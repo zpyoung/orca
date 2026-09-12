@@ -18,6 +18,8 @@ import { ClientUiWorkspaceFilterFields } from './client-ui-workspace-filter-fiel
 import { TaskResumeState } from './task-resume-state-schema'
 import { WorkspaceCleanup } from './workspace-cleanup-ui-schema'
 import { omitUndefinedValues, tolerateUnknownValues } from './ui-update-value-tolerance'
+import { WorkspaceActivityUIUpdateFields } from './fork-workspace-activity-window/workspace-activity-ui-schema'
+import { WorkspaceReviewUIUpdateFields } from './fork-workspace-review-filters/workspace-review-ui-schema'
 
 const NullableString = z.string().nullable()
 const StringArray = z.array(z.string())
@@ -132,6 +134,7 @@ const UiUpdateFields = z
     agentsFilterRepoIds: StringArray.optional(),
     agentsShowChildAgents: z.boolean().optional(),
     agentsCompactMode: z.boolean().optional(),
+    agentsShowSearch: z.boolean().optional(),
     agentsReadFilter: z.enum(THREAD_READ_FILTER_VALUES).optional(),
     agentsGroupBy: z.enum(ACTIVITY_GROUP_BY_VALUES).optional(),
     workspaceHostOrder: z.array(z.string()).optional(),
@@ -145,6 +148,8 @@ const UiUpdateFields = z
       .array(z.object({ hostId: z.string(), repoId: z.string() }).strict())
       .optional(),
     ...ClientUiWorkspaceFilterFields,
+    ...WorkspaceActivityUIUpdateFields,
+    ...WorkspaceReviewUIUpdateFields,
     // Why: rides App.tsx's debounced writer, so omitting it rejected that entire
     // payload (sidebar widths, filters, agent acks) for every paired client.
     showDotfilesByWorktree: z.record(z.string(), z.boolean()).optional(),

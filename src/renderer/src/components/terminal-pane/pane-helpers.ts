@@ -6,6 +6,7 @@ export type PaneFocusOwnership = {
   tabId: string
   paneDockOwnsFocus: (paneKey: PaneKey) => boolean
 }
+import { focusPanePreservingOverlays } from '@/lib/pane-manager/pane-overlay-focus'
 
 export function fitPanes(manager: PaneManager): void {
   manager.fitAllPanes()
@@ -35,7 +36,7 @@ export function focusActivePane(manager: PaneManager, ownership?: PaneFocusOwner
   if (shouldPreserveEditableFocus(activeElement)) {
     return
   }
-  activePane.terminal.focus()
+  focusPanePreservingOverlays(activePane)
 }
 
 export function fitAndFocusPanes(manager: PaneManager, ownership?: PaneFocusOwnership): void {

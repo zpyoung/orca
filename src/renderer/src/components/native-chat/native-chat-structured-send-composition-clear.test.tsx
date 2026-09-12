@@ -93,6 +93,8 @@ function transport(
     optionSnapshot: [],
     onError: vi.fn(),
     runtime: 'remote',
+    sessionId: 'session-test',
+    runtimeEnvironmentId: null,
     ...overrides
   }
 }
@@ -103,6 +105,16 @@ function textarea(): HTMLTextAreaElement {
 
 function pressEnter(input: HTMLTextAreaElement): void {
   fireEvent.keyDown(input, { key: 'Enter', keyCode: 13, isComposing: false })
+}
+
+// Why: this fork's composer field is a real <textarea>, so it is driven by change
+// events rather than by upstream's tiptap prompt-editor helpers.
+function changePrompt(input: HTMLTextAreaElement, value: string): void {
+  fireEvent.change(input, { target: { value } })
+}
+
+function promptValue(input: HTMLTextAreaElement): string {
+  return input.value
 }
 
 let paneCounter = 0
@@ -142,12 +154,12 @@ describe('structured send racing the next IME composition', () => {
     renderComposer(structured)
     const input = textarea()
 
-    fireEvent.change(input, { target: { value: '안녕' } })
+    changePrompt(input, '안녕')
     pressEnter(input)
     expect(structured.dispatchCommand).toHaveBeenCalledWith('안녕')
 
     fireEvent.compositionStart(input)
-    fireEvent.change(input, { target: { value: '안녕하' } })
+    changePrompt(input, '안녕하')
 
     await act(async () => {
       dispatch.resolve(PASS_THROUGH)
@@ -155,7 +167,7 @@ describe('structured send racing the next IME composition', () => {
     })
     fireEvent.compositionEnd(input, { data: '하' })
 
-    expect(input.value).toBe('하')
+    expect(promptValue(input)).toBe('하')
 
     await act(async () => pressEnter(input))
     expect(structured.send).toHaveBeenLastCalledWith('하', [])
@@ -167,11 +179,11 @@ describe('structured send racing the next IME composition', () => {
     renderComposer(structured)
     const input = textarea()
 
-    fireEvent.change(input, { target: { value: 'abcd' } })
+    changePrompt(input, 'abcd')
     pressEnter(input)
 
     fireEvent.compositionStart(input)
-    fireEvent.change(input, { target: { value: 'ab가cd' } })
+    changePrompt(input, 'ab가cd')
 
     await act(async () => {
       dispatch.resolve(PASS_THROUGH)
@@ -179,7 +191,7 @@ describe('structured send racing the next IME composition', () => {
     })
     fireEvent.compositionEnd(input, { data: '가' })
 
-    expect(input.value).toBe('가')
+    expect(promptValue(input)).toBe('가')
   })
 
   // Clearing optimistically before the RPC would lose the draft here, which is why the clear
@@ -189,11 +201,11 @@ describe('structured send racing the next IME composition', () => {
     renderComposer(structured)
     const input = textarea()
 
-    fireEvent.change(input, { target: { value: '안녕' } })
+    changePrompt(input, '안녕')
     await act(async () => pressEnter(input))
 
     expect(structured.send).toHaveBeenCalledWith('안녕', [])
-    expect(input.value).toBe('안녕')
+    expect(promptValue(input)).toBe('안녕')
   })
 
   it('keeps the draft when a rejected send races the next composition', async () => {
@@ -205,11 +217,11 @@ describe('structured send racing the next IME composition', () => {
     renderComposer(structured)
     const input = textarea()
 
-    fireEvent.change(input, { target: { value: '안녕' } })
+    changePrompt(input, '안녕')
     pressEnter(input)
 
     fireEvent.compositionStart(input)
-    fireEvent.change(input, { target: { value: '안녕하' } })
+    changePrompt(input, '안녕하')
 
     await act(async () => {
       dispatch.resolve(PASS_THROUGH)
@@ -217,7 +229,7 @@ describe('structured send racing the next IME composition', () => {
     })
     fireEvent.compositionEnd(input, { data: '하' })
 
-    expect(input.value).toBe('안녕하')
+    expect(promptValue(input)).toBe('안녕하')
   })
 
   // A rejected command still reports its error, and the composer keeps the text to retry.
@@ -228,11 +240,11 @@ describe('structured send racing the next IME composition', () => {
     renderComposer(structured)
     const input = textarea()
 
-    fireEvent.change(input, { target: { value: '/model' } })
+    changePrompt(input, '/model')
     await act(async () => pressEnter(input))
 
     expect(structured.onError).toHaveBeenCalledWith('nope')
     expect(structured.send).not.toHaveBeenCalled()
-    expect(input.value).toBe('/model')
+    expect(promptValue(input)).toBe('/model')
   })
 })

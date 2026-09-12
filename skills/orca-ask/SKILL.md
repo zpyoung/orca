@@ -44,7 +44,7 @@ same way in POSIX shells, PowerShell, and cmd.exe.
 If the selected executable cannot run, report its exact error and stop. Do not fall through
 to another executable, which could silently target a different Orca build.
 
-## Load the full guide before running Orca commands
+## Load the version-matched guide before running Orca commands
 
 ```text
 ORCA skills get orca-ask
@@ -55,27 +55,12 @@ next commands — the register/wait/cancel commands, the register → wait loop,
 the question schema, escape hatches, credential refusal, and answer shapes. Read it first,
 then run the specific command you need.
 
-Don't guess subcommands or flags from memory or from a cached copy of this stub. They
-change between Orca releases, and this file deliberately no longer lists them. Confirm the
-app is up with `ORCA status --json` (start it with `ORCA open --json` if needed), and
-prefer `--json` for agent-driven calls.
-
-## If an older Orca does not recognize `skills get`
-
-Use this fallback only when the selected binary explicitly reports that `skills get` is an
-unknown command. Another failure is not proof of an older binary; report it rather than
-guessing or changing executables. For a confirmed pre-guide binary, use only this bounded,
-read-only bootstrap to orient. Do not dead-end and do not invent commands:
-
-```text
-ORCA status --json
-```
-
 There is no safe read-only substitute for `ask` itself — registering one is a real,
 user-visible side effect, and an older binary may not have the command at all. Do not
 fall back to `orca orchestration ask`; it is a different tool for worker-to-coordinator
 messaging, not for asking the human user.
 
-Then tell the user that updating Orca restores the full, version-matched guide via
-`ORCA skills get orca-ask`. Beyond `status`, ask the user rather than guessing a command
-surface this older binary may not support.
+Prefer `--json`. Use the selected executable's `--help` for commands or flags the guide does
+not cover. If a command reports that Orca is not running, start it with `ORCA open --json`
+and retry. If `skills get` is unknown, explain that updating Orca restores the guide; use
+`--help` for read-only discovery and do not guess unsupported commands.

@@ -5,7 +5,6 @@ import { useAppStore } from '../../store'
 import { getCachedTerminalTabForWorktree } from './terminal-tab-lookup'
 import { selectTerminalTabAgentTypesByLeaf } from './terminal-tab-agent-type-index'
 import { collectLeafIdsInOrder, EMPTY_LAYOUT } from './layout-serialization'
-import { makePaneKey } from '../../../../shared/stable-pane-id'
 import { sanitizeTerminalLayoutPaneTitles } from '@/lib/terminal-pane-title-sanitization'
 import { resolveNativeChatLeafTitleAgent } from './native-chat-leaf-title-agent'
 import { useTerminalPaneStoreActions } from './use-terminal-pane-store-actions'
@@ -57,11 +56,6 @@ export function useTerminalPaneChatState(controller: TerminalPaneTitleController
   )
   const nativeChatEnabled = useAppStore((store) => store.settings?.experimentalNativeChat === true)
   const effectiveChatViewMode = nativeChatEnabled && isChatViewMode
-  const chatPaneDispatchStatus = useAppStore((store) =>
-    chatLeafId
-      ? store.agentStatusByPaneKey[makePaneKey(tabId, chatLeafId)]?.orchestration?.dispatchStatus
-      : undefined
-  )
   const runtimePaneTitlesByPaneId = useAppStore(
     useShallow((store) => store.runtimePaneTitlesByTabId[tabId] ?? {})
   )
@@ -284,7 +278,6 @@ export function useTerminalPaneChatState(controller: TerminalPaneTitleController
     structuredSessionId,
     nativeChatEnabled,
     effectiveChatViewMode,
-    chatPaneDispatchStatus,
     unifiedTabLabel,
     runtimePaneTitlesByPaneId,
     tabAgentTypeByLeaf,

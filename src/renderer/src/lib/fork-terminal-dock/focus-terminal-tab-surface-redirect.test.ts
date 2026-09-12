@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { UNCOVERED_TERMINAL_LEAF_SELECTOR } from '@/components/terminal-pane/native-chat-covered-pane'
 import { focusTerminalTabSurface } from '../focus-terminal-tab-surface'
 
 const mocks = vi.hoisted(() => ({
@@ -23,10 +24,12 @@ function stubAnimationFrames(): () => void {
 }
 
 function focusTabWithSurface(surface: object): void {
+  // Why: the tab-wide lookup is scoped to uncovered leaves, so the stub has to
+  // answer the same selector the implementation builds, not a bare descendant one.
+  const helperSelector = `[data-terminal-tab-id="tab-1"] ${UNCOVERED_TERMINAL_LEAF_SELECTOR} .xterm-helper-textarea`
   vi.stubGlobal('document', {
-    querySelector: vi.fn((selector: string) =>
-      selector === '[data-terminal-tab-id="tab-1"] .xterm-helper-textarea' ? surface : null
-    )
+    querySelector: vi.fn((selector: string) => (selector === helperSelector ? surface : null)),
+    querySelectorAll: vi.fn(() => [])
   })
   const flushAnimationFrames = stubAnimationFrames()
   focusTerminalTabSurface('tab-1', null, { refreshImeContext: true })

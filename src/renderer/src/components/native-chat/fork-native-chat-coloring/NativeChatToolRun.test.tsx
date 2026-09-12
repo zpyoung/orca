@@ -60,8 +60,11 @@ describe('NativeChatToolRun coloring', () => {
     const { container } = render(<NativeChatToolRun blocks={blocks} expandSignal />)
 
     expect(container.querySelector('[data-tool-category-glyph="exec"]')).toBeInTheDocument()
-    const code = screen.getByText('Bash')
-    expect(code.className).toContain('text-tool-exec')
+    // Why: the run header repeats each member's name, so the row's own <code> is
+    // the only unambiguous handle on the coloured element.
+    const code = container.querySelector('code')
+    expect(code?.textContent).toBe('Bash')
+    expect(code?.className).toContain('text-tool-exec')
   })
 
   it('renders neither glyph nor color class for an unrecognized tool name', () => {
@@ -70,9 +73,10 @@ describe('NativeChatToolRun coloring', () => {
     const { container } = render(<NativeChatToolRun blocks={blocks} expandSignal />)
 
     expect(container.querySelector('[data-tool-category-glyph]')).toBeNull()
-    const code = screen.getByText('SomeMcpTool')
-    expect(code.className).not.toMatch(/text-tool-/)
-    expect(code.className).toContain('text-foreground/90')
+    const code = container.querySelector('code')
+    expect(code?.textContent).toBe('SomeMcpTool')
+    expect(code?.className).not.toMatch(/text-tool-/)
+    expect(code?.className).toContain('text-foreground/90')
   })
 
   it('gives a tool result block no glyph and no category color', () => {

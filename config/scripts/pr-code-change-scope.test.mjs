@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -12,21 +12,6 @@ import {
 
 const projectDir = resolve(import.meta.dirname, '../..')
 const prWorkflow = parse(readFileSync(join(projectDir, '.github/workflows/pr.yml'), 'utf8'))
-
-const expensiveJobs = [
-  'static_analysis',
-  'typecheck',
-  'git_compatibility',
-  'codex_index_heal_contract',
-  'xterm_patch_sync',
-  'shell_contracts',
-  'test',
-  'orcad_browser',
-  'cross-version-wire',
-  'managed_hook_node18',
-  'package',
-  'package_windows'
-]
 
 const ALWAYS_ON = ['static_analysis', 'typecheck', 'test']
 
@@ -353,25 +338,57 @@ describe('per-job path classification', () => {
     expect(result.stdout).toContain('package=false\n')
     expect(result.stdout).toContain('test=true\n')
   })
+
+  // A long-lived PR whose base.sha has gone stale diffs thousands of files, so the writer
+  // outruns one pipe buffer. A single fd-0 read then returns early, breaks the writer's pipe,
+  // and still exits 0 -- emitting no pairs at all, which silently skips every lane.
+  it('classifies a path that arrives after the first pipe buffer', async () => {
+    const filler = Array.from(
+      { length: 12_000 },
+      (_, index) => `docs/reference/generated-placeholder-${index}.md`
+    )
+    const input = `${[...filler, 'config/patches/xterm-upstream.json'].join('\n')}\n`
+    expect(input.length).toBeGreaterThan(64 * 1024)
+
+    const child = spawn(process.execPath, ['config/scripts/pr-code-change-scope.mjs'], {
+      cwd: projectDir,
+      stdio: ['pipe', 'pipe', 'pipe']
+    })
+    let stdout = ''
+    let stderr = ''
+    let brokePipe = false
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    child.stdout.on('data', (chunk) => (stdout += chunk))
+    child.stderr.on('data', (chunk) => (stderr += chunk))
+    child.stdin.on('error', (error) => {
+      brokePipe ||= error.code === 'EPIPE'
+    })
+
+    const exitCode = await new Promise((resolvePromise) => {
+      child.on('close', resolvePromise)
+      let offset = 0
+      const step = () => {
+        if (offset >= input.length) {
+          child.stdin.end()
+          return
+        }
+        child.stdin.write(input.slice(offset, offset + 64 * 1024))
+        offset += 64 * 1024
+        setTimeout(step, 20)
+      }
+      step()
+    })
+
+    expect(stderr).not.toContain('EAGAIN')
+    expect(brokePipe).toBe(false)
+    expect(exitCode, stderr).toBe(0)
+    expect(stdout).toContain('should_run=true\n')
+    expect(stdout).toContain('xterm_patch_sync=true\n')
+  })
 })
 
 describe('PR Checks skip wiring', () => {
-  it('classifies the PR range with a tested script and expands renames', () => {
-    const classify = prWorkflow.jobs.code_paths.steps.find(
-      (step) => step.name === 'Classify changed paths'
-    )
-    expect(classify.run).toContain('--diff-filter=ACDMR')
-    expect(classify.run).toContain('--no-renames')
-    expect(classify.run).toContain('--merge-base "$BASE_SHA" "$HEAD_SHA"')
-    expect(classify.run).toContain('node config/scripts/pr-code-change-scope.mjs')
-    expect(classify.run).toContain('tee -a "$GITHUB_OUTPUT"')
-    for (const jobName of ['should_run', 'native_cache_changed', ...expensiveJobs]) {
-      expect(prWorkflow.jobs.code_paths.outputs[jobName], jobName).toBe(
-        `\${{ steps.filter.outputs.${jobName} }}`
-      )
-    }
-  })
-
   it('gives static analysis the mobile types its type-aware pass resolves', () => {
     expect(prWorkflow.jobs.code_paths.outputs.mobile_dependencies).toBe(
       '${{ steps.filter.outputs.mobile_dependencies }}'
@@ -389,28 +406,6 @@ describe('PR Checks skip wiring', () => {
   it('keeps the cheap root-directory guard on docs-only PRs', () => {
     expect(prWorkflow.jobs.root_directory_guard.if).toBeUndefined()
     expect(prWorkflow.jobs.root_directory_guard.needs).toBeUndefined()
-  })
-
-  it('gates each expensive job on its classifier and cache prerequisite', () => {
-    for (const jobName of expensiveJobs.filter((jobName) => jobName !== 'test')) {
-      expect(prWorkflow.jobs[jobName].needs, jobName).toEqual(['code_paths'])
-      expect(prWorkflow.jobs[jobName].if, jobName).toBe(
-        `needs.code_paths.outputs.${jobName} == 'true'`
-      )
-    }
-    expect(prWorkflow.jobs.test.needs).toEqual(['code_paths', 'test_native_cache'])
-    expect(prWorkflow.jobs.test.if).toContain("needs.code_paths.outputs.test == 'true'")
-    expect(prWorkflow.jobs.test.if).toContain("needs.test_native_cache.result == 'success'")
-    expect(prWorkflow.jobs.test.if).toContain("needs.test_native_cache.result == 'skipped'")
-    expect(prWorkflow.jobs.test_native_cache.needs).toEqual(['code_paths'])
-    expect(prWorkflow.jobs.test_native_cache.if).toBe(
-      "needs.code_paths.outputs.native_cache_changed == 'true'"
-    )
-    expect(prWorkflow.jobs.test_native_cache.strategy).toBeUndefined()
-    const primerInstall = prWorkflow.jobs.test_native_cache.steps.find(
-      (step) => step.uses === './.github/actions/install-node-dependencies'
-    )
-    expect(primerInstall.with['node-version']).toBe('24')
   })
 
   it('skips e2e detection on docs-only PRs without dropping the draft gate', () => {

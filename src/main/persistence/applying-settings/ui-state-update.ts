@@ -42,6 +42,9 @@ import {
   stripMainOwnedTelemetryMarkerFromUI
 } from './ui-interaction-merge'
 
+import { mergeWorkspaceActivityUI } from '../../../shared/fork-workspace-activity-window/workspace-activity-ui'
+import { mergeWorkspaceReviewUI } from '../../../shared/fork-workspace-review-filters/workspace-review-ui'
+
 export type UIUpdateOperations = {
   state: PersistedState
   removeRetainedBlob: (
@@ -79,6 +82,8 @@ export function updatePersistedUI(
     // fallback; the profile sidecar is authoritative in current builds.
     activeView: currentUI.activeView
   }
+  const nextActivityUI = mergeWorkspaceActivityUI(operations.state.ui, sanitizedUpdates)
+  const nextReviewUI = mergeWorkspaceReviewUI(operations.state.ui, sanitizedUpdates)
   const nextRightSidebarTab =
     sanitizedUpdates.rightSidebarTab !== undefined
       ? normalizeRightSidebarTab(sanitizedUpdates.rightSidebarTab)
@@ -122,6 +127,8 @@ export function updatePersistedUI(
       sanitizedUpdates.agentActivityDisplayMode !== undefined
         ? normalizeAgentActivityDisplayMode(sanitizedUpdates.agentActivityDisplayMode)
         : normalizeAgentActivityDisplayMode(operations.state.ui?.agentActivityDisplayMode),
+    ...nextActivityUI,
+    ...nextReviewUI,
     workspaceStatuses:
       sanitizedUpdates.workspaceStatuses !== undefined
         ? normalizeWorkspaceStatuses(sanitizedUpdates.workspaceStatuses)

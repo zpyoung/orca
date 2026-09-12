@@ -101,6 +101,7 @@ function resumeArgs(manager: FakeManager, shouldUseLightTabResume: boolean) {
     ...focusOwnership,
     manager: manager as never as PaneManager,
     isActive: true,
+    isChatViewMode: false,
     wasVisible: false,
     shouldUseLightTabResume,
     captureViewportPositions: vi.fn(() => new Map()),
@@ -246,6 +247,35 @@ describe('resumeTerminalVisibility reveal repaint', () => {
     expect(manager.fitAllPanes).not.toHaveBeenCalled()
   })
 
+  it.each([
+    ['light', true],
+    ['heavy', false]
+  ])('does not focus the covered terminal on a %s chat reveal', async (_path, lightResume) => {
+    const manager = createManager()
+    const args = resumeArgs(manager, lightResume)
+    args.isChatViewMode = true
+    const { focusActivePane } = vi.mocked(await import('./pane-helpers'))
+
+    resumeTerminalVisibility(args)
+
+    expect(focusActivePane).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['light', true],
+    ['heavy', false]
+  ])('keeps focusing an active terminal on a %s reveal', async (_path, lightResume) => {
+    const manager = createManager()
+    const { focusActivePane } = vi.mocked(await import('./pane-helpers'))
+
+    resumeTerminalVisibility(resumeArgs(manager, lightResume))
+
+    // Why: this fork always threads dock focus ownership as the second argument,
+    // so the upstream case is asserted on the manager plus that ownership record.
+    expect(focusActivePane).toHaveBeenCalledWith(manager, expect.anything())
+    expectThreadedOwnership(vi.mocked(focusActivePane).mock.calls.at(-1)?.[1])
+  })
+
   it('checks each pane for a stale WebGL backing on a light tab reveal', () => {
     const first = { terminal: { name: 'pane-a' } }
     const second = { terminal: { name: 'pane-b' } }
@@ -278,6 +308,7 @@ describe('resumeTerminalVisibility reveal repaint', () => {
       ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: true,
+      isChatViewMode: false,
       clearGlyphAtlases: false
     })
 
@@ -293,11 +324,27 @@ describe('resumeTerminalVisibility reveal repaint', () => {
       ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: true,
+      isChatViewMode: false,
       clearGlyphAtlases: false
     })
 
     expect(focusActivePane).toHaveBeenCalledWith(manager, expect.anything())
     expectThreadedOwnership(vi.mocked(focusActivePane).mock.calls.at(-1)?.[1])
+  })
+
+  it('does not focus the covered terminal during chat window-wake recovery', async () => {
+    const manager = createManager()
+    const { focusActivePane } = vi.mocked(await import('./pane-helpers'))
+
+    recoverVisibleTerminalWindowWake({
+      ...focusOwnership,
+      manager: manager as never as PaneManager,
+      isActive: true,
+      isChatViewMode: true,
+      clearGlyphAtlases: false
+    })
+
+    expect(focusActivePane).not.toHaveBeenCalled()
   })
 
   it('repairs WebGL canvas backing-store dpr on window wake', () => {
@@ -313,6 +360,7 @@ describe('resumeTerminalVisibility reveal repaint', () => {
       ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: true,
+      isChatViewMode: false,
       clearGlyphAtlases: false
     })
 
@@ -337,6 +385,7 @@ describe('resumeTerminalVisibility reveal repaint', () => {
       ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: true,
+      isChatViewMode: false,
       clearGlyphAtlases: false
     })
 
@@ -377,6 +426,7 @@ describe('resumeTerminalVisibility reveal repaint', () => {
       ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: true,
+      isChatViewMode: false,
       clearGlyphAtlases: false
     })
 
@@ -394,6 +444,7 @@ describe('resumeTerminalVisibility reveal repaint', () => {
       ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: true,
+      isChatViewMode: false,
       clearGlyphAtlases: false
     })
 
@@ -406,6 +457,7 @@ describe('resumeTerminalVisibility reveal repaint', () => {
       ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: false,
+      isChatViewMode: false,
       clearGlyphAtlases: true
     })
 
@@ -422,6 +474,7 @@ describe('resumeTerminalVisibility reveal repaint', () => {
       ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: false,
+      isChatViewMode: false,
       clearGlyphAtlases: true
     })
 
@@ -443,6 +496,7 @@ describe('resumeTerminalVisibility reveal repaint', () => {
       ...focusOwnership,
       manager: manager as never as PaneManager,
       isActive: false,
+      isChatViewMode: false,
       clearGlyphAtlases: false
     })
 

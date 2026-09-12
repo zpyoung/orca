@@ -410,6 +410,22 @@ import repointed at a forked copy, and a relay test mocking the fork's transport
 and resolves to the tag, so a dependency the exception dropped makes `pnpm install --frozen-lockfile`
 fail in Step 8 with a lockfile error that names nothing about ownership.
 
+**A `deleted: true` exception can be invalidated by the release you are merging.** The fork's
+deletions were decided against the *previous* tag's import graph; a new release can add files that
+import a module the fork deletes. Nothing reports it — `remove.txt` honours the deletion, both
+manifest checks pass, and the ownership guard passes — so it surfaces as `TS2307` against upstream's
+own new files. Sweep right after `remove.txt` is applied:
+
+```sh
+git grep -n "from '\./" "$UPSTREAM_TARGET" -- <dir of each deleted path> \
+  | grep -Ff <(sed 's|.*/||;s|\.[^.]*$||' <out-dir>/remove.txt)
+```
+
+Withdraw the deletion rather than extending it: restore the module and its test from the tag and
+drop the exception. Never delete the new upstream files to match, and never repoint an upstream
+import at the fork's replacement unless that module really provides the same surface. See
+[`references/sync-lessons.md`](./references/sync-lessons.md) for the v1.4.200 case.
+
 **A reset upstream test may pin an upstream release tag this remote does not have.** The
 cross-version-wire harness resolves refs against git, so a constant naming a bare `vX.Y.Z` aborts
 the whole suite in PR CI — three releases have now added one. Sweep after the reset:

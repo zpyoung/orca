@@ -16,7 +16,6 @@ import { normalizeFeatureInteractions } from '../../../../../shared/feature-inte
 import { normalizeContextualTourIds } from '../../../../../shared/contextual-tours'
 import { normalizeFeatureTipIds } from '../../../../../shared/feature-tips'
 import {
-  DEFAULT_HIDE_SLEEPING_WORKSPACES,
   normalizeWorktreeCardProperties,
   normalizeAgentActivityDisplayMode
 } from '../../../../../shared/constants'
@@ -39,6 +38,8 @@ import { normalizeBrowserPageZoomLevel } from '../../../../../shared/browser-pag
 import { normalizeKagiSessionLink } from '../../../../../shared/browser-url'
 import { isReleaseChannel } from '../../../../../shared/release-channel'
 import type { StatusBarItem } from '../../../../../shared/ui-chrome-types'
+import { hydrateWorkspaceActivityWindow } from '../../../../../shared/fork-workspace-activity-window/workspace-activity-window'
+import { hydrateWorkspaceReviewFilters } from '../../../../../shared/fork-workspace-review-filters/workspace-review-filters'
 import {
   filterSetupScriptPromptDismissalsToValidRepos,
   sanitizeSetupScriptPromptDismissals
@@ -150,8 +151,8 @@ export function createUiHydrationActions(set: UISliceSet, _get: UISliceGet): Par
           projectOrderBy: ui.projectOrderBy,
           // Why: Active-only was retired; force the old flag off so an old profile can't invisibly narrow the workspace list.
           showActiveOnly: false,
-          // Why: ignore older positive-form keys so old profiles start from the new default (sleeping workspaces visible).
-          showSleepingWorkspaces: !(ui.hideSleepingWorkspaces ?? DEFAULT_HIDE_SLEEPING_WORKSPACES),
+          ...hydrateWorkspaceActivityWindow(ui),
+          ...hydrateWorkspaceReviewFilters(ui),
           workspaceHostScope: normalizeExecutionHostScope(ui.workspaceHostScope),
           visibleWorkspaceHostIds: normalizeHydratedVisibleWorkspaceHostIds(ui),
           workspaceHostOrder: normalizeExecutionHostOrder(ui.workspaceHostOrder),
@@ -186,6 +187,7 @@ export function createUiHydrationActions(set: UISliceSet, _get: UISliceGet): Par
           ),
           agentsShowChildAgents: ui.agentsShowChildAgents === true,
           agentsCompactMode: ui.agentsCompactMode !== false,
+          agentsShowSearch: ui.agentsShowSearch !== false,
           agentsReadFilter: normalizeThreadReadFilter(ui.agentsReadFilter),
           agentsGroupBy: normalizeActivityGroupBy(ui.agentsGroupBy),
           collapsedGroups: new Set(ui.collapsedGroups ?? []),

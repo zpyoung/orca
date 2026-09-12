@@ -1,0 +1,22 @@
+{
+  "auto": {
+    "components": {
+      "sidebar": {
+        "WorkspaceActivityWindowControl": {
+          "activityWindow": "アクティビティ期間",
+          "all": "すべて",
+          "live-only": "アクティブのみ",
+          "today": "過去24時間",
+          "week": "過去7日間",
+          "month": "過去30日間",
+          "custom": "カスタム",
+          "customDays": "カスタム日数",
+          "customDaysError": "正の整数を入力してください。"
+        },
+        "WorkspaceActivityHiddenCountRow": {
+          "hidden": "アクティビティ期間により{{count}}件のワークスペースを非表示"
+        }
+      }
+    }
+  }
+}

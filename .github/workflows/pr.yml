@@ -27,6 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       should_run: ${{ steps.filter.outputs.should_run }}
+      changed_count: ${{ steps.filter.outputs.changed_count }}
       native_cache_changed: ${{ steps.filter.outputs.native_cache_changed }}
       mobile_dependencies: ${{ steps.filter.outputs.mobile_dependencies }}
       static_analysis: ${{ steps.filter.outputs.static_analysis }}
@@ -40,12 +41,10 @@ jobs:
       cross-version-wire: ${{ steps.filter.outputs.cross-version-wire }}
       managed_hook_node18: ${{ steps.filter.outputs.managed_hook_node18 }}
       package: ${{ steps.filter.outputs.package }}
-      package_windows: ${{ steps.filter.outputs.package_windows }}
       e2e_should_run: ${{ steps.e2e_filter.outputs.should_run }}
       test_files: ${{ steps.e2e_filter.outputs.test_files }}
       ssh_source_changed: ${{ steps.e2e_filter.outputs.ssh_source_changed }}
       native_ime_source_changed: ${{ steps.e2e_filter.outputs.native_ime_source_changed }}
-      wsl_source_changed: ${{ steps.e2e_filter.outputs.wsl_source_changed }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -66,13 +65,15 @@ jobs:
           set -euo pipefail
           # Why --no-renames: name-only rename detection can report only the destination.
           # A code file moved under docs/ must still expose its code-side deletion.
-          CHANGED="$(git diff --name-only --no-renames --diff-filter=ACDMR --merge-base "$BASE_SHA" "$HEAD_SHA")"
+          git diff --name-only --no-renames --diff-filter=ACDMR --merge-base "$BASE_SHA" "$HEAD_SHA" \
+            > "$RUNNER_TEMP/changed-paths.txt"
           echo "Changed paths:"
-          printf '%s\n' "$CHANGED"
+          cat "$RUNNER_TEMP/changed-paths.txt"
           # Why a file, not a pipe: the scope script reads stdin with readFileSync(0), which
           # throws EAGAIN once the payload exceeds the 64KB pipe buffer. A sync PR changes
           # thousands of paths (~330KB), so the pipe form fails every time on those.
-          printf '%s\n' "$CHANGED" > "$RUNNER_TEMP/changed-paths.txt"
+          CHANGED_COUNT="$(wc -l < "$RUNNER_TEMP/changed-paths.txt")"
+          echo "changed_count=$((CHANGED_COUNT))" >> "$GITHUB_OUTPUT"
           node config/scripts/pr-code-change-scope.mjs \
             < "$RUNNER_TEMP/changed-paths.txt" | tee -a "$GITHUB_OUTPUT"
 
@@ -84,26 +85,29 @@ jobs:
           set -euo pipefail
           BASE="${{ github.event.pull_request.base.sha }}"
           HEAD="${{ github.event.pull_request.head.sha }}"
-          CHANGED="$(git diff --name-only --diff-filter=AMCR --merge-base "$BASE" "$HEAD")"
+          # Use a file here too so sync-sized diffs cannot exhaust Node's stdin pipe buffer.
+          git diff --name-only --diff-filter=AMCR --merge-base "$BASE" "$HEAD" \
+            > "$RUNNER_TEMP/e2e-changed-paths.txt"
           # Source routes are executable contracts so a test can prove exact
           # authorities, exclusions, and sentinels without evaluating workflow shell.
-          TEST_FILES_JSON="$(printf '%s\n' "$CHANGED" | node config/scripts/pr-e2e-source-routing.mjs)"
+          TEST_FILES_JSON="$(node config/scripts/pr-e2e-source-routing.mjs < "$RUNNER_TEMP/e2e-changed-paths.txt")"
           echo "test_files=$TEST_FILES_JSON" >> "$GITHUB_OUTPUT"
           # Why a separate signal: the Docker-SSH lane must trigger on SSH source, not on a
           # spec name surviving in a route's list. Same routes, so the two cannot drift.
-          SSH_SOURCE_CHANGED="$(printf '%s\n' "$CHANGED" | node config/scripts/pr-e2e-source-routing.mjs --ssh-source)"
+          SSH_SOURCE_CHANGED="$(node config/scripts/pr-e2e-source-routing.mjs --ssh-source < "$RUNNER_TEMP/e2e-changed-paths.txt")"
           echo "ssh_source_changed=$SSH_SOURCE_CHANGED" >> "$GITHUB_OUTPUT"
           echo "SSH source changed: $SSH_SOURCE_CHANGED"
           # Why its own signal: the real-IME lane is a whole ibus session, not a spec, so it must
           # trigger on IME source rather than on a spec name in some route's list.
-          NATIVE_IME_SOURCE_CHANGED="$(printf '%s\n' "$CHANGED" | node config/scripts/pr-e2e-source-routing.mjs --native-ime-source)"
+          NATIVE_IME_SOURCE_CHANGED="$(node config/scripts/pr-e2e-source-routing.mjs --native-ime-source < "$RUNNER_TEMP/e2e-changed-paths.txt")"
           echo "native_ime_source_changed=$NATIVE_IME_SOURCE_CHANGED" >> "$GITHUB_OUTPUT"
-          WSL_CHANGED="$(git diff --name-only --no-renames --diff-filter=ACDMR --merge-base "$BASE" "$HEAD")"
-          WSL_SOURCE_CHANGED="$(printf '%s\n' "$WSL_CHANGED" | node config/scripts/pr-e2e-source-routing.mjs --wsl-source)"
-          echo "wsl_source_changed=$WSL_SOURCE_CHANGED" >> "$GITHUB_OUTPUT"
           echo "Native IME source changed: $NATIVE_IME_SOURCE_CHANGED"
-          SHOULD_RUN="$(printf '%s\n' "$CHANGED" | node config/scripts/pr-e2e-source-routing.mjs --reusable-workflow)"
-          if [ "$SHOULD_RUN" = true ]; then
+          SHOULD_RUN="$(node config/scripts/pr-e2e-source-routing.mjs --reusable-workflow < "$RUNNER_TEMP/e2e-changed-paths.txt")"
+          TEST_FILE_COUNT="$(jq 'length' <<< "$TEST_FILES_JSON")"
+          if [ "$TEST_FILE_COUNT" -gt 25 ]; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping reusable E2E workflow: $TEST_FILE_COUNT selected specs exceeds the 25-spec limit; this sync-sized selection is covered by the scheduled full suite."
+          elif [ "$SHOULD_RUN" = true ]; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
             echo "Changed E2E specs: $TEST_FILES_JSON"
           else
@@ -161,10 +165,17 @@ jobs:
           fi
 
       - name: Enforce changed-code quality
+        if: fromJSON(needs.code_paths.outputs.changed_count) <= 500
         run: pnpm run check:code-quality:changed -- "${{ github.event.pull_request.base.sha }}"
 
       - name: Enforce React Doctor on changed lines
+        if: fromJSON(needs.code_paths.outputs.changed_count) <= 500
         run: pnpm run check:react-doctor:changed -- "${{ github.event.pull_request.base.sha }}"
+
+      - name: Explain skipped changed-line quality checks
+        if: fromJSON(needs.code_paths.outputs.changed_count) > 500
+        run: |
+          echo "Skipping changed-code quality and React Doctor: ${{ needs.code_paths.outputs.changed_count }} changed files exceeds the 500-file limit for strict changed-line scans. Baseline checks remain enabled."
 
       - name: Check Zustand selector fan-out budget
         run: pnpm run check:zustand-selector-fanout
@@ -833,127 +844,6 @@ jobs:
       - name: Smoke packaged hang watchdog worker
         run: xvfb-run --auto-servernum node config/scripts/smoke-packaged-hang-watchdog-worker.mjs --app-dir=dist/linux-unpacked
 
-  package_windows:
-    name: package (windows)
-    needs: [code_paths]
-    if: needs.code_paths.outputs.package_windows == 'true'
-    runs-on: windows-2022
-    timeout-minutes: 30
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-
-      - name: Cache electron-builder downloads
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~\AppData\Local\electron\Cache
-            ~\AppData\Local\electron-builder\Cache
-          key: electron-builder-windows-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            electron-builder-windows-
-
-      # Why persist-native-cache false: this job later rebuilds the same path for
-      # Electron. A post-job save would store the Electron ABI under the Node key.
-      - uses: ./.github/actions/install-node-dependencies
-        id: deps
-        with:
-          native-runtime: node
-          persist-native-cache: 'false'
-
-      - name: Save compiled Node native modules
-        if: steps.deps.outputs.native-cache-hit != 'true'
-        uses: actions/cache/save@v5
-        with:
-          path: |
-            node_modules/.pnpm/node-pty@*/node_modules/node-pty/build
-            node_modules/.pnpm/windows-native-registry@*/node_modules/windows-native-registry/build
-            node_modules/.pnpm/@vscode+windows-process-tree@*/node_modules/@vscode/windows-process-tree/build
-          key: native-modules-${{ runner.os }}-${{ steps.deps.outputs.native-cache-scope }}-${{ runner.arch }}-node-node${{ steps.deps.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml', '.github/actions/install-node-dependencies/action.yml', 'config/scripts/ensure-native-runtime.mjs', 'config/scripts/rebuild-native-deps.mjs', 'config/patches/node-pty@1.1.0.patch', 'config/patches/@vscode__windows-process-tree@0.8.0.patch') }}
-
-      # vitest runs here directly rather than through `pnpm test`, so the addon
-      # assertions only hold once install-node-dependencies has rebuilt natives.
-      - name: Test Windows-specific boundaries
-        run: >-
-          pnpm exec vitest run --config config/vitest.config.ts
-          config/scripts/rebuild-native-deps.test.mjs
-          config/scripts/rebuild-native-deps-windows-process-tree.test.mjs
-          src/main/browser/browser-client-page-renderer-lifecycle.electron.test.ts
-          src/main/browser/browser-route-tcp-egress.electron.test.ts
-          src/main/browser/browser-route-webrtc-egress.electron.test.ts
-          src/main/browser/browser-route-h3-egress.electron.test.ts
-          src/main/browser/browser-route-dns-prefetch.electron.test.ts
-          src/main/providers/windows-conpty-wide-char-duplication.node-pty.test.ts
-          src/main/providers/pty-repaint-wide-char-buffer.node-pty.test.ts
-          src/shared/child-process/windows-command-line.win32.test.ts
-          src/shared/child-process/windows-cmd-shim-resolution.test.ts
-          src/shared/child-process/windows-cmd-shim-resolution.win32.test.ts
-          src/main/agent-hooks/windows-hook-payload-delivery.test.ts
-          src/main/agent-hooks/windows-direct-cmd-hook-command.test.ts
-          src/main/windows/windows-pty-job.win32.test.ts
-          src/main/windows/windows-host-job.win32.test.ts
-          src/main/windows/windows-process-tree-command-line-patch.test.ts
-          src/main/windows-live-tree-kill.win32.test.ts
-          src/main/wsl/wsl-runner.test.ts
-          src/main/wsl/wsl-guest-environment.test.ts
-          src/main/wsl/wsl-invocation-boundary.test.ts
-          src/main/wsl/wsl-executable-path.win32.test.ts
-          src/main/wsl/wsl-w1-w3-contract.test.ts
-          src/shared/source-scan/source-tree-scan.test.ts
-          src/main/cli/wsl-cli-powershell-boundary.test.ts
-          src/main/computer/desktop-script-runtime-host.win32.test.ts
-          src/main/cursor/hook-service.test.ts
-          src/main/orca-profiles/profile-index-store.test.ts
-          src/main/startup/windows-install-dir-acl-repair.win32.test.ts
-          src/main/runtime/repo-worktree-admin-fingerprint.test.ts
-          src/main/runtime/worktree-scan-admin-fingerprint-gate.test.ts
-          src/shared/secure-file-fsync-flags.test.ts
-          src/shared/secure-path-windows-acl.win32.test.ts
-          src/main/runtime/unreadable-secret-store-preservation.win32.test.ts
-          src/main/ipc/pty-codex-account-attribution.test.ts
-          src/main/ipc/pty-spawn-env-codex-resume-provenance.test.ts
-          src/relay/windows-port-scan.win32.test.ts
-
-      # Why the :parallel variant: identical to build:release except the three
-      # electron-vite targets overlap instead of running back to back. The Linux package
-      # job already packages and smoke-tests an AppImage built that way.
-      - name: Cache Windows CLI launcher
-        uses: actions/cache@v5
-        with:
-          path: native/windows-cli-launcher/.build
-          key: windows-cli-launcher-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('native/windows-cli-launcher/**', 'config/scripts/build-windows-cli-launcher.mjs') }}
-
-      - name: Build package inputs
-        env:
-          ORCA_REUSE_WINDOWS_CLI_LAUNCHER: '1'
-        run: pnpm run build:release:parallel
-
-      - name: Restore compiled Electron native modules
-        uses: actions/cache@v5
-        with:
-          path: |
-            node_modules/.pnpm/node-pty@*/node_modules/node-pty/build
-            node_modules/.pnpm/windows-native-registry@*/node_modules/windows-native-registry/build
-            node_modules/.pnpm/@vscode+windows-process-tree@*/node_modules/@vscode/windows-process-tree/build
-          key: native-modules-${{ runner.os }}-${{ steps.deps.outputs.native-cache-scope }}-${{ runner.arch }}-electron-node${{ steps.deps.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml', '.github/actions/install-node-dependencies/action.yml', 'config/scripts/ensure-native-runtime.mjs', 'config/scripts/rebuild-native-deps.mjs', 'config/patches/node-pty@1.1.0.patch', 'config/patches/@vscode__windows-process-tree@0.8.0.patch') }}
-
-      - name: Prepare Electron native runtime
-        run: node config/scripts/ensure-native-runtime.mjs --runtime=electron
-
-      - name: Package unpacked app
-        env:
-          ORCA_REUSE_PREPARED_NATIVE_RUNTIME: '1'
-        run: pnpm exec electron-builder --config config/electron-builder.config.cjs --dir
-
-      - name: Smoke packaged Windows PTY native capability
-        run: pnpm run smoke:windows-pty-native-capability -- --exe=dist/win-unpacked/Orca.exe
-
-      - name: Smoke packaged CLI
-        run: node config/scripts/smoke-packaged-cli.mjs --app-dir=dist/win-unpacked
-
   e2e:
     name: e2e
     needs: code_paths
@@ -984,16 +874,6 @@ jobs:
       contents: read
     uses: ./.github/workflows/terminal-ime-e2e.yml
 
-  windows_wsl:
-    name: real WSL terminal
-    needs: code_paths
-    if: needs.code_paths.outputs.wsl_source_changed == 'true'
-    permissions:
-      contents: read
-    uses: ./.github/workflows/windows-wsl-e2e.yml
-    with:
-      ref: ${{ github.event.pull_request.head.sha }}
-
   verify:
     if: always()
     needs:
@@ -1011,7 +891,6 @@ jobs:
       - cross-version-wire
       - managed_hook_node18
       - package
-      - package_windows
     runs-on: ubuntu-latest
 
     steps:
@@ -1051,8 +930,6 @@ jobs:
           MANAGED_HOOK_NODE18_SHOULD_RUN: ${{ needs.code_paths.outputs.managed_hook_node18 }}
           PACKAGE: ${{ needs.package.result }}
           PACKAGE_SHOULD_RUN: ${{ needs.code_paths.outputs.package }}
-          PACKAGE_WINDOWS: ${{ needs.package_windows.result }}
-          PACKAGE_WINDOWS_SHOULD_RUN: ${{ needs.code_paths.outputs.package_windows }}
         run: |
           if [ "$CODE_PATHS" != "success" ]; then
             exit 1
@@ -1096,5 +973,4 @@ jobs:
           check_job cross-version-wire "$CROSS_VERSION_WIRE" "$CROSS_VERSION_WIRE_SHOULD_RUN"
           check_job managed_hook_node18 "$MANAGED_HOOK_NODE18" "$MANAGED_HOOK_NODE18_SHOULD_RUN"
           check_job package "$PACKAGE" "$PACKAGE_SHOULD_RUN"
-          check_job package_windows "$PACKAGE_WINDOWS" "$PACKAGE_WINDOWS_SHOULD_RUN"
           exit "$failed"

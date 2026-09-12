@@ -70,3 +70,60 @@ verify rather than assume they need editing. And `config/max-lines-baseline.txt`
 short inline arrays the repo's formatter keeps on one line, turning a 30-line edit into a
 650-line diff that buries the actual change. Edit the file as text.
 
+## A later release can invalidate a `deleted: true` exception
+
+**What happened.** The fork deletes 25 upstream paths outright, eleven of them the native-chat
+composer modules its own `fork-agent-composer` superseded. Those deletions were decided against
+v1.4.198's import graph. v1.4.200 then added four brand-new upstream files —
+`NativeChatPromptEditor.tsx` and its test, `native-chat-composer-drop-scope.test.tsx`,
+`use-native-chat-composer-catalog.test.tsx` — that import four of the deleted modules
+(`native-chat-draft-cache`, `native-chat-composer-scope-cache`, `NativeChatImageAttachmentPreview`,
+`use-native-chat-composer-keydown`). Ownership resolution is silent about it: `remove.txt` honours
+the deletion, `--verify-seams` and `--verify-residuals` both pass, and the fork ownership guard
+passes. It surfaces only as `TS2307: Cannot find module` — reported against *upstream's* files, in a
+directory the fork never edited, which reads at first like merge damage somewhere else entirely.
+
+**The tell.** A typecheck error naming a path the fork does not own, pointing at a relative import
+of a path that is in `remove.txt`. Confirm with a set comparison rather than by reading the error:
+
+```sh
+python3 - "$UPSTREAM_TARGET" <<'PY'
+import json, subprocess, sys
+m = json.load(open('config/fork-ownership.json'))
+gone = {e['path'] for e in m['exceptions'] if e.get('deleted')}
+tag = sys.argv[1]
+for p in sorted(gone):
+    mod = p.rsplit('/', 1)[-1].rsplit('.', 1)[0]
+    hits = subprocess.run(['git', 'grep', '-l', f"/{mod}'", tag, '--', p.rsplit('/', 1)[0]],
+                          capture_output=True, text=True).stdout.split()
+    live = [h.split(':', 1)[1] for h in hits if h.split(':', 1)[1] not in gone]
+    if live:
+        print(f'{p} still imported by {len(live)}: {live[:3]}')
+PY
+```
+
+Run it right after `remove.txt` is applied, not after the typecheck fails — the classifier will
+never raise it, because a deletion the manifest declares is, to the classifier, resolved.
+
+**The right move.** Withdraw the deletion; do not extend it. Restore the module (and its test) from
+the tag, drop the `deleted: true` exception, and leave every fork replacement exactly where it is.
+Nothing the fork ships changes: its own field, caches, and copies stay, and the restored upstream
+module is simply live again for upstream's own consumers. v1.4.200 needed eight withdrawals (four
+modules plus their tests) and cost the fork nothing.
+
+Two adjacent moves are wrong, and both look tempting:
+
+- **Do not delete the new upstream files too.** That is a growing deletion set the fork has to
+  re-extend every release, and it throws away upstream tests — `use-native-chat-composer-catalog.test.tsx`
+  covers a hook the fork's own composer now calls.
+- **Do not repoint upstream's import at the fork's replacement** unless the fork module genuinely
+  provides the same surface. The fork's `agent-composer-draft-cache` exports a *string* cache;
+  v1.4.200's editor needs `readNativeChatDraftDocument`/`writeNativeChatDraftDocument`, which persist
+  a ProseMirror document the fork's cache has no notion of. A type-only import is the exception —
+  `NativeChatImageAttachmentPreview` takes the fork's attachment type through an ordinary
+  import-swap seam, because the fork really does own that type now.
+
+**Do not mistake this for a feature collision.** Upstream re-landing work beside a fork feature is
+not upstream re-implementing it. Record the collision outcome (`agent-composer: possible` here), raise
+it, and keep resolving: the withdrawal costs no fork behaviour, so it is not a decision that has to
+wait for a human.

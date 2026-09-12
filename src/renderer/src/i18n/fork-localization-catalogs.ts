@@ -64,6 +64,16 @@ import artifactPasswordsES from '../components/artifacts/fork-artifact-passwords
 import artifactPasswordsJA from '../components/artifacts/fork-artifact-passwords/locales/ja.json'
 import artifactPasswordsKO from '../components/artifacts/fork-artifact-passwords/locales/ko.json'
 import artifactPasswordsZH from '../components/artifacts/fork-artifact-passwords/locales/zh.json'
+import activityWindowEN from '../components/sidebar/fork-workspace-activity-window/locales/en.json'
+import activityWindowES from '../components/sidebar/fork-workspace-activity-window/locales/es.json'
+import activityWindowJA from '../components/sidebar/fork-workspace-activity-window/locales/ja.json'
+import activityWindowKO from '../components/sidebar/fork-workspace-activity-window/locales/ko.json'
+import activityWindowZH from '../components/sidebar/fork-workspace-activity-window/locales/zh.json'
+import reviewFiltersEN from '../components/sidebar/fork-workspace-review-filters/locales/en.json'
+import reviewFiltersES from '../components/sidebar/fork-workspace-review-filters/locales/es.json'
+import reviewFiltersJA from '../components/sidebar/fork-workspace-review-filters/locales/ja.json'
+import reviewFiltersKO from '../components/sidebar/fork-workspace-review-filters/locales/ko.json'
+import reviewFiltersZH from '../components/sidebar/fork-workspace-review-filters/locales/zh.json'
 import askQuestionToolEN from '../components/fork-ask-question-tool/locales/en.json'
 import askQuestionToolES from '../components/fork-ask-question-tool/locales/es.json'
 import askQuestionToolJA from '../components/fork-ask-question-tool/locales/ja.json'
@@ -101,6 +111,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     dirtyBranchEN,
     sessionInfoEN,
     artifactPasswordsEN,
+    activityWindowEN,
+    reviewFiltersEN,
     askQuestionToolEN
   ],
   es: [
@@ -117,6 +129,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     dirtyBranchES,
     sessionInfoES,
     artifactPasswordsES,
+    activityWindowES,
+    reviewFiltersES,
     askQuestionToolES
   ],
   ja: [
@@ -133,6 +147,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     dirtyBranchJA,
     sessionInfoJA,
     artifactPasswordsJA,
+    activityWindowJA,
+    reviewFiltersJA,
     askQuestionToolJA
   ],
   ko: [
@@ -149,6 +165,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     dirtyBranchKO,
     sessionInfoKO,
     artifactPasswordsKO,
+    activityWindowKO,
+    reviewFiltersKO,
     askQuestionToolKO
   ],
   zh: [
@@ -165,6 +183,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     dirtyBranchZH,
     sessionInfoZH,
     artifactPasswordsZH,
+    activityWindowZH,
+    reviewFiltersZH,
     askQuestionToolZH
   ]
 }

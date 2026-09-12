@@ -1,6 +1,6 @@
 ---
-last_released_commit: 9351b616a5514127ad64db2d99f2d8b9ba95ad38
-upstream_synced: v1.4.198
+last_released_commit: aa63d4a3f61d60b769fa10872c0da6090988279a
+upstream_synced: v1.4.200
 ---
 
 # Changelog
@@ -11,6 +11,31 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.201-rc.0.zy01] - 2026-09-11
+
+Synced to upstream [v1.4.200](https://github.com/stablyai/orca/releases/tag/v1.4.200), absorbing
+v1.4.199 and v1.4.200 in one span.
+
+### Added
+- The sidebar can now hide workspaces you are not working on: filter by how recently a workspace was
+  active — including a custom date range — and by whether its review is finished and its checks are
+  passing. The choices persist per pairing, and the header says how many workspaces are hidden so a
+  filtered list never looks like a missing one.
+
+### Changed
+- A file dropped on a chat composer now attaches only to the composer it landed on. Upstream shipped
+  its own version of the fix this fork had been carrying, so the fork's copy is retired in favour of
+  it; the behaviour is the same and it now covers every composer, not just this fork's.
+- Skill and slash-command suggestions come from what the running session reports it actually loaded,
+  and still name the plugin each skill belongs to. The two used to be alternatives; they now compose,
+  so a skill offered by more than one plugin stays disambiguated.
+- PR CI no longer scans a sync-sized diff line by line, and the Windows lanes this macOS-only fork
+  cannot use are gone. Sync pull requests stop burning their budget on checks that could not finish.
+
+### Fixed
+- The terminal no longer loses its composer draft or its focus after a window wake while a chat view
+  covers the pane — an effect had stopped re-running when the chat view was toggled.
 
 ## [1.4.199-rc.0.zy01] - 2026-09-10
 

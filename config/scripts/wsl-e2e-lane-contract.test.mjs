@@ -8,6 +8,7 @@ const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), '
 describe('real WSL terminal lane', () => {
   it.each([
     'config/scripts/verify-wsl-e2e-participation.mjs',
+    'config/scripts/verify-playwright-participation.mjs',
     'src/main/wsl-availability.ts',
     'src/main/wsl/wsl-runner.ts',
     'src/main/pty/wsl-orca-env.ts',
@@ -36,19 +37,7 @@ describe('real WSL terminal lane', () => {
     expect(hasWslSourceChange([path])).toBe(false)
   })
 
-  it('runs the reusable lane at the immutable PR head', () => {
-    const pr = parse(read('.github/workflows/pr.yml'))
-    expect(pr.jobs.windows_wsl.if).toBe("needs.code_paths.outputs.wsl_source_changed == 'true'")
-    expect(pr.jobs.windows_wsl.with.ref).toBe('${{ github.event.pull_request.head.sha }}')
-    const detector = pr.jobs['code_paths'].steps.find(
-      (step) => step.name === 'Filter changed E2E specs'
-    )
-    expect(detector.run).toContain(
-      'WSL_CHANGED="$(git diff --name-only --no-renames --diff-filter=ACDMR'
-    )
-    expect(detector.run).toContain(
-      '"$WSL_CHANGED" | node config/scripts/pr-e2e-source-routing.mjs --wsl-source'
-    )
+  it('runs the reusable lane at its requested ref and requires every WSL execution', () => {
     const workflow = parse(read('.github/workflows/windows-wsl-e2e.yml'))
     const steps = workflow.jobs['wsl-terminal'].steps
     expect(steps[0].with.ref).toBe('${{ inputs.ref || github.sha }}')

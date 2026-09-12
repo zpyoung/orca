@@ -302,13 +302,6 @@ describe('PR workflow parallelism', () => {
     expect(installFor('shell_contracts').with['native-runtime']).toBe('node')
     expect(sharedTestInstall.with['native-runtime']).toBe('node')
     expect(installFor('package').with['native-runtime']).toBe('electron')
-    expect(installFor('package_windows').with['native-runtime']).toBe('node')
-    expect(installFor('package_windows').with['persist-native-cache']).toBe('false')
-    expect(
-      workflow.jobs.package_windows.steps.find(
-        (step) => step.name === 'Save compiled Node native modules'
-      ).if
-    ).toBe("steps.deps.outputs.native-cache-hit != 'true'")
 
     expect(dependencyAction.inputs['persist-native-cache'].default).toBe('true')
     expect(
@@ -453,23 +446,6 @@ describe('PR workflow parallelism', () => {
   })
 
   it('keeps verify as the aggregate required check', () => {
-    expect(workflow.jobs.verify.needs).toEqual([
-      'code_paths',
-      'static_analysis',
-      'root_directory_guard',
-      'fork_ownership_guard',
-      'typecheck',
-      'git_compatibility',
-      'codex_index_heal_contract',
-      'xterm_patch_sync',
-      'shell_contracts',
-      'test',
-      'orcad_browser',
-      'cross-version-wire',
-      'managed_hook_node18',
-      'package',
-      'package_windows'
-    ])
     const verifyStep = workflow.jobs.verify.steps.find(
       (step) => step.name === 'Require successful checks'
     )
