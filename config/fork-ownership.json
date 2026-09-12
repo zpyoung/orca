@@ -2496,6 +2496,12 @@
       "lines": ["      'ask',", "        'ask',"]
     },
     {
+      "path": "src/main/startup/cli-command-names.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": ["  'ask',"]
+    },
+    {
       "path": "src/main/runtime/rpc/methods/index.ts",
       "feature": "ask-question-tool",
       "kind": "registration",
@@ -2629,11 +2635,13 @@
       "feature": "ask-question-tool",
       "kind": "registration",
       "lines": [
+        "import { askRosterFor } from '../../fork-ask-question-tool/ask-attached-surface-roster'",
         "      onReady: (socket) => {",
-        "        this.runtime",
-        "          .getAskServices()",
-        "          .roster.recordConnectionCapabilities(socket.connectionId, socket.clientCapabilities)",
-        "        this.runtime.getAskServices().roster.forgetConnection(socket.connectionId)"
+        "        askRosterFor(this.runtime)?.recordConnectionCapabilities(",
+        "          socket.connectionId,",
+        "          socket.clientCapabilities",
+        "        )",
+        "        askRosterFor(this.runtime)?.forgetConnection(socket.connectionId)"
       ]
     },
     {
@@ -4129,7 +4137,7 @@
       "removed": 2
     },
     "src/main/runtime/runtime-rpc/runtime-rpc-lifecycle.ts": {
-      "added": 5,
+      "added": 7,
       "removed": 1
     },
     "src/main/skills/claude-plugin-skill-sources.test.ts": {
@@ -4154,6 +4162,10 @@
     },
     "src/main/ssh/ssh-relay-session.ts": {
       "added": 38,
+      "removed": 0
+    },
+    "src/main/startup/cli-command-names.ts": {
+      "added": 1,
       "removed": 0
     },
     "src/main/startup/main-process-account-services.ts": {

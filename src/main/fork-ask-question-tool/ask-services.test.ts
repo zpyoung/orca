@@ -1,48 +1,40 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { createRequire } from 'node:module'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { installFakeAppEnvironment } from '../../../config/scripts/vitest-host-ports-setup'
 import { askServicesFor } from './ask-services'
 import { ASK_LIVENESS_GRACE_MS } from './ask-registry'
 import { ASK_SURFACE_CLIENT_CAPABILITY } from '../../shared/fork-ask-question-tool/ask-question-capability'
-
-// Why: ask-services.ts resolves the electron app lazily via require('electron') (mirroring
-// getOrchestrationDb) rather than a static import, so outside a real Electron process
-// require('electron') just returns the binary's path string — stub the module's own
-// require.cache entry, since vi.mock only intercepts the ESM import graph.
-const require = createRequire(import.meta.url)
-const electronModulePath = require.resolve('electron')
-const mockElectronApp = { userDataPath: '' }
-
-require.cache[electronModulePath] = {
-  id: electronModulePath,
-  filename: electronModulePath,
-  loaded: true,
-  exports: { app: { getPath: () => mockElectronApp.userDataPath } }
-} as unknown as NodeJS.Module
 
 describe('askServicesFor', () => {
   let root: string
 
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'orca-ask-services-'))
-    mockElectronApp.userDataPath = root
+    // Why: the shared vitest userData would let register()'s requestId idempotency reach across tests.
+    installFakeAppEnvironment({ getPath: () => root })
   })
 
   afterEach(() => {
     rmSync(root, { recursive: true, force: true })
   })
 
-  it('does not construct the ask db until first called for a runtime key, then memoizes it', () => {
+  it('opens the ask db on the first db or registry read, not on construction, then memoizes it', () => {
     const runtimeKey = {}
     const dbPath = join(root, 'asks.db')
 
+    const services = askServicesFor(runtimeKey, () => false)
+    // connection bookkeeping is what every authenticated client drives; it must not need the store
+    services.roster.recordConnectionCapabilities('conn-1', [ASK_SURFACE_CLIENT_CAPABILITY])
+    services.roster.trackPaneSubscription('conn-1', 'pane:1')
+    services.roster.forgetConnection('conn-1')
     expect(existsSync(dbPath)).toBe(false)
 
-    const services = askServicesFor(runtimeKey, () => false)
+    expect(services.registry).toBeDefined()
     expect(existsSync(dbPath)).toBe(true)
     expect(askServicesFor(runtimeKey, () => false)).toBe(services)
+    expect(askServicesFor(runtimeKey, () => false).db).toBe(services.db)
   })
 
   it('builds the registry over the same db and keeps both stable across calls', async () => {

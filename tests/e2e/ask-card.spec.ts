@@ -5,18 +5,11 @@ import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } fro
 import { waitForActivePaneHookDescriptor, waitForActiveTerminalManager } from './helpers/terminal'
 import type { AskRegistryEvent } from '../../src/shared/fork-ask-question-tool/ask-question-schema'
 
-type RpcCall = { method: string; params?: unknown }
-
 /** Mirrors `ASK_DISMISS_DELAY_MS` in the asks slice; imported as a literal because the slice pulls
  * renderer-only aliases that do not resolve in the Playwright process. */
 const ASK_DISMISS_DELAY_MS = 4000
 
-declare global {
-  // oxlint-disable-next-line typescript-eslint/consistent-type-definitions -- declaration merging requires interface
-  interface Window {
-    __askRpcCalls?: RpcCall[]
-  }
-}
+type RuntimeRpcReply<T> = { ok: true; result: T } | { ok: false; error?: { message?: string } }
 
 async function setupAskPane(page: Page): Promise<{ paneKey: string }> {
   await waitForSessionReady(page)
@@ -59,30 +52,6 @@ async function seedPendingAsk(
   }, args)
 }
 
-/** Applies the terminal transition a real backend would push once an answer commits — this
- * suite has no live agent to register a real ask against, so the round trip is simulated here. */
-async function resolveSeededAsk(
-  page: Page,
-  args: { paneKey: string; askId: string; summary: string }
-): Promise<void> {
-  await page.evaluate(({ paneKey, askId, summary }) => {
-    window.__store?.setState((state) => ({
-      pendingAsksByPaneKey: {
-        ...state.pendingAsksByPaneKey,
-        [paneKey]: (state.pendingAsksByPaneKey[paneKey] ?? []).map((card) =>
-          card.askId === askId
-            ? {
-                ...card,
-                status: 'answered' as const,
-                result: { answers: {}, skipped: [], summary }
-              }
-            : card
-        )
-      }
-    }))
-  }, args)
-}
-
 /** Pushes an event through the real `applyAskRegistryEvent` reducer. `seedPendingAsk` writes store
  * state directly, so it never arms the terminal auto-dismiss the reducer owns. */
 async function applyAskEvent(page: Page, event: AskRegistryEvent): Promise<void> {
@@ -114,45 +83,73 @@ function textAsk(args: {
   }
 }
 
-async function installAskRpcRecorder(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    window.__askRpcCalls = []
-    const original = window.api.runtime.call
-    window.api.runtime.call = (args) => {
-      window.__askRpcCalls?.push(args)
-      return original(args)
-    }
-  })
-}
-
-async function getRecordedAskRpcCalls(page: Page): Promise<RpcCall[]> {
-  return page.evaluate(() => window.__askRpcCalls ?? [])
-}
-
-/** Makes `ask.snapshot` return a canned result while every other RPC call passes through
- * untouched — the seam that lets a hydration replay be driven without a real backend row. */
-async function mockAskSnapshotResponse(
+/** Registers a real ask on `paneKey` over the same RPC the CLI uses. The contextBridge API is
+ * deep-frozen, so nothing here can be intercepted from the page; the card, the answer, and the
+ * draft all have to travel the production path and be observed where the registry reports them. */
+async function registerAsk(
   page: Page,
-  snapshot: { asks: AskRegistryEvent[]; seq: number; epoch: string }
-): Promise<void> {
-  await page.evaluate((snapshotResult) => {
-    const original = window.api.runtime.call
-    window.api.runtime.call = (args) => {
-      if (args.method === 'ask.snapshot') {
-        return Promise.resolve({
-          id: 'e2e-ask-snapshot',
-          ok: true as const,
-          result: snapshotResult,
-          _meta: { runtimeId: 'e2e' }
-        })
+  args: { paneKey: string; questionId: string; question: string }
+): Promise<string> {
+  return page.evaluate(async ({ paneKey, questionId, question }) => {
+    const response = (await window.api.runtime.call({
+      method: 'ask.register',
+      params: {
+        spec: { questions: [{ id: questionId, type: 'text', question }] },
+        requestId: `e2e-ask-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        paneKey,
+        cwd: '/'
       }
-      return original(args)
+    })) as RuntimeRpcReply<{ askId?: string; status?: string; reason?: string }>
+    if (!response.ok) {
+      throw new Error(`ask.register failed: ${response.error?.message ?? 'unknown error'}`)
     }
-  }, snapshot)
+    if (!response.result.askId) {
+      throw new Error(`ask.register registered nothing: ${JSON.stringify(response.result)}`)
+    }
+    return response.result.askId
+  }, args)
+}
+
+async function cancelAsk(page: Page, askId: string): Promise<void> {
+  await page.evaluate(
+    (id) => window.api.runtime.call({ method: 'ask.cancel', params: { askId: id } }),
+    askId
+  )
+}
+
+/** The card the asks slice currently holds for `askId`, as the registry's events shaped it. */
+async function readAskCard(
+  page: Page,
+  args: { paneKey: string; askId: string }
+): Promise<{ status: string; result?: unknown } | null> {
+  return page.evaluate(({ paneKey, askId }) => {
+    const cards = window.__store?.getState().pendingAsksByPaneKey[paneKey] ?? []
+    const card = cards.find((candidate) => candidate.askId === askId)
+    return card ? { status: card.status, result: card.result } : null
+  }, args)
+}
+
+/** The draft the registry has durably recorded for one question, read back over `ask.snapshot`. */
+async function readPersistedDraft(
+  page: Page,
+  args: { askId: string; questionId: string }
+): Promise<string | undefined> {
+  return page.evaluate(async ({ askId, questionId }) => {
+    const response = (await window.api.runtime.call({
+      method: 'ask.snapshot',
+      params: {}
+    })) as RuntimeRpcReply<{
+      asks: { askId: string; partial?: Record<string, { draft?: string }> }[]
+    }>
+    if (!response.ok) {
+      return undefined
+    }
+    return response.result.asks.find((ask) => ask.askId === askId)?.partial?.[questionId]?.draft
+  }, args)
 }
 
 /** Renderer-remount seam: clears the slice back to its pre-hydration shape, then replays the real
- * `hydrateAsks()` against whatever `ask.snapshot` response is currently installed. */
+ * `hydrateAsks()` against the registry's live `ask.snapshot`. */
 async function replayAskHydration(page: Page): Promise<void> {
   await page.evaluate(() => {
     window.__store?.setState({ pendingAsksByPaneKey: {}, askWatermark: null, _askEventBuffer: [] })
@@ -213,75 +210,60 @@ test.describe('Ask card', () => {
 
   test('answering resolves the blocked wait and collapses the card', async ({ orcaPage }) => {
     const { paneKey } = await setupAskPane(orcaPage)
-    const askId = `e2e-ask-answer-${randomUUID()}`
     const questionId = 'q1'
     const question = 'What should the release notes say?'
     const answerText = 'Fixed the release build pipeline.'
 
-    await seedPendingAsk(orcaPage, { paneKey, askId, questionId, question })
+    const askId = await registerAsk(orcaPage, { paneKey, questionId, question })
     const field = orcaPage.getByRole('textbox', { name: question })
     await expect(field).toBeVisible({ timeout: 10_000 })
     await field.fill(answerText)
-
-    await installAskRpcRecorder(orcaPage)
     await orcaPage.getByRole('button', { name: 'Submit' }).click()
 
+    // The registry commits the answer and pushes the terminal event back over ask:set, so the
+    // card's own result is the proof that Submit reached ask.answer with exactly what was typed.
     await expect
-      .poll(
-        async () =>
-          (await getRecordedAskRpcCalls(orcaPage)).some((call) => call.method === 'ask.answer'),
-        {
-          timeout: 10_000,
-          message: 'submit did not reach the ask.answer RPC call'
-        }
-      )
-      .toBe(true)
-    const answerCall = (await getRecordedAskRpcCalls(orcaPage)).find(
-      (call) => call.method === 'ask.answer'
-    )
-    expect(answerCall?.params).toEqual({
-      askId,
-      answers: { [questionId]: { value: answerText, source: 'input' } },
-      skipped: []
-    })
-
-    await resolveSeededAsk(orcaPage, { paneKey, askId, summary: 'Answered.' })
+      .poll(async () => (await readAskCard(orcaPage, { paneKey, askId }))?.result ?? null, {
+        timeout: 10_000,
+        message: 'submit did not resolve the ask through ask.answer'
+      })
+      .toMatchObject({
+        answers: { [questionId]: { value: answerText, source: 'input' } },
+        skipped: []
+      })
 
     await expect(orcaPage.getByText(question)).toHaveCount(0, { timeout: 10_000 })
-    await expect(orcaPage.getByText('Answered.')).toBeVisible()
   })
 
   test('restores a pending ask with its partial draft intact after a renderer remount', async ({
     orcaPage
   }) => {
     const { paneKey } = await setupAskPane(orcaPage)
-    const askId = `e2e-ask-restart-${randomUUID()}`
     const questionId = 'q1'
     const question = 'Which branch should this ship from?'
     const draftText = 'release/1.4 pending one more fix'
 
-    const snapshotEvent: AskRegistryEvent = {
-      seq: 1,
-      epoch: 'e2e-restart-epoch',
-      askId,
-      paneKey,
-      status: 'pending',
-      spec: { questions: [{ id: questionId, type: 'text', question }] },
-      partial: { [questionId]: { draft: draftText } }
-    }
-    await mockAskSnapshotResponse(orcaPage, {
-      asks: [snapshotEvent],
-      seq: 1,
-      epoch: 'e2e-restart-epoch'
-    })
+    const askId = await registerAsk(orcaPage, { paneKey, questionId, question })
+    const field = orcaPage.getByRole('textbox', { name: question })
+    await expect(field).toBeVisible({ timeout: 10_000 })
+    await field.fill(draftText)
+    // The dock debounces ask.updatePartial; the replay below must run against a draft the
+    // registry already holds, or it would only prove the field kept its own state.
+    await expect
+      .poll(() => readPersistedDraft(orcaPage, { askId, questionId }), {
+        timeout: 10_000,
+        message: 'the draft never reached ask.updatePartial'
+      })
+      .toBe(draftText)
 
     await replayAskHydration(orcaPage)
 
     // The regression this guards: a card that merely exists post-restart is not enough — the
     // hydrated draft must reach the field, or the user's in-progress answer is silently lost.
-    const field = orcaPage.getByRole('textbox', { name: question })
     await expect(field).toBeVisible({ timeout: 10_000 })
     await expect(field).toHaveValue(draftText)
+
+    await cancelAsk(orcaPage, askId)
   })
 
   test('clears a resolved card and surfaces the next queued ask on its own', async ({

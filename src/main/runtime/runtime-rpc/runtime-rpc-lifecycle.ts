@@ -18,6 +18,7 @@ import {
   createRuntimeTransportMetadata,
   sweepOrphanedRuntimeSockets
 } from './runtime-rpc-socket-metadata'
+import { askRosterFor } from '../../fork-ask-question-tool/ask-attached-surface-roster'
 
 export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {
   async start(): Promise<void> {
@@ -234,9 +235,10 @@ export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {
         // legitimately lack this method (its own server activates it).
         this.runtime.activateRecentPtyPathCandidateTracking?.()
         this.mobileRelayPairingProvider?.onDemandStateChanged?.()
-        this.runtime
-          .getAskServices()
-          .roster.recordConnectionCapabilities(socket.connectionId, socket.clientCapabilities)
+        askRosterFor(this.runtime)?.recordConnectionCapabilities(
+          socket.connectionId,
+          socket.clientCapabilities
+        )
       },
       onClose: (socket, hasOtherConnections) => {
         if (!socket) {
@@ -246,7 +248,7 @@ export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {
         // Why: subscriptions and binary streams are socket-scoped, but disconnect state is device-scoped across transports.
         this.runtime.cleanupSubscriptionsForConnection(socket.connectionId)
         this.runtime.cancelMobileDictationForConnection(socket.connectionId)
-        this.runtime.getAskServices().roster.forgetConnection(socket.connectionId)
+        askRosterFor(this.runtime)?.forgetConnection(socket.connectionId)
         this.binaryMessageRouter.deleteConnection(socket.connectionId)
         if (!hasOtherConnections) {
           this.runtime.onClientDisconnected(socket.device.deviceToken)

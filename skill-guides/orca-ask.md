@@ -16,6 +16,8 @@ description: >-
 
 `orca ask` asks the *user* — not another agent — a structured question and blocks until they answer, decline, or a timeout you opted into expires. It exists for one thing: a genuine human decision you cannot make yourself. It is not `orca orchestration ask`, which is worker-to-coordinator messaging between agents inside an orchestration run; see the `orchestration` skill for that.
 
+`ORCA` is a placeholder for the executable you resolved in the stub; substitute it before running.
+
 ## When To Use
 
 - Use it when the answer is a real judgment call only the user can make — choosing between two valid approaches, deciding whether to proceed with something destructive, or a value that genuinely isn't discoverable in the repo or environment.
@@ -26,9 +28,9 @@ description: >-
 ## The Three Commands
 
 ```bash
-orca ask        --spec <json|@file> [--timeout-ms <n>] [--chunk-ms <n>] [--json]
-orca ask wait   --id <ask_id> [--chunk-ms <n>] [--json]
-orca ask cancel --id <ask_id> [--json]
+ORCA ask        --spec <json|@file> [--timeout-ms <n>] [--chunk-ms <n>] [--json]
+ORCA ask wait   --id <ask_id> [--chunk-ms <n>] [--json]
+ORCA ask cancel --id <ask_id> [--json]
 ```
 
 - `--spec` is inline JSON or `@path/to/file.json` (a relative path resolves against your cwd). Invalid JSON or a spec that fails schema validation exits non-zero with a message naming the offending field, e.g. `questions[0].id: id is required and must be a non-empty string`.
@@ -54,7 +56,7 @@ orca ask cancel --id <ask_id> [--json]
    This is **not a failure and not a timeout** — the user simply hasn't answered yet. Resume in a new call:
 
    ```bash
-   orca ask wait --id ask_01J...
+   ORCA ask wait --id ask_01J...
    ```
 
 5. Repeat step 4 with `ask wait` for as many chunks as it takes. **This loop is yours to run across separate tool calls — never try to loop it inside one process or one blocking call.** The chunk size exists because agent harnesses cap how long a single shell invocation may run, well under the smallest known harness default; a `pending` envelope is the CLI handing control back to you before that cap bites, and it keeps handing it back every chunk until someone answers.
@@ -64,7 +66,7 @@ orca ask cancel --id <ask_id> [--json]
 Worked example:
 
 ```bash
-orca ask --spec '{"questions":[{"id":"db_engine","type":"select","question":"Which database?","options":[{"value":"postgres","label":"PostgreSQL"},{"value":"mysql","label":"MySQL"}]}]}'
+ORCA ask --spec '{"questions":[{"id":"db_engine","type":"select","question":"Which database?","options":[{"value":"postgres","label":"PostgreSQL"},{"value":"mysql","label":"MySQL"}]}]}'
 ```
 
 ```json
@@ -73,7 +75,7 @@ orca ask --spec '{"questions":[{"id":"db_engine","type":"select","question":"Whi
 ```
 
 ```bash
-orca ask wait --id ask_01J000000000000000000001
+ORCA ask wait --id ask_01J000000000000000000001
 ```
 
 ```json

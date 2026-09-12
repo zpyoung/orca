@@ -9,9 +9,15 @@ type AskStore = { getState: () => Pick<AsksSlice, 'hydrateAsks' | 'applyAskRegis
  * app store. Returns the preload disposer for the caller's own unmount cleanup (tech.md § C8).
  */
 export function wireAskIpcEvents(store: AskStore): () => void {
-  void store.getState().hydrateAsks()
-  const stopVerdict = wireClaudeSuppressionVerdict(window.api.asks)
-  const stopAskEvents = window.api.asks.onSet((event) => {
+  const asksApi: typeof window.api.asks | undefined = window.api.asks
+  const state: Partial<ReturnType<AskStore['getState']>> = store.getState()
+  // upstream's useIpcEvents tests drive this bridge with partial store and preload doubles
+  if (!asksApi || typeof state.hydrateAsks !== 'function') {
+    return () => {}
+  }
+  void state.hydrateAsks()
+  const stopVerdict = wireClaudeSuppressionVerdict(asksApi)
+  const stopAskEvents = asksApi.onSet((event) => {
     store.getState().applyAskRegistryEvent(event)
   })
   return () => {

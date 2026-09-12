@@ -34,7 +34,9 @@ export class AskAttachedSurfaceRoster {
     capabilities: readonly RuntimeCapability[]
   ): void {
     const affectedPanes = [...(this.paneRefcountsByConnection.get(connectionId)?.keys() ?? [])]
-    const wasCapable = new Map(affectedPanes.map((paneKey) => [paneKey, this.hasCapableOwner(paneKey)]))
+    const wasCapable = new Map(
+      affectedPanes.map((paneKey) => [paneKey, this.hasCapableOwner(paneKey)])
+    )
     this.capabilitiesByConnection.set(connectionId, capabilities)
     for (const paneKey of affectedPanes) {
       this.reportOwnershipChange(paneKey, wasCapable.get(paneKey) ?? false)
@@ -44,7 +46,9 @@ export class AskAttachedSurfaceRoster {
   /** Drops every pane and capability entry for a connection — the dropped-connection safety net. */
   forgetConnection(connectionId: string): void {
     const affectedPanes = [...(this.paneRefcountsByConnection.get(connectionId)?.keys() ?? [])]
-    const wasCapable = new Map(affectedPanes.map((paneKey) => [paneKey, this.hasCapableOwner(paneKey)]))
+    const wasCapable = new Map(
+      affectedPanes.map((paneKey) => [paneKey, this.hasCapableOwner(paneKey)])
+    )
     this.capabilitiesByConnection.delete(connectionId)
     this.paneRefcountsByConnection.delete(connectionId)
     this.subscribedPaneByConnectionAndHandle.delete(connectionId)
@@ -132,7 +136,9 @@ export class AskAttachedSurfaceRoster {
       if (!panes.has(paneKey)) {
         continue
       }
-      if (this.capabilitiesByConnection.get(connectionId)?.includes(ASK_SURFACE_CLIENT_CAPABILITY)) {
+      if (
+        this.capabilitiesByConnection.get(connectionId)?.includes(ASK_SURFACE_CLIENT_CAPABILITY)
+      ) {
         return true
       }
     }
@@ -155,11 +161,21 @@ type AskSurfacePaneTrackingRuntime = {
   getAskServices?: () => { roster: AskAttachedSurfaceRoster }
 }
 
+/** The connection-level roster, or null on a runtime (test double, remote proxy) that carries no ask services. */
+export function askRosterFor(
+  runtime: Pick<AskSurfacePaneTrackingRuntime, 'getAskServices'>
+): AskAttachedSurfaceRoster | null {
+  return typeof runtime.getAskServices === 'function' ? runtime.getAskServices().roster : null
+}
+
 function resolveTrackingTarget(
   runtime: AskSurfacePaneTrackingRuntime,
   terminalHandle: string
 ): { roster: AskAttachedSurfaceRoster; paneKey: string } | null {
-  if (typeof runtime.getTerminalPaneKey !== 'function' || typeof runtime.getAskServices !== 'function') {
+  if (
+    typeof runtime.getTerminalPaneKey !== 'function' ||
+    typeof runtime.getAskServices !== 'function'
+  ) {
     return null
   }
   const paneKey = runtime.getTerminalPaneKey(terminalHandle)
@@ -195,7 +211,9 @@ export function untrackAskSurfacePaneSubscription(
   const roster = runtime.getAskServices().roster
   const paneKey =
     roster.takeSubscribedPane(connectionId, terminalHandle) ??
-    (typeof runtime.getTerminalPaneKey === 'function' ? runtime.getTerminalPaneKey(terminalHandle) : null)
+    (typeof runtime.getTerminalPaneKey === 'function'
+      ? runtime.getTerminalPaneKey(terminalHandle)
+      : null)
   if (paneKey) {
     roster.untrackPaneSubscription(connectionId, paneKey)
   }
