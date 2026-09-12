@@ -1,5 +1,5 @@
 ---
-last_released_commit: aa63d4a3f61d60b769fa10872c0da6090988279a
+last_released_commit: 530529320217cbc2173c23c2721d61ed5eda034e
 upstream_synced: v1.4.200
 ---
 
@@ -11,6 +11,29 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.201-rc.0.zy02] - 2026-09-12
+
+Synced to upstream [v1.4.200](https://github.com/stablyai/orca/releases/tag/v1.4.200) — no new
+upstream stable release since the previous fork build.
+
+### Added
+- Project and group ledgers: a durable, validated record of decisions and findings that lives with a
+  project rather than in a scratch file. Entries carry provenance, revision history, and a triage
+  state, can be imported in bulk, and are browsable from a new sidebar view that filters by scope —
+  workspace, project, or group — and names the owner each entry resolves to. The `orca ledger`
+  command reaches the same data from the CLI, including on remote hosts, with list and review
+  filters and positional entry IDs.
+- Ledger staleness thresholds now live in repository settings and are reachable by deep link, so a
+  project can say for itself when an entry counts as going stale.
+
+### Changed
+- Removing a project or group checks its ledger first and refuses on a revision conflict rather than
+  silently discarding entries, and a rejected save keeps its error visible while leaving the form
+  usable instead of clearing what you typed.
+- The upstream-sync runbook now withdraws a fork file deletion when a new upstream release starts
+  importing the module the fork deleted. That case reached the previous sync as a type error against
+  upstream's own new files, with every ownership check still passing.
 
 ## [1.4.201-rc.0.zy01] - 2026-09-11
 
