@@ -1,5 +1,5 @@
 ---
-last_released_commit: 530529320217cbc2173c23c2721d61ed5eda034e
+last_released_commit: 8d12ef0fd74379cba6307cfb8ce1ced061cf83a9
 upstream_synced: v1.4.200
 ---
 
@@ -11,6 +11,27 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.201-rc.0.zy03] - 2026-09-13
+
+Synced to upstream [v1.4.200](https://github.com/stablyai/orca/releases/tag/v1.4.200) — no new
+upstream stable release since the previous fork build.
+
+### Added
+- `orca ask` lets an agent working in an Orca terminal put a real question to you and block until
+  you answer it — select, multi-select, text, number, date, or confirm — with the answer coming back
+  as a structured JSON envelope. A question that outlives a single invocation is resumed with
+  `orca ask wait` instead of holding a shell open, and `orca ask cancel` withdraws one the agent no
+  longer needs. The pane, terminal, and worktree an ask came from are recorded automatically, so it
+  reaches the right place with no flags to set.
+- Questions arrive as cards in a new Questions panel in the right sidebar, keeping your draft while
+  you think about it. One left unanswered escalates to a notification, and one raised while no UI is
+  attached is handed to the coordinator rather than stranding the agent. Registered questions are
+  stored durably rather than held in memory.
+- Claude sessions launched by Orca now suppress Claude's own `AskUserQuestion` prompt when the
+  installed `claude` binary is new enough to honour it, leaving one question surface rather than
+  two. The check fails open: a version that can't be read, or one below the floor, just leaves
+  Claude's prompt in place. The `orca-ask` skill guide ships with the bundled skill set.
 
 ## [1.4.201-rc.0.zy02] - 2026-09-12
 
