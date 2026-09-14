@@ -127,6 +127,11 @@
         "src/renderer/src/web/web-ledger-api.ts",
         "src/shared/ledger*.ts"
       ]
+    },
+    {
+      "name": "skills-repository",
+      "purpose": "Points `npx skills add` at this fork's repository so the skills it ships that upstream does not have are actually installable.",
+      "globs": ["**/fork-skills-repository/**"]
     }
   ],
   "seams": [
@@ -3273,6 +3278,71 @@
         "          ...hydrateWorkspaceActivityWindow(ui),",
         "          ...hydrateWorkspaceReviewFilters(ui),"
       ]
+    },
+    {
+      "path": "src/shared/agent-feature-install-commands.ts",
+      "feature": "skills-repository",
+      "kind": "import-swap",
+      "lines": [
+        "import { ORCA_SKILLS_REPOSITORY_URL } from './fork-skills-repository/skills-repository-url'",
+        "export { ORCA_SKILLS_REPOSITORY_URL }"
+      ]
+    },
+    {
+      "path": "src/cli/skills.test.ts",
+      "feature": "skills-repository",
+      "kind": "import-swap",
+      "lines": [
+        "import { ORCA_SKILLS_REPOSITORY_URL } from '../shared/fork-skills-repository/skills-repository-url'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/onboarding/onboarding-feature-setup.test.ts",
+      "feature": "skills-repository",
+      "kind": "import-swap",
+      "lines": [
+        "import { ORCA_SKILLS_REPOSITORY_URL } from '../../../../shared/fork-skills-repository/skills-repository-url'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/OrchestrationPane.test.tsx",
+      "feature": "skills-repository",
+      "kind": "import-swap",
+      "lines": [
+        "import { ORCA_SKILLS_REPOSITORY_URL } from '../../../../shared/fork-skills-repository/skills-repository-url'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/linear-agent-skill-install-cta.test.tsx",
+      "feature": "skills-repository",
+      "kind": "import-swap",
+      "lines": [
+        "import { ORCA_SKILLS_REPOSITORY_URL } from '../../../../shared/fork-skills-repository/skills-repository-url'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/skills/SkillFreshnessUpdateDialog.test.tsx",
+      "feature": "skills-repository",
+      "kind": "import-swap",
+      "lines": [
+        "import { ORCA_SKILLS_REPOSITORY_URL } from '../../../../shared/fork-skills-repository/skills-repository-url'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/skills/skill-freshness-skipped-reason.test.ts",
+      "feature": "skills-repository",
+      "kind": "import-swap",
+      "lines": [
+        "import { ORCA_SKILLS_REPOSITORY_URL } from '../../../../shared/fork-skills-repository/skills-repository-url'"
+      ]
+    },
+    {
+      "path": "src/shared/agent-feature-install-commands.test.ts",
+      "feature": "skills-repository",
+      "kind": "import-swap",
+      "lines": [
+        "import { ORCA_SKILLS_REPOSITORY_URL } from './fork-skills-repository/skills-repository-url'"
+      ]
     }
   ],
   "exceptions": [
@@ -3931,6 +4001,10 @@
       "added": 3,
       "removed": 0
     },
+    "src/cli/skills.test.ts": {
+      "added": 12,
+      "removed": 13
+    },
     "src/cli/specs/artifacts.ts": {
       "added": 2,
       "removed": 2
@@ -4523,6 +4597,10 @@
       "added": 1,
       "removed": 1
     },
+    "src/renderer/src/components/onboarding/onboarding-feature-setup.test.ts": {
+      "added": 2,
+      "removed": 1
+    },
     "src/renderer/src/components/right-sidebar/AiVaultPanel.tsx": {
       "added": 3,
       "removed": 1
@@ -4571,6 +4649,10 @@
       "added": 5,
       "removed": 0
     },
+    "src/renderer/src/components/settings/OrchestrationPane.test.tsx": {
+      "added": 3,
+      "removed": 4
+    },
     "src/renderer/src/components/settings/appearance-search.ts": {
       "added": 2,
       "removed": 0
@@ -4578,6 +4660,10 @@
     "src/renderer/src/components/settings/experimental-search.ts": {
       "added": 5,
       "removed": 0
+    },
+    "src/renderer/src/components/settings/linear-agent-skill-install-cta.test.tsx": {
+      "added": 3,
+      "removed": 2
     },
     "src/renderer/src/components/settings/settings-page-renderer.tsx": {
       "added": 2,
@@ -4746,6 +4832,14 @@
     "src/renderer/src/components/sidebar/worktree-list/viewport/virtual-row-context.ts": {
       "added": 5,
       "removed": 0
+    },
+    "src/renderer/src/components/skills/SkillFreshnessUpdateDialog.test.tsx": {
+      "added": 3,
+      "removed": 2
+    },
+    "src/renderer/src/components/skills/skill-freshness-skipped-reason.test.ts": {
+      "added": 2,
+      "removed": 1
     },
     "src/renderer/src/components/terminal-pane/TerminalContextMenu.test.tsx": {
       "added": 42,
@@ -5086,6 +5180,14 @@
     "src/renderer/src/web/web-preload-api-ui.test.ts": {
       "added": 10,
       "removed": 2
+    },
+    "src/shared/agent-feature-install-commands.test.ts": {
+      "added": 6,
+      "removed": 5
+    },
+    "src/shared/agent-feature-install-commands.ts": {
+      "added": 2,
+      "removed": 1
     },
     "src/shared/artifacts.ts": {
       "added": 12,
