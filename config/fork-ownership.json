@@ -129,12 +129,23 @@
       ]
     },
     {
+      "name": "computer-peer-identity",
+      "purpose": "Authorizes the packaged fork's macOS computer-use peer without broadening bundle-prefix trust.",
+      "globs": ["**/fork-computer-peer-identity/**"]
+    },
+    {
       "name": "skills-repository",
       "purpose": "Points `npx skills add` at this fork's repository so the skills it ships that upstream does not have are actually installable.",
       "globs": ["**/fork-skills-repository/**"]
     }
   ],
   "seams": [
+    {
+      "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift",
+      "feature": "computer-peer-identity",
+      "kind": "registration",
+      "lines": ["    return isTrustedComputerPeerBundleIdentifier(bundleId)"]
+    },
     {
       "path": "src/renderer/src/components/sidebar/use-worktree-activity-status.ts",
       "feature": "ask-question-tool",
@@ -4356,6 +4367,10 @@
     }
   ],
   "residuals": {
+    "native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift": {
+      "added": 1,
+      "removed": 3
+    },
     "src/renderer/src/components/sidebar/use-worktree-activity-status.ts": {
       "added": 4,
       "removed": 1
