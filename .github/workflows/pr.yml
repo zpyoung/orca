@@ -135,6 +135,9 @@ jobs:
       - uses: ./.github/actions/install-node-dependencies
         with:
           native-runtime: node
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            mobile/pnpm-lock.yaml
 
       - name: Lint
         run: pnpm exec oxlint --format github
@@ -225,6 +228,9 @@ jobs:
       - name: Boot orcad and round-trip a terminal
         run: pnpm run smoke:orcad-terminal
 
+      - name: Verify the generated RPC params catalog
+        run: pnpm run verify:rpc-params-catalog
+
       - name: Verify bundled skill guides
         run: pnpm run verify:bundled-skill-guides
 
@@ -291,6 +297,12 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node .github/scripts/check-root-directory-entries.mjs "$BASE_SHA" "$HEAD_SHA"
+
+      # Why here: the READMEs embed media owned by docs/site and resources/onboarding,
+      # and the classifier skips static_analysis for docs-only diffs. This job runs
+      # on every PR and needs no install.
+      - name: Check README local links
+        run: node config/scripts/check-readme-local-links.mjs
 
   fork_ownership_guard:
     name: fork ownership guard
@@ -821,18 +833,9 @@ jobs:
           [[ "$rpm_marker" == rpm ]] || { echo "Expected rpm marker, got: $rpm_marker"; exit 1; }
 
       - name: Verify headless serve signal shutdown
-        run: node config/scripts/run-headless-serve-shutdown-docker.mjs --appimage dist/orca-linux.AppImage
-
-      - name: Verify extracted launcher serve signal shutdown
         run: >-
           node config/scripts/run-headless-serve-shutdown-docker.mjs
-          --appimage dist/orca-linux.AppImage --entrypoint launcher
-
-      - name: Verify AppImage CLI registration and serve signal shutdown
-        run: >-
-          node config/scripts/run-headless-serve-shutdown-docker.mjs
-          --appimage dist/orca-linux.AppImage --entrypoint appimage
-          --signal-target serving-electron --int-delivery pid
+          --appimage dist/orca-linux.AppImage --all-entrypoints
 
       # A default container reproduces the hostile AppImage launch environment.
       - name: Verify Linux CLI launch contract

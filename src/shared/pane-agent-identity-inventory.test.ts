@@ -154,6 +154,7 @@ const INVENTORY: readonly InventoryGroup[] = [
     classification: 'identity-consumer',
     paths: [
       ['mobile/src/session/mobile-terminal-tab-agent.ts', 2],
+      ['src/main/runtime/tui-idle-evidence.ts', 2],
       ['src/renderer/src/lib/open-tab-occupant-agent.ts', 2],
       ['src/renderer/src/lib/use-tab-agent.ts', 3]
     ]
