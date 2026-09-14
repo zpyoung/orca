@@ -1820,6 +1820,14 @@
       ]
     },
     {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-structured-composer-send.test.tsx",
+      "feature": "agent-composer",
+      "kind": "import-swap",
+      "lines": [
+        "import type { AgentComposerImageAttachment as NativeChatComposerImageAttachment } from './fork-agent-composer/AgentComposerField'"
+      ]
+    },
+    {
       "path": "src/renderer/src/components/native-chat/use-native-chat-structured-composer-send.ts",
       "feature": "agent-composer",
       "kind": "import-swap",
@@ -5040,6 +5048,10 @@
     "src/renderer/src/components/native-chat/use-native-chat-session-options.ts": {
       "added": 74,
       "removed": 11
+    },
+    "src/renderer/src/components/native-chat/use-native-chat-structured-composer-send.test.tsx": {
+      "added": 1,
+      "removed": 1
     },
     "src/renderer/src/components/native-chat/use-native-chat-structured-composer-send.ts": {
       "added": 2,
