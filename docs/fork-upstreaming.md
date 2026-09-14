@@ -85,7 +85,7 @@ test file.
 `react-doctor/no-ref-current-in-render`, `react-doctor/no-effect-with-fresh-deps` and
 `react-doctor/no-prop-callback-in-render` default to `error` in the CLI but are absent from
 `config/oxlint-react-doctor.json`, the repo's curated React Doctor rule list, where every listed
-rule runs at `warn`. `react-doctor/effect-needs-cleanup` is stranger still: it *is* on that list at
+rule runs at `warn`. `react-doctor/effect-needs-cleanup` is stranger still: it _is_ on that list at
 `warn`, so the CLI running it at `error` contradicts the severity the repo declares for it. Both fire only on deliberate,
 upstream-authored patterns: latest-value refs written during render, a render-phase array-identity
 cache, and test harnesses whose inline ref literals are the fixture under test. Setting them to
@@ -115,7 +115,7 @@ The `package.json` severities need no `exceptions` row of their own; the file is
 
 The v1.4.193 sync added the last three. The first two are the same shape as the originals — a
 `node:buffer` import and a template literal, on lines the merge touched. The third is different in
-kind: `use-checks-list-state.tsx` wrote `autoExpandedContextRef` *inside* a `setExpandedCheckKeys`
+kind: `use-checks-list-state.tsx` wrote `autoExpandedContextRef` _inside_ a `setExpandedCheckKeys`
 updater, and React may run an updater more than once, so the write is hoisted into the effect that
 queues it. That one is a genuine correctness fix to upstream's hook and worth submitting on its own
 merits, not just to clear the gate.
@@ -258,3 +258,23 @@ file.
 - `src/main/runtime/structured-agent-session-integration.test.ts`
 
 **Status:** pending-upstream. Not yet submitted.
+
+## bug-2 Relay and SSH environment-dependent failures
+
+**Ledger:** `bug-2`.
+
+**What:** The POSIX GC regression feeds more than 1 MiB of upload-stage paths through the real
+shell filter before enumerating two real install directories. It no longer creates and removes
+15,197 directories merely to generate listing volume; the output must still contain only the two
+install names and remain below 1 KiB.
+
+**Why upstream, not isolated:** this repairs an existing upstream regression fixture in place. A
+fork copy would duplicate the suite without a seam.
+
+**Paths:**
+
+- `src/main/ssh/ssh-remote-commands.test.ts`
+
+**Status:** pending-upstream. Not yet submitted. `bug-2` stays open: this closes the POSIX GC
+failure only. The `git-handler` upstreamStatus failure is `bug-47`, and the two
+`agent-exec-handler` spawn-arg failures are host `GIT_CONFIG_*` bleed, still unaddressed.
