@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 import type { TabDragItemData } from '../tab-group/useTabDragSplit'
 import { useAppStore } from '../../store'
+import { selectTabHasPendingAsk } from '../fork-ask-question-tool/pending-ask-attention'
 import {
   ACTIVE_TAB_INDICATOR_CLASSES,
   getDropIndicatorClasses,
@@ -101,6 +102,7 @@ export default function SortableTab({
   // Why: resolver returns a primitive so unrelated agent updates can't repaint this tab (pane bucketing memoized per snapshot).
   const activityStatus = useAppStore((s) =>
     resolveTerminalTabActivityStatus({
+      hasPendingAsk: selectTabHasPendingAsk(s, tab.id),
       tab,
       agentStatusByPaneKey: s.agentStatusByPaneKey,
       agentStatusEpoch: s.agentStatusEpoch,

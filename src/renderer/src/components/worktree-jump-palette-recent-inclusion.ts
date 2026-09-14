@@ -18,7 +18,8 @@ export function shouldIncludeOpenTabInRecentSection({
   paneSources,
   unreadTerminalTabs,
   unreadAgentCompletionPanes,
-  now
+  now,
+  hasPendingAsk
 }: {
   item: OpenTabPaletteItem
   worktree: Worktree
@@ -27,6 +28,7 @@ export function shouldIncludeOpenTabInRecentSection({
   unreadTerminalTabs: Record<string, boolean | undefined>
   unreadAgentCompletionPanes: Record<string, boolean | undefined>
   now: number
+  hasPendingAsk?: boolean
 }): boolean {
   if (worktree.isArchived) {
     return false
@@ -38,7 +40,7 @@ export function shouldIncludeOpenTabInRecentSection({
     return false
   }
   const badge = resolveTerminalTabAttentionBadge({
-    status: resolveRecentWorkspaceTabStatus(row, paneSources, now),
+    status: hasPendingAsk ? 'permission' : resolveRecentWorkspaceTabStatus(row, paneSources, now),
     hasUnread: terminalTabHasUnreadActivity({
       terminalTabId: row.terminalTab.id,
       unreadTerminalTabs,

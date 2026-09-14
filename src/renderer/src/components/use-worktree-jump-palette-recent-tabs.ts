@@ -14,6 +14,7 @@ import {
   type PaletteItem
 } from './worktree-jump-palette-model'
 import { shouldIncludeOpenTabInRecentSection } from './worktree-jump-palette-recent-inclusion'
+import { usePendingAskTabIds } from '@/components/fork-ask-question-tool/use-pending-ask-tab-ids'
 import type { WorktreeJumpPaletteLocalState } from './use-worktree-jump-palette-local-state'
 import type { WorktreeJumpPaletteOpenTabs } from './use-worktree-jump-palette-open-tabs'
 import type { WorktreeJumpPaletteStoreState } from './use-worktree-jump-palette-store-state'
@@ -156,6 +157,7 @@ export function useWorktreeJumpPaletteRecentTabs({
     () => new Map(openTabRecentRows.map(({ item, row }) => [item, row])),
     [openTabRecentRows]
   )
+  const pendingAskTabIds = usePendingAskTabIds()
   const recentTabRows = useMemo<RecentWorkspaceTabRow[]>(() => {
     const now = Date.now()
     const rows: RecentWorkspaceTabRow[] = []
@@ -168,14 +170,21 @@ export function useWorktreeJumpPaletteRecentTabs({
           paneSources: recentTabPaneSources,
           unreadTerminalTabs,
           unreadAgentCompletionPanes,
-          now
+          now,
+          hasPendingAsk: row.terminalTab != null && pendingAskTabIds.has(row.terminalTab.id)
         })
       ) {
         rows.push(row)
       }
     }
     return rows
-  }, [openTabRecentRows, recentTabPaneSources, unreadAgentCompletionPanes, unreadTerminalTabs])
+  }, [
+    openTabRecentRows,
+    pendingAskTabIds,
+    recentTabPaneSources,
+    unreadAgentCompletionPanes,
+    unreadTerminalTabs
+  ])
   const [recentTabSnapshot, setRecentTabSnapshot] = useState(EMPTY_RECENT_TAB_SNAPSHOT)
   // Why: recent rows are already narrowed by the filter, so a filter change mid-open must
   // re-capture — a frozen order would otherwise hide rows a cleared chip brought back.
