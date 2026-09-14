@@ -65,12 +65,13 @@ describe('release install targets', () => {
     expect(script).toContain(macCpuFlag)
   })
 
-  it('keeps installed Windows addon checks in the Windows CI lane', () => {
-    const steps = Object.values(workflow('pr').jobs).flatMap((job) => job.steps ?? [])
-    const test = steps.find((step) => step.name === 'Test Windows-specific boundaries')
-    expect(test.run).toContain('config/scripts/windows-process-tree-gyp-path.test.mjs')
-    expect(test.run).toContain('config/scripts/windows-process-tree-gyp-rebuild.test.mjs')
-    expect(test.run).toContain('config/scripts/package-electron-runtime-contract.test.mjs')
-    expect(test.run).toContain('config/scripts/electron-builder-runtime-resources.test.mjs')
+  // This fork removed the Windows PR lanes, so upstream's "the Windows lane still carries its
+  // addon checks" contract has no lane to assert against. Assert the removal instead: a
+  // half-restored lane that drops the addon checks fails here just as loudly.
+  it('has no Windows CI lane, so no Windows addon checks to keep', () => {
+    const jobs = workflow('pr').jobs
+    expect(Object.keys(jobs)).not.toContain('package_windows')
+    const steps = Object.values(jobs).flatMap((job) => job.steps ?? [])
+    expect(steps.find((step) => step.name === 'Test Windows-specific boundaries')).toBeUndefined()
   })
 })

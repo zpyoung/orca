@@ -2949,8 +2949,8 @@
       "feature": "terminal-dock",
       "kind": "registration",
       "lines": [
-        "import { focusPaneOrDockComposer } from '@/components/terminal-pane/fork-terminal-dock/dock-composer-focus-redirect'",
-        "  manager.setActivePane(resolution.numericPaneId, { focus: false })"
+        "import { findPaneDockComposer } from '@/components/terminal-pane/fork-terminal-dock/dock-composer-focus-redirect'",
+        "  const dockComposer = findPaneDockComposer(requestedPane)"
       ]
     },
     {
@@ -3840,6 +3840,11 @@
     {
       "path": "config/scripts/check-fork-ownership.test.mjs",
       "reason": "Tests for the fork ownership CI guard above.",
+      "status": "permanent"
+    },
+    {
+      "path": "config/scripts/ci-dependency-download-cache.test.mjs",
+      "reason": "Contracts for the fork-owned PR job graph. Upstream asserts its Windows lane still carries the addon checks; this fork removed the Windows PR lanes, so the case asserts the removal instead.",
       "status": "permanent"
     },
     {
@@ -5570,8 +5575,8 @@
       "removed": 11
     },
     "src/renderer/src/runtime/sync-runtime-graph.ts": {
-      "added": 7,
-      "removed": 4
+      "added": 13,
+      "removed": 1
     },
     "src/renderer/src/runtime/sync-runtime-graph/mobile-session-capture.ts": {
       "added": 1,

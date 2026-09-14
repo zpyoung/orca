@@ -47,12 +47,11 @@ describe('focusRuntimeTerminalSurface', () => {
     expect(terminal.focus).not.toHaveBeenCalled()
   })
 
-  it('falls back to the terminal for a resolved leaf without a composer', () => {
-    const { manager, terminal } = registerRuntimeFocusTab('tab-terminal-leaf', false)
+  it('leaves an uncovered leaf without a composer to the manager', () => {
+    const { manager } = registerRuntimeFocusTab('tab-terminal-leaf', false)
 
     expect(focusRuntimeTerminalSurface('tab-terminal-leaf', FOCUS_LEAF_ID)).toBe(true)
-    expect(manager.setActivePane).toHaveBeenCalledWith(7, { focus: false })
-    expect(terminal.focus).toHaveBeenCalledOnce()
+    expect(manager.setActivePane).toHaveBeenCalledWith(7, { focus: true })
   })
 
   it('focuses the active pane composer when no leaf is requested', () => {
