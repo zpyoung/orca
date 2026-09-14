@@ -129,6 +129,11 @@
       ]
     },
     {
+      "name": "dev-tcc",
+      "purpose": "Keeps TCC prompt attribution aligned with the stable app and helper bundle identities emitted by the dev runner.",
+      "globs": ["**/fork-dev-tcc/**"]
+    },
+    {
       "name": "skills-repository",
       "purpose": "Points `npx skills add` at this fork's repository so the skills it ships that upstream does not have are actually installable.",
       "globs": ["**/fork-skills-repository/**"]
@@ -607,6 +612,8 @@
       "feature": "fork-infra",
       "kind": "registration",
       "lines": [
+        "  'com.stablyai.orca.dev',",
+        "  'com.stablyai.orca.dev.helper',",
         "  'com.zpyoung.orca',",
         "  'com.zpyoung.orca.helper',",
         "  'com.zpyoung.orca.dev',",
@@ -4582,7 +4589,7 @@
     },
     "src/main/macos-tcc-prompt-watch.ts": {
       "added": 6,
-      "removed": 6
+      "removed": 4
     },
     "src/main/native-chat/transcript-incremental-reader.ts": {
       "added": 11,
