@@ -289,9 +289,9 @@ module.exports = {
     // Why: a Linux runner-image glibc bump silently shipped a node-pty pty.node
     // requiring GLIBC_2.34, crashing the app on startup on Ubuntu 20.04 (#9902).
     // Fail packaging if any bundled native binary exceeds the supported floor.
-    // Why after the prune: cross-builds intentionally install every optional
-    // native variant, so an arm64 slice still carries the x64 @parcel/watcher
-    // until prunePackagedRuntimeNodeModules drops it.
+    // Why after the prune: `pnpm install:release` widens the CPU set for cross-builds,
+    // so an arm64 slice can still carry the x64 @parcel/watcher until
+    // prunePackagedRuntimeNodeModules drops it.
     if (context.electronPlatformName === 'linux') {
       // Why the arch is passed: symbol-version checks pass happily on a wrong-architecture binary,
       // so a cross-built slice could ship the host's pty.node and only fail at runtime.

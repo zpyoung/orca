@@ -334,6 +334,50 @@ export function filesForScan(files, scan) {
   )
 }
 
+// Why: only the casting scan enforces `assertionStyle: never`, so under the root config an
+// `as` cast is legal and the SAFETY: directive AGENTS.md mandates reads as unused. The untyped
+// scan reports that as a warning, which the gate counts, so exempt exactly those directives.
+export function isCastingDirectiveUnusedWarning(diagnostic, root) {
+  if (!/^Unused (?:oxlint|eslint)-disable/.test(diagnostic.message ?? '')) {
+    return false
+  }
+  return (diagnostic.labels ?? []).some((label) =>
+    diagnosticHighlightedLines(root, diagnostic.filename, label.span).some((line) =>
+      CASTING_DISABLE_PATTERN.test(line)
+    )
+  )
+}
+
+// Why: oxlint cannot see the AGENTS.md requirement that every casting suppression carry a
+// line-specific SAFETY: rationale, so the directive text itself is checked over added lines.
+export function findCastingDirectivesMissingSafety(root, rangesByFile) {
+  const findings = []
+  for (const [file, ranges] of rangesByFile) {
+    const absolutePath = path.join(root, file)
+    if (!existsSync(absolutePath)) {
+      continue
+    }
+    readFileSync(absolutePath, 'utf8')
+      .split(/\r?\n/)
+      .forEach((text, index) => {
+        const line = index + 1
+        if (
+          CASTING_DISABLE_PATTERN.test(text) &&
+          !text.includes('SAFETY:') &&
+          overlapsAddedLines(line, line, ranges)
+        ) {
+          findings.push({
+            filename: file,
+            code: `${CASTING_RULE} (missing SAFETY:)`,
+            message: `Suppressing ${CASTING_RULE} requires a line-specific "SAFETY:" explanation.`,
+            labels: [{ span: { line } }]
+          })
+        }
+      })
+  }
+  return findings
+}
+
 function isSuppressedDiagnostic(diagnostic, root) {
   const files = SUPPRESSED_REACT_DOCTOR_DIAGNOSTICS.get(diagnostic.code)
   return files?.has(normalizedDiagnosticPath(root, diagnostic.filename)) ?? false

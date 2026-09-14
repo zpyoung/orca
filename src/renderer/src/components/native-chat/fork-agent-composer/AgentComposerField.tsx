@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/NativeChatComposerField.tsx
-// FORK-COPY-SHA: e0826956fcfc532f5a1e55b5e081f2e57e553c43
+// FORK-COPY-SHA: b1f7085315542b37f7726f3df03a72539cafa540
 import type { ClipboardEventHandler, KeyboardEventHandler, RefObject } from 'react'
 import { useLayoutEffect, useRef } from 'react'
 import type { useImeEnterGestureOwnership } from '@/lib/ime-composition-keyboard-event'
@@ -182,7 +182,7 @@ export function AgentComposerField({
             layout === 'dock' ? 'flex h-full min-h-0 flex-col' : cn('mx-auto', widthClassName)
           )}
         >
-          {autocomplete.mode === 'slash' || autocomplete.mode === 'skill' ? (
+          {autocomplete.mode === 'slash' ? (
             <NativeChatPickerMenu
               autocomplete={autocomplete}
               activeIndex={activeSuggestion}
@@ -292,15 +292,10 @@ export function AgentComposerField({
                 }}
                 onPaste={onPaste}
                 onSelect={(e) => onTextareaSelect(e.currentTarget)}
-                aria-expanded={autocomplete.mode === 'slash' || autocomplete.mode === 'skill'}
-                aria-controls={
-                  autocomplete.mode === 'slash' || autocomplete.mode === 'skill'
-                    ? pickerListboxId
-                    : undefined
-                }
+                aria-expanded={autocomplete.mode === 'slash'}
+                aria-controls={autocomplete.mode === 'slash' ? pickerListboxId : undefined}
                 aria-activedescendant={
-                  (autocomplete.mode === 'slash' || autocomplete.mode === 'skill') &&
-                  autocomplete.items.length > 0
+                  autocomplete.mode === 'slash' && autocomplete.items.length > 0
                     ? `${pickerListboxId}-option-${Math.min(activeSuggestion, autocomplete.items.length - 1)}`
                     : undefined
                 }
