@@ -64,7 +64,7 @@ describe('deriveComposerAutocomplete — slash', () => {
     expect(deriveComposerAutocomplete('/clear now', 10, COMMANDS).mode).toBe('none')
   })
 
-  it('offers skills but not commands for a mid-draft `/`', () => {
+  it('opens a non-dispatchable picker for a mid-draft `/`', () => {
     const profile = getNativeChatAgentProfile('claude')
     const skills = [skill({ name: 'browser' })]
     const result = deriveComposerAutocomplete('please run /bro', 15, COMMANDS, skills, profile)
@@ -74,9 +74,9 @@ describe('deriveComposerAutocomplete — slash', () => {
     }
     expect(result.query).toBe('bro')
     expect(result.items.map((item) => item.kind)).toEqual(['skill'])
-    expect(result.commandsEnabled).toBe(false)
     expect(result.skillsEnabled).toBe(true)
-    expect(result.grouped).toBe(false)
+    // Mid-draft the token is part of the sentence, so a pick completes it rather than sending it.
+    expect(result.dispatchable).toBe(false)
     expect(result.triggerKey).toBe('/:11')
   })
 
@@ -87,14 +87,15 @@ describe('deriveComposerAutocomplete — slash', () => {
     if (result.mode !== 'slash') {
       return
     }
-    expect(result.commandsEnabled).toBe(false)
+    expect(result.dispatchable).toBe(false)
     expect(result.triggerKey).toBe('/:1')
   })
 
-  it('stays closed for a mid-draft `/` when the agent has no slash skills', () => {
+  it('stays closed for a mid-draft `/` when no agent profile is known', () => {
     expect(deriveComposerAutocomplete('hi /clear', 9, COMMANDS).mode).toBe('none')
+    // Every agent with a known grammar opens the same menu; only the inserted token differs.
     const codex = getNativeChatAgentProfile('codex')
-    expect(deriveComposerAutocomplete('hi /cl', 6, COMMANDS, [skill({})], codex).mode).toBe('none')
+    expect(deriveComposerAutocomplete('hi /cl', 6, COMMANDS, [skill({})], codex).mode).toBe('slash')
   })
 
   it('keys dismissal to the trigger position, so a later `/` reopens', () => {
