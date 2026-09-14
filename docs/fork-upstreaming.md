@@ -85,7 +85,7 @@ test file.
 `react-doctor/no-ref-current-in-render`, `react-doctor/no-effect-with-fresh-deps` and
 `react-doctor/no-prop-callback-in-render` default to `error` in the CLI but are absent from
 `config/oxlint-react-doctor.json`, the repo's curated React Doctor rule list, where every listed
-rule runs at `warn`. `react-doctor/effect-needs-cleanup` is stranger still: it *is* on that list at
+rule runs at `warn`. `react-doctor/effect-needs-cleanup` is stranger still: it _is_ on that list at
 `warn`, so the CLI running it at `error` contradicts the severity the repo declares for it. Both fire only on deliberate,
 upstream-authored patterns: latest-value refs written during render, a render-phase array-identity
 cache, and test harnesses whose inline ref literals are the fixture under test. Setting them to
@@ -115,7 +115,7 @@ The `package.json` severities need no `exceptions` row of their own; the file is
 
 The v1.4.193 sync added the last three. The first two are the same shape as the originals — a
 `node:buffer` import and a template literal, on lines the merge touched. The third is different in
-kind: `use-checks-list-state.tsx` wrote `autoExpandedContextRef` *inside* a `setExpandedCheckKeys`
+kind: `use-checks-list-state.tsx` wrote `autoExpandedContextRef` _inside_ a `setExpandedCheckKeys`
 updater, and React may run an updater more than once, so the write is hoisted into the effect that
 queues it. That one is a genuine correctness fix to upstream's hook and worth submitting on its own
 merits, not just to clear the gate.
@@ -256,5 +256,28 @@ file.
 **Paths:**
 
 - `src/main/runtime/structured-agent-session-integration.test.ts`
+
+**Status:** pending-upstream. Not yet submitted.
+
+## Draft RC recovery recognizes fork tags
+
+**What:** the interrupted-release publisher accepts both upstream RC tags
+(`vMAJOR.MINOR.PATCH-rc.N`) and the fork's corresponding release tags with exactly one optional
+`.zyNN` suffix. Its tests preserve the bot-authored draft gate, reject malformed suffixes, exercise
+current and stale upstream and fork tags, and prove through the real required-asset verifier that an
+artifact-less draft remains private.
+
+**Ledger:** `bug-14`, repaired together with `bug-48` in the fork-owned release workflow.
+
+**Why upstream, not isolated:** candidate recognition is one predicate inside upstream's existing
+recovery publisher, ahead of its current-ref and asset-completeness safety gates. Isolating the
+predicate would require a forked publisher or a parallel pre-filter that can drift from those
+guards; the narrowly anchored optional suffix preserves upstream's tag behavior while recognizing
+the fork's release identifier.
+
+**Paths:**
+
+- `config/scripts/publish-complete-draft-releases.mjs`
+- `config/scripts/publish-complete-draft-releases.test.mjs`
 
 **Status:** pending-upstream. Not yet submitted.

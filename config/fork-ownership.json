@@ -132,6 +132,11 @@
       "name": "skills-repository",
       "purpose": "Points `npx skills add` at this fork's repository so the skills it ships that upstream does not have are actually installable.",
       "globs": ["**/fork-skills-repository/**"]
+    },
+    {
+      "name": "release-recovery",
+      "purpose": "Covers fork release automation that recovers interrupted RC cuts by resuming only current, complete draft releases.",
+      "globs": ["**/fork-release-recovery/**"]
     }
   ],
   "seams": [
@@ -3987,6 +3992,18 @@
       "path": "config/scripts/pr-workflow-parallelism.test.mjs",
       "reason": "Contracts for the fork-owned PR job graph, which omits Windows packaging and must not restore upstream's exact aggregate dependency list.",
       "status": "permanent"
+    },
+    {
+      "path": "config/scripts/publish-complete-draft-releases.mjs",
+      "reason": "Widens the upstream draft-RC recovery selector to recognize this fork's exact .zyNN release suffix while preserving its bot, draft, current-ref, and asset-completeness gates.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#draft-rc-recovery-recognizes-fork-tags"
+    },
+    {
+      "path": "config/scripts/publish-complete-draft-releases.test.mjs",
+      "reason": "Covers upstream and .zyNN draft-RC selection, malformed suffix rejection, stale skips, and artifact-less drafts remaining private through the real asset verifier.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#draft-rc-recovery-recognizes-fork-tags"
     },
     {
       "path": "config/scripts/reject-local-vitest-run.mjs",
