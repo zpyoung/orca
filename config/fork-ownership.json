@@ -3776,6 +3776,12 @@
   ],
   "exceptions": [
     {
+      "path": "src/shared/posix-command-path-lookup.test.ts",
+      "reason": "Isolates shell lookup regression fixtures from zsh startup files that overwrite the injected PATH.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#posix-lookup-test-startup-isolation"
+    },
+    {
       "path": ".claude/hooks/require-sandboxed-tests.mjs",
       "reason": "Fork-only guard keeping vitest on the remote sandbox host; upstream runs tests locally.",
       "status": "permanent"
