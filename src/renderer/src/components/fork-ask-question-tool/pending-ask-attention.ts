@@ -12,42 +12,47 @@ type PendingAskAttentionState = {
   tabsByWorktree?: Record<string, readonly { id: string }[]>
 }
 
-function tabHasPendingAsk(queues: AskQueues, paneKeys: string[], tabId: string): boolean {
-  const prefix = `${tabId}:`
-  // Prefix matching also covers legacy numeric pane IDs.
-  return paneKeys.some(
-    (key) =>
-      key.startsWith(prefix) &&
-      key.length > prefix.length &&
-      queues[key].some((card) => !isTerminalAskStatus(card.status))
-  )
+type PendingAskIndex = {
+  tabIds: ReadonlySet<string>
+  /** Sorted so a shallow-compared subscription keeps one array identity per snapshot. */
+  sortedTabIds: readonly string[]
+}
+
+// Why: ask writes replace this map; WeakMap indexes each snapshot once without pinning retired ones.
+const indexByQueues = new WeakMap<AskQueues, PendingAskIndex>()
+
+function indexPendingAsks(queues: AskQueues): PendingAskIndex {
+  const cached = indexByQueues.get(queues)
+  if (cached) {
+    return cached
+  }
+  // Why: every mounted tab and worktree card runs a selector per store tick; scan the map once.
+  const tabIds = new Set<string>()
+  for (const [paneKey, cards] of Object.entries(queues)) {
+    // a pane key is `${tabId}:${paneId}`, and neither half may be empty to attribute the ask
+    const separator = paneKey.indexOf(':')
+    if (separator <= 0 || separator === paneKey.length - 1) {
+      continue
+    }
+    if (cards.some((card) => !isTerminalAskStatus(card.status))) {
+      tabIds.add(paneKey.slice(0, separator))
+    }
+  }
+  const index: PendingAskIndex = { tabIds, sortedTabIds: [...tabIds].sort() }
+  indexByQueues.set(queues, index)
+  return index
 }
 
 /** True while any pane of `tabId` holds a non-terminal ask. */
 export function selectTabHasPendingAsk(state: PendingAskAttentionState, tabId: string): boolean {
   const queues = state.pendingAsksByPaneKey
-  if (!queues) {
-    return false
-  }
-  const paneKeys = Object.keys(queues)
-  return paneKeys.length > 0 && tabHasPendingAsk(queues, paneKeys, tabId)
+  return queues ? indexPendingAsks(queues).tabIds.has(tabId) : false
 }
 
 /** Tab ids holding a non-terminal ask, sorted so a shallow-compared subscription stays stable. */
 export function selectPendingAskTabIds(state: PendingAskAttentionState): readonly string[] {
   const queues = state.pendingAsksByPaneKey
-  if (!queues) {
-    return EMPTY_TAB_IDS
-  }
-  const tabIds = new Set<string>()
-  for (const [key, cards] of Object.entries(queues)) {
-    // inverse of the prefix match above: a pane key is `${tabId}:${paneId}`
-    const separator = key.lastIndexOf(':')
-    if (separator > 0 && cards.some((card) => !isTerminalAskStatus(card.status))) {
-      tabIds.add(key.slice(0, separator))
-    }
-  }
-  return [...tabIds].sort()
+  return queues ? indexPendingAsks(queues).sortedTabIds : EMPTY_TAB_IDS
 }
 
 /** True while any tab of `worktreeId` holds a non-terminal ask. */
@@ -59,13 +64,9 @@ export function selectWorktreeHasPendingAsk(
   if (!queues) {
     return false
   }
-  // why: this runs per worktree card on every store tick; enumerate the queue map once
-  const paneKeys = Object.keys(queues)
-  if (paneKeys.length === 0) {
+  const { tabIds } = indexPendingAsks(queues)
+  if (tabIds.size === 0) {
     return false
   }
-  return (
-    state.tabsByWorktree?.[worktreeId]?.some((tab) => tabHasPendingAsk(queues, paneKeys, tab.id)) ??
-    false
-  )
+  return state.tabsByWorktree?.[worktreeId]?.some((tab) => tabIds.has(tab.id)) ?? false
 }

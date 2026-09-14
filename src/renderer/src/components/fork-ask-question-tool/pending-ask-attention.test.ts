@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest'
 import type { AskStatus } from '../../../../shared/fork-ask-question-tool/ask-answer-envelope'
 import type { AgentStatusEntry } from '../../../../shared/agent-status-types'
 import { resolveTerminalTabActivityStatus } from '../tab-bar/terminal-tab-activity-status'
-import { selectTabHasPendingAsk, selectWorktreeHasPendingAsk } from './pending-ask-attention'
+import {
+  selectPendingAskTabIds,
+  selectTabHasPendingAsk,
+  selectWorktreeHasPendingAsk
+} from './pending-ask-attention'
 
 type AttentionState = Parameters<typeof selectWorktreeHasPendingAsk>[0]
 const PANE_KEY = 'tab-1:11111111-1111-4111-8111-111111111111'
@@ -81,6 +85,31 @@ describe('pending ask attention', () => {
     const state = { ...stateWithAsk(), pendingAsksByPaneKey: { [PANE_KEY]: [] } }
     expect(selectTabHasPendingAsk(state, 'tab-1')).toBe(false)
     expect(selectWorktreeHasPendingAsk(state, 'workspace')).toBe(false)
+  })
+
+  it('attributes a tab id the same way for both selectors', () => {
+    const state = stateWithAsk('registered')
+    expect(selectPendingAskTabIds(state)).toEqual(['tab-1'])
+    expect(selectTabHasPendingAsk(state, 'tab-1')).toBe(true)
+  })
+
+  it.each(['tab-1', 'tab-1:', 'null', ':123'])(
+    'reports no tab id for unattributed pane key %s',
+    (paneKey) => {
+      expect(selectPendingAskTabIds(stateWithAsk('registered', paneKey))).toEqual([])
+    }
+  )
+
+  it('reuses one index per queue snapshot and rebuilds on the next one', () => {
+    const state = stateWithAsk('registered')
+    const first = selectPendingAskTabIds(state)
+    expect(selectPendingAskTabIds({ ...state })).toBe(first)
+
+    const next = {
+      ...state,
+      pendingAsksByPaneKey: { 'tab-9:123': [{ status: 'registered' as const }] }
+    }
+    expect(selectPendingAskTabIds(next)).toEqual(['tab-9'])
   })
 })
 

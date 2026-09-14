@@ -147,12 +147,10 @@ describe('pending ask Cmd+J surfaces', () => {
   })
 
   it('keeps the current tab in the recent section while its ask is pending', () => {
-    // The palette's union types carry far more than this predicate reads; narrow to the two
-    // fields it branches on rather than constructing a whole item and worktree.
-    const item = {
-      type: 'workspace-tab',
-      result: { isCurrentTab: true }
-    } as unknown as OpenTabPaletteItem
+    const itemShape = { type: 'workspace-tab', result: { isCurrentTab: true } }
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the predicate branches only on item.type and item.result.isCurrentTab; a real WorkspaceTabPaletteSearchResult carries a whole Tab, Worktree and PaletteDocument it never reads.
+    const item = itemShape as unknown as OpenTabPaletteItem
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the predicate reads only worktree.isArchived.
     const worktree = { isArchived: false } as unknown as Worktree
     const include = (hasPendingAsk: boolean): boolean =>
       shouldIncludeOpenTabInRecentSection({
