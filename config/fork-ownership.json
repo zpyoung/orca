@@ -1,6 +1,16 @@
 {
   "features": [
     {
+      "name": "heimdall",
+      "purpose": "Deterministic reconciler kernel supervising durable watchers; kinds register into it in-tree.",
+      "globs": ["**/fork-heimdall/**"]
+    },
+    {
+      "name": "hosted-review-sitter",
+      "purpose": "Watches explicitly enrolled hosted reviews, journals decisions and approvals, and gates branch updates, policy-bound fixes, and merges.",
+      "globs": ["**/fork-hosted-review-sitter/**"]
+    },
+    {
       "name": "worktree-groups",
       "purpose": "Lets a worktree join a project group independently of its repo's own group membership, so cross-repo worktrees can share a sidebar section.",
       "globs": ["**/fork-worktree-groups/**"]
@@ -130,6 +140,197 @@
     }
   ],
   "seams": [
+    {
+      "path": "src/main/providers/ssh-git-remote-sync-provider.ts",
+      "feature": "hosted-review-sitter",
+      "kind": "import-swap",
+      "lines": [
+        "import { HostedReviewSitterSshGitProvider } from '../fork-hosted-review-sitter/ssh-git-adapter'",
+        "export class SshGitRemoteSyncProvider extends HostedReviewSitterSshGitProvider {"
+      ]
+    },
+    {
+      "path": "src/relay/git-handler-registration.ts",
+      "feature": "hosted-review-sitter",
+      "kind": "registration",
+      "lines": [
+        "import { registerHostedReviewSitterGitHandlers } from './fork-hosted-review-sitter/git-adapter'",
+        "  registerHostedReviewSitterGitHandlers(dispatcher, handlers.sync)"
+      ]
+    },
+    {
+      "path": "src/relay/git-handler-sync-operations.ts",
+      "feature": "hosted-review-sitter",
+      "kind": "import-swap",
+      "lines": [
+        "import { HostedReviewSitterRelayGitContext } from './fork-hosted-review-sitter/git-adapter'",
+        "export class GitHandlerSyncOperations extends HostedReviewSitterRelayGitContext {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/editor/check-run-details-fix-with-ai.test.ts",
+      "feature": "hosted-review-sitter",
+      "kind": "import-swap",
+      "lines": ["vi.mock('@/fork-hosted-review-sitter/fix-checks-agent-launch', () => ({"]
+    },
+    {
+      "path": "src/renderer/src/components/editor/check-run-details-fix-with-ai.ts",
+      "feature": "hosted-review-sitter",
+      "kind": "import-swap",
+      "lines": [
+        "import { startFixChecksAgent } from '@/fork-hosted-review-sitter/fix-checks-agent-launch'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/github-item-dialog/inspect-pull-request/checks-tab-actions.ts",
+      "feature": "hosted-review-sitter",
+      "kind": "import-swap",
+      "lines": [
+        "import { startFixChecksAgent } from '@/fork-hosted-review-sitter/fix-checks-agent-launch'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/pull-request-page/checks/fix-launch.ts",
+      "feature": "hosted-review-sitter",
+      "kind": "import-swap",
+      "lines": [
+        "import { startFixChecksAgent } from '@/fork-hosted-review-sitter/fix-checks-agent-launch'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/pull-request-page/page/surface.tsx",
+      "feature": "hosted-review-sitter",
+      "kind": "registration",
+      "lines": [
+        "import { HostedReviewSitterPullRequestPanel } from '@/fork-hosted-review-sitter/HostedReviewSitterPullRequestPanel'",
+        "      <HostedReviewSitterPullRequestPanel",
+        "        workItem={workItem}",
+        "        effectiveRepoId={effectiveRepoId}",
+        "        attachedWorkspace={attachedWorkspace}",
+        "      />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/ChecksPanel.tsx",
+      "feature": "hosted-review-sitter",
+      "kind": "registration",
+      "lines": [
+        "import { withHostedReviewSitterStopControl } from '@/fork-hosted-review-sitter/HostedReviewSitterGlobalStopControl'",
+        "    return withHostedReviewSitterStopControl(<ChecksPanelEmptyContent model={model} />)",
+        "  return withHostedReviewSitterStopControl(",
+        "    <ChecksPanelActiveContent model={model} ReviewHeaderComponent={ChecksPanelReviewHeader} />",
+        "  )"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/active-content.tsx",
+      "feature": "hosted-review-sitter",
+      "kind": "registration",
+      "lines": [
+        "import { HostedReviewSitterPanel } from '@/fork-hosted-review-sitter/HostedReviewSitterPanel'",
+        "      <HostedReviewSitterPanel model={model} />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/use-checks-panel-check-and-review-actions.tsx",
+      "feature": "hosted-review-sitter",
+      "kind": "import-swap",
+      "lines": [
+        "import { startFixChecksAgent } from '@/fork-hosted-review-sitter/fix-checks-agent-launch'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/WorktreeCardStatusSlot.tsx",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "import { useHeimdallGlyph, withHeimdallGlyph } from '@/fork-heimdall/heimdall-status-lane-glyph'",
+        "  const heimdallGlyph = useHeimdallGlyph(worktreeId, status, passiveStatusAnnouncement, className)",
+        "    return overlayNewCardUnreadStatus(heimdallGlyph ?? passiveStatus, showNewCardUnreadAlert)",
+        "                {withHeimdallGlyph(heimdallGlyph, status)}"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/agent-launch-routing-caller-census.test.ts",
+      "feature": "hosted-review-sitter",
+      "kind": "registration",
+      "lines": ["  'src/renderer/src/fork-hosted-review-sitter/fix-checks-agent-launch.ts',"]
+    },
+    {
+      "path": "src/renderer/src/lib/worktree-activation-surface-caller-wiring.test.ts",
+      "feature": "hosted-review-sitter",
+      "kind": "registration",
+      "lines": ["  'src/renderer/src/fork-hosted-review-sitter/fix-checks-agent-launch.ts',"]
+    },
+    {
+      "path": "src/main/startup/main-process-runtime-service.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "import { startHeimdall } from '../fork-heimdall/registration'",
+        "  state.heimdall = startHeimdall(runtime, store, state.isServeMode)"
+      ]
+    },
+    {
+      "path": "src/main/startup/main-process-state.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "import type { HeimdallKernelService } from '../fork-heimdall/kernel-service'",
+        "  heimdall: null as HeimdallKernelService | null,"
+      ]
+    },
+    {
+      "path": "src/main/startup/main-process-quit.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": ["    state.heimdall?.stopForShutdown()"]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/index.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "import { HEIMDALL_METHODS } from './fork-heimdall/heimdall'",
+        "  ...HEIMDALL_METHODS,"
+      ]
+    },
+    {
+      "path": "src/preload/api-types.ts",
+      "feature": "heimdall",
+      "kind": "passthrough",
+      "lines": [
+        "import type { HeimdallApi } from '../shared/fork-heimdall/api'",
+        "  heimdall: HeimdallApi"
+      ]
+    },
+    {
+      "path": "src/preload/api-types.ts",
+      "feature": "hosted-review-sitter",
+      "kind": "passthrough",
+      "lines": [
+        "import type { HostedReviewAgentApi } from '../shared/fork-hosted-review-sitter/api'",
+        "  hostedReviewAgent: HostedReviewAgentApi"
+      ]
+    },
+    {
+      "path": "src/preload/index.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "import { buildForkHeimdallApi } from './fork-heimdall/heimdall-preload-api'",
+        "  heimdall: buildForkHeimdallApi(),"
+      ]
+    },
+    {
+      "path": "src/preload/index.ts",
+      "feature": "hosted-review-sitter",
+      "kind": "registration",
+      "lines": [
+        "import { buildHostedReviewAgentApi } from './fork-hosted-review-sitter/hosted-review-agent-preload-api'",
+        "  hostedReviewAgent: buildHostedReviewAgentApi(),"
+      ]
+    },
     {
       "path": ".gitignore",
       "feature": "fork-infra",
@@ -3847,6 +4048,41 @@
     }
   ],
   "residuals": {
+    "src/main/providers/ssh-git-remote-sync-provider.ts": { "added": 2, "removed": 2 },
+    "src/relay/git-handler-registration.ts": { "added": 2, "removed": 0 },
+    "src/relay/git-handler-sync-operations.ts": { "added": 2, "removed": 2 },
+    "src/renderer/src/components/editor/check-run-details-fix-with-ai.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/editor/check-run-details-fix-with-ai.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/github-item-dialog/inspect-pull-request/checks-tab-actions.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/pull-request-page/checks/fix-launch.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/pull-request-page/page/surface.tsx": { "added": 6, "removed": 0 },
+    "src/renderer/src/components/right-sidebar/ChecksPanel.tsx": { "added": 5, "removed": 2 },
+    "src/renderer/src/components/right-sidebar/checks-panel/active-content.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/right-sidebar/checks-panel/use-checks-panel-check-and-review-actions.tsx": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/WorktreeCardStatusSlot.tsx": { "added": 4, "removed": 7 },
+    "src/renderer/src/lib/agent-launch-routing-caller-census.test.ts": { "added": 1, "removed": 0 },
+    "src/renderer/src/lib/worktree-activation-surface-caller-wiring.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
     ".gitignore": {
       "added": 14,
       "removed": 2
@@ -4144,7 +4380,7 @@
       "removed": 2
     },
     "src/main/runtime/rpc/methods/index.ts": {
-      "added": 6,
+      "added": 8,
       "removed": 0
     },
     "src/main/runtime/rpc/methods/native-chat.test.ts": {
@@ -4240,9 +4476,11 @@
       "removed": 0
     },
     "src/main/startup/main-process-runtime-service.ts": {
-      "added": 15,
+      "added": 17,
       "removed": 2
     },
+    "src/main/startup/main-process-state.ts": { "added": 2, "removed": 0 },
+    "src/main/startup/main-process-quit.ts": { "added": 1, "removed": 0 },
     "src/main/telemetry/client.ts": {
       "added": 2,
       "removed": 1
@@ -4260,7 +4498,7 @@
       "removed": 1
     },
     "src/preload/api-types.ts": {
-      "added": 17,
+      "added": 21,
       "removed": 0
     },
     "src/preload/api/native-chat-api.ts": {
@@ -4284,7 +4522,7 @@
       "removed": 0
     },
     "src/preload/index.ts": {
-      "added": 8,
+      "added": 12,
       "removed": 0
     },
     "src/relay/relay-runtime-services.ts": {

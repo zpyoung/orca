@@ -1,0 +1,256 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { WatcherEnrollment } from '../../../shared/fork-heimdall/watcher-types'
+import { RuntimeHeimdallOrchestrationAdapter } from './orchestration-adapter'
+
+const upstream = vi.hoisted(() => ({
+  checkRunMailbox: vi.fn(),
+  resolveRunScope: vi.fn()
+}))
+
+vi.mock('../../runtime/rpc/methods/orchestration/messaging/check-run', () => ({
+  checkRunMailbox: upstream.checkRunMailbox
+}))
+vi.mock('../../runtime/rpc/methods/orchestration/runs/run-scope', () => ({
+  resolveRunScope: upstream.resolveRunScope
+}))
+
+const IDENTITY = { handle: 'heimdall-coordinator', paneKey: 'heimdall-pane' }
+
+const ENROLLMENT = {
+  watcherId: 'watcher-1',
+  kind: 'hosted-review',
+  workspaceKey: 'local::/repo',
+  executionHostId: 'local',
+  repoId: 'repo-1',
+  worktreeId: 'repo-1::/repo',
+  workspacePath: '/repo',
+  schedulerOwner: 'local_host_service',
+  enabled: true,
+  capabilities: {},
+  budget: { wallClockActiveMs: null, turns: null },
+  kindPayload: {},
+  coordinatorIdentity: IDENTITY,
+  orchestrationRunId: 'run-1',
+  createdAtMs: 1,
+  terminalAtMs: null
+} as WatcherEnrollment
+
+function message(id: string, sequence: number, body: string) {
+  return {
+    id,
+    run_id: 'run-1',
+    delivery_contract: 'current_delivery' as const,
+    from_handle: 'term-worker',
+    to_handle: 'run:run-1',
+    subject: `subject-${sequence}`,
+    body,
+    type: 'worker_done' as const,
+    priority: 'normal' as const,
+    thread_id: null,
+    payload: null,
+    read: 0,
+    sequence,
+    created_at: '2026-09-14T12:00:00.000Z',
+    delivered_at: null,
+    sender_pane_key: 'worker-pane'
+  }
+}
+
+describe('Heimdall orchestration mailbox drain', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    upstream.resolveRunScope.mockReturnValue({
+      id: 'run-1',
+      consumer_generation: 3,
+      coordinator_handle: IDENTITY.handle,
+      coordinator_pane_key: IDENTITY.paneKey
+    })
+  })
+
+  it('records one batch before acknowledging it on the next drain and dedupes a redelivery by sequence', async () => {
+    const events: string[] = []
+    const first = {
+      ...message('message-7', 7, 'finished once'),
+      payload: JSON.stringify({
+        dispatchId: 'dispatch-7',
+        outcome: 'succeeded',
+        taskId: 'task-7'
+      })
+    }
+    const second = {
+      ...message('message-8', 8, 'finished next'),
+      payload: JSON.stringify({
+        dispatchId: 'dispatch-8',
+        outcome: 'failed',
+        taskId: 'task-8'
+      })
+    }
+    const rows = {
+      [first.id]: first,
+      [second.id]: second
+    }
+    const db = {
+      getMessageById: vi.fn((id: string) => rows[id as keyof typeof rows])
+    }
+    const runtime = { getOrchestrationDb: vi.fn(() => db) }
+    upstream.checkRunMailbox
+      .mockImplementationOnce(async ({ params }: { params: { ack?: string } }) => {
+        events.push(`check:${params.ack ?? 'none'}`)
+        return {
+          runId: 'run-1',
+          deliveryId: 'delivery-1',
+          messages: [{ id: first.id }],
+          count: 1,
+          replayed: false
+        }
+      })
+      .mockImplementationOnce(async ({ params }: { params: { ack?: string } }) => {
+        events.push(`check:${params.ack ?? 'none'}`)
+        return {
+          runId: 'run-1',
+          deliveryId: 'delivery-1',
+          messages: [{ id: first.id }],
+          count: 1,
+          replayed: true
+        }
+      })
+      .mockImplementationOnce(async ({ params }: { params: { ack?: string } }) => {
+        events.push(`check:${params.ack ?? 'none'}`)
+        return {
+          runId: 'run-1',
+          deliveryId: 'delivery-2',
+          messages: [{ id: second.id }],
+          count: 1,
+          replayed: false,
+          acknowledged: params.ack ?? null
+        }
+      })
+    const adapter = new RuntimeHeimdallOrchestrationAdapter(runtime as never, {
+      persistOrchestrationRunId: async () => undefined
+    })
+
+    const delivered = await adapter.drainMailbox({
+      enrollment: ENROLLMENT,
+      cursor: { previousDeliveryId: null, lastSequence: -1 }
+    })
+    for (const entry of delivered) {
+      events.push(`record:${entry.kind === 'evidence' ? entry.source?.sequence : 'missing'}`)
+    }
+
+    // A crash that loses only the pending acknowledgement re-opens the same durable Delivery id.
+    // Its message is harmless because the ledger's sequence cursor was already committed.
+    const replayed = await adapter.drainMailbox({
+      enrollment: ENROLLMENT,
+      cursor: { previousDeliveryId: null, lastSequence: 7 }
+    })
+    const recovered = await adapter.drainMailbox({
+      enrollment: ENROLLMENT,
+      cursor: { previousDeliveryId: 'delivery-1', lastSequence: 7 }
+    })
+
+    expect(events).toEqual(['check:none', 'record:7', 'check:none', 'check:delivery-1'])
+    expect(delivered).toEqual([
+      expect.objectContaining({
+        watcherId: 'watcher-1',
+        kind: 'evidence',
+        evidenceKind: 'orchestration-mailbox',
+        source: {
+          kind: 'orchestration',
+          sequence: 7,
+          messageId: 'message-7',
+          deliveryId: 'delivery-1'
+        },
+        payload: {
+          type: 'worker_done',
+          payload: {
+            dispatchId: 'dispatch-7',
+            outcome: 'succeeded',
+            result: 'finished once'
+          }
+        }
+      })
+    ])
+    expect(replayed).toEqual([])
+    expect(recovered).toEqual([
+      expect.objectContaining({
+        source: expect.objectContaining({ sequence: 8, messageId: 'message-8' }),
+        payload: {
+          type: 'worker_done',
+          payload: {
+            dispatchId: 'dispatch-8',
+            outcome: 'failed',
+            result: 'finished next'
+          }
+        }
+      })
+    ])
+    expect(upstream.checkRunMailbox.mock.calls[1]![0].params.ack).toBeUndefined()
+    expect(upstream.checkRunMailbox.mock.calls[2]![0].params.ack).toBe('delivery-1')
+  })
+
+  it('does not acknowledge the batch it is returning', async () => {
+    const row = message('message-1', 1, 'result')
+    const db = { getMessageById: vi.fn(() => row) }
+    upstream.checkRunMailbox.mockResolvedValue({
+      runId: 'run-1',
+      deliveryId: 'delivery-current',
+      messages: [{ id: row.id }],
+      count: 1
+    })
+    const adapter = new RuntimeHeimdallOrchestrationAdapter(
+      { getOrchestrationDb: () => db } as never,
+      { persistOrchestrationRunId: async () => undefined }
+    )
+
+    await adapter.drainMailbox({
+      enrollment: ENROLLMENT,
+      cursor: { previousDeliveryId: 'delivery-previous', lastSequence: 0 }
+    })
+
+    expect(upstream.checkRunMailbox).toHaveBeenCalledWith(
+      expect.objectContaining({
+        params: expect.objectContaining({ ack: 'delivery-previous' })
+      })
+    )
+    expect(upstream.checkRunMailbox.mock.calls[0]![0].params.ack).not.toBe('delivery-current')
+  })
+
+  it('stores a question as a cited semantic fact instead of copying the orchestration row', async () => {
+    const row = {
+      ...message('message-question', 9, 'Which implementation should I use?'),
+      type: 'question' as const,
+      subject: 'Need a decision',
+      payload: JSON.stringify({ dispatchId: 'dispatch-9', taskId: 'task-9' })
+    }
+    const db = { getMessageById: vi.fn(() => row) }
+    upstream.checkRunMailbox.mockResolvedValue({
+      runId: 'run-1',
+      deliveryId: 'delivery-question',
+      messages: [{ id: row.id }],
+      count: 1
+    })
+    const adapter = new RuntimeHeimdallOrchestrationAdapter(
+      { getOrchestrationDb: () => db } as never,
+      { persistOrchestrationRunId: async () => undefined }
+    )
+
+    const [entry] = await adapter.drainMailbox({
+      enrollment: ENROLLMENT,
+      cursor: { previousDeliveryId: null, lastSequence: 8 }
+    })
+
+    expect(entry).toMatchObject({
+      source: { messageId: 'message-question', sequence: 9 },
+      payload: {
+        type: 'question',
+        body: 'Which implementation should I use?',
+        payload: { dispatchId: 'dispatch-9' }
+      }
+    })
+    if (!entry || entry.kind !== 'evidence') {
+      throw new Error('Expected mailbox evidence')
+    }
+    expect(entry.payload).not.toHaveProperty('subject')
+    expect(entry.payload).not.toHaveProperty('messageId')
+  })
+})

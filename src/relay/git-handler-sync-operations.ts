@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { RequestContext } from './dispatcher'
-import { GitHandlerOperationContext } from './git-handler-operation-context'
+import { HostedReviewSitterRelayGitContext } from './fork-hosted-review-sitter/git-adapter'
 import { resolveRelayPushTarget } from './git-handler-push-target'
 import { normalizeGitErrorMessage, runPullWithDivergenceFallback } from '../shared/git-remote-error'
 import { assertGitPushTargetShape } from '../shared/git-push-target-validation'
@@ -15,7 +15,7 @@ import {
 } from '../shared/git-rebase-source'
 import { isNoWriteFetchHeadUnsupportedError } from '../shared/git-fetch-head-capability'
 
-export class GitHandlerSyncOperations extends GitHandlerOperationContext {
+export class GitHandlerSyncOperations extends HostedReviewSitterRelayGitContext {
   async push(params: Record<string, unknown>) {
     this.clearGitMutationReadCaches()
     const worktreePath = params.worktreePath as string

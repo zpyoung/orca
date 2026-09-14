@@ -1,0 +1,22 @@
+{
+  "fork": {
+    "heimdall": {
+      "kind": {
+        "objective": "Objective watcher"
+      },
+      "status": {
+        "watching": "Watching",
+        "held": "Held",
+        "acting": "Acting",
+        "escalated": "Escalated",
+        "parked": "Parked",
+        "terminal": "Complete",
+        "disabled": "Stopped",
+        "unreachable": "Host unreachable"
+      },
+      "indicator": {
+        "tooltip": "{{kind}} · {{state}}"
+      }
+    }
+  }
+}

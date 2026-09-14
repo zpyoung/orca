@@ -17,6 +17,7 @@ import { fingerprintOrchestrationPeer } from '../runtime/orchestration/environme
 import { callRuntimeEnvironment } from '../ipc/runtime-environment-transport-routing'
 import { mainProcessState as state } from './main-process-state'
 import { forwardAskEventsToRenderer } from '../fork-ask-question-tool/ask-ipc-forward'
+import { startHeimdall } from '../fork-heimdall/registration'
 import { startClaudeSuppressionVerdictPublisher } from '../fork-ask-question-tool/claude-suppression-verdict-publisher'
 import { getDashboardPopoutWindow } from '../window/dashboard-popout-window'
 import { prepareCodexRuntimeHomeForLaunch } from './codex-launch-preparation'
@@ -137,6 +138,7 @@ export function initializeMainProcessRuntime(): OrcaRuntimeService {
     () => state.mainWindow,
     getDashboardPopoutWindow
   )
+  state.heimdall = startHeimdall(runtime, store, state.isServeMode)
   startClaudeSuppressionVerdictPublisher({
     store,
     ipcMain,
