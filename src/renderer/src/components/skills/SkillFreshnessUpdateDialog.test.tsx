@@ -14,6 +14,7 @@ import {
   requestSkillFreshnessUpdateDialog
 } from './skill-freshness-update-dialog'
 import { _resetSkillUpdateRunStore, SKILL_UPDATE_SUCCESS_LINGER_MS } from './skill-update-run-store'
+import { ORCA_SKILLS_REPOSITORY_URL } from '../../../../shared/fork-skills-repository/skills-repository-url'
 
 const mocks = vi.hoisted(() => ({
   inventory: null as SkillFreshnessInventory | null,
@@ -533,7 +534,7 @@ describe('SkillFreshnessUpdateDialog', () => {
     await openViaRequest()
 
     expect(container?.textContent).toContain(
-      'npx skills add https://github.com/stablyai/orca --skill orchestration --global'
+      `npx skills add ${ORCA_SKILLS_REPOSITORY_URL} --skill orchestration --global`
     )
   })
 
@@ -564,7 +565,7 @@ describe('SkillFreshnessUpdateDialog', () => {
 
     const row = container?.querySelector('[data-skill-row="orchestration"]')
     expect(row?.textContent).toContain(
-      'npx skills add https://github.com/stablyai/orca --skill orchestration --global'
+      `npx skills add ${ORCA_SKILLS_REPOSITORY_URL} --skill orchestration --global`
     )
     expect(row?.textContent).not.toContain('This is a project skill, not a global one')
     // Still listed, though — ownership silences the explanation, never the location.
