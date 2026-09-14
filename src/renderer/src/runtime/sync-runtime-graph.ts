@@ -1,5 +1,9 @@
 import { focusPaneOrDockComposer } from '@/components/terminal-pane/fork-terminal-dock/dock-composer-focus-redirect'
 import type { AppState } from '@/store/types'
+import {
+  activePaneIsCoveredByNativeChat,
+  paneIsCoveredByNativeChat
+} from '@/components/terminal-pane/native-chat-covered-pane'
 import { resolveLeafIdForManager } from '@/lib/pane-manager/pane-key-resolution'
 import {
   syncRuntimeGraph,

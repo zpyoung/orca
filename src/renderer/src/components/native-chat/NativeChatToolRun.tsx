@@ -1,30 +1,23 @@
 import type { CommentMarkdownLinkClickHandler } from '@/components/sidebar/CommentMarkdown'
-import {
-  NativeChatToolName,
-  NativeChatCommandMetadata,
-  NativeChatSearchResults
-} from './NativeChatToolAnnotations'
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useMemo } from 'react'
+import { useNativeChatDisclosure } from './native-chat-disclosure-store'
+import { NativeChatToolLine } from './NativeChatToolLine'
 import { Check, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import {
   isToolCallBlock,
-  isToolResultBlock,
   type NativeChatBlock,
   type NativeChatSubagentGroupBlock,
   type NativeChatToolCallBlock
 } from '../../../../shared/native-chat-types'
 import { isRenderableSubagentGroup } from '../../../../shared/native-chat-subagent-summary'
-import { diffFromText, diffFromToolCall, type DiffLine } from './native-chat-diff'
 import { NativeChatDiffCard } from './NativeChatDiffCard'
 import type { NativeChatDiffReveal } from './native-chat-turn-diffs'
 import { buildEditCards, NO_EDIT_CARDS } from './native-chat-edit-cards'
 import {
   countToolCalls,
-  createToolInputDisplay,
   toolRunSummaryMembers,
-  truncateToolDetail,
   type ToolRunMember
 } from './native-chat-tool-summary'
 import {
@@ -34,7 +27,6 @@ import {
 import { nativeChatToolRunIconName } from '../../../../shared/native-chat-tool-icon'
 import { NativeChatTaskList } from './NativeChatTaskList'
 import { buildNativeChatTaskListRows } from './native-chat-task-list-history'
-import { NativeChatDiffView } from './NativeChatDiffView'
 import { NativeChatSubagentRun } from './NativeChatSubagentRun'
 import { NativeChatToolIcon, NativeChatToolRunIcon } from './NativeChatToolIcon'
 import {
@@ -161,8 +153,7 @@ function ToolLine({
 }
 
 /** A run of a message's tool calls/results, collapsed to a one-line summary that
- *  expands to the individual inline tool lines. `expandSignal` lets the global
- *  toolbar toggle drive every run at once while still allowing per-run override. */
+ *  expands to the individual inline tool lines. */
 export function NativeChatToolRun({
   blocks,
   previousTodoWrite,
@@ -174,6 +165,7 @@ export function NativeChatToolRun({
   activeTurnIsWorking,
   expandOverride,
   structuredActivityUi = true,
+  disclosureId,
   onLinkClick
 }: {
   blocks: NativeChatBlock[]
@@ -183,32 +175,28 @@ export function NativeChatToolRun({
   onRevealDiff?: (element: HTMLElement) => void
   /** Spawn-group rosters that belong with this run's activity, one row each. */
   subagentGroups?: NativeChatSubagentGroupBlock[]
-  /** Toolbar-driven desired open state. Each change re-syncs this run's state. */
+  /** Legacy view-level default; production native-chat entry points pass false. */
   expandSignal: boolean
   /** Per-turn disclosure state controlled by the completed turn status row. */
   expandOverride?: boolean
   /** Structured lifecycle state, when available, keeps orphaned running calls from spinning. */
   activeTurnIsWorking?: boolean
   structuredActivityUi?: boolean
+  /** Message this run belongs to. Windowing unmounts rows, so a run the reader
+   *  opened has to be remembered somewhere that outlives the row. */
+  disclosureId?: string
   onLinkClick?: CommentMarkdownLinkClickHandler
 }): React.JSX.Element | null {
-  const [open, setOpen] = useState(revealedDiff ? true : (expandOverride ?? expandSignal))
-  const [controls, setControls] = useState({ expandOverride, expandSignal, revealedDiff })
-  if (
-    controls.expandOverride !== expandOverride ||
-    controls.expandSignal !== expandSignal ||
-    controls.revealedDiff !== revealedDiff
-  ) {
-    setControls({ expandOverride, expandSignal, revealedDiff })
-    if (revealedDiff && controls.revealedDiff !== revealedDiff) {
-      setOpen(true)
-    } else if (
-      controls.expandOverride !== expandOverride ||
-      controls.expandSignal !== expandSignal
-    ) {
-      setOpen(expandOverride ?? expandSignal)
-    }
-  }
+  // A reader's deviation belongs to the controlling disclosure state, so returning
+  // to that state restores the same choice without writing to the store mid-render.
+  const runKey =
+    disclosureId === undefined
+      ? undefined
+      : `run:${disclosureId}:${expandOverride ?? '-'}:${expandSignal}:${revealedDiff?.requestId ?? '-'}`
+  const { open, setOpen } = useNativeChatDisclosure(
+    runKey,
+    revealedDiff ? true : (expandOverride ?? expandSignal)
+  )
 
   // Childless groups are dropped so `subagentRows.length` stays an honest test of
   // "something will draw": the roster-only branch below returns a margin-bearing
@@ -240,8 +228,7 @@ export function NativeChatToolRun({
     : null
   const isSettled = latestActiveCall == null
   const hasRunningCall = blocks.some((block) => isToolCallBlock(block) && block.state === 'running')
-  // The turn caret opens the activity group, while each child tool remains
-  // collapsed. The global expand toolbar still opens child details together.
+  // The turn caret opens the activity group while each child tool stays collapsed.
   const expandToolLines = expandOverride === undefined ? open : false
   // Diffing every edit is the run's most expensive work, so a collapsed run —
   // which renders none of it — never pays for it.
@@ -311,7 +298,7 @@ export function NativeChatToolRun({
       {latestActiveCall ? (
         <button
           type="button"
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => setOpen(!open)}
           className="group flex min-h-6 w-full items-center gap-1.5 rounded-md py-0.5 text-left text-sm leading-relaxed text-muted-foreground hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
           aria-expanded={open}
           aria-live="polite"
@@ -329,7 +316,7 @@ export function NativeChatToolRun({
       ) : (
         <button
           type="button"
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => setOpen(!open)}
           className="group flex min-h-6 w-full items-center gap-1.5 py-0.5 text-left"
           aria-expanded={open}
         >
@@ -429,6 +416,11 @@ export function NativeChatToolRun({
                         }
                         onReveal={onRevealDiff}
                         initiallyExpanded={expandToolLines}
+                        disclosureKey={
+                          disclosureId === undefined
+                            ? undefined
+                            : `diff:${disclosureId}:${edit.key}:${fileIndex}`
+                        }
                       />
                     ))}
                   </div>
@@ -445,12 +437,25 @@ export function NativeChatToolRun({
                     : `${block.type}`
               const occurrence = seen.get(signature) ?? 0
               seen.set(signature, occurrence + 1)
+              const providerCallId =
+                block.type === 'tool-call' &&
+                block.callId !== undefined &&
+                block.callId.trim().length > 0
+                  ? block.callId
+                  : undefined
+              const lineIdentity =
+                providerCallId !== undefined
+                  ? `call:${providerCallId}`
+                  : `${signature}:${occurrence}`
               return (
-                <ToolLine
-                  key={`${signature}:${occurrence}`}
+                <NativeChatToolLine
+                  key={lineIdentity}
                   block={block}
                   onLinkClick={onLinkClick}
                   initiallyExpanded={expandToolLines}
+                  disclosureKey={
+                    disclosureId === undefined ? undefined : `line:${disclosureId}:${lineIdentity}`
+                  }
                 />
               )
             })

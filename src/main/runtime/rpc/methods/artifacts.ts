@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { defineMethod } from '../core'
 import {
   ARTIFACT_MAX_CONTENT_BYTES,
   ARTIFACT_MAX_REQUEST_BYTES,
@@ -76,7 +76,7 @@ export const ARTIFACT_METHODS: readonly RpcAnyMethod[] = withArtifactProtectionP
   }),
   defineMethod({
     name: 'artifacts.delete',
-    params: z.object({ id: z.string().min(1), ...CloudOptions }),
+    params: ArtifactsDeleteParams,
     handler: (params, { runtime }) => runtime.deleteArtifact(params.id, params)
   })
 ])

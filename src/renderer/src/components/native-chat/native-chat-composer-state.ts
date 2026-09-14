@@ -9,6 +9,8 @@ import {
 } from '../../../../shared/native-chat-slash-commands'
 import {
   buildNativeChatPickerItems,
+  LEADING_SLASH_TRIGGER,
+  MID_PROMPT_SLASH_TRIGGER,
   type NativeChatPickerItem,
   type NativeChatSkillDiscoverySnapshot
 } from './native-chat-picker-items'
@@ -35,7 +37,9 @@ type PickerAutocomplete = {
   query: string
   items: NativeChatPickerItem[]
   triggerKey: string
-  prefix: '/' | '$'
+  prefix: '/'
+  /** Only a draft-leading `/command` reaches the agent as a command. */
+  dispatchable: boolean
   grouped: boolean
   commandsEnabled: boolean
   skillsEnabled: boolean
@@ -47,9 +51,19 @@ export type ComposerAutocomplete =
   | { mode: 'none' }
   | ({ mode: 'slash' } & PickerAutocomplete)
   | { mode: 'mention'; query: string }
-  | ({ mode: 'skill' } & PickerAutocomplete)
 
 const EMPTY_DISCOVERY: NativeChatSkillDiscoverySnapshot = { status: 'ready', skills: [] }
+
+/** Whether the caret sits in a token that needs the skill catalog loaded. */
+export function isSkillPickerTriggered(
+  before: string,
+  profile: NativeChatAgentProfile | null
+): boolean {
+  if (!profile) {
+    return false
+  }
+  return LEADING_SLASH_TRIGGER.test(before) || MID_PROMPT_SLASH_TRIGGER.test(before)
+}
 
 export function deriveComposerAutocomplete(
   draft: string,
@@ -78,20 +92,14 @@ export function deriveComposerAutocomplete(
   if (mentionMatch) {
     return { mode: 'mention', query: mentionMatch[1] }
   }
-  const skillMatch =
-    profile?.skillPrefix === '$' || (!profile && skills.length > 0)
-      ? before.match(/(?:^|\s)\$(\S*)$/)
-      : null
-  if (!skillMatch) {
+  // Why: `/` is the whole composer grammar, so a mid-prompt token opens the same
+  // menu a leading one does — it just cannot dispatch.
+  const midPromptMatch = profile ? before.match(MID_PROMPT_SLASH_TRIGGER) : null
+  if (!midPromptMatch) {
     return { mode: 'none' }
   }
-  const triggerKey = `$:${before.length - skillMatch[1].length - 1}`
-  if (dismissedTriggerKey === triggerKey) {
-    return { mode: 'none' }
-  }
-  const query = skillMatch[1]
-  return {
-    mode: 'skill',
+  const query = midPromptMatch[1]
+  return deriveSlashAutocomplete(
     query,
     triggerKey,
     prefix: '$',
@@ -152,12 +160,12 @@ function deriveSlashAutocomplete(
     commandsEnabled: commands.length > 0,
     skillsEnabled: hasSlashSkills,
     items,
-    skillStatus: hasSlashSkills
+    skillStatus: skillsEnabled
       ? discovery.status === 'idle'
         ? 'loading'
         : discovery.status
       : 'ready',
-    ...(hasSlashSkills && discovery.errorKind ? { skillErrorKind: discovery.errorKind } : {})
+    ...(skillsEnabled && discovery.errorKind ? { skillErrorKind: discovery.errorKind } : {})
   }
 }
 

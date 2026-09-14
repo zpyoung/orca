@@ -1,13 +1,28 @@
-import { z } from 'zod'
-import { defineMethod, type RpcMethod } from '../core'
-import { OptionalFiniteNumber, OptionalString, requiredString } from '../schemas'
+import { defineMethod } from '../core'
 import { PROJECT_RUNTIME_METHODS } from './project-runtime-rpc-methods'
 import { FOLDER_WORKSPACE_METHODS } from './folder-workspace'
-import { createRepoUpdateSchema } from './repo-update-schema'
+import { RepoSelector } from './github-repo-target-schemas'
 import {
   projectRepoResultVisibilityForClient,
   projectRepoVisibilityForClient
 } from '../repo-visibility-projection'
+import {
+  ProjectGroupCreate,
+  ProjectGroupImportNested,
+  ProjectGroupMoveProject,
+  ProjectGroupScanNested,
+  ProjectGroupSelector,
+  ProjectGroupUpdate,
+  RepoClone,
+  RepoCreate,
+  RepoIssueCommandWrite,
+  RepoPath,
+  RepoReorder,
+  RepoSearchRefs,
+  RepoSetBaseRef,
+  RepoSparsePresetSave,
+  RepoUpdate
+} from '../../../../shared/rpc-contract/repo-params'
 
 const RepoSelector = z.object({
   repo: requiredString('Missing repo selector')

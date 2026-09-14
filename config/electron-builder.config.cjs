@@ -7,6 +7,7 @@ const {
   verifyPackagedDaemonEntryBoots
 } = require('./scripts/verify-packaged-daemon-entry.cjs')
 const {
+  assertPackagedNativeVariantsInstalled,
   createPackagedRuntimeNodeModuleResources,
   prunePackagedRuntimeNodeModules,
   verifyPackagedMainRuntimeDeps
@@ -107,6 +108,16 @@ const rpmElectronRuntimeDependencies = [
 // Keep in sync with isMarkdownDocumentName() in src/main/ipc/markdown-documents.ts and with
 // config/nsis/orca-installer-hooks.nsh, which registers the same set on Windows.
 const MARKDOWN_FILE_EXTENSIONS = ['md', 'markdown', 'mdx']
+
+// Why: the config must load on a host-only install without resolving unused Windows addons.
+// This is load-time tolerance only; beforePack enforces that the target's natives are installed.
+// Why one package: @vscode/windows-process-tree is the only os: win32 npm addon;
+// @orca/windows-registry is a workspace link present on every host, so its presence proves nothing.
+const windowsRuntimeResources = existsSync(
+  join(__dirname, '..', 'node_modules', '@vscode', 'windows-process-tree', 'package.json')
+)
+  ? createPackagedRuntimeNodeModuleResources('win32')
+  : []
 
 /** @type {import('electron-builder').Configuration} */
 module.exports = {
@@ -234,6 +245,9 @@ module.exports = {
       verifyStaticAppImagePackage(file, arch)
     }
   },
+  beforePack: (context) => {
+    assertPackagedNativeVariantsInstalled(context.electronPlatformName, context.arch)
+  },
   afterPack: async (context) => {
     const resourcesDir =
       context.electronPlatformName === 'darwin'
@@ -357,7 +371,7 @@ module.exports = {
     },
     extraResources: [
       ...commonExtraResources,
-      ...createPackagedRuntimeNodeModuleResources('win32'),
+      ...windowsRuntimeResources,
       winSpeechNativeResource,
       {
         from: 'resources/win32/bin/orca.cmd',

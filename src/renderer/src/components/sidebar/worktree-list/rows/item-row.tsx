@@ -27,7 +27,7 @@ import {
 import { stopNestedWorktreeCardBubble } from './header-event-guards'
 import type { WorktreeItemRow } from '../listing/renderable-rows'
 import { getWorktreeOptionId } from './option-dom'
-import type { WorktreePointerDrag, WorktreeRowDragState } from '../drag/row-state'
+import type { WorktreeRowDragState } from '../drag/row-state'
 
 export type WorktreeItemRowContext = {
   settings: AppState['settings']
@@ -37,7 +37,6 @@ export type WorktreeItemRowContext = {
   groupIndexByRowKey: ReadonlyMap<string, number>
   agentSendTargetWorktreeId: string | null
   worktreeDragState: WorktreeRowDragState
-  worktreePointerDragRef: React.MutableRefObject<WorktreePointerDrag | null>
   nativeLineageDropTargetId: string | null
   activeWorktreeId: string | null
   activeWorkspaceExecutionHostId: ExecutionHostId | null
@@ -147,8 +146,7 @@ export function renderWorktreeItemRow(
   const worktreeIdentity = getWorktreeHostIdentity(itemRow.worktree)
   const isLineageDropTarget =
     ctx.worktreeDragState.draggingWorktreeId &&
-    (ctx.worktreePointerDragRef.current?.latestStatusDropTarget?.target.lineageParentId ===
-      itemRow.worktree.id ||
+    (ctx.worktreeDragState.lineageDropTargetId === itemRow.worktree.id ||
       ctx.nativeLineageDropTargetId === itemRow.worktree.id)
   const isActiveWorktree =
     ctx.activeWorktreeId === itemRow.worktree.id &&

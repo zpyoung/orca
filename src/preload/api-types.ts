@@ -222,7 +222,6 @@ import type { ForkSessionInfoApi } from './fork-session-info/session-info-preloa
 declare global {
   // oxlint-disable-next-line typescript-eslint/consistent-type-definitions -- declaration merging requires interface
   interface Window {
-    electron: ElectronAPI
     api: PreloadApi
   }
 }

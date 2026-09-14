@@ -8,12 +8,19 @@ import { resolveOxlintInvocation } from './oxlint-cli-invocation.mjs'
 
 const SOURCE_FILE_PATTERN = /\.(?:[cm]?[jt]sx?)$/
 const ROOT_CODE_QUALITY_IGNORED_PREFIXES = ['cloud/']
+const CASTING_RULE = 'typescript/consistent-type-assertions'
+const CASTING_DISABLE_PATTERN =
+  /\/[/*]\s*(?:oxlint|eslint)-disable(?:-next-line|-line)?\s[^\n]*typescript\/consistent-type-assertions/
 export const OXLINT_SCANS = [
   {
     // Why: no --config, so Oxlint keeps discovering nested configs. Pinning the root
     // config would apply root rules to mobile/, whose .oxlintrc.json turns them off.
     label: 'code quality',
     args: ['--report-unused-disable-directives-severity', 'warn']
+  },
+  {
+    label: 'casting code quality',
+    args: ['--config', 'config/oxlint-code-quality-casting.json']
   },
   {
     label: 'type-aware code quality',
@@ -373,6 +380,7 @@ export function main(
     const diagnostics = runOxlintScan(root, scan, scanFiles).filter(
       (diagnostic) =>
         !isSuppressedDiagnostic(diagnostic, root) &&
+        !isCastingDirectiveUnusedWarning(diagnostic, root) &&
         diagnosticTouchesAddedLines(diagnostic, rangesByFile, root, baseBlocks)
     )
     for (const diagnostic of diagnostics) {
@@ -383,6 +391,15 @@ export function main(
       `${scan.label}: ${diagnostics.length} new finding(s) across ${scanFiles.length} changed file(s).`
     )
   }
+
+  const missingSafety = findCastingDirectivesMissingSafety(root, rangesByFile)
+  for (const diagnostic of missingSafety) {
+    printDiagnostic(diagnostic, root)
+  }
+  failures += missingSafety.length
+  console.log(
+    `casting SAFETY: rationale: ${missingSafety.length} new finding(s) across ${files.length} changed file(s).`
+  )
 
   if (failures > 0) {
     console.error(

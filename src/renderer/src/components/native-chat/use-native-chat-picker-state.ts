@@ -18,6 +18,7 @@ import {
   classifyNativeChatSend,
   deriveComposerAutocomplete,
   editReplacesTriggerToken,
+  isSkillPickerTriggered,
   type ComposerAutocomplete,
   type NativeChatPickerItem,
   type NativeChatSendClassification
@@ -114,7 +115,7 @@ export function useNativeChatPickerState(args: {
   }, [dismissalContext])
 
   useEffect(() => {
-    if (autocomplete.mode !== 'slash' && autocomplete.mode !== 'skill') {
+    if (autocomplete.mode !== 'slash') {
       lastOpenKeyRef.current = null
       return
     }
@@ -127,10 +128,10 @@ export function useNativeChatPickerState(args: {
 
   const completeItem = useCallback(
     (item: NativeChatPickerItem) => {
-      if (autocomplete.mode !== 'slash' && autocomplete.mode !== 'skill') {
+      if (autocomplete.mode !== 'slash') {
         return
       }
-      const result = applyPickerSuggestion(draft, caret, item, autocomplete.prefix)
+      const result = applyPickerSuggestion(draft, caret, item)
       if (item.kind === 'skill' && textareaRef.current?.insertSkill) {
         const from = result.caret - result.insertedToken.length - 1
         textareaRef.current.insertSkill(from, caret, result.insertedToken)
@@ -174,10 +175,7 @@ export function useNativeChatPickerState(args: {
         null,
         sessionSkillNames
       )
-      if (
-        (next.mode !== 'slash' && next.mode !== 'skill') ||
-        next.triggerKey !== dismissed.triggerKey
-      ) {
+      if (next.mode !== 'slash' || next.triggerKey !== dismissed.triggerKey) {
         setDismissed(null)
       }
     },
