@@ -4332,6 +4332,18 @@
       "status": "permanent"
     },
     {
+      "path": "src/shared/git-remote-error.test.ts",
+      "reason": "Regression coverage for bug-47: preserve multiline Git diagnoses and credential redaction across line endings.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#git-multiline-diagnostics"
+    },
+    {
+      "path": "src/shared/git-remote-error.ts",
+      "reason": "Fix bug-47 in upstream error normalization: preserve the diagnostic block rather than only its final line.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#git-multiline-diagnostics"
+    },
+    {
       "path": "src/shared/native-chat-transcript-retention.test.ts",
       "reason": "Tests for the retention-fix shared companion above.",
       "status": "pending-upstream",

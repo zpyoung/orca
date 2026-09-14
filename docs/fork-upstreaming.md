@@ -7,6 +7,27 @@ manifest `exceptions[]` row (`status: "pending-upstream"`, `ledger` pointing at 
 anchor) are created and removed together — see `config/scripts/fork-ownership-manifest.mjs` for
 the invariant this enforces.
 
+## Git multiline diagnostics
+
+**Ledger:** bug-47.
+
+**What:** preserves Git's diagnostic block from the last `fatal:` or `error:` line,
+including continuation lines such as the filesystem-discovery explanation. Command
+wrappers and preceding progress output remain excluded, credentials remain redacted,
+and unprefixed failures retain the last-nonempty-line fallback.
+
+**Why upstream, not isolated:** this corrects the existing shared normalizer used by
+local and SSH Git operations, including non-repository folder workspaces. A forked
+copy would duplicate the same error policy. No Git command or wire schema changes;
+older clients continue to receive an ordinary error string.
+
+**Paths:**
+
+- `src/shared/git-remote-error.ts`
+- `src/shared/git-remote-error.test.ts`
+
+**Status:** pending-upstream. Not yet submitted.
+
 ## Retention fix
 
 **What:** `useNativeChatRetainedSession` blanks a retained transcript while a fresh read is
@@ -85,7 +106,7 @@ test file.
 `react-doctor/no-ref-current-in-render`, `react-doctor/no-effect-with-fresh-deps` and
 `react-doctor/no-prop-callback-in-render` default to `error` in the CLI but are absent from
 `config/oxlint-react-doctor.json`, the repo's curated React Doctor rule list, where every listed
-rule runs at `warn`. `react-doctor/effect-needs-cleanup` is stranger still: it *is* on that list at
+rule runs at `warn`. `react-doctor/effect-needs-cleanup` is stranger still: it _is_ on that list at
 `warn`, so the CLI running it at `error` contradicts the severity the repo declares for it. Both fire only on deliberate,
 upstream-authored patterns: latest-value refs written during render, a render-phase array-identity
 cache, and test harnesses whose inline ref literals are the fixture under test. Setting them to
@@ -115,7 +136,7 @@ The `package.json` severities need no `exceptions` row of their own; the file is
 
 The v1.4.193 sync added the last three. The first two are the same shape as the originals — a
 `node:buffer` import and a template literal, on lines the merge touched. The third is different in
-kind: `use-checks-list-state.tsx` wrote `autoExpandedContextRef` *inside* a `setExpandedCheckKeys`
+kind: `use-checks-list-state.tsx` wrote `autoExpandedContextRef` _inside_ a `setExpandedCheckKeys`
 updater, and React may run an updater more than once, so the write is hoisted into the effect that
 queues it. That one is a genuine correctness fix to upstream's hook and worth submitting on its own
 merits, not just to clear the gate.
