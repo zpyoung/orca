@@ -39,6 +39,38 @@ Never use vague names like `helpers`, `utils`, `common`, `misc`, or `shared-stuf
 - **Test**: see [Running Tests: Remote Sandbox Only](#running-tests-remote-sandbox-only) — `pnpm test` is blocked on this machine
 - **Lint**: `oxlint`, or `pnpm run check:code-quality:changed` for changed files (full `pnpm lint` is slow); format with `pnpm format`
 
+# Typed Observations: the Orca Ledger
+
+When you notice something you cannot act on in this session, do NOT bury it in prose with phrases
+like "pre-existing", "out of scope", "future work", or "skipped for brevity". File it in the Orca
+ledger, which is keyed to the project, so entries survive worktree deletion and stay visible from
+sibling worktrees of this repo.
+
+```sh
+orca ledger file --type bug      --title <t> --file <path:line> \
+                                 --description <d> --severity critical|high|medium|low
+orca ledger file --type deferred --title <t> --why-deferred <w> \
+                                 --priority high|medium|low
+orca ledger file --type test-gap --title <t> --file-under-test <path:line> \
+                                 --reason-skipped <r>
+orca ledger file --type proposal --title <t> --context <c> --recommendation <r>
+orca ledger file --type decision --title <t> --context <c> --decision <d> \
+                                 --consequences <q> --status proposed|accepted|superseded
+orca ledger list   --type bug --state open --json
+orca ledger show   --id bug-12 --json
+orca ledger state  --id bug-12 --state resolved --if-revision <n> --json
+orca ledger review --json
+```
+
+`--if-revision` takes the revision from `show`; a stale value returns `conflict` with the current
+revision in `error.data.currentRevision`.
+
+The ledger is the only surface, and it wins on any disagreement. BUGS.md, DEFERRED.md,
+TEST_BACKLOG.md, proposals.md and docs/adr/ are legacy — read them for history, never append to
+them. BUGS.md and DEFERRED.md were migrated; TEST_BACKLOG.md was not, so its entries live only in
+markdown until someone files them. The `quirk:typed-artifacts` skill and the `/quirk:artifacts:*`
+commands still write markdown; do not use them.
+
 # Fork Feature Structure
 
 This fork tracks upstream stable tags, and every sync resolves file ownership from

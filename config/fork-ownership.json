@@ -150,21 +150,13 @@
       "feature": "fork-infra",
       "kind": "passthrough",
       "lines": [
+        "# Typed Observations: the Orca Ledger",
         "# Fork Feature Structure",
         "## Seams",
         "## Precedence",
         "## CI enforcement",
         "## Running Tests: Remote Sandbox Only",
         "## Typechecking: Scope It to What You Changed"
-      ]
-    },
-    {
-      "path": "CLAUDE.md",
-      "feature": "fork-infra",
-      "kind": "passthrough",
-      "lines": [
-        "for brevity\". Route it via the `typed-artifacts` skill (auto-loads on",
-        "those phrases) or use one of:"
       ]
     },
     {
@@ -3856,12 +3848,8 @@
       "removed": 4
     },
     "AGENTS.md": {
-      "added": 113,
+      "added": 145,
       "removed": 1
-    },
-    "CLAUDE.md": {
-      "added": 17,
-      "removed": 0
     },
     "config/localization-coverage-allowlist.json": {
       "added": 7,
