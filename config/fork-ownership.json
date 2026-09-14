@@ -136,6 +136,45 @@
   ],
   "seams": [
     {
+      "path": "src/renderer/src/components/sidebar/use-worktree-activity-status.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { selectWorktreeHasPendingAsk } from '../fork-ask-question-tool/pending-ask-attention'",
+        "  const hasPendingAsk = useAppStore((s) => selectWorktreeHasPendingAsk(s, worktreeId))",
+        "        hasPermission: hasPermission || hasPendingAsk,",
+        "      hasPendingAsk,"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/use-worktree-activity-statuses.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { selectWorktreeHasPendingAsk } from '../fork-ask-question-tool/pending-ask-attention'",
+        "        hasPermission: hasPermission || selectWorktreeHasPendingAsk(statusInputs, worktreeId),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/tab-bar/terminal-tab-activity-status.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "  hasPendingAsk?: boolean",
+        "  hasPendingAsk,",
+        "    hasPermission: hasPendingAsk || (flags?.hasPermission ?? false),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/tab-bar/SortableTab.tsx",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { selectTabHasPendingAsk } from '../fork-ask-question-tool/pending-ask-attention'",
+        "      hasPendingAsk: selectTabHasPendingAsk(s, tab.id),"
+      ]
+    },
+    {
       "path": ".gitignore",
       "feature": "fork-infra",
       "kind": "passthrough",
@@ -3694,6 +3733,45 @@
         "      ref: 'v1.4.191-rc.0.zy01',",
         "    const checkout = await materializeReleaseCheckout('v1.4.191-rc.0.zy01', { cacheRoot })"
       ]
+    },
+    {
+      "path": "src/renderer/src/components/cmd-j/palette-live-status.tsx",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import {",
+        "  selectTabHasPendingAsk,",
+        "  selectWorktreeHasPendingAsk",
+        "} from '@/components/fork-ask-question-tool/pending-ask-attention'",
+        "  const hasPendingAsk = useAppStore((s) => selectWorktreeHasPendingAsk(s, worktree.id))",
+        "  const status = hasPendingAsk ? 'permission' : heuristic",
+        "  const hasPendingAsk = useAppStore((s) =>",
+        "    terminalTabId == null ? false : selectTabHasPendingAsk(s, terminalTabId)",
+        "  )",
+        "      ? hasPendingAsk",
+        "        ? 'permission'",
+        "        : resolveRecentWorkspaceTabStatus(row, live.paneSources, live.now)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/worktree-jump-palette-recent-inclusion.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "  hasPendingAsk",
+        "  hasPendingAsk?: boolean",
+        "    status: hasPendingAsk ? 'permission' : resolveRecentWorkspaceTabStatus(row, paneSources, now),"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/use-worktree-jump-palette-recent-tabs.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { usePendingAskTabIds } from '@/components/fork-ask-question-tool/use-pending-ask-tab-ids'",
+        "  const pendingAskTabIds = usePendingAskTabIds()",
+        "          hasPendingAsk: row.terminalTab != null && pendingAskTabIds.has(row.terminalTab.id)"
+      ]
     }
   ],
   "exceptions": [
@@ -4278,6 +4356,22 @@
     }
   ],
   "residuals": {
+    "src/renderer/src/components/sidebar/use-worktree-activity-status.ts": {
+      "added": 4,
+      "removed": 1
+    },
+    "src/renderer/src/components/sidebar/use-worktree-activity-statuses.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/renderer/src/components/tab-bar/terminal-tab-activity-status.ts": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/renderer/src/components/tab-bar/SortableTab.tsx": {
+      "added": 2,
+      "removed": 0
+    },
     ".gitignore": {
       "added": 14,
       "removed": 2
@@ -5905,6 +5999,18 @@
     "tests/e2e/cross-version-wire/release-checkout.unit.test.ts": {
       "added": 11,
       "removed": 14
+    },
+    "src/renderer/src/components/cmd-j/palette-live-status.tsx": {
+      "added": 13,
+      "removed": 2
+    },
+    "src/renderer/src/components/use-worktree-jump-palette-recent-tabs.ts": {
+      "added": 11,
+      "removed": 2
+    },
+    "src/renderer/src/components/worktree-jump-palette-recent-inclusion.ts": {
+      "added": 4,
+      "removed": 2
     }
   }
 }
