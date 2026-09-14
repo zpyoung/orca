@@ -25,7 +25,7 @@ export function cleanInline(value: string): string {
 }
 
 export function parseLabel(line: string): { key: string; value: string } | undefined {
-  const match = /^\s*(?:[-*+]\s+)?(?:\*\*([^*]+):\*\*|([^:]+):)\s*(.*)$/.exec(line)
+  const match = /^\s*(?:[-*+]\s+)?(?:\*\*([^*]+)(?::\*\*|\*\*:)|([^:]+):)\s*(.*)$/.exec(line)
   return match ? { key: match[1] || match[2], value: match[3] } : undefined
 }
 
