@@ -63,7 +63,9 @@ export type GitInspectionApi = {
     staged: boolean
     compareAgainstHead?: boolean
     connectionId?: string
+    requestToken?: string
   }) => Promise<GitDiffResult>
+  cancelDiff: (args: { requestToken: string }) => Promise<void>
   branchCompare: (args: {
     worktreePath: string
     baseRef: string

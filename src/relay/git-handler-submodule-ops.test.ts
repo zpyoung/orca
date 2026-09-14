@@ -87,6 +87,27 @@ describe('listSubmodulePathsCached', () => {
     expect(calls).toBe(1)
   })
 
+  it('does not cache aborted discovery before an immediate retry', async () => {
+    const abortError = new Error('cancelled')
+    abortError.name = 'AbortError'
+    let calls = 0
+    const git: GitExec = async () => {
+      calls += 1
+      if (calls === 1) {
+        throw abortError
+      }
+      return { stdout: 'submodule.lib.path vendor/lib\n', stderr: '' }
+    }
+    const cache = createSubmodulePathsCache()
+
+    await expect(listSubmodulePathsCached(git, '/repo', cache, 1_000)).rejects.toBe(abortError)
+    expect(getSubmodulePathsCacheCount(cache)).toBe(0)
+    await expect(listSubmodulePathsCached(git, '/repo', cache, 1_001)).resolves.toEqual([
+      'vendor/lib'
+    ])
+    expect(calls).toBe(2)
+  })
+
   it('stays bounded through prolonged remote-worktree churn and retains recent entries', async () => {
     const { git, calls } = gitmodulesExec(['vendor/lib'])
     const cache = createSubmodulePathsCache()

@@ -409,4 +409,56 @@ describe('settled diff cache', () => {
     // Why exactly equal: the second read must join the first, not start its own spawns.
     expect(blobReadCount()).toBe(spawnsBeforePoll)
   })
+
+  it('keeps a coalesced diff read running when one of its readers cancels', async () => {
+    const blockedBlob = Promise.withResolvers<{ stdout: Buffer }>()
+    gitExecFileAsyncBufferMock.mockReturnValue(blockedBlob.promise)
+    const firstController = new AbortController()
+    const secondController = new AbortController()
+    const firstError = new Error('first cancelled')
+
+    const first = getDiff(REPO, FILE, false, false, { signal: firstController.signal })
+    const second = getDiff(REPO, FILE, false, false, { signal: secondController.signal })
+    await vi.waitFor(() => expect(blobReadCount()).toBeGreaterThan(0))
+    const sharedSignal = gitExecFileAsyncBufferMock.mock.calls[0]?.[1]?.signal
+    expect(sharedSignal).toBeInstanceOf(AbortSignal)
+
+    firstController.abort(firstError)
+
+    await expect(first).rejects.toBe(firstError)
+    expect(sharedSignal.aborted).toBe(false)
+    blockedBlob.resolve({ stdout: Buffer.from('index-content\n') })
+    await expect(second).resolves.toMatchObject({ modifiedContent: 'working-tree-content' })
+  })
+
+  it('aborts the git blob read once every coalesced reader cancels', async () => {
+    const hostRead = Promise.withResolvers<{ stdout: Buffer }>()
+    let sharedSignal: AbortSignal | undefined
+    gitExecFileAsyncBufferMock.mockImplementation(
+      (_args: string[], options: { signal?: AbortSignal }) => {
+        sharedSignal = options.signal
+        options.signal?.addEventListener('abort', () => hostRead.reject(options.signal?.reason), {
+          once: true
+        })
+        return hostRead.promise
+      }
+    )
+    const firstController = new AbortController()
+    const secondController = new AbortController()
+    const firstError = new Error('first cancelled')
+    const secondError = new Error('second cancelled')
+
+    const first = getDiff(REPO, FILE, false, false, { signal: firstController.signal })
+    const second = getDiff(REPO, FILE, false, false, { signal: secondController.signal })
+    await vi.waitFor(() => expect(blobReadCount()).toBe(1))
+
+    firstController.abort(firstError)
+    await expect(first).rejects.toBe(firstError)
+    expect(sharedSignal?.aborted).toBe(false)
+
+    secondController.abort(secondError)
+    await expect(second).rejects.toBe(secondError)
+    expect(sharedSignal?.aborted).toBe(true)
+    expect(blobReadCount()).toBe(1)
+  })
 })
