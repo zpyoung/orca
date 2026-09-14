@@ -62,7 +62,7 @@ export function commitWorktreePointerDrop(args: PointerDropCommitArgs): void {
   // helps when the frame runs, which is the case that was never broken.
   // A release inside the board is outside this container, so the hit-test
   // returns none there and the board path below still wins on its own turf.
-  if (ctx.commitWorktreeGroupMembershipDrop(event, drag)) {
+  if (ctx.commitWorktreeGroupMembershipDrop?.(event, drag)) {
     ctx.clearWorktreeDrag()
     return
   }

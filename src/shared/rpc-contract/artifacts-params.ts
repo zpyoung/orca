@@ -34,6 +34,7 @@ export const WriteRequest = z
     contentType: z.enum(['text/html', 'text/markdown']),
     fileName: z.string().min(1).max(512),
     title: z.string().max(512).optional(),
+    protection: z.never().optional(),
     ...CloudOptions
   })
   .refine((request) => artifactWriteRequestByteLength(request) <= ARTIFACT_MAX_REQUEST_BYTES, {

@@ -10,6 +10,7 @@ import {
 import { shouldDeferActivationTerminalPrep } from './activation-terminal-prep'
 import { deriveActiveSurfaceForWorktree } from '../../tabs/tabs-surface'
 import { workspaceActivityExitPatchForActivation } from '../../fork-workspace-activity-window/workspace-activity-exit-stamp'
+import { clearWorktreeSleepIntent } from '@/lib/worktree-sleep-intent'
 
 export function createSetActiveFolderWorkspace(
   set: WorktreeSliceSet,

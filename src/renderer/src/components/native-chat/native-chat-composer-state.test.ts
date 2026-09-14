@@ -454,7 +454,7 @@ describe('native skill and command picker', () => {
       'quirk',
       'warp'
     ])
-    expect(applyPickerSuggestion('/ren', 4, items[0], '/').draft).toBe('/quirk:render ')
+    expect(applyPickerSuggestion('/ren', 4, items[0]).draft).toBe('/quirk:render ')
   })
 
   it('merges same-named plugin skills for an agent that takes a bare skill name', () => {
@@ -580,12 +580,14 @@ describe('native skill and command picker', () => {
   })
 
   it('replaces a mid-draft /token without disturbing the text before it', () => {
-    const result = applyPickerSuggestion(
-      'please run /bro now',
-      15,
-      { kind: 'skill', id: 'skill:browser', name: 'browser', description: null, sources: [] },
-      '/'
-    )
+    const result = applyPickerSuggestion('please run /bro now', 15, {
+      kind: 'skill',
+      id: 'skill:browser',
+      name: 'browser',
+      token: '/browser',
+      description: null,
+      sources: []
+    })
     expect(result.draft).toBe('please run /browser  now')
     expect(result.caret).toBe('please run /browser '.length)
     expect(result.insertedToken).toBe('/browser')

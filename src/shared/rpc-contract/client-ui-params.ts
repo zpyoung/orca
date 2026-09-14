@@ -14,6 +14,8 @@ import { ClientUiWorkspaceFilterFields } from './client-ui-workspace-filter-fiel
 import { TaskResumeState } from './task-resume-state-params'
 import { WorkspaceCleanup } from './workspace-cleanup-ui-params'
 import { omitUndefinedValues, tolerateUnknownValues } from './ui-update-value-tolerance-params'
+import { WorkspaceActivityUIUpdateFields } from '../fork-workspace-activity-window/workspace-activity-ui-schema'
+import { WorkspaceReviewUIUpdateFields } from '../fork-workspace-review-filters/workspace-review-ui-schema'
 
 export const NullableString = z.string().nullable()
 
@@ -41,11 +43,14 @@ export const STATIC_RIGHT_SIDEBAR_TABS = [
   'explorer',
   'search',
   'vault',
+  'session-info',
+  'ask',
   'workspaces',
   'pr-checks',
   'source-control',
   'checks',
-  'ports'
+  'ports',
+  'ledger'
 ] as const
 
 // Plugin panels are open-ended `plugin:<publisher>.<id>/<panel>` keys, so the
@@ -115,7 +120,8 @@ export const TopLevelViewSchema = z.enum([
   'space',
   'skills',
   'artifacts',
-  'mobile'
+  'mobile',
+  'ledger'
 ])
 
 export const UiUpdateFields = z
@@ -159,6 +165,8 @@ export const UiUpdateFields = z
       .array(z.object({ hostId: z.string(), repoId: z.string() }).strict())
       .optional(),
     ...ClientUiWorkspaceFilterFields,
+    ...WorkspaceActivityUIUpdateFields,
+    ...WorkspaceReviewUIUpdateFields,
     // Why: rides App.tsx's debounced writer, so omitting it rejected that entire
     // payload (sidebar widths, filters, agent acks) for every paired client.
     showDotfilesByWorktree: z.record(z.string(), z.boolean()).optional(),

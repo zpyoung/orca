@@ -133,7 +133,7 @@ export function flushWorktreePointerDragFrame(args: WorktreePointerDragFrameArgs
 
   // Why: a group-header hit is unambiguous, so it wins over lineage/status/
   // reorder targets before any of those are even computed.
-  if (ctx.trackWorktreeGroupMembershipDragFrame(drag)) {
+  if (ctx.trackWorktreeGroupMembershipDragFrame?.(drag)) {
     // Why: both tracked targets survive as within-tolerance sticky commit
     // fallbacks, and pointer-up resolves the board one FIRST — so a release on
     // a header shortly after leaving a lane could commit that lane instead of

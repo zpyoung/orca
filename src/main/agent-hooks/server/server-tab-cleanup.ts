@@ -2,6 +2,7 @@ import { clearPaneCacheState } from '../../../shared/agent-hook-listener/listene
 import { paneCacheKeyMatchesTab } from './server-status-identity'
 import { AgentHookServerCleanup } from './server-cleanup'
 import { sessionInfoService } from '../../fork-session-info/session-info-service'
+import type { EnrichedAgentHookEventPayload } from './server-types'
 
 export abstract class AgentHookServerTabCleanup extends AgentHookServerCleanup {
   /** Drop every status/cache claim attributable to a closed tab prefix. */

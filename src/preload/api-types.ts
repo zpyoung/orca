@@ -1,4 +1,3 @@
-import type { ElectronAPI } from '@electron-toolkit/preload'
 import type { AskRegistryEvent } from '../shared/fork-ask-question-tool/ask-question-schema'
 import type { ClaudeSuppressionVerdict } from '../shared/fork-ask-question-tool/claude-suppression-verdict'
 import type {

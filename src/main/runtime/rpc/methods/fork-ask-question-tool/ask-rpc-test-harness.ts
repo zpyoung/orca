@@ -106,7 +106,7 @@ export function createAskRpcHarness(): { setup(): AskRpcHarness; cleanup(): void
           throw new Error(`${name} is a streaming method; use subscribe() instead`)
         }
         const parsed = method.params ? method.params.parse(params) : undefined
-        return method.handler(parsed, { ...ctx, ...ctxOverride })
+        return method.handler(parsed as never, { ...ctx, ...ctxOverride })
       },
       subscribe: (name, params, ctxOverride) => {
         const method = findMethod(name)
@@ -119,7 +119,7 @@ export function createAskRpcHarness(): { setup(): AskRpcHarness; cleanup(): void
         // call returns, registerSubscriptionCleanup has already fired with the real id — capture
         // it via a spy rather than reconstructing the internal id scheme.
         const registerSpy = vi.spyOn(runtime, 'registerSubscriptionCleanup')
-        const handlerPromise = method.handler(parsed, { ...ctx, ...ctxOverride }, (frame) =>
+        const handlerPromise = method.handler(parsed as never, { ...ctx, ...ctxOverride }, (frame) =>
           frames.push(frame)
         )
         const subscriptionId = registerSpy.mock.calls.at(-1)?.[0] as string | undefined

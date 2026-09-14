@@ -2,13 +2,18 @@ import type {
   RpcMethodName,
   RpcParams
 } from '../../../shared/rpc-contract/rpc-params-catalog.generated'
+import type { ForkUncataloguedMethod } from './fork-rpc-params/fork-uncatalogued-methods'
 import type { RpcAnyMethodDeclaration } from './core'
 import type { ALL_RPC_METHODS } from './methods'
 
 type RegisteredMethod = (typeof ALL_RPC_METHODS)[number]
 
 // These schemas reach into src/main and have no shared catalog entry.
-type UncataloguedMethod = 'emulator.install' | 'orchestration.send' | 'orchestration.taskUpdate'
+type UncataloguedMethod =
+  | 'emulator.install'
+  | 'orchestration.send'
+  | 'orchestration.taskUpdate'
+  | ForkUncataloguedMethod
 
 type IsAny<T> = 0 extends 1 & T ? true : false
 

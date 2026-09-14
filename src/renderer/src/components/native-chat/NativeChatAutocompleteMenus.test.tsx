@@ -73,6 +73,7 @@ describe('NativeChatPickerMenu', () => {
               kind: 'skill',
               id: 'skill:quirk:render',
               name: 'quirk:render',
+              token: '/quirk:render',
               description: 'Render a page',
               pluginName: 'quirk',
               sources: [
@@ -99,12 +100,12 @@ describe('NativeChatPickerMenu', () => {
     render(
       <NativeChatPickerMenu
         autocomplete={autocomplete({
-          prefix: '$',
           items: [
             {
               kind: 'skill',
               id: 'skill:render',
               name: 'render',
+              token: '/render',
               description: 'Render a page',
               sources: [
                 {

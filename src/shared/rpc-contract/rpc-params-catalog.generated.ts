@@ -413,7 +413,6 @@ import {
   ProjectGroupImportNested,
   ProjectGroupMoveProject,
   ProjectGroupScanNested,
-  ProjectGroupSelector,
   ProjectGroupUpdate,
   RepoClone,
   RepoCreate,
@@ -581,6 +580,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'artifacts.getPublishedLink': SourceRequest,
   'artifacts.list': ListOptions,
   'artifacts.publish': WriteRequest,
+  'artifacts.revealPassphrase': SourceRequest,
   'artifacts.share': WriteRequest,
   'artifacts.unshare': SourceRequest,
   'artifacts.update': WriteRequest,
@@ -1002,7 +1002,6 @@ export const RPC_PARAMS_BY_METHOD = {
   'project.list': null,
   'project.update': ProjectUpdate,
   'projectGroup.create': ProjectGroupCreate,
-  'projectGroup.delete': ProjectGroupSelector,
   'projectGroup.importNested': ProjectGroupImportNested,
   'projectGroup.list': null,
   'projectGroup.moveProject': ProjectGroupMoveProject,
@@ -1025,7 +1024,6 @@ export const RPC_PARAMS_BY_METHOD = {
   'repo.issueCommandWrite': RepoIssueCommandWrite,
   'repo.list': null,
   'repo.reorder': RepoReorder,
-  'repo.rm': RepoSelector,
   'repo.saveSparsePreset': RepoSparsePresetSave,
   'repo.searchRefs': RepoSearchRefs,
   'repo.setBaseRef': RepoSetBaseRef,
@@ -1152,9 +1150,24 @@ export const RPC_PARAMS_BY_METHOD = {
 // Why: these methods bind a schema the shared contract cannot hold because its value
 // graph reaches into src/main. Listing them keeps the gap visible instead of absent.
 export const RPC_METHODS_WITHOUT_SHARED_PARAMS: readonly string[] = [
+  'artifacts.publishProtected',
+  'artifacts.removeProtection',
+  'artifacts.rotateProtection',
+  'artifacts.shareProtected',
+  'ask.answer',
+  'ask.cancel',
+  'ask.register',
+  'ask.snapshot',
+  'ask.subscribe',
+  'ask.updatePartial',
+  'ask.wait',
   'emulator.install',
+  'ledger.request',
+  'ledger.ui',
   'orchestration.send',
-  'orchestration.taskUpdate'
+  'orchestration.taskUpdate',
+  'projectGroup.delete',
+  'repo.rm'
 ]
 
 export type RpcMethodName = keyof typeof RPC_PARAMS_BY_METHOD

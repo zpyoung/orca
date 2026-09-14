@@ -36,8 +36,6 @@ import {
   type NativeChatDiffTarget,
   type NativeChatTurnDiff
 } from './native-chat-turn-diffs'
-import { NativeChatTurnDiffRollup } from './NativeChatTurnDiffRollup'
-import { NativeChatResolutionReceipt } from './NativeChatResolutionReceipt'
 import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'
 import { cn } from '@/lib/utils'
 
@@ -250,10 +248,12 @@ export function NativeChatMessageList({
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div className="relative min-h-0 flex-1">
           <div
-            ref={contentRef}
-            // Why: matches composer column (max-w-4xl) with 5px horizontal inset
-            // on each side so content is slightly narrower than the input box.
-            className={cn('mx-auto flex w-full flex-col gap-5 px-[5px]', widthClassName)}
+            ref={scrollRef}
+            onScroll={onScroll}
+            // Named so measurement can find the scroll root without depending on
+            // which utility class happens to make it scroll.
+            data-native-chat-scroll
+            className="scrollbar-sleek relative h-full overflow-y-auto [scrollbar-gutter:stable_both-edges]"
             // Why: `zoom` scales the chat transcript's text and layout together,
             // scoped to this pane so the rest of the app is untouched. It sits on
             // the scroll container rather than the content inside it so that
@@ -267,7 +267,7 @@ export function NativeChatMessageList({
                 ref={contentRef}
                 // Why: matches composer column (max-w-4xl) with 5px horizontal inset
                 // on each side so content is slightly narrower than the input box.
-                className="mx-auto flex w-full max-w-4xl flex-col gap-5 px-[5px]"
+                className={cn('mx-auto flex w-full flex-col gap-5 px-[5px]', widthClassName)}
               >
                 {hasMore ? (
                   <div className="flex justify-center py-1">

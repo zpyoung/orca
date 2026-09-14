@@ -9,30 +9,37 @@ export type NativeChatAgentProfile = {
    *  where that syntax is verified — an unverified guess would insert a token
    *  the agent cannot resolve, so the rest fall back to the bare skill name. */
   namespacesPluginSkills: boolean
+  /** The agent's own harness expands a slash command out of the message text, so
+   *  the chat host claims only the commands it implements itself. */
+  expandsSlashCommandsFromText?: true
+  /** Catalog commands the model acts on when they arrive as prose, even though
+   *  the runtime has no slash parser of its own. */
+  textDrivenCommands?: readonly string[]
 }
 
 const NATIVE_CHAT_AGENT_PROFILES: Partial<Record<AgentType, NativeChatAgentProfile>> = {
   codex: {
     skillPrefix: '$',
-    groupedSlash: false,
     skillSourceOwner: 'codex',
-    namespacesPluginSkills: false
+    namespacesPluginSkills: false,
+    // The app-server has no slash parser, but the model owns goal tools and
+    // calls create_goal itself when `/goal <objective>` reaches it as prose.
+    textDrivenCommands: ['goal']
   },
   claude: {
     skillPrefix: '/',
-    groupedSlash: true,
     skillSourceOwner: 'claude',
-    namespacesPluginSkills: true
+    namespacesPluginSkills: true,
+    expandsSlashCommandsFromText: true
   },
   openclaude: {
     skillPrefix: '/',
-    groupedSlash: true,
     skillSourceOwner: 'claude',
-    namespacesPluginSkills: true
+    namespacesPluginSkills: true,
+    expandsSlashCommandsFromText: true
   },
   grok: {
     skillPrefix: '/',
-    groupedSlash: true,
     skillSourceOwner: 'grok',
     namespacesPluginSkills: false
   }

@@ -76,11 +76,11 @@ export function deriveComposerAutocomplete(
   sessionSkillNames?: readonly string[]
 ): ComposerAutocomplete {
   const before = draft.slice(0, caret)
-  const slashMatch = before.match(/(?:^|\s)\/(\S*)$/)
-  if (slashMatch) {
+  const leadingMatch = before.match(LEADING_SLASH_TRIGGER)
+  if (leadingMatch) {
     return deriveSlashAutocomplete(
-      slashMatch[1],
-      before.length - slashMatch[1].length - 1,
+      leadingMatch[1],
+      0,
       agentCommands,
       profile,
       discovery,
@@ -101,22 +101,13 @@ export function deriveComposerAutocomplete(
   const query = midPromptMatch[1]
   return deriveSlashAutocomplete(
     query,
-    triggerKey,
-    prefix: '$',
-    grouped: false,
-    commandsEnabled: false,
-    skillsEnabled: true,
-    items: buildNativeChatPickerItems(
-      [],
-      discovery.skills,
-      query,
-      '$',
-      sessionSkillNames,
-      profile?.namespacesPluginSkills === true
-    ),
-    skillStatus: discovery.status === 'idle' ? 'loading' : discovery.status,
-    ...(discovery.errorKind ? { skillErrorKind: discovery.errorKind } : {})
-  }
+    before.length - query.length - 1,
+    agentCommands,
+    profile,
+    discovery,
+    dismissedTriggerKey,
+    sessionSkillNames
+  )
 }
 
 /** The supported TUIs dispatch a command only as the draft's leading token, and
@@ -124,31 +115,27 @@ export function deriveComposerAutocomplete(
  *  else offers skills alone. */
 function deriveSlashAutocomplete(
   query: string,
-  tokenStart: number,
+  triggerPosition: number,
   agentCommands: readonly SlashCommandSuggestion[],
   profile: NativeChatAgentProfile | null,
   discovery: NativeChatSkillDiscoverySnapshot,
   dismissedTriggerKey: string | null,
   sessionSkillNames: readonly string[] | undefined
 ): ComposerAutocomplete {
-  const triggerKey = `/:${tokenStart}`
+  const triggerKey = `/:${triggerPosition}`
   if (dismissedTriggerKey === triggerKey) {
     return { mode: 'none' }
   }
-  const hasSlashSkills = profile?.skillPrefix === '/'
-  const leadsDraft = tokenStart === 0
-  if (!leadsDraft && !hasSlashSkills) {
-    return { mode: 'none' }
-  }
-  const commands = leadsDraft ? agentCommands : []
-  // Why: the caller owns catalog policy (e.g. Grok ships skills-only until a
-  // verified catalog lands); this derivation must not re-gate per agent.
+  // Every agent with a known grammar offers skills here; only the token a pick
+  // inserts differs. The caller owns catalog policy (e.g. Grok ships skills-only
+  // until a verified catalog lands), so this derivation must not re-gate per agent.
+  const skillsEnabled = profile !== null
   const items = buildNativeChatPickerItems(
-    commands,
-    hasSlashSkills ? discovery.skills : [],
+    agentCommands,
+    skillsEnabled ? discovery.skills : [],
     query,
-    '/',
-    hasSlashSkills ? sessionSkillNames : [],
+    profile?.skillPrefix ?? '/',
+    skillsEnabled ? sessionSkillNames : [],
     profile?.namespacesPluginSkills === true
   )
   return {
@@ -156,9 +143,10 @@ function deriveSlashAutocomplete(
     query,
     triggerKey,
     prefix: '/',
-    grouped: leadsDraft && profile?.groupedSlash === true,
-    commandsEnabled: commands.length > 0,
-    skillsEnabled: hasSlashSkills,
+    dispatchable: triggerPosition === 0,
+    grouped: skillsEnabled,
+    commandsEnabled: agentCommands.length > 0,
+    skillsEnabled,
     items,
     skillStatus: skillsEnabled
       ? discovery.status === 'idle'

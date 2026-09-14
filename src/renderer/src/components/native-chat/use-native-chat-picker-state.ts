@@ -69,13 +69,7 @@ export function useNativeChatPickerState(args: {
     setActiveSuggestion
   } = args
   const profile = useMemo(() => getNativeChatAgentProfile(agent), [agent])
-  const beforeCaret = draft.slice(0, caret)
-  const skillPickerTriggered =
-    profile?.skillPrefix === '$'
-      ? /(?:^|\s)\$\S*$/.test(beforeCaret)
-      : profile?.skillPrefix === '/'
-        ? /(?:^|\s)\/\S*$/.test(beforeCaret)
-        : false
+  const skillPickerTriggered = isSkillPickerTriggered(draft.slice(0, caret), profile)
   const discovery = useNativeChatSkills(agent, terminalTabId, skillPickerTriggered)
   const listboxId = `native-chat-picker-${useId().replaceAll(':', '')}`
   const dismissalContext = `${draftScopeKey}:${agent}`

@@ -54,7 +54,7 @@ export function buildNativeChatPickerItems(
   commands: readonly SlashCommandSuggestion[],
   skills: readonly DiscoveredSkill[],
   query: string,
-  prefix: '/' | '$',
+  skillSigil: '/' | '$',
   sessionSkillNames?: readonly string[],
   namespacePluginSkills = false
 ): NativeChatPickerItem[] {
@@ -68,6 +68,7 @@ export function buildNativeChatPickerItems(
     skills,
     sessionSkillNames,
     unclassifiedNames,
+    skillSigil,
     namespacePluginSkills
   )
   const skillNames = new Set(mergedSkills.map((skill) => skill.name))
@@ -110,6 +111,7 @@ function mergeNativeChatSkills(
   skills: readonly DiscoveredSkill[],
   sessionSkillNames: readonly string[] | undefined,
   unclassifiedNames: ReadonlySet<string>,
+  skillSigil: '/' | '$',
   namespacePluginSkills: boolean
 ): Extract<NativeChatPickerItem, { kind: 'skill' }>[] {
   const exactPaths = new Map<string, DiscoveredSkill>()
@@ -140,7 +142,7 @@ function mergeNativeChatSkills(
         ]
       : [...byName.keys()]
   return [...new Set(names)]
-    .flatMap((name) => pickerSkills(name, byName.get(name) ?? [], namespacePluginSkills))
+    .flatMap((name) => pickerSkills(name, byName.get(name) ?? [], skillSigil, namespacePluginSkills))
     .sort(comparePickerSkills)
 }
 
@@ -150,10 +152,11 @@ function mergeNativeChatSkills(
 function pickerSkills(
   name: string,
   namedSkills: readonly DiscoveredSkill[],
+  skillSigil: '/' | '$',
   namespacePluginSkills: boolean
 ): Extract<NativeChatPickerItem, { kind: 'skill' }>[] {
   if (!namespacePluginSkills) {
-    return [pickerSkill(name, namedSkills)]
+    return [pickerSkill(name, namedSkills, skillSigil)]
   }
   const byToken = new Map<string, DiscoveredSkill[]>()
   for (const skill of namedSkills) {
@@ -162,9 +165,9 @@ function pickerSkills(
     byToken.set(token, [...(byToken.get(token) ?? []), skill])
   }
   if (byToken.size === 0) {
-    return [pickerSkill(name, [])]
+    return [pickerSkill(name, [], skillSigil)]
   }
-  return [...byToken.entries()].map(([token, group]) => pickerSkill(token, group))
+  return [...byToken.entries()].map(([token, group]) => pickerSkill(token, group, skillSigil))
 }
 
 function pickerSkill(
@@ -328,9 +331,7 @@ export function applyPickerSuggestion(
 ): { draft: string; caret: number; insertedToken: string } {
   const before = draft.slice(0, caret)
   const after = draft.slice(caret)
-  // Why: this fork's composer offers the slash picker mid-draft, not only on a
-  // draft that starts with it, so the token is matched after any whitespace.
-  const match = before.match(prefix === '/' ? /(^|\s)\/(\S*)$/ : /(^|\s)\$(\S*)$/)
+  const match = before.match(LEADING_SLASH_TRIGGER) ?? before.match(MID_PROMPT_SLASH_TRIGGER)
   if (!match) {
     return { draft, caret, insertedToken: '' }
   }

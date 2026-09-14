@@ -1,5 +1,4 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { electronAPI } from '@electron-toolkit/preload'
 import { buildForkSessionHandoffApi } from './fork-session-handoff/session-handoff-preload-api'
 import { buildForkSessionInfoApi } from './fork-session-info/session-info-preload-api'
 import { buildForkAskApi } from './fork-ask-question-tool/ask-preload-api'

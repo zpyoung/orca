@@ -6,7 +6,7 @@ import {
   type SubscribeNativeChatTranscriptArgs
 } from '../../../native-chat/transcript-watch'
 import { nativeChatCompanionFrameFields } from '../../../../shared/fork-native-chat-session-options/native-chat-transcript-companion'
-import { defineMethod, defineStreamingMethod, type RpcAnyMethod, type RpcContext } from '../core'
+import { defineMethod, defineStreamingMethod, type RpcContext } from '../core'
 import { sanitizeNativeChatRpcBlock } from './native-chat-rpc-block-sanitize'
 import {
   MOBILE_NATIVE_CHAT_MAX_WINDOW,

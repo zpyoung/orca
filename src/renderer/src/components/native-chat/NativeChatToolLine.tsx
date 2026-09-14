@@ -13,6 +13,7 @@ import {
   NativeChatToolName
 } from './NativeChatToolAnnotations'
 import { NativeChatToolIcon } from './NativeChatToolIcon'
+import { NativeChatToolName as ForkNativeChatToolName } from './fork-native-chat-coloring/native-chat-tool-category-glyphs'
 import { NativeChatDiffView } from './NativeChatDiffView'
 import { diffFromText, diffFromToolCall, type DiffLine } from './native-chat-diff'
 import { useNativeChatDisclosure } from './native-chat-disclosure-store'
@@ -89,9 +90,9 @@ export function NativeChatToolLine({
              category to read from it. The empty slot keeps rows aligned. */
           <span aria-hidden className="size-4 shrink-0" />
         )}
-        <code className="min-w-0 truncate font-mono text-xs font-semibold text-foreground/90 transition-colors group-hover:text-foreground">
+        <ForkNativeChatToolName name={name}>
           {isCall ? <NativeChatToolName name={name} mcpIdentity={block.mcpIdentity} /> : name}
-        </code>
+        </ForkNativeChatToolName>
         {preview ? (
           <span
             className="min-w-0 truncate font-mono text-[11px] text-muted-foreground transition-colors group-hover:text-foreground/70"
