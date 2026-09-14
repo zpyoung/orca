@@ -4014,6 +4014,11 @@
       "status": "permanent"
     },
     {
+      "path": "config/scripts/run-sandboxed-test-shards.test.mjs",
+      "reason": "Regression coverage for the fork's sandbox runner matching CI lane selection.",
+      "status": "permanent"
+    },
+    {
       "path": "config/scripts/skill-sharing-release-workflow.test.mjs",
       "status": "permanent",
       "reason": "Asserts a Windows/Linux skill-sharing release gate upstream added to release-cut.yml; the fork's release pipeline is macOS-only and has no such job.",
