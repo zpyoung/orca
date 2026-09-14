@@ -1376,6 +1376,15 @@
       ]
     },
     {
+      "path": "src/renderer/src/app-shell/TitlebarLeftControls.tsx",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { AskPendingCountBadge } from '../components/fork-ask-question-tool/AskPendingCountBadge'",
+        "      <AskPendingCountBadge />"
+      ]
+    },
+    {
       "path": "src/renderer/src/app-shell/AppWorkspaceShell.tsx",
       "feature": "project-ledger",
       "kind": "registration",
@@ -4356,6 +4365,10 @@
     }
   ],
   "residuals": {
+    "src/renderer/src/app-shell/TitlebarLeftControls.tsx": {
+      "added": 2,
+      "removed": 0
+    },
     "src/renderer/src/components/sidebar/use-worktree-activity-status.ts": {
       "added": 4,
       "removed": 1
