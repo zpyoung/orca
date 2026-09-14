@@ -1,5 +1,9 @@
-import { focusPaneOrDockComposer } from '@/components/terminal-pane/fork-terminal-dock/dock-composer-focus-redirect'
+import { findPaneDockComposer } from '@/components/terminal-pane/fork-terminal-dock/dock-composer-focus-redirect'
 import type { AppState } from '@/store/types'
+import {
+  activePaneIsCoveredByNativeChat,
+  paneIsCoveredByNativeChat
+} from '@/components/terminal-pane/native-chat-covered-pane'
 import { resolveLeafIdForManager } from '@/lib/pane-manager/pane-key-resolution'
 import {
   syncRuntimeGraph,
@@ -73,16 +77,38 @@ export function focusRuntimeTerminalSurface(
     return false
   }
   if (!leafId) {
-    focusPaneOrDockComposer(manager.getActivePane())
+    // The dock composer sits above the xterm and is the pane's real input surface, so it wins
+    // before the chat-cover check below ever applies.
+    const activeDockComposer = findPaneDockComposer(manager.getActivePane())
+    if (activeDockComposer) {
+      activeDockComposer.focus()
+      return true
+    }
+    // Why: mirrors focus-terminal-tab-surface.ts's chat-view bail — the xterm is covered by the
+    // chat portal, so focusing it pulls the caret out of the composer. `true` = handled because
+    // `false` sends the caller to the DOM fallback.
+    if (activePaneIsCoveredByNativeChat(manager)) {
+      return true
+    }
+    manager.getActivePane()?.terminal.focus()
     return true
   }
   const resolution = resolveLeafIdForManager(tabId, leafId, manager)
   if (resolution.status !== 'resolved') {
     return false
   }
-  const pane = manager.getPanes().find((candidate) => candidate.id === resolution.numericPaneId)
-  manager.setActivePane(resolution.numericPaneId, { focus: false })
-  focusPaneOrDockComposer(pane)
+  const requestedPane = manager
+    .getPanes()
+    .find((candidate) => candidate.id === resolution.numericPaneId)
+  // Activating a covered leaf lets its chat surface claim the composer without focusing the
+  // xterm underneath it. Explicit leaf requests must still change the manager's active pane.
+  // A dock composer takes focus here rather than through the manager, which would focus the
+  // xterm underneath it instead.
+  const dockComposer = findPaneDockComposer(requestedPane)
+  manager.setActivePane(resolution.numericPaneId, {
+    focus: dockComposer ? false : !paneIsCoveredByNativeChat(requestedPane)
+  })
+  dockComposer?.focus()
   scheduleRuntimeGraphSync()
   return true
 }

@@ -45,6 +45,7 @@ const COMMAND = {
   kind: 'command' as const,
   id: 'command:clear',
   name: 'clear',
+  token: '/clear',
   description: 'Clear history',
   skillCollision: false
 }

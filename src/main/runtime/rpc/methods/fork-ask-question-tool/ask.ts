@@ -1,4 +1,4 @@
-import { defineMethod, defineStreamingMethod, type RpcAnyMethod } from '../../core'
+import { defineMethod, defineStreamingMethod } from '../../core'
 import { isTerminalAskStatus } from '../../../../../shared/fork-ask-question-tool/ask-answer-envelope'
 import {
   ASK_DEFAULT_CHUNK_MS,
@@ -55,7 +55,7 @@ function buildPendingSnapshot(
 
 let askSubscriptionSeq = 0
 
-export const ASK_METHODS: readonly RpcAnyMethod[] = [
+export const ASK_METHODS = [
   defineMethod({
     name: 'ask.register',
     params: AskRegisterParams,

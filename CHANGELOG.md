@@ -1,6 +1,6 @@
 ---
-last_released_commit: 8d12ef0fd74379cba6307cfb8ce1ced061cf83a9
-upstream_synced: v1.4.200
+last_released_commit: 23cae70e86c247745492ea5737daa30beeb7e904
+upstream_synced: v1.4.202
 ---
 
 # Changelog
@@ -11,6 +11,24 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.203-rc.0.zy01] - 2026-09-14
+
+Synced to upstream [v1.4.202](https://github.com/stablyai/orca/releases/tag/v1.4.202), absorbing
+v1.4.201 in the same step.
+
+### Fixed
+- `npx skills add` cloned upstream, so every skill this fork ships that upstream does not have was
+  missing from the tree the installer read. It now installs from this fork's own repository.
+- The docked agent composer kept focus when a pane had one, but upstream's new chat-cover rule
+  could focus the terminal underneath it instead. A pane with a dock composer now hands focus
+  straight to it, and every other pane follows upstream's rule.
+
+### Changed
+- The mid-prompt `/` picker is now upstream's: it offers commands as well as skills mid-draft, and
+  opens for any agent with a known grammar. A pick made mid-sentence still completes the token
+  rather than sending it.
+- `$`-prefixed skill triggering is gone — upstream routes every agent's skills through `/`.
 
 ## [1.4.201-rc.0.zy03] - 2026-09-13
 

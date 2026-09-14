@@ -1,6 +1,7 @@
 import { isSkillsCliAgentKeyShaped } from './skills-cli-agent-keys'
+import { ORCA_SKILLS_REPOSITORY_URL } from './fork-skills-repository/skills-repository-url'
 
-export const ORCA_SKILLS_REPOSITORY_URL = 'https://github.com/stablyai/orca'
+export { ORCA_SKILLS_REPOSITORY_URL }
 
 export const ORCA_CLI_SKILL_NAME = 'orca-cli'
 export const COMPUTER_USE_SKILL_NAME = 'computer-use'
