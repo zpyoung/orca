@@ -19,6 +19,24 @@ The existing suite should remain the single source of coverage.
 **Paths:** `src/shared/posix-command-path-lookup.test.ts`.
 
 **Orca ledger:** `bug-3`.
+## Git multiline diagnostics
+
+**Ledger:** bug-47.
+
+**What:** preserves Git's diagnostic block from the last `fatal:` or `error:` line,
+including continuation lines such as the filesystem-discovery explanation. Command
+wrappers and preceding progress output remain excluded, credentials remain redacted,
+and unprefixed failures retain the last-nonempty-line fallback.
+
+**Why upstream, not isolated:** this corrects the existing shared normalizer used by
+local and SSH Git operations, including non-repository folder workspaces. A forked
+copy would duplicate the same error policy. No Git command or wire schema changes;
+older clients continue to receive an ordinary error string.
+
+**Paths:**
+
+- `src/shared/git-remote-error.ts`
+- `src/shared/git-remote-error.test.ts`
 
 **Status:** pending-upstream. Not yet submitted.
 
