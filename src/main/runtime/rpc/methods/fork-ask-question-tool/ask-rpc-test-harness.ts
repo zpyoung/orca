@@ -7,6 +7,7 @@ import {
   createAskAttachedSurfaceRoster,
   type AskAttachedSurfaceRoster
 } from '../../../../fork-ask-question-tool/ask-attached-surface-roster'
+import { createAskWaitConcurrencyGate } from '../../../../fork-ask-question-tool/ask-wait-concurrency-gate'
 import type { RpcContext } from '../../core'
 import { ASK_METHODS } from './ask'
 
@@ -23,7 +24,11 @@ export type AskRpcHarness = {
   setPaneOwner(paneKey: string, terminalHandle: string): void
   /** Makes a worktreeId/workspaceId resolve as known (F4) — everything else 404s via `showManagedWorktree`. */
   setKnownWorktree(worktreeId: string): void
-  call(name: string, params: Record<string, unknown>, ctxOverride?: Partial<RpcContext>): Promise<unknown>
+  call(
+    name: string,
+    params: Record<string, unknown>,
+    ctxOverride?: Partial<RpcContext>
+  ): Promise<unknown>
   /**
    * Starts a streaming method. Its handler resolves only once `stop()` triggers the registered
    * subscription cleanup, so this captures that cleanup call rather than the internal
@@ -48,14 +53,24 @@ export function createAskRpcHarness(): { setup(): AskRpcHarness; cleanup(): void
   let askDb: AskDb
   let opened = false
 
-  function buildInstance(paneOwnersSeed?: Map<string, string>, knownWorktreesSeed?: Set<string>): AskRpcHarness {
+  function buildInstance(
+    paneOwnersSeed?: Map<string, string>,
+    knownWorktreesSeed?: Set<string>
+  ): AskRpcHarness {
     const runtime = new OrcaRuntimeService()
     runtime.setOrchestrationDb(orchestrationDb)
 
     const registry = new AskRegistry(askDb)
     const hasLocalRendererWindow = { value: false }
-    const roster = createAskAttachedSurfaceRoster({ hasLocalRendererWindow: () => hasLocalRendererWindow.value })
-    vi.spyOn(runtime, 'getAskServices').mockReturnValue({ db: askDb, registry, roster })
+    const roster = createAskAttachedSurfaceRoster({
+      hasLocalRendererWindow: () => hasLocalRendererWindow.value
+    })
+    vi.spyOn(runtime, 'getAskServices').mockReturnValue({
+      db: askDb,
+      registry,
+      roster,
+      waitGate: createAskWaitConcurrencyGate()
+    })
 
     const paneOwners = paneOwnersSeed ?? new Map<string, string>()
     vi.spyOn(runtime, 'getAgentStatusTerminalHandleForPaneKey').mockImplementation((paneKey) =>
@@ -77,7 +92,9 @@ export function createAskRpcHarness(): { setup(): AskRpcHarness; cleanup(): void
       if (!knownWorktrees.has(worktreeId)) {
         throw new Error('selector_not_found')
       }
-      return { id: worktreeId } as unknown as Awaited<ReturnType<typeof runtime.showManagedWorktree>>
+      return { id: worktreeId } as unknown as Awaited<
+        ReturnType<typeof runtime.showManagedWorktree>
+      >
     })
 
     const ctx: RpcContext = { runtime }

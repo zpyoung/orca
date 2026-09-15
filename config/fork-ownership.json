@@ -2670,6 +2670,32 @@
       ]
     },
     {
+      "path": "src/main/runtime/runtime-rpc/runtime-rpc-long-poll.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": ["  if (request.method === 'ask.wait') {"]
+    },
+    {
+      "path": "src/main/runtime/rpc/errors.ts",
+      "feature": "ask-question-tool",
+      "kind": "passthrough",
+      "lines": ["  'runtime_busy',"]
+    },
+    {
+      "path": "src/main/runtime/rpc/errors.ts",
+      "feature": "project-ledger",
+      "kind": "passthrough",
+      "lines": [
+        "import { LedgerError } from '../../../shared/ledger'",
+        "  'ledger_ui_proof_invalid',",
+        "  'ledger_ui_proof_expired',",
+        "  'ledger_ui_proof_replayed',",
+        "  'ledger_ui_proof_capacity',",
+        "  if (error instanceof LedgerError) {",
+        "    return errorResponse(id, meta, error.code, message, error.details)"
+      ]
+    },
+    {
       "path": "src/main/runtime/runtime-rpc/runtime-rpc-lifecycle.ts",
       "feature": "ask-question-tool",
       "kind": "registration",
@@ -4271,6 +4297,14 @@
     },
     "src/main/runtime/runtime-mobile-session-projection.ts": {
       "added": 1,
+      "removed": 0
+    },
+    "src/main/runtime/runtime-rpc/runtime-rpc-long-poll.ts": {
+      "added": 4,
+      "removed": 0
+    },
+    "src/main/runtime/rpc/errors.ts": {
+      "added": 9,
       "removed": 0
     },
     "src/main/runtime/runtime-rpc/runtime-rpc-lifecycle.ts": {

@@ -2,10 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const callMock = vi.fn()
 
-import { RuntimeClientError } from '../runtime-client'
+import { RuntimeClientError, RuntimeRpcFailureError } from '../runtime-client'
 import { ASK_HANDLERS } from './handlers'
 
-const VALID_SPEC_JSON = '{"questions":[{"id":"confirm_deploy","type":"confirm","question":"Deploy now?"}]}'
+const VALID_SPEC_JSON =
+  '{"questions":[{"id":"confirm_deploy","type":"confirm","question":"Deploy now?"}]}'
 
 function ctx(flags: [string, string | boolean][], overrides: { cwd?: string } = {}) {
   return {
@@ -71,12 +72,16 @@ describe('ask flag and spec validation (client.call never invoked on bad input)'
   })
 
   it('rejects a missing --id on ask wait', async () => {
-    await expect(ASK_HANDLERS['ask wait'](ctx([]))).rejects.toMatchObject({ code: 'invalid_argument' })
+    await expect(ASK_HANDLERS['ask wait'](ctx([]))).rejects.toMatchObject({
+      code: 'invalid_argument'
+    })
     expect(callMock).not.toHaveBeenCalled()
   })
 
   it('rejects a missing --id on ask cancel', async () => {
-    await expect(ASK_HANDLERS['ask cancel'](ctx([]))).rejects.toMatchObject({ code: 'invalid_argument' })
+    await expect(ASK_HANDLERS['ask cancel'](ctx([]))).rejects.toMatchObject({
+      code: 'invalid_argument'
+    })
     expect(callMock).not.toHaveBeenCalled()
   })
 })
@@ -94,11 +99,15 @@ describe('orca ask: register -> registered line -> one wait chunk -> envelope', 
   })
 
   it('prints the registered line before issuing ask.wait, then prints the terminal envelope', async () => {
-    callMock
-      .mockResolvedValueOnce({ result: { askId: 'ask_1' } })
-      .mockResolvedValueOnce({
-        result: { status: 'answered', askId: 'ask_1', answers: {}, skipped: [], summary: 'Deploy now?: yes' }
-      })
+    callMock.mockResolvedValueOnce({ result: { askId: 'ask_1' } }).mockResolvedValueOnce({
+      result: {
+        status: 'answered',
+        askId: 'ask_1',
+        answers: {},
+        skipped: [],
+        summary: 'Deploy now?: yes'
+      }
+    })
 
     await ASK_HANDLERS.ask(ctx([['spec', VALID_SPEC_JSON]]))
 
@@ -107,7 +116,13 @@ describe('orca ask: register -> registered line -> one wait chunk -> envelope', 
     expect(callMock.mock.calls[1][0]).toBe('ask.wait')
     expect(logSpy.mock.calls[0][0]).toBe(JSON.stringify({ status: 'registered', askId: 'ask_1' }))
     expect(logSpy.mock.calls[1][0]).toBe(
-      JSON.stringify({ status: 'answered', askId: 'ask_1', answers: {}, skipped: [], summary: 'Deploy now?: yes' })
+      JSON.stringify({
+        status: 'answered',
+        askId: 'ask_1',
+        answers: {},
+        skipped: [],
+        summary: 'Deploy now?: yes'
+      })
     )
   })
 
@@ -124,7 +139,9 @@ describe('orca ask: register -> registered line -> one wait chunk -> envelope', 
   })
 
   it('never issues ask.wait when ask.register reports an immediate unavailable outcome (no id)', async () => {
-    callMock.mockResolvedValueOnce({ result: { status: 'unavailable', reason: 'no attached ask surface' } })
+    callMock.mockResolvedValueOnce({
+      result: { status: 'unavailable', reason: 'no attached ask surface' }
+    })
 
     await ASK_HANDLERS.ask(ctx([['spec', VALID_SPEC_JSON]]))
 
@@ -143,7 +160,14 @@ describe('orca ask: register -> registered line -> one wait chunk -> envelope', 
     'exits without throwing for terminal status %s',
     async (status) => {
       callMock.mockResolvedValueOnce({ result: { askId: 'ask_3' } }).mockResolvedValueOnce({
-        result: { status, askId: 'ask_3', answers: {}, skipped: [], summary: '', ...(status === 'unavailable' ? { reason: 'expired' } : {}) }
+        result: {
+          status,
+          askId: 'ask_3',
+          answers: {},
+          skipped: [],
+          summary: '',
+          ...(status === 'unavailable' ? { reason: 'expired' } : {})
+        }
       })
 
       await expect(ASK_HANDLERS.ask(ctx([['spec', VALID_SPEC_JSON]]))).resolves.toBeUndefined()
@@ -161,7 +185,9 @@ describe('orca ask: register -> registered line -> one wait chunk -> envelope', 
     vi.useFakeTimers()
     // Why: attach the assertion synchronously, before any timer advances, so the
     // rejection this retry swallows internally is never briefly unobserved.
-    const assertion = expect(ASK_HANDLERS.ask(ctx([['spec', VALID_SPEC_JSON]]))).resolves.toBeUndefined()
+    const assertion = expect(
+      ASK_HANDLERS.ask(ctx([['spec', VALID_SPEC_JSON]]))
+    ).resolves.toBeUndefined()
     await vi.runAllTimersAsync()
     await assertion
     vi.useRealTimers()
@@ -182,7 +208,9 @@ describe('orca ask: register -> registered line -> one wait chunk -> envelope', 
       })
 
     vi.useFakeTimers()
-    const assertion = expect(ASK_HANDLERS.ask(ctx([['spec', VALID_SPEC_JSON]]))).resolves.toBeUndefined()
+    const assertion = expect(
+      ASK_HANDLERS.ask(ctx([['spec', VALID_SPEC_JSON]]))
+    ).resolves.toBeUndefined()
     await vi.runAllTimersAsync()
     await assertion
     vi.useRealTimers()
@@ -236,7 +264,11 @@ describe('orca ask wait', () => {
     await ASK_HANDLERS['ask wait'](ctx([['id', 'ask_1']]))
 
     expect(callMock).toHaveBeenCalledTimes(1)
-    expect(callMock).toHaveBeenCalledWith('ask.wait', { askId: 'ask_1', chunkMs: undefined }, expect.any(Object))
+    expect(callMock).toHaveBeenCalledWith(
+      'ask.wait',
+      { askId: 'ask_1', chunkMs: undefined },
+      expect.any(Object)
+    )
     expect(console.log).toHaveBeenCalledWith(
       JSON.stringify({ status: 'pending', askId: 'ask_1', instruction: 'orca ask wait --id ask_1' })
     )
@@ -254,7 +286,58 @@ describe('orca ask wait', () => {
       ])
     )
 
-    expect(callMock).toHaveBeenCalledWith('ask.wait', { askId: 'ask_1', chunkMs: 2000 }, expect.any(Object))
+    expect(callMock).toHaveBeenCalledWith(
+      'ask.wait',
+      { askId: 'ask_1', chunkMs: 2000 },
+      expect.any(Object)
+    )
+  })
+
+  it('returns a resumable capacity envelope without retrying a rejected wait', async () => {
+    callMock.mockRejectedValueOnce(
+      new RuntimeRpcFailureError({
+        id: 'req_busy',
+        ok: false,
+        error: {
+          code: 'runtime_busy',
+          message: 'shared long-poll admission rejected this request'
+        }
+      })
+    )
+
+    await expect(ASK_HANDLERS['ask wait'](ctx([['id', 'ask_busy']]))).resolves.toBeUndefined()
+
+    expect(callMock).toHaveBeenCalledTimes(1)
+    expect(callMock).toHaveBeenCalledWith(
+      'ask.wait',
+      { askId: 'ask_busy', chunkMs: undefined },
+      expect.any(Object)
+    )
+    expect(console.log).toHaveBeenCalledTimes(1)
+    const output = JSON.parse(vi.mocked(console.log).mock.calls[0][0] as string) as Record<
+      string,
+      unknown
+    >
+    expect(output).toMatchObject({
+      status: 'pending',
+      askId: 'ask_busy',
+      code: 'runtime_busy',
+      instruction: 'orca ask wait --id ask_busy'
+    })
+  })
+
+  it('surfaces non-capacity RPC failures unchanged', async () => {
+    const failure = new RuntimeRpcFailureError({
+      id: 'req_invalid',
+      ok: false,
+      error: { code: 'invalid_argument', message: 'unknown ask id' }
+    })
+    callMock.mockRejectedValueOnce(failure)
+
+    await expect(ASK_HANDLERS['ask wait'](ctx([['id', 'ask_unknown']]))).rejects.toBe(failure)
+
+    expect(callMock).toHaveBeenCalledTimes(1)
+    expect(console.log).not.toHaveBeenCalled()
   })
 })
 

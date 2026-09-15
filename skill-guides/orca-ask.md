@@ -14,7 +14,7 @@ description: >-
 
 # Orca Ask
 
-`orca ask` asks the *user* — not another agent — a structured question and blocks until they answer, decline, or a timeout you opted into expires. It exists for one thing: a genuine human decision you cannot make yourself. It is not `orca orchestration ask`, which is worker-to-coordinator messaging between agents inside an orchestration run; see the `orchestration` skill for that.
+`orca ask` asks the _user_ — not another agent — a structured question and blocks until they answer, decline, or a timeout you opted into expires. It exists for one thing: a genuine human decision you cannot make yourself. It is not `orca orchestration ask`, which is worker-to-coordinator messaging between agents inside an orchestration run; see the `orchestration` skill for that.
 
 `ORCA` is a placeholder for the executable you resolved in the stub; substitute it before running.
 
@@ -35,7 +35,7 @@ ORCA ask cancel --id <ask_id> [--json]
 
 - `--spec` is inline JSON or `@path/to/file.json` (a relative path resolves against your cwd). Invalid JSON or a spec that fails schema validation exits non-zero with a message naming the offending field, e.g. `questions[0].id: id is required and must be a non-empty string`.
 - `--timeout-ms` is an opt-in automation deadline, in milliseconds. Omit it and the ask waits on the user indefinitely — attended asks have no wall-clock deadline, only liveness tracking.
-- `--chunk-ms` controls how long *this invocation* blocks before returning control to you if still unanswered — default 100000 (100s). It is not a deadline: a `pending` result only means "not answered within this chunk," not "gave up." You don't need to tune it.
+- `--chunk-ms` controls how long _this invocation_ blocks before returning control to you if still unanswered — default 100000 (100s). It is not a deadline: a `pending` result only means "not answered within this chunk," not "gave up." You don't need to tune it.
 - `--json` is accepted on all three but changes nothing: every one of these commands always prints bare JSON on stdout, `--json` or not, because the consumer is always a model.
 - `orca ask cancel` resolves a pending ask as `declined`. Use it if you registered an ask you no longer need answered (e.g. you found the answer another way while waiting). Cancelling an ask that's already resolved, or an unknown id, isn't an error — it just returns that ask's actual current envelope.
 - Pane/worktree attribution (which UI the ask is routed to) is automatic, from environment variables Orca sets inside its own terminals (`ORCA_PANE_KEY`, `ORCA_TERMINAL_HANDLE`, `ORCA_WORKTREE_ID`, `ORCA_WORKSPACE_ID`). There is no flag for it.
@@ -50,7 +50,7 @@ ORCA ask cancel --id <ask_id> [--json]
 4. If the chunk elapses first, it prints a `pending` envelope and exits:
 
    ```json
-   {"status":"pending","askId":"ask_01J...","instruction":"orca ask wait --id ask_01J..."}
+   { "status": "pending", "askId": "ask_01J...", "instruction": "orca ask wait --id ask_01J..." }
    ```
 
    This is **not a failure and not a timeout** — the user simply hasn't answered yet. Resume in a new call:
@@ -79,24 +79,34 @@ ORCA ask wait --id ask_01J000000000000000000001
 ```
 
 ```json
-{"status":"answered","askId":"ask_01J000000000000000000001","answers":{"db_engine":{"value":"postgres","label":"PostgreSQL","source":"option"}},"skipped":[],"summary":"Database: PostgreSQL"}
+{
+  "status": "answered",
+  "askId": "ask_01J000000000000000000001",
+  "answers": { "db_engine": { "value": "postgres", "label": "PostgreSQL", "source": "option" } },
+  "skipped": [],
+  "summary": "Database: PostgreSQL"
+}
 ```
 
 ## Exit Codes And Status
 
 Every registered outcome — including a decline — exits **0**. The outcome lives entirely in `status`; a non-answer is not a process failure.
 
-Non-zero exit means a usage error, nothing else: invalid `--spec` JSON, a schema validation failure, a missing required flag, or no reachable Orca runtime. Fix the input and retry those — never retry because the user didn't answer.
+Non-zero exit means a usage or runtime transport error: invalid `--spec` JSON, a schema validation failure, a missing required flag, or a failed connection. Fix invalid input before retrying — never retry because the user didn't answer.
 
-| `status` | terminal? | meaning |
-|---|---|---|
-| `registered` | no | first line printed; ask accepted, chunk wait starting |
-| `pending` | no | chunk elapsed unanswered — resume with `ask wait` |
-| `answered` | yes | user answered every question |
-| `partial` | yes | user submitted with ≥1 question skipped |
-| `declined` | yes | user closed the card, interrupted the turn, or you ran `ask cancel` — these are indistinguishable in the envelope |
-| `timed_out` | yes | `--timeout-ms` elapsed: each question resolves to its declared `default` (`source: "default"`) if one exists, else the user's own in-progress answer if they'd gotten that far, else it lands in `skipped[]` |
-| `unavailable` | yes | no capable surface — see below |
+If `runtime_unavailable` occurs during a wait, it does **not** prove Orca stopped: an established connection can be torn down too. The registered ask is durable. Restore connectivity if needed, then resume with `orca ask wait --id <askId>` using the id from the registration line; do not register a duplicate ask.
+
+If a wait returns `{"status":"pending","askId":"...","code":"runtime_busy",...}`, wait capacity is full and this invocation did not start a chunk. It exits 0 with a reason and resume instruction. Back off, then resume the same ask with `orca ask wait --id <askId>`; do not re-register it.
+
+| `status`      | terminal? | meaning                                                                                                                                                                                                      |
+| ------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `registered`  | no        | first line printed; ask accepted, chunk wait starting                                                                                                                                                        |
+| `pending`     | no        | chunk elapsed unanswered, or `code: "runtime_busy"` means wait capacity is full — resume with `ask wait` (back off first when busy)                                                                          |
+| `answered`    | yes       | user answered every question                                                                                                                                                                                 |
+| `partial`     | yes       | user submitted with ≥1 question skipped                                                                                                                                                                      |
+| `declined`    | yes       | user closed the card, interrupted the turn, or you ran `ask cancel` — these are indistinguishable in the envelope                                                                                            |
+| `timed_out`   | yes       | `--timeout-ms` elapsed: each question resolves to its declared `default` (`source: "default"`) if one exists, else the user's own in-progress answer if they'd gotten that far, else it lands in `skipped[]` |
+| `unavailable` | yes       | no capable surface — see below                                                                                                                                                                               |
 
 **A `declined` result is a normal answer to reason about, not an error to retry.** The natural instinct on a non-answer is to ask again; resist it — the user chose not to answer, and re-asking the same question doesn't change that.
 
@@ -111,20 +121,20 @@ A spec is a flat array of questions — no branching; call `orca ask` again if y
 
 Every question has:
 
-- `id` *(required, string, non-empty)* — **you assign it**, and it must be unique within the spec; duplicates are a validation error. Answers key back by `id`, so pick something stable.
-- `question` *(required, string)* — the prompt text.
-- `header` *(optional, string)*
-- `required` *(optional, boolean)* — see Escape Hatches below; this does **not** make the question un-skippable.
+- `id` _(required, string, non-empty)_ — **you assign it**, and it must be unique within the spec; duplicates are a validation error. Answers key back by `id`, so pick something stable.
+- `question` _(required, string)_ — the prompt text.
+- `header` _(optional, string)_
+- `required` _(optional, boolean)_ — see Escape Hatches below; this does **not** make the question un-skippable.
 - `type` — one of the six below, each with its own extra attributes.
 
-| type | extra attributes | `default` domain |
-|---|---|---|
-| `select` | `options[]`: `{value, label, description?, preview?}` | one option's `value` |
-| `multiselect` | `options[]` (same shape) | array of option `values` |
-| `text` | `multiline?`, `pattern?` (regex, ≤200 chars, rejected if it nests repetition like `(a+)+`), `format?: "email" \| "url"` | string matching `pattern`/`format` if set |
-| `number` | `integer?`, `min?`, `max?` | number within `min`/`max`, integral if `integer` |
-| `date` | — | ISO 8601 `YYYY-MM-DD`, a real calendar date |
-| `confirm` | — | boolean |
+| type          | extra attributes                                                                                                        | `default` domain                                 |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `select`      | `options[]`: `{value, label, description?, preview?}`                                                                   | one option's `value`                             |
+| `multiselect` | `options[]` (same shape)                                                                                                | array of option `values`                         |
+| `text`        | `multiline?`, `pattern?` (regex, ≤200 chars, rejected if it nests repetition like `(a+)+`), `format?: "email" \| "url"` | string matching `pattern`/`format` if set        |
+| `number`      | `integer?`, `min?`, `max?`                                                                                              | number within `min`/`max`, integral if `integer` |
+| `date`        | —                                                                                                                       | ISO 8601 `YYYY-MM-DD`, a real calendar date      |
+| `confirm`     | —                                                                                                                       | boolean                                          |
 
 An option (`select`/`multiselect`) is `{value, label, description?, preview?}` — `value` and `label` are required strings; `preview` is `{format: "markdown" | "html", content: string}` for a richer option write-up, rendered sandboxed in the card UI.
 
@@ -153,14 +163,14 @@ Only `id`, `question`, and option `value` are checked — `label`, `description`
 
 `answers` is keyed by question `id`; a skipped question is omitted there and listed by id in `skipped[]` instead. `summary` is one rendered line per question — quote it rather than re-deriving your own text.
 
-| type | `answers[id]` shape |
-|---|---|
-| `select` | `{value: string, label?: string, note?: string, source: "option" \| "other" \| "default"}` — `"other"` puts free text in `value` with no `label`; `note` is optional free text alongside a picked option |
-| `multiselect` | `{values: string[], labels: string[], other?: string, source: "options" \| "default"}` — parallel arrays in option order; free-text-only is empty arrays plus `other` |
-| `text` | `{value: string, source: "input" \| "default"}` |
-| `number` | `{value: number, source: "input" \| "default"}` |
-| `date` | `{value: "YYYY-MM-DD", source: "input" \| "default"}` |
-| `confirm` | `{value: boolean, source: "input" \| "default"}` |
+| type          | `answers[id]` shape                                                                                                                                                                                      |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `select`      | `{value: string, label?: string, note?: string, source: "option" \| "other" \| "default"}` — `"other"` puts free text in `value` with no `label`; `note` is optional free text alongside a picked option |
+| `multiselect` | `{values: string[], labels: string[], other?: string, source: "options" \| "default"}` — parallel arrays in option order; free-text-only is empty arrays plus `other`                                    |
+| `text`        | `{value: string, source: "input" \| "default"}`                                                                                                                                                          |
+| `number`      | `{value: number, source: "input" \| "default"}`                                                                                                                                                          |
+| `date`        | `{value: "YYYY-MM-DD", source: "input" \| "default"}`                                                                                                                                                    |
+| `confirm`     | `{value: boolean, source: "input" \| "default"}`                                                                                                                                                         |
 
 ## Next Action
 

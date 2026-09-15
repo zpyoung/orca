@@ -50,6 +50,10 @@ export function classifyRuntimeLongPoll(request: RpcRequest): RuntimeLongPollCla
   if (request.method === 'orchestration.ask') {
     return 'ask'
   }
+  // Why: 'ask' would spend orchestration.ask's reservation on human-blocked waits; the fork's own ask-wait gate meters these.
+  if (request.method === 'ask.wait') {
+    return 'wait'
+  }
   if (request.method === 'orchestration.check') {
     const params = request.params as { wait?: unknown } | undefined
     return params?.wait === true ? 'wait' : null
