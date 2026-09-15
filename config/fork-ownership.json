@@ -1098,6 +1098,12 @@
       ]
     },
     {
+      "path": "src/main/runtime/runtime-rpc/runtime-rpc-long-poll.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": ["  if (request.method === 'terminal.wait' || request.method === 'ask.wait') {"]
+    },
+    {
       "path": "src/main/runtime/runtime-rpc/runtime-rpc-websocket-dispatch.ts",
       "feature": "project-ledger",
       "kind": "registration",
@@ -4891,6 +4897,10 @@
     },
     "src/main/runtime/runtime-rpc/runtime-rpc-lifecycle.ts": {
       "added": 7,
+      "removed": 1
+    },
+    "src/main/runtime/runtime-rpc/runtime-rpc-long-poll.ts": {
+      "added": 1,
       "removed": 1
     },
     "src/main/runtime/runtime-rpc/runtime-rpc-websocket-dispatch.ts": {
