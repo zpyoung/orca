@@ -118,7 +118,7 @@ export function NativeChatResolvedView({
   const hookWorkingEpoch = useAppStore(
     (s) => s.agentStatusByPaneKey[paneKey]?.stateStartedAt ?? null
   )
-  const canSend = useNativeChatCanSend(targetPtyId)
+  const canSend = useNativeChatCanSend(terminalTabId, targetPtyId)
   // Reuse the verified composer send path for interactive cards and composer
   // stop (Stop sends ESC, the agent-TUI interrupt key).
   const interactiveSend = useNativeChatInteractiveSend(terminalTabId, paneKey, targetPtyId, agent)
@@ -421,9 +421,8 @@ export function NativeChatResolvedView({
         onShowingQuestionChange={setQuestionActive}
         answerInputRef={questionAnswerInputRef}
       />
-      {/* canSend reflects the mobile presence-lock: when a mobile client holds
-          the pty, the composer shows its guarded state instead of racing the
-          mobile driver (R8). */}
+      {/* canSend reflects both the tab's fresh-shell quarantine and the mobile
+          presence-lock, so native chat cannot race either input owner. */}
       {questionActive ? null : (
         <NativeChatComposer
           ref={composerRef}

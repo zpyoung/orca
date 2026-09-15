@@ -12,7 +12,8 @@ import {
   NATIVE_CHAT_SUBMIT_DELAY_MS
 } from '../../../../../shared/native-chat-answer-stepping'
 import { buildNativeChatPasteBytes } from '../native-chat-send'
-import type { NativeChatSendHandle, RuntimeSettings } from '../native-chat-runtime-send'
+import type { NativeChatSendHandle } from '../native-chat-runtime-send'
+import type { NativeChatResolvedTarget } from '../native-chat-composer-target'
 
 /**
  * Answer Claude's AskUserQuestion by writing its keystroke groups (built by
@@ -20,8 +21,7 @@ import type { NativeChatSendHandle, RuntimeSettings } from '../native-chat-runti
  * step so the arrow-navigate selector applies each before the next.
  */
 export function sendNativeChatAskAnswer(
-  settings: RuntimeSettings,
-  ptyId: string,
+  target: NativeChatResolvedTarget,
   groups: AskAnswerKeyGroup[],
   onSettled?: (delivered: boolean) => void
 ): NativeChatSendHandle {
@@ -39,10 +39,15 @@ export function sendNativeChatAskAnswer(
           // Why: inference must use the remote host's acceptance result, not
           // the fire-and-forget renderer dispatch result.
           verifiedWrites.push(
-            sendRuntimePtyInputVerified(settings, ptyId, bytes).catch(() => false)
+            sendRuntimePtyInputVerified(
+              target.settings,
+              target.ptyId,
+              bytes,
+              () => cancelled
+            ).catch(() => false)
           )
         } else {
-          sendRuntimePtyInput(settings, ptyId, bytes)
+          sendRuntimePtyInput(target.settings, target.ptyId, bytes)
         }
       }, index * NATIVE_CHAT_QUESTION_STEP_MS)
     )

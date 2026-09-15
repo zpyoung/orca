@@ -95,8 +95,8 @@ export function useNativeChatPickerCommandDispatch(args: {
       })
       trackPendingSend(
         agent === 'codex'
-          ? sendNativeChatTypedCommand(target.settings, target.ptyId, text)
-          : sendNativeChatMessage(target.settings, target.ptyId, text, sendOptions)
+          ? sendNativeChatTypedCommand(target, text)
+          : sendNativeChatMessage(target, text, sendOptions)
       )
       emitNativeChatPickerItemAccepted({ agent, itemKind: 'command' })
       // Why: picker dispatch is a catalog-verified command send; it must leave

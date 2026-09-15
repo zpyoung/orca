@@ -6,6 +6,7 @@ import { notifyCodexPaneBoundForStaleSweep } from '@/lib/codex-stale-pane-sweep'
 import { createTerminalGitHubPRLinkDetector } from '../../../../../shared/terminal-github-pr-link-detector'
 import { setRendererPtyVisibilityClaim } from '../pty-renderer-delivery-claims'
 import { AGENT_TASK_COMPLETE_NOTIFICATION_GRACE_MS } from '../agent-task-complete-policy'
+import { armTerminalInputQuarantine } from '../terminal-input-quarantine'
 
 import {
   isAgentTaskCompleteNotificationEnabled,
@@ -204,7 +205,17 @@ export function installPanePtyVisibilityBind(session: ConnectPanePtySession): vo
     if (!session.canAdoptCapturedDirectSshRetryPty(ptyId)) {
       return
     }
-    session.remotePtyIncarnationId = incarnationId ?? null
+    const previousIncarnationId = session.remotePtyIncarnationId ?? null
+    const nextIncarnationId = incarnationId ?? null
+    if (
+      previousIncarnationId !== null &&
+      nextIncarnationId !== null &&
+      previousIncarnationId !== nextIncarnationId
+    ) {
+      // an unstamped rotation may preserve the shell, so only a changed stamp proves replacement.
+      armTerminalInputQuarantine(session.deps.tabId)
+    }
+    session.remotePtyIncarnationId = nextIncarnationId
     // Why: provider handle rotation keeps the existing pane/session generation;
     // replace its stale store identity without fresh-spawn exit semantics.
     session.bindActivePanePty(ptyId, { replacePtyId: replacedPtyId })

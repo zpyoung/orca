@@ -302,5 +302,28 @@ namespace remains accepted, and only exact roots or dot-delimited children quali
 
 **Depends on:** the fork's packaged app ID is `com.zpyoung.orca`; upstream and development builds
 continue to use `com.stablyai.orca` or a dot-suffixed child.
+## Reattach input quarantine
+
+**Ledger:** `bug-1`.
+
+**What:** arms terminal-tab input quarantine before a remote pane binds a replacement shell.
+An ordinary provider-handle rotation with the same shell remains unquarantined. Host-pane
+recovery arms it in the transport that issued the `terminal.recoverPane` call, so missing
+incarnation metadata or a handle an older host reuses cannot bypass the guard; the rebind
+callback and the remote wire protocol are both unchanged.
+
+Native-chat eligibility and runtime sends also honor that tab's quarantine. Reattachment
+invalidates queued bodies, paced answers, and delayed submit writes rather than replaying them
+when quarantine expires. Cancellation must not write cleanup bytes into the replacement shell.
+
+**Why upstream, not isolated:** both defects cross existing upstream terminal binding and
+native-chat write boundaries. A parallel binding or send implementation would leave callers
+able to bypass the safety guard. The existing fork composer is updated at the same boundary;
+new quarantine-specific logic and regressions live under `fork-input-quarantine/`.
+
+**Paths:** the `bug-1` exceptions in `config/fork-ownership.json` cover the terminal transport,
+PTY binding, native-chat eligibility, send queue, and migrated consumers/tests. The
+`input-quarantine` feature owns its isolated logic and regressions; existing composer changes
+remain under the `agent-composer` feature.
 
 **Status:** pending-upstream. Not yet submitted.

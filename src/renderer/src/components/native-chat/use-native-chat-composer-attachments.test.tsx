@@ -21,6 +21,7 @@ vi.mock('@/runtime/runtime-terminal-inspection', () => ({
 type ProbeApi = ReturnType<typeof useNativeChatComposerAttachments>
 
 const target: NativeChatResolvedTarget = {
+  terminalTabId: 'tab-1',
   ptyId: 'pty-1',
   settings: { activeRuntimeEnvironmentId: null }
 }

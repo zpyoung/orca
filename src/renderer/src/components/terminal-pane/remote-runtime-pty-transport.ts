@@ -33,6 +33,7 @@ import type {
 } from './pty-transport-types'
 import { createPtyOutputProcessor } from './pty-transport'
 import { isSshSessionGoneError } from './pty-connection/pty-connect-limits'
+import { armTerminalInputQuarantine } from './terminal-input-quarantine'
 import { RuntimeRpcCallError, unwrapRuntimeRpcResult } from '../../runtime/runtime-rpc-client'
 import {
   getRemoteRuntimePtyEnvironmentId,
@@ -1328,6 +1329,9 @@ export function createRemoteRuntimePtyTransport(
         unregisterShutdownHandlers(replacedPtyId)
         registerShutdownHandlers(remotePtyId)
         connected = true
+        // recoverPane always spawns a shell, even when a legacy host reuses its handle or omits
+        // the incarnation stamp, so neither identity carries the evidence the pane bind needs.
+        armTerminalInputQuarantine(tabId)
         if (
           replacedPtyId &&
           (replacedPtyId !== remotePtyId || previousIncarnationId !== authoritativePtyIncarnationId)
