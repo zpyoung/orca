@@ -14,13 +14,9 @@ import {
   writeManagedScriptRemote
 } from '../agent-hooks/installer-utils-remote'
 import { refreshManagedScriptIfPresent } from '../agent-hooks/managed-hook-script-refresh'
-import {
-  buildPosixHookPayloadCapture,
-  buildPosixHookSpoolLines,
-  buildWindowsHookEnvironmentGuardLines,
-  buildWindowsHookStdinDrainEpilogue,
-  WINDOWS_HOOK_STDIN_DRAIN_LABEL
-} from '../agent-hooks/hook-stdin-contract'
+import { getManagedScript } from './hook-script'
+
+export { getManagedScript }
 import {
   finalizeManagedStatusLineRemoval,
   getManagedStatusLineScript,
