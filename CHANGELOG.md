@@ -1,6 +1,6 @@
 ---
-last_released_commit: 23cae70e86c247745492ea5737daa30beeb7e904
-upstream_synced: v1.4.202
+last_released_commit: 7142b25bdc89a6f96916264b07def66398972f16
+upstream_synced: v1.4.203
 ---
 
 # Changelog
@@ -11,6 +11,40 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.204-rc.0.zy01] - 2026-09-15
+
+Synced to upstream [v1.4.203](https://github.com/stablyai/orca/releases/tag/v1.4.203).
+
+### Fixed
+- Release-notes links opened a 404 for everyone on a fork build, and the dev build picker listed
+  upstream's releases instead of this fork's. Stable and RC lookups now both resolve against the
+  fork's own repository.
+- The macOS press-and-hold default — the one that turns accented-character popups back into key
+  repeat — was gated on upstream's bundle identifier, so it silently never applied to a fork build.
+- macOS permission prompts were counted against upstream's dev bundle identifier while the
+  TCC watch had already moved to the fork's, so prompts from a stable dev build went unrecorded.
+- A long `orca ask` wait dropped its runtime connection after roughly twenty seconds and reported
+  "Orca is not running", abandoning a question that was still live and durable. Long waits now stay
+  alive and resume after a drop.
+- The pending-ask count never appeared in the titlebar — the badge was written but never mounted,
+  so there was no way to see that a question was waiting.
+- Ledger import misread `**Key**:` labels, the common bold form, and a storage failure partway
+  through aborted the run without resuming, leaving entries half-imported.
+- In a split tab, the lineage badge could resolve an ambiguous legacy pane key to the wrong pane and
+  jump to a sibling.
+- Starting a session handoff against a target that could not be resolved did nothing at all, with no
+  error. It now reports what is missing.
+- A template save the server rejected failed silently in the handoff settings editor, leaving the
+  editor looking as though the change had been kept.
+
+### Changed
+- Orca ask worktrees now carry their own sidebar icon.
+- Two suites that read the POSIX shell lookup are isolated from the developer's zsh startup files,
+  and the sandbox shard runner's exclude list matches CI's shell contracts again, so live-shell
+  suites no longer run inside parallel shards locally.
+- Internal documentation: the Orca ledger workflow for bugs and deferred work is written up, and the
+  sync skill records how to size a module split by line count and diagnose a type-only gate.
 
 ## [1.4.203-rc.0.zy01] - 2026-09-14
 
