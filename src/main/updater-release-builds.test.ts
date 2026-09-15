@@ -241,7 +241,7 @@ describe('resolveTargetBuild', () => {
 
   it('pins a stable tag at the main repo download path', () => {
     expect(resolveTargetBuild('stable', 'v1.4.159').feedUrl).toBe(
-      'https://github.com/stablyai/orca/releases/download/v1.4.159'
+      'https://github.com/zpyoung/orca/releases/download/v1.4.159'
     )
   })
 

@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-pagination.ts
-// FORK-COPY-SHA: b1f7085315542b37f7726f3df03a72539cafa540
+// FORK-COPY-SHA: 776e424e76405a06851dd9ec9ff3b58ffbdb3eea
 // Pure pagination math for the native-chat read window. The renderer reads the
 // transcript tail with a `limit`; when the user scrolls to the top it raises the
 // limit by a page to load older history. Kept pure (no React/IO) so the limit
