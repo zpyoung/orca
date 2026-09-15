@@ -1,6 +1,6 @@
 // Why: git.diff, git.branchDiff and git.commitDiff all return a GitDiffResult, so capping only the
 // first would leave the other two able to kill a remote socket.
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, type Mock } from 'vitest'
 import {
   REMOTE_RPC_MAX_CONTENT_BYTES,
   remoteRpcContentBudget
@@ -55,23 +55,37 @@ const CASES: readonly { method: string; runtimeMethod: string; params: Record<st
     }
   ]
 
-/** Stands in for orca-runtime-git.ts, which enforces the budget it is handed as its last argument. */
-function stubRuntime(runtimeMethod: string): OrcaRuntimeService {
-  return {
+function budgetedDiff(): Mock<(...args: unknown[]) => Promise<GitDiffResult>> {
+  return vi.fn(async (...args: unknown[]) => {
+    const maxContentBytes = args.findLast((arg) => typeof arg === 'number')
+    return assertGitDiffWithinTransportBudget(
+      OVERSIZED_DIFF,
+      typeof maxContentBytes === 'number' ? maxContentBytes : undefined
+    )
+  })
+}
+
+/** Stands in for orca-runtime-git.ts, which enforces the numeric transport budget it is handed. */
+function stubRuntime(): OrcaRuntimeService {
+  const runtime: Pick<
+    OrcaRuntimeService,
+    'getRuntimeId' | 'getRuntimeGitDiff' | 'getRuntimeGitBranchDiff' | 'getRuntimeGitCommitDiff'
+  > = {
     getRuntimeId: () => 'test-runtime',
-    [runtimeMethod]: vi.fn(async (...args: unknown[]) => {
-      const maxContentBytes = args.at(-1)
-      return assertGitDiffWithinTransportBudget(
-        OVERSIZED_DIFF,
-        typeof maxContentBytes === 'number' ? maxContentBytes : undefined
-      )
-    })
-  } as unknown as OrcaRuntimeService
+    getRuntimeGitDiff: budgetedDiff(),
+    getRuntimeGitBranchDiff: budgetedDiff(),
+    getRuntimeGitCommitDiff: budgetedDiff()
+  }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The dispatcher reads only the Git diff methods and the runtime id installed above.
+  return runtime as OrcaRuntimeService
 }
 
 function budgetArgument(runtime: OrcaRuntimeService, runtimeMethod: string): unknown {
-  const spy = (runtime as unknown as Record<string, ReturnType<typeof vi.fn>>)[runtimeMethod]!
-  return spy.mock.calls[0]!.at(-1)
+  const spy = Reflect.get(runtime, runtimeMethod)
+  if (!vi.isMockFunction(spy)) {
+    throw new TypeError(`Expected ${runtimeMethod} to be a mock function`)
+  }
+  return spy.mock.calls[0]!.findLast((arg) => typeof arg === 'number')
 }
 
 function makeRequest(method: string, params: Record<string, unknown>): RpcRequest {
@@ -94,7 +108,7 @@ async function dispatchRemote(
 
 describe('remote git diff transport budget', () => {
   it.each(CASES)('caps $method for a mobile client', async ({ method, runtimeMethod, params }) => {
-    const runtime = stubRuntime(runtimeMethod)
+    const runtime = stubRuntime()
 
     const response = await dispatchRemote(runtime, method, params, 'mobile')
 
@@ -108,7 +122,7 @@ describe('remote git diff transport budget', () => {
   it.each(CASES)(
     'caps $method for a remote desktop client',
     async ({ method, runtimeMethod, params }) => {
-      const runtime = stubRuntime(runtimeMethod)
+      const runtime = stubRuntime()
 
       const response = await dispatchRemote(runtime, method, params, 'runtime')
 
@@ -118,7 +132,7 @@ describe('remote git diff transport budget', () => {
   )
 
   it('charges a long request id against the remote content budget', async () => {
-    const runtime = stubRuntime('getRuntimeGitDiff')
+    const runtime = stubRuntime()
     const dispatcher = new RpcDispatcher({ runtime, methods: GIT_METHODS })
     const requestId = '\u0001'.repeat(8_192)
     const replies: string[] = []
@@ -139,7 +153,7 @@ describe('remote git diff transport budget', () => {
   it.each(CASES)(
     'leaves $method uncapped for a local caller',
     async ({ method, runtimeMethod, params }) => {
-      const runtime = stubRuntime(runtimeMethod)
+      const runtime = stubRuntime()
       const dispatcher = new RpcDispatcher({ runtime, methods: GIT_METHODS })
 
       const response = await dispatcher.dispatch(makeRequest(method, params))

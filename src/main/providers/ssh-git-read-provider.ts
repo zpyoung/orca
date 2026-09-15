@@ -19,6 +19,7 @@ const ABSENT_BRANCH_DIFF_HEAD_OID = { absent: true } as const
 export class SshGitReadProvider {
   private readonly gitDiffReadDedupe = new InFlightPromiseDedupe<GitDiffResult | GitDiffResult[]>()
   private readonly statusReadLeaseOwner = new GitStatusReadLeaseOwner<GitStatusResult>()
+  private readonly gitDiffReadLeaseOwner = new GitStatusReadLeaseOwner<GitDiffResult>()
   private readonly upstreamStatusReadOwner = new GitUpstreamStatusReadOwner()
 
   constructor(
@@ -47,6 +48,7 @@ export class SshGitReadProvider {
   /** Overridden by subclasses that own additional read caches (worktree listings). */
   protected invalidateGitReads(): void {
     this.gitDiffReadDedupe.clear()
+    this.gitDiffReadLeaseOwner.invalidate()
     this.statusReadLeaseOwner.invalidate()
     this.upstreamStatusReadOwner.invalidate()
   }
@@ -56,6 +58,7 @@ export class SshGitReadProvider {
     options?: GitProviderStatusOptions
   ): Promise<GitStatusResult> {
     this.gitDiffReadDedupe.clear()
+    this.gitDiffReadLeaseOwner.invalidate()
     const request = {
       worktreePath,
       ...(options?.admissionTier ? { admissionTier: options.admissionTier } : {}),
@@ -91,6 +94,7 @@ export class SshGitReadProvider {
     area: GitStagingArea = 'unstaged'
   ): Promise<GitStatusResult> {
     this.gitDiffReadDedupe.clear()
+    this.gitDiffReadLeaseOwner.invalidate()
     try {
       return (await this.mux.request('git.submoduleStatus', {
         worktreePath,
@@ -111,18 +115,28 @@ export class SshGitReadProvider {
     worktreePath: string,
     filePath: string,
     staged: boolean,
-    compareAgainstHead?: boolean
+    compareAgainstHead?: boolean,
+    options?: { signal?: AbortSignal }
   ): Promise<GitDiffResult> {
-    return this.gitDiffReadDedupe.run(
+    return this.gitDiffReadLeaseOwner.lease(
       stableInFlightKey(['diff', worktreePath, filePath, staged, compareAgainstHead]),
-      async () =>
-        (await requestGitStreamable(this.mux, 'git.diff', {
-          worktreePath,
-          filePath,
-          staged,
-          compareAgainstHead
-        })) as GitDiffResult
-    ) as Promise<GitDiffResult>
+      options?.signal,
+      async (sharedSignal) => {
+        const result = await requestGitStreamable(
+          this.mux,
+          'git.diff',
+          {
+            worktreePath,
+            filePath,
+            staged,
+            compareAgainstHead
+          },
+          { signal: sharedSignal }
+        )
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: git.diff is registered to return GitDiffResult on the relay.
+        return result as GitDiffResult
+      }
+    )
   }
 
   async getBranchDiff(

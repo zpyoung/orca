@@ -3730,6 +3730,198 @@
   ],
   "exceptions": [
     {
+      "path": "src/main/git/source-control/submodule-paths.ts",
+      "reason": "Does not cache cancelled submodule discovery as an empty routing result.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/relay/git-handler-submodule-ops.ts",
+      "reason": "Preserves relay discovery cancellation so a retry still routes submodule diffs correctly.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/git/status-submodule-path-cache.test.ts",
+      "reason": "Regression coverage ensuring an aborted diff discovery cannot poison the next submodule lookup.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/relay/git-handler-submodule-ops.test.ts",
+      "reason": "Regression coverage preserving submodule routing after a cancelled SSH diff discovery.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/runtime/runtime-rpc-mobile-method-allowlist.test.ts",
+      "reason": "Regression coverage that a mobile diff still reaches execution with its transport budget alongside the optional abort signal.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/git-diff-transport-budget.test.ts",
+      "reason": "Preserves transport-budget coverage when diff requests also carry an abort signal.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/git/source-control/git-read-cache-invalidation.ts",
+      "reason": "Preserves diff cache invalidation while isolating cancellation between local readers.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/git/source-control/file-diff.ts",
+      "reason": "Cancels local diff reads without cancelling unrelated consumers of a coalesced read.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/git/source-control/git-blob-read.ts",
+      "reason": "Preserves abort errors and stops subsequent blob reads when a diff request is cancelled.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/ipc/filesystem-git-status-staging.test.ts",
+      "reason": "Regression coverage for sender-scoped cancellation of in-flight diff IPC requests.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/providers/ssh-git-provider-diff.test.ts",
+      "reason": "Regression coverage for SSH diff cancellation and isolation of unrelated readers.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/git.test.ts",
+      "reason": "Regression coverage for cancellation reaching runtime Git diff execution.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-git-diff-budget.test.ts",
+      "reason": "Regression coverage for cancelling host-owned Git diff requests.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/relay/git-handler-diff-read-coalescing.test.ts",
+      "reason": "Regression coverage for cancelling relay diff work without stopping unrelated consumers.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/renderer/src/runtime/runtime-git-diff-client.ts",
+      "reason": "Propagates diff cancellation through runtime RPC and sender-scoped IPC instead of abandoning in-flight repository probes.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/renderer/src/web/preload-api/web-git-api.ts",
+      "reason": "Cancels token-scoped Git diff requests from the web client so a retargeted probe stops on the execution host.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/preload/api/git-bridge.ts",
+      "reason": "Exposes token-scoped cancellation for Git diff requests.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/preload/api/git-inspection-api.ts",
+      "reason": "Declares the optional diff request token and cancellation API.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/ipc/filesystem.ts",
+      "reason": "Owns sender-scoped cancellation state for Git diff IPC requests.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/ipc/filesystem/filesystem-handler-context.ts",
+      "reason": "Shares the diff cancellation registry with filesystem IPC handlers.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/ipc/filesystem/filesystem-git-status-handlers.ts",
+      "reason": "Cancels tokenized Git diff requests and passes abort signals to their execution host.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/providers/git-provider-contract.ts",
+      "reason": "Allows Git diff consumers to cancel work on the execution host.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/providers/ssh-git-read-provider.ts",
+      "reason": "Propagates diff cancellation to the SSH transport without cancelling unrelated readers.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/runtime/runtime-git-diff-commands.ts",
+      "reason": "Passes runtime diff abort signals through local and SSH execution paths.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/git-diff-methods.ts",
+      "reason": "Forwards the RPC request abort signal into Git diff execution.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/git/command-runner/git-exec-file.ts",
+      "reason": "Preserves cancellation for buffered Git subprocesses used by diff reads.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/relay/git-handler-operation-context.ts",
+      "reason": "Allows relay diff buffer reads to carry the request abort signal.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/relay/git-handler.ts",
+      "reason": "Propagates cancellation into buffered Git execution on the SSH host.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/relay/git-handler-ops.ts",
+      "reason": "Cancels diff blob reads rather than allowing aborted requests to launch further Git subprocesses.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/relay/git-handler-read-operations.ts",
+      "reason": "Threads relay diff request cancellation into host-side diff computation.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/git/status-diff-settled-cache.test.ts",
+      "reason": "Regression coverage for cancelling one reader of a coalesced local diff read.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/renderer/src/web/web-preload-api-git.test.ts",
+      "reason": "Regression coverage for web-client diff cancellation racing worktree path resolution.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
       "path": ".claude/hooks/require-sandboxed-tests.mjs",
       "reason": "Fork-only guard keeping vitest on the remote sandbox host; upstream runs tests locally.",
       "status": "permanent"

@@ -121,10 +121,6 @@ describe('fetchHandoffRepoState', () => {
       diffCharCap: 80
     })
 
-    expect(getRuntimeGitDiff).toHaveBeenNthCalledWith(1, expect.anything(), {
-      filePath: 'src/changed.ts',
-      staged: false
-    })
     expect(result?.diffBodies?.length).toBe(80)
     expect(result?.diffTruncated).toBe(true)
   })

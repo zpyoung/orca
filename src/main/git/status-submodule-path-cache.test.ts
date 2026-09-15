@@ -94,6 +94,22 @@ describe('submodule path cache', () => {
     expect(gitExecFileAsyncMock).toHaveBeenCalledTimes(callsBeforeRetainedRead + 1)
   })
 
+  it('does not cache an aborted .gitmodules read before an immediate retry', async () => {
+    const controller = new AbortController()
+    const abortError = new Error('cancelled')
+    controller.abort(abortError)
+    gitExecFileAsyncMock
+      .mockRejectedValueOnce(abortError)
+      .mockResolvedValueOnce({ stdout: 'submodule.lib.path vendor/lib\n' })
+
+    await expect(listSubmodulePaths('/repo', { signal: controller.signal })).rejects.toBe(
+      abortError
+    )
+    expect(getSubmodulePathsCacheCountForTests()).toBe(0)
+    await expect(listSubmodulePaths('/repo')).resolves.toEqual(['vendor/lib'])
+    expect(gitExecFileAsyncMock).toHaveBeenCalledTimes(2)
+  })
+
   it('does not let a pre-invalidation read repopulate the cache', async () => {
     let resolveOldRead: ((value: { stdout: string }) => void) | undefined
     gitExecFileAsyncMock.mockImplementationOnce(

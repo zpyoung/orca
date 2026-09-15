@@ -274,6 +274,66 @@ file.
 
 **Status:** pending-upstream. Not yet submitted.
 
+## Git diff request cancellation
+
+**Ledger:** `bug-12`.
+
+**What:** repository probes carry their abort signal through the renderer, token-scoped
+`git:cancelDiff` IPC, runtime RPC, SSH transport, and host-side Git blob reads. Closing or
+retargeting a handoff must cancel the diff request, not merely discard its eventual result.
+Cancellation is scoped to the requesting sender and must not stop unrelated diff consumers.
+
+**Why upstream, not isolated:** the missing cancellation spans upstream's existing Git diff
+API and subprocess execution path. Forking those modules would duplicate the Git transport
+and execution stack; adding optional cancellation to the existing path preserves callers
+that do not supply a signal.
+
+**Paths:**
+
+- `src/renderer/src/runtime/runtime-git-diff-client.ts`
+- `src/renderer/src/web/preload-api/web-git-api.ts`
+- `src/preload/api/git-bridge.ts`
+- `src/preload/api/git-inspection-api.ts`
+- `src/main/ipc/filesystem.ts`
+- `src/main/ipc/filesystem/filesystem-handler-context.ts`
+- `src/main/ipc/filesystem/filesystem-git-status-handlers.ts`
+- `src/main/providers/git-provider-contract.ts`
+- `src/main/providers/ssh-git-read-provider.ts`
+- `src/main/runtime/runtime-git-diff-commands.ts`
+- `src/main/runtime/rpc/methods/git-diff-methods.ts`
+- `src/main/git/command-runner/git-exec-file.ts`
+- `src/main/git/source-control/git-read-cache-invalidation.ts`
+- `src/main/git/source-control/file-diff.ts`
+- `src/main/git/source-control/git-blob-read.ts`
+- `src/main/git/source-control/submodule-paths.ts`
+- `src/relay/git-handler-operation-context.ts`
+- `src/relay/git-handler.ts`
+- `src/relay/git-handler-ops.ts`
+- `src/relay/git-handler-read-operations.ts`
+- `src/relay/git-handler-submodule-ops.ts`
+
+**Regression coverage:**
+
+- `src/main/ipc/filesystem-git-status-staging.test.ts`
+- `src/main/providers/ssh-git-provider-diff.test.ts`
+- `src/main/runtime/rpc/methods/git.test.ts`
+- `src/main/runtime/orca-runtime-git-diff-budget.test.ts`
+- `src/relay/git-handler-diff-read-coalescing.test.ts`
+- `src/main/runtime/runtime-rpc-mobile-method-allowlist.test.ts`
+- `src/main/runtime/rpc/methods/git-diff-transport-budget.test.ts`
+- `src/main/git/status-submodule-path-cache.test.ts`
+- `src/relay/git-handler-submodule-ops.test.ts`
+- `src/main/git/status-diff-settled-cache.test.ts`
+- `src/renderer/src/web/web-preload-api-git.test.ts`
+
+The handoff caller and its cancellation regression remain in the existing
+`fork-session-handoff` feature.
+Cancelled submodule discovery is not cached as an empty result, so an immediate retry
+retains the correct submodule diff route.
+
+**Compatibility:** reuse existing RPC cancellation and stream teardown; do not add a wire
+opcode or require a new field from older peers. Cancellation of host subprocesses requires
+the host-side fix as well as the caller-side signal.
 ## bug-35
 
 **What:** the macOS press-and-hold startup routine treated only `com.stablyai.orca` and its

@@ -28,6 +28,7 @@ export function registerFilesystemHandlers(
     store,
     commitMessageAgentEnv,
     createSenderScopedRequestCancellations(),
+    createSenderScopedRequestCancellations(),
     createSenderScopedRequestCancellations()
   )
 
