@@ -11,6 +11,11 @@
       "globs": ["**/fork-hosted-review-sitter/**"]
     },
     {
+      "name": "heimdall-objective",
+      "purpose": "Objective watcher kind with structured contracts, orchestration roles, plan revisions, acceptance checks, and landing evidence in a fork-owned store.",
+      "globs": ["**/fork-heimdall-objective/**"]
+    },
+    {
       "name": "worktree-groups",
       "purpose": "Lets a worktree join a project group independently of its repo's own group membership, so cross-repo worktrees can share a sidebar section.",
       "globs": ["**/fork-worktree-groups/**"]
@@ -251,6 +256,132 @@
       ]
     },
     {
+      "path": "src/shared/protocol-version.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "import { HEIMDALL_COMMANDS_RUNTIME_CAPABILITY } from './fork-heimdall/capability'",
+        "  HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,"
+      ]
+    },
+    {
+      "path": "src/shared/remote-runtime-shared-control-protocol.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "import { getHeimdallSubscriptionCleanupRequest } from './fork-heimdall/subscription-routing'",
+        "  return getHeimdallSubscriptionCleanupRequest(subscription)"
+      ]
+    },
+    {
+      "path": "src/shared/remote-runtime-shared-control-subscriptions.ts",
+      "feature": "heimdall",
+      "kind": "passthrough",
+      "lines": ["    method === 'heimdall:subscribe' ||"]
+    },
+    {
+      "path": "src/main/ipc/runtime-environment-support-routing.ts",
+      "feature": "heimdall",
+      "kind": "passthrough",
+      "lines": ["    method === 'heimdall:subscribe' ||"]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/client-ui-schemas.ts",
+      "feature": "heimdall",
+      "kind": "passthrough",
+      "lines": ["  'heimdall',"]
+    },
+    {
+      "path": "src/main/startup/main-process-runtime-launch.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": ["  state.heimdall?.start()"]
+    },
+    {
+      "path": "src/renderer/src/app-shell/AppWorkspaceShell.tsx",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "const HeimdallPage = lazy(() => import('../fork-heimdall/HeimdallPage'))",
+        "      {activeView === 'heimdall' ? <HeimdallPage /> : null}"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/sidebar/SidebarNav.tsx",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "import { HeimdallSidebarNavEntry } from '@/fork-heimdall/HeimdallSidebarNavEntry'",
+        "      <HeimdallSidebarNavEntry />"
+      ]
+    },
+    {
+      "path": "src/renderer/src/hooks/ipc-events/app-lifetime-ipc-bridge.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "import { wireHeimdallIpcEvents } from '@/fork-heimdall/wire-heimdall-ipc-events'",
+        "  unsubs.push(wireHeimdallIpcEvents(useAppStore))"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/worktree-nav-view-history-replay.ts",
+      "feature": "heimdall",
+      "kind": "passthrough",
+      "lines": ["    entry === 'heimdall'"]
+    },
+    {
+      "path": "src/renderer/src/store/index.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "import { createHeimdallFleetSlice } from './slices/fork-heimdall/fleet'",
+        "        ...createHeimdallFleetSlice(...a)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/store-test-helpers.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "import { createHeimdallFleetSlice } from './fork-heimdall/fleet'",
+        "    ...createHeimdallFleetSlice(...a)"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/ui/ui-slice-contract-core.ts",
+      "feature": "heimdall",
+      "kind": "passthrough",
+      "lines": ["  | 'heimdall'"]
+    },
+    {
+      "path": "src/renderer/src/store/slices/worktree-nav-history.ts",
+      "feature": "heimdall",
+      "kind": "passthrough",
+      "lines": ["  | 'heimdall'", "  'heimdall'"]
+    },
+    {
+      "path": "src/renderer/src/store/types.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "import type { HeimdallFleetSlice } from './slices/fork-heimdall/fleet'",
+        "  HeimdallFleetSlice"
+      ]
+    },
+    {
+      "path": "src/shared/top-level-view.ts",
+      "feature": "heimdall",
+      "kind": "passthrough",
+      "lines": ["  heimdall: true"]
+    },
+    {
+      "path": "src/shared/ui-chrome-types.ts",
+      "feature": "heimdall",
+      "kind": "passthrough",
+      "lines": ["  | 'heimdall'"]
+    },
+    {
       "path": "src/renderer/src/lib/agent-launch-routing-caller-census.test.ts",
       "feature": "hosted-review-sitter",
       "kind": "registration",
@@ -268,7 +399,9 @@
       "kind": "registration",
       "lines": [
         "import { startHeimdall } from '../fork-heimdall/registration'",
-        "  state.heimdall = startHeimdall(runtime, store, state.isServeMode)"
+        "import { wireHeimdallFleetWindows } from '../fork-heimdall/fleet-ipc-forward'",
+        "  state.heimdall = startHeimdall(runtime, store, state.isServeMode)",
+        "  wireHeimdallFleetWindows(runtime, () => state.mainWindow)"
       ]
     },
     {
@@ -847,12 +980,6 @@
         "import { NativeChatHandler } from './fork-native-chat-relay/native-chat-handler'",
         "      new NativeChatHandler(dispatcher)"
       ]
-    },
-    {
-      "path": "src/renderer/src/assets/main.css",
-      "feature": "native-chat-coloring",
-      "kind": "passthrough",
-      "lines": ["@import './fork-native-chat-coloring.css';"]
     },
     {
       "path": "src/renderer/src/assets/terminal.css",
@@ -2937,7 +3064,7 @@
       "kind": "registration",
       "lines": [
         "import { createAsksSlice } from './slices/fork-ask-question-tool/asks'",
-        "        ...createAsksSlice(...a)"
+        "        ...createAsksSlice(...a),"
       ]
     },
     {
@@ -2946,7 +3073,7 @@
       "kind": "registration",
       "lines": [
         "import { createAsksSlice } from './fork-ask-question-tool/asks'",
-        "    ...createAsksSlice(...a)"
+        "    ...createAsksSlice(...a),"
       ]
     },
     {
@@ -2955,7 +3082,7 @@
       "kind": "registration",
       "lines": [
         "import type { AsksSlice } from './slices/fork-ask-question-tool/asks'",
-        "  AsksSlice"
+        "  AsksSlice &"
       ]
     },
     {
@@ -3477,6 +3604,12 @@
     }
   ],
   "exceptions": [
+    {
+      "path": "src/renderer/src/assets/main.css",
+      "reason": "Adds canonical light/dark warning surface and foreground tokens for non-error attention states; the design-system extension belongs upstream rather than in feature-local CSS.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#warning-status-tokens"
+    },
     {
       "path": ".claude/hooks/require-sandboxed-tests.mjs",
       "reason": "Fork-only guard keeping vitest on the remote sandbox host; upstream runs tests locally.",
@@ -4239,6 +4372,10 @@
       "added": 6,
       "removed": 0
     },
+    "src/main/ipc/runtime-environment-support-routing.ts": {
+      "added": 1,
+      "removed": 0
+    },
     "src/main/ipc/ssh-relay-session-callbacks.ts": {
       "added": 2,
       "removed": 0
@@ -4376,7 +4513,7 @@
       "removed": 1
     },
     "src/main/runtime/rpc/methods/client-ui-schemas.ts": {
-      "added": 10,
+      "added": 11,
       "removed": 2
     },
     "src/main/runtime/rpc/methods/index.ts": {
@@ -4475,8 +4612,12 @@
       "added": 2,
       "removed": 0
     },
+    "src/main/startup/main-process-runtime-launch.ts": {
+      "added": 1,
+      "removed": 0
+    },
     "src/main/startup/main-process-runtime-service.ts": {
-      "added": 17,
+      "added": 19,
       "removed": 2
     },
     "src/main/startup/main-process-state.ts": { "added": 2, "removed": 0 },
@@ -4537,12 +4678,12 @@
       "added": 2,
       "removed": 0
     },
-    "src/renderer/src/app-shell/use-persisted-ui-writer.ts": {
-      "added": 4,
+    "src/renderer/src/app-shell/AppWorkspaceShell.tsx": {
+      "added": 22,
       "removed": 0
     },
-    "src/renderer/src/assets/main.css": {
-      "added": 1,
+    "src/renderer/src/app-shell/use-persisted-ui-writer.ts": {
+      "added": 4,
       "removed": 0
     },
     "src/renderer/src/assets/terminal.css": {
@@ -4829,6 +4970,10 @@
       "added": 11,
       "removed": 19
     },
+    "src/renderer/src/components/sidebar/SidebarNav.tsx": {
+      "added": 23,
+      "removed": 0
+    },
     "src/renderer/src/components/sidebar/SidebarWorkspaceFilterSection.tsx": {
       "added": 4,
       "removed": 11
@@ -5082,7 +5227,7 @@
       "removed": 1
     },
     "src/renderer/src/hooks/ipc-events/app-lifetime-ipc-bridge.ts": {
-      "added": 2,
+      "added": 4,
       "removed": 0
     },
     "src/renderer/src/hooks/settings-navigation-workflow-sections.ts": {
@@ -5197,6 +5342,10 @@
       "added": 3,
       "removed": 3
     },
+    "src/renderer/src/lib/worktree-nav-view-history-replay.ts": {
+      "added": 6,
+      "removed": 1
+    },
     "src/renderer/src/runtime/runtime-terminal-inspection.test.ts": {
       "added": 2,
       "removed": 0
@@ -5258,7 +5407,7 @@
       "removed": 1
     },
     "src/renderer/src/store/index.ts": {
-      "added": 5,
+      "added": 7,
       "removed": 1
     },
     "src/renderer/src/store/right-sidebar-route.ts": {
@@ -5274,7 +5423,7 @@
       "removed": 0
     },
     "src/renderer/src/store/slices/store-test-helpers.ts": {
-      "added": 5,
+      "added": 7,
       "removed": 1
     },
     "src/renderer/src/store/slices/tabs/create-tabs-slice.ts": {
@@ -5293,9 +5442,17 @@
       "added": 16,
       "removed": 4
     },
+    "src/renderer/src/store/slices/ui/ui-slice-contract-core.ts": {
+      "added": 2,
+      "removed": 0
+    },
     "src/renderer/src/store/slices/ui/ui-slice-hydration-actions.ts": {
       "added": 4,
       "removed": 3
+    },
+    "src/renderer/src/store/slices/worktree-nav-history.ts": {
+      "added": 8,
+      "removed": 2
     },
     "src/renderer/src/store/slices/worktrees/session/set-active-folder-workspace.ts": {
       "added": 11,
@@ -5306,7 +5463,7 @@
       "removed": 2
     },
     "src/renderer/src/store/types.ts": {
-      "added": 5,
+      "added": 7,
       "removed": 1
     },
     "src/renderer/src/web/preload-api/web-native-chat-api.ts": {
@@ -5402,8 +5559,16 @@
       "removed": 1
     },
     "src/shared/protocol-version.ts": {
-      "added": 4,
+      "added": 6,
       "removed": 1
+    },
+    "src/shared/remote-runtime-shared-control-protocol.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/shared/remote-runtime-shared-control-subscriptions.ts": {
+      "added": 1,
+      "removed": 0
     },
     "src/shared/runtime-mobile-session-tab-contracts.ts": {
       "added": 4,
@@ -5433,6 +5598,10 @@
       "added": 2,
       "removed": 0
     },
+    "src/shared/top-level-view.ts": {
+      "added": 3,
+      "removed": 1
+    },
     "src/shared/tui-agent-launch-command.ts": {
       "added": 15,
       "removed": 6
@@ -5446,7 +5615,7 @@
       "removed": 1
     },
     "src/shared/ui-chrome-types.ts": {
-      "added": 4,
+      "added": 5,
       "removed": 0
     },
     "src/shared/workspace-session-schema.test.ts": {

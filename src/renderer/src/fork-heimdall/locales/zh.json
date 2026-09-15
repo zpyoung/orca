@@ -1,1 +1,147 @@
-{}
+{
+  "fork": {
+    "heimdall": {
+      "kind": {
+        "objective": "目标监视器"
+      },
+      "status": {
+        "watching": "监视中",
+        "held": "已暂缓",
+        "acting": "执行中",
+        "escalated": "已升级",
+        "parked": "已停驻",
+        "terminal": "已完成",
+        "disabled": "已停止",
+        "unreachable": "主机无法访问",
+        "lostContact": "主机无法访问 · 上次确认于 {{age}}",
+        "phase": "当前阶段"
+      },
+      "indicator": {
+        "tooltip": "{{kind}} · {{state}}",
+        "lostContact": "主机无法访问 · 上次确认于 {{age}}"
+      },
+      "host": {
+        "remote": "远程 · {{host}}",
+        "local": "此设备"
+      },
+      "time": {
+        "never": "从未",
+        "now": "刚刚",
+        "ago": "{{age}}前"
+      },
+      "sidebar": {
+        "title": "Heimdall",
+        "attention": "有 {{count}} 个监视器需要关注"
+      },
+      "page": {
+        "back": "返回",
+        "title": "Heimdall 监视器集群",
+        "summary": "{{active}} 个监视器运行中 · {{attention}} 个需要关注",
+        "refresh": "刷新监视器集群",
+        "staleError": "监视器集群刷新失败；正在显示上次确认的快照：{{error}}"
+      },
+      "fleet": {
+        "title": "监视器集群",
+        "emptyTitle": "集群中没有监视器",
+        "emptyDescription": "请从受支持的工作区启用监视器，即可在此处查看。",
+        "name": "监视器",
+        "status": "状态",
+        "phase": "阶段",
+        "activeBurn": "活动时长",
+        "turns": "轮次",
+        "elapsed": "已用时间",
+        "lastTick": "上次检查"
+      },
+      "detail": {
+        "back": "返回监视器集群",
+        "refreshing": "正在刷新详情",
+        "observed": "所有者状态已于 {{age}} 确认",
+        "remote": "远程缓存",
+        "lostContact": "上次确认时间：{{age}}；当前无法联系所有者。监视器可能仍在运行。",
+        "readOnly": "只读。",
+        "staleError": "详情刷新失败；正在显示上次确认的数据：{{error}}",
+        "loading": "正在加载所有者详情…",
+        "unavailable": "所有者详情不可用。",
+        "selectPrompt": "请选择一个监视器，以查看其决策、工作进程和所有者控制项。"
+      },
+      "controls": {
+        "title": "所有者控制",
+        "resume": "继续",
+        "pause": "暂停",
+        "disarm": "停用",
+        "approve": "批准",
+        "budgetResumeWarning": "该监视器已耗尽预算。请先提高限制，否则恢复后它会再次进入停驻状态。"
+      },
+      "command": {
+        "applied": "所有者已于 {{time}} 应用该命令。",
+        "refused": "所有者拒绝了该命令（{{reason}}）：{{detail}}",
+        "indeterminate": "该命令是否已应用尚不确定。正在重新读取所有者状态… {{detail}}",
+        "stopAllIndeterminate": "{{count}} 个停止命令是否已应用尚不确定。正在重新读取所有者状态。",
+        "stopAllRefused": "{{count}} 个所有者拒绝了停止命令。"
+      },
+      "budget": {
+        "title": "预算",
+        "activeTime": "活动时长",
+        "unlimited": "无限制",
+        "unlimitedShort": "不限",
+        "turns": "工作进程轮次",
+        "exhausted": "已耗尽：{{kind}}",
+        "minutesLimit": "活动分钟数上限",
+        "turnLimit": "工作进程轮次上限",
+        "apply": "应用预算"
+      },
+      "escalations": {
+        "title": "未处理的升级事项"
+      },
+      "workers": {
+        "title": "运行中的工作进程",
+        "empty": "没有正在运行的工作进程。",
+        "live": "运行中",
+        "unverifiable": "无法访问",
+        "exited": "已退出",
+        "noContact": "尚未确认联系",
+        "lastContact": "上次联系 {{age}}",
+        "stop": "停止",
+        "answerPlaceholder": "回答工作进程",
+        "answerLabel": "回答工作进程的问题",
+        "sendAnswer": "发送回答"
+      },
+      "trace": {
+        "title": "决策追踪",
+        "noDecision": "未记录决策",
+        "decidedAction": "执行：{{action}}",
+        "empty": "尚无决策追踪记录。",
+        "tick": "第 {{seq}} 次检查",
+        "running": "运行中",
+        "saw": "观察到",
+        "noSnapshot": "未记录快照",
+        "decided": "已决定",
+        "gate": "门控",
+        "declined": "已拒绝",
+        "noneDeclined": "没有阶段被拒绝"
+      },
+      "activity": {
+        "title": "监视器操作历史",
+        "asOf": "截至 {{age}}",
+        "partial": "{{count}} 个监视器的历史记录无法刷新；保留可见记录。",
+        "empty": "尚未记录自主操作。"
+      },
+      "ledger": {
+        "title": "监视器活动",
+        "attemptResolved": "尝试已解决",
+        "attemptAbandoned": "尝试已放弃",
+        "evidence": "证据",
+        "activeTimeStarted": "活动时长已开始",
+        "activeTimeChecked": "活动时长检查点",
+        "activeTimeStopped": "活动时长已停止",
+        "workerTurn": "工作进程轮次",
+        "finished": "已完成",
+        "empty": "尚未记录活动。"
+      },
+      "error": {
+        "unavailable": "Heimdall 控制平面不可用。",
+        "ownerUnavailable": "所属运行时不可用；未发送注册请求。"
+      }
+    }
+  }
+}

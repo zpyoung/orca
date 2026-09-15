@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { BudgetPolicySchema } from '../../shared/fork-heimdall/budget'
+import type { WatcherOwnerFence } from '../../shared/fork-heimdall/fleet-types'
 import {
   CapabilityModeSchema,
   WatcherEnrollmentSchema,
@@ -17,6 +18,23 @@ const EnrollmentRearmConfigurationSchema = z
   .strict()
 
 export type EnrollmentRearmConfiguration = z.infer<typeof EnrollmentRearmConfigurationSchema>
+
+const EnrollmentControlChangeSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    paused: z.boolean().optional(),
+    budget: BudgetPolicySchema.optional()
+  })
+  .strict()
+
+export type EnrollmentControlChange = z.infer<typeof EnrollmentControlChangeSchema>
+export type EnrollmentControlCommit =
+  | { status: 'committed'; enrollment: EnrollmentRecord }
+  | {
+      status: 'refused'
+      reason: 'watcher-not-found' | 'owner-conflict' | 'stale-revision' | 'invalid-state'
+      detail: string
+    }
 
 export type MalformedKindPayloadEnrollment = Omit<WatcherEnrollment, 'kindPayload'> & {
   malformedKindPayload: {
@@ -43,6 +61,8 @@ type EnrollmentRow = {
   workspace_path: string
   scheduler_owner: string
   enabled: number
+  paused: number
+  command_revision: number
   capabilities_json: string
   budget_json: string
   kind_payload_json: string
@@ -58,10 +78,20 @@ export type EnrollmentStore = {
   list(): EnrollmentRecord[]
   findLiveByWorkspace(workspaceKey: WorkspaceKey): EnrollmentRecord | null
   insert(enrollment: WatcherEnrollment): WatcherEnrollment
+  commitControl(
+    watcherId: string,
+    expectedOwner: WatcherOwnerFence,
+    change: EnrollmentControlChange,
+    appendWithinTransaction?: () => void
+  ): EnrollmentControlCommit
   setEnabled(watcherId: string, enabled: boolean): EnrollmentRecord
   rearm(watcherId: string, configuration: EnrollmentRearmConfiguration): WatcherEnrollment
   setOrchestrationRunId(watcherId: string, runId: string | null): WatcherEnrollment
-  markTerminal(watcherId: string, terminalAtMs: number): EnrollmentRecord
+  markTerminal(
+    watcherId: string,
+    terminalAtMs: number,
+    appendWithinTransaction?: () => void
+  ): EnrollmentRecord
 }
 
 /** Authoritative, schema-validated enrollment persistence. */
@@ -73,9 +103,9 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
       .connection()
       .prepare(
         `SELECT watcher_id, kind, workspace_key, execution_host_id, repo_id, worktree_id,
-                workspace_path, scheduler_owner, enabled, capabilities_json, budget_json,
-                kind_payload_json, coordinator_handle, coordinator_pane_key,
-                orchestration_run_id, created_at_ms, terminal_at_ms
+                workspace_path, scheduler_owner, enabled, paused, command_revision,
+                capabilities_json, budget_json, kind_payload_json, coordinator_handle,
+                coordinator_pane_key, orchestration_run_id, created_at_ms, terminal_at_ms
            FROM heimdall_enrollment
           WHERE watcher_id = ?`
       )
@@ -88,9 +118,9 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
       .connection()
       .prepare(
         `SELECT watcher_id, kind, workspace_key, execution_host_id, repo_id, worktree_id,
-                workspace_path, scheduler_owner, enabled, capabilities_json, budget_json,
-                kind_payload_json, coordinator_handle, coordinator_pane_key,
-                orchestration_run_id, created_at_ms, terminal_at_ms
+                workspace_path, scheduler_owner, enabled, paused, command_revision,
+                capabilities_json, budget_json, kind_payload_json, coordinator_handle,
+                coordinator_pane_key, orchestration_run_id, created_at_ms, terminal_at_ms
            FROM heimdall_enrollment
           ORDER BY created_at_ms, watcher_id`
       )
@@ -103,9 +133,9 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
       .connection()
       .prepare(
         `SELECT watcher_id, kind, workspace_key, execution_host_id, repo_id, worktree_id,
-                workspace_path, scheduler_owner, enabled, capabilities_json, budget_json,
-                kind_payload_json, coordinator_handle, coordinator_pane_key,
-                orchestration_run_id, created_at_ms, terminal_at_ms
+                workspace_path, scheduler_owner, enabled, paused, command_revision,
+                capabilities_json, budget_json, kind_payload_json, coordinator_handle,
+                coordinator_pane_key, orchestration_run_id, created_at_ms, terminal_at_ms
            FROM heimdall_enrollment
           WHERE workspace_key = ? AND terminal_at_ms IS NULL`
       )
@@ -121,10 +151,10 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
       .prepare(
         `INSERT INTO heimdall_enrollment (
            watcher_id, kind, workspace_key, execution_host_id, repo_id, worktree_id,
-           workspace_path, scheduler_owner, enabled, capabilities_json, budget_json,
-           kind_payload_json, coordinator_handle, coordinator_pane_key,
+           workspace_path, scheduler_owner, enabled, paused, command_revision, capabilities_json,
+           budget_json, kind_payload_json, coordinator_handle, coordinator_pane_key,
            orchestration_run_id, created_at_ms, terminal_at_ms
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         parsed.watcherId,
@@ -136,6 +166,8 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
         parsed.workspacePath,
         parsed.schedulerOwner,
         parsed.enabled ? 1 : 0,
+        parsed.paused ? 1 : 0,
+        parsed.commandRevision,
         this.serializeJson('capabilities', parsed.capabilities),
         this.serializeJson('budget', parsed.budget),
         this.serializeJson('kind payload', parsed.kindPayload),
@@ -166,6 +198,8 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
       watcherId,
       `UPDATE heimdall_enrollment
           SET enabled = 1,
+              paused = 0,
+              command_revision = command_revision + 1,
               capabilities_json = ?,
               budget_json = ?,
               kind_payload_json = ?
@@ -179,6 +213,89 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
       watcherId
     )
     return this.requireValid(watcherId)
+  }
+
+  commitControl(
+    watcherId: string,
+    expectedOwner: WatcherOwnerFence,
+    untrustedChange: EnrollmentControlChange,
+    appendWithinTransaction?: () => void
+  ): EnrollmentControlCommit {
+    if (!watcherId) {
+      return { status: 'refused', reason: 'watcher-not-found', detail: 'A watcher id is required' }
+    }
+    const change = EnrollmentControlChangeSchema.parse(untrustedChange)
+    this.database.assertWritable()
+    const connection = this.database.connection()
+    connection.exec('BEGIN IMMEDIATE')
+    try {
+      const current = this.get(watcherId)
+      if (!current) {
+        connection.exec('ROLLBACK')
+        return {
+          status: 'refused',
+          reason: 'watcher-not-found',
+          detail: `Heimdall watcher ${watcherId} was not found`
+        }
+      }
+      if (
+        current.executionHostId !== expectedOwner.executionHostId ||
+        current.schedulerOwner !== expectedOwner.schedulerOwner ||
+        current.workspaceKey !== expectedOwner.workspaceKey
+      ) {
+        connection.exec('ROLLBACK')
+        return {
+          status: 'refused',
+          reason: 'owner-conflict',
+          detail: `Heimdall watcher ${watcherId} is owned by a different execution authority`
+        }
+      }
+      if (current.commandRevision !== expectedOwner.revision) {
+        connection.exec('ROLLBACK')
+        return {
+          status: 'refused',
+          reason: 'stale-revision',
+          detail: `Heimdall watcher ${watcherId} advanced to revision ${current.commandRevision}`
+        }
+      }
+      if (current.terminalAtMs !== null) {
+        connection.exec('ROLLBACK')
+        return {
+          status: 'refused',
+          reason: 'invalid-state',
+          detail: `Heimdall watcher ${watcherId} is terminal`
+        }
+      }
+
+      const result = connection
+        .prepare(
+          `UPDATE heimdall_enrollment
+              SET enabled = ?,
+                  paused = ?,
+                  budget_json = ?,
+                  command_revision = command_revision + 1
+            WHERE watcher_id = ? AND command_revision = ? AND terminal_at_ms IS NULL`
+        )
+        .run(
+          (change.enabled ?? current.enabled) ? 1 : 0,
+          (change.paused ?? current.paused) ? 1 : 0,
+          this.serializeJson('budget', change.budget ?? current.budget),
+          watcherId,
+          expectedOwner.revision
+        )
+      if (Number(result.changes) !== 1) {
+        throw new Error(`Heimdall watcher ${watcherId} changed during its control transaction`)
+      }
+      appendWithinTransaction?.()
+      const enrollment = this.require(watcherId)
+      connection.exec('COMMIT')
+      return { status: 'committed', enrollment }
+    } catch (error) {
+      if (connection.isTransaction) {
+        connection.exec('ROLLBACK')
+      }
+      throw error
+    }
   }
 
   setOrchestrationRunId(watcherId: string, runId: string | null): WatcherEnrollment {
@@ -196,19 +313,43 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
     return this.requireValid(watcherId)
   }
 
-  markTerminal(watcherId: string, terminalAtMs: number): EnrollmentRecord {
+  markTerminal(
+    watcherId: string,
+    terminalAtMs: number,
+    appendWithinTransaction?: () => void
+  ): EnrollmentRecord {
     if (!Number.isSafeInteger(terminalAtMs) || terminalAtMs < 0) {
       throw new Error('A terminal timestamp must be a non-negative integer')
     }
-    this.updateExisting(
-      watcherId,
-      `UPDATE heimdall_enrollment
-          SET enabled = 0, terminal_at_ms = ?
-        WHERE watcher_id = ? AND terminal_at_ms IS NULL`,
-      terminalAtMs,
-      watcherId
-    )
-    return this.require(watcherId)
+    this.database.assertWritable()
+    const connection = this.database.connection()
+    connection.exec('BEGIN IMMEDIATE')
+    try {
+      const current = this.require(watcherId)
+      if (current.terminalAtMs !== null) {
+        connection.exec('COMMIT')
+        return current
+      }
+      appendWithinTransaction?.()
+      const result = connection
+        .prepare(
+          `UPDATE heimdall_enrollment
+              SET enabled = 0, paused = 0, terminal_at_ms = ?
+            WHERE watcher_id = ? AND terminal_at_ms IS NULL`
+        )
+        .run(terminalAtMs, watcherId)
+      if (Number(result.changes) !== 1) {
+        throw new Error(`Heimdall watcher ${watcherId} changed during its terminal transaction`)
+      }
+      const updated = this.require(watcherId)
+      connection.exec('COMMIT')
+      return updated
+    } catch (error) {
+      if (connection.isTransaction) {
+        connection.exec('ROLLBACK')
+      }
+      throw error
+    }
   }
 
   private require(watcherId: string): EnrollmentRecord {
@@ -282,6 +423,8 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
       workspacePath: row.workspace_path,
       schedulerOwner: row.scheduler_owner,
       enabled: row.enabled === 1,
+      paused: row.paused === 1,
+      commandRevision: row.command_revision,
       capabilities: JSON.parse(row.capabilities_json),
       budget: JSON.parse(row.budget_json),
       kindPayload,

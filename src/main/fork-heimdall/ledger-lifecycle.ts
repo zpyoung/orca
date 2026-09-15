@@ -3,7 +3,8 @@ import { deriveBudgetState } from '../../shared/fork-heimdall/budget'
 import type {
   DispatchResult,
   DispatchWorkerInput,
-  KernelAction
+  KernelAction,
+  LeaseGuard
 } from '../../shared/fork-heimdall/kind-contract'
 import {
   getInFlightAttempts,
@@ -26,6 +27,8 @@ export type DispatchLifecycleInput = {
   spec: string
   agent?: string
   taskKey?: string
+  deps?: readonly string[]
+  lease?: LeaseGuard
   dispatchKind?: 'planner' | 'child'
 }
 
@@ -118,8 +121,8 @@ export class WatcherLedgerLifecycle {
     this.dependencies.ledgerStore.append(input.enrollment.watcherId, dispatchAttempt)
     return this.callAdapter(input, dispatchAttempt)
   }
-  /** Replays write-ahead dispatches and repairs older running rows that predate their turn. */
-  async recover(enrollment: WatcherEnrollment): Promise<AttemptEntry[]> {
+  /** Recovers write-ahead and unresolved dispatch receipts, and repairs missing turn facts. */
+  async recover(enrollment: WatcherEnrollment, lease?: LeaseGuard): Promise<AttemptEntry[]> {
     let ledger = this.dependencies.ledgerStore.read(enrollment.watcherId)
     for (const attempt of getInFlightAttempts(ledger)) {
       if (attempt.state !== 'running' || !attempt.dispatchId) {
@@ -130,10 +133,14 @@ export class WatcherLedgerLifecycle {
         ledger = this.dependencies.ledgerStore.read(enrollment.watcherId)
       }
     }
-    const absent: AttemptEntry[] = []
-    const pending = getInFlightAttempts(ledger).filter(
+    const attempted = getInFlightAttempts(ledger).filter(
       (attempt) => attempt.state === 'attempted' && attempt.dispatch !== undefined
     )
+    const unresolved = getUnresolvedAttempts(ledger).filter(
+      (attempt) => attempt.dispatch !== undefined && attempt.dispatchId === undefined
+    )
+    const pending = [...attempted, ...unresolved]
+    const absent: AttemptEntry[] = []
     for (const attempt of pending) {
       const dispatch = attempt.dispatch
       if (!dispatch) {
@@ -144,9 +151,13 @@ export class WatcherLedgerLifecycle {
         attemptFingerprint: attempt.fingerprint,
         spec: dispatch.spec,
         ...(dispatch.agent ? { agent: dispatch.agent } : {}),
-        ...(dispatch.taskKey ? { taskKey: dispatch.taskKey } : {})
+        ...(dispatch.taskKey ? { taskKey: dispatch.taskKey } : {}),
+        ...(dispatch.deps ? { deps: dispatch.deps } : {})
       })
-      if (result.status === 'absent') {
+      await lease?.assertHeld()
+      if (attempt.state === 'settled') {
+        this.recordRecoveredUncertainDispatch(enrollment, attempt, result)
+      } else if (result.status === 'absent') {
         absent.push(attempt)
       } else {
         this.recordDispatchResult(enrollment, attempt, result)
@@ -257,6 +268,7 @@ export class WatcherLedgerLifecycle {
         spec: input.spec,
         dispatchKind: input.dispatchKind ?? 'child',
         ...(input.agent ? { agent: input.agent } : {}),
+        ...(input.deps ? { deps: [...input.deps] } : {}),
         ...(input.taskKey ? { taskKey: input.taskKey } : {})
       }
     }
@@ -272,6 +284,7 @@ export class WatcherLedgerLifecycle {
         spec: input.spec,
         dispatchKind: input.dispatchKind ?? 'child',
         ...(input.agent ? { agent: input.agent } : {}),
+        ...(input.deps ? { deps: [...input.deps] } : {}),
         ...(input.taskKey ? { taskKey: input.taskKey } : {})
       }
     }
@@ -306,7 +319,9 @@ export class WatcherLedgerLifecycle {
     input: DispatchLifecycleInput,
     attempt: AttemptEntry
   ): Promise<DispatchResult> {
+    await input.lease?.assertHeld()
     const result = await this.dependencies.adapter.dispatchWorker(this.adapterInput(input))
+    await input.lease?.assertHeld()
     this.recordDispatchResult(input.enrollment, attempt, result)
     return result
   }
@@ -317,6 +332,7 @@ export class WatcherLedgerLifecycle {
       attemptFingerprint: input.fingerprint,
       spec: input.spec,
       ...(input.agent ? { agent: input.agent } : {}),
+      ...(input.deps ? { deps: input.deps } : {}),
       ...(input.taskKey ? { taskKey: input.taskKey } : {})
     }
   }
@@ -335,13 +351,17 @@ export class WatcherLedgerLifecycle {
         this.dependencies.ledgerStore.read(enrollment.watcherId)
       ).find((candidate) => candidate.attemptId === attempt.attemptId)
       if (latest?.state !== 'running') {
-        this.dependencies.ledgerStore.append(enrollment.watcherId, {
+        const runningAttempt: AttemptEntry = {
           ...attempt,
           eventId: this.createId(),
           atMs: this.now(),
           state: 'running',
           dispatchId: result.dispatchId
-        })
+        }
+        delete runningAttempt.effect
+        delete runningAttempt.reason
+        delete runningAttempt.result
+        this.dependencies.ledgerStore.append(enrollment.watcherId, runningAttempt)
       }
       if (!this.workerIntervals.has(attempt.attemptId)) {
         const current = this.dependencies.budgetClock.current?.(enrollment.watcherId) ?? null
@@ -363,6 +383,28 @@ export class WatcherLedgerLifecycle {
       result
     })
   }
+  private recordRecoveredUncertainDispatch(
+    enrollment: WatcherEnrollment,
+    attempt: AttemptEntry,
+    result: DispatchResult | { status: 'absent' }
+  ): void {
+    if (result.status === 'dispatched') {
+      this.recordDispatchResult(enrollment, attempt, result)
+    } else if (result.status === 'refused' || result.status === 'absent') {
+      this.dependencies.ledgerStore.append(enrollment.watcherId, {
+        eventId: this.createId(),
+        watcherId: enrollment.watcherId,
+        atMs: this.now(),
+        origin: 'owner',
+        class: 'fact',
+        kind: 'attempt-resolved',
+        attemptId: attempt.attemptId,
+        effect: 'not-landed',
+        evidence: result
+      })
+    }
+  }
+
   private hasTurn(ledger: WatcherLedger, attemptId: string, dispatchId: string): boolean {
     return ledger.entries.some(
       (entry) =>

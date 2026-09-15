@@ -62,6 +62,7 @@ export function shouldRouteSubscriptionBySupport(method: string): boolean {
     method === 'session.tabs.subscribeAll' ||
     method === 'accounts.subscribe' ||
     method === 'notifications.subscribe' ||
+    method === 'heimdall:subscribe' ||
     method === 'files.watch'
   )
 }

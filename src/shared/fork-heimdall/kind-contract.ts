@@ -8,7 +8,7 @@ import type {
 } from './ledger-types'
 import type { PacingTier } from './pacing'
 import type { LiveSnapshot, Snapshot } from './snapshot'
-import type { StopPredicate, StopVerdict } from './stop-policy'
+import type { StopDisposition, StopPredicate, StopVerdict } from './stop-policy'
 import type { ConsideredPhase, TraceSnapshotSummary } from './tick-trace'
 import type {
   AuthorizedEnrollment,
@@ -42,6 +42,7 @@ export type DispatchWorkerRequest = {
   spec: string
   agent?: string
   taskKey?: string
+  deps?: readonly string[]
 }
 
 export type DispatchWorkerInput = DispatchWorkerRequest & {
@@ -95,7 +96,11 @@ export type Decision<TWorld, TAction extends KernelAction> = {
 
 export type ActionExecutor<TWorld, TAction extends KernelAction> = {
   execute(action: TAction, context: ExecuteContext<TWorld>): Promise<ActionOutcome>
-  resolveOutcome(attempt: AttemptEntry, fresh: LiveSnapshot<TWorld>): EffectCertainty
+  resolveOutcome(
+    attempt: AttemptEntry,
+    fresh: LiveSnapshot<TWorld>,
+    ledger: WatcherLedger
+  ): EffectCertainty | Promise<EffectCertainty>
 }
 
 export type PacingPolicy<TWorld> = {
@@ -120,4 +125,4 @@ export type WatcherKind<
     planner?: PlannerAdapter<TWorld>
   }
 
-export type { StopPredicate, StopVerdict }
+export type { StopDisposition, StopPredicate, StopVerdict }

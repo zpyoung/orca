@@ -2,31 +2,68 @@ import React, { useState } from 'react'
 import { Loader2, OctagonX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
-import type { HeimdallApi } from '../../../shared/fork-heimdall/api'
+import { useAppStore } from '@/store'
+import { getHeimdallControlApi } from '@/fork-heimdall/heimdall-control-api'
+import { isActiveHeimdallWatcher } from '@/fork-heimdall/active-watcher-registry'
 
-function getGlobalDisarmApi(): Pick<HeimdallApi, 'disarmAll'> | null {
-  const candidate: unknown = window.api?.heimdall
-  if (!candidate || typeof candidate !== 'object') {
-    return null
-  }
-  const disarmAll = (candidate as Partial<HeimdallApi>).disarmAll
-  return typeof disarmAll === 'function' ? { disarmAll } : null
-}
-
-/** Always-mounted emergency stop for all watchers, independent of review selection. */
+/** Always-mounted emergency stop for all hosted-review watchers, routed through each owner fence. */
 export function HostedReviewSitterGlobalStopControl(): React.JSX.Element {
-  const api = getGlobalDisarmApi()
+  const api = getHeimdallControlApi()
+  const fleet = useAppStore((state) => state.heimdallFleet)
+  const hydrateFleet = useAppStore((state) => state.hydrateHeimdallFleet)
   const [stopping, setStopping] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const activeRows =
+    fleet?.entries.filter(
+      (row) => row.entry.enrollment.kind === 'hosted-review' && isActiveHeimdallWatcher(row.entry)
+    ) ?? []
 
-  const disarmAll = async (): Promise<void> => {
-    if (!api || stopping) {
+  const disarmActiveSitters = async (): Promise<void> => {
+    if (!api || stopping || activeRows.length === 0) {
       return
     }
     setStopping(true)
     setError(null)
     try {
-      await api.disarmAll()
+      const settled = await Promise.allSettled(
+        activeRows.map((row) =>
+          Promise.resolve().then(() =>
+            api.command({
+              target: row.target,
+              expectedOwner: row.ownerFence,
+              command: { kind: 'disarm' }
+            })
+          )
+        )
+      )
+      const results = settled.flatMap((result) =>
+        result.status === 'fulfilled' ? [result.value] : []
+      )
+      const refused = results.filter((result) => result.status === 'refused').length
+      const indeterminate =
+        results.filter((result) => result.status === 'indeterminate').length +
+        settled.filter((result) => result.status === 'rejected').length
+      const outcomes: string[] = []
+      if (indeterminate > 0) {
+        outcomes.push(
+          translate(
+            'fork.heimdall.command.stopAllIndeterminate',
+            '{{count}} stop commands may or may not have applied. Owner state is being re-read.',
+            { count: indeterminate }
+          )
+        )
+      }
+      if (refused > 0) {
+        outcomes.push(
+          translate(
+            'fork.heimdall.command.stopAllRefused',
+            '{{count}} owners refused the stop command.',
+            { count: refused }
+          )
+        )
+      }
+      setError(outcomes.length > 0 ? outcomes.join(' ') : null)
+      await hydrateFleet()
     } catch (cause) {
       setError(
         cause instanceof Error && cause.message.trim()
@@ -36,6 +73,7 @@ export function HostedReviewSitterGlobalStopControl(): React.JSX.Element {
               'PR Sitter could not stop all active sitters.'
             )
       )
+      await hydrateFleet()
     } finally {
       setStopping(false)
     }
@@ -51,8 +89,8 @@ export function HostedReviewSitterGlobalStopControl(): React.JSX.Element {
           type="button"
           variant="outline"
           size="xs"
-          disabled={!api || stopping}
-          onClick={() => void disarmAll()}
+          disabled={!api || stopping || activeRows.length === 0}
+          onClick={() => void disarmActiveSitters()}
         >
           {stopping ? <Loader2 className="animate-spin" /> : <OctagonX />}
           {api
@@ -67,7 +105,7 @@ export function HostedReviewSitterGlobalStopControl(): React.JSX.Element {
         )}
       </p>
       {error ? (
-        <p className="mt-1 text-[10px] leading-relaxed text-destructive" role="alert">
+        <p className="mt-1 text-[10px] leading-relaxed text-status-warning" role="status">
           {error}
         </p>
       ) : null}

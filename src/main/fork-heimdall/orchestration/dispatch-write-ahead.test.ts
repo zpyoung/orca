@@ -16,6 +16,8 @@ const ENROLLMENT = {
   workspacePath: '/repo',
   schedulerOwner: 'local_host_service',
   enabled: true,
+  paused: false,
+  commandRevision: 0,
   capabilities: { fixChecks: 'on' },
   budget: { wallClockActiveMs: null, turns: 10 },
   kindPayload: {},
@@ -67,6 +69,7 @@ function input(fingerprint: string) {
     fingerprint,
     spec: 'Fix the check, commit locally, and do not publish.',
     agent: 'codex',
+    deps: ['task-plan', 'task-contract'],
     taskKey: 'prepare-fix' as const,
     dispatchKind: 'child' as const
   }
@@ -92,7 +95,8 @@ describe('Heimdall dispatch write-ahead lifecycle', () => {
       kind: 'attempt',
       state: 'attempted',
       fingerprint: 'attempt-1',
-      orchestrationRequestId: orchestrationRequestIdForAttemptFingerprint('attempt-1')
+      orchestrationRequestId: orchestrationRequestIdForAttemptFingerprint('attempt-1'),
+      dispatch: expect.objectContaining({ deps: ['task-plan', 'task-contract'] })
     })
     expect(world.entries[0]).not.toHaveProperty('dispatchId')
   })
@@ -123,6 +127,9 @@ describe('Heimdall dispatch write-ahead lifecycle', () => {
     expect(adapter.dispatchWorker).toHaveBeenCalledOnce()
     expect(adapter.recoverDispatch).toHaveBeenCalledOnce()
     expect(adapter.recoverDispatch.mock.calls[0]![0].attemptFingerprint).toBe('attempt-replay')
+    expect(adapter.recoverDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ deps: ['task-plan', 'task-contract'] })
+    )
     expect(
       world.entries.filter((entry) => entry.kind === 'turn' && entry.dispatchId === 'dispatch-1')
     ).toHaveLength(1)
@@ -267,6 +274,148 @@ describe('Heimdall dispatch write-ahead lifecycle', () => {
     expect(adapter.dispatchWorker).not.toHaveBeenCalled()
     expect(adapter.recoverDispatch).not.toHaveBeenCalled()
     expect(world.entries.filter((entry) => entry.kind === 'turn')).toHaveLength(1)
+  })
+
+  it('restores an indeterminate dispatch receipt to running with its original deps and one turn', async () => {
+    const adapter = {
+      dispatchWorker: vi.fn(),
+      recoverDispatch: vi.fn(async () => ({
+        status: 'dispatched' as const,
+        dispatchId: 'dispatch-recovered'
+      }))
+    }
+    const world = harness(adapter)
+    const writeAhead = {
+      eventId: 'attempt-event',
+      watcherId: ENROLLMENT.watcherId,
+      atMs: 1,
+      origin: 'owner',
+      class: 'fact',
+      kind: 'attempt',
+      attemptId: 'attempt-unknown',
+      fingerprint: 'unknown-fingerprint',
+      action: ACTION,
+      state: 'attempted',
+      dispatch: {
+        spec: 'Fix the check.',
+        agent: 'codex',
+        taskKey: 'prepare-fix',
+        deps: ['task-plan'],
+        dispatchKind: 'child'
+      }
+    } as const satisfies LedgerEntry
+    world.entries.push(writeAhead, {
+      ...writeAhead,
+      eventId: 'uncertain-event',
+      state: 'settled',
+      effect: 'indeterminate',
+      reason: 'operation-unknown'
+    })
+
+    await world.lifecycle.recover(ENROLLMENT)
+
+    expect(adapter.recoverDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ deps: ['task-plan'], attemptFingerprint: 'unknown-fingerprint' })
+    )
+    expect(world.entries).toContainEqual(
+      expect.objectContaining({
+        kind: 'attempt',
+        attemptId: 'attempt-unknown',
+        state: 'running',
+        dispatchId: 'dispatch-recovered'
+      })
+    )
+    const running = world.entries.findLast(
+      (entry) => entry.kind === 'attempt' && entry.attemptId === 'attempt-unknown'
+    )
+    expect(running).not.toHaveProperty('effect')
+    expect(world.entries.filter((entry) => entry.kind === 'turn')).toHaveLength(1)
+    expect(world.budgetClock.open).toHaveBeenCalledOnce()
+  })
+
+  it('resolves an uncertain pre-receipt dispatch when recovery confirms no receipt', async () => {
+    const adapter = {
+      dispatchWorker: vi.fn(),
+      recoverDispatch: vi.fn(async () => ({ status: 'absent' as const }))
+    }
+    const world = harness(adapter)
+    const writeAhead = {
+      eventId: 'attempt-event',
+      watcherId: ENROLLMENT.watcherId,
+      atMs: 1,
+      origin: 'owner',
+      class: 'fact',
+      kind: 'attempt',
+      attemptId: 'attempt-unknown',
+      fingerprint: 'unknown-fingerprint',
+      action: ACTION,
+      state: 'attempted',
+      dispatch: { spec: 'Fix the check.', dispatchKind: 'child' }
+    } as const satisfies LedgerEntry
+    const unresolved = {
+      ...writeAhead,
+      eventId: 'uncertain-event',
+      state: 'settled',
+      effect: 'indeterminate',
+      reason: 'operation-unknown'
+    } as const satisfies LedgerEntry
+    world.entries.push(writeAhead, unresolved)
+
+    await expect(world.lifecycle.recover(ENROLLMENT)).resolves.toEqual([])
+
+    expect(world.entries.at(-1)).toEqual(
+      expect.objectContaining({
+        kind: 'attempt-resolved',
+        attemptId: 'attempt-unknown',
+        effect: 'not-landed',
+        evidence: { status: 'absent' }
+      })
+    )
+    expect(adapter.dispatchWorker).not.toHaveBeenCalled()
+    expect(world.entries.some((entry) => entry.kind === 'turn')).toBe(false)
+  })
+
+  it('does not resurrect a worker that exited without completion evidence', async () => {
+    const adapter = {
+      dispatchWorker: vi.fn(),
+      recoverDispatch: vi.fn(async () => ({
+        status: 'dispatched' as const,
+        dispatchId: 'dispatch-old'
+      }))
+    }
+    const world = harness(adapter)
+    const writeAhead = {
+      eventId: 'attempt-event',
+      watcherId: ENROLLMENT.watcherId,
+      atMs: 1,
+      origin: 'owner',
+      class: 'fact',
+      kind: 'attempt',
+      attemptId: 'attempt-exited',
+      fingerprint: 'exited-fingerprint',
+      action: ACTION,
+      state: 'attempted',
+      dispatch: { spec: 'Fix the check.', dispatchKind: 'child' }
+    } as const satisfies LedgerEntry
+    const running = {
+      ...writeAhead,
+      eventId: 'running-event',
+      state: 'running',
+      dispatchId: 'dispatch-old'
+    } as const satisfies LedgerEntry
+    const exited = {
+      ...running,
+      eventId: 'exited-event',
+      state: 'settled',
+      effect: 'indeterminate',
+      reason: 'worker-exited-without-completion'
+    } as const satisfies LedgerEntry
+    world.entries.push(writeAhead, running, exited)
+
+    await expect(world.lifecycle.recover(ENROLLMENT)).resolves.toEqual([])
+
+    expect(adapter.recoverDispatch).not.toHaveBeenCalled()
+    expect(world.entries.at(-1)).toEqual(exited)
   })
 
   it('does not create work while recovering an absent receipt for a disabled watcher', async () => {

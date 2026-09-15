@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import type { RuntimeTerminalShow } from '../../../shared/runtime-types'
 import type { OrcaRuntimeService } from '../../runtime/orca-runtime'
 import type { RunRow } from '../../runtime/orchestration/db'
@@ -21,59 +20,40 @@ import type {
   DispatchResult,
   DispatchWorkerInput
 } from '../../../shared/fork-heimdall/kind-contract'
+import type { WatcherCommandResult, WatcherWorker } from '../../../shared/fork-heimdall/fleet-types'
 import type { LedgerEntry } from '../../../shared/fork-heimdall/ledger-types'
 import type { WatcherEnrollment } from '../../../shared/fork-heimdall/watcher-types'
 import { resolveWorkerStartReadinessTimeoutMs } from '../../../shared/orchestration-timing-budgets'
 import { ORCHESTRATION_CONTRACT_VERSION } from '../../../shared/protocol-version'
 import { isStructuredWorkerHandle } from '../../runtime/structured-worker-identity'
 import { coordinatorIdentityFingerprint } from './coordinator-identity'
+import {
+  CoordinatorSeatLostError,
+  orchestrationRequestIdForAttemptFingerprint,
+  QuestionAlreadyAnsweredError,
+  type DispatchObservation,
+  type HeimdallOrchestrationAdapter,
+  type HeimdallOrchestrationPersistence,
+  type RecoverDispatchResult
+} from './orchestration-contract'
 import { drainHeimdallMailbox, type MailboxDrainInput } from './mailbox-drain'
+import { answerWatcherQuestion } from './question-answer'
+import { listWatcherWorkers, stopWatcherWorker } from './worker-controls'
 
+export {
+  CoordinatorSeatLostError,
+  orchestrationRequestIdForAttemptFingerprint,
+  QuestionAlreadyAnsweredError
+}
 export type { DispatchResult, DispatchWorkerInput }
+export type {
+  DispatchObservation,
+  HeimdallOrchestrationAdapter,
+  HeimdallOrchestrationPersistence,
+  RecoverDispatchResult
+}
 export type { CoordinatorIdentity } from '../../../shared/fork-heimdall/watcher-types'
-
 export type { MailboxCursor, MailboxDrainInput } from './mailbox-drain'
-
-export type HeimdallOrchestrationPersistence = {
-  persistOrchestrationRunId(watcherId: string, runId: string): Promise<void>
-}
-
-export type HeimdallOrchestrationAdapter = {
-  ensureRun(enrollment: WatcherEnrollment): Promise<{ runId: string }>
-  dispatchWorker(input: DispatchWorkerInput): Promise<DispatchResult>
-  recoverDispatch(input: DispatchWorkerInput): Promise<RecoverDispatchResult>
-  readDispatch(enrollment: WatcherEnrollment, dispatchId: string): Promise<DispatchObservation>
-  drainMailbox(input: MailboxDrainInput): Promise<LedgerEntry[]>
-  answerQuestion(enrollment: WatcherEnrollment, messageId: string, body: string): Promise<void>
-}
-
-export class CoordinatorSeatLostError extends Error {
-  readonly code = 'coordinator-seat-lost'
-  readonly reason = { kind: 'coordinator-seat-lost' } as const
-
-  constructor(watcherId: string, cause?: unknown) {
-    const detail = cause instanceof Error ? `: ${cause.message}` : ''
-    super(`Coordinator seat for Heimdall watcher ${watcherId} was lost${detail}`)
-    this.name = 'CoordinatorSeatLostError'
-  }
-}
-
-export function orchestrationRequestIdForAttemptFingerprint(attemptFingerprint: string): string {
-  if (!attemptFingerprint.trim()) {
-    throw new Error('attemptFingerprint must be non-empty')
-  }
-  return createHash('sha256')
-    .update('heimdall-dispatch-v1\0')
-    .update(attemptFingerprint)
-    .digest('hex')
-}
-
-export type DispatchObservation =
-  | { status: 'live' }
-  | { status: 'exited' }
-  | { status: 'unverifiable'; reason?: string }
-
-export type RecoverDispatchResult = DispatchResult | { status: 'absent' }
 
 type WorkerStartReceipt = {
   dispatchId?: string
@@ -86,6 +66,7 @@ const CAPABILITY_ERROR_CODES: Record<string, true> = {
   capability_unsupported: true,
   invalid_argument: true,
   request_mismatch: true,
+  task_not_startable: true,
   worker_prompt_too_large: true
 }
 const PLACEMENT_ERROR_CODES: Record<string, true> = {
@@ -301,6 +282,40 @@ export class RuntimeHeimdallOrchestrationAdapter implements HeimdallOrchestratio
       return { status: 'unverifiable', reason: errorDetail(error) }
     }
   }
+  async listWorkers(enrollment: WatcherEnrollment): Promise<WatcherWorker[]> {
+    if (!enrollment.orchestrationRunId) {
+      return []
+    }
+    const run = this.resolvePersistedRun(enrollment, enrollment.orchestrationRunId)
+    this.assertRunIdentity(enrollment, run)
+    return listWatcherWorkers(this.runtime, run)
+  }
+
+  async stopWorker(
+    enrollment: WatcherEnrollment,
+    dispatchId: string
+  ): Promise<WatcherCommandResult> {
+    if (!dispatchId.trim()) {
+      return {
+        status: 'refused',
+        reason: 'invalid-command',
+        detail: 'dispatchId must be non-empty'
+      }
+    }
+    if (!enrollment.orchestrationRunId) {
+      return {
+        status: 'refused',
+        reason: 'worker-unverifiable',
+        detail: `Watcher ${enrollment.watcherId} has no orchestration Run`
+      }
+    }
+    const run = this.resolvePersistedRun(enrollment, enrollment.orchestrationRunId)
+    this.assertRunIdentity(enrollment, run)
+    return stopWatcherWorker(this.runtime, enrollment, run, dispatchId, () => {
+      const current = this.resolvePersistedRun(enrollment, run.id)
+      this.assertRunIdentity(enrollment, current)
+    })
+  }
 
   async drainMailbox(input: MailboxDrainInput): Promise<LedgerEntry[]> {
     const ensured = await this.ensureRun(input.enrollment)
@@ -330,26 +345,16 @@ export class RuntimeHeimdallOrchestrationAdapter implements HeimdallOrchestratio
       throw new Error('messageId and body must be non-empty')
     }
     const ensured = await this.ensureRun(enrollment)
-    const db = this.runtime.getOrchestrationDb()
     const run = this.resolvePersistedRun(enrollment, ensured.runId)
     this.assertRunIdentity(enrollment, run)
-    const question = db.getQuestion(messageId)
-    if (!question || question.run_id !== run.id) {
-      throw new OrchestrationError(
-        'question_not_found',
-        `Question ${messageId} was not found in Run ${run.id}.`
-      )
-    }
     try {
-      db.answerQuestion({
-        messageId,
-        runId: run.id,
-        consumerGeneration: run.consumer_generation,
-        body
-      })
+      answerWatcherQuestion(this.runtime, run, messageId, body)
     } catch (error) {
       if (isOrchestrationError(error, 'consumer_fenced')) {
         throw new CoordinatorSeatLostError(enrollment.watcherId, error)
+      }
+      if (isOrchestrationError(error, 'answer_conflict')) {
+        throw new QuestionAlreadyAnsweredError(messageId, error)
       }
       throw error
     }
@@ -394,6 +399,7 @@ function workerStartParams(input: DispatchWorkerInput) {
     from: input.enrollment.coordinatorIdentity.handle,
     worktree: `id:${workspaceRuntimeId(input.enrollment)}`,
     ...(input.agent ? { agent: input.agent } : {}),
+    ...(input.deps ? { deps: JSON.stringify(input.deps) } : {}),
     ...(input.taskKey ? { taskTitle: input.taskKey } : {})
   }
 }
@@ -427,8 +433,8 @@ function parseWorkerStartReceipt(serialized: string | null): WorkerStartReceipt 
   }
 }
 
-function workspaceRuntimeId(enrollment: WatcherEnrollment): string {
-  return enrollment.worktreeId ?? `folder:${enrollment.repoId}`
+export function workspaceRuntimeId(enrollment: WatcherEnrollment): string {
+  return enrollment.worktreeId ?? `${enrollment.repoId}::${enrollment.workspacePath}`
 }
 
 function coordinatorRuntimeFacade(

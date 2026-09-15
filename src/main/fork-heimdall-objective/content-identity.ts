@@ -1,0 +1,436 @@
+import { createHash } from 'node:crypto'
+import { lstat } from 'node:fs/promises'
+import { posix, win32 } from 'node:path'
+import type { ExecutionHostId } from '../../shared/execution-host'
+import { resolveWorktreeHostPath } from '../../shared/git-metadata-path'
+import { gitExecFileAsync } from '../git/command-runner/git-exec-file'
+import type { IFilesystemProvider } from '../providers/types'
+import {
+  localGitOptionsForTarget,
+  requireRuntimeGitProvider,
+  type RuntimeGitTarget
+} from '../runtime/runtime-git-command-target'
+import { requireRuntimeFileProvider } from '../runtime/runtime-file-command-target'
+import { resolveLeasePathFlavor } from '../fork-heimdall/lease-host-filesystem'
+
+const HASH_CONCURRENCY = 8
+
+export type ObjectiveWorkspaceTarget = {
+  kind: 'git' | 'folder'
+  executionHostId: ExecutionHostId
+  workspacePath: string
+  fileProvider: IFilesystemProvider | null
+  gitTarget?: RuntimeGitTarget
+}
+
+type GitCommand = (args: string[]) => Promise<{ stdout: string; stderr: string }>
+type DirtyPath = {
+  path: string
+  deleted: boolean
+  metadata: string
+  submodule: boolean
+  untracked: boolean
+}
+type ParsedGitStatus = { entries: DirtyPath[]; unborn: boolean }
+type ObservedStat = { type: string; mode?: number }
+
+function sha256(parts: readonly string[]): string {
+  const hash = createHash('sha256')
+  for (const part of parts) {
+    hash.update(part)
+  }
+  return hash.digest('hex')
+}
+
+function isObjectiveMetadataPath(relativePath: string, caseInsensitive = false): boolean {
+  const candidate = caseInsensitive ? relativePath.toLowerCase() : relativePath
+  return candidate === '.orca' || candidate.startsWith('.orca/')
+}
+
+function parseDirtyPaths(status: string, caseInsensitivePaths: boolean): ParsedGitStatus {
+  const fields = status.split('\0')
+  if (fields.at(-1) === '') {
+    fields.pop()
+  }
+  const entries: DirtyPath[] = []
+  let unborn = false
+
+  for (let index = 0; index < fields.length; index += 1) {
+    const field = fields[index]!
+    if (field.startsWith('# ')) {
+      if (field === '# branch.oid (initial)') {
+        unborn = true
+      }
+      continue
+    }
+    if (field.startsWith('? ')) {
+      const path = field.slice(2)
+      if (!path) {
+        throw new Error('Git returned an empty porcelain path')
+      }
+      entries.push({
+        path,
+        deleted: false,
+        metadata: 'untracked',
+        submodule: false,
+        untracked: true
+      })
+      continue
+    }
+    if (field.startsWith('! ')) {
+      continue
+    }
+
+    const ordinary =
+      /^1 ([^ ]{2}) ([^ ]{4}) ([0-7]{6}) ([0-7]{6}) ([0-7]{6}) ([0-9a-f]{40,64}) ([0-9a-f]{40,64}) ([\s\S]+)$/u.exec(
+        field
+      )
+    if (ordinary) {
+      const [
+        ,
+        statusCode,
+        submoduleState,
+        headMode,
+        indexMode,
+        worktreeMode,
+        headOid,
+        indexOid,
+        path
+      ] = ordinary
+      entries.push({
+        path: path!,
+        deleted: worktreeMode === '000000',
+        metadata: [
+          'ordinary',
+          statusCode,
+          submoduleState,
+          headMode,
+          indexMode,
+          worktreeMode,
+          headOid,
+          indexOid
+        ].join('\0'),
+        submodule: submoduleState![0] === 'S' || worktreeMode === '160000',
+        untracked: false
+      })
+      continue
+    }
+
+    const renamed =
+      /^2 ([^ ]{2}) ([^ ]{4}) ([0-7]{6}) ([0-7]{6}) ([0-7]{6}) ([0-9a-f]{40,64}) ([0-9a-f]{40,64}) ([RC][0-9]+) ([\s\S]+)$/u.exec(
+        field
+      )
+    if (renamed) {
+      const [
+        ,
+        statusCode,
+        submoduleState,
+        headMode,
+        indexMode,
+        worktreeMode,
+        headOid,
+        indexOid,
+        score,
+        path
+      ] = renamed
+      const sourcePath = fields[++index]
+      if (!sourcePath) {
+        throw new Error('Git returned a rename without its source path')
+      }
+      const metadata = [
+        'renamed',
+        statusCode,
+        submoduleState,
+        headMode,
+        indexMode,
+        worktreeMode,
+        headOid,
+        indexOid,
+        score,
+        sourcePath
+      ].join('\0')
+      entries.push({
+        path: path!,
+        deleted: worktreeMode === '000000',
+        metadata,
+        submodule: submoduleState![0] === 'S' || worktreeMode === '160000',
+        untracked: false
+      })
+      if (score![0] === 'R') {
+        entries.push({
+          path: sourcePath,
+          deleted: true,
+          metadata: `rename-source\0${metadata}`,
+          submodule: headMode === '160000' || indexMode === '160000',
+          untracked: false
+        })
+      }
+      continue
+    }
+
+    const unmerged =
+      /^u ([^ ]{2}) ([^ ]{4}) ([0-7]{6}) ([0-7]{6}) ([0-7]{6}) ([0-7]{6}) ([0-9a-f]{40,64}) ([0-9a-f]{40,64}) ([0-9a-f]{40,64}) ([\s\S]+)$/u.exec(
+        field
+      )
+    if (unmerged) {
+      const [
+        ,
+        statusCode,
+        submoduleState,
+        baseMode,
+        oursMode,
+        theirsMode,
+        worktreeMode,
+        baseOid,
+        oursOid,
+        theirsOid,
+        path
+      ] = unmerged
+      entries.push({
+        path: path!,
+        deleted: worktreeMode === '000000',
+        metadata: [
+          'unmerged',
+          statusCode,
+          submoduleState,
+          baseMode,
+          oursMode,
+          theirsMode,
+          worktreeMode,
+          baseOid,
+          oursOid,
+          theirsOid
+        ].join('\0'),
+        submodule: submoduleState![0] === 'S' || worktreeMode === '160000',
+        untracked: false
+      })
+      continue
+    }
+    throw new Error('Git returned malformed porcelain status')
+  }
+
+  return {
+    entries: entries
+      .filter((entry) => !isObjectiveMetadataPath(entry.path, caseInsensitivePaths))
+      .sort((left, right) => {
+        if (left.path !== right.path) {
+          return left.path < right.path ? -1 : 1
+        }
+        if (left.metadata !== right.metadata) {
+          return left.metadata < right.metadata ? -1 : 1
+        }
+        return Number(left.deleted) - Number(right.deleted)
+      }),
+    unborn
+  }
+}
+
+async function mapConcurrent<T, R>(
+  values: readonly T[],
+  limit: number,
+  map: (value: T) => Promise<R>
+): Promise<R[]> {
+  const results = Array.from({ length: values.length }) as R[]
+  let nextIndex = 0
+  const concurrency = Math.min(limit, values.length)
+  await Promise.all(
+    Array.from({ length: concurrency }, async () => {
+      while (nextIndex < values.length) {
+        const index = nextIndex++
+        results[index] = await map(values[index]!)
+      }
+    })
+  )
+  return results
+}
+
+export function objectiveGitCommandForTarget(target: ObjectiveWorkspaceTarget): GitCommand {
+  const gitTarget = target.gitTarget
+  if (!gitTarget) {
+    throw new Error('Git objective target has no runtime Git target')
+  }
+  if (gitTarget.executionHostId !== target.executionHostId) {
+    throw new Error('Git and filesystem routes disagree on execution host')
+  }
+  const provider = requireRuntimeGitProvider(gitTarget)
+  if (provider) {
+    return (args) => provider.exec(args, target.workspacePath)
+  }
+  const options = localGitOptionsForTarget(gitTarget)
+  const cwd = resolveWorktreeHostPath(target.workspacePath, options) ?? target.workspacePath
+  return (args) =>
+    gitExecFileAsync(args, {
+      ...options,
+      cwd,
+      admissionTier: 'background'
+    })
+}
+
+function workspaceFilesystemRoot(target: ObjectiveWorkspaceTarget): string {
+  if (target.fileProvider || !target.gitTarget) {
+    return target.workspacePath
+  }
+  return (
+    resolveWorktreeHostPath(target.workspacePath, localGitOptionsForTarget(target.gitTarget)) ??
+    target.workspacePath
+  )
+}
+
+async function readWorkingTreeStat(
+  target: ObjectiveWorkspaceTarget,
+  repositoryPrefix: string,
+  path: string
+): Promise<ObservedStat> {
+  const relativePath = repositoryPrefix ? posix.join(repositoryPrefix, path) : path
+  const root = workspaceFilesystemRoot(target)
+  const flavor = resolveLeasePathFlavor(target.executionHostId, root)
+  const absolutePath = flavor.join(root, ...relativePath.split('/'))
+  if (target.fileProvider) {
+    if (!target.fileProvider.lstat) {
+      throw new Error('Remote untracked path identity requires lstat capability')
+    }
+    return await target.fileProvider.lstat(absolutePath)
+  }
+  const stat = await lstat(absolutePath)
+  return {
+    type: stat.isDirectory()
+      ? 'directory'
+      : stat.isSymbolicLink()
+        ? 'symlink'
+        : stat.isFile()
+          ? 'file'
+          : 'other',
+    mode: stat.mode
+  }
+}
+
+async function fingerprintDirtyPath(
+  target: ObjectiveWorkspaceTarget,
+  runGit: GitCommand,
+  repositoryPrefix: string,
+  entry: DirtyPath,
+  caseInsensitivePaths: boolean
+): Promise<string> {
+  if (entry.deleted) {
+    return 'deleted'
+  }
+
+  if (entry.submodule) {
+    const nestedRunGit: GitCommand = (args) => runGit(['-C', entry.path, ...args])
+    const nestedPrefix = repositoryPrefix ? posix.join(repositoryPrefix, entry.path) : entry.path
+    return `submodule\0${await computeGitRepositoryIdentity(
+      target,
+      nestedRunGit,
+      nestedPrefix,
+      caseInsensitivePaths
+    )}`
+  }
+
+  let workingMetadata = ''
+  if (entry.untracked) {
+    const stat = await readWorkingTreeStat(target, repositoryPrefix, entry.path)
+    const modeIdentity =
+      stat.type === 'file' && typeof stat.mode === 'number'
+        ? (stat.mode & 0o111) === 0
+          ? 'regular'
+          : 'executable'
+        : 'mode-unavailable'
+    workingMetadata = [stat.type, modeIdentity].join('\0')
+    if (stat.type === 'directory') {
+      const nestedRunGit: GitCommand = (args) => runGit(['-C', entry.path, ...args])
+      const nestedPrefix = repositoryPrefix ? posix.join(repositoryPrefix, entry.path) : entry.path
+      return `nested-repository\0${workingMetadata}\0${await computeGitRepositoryIdentity(
+        target,
+        nestedRunGit,
+        nestedPrefix,
+        caseInsensitivePaths
+      )}`
+    }
+  }
+
+  const output = (await runGit(['hash-object', '--', entry.path])).stdout.trim()
+  if (!/^[0-9a-f]{40,64}$/u.test(output)) {
+    throw new Error(`Git did not return an object hash for ${entry.path}`)
+  }
+  return `blob\0${workingMetadata}\0${output}`
+}
+
+async function computeGitRepositoryIdentity(
+  target: ObjectiveWorkspaceTarget,
+  runGit: GitCommand,
+  repositoryPrefix: string,
+  caseInsensitivePaths: boolean
+): Promise<string> {
+  const [treeResult, statusResult] = await Promise.allSettled([
+    runGit(['rev-parse', '--verify', 'HEAD^{tree}']),
+    runGit([
+      'status',
+      '--porcelain=v2',
+      '--branch',
+      '-z',
+      '--untracked-files=all',
+      '--ignore-submodules=none',
+      '--'
+    ])
+  ])
+  if (statusResult.status === 'rejected') {
+    throw statusResult.reason
+  }
+
+  const parsed = parseDirtyPaths(statusResult.value.stdout, caseInsensitivePaths)
+  let treeOid = 'unborn'
+  if (treeResult.status === 'fulfilled') {
+    treeOid = treeResult.value.stdout.trim()
+    if (!/^[0-9a-f]{40,64}$/u.test(treeOid)) {
+      throw new Error('Git did not return a valid tree object id')
+    }
+  } else if (!parsed.unborn) {
+    throw treeResult.reason
+  }
+
+  const fingerprints = await mapConcurrent(parsed.entries, HASH_CONCURRENCY, (entry) =>
+    fingerprintDirtyPath(target, runGit, repositoryPrefix, entry, caseInsensitivePaths)
+  )
+  const parts: string[] = [treeOid, '\0']
+  for (let index = 0; index < parsed.entries.length; index += 1) {
+    const entry = parsed.entries[index]!
+    parts.push(entry.path, '\0', entry.metadata, '\0', fingerprints[index]!, '\0')
+  }
+  return sha256(parts)
+}
+
+async function computeGitIdentity(target: ObjectiveWorkspaceTarget): Promise<string> {
+  const caseInsensitivePaths =
+    resolveLeasePathFlavor(target.executionHostId, target.workspacePath) === win32
+  return await computeGitRepositoryIdentity(
+    target,
+    objectiveGitCommandForTarget(target),
+    '',
+    caseInsensitivePaths
+  )
+}
+
+async function computeFolderIdentity(target: ObjectiveWorkspaceTarget): Promise<string> {
+  // Loaded after this module is initialized because the manifest owns host observation and imports
+  // the public target/Git-command contracts above.
+  const { observeObjectiveWorkspaceManifest } = await import('./objective-workspace-manifest')
+  const manifest = await observeObjectiveWorkspaceManifest(target)
+  const hash = createHash('sha256')
+  for (const entry of manifest) {
+    hash.update(entry.path)
+    hash.update('\0')
+    hash.update(entry.fingerprint)
+    hash.update('\0')
+  }
+  return hash.digest('hex')
+}
+
+export async function computeWorkspaceContentIdentity(
+  target: ObjectiveWorkspaceTarget
+): Promise<string> {
+  const routedFileProvider = requireRuntimeFileProvider(target)
+  if (routedFileProvider !== target.fileProvider) {
+    throw new Error('Objective filesystem route changed after target resolution')
+  }
+  return target.kind === 'git' ? computeGitIdentity(target) : computeFolderIdentity(target)
+}

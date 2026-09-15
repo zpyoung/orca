@@ -85,6 +85,7 @@ export class WatcherRunnerGateLifecycle {
         action.evidenceKey
       )
       snapshot = await runner.kind.read(runner.enrollment, { fresh: true })
+      await this.assertLeaseHeld(runner)
       trace.snapshotReadCount += 1
       const live = requireLiveSnapshot(snapshot)
       decision = runner.kind.decide(live, ledger)
@@ -120,14 +121,12 @@ export class WatcherRunnerGateLifecycle {
     if (gate.verdict === 'allow') {
       gate = this.commitGate(runner, action, snapshot, recoveredAttempt?.attemptId)
       if (gate.verdict === 'allow') {
-        const guard = runner.leaseGuard
-        if (!guard) {
-          gate = { verdict: 'hold', reason: 'lease-not-held' }
-        } else {
-          await guard.assertHeld()
-          gate = this.commitGate(runner, action, snapshot, recoveredAttempt?.attemptId)
-        }
+        await this.assertLeaseHeld(runner)
+        gate = this.commitGate(runner, action, snapshot, recoveredAttempt?.attemptId)
       }
+    }
+    if (gate.verdict !== 'allow') {
+      await this.assertLeaseHeld(runner)
     }
     trace.gate = gate
     if (gate.verdict !== 'allow') {
@@ -153,6 +152,15 @@ export class WatcherRunnerGateLifecycle {
     if (runner.suspended) {
       return { verdict: 'hold', reason: 'suspended' }
     }
+    if (runner.controlPending !== null) {
+      return { verdict: 'hold', reason: `${runner.controlPending}-requested` }
+    }
+    if (!runner.enrollment.enabled) {
+      return { verdict: 'hold', reason: 'disabled' }
+    }
+    if (runner.enrollment.paused) {
+      return { verdict: 'hold', reason: 'paused' }
+    }
     const ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
     return gateAction(
       action,
@@ -160,6 +168,13 @@ export class WatcherRunnerGateLifecycle {
       runner.enrollment,
       this.withoutAttempt(ledger, ignoredAttemptId)
     )
+  }
+
+  private async assertLeaseHeld(runner: WatcherRunner): Promise<void> {
+    if (!runner.leaseGuard) {
+      throw new Error('Watcher gate reached a durable outcome without a lease')
+    }
+    await runner.leaseGuard.assertHeld()
   }
 
   private withoutAttempt(ledger: WatcherLedger, attemptId?: string): WatcherLedger {

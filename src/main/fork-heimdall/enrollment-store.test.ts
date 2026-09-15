@@ -31,6 +31,8 @@ function enrollment(overrides: Partial<WatcherEnrollment> = {}): WatcherEnrollme
     workspacePath: '/worktree',
     schedulerOwner: 'local_host_service',
     enabled: true,
+    paused: false,
+    commandRevision: 0,
     capabilities: { merge: 'gated' },
     budget: { wallClockActiveMs: 60_000, turns: 2 },
     kindPayload: { pullRequest: 1 },
@@ -94,6 +96,8 @@ describe('Heimdall enrollment store', () => {
       ...before,
       enabled: true,
       capabilities: REARM_CONFIGURATION.capabilities,
+      paused: false,
+      commandRevision: before.commandRevision + 1,
       budget: REARM_CONFIGURATION.budget,
       kindPayload: REARM_CONFIGURATION.kindPayload
     })

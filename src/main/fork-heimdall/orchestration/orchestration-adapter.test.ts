@@ -5,12 +5,15 @@ import { OrchestrationError } from '../../runtime/orchestration/orchestration-er
 import { hashCanonical } from '../../runtime/rpc/orchestration-mutation-receipt'
 import {
   CoordinatorSeatLostError,
+  QuestionAlreadyAnsweredError,
   RuntimeHeimdallOrchestrationAdapter,
   orchestrationRequestIdForAttemptFingerprint
 } from './orchestration-adapter'
 
 const upstream = vi.hoisted(() => ({
   startLocalWorker: vi.fn(),
+  listWorkers: vi.fn(),
+  stopWorker: vi.fn(),
   resolveRunScope: vi.fn(),
   mutationRun: vi.fn(),
   inspectWorkerTerminal: vi.fn(),
@@ -26,6 +29,22 @@ const upstream = vi.hoisted(() => ({
 
 vi.mock('../../runtime/rpc/methods/orchestration/worker/local-worker-start', () => ({
   startLocalWorker: upstream.startLocalWorker
+}))
+vi.mock('../../runtime/rpc/methods/orchestration/worker/worker-list-method', () => ({
+  ORCHESTRATION_WORKER_LIST_METHOD: {
+    name: 'orchestration.workerList',
+    params: { parse: (value: unknown) => value },
+    handler: upstream.listWorkers
+  }
+}))
+vi.mock('../../runtime/rpc/methods/orchestration/worker/worker-stop', () => ({
+  ORCHESTRATION_WORKER_STOP_METHODS: [
+    {
+      name: 'orchestration.workerStop',
+      params: { parse: (value: unknown) => value },
+      handler: upstream.stopWorker
+    }
+  ]
 }))
 vi.mock('../../runtime/rpc/methods/orchestration/worker/worker-observation', () => ({
   inspectWorkerTerminal: upstream.inspectWorkerTerminal
@@ -60,6 +79,8 @@ function enrollment(overrides: Record<string, unknown> = {}): WatcherEnrollment 
     workspacePath: '/repo',
     schedulerOwner: 'local_host_service',
     enabled: true,
+    paused: false,
+    commandRevision: 0,
     capabilities: {},
     budget: { wallClockActiveMs: null, turns: null },
     kindPayload: {},
@@ -79,11 +100,15 @@ type FakeRun = {
 }
 
 type FakeDatabase = {
+  db: { prepare: Mock }
   createRun: Mock
   getCurrentRunForPane: Mock
   getRun: Mock
   getDispatchContextById: Mock
   getWorkerDispatch: Mock
+  getFederatedDispatch: Mock
+  enqueueFederationRelay: Mock
+  listTasks: Mock
   getMutationReceipt: Mock
   getMessageById: Mock
   getQuestion: Mock
@@ -93,6 +118,7 @@ type FakeDatabase = {
 function fakeDb(id: string): FakeDatabase {
   let run: FakeRun | undefined
   return {
+    db: { prepare: vi.fn(() => ({ all: vi.fn(() => []) })) },
     createRun: vi.fn(
       (params: { coordinatorHandle: string; coordinatorPaneKey: string }) =>
         (run = {
@@ -106,10 +132,17 @@ function fakeDb(id: string): FakeDatabase {
     getRun: vi.fn((runId: string) => (runId === run?.id ? run : undefined)),
     getDispatchContextById: vi.fn(),
     getWorkerDispatch: vi.fn(),
+    getFederatedDispatch: vi.fn(),
+    enqueueFederationRelay: vi.fn(),
+    listTasks: vi.fn(() => []),
     getMutationReceipt: vi.fn(),
     getMessageById: vi.fn(),
     getQuestion: vi.fn(),
-    answerQuestion: vi.fn()
+    answerQuestion: vi.fn(() => ({
+      message: { id: 'message-answer' },
+      question: { status: 'answered' },
+      duplicate: false
+    }))
   }
 }
 
@@ -126,6 +159,8 @@ function fakeRuntime(firstDb = fakeDb('run-1')) {
     inspectTerminalProcessIncarnationLiveness: vi.fn(
       async (): Promise<'live' | 'exited' | 'unverifiable'> => 'unverifiable'
     ),
+    ensureOrchestrationFederationRelay: vi.fn(),
+    notifyMessageArrived: vi.fn(),
     recordRuntimeMutation() {
       this.mutationCount += 1
     }
@@ -142,7 +177,7 @@ function fakeRuntime(firstDb = fakeDb('run-1')) {
 function invokeMutation() {
   upstream.mutationRun.mockImplementation(
     async (
-      _request: unknown,
+      request: { method: string },
       _params: unknown,
       invoke: (mutation: {
         identity: {
@@ -157,7 +192,7 @@ function invokeMutation() {
         identity: {
           callerFingerprint: 'caller-fingerprint',
           requestId: 'request-id',
-          method: 'orchestration.workerStart',
+          method: request.method,
           payloadHash: 'payload-hash'
         }
       })
@@ -179,6 +214,16 @@ describe('Heimdall orchestration adapter', () => {
       terminal: null,
       exact: true,
       status: 'live'
+    })
+    upstream.listWorkers.mockResolvedValue({
+      workers: [],
+      counts: {},
+      page: { limit: 100, total: 0, hasMore: false, nextCursor: null }
+    })
+    upstream.stopWorker.mockResolvedValue({
+      state: 'stopped',
+      alreadySettled: false,
+      processAction: 'closed_agent_terminal'
     })
   })
 
@@ -241,6 +286,7 @@ describe('Heimdall orchestration adapter', () => {
         spec: 'Commit locally; do not publish.',
         agent: 'codex',
         taskKey: 'prepare-fix',
+        deps: ['task-plan', 'task-schema'],
         attemptFingerprint: 'content:prepare-fix:evidence'
       })
     ).resolves.toEqual({ status: 'dispatched', dispatchId: 'dispatch-1' })
@@ -257,6 +303,7 @@ describe('Heimdall orchestration adapter', () => {
       worktree: 'id:repo-1::/repo',
       spec: 'Commit locally; do not publish.',
       agent: 'codex',
+      deps: JSON.stringify(['task-plan', 'task-schema']),
       taskTitle: 'prepare-fix'
     })
 
@@ -274,7 +321,30 @@ describe('Heimdall orchestration adapter', () => {
     expect(workerArgs.coordinatorPane).toBe(IDENTITY.paneKey)
   })
 
-  it('routes a folder enrollment only to its authoritative folder workspace id', async () => {
+  it('returns a typed refusal when orchestration dependencies are not startable', async () => {
+    const world = fakeRuntime()
+    upstream.mutationRun.mockRejectedValueOnce(
+      new OrchestrationError('task_not_startable', 'dependency task failed')
+    )
+    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
+      persistOrchestrationRunId: async () => undefined
+    })
+
+    await expect(
+      adapter.dispatchWorker({
+        enrollment: enrollment({ orchestrationRunId: 'run-1' }),
+        spec: 'Implement the ready node.',
+        deps: ['failed-task'],
+        attemptFingerprint: 'blocked-dependency'
+      })
+    ).resolves.toEqual({
+      status: 'refused',
+      reason: 'capability-invalid',
+      detail: 'dependency task failed'
+    })
+  })
+
+  it('routes a folder repo through its authoritative root worktree identity', async () => {
     const world = fakeRuntime()
     const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
       persistOrchestrationRunId: async () => undefined
@@ -291,18 +361,22 @@ describe('Heimdall orchestration adapter', () => {
     })
 
     expect(upstream.mutationRun.mock.calls[0]![1]).toMatchObject({
-      worktree: 'id:folder:folder-1'
+      worktree: 'id:folder-1::/repo'
     })
     const workerArgs = upstream.startLocalWorker.mock.calls[0]![0]
     await expect(workerArgs.runtime.showTerminal(IDENTITY.handle)).resolves.toMatchObject({
-      worktreeId: 'folder:folder-1'
+      worktreeId: 'folder-1::/repo'
     })
   })
 
   it('answers through the currently fenced consumer generation', async () => {
     const world = fakeRuntime()
     const db = world.runtime.getOrchestrationDb()
-    db.getQuestion.mockReturnValue({ message_id: 'message-question', run_id: 'run-1' })
+    db.getQuestion.mockReturnValue({
+      message_id: 'message-question',
+      run_id: 'run-1',
+      dispatch_id: 'dispatch-1'
+    })
     const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
       persistOrchestrationRunId: async () => undefined
     })
@@ -319,6 +393,331 @@ describe('Heimdall orchestration adapter', () => {
       consumerGeneration: 1,
       body: 'Use the prepared commit.'
     })
+    expect(world.runtime.notifyMessageArrived).toHaveBeenCalledWith('dispatch:dispatch-1', 'status')
+    expect(db.enqueueFederationRelay).not.toHaveBeenCalled()
+  })
+
+  it('translates an answer race without writing a second answer', async () => {
+    const world = fakeRuntime()
+    const db = world.runtime.getOrchestrationDb()
+    db.getQuestion.mockReturnValue({
+      message_id: 'message-question',
+      run_id: 'run-1',
+      dispatch_id: 'dispatch-1'
+    })
+    db.answerQuestion.mockImplementation(() => {
+      throw new OrchestrationError('answer_conflict', 'another answer won')
+    })
+    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
+      persistOrchestrationRunId: async () => undefined
+    })
+
+    await expect(
+      adapter.answerQuestion(
+        enrollment({ orchestrationRunId: 'run-1' }),
+        'message-question',
+        'Use the prepared commit.'
+      )
+    ).rejects.toBeInstanceOf(QuestionAlreadyAnsweredError)
+    expect(db.answerQuestion).toHaveBeenCalledOnce()
+  })
+
+  it('returns no workers without opening an orchestration database or Run', async () => {
+    const world = fakeRuntime()
+    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
+      persistOrchestrationRunId: async () => undefined
+    })
+
+    await expect(adapter.listWorkers(enrollment())).resolves.toEqual([])
+    expect(world.runtime.getOrchestrationDb).not.toHaveBeenCalled()
+    expect(upstream.listWorkers).not.toHaveBeenCalled()
+  })
+
+  it('aggregates active Run workers across stable inventory pages', async () => {
+    const world = fakeRuntime()
+    const db = world.runtime.getOrchestrationDb()
+    const dispatches: Record<string, Record<string, unknown>> = {
+      'dispatch-live': {
+        id: 'dispatch-live',
+        run_id: 'run-1',
+        dispatched_at: '2026-09-15 12:00:00',
+        created_at: '2026-09-15 11:59:00',
+        last_heartbeat_at: '2026-09-15 12:02:00'
+      },
+      'dispatch-unreachable': {
+        id: 'dispatch-unreachable',
+        run_id: 'run-1',
+        dispatched_at: '2026-09-15 12:03:00',
+        created_at: '2026-09-15 12:03:00',
+        last_heartbeat_at: '2026-09-15 12:04:00'
+      }
+    }
+    db.getDispatchContextById.mockImplementation((dispatchId: string) => dispatches[dispatchId])
+    db.listTasks.mockReturnValue([
+      {
+        id: 'task-live',
+        display_name: 'Implement fleet controls',
+        task_title: 'fleet controls',
+        spec: 'Full implementation spec'
+      },
+      {
+        id: 'task-unreachable',
+        display_name: null,
+        task_title: null,
+        spec: 'Inspect the unreachable worker'
+      }
+    ])
+    db.db.prepare.mockReturnValue({
+      all: vi.fn(() => [
+        {
+          message_id: 'question-1',
+          dispatch_id: 'dispatch-live',
+          body: 'Which host should own this?'
+        }
+      ])
+    })
+    upstream.listWorkers
+      .mockResolvedValueOnce({
+        workers: [
+          {
+            dispatchId: 'dispatch-live',
+            taskId: 'task-live',
+            runId: 'run-1',
+            dispatchStatus: 'dispatched',
+            projection: {
+              liveness: { verdict: 'live' },
+              evidence: { lastObservedAt: Date.parse('2026-09-15T12:01:00Z') }
+            }
+          },
+          {
+            dispatchId: 'dispatch-settled',
+            taskId: 'task-settled',
+            runId: 'run-1',
+            dispatchStatus: 'completed',
+            projection: {
+              liveness: { verdict: 'exited' },
+              evidence: { lastObservedAt: null }
+            }
+          }
+        ],
+        page: { hasMore: true, nextCursor: 'stable-page-2' }
+      })
+      .mockResolvedValueOnce({
+        workers: [
+          {
+            dispatchId: 'dispatch-unreachable',
+            taskId: 'task-unreachable',
+            runId: 'run-1',
+            dispatchStatus: 'dispatched',
+            projection: {
+              liveness: { verdict: 'unverifiable', reason: 'host_unavailable' },
+              evidence: { lastObservedAt: null }
+            }
+          }
+        ],
+        page: { hasMore: false, nextCursor: null }
+      })
+    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
+      persistOrchestrationRunId: async () => undefined
+    })
+
+    await expect(adapter.listWorkers(enrollment({ orchestrationRunId: 'run-1' }))).resolves.toEqual(
+      [
+        {
+          dispatchId: 'dispatch-live',
+          task: 'Implement fleet controls',
+          dispatchedAtMs: Date.parse('2026-09-15T12:00:00Z'),
+          lastContactAtMs: Date.parse('2026-09-15T12:02:00Z'),
+          liveness: 'live',
+          reason: null,
+          question: { messageId: 'question-1', body: 'Which host should own this?' }
+        },
+        {
+          dispatchId: 'dispatch-unreachable',
+          task: 'Inspect the unreachable worker',
+          dispatchedAtMs: Date.parse('2026-09-15T12:03:00Z'),
+          lastContactAtMs: Date.parse('2026-09-15T12:04:00Z'),
+          liveness: 'unverifiable',
+          reason: 'host_unavailable',
+          question: null
+        }
+      ]
+    )
+    expect(upstream.listWorkers.mock.calls).toEqual([
+      [{ run: 'run-1', includeRemote: true, paginate: true }, { runtime: world.runtime }],
+      [
+        {
+          run: 'run-1',
+          includeRemote: true,
+          paginate: true,
+          cursor: 'stable-page-2'
+        },
+        { runtime: world.runtime }
+      ]
+    ])
+  })
+
+  it('stops only an exact worker in the watcher Run through the durable host path', async () => {
+    const world = fakeRuntime()
+    const db = world.runtime.getOrchestrationDb()
+    db.getDispatchContextById.mockReturnValue({
+      id: 'dispatch-1',
+      run_id: 'run-1',
+      process_incarnation: 'runtime:pty:incarnation-1'
+    })
+    db.getWorkerDispatch.mockReturnValue({ state: 'ready' })
+    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
+      persistOrchestrationRunId: async () => undefined
+    })
+
+    await expect(
+      adapter.stopWorker(enrollment({ orchestrationRunId: 'run-1' }), 'dispatch-1')
+    ).resolves.toMatchObject({ status: 'applied', appliedAtMs: expect.any(Number) })
+    expect(upstream.mutationRun.mock.calls[0]![0]).toMatchObject({
+      method: 'orchestration.workerStop',
+      params: { dispatch: 'dispatch-1' },
+      orchestrationRequestId: expect.stringMatching(/^heimdall-stop-worker-/)
+    })
+    expect(upstream.stopWorker).toHaveBeenCalledWith(
+      { dispatch: 'dispatch-1' },
+      {
+        runtime: world.runtime,
+        orchestrationMutation: expect.objectContaining({
+          method: 'orchestration.workerStop'
+        })
+      }
+    )
+  })
+
+  it('accepts a federated worker only with its exact remote process identity', async () => {
+    const world = fakeRuntime()
+    const db = world.runtime.getOrchestrationDb()
+    db.getDispatchContextById.mockReturnValue({
+      id: 'dispatch-remote',
+      run_id: 'run-1',
+      process_incarnation: null
+    })
+    db.getWorkerDispatch.mockReturnValue({ state: 'ready' })
+    db.getFederatedDispatch.mockReturnValue({
+      remote_runtime_epoch: 'remote-epoch',
+      remote_terminal_handle: 'terminal-remote'
+    })
+    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
+      persistOrchestrationRunId: async () => undefined
+    })
+
+    await expect(
+      adapter.stopWorker(enrollment({ orchestrationRunId: 'run-1' }), 'dispatch-remote')
+    ).resolves.toMatchObject({ status: 'applied' })
+    expect(upstream.stopWorker).toHaveBeenCalledWith(
+      { dispatch: 'dispatch-remote' },
+      expect.objectContaining({ runtime: world.runtime })
+    )
+  })
+
+  it('refuses a pre-send host failure without claiming the worker stopped', async () => {
+    const world = fakeRuntime()
+    const db = world.runtime.getOrchestrationDb()
+    db.getDispatchContextById.mockReturnValue({
+      id: 'dispatch-1',
+      run_id: 'run-1',
+      process_incarnation: 'runtime:pty:incarnation-1'
+    })
+    db.getWorkerDispatch.mockReturnValue({ state: 'ready' })
+    upstream.stopWorker.mockRejectedValue(
+      new OrchestrationError('server_required', 'Worker host is unavailable')
+    )
+    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
+      persistOrchestrationRunId: async () => undefined
+    })
+
+    await expect(
+      adapter.stopWorker(enrollment({ orchestrationRunId: 'run-1' }), 'dispatch-1')
+    ).resolves.toEqual({
+      status: 'refused',
+      reason: 'worker-unverifiable',
+      detail: 'Worker host is unavailable'
+    })
+  })
+
+  it('rechecks the coordinator seat inside the durable stop invocation', async () => {
+    const world = fakeRuntime()
+    const db = world.runtime.getOrchestrationDb()
+    db.getDispatchContextById.mockReturnValue({
+      id: 'dispatch-1',
+      run_id: 'run-1',
+      process_incarnation: 'runtime:pty:incarnation-1'
+    })
+    db.getWorkerDispatch.mockReturnValue({ state: 'ready' })
+    upstream.resolveRunScope
+      .mockReturnValueOnce({
+        id: 'run-1',
+        consumer_generation: 1,
+        coordinator_handle: IDENTITY.handle,
+        coordinator_pane_key: IDENTITY.paneKey
+      })
+      .mockImplementationOnce(() => {
+        throw new OrchestrationError('consumer_fenced', 'Coordinator seat changed')
+      })
+    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
+      persistOrchestrationRunId: async () => undefined
+    })
+
+    await expect(
+      adapter.stopWorker(enrollment({ orchestrationRunId: 'run-1' }), 'dispatch-1')
+    ).rejects.toBeInstanceOf(CoordinatorSeatLostError)
+    expect(upstream.stopWorker).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    [
+      { state: 'stop_unknown', processAction: 'none', lastError: 'identity changed' },
+      {
+        status: 'refused',
+        reason: 'worker-unverifiable',
+        detail: 'identity changed'
+      }
+    ],
+    [
+      { state: 'stop_unknown', processAction: 'unknown', lastError: 'connection lost' },
+      { status: 'indeterminate', detail: 'connection lost' }
+    ]
+  ])('preserves an unconfirmed stop receipt as %j', async (receipt, expected) => {
+    const world = fakeRuntime()
+    const db = world.runtime.getOrchestrationDb()
+    db.getDispatchContextById.mockReturnValue({
+      id: 'dispatch-1',
+      run_id: 'run-1',
+      process_incarnation: 'runtime:pty:incarnation-1'
+    })
+    db.getWorkerDispatch.mockReturnValue({ state: 'ready' })
+    upstream.stopWorker.mockResolvedValue(receipt)
+    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
+      persistOrchestrationRunId: async () => undefined
+    })
+
+    await expect(
+      adapter.stopWorker(enrollment({ orchestrationRunId: 'run-1' }), 'dispatch-1')
+    ).resolves.toEqual(expected)
+  })
+
+  it('refuses a dispatch outside the watcher Run before invoking the stop path', async () => {
+    const world = fakeRuntime()
+    const db = world.runtime.getOrchestrationDb()
+    db.getDispatchContextById.mockReturnValue({
+      id: 'dispatch-other',
+      run_id: 'run-other',
+      process_incarnation: 'runtime:pty:other'
+    })
+    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
+      persistOrchestrationRunId: async () => undefined
+    })
+
+    await expect(
+      adapter.stopWorker(enrollment({ orchestrationRunId: 'run-1' }), 'dispatch-other')
+    ).resolves.toMatchObject({ status: 'refused', reason: 'worker-unverifiable' })
+    expect(upstream.mutationRun).not.toHaveBeenCalled()
+    expect(upstream.stopWorker).not.toHaveBeenCalled()
   })
 
   it.each(['consumer_fenced', 'run_not_found'] as const)(

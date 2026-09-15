@@ -12,10 +12,135 @@
         "parked": "Parked",
         "terminal": "Complete",
         "disabled": "Stopped",
-        "unreachable": "Host unreachable"
+        "unreachable": "Host unreachable",
+        "lostContact": "Host unreachable · last confirmed {{age}}",
+        "phase": "Current phase"
       },
       "indicator": {
-        "tooltip": "{{kind}} · {{state}}"
+        "tooltip": "{{kind}} · {{state}}",
+        "lostContact": "Host unreachable · last confirmed {{age}}"
+      },
+      "host": {
+        "remote": "Remote · {{host}}",
+        "local": "This device"
+      },
+      "time": {
+        "never": "Never",
+        "now": "now",
+        "ago": "{{age}} ago"
+      },
+      "sidebar": {
+        "title": "Heimdall",
+        "attention": "{{count}} watchers need attention"
+      },
+      "page": {
+        "back": "Back",
+        "title": "Heimdall fleet",
+        "summary": "{{active}} active · {{attention}} need attention",
+        "refresh": "Refresh fleet",
+        "staleError": "Fleet refresh failed; showing the last confirmed snapshot: {{error}}"
+      },
+      "fleet": {
+        "title": "Watcher fleet",
+        "emptyTitle": "No watchers in the fleet",
+        "emptyDescription": "Arm a watcher from a supported workspace to see it here.",
+        "name": "Watcher",
+        "status": "Status",
+        "phase": "Phase",
+        "activeBurn": "Active time",
+        "turns": "Turns",
+        "elapsed": "Elapsed",
+        "lastTick": "Last tick"
+      },
+      "detail": {
+        "back": "Back to fleet",
+        "refreshing": "Refreshing detail",
+        "observed": "Owner state observed {{age}}",
+        "remote": "Remote cache",
+        "lostContact": "Last confirmed {{age}}; the owner cannot currently be reached. The watcher may still be running.",
+        "readOnly": "Read-only.",
+        "staleError": "Detail refresh failed; showing the last confirmed data: {{error}}",
+        "loading": "Loading owner detail…",
+        "unavailable": "Owner detail is unavailable.",
+        "selectPrompt": "Select a watcher to inspect its decisions, workers, and owner controls."
+      },
+      "controls": {
+        "title": "Owner controls",
+        "resume": "Resume",
+        "pause": "Pause",
+        "disarm": "Disarm",
+        "approve": "Approve",
+        "budgetResumeWarning": "This watcher exhausted its budget. Increase the limit before resuming or it will park again."
+      },
+      "command": {
+        "applied": "Applied by the owner at {{time}}.",
+        "refused": "Owner refused the command ({{reason}}): {{detail}}",
+        "indeterminate": "The command may or may not have applied. Re-reading owner state… {{detail}}",
+        "stopAllIndeterminate": "{{count}} stop commands may or may not have applied. Owner state is being re-read.",
+        "stopAllRefused": "{{count}} owners refused the stop command."
+      },
+      "budget": {
+        "title": "Budget",
+        "activeTime": "Active time",
+        "unlimited": "Unlimited",
+        "unlimitedShort": "unlimited",
+        "turns": "Worker turns",
+        "exhausted": "Exhausted: {{kind}}",
+        "minutesLimit": "Active minutes limit",
+        "turnLimit": "Worker turn limit",
+        "apply": "Apply budget"
+      },
+      "escalations": {
+        "title": "Open escalations"
+      },
+      "workers": {
+        "title": "Live workers",
+        "empty": "No live workers.",
+        "live": "Live",
+        "unverifiable": "Unreachable",
+        "exited": "Exited",
+        "noContact": "No confirmed contact",
+        "lastContact": "Last contact {{age}}",
+        "stop": "Stop",
+        "answerPlaceholder": "Answer the worker",
+        "answerLabel": "Answer worker question",
+        "sendAnswer": "Send answer"
+      },
+      "trace": {
+        "title": "Decision trace",
+        "noDecision": "No decision recorded",
+        "decidedAction": "Act: {{action}}",
+        "empty": "No decision traces yet.",
+        "tick": "Tick {{seq}}",
+        "running": "Running",
+        "saw": "Saw",
+        "noSnapshot": "No snapshot recorded",
+        "decided": "Decided",
+        "gate": "Gate",
+        "declined": "Declined",
+        "noneDeclined": "No phase declined"
+      },
+      "activity": {
+        "title": "Fleet action history",
+        "asOf": "As of {{age}}",
+        "partial": "{{count}} watcher histories could not be refreshed; visible records are retained.",
+        "empty": "No autonomous actions recorded yet."
+      },
+      "ledger": {
+        "title": "Watcher activity",
+        "attemptResolved": "Attempt resolved",
+        "attemptAbandoned": "Attempt abandoned",
+        "evidence": "Evidence",
+        "activeTimeStarted": "Active time started",
+        "activeTimeChecked": "Active time checkpoint",
+        "activeTimeStopped": "Active time stopped",
+        "workerTurn": "Worker turn",
+        "finished": "Finished",
+        "empty": "No activity recorded yet."
+      },
+      "error": {
+        "unavailable": "Heimdall control plane is unavailable.",
+        "ownerUnavailable": "The owning runtime is unavailable; no enrollment was sent."
       }
     }
   }

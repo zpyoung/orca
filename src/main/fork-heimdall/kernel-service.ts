@@ -1,8 +1,15 @@
 import { randomUUID } from 'node:crypto'
-import { homedir } from 'node:os'
-import { ApprovalScopeSchema, type ApprovalScope } from '../../shared/fork-heimdall/gate'
+import { deriveBudgetState } from '../../shared/fork-heimdall/budget'
 import type { KernelAction, WatcherKind } from '../../shared/fork-heimdall/kind-contract'
-import { getLatestApproval, getInFlightAttempts } from '../../shared/fork-heimdall/ledger-queries'
+import {
+  WatcherTargetSchema,
+  type HeimdallFleetSnapshot,
+  type WatcherCommandRequest,
+  type WatcherCommandResult,
+  type WatcherDetail,
+  type WatcherTarget
+} from '../../shared/fork-heimdall/fleet-types'
+import { getInFlightAttempts } from '../../shared/fork-heimdall/ledger-queries'
 import type { LedgerEntry, WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type {
   EnrollInput,
@@ -12,36 +19,30 @@ import type {
 } from '../../shared/fork-heimdall/watcher-types'
 import { HeimdallBudgetClock } from './budget-clock'
 import { HeimdallDatabase } from './database'
-import {
-  buildHeimdallDebugReport,
-  dormantWatcherStatus,
-  type HeimdallDebugReport
-} from './debug-report'
+import { WatcherControlPlane } from './control-plane'
+import type { HeimdallDebugReport } from './debug-report'
 import {
   HeimdallEnrollmentStore,
   isMalformedKindPayloadEnrollment,
   type EnrollmentRecord,
   type EnrollmentStore
 } from './enrollment-store'
-import {
-  authorizeKindEnrollment,
-  enrollmentForPresentation,
-  extendBudgetForRearm,
-  runnableEnrollment
-} from './kernel-enrollment'
+import { enrollmentForPresentation, runnableEnrollment } from './kernel-enrollment'
+import { enrollWatcher } from './kernel-enrollment-lifecycle'
 import { HeimdallKernelHost } from './kernel-host'
 import { watcherListEntry } from './kernel-list-entry'
 import type { HeimdallKernelService } from './kernel-service-contract'
 import {
-  requireLeaseStore,
   runnerLedgerStore,
   type HeimdallKernelServiceDependencies
 } from './kernel-service-dependencies'
+import { shutdownHeimdallKernel } from './kernel-shutdown'
+import { KernelTerminalTransition } from './kernel-terminal-transition'
+import { KernelReadModel } from './kernel-read-model'
 import { HeimdallLedgerStore } from './ledger-store'
 import { HostRoutedLeaseStore, type LeaseStore } from './lease-store'
 import { MalformedEnrollmentLifecycle } from './malformed-enrollment'
 import { notifyWatcher } from './notification'
-import { mintCoordinatorIdentity } from './orchestration/coordinator-identity'
 import { RuntimeHeimdallOrchestrationAdapter } from './orchestration/orchestration-adapter'
 import { WatcherKindRegistry, type RegisteredWatcherKind } from './registry'
 import { WatcherRunnerLoop } from './runner-loop'
@@ -50,14 +51,20 @@ import type { RunnerBudgetClock, RunnerLedgerStore, WatcherRunner } from './runn
 export type { HeimdallKernelService } from './kernel-service-contract'
 export class HeimdallKernelServiceImpl implements HeimdallKernelService {
   private readonly registry = new WatcherKindRegistry()
+  private readonly runners = new Map<string, WatcherRunner>()
   private malformedEnrollments: MalformedEnrollmentLifecycle | null = null
   private database: HeimdallDatabase | null = null
-  private readonly runners = new Map<string, WatcherRunner>()
   private enrollments: EnrollmentStore | null = null
   private ledgerStore: HeimdallLedgerStore | null = null
   private leaseStore: LeaseStore | null = null
+  private readModel: KernelReadModel | null = null
   private host: HeimdallKernelHost | null = null
   private runnerLoop: WatcherRunnerLoop | null = null
+  private controlPlane: WatcherControlPlane | null = null
+  private terminalTransition: KernelTerminalTransition | null = null
+  private readonly subscribers = new Set<() => void>()
+  private readonly shutdownListeners = new Set<() => void>()
+  private unsubscribeLedger: (() => void) | null = null
   private loaded = false
   private stopped = false
   private readonly onSuspend = (): void => this.suspend()
@@ -73,7 +80,11 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
       return
     }
     for (const record of this.requireEnrollments().list()) {
-      if (record.kind !== kind.id || this.runners.has(record.watcherId)) {
+      if (
+        record.kind !== kind.id ||
+        this.runners.has(record.watcherId) ||
+        !this.ownsEnrollment(record)
+      ) {
         continue
       }
       if (isMalformedKindPayloadEnrollment(record)) {
@@ -90,81 +101,26 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
         this.database?.isReadOnly() !== true
       )
     }
+    this.publishChanged()
   }
 
   async enroll(untrustedInput: EnrollInput): Promise<EnrollResult> {
     this.ensureLoaded()
-    const authorization = await authorizeKindEnrollment(this.registry, untrustedInput)
-    if (authorization.status !== 'authorized') {
-      return authorization
-    }
-    const { authorized, kind } = authorization
-
-    const existing = this.requireEnrollments().findLiveByWorkspace(authorized.workspaceKey)
-    if (existing) {
-      if (isMalformedKindPayloadEnrollment(existing)) {
-        return {
-          status: 'refused',
-          reason: 'invalid-payload',
-          detail: 'Persisted kind payload is malformed and cannot be re-armed'
-        }
-      }
-      if (existing.enabled) {
-        return {
-          status: 'refused',
-          reason: 'duplicate-workspace',
-          existingWatcherId: existing.watcherId
-        }
-      }
-      if (existing.kind !== authorized.kind) {
-        return {
-          status: 'refused',
-          reason: 'invalid-payload',
-          detail: `Workspace is already enrolled as ${existing.kind}`
-        }
-      }
-      const extendedBudget = extendBudgetForRearm(
-        this.requireRunnerLedger().read(existing.watcherId),
-        existing.budget,
-        authorized.budget
-      )
-      const rearmed = this.requireEnrollments().rearm(existing.watcherId, {
-        capabilities: authorized.capabilities,
-        budget: extendedBudget,
-        kindPayload: authorized.kindPayload
-      })
-      this.requireRunnerLoop().acknowledgePark(rearmed.watcherId)
-      let runner = this.runners.get(rearmed.watcherId)
-      if (!runner) {
-        runner = this.restoreRunner(rearmed, kind)
-      } else {
-        runner.enrollment = rearmed
-        runner.status = {
-          ...runner.status,
-          enabled: true,
-          state: 'watching',
-          phase: 're-armed',
-          reason: null,
-          parkReason: null
-        }
-        runner.stopped = false
-        this.requireRunnerLoop().schedule(runner, 0)
-      }
-      return { status: 're-armed', entry: this.listEntry(rearmed) }
-    }
-
-    const enrollment: WatcherEnrollment = {
-      ...authorized,
-      watcherId: this.createId(),
-      enabled: true,
-      coordinatorIdentity: mintCoordinatorIdentity(this.createId()),
-      orchestrationRunId: null,
-      createdAtMs: this.now(),
-      terminalAtMs: null
-    }
-    const inserted = this.requireEnrollments().insert(enrollment)
-    this.restoreRunner(inserted, kind)
-    return { status: 'enrolled', entry: this.listEntry(inserted) }
+    return await enrollWatcher(untrustedInput, {
+      registry: this.registry,
+      storageAuthority: this.storageAuthority(),
+      enrollments: this.requireEnrollments(),
+      readLedger: (watcherId) => this.requireRunnerLedger().read(watcherId),
+      owns: (enrollment) => this.ownsEnrollment(enrollment),
+      restore: (enrollment, kind) => this.restoreRunner(enrollment, kind),
+      runner: (watcherId) => this.runners.get(watcherId) ?? null,
+      acknowledgePark: (watcherId) => this.requireRunnerLoop().acknowledgePark(watcherId),
+      entry: (enrollment) => this.listEntry(enrollment),
+      schedule: (runner) => this.requireRunnerLoop().schedule(runner, 0),
+      publish: () => this.publishChanged(),
+      now: () => this.now(),
+      createId: () => this.createId()
+    })
   }
 
   async list(): Promise<WatcherListEntry[]> {
@@ -174,68 +130,31 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
       .map((record) => this.listEntry(record))
   }
 
-  async disarm(watcherId: string): Promise<void> {
+  async fleet(): Promise<HeimdallFleetSnapshot> {
     this.ensureLoaded()
-    const enrollment = this.requireEnrollments().setEnabled(watcherId, false)
-    const runner = this.runners.get(watcherId)
-    if (runner) {
-      if (isMalformedKindPayloadEnrollment(enrollment)) {
-        const guard = runner.leaseGuard
-        this.requireRunnerLoop().disarm(runner)
-        if (guard) {
-          await requireLeaseStore(this.leaseStore).release(enrollment.workspaceKey, guard.epoch)
-        }
-        return
-      }
-      runner.enrollment = enrollment
-      runner.status = {
-        ...runner.status,
-        enabled: false,
-        state: 'disabled',
-        phase: 'disarmed',
-        reason: null,
-        parkReason: null,
-        nextPulseAtMs: null
-      }
-      if (getInFlightAttempts(this.requireRunnerLedger().read(watcherId)).length === 0) {
-        const guard = runner.leaseGuard
-        this.requireRunnerLoop().disarm(runner)
-        if (guard) {
-          await requireLeaseStore(this.leaseStore).release(enrollment.workspaceKey, guard.epoch)
-        }
-      }
-    }
+    return this.requireReadModel().fleet(this.requireEnrollments().list())
   }
 
-  async disarmAll(): Promise<void> {
+  async detail(untrustedTarget: WatcherTarget): Promise<WatcherDetail> {
     this.ensureLoaded()
-    for (const enrollment of this.requireEnrollments().list()) {
-      if (enrollment.terminalAtMs === null && enrollment.enabled) {
-        await this.disarm(enrollment.watcherId)
-      }
-    }
+    const target = WatcherTargetSchema.parse(untrustedTarget)
+    return await this.requireReadModel().detail(
+      target,
+      this.requireEnrollmentRecord(target.watcherId)
+    )
   }
 
-  async approve(watcherId: string, untrustedScope: ApprovalScope): Promise<void> {
+  command(request: WatcherCommandRequest): Promise<WatcherCommandResult> {
     this.ensureLoaded()
-    const scope = ApprovalScopeSchema.parse(untrustedScope)
-    const enrollment = this.requireEnrollment(watcherId)
-    const ledger = this.requireRunnerLedger().read(watcherId)
-    const previous = getLatestApproval(ledger, scope)
-    this.append(watcherId, {
-      eventId: this.createId(),
-      watcherId,
-      atMs: this.now(),
-      origin: 'owner',
-      class: 'fact',
-      kind: 'approval',
-      scope,
-      decision: 'approved',
-      foldCount: (previous?.foldCount ?? 0) + 1
-    })
-    const runner =
-      this.runners.get(watcherId) ?? this.restoreRunner(enrollment, this.requireKind(enrollment))
-    this.requireRunnerLoop().schedule(runner, 0)
+    if (!this.controlPlane) {
+      throw new Error('Heimdall control plane is unavailable')
+    }
+    return this.controlPlane.command(request)
+  }
+
+  subscribe(listener: () => void): () => void {
+    this.subscribers.add(listener)
+    return () => this.subscribers.delete(listener)
   }
 
   ledger(watcherId: string): WatcherLedger {
@@ -243,33 +162,9 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
     this.requireEnrollmentRecord(watcherId)
     return this.requireRunnerLedger().read(watcherId)
   }
-
   debugReport(watcherId: string): HeimdallDebugReport {
     this.ensureLoaded()
-    const enrollment = enrollmentForPresentation(this.requireEnrollmentRecord(watcherId))
-    const ledger = this.requireRunnerLedger().read(watcherId)
-    const runner = this.runners.get(watcherId) ?? null
-    return buildHeimdallDebugReport({
-      enrollment,
-      status: runner?.status ?? dormantWatcherStatus(enrollment, ledger),
-      ledger,
-      traces: runner?.traces ?? this.requireRunnerLedger().readTickTraces(watcherId),
-      runner: runner
-        ? {
-            consecutiveErrors: runner.consecutiveErrors,
-            lastFullResyncAtMs: runner.lastFullResyncAtMs,
-            tickQueued: runner.tickQueued,
-            reconcileAgain: runner.reconcileAgain,
-            timerArmed: runner.timer !== null,
-            actionInFlight: getInFlightAttempts(ledger).length > 0,
-            leaseEpoch: runner.leaseGuard?.epoch ?? null
-          }
-        : null,
-      generatedAtMs: this.now(),
-      appVersion: this.dependencies.appVersion?.() ?? 'unknown',
-      platform: process.platform,
-      homeDirectory: homedir()
-    })
+    return this.requireReadModel().debugReport(this.requireEnrollmentRecord(watcherId))
   }
 
   suspend(): void {
@@ -290,31 +185,47 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
     }
   }
 
+  start(): void {
+    if (!this.dependencies.database) {
+      const store: unknown = this.dependencies.store
+      if (
+        typeof store !== 'object' ||
+        store === null ||
+        !('getProfileStorageDirectory' in store) ||
+        typeof store.getProfileStorageDirectory !== 'function'
+      ) {
+        return
+      }
+      const directory = store.getProfileStorageDirectory()
+      if (typeof directory !== 'string' || directory.length === 0) {
+        return
+      }
+    }
+    this.ensureLoaded()
+  }
+
+  onShutdown(listener: () => void): () => void {
+    this.shutdownListeners.add(listener)
+    return () => this.shutdownListeners.delete(listener)
+  }
+
   stopForShutdown(): void {
     if (this.stopped) {
       return
     }
     this.stopped = true
-    if (!this.loaded) {
-      return
-    }
-    // The caller is Electron's synchronous will-quit teardown, so a throw here would skip every
-    // later member of that barrier and orphan plugin hosts and browser daemons.
-    try {
-      for (const runner of this.runners.values()) {
-        const guard = runner.leaseGuard
-        this.requireRunnerLoop().stop(runner)
-        if (guard) {
-          void requireLeaseStore(this.leaseStore)
-            .release(runner.enrollment.workspaceKey, guard.epoch)
-            .catch(() => {})
-        }
-      }
-      this.host?.detachPowerMonitor()
-      this.database?.close()
-    } catch (error) {
-      console.warn('[heimdall] shutdown teardown failed:', error)
-    }
+    shutdownHeimdallKernel({
+      loaded: this.loaded,
+      listeners: this.shutdownListeners,
+      subscribers: this.subscribers,
+      runners: this.runners.values(),
+      runnerLoop: this.runnerLoop,
+      leaseStore: this.leaseStore,
+      host: this.host,
+      unsubscribeLedger: this.unsubscribeLedger,
+      database: this.database
+    })
+    this.unsubscribeLedger = null
   }
 
   /** Narrow test seam: real scheduling always calls the same serialized pulse. */
@@ -354,6 +265,12 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
     this.enrollments = enrollments
     this.ledgerStore = ledgerStore
     this.leaseStore = leaseStore
+    this.terminalTransition = new KernelTerminalTransition({
+      enrollments,
+      ledger: ledgerStore,
+      now: () => this.now(),
+      createId: () => this.createId()
+    })
     this.host = host
     const runnerLedger = runnerLedgerStore(ledgerStore)
     this.malformedEnrollments = new MalformedEnrollmentLifecycle({
@@ -392,6 +309,7 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
       budgetClock: budgetClock as RunnerBudgetClock,
       leaseStore,
       orchestration,
+      onStatus: () => this.publishChanged(),
       persistEnabled: (enrollment, enabled) => {
         const updated = this.requireEnrollments().setEnabled(enrollment.watcherId, enabled)
         if (isMalformedKindPayloadEnrollment(updated)) {
@@ -399,6 +317,8 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
         }
         return updated
       },
+      persistTerminal: (runner, fired) =>
+        this.requireTerminalTransition().commit(runner.enrollment, fired),
       notifyApproval: (enrollment, action) =>
         notifyWatcher(
           this.dependencies.store,
@@ -414,9 +334,34 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
       holderId: this.dependencies.holderId ?? `process-${process.pid}-${randomUUID()}`
     })
     this.loaded = true
+    this.controlPlane = new WatcherControlPlane({
+      enrollments,
+      ledger: ledgerStore,
+      lease: leaseStore,
+      orchestration,
+      runnerLoop: this.requireRunnerLoop(),
+      runner: (watcherId) => this.runners.get(watcherId) ?? null,
+      owns: (enrollment) => this.ownsEnrollment(enrollment),
+      now: () => this.now(),
+      createId: () => this.createId(),
+      changed: () => this.publishChanged()
+    })
+    this.readModel = new KernelReadModel({
+      ledger: runnerLedger,
+      orchestration,
+      entry: (record) => this.listEntry(record),
+      runner: (watcherId) => this.runners.get(watcherId) ?? null,
+      owns: (record) => this.ownsEnrollment(record),
+      now: () => this.now(),
+      appVersion: () => this.dependencies.appVersion?.() ?? 'unknown'
+    })
+    this.unsubscribeLedger = ledgerStore.subscribe(() => this.publishChanged())
     const writable = !database.isReadOnly()
     host.attachPowerMonitor()
     for (const record of enrollments.list()) {
+      if (!this.ownsEnrollment(record)) {
+        continue
+      }
       if (isMalformedKindPayloadEnrollment(record)) {
         this.malformedEnrollments!.record(record, writable)
         continue
@@ -438,6 +383,10 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
     kind: RegisteredWatcherKind,
     schedule: boolean = true
   ): WatcherRunner {
+    enrollment = this.requireTerminalTransition().recover(
+      enrollment,
+      this.database?.isReadOnly() !== true
+    )
     const existing = this.runners.get(enrollment.watcherId)
     if (existing) {
       return existing
@@ -446,7 +395,11 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
     this.runners.set(enrollment.watcherId, runner)
     const hasInFlight =
       getInFlightAttempts(this.requireRunnerLedger().read(enrollment.watcherId)).length > 0
-    if (schedule && (enrollment.enabled || hasInFlight)) {
+    if (
+      schedule &&
+      enrollment.terminalAtMs === null &&
+      ((!enrollment.paused && enrollment.enabled) || hasInFlight)
+    ) {
       this.requireRunnerLoop().schedule(runner, 0)
     }
     return runner
@@ -454,12 +407,19 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
   private listEntry(record: EnrollmentRecord): WatcherListEntry {
     const malformed = isMalformedKindPayloadEnrollment(record)
     const enrollment = enrollmentForPresentation(record)
+    const ledger = this.requireRunnerLedger().read(enrollment.watcherId)
+    const runner = this.runners.get(enrollment.watcherId)
     return watcherListEntry({
       enrollment,
       kind: this.registry.get(enrollment.kind),
-      ledger: this.requireRunnerLedger().read(enrollment.watcherId),
-      ...(this.runners.get(enrollment.watcherId)
-        ? { status: this.runners.get(enrollment.watcherId)!.status }
+      ledger,
+      ...(runner
+        ? {
+            status: {
+              ...runner.status,
+              budget: deriveBudgetState(ledger, enrollment.budget)
+            }
+          }
         : {}),
       malformedPayload: malformed || this.malformedEnrollments!.has(enrollment.watcherId)
     })
@@ -485,6 +445,12 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
     }
     return this.runnerLoop
   }
+  private requireTerminalTransition(): KernelTerminalTransition {
+    if (!this.terminalTransition) {
+      throw new Error('Heimdall terminal transition is unavailable')
+    }
+    return this.terminalTransition
+  }
 
   private requireEnrollmentRecord(watcherId: string): EnrollmentRecord {
     const enrollment = this.requireEnrollments().get(watcherId)
@@ -502,12 +468,31 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
     return enrollment
   }
 
-  private requireKind(enrollment: WatcherEnrollment): RegisteredWatcherKind {
-    const kind = this.registry.get(enrollment.kind)
-    if (!kind) {
-      throw new Error(`Unknown Heimdall watcher kind: ${enrollment.kind}`)
+  private requireReadModel(): KernelReadModel {
+    if (!this.readModel) {
+      throw new Error('Heimdall read model is unavailable')
     }
-    return kind
+    return this.readModel
+  }
+
+  private ownsEnrollment(enrollment: EnrollmentRecord): boolean {
+    return this.storageAuthority() === 'runtime'
+      ? enrollment.schedulerOwner === 'remote_host_service'
+      : enrollment.schedulerOwner !== 'remote_host_service'
+  }
+
+  private storageAuthority(): 'desktop' | 'runtime' {
+    return this.dependencies.storageAuthority ?? 'desktop'
+  }
+
+  private publishChanged(): void {
+    for (const subscriber of this.subscribers) {
+      try {
+        subscriber()
+      } catch (error) {
+        console.warn('[heimdall] fleet subscriber failed:', error)
+      }
+    }
   }
 
   private append(watcherId: string, entry: LedgerEntry): void {

@@ -1,6 +1,7 @@
 import type { KernelAction } from '../../shared/fork-heimdall/kind-contract'
 import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
 import type { WatcherTickTrace } from '../../shared/fork-heimdall/tick-trace'
+import type { FiredStopPredicate } from '../../shared/fork-heimdall/stop-policy'
 import type { WatcherEnrollment, WatcherStatus } from '../../shared/fork-heimdall/watcher-types'
 import type { HeimdallOrchestrationAdapter } from './orchestration/orchestration-adapter'
 import type { LeaseGuard, LeaseStore } from './lease-store'
@@ -28,6 +29,7 @@ export type WatcherRunner = {
   reconcileAgain: boolean
   stopped: boolean
   suspended: boolean
+  controlPending: 'pause' | 'disarm' | null
   recovered: boolean
   forceFresh: boolean
   consecutiveErrors: number
@@ -45,6 +47,7 @@ export type WatcherRunnerDependencies = {
   leaseStore: LeaseStore
   orchestration: HeimdallOrchestrationAdapter
   persistEnabled(enrollment: WatcherEnrollment, enabled: boolean): WatcherEnrollment
+  persistTerminal(runner: WatcherRunner, fired: FiredStopPredicate): WatcherEnrollment
   now?: () => number
   createId?: () => string
   setTimer?: typeof setTimeout

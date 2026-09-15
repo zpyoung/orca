@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -85,5 +85,52 @@ describe('Heimdall database initialization', () => {
     expect(first.connection().pragma('user_version', { simple: true })).toBe(futureVersion)
     expect(() => first.assertWritable()).toThrow('database is read-only')
     expect(competing.connection().pragma('user_version', { simple: true })).toBe(futureVersion)
+  })
+
+  it('migrates version-one enrollments with durable control defaults', () => {
+    const databaseDirectory = join(root, 'fork-heimdall')
+    mkdirSync(databaseDirectory, { recursive: true })
+    const databasePath = join(databaseDirectory, 'heimdall.db')
+    const legacy = new Database(databasePath)
+    legacy.exec(`
+      CREATE TABLE heimdall_enrollment (
+        watcher_id TEXT PRIMARY KEY,
+        kind TEXT NOT NULL,
+        workspace_key TEXT NOT NULL,
+        execution_host_id TEXT NOT NULL,
+        repo_id TEXT NOT NULL,
+        worktree_id TEXT,
+        workspace_path TEXT NOT NULL,
+        scheduler_owner TEXT NOT NULL,
+        enabled INTEGER NOT NULL,
+        capabilities_json TEXT NOT NULL,
+        budget_json TEXT NOT NULL,
+        kind_payload_json TEXT NOT NULL,
+        coordinator_handle TEXT NOT NULL,
+        coordinator_pane_key TEXT NOT NULL,
+        orchestration_run_id TEXT,
+        created_at_ms INTEGER NOT NULL,
+        terminal_at_ms INTEGER
+      );
+      INSERT INTO heimdall_enrollment VALUES (
+        'watcher-legacy', 'hosted-review', 'local::/workspace', 'local', 'repo-1', NULL,
+        '/workspace', 'local_host_service', 1, '{}',
+        '{"wallClockActiveMs":null,"turns":null}', '{}', 'coordinator', 'pane', NULL, 1, NULL
+      );
+      PRAGMA user_version = 1;
+    `)
+    legacy.close()
+
+    const migrated = new HeimdallDatabase(root)
+    opened.push(migrated)
+    expect(
+      migrated
+        .connection()
+        .prepare('SELECT paused, command_revision FROM heimdall_enrollment WHERE watcher_id = ?')
+        .get('watcher-legacy')
+    ).toEqual({ paused: 0, command_revision: 0 })
+    expect(migrated.connection().pragma('user_version', { simple: true })).toBe(
+      HEIMDALL_DATABASE_SCHEMA_VERSION
+    )
   })
 })

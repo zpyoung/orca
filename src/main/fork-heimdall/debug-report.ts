@@ -1,8 +1,13 @@
 import { sanitizeCrashReportString } from '../../shared/crash-report-redaction'
 import { deriveBudgetState, type BudgetState } from '../../shared/fork-heimdall/budget'
+import { getLatestEscalations } from '../../shared/fork-heimdall/ledger-queries'
 import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type { WatcherTickTrace } from '../../shared/fork-heimdall/tick-trace'
-import type { WatcherEnrollment, WatcherStatus } from '../../shared/fork-heimdall/watcher-types'
+import type {
+  WatcherEnrollment,
+  WatcherParkReason,
+  WatcherStatus
+} from '../../shared/fork-heimdall/watcher-types'
 
 export const HEIMDALL_DEBUG_REPORT_SCHEMA_VERSION = 1
 export const DEBUG_REPORT_LEDGER_ENTRY_LIMIT = 200
@@ -53,19 +58,128 @@ export function collapseWatcherHomeDirectory(path: string, homeDirectory?: strin
   }
   return remainder.startsWith('/') || remainder.startsWith('\\') ? `~${remainder}` : path
 }
+function persistedParkReason(
+  enrollment: WatcherEnrollment,
+  ledger: WatcherLedger,
+  budget: BudgetState
+): WatcherParkReason | null {
+  const park = getLatestEscalations(ledger)
+    .toReversed()
+    .find((entry) => entry.status === 'open' && entry.escalationKind.startsWith('park-'))
+  if (!park) {
+    return null
+  }
+  if (park.escalationKind === 'park-budget') {
+    const persisted = decodeParkDetail(park.escalationId, enrollment.watcherId, 'budget')
+    if (persisted === 'wall-clock' || persisted === 'turns') {
+      return { kind: 'budget', exhaustion: { kind: persisted } }
+    }
+    return budget.exhausted ? { kind: 'budget', exhaustion: budget.exhausted } : null
+  }
+  if (park.escalationKind === 'park-stop-predicate') {
+    return {
+      kind: 'stop-predicate',
+      predicateId:
+        decodeParkDetail(park.escalationId, enrollment.watcherId, 'stop-predicate') ??
+        park.reason ??
+        'persisted-stop-predicate',
+      reason: park.reason ?? 'stop-predicate'
+    }
+  }
+  if (park.escalationKind === 'park-worker-question') {
+    const question = getLatestEscalations(ledger)
+      .toReversed()
+      .find((entry) => entry.status === 'open' && entry.escalationKind === 'worker-question')
+    const messageId =
+      decodeParkDetail(park.escalationId, enrollment.watcherId, 'worker-question') ??
+      question?.escalationId.split(':').at(-1) ??
+      null
+    return messageId ? { kind: 'worker-question', messageId } : null
+  }
+  return park.escalationKind === 'park-coordinator-seat-lost'
+    ? { kind: 'coordinator-seat-lost' }
+    : null
+}
+
+function decodeParkDetail(
+  escalationId: string,
+  watcherId: string,
+  kind: WatcherParkReason['kind']
+): string | null {
+  const prefix = `park:${watcherId}:${kind}:`
+  if (!escalationId.startsWith(prefix)) {
+    return null
+  }
+  try {
+    return decodeURIComponent(escalationId.slice(prefix.length)) || null
+  } catch {
+    return null
+  }
+}
+
 export function dormantWatcherStatus(
   enrollment: WatcherEnrollment,
   ledger: WatcherLedger
 ): WatcherStatus {
   const terminal = ledger.entries.find((entry) => entry.kind === 'terminal')
+  const budget = deriveBudgetState(ledger, enrollment.budget)
+  const latestHalt = ledger.entries
+    .toReversed()
+    .find(
+      (entry) =>
+        entry.kind === 'escalation' &&
+        (entry.escalationKind.startsWith('park-') || entry.escalationKind === 'control-disarm')
+    )
+  const automaticallyParked =
+    !enrollment.enabled &&
+    latestHalt?.kind === 'escalation' &&
+    latestHalt.escalationKind.startsWith('park-')
+  const parkReason = enrollment.enabled ? null : persistedParkReason(enrollment, ledger, budget)
+  const approval = enrollment.enabled
+    ? getLatestEscalations(ledger)
+        .toReversed()
+        .find(
+          (entry) =>
+            entry.status === 'open' &&
+            entry.escalationKind === 'awaiting-approval' &&
+            entry.approvalScope
+        )
+    : null
+  const state = terminal
+    ? 'terminal'
+    : enrollment.paused
+      ? 'held'
+      : automaticallyParked
+        ? 'parked'
+        : approval
+          ? 'escalated'
+          : enrollment.enabled
+            ? 'watching'
+            : 'disabled'
   return {
     watcherId: enrollment.watcherId,
     enabled: enrollment.enabled,
-    state: terminal ? 'terminal' : enrollment.enabled ? 'watching' : 'disabled',
-    phase: terminal ? 'terminal' : enrollment.enabled ? 'starting' : 'disabled',
-    reason: terminal?.reason ?? null,
-    parkReason: null,
-    budget: deriveBudgetState(ledger, enrollment.budget),
+    state,
+    phase:
+      state === 'terminal'
+        ? 'terminal'
+        : state === 'held'
+          ? 'paused'
+          : state === 'parked'
+            ? 'parked'
+            : state === 'escalated'
+              ? 'gate'
+              : state === 'watching'
+                ? 'starting'
+                : 'disabled',
+    reason:
+      terminal?.reason ??
+      (enrollment.paused
+        ? 'paused'
+        : (parkReason?.kind ??
+          (automaticallyParked ? 'ready-to-resume' : (approval?.reason ?? null)))),
+    parkReason,
+    budget,
     startedAtMs: enrollment.createdAtMs,
     lastSuccessfulTickAtMs: null,
     nextPulseAtMs: null

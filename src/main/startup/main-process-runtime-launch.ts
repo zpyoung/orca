@@ -203,6 +203,7 @@ async function launchServeMode(
   }
   // Why: headless serve never opens a renderer, so arm scheduled automation dispatch here.
   state.automations?.start()
+  state.heimdall?.start()
   // Why: serve deletes worktrees too, and the history GC that normally drains delete tombstones is
   // armed from the main window — without this, a quit mid-removal leaks the tree until a desktop launch.
   scheduleAllPendingHistoryTreeRemovals()

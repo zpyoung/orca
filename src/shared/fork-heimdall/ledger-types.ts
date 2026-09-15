@@ -14,6 +14,7 @@ export const KernelActionSchema = z
     visibility: z.enum(['external', 'local']),
     contentIdentity: IdSchema,
     evidenceKey: IdSchema,
+    recovery: z.literal('replay-safe').optional(),
     expectedState: z.object({ target: IdSchema, before: IdSchema }).strict().optional()
   })
   .passthrough()
@@ -67,6 +68,7 @@ export const AttemptEntrySchema = OwnerFactBaseSchema.extend({
       spec: IdSchema,
       agent: IdSchema.optional(),
       taskKey: IdSchema.optional(),
+      deps: z.array(IdSchema).optional(),
       dispatchKind: z.enum(['planner', 'child'])
     })
     .strict()

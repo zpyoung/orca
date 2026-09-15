@@ -56,6 +56,8 @@ export const WatcherEnrollmentSchema = z
     workspacePath: IdSchema,
     schedulerOwner: AutomationSchedulerOwnerSchema,
     enabled: z.boolean(),
+    paused: z.boolean().default(false),
+    commandRevision: z.number().int().nonnegative().default(0),
     capabilities: z.record(z.string().min(1), CapabilityModeSchema),
     budget: BudgetPolicySchema,
     kindPayload: z.unknown(),

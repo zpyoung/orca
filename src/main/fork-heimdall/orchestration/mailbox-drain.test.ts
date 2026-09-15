@@ -26,6 +26,8 @@ const ENROLLMENT = {
   workspacePath: '/repo',
   schedulerOwner: 'local_host_service',
   enabled: true,
+  paused: false,
+  commandRevision: 0,
   capabilities: {},
   budget: { wallClockActiveMs: null, turns: null },
   kindPayload: {},
@@ -74,7 +76,9 @@ describe('Heimdall orchestration mailbox drain', () => {
       payload: JSON.stringify({
         dispatchId: 'dispatch-7',
         outcome: 'succeeded',
-        taskId: 'task-7'
+        taskId: 'task-7',
+        reportPath: '/repo/.orca/reports/node-7.json',
+        filesModified: ['src/node.ts']
       })
     }
     const second = {
@@ -82,7 +86,9 @@ describe('Heimdall orchestration mailbox drain', () => {
       payload: JSON.stringify({
         dispatchId: 'dispatch-8',
         outcome: 'failed',
-        taskId: 'task-8'
+        taskId: 'task-8',
+        reportPath: '/repo/.orca/reports/node-8.json',
+        filesModified: ['src/failed.ts']
       })
     }
     const rows = {
@@ -164,7 +170,10 @@ describe('Heimdall orchestration mailbox drain', () => {
           type: 'worker_done',
           payload: {
             dispatchId: 'dispatch-7',
+            taskId: 'task-7',
             outcome: 'succeeded',
+            reportPath: '/repo/.orca/reports/node-7.json',
+            filesModified: ['src/node.ts'],
             result: 'finished once'
           }
         }
@@ -178,7 +187,10 @@ describe('Heimdall orchestration mailbox drain', () => {
           type: 'worker_done',
           payload: {
             dispatchId: 'dispatch-8',
+            taskId: 'task-8',
             outcome: 'failed',
+            reportPath: '/repo/.orca/reports/node-8.json',
+            filesModified: ['src/failed.ts'],
             result: 'finished next'
           }
         }
@@ -220,7 +232,12 @@ describe('Heimdall orchestration mailbox drain', () => {
       ...message('message-question', 9, 'Which implementation should I use?'),
       type: 'question' as const,
       subject: 'Need a decision',
-      payload: JSON.stringify({ dispatchId: 'dispatch-9', taskId: 'task-9' })
+      payload: JSON.stringify({
+        dispatchId: 'dispatch-9',
+        taskId: 'task-9',
+        reportPath: '/must/not/pass',
+        filesModified: ['must-not-pass.ts']
+      })
     }
     const db = { getMessageById: vi.fn(() => row) }
     upstream.checkRunMailbox.mockResolvedValue({
@@ -244,7 +261,7 @@ describe('Heimdall orchestration mailbox drain', () => {
       payload: {
         type: 'question',
         body: 'Which implementation should I use?',
-        payload: { dispatchId: 'dispatch-9' }
+        payload: { dispatchId: 'dispatch-9', taskId: 'task-9' }
       }
     })
     if (!entry || entry.kind !== 'evidence') {
@@ -252,5 +269,58 @@ describe('Heimdall orchestration mailbox drain', () => {
     }
     expect(entry.payload).not.toHaveProperty('subject')
     expect(entry.payload).not.toHaveProperty('messageId')
+    const fact = entry.payload as { payload: Record<string, unknown> }
+    expect(fact.payload).not.toHaveProperty('reportPath')
+    expect(fact.payload).not.toHaveProperty('filesModified')
+  })
+
+  it.each([
+    'status',
+    'dispatch',
+    'merge_ready',
+    'escalation',
+    'handoff',
+    'decision_gate',
+    'heartbeat'
+  ] as const)('passes taskId through %s facts without worker report fields', async (type) => {
+    const row = {
+      ...message(`message-${type}`, 10, 'worker update'),
+      type,
+      payload: JSON.stringify({
+        taskId: `task-${type}`,
+        reportPath: '/must/not/pass',
+        filesModified: ['must-not-pass.ts']
+      })
+    }
+    const db = { getMessageById: vi.fn(() => row) }
+    upstream.checkRunMailbox.mockResolvedValue({
+      runId: 'run-1',
+      deliveryId: `delivery-${type}`,
+      messages: [{ id: row.id }],
+      count: 1
+    })
+    const adapter = new RuntimeHeimdallOrchestrationAdapter(
+      { getOrchestrationDb: () => db } as never,
+      { persistOrchestrationRunId: async () => undefined }
+    )
+
+    const [entry] = await adapter.drainMailbox({
+      enrollment: ENROLLMENT,
+      cursor: { previousDeliveryId: null, lastSequence: 9 }
+    })
+
+    expect(entry).toMatchObject({
+      payload: {
+        type,
+        payload: { taskId: `task-${type}` },
+        ...(type === 'escalation' ? { subject: 'subject-10', body: 'worker update' } : {})
+      }
+    })
+    if (!entry || entry.kind !== 'evidence') {
+      throw new Error('Expected mailbox evidence')
+    }
+    const fact = entry.payload as { payload: Record<string, unknown> }
+    expect(fact.payload).not.toHaveProperty('reportPath')
+    expect(fact.payload).not.toHaveProperty('filesModified')
   })
 })

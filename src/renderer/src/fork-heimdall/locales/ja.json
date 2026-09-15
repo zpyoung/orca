@@ -1,1 +1,147 @@
-{}
+{
+  "fork": {
+    "heimdall": {
+      "kind": {
+        "objective": "目的ウォッチャー"
+      },
+      "status": {
+        "watching": "監視中",
+        "held": "保留中",
+        "acting": "実行中",
+        "escalated": "エスカレーション済み",
+        "parked": "待機中",
+        "terminal": "完了",
+        "disabled": "停止",
+        "unreachable": "ホストに接続できません",
+        "lostContact": "ホストに接続できません · 最終確認: {{age}}",
+        "phase": "現在のフェーズ"
+      },
+      "indicator": {
+        "tooltip": "{{kind}} · {{state}}",
+        "lostContact": "ホストに接続できません · 最終確認: {{age}}"
+      },
+      "host": {
+        "remote": "リモート · {{host}}",
+        "local": "このデバイス"
+      },
+      "time": {
+        "never": "なし",
+        "now": "たった今",
+        "ago": "{{age}}前"
+      },
+      "sidebar": {
+        "title": "Heimdall",
+        "attention": "{{count}}件のウォッチャーに対応が必要です"
+      },
+      "page": {
+        "back": "戻る",
+        "title": "Heimdallフリート",
+        "summary": "{{active}}件がアクティブ · {{attention}}件に対応が必要",
+        "refresh": "フリートを更新",
+        "staleError": "フリートの更新に失敗しました。最後に確認されたスナップショットを表示しています: {{error}}"
+      },
+      "fleet": {
+        "title": "ウォッチャーフリート",
+        "emptyTitle": "フリートにウォッチャーはありません",
+        "emptyDescription": "対応ワークスペースからウォッチャーを起動すると、ここに表示されます。",
+        "name": "ウォッチャー",
+        "status": "ステータス",
+        "phase": "フェーズ",
+        "activeBurn": "アクティブ時間",
+        "turns": "ターン数",
+        "elapsed": "経過時間",
+        "lastTick": "最終ティック"
+      },
+      "detail": {
+        "back": "フリートに戻る",
+        "refreshing": "詳細を更新中",
+        "observed": "オーナーの状態を確認（{{age}}）",
+        "remote": "リモートキャッシュ",
+        "lostContact": "最終確認: {{age}}。現在オーナーに接続できません。ウォッチャーはまだ実行中の可能性があります。",
+        "readOnly": "読み取り専用。",
+        "staleError": "詳細の更新に失敗しました。最後に確認されたデータを表示しています: {{error}}",
+        "loading": "オーナーの詳細を読み込み中…",
+        "unavailable": "オーナーの詳細を利用できません。",
+        "selectPrompt": "ウォッチャーを選択すると、その判断、ワーカー、オーナー操作を確認できます。"
+      },
+      "controls": {
+        "title": "オーナー操作",
+        "resume": "再開",
+        "pause": "一時停止",
+        "disarm": "解除",
+        "approve": "承認",
+        "budgetResumeWarning": "このウォッチャーは予算を使い切りました。再開する前に上限を増やさないと、再び待機状態になります。"
+      },
+      "command": {
+        "applied": "オーナーにより {{time}} に適用されました。",
+        "refused": "オーナーがコマンドを拒否しました（{{reason}}）: {{detail}}",
+        "indeterminate": "コマンドが適用されたかどうか不明です。オーナーの状態を再読み込みしています… {{detail}}",
+        "stopAllIndeterminate": "{{count}}件の停止コマンドが適用されたかどうか不明です。オーナーの状態を再読み込みしています。",
+        "stopAllRefused": "{{count}}件のオーナーが停止コマンドを拒否しました。"
+      },
+      "budget": {
+        "title": "予算",
+        "activeTime": "アクティブ時間",
+        "unlimited": "無制限",
+        "unlimitedShort": "無制限",
+        "turns": "ワーカーターン数",
+        "exhausted": "使い切りました: {{kind}}",
+        "minutesLimit": "アクティブ時間（分）の上限",
+        "turnLimit": "ワーカーターン数の上限",
+        "apply": "予算を適用"
+      },
+      "escalations": {
+        "title": "未解決のエスカレーション"
+      },
+      "workers": {
+        "title": "稼働中のワーカー",
+        "empty": "稼働中のワーカーはありません。",
+        "live": "稼働中",
+        "unverifiable": "到達不能",
+        "exited": "終了",
+        "noContact": "確認済みの連絡なし",
+        "lastContact": "最終連絡 {{age}}",
+        "stop": "停止",
+        "answerPlaceholder": "ワーカーに回答",
+        "answerLabel": "ワーカーの質問に回答",
+        "sendAnswer": "回答を送信"
+      },
+      "trace": {
+        "title": "判断のトレース",
+        "noDecision": "判断は記録されていません",
+        "decidedAction": "実行: {{action}}",
+        "empty": "判断トレースはまだありません。",
+        "tick": "ティック {{seq}}",
+        "running": "実行中",
+        "saw": "確認",
+        "noSnapshot": "スナップショットは記録されていません",
+        "decided": "決定済み",
+        "gate": "ゲート",
+        "declined": "却下",
+        "noneDeclined": "却下されたフェーズはありません"
+      },
+      "activity": {
+        "title": "フリートのアクション履歴",
+        "asOf": "確認時点: {{age}}",
+        "partial": "{{count}}件のウォッチャー履歴を更新できませんでした。表示可能な記録は保持されています。",
+        "empty": "自律アクションはまだ記録されていません。"
+      },
+      "ledger": {
+        "title": "ウォッチャーのアクティビティ",
+        "attemptResolved": "試行を解決",
+        "attemptAbandoned": "試行を放棄",
+        "evidence": "証拠",
+        "activeTimeStarted": "アクティブ時間を開始",
+        "activeTimeChecked": "アクティブ時間のチェックポイント",
+        "activeTimeStopped": "アクティブ時間を停止",
+        "workerTurn": "ワーカーターン",
+        "finished": "完了",
+        "empty": "アクティビティはまだ記録されていません。"
+      },
+      "error": {
+        "unavailable": "Heimdallコントロールプレーンを利用できません。",
+        "ownerUnavailable": "オーナーランタイムを利用できないため、登録は送信されませんでした。"
+      }
+    }
+  }
+}

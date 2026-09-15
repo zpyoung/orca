@@ -1,40 +1,62 @@
 import { z } from 'zod'
-import { ApprovalScopeSchema, type ApprovalScope } from './gate'
-import { WatcherLedgerSchema, type WatcherLedger } from './ledger-types'
 import {
-  EnrollInputSchema,
-  WatcherListEntrySchema,
-  type EnrollInput,
-  type WatcherListEntry
-} from './watcher-types'
-
-const WatcherIdSchema = z
-  .string()
-  .min(1)
-  .refine((value) => value.trim().length > 0)
+  HeimdallFleetSnapshotSchema,
+  WatcherCommandRequestSchema,
+  WatcherCommandResultSchema,
+  WatcherDetailSchema,
+  WatcherTargetSchema,
+  type HeimdallFleetSnapshot,
+  type WatcherCommandRequest,
+  type WatcherCommandResult,
+  type WatcherDetail,
+  type WatcherTarget
+} from './fleet-types'
+import { EnrollInputSchema, WatcherListEntrySchema, type EnrollInput } from './watcher-types'
+import type { ObjectiveDetail } from '../fork-heimdall-objective/detail-types'
 
 export const HEIMDALL_CHANNELS = {
-  list: 'heimdall:list',
   enroll: 'heimdall:enroll',
-  disarm: 'heimdall:disarm',
-  disarmAll: 'heimdall:disarmAll',
-  approve: 'heimdall:approve',
-  ledger: 'heimdall:ledger',
-  debugReport: 'heimdall:debugReport'
+  fleet: 'heimdall:fleet',
+  detail: 'heimdall:detail',
+  objectiveDetail: 'heimdall:objectiveDetail',
+  command: 'heimdall:command',
+  debugReport: 'heimdall:debugReport',
+  subscribe: 'heimdall:subscribe',
+  unsubscribe: 'heimdall:unsubscribe'
 } as const
 
-export const WatcherIdRequestSchema = z.object({ watcherId: WatcherIdSchema }).strict()
-export type WatcherIdRequest = z.infer<typeof WatcherIdRequestSchema>
-
-export const ApproveRequestSchema = z
+export const HeimdallRemoteOwnerSchema = z
   .object({
-    watcherId: WatcherIdSchema,
-    scope: ApprovalScopeSchema
+    connectionId: WatcherTargetSchema.shape.connectionId.unwrap(),
+    pairingRevision: WatcherTargetSchema.shape.pairingRevision.unwrap()
   })
   .strict()
-export type ApproveRequest = z.infer<typeof ApproveRequestSchema>
+export type HeimdallRemoteOwner = z.infer<typeof HeimdallRemoteOwnerSchema>
+
+export const HeimdallEnrollRequestSchema = z
+  .object({
+    input: EnrollInputSchema,
+    owner: HeimdallRemoteOwnerSchema.nullable()
+  })
+  .strict()
 
 export const EmptyHeimdallRequestSchema = z.object({}).strict()
+export const HeimdallUnsubscribeRequestSchema = z
+  .object({ subscriptionId: z.string().min(1) })
+  .strict()
+
+export const HeimdallSubscriptionEventSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      type: z.literal('ready'),
+      subscriptionId: z.string().min(1),
+      snapshot: HeimdallFleetSnapshotSchema
+    })
+    .strict(),
+  z.object({ type: z.literal('snapshot'), snapshot: HeimdallFleetSnapshotSchema }).strict(),
+  z.object({ type: z.literal('end') }).strict()
+])
+export type HeimdallSubscriptionEvent = z.infer<typeof HeimdallSubscriptionEventSchema>
 
 export const EnrollSuccessSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('enrolled'), entry: WatcherListEntrySchema }).strict(),
@@ -42,17 +64,30 @@ export const EnrollSuccessSchema = z.discriminatedUnion('status', [
 ])
 export type EnrollSuccess = z.infer<typeof EnrollSuccessSchema>
 
-export const WatcherListSchema = z.array(WatcherListEntrySchema)
-export { EnrollInputSchema, WatcherLedgerSchema }
-export type { ApprovalScope, EnrollInput, WatcherLedger, WatcherListEntry }
+export {
+  EnrollInputSchema,
+  HeimdallFleetSnapshotSchema,
+  WatcherCommandRequestSchema,
+  WatcherCommandResultSchema,
+  WatcherDetailSchema,
+  WatcherTargetSchema
+}
+export type {
+  EnrollInput,
+  HeimdallFleetSnapshot,
+  WatcherCommandRequest,
+  WatcherCommandResult,
+  WatcherDetail,
+  WatcherTarget
+}
 
 /** Refused enrollment rejects with a message ending in its typed reason. */
 export type HeimdallApi = {
-  list(): Promise<WatcherListEntry[]>
-  enroll(input: EnrollInput): Promise<EnrollSuccess>
-  disarm(watcherId: string): Promise<void>
-  disarmAll(): Promise<void>
-  approve(watcherId: string, scope: ApprovalScope): Promise<void>
-  ledger(watcherId: string): Promise<WatcherLedger>
-  debugReport(watcherId: string): Promise<unknown>
+  enroll(input: EnrollInput, owner?: HeimdallRemoteOwner): Promise<EnrollSuccess>
+  fleet(): Promise<HeimdallFleetSnapshot>
+  detail(target: WatcherTarget): Promise<WatcherDetail>
+  objectiveDetail?(target: WatcherTarget): Promise<ObjectiveDetail>
+  command(request: WatcherCommandRequest): Promise<WatcherCommandResult>
+  debugReport(target: WatcherTarget): Promise<unknown>
+  onFleetChanged(listener: (snapshot: HeimdallFleetSnapshot) => void): () => void
 }

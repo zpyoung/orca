@@ -20,6 +20,8 @@ export type AuthorizedKindEnrollment = {
   kind: RegisteredWatcherKind
 }
 
+export type HeimdallStorageAuthority = 'desktop' | 'runtime'
+
 function isOwnerRefusal(error: unknown): error is { schedulerOwner: AutomationSchedulerOwner } {
   return (
     typeof error === 'object' &&
@@ -33,7 +35,8 @@ function isOwnerRefusal(error: unknown): error is { schedulerOwner: AutomationSc
 
 export async function authorizeKindEnrollment(
   registry: WatcherKindRegistry,
-  untrustedInput: EnrollInput
+  untrustedInput: EnrollInput,
+  storageAuthority: HeimdallStorageAuthority = 'desktop'
 ): Promise<AuthorizedKindEnrollment | EnrollmentRefusal> {
   const inputResult = EnrollInputSchema.safeParse(untrustedInput)
   if (!inputResult.success) {
@@ -86,7 +89,11 @@ export async function authorizeKindEnrollment(
       detail: 'Authorized kind payload is invalid'
     }
   }
-  if (authorized.schedulerOwner === 'remote_host_service') {
+  const executableOwner =
+    storageAuthority === 'runtime'
+      ? authorized.schedulerOwner === 'remote_host_service'
+      : authorized.schedulerOwner !== 'remote_host_service'
+  if (!executableOwner) {
     return {
       status: 'refused',
       reason: 'owner-not-executable',

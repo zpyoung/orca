@@ -40,14 +40,16 @@ export type HostedReviewKernelRegistration = {
 
 export function createHostedReviewKind(
   runtime: OrcaRuntimeService,
-  store: Store
+  store: Store,
+  storageAuthority: 'desktop' | 'runtime' = 'desktop'
 ): HostedReviewKind {
   const provider = createHostedReviewSitterProvider(runtime, store)
   return {
     id: 'hosted-review',
     displayName: 'Hosted review',
     enrollmentPayloadSchema,
-    authorizeEnrollment: (input) => authorizeHostedReviewSitterDefinition(runtime, store, input),
+    authorizeEnrollment: (input) =>
+      authorizeHostedReviewSitterDefinition(runtime, store, input, storageAuthority),
     describeEnrollment(enrollment) {
       const payload = parseHostedReviewEnrollmentPayload(enrollment.kindPayload)
       return payload
@@ -94,7 +96,8 @@ export function createHostedReviewKind(
 export function registerHostedReviewKind(
   kernel: HostedReviewKernelRegistration,
   runtime: OrcaRuntimeService,
-  store: Store
+  store: Store,
+  storageAuthority: 'desktop' | 'runtime' = 'desktop'
 ): void {
-  kernel.registerKind(createHostedReviewKind(runtime, store))
+  kernel.registerKind(createHostedReviewKind(runtime, store, storageAuthority))
 }

@@ -11,6 +11,7 @@ import type { RunnerLedgerStore } from './runner-state'
 export type HeimdallKernelServiceDependencies = {
   runtime: OrcaRuntimeService
   store: Store
+  storageAuthority?: 'desktop' | 'runtime'
   database?: HeimdallDatabase
   enrollmentStore?: EnrollmentStore
   ledgerStore?: HeimdallLedgerStore

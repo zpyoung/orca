@@ -18,6 +18,7 @@ import { callRuntimeEnvironment } from '../ipc/runtime-environment-transport-rou
 import { mainProcessState as state } from './main-process-state'
 import { forwardAskEventsToRenderer } from '../fork-ask-question-tool/ask-ipc-forward'
 import { startHeimdall } from '../fork-heimdall/registration'
+import { wireHeimdallFleetWindows } from '../fork-heimdall/fleet-ipc-forward'
 import { startClaudeSuppressionVerdictPublisher } from '../fork-ask-question-tool/claude-suppression-verdict-publisher'
 import { getDashboardPopoutWindow } from '../window/dashboard-popout-window'
 import { prepareCodexRuntimeHomeForLaunch } from './codex-launch-preparation'
@@ -139,6 +140,7 @@ export function initializeMainProcessRuntime(): OrcaRuntimeService {
     getDashboardPopoutWindow
   )
   state.heimdall = startHeimdall(runtime, store, state.isServeMode)
+  wireHeimdallFleetWindows(runtime, () => state.mainWindow)
   startClaudeSuppressionVerdictPublisher({
     store,
     ipcMain,

@@ -16,7 +16,8 @@ import type { HostedReviewInfo } from '../../../shared/hosted-review'
 import type { Repo } from '../../../shared/repo-types'
 import type { Worktree } from '../../../shared/worktree/types'
 import type { WatcherLedger } from '../../../shared/fork-heimdall/ledger-types'
-import type { EnrollInput, WatcherListEntry } from '../../../shared/fork-heimdall/watcher-types'
+import type { WatcherCommandResult } from '../../../shared/fork-heimdall/fleet-types'
+import type { EnrollInput } from '../../../shared/fork-heimdall/watcher-types'
 import type {
   HostedReviewBranchUpdateMode,
   HostedReviewEnrollmentPayload,
@@ -28,6 +29,8 @@ import { HostedReviewSitterEnrollmentForm } from './HostedReviewSitterEnrollment
 import { assertClipboardTextWriteWithinLimit } from '../../../shared/clipboard-text'
 import { HostedReviewSitterStatusContent } from './HostedReviewSitterStatusContent'
 import { hostedReviewSitterStatusLabel } from './hosted-review-sitter-format'
+import { formatHeimdallAge } from '@/fork-heimdall/fleet-format'
+import { isHeimdallAttentionRow } from '@/fork-heimdall/fleet-selectors'
 import {
   awaitingApprovalScope,
   describeError,
@@ -36,7 +39,6 @@ import {
   sameHostedReview
 } from './hosted-review-sitter-panel-state'
 
-const POLL_INTERVAL_MS = 5_000
 const DEFAULT_ACTIVE_BUDGET_HOURS = 4
 const DEFAULT_CAPABILITIES: HostedReviewSitterCapabilities = {
   updateBranch: 'off',
@@ -44,6 +46,12 @@ const DEFAULT_CAPABILITIES: HostedReviewSitterCapabilities = {
   fixChecks: 'off',
   merge: 'off'
 }
+const HOSTED_REVIEW_CAPABILITIES = [
+  'updateBranch',
+  'resolveConflicts',
+  'fixChecks',
+  'merge'
+] as const
 
 export type HostedReviewSitterReviewPanelProps = {
   repoId: string
@@ -57,7 +65,6 @@ export type HostedReviewSitterReviewPanelProps = {
 }
 
 type HostedReviewSitterPanelContentProps = {
-  /** A paired runtime owns its main process; Phase 1 does not expose its kernel to this client. */
   runtimeEnvironmentId: string | null
 } & HostedReviewSitterReviewPanelProps
 
@@ -72,99 +79,139 @@ function HostedReviewSitterPanelContent({
   reviewState,
   runtimeEnvironmentId
 }: HostedReviewSitterPanelContentProps): React.JSX.Element | null {
-  const bridgeApi = getHeimdallApi()
-  const api = runtimeEnvironmentId ? null : bridgeApi
+  const api = getHeimdallApi()
   const supportedProvider = isSupportedProvider(reviewProvider)
-  const [entries, setEntries] = useState<WatcherListEntry[] | null>(null)
+  const fleet = useAppStore((state) => state.heimdallFleet)
+  const hydrateFleet = useAppStore((state) => state.hydrateHeimdallFleet)
+  const runtimeEnvironment = useAppStore((state) =>
+    runtimeEnvironmentId
+      ? (state.runtimeEnvironments.find((environment) => environment.id === runtimeEnvironmentId) ??
+        null)
+      : null
+  )
+  const entries = useMemo(() => fleet?.entries.map((row) => row.entry) ?? null, [fleet])
+  const currentFleetRow = useMemo(() => {
+    if (runtimeEnvironmentId && !runtimeEnvironment) {
+      return null
+    }
+    const owner = runtimeEnvironment
+      ? {
+          connectionId: runtimeEnvironment.id,
+          pairingRevision: runtimeEnvironment.pairingRevision ?? runtimeEnvironment.createdAt
+        }
+      : { connectionId: null, pairingRevision: null }
+    return (
+      fleet?.entries.find((row) =>
+        sameHostedReview(row, {
+          repoId,
+          worktreeId,
+          reviewProvider,
+          reviewNumber,
+          owner
+        })
+      ) ?? null
+    )
+  }, [
+    fleet,
+    repoId,
+    reviewNumber,
+    reviewProvider,
+    runtimeEnvironment,
+    runtimeEnvironmentId,
+    worktreeId
+  ])
+  const currentEntry = currentFleetRow?.entry ?? null
+  const currentPayload = currentEntry
+    ? (currentEntry.enrollment.kindPayload as HostedReviewEnrollmentPayload)
+    : null
+  const ownerCapabilities: HostedReviewSitterCapabilities = {
+    updateBranch:
+      currentEntry?.enrollment.capabilities.updateBranch ?? DEFAULT_CAPABILITIES.updateBranch,
+    resolveConflicts:
+      currentEntry?.enrollment.capabilities.resolveConflicts ??
+      DEFAULT_CAPABILITIES.resolveConflicts,
+    fixChecks: currentEntry?.enrollment.capabilities.fixChecks ?? DEFAULT_CAPABILITIES.fixChecks,
+    merge: currentEntry?.enrollment.capabilities.merge ?? DEFAULT_CAPABILITIES.merge
+  }
+  const ownerBranchUpdateMode = currentPayload?.branchUpdateMode ?? 'merge-base-update'
+  const ownerMergeMethod: 'default' | HostedReviewMergeMethod =
+    currentPayload?.mergeMethod ?? 'default'
+  const ownerActiveBudgetMs = currentEntry?.enrollment.budget.wallClockActiveMs
+  const ownerActiveBudgetHours =
+    ownerActiveBudgetMs === null
+      ? Number.NaN
+      : ownerActiveBudgetMs === undefined
+        ? DEFAULT_ACTIVE_BUDGET_HOURS
+        : ownerActiveBudgetMs / (60 * 60 * 1_000)
+  const lostContact =
+    currentFleetRow?.contact === 'unverifiable' || currentEntry?.status.state === 'unreachable'
+  const commandReadOnlyReason = currentFleetRow?.readOnlyReason ?? null
+  const controlsReadOnly = lostContact || commandReadOnlyReason !== null
   const [ledger, setLedger] = useState<WatcherLedger | null>(null)
   const [serviceError, setServiceError] = useState<string | null>(null)
   const [mutationError, setMutationError] = useState<string | null>(null)
+  const [mutationTone, setMutationTone] = useState<'error' | 'refused' | 'indeterminate'>('error')
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [ledgerOpen, setLedgerOpen] = useState(false)
   const [debugReportCopied, setDebugReportCopied] = useState(false)
   const [configOpen, setConfigOpen] = useState(false)
-  const [capabilities, setCapabilities] = useState<HostedReviewSitterCapabilities>({
-    ...DEFAULT_CAPABILITIES
-  })
-  const [branchUpdateMode, setBranchUpdateMode] =
-    useState<HostedReviewBranchUpdateMode>('merge-base-update')
-  const [mergeMethod, setMergeMethod] = useState<'default' | HostedReviewMergeMethod>('default')
-  const [activeBudgetHours, setActiveBudgetHours] = useState(DEFAULT_ACTIVE_BUDGET_HOURS)
+  const [capabilityOverrides, setCapabilityOverrides] = useState<
+    Partial<HostedReviewSitterCapabilities>
+  >({})
+  const [branchUpdateModeOverride, setBranchUpdateModeOverride] =
+    useState<HostedReviewBranchUpdateMode | null>(null)
+  const [mergeMethodOverride, setMergeMethodOverride] = useState<
+    'default' | HostedReviewMergeMethod | null
+  >(null)
+  const [activeBudgetHoursOverride, setActiveBudgetHoursOverride] = useState<number | null>(null)
+  const capabilities: HostedReviewSitterCapabilities = {
+    updateBranch: capabilityOverrides.updateBranch ?? ownerCapabilities.updateBranch,
+    resolveConflicts: capabilityOverrides.resolveConflicts ?? ownerCapabilities.resolveConflicts,
+    fixChecks: capabilityOverrides.fixChecks ?? ownerCapabilities.fixChecks,
+    merge: capabilityOverrides.merge ?? ownerCapabilities.merge
+  }
+  const branchUpdateMode = branchUpdateModeOverride ?? ownerBranchUpdateMode
+  const mergeMethod = mergeMethodOverride ?? ownerMergeMethod
+  const activeBudgetHours = activeBudgetHoursOverride ?? ownerActiveBudgetHours
   const requestSerialRef = useRef(0)
-  const identityKey = `${repoId}:${worktreeId}:${reviewProvider}:${reviewNumber}:${runtimeEnvironmentId ?? 'desktop'}`
 
   const refresh = useCallback(async (): Promise<void> => {
-    if (!api || !supportedProvider) {
+    if (!api || !supportedProvider || !currentFleetRow || !configOpen) {
+      setLedger(null)
       return
     }
     const requestSerial = ++requestSerialRef.current
     try {
-      const nextEntries = await api.list()
-      if (requestSerial !== requestSerialRef.current) {
-        return
-      }
-      setEntries(nextEntries)
-      setServiceError(null)
-      const current = nextEntries.find((entry) =>
-        sameHostedReview(entry, repoId, reviewProvider, reviewNumber)
-      )
-      if (!current) {
-        setLedger(null)
-        return
-      }
-      try {
-        const nextLedger = await api.ledger(current.enrollment.watcherId)
-        if (requestSerial === requestSerialRef.current) {
-          setLedger(nextLedger)
-        }
-      } catch (error) {
-        if (requestSerial === requestSerialRef.current) {
-          setLedger(null)
-          setServiceError(
-            translate(
-              'fork.hostedReviewSitter.error.activityUnavailable',
-              'Activity unavailable: {{error}}',
-              { error: describeError(error) }
-            )
-          )
-        }
+      const detail = await api.detail(currentFleetRow.target)
+      if (requestSerial === requestSerialRef.current) {
+        setLedger(detail.ledger)
+        setServiceError(null)
       }
     } catch (error) {
       if (requestSerial === requestSerialRef.current) {
-        setServiceError(describeError(error))
+        setServiceError(
+          currentFleetRow.contact === 'unverifiable'
+            ? null
+            : translate(
+                'fork.hostedReviewSitter.error.activityUnavailable',
+                'Activity unavailable: {{error}}',
+                { error: describeError(error) }
+              )
+        )
       }
     }
-  }, [api, repoId, reviewNumber, reviewProvider, supportedProvider])
+  }, [api, configOpen, currentFleetRow, supportedProvider])
 
   useEffect(() => {
-    requestSerialRef.current += 1
-    setEntries(null)
-    setLedger(null)
-    setServiceError(null)
-    setMutationError(null)
-    setCapabilities({ ...DEFAULT_CAPABILITIES })
-    setBranchUpdateMode('merge-base-update')
-    setMergeMethod('default')
-    setActiveBudgetHours(DEFAULT_ACTIVE_BUDGET_HOURS)
-    setLedgerOpen(false)
-    setConfigOpen(false)
-    if (!api || !supportedProvider) {
-      return
+    if (api && supportedProvider) {
+      void hydrateFleet()
     }
-    void refresh()
-    const interval = window.setInterval(() => void refresh(), POLL_INTERVAL_MS)
-    return () => {
-      window.clearInterval(interval)
-      requestSerialRef.current += 1
-    }
-  }, [api, identityKey, refresh, supportedProvider])
+  }, [api, hydrateFleet, supportedProvider])
 
-  const currentEntry = useMemo(
-    () =>
-      entries?.find((entry) => sameHostedReview(entry, repoId, reviewProvider, reviewNumber)) ??
-      null,
-    [entries, repoId, reviewNumber, reviewProvider]
-  )
+  useEffect(() => {
+    void refresh()
+  }, [refresh])
+
   const currentEntryIsActive = currentEntry !== null && isActiveHostedReviewSitter(currentEntry)
   const approvalScope = useMemo(() => awaitingApprovalScope(ledger), [ledger])
 
@@ -182,24 +229,54 @@ function HostedReviewSitterPanelContent({
     return null
   }
 
-  const runMutation = async (name: string, operation: () => Promise<void>): Promise<void> => {
+  const runMutation = async (
+    name: string,
+    operation: () => Promise<WatcherCommandResult | void>
+  ): Promise<void> => {
     if (!api || busyAction) {
       return
     }
     setBusyAction(name)
     setMutationError(null)
     try {
-      await operation()
-      await refresh()
+      const result = await operation()
+      if (result && result.status !== 'applied') {
+        setMutationTone(result.status)
+        setMutationError(
+          result.status === 'indeterminate'
+            ? translate(
+                'fork.heimdall.command.indeterminate',
+                'The command may or may not have applied. Re-reading owner state… {{detail}}',
+                { detail: result.detail ?? '' }
+              )
+            : translate(
+                'fork.heimdall.command.refused',
+                'Owner refused the command ({{reason}}): {{detail}}',
+                { reason: result.reason ?? 'unknown', detail: result.detail ?? '' }
+              )
+        )
+      }
     } catch (error) {
+      setMutationTone('error')
       setMutationError(describeError(error))
     } finally {
+      await Promise.allSettled([hydrateFleet(), refresh()])
       setBusyAction(null)
     }
   }
 
   const enroll = (): void => {
     if (!api || !isSupportedProvider(reviewProvider)) {
+      return
+    }
+    if (runtimeEnvironmentId && !runtimeEnvironment) {
+      setMutationTone('error')
+      setMutationError(
+        translate(
+          'fork.heimdall.error.ownerUnavailable',
+          'The owning runtime is unavailable; no enrollment was sent.'
+        )
+      )
       return
     }
     const input: EnrollInput = {
@@ -221,25 +298,35 @@ function HostedReviewSitterPanelContent({
       } satisfies HostedReviewEnrollmentPayload
     }
     void runMutation('enroll', async () => {
-      await api.enroll(input)
+      const owner = runtimeEnvironment
+        ? {
+            connectionId: runtimeEnvironment.id,
+            pairingRevision: runtimeEnvironment.pairingRevision ?? runtimeEnvironment.createdAt
+          }
+        : undefined
+      await api.enroll(input, owner)
+      setCapabilityOverrides({})
+      setBranchUpdateModeOverride(null)
+      setMergeMethodOverride(null)
+      setActiveBudgetHoursOverride(null)
     })
   }
 
   const copyDebugReport = (): void => {
-    if (!api || !currentEntry || busyAction) {
+    if (!api || !currentFleetRow || busyAction) {
       return
     }
-    const watcherId = currentEntry.enrollment.watcherId
     setBusyAction('debugReport')
     setMutationError(null)
     void (async () => {
       try {
-        const report = await api.debugReport(watcherId)
+        const report = await api.debugReport(currentFleetRow.target)
         const serialized = JSON.stringify(report, null, 2)
         const text = assertClipboardTextWriteWithinLimit(serialized ?? String(report))
         await window.api.ui.writeClipboardText(text)
         setDebugReportCopied(true)
       } catch (error) {
+        setMutationTone('error')
         setMutationError(describeError(error))
       } finally {
         setBusyAction(null)
@@ -248,32 +335,39 @@ function HostedReviewSitterPanelContent({
   }
 
   const disarmCurrent = (): void => {
-    if (!api || !currentEntry || !currentEntryIsActive) {
+    if (!api || !currentFleetRow || !currentEntryIsActive || controlsReadOnly) {
       return
     }
-    void runMutation('disarm', () => api.disarm(currentEntry.enrollment.watcherId))
+    void runMutation('disarm', () =>
+      api.command({
+        target: currentFleetRow.target,
+        expectedOwner: currentFleetRow.ownerFence,
+        command: { kind: 'disarm' }
+      })
+    )
   }
 
   const approveCurrentAction = (): void => {
-    if (!api || !currentEntry || !approvalScope) {
+    if (!api || !currentFleetRow || !approvalScope || controlsReadOnly) {
       return
     }
-    void runMutation('approve', () => api.approve(currentEntry.enrollment.watcherId, approvalScope))
+    void runMutation('approve', () =>
+      api.command({
+        target: currentFleetRow.target,
+        expectedOwner: currentFleetRow.ownerFence,
+        command: { kind: 'approve', scope: approvalScope }
+      })
+    )
   }
 
-  const unavailableReason = runtimeEnvironmentId
+  const unavailableReason = !api
     ? translate(
-        'fork.hostedReviewSitter.unavailable.pairedRuntime',
-        'PR Sitter is not available for peer-hosted workspaces.'
+        'fork.hostedReviewSitter.unavailable.missingApi',
+        'This Orca host does not provide the PR Sitter service.'
       )
-    : !bridgeApi
-      ? translate(
-          'fork.hostedReviewSitter.unavailable.missingApi',
-          'This Orca host does not provide the PR Sitter service.'
-        )
-      : entries === null
-        ? serviceError
-        : null
+    : entries === null
+      ? serviceError
+      : null
   const enrollBlockedReason =
     reviewState !== 'open' && reviewState !== 'draft'
       ? translate(
@@ -291,8 +385,7 @@ function HostedReviewSitterPanelContent({
               'The worktree path is unavailable.'
             )
           : null
-  const statusIsError =
-    currentEntry?.status.state === 'escalated' || currentEntry?.status.state === 'parked'
+  const statusNeedsAttention = currentFleetRow ? isHeimdallAttentionRow(currentFleetRow) : false
 
   return (
     <section
@@ -311,10 +404,16 @@ function HostedReviewSitterPanelContent({
             </span>
             {currentEntry ? (
               <Badge
-                variant={statusIsError ? 'destructive' : 'outline'}
-                className="h-5 text-[10px]"
+                variant="outline"
+                className={
+                  statusNeedsAttention || lostContact
+                    ? 'h-5 border-status-warning-border bg-status-warning-background text-[10px] text-status-warning-foreground'
+                    : 'h-5 text-[10px]'
+                }
               >
-                {hostedReviewSitterStatusLabel(currentEntry.status.state)}
+                {hostedReviewSitterStatusLabel(
+                  lostContact ? 'unreachable' : currentEntry.status.state
+                )}
               </Badge>
             ) : null}
             {entries === null && !unavailableReason ? (
@@ -356,12 +455,26 @@ function HostedReviewSitterPanelContent({
               </div>
             ) : (
               <>
+                {lostContact && currentFleetRow ? (
+                  <p
+                    className="mb-2 rounded-md border border-status-warning-border bg-status-warning-background px-3 py-2 text-xs text-status-warning-foreground"
+                    role="status"
+                  >
+                    {translate(
+                      'fork.heimdall.detail.lostContact',
+                      'Last confirmed {{age}}; the owner cannot currently be reached. The watcher may still be running.',
+                      { age: formatHeimdallAge(currentFleetRow.observedAtMs) }
+                    )}
+                  </p>
+                ) : null}
                 {currentEntry ? (
                   <HostedReviewSitterStatusContent
                     entry={currentEntry}
                     ledger={ledger}
                     approvalScope={approvalScope}
                     ledgerOpen={ledgerOpen}
+                    readOnly={controlsReadOnly}
+                    readOnlyReason={commandReadOnlyReason}
                     busy={busyAction !== null}
                     stopping={busyAction === 'disarm'}
                     approving={busyAction === 'approve'}
@@ -385,10 +498,20 @@ function HostedReviewSitterPanelContent({
                     busy={busyAction !== null}
                     arming={busyAction === 'enroll'}
                     rearming={currentEntry !== null}
-                    onCapabilitiesChange={setCapabilities}
-                    onBranchUpdateModeChange={setBranchUpdateMode}
-                    onMergeMethodChange={setMergeMethod}
-                    onActiveBudgetHoursChange={setActiveBudgetHours}
+                    onCapabilitiesChange={(nextCapabilities) => {
+                      const changedCapability = HOSTED_REVIEW_CAPABILITIES.find(
+                        (capability) => nextCapabilities[capability] !== capabilities[capability]
+                      )
+                      if (changedCapability) {
+                        setCapabilityOverrides((current) => ({
+                          ...current,
+                          [changedCapability]: nextCapabilities[changedCapability]
+                        }))
+                      }
+                    }}
+                    onBranchUpdateModeChange={setBranchUpdateModeOverride}
+                    onMergeMethodChange={setMergeMethodOverride}
+                    onActiveBudgetHoursChange={setActiveBudgetHoursOverride}
                     onArm={enroll}
                   />
                 ) : null}
@@ -396,7 +519,16 @@ function HostedReviewSitterPanelContent({
             )}
 
             {mutationError ? (
-              <div className="mt-2 text-[10px] leading-relaxed text-destructive" role="alert">
+              <div
+                className={
+                  mutationTone === 'refused'
+                    ? 'mt-2 rounded-md border border-status-warning-border bg-status-warning-background px-2.5 py-2 text-[10px] leading-relaxed text-status-warning-foreground'
+                    : mutationTone === 'indeterminate'
+                      ? 'mt-2 rounded-md border border-border bg-muted px-2.5 py-2 text-[10px] leading-relaxed text-foreground'
+                      : 'mt-2 text-[10px] leading-relaxed text-destructive'
+                }
+                role={mutationTone === 'error' ? 'alert' : 'status'}
+              >
                 {mutationError}
               </div>
             ) : null}
@@ -418,7 +550,32 @@ export function HostedReviewSitterReviewPanel(
   const runtimeEnvironmentId = useAppStore((state) =>
     getRuntimeEnvironmentIdForWorktree(state, props.worktreeId)
   )
-  return <HostedReviewSitterPanelContent {...props} runtimeEnvironmentId={runtimeEnvironmentId} />
+  const runtimeEnvironmentPairingRevision = useAppStore((state) => {
+    if (!runtimeEnvironmentId) {
+      return null
+    }
+    const runtimeEnvironment = state.runtimeEnvironments.find(
+      (environment) => environment.id === runtimeEnvironmentId
+    )
+    return runtimeEnvironment
+      ? (runtimeEnvironment.pairingRevision ?? runtimeEnvironment.createdAt)
+      : null
+  })
+  const identityKey = JSON.stringify([
+    props.repoId,
+    props.worktreeId,
+    props.reviewProvider,
+    props.reviewNumber,
+    runtimeEnvironmentId,
+    runtimeEnvironmentPairingRevision
+  ])
+  return (
+    <HostedReviewSitterPanelContent
+      key={identityKey}
+      {...props}
+      runtimeEnvironmentId={runtimeEnvironmentId}
+    />
+  )
 }
 
 export type HostedReviewSitterPanelModel = {

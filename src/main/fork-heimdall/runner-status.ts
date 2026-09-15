@@ -1,11 +1,13 @@
 import { deriveBudgetState } from '../../shared/fork-heimdall/budget'
 import type { LedgerEntry } from '../../shared/fork-heimdall/ledger-types'
+import type { FiredStopPredicate } from '../../shared/fork-heimdall/stop-policy'
 import type { WatcherParkReason } from '../../shared/fork-heimdall/watcher-types'
 import type { RunnerLedgerStore, WatcherRunner } from './runner-state'
 
 export type WatcherRunnerStatusDependencies = {
   ledgerStore: RunnerLedgerStore
   persistEnabled: (runner: WatcherRunner, enabled: boolean) => WatcherRunner['enrollment']
+  persistTerminal: (runner: WatcherRunner, fired: FiredStopPredicate) => WatcherRunner['enrollment']
   now: () => number
   createId: () => string
   publish: (runner: WatcherRunner) => void
@@ -19,8 +21,20 @@ export function isCoordinatorSeatLost(error: unknown): boolean {
     error.code === 'coordinator-seat-lost'
   )
 }
+function parkEscalationId(watcherId: string, reason: WatcherParkReason): string {
+  const detail =
+    reason.kind === 'stop-predicate'
+      ? reason.predicateId
+      : reason.kind === 'worker-question'
+        ? reason.messageId
+        : reason.kind === 'budget'
+          ? reason.exhaustion.kind
+          : null
+  const base = `park:${watcherId}:${reason.kind}`
+  return detail ? `${base}:${encodeURIComponent(detail)}` : base
+}
 
-/** Owns durable park transitions and their corresponding public status projection. */
+/** Owns durable stop transitions and their corresponding public status projection. */
 export class WatcherRunnerStatusLifecycle {
   constructor(private readonly dependencies: WatcherRunnerStatusDependencies) {}
 
@@ -34,7 +48,7 @@ export class WatcherRunnerStatusLifecycle {
         origin: 'owner',
         class: 'fact',
         kind: 'escalation',
-        escalationId: `park:${runner.enrollment.watcherId}:${reason.kind}`,
+        escalationId: parkEscalationId(runner.enrollment.watcherId, reason),
         escalationKind: `park-${reason.kind}`,
         status: 'open',
         foldCount: 1,
@@ -52,6 +66,28 @@ export class WatcherRunnerStatusLifecycle {
         this.dependencies.ledgerStore.read(runner.enrollment.watcherId),
         runner.enrollment.budget
       ),
+      nextPulseAtMs: null
+    }
+    this.dependencies.publish(runner)
+  }
+  terminal(runner: WatcherRunner, fired: FiredStopPredicate): void {
+    if (fired.disposition !== 'terminal') {
+      throw new Error('A park predicate cannot make a watcher terminal')
+    }
+    runner.enrollment = this.dependencies.persistTerminal(runner, fired)
+    runner.stopped = true
+    runner.status = {
+      ...runner.status,
+      enabled: false,
+      state: 'terminal',
+      phase: 'terminal',
+      reason: fired.reason,
+      parkReason: null,
+      budget: deriveBudgetState(
+        this.dependencies.ledgerStore.read(runner.enrollment.watcherId),
+        runner.enrollment.budget
+      ),
+      lastSuccessfulTickAtMs: this.dependencies.now(),
       nextPulseAtMs: null
     }
     this.dependencies.publish(runner)

@@ -1,1 +1,147 @@
-{}
+{
+  "fork": {
+    "heimdall": {
+      "kind": {
+        "objective": "Observateur d’objectif"
+      },
+      "status": {
+        "watching": "Surveillance",
+        "held": "En attente",
+        "acting": "Action en cours",
+        "escalated": "Escaladé",
+        "parked": "En pause",
+        "terminal": "Terminé",
+        "disabled": "Arrêté",
+        "unreachable": "Hôte injoignable",
+        "lostContact": "Hôte injoignable · dernière confirmation {{age}}",
+        "phase": "Phase actuelle"
+      },
+      "indicator": {
+        "tooltip": "{{kind}} · {{state}}",
+        "lostContact": "Hôte injoignable · dernière confirmation {{age}}"
+      },
+      "host": {
+        "remote": "Distant · {{host}}",
+        "local": "Cet appareil"
+      },
+      "time": {
+        "never": "Jamais",
+        "now": "à l’instant",
+        "ago": "Il y a {{age}}"
+      },
+      "sidebar": {
+        "title": "Heimdall",
+        "attention": "{{count}} observateurs nécessitent votre attention"
+      },
+      "page": {
+        "back": "Retour",
+        "title": "Flotte Heimdall",
+        "summary": "{{active}} actifs · {{attention}} nécessitent votre attention",
+        "refresh": "Actualiser la flotte",
+        "staleError": "Échec de l’actualisation de la flotte ; affichage du dernier instantané confirmé : {{error}}"
+      },
+      "fleet": {
+        "title": "Flotte d’observateurs",
+        "emptyTitle": "Aucun observateur dans la flotte",
+        "emptyDescription": "Activez un observateur depuis un espace de travail pris en charge pour le voir ici.",
+        "name": "Observateur",
+        "status": "État",
+        "phase": "Phase",
+        "activeBurn": "Temps actif",
+        "turns": "Tours",
+        "elapsed": "Temps écoulé",
+        "lastTick": "Dernier cycle"
+      },
+      "detail": {
+        "back": "Retour à la flotte",
+        "refreshing": "Actualisation des détails",
+        "observed": "État du runtime propriétaire observé {{age}}",
+        "remote": "Cache distant",
+        "lostContact": "Dernière confirmation {{age}} ; le runtime propriétaire est actuellement inaccessible. L’observateur peut néanmoins être toujours en cours d’exécution.",
+        "readOnly": "Lecture seule.",
+        "staleError": "Échec de l’actualisation des détails ; affichage des dernières données confirmées : {{error}}",
+        "loading": "Chargement des détails du runtime propriétaire…",
+        "unavailable": "Les détails du runtime propriétaire sont indisponibles.",
+        "selectPrompt": "Sélectionnez un observateur pour examiner ses décisions, ses agents et les contrôles du runtime propriétaire."
+      },
+      "controls": {
+        "title": "Contrôles du runtime propriétaire",
+        "resume": "Reprendre",
+        "pause": "Mettre en pause",
+        "disarm": "Désarmer",
+        "approve": "Approuver",
+        "budgetResumeWarning": "Le budget de cet observateur est épuisé. Augmentez la limite avant de le reprendre, sinon il sera de nouveau mis en pause."
+      },
+      "command": {
+        "applied": "Appliquée par le runtime propriétaire à {{time}}.",
+        "refused": "Commande refusée par le runtime propriétaire ({{reason}}) : {{detail}}",
+        "indeterminate": "La commande a peut-être été appliquée ou non. Nouvelle lecture de l’état du runtime propriétaire… {{detail}}",
+        "stopAllIndeterminate": "{{count}} commandes d’arrêt ont peut-être été appliquées ou non. Nouvelle lecture de l’état du runtime propriétaire en cours.",
+        "stopAllRefused": "{{count}} runtimes propriétaires ont refusé la commande d’arrêt."
+      },
+      "budget": {
+        "title": "Budget",
+        "activeTime": "Temps actif",
+        "unlimited": "Illimité",
+        "unlimitedShort": "illimité",
+        "turns": "Tours de l’agent",
+        "exhausted": "Épuisé : {{kind}}",
+        "minutesLimit": "Limite de minutes actives",
+        "turnLimit": "Limite de tours de l’agent",
+        "apply": "Appliquer le budget"
+      },
+      "escalations": {
+        "title": "Escalades ouvertes"
+      },
+      "workers": {
+        "title": "Agents actifs",
+        "empty": "Aucun agent actif.",
+        "live": "Actif",
+        "unverifiable": "Injoignable",
+        "exited": "Terminé",
+        "noContact": "Aucun contact confirmé",
+        "lastContact": "Dernier contact {{age}}",
+        "stop": "Arrêter",
+        "answerPlaceholder": "Répondre à l’agent",
+        "answerLabel": "Répondre à la question de l’agent",
+        "sendAnswer": "Envoyer la réponse"
+      },
+      "trace": {
+        "title": "Trace de décision",
+        "noDecision": "Aucune décision enregistrée",
+        "decidedAction": "Action : {{action}}",
+        "empty": "Aucune trace de décision pour le moment.",
+        "tick": "Cycle {{seq}}",
+        "running": "En cours",
+        "saw": "Observé",
+        "noSnapshot": "Aucun instantané enregistré",
+        "decided": "Décision",
+        "gate": "Barrière",
+        "declined": "Refusées",
+        "noneDeclined": "Aucune phase refusée"
+      },
+      "activity": {
+        "title": "Historique des actions de la flotte",
+        "asOf": "Dernière actualisation : {{age}}",
+        "partial": "{{count}} historiques d’observateurs n’ont pas pu être actualisés ; les enregistrements visibles sont conservés.",
+        "empty": "Aucune action autonome enregistrée pour le moment."
+      },
+      "ledger": {
+        "title": "Activité de l’observateur",
+        "attemptResolved": "Tentative résolue",
+        "attemptAbandoned": "Tentative abandonnée",
+        "evidence": "Preuve",
+        "activeTimeStarted": "Temps actif démarré",
+        "activeTimeChecked": "Point de contrôle du temps actif",
+        "activeTimeStopped": "Temps actif arrêté",
+        "workerTurn": "Tour de l’agent",
+        "finished": "Terminé",
+        "empty": "Aucune activité enregistrée pour le moment."
+      },
+      "error": {
+        "unavailable": "Le plan de contrôle Heimdall est indisponible.",
+        "ownerUnavailable": "Le runtime propriétaire est indisponible ; aucune inscription n’a été envoyée."
+      }
+    }
+  }
+}

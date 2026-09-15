@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { WatcherLedger } from '../fork-heimdall/ledger-types'
+import { evaluateStopPredicates } from '../fork-heimdall/stop-policy'
 import {
   computeDesiredAction as computeDesiredActionCore,
   explainDesiredAction as explainDesiredActionCore
 } from './decision'
 import { hostedReviewAttemptFingerprint, hostedReviewContentIdentity } from './action-identity'
 import { deriveHostedReviewSitterDiscrepancies } from './reconciliation'
+import { HOSTED_REVIEW_STOP_PREDICATES } from './stop-policy'
 import type {
   HostedReviewCheckSnapshot,
   HostedReviewPreparedCommit,
@@ -203,6 +205,20 @@ function explainDesiredAction(
     freshness,
     preparedCommit: null
   })
+}
+
+function evaluateRegisteredStop(input: TestReview, history: WatcherLedger) {
+  const { freshness, observedAtMs, ...reviewSnapshot } = input
+  return evaluateStopPredicates(
+    HOSTED_REVIEW_STOP_PREDICATES,
+    {
+      freshness,
+      contentIdentity: hostedReviewContentIdentity(reviewSnapshot),
+      observedAtMs,
+      world: { review: reviewSnapshot, definition: sitter(), preparedCommit: null }
+    },
+    history
+  )
 }
 
 function completedAction(
@@ -408,7 +424,7 @@ describe('PR sitter desired-action safety policy', () => {
     })
   })
 
-  it('escalates fresh reproduced failures whose signature cannot be established', () => {
+  it('parks fresh reproduced failures whose signature cannot be established', () => {
     const initial = review({
       checks: [check({ state: 'failed', failureSignature: null })],
       providerReadiness: { verdict: 'blocked', blockers: ['checks'] }
@@ -430,7 +446,11 @@ describe('PR sitter desired-action safety policy', () => {
       ],
       providerReadiness: { verdict: 'blocked', blockers: ['behind', 'checks'] }
     })
-    expect(computeDesiredAction(reproduced, sitter(), history)).toBeNull()
+    expect(evaluateRegisteredStop(reproduced, history)).toEqual({
+      predicateId: 'unverifiable-reproduced-failure',
+      disposition: 'park',
+      reason: 'unverifiable-reproduced-failure'
+    })
     expect(deriveHostedReviewSitterDiscrepancies(reproduced, history)).toContainEqual(
       expect.objectContaining({ kind: 'unverifiable-failure', status: 'escalated' })
     )
@@ -521,7 +541,7 @@ describe('PR sitter desired-action safety policy', () => {
     ).toBeNull()
   })
 
-  it('stops on the same signature after an attributed fix across SHAs', () => {
+  it('parks on the same signature after an attributed fix across SHAs', () => {
     const fixedHead = review({
       headSha: 'head-2',
       checks: [
@@ -546,7 +566,12 @@ describe('PR sitter desired-action safety policy', () => {
       publishActionId: 'publish-1'
     }
     const history = ledger([attribution])
-    expect(computeDesiredAction(fixedHead, sitter(), history)).toBeNull()
+    expect(evaluateRegisteredStop(fixedHead, history)).toEqual({
+      predicateId: 'repeated-failure-after-own-fix',
+      disposition: 'park',
+      reason: 'repeated-failure-after-own-fix',
+      detail: 'test'
+    })
     expect(deriveHostedReviewSitterDiscrepancies(fixedHead, history)).toContainEqual(
       expect.objectContaining({ kind: 'fix-did-not-resolve', status: 'escalated' })
     )
@@ -556,6 +581,7 @@ describe('PR sitter desired-action safety policy', () => {
       headSha: 'head-3',
       checks: [{ ...fixedHead.checks[0]!, headSha: 'head-3', observationId: 'head-3:test' }]
     })
+    expect(evaluateRegisteredStop(externalHead, history)).toBeNull()
     expect(computeDesiredAction(externalHead, sitter(), history)).toMatchObject({
       kind: 'rerun-check'
     })
@@ -595,7 +621,12 @@ describe('PR sitter desired-action safety policy', () => {
       ],
       providerReadiness: { verdict: 'blocked', blockers: ['checks'] }
     })
-    expect(computeDesiredAction(repeated, sitter(), history)).toBeNull()
+    expect(evaluateRegisteredStop(repeated, history)).toEqual({
+      predicateId: 'repeated-failure-after-own-fix',
+      disposition: 'park',
+      reason: 'repeated-failure-after-own-fix',
+      detail: 'test'
+    })
     expect(deriveHostedReviewSitterDiscrepancies(repeated, history)).toContainEqual(
       expect.objectContaining({ kind: 'fix-did-not-resolve', status: 'escalated' })
     )
@@ -650,7 +681,12 @@ describe('PR sitter desired-action safety policy', () => {
       providerReadiness: { verdict: 'blocked', blockers: ['checks'] }
     })
 
-    expect(computeDesiredAction(repeated, sitter(), history)).toBeNull()
+    expect(evaluateRegisteredStop(repeated, history)).toEqual({
+      predicateId: 'repeated-failure-after-own-fix',
+      disposition: 'park',
+      reason: 'repeated-failure-after-own-fix',
+      detail: 'test'
+    })
     expect(deriveHostedReviewSitterDiscrepancies(repeated, history)).toContainEqual(
       expect.objectContaining({ kind: 'fix-did-not-resolve', status: 'escalated' })
     )
@@ -692,9 +728,12 @@ describe('PR sitter desired-action safety policy', () => {
       ],
       providerReadiness: { verdict: 'blocked', blockers: ['checks'] }
     })
-    expect(
-      computeDesiredAction(repeatedFirstFailure, sitter(), ledger([firstFix, secondFix]))
-    ).toBeNull()
+    expect(evaluateRegisteredStop(repeatedFirstFailure, ledger([firstFix, secondFix]))).toEqual({
+      predicateId: 'repeated-failure-after-own-fix',
+      disposition: 'park',
+      reason: 'repeated-failure-after-own-fix',
+      detail: 'test-a'
+    })
   })
 })
 

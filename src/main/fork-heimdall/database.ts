@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import Database from '../sqlite/sync-database'
 import { hardenSqliteDatabaseFiles } from '../sqlite/harden-database-files'
 
-export const HEIMDALL_DATABASE_SCHEMA_VERSION = 1
+export const HEIMDALL_DATABASE_SCHEMA_VERSION = 2
 export const HEIMDALL_DATABASE_BUSY_TIMEOUT_MS = 5_000
 
 export type HeimdallProfileDirectoryProvider = {
@@ -12,7 +12,7 @@ export type HeimdallProfileDirectoryProvider = {
 
 type ProfileDirectorySource = string | (() => string) | HeimdallProfileDirectoryProvider
 
-const HEIMDALL_SCHEMA_SQL = `
+const HEIMDALL_SCHEMA_V1_SQL = `
 CREATE TABLE heimdall_enrollment (
   watcher_id TEXT PRIMARY KEY,
   kind TEXT NOT NULL,
@@ -75,6 +75,13 @@ CREATE TABLE heimdall_terminal_summary (
   totals_json TEXT NOT NULL,
   at_ms INTEGER NOT NULL
 );
+`
+
+const HEIMDALL_SCHEMA_V2_SQL = `
+ALTER TABLE heimdall_enrollment
+  ADD COLUMN paused INTEGER NOT NULL DEFAULT 0 CHECK (paused IN (0, 1));
+ALTER TABLE heimdall_enrollment
+  ADD COLUMN command_revision INTEGER NOT NULL DEFAULT 0 CHECK (command_revision >= 0);
 `
 
 /** Lazily owns the single profile-scoped Heimdall registry database. */
@@ -207,8 +214,13 @@ export class HeimdallDatabase {
         database.exec('ROLLBACK')
         return 'future-schema'
       }
+      if (lockedVersion < 1) {
+        database.exec(HEIMDALL_SCHEMA_V1_SQL)
+      }
+      if (lockedVersion < 2) {
+        database.exec(HEIMDALL_SCHEMA_V2_SQL)
+      }
       if (lockedVersion < HEIMDALL_DATABASE_SCHEMA_VERSION) {
-        database.exec(HEIMDALL_SCHEMA_SQL)
         database.pragma(`user_version = ${HEIMDALL_DATABASE_SCHEMA_VERSION}`)
       }
       database.exec('COMMIT')

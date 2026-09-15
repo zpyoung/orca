@@ -29,23 +29,26 @@ Role tokens come in pairs: a **surface** and a **foreground** that meets contras
 
 **Categorical tokens are the exception.** `--git-graph-lane-1` through `-5` and the `--tool-*` family (see [Tool activity colors](#tool-activity-colors)) are standalone hues, not surface/foreground pairs. A categorical token has no paired foreground, so it must clear a measured contrast floor against every surface it's drawn on instead.
 
-| Role                                     | Use it for                                                  | Don't use it for                                    |
-| ---------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------- |
-| `background` / `foreground`              | App canvas, default text                                    | Cards, popovers, sidebar (have their own)           |
-| `card` / `card-foreground`               | Panels lifted off the canvas                                | The canvas itself                                   |
-| `popover` / `popover-foreground`         | Floating menus, dropdowns, hovercards                       | Inline UI                                           |
-| `primary` / `primary-foreground`         | The single affirmative action in a flow (Save, Confirm)     | Decorative accents; hover states; secondary actions |
-| `secondary` / `secondary-foreground`     | Lower-emphasis actions next to a primary                    | The affirmative action                              |
-| `muted` / `muted-foreground`             | De-emphasized text, captions, placeholders, disabled chrome | Body copy; primary actions                          |
-| `accent` / `accent-foreground`           | Hover/active backgrounds for ghost buttons and list rows    | Solid filled buttons (use `secondary` instead)      |
-| `destructive` / `destructive-foreground` | Delete, discard, irreversible-action buttons; error states  | Cancel buttons (Cancel is not destructive)          |
-| `border`                                 | All hairlines: dividers, input outlines, card edges         | Heavy emphasis; that's `ring`                       |
-| `input`                                  | Form field background only                                  | Anywhere outside form fields                        |
-| `ring`                                   | Focus-visible outlines, active selection halos              | Persistent decoration                               |
-| `sidebar` (+ variants)                   | The worktree sidebar and its children                       | Other panels                                        |
-| `editor-surface`                         | Background of Monaco / markdown editor panes                | App chrome                                          |
+| Role                                                      | Use it for                                                  | Don't use it for                                    |
+| --------------------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------- |
+| `background` / `foreground`                               | App canvas, default text                                    | Cards, popovers, sidebar (have their own)           |
+| `card` / `card-foreground`                                | Panels lifted off the canvas                                | The canvas itself                                   |
+| `popover` / `popover-foreground`                          | Floating menus, dropdowns, hovercards                       | Inline UI                                           |
+| `primary` / `primary-foreground`                          | The single affirmative action in a flow (Save, Confirm)     | Decorative accents; hover states; secondary actions |
+| `secondary` / `secondary-foreground`                      | Lower-emphasis actions next to a primary                    | The affirmative action                              |
+| `muted` / `muted-foreground`                              | De-emphasized text, captions, placeholders, disabled chrome | Body copy; primary actions                          |
+| `accent` / `accent-foreground`                            | Hover/active backgrounds for ghost buttons and list rows    | Solid filled buttons (use `secondary` instead)      |
+| `destructive` / `destructive-foreground`                  | Delete, discard, irreversible-action buttons; error states  | Cancel buttons (Cancel is not destructive)          |
+| `status-warning-background` / `status-warning-foreground` | Attention, parked work, unverifiable host contact           | Confirmed failures; proof that remote work exited   |
+| `border`                                                  | All hairlines: dividers, input outlines, card edges         | Heavy emphasis; that's `ring`                       |
+| `input`                                                   | Form field background only                                  | Anywhere outside form fields                        |
+| `ring`                                                    | Focus-visible outlines, active selection halos              | Persistent decoration                               |
+| `sidebar` (+ variants)                                    | The worktree sidebar and its children                       | Other panels                                        |
+| `editor-surface`                                          | Background of Monaco / markdown editor panes                | App chrome                                          |
 
 The `sidebar` family expands into `--sidebar`, `--sidebar-foreground`, `--sidebar-primary`, `--sidebar-primary-foreground`, `--sidebar-accent`, `--sidebar-accent-foreground`, `--sidebar-border`, and `--sidebar-ring` — use them inside the worktree sidebar so its hover/selected/focus states stay consistent and don't bleed into other panels. `editor-surface` is its own token (not just `background`) because Monaco and the markdown editor have a slightly darker surface in dark mode to match VS Code conventions; reach for it whenever you're rendering an editor pane.
+
+The warning family also provides `--status-warning` for compact marks and `--status-warning-border` for outlines. Pair warning surfaces with their foreground token and explicit status text; lost contact never implies that remote work exited.
 
 ### Git decoration colors
 
@@ -65,15 +68,15 @@ Use these _only_ for git status. Don't reuse them for unrelated state colors —
 
 ### Tool activity colors
 
-The native chat transcript colors tool lines on one axis: five hues answer *what kind of work is this?* Each category also carries a lucide glyph, so hue is never the sole encoder. Contrast is measured against the app canvas (`#ffffff` light, `#0a0a0a` dark):
+The native chat transcript colors tool lines on one axis: five hues answer _what kind of work is this?_ Each category also carries a lucide glyph, so hue is never the sole encoder. Contrast is measured against the app canvas (`#ffffff` light, `#0a0a0a` dark):
 
-| Token | Light | on canvas | Dark | on canvas | Meaning | Example tools |
-| --- | --- | --- | --- | --- | --- | --- |
-| `--tool-read` | `#2f6a96` | 5.80:1 | `#8ab4d8` | 9.05:1 | Reading a file | Read, NotebookRead |
-| `--tool-write` | `#8a6100` | 5.54:1 | `#e3b341` | 10.17:1 | Modifying your files | Edit, MultiEdit, Write |
-| `--tool-exec` | `#24707a` | 5.72:1 | `#79bfc4` | 9.49:1 | Running a command | Bash, terminal, shell |
-| `--tool-search` | `#4f4fc4` | 6.47:1 | `#9a9ae6` | 7.67:1 | Locating something | Grep, Glob |
-| `--tool-net` | `#6a4fb0` | 6.25:1 | `#b39ddb` | 8.26:1 | Reaching the network | WebFetch, WebSearch |
+| Token           | Light     | on canvas | Dark      | on canvas | Meaning              | Example tools          |
+| --------------- | --------- | --------- | --------- | --------- | -------------------- | ---------------------- |
+| `--tool-read`   | `#2f6a96` | 5.80:1    | `#8ab4d8` | 9.05:1    | Reading a file       | Read, NotebookRead     |
+| `--tool-write`  | `#8a6100` | 5.54:1    | `#e3b341` | 10.17:1   | Modifying your files | Edit, MultiEdit, Write |
+| `--tool-exec`   | `#24707a` | 5.72:1    | `#79bfc4` | 9.49:1    | Running a command    | Bash, terminal, shell  |
+| `--tool-search` | `#4f4fc4` | 6.47:1    | `#9a9ae6` | 7.67:1    | Locating something   | Grep, Glob             |
+| `--tool-net`    | `#6a4fb0` | 6.25:1    | `#b39ddb` | 8.26:1    | Reaching the network | WebFetch, WebSearch    |
 
 `--tool-write` is the only warm hue, and that's deliberate: amber means the agent touched your files. The four cool hues recede into chrome; the one warm hue is the thing worth noticing. An unrecognized tool name takes no category and renders exactly as it does today — neutral, no glyph. Orca hosts agents whose tool vocabularies it doesn't control, so a classifier that guessed would mislabel third-party tools with confident color.
 

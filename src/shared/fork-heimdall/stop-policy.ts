@@ -2,6 +2,9 @@ import { z } from 'zod'
 import type { Snapshot } from './snapshot'
 import type { WatcherLedger } from './ledger-types'
 
+export const StopDispositionSchema = z.enum(['park', 'terminal'])
+export type StopDisposition = z.infer<typeof StopDispositionSchema>
+
 export const StopVerdictSchema = z.discriminatedUnion('stop', [
   z.object({ stop: z.literal(false) }).strict(),
   z
@@ -16,11 +19,13 @@ export type StopVerdict = z.infer<typeof StopVerdictSchema>
 
 export type StopPredicate<TWorld> = {
   id: string
+  disposition?: StopDisposition
   evaluate(snapshot: Snapshot<TWorld>, ledger: WatcherLedger): StopVerdict
 }
 
 export type FiredStopPredicate = {
   predicateId: string
+  disposition: StopDisposition
   reason: string
   detail?: string
 }
@@ -36,6 +41,7 @@ export function evaluateStopPredicates<TWorld>(
     if (verdict.stop) {
       return {
         predicateId: predicate.id,
+        disposition: predicate.disposition ?? 'park',
         reason: verdict.reason,
         ...(verdict.detail === undefined ? {} : { detail: verdict.detail })
       }

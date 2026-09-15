@@ -79,7 +79,14 @@ export type LedgerStore = {
 
 /** Synchronous append-only ledger and its explicitly bounded retention projections. */
 export class HeimdallLedgerStore implements LedgerStore {
+  private readonly listeners = new Set<(watcherId: string) => void>()
+
   constructor(private readonly database: HeimdallDatabase) {}
+
+  subscribe(listener: (watcherId: string) => void): () => void {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
 
   read(watcherId: string): WatcherLedger {
     this.requireWatcherId(watcherId)
@@ -109,7 +116,10 @@ export class HeimdallLedgerStore implements LedgerStore {
 
     this.database.assertWritable()
     const connection = this.database.connection()
-    connection.exec('BEGIN IMMEDIATE')
+    const ownsTransaction = !connection.isTransaction
+    if (ownsTransaction) {
+      connection.exec('BEGIN IMMEDIATE')
+    }
     try {
       this.assertLedgerOpen(connection, parsed)
       if (parsed.kind === 'attempt-resolved') {
@@ -153,10 +163,15 @@ export class HeimdallLedgerStore implements LedgerStore {
       if (parsed.class === 'observation') {
         reclaimLedgerObservations(connection, parsed.watcherId)
       }
-      connection.exec('COMMIT')
+      if (ownsTransaction) {
+        connection.exec('COMMIT')
+        this.publish(parsed.watcherId)
+      }
       return seq
     } catch (error) {
-      connection.exec('ROLLBACK')
+      if (ownsTransaction && connection.isTransaction) {
+        connection.exec('ROLLBACK')
+      }
       throw error
     }
   }
@@ -224,6 +239,7 @@ export class HeimdallLedgerStore implements LedgerStore {
       connection.exec('ROLLBACK')
       throw error
     }
+    this.publish(watcherId)
   }
 
   readTickTraces(watcherId: string): WatcherTickTrace[] {
@@ -488,6 +504,11 @@ export class HeimdallLedgerStore implements LedgerStore {
   private requireWatcherId(watcherId: string): void {
     if (!watcherId) {
       throw new Error('A watcher id is required')
+    }
+  }
+  private publish(watcherId: string): void {
+    for (const listener of this.listeners) {
+      listener(watcherId)
     }
   }
 }

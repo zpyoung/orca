@@ -45,6 +45,7 @@ import type { RemoteServerUpdatesSlice } from './slices/remote-server-updates'
 import type { TerminalQuickCommandHostsSlice } from './slices/terminal-quick-command-hosts'
 import type { AsksSlice } from './slices/fork-ask-question-tool/asks'
 import type { LedgerSlice } from './slices/ledger'
+import type { HeimdallFleetSlice } from './slices/fork-heimdall/fleet'
 
 export type AppState = RepoSlice &
   SparsePresetsSlice &
@@ -90,4 +91,5 @@ export type AppState = RepoSlice &
   RemoteServerUpdatesSlice &
   TerminalQuickCommandHostsSlice &
   LedgerSlice &
-  AsksSlice
+  AsksSlice &
+  HeimdallFleetSlice

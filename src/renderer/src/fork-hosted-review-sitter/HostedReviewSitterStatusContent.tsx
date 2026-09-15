@@ -129,6 +129,8 @@ export type HostedReviewSitterStatusContentProps = {
   ledger: WatcherLedger | null
   approvalScope: ApprovalScope | null
   ledgerOpen: boolean
+  readOnly: boolean
+  readOnlyReason: string | null
   busy: boolean
   stopping: boolean
   approving: boolean
@@ -146,6 +148,8 @@ export function HostedReviewSitterStatusContent({
   ledger,
   approvalScope,
   ledgerOpen,
+  readOnly,
+  readOnlyReason,
   busy,
   stopping,
   approving,
@@ -159,13 +163,22 @@ export function HostedReviewSitterStatusContent({
 }: HostedReviewSitterStatusContentProps): React.JSX.Element {
   const { enrollment, status } = entry
   const reason = entryStatusReason(entry)
-  const statusIsError = status.state === 'escalated' || status.state === 'parked'
+  const statusNeedsAttention = status.state === 'escalated' || status.state === 'parked'
   const activeLimitMs = enrollment.budget.wallClockActiveMs
   const remainingBudgetMs =
     activeLimitMs === null ? null : Math.max(0, activeLimitMs - status.budget.activeMs)
   const escalations = latestEscalations(ledger)
   return (
     <div className="mt-2 space-y-2">
+      {readOnlyReason ? (
+        <p
+          className="rounded-md border border-status-warning-border bg-status-warning-background px-2.5 py-2 text-[11px] text-status-warning-foreground"
+          role="status"
+        >
+          <strong>{translate('fork.heimdall.detail.readOnly', 'Read-only.')}</strong>{' '}
+          {readOnlyReason}
+        </p>
+      ) : null}
       <div className="rounded-md border border-border bg-background/60 px-2.5 py-2">
         <div className="flex items-center justify-between gap-2 text-[11px]">
           <span className="flex items-center gap-1 text-muted-foreground">
@@ -197,11 +210,11 @@ export function HostedReviewSitterStatusContent({
           <div
             className={cn(
               'mt-1.5 flex items-start gap-1.5 text-[11px] leading-relaxed',
-              statusIsError ? 'text-destructive' : 'text-muted-foreground'
+              statusNeedsAttention ? 'text-status-warning' : 'text-muted-foreground'
             )}
-            role={statusIsError ? 'alert' : 'status'}
+            role="status"
           >
-            {(status.state === 'held' || statusIsError) && (
+            {(status.state === 'held' || statusNeedsAttention) && (
               <TriangleAlert className="mt-0.5 size-3 shrink-0" aria-hidden />
             )}
             <span>{reason}</span>
@@ -231,7 +244,7 @@ export function HostedReviewSitterStatusContent({
             type="button"
             size="xs"
             className="mt-2 w-full"
-            disabled={busy}
+            disabled={busy || readOnly}
             onClick={onApprove}
           >
             {approving ? <Loader2 className="animate-spin" /> : null}
@@ -271,7 +284,7 @@ export function HostedReviewSitterStatusContent({
             variant="outline"
             size="xs"
             className="w-full"
-            disabled={busy}
+            disabled={busy || readOnly}
             onClick={onStop}
           >
             {stopping ? <Loader2 className="animate-spin" /> : null}

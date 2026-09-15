@@ -1,196 +1,20 @@
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { z } from 'zod'
+import { describe, expect, it, vi } from 'vitest'
 import type { KernelAction, WatcherKind } from '../../shared/fork-heimdall/kind-contract'
 import type { LedgerEntry } from '../../shared/fork-heimdall/ledger-types'
 import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
-import type { EnrollInput, WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
-import type { Store } from '../persistence'
-import type { OrcaRuntimeService } from '../runtime/orca-runtime'
-import { HeimdallBudgetClock } from './budget-clock'
 import { HeimdallDatabase } from './database'
 import { HeimdallEnrollmentStore } from './enrollment-store'
-import { HeimdallKernelServiceImpl } from './kernel-service'
-import { HeimdallLedgerStore } from './ledger-store'
-import type { LeaseResult, LeaseStore } from './lease-store'
-import type { HeimdallOrchestrationAdapter } from './orchestration/orchestration-adapter'
+import {
+  action,
+  authorized,
+  enrollmentInput,
+  harness,
+  kind,
+  runningDispatch,
+  type World
+} from './kernel-service-test-harness'
 
 vi.mock('electron', () => ({}))
-
-const directories: string[] = []
-afterEach(async () => {
-  await Promise.all(
-    directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true }))
-  )
-})
-
-type World = { revision: string; stopped?: boolean }
-const action = (revision: string): KernelAction => ({
-  kind: 'apply-review-fix',
-  capability: 'write',
-  visibility: 'external',
-  contentIdentity: revision,
-  evidenceKey: `review:${revision}`,
-  expectedState: { target: 'review', before: revision }
-})
-
-const enrollmentInput = (budget = { wallClockActiveMs: 100, turns: 2 }): EnrollInput => ({
-  kind: 'hosted-review',
-  repoId: 'repo-1',
-  worktreeId: 'worktree-1',
-  capabilities: { write: 'on' },
-  budget,
-  kindPayload: { label: 'Review 1' }
-})
-
-function authorized(
-  input: EnrollInput,
-  owner: WatcherEnrollment['schedulerOwner'] = 'local_host_service'
-) {
-  return {
-    kind: input.kind,
-    workspaceKey: 'local::/workspace/review-1' as const,
-    executionHostId: 'local' as const,
-    repoId: input.repoId,
-    worktreeId: input.worktreeId,
-    workspacePath: '/workspace/review-1',
-    schedulerOwner: owner,
-    capabilities: input.capabilities,
-    budget: input.budget,
-    kindPayload: input.kindPayload
-  }
-}
-
-function kind(overrides: Partial<WatcherKind<World, KernelAction, { label: string }>> = {}) {
-  const defaultSnapshot: Snapshot<World> = {
-    freshness: 'live',
-    contentIdentity: 'revision-1',
-    observedAtMs: 1,
-    world: { revision: 'revision-1' }
-  }
-  return {
-    id: 'hosted-review',
-    displayName: 'Hosted review',
-    describeEnrollment: () => 'Review 1',
-    enrollmentPayloadSchema: z.object({ label: z.string() }).strict(),
-    authorizeEnrollment: async (input: EnrollInput) => authorized(input),
-    read: async () => defaultSnapshot,
-    describeSnapshot: (snapshot: Snapshot<World>) => ({
-      freshness: snapshot.freshness,
-      contentIdentity: snapshot.contentIdentity,
-      summary: snapshot.world.revision
-    }),
-    decide: () => ({ action: null, reason: 'quiet', considered: [] }),
-    execute: async () => ({ effect: 'landed' as const }),
-    resolveOutcome: () => 'not-landed' as const,
-    ...overrides
-  } satisfies WatcherKind<World, KernelAction, { label: string }>
-}
-
-function heldLease(): LeaseResult {
-  return {
-    status: 'held',
-    epoch: 1,
-    guard: {
-      epoch: 1,
-      assertHeld: async () => {},
-      renewLoop: () => ({ dispose: () => {} })
-    }
-  }
-}
-
-async function harness(
-  options: {
-    lease?: () => LeaseResult
-    mailbox?: () => LedgerEntry[]
-    dispatchObservation?: () => { status: 'live' | 'exited' | 'unverifiable'; reason?: string }
-  } = {}
-) {
-  const directory = await mkdtemp(join(tmpdir(), 'heimdall-kernel-'))
-  directories.push(directory)
-  const database = new HeimdallDatabase(directory)
-  const enrollmentStore = new HeimdallEnrollmentStore(database)
-  const ledgerStore = new HeimdallLedgerStore(database)
-  const budgetClock = new HeimdallBudgetClock(ledgerStore, { now: () => 100 })
-  const schedule = vi.fn()
-  let identifier = 0
-  const leaseStore: LeaseStore = {
-    acquireOrRenew: vi.fn(async () => options.lease?.() ?? heldLease()),
-    release: vi.fn(async () => {})
-  }
-  const orchestration: HeimdallOrchestrationAdapter = {
-    ensureRun: vi.fn(async () => ({ runId: 'run-1' })),
-    dispatchWorker: vi.fn(async () => ({
-      status: 'dispatched' as const,
-      dispatchId: 'dispatch-1'
-    })),
-    recoverDispatch: vi.fn(async () => ({ status: 'absent' as const })),
-    readDispatch: vi.fn(async () => options.dispatchObservation?.() ?? { status: 'live' as const }),
-    drainMailbox: vi.fn(async () => options.mailbox?.() ?? []),
-    answerQuestion: vi.fn(async () => {})
-  }
-  const store = {
-    getProfileStorageDirectory: () => directory,
-    getSettings: () => ({ notifications: { enabled: false } })
-  } as unknown as Store
-  const service = new HeimdallKernelServiceImpl({
-    runtime: {} as OrcaRuntimeService,
-    store,
-    database,
-    enrollmentStore,
-    ledgerStore,
-    budgetClock,
-    leaseStore,
-    orchestration,
-    now: () => 100,
-    createId: () => `id-${++identifier}`,
-    setTimer: ((callback: () => void, delay: number) => {
-      schedule(callback, delay)
-      return { unref: () => {} } as NodeJS.Timeout
-    }) as typeof setTimeout,
-    clearTimer: vi.fn() as unknown as typeof clearTimeout,
-    holderId: 'test-holder'
-  })
-  return {
-    service,
-    database,
-    enrollmentStore,
-    ledgerStore,
-    budgetClock,
-    leaseStore,
-    orchestration,
-    schedule
-  }
-}
-
-function runningDispatch(watcherId: string): LedgerEntry[] {
-  const attempted: LedgerEntry = {
-    eventId: 'attempt-event',
-    watcherId,
-    atMs: 10,
-    origin: 'owner',
-    class: 'fact',
-    kind: 'attempt',
-    attemptId: 'attempt-1',
-    fingerprint: 'fingerprint-1',
-    action: action('revision-1'),
-    state: 'attempted',
-    dispatch: { spec: 'Do the work', dispatchKind: 'child' },
-    orchestrationRequestId: 'request-1'
-  }
-  return [
-    attempted,
-    {
-      ...attempted,
-      eventId: 'running-event',
-      atMs: 11,
-      state: 'running',
-      dispatchId: 'dispatch-1'
-    }
-  ]
-}
 
 describe('Heimdall kernel service', () => {
   it('refuses duplicate workspaces and remote-host-owned enrollment without mutating a second row', async () => {
@@ -259,7 +83,16 @@ describe('Heimdall kernel service', () => {
       dispatchKind: 'child',
       dispatchId: 'dispatch-old'
     })
-    await service.disarm(watcherId)
+    const active = (await service.fleet()).entries.find(
+      (entry) => entry.target.watcherId === watcherId
+    )!
+    await expect(
+      service.command({
+        target: active.target,
+        expectedOwner: active.ownerFence,
+        command: { kind: 'disarm' }
+      })
+    ).resolves.toMatchObject({ status: 'applied' })
     const rearmed = await service.enroll({
       ...enrollmentInput(),
       capabilities: { write: 'gated' },
@@ -271,6 +104,45 @@ describe('Heimdall kernel service', () => {
       expect(rearmed.entry.enrollment.capabilities).toEqual({ write: 'gated' })
       expect(rearmed.entry.enrollment.kindPayload).toEqual({ label: 'Review 1 updated' })
     }
+  })
+
+  it('refuses cross-authority rearm without transferring a disabled watcher', async () => {
+    const desktop = await harness()
+    desktop.service.registerKind(kind())
+    const enrolled = await desktop.service.enroll(enrollmentInput())
+    if (enrolled.status !== 'enrolled') {
+      throw new Error('expected enrollment')
+    }
+    const active = (await desktop.service.fleet()).entries[0]!
+    await expect(
+      desktop.service.command({
+        target: active.target,
+        expectedOwner: active.ownerFence,
+        command: { kind: 'disarm' }
+      })
+    ).resolves.toMatchObject({ status: 'applied' })
+    desktop.service.stopForShutdown()
+
+    const runtime = await harness({
+      directory: desktop.directory,
+      storageAuthority: 'runtime'
+    })
+    runtime.service.registerKind(
+      kind({
+        authorizeEnrollment: async (input) => authorized(input, 'remote_host_service')
+      })
+    )
+    await expect(runtime.service.enroll(enrollmentInput())).resolves.toEqual({
+      status: 'refused',
+      reason: 'owner-not-executable',
+      schedulerOwner: 'local_host_service'
+    })
+    expect(runtime.enrollmentStore.get(enrolled.entry.enrollment.watcherId)).toMatchObject({
+      enabled: false,
+      schedulerOwner: 'local_host_service',
+      commandRevision: 1
+    })
+    runtime.service.stopForShutdown()
   })
 
   it('retains enrollment and retries when lease acquisition is refused', async () => {
@@ -331,23 +203,22 @@ describe('Heimdall kernel service', () => {
 
   it('parks on a stop predicate but keeps transient read failures enrolled with backoff', async () => {
     const stopped = await harness()
-    stopped.service.registerKind(
-      kind({
-        read: async () => ({
-          freshness: 'live',
-          contentIdentity: 'stop',
-          observedAtMs: 1,
-          world: { revision: 'stop', stopped: true }
-        }),
-        stopPredicates: [
-          {
-            id: 'closed',
-            evaluate: (snapshot) =>
-              snapshot.world.stopped ? { stop: true, reason: 'review-closed' } : { stop: false }
-          }
-        ]
-      })
-    )
+    const stoppedKind = kind({
+      read: async () => ({
+        freshness: 'live',
+        contentIdentity: 'stop',
+        observedAtMs: 1,
+        world: { revision: 'stop', stopped: true }
+      }),
+      stopPredicates: [
+        {
+          id: 'closed',
+          evaluate: (snapshot) =>
+            snapshot.world.stopped ? { stop: true, reason: 'review-closed' } : { stop: false }
+        }
+      ]
+    })
+    stopped.service.registerKind(stoppedKind)
     const enrolled = await stopped.service.enroll(enrollmentInput())
     if (enrolled.status !== 'enrolled') {
       throw new Error('expected enrollment')
@@ -357,6 +228,46 @@ describe('Heimdall kernel service', () => {
       enrollment: { enabled: false },
       status: { state: 'parked', parkReason: { kind: 'stop-predicate', predicateId: 'closed' } }
     })
+
+    stopped.service.stopForShutdown()
+    const restarted = await harness({ directory: stopped.directory })
+    restarted.service.registerKind(stoppedKind)
+    const restoredPark = (await restarted.service.fleet()).entries[0]!
+    expect(restoredPark).toMatchObject({
+      entry: {
+        enrollment: { enabled: false },
+        status: {
+          state: 'parked',
+          phase: 'parked',
+          reason: 'stop-predicate',
+          parkReason: {
+            kind: 'stop-predicate',
+            predicateId: 'closed',
+            reason: 'review-closed'
+          }
+        }
+      }
+    })
+    await expect(
+      restarted.service.command({
+        target: restoredPark.target,
+        expectedOwner: restoredPark.ownerFence,
+        command: { kind: 'disarm' }
+      })
+    ).resolves.toMatchObject({ status: 'applied' })
+    const disarmed = (await restarted.service.fleet()).entries[0]!
+    expect(disarmed).toMatchObject({
+      ownerFence: { revision: 1 },
+      entry: { enrollment: { enabled: false }, status: { state: 'disabled' } }
+    })
+    await expect(
+      restarted.service.command({
+        target: disarmed.target,
+        expectedOwner: disarmed.ownerFence,
+        command: { kind: 'resume' }
+      })
+    ).resolves.toMatchObject({ status: 'refused', reason: 'invalid-state' })
+    restarted.service.stopForShutdown()
 
     const failing = await harness()
     failing.service.registerKind(
@@ -480,6 +391,34 @@ describe('Heimdall kernel service', () => {
         })
       ])
     )
+    const parkedEntry = (await service.fleet()).entries[0]!
+    await expect(
+      service.command({
+        target: parkedEntry.target,
+        expectedOwner: parkedEntry.ownerFence,
+        command: {
+          kind: 'answer-question',
+          messageId: 'message-question',
+          body: 'Use the current branch'
+        }
+      })
+    ).resolves.toMatchObject({ status: 'applied' })
+    expect(orchestration.answerQuestion).toHaveBeenCalledWith(
+      expect.objectContaining({ watcherId }),
+      'message-question',
+      'Use the current branch'
+    )
+    await service.reconcileForTesting(watcherId)
+    expect((await service.fleet()).entries[0]).toMatchObject({
+      ownerFence: { revision: 1 },
+      entry: { enrollment: { enabled: true }, status: { state: 'watching' } }
+    })
+    const latestQuestion = service
+      .ledger(watcherId)
+      .entries.findLast(
+        (entry) => entry.kind === 'escalation' && entry.escalationKind === 'worker-question'
+      )
+    expect(latestQuestion).toMatchObject({ status: 'resolved' })
   })
   it('keeps polling after a disarm that leaves work in flight so the lease is released', async () => {
     const { service, ledgerStore, leaseStore, schedule } = await harness()
@@ -493,7 +432,14 @@ describe('Heimdall kernel service', () => {
       ledgerStore.append(entry)
     }
 
-    await service.disarm(watcherId)
+    const active = (await service.fleet()).entries[0]!
+    await expect(
+      service.command({
+        target: active.target,
+        expectedOwner: active.ownerFence,
+        command: { kind: 'disarm' }
+      })
+    ).resolves.toMatchObject({ status: 'applied' })
     // the in-flight branch deliberately holds the lease so the worker can still be reconciled
     expect(leaseStore.release).not.toHaveBeenCalled()
     expect((await service.list())[0]).toMatchObject({
@@ -636,6 +582,8 @@ describe('Heimdall kernel service', () => {
     const base = {
       ...authorized(enrollmentInput()),
       enabled: true,
+      paused: false,
+      commandRevision: 0,
       coordinatorIdentity: { handle: 'coordinator', paneKey: 'pane' },
       orchestrationRunId: null,
       createdAtMs: 1,
@@ -687,7 +635,17 @@ describe('Heimdall kernel service', () => {
     ).toEqual({ kind_payload_json: rawPayload })
   })
 
-  it('revalidates enrollment and lease after preflight before committing an action', async () => {
+  it('allocates strictly increasing fleet generations when the clock does not advance', async () => {
+    const { service } = await harness()
+
+    const first = await service.fleet()
+    const second = await service.fleet()
+
+    expect(first.generatedAtMs).toBe(100)
+    expect(second.generatedAtMs).toBe(101)
+  })
+
+  it('fences an in-flight decision with a durable pause before its commit point', async () => {
     let enterPreflight!: () => void
     const enteredPreflight = new Promise<void>((resolve) => {
       enterPreflight = resolve
@@ -714,15 +672,242 @@ describe('Heimdall kernel service', () => {
       throw new Error('expected enrollment')
     }
     const watcherId = result.entry.enrollment.watcherId
+    const row = (await service.fleet()).entries[0]!
 
     const reconciliation = service.reconcileForTesting(watcherId)
     await enteredPreflight
-    await service.disarm(watcherId)
+    const pause = service.command({
+      target: row.target,
+      expectedOwner: row.ownerFence,
+      command: { kind: 'pause' }
+    })
+    await Promise.resolve()
+    await Promise.resolve()
     finishPreflight()
     await reconciliation
+    await expect(pause).resolves.toMatchObject({ status: 'applied' })
 
     expect(execute).not.toHaveBeenCalled()
     expect(leaseStore.release).toHaveBeenCalled()
+    expect((await service.fleet()).entries[0]).toMatchObject({
+      paused: true,
+      ownerFence: { revision: 1 },
+      entry: { enrollment: { enabled: true, budget: enrollmentInput().budget } }
+    })
     expect(service.ledger(watcherId).entries.some((entry) => entry.kind === 'attempt')).toBe(false)
+  })
+  it('blocks worker dispatch when pause is requested at an async pre-dispatch boundary', async () => {
+    let enterBoundary!: () => void
+    const enteredBoundary = new Promise<void>((resolve) => {
+      enterBoundary = resolve
+    })
+    let releaseBoundary!: () => void
+    const boundaryReleased = new Promise<void>((resolve) => {
+      releaseBoundary = resolve
+    })
+    const { service, orchestration } = await harness()
+    service.registerKind(
+      kind({
+        decide: (snapshot) => ({ action: action(snapshot.contentIdentity) }),
+        execute: async (_action, context) => {
+          enterBoundary()
+          await boundaryReleased
+          await context.lease.assertHeld()
+          await context.dispatchWorker({ spec: 'must-not-dispatch' })
+          return { effect: 'landed' as const }
+        }
+      })
+    )
+    const enrolled = await service.enroll(enrollmentInput())
+    if (enrolled.status !== 'enrolled') {
+      throw new Error('expected enrollment')
+    }
+    const row = (await service.fleet()).entries[0]!
+    const reconciliation = service.reconcileForTesting(row.target.watcherId)
+    await enteredBoundary
+    const pause = service.command({
+      target: row.target,
+      expectedOwner: row.ownerFence,
+      command: { kind: 'pause' }
+    })
+    await Promise.resolve()
+    await Promise.resolve()
+    releaseBoundary()
+    await reconciliation
+    await expect(pause).resolves.toMatchObject({ status: 'applied' })
+
+    expect(orchestration.dispatchWorker).not.toHaveBeenCalled()
+    expect((await service.fleet()).entries[0]).toMatchObject({
+      paused: true,
+      entry: { status: { state: 'held', phase: 'paused' } }
+    })
+  })
+
+  it('preserves consumed budget across pause, policy adjustment, and resume', async () => {
+    const { service, ledgerStore } = await harness()
+    service.registerKind(kind())
+    const enrolled = await service.enroll(enrollmentInput())
+    if (enrolled.status !== 'enrolled') {
+      throw new Error('expected enrollment')
+    }
+    const watcherId = enrolled.entry.enrollment.watcherId
+    ledgerStore.append({
+      eventId: 'turn-1',
+      watcherId,
+      atMs: 100,
+      origin: 'owner',
+      class: 'fact',
+      kind: 'turn',
+      dispatchKind: 'planner',
+      dispatchId: 'dispatch-1'
+    })
+    const initial = (await service.fleet()).entries[0]!
+    await service.command({
+      target: initial.target,
+      expectedOwner: initial.ownerFence,
+      command: { kind: 'pause' }
+    })
+    const paused = (await service.fleet()).entries[0]!
+    await service.command({
+      target: paused.target,
+      expectedOwner: paused.ownerFence,
+      command: {
+        kind: 'adjust-budget',
+        budget: { wallClockActiveMs: 120_000, turns: 8 }
+      }
+    })
+    const adjusted = (await service.fleet()).entries[0]!
+
+    expect(adjusted).toMatchObject({
+      paused: true,
+      ownerFence: { revision: 2 },
+      entry: {
+        enrollment: { budget: { wallClockActiveMs: 120_000, turns: 8 } },
+        status: { budget: { turns: 1 } }
+      }
+    })
+    await service.command({
+      target: adjusted.target,
+      expectedOwner: adjusted.ownerFence,
+      command: { kind: 'resume' }
+    })
+    expect((await service.fleet()).entries[0]).toMatchObject({
+      paused: false,
+      ownerFence: { revision: 3 },
+      entry: {
+        enrollment: { budget: { wallClockActiveMs: 120_000, turns: 8 } },
+        status: { budget: { turns: 1 } }
+      }
+    })
+  })
+
+  it('keeps an adjusted budget park durable until explicit resume', async () => {
+    const parked = await harness()
+    const registeredKind = kind()
+    parked.service.registerKind(registeredKind)
+    const enrolled = await parked.service.enroll(
+      enrollmentInput({ wallClockActiveMs: null, turns: 1 })
+    )
+    if (enrolled.status !== 'enrolled') {
+      throw new Error('expected enrollment')
+    }
+    const watcherId = enrolled.entry.enrollment.watcherId
+    parked.ledgerStore.append({
+      eventId: 'budget-turn',
+      watcherId,
+      atMs: 100,
+      origin: 'owner',
+      class: 'fact',
+      kind: 'turn',
+      dispatchKind: 'planner',
+      dispatchId: 'budget-dispatch'
+    })
+    await parked.service.reconcileForTesting(watcherId)
+    const exhausted = (await parked.service.fleet()).entries[0]!
+    await expect(
+      parked.service.command({
+        target: exhausted.target,
+        expectedOwner: exhausted.ownerFence,
+        command: { kind: 'resume' }
+      })
+    ).resolves.toMatchObject({ status: 'refused', reason: 'invalid-state' })
+    await parked.service.command({
+      target: exhausted.target,
+      expectedOwner: exhausted.ownerFence,
+      command: {
+        kind: 'adjust-budget',
+        budget: { wallClockActiveMs: null, turns: 2 }
+      }
+    })
+    parked.service.stopForShutdown()
+
+    const restarted = await harness({ directory: parked.directory })
+    restarted.service.registerKind(registeredKind)
+    const stillParked = (await restarted.service.fleet()).entries[0]!
+    expect(stillParked).toMatchObject({
+      ownerFence: { revision: 1 },
+      entry: {
+        enrollment: { enabled: false, budget: { wallClockActiveMs: null, turns: 2 } },
+        status: {
+          state: 'parked',
+          parkReason: { kind: 'budget', exhaustion: { kind: 'turns' } },
+          budget: { turns: 1, exhausted: null }
+        }
+      }
+    })
+    await expect(
+      restarted.service.command({
+        target: stillParked.target,
+        expectedOwner: stillParked.ownerFence,
+        command: { kind: 'resume' }
+      })
+    ).resolves.toMatchObject({ status: 'applied' })
+    expect((await restarted.service.fleet()).entries[0]).toMatchObject({
+      ownerFence: { revision: 2 },
+      entry: { enrollment: { enabled: true }, status: { state: 'watching', phase: 'resumed' } }
+    })
+    restarted.service.stopForShutdown()
+  })
+
+  it('retains pause across storage restart and refuses stale revision or owner fences', async () => {
+    const { service, directory } = await harness()
+    service.registerKind(kind())
+    const enrolled = await service.enroll(enrollmentInput())
+    if (enrolled.status !== 'enrolled') {
+      throw new Error('expected enrollment')
+    }
+    const row = (await service.fleet()).entries[0]!
+    await expect(
+      service.command({
+        target: row.target,
+        expectedOwner: row.ownerFence,
+        command: { kind: 'pause' }
+      })
+    ).resolves.toMatchObject({ status: 'applied' })
+    await expect(
+      service.command({
+        target: row.target,
+        expectedOwner: row.ownerFence,
+        command: { kind: 'resume' }
+      })
+    ).resolves.toMatchObject({ status: 'refused', reason: 'stale-revision' })
+    await expect(
+      service.command({
+        target: row.target,
+        expectedOwner: { ...row.ownerFence, workspaceKey: 'local::/different-worktree' },
+        command: { kind: 'resume' }
+      })
+    ).resolves.toMatchObject({ status: 'refused', reason: 'owner-conflict' })
+
+    service.stopForShutdown()
+    const reopenedDatabase = new HeimdallDatabase(directory)
+    const reopenedEnrollments = new HeimdallEnrollmentStore(reopenedDatabase)
+    expect(reopenedEnrollments.get(row.target.watcherId)).toMatchObject({
+      enabled: true,
+      paused: true,
+      commandRevision: 1,
+      budget: enrollmentInput().budget
+    })
+    reopenedDatabase.close()
   })
 })

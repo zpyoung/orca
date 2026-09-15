@@ -7,7 +7,10 @@ vi.mock('electron', () => ({
 }))
 
 import { startHeimdall } from './registration'
-import { requireHeimdallKernel } from '../runtime/rpc/methods/fork-heimdall/kernel-binding'
+import {
+  requireHeimdallKernel,
+  requireHeimdallTransport
+} from '../runtime/rpc/methods/fork-heimdall/kernel-binding'
 
 function unopenedStore(): Store {
   return {
@@ -33,11 +36,13 @@ describe('Heimdall startup isolation', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  it('does not bind or start a serve-mode scheduler', () => {
+  it('binds a lazy serve-mode owner without opening storage or scheduling work', () => {
     vi.useFakeTimers()
     const runtime = {} as OrcaRuntimeService
-    expect(startHeimdall(runtime, unopenedStore(), true)).toBeNull()
-    expect(() => requireHeimdallKernel(runtime)).toThrow('owner-not-executable')
+    const kernel = startHeimdall(runtime, unopenedStore(), true)
+    expect(requireHeimdallKernel(runtime)).toBe(kernel)
+    expect(requireHeimdallTransport(runtime)).toBeDefined()
     expect(vi.getTimerCount()).toBe(0)
+    kernel.stopForShutdown()
   })
 })

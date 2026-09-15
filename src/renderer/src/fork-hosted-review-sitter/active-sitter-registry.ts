@@ -12,7 +12,7 @@ export function isActiveHostedReviewSitter(entry: WatcherListEntry): boolean {
   return entry.enrollment.kind === 'hosted-review' && isActiveHeimdallWatcher(entry)
 }
 
-/** Hosted-review projection of the shared five-second Heimdall fleet poll. */
+/** Hosted-review projection of the shared pushed Heimdall fleet cache. */
 export function useActiveHostedReviewSitterState(worktreeId: string): WatcherStatusState | null {
   const watcher = useActiveHeimdallWatcherState(worktreeId)
   return watcher?.kind === 'hosted-review' ? watcher.state : null

@@ -1,5 +1,6 @@
 import { translate } from '@/i18n/i18n'
 import type { HeimdallApi } from '../../../shared/fork-heimdall/api'
+import type { WatcherFleetEntry, WatcherTarget } from '../../../shared/fork-heimdall/fleet-types'
 import type {
   ApprovalScope,
   EscalationEntry,
@@ -18,12 +19,10 @@ export function getHeimdallApi(): HeimdallApi | null {
   }
   const methods = candidate as Partial<Record<keyof HeimdallApi, unknown>>
   if (
-    typeof methods.list !== 'function' ||
+    typeof methods.fleet !== 'function' ||
+    typeof methods.detail !== 'function' ||
+    typeof methods.command !== 'function' ||
     typeof methods.enroll !== 'function' ||
-    typeof methods.disarm !== 'function' ||
-    typeof methods.disarmAll !== 'function' ||
-    typeof methods.approve !== 'function' ||
-    typeof methods.ledger !== 'function' ||
     typeof methods.debugReport !== 'function'
   ) {
     return null
@@ -60,18 +59,27 @@ function hostedReviewPayload(entry: WatcherListEntry): HostedReviewEnrollmentPay
   return candidate as HostedReviewEnrollmentPayload
 }
 
-export function sameHostedReview(
-  entry: WatcherListEntry,
-  repoId: string,
-  reviewProvider: string,
+export type HostedReviewSitterSelection = {
+  repoId: string
+  worktreeId: string | null
+  reviewProvider: string
   reviewNumber: number
+  owner: Pick<WatcherTarget, 'connectionId' | 'pairingRevision'>
+}
+
+export function sameHostedReview(
+  row: WatcherFleetEntry,
+  selection: HostedReviewSitterSelection
 ): boolean {
-  const payload = hostedReviewPayload(entry)
+  const payload = hostedReviewPayload(row.entry)
   return (
     payload !== null &&
-    entry.enrollment.repoId === repoId &&
-    payload.provider === reviewProvider &&
-    payload.reviewNumber === reviewNumber
+    row.entry.enrollment.repoId === selection.repoId &&
+    row.entry.enrollment.worktreeId === selection.worktreeId &&
+    payload.provider === selection.reviewProvider &&
+    payload.reviewNumber === selection.reviewNumber &&
+    row.target.connectionId === selection.owner.connectionId &&
+    row.target.pairingRevision === selection.owner.pairingRevision
   )
 }
 

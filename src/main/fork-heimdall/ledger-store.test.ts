@@ -87,6 +87,8 @@ function enrollment(watcherId = 'watcher-1'): WatcherEnrollment {
     workspacePath: '/worktree',
     schedulerOwner: 'local_host_service',
     enabled: true,
+    paused: false,
+    commandRevision: 0,
     capabilities: { merge: 'gated' },
     budget: { wallClockActiveMs: 60_000, turns: 2 },
     kindPayload: { pullRequest: 1 },

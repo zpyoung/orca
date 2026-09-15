@@ -1,0 +1,440 @@
+import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { translate } from '@/i18n/i18n'
+import type { ObjectiveDetail } from '../../../shared/fork-heimdall-objective/detail-types'
+import type { WatcherFleetEntry } from '../../../shared/fork-heimdall/fleet-types'
+import { formatHeimdallTime } from '../fork-heimdall/fleet-format'
+import {
+  OBJECTIVE_CAPABILITIES,
+  OBJECTIVE_LANDING_BARS,
+  OBJECTIVE_ROLES,
+  OBJECTIVE_SITTER_CAPABILITIES
+} from './objective-enrollment-model'
+import {
+  objectiveCapabilityLabel,
+  objectiveCapabilityModeLabel,
+  objectiveCriterionReviewLabel,
+  objectiveLandingBarLabel,
+  objectiveNodeStateLabel,
+  objectiveReviewRoleLabel,
+  objectiveRevisionStatusLabel,
+  objectiveRoleLabel,
+  objectiveSitterCapabilityLabel,
+  objectiveTierLabel,
+  objectiveVerdictLabel,
+  objectiveWorkspaceKindLabel
+} from './objective-copy'
+
+function shortIdentity(value: string): string {
+  return value.length > 12 ? `${value.slice(0, 12)}…` : value
+}
+
+function ContractValue({
+  label,
+  children
+}: {
+  label: string
+  children: React.ReactNode
+}): React.JSX.Element {
+  return (
+    <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-3 border-b border-border/60 py-2 last:border-0">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 break-words text-xs text-foreground">{children}</dd>
+    </div>
+  )
+}
+
+function ObjectiveContract({
+  detail,
+  row
+}: {
+  detail: ObjectiveDetail
+  row: WatcherFleetEntry
+}): React.JSX.Element {
+  const contract = detail.contract
+  const roleAgents = OBJECTIVE_ROLES.flatMap((role) => {
+    const agent = contract.roleAgents[role]
+    return agent ? [{ role, agent }] : []
+  })
+  const sitterOverrides = OBJECTIVE_SITTER_CAPABILITIES.flatMap((capability) => {
+    const mode = contract.sitterOverrides[capability]
+    return mode ? [{ capability, mode }] : []
+  })
+  return (
+    <section aria-labelledby="objective-contract-title">
+      <h3
+        id="objective-contract-title"
+        className="mb-2 text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground"
+      >
+        {translate('fork.heimdallObjective.detail.contract', 'Contract')}
+      </h3>
+      <div className="rounded-md border border-border bg-muted/10 px-3">
+        <ContractValue label={translate('fork.heimdallObjective.detail.objective', 'Objective')}>
+          <span className="whitespace-pre-wrap">{contract.objectiveText}</span>
+        </ContractValue>
+        <ContractValue label={translate('fork.heimdallObjective.detail.tier', 'Tier')}>
+          {objectiveTierLabel(contract.tier)}
+        </ContractValue>
+        <ContractValue label={translate('fork.heimdallObjective.detail.landingBar', 'Landing bar')}>
+          {objectiveLandingBarLabel(contract.landingBar)}
+        </ContractValue>
+        <ContractValue label={translate('fork.heimdallObjective.detail.workspace', 'Workspace')}>
+          {row.entry.enrollment.worktreeId
+            ? translate(
+                'fork.heimdallObjective.detail.workspaceGitValue',
+                '{{kind}} · {{repo}} / {{worktree}}',
+                {
+                  kind: objectiveWorkspaceKindLabel(contract.workspaceKind),
+                  repo: row.entry.enrollment.repoId,
+                  worktree: row.entry.enrollment.worktreeId
+                }
+              )
+            : translate(
+                'fork.heimdallObjective.detail.workspaceFolderValue',
+                '{{kind}} · {{repo}}',
+                {
+                  kind: objectiveWorkspaceKindLabel(contract.workspaceKind),
+                  repo: row.entry.enrollment.repoId
+                }
+              )}
+        </ContractValue>
+        <ContractValue
+          label={translate('fork.heimdallObjective.detail.maxConcurrency', 'Concurrency')}
+        >
+          {contract.maxConcurrency}
+        </ContractValue>
+        <ContractValue
+          label={translate('fork.heimdallObjective.detail.territory', 'Write territory')}
+        >
+          <ul className="space-y-1 font-mono">
+            {contract.writeTerritory.map((glob) => (
+              <li key={glob}>{glob}</li>
+            ))}
+          </ul>
+        </ContractValue>
+        <ContractValue
+          label={translate('fork.heimdallObjective.detail.capabilities', 'Capabilities')}
+        >
+          <span>
+            {OBJECTIVE_CAPABILITIES.map(
+              (capability) =>
+                `${objectiveCapabilityLabel(capability)}: ${objectiveCapabilityModeLabel(
+                  row.entry.enrollment.capabilities[capability] ?? 'off'
+                )}`
+            ).join(' · ')}
+          </span>
+        </ContractValue>
+        <ContractValue label={translate('fork.heimdallObjective.detail.budget', 'Budget')}>
+          {translate(
+            'fork.heimdallObjective.detail.budgetValue',
+            '{{hours}} active hours · {{turns}} turns',
+            {
+              hours:
+                row.entry.enrollment.budget.wallClockActiveMs === null
+                  ? '∞'
+                  : row.entry.enrollment.budget.wallClockActiveMs / 3_600_000,
+              turns: row.entry.enrollment.budget.turns ?? '∞'
+            }
+          )}
+        </ContractValue>
+        <ContractValue label={translate('fork.heimdallObjective.detail.roleAgents', 'Role agents')}>
+          {roleAgents.length > 0
+            ? roleAgents
+                .map(({ role, agent }) => `${objectiveRoleLabel(role)}: ${agent}`)
+                .join(' · ')
+            : translate('fork.heimdallObjective.detail.automatic', 'Automatic')}
+        </ContractValue>
+        <ContractValue
+          label={translate('fork.heimdallObjective.detail.sitterOverrides', 'Landing overrides')}
+        >
+          {sitterOverrides.length > 0
+            ? sitterOverrides
+                .map(
+                  ({ capability, mode }) =>
+                    `${objectiveSitterCapabilityLabel(capability)}: ${objectiveCapabilityModeLabel(mode)}`
+                )
+                .join(' · ')
+            : translate('fork.heimdallObjective.detail.defaults', 'Landing defaults')}
+        </ContractValue>
+      </div>
+    </section>
+  )
+}
+
+function Criterion({
+  criterion
+}: {
+  criterion: ObjectiveDetail['nodes'][number]['criteria'][number]
+}): React.JSX.Element {
+  const check = criterion.lastCheck
+  return (
+    <li className="rounded-md border border-border/70 bg-background px-2.5 py-2">
+      <p className="text-xs text-foreground">{criterion.body}</p>
+      <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">{criterion.id}</p>
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+        <span>
+          {criterion.shellCheckable
+            ? translate('fork.heimdallObjective.detail.shellCheck', 'Shell check')
+            : translate('fork.heimdallObjective.detail.reviewCriterion', 'Review criterion')}
+        </span>
+        {check ? (
+          <>
+            <Badge variant="outline">
+              {check.timedOut
+                ? translate('fork.heimdallObjective.detail.timedOut', 'Timed out')
+                : translate('fork.heimdallObjective.detail.exitCode', 'Exit {{code}}', {
+                    code: check.exitCode ?? '—'
+                  })}
+            </Badge>
+            <time dateTime={new Date(check.atMs).toISOString()}>
+              {formatHeimdallTime(check.atMs)}
+            </time>
+            <span className="font-mono" title={check.contentIdentity}>
+              {shortIdentity(check.contentIdentity)}
+            </span>
+          </>
+        ) : null}
+        {criterion.lastReview ? (
+          <Badge variant="outline">
+            {translate('fork.heimdallObjective.detail.reviewResult', 'Review: {{result}}', {
+              result: objectiveCriterionReviewLabel(criterion.lastReview)
+            })}
+          </Badge>
+        ) : null}
+        {!check && !criterion.lastReview ? (
+          <span>{translate('fork.heimdallObjective.detail.notChecked', 'Not checked yet')}</span>
+        ) : null}
+      </div>
+    </li>
+  )
+}
+
+function RevisionPlan({
+  detail,
+  revisionId
+}: {
+  detail: ObjectiveDetail
+  revisionId: string
+}): React.JSX.Element {
+  const nodes = detail.nodes.filter((node) => node.revisionId === revisionId)
+  if (nodes.length === 0) {
+    return (
+      <p className="rounded-md border border-border bg-muted/10 px-3 py-5 text-center text-xs text-muted-foreground">
+        {translate('fork.heimdallObjective.detail.noNodes', 'No plan nodes in this revision.')}
+      </p>
+    )
+  }
+  return (
+    <ol className="space-y-2">
+      {nodes.map((node) => (
+        <li key={node.taskKey} className="rounded-md border border-border bg-muted/10 p-3">
+          <div className="flex flex-wrap items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-foreground">{node.title}</p>
+              <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">{node.taskKey}</p>
+            </div>
+            <Badge variant="outline">{objectiveNodeStateLabel(node.state)}</Badge>
+          </div>
+          {node.state === 'awaiting-approval' ? (
+            <a
+              href="#heimdall-escalations-title"
+              className="mt-2 inline-block text-xs font-medium text-foreground underline underline-offset-2"
+            >
+              {translate('fork.heimdallObjective.detail.reviewApproval', 'Review approval request')}
+            </a>
+          ) : null}
+          {node.orchestrationTaskId || node.dispatchId ? (
+            <p className="mt-2 break-all font-mono text-[10px] text-muted-foreground">
+              {node.orchestrationTaskId
+                ? translate('fork.heimdallObjective.detail.taskId', 'Task {{id}}', {
+                    id: node.orchestrationTaskId
+                  })
+                : ''}
+              {node.orchestrationTaskId && node.dispatchId ? ' · ' : ''}
+              {node.dispatchId
+                ? translate('fork.heimdallObjective.detail.dispatchId', 'Dispatch {{id}}', {
+                    id: node.dispatchId
+                  })
+                : ''}
+            </p>
+          ) : null}
+          {node.criteria.length > 0 ? (
+            <ul className="mt-3 space-y-2">
+              {node.criteria.map((criterion) => (
+                <Criterion key={criterion.id} criterion={criterion} />
+              ))}
+            </ul>
+          ) : null}
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+function ObjectivePlan({ detail }: { detail: ObjectiveDetail }): React.JSX.Element {
+  const revisions = [...detail.revisions].sort((left, right) => right.number - left.number)
+  const initialRevision = revisions[0]?.id
+  return (
+    <section aria-labelledby="objective-plan-title">
+      <h3
+        id="objective-plan-title"
+        className="mb-2 text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground"
+      >
+        {translate('fork.heimdallObjective.detail.plan', 'Plan')}
+      </h3>
+      {initialRevision ? (
+        <Tabs key={initialRevision} defaultValue={initialRevision}>
+          <TabsList
+            className="max-w-full justify-start overflow-x-auto scrollbar-sleek"
+            variant="line"
+          >
+            {revisions.map((revision) => (
+              <TabsTrigger key={revision.id} value={revision.id}>
+                {translate('fork.heimdallObjective.detail.revision', 'Revision {{number}}', {
+                  number: revision.number
+                })}
+                <Badge variant="outline">{objectiveRevisionStatusLabel(revision.status)}</Badge>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          {revisions.map((revision) => (
+            <TabsContent key={revision.id} value={revision.id} className="space-y-2">
+              <p className="text-[11px] text-muted-foreground">
+                {translate(
+                  'fork.heimdallObjective.detail.revisionMeta',
+                  '{{nodes}} nodes · created {{time}} · digest {{digest}}',
+                  {
+                    nodes: revision.nodeCount,
+                    time: formatHeimdallTime(revision.createdAtMs),
+                    digest: shortIdentity(revision.digest)
+                  }
+                )}
+              </p>
+              {revision.approvedAtMs !== null ? (
+                <p className="text-[11px] text-muted-foreground">
+                  {translate(
+                    'fork.heimdallObjective.detail.revisionApproved',
+                    'Approved {{time}}',
+                    { time: formatHeimdallTime(revision.approvedAtMs) }
+                  )}
+                </p>
+              ) : null}
+              <RevisionPlan detail={detail} revisionId={revision.id} />
+            </TabsContent>
+          ))}
+        </Tabs>
+      ) : (
+        <p className="rounded-md border border-border bg-muted/10 px-3 py-5 text-center text-xs text-muted-foreground">
+          {translate('fork.heimdallObjective.detail.noPlan', 'No plan revision yet.')}
+        </p>
+      )}
+      {detail.verdicts.length > 0 ? (
+        <div className="mt-3 space-y-1.5">
+          <h4 className="text-[11px] font-semibold text-muted-foreground">
+            {translate('fork.heimdallObjective.detail.verdicts', 'Review verdicts')}
+          </h4>
+          {detail.verdicts.map((verdict) => (
+            <div
+              key={`${verdict.dispatchId}:${verdict.role}`}
+              className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground"
+            >
+              <Badge variant="outline">{objectiveReviewRoleLabel(verdict.role)}</Badge>
+              <span>{objectiveVerdictLabel(verdict.verdict)}</span>
+              <time dateTime={new Date(verdict.atMs).toISOString()}>
+                {formatHeimdallTime(verdict.atMs)}
+              </time>
+              <span className="font-mono" title={verdict.contentIdentity}>
+                {shortIdentity(verdict.contentIdentity)}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
+function ObjectiveLanding({ detail }: { detail: ObjectiveDetail }): React.JSX.Element {
+  const targetIndex = OBJECTIVE_LANDING_BARS.indexOf(detail.contract.landingBar)
+  return (
+    <section aria-labelledby="objective-landing-title">
+      <h3
+        id="objective-landing-title"
+        className="mb-2 text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground"
+      >
+        {translate('fork.heimdallObjective.detail.landing', 'Landing')}
+      </h3>
+      <ol className="divide-y divide-border rounded-md border border-border bg-muted/10">
+        {OBJECTIVE_LANDING_BARS.map((rung, index) => {
+          const evidence = detail.landing.toReversed().find((entry) => entry.rung === rung)
+          const phaseFour = rung !== 'files-on-disk' && !evidence
+          return (
+            <li
+              key={rung}
+              className="flex flex-wrap items-center gap-2 px-3 py-2 text-xs"
+              data-objective-landing-reached={evidence ? '' : undefined}
+            >
+              <span className={evidence ? 'font-medium text-foreground' : 'text-muted-foreground'}>
+                {objectiveLandingBarLabel(rung)}
+              </span>
+              {index === targetIndex ? (
+                <Badge variant="outline">
+                  {translate('fork.heimdallObjective.detail.target', 'Target')}
+                </Badge>
+              ) : null}
+              {evidence ? (
+                <>
+                  <Badge variant="secondary">
+                    {translate('fork.heimdallObjective.detail.reached', 'Reached')}
+                  </Badge>
+                  <span
+                    className="font-mono text-[11px] text-muted-foreground"
+                    title={evidence.contentIdentity}
+                  >
+                    {shortIdentity(evidence.contentIdentity)}
+                  </span>
+                  <time
+                    className="ml-auto text-[11px] text-muted-foreground"
+                    dateTime={new Date(evidence.atMs).toISOString()}
+                  >
+                    {formatHeimdallTime(evidence.atMs)}
+                  </time>
+                </>
+              ) : phaseFour ? (
+                <span className="ml-auto text-[11px] text-muted-foreground">
+                  {translate('fork.heimdallObjective.detail.phaseFour', 'Phase 4')}
+                </span>
+              ) : (
+                <span className="ml-auto text-[11px] text-muted-foreground">
+                  {translate('fork.heimdallObjective.detail.pending', 'Pending')}
+                </span>
+              )}
+            </li>
+          )
+        })}
+      </ol>
+      <p className="mt-2 text-[11px] text-muted-foreground">
+        {translate(
+          'fork.heimdallObjective.detail.landingHelp',
+          'Phase 3 proves files on disk. Higher landing rungs remain parked for Phase 4.'
+        )}
+      </p>
+    </section>
+  )
+}
+
+export function ObjectiveDetailContent({
+  detail,
+  row
+}: {
+  detail: ObjectiveDetail
+  row: WatcherFleetEntry
+}): React.JSX.Element {
+  return (
+    <div className="space-y-6">
+      <ObjectiveContract detail={detail} row={row} />
+      <ObjectivePlan detail={detail} />
+      <ObjectiveLanding detail={detail} />
+    </div>
+  )
+}

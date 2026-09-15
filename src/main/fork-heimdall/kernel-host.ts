@@ -114,11 +114,12 @@ export class HeimdallKernelHost {
     ) {
       throw new Error('Runtime cannot resolve a Heimdall folder target')
     }
+    const worktreeId = `${enrollment.repoId}::${enrollment.workspacePath}`
     const fileTarget = await (runtime as RuntimeFileTargetResolver).resolveRuntimeFileTarget(
-      `folder:${enrollment.repoId}`
+      `id:${worktreeId}`
     )
     if (
-      fileTarget.worktree.id !== enrollment.repoId ||
+      fileTarget.worktree.id !== worktreeId ||
       fileTarget.executionHostId !== enrollment.executionHostId ||
       fileTarget.worktree.path !== enrollment.workspacePath
     ) {

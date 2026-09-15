@@ -1,24 +1,22 @@
 import { makeAttemptFingerprint } from '../../shared/fork-heimdall/attempt-fingerprint'
 import type { GateVerdict } from '../../shared/fork-heimdall/gate'
-import type { KernelAction } from '../../shared/fork-heimdall/kind-contract'
+import type { KernelAction, LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
 import {
   getInFlightAttempts,
   getLatestAttempts,
-  getLatestEscalations,
-  getUnresolvedAttempts
+  getLatestEscalations
 } from '../../shared/fork-heimdall/ledger-queries'
 import type {
   AttemptEntry,
   LedgerEntry,
   WatcherLedger
 } from '../../shared/fork-heimdall/ledger-types'
-import { requireLiveSnapshot, type Snapshot } from '../../shared/fork-heimdall/snapshot'
+import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
-import type {
-  HeimdallOrchestrationAdapter,
-  MailboxCursor
-} from './orchestration/orchestration-adapter'
+import type { HeimdallOrchestrationAdapter } from './orchestration/orchestration-adapter'
 import type { WatcherLedgerLifecycle } from './ledger-lifecycle'
+import { WatcherAttemptRecovery } from './runner-attempt-recovery'
+import { hasSequenceSinceRunBoundary, mailboxBody, mailboxCursor } from './runner-mailbox'
 import type { RunnerBudgetClock, RunnerLedgerStore, WatcherRunner } from './runner-state'
 
 export type WatcherRunnerActionDependencies = {
@@ -60,89 +58,48 @@ function confirmedNotLanded(
     ...('result' in error ? { result: error.result } : {})
   }
 }
-function mailboxBody(entry: Extract<LedgerEntry, { kind: 'evidence' }>): {
-  type: string
-  messageId?: string
-  dispatchId?: string
-  outcome?: string
-  result?: unknown
-  body?: string
-} | null {
-  if (
-    entry.evidenceKind !== 'orchestration-mailbox' ||
-    typeof entry.payload !== 'object' ||
-    entry.payload === null
-  ) {
-    return null
-  }
-  const envelope = entry.payload as Record<string, unknown>
-  const type = typeof envelope.type === 'string' ? envelope.type : ''
-  let payload: Record<string, unknown> = {}
-  if (typeof envelope.payload === 'string') {
-    try {
-      const parsed: unknown = JSON.parse(envelope.payload)
-      if (typeof parsed === 'object' && parsed !== null) {
-        payload = parsed as Record<string, unknown>
-      }
-    } catch {
-      payload = {}
-    }
-  } else if (typeof envelope.payload === 'object' && envelope.payload !== null) {
-    payload = envelope.payload as Record<string, unknown>
-  }
-  return {
-    type,
-    ...(entry.source?.kind === 'orchestration' ? { messageId: entry.source.messageId } : {}),
-    ...(typeof payload.dispatchId === 'string' ? { dispatchId: payload.dispatchId } : {}),
-    ...(typeof payload.outcome === 'string' ? { outcome: payload.outcome } : {}),
-    ...(payload.result === undefined ? {} : { result: payload.result }),
-    ...(typeof envelope.body === 'string' ? { body: envelope.body } : {})
-  }
-}
-
-/** The run boundary makes a replacement run's sequence namespace start fresh without deleting history. */
-function mailboxCursor(ledger: WatcherLedger): MailboxCursor {
-  let cursor: MailboxCursor = { previousDeliveryId: null, lastSequence: -1 }
-  for (const entry of ledger.entries) {
-    if (entry.kind !== 'evidence') {
-      continue
-    }
-    if (entry.evidenceKind === 'orchestration-run-boundary') {
-      cursor = { previousDeliveryId: null, lastSequence: -1 }
-    } else if (entry.source?.kind === 'orchestration') {
-      cursor = {
-        previousDeliveryId: entry.source.deliveryId ?? cursor.previousDeliveryId,
-        lastSequence: Math.max(cursor.lastSequence, entry.source.sequence)
-      }
-    }
-  }
-  return cursor
-}
-
-function hasSequenceSinceRunBoundary(ledger: WatcherLedger, sequence: number): boolean {
-  let found = false
-  for (const entry of ledger.entries) {
-    if (entry.kind !== 'evidence') {
-      continue
-    }
-    if (entry.evidenceKind === 'orchestration-run-boundary') {
-      found = false
-    } else if (entry.source?.kind === 'orchestration' && entry.source.sequence === sequence) {
-      found = true
-    }
-  }
-  return found
-}
 
 export class WatcherRunnerActions {
-  constructor(private readonly dependencies: WatcherRunnerActionDependencies) {}
+  private readonly attemptRecovery: WatcherAttemptRecovery
+
+  constructor(private readonly dependencies: WatcherRunnerActionDependencies) {
+    this.attemptRecovery = new WatcherAttemptRecovery({
+      ledgerStore: dependencies.ledgerStore,
+      now: dependencies.now,
+      createId: dependencies.createId,
+      replay: async (runner, snapshot, attempt) =>
+        await this.execute(runner, snapshot, attempt.action, attempt)
+    })
+  }
 
   async execute(
     runner: WatcherRunner,
     snapshot: Snapshot<unknown>,
     action: KernelAction,
     recoveredAttempt?: AttemptEntry
-  ): Promise<void> {
+  ): Promise<boolean> {
+    if (!this.executionAllowed(runner)) {
+      if (recoveredAttempt) {
+        this.attemptRecovery.settleRecoveredNotRun(runner, recoveredAttempt)
+      }
+      return false
+    }
+    const rawLease = runner.leaseGuard
+    if (!rawLease) {
+      throw new Error('Watcher action reached execution without a lease')
+    }
+    const executionLease = this.executionLease(runner, rawLease)
+    try {
+      await executionLease.assertHeld()
+    } catch (error) {
+      if (!this.executionAllowed(runner)) {
+        if (recoveredAttempt) {
+          this.attemptRecovery.settleRecoveredNotRun(runner, recoveredAttempt)
+        }
+        return false
+      }
+      throw error
+    }
     const fingerprint = makeAttemptFingerprint(
       action.contentIdentity,
       action.kind,
@@ -161,7 +118,7 @@ export class WatcherRunnerActions {
       state: 'attempted'
     }
     if (attempt.fingerprint !== fingerprint || attempt.state !== 'attempted') {
-      throw new Error('Recovered dispatch attempt does not match the current action')
+      throw new Error('Recovered attempt does not match the current action')
     }
     if (!recoveredAttempt) {
       this.append(runner, attempt)
@@ -174,10 +131,12 @@ export class WatcherRunnerActions {
     try {
       const outcome = await runner.kind.execute(action, {
         snapshot,
-        lease: runner.leaseGuard!,
+        lease: executionLease,
         ledger: this.dependencies.ledgerStore.read(runner.enrollment.watcherId),
         dispatchWorker: async (request) => {
+          await executionLease.assertHeld()
           const result = await this.dependencies.dispatchLifecycle.dispatchAttempt(attempt, {
+            lease: executionLease,
             enrollment: runner.enrollment,
             action,
             fingerprint,
@@ -188,15 +147,15 @@ export class WatcherRunnerActions {
           return result
         }
       })
-      await runner.leaseGuard!.assertHeld()
+      await rawLease.assertHeld()
       const latest = getLatestAttempts(
         this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
       ).find((entry) => entry.attemptId === attempt.attemptId)
       if (latest?.state === 'settled') {
-        return
+        return true
       }
       if (latest?.state === 'running' || dispatched) {
-        return
+        return true
       }
       this.append(runner, {
         ...(latest ?? attempt),
@@ -205,12 +164,13 @@ export class WatcherRunnerActions {
         state: 'settled',
         ...outcome
       })
+      return true
     } catch (error) {
       const latest = getLatestAttempts(
         this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
       ).find((entry) => entry.attemptId === attempt.attemptId)
       if (latest?.state === 'settled') {
-        return
+        return true
       }
       const leaseLost = error instanceof Error && error.name === 'LeaseLostError'
       const knownNotLanded = leaseLost ? null : confirmedNotLanded(error)
@@ -230,7 +190,7 @@ export class WatcherRunnerActions {
         })
       }
       if (knownNotLanded) {
-        return
+        return this.executionAllowed(runner)
       }
       throw error
     } finally {
@@ -250,6 +210,7 @@ export class WatcherRunnerActions {
       enrollment: runner.enrollment,
       cursor: mailboxCursor(ledger)
     })
+    await this.assertLeaseHeld(runner)
     let question: { messageId: string; dispatchId?: string; reason: string } | null = null
     for (const entry of entries) {
       if (
@@ -333,6 +294,7 @@ export class WatcherRunnerActions {
         runner.enrollment,
         attempt.dispatchId
       )
+      await this.assertLeaseHeld(runner)
       if (observation.status === 'live') {
         this.dependencies.dispatchLifecycle.observeWorkerLive(
           runner.enrollment.watcherId,
@@ -372,41 +334,26 @@ export class WatcherRunnerActions {
     return messageId ? { messageId } : null
   }
 
-  resolveUncertainAttempts(
+  async recoverBeforeStop(
+    runner: WatcherRunner,
+    snapshot: Snapshot<unknown>,
+    absentDispatches: readonly AttemptEntry[]
+  ): Promise<WatcherLedger> {
+    this.settleAbsentDispatches(runner, absentDispatches)
+    await this.recoverAttempts(
+      runner,
+      snapshot,
+      this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
+    )
+    return this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
+  }
+
+  async recoverAttempts(
     runner: WatcherRunner,
     snapshot: Snapshot<unknown>,
     ledger: WatcherLedger
-  ): void {
-    const live = requireLiveSnapshot(snapshot)
-    for (const attempt of getUnresolvedAttempts(ledger)) {
-      const effect = runner.kind.resolveOutcome(attempt, live)
-      if (effect === 'indeterminate') {
-        continue
-      }
-      this.append(runner, {
-        eventId: this.dependencies.createId(),
-        watcherId: runner.enrollment.watcherId,
-        atMs: this.dependencies.now(),
-        origin: 'owner',
-        class: 'fact',
-        kind: 'attempt-resolved',
-        attemptId: attempt.attemptId,
-        effect,
-        evidence: runner.kind.describeSnapshot(live)
-      })
-    }
-    if (
-      getUnresolvedAttempts(this.dependencies.ledgerStore.read(runner.enrollment.watcherId))
-        .length === 0
-    ) {
-      for (const trace of runner.traces) {
-        if (!trace.pinned) {
-          continue
-        }
-        this.dependencies.ledgerStore.releaseTickTracePin(runner.enrollment.watcherId, trace.seq)
-        trace.pinned = false
-      }
-    }
+  ): Promise<void> {
+    await this.attemptRecovery.recover(runner, snapshot, ledger)
   }
 
   acknowledgePark(watcherId: string): void {
@@ -426,39 +373,11 @@ export class WatcherRunnerActions {
   }
 
   settleAbsentDispatches(runner: WatcherRunner, attempts: readonly AttemptEntry[]): void {
-    for (const attempt of attempts) {
-      const latest = getLatestAttempts(
-        this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
-      ).find((candidate) => candidate.attemptId === attempt.attemptId)
-      if (latest?.state !== 'attempted') {
-        continue
-      }
-      this.append(runner, {
-        ...latest,
-        eventId: this.dependencies.createId(),
-        atMs: this.dependencies.now(),
-        state: 'settled',
-        effect: 'not-landed',
-        reason: 'dispatch-receipt-absent'
-      })
-    }
+    this.attemptRecovery.settleAbsentDispatches(runner, attempts)
   }
 
   abandonPendingAttempts(runner: WatcherRunner, ledger: WatcherLedger): void {
-    for (const attempt of getInFlightAttempts(ledger)) {
-      if (attempt.state !== 'attempted') {
-        continue
-      }
-      this.append(runner, {
-        ...attempt,
-        eventId: this.dependencies.createId(),
-        atMs: this.dependencies.now(),
-        state: 'settled',
-        effect: 'not-landed',
-        reason: 'workspace-moved'
-      })
-      this.abandonFingerprint(runner, attempt.fingerprint, 'workspace-moved')
-    }
+    this.attemptRecovery.abandonPendingAttempts(runner, ledger)
   }
 
   abandonFingerprint(
@@ -508,6 +427,50 @@ export class WatcherRunnerActions {
         this.dependencies.notifyApproval?.(runner.enrollment, action)
       }
     }
+  }
+
+  private executionAllowed(runner: WatcherRunner): boolean {
+    return (
+      !runner.stopped &&
+      !runner.suspended &&
+      runner.controlPending === null &&
+      runner.enrollment.enabled &&
+      !runner.enrollment.paused
+    )
+  }
+
+  private executionLease(runner: WatcherRunner, rawLease: LeaseGuard): LeaseGuard {
+    return {
+      epoch: rawLease.epoch,
+      renewLoop: () => rawLease.renewLoop(),
+      assertHeld: async () => {
+        this.assertExecutionAllowed(runner)
+        await rawLease.assertHeld()
+        this.assertExecutionAllowed(runner)
+      }
+    }
+  }
+
+  private assertExecutionAllowed(runner: WatcherRunner): void {
+    if (this.executionAllowed(runner)) {
+      return
+    }
+    const reason = runner.controlPending
+      ? `${runner.controlPending}-requested`
+      : runner.enrollment.paused
+        ? 'paused'
+        : 'disabled'
+    throw Object.assign(new Error(`Watcher execution is fenced: ${reason}`), {
+      effect: 'not-landed' as const,
+      reason
+    })
+  }
+
+  private async assertLeaseHeld(runner: WatcherRunner): Promise<void> {
+    if (!runner.leaseGuard) {
+      throw new Error('Watcher reconciliation reached persistence without a lease')
+    }
+    await runner.leaseGuard.assertHeld()
   }
 
   private append(runner: WatcherRunner, entry: LedgerEntry): void {

@@ -49,7 +49,8 @@ export class HostedReviewOwnerNotExecutableError extends Error {
 export async function authorizeHostedReviewSitterDefinition(
   runtime: OrcaRuntimeService,
   store: Store,
-  input: EnrollInput
+  input: EnrollInput,
+  storageAuthority: 'desktop' | 'runtime' = 'desktop'
 ): Promise<AuthorizedEnrollment> {
   if (input.kind !== 'hosted-review' || !input.worktreeId) {
     throw new Error('Hosted review enrollment requires an explicit Git worktree')
@@ -62,10 +63,14 @@ export async function authorizeHostedReviewSitterDefinition(
   if (!repo) {
     throw new Error('Hosted review sitter repository is unavailable')
   }
-  const schedulerOwner = getAutomationSchedulerOwner(repo)
-  if (schedulerOwner === 'remote_host_service') {
-    throw new HostedReviewOwnerNotExecutableError(schedulerOwner)
+  const routeOwner = getAutomationSchedulerOwner(repo)
+  if (
+    (storageAuthority === 'desktop' && routeOwner === 'remote_host_service') ||
+    (storageAuthority === 'runtime' && routeOwner !== 'local_host_service')
+  ) {
+    throw new HostedReviewOwnerNotExecutableError(routeOwner)
   }
+  const schedulerOwner = storageAuthority === 'runtime' ? 'remote_host_service' : routeOwner
   const workspace = await runtime.showManagedWorktree(`id:${input.worktreeId}`)
   if (workspace.repoId !== repo.id || workspace.id !== input.worktreeId) {
     throw new Error('Invalid hosted review sitter worktree identity')

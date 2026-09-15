@@ -109,11 +109,15 @@ function mailboxEvidence(
 
 function normalizedMailboxFact(message: MessageRow): {
   type: MessageRow['type']
+  subject?: string
   body?: string
   payload: {
     dispatchId?: string
+    taskId?: string
     outcome?: string
     result?: string
+    reportPath?: string
+    filesModified?: string[]
   }
 } {
   let raw: Record<string, unknown> = {}
@@ -131,11 +135,21 @@ function normalizedMailboxFact(message: MessageRow): {
     type: message.type,
     payload: {
       ...(typeof raw.dispatchId === 'string' ? { dispatchId: raw.dispatchId } : {}),
+      ...(typeof raw.taskId === 'string' ? { taskId: raw.taskId } : {}),
       ...(message.type === 'worker_done' && typeof raw.outcome === 'string'
         ? { outcome: raw.outcome }
         : {}),
+      ...(message.type === 'worker_done' && typeof raw.reportPath === 'string'
+        ? { reportPath: raw.reportPath }
+        : {}),
+      ...(message.type === 'worker_done' &&
+      Array.isArray(raw.filesModified) &&
+      raw.filesModified.every((file): file is string => typeof file === 'string')
+        ? { filesModified: raw.filesModified }
+        : {}),
       ...(message.type === 'worker_done' ? { result: message.body } : {})
     },
-    ...(message.type === 'question' ? { body: message.body } : {})
+    ...(message.type === 'escalation' ? { subject: message.subject } : {}),
+    ...(message.type === 'question' || message.type === 'escalation' ? { body: message.body } : {})
   }
 }

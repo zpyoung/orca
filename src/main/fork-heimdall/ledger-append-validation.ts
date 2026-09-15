@@ -59,7 +59,18 @@ export function assertAttemptTransition(ledger: WatcherLedger, candidate: Attemp
       throw new Error(`Heimdall attempt ${candidate.attemptId} has immutable identity`)
     }
     if (latest.state === 'settled') {
-      throw new Error(`Heimdall attempt ${candidate.attemptId} is already settled`)
+      const validDispatchRecovery =
+        latest.effect === 'indeterminate' &&
+        latest.dispatch !== undefined &&
+        candidate.state === 'running' &&
+        candidate.dispatchId !== undefined &&
+        candidate.effect === undefined &&
+        candidate.reason === undefined &&
+        candidate.result === undefined &&
+        isDeepStrictEqual(latest.dispatch, candidate.dispatch)
+      if (!validDispatchRecovery) {
+        throw new Error(`Heimdall attempt ${candidate.attemptId} is already settled`)
+      }
     }
     if (latest.state === 'running' && candidate.state === 'attempted') {
       throw new Error(`Heimdall attempt ${candidate.attemptId} cannot move backward`)

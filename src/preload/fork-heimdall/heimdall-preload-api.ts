@@ -1,5 +1,10 @@
+import { ipcRenderer } from 'electron'
 import { runtimeApi } from '../api/runtime-bridge'
 import { HEIMDALL_CHANNELS, type HeimdallApi } from '../../shared/fork-heimdall/api'
+import {
+  HEIMDALL_FLEET_CHANGED_CHANNEL,
+  type HeimdallFleetSnapshot
+} from '../../shared/fork-heimdall/fleet-types'
 
 async function call<TResult>(method: string, params: unknown = {}): Promise<TResult> {
   const response = await runtimeApi.call({ method, params })
@@ -11,12 +16,17 @@ async function call<TResult>(method: string, params: unknown = {}): Promise<TRes
 
 export function buildForkHeimdallApi(): HeimdallApi {
   return {
-    list: () => call(HEIMDALL_CHANNELS.list),
-    enroll: (input) => call(HEIMDALL_CHANNELS.enroll, input),
-    disarm: (watcherId) => call(HEIMDALL_CHANNELS.disarm, { watcherId }),
-    disarmAll: () => call(HEIMDALL_CHANNELS.disarmAll),
-    approve: (watcherId, scope) => call(HEIMDALL_CHANNELS.approve, { watcherId, scope }),
-    ledger: (watcherId) => call(HEIMDALL_CHANNELS.ledger, { watcherId }),
-    debugReport: (watcherId) => call(HEIMDALL_CHANNELS.debugReport, { watcherId })
+    enroll: (input, owner) => call(HEIMDALL_CHANNELS.enroll, { input, owner: owner ?? null }),
+    fleet: () => call(HEIMDALL_CHANNELS.fleet),
+    detail: (target) => call(HEIMDALL_CHANNELS.detail, target),
+    objectiveDetail: (target) => call(HEIMDALL_CHANNELS.objectiveDetail, target),
+    command: (request) => call(HEIMDALL_CHANNELS.command, request),
+    debugReport: (target) => call(HEIMDALL_CHANNELS.debugReport, target),
+    onFleetChanged: (callback) => {
+      const listener = (_event: Electron.IpcRendererEvent, snapshot: HeimdallFleetSnapshot): void =>
+        callback(snapshot)
+      ipcRenderer.on(HEIMDALL_FLEET_CHANGED_CHANNEL, listener)
+      return () => ipcRenderer.removeListener(HEIMDALL_FLEET_CHANGED_CHANNEL, listener)
+    }
   }
 }

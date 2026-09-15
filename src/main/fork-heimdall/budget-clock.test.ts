@@ -44,7 +44,8 @@ describe('Heimdall budget clock', () => {
     const clock = makeClock()
     const handle = clock.open('watcher-1', 'action-in-flight')
 
-    expect(() => clock.open('watcher-1', 'worker-dispatched')).toThrow('already open')
+    expect(() => clock.open('watcher-1', 'worker-dispatched')).toThrow()
+    expect(entries().filter((entry) => entry.kind === 'interval-open')).toHaveLength(1)
     expect(clock.current('watcher-1')).toEqual(handle)
   })
 

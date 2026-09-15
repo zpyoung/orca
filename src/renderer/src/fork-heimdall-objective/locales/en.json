@@ -1,0 +1,172 @@
+{
+  "fork": {
+    "heimdallObjective": {
+      "value": {
+        "tier": {
+          "express": "Express",
+          "standard": "Standard",
+          "full": "Full"
+        },
+        "bar": {
+          "filesOnDisk": "Files on disk",
+          "committedLocalBranch": "Committed local branch",
+          "pushedRef": "Pushed ref",
+          "hostedReview": "Hosted review",
+          "merged": "Merged"
+        },
+        "capabilityMode": {
+          "off": "Off",
+          "gated": "Approval required",
+          "on": "On"
+        },
+        "capability": {
+          "plan": "Plan",
+          "implement": "Implement",
+          "review": "Review",
+          "check": "Run checks",
+          "land": "Land"
+        },
+        "role": {
+          "planner": "Planner",
+          "implementer": "Implementer",
+          "reviewer": "Reviewer",
+          "integrator": "Integrator"
+        },
+        "sitter": {
+          "updateBranch": "Update branch",
+          "resolveConflicts": "Resolve conflicts",
+          "fixChecks": "Fix checks",
+          "merge": "Merge"
+        },
+        "workspace": {
+          "folder": "Folder",
+          "git": "Git"
+        },
+        "node": {
+          "pending": "Pending",
+          "blockedByDeps": "Blocked by dependencies",
+          "awaitingApproval": "Awaiting approval",
+          "dispatched": "Dispatched",
+          "succeeded": "Succeeded",
+          "failed": "Failed",
+          "replanned": "Replanned"
+        },
+        "revision": {
+          "draft": "Draft",
+          "approved": "Approved",
+          "rejected": "Rejected",
+          "superseded": "Superseded"
+        },
+        "reviewRole": {
+          "reviewer": "Reviewer",
+          "integrator": "Integrator"
+        },
+        "verdict": {
+          "approve": "Approve",
+          "block": "Block"
+        },
+        "criterionReview": {
+          "pass": "Pass",
+          "block": "Block"
+        }
+      },
+      "enrollment": {
+        "newAction": "New objective",
+        "title": "New objective",
+        "description": "Define the contract Heimdall will plan, execute, review, and land.",
+        "workspace": "Workspace",
+        "workspaceHelp": "The selected workspace and its owning host run every worker and check.",
+        "workspacePlaceholder": "Choose a workspace",
+        "noWorkspaces": "No eligible workspace is available.",
+        "objective": "Objective",
+        "objectiveHelp": "State the observable result the workers must deliver.",
+        "execution": "Execution contract",
+        "tier": "Tier",
+        "landingBar": "Landing bar",
+        "maxConcurrency": "Max concurrency",
+        "maxConcurrencyHelp": "Fixed at 1 while objective workers run serially.",
+        "territory": "Write territory",
+        "territoryHelp": "One workspace-relative glob per line. .git, .orca, absolute paths, and parent traversal are refused.",
+        "budgets": "Budgets",
+        "activeBudget": "Active work (hours)",
+        "activeBudgetA11y": "{{hours}} hours",
+        "turnBudget": "Worker turn limit",
+        "capabilities": "Capabilities",
+        "roleAgents": "Role agents",
+        "roleAgentsHelp": "Automatic lets the owning host choose. Explicit choices are limited to agents detected there.",
+        "agentAutomatic": "Automatic",
+        "sitterOverrides": "Later landing overrides",
+        "sitterOverridesHelp": "Stored now for the higher landing rungs delivered in Phase 4.",
+        "inherit": "Use landing defaults",
+        "serviceUnavailable": "Heimdall enrollment is not available in this client.",
+        "ownerUnavailable": "The workspace owner is unavailable; no enrollment was sent.",
+        "ownerUnavailableShort": "Owner unavailable",
+        "validationTitle": "Fix the contract before starting",
+        "cancel": "Cancel",
+        "submit": "Start objective"
+      },
+      "validation": {
+        "workspaceRequired": "Choose a workspace.",
+        "objectiveRequired": "Enter an objective.",
+        "objectiveTooLong": "The objective must be 16,384 characters or fewer.",
+        "landingBarRequiresGit": "Folder workspaces support only the files-on-disk landing bar.",
+        "maxConcurrency": "This release supports exactly one objective worker at a time.",
+        "territoryRequired": "Add at least one write-territory glob.",
+        "territoryTooMany": "Write territory supports at most 64 globs.",
+        "territoryDuplicate": "Write-territory globs must be unique.",
+        "territoryInvalid": "Invalid write-territory glob: {{glob}}",
+        "capabilitiesInvalid": "All five objective capabilities must be configured.",
+        "roleAgentUnknown": "Agent {{agent}} is not available on the selected workspace host.",
+        "activeBudgetInvalid": "Choose a positive active-work budget.",
+        "turnBudgetInvalid": "Worker turns must be a whole number of zero or more."
+      },
+      "detail": {
+        "title": "Objective",
+        "unavailable": "Objective detail is not available from this host.",
+        "asOf": "Objective state as of {{time}}",
+        "loading": "Loading objective state…",
+        "refreshing": "Refreshing objective detail",
+        "staleError": "Objective refresh failed; showing the last confirmed state: {{error}}",
+        "loadError": "Objective detail could not be loaded: {{error}}",
+        "contract": "Contract",
+        "objective": "Objective",
+        "tier": "Tier",
+        "landingBar": "Landing bar",
+        "workspace": "Workspace",
+        "workspaceGitValue": "{{kind}} · {{repo}} / {{worktree}}",
+        "workspaceFolderValue": "{{kind}} · {{repo}}",
+        "maxConcurrency": "Concurrency",
+        "territory": "Write territory",
+        "capabilities": "Capabilities",
+        "budget": "Budget",
+        "budgetValue": "{{hours}} active hours · {{turns}} turns",
+        "roleAgents": "Role agents",
+        "automatic": "Automatic",
+        "sitterOverrides": "Landing overrides",
+        "defaults": "Landing defaults",
+        "shellCheck": "Shell check",
+        "reviewCriterion": "Review criterion",
+        "timedOut": "Timed out",
+        "exitCode": "Exit {{code}}",
+        "reviewResult": "Review: {{result}}",
+        "notChecked": "Not checked yet",
+        "noNodes": "No plan nodes in this revision.",
+        "reviewApproval": "Review approval request",
+        "taskId": "Task {{id}}",
+        "dispatchId": "Dispatch {{id}}",
+        "plan": "Plan",
+        "revision": "Revision {{number}}",
+        "revisionMeta": "{{nodes}} nodes · created {{time}} · digest {{digest}}",
+        "revisionApproved": "Approved {{time}}",
+        "noPlan": "No plan revision yet.",
+        "verdicts": "Review verdicts",
+        "landing": "Landing",
+        "target": "Target",
+        "reached": "Reached",
+        "phaseFour": "Phase 4",
+        "pending": "Pending",
+        "landingHelp": "Phase 3 proves files on disk. Higher landing rungs remain parked for Phase 4."
+      }
+    }
+  }
+}

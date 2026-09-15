@@ -3,6 +3,11 @@ import { join, relative, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const OWNER_DIRECTORY = 'src/main/fork-heimdall/orchestration/'
+const WATCHED_DIRECTORIES = [
+  'src/main/fork-heimdall',
+  'src/main/fork-heimdall-objective',
+  'src/main/fork-hosted-review-sitter'
+] as const
 const IMPORT_PATTERN =
   /(?:from\s+['"][^'"]*(?:runtime\/orchestration|rpc\/methods\/orchestration)[^'"]*['"]|import\(\s*['"][^'"]*(?:runtime\/orchestration|rpc\/methods\/orchestration)[^'"]*['"]\s*\)|require\(\s*['"][^'"]*(?:runtime\/orchestration|rpc\/methods\/orchestration)[^'"]*['"]\s*\))/
 
@@ -25,15 +30,19 @@ function codeText(contents: string): string {
 
 describe('Heimdall orchestration import boundary', () => {
   const repoRoot = resolve(__dirname, '../../..')
-  const root = join(repoRoot, 'src/main/fork-heimdall')
-  const files = collectTypeScriptFiles(root)
+  const files = WATCHED_DIRECTORIES.flatMap((directory) =>
+    collectTypeScriptFiles(join(repoRoot, directory))
+  )
   const offenders = files
     .map((file) => relative(repoRoot, file).split('\\').join('/'))
     .filter((path) => !path.startsWith(OWNER_DIRECTORY))
     .filter((path) => IMPORT_PATTERN.test(codeText(readFileSync(join(repoRoot, path), 'utf8'))))
 
-  it('walks the real feature tree rather than passing vacuously', () => {
+  it('walks the kernel and both kind trees rather than passing vacuously', () => {
     expect(files.length).toBeGreaterThan(5)
+    for (const directory of WATCHED_DIRECTORIES) {
+      expect(files.some((file) => file.startsWith(join(repoRoot, directory)))).toBe(true)
+    }
     expect(files.some((path) => path.includes('/orchestration/'))).toBe(true)
   })
 
