@@ -9,24 +9,86 @@ import { toRuntimeWorktreeSelector } from './runtime-worktree-selector'
 
 export async function getRuntimeGitDiff(
   context: RuntimeGitContext,
-  args: { filePath: string; staged: boolean; compareAgainstHead?: boolean }
+  args: {
+    filePath: string
+    staged: boolean
+    compareAgainstHead?: boolean
+    signal?: AbortSignal
+  }
 ): Promise<GitDiffResult> {
+  const { signal, ...diffArgs } = args
+  if (signal?.aborted) {
+    throw createGitDiffAbortError()
+  }
   const target = getActiveRuntimeTarget(context.settings)
   if (target.kind === 'local' || !context.worktreeId) {
-    return window.api.git.diff({
-      worktreePath: resolveLocalWorktreePath(context),
-      filePath: args.filePath,
-      staged: args.staged,
-      compareAgainstHead: args.compareAgainstHead,
-      connectionId: context.connectionId
-    })
+    return callLocalGitDiff(
+      {
+        worktreePath: resolveLocalWorktreePath(context),
+        ...diffArgs,
+        connectionId: context.connectionId
+      },
+      signal
+    )
   }
   return callRuntimeRpc<GitDiffResult>(
     target,
     'git.diff',
-    { worktree: toRuntimeWorktreeSelector(context.worktreeId), ...args },
-    { timeoutMs: 15_000 }
+    { worktree: toRuntimeWorktreeSelector(context.worktreeId), ...diffArgs },
+    { timeoutMs: 15_000, signal }
   )
+}
+
+let nextGitDiffRequestToken = 0
+
+function createGitDiffAbortError(): Error {
+  const error = new Error('Git diff request aborted')
+  error.name = 'AbortError'
+  return error
+}
+
+function callLocalGitDiff(
+  args: Parameters<Window['api']['git']['diff']>[0],
+  signal?: AbortSignal
+): Promise<GitDiffResult> {
+  if (!signal) {
+    return window.api.git.diff(args)
+  }
+  if (signal.aborted) {
+    return Promise.reject(createGitDiffAbortError())
+  }
+  const requestToken = `git-diff-${Date.now()}-${++nextGitDiffRequestToken}`
+  const request = Promise.withResolvers<GitDiffResult>()
+  let settled = false
+  const finish = (complete: () => void): void => {
+    if (settled) {
+      return
+    }
+    settled = true
+    signal.removeEventListener('abort', cancel)
+    complete()
+  }
+  const cancel = (): void => {
+    void window.api.git.cancelDiff({ requestToken }).catch(() => {})
+    finish(() => request.reject(createGitDiffAbortError()))
+  }
+  signal.addEventListener('abort', cancel, { once: true })
+  try {
+    void window.api.git.diff({ ...args, requestToken }).then(
+      (diff) =>
+        finish(() => {
+          if (signal.aborted) {
+            request.reject(createGitDiffAbortError())
+            return
+          }
+          request.resolve(diff)
+        }),
+      (error) => finish(() => request.reject(error))
+    )
+  } catch (error) {
+    finish(() => request.reject(error))
+  }
+  return request.promise
 }
 
 export async function getRuntimeGitBranchCompare(

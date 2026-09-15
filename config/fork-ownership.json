@@ -129,14 +129,14 @@
       ]
     },
     {
-      "name": "computer-peer-identity",
-      "purpose": "Authorizes the packaged fork's macOS computer-use peer without broadening bundle-prefix trust.",
-      "globs": ["**/fork-computer-peer-identity/**"]
-    },
-    {
       "name": "skills-repository",
       "purpose": "Points `npx skills add` at this fork's repository so the skills it ships that upstream does not have are actually installable.",
       "globs": ["**/fork-skills-repository/**"]
+    },
+    {
+      "name": "input-quarantine",
+      "purpose": "Prevents stale terminal and native-chat input from reaching a replacement PTY after reattachment.",
+      "globs": ["**/fork-input-quarantine/**"]
     },
     {
       "name": "release-routing",
@@ -147,15 +147,14 @@
       "name": "dev-tcc",
       "purpose": "Keeps TCC prompt attribution aligned with the stable app and helper bundle identities emitted by the dev runner.",
       "globs": ["**/fork-dev-tcc/**"]
+    },
+    {
+      "name": "computer-peer-identity",
+      "purpose": "Authorizes the packaged fork's macOS computer-use peer without broadening bundle-prefix trust.",
+      "globs": ["**/fork-computer-peer-identity/**"]
     }
   ],
   "seams": [
-    {
-      "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift",
-      "feature": "computer-peer-identity",
-      "kind": "registration",
-      "lines": ["    return isTrustedComputerPeerBundleIdentifier(bundleId)"]
-    },
     {
       "path": "src/renderer/src/components/sidebar/use-worktree-activity-status.ts",
       "feature": "ask-question-tool",
@@ -1546,24 +1545,6 @@
       "lines": ["    if (plugins.length > 1) {", "        { plugins: plugins.join(', ') }"]
     },
     {
-      "path": "src/renderer/src/components/native-chat/NativeChatComposer.test.tsx",
-      "feature": "agent-composer",
-      "kind": "passthrough",
-      "lines": [
-        "vi.mock('./fork-agent-composer/AgentComposerField', () => ({",
-        "vi.mock('./fork-agent-composer/use-agent-composer-draft', () => ({"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/NativeChatComposer.tsx",
-      "feature": "agent-composer",
-      "kind": "registration",
-      "lines": [
-        "} from './fork-agent-composer/AgentComposer'",
-        "import { seedHistory } from './fork-agent-composer/agent-composer-history'"
-      ]
-    },
-    {
       "path": "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.test.tsx",
       "feature": "agent-composer",
       "kind": "import-swap",
@@ -1627,16 +1608,6 @@
         "import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'",
         "  const widthClassName = useNativeChatWidthClassName()",
         "      <div className={cn('mx-auto w-full px-3 pt-2 pb-4 sm:px-4', widthClassName)}>"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/NativeChatResolvedView.tsx",
-      "feature": "native-chat-relay",
-      "kind": "registration",
-      "lines": [
-        "import { NativeChatConversation } from './fork-native-chat-relay/NativeChatConversation'",
-        "} from './fork-native-chat-relay/native-chat-runtime-owner'",
-        "  const sshConnectionId = useAppStore((s) => selectNativeChatSshConnectionId(s, terminalTabId))"
       ]
     },
     {
@@ -1722,35 +1693,6 @@
       "lines": ["  ): boolean =>", "  const applyReport = ("]
     },
     {
-      "path": "src/renderer/src/components/native-chat/native-chat-runtime-send-launch-draft.test.ts",
-      "feature": "agent-composer",
-      "kind": "passthrough",
-      "lines": [
-        "} from './fork-agent-composer/native-chat-runtime-clear'",
-        "const writes = (): string[] => {",
-        "    await vi.advanceTimersByTimeAsync(0)"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-runtime-send.test.ts",
-      "feature": "agent-composer",
-      "kind": "passthrough",
-      "lines": [
-        "import { NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT } from './fork-agent-composer/native-chat-runtime-clear'",
-        "} from './fork-agent-composer/native-chat-send-outcome'",
-        "import { cancelNativeChatPtySends } from './native-chat-pty-send-queue'"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/native-chat-runtime-send.ts",
-      "feature": "agent-composer",
-      "kind": "registration",
-      "lines": [
-        "import { clearConfirmDurationMs } from './fork-agent-composer/native-chat-runtime-clear'",
-        "} from './fork-agent-composer/native-chat-typed-command-send'"
-      ]
-    },
-    {
       "path": "src/renderer/src/components/native-chat/native-chat-session-option-cache.ts",
       "feature": "native-chat-session-options",
       "kind": "registration",
@@ -1778,36 +1720,12 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.test.tsx",
-      "feature": "agent-composer",
-      "kind": "passthrough",
-      "lines": [
-        "  it('observes a restore performed after a replacement host mounted (dock/native-chat handoff)', async () => {",
-        "    expect(() => {"
-      ]
-    },
-    {
       "path": "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.ts",
       "feature": "agent-composer",
       "kind": "registration",
       "lines": [
         "} from './fork-agent-composer/agent-composer-attachment-cache'",
         "import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentComposerField'"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-interactive-send.test.tsx",
-      "feature": "agent-composer",
-      "kind": "passthrough",
-      "lines": ["    onOutcome('observed-cleared')", "    onOutcome('may-not-have-sent')"]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-interactive-send.ts",
-      "feature": "agent-composer",
-      "kind": "registration",
-      "lines": [
-        "import type { SendOutcome } from './fork-agent-composer/native-chat-send-outcome'",
-        "          inFlightRef.current = null"
       ]
     },
     {
@@ -1821,45 +1739,10 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-picker-command-dispatch.test.tsx",
-      "feature": "agent-composer",
-      "kind": "passthrough",
-      "lines": [
-        "import type { AgentComposerImageAttachment } from './fork-agent-composer/AgentComposerField'",
-        "vi.mock('./fork-agent-composer/composer-send-options', () => ({"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-picker-command-dispatch.ts",
-      "feature": "agent-composer",
-      "kind": "registration",
-      "lines": [
-        "import type { ComposerSendTier } from './fork-agent-composer/composer-send-tier'",
-        "import type { SendOutcome } from './fork-agent-composer/native-chat-send-outcome'"
-      ]
-    },
-    {
       "path": "src/renderer/src/components/native-chat/use-native-chat-send-lifecycle.test.tsx",
       "feature": "agent-composer",
       "kind": "passthrough",
       "lines": ["    rerender({})", "      { initialProps: {} }"]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-send-lifecycle.ts",
-      "feature": "agent-composer",
-      "kind": "registration",
-      "lines": [
-        "import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'",
-        "        handle.cancel()"
-      ]
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/use-native-chat-session-option-command.ts",
-      "feature": "agent-composer",
-      "kind": "registration",
-      "lines": [
-        "import { pushHistory, type HistoryState } from './fork-agent-composer/agent-composer-history'"
-      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/use-native-chat-session-options.ts",
@@ -2993,12 +2876,6 @@
       ]
     },
     {
-      "path": "src/renderer/src/runtime/runtime-terminal-inspection.ts",
-      "feature": "terminal-dock",
-      "kind": "registration",
-      "lines": ["} from './runtime-rpc-client'", "  data: string,"]
-    },
-    {
       "path": "src/renderer/src/runtime/sync-runtime-graph.ts",
       "feature": "terminal-dock",
       "kind": "registration",
@@ -3843,9 +3720,207 @@
         "      'https://github.com/zpyoung/orca/releases/tag/v1.4.160-rc.3'",
         "    expect(getReleaseNotesUrlForVersion(null)).toBe('https://github.com/zpyoung/orca/releases')"
       ]
+    },
+    {
+      "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift",
+      "feature": "computer-peer-identity",
+      "kind": "registration",
+      "lines": ["    return isTrustedComputerPeerBundleIdentifier(bundleId)"]
     }
   ],
   "exceptions": [
+    {
+      "path": "src/main/git/source-control/submodule-paths.ts",
+      "reason": "Does not cache cancelled submodule discovery as an empty routing result.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/relay/git-handler-submodule-ops.ts",
+      "reason": "Preserves relay discovery cancellation so a retry still routes submodule diffs correctly.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/git/status-submodule-path-cache.test.ts",
+      "reason": "Regression coverage ensuring an aborted diff discovery cannot poison the next submodule lookup.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/relay/git-handler-submodule-ops.test.ts",
+      "reason": "Regression coverage preserving submodule routing after a cancelled SSH diff discovery.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/runtime/runtime-rpc-mobile-method-allowlist.test.ts",
+      "reason": "Regression coverage that a mobile diff still reaches execution with its transport budget alongside the optional abort signal.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/git-diff-transport-budget.test.ts",
+      "reason": "Preserves transport-budget coverage when diff requests also carry an abort signal.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/git/source-control/git-read-cache-invalidation.ts",
+      "reason": "Preserves diff cache invalidation while isolating cancellation between local readers.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/git/source-control/file-diff.ts",
+      "reason": "Cancels local diff reads without cancelling unrelated consumers of a coalesced read.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/git/source-control/git-blob-read.ts",
+      "reason": "Preserves abort errors and stops subsequent blob reads when a diff request is cancelled.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/ipc/filesystem-git-status-staging.test.ts",
+      "reason": "Regression coverage for sender-scoped cancellation of in-flight diff IPC requests.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/providers/ssh-git-provider-diff.test.ts",
+      "reason": "Regression coverage for SSH diff cancellation and isolation of unrelated readers.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/git.test.ts",
+      "reason": "Regression coverage for cancellation reaching runtime Git diff execution.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-git-diff-budget.test.ts",
+      "reason": "Regression coverage for cancelling host-owned Git diff requests.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/relay/git-handler-diff-read-coalescing.test.ts",
+      "reason": "Regression coverage for cancelling relay diff work without stopping unrelated consumers.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/renderer/src/runtime/runtime-git-diff-client.ts",
+      "reason": "Propagates diff cancellation through runtime RPC and sender-scoped IPC instead of abandoning in-flight repository probes.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/renderer/src/web/preload-api/web-git-api.ts",
+      "reason": "Cancels token-scoped Git diff requests from the web client so a retargeted probe stops on the execution host.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/preload/api/git-bridge.ts",
+      "reason": "Exposes token-scoped cancellation for Git diff requests.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/preload/api/git-inspection-api.ts",
+      "reason": "Declares the optional diff request token and cancellation API.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/ipc/filesystem.ts",
+      "reason": "Owns sender-scoped cancellation state for Git diff IPC requests.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/ipc/filesystem/filesystem-handler-context.ts",
+      "reason": "Shares the diff cancellation registry with filesystem IPC handlers.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/ipc/filesystem/filesystem-git-status-handlers.ts",
+      "reason": "Cancels tokenized Git diff requests and passes abort signals to their execution host.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/providers/git-provider-contract.ts",
+      "reason": "Allows Git diff consumers to cancel work on the execution host.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/providers/ssh-git-read-provider.ts",
+      "reason": "Propagates diff cancellation to the SSH transport without cancelling unrelated readers.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/runtime/runtime-git-diff-commands.ts",
+      "reason": "Passes runtime diff abort signals through local and SSH execution paths.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/git-diff-methods.ts",
+      "reason": "Forwards the RPC request abort signal into Git diff execution.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/git/command-runner/git-exec-file.ts",
+      "reason": "Preserves cancellation for buffered Git subprocesses used by diff reads.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/relay/git-handler-operation-context.ts",
+      "reason": "Allows relay diff buffer reads to carry the request abort signal.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/relay/git-handler.ts",
+      "reason": "Propagates cancellation into buffered Git execution on the SSH host.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/relay/git-handler-ops.ts",
+      "reason": "Cancels diff blob reads rather than allowing aborted requests to launch further Git subprocesses.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/relay/git-handler-read-operations.ts",
+      "reason": "Threads relay diff request cancellation into host-side diff computation.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/git/status-diff-settled-cache.test.ts",
+      "reason": "Regression coverage for cancelling one reader of a coalesced local diff read.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/renderer/src/web/web-preload-api-git.test.ts",
+      "reason": "Regression coverage for web-client diff cancellation racing worktree path resolution.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
     {
       "path": ".claude/hooks/require-sandboxed-tests.mjs",
       "reason": "Fork-only guard keeping vitest on the remote sandbox host; upstream runs tests locally.",
@@ -4409,6 +4484,18 @@
       "status": "permanent"
     },
     {
+      "path": "src/shared/git-remote-error.test.ts",
+      "reason": "Regression coverage for bug-47: preserve multiline Git diagnoses and credential redaction across line endings.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#git-multiline-diagnostics"
+    },
+    {
+      "path": "src/shared/git-remote-error.ts",
+      "reason": "Fix bug-47 in upstream error normalization: preserve the diagnostic block rather than only its final line.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#git-multiline-diagnostics"
+    },
+    {
       "path": "src/shared/native-chat-transcript-retention.test.ts",
       "reason": "Tests for the retention-fix shared companion above.",
       "status": "pending-upstream",
@@ -4430,6 +4517,138 @@
       "path": "tests/e2e/cross-version-wire/release-checkout.ts",
       "reason": "Encodes the fork's own (tagless) release-history shape for cross-version wire tests.",
       "status": "permanent"
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/pty-connection/pane-pty-visibility-bind.ts",
+      "reason": "Arms input quarantine before binding a replacement shell while preserving same-incarnation handle rotations.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatResolvedView.tsx",
+      "reason": "Connects native-chat send eligibility to terminal-tab quarantine while preserving fork relay routing.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-send-eligibility.ts",
+      "reason": "Rejects native-chat input while its terminal tab is quarantined.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-can-send.ts",
+      "reason": "Subscribes native-chat send eligibility to terminal quarantine changes.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-interactive-send.ts",
+      "reason": "Blocks raw and interactive native-chat input during quarantine and cancels pending sends on reattachment.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-runtime-send.ts",
+      "reason": "Keeps terminal-tab identity at native-chat write boundaries so quarantine also protects queued and delayed submissions.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-pty-send-queue.ts",
+      "reason": "Invalidates queued native-chat writes when their terminal tab enters reattach quarantine.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-composer-target.ts",
+      "reason": "Preserves terminal-tab identity in the composer send target used for quarantine enforcement.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-session-option-command.ts",
+      "reason": "Routes native-chat session-option commands through the quarantine-aware send target.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-send-eligibility.test.ts",
+      "reason": "Maintains behavioral send-eligibility coverage after adding terminal quarantine.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-interactive-send.test.tsx",
+      "reason": "Maintains interactive-send coverage against quarantine-aware runtime targets.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/remote-runtime-pty-transport.ts",
+      "reason": "Arms reattach quarantine on host-pane recovery, the only layer that knows a shell was spawned when a legacy host omits incarnation metadata or reuses a handle.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
+    },
+    {
+      "path": "src/renderer/src/runtime/runtime-terminal-inspection.ts",
+      "reason": "Honors operation cancellation before verified PTY dispatch and fallback writes so native-chat quarantine cannot be bypassed across an asynchronous write.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatComposer.tsx",
+      "reason": "Preserves terminal-tab identity when the native-chat composer resolves a quarantine-aware send target.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/NativeChatComposer.test.tsx",
+      "reason": "Migrates native-chat composer coverage to quarantine-aware send targets.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-runtime-send-launch-draft.test.ts",
+      "reason": "Migrates launch-draft send coverage to terminal-tab-scoped runtime targets.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-runtime-send.test.ts",
+      "reason": "Maintains runtime-send behavior coverage across the quarantine-aware target cutover.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.test.tsx",
+      "reason": "Migrates attachment-send coverage to terminal-tab-scoped runtime targets.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-picker-command-dispatch.ts",
+      "reason": "Keeps picker-command dispatch on the quarantine-aware composer target.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-picker-command-dispatch.test.tsx",
+      "reason": "Migrates picker-command behavior coverage to quarantine-aware targets.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-send-lifecycle.ts",
+      "reason": "Cancels pending composer operations and optimistic messages without cleanup writes when reattach quarantine arms.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-session-option-command.test.tsx",
+      "reason": "Migrates session-option command coverage to terminal-tab-scoped runtime targets.",
+      "status": "pending-upstream",
+      "ledger": "bug-1"
     },
     {
       "path": "src/shared/posix-command-path-lookup.test.ts",
@@ -4468,10 +4687,6 @@
     }
   ],
   "residuals": {
-    "native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift": {
-      "added": 1,
-      "removed": 3
-    },
     "src/renderer/src/components/sidebar/use-worktree-activity-status.ts": {
       "added": 4,
       "removed": 1
@@ -5100,14 +5315,6 @@
       "added": 10,
       "removed": 2
     },
-    "src/renderer/src/components/native-chat/NativeChatComposer.test.tsx": {
-      "added": 38,
-      "removed": 83
-    },
-    "src/renderer/src/components/native-chat/NativeChatComposer.tsx": {
-      "added": 201,
-      "removed": 277
-    },
     "src/renderer/src/components/native-chat/NativeChatImageAttachmentPreview.test.tsx": {
       "added": 1,
       "removed": 1
@@ -5135,10 +5342,6 @@
     "src/renderer/src/components/native-chat/NativeChatQuestionCard.tsx": {
       "added": 3,
       "removed": 1
-    },
-    "src/renderer/src/components/native-chat/NativeChatResolvedView.tsx": {
-      "added": 16,
-      "removed": 17
     },
     "src/renderer/src/components/native-chat/NativeChatToolLine.tsx": {
       "added": 3,
@@ -5184,18 +5387,6 @@
       "added": 25,
       "removed": 8
     },
-    "src/renderer/src/components/native-chat/native-chat-runtime-send-launch-draft.test.ts": {
-      "added": 35,
-      "removed": 15
-    },
-    "src/renderer/src/components/native-chat/native-chat-runtime-send.test.ts": {
-      "added": 496,
-      "removed": 81
-    },
-    "src/renderer/src/components/native-chat/native-chat-runtime-send.ts": {
-      "added": 68,
-      "removed": 235
-    },
     "src/renderer/src/components/native-chat/native-chat-session-option-cache.ts": {
       "added": 32,
       "removed": 1
@@ -5208,45 +5399,17 @@
       "added": 12,
       "removed": 3
     },
-    "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.test.tsx": {
-      "added": 78,
-      "removed": 114
-    },
     "src/renderer/src/components/native-chat/use-native-chat-composer-attachments.ts": {
       "added": 98,
       "removed": 47
-    },
-    "src/renderer/src/components/native-chat/use-native-chat-interactive-send.test.tsx": {
-      "added": 38,
-      "removed": 1
-    },
-    "src/renderer/src/components/native-chat/use-native-chat-interactive-send.ts": {
-      "added": 16,
-      "removed": 2
     },
     "src/renderer/src/components/native-chat/use-native-chat-live-session-pending.test.ts": {
       "added": 4,
       "removed": 5
     },
-    "src/renderer/src/components/native-chat/use-native-chat-picker-command-dispatch.test.tsx": {
-      "added": 129,
-      "removed": 29
-    },
-    "src/renderer/src/components/native-chat/use-native-chat-picker-command-dispatch.ts": {
-      "added": 48,
-      "removed": 6
-    },
     "src/renderer/src/components/native-chat/use-native-chat-send-lifecycle.test.tsx": {
       "added": 59,
       "removed": 0
-    },
-    "src/renderer/src/components/native-chat/use-native-chat-send-lifecycle.ts": {
-      "added": 22,
-      "removed": 3
-    },
-    "src/renderer/src/components/native-chat/use-native-chat-session-option-command.ts": {
-      "added": 1,
-      "removed": 1
     },
     "src/renderer/src/components/native-chat/use-native-chat-session-options.ts": {
       "added": 74,
@@ -5768,10 +5931,6 @@
       "added": 2,
       "removed": 0
     },
-    "src/renderer/src/runtime/runtime-terminal-inspection.ts": {
-      "added": 73,
-      "removed": 11
-    },
     "src/renderer/src/runtime/sync-runtime-graph.ts": {
       "added": 13,
       "removed": 1
@@ -6151,6 +6310,10 @@
     "src/renderer/src/components/UpdateCard.error-card.test.tsx": {
       "added": 5,
       "removed": 5
+    },
+    "native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift": {
+      "added": 1,
+      "removed": 3
     }
   }
 }

@@ -133,7 +133,10 @@ export async function listSubmodulePaths(git: GitExec, worktreePath: string): Pr
               .replace(/\/+$/, '')
       })
       .filter((value) => value.length > 0)
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw error
+    }
     return []
   }
 }

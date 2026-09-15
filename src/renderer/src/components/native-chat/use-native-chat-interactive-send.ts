@@ -16,12 +16,17 @@ import {
   type AskPrompt
 } from './native-chat-interactive-prompt'
 import {
+  invalidateNativeChatPtySends,
   sendNativeChatAskAnswer,
   sendNativeChatMessage,
   type NativeChatSendHandle
 } from './native-chat-runtime-send'
 import type { SendOutcome } from './fork-agent-composer/native-chat-send-outcome'
 import { inferQuestionAnsweredFromCurrentStatus } from '../terminal-pane/agent-question-answered-inference'
+import {
+  isTerminalInputQuarantined,
+  subscribeTerminalInputQuarantine
+} from '../terminal-pane/terminal-input-quarantine'
 
 // ESC is the agent-TUI interrupt/cancel key over the PTY (matches how the
 // composer forwards Escape). Used to cancel a question or deny an approval.
@@ -71,10 +76,23 @@ export function useNativeChatInteractiveSend(
     () => cancelInFlight,
     [agent, cancelInFlight, paneKey, targetPtyId, terminalTabId]
   )
+  useLayoutEffect(
+    () =>
+      subscribeTerminalInputQuarantine(terminalTabId, (armed) => {
+        if (!armed) {
+          return
+        }
+        if (targetPtyId) {
+          invalidateNativeChatPtySends(targetPtyId)
+        }
+        inFlightRef.current = null
+      }),
+    [terminalTabId, targetPtyId]
+  )
 
   const sendRaw = useCallback(
     (raw: string) => {
-      if (!targetPtyId) {
+      if (!targetPtyId || isTerminalInputQuarantined(terminalTabId)) {
         return
       }
       sendRuntimePtyInput(getSettingsForAgentTabRuntimeOwner(terminalTabId), targetPtyId, raw)
@@ -88,12 +106,20 @@ export function useNativeChatInteractiveSend(
       selections: AskAnswerSelection[],
       onDeliverySettled?: (delivered: boolean) => void
     ): { settleAfterMs: number; waitsForVerifiedDelivery: boolean } => {
-      if (!targetPtyId || !hasAskAnswer(prompt, selections)) {
+      if (
+        !targetPtyId ||
+        !hasAskAnswer(prompt, selections) ||
+        isTerminalInputQuarantined(terminalTabId)
+      ) {
+        if (isTerminalInputQuarantined(terminalTabId)) {
+          onDeliverySettled?.(false)
+        }
         return { settleAfterMs: 0, waitsForVerifiedDelivery: false }
       }
       // Cancel any prior in-flight answer before starting a new one.
       cancelInFlight()
       const settings = getSettingsForAgentTabRuntimeOwner(terminalTabId)
+      const target = { terminalTabId, ptyId: targetPtyId, settings }
       // Claude and Codex ignore pasted labels but have different selector state
       // machines; Grok commits pasted text. OpenClaude follows Claude's path.
       const stepsAnswer = shouldStepNativeChatAskAnswer(agent)
@@ -140,14 +166,13 @@ export function useNativeChatInteractiveSend(
       }
       const handle: NativeChatSendHandle = stepsAnswer
         ? sendNativeChatAskAnswer(
-            settings,
-            targetPtyId,
+            target,
             buildsCodexAnswer
               ? buildCodexAskAnswerKeys(prompt, selections)
               : buildAskAnswerKeys(prompt, selections),
             onSettled
           )
-        : sendNativeChatMessage(settings, targetPtyId, formatAskAnswer(prompt, selections), {
+        : sendNativeChatMessage(target, formatAskAnswer(prompt, selections), {
             onOutcome
           })
       // Why: native-chat answer writes bypass xterm.onData. Infer only after

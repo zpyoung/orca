@@ -38,7 +38,7 @@ import { applyGitStatusUpstreamRefWatchRequest } from '../git-status-upstream-re
 import type { FilesystemHandlerContext } from './filesystem-handler-context'
 
 export function registerFilesystemGitStatusHandlers(context: FilesystemHandlerContext): void {
-  const { store, gitStatusCancellations } = context
+  const { store, gitStatusCancellations, gitDiffCancellations } = context
   ipcMain.handle(
     'git:status',
     async (
@@ -275,38 +275,50 @@ export function registerFilesystemGitStatusHandlers(context: FilesystemHandlerCo
   ipcMain.handle(
     'git:diff',
     async (
-      _event,
+      event,
       args: {
         worktreePath: string
         filePath: string
         staged: boolean
         compareAgainstHead?: boolean
         connectionId?: string
+        requestToken?: string
       }
     ): Promise<GitDiffResult> => {
-      if (args.connectionId) {
-        const provider = getSshGitProvider(args.connectionId)
-        if (!provider) {
-          throw new Error(SSH_GIT_PROVIDER_UNAVAILABLE_MESSAGE)
+      const controller = gitDiffCancellations.begin(event, args.requestToken)
+      try {
+        if (args.connectionId) {
+          const provider = getSshGitProvider(args.connectionId)
+          if (!provider) {
+            throw new Error(SSH_GIT_PROVIDER_UNAVAILABLE_MESSAGE)
+          }
+          return await provider.getDiff(
+            args.worktreePath,
+            args.filePath,
+            args.staged,
+            args.compareAgainstHead,
+            controller ? { signal: controller.signal } : undefined
+          )
         }
-        return provider.getDiff(
+        const worktreePath = await resolveRegisteredWorktreePath(args.worktreePath, store)
+        const filePath = validateGitRelativeFilePath(worktreePath, args.filePath)
+        const gitOptions = getLocalGitOptionsForRegisteredWorktree(
+          store,
           args.worktreePath,
-          args.filePath,
-          args.staged,
-          args.compareAgainstHead
+          worktreePath
         )
+        return await getDiff(worktreePath, filePath, args.staged, args.compareAgainstHead, {
+          ...gitOptions,
+          admissionTier: 'interactive',
+          ...(controller ? { signal: controller.signal } : {})
+        })
+      } finally {
+        gitDiffCancellations.finish(event, args.requestToken, controller)
       }
-      const worktreePath = await resolveRegisteredWorktreePath(args.worktreePath, store)
-      const filePath = validateGitRelativeFilePath(worktreePath, args.filePath)
-      const gitOptions = getLocalGitOptionsForRegisteredWorktree(
-        store,
-        args.worktreePath,
-        worktreePath
-      )
-      return getDiff(worktreePath, filePath, args.staged, args.compareAgainstHead, {
-        ...gitOptions,
-        admissionTier: 'interactive'
-      })
     }
   )
+
+  ipcMain.handle('git:cancelDiff', (event, args: { requestToken: string }): void => {
+    gitDiffCancellations.cancel(event, args.requestToken)
+  })
 }
