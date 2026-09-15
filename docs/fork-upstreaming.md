@@ -19,6 +19,24 @@ The existing suite should remain the single source of coverage.
 **Paths:** `src/shared/posix-command-path-lookup.test.ts`.
 
 **Orca ledger:** `bug-3`.
+## Git multiline diagnostics
+
+**Ledger:** bug-47.
+
+**What:** preserves Git's diagnostic block from the last `fatal:` or `error:` line,
+including continuation lines such as the filesystem-discovery explanation. Command
+wrappers and preceding progress output remain excluded, credentials remain redacted,
+and unprefixed failures retain the last-nonempty-line fallback.
+
+**Why upstream, not isolated:** this corrects the existing shared normalizer used by
+local and SSH Git operations, including non-repository folder workspaces. A forked
+copy would duplicate the same error policy. No Git command or wire schema changes;
+older clients continue to receive an ordinary error string.
+
+**Paths:**
+
+- `src/shared/git-remote-error.ts`
+- `src/shared/git-remote-error.test.ts`
 
 **Status:** pending-upstream. Not yet submitted.
 
@@ -274,6 +292,66 @@ file.
 
 **Status:** pending-upstream. Not yet submitted.
 
+## Git diff request cancellation
+
+**Ledger:** `bug-12`.
+
+**What:** repository probes carry their abort signal through the renderer, token-scoped
+`git:cancelDiff` IPC, runtime RPC, SSH transport, and host-side Git blob reads. Closing or
+retargeting a handoff must cancel the diff request, not merely discard its eventual result.
+Cancellation is scoped to the requesting sender and must not stop unrelated diff consumers.
+
+**Why upstream, not isolated:** the missing cancellation spans upstream's existing Git diff
+API and subprocess execution path. Forking those modules would duplicate the Git transport
+and execution stack; adding optional cancellation to the existing path preserves callers
+that do not supply a signal.
+
+**Paths:**
+
+- `src/renderer/src/runtime/runtime-git-diff-client.ts`
+- `src/renderer/src/web/preload-api/web-git-api.ts`
+- `src/preload/api/git-bridge.ts`
+- `src/preload/api/git-inspection-api.ts`
+- `src/main/ipc/filesystem.ts`
+- `src/main/ipc/filesystem/filesystem-handler-context.ts`
+- `src/main/ipc/filesystem/filesystem-git-status-handlers.ts`
+- `src/main/providers/git-provider-contract.ts`
+- `src/main/providers/ssh-git-read-provider.ts`
+- `src/main/runtime/runtime-git-diff-commands.ts`
+- `src/main/runtime/rpc/methods/git-diff-methods.ts`
+- `src/main/git/command-runner/git-exec-file.ts`
+- `src/main/git/source-control/git-read-cache-invalidation.ts`
+- `src/main/git/source-control/file-diff.ts`
+- `src/main/git/source-control/git-blob-read.ts`
+- `src/main/git/source-control/submodule-paths.ts`
+- `src/relay/git-handler-operation-context.ts`
+- `src/relay/git-handler.ts`
+- `src/relay/git-handler-ops.ts`
+- `src/relay/git-handler-read-operations.ts`
+- `src/relay/git-handler-submodule-ops.ts`
+
+**Regression coverage:**
+
+- `src/main/ipc/filesystem-git-status-staging.test.ts`
+- `src/main/providers/ssh-git-provider-diff.test.ts`
+- `src/main/runtime/rpc/methods/git.test.ts`
+- `src/main/runtime/orca-runtime-git-diff-budget.test.ts`
+- `src/relay/git-handler-diff-read-coalescing.test.ts`
+- `src/main/runtime/runtime-rpc-mobile-method-allowlist.test.ts`
+- `src/main/runtime/rpc/methods/git-diff-transport-budget.test.ts`
+- `src/main/git/status-submodule-path-cache.test.ts`
+- `src/relay/git-handler-submodule-ops.test.ts`
+- `src/main/git/status-diff-settled-cache.test.ts`
+- `src/renderer/src/web/web-preload-api-git.test.ts`
+
+The handoff caller and its cancellation regression remain in the existing
+`fork-session-handoff` feature.
+Cancelled submodule discovery is not cached as an empty result, so an immediate retry
+retains the correct submodule diff route.
+
+**Compatibility:** reuse existing RPC cancellation and stream teardown; do not add a wire
+opcode or require a new field from older peers. Cancellation of host subprocesses requires
+the host-side fix as well as the caller-side signal.
 ## bug-35
 
 **What:** the macOS press-and-hold startup routine treated only `com.stablyai.orca` and its
@@ -322,5 +400,28 @@ the fork's release identifier.
 
 - `config/scripts/publish-complete-draft-releases.mjs`
 - `config/scripts/publish-complete-draft-releases.test.mjs`
+## Reattach input quarantine
+
+**Ledger:** `bug-1`.
+
+**What:** arms terminal-tab input quarantine before a remote pane binds a replacement shell.
+An ordinary provider-handle rotation with the same shell remains unquarantined. Host-pane
+recovery arms it in the transport that issued the `terminal.recoverPane` call, so missing
+incarnation metadata or a handle an older host reuses cannot bypass the guard; the rebind
+callback and the remote wire protocol are both unchanged.
+
+Native-chat eligibility and runtime sends also honor that tab's quarantine. Reattachment
+invalidates queued bodies, paced answers, and delayed submit writes rather than replaying them
+when quarantine expires. Cancellation must not write cleanup bytes into the replacement shell.
+
+**Why upstream, not isolated:** both defects cross existing upstream terminal binding and
+native-chat write boundaries. A parallel binding or send implementation would leave callers
+able to bypass the safety guard. The existing fork composer is updated at the same boundary;
+new quarantine-specific logic and regressions live under `fork-input-quarantine/`.
+
+**Paths:** the `bug-1` exceptions in `config/fork-ownership.json` cover the terminal transport,
+PTY binding, native-chat eligibility, send queue, and migrated consumers/tests. The
+`input-quarantine` feature owns its isolated logic and regressions; existing composer changes
+remain under the `agent-composer` feature.
 
 **Status:** pending-upstream. Not yet submitted.

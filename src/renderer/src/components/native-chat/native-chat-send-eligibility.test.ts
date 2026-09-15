@@ -6,20 +6,24 @@ import {
 
 describe('deriveNativeChatCanSend', () => {
   it('blocks sends when a mobile client holds the pty (presence-lock active)', () => {
-    expect(deriveNativeChatCanSend({ kind: 'mobile', clientId: 'phone-1' })).toBe(false)
+    expect(deriveNativeChatCanSend({ kind: 'mobile', clientId: 'phone-1' }, false)).toBe(false)
   })
 
   it('allows sends when the desktop drives the pty', () => {
-    expect(deriveNativeChatCanSend({ kind: 'desktop' })).toBe(true)
+    expect(deriveNativeChatCanSend({ kind: 'desktop' }, false)).toBe(true)
   })
 
   it('allows sends when the pty is idle', () => {
-    expect(deriveNativeChatCanSend({ kind: 'idle' })).toBe(true)
+    expect(deriveNativeChatCanSend({ kind: 'idle' }, false)).toBe(true)
   })
 
   it('treats an unresolved driver (null/undefined) as unlocked', () => {
-    expect(deriveNativeChatCanSend(null)).toBe(true)
-    expect(deriveNativeChatCanSend(undefined)).toBe(true)
+    expect(deriveNativeChatCanSend(null, false)).toBe(true)
+    expect(deriveNativeChatCanSend(undefined, false)).toBe(true)
+  })
+
+  it('blocks sends while fresh-shell input quarantine is armed', () => {
+    expect(deriveNativeChatCanSend({ kind: 'desktop' }, true)).toBe(false)
   })
 })
 

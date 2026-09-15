@@ -55,7 +55,10 @@ export const gitApi = {
     staged: boolean
     compareAgainstHead?: boolean
     connectionId?: string
+    requestToken?: string
   }) => ipcRenderer.invoke('git:diff', args),
+  cancelDiff: (args: { requestToken: string }): Promise<void> =>
+    ipcRenderer.invoke('git:cancelDiff', args),
   branchCompare: (args: { worktreePath: string; baseRef: string; connectionId?: string }) =>
     ipcRenderer.invoke('git:branchCompare', args),
   commitCompare: (args: { worktreePath: string; commitId: string; connectionId?: string }) =>

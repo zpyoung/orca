@@ -17,6 +17,10 @@ import {
   type GitSpyTarget
 } from './git-handler-test-harness'
 
+type CancellableGitBufferTarget = {
+  gitBuffer(args: string[], cwd: string, options?: { signal?: AbortSignal }): Promise<Buffer>
+}
+
 function deferredRelayBuffer(content: string): {
   promise: Promise<Buffer>
   resolve: () => void
@@ -29,6 +33,17 @@ function deferredRelayBuffer(content: string): {
     promise,
     resolve: () => resolve(Buffer.from(content))
   }
+}
+
+/**
+ * Stub the plain git runner so a diff's submodule discovery resolves without spawning
+ * `git config --file .gitmodules`, whose latency outruns waitForSpyCalls' tick budget.
+ */
+function stubSubmoduleDiscovery(handler: GitHandler): void {
+  vi
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The test spies on GitHandler's concrete git method through its verified signature.
+    .spyOn(handler as unknown as GitSpyTarget, 'git')
+    .mockResolvedValue({ stdout: '', stderr: '' })
 }
 
 async function waitForSpyCalls(mock: ReturnType<typeof vi.fn>, calls: number): Promise<void> {
@@ -91,6 +106,95 @@ describe('GitHandler', () => {
       })
 
       expect(gitBufferSpy).toHaveBeenCalledTimes(4)
+    })
+
+    it('keeps coalesced git.diff host work running for an uncancelled reader', async () => {
+      const leftBlob = deferredRelayBuffer('left\n')
+      const rightBlob = deferredRelayBuffer('right\n')
+      const pendingBuffers = [leftBlob, rightBlob]
+      const signals: AbortSignal[] = []
+      const gitBufferSpy = vi
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The test spies on GitHandler's concrete gitBuffer method through its verified signature.
+        .spyOn(handler as unknown as CancellableGitBufferTarget, 'gitBuffer')
+        .mockImplementation(async (_args, _cwd, options) => {
+          if (options?.signal) {
+            signals.push(options.signal)
+          }
+          return pendingBuffers.shift()!.promise
+        })
+      stubSubmoduleDiscovery(handler)
+      const firstController = new AbortController()
+      const secondController = new AbortController()
+      const firstError = new Error('first cancelled')
+
+      const first = dispatcher.callRequest(
+        'git.diff',
+        { worktreePath: tmpDir, filePath: 'src/file.ts', staged: true },
+        { isStale: () => firstController.signal.aborted, signal: firstController.signal }
+      )
+      const second = dispatcher.callRequest(
+        'git.diff',
+        { worktreePath: tmpDir, filePath: 'src/file.ts', staged: true },
+        { isStale: () => secondController.signal.aborted, signal: secondController.signal }
+      )
+      await waitForSpyCalls(gitBufferSpy, 1)
+
+      firstController.abort(firstError)
+
+      await expect(first).rejects.toBe(firstError)
+      expect(signals[0]?.aborted).toBe(false)
+      leftBlob.resolve()
+      await waitForSpyCalls(gitBufferSpy, 2)
+      rightBlob.resolve()
+      await expect(second).resolves.toMatchObject({
+        originalContent: 'left\n',
+        modifiedContent: 'right\n'
+      })
+    })
+
+    it('aborts git.diff host execution after every coalesced reader cancels', async () => {
+      const hostRead = Promise.withResolvers<Buffer>()
+      let sharedSignal: AbortSignal | undefined
+      const gitBufferSpy = vi
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The test spies on GitHandler's concrete gitBuffer method through its verified signature.
+        .spyOn(handler as unknown as CancellableGitBufferTarget, 'gitBuffer')
+        .mockImplementation((_args, _cwd, options) => {
+          sharedSignal = options?.signal
+          options?.signal?.addEventListener(
+            'abort',
+            () => hostRead.reject(options.signal?.reason),
+            {
+              once: true
+            }
+          )
+          return hostRead.promise
+        })
+      stubSubmoduleDiscovery(handler)
+      const firstController = new AbortController()
+      const secondController = new AbortController()
+      const firstError = new Error('first cancelled')
+      const secondError = new Error('second cancelled')
+
+      const first = dispatcher.callRequest(
+        'git.diff',
+        { worktreePath: tmpDir, filePath: 'src/file.ts', staged: true },
+        { isStale: () => firstController.signal.aborted, signal: firstController.signal }
+      )
+      const second = dispatcher.callRequest(
+        'git.diff',
+        { worktreePath: tmpDir, filePath: 'src/file.ts', staged: true },
+        { isStale: () => secondController.signal.aborted, signal: secondController.signal }
+      )
+      await waitForSpyCalls(gitBufferSpy, 1)
+
+      firstController.abort(firstError)
+      await expect(first).rejects.toBe(firstError)
+      expect(sharedSignal?.aborted).toBe(false)
+
+      secondController.abort(secondError)
+      await expect(second).rejects.toBe(secondError)
+      expect(sharedSignal?.aborted).toBe(true)
+      expect(gitBufferSpy).toHaveBeenCalledTimes(1)
     })
 
     it('clears pending git.diff reads when status runs', async () => {

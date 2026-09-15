@@ -17,6 +17,7 @@ import type { NativeChatSendHandle, NativeChatSendOptions } from '../native-chat
 import { useNativeChatSendLifecycle } from '../use-native-chat-send-lifecycle'
 import { useNativeChatTypedInsertion } from '../use-native-chat-typed-insertion'
 import type { NativeChatResolvedTarget } from '../native-chat-composer-target'
+import { isTerminalInputQuarantined } from '../../terminal-pane/terminal-input-quarantine'
 import type {
   ComposerAutocomplete,
   NativeChatPickerItem,
@@ -118,10 +119,14 @@ export function useAgentComposerCoreState(props: AgentComposerCoreProps): AgentC
   }
 
   const resolveTarget = useCallback((): NativeChatResolvedTarget | null => {
-    if (!targetPtyId) {
+    if (!targetPtyId || isTerminalInputQuarantined(terminalTabId)) {
       return null
     }
-    return { ptyId: targetPtyId, settings: getSettingsForAgentTabRuntimeOwner(terminalTabId) }
+    return {
+      terminalTabId,
+      ptyId: targetPtyId,
+      settings: getSettingsForAgentTabRuntimeOwner(terminalTabId)
+    }
   }, [targetPtyId, terminalTabId])
 
   const hasPty = allowWithoutTarget || targetPtyId !== null
