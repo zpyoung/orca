@@ -7,6 +7,21 @@ manifest `exceptions[]` row (`status: "pending-upstream"`, `ledger` pointing at 
 anchor) are created and removed together — see `config/scripts/fork-ownership-manifest.mjs` for
 the invariant this enforces.
 
+## POSIX lookup test startup isolation
+
+**What:** runs the zsh lookup case with `-f` so user startup files cannot replace the fixture
+PATH. The existing alias/function-mask regression uses a temporary executable and a controlled
+`.zshenv` that overwrites PATH, making the failure reproducible on clean sandbox hosts.
+
+**Why upstream, not isolated:** this fixes upstream test isolation, not shipped lookup behavior.
+The existing suite should remain the single source of coverage.
+
+**Paths:** `src/shared/posix-command-path-lookup.test.ts`.
+
+**Orca ledger:** `bug-3`.
+
+**Status:** pending-upstream. Not yet submitted.
+
 ## Retention fix
 
 **What:** `useNativeChatRetainedSession` blanks a retained transcript while a fresh read is
@@ -278,3 +293,33 @@ fork copy would duplicate the suite without a seam.
 **Status:** pending-upstream. Not yet submitted. `bug-2` stays open: this closes the POSIX GC
 failure only. The `git-handler` upstreamStatus failure is `bug-47`, and the two
 `agent-exec-handler` spawn-arg failures are host `GIT_CONFIG_*` bleed, still unaddressed.
+## bug-35
+
+**What:** the macOS press-and-hold startup routine treated only `com.stablyai.orca` and its
+dot-children as Orca preference domains. The fork ships its packaged app as `com.zpyoung.orca`, so
+the routine recorded `foreign-bundle` and never applied the key-repeat default. The ownership check
+now accepts both exact namespace roots and their dot-children. Unit coverage pins both namespaces
+and rejects lookalike or unrelated identifiers; the startup E2E recognizes either packaged
+identity, and the reference commands use the fork's shipped domain.
+
+An earlier `foreign-bundle` record needs no migration or deletion. It is a non-terminal decision,
+so startup already retries it on every launch and applies the default once the packaged fork domain
+is recognized.
+
+**Why upstream, not isolated:** the domain gate is part of upstream's startup routine and shares its
+one-time record, explicit-user-value preservation, and conservative `defaults(1)` failure handling.
+Forking that routine merely to add one owned namespace would duplicate the safety-critical state
+machine. The narrow two-root allowlist changes no other identity policy: the upstream/development
+namespace remains accepted, and only exact roots or dot-delimited children qualify.
+
+**Paths:**
+
+- `src/main/macos-press-and-hold-default.ts`
+- `src/main/macos-press-and-hold-default.test.ts`
+- `tests/e2e/macos-press-and-hold-startup.spec.ts`
+- `docs/reference/macos-press-and-hold.md`
+
+**Depends on:** the fork's packaged app ID is `com.zpyoung.orca`; upstream and development builds
+continue to use `com.stablyai.orca` or a dot-suffixed child.
+
+**Status:** pending-upstream. Not yet submitted.

@@ -311,8 +311,21 @@ about *how the tree is fixed*, not about tolerating a failure: lint must still p
 
 Traps that fake results:
 
-- `rm -f config/*.tsbuildinfo` before every typecheck. Composite projects cache errors across
-  `git checkout` swaps.
+- Clear the composite build cache before every typecheck — composite projects cache errors across
+  `git checkout` swaps. Use `find`, never the glob:
+
+  ```sh
+  find config -maxdepth 1 -name '*.tsbuildinfo' -delete
+  ```
+
+  `rm -f config/*.tsbuildinfo` is the obvious form and it is unsafe here. This machine's shell is
+  zsh, where an unmatched glob is a hard error (`nomatch`) rather than a literal word, and the error
+  aborts the **whole** command list — so `rm -f config/*.tsbuildinfo && pnpm run typecheck:node`
+  prints `no matches found` and never runs `tsc`. `-f` does not help: zsh fails before `rm` is
+  reached. A fresh worktree has no `.tsbuildinfo` at all, and every later clear leaves none behind,
+  so the unmatched case is the normal one. The tell is a typecheck step that emits
+  `no matches found: config/*.tsbuildinfo` and then nothing — no `$ tsc --noEmit -p …` line, no
+  errors — which reads exactly like a pass.
 - Running the suite locally to diagnose something is a deliberate detour, not part of the gate — and
   it goes through `pnpm test:sandbox` (`AGENTS.md`), which a `PreToolUse` hook enforces. Two traps
   bite whichever way it is invoked: the run never builds the CLI, and ambient Git configuration can

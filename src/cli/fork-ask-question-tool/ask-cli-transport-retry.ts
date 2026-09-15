@@ -4,7 +4,7 @@ import { RuntimeClientError, RuntimeRpcFailureError } from '../runtime-client'
 export const ASK_CLI_TRANSPORT_RETRY_ATTEMPTS = 3
 export const ASK_CLI_TRANSPORT_RETRY_DELAY_MS = 500
 
-function isRetryableTransportError(error: unknown): boolean {
+export function isRetryableTransportError(error: unknown): boolean {
   return (
     error instanceof RuntimeClientError &&
     !(error instanceof RuntimeRpcFailureError) &&
