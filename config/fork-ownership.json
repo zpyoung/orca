@@ -4143,6 +4143,12 @@
       "status": "permanent"
     },
     {
+      "path": "docs/reference/macos-press-and-hold.md",
+      "reason": "Documents bug-35's fork packaged domain commands, continued upstream/dev-domain support, and automatic retry of earlier foreign-bundle decisions; ships with the startup fix.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#bug-35"
+    },
+    {
       "path": "mobile/src/browser/mobile-browser-frame-state.ts",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate",
@@ -4201,6 +4207,18 @@
       "path": "resources/skills/snapshot-registry.json",
       "reason": "Released skill snapshots recorded from the fork's own release tags; upstream's snapshots describe revisions no fork tag ever shipped.",
       "status": "permanent"
+    },
+    {
+      "path": "src/main/macos-press-and-hold-default.test.ts",
+      "reason": "Covers bug-35's domain-ownership regression: the fork and upstream namespaces and their dot-children are accepted while lookalike and unrelated bundle identifiers remain foreign.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#bug-35"
+    },
+    {
+      "path": "src/main/macos-press-and-hold-default.ts",
+      "reason": "Fixes bug-35 by recognizing com.zpyoung.orca and its dot-children as owned press-and-hold preference domains while retaining com.stablyai.orca and its dot-children.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#bug-35"
     },
     {
       "path": "src/main/runtime/rpc/fork-rpc-params/fork-uncatalogued-methods.ts",
@@ -4407,6 +4425,12 @@
       "path": "tests/e2e/cross-version-wire/release-checkout.ts",
       "reason": "Encodes the fork's own (tagless) release-history shape for cross-version wire tests.",
       "status": "permanent"
+    },
+    {
+      "path": "tests/e2e/macos-press-and-hold-startup.spec.ts",
+      "reason": "Keeps the startup ownership assertion aligned with bug-35 by treating either the fork or upstream namespace and its dot-children as an Orca bundle domain.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#bug-35"
     }
   ],
   "residuals": {
