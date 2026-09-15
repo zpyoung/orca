@@ -73,7 +73,7 @@ function setup(overrides: Partial<Parameters<typeof useNativeChatPickerCommandDi
       paneKey: 'pane-dock-picker',
       sendTier: 'verified',
       readTerminalScreen: () => null,
-      resolveTarget: () => ({ ptyId: 'pty-1', settings: {} as never }),
+      resolveTarget: () => ({ terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} }),
       sessionOptionsSurface: null,
       imageAttachments: attachments,
       ...callbacks,
@@ -100,7 +100,10 @@ describe('useNativeChatPickerCommandDispatch', () => {
 
     act(() => hook.result.current(COMMAND))
 
-    expect(sendNativeChatTypedCommand).toHaveBeenCalledWith({}, 'pty-1', '/clear')
+    expect(sendNativeChatTypedCommand).toHaveBeenCalledWith(
+      { terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} },
+      '/clear'
+    )
     expect(sendNativeChatMessage).not.toHaveBeenCalled()
   })
 
@@ -109,7 +112,11 @@ describe('useNativeChatPickerCommandDispatch', () => {
 
     act(() => hook.result.current(COMMAND))
 
-    expect(sendNativeChatMessage).toHaveBeenCalledWith({}, 'pty-1', '/clear', expect.anything())
+    expect(sendNativeChatMessage).toHaveBeenCalledWith(
+      { terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} },
+      '/clear',
+      expect.anything()
+    )
     expect(sendNativeChatTypedCommand).not.toHaveBeenCalled()
   })
 
@@ -122,8 +129,7 @@ describe('useNativeChatPickerCommandDispatch', () => {
       expect.objectContaining({ text: '/clear', tier: 'verified' })
     )
     expect(sendNativeChatMessage).toHaveBeenCalledWith(
-      {},
-      'pty-1',
+      { terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} },
       '/clear',
       expect.objectContaining({ onOutcome: expect.any(Function) })
     )
