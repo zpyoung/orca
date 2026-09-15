@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   sendNativeChatAskAnswer: vi.fn(),
   sendNativeChatMessage: vi.fn(),
   // Mutable so a test can swap the live status between sendAnswer and settle.
-  storeState: { agentStatusByPaneKey: {} as Record<string, unknown> }
+  storeState: { agentStatusByPaneKey: Object.fromEntries([]) }
 }))
 
 const PANE_KEY = 'tab-1:11111111-1111-4111-8111-111111111111'
@@ -73,8 +73,11 @@ describe('useNativeChatInteractiveSend', () => {
 
     // Grok commits a pasted answer: label text 'B', not option-number keystrokes.
     expect(mocks.sendNativeChatMessage).toHaveBeenCalledWith(
-      { terminalTabId: 'tab-1' },
-      'pty-1',
+      {
+        terminalTabId: 'tab-1',
+        ptyId: 'pty-1',
+        settings: { terminalTabId: 'tab-1' }
+      },
       'B',
       { onOutcome: expect.any(Function) }
     )
@@ -95,7 +98,7 @@ describe('useNativeChatInteractiveSend', () => {
     // the card now always waits for the send's real outcome (r5-1).
     expect(sendResult).toEqual({ settleAfterMs: 500, waitsForVerifiedDelivery: true })
 
-    const onOutcome = mocks.sendNativeChatMessage.mock.calls[0]?.[3]?.onOutcome
+    const onOutcome = mocks.sendNativeChatMessage.mock.calls[0]?.[2]?.onOutcome
     expect(onOutcome).toBeTypeOf('function')
 
     onOutcome('may-not-have-sent')
@@ -111,7 +114,7 @@ describe('useNativeChatInteractiveSend', () => {
     act(() => {
       result.current.sendAnswer(PROMPT, [{ indices: [1] }], onDeliverySettled)
     })
-    const onOutcome = mocks.sendNativeChatMessage.mock.calls[0]?.[3]?.onOutcome
+    const onOutcome = mocks.sendNativeChatMessage.mock.calls[0]?.[2]?.onOutcome
 
     onOutcome('observed-cleared')
     expect(onDeliverySettled).toHaveBeenCalledExactlyOnceWith(true)
@@ -127,8 +130,11 @@ describe('useNativeChatInteractiveSend', () => {
     // Codex's request_user_input card ignores typed labels (STA-1860 shape):
     // the 2nd option is delivered as its digit '2', which selects AND commits.
     expect(mocks.sendNativeChatAskAnswer).toHaveBeenCalledWith(
-      { terminalTabId: 'tab-1' },
-      'pty-1',
+      {
+        terminalTabId: 'tab-1',
+        ptyId: 'pty-1',
+        settings: { terminalTabId: 'tab-1' }
+      },
       [{ raw: '2' }],
       expect.any(Function)
     )
@@ -148,7 +154,7 @@ describe('useNativeChatInteractiveSend', () => {
 
     act(() => result.current.sendAnswer(prompt, [{ indices: [1] }, { indices: [0] }]))
 
-    expect(mocks.sendNativeChatAskAnswer.mock.calls[0]?.[2]).toEqual([{ raw: '2' }, { raw: '1' }])
+    expect(mocks.sendNativeChatAskAnswer.mock.calls[0]?.[1]).toEqual([{ raw: '2' }, { raw: '1' }])
   })
 
   it('routes a Claude answer through the option-number keystroke path', () => {
@@ -160,8 +166,11 @@ describe('useNativeChatInteractiveSend', () => {
 
     // The 2nd option is delivered as its number '2', not the label 'B' (STA-1860).
     expect(mocks.sendNativeChatAskAnswer).toHaveBeenCalledWith(
-      { terminalTabId: 'tab-1' },
-      'pty-1',
+      {
+        terminalTabId: 'tab-1',
+        ptyId: 'pty-1',
+        settings: { terminalTabId: 'tab-1' }
+      },
       [{ raw: '2' }],
       expect.any(Function)
     )
@@ -175,7 +184,7 @@ describe('useNativeChatInteractiveSend', () => {
 
     act(() => result.current.sendAnswer(PROMPT, [{ indices: [1] }]))
 
-    const onSettled = mocks.sendNativeChatAskAnswer.mock.calls[0]?.[3]
+    const onSettled = mocks.sendNativeChatAskAnswer.mock.calls[0]?.[2]
     expect(onSettled).toBeTypeOf('function')
     onSettled?.(true)
     expect(mocks.inferQuestionAnswered).toHaveBeenCalledOnce()
@@ -256,7 +265,7 @@ describe('useNativeChatInteractiveSend', () => {
     act(() => result.current.sendAnswer(PROMPT, [{ indices: [1] }]))
     expect(mocks.inferQuestionAnswered).not.toHaveBeenCalled()
 
-    const onSettled = mocks.sendNativeChatAskAnswer.mock.calls[0]?.[3]
+    const onSettled = mocks.sendNativeChatAskAnswer.mock.calls[0]?.[2]
     expect(onSettled).toBeTypeOf('function')
     onSettled?.(false)
     expect(mocks.inferQuestionAnswered).not.toHaveBeenCalled()
@@ -291,7 +300,7 @@ describe('useNativeChatInteractiveSend', () => {
       }
     }
 
-    const onSettled = mocks.sendNativeChatAskAnswer.mock.calls[0]?.[3]
+    const onSettled = mocks.sendNativeChatAskAnswer.mock.calls[0]?.[2]
     onSettled?.(true)
 
     // The baseline is question A's (captured before delivery), so the server can
@@ -317,7 +326,7 @@ describe('useNativeChatInteractiveSend', () => {
     })
     expect(sendResult).toEqual({ settleAfterMs: 500, waitsForVerifiedDelivery: true })
 
-    const onSettled = mocks.sendNativeChatAskAnswer.mock.calls[0]?.[3]
+    const onSettled = mocks.sendNativeChatAskAnswer.mock.calls[0]?.[2]
     onSettled?.(false)
     expect(onDeliverySettled).toHaveBeenCalledExactlyOnceWith(false)
 

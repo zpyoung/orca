@@ -11,6 +11,9 @@ export type AskWaitConcurrencyGate = {
  * Meters concurrent `ask.wait` chunks for one runtime, shedding the overflow with the
  * `runtime_busy` RPC code the CLI retries on. The ask itself is durable, so a shed wait costs
  * only a re-poll — unlike `orchestration.ask`, whose caller exits non-zero when it is shed.
+ *
+ * Sheds rather than queues: a queued wait would go on holding its long-poll slot while it
+ * waited for one, which is the starvation this exists to prevent.
  */
 export function createAskWaitConcurrencyGate(
   cap: number = ASK_WAIT_CONCURRENCY_CAP

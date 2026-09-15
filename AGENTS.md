@@ -33,11 +33,51 @@ Never use vague names like `helpers`, `utils`, `common`, `misc`, or `shared-stuf
 
 ## Type Declarations: Prefer `.ts` Over `.d.ts`
 
+## Type Assertions: Prefer Checked Types
+
+Avoid type assertions except `as const`. Unavoidable casts need a line-specific `SAFETY:` explanation:
+
+```ts
+// oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Explain the verified invariant here.
+```
+
 # Verifying Changes
 
 - **Typecheck**: `pnpm tc` (or `tc:node` / `tc:cli` / `tc:web`)
 - **Test**: see [Running Tests: Remote Sandbox Only](#running-tests-remote-sandbox-only) — `pnpm test` is blocked on this machine
 - **Lint**: `oxlint`, or `pnpm run check:code-quality:changed` for changed files (full `pnpm lint` is slow); format with `pnpm format`
+
+# Typed Observations: the Orca Ledger
+
+When you notice something you cannot act on in this session, do NOT bury it in prose with phrases
+like "pre-existing", "out of scope", "future work", or "skipped for brevity". File it in the Orca
+ledger, which is keyed to the project, so entries survive worktree deletion and stay visible from
+sibling worktrees of this repo.
+
+```sh
+orca ledger file --type bug      --title <t> --file <path:line> \
+                                 --description <d> --severity critical|high|medium|low
+orca ledger file --type deferred --title <t> --why-deferred <w> \
+                                 --priority high|medium|low
+orca ledger file --type test-gap --title <t> --file-under-test <path:line> \
+                                 --reason-skipped <r>
+orca ledger file --type proposal --title <t> --context <c> --recommendation <r>
+orca ledger file --type decision --title <t> --context <c> --decision <d> \
+                                 --consequences <q> --status proposed|accepted|superseded
+orca ledger list   --type bug --state open --json
+orca ledger show   --id bug-12 --json
+orca ledger state  --id bug-12 --state resolved --if-revision <n> --json
+orca ledger review --json
+```
+
+`--if-revision` takes the revision from `show`; a stale value returns `conflict` with the current
+revision in `error.data.currentRevision`.
+
+The ledger is the only surface, and it wins on any disagreement. BUGS.md, DEFERRED.md,
+TEST_BACKLOG.md, proposals.md and docs/adr/ are legacy — read them for history, never append to
+them. BUGS.md and DEFERRED.md were migrated; TEST_BACKLOG.md was not, so its entries live only in
+markdown until someone files them. The `quirk:typed-artifacts` skill and the `/quirk:artifacts:*`
+commands still write markdown; do not use them.
 
 # Fork Feature Structure
 
@@ -172,6 +212,10 @@ Orca targets macOS, Linux, and Windows. Keep all platform-dependent behavior beh
 - **WSL commands**: build argv with `buildWslExecArgs` (always `--exec` — under `--`, `wsl.exe` expands `$name` in every argument and silently rewrites the script), and fence anything whose stdout you parse with `buildWslCapturedLoginShellCommand`, because the interactive login shell prints the distro banner to stdout. See [`docs/reference/wsl-command-execution.md`](./docs/reference/wsl-command-execution.md).
 - **Linux native modules**: keep the glibc floor at Ubuntu 20.04 / glibc 2.31. A module compiled from source on a newer runner can reference symbol versions absent on the floor and crash the app on startup. See [`docs/reference/linux-glibc-compatibility.md`](./docs/reference/linux-glibc-compatibility.md); packaging fails if a bundled native binary needs newer glibc.
 
+## Native Dependency Installs
+
+Ordinary `pnpm install` covers the host OS and CPU only. Before packaging for another architecture — including `pnpm build:mac`, which builds x64 and arm64 by default — run `pnpm install:release`. electron-builder only warns on a missing `extraResources` source, so the `beforePack` guard is what turns a thin install into a build failure instead of a silently broken artifact; see [`docs/reference/pnpm-install-policy.md`](./docs/reference/pnpm-install-policy.md).
+
 ## SSH Use Case
 
 All changes must consider the SSH use case. Don't assume local-only execution. Before changing anything that reports on, stops, or lists remote work, follow [`docs/reference/ssh-execution-boundary.md`](./docs/reference/ssh-execution-boundary.md): the execution host owns everything that touches execution, and loss of contact is never evidence of process death — the verdict vocabulary is `live` / `unverifiable` / `exited`, with no synonyms.
@@ -179,6 +223,14 @@ All changes must consider the SSH use case. Don't assume local-only execution. B
 ## Folder Workspace Use Case
 
 All changes must consider folder workspaces as well as git worktrees. Don't assume every workspace is a git worktree.
+
+## Agent Status
+
+The execution host owns agent status in one store, the hook server's, and every reader (sidebar, `worktree ps`, mobile, dashboard) subscribes to it. Before adding a producer, a cache, or a reader-side precedence rule, read [`docs/reference/agent-status-store.md`](./docs/reference/agent-status-store.md): new producers write into that store, and readers keep only presentation policy.
+
+## Agent Terminal Screens
+
+A rule that reads what an agent CLI paints on a terminal — readiness, blocked prompts, idle — must be written against a captured transcript, not a remembered screen. Record one with [`docs/reference/agent-pty-transcript-capture.md`](./docs/reference/agent-pty-transcript-capture.md), which keeps escapes and wrapping intact and scrubs account identifiers before they reach git. Antigravity readiness has no transcript yet and five failed attempts without one; before touching it, read [`docs/reference/antigravity-readiness-evidence.md`](./docs/reference/antigravity-readiness-evidence.md).
 
 ## Remote Wire Compatibility
 

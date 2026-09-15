@@ -26,6 +26,13 @@ export function findDockComposerTextarea(
   return queryDockComposerTextarea(pane)
 }
 
+/** The pane's enabled dock composer, if it has one. */
+export function findPaneDockComposer(
+  pane: Pick<DockFocusablePane, 'container'> | null | undefined
+): HTMLTextAreaElement | null {
+  return pane ? queryDockComposerTextarea(pane.container) : null
+}
+
 /** Focuses a pane's dock composer when available, otherwise its terminal. */
 export function focusPaneOrDockComposer(pane: DockFocusablePane | null | undefined): void {
   if (!pane) {

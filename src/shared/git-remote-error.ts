@@ -12,6 +12,7 @@ const NORMALIZED_SUBMODULE_PUSH_FAILURE_PATTERN =
   /(?:^|:\s)((?:Submodule '[^'\n]+'|A submodule) (?:has remote changes\. Pull inside the submodule, then try again\.|could not be pushed\. Resolve the submodule push error, then try again\.))(?:$|\s)/i
 const DIVERGENT_PULL_RECONCILIATION_PATTERN =
   /Need to specify how to reconcile divergent branches|divergent branches and need to specify how to reconcile them/i
+const DIAGNOSTIC_LINE_PATTERN = /^[ \t]*(?:fatal|error):/gm
 // Why: these args already pin a reconcile strategy; the merge fallback must not override an explicit choice like --ff-only.
 const RECONCILIATION_PULL_ARG_PATTERN =
   /^(--rebase|--no-rebase|--ff-only|--ff|--no-ff|--merge|-r)(=|$)/
@@ -43,7 +44,6 @@ export function formatSubmodulePushFailureDetail(message: string): string | null
 }
 
 function extractTailLine(message: string): string {
-  // Why: last non-empty stderr line is the diagnostic; the full blob risks leaking local paths/env to the UI.
   for (const rawLine of iterateLinesFromEnd(message)) {
     const line = rawLine.trim()
     if (line.length > 0) {
@@ -173,7 +173,15 @@ export function normalizeGitErrorMessage(error: unknown, operation?: GitRemoteOp
     return 'Pull would overwrite untracked files. Move, remove, or add them before pulling.'
   }
 
-  // Fallthrough: raw was already credential-scrubbed at top, so just extract the tail stderr line.
+  // Why: git interleaves per-ref output between an early diagnostic and its summary, so anchor on the last prefixed line to keep the block bounded.
+  let diagnosticStart = -1
+  for (const match of raw.matchAll(DIAGNOSTIC_LINE_PATTERN)) {
+    diagnosticStart = match.index
+  }
+  if (diagnosticStart !== -1) {
+    return raw.slice(diagnosticStart).trim()
+  }
+
   return extractTailLine(raw)
 }
 

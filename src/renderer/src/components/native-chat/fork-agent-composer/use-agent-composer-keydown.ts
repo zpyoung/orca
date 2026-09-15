@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/use-native-chat-composer-keydown.ts
-// FORK-COPY-SHA: f352b6b08d9028ba8b577d6ac8a8247c2a6c9c92
+// FORK-COPY-SHA: 776e424e76405a06851dd9ec9ff3b58ffbdb3eea
 import { useCallback, type Dispatch, type KeyboardEventHandler, type SetStateAction } from 'react'
 import { recallNext, recallPrevious, type HistoryState } from './agent-composer-history'
 import type { ComposerAutocomplete, NativeChatPickerItem } from '../native-chat-composer-state'
@@ -48,7 +48,7 @@ export function useAgentComposerKeyDown({
         return
       }
 
-      if (autocomplete.mode === 'slash' || autocomplete.mode === 'skill') {
+      if (autocomplete.mode === 'slash') {
         const items = autocomplete.items
         if (event.key === 'ArrowDown' && items.length > 0) {
           event.preventDefault()
@@ -63,7 +63,9 @@ export function useAgentComposerKeyDown({
         if ((event.key === 'Enter' || event.key === 'Tab') && items.length > 0) {
           event.preventDefault()
           const item = items[activeSuggestion] ?? items[0]
-          if (event.key === 'Enter' && item.kind === 'command') {
+          // A mid-prompt command is part of the sentence being written, so Enter
+          // completes the token instead of sending the command on its own.
+          if (event.key === 'Enter' && item.kind === 'command' && autocomplete.dispatchable) {
             dispatchPickerCommand(item)
           } else {
             completePickerItem(item)

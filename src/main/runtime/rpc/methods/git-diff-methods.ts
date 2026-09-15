@@ -1,4 +1,4 @@
-import { defineMethod, type RpcMethod } from '../core'
+import { defineMethod } from '../core'
 import { remoteRpcContentBudget } from '../../../../shared/remote-rpc-content-budget'
 import { GitBranchDiff, GitCommitDiff, GitDiff } from './git-params'
 
@@ -11,17 +11,18 @@ function remoteDiffContentBudget(
   return clientKind && requestId ? remoteRpcContentBudget(requestId) : undefined
 }
 
-export const GIT_DIFF_METHODS: RpcMethod[] = [
+export const GIT_DIFF_METHODS = [
   defineMethod({
     name: 'git.diff',
     params: GitDiff,
-    handler: async (params, { runtime, clientKind, requestId }) =>
+    handler: async (params, { runtime, clientKind, requestId, signal }) =>
       runtime.getRuntimeGitDiff(
         params.worktree,
         params.filePath,
         params.staged,
         params.compareAgainstHead,
-        remoteDiffContentBudget(clientKind, requestId)
+        remoteDiffContentBudget(clientKind, requestId),
+        signal
       )
   }),
   defineMethod({

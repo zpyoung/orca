@@ -7,6 +7,39 @@ manifest `exceptions[]` row (`status: "pending-upstream"`, `ledger` pointing at 
 anchor) are created and removed together — see `config/scripts/fork-ownership-manifest.mjs` for
 the invariant this enforces.
 
+## POSIX lookup test startup isolation
+
+**What:** runs the zsh lookup case with `-f` so user startup files cannot replace the fixture
+PATH. The existing alias/function-mask regression uses a temporary executable and a controlled
+`.zshenv` that overwrites PATH, making the failure reproducible on clean sandbox hosts.
+
+**Why upstream, not isolated:** this fixes upstream test isolation, not shipped lookup behavior.
+The existing suite should remain the single source of coverage.
+
+**Paths:** `src/shared/posix-command-path-lookup.test.ts`.
+
+**Orca ledger:** `bug-3`.
+## Git multiline diagnostics
+
+**Ledger:** bug-47.
+
+**What:** preserves Git's diagnostic block from the last `fatal:` or `error:` line,
+including continuation lines such as the filesystem-discovery explanation. Command
+wrappers and preceding progress output remain excluded, credentials remain redacted,
+and unprefixed failures retain the last-nonempty-line fallback.
+
+**Why upstream, not isolated:** this corrects the existing shared normalizer used by
+local and SSH Git operations, including non-repository folder workspaces. A forked
+copy would duplicate the same error policy. No Git command or wire schema changes;
+older clients continue to receive an ordinary error string.
+
+**Paths:**
+
+- `src/shared/git-remote-error.ts`
+- `src/shared/git-remote-error.test.ts`
+
+**Status:** pending-upstream. Not yet submitted.
+
 ## Retention fix
 
 **What:** `useNativeChatRetainedSession` blanks a retained transcript while a fresh read is
@@ -85,7 +118,7 @@ test file.
 `react-doctor/no-ref-current-in-render`, `react-doctor/no-effect-with-fresh-deps` and
 `react-doctor/no-prop-callback-in-render` default to `error` in the CLI but are absent from
 `config/oxlint-react-doctor.json`, the repo's curated React Doctor rule list, where every listed
-rule runs at `warn`. `react-doctor/effect-needs-cleanup` is stranger still: it *is* on that list at
+rule runs at `warn`. `react-doctor/effect-needs-cleanup` is stranger still: it _is_ on that list at
 `warn`, so the CLI running it at `error` contradicts the severity the repo declares for it. Both fire only on deliberate,
 upstream-authored patterns: latest-value refs written during render, a render-phase array-identity
 cache, and test harnesses whose inline ref literals are the fixture under test. Setting them to
@@ -115,7 +148,7 @@ The `package.json` severities need no `exceptions` row of their own; the file is
 
 The v1.4.193 sync added the last three. The first two are the same shape as the originals — a
 `node:buffer` import and a template literal, on lines the merge touched. The third is different in
-kind: `use-checks-list-state.tsx` wrote `autoExpandedContextRef` *inside* a `setExpandedCheckKeys`
+kind: `use-checks-list-state.tsx` wrote `autoExpandedContextRef` _inside_ a `setExpandedCheckKeys`
 updater, and React may run an updater more than once, so the write is hoisted into the effect that
 queues it. That one is a genuine correctness fix to upstream's hook and worth submitting on its own
 merits, not just to clear the gate.
@@ -256,5 +289,158 @@ file.
 **Paths:**
 
 - `src/main/runtime/structured-agent-session-integration.test.ts`
+
+**Status:** pending-upstream. Not yet submitted.
+
+## bug-2 Relay and SSH environment-dependent failures
+
+**Ledger:** `bug-2`.
+
+**What:** The POSIX GC regression feeds more than 1 MiB of upload-stage paths through the real
+shell filter before enumerating two real install directories. It no longer creates and removes
+15,197 directories merely to generate listing volume; the output must still contain only the two
+install names and remain below 1 KiB.
+
+**Why upstream, not isolated:** this repairs an existing upstream regression fixture in place. A
+fork copy would duplicate the suite without a seam.
+
+**Paths:**
+
+- `src/main/ssh/ssh-remote-commands.test.ts`
+
+**Status:** pending-upstream. Not yet submitted. `bug-2` stays open: this closes the POSIX GC
+failure only. The `git-handler` upstreamStatus failure is `bug-47`, and the two
+`agent-exec-handler` spawn-arg failures are host `GIT_CONFIG_*` bleed, still unaddressed.
+## Git diff request cancellation
+
+**Ledger:** `bug-12`.
+
+**What:** repository probes carry their abort signal through the renderer, token-scoped
+`git:cancelDiff` IPC, runtime RPC, SSH transport, and host-side Git blob reads. Closing or
+retargeting a handoff must cancel the diff request, not merely discard its eventual result.
+Cancellation is scoped to the requesting sender and must not stop unrelated diff consumers.
+
+**Why upstream, not isolated:** the missing cancellation spans upstream's existing Git diff
+API and subprocess execution path. Forking those modules would duplicate the Git transport
+and execution stack; adding optional cancellation to the existing path preserves callers
+that do not supply a signal.
+
+**Paths:**
+
+- `src/renderer/src/runtime/runtime-git-diff-client.ts`
+- `src/renderer/src/web/preload-api/web-git-api.ts`
+- `src/preload/api/git-bridge.ts`
+- `src/preload/api/git-inspection-api.ts`
+- `src/main/ipc/filesystem.ts`
+- `src/main/ipc/filesystem/filesystem-handler-context.ts`
+- `src/main/ipc/filesystem/filesystem-git-status-handlers.ts`
+- `src/main/providers/git-provider-contract.ts`
+- `src/main/providers/ssh-git-read-provider.ts`
+- `src/main/runtime/runtime-git-diff-commands.ts`
+- `src/main/runtime/rpc/methods/git-diff-methods.ts`
+- `src/main/git/command-runner/git-exec-file.ts`
+- `src/main/git/source-control/git-read-cache-invalidation.ts`
+- `src/main/git/source-control/file-diff.ts`
+- `src/main/git/source-control/git-blob-read.ts`
+- `src/main/git/source-control/submodule-paths.ts`
+- `src/relay/git-handler-operation-context.ts`
+- `src/relay/git-handler.ts`
+- `src/relay/git-handler-ops.ts`
+- `src/relay/git-handler-read-operations.ts`
+- `src/relay/git-handler-submodule-ops.ts`
+
+**Regression coverage:**
+
+- `src/main/ipc/filesystem-git-status-staging.test.ts`
+- `src/main/providers/ssh-git-provider-diff.test.ts`
+- `src/main/runtime/rpc/methods/git.test.ts`
+- `src/main/runtime/orca-runtime-git-diff-budget.test.ts`
+- `src/relay/git-handler-diff-read-coalescing.test.ts`
+- `src/main/runtime/runtime-rpc-mobile-method-allowlist.test.ts`
+- `src/main/runtime/rpc/methods/git-diff-transport-budget.test.ts`
+- `src/main/git/status-submodule-path-cache.test.ts`
+- `src/relay/git-handler-submodule-ops.test.ts`
+- `src/main/git/status-diff-settled-cache.test.ts`
+- `src/renderer/src/web/web-preload-api-git.test.ts`
+
+The handoff caller and its cancellation regression remain in the existing
+`fork-session-handoff` feature.
+Cancelled submodule discovery is not cached as an empty result, so an immediate retry
+retains the correct submodule diff route.
+
+**Compatibility:** reuse existing RPC cancellation and stream teardown; do not add a wire
+opcode or require a new field from older peers. Cancellation of host subprocesses requires
+the host-side fix as well as the caller-side signal.
+## bug-35
+
+**What:** the macOS press-and-hold startup routine treated only `com.stablyai.orca` and its
+dot-children as Orca preference domains. The fork ships its packaged app as `com.zpyoung.orca`, so
+the routine recorded `foreign-bundle` and never applied the key-repeat default. The ownership check
+now accepts both exact namespace roots and their dot-children. Unit coverage pins both namespaces
+and rejects lookalike or unrelated identifiers; the startup E2E recognizes either packaged
+identity, and the reference commands use the fork's shipped domain.
+
+An earlier `foreign-bundle` record needs no migration or deletion. It is a non-terminal decision,
+so startup already retries it on every launch and applies the default once the packaged fork domain
+is recognized.
+
+**Why upstream, not isolated:** the domain gate is part of upstream's startup routine and shares its
+one-time record, explicit-user-value preservation, and conservative `defaults(1)` failure handling.
+Forking that routine merely to add one owned namespace would duplicate the safety-critical state
+machine. The narrow two-root allowlist changes no other identity policy: the upstream/development
+namespace remains accepted, and only exact roots or dot-delimited children qualify.
+
+**Paths:**
+
+- `src/main/macos-press-and-hold-default.ts`
+- `src/main/macos-press-and-hold-default.test.ts`
+- `tests/e2e/macos-press-and-hold-startup.spec.ts`
+- `docs/reference/macos-press-and-hold.md`
+
+**Depends on:** the fork's packaged app ID is `com.zpyoung.orca`; upstream and development builds
+continue to use `com.stablyai.orca` or a dot-suffixed child.
+## Draft RC recovery recognizes fork tags
+
+**What:** the interrupted-release publisher accepts both upstream RC tags
+(`vMAJOR.MINOR.PATCH-rc.N`) and the fork's corresponding release tags with exactly one optional
+`.zyNN` suffix. Its tests preserve the bot-authored draft gate, reject malformed suffixes, exercise
+current and stale upstream and fork tags, and prove through the real required-asset verifier that an
+artifact-less draft remains private.
+
+**Ledger:** `bug-14`, repaired together with `bug-48` in the fork-owned release workflow.
+
+**Why upstream, not isolated:** candidate recognition is one predicate inside upstream's existing
+recovery publisher, ahead of its current-ref and asset-completeness safety gates. Isolating the
+predicate would require a forked publisher or a parallel pre-filter that can drift from those
+guards; the narrowly anchored optional suffix preserves upstream's tag behavior while recognizing
+the fork's release identifier.
+
+**Paths:**
+
+- `config/scripts/publish-complete-draft-releases.mjs`
+- `config/scripts/publish-complete-draft-releases.test.mjs`
+## Reattach input quarantine
+
+**Ledger:** `bug-1`.
+
+**What:** arms terminal-tab input quarantine before a remote pane binds a replacement shell.
+An ordinary provider-handle rotation with the same shell remains unquarantined. Host-pane
+recovery arms it in the transport that issued the `terminal.recoverPane` call, so missing
+incarnation metadata or a handle an older host reuses cannot bypass the guard; the rebind
+callback and the remote wire protocol are both unchanged.
+
+Native-chat eligibility and runtime sends also honor that tab's quarantine. Reattachment
+invalidates queued bodies, paced answers, and delayed submit writes rather than replaying them
+when quarantine expires. Cancellation must not write cleanup bytes into the replacement shell.
+
+**Why upstream, not isolated:** both defects cross existing upstream terminal binding and
+native-chat write boundaries. A parallel binding or send implementation would leave callers
+able to bypass the safety guard. The existing fork composer is updated at the same boundary;
+new quarantine-specific logic and regressions live under `fork-input-quarantine/`.
+
+**Paths:** the `bug-1` exceptions in `config/fork-ownership.json` cover the terminal transport,
+PTY binding, native-chat eligibility, send queue, and migrated consumers/tests. The
+`input-quarantine` feature owns its isolated logic and regressions; existing composer changes
+remain under the `agent-composer` feature.
 
 **Status:** pending-upstream. Not yet submitted.

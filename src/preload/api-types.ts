@@ -1,4 +1,3 @@
-import type { ElectronAPI } from '@electron-toolkit/preload'
 import type { AskRegistryEvent } from '../shared/fork-ask-question-tool/ask-question-schema'
 import type { ClaudeSuppressionVerdict } from '../shared/fork-ask-question-tool/claude-suppression-verdict'
 import type {
@@ -222,7 +221,6 @@ import type { ForkSessionInfoApi } from './fork-session-info/session-info-preloa
 declare global {
   // oxlint-disable-next-line typescript-eslint/consistent-type-definitions -- declaration merging requires interface
   interface Window {
-    electron: ElectronAPI
     api: PreloadApi
   }
 }

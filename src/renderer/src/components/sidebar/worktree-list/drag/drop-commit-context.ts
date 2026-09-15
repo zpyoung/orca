@@ -34,8 +34,10 @@ export type WorktreeDropCommitContext = {
     draggedIds: readonly string[]
   ) => WorktreeSidebarLineageDropTarget
   commitWorktreeLineageParentDrop: (draggedIds: readonly string[], parentId: string) => boolean
-  trackWorktreeGroupMembershipDragFrame: (drag: WorktreePointerDrag) => boolean
-  commitWorktreeGroupMembershipDrop: (event: PointerEvent, drag: WorktreePointerDrag) => boolean
+  // Optional: upstream's own drag suites build this context with partial doubles that
+  // know nothing about worktree groups, so requiring them would fail those tests.
+  trackWorktreeGroupMembershipDragFrame?: (drag: WorktreePointerDrag) => boolean
+  commitWorktreeGroupMembershipDrop?: (event: PointerEvent, drag: WorktreePointerDrag) => boolean
   clearReorderedWorktreeParents: (args: {
     draggedIds: readonly string[]
     sourceGroupKey: string

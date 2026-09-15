@@ -58,6 +58,30 @@ describe('ensureMacPressAndHoldDefault', () => {
     expect(records.at(-1)?.decision).toBe('applied')
   })
 
+  it('recovers a rejected fork bundle and applies the default only once', () => {
+    const domain = 'com.zpyoung.orca'
+    const { host, writes, records } = createHost({
+      resolveBundleIdentifier: () => domain,
+      record: { ...terminalRecord('foreign-bundle'), domain }
+    })
+
+    expect(ensureMacPressAndHoldDefault(host)).toBe('applied')
+    expect(writes).toEqual([{ domain, value: false }])
+    expect(records.at(-1)?.decision).toBe('applied')
+    expect(ensureMacPressAndHoldDefault(host)).toBe('already-decided')
+    expect(writes).toEqual([{ domain, value: false }])
+  })
+
+  it('preserves an explicit preference in the fork domain', () => {
+    const { host, writes } = createHost({
+      resolveBundleIdentifier: () => 'com.zpyoung.orca',
+      readDomainPreference: () => 'set'
+    })
+
+    expect(ensureMacPressAndHoldDefault(host)).toBe('kept-user-preference')
+    expect(writes).toEqual([])
+  })
+
   describe('platform guard', () => {
     for (const platform of ['win32', 'linux'] as const) {
       it(`does nothing at all on ${platform}`, () => {
@@ -143,6 +167,9 @@ describe('ensureMacPressAndHoldDefault', () => {
     it('accepts Orca and its channel-scoped bundles, and nothing else', () => {
       expect(isOrcaPreferencesDomain('com.stablyai.orca')).toBe(true)
       expect(isOrcaPreferencesDomain('com.stablyai.orca.dev')).toBe(true)
+      expect(isOrcaPreferencesDomain('com.zpyoung.orca')).toBe(true)
+      expect(isOrcaPreferencesDomain('com.zpyoung.orca.local')).toBe(true)
+      expect(isOrcaPreferencesDomain('com.zpyoung.orcafake')).toBe(false)
       expect(isOrcaPreferencesDomain('com.github.Electron')).toBe(false)
       // Why: a prefix test without the dot would accept a lookalike bundle id.
       expect(isOrcaPreferencesDomain('com.stablyai.orcafake')).toBe(false)

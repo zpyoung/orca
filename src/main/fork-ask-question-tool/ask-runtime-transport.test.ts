@@ -16,6 +16,7 @@ type AskRegistryInternals = {
 }
 
 function waiterCount(registry: AskRegistry, askId: string): number {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: AskRegistry exposes no waiter count; `live` is its own private field and this reads only the set's size.
   return (registry as unknown as AskRegistryInternals).live.get(askId)?.waiters.size ?? 0
 }
 

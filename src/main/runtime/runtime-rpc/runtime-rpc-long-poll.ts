@@ -29,7 +29,7 @@ export function classifyRuntimeLongPoll(request: RpcRequest): RuntimeLongPollCla
   if (request.method === 'browser.clientHost.attach') {
     return 'browser-host'
   }
-  if (request.method === 'terminal.wait') {
+  if (request.method === 'terminal.wait' || request.method === 'ask.wait') {
     return 'wait'
   }
   // Agent-prompt submission waits for the PTY's lifecycle transition (up to
@@ -49,10 +49,6 @@ export function classifyRuntimeLongPoll(request: RpcRequest): RuntimeLongPollCla
   // waiter when the asking client disconnects.
   if (request.method === 'orchestration.ask') {
     return 'ask'
-  }
-  // Why: 'ask' would spend orchestration.ask's reservation on human-blocked waits; the fork's own ask-wait gate meters these.
-  if (request.method === 'ask.wait') {
-    return 'wait'
   }
   if (request.method === 'orchestration.check') {
     const params = request.params as { wait?: unknown } | undefined

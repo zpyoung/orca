@@ -201,18 +201,39 @@ describe('git RPC methods', () => {
       })
     )
 
-    // A local dispatch sets no clientKind, so the transport budget stays undefined.
+    // A local dispatch sets no clientKind and no signal, so both trailing arguments stay undefined.
     expect(runtime.getRuntimeGitDiff).toHaveBeenCalledWith(
       'id:wt-1',
       'src/index.ts',
       false,
       true,
+      undefined,
       undefined
     )
     expect(response).toMatchObject({
       ok: true,
       result: { kind: 'text', modifiedContent: 'hello' }
     })
+
+    const controller = new AbortController()
+    await dispatcher.dispatch(
+      makeRequest('git.diff', {
+        worktree: 'id:wt-1',
+        filePath: 'src/index.ts',
+        staged: false,
+        compareAgainstHead: true
+      }),
+      { signal: controller.signal }
+    )
+
+    expect(runtime.getRuntimeGitDiff).toHaveBeenLastCalledWith(
+      'id:wt-1',
+      'src/index.ts',
+      false,
+      true,
+      undefined,
+      controller.signal
+    )
   })
 
   it('returns bounded git history for a selected worktree', async () => {

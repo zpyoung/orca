@@ -1,6 +1,7 @@
 import { getSettingsForWorktreeRuntimeOwner } from '@/lib/worktree-runtime-owner'
 import type { WorktreeRuntimeOwnerState } from '@/lib/worktree-runtime-owner'
 import type { GitStatusEntry, GitStatusResult } from '../../../../shared/git-status-types'
+import type { GitDiffResult } from '../../../../shared/git-diff-compare-types'
 import { getRuntimeGitDiff, getRuntimeGitStatus } from '@/runtime/runtime-git-client'
 import type { RuntimeGitContext } from '@/runtime/runtime-git-client'
 import { FORK_HANDOFF_DIFF_CHAR_CAP, type HandoffRepoStateBlock } from './handoff-brief-composer'
@@ -92,7 +93,8 @@ async function fetchDiffBodies(args: {
     }
     const result = await getRuntimeGitDiff(args.context, {
       filePath: entry.path,
-      staged: entry.area === 'staged'
+      staged: entry.area === 'staged',
+      signal: args.signal
     })
     args.signal?.throwIfAborted()
     const section = formatDiffSection(entry, result)
@@ -110,10 +112,7 @@ async function fetchDiffBodies(args: {
   return { bodies: bodies || null, truncated }
 }
 
-function formatDiffSection(
-  entry: GitStatusEntry,
-  result: Awaited<ReturnType<typeof getRuntimeGitDiff>>
-): string {
+function formatDiffSection(entry: GitStatusEntry, result: GitDiffResult): string {
   const path = entry.oldPath ? `${entry.oldPath} -> ${entry.path}` : entry.path
   const heading = `### ${entry.area}: ${entry.status} ${path}`
   if (result.kind === 'binary') {

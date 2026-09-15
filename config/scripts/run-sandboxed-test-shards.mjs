@@ -39,6 +39,7 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 
 const PROJECT_DIR = path.resolve(import.meta.dirname, '../..')
@@ -54,26 +55,43 @@ const IMAGE_CONTEXT_ROOTS = [
   'pnpm-workspace.yaml'
 ]
 
-/**
- * Specs pr.yml keeps out of the sharded lane because they drive real shells at
- * maxWorkers=1. Kept identical so a sandbox run covers exactly what CI covers.
- */
+/** Matches the serialized shell-contract selection in pr.yml. */
 const SHELL_CONTRACT_SPECS = [
   'src/main/daemon/repro-13767-shell-ready-marker-lost-to-exec.test.ts',
   'src/main/daemon/shell-ready.test.ts',
   'src/main/daemon/node-pty-fd-leak.test.ts',
-  'src/main/providers/local-pty-shell-ready.test.ts',
+  'src/main/providers/local-pty-shell-ready-zsh-launch-environment.test.ts',
   'src/main/providers/__tests__/shell-ready-framework-example.test.ts',
+  'src/main/pty/codex-shell-launch-preflight.test.ts',
+  'src/main/pty/omp-shell-wrapper-alias-safety.test.ts',
   'src/main/pty/omp-shell-wrapper.node-pty.test.ts',
+  'src/main/shell-startup-feature-channel.test.ts',
+  'src/main/terminal-history-fish-session.node-pty.test.ts',
+  'src/main/zsh-scoped-histfile.live-shell.test.ts',
+  'src/main/zsh-startup-hook-user-config-equivalence.live-shell.test.ts',
+  'src/main/zsh-wrapper-version-mismatch.live-shell.test.ts',
   'src/renderer/src/components/terminal-pane/fish-color-scheme-child-stdin.node-pty.test.ts',
+  'src/shared/fish-query-reply-child-stdin.node-pty.test.ts',
+  'src/shared/pty-reply-echo-shapes.node-pty.test.ts',
+  'src/shared/startup-shell-portability.live-shell.test.ts',
   'src/shared/posix-command-path-lookup.test.ts'
 ]
 
-const UNIT_EXCLUDES = [...SHELL_CONTRACT_SPECS, 'tests/e2e/cross-version-wire/**']
+/** The preflight and alias-safety suites also run in CI's unit lane. */
+const UNIT_EXCLUDES = [
+  ...SHELL_CONTRACT_SPECS.filter(
+    (spec) =>
+      spec !== 'src/main/pty/codex-shell-launch-preflight.test.ts' &&
+      spec !== 'src/main/pty/omp-shell-wrapper-alias-safety.test.ts'
+  ),
+  'tests/e2e/cross-version-wire/**'
+]
 
 const LANES = new Set(['unit', 'shell', 'e2e'])
 
-main()
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main()
+}
 
 function main() {
   const options = readOptions()
@@ -385,7 +403,7 @@ function laneEnvArgs(lane) {
   return []
 }
 
-function laneCommand(options, shard) {
+export function laneCommand(options, shard) {
   if (options.lane === 'shell') {
     return [
       'pnpm',

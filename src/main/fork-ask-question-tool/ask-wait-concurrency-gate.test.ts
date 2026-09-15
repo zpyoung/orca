@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { ASK_LONG_POLL_SHARE, LONG_POLL_CAP } from '../runtime/runtime-rpc/runtime-rpc-long-poll'
 import { ASK_WAIT_CONCURRENCY_CAP, createAskWaitConcurrencyGate } from './ask-wait-concurrency-gate'
 
 function deferred(): {
@@ -72,7 +73,8 @@ describe('ask wait concurrency gate', () => {
     await running
   })
 
-  it('leaves the majority of the long-poll budget to other classes', () => {
-    expect(ASK_WAIT_CONCURRENCY_CAP).toBe(4)
+  it('cannot fill the long-poll budget together with orchestration asks', () => {
+    const orchestrationAskCap = Math.floor(LONG_POLL_CAP * ASK_LONG_POLL_SHARE)
+    expect(ASK_WAIT_CONCURRENCY_CAP + orchestrationAskCap).toBeLessThan(LONG_POLL_CAP)
   })
 })

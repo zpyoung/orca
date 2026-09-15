@@ -308,7 +308,7 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       // one lands as literal text.
       sendTypedCommand: (target, text) =>
         agent === 'codex' && isSlashCommandDraft(text)
-          ? sendNativeChatTypedCommand(target.settings, target.ptyId, text)
+          ? sendNativeChatTypedCommand(target, text)
           : null,
       buildSendOptions: () =>
         resolveNativeChatLaunchDraftSend({

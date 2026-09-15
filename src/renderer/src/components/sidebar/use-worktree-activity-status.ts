@@ -9,8 +9,10 @@ import {
   selectRuntimePaneTitlesForWorktree
 } from './worktree-card-status-inputs'
 import { selectWorktreeAgentActivitySummary } from './worktree-agent-activity-summary'
+import { selectWorktreeHasPendingAsk } from '../fork-ask-question-tool/pending-ask-attention'
 
 export function useWorktreeActivityStatus(worktreeId: string): WorktreeStatus {
+  const hasPendingAsk = useAppStore((s) => selectWorktreeHasPendingAsk(s, worktreeId))
   const tabs = useAppStore((s) => s.tabsByWorktree[worktreeId] ?? EMPTY_TABS)
   const browserTabs = useAppStore((s) => s.browserTabsByWorktree[worktreeId] ?? EMPTY_BROWSER_TABS)
   const runtimePaneTitlesForWorktree = useAppStore(
@@ -46,7 +48,7 @@ export function useWorktreeActivityStatus(worktreeId: string): WorktreeStatus {
         agentStatusPaneIdsByTabId,
         stalePaneIdsByTabId,
         terminalLayoutRootsByTabId,
-        hasPermission,
+        hasPermission: hasPermission || hasPendingAsk,
         hasLiveWorking,
         hasLiveMonitoring,
         hasInterrupted,
@@ -62,6 +64,7 @@ export function useWorktreeActivityStatus(worktreeId: string): WorktreeStatus {
       stalePaneIdsByTabId,
       terminalLayoutRootsByTabId,
       hasPermission,
+      hasPendingAsk,
       hasLiveWorking,
       hasLiveMonitoring,
       hasInterrupted,

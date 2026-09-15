@@ -654,7 +654,8 @@ jobs:
               if [[ -z "$highest_rc" ]]; then
                 new="${base}-rc.0"
               else
-                existing_rc_tag="v${base}-rc.${highest_rc}"
+                highest_suffix="$(highest_fork_suffix_for_rc "$base" "$highest_rc")"
+                printf -v existing_rc_tag 'v%s-rc.%s.zy%02d' "$base" "$highest_rc" "$highest_suffix"
                 # Why: a failed or GitHub-stuck run can leave the highest RC
                 # tag attached to a draft/missing release. Resume only when it
                 # was cut from this ref; stale attempts advance to rc.N+1.
@@ -1172,6 +1173,8 @@ jobs:
       # Electron binary from GitHub release assets. GitHub's download CDN
       # occasionally returns 504s that fail the whole release. Retry on
       # failure so transient network errors don't require a manual re-run.
+      # Why host-only: this job packages only for its own runner OS and
+      # architecture, so the default host-scoped install is deliberate.
       - name: Install dependencies
         uses: nick-fields/retry@v4
         with:

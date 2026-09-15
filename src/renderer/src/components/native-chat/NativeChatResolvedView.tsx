@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNativeChatComposerRevealFocus } from './use-native-chat-composer-reveal-focus'
 import { useAppStore } from '../../store'
 import { useNativeChatLaunchDraftSignal } from './use-native-chat-launch-draft-adoption'
 import { useNativeChatRetainedSession } from './use-native-chat-retained-session'
@@ -66,6 +67,7 @@ export function NativeChatResolvedView({
   sessionId,
   transcriptPath,
   isVisible,
+  isFocusedGroup,
   targetPtyId,
   terminalTabId,
   ownsTabWideLaunchDraft,
@@ -116,7 +118,7 @@ export function NativeChatResolvedView({
   const hookWorkingEpoch = useAppStore(
     (s) => s.agentStatusByPaneKey[paneKey]?.stateStartedAt ?? null
   )
-  const canSend = useNativeChatCanSend(targetPtyId)
+  const canSend = useNativeChatCanSend(terminalTabId, targetPtyId)
   // Reuse the verified composer send path for interactive cards and composer
   // stop (Stop sends ESC, the agent-TUI interrupt key).
   const interactiveSend = useNativeChatInteractiveSend(terminalTabId, paneKey, targetPtyId, agent)
@@ -134,6 +136,13 @@ export function NativeChatResolvedView({
     rootRef,
     composerRef,
     questionAnswerInputRef
+  })
+  useNativeChatComposerRevealFocus({
+    rootRef,
+    composerRef,
+    isVisible,
+    isFocusedGroup,
+    composerReady: !questionActive && targetPtyId !== null && canSend
   })
   const contextMenu = useNativeChatContextMenu({
     rootRef,
@@ -412,9 +421,8 @@ export function NativeChatResolvedView({
         onShowingQuestionChange={setQuestionActive}
         answerInputRef={questionAnswerInputRef}
       />
-      {/* canSend reflects the mobile presence-lock: when a mobile client holds
-          the pty, the composer shows its guarded state instead of racing the
-          mobile driver (R8). */}
+      {/* canSend reflects both the tab's fresh-shell quarantine and the mobile
+          presence-lock, so native chat cannot race either input owner. */}
       {questionActive ? null : (
         <NativeChatComposer
           ref={composerRef}

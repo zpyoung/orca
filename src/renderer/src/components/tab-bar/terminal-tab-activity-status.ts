@@ -135,6 +135,7 @@ function parseAgentStatusPaneKey(paneKey: string): { tabId: string; paneId: stri
 const EMPTY_PANE_IDS: ReadonlySet<string> = new Set()
 
 type TerminalTabActivityInput = {
+  hasPendingAsk?: boolean
   // Why: launchAgent is read, not just carried — the status gate needs it to attribute a
   // bare spinner title to an agent (#9040). Narrowing it away here compiles (it is optional)
   // but silently drops the tab-bar dot back to the pre-#9040 behavior.
@@ -155,6 +156,7 @@ type TerminalTabActivityInput = {
  * Returns a `WorktreeStatus` primitive so the tab re-renders only when it flips.
  */
 export function resolveTerminalTabActivityStatus({
+  hasPendingAsk,
   tab,
   agentStatusByPaneKey,
   agentStatusEpoch,
@@ -171,7 +173,7 @@ export function resolveTerminalTabActivityStatus({
     agentStatusPaneIdsByTabId: { [tab.id]: flags?.paneIds ?? EMPTY_PANE_IDS },
     stalePaneIdsByTabId: { [tab.id]: flags?.stalePaneIds ?? EMPTY_PANE_IDS },
     terminalLayoutsByTabId: terminalLayout ? { [tab.id]: terminalLayout } : undefined,
-    hasPermission: flags?.hasPermission ?? false,
+    hasPermission: hasPendingAsk || (flags?.hasPermission ?? false),
     hasLiveWorking: flags?.hasLiveWorking ?? false,
     hasLiveMonitoring: flags?.hasLiveMonitoring ?? false,
     hasInterrupted: flags?.hasInterrupted ?? false,
