@@ -17,14 +17,18 @@ function pendingAskCountLabel(count: number): string {
       )
 }
 
-/** Sidebar-wide count of asks still awaiting an answer, across every pane (tech.md § C8). */
+/** Counts asks awaiting an answer across every pane. */
 export function AskPendingCountBadge(): React.JSX.Element | null {
   const count = useAppStore(selectPendingAskCount)
   if (count === 0) {
     return null
   }
   return (
-    <Badge variant="secondary" className="text-agent-question" aria-label={pendingAskCountLabel(count)}>
+    <Badge
+      variant="secondary"
+      className="text-agent-question"
+      aria-label={pendingAskCountLabel(count)}
+    >
       {count}
     </Badge>
   )

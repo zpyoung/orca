@@ -81,7 +81,13 @@ export function HandoffTemplatesPane(): React.JSX.Element {
       .settings?.forkSessionHandoff?.templates?.find(
         (template) => template.id === editor.template.id
       )
-    return saved?.name === values.name.trim() && saved.body === values.body.trim()
+    if (saved?.name !== values.name.trim() || saved.body !== values.body.trim()) {
+      toast.error(
+        translate('components.settings.forkSessionHandoff.saveFailed', 'Could not save templates')
+      )
+      return false
+    }
+    return true
   }
 
   const remove = async (template: ForkSessionHandoffTemplate): Promise<void> => {
