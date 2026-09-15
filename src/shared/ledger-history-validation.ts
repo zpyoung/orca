@@ -13,7 +13,11 @@ import {
   validOwner
 } from './ledger-validation-primitives'
 
-function validSnapshot(snapshot: unknown): boolean {
+function validOptionalEnum(value: unknown, allowed: readonly unknown[]): boolean {
+  return value === undefined || allowed.includes(value)
+}
+
+function validSnapshot(snapshot: unknown, type: LedgerEntryType): boolean {
   if (snapshot === null) {
     return true
   }
@@ -27,9 +31,9 @@ function validSnapshot(snapshot: unknown): boolean {
   }
   const content = snapshot.content
   return (
-    (content.severity === undefined || SEVERITIES.includes(content.severity as never)) &&
-    (content.priority === undefined || PRIORITIES.includes(content.priority as never)) &&
-    (content.status === undefined || DECISION_STATUSES.includes(content.status as never))
+    (type !== 'bug' || validOptionalEnum(content.severity, SEVERITIES)) &&
+    (type !== 'deferred' || validOptionalEnum(content.priority, PRIORITIES)) &&
+    (type !== 'decision' || validOptionalEnum(content.status, DECISION_STATUSES))
   )
 }
 
@@ -87,8 +91,8 @@ export function validLedgerEntry(value: unknown): value is LedgerEntry {
       !isoDate(change.at) ||
       !validActor(change.actor) ||
       !Array.isArray(change.changedFields) ||
-      !validSnapshot(change.before) ||
-      !validSnapshot(change.after)
+      !validSnapshot(change.before, type) ||
+      !validSnapshot(change.after, type)
     ) {
       return false
     }
