@@ -399,6 +399,26 @@ namespace remains accepted, and only exact roots or dot-delimited children quali
 
 **Depends on:** the fork's packaged app ID is `com.zpyoung.orca`; upstream and development builds
 continue to use `com.stablyai.orca` or a dot-suffixed child.
+## Draft RC recovery recognizes fork tags
+
+**What:** the interrupted-release publisher accepts both upstream RC tags
+(`vMAJOR.MINOR.PATCH-rc.N`) and the fork's corresponding release tags with exactly one optional
+`.zyNN` suffix. Its tests preserve the bot-authored draft gate, reject malformed suffixes, exercise
+current and stale upstream and fork tags, and prove through the real required-asset verifier that an
+artifact-less draft remains private.
+
+**Ledger:** `bug-14`, repaired together with `bug-48` in the fork-owned release workflow.
+
+**Why upstream, not isolated:** candidate recognition is one predicate inside upstream's existing
+recovery publisher, ahead of its current-ref and asset-completeness safety gates. Isolating the
+predicate would require a forked publisher or a parallel pre-filter that can drift from those
+guards; the narrowly anchored optional suffix preserves upstream's tag behavior while recognizing
+the fork's release identifier.
+
+**Paths:**
+
+- `config/scripts/publish-complete-draft-releases.mjs`
+- `config/scripts/publish-complete-draft-releases.test.mjs`
 ## Reattach input quarantine
 
 **Ledger:** `bug-1`.

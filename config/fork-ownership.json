@@ -134,9 +134,14 @@
       "globs": ["**/fork-skills-repository/**"]
     },
     {
-      "name": "input-quarantine",
-      "purpose": "Prevents stale terminal and native-chat input from reaching a replacement PTY after reattachment.",
-      "globs": ["**/fork-input-quarantine/**"]
+      "name": "release-recovery",
+      "purpose": "Covers fork release automation that recovers interrupted RC cuts by resuming only current, complete draft releases.",
+      "globs": ["**/fork-release-recovery/**"]
+    },
+    {
+      "name": "computer-peer-identity",
+      "purpose": "Authorizes the packaged fork's macOS computer-use peer without broadening bundle-prefix trust.",
+      "globs": ["**/fork-computer-peer-identity/**"]
     },
     {
       "name": "release-routing",
@@ -149,9 +154,9 @@
       "globs": ["**/fork-dev-tcc/**"]
     },
     {
-      "name": "computer-peer-identity",
-      "purpose": "Authorizes the packaged fork's macOS computer-use peer without broadening bundle-prefix trust.",
-      "globs": ["**/fork-computer-peer-identity/**"]
+      "name": "input-quarantine",
+      "purpose": "Prevents stale terminal and native-chat input from reaching a replacement PTY after reattachment.",
+      "globs": ["**/fork-input-quarantine/**"]
     }
   ],
   "seams": [
@@ -3674,6 +3679,12 @@
       ]
     },
     {
+      "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift",
+      "feature": "computer-peer-identity",
+      "kind": "registration",
+      "lines": ["    return isTrustedComputerPeerBundleIdentifier(bundleId)"]
+    },
+    {
       "path": "src/main/runtime/runtime-rpc/runtime-rpc-long-poll.ts",
       "feature": "ask-question-tool",
       "kind": "registration",
@@ -3720,207 +3731,9 @@
         "      'https://github.com/zpyoung/orca/releases/tag/v1.4.160-rc.3'",
         "    expect(getReleaseNotesUrlForVersion(null)).toBe('https://github.com/zpyoung/orca/releases')"
       ]
-    },
-    {
-      "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift",
-      "feature": "computer-peer-identity",
-      "kind": "registration",
-      "lines": ["    return isTrustedComputerPeerBundleIdentifier(bundleId)"]
     }
   ],
   "exceptions": [
-    {
-      "path": "src/main/git/source-control/submodule-paths.ts",
-      "reason": "Does not cache cancelled submodule discovery as an empty routing result.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/relay/git-handler-submodule-ops.ts",
-      "reason": "Preserves relay discovery cancellation so a retry still routes submodule diffs correctly.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/main/git/status-submodule-path-cache.test.ts",
-      "reason": "Regression coverage ensuring an aborted diff discovery cannot poison the next submodule lookup.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/relay/git-handler-submodule-ops.test.ts",
-      "reason": "Regression coverage preserving submodule routing after a cancelled SSH diff discovery.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/main/runtime/runtime-rpc-mobile-method-allowlist.test.ts",
-      "reason": "Regression coverage that a mobile diff still reaches execution with its transport budget alongside the optional abort signal.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/main/runtime/rpc/methods/git-diff-transport-budget.test.ts",
-      "reason": "Preserves transport-budget coverage when diff requests also carry an abort signal.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/main/git/source-control/git-read-cache-invalidation.ts",
-      "reason": "Preserves diff cache invalidation while isolating cancellation between local readers.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/main/git/source-control/file-diff.ts",
-      "reason": "Cancels local diff reads without cancelling unrelated consumers of a coalesced read.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/main/git/source-control/git-blob-read.ts",
-      "reason": "Preserves abort errors and stops subsequent blob reads when a diff request is cancelled.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/main/ipc/filesystem-git-status-staging.test.ts",
-      "reason": "Regression coverage for sender-scoped cancellation of in-flight diff IPC requests.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/main/providers/ssh-git-provider-diff.test.ts",
-      "reason": "Regression coverage for SSH diff cancellation and isolation of unrelated readers.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/main/runtime/rpc/methods/git.test.ts",
-      "reason": "Regression coverage for cancellation reaching runtime Git diff execution.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/main/runtime/orca-runtime-git-diff-budget.test.ts",
-      "reason": "Regression coverage for cancelling host-owned Git diff requests.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/relay/git-handler-diff-read-coalescing.test.ts",
-      "reason": "Regression coverage for cancelling relay diff work without stopping unrelated consumers.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/renderer/src/runtime/runtime-git-diff-client.ts",
-      "reason": "Propagates diff cancellation through runtime RPC and sender-scoped IPC instead of abandoning in-flight repository probes.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/renderer/src/web/preload-api/web-git-api.ts",
-      "reason": "Cancels token-scoped Git diff requests from the web client so a retargeted probe stops on the execution host.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/preload/api/git-bridge.ts",
-      "reason": "Exposes token-scoped cancellation for Git diff requests.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/preload/api/git-inspection-api.ts",
-      "reason": "Declares the optional diff request token and cancellation API.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/main/ipc/filesystem.ts",
-      "reason": "Owns sender-scoped cancellation state for Git diff IPC requests.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/main/ipc/filesystem/filesystem-handler-context.ts",
-      "reason": "Shares the diff cancellation registry with filesystem IPC handlers.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/main/ipc/filesystem/filesystem-git-status-handlers.ts",
-      "reason": "Cancels tokenized Git diff requests and passes abort signals to their execution host.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/main/providers/git-provider-contract.ts",
-      "reason": "Allows Git diff consumers to cancel work on the execution host.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/main/providers/ssh-git-read-provider.ts",
-      "reason": "Propagates diff cancellation to the SSH transport without cancelling unrelated readers.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/main/runtime/runtime-git-diff-commands.ts",
-      "reason": "Passes runtime diff abort signals through local and SSH execution paths.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/main/runtime/rpc/methods/git-diff-methods.ts",
-      "reason": "Forwards the RPC request abort signal into Git diff execution.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/main/git/command-runner/git-exec-file.ts",
-      "reason": "Preserves cancellation for buffered Git subprocesses used by diff reads.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/relay/git-handler-operation-context.ts",
-      "reason": "Allows relay diff buffer reads to carry the request abort signal.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/relay/git-handler.ts",
-      "reason": "Propagates cancellation into buffered Git execution on the SSH host.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/relay/git-handler-ops.ts",
-      "reason": "Cancels diff blob reads rather than allowing aborted requests to launch further Git subprocesses.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/relay/git-handler-read-operations.ts",
-      "reason": "Threads relay diff request cancellation into host-side diff computation.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/main/git/status-diff-settled-cache.test.ts",
-      "reason": "Regression coverage for cancelling one reader of a coalesced local diff read.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
-    {
-      "path": "src/renderer/src/web/web-preload-api-git.test.ts",
-      "reason": "Regression coverage for web-client diff cancellation racing worktree path resolution.",
-      "status": "pending-upstream",
-      "ledger": "bug-12"
-    },
     {
       "path": ".claude/hooks/require-sandboxed-tests.mjs",
       "reason": "Fork-only guard keeping vitest on the remote sandbox host; upstream runs tests locally.",
@@ -4139,6 +3952,18 @@
       "path": "config/scripts/pr-workflow-parallelism.test.mjs",
       "reason": "Contracts for the fork-owned PR job graph, which omits Windows packaging and must not restore upstream's exact aggregate dependency list.",
       "status": "permanent"
+    },
+    {
+      "path": "config/scripts/publish-complete-draft-releases.mjs",
+      "reason": "Widens the upstream draft-RC recovery selector to recognize this fork's exact .zyNN release suffix while preserving its bot, draft, current-ref, and asset-completeness gates.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#draft-rc-recovery-recognizes-fork-tags"
+    },
+    {
+      "path": "config/scripts/publish-complete-draft-releases.test.mjs",
+      "reason": "Covers upstream and .zyNN draft-RC selection, malformed suffix rejection, stale skips, and artifact-less drafts remaining private through the real asset verifier.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#draft-rc-recovery-recognizes-fork-tags"
     },
     {
       "path": "config/scripts/reject-local-vitest-run.mjs",
@@ -4484,18 +4309,6 @@
       "status": "permanent"
     },
     {
-      "path": "src/shared/git-remote-error.test.ts",
-      "reason": "Regression coverage for bug-47: preserve multiline Git diagnoses and credential redaction across line endings.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#git-multiline-diagnostics"
-    },
-    {
-      "path": "src/shared/git-remote-error.ts",
-      "reason": "Fix bug-47 in upstream error normalization: preserve the diagnostic block rather than only its final line.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#git-multiline-diagnostics"
-    },
-    {
       "path": "src/shared/native-chat-transcript-retention.test.ts",
       "reason": "Tests for the retention-fix shared companion above.",
       "status": "pending-upstream",
@@ -4517,6 +4330,245 @@
       "path": "tests/e2e/cross-version-wire/release-checkout.ts",
       "reason": "Encodes the fork's own (tagless) release-history shape for cross-version wire tests.",
       "status": "permanent"
+    },
+    {
+      "path": "src/shared/posix-command-path-lookup.test.ts",
+      "reason": "Isolates shell lookup regression fixtures from zsh startup files that overwrite the injected PATH.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#posix-lookup-test-startup-isolation"
+    },
+    {
+      "path": "config/scripts/run-sandboxed-test-shards.test.mjs",
+      "reason": "Regression coverage for the fork's sandbox runner matching CI lane selection.",
+      "status": "permanent"
+    },
+    {
+      "path": "docs/reference/macos-press-and-hold.md",
+      "reason": "Documents bug-35's fork packaged domain commands, continued upstream/dev-domain support, and automatic retry of earlier foreign-bundle decisions; ships with the startup fix.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#bug-35"
+    },
+    {
+      "path": "src/main/macos-press-and-hold-default.test.ts",
+      "reason": "Covers bug-35's domain-ownership regression: the fork and upstream namespaces and their dot-children are accepted while lookalike and unrelated bundle identifiers remain foreign.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#bug-35"
+    },
+    {
+      "path": "src/main/macos-press-and-hold-default.ts",
+      "reason": "Fixes bug-35 by recognizing com.zpyoung.orca and its dot-children as owned press-and-hold preference domains while retaining com.stablyai.orca and its dot-children.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#bug-35"
+    },
+    {
+      "path": "tests/e2e/macos-press-and-hold-startup.spec.ts",
+      "reason": "Keeps the startup ownership assertion aligned with bug-35 by treating either the fork or upstream namespace and its dot-children as an Orca bundle domain.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#bug-35"
+    },
+    {
+      "path": "src/main/git/source-control/submodule-paths.ts",
+      "reason": "Does not cache cancelled submodule discovery as an empty routing result.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/relay/git-handler-submodule-ops.ts",
+      "reason": "Preserves relay discovery cancellation so a retry still routes submodule diffs correctly.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/git/status-submodule-path-cache.test.ts",
+      "reason": "Regression coverage ensuring an aborted diff discovery cannot poison the next submodule lookup.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/relay/git-handler-submodule-ops.test.ts",
+      "reason": "Regression coverage preserving submodule routing after a cancelled SSH diff discovery.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/runtime/runtime-rpc-mobile-method-allowlist.test.ts",
+      "reason": "Regression coverage that a mobile diff still reaches execution with its transport budget alongside the optional abort signal.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/git-diff-transport-budget.test.ts",
+      "reason": "Preserves transport-budget coverage when diff requests also carry an abort signal.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/git/source-control/git-read-cache-invalidation.ts",
+      "reason": "Preserves diff cache invalidation while isolating cancellation between local readers.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/git/source-control/file-diff.ts",
+      "reason": "Cancels local diff reads without cancelling unrelated consumers of a coalesced read.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/git/source-control/git-blob-read.ts",
+      "reason": "Preserves abort errors and stops subsequent blob reads when a diff request is cancelled.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/ipc/filesystem-git-status-staging.test.ts",
+      "reason": "Regression coverage for sender-scoped cancellation of in-flight diff IPC requests.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/providers/ssh-git-provider-diff.test.ts",
+      "reason": "Regression coverage for SSH diff cancellation and isolation of unrelated readers.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/git.test.ts",
+      "reason": "Regression coverage for cancellation reaching runtime Git diff execution.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-git-diff-budget.test.ts",
+      "reason": "Regression coverage for cancelling host-owned Git diff requests.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/relay/git-handler-diff-read-coalescing.test.ts",
+      "reason": "Regression coverage for cancelling relay diff work without stopping unrelated consumers.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/renderer/src/runtime/runtime-git-diff-client.ts",
+      "reason": "Propagates diff cancellation through runtime RPC and sender-scoped IPC instead of abandoning in-flight repository probes.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/renderer/src/web/preload-api/web-git-api.ts",
+      "reason": "Cancels token-scoped Git diff requests from the web client so a retargeted probe stops on the execution host.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/preload/api/git-bridge.ts",
+      "reason": "Exposes token-scoped cancellation for Git diff requests.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/preload/api/git-inspection-api.ts",
+      "reason": "Declares the optional diff request token and cancellation API.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/ipc/filesystem.ts",
+      "reason": "Owns sender-scoped cancellation state for Git diff IPC requests.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/ipc/filesystem/filesystem-handler-context.ts",
+      "reason": "Shares the diff cancellation registry with filesystem IPC handlers.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/ipc/filesystem/filesystem-git-status-handlers.ts",
+      "reason": "Cancels tokenized Git diff requests and passes abort signals to their execution host.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/providers/git-provider-contract.ts",
+      "reason": "Allows Git diff consumers to cancel work on the execution host.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/providers/ssh-git-read-provider.ts",
+      "reason": "Propagates diff cancellation to the SSH transport without cancelling unrelated readers.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/runtime/runtime-git-diff-commands.ts",
+      "reason": "Passes runtime diff abort signals through local and SSH execution paths.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/git-diff-methods.ts",
+      "reason": "Forwards the RPC request abort signal into Git diff execution.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/git/command-runner/git-exec-file.ts",
+      "reason": "Preserves cancellation for buffered Git subprocesses used by diff reads.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/relay/git-handler-operation-context.ts",
+      "reason": "Allows relay diff buffer reads to carry the request abort signal.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/relay/git-handler.ts",
+      "reason": "Propagates cancellation into buffered Git execution on the SSH host.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/relay/git-handler-ops.ts",
+      "reason": "Cancels diff blob reads rather than allowing aborted requests to launch further Git subprocesses.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/relay/git-handler-read-operations.ts",
+      "reason": "Threads relay diff request cancellation into host-side diff computation.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/main/git/status-diff-settled-cache.test.ts",
+      "reason": "Regression coverage for cancelling one reader of a coalesced local diff read.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/renderer/src/web/web-preload-api-git.test.ts",
+      "reason": "Regression coverage for web-client diff cancellation racing worktree path resolution.",
+      "status": "pending-upstream",
+      "ledger": "bug-12"
+    },
+    {
+      "path": "src/shared/git-remote-error.test.ts",
+      "reason": "Regression coverage for bug-47: preserve multiline Git diagnoses and credential redaction across line endings.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#git-multiline-diagnostics"
+    },
+    {
+      "path": "src/shared/git-remote-error.ts",
+      "reason": "Fix bug-47 in upstream error normalization: preserve the diagnostic block rather than only its final line.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#git-multiline-diagnostics"
     },
     {
       "path": "src/renderer/src/components/terminal-pane/pty-connection/pane-pty-visibility-bind.ts",
@@ -4649,41 +4701,6 @@
       "reason": "Migrates session-option command coverage to terminal-tab-scoped runtime targets.",
       "status": "pending-upstream",
       "ledger": "bug-1"
-    },
-    {
-      "path": "src/shared/posix-command-path-lookup.test.ts",
-      "reason": "Isolates shell lookup regression fixtures from zsh startup files that overwrite the injected PATH.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#posix-lookup-test-startup-isolation"
-    },
-    {
-      "path": "config/scripts/run-sandboxed-test-shards.test.mjs",
-      "reason": "Regression coverage for the fork's sandbox runner matching CI lane selection.",
-      "status": "permanent"
-    },
-    {
-      "path": "docs/reference/macos-press-and-hold.md",
-      "reason": "Documents bug-35's fork packaged domain commands, continued upstream/dev-domain support, and automatic retry of earlier foreign-bundle decisions; ships with the startup fix.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#bug-35"
-    },
-    {
-      "path": "src/main/macos-press-and-hold-default.test.ts",
-      "reason": "Covers bug-35's domain-ownership regression: the fork and upstream namespaces and their dot-children are accepted while lookalike and unrelated bundle identifiers remain foreign.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#bug-35"
-    },
-    {
-      "path": "src/main/macos-press-and-hold-default.ts",
-      "reason": "Fixes bug-35 by recognizing com.zpyoung.orca and its dot-children as owned press-and-hold preference domains while retaining com.stablyai.orca and its dot-children.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#bug-35"
-    },
-    {
-      "path": "tests/e2e/macos-press-and-hold-startup.spec.ts",
-      "reason": "Keeps the startup ownership assertion aligned with bug-35 by treating either the fork or upstream namespace and its dot-children as an Orca bundle domain.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#bug-35"
     }
   ],
   "residuals": {
@@ -6287,6 +6304,10 @@
       "added": 4,
       "removed": 2
     },
+    "native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift": {
+      "added": 1,
+      "removed": 3
+    },
     "src/renderer/src/app-shell/TitlebarLeftControls.tsx": {
       "added": 2,
       "removed": 0
@@ -6310,10 +6331,6 @@
     "src/renderer/src/components/UpdateCard.error-card.test.tsx": {
       "added": 5,
       "removed": 5
-    },
-    "native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift": {
-      "added": 1,
-      "removed": 3
     }
   }
 }
