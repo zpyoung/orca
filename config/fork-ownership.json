@@ -1,11 +1,6 @@
 {
   "features": [
     {
-      "name": "release-routing",
-      "purpose": "Keeps stable and RC release notes and build selection on the fork's release repository.",
-      "globs": ["**/fork-release-routing/**"]
-    },
-    {
       "name": "worktree-groups",
       "purpose": "Lets a worktree join a project group independently of its repo's own group membership, so cross-repo worktrees can share a sidebar section.",
       "globs": ["**/fork-worktree-groups/**"]
@@ -134,17 +129,33 @@
       ]
     },
     {
-      "name": "dev-tcc",
-      "purpose": "Keeps TCC prompt attribution aligned with the stable app and helper bundle identities emitted by the dev runner.",
-      "globs": ["**/fork-dev-tcc/**"]
+      "name": "computer-peer-identity",
+      "purpose": "Authorizes the packaged fork's macOS computer-use peer without broadening bundle-prefix trust.",
+      "globs": ["**/fork-computer-peer-identity/**"]
     },
     {
       "name": "skills-repository",
       "purpose": "Points `npx skills add` at this fork's repository so the skills it ships that upstream does not have are actually installable.",
       "globs": ["**/fork-skills-repository/**"]
+    },
+    {
+      "name": "release-routing",
+      "purpose": "Keeps stable and RC release notes and build selection on the fork's release repository.",
+      "globs": ["**/fork-release-routing/**"]
+    },
+    {
+      "name": "dev-tcc",
+      "purpose": "Keeps TCC prompt attribution aligned with the stable app and helper bundle identities emitted by the dev runner.",
+      "globs": ["**/fork-dev-tcc/**"]
     }
   ],
   "seams": [
+    {
+      "path": "native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift",
+      "feature": "computer-peer-identity",
+      "kind": "registration",
+      "lines": ["    return isTrustedComputerPeerBundleIdentifier(bundleId)"]
+    },
     {
       "path": "src/renderer/src/components/sidebar/use-worktree-activity-status.ts",
       "feature": "ask-question-tool",
@@ -1098,12 +1109,6 @@
       ]
     },
     {
-      "path": "src/main/runtime/runtime-rpc/runtime-rpc-long-poll.ts",
-      "feature": "ask-question-tool",
-      "kind": "registration",
-      "lines": ["  if (request.method === 'terminal.wait' || request.method === 'ask.wait') {"]
-    },
-    {
       "path": "src/main/runtime/runtime-rpc/runtime-rpc-websocket-dispatch.ts",
       "feature": "project-ledger",
       "kind": "registration",
@@ -1249,12 +1254,6 @@
       "lines": ["const TELEMETRY_ENABLED = false"]
     },
     {
-      "path": "src/main/updater-release-builds.test.ts",
-      "feature": "release-routing",
-      "kind": "passthrough",
-      "lines": ["      'https://github.com/zpyoung/orca/releases/download/v1.4.159'"]
-    },
-    {
       "path": "src/main/updater.publishing-window-feed.test.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
@@ -1397,15 +1396,6 @@
       "lines": [
         "import { AskEscalationGate } from '../components/fork-ask-question-tool/AskEscalationGate'",
         "      <AskEscalationGate />"
-      ]
-    },
-    {
-      "path": "src/renderer/src/app-shell/TitlebarLeftControls.tsx",
-      "feature": "ask-question-tool",
-      "kind": "registration",
-      "lines": [
-        "import { AskPendingCountBadge } from '../components/fork-ask-question-tool/AskPendingCountBadge'",
-        "      <AskPendingCountBadge />"
       ]
     },
     {
@@ -3444,33 +3434,6 @@
       "lines": ["    appId: 'com.zpyoung.orca',"]
     },
     {
-      "path": "src/shared/release-channel.ts",
-      "feature": "release-routing",
-      "kind": "registration",
-      "lines": ["export const MAIN_RELEASE_REPO = 'zpyoung/orca'"]
-    },
-    {
-      "path": "src/renderer/src/components/UpdateCard.error-card.test.tsx",
-      "feature": "release-routing",
-      "kind": "passthrough",
-      "lines": [
-        "    expect(openUrl).toHaveBeenCalledWith('https://github.com/zpyoung/orca/releases')",
-        "    expect(openUrl).toHaveBeenCalledWith('https://github.com/zpyoung/orca/releases/tag/v1.4.200')"
-      ]
-    },
-    {
-      "path": "src/shared/release-channel.test.ts",
-      "feature": "release-routing",
-      "kind": "passthrough",
-      "lines": [
-        "    expect(getReleaseRepoForChannel('stable')).toBe('zpyoung/orca')",
-        "    expect(getReleaseRepoForChannel('rc')).toBe('zpyoung/orca')",
-        "      'https://github.com/zpyoung/orca/releases/tag/v1.4.160'",
-        "      'https://github.com/zpyoung/orca/releases/tag/v1.4.160-rc.3'",
-        "    expect(getReleaseNotesUrlForVersion(null)).toBe('https://github.com/zpyoung/orca/releases')"
-      ]
-    },
-    {
       "path": "src/shared/native-chat-agent-profiles.ts",
       "feature": "native-chat-session-options",
       "kind": "registration",
@@ -3832,15 +3795,57 @@
         "  const pendingAskTabIds = usePendingAskTabIds()",
         "          hasPendingAsk: row.terminalTab != null && pendingAskTabIds.has(row.terminalTab.id)"
       ]
+    },
+    {
+      "path": "src/main/runtime/runtime-rpc/runtime-rpc-long-poll.ts",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": ["  if (request.method === 'terminal.wait' || request.method === 'ask.wait') {"]
+    },
+    {
+      "path": "src/main/updater-release-builds.test.ts",
+      "feature": "release-routing",
+      "kind": "passthrough",
+      "lines": ["      'https://github.com/zpyoung/orca/releases/download/v1.4.159'"]
+    },
+    {
+      "path": "src/renderer/src/app-shell/TitlebarLeftControls.tsx",
+      "feature": "ask-question-tool",
+      "kind": "registration",
+      "lines": [
+        "import { AskPendingCountBadge } from '../components/fork-ask-question-tool/AskPendingCountBadge'",
+        "      <AskPendingCountBadge />"
+      ]
+    },
+    {
+      "path": "src/shared/release-channel.ts",
+      "feature": "release-routing",
+      "kind": "registration",
+      "lines": ["export const MAIN_RELEASE_REPO = 'zpyoung/orca'"]
+    },
+    {
+      "path": "src/renderer/src/components/UpdateCard.error-card.test.tsx",
+      "feature": "release-routing",
+      "kind": "passthrough",
+      "lines": [
+        "    expect(openUrl).toHaveBeenCalledWith('https://github.com/zpyoung/orca/releases')",
+        "    expect(openUrl).toHaveBeenCalledWith('https://github.com/zpyoung/orca/releases/tag/v1.4.200')"
+      ]
+    },
+    {
+      "path": "src/shared/release-channel.test.ts",
+      "feature": "release-routing",
+      "kind": "passthrough",
+      "lines": [
+        "    expect(getReleaseRepoForChannel('stable')).toBe('zpyoung/orca')",
+        "    expect(getReleaseRepoForChannel('rc')).toBe('zpyoung/orca')",
+        "      'https://github.com/zpyoung/orca/releases/tag/v1.4.160'",
+        "      'https://github.com/zpyoung/orca/releases/tag/v1.4.160-rc.3'",
+        "    expect(getReleaseNotesUrlForVersion(null)).toBe('https://github.com/zpyoung/orca/releases')"
+      ]
     }
   ],
   "exceptions": [
-    {
-      "path": "src/shared/posix-command-path-lookup.test.ts",
-      "reason": "Isolates shell lookup regression fixtures from zsh startup files that overwrite the injected PATH.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#posix-lookup-test-startup-isolation"
-    },
     {
       "path": ".claude/hooks/require-sandboxed-tests.mjs",
       "reason": "Fork-only guard keeping vitest on the remote sandbox host; upstream runs tests locally.",
@@ -4080,11 +4085,6 @@
       "status": "permanent"
     },
     {
-      "path": "config/scripts/run-sandboxed-test-shards.test.mjs",
-      "reason": "Regression coverage for the fork's sandbox runner matching CI lane selection.",
-      "status": "permanent"
-    },
-    {
       "path": "config/scripts/skill-sharing-release-workflow.test.mjs",
       "status": "permanent",
       "reason": "Asserts a Windows/Linux skill-sharing release gate upstream added to release-cut.yml; the fork's release pipeline is macOS-only and has no such job.",
@@ -4160,12 +4160,6 @@
       "status": "permanent"
     },
     {
-      "path": "docs/reference/macos-press-and-hold.md",
-      "reason": "Documents bug-35's fork packaged domain commands, continued upstream/dev-domain support, and automatic retry of earlier foreign-bundle decisions; ships with the startup fix.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#bug-35"
-    },
-    {
       "path": "mobile/src/browser/mobile-browser-frame-state.ts",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate",
@@ -4224,18 +4218,6 @@
       "path": "resources/skills/snapshot-registry.json",
       "reason": "Released skill snapshots recorded from the fork's own release tags; upstream's snapshots describe revisions no fork tag ever shipped.",
       "status": "permanent"
-    },
-    {
-      "path": "src/main/macos-press-and-hold-default.test.ts",
-      "reason": "Covers bug-35's domain-ownership regression: the fork and upstream namespaces and their dot-children are accepted while lookalike and unrelated bundle identifiers remain foreign.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#bug-35"
-    },
-    {
-      "path": "src/main/macos-press-and-hold-default.ts",
-      "reason": "Fixes bug-35 by recognizing com.zpyoung.orca and its dot-children as owned press-and-hold preference domains while retaining com.stablyai.orca and its dot-children.",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#bug-35"
     },
     {
       "path": "src/main/runtime/rpc/fork-rpc-params/fork-uncatalogued-methods.ts",
@@ -4444,6 +4426,35 @@
       "status": "permanent"
     },
     {
+      "path": "src/shared/posix-command-path-lookup.test.ts",
+      "reason": "Isolates shell lookup regression fixtures from zsh startup files that overwrite the injected PATH.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#posix-lookup-test-startup-isolation"
+    },
+    {
+      "path": "config/scripts/run-sandboxed-test-shards.test.mjs",
+      "reason": "Regression coverage for the fork's sandbox runner matching CI lane selection.",
+      "status": "permanent"
+    },
+    {
+      "path": "docs/reference/macos-press-and-hold.md",
+      "reason": "Documents bug-35's fork packaged domain commands, continued upstream/dev-domain support, and automatic retry of earlier foreign-bundle decisions; ships with the startup fix.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#bug-35"
+    },
+    {
+      "path": "src/main/macos-press-and-hold-default.test.ts",
+      "reason": "Covers bug-35's domain-ownership regression: the fork and upstream namespaces and their dot-children are accepted while lookalike and unrelated bundle identifiers remain foreign.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#bug-35"
+    },
+    {
+      "path": "src/main/macos-press-and-hold-default.ts",
+      "reason": "Fixes bug-35 by recognizing com.zpyoung.orca and its dot-children as owned press-and-hold preference domains while retaining com.stablyai.orca and its dot-children.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#bug-35"
+    },
+    {
       "path": "tests/e2e/macos-press-and-hold-startup.spec.ts",
       "reason": "Keeps the startup ownership assertion aligned with bug-35 by treating either the fork or upstream namespace and its dot-children as an Orca bundle domain.",
       "status": "pending-upstream",
@@ -4451,9 +4462,9 @@
     }
   ],
   "residuals": {
-    "src/renderer/src/app-shell/TitlebarLeftControls.tsx": {
-      "added": 2,
-      "removed": 0
+    "native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift": {
+      "added": 1,
+      "removed": 3
     },
     "src/renderer/src/components/sidebar/use-worktree-activity-status.ts": {
       "added": 4,
@@ -4899,10 +4910,6 @@
       "added": 7,
       "removed": 1
     },
-    "src/main/runtime/runtime-rpc/runtime-rpc-long-poll.ts": {
-      "added": 1,
-      "removed": 1
-    },
     "src/main/runtime/runtime-rpc/runtime-rpc-websocket-dispatch.ts": {
       "added": 1,
       "removed": 0
@@ -4960,22 +4967,6 @@
       "removed": 1
     },
     "src/main/updater.publishing-window-feed.test.ts": {
-      "added": 5,
-      "removed": 5
-    },
-    "src/main/updater-release-builds.test.ts": {
-      "added": 1,
-      "removed": 1
-    },
-    "src/shared/release-channel.ts": {
-      "added": 1,
-      "removed": 1
-    },
-    "src/shared/release-channel.test.ts": {
-      "added": 5,
-      "removed": 5
-    },
-    "src/renderer/src/components/UpdateCard.error-card.test.tsx": {
       "added": 5,
       "removed": 5
     },
@@ -6130,6 +6121,30 @@
     "src/renderer/src/components/worktree-jump-palette-recent-inclusion.ts": {
       "added": 4,
       "removed": 2
+    },
+    "src/renderer/src/app-shell/TitlebarLeftControls.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/runtime/runtime-rpc/runtime-rpc-long-poll.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/main/updater-release-builds.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/shared/release-channel.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/shared/release-channel.test.ts": {
+      "added": 5,
+      "removed": 5
+    },
+    "src/renderer/src/components/UpdateCard.error-card.test.tsx": {
+      "added": 5,
+      "removed": 5
     }
   }
 }
