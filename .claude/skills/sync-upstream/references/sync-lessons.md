@@ -195,7 +195,8 @@ for i, (name, _) in enumerate(imps):
           f"Exclude<(typeof {name})[number]['name'], RpcMethodName> // {name}")
 print('export {}')
 PY
-rm -f config/*.tsbuildinfo; pnpm run typecheck:node 2>&1 | grep "__probe"
+find config -maxdepth 1 -name '*.tsbuildinfo' -delete
+pnpm run typecheck:node 2>&1 | grep "__probe"
 rm -f src/main/runtime/rpc/__probe.ts
 ```
 
