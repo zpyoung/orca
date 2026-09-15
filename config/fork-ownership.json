@@ -4048,6 +4048,12 @@
       "status": "permanent"
     },
     {
+      "path": "src/main/ssh/ssh-remote-commands.test.ts",
+      "reason": "Replaces bug-2 disk-heavy GC stage fixture with a bounded synthetic listing through the real POSIX pipeline.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#bug-2-relay-and-ssh-environment-dependent-failures"
+    },
+    {
       "path": "config/scripts/check-changed-code-quality.mjs",
       "reason": "Stops the changed-lines type-aware scan pinning the root oxlint config over mobile/, whose workspace deps are absent in the gate job so every React Native type resolves as an error type.",
       "status": "pending-upstream",

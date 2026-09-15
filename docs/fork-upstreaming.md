@@ -292,6 +292,25 @@ file.
 
 **Status:** pending-upstream. Not yet submitted.
 
+## bug-2 Relay and SSH environment-dependent failures
+
+**Ledger:** `bug-2`.
+
+**What:** The POSIX GC regression feeds more than 1 MiB of upload-stage paths through the real
+shell filter before enumerating two real install directories. It no longer creates and removes
+15,197 directories merely to generate listing volume; the output must still contain only the two
+install names and remain below 1 KiB.
+
+**Why upstream, not isolated:** this repairs an existing upstream regression fixture in place. A
+fork copy would duplicate the suite without a seam.
+
+**Paths:**
+
+- `src/main/ssh/ssh-remote-commands.test.ts`
+
+**Status:** pending-upstream. Not yet submitted. `bug-2` stays open: this closes the POSIX GC
+failure only. The `git-handler` upstreamStatus failure is `bug-47`, and the two
+`agent-exec-handler` spawn-arg failures are host `GIT_CONFIG_*` bleed, still unaddressed.
 ## Git diff request cancellation
 
 **Ledger:** `bug-12`.
