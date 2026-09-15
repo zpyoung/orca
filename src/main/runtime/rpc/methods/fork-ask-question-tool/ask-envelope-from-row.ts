@@ -1,6 +1,13 @@
 import { isTerminalAskStatus } from '../../../../../shared/fork-ask-question-tool/ask-answer-envelope'
-import type { AskEnvelope, AskResultBody } from '../../../../../shared/fork-ask-question-tool/ask-answer-envelope'
-import type { AskPartial, AskRegistryEvent, AskSpec } from '../../../../../shared/fork-ask-question-tool/ask-question-schema'
+import type {
+  AskEnvelope,
+  AskResultBody
+} from '../../../../../shared/fork-ask-question-tool/ask-answer-envelope'
+import type {
+  AskPartial,
+  AskRegistryEvent,
+  AskSpec
+} from '../../../../../shared/fork-ask-question-tool/ask-question-schema'
 import type { AskRow } from '../../../../fork-ask-question-tool/ask-db'
 
 const EMPTY_RESULT: AskResultBody = { answers: {}, skipped: [], summary: '' }
@@ -30,11 +37,12 @@ export function envelopeFromAskRow(row: AskRow): AskEnvelope {
 }
 
 export function unknownAskEnvelope(askId: string): AskEnvelope {
-  return { status: 'unavailable', askId, reason: `ask ${askId} is unknown or has expired`, ...EMPTY_RESULT }
-}
-
-export function pendingEnvelope(askId: string): AskEnvelope {
-  return { status: 'pending', askId, instruction: `orca ask wait --id ${askId}` }
+  return {
+    status: 'unavailable',
+    askId,
+    reason: `ask ${askId} is unknown or has expired`,
+    ...EMPTY_RESULT
+  }
 }
 
 /** The `AskRegistryEvent` for one row — a snapshot-frame source for asks this process never saw a live transition for. */

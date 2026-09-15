@@ -2,15 +2,17 @@
 
 macOS opens the accent picker when a key is held unless an application opts out in its preferences
 domain. That prevents held keys from repeating in terminal applications such as vim. On the first
-eligible launch, Orca writes:
+eligible launch, the packaged fork writes:
 
 ```sh
-defaults write com.stablyai.orca ApplePressAndHoldEnabled -bool false
+defaults write com.zpyoung.orca ApplePressAndHoldEnabled -bool false
 ```
 
-The write is scoped to Orca's packaged bundle domain. Bare Electron development bundles and
-non-macOS platforms are left untouched. A fresh write is conservatively treated as taking effect
-on the next launch.
+The write is scoped to the running Orca bundle domain. The fork namespace `com.zpyoung.orca` and
+its dot-suffixed channel domains are accepted, as are the upstream/development namespace
+`com.stablyai.orca` and its dot-children (including `com.stablyai.orca.dev`). Bare Electron
+development bundles and non-macOS platforms are left untouched. A fresh write is conservatively
+treated as taking effect on the next launch.
 
 ## Precedence and decision record
 
@@ -20,8 +22,10 @@ user choice and preserved. Only an unset key receives the `false` default.
 The decision is stored once in
 `<userData>/macos-press-and-hold-default.json`. An `applied` or
 `kept-user-preference` decision prevents future launches from touching the domain again.
-Probe and write failures remain retryable so a transient failure does not permanently disable the
-fix.
+`foreign-bundle`, `probe-failed`, and `write-failed` decisions remain retryable because the
+underlying condition may change. In particular, a `foreign-bundle` decision recorded by an
+earlier fork build is retried automatically after upgrading to a build that recognizes
+`com.zpyoung.orca`; no record deletion is required.
 
 `defaults read <domain> <key>` is used instead of
 `systemPreferences.getUserDefault`: the Electron API cannot distinguish an unset key from an
@@ -33,18 +37,18 @@ timeouts, and other exit statuses leave the preference alone.
 Set the preference explicitly, then restart Orca:
 
 ```sh
-defaults write com.stablyai.orca ApplePressAndHoldEnabled -bool true
+defaults write com.zpyoung.orca ApplePressAndHoldEnabled -bool true
 ```
 
 After Orca has recorded its one-time decision, deleting the key also restores the macOS default
 without Orca recreating it:
 
 ```sh
-defaults delete com.stablyai.orca ApplePressAndHoldEnabled
+defaults delete com.zpyoung.orca ApplePressAndHoldEnabled
 ```
 
-Development and prerelease channels may use a channel-suffixed Orca bundle identifier; use that
-domain instead when applicable.
+Development and prerelease channels may use a channel-suffixed Orca bundle identifier under either
+accepted namespace; use that running bundle's domain instead when applicable.
 
 ## Reverting
 
