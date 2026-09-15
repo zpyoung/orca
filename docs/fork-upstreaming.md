@@ -7,6 +7,21 @@ manifest `exceptions[]` row (`status: "pending-upstream"`, `ledger` pointing at 
 anchor) are created and removed together — see `config/scripts/fork-ownership-manifest.mjs` for
 the invariant this enforces.
 
+## POSIX lookup test startup isolation
+
+**What:** runs the zsh lookup case with `-f` so user startup files cannot replace the fixture
+PATH. The existing alias/function-mask regression uses a temporary executable and a controlled
+`.zshenv` that overwrites PATH, making the failure reproducible on clean sandbox hosts.
+
+**Why upstream, not isolated:** this fixes upstream test isolation, not shipped lookup behavior.
+The existing suite should remain the single source of coverage.
+
+**Paths:** `src/shared/posix-command-path-lookup.test.ts`.
+
+**Orca ledger:** `bug-3`.
+
+**Status:** pending-upstream. Not yet submitted.
+
 ## Retention fix
 
 **What:** `useNativeChatRetainedSession` blanks a retained transcript while a fresh read is
