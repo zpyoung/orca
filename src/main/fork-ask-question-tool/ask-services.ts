@@ -6,11 +6,16 @@ import {
   createAskAttachedSurfaceRoster,
   type AskAttachedSurfaceRoster
 } from './ask-attached-surface-roster'
+import {
+  createAskWaitConcurrencyGate,
+  type AskWaitConcurrencyGate
+} from './ask-wait-concurrency-gate'
 
 export type AskServices = {
   readonly db: AskDb
   readonly registry: AskRegistry
   readonly roster: AskAttachedSurfaceRoster
+  readonly waitGate: AskWaitConcurrencyGate
 }
 
 type DurableAskStore = { db: AskDb; registry: AskRegistry }
@@ -50,6 +55,7 @@ export function askServicesFor(
         notePaneAttached: (paneKey) => durable?.registry.notePaneAttached(paneKey)
       }
     )
+    const waitGate = createAskWaitConcurrencyGate()
     services = {
       get db() {
         return openDurable().db
@@ -57,7 +63,8 @@ export function askServicesFor(
       get registry() {
         return openDurable().registry
       },
-      roster
+      roster,
+      waitGate
     }
     servicesByRuntime.set(runtime, services)
   }

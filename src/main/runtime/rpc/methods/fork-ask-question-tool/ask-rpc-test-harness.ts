@@ -7,6 +7,7 @@ import {
   createAskAttachedSurfaceRoster,
   type AskAttachedSurfaceRoster
 } from '../../../../fork-ask-question-tool/ask-attached-surface-roster'
+import { createAskWaitConcurrencyGate } from '../../../../fork-ask-question-tool/ask-wait-concurrency-gate'
 import type { RpcContext } from '../../core'
 import { ASK_METHODS } from './ask'
 
@@ -55,7 +56,12 @@ export function createAskRpcHarness(): { setup(): AskRpcHarness; cleanup(): void
     const registry = new AskRegistry(askDb)
     const hasLocalRendererWindow = { value: false }
     const roster = createAskAttachedSurfaceRoster({ hasLocalRendererWindow: () => hasLocalRendererWindow.value })
-    vi.spyOn(runtime, 'getAskServices').mockReturnValue({ db: askDb, registry, roster })
+    vi.spyOn(runtime, 'getAskServices').mockReturnValue({
+      db: askDb,
+      registry,
+      roster,
+      waitGate: createAskWaitConcurrencyGate()
+    })
 
     const paneOwners = paneOwnersSeed ?? new Map<string, string>()
     vi.spyOn(runtime, 'getAgentStatusTerminalHandleForPaneKey').mockImplementation((paneKey) =>

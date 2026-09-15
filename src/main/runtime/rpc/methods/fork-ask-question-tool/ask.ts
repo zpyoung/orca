@@ -36,7 +36,9 @@ function buildNoUiUnavailableReason(attribution: AskAttribution): string {
 }
 
 function formatSpecErrors(errors: { path: string; message: string }[]): string {
-  return errors.map((error) => (error.path ? `${error.path}: ${error.message}` : error.message)).join('; ')
+  return errors
+    .map((error) => (error.path ? `${error.path}: ${error.message}` : error.message))
+    .join('; ')
 }
 
 // Why: the watermark is the store's true head seq, not a max over pending (or paneKey-filtered)
@@ -49,7 +51,8 @@ function buildPendingSnapshot(
   paneKeyFilter?: string
 ): { asks: AskRegistryEvent[]; maxSeq: number } {
   const rows = db.listPending()
-  const filtered = paneKeyFilter === undefined ? rows : rows.filter((row) => row.pane_key === paneKeyFilter)
+  const filtered =
+    paneKeyFilter === undefined ? rows : rows.filter((row) => row.pane_key === paneKeyFilter)
   return { asks: filtered.map((row) => registryEventFromRow(row, epoch)), maxSeq: db.currentSeq() }
 }
 
@@ -96,14 +99,15 @@ export const ASK_METHODS = [
     name: 'ask.wait',
     params: AskWaitParams,
     handler: async (params, { runtime, signal }) => {
-      const { db, registry } = runtime.getAskServices()
+      const { db, registry, waitGate } = runtime.getAskServices()
       const chunkMs = params.chunkMs ?? ASK_DEFAULT_CHUNK_MS
       const waitSignal = signal ?? new AbortController().signal
       const row = db.getAsk(params.askId)
-      if (row?.origin === 'handoff') {
-        return waitHandoffChunk(runtime, db, params.askId, chunkMs, waitSignal)
-      }
-      return registry.waitChunk(params.askId, chunkMs, waitSignal)
+      return waitGate.run(() =>
+        row?.origin === 'handoff'
+          ? waitHandoffChunk(runtime, db, params.askId, chunkMs, waitSignal)
+          : registry.waitChunk(params.askId, chunkMs, waitSignal)
+      )
     }
   }),
 
@@ -119,10 +123,18 @@ export const ASK_METHODS = [
       const spec = JSON.parse(row.spec_json) as AskSpec
       const validation = validateAskAnswerSubmission(spec, params.answers, params.skipped)
       if (!validation.ok) {
-        throw new Error(validation.errors.map((error) => `${error.path}: ${error.message}`).join('; '))
+        throw new Error(
+          validation.errors.map((error) => `${error.path}: ${error.message}`).join('; ')
+        )
       }
       if (row.origin === 'handoff') {
-        return commitHandoffAnswer(runtime, db, params.askId, validation.answers, validation.skipped)
+        return commitHandoffAnswer(
+          runtime,
+          db,
+          params.askId,
+          validation.answers,
+          validation.skipped
+        )
       }
       return registry.answer(params.askId, validation.answers, validation.skipped)
     }

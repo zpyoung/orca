@@ -915,6 +915,12 @@
       "lines": ["import { LedgerError } from '../../../shared/ledger'"]
     },
     {
+      "path": "src/main/runtime/rpc/errors.ts",
+      "feature": "ask-question-tool",
+      "kind": "passthrough",
+      "lines": ["  'runtime_busy',"]
+    },
+    {
       "path": "src/main/runtime/rpc/methods/artifacts.ts",
       "feature": "artifact-passwords",
       "kind": "registration",
@@ -5057,7 +5063,7 @@
       "removed": 1
     },
     "src/main/runtime/rpc/errors.ts": {
-      "added": 8,
+      "added": 9,
       "removed": 0
     },
     "src/main/runtime/rpc/methods/artifacts.ts": {

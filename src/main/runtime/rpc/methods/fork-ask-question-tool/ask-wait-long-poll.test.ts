@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { AskDb } from '../../../../fork-ask-question-tool/ask-db'
 import { AskRegistry } from '../../../../fork-ask-question-tool/ask-registry'
 import { createAskAttachedSurfaceRoster } from '../../../../fork-ask-question-tool/ask-attached-surface-roster'
+import { createAskWaitConcurrencyGate } from '../../../../fork-ask-question-tool/ask-wait-concurrency-gate'
 import { OrcaRuntimeService } from '../../../orca-runtime'
 import { OrcaRuntimeRpcServer } from '../../../runtime-rpc'
 import { readRuntimeMetadata } from '../../../runtime-metadata'
@@ -49,7 +50,7 @@ describe('ask.wait long-poll transport', () => {
     const runtime = new OrcaRuntimeService()
     const getAskServicesSpy = vi
       .spyOn(runtime, 'getAskServices')
-      .mockReturnValue({ db, registry, roster })
+      .mockReturnValue({ db, registry, roster, waitGate: createAskWaitConcurrencyGate() })
     const { askId } = await registry.register(
       { questions: [{ id: 'q1', type: 'text', question: 'Still waiting?' }] },
       { paneKey: 'tab_wait:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', worktreeId: null },
