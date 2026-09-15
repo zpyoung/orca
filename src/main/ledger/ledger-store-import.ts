@@ -45,10 +45,12 @@ export function reconcileLedgerImports(
       try {
         dependencies.commit(next)
       } catch (error) {
-        throw new LedgerError('storage-failed', 'Import commit failed', {
-          cause: String(error),
-          importResult: cloneLedger(result)
+        result.skipped.push({
+          anchor: source.anchor,
+          sourcePath: source.sourcePath,
+          reason: `Import commit failed: ${String(error)}`
         })
+        continue
       }
       record = next
     }

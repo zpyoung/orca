@@ -7,6 +7,21 @@ manifest `exceptions[]` row (`status: "pending-upstream"`, `ledger` pointing at 
 anchor) are created and removed together — see `config/scripts/fork-ownership-manifest.mjs` for
 the invariant this enforces.
 
+## POSIX lookup test startup isolation
+
+**What:** runs the zsh lookup case with `-f` so user startup files cannot replace the fixture
+PATH. The existing alias/function-mask regression uses a temporary executable and a controlled
+`.zshenv` that overwrites PATH, making the failure reproducible on clean sandbox hosts.
+
+**Why upstream, not isolated:** this fixes upstream test isolation, not shipped lookup behavior.
+The existing suite should remain the single source of coverage.
+
+**Paths:** `src/shared/posix-command-path-lookup.test.ts`.
+
+**Orca ledger:** `bug-3`.
+
+**Status:** pending-upstream. Not yet submitted.
+
 ## Retention fix
 
 **What:** `useNativeChatRetainedSession` blanks a retained transcript while a fresh read is
@@ -85,7 +100,7 @@ test file.
 `react-doctor/no-ref-current-in-render`, `react-doctor/no-effect-with-fresh-deps` and
 `react-doctor/no-prop-callback-in-render` default to `error` in the CLI but are absent from
 `config/oxlint-react-doctor.json`, the repo's curated React Doctor rule list, where every listed
-rule runs at `warn`. `react-doctor/effect-needs-cleanup` is stranger still: it *is* on that list at
+rule runs at `warn`. `react-doctor/effect-needs-cleanup` is stranger still: it _is_ on that list at
 `warn`, so the CLI running it at `error` contradicts the severity the repo declares for it. Both fire only on deliberate,
 upstream-authored patterns: latest-value refs written during render, a render-phase array-identity
 cache, and test harnesses whose inline ref literals are the fixture under test. Setting them to
@@ -115,7 +130,7 @@ The `package.json` severities need no `exceptions` row of their own; the file is
 
 The v1.4.193 sync added the last three. The first two are the same shape as the originals — a
 `node:buffer` import and a template literal, on lines the merge touched. The third is different in
-kind: `use-checks-list-state.tsx` wrote `autoExpandedContextRef` *inside* a `setExpandedCheckKeys`
+kind: `use-checks-list-state.tsx` wrote `autoExpandedContextRef` _inside_ a `setExpandedCheckKeys`
 updater, and React may run an updater more than once, so the write is hoisted into the effect that
 queues it. That one is a genuine correctness fix to upstream's hook and worth submitting on its own
 merits, not just to clear the gate.
@@ -256,5 +271,36 @@ file.
 **Paths:**
 
 - `src/main/runtime/structured-agent-session-integration.test.ts`
+
+**Status:** pending-upstream. Not yet submitted.
+
+## bug-35
+
+**What:** the macOS press-and-hold startup routine treated only `com.stablyai.orca` and its
+dot-children as Orca preference domains. The fork ships its packaged app as `com.zpyoung.orca`, so
+the routine recorded `foreign-bundle` and never applied the key-repeat default. The ownership check
+now accepts both exact namespace roots and their dot-children. Unit coverage pins both namespaces
+and rejects lookalike or unrelated identifiers; the startup E2E recognizes either packaged
+identity, and the reference commands use the fork's shipped domain.
+
+An earlier `foreign-bundle` record needs no migration or deletion. It is a non-terminal decision,
+so startup already retries it on every launch and applies the default once the packaged fork domain
+is recognized.
+
+**Why upstream, not isolated:** the domain gate is part of upstream's startup routine and shares its
+one-time record, explicit-user-value preservation, and conservative `defaults(1)` failure handling.
+Forking that routine merely to add one owned namespace would duplicate the safety-critical state
+machine. The narrow two-root allowlist changes no other identity policy: the upstream/development
+namespace remains accepted, and only exact roots or dot-delimited children qualify.
+
+**Paths:**
+
+- `src/main/macos-press-and-hold-default.ts`
+- `src/main/macos-press-and-hold-default.test.ts`
+- `tests/e2e/macos-press-and-hold-startup.spec.ts`
+- `docs/reference/macos-press-and-hold.md`
+
+**Depends on:** the fork's packaged app ID is `com.zpyoung.orca`; upstream and development builds
+continue to use `com.stablyai.orca` or a dot-suffixed child.
 
 **Status:** pending-upstream. Not yet submitted.

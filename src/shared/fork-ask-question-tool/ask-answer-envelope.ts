@@ -66,11 +66,19 @@ export type AskResultBody = {
 export type AskRegisteredEnvelope = { status: 'registered'; askId: string }
 /** `instruction` is a human-readable instruction to resume blocking, e.g. `orca ask wait --id <askId>`. */
 export type AskPendingEnvelope = { status: 'pending'; askId: string; instruction: string }
+
+export function pendingEnvelope(askId: string): AskPendingEnvelope {
+  return { status: 'pending', askId, instruction: `orca ask wait --id ${askId}` }
+}
 export type AskAnsweredEnvelope = { status: 'answered'; askId: string } & AskResultBody
 export type AskPartialEnvelope = { status: 'partial'; askId: string } & AskResultBody
 export type AskDeclinedEnvelope = { status: 'declined'; askId: string } & AskResultBody
 export type AskTimedOutEnvelope = { status: 'timed_out'; askId: string } & AskResultBody
-export type AskUnavailableEnvelope = { status: 'unavailable'; askId: string; reason: string } & AskResultBody
+export type AskUnavailableEnvelope = {
+  status: 'unavailable'
+  askId: string
+  reason: string
+} & AskResultBody
 
 export type AskEnvelope =
   | AskRegisteredEnvelope
