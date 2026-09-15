@@ -36,6 +36,7 @@ import {
   Plus,
   RefreshCw,
   Send,
+  ShieldCheck,
   Wrench,
   X
 } from 'lucide-react'
@@ -132,6 +133,7 @@ import {
 } from '@/components/right-sidebar/pr-comments-ai-launch-ack'
 import { buildPRCommentConversationReplyBody } from '@/components/right-sidebar/pr-comment-fixing-reply-body'
 import { useAppStore } from '@/store'
+import { requestAdversarialReviewLaunch } from '@/components/right-sidebar/adversarial-review/adversarial-review-launch-request'
 import { useAllWorktrees } from '@/store/selectors'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import { useRepoLabels, useRepoAssignees, useImmediateMutation } from '@/hooks/useIssueMetadata'
@@ -5545,6 +5547,23 @@ export default function PullRequestPage({
                     {translate('auto.components.PullRequestPage.1a2570e18e', 'Start new workspace')}
                   </DropdownMenuItem>
                 ) : null}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={() => {
+                    requestAdversarialReviewLaunch({
+                      targetKind: 'hosted',
+                      target: workItem.url
+                    })
+                    useAppStore.getState().setRightSidebarOpen(true)
+                    useAppStore.getState().setRightSidebarTab('adversarial-review')
+                  }}
+                >
+                  <ShieldCheck className="size-4" />
+                  {translate(
+                    'auto.components.PullRequestPage.adversarialReview',
+                    'Adversarial Review…'
+                  )}
+                </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => window.api.shell.openUrl(workItem.url)}>
                   <ExternalLink className="size-4" />
                   {translate('auto.components.PullRequestPage.8ecda455a0', 'Open on GitHub')}

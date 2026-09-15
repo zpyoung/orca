@@ -443,6 +443,7 @@ export type EditorSlice = {
   rightSidebarOpen: boolean
   rightSidebarWidth: number
   rightSidebarTab: ActiveRightSidebarTab
+  selectedAdversarialReviewRunId: string | null
   rightSidebarExplorerView: RightSidebarExplorerView
   rightSidebarRouteRequestId: number
   rightSidebarTabByWorktree: Record<string, ActiveRightSidebarTab>
@@ -452,6 +453,7 @@ export type EditorSlice = {
   setRightSidebarOpen: (open: boolean) => void
   setRightSidebarWidth: (width: number) => void
   setRightSidebarTab: (tab: ActiveRightSidebarTab) => void
+  setSelectedAdversarialReviewRunId: (runId: string | null) => void
   setRightSidebarExplorerView: (view: RightSidebarExplorerView) => void
   showRightSidebarFiles: () => void
   showRightSidebarSearch: (payload?: {
@@ -1536,6 +1538,7 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
   rightSidebarOpen: false,
   rightSidebarWidth: 280,
   rightSidebarTab: 'explorer',
+  selectedAdversarialReviewRunId: null,
   rightSidebarExplorerView: 'files',
   rightSidebarRouteRequestId: 0,
   rightSidebarTabByWorktree: {},
@@ -1550,6 +1553,7 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
       rightSidebarRouteRequestId: s.rightSidebarRouteRequestId + 1,
       ...(tab === 'explorer' ? { rightSidebarExplorerView: 'files' as const } : {})
     })),
+  setSelectedAdversarialReviewRunId: (runId) => set({ selectedAdversarialReviewRunId: runId }),
   setRightSidebarExplorerView: (view) =>
     set((s) => ({
       rightSidebarExplorerView: view,

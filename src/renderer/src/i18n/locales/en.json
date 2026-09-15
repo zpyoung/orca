@@ -1117,6 +1117,7 @@
         "16b3412570": "Merge",
         "131865e231": "Create workspace",
         "f2e64d1c20": "Open in GitLab",
+        "adversarialReview": "Adversarial Review…",
         "84012fa8fb": "Comment",
         "c08e1d5a57": "Comment on {{value0}}{{value1}}…",
         "f11e3e7675": "No pipeline runs for this MR.",
@@ -1446,6 +1447,7 @@
         "c44b70352b": "base branch",
         "b0e80f083d": "wants to merge into",
         "8ecda455a0": "Open on GitHub",
+        "adversarialReview": "Adversarial Review…",
         "1a2570e18e": "Start new workspace",
         "57c13a5aa4": "More PR workspace actions",
         "25690a3855": "Start workspace from PR",
@@ -11243,7 +11245,8 @@
             "fc3095d2ed": "explorer",
             "aiVaultSessionHistory": "Agents",
             "folderWorkspaces": "Attached worktrees",
-            "parentPrChecks": "PR Checks"
+            "parentPrChecks": "PR Checks",
+            "adversarialReview": "Adversarial Review"
           },
           "right": {
             "panel": {
@@ -11334,6 +11337,7 @@
                 "items": {
                   "7aad2c0240": "Hosted review operation in progress…",
                   "9e779995dd": "Create {{value0}}",
+                  "adversarialReview": "Adversarial Review…",
                   "226b85a3a7": "Fetch",
                   "323bb614aa": "Commit & Sync",
                   "2b8e6595fd": "Commit",
@@ -15184,6 +15188,65 @@
         "addressInUse": "Another process may be holding the port. Restart Orca to try again.",
         "unknown": "Restart Orca to try again."
       }
+    }
+  },
+  "adversarialReview": {
+    "launch": {
+      "target": {
+        "worktree": "Current worktree",
+        "branch": "Branch vs base",
+        "hosted": "Hosted review",
+        "commit": "Commit",
+        "path": "Path",
+        "custom": "Custom target",
+        "label": "Target",
+        "folderPlaceholder": "Path or custom target",
+        "worktreePlaceholder": "WORKTREE"
+      },
+      "title": "Start adversarial review",
+      "description": "A separate agent family reviews the resolved artifact without the author's rationale.",
+      "criteria": {
+        "label": "Criteria",
+        "placeholder": "Paste the task contract or acceptance criteria verbatim.",
+        "help": "Criteria is never inferred from commit messages or author reasoning."
+      },
+      "profile": "Profile",
+      "depth": "Depth",
+      "authorFamily": "Author family",
+      "reviewer": "Reviewer",
+      "prepass": "Pre-pass commands",
+      "noCommands": "No commands detected",
+      "cancel": "Cancel",
+      "start": "Start review"
+    },
+    "panel": {
+      "label": "Adversarial review",
+      "title": "Adversarial review",
+      "refresh": "Refresh review runs",
+      "new": "New",
+      "emptyTitle": "No review runs yet",
+      "emptyDescription": "Launch an independent review of the current worktree, a branch, or a path.",
+      "start": "Start adversarial review",
+      "abort": "Abort",
+      "showDriver": "Show driver terminal",
+      "running": "Review is still running…",
+      "noFindings": "No findings"
+    },
+    "finding": {
+      "evidence": "Evidence",
+      "dismiss": "Dismiss",
+      "sendToAgent": "Send to agent",
+      "newAgent": "New agent tab…",
+      "dismissTitle": "Dismiss finding",
+      "dismissDescription": "The reason stays in this campaign and is never sent to later review stages.",
+      "dismissPlaceholder": "Why is this finding not applicable?",
+      "cancel": "Cancel",
+      "dismissConfirm": "Dismiss finding"
+    },
+    "header": {
+      "reduced": "Independence: reduced",
+      "stale": "Verdict is stale",
+      "changed": "changed ·"
     }
   },
   "featureTips": {

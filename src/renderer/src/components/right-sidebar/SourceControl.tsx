@@ -69,6 +69,7 @@ import {
   type DropdownActionKind,
   type DropdownEntry
 } from './source-control-dropdown-items'
+import { requestAdversarialReviewLaunch } from './adversarial-review/adversarial-review-launch-request'
 import { isCommitMessageFieldDisabled } from './source-control-commit-eligibility'
 import { BulkActionBar } from './BulkActionBar'
 import { useSourceControlSelection, type FlatEntry } from './useSourceControlSelection'
@@ -4415,6 +4416,11 @@ function SourceControlInner(): React.JSX.Element {
         case 'push_create_pr':
           void runCreatePrIntent()
           return
+        case 'launchAdversarialReview':
+          requestAdversarialReviewLaunch()
+          setRightSidebarOpen(true)
+          setRightSidebarTab('adversarial-review')
+          return
         case 'push':
         case 'force_push':
         case 'pull':
@@ -4436,7 +4442,9 @@ function SourceControlInner(): React.JSX.Element {
       prGenerating,
       runCreatePrIntent,
       runCompoundCommitAction,
-      runRemoteAction
+      runRemoteAction,
+      setRightSidebarOpen,
+      setRightSidebarTab
     ]
   )
 

@@ -2137,6 +2137,12 @@ export type OrcaHooks = {
   environmentRecipes?: OrcaVmRecipe[] // Project-scoped per-workspace environment recipes
   environmentRecipeDiagnostics?: OrcaVmRecipeDiagnostic[] // Non-fatal validation issues from environmentRecipes
   worktree?: OrcaWorktreeDefaults // Project-scoped defaults applied when a worktree is created
+  review?: OrcaReviewDefaults // Project-scoped adversarial review checks and capture exclusions
+}
+
+export type OrcaReviewDefaults = {
+  checks?: string[]
+  generatedOutputs?: string[]
 }
 
 export type OrcaWorktreeDefaults = {
@@ -3106,6 +3112,12 @@ export type GlobalSettings = {
   commitMessageAi?: CommitMessageAiSettings
   /** Source-control AI generation settings for commit messages and hosted-review drafts. */
   sourceControlAi?: SourceControlAiSettings
+  /** Saved defaults for adversarial-review launches. */
+  adversarialReview?: {
+    defaultDepth?: 'quick' | 'standard' | 'deep'
+    defaultReviewer?: TuiAgent
+    authorFamilyOverride?: 'anthropic' | 'openai' | 'google' | 'other'
+  }
   /** GitLab project preferences (pinned + recent paths). Optional for pre-GitLab profiles; persistence merge fills the default. */
   gitlabProjects?: GitLabProjectSettings
   /** Anonymous product-telemetry state; optional until the one-shot Store.load() migration populates it.
@@ -3346,6 +3358,7 @@ export type RightSidebarTab =
   | 'workspaces'
   | 'pr-checks'
   | 'source-control'
+  | 'adversarial-review'
   | 'checks'
   | 'ports'
   // Plugin-contributed panels are keyed `plugin:<pluginId>/<panelId>` so the

@@ -705,7 +705,7 @@ describe('client UI RPC methods', () => {
     })
   })
 
-  it.each(['workspaces', 'pr-checks', 'plugin:acme.tools/inspector'])(
+  it.each(['workspaces', 'pr-checks', 'adversarial-review', 'plugin:acme.tools/inspector'])(
     'accepts the %s right sidebar tab a paired client can be sitting on',
     async (rightSidebarTab) => {
       const runtime = {

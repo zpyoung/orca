@@ -54,39 +54,39 @@ export const FindingCategorySchema = z
 
 // Presence is not content: upstream rejects a whitespace-only value on every
 // field but `absence`'s `output`, where an empty string is the proof itself.
-const nonBlankString = z.string().refine((value) => value.trim().length > 0, {
+export const FindingNonBlankTextSchema = z.string().refine((value) => value.trim().length > 0, {
   message: 'must not be blank'
 })
 
 const FileLineEvidenceSchema = z.object({
   kind: z.literal('file-line'),
-  ref: nonBlankString,
-  quote: nonBlankString
+  ref: FindingNonBlankTextSchema,
+  quote: FindingNonBlankTextSchema
 })
 
 const QuoteEvidenceSchema = z.object({
   kind: z.literal('quote'),
-  ref: nonBlankString,
-  quote: nonBlankString
+  ref: FindingNonBlankTextSchema,
+  quote: FindingNonBlankTextSchema
 })
 
 const CommandEvidenceSchema = z.object({
   kind: z.literal('command'),
-  command: nonBlankString,
-  output: nonBlankString
+  command: FindingNonBlankTextSchema,
+  output: FindingNonBlankTextSchema
 })
 
 const AbsenceEvidenceSchema = z.object({
   kind: z.literal('absence'),
-  command: nonBlankString,
-  ref: nonBlankString,
+  command: FindingNonBlankTextSchema,
+  ref: FindingNonBlankTextSchema,
   output: z.string()
 })
 
 const PrepassEvidenceSchema = z.object({
   kind: z.literal('prepass'),
-  ref: nonBlankString,
-  output: nonBlankString
+  ref: FindingNonBlankTextSchema,
+  output: FindingNonBlankTextSchema
 })
 
 export const EvidenceSchema = z.discriminatedUnion('kind', [
@@ -106,21 +106,37 @@ export type Evidence = z.infer<typeof EvidenceSchema>
  * `effective_severity`/`blocking` are computed by the evidence gate, never
  * asserted by a stage, and are optional here for exactly that reason.
  */
-export const FindingSchema = z.object({
-  id: FindingIdFieldSchema,
-  severity: FindingSeveritySchema,
-  confidence: FindingConfidenceSchema,
-  category: FindingCategorySchema,
-  claim: nonBlankString,
-  evidence: z.array(EvidenceSchema).min(1),
-  remediation: nonBlankString,
-  patch: z.string().nullable().optional(),
-  stage: FindingStageSchema,
-  disposition: FindingDispositionSchema.optional(),
-  kind: FindingRecordKindSchema.optional(),
-  adjudicated_severity: FindingSeveritySchema.optional(),
-  prior_id: FindingIdSchema.optional(),
-  effective_severity: FindingSeveritySchema.optional(),
-  blocking: z.boolean().optional()
-})
+export const FindingSchema = z
+  .object({
+    id: FindingIdFieldSchema,
+    severity: FindingSeveritySchema,
+    confidence: FindingConfidenceSchema,
+    category: FindingCategorySchema,
+    claim: FindingNonBlankTextSchema,
+    evidence: z.array(EvidenceSchema).min(1),
+    remediation: FindingNonBlankTextSchema,
+    patch: z.string().nullable().optional(),
+    stage: FindingStageSchema,
+    disposition: FindingDispositionSchema.optional(),
+    kind: FindingRecordKindSchema.optional(),
+    adjudicated_severity: FindingSeveritySchema.optional(),
+    prior_id: FindingIdSchema.optional(),
+    effective_severity: FindingSeveritySchema.optional(),
+    blocking: z.boolean().optional(),
+    ruling_reason: FindingNonBlankTextSchema.optional(),
+    counter_evidence: z.array(EvidenceSchema).optional()
+  })
+  .superRefine((finding, ctx) => {
+    if (
+      finding.adjudicated_severity !== undefined &&
+      finding.stage !== 'refute' &&
+      finding.stage !== 'tiebreak'
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['adjudicated_severity'],
+        message: 'only refute and tiebreak may re-grade a finding'
+      })
+    }
+  })
 export type Finding = z.infer<typeof FindingSchema>

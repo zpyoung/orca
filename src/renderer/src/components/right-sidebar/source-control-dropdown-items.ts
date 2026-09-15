@@ -38,6 +38,7 @@ export type DropdownActionKind =
   | 'rebase_base'
   | 'fetch'
   | 'publish'
+  | 'launchAdversarialReview'
 
 export type DropdownItem = {
   kind: DropdownActionKind
@@ -556,6 +557,20 @@ export function resolveDropdownItems(inputs: DropdownActionInputs): DropdownEntr
       }
     )
   }
+  entries.push(
+    { kind: 'separator' },
+    {
+      kind: 'launchAdversarialReview',
+      label: translate(
+        'auto.components.right.sidebar.source.control.dropdown.items.adversarialReview',
+        'Adversarial Review…'
+      ),
+      title: globalBusy
+        ? 'Source control operation in progress…'
+        : 'Review this worktree with an independent agent',
+      disabled: globalBusy
+    }
+  )
   if (!isPullRequestOperationActive) {
     return entries
   }

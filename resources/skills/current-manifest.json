@@ -38,6 +38,24 @@
       ]
     },
     {
+      "name": "orca-adversarial-review",
+      "sourcePath": "skills/orca-adversarial-review",
+      "releaseRevision": 1,
+      "packageDigest": "995bd4e9622e1b18634b63e95cfffa28e6f148f886414425b9cce641104a1522",
+      "gitTreeSha": "2b043b269b1cbcd58b6a6cbf3b7879dfa876b1c1",
+      "files": [
+        {
+          "path": "SKILL.md",
+          "size": 1891,
+          "executable": false,
+          "classification": "text",
+          "exactSha256": "32817614bdeb38f9223fbd8001493b3791532e2eb9a650f47bf46a38d0e5ca5a",
+          "textNormalizedSha256": "32817614bdeb38f9223fbd8001493b3791532e2eb9a650f47bf46a38d0e5ca5a",
+          "identitySha256": "32817614bdeb38f9223fbd8001493b3791532e2eb9a650f47bf46a38d0e5ca5a"
+        }
+      ]
+    },
+    {
       "name": "orca-cli",
       "sourcePath": "skills/orca-cli",
       "releaseRevision": 1,

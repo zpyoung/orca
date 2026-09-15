@@ -523,6 +523,7 @@ import {
 import { RuntimeEmulatorCommands } from './orca-runtime-emulator'
 import type { EmulatorBridge } from '../emulator/emulator-bridge'
 import { getRuntimeFileTargetExecutionHostId, RuntimeFileCommands } from './orca-runtime-files'
+import { ReviewRuntimeCommands } from '../review/review-runtime-commands'
 import { RuntimeGitCommands } from './orca-runtime-git'
 import {
   activateClientSessionTabSelection,
@@ -8722,6 +8723,32 @@ export class OrcaRuntimeService {
     return await this.notifier.saveMobileMarkdownTab(worktreeId, tabId, baseVersion, content)
   }
 
+  private readonly reviewCommands = new ReviewRuntimeCommands({
+    resolveRuntimeFileTarget: (selector) => this.resolveRuntimeFileTarget(selector)
+  })
+
+  reviewRunCreate: ReviewRuntimeCommands['runCreate'] = this.reviewCommands.runCreate.bind(
+    this.reviewCommands
+  )
+  reviewRunList: ReviewRuntimeCommands['runList'] = this.reviewCommands.runList.bind(
+    this.reviewCommands
+  )
+  reviewRunShow: ReviewRuntimeCommands['runShow'] = this.reviewCommands.runShow.bind(
+    this.reviewCommands
+  )
+  reviewRunAbort: ReviewRuntimeCommands['runAbort'] = this.reviewCommands.runAbort.bind(
+    this.reviewCommands
+  )
+  reviewRunFail: ReviewRuntimeCommands['runFail'] = this.reviewCommands.runFail.bind(
+    this.reviewCommands
+  )
+  reviewDismiss: ReviewRuntimeCommands['dismiss'] = this.reviewCommands.dismiss.bind(
+    this.reviewCommands
+  )
+  reviewStaleness: ReviewRuntimeCommands['staleness'] = this.reviewCommands.staleness.bind(
+    this.reviewCommands
+  )
+
   private readonly fileCommands = new RuntimeFileCommands({
     getRuntimeId: () => this.runtimeId,
     requireStore: () => this.requireStore(),
@@ -9045,6 +9072,7 @@ export class OrcaRuntimeService {
   private async resolveRuntimeFileTarget(worktreeSelector: string): Promise<{
     worktree: ResolvedWorktree
     connectionId?: string
+    wslDistro?: string
   }> {
     const folderScope = await this.resolveFolderWorkspaceLaunchScope(worktreeSelector)
     if (folderScope?.folderWorkspace) {
@@ -9057,7 +9085,14 @@ export class OrcaRuntimeService {
     const store = this.requireStore()
     const worktree = await this.resolveWorktreeSelector(worktreeSelector)
     const repo = store.getRepo(worktree.repoId)
-    return { worktree, connectionId: repo?.connectionId ?? undefined }
+    const connectionId = repo?.connectionId ?? undefined
+    const localGitOptions =
+      repo && !connectionId ? getLocalProjectWorktreeGitOptions(store, repo) : {}
+    return {
+      worktree,
+      connectionId,
+      ...(localGitOptions.wslDistro ? { wslDistro: localGitOptions.wslDistro } : {})
+    }
   }
 
   private async resolveKnownWorkspaceFileTarget(

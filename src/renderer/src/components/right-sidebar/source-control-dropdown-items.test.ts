@@ -27,7 +27,7 @@ function inputs(overrides: Partial<DropdownActionInputs> = {}): DropdownActionIn
 }
 
 describe('resolveDropdownItems', () => {
-  it('renders every row — Commit through Publish — for a staged, tracked, ahead+behind branch', () => {
+  it('renders every row and the trailing adversarial-review group', () => {
     const items = resolveDropdownItems(
       inputs({
         stagedCount: 1,
@@ -50,7 +50,9 @@ describe('resolveDropdownItems', () => {
       'sync',
       'rebase_base',
       'fetch',
-      'publish'
+      'publish',
+      'separator',
+      'launchAdversarialReview'
     ])
   })
 

@@ -71,6 +71,13 @@ function normalizeSharedDirectories(value: unknown): string[] {
   return Array.from(seen)
 }
 
+function normalizeOrderedStrings(value: unknown): string[] {
+  if (!Array.isArray(value) || value.length > MAX_ORCA_YAML_COLLECTION_ENTRIES) {
+    return []
+  }
+  return value.map(asTrimmedString).filter((entry): entry is string => entry !== undefined)
+}
+
 function normalizeDefaultTabs(value: unknown): OrcaDefaultTabTemplate[] {
   if (!Array.isArray(value) || value.length > MAX_ORCA_YAML_COLLECTION_ENTRIES) {
     return []
@@ -224,6 +231,11 @@ export function parseOrcaYaml(content: string): OrcaHooks | null {
   const sharedDirectories = worktreeRecord
     ? normalizeSharedDirectories(worktreeRecord.sharedDirectories)
     : []
+  const reviewRecord = asRecord(record.review)
+  const reviewChecks = reviewRecord ? normalizeOrderedStrings(reviewRecord.checks) : []
+  const reviewGeneratedOutputs = reviewRecord
+    ? normalizeOrderedStrings(reviewRecord.generatedOutputs)
+    : []
 
   if (
     !setup &&
@@ -232,7 +244,9 @@ export function parseOrcaYaml(content: string): OrcaHooks | null {
     defaultTabs.length === 0 &&
     environmentRecipes.length === 0 &&
     environmentRecipeDiagnostics.length === 0 &&
-    sharedDirectories.length === 0
+    sharedDirectories.length === 0 &&
+    reviewChecks.length === 0 &&
+    reviewGeneratedOutputs.length === 0
   ) {
     return null
   }
@@ -246,6 +260,16 @@ export function parseOrcaYaml(content: string): OrcaHooks | null {
     ...(defaultTabs.length > 0 ? { defaultTabs } : {}),
     ...(environmentRecipes.length > 0 ? { environmentRecipes } : {}),
     ...(environmentRecipeDiagnostics.length > 0 ? { environmentRecipeDiagnostics } : {}),
-    ...(sharedDirectories.length > 0 ? { worktree: { sharedDirectories } } : {})
+    ...(sharedDirectories.length > 0 ? { worktree: { sharedDirectories } } : {}),
+    ...(reviewChecks.length > 0 || reviewGeneratedOutputs.length > 0
+      ? {
+          review: {
+            ...(reviewChecks.length > 0 ? { checks: reviewChecks } : {}),
+            ...(reviewGeneratedOutputs.length > 0
+              ? { generatedOutputs: reviewGeneratedOutputs }
+              : {})
+          }
+        }
+      : {})
   }
 }

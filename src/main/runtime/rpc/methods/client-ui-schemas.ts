@@ -37,16 +37,8 @@ const WorktreeCardPropertyParam = z.enum(WORKTREE_CARD_PROPERTIES)
 const WorktreeCardProperties = z
   .array(WorktreeCardPropertyParam)
   .transform((value) => normalizeWorktreeCardProperties(value))
-const STATIC_RIGHT_SIDEBAR_TABS = [
-  'explorer',
-  'search',
-  'vault',
-  'workspaces',
-  'pr-checks',
-  'source-control',
-  'checks',
-  'ports'
-] as const
+// oxfmt-ignore
+const STATIC_RIGHT_SIDEBAR_TABS = ['explorer', 'search', 'vault', 'workspaces', 'pr-checks', 'source-control', 'adversarial-review', 'checks', 'ports'] as const
 // Plugin panels are open-ended `plugin:<publisher>.<id>/<panel>` keys, so the
 // schema validates their shape rather than enumerating them.
 const RightSidebarTabParam = z.custom<StaticRightSidebarTab | `plugin:${string}`>(

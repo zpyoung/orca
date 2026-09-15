@@ -72,6 +72,26 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     load: async () => (await import('./handlers/file.js')).FILE_HANDLERS
   },
   {
+    name: 'review',
+    keys: [
+      'review run-create',
+      'review resolve',
+      'review prepass',
+      'review select-model',
+      'review stage-prompt',
+      'review claims',
+      'review merge',
+      'review gate',
+      'review manifest',
+      'review run-abort',
+      'review run-list',
+      'review run-show',
+      'review run-fail',
+      'review dismiss'
+    ],
+    load: async () => (await import('./handlers/review.js')).REVIEW_HANDLERS
+  },
+  {
     name: 'terminal',
     keys: [
       'terminal list',

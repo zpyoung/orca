@@ -20,6 +20,7 @@ import {
   Pencil,
   RefreshCw,
   Send,
+  ShieldCheck,
   X
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -42,6 +43,7 @@ import {
   hasBoundedCommentBodyText
 } from '@/lib/comment-body-submit-state'
 import { useAppStore } from '@/store'
+import { requestAdversarialReviewLaunch } from '@/components/right-sidebar/adversarial-review/adversarial-review-launch-request'
 import type {
   GitLabAssignableUser,
   GitLabPipelineJob,
@@ -1672,6 +1674,27 @@ export default function GitLabItemDialog({
                   {translate('auto.components.GitLabItemDialog.f2e64d1c20', 'Open in GitLab')}
                 </Button>
                 <div className="flex items-center gap-2">
+                  {isMR ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        requestAdversarialReviewLaunch({
+                          targetKind: 'hosted',
+                          target: item.url
+                        })
+                        useAppStore.getState().setRightSidebarOpen(true)
+                        useAppStore.getState().setRightSidebarTab('adversarial-review')
+                        onClose()
+                      }}
+                    >
+                      <ShieldCheck className="size-3.5" />
+                      {translate(
+                        'auto.components.GitLabItemDialog.adversarialReview',
+                        'Adversarial Review…'
+                      )}
+                    </Button>
+                  ) : null}
                   {onCreateWorkspace ? (
                     <Button variant="outline" size="sm" onClick={() => onCreateWorkspace(item)}>
                       {translate('auto.components.GitLabItemDialog.131865e231', 'Create workspace')}

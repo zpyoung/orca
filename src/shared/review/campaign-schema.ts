@@ -1,22 +1,22 @@
 import { z } from 'zod'
-import { FindingSeveritySchema } from './finding-schema'
+import { FindingCategorySchema, FindingIdSchema, FindingSeveritySchema } from './finding-schema'
 import { ResolveTargetKindSchema, ReviewProfileSchema } from './stage-schemas'
 
 const DismissedFindingSchema = z.object({
-  id: z.string().min(1),
+  id: FindingIdSchema,
   run_id: z.string().min(1),
   claim: z.string().min(1),
-  category: z.string().min(1),
+  category: FindingCategorySchema,
   effective_severity: FindingSeveritySchema,
   reason: z.string().min(1),
   dismissed_at: z.string().min(1)
 })
 
 const AcceptedOpenFindingSchema = z.object({
-  id: z.string().min(1),
+  id: FindingIdSchema,
   run_id: z.string().min(1),
   claim: z.string().min(1),
-  category: z.string().min(1),
+  category: FindingCategorySchema,
   effective_severity: FindingSeveritySchema,
   evidence_refs: z.array(z.string())
 })

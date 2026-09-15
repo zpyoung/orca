@@ -117,6 +117,9 @@ export const ORPHAN_WORKTREE_ID = '__orphan__'
 // Why: synthetic local workspace; persistence pruning must classify it without the repo catalog.
 export const FLOATING_TERMINAL_WORKTREE_ID = 'global-floating-terminal'
 
+/** Run-scoped terminals stay alive when their workspace view tab closes. */
+export const REVIEW_RUN_TERMINAL_BUCKET = 'adversarial-review-runs'
+
 export const REPO_COLORS = [
   '#737373', // neutral
   '#ef4444', // red

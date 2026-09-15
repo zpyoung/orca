@@ -1,5 +1,15 @@
 import { z } from 'zod'
 import { AGENT_FAMILIES } from './agent-family'
+import {
+  EvidenceSchema,
+  FindingCategorySchema,
+  FindingConfidenceSchema,
+  FindingDispositionSchema,
+  FindingIdSchema,
+  FindingNonBlankTextSchema,
+  FindingSchema,
+  FindingSeveritySchema
+} from './finding-schema'
 import { REVIEW_CHAIN_STEPS, REVIEW_DEPTHS } from './run-shape'
 
 export const ReviewDepthSchema = z.enum(REVIEW_DEPTHS)
@@ -113,3 +123,59 @@ export const ModelSelectionSchema = z.object({
   chain: ChainSchema
 })
 export type ModelSelection = z.infer<typeof ModelSelectionSchema>
+
+export const ClaimsResultSchema = z.object({
+  claims: z.array(
+    z.object({
+      id: FindingIdSchema,
+      severity: FindingSeveritySchema,
+      confidence: FindingConfidenceSchema,
+      category: FindingCategorySchema,
+      claim: FindingNonBlankTextSchema,
+      evidence: z.array(EvidenceSchema).min(1)
+    })
+  ),
+  findings: z.array(FindingSchema),
+  carried_kinds: z.array(z.enum(['limitation', 'question'])),
+  chain: ChainSchema.extend({ step: z.literal('claims') })
+})
+export type ClaimsResult = z.infer<typeof ClaimsResultSchema>
+
+export const StageJudgmentSchema = z.object({
+  id: FindingIdSchema,
+  disposition: FindingDispositionSchema,
+  reason: FindingNonBlankTextSchema,
+  severity: FindingSeveritySchema.optional(),
+  confidence: FindingConfidenceSchema.optional(),
+  counter_evidence: z.array(EvidenceSchema).optional()
+})
+export type StageJudgment = z.infer<typeof StageJudgmentSchema>
+
+export const MergeResultSchema = z
+  .object({
+    findings: z.array(FindingSchema),
+    stage: z.enum(['refute', 'tiebreak']),
+    judged: z.number().int().nonnegative(),
+    chain: MergeChainSchema
+  })
+  .superRefine((result, ctx) => {
+    if (result.stage !== result.chain.stage) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['chain', 'stage'],
+        message: 'merge envelope and chain stages must agree'
+      })
+    }
+  })
+export type MergeResult = z.infer<typeof MergeResultSchema>
+
+export const QuickFindingsResultSchema = z.object({
+  findings: z.array(FindingSchema),
+  suppressed: z.array(
+    z.object({
+      id: FindingIdSchema.optional(),
+      reason: z.string().min(1)
+    })
+  )
+})
+export type QuickFindingsResult = z.infer<typeof QuickFindingsResultSchema>
