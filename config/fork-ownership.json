@@ -1,6 +1,11 @@
 {
   "features": [
     {
+      "name": "release-routing",
+      "purpose": "Keeps stable and RC release notes and build selection on the fork's release repository.",
+      "globs": ["**/fork-release-routing/**"]
+    },
+    {
       "name": "worktree-groups",
       "purpose": "Lets a worktree join a project group independently of its repo's own group membership, so cross-repo worktrees can share a sidebar section.",
       "globs": ["**/fork-worktree-groups/**"]
@@ -1236,6 +1241,12 @@
       "feature": "fork-infra",
       "kind": "passthrough",
       "lines": ["const TELEMETRY_ENABLED = false"]
+    },
+    {
+      "path": "src/main/updater-release-builds.test.ts",
+      "feature": "release-routing",
+      "kind": "passthrough",
+      "lines": ["      'https://github.com/zpyoung/orca/releases/download/v1.4.159'"]
     },
     {
       "path": "src/main/updater.publishing-window-feed.test.ts",
@@ -3427,6 +3438,33 @@
       "lines": ["    appId: 'com.zpyoung.orca',"]
     },
     {
+      "path": "src/shared/release-channel.ts",
+      "feature": "release-routing",
+      "kind": "registration",
+      "lines": ["export const MAIN_RELEASE_REPO = 'zpyoung/orca'"]
+    },
+    {
+      "path": "src/renderer/src/components/UpdateCard.error-card.test.tsx",
+      "feature": "release-routing",
+      "kind": "passthrough",
+      "lines": [
+        "    expect(openUrl).toHaveBeenCalledWith('https://github.com/zpyoung/orca/releases')",
+        "    expect(openUrl).toHaveBeenCalledWith('https://github.com/zpyoung/orca/releases/tag/v1.4.200')"
+      ]
+    },
+    {
+      "path": "src/shared/release-channel.test.ts",
+      "feature": "release-routing",
+      "kind": "passthrough",
+      "lines": [
+        "    expect(getReleaseRepoForChannel('stable')).toBe('zpyoung/orca')",
+        "    expect(getReleaseRepoForChannel('rc')).toBe('zpyoung/orca')",
+        "      'https://github.com/zpyoung/orca/releases/tag/v1.4.160'",
+        "      'https://github.com/zpyoung/orca/releases/tag/v1.4.160-rc.3'",
+        "    expect(getReleaseNotesUrlForVersion(null)).toBe('https://github.com/zpyoung/orca/releases')"
+      ]
+    },
+    {
       "path": "src/shared/native-chat-agent-profiles.ts",
       "feature": "native-chat-session-options",
       "kind": "registration",
@@ -4877,6 +4915,22 @@
       "removed": 1
     },
     "src/main/updater.publishing-window-feed.test.ts": {
+      "added": 5,
+      "removed": 5
+    },
+    "src/main/updater-release-builds.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/shared/release-channel.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/shared/release-channel.test.ts": {
+      "added": 5,
+      "removed": 5
+    },
+    "src/renderer/src/components/UpdateCard.error-card.test.tsx": {
       "added": 5,
       "removed": 5
     },
