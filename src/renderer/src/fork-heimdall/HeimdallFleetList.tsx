@@ -1,4 +1,4 @@
-import { Check } from 'lucide-react'
+import { Bot, Check, CircleHelp, Clock3, ListChecks, Play, WifiOff } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import {
@@ -9,11 +9,16 @@ import {
 } from '@/lib/list-table-layout'
 import type { WatcherFleetEntry, WatcherTarget } from '../../../shared/fork-heimdall/fleet-types'
 import { formatHeimdallAge, formatHeimdallDuration } from './fleet-format'
+import {
+  resolveFleetActivity,
+  resolveFleetWorkflowPhase,
+  resolveFleetWorkspace
+} from './fleet-row-presentation'
 import { sameWatcherTarget } from './fleet-selectors'
 import { HeimdallStatusPill } from './HeimdallStatusPill'
 
 const GRID =
-  'grid min-w-[720px] grid-cols-[minmax(135px,1.4fr)_minmax(120px,1fr)_minmax(85px,0.8fr)_110px_52px_58px_82px]'
+  'grid min-w-[1180px] grid-cols-[minmax(175px,1.25fr)_minmax(165px,1.2fr)_minmax(155px,1fr)_minmax(90px,0.65fr)_minmax(125px,0.9fr)_110px_52px_58px_82px]'
 
 function ActiveBurn({ row }: { row: WatcherFleetEntry }): React.JSX.Element {
   const used = row.entry.status.budget.activeMs
@@ -41,6 +46,146 @@ function ActiveBurn({ row }: { row: WatcherFleetEntry }): React.JSX.Element {
         </div>
       ) : null}
     </div>
+  )
+}
+
+function workflowPhaseLabel(phase: string | null): string {
+  switch (phase) {
+    case 'planning':
+      return translate('fork.heimdall.phase.planning', 'Planning')
+    case 'implementation':
+    case 'implementing':
+      return translate('fork.heimdall.phase.implementing', 'Implementing')
+    case 'checks':
+      return translate('fork.heimdall.phase.checking', 'Checking')
+    case 'review':
+    case 'reviewing':
+      return translate('fork.heimdall.phase.reviewing', 'Reviewing')
+    case 'landing':
+      return translate('fork.heimdall.phase.landing', 'Landing')
+    case 'landed':
+      return translate('fork.heimdall.phase.landed', 'Landed')
+    case null:
+      return translate('fork.heimdall.phase.unavailable', 'Phase unavailable')
+    default: {
+      const readable = phase.replace(/[-_]+/g, ' ')
+      return `${readable.charAt(0).toUpperCase()}${readable.slice(1)}`
+    }
+  }
+}
+
+function ActivityIndicator({
+  row,
+  asOfMs
+}: {
+  row: WatcherFleetEntry
+  asOfMs: number
+}): React.JSX.Element {
+  const activity = resolveFleetActivity(row)
+  if (activity.kind === 'unverifiable') {
+    const detail = translate('fork.heimdall.activity.lastConfirmed', 'Last confirmed {{age}}', {
+      age: formatHeimdallAge(activity.lastConfirmedAtMs, asOfMs)
+    })
+    return (
+      <span className="flex min-w-0 items-start gap-1.5 text-status-warning" title={detail}>
+        <WifiOff className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+        <span className="min-w-0">
+          <span className="block truncate text-xs font-medium">
+            {translate('fork.heimdall.activity.unverifiable', 'Contact unverifiable')}
+          </span>
+          <span className="block truncate text-[11px]">{detail}</span>
+        </span>
+      </span>
+    )
+  }
+  if (activity.kind === 'unknown') {
+    return (
+      <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
+        <CircleHelp className="size-3.5 shrink-0" aria-hidden />
+        <span className="truncate text-xs">
+          {translate('fork.heimdall.activity.unavailable', 'Activity unavailable')}
+        </span>
+      </span>
+    )
+  }
+  if (activity.kind === 'waiting') {
+    const waiting = row.entry.status.state === 'watching'
+    return (
+      <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
+        <Clock3 className="size-3.5 shrink-0" aria-hidden />
+        <span className="truncate text-xs">
+          {waiting
+            ? translate('fork.heimdall.activity.waiting', 'Waiting for change')
+            : translate('fork.heimdall.activity.inactive', 'No active work')}
+        </span>
+      </span>
+    )
+  }
+
+  const started =
+    activity.startedAtMs === null
+      ? null
+      : translate('fork.heimdall.activity.started', 'Started {{age}}', {
+          age: formatHeimdallAge(activity.startedAtMs, asOfMs)
+        })
+  const detail = [activity.detail?.replace(/[-_]+/g, ' '), started]
+    .filter((value): value is string => Boolean(value))
+    .join(' · ')
+  const label =
+    activity.kind === 'agent-in-flight'
+      ? activity.count === 1
+        ? translate('fork.heimdall.activity.agentInFlight', 'Agent work in flight')
+        : translate('fork.heimdall.activity.agentsInFlight', '{{count}} agent tasks in flight', {
+            count: activity.count
+          })
+      : activity.kind === 'check-running'
+        ? translate('fork.heimdall.activity.checkRunning', 'Check running')
+        : translate('fork.heimdall.activity.actionRunning', 'Action running')
+  const Icon =
+    activity.kind === 'agent-in-flight'
+      ? Bot
+      : activity.kind === 'check-running'
+        ? ListChecks
+        : Play
+  return (
+    <span className="flex min-w-0 items-start gap-1.5" title={detail || label}>
+      <Icon className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+      <span className="min-w-0">
+        <span className="block truncate text-xs font-medium">{label}</span>
+        {detail ? (
+          <span className="block truncate text-[11px] text-muted-foreground">{detail}</span>
+        ) : null}
+      </span>
+    </span>
+  )
+}
+
+function WorkspaceCell({
+  row,
+  current
+}: {
+  row: WatcherFleetEntry
+  current: boolean
+}): React.JSX.Element {
+  const workspace = resolveFleetWorkspace(row)
+  const branch = workspace.branch?.replace(/^refs\/heads\//, '') ?? null
+  const location =
+    workspace.kind === 'folder'
+      ? translate('fork.heimdall.workspace.folder', 'Folder')
+      : (branch ?? translate('fork.heimdall.workspace.branchUnavailable', 'Branch unavailable'))
+  const detail = workspace.hostLabel ? `${location} · ${workspace.hostLabel}` : location
+  return (
+    <span className="flex min-w-0 items-start gap-2">
+      {current ? (
+        <Check className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+      ) : (
+        <span className="size-3.5 shrink-0" />
+      )}
+      <span className="min-w-0" title={`${workspace.fullPath}\n${detail}`}>
+        <span className="block truncate font-medium">{workspace.label}</span>
+        <span className="block truncate text-[11px] text-muted-foreground">{detail}</span>
+      </span>
+    </span>
   )
 }
 
@@ -75,9 +220,11 @@ export function HeimdallFleetList({
   return (
     <div className={cn(LIST_TABLE_CONTAINER_CLASS, 'scrollbar-sleek overflow-x-auto')}>
       <div className={cn(GRID, LIST_TABLE_HEADER_CLASS)}>
+        <span>{translate('fork.heimdall.fleet.workspace', 'Workspace')}</span>
         <span>{translate('fork.heimdall.fleet.name', 'Watcher')}</span>
-        <span>{translate('fork.heimdall.fleet.status', 'Status')}</span>
+        <span>{translate('fork.heimdall.fleet.activity', 'Activity')}</span>
         <span>{translate('fork.heimdall.fleet.phase', 'Phase')}</span>
+        <span>{translate('fork.heimdall.fleet.status', 'Status')}</span>
         <span>{translate('fork.heimdall.fleet.activeBurn', 'Active time')}</span>
         <span className="text-right">{translate('fork.heimdall.fleet.turns', 'Turns')}</span>
         <span className="text-right">{translate('fork.heimdall.fleet.elapsed', 'Elapsed')}</span>
@@ -87,6 +234,7 @@ export function HeimdallFleetList({
         {rows.map((row) => {
           const current = sameWatcherTarget(selected, row.target)
           const turnsLimit = row.entry.enrollment.budget.turns
+          const phase = workflowPhaseLabel(resolveFleetWorkflowPhase(row))
           return (
             <button
               key={`${row.target.connectionId ?? 'local'}:${row.target.pairingRevision ?? 'local'}:${row.target.watcherId}`}
@@ -96,24 +244,23 @@ export function HeimdallFleetList({
               onClick={() => onSelect(row.target)}
               aria-pressed={current}
             >
-              <span className="flex min-w-0 items-center gap-2 font-medium">
-                {current ? (
-                  <Check className="size-3.5 shrink-0" aria-hidden />
-                ) : (
-                  <span className="size-3.5" />
-                )}
-                <span className="truncate" title={row.entry.name}>
+              <WorkspaceCell row={row} current={current} />
+              <span className="min-w-0">
+                <span className="block truncate text-xs font-medium" title={row.entry.name}>
                   {row.entry.name}
                 </span>
+                <span className="block truncate text-[11px] text-muted-foreground">
+                  {row.entry.enrollment.kind === 'objective'
+                    ? translate('fork.heimdall.kind.objective', 'Objective')
+                    : translate('fork.heimdall.kind.hostedReview', 'Hosted review')}
+                </span>
+              </span>
+              <ActivityIndicator row={row} asOfMs={asOfMs} />
+              <span className="truncate text-xs" title={phase}>
+                {phase}
               </span>
               <span className="min-w-0 overflow-hidden">
                 <HeimdallStatusPill row={row} />
-              </span>
-              <span
-                className="truncate text-xs text-muted-foreground"
-                title={row.entry.status.phase}
-              >
-                {row.entry.status.phase}
               </span>
               <ActiveBurn row={row} />
               <span className="text-right text-xs tabular-nums">

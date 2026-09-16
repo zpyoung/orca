@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, rm, symlink, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -11,6 +11,7 @@ import { registerSshGitProvider, unregisterSshGitProvider } from '../providers/s
 import type { IFilesystemProvider } from '../providers/types'
 import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
 import { computeWorkspaceContentIdentity, type ObjectiveWorkspaceTarget } from './content-identity'
+import { computeObjectiveWorktreeContentDigest } from './objective-workspace-manifest'
 
 const temporaryDirectories: string[] = []
 
@@ -102,6 +103,46 @@ describe('computeWorkspaceContentIdentity', () => {
     await rm(join(root, 'tracked.txt'))
     await expect(computeWorkspaceContentIdentity(target)).resolves.not.toBe(untrackedIdentity)
   })
+
+  it.skipIf(process.platform === 'win32')(
+    'ignores index-only staging while tracking worktree, HEAD, rename, deletion, and mode changes',
+    async () => {
+      const root = await temporaryDirectory('orca-objective-git-index-')
+      await git(root, ['init'])
+      const trackedPath = join(root, 'tracked.txt')
+      await writeFile(trackedPath, 'initial\n')
+      await commitAll(root, 'initial')
+      const target = gitTarget(root)
+      const cleanIdentity = await computeWorkspaceContentIdentity(target)
+
+      await writeFile(trackedPath, 'staged content\n')
+      const dirtyIdentity = await computeWorkspaceContentIdentity(target)
+      expect(dirtyIdentity).not.toBe(cleanIdentity)
+      await git(root, ['add', '--', 'tracked.txt'])
+      await expect(computeWorkspaceContentIdentity(target)).resolves.toBe(dirtyIdentity)
+
+      await writeFile(trackedPath, 'worktree content\n')
+      const worktreeIdentity = await computeWorkspaceContentIdentity(target)
+      expect(worktreeIdentity).not.toBe(dirtyIdentity)
+      await git(root, ['add', '--', 'tracked.txt'])
+      const stagedWorktreeIdentity = await computeWorkspaceContentIdentity(target)
+      expect(stagedWorktreeIdentity).toBe(worktreeIdentity)
+      await commitAll(root, 'move HEAD tree')
+      const movedHeadIdentity = await computeWorkspaceContentIdentity(target)
+      expect(movedHeadIdentity).not.toBe(stagedWorktreeIdentity)
+
+      await git(root, ['mv', 'tracked.txt', 'renamed.txt'])
+      await expect(computeWorkspaceContentIdentity(target)).resolves.not.toBe(movedHeadIdentity)
+      await git(root, ['reset', '--hard', 'HEAD'])
+
+      await rm(trackedPath)
+      await expect(computeWorkspaceContentIdentity(target)).resolves.not.toBe(movedHeadIdentity)
+      await git(root, ['reset', '--hard', 'HEAD'])
+
+      await chmod(trackedPath, 0o755)
+      await expect(computeWorkspaceContentIdentity(target)).resolves.not.toBe(movedHeadIdentity)
+    }
+  )
 
   it('uses the routed Git provider for remote dirty object hashes and ignores remote .orca paths', async () => {
     const calls: string[][] = []
@@ -283,4 +324,32 @@ describe('computeWorkspaceContentIdentity', () => {
 
     await expect(computeWorkspaceContentIdentity(target)).resolves.not.toBe(firstIdentity)
   })
+})
+
+describe('computeObjectiveWorktreeContentDigest', () => {
+  it.skipIf(process.platform === 'win32')(
+    'tracks a symlink target even when target contents match and tolerates a broken link',
+    async () => {
+      const root = await temporaryDirectory('orca-objective-worktree-digest-')
+      await git(root, ['init'])
+      await writeFile(join(root, 'target-a.txt'), 'identical\n')
+      await writeFile(join(root, 'target-b.txt'), 'identical\n')
+      const link = join(root, 'current.txt')
+      await symlink('target-a.txt', link)
+      await commitAll(root, 'initial symlink')
+      const target = gitTarget(root)
+      const firstDigest = await computeObjectiveWorktreeContentDigest(target)
+
+      await rm(link)
+      await symlink('target-b.txt', link)
+      const retargetedDigest = await computeObjectiveWorktreeContentDigest(target)
+      expect(retargetedDigest).not.toBe(firstDigest)
+
+      await rm(link)
+      await symlink('missing.txt', link)
+      await expect(computeObjectiveWorktreeContentDigest(target)).resolves.toMatch(
+        /^[0-9a-f]{64}$/u
+      )
+    }
+  )
 })

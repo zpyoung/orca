@@ -27,7 +27,9 @@ export type ObjectiveNoActionReason =
   | 'review-report-unavailable'
   | 'landing-in-flight'
   | 'landed-at-bar'
-  | 'awaiting-phase-4'
+  | 'branch-not-attached'
+  | 'push-target-unavailable'
+  | 'base-branch-unresolvable'
 
 export type ObjectiveDecisionOutcome = DecisionOutcome<ObjectiveAction>
 export type ObjectiveAttempt = { attempt: AttemptEntry; action: ObjectiveAction }

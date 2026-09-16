@@ -84,9 +84,12 @@
         "tier": "Tier",
         "landingBar": "Landing bar",
         "maxConcurrency": "Max concurrency",
-        "maxConcurrencyHelp": "Fixed at 1 while objective workers run serially.",
+        "maxConcurrencyHelp": {
+          "one": "Only supported value; actions run serially."
+        },
+        "maxConcurrencyFixedHelp": "Fixed at 1 while objective workers run serially.",
         "territory": "Write territory",
-        "territoryHelp": "One workspace-relative glob per line. .git, .orca, absolute paths, and parent traversal are refused.",
+        "territoryHelp": "Leave blank to allow the whole workspace. Otherwise enter one workspace-relative glob per line.",
         "budgets": "Budgets",
         "activeBudget": "Active work (hours)",
         "activeBudgetA11y": "{{hours}} hours",
@@ -95,15 +98,75 @@
         "roleAgents": "Role agents",
         "roleAgentsHelp": "Automatic lets the owning host choose. Explicit choices are limited to agents detected there.",
         "agentAutomatic": "Automatic",
-        "sitterOverrides": "Later landing overrides",
-        "sitterOverridesHelp": "Stored now for the higher landing rungs delivered in Phase 4.",
+        "sitterOverrides": "Review watcher overrides",
+        "sitterOverridesHelp": "Applied to the review watcher enrolled when the run reaches its hosted-review rung.",
         "inherit": "Use landing defaults",
         "serviceUnavailable": "Heimdall enrollment is not available in this client.",
         "ownerUnavailable": "The workspace owner is unavailable; no enrollment was sent.",
         "ownerUnavailableShort": "Owner unavailable",
+        "landingBarRequiresGit": "Folder workspaces support only the files-on-disk landing bar.",
+        "landingBarRequiresWorktree": "Hosted-review and merged landing bars require a git worktree.",
+        "landingBarRequiresSupportedForge": "Hosted-review and merged landing bars require a GitHub or GitLab repository.",
         "validationTitle": "Fix the contract before starting",
         "cancel": "Cancel",
-        "submit": "Start objective"
+        "submit": "Start objective",
+        "tierHelpLabel": "Tier help",
+        "tierHelpSummary": "Sets the review required before landing.",
+        "tierHelp": {
+          "express": "No reviewer or integrator.",
+          "standard": "Reviewer approval required.",
+          "full": "Reviewer and integrator approval required."
+        },
+        "landingBarHelpLabel": "Landing bar help",
+        "landingBarHelpSummary": "Sets the stopping rung; folders allow only Files on disk.",
+        "landingBarHelp": {
+          "filesOnDisk": "Keep completed edits uncommitted.",
+          "committedLocalBranch": "Commit territory changes locally.",
+          "pushedRef": "Push the commit to its remote branch.",
+          "hostedReview": "Open a review; GitHub/GitLab worktree required.",
+          "merged": "Watcher handoff for gated merge; GitHub/GitLab worktree required."
+        },
+        "maxConcurrencyHelpLabel": "Max concurrency help",
+        "maxConcurrencyHelpSummary": "Sets the worker limit.",
+        "territoryHelpLabel": "Write territory help",
+        "territoryTooltipSummary": "Limits writes; protected .git and .orca paths are always excluded.",
+        "territoryTooltip": {
+          "allWorkspaceLabel": "Whole workspace (blank / **)",
+          "allWorkspace": "Blank becomes ** and allows every other relative path.",
+          "customGlobsLabel": "Custom globs",
+          "customGlobs": "Up to 64 unique relative globs; one per line, no absolute paths or .."
+        },
+        "capabilityModeHelp": {
+          "off": "Blocks this capability.",
+          "gated": "Pauses each action for approval.",
+          "on": "Runs without approval after safety checks."
+        },
+        "capabilityModesHelpLabel": "Capability values help",
+        "capabilityModesHelpSummary": "Sets how each objective action is authorized.",
+        "capabilityHelpLabel": "{{capability}} capability help",
+        "capabilityHelp": {
+          "plan": "Controls planning, replanning, and activation.",
+          "implement": "Controls task dispatch and report ingestion.",
+          "review": "Controls reviewer and Full-tier integrator verdicts.",
+          "check": "Controls active-plan shell checks.",
+          "land": "Controls record, commit, push, and open-review steps."
+        },
+        "territoryOptional": "Write territory (optional)",
+        "territoryPlaceholder": "Whole workspace (default)",
+        "existingPlanFileTypeError": "Choose a .md, .markdown, .txt, or .json file.",
+        "existingPlanFileSizeError": "Choose a file no larger than 256 KB.",
+        "existingPlanLengthError": "Reduce the existing plan to 65,536 characters or fewer.",
+        "existingPlanReadError": "Orca could not read that file. Choose another file or paste the plan.",
+        "hideExistingPlan": "Hide plan",
+        "editExistingPlan": "Edit plan",
+        "addExistingPlan": "Add existing plan",
+        "existingPlanSource": "Existing plan source",
+        "existingPlanHelp": "Paste or import Markdown, text, or JSON as source. The planner converts it into executable tasks; normal Plan approval rules still apply.",
+        "importExistingPlan": "Import file",
+        "existingPlanPlaceholder": "Paste the plan the planner should normalize…",
+        "existingPlanCharacterCount": "{{current}} / {{maximum}} characters",
+        "removeExistingPlan": "Remove plan",
+        "existingPlanPlanOff": "Plan is Off. Any source plan is saved but cannot be processed until Plan is Gated or On; a planner still converts it into executable tasks under that approval mode."
       },
       "validation": {
         "workspaceRequired": "Choose a workspace.",
@@ -111,14 +174,14 @@
         "objectiveTooLong": "The objective must be 16,384 characters or fewer.",
         "landingBarRequiresGit": "Folder workspaces support only the files-on-disk landing bar.",
         "maxConcurrency": "This release supports exactly one objective worker at a time.",
-        "territoryRequired": "Add at least one write-territory glob.",
         "territoryTooMany": "Write territory supports at most 64 globs.",
         "territoryDuplicate": "Write-territory globs must be unique.",
         "territoryInvalid": "Invalid write-territory glob: {{glob}}",
         "capabilitiesInvalid": "All five objective capabilities must be configured.",
         "roleAgentUnknown": "Agent {{agent}} is not available on the selected workspace host.",
         "activeBudgetInvalid": "Choose a positive active-work budget.",
-        "turnBudgetInvalid": "Worker turns must be a whole number of zero or more."
+        "turnBudgetInvalid": "Worker turns must be a whole number of zero or more.",
+        "existingPlanTooLong": "The existing plan must be 65,536 characters or fewer."
       },
       "detail": {
         "title": "Objective",
@@ -163,9 +226,22 @@
         "landing": "Landing",
         "target": "Target",
         "reached": "Reached",
-        "phaseFour": "Phase 4",
         "pending": "Pending",
-        "landingHelp": "Phase 3 proves files on disk. Higher landing rungs remain parked for Phase 4."
+        "handedOff": "Handed off",
+        "openReview": "Open review",
+        "watchedBySitter": "Watched by sitter",
+        "merged": "Merged",
+        "landingHelp": "Rungs above the reached one are pending; the run stops at its bar."
+      },
+      "workspacePicker": {
+        "placeholder": "Choose a workspace",
+        "searchLabel": "Search workspaces",
+        "searchPlaceholder": "Search by name, path, branch, or host…",
+        "filterLabel": "Filter workspaces",
+        "filterAll": "All",
+        "filterGit": "Git worktrees",
+        "filterFolders": "Folders",
+        "noMatches": "No eligible workspaces match."
       }
     }
   }

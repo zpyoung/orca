@@ -7,14 +7,19 @@ import { makeAttemptFingerprint } from '../../shared/fork-heimdall/attempt-finge
 import type {
   ExecuteContext,
   KernelAction,
+  LeaseGuard,
   WatcherKind
 } from '../../shared/fork-heimdall/kind-contract'
 import {
   getInFlightAttempts,
   getUnresolvedAttempts
 } from '../../shared/fork-heimdall/ledger-queries'
-import type { AttemptEntry, LedgerEntry } from '../../shared/fork-heimdall/ledger-types'
-import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
+import type {
+  AttemptEntry,
+  LedgerEntry,
+  WatcherLedger
+} from '../../shared/fork-heimdall/ledger-types'
+import type { LiveSnapshot, Snapshot } from '../../shared/fork-heimdall/snapshot'
 import type { EnrollInput, WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
 import type { Store } from '../persistence'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
@@ -277,7 +282,7 @@ describe('Heimdall kernel terminal and local recovery lifecycle', () => {
     ])
     expect((await world.service.list())[0]).toMatchObject({ status: { state: 'terminal' } })
     expect(world.leaseStore.release).toHaveBeenCalled()
-    world.service.stopForShutdown()
+    await world.service.stopForShutdown()
 
     const restarted = await harness({ directory: world.directory })
     restarted.service.registerKind(terminalKind)
@@ -291,7 +296,7 @@ describe('Heimdall kernel terminal and local recovery lifecycle', () => {
     expect(
       restarted.service.ledger(watcherId).entries.filter((entry) => entry.kind === 'terminal')
     ).toHaveLength(1)
-    restarted.service.stopForShutdown()
+    await restarted.service.stopForShutdown()
   })
 
   it('keeps polling a running worker after a park predicate fires', async () => {
@@ -349,7 +354,7 @@ describe('Heimdall kernel terminal and local recovery lifecycle', () => {
     expect(world.service.ledger(watcherId).entries.some((entry) => entry.kind === 'terminal')).toBe(
       false
     )
-    world.service.stopForShutdown()
+    await world.service.stopForShutdown()
   })
 
   it('does not seal terminal state while an outcome remains unresolved', async () => {
@@ -390,7 +395,7 @@ describe('Heimdall kernel terminal and local recovery lifecycle', () => {
     await world.service.reconcileForTesting(watcherId)
     expect(world.enrollmentStore.get(watcherId)).toMatchObject({ terminalAtMs: 100 })
     expect(getUnresolvedAttempts(world.service.ledger(watcherId))).toHaveLength(0)
-    world.service.stopForShutdown()
+    await world.service.stopForShutdown()
   })
 
   it('does not persist a probe result after losing its lease during the probe', async () => {
@@ -425,7 +430,7 @@ describe('Heimdall kernel terminal and local recovery lifecycle', () => {
     const ledger = world.service.ledger(watcherId)
     expect(ledger.entries.some((entry) => entry.kind === 'attempt-resolved')).toBe(false)
     expect(getUnresolvedAttempts(ledger)).toHaveLength(1)
-    world.service.stopForShutdown()
+    await world.service.stopForShutdown()
   })
 
   it('repairs a terminal fact committed before the enrollment marker', async () => {
@@ -463,7 +468,7 @@ describe('Heimdall kernel terminal and local recovery lifecycle', () => {
         .ledger(enrollment.watcherId)
         .entries.filter((entry) => entry.kind === 'terminal')
     ).toHaveLength(1)
-    world.service.stopForShutdown()
+    await world.service.stopForShutdown()
   })
 
   it('recovers a concrete dispatch receipt before kind outcome probing', async () => {
@@ -514,7 +519,7 @@ describe('Heimdall kernel terminal and local recovery lifecycle', () => {
     ])
     expect(ledger.entries.filter((entry) => entry.kind === 'turn')).toHaveLength(1)
     expect(resolveOutcome).not.toHaveBeenCalled()
-    world.service.stopForShutdown()
+    await world.service.stopForShutdown()
   })
 
   it('replays an identity-current action marked replay-safe under the lease', async () => {
@@ -549,7 +554,7 @@ describe('Heimdall kernel terminal and local recovery lifecycle', () => {
         effect: 'landed'
       })
     )
-    world.service.stopForShutdown()
+    await world.service.stopForShutdown()
   })
 
   it('settles an absent dispatch receipt while its watcher is disabled', async () => {
@@ -588,7 +593,7 @@ describe('Heimdall kernel terminal and local recovery lifecycle', () => {
         reason: 'dispatch-receipt-absent'
       })
     )
-    world.service.stopForShutdown()
+    await world.service.stopForShutdown()
   })
 
   it('does not replay a probe-only action with an uncertain shell effect', async () => {
@@ -612,13 +617,14 @@ describe('Heimdall kernel terminal and local recovery lifecycle', () => {
     expect(getUnresolvedAttempts(ledger)).toEqual([
       expect.objectContaining({ attemptId: 'attempt-1', effect: 'indeterminate' })
     ])
-    world.service.stopForShutdown()
+    await world.service.stopForShutdown()
   })
 
-  it('abandons replay-safe work when the live content identity moved', async () => {
+  it('probes stale replay-safe work without replaying it at the new identity', async () => {
     const execute = vi.fn(async () => ({ effect: 'landed' as const }))
+    const resolveOutcome = vi.fn(async () => 'not-landed' as const)
     const world = await harness()
-    world.service.registerKind(watcherKind({ execute }))
+    world.service.registerKind(watcherKind({ execute, resolveOutcome }))
     const enrolled = await world.service.enroll(input)
     if (enrolled.status !== 'enrolled') {
       throw new Error('Expected enrollment')
@@ -628,18 +634,383 @@ describe('Heimdall kernel terminal and local recovery lifecycle', () => {
 
     await world.service.reconcileForTesting(watcherId)
 
+    expect(resolveOutcome).toHaveBeenCalledOnce()
     expect(execute).not.toHaveBeenCalled()
-    expect(world.service.ledger(watcherId).entries).toEqual(
+    expect(world.service.ledger(watcherId).entries).toContainEqual(
+      expect.objectContaining({
+        kind: 'attempt',
+        state: 'settled',
+        effect: 'not-landed',
+        reason: 'local-action-recovery-probe'
+      })
+    )
+    expect(
+      world.service.ledger(watcherId).entries.some((entry) => entry.kind === 'attempt-abandoned')
+    ).toBe(false)
+    await world.service.stopForShutdown()
+  })
+
+  it('accepts authoritative landed repair after a local action changes identity', async () => {
+    const execute = vi.fn(async () => ({ effect: 'landed' as const }))
+    const repairMissingRung = vi.fn()
+    const resolveOutcome = vi.fn(
+      async (
+        _attempt: AttemptEntry,
+        _fresh: LiveSnapshot<World>,
+        _ledger: WatcherLedger,
+        lease: LeaseGuard
+      ) => {
+        await lease.assertHeld()
+        repairMissingRung()
+        return 'landed' as const
+      }
+    )
+    const world = await harness()
+    world.service.registerKind(watcherKind({ execute, resolveOutcome }))
+    const enrolled = await world.service.enroll(input)
+    if (enrolled.status !== 'enrolled') {
+      throw new Error('Expected enrollment')
+    }
+    const watcherId = enrolled.entry.enrollment.watcherId
+    world.ledgerStore.append(attempted(watcherId, action('stale-revision', 'replay-safe')))
+
+    await world.service.reconcileForTesting(watcherId)
+
+    expect(resolveOutcome).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: expect.objectContaining({ contentIdentity: 'stale-revision' })
+      }),
+      expect.objectContaining({ contentIdentity: 'revision-1' }),
+      expect.any(Object),
+      expect.objectContaining({ epoch: 1, assertHeld: expect.any(Function) })
+    )
+    expect(repairMissingRung).toHaveBeenCalledOnce()
+    expect(execute).not.toHaveBeenCalled()
+    expect(world.service.ledger(watcherId).entries).toContainEqual(
+      expect.objectContaining({
+        kind: 'attempt',
+        state: 'settled',
+        effect: 'landed',
+        reason: 'local-action-recovery-probe'
+      })
+    )
+    await world.service.stopForShutdown()
+  })
+
+  it('authoritatively probes an external attempt after an identity move', async () => {
+    const execute = vi.fn(async () => ({ effect: 'landed' as const }))
+    const resolveOutcome = vi.fn(async () => 'landed' as const)
+    const world = await harness()
+    world.service.registerKind(watcherKind({ execute, resolveOutcome }))
+    const enrolled = await world.service.enroll(input)
+    if (enrolled.status !== 'enrolled') {
+      throw new Error('Expected enrollment')
+    }
+    const watcherId = enrolled.entry.enrollment.watcherId
+    const externalAction: KernelAction = {
+      kind: 'push-ref',
+      capability: 'land',
+      visibility: 'external',
+      contentIdentity: 'stale-revision',
+      evidenceKey: 'push-ref:stale-revision',
+      expectedState: { target: 'origin/feature', before: 'remote-before' }
+    }
+    world.ledgerStore.append(attempted(watcherId, externalAction))
+
+    await world.service.reconcileForTesting(watcherId)
+
+    expect(resolveOutcome).toHaveBeenCalledOnce()
+    expect(execute).not.toHaveBeenCalled()
+    expect(world.service.ledger(watcherId).entries).toContainEqual(
+      expect.objectContaining({
+        kind: 'attempt',
+        state: 'settled',
+        effect: 'landed',
+        reason: 'local-action-recovery-probe'
+      })
+    )
+    expect(
+      world.service.ledger(watcherId).entries.some((entry) => entry.kind === 'attempt-abandoned')
+    ).toBe(false)
+    await world.service.stopForShutdown()
+  })
+})
+
+const objectiveInput: EnrollInput = {
+  ...input,
+  kind: 'objective',
+  kindPayload: { label: 'Objective' }
+}
+
+const sitterInput: EnrollInput = {
+  ...input,
+  kindPayload: { label: 'Sitter', reviewUrl: 'https://example.test/review/1' }
+}
+
+function handoffObjective(
+  derive = vi.fn(async () => ({
+    kind: 'enroll' as const,
+    input: sitterInput,
+    reason: 'bar-reached'
+  }))
+) {
+  return watcherKind({
+    id: 'objective',
+    authorizeEnrollment: async (enrollment) => authorized(enrollment),
+    handoff: { derive },
+    stopPredicates: [
+      {
+        id: 'objective-bar-reached',
+        disposition: 'terminal',
+        evaluate: () => ({
+          stop: true,
+          reason: 'hosted-review rung reached; handed off',
+          detail: 'revision-1'
+        })
+      }
+    ]
+  })
+}
+
+function handoffSitter(
+  overrides: Partial<WatcherKind<World, KernelAction, { label: string }>> = {}
+) {
+  return watcherKind({
+    enrollmentPayloadSchema: z.object({ label: z.string(), reviewUrl: z.string().url() }).strict(),
+    ...overrides
+  })
+}
+
+describe('Heimdall atomic terminal handoff', () => {
+  it('commits both ledgers and the sitter enrollment once before activation', async () => {
+    const derive = vi.fn(async () => ({
+      kind: 'enroll' as const,
+      input: sitterInput,
+      reason: 'bar-reached'
+    }))
+    const world = await harness()
+    world.service.registerKind(handoffSitter())
+    world.service.registerKind(handoffObjective(derive))
+    const enrolled = await world.service.enroll(objectiveInput)
+    if (enrolled.status !== 'enrolled') {
+      throw new Error('Expected objective enrollment')
+    }
+    const objectiveId = enrolled.entry.enrollment.watcherId
+
+    await world.service.reconcileForTesting(objectiveId)
+
+    const records = world.enrollmentStore.list()
+    const sitter = records.find((record) => record.kind === 'hosted-review')
+    expect(records).toHaveLength(2)
+    expect(world.enrollmentStore.get(objectiveId)).toMatchObject({
+      enabled: false,
+      terminalAtMs: 100
+    })
+    expect(sitter).toMatchObject({ enabled: true, terminalAtMs: null, createdAtMs: 100 })
+    if (!sitter) {
+      throw new Error('Expected sitter enrollment')
+    }
+    expect(
+      world.service
+        .ledger(objectiveId)
+        .entries.filter(
+          (entry) =>
+            (entry.kind === 'evidence' && entry.evidenceKind === 'handoff') ||
+            entry.kind === 'terminal'
+        )
+        .map((entry) => entry.kind)
+    ).toEqual(['evidence', 'terminal'])
+    expect(world.service.ledger(sitter.watcherId).entries[0]).toMatchObject({
+      kind: 'evidence',
+      evidenceKind: 'handoff-origin',
+      payload: {
+        objectiveWatcherId: objectiveId,
+        contentIdentity: 'revision-1',
+        reachedRung: 'hosted-review'
+      }
+    })
+
+    await world.service.reconcileForTesting(objectiveId)
+    expect(derive).toHaveBeenCalledTimes(1)
+    expect(
+      world.enrollmentStore.list().filter((record) => record.kind === 'hosted-review')
+    ).toHaveLength(1)
+    await world.service.stopForShutdown()
+  })
+
+  it('terminates with an escalation when sitter authorization is refused', async () => {
+    const world = await harness()
+    world.service.registerKind(
+      handoffSitter({
+        authorizeEnrollment: async () => {
+          throw new Error('review closed')
+        }
+      })
+    )
+    world.service.registerKind(handoffObjective())
+    const enrolled = await world.service.enroll(objectiveInput)
+    if (enrolled.status !== 'enrolled') {
+      throw new Error('Expected objective enrollment')
+    }
+    const objectiveId = enrolled.entry.enrollment.watcherId
+
+    await world.service.reconcileForTesting(objectiveId)
+
+    expect(world.enrollmentStore.list()).toHaveLength(1)
+    expect(world.enrollmentStore.get(objectiveId)?.terminalAtMs).toBe(100)
+    expect(world.service.ledger(objectiveId).entries).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          kind: 'attempt',
-          state: 'settled',
-          effect: 'not-landed',
-          reason: 'workspace-moved'
+          kind: 'escalation',
+          escalationKind: 'handoff-refused',
+          status: 'open',
+          reason: 'review closed'
         }),
-        expect.objectContaining({ kind: 'attempt-abandoned', reason: 'workspace-moved' })
+        expect.objectContaining({ kind: 'terminal' })
       ])
     )
-    world.service.stopForShutdown()
+    await world.service.stopForShutdown()
+  })
+
+  it('refuses a sitter authorization that moves the handoff to another workspace', async () => {
+    const world = await harness()
+    world.service.registerKind(
+      handoffSitter({
+        authorizeEnrollment: async (enrollment) => ({
+          ...authorized(enrollment),
+          workspaceKey: 'runtime:other-host::/workspace/moved' as const,
+          executionHostId: 'runtime:other-host' as const,
+          workspacePath: '/workspace/moved'
+        })
+      })
+    )
+    world.service.registerKind(handoffObjective())
+    const enrolled = await world.service.enroll(objectiveInput)
+    if (enrolled.status !== 'enrolled') {
+      throw new Error('Expected objective enrollment')
+    }
+    const objectiveId = enrolled.entry.enrollment.watcherId
+
+    await world.service.reconcileForTesting(objectiveId)
+
+    expect(world.enrollmentStore.list()).toHaveLength(1)
+    expect(world.enrollmentStore.get(objectiveId)?.terminalAtMs).toBe(100)
+    expect(world.service.ledger(objectiveId).entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'escalation',
+          escalationKind: 'handoff-refused',
+          reason: 'Authorized handoff workspace does not match the terminating watcher'
+        }),
+        expect.objectContaining({ kind: 'terminal' })
+      ])
+    )
+    await world.service.stopForShutdown()
+  })
+
+  it('writes no terminal or sitter after authorization loses the lease', async () => {
+    const world = await harness()
+    world.service.registerKind(
+      handoffSitter({
+        authorizeEnrollment: async (enrollment) => {
+          world.assertHeld.mockRejectedValueOnce(new Error('lease lost'))
+          return authorized(enrollment)
+        }
+      })
+    )
+    world.service.registerKind(handoffObjective())
+    const enrolled = await world.service.enroll(objectiveInput)
+    if (enrolled.status !== 'enrolled') {
+      throw new Error('Expected objective enrollment')
+    }
+    const objectiveId = enrolled.entry.enrollment.watcherId
+
+    await world.service.reconcileForTesting(objectiveId)
+
+    expect(world.enrollmentStore.list()).toHaveLength(1)
+    expect(world.enrollmentStore.get(objectiveId)).toMatchObject({
+      enabled: true,
+      terminalAtMs: null
+    })
+    expect(
+      world.service
+        .ledger(objectiveId)
+        .entries.some(
+          (entry) =>
+            entry.kind === 'terminal' ||
+            (entry.kind === 'evidence' && entry.evidenceKind === 'handoff')
+        )
+    ).toBe(false)
+    await world.service.stopForShutdown()
+  })
+
+  it('rolls the objective terminal and ledger back when sitter insertion fails', async () => {
+    const world = await harness()
+    world.service.registerKind(handoffSitter())
+    world.service.registerKind(handoffObjective())
+    const enrolled = await world.service.enroll(objectiveInput)
+    if (enrolled.status !== 'enrolled') {
+      throw new Error('Expected objective enrollment')
+    }
+    const objectiveId = enrolled.entry.enrollment.watcherId
+    const insert = world.enrollmentStore.insert.bind(world.enrollmentStore)
+    vi.spyOn(world.enrollmentStore, 'insert').mockImplementation((enrollment) => {
+      if (enrollment.kind === 'hosted-review') {
+        throw new Error('sitter insert failed')
+      }
+      return insert(enrollment)
+    })
+
+    await world.service.reconcileForTesting(objectiveId)
+
+    expect(world.enrollmentStore.list()).toHaveLength(1)
+    expect(world.enrollmentStore.get(objectiveId)).toMatchObject({
+      enabled: true,
+      terminalAtMs: null
+    })
+    expect(
+      world.service
+        .ledger(objectiveId)
+        .entries.some(
+          (entry) =>
+            entry.kind === 'terminal' ||
+            (entry.kind === 'evidence' && entry.evidenceKind === 'handoff')
+        )
+    ).toBe(false)
+    await world.service.stopForShutdown()
+  })
+
+  it('retries a duplicate workspace insertion as a refused terminal handoff', async () => {
+    const world = await harness()
+    world.service.registerKind(handoffSitter())
+    world.service.registerKind(handoffObjective())
+    const enrolled = await world.service.enroll(objectiveInput)
+    if (enrolled.status !== 'enrolled') {
+      throw new Error('Expected objective enrollment')
+    }
+    const objectiveId = enrolled.entry.enrollment.watcherId
+    const collision = Object.assign(
+      new Error('UNIQUE constraint failed: heimdall_enrollment.workspace_key'),
+      { code: 'SQLITE_CONSTRAINT_UNIQUE' }
+    )
+    vi.spyOn(world.enrollmentStore, 'insert').mockImplementationOnce(() => {
+      throw collision
+    })
+
+    await world.service.reconcileForTesting(objectiveId)
+
+    expect(world.enrollmentStore.list()).toHaveLength(1)
+    expect(world.enrollmentStore.get(objectiveId)?.terminalAtMs).toBe(100)
+    expect(world.service.ledger(objectiveId).entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'escalation',
+          escalationKind: 'handoff-refused',
+          reason: 'duplicate-workspace'
+        }),
+        expect.objectContaining({ kind: 'terminal' })
+      ])
+    )
+    await world.service.stopForShutdown()
   })
 })

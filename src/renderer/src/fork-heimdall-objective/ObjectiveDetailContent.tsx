@@ -1,15 +1,21 @@
+import { ExternalLink } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { translate } from '@/i18n/i18n'
+import { useAppStore } from '@/store'
 import type { ObjectiveDetail } from '../../../shared/fork-heimdall-objective/detail-types'
+import { OBJECTIVE_LANDING_LADDER } from '../../../shared/fork-heimdall-objective/landing-ladder'
+import type { WatcherLedger } from '../../../shared/fork-heimdall/ledger-types'
 import type { WatcherFleetEntry } from '../../../shared/fork-heimdall/fleet-types'
 import { formatHeimdallTime } from '../fork-heimdall/fleet-format'
+import { sameWatcherTarget } from '../fork-heimdall/fleet-selectors'
 import {
   OBJECTIVE_CAPABILITIES,
-  OBJECTIVE_LANDING_BARS,
   OBJECTIVE_ROLES,
   OBJECTIVE_SITTER_CAPABILITIES
 } from './objective-enrollment-model'
+import { objectiveHandoffEvidence } from './handoff-evidence'
 import {
   objectiveCapabilityLabel,
   objectiveCapabilityModeLabel,
@@ -354,8 +360,47 @@ function ObjectivePlan({ detail }: { detail: ObjectiveDetail }): React.JSX.Eleme
   )
 }
 
-function ObjectiveLanding({ detail }: { detail: ObjectiveDetail }): React.JSX.Element {
-  const targetIndex = OBJECTIVE_LANDING_BARS.indexOf(detail.contract.landingBar)
+const EMPTY_FLEET: readonly WatcherFleetEntry[] = []
+function latestLandingEvidence(
+  detail: ObjectiveDetail,
+  rung: ObjectiveDetail['landing'][number]['rung']
+): ObjectiveDetail['landing'][number] | undefined {
+  for (let index = detail.landing.length - 1; index >= 0; index -= 1) {
+    const evidence = detail.landing[index]
+    if (evidence?.rung === rung) {
+      return evidence
+    }
+  }
+  return undefined
+}
+
+function ObjectiveLanding({
+  detail,
+  ledger,
+  row
+}: {
+  detail: ObjectiveDetail
+  ledger: WatcherLedger | null
+  row: WatcherFleetEntry
+}): React.JSX.Element {
+  const fleet = useAppStore((state) => state.heimdallFleet?.entries ?? EMPTY_FLEET)
+  const selectWatcher = useAppStore((state) => state.selectHeimdallWatcher)
+  const handoff = objectiveHandoffEvidence(ledger)
+  const sitterTarget = handoff ? { ...row.target, watcherId: handoff.sitterWatcherId } : null
+  const sitter = sitterTarget
+    ? fleet.find((candidate) => sameWatcherTarget(sitterTarget, candidate.target))
+    : undefined
+  const sitterMerged =
+    sitter?.entry.status.state === 'terminal' && sitter.entry.status.reason === 'review merged'
+  const sitterLive =
+    sitter !== undefined &&
+    sitter.entry.enrollment.terminalAtMs === null &&
+    sitter.entry.status.enabled &&
+    sitter.entry.status.state !== 'terminal' &&
+    sitter.entry.status.state !== 'disabled'
+  const targetIndex = OBJECTIVE_LANDING_LADDER.indexOf(detail.contract.landingBar)
+  const visibleRungs = OBJECTIVE_LANDING_LADDER.slice(0, targetIndex + 1)
+
   return (
     <section aria-labelledby="objective-landing-title">
       <h3
@@ -365,16 +410,18 @@ function ObjectiveLanding({ detail }: { detail: ObjectiveDetail }): React.JSX.El
         {translate('fork.heimdallObjective.detail.landing', 'Landing')}
       </h3>
       <ol className="divide-y divide-border rounded-md border border-border bg-muted/10">
-        {OBJECTIVE_LANDING_BARS.map((rung, index) => {
-          const evidence = detail.landing.toReversed().find((entry) => entry.rung === rung)
-          const phaseFour = rung !== 'files-on-disk' && !evidence
+        {visibleRungs.map((rung, index) => {
+          const evidence = rung === 'merged' ? undefined : latestLandingEvidence(detail, rung)
+          const merged = rung === 'merged' && sitterMerged
+          const watchedBySitter = rung === 'merged' && sitterLive
+          const reached = Boolean(evidence) || merged
           return (
             <li
               key={rung}
               className="flex flex-wrap items-center gap-2 px-3 py-2 text-xs"
-              data-objective-landing-reached={evidence ? '' : undefined}
+              data-objective-landing-reached={reached ? '' : undefined}
             >
-              <span className={evidence ? 'font-medium text-foreground' : 'text-muted-foreground'}>
+              <span className={reached ? 'font-medium text-foreground' : 'text-muted-foreground'}>
                 {objectiveLandingBarLabel(rung)}
               </span>
               {index === targetIndex ? (
@@ -387,6 +434,23 @@ function ObjectiveLanding({ detail }: { detail: ObjectiveDetail }): React.JSX.El
                   <Badge variant="secondary">
                     {translate('fork.heimdallObjective.detail.reached', 'Reached')}
                   </Badge>
+                  {rung === 'hosted-review' && handoff ? (
+                    <>
+                      <Badge variant="outline">
+                        {translate('fork.heimdallObjective.detail.handedOff', 'Handed off')}
+                      </Badge>
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="xs"
+                        className="h-auto gap-1 p-0 text-xs"
+                        onClick={() => void window.api.shell.openUrl(handoff.reviewUrl)}
+                      >
+                        {translate('fork.heimdallObjective.detail.openReview', 'Open review')}
+                        <ExternalLink className="size-3" aria-hidden />
+                      </Button>
+                    </>
+                  ) : null}
                   <span
                     className="font-mono text-[11px] text-muted-foreground"
                     title={evidence.contentIdentity}
@@ -400,10 +464,28 @@ function ObjectiveLanding({ detail }: { detail: ObjectiveDetail }): React.JSX.El
                     {formatHeimdallTime(evidence.atMs)}
                   </time>
                 </>
-              ) : phaseFour ? (
-                <span className="ml-auto text-[11px] text-muted-foreground">
-                  {translate('fork.heimdallObjective.detail.phaseFour', 'Phase 4')}
-                </span>
+              ) : merged ? (
+                <Badge variant="secondary">
+                  {translate('fork.heimdallObjective.detail.merged', 'Merged')}
+                </Badge>
+              ) : watchedBySitter && sitter ? (
+                <>
+                  <span className="text-[11px] text-muted-foreground">
+                    {translate(
+                      'fork.heimdallObjective.detail.watchedBySitter',
+                      'Watched by sitter'
+                    )}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="xs"
+                    className="h-auto p-0 font-mono text-[11px]"
+                    onClick={() => selectWatcher(sitter.target)}
+                  >
+                    {sitter.target.watcherId}
+                  </Button>
+                </>
               ) : (
                 <span className="ml-auto text-[11px] text-muted-foreground">
                   {translate('fork.heimdallObjective.detail.pending', 'Pending')}
@@ -416,7 +498,7 @@ function ObjectiveLanding({ detail }: { detail: ObjectiveDetail }): React.JSX.El
       <p className="mt-2 text-[11px] text-muted-foreground">
         {translate(
           'fork.heimdallObjective.detail.landingHelp',
-          'Phase 3 proves files on disk. Higher landing rungs remain parked for Phase 4.'
+          'Rungs above the reached one are pending; the run stops at its bar.'
         )}
       </p>
     </section>
@@ -425,16 +507,18 @@ function ObjectiveLanding({ detail }: { detail: ObjectiveDetail }): React.JSX.El
 
 export function ObjectiveDetailContent({
   detail,
+  ledger,
   row
 }: {
   detail: ObjectiveDetail
+  ledger: WatcherLedger | null
   row: WatcherFleetEntry
 }): React.JSX.Element {
   return (
     <div className="space-y-6">
       <ObjectiveContract detail={detail} row={row} />
       <ObjectivePlan detail={detail} />
-      <ObjectiveLanding detail={detail} />
+      <ObjectiveLanding detail={detail} ledger={ledger} row={row} />
     </div>
   )
 }

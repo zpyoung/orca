@@ -8,9 +8,12 @@ import {
 import type { ObjectiveDatabase } from './objective-database'
 import {
   parseJson,
+  parseLandingPayloadJson,
   type CheckRow,
   type CriterionRow,
+  type LandingRow,
   type ObjectiveCheckAttempt,
+  type ObjectiveLandingPayload,
   type ObjectiveStoredCriterion
 } from './objective-store-data'
 
@@ -155,5 +158,20 @@ export class ObjectiveStoreQueries {
         )
         .get(watcherId, rung, contentIdentity)
     )
+  }
+
+  landingRow(
+    watcherId: string,
+    rung: ObjectiveLandingBar,
+    contentIdentity: string
+  ): ObjectiveLandingPayload | null {
+    const row = this.database
+      .connection()
+      .prepare(
+        `SELECT rung, content_identity, payload_json, created_at_ms
+         FROM landing_evidence WHERE watcher_id = ? AND rung = ? AND content_identity = ?`
+      )
+      .get(watcherId, rung, contentIdentity) as LandingRow | undefined
+    return row ? parseLandingPayloadJson(row.rung, row.payload_json, 'landing payload') : null
   }
 }

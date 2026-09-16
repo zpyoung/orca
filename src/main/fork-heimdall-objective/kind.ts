@@ -1,11 +1,17 @@
 import { deriveBudgetState } from '../../shared/fork-heimdall/budget'
 import type { GateVerdict } from '../../shared/fork-heimdall/gate'
-import type { WatcherKind } from '../../shared/fork-heimdall/kind-contract'
+import type { HandoffAdapter, WatcherKind } from '../../shared/fork-heimdall/kind-contract'
 import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
 import type { ObjectiveEnrollmentPayload } from '../../shared/fork-heimdall-objective/contract-types'
 import { ObjectiveEnrollmentPayloadSchema } from '../../shared/fork-heimdall-objective/contract-types'
+import {
+  highestReachedRung,
+  reachedRungs,
+  stopRungForBar
+} from '../../shared/fork-heimdall-objective/landing-ladder'
+import { deriveHandoffInput } from '../../shared/fork-heimdall-objective/objective-handoff-policy'
 import { decideObjective } from '../../shared/fork-heimdall-objective/decision'
 import {
   ObjectiveWorldSchema,
@@ -18,12 +24,15 @@ import { runtimeFileSshTargetId } from '../runtime/runtime-file-command-target'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { createObjectiveActionExecutor } from './action-executor'
 import { computeWorkspaceContentIdentity, type ObjectiveWorkspaceTarget } from './content-identity'
+import { defaultObjectiveForgeAccess, type ObjectiveForgeAccess } from './objective-forge-access'
 import { authorizeObjectiveEnrollment, objectiveContractFromEnrollment } from './definition'
 import {
   bindObjectiveSnapshot,
   requireObjectiveSnapshotBinding,
   type ObjectiveSnapshotBinding
 } from './execution-context'
+import { readObjectiveLandingContext } from './landing-snapshot'
+import { HostedReviewLandingPayloadSchema } from './objective-store-data'
 import type { ObjectiveStore } from './objective-store'
 import { resolveObjectiveWorkspaceTarget } from './workspace-target'
 import type { ObjectiveAction } from '../../shared/fork-heimdall-objective/objective-actions'
@@ -80,11 +89,13 @@ function objectivePreflight(args: {
 }
 
 function objectivePhase(snapshot: Snapshot<ObjectiveWorld>): string {
-  const currentLanding = snapshot.world.plan.landing.some(
-    (entry) => entry.contentIdentity === snapshot.contentIdentity
-  )
-  if (currentLanding) {
+  const reached = reachedRungs(snapshot.world.plan.landing, snapshot.contentIdentity)
+  const currentLanding = highestReachedRung(snapshot.world.plan.landing, snapshot.contentIdentity)
+  if (reached.has(stopRungForBar(snapshot.world.contract.landingBar))) {
     return 'landed'
+  }
+  if (currentLanding !== null) {
+    return 'landing'
   }
   const revision = snapshot.world.plan.revisions.find((entry) => entry.status === 'approved')
   if (!revision) {
@@ -101,17 +112,50 @@ function objectivePhase(snapshot: Snapshot<ObjectiveWorld>): string {
   return checksCurrent ? 'review' : 'checks'
 }
 
+function objectiveHandoffAdapter(objectiveStore: ObjectiveStore): HandoffAdapter<ObjectiveWorld> {
+  return {
+    derive(enrollment, fired, ledger) {
+      const contract = objectiveContractFromEnrollment(enrollment)
+      if (stopRungForBar(contract.landingBar) !== 'hosted-review') {
+        return { kind: 'none', reason: 'bar-below-hosted-review' }
+      }
+      if (!fired.detail) {
+        return { kind: 'none', reason: 'hosted-review-row-missing' }
+      }
+      const landing = HostedReviewLandingPayloadSchema.safeParse(
+        objectiveStore.landingRow(enrollment.watcherId, 'hosted-review', fired.detail)
+      )
+      if (!landing.success) {
+        return { kind: 'none', reason: 'hosted-review-row-missing' }
+      }
+      return {
+        kind: 'enroll',
+        input: deriveHandoffInput({
+          enrollment,
+          contract,
+          landing: landing.data,
+          budgetState: deriveBudgetState(ledger, enrollment.budget)
+        }),
+        reason: 'bar-reached'
+      }
+    }
+  }
+}
+
 export function createObjectiveKind(args: {
   runtime: OrcaRuntimeService
   store: Store
   objectiveStore: ObjectiveStore
   storageAuthority?: 'desktop' | 'runtime'
+  forge?: ObjectiveForgeAccess
 }): ObjectiveKind {
   const snapshotBindings = new WeakMap<Snapshot<ObjectiveWorld>, ObjectiveSnapshotBinding>()
+  const forge = args.forge ?? defaultObjectiveForgeAccess
   const executor = createObjectiveActionExecutor({
     store: args.store,
     objectiveStore: args.objectiveStore,
-    snapshotBindings
+    snapshotBindings,
+    forge
   })
   return {
     id: 'objective',
@@ -122,7 +166,8 @@ export function createObjectiveKind(args: {
         args.runtime,
         args.store,
         input,
-        args.storageAuthority ?? 'desktop'
+        args.storageAuthority ?? 'desktop',
+        forge
       ),
     describeEnrollment(enrollment) {
       const text = objectiveContractFromEnrollment(enrollment).objectiveText
@@ -135,12 +180,26 @@ export function createObjectiveKind(args: {
         throw new Error('Objective workspace kind changed after enrollment')
       }
       const contentIdentity = await computeWorkspaceContentIdentity(target)
+      const projection = args.objectiveStore.project(
+        enrollment.watcherId,
+        undefined,
+        contentIdentity
+      )
+      const landingContext = await readObjectiveLandingContext({
+        target,
+        projection,
+        contentIdentity,
+        repoKey: enrollment.repoId,
+        landingBar: contract.landingBar,
+        forge
+      })
       const world = ObjectiveWorldSchema.parse({
         contract,
         workspaceKind: target.kind,
-        plan: args.objectiveStore.project(enrollment.watcherId, undefined, contentIdentity),
+        plan: projection,
         reports: [],
-        budget: enrollment.budget
+        budget: enrollment.budget,
+        landingContext
       })
       const snapshot: Snapshot<ObjectiveWorld> = {
         freshness: options.fresh ? 'live' : 'cached',
@@ -162,7 +221,8 @@ export function createObjectiveKind(args: {
         revision: revision?.number ?? null,
         nodesDone: nodes.filter((node) => node.state === 'succeeded').length,
         nodesTotal: nodes.length,
-        phase: objectivePhase(snapshot)
+        phase: objectivePhase(snapshot),
+        branch: snapshot.world.landingContext.branch
       }
     },
     decide: decideObjective,
@@ -180,6 +240,17 @@ export function createObjectiveKind(args: {
     resolveOutcome: executor.resolveOutcome,
     stopPredicates: OBJECTIVE_STOP_PREDICATES,
     pacing: objectivePacing,
-    planner: {}
+    planner: {},
+    handoff: objectiveHandoffAdapter(args.objectiveStore),
+    debug: {
+      pointers: () => [
+        {
+          role: 'kind-database',
+          host: 'kernel',
+          path: args.objectiveStore.databasePath(),
+          status: 'resolved'
+        }
+      ]
+    }
   }
 }

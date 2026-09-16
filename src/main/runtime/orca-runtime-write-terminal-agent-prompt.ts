@@ -13,7 +13,10 @@ import {
   getAgentPromptSubmitDelayMs,
   getTerminalPasteIngestMs
 } from '../../shared/agent-prompt-injection'
-import type { AgentPromptWaitTextCache } from './agent-prompt-submission-verification'
+import type {
+  AgentPromptActivity,
+  AgentPromptWaitTextCache
+} from './agent-prompt-submission-verification'
 import {
   isTerminalSendSettlementAgent,
   resolveAgentPromptEffectTimeoutMs,
@@ -33,25 +36,42 @@ export class OrcaRuntimeWithWriteTerminalAgentPrompt extends OrcaRuntimeWithReso
     const permissionBaseline = this.getAgentPromptActivity(handle, ptyId)
     this.assertAgentPromptPermissionSafe(permissionBaseline, permissionBaseline)
     const admitted = agentSessionPtyWriteGate.assertAdmitted(ptyId)
-    const writeHostPlatform = this.getPtyWriteHostPlatform(ptyId)
+    const ptyAgent = this.getPtyAgent(ptyId)
+    const atomicOmpSubmit = ptyAgent === 'omp'
+    const writeHostPlatform = atomicOmpSubmit ? null : this.getPtyWriteHostPlatform(ptyId)
     const pasteByteLength = Buffer.byteLength(pastePayload, 'utf8')
-    const pasteIngestMs = getTerminalPasteIngestMs(writeHostPlatform, pasteByteLength)
-    const renderGate = this.createAgentPromptRenderGate(ptyId, pasteIngestMs)
+    const renderGate = atomicOmpSubmit
+      ? null
+      : this.createAgentPromptRenderGate(
+          ptyId,
+          getTerminalPasteIngestMs(writeHostPlatform!, pasteByteLength)
+        )
+    const waitTextCache: AgentPromptWaitTextCache = {}
+    let baseline: AgentPromptActivity
     try {
       assertAgentPromptRequestActive(options.signal)
       this.assertAgentPromptGeneration(ptyId, generation)
       await options.beforeWrite?.(ptyId)
       assertAgentPromptRequestActive(options.signal)
       this.assertAgentPromptGeneration(ptyId, generation)
-      this.assertAgentPromptPermissionSafe(
-        permissionBaseline,
-        this.getAgentPromptActivity(handle, ptyId)
+      const activityBeforeWrite = this.getAgentPromptActivity(
+        handle,
+        ptyId,
+        atomicOmpSubmit ? waitTextCache : undefined
       )
+      this.assertAgentPromptPermissionSafe(permissionBaseline, activityBeforeWrite)
       agentSessionPtyWriteGate.assertReadmitted(ptyId, admitted)
+      if (atomicOmpSubmit) {
+        // OMP recognizes a trailing submit only when it arrives with the completed
+        // bracketed paste. A delayed bare CR instead selects its large-paste menu.
+        baseline = activityBeforeWrite
+      }
       // Keep the bracketed paste frame in one PTY write; Claude's composer can drop the
-      // beginning when a large frame is split into independently processed chunks.
+      // beginning when a large frame is split into independently processed chunks. OMP
+      // additionally needs its one submit byte appended to that complete frame.
       renderGate?.arm()
-      if (!this.ptyController?.write(ptyId, pastePayload)) {
+      const writePayload = atomicOmpSubmit ? `${pastePayload}${AGENT_PROMPT_SUBMIT}` : pastePayload
+      if (!this.ptyController?.write(ptyId, writePayload)) {
         throw new Error('terminal_not_writable')
       }
     } catch (error) {
@@ -59,37 +79,38 @@ export class OrcaRuntimeWithWriteTerminalAgentPrompt extends OrcaRuntimeWithReso
       throw error
     }
 
-    if (renderGate) {
+    if (!atomicOmpSubmit) {
+      if (renderGate) {
+        try {
+          await waitForAgentPromptPromise(renderGate.wait(), options.signal)
+        } finally {
+          renderGate.dispose()
+        }
+      } else {
+        await waitForAgentPromptDelay(
+          getAgentPromptSubmitDelayMs(writeHostPlatform!, pasteByteLength),
+          options.signal
+        )
+      }
+      assertAgentPromptRequestActive(options.signal)
+      this.assertAgentPromptGeneration(ptyId, generation)
+      agentSessionPtyWriteGate.assertReadmitted(ptyId, admitted)
       try {
-        await waitForAgentPromptPromise(renderGate.wait(), options.signal)
-      } finally {
-        renderGate.dispose()
+        await options.beforeWrite?.(ptyId)
+      } catch (error) {
+        if (options.suffixFailureError) {
+          throw new Error(options.suffixFailureError)
+        }
+        throw error
       }
-    } else {
-      await waitForAgentPromptDelay(
-        getAgentPromptSubmitDelayMs(writeHostPlatform, pasteByteLength),
-        options.signal
-      )
-    }
-    assertAgentPromptRequestActive(options.signal)
-    this.assertAgentPromptGeneration(ptyId, generation)
-    agentSessionPtyWriteGate.assertReadmitted(ptyId, admitted)
-    try {
-      await options.beforeWrite?.(ptyId)
-    } catch (error) {
-      if (options.suffixFailureError) {
-        throw new Error(options.suffixFailureError)
+      assertAgentPromptRequestActive(options.signal)
+      this.assertAgentPromptGeneration(ptyId, generation)
+      baseline = this.getAgentPromptActivity(handle, ptyId, waitTextCache)
+      this.assertAgentPromptPermissionSafe(permissionBaseline, baseline)
+      agentSessionPtyWriteGate.assertReadmitted(ptyId, admitted)
+      if (!this.ptyController?.write(ptyId, AGENT_PROMPT_SUBMIT)) {
+        throw new Error(options.suffixFailureError ?? 'terminal_not_writable')
       }
-      throw error
-    }
-    assertAgentPromptRequestActive(options.signal)
-    this.assertAgentPromptGeneration(ptyId, generation)
-    const waitTextCache: AgentPromptWaitTextCache = {}
-    const baseline = this.getAgentPromptActivity(handle, ptyId, waitTextCache)
-    this.assertAgentPromptPermissionSafe(permissionBaseline, baseline)
-    agentSessionPtyWriteGate.assertReadmitted(ptyId, admitted)
-    if (!this.ptyController?.write(ptyId, AGENT_PROMPT_SUBMIT)) {
-      throw new Error(options.suffixFailureError ?? 'terminal_not_writable')
     }
     const effectTimeoutMs = resolveAgentPromptEffectTimeoutMs(this.getPtyAgent(ptyId))
     if (!options.acceptQueued || !options.requestId) {
@@ -123,7 +144,7 @@ export class OrcaRuntimeWithWriteTerminalAgentPrompt extends OrcaRuntimeWithReso
     const checkpoint: RuntimeTerminalSend = {
       handle,
       accepted: true,
-      bytesWritten: Buffer.byteLength(pastePayload, 'utf8') + 1,
+      bytesWritten: pasteByteLength + 1,
       prompt: inputAccepted
     }
     options.onInputAccepted?.(checkpoint)

@@ -1,6 +1,7 @@
-import { constants, type Stats } from 'node:fs'
 import { createHash } from 'node:crypto'
+import { constants, type Stats } from 'node:fs'
 import { chmod, lstat, mkdir, open, realpath } from 'node:fs/promises'
+import type { ZodIssue } from 'zod'
 import {
   IntegratorReportSchema,
   ImplementerReportSchema,
@@ -28,6 +29,9 @@ import { resolveLeasePathFlavor } from '../fork-heimdall/lease-host-filesystem'
 import { objectiveGitCommandForTarget, type ObjectiveWorkspaceTarget } from './content-identity'
 
 export const MAX_OBJECTIVE_REPORT_BYTES = 256 * 1024
+const MAX_REPORT_SCHEMA_ISSUES = 5
+const MAX_REPORT_SCHEMA_ISSUE_MESSAGE_CHARS = 512
+const MAX_REPORT_SCHEMA_DETAIL_CHARS = 2_048
 
 export type ObjectiveReportRole = 'planner' | 'implementer' | 'reviewer' | 'integrator'
 export type ObjectiveRoleReport =
@@ -55,6 +59,7 @@ export type ObjectiveReportReadFailureReason =
 type ObjectiveReportReadFailure = {
   ok: false
   reason: ObjectiveReportReadFailureReason
+  detail?: string
 }
 
 type ObjectiveReportReadSuccess<R extends ObjectiveReportRole> = R extends ObjectiveReportRole
@@ -188,10 +193,50 @@ function isMissingFileError(error: unknown): boolean {
   return code === 'ENOENT' || code === 'ENOTDIR' || code === 2
 }
 
+function formatIssuePath(path: readonly PropertyKey[]): string {
+  let formatted = ''
+  for (const segment of path) {
+    if (typeof segment === 'number') {
+      formatted += `[${segment}]`
+      continue
+    }
+    const field = String(segment)
+    formatted += formatted.length === 0 ? field : `.${field}`
+  }
+  return formatted || 'report'
+}
+
+function formatReportSchemaIssues(issues: readonly ZodIssue[]): string {
+  const issueDetails = issues
+    .slice(0, MAX_REPORT_SCHEMA_ISSUES)
+    .map((issue) => {
+      const message =
+        issue.message.length <= MAX_REPORT_SCHEMA_ISSUE_MESSAGE_CHARS
+          ? issue.message
+          : `${issue.message.slice(0, MAX_REPORT_SCHEMA_ISSUE_MESSAGE_CHARS - 1)}…`
+      return `${formatIssuePath(issue.path)}: ${message}`
+    })
+    .join('\n')
+  const omittedIssueCount = Math.max(0, issues.length - MAX_REPORT_SCHEMA_ISSUES)
+  if (omittedIssueCount > 0) {
+    const omittedSummary = `+ ${omittedIssueCount} more issues`
+    const availableIssueChars = MAX_REPORT_SCHEMA_DETAIL_CHARS - omittedSummary.length - 1
+    const boundedIssueDetails =
+      issueDetails.length <= availableIssueChars
+        ? issueDetails
+        : `${issueDetails.slice(0, availableIssueChars - 1)}…`
+    return `${boundedIssueDetails}\n${omittedSummary}`
+  }
+  if (issueDetails.length <= MAX_REPORT_SCHEMA_DETAIL_CHARS) {
+    return issueDetails
+  }
+  return `${issueDetails.slice(0, MAX_REPORT_SCHEMA_DETAIL_CHARS - 1)}…`
+}
+
 function parseReportForRole<R extends ObjectiveReportRole>(
   role: R,
   input: unknown
-): { success: true; data: ObjectiveReportByRole[R] } | { success: false } {
+): { success: true; data: ObjectiveReportByRole[R] } | { success: false; detail: string } {
   const result =
     role === 'planner'
       ? PlannerReportSchema.safeParse(input)
@@ -202,7 +247,7 @@ function parseReportForRole<R extends ObjectiveReportRole>(
           : IntegratorReportSchema.safeParse(input)
   return result.success
     ? { success: true, data: result.data as ObjectiveReportByRole[R] }
-    : { success: false }
+    : { success: false, detail: formatReportSchemaIssues(result.error.issues) }
 }
 
 function matchesAnotherRole(input: unknown, expectedRole: ObjectiveReportRole): boolean {
@@ -408,9 +453,11 @@ export async function readObjectiveRoleReport<R extends ObjectiveReportRole>(
   }
   const parsed = parseReportForRole(request.role, input)
   if (!parsed.success) {
+    const reason = matchesAnotherRole(input, request.role) ? 'role-mismatch' : 'malformed'
     return {
       ok: false,
-      reason: matchesAnotherRole(input, request.role) ? 'role-mismatch' : 'malformed'
+      reason,
+      ...(reason === 'malformed' ? { detail: parsed.detail } : {})
     }
   }
   if (

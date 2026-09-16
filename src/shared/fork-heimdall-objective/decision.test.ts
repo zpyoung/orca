@@ -82,6 +82,13 @@ function snapshot(
       plan,
       reports: [],
       budget: { wallClockActiveMs: 60_000, turns: 20 },
+      landingContext: {
+        branch: 'feature/objective',
+        headSha: 'head-current',
+        worktreeContentDigest: 'worktree-digest',
+        pushTarget: { remote: 'origin', branch: 'feature/objective', remoteSha: '' },
+        hostedReview: { provider: 'github', repoKey: 'repo-1', base: 'main' }
+      },
       ...overrides
     }
   }
@@ -485,6 +492,282 @@ describe('objective tier review policy', () => {
       kind: 'dispatch-planner',
       evidenceKey: 'plan:2',
       reason: 'replan-after-block'
+    })
+  })
+})
+
+describe('objective landing ladder decisions', () => {
+  it('emits a deterministic commit action after files-on-disk', () => {
+    const decision = decideObjective(
+      snapshot(
+        projection({
+          landing: [
+            {
+              rung: 'files-on-disk',
+              revisionId: 'revision-1',
+              contentIdentity: 'content-current',
+              atMs: 50
+            }
+          ]
+        }),
+        { contract: { ...CONTRACT, landingBar: 'committed-local-branch' } }
+      ),
+      ledger()
+    )
+    expect(decision.action).toEqual({
+      kind: 'commit-local-branch',
+      capability: 'land',
+      visibility: 'local',
+      recovery: 'replay-safe',
+      contentIdentity: 'content-current',
+      evidenceKey: 'committed-local-branch:content-current',
+      rung: 'committed-local-branch',
+      revisionId: 'revision-1',
+      branch: 'feature/objective',
+      headSha: 'head-current',
+      worktreeContentDigest: 'worktree-digest',
+      fromContentIdentity: 'content-current',
+      attemptTrailer: 'committed-local-branch:content-current'
+    })
+  })
+
+  it('emits push with the exact observed remote state while retaining pre-commit lineage', () => {
+    const committed = projection({
+      nodes: [
+        node('core', {
+          state: 'succeeded',
+          criteria: [
+            {
+              id: 'criterion-1',
+              ordinal: 0,
+              shellCheckable: true,
+              checkCommand: 'pnpm check',
+              lastCheck: {
+                contentIdentity: 'checked-content',
+                exitCode: 0,
+                timedOut: false,
+                atMs: 40
+              },
+              lastReview: 'pass'
+            }
+          ]
+        })
+      ],
+      verdicts: [
+        {
+          dispatchId: 'review-dispatch',
+          revisionId: 'revision-1',
+          role: 'reviewer',
+          verdict: 'approve',
+          contentIdentity: 'checked-content',
+          reportDigest: 'review-digest',
+          atMs: 45
+        }
+      ],
+      landing: [
+        {
+          rung: 'files-on-disk',
+          revisionId: 'revision-1',
+          contentIdentity: 'checked-content',
+          atMs: 50
+        },
+        {
+          rung: 'committed-local-branch',
+          revisionId: 'revision-1',
+          contentIdentity: 'committed-content',
+          fromContentIdentity: 'checked-content',
+          branch: 'feature/objective',
+          commitSha: 'commit-1',
+          atMs: 60
+        }
+      ]
+    })
+    const decision = decideObjective(
+      snapshot(
+        committed,
+        {
+          contract: { ...CONTRACT, landingBar: 'pushed-ref' },
+          landingContext: {
+            branch: 'feature/objective',
+            headSha: 'commit-1',
+            worktreeContentDigest: 'worktree-digest',
+            pushTarget: {
+              remote: 'upstream',
+              branch: 'review/objective',
+              remoteSha: 'remote-before'
+            },
+            hostedReview: { provider: 'github', repoKey: 'repo-1', base: 'main' }
+          }
+        },
+        'committed-content'
+      ),
+      ledger()
+    )
+    expect(decision.action).toEqual({
+      kind: 'push-ref',
+      capability: 'land',
+      visibility: 'external',
+      contentIdentity: 'committed-content',
+      evidenceKey: 'pushed-ref:commit-1:upstream/review/objective:remote-before',
+      rung: 'pushed-ref',
+      revisionId: 'revision-1',
+      branch: 'review/objective',
+      remote: 'upstream',
+      commitSha: 'commit-1',
+      expectedState: {
+        target: 'upstream/review/objective',
+        before: 'remote-before'
+      }
+    })
+  })
+
+  it('emits review creation after push and stops merged objectives at hosted review', () => {
+    const pushed = projection({
+      landing: [
+        {
+          rung: 'pushed-ref',
+          revisionId: 'revision-1',
+          contentIdentity: 'committed-content',
+          fromContentIdentity: 'committed-content',
+          remote: 'origin',
+          branch: 'feature/objective',
+          commitSha: 'commit-1',
+          remoteSha: 'commit-1',
+          atMs: 70
+        }
+      ]
+    })
+    const reviewDecision = decideObjective(
+      snapshot(pushed, { contract: { ...CONTRACT, landingBar: 'merged' } }, 'committed-content'),
+      ledger()
+    )
+    expect(reviewDecision.action).toEqual({
+      kind: 'open-hosted-review',
+      capability: 'land',
+      visibility: 'external',
+      contentIdentity: 'committed-content',
+      evidenceKey: 'hosted-review:github:feature/objective:commit-1',
+      rung: 'hosted-review',
+      revisionId: 'revision-1',
+      branch: 'feature/objective',
+      base: 'main',
+      headSha: 'commit-1',
+      provider: 'github',
+      expectedState: {
+        target: 'github:repo-1:feature/objective',
+        before: 'no-review'
+      }
+    })
+
+    const hosted = projection({
+      landing: [
+        ...pushed.landing,
+        {
+          rung: 'hosted-review',
+          revisionId: 'revision-1',
+          contentIdentity: 'committed-content',
+          fromContentIdentity: 'committed-content',
+          provider: 'github',
+          reviewNumber: 42,
+          reviewUrl: 'https://github.com/acme/repo/pull/42',
+          branch: 'feature/objective',
+          headSha: 'commit-1',
+          base: 'main',
+          atMs: 80
+        }
+      ]
+    })
+    expect(
+      decideObjective(
+        snapshot(hosted, { contract: { ...CONTRACT, landingBar: 'merged' } }, 'committed-content'),
+        ledger()
+      )
+    ).toMatchObject({ action: null, reason: 'landed-at-bar', detail: 'merged' })
+  })
+
+  it('does not emit commit from detached HEAD or review without a resolved base', () => {
+    const files = projection({
+      landing: [
+        {
+          rung: 'files-on-disk',
+          revisionId: 'revision-1',
+          contentIdentity: 'content-current',
+          atMs: 50
+        }
+      ]
+    })
+    expect(
+      decideObjective(
+        snapshot(files, {
+          contract: { ...CONTRACT, landingBar: 'committed-local-branch' },
+          landingContext: {
+            branch: null,
+            headSha: null,
+            worktreeContentDigest: null,
+            pushTarget: null,
+            hostedReview: null
+          }
+        }),
+        ledger()
+      )
+    ).toMatchObject({ action: null, reason: 'branch-not-attached' })
+
+    const pushed = projection({
+      landing: [
+        {
+          rung: 'pushed-ref',
+          revisionId: 'revision-1',
+          contentIdentity: 'committed-content',
+          fromContentIdentity: 'committed-content',
+          branch: 'feature/objective',
+          commitSha: 'commit-1',
+          atMs: 60
+        }
+      ]
+    })
+    expect(
+      decideObjective(
+        snapshot(
+          pushed,
+          {
+            contract: { ...CONTRACT, landingBar: 'hosted-review' },
+            landingContext: {
+              branch: 'feature/objective',
+              headSha: 'commit-1',
+              worktreeContentDigest: 'worktree-digest',
+              pushTarget: null,
+              hostedReview: { provider: 'github', repoKey: 'repo-1', base: null }
+            }
+          },
+          'committed-content'
+        ),
+        ledger()
+      )
+    ).toMatchObject({ action: null, reason: 'base-branch-unresolvable' })
+  })
+})
+
+describe('objective lowered landing bar', () => {
+  it('treats an already reached higher rung as landed at the re-armed lower bar', () => {
+    const plan = projection({
+      landing: [
+        {
+          rung: 'pushed-ref',
+          revisionId: 'revision-1',
+          contentIdentity: 'content-current',
+          atMs: 80
+        }
+      ]
+    })
+    expect(
+      decideObjective(
+        snapshot(plan, { contract: { ...CONTRACT, landingBar: 'committed-local-branch' } }),
+        ledger()
+      )
+    ).toMatchObject({
+      action: null,
+      reason: 'landed-at-bar',
+      detail: 'committed-local-branch'
     })
   })
 })

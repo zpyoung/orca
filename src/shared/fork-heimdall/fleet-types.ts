@@ -36,6 +36,25 @@ export const WatcherOwnerFenceSchema = z
   .strict()
 export type WatcherOwnerFence = z.infer<typeof WatcherOwnerFenceSchema>
 
+export const WatcherFleetActivitySchema = z
+  .object({
+    kind: z.enum(['agent-in-flight', 'check-running', 'action-running', 'waiting']),
+    count: z.number().int().nonnegative(),
+    detail: z.string().trim().min(1).nullable(),
+    startedAtMs: TimestampSchema.nullable()
+  })
+  .strict()
+export type WatcherFleetActivity = z.infer<typeof WatcherFleetActivitySchema>
+
+export const WatcherFleetWorkspaceSchema = z
+  .object({
+    label: IdSchema,
+    kind: z.enum(['git', 'folder']),
+    branch: IdSchema.nullable()
+  })
+  .strict()
+export type WatcherFleetWorkspace = z.infer<typeof WatcherFleetWorkspaceSchema>
+
 export const WatcherFleetEntrySchema = z
   .object({
     target: WatcherTargetSchema,
@@ -45,7 +64,10 @@ export const WatcherFleetEntrySchema = z
     contact: z.enum(['live', 'unverifiable']),
     readOnlyReason: z.string().nullable(),
     capabilityNotes: z.array(z.string()),
-    paused: z.boolean()
+    paused: z.boolean(),
+    workflowPhase: IdSchema.nullable().optional(),
+    activity: WatcherFleetActivitySchema.optional(),
+    workspace: WatcherFleetWorkspaceSchema.optional()
   })
   .strict()
 export type WatcherFleetEntry = z.infer<typeof WatcherFleetEntrySchema>
@@ -58,6 +80,15 @@ export const HeimdallFleetSnapshotSchema = z
   .strict()
 export type HeimdallFleetSnapshot = z.infer<typeof HeimdallFleetSnapshotSchema>
 
+export const WatcherWorkerNavigationSchema = z
+  .object({
+    worktreeId: IdSchema,
+    executionHostId: ExecutionHostIdSchema,
+    paneKey: IdSchema
+  })
+  .strict()
+export type WatcherWorkerNavigation = z.infer<typeof WatcherWorkerNavigationSchema>
+
 export const WatcherWorkerSchema = z
   .object({
     dispatchId: IdSchema,
@@ -66,7 +97,8 @@ export const WatcherWorkerSchema = z
     lastContactAtMs: TimestampSchema.nullable(),
     liveness: z.enum(['live', 'unverifiable', 'exited']),
     reason: z.string().nullable(),
-    question: z.object({ messageId: IdSchema, body: z.string() }).strict().nullable()
+    question: z.object({ messageId: IdSchema, body: z.string() }).strict().nullable(),
+    navigation: WatcherWorkerNavigationSchema.nullable().optional()
   })
   .strict()
 export type WatcherWorker = z.infer<typeof WatcherWorkerSchema>

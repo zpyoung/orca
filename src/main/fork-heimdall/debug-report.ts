@@ -1,19 +1,27 @@
 import { sanitizeCrashReportString } from '../../shared/crash-report-redaction'
 import { deriveBudgetState, type BudgetState } from '../../shared/fork-heimdall/budget'
+import type { WatcherWorker } from '../../shared/fork-heimdall/fleet-types'
+import type { DebugPointer } from '../../shared/fork-heimdall/kind-contract'
 import { getLatestEscalations } from '../../shared/fork-heimdall/ledger-queries'
-import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
-import type { WatcherTickTrace } from '../../shared/fork-heimdall/tick-trace'
+import type { LedgerEntry, WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
+import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
+import {
+  TICK_TRACE_FULL_DETAIL_COUNT,
+  type TraceSnapshotSummary,
+  type WatcherTickTrace
+} from '../../shared/fork-heimdall/tick-trace'
 import type {
   WatcherEnrollment,
   WatcherParkReason,
   WatcherStatus
 } from '../../shared/fork-heimdall/watcher-types'
 
-export const HEIMDALL_DEBUG_REPORT_SCHEMA_VERSION = 1
+export const HEIMDALL_DEBUG_REPORT_SCHEMA_VERSION = 2
 export const DEBUG_REPORT_LEDGER_ENTRY_LIMIT = 200
-export const DEBUG_REPORT_TRACE_LIMIT = 5
+export const DEBUG_REPORT_TRACE_LIMIT = TICK_TRACE_FULL_DETAIL_COUNT
 
 export type WatcherRunnerDebugState = {
+  kindId: WatcherEnrollment['kind']
   consecutiveErrors: number
   lastFullResyncAtMs: number | null
   tickQueued: boolean
@@ -21,7 +29,22 @@ export type WatcherRunnerDebugState = {
   timerArmed: boolean
   actionInFlight: boolean
   leaseEpoch: number | null
+  stopped: boolean
+  suspended: boolean
+  controlPending: 'pause' | 'disarm' | null
+  recovered: boolean
+  forceFresh: boolean
+  traceSequence: number
+  leaseRenewalArmed: boolean
+  snapshot: {
+    freshness: Snapshot<unknown>['freshness']
+    observedAtMs: number
+    contentIdentity: string
+    summary: TraceSnapshotSummary | null
+  } | null
 }
+
+export type { DebugPointer } from '../../shared/fork-heimdall/kind-contract'
 
 export type HeimdallDebugReportInput = {
   enrollment: WatcherEnrollment
@@ -33,6 +56,12 @@ export type HeimdallDebugReportInput = {
   appVersion: string
   platform: string
   homeDirectory?: string
+  budgetClock: { openIntervalId: string | null }
+  malformedPayload: boolean
+  pendingControlOperation: boolean
+  workers: readonly WatcherWorker[]
+  workersError: string | null
+  pointers: readonly DebugPointer[]
 }
 
 export type HeimdallDebugReport = {
@@ -43,7 +72,13 @@ export type HeimdallDebugReport = {
   enrollment: WatcherEnrollment
   status: WatcherStatus
   budget: BudgetState
+  budgetClock: { openIntervalId: string | null }
+  malformedPayload: boolean
+  pendingControlOperation: boolean
   runner: WatcherRunnerDebugState | null
+  workers: WatcherWorker[]
+  workersError: string | null
+  pointers: DebugPointer[]
   ledger: { totalEntries: number; entries: WatcherLedger['entries'] }
   traces: WatcherTickTrace[]
 }
@@ -57,6 +92,34 @@ export function collapseWatcherHomeDirectory(path: string, homeDirectory?: strin
     return '~'
   }
   return remainder.startsWith('/') || remainder.startsWith('\\') ? `~${remainder}` : path
+}
+
+export function describeDebugSnapshot(
+  snapshot: Snapshot<unknown>,
+  describe: (snapshot: Snapshot<unknown>) => TraceSnapshotSummary
+): NonNullable<WatcherRunnerDebugState['snapshot']> {
+  let summary: TraceSnapshotSummary | null = null
+  try {
+    summary = describe(snapshot)
+  } catch {
+    // A kind-owned description must not make the diagnostic endpoint unavailable.
+  }
+  return {
+    freshness: snapshot.freshness,
+    observedAtMs: snapshot.observedAtMs,
+    contentIdentity: snapshot.contentIdentity,
+    summary
+  }
+}
+
+function sanitizeLedgerEntry(entry: LedgerEntry): LedgerEntry {
+  if (entry.kind === 'attempt-abandoned') {
+    return entry
+  }
+  if (!('reason' in entry) || typeof entry.reason !== 'string') {
+    return entry
+  }
+  return { ...entry, reason: sanitizeCrashReportString(entry.reason, 2_000) }
 }
 function persistedParkReason(
   enrollment: WatcherEnrollment,
@@ -187,7 +250,9 @@ export function dormantWatcherStatus(
 }
 
 export function buildHeimdallDebugReport(input: HeimdallDebugReportInput): HeimdallDebugReport {
-  const entries = input.ledger.entries.slice(-DEBUG_REPORT_LEDGER_ENTRY_LIMIT)
+  const entries = input.ledger.entries
+    .slice(-DEBUG_REPORT_LEDGER_ENTRY_LIMIT)
+    .map(sanitizeLedgerEntry)
   const traces = [...input.traces]
     .sort((left, right) => right.seq - left.seq)
     .slice(0, DEBUG_REPORT_TRACE_LIMIT)
@@ -209,14 +274,24 @@ export function buildHeimdallDebugReport(input: HeimdallDebugReportInput): Heimd
     platform: input.platform,
     enrollment: {
       ...input.enrollment,
-      workspacePath: collapseWatcherHomeDirectory(
-        input.enrollment.workspacePath,
-        input.homeDirectory
-      )
+      workspacePath:
+        input.enrollment.executionHostId === 'local'
+          ? collapseWatcherHomeDirectory(input.enrollment.workspacePath, input.homeDirectory)
+          : input.enrollment.workspacePath
     },
     status: input.status,
     budget: deriveBudgetState(input.ledger, input.enrollment.budget),
+    budgetClock: input.budgetClock,
+    malformedPayload: input.malformedPayload,
+    pendingControlOperation: input.pendingControlOperation,
     runner: input.runner,
+    workers: [...input.workers],
+    workersError:
+      input.workersError === null ? null : sanitizeCrashReportString(input.workersError, 2_000),
+    pointers: input.pointers.map((pointer) => ({
+      ...pointer,
+      ...(pointer.detail ? { detail: sanitizeCrashReportString(pointer.detail, 2_000) } : {})
+    })),
     ledger: { totalEntries: input.ledger.entries.length, entries },
     traces
   }

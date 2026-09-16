@@ -131,4 +131,19 @@ describe('Heimdall enrollment store', () => {
     )
     expect(enrollments.get('watcher-1')).toEqual(before)
   })
+
+  it('rolls back the terminal update when the post-terminal hook fails', () => {
+    const before = enrollments.insert(enrollment())
+    let observedTerminalAtMs: number | null = null
+
+    expect(() =>
+      enrollments.markTerminal('watcher-1', 50, undefined, () => {
+        observedTerminalAtMs = enrollments.get('watcher-1')?.terminalAtMs ?? null
+        throw new Error('sitter insert failed')
+      })
+    ).toThrow('sitter insert failed')
+
+    expect(observedTerminalAtMs).toBe(50)
+    expect(enrollments.get('watcher-1')).toEqual(before)
+  })
 })

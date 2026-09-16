@@ -1,5 +1,7 @@
 import {
+  OBJECTIVE_ALL_WORKSPACE_PATHS_GLOB,
   OBJECTIVE_CAPABILITY_KEYS,
+  OBJECTIVE_EXISTING_PLAN_MAX_LENGTH,
   OBJECTIVE_ROLES as SHARED_OBJECTIVE_ROLES,
   OBJECTIVE_TERRITORY_MAX_ENTRIES,
   OBJECTIVE_TEXT_MAX_LENGTH,
@@ -35,6 +37,7 @@ export type ObjectiveSitterCapability = (typeof OBJECTIVE_SITTER_CAPABILITIES)[n
 
 export type ObjectiveEnrollmentDraft = {
   objectiveText: string
+  existingPlanText: string
   tier: ObjectiveTier
   landingBar: ObjectiveLandingBar
   maxConcurrency: number
@@ -48,13 +51,23 @@ export type ObjectiveEnrollmentDraft = {
   availableAgentIds: readonly string[]
 }
 
+export type ObjectiveForgeAvailability = 'checking' | 'supported' | 'unsupported' | 'unavailable'
+
+export type ObjectiveLandingBarAvailability = {
+  workspaceKind: ObjectiveWorkspaceKind | null
+  worktreeId: string | null
+  forge: ObjectiveForgeAvailability
+}
+
 export type ObjectiveEnrollmentErrorCode =
   | 'workspace-required'
   | 'objective-required'
   | 'objective-too-long'
+  | 'existing-plan-too-long'
   | 'landing-bar-requires-git'
+  | 'landing-bar-requires-worktree'
+  | 'landing-bar-requires-supported-forge'
   | 'max-concurrency-unsupported'
-  | 'territory-required'
   | 'territory-too-many'
   | 'territory-duplicate'
   | 'territory-invalid'
@@ -69,10 +82,11 @@ export type ObjectiveEnrollmentError = {
 }
 
 export function parseWriteTerritory(value: string): string[] {
-  return value
+  const territory = value
     .split(/\r?\n/u)
     .map((line) => line.trim())
     .filter(Boolean)
+  return territory.length === 0 ? [OBJECTIVE_ALL_WORKSPACE_PATHS_GLOB] : territory
 }
 
 export function territoryGlobError(glob: string): ObjectiveEnrollmentError | null {
@@ -80,14 +94,21 @@ export function territoryGlobError(glob: string): ObjectiveEnrollmentError | nul
 }
 
 export function isObjectiveLandingBarAvailable(
-  workspaceKind: ObjectiveWorkspaceKind | null,
+  availability: ObjectiveLandingBarAvailability,
   landingBar: ObjectiveLandingBar
 ): boolean {
-  return workspaceKind !== 'folder' || landingBar === 'files-on-disk'
+  if (availability.workspaceKind === 'folder') {
+    return landingBar === 'files-on-disk'
+  }
+  if (landingBar !== 'hosted-review' && landingBar !== 'merged') {
+    return true
+  }
+  return availability.worktreeId !== null && availability.forge === 'supported'
 }
 
 export function validateObjectiveEnrollmentDraft(
-  draft: ObjectiveEnrollmentDraft
+  draft: ObjectiveEnrollmentDraft,
+  landingAvailability: ObjectiveLandingBarAvailability
 ): ObjectiveEnrollmentError[] {
   const errors: ObjectiveEnrollmentError[] = []
   const objective = draft.objectiveText.trim()
@@ -99,17 +120,27 @@ export function validateObjectiveEnrollmentDraft(
   } else if (objective.length > OBJECTIVE_TEXT_MAX_LENGTH) {
     errors.push({ code: 'objective-too-long' })
   }
-  if (!isObjectiveLandingBarAvailable(draft.workspaceKind, draft.landingBar)) {
-    errors.push({ code: 'landing-bar-requires-git' })
+  if (draft.existingPlanText.trim().length > OBJECTIVE_EXISTING_PLAN_MAX_LENGTH) {
+    errors.push({ code: 'existing-plan-too-long' })
+  }
+  if (
+    landingAvailability.workspaceKind !== null &&
+    !isObjectiveLandingBarAvailable(landingAvailability, draft.landingBar)
+  ) {
+    if (landingAvailability.workspaceKind === 'folder') {
+      errors.push({ code: 'landing-bar-requires-git' })
+    } else if (landingAvailability.worktreeId === null) {
+      errors.push({ code: 'landing-bar-requires-worktree' })
+    } else {
+      errors.push({ code: 'landing-bar-requires-supported-forge' })
+    }
   }
   if (draft.maxConcurrency !== 1) {
     errors.push({ code: 'max-concurrency-unsupported' })
   }
 
   const territory = parseWriteTerritory(draft.writeTerritoryText)
-  if (territory.length === 0) {
-    errors.push({ code: 'territory-required' })
-  } else if (territory.length > OBJECTIVE_TERRITORY_MAX_ENTRIES) {
+  if (territory.length > OBJECTIVE_TERRITORY_MAX_ENTRIES) {
     errors.push({ code: 'territory-too-many' })
   } else {
     if (new Set(territory).size !== territory.length) {

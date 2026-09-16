@@ -5,6 +5,12 @@ import type { PacingTier } from '../fork-heimdall/pacing'
 import type { Snapshot } from '../fork-heimdall/snapshot'
 import { ObjectiveActionSchema } from './objective-actions'
 import type { ObjectiveBudgetBucket, ObjectiveWorld } from './detail-types'
+import {
+  OBJECTIVE_LANDING_LADDER,
+  highestReachedRung,
+  nextRung,
+  stopRungForBar
+} from './landing-ladder'
 
 const TIGHT_BUDGET_RATIO = 0.5
 const NEARLY_SPENT_BUDGET_RATIO = 0.85
@@ -38,21 +44,47 @@ export function paceObjective(
   snapshot: Snapshot<ObjectiveWorld>,
   ledger: WatcherLedger
 ): PacingTier {
+  const highest = highestReachedRung(snapshot.world.plan.landing, snapshot.contentIdentity)
+  const stop = stopRungForBar(snapshot.world.contract.landingBar)
   if (
-    snapshot.world.plan.landing.some(
-      (entry) =>
-        entry.rung === 'files-on-disk' && entry.contentIdentity === snapshot.contentIdentity
-    )
+    highest !== null &&
+    OBJECTIVE_LANDING_LADDER.indexOf(highest) >= OBJECTIVE_LANDING_LADDER.indexOf(stop)
   ) {
     return 'stopped'
   }
-  if (
-    getInFlightAttempts(ledger).some((attempt) => {
-      const action = ObjectiveActionSchema.safeParse(attempt.action)
-      return action.success && action.data.kind.startsWith('dispatch-')
-    })
-  ) {
+  let dispatchInFlight = false
+  for (const attempt of getInFlightAttempts(ledger)) {
+    const parsed = ObjectiveActionSchema.safeParse(attempt.action)
+    if (!parsed.success) {
+      continue
+    }
+    const action = parsed.data
+    if (
+      action.kind === 'commit-local-branch' ||
+      action.kind === 'push-ref' ||
+      action.kind === 'open-hosted-review'
+    ) {
+      return 'rapid'
+    }
+    dispatchInFlight ||= action.kind.startsWith('dispatch-')
+  }
+  if (dispatchInFlight) {
     return 'active'
+  }
+  if (highest !== null) {
+    const next = nextRung(highest, snapshot.world.contract.landingBar)
+    const context = snapshot.world.landingContext
+    if (
+      (next === 'committed-local-branch' &&
+        (context.branch === null ||
+          context.headSha === null ||
+          context.worktreeContentDigest === null)) ||
+      (next === 'pushed-ref' && context.pushTarget === null) ||
+      (next === 'hosted-review' &&
+        (context.hostedReview === null || context.hostedReview.base === null))
+    ) {
+      return 'idle'
+    }
   }
   if (
     getLatestEscalations(ledger).some(

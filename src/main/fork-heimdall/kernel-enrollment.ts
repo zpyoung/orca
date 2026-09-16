@@ -12,13 +12,18 @@ import {
 import type { RegisteredWatcherKind, WatcherKindRegistry } from './registry'
 import { isMalformedKindPayloadEnrollment, type EnrollmentRecord } from './enrollment-store'
 
-type EnrollmentRefusal = Extract<EnrollResult, { status: 'refused' }>
+export type EnrollmentAuthorizationRefusal = Exclude<
+  Extract<EnrollResult, { status: 'refused' }>,
+  { reason: 'duplicate-workspace' }
+>
 
 export type AuthorizedKindEnrollment = {
   status: 'authorized'
   authorized: AuthorizedEnrollment
   kind: RegisteredWatcherKind
 }
+
+export type KindEnrollmentAuthorization = AuthorizedKindEnrollment | EnrollmentAuthorizationRefusal
 
 export type HeimdallStorageAuthority = 'desktop' | 'runtime'
 
@@ -37,7 +42,7 @@ export async function authorizeKindEnrollment(
   registry: WatcherKindRegistry,
   untrustedInput: EnrollInput,
   storageAuthority: HeimdallStorageAuthority = 'desktop'
-): Promise<AuthorizedKindEnrollment | EnrollmentRefusal> {
+): Promise<KindEnrollmentAuthorization> {
   const inputResult = EnrollInputSchema.safeParse(untrustedInput)
   if (!inputResult.success) {
     return { status: 'refused', reason: 'invalid-payload', detail: inputResult.error.message }

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  OBJECTIVE_ALL_WORKSPACE_PATHS_GLOB,
+  OBJECTIVE_EXISTING_PLAN_MAX_LENGTH,
   ObjectiveCapabilitiesSchema,
   ObjectiveEnrollmentPayloadSchema,
   objectiveCapabilityModes,
@@ -38,6 +40,30 @@ describe('objective enrollment payload', () => {
     }
   })
 
+  it('accepts the canonical whole-workspace territory', () => {
+    expect(
+      ObjectiveEnrollmentPayloadSchema.parse(
+        payload({ writeTerritory: [OBJECTIVE_ALL_WORKSPACE_PATHS_GLOB] })
+      ).writeTerritory
+    ).toEqual([OBJECTIVE_ALL_WORKSPACE_PATHS_GLOB])
+  })
+
+  it('canonicalizes and bounds the optional existing plan', () => {
+    expect(
+      ObjectiveEnrollmentPayloadSchema.parse(
+        payload({ existingPlan: ' \n# Existing plan\n\n- Keep this task. \n' })
+      ).existingPlan
+    ).toBe('# Existing plan\n\n- Keep this task.')
+    expect(
+      ObjectiveEnrollmentPayloadSchema.safeParse(payload({ existingPlan: ' \n\t ' })).success
+    ).toBe(false)
+    expect(
+      ObjectiveEnrollmentPayloadSchema.safeParse(
+        payload({ existingPlan: 'x'.repeat(OBJECTIVE_EXISTING_PLAN_MAX_LENGTH + 1) })
+      ).success
+    ).toBe(false)
+  })
+
   it('rejects unknown fields and unbounded objective text', () => {
     expect(
       ObjectiveEnrollmentPayloadSchema.safeParse({ ...payload(), ignored: true }).success
@@ -54,7 +80,6 @@ describe('objective enrollment payload', () => {
     'C:/repo/**',
     '.git/**',
     '.orca/**',
-    '**',
     '*/**',
     'src/../secrets/**',
     'src\\**'

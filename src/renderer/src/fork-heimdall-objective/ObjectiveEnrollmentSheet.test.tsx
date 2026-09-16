@@ -1,17 +1,22 @@
 // @vitest-environment happy-dom
 
 import { useState } from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { AppState } from '@/store/types'
 import { getDefaultSettings } from '../../../shared/constants'
-import { objectiveCapabilityModes } from '../../../shared/fork-heimdall-objective/contract-types'
+import {
+  OBJECTIVE_ALL_WORKSPACE_PATHS_GLOB,
+  OBJECTIVE_EXISTING_PLAN_MAX_LENGTH,
+  objectiveCapabilityModes
+} from '../../../shared/fork-heimdall-objective/contract-types'
 import { ObjectiveEnrollmentFields } from './ObjectiveEnrollmentFields'
 import { buildObjectiveEnrollmentSubmission } from './objective-enrollment-request'
 import {
   isObjectiveLandingBarAvailable,
   validateObjectiveEnrollmentDraft,
-  type ObjectiveEnrollmentDraft
+  type ObjectiveEnrollmentDraft,
+  type ObjectiveLandingBarAvailability
 } from './objective-enrollment-model'
 import {
   buildObjectiveWorkspaceOptions,
@@ -23,6 +28,7 @@ afterEach(cleanup)
 function draft(overrides: Partial<ObjectiveEnrollmentDraft> = {}): ObjectiveEnrollmentDraft {
   return {
     objectiveText: 'Ship the objective watcher',
+    existingPlanText: '',
     tier: 'standard',
     landingBar: 'files-on-disk',
     maxConcurrency: 1,
@@ -43,19 +49,53 @@ function draft(overrides: Partial<ObjectiveEnrollmentDraft> = {}): ObjectiveEnro
   }
 }
 
-function EditableObjectiveFields(): React.JSX.Element {
-  const [currentDraft, setCurrentDraft] = useState(() => draft({ objectiveText: '' }))
+function objectiveWorkspace(): ObjectiveWorkspaceOption {
+  return {
+    key: 'runtime:hermes:repo:worktree',
+    repoId: 'repo',
+    repoPath: '/workspace/repo',
+    worktreeId: 'worktree',
+    workspacePath: '/workspace/repo',
+    branch: 'main',
+    workspaceKind: 'git',
+    label: 'Workspace',
+    detail: '/workspace',
+    owner: { connectionId: 'hermes', pairingRevision: 22 },
+    ownerUnavailable: false,
+    availableAgentIds: ['codex']
+  }
+}
+
+function EditableObjectiveFields({
+  existingPlanText = ''
+}: {
+  existingPlanText?: string
+}): React.JSX.Element {
+  const [currentDraft, setCurrentDraft] = useState(() =>
+    draft({ objectiveText: '', existingPlanText })
+  )
   return (
     <ObjectiveEnrollmentFields
       draft={currentDraft}
       selectedWorkspaceKey=""
       workspaces={[]}
+      landingAvailability={{ workspaceKind: null, worktreeId: null, forge: 'checking' }}
       agents={[]}
       disabled={false}
       onWorkspaceChange={() => {}}
       onDraftChange={setCurrentDraft}
     />
   )
+}
+
+function deferredPlanFile(): { file: File; resolve: (contents: string) => void } {
+  let resolve!: (contents: string) => void
+  const contents = new Promise<string>((settle) => {
+    resolve = settle
+  })
+  const file = new File([], 'deferred.md', { type: 'text/markdown' })
+  Object.defineProperty(file, 'text', { value: () => contents })
+  return { file, resolve }
 }
 
 function runtimeState(): Pick<
@@ -143,6 +183,78 @@ describe('objective enrollment contract', () => {
     expect((objective as HTMLTextAreaElement).value).toBe('Ship the visible objective')
   })
 
+  it('keeps the prior source plan when an imported file exceeds the pre-read size limit', () => {
+    const priorPlan = '# Existing plan'
+    const { container } = render(<EditableObjectiveFields existingPlanText={priorPlan} />)
+    const source = screen.getByRole('textbox', { name: 'Existing plan source' })
+    const fileInput = container.querySelector<HTMLInputElement>('input[type="file"]')
+    const oversizedFile = new File(
+      [new Uint8Array(OBJECTIVE_EXISTING_PLAN_MAX_LENGTH * 4 + 1)],
+      'oversized.md',
+      { type: 'text/markdown' }
+    )
+
+    expect(fileInput).not.toBeNull()
+    fireEvent.change(fileInput!, { target: { files: [oversizedFile] } })
+
+    expect((source as HTMLTextAreaElement).value).toBe(priorPlan)
+    expect(source.getAttribute('aria-invalid')).toBe('true')
+  })
+
+  it('keeps concurrent draft edits and cancels a pending import when the plan is removed', async () => {
+    const { container } = render(<EditableObjectiveFields existingPlanText="# Existing plan" />)
+    const objective = screen.getByRole('textbox', { name: 'Objective' })
+    const fileInput = container.querySelector<HTMLInputElement>('input[type="file"]')
+    const firstImport = deferredPlanFile()
+
+    expect(fileInput).not.toBeNull()
+    fireEvent.change(fileInput!, { target: { files: [firstImport.file] } })
+    fireEvent.change(objective, { target: { value: 'Latest objective text' } })
+    await act(async () => {
+      firstImport.resolve('# Imported plan')
+      await Promise.resolve()
+    })
+
+    expect((objective as HTMLTextAreaElement).value).toBe('Latest objective text')
+    expect(
+      (screen.getByRole('textbox', { name: 'Existing plan source' }) as HTMLTextAreaElement).value
+    ).toBe('# Imported plan')
+
+    const staleImport = deferredPlanFile()
+    fireEvent.change(fileInput!, { target: { files: [staleImport.file] } })
+    fireEvent.click(screen.getByRole('button', { name: 'Remove plan' }))
+    await act(async () => {
+      staleImport.resolve('# Stale plan')
+      await Promise.resolve()
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Add existing plan' }))
+
+    expect(
+      (screen.getByRole('textbox', { name: 'Existing plan source' }) as HTMLTextAreaElement).value
+    ).toBe('')
+  })
+
+  it('rejects source plans only after the shared character limit', () => {
+    const availability: ObjectiveLandingBarAvailability = {
+      workspaceKind: 'git',
+      worktreeId: 'worktree',
+      forge: 'supported'
+    }
+
+    expect(
+      validateObjectiveEnrollmentDraft(
+        draft({ existingPlanText: 'x'.repeat(OBJECTIVE_EXISTING_PLAN_MAX_LENGTH) }),
+        availability
+      ).some((error) => error.code === 'existing-plan-too-long')
+    ).toBe(false)
+    expect(
+      validateObjectiveEnrollmentDraft(
+        draft({ existingPlanText: 'x'.repeat(OBJECTIVE_EXISTING_PLAN_MAX_LENGTH + 1) }),
+        availability
+      ).some((error) => error.code === 'existing-plan-too-long')
+    ).toBe(true)
+  })
+
   it('prevalidates the owner rules the RPC cannot describe', () => {
     const errors = validateObjectiveEnrollmentDraft(
       draft({
@@ -151,7 +263,8 @@ describe('objective enrollment contract', () => {
         maxConcurrency: 2,
         writeTerritoryText: '.g*/**\nsrc/**\nsrc/**',
         roleAgents: { planner: 'claude', implementer: '', reviewer: '', integrator: '' }
-      })
+      }),
+      { workspaceKind: 'folder', worktreeId: null, forge: 'checking' }
     )
 
     expect(errors.map((error) => error.code)).toEqual([
@@ -163,11 +276,52 @@ describe('objective enrollment contract', () => {
     ])
   })
 
-  it('only offers the files-on-disk landing bar for folder workspaces', () => {
-    expect(isObjectiveLandingBarAvailable('folder', 'files-on-disk')).toBe(true)
-    expect(isObjectiveLandingBarAvailable('folder', 'committed-local-branch')).toBe(false)
-    expect(isObjectiveLandingBarAvailable('folder', 'pushed-ref')).toBe(false)
-    expect(isObjectiveLandingBarAvailable('git', 'merged')).toBe(true)
+  it('treats blank territory as the whole workspace when validating and serializing', () => {
+    const blankTerritoryDraft = draft({ writeTerritoryText: ' \n\t' })
+
+    expect(
+      validateObjectiveEnrollmentDraft(blankTerritoryDraft, {
+        workspaceKind: 'git',
+        worktreeId: 'worktree',
+        forge: 'supported'
+      })
+    ).toEqual([])
+    expect(
+      buildObjectiveEnrollmentSubmission(blankTerritoryDraft, objectiveWorkspace()).input
+    ).toMatchObject({
+      kindPayload: { writeTerritory: [OBJECTIVE_ALL_WORKSPACE_PATHS_GLOB] }
+    })
+  })
+
+  it('offers landing bars only when the selected workspace can fulfill them', () => {
+    const folder: ObjectiveLandingBarAvailability = {
+      workspaceKind: 'folder',
+      worktreeId: null,
+      forge: 'checking'
+    }
+    const missingWorktree: ObjectiveLandingBarAvailability = {
+      workspaceKind: 'git',
+      worktreeId: null,
+      forge: 'supported'
+    }
+    const unsupportedForge: ObjectiveLandingBarAvailability = {
+      workspaceKind: 'git',
+      worktreeId: 'worktree',
+      forge: 'unsupported'
+    }
+    const supportedForge: ObjectiveLandingBarAvailability = {
+      workspaceKind: 'git',
+      worktreeId: 'worktree',
+      forge: 'supported'
+    }
+
+    expect(isObjectiveLandingBarAvailable(folder, 'files-on-disk')).toBe(true)
+    expect(isObjectiveLandingBarAvailable(folder, 'committed-local-branch')).toBe(false)
+    expect(isObjectiveLandingBarAvailable(folder, 'pushed-ref')).toBe(false)
+    expect(isObjectiveLandingBarAvailable(missingWorktree, 'hosted-review')).toBe(false)
+    expect(isObjectiveLandingBarAvailable(unsupportedForge, 'hosted-review')).toBe(false)
+    expect(isObjectiveLandingBarAvailable(unsupportedForge, 'pushed-ref')).toBe(true)
+    expect(isObjectiveLandingBarAvailable(supportedForge, 'merged')).toBe(true)
   })
 
   it('routes both git and folder selections to their actual runtime owner', () => {
@@ -190,20 +344,11 @@ describe('objective enrollment contract', () => {
   })
 
   it('builds the exact enrollment payload and passes the selected owner fence', () => {
-    const workspace: ObjectiveWorkspaceOption = {
-      key: 'runtime:hermes:repo:worktree',
-      repoId: 'repo',
-      worktreeId: 'worktree',
-      workspaceKind: 'git',
-      label: 'Workspace',
-      detail: '/workspace',
-      owner: { connectionId: 'hermes', pairingRevision: 22 },
-      ownerUnavailable: false,
-      availableAgentIds: ['codex']
-    }
+    const workspace = objectiveWorkspace()
     const submission = buildObjectiveEnrollmentSubmission(
       draft({
         objectiveText: '  Ship it  ',
+        existingPlanText: '  # Supplied plan\n\nShip task A.  ',
         roleAgents: { planner: 'codex', implementer: '', reviewer: '', integrator: '' },
         sitterOverrides: {
           updateBranch: 'gated',
@@ -224,11 +369,16 @@ describe('objective enrollment contract', () => {
       kindPayload: {
         objectiveText: 'Ship it',
         maxConcurrency: 1,
+        existingPlan: '# Supplied plan\n\nShip task A.',
         workspaceKind: 'git',
         writeTerritory: ['src/**', 'tests/**'],
         roleAgents: { planner: 'codex' },
         sitterOverrides: { updateBranch: 'gated', merge: 'off' }
       }
     })
+    expect(
+      buildObjectiveEnrollmentSubmission(draft({ existingPlanText: ' \n\t' }), objectiveWorkspace())
+        .input.kindPayload
+    ).not.toHaveProperty('existingPlan')
   })
 })

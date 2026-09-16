@@ -30,9 +30,7 @@ export function startHeimdall(
     userDataPath: getCanonicalUserDataPath
   })
   bindHeimdallTransport(runtime, transport)
-  kernel.onShutdown(() => {
-    transport.dispose()
-    objective.dispose()
-  })
+  kernel.onShutdown(() => transport.dispose())
+  kernel.onShutdown(() => objective.dispose(), 'drained')
   return kernel
 }

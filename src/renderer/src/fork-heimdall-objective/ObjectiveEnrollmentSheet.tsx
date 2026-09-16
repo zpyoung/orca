@@ -18,6 +18,8 @@ import {
   OBJECTIVE_ROLES,
   validateObjectiveEnrollmentDraft,
   type ObjectiveEnrollmentDraft,
+  type ObjectiveForgeAvailability,
+  type ObjectiveLandingBarAvailability,
   type ObjectiveEnrollmentError
 } from './objective-enrollment-model'
 import { buildObjectiveEnrollmentSubmission } from './objective-enrollment-request'
@@ -30,6 +32,7 @@ const DEFAULT_TURN_BUDGET = '40'
 function newDraft(): ObjectiveEnrollmentDraft {
   return {
     objectiveText: '',
+    existingPlanText: '',
     tier: 'standard',
     landingBar: 'files-on-disk',
     maxConcurrency: 1,
@@ -60,20 +63,30 @@ function validationErrorCopy(error: ObjectiveEnrollmentError): string {
         'fork.heimdallObjective.validation.objectiveTooLong',
         'The objective must be 16,384 characters or fewer.'
       )
+    case 'existing-plan-too-long':
+      return translate(
+        'fork.heimdallObjective.validation.existingPlanTooLong',
+        'The existing plan must be 65,536 characters or fewer.'
+      )
     case 'landing-bar-requires-git':
       return translate(
         'fork.heimdallObjective.validation.landingBarRequiresGit',
         'Folder workspaces support only the files-on-disk landing bar.'
       )
+    case 'landing-bar-requires-worktree':
+      return translate(
+        'fork.heimdallObjective.enrollment.landingBarRequiresWorktree',
+        'Hosted-review and merged landing bars require a git worktree.'
+      )
+    case 'landing-bar-requires-supported-forge':
+      return translate(
+        'fork.heimdallObjective.enrollment.landingBarRequiresSupportedForge',
+        'Hosted-review and merged landing bars require a GitHub or GitLab repository.'
+      )
     case 'max-concurrency-unsupported':
       return translate(
         'fork.heimdallObjective.validation.maxConcurrency',
         'This release supports exactly one objective worker at a time.'
-      )
-    case 'territory-required':
-      return translate(
-        'fork.heimdallObjective.validation.territoryRequired',
-        'Add at least one write-territory glob.'
       )
     case 'territory-too-many':
       return translate(
@@ -115,6 +128,30 @@ function validationErrorCopy(error: ObjectiveEnrollmentError): string {
   }
 }
 
+function enrollmentErrorCopy(error: unknown): string {
+  const message = describeObjectiveError(error)
+  const reason = message.trim()
+  if (reason.includes('landing-bar-requires-git')) {
+    return translate(
+      'fork.heimdallObjective.enrollment.landingBarRequiresGit',
+      'Folder workspaces support only the files-on-disk landing bar.'
+    )
+  }
+  if (reason.includes('landing-bar-requires-worktree')) {
+    return translate(
+      'fork.heimdallObjective.enrollment.landingBarRequiresWorktree',
+      'Hosted-review and merged landing bars require a git worktree.'
+    )
+  }
+  if (reason.includes('landing-bar-requires-supported-forge')) {
+    return translate(
+      'fork.heimdallObjective.enrollment.landingBarRequiresSupportedForge',
+      'Hosted-review and merged landing bars require a GitHub or GitLab repository.'
+    )
+  }
+  return message
+}
+
 export type ObjectiveEnrollmentSheetProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -132,6 +169,9 @@ export function ObjectiveEnrollmentSheet({
   const runtimeDetectedAgentIds = useAppStore((state) => state.runtimeDetectedAgentIds)
   const settings = useAppStore((state) => state.settings)
   const hydrateFleet = useAppStore((state) => state.hydrateHeimdallFleet)
+  const getHostedReviewCreationEligibility = useAppStore(
+    (state) => state.getHostedReviewCreationEligibility
+  )
   const workspaces = useMemo(
     () =>
       buildObjectiveWorkspaceOptions({
@@ -158,8 +198,52 @@ export function ObjectiveEnrollmentSheet({
   const [showValidation, setShowValidation] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [forgeAvailability, setForgeAvailability] = useState<ObjectiveForgeAvailability>('checking')
   const selectedWorkspace = workspaces.find((workspace) => workspace.key === selectedWorkspaceKey)
-  const validationErrors = validateObjectiveEnrollmentDraft(draft)
+  const landingAvailability: ObjectiveLandingBarAvailability = {
+    workspaceKind: selectedWorkspace?.workspaceKind ?? null,
+    worktreeId: selectedWorkspace?.worktreeId ?? null,
+    forge: forgeAvailability
+  }
+  const validationErrors = validateObjectiveEnrollmentDraft(draft, landingAvailability)
+
+  useEffect(() => {
+    if (
+      !open ||
+      !selectedWorkspace ||
+      selectedWorkspace.workspaceKind !== 'git' ||
+      selectedWorkspace.worktreeId === null
+    ) {
+      setForgeAvailability('checking')
+      return
+    }
+    let current = true
+    setForgeAvailability('checking')
+    void getHostedReviewCreationEligibility({
+      repoPath: selectedWorkspace.repoPath,
+      repoId: selectedWorkspace.repoId,
+      worktreePath: selectedWorkspace.workspacePath,
+      branch: selectedWorkspace.branch || 'HEAD'
+    }).then(
+      (eligibility) => {
+        if (current) {
+          setForgeAvailability(
+            eligibility.provider === 'github' || eligibility.provider === 'gitlab'
+              ? 'supported'
+              : 'unsupported'
+          )
+        }
+      },
+      () => {
+        if (current) {
+          setForgeAvailability('unavailable')
+        }
+      }
+    )
+    return () => {
+      current = false
+    }
+  }, [getHostedReviewCreationEligibility, open, selectedWorkspace])
 
   useEffect(() => {
     if (!selectedWorkspace) {
@@ -168,6 +252,8 @@ export function ObjectiveEnrollmentSheet({
         setDraft((current) => ({
           ...current,
           workspaceKind: null,
+          landingBar: 'files-on-disk',
+          capabilities: { ...current.capabilities, land: 'on' },
           roleAgents: { planner: '', implementer: '', reviewer: '', integrator: '' },
           availableAgentIds: []
         }))
@@ -179,46 +265,68 @@ export function ObjectiveEnrollmentSheet({
       const agentId = draft.roleAgents[role]
       return agentId && !availableAgentIds.includes(agentId)
     })
+    const highLandingBar = draft.landingBar === 'hosted-review' || draft.landingBar === 'merged'
+    const resetLandingBar =
+      (selectedWorkspace.workspaceKind === 'folder' && draft.landingBar !== 'files-on-disk') ||
+      (selectedWorkspace.worktreeId === null && highLandingBar)
     if (
       draft.workspaceKind !== selectedWorkspace.workspaceKind ||
       unavailableRole ||
+      resetLandingBar ||
       draft.availableAgentIds.join('\0') !== availableAgentIds.join('\0')
     ) {
-      setDraft((current) => ({
-        ...current,
-        workspaceKind: selectedWorkspace.workspaceKind,
-        landingBar:
-          selectedWorkspace.workspaceKind === 'folder' ? 'files-on-disk' : current.landingBar,
-        capabilities:
-          selectedWorkspace.workspaceKind === 'folder' && current.landingBar !== 'files-on-disk'
-            ? { ...current.capabilities, land: 'on' }
-            : current.capabilities,
-        roleAgents: Object.fromEntries(
-          OBJECTIVE_ROLES.map((role) => [
-            role,
-            availableAgentIds.includes(current.roleAgents[role]) ? current.roleAgents[role] : ''
-          ])
-        ) as ObjectiveEnrollmentDraft['roleAgents'],
-        availableAgentIds
-      }))
+      setDraft((current) => {
+        const landingBar =
+          selectedWorkspace.workspaceKind === 'folder'
+            ? 'files-on-disk'
+            : selectedWorkspace.worktreeId === null &&
+                (current.landingBar === 'hosted-review' || current.landingBar === 'merged')
+              ? 'pushed-ref'
+              : current.landingBar
+        return {
+          ...current,
+          workspaceKind: selectedWorkspace.workspaceKind,
+          landingBar,
+          capabilities:
+            landingBar === 'files-on-disk'
+              ? { ...current.capabilities, land: 'on' }
+              : current.capabilities,
+          roleAgents: Object.fromEntries(
+            OBJECTIVE_ROLES.map((role) => [
+              role,
+              availableAgentIds.includes(current.roleAgents[role]) ? current.roleAgents[role] : ''
+            ])
+          ) as ObjectiveEnrollmentDraft['roleAgents'],
+          availableAgentIds
+        }
+      })
     }
   }, [draft, selectedWorkspace, selectedWorkspaceKey])
 
   const selectWorkspace = (key: string): void => {
     const workspace = workspaces.find((candidate) => candidate.key === key)
     setSelectedWorkspaceKey(key)
+    setForgeAvailability('checking')
     setServerError(null)
-    setDraft((current) => ({
-      ...current,
-      workspaceKind: workspace?.workspaceKind ?? null,
-      landingBar: workspace?.workspaceKind === 'folder' ? 'files-on-disk' : current.landingBar,
-      capabilities:
-        workspace?.workspaceKind === 'folder' && current.landingBar !== 'files-on-disk'
-          ? { ...current.capabilities, land: 'on' }
-          : current.capabilities,
-      roleAgents: { planner: '', implementer: '', reviewer: '', integrator: '' },
-      availableAgentIds: workspace?.availableAgentIds ?? []
-    }))
+    setDraft((current) => {
+      const landingBar =
+        !workspace || workspace.workspaceKind === 'folder'
+          ? 'files-on-disk'
+          : current.landingBar === 'hosted-review' || current.landingBar === 'merged'
+            ? 'pushed-ref'
+            : current.landingBar
+      return {
+        ...current,
+        workspaceKind: workspace?.workspaceKind ?? null,
+        landingBar,
+        capabilities:
+          landingBar === 'files-on-disk'
+            ? { ...current.capabilities, land: 'on' }
+            : current.capabilities,
+        roleAgents: { planner: '', implementer: '', reviewer: '', integrator: '' },
+        availableAgentIds: workspace?.availableAgentIds ?? []
+      }
+    })
   }
 
   const submit = async (): Promise<void> => {
@@ -258,7 +366,7 @@ export function ObjectiveEnrollmentSheet({
       setShowValidation(false)
       onOpenChange(false)
     } catch (error) {
-      setServerError(describeObjectiveError(error))
+      setServerError(enrollmentErrorCopy(error))
     } finally {
       setSubmitting(false)
     }
@@ -292,6 +400,7 @@ export function ObjectiveEnrollmentSheet({
             draft={draft}
             selectedWorkspaceKey={selectedWorkspaceKey}
             workspaces={workspaces}
+            landingAvailability={landingAvailability}
             agents={getAgentCatalog()}
             disabled={submitting}
             onWorkspaceChange={selectWorkspace}

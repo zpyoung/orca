@@ -28,6 +28,45 @@ function node(taskKey: string, spec: string): ObjectivePlanTask {
 }
 
 describe('objective role prompts', () => {
+  it('includes the supplied source plan in the planner prompt', () => {
+    const existingPlan =
+      '## Existing source\n\n- Implement task A after task B.\n- Accept only when EXACT-PLAN-TOKEN passes.'
+    const prompt = buildObjectiveRolePrompt({
+      role: 'planner',
+      contract: { ...contract, existingPlan },
+      reason: 'initial',
+      reportPath: '/tmp/objective/report.json',
+      budgetBucket: 'plenty'
+    })
+
+    expect(prompt).toContain(existingPlan)
+  })
+
+  it('keeps an existing plan out of non-planner prompts', () => {
+    const existingPlan = 'RAW-PLAN-MUST-REACH-ONLY-THE-PLANNER'
+    const assigned = node('assigned', 'Implement the assigned behavior')
+    const inputContract = { ...contract, existingPlan }
+    const common = {
+      contract: inputContract,
+      reportPath: '/tmp/objective/report.json',
+      budgetBucket: 'plenty' as const
+    }
+    const prompts = [
+      buildObjectiveRolePrompt({
+        ...common,
+        role: 'implementer',
+        node: assigned,
+        plan: [assigned]
+      }),
+      buildObjectiveRolePrompt({ ...common, role: 'reviewer', plan: [assigned] }),
+      buildObjectiveRolePrompt({ ...common, role: 'integrator', plan: [assigned] })
+    ]
+
+    for (const prompt of prompts) {
+      expect(prompt).not.toContain(existingPlan)
+    }
+  })
+
   it('gives an implementer exactly its assigned node rather than sibling plan bodies', () => {
     const assigned = node('assigned', 'Implement the assigned behavior')
     const siblingSecret = 'SIBLING-SPEC-MUST-NOT-LEAK'

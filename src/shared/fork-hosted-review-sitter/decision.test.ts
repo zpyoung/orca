@@ -737,6 +737,24 @@ describe('PR sitter desired-action safety policy', () => {
   })
 })
 
+describe('PR sitter lifecycle stop policy', () => {
+  it('does not stop an open review', () => {
+    expect(evaluateRegisteredStop(review(), ledger())).toBeNull()
+  })
+
+  it.each(['merged', 'closed'] as const)(
+    'terminates a %s review with head evidence',
+    (lifecycle) => {
+      expect(evaluateRegisteredStop(review({ lifecycle }), ledger())).toEqual({
+        predicateId: 'hosted-review-lifecycle-closed',
+        disposition: 'terminal',
+        reason: `review ${lifecycle}`,
+        detail: HEAD
+      })
+    }
+  )
+})
+
 describe('PR sitter no-action reasons', () => {
   it('reports a terminal review before considering actions', () => {
     expect(explainDesiredAction(review({ lifecycle: 'merged' }), sitter(), ledger())).toMatchObject(

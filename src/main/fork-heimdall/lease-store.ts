@@ -41,9 +41,16 @@ export type LeaseResult =
   | { status: 'refused'; reason: 'held-by-other'; holder: string; epoch: number }
   | { status: 'unverifiable'; reason: string }
 
+export type LeaseLocationDescription = {
+  executionHostId: ExecutionHostId
+  leaseDirectory: string
+  pathSeparator: string
+}
+
 export type LeaseStore = {
   acquireOrRenew(key: WorkspaceKey, holder: string, ttlMs: number): Promise<LeaseResult>
   release(key: WorkspaceKey, epoch: number): Promise<void>
+  describeLocation?(key: WorkspaceKey): LeaseLocationDescription | null
 }
 
 type ResolvedLeaseLocation = {
@@ -176,6 +183,17 @@ export class HostRoutedLeaseStore implements LeaseStore {
       ownerNow?: () => number
     }
   ) {}
+
+  describeLocation(key: WorkspaceKey): LeaseLocationDescription | null {
+    const location = this.locations.get(key)
+    return location
+      ? {
+          executionHostId: location.target.executionHostId,
+          leaseDirectory: location.leaseDirectory,
+          pathSeparator: location.pathFlavor.sep
+        }
+      : null
+  }
 
   async acquireOrRenew(key: WorkspaceKey, holder: string, ttlMs: number): Promise<LeaseResult> {
     if (!holder || !Number.isSafeInteger(ttlMs) || ttlMs <= 0) {

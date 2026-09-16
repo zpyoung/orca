@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ExecuteContext } from '../../shared/fork-heimdall/kind-contract'
 import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
+import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import {
+  buildMergeAction,
+  hostedReviewAttemptFingerprint,
   actionWritesWorktree,
   type HostedReviewSitterAction,
   type HostedReviewSitterContention,
@@ -11,6 +14,9 @@ import type { Store } from '../persistence'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { HostedReviewWorkerDispatch } from './agent-preparation'
 import { createHostedReviewKind, registerHostedReviewKind, type HostedReviewKind } from './kind'
+import type { WatcherRunner } from '../fork-heimdall/runner-state'
+import { WatcherRunnerStopLifecycle } from '../fork-heimdall/runner-stop-lifecycle'
+import type { WatcherRunnerStatusLifecycle } from '../fork-heimdall/runner-status'
 
 const { inspectContention, launchFix } = vi.hoisted(() => ({
   inspectContention: vi.fn<() => Promise<HostedReviewSitterContention>>(),
@@ -74,6 +80,31 @@ function fakeStore(): Store {
 
 const runtime = { launchAgentTerminal: vi.fn() } as unknown as OrcaRuntimeService
 
+function attemptLedger(
+  action: HostedReviewSitterAction,
+  state: 'running' | 'settled',
+  effect?: 'landed' | 'not-landed' | 'indeterminate'
+): WatcherLedger {
+  return {
+    watcherId: 'watcher-1',
+    entries: [
+      {
+        eventId: `attempt-${state}-${effect ?? 'pending'}`,
+        watcherId: 'watcher-1',
+        atMs: 1,
+        origin: 'owner',
+        class: 'fact',
+        kind: 'attempt',
+        attemptId: 'attempt-1',
+        fingerprint: hostedReviewAttemptFingerprint(action),
+        action,
+        state,
+        ...(effect === undefined ? {} : { effect })
+      }
+    ]
+  }
+}
+
 describe('hosted review kind', () => {
   it('registers identity, stop predicates, and the payload schema', () => {
     let registered: HostedReviewKind | undefined
@@ -82,6 +113,7 @@ describe('hosted review kind', () => {
     expect(registered?.id).toBe('hosted-review')
     expect(registered?.displayName).toBe('Hosted review')
     expect(registered?.stopPredicates?.map((predicate) => predicate.id)).toEqual([
+      'hosted-review-lifecycle-closed',
       'repeated-failure-after-own-fix',
       'unverifiable-reproduced-failure'
     ])
@@ -96,6 +128,64 @@ describe('hosted review kind', () => {
       }).success
     ).toBe(true)
   })
+
+  it.each(['merged', 'closed'] as const)(
+    'defers a %s lifecycle terminal until attempts are settled',
+    async (lifecycle) => {
+      const kind = createHostedReviewKind(runtime, fakeStore())
+      const action = buildMergeAction(review, definition)
+      if (!action) {
+        throw new Error('Expected merge action')
+      }
+      const terminalSnapshot: Snapshot<HostedReviewWorld> = {
+        ...snapshot,
+        world: { ...snapshot.world, review: { ...review, lifecycle } }
+      }
+      const terminal = vi.fn()
+      const assertHeld = vi.fn(async () => undefined)
+      const runner = {
+        kind,
+        leaseGuard: {
+          epoch: 1,
+          assertHeld,
+          renewLoop: () => ({ dispose: () => undefined })
+        }
+      } as unknown as WatcherRunner
+      const stopLifecycle = new WatcherRunnerStopLifecycle({
+        terminal,
+        park: vi.fn()
+      } as unknown as WatcherRunnerStatusLifecycle)
+
+      await expect(
+        stopLifecycle.evaluate(runner, terminalSnapshot, attemptLedger(action, 'running'))
+      ).resolves.toBe('deferred')
+      await expect(
+        stopLifecycle.evaluate(
+          runner,
+          terminalSnapshot,
+          attemptLedger(action, 'settled', 'indeterminate')
+        )
+      ).resolves.toBe('deferred')
+      expect(assertHeld).not.toHaveBeenCalled()
+      expect(terminal).not.toHaveBeenCalled()
+
+      const settledEffect = lifecycle === 'merged' ? 'landed' : 'not-landed'
+      await expect(
+        stopLifecycle.evaluate(
+          runner,
+          terminalSnapshot,
+          attemptLedger(action, 'settled', settledEffect)
+        )
+      ).resolves.toBe('terminal')
+      expect(assertHeld).toHaveBeenCalledOnce()
+      expect(terminal).toHaveBeenCalledWith(runner, {
+        predicateId: 'hosted-review-lifecycle-closed',
+        disposition: 'terminal',
+        reason: `review ${lifecycle}`,
+        detail: review.headSha
+      })
+    }
+  )
 
   it.each([
     [{ state: 'clear' }, { verdict: 'allow' }],

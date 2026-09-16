@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { hostedReviewContentIdentity } from './action-identity'
+import { gateAction } from '../fork-heimdall/gate'
+import type { WatcherLedger } from '../fork-heimdall/ledger-types'
+import { hostedReviewAttemptFingerprint, hostedReviewContentIdentity } from './action-identity'
 import {
   buildMergeAction,
   buildPrepareConflictAction,
@@ -181,6 +183,35 @@ function action(kind: HostedReviewSitterAction['kind']): HostedReviewSitterActio
   }
 }
 
+function retryableFailureLedger(action: HostedReviewSitterAction): WatcherLedger {
+  return {
+    watcherId: 'sitter-1',
+    entries: [
+      {
+        eventId: 'merge-failed',
+        watcherId: 'sitter-1',
+        atMs: 1_000,
+        origin: 'owner',
+        class: 'fact',
+        kind: 'attempt',
+        attemptId: 'merge-attempt-1',
+        fingerprint: hostedReviewAttemptFingerprint(action),
+        action,
+        state: 'settled',
+        effect: 'not-landed'
+      }
+    ]
+  }
+}
+
+function gateEnrollment(sitterDefinition: HostedReviewSitterDefinition) {
+  return {
+    enabled: true,
+    capabilities: sitterDefinition.capabilities,
+    budget: { wallClockActiveMs: 60_000, turns: 10 }
+  }
+}
+
 describe('hosted-review kind preflight', () => {
   it('classifies worktree writes by action and provider execution path', () => {
     const github = definition()
@@ -276,6 +307,117 @@ describe('hosted-review kind preflight', () => {
       expect(hostedReviewPreflight(merge, world, contention)).toEqual({ verdict: 'allow' })
     }
   })
+
+  it.each([
+    { queueRequired: false, actionKind: 'merge' },
+    { queueRequired: true, actionKind: 'enqueue' }
+  ] as const)(
+    'does not rearm $actionKind on observation churn but does on new required-check evidence',
+    ({ queueRequired, actionKind }) => {
+      const defaultCheck = review().checks[0]!
+      const originalReview = review({
+        queue: { required: queueRequired, membership: 'not-enqueued' },
+        checks: [
+          { ...defaultCheck, observationId: 'test:old' },
+          {
+            ...defaultCheck,
+            checkKey: 'lint',
+            checkId: 'check-2',
+            name: 'lint',
+            observationId: 'lint:old'
+          }
+        ]
+      })
+      const sitterDefinition = definition()
+      const originalAction = buildMergeAction(originalReview, sitterDefinition)
+      if (!originalAction) {
+        throw new Error(`expected ${actionKind}`)
+      }
+      expect(originalAction.kind).toBe(actionKind)
+      expect(originalAction.evidenceKey).toBe(
+        queueRequired
+          ? JSON.stringify(['enqueue', 'head-1', 'lint=passed', 'test=passed'])
+          : JSON.stringify(['merge', 'head-1', 'squash', 'lint=passed', 'test=passed'])
+      )
+
+      const churnedReview = review({
+        queue: { required: queueRequired, membership: 'not-enqueued' },
+        checks: [
+          {
+            ...defaultCheck,
+            checkKey: 'lint',
+            checkId: 'check-2',
+            name: 'lint',
+            observationId: 'lint:new'
+          },
+          { ...defaultCheck, observationId: 'test:new' }
+        ]
+      })
+      const churnedAction = buildMergeAction(churnedReview, sitterDefinition)
+      if (!churnedAction) {
+        throw new Error(`expected churned ${actionKind}`)
+      }
+      expect(churnedAction.evidenceKey).toBe(originalAction.evidenceKey)
+      expect(
+        gateAction(
+          churnedAction,
+          snapshot(churnedReview, sitterDefinition),
+          gateEnrollment(sitterDefinition),
+          retryableFailureLedger(originalAction)
+        )
+      ).toEqual({ verdict: 'hold', reason: 'retry-needs-new-evidence' })
+
+      const changedIdentityReview = review({
+        queue: { required: queueRequired, membership: 'not-enqueued' },
+        checks: [
+          { ...defaultCheck, observationId: 'test:new' },
+          {
+            ...defaultCheck,
+            checkKey: 'typecheck',
+            checkId: 'check-3',
+            name: 'typecheck',
+            observationId: 'typecheck:1'
+          }
+        ]
+      })
+      const changedIdentityAction = buildMergeAction(changedIdentityReview, sitterDefinition)
+      if (!changedIdentityAction) {
+        throw new Error(`expected changed-evidence ${actionKind}`)
+      }
+      expect(changedIdentityAction.evidenceKey).not.toBe(originalAction.evidenceKey)
+      expect(
+        gateAction(
+          changedIdentityAction,
+          snapshot(changedIdentityReview, sitterDefinition),
+          gateEnrollment(sitterDefinition),
+          retryableFailureLedger(originalAction)
+        )
+      ).toEqual({ verdict: 'allow' })
+
+      const gatedDefinition = definition({
+        capabilities: { ...sitterDefinition.capabilities, merge: 'gated' }
+      })
+      expect(
+        gateAction(
+          changedIdentityAction,
+          snapshot(changedIdentityReview, gatedDefinition),
+          gateEnrollment(gatedDefinition),
+          retryableFailureLedger(originalAction)
+        )
+      ).toMatchObject({ verdict: 'hold', reason: 'awaiting-approval' })
+
+      const changedStateAction = buildMergeAction(
+        {
+          ...originalReview,
+          checks: originalReview.checks.map((check) =>
+            check.checkKey === 'lint' ? { ...check, state: 'failed' as const } : check
+          )
+        },
+        sitterDefinition
+      )
+      expect(changedStateAction?.evidenceKey).not.toBe(originalAction.evidenceKey)
+    }
+  )
 
   it('escalates a review identity mismatch before considering contention', () => {
     const reviewSnapshot = review()

@@ -1,14 +1,13 @@
-import {
-  EnrollSuccessSchema,
-  HEIMDALL_CHANNELS,
-  type EnrollSuccess
-} from '../../shared/fork-heimdall/api'
-import {
-  WatcherCommandResultSchema,
-  type WatcherCommandRequest,
-  type WatcherCommandResult,
-  type WatcherTarget
+import { HEIMDALL_CHANNELS, type EnrollSuccess } from '../../shared/fork-heimdall/api'
+import type {
+  WatcherCommandRequest,
+  WatcherCommandResult,
+  WatcherTarget
 } from '../../shared/fork-heimdall/fleet-types'
+import {
+  EnrollSuccessReaderSchema,
+  WatcherCommandResultReaderSchema
+} from '../../shared/fork-heimdall/remote-reader-schemas'
 import type { EnrollInput } from '../../shared/fork-heimdall/watcher-types'
 import type { RuntimeRpcResponse } from '../../shared/runtime-rpc-envelope'
 import {
@@ -57,7 +56,7 @@ export async function enrollRemoteWatcher(
     }
     throw new Error(`Heimdall enrollment outcome is indeterminate. ${COMMAND_INDETERMINATE}`)
   }
-  const parsed = EnrollSuccessSchema.safeParse(response.result)
+  const parsed = EnrollSuccessReaderSchema.safeParse(response.result)
   if (!parsed.success) {
     throw new Error('The owning runtime returned an invalid Heimdall enrollment result.')
   }
@@ -85,7 +84,7 @@ export async function sendRemoteWatcherCommand(
         ? refused('unsupported-capability', 'The owning runtime does not expose Heimdall commands.')
         : indeterminate()
     }
-    const parsed = WatcherCommandResultSchema.safeParse(response.result)
+    const parsed = WatcherCommandResultReaderSchema.safeParse(response.result)
     return parsed.success ? parsed.data : indeterminate()
   } catch (error) {
     if (error instanceof HeimdallCommandCapabilityError) {

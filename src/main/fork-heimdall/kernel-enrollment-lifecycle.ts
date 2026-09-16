@@ -31,6 +31,20 @@ export type KernelEnrollmentLifecycleDependencies = {
   createId(): string
 }
 
+type InsertedEnrollmentActivation = Pick<
+  KernelEnrollmentLifecycleDependencies,
+  'restore' | 'publish'
+>
+
+export function activateInsertedEnrollment(
+  inserted: WatcherEnrollment,
+  kind: RegisteredWatcherKind,
+  dependencies: InsertedEnrollmentActivation
+): void {
+  dependencies.restore(inserted, kind)
+  dependencies.publish()
+}
+
 export async function enrollWatcher(
   untrustedInput: EnrollInput,
   dependencies: KernelEnrollmentLifecycleDependencies
@@ -129,7 +143,6 @@ export async function enrollWatcher(
     terminalAtMs: null
   }
   const inserted = dependencies.enrollments.insert(enrollment)
-  dependencies.restore(inserted, kind)
-  dependencies.publish()
+  activateInsertedEnrollment(inserted, kind, dependencies)
   return { status: 'enrolled', entry: dependencies.entry(inserted) }
 }

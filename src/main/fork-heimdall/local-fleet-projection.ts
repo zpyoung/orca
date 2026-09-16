@@ -1,4 +1,12 @@
-import type { WatcherFleetEntry, WatcherOwnerFence } from '../../shared/fork-heimdall/fleet-types'
+import type {
+  WatcherFleetActivity,
+  WatcherFleetEntry,
+  WatcherFleetWorkspace,
+  WatcherOwnerFence
+} from '../../shared/fork-heimdall/fleet-types'
+import { getInFlightAttempts } from '../../shared/fork-heimdall/ledger-queries'
+import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
+import type { WatcherTickTrace } from '../../shared/fork-heimdall/tick-trace'
 import type { WatcherListEntry } from '../../shared/fork-heimdall/watcher-types'
 
 const ATTENTION_RANK: Record<WatcherListEntry['status']['state'], number> = {
@@ -22,10 +30,123 @@ export function watcherOwnerFence(entry: WatcherListEntry): WatcherOwnerFence {
   }
 }
 
+function latestSnapshotString(traces: readonly WatcherTickTrace[], key: string): string | null {
+  let latest: WatcherTickTrace | null = null
+  for (const trace of traces) {
+    if (
+      trace.snapshot &&
+      Object.hasOwn(trace.snapshot, key) &&
+      (!latest || trace.seq > latest.seq)
+    ) {
+      latest = trace
+    }
+  }
+  const value = latest?.snapshot?.[key]
+  return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+function workspaceSummary(
+  entry: WatcherListEntry,
+  traces: readonly WatcherTickTrace[],
+  label: string | null
+): WatcherFleetWorkspace {
+  const enrollment = entry.enrollment
+  const payload =
+    typeof enrollment.kindPayload === 'object' && enrollment.kindPayload !== null
+      ? (enrollment.kindPayload as Record<string, unknown>)
+      : null
+  const objectiveWorkspaceKind =
+    enrollment.kind === 'objective' &&
+    (payload?.workspaceKind === 'git' || payload?.workspaceKind === 'folder')
+      ? payload.workspaceKind
+      : null
+  const kind =
+    enrollment.kind === 'hosted-review'
+      ? 'git'
+      : (objectiveWorkspaceKind ?? (enrollment.worktreeId === null ? 'folder' : 'git'))
+  const withoutTrailingSeparators = enrollment.workspacePath.replace(/[\\/]+$/, '')
+  const pathLabel = withoutTrailingSeparators.split(/[\\/]/).at(-1) || enrollment.workspacePath
+  const hostedReviewBranch =
+    enrollment.kind === 'hosted-review' && typeof payload?.branch === 'string'
+      ? payload.branch.trim() || null
+      : null
+  return {
+    label: label?.trim() || pathLabel,
+    kind,
+    branch:
+      kind === 'folder'
+        ? null
+        : enrollment.kind === 'objective'
+          ? latestSnapshotString(traces, 'branch')
+          : hostedReviewBranch
+  }
+}
+
+function activitySummary(ledger: WatcherLedger, owned: boolean): WatcherFleetActivity | undefined {
+  if (!owned) {
+    return undefined
+  }
+  const inFlight = getInFlightAttempts(ledger)
+  if (inFlight.length === 0) {
+    return { kind: 'waiting', count: 0, detail: null, startedAtMs: null }
+  }
+
+  let firstAgent: (typeof inFlight)[number] | null = null
+  let firstCheck: (typeof inFlight)[number] | null = null
+  let firstAction = inFlight[0]!
+  let agentCount = 0
+  let checkCount = 0
+  for (const attempt of inFlight) {
+    if (attempt.atMs < firstAction.atMs) {
+      firstAction = attempt
+    }
+    if (attempt.dispatch !== undefined) {
+      agentCount += 1
+      if (!firstAgent || attempt.atMs < firstAgent.atMs) {
+        firstAgent = attempt
+      }
+    } else if (attempt.action.kind === 'run-check' || attempt.action.capability === 'check') {
+      checkCount += 1
+      if (!firstCheck || attempt.atMs < firstCheck.atMs) {
+        firstCheck = attempt
+      }
+    }
+  }
+  if (firstAgent) {
+    return {
+      kind: 'agent-in-flight',
+      count: agentCount,
+      detail: firstAgent.dispatch?.taskKey ?? firstAgent.action.kind,
+      startedAtMs: firstAgent.atMs
+    }
+  }
+  if (firstCheck) {
+    return {
+      kind: 'check-running',
+      count: checkCount,
+      detail: firstCheck.action.kind,
+      startedAtMs: firstCheck.atMs
+    }
+  }
+  return {
+    kind: 'action-running',
+    count: inFlight.length,
+    detail: firstAction.action.kind,
+    startedAtMs: firstAction.atMs
+  }
+}
+
+export type LocalFleetProjectionInput = {
+  ledger: WatcherLedger
+  traces: readonly WatcherTickTrace[]
+  workspaceLabel: string | null
+}
+
 export function localFleetEntry(
   entry: WatcherListEntry,
   observedAtMs: number,
-  owned: boolean
+  owned: boolean,
+  projection: LocalFleetProjectionInput
 ): WatcherFleetEntry {
   const capabilityNotes =
     entry.enrollment.schedulerOwner === 'ssh_bridge'
@@ -33,6 +154,7 @@ export function localFleetEntry(
           'SSH control requires this desktop client to stay connected; use a remote runtime for unattended work.'
         ]
       : []
+  const activity = activitySummary(projection.ledger, owned)
   return {
     target: { watcherId: entry.enrollment.watcherId, connectionId: null, pairingRevision: null },
     entry,
@@ -41,7 +163,13 @@ export function localFleetEntry(
     contact: 'live',
     readOnlyReason: owned ? null : 'This watcher is owned by another runtime.',
     capabilityNotes,
-    paused: entry.enrollment.paused
+    paused: entry.enrollment.paused,
+    workflowPhase:
+      entry.enrollment.kind === 'objective'
+        ? latestSnapshotString(projection.traces, 'phase')
+        : entry.status.phase,
+    ...(activity ? { activity } : {}),
+    workspace: workspaceSummary(entry, projection.traces, projection.workspaceLabel)
   }
 }
 

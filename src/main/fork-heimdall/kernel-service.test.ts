@@ -121,7 +121,7 @@ describe('Heimdall kernel service', () => {
         command: { kind: 'disarm' }
       })
     ).resolves.toMatchObject({ status: 'applied' })
-    desktop.service.stopForShutdown()
+    await desktop.service.stopForShutdown()
 
     const runtime = await harness({
       directory: desktop.directory,
@@ -142,7 +142,7 @@ describe('Heimdall kernel service', () => {
       schedulerOwner: 'local_host_service',
       commandRevision: 1
     })
-    runtime.service.stopForShutdown()
+    await runtime.service.stopForShutdown()
   })
 
   it('retains enrollment and retries when lease acquisition is refused', async () => {
@@ -229,7 +229,7 @@ describe('Heimdall kernel service', () => {
       status: { state: 'parked', parkReason: { kind: 'stop-predicate', predicateId: 'closed' } }
     })
 
-    stopped.service.stopForShutdown()
+    await stopped.service.stopForShutdown()
     const restarted = await harness({ directory: stopped.directory })
     restarted.service.registerKind(stoppedKind)
     const restoredPark = (await restarted.service.fleet()).entries[0]!
@@ -267,7 +267,7 @@ describe('Heimdall kernel service', () => {
         command: { kind: 'resume' }
       })
     ).resolves.toMatchObject({ status: 'refused', reason: 'invalid-state' })
-    restarted.service.stopForShutdown()
+    await restarted.service.stopForShutdown()
 
     const failing = await harness()
     failing.service.registerKind(
@@ -607,6 +607,7 @@ describe('Heimdall kernel service', () => {
 
     const listed = await service.list()
     await service.reconcileForTesting('valid-watcher')
+    const malformedReport = await service.debugReport('malformed-watcher')
 
     expect(listed).toHaveLength(2)
     expect(
@@ -618,6 +619,13 @@ describe('Heimdall kernel service', () => {
         state: 'escalated',
         phase: 'invalid-kind-payload'
       }
+    })
+    expect(malformedReport).toMatchObject({
+      malformedPayload: true,
+      status: { state: 'escalated', phase: 'invalid-kind-payload' },
+      runner: null,
+      workers: [],
+      workersError: null
     })
     expect(
       service
@@ -705,7 +713,12 @@ describe('Heimdall kernel service', () => {
     const boundaryReleased = new Promise<void>((resolve) => {
       releaseBoundary = resolve
     })
-    const { service, orchestration } = await harness()
+    const { service, orchestration, leaseStore } = await harness()
+    leaseStore.describeLocation = () => ({
+      executionHostId: 'local',
+      leaseDirectory: '/workspace/review-1/.orca/heimdall/lease',
+      pathSeparator: '/'
+    })
     service.registerKind(
       kind({
         decide: (snapshot) => ({ action: action(snapshot.contentIdentity) }),
@@ -732,6 +745,17 @@ describe('Heimdall kernel service', () => {
     })
     await Promise.resolve()
     await Promise.resolve()
+    const pendingReport = await service.debugReport(row.target.watcherId)
+    expect(pendingReport).toMatchObject({
+      pendingControlOperation: true,
+      runner: { controlPending: 'pause', actionInFlight: true }
+    })
+    expect(pendingReport.pointers).toContainEqual({
+      role: 'lease-holder',
+      host: 'local',
+      path: '/workspace/review-1/.orca/heimdall/lease/epoch-1/holder.json',
+      status: 'resolved'
+    })
     releaseBoundary()
     await reconciliation
     await expect(pause).resolves.toMatchObject({ status: 'applied' })
@@ -839,7 +863,7 @@ describe('Heimdall kernel service', () => {
         budget: { wallClockActiveMs: null, turns: 2 }
       }
     })
-    parked.service.stopForShutdown()
+    await parked.service.stopForShutdown()
 
     const restarted = await harness({ directory: parked.directory })
     restarted.service.registerKind(registeredKind)
@@ -866,7 +890,7 @@ describe('Heimdall kernel service', () => {
       ownerFence: { revision: 2 },
       entry: { enrollment: { enabled: true }, status: { state: 'watching', phase: 'resumed' } }
     })
-    restarted.service.stopForShutdown()
+    await restarted.service.stopForShutdown()
   })
 
   it('retains pause across storage restart and refuses stale revision or owner fences', async () => {
@@ -899,7 +923,7 @@ describe('Heimdall kernel service', () => {
       })
     ).resolves.toMatchObject({ status: 'refused', reason: 'owner-conflict' })
 
-    service.stopForShutdown()
+    await service.stopForShutdown()
     const reopenedDatabase = new HeimdallDatabase(directory)
     const reopenedEnrollments = new HeimdallEnrollmentStore(reopenedDatabase)
     expect(reopenedEnrollments.get(row.target.watcherId)).toMatchObject({

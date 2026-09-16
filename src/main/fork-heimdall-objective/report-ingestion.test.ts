@@ -144,7 +144,44 @@ describe('objective role report ingestion', () => {
         mailboxReportPath: path,
         role: 'planner'
       })
-    ).resolves.toEqual({ ok: false, reason: 'malformed' })
+    ).resolves.toMatchObject({ ok: false, reason: 'malformed' })
+  })
+
+  it('rejects planner globs with an actionable field path while preserving classification', async () => {
+    const target = await localFolderTarget()
+    const path = await issueObjectiveReportPath(target, 'planner-glob-attempt')
+    await writeFile(
+      path,
+      JSON.stringify({
+        plan: [
+          {
+            taskKey: 'task-1',
+            title: 'Implement behavior',
+            spec: 'Implement the objective behavior completely.',
+            deps: [],
+            criteria: [{ body: 'Behavior works', shellCheckable: true, checkCommand: 'true' }],
+            declaresDependencyChange: false,
+            declaredPaths: ['src/**']
+          }
+        ]
+      })
+    )
+
+    const result = await readObjectiveRoleReport({
+      target,
+      attemptFingerprint: 'planner-glob-attempt',
+      mailboxReportPath: path,
+      role: 'planner'
+    })
+
+    expect(result).toEqual({
+      ok: false,
+      reason: 'malformed',
+      detail: 'plan[0].declaredPaths[0]: Path must be a concrete workspace-relative path'
+    })
+    if (!result.ok) {
+      expect(result.detail).not.toContain('src/**')
+    }
   })
 
   it('distinguishes a complete report for the wrong role from malformed JSON', async () => {
@@ -324,7 +361,8 @@ describe('objective role report ingestion', () => {
             spec: 'Implement the objective behavior completely.',
             deps: [],
             criteria: [{ body: 'Behavior works', shellCheckable: true, checkCommand: 'true' }],
-            declaresDependencyChange: false
+            declaresDependencyChange: false,
+            declaredPaths: ['src/behavior.ts']
           }
         ]
       })
@@ -339,6 +377,7 @@ describe('objective role report ingestion', () => {
     expect(result.ok).toBe(true)
     if (result.ok) {
       expect(result.report.plan[0]?.taskKey).toBe('task-1')
+      expect(result.report.plan[0]?.declaredPaths).toEqual(['src/behavior.ts'])
       expect(result.reportDigest).toMatch(/^[0-9a-f]{64}$/u)
       expect(result.path).toBe(path)
     }

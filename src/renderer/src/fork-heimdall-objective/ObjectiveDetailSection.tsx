@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import type { ObjectiveDetail } from '../../../shared/fork-heimdall-objective/detail-types'
+import type { WatcherLedger } from '../../../shared/fork-heimdall/ledger-types'
 import type { WatcherFleetEntry, WatcherTarget } from '../../../shared/fork-heimdall/fleet-types'
 import { ObjectiveDetailContent } from './ObjectiveDetailContent'
 import {
@@ -38,7 +39,13 @@ function detailRefreshSignature(row: WatcherFleetEntry): string {
   ].join(':')
 }
 
-export function ObjectiveDetailSection({ row }: { row: WatcherFleetEntry }): React.JSX.Element {
+export function ObjectiveDetailSection({
+  row,
+  ledger
+}: {
+  row: WatcherFleetEntry
+  ledger: WatcherLedger | null
+}): React.JSX.Element {
   const api = getObjectiveHeimdallApi()
   const [detail, setDetail] = useState<ObjectiveDetail | null>(null)
   const [loading, setLoading] = useState(false)
@@ -66,16 +73,17 @@ export function ObjectiveDetailSection({ row }: { row: WatcherFleetEntry }): Rea
     try {
       const nextDetail = await api.objectiveDetail(row.target)
       if (
-        generationRef.current === requestGeneration &&
-        signatureRef.current === requestSignature
+        generationRef.current !== requestGeneration ||
+        signatureRef.current !== requestSignature
       ) {
-        detailTargetRef.current = requestTargetSignature
-        errorTargetRef.current = null
-        unavailableTargetRef.current = null
-        setDetail(nextDetail)
-        setUnavailable(false)
-        setError(null)
+        return
       }
+      detailTargetRef.current = requestTargetSignature
+      errorTargetRef.current = null
+      unavailableTargetRef.current = null
+      setDetail(nextDetail)
+      setUnavailable(false)
+      setError(null)
     } catch (cause) {
       if (
         generationRef.current !== requestGeneration ||
@@ -185,7 +193,7 @@ export function ObjectiveDetailSection({ row }: { row: WatcherFleetEntry }): Rea
         </p>
       ) : null}
       {visibleDetail ? (
-        <ObjectiveDetailContent detail={visibleDetail} row={row} />
+        <ObjectiveDetailContent detail={visibleDetail} ledger={ledger} row={row} />
       ) : !visibleError ? (
         <div
           className="h-20 animate-pulse rounded-md border border-border bg-muted/20"

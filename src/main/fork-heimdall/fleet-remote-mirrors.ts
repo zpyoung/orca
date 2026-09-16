@@ -1,9 +1,9 @@
 import {
   HEIMDALL_CHANNELS,
-  HeimdallSubscriptionEventSchema,
   type EnrollSuccess,
   type HeimdallRemoteOwner
 } from '../../shared/fork-heimdall/api'
+import { HeimdallSubscriptionEventReaderSchema } from '../../shared/fork-heimdall/remote-reader-schemas'
 import type {
   WatcherCommandRequest,
   WatcherCommandResult,
@@ -275,7 +275,7 @@ export class HeimdallRemoteFleetMirrors {
       mirror.isCurrentSubscription(incarnation, subscriptionGeneration, this.disposed) &&
       response.ok === true
     ) {
-      const event = HeimdallSubscriptionEventSchema.safeParse(response.result)
+      const event = HeimdallSubscriptionEventReaderSchema.safeParse(response.result)
       if (event.success && event.data.type === 'ready') {
         observationEpoch = ++mirror.observationEpoch
         mirror.ownerGeneratedAtMs = -1
@@ -311,7 +311,7 @@ export class HeimdallRemoteFleetMirrors {
       }
       return
     }
-    const event = HeimdallSubscriptionEventSchema.safeParse(response.result)
+    const event = HeimdallSubscriptionEventReaderSchema.safeParse(response.result)
     if (!event.success || event.data.type === 'end') {
       return
     }

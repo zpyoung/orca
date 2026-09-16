@@ -2,7 +2,9 @@ import { z } from 'zod'
 import { CapabilityModeSchema } from '../fork-heimdall/watcher-types'
 
 export const OBJECTIVE_TEXT_MAX_LENGTH = 16_384
+export const OBJECTIVE_EXISTING_PLAN_MAX_LENGTH = 65_536
 export const OBJECTIVE_TERRITORY_MAX_ENTRIES = 64
+export const OBJECTIVE_ALL_WORKSPACE_PATHS_GLOB = '**'
 export const OBJECTIVE_PATH_MAX_LENGTH = 1_024
 export const OBJECTIVE_AGENT_ID_MAX_LENGTH = 256
 
@@ -117,6 +119,9 @@ export function isAllowedObjectiveTerritoryGlob(value: string): boolean {
   if (!isWorkspaceRelativePath(value) || /[[\]{}()!]/u.test(value)) {
     return false
   }
+  if (value === OBJECTIVE_ALL_WORKSPACE_PATHS_GLOB) {
+    return true
+  }
   const slash = value.indexOf('/')
   const root = slash === -1 ? value : value.slice(0, slash)
   return !wildcardMatches('.git', root) && !wildcardMatches('.orca', root)
@@ -127,12 +132,13 @@ export const ObjectiveTerritoryGlobSchema = z
   .max(OBJECTIVE_PATH_MAX_LENGTH)
   .refine(
     isAllowedObjectiveTerritoryGlob,
-    'Territory must be a bounded workspace-relative glob that excludes .git and .orca'
+    'Territory must be ** or a bounded workspace-relative glob that excludes .git and .orca'
   )
 
 export const ObjectiveEnrollmentPayloadSchema = z
   .object({
     objectiveText: BoundedTextSchema(OBJECTIVE_TEXT_MAX_LENGTH),
+    existingPlan: BoundedTextSchema(OBJECTIVE_EXISTING_PLAN_MAX_LENGTH).optional(),
     tier: ObjectiveTierSchema,
     landingBar: ObjectiveLandingBarSchema,
     maxConcurrency: z.number().int().min(1).max(1_024),

@@ -1,4 +1,5 @@
 import type { z } from 'zod'
+import type { ExecutionHostId } from '../execution-host'
 import type { ActionOutcome, EffectCertainty } from './effect-certainty'
 import type { GateVerdict } from './gate'
 import type {
@@ -8,7 +9,7 @@ import type {
 } from './ledger-types'
 import type { PacingTier } from './pacing'
 import type { LiveSnapshot, Snapshot } from './snapshot'
-import type { StopDisposition, StopPredicate, StopVerdict } from './stop-policy'
+import type { FiredStopPredicate, StopDisposition, StopPredicate, StopVerdict } from './stop-policy'
 import type { ConsideredPhase, TraceSnapshotSummary } from './tick-trace'
 import type {
   AuthorizedEnrollment,
@@ -99,7 +100,8 @@ export type ActionExecutor<TWorld, TAction extends KernelAction> = {
   resolveOutcome(
     attempt: AttemptEntry,
     fresh: LiveSnapshot<TWorld>,
-    ledger: WatcherLedger
+    ledger: WatcherLedger,
+    lease: LeaseGuard
   ): EffectCertainty | Promise<EffectCertainty>
 }
 
@@ -110,6 +112,30 @@ export type PacingPolicy<TWorld> = {
 /** Phase 3 marker: its presence tells the kernel planning is supported. */
 export type PlannerAdapter<TWorld> = {
   readonly world?: TWorld
+}
+
+export type HandoffDerivation =
+  | { kind: 'enroll'; input: EnrollInput; reason: string }
+  | { kind: 'none'; reason: string }
+
+export type HandoffAdapter<_TWorld> = {
+  derive(
+    enrollment: WatcherEnrollment,
+    fired: FiredStopPredicate,
+    ledger: WatcherLedger
+  ): HandoffDerivation | Promise<HandoffDerivation>
+}
+
+export type DebugPointer = {
+  role: 'kernel-database' | 'kind-database' | 'workspace' | 'lease-holder'
+  host: 'kernel' | ExecutionHostId
+  path: string
+  status: 'resolved' | 'unresolved'
+  detail?: string
+}
+
+export type KindDebugAdapter = {
+  pointers?(enrollment: WatcherEnrollment): readonly DebugPointer[]
 }
 
 export type WatcherKind<
@@ -123,6 +149,8 @@ export type WatcherKind<
     stopPredicates?: readonly StopPredicate<TWorld>[]
     pacing?: PacingPolicy<TWorld>
     planner?: PlannerAdapter<TWorld>
+    handoff?: HandoffAdapter<TWorld>
+    debug?: KindDebugAdapter
   }
 
 export type { StopDisposition, StopPredicate, StopVerdict }

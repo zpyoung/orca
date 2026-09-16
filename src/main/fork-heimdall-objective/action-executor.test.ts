@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeAttemptFingerprint } from '../../shared/fork-heimdall/attempt-fingerprint'
+import type { LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
 import type {
   AttemptEntry,
   LedgerEntry,
@@ -12,6 +13,7 @@ import type { ObjectiveWorld } from '../../shared/fork-heimdall-objective/detail
 import type { Store } from '../persistence'
 import { createObjectiveActionExecutor } from './action-executor'
 import { findObjectiveWorkerEvidence, type ObjectiveSnapshotBinding } from './execution-context'
+import type { ObjectiveForgeAccess } from './objective-forge-access'
 import type { ObjectiveStore } from './objective-store'
 
 const { readReport, validateChanges } = vi.hoisted(() => ({
@@ -26,6 +28,12 @@ vi.mock('./observed-workspace-changes', () => ({
   captureObjectiveWorkspaceBaseline: vi.fn(),
   validateObjectiveWorkspaceChanges: validateChanges
 }))
+
+const TEST_LEASE = {
+  epoch: 1,
+  assertHeld: vi.fn(async () => undefined),
+  renewLoop: () => ({ dispose: () => undefined })
+} satisfies LeaseGuard
 
 const contract = {
   objectiveText: 'Implement the objective.',
@@ -66,7 +74,14 @@ function snapshot(contentIdentity = 'new-content'): LiveSnapshot<ObjectiveWorld>
       workspaceKind: 'folder',
       plan: { revisions: [], nodes: [], verdicts: [], landing: [] },
       reports: [],
-      budget: enrollment.budget
+      budget: enrollment.budget,
+      landingContext: {
+        branch: null,
+        headSha: null,
+        worktreeContentDigest: null,
+        pushTarget: null,
+        hostedReview: null
+      }
     }
   }
 }
@@ -170,7 +185,8 @@ function harness(storeOverrides: Partial<ObjectiveStore> = {}) {
   const executor = createObjectiveActionExecutor({
     store: {} as Store,
     objectiveStore,
-    snapshotBindings: bindings
+    snapshotBindings: bindings,
+    forge: {} as ObjectiveForgeAccess
   })
   return { executor, fresh }
 }
@@ -213,9 +229,9 @@ describe('objective action recovery', () => {
     }
     expect(findObjectiveWorkerEvidence(ledger, 'dispatch-1')?.orchestrationTaskId).toBe('task-1')
 
-    await expect(executor.resolveOutcome(attempt(dispatchNode), fresh, ledger)).resolves.toBe(
-      'landed'
-    )
+    await expect(
+      executor.resolveOutcome(attempt(dispatchNode), fresh, ledger, TEST_LEASE)
+    ).resolves.toBe('landed')
     expect(readReport).toHaveBeenCalledWith(
       expect.objectContaining({
         attemptFingerprint: makeAttemptFingerprint(
@@ -252,9 +268,9 @@ describe('objective action recovery', () => {
       entries: [attempt(dispatchNode), workerDone('succeeded')]
     }
 
-    await expect(executor.resolveOutcome(attempt(dispatchNode), fresh, ledger)).resolves.toBe(
-      'not-landed'
-    )
+    await expect(
+      executor.resolveOutcome(attempt(dispatchNode), fresh, ledger, TEST_LEASE)
+    ).resolves.toBe('not-landed')
   })
 
   it('resolves a crash before dispatch metadata as authoritatively not landed', async () => {
@@ -264,7 +280,9 @@ describe('objective action recovery', () => {
     delete crashed.dispatchId
     const ledger: WatcherLedger = { watcherId: 'watcher-1', entries: [crashed] }
 
-    await expect(executor.resolveOutcome(crashed, fresh, ledger)).resolves.toBe('not-landed')
+    await expect(executor.resolveOutcome(crashed, fresh, ledger, TEST_LEASE)).resolves.toBe(
+      'not-landed'
+    )
     expect(readReport).not.toHaveBeenCalled()
   })
 
@@ -272,9 +290,9 @@ describe('objective action recovery', () => {
     const { executor, fresh } = harness()
     const ledger: WatcherLedger = { watcherId: 'watcher-1', entries: [attempt(dispatchNode)] }
 
-    await expect(executor.resolveOutcome(attempt(dispatchNode), fresh, ledger)).resolves.toBe(
-      'indeterminate'
-    )
+    await expect(
+      executor.resolveOutcome(attempt(dispatchNode), fresh, ledger, TEST_LEASE)
+    ).resolves.toBe('indeterminate')
     expect(readReport).not.toHaveBeenCalled()
   })
 
@@ -285,9 +303,9 @@ describe('objective action recovery', () => {
       entries: [attempt(dispatchNode), workerDone('failed')]
     }
 
-    await expect(executor.resolveOutcome(attempt(dispatchNode), fresh, ledger)).resolves.toBe(
-      'not-landed'
-    )
+    await expect(
+      executor.resolveOutcome(attempt(dispatchNode), fresh, ledger, TEST_LEASE)
+    ).resolves.toBe('not-landed')
     expect(readReport).not.toHaveBeenCalled()
   })
 
@@ -310,14 +328,14 @@ describe('objective action recovery', () => {
       getCheckAttempt: () => ({ completedAtMs: 12 }) as never
     })
 
-    expect(absent.executor.resolveOutcome(attempt(checkAction), absent.fresh, ledger)).toBe(
-      'not-landed'
-    )
-    expect(incomplete.executor.resolveOutcome(attempt(checkAction), incomplete.fresh, ledger)).toBe(
-      'indeterminate'
-    )
-    expect(completed.executor.resolveOutcome(attempt(checkAction), completed.fresh, ledger)).toBe(
-      'landed'
-    )
+    expect(
+      absent.executor.resolveOutcome(attempt(checkAction), absent.fresh, ledger, TEST_LEASE)
+    ).toBe('not-landed')
+    expect(
+      incomplete.executor.resolveOutcome(attempt(checkAction), incomplete.fresh, ledger, TEST_LEASE)
+    ).toBe('indeterminate')
+    expect(
+      completed.executor.resolveOutcome(attempt(checkAction), completed.fresh, ledger, TEST_LEASE)
+    ).toBe('landed')
   })
 })

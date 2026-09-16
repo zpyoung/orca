@@ -34,8 +34,10 @@ export function buildObjectiveEnrollmentSubmission(
       sitterOverrides[capability] = mode
     }
   }
+  const existingPlan = draft.existingPlanText.trim()
   const kindPayload: ObjectiveEnrollmentPayload = {
     objectiveText: draft.objectiveText.trim(),
+    ...(existingPlan ? { existingPlan } : {}),
     tier: draft.tier,
     landingBar: draft.landingBar,
     maxConcurrency: 1,

@@ -8,6 +8,7 @@ import type { WatcherRunner } from './runner-state'
 export type KernelShutdownInput = {
   loaded: boolean
   listeners: Set<() => void>
+  drainedListeners: Set<() => void>
   subscribers: Set<() => void>
   runners: Iterable<WatcherRunner>
   runnerLoop: WatcherRunnerLoop | null
@@ -17,18 +18,44 @@ export type KernelShutdownInput = {
   database: HeimdallDatabase | null
 }
 
-/** Runs Electron's synchronous kernel shutdown barrier. */
-export function shutdownHeimdallKernel(input: KernelShutdownInput): void {
-  for (const listener of input.listeners) {
+const DEFAULT_DRAIN_MS = 1_500
+
+async function drainOperations(
+  operations: Promise<unknown>[],
+  deadlineAtMs: number
+): Promise<void> {
+  if (operations.length === 0) {
+    return
+  }
+  let timer: NodeJS.Timeout | undefined
+  const deadline = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, Math.max(0, deadlineAtMs - Date.now()))
+    timer?.unref()
+  })
+  await Promise.race([Promise.allSettled(operations), deadline])
+  clearTimeout(timer)
+}
+
+function notifyShutdownListeners(listeners: Set<() => void>): void {
+  for (const listener of listeners) {
     try {
       listener()
     } catch (error) {
       console.warn('[heimdall] shutdown listener failed:', error)
     }
   }
-  input.listeners.clear()
+  listeners.clear()
+}
+
+/** Stops new work, gives active ticks a bounded drain, then closes kernel storage. */
+export async function shutdownHeimdallKernel(
+  input: KernelShutdownInput,
+  drainMs = DEFAULT_DRAIN_MS
+): Promise<void> {
   input.subscribers.clear()
+  notifyShutdownListeners(input.listeners)
   if (!input.loaded) {
+    notifyShutdownListeners(input.drainedListeners)
     return
   }
 
@@ -36,19 +63,43 @@ export function shutdownHeimdallKernel(input: KernelShutdownInput): void {
     if (!input.runnerLoop) {
       throw new Error('Heimdall runner is unavailable')
     }
-    for (const runner of input.runners) {
-      const guard = runner.leaseGuard
+    const runners = [...input.runners]
+    const deadlineAtMs = Date.now() + Math.max(0, drainMs)
+    for (const runner of runners) {
       input.runnerLoop.stop(runner)
-      if (guard) {
-        void requireLeaseStore(input.leaseStore)
-          .release(runner.enrollment.workspaceKey, guard.epoch)
-          .catch(() => {})
-      }
     }
     input.host?.detachPowerMonitor()
     input.unsubscribeLedger?.()
-    input.database?.close()
+    await drainOperations(
+      runners.map((runner) => runner.operationTail),
+      deadlineAtMs
+    )
+
+    const releases: Promise<void>[] = []
+    for (const runner of runners) {
+      const guard = runner.leaseGuard
+      if (!guard) {
+        continue
+      }
+      releases.push(
+        requireLeaseStore(input.leaseStore)
+          .release(runner.enrollment.workspaceKey, guard.epoch)
+          .catch(() => {})
+          .finally(() => {
+            if (runner.leaseGuard === guard) {
+              runner.leaseGuard = null
+            }
+          })
+      )
+    }
+    await drainOperations(releases, deadlineAtMs)
   } catch (error) {
     console.warn('[heimdall] shutdown teardown failed:', error)
+  }
+  notifyShutdownListeners(input.drainedListeners)
+  try {
+    input.database?.close()
+  } catch (error) {
+    console.warn('[heimdall] shutdown database close failed:', error)
   }
 }

@@ -15,7 +15,7 @@ import type { ObjectiveDatabase } from './objective-database'
 import {
   CriteriaResultsSchema,
   DependenciesSchema,
-  LandingPayloadSchema,
+  parseLandingPayloadJson,
   parseJson,
   type CriterionRow,
   type LandingRow,
@@ -239,12 +239,49 @@ function buildProjection(
       reportDigest: row.report_digest,
       atMs: row.created_at_ms
     })),
-    landing: landingRows.map((row) => ({
-      rung: row.rung,
-      revisionId: parseJson(LandingPayloadSchema, row.payload_json, 'landing payload').revisionId,
-      contentIdentity: row.content_identity,
-      atMs: row.created_at_ms
-    }))
+    landing: landingRows.map((row) => {
+      const payload = parseLandingPayloadJson(row.rung, row.payload_json, 'landing payload')
+      const common = {
+        rung: row.rung,
+        revisionId: payload.revisionId,
+        contentIdentity: row.content_identity,
+        atMs: row.created_at_ms
+      }
+      if (row.rung === 'files-on-disk' || !('fromContentIdentity' in payload)) {
+        return common
+      }
+      if (row.rung === 'committed-local-branch' && 'treeOid' in payload) {
+        return {
+          ...common,
+          fromContentIdentity: payload.fromContentIdentity,
+          branch: payload.branch,
+          commitSha: payload.commitSha
+        }
+      }
+      if (row.rung === 'pushed-ref' && 'remote' in payload) {
+        return {
+          ...common,
+          fromContentIdentity: payload.fromContentIdentity,
+          branch: payload.branch,
+          commitSha: payload.commitSha,
+          remote: payload.remote,
+          remoteSha: payload.remoteSha
+        }
+      }
+      if (row.rung === 'hosted-review' && 'provider' in payload) {
+        return {
+          ...common,
+          fromContentIdentity: payload.fromContentIdentity,
+          branch: payload.branch,
+          provider: payload.provider,
+          reviewNumber: payload.reviewNumber,
+          reviewUrl: payload.reviewUrl,
+          headSha: payload.headSha,
+          base: payload.base
+        }
+      }
+      return { ...common, fromContentIdentity: payload.fromContentIdentity }
+    })
   }
 }
 

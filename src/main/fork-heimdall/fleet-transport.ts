@@ -23,7 +23,7 @@ export type HeimdallFleetKernel = {
   fleet(): Promise<HeimdallFleetSnapshot>
   detail(target: WatcherTarget): Promise<WatcherDetail>
   command(request: WatcherCommandRequest): Promise<WatcherCommandResult>
-  debugReport(watcherId: string): HeimdallDebugReport
+  debugReport(watcherId: string): Promise<HeimdallDebugReport>
   subscribe(listener: () => void): () => void
 }
 

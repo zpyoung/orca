@@ -275,3 +275,27 @@ file.
 - `src/main/runtime/structured-agent-session-integration.test.ts`
 
 **Status:** pending-upstream. Not yet submitted.
+
+## OMP atomic paste submit
+
+**What:** `writeTerminalAgentPrompt` sends OMP the complete bracketed-paste frame plus exactly one
+carriage return in one PTY write. It captures the lifecycle baseline immediately before that write,
+after the existing cancellation, generation, permission and agent-session admission checks.
+Non-OMP agents retain the existing paste-ingest/render wait and separate submit write.
+
+OMP 18.1.5 and newer can mark a bracketed paste for immediate submission only when Enter trails the
+paste end in the same input burst. With Orca's former split delivery, OMP received the paste, opened
+its large-paste menu, and then consumed the delayed carriage return as a menu key instead of
+submitting the prompt. OMP 18.2.2 reproduces that behavior and accepts the combined frame.
+
+**Why upstream, not isolated:** this is a provider compatibility fix inside upstream's canonical
+agent-prompt writer. A fork-only parallel send path would have to duplicate the generation,
+permission, lease-admission, lifecycle-baseline and delivery-receipt invariants that the shared
+writer already owns.
+
+**Paths:**
+
+- `src/main/runtime/orca-runtime-write-terminal-agent-prompt.ts`
+- `src/main/runtime/agent-prompt-submission-omp-atomic.test.ts`
+
+**Status:** pending-upstream. Not yet submitted.

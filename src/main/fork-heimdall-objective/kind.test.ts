@@ -89,6 +89,9 @@ async function workspaceFixture(kind: 'folder' | 'git'): Promise<WorkspaceFixtur
   await writeFile(join(createdRoot, 'src', 'obsolete.txt'), 'remove me\n')
   if (kind === 'git') {
     await runGit(createdRoot, ['init', '-b', 'main'])
+    await runGit(createdRoot, ['config', 'user.name', 'Objective Integration'])
+    await runGit(createdRoot, ['config', 'user.email', 'objective@example.test'])
+    await runGit(createdRoot, ['config', 'commit.gpgsign', 'false'])
     await runGit(createdRoot, ['add', 'src'])
     await runGit(createdRoot, [
       '-c',
@@ -344,6 +347,24 @@ function fingerprintFileName(fingerprint: string): string {
 }
 
 describe('objective kind through the Heimdall kernel', () => {
+  it('publishes the objective database as a kind-owned debug pointer', async () => {
+    const fixture = await workspaceFixture('folder')
+    const world = await kernelHarness(fixture, 'debug-pointer')
+    const enrolled = await world.service.enroll(enrollmentInput(fixture))
+    if (enrolled.status !== 'enrolled') {
+      throw new Error('Expected objective enrollment')
+    }
+
+    const report = await world.service.debugReport(enrolled.entry.enrollment.watcherId)
+
+    expect(report.pointers).toContainEqual({
+      role: 'kind-database',
+      host: 'kernel',
+      path: world.objectiveStore.databasePath(),
+      status: 'resolved'
+    })
+  })
+
   it.each(['folder', 'git'] as const)(
     'completes the real %s workspace flow and keeps its terminal watcher inert after restart',
     async (workspaceKind) => {
@@ -469,6 +490,122 @@ describe('objective kind through the Heimdall kernel', () => {
       ).toHaveLength(1)
     }
   )
+
+  it('walks an approved Git objective through commit and first push, then stays inert', async () => {
+    const fixture = await workspaceFixture('git')
+    const remote = join(dirname(fixture.root), 'objective-remote.git')
+    await runGit(dirname(fixture.root), ['init', '--bare', remote])
+    await runGit(fixture.root, ['remote', 'add', 'origin', remote])
+    const first = await kernelHarness(fixture, 'pushed-ref')
+    const baseInput = enrollmentInput(fixture)
+    const enrolled = await first.service.enroll({
+      ...baseInput,
+      capabilities: { ...baseInput.capabilities, land: 'gated' },
+      kindPayload: {
+        ...(baseInput.kindPayload as Record<string, unknown>),
+        landingBar: 'pushed-ref'
+      }
+    })
+    if (enrolled.status !== 'enrolled') {
+      throw new Error('Expected objective enrollment')
+    }
+    const watcherId = enrolled.entry.enrollment.watcherId
+
+    for (let pulse = 0; pulse < 6; pulse += 1) {
+      await first.service.reconcileForTesting(watcherId)
+    }
+    await first.service.reconcileForTesting(watcherId)
+    const commitEscalation = first.service
+      .ledger(watcherId)
+      .entries.findLast(
+        (entry) =>
+          entry.kind === 'escalation' &&
+          entry.status === 'open' &&
+          entry.approvalScope?.actionKind === 'commit-local-branch'
+      )
+    if (
+      !commitEscalation ||
+      commitEscalation.kind !== 'escalation' ||
+      !commitEscalation.approvalScope
+    ) {
+      throw new Error('Expected commit approval escalation')
+    }
+    let fleetEntry = (await first.service.fleet()).entries[0]!
+    await expect(
+      first.service.command({
+        target: fleetEntry.target,
+        expectedOwner: fleetEntry.ownerFence,
+        command: { kind: 'approve', scope: commitEscalation.approvalScope }
+      })
+    ).resolves.toMatchObject({ status: 'applied' })
+
+    await first.service.reconcileForTesting(watcherId)
+    expect(getLatestAttempts(first.service.ledger(watcherId)).at(-1)?.action.kind).toBe(
+      'commit-local-branch'
+    )
+    await first.service.reconcileForTesting(watcherId)
+    const pushEscalation = first.service
+      .ledger(watcherId)
+      .entries.findLast(
+        (entry) =>
+          entry.kind === 'escalation' &&
+          entry.status === 'open' &&
+          entry.approvalScope?.actionKind === 'push-ref'
+      )
+    if (!pushEscalation || pushEscalation.kind !== 'escalation' || !pushEscalation.approvalScope) {
+      throw new Error('Expected push approval escalation')
+    }
+    fleetEntry = (await first.service.fleet()).entries[0]!
+    await expect(
+      first.service.command({
+        target: fleetEntry.target,
+        expectedOwner: fleetEntry.ownerFence,
+        command: { kind: 'approve', scope: pushEscalation.approvalScope }
+      })
+    ).resolves.toMatchObject({ status: 'applied' })
+
+    await first.service.reconcileForTesting(watcherId)
+    const ledger = first.service.ledger(watcherId)
+    expect(getLatestAttempts(ledger).map((entry) => entry.action.kind)).toEqual([
+      'dispatch-planner',
+      'ingest-plan',
+      'activate-plan',
+      'dispatch-node',
+      'ingest-report',
+      'run-check',
+      'commit-local-branch',
+      'push-ref'
+    ])
+    expect(first.objectiveStore.project(watcherId).landing.map((entry) => entry.rung)).toEqual([
+      'committed-local-branch',
+      'pushed-ref'
+    ])
+    const localHead = await runGit(fixture.root, ['rev-parse', 'HEAD'])
+    expect(
+      await runGit(fixture.root, ['ls-remote', '--heads', 'origin', 'refs/heads/main'])
+    ).toContain(localHead)
+    expect(ledger.entries.filter((entry) => entry.kind === 'terminal')).toEqual([
+      expect.objectContaining({
+        state: 'objective-bar-reached',
+        reason: 'pushed-ref landing bar reached'
+      })
+    ])
+
+    first.close()
+    const restarted = await kernelHarness(fixture, 'pushed-ref-restarted')
+    expect((await restarted.service.list())[0]).toMatchObject({
+      enrollment: { watcherId, enabled: false },
+      status: { state: 'terminal', phase: 'terminal' }
+    })
+    restarted.schedule.mockClear()
+    restarted.service.resume()
+    await restarted.service.reconcileForTesting(watcherId)
+    expect(restarted.schedule).not.toHaveBeenCalled()
+    expect(restarted.orchestration.dispatchWorker).not.toHaveBeenCalled()
+    expect(
+      restarted.service.ledger(watcherId).entries.filter((entry) => entry.kind === 'terminal')
+    ).toHaveLength(1)
+  })
 
   it('rejects a worker report that omits a host-observed workspace change', async () => {
     const fixture = await workspaceFixture('folder')

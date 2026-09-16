@@ -172,7 +172,19 @@ export function hasUnverifiableReproducedFailure(
   })
 }
 
+export const hostedReviewLifecycleTerminalPredicate: StopPredicate<HostedReviewWorld> = {
+  id: 'hosted-review-lifecycle-closed',
+  disposition: 'terminal',
+  evaluate(snapshot) {
+    const lifecycle = snapshot.world.review.lifecycle
+    return lifecycle === 'open'
+      ? { stop: false }
+      : { stop: true, reason: `review ${lifecycle}`, detail: snapshot.world.review.headSha }
+  }
+}
+
 export const HOSTED_REVIEW_STOP_PREDICATES: readonly StopPredicate<HostedReviewWorld>[] = [
+  hostedReviewLifecycleTerminalPredicate,
   {
     id: 'repeated-failure-after-own-fix',
     evaluate(snapshot, ledger) {

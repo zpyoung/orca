@@ -142,7 +142,7 @@ function installApi(overrides: Partial<HeimdallApi>): void {
 describe('ObjectiveDetailSection', () => {
   it('renders the remote-safe unavailable state when the optional method is absent', async () => {
     installApi({})
-    await act(async () => root.render(<ObjectiveDetailSection row={row(1)} />))
+    await act(async () => root.render(<ObjectiveDetailSection row={row(1)} ledger={null} />))
 
     expect(container.textContent).toContain('Objective detail is not available from this host.')
   })
@@ -153,7 +153,7 @@ describe('ObjectiveDetailSection', () => {
         Promise.reject(new Error('Unknown method: heimdall:objectiveDetail'))
       )
     })
-    await act(async () => root.render(<ObjectiveDetailSection row={row(1)} />))
+    await act(async () => root.render(<ObjectiveDetailSection row={row(1)} ledger={null} />))
     await flushEffects()
 
     expect(container.textContent).toContain('Objective detail is not available from this host.')
@@ -169,9 +169,9 @@ describe('ObjectiveDetailSection', () => {
       .mockImplementationOnce(() => second.promise)
     installApi({ objectiveDetail })
 
-    await act(async () => root.render(<ObjectiveDetailSection row={row(1, 10)} />))
+    await act(async () => root.render(<ObjectiveDetailSection row={row(1, 10)} ledger={null} />))
     await flushEffects()
-    await act(async () => root.render(<ObjectiveDetailSection row={row(2, 20)} />))
+    await act(async () => root.render(<ObjectiveDetailSection row={row(2, 20)} ledger={null} />))
     await flushEffects()
     await act(async () => {
       second.resolve(detail('New owner state', 20))

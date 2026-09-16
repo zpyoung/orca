@@ -8,6 +8,7 @@ import {
   type ObjectiveCapabilities,
   type ObjectiveEnrollmentPayload
 } from '../../shared/fork-heimdall-objective/contract-types'
+import { OBJECTIVE_LANDING_LADDER } from '../../shared/fork-heimdall-objective/landing-ladder'
 import type {
   AuthorizedEnrollment,
   EnrollInput,
@@ -19,6 +20,11 @@ import type { Repo } from '../../shared/repo-types'
 import type { Store } from '../persistence'
 import { getAutomationSchedulerOwner } from '../persistence/scheduling-automations/automation-context-migration'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
+import {
+  defaultObjectiveForgeAccess,
+  objectiveForgeContext,
+  type ObjectiveForgeAccess
+} from './objective-forge-access'
 
 type ObjectiveRuntimeResolver = {
   resolveRuntimeGitTarget(selector: string): Promise<RuntimeGitTarget>
@@ -79,7 +85,11 @@ async function resolveGitWorkspace(
   runtime: ObjectiveRuntimeResolver,
   repoId: string,
   worktreeId: string
-): Promise<{ executionHostId: ExecutionHostId; workspacePath: string }> {
+): Promise<{
+  executionHostId: ExecutionHostId
+  workspacePath: string
+  gitTarget: RuntimeGitTarget
+}> {
   const target = await runtime.resolveRuntimeGitTarget(`id:${worktreeId}`)
   const worktree = target.worktree
   if (worktree.id !== worktreeId || worktree.repoId !== repoId) {
@@ -88,13 +98,21 @@ async function resolveGitWorkspace(
   if (!worktree.path || worktree.git.isBare || worktree.git.prunable) {
     throw new Error('Objective Git workspace is unavailable')
   }
-  return { executionHostId: target.executionHostId, workspacePath: worktree.path }
+  return {
+    executionHostId: target.executionHostId,
+    workspacePath: worktree.path,
+    gitTarget: target
+  }
 }
 
 async function resolveFolderWorkspace(
   runtime: ObjectiveRuntimeResolver,
   repo: Repo
-): Promise<{ executionHostId: ExecutionHostId; workspacePath: string }> {
+): Promise<{
+  executionHostId: ExecutionHostId
+  workspacePath: string
+  gitTarget?: never
+}> {
   const target = await runtime.resolveRuntimeFileTarget(`id:${repo.id}::${repo.path}`)
   const worktree = target.worktree
   if (worktree.repoId !== repo.id || worktree.path !== repo.path) {
@@ -108,7 +126,8 @@ export async function authorizeObjectiveEnrollment(
   runtime: OrcaRuntimeService,
   store: Store,
   input: EnrollInput,
-  storageAuthority: 'desktop' | 'runtime' = 'desktop'
+  storageAuthority: 'desktop' | 'runtime' = 'desktop',
+  forge: ObjectiveForgeAccess = defaultObjectiveForgeAccess
 ): Promise<AuthorizedEnrollment> {
   if (input.kind !== 'objective') {
     throw new Error('Objective enrollment requires the objective kind')
@@ -128,6 +147,12 @@ export async function authorizeObjectiveEnrollment(
   if (folder && contract.landingBar !== 'files-on-disk') {
     throw new Error('landing-bar-requires-git')
   }
+  const requiresHostedReview =
+    OBJECTIVE_LANDING_LADDER.indexOf(contract.landingBar) >=
+    OBJECTIVE_LANDING_LADDER.indexOf('hosted-review')
+  if (!folder && input.worktreeId === null && requiresHostedReview) {
+    throw new Error('landing-bar-requires-worktree')
+  }
   if (contract.maxConcurrency > 1) {
     throw new Error('max-concurrency-unsupported')
   }
@@ -145,6 +170,23 @@ export async function authorizeObjectiveEnrollment(
       : (() => {
           throw new Error('Git objective enrollment requires an explicit worktree')
         })()
+  if (!folder && requiresHostedReview) {
+    if (!workspace.gitTarget) {
+      throw new Error('landing-bar-requires-worktree')
+    }
+    const provider = await forge.detectProvider(
+      objectiveForgeContext({
+        kind: 'git',
+        executionHostId: workspace.executionHostId,
+        workspacePath: workspace.workspacePath,
+        fileProvider: null,
+        gitTarget: workspace.gitTarget
+      })
+    )
+    if (provider !== 'github' && provider !== 'gitlab') {
+      throw new Error('landing-bar-requires-supported-forge')
+    }
+  }
   const schedulerOwner = schedulerOwnerFor(repo, workspace.executionHostId, storageAuthority)
 
   return {

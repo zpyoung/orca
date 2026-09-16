@@ -27,7 +27,14 @@ function worldSnapshot(overrides: Partial<ObjectiveWorld['plan']> = {}): Snapsho
       workspaceKind: 'git',
       plan: { revisions: [], nodes: [], verdicts: [], landing: [], ...overrides },
       reports: [],
-      budget: { wallClockActiveMs: null, turns: 10 }
+      budget: { wallClockActiveMs: null, turns: 10 },
+      landingContext: {
+        branch: null,
+        headSha: null,
+        worktreeContentDigest: null,
+        pushTarget: null,
+        hostedReview: null
+      }
     }
   }
 }
@@ -123,6 +130,97 @@ describe('objective pacing', () => {
         { rung: 'files-on-disk', revisionId: 'revision-1', contentIdentity: 'content-1', atMs: 20 }
       ]
     })
+    expect(paceObjective(snapshot, ledger())).toBe('stopped')
+  })
+
+  it('stops at the hosted-review handoff rung for a merged objective', () => {
+    const snapshot = worldSnapshot({
+      landing: [
+        {
+          rung: 'hosted-review',
+          revisionId: 'revision-1',
+          contentIdentity: 'content-1',
+          atMs: 20
+        }
+      ]
+    })
+    snapshot.world.contract.landingBar = 'merged'
+    expect(paceObjective(snapshot, ledger())).toBe('stopped')
+  })
+
+  it('keeps rapid pacing while a landing rung attempt is in flight', () => {
+    const entries: LedgerEntry[] = [
+      {
+        kind: 'attempt',
+        eventId: 'event-commit',
+        watcherId: 'watcher-1',
+        atMs: 10,
+        origin: 'owner',
+        class: 'fact',
+        attemptId: 'attempt-commit',
+        fingerprint: 'fingerprint-commit',
+        state: 'running',
+        action: {
+          kind: 'commit-local-branch',
+          capability: 'land',
+          visibility: 'local',
+          recovery: 'replay-safe',
+          contentIdentity: 'content-1',
+          evidenceKey: 'committed-local-branch:content-1',
+          rung: 'committed-local-branch',
+          revisionId: 'revision-1',
+          branch: 'feature/objective',
+          headSha: 'head-1',
+          worktreeContentDigest: 'worktree-digest',
+          fromContentIdentity: 'content-1',
+          attemptTrailer: 'committed-local-branch:content-1'
+        }
+      },
+      {
+        kind: 'escalation',
+        eventId: 'event-gate',
+        watcherId: 'watcher-1',
+        atMs: 9,
+        origin: 'owner',
+        class: 'fact',
+        escalationId: 'gate-1',
+        escalationKind: 'awaiting-approval',
+        status: 'open',
+        foldCount: 1
+      }
+    ]
+    expect(paceObjective(worldSnapshot(), ledger(entries))).toBe('rapid')
+  })
+
+  it('idles instead of pulsing when the next rung lacks required repository context', () => {
+    const snapshot = worldSnapshot({
+      landing: [
+        {
+          rung: 'files-on-disk',
+          revisionId: 'revision-1',
+          contentIdentity: 'content-1',
+          atMs: 20
+        }
+      ]
+    })
+    snapshot.world.contract.landingBar = 'committed-local-branch'
+    expect(paceObjective(snapshot, ledger())).toBe('idle')
+  })
+})
+
+describe('objective re-armed pacing', () => {
+  it('stops when a higher current rung already satisfies the lowered bar', () => {
+    const snapshot = worldSnapshot({
+      landing: [
+        {
+          rung: 'pushed-ref',
+          revisionId: 'revision-1',
+          contentIdentity: 'content-1',
+          atMs: 20
+        }
+      ]
+    })
+    snapshot.world.contract.landingBar = 'committed-local-branch'
     expect(paceObjective(snapshot, ledger())).toBe('stopped')
   })
 })

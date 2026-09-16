@@ -7,6 +7,7 @@ import { createFleetEnvironmentTransport } from '../../../../fork-heimdall/fleet
 import { requireHeimdallKernel } from '../fork-heimdall/kernel-binding'
 import { getCanonicalUserDataPath } from '../../../../persistence'
 import { requireHeimdallObjectiveStore } from './objective-binding'
+import { ObjectiveDetailReaderSchema } from './objective-detail-reader-schema'
 
 async function readLocalObjectiveDetail(runtime: object, watcherId: string) {
   const target = { watcherId, connectionId: null, pairingRevision: null } as const
@@ -36,7 +37,7 @@ async function readRemoteObjectiveDetail(target: {
       `The owning runtime refused the objective detail read: ${response.error.message}`
     )
   }
-  return ObjectiveDetailSchema.parse(response.result)
+  return ObjectiveDetailReaderSchema.parse(response.result)
 }
 
 export const HEIMDALL_OBJECTIVE_METHODS: readonly RpcAnyMethod[] = [

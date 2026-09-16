@@ -14,6 +14,12 @@ const ActionBase = {
   evidenceKey: IdSchema
 } as const
 const ReplaySafeSchema = z.literal('replay-safe')
+const ExpectedStateSchema = z
+  .object({
+    target: IdSchema,
+    before: z.string().max(1_024)
+  })
+  .strict()
 
 export const DispatchPlannerActionSchema = z
   .object({
@@ -138,6 +144,56 @@ export const RecordLandingActionSchema = z
   .strict()
 export type RecordLandingAction = z.infer<typeof RecordLandingActionSchema>
 
+export const CommitLocalBranchActionSchema = z
+  .object({
+    ...ActionBase,
+    kind: z.literal('commit-local-branch'),
+    capability: z.literal('land'),
+    recovery: ReplaySafeSchema,
+    rung: z.literal('committed-local-branch'),
+    revisionId: IdSchema,
+    branch: IdSchema,
+    headSha: IdSchema,
+    worktreeContentDigest: IdSchema,
+    fromContentIdentity: IdSchema,
+    attemptTrailer: IdSchema
+  })
+  .strict()
+export type CommitLocalBranchAction = z.infer<typeof CommitLocalBranchActionSchema>
+
+export const PushRefActionSchema = z
+  .object({
+    ...ActionBase,
+    kind: z.literal('push-ref'),
+    capability: z.literal('land'),
+    visibility: z.literal('external'),
+    rung: z.literal('pushed-ref'),
+    revisionId: IdSchema,
+    branch: IdSchema,
+    remote: IdSchema,
+    commitSha: IdSchema,
+    expectedState: ExpectedStateSchema
+  })
+  .strict()
+export type PushRefAction = z.infer<typeof PushRefActionSchema>
+
+export const OpenHostedReviewActionSchema = z
+  .object({
+    ...ActionBase,
+    kind: z.literal('open-hosted-review'),
+    capability: z.literal('land'),
+    visibility: z.literal('external'),
+    rung: z.literal('hosted-review'),
+    revisionId: IdSchema,
+    branch: IdSchema,
+    base: IdSchema,
+    headSha: IdSchema,
+    provider: z.enum(['github', 'gitlab']),
+    expectedState: ExpectedStateSchema
+  })
+  .strict()
+export type OpenHostedReviewAction = z.infer<typeof OpenHostedReviewActionSchema>
+
 export const ObjectiveActionSchema = z.discriminatedUnion('kind', [
   DispatchPlannerActionSchema,
   IngestPlanActionSchema,
@@ -148,7 +204,10 @@ export const ObjectiveActionSchema = z.discriminatedUnion('kind', [
   DispatchReviewerActionSchema,
   DispatchIntegratorActionSchema,
   IngestVerdictActionSchema,
-  RecordLandingActionSchema
+  RecordLandingActionSchema,
+  CommitLocalBranchActionSchema,
+  PushRefActionSchema,
+  OpenHostedReviewActionSchema
 ])
 export type ObjectiveAction = z.infer<typeof ObjectiveActionSchema>
 
@@ -172,6 +231,29 @@ export const ObjectiveActionNaturalKeySchema = z.discriminatedUnion('kind', [
       kind: z.literal('landing-evidence'),
       rung: ObjectiveLandingBarSchema,
       contentIdentity: IdSchema
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('commit-local-branch'),
+      revisionId: IdSchema,
+      fromContentIdentity: IdSchema
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('push-ref'),
+      commitSha: IdSchema,
+      remote: IdSchema,
+      branch: IdSchema
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('open-hosted-review'),
+      provider: z.enum(['github', 'gitlab']),
+      branch: IdSchema,
+      headSha: IdSchema
     })
     .strict()
 ])
@@ -205,6 +287,26 @@ export function objectiveActionNaturalKey(
         kind: 'landing-evidence',
         rung: action.rung,
         contentIdentity: action.contentIdentity
+      }
+    case 'commit-local-branch':
+      return {
+        kind: 'commit-local-branch',
+        revisionId: action.revisionId,
+        fromContentIdentity: action.fromContentIdentity
+      }
+    case 'push-ref':
+      return {
+        kind: 'push-ref',
+        commitSha: action.commitSha,
+        remote: action.remote,
+        branch: action.branch
+      }
+    case 'open-hosted-review':
+      return {
+        kind: 'open-hosted-review',
+        provider: action.provider,
+        branch: action.branch,
+        headSha: action.headSha
       }
     case 'dispatch-planner':
     case 'dispatch-node':
@@ -240,6 +342,30 @@ export const ObjectiveActionResultSchema = z.discriminatedUnion('kind', [
       verdict: ObjectiveVerdictSchema
     })
     .strict(),
-  z.object({ ...NaturalKeyResultBase, kind: z.literal('landing-recorded') }).strict()
+  z.object({ ...NaturalKeyResultBase, kind: z.literal('landing-recorded') }).strict(),
+  z
+    .object({
+      naturalKey: ObjectiveActionNaturalKeySchema,
+      kind: z.literal('commit-recorded'),
+      commitSha: IdSchema,
+      contentIdentity: IdSchema,
+      outsideTerritoryPaths: z.array(ObjectiveWorkspacePathSchema).max(256)
+    })
+    .strict(),
+  z
+    .object({
+      naturalKey: ObjectiveActionNaturalKeySchema,
+      kind: z.literal('push-recorded'),
+      remoteSha: IdSchema
+    })
+    .strict(),
+  z
+    .object({
+      naturalKey: ObjectiveActionNaturalKeySchema,
+      kind: z.literal('review-recorded'),
+      reviewNumber: z.number().int().positive().safe(),
+      reviewUrl: z.string().trim().url()
+    })
+    .strict()
 ])
 export type ObjectiveActionResult = z.infer<typeof ObjectiveActionResultSchema>

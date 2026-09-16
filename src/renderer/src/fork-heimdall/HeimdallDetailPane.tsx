@@ -1,20 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  ArrowLeft,
-  Clock3,
-  Loader2,
-  Pause,
-  Play,
-  SlidersHorizontal,
-  StopCircle
-} from 'lucide-react'
+import { ArrowLeft, Clock3, Loader2, Pause, Play, StopCircle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
-import { getLatestEscalations } from '../../../shared/fork-heimdall/ledger-queries'
+import {
+  getLatestApproval,
+  getLatestEscalations
+} from '../../../shared/fork-heimdall/ledger-queries'
 import type {
   WatcherCommand,
   WatcherCommandResult,
@@ -22,8 +15,11 @@ import type {
   WatcherFleetEntry,
   WatcherWorker
 } from '../../../shared/fork-heimdall/fleet-types'
-import { formatHeimdallAge, formatHeimdallDuration, formatHeimdallTime } from './fleet-format'
+import { formatHeimdallAge, formatHeimdallTime } from './fleet-format'
+import { openHeimdallWorker } from './heimdall-worker-navigation'
 import { getHeimdallControlApi } from './heimdall-control-api'
+import { HeimdallBudgetCard } from './HeimdallBudgetCard'
+import { HeimdallDebugReportButton } from './HeimdallDebugReportButton'
 import { HeimdallDecisionTrace } from './HeimdallDecisionTrace'
 import { HeimdallEscalations } from './HeimdallEscalations'
 import { HeimdallLedgerActivity } from './HeimdallLedgerActivity'
@@ -68,14 +64,6 @@ function commandNotice(result: WatcherCommandResult): HeimdallCommandNotice {
   }
 }
 
-function parseLimit(value: string, multiplier = 1): number | null | undefined {
-  if (!value.trim()) {
-    return null
-  }
-  const parsed = Number(value)
-  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed * multiplier) : undefined
-}
-
 export type HeimdallDetailPaneProps = {
   row: WatcherFleetEntry
   onBack: () => void
@@ -92,8 +80,6 @@ function HeimdallDetailPaneContent({ row, onBack }: HeimdallDetailPaneProps): Re
   const [error, setError] = useState<string | null>(null)
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [notice, setNotice] = useState<HeimdallCommandNotice | null>(null)
-  const [activeMinutesOverride, setActiveMinutesOverride] = useState<string | null>(null)
-  const [turnsOverride, setTurnsOverride] = useState<string | null>(null)
   const requestGeneration = useRef(0)
   const lastRefreshSignature = useRef<string | null>(null)
   const rowKey = targetKey(row)
@@ -159,15 +145,21 @@ function HeimdallDetailPaneContent({ row, onBack }: HeimdallDetailPaneProps): Re
     readOnlyReason: row.readOnlyReason,
     capabilityNotes: row.capabilityNotes
   }
-  const openEscalations = useMemo(
-    () =>
-      activeDetail
-        ? getLatestEscalations(activeDetail.ledger).filter(
-            (entry) => entry.status === 'open' || entry.status === 'escalated'
-          )
-        : [],
-    [activeDetail]
-  )
+  const openEscalations = useMemo(() => {
+    if (!activeDetail) {
+      return []
+    }
+    return getLatestEscalations(activeDetail.ledger).filter((entry) => {
+      if (entry.status !== 'open' && entry.status !== 'escalated') {
+        return false
+      }
+      return !(
+        entry.escalationKind === 'awaiting-approval' &&
+        entry.approvalScope &&
+        getLatestApproval(activeDetail.ledger, entry.approvalScope)?.decision === 'approved'
+      )
+    })
+  }, [activeDetail])
   const readOnly =
     Boolean(displayedRow.readOnlyReason) ||
     displayedRow.contact === 'unverifiable' ||
@@ -177,18 +169,6 @@ function HeimdallDetailPaneContent({ row, onBack }: HeimdallDetailPaneProps): Re
     activeDetail.watcher.ownerFence.revision < row.ownerFence.revision ||
     (activeDetail.watcher.ownerFence.revision === row.ownerFence.revision &&
       activeDetail.watcher.observedAtMs < row.observedAtMs)
-  const activeLimit = displayedRow.entry.enrollment.budget.wallClockActiveMs
-  const activeMinutes =
-    activeMinutesOverride ?? (activeLimit === null ? '' : String(activeLimit / 60_000))
-  const turnLimit = displayedRow.entry.enrollment.budget.turns
-  const turns = turnsOverride ?? (turnLimit === null ? '' : String(turnLimit))
-  const activePercent =
-    activeLimit === null || activeLimit === 0
-      ? null
-      : Math.min(100, (displayedRow.entry.status.budget.activeMs / activeLimit) * 100)
-  const parsedMinutes = parseLimit(activeMinutes, 60_000)
-  const parsedTurns = parseLimit(turns)
-  const budgetValid = parsedMinutes !== undefined && parsedTurns !== undefined
 
   const runCommand = async (
     key: string,
@@ -197,6 +177,7 @@ function HeimdallDetailPaneContent({ row, onBack }: HeimdallDetailPaneProps): Re
     const api = getHeimdallControlApi()
     const requiresDetailEvidence =
       command.kind === 'approve' ||
+      command.kind === 'adjust-budget' ||
       command.kind === 'answer-question' ||
       command.kind === 'stop-worker'
     if (!api || busyKey || readOnly || (requiresDetailEvidence && detailEvidenceStale)) {
@@ -277,6 +258,7 @@ function HeimdallDetailPaneContent({ row, onBack }: HeimdallDetailPaneProps): Re
               {watcherHostLabel(displayedRow)} · {status.phase}
             </p>
           </div>
+          <HeimdallDebugReportButton target={displayedRow.target} />
           {loading ? (
             <Loader2
               className="mt-1 size-4 animate-spin text-muted-foreground"
@@ -409,114 +391,26 @@ function HeimdallDetailPaneContent({ row, onBack }: HeimdallDetailPaneProps): Re
           ) : null}
         </section>
 
-        <section aria-labelledby="heimdall-budget-title">
-          <h3
-            id="heimdall-budget-title"
-            className="mb-2 text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground"
-          >
-            {translate('fork.heimdall.budget.title', 'Budget')}
-          </h3>
-          <div className="rounded-md border border-border bg-muted/10 p-3">
-            <div className="flex items-center justify-between gap-2 text-xs">
-              <span>{translate('fork.heimdall.budget.activeTime', 'Active time')}</span>
-              <span className="tabular-nums">
-                {formatHeimdallDuration(status.budget.activeMs)} /{' '}
-                {activeLimit === null
-                  ? translate('fork.heimdall.budget.unlimited', 'Unlimited')
-                  : formatHeimdallDuration(activeLimit)}
-              </span>
-            </div>
-            {activePercent !== null ? (
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-status-success"
-                  style={{ width: `${activePercent}%` }}
-                />
-              </div>
-            ) : null}
-            <div className="mt-2 flex items-center justify-between gap-2 text-xs">
-              <span>{translate('fork.heimdall.budget.turns', 'Worker turns')}</span>
-              <span className="tabular-nums">
-                {status.budget.turns} / {displayedRow.entry.enrollment.budget.turns ?? '∞'}
-              </span>
-            </div>
-            {status.budget.exhausted ? (
-              <p className="mt-2 text-xs text-status-warning">
-                {translate('fork.heimdall.budget.exhausted', 'Exhausted: {{kind}}', {
-                  kind: status.budget.exhausted.kind
-                })}
-              </p>
-            ) : null}
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1">
-                <Label htmlFor="heimdall-active-minutes" className="text-xs">
-                  {translate('fork.heimdall.budget.minutesLimit', 'Active minutes limit')}
-                </Label>
-                <Input
-                  id="heimdall-active-minutes"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={activeMinutes}
-                  disabled={readOnly || busyKey !== null}
-                  placeholder={translate('fork.heimdall.budget.unlimited', 'Unlimited')}
-                  onChange={(event) => setActiveMinutesOverride(event.target.value)}
-                  aria-invalid={parsedMinutes === undefined}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="heimdall-turn-limit" className="text-xs">
-                  {translate('fork.heimdall.budget.turnLimit', 'Worker turn limit')}
-                </Label>
-                <Input
-                  id="heimdall-turn-limit"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={turns}
-                  disabled={readOnly || busyKey !== null}
-                  placeholder={translate('fork.heimdall.budget.unlimited', 'Unlimited')}
-                  onChange={(event) => setTurnsOverride(event.target.value)}
-                  aria-invalid={parsedTurns === undefined}
-                />
-              </div>
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              className="mt-3"
-              disabled={readOnly || busyKey !== null || !budgetValid}
-              onClick={() => {
-                if (parsedMinutes !== undefined && parsedTurns !== undefined) {
-                  void runCommand('adjust-budget', {
-                    kind: 'adjust-budget',
-                    budget: { wallClockActiveMs: parsedMinutes, turns: parsedTurns }
-                  }).then((result) => {
-                    if (result?.status === 'applied') {
-                      setActiveMinutesOverride(null)
-                      setTurnsOverride(null)
-                    }
-                  })
-                }
-              }}
-            >
-              {busyKey === 'adjust-budget' ? (
-                <Loader2 className="animate-spin" />
-              ) : (
-                <SlidersHorizontal />
-              )}
-              {translate('fork.heimdall.budget.apply', 'Apply budget')}
-            </Button>
-          </div>
-        </section>
+        <HeimdallBudgetCard
+          policy={displayedRow.entry.enrollment.budget}
+          usage={status.budget}
+          disabled={readOnly || detailEvidenceStale}
+          busy={busyKey !== null}
+          applying={busyKey === 'adjust-budget'}
+          onApply={async (budget) => {
+            const result = await runCommand('adjust-budget', { kind: 'adjust-budget', budget })
+            return result?.status === 'applied'
+          }}
+        />
 
         <HeimdallEscalations
           entries={openEscalations}
+          traces={activeDetail?.traces ?? []}
           readOnly={readOnly || detailEvidenceStale}
           busyKey={busyKey}
           onApprove={(key, scope) => void runCommand(key, { kind: 'approve', scope })}
         />
-        <HeimdallKindDetail row={displayedRow} />
+        <HeimdallKindDetail row={displayedRow} ledger={activeDetail?.ledger ?? null} />
 
         <section aria-labelledby="heimdall-workers-title">
           <h3
@@ -530,6 +424,8 @@ function HeimdallDetailPaneContent({ row, onBack }: HeimdallDetailPaneProps): Re
               workers={activeDetail.workers}
               disabled={readOnly || detailEvidenceStale}
               busyKey={busyKey}
+              ownerConnectionId={displayedRow.target.connectionId}
+              onOpen={openHeimdallWorker}
               onAnswer={answerWorker}
               onStop={async (worker) => {
                 await runCommand(`stop-worker:${worker.dispatchId}`, {

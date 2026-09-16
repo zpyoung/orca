@@ -32,7 +32,9 @@ function reportContract(role: ObjectiveRole): string {
         'Write one strict JSON object: {"plan":[task,...]}.',
         'Each task is {taskKey,title,spec,deps,criteria,declaresDependencyChange,declaredPaths?}.',
         'Each criterion is {body,shellCheckable,checkCommand}; checkCommand is non-null exactly when shellCheckable is true.',
-        'Task keys are unique, dependencies name other tasks, the graph is acyclic, and declared paths stay in write territory.'
+        'Task keys are unique, dependencies name other tasks, and the graph is acyclic.',
+        'When known, declaredPaths contains only concrete workspace-relative file paths inside write territory.',
+        'Never use globs or copy write-territory patterns into declaredPaths; omit declaredPaths when exact files are unknown.'
       ].join('\n')
     case 'implementer':
       return [
@@ -80,7 +82,37 @@ function planReviewView(plan: ObjectivePlan): unknown {
   }))
 }
 
+function existingPlanContext(input: ObjectiveRolePromptInput): string[] {
+  const existingPlan = input.contract.existingPlan
+  if (input.role !== 'planner' || !existingPlan) {
+    return []
+  }
+
+  const normalizationInstruction =
+    (input.reason ?? 'initial') === 'initial'
+      ? [
+          'Normalize the source plan into the strict planner report contract.',
+          'Preserve its scope, tasks, dependencies, and acceptance criteria; only fill in details needed to make it executable under this objective contract.',
+          'Do not replace it with a newly designed plan.'
+        ].join('\n')
+      : [
+          'Use the source plan as context for this replan, adapting it as needed for the stated replanning reason while preserving the objective.',
+          'Account for work already completed; do not force completed tasks to run again.'
+        ].join('\n')
+
+  return [
+    `USER-SUPPLIED EXISTING PLAN SOURCE - BEGIN\n${existingPlan}\nUSER-SUPPLIED EXISTING PLAN SOURCE - END`,
+    [
+      normalizationInstruction,
+      'The source is not direct-execution authorization: objective capability modes and approval gates remain unchanged.'
+    ].join('\n')
+  ]
+}
+
 function roleContext(input: ObjectiveRolePromptInput): string[] {
+  if (input.role === 'planner') {
+    return existingPlanContext(input)
+  }
   if (input.role === 'implementer') {
     return [`ASSIGNED NODE JSON:\n${JSON.stringify(input.node)}`]
   }

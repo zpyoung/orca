@@ -223,7 +223,7 @@ export function buildMergeAction(
   sitter: HostedReviewSitterDefinition
 ): HostedReviewSitterAction | null {
   const currentEvidence = currentRequiredChecks(review)
-    .map((check) => check.observationId)
+    .map((check) => `${check.checkKey}=${check.state}`)
     .sort()
   if (review.queue.required) {
     if (review.queue.membership !== 'not-enqueued') {

@@ -15,6 +15,18 @@ import { OBJECTIVE_TEXT_MAX_LENGTH } from '../../../shared/fork-heimdall-objecti
 import type { CapabilityMode } from '../../../shared/fork-heimdall/watcher-types'
 import type { AgentCatalogEntry } from '@/lib/agent-catalog'
 import {
+  ObjectiveEnrollmentFieldHelp,
+  objectiveCapabilityHelp,
+  objectiveCapabilityModesHelp,
+  objectiveConcurrencyHelp,
+  objectiveLandingBarHelp,
+  objectiveTerritoryHelp,
+  objectiveTierHelp,
+  type ObjectiveEnrollmentHelpCopy
+} from './ObjectiveEnrollmentFieldHelp'
+import { ObjectiveExistingPlanInput } from './ObjectiveExistingPlanInput'
+import { ObjectiveWorkspacePicker } from './ObjectiveWorkspacePicker'
+import {
   isObjectiveLandingBarAvailable,
   OBJECTIVE_CAPABILITIES,
   OBJECTIVE_LANDING_BARS,
@@ -22,6 +34,7 @@ import {
   OBJECTIVE_SITTER_CAPABILITIES,
   OBJECTIVE_TIERS,
   type ObjectiveEnrollmentDraft,
+  type ObjectiveLandingBarAvailability,
   type ObjectiveLandingBar
 } from './objective-enrollment-model'
 import type { ObjectiveWorkspaceOption } from './objective-workspace-options'
@@ -31,20 +44,21 @@ import {
   objectiveLandingBarLabel,
   objectiveRoleLabel,
   objectiveSitterCapabilityLabel,
-  objectiveTierLabel,
-  objectiveWorkspaceKindLabel
+  objectiveTierLabel
 } from './objective-copy'
 
 const CAPABILITY_MODES: readonly CapabilityMode[] = ['off', 'gated', 'on']
 
 function CompactSelect({
   label,
+  help,
   value,
   disabled,
   options,
   onChange
 }: {
   label: string
+  help?: ObjectiveEnrollmentHelpCopy
   value: string
   disabled: boolean
   options: readonly { value: string; label: string; disabled?: boolean }[]
@@ -53,9 +67,12 @@ function CompactSelect({
   const labelId = useId()
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_148px] items-center gap-3">
-      <Label id={labelId} className="truncate text-xs">
-        {label}
-      </Label>
+      <div className="flex min-w-0 items-center gap-1">
+        <Label id={labelId} className="truncate text-xs">
+          {label}
+        </Label>
+        {help ? <ObjectiveEnrollmentFieldHelp {...help} /> : null}
+      </div>
       <Select value={value} disabled={disabled} onValueChange={onChange}>
         <SelectTrigger aria-labelledby={labelId} size="sm" className="w-full text-xs">
           <SelectValue />
@@ -78,6 +95,7 @@ function CompactSelect({
 }
 export type ObjectiveEnrollmentFieldsProps = {
   draft: ObjectiveEnrollmentDraft
+  landingAvailability: ObjectiveLandingBarAvailability
   selectedWorkspaceKey: string
   workspaces: readonly ObjectiveWorkspaceOption[]
   agents: readonly AgentCatalogEntry[]
@@ -88,6 +106,7 @@ export type ObjectiveEnrollmentFieldsProps = {
 
 export function ObjectiveEnrollmentFields({
   draft,
+  landingAvailability,
   selectedWorkspaceKey,
   workspaces,
   agents,
@@ -137,38 +156,13 @@ export function ObjectiveEnrollmentFields({
             )}
           </p>
         </div>
-        <Select value={selectedWorkspaceKey} disabled={disabled} onValueChange={onWorkspaceChange}>
-          <SelectTrigger aria-labelledby={workspaceLabelId} className="w-full">
-            <SelectValue
-              placeholder={translate(
-                'fork.heimdallObjective.enrollment.workspacePlaceholder',
-                'Choose a workspace'
-              )}
-            />
-          </SelectTrigger>
-          <SelectContent>
-            {workspaces.map((workspace) => (
-              <SelectItem
-                key={workspace.key}
-                value={workspace.key}
-                disabled={workspace.ownerUnavailable}
-              >
-                <span className="block max-w-[460px]">
-                  <span className="block truncate text-sm">{workspace.label}</span>
-                  <span className="block truncate text-[11px] text-muted-foreground">
-                    {objectiveWorkspaceKindLabel(workspace.workspaceKind)} · {workspace.detail}
-                    {workspace.ownerUnavailable
-                      ? ` · ${translate(
-                          'fork.heimdallObjective.enrollment.ownerUnavailableShort',
-                          'Owner unavailable'
-                        )}`
-                      : ''}
-                  </span>
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <ObjectiveWorkspacePicker
+          value={selectedWorkspaceKey}
+          workspaces={workspaces}
+          disabled={disabled}
+          labelledBy={workspaceLabelId}
+          onChange={onWorkspaceChange}
+        />
         {workspaces.length === 0 ? (
           <p className="text-xs text-muted-foreground" role="status">
             {translate(
@@ -209,6 +203,7 @@ export function ObjectiveEnrollmentFields({
         </h3>
         <CompactSelect
           label={translate('fork.heimdallObjective.enrollment.tier', 'Tier')}
+          help={objectiveTierHelp()}
           value={draft.tier}
           disabled={disabled}
           options={OBJECTIVE_TIERS.map((tier) => ({
@@ -221,12 +216,13 @@ export function ObjectiveEnrollmentFields({
         />
         <CompactSelect
           label={translate('fork.heimdallObjective.enrollment.landingBar', 'Landing bar')}
+          help={objectiveLandingBarHelp()}
           value={draft.landingBar}
           disabled={disabled}
           options={OBJECTIVE_LANDING_BARS.map((bar) => ({
             value: bar,
             label: objectiveLandingBarLabel(bar),
-            disabled: !isObjectiveLandingBarAvailable(draft.workspaceKind, bar)
+            disabled: !isObjectiveLandingBarAvailable(landingAvailability, bar)
           }))}
           onChange={(value) => {
             const landingBar = value as ObjectiveLandingBar
@@ -242,12 +238,15 @@ export function ObjectiveEnrollmentFields({
         />
         <div className="grid grid-cols-[minmax(0,1fr)_148px] items-center gap-3">
           <div className="space-y-0.5">
-            <Label htmlFor={concurrencyId}>
-              {translate('fork.heimdallObjective.enrollment.maxConcurrency', 'Max concurrency')}
-            </Label>
+            <div className="flex items-center gap-1">
+              <Label htmlFor={concurrencyId}>
+                {translate('fork.heimdallObjective.enrollment.maxConcurrency', 'Max concurrency')}
+              </Label>
+              <ObjectiveEnrollmentFieldHelp {...objectiveConcurrencyHelp()} />
+            </div>
             <p className="text-[11px] text-muted-foreground">
               {translate(
-                'fork.heimdallObjective.enrollment.maxConcurrencyHelp',
+                'fork.heimdallObjective.enrollment.maxConcurrencyFixedHelp',
                 'Fixed at 1 while objective workers run serially.'
               )}
             </p>
@@ -255,12 +254,22 @@ export function ObjectiveEnrollmentFields({
           <Input id={concurrencyId} value="1" readOnly disabled className="text-xs" />
         </div>
         <div className="space-y-2">
-          <Label htmlFor={territoryId}>
-            {translate('fork.heimdallObjective.enrollment.territory', 'Write territory')}
-          </Label>
+          <div className="flex items-center gap-1">
+            <Label htmlFor={territoryId}>
+              {translate(
+                'fork.heimdallObjective.enrollment.territoryOptional',
+                'Write territory (optional)'
+              )}
+            </Label>
+            <ObjectiveEnrollmentFieldHelp {...objectiveTerritoryHelp()} />
+          </div>
           <Textarea
             id={territoryId}
             rows={4}
+            placeholder={translate(
+              'fork.heimdallObjective.enrollment.territoryPlaceholder',
+              'Whole workspace (default)'
+            )}
             value={draft.writeTerritoryText}
             disabled={disabled}
             className="font-mono text-xs"
@@ -271,7 +280,7 @@ export function ObjectiveEnrollmentFields({
           <p className="text-[11px] text-muted-foreground">
             {translate(
               'fork.heimdallObjective.enrollment.territoryHelp',
-              'One workspace-relative glob per line. .git, .orca, absolute paths, and parent traversal are refused.'
+              'Leave blank to allow the whole workspace. Otherwise enter one workspace-relative glob per line.'
             )}
           </p>
         </div>
@@ -343,24 +352,43 @@ export function ObjectiveEnrollmentFields({
       </section>
 
       <section className="space-y-3">
-        <h3 className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-          {translate('fork.heimdallObjective.enrollment.capabilities', 'Capabilities')}
-        </h3>
-        {OBJECTIVE_CAPABILITIES.map((capability) => (
-          <CompactSelect
-            key={capability}
-            label={objectiveCapabilityLabel(capability)}
-            value={draft.capabilities[capability]}
-            disabled={disabled}
-            options={capabilityOptions}
-            onChange={(mode) =>
-              onDraftChange({
-                ...draft,
-                capabilities: { ...draft.capabilities, [capability]: mode as CapabilityMode }
-              })
-            }
-          />
-        ))}
+        <div className="flex items-center gap-1">
+          <h3 className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+            {translate('fork.heimdallObjective.enrollment.capabilities', 'Capabilities')}
+          </h3>
+          <ObjectiveEnrollmentFieldHelp {...objectiveCapabilityModesHelp()} />
+        </div>
+        {OBJECTIVE_CAPABILITIES.map((capability) => {
+          const field = (
+            <CompactSelect
+              key={capability}
+              label={objectiveCapabilityLabel(capability)}
+              help={objectiveCapabilityHelp(capability)}
+              value={draft.capabilities[capability]}
+              disabled={disabled}
+              options={capabilityOptions}
+              onChange={(mode) =>
+                onDraftChange({
+                  ...draft,
+                  capabilities: { ...draft.capabilities, [capability]: mode as CapabilityMode }
+                })
+              }
+            />
+          )
+          return capability === 'plan' ? (
+            <ObjectiveExistingPlanInput
+              key={capability}
+              value={draft.existingPlanText}
+              planMode={draft.capabilities.plan}
+              disabled={disabled}
+              onChange={(existingPlanText) => onDraftChange({ ...draft, existingPlanText })}
+            >
+              {field}
+            </ObjectiveExistingPlanInput>
+          ) : (
+            field
+          )
+        })}
       </section>
 
       <section className="space-y-3">
@@ -400,13 +428,13 @@ export function ObjectiveEnrollmentFields({
           <h3 className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
             {translate(
               'fork.heimdallObjective.enrollment.sitterOverrides',
-              'Later landing overrides'
+              'Review watcher overrides'
             )}
           </h3>
           <p className="mt-1 text-xs text-muted-foreground">
             {translate(
               'fork.heimdallObjective.enrollment.sitterOverridesHelp',
-              'Stored now for the higher landing rungs delivered in Phase 4.'
+              'Applied to the review watcher enrolled when the run reaches its hosted-review rung.'
             )}
           </p>
         </div>

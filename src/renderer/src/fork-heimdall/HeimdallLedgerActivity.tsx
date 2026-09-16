@@ -2,7 +2,9 @@ import { translate } from '@/i18n/i18n'
 import type { LedgerEntry, WatcherLedger } from '../../../shared/fork-heimdall/ledger-types'
 import { formatHeimdallAge } from './fleet-format'
 
-function entrySummary(entry: LedgerEntry): string {
+type VisibleLedgerEntry = Exclude<LedgerEntry, { kind: 'interval-checkpoint' }>
+
+function entrySummary(entry: VisibleLedgerEntry): string {
   switch (entry.kind) {
     case 'attempt':
       return `${entry.action.kind} · ${entry.effect ?? entry.state}`
@@ -18,8 +20,6 @@ function entrySummary(entry: LedgerEntry): string {
       return `${translate('fork.heimdall.ledger.evidence', 'Evidence')} · ${entry.evidenceKind}`
     case 'interval-open':
       return `${translate('fork.heimdall.ledger.activeTimeStarted', 'Active time started')} · ${entry.cause}`
-    case 'interval-checkpoint':
-      return translate('fork.heimdall.ledger.activeTimeChecked', 'Active time checkpoint')
     case 'interval-close':
       return `${translate('fork.heimdall.ledger.activeTimeStopped', 'Active time stopped')} · ${entry.closeReason}`
     case 'turn':
@@ -32,7 +32,10 @@ function entrySummary(entry: LedgerEntry): string {
 }
 
 export function HeimdallLedgerActivity({ ledger }: { ledger: WatcherLedger }): React.JSX.Element {
-  const entries = [...ledger.entries].sort((a, b) => b.atMs - a.atMs).slice(0, 30)
+  const entries = ledger.entries
+    .filter((entry): entry is VisibleLedgerEntry => entry.kind !== 'interval-checkpoint')
+    .sort((a, b) => b.atMs - a.atMs)
+    .slice(0, 30)
   if (entries.length === 0) {
     return (
       <p className="text-xs text-muted-foreground">
@@ -42,20 +45,40 @@ export function HeimdallLedgerActivity({ ledger }: { ledger: WatcherLedger }): R
   }
   return (
     <ol className="divide-y divide-border rounded-md border border-border bg-muted/10">
-      {entries.map((entry) => (
-        <li
-          key={entry.eventId}
-          className="flex items-start justify-between gap-3 px-3 py-2 text-xs"
-        >
-          <span className="min-w-0 break-words">{entrySummary(entry)}</span>
-          <time
-            className="shrink-0 text-[11px] text-muted-foreground"
-            dateTime={new Date(entry.atMs).toISOString()}
+      {entries.map((entry) => {
+        const result = entry.kind === 'attempt' ? entry.result : undefined
+        const detail =
+          typeof result === 'object' &&
+          result !== null &&
+          'detail' in result &&
+          typeof result.detail === 'string'
+            ? result.detail
+            : undefined
+        return (
+          <li
+            key={entry.eventId}
+            className="flex items-start justify-between gap-3 px-3 py-2 text-xs"
           >
-            {formatHeimdallAge(entry.atMs)}
-          </time>
-        </li>
-      ))}
+            <div className="min-w-0 break-words">
+              <span>{entrySummary(entry)}</span>
+              {entry.kind === 'attempt' && entry.reason !== undefined ? (
+                <p className="text-[11px] leading-4 text-muted-foreground">{entry.reason}</p>
+              ) : null}
+              {detail !== undefined ? (
+                <p className="whitespace-pre-wrap text-[11px] leading-4 text-muted-foreground">
+                  {detail}
+                </p>
+              ) : null}
+            </div>
+            <time
+              className="shrink-0 text-[11px] text-muted-foreground"
+              dateTime={new Date(entry.atMs).toISOString()}
+            >
+              {formatHeimdallAge(entry.atMs)}
+            </time>
+          </li>
+        )
+      })}
     </ol>
   )
 }

@@ -90,17 +90,17 @@ export const HEIMDALL_METHODS: readonly RpcAnyMethod[] = [
   defineMethod({
     name: HEIMDALL_CHANNELS.debugReport,
     params: WatcherTargetSchema.or(LegacyWatcherIdRequestSchema),
-    handler: (target, { runtime, clientKind }) => {
+    handler: async (target, { runtime, clientKind }) => {
       if (!('connectionId' in target)) {
         return projectLegacyDebugReport(
-          requireHeimdallKernel(runtime).debugReport(target.watcherId)
+          await requireHeimdallKernel(runtime).debugReport(target.watcherId)
         )
       }
       if (clientKind === 'runtime') {
         assertLocalTarget(target)
-        return requireHeimdallKernel(runtime).debugReport(target.watcherId)
+        return await requireHeimdallKernel(runtime).debugReport(target.watcherId)
       }
-      return requireHeimdallTransport(runtime).debugReport(target)
+      return await requireHeimdallTransport(runtime).debugReport(target)
     }
   }),
   defineStreamingMethod({

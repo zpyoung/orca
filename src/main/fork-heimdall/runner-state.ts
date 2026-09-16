@@ -47,7 +47,7 @@ export type WatcherRunnerDependencies = {
   leaseStore: LeaseStore
   orchestration: HeimdallOrchestrationAdapter
   persistEnabled(enrollment: WatcherEnrollment, enabled: boolean): WatcherEnrollment
-  persistTerminal(runner: WatcherRunner, fired: FiredStopPredicate): WatcherEnrollment
+  persistTerminal(runner: WatcherRunner, fired: FiredStopPredicate): Promise<WatcherEnrollment>
   now?: () => number
   createId?: () => string
   setTimer?: typeof setTimeout

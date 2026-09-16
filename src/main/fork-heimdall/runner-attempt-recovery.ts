@@ -1,3 +1,4 @@
+import type { LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
 import {
   getInFlightAttempts,
   getLatestAttempts,
@@ -41,12 +42,14 @@ export class WatcherAttemptRecovery {
       if (attempt.state !== 'attempted' || attempt.dispatch) {
         continue
       }
-      if (attempt.action.contentIdentity !== live.contentIdentity) {
-        continue
-      }
-      const effect = await runner.kind.resolveOutcome(attempt, live, ledger)
-      await this.assertLeaseHeld(runner)
-      if (effect === 'not-landed' && attempt.action.recovery === 'replay-safe') {
+      const lease = this.requireLease(runner)
+      const effect = await runner.kind.resolveOutcome(attempt, live, ledger, lease)
+      await this.assertLeaseHeld(runner, lease)
+      if (
+        effect === 'not-landed' &&
+        attempt.action.recovery === 'replay-safe' &&
+        attempt.action.contentIdentity === live.contentIdentity
+      ) {
         await this.dependencies.replay(runner, snapshot, attempt)
         continue
       }
@@ -106,7 +109,7 @@ export class WatcherAttemptRecovery {
 
   abandonPendingAttempts(runner: WatcherRunner, ledger: WatcherLedger): void {
     for (const attempt of getInFlightAttempts(ledger)) {
-      if (attempt.state !== 'attempted') {
+      if (attempt.state !== 'attempted' || !attempt.dispatch) {
         continue
       }
       this.append(runner, {
@@ -137,8 +140,9 @@ export class WatcherAttemptRecovery {
     attempts: readonly AttemptEntry[]
   ): Promise<void> {
     for (const attempt of attempts) {
-      const effect = await runner.kind.resolveOutcome(attempt, live, ledger)
-      await this.assertLeaseHeld(runner)
+      const lease = this.requireLease(runner)
+      const effect = await runner.kind.resolveOutcome(attempt, live, ledger, lease)
+      await this.assertLeaseHeld(runner, lease)
       if (effect === 'indeterminate') {
         continue
       }
@@ -166,11 +170,18 @@ export class WatcherAttemptRecovery {
     }
   }
 
-  private async assertLeaseHeld(runner: WatcherRunner): Promise<void> {
+  private requireLease(runner: WatcherRunner): LeaseGuard {
     if (!runner.leaseGuard) {
       throw new Error('Watcher recovery reached persistence without a lease')
     }
-    await runner.leaseGuard.assertHeld()
+    return runner.leaseGuard
+  }
+
+  private async assertLeaseHeld(runner: WatcherRunner, lease: LeaseGuard): Promise<void> {
+    if (runner.leaseGuard !== lease) {
+      throw new Error('Watcher recovery lease changed before persistence')
+    }
+    await lease.assertHeld()
   }
 
   private append(runner: WatcherRunner, entry: LedgerEntry): void {

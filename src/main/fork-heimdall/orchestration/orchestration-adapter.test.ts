@@ -109,6 +109,8 @@ type FakeDatabase = {
   getFederatedDispatch: Mock
   enqueueFederationRelay: Mock
   listTasks: Mock
+  listWorkerTerminalResources: Mock
+  listFederatedDispatchesByIds: Mock
   getMutationReceipt: Mock
   getMessageById: Mock
   getQuestion: Mock
@@ -135,6 +137,8 @@ function fakeDb(id: string): FakeDatabase {
     getFederatedDispatch: vi.fn(),
     enqueueFederationRelay: vi.fn(),
     listTasks: vi.fn(() => []),
+    listWorkerTerminalResources: vi.fn(() => []),
+    listFederatedDispatchesByIds: vi.fn(() => []),
     getMutationReceipt: vi.fn(),
     getMessageById: vi.fn(),
     getQuestion: vi.fn(),
@@ -530,7 +534,8 @@ describe('Heimdall orchestration adapter', () => {
           lastContactAtMs: Date.parse('2026-09-15T12:02:00Z'),
           liveness: 'live',
           reason: null,
-          question: { messageId: 'question-1', body: 'Which host should own this?' }
+          question: { messageId: 'question-1', body: 'Which host should own this?' },
+          navigation: null
         },
         {
           dispatchId: 'dispatch-unreachable',
@@ -539,7 +544,8 @@ describe('Heimdall orchestration adapter', () => {
           lastContactAtMs: Date.parse('2026-09-15T12:04:00Z'),
           liveness: 'unverifiable',
           reason: 'host_unavailable',
-          question: null
+          question: null,
+          navigation: null
         }
       ]
     )

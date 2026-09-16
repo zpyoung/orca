@@ -1,5 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import type { WatcherCommandResult, WatcherWorker } from '../../../shared/fork-heimdall/fleet-types'
+import { toSshExecutionHostId, type ExecutionHostId } from '../../../shared/execution-host'
+import { parsePaneKey } from '../../../shared/stable-pane-id'
+import { parseWorkerTerminalHostScope } from '../../../shared/worker-terminal-host-scope'
 import type { WatcherEnrollment } from '../../../shared/fork-heimdall/watcher-types'
 import { ORCHESTRATION_CONTRACT_VERSION } from '../../../shared/protocol-version'
 import type { OrcaRuntimeService } from '../../runtime/orca-runtime'
@@ -41,6 +44,12 @@ type PendingQuestionRow = {
   body: string
 }
 
+type WorkerNavigationSource = {
+  worktreeId: string | null
+  paneKey: string | null
+  hostScope: string | null
+}
+
 const ACTIVE_DISPATCH_STATUSES: Record<string, true> = {
   pending: true,
   dispatched: true
@@ -56,6 +65,7 @@ const WORKER_STOP_METHOD = ORCHESTRATION_WORKER_STOP_METHODS.find(
 
 export async function listWatcherWorkers(
   runtime: OrcaRuntimeService,
+  enrollment: WatcherEnrollment,
   run: RunRow
 ): Promise<WatcherWorker[]> {
   const active = await listActiveWorkerRows(runtime, run.id)
@@ -66,10 +76,21 @@ export async function listWatcherWorkers(
     run.id,
     active.map((worker) => worker.dispatchId)
   )
+  const workerRows = new Map(
+    db
+      .listWorkerTerminalResources({ dispatchIds: active.map((worker) => worker.dispatchId) })
+      .map((worker) => [worker.dispatchId, worker])
+  )
+  const federatedDispatchIds = new Set(
+    db
+      .listFederatedDispatchesByIds(active.map((worker) => worker.dispatchId))
+      .map((dispatch) => dispatch.dispatch_id)
+  )
   const result: WatcherWorker[] = []
   for (const worker of active) {
     const dispatch = db.getDispatchContextById(worker.dispatchId)
     const task = tasks.get(worker.taskId)
+    const workerRow = workerRows.get(worker.dispatchId)
     if (!dispatch || dispatch.run_id !== run.id || !task) {
       continue
     }
@@ -87,10 +108,39 @@ export async function listWatcherWorkers(
         worker.projection.liveness.verdict === 'unverifiable'
           ? (worker.projection.liveness.reason ?? 'Worker liveness is unavailable')
           : null,
-      question: questions.get(worker.dispatchId) ?? null
+      question: questions.get(worker.dispatchId) ?? null,
+      navigation: federatedDispatchIds.has(worker.dispatchId)
+        ? null
+        : watcherWorkerNavigation(enrollment.executionHostId, {
+            worktreeId: workerRow?.worktreeId ?? null,
+            paneKey: workerRow?.paneKey ?? null,
+            hostScope: workerRow?.resource?.host_scope ?? dispatch.host_scope
+          })
     })
   }
   return result
+}
+
+function watcherWorkerNavigation(
+  ownerExecutionHostId: ExecutionHostId,
+  worker: WorkerNavigationSource
+): NonNullable<WatcherWorker['navigation']> | null {
+  if (!worker.worktreeId || !worker.paneKey || !parsePaneKey(worker.paneKey)) {
+    return null
+  }
+  const hostScope = parseWorkerTerminalHostScope(worker.hostScope)
+  if (!hostScope) {
+    return null
+  }
+  const executionHostId =
+    hostScope.kind === 'ssh' && ownerExecutionHostId === 'local'
+      ? toSshExecutionHostId(hostScope.targetId)
+      : ownerExecutionHostId
+  return {
+    worktreeId: worker.worktreeId,
+    executionHostId,
+    paneKey: worker.paneKey
+  }
 }
 
 async function listActiveWorkerRows(

@@ -2,7 +2,7 @@ import type { HeimdallApi } from '../../../shared/fork-heimdall/api'
 
 export type HeimdallControlApi = Pick<
   HeimdallApi,
-  'fleet' | 'detail' | 'command' | 'onFleetChanged'
+  'fleet' | 'detail' | 'command' | 'debugReport' | 'onFleetChanged'
 >
 
 export function getHeimdallControlApi(): HeimdallControlApi | null {
@@ -14,6 +14,7 @@ export function getHeimdallControlApi(): HeimdallControlApi | null {
   return typeof methods.fleet === 'function' &&
     typeof methods.detail === 'function' &&
     typeof methods.command === 'function' &&
+    typeof methods.debugReport === 'function' &&
     typeof methods.onFleetChanged === 'function'
     ? (candidate as HeimdallControlApi)
     : null

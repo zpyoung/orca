@@ -3,14 +3,13 @@ import { createHash } from 'node:crypto'
 import { lstat, readlink, readdir } from 'node:fs/promises'
 import { posix, win32 } from 'node:path'
 import { MAX_FILE_RANGE_READ_BYTES } from '../../shared/file-range-read'
-import { resolveWorktreeHostPath } from '../../shared/git-metadata-path'
 import type { IFilesystemProvider } from '../providers/types'
 import { resolveLeasePathFlavor } from '../fork-heimdall/lease-host-filesystem'
-import { localGitOptionsForTarget } from '../runtime/runtime-git-command-target'
 import { runtimeFileRouteForTarget } from '../runtime/runtime-file-command-target'
 import { objectiveGitCommandForTarget, type ObjectiveWorkspaceTarget } from './content-identity'
 
 const HASH_CONCURRENCY = 8
+const MODE_PROBE_BATCH_SIZE = 200
 
 export type ObjectiveWorkspaceManifestEntry = { path: string; fingerprint: string }
 
@@ -93,7 +92,7 @@ async function mapConcurrent<T, R>(
 }
 
 type GitCommand = (args: string[]) => Promise<{ stdout: string; stderr: string }>
-type GitIndexIdentity = { modes: string[]; records: string[]; gitlink: boolean }
+type GitIndexIdentity = { gitlink: boolean }
 
 function parseGitIndexIdentities(stdout: string): Map<string, GitIndexIdentity> {
   const identities = new Map<string, GitIndexIdentity>()
@@ -105,91 +104,90 @@ function parseGitIndexIdentities(stdout: string): Map<string, GitIndexIdentity> 
     if (!match || !path) {
       throw new Error('Git returned malformed index metadata')
     }
-    const identity = identities.get(path) ?? { modes: [], records: [], gitlink: false }
-    identity.modes.push(match[1])
-    identity.records.push(header)
+    const identity = identities.get(path) ?? { gitlink: false }
     identity.gitlink ||= match[1] === '160000'
     identities.set(path, identity)
   }
   return identities
 }
 
-function parseGitWorkingModes(stdout: string): Map<string, string> {
-  const fields = parseNulPaths(stdout)
-  const modes = new Map<string, string>()
-  for (let index = 0; index < fields.length; index += 2) {
-    const header = fields[index] ?? ''
-    const path = fields[index + 1] ?? ''
-    const match = /^:[0-7]{6} ([0-7]{6}) [0-9a-f]{40,64} [0-9a-f]{40,64} [A-Z]+$/u.exec(header)
-    if (!match || !path) {
-      throw new Error('Git returned malformed working-tree metadata')
-    }
-    modes.set(path, match[1])
-  }
-  return modes
-}
+type GitPathModeEvidence = { modeIdentity: string; symlinkTarget?: string }
 
-async function untrackedGitPathIdentity(
-  target: ObjectiveWorkspaceTarget,
-  provider: IFilesystemProvider | null,
-  path: string
-): Promise<string> {
-  if (provider) {
-    if (!provider.lstat) {
-      throw new Error('Remote untracked path identity requires lstat capability')
+async function gitPathModeEvidence(
+  runGit: GitCommand,
+  paths: readonly string[]
+): Promise<GitPathModeEvidence[]> {
+  const evidence: GitPathModeEvidence[] = []
+  for (let index = 0; index < paths.length; index += MODE_PROBE_BATCH_SIZE) {
+    const batch = paths.slice(index, index + MODE_PROBE_BATCH_SIZE)
+    // Git !aliases use Git's bundled POSIX shell on Windows. Paths remain positional "$@"
+    // arguments, never interpolated into shell source, so metacharacters cannot become syntax.
+    const stdout = (
+      await runGit([
+        '-c',
+        'alias.orca-objective-modes=!f() { test "$1" = -- && shift; for path do case "$path" in -*) path="./$path";; esac; if test -L "$path"; then printf "symlink\\\\0"; readlink "$path" || exit; printf "\\\\0"; elif test -x "$path"; then printf "file:executable\\\\0"; else printf "file:regular\\\\0"; fi; done; }; f',
+        'orca-objective-modes',
+        '--',
+        ...batch
+      ])
+    ).stdout
+    const fields = stdout.split('\0')
+    if (fields.at(-1) === '') {
+      fields.pop()
     }
-    const stat = await provider.lstat(
-      resolveLeasePathFlavor(target.executionHostId, target.workspacePath).join(
-        target.workspacePath,
-        ...path.split('/')
-      )
-    )
-    if (stat.type !== 'file' && stat.type !== 'symlink') {
-      throw new Error(`Unsupported untracked Git path type for ${path}`)
+    let fieldIndex = 0
+    for (const path of batch) {
+      const modeIdentity = fields[fieldIndex++]
+      if (modeIdentity === 'symlink') {
+        const rawTarget = fields[fieldIndex++]
+        if (rawTarget === undefined || !rawTarget.endsWith('\n')) {
+          throw new Error(`Git returned malformed symlink evidence for ${path}`)
+        }
+        evidence.push({ modeIdentity, symlinkTarget: rawTarget.slice(0, -1) })
+      } else if (modeIdentity === 'file:executable' || modeIdentity === 'file:regular') {
+        evidence.push({ modeIdentity })
+      } else {
+        throw new Error(`Git returned malformed worktree mode evidence for ${path}`)
+      }
     }
-    return `untracked:${stat.type}`
+    if (fieldIndex !== fields.length) {
+      throw new Error('Git returned excess worktree mode evidence')
+    }
   }
-  const gitTarget = target.gitTarget!
-  const root =
-    resolveWorktreeHostPath(target.workspacePath, localGitOptionsForTarget(gitTarget)) ??
-    target.workspacePath
-  const stat = await lstat(
-    resolveLeasePathFlavor(target.executionHostId, root).join(root, ...path.split('/'))
-  )
-  if (stat.isSymbolicLink()) {
-    return 'untracked:symlink'
-  }
-  if (!stat.isFile()) {
-    throw new Error(`Unsupported untracked Git path type for ${path}`)
-  }
-  return `untracked:file:${(stat.mode & 0o111) === 0 ? 'regular' : 'executable'}`
+  return evidence
 }
 
 async function gitPathFingerprint(
   runGit: GitCommand,
   path: string,
   indexIdentity: GitIndexIdentity | undefined,
-  modeIdentity: string
+  evidence: GitPathModeEvidence
 ): Promise<string> {
   if (indexIdentity?.gitlink) {
-    const status = (
-      await runGit([
+    const nestedRunGit: GitCommand = (args) => runGit(['-C', path, ...args])
+    const [head, status] = await Promise.all([
+      nestedRunGit(['rev-parse', '--verify', 'HEAD']).then((result) => result.stdout.trim()),
+      nestedRunGit([
         'status',
         '--porcelain=v2',
         '-z',
         '--untracked-files=all',
-        '--ignore-submodules=none',
-        '--',
-        path
-      ])
-    ).stdout
-    return sha256(['gitlink\0', ...indexIdentity.records.sort(), '\0', status])
+        '--ignore-submodules=none'
+      ]).then((result) => result.stdout)
+    ])
+    return sha256(['gitlink\0', head, '\0', status])
+  }
+  if (evidence.modeIdentity === 'symlink') {
+    if (evidence.symlinkTarget === undefined) {
+      throw new Error(`Git returned no symlink target evidence for ${path}`)
+    }
+    return sha256(['git-symlink\0', evidence.symlinkTarget])
   }
   const objectId = (await runGit(['hash-object', '--', path])).stdout.trim()
   if (!/^[0-9a-f]{40,64}$/u.test(objectId)) {
     throw new Error(`Git did not return an object hash for ${path}`)
   }
-  return sha256(['git-file\0', modeIdentity, '\0', objectId])
+  return sha256(['git-file\0', evidence.modeIdentity, '\0', objectId])
 }
 
 async function gitManifest(target: ObjectiveWorkspaceTarget) {
@@ -202,33 +200,31 @@ async function gitManifest(target: ObjectiveWorkspaceTarget) {
     throw new Error('Objective Git and filesystem authorities disagree')
   }
   const runGit = objectiveGitCommandForTarget(target)
-  const [listed, deleted, staged, working] = await Promise.all([
+  const [listed, deleted, staged] = await Promise.all([
     runGit(['ls-files', '--cached', '--others', '--exclude-standard', '-z', '--']),
     runGit(['ls-files', '--deleted', '-z', '--']),
-    runGit(['ls-files', '--stage', '-z', '--']),
-    runGit(['diff-files', '--raw', '--no-abbrev', '-z', '--'])
+    runGit(['ls-files', '--stage', '-z', '--'])
   ])
   const caseInsensitive =
     resolveLeasePathFlavor(target.executionHostId, target.workspacePath) === win32
   const deletedPaths = new Set(parseNulPaths(deleted.stdout))
   const indexByPath = parseGitIndexIdentities(staged.stdout)
-  const workingModeByPath = parseGitWorkingModes(working.stdout)
-  const fileProvider = objectiveFilesystemProviderForTarget(target)
+  objectiveFilesystemProviderForTarget(target)
   const paths = [...new Set(parseNulPaths(listed.stdout))]
     .filter((path) => !deletedPaths.has(path) && !isExcludedGitPath(path, caseInsensitive))
     .sort()
-  return await mapConcurrent(paths, HASH_CONCURRENCY, async (path) => {
-    const indexIdentity = indexByPath.get(path)
-    const modeIdentity =
-      workingModeByPath.get(path) ??
-      (indexIdentity
-        ? indexIdentity.modes.sort().join(',')
-        : await untrackedGitPathIdentity(target, fileProvider, path))
-    return {
-      path,
-      fingerprint: await gitPathFingerprint(runGit, path, indexIdentity, modeIdentity)
+  const modeEvidence = await gitPathModeEvidence(runGit, paths)
+  return await mapConcurrent(
+    paths.map((path, index) => ({ path, evidence: modeEvidence[index]! })),
+    HASH_CONCURRENCY,
+    async ({ path, evidence }) => {
+      const indexIdentity = indexByPath.get(path)
+      return {
+        path,
+        fingerprint: await gitPathFingerprint(runGit, path, indexIdentity, evidence)
+      }
     }
-  })
+  )
 }
 
 function validateChildName(name: string, windowsPaths: boolean): void {
@@ -433,4 +429,23 @@ export async function observeObjectiveWorkspaceManifest(
 ): Promise<ObjectiveWorkspaceManifestEntry[]> {
   objectiveFilesystemProviderForTarget(target)
   return target.kind === 'git' ? await gitManifest(target) : await folderManifest(target)
+}
+
+export function objectiveWorkspaceManifestDigest(
+  manifest: readonly ObjectiveWorkspaceManifestEntry[]
+): string {
+  const hash = createHash('sha256')
+  for (const entry of manifest) {
+    hash.update(entry.path)
+    hash.update('\0')
+    hash.update(entry.fingerprint)
+    hash.update('\0')
+  }
+  return hash.digest('hex')
+}
+
+export async function computeObjectiveWorktreeContentDigest(
+  target: ObjectiveWorkspaceTarget
+): Promise<string> {
+  return objectiveWorkspaceManifestDigest(await observeObjectiveWorkspaceManifest(target))
 }

@@ -41,7 +41,7 @@ function harness() {
   const runtime = {}
   const ledger = { watcherId: 'watcher-1', entries: [] }
   const debugReport = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     enrollment: ENTRY.enrollment,
     status: ENTRY.status,
     ledger: { totalEntries: 0, entries: [] },
@@ -51,7 +51,7 @@ function harness() {
     enroll: vi.fn(async () => ({ status: 'enrolled' as const, entry: ENTRY })),
     list: vi.fn(async () => [ENTRY]),
     ledger: vi.fn(() => ledger),
-    debugReport: vi.fn(() => debugReport),
+    debugReport: vi.fn(async () => debugReport),
     disarm: vi.fn(),
     disarmAll: vi.fn(),
     approve: vi.fn()

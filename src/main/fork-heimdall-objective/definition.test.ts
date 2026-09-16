@@ -1,8 +1,20 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { EnrollInput } from '../../shared/fork-heimdall/watcher-types'
+import { deriveHandoffInput } from '../../shared/fork-heimdall-objective/objective-handoff-policy'
+import { ObjectiveEnrollmentPayloadSchema } from '../../shared/fork-heimdall-objective/contract-types'
+import {
+  EnrollInputSchema,
+  WatcherEnrollmentSchema,
+  type EnrollInput
+} from '../../shared/fork-heimdall/watcher-types'
+import { authorizeKindEnrollment } from '../fork-heimdall/kernel-enrollment'
+import { type RegisteredWatcherKind, WatcherKindRegistry } from '../fork-heimdall/registry'
+import { enrollmentPayloadSchema } from '../fork-hosted-review-sitter/definition-store'
 import type { Store } from '../persistence'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { authorizeObjectiveEnrollment, ObjectiveOwnerNotExecutableError } from './definition'
+import { createObjectiveKind } from './kind'
+import type { ObjectiveForgeAccess } from './objective-forge-access'
+import type { ObjectiveStore } from './objective-store'
 
 function input(overrides: Partial<EnrollInput> = {}): EnrollInput {
   return {
@@ -47,6 +59,34 @@ function gitRuntime(executionHostId: 'local' | `ssh:${string}` | `runtime:${stri
       }
     })
   } as unknown as OrcaRuntimeService
+}
+
+function forge(provider: 'github' | 'unsupported'): ObjectiveForgeAccess {
+  return {
+    detectProvider: vi.fn(async () => provider),
+    getProvider: vi.fn(async () => null),
+    getDefaultBranch: vi.fn(async () => null),
+    isAuthenticated: vi.fn(async () => false),
+    invalidate: vi.fn()
+  }
+}
+
+async function authorizeThroughKernel(
+  runtime: OrcaRuntimeService,
+  repository: Store,
+  enrollment: EnrollInput,
+  objectiveForge: ObjectiveForgeAccess
+) {
+  const registry = new WatcherKindRegistry()
+  registry.register(
+    createObjectiveKind({
+      runtime,
+      store: repository,
+      objectiveStore: {} as ObjectiveStore,
+      forge: objectiveForge
+    }) as unknown as RegisteredWatcherKind
+  )
+  return authorizeKindEnrollment(registry, enrollment)
 }
 
 describe('objective enrollment authorization', () => {
@@ -135,5 +175,96 @@ describe('objective enrollment authorization', () => {
     await expect(
       authorizeObjectiveEnrollment(gitRuntime('local'), store({ id: 'repo-1' }), enrollment)
     ).rejects.toThrow('max-concurrency-unsupported')
+  })
+
+  it('maps a hosted-review objective without an explicit worktree to invalid-payload', async () => {
+    const enrollment = input({
+      worktreeId: null,
+      kindPayload: {
+        ...(input().kindPayload as Record<string, unknown>),
+        landingBar: 'hosted-review'
+      }
+    })
+
+    await expect(
+      authorizeThroughKernel(
+        gitRuntime('local'),
+        store({ id: 'repo-1' }),
+        enrollment,
+        forge('github')
+      )
+    ).resolves.toEqual({
+      status: 'refused',
+      reason: 'invalid-payload',
+      detail: 'landing-bar-requires-worktree'
+    })
+  })
+
+  it('maps an unsupported hosted-review forge to invalid-payload', async () => {
+    const enrollment = input({
+      kindPayload: {
+        ...(input().kindPayload as Record<string, unknown>),
+        landingBar: 'hosted-review'
+      }
+    })
+
+    await expect(
+      authorizeThroughKernel(
+        gitRuntime('local'),
+        store({ id: 'repo-1' }),
+        enrollment,
+        forge('unsupported')
+      )
+    ).resolves.toEqual({
+      status: 'refused',
+      reason: 'invalid-payload',
+      detail: 'landing-bar-requires-supported-forge'
+    })
+  })
+
+  it('derives a handoff accepted by both the kernel and hosted-review kind schemas', () => {
+    const source = input()
+    const contract = ObjectiveEnrollmentPayloadSchema.parse({
+      ...(source.kindPayload as Record<string, unknown>),
+      landingBar: 'hosted-review'
+    })
+    const enrollment = WatcherEnrollmentSchema.parse({
+      watcherId: 'objective-watcher',
+      kind: 'objective',
+      workspaceKey: 'local::/workspace/repo',
+      executionHostId: 'local',
+      repoId: source.repoId,
+      worktreeId: source.worktreeId,
+      workspacePath: '/workspace/repo',
+      schedulerOwner: 'local_host_service',
+      enabled: true,
+      paused: false,
+      commandRevision: 0,
+      capabilities: source.capabilities,
+      budget: source.budget,
+      kindPayload: contract,
+      coordinatorIdentity: { handle: 'coordinator-handle', paneKey: 'coordinator-pane' },
+      orchestrationRunId: null,
+      createdAtMs: 1,
+      terminalAtMs: null
+    })
+    const handoff = deriveHandoffInput({
+      enrollment,
+      contract,
+      landing: {
+        revisionId: 'revision-1',
+        fromContentIdentity: 'content-before-review',
+        provider: 'github',
+        reviewNumber: 42,
+        reviewUrl: 'https://github.test/acme/repo/pull/42',
+        branch: 'feature/objective',
+        headSha: 'a'.repeat(40),
+        base: 'main'
+      },
+      budgetState: { activeMs: 5_000, turns: 2, exhausted: null }
+    })
+
+    expect(EnrollInputSchema.parse(handoff)).toEqual(handoff)
+    expect(enrollmentPayloadSchema.parse(handoff.kindPayload)).toEqual(handoff.kindPayload)
   })
 })

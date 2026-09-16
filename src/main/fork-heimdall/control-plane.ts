@@ -7,8 +7,9 @@ import {
   type WatcherWorker
 } from '../../shared/fork-heimdall/fleet-types'
 import { getLatestApproval, getLatestEscalations } from '../../shared/fork-heimdall/ledger-queries'
-import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
+import type { ApprovalScope, WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
+import { getApprovalEscalationsToResolve } from './approval-resolution'
 import { WatcherEnrollmentControlLifecycle } from './control-enrollment-lifecycle'
 import {
   isMalformedKindPayloadEnrollment,
@@ -23,7 +24,7 @@ import {
   CoordinatorSeatLostError,
   QuestionAlreadyAnsweredError,
   type HeimdallOrchestrationAdapter
-} from './orchestration/orchestration-adapter'
+} from './orchestration/orchestration-contract'
 import type { WatcherRunnerLoop } from './runner-loop'
 import type { WatcherRunner } from './runner-state'
 
@@ -74,6 +75,10 @@ export class WatcherControlPlane {
       )
     }
     return this.serialized(request.target.watcherId, () => this.apply(request))
+  }
+
+  hasPendingOperation(watcherId: string): boolean {
+    return this.operationTails.has(watcherId)
   }
 
   private serialized(
@@ -159,6 +164,7 @@ export class WatcherControlPlane {
         decision: 'approved',
         foldCount: (previous?.foldCount ?? 0) + 1
       })
+      this.appendApprovalResolutionTransitions(enrollment.watcherId, scope.data)
     })
     if (commit.status === 'refused') {
       return commit
@@ -330,6 +336,21 @@ export class WatcherControlPlane {
         entry.escalationKind === 'worker-question' &&
         entry.escalationId.endsWith(`:${messageId}`)
     )
+  }
+
+  private appendApprovalResolutionTransitions(watcherId: string, scope: ApprovalScope): void {
+    for (const entry of getApprovalEscalationsToResolve(
+      this.dependencies.ledger.read(watcherId),
+      scope
+    )) {
+      this.dependencies.ledger.append({
+        ...entry,
+        eventId: this.dependencies.createId(),
+        atMs: this.dependencies.now(),
+        status: 'resolved',
+        foldCount: entry.foldCount + 1
+      })
+    }
   }
 
   private appendAnsweredQuestionTransitions(watcherId: string, messageId: string): void {

@@ -1,73 +1,121 @@
 import type { StopPredicate } from '../fork-heimdall/stop-policy'
 import { getAttemptResolution, getLatestAttempts } from '../fork-heimdall/ledger-queries'
 import type { WatcherLedger } from '../fork-heimdall/ledger-types'
-import { ObjectiveActionSchema } from './objective-actions'
+import { ObjectiveActionResultSchema, ObjectiveActionSchema } from './objective-actions'
+import type { ObjectiveLandingBar } from './contract-types'
 import type { ObjectiveWorld } from './detail-types'
+import { OBJECTIVE_LANDING_LADDER, reachedRungs, stopRungForBar } from './landing-ladder'
 
 export const OBJECTIVE_BAR_REACHED_PREDICATE_ID = 'objective-bar-reached'
-export const OBJECTIVE_AWAITING_PHASE_FOUR_PREDICATE_ID = 'objective-awaiting-phase-4'
 export const OBJECTIVE_WORKER_ESCALATION_PREDICATE_ID = 'worker-escalation'
 
-function filesOnDiskLandedAtCurrentIdentity(
+function landedRungIdentityFromAttempts(
   snapshot: { contentIdentity: string; world: ObjectiveWorld },
-  ledger: WatcherLedger
-): boolean {
-  if (
-    snapshot.world.plan.landing.some(
-      (entry) =>
-        entry.rung === 'files-on-disk' && entry.contentIdentity === snapshot.contentIdentity
-    )
-  ) {
-    return true
+  ledger: WatcherLedger,
+  stopRung: ObjectiveLandingBar
+): string | null {
+  let activeRevisionId: string | null = null
+  let activeRevisionNumber = -1
+  for (const revision of snapshot.world.plan.revisions) {
+    if (revision.status === 'approved' && revision.number > activeRevisionNumber) {
+      activeRevisionId = revision.id
+      activeRevisionNumber = revision.number
+    }
   }
-  return getLatestAttempts(ledger).some((attempt) => {
-    if (attempt.state !== 'settled') {
-      return false
+  if (activeRevisionId === null) {
+    return null
+  }
+
+  const attempts = getLatestAttempts(ledger)
+  for (let index = attempts.length - 1; index >= 0; index -= 1) {
+    const attempt = attempts[index]
+    if ((getAttemptResolution(ledger, attempt.attemptId)?.effect ?? attempt.effect) !== 'landed') {
+      continue
     }
-    const action = ObjectiveActionSchema.safeParse(attempt.action)
+    const parsedAction = ObjectiveActionSchema.safeParse(attempt.action)
     if (
-      !action.success ||
-      action.data.kind !== 'record-landing' ||
-      action.data.rung !== 'files-on-disk' ||
-      action.data.contentIdentity !== snapshot.contentIdentity
+      !parsedAction.success ||
+      (parsedAction.data.kind !== 'record-landing' &&
+        parsedAction.data.kind !== 'commit-local-branch' &&
+        parsedAction.data.kind !== 'push-ref' &&
+        parsedAction.data.kind !== 'open-hosted-review') ||
+      parsedAction.data.revisionId !== activeRevisionId ||
+      parsedAction.data.contentIdentity !== snapshot.contentIdentity ||
+      OBJECTIVE_LANDING_LADDER.indexOf(parsedAction.data.rung) <
+        OBJECTIVE_LANDING_LADDER.indexOf(stopRung)
     ) {
-      return false
+      continue
     }
-    return (getAttemptResolution(ledger, attempt.attemptId)?.effect ?? attempt.effect) === 'landed'
-  })
+    const action = parsedAction.data
+    const parsedResult = ObjectiveActionResultSchema.safeParse(attempt.result)
+    if (!parsedResult.success) {
+      continue
+    }
+    const result = parsedResult.data
+    if (
+      action.kind === 'record-landing' &&
+      result.kind === 'landing-recorded' &&
+      result.naturalKey.kind === 'landing-evidence' &&
+      result.naturalKey.rung === action.rung &&
+      result.naturalKey.contentIdentity === action.contentIdentity
+    ) {
+      return action.contentIdentity
+    }
+    if (
+      action.kind === 'commit-local-branch' &&
+      result.kind === 'commit-recorded' &&
+      result.naturalKey.kind === 'commit-local-branch' &&
+      result.naturalKey.revisionId === action.revisionId &&
+      result.naturalKey.fromContentIdentity === action.fromContentIdentity
+    ) {
+      return result.contentIdentity
+    }
+    if (
+      action.kind === 'push-ref' &&
+      result.kind === 'push-recorded' &&
+      result.naturalKey.kind === 'push-ref' &&
+      result.naturalKey.commitSha === action.commitSha &&
+      result.naturalKey.remote === action.remote &&
+      result.naturalKey.branch === action.branch
+    ) {
+      return action.contentIdentity
+    }
+    if (
+      action.kind === 'open-hosted-review' &&
+      result.kind === 'review-recorded' &&
+      result.naturalKey.kind === 'open-hosted-review' &&
+      result.naturalKey.provider === action.provider &&
+      result.naturalKey.branch === action.branch &&
+      result.naturalKey.headSha === action.headSha
+    ) {
+      return action.contentIdentity
+    }
+  }
+  return null
 }
 
 export const objectiveBarReachedPredicate: StopPredicate<ObjectiveWorld> = {
   id: OBJECTIVE_BAR_REACHED_PREDICATE_ID,
   disposition: 'terminal',
   evaluate(snapshot, ledger) {
-    if (
-      snapshot.world.contract.landingBar !== 'files-on-disk' ||
-      !filesOnDiskLandedAtCurrentIdentity(snapshot, ledger)
-    ) {
+    const bar = snapshot.world.contract.landingBar
+    const stopRung = stopRungForBar(bar)
+    const projected = reachedRungs(snapshot.world.plan.landing, snapshot.contentIdentity).has(
+      stopRung
+    )
+    const reachedIdentity = projected
+      ? snapshot.contentIdentity
+      : landedRungIdentityFromAttempts(snapshot, ledger, stopRung)
+    if (reachedIdentity === null) {
       return { stop: false }
     }
     return {
       stop: true,
-      reason: 'files-on-disk landing bar reached',
-      detail: snapshot.contentIdentity
-    }
-  }
-}
-
-export const objectiveAwaitingPhaseFourPredicate: StopPredicate<ObjectiveWorld> = {
-  id: OBJECTIVE_AWAITING_PHASE_FOUR_PREDICATE_ID,
-  evaluate(snapshot, ledger) {
-    if (
-      snapshot.world.contract.landingBar === 'files-on-disk' ||
-      !filesOnDiskLandedAtCurrentIdentity(snapshot, ledger)
-    ) {
-      return { stop: false }
-    }
-    return {
-      stop: true,
-      reason: `files-on-disk reached; awaiting Phase 4 for ${snapshot.world.contract.landingBar}`,
-      detail: snapshot.world.contract.landingBar
+      reason:
+        bar === 'merged'
+          ? 'hosted-review rung reached; handed off'
+          : `${stopRung} landing bar reached`,
+      detail: reachedIdentity
     }
   }
 }
@@ -132,6 +180,5 @@ export const objectiveWorkerEscalationPredicate: StopPredicate<ObjectiveWorld> =
 
 export const OBJECTIVE_STOP_PREDICATES = [
   objectiveBarReachedPredicate,
-  objectiveAwaitingPhaseFourPredicate,
   objectiveWorkerEscalationPredicate
 ] as const satisfies readonly StopPredicate<ObjectiveWorld>[]

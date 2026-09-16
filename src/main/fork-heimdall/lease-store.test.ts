@@ -546,6 +546,24 @@ describe('host-routed epoch lease', () => {
     expect(fs.directories.has('/srv/repo/.git /orca-heimdall/lease')).toBe(true)
   })
 
+  it('describes only cached lease locations and never resolves a cold route', async () => {
+    const fs = new MemoryFilesystem()
+    const key = makeWorkspaceKey('ssh:host-a', '/workspace')
+    const resolveTarget = vi.fn(async () => remoteTarget(fs))
+    const store = new HostRoutedLeaseStore({ resolveTarget })
+
+    expect(store.describeLocation(key)).toBeNull()
+    expect(resolveTarget).not.toHaveBeenCalled()
+
+    await store.acquireOrRenew(key, 'owner', 90_000)
+    expect(store.describeLocation(key)).toEqual({
+      executionHostId: 'ssh:host-a',
+      leaseDirectory: '/workspace/.orca/heimdall/lease',
+      pathSeparator: '/'
+    })
+    expect(resolveTarget).toHaveBeenCalledOnce()
+  })
+
   it('routes local folder leases through node fs only when the route provider is null', async () => {
     const root = mkdtempSync(join(tmpdir(), 'heimdall-lease-'))
     temporaryPaths.push(root)

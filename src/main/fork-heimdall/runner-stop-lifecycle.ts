@@ -30,7 +30,7 @@ export class WatcherRunnerStopLifecycle {
         return 'deferred'
       }
       await this.assertLeaseHeld(runner)
-      this.status.terminal(runner, fired)
+      await this.status.terminal(runner, fired)
       return 'terminal'
     }
     await this.assertLeaseHeld(runner)

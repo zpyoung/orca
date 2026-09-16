@@ -28,6 +28,11 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     load: async () => (await import('./fork-ask-question-tool/handlers.js')).ASK_HANDLERS
   },
   {
+    name: 'heimdall',
+    keys: ['heimdall debug'],
+    load: async () => (await import('./fork-heimdall/handlers.js')).HEIMDALL_HANDLERS
+  },
+  {
     name: 'artifacts',
     keys: [
       'artifacts list',

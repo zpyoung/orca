@@ -23,15 +23,15 @@ export type ObjectiveWorkspaceTarget = {
   gitTarget?: RuntimeGitTarget
 }
 
-type GitCommand = (args: string[]) => Promise<{ stdout: string; stderr: string }>
-type DirtyPath = {
+export type ObjectiveGitCommand = (args: string[]) => Promise<{ stdout: string; stderr: string }>
+export type ObjectiveDirtyPath = {
   path: string
   deleted: boolean
   metadata: string
   submodule: boolean
   untracked: boolean
 }
-type ParsedGitStatus = { entries: DirtyPath[]; unborn: boolean }
+type ParsedGitStatus = { entries: ObjectiveDirtyPath[]; unborn: boolean }
 type ObservedStat = { type: string; mode?: number }
 
 function sha256(parts: readonly string[]): string {
@@ -47,12 +47,15 @@ function isObjectiveMetadataPath(relativePath: string, caseInsensitive = false):
   return candidate === '.orca' || candidate.startsWith('.orca/')
 }
 
-function parseDirtyPaths(status: string, caseInsensitivePaths: boolean): ParsedGitStatus {
+export function parseObjectiveDirtyPaths(
+  status: string,
+  caseInsensitivePaths: boolean
+): ParsedGitStatus {
   const fields = status.split('\0')
   if (fields.at(-1) === '') {
     fields.pop()
   }
-  const entries: DirtyPath[] = []
+  const entries: ObjectiveDirtyPath[] = []
   let unborn = false
 
   for (let index = 0; index < fields.length; index += 1) {
@@ -71,7 +74,7 @@ function parseDirtyPaths(status: string, caseInsensitivePaths: boolean): ParsedG
       entries.push({
         path,
         deleted: false,
-        metadata: 'untracked',
+        metadata: 'worktree',
         submodule: false,
         untracked: true
       })
@@ -86,30 +89,11 @@ function parseDirtyPaths(status: string, caseInsensitivePaths: boolean): ParsedG
         field
       )
     if (ordinary) {
-      const [
-        ,
-        statusCode,
-        submoduleState,
-        headMode,
-        indexMode,
-        worktreeMode,
-        headOid,
-        indexOid,
-        path
-      ] = ordinary
+      const [, , submoduleState, , , worktreeMode, , , path] = ordinary
       entries.push({
         path: path!,
         deleted: worktreeMode === '000000',
-        metadata: [
-          'ordinary',
-          statusCode,
-          submoduleState,
-          headMode,
-          indexMode,
-          worktreeMode,
-          headOid,
-          indexOid
-        ].join('\0'),
+        metadata: 'worktree',
         submodule: submoduleState![0] === 'S' || worktreeMode === '160000',
         untracked: false
       })
@@ -121,38 +105,15 @@ function parseDirtyPaths(status: string, caseInsensitivePaths: boolean): ParsedG
         field
       )
     if (renamed) {
-      const [
-        ,
-        statusCode,
-        submoduleState,
-        headMode,
-        indexMode,
-        worktreeMode,
-        headOid,
-        indexOid,
-        score,
-        path
-      ] = renamed
+      const [, , submoduleState, , , worktreeMode, , , score, path] = renamed
       const sourcePath = fields[++index]
       if (!sourcePath) {
         throw new Error('Git returned a rename without its source path')
       }
-      const metadata = [
-        'renamed',
-        statusCode,
-        submoduleState,
-        headMode,
-        indexMode,
-        worktreeMode,
-        headOid,
-        indexOid,
-        score,
-        sourcePath
-      ].join('\0')
       entries.push({
         path: path!,
         deleted: worktreeMode === '000000',
-        metadata,
+        metadata: 'worktree',
         submodule: submoduleState![0] === 'S' || worktreeMode === '160000',
         untracked: false
       })
@@ -160,8 +121,8 @@ function parseDirtyPaths(status: string, caseInsensitivePaths: boolean): ParsedG
         entries.push({
           path: sourcePath,
           deleted: true,
-          metadata: `rename-source\0${metadata}`,
-          submodule: headMode === '160000' || indexMode === '160000',
+          metadata: 'worktree',
+          submodule: submoduleState![0] === 'S',
           untracked: false
         })
       }
@@ -173,34 +134,11 @@ function parseDirtyPaths(status: string, caseInsensitivePaths: boolean): ParsedG
         field
       )
     if (unmerged) {
-      const [
-        ,
-        statusCode,
-        submoduleState,
-        baseMode,
-        oursMode,
-        theirsMode,
-        worktreeMode,
-        baseOid,
-        oursOid,
-        theirsOid,
-        path
-      ] = unmerged
+      const [, , submoduleState, , , , worktreeMode, , , , path] = unmerged
       entries.push({
         path: path!,
         deleted: worktreeMode === '000000',
-        metadata: [
-          'unmerged',
-          statusCode,
-          submoduleState,
-          baseMode,
-          oursMode,
-          theirsMode,
-          worktreeMode,
-          baseOid,
-          oursOid,
-          theirsOid
-        ].join('\0'),
+        metadata: 'worktree',
         submodule: submoduleState![0] === 'S' || worktreeMode === '160000',
         untracked: false
       })
@@ -244,7 +182,9 @@ async function mapConcurrent<T, R>(
   return results
 }
 
-export function objectiveGitCommandForTarget(target: ObjectiveWorkspaceTarget): GitCommand {
+export function objectiveGitCommandForTarget(
+  target: ObjectiveWorkspaceTarget
+): ObjectiveGitCommand {
   const gitTarget = target.gitTarget
   if (!gitTarget) {
     throw new Error('Git objective target has no runtime Git target')
@@ -306,9 +246,9 @@ async function readWorkingTreeStat(
 
 async function fingerprintDirtyPath(
   target: ObjectiveWorkspaceTarget,
-  runGit: GitCommand,
+  runGit: ObjectiveGitCommand,
   repositoryPrefix: string,
-  entry: DirtyPath,
+  entry: ObjectiveDirtyPath,
   caseInsensitivePaths: boolean
 ): Promise<string> {
   if (entry.deleted) {
@@ -316,7 +256,7 @@ async function fingerprintDirtyPath(
   }
 
   if (entry.submodule) {
-    const nestedRunGit: GitCommand = (args) => runGit(['-C', entry.path, ...args])
+    const nestedRunGit: ObjectiveGitCommand = (args) => runGit(['-C', entry.path, ...args])
     const nestedPrefix = repositoryPrefix ? posix.join(repositoryPrefix, entry.path) : entry.path
     return `submodule\0${await computeGitRepositoryIdentity(
       target,
@@ -326,26 +266,23 @@ async function fingerprintDirtyPath(
     )}`
   }
 
-  let workingMetadata = ''
-  if (entry.untracked) {
-    const stat = await readWorkingTreeStat(target, repositoryPrefix, entry.path)
-    const modeIdentity =
-      stat.type === 'file' && typeof stat.mode === 'number'
-        ? (stat.mode & 0o111) === 0
-          ? 'regular'
-          : 'executable'
-        : 'mode-unavailable'
-    workingMetadata = [stat.type, modeIdentity].join('\0')
-    if (stat.type === 'directory') {
-      const nestedRunGit: GitCommand = (args) => runGit(['-C', entry.path, ...args])
-      const nestedPrefix = repositoryPrefix ? posix.join(repositoryPrefix, entry.path) : entry.path
-      return `nested-repository\0${workingMetadata}\0${await computeGitRepositoryIdentity(
-        target,
-        nestedRunGit,
-        nestedPrefix,
-        caseInsensitivePaths
-      )}`
-    }
+  const stat = await readWorkingTreeStat(target, repositoryPrefix, entry.path)
+  const modeIdentity =
+    stat.type === 'file' && typeof stat.mode === 'number'
+      ? (stat.mode & 0o111) === 0
+        ? 'regular'
+        : 'executable'
+      : 'mode-unavailable'
+  const workingMetadata = [stat.type, modeIdentity].join('\0')
+  if (stat.type === 'directory') {
+    const nestedRunGit: ObjectiveGitCommand = (args) => runGit(['-C', entry.path, ...args])
+    const nestedPrefix = repositoryPrefix ? posix.join(repositoryPrefix, entry.path) : entry.path
+    return `nested-repository\0${workingMetadata}\0${await computeGitRepositoryIdentity(
+      target,
+      nestedRunGit,
+      nestedPrefix,
+      caseInsensitivePaths
+    )}`
   }
 
   const output = (await runGit(['hash-object', '--', entry.path])).stdout.trim()
@@ -357,7 +294,7 @@ async function fingerprintDirtyPath(
 
 async function computeGitRepositoryIdentity(
   target: ObjectiveWorkspaceTarget,
-  runGit: GitCommand,
+  runGit: ObjectiveGitCommand,
   repositoryPrefix: string,
   caseInsensitivePaths: boolean
 ): Promise<string> {
@@ -377,7 +314,7 @@ async function computeGitRepositoryIdentity(
     throw statusResult.reason
   }
 
-  const parsed = parseDirtyPaths(statusResult.value.stdout, caseInsensitivePaths)
+  const parsed = parseObjectiveDirtyPaths(statusResult.value.stdout, caseInsensitivePaths)
   let treeOid = 'unborn'
   if (treeResult.status === 'fulfilled') {
     treeOid = treeResult.value.stdout.trim()

@@ -90,7 +90,8 @@ export type EnrollmentStore = {
   markTerminal(
     watcherId: string,
     terminalAtMs: number,
-    appendWithinTransaction?: () => void
+    appendWithinTransaction?: () => void,
+    afterTerminalWithinTransaction?: () => void
   ): EnrollmentRecord
 }
 
@@ -316,7 +317,8 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
   markTerminal(
     watcherId: string,
     terminalAtMs: number,
-    appendWithinTransaction?: () => void
+    appendWithinTransaction?: () => void,
+    afterTerminalWithinTransaction?: () => void
   ): EnrollmentRecord {
     if (!Number.isSafeInteger(terminalAtMs) || terminalAtMs < 0) {
       throw new Error('A terminal timestamp must be a non-negative integer')
@@ -341,6 +343,7 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
       if (Number(result.changes) !== 1) {
         throw new Error(`Heimdall watcher ${watcherId} changed during its terminal transaction`)
       }
+      afterTerminalWithinTransaction?.()
       const updated = this.require(watcherId)
       connection.exec('COMMIT')
       return updated

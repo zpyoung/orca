@@ -1,10 +1,10 @@
 import { HEIMDALL_CHANNELS } from '../../shared/fork-heimdall/api'
-import {
-  WatcherDetailSchema,
-  type WatcherDetail,
-  type WatcherFleetEntry,
-  type WatcherTarget
+import type {
+  WatcherDetail,
+  WatcherFleetEntry,
+  WatcherTarget
 } from '../../shared/fork-heimdall/fleet-types'
+import { WatcherDetailReaderSchema } from '../../shared/fork-heimdall/remote-reader-schemas'
 import type { Store } from '../persistence'
 import type {
   FleetEnvironmentIdentity,
@@ -41,7 +41,7 @@ export async function readConfirmedRemoteDetail(
       `The owning runtime refused the Heimdall detail read: ${response.error.message}`
     )
   }
-  const parsed = WatcherDetailSchema.safeParse(response.result)
+  const parsed = WatcherDetailReaderSchema.safeParse(response.result)
   if (!parsed.success) {
     throw new HeimdallOwnerDetailReadError(
       'The owning runtime returned an invalid Heimdall watcher detail.'

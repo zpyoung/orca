@@ -15,6 +15,7 @@ import type {
   ObjectiveRevisionProjection,
   ObjectiveWorld
 } from './detail-types'
+import { lineageBaseIdentity } from './landing-ladder'
 type ReviewDispatchAction = Extract<
   ObjectiveAction,
   { kind: 'dispatch-reviewer' | 'dispatch-integrator' }
@@ -31,9 +32,10 @@ export function decideObjectiveChecks(
     .filter((node) => node.revisionId === revision.id)
     .flatMap((node) => node.criteria)
     .filter((criterion) => criterion.shellCheckable)
+  const lineageIdentity = lineageBaseIdentity(snapshot.world.plan.landing, snapshot.contentIdentity)
   for (const criterion of criteria) {
     const current =
-      criterion.lastCheck?.contentIdentity === snapshot.contentIdentity ? criterion.lastCheck : null
+      criterion.lastCheck?.contentIdentity === lineageIdentity ? criterion.lastCheck : null
     if (current) {
       if (current.exitCode !== 0 || current.timedOut) {
         return decidePlannerAction(
@@ -140,12 +142,13 @@ function decideReviewRole(
   revision: ObjectiveRevisionProjection,
   role: ObjectiveReviewRole
 ): ObjectiveDecisionOutcome | 'approved' | 'blocked' {
+  const lineageIdentity = lineageBaseIdentity(snapshot.world.plan.landing, snapshot.contentIdentity)
   const verdict = snapshot.world.plan.verdicts
     .filter(
       (candidate) =>
         candidate.revisionId === revision.id &&
         candidate.role === role &&
-        candidate.contentIdentity === snapshot.contentIdentity
+        candidate.contentIdentity === lineageIdentity
     )
     .sort((left, right) => right.atMs - left.atMs)[0]
   if (verdict) {

@@ -1,7 +1,7 @@
 import type { ActionOutcome, EffectCertainty } from '../../shared/fork-heimdall/effect-certainty'
 import { makeAttemptFingerprint } from '../../shared/fork-heimdall/attempt-fingerprint'
 import { getLatestAttempts } from '../../shared/fork-heimdall/ledger-queries'
-import type { ActionExecutor } from '../../shared/fork-heimdall/kind-contract'
+import type { ActionExecutor, LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
 import type { AttemptEntry, WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type { LiveSnapshot, Snapshot } from '../../shared/fork-heimdall/snapshot'
 import {
@@ -16,6 +16,7 @@ import {
   parseAndValidateReviewerReport
 } from '../../shared/fork-heimdall-objective/plan-schema'
 import type { Store } from '../persistence'
+import type { ObjectiveForgeAccess } from './objective-forge-access'
 import { executeObjectiveDispatch } from './dispatch-executor'
 import {
   findObjectiveWorkerEvidence,
@@ -24,6 +25,12 @@ import {
 } from './execution-context'
 import { validateObjectiveWorkspaceChanges } from './observed-workspace-changes'
 import { executeObjectiveLocalAction } from './local-action-executor'
+import {
+  executeCommitLocalBranch,
+  executeOpenHostedReview,
+  executePushRef
+} from './landing-action-executor'
+import { resolveLandingOutcome } from './landing-recovery'
 import type { ObjectiveStore } from './objective-store'
 import { readObjectiveRoleReport } from './report-ingestion'
 
@@ -31,6 +38,7 @@ type ObjectiveExecutorDependencies = {
   store: Store
   objectiveStore: ObjectiveStore
   snapshotBindings: WeakMap<Snapshot<ObjectiveWorld>, ObjectiveSnapshotBinding>
+  forge: ObjectiveForgeAccess
 }
 
 function dispatchedTaskKeys(ledger: WatcherLedger): string[] {
@@ -44,8 +52,15 @@ function dispatchedTaskKeys(ledger: WatcherLedger): string[] {
   return [...keys]
 }
 
+type StoreLocalAction = Exclude<
+  ObjectiveAction,
+  {
+    kind: `dispatch-${string}` | 'commit-local-branch' | 'push-ref' | 'open-hosted-review'
+  }
+>
+
 function localActionOutcome(
-  action: Exclude<ObjectiveAction, { kind: `dispatch-${string}` }>,
+  action: StoreLocalAction,
   binding: ObjectiveSnapshotBinding,
   objectiveStore: ObjectiveStore
 ): EffectCertainty {
@@ -192,6 +207,10 @@ async function resolveDispatchOutcome(args: {
 export function createObjectiveActionExecutor(
   dependencies: ObjectiveExecutorDependencies
 ): ActionExecutor<ObjectiveWorld, ObjectiveAction> {
+  const landingDependencies = {
+    objectiveStore: dependencies.objectiveStore,
+    forge: dependencies.forge
+  }
   return {
     execute(action, context): Promise<ActionOutcome> {
       const binding = requireObjectiveSnapshotBinding(
@@ -207,8 +226,17 @@ export function createObjectiveActionExecutor(
           store: dependencies.store
         })
       }
+      if (action.kind === 'commit-local-branch') {
+        return executeCommitLocalBranch({ action, binding, context, ...landingDependencies })
+      }
+      if (action.kind === 'push-ref') {
+        return executePushRef({ action, binding, context, ...landingDependencies })
+      }
+      if (action.kind === 'open-hosted-review') {
+        return executeOpenHostedReview({ action, binding, context, ...landingDependencies })
+      }
       return executeObjectiveLocalAction({
-        action: action as Exclude<ObjectiveAction, { kind: `dispatch-${string}` }>,
+        action: action as StoreLocalAction,
         binding,
         context,
         objectiveStore: dependencies.objectiveStore
@@ -217,7 +245,8 @@ export function createObjectiveActionExecutor(
     resolveOutcome(
       attempt: AttemptEntry,
       fresh: LiveSnapshot<ObjectiveWorld>,
-      ledger: WatcherLedger
+      ledger: WatcherLedger,
+      lease: LeaseGuard
     ): EffectCertainty | Promise<EffectCertainty> {
       const binding = requireObjectiveSnapshotBinding(dependencies.snapshotBindings, fresh)
       const parsed = ObjectiveActionSchema.safeParse(attempt.action)
@@ -232,9 +261,22 @@ export function createObjectiveActionExecutor(
       ) {
         return 'indeterminate'
       }
+      if (
+        parsed.data.kind === 'commit-local-branch' ||
+        parsed.data.kind === 'push-ref' ||
+        parsed.data.kind === 'open-hosted-review'
+      ) {
+        return resolveLandingOutcome({
+          attempt,
+          action: parsed.data,
+          binding,
+          ...landingDependencies,
+          lease
+        })
+      }
       if (!parsed.data.kind.startsWith('dispatch-')) {
         return localActionOutcome(
-          parsed.data as Exclude<ObjectiveAction, { kind: `dispatch-${string}` }>,
+          parsed.data as StoreLocalAction,
           binding,
           dependencies.objectiveStore
         )

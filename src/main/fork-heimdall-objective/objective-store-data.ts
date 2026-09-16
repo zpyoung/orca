@@ -15,11 +15,91 @@ import {
 
 const IdSchema = z.string().trim().min(1).max(1_024)
 
-export const LandingPayloadSchema = z.object({ revisionId: IdSchema }).strict()
+const FilesOnDiskLandingPayloadSchema = z.object({ revisionId: IdSchema }).strict()
+const CommittedLocalBranchLandingPayloadSchema = z
+  .object({
+    revisionId: IdSchema,
+    fromContentIdentity: IdSchema,
+    commitSha: IdSchema,
+    treeOid: IdSchema,
+    branch: IdSchema
+  })
+  .strict()
+const PushedRefLandingPayloadSchema = z
+  .object({
+    revisionId: IdSchema,
+    fromContentIdentity: IdSchema,
+    remote: IdSchema,
+    branch: IdSchema,
+    commitSha: IdSchema,
+    remoteSha: IdSchema
+  })
+  .strict()
+export const HostedReviewLandingPayloadSchema = z
+  .object({
+    revisionId: IdSchema,
+    fromContentIdentity: IdSchema,
+    provider: z.enum(['github', 'gitlab']),
+    reviewNumber: z.number().int().positive().safe(),
+    reviewUrl: z.string().trim().url(),
+    branch: IdSchema,
+    headSha: IdSchema,
+    base: IdSchema
+  })
+  .strict()
+const MergedLandingPayloadSchema = z
+  .object({
+    revisionId: IdSchema,
+    fromContentIdentity: IdSchema,
+    mergeSha: IdSchema
+  })
+  .strict()
+
+export const LandingPayloadSchema = z.union([
+  FilesOnDiskLandingPayloadSchema,
+  CommittedLocalBranchLandingPayloadSchema,
+  PushedRefLandingPayloadSchema,
+  HostedReviewLandingPayloadSchema,
+  MergedLandingPayloadSchema
+])
 export const CriteriaResultsSchema = z.array(ReviewCriterionResultSchema)
 export const DependenciesSchema = z.array(IdSchema).max(128)
 
 export type ObjectiveLandingPayload = z.infer<typeof LandingPayloadSchema>
+export type HostedReviewLandingPayload = z.infer<typeof HostedReviewLandingPayloadSchema>
+
+export function parseLandingPayload(
+  rung: ObjectiveLandingBar,
+  value: unknown
+): ObjectiveLandingPayload {
+  const schema = {
+    'files-on-disk': FilesOnDiskLandingPayloadSchema,
+    'committed-local-branch': CommittedLocalBranchLandingPayloadSchema,
+    'pushed-ref': PushedRefLandingPayloadSchema,
+    'hosted-review': HostedReviewLandingPayloadSchema,
+    merged: MergedLandingPayloadSchema
+  }[rung]
+  return schema.parse(value)
+}
+
+export function parseLandingPayloadJson(
+  rung: ObjectiveLandingBar,
+  json: string,
+  field: string
+): ObjectiveLandingPayload {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(json)
+  } catch {
+    throw new Error(`Objective database contains malformed ${field} JSON`)
+  }
+  try {
+    return parseLandingPayload(rung, parsed)
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new Error(`Objective database contains invalid ${field}: ${detail}`)
+  }
+}
 
 export type IngestPlanArgs = {
   watcherId: string

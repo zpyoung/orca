@@ -288,7 +288,7 @@ export class RuntimeHeimdallOrchestrationAdapter implements HeimdallOrchestratio
     }
     const run = this.resolvePersistedRun(enrollment, enrollment.orchestrationRunId)
     this.assertRunIdentity(enrollment, run)
-    return listWatcherWorkers(this.runtime, run)
+    return listWatcherWorkers(this.runtime, enrollment, run)
   }
 
   async stopWorker(

@@ -2,6 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { makeAttemptFingerprint } from '../../shared/fork-heimdall/attempt-fingerprint'
 import type { ExecuteContext } from '../../shared/fork-heimdall/kind-contract'
 import type { ObjectiveAction } from '../../shared/fork-heimdall-objective/objective-actions'
 import type { ObjectiveWorld } from '../../shared/fork-heimdall-objective/detail-types'
@@ -10,6 +11,7 @@ import { computeWorkspaceContentIdentity } from './content-identity'
 import { ObjectiveDatabase } from './objective-database'
 import type { ObjectiveSnapshotBinding } from './execution-context'
 import { executeObjectiveLocalAction } from './local-action-executor'
+import { issueObjectiveReportPath } from './report-ingestion'
 import { ObjectiveStore } from './objective-store'
 
 const WATCHER_ID = 'watcher-1'
@@ -202,6 +204,135 @@ describe('objective landing execution', () => {
       expect(fixture.objectiveStore.hasLanding(WATCHER_ID, 'files-on-disk', contentIdentity)).toBe(
         false
       )
+    } finally {
+      await rm(workspacePath, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('objective report ingestion execution', () => {
+  it('returns planner schema detail without persisting a malformed plan', async () => {
+    const database = new ObjectiveDatabase(':memory:')
+    opened.push(database)
+    const objectiveStore = new ObjectiveStore(database)
+    const workspacePath = await mkdtemp(join(tmpdir(), 'objective-plan-ingestion-'))
+    try {
+      const target = {
+        kind: 'folder' as const,
+        executionHostId: 'local' as const,
+        workspacePath,
+        fileProvider: null
+      }
+      const dispatchAction = {
+        kind: 'dispatch-planner',
+        capability: 'plan',
+        visibility: 'local',
+        contentIdentity: 'content-1',
+        evidenceKey: 'revision-1',
+        revisionNumber: 1,
+        reason: 'initial'
+      } satisfies ObjectiveAction
+      const fingerprint = makeAttemptFingerprint(
+        dispatchAction.contentIdentity,
+        dispatchAction.kind,
+        dispatchAction.evidenceKey
+      )
+      const reportPath = await issueObjectiveReportPath(target, fingerprint)
+      await writeFile(
+        reportPath,
+        JSON.stringify({
+          plan: [
+            {
+              taskKey: 'node-1',
+              title: 'Node 1',
+              spec: 'Execute node one',
+              deps: [],
+              criteria: [{ body: 'Node works', shellCheckable: false, checkCommand: null }],
+              declaresDependencyChange: false,
+              declaredPaths: ['src/**']
+            }
+          ]
+        })
+      )
+      const ingestAction = {
+        kind: 'ingest-plan',
+        capability: 'plan',
+        visibility: 'local',
+        contentIdentity: 'content-1',
+        evidenceKey: 'revision-1',
+        recovery: 'replay-safe',
+        dispatchId: 'dispatch-planner-1',
+        revisionNumber: 1,
+        reportPath
+      } satisfies ObjectiveAction
+      const binding = {
+        enrollment: { watcherId: WATCHER_ID },
+        contract: { writeTerritory: ['src/**'] },
+        target
+      } as unknown as ObjectiveSnapshotBinding
+      const context = {
+        snapshot: { contentIdentity: 'content-1' },
+        ledger: {
+          watcherId: WATCHER_ID,
+          entries: [
+            {
+              eventId: 'attempt-planner-1',
+              watcherId: WATCHER_ID,
+              atMs: 1,
+              origin: 'owner',
+              class: 'fact',
+              kind: 'attempt',
+              attemptId: 'attempt-planner-1',
+              fingerprint,
+              action: dispatchAction,
+              state: 'settled',
+              effect: 'indeterminate',
+              dispatch: {
+                spec: 'Plan the objective.',
+                deps: [],
+                dispatchKind: 'planner'
+              },
+              dispatchId: 'dispatch-planner-1'
+            },
+            {
+              eventId: 'evidence-planner-1',
+              watcherId: WATCHER_ID,
+              atMs: 2,
+              origin: 'owner',
+              class: 'fact',
+              kind: 'evidence',
+              evidenceKind: 'orchestration-mailbox',
+              payload: {
+                type: 'worker_done',
+                payload: {
+                  dispatchId: 'dispatch-planner-1',
+                  outcome: 'succeeded',
+                  reportPath,
+                  filesModified: []
+                }
+              }
+            }
+          ]
+        },
+        lease: { assertHeld: vi.fn(async () => undefined) },
+        dispatchWorker: vi.fn()
+      } as unknown as ExecuteContext<ObjectiveWorld>
+
+      await expect(
+        executeObjectiveLocalAction({
+          action: ingestAction,
+          binding,
+          context,
+          objectiveStore
+        })
+      ).resolves.toEqual({
+        effect: 'not-landed',
+        reason: 'planner-report-malformed',
+        result: {
+          detail: 'plan[0].declaredPaths[0]: Path must be a concrete workspace-relative path'
+        }
+      })
+      expect(objectiveStore.project(WATCHER_ID).revisions).toEqual([])
     } finally {
       await rm(workspacePath, { recursive: true, force: true })
     }

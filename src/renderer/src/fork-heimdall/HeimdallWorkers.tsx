@@ -1,15 +1,21 @@
 import { useState } from 'react'
-import { HelpCircle, Loader2, Radio, Square } from 'lucide-react'
+import { ExternalLink, HelpCircle, Loader2, Radio, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { translate } from '@/i18n/i18n'
 import type { WatcherWorker } from '../../../shared/fork-heimdall/fleet-types'
 import { formatHeimdallAge } from './fleet-format'
+import {
+  resolveHeimdallWorkerNavigation,
+  type HeimdallWorkerNavigation
+} from './heimdall-worker-navigation'
 
 export type HeimdallWorkersProps = {
   workers: readonly WatcherWorker[]
   disabled: boolean
+  ownerConnectionId: string | null
   busyKey: string | null
+  onOpen: (navigation: HeimdallWorkerNavigation) => void
   onAnswer: (worker: WatcherWorker, body: string) => Promise<void>
   onStop: (worker: WatcherWorker) => Promise<void>
 }
@@ -19,7 +25,7 @@ function workerLivenessLabel(liveness: WatcherWorker['liveness']): string {
     return translate('fork.heimdall.workers.live', 'Live')
   }
   if (liveness === 'unverifiable') {
-    return translate('fork.heimdall.workers.unverifiable', 'Unreachable')
+    return translate('fork.heimdall.workers.unverifiable', 'Unverifiable')
   }
   return translate('fork.heimdall.workers.exited', 'Exited')
 }
@@ -28,6 +34,8 @@ export function HeimdallWorkers({
   workers,
   disabled,
   busyKey,
+  ownerConnectionId,
+  onOpen,
   onAnswer,
   onStop
 }: HeimdallWorkersProps): React.JSX.Element {
@@ -46,6 +54,7 @@ export function HeimdallWorkers({
         const answer = question ? (answers[question.messageId] ?? '') : ''
         const stopKey = `stop-worker:${worker.dispatchId}`
         const answerKey = question ? `answer:${question.messageId}` : ''
+        const navigation = resolveHeimdallWorkerNavigation(worker.navigation, ownerConnectionId)
         return (
           <li key={worker.dispatchId} className="rounded-md border border-border bg-muted/10 p-3">
             <div className="flex items-start gap-2">
@@ -66,22 +75,40 @@ export function HeimdallWorkers({
                   {worker.reason ? ` · ${worker.reason}` : ''}
                 </p>
               </div>
-              {worker.liveness !== 'exited' ? (
+              <div className="flex shrink-0 flex-wrap gap-2">
                 <Button
                   type="button"
                   variant="outline"
                   size="xs"
-                  disabled={disabled || busyKey !== null}
-                  onClick={() => void onStop(worker)}
+                  disabled={navigation === null}
+                  onClick={() => {
+                    if (navigation) {
+                      onOpen(navigation)
+                    }
+                  }}
                 >
-                  {busyKey === stopKey ? (
-                    <Loader2 className="animate-spin" aria-hidden />
-                  ) : (
-                    <Square aria-hidden />
-                  )}
-                  {translate('fork.heimdall.workers.stop', 'Stop')}
+                  <ExternalLink aria-hidden />
+                  {navigation
+                    ? translate('fork.heimdall.workers.open', 'Open')
+                    : translate('fork.heimdall.workers.openUnavailable', 'Open unavailable')}
                 </Button>
-              ) : null}
+                {worker.liveness !== 'exited' ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    disabled={disabled || busyKey !== null}
+                    onClick={() => void onStop(worker)}
+                  >
+                    {busyKey === stopKey ? (
+                      <Loader2 className="animate-spin" aria-hidden />
+                    ) : (
+                      <Square aria-hidden />
+                    )}
+                    {translate('fork.heimdall.workers.stop', 'Stop')}
+                  </Button>
+                ) : null}
+              </div>
             </div>
             {question ? (
               <form

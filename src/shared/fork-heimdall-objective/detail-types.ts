@@ -100,6 +100,16 @@ export const ObjectiveLandingProjectionSchema = z
     rung: ObjectiveLandingBarSchema,
     revisionId: IdSchema,
     contentIdentity: IdSchema,
+    fromContentIdentity: IdSchema.optional(),
+    branch: IdSchema.optional(),
+    commitSha: IdSchema.optional(),
+    remote: IdSchema.optional(),
+    remoteSha: z.string().max(1_024).optional(),
+    provider: z.enum(['github', 'gitlab']).optional(),
+    reviewNumber: z.number().int().positive().safe().optional(),
+    reviewUrl: z.string().trim().url().optional(),
+    headSha: IdSchema.optional(),
+    base: IdSchema.optional(),
     atMs: TimestampSchema
   })
   .strict()
@@ -137,13 +147,39 @@ export type ObjectivePendingReport = z.infer<typeof ObjectivePendingReportSchema
 export const ObjectiveBudgetBucketSchema = z.enum(['plenty', 'tight', 'nearly-spent', 'spent'])
 export type ObjectiveBudgetBucket = z.infer<typeof ObjectiveBudgetBucketSchema>
 
+export const ObjectiveLandingContextSchema = z
+  .object({
+    branch: IdSchema.nullable(),
+    headSha: IdSchema.nullable(),
+    worktreeContentDigest: IdSchema.nullable(),
+    pushTarget: z
+      .object({
+        remote: IdSchema,
+        branch: IdSchema,
+        remoteSha: z.string().max(1_024)
+      })
+      .strict()
+      .nullable(),
+    hostedReview: z
+      .object({
+        provider: z.enum(['github', 'gitlab']),
+        repoKey: IdSchema,
+        base: IdSchema.nullable()
+      })
+      .strict()
+      .nullable()
+  })
+  .strict()
+export type ObjectiveLandingContext = z.infer<typeof ObjectiveLandingContextSchema>
+
 export const ObjectiveWorldSchema = z
   .object({
     contract: ObjectiveEnrollmentPayloadSchema,
     workspaceKind: ObjectiveWorkspaceKindSchema,
     plan: ObjectiveProjectionSchema,
     reports: z.array(ObjectivePendingReportSchema),
-    budget: BudgetPolicySchema
+    budget: BudgetPolicySchema,
+    landingContext: ObjectiveLandingContextSchema
   })
   .strict()
 export type ObjectiveWorld = z.infer<typeof ObjectiveWorldSchema>

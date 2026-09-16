@@ -30,10 +30,19 @@ import { validateObjectiveWorkspaceChanges } from './observed-workspace-changes'
 import type { ObjectiveStore } from './objective-store'
 import { readObjectiveRoleReport } from './report-ingestion'
 
-type LocalAction = Exclude<ObjectiveAction, { kind: `dispatch-${string}` }>
+type LocalAction = Exclude<
+  ObjectiveAction,
+  {
+    kind: `dispatch-${string}` | 'commit-local-branch' | 'push-ref' | 'open-hosted-review'
+  }
+>
 
-function invalid(reason: string): ActionOutcome {
-  return { effect: 'not-landed', reason }
+function invalid(reason: string, detail?: string): ActionOutcome {
+  return {
+    effect: 'not-landed',
+    reason,
+    ...(detail === undefined ? {} : { result: { detail } })
+  }
 }
 
 function naturalKey(action: LocalAction): ObjectiveActionNaturalKey {
@@ -79,7 +88,7 @@ async function ingestPlan(args: {
     role: 'planner'
   })
   if (!read.ok) {
-    return invalid(`planner-report-${read.reason}`)
+    return invalid(`planner-report-${read.reason}`, read.detail)
   }
   let report: PlannerReport
   try {
@@ -148,7 +157,7 @@ async function ingestImplementerReport(args: {
     taskKey: args.action.taskKey
   })
   if (!read.ok) {
-    return invalid(`implementer-report-${read.reason}`)
+    return invalid(`implementer-report-${read.reason}`, read.detail)
   }
   let report: ImplementerReport
   try {
@@ -275,7 +284,7 @@ async function ingestVerdict(args: {
         role: 'reviewer'
       })
       if (!read.ok) {
-        return invalid(`review-report-${read.reason}`)
+        return invalid(`review-report-${read.reason}`, read.detail)
       }
       report = parseAndValidateReviewerReport(read.report, plan)
       reportDigest = read.reportDigest
@@ -287,7 +296,7 @@ async function ingestVerdict(args: {
         role: 'integrator'
       })
       if (!read.ok) {
-        return invalid(`review-report-${read.reason}`)
+        return invalid(`review-report-${read.reason}`, read.detail)
       }
       report = parseAndValidateIntegratorReport(read.report, plan)
       reportDigest = read.reportDigest

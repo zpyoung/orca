@@ -2,7 +2,8 @@
   "fork": {
     "heimdall": {
       "kind": {
-        "objective": "Objective watcher"
+        "objective": "Objective watcher",
+        "hostedReview": "Hosted review"
       },
       "status": {
         "watching": "Watching",
@@ -50,7 +51,9 @@
         "activeBurn": "Active time",
         "turns": "Turns",
         "elapsed": "Elapsed",
-        "lastTick": "Last tick"
+        "lastTick": "Last tick",
+        "workspace": "Workspace",
+        "activity": "Activity"
       },
       "detail": {
         "back": "Back to fleet",
@@ -64,13 +67,23 @@
         "unavailable": "Owner detail is unavailable.",
         "selectPrompt": "Select a watcher to inspect its decisions, workers, and owner controls."
       },
+      "kindDetail": {
+        "handedOffFrom": "Handed off from objective {{id}}"
+      },
       "controls": {
         "title": "Owner controls",
         "resume": "Resume",
         "pause": "Pause",
         "disarm": "Disarm",
         "approve": "Approve",
-        "budgetResumeWarning": "This watcher exhausted its budget. Increase the limit before resuming or it will park again."
+        "budgetResumeWarning": "This watcher exhausted its budget. Increase the limit before resuming or it will park again.",
+        "approveAction": "Approve: {{action}}"
+      },
+      "debugReport": {
+        "copy": "Copy debug report",
+        "copied": "Debug report copied",
+        "copyError": "Could not copy the debug report.",
+        "copyErrorWithDetail": "Could not copy the debug report: {{error}}"
       },
       "command": {
         "applied": "Applied by the owner at {{time}}.",
@@ -88,7 +101,9 @@
         "exhausted": "Exhausted: {{kind}}",
         "minutesLimit": "Active minutes limit",
         "turnLimit": "Worker turn limit",
-        "apply": "Apply budget"
+        "apply": "Apply budget",
+        "edit": "Edit",
+        "cancel": "Cancel"
       },
       "escalations": {
         "title": "Open escalations"
@@ -97,14 +112,16 @@
         "title": "Live workers",
         "empty": "No live workers.",
         "live": "Live",
-        "unverifiable": "Unreachable",
+        "unverifiable": "Unverifiable",
         "exited": "Exited",
         "noContact": "No confirmed contact",
         "lastContact": "Last contact {{age}}",
         "stop": "Stop",
         "answerPlaceholder": "Answer the worker",
         "answerLabel": "Answer worker question",
-        "sendAnswer": "Send answer"
+        "sendAnswer": "Send answer",
+        "open": "Open",
+        "openUnavailable": "Open unavailable"
       },
       "trace": {
         "title": "Decision trace",
@@ -124,7 +141,17 @@
         "title": "Fleet action history",
         "asOf": "As of {{age}}",
         "partial": "{{count}} watcher histories could not be refreshed; visible records are retained.",
-        "empty": "No autonomous actions recorded yet."
+        "empty": "No autonomous actions recorded yet.",
+        "lastConfirmed": "Last confirmed {{age}}",
+        "unverifiable": "Contact unverifiable",
+        "unavailable": "Activity unavailable",
+        "waiting": "Waiting for change",
+        "inactive": "No active work",
+        "started": "Started {{age}}",
+        "agentInFlight": "Agent work in flight",
+        "agentsInFlight": "{{count}} agent tasks in flight",
+        "checkRunning": "Check running",
+        "actionRunning": "Action running"
       },
       "ledger": {
         "title": "Watcher activity",
@@ -141,6 +168,82 @@
       "error": {
         "unavailable": "Heimdall control plane is unavailable.",
         "ownerUnavailable": "The owning runtime is unavailable; no enrollment was sent."
+      },
+      "approval": {
+        "preparedCommit": "Prepared commit",
+        "scopeDetails": "Approval scope",
+        "contentState": "Content state",
+        "evidence": "Evidence",
+        "exactScopeNotice": "Approval applies only to this exact action and content. New or changed actions require separate approval.",
+        "action": {
+          "dispatchPlanner": "Start planner",
+          "ingestPlan": "Read planner result",
+          "activatePlan": "Activate plan",
+          "dispatchNode": "Start implementation task",
+          "ingestReport": "Read implementation report",
+          "runCheck": "Run acceptance check",
+          "dispatchReviewer": "Start review",
+          "dispatchIntegrator": "Start integrator review",
+          "ingestVerdict": "Read review verdict",
+          "recordLanding": "Record completed work",
+          "commitLocalBranch": "Commit local branch",
+          "pushRef": "Push branch",
+          "openHostedReview": "Open hosted review"
+        },
+        "explanation": {
+          "dispatchPlanner": "Start the planner for this objective.",
+          "ingestPlan": "Read the planner result into the objective plan.",
+          "activatePlan": "Make the prepared objective plan active.",
+          "dispatchNode": "Start an implementation worker for an objective task.",
+          "ingestReport": "Read an implementation worker report into the objective state.",
+          "runCheck": "Run an acceptance command for the objective.",
+          "dispatchReviewer": "Start an independent review of the objective work.",
+          "dispatchIntegrator": "Start the final integration review of the objective work.",
+          "ingestVerdict": "Read a review verdict into the objective state.",
+          "recordLanding": "Record the completed objective work as landed on disk.",
+          "commitLocalBranch": "Commit the completed objective work to its local branch.",
+          "pushRef": "Push the objective branch to its remote.",
+          "openHostedReview": "Open a hosted review for the objective branch.",
+          "rerunCheck": "Request another run of the failed hosted check.",
+          "prepareFix": "Start a worker to prepare a fix for the failed hosted check.",
+          "publishFix": "Publish the prepared check fix to the hosted review branch.",
+          "prepareConflictResolution": "Start a worker to prepare a merge-conflict resolution.",
+          "publishConflictResolution": "Publish the prepared conflict resolution to the hosted review branch.",
+          "updateBranch": "Update the hosted review branch from its base branch.",
+          "merge": "Merge the hosted review.",
+          "enqueue": "Enter the hosted review in its merge queue.",
+          "unknown": "Approve this exact requested action."
+        },
+        "detail": {
+          "task": "Task",
+          "revision": "Revision",
+          "criterion": "Criterion",
+          "command": "Command",
+          "branch": "Branch",
+          "remote": "Remote",
+          "baseBranch": "Base branch",
+          "provider": "Provider",
+          "reviewRole": "Review role",
+          "commit": "Commit",
+          "check": "Check",
+          "baseCommit": "Base commit",
+          "mergeMethod": "Merge method",
+          "updateMethod": "Update method",
+          "review": "Review"
+        }
+      },
+      "phase": {
+        "planning": "Planning",
+        "implementing": "Implementing",
+        "checking": "Checking",
+        "reviewing": "Reviewing",
+        "landing": "Landing",
+        "landed": "Landed",
+        "unavailable": "Phase unavailable"
+      },
+      "workspace": {
+        "folder": "Folder",
+        "branchUnavailable": "Branch unavailable"
       }
     }
   }

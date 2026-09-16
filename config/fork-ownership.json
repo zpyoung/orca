@@ -456,6 +456,53 @@
       ]
     },
     {
+      "path": "src/cli/specs/index.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "import { HEIMDALL_COMMAND_SPECS } from '../fork-heimdall/specs'",
+        "  ...HEIMDALL_COMMAND_SPECS,"
+      ]
+    },
+    {
+      "path": "src/cli/handler-group-manifest.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "    name: 'heimdall',",
+        "    keys: ['heimdall debug'],",
+        "    load: async () => (await import('./fork-heimdall/handlers.js')).HEIMDALL_HANDLERS"
+      ]
+    },
+    {
+      "path": "src/cli/args.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": ["      'heimdall',", "        'heimdall',"]
+    },
+    {
+      "path": "src/main/startup/cli-command-names.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": ["  'heimdall',"]
+    },
+    {
+      "path": "src/cli/root-help-text-primary.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "  'Heimdall:',",
+        "  '  heimdall debug            Collect a watcher debug report',",
+        "  '',"
+      ]
+    },
+    {
+      "path": "src/cli/root-help-text-secondary.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": ["  '  orca heimdall debug <watcherId> [--json] [--out <path>]',"]
+    },
+    {
       "path": "src/preload/index.ts",
       "feature": "hosted-review-sitter",
       "kind": "registration",
@@ -4136,6 +4183,18 @@
       "ledger": "docs/fork-upstreaming.md#structured-session-history-page-races-the-reap-tombstone"
     },
     {
+      "path": "src/main/runtime/orca-runtime-write-terminal-agent-prompt.ts",
+      "reason": "OMP prompt submission fix: appends exactly one CR to the complete bracketed-paste frame in the same PTY write and captures lifecycle evidence before that write, so OMP's large-paste menu cannot consume a delayed submit.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#omp-atomic-paste-submit"
+    },
+    {
+      "path": "src/main/runtime/agent-prompt-submission-omp-atomic.test.ts",
+      "reason": "Regression coverage for OMP atomic large-paste acceptance, pre-write lifecycle baselines, write safety gates, and unchanged delayed submission for other agents.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#omp-atomic-paste-submit"
+    },
+    {
       "path": "config/scripts/client-hosted-browser-package-coverage.test.mjs",
       "reason": "Contracts for the fork's PR packaging policy; upstream's Windows PR job must not be required by a macOS-only release fork.",
       "status": "permanent"
@@ -4273,7 +4332,7 @@
       "removed": 0
     },
     "src/cli/args.ts": {
-      "added": 3,
+      "added": 5,
       "removed": 0
     },
     "src/cli/artifact-format.ts": {
@@ -4285,7 +4344,7 @@
       "removed": 0
     },
     "src/cli/handler-group-manifest.ts": {
-      "added": 19,
+      "added": 24,
       "removed": 0
     },
     "src/cli/handlers/artifacts.ts": {
@@ -4293,11 +4352,11 @@
       "removed": 1
     },
     "src/cli/root-help-text-primary.ts": {
-      "added": 15,
+      "added": 18,
       "removed": 0
     },
     "src/cli/root-help-text-secondary.ts": {
-      "added": 3,
+      "added": 4,
       "removed": 0
     },
     "src/cli/specs/artifacts.ts": {
@@ -4305,7 +4364,7 @@
       "removed": 2
     },
     "src/cli/specs/index.ts": {
-      "added": 5,
+      "added": 7,
       "removed": 1
     },
     "src/main/agent-hooks/server/server-lifecycle.ts": {
@@ -4601,7 +4660,7 @@
       "removed": 0
     },
     "src/main/startup/cli-command-names.ts": {
-      "added": 2,
+      "added": 3,
       "removed": 0
     },
     "src/main/startup/main-process-account-services.ts": {

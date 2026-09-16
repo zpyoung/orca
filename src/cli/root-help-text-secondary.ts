@@ -43,6 +43,7 @@ export const ROOT_HELP_TEXT_SECONDARY = [
   '  orca ask --spec <json|@file> [--timeout-ms <n>] [--chunk-ms <n>] [--json]',
   '  orca ask wait --id <ask_id> [--chunk-ms <n>] [--json]',
   '  orca ask cancel --id <ask_id> [--json]',
+  '  orca heimdall debug <watcherId> [--json] [--out <path>]',
   '  orca account add [--agent claude|codex] [--json]',
   '  orca account list [--json]',
   '  orca host list [--json]',

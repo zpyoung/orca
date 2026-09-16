@@ -25,10 +25,10 @@ export type HeimdallKernelService = {
   command(request: WatcherCommandRequest): Promise<WatcherCommandResult>
   subscribe(listener: () => void): () => void
   ledger(watcherId: string): WatcherLedger
-  debugReport(watcherId: string): HeimdallDebugReport
+  debugReport(watcherId: string): Promise<HeimdallDebugReport>
   suspend(): void
   resume(): void
   start(): void
-  onShutdown(listener: () => void): () => void
-  stopForShutdown(): void
+  onShutdown(listener: () => void, phase?: 'start' | 'drained'): () => void
+  stopForShutdown(): Promise<void>
 }

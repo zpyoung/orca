@@ -2,7 +2,10 @@ import { mkdirSync, mkdtempSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { ObjectiveEnrollmentPayload } from '../../shared/fork-heimdall-objective/contract-types'
+import type {
+  ObjectiveEnrollmentPayload,
+  ObjectiveLandingBar
+} from '../../shared/fork-heimdall-objective/contract-types'
 import { ObjectiveDetailSchema } from '../../shared/fork-heimdall-objective/detail-types'
 import type {
   PlannerReport,
@@ -15,6 +18,7 @@ import type {
 } from '../../shared/fork-heimdall/ledger-types'
 import Database from '../sqlite/sync-database'
 import { OBJECTIVE_DATABASE_SCHEMA_VERSION, ObjectiveDatabase } from './objective-database'
+import type { ObjectiveLandingPayload } from './objective-store-data'
 import { ObjectiveStore } from './objective-store'
 
 const WATCHER_ID = 'watcher-objective-1'
@@ -231,6 +235,103 @@ describe('ObjectiveStore natural-key persistence', () => {
       landing_evidence: 1
     })
     expect(store.getCheckAttempt(criterionId, CONTENT_IDENTITY)?.completedAtMs).toBe(450)
+  })
+
+  it('round-trips every landing rung and rejects a changed rich payload replay', () => {
+    const revision = ingest()
+    const cases: {
+      rung: ObjectiveLandingBar
+      payload: ObjectiveLandingPayload
+    }[] = [
+      {
+        rung: 'files-on-disk',
+        payload: { revisionId: revision.revisionId }
+      },
+      {
+        rung: 'committed-local-branch',
+        payload: {
+          revisionId: revision.revisionId,
+          fromContentIdentity: 'content-before-commit',
+          commitSha: 'a'.repeat(40),
+          treeOid: 'b'.repeat(40),
+          branch: 'feature/objective'
+        }
+      },
+      {
+        rung: 'pushed-ref',
+        payload: {
+          revisionId: revision.revisionId,
+          fromContentIdentity: 'content-after-commit',
+          remote: 'origin',
+          branch: 'feature/objective',
+          commitSha: 'a'.repeat(40),
+          remoteSha: 'a'.repeat(40)
+        }
+      },
+      {
+        rung: 'hosted-review',
+        payload: {
+          revisionId: revision.revisionId,
+          fromContentIdentity: 'content-after-commit',
+          provider: 'github',
+          reviewNumber: 42,
+          reviewUrl: 'https://github.test/acme/repo/pull/42',
+          branch: 'feature/objective',
+          headSha: 'a'.repeat(40),
+          base: 'main'
+        }
+      },
+      {
+        rung: 'merged',
+        payload: {
+          revisionId: revision.revisionId,
+          fromContentIdentity: 'content-after-commit',
+          mergeSha: 'c'.repeat(40)
+        }
+      }
+    ]
+
+    for (const [index, entry] of cases.entries()) {
+      const landing = {
+        watcherId: WATCHER_ID,
+        rung: entry.rung,
+        contentIdentity: `content-${entry.rung}`,
+        attemptFingerprint: `landing-fingerprint-${entry.rung}`,
+        payload: entry.payload,
+        epoch: 4,
+        createdAtMs: 600 + index
+      }
+      const recorded = store.recordLanding(landing)
+      expect(store.landingRow(WATCHER_ID, entry.rung, landing.contentIdentity)).toEqual(
+        entry.payload
+      )
+      expect(
+        store.recordLanding({
+          ...landing,
+          payload: structuredClone(entry.payload),
+          epoch: 99,
+          createdAtMs: 9_999
+        })
+      ).toEqual(recorded)
+    }
+
+    expect(() =>
+      store.recordLanding({
+        watcherId: WATCHER_ID,
+        rung: 'committed-local-branch',
+        contentIdentity: 'content-committed-local-branch',
+        attemptFingerprint: 'landing-fingerprint-committed-local-branch',
+        payload: {
+          revisionId: revision.revisionId,
+          fromContentIdentity: 'content-before-commit',
+          commitSha: 'd'.repeat(40),
+          treeOid: 'b'.repeat(40),
+          branch: 'feature/objective'
+        },
+        epoch: 4,
+        createdAtMs: 601
+      })
+    ).toThrow(/different content/)
   })
 
   it('projects the check for the requested content identity after workspace reversion', () => {

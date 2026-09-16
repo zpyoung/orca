@@ -8,7 +8,7 @@ import {
 import type Database from '../sqlite/sync-database'
 import type { ObjectiveDatabase } from './objective-database'
 import {
-  LandingPayloadSchema,
+  parseLandingPayload,
   naturalId,
   type ActivatePlanArgs,
   type ActivatePlanResult,
@@ -322,7 +322,7 @@ export class ObjectiveStoreMutations {
 
   recordLanding(args: RecordLandingArgs): RecordLandingResult {
     const rung = ObjectiveLandingBarSchema.parse(args.rung)
-    const payload = LandingPayloadSchema.parse(args.payload)
+    const payload = parseLandingPayload(rung, args.payload)
     const payloadJson = JSON.stringify(payload)
     return this.mutate(() => {
       const db = this.database.connection()

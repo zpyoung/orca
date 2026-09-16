@@ -19,6 +19,7 @@ import type {
   IngestPlanArgs,
   IngestPlanResult,
   ObjectiveCheckAttempt,
+  ObjectiveLandingPayload,
   ObjectiveReconcileResult,
   ObjectiveStoredCriterion,
   RecordLandingArgs,
@@ -60,6 +61,10 @@ export class ObjectiveStore {
   ) {
     this.mutations = new ObjectiveStoreMutations(database)
     this.queries = new ObjectiveStoreQueries(database)
+  }
+
+  databasePath(): string {
+    return this.database.databasePath()
   }
 
   ingestPlan(args: IngestPlanArgs): IngestPlanResult {
@@ -138,6 +143,14 @@ export class ObjectiveStore {
 
   hasLanding(watcherId: string, rung: ObjectiveLandingBar, contentIdentity: string): boolean {
     return this.queries.hasLanding(watcherId, rung, contentIdentity)
+  }
+
+  landingRow(
+    watcherId: string,
+    rung: ObjectiveLandingBar,
+    contentIdentity: string
+  ): ObjectiveLandingPayload | null {
+    return this.queries.landingRow(watcherId, rung, contentIdentity)
   }
 
   project(

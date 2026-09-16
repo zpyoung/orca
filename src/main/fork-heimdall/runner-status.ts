@@ -7,7 +7,10 @@ import type { RunnerLedgerStore, WatcherRunner } from './runner-state'
 export type WatcherRunnerStatusDependencies = {
   ledgerStore: RunnerLedgerStore
   persistEnabled: (runner: WatcherRunner, enabled: boolean) => WatcherRunner['enrollment']
-  persistTerminal: (runner: WatcherRunner, fired: FiredStopPredicate) => WatcherRunner['enrollment']
+  persistTerminal: (
+    runner: WatcherRunner,
+    fired: FiredStopPredicate
+  ) => Promise<WatcherRunner['enrollment']>
   now: () => number
   createId: () => string
   publish: (runner: WatcherRunner) => void
@@ -70,11 +73,11 @@ export class WatcherRunnerStatusLifecycle {
     }
     this.dependencies.publish(runner)
   }
-  terminal(runner: WatcherRunner, fired: FiredStopPredicate): void {
+  async terminal(runner: WatcherRunner, fired: FiredStopPredicate): Promise<void> {
     if (fired.disposition !== 'terminal') {
       throw new Error('A park predicate cannot make a watcher terminal')
     }
-    runner.enrollment = this.dependencies.persistTerminal(runner, fired)
+    runner.enrollment = await this.dependencies.persistTerminal(runner, fired)
     runner.stopped = true
     runner.status = {
       ...runner.status,

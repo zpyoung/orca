@@ -15,7 +15,10 @@ import {
 export type ObjectiveWorkspaceOption = {
   key: string
   repoId: string
+  repoPath: string
   worktreeId: string | null
+  workspacePath: string
+  branch: string | null
   workspaceKind: ObjectiveWorkspaceKind
   label: string
   detail: string
@@ -81,7 +84,10 @@ export function buildObjectiveWorkspaceOptions(
       options.push({
         key: `${repoHostId}:${repo.id}:folder`,
         repoId: repo.id,
+        repoPath: repo.path,
         worktreeId: null,
+        workspacePath: repo.path,
+        branch: null,
         workspaceKind: 'folder',
         label: repo.displayName,
         detail: `${repo.path} · ${repoHostId}`,
@@ -98,7 +104,10 @@ export function buildObjectiveWorkspaceOptions(
       options.push({
         key: `${worktreeHostId}:${repo.id}:${worktree.id}`,
         repoId: repo.id,
+        repoPath: repo.path,
         worktreeId: worktree.id,
+        workspacePath: worktree.path,
+        branch: worktree.branch,
         workspaceKind: 'git',
         label: `${repo.displayName} / ${worktree.displayName || worktree.branch || worktree.path}`,
         detail: `${worktree.path} · ${worktreeHostId}`,
