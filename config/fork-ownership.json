@@ -161,6 +161,14 @@
   ],
   "seams": [
     {
+      "path": "src/renderer/src/components/native-chat/native-chat-composer-workspace-file-drop.test.tsx",
+      "feature": "input-quarantine",
+      "kind": "registration",
+      "lines": [
+        "            terminalTabId: 'terminal-tab-1',"
+      ]
+    },
+    {
       "path": "src/renderer/src/components/sidebar/use-worktree-activity-status.ts",
       "feature": "ask-question-tool",
       "kind": "registration",
@@ -4699,6 +4707,10 @@
     }
   ],
   "residuals": {
+    "src/renderer/src/components/native-chat/native-chat-composer-workspace-file-drop.test.tsx": {
+      "added": 7,
+      "removed": 1
+    },
     "src/renderer/src/components/sidebar/use-worktree-activity-status.ts": {
       "added": 4,
       "removed": 1

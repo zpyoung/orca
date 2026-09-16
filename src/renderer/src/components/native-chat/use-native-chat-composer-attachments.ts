@@ -1,5 +1,5 @@
 import type { NativeChatComposerInput } from './native-chat-composer-input'
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { translate } from '@/i18n/i18n'
 import {
   nativeChatComposerTargetIsRemote,

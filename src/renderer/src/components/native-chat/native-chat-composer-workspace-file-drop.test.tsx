@@ -141,7 +141,13 @@ function ComposerProbe({
     disabled,
     isComposing: imeEnterGesture.isComposing,
     resolveTarget: () =>
-      structured ? null : { ptyId: 'pty-1', settings: { activeRuntimeEnvironmentId: null } },
+      structured
+        ? null
+        : {
+            terminalTabId: 'terminal-tab-1',
+            ptyId: 'pty-1',
+            settings: { activeRuntimeEnvironmentId: null }
+          },
     textareaRef: inputRef,
     setCaret,
     setDraft,
