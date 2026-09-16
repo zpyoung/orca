@@ -1,3 +1,4 @@
+import type { ReadableAgentAttentionUnread } from '@/attention/agent-attention-contract'
 import {
   resolveTerminalTabAttentionBadge,
   terminalTabHasUnreadActivity
@@ -25,8 +26,8 @@ export function shouldIncludeOpenTabInRecentSection({
   worktree: Worktree
   row: OpenTabRecentRow['row']
   paneSources: TabPaneInputSources
-  unreadTerminalTabs: Record<string, boolean | undefined>
-  unreadAgentCompletionPanes: Record<string, boolean | undefined>
+  unreadTerminalTabs: Record<string, ReadableAgentAttentionUnread>
+  unreadAgentCompletionPanes: Record<string, ReadableAgentAttentionUnread>
   now: number
   hasPendingAsk?: boolean
 }): boolean {

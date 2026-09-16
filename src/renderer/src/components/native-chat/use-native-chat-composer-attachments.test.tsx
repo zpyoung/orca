@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, createElement, useRef, useState } from 'react'
+import { act, createElement, useEffect, useRef, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import {
   clearNativeChatAttachmentCacheForTests,
@@ -10,15 +10,18 @@ import {
   useNativeChatComposerAttachments
 } from './use-native-chat-composer-attachments'
 import type { NativeChatResolvedTarget } from './native-chat-composer-target'
+import { NATIVE_FILE_DROP_MAX_PATHS } from '../../../../shared/native-file-drop'
 
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string) => fallback
 }))
+const runtimeTarget = vi.hoisted(() => ({ remote: false }))
 vi.mock('@/runtime/runtime-terminal-inspection', () => ({
-  isRemoteRuntimePtyId: () => false
+  isRemoteRuntimePtyId: () => runtimeTarget.remote
 }))
 
-type ProbeApi = ReturnType<typeof useNativeChatComposerAttachments>
+type AttachmentApi = ReturnType<typeof useNativeChatComposerAttachments>
+type ProbeApi = AttachmentApi & { adoptDraft: (draft: string) => void }
 
 const target: NativeChatResolvedTarget = {
   terminalTabId: 'tab-1',
@@ -29,36 +32,56 @@ const target: NativeChatResolvedTarget = {
 function Probe({
   scopeKey,
   structured = false,
+  disabled = false,
+  isComposing,
   onReady
 }: {
   scopeKey: string
   structured?: boolean
+  disabled?: boolean
+  isComposing: () => boolean
   onReady: (api: ProbeApi) => void
 }): React.JSX.Element {
   const [caret, setCaret] = useState(0)
-  const [, setDraftValue] = useState('')
-  const [, setNotice] = useState<string | null>(null)
+  const [draftValue, setDraftValue] = useState('')
+  const [notice, setNotice] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const api = useNativeChatComposerAttachments({
     attachmentScopeKey: scopeKey,
     allowWithoutTarget: structured,
     caret,
-    disabled: false,
-    isComposing: () => false,
+    disabled,
+    isComposing,
     resolveTarget: () => (structured ? null : target),
     textareaRef,
     setCaret,
     setDraft: (updater) => setDraftValue((previous) => updater(previous)),
     setNotice
   })
-  onReady(api)
-  return createElement('textarea', { ref: textareaRef })
+  useEffect(() => {
+    onReady({ ...api, adoptDraft: setDraftValue })
+  }, [api, onReady])
+  return (
+    <div>
+      <textarea ref={textareaRef} />
+      <output data-draft>{draftValue}</output>
+      <output data-notice>{notice}</output>
+    </div>
+  )
 }
 
 async function renderProbe(
   scopeKey: string,
-  structured = false
-): Promise<{ root: Root; latest: () => ProbeApi; rerender: (scopeKey: string) => Promise<void> }> {
+  structured = false,
+  options: { disabled?: boolean; isComposing?: () => boolean } = {}
+): Promise<{
+  draft: () => string
+  latest: () => ProbeApi
+  notice: () => string
+  rerender: (scopeKey: string, disabled?: boolean) => Promise<void>
+  root: Root
+  textarea: () => HTMLTextAreaElement
+}> {
   const container = document.createElement('div')
   document.body.append(container)
   // onReady fires on every render, so keep the freshest snapshot — reading a
@@ -68,13 +91,26 @@ async function renderProbe(
   const onReady = (next: ProbeApi): void => {
     api = next
   }
-  await act(async () => {
-    root.render(createElement(Probe, { scopeKey, structured, onReady }))
-  })
+  const isComposing = options.isComposing ?? (() => false)
+  const render = async (nextScopeKey: string, disabled: boolean): Promise<void> => {
+    await act(async () => {
+      root.render(
+        createElement(Probe, {
+          scopeKey: nextScopeKey,
+          structured,
+          disabled,
+          isComposing,
+          onReady
+        })
+      )
+    })
+  }
+  await render(scopeKey, options.disabled ?? false)
   if (!api) {
     throw new Error('Probe did not render')
   }
   return {
+    draft: () => container.querySelector('[data-draft]')?.textContent ?? '',
     root,
     latest: () => {
       if (!api) {
@@ -82,16 +118,22 @@ async function renderProbe(
       }
       return api
     },
-    rerender: async (nextScopeKey: string) => {
-      await act(async () => {
-        root.render(createElement(Probe, { scopeKey: nextScopeKey, structured, onReady }))
-      })
+    notice: () => container.querySelector('[data-notice]')?.textContent ?? '',
+    rerender: (nextScopeKey: string, disabled = options.disabled ?? false) =>
+      render(nextScopeKey, disabled),
+    textarea: () => {
+      const textarea = container.querySelector('textarea')
+      if (!textarea) {
+        throw new Error('Probe textarea is not mounted')
+      }
+      return textarea
     }
   }
 }
 
 describe('useNativeChatComposerAttachments', () => {
   afterEach(() => {
+    runtimeTarget.remote = false
     clearNativeChatAttachmentCacheForTests()
     document.body.replaceChildren()
   })
@@ -132,6 +174,140 @@ describe('useNativeChatComposerAttachments', () => {
     act(() => probe.root.unmount())
   })
 
+  it('accepts only ownership-validated paths for a remote runtime target', async () => {
+    runtimeTarget.remote = true
+    const probe = await renderProbe('remote-pty')
+
+    act(() => probe.latest().attachResolvedPaths(['/remote/untrusted.txt']))
+    expect(probe.draft()).toBe('')
+    expect(probe.notice()).toBe('Local attachments are not available for remote sessions.')
+
+    act(() =>
+      probe.latest().attachResolvedPaths(['/remote/trusted.txt'], undefined, {
+        targetOwnerIsCurrent: () => true
+      })
+    )
+    expect(probe.draft()).toBe('@/remote/trusted.txt ')
+    act(() => probe.root.unmount())
+  })
+
+  it('rejects an ownership-validated path when its owner changes before IME flush', async () => {
+    let composing = true
+    let ownerCurrent = true
+    const probe = await renderProbe('pty-1', false, { isComposing: () => composing })
+
+    act(() =>
+      probe.latest().attachResolvedPaths(['/remote/trusted.txt'], undefined, {
+        targetOwnerIsCurrent: () => ownerCurrent
+      })
+    )
+    ownerCurrent = false
+    composing = false
+    act(() => probe.latest().flushPendingAttachments())
+
+    expect(probe.draft()).toBe('')
+    expect(probe.notice()).toBe('Files can only be attached to their source workspace.')
+    act(() => probe.root.unmount())
+  })
+
+  // Today's only caller settles ownership synchronously before it calls, so this
+  // verdict cannot arrive false — but the hook exports this entry point. Pinned
+  // because the fallback is not a refusal: a false verdict is not "owned", so a
+  // remote target would blame client-local attachments for an ownership failure.
+  it('names the ownership failure when an immediate attach arrives already false', async () => {
+    runtimeTarget.remote = true
+    const probe = await renderProbe('pty-1', false, { isComposing: () => false })
+
+    act(() =>
+      probe.latest().attachResolvedPaths(['/remote/moved.txt'], undefined, {
+        targetOwnerIsCurrent: () => false
+      })
+    )
+
+    expect(probe.draft()).toBe('')
+    expect(probe.notice()).toBe('Files can only be attached to their source workspace.')
+    act(() => probe.root.unmount())
+  })
+
+  // Ownership is per path: the target-owned drop still lands, the client-local
+  // paste is refused, and the refusal is reported rather than hidden.
+  it('keeps the owned half of a mixed queued batch after the target becomes remote', async () => {
+    let composing = true
+    const probe = await renderProbe('pty-1', false, { isComposing: () => composing })
+
+    act(() => {
+      probe.latest().attachResolvedPaths(['/remote/trusted.txt'], undefined, {
+        targetOwnerIsCurrent: () => true
+      })
+      probe.latest().attachResolvedPaths(['/local/untrusted.txt'])
+    })
+    runtimeTarget.remote = true
+    composing = false
+    act(() => probe.latest().flushPendingAttachments())
+
+    expect(probe.draft()).toBe('@/remote/trusted.txt ')
+    expect(probe.notice()).toBe('Local attachments are not available for remote sessions.')
+    act(() => probe.root.unmount())
+  })
+
+  // References are inserted in the order the user made them. Splitting the queue
+  // into an owned half and a client-local half would hoist every workspace drop
+  // ahead of a paste that came first.
+  it('keeps a mixed queued batch in the order it was attached', async () => {
+    let composing = true
+    const probe = await renderProbe('pty-1', false, { isComposing: () => composing })
+
+    act(() => {
+      probe.latest().attachResolvedPaths(['/local/first.txt'])
+      probe.latest().attachResolvedPaths(['/remote/second.txt'], undefined, {
+        targetOwnerIsCurrent: () => true
+      })
+    })
+    composing = false
+    act(() => probe.latest().flushPendingAttachments())
+
+    expect(probe.draft()).toBe('@/local/first.txt @/remote/second.txt ')
+    act(() => probe.root.unmount())
+  })
+
+  it('refuses a wholly client-local queued batch on a remote target', async () => {
+    let composing = true
+    const probe = await renderProbe('pty-1', false, { isComposing: () => composing })
+
+    act(() => probe.latest().attachResolvedPaths(['/local/untrusted.txt']))
+    runtimeTarget.remote = true
+    composing = false
+    act(() => probe.latest().flushPendingAttachments())
+
+    expect(probe.draft()).toBe('')
+    expect(probe.notice()).toBe('Local attachments are not available for remote sessions.')
+    act(() => probe.root.unmount())
+  })
+
+  // An already-blocked target refuses at the drop instead of queueing. Queued
+  // paths that can never attach would still spend the pending budget, and the
+  // next legitimate drop would be turned away for being one too many.
+  it('refuses an already-blocked target at the drop without spending the queue budget', async () => {
+    runtimeTarget.remote = true
+    let composing = true
+    const probe = await renderProbe('pty-1', false, { isComposing: () => composing })
+
+    const refused = Array.from(
+      { length: NATIVE_FILE_DROP_MAX_PATHS },
+      (_unused, index) => `/local/refused-${index}.txt`
+    )
+    act(() => probe.latest().attachResolvedPaths(refused))
+    expect(probe.notice()).toBe('Local attachments are not available for remote sessions.')
+
+    runtimeTarget.remote = false
+    act(() => probe.latest().attachResolvedPaths(['/local/allowed.txt']))
+    composing = false
+    act(() => probe.latest().flushPendingAttachments())
+
+    expect(probe.draft()).toBe('@/local/allowed.txt ')
+    act(() => probe.root.unmount())
+  })
+
   it('removes an attached image chip cleanly', async () => {
     const probe = await renderProbe('pty-1')
     await act(async () => {
@@ -147,82 +323,80 @@ describe('useNativeChatComposerAttachments', () => {
     act(() => probe.root.unmount())
   })
 
-  it('restores failed-send chips by path without duplicating chips attached since send', async () => {
-    const probe = await renderProbe('pty-restore')
-    await act(async () => {
-      probe.latest().appendImageAttachments(['/tmp/sent.png'])
+  it('adopts browser text before draining ordered duplicate paths exactly once', async () => {
+    let composing = true
+    const probe = await renderProbe('pty-1', false, { isComposing: () => composing })
+    const textarea = probe.textarea()
+    textarea.focus()
+    textarea.value = '각 '
+    textarea.setSelectionRange(2, 2)
+    const focus = vi.spyOn(textarea, 'focus')
+
+    act(() => {
+      probe.latest().attachResolvedPaths(['/remote/b.txt', '/remote/b.txt'])
+      probe.latest().attachResolvedPaths(['/remote/a.txt'])
     })
-    const sent = [...probe.latest().imageAttachments]
-    await act(async () => {
-      probe.latest().clearImageAttachments()
-    })
-    await act(async () => {
-      probe.latest().appendImageAttachments(['/tmp/new.png', '/tmp/sent.png'])
-    })
-    await act(async () => {
-      probe.latest().restoreImageAttachments(sent)
+    expect(probe.draft()).toBe('')
+
+    composing = false
+    textarea.blur()
+    act(() => {
+      probe.latest().adoptDraft(textarea.value)
+      probe.latest().flushPendingAttachments()
+      probe.latest().flushPendingAttachments()
     })
 
-    expect(probe.latest().imageAttachments.map((attachment) => attachment.path)).toEqual([
-      '/tmp/new.png',
-      '/tmp/sent.png'
-    ])
-    expect(readNativeChatAttachmentCache('pty-restore')).toEqual(probe.latest().imageAttachments)
+    expect(probe.draft()).toBe('각 @/remote/b.txt @/remote/b.txt @/remote/a.txt ')
+    // The focus this flush must not steal would be scheduled a frame out, so without advancing
+    // one the assertions below hold even when the flush does steal focus.
+    await act(async () => {
+      await new Promise((resolve) => requestAnimationFrame(resolve))
+    })
+    expect(focus).not.toHaveBeenCalled()
+    expect(document.activeElement).not.toBe(textarea)
     act(() => probe.root.unmount())
   })
 
-  it('rescopes attachments when the scope key changes (composer reused for another pane)', async () => {
-    const probe = await renderProbe('pty-1')
-    await act(async () => {
-      probe.latest().attachResolvedPaths(['/tmp/orca-native-chat-pane-1.png'])
-    })
-    expect(probe.latest().imageAttachments).toMatchObject([
-      { path: '/tmp/orca-native-chat-pane-1.png' }
-    ])
+  it('drops queued paths after any disabled transition', async () => {
+    let composing = true
+    const probe = await renderProbe('pty-1', false, { isComposing: () => composing })
 
-    // Reused for a different pane: pane-1's chip must not stay live (it would
-    // otherwise be submitted to pane-2's target now that images defer to submit).
-    await probe.rerender('pty-2')
-    expect(probe.latest().imageAttachments).toMatchObject([])
+    act(() => probe.latest().attachResolvedPaths(['/remote/a.txt']))
+    await probe.rerender('pty-1', true)
+    await probe.rerender('pty-1', false)
+    composing = false
+    act(() => probe.latest().flushPendingAttachments())
 
-    // Switching back restores pane-1's still-cached chip.
-    await probe.rerender('pty-1')
-    expect(probe.latest().imageAttachments).toMatchObject([
-      { path: '/tmp/orca-native-chat-pane-1.png' }
-    ])
+    expect(probe.draft()).toBe('')
     act(() => probe.root.unmount())
   })
 
-  it('observes a restore performed after a replacement host mounted (dock/native-chat handoff)', async () => {
-    // The old host already unmounted (its send-lifecycle cleanup restores the
-    // payload after the new host has taken over) — the new host must still see it.
-    const replacement = await renderProbe('pty-handoff')
-    expect(replacement.latest().imageAttachments).toMatchObject([])
+  it('caps paths queued during composition and keeps overflow visible after flush', async () => {
+    let composing = true
+    const probe = await renderProbe('pty-1', false, { isComposing: () => composing })
+    const acceptedPaths = Array.from(
+      { length: NATIVE_FILE_DROP_MAX_PATHS },
+      (_, index) => `/remote/accepted-${index}.txt`
+    )
 
-    await act(async () => {
-      restoreNativeChatAttachmentCache('pty-handoff', [{ id: 'restored-1', path: '/tmp/lost.png' }])
+    act(() => {
+      probe.latest().attachResolvedPaths(acceptedPaths)
+      probe.latest().attachResolvedPaths(['/remote/rejected.txt'])
     })
 
-    expect(replacement.latest().imageAttachments).toMatchObject([{ path: '/tmp/lost.png' }])
-    expect(readNativeChatAttachmentCache('pty-handoff')).toMatchObject([{ path: '/tmp/lost.png' }])
-    act(() => replacement.root.unmount())
-  })
+    expect(probe.draft()).toBe('')
+    expect(probe.notice()).toBe(
+      'Too many attachments are waiting. Finish composing before attaching more.'
+    )
 
-  it('does not let a throwing subscriber abort fanout to other subscribers', async () => {
-    const throwing = vi.fn(() => {
-      throw new Error('boom')
-    })
-    const unsubscribeThrowing = subscribeNativeChatAttachmentCache('pty-throw', throwing)
-    const probe = await renderProbe('pty-throw')
+    composing = false
+    act(() => probe.latest().flushPendingAttachments())
 
-    expect(() => {
-      act(() => {
-        restoreNativeChatAttachmentCache('pty-throw', [{ id: 'r1', path: '/tmp/ok.png' }])
-      })
-    }).not.toThrow()
-
-    expect(probe.latest().imageAttachments).toMatchObject([{ path: '/tmp/ok.png' }])
-    unsubscribeThrowing()
+    expect(probe.draft().match(/@\/remote\/accepted-/g)).toHaveLength(NATIVE_FILE_DROP_MAX_PATHS)
+    expect(probe.draft()).not.toContain('rejected.txt')
+    expect(probe.notice()).toBe(
+      'Too many attachments are waiting. Finish composing before attaching more.'
+    )
     act(() => probe.root.unmount())
   })
 
@@ -308,6 +482,85 @@ describe('useNativeChatComposerAttachments', () => {
       probe.latest().clearImageAttachments()
     })
     expect(revoke).not.toHaveBeenCalled()
+    act(() => probe.root.unmount())
+  })
+
+  it('restores failed-send chips by path without duplicating chips attached since send', async () => {
+    const probe = await renderProbe('pty-restore')
+    await act(async () => {
+      probe.latest().appendImageAttachments(['/tmp/sent.png'])
+    })
+    const sent = [...probe.latest().imageAttachments]
+    await act(async () => {
+      probe.latest().clearImageAttachments()
+    })
+    await act(async () => {
+      probe.latest().appendImageAttachments(['/tmp/new.png', '/tmp/sent.png'])
+    })
+    await act(async () => {
+      probe.latest().restoreImageAttachments(sent)
+    })
+
+    expect(probe.latest().imageAttachments.map((attachment) => attachment.path)).toEqual([
+      '/tmp/new.png',
+      '/tmp/sent.png'
+    ])
+    expect(readNativeChatAttachmentCache('pty-restore')).toEqual(probe.latest().imageAttachments)
+    act(() => probe.root.unmount())
+  })
+
+  it('rescopes attachments when the scope key changes (composer reused for another pane)', async () => {
+    const probe = await renderProbe('pty-1')
+    await act(async () => {
+      probe.latest().attachResolvedPaths(['/tmp/orca-native-chat-pane-1.png'])
+    })
+    expect(probe.latest().imageAttachments).toMatchObject([
+      { path: '/tmp/orca-native-chat-pane-1.png' }
+    ])
+
+    // Reused for a different pane: pane-1's chip must not stay live (it would
+    // otherwise be submitted to pane-2's target now that images defer to submit).
+    await probe.rerender('pty-2')
+    expect(probe.latest().imageAttachments).toMatchObject([])
+
+    // Switching back restores pane-1's still-cached chip.
+    await probe.rerender('pty-1')
+    expect(probe.latest().imageAttachments).toMatchObject([
+      { path: '/tmp/orca-native-chat-pane-1.png' }
+    ])
+    act(() => probe.root.unmount())
+  })
+
+  it('observes a restore performed after a replacement host mounted (dock/native-chat handoff)', async () => {
+    // The old host already unmounted (its send-lifecycle cleanup restores the
+    // payload after the new host has taken over) — the new host must still see it.
+    const replacement = await renderProbe('pty-handoff')
+    expect(replacement.latest().imageAttachments).toMatchObject([])
+
+    await act(async () => {
+      restoreNativeChatAttachmentCache('pty-handoff', [{ id: 'restored-1', path: '/tmp/lost.png' }])
+    })
+
+    expect(replacement.latest().imageAttachments).toMatchObject([{ path: '/tmp/lost.png' }])
+    expect(readNativeChatAttachmentCache('pty-handoff')).toMatchObject([{ path: '/tmp/lost.png' }])
+    act(() => replacement.root.unmount())
+  })
+
+  it('does not let a throwing subscriber abort fanout to other subscribers', async () => {
+    const throwing = vi.fn(() => {
+      throw new Error('boom')
+    })
+    const unsubscribeThrowing = subscribeNativeChatAttachmentCache('pty-throw', throwing)
+    const probe = await renderProbe('pty-throw')
+
+    expect(() => {
+      act(() => {
+        restoreNativeChatAttachmentCache('pty-throw', [{ id: 'r1', path: '/tmp/ok.png' }])
+      })
+    }).not.toThrow()
+
+    expect(probe.latest().imageAttachments).toMatchObject([{ path: '/tmp/ok.png' }])
+    unsubscribeThrowing()
     act(() => probe.root.unmount())
   })
 })

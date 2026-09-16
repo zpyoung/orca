@@ -24,6 +24,7 @@ import { useNativeChatPickerState } from './use-native-chat-picker-state'
 import { useNativeChatPickerCommandDispatch } from './use-native-chat-picker-command-dispatch'
 import { useNativeChatComposerCatalog } from './use-native-chat-composer-catalog'
 import { useNativeChatStructuredComposerSend } from './use-native-chat-structured-composer-send'
+import { useNativeChatWorkspaceFileDrop } from './use-native-chat-workspace-file-drop'
 import { seedHistory } from './fork-agent-composer/agent-composer-history'
 import type {
   NativeChatComposerHandle,
@@ -148,6 +149,14 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       textareaRef: core.textareaRef,
       setCaret: core.setCaret,
       setDraft: core.setDraft,
+      setNotice: core.setNotice
+    })
+    useNativeChatWorkspaceFileDrop({
+      terminalTabId,
+      structuredWorktreeId: structuredTransport?.worktreeId,
+      disabled: core.disabled,
+      paneKey,
+      attachResolvedPaths,
       setNotice: core.setNotice
     })
 

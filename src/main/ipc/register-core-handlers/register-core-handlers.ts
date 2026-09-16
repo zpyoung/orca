@@ -26,6 +26,7 @@ import { registerLedgerHandlers } from '../ledger'
 import { registerRuntimeEnvironmentHandlers } from '../runtime-environments'
 import { registerEphemeralVmHandlers } from '../ephemeral-vm'
 import { registerAiVaultHandlers } from '../ai-vault'
+import { registerAiVaultSearchHandlers } from '../ai-vault-search'
 import { registerNativeChatHandlers } from '../native-chat'
 import { registerNotificationHandlers } from '../notifications'
 import { registerNotebookHandlers } from '../notebook'
@@ -92,6 +93,7 @@ import {
   resolveRuntimeAiVaultSessionTitles,
   scanRuntimeAiVaultSessions
 } from '../../ai-vault/runtime-session-scanner'
+import { callRuntimeSessionSearch } from '../../ai-vault/runtime-session-search-call'
 import type { PluginService } from '../../plugins/plugin-service'
 import type { PluginMarketplaceHandlerServices } from '../plugin-marketplaces'
 
@@ -220,6 +222,10 @@ export function registerCoreHandlers(
   registerLedgerHandlers(runtime, { userDataPath: app.getPath('userData') })
   registerRuntimeEnvironmentHandlers(store)
   registerEphemeralVmHandlers(store, pluginService)
+  registerAiVaultSearchHandlers({
+    callRuntimeSearch: (environmentId, method, params) =>
+      callRuntimeSessionSearch(app.getPath('userData'), environmentId, method, params)
+  })
   registerAiVaultHandlers({
     ensureStructuredSessionOwnership: () => runtime.ensureStructuredAgentSessionHost(),
     getAdditionalCodexHomePaths: lifecycleOptions.getAdditionalAiVaultCodexHomePaths,

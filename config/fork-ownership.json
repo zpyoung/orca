@@ -161,6 +161,23 @@
   ],
   "seams": [
     {
+      "path": "src/main/skills/skill-discovery-wsl-alias-sharing.test.ts",
+      "feature": "live-plugin-marketplaces",
+      "kind": "import-swap",
+      "lines": [
+        "vi.mock('./fork-live-plugin-marketplaces/live-plugin-marketplace-sources-wsl', () => ({",
+        "  discoverLiveClaudePluginSkillSourcesInWsl: io.plugins"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-composer-workspace-file-drop.test.tsx",
+      "feature": "input-quarantine",
+      "kind": "registration",
+      "lines": [
+        "            terminalTabId: 'terminal-tab-1',"
+      ]
+    },
+    {
       "path": "src/renderer/src/components/sidebar/use-worktree-activity-status.ts",
       "feature": "ask-question-tool",
       "kind": "registration",
@@ -489,17 +506,17 @@
       "lines": ["const MACOS_PACKAGED_BUNDLE_ID = 'com.zpyoung.orca'"]
     },
     {
-      "path": "src/main/ipc/notifications.ts",
+      "path": "src/main/notifications/notification-delivery-service.ts",
       "feature": "ask-question-tool",
       "kind": "registration",
       "lines": [
         "      // pending-ask text already ran through translate() in the renderer; skip rebuilding it here",
         "      const notificationOptions =",
-        "        args.source === 'pending-ask' && args.title && args.body",
-        "          ? { title: args.title, body: args.body }",
-        "          : buildNotificationOptions(args)",
+        "        request.source === 'pending-ask' && request.title && request.body",
+        "          ? { title: request.title, body: request.body }",
+        "          : buildNotificationOptions(request)",
         "      // no mobile push for pending asks in v1",
-        "      if (runtime && args.source !== 'test' && args.source !== 'pending-ask') {"
+        "        request.source !== 'pending-ask'"
       ]
     },
     {
@@ -1178,16 +1195,17 @@
       "kind": "import-swap",
       "lines": [
         "import { discoverLiveClaudePluginSkillSourcesInWsl } from './fork-live-plugin-marketplaces/live-plugin-marketplace-sources-wsl'",
-        "    pluginRoots = await discoverLiveClaudePluginSkillSourcesInWsl(args)"
+        "      pluginRoots = await discoverLiveClaudePluginSkillSourcesInWsl({ ...args, cwd })"
       ]
     },
     {
-      "path": "src/main/skills/skill-discovery-wsl.ts",
+      "path": "src/main/skills/skill-discovery-wsl-observation.ts",
       "feature": "skill-plugin-attribution",
       "kind": "registration",
       "lines": [
         "import { pluginNameForSkill } from './fork-skill-plugin-attribution/skill-plugin-name-resolution'",
-        "      ...(pluginName ? { pluginName } : {})"
+        "    const pluginName = pluginNameForSkill(root, skillFilePath, pathPosix)",
+        "        ...(pluginName ? { pluginName } : {})"
       ]
     },
     {
@@ -4175,18 +4193,6 @@
       "deleted": true
     },
     {
-      "path": "src/renderer/src/components/native-chat/NativeChatComposerActions.tsx",
-      "reason": "Replaced by the host-agnostic AgentComposerActions in fork-agent-composer; restoring upstream's copy would reintroduce a second, chat-only action bar.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
-      "path": "src/renderer/src/components/native-chat/NativeChatComposerField.tsx",
-      "reason": "Replaced by the host-agnostic AgentComposerField in fork-agent-composer; restoring upstream's copy would reintroduce a second, chat-only composer field.",
-      "status": "permanent",
-      "deleted": true
-    },
-    {
       "path": "src/renderer/src/components/native-chat/native-chat-composer-autogrow.test.tsx",
       "reason": "Superseded by the fork copy's test in fork-agent-composer.",
       "status": "permanent",
@@ -4194,7 +4200,7 @@
     },
     {
       "path": "src/renderer/src/components/native-chat/native-chat-composer-composition.test.tsx",
-      "reason": "Exercises upstream's NativeChatComposerField, which this fork deletes in favour of the host-agnostic AgentComposerField; the fork's equivalent coverage lives in fork-agent-composer.",
+      "reason": "Exercises upstream's NativeChatComposerField, which this fork does not render in the chat composer; the fork's equivalent coverage lives in fork-agent-composer.",
       "status": "permanent",
       "deleted": true
     },
@@ -4710,6 +4716,14 @@
     }
   ],
   "residuals": {
+    "src/main/skills/skill-discovery-wsl-alias-sharing.test.ts": {
+      "added": 5,
+      "removed": 0
+    },
+    "src/renderer/src/components/native-chat/native-chat-composer-workspace-file-drop.test.tsx": {
+      "added": 7,
+      "removed": 1
+    },
     "src/renderer/src/components/sidebar/use-worktree-activity-status.ts": {
       "added": 4,
       "removed": 1
@@ -4866,8 +4880,8 @@
       "added": 1,
       "removed": 1
     },
-    "src/main/ipc/notifications.ts": {
-      "added": 7,
+    "src/main/notifications/notification-delivery-service.ts": {
+      "added": 11,
       "removed": 2
     },
     "src/main/ipc/pty/ipc/write-input.ts": {
@@ -5179,8 +5193,12 @@
       "removed": 1
     },
     "src/main/skills/skill-discovery-wsl.ts": {
-      "added": 6,
-      "removed": 3
+      "added": 2,
+      "removed": 2
+    },
+    "src/main/skills/skill-discovery-wsl-observation.ts": {
+      "added": 4,
+      "removed": 1
     },
     "src/main/ssh/ssh-relay-session.ts": {
       "added": 38,

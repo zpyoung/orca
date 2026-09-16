@@ -55,6 +55,7 @@ export function NativeChatMessageList({
   settledTurns,
   failedDeliveryMessageIds,
   showTurnStatus = true,
+  showLiveTurnActivity = true,
   turnActivity,
   runtimeContext
 }: {
@@ -73,6 +74,8 @@ export function NativeChatMessageList({
   failedDeliveryMessageIds?: ReadonlySet<string>
   /** Turn timing and disclosure are available on structured agent sessions. */
   showTurnStatus?: boolean
+  /** Whether the active turn's foreground activity row should be visible. */
+  showLiveTurnActivity?: boolean
   turnActivity?: NativeChatTurnActivity | null
   runtimeContext?: RuntimeFileOperationArgs | null
 }): React.JSX.Element {
@@ -288,7 +291,7 @@ export function NativeChatMessageList({
                   context={rowContext}
                   window={transcriptWindow}
                 />
-                {showTurnStatus && isWorking ? (
+                {showTurnStatus && showLiveTurnActivity && isWorking ? (
                   <NativeChatTurnActivityLine
                     activity={turnActivity}
                     status={turnStatuses.active}
