@@ -8,16 +8,8 @@ import { posix as pathPosix } from 'node:path'
 import type { SkillDiscoveryResult, SkillSourceKind } from '../../shared/skills'
 import { quoteBashString } from '../wsl-bash-command'
 import { runWslProcess } from '../wsl/wsl-runner'
-import {
-  buildSkillDiscoverySources,
-  sortDiscoveredSkills,
-  sortSkillDiscoverySources,
-  sourceKindForSkill,
-  sourceLabelForSkill,
-  stablePathId,
-  type SkillScanRoot
-} from './skill-discovery-sources'
-import { pluginNameForSkill } from './fork-skill-plugin-attribution/skill-plugin-name-resolution'
+import { buildSkillDiscoverySources, type SkillScanRoot } from './skill-discovery-sources'
+import { rootMayContainSourceKind } from './skill-discovery-source-filter'
 import { discoverLiveClaudePluginSkillSourcesInWsl } from './fork-live-plugin-marketplaces/live-plugin-marketplace-sources-wsl'
 import type { SkillProviderRootOverrides } from './skill-provider-destinations'
 import { SKILL_STAGING_GLOB } from './skill-delete/staging-names'
@@ -166,101 +158,7 @@ async function executeWslSkillDiscovery(distro: string, script: string): Promise
   return result.stdout
 }
 
-function readProtocolField(fields: string[], index: number): string {
-  const value = fields[index]
-  if (value === undefined) {
-    throw new Error('WSL skill discovery returned an incomplete response.')
-  }
-  return value
-}
-
-export function parseWslSkillDiscoveryOutput(
-  output: string,
-  roots: readonly SkillScanRoot[],
-  scannedAt = Date.now()
-): SkillDiscoveryResult {
-  const fields = output.split('\0')
-  const rootExists = new Map<number, boolean>()
-  const skillsByCanonicalPath = new Map<string, DiscoveredSkill>()
-  let index = 0
-  while (index < fields.length && fields[index]) {
-    const recordKind = fields[index++]
-    const rootIndex = Number.parseInt(readProtocolField(fields, index++), 10)
-    const root = roots[rootIndex]
-    if (!root) {
-      throw new Error('WSL skill discovery returned an unknown source.')
-    }
-    if (recordKind === 'R') {
-      rootExists.set(rootIndex, readProtocolField(fields, index++) === '1')
-      continue
-    }
-    if (recordKind !== 'S') {
-      throw new Error('WSL skill discovery returned an invalid response.')
-    }
-
-    const skillFilePath = readProtocolField(fields, index++)
-    const canonicalSkillFilePath = readProtocolField(fields, index++)
-    const updatedAtSeconds = Number.parseInt(readProtocolField(fields, index++), 10)
-    const markdown = Buffer.from(readProtocolField(fields, index++), 'base64').toString('utf8')
-    const existing = skillsByCanonicalPath.get(canonicalSkillFilePath)
-    if (existing) {
-      // Why: dedup keeps one row, but every contributing root must survive so
-      // per-agent visibility does not depend on root scan order. providers is
-      // per-agent visibility too, so union it rather than keeping only the first.
-      if (existing.rootPaths && !existing.rootPaths.includes(root.path)) {
-        existing.rootPaths.push(root.path)
-      }
-      // Reassign a fresh array — `providers` aliases the scan root's array, so
-      // pushing in place would mutate the root and sibling skills/sources.
-      const mergedProviders = [...existing.providers]
-      for (const provider of root.providers) {
-        if (!mergedProviders.includes(provider)) {
-          mergedProviders.push(provider)
-        }
-      }
-      existing.providers = mergedProviders
-      continue
-    }
-    const directoryPath = pathPosix.dirname(skillFilePath)
-    const summary = summarizeSkillMarkdown(markdown)
-    const sourceKind = sourceKindForSkill(root, skillFilePath, pathPosix)
-    const pluginName = pluginNameForSkill(root, skillFilePath, pathPosix)
-    skillsByCanonicalPath.set(canonicalSkillFilePath, {
-      id: stablePathId(canonicalSkillFilePath),
-      name: summary.name ?? pathPosix.basename(directoryPath),
-      description: summary.description,
-      // Copy: `root.providers` is shared across every skill/source from this
-      // root, so a later in-place merge must not mutate the aliased array.
-      providers: [...root.providers],
-      sourceKind,
-      sourceLabel: sourceLabelForSkill(root, sourceKind),
-      rootPath: root.path,
-      rootPaths: [root.path],
-      directoryPath,
-      skillFilePath,
-      installed: true,
-      updatedAt: Number.isFinite(updatedAtSeconds) ? updatedAtSeconds * 1000 : null,
-      ...(pluginName ? { pluginName } : {})
-    })
-  }
-
-  const sources: SkillDiscoverySource[] = roots.map((root, rootIndex) => {
-    const exists = rootExists.get(rootIndex) ?? false
-    return {
-      ...root,
-      providers: [...root.providers],
-      exists,
-      skippedReason: exists ? undefined : 'missing'
-    }
-  })
-  return {
-    skills: sortDiscoveredSkills([...skillsByCanonicalPath.values()]),
-    sources: sortSkillDiscoverySources(sources),
-    scannedAt
-  }
-}
-
-export async function discoverSkillsInWsl(args: {
+type WslSkillDiscoveryArgs = {
   distro: string
   homeDir: string
   cwd?: string
@@ -293,10 +191,12 @@ export async function discoverSkillObservationInWsl(
   // not abort the mandatory native/home/repo/bundled scan.
   const cwd = args.cwd ?? args.homeDir
   let pluginRoots: SkillScanRoot[] = []
-  try {
-    pluginRoots = await discoverLiveClaudePluginSkillSourcesInWsl(args)
-  } catch {
-    pluginRoots = []
+  if (!args.sourceKinds?.length || args.sourceKinds.includes('plugin')) {
+    try {
+      pluginRoots = await discoverLiveClaudePluginSkillSourcesInWsl({ ...args, cwd })
+    } catch {
+      pluginRoots = []
+    }
   }
   const roots = [
     ...buildSkillDiscoverySources({

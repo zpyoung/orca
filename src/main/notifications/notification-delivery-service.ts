@@ -68,10 +68,19 @@ export function createNotificationDeliveryService(
         (request.source !== 'agent-task-complete' || settings.agentTaskComplete) &&
         (request.source !== 'terminal-bell' || settings.terminalBell)
 
-      const notificationOptions = buildNotificationOptions(request)
+      // pending-ask text already ran through translate() in the renderer; skip rebuilding it here
+      const notificationOptions =
+        request.source === 'pending-ask' && request.title && request.body
+          ? { title: request.title, body: request.body }
+          : buildNotificationOptions(request)
 
       // Why: desktop focus only means this computer sees the worktree; the paired phone may still need the alert.
-      if (deps.dispatchMobileNotification && request.source !== 'test') {
+      // no mobile push for pending asks in v1
+      if (
+        deps.dispatchMobileNotification &&
+        request.source !== 'test' &&
+        request.source !== 'pending-ask'
+      ) {
         if (
           reserveNotificationCooldown(
             recentMobileNotifications,

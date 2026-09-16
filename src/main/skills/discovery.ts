@@ -18,6 +18,7 @@ import {
   stablePathId,
   type SkillScanRoot
 } from './skill-discovery-sources'
+import { rootMayContainSourceKind } from './skill-discovery-source-filter'
 import { pluginNameForSkill } from './fork-skill-plugin-attribution/skill-plugin-name-resolution'
 import { discoverLiveClaudePluginSkillSources } from './fork-live-plugin-marketplaces/live-plugin-marketplace-sources'
 import { findSkillFiles } from './skill-root-file-walk'
@@ -278,7 +279,9 @@ export async function discoverSkills(args: {
     ...buildSkillDiscoverySources({ ...args, homeDir }),
     // Why: plugin discovery is native-chat data keyed to an explicit workspace.
     // Untargeted scans (Settings) keep their pre-picker inventory and cost.
-    ...(args.cwd && args.includeCwd !== false
+    ...(args.cwd &&
+    args.includeCwd !== false &&
+    (!args.sourceKinds?.length || args.sourceKinds.includes('plugin'))
       ? await discoverLiveClaudePluginSkillSources({ homeDir, cwd: args.cwd })
       : [])
   ].filter((root) => rootMayContainSourceKind(root, args.sourceKinds))

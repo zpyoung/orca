@@ -1,3 +1,5 @@
+import { installChildSessionSearchService } from '../ai-vault-search/session-search-enablement'
+import { getCanonicalUserDataPath } from '../persistence/loading-store/user-data-path'
 import { app, ipcMain } from 'electron'
 import { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { getLocalPtyProvider, getSshPtyProvider, clearProviderPtyState } from '../ipc/pty'

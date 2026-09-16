@@ -15,6 +15,7 @@ import {
   type SkillScanRoot
 } from './skill-discovery-sources'
 import { rootMayContainSourceKind } from './skill-discovery-source-filter'
+import { pluginNameForSkill } from './fork-skill-plugin-attribution/skill-plugin-name-resolution'
 
 export type WslSkillDiscoveryObservation = {
   rows: { canonicalSkillFilePath: string; skill: DiscoveredSkill }[]
@@ -61,6 +62,7 @@ export function readWslSkillDiscoveryObservation(
     const directoryPath = pathPosix.dirname(skillFilePath)
     const summary = summarizeSkillMarkdown(markdown)
     const sourceKind = sourceKindForSkill(root, skillFilePath, pathPosix)
+    const pluginName = pluginNameForSkill(root, skillFilePath, pathPosix)
     const directoryName = pathPosix.basename(directoryPath)
     rows.push({
       canonicalSkillFilePath,
@@ -78,7 +80,8 @@ export function readWslSkillDiscoveryObservation(
         directoryPath,
         skillFilePath,
         installed: true,
-        updatedAt: Number.isFinite(updatedAtSeconds) ? updatedAtSeconds * 1000 : null
+        updatedAt: Number.isFinite(updatedAtSeconds) ? updatedAtSeconds * 1000 : null,
+        ...(pluginName ? { pluginName } : {})
       }
     })
   }
