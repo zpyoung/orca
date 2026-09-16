@@ -134,6 +134,12 @@ export function initializeMainProcessRuntime(): OrcaRuntimeService {
     orchestrationEnvironmentTransport,
     skillTransactionRecovery: state.skillTransactionRecovery
   })
+  // Both desktop and headless serve own a host-local search service.
+  const sessionSearch = installChildSessionSearchService({
+    dataRoot: getCanonicalUserDataPath(),
+    getSettings: () => store.getSettings()
+  })
+  app.once('will-quit', () => sessionSearch?.dispose())
   state.runtime = runtime
   agentHookServer.subscribeEnrichedStatus((enriched) =>
     recordObservedAgentStatusPaneIdentity(observedPaneIdentities, enriched.paneKey, runtime)

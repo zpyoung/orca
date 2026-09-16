@@ -1,5 +1,6 @@
-import { ShieldQuestion } from 'lucide-react'
+import { ShieldQuestion, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { translate } from '@/i18n/i18n'
 import type { ChatApproval } from './native-chat-interactive-prompt'
 import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'
 
@@ -7,6 +8,8 @@ export type NativeChatApprovalCardProps = {
   approval: ChatApproval
   /** Send the chosen option's literal string to the agent's PTY. */
   onChoose: (send: string) => void
+  /** Cancel the active provider turn while this card owns the composer region. */
+  onCancel?: () => void
 }
 
 /**
@@ -17,7 +20,8 @@ export type NativeChatApprovalCardProps = {
  */
 export function NativeChatApprovalCard({
   approval,
-  onChoose
+  onChoose,
+  onCancel
 }: NativeChatApprovalCardProps): React.JSX.Element {
   const widthClassName = useNativeChatWidthClassName()
 
@@ -27,7 +31,7 @@ export function NativeChatApprovalCard({
         <div className="flex w-full flex-col gap-2 rounded-lg border border-input bg-card px-4 py-3 shadow-xs">
           <div className="flex items-start gap-2">
             <ShieldQuestion className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-foreground">{approval.title}</p>
               {approval.detail ? (
                 <p className="mt-0.5 break-words font-mono text-xs text-muted-foreground">
@@ -35,6 +39,16 @@ export function NativeChatApprovalCard({
                 </p>
               ) : null}
             </div>
+            {onCancel ? (
+              <button
+                type="button"
+                onClick={onCancel}
+                aria-label={translate('components.native-chat.approval.cancel', 'Cancel')}
+                className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <X className="size-4" />
+              </button>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
             {approval.options.map((opt, i) => (

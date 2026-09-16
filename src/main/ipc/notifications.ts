@@ -9,13 +9,12 @@ import type {
   NotificationPermissionStatusResult
 } from '../../shared/notification-settings-types'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
-import { buildNotificationOptions } from './notification-options'
 import { readNotificationAuthorizationStatus } from './notification-authorization-status'
 import { setTrayAttention } from '../tray/system-tray'
 import { isMainWindowVisible } from '../window/main-window-visibility'
 import { activeNotificationsById } from './native-notification-lifecycle'
 import { deliverNativeNotification } from './native-notification-delivery'
-import { reserveNotificationCooldown } from './notification-burst-cooldown'
+import { createNotificationDeliveryService } from '../notifications/notification-delivery-service'
 import { registerNotificationSoundHandlers } from './notification-sound-ipc'
 import { openNotificationSystemSettings } from './notification-system-settings-link'
 import {
@@ -29,8 +28,6 @@ import {
 export function registerNotificationHandlers(store: Store, runtime?: OrcaRuntimeService): void {
   ipcMain.removeHandler('notifications:getDesktopAwayState')
   ipcMain.handle('notifications:getDesktopAwayState', () => readDesktopAwayState(powerMonitor))
-  const recentDesktopNotifications = new Map<string, number>()
-  const recentMobileNotifications = new Map<string, number>()
   resetNotificationPermissionEvidence()
 
   ipcMain.removeHandler('notifications:openSystemSettings')
@@ -104,6 +101,23 @@ export function registerNotificationHandlers(store: Store, runtime?: OrcaRuntime
       runtime?.dismissMobileNotification(id)
     }
     return { dismissed }
+  })
+
+  const deliveryService = createNotificationDeliveryService({
+    readNotificationSettings: () => store.getSettings().notifications,
+    findActiveWindow: () =>
+      BrowserWindow.getAllWindows().find((window) => !window.isDestroyed()) ?? null,
+    isWindowVisible: isMainWindowVisible,
+    setTrayAttention,
+    isNotificationSupported: () => Notification.isSupported(),
+    dispatchMobileNotification: runtime
+      ? (payload) => runtime.dispatchMobileNotification(payload)
+      : null,
+    readAuthorizationStatus: readNotificationAuthorizationStatus,
+    recordDeliveryOutcome: recordNotificationDeliveryOutcome,
+    deliverNative: deliverNativeNotification,
+    platform: process.platform,
+    now: () => Date.now()
   })
 
   ipcMain.removeHandler('notifications:dispatch')
