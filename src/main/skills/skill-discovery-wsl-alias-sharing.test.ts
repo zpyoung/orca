@@ -4,6 +4,11 @@ vi.mock('../wsl/wsl-runner', () => ({ runWslProcess: io.run }))
 vi.mock('./claude-plugin-skill-sources-wsl', () => ({
   discoverClaudePluginSkillSourcesInWsl: io.plugins
 }))
+// this fork's discovery calls the live-marketplace reader instead, so upstream's mock
+// alone would leave the real one running behind the spy this test asserts on
+vi.mock('./fork-live-plugin-marketplaces/live-plugin-marketplace-sources-wsl', () => ({
+  discoverLiveClaudePluginSkillSourcesInWsl: io.plugins
+}))
 vi.mock('./discovery', () => ({ clearSkillRootScanCache: vi.fn(), discoverSkills: vi.fn() }))
 import { clearSkillDiscoveryCaches, discoverSkillsOnTarget } from './skill-discovery-target'
 import {

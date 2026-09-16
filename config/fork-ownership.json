@@ -161,6 +161,15 @@
   ],
   "seams": [
     {
+      "path": "src/main/skills/skill-discovery-wsl-alias-sharing.test.ts",
+      "feature": "live-plugin-marketplaces",
+      "kind": "import-swap",
+      "lines": [
+        "vi.mock('./fork-live-plugin-marketplaces/live-plugin-marketplace-sources-wsl', () => ({",
+        "  discoverLiveClaudePluginSkillSourcesInWsl: io.plugins"
+      ]
+    },
+    {
       "path": "src/renderer/src/components/native-chat/native-chat-composer-workspace-file-drop.test.tsx",
       "feature": "input-quarantine",
       "kind": "registration",
@@ -4191,7 +4200,7 @@
     },
     {
       "path": "src/renderer/src/components/native-chat/native-chat-composer-composition.test.tsx",
-      "reason": "Exercises upstream's NativeChatComposerField, which this fork deletes in favour of the host-agnostic AgentComposerField; the fork's equivalent coverage lives in fork-agent-composer.",
+      "reason": "Exercises upstream's NativeChatComposerField, which this fork does not render in the chat composer; the fork's equivalent coverage lives in fork-agent-composer.",
       "status": "permanent",
       "deleted": true
     },
@@ -4707,6 +4716,10 @@
     }
   ],
   "residuals": {
+    "src/main/skills/skill-discovery-wsl-alias-sharing.test.ts": {
+      "added": 5,
+      "removed": 0
+    },
     "src/renderer/src/components/native-chat/native-chat-composer-workspace-file-drop.test.tsx": {
       "added": 7,
       "removed": 1
