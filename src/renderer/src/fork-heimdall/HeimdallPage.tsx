@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, Bot, Loader2, Plus, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
@@ -59,19 +59,30 @@ export default function HeimdallPage(): React.JSX.Element {
   const pageRef = useRef<HTMLElement>(null)
   const [wideDetailLayout, setWideDetailLayout] = useState(false)
   const [objectiveSheetOpen, setObjectiveSheetOpen] = useState(false)
-  const detailSignature = rows.map(historyRowSignature).join('|')
+  const detailSignature = rows.map(historyRowSignature).sort().join('|')
 
-  const historyRowSignatures = useRef<Record<string, string>>({})
-  useEffect(() => {
+  const completedHistoryRowSignatures = useRef<Record<string, string>>({})
+  // Equal snapshots (and StrictMode's repeated effect) must not cancel the only detail request.
+  const lastHistorySignature = useRef<string | null>(null)
+  const refreshHistory = useEffectEvent((signature: string) => {
+    if (lastHistorySignature.current === signature) {
+      return
+    }
+    lastHistorySignature.current = signature
     const generation = ++historyGeneration.current
-    const nextSignatures: Record<string, string> = {}
-    const rowsToRefresh = rows.filter((row) => {
-      const key = `${row.target.connectionId ?? 'local'}:${row.target.pairingRevision ?? 'local'}:${row.target.watcherId}`
-      const signature = historyRowSignature(row)
-      nextSignatures[key] = signature
-      return historyRowSignatures.current[key] !== signature
-    })
-    historyRowSignatures.current = nextSignatures
+    const rowSignatures = rows.map((row) => ({
+      row,
+      key: `${row.target.connectionId ?? 'local'}:${row.target.pairingRevision ?? 'local'}:${row.target.watcherId}`,
+      signature: historyRowSignature(row)
+    }))
+    const activeKeys = new Set(rowSignatures.map(({ key }) => key))
+    const completedSignatures = Object.fromEntries(
+      Object.entries(completedHistoryRowSignatures.current).filter(([key]) => activeKeys.has(key))
+    )
+    completedHistoryRowSignatures.current = completedSignatures
+    const rowsToRefresh = rowSignatures.filter(
+      ({ key, signature: rowSignature }) => completedSignatures[key] !== rowSignature
+    )
     if (rows.length === 0) {
       setDetailsByKey({})
       setHistoryFailures(0)
@@ -98,16 +109,18 @@ export default function HeimdallPage(): React.JSX.Element {
     }
     setHistoryLoading(true)
     void Promise.allSettled(
-      rowsToRefresh.map((row) => Promise.resolve().then(() => api.detail(row.target)))
+      rowsToRefresh.map(({ row }) => Promise.resolve().then(() => api.detail(row.target)))
     ).then((results) => {
       if (historyGeneration.current !== generation) {
         return
       }
       let failures = 0
       const fulfilledDetails: WatcherDetail[] = []
-      for (const result of results) {
+      for (const [index, result] of results.entries()) {
         if (result.status === 'fulfilled') {
           fulfilledDetails.push(result.value)
+          const completed = rowsToRefresh[index]
+          completedSignatures[completed.key] = completed.signature
         } else {
           failures += 1
         }
@@ -130,8 +143,11 @@ export default function HeimdallPage(): React.JSX.Element {
       }
       setHistoryLoading(false)
     })
-  }, [detailSignature, rows])
+  })
 
+  useEffect(() => {
+    refreshHistory(detailSignature)
+  }, [detailSignature])
   useEffect(() => {
     const page = pageRef.current
     if (!page) {
