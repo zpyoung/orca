@@ -207,20 +207,31 @@ which and why in the commit message. Do **not** backport the missing implementat
 
 ## When upstream tightens the linter
 
-A stable tag can enable new rules in `.oxlintrc.json` (and bump the `oxlint` devDependency). Those
-rules then fire on **fork-only files the merge never touched**, byte-identical to the pre-merge
-baseline. This is not an ownership question — there is no upstream side of a fork-only file to
-resolve to — and it blocked three consecutive syncs (v1.4.183 twice, v1.4.184) before the policy
-below existed.
+A stable tag can enable new rules (and bump the `oxlint` devDependency). Those rules then fire on
+**fork-only files the merge never touched**, byte-identical to the pre-merge baseline. This is not
+an ownership question — there is no upstream side of a fork-only file to resolve to — and it
+blocked three consecutive syncs (v1.4.183 twice, v1.4.184) before the policy below existed.
 
 Diagnose it before treating a lint failure as merge damage:
 
 ```sh
-git diff "$ORIGIN_MAIN_OLD" HEAD -- .oxlintrc.json     # did the merge add rules?
-git diff --quiet "$ORIGIN_MAIN_OLD" -- <violating-file> # is the file identical to baseline?
+git diff "$ORIGIN_MAIN_OLD" HEAD -- .oxlintrc.json 'config/oxlint-*.json'   # new rules anywhere?
+git diff "$ORIGIN_MAIN_OLD" HEAD -- package.json | grep -E '^[-+].*"(lint|audit:|check:)' # new step?
+git diff --quiet "$ORIGIN_MAIN_OLD" -- <violating-file>  # is the file identical to baseline?
 ```
 
-Both true → toolchain tightening. **Adopting the new rule in the fork's own file is in scope**, but
+**`.oxlintrc.json` alone is not the question, and answering only it reads as "no new rules" when
+there are eight.** v1.4.205 left that file byte-identical and instead added
+`config/oxlint-anti-slop.json` — a whole plugin, `anti-slop`, with eight rules on — reached through
+a *new* `pnpm lint` sub-step, `audit:anti-slop`. A release can add a config, a step, or both, so
+diff every `config/oxlint-*.json` and the `lint` script together.
+
+That second command matters for a reason beyond discovery: `package.json` is a whole-file fork
+exception, so a new sub-step only reaches the fork's tree if the `ours.txt` audit three-way-merges
+it. Skip that merge and the gate passes locally while PR CI, which runs the step from its own
+workflow, fails.
+
+New rules → toolchain tightening. **Adopting the new rule in the fork's own file is in scope**, but
 only mechanically:
 
 ```sh
@@ -235,7 +246,16 @@ Hard limits. Violate any of these and it is a human decision, not an automated o
 - Only files byte-identical to `$ORIGIN_MAIN_OLD`. A violation in a file the merge *changed* is
   `-X ours` damage — resolve it to one real side instead (see the two sections above).
 - Only what `--fix` rewrites on its own. Never hand-write a logic change to satisfy a rule, and never
-  reach for `--fix-suggestions` or `--fix-dangerously`; both can alter behavior.
+  reach for `--fix-suggestions` or `--fix-dangerously`; both can alter behavior. A whole rule family
+  can be un-fixable: none of `anti-slop`'s eight is, so v1.4.205's eleven findings left the run no
+  legal move at all. A rename looks mechanical enough to talk yourself past this — it is still
+  hand-written, and this limit is exactly the answer a human already gave on v1.4.184.
+- Only violations in files the fork owns. A violation in a file byte-identical to the *tag* is
+  upstream's release failing its own new rule — v1.4.205 shipped `Reflect.get` in
+  `src/shared/agent-status-legacy-adapter.ts` under its own new `no-reflect-get`, and had already
+  fixed it on trunk. It cannot be pre-fixed on `main` (the file does not exist there) and the trunk
+  fix must not be backported, so it is a separate decision from the fork-side ones. Name it
+  explicitly when escalating, or the rerun re-escalates on that one file after the rest are fixed.
 - Never edit `.oxlintrc.json` to silence the rule. Upstream owns that file, so the next sync would
   re-add the rule and re-block.
 
