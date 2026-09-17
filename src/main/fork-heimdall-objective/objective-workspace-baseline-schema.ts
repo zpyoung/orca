@@ -1,5 +1,4 @@
-import type { GitWorkspaceObservation } from './content-identity'
-import type { ObjectiveWorkspaceTarget } from './content-identity'
+import type { GitWorkspaceObservation, ObjectiveWorkspaceTarget } from './content-identity'
 import type { ObjectiveWorkspaceManifestEntry } from './objective-workspace-manifest-digest'
 
 export const LEGACY_BASELINE_VERSION = 1
