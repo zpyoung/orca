@@ -107,6 +107,7 @@ export async function harness(
     storageAuthority?: 'desktop' | 'runtime'
     lease?: () => LeaseResult
     mailbox?: () => LedgerEntry[]
+    releaseWorker?: HeimdallOrchestrationAdapter['releaseWorker']
     dispatchObservation?: () => { status: 'live' | 'exited' | 'unverifiable'; reason?: string }
   } = {}
 ) {
@@ -134,12 +135,24 @@ export async function harness(
     readDispatch: vi.fn(async () => options.dispatchObservation?.() ?? { status: 'live' as const }),
     listWorkers: vi.fn(async () => []),
     stopWorker: vi.fn(async () => ({ status: 'applied' as const, appliedAtMs: 100 })),
+    releaseWorker: vi.fn(
+      options.releaseWorker ??
+        (async (_enrollment: WatcherEnrollment, dispatchId: string) => ({
+          dispatchId,
+          state: 'released' as const,
+          processAction: 'closed_agent_terminal' as const,
+          archive: null
+        }))
+    ),
     drainMailbox: vi.fn(async () => options.mailbox?.() ?? []),
-    answerQuestion: vi.fn(async () => {})
+    answerQuestion: vi.fn(async () => {}),
+    readQuestion: vi.fn(async () => ({ status: 'pending' as const }))
   }
   const store = {
     getProfileStorageDirectory: () => directory,
-    getSettings: () => ({ notifications: { enabled: false } })
+    getSettings: () => ({ notifications: { enabled: false } }),
+    getRepo: () => null,
+    getWorktreeMetaForHost: () => null
   } as unknown as Store
   const service = new HeimdallKernelServiceImpl({
     runtime: {} as OrcaRuntimeService,

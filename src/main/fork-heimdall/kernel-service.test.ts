@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { HEIMDALL_BUDGET_GENERATION_EVIDENCE_KIND } from '../../shared/fork-heimdall/budget'
 import type { KernelAction, WatcherKind } from '../../shared/fork-heimdall/kind-contract'
 import type { LedgerEntry } from '../../shared/fork-heimdall/ledger-types'
 import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
@@ -45,7 +46,7 @@ describe('Heimdall kernel service', () => {
     expect(await service.list()).toHaveLength(1)
   })
 
-  it('re-arms a disabled watcher by adding the new allowance to already spent budget', async () => {
+  it('starts a fresh budget generation when enrolling after explicit disarm', async () => {
     const { service, ledgerStore } = await harness()
     service.registerKind(kind())
     const result = await service.enroll(enrollmentInput())
@@ -83,6 +84,9 @@ describe('Heimdall kernel service', () => {
       dispatchKind: 'child',
       dispatchId: 'dispatch-old'
     })
+    for (const entry of runningDispatch(watcherId)) {
+      ledgerStore.append(entry)
+    }
     const active = (await service.fleet()).entries.find(
       (entry) => entry.target.watcherId === watcherId
     )!
@@ -99,11 +103,108 @@ describe('Heimdall kernel service', () => {
       kindPayload: { label: 'Review 1 updated' }
     })
     expect(rearmed.status).toBe('re-armed')
-    if (rearmed.status === 're-armed') {
-      expect(rearmed.entry.enrollment.budget).toEqual({ wallClockActiveMs: 140, turns: 3 })
-      expect(rearmed.entry.enrollment.capabilities).toEqual({ write: 'gated' })
-      expect(rearmed.entry.enrollment.kindPayload).toEqual({ label: 'Review 1 updated' })
+    if (rearmed.status !== 're-armed') {
+      throw new Error('expected re-armed enrollment')
     }
+    expect(rearmed.entry.enrollment).toMatchObject({
+      watcherId,
+      budget: { wallClockActiveMs: 100, turns: 2 },
+      capabilities: { write: 'gated' },
+      kindPayload: { label: 'Review 1 updated' }
+    })
+    expect(rearmed.entry.status.budget).toEqual({ activeMs: 0, turns: 0, exhausted: null })
+    expect(service.ledger(watcherId).entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ eventId: 'open', kind: 'interval-open' }),
+        expect.objectContaining({ eventId: 'close', kind: 'interval-close' }),
+        expect.objectContaining({ eventId: 'turn', kind: 'turn' }),
+        expect.objectContaining({ eventId: 'running-event', kind: 'attempt', state: 'running' }),
+        expect.objectContaining({
+          kind: 'evidence',
+          evidenceKind: HEIMDALL_BUDGET_GENERATION_EVIDENCE_KIND,
+          payload: { reason: 're-enrollment-after-explicit-disarm' }
+        })
+      ])
+    )
+    expect(
+      service
+        .ledger(watcherId)
+        .entries.some((entry) => entry.kind === 'attempt-resolved' || entry.kind === 'terminal')
+    ).toBe(false)
+
+    ledgerStore.append({
+      eventId: 'new-open',
+      watcherId,
+      atMs: 100,
+      origin: 'owner',
+      class: 'fact',
+      kind: 'interval-open',
+      intervalId: 'interval-2',
+      cause: 'action-in-flight'
+    })
+    ledgerStore.append({
+      eventId: 'new-close',
+      watcherId,
+      atMs: 125,
+      origin: 'owner',
+      class: 'fact',
+      kind: 'interval-close',
+      intervalId: 'interval-2',
+      closeReason: 'settled'
+    })
+    ledgerStore.append({
+      eventId: 'new-turn',
+      watcherId,
+      atMs: 125,
+      origin: 'owner',
+      class: 'fact',
+      kind: 'turn',
+      dispatchKind: 'child',
+      dispatchId: 'dispatch-new'
+    })
+    expect((await service.fleet()).entries[0]?.entry.status.budget).toEqual({
+      activeMs: 25,
+      turns: 1,
+      exhausted: null
+    })
+  })
+
+  it('preserves consumed usage when re-enrolling an automatically parked watcher', async () => {
+    const { service, ledgerStore } = await harness()
+    service.registerKind(kind())
+    const enrolled = await service.enroll(enrollmentInput({ wallClockActiveMs: null, turns: 1 }))
+    if (enrolled.status !== 'enrolled') {
+      throw new Error('expected enrollment')
+    }
+    const watcherId = enrolled.entry.enrollment.watcherId
+    ledgerStore.append({
+      eventId: 'spent-turn',
+      watcherId,
+      atMs: 50,
+      origin: 'owner',
+      class: 'fact',
+      kind: 'turn',
+      dispatchKind: 'child',
+      dispatchId: 'spent-dispatch'
+    })
+    await service.reconcileForTesting(watcherId)
+
+    const rearmed = await service.enroll(enrollmentInput())
+    expect(rearmed.status).toBe('re-armed')
+    if (rearmed.status !== 're-armed') {
+      throw new Error('expected re-armed enrollment')
+    }
+    expect(rearmed.entry.enrollment.budget).toEqual({ wallClockActiveMs: 100, turns: 3 })
+    expect(rearmed.entry.status.budget).toEqual({ activeMs: 0, turns: 1, exhausted: null })
+    expect(
+      service
+        .ledger(watcherId)
+        .entries.some(
+          (entry) =>
+            entry.kind === 'evidence' &&
+            entry.evidenceKind === HEIMDALL_BUDGET_GENERATION_EVIDENCE_KIND
+        )
+    ).toBe(false)
   })
 
   it('refuses cross-authority rearm without transferring a disabled watcher', async () => {

@@ -14,6 +14,7 @@ const upstream = vi.hoisted(() => ({
   startLocalWorker: vi.fn(),
   listWorkers: vi.fn(),
   stopWorker: vi.fn(),
+  releaseWorker: vi.fn(),
   resolveRunScope: vi.fn(),
   mutationRun: vi.fn(),
   inspectWorkerTerminal: vi.fn(),
@@ -43,6 +44,14 @@ vi.mock('../../runtime/rpc/methods/orchestration/worker/worker-stop', () => ({
       name: 'orchestration.workerStop',
       params: { parse: (value: unknown) => value },
       handler: upstream.stopWorker
+    }
+  ]
+}))
+vi.mock('../../runtime/rpc/methods/orchestration/worker/worker-release', () => ({
+  ORCHESTRATION_WORKER_RELEASE_METHODS: [
+    {
+      name: 'orchestration.workerRelease',
+      handler: upstream.releaseWorker
     }
   ]
 }))
@@ -724,6 +733,27 @@ describe('Heimdall orchestration adapter', () => {
     ).resolves.toMatchObject({ status: 'refused', reason: 'worker-unverifiable' })
     expect(upstream.mutationRun).not.toHaveBeenCalled()
     expect(upstream.stopWorker).not.toHaveBeenCalled()
+  })
+
+  it('refuses a dispatch outside the watcher Run before invoking the release path', async () => {
+    const world = fakeRuntime()
+    const db = world.runtime.getOrchestrationDb()
+    db.getDispatchContextById.mockReturnValue({
+      id: 'dispatch-other',
+      run_id: 'run-other'
+    })
+    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
+      persistOrchestrationRunId: async () => undefined
+    })
+
+    await expect(
+      adapter.releaseWorker(enrollment({ orchestrationRunId: 'run-1' }), 'dispatch-other')
+    ).rejects.toMatchObject({
+      code: 'dispatch_run_mismatch',
+      message: 'Dispatch dispatch-other could not be verified in watcher Run run-1'
+    })
+    expect(upstream.mutationRun).not.toHaveBeenCalled()
+    expect(upstream.releaseWorker).not.toHaveBeenCalled()
   })
 
   it.each(['consumer_fenced', 'run_not_found'] as const)(

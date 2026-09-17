@@ -1,10 +1,12 @@
 import { makeAttemptFingerprint } from '../../shared/fork-heimdall/attempt-fingerprint'
+import { WORKER_EXITED_WITHOUT_COMPLETION } from '../../shared/fork-heimdall/effect-certainty'
 import type { GateVerdict } from '../../shared/fork-heimdall/gate'
 import type { KernelAction, LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
 import {
   getInFlightAttempts,
   getLatestAttempts,
-  getLatestEscalations
+  getLatestEscalations,
+  getUnresolvedAttempts
 } from '../../shared/fork-heimdall/ledger-queries'
 import type {
   AttemptEntry,
@@ -15,8 +17,10 @@ import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
 import type { HeimdallOrchestrationAdapter } from './orchestration/orchestration-adapter'
 import type { WatcherLedgerLifecycle } from './ledger-lifecycle'
+import { getOpenWorkerQuestion, voidedWorkerQuestionEntries } from './question-resolution'
 import { WatcherAttemptRecovery } from './runner-attempt-recovery'
 import { hasSequenceSinceRunBoundary, mailboxBody, mailboxCursor } from './runner-mailbox'
+import { releaseSettledWorker } from './runner-worker-release'
 import type { RunnerBudgetClock, RunnerLedgerStore, WatcherRunner } from './runner-state'
 
 export type WatcherRunnerActionDependencies = {
@@ -276,13 +280,19 @@ export class WatcherRunnerActions {
           result: body.result ?? body.body,
           reason: body.outcome
         })
+        await releaseSettledWorker(runner, body.dispatchId, this.dependencies)
       }
     }
 
-    const currentLedger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
-    const pendingQuestion = question ?? this.pendingWorkerQuestion(currentLedger)
-    if (pendingQuestion) {
-      return { status: 'question', messageId: pendingQuestion.messageId }
+    let currentLedger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
+    const pendingMessageId =
+      question?.messageId ?? getOpenWorkerQuestion(currentLedger)?.messageId ?? null
+    if (pendingMessageId) {
+      // a question raised in this drain is answerable by definition; only a carried-over one can be void
+      if (question || !(await this.voidUnanswerableQuestion(runner, pendingMessageId))) {
+        return { status: 'question', messageId: pendingMessageId }
+      }
+      currentLedger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
     }
 
     let exited = false
@@ -305,8 +315,9 @@ export class WatcherRunnerActions {
           watcherId: runner.enrollment.watcherId,
           dispatchId: attempt.dispatchId,
           effect: 'indeterminate',
-          reason: 'worker-exited-without-completion'
+          reason: WORKER_EXITED_WITHOUT_COMPLETION
         })
+        await releaseSettledWorker(runner, attempt.dispatchId, this.dependencies)
         exited = true
       } else {
         this.dependencies.dispatchLifecycle.closeForContactLoss(runner.enrollment.watcherId)
@@ -318,20 +329,30 @@ export class WatcherRunnerActions {
     }
     return exited ? { status: 'exited' } : { status: 'clear' }
   }
-  private pendingWorkerQuestion(ledger: WatcherLedger): { messageId: string } | null {
-    const escalation = getLatestEscalations(ledger)
-      .toReversed()
-      .find(
-        (entry) =>
-          entry.escalationKind === 'worker-question' &&
-          entry.status === 'open' &&
-          entry.escalationId.startsWith('worker-question:')
-      )
-    if (!escalation) {
-      return null
+
+  /**
+   * Retires a carried-over question escalation whose thread can no longer accept an answer, so the
+   * watcher stops demanding input nobody can supply. Returns whether the escalation was retired.
+   */
+  private async voidUnanswerableQuestion(
+    runner: WatcherRunner,
+    messageId: string
+  ): Promise<boolean> {
+    const state = await this.dependencies.orchestration.readQuestion(runner.enrollment, messageId)
+    if (state.status === 'pending' || state.status === 'unverifiable') {
+      return false
     }
-    const messageId = escalation.escalationId.split(':').at(-1)
-    return messageId ? { messageId } : null
+    const entries = voidedWorkerQuestionEntries(
+      this.dependencies.ledgerStore.read(runner.enrollment.watcherId),
+      runner.enrollment.watcherId,
+      messageId,
+      state.status,
+      { atMs: this.dependencies.now(), createId: this.dependencies.createId }
+    )
+    for (const entry of entries) {
+      this.append(runner, entry)
+    }
+    return entries.length > 0
   }
 
   async recoverBeforeStop(
@@ -353,6 +374,11 @@ export class WatcherRunnerActions {
     snapshot: Snapshot<unknown>,
     ledger: WatcherLedger
   ): Promise<void> {
+    for (const attempt of getUnresolvedAttempts(ledger)) {
+      if (attempt.reason === WORKER_EXITED_WITHOUT_COMPLETION && attempt.dispatchId !== undefined) {
+        await releaseSettledWorker(runner, attempt.dispatchId, this.dependencies)
+      }
+    }
     await this.attemptRecovery.recover(runner, snapshot, ledger)
   }
 

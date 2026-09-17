@@ -6,6 +6,7 @@ import type {
 import type { WatcherCommandResult, WatcherWorker } from '../../../shared/fork-heimdall/fleet-types'
 import type { LedgerEntry } from '../../../shared/fork-heimdall/ledger-types'
 import type { WatcherEnrollment } from '../../../shared/fork-heimdall/watcher-types'
+import type { WorkerReleaseReceipt } from '../../runtime/rpc/methods/orchestration/worker/worker-release-completion'
 import type { MailboxDrainInput } from './mailbox-drain'
 
 export type HeimdallOrchestrationPersistence = {
@@ -18,6 +19,23 @@ export type DispatchObservation =
   | { status: 'unverifiable'; reason?: string }
 
 export type RecoverDispatchResult = DispatchResult | { status: 'absent' }
+
+/**
+ * Whether a worker question can still receive an answer. `answered`, `closed` and `absent` are all
+ * unanswerable: orchestration refuses `answerQuestion` on each, so an escalation still demanding one
+ * can never be cleared by a human. `unverifiable` is not settlement — the caller must leave it open.
+ */
+export type WatcherQuestionState =
+  | { status: 'pending' }
+  | { status: 'answered' }
+  | { status: 'closed' }
+  | { status: 'absent' }
+  | { status: 'unverifiable'; reason: string }
+
+export type UnanswerableQuestionStatus = Exclude<
+  WatcherQuestionState['status'],
+  'pending' | 'unverifiable'
+>
 
 export function orchestrationRequestIdForAttemptFingerprint(attemptFingerprint: string): string {
   if (!attemptFingerprint.trim()) {
@@ -36,8 +54,10 @@ export type HeimdallOrchestrationAdapter = {
   readDispatch(enrollment: WatcherEnrollment, dispatchId: string): Promise<DispatchObservation>
   listWorkers(enrollment: WatcherEnrollment): Promise<WatcherWorker[]>
   stopWorker(enrollment: WatcherEnrollment, dispatchId: string): Promise<WatcherCommandResult>
+  releaseWorker(enrollment: WatcherEnrollment, dispatchId: string): Promise<WorkerReleaseReceipt>
   drainMailbox(input: MailboxDrainInput): Promise<LedgerEntry[]>
   answerQuestion(enrollment: WatcherEnrollment, messageId: string, body: string): Promise<void>
+  readQuestion(enrollment: WatcherEnrollment, messageId: string): Promise<WatcherQuestionState>
 }
 
 export class CoordinatorSeatLostError extends Error {

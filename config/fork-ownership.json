@@ -3,7 +3,7 @@
     {
       "name": "heimdall",
       "purpose": "Deterministic reconciler kernel supervising durable watchers; kinds register into it in-tree.",
-      "globs": ["**/fork-heimdall/**"]
+      "globs": ["**/fork-heimdall/**", "docs/reference/heimdall-watcher.md"]
     },
     {
       "name": "hosted-review-sitter",
@@ -4194,6 +4194,30 @@
     {
       "path": "src/main/runtime/orca-runtime-write-terminal-agent-prompt.ts",
       "reason": "OMP prompt submission fix: appends exactly one CR to the complete bracketed-paste frame in the same PTY write and captures lifecycle evidence before that write, so OMP's large-paste menu cannot consume a delayed submit.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#omp-atomic-paste-submit"
+    },
+    {
+      "path": "src/main/runtime/runtime-terminal-state-records.ts",
+      "reason": "OMP prompt submission fix: adds pty.launchedAgent, the agent identity that outlives launch-authority retirement, so the atomic-submit decision cannot depend on state the shell's command-finished marker clears.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#omp-atomic-paste-submit"
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-create-terminal.ts",
+      "reason": "OMP prompt submission fix: records pty.launchedAgent alongside the retiring pty.launchAgent when a terminal is created with an agent.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#omp-atomic-paste-submit"
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-record-pty-worktree.ts",
+      "reason": "OMP prompt submission fix: initializes pty.launchedAgent on the tracked PTY record.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#omp-atomic-paste-submit"
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-resolve-authoritative-terminal-wait-permission.ts",
+      "reason": "OMP prompt submission fix: getPtyAgent falls back to pty.launchedAgent, because launch authority retires on the first command-finished marker and OMP's foreground process reports as bun, which no agent recognizer maps.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#omp-atomic-paste-submit"
     },

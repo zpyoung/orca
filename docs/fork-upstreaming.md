@@ -293,9 +293,34 @@ agent-prompt writer. A fork-only parallel send path would have to duplicate the 
 permission, lease-admission, lifecycle-baseline and delivery-receipt invariants that the shared
 writer already owns.
 
+Choosing the atomic path from `getPtyAgent` alone was not enough. `getPtyAgent` read
+`pty.launchAgent ?? pty.foregroundAgent`, and both can be absent while OMP is running:
+
+- `retirePtyAgentLaunchAuthority` clears `pty.launchAgent` on the shell's first `command-finished`
+  (OSC 133;D) marker, which the startup shell emits at a time that races the dispatch preamble
+  write. Whichever arrived first decided whether the prompt submitted.
+- `pty.foregroundAgent` can never cover for it, because OMP is spawned through Bun and the
+  foreground process name is `bun`, which `recognizeAgentProcess` maps to no agent.
+
+The fix separates identity from authority: `pty.launchedAgent` records which agent Orca launched and
+is never retired, and `getPtyAgent` prefers it over process-name detection. Authority
+(`launchToken`, `launchIncarnationId`, `launchAgent`) still retires exactly as before.
+
+The production minifier exposed a second failure: interpolating the submit constant into a template
+literal emitted a raw CR in the bundled template. JavaScript normalizes that source character to LF,
+so OMP received a newline instead of Enter even though source-level tests passed. String
+concatenation preserves the escaped CR in the bundle. A rebuilt-runtime smoke confirmed the complete
+paste ends with CR at OMP's stdin and a fresh worker reports completion without manual submission.
+The regression bundles and executes the actual writer with OXC, checking the emitted PTY bytes;
+it fails on the former template construction rather than merely checking unbundled source behavior.
+
 **Paths:**
 
 - `src/main/runtime/orca-runtime-write-terminal-agent-prompt.ts`
 - `src/main/runtime/agent-prompt-submission-omp-atomic.test.ts`
+- `src/main/runtime/runtime-terminal-state-records.ts`
+- `src/main/runtime/orca-runtime-create-terminal.ts`
+- `src/main/runtime/orca-runtime-record-pty-worktree.ts`
+- `src/main/runtime/orca-runtime-resolve-authoritative-terminal-wait-permission.ts`
 
 **Status:** pending-upstream. Not yet submitted.

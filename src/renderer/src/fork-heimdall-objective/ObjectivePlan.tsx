@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { translate } from '@/i18n/i18n'
+import { cn } from '@/lib/utils'
 import type { ObjectiveDetail } from '../../../shared/fork-heimdall-objective/detail-types'
 import { formatHeimdallTime } from '../fork-heimdall/fleet-format'
 import { shortObjectiveIdentity } from './objective-detail-format'
@@ -129,42 +130,43 @@ function RevisionPlan({
 export function ObjectivePlan({ detail }: { detail: ObjectiveDetail }): React.JSX.Element {
   const revisions = [...detail.revisions].sort((left, right) => right.number - left.number)
   const initialRevision = revisions[0]
-  const [open, setOpen] = useState(true)
+  const [userOpen, setUserOpen] = useState<boolean | null>(null)
   const [selectedRevisionId, setSelectedRevisionId] = useState(initialRevision?.id)
   const selectedRevision =
     revisions.find((revision) => revision.id === selectedRevisionId) ?? initialRevision
+  // approved means implementation is underway, so the default tracks the latest revision's status until the user toggles
+  const open = userOpen ?? initialRevision?.status !== 'approved'
 
   return (
     <section aria-labelledby="objective-plan-title">
-      <Collapsible open={open} onOpenChange={setOpen}>
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <h3
-            id="objective-plan-title"
-            className="text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground"
-          >
-            {translate('fork.heimdallObjective.detail.plan', 'Plan')}
-          </h3>
+      <Collapsible open={open} onOpenChange={setUserOpen}>
+        <h3
+          id="objective-plan-title"
+          className={cn(
+            'mb-2 text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground',
+            // the trigger's own padding would push the label off the section's left edge
+            selectedRevision && '-mx-1.5'
+          )}
+        >
           {selectedRevision ? (
             <CollapsibleTrigger asChild>
               <Button
                 type="button"
                 variant="ghost"
                 size="xs"
-                className="-mr-2 shrink-0 text-muted-foreground hover:text-foreground"
+                className="group w-full justify-between text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground hover:text-foreground"
               >
+                {translate('fork.heimdallObjective.detail.plan', 'Plan')}
                 <ChevronRight
                   aria-hidden
-                  className={`size-3.5 transition-transform motion-reduce:transition-none ${
-                    open ? 'rotate-90' : ''
-                  }`}
+                  className="size-3.5 transition-transform motion-reduce:transition-none group-data-[state=open]:rotate-90"
                 />
-                {open
-                  ? translate('fork.heimdallObjective.detail.collapsePlan', 'Collapse plan')
-                  : translate('fork.heimdallObjective.detail.expandPlan', 'Expand plan')}
               </Button>
             </CollapsibleTrigger>
-          ) : null}
-        </div>
+          ) : (
+            translate('fork.heimdallObjective.detail.plan', 'Plan')
+          )}
+        </h3>
         {selectedRevision ? (
           <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
             <span className="font-medium text-foreground">

@@ -1,5 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { deriveBudgetState } from '../../shared/fork-heimdall/budget'
+import {
+  deriveBudgetState,
+  HEIMDALL_BUDGET_GENERATION_EVIDENCE_KIND
+} from '../../shared/fork-heimdall/budget'
 import type { KernelAction, WatcherKind } from '../../shared/fork-heimdall/kind-contract'
 import {
   WatcherTargetSchema,
@@ -111,6 +114,18 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
       storageAuthority: this.storageAuthority(),
       enrollments: this.requireEnrollments(),
       readLedger: (watcherId) => this.requireRunnerLedger().read(watcherId),
+      appendBudgetGeneration: (watcherId) => {
+        this.requireRunnerLedger().append(watcherId, {
+          eventId: this.createId(),
+          watcherId,
+          atMs: this.now(),
+          origin: 'owner',
+          class: 'fact',
+          kind: 'evidence',
+          evidenceKind: HEIMDALL_BUDGET_GENERATION_EVIDENCE_KIND,
+          payload: { reason: 're-enrollment-after-explicit-disarm' }
+        })
+      },
       owns: (enrollment) => this.ownsEnrollment(enrollment),
       restore: (enrollment, kind) => this.restoreRunner(enrollment, kind),
       runner: (watcherId) => this.runners.get(watcherId) ?? null,

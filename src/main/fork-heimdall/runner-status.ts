@@ -1,3 +1,4 @@
+import { parkEscalationId } from '../../shared/fork-heimdall/park-escalation-id'
 import { deriveBudgetState } from '../../shared/fork-heimdall/budget'
 import type { LedgerEntry } from '../../shared/fork-heimdall/ledger-types'
 import type { FiredStopPredicate } from '../../shared/fork-heimdall/stop-policy'
@@ -24,19 +25,6 @@ export function isCoordinatorSeatLost(error: unknown): boolean {
     error.code === 'coordinator-seat-lost'
   )
 }
-function parkEscalationId(watcherId: string, reason: WatcherParkReason): string {
-  const detail =
-    reason.kind === 'stop-predicate'
-      ? reason.predicateId
-      : reason.kind === 'worker-question'
-        ? reason.messageId
-        : reason.kind === 'budget'
-          ? reason.exhaustion.kind
-          : null
-  const base = `park:${watcherId}:${reason.kind}`
-  return detail ? `${base}:${encodeURIComponent(detail)}` : base
-}
-
 /** Owns durable stop transitions and their corresponding public status projection. */
 export class WatcherRunnerStatusLifecycle {
   constructor(private readonly dependencies: WatcherRunnerStatusDependencies) {}
@@ -73,6 +61,22 @@ export class WatcherRunnerStatusLifecycle {
     }
     this.dependencies.publish(runner)
   }
+  /** Keeps a parked watcher parked, but drops the reason once the thing it waited on is gone. */
+  readyToResume(runner: WatcherRunner): void {
+    runner.status = {
+      ...runner.status,
+      state: 'parked',
+      phase: 'parked',
+      reason: 'ready-to-resume',
+      parkReason: null,
+      budget: deriveBudgetState(
+        this.dependencies.ledgerStore.read(runner.enrollment.watcherId),
+        runner.enrollment.budget
+      )
+    }
+    this.dependencies.publish(runner)
+  }
+
   async terminal(runner: WatcherRunner, fired: FiredStopPredicate): Promise<void> {
     if (fired.disposition !== 'terminal') {
       throw new Error('A park predicate cannot make a watcher terminal')

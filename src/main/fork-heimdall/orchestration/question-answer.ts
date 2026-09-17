@@ -1,6 +1,26 @@
 import type { OrcaRuntimeService } from '../../runtime/orca-runtime'
 import type { RunRow } from '../../runtime/orchestration/db'
 import { OrchestrationError } from '../../runtime/orchestration/orchestration-error'
+import type { WatcherQuestionState } from './orchestration-contract'
+
+/**
+ * Reads whether a question thread can still be answered. A thread belonging to another Run reads as
+ * absent rather than pending, because this Run's coordinator could never answer it.
+ */
+export function readWatcherQuestion(
+  runtime: OrcaRuntimeService,
+  run: RunRow,
+  messageId: string
+): WatcherQuestionState {
+  const question = runtime.getOrchestrationDb().getQuestion(messageId)
+  if (!question || question.run_id !== run.id) {
+    return { status: 'absent' }
+  }
+  if (question.status === 'answered' || question.status === 'closed') {
+    return { status: question.status }
+  }
+  return { status: 'pending' }
+}
 
 export function answerWatcherQuestion(
   runtime: OrcaRuntimeService,

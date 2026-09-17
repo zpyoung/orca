@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
+import {
+  deriveBudgetState,
+  HEIMDALL_BUDGET_GENERATION_EVIDENCE_KIND
+} from '../../../shared/fork-heimdall/budget'
 import type { KernelAction } from '../../../shared/fork-heimdall/kind-contract'
 import type { LedgerEntry, WatcherLedger } from '../../../shared/fork-heimdall/ledger-types'
 import type { WatcherEnrollment } from '../../../shared/fork-heimdall/watcher-types'
@@ -140,6 +144,61 @@ describe('Heimdall dispatch write-ahead lifecycle', () => {
       )
     ).toHaveLength(1)
     expect(world.budgetClock.open).toHaveBeenCalledOnce()
+  })
+
+  it('recovers pre-generation dispatches without charging their late turn or work interval', async () => {
+    const adapter = {
+      dispatchWorker: vi.fn().mockRejectedValueOnce(new Error('crash')),
+      recoverDispatch: vi
+        .fn()
+        .mockResolvedValue({ status: 'dispatched', dispatchId: 'dispatch-old' } as const)
+    }
+    const world = harness(adapter)
+    await expect(world.lifecycle.dispatch(input('attempt-before-disarm'))).rejects.toThrow('crash')
+    world.ledgerStore.append(ENROLLMENT.watcherId, {
+      eventId: 'budget-generation',
+      watcherId: ENROLLMENT.watcherId,
+      atMs: 101,
+      origin: 'owner',
+      class: 'fact',
+      kind: 'evidence',
+      evidenceKind: HEIMDALL_BUDGET_GENERATION_EVIDENCE_KIND,
+      payload: { reason: 're-enrollment-after-explicit-disarm' }
+    })
+
+    const recovered = new WatcherLedgerLifecycle({
+      ledgerStore: world.ledgerStore,
+      budgetClock: world.budgetClock,
+      adapter,
+      now: () => 102,
+      createId: (() => {
+        let id = 100
+        return () => `event-${++id}`
+      })()
+    })
+    await recovered.recover(ENROLLMENT)
+
+    expect(world.entries).toContainEqual(
+      expect.objectContaining({
+        kind: 'attempt',
+        state: 'running',
+        dispatchId: 'dispatch-old'
+      })
+    )
+    expect(world.entries).toContainEqual(
+      expect.objectContaining({
+        kind: 'turn',
+        attemptId: expect.any(String),
+        dispatchId: 'dispatch-old'
+      })
+    )
+    expect(
+      deriveBudgetState(
+        { watcherId: ENROLLMENT.watcherId, entries: world.entries },
+        ENROLLMENT.budget
+      )
+    ).toEqual({ activeMs: 0, turns: 0, exhausted: null })
+    expect(world.budgetClock.open).not.toHaveBeenCalled()
   })
 
   it('keeps operation_unknown unresolved and blocks a second dispatch', async () => {

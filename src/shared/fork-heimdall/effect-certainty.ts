@@ -3,6 +3,8 @@ import { z } from 'zod'
 export const EffectCertaintySchema = z.enum(['landed', 'not-landed', 'indeterminate'])
 export type EffectCertainty = z.infer<typeof EffectCertaintySchema>
 
+export const WORKER_EXITED_WITHOUT_COMPLETION = 'worker-exited-without-completion'
+
 export const ActionOutcomeSchema = z
   .object({
     effect: EffectCertaintySchema,

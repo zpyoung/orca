@@ -51,12 +51,9 @@ export type ObjectiveEnrollmentDraft = {
   availableAgentIds: readonly string[]
 }
 
-export type ObjectiveForgeAvailability = 'checking' | 'supported' | 'unsupported' | 'unavailable'
-
 export type ObjectiveLandingBarAvailability = {
   workspaceKind: ObjectiveWorkspaceKind | null
   worktreeId: string | null
-  forge: ObjectiveForgeAvailability
 }
 
 export type ObjectiveEnrollmentErrorCode =
@@ -66,7 +63,6 @@ export type ObjectiveEnrollmentErrorCode =
   | 'existing-plan-too-long'
   | 'landing-bar-requires-git'
   | 'landing-bar-requires-worktree'
-  | 'landing-bar-requires-supported-forge'
   | 'max-concurrency-unsupported'
   | 'territory-too-many'
   | 'territory-duplicate'
@@ -103,7 +99,7 @@ export function isObjectiveLandingBarAvailable(
   if (landingBar !== 'hosted-review' && landingBar !== 'merged') {
     return true
   }
-  return availability.worktreeId !== null && availability.forge === 'supported'
+  return availability.worktreeId !== null
 }
 
 export function validateObjectiveEnrollmentDraft(
@@ -127,13 +123,12 @@ export function validateObjectiveEnrollmentDraft(
     landingAvailability.workspaceKind !== null &&
     !isObjectiveLandingBarAvailable(landingAvailability, draft.landingBar)
   ) {
-    if (landingAvailability.workspaceKind === 'folder') {
-      errors.push({ code: 'landing-bar-requires-git' })
-    } else if (landingAvailability.worktreeId === null) {
-      errors.push({ code: 'landing-bar-requires-worktree' })
-    } else {
-      errors.push({ code: 'landing-bar-requires-supported-forge' })
-    }
+    errors.push({
+      code:
+        landingAvailability.workspaceKind === 'folder'
+          ? 'landing-bar-requires-git'
+          : 'landing-bar-requires-worktree'
+    })
   }
   if (draft.maxConcurrency !== 1) {
     errors.push({ code: 'max-concurrency-unsupported' })

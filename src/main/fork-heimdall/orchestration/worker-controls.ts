@@ -10,6 +10,9 @@ import type { OrchestrationDb, RunRow } from '../../runtime/orchestration/db'
 import { exposeUtcTimestamp } from '../../runtime/orchestration/db/utc-timestamp'
 import { OrchestrationError } from '../../runtime/orchestration/orchestration-error'
 import { ORCHESTRATION_WORKER_LIST_METHOD } from '../../runtime/rpc/methods/orchestration/worker/worker-list-method'
+import { ORCHESTRATION_WORKER_RELEASE_METHODS } from '../../runtime/rpc/methods/orchestration/worker/worker-release'
+import type { WorkerReleaseReceipt } from '../../runtime/rpc/methods/orchestration/worker/worker-release-completion'
+import { WorkerDispatchParams } from '../../runtime/rpc/methods/orchestration/worker/worker-release-schemas'
 import { ORCHESTRATION_WORKER_STOP_METHODS } from '../../runtime/rpc/methods/orchestration/worker/worker-stop'
 import { getOrchestrationMutationExecutor } from '../../runtime/rpc/orchestration-mutation-executor'
 import type { RpcRequest } from '../../runtime/rpc/core'
@@ -61,6 +64,9 @@ const SETTLED_WORKER_STATES: Record<string, true> = {
 }
 const WORKER_STOP_METHOD = ORCHESTRATION_WORKER_STOP_METHODS.find(
   (method) => method.name === 'orchestration.workerStop'
+)
+const WORKER_RELEASE_METHOD = ORCHESTRATION_WORKER_RELEASE_METHODS.find(
+  (method) => method.name === 'orchestration.workerRelease'
 )
 
 export async function listWatcherWorkers(
@@ -255,6 +261,48 @@ export async function stopWatcherWorker(
       ? commandRefused('invalid-state', error.message)
       : commandRefused('worker-unverifiable', errorDetail(error))
   }
+}
+
+export async function releaseWatcherWorker(
+  runtime: OrcaRuntimeService,
+  enrollment: WatcherEnrollment,
+  run: RunRow,
+  dispatchId: string,
+  assertCoordinatorSeat: () => void
+): Promise<WorkerReleaseReceipt> {
+  const dispatch = runtime.getOrchestrationDb().getDispatchContextById(dispatchId)
+  if (!dispatch || dispatch.run_id !== run.id) {
+    throw new OrchestrationError(
+      'dispatch_run_mismatch',
+      `Dispatch ${dispatchId} could not be verified in watcher Run ${run.id}`
+    )
+  }
+  if (!WORKER_RELEASE_METHOD) {
+    throw new OrchestrationError('operation_unknown', 'Orchestration worker-release is unavailable')
+  }
+
+  const requestId = `heimdall-release-worker-${randomUUID()}`
+  const params = WorkerDispatchParams.parse({ dispatch: dispatchId })
+  const request: RpcRequest = {
+    id: requestId,
+    authToken: '',
+    method: 'orchestration.workerRelease',
+    params,
+    orchestrationRequestId: requestId,
+    orchestrationContractVersion: ORCHESTRATION_CONTRACT_VERSION
+  }
+  return (await getOrchestrationMutationExecutor(runtime).run(
+    request,
+    params,
+    (mutation) => {
+      assertCoordinatorSeat()
+      return WORKER_RELEASE_METHOD.handler(params, {
+        runtime,
+        orchestrationMutation: mutation?.identity
+      })
+    },
+    coordinatorIdentityFingerprint(enrollment.coordinatorIdentity)
+  )) as WorkerReleaseReceipt
 }
 
 function pendingQuestionsByDispatch(

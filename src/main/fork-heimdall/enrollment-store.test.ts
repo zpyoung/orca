@@ -9,6 +9,7 @@ import {
   isMalformedKindPayloadEnrollment,
   type EnrollmentRearmConfiguration
 } from './enrollment-store'
+import { HeimdallLedgerStore } from './ledger-store'
 
 let root: string
 let database: HeimdallDatabase
@@ -101,6 +102,29 @@ describe('Heimdall enrollment store', () => {
       budget: REARM_CONFIGURATION.budget,
       kindPayload: REARM_CONFIGURATION.kindPayload
     })
+  })
+
+  it('rolls back the rearm when its budget generation append fails', () => {
+    const before = enrollments.insert(enrollment({ enabled: false }))
+    const ledger = new HeimdallLedgerStore(database)
+
+    expect(() =>
+      enrollments.rearm('watcher-1', REARM_CONFIGURATION, () => {
+        ledger.append({
+          eventId: 'budget-generation',
+          watcherId: 'watcher-1',
+          atMs: 2,
+          origin: 'owner',
+          class: 'fact',
+          kind: 'evidence',
+          evidenceKind: 'budget-generation',
+          payload: { reason: 're-enrollment-after-explicit-disarm' }
+        })
+        throw new Error('generation append failed')
+      })
+    ).toThrow('generation append failed')
+    expect(enrollments.get('watcher-1')).toEqual(before)
+    expect(ledger.read('watcher-1').entries).toEqual([])
   })
 
   it('rejects invalid rearm configuration before changing the disabled watcher', () => {

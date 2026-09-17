@@ -279,6 +279,9 @@ export class WatcherRunnerLoop {
         this.schedule(runner, HEIMDALL_RAPID_POLL_MS)
         return
       }
+      if (runner.status.parkReason?.kind === 'worker-question') {
+        this.statusLifecycle.readyToResume(runner)
+      }
       if (workerState.status === 'unverifiable') {
         trace.error = { message: workerState.reason }
         runner.consecutiveErrors += 1

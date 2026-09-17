@@ -1,6 +1,7 @@
 import type { StopPredicate } from '../fork-heimdall/stop-policy'
 import { getAttemptResolution, getLatestAttempts } from '../fork-heimdall/ledger-queries'
 import type { WatcherLedger } from '../fork-heimdall/ledger-types'
+import { stopPredicateParkEscalationId } from '../fork-heimdall/park-escalation-id'
 import { ObjectiveActionResultSchema, ObjectiveActionSchema } from './objective-actions'
 import type { ObjectiveLandingBar } from './contract-types'
 import type { ObjectiveWorld } from './detail-types'
@@ -125,7 +126,8 @@ function latestWorkerEscalationAcknowledgementIndex(ledger: WatcherLedger): numb
     const entry = ledger.entries[index]
     if (
       entry.kind === 'escalation' &&
-      entry.escalationKind === `park-stop-predicate:${OBJECTIVE_WORKER_ESCALATION_PREDICATE_ID}` &&
+      entry.escalationId ===
+        stopPredicateParkEscalationId(ledger.watcherId, OBJECTIVE_WORKER_ESCALATION_PREDICATE_ID) &&
       (entry.status === 'acknowledged' || entry.status === 'resolved')
     ) {
       return index

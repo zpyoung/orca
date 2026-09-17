@@ -99,7 +99,7 @@ export class OrcaRuntimeWithResolveAuthoritativeTerminalWaitPermission extends O
 
   protected getPtyAgent(ptyId: string): TuiAgent | null {
     const pty = this.ptysById.get(ptyId)
-    return pty?.launchAgent ?? pty?.foregroundAgent ?? null
+    return pty?.launchAgent ?? pty?.launchedAgent ?? pty?.foregroundAgent ?? null
   }
 
   protected assertAgentPromptPermissionSafe(

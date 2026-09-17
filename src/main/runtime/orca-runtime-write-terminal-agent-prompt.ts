@@ -70,7 +70,8 @@ export class OrcaRuntimeWithWriteTerminalAgentPrompt extends OrcaRuntimeWithReso
       // beginning when a large frame is split into independently processed chunks. OMP
       // additionally needs its one submit byte appended to that complete frame.
       renderGate?.arm()
-      const writePayload = atomicOmpSubmit ? `${pastePayload}${AGENT_PROMPT_SUBMIT}` : pastePayload
+      // Template folding can emit a literal CR, which JavaScript normalizes to LF.
+      const writePayload = atomicOmpSubmit ? pastePayload + AGENT_PROMPT_SUBMIT : pastePayload
       if (!this.ptyController?.write(ptyId, writePayload)) {
         throw new Error('terminal_not_writable')
       }

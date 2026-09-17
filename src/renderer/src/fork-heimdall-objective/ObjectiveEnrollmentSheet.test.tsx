@@ -79,7 +79,7 @@ function EditableObjectiveFields({
       draft={currentDraft}
       selectedWorkspaceKey=""
       workspaces={[]}
-      landingAvailability={{ workspaceKind: null, worktreeId: null, forge: 'checking' }}
+      landingAvailability={{ workspaceKind: null, worktreeId: null }}
       agents={[]}
       disabled={false}
       onWorkspaceChange={() => {}}
@@ -237,8 +237,7 @@ describe('objective enrollment contract', () => {
   it('rejects source plans only after the shared character limit', () => {
     const availability: ObjectiveLandingBarAvailability = {
       workspaceKind: 'git',
-      worktreeId: 'worktree',
-      forge: 'supported'
+      worktreeId: 'worktree'
     }
 
     expect(
@@ -264,7 +263,7 @@ describe('objective enrollment contract', () => {
         writeTerritoryText: '.g*/**\nsrc/**\nsrc/**',
         roleAgents: { planner: 'claude', implementer: '', reviewer: '', integrator: '' }
       }),
-      { workspaceKind: 'folder', worktreeId: null, forge: 'checking' }
+      { workspaceKind: 'folder', worktreeId: null }
     )
 
     expect(errors.map((error) => error.code)).toEqual([
@@ -282,8 +281,7 @@ describe('objective enrollment contract', () => {
     expect(
       validateObjectiveEnrollmentDraft(blankTerritoryDraft, {
         workspaceKind: 'git',
-        worktreeId: 'worktree',
-        forge: 'supported'
+        worktreeId: 'worktree'
       })
     ).toEqual([])
     expect(
@@ -293,35 +291,29 @@ describe('objective enrollment contract', () => {
     })
   })
 
-  it('offers landing bars only when the selected workspace can fulfill them', () => {
+  it('offers hosted landing bars immediately for a selected git worktree', () => {
     const folder: ObjectiveLandingBarAvailability = {
       workspaceKind: 'folder',
-      worktreeId: null,
-      forge: 'checking'
+      worktreeId: null
     }
     const missingWorktree: ObjectiveLandingBarAvailability = {
       workspaceKind: 'git',
-      worktreeId: null,
-      forge: 'supported'
+      worktreeId: null
     }
-    const unsupportedForge: ObjectiveLandingBarAvailability = {
+    const gitWorktree: ObjectiveLandingBarAvailability = {
       workspaceKind: 'git',
-      worktreeId: 'worktree',
-      forge: 'unsupported'
-    }
-    const supportedForge: ObjectiveLandingBarAvailability = {
-      workspaceKind: 'git',
-      worktreeId: 'worktree',
-      forge: 'supported'
+      worktreeId: 'worktree'
     }
 
     expect(isObjectiveLandingBarAvailable(folder, 'files-on-disk')).toBe(true)
     expect(isObjectiveLandingBarAvailable(folder, 'committed-local-branch')).toBe(false)
     expect(isObjectiveLandingBarAvailable(folder, 'pushed-ref')).toBe(false)
     expect(isObjectiveLandingBarAvailable(missingWorktree, 'hosted-review')).toBe(false)
-    expect(isObjectiveLandingBarAvailable(unsupportedForge, 'hosted-review')).toBe(false)
-    expect(isObjectiveLandingBarAvailable(unsupportedForge, 'pushed-ref')).toBe(true)
-    expect(isObjectiveLandingBarAvailable(supportedForge, 'merged')).toBe(true)
+    expect(isObjectiveLandingBarAvailable(gitWorktree, 'hosted-review')).toBe(true)
+    expect(isObjectiveLandingBarAvailable(gitWorktree, 'merged')).toBe(true)
+    expect(validateObjectiveEnrollmentDraft(draft({ landingBar: 'merged' }), gitWorktree)).toEqual(
+      []
+    )
   })
 
   it('routes both git and folder selections to their actual runtime owner', () => {

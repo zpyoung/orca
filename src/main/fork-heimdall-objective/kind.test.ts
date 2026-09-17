@@ -147,6 +147,7 @@ async function workspaceFixture(kind: 'folder' | 'git'): Promise<WorkspaceFixtur
   const store = {
     getProfileStorageDirectory: () => profile,
     getRepo: (id: string) => (id === repoId ? repo : undefined),
+    getWorktreeMetaForHost: () => null,
     getSettings: () => ({
       defaultTuiAgent: 'codex',
       disabledTuiAgents: [],
@@ -274,12 +275,19 @@ function orchestrationSimulation(
     readDispatch: vi.fn(async () => ({ status: 'live' as const })),
     listWorkers: vi.fn(async () => []),
     stopWorker: vi.fn(async () => ({ status: 'applied' as const, appliedAtMs: 1 })),
+    releaseWorker: vi.fn(async (_enrollment: WatcherEnrollment, dispatchId: string) => ({
+      dispatchId,
+      state: 'released' as const,
+      processAction: 'closed_agent_terminal' as const,
+      archive: null
+    })),
     drainMailbox: vi.fn(async () => {
       const entries = queued.splice(0)
       delivered.push(...entries)
       return entries
     }),
-    answerQuestion: vi.fn(async () => undefined)
+    answerQuestion: vi.fn(async () => undefined),
+    readQuestion: vi.fn(async () => ({ status: 'pending' as const }))
   } satisfies HeimdallOrchestrationAdapter
   return { adapter, delivered, dispatchWorker, reportPaths }
 }

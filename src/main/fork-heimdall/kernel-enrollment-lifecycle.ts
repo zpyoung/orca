@@ -20,6 +20,7 @@ export type KernelEnrollmentLifecycleDependencies = {
   storageAuthority: 'desktop' | 'runtime'
   enrollments: EnrollmentStore
   readLedger(watcherId: string): WatcherLedger
+  appendBudgetGeneration(watcherId: string): void
   owns(enrollment: EnrollmentRecord): boolean
   restore(enrollment: WatcherEnrollment, kind: RegisteredWatcherKind): WatcherRunner
   runner(watcherId: string): WatcherRunner | null
@@ -43,6 +44,15 @@ export function activateInsertedEnrollment(
 ): void {
   dependencies.restore(inserted, kind)
   dependencies.publish()
+}
+
+function latestHaltWasExplicitDisarm(ledger: WatcherLedger): boolean {
+  const halt = ledger.entries.findLast(
+    (entry) =>
+      entry.kind === 'escalation' &&
+      (entry.escalationKind.startsWith('park-') || entry.escalationKind === 'control-disarm')
+  )
+  return halt?.kind === 'escalation' && halt.escalationKind === 'control-disarm'
 }
 
 export async function enrollWatcher(
@@ -100,16 +110,22 @@ export async function enrollWatcher(
         detail: `Workspace is already enrolled as ${existing.kind}`
       }
     }
-    const budget = extendBudgetForRearm(
-      dependencies.readLedger(existing.watcherId),
-      existing.budget,
-      authorized.budget
+    const ledger = dependencies.readLedger(existing.watcherId)
+    const startsNewBudgetGeneration = latestHaltWasExplicitDisarm(ledger)
+    const budget = startsNewBudgetGeneration
+      ? authorized.budget
+      : extendBudgetForRearm(ledger, existing.budget, authorized.budget)
+    const rearmed = dependencies.enrollments.rearm(
+      existing.watcherId,
+      {
+        capabilities: authorized.capabilities,
+        budget,
+        kindPayload: authorized.kindPayload
+      },
+      startsNewBudgetGeneration
+        ? () => dependencies.appendBudgetGeneration(existing.watcherId)
+        : undefined
     )
-    const rearmed = dependencies.enrollments.rearm(existing.watcherId, {
-      capabilities: authorized.capabilities,
-      budget,
-      kindPayload: authorized.kindPayload
-    })
     dependencies.acknowledgePark(rearmed.watcherId)
     let runner = dependencies.runner(rearmed.watcherId)
     if (!runner) {

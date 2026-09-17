@@ -148,8 +148,15 @@ async function harness(
     readDispatch: vi.fn(async () => options.dispatchObservation?.() ?? { status: 'live' as const }),
     listWorkers: vi.fn(async () => []),
     stopWorker: vi.fn(async () => ({ status: 'applied' as const, appliedAtMs: 100 })),
+    releaseWorker: vi.fn(async (_enrollment: WatcherEnrollment, dispatchId: string) => ({
+      dispatchId,
+      state: 'released' as const,
+      processAction: 'closed_agent_terminal' as const,
+      archive: null
+    })),
     drainMailbox: vi.fn(async () => options.mailbox?.() ?? []),
-    answerQuestion: vi.fn(async () => {})
+    answerQuestion: vi.fn(async () => {}),
+    readQuestion: vi.fn(async () => ({ status: 'pending' as const }))
   }
   let nextId = 0
   const service = new HeimdallKernelServiceImpl({

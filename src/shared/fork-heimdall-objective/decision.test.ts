@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { WORKER_EXITED_WITHOUT_COMPLETION } from '../fork-heimdall/effect-certainty'
 import type {
   AttemptEntry,
   EvidenceEntry,
@@ -101,6 +102,7 @@ function attempt(
     effect?: AttemptEntry['effect']
     dispatchId?: string
     atMs?: number
+    reason?: AttemptEntry['reason']
   } = {}
 ): AttemptEntry {
   const dispatchAction = action.kind.startsWith('dispatch-')
@@ -116,6 +118,7 @@ function attempt(
     action,
     state: options.state ?? 'running',
     ...(options.effect === undefined ? {} : { effect: options.effect }),
+    ...(options.reason === undefined ? {} : { reason: options.reason }),
     ...(dispatchAction
       ? {
           dispatch: {
@@ -293,6 +296,52 @@ describe('objective deterministic phase flow', () => {
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
       evidenceKey: 'plan:2',
+      reason: 'replan-after-failure'
+    })
+  })
+
+  it('replans after a reportless worker death resolves as not landed', () => {
+    const dispatch: ObjectiveAction = {
+      kind: 'dispatch-node',
+      capability: 'implement',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'revision-1:core',
+      revisionId: 'revision-1',
+      taskKey: 'core',
+      depsOrchestrationIds: []
+    }
+    const running = attempt(dispatch, { dispatchId: 'dispatch-core', atMs: 30 })
+    const settled = attempt(dispatch, {
+      state: 'settled',
+      effect: 'indeterminate',
+      reason: WORKER_EXITED_WITHOUT_COMPLETION,
+      dispatchId: 'dispatch-core',
+      atMs: 35
+    })
+    const decision = decideObjective(
+      snapshot(projection()),
+      ledger([
+        running,
+        settled,
+        {
+          kind: 'attempt-resolved',
+          eventId: 'event-worker-death-resolution',
+          watcherId: 'watcher-1',
+          atMs: 40,
+          origin: 'owner',
+          class: 'fact',
+          attemptId: settled.attemptId,
+          effect: 'not-landed',
+          evidence: { reason: WORKER_EXITED_WITHOUT_COMPLETION }
+        }
+      ])
+    )
+
+    expect(decision.action).toMatchObject({
+      kind: 'dispatch-planner',
+      evidenceKey: 'plan:2',
+      revisionNumber: 2,
       reason: 'replan-after-failure'
     })
   })

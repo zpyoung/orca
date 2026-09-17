@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { LedgerEntry, WatcherLedger } from '../fork-heimdall/ledger-types'
 import type { Snapshot } from '../fork-heimdall/snapshot'
+import { parkEscalationId } from '../fork-heimdall/park-escalation-id'
 import type { ObjectiveWorld } from './detail-types'
 import { stopRungForBar } from './landing-ladder'
 import { objectiveBarReachedPredicate, objectiveWorkerEscalationPredicate } from './stop-policy'
@@ -383,11 +384,49 @@ describe('objective stop policy', () => {
             atMs: 30,
             origin: 'owner',
             class: 'fact',
-            escalationId: 'park-stop-predicate:worker-escalation',
-            escalationKind: 'park-stop-predicate:worker-escalation',
+            escalationId: 'park:watcher-1:stop-predicate:worker-escalation',
+            escalationKind: 'park-stop-predicate',
             status: 'acknowledged',
             foldCount: 2
           }
+        ])
+      )
+    ).toEqual({ stop: false })
+  })
+
+  it('reads back an acknowledgement written with the park escalation id the runner produces', () => {
+    const acknowledged: LedgerEntry = {
+      kind: 'escalation',
+      eventId: 'event-ack',
+      watcherId: 'watcher-1',
+      atMs: 30,
+      origin: 'owner',
+      class: 'fact',
+      escalationId: parkEscalationId('watcher-1', {
+        kind: 'stop-predicate',
+        predicateId: 'worker-escalation',
+        reason: 'Agent exited unexpectedly'
+      }),
+      escalationKind: 'park-stop-predicate',
+      status: 'acknowledged',
+      foldCount: 2
+    }
+
+    expect(
+      objectiveWorkerEscalationPredicate.evaluate(
+        snapshot('files-on-disk'),
+        ledger([
+          {
+            kind: 'evidence',
+            eventId: 'event-escalation',
+            watcherId: 'watcher-1',
+            atMs: 20,
+            origin: 'owner',
+            class: 'fact',
+            evidenceKind: 'orchestration-mailbox',
+            payload: { type: 'escalation', subject: 'Agent exited unexpectedly', payload: {} }
+          },
+          acknowledged
         ])
       )
     ).toEqual({ stop: false })

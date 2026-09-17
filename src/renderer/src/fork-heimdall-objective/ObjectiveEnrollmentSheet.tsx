@@ -18,7 +18,6 @@ import {
   OBJECTIVE_ROLES,
   validateObjectiveEnrollmentDraft,
   type ObjectiveEnrollmentDraft,
-  type ObjectiveForgeAvailability,
   type ObjectiveLandingBarAvailability,
   type ObjectiveEnrollmentError
 } from './objective-enrollment-model'
@@ -77,11 +76,6 @@ function validationErrorCopy(error: ObjectiveEnrollmentError): string {
       return translate(
         'fork.heimdallObjective.enrollment.landingBarRequiresWorktree',
         'Hosted-review and merged landing bars require a git worktree.'
-      )
-    case 'landing-bar-requires-supported-forge':
-      return translate(
-        'fork.heimdallObjective.enrollment.landingBarRequiresSupportedForge',
-        'Hosted-review and merged landing bars require a GitHub or GitLab repository.'
       )
     case 'max-concurrency-unsupported':
       return translate(
@@ -169,9 +163,6 @@ export function ObjectiveEnrollmentSheet({
   const runtimeDetectedAgentIds = useAppStore((state) => state.runtimeDetectedAgentIds)
   const settings = useAppStore((state) => state.settings)
   const hydrateFleet = useAppStore((state) => state.hydrateHeimdallFleet)
-  const getHostedReviewCreationEligibility = useAppStore(
-    (state) => state.getHostedReviewCreationEligibility
-  )
   const workspaces = useMemo(
     () =>
       buildObjectiveWorkspaceOptions({
@@ -198,52 +189,12 @@ export function ObjectiveEnrollmentSheet({
   const [showValidation, setShowValidation] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [forgeAvailability, setForgeAvailability] = useState<ObjectiveForgeAvailability>('checking')
   const selectedWorkspace = workspaces.find((workspace) => workspace.key === selectedWorkspaceKey)
   const landingAvailability: ObjectiveLandingBarAvailability = {
     workspaceKind: selectedWorkspace?.workspaceKind ?? null,
-    worktreeId: selectedWorkspace?.worktreeId ?? null,
-    forge: forgeAvailability
+    worktreeId: selectedWorkspace?.worktreeId ?? null
   }
   const validationErrors = validateObjectiveEnrollmentDraft(draft, landingAvailability)
-
-  useEffect(() => {
-    if (
-      !open ||
-      !selectedWorkspace ||
-      selectedWorkspace.workspaceKind !== 'git' ||
-      selectedWorkspace.worktreeId === null
-    ) {
-      setForgeAvailability('checking')
-      return
-    }
-    let current = true
-    setForgeAvailability('checking')
-    void getHostedReviewCreationEligibility({
-      repoPath: selectedWorkspace.repoPath,
-      repoId: selectedWorkspace.repoId,
-      worktreePath: selectedWorkspace.workspacePath,
-      branch: selectedWorkspace.branch || 'HEAD'
-    }).then(
-      (eligibility) => {
-        if (current) {
-          setForgeAvailability(
-            eligibility.provider === 'github' || eligibility.provider === 'gitlab'
-              ? 'supported'
-              : 'unsupported'
-          )
-        }
-      },
-      () => {
-        if (current) {
-          setForgeAvailability('unavailable')
-        }
-      }
-    )
-    return () => {
-      current = false
-    }
-  }, [getHostedReviewCreationEligibility, open, selectedWorkspace])
 
   useEffect(() => {
     if (!selectedWorkspace) {
@@ -306,13 +257,14 @@ export function ObjectiveEnrollmentSheet({
   const selectWorkspace = (key: string): void => {
     const workspace = workspaces.find((candidate) => candidate.key === key)
     setSelectedWorkspaceKey(key)
-    setForgeAvailability('checking')
     setServerError(null)
     setDraft((current) => {
+      const highLandingBar =
+        current.landingBar === 'hosted-review' || current.landingBar === 'merged'
       const landingBar =
         !workspace || workspace.workspaceKind === 'folder'
           ? 'files-on-disk'
-          : current.landingBar === 'hosted-review' || current.landingBar === 'merged'
+          : workspace.worktreeId === null && highLandingBar
             ? 'pushed-ref'
             : current.landingBar
       return {

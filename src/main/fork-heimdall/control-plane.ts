@@ -10,6 +10,12 @@ import { getLatestApproval, getLatestEscalations } from '../../shared/fork-heimd
 import type { ApprovalScope, WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
 import { getApprovalEscalationsToResolve } from './approval-resolution'
+import {
+  appendAnsweredQuestionTransitions,
+  appendVoidedQuestionTransitions,
+  voidUnanswerableQuestion,
+  type QuestionLedgerAccess
+} from './question-resolution'
 import { WatcherEnrollmentControlLifecycle } from './control-enrollment-lifecycle'
 import {
   isMalformedKindPayloadEnrollment,
@@ -113,6 +119,12 @@ export class WatcherControlPlane {
       case 'pause':
         return await this.enrollmentLifecycle.pause(enrollment, request.expectedOwner)
       case 'resume':
+        // a question its worker can no longer answer must not keep refusing the only recovery
+        await voidUnanswerableQuestion(
+          this.questionLedger,
+          this.readQuestion(enrollment),
+          enrollment.watcherId
+        )
         return this.enrollmentLifecycle.resume(enrollment, request.expectedOwner)
       case 'disarm':
         return await this.enrollmentLifecycle.disarm(enrollment, request.expectedOwner)
@@ -221,13 +233,17 @@ export class WatcherControlPlane {
       ) {
         return refused('coordinator-seat-lost', errorText(error))
       }
+      if (errorCode(error) === 'dispatch_inactive') {
+        appendVoidedQuestionTransitions(this.questionLedger, current.watcherId, messageId, 'closed')
+        return refused('question-already-answered', errorText(error))
+      }
       return { status: 'indeterminate', detail: errorText(error) }
     }
     const commit = this.commit(
       current.watcherId,
       expectedOwner,
       restoreAutoQuestionPark ? { enabled: true } : {},
-      () => this.appendAnsweredQuestionTransitions(current.watcherId, messageId)
+      () => appendAnsweredQuestionTransitions(this.questionLedger, current.watcherId, messageId)
     )
     if (commit.status === 'refused') {
       return {
@@ -353,26 +369,18 @@ export class WatcherControlPlane {
     }
   }
 
-  private appendAnsweredQuestionTransitions(watcherId: string, messageId: string): void {
-    const parkId = `park:${watcherId}:worker-question`
-    for (const entry of getLatestEscalations(this.dependencies.ledger.read(watcherId))) {
-      const matchesQuestion =
-        entry.escalationKind === 'worker-question' && entry.escalationId.endsWith(`:${messageId}`)
-      const matchesPark =
-        entry.escalationKind === 'park-worker-question' &&
-        (entry.escalationId === parkId ||
-          entry.escalationId === `${parkId}:${encodeURIComponent(messageId)}`)
-      if (entry.status !== 'open' || (!matchesQuestion && !matchesPark)) {
-        continue
-      }
-      this.dependencies.ledger.append({
-        ...entry,
-        eventId: this.dependencies.createId(),
-        atMs: this.dependencies.now(),
-        status: matchesQuestion ? 'resolved' : 'acknowledged',
-        foldCount: entry.foldCount + 1
-      })
+  private get questionLedger(): QuestionLedgerAccess {
+    return {
+      read: (watcherId) => this.dependencies.ledger.read(watcherId),
+      append: (entry) => this.dependencies.ledger.append(entry),
+      now: this.dependencies.now,
+      createId: this.dependencies.createId
     }
+  }
+
+  private readQuestion(enrollment: WatcherEnrollment) {
+    return (messageId: string) =>
+      this.dependencies.orchestration.readQuestion(enrollment, messageId)
   }
 
   private appendOpenParkAcknowledgements(watcherId: string): void {

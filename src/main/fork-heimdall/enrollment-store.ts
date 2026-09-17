@@ -85,7 +85,11 @@ export type EnrollmentStore = {
     appendWithinTransaction?: () => void
   ): EnrollmentControlCommit
   setEnabled(watcherId: string, enabled: boolean): EnrollmentRecord
-  rearm(watcherId: string, configuration: EnrollmentRearmConfiguration): WatcherEnrollment
+  rearm(
+    watcherId: string,
+    configuration: EnrollmentRearmConfiguration,
+    appendWithinTransaction?: () => void
+  ): WatcherEnrollment
   setOrchestrationRunId(watcherId: string, runId: string | null): WatcherEnrollment
   markTerminal(
     watcherId: string,
@@ -193,27 +197,50 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
     return this.require(watcherId)
   }
 
-  rearm(watcherId: string, configuration: EnrollmentRearmConfiguration): WatcherEnrollment {
+  rearm(
+    watcherId: string,
+    configuration: EnrollmentRearmConfiguration,
+    appendWithinTransaction?: () => void
+  ): WatcherEnrollment {
+    if (!watcherId) {
+      throw new Error('A watcher id is required')
+    }
     const parsed = EnrollmentRearmConfigurationSchema.parse(configuration)
-    this.updateExisting(
-      watcherId,
-      `UPDATE heimdall_enrollment
-          SET enabled = 1,
-              paused = 0,
-              command_revision = command_revision + 1,
-              capabilities_json = ?,
-              budget_json = ?,
-              kind_payload_json = ?
-        WHERE watcher_id = ?
-          AND terminal_at_ms IS NULL
-          AND enabled = 0
-          AND json_valid(kind_payload_json)`,
-      this.serializeJson('capabilities', parsed.capabilities),
-      this.serializeJson('budget', parsed.budget),
-      this.serializeJson('kind payload', parsed.kindPayload),
-      watcherId
-    )
-    return this.requireValid(watcherId)
+    const capabilities = this.serializeJson('capabilities', parsed.capabilities)
+    const budget = this.serializeJson('budget', parsed.budget)
+    const kindPayload = this.serializeJson('kind payload', parsed.kindPayload)
+    this.database.assertWritable()
+    const connection = this.database.connection()
+    connection.exec('BEGIN IMMEDIATE')
+    try {
+      const result = connection
+        .prepare(
+          `UPDATE heimdall_enrollment
+              SET enabled = 1,
+                  paused = 0,
+                  command_revision = command_revision + 1,
+                  capabilities_json = ?,
+                  budget_json = ?,
+                  kind_payload_json = ?
+            WHERE watcher_id = ?
+              AND terminal_at_ms IS NULL
+              AND enabled = 0
+              AND json_valid(kind_payload_json)`
+        )
+        .run(capabilities, budget, kindPayload, watcherId)
+      if (Number(result.changes) !== 1) {
+        throw new Error(`Unknown or immutable Heimdall watcher: ${watcherId}`)
+      }
+      appendWithinTransaction?.()
+      const rearmed = this.requireValid(watcherId)
+      connection.exec('COMMIT')
+      return rearmed
+    } catch (error) {
+      if (connection.isTransaction) {
+        connection.exec('ROLLBACK')
+      }
+      throw error
+    }
   }
 
   commitControl(

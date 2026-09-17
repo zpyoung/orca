@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { WORKER_EXITED_WITHOUT_COMPLETION } from '../../shared/fork-heimdall/effect-certainty'
 import { makeAttemptFingerprint } from '../../shared/fork-heimdall/attempt-fingerprint'
 import type { LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
 import type {
@@ -202,6 +203,16 @@ const dispatchNode: ObjectiveAction = {
   depsOrchestrationIds: []
 }
 
+const dispatchPlanner: ObjectiveAction = {
+  kind: 'dispatch-planner',
+  capability: 'plan',
+  visibility: 'local',
+  contentIdentity: 'old-content',
+  evidenceKey: 'plan:2',
+  revisionNumber: 2,
+  reason: 'replan-after-failure'
+}
+
 describe('objective action recovery', () => {
   beforeEach(() => {
     readReport.mockReset()
@@ -286,14 +297,58 @@ describe('objective action recovery', () => {
     expect(readReport).not.toHaveBeenCalled()
   })
 
-  it('does not treat an on-disk report as success without trusted worker_done evidence', async () => {
-    const { executor, fresh } = harness()
-    const ledger: WatcherLedger = { watcherId: 'watcher-1', entries: [attempt(dispatchNode)] }
+  it.each([
+    { circumstance: 'without a recorded reason', reason: undefined },
+    { circumstance: 'after contact loss', reason: 'contact-lost' }
+  ] as const)(
+    'does not trust an on-disk report $circumstance without worker_done evidence',
+    async ({ reason }) => {
+      const { executor, fresh } = harness()
+      const uncertain = attempt(dispatchNode, reason === undefined ? {} : { reason })
+      const ledger: WatcherLedger = { watcherId: 'watcher-1', entries: [uncertain] }
 
-    await expect(
-      executor.resolveOutcome(attempt(dispatchNode), fresh, ledger, TEST_LEASE)
-    ).resolves.toBe('indeterminate')
+      await expect(executor.resolveOutcome(uncertain, fresh, ledger, TEST_LEASE)).resolves.toBe(
+        'indeterminate'
+      )
+      expect(readReport).not.toHaveBeenCalled()
+    }
+  )
+
+  it.each([
+    { role: 'implementer', action: dispatchNode },
+    { role: 'planner', action: dispatchPlanner }
+  ])('resolves an exited $role without completion evidence as not landed', async ({ action }) => {
+    const { executor, fresh } = harness()
+    const exited = attempt(action, { reason: WORKER_EXITED_WITHOUT_COMPLETION })
+    const ledger: WatcherLedger = { watcherId: 'watcher-1', entries: [exited] }
+
+    await expect(executor.resolveOutcome(exited, fresh, ledger, TEST_LEASE)).resolves.toBe(
+      'not-landed'
+    )
     expect(readReport).not.toHaveBeenCalled()
+  })
+
+  it('prefers late worker_done evidence over an earlier exited-without-completion settlement', async () => {
+    readReport.mockResolvedValue({
+      ok: true,
+      role: 'implementer',
+      path: '/workspace/report.json',
+      reportDigest: 'digest-1',
+      report: {
+        taskKey: 'node-a',
+        summary: 'Implemented A',
+        filesModified: ['src/a.ts'],
+        criteriaSelfAssessment: [{ criterionIndex: 0, result: 'pass', note: 'Verified' }]
+      }
+    })
+    const { executor, fresh } = harness()
+    const exited = attempt(dispatchNode, { reason: WORKER_EXITED_WITHOUT_COMPLETION })
+    const ledger: WatcherLedger = {
+      watcherId: 'watcher-1',
+      entries: [exited, workerDone('succeeded')]
+    }
+
+    await expect(executor.resolveOutcome(exited, fresh, ledger, TEST_LEASE)).resolves.toBe('landed')
   })
 
   it('resolves a failed worker outcome as not landed without trusting a report path', async () => {

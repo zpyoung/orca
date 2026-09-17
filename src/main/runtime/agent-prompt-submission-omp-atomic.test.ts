@@ -1,3 +1,7 @@
+import { resolve } from 'node:path'
+import { runInNewContext } from 'node:vm'
+import { build as buildVite, normalizePath } from 'vite'
+import type { Rollup } from 'vite'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   AGENT_PROMPT_BRACKETED_PASTE_END,
@@ -37,6 +41,96 @@ vi.mock('../git/worktree', () => ({
 }))
 
 const PTY_ID = 'pty-prompt'
+
+// Bundle the real writer and submit constant; external stubs avoid compiling the main-runtime graph.
+const BUNDLED_WRITER_PATH = normalizePath(
+  resolve(__dirname, 'orca-runtime-write-terminal-agent-prompt.ts')
+)
+const BUNDLED_WRITER_EXTERNALS: Record<string, object> = {
+  './orca-runtime-resolve-authoritative-terminal-wait-permission': {
+    OrcaRuntimeWithResolveAuthoritativeTerminalWaitPermission: class {}
+  },
+  './orca-runtime-core': {
+    assertAgentPromptRequestActive: () => {},
+    waitForAgentPromptDelay: async () => {},
+    waitForAgentPromptPromise: async (promise: Promise<unknown>) => await promise
+  },
+  './agent-session-pty-write-gate': {
+    agentSessionPtyWriteGate: {
+      assertAdmitted: () => null,
+      assertReadmitted: () => {}
+    }
+  },
+  './agent-prompt-submission-verification': {
+    isTerminalSendSettlementAgent: () => false,
+    resolveAgentPromptEffectTimeoutMs: () => 0,
+    verifyAgentPromptSubmission: async () => {}
+  }
+}
+
+type BundledWriter = {
+  assertAgentPromptGeneration: () => void
+  getAgentPromptActivity: () => {
+    workingSequence: number
+    explicitWorkingStartedAt: null
+    permissionSequence: number
+  }
+  assertAgentPromptPermissionSafe: () => void
+  getPtyAgent: () => 'omp'
+  ptyController: { write: (ptyId: string, data: string) => boolean }
+  writeTerminalAgentPrompt(
+    handle: string,
+    ptyId: string,
+    generation: number,
+    pastePayload: string
+  ): Promise<unknown>
+}
+
+type BundledWriterConstructor = new () => BundledWriter
+
+async function buildBundledWriter(): Promise<BundledWriterConstructor> {
+  const result = await buildVite({
+    configFile: false,
+    logLevel: 'silent',
+    build: {
+      write: false,
+      ssr: true,
+      minify: 'oxc',
+      rollupOptions: {
+        input: BUNDLED_WRITER_PATH,
+        external: (id, importer) =>
+          importer === BUNDLED_WRITER_PATH && Object.hasOwn(BUNDLED_WRITER_EXTERNALS, id),
+        output: { format: 'cjs' }
+      }
+    }
+  })
+  const output = (Array.isArray(result) ? result[0] : result) as Rollup.RollupOutput
+  const chunk = output.output.find(
+    (item): item is Rollup.OutputChunk => item.type === 'chunk' && item.isEntry
+  )
+  if (!chunk) {
+    throw new Error('OMP writer bundle emitted no entry chunk')
+  }
+  const module = { exports: {} as Record<string, unknown> }
+  runInNewContext(chunk.code, {
+    Buffer,
+    TextEncoder,
+    exports: module.exports,
+    module,
+    require: (id: string) => {
+      const external = BUNDLED_WRITER_EXTERNALS[id]
+      if (!external) {
+        throw new Error(`Unexpected OMP writer bundle import: ${id}`)
+      }
+      return external
+    }
+  })
+  const constructor = module.exports.OrcaRuntimeWithWriteTerminalAgentPrompt
+  if (typeof constructor !== 'function') {
+    throw new Error('OMP writer bundle emitted no runtime constructor')
+  }
+  return constructor as unknown as BundledWriterConstructor
+}
 
 /** Models the observable OMP large-paste decision without importing an installed CLI package.
  * OMP accepts a trailing submit from the same input burst as the completed paste; otherwise it
@@ -84,6 +178,32 @@ afterEach(() => {
 })
 
 describe('OMP agent prompt submission', () => {
+  it('preserves the CR submit byte through the OXC-minified writer bundle', async () => {
+    const Writer = await buildBundledWriter()
+    const runtime = new Writer()
+    const writes: string[] = []
+    runtime.assertAgentPromptGeneration = () => {}
+    runtime.getAgentPromptActivity = () => ({
+      workingSequence: 0,
+      explicitWorkingStartedAt: null,
+      permissionSequence: 0
+    })
+    runtime.assertAgentPromptPermissionSafe = () => {}
+    runtime.getPtyAgent = () => 'omp'
+    runtime.ptyController = {
+      write: (_ptyId, data) => {
+        writes.push(data)
+        return true
+      }
+    }
+    const pastePayload = `${AGENT_PROMPT_BRACKETED_PASTE_START}bundled${AGENT_PROMPT_BRACKETED_PASTE_END}`
+
+    await runtime.writeTerminalAgentPrompt('handle', PTY_ID, 1, pastePayload)
+
+    expect(writes).toEqual([pastePayload + AGENT_PROMPT_SUBMIT])
+    expect(Buffer.from(writes[0]!).at(-1)).toBe(0x0d)
+  })
+
   it('atomically accepts a large paste and observes a turn started during that write', async () => {
     const prompt = Array.from(
       { length: 120 },
@@ -188,6 +308,32 @@ describe('OMP agent prompt submission', () => {
       })
     ).rejects.toThrow('agent_session_checkpoint_stale')
     expect(created.writes).toEqual([])
+  })
+
+  it('stays atomic after the shell command-finished marker retires launch authority', async () => {
+    const prompt = Array.from(
+      { length: 120 },
+      (_, index) => `line ${index}: ${'x'.repeat(48)}`
+    ).join('\n')
+    let runtime: OrcaRuntimeService
+    const omp = createOmpLargePasteHarness(() => {
+      runtime.onPtyData(PTY_ID, '\x1b]9999;{"state":"working","agentType":"omp"}\x07', Date.now())
+    })
+    const created = await createAgentPromptSubmissionRuntime(
+      (_runtime, data) => omp.ingest(data),
+      'omp'
+    )
+    runtime = created.runtime
+    // The startup shell emits this before the agent settles, so it races every dispatch preamble.
+    runtime.emitDaemonPtyTransientFact(PTY_ID, { kind: 'command-finished', exitCode: 0 })
+
+    await expect(runtime.sendTerminalAgentPrompt(created.handle, prompt)).resolves.toMatchObject({
+      accepted: true
+    })
+
+    expect(omp.submissions).toEqual([prompt])
+    expect(omp.menuOpens()).toBe(0)
+    expect(created.writes).toEqual([`${buildAgentPromptPasteBytes(prompt)}${AGENT_PROMPT_SUBMIT}`])
   })
 
   it('keeps non-OMP submission delayed and emits exactly one separate CR', async () => {

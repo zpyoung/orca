@@ -219,8 +219,6 @@
         "taskId": "Task {{id}}",
         "dispatchId": "Dispatch {{id}}",
         "plan": "Plan",
-        "collapsePlan": "Collapse plan",
-        "expandPlan": "Expand plan",
         "revision": "Revision {{number}}",
         "revisionMeta": "{{nodes}} nodes · created {{time}} · digest {{digest}}",
         "revisionApproved": "Approved {{time}}",

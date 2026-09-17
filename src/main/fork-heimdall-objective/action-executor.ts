@@ -1,4 +1,8 @@
-import type { ActionOutcome, EffectCertainty } from '../../shared/fork-heimdall/effect-certainty'
+import {
+  WORKER_EXITED_WITHOUT_COMPLETION,
+  type ActionOutcome,
+  type EffectCertainty
+} from '../../shared/fork-heimdall/effect-certainty'
 import { makeAttemptFingerprint } from '../../shared/fork-heimdall/attempt-fingerprint'
 import { getLatestAttempts } from '../../shared/fork-heimdall/ledger-queries'
 import type { ActionExecutor, LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
@@ -158,7 +162,7 @@ async function resolveDispatchOutcome(args: {
   }
   const evidence = findObjectiveWorkerEvidence(args.ledger, dispatchId)
   if (!evidence) {
-    return 'indeterminate'
+    return args.attempt.reason === WORKER_EXITED_WITHOUT_COMPLETION ? 'not-landed' : 'indeterminate'
   }
   if (evidence.outcome === 'failed') {
     return 'not-landed'

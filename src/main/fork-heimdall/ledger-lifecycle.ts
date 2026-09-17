@@ -1,5 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { deriveBudgetState } from '../../shared/fork-heimdall/budget'
+import {
+  attemptPredatesCurrentBudgetGeneration,
+  deriveBudgetState
+} from '../../shared/fork-heimdall/budget'
 import type {
   DispatchResult,
   DispatchWorkerInput,
@@ -171,7 +174,11 @@ export class WatcherLedgerLifecycle {
     const attempt = getInFlightAttempts(ledger).find(
       (candidate) => candidate.state === 'running' && candidate.dispatchId === dispatchId
     )
-    if (!attempt || this.workerIntervals.has(attempt.attemptId)) {
+    if (
+      !attempt ||
+      this.workerIntervals.has(attempt.attemptId) ||
+      attemptPredatesCurrentBudgetGeneration(ledger, attempt.attemptId)
+    ) {
       return
     }
     const current = this.dependencies.budgetClock.current?.(watcherId) ?? null
@@ -363,7 +370,10 @@ export class WatcherLedgerLifecycle {
         delete runningAttempt.result
         this.dependencies.ledgerStore.append(enrollment.watcherId, runningAttempt)
       }
-      if (!this.workerIntervals.has(attempt.attemptId)) {
+      if (
+        !this.workerIntervals.has(attempt.attemptId) &&
+        !attemptPredatesCurrentBudgetGeneration(ledger, attempt.attemptId)
+      ) {
         const current = this.dependencies.budgetClock.current?.(enrollment.watcherId) ?? null
         this.workerIntervals.set(
           attempt.attemptId,
