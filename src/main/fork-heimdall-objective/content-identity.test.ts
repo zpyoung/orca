@@ -352,4 +352,22 @@ describe('computeObjectiveWorktreeContentDigest', () => {
       )
     }
   )
+  it('is unchanged when dirty content is committed unmodified, and changes when it is edited', async () => {
+    const root = await temporaryDirectory('orca-objective-worktree-digest-commit-')
+    await git(root, ['init'])
+    await writeFile(join(root, 'tracked.txt'), 'committed\n')
+    await commitAll(root, 'initial')
+    await writeFile(join(root, 'tracked.txt'), 'worker edit\n')
+    const target = gitTarget(root)
+    const dirtyDigest = await computeObjectiveWorktreeContentDigest(target)
+
+    await commitAll(root, 'worker commit')
+
+    // The landing path compares this digest across the commit, so committing unmodified content
+    // has to leave it alone; only the bytes on disk may move it.
+    expect(await computeObjectiveWorktreeContentDigest(target)).toBe(dirtyDigest)
+
+    await writeFile(join(root, 'tracked.txt'), 'edited after commit\n')
+    expect(await computeObjectiveWorktreeContentDigest(target)).not.toBe(dirtyDigest)
+  })
 })
