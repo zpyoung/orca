@@ -32,6 +32,12 @@ export type ObjectiveDirtyPath = {
   untracked: boolean
 }
 type ParsedGitStatus = { entries: ObjectiveDirtyPath[]; unborn: boolean }
+export type GitDirtyFingerprint = { path: string; fingerprint: string }
+export type GitWorkspaceObservation = { treeOid: string; dirty: GitDirtyFingerprint[] }
+
+// Every porcelain-v2 arm records the same tag, so the identity hash re-injects it as a constant.
+const DIRTY_ENTRY_METADATA = 'worktree'
+const SYMLINK_OID_ALIAS = 'orca-objective-symlink-oid'
 type ObservedStat = { type: string; mode?: number }
 
 function sha256(parts: readonly string[]): string {
@@ -42,7 +48,7 @@ function sha256(parts: readonly string[]): string {
   return hash.digest('hex')
 }
 
-function isObjectiveMetadataPath(relativePath: string, caseInsensitive = false): boolean {
+export function isObjectiveMetadataPath(relativePath: string, caseInsensitive = false): boolean {
   const candidate = caseInsensitive ? relativePath.toLowerCase() : relativePath
   return candidate === '.orca' || candidate.startsWith('.orca/')
 }
@@ -163,7 +169,7 @@ export function parseObjectiveDirtyPaths(
   }
 }
 
-async function mapConcurrent<T, R>(
+export async function mapConcurrent<T, R>(
   values: readonly T[],
   limit: number,
   map: (value: T) => Promise<R>
@@ -244,6 +250,27 @@ async function readWorkingTreeStat(
   }
 }
 
+// git hash-object resolves a symlink to its target, which both hides a retarget and fails outright
+// on a broken link; hashing the link text shell-side reproduces the blob Git itself stores.
+async function symlinkBlobObjectId(runGit: ObjectiveGitCommand, path: string): Promise<string> {
+  const { stdout } = await runGit([
+    '-c',
+    `alias.${SYMLINK_OID_ALIAS}=!f() { test "$1" = -- && shift; for path do case "$path" in -*) path="./$path";; esac; printf "%s" "$(readlink "$path")" | git hash-object --stdin | tr -d "\\n"; printf "\\0"; done; }; f`,
+    SYMLINK_OID_ALIAS,
+    '--',
+    path
+  ])
+  const fields = stdout.split('\0')
+  if (fields.at(-1) === '') {
+    fields.pop()
+  }
+  const objectId = fields.length === 1 ? fields[0] : undefined
+  if (objectId === undefined || !/^[0-9a-f]{40,64}$/u.test(objectId)) {
+    throw new Error(`Git did not return a symlink object hash for ${path}`)
+  }
+  return objectId
+}
+
 async function fingerprintDirtyPath(
   target: ObjectiveWorkspaceTarget,
   runGit: ObjectiveGitCommand,
@@ -285,6 +312,10 @@ async function fingerprintDirtyPath(
     )}`
   }
 
+  if (stat.type === 'symlink') {
+    return `blob\0${workingMetadata}\0${await symlinkBlobObjectId(runGit, entry.path)}`
+  }
+
   const output = (await runGit(['hash-object', '--', entry.path])).stdout.trim()
   if (!/^[0-9a-f]{40,64}$/u.test(output)) {
     throw new Error(`Git did not return an object hash for ${entry.path}`)
@@ -292,12 +323,12 @@ async function fingerprintDirtyPath(
   return `blob\0${workingMetadata}\0${output}`
 }
 
-async function computeGitRepositoryIdentity(
+export async function observeGitRepositoryState(
   target: ObjectiveWorkspaceTarget,
   runGit: ObjectiveGitCommand,
   repositoryPrefix: string,
   caseInsensitivePaths: boolean
-): Promise<string> {
+): Promise<GitWorkspaceObservation> {
   const [treeResult, statusResult] = await Promise.allSettled([
     runGit(['rev-parse', '--verify', 'HEAD^{tree}']),
     runGit([
@@ -328,12 +359,43 @@ async function computeGitRepositoryIdentity(
   const fingerprints = await mapConcurrent(parsed.entries, HASH_CONCURRENCY, (entry) =>
     fingerprintDirtyPath(target, runGit, repositoryPrefix, entry, caseInsensitivePaths)
   )
-  const parts: string[] = [treeOid, '\0']
-  for (let index = 0; index < parsed.entries.length; index += 1) {
-    const entry = parsed.entries[index]!
-    parts.push(entry.path, '\0', entry.metadata, '\0', fingerprints[index]!, '\0')
+  return {
+    treeOid,
+    dirty: parsed.entries.map((entry, index) => ({
+      path: entry.path,
+      fingerprint: fingerprints[index]!
+    }))
+  }
+}
+
+export async function computeGitRepositoryIdentity(
+  target: ObjectiveWorkspaceTarget,
+  runGit: ObjectiveGitCommand,
+  repositoryPrefix: string,
+  caseInsensitivePaths: boolean
+): Promise<string> {
+  const observed = await observeGitRepositoryState(
+    target,
+    runGit,
+    repositoryPrefix,
+    caseInsensitivePaths
+  )
+  const parts: string[] = [observed.treeOid, '\0']
+  for (const entry of observed.dirty) {
+    parts.push(entry.path, '\0', DIRTY_ENTRY_METADATA, '\0', entry.fingerprint, '\0')
   }
   return sha256(parts)
+}
+
+export async function observeGitWorkspaceState(
+  target: ObjectiveWorkspaceTarget
+): Promise<GitWorkspaceObservation> {
+  return await observeGitRepositoryState(
+    target,
+    objectiveGitCommandForTarget(target),
+    '',
+    resolveLeasePathFlavor(target.executionHostId, target.workspacePath) === win32
+  )
 }
 
 async function computeGitIdentity(target: ObjectiveWorkspaceTarget): Promise<string> {

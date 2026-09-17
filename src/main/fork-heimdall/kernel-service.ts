@@ -36,6 +36,7 @@ import {
 } from './kernel-service-dependencies'
 import { bootHeimdallKernelService } from './kernel-service-boot'
 import { shutdownHeimdallKernel } from './kernel-shutdown'
+import { heimdallMailboxAddressForRun, setHeimdallMailboxWake } from './mailbox-wake-registry'
 import type { KernelTerminalTransition } from './kernel-terminal-transition'
 import type { KernelReadModel } from './kernel-read-model'
 import type { HeimdallLedgerStore } from './ledger-store'
@@ -201,6 +202,16 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
       }
     }
     this.ensureLoaded()
+    setHeimdallMailboxWake((address) => this.wakeRunnersForMailbox(address))
+  }
+
+  private wakeRunnersForMailbox(address: string): void {
+    for (const runner of this.runners.values()) {
+      const runId = runner.enrollment.orchestrationRunId
+      if (runId && heimdallMailboxAddressForRun(runId) === address) {
+        this.requireRunnerLoop().schedule(runner, 0)
+      }
+    }
   }
 
   onShutdown(listener: () => void, phase: 'start' | 'drained' = 'start'): () => void {
@@ -214,6 +225,7 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
       return this.shutdownPromise ?? Promise.resolve()
     }
     this.stopped = true
+    setHeimdallMailboxWake(null)
     this.shutdownPromise = shutdownHeimdallKernel({
       loaded: this.loaded,
       listeners: this.shutdownListeners,

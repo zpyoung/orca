@@ -427,7 +427,9 @@ export class WatcherRunnerLoop {
       this.statusLifecycle.markSuccessful(runner, 'acting')
       const afterStop = await this.stopLifecycle.evaluate(runner, snapshot, ledger)
       if (afterStop === 'clear' || afterStop === 'deferred') {
-        this.schedule(runner, HEIMDALL_RAPID_POLL_MS)
+        // The next decision is a pure function of the ledger and the snapshot, and attempt
+        // fingerprints stop a settled action being retried, so waiting only adds latency.
+        this.schedule(runner, 0)
       }
     } catch (error) {
       this.dispatchLifecycle.closeForContactLoss(runner.enrollment.watcherId)

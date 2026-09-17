@@ -298,6 +298,15 @@
       "lines": ["  state.heimdall?.start()"]
     },
     {
+      "path": "src/main/runtime/orca-runtime-refresh-floating-workspace-pty-liveness.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "import { notifyHeimdallMailboxArrival } from '../fork-heimdall/mailbox-wake-registry'",
+        "    notifyHeimdallMailboxArrival(handle, messageType)"
+      ]
+    },
+    {
       "path": "src/renderer/src/app-shell/AppWorkspaceShell.tsx",
       "feature": "heimdall",
       "kind": "registration",
@@ -4668,6 +4677,10 @@
       "removed": 3
     },
     "src/main/startup/main-process-observers.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/runtime/orca-runtime-refresh-floating-workspace-pty-liveness.ts": {
       "added": 2,
       "removed": 0
     },

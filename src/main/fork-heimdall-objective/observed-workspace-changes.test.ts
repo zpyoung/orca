@@ -10,6 +10,7 @@ import {
 import type { FileStat, IFilesystemProvider } from '../providers/types'
 import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
 import type { ObjectiveWorkspaceTarget } from './content-identity'
+import { observeObjectiveWorkspaceManifest } from './objective-workspace-manifest'
 import {
   captureObjectiveWorkspaceBaseline,
   validateObjectiveWorkspaceChanges
@@ -49,6 +50,28 @@ function gitTarget(workspacePath: string): ObjectiveWorkspaceTarget {
 
 async function git(cwd: string, args: string[]): Promise<void> {
   await gitExecFileAsync(args, { cwd, admissionTier: 'background' })
+}
+
+async function commitAll(root: string, message: string): Promise<void> {
+  await git(root, ['add', '-A'])
+  await git(root, [
+    '-c',
+    'user.name=Objective Test',
+    '-c',
+    'user.email=objective@example.test',
+    '-c',
+    'commit.gpgsign=false',
+    'commit',
+    '-m',
+    message
+  ])
+}
+
+async function gitRepository(prefix: string): Promise<string> {
+  const root = await temporaryDirectory(prefix)
+  await git(root, ['init'])
+  await mkdir(join(root, 'src'))
+  return root
 }
 
 type MemoryNode =
@@ -484,5 +507,155 @@ describe('objective observed workspace changes', () => {
       })
     ).resolves.toEqual({ ok: false, reason: 'objective-workspace-route-unavailable' })
     expect(replacementProvider.observedPaths).toEqual([])
+  })
+  it('does not report a path that was dirty at capture and is then committed unchanged', async () => {
+    const root = await gitRepository('orca-objective-observed-commit-')
+    await writeFile(join(root, 'src', 'staged.ts'), 'before\n')
+    await commitAll(root, 'initial')
+    await writeFile(join(root, 'src', 'staged.ts'), 'worker edit\n')
+    const target = gitTarget(root)
+    await captureObjectiveWorkspaceBaseline(target, 'commit-attempt')
+
+    await commitAll(root, 'worker commit')
+
+    await expect(
+      validateObjectiveWorkspaceChanges({
+        target,
+        attemptFingerprint: 'commit-attempt',
+        reportedFiles: [],
+        writeTerritory: ['src/**']
+      })
+    ).resolves.toEqual({ ok: true, changedPaths: [] })
+  })
+
+  it('reports a path that was dirty at capture and is then restored to HEAD', async () => {
+    const root = await gitRepository('orca-objective-observed-revert-')
+    await writeFile(join(root, 'src', 'reverted.ts'), 'committed\n')
+    await commitAll(root, 'initial')
+    await writeFile(join(root, 'src', 'reverted.ts'), 'dirty at capture\n')
+    const target = gitTarget(root)
+    await captureObjectiveWorkspaceBaseline(target, 'revert-attempt')
+
+    await git(root, ['checkout', '--', 'src/reverted.ts'])
+
+    await expect(
+      validateObjectiveWorkspaceChanges({
+        target,
+        attemptFingerprint: 'revert-attempt',
+        reportedFiles: ['src/reverted.ts'],
+        writeTerritory: ['src/**']
+      })
+    ).resolves.toEqual({ ok: true, changedPaths: ['src/reverted.ts'] })
+  })
+
+  it('reports a file created and committed without being dirty at either observation', async () => {
+    const root = await gitRepository('orca-objective-observed-added-')
+    await writeFile(join(root, 'src', 'existing.ts'), 'existing\n')
+    await commitAll(root, 'initial')
+    const target = gitTarget(root)
+    await captureObjectiveWorkspaceBaseline(target, 'added-attempt')
+
+    await writeFile(join(root, 'src', 'added.ts'), 'added\n')
+    await commitAll(root, 'worker commit')
+
+    await expect(
+      validateObjectiveWorkspaceChanges({
+        target,
+        attemptFingerprint: 'added-attempt',
+        reportedFiles: ['src/added.ts'],
+        writeTerritory: ['src/**']
+      })
+    ).resolves.toEqual({ ok: true, changedPaths: ['src/added.ts'] })
+  })
+
+  it.skipIf(process.platform === 'win32')(
+    'observes a dirty symlink that points at a missing file instead of failing on it',
+    async () => {
+      const root = await gitRepository('orca-objective-observed-broken-link-')
+      await writeFile(join(root, 'src', 'kept.ts'), 'kept\n')
+      await commitAll(root, 'initial')
+      await symlink('does-not-exist.ts', join(root, 'src', 'dangling.ts'))
+      const target = gitTarget(root)
+      await captureObjectiveWorkspaceBaseline(target, 'broken-link-attempt')
+
+      await writeFile(join(root, 'src', 'kept.ts'), 'changed\n')
+
+      await expect(
+        validateObjectiveWorkspaceChanges({
+          target,
+          attemptFingerprint: 'broken-link-attempt',
+          reportedFiles: ['src/kept.ts'],
+          writeTerritory: ['src/**']
+        })
+      ).resolves.toEqual({ ok: true, changedPaths: ['src/kept.ts'] })
+    }
+  )
+
+  it.skipIf(process.platform === 'win32')(
+    'reports a retargeted symlink whose old and new targets hold identical content',
+    async () => {
+      const root = await gitRepository('orca-objective-observed-retarget-')
+      await writeFile(join(root, 'src', 'first.ts'), 'same\n')
+      await writeFile(join(root, 'src', 'second.ts'), 'same\n')
+      await symlink('first.ts', join(root, 'src', 'link.ts'))
+      await commitAll(root, 'initial')
+      const target = gitTarget(root)
+      await captureObjectiveWorkspaceBaseline(target, 'retarget-attempt')
+
+      await unlink(join(root, 'src', 'link.ts'))
+      await symlink('second.ts', join(root, 'src', 'link.ts'))
+
+      await expect(
+        validateObjectiveWorkspaceChanges({
+          target,
+          attemptFingerprint: 'retarget-attempt',
+          reportedFiles: ['src/link.ts'],
+          writeTerritory: ['src/**']
+        })
+      ).resolves.toEqual({ ok: true, changedPaths: ['src/link.ts'] })
+    }
+  )
+
+  it('validates a baseline captured in the legacy whole-manifest format', async () => {
+    const root = await gitRepository('orca-objective-observed-legacy-')
+    await writeFile(join(root, 'src', 'legacy.ts'), 'before\n')
+    await commitAll(root, 'initial')
+    const target = gitTarget(root)
+    await captureObjectiveWorkspaceBaseline(target, 'legacy-attempt')
+
+    const baselineDirectory = join(
+      root,
+      '.git',
+      'orca-heimdall',
+      'objective',
+      'reports',
+      'workspace-baselines'
+    )
+    const [baselineName] = await readdir(baselineDirectory)
+    await writeFile(
+      join(baselineDirectory, baselineName!),
+      JSON.stringify({
+        version: 1,
+        attemptFingerprint: 'legacy-attempt',
+        target: {
+          kind: 'git',
+          executionHostId: 'local',
+          workspacePath: root,
+          gitWorktreeId: `objective-repo::${root}`
+        },
+        entries: await observeObjectiveWorkspaceManifest(target)
+      })
+    )
+
+    await writeFile(join(root, 'src', 'legacy.ts'), 'after\n')
+
+    await expect(
+      validateObjectiveWorkspaceChanges({
+        target,
+        attemptFingerprint: 'legacy-attempt',
+        reportedFiles: ['src/legacy.ts'],
+        writeTerritory: ['src/**']
+      })
+    ).resolves.toEqual({ ok: true, changedPaths: ['src/legacy.ts'] })
   })
 })

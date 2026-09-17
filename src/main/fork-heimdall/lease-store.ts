@@ -176,6 +176,7 @@ class EpochLeaseGuard implements LeaseGuard {
 export class HostRoutedLeaseStore implements LeaseStore {
   private readonly locations = new Map<WorkspaceKey, ResolvedLeaseLocation>()
   private readonly epochOperationTails = new Map<string, Promise<void>>()
+  private readonly renewedAtMs = new Map<string, number>()
 
   constructor(
     private readonly dependencies: {
@@ -256,6 +257,7 @@ export class HostRoutedLeaseStore implements LeaseStore {
       if (currentEpochAfterRelease !== epoch) {
         throw new LeaseLostError(`Lease epoch ${epoch} was fenced while it was being released`)
       }
+      this.renewedAtMs.delete(`${location.leaseDirectory}\0${epoch}`)
     })
   }
 
@@ -389,11 +391,19 @@ export class HostRoutedLeaseStore implements LeaseStore {
       if (await this.isExpiredByHostClock(location, epoch, ttlMs)) {
         throw new LeaseLostError('Lease expired on its execution host')
       }
-      if (renew) {
+      // The holder file's mtime is the liveness signal, so an immediate re-tick gains nothing by
+      // rewriting it; the renewal loop's own ttl/3 cadence still keeps it well inside the TTL.
+      const renewalKey = `${location.leaseDirectory}\0${epoch}`
+      const ownerNow = this.dependencies.ownerNow?.() ?? Date.now()
+      const lastRenewedAtMs = this.renewedAtMs.get(renewalKey)
+      const renewalDue =
+        lastRenewedAtMs === undefined || ownerNow - lastRenewedAtMs >= Math.floor(ttlMs / 3)
+      if (renew && renewalDue) {
         await location.fs.writeFile(
           holderPath,
           JSON.stringify({ ...current, ttlMs, released: false })
         )
+        this.renewedAtMs.set(renewalKey, ownerNow)
       }
       const currentEpochAfterVerification = highestEpoch(
         await location.fs.readDir(location.leaseDirectory)

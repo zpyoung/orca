@@ -3,7 +3,16 @@ import { chmod, lstat, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { objectivePathMatchesTerritory } from '../../shared/fork-heimdall-objective/plan-schema'
 import type { IFilesystemProvider } from '../providers/types'
 import { resolveLeasePathFlavor } from '../fork-heimdall/lease-host-filesystem'
-import type { ObjectiveWorkspaceTarget } from './content-identity'
+import { observeGitWorkspaceState, type ObjectiveWorkspaceTarget } from './content-identity'
+import { computeGitWorkspaceChangedPaths } from './git-workspace-changed-set'
+import {
+  GIT_BASELINE_VERSION,
+  LEGACY_BASELINE_VERSION,
+  parseBaseline,
+  sameTarget,
+  targetDescriptor,
+  type WorkspaceBaseline
+} from './objective-workspace-baseline-schema'
 import {
   objectiveFilesystemProviderForTarget,
   observeObjectiveWorkspaceManifest,
@@ -11,21 +20,8 @@ import {
 } from './objective-workspace-manifest'
 import { resolveExpectedObjectiveReportPath } from './report-ingestion'
 
-const BASELINE_VERSION = 1
 const MAX_BASELINE_BYTES = 64 * 1024 * 1024
 
-type BaselineTarget = {
-  kind: ObjectiveWorkspaceTarget['kind']
-  executionHostId: string
-  workspacePath: string
-  gitWorktreeId: string | null
-}
-type WorkspaceBaseline = {
-  version: typeof BASELINE_VERSION
-  attemptFingerprint: string
-  target: BaselineTarget
-  entries: ManifestEntry[]
-}
 type BaselineRead =
   | { state: 'ok'; baseline: WorkspaceBaseline }
   | { state: 'missing' | 'malformed' | 'unreadable' }
@@ -42,84 +38,6 @@ function errorCode(error: unknown): string | number | undefined {
 function isMissing(error: unknown): boolean {
   const code = errorCode(error)
   return code === 'ENOENT' || code === 'ENOTDIR' || code === 2
-}
-
-function targetDescriptor(target: ObjectiveWorkspaceTarget): BaselineTarget {
-  return {
-    kind: target.kind,
-    executionHostId: target.executionHostId,
-    workspacePath: target.workspacePath,
-    gitWorktreeId: target.kind === 'git' ? (target.gitTarget?.worktree.id ?? null) : null
-  }
-}
-
-function sameTarget(left: BaselineTarget, right: BaselineTarget): boolean {
-  return (
-    left.kind === right.kind &&
-    left.executionHostId === right.executionHostId &&
-    left.workspacePath === right.workspacePath &&
-    left.gitWorktreeId === right.gitWorktreeId
-  )
-}
-
-function exactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
-  const actual = Object.keys(value).sort()
-  const expected = [...keys].sort()
-  return actual.length === expected.length && actual.every((key, index) => key === expected[index])
-}
-
-function parseBaseline(input: unknown): WorkspaceBaseline | null {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) {
-    return null
-  }
-  const value = input as Record<string, unknown>
-  if (!exactKeys(value, ['version', 'attemptFingerprint', 'target', 'entries'])) {
-    return null
-  }
-  if (value.version !== BASELINE_VERSION || typeof value.attemptFingerprint !== 'string') {
-    return null
-  }
-  if (!value.target || typeof value.target !== 'object' || Array.isArray(value.target)) {
-    return null
-  }
-  const rawTarget = value.target as Record<string, unknown>
-  if (!exactKeys(rawTarget, ['kind', 'executionHostId', 'workspacePath', 'gitWorktreeId'])) {
-    return null
-  }
-  if (
-    (rawTarget.kind !== 'git' && rawTarget.kind !== 'folder') ||
-    typeof rawTarget.executionHostId !== 'string' ||
-    typeof rawTarget.workspacePath !== 'string' ||
-    (rawTarget.gitWorktreeId !== null && typeof rawTarget.gitWorktreeId !== 'string') ||
-    !Array.isArray(value.entries)
-  ) {
-    return null
-  }
-  const entries: ManifestEntry[] = []
-  let previousPath: string | null = null
-  for (const rawEntry of value.entries) {
-    if (!rawEntry || typeof rawEntry !== 'object' || Array.isArray(rawEntry)) {
-      return null
-    }
-    const entry = rawEntry as Record<string, unknown>
-    if (
-      !exactKeys(entry, ['path', 'fingerprint']) ||
-      typeof entry.path !== 'string' ||
-      typeof entry.fingerprint !== 'string' ||
-      !/^[0-9a-f]{64}$/u.test(entry.fingerprint) ||
-      (previousPath !== null && entry.path <= previousPath)
-    ) {
-      return null
-    }
-    entries.push({ path: entry.path, fingerprint: entry.fingerprint })
-    previousPath = entry.path
-  }
-  return {
-    version: BASELINE_VERSION,
-    attemptFingerprint: value.attemptFingerprint,
-    target: rawTarget as BaselineTarget,
-    entries
-  }
 }
 
 async function baselinePath(
@@ -247,12 +165,20 @@ export async function captureObjectiveWorkspaceBaseline(
   if (existing.state !== 'missing') {
     throw new Error(`Objective workspace baseline is ${existing.state}`)
   }
-  const baseline: WorkspaceBaseline = {
-    version: BASELINE_VERSION,
-    attemptFingerprint,
-    target: targetDescriptor(target),
-    entries: await observeObjectiveWorkspaceManifest(target)
-  }
+  const baseline: WorkspaceBaseline =
+    target.kind === 'git'
+      ? {
+          version: GIT_BASELINE_VERSION,
+          attemptFingerprint,
+          target: targetDescriptor(target),
+          git: await observeGitWorkspaceState(target)
+        }
+      : {
+          version: LEGACY_BASELINE_VERSION,
+          attemptFingerprint,
+          target: targetDescriptor(target),
+          entries: await observeObjectiveWorkspaceManifest(target)
+        }
   await writeBaseline(target, baseline, location.directory, location.path)
 }
 
@@ -287,13 +213,22 @@ export async function validateObjectiveWorkspaceChanges(args: {
   ) {
     return { ok: false, reason: 'objective-workspace-baseline-mismatch' }
   }
-  let after: ManifestEntry[]
+  let observed: string[]
   try {
-    after = await observeObjectiveWorkspaceManifest(args.target)
+    observed =
+      stored.baseline.version === GIT_BASELINE_VERSION
+        ? await computeGitWorkspaceChangedPaths(
+            args.target,
+            stored.baseline.git,
+            await observeGitWorkspaceState(args.target)
+          )
+        : changedPaths(
+            stored.baseline.entries,
+            await observeObjectiveWorkspaceManifest(args.target)
+          )
   } catch {
     return { ok: false, reason: 'objective-workspace-observation-failed' }
   }
-  const observed = changedPaths(stored.baseline.entries, after)
   const outside = observed.find((path) => !objectivePathMatchesTerritory(path, args.writeTerritory))
   if (outside) {
     return { ok: false, reason: `observed-change-outside-write-territory:${outside}` }
