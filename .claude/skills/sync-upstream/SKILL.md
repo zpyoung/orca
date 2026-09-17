@@ -142,6 +142,20 @@ range and are not fork work. Excluding `upstream/main` as well as `$UPSTREAM_TAR
   no direct push to `main` anywhere in this flow.
 - Otherwise continue.
 
+Then check that the **previous** stable tag is still an ancestor:
+
+```sh
+git merge-base --is-ancestor "$PREV_TAG" origin/main
+```
+
+If it fails, the last sync PR was squash-merged. `main` still carries that release's *content*, so
+nothing looks wrong, but the tag commit is gone from the lineage and `git merge` resolves its base a
+release further back — v1.4.205 merged against a v1.4.203-era base and produced 2,536 differing
+paths and 287 conflicted files instead of a one-release step. Proceed with the normal procedure:
+`-X ours` plus Step 6 still resolve it, and `$PREV_TAG` is still the right content baseline for
+every Step 6 audit diff. But say so in the report — it is a violated invariant of this flow, not a
+quirk of the release — and expect the ownership lists to be several times their usual size.
+
 ### An earlier run's PR may already resolve this tag
 
 This automation opens one run a day, and a run that stops with CI red leaves its PR open. The next
@@ -258,6 +272,21 @@ before merging, so an install failure is never mistaken for a resolution failure
 ```sh
 pnpm install --frozen-lockfile
 ```
+
+**One dirty-tree case is not someone's work and must not stop the run.** The worktree setup installs
+with whatever `pnpm` is on `PATH`, and an ambient pnpm 10 rewrites the pnpm-12 lockfile in place —
+`pnpm-lock.yaml` alone modified, its `packageManagerDependencies` block dropped and the rest
+reflowed. Confirm it is only that file and only that shape, then restore it and take the pinned
+toolchain for the whole run, since `package.json`'s `packageManager` is not self-enforcing here:
+
+```sh
+git checkout -- pnpm-lock.yaml
+corepack pnpm -v            # must print the packageManager pin, e.g. 12.0.0
+```
+
+Put a `pnpm` shim that execs `corepack pnpm` at the front of `PATH` for the run — repo scripts
+invoke bare `pnpm` internally, so switching only your own calls is not enough. Anything else dirty
+is a stop.
 
 If any check or the install fails, STOP and go to Step 13 with "needs attention: unusable run
 workspace (<which check failed>) — nothing merged, nothing pushed".
@@ -532,7 +561,17 @@ A hard fail here is not the end of the run — work it under the fix policy abov
 gate from the top. Re-run it whole: a fix for a typecheck error routinely breaks lint, and a partial
 re-run is how a broken tree reaches the PR.
 
-If the policy says escalate, or the same failure survives your fixes, restore and bail:
+If the policy says escalate, or the same failure survives your fixes, **tag the resolution before
+you throw it away**. The reset is mandatory, but a run that escalates has usually produced a
+complete, correct resolution that only a human decision blocks, and the tag lives in the shared
+`.git`, so it survives this worktree being deleted:
+
+```sh
+git tag "sync-resolved/${STABLE_TAG}-<stamp>" HEAD
+```
+
+Name that tag and its SHA in the report, so the rerun after the decision starts from it instead of
+redoing hours of ownership work. Then restore and bail:
 `git reset --hard $ORIGIN_MAIN_OLD`, then go to Step 13 with "needs attention: merge resolved but
 <install|manifest|typecheck|lint> failed — manual resolution required; backup at
 origin/<BACKUP_REF>". Include the first ~20 lines of the failure output.
@@ -709,7 +748,14 @@ Then confirm and capture the new tip:
 git fetch origin main
 MAIN_NEW=$(git rev-parse origin/main)
 git merge-base --is-ancestor "$UPSTREAM_TARGET" origin/main   # must succeed
+git rev-list --parents -n1 "$MAIN_NEW" | wc -w                # must be 3: the commit and two parents
 ```
+
+The parent count is the only check a squash fails. The ancestor check above passes either way,
+because a squash carries the tag's content forward even though it drops the tag from the lineage —
+which is why #82 went unnoticed until the next sync merged against a stale base. If the tip has one
+parent, report "needs attention: the sync PR was not merged as a merge commit" and say which
+`$PREV_TAG` the next run will find missing.
 
 The fork does not delete branches on merge, and this automation opens one a day, so clean up the
 remote branch best-effort: `git push origin --delete "$SYNC_BRANCH"`. A failure here is worth a line

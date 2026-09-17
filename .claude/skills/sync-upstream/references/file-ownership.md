@@ -256,6 +256,9 @@ Hard limits. Violate any of these and it is a human decision, not an automated o
   fixed it on trunk. It cannot be pre-fixed on `main` (the file does not exist there) and the trunk
   fix must not be backported, so it is a separate decision from the fork-side ones. Name it
   explicitly when escalating, or the rerun re-escalates on that one file after the rest are fixed.
+  Proving it needs no checkout, unlike the vitest case above: if the lint config, the plugin pin in
+  `package.json`, and the violating file are each byte-identical to the tag, the inputs are the
+  tag's and the finding is deterministic. Three `git diff --quiet` calls settle it.
 - Never edit `.oxlintrc.json` to silence the rule. Upstream owns that file, so the next sync would
   re-add the rule and re-block.
 
@@ -267,10 +270,15 @@ To get ahead of the next release instead of discovering this mid-sync, run the t
 against the current tree before merging — restore the baseline config afterward:
 
 ```sh
-cp .oxlintrc.json /tmp/oxlintrc.baseline.json
-git show <target-ref>:.oxlintrc.json > .oxlintrc.json
-pnpm exec oxlint; cp /tmp/oxlintrc.baseline.json .oxlintrc.json
+git diff <target-ref> -- .oxlintrc.json 'config/oxlint-*.json'
+git diff <target-ref> -- package.json | grep -E '^[-+].*"(lint|audit:|check:)'
 ```
+
+Swapping in the target's `.oxlintrc.json` and re-running `oxlint` is **not** the pre-check, for the
+same reason the diagnostic above is not: a release can put its new rules in a separate config behind
+a separate script, and that rehearsal runs neither. Read the two diffs instead, then rehearse
+whatever they actually name — for v1.4.205 that meant installing the pinned plugin and running
+`audit:anti-slop`, which the old rehearsal would have missed entirely.
 
 ## When upstream ratchets a chokepoint
 
