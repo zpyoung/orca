@@ -1,6 +1,6 @@
 ---
-last_released_commit: 7142b25bdc89a6f96916264b07def66398972f16
-upstream_synced: v1.4.203
+last_released_commit: 8ee9f04c4dcf4cd017dd969bcdc1d0667938d5f5
+upstream_synced: v1.4.206
 ---
 
 # Changelog
@@ -11,6 +11,37 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.207-rc.0.zy01] - 2026-09-18
+
+Synced to upstream [v1.4.206](https://github.com/stablyai/orca/releases/tag/v1.4.206), absorbing
+v1.4.204, v1.4.205 and v1.4.206 in one step.
+
+### Fixed
+- A parked `orca ask` no longer starves worker-to-coordinator messaging. Waiting on a human used to
+  hold one of eight shared long-poll slots for the full chunk, so eight agents waiting at once shed
+  every later `orchestration.ask` — which has no shed tolerance — and browser attach with it. Waits
+  are now metered on their own per-runtime gate of four, and overflow is reported as a resumable
+  pending ask rather than a failure.
+- Stale terminal input can no longer reach a replacement PTY after a reattach, and the same
+  quarantine now covers native-chat sends.
+- Cancelling a session handoff cancels its repository diff probes all the way through, instead of
+  leaving them running against a worktree nobody is waiting on.
+- Git errors that span several lines keep their full diagnostic text instead of being truncated to
+  the first line.
+- Interrupted release cuts can be recovered: a draft RC whose tag already exists is completed rather
+  than abandoned.
+- The packaged fork's macOS computer-use helper authorizes its own peers, so computer use works in a
+  packaged build without widening bundle-prefix trust.
+- The POSIX garbage-collection listing test no longer creates and removes 15,197 directories on the
+  test host; it feeds the real shell filter a synthetic listing instead.
+
+### Changed
+- Fork code adopts the eight `anti-slop` lint rules upstream enabled in v1.4.206, following
+  upstream's own renames for each rule. Symbol names and parameter types only — no behaviour
+  changed.
+- The sandboxed test runner tracks CI's shell-contract lane again after upstream moved the OMP
+  alias-safety suite out of the unit lane.
 
 ## [1.4.204-rc.0.zy01] - 2026-09-15
 
