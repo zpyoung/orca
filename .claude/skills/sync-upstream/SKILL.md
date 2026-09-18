@@ -240,8 +240,11 @@ handed and stop rather than adapting to a workspace that fails any of these:
 - `git symbolic-ref --short HEAD` resolves (HEAD is not detached) and is **not** `main`. Merging on
   `main` would put the resolution on the branch the PR targets.
 - `git status --porcelain` is empty.
-- No rebase/merge/cherry-pick is in progress (no `.git/rebase-merge`, `.git/rebase-apply`,
-  `.git/MERGE_HEAD`).
+- No rebase/merge/cherry-pick is in progress. Resolve each path with `git rev-parse --git-path`
+  (`MERGE_HEAD`, `rebase-merge`, `rebase-apply`, `CHERRY_PICK_HEAD`) and test what it prints. A
+  literal `.git/MERGE_HEAD` test can never fire here: the run always happens in a worktree, where
+  `.git` is a *file* pointing at `<main repo>/.git/worktrees/<name>/`, so every `.git/<state>` path
+  reads as absent no matter what is in progress.
 - `git merge-base --is-ancestor HEAD origin/main` succeeds. The branch carries no commits of its
   own, so the reset below destroys nothing. If it fails, the workspace holds someone's work.
 
