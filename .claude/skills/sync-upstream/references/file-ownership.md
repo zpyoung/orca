@@ -231,33 +231,51 @@ exception, so a new sub-step only reaches the fork's tree if the `ours.txt` audi
 it. Skip that merge and the gate passes locally while PR CI, which runs the step from its own
 workflow, fails.
 
-New rules → toolchain tightening. **Adopting the new rule in the fork's own file is in scope**, but
-only mechanically:
+New rules → toolchain tightening. **Adopting a new rule in the fork's own files is the run's job,
+and it does not stop for a human.** A red lint gate is never a reason to abandon a resolution that
+is otherwise complete.
+
+Try `pnpm exec oxlint --fix <violating-file>` first, because a fixable rule costs nothing. Expect it
+to rewrite nothing: whole rule families are advisory-only. `anti-slop` shipped eight rules in
+v1.4.206 and **not one** is auto-fixable, so a run that treats `--fix` as the boundary has no move at
+all — which is exactly how v1.4.205 stalled with everything else green.
+
+**Write the fix by hand, and take the wording from upstream.** Upstream ran the same rule over its
+own tree in the release that enabled it, so its adoption commit is the reference answer for what the
+rule wants. Find it and read it before renaming anything:
 
 ```sh
-pnpm exec oxlint --fix <violating-file>
+git log --oneline "$PREV_TAG".."$UPSTREAM_TARGET" --grep 'lint' --grep 'anti-slop' -i
+git show <that commit> -- src | grep -E '^[-+]' | grep -vE '^[-+]{3}'
 ```
 
-Commit it separately from the merge and the ownership commit, and name the rule in the message. Then
-re-run the full gate — the fix is only valid if typecheck, lint, and tests all still pass.
+For v1.4.206 that gave the whole vocabulary: `no-shape-in-symbol-names` wants the decision a symbol
+carries, not the structure it inspects (`isSkillsCliAgentKeyShaped` → `isUsableSkillsCliAgentKey`,
+`RootShape` → `RootLayout`, `SourceShape` → `SourceCookieRow`); `no-reflect-get` wants typed
+property access, not a cast. Mirroring that is what keeps a hand-written fix from being an invention.
 
-Hard limits. Violate any of these and it is a human decision, not an automated one:
+Then, per rule:
 
-- Only files byte-identical to `$ORIGIN_MAIN_OLD`. A violation in a file the merge *changed* is
-  `-X ours` damage — resolve it to one real side instead (see the two sections above).
-- Only what `--fix` rewrites on its own. Never hand-write a logic change to satisfy a rule, and never
-  reach for `--fix-suggestions` or `--fix-dangerously`; both can alter behavior. A whole rule family
-  can be un-fixable: none of `anti-slop`'s eight is, so v1.4.205's eleven findings left the run no
-  legal move at all. A rename looks mechanical enough to talk yourself past this — it is still
-  hand-written, and this limit is exactly the answer a human already gave on v1.4.184.
-- Only violations in files the fork owns. A violation in a file byte-identical to the *tag* is
-  upstream's release failing its own new rule — v1.4.205 shipped `Reflect.get` in
-  `src/shared/agent-status-legacy-adapter.ts` under its own new `no-reflect-get`, and had already
-  fixed it on trunk. It cannot be pre-fixed on `main` (the file does not exist there) and the trunk
-  fix must not be backported, so it is a separate decision from the fork-side ones. Name it
-  explicitly when escalating, or the rerun re-escalates on that one file after the rest are fixed.
-- Never edit `.oxlintrc.json` to silence the rule. Upstream owns that file, so the next sync would
-  re-add the rule and re-block.
+1. One commit per rule, named for it, separate from the merge and the ownership commit, citing the
+   upstream commit whose idiom it mirrors. That trail is what makes the change reviewable.
+2. Re-run the **whole** gate. A rename reaches callers and tests, and a narrowed parameter type can
+   reject a test's `{}` — both happened on v1.4.206 and both are part of the fix, not a new problem.
+3. Say in the PR body what changed and what did not.
+
+Hard limits. These bound *how* the fix is written; none of them is a reason to stop:
+
+- **Names and types only, never behaviour.** Rename a symbol, name a type that was `object`, narrow a
+  string key to the union it always held. Never change a branch, a message, an assertion or a
+  regex to satisfy a rule. If the only way to clear a rule is to change what the code *does*, that
+  one violation is a human decision — resolve the rest and escalate it alone.
+- Never `--fix-suggestions` or `--fix-dangerously`; both can alter behaviour.
+- Only files the fork owns. A violation in a file byte-identical to the *tag* is upstream's release
+  failing its own new rule; v1.4.205 shipped `Reflect.get` in `agent-status-legacy-adapter.ts` under
+  its own new `no-reflect-get` and fixed it on the next release branch. Retarget to the newer stable
+  tag if one exists — that is the cheapest fix and it dissolves the finding. Otherwise treat it as an
+  upstream defect and escalate that file alone.
+- Never edit `.oxlintrc.json` or `config/oxlint-*.json` to silence a rule, and never add a
+  suppression entry. Upstream owns those files, so the next sync re-adds the rule and re-blocks.
 
 Only violations that survive into the **merged** tree matter. Running the new config against the
 pre-merge baseline over-reports badly: most flagged files take upstream's already-compliant version

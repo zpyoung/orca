@@ -481,14 +481,22 @@ A fix may:
   changed line on a sync PR, so `static analysis` reports findings upstream's own CI never sees.
   Rewrite upstream's code to satisfy the rule and declare the file `pending-upstream` under the
   existing ledger section — never add it to a suppression list
-- apply mechanical lint/format fixes (`oxlint --fix`, `pnpm format`), committed on their own
+- apply lint and format fixes, committed one commit per rule. A stable tag can enable whole rule
+  families that `--fix` cannot rewrite, and adopting those in fork-owned files **is the run's job** —
+  it is never an escalation on its own. The fix is names and types only, taken from upstream's own
+  adoption commit for that rule; `references/file-ownership.md` § *When upstream tightens the linter*
+  has the method and its limits
 
 Escalate — stop, leave the PR open, report "needs attention" — for:
 
 - any resolution that would cost fork feature functionality: upstream reworked the code a fork
   feature hangs off, and every fix available loses behavior this fork ships
 - the Step 6 human decisions (feature collision, pending-upstream item, unresolvable conflict)
-- an upstream defect the fork would have to work around
+- an upstream defect the fork would have to work around — including a new lint rule that upstream's
+  own release violates in its own file. Retarget to a newer stable tag first if one exists; that
+  usually dissolves it
+- a single lint violation that cannot be cleared without changing what the code does. Adopt every
+  other rule, and escalate that one file alone rather than the run
 
 Never, on either gate:
 
@@ -710,6 +718,19 @@ git fetch origin main
 MAIN_NEW=$(git rev-parse origin/main)
 git merge-base --is-ancestor "$UPSTREAM_TARGET" origin/main   # must succeed
 ```
+
+**That last check is not a formality — run it and act on it.** A squash puts the tag's *content* on
+`main` while leaving its *commit* off the ancestry, and nothing else notices until much later. The
+fork ownership guard picks the newest stable tag reachable from HEAD, so it silently falls back to
+the previous release and reports every seam re-baselined since as drift — on **every** PR, including
+ones that touch nothing. PR #82 was squashed this way and left #83 red with ~25 false residual
+failures and no fault of its own; `main`'s tree verified clean against the tag it actually carried.
+
+If the check fails, `main` has the content but not the lineage. Do not reset or force anything:
+report "needs attention: $STABLE_TAG merged without a merge commit — ownership guard will compare
+against the previous tag on every PR", and note that the next sync's own merge commit restores the
+ancestry. The repo still allows `allow_squash_merge` and `allow_rebase_merge`, so this can recur;
+whether to turn them off is the repo owner's call, not the run's.
 
 The fork does not delete branches on merge, and this automation opens one a day, so clean up the
 remote branch best-effort: `git push origin --delete "$SYNC_BRANCH"`. A failure here is worth a line
