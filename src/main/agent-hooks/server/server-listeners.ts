@@ -20,12 +20,16 @@ import { toAgentStatusIpcPayload } from './server-status-identity'
 import { AgentHookServerState } from './server-state'
 import { serializeAgentStatusSubject } from '../../../shared/agent-status-subject'
 import { structuredStatusLegacyEvent } from './server-structured-status-row'
+import { sessionInfoService } from '../../fork-session-info/session-info-service'
 
 // Why: the listing counter starts at 1, so an unassigned row must sort last — never above every ordered row.
 const UNORDERED_STATUS_ROW = Number.MAX_SAFE_INTEGER
 
 export abstract class AgentHookServerListeners extends AgentHookServerState {
+  // Why: every status emit must reach plugins too, so a new early-return path
+  // upstream cannot silently leave the plugin tap behind the main-window fanout.
   protected emitEnrichedStatus(enriched: EnrichedAgentHookEventPayload): void {
+    sessionInfoService.observeAgentHook(enriched)
     this.onAgentStatus?.(enriched)
     for (const listener of this.enrichedStatusListeners) {
       try {

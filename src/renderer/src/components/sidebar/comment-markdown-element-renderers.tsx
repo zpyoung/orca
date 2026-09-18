@@ -237,7 +237,8 @@ export function createCompactCommentMarkdownComponents(
 
 export function createDocumentCommentMarkdownComponents(
   onLinkClick?: CommentMarkdownLinkClickHandler,
-  highlightCode?: boolean
+  highlightCode?: boolean,
+  renderCodeBlock?: DocumentCodeBlockRenderer
 ): Components {
   return {
     p: ({ children }) => <p className="my-2 first:mt-0 last:mb-0">{children}</p>,

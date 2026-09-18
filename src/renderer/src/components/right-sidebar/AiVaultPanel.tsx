@@ -54,6 +54,8 @@ import { AgentSessionContinuationDialog } from '@/components/agent-session-conti
 import { AiVaultScanIssueBanners } from './AiVaultScanIssueBanners'
 import { useAiVaultSessionDeleteAction } from './ai-vault-session-delete-action'
 import { useSessionInfoVaultNavigation } from './fork-session-info/session-info-vault-navigation'
+import { useAiVaultPanelSearch } from './use-ai-vault-search'
+import { AiVaultPanelSearch } from './AiVaultPanelSearch'
 
 export default function AiVaultPanel(): React.JSX.Element {
   const activeWorktreeId = useActiveWorktreeId()

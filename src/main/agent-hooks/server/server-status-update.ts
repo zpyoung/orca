@@ -21,7 +21,6 @@ import {
 import { isStaleGrokTurnEnd } from './server-grok-status-rules'
 import { isToolProgressWorkingAfterInterrupt } from './server-status-identity'
 import { AgentHookServerStatusApplication } from './server-status-application'
-import { sessionInfoService } from '../../fork-session-info/session-info-service'
 
 export abstract class AgentHookServerStatusUpdate extends AgentHookServerStatusApplication {
   protected applyNormalizedStatus(
@@ -306,17 +305,12 @@ export abstract class AgentHookServerStatusUpdate extends AgentHookServerStatusA
     }
   }
 
-  // Why: every status emit must reach plugins too, so a new early-return path
-  // upstream cannot silently leave the plugin tap behind the main-window fanout.
-  protected emitEnrichedStatus(enriched: EnrichedAgentHookEventPayload): void {
-    sessionInfoService.observeAgentHook(enriched)
-    this.onAgentStatus?.(enriched)
-    for (const listener of this.enrichedStatusListeners) {
-      try {
-        listener(enriched)
-      } catch (err) {
-        console.error('[agent-hooks] enriched status listener threw', err)
-      }
-    }
+  private writeLegacyStatusRow(entry: EnrichedAgentHookEventPayload): boolean {
+    return admitLegacyAgentStatus(
+      this.state,
+      'main-status-update',
+      entry,
+      AGENT_STATUS_2A_CURRENT_PRODUCER_MODE
+    )
   }
 }

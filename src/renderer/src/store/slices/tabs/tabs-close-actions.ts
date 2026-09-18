@@ -9,6 +9,16 @@ import {
 } from '../tab-group-state'
 import { buildActiveSurfacePatch } from './tabs-surface'
 import { removeTabPaneKeysFromPendingMutations } from '../fork-terminal-dock/tab-terminal-dock-state'
+import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
+import { getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
+import { beginStructuredAgentSessionTabClose } from '@/runtime/structured-agent-session-tab-retirement'
+import {
+  hasStructuredAgentSessionLaunchCancellationTombstone,
+  shouldRetainStructuredAgentSessionLaunchTab
+} from '@/lib/structured-agent-session-launch-registry'
+import { structuredAgentSessionTabId } from '../../../../../shared/structured-agent-session-projection'
+import { clearWebSessionFocusIntentIfMatches } from '@/runtime/web-session-focus-intent'
+import { LOCAL_STRUCTURED_SESSION_OWNER } from '@/runtime/local-structured-session-owner'
 
 export function createTabsCloseActions(
   set: TabsSliceSet,

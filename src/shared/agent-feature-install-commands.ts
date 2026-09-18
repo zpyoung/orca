@@ -1,4 +1,4 @@
-import { isSkillsCliAgentKeyShaped } from './skills-cli-agent-keys'
+import { isUsableSkillsCliAgentKey } from './skills-cli-agent-keys'
 import { ORCA_SKILLS_REPOSITORY_URL } from './fork-skills-repository/skills-repository-url'
 
 export { ORCA_SKILLS_REPOSITORY_URL }
