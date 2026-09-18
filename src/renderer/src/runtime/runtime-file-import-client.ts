@@ -1,4 +1,5 @@
 import { basename, joinPath } from '@/lib/path'
+import type { ImportItemResult } from '../../../shared/filesystem-import-result-types'
 import { getRuntimeEnvironmentConnectionGeneration } from '@/store/slices/runtime-status'
 import type { RuntimeFileOperationArgs } from './runtime-file-client-types'
 import { captureRuntimeEnvironmentRequestRevision } from './runtime-environment-revision'
@@ -70,7 +71,7 @@ export async function importExternalPathsToRuntime(
   importSession.assertCurrent()
   const staged = await window.api.fs.stageExternalPathsForRuntimeUpload({ sourcePaths })
   importSession.assertCurrent()
-  const results: RuntimeImportResult[] = []
+  const results: ImportItemResult[] = []
   const reservedNames = new Set<string>()
 
   await ensureRuntimeDirectory(context, destinationDir, importSession)
@@ -112,7 +113,16 @@ export async function importExternalPathsToRuntime(
           importSession,
           context.worktreeId,
           entryRelativePath,
-          entry.contentBase64,
+          {
+            sourceRootPath: source.sourcePath,
+            entryRelativePath: entry.relativePath,
+            expected: {
+              byteLength: entry.byteLength,
+              inode: entry.inode,
+              deviceId: entry.deviceId,
+              modifiedAtMs: entry.modifiedAtMs
+            }
+          },
           context.expectedSshConnectionGeneration,
           context.expectedSshTargetId,
           context.expectedExecutionHostId ??

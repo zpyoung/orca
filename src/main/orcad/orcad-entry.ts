@@ -26,6 +26,10 @@ import {
 import { acquireOrcadInstanceLock, OrcadInstanceLockError } from './orcad-instance-lock'
 import { startOrcadWithLifecycle } from './orcad-lifecycle'
 import { parseArgs } from './orcad-command-arguments'
+import {
+  changedAiVaultSearchSettings,
+  type AiVaultSearchSettings
+} from '../../shared/ai-vault-search-settings'
 
 export { parseArgs }
 
@@ -258,7 +262,7 @@ async function startOrcadRuntime(
   })
 
   const { installOrcadSessionSearchService } = await import('./orcad-session-search')
-  const sessionSearch = await installOrcadSessionSearchService({
+  sessionSearch = await installOrcadSessionSearchService({
     userDataPath: runtimeUserDataPath,
     getSettings: () => store.getSettings()
   })

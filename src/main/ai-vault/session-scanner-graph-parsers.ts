@@ -1,3 +1,4 @@
+import { foldOmpTranscriptTitle, type OmpTranscriptTitle } from './session-scanner-omp-title'
 import {
   remoteSessionContentLines,
   type RemoteSessionContent

@@ -254,14 +254,12 @@ export function useMobileSourceControlOpeners(params: Params) {
             mergeBase: summary.mergeBase
           }
         })
-        let interpreted: unknown
+        let result: MobileGitDiffReply
         try {
-          interpreted = gitBranchDiffRead.interpret(reply)
+          result = gitBranchDiffRead.interpret(reply)
         } catch (error) {
           throw new Error(refusedRpcMessageOrFallback(error, 'Unable to load committed diff'))
         }
-        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Preserve the established response shape at this boundary.
-        const result = interpreted as GitDiffTextResult | { kind: 'binary' }
         if (result.kind !== 'text') {
           throw new Error('Binary branch diff preview unavailable on mobile')
         }

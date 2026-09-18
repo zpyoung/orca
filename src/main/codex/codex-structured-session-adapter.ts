@@ -186,13 +186,14 @@ export class CodexStructuredSessionAdapter implements StructuredAgentSessionAdap
     sessionId: string,
     journalItemId: string,
     promptKey: string,
-    turnId?: string | null
+    turnId?: string | null,
+    threadId?: string
   ): void =>
     this.sessions
       .get(sessionId)
       ?.prompts.bindJournalItemId(
         journalItemId,
-        this.session(sessionId).threadId,
+        threadId ?? this.session(sessionId).threadId,
         promptKey,
         turnId
       )

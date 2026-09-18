@@ -35,7 +35,7 @@ function optionSession(request: CodexAppServerConnection['request']): CodexSessi
     options: new Map(),
     reportedOptions: { model: 'gpt-live', effort: 'high' },
     fastModeTierByModel: new Map(),
-    turnIdWaiters: [],
+    dispatchEchoes: createCodexDispatchEchoes(),
     translator: null
   }
 }

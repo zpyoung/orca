@@ -3,18 +3,25 @@
   "family": "session.tab-reveal",
   "namedDeltas": [],
   "runnerVersion": 1,
-  "baseline": "50e752fc66a84638b0a8c1f4bdbbd5fdc708c3e9",
+  "baseline": "a28085adbfb65d3f27393cc7a0d78cfa2b4ff07e",
   "lockfileSha256": "788c1234b38a61fc882fca292341fce6690deee9cc6695673b0575cf2c4cf571",
-  "recorderSha256": "5ec2faffa944097d2916e2e9e2259b9d0c68e364c5f865bafd8a9600faedbdc7",
+  "recorderSha256": "d08bf9cd596ee449531f079c9f4f83efcb03fbc5e8d8658d15e0407d3464ec0e",
+  "adapterSha256": "5e47c7960b9352753f0751d4ccf5e3ff7fb7b74a63cc4e4df3c3ffdcc6c1e66b",
   "scenarioSha256": "c38f2bc5c9faca0774dfe202137877bada9deba165c5e9c955cbe67eae0cbdd9",
   "platform": "darwin",
   "scenarioVersion": 1,
   "projectionVersion": 2,
-  "goldenFormatVersion": 4,
+  "goldenFormatVersion": 5,
   "values": {
-    "0f9f4df04699": {
+    "0410be39707b": {
+      "name": "session.tabs.list#1",
+      "json": "{\"id\":\"frame-1\",\"deviceToken\":\"recording-device\",\"method\":\"session.tabs.list\",\"params\":{\"worktree\":\"id:repo42::/p\"}}",
+      "sent": 1
+    },
+    "10e4a5c67c9f": {
       "name": "session.tabs.activate#1",
-      "json": "{\"id\":\"frame-2\",\"deviceToken\":\"recording-device\",\"method\":\"session.tabs.activate\",\"params\":{\"worktree\":\"id:repo42::/p\",\"tabId\":\"tab-1\",\"notifyClients\":false,\"navigation\":\"caller\",\"intent\":\"user\"}}"
+      "json": "{\"id\":\"frame-2\",\"deviceToken\":\"recording-device\",\"method\":\"session.tabs.activate\",\"params\":{\"worktree\":\"id:repo42::/p\",\"tabId\":\"tab-1\",\"notifyClients\":false,\"navigation\":\"caller\",\"intent\":\"user\"}}",
+      "sent": 2
     },
     "12380cd54c7c": {
       "name": "session.tabs.list#1",
@@ -445,10 +452,6 @@
         }
       }
     },
-    "eb116b4d99bb": {
-      "name": "session.tabs.list#1",
-      "json": "{\"id\":\"frame-1\",\"deviceToken\":\"recording-device\",\"method\":\"session.tabs.list\",\"params\":{\"worktree\":\"id:repo42::/p\"}}"
-    },
     "f0e11346d0fc": {
       "name": "session.tabs.list#1",
       "args": [
@@ -516,7 +519,7 @@
         "id": "sc-reveal-first-poll.prelude:list-pending",
         "observation": {
           "sender": ["f884811cfa05"],
-          "payloads": ["eb116b4d99bb"],
+          "payloads": ["0410be39707b"],
           "settlements": {
             "reveal": "9270aeb7d9c6"
           },
@@ -528,7 +531,7 @@
         "id": "sc-reveal-first-poll.normal:activate-pending",
         "observation": {
           "sender": ["92b5192ed75d", "5fbe284a7387"],
-          "payloads": ["eb116b4d99bb", "0f9f4df04699"],
+          "payloads": ["0410be39707b", "10e4a5c67c9f"],
           "settlements": {
             "reveal": "9270aeb7d9c6"
           },
@@ -540,7 +543,7 @@
         "id": "sc-reveal-first-poll.normal:settled",
         "observation": {
           "sender": ["92b5192ed75d", "bb3b4ee6b927"],
-          "payloads": ["eb116b4d99bb", "0f9f4df04699"],
+          "payloads": ["0410be39707b", "10e4a5c67c9f"],
           "settlements": {
             "reveal": "60ef11dd407d"
           },
@@ -552,7 +555,7 @@
         "id": "sc-reveal-first-poll.result-absent:activate-pending",
         "observation": {
           "sender": ["94db2ba485c5"],
-          "payloads": ["eb116b4d99bb"],
+          "payloads": ["0410be39707b"],
           "settlements": {
             "reveal": "9270aeb7d9c6"
           },
@@ -564,7 +567,7 @@
         "id": "sc-reveal-first-poll.result-absent:settled",
         "observation": {
           "sender": ["94db2ba485c5"],
-          "payloads": ["eb116b4d99bb"],
+          "payloads": ["0410be39707b"],
           "settlements": {
             "reveal": "9270aeb7d9c6"
           },
@@ -576,7 +579,7 @@
         "id": "sc-reveal-first-poll.result-null:activate-pending",
         "observation": {
           "sender": ["7eb00dad4d0d"],
-          "payloads": ["eb116b4d99bb"],
+          "payloads": ["0410be39707b"],
           "settlements": {
             "reveal": "9270aeb7d9c6"
           },
@@ -588,7 +591,7 @@
         "id": "sc-reveal-first-poll.result-null:settled",
         "observation": {
           "sender": ["7eb00dad4d0d"],
-          "payloads": ["eb116b4d99bb"],
+          "payloads": ["0410be39707b"],
           "settlements": {
             "reveal": "9270aeb7d9c6"
           },
@@ -600,7 +603,7 @@
         "id": "sc-reveal-first-poll.inner-ok-missing:activate-pending",
         "observation": {
           "sender": ["c3ee87ce1af9"],
-          "payloads": ["eb116b4d99bb"],
+          "payloads": ["0410be39707b"],
           "settlements": {
             "reveal": "9270aeb7d9c6"
           },
@@ -612,7 +615,7 @@
         "id": "sc-reveal-first-poll.inner-ok-missing:settled",
         "observation": {
           "sender": ["c3ee87ce1af9"],
-          "payloads": ["eb116b4d99bb"],
+          "payloads": ["0410be39707b"],
           "settlements": {
             "reveal": "9270aeb7d9c6"
           },
@@ -624,7 +627,7 @@
         "id": "sc-reveal-first-poll.inner-false-string-error:activate-pending",
         "observation": {
           "sender": ["f0e11346d0fc"],
-          "payloads": ["eb116b4d99bb"],
+          "payloads": ["0410be39707b"],
           "settlements": {
             "reveal": "9270aeb7d9c6"
           },
@@ -636,7 +639,7 @@
         "id": "sc-reveal-first-poll.inner-false-string-error:settled",
         "observation": {
           "sender": ["f0e11346d0fc"],
-          "payloads": ["eb116b4d99bb"],
+          "payloads": ["0410be39707b"],
           "settlements": {
             "reveal": "9270aeb7d9c6"
           },
@@ -648,7 +651,7 @@
         "id": "sc-reveal-first-poll.inner-false-object-error:activate-pending",
         "observation": {
           "sender": ["12380cd54c7c"],
-          "payloads": ["eb116b4d99bb"],
+          "payloads": ["0410be39707b"],
           "settlements": {
             "reveal": "9270aeb7d9c6"
           },
@@ -660,7 +663,7 @@
         "id": "sc-reveal-first-poll.inner-false-object-error:settled",
         "observation": {
           "sender": ["12380cd54c7c"],
-          "payloads": ["eb116b4d99bb"],
+          "payloads": ["0410be39707b"],
           "settlements": {
             "reveal": "9270aeb7d9c6"
           },
@@ -672,7 +675,7 @@
         "id": "sc-reveal-first-poll.outer-refused:activate-pending",
         "observation": {
           "sender": ["661ed2754e93"],
-          "payloads": ["eb116b4d99bb"],
+          "payloads": ["0410be39707b"],
           "settlements": {
             "reveal": "9270aeb7d9c6"
           },
@@ -684,7 +687,7 @@
         "id": "sc-reveal-first-poll.outer-refused:settled",
         "observation": {
           "sender": ["661ed2754e93"],
-          "payloads": ["eb116b4d99bb"],
+          "payloads": ["0410be39707b"],
           "settlements": {
             "reveal": "9270aeb7d9c6"
           },
@@ -696,7 +699,7 @@
         "id": "sc-reveal-first-poll.outer-refused-no-message:activate-pending",
         "observation": {
           "sender": ["c7d63e6d1ae1"],
-          "payloads": ["eb116b4d99bb"],
+          "payloads": ["0410be39707b"],
           "settlements": {
             "reveal": "9270aeb7d9c6"
           },
@@ -708,7 +711,7 @@
         "id": "sc-reveal-first-poll.outer-refused-no-message:settled",
         "observation": {
           "sender": ["c7d63e6d1ae1"],
-          "payloads": ["eb116b4d99bb"],
+          "payloads": ["0410be39707b"],
           "settlements": {
             "reveal": "9270aeb7d9c6"
           },
@@ -720,7 +723,7 @@
         "id": "sc-reveal-first-poll.method-not-found:activate-pending",
         "observation": {
           "sender": ["b5a14b5bcd38"],
-          "payloads": ["eb116b4d99bb"],
+          "payloads": ["0410be39707b"],
           "settlements": {
             "reveal": "9270aeb7d9c6"
           },
@@ -732,7 +735,7 @@
         "id": "sc-reveal-first-poll.method-not-found:settled",
         "observation": {
           "sender": ["b5a14b5bcd38"],
-          "payloads": ["eb116b4d99bb"],
+          "payloads": ["0410be39707b"],
           "settlements": {
             "reveal": "9270aeb7d9c6"
           },
@@ -744,7 +747,7 @@
         "id": "sc-reveal-first-poll.transport-rejection:activate-pending",
         "observation": {
           "sender": ["4fe73924ca34"],
-          "payloads": ["eb116b4d99bb"],
+          "payloads": ["0410be39707b"],
           "settlements": {
             "reveal": "9270aeb7d9c6"
           },
@@ -756,7 +759,7 @@
         "id": "sc-reveal-first-poll.transport-rejection:settled",
         "observation": {
           "sender": ["4fe73924ca34"],
-          "payloads": ["eb116b4d99bb"],
+          "payloads": ["0410be39707b"],
           "settlements": {
             "reveal": "9270aeb7d9c6"
           },
@@ -768,7 +771,7 @@
         "id": "sc-reveal-first-poll.transport-rejection-no-message:activate-pending",
         "observation": {
           "sender": ["63a99e79af5b"],
-          "payloads": ["eb116b4d99bb"],
+          "payloads": ["0410be39707b"],
           "settlements": {
             "reveal": "9270aeb7d9c6"
           },
@@ -780,7 +783,7 @@
         "id": "sc-reveal-first-poll.transport-rejection-no-message:settled",
         "observation": {
           "sender": ["63a99e79af5b"],
-          "payloads": ["eb116b4d99bb"],
+          "payloads": ["0410be39707b"],
           "settlements": {
             "reveal": "9270aeb7d9c6"
           },

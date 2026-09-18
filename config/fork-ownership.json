@@ -1519,14 +1519,6 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/dashboard-popout/AgentMapWorkspaceContextMenu.test.tsx",
-      "feature": "worktree-groups",
-      "kind": "passthrough",
-      "lines": [
-        "    const createGroup = await screen.findByText('New group from worktree', {}, { timeout: 5_000 })"
-      ]
-    },
-    {
       "path": "src/renderer/src/components/dashboard/DashboardAgentRow.tsx",
       "feature": "session-handoff",
       "kind": "registration",
@@ -5325,10 +5317,6 @@
       "removed": 3
     },
     "src/renderer/src/components/browser-pane/assemble-chrome/browser-page-toolbar.tsx": {
-      "added": 1,
-      "removed": 1
-    },
-    "src/renderer/src/components/dashboard-popout/AgentMapWorkspaceContextMenu.test.tsx": {
       "added": 1,
       "removed": 1
     },

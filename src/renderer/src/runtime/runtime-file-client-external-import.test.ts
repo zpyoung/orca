@@ -67,10 +67,10 @@ const identityOf = (entry: Record<string, unknown>): Record<string, unknown> => 
 })
 
 describe('runtime file client', () => {
-  it('uploads a staged directory after one ownership and one cold compatibility preflight', async () => {
+  it('streams staged directory entries through main instead of sending base64 itself', async () => {
     replaceRuntimeEnvironmentRevisions([{ id: 'env-1', createdAt: 1, pairingRevision: 17 }])
-    const firstChunk = 'A'.repeat(512 * 1024)
-    const secondChunk = 'BBBBBBBB'
+    const logo = stagedFile('logo.png', 3, 101)
+    const large = stagedFile('large.bin', 40 * 1024 * 1024, 102)
     fsStageExternalPathsForRuntimeUpload.mockResolvedValue({
       sources: [
         {
@@ -78,85 +78,19 @@ describe('runtime file client', () => {
           status: 'staged',
           name: 'assets',
           kind: 'directory',
-          entries: [
-            { relativePath: '', kind: 'directory' },
-            { relativePath: 'logo.png', kind: 'file', contentBase64: 'cG5n' },
-            {
-              relativePath: 'large.bin',
-              kind: 'file',
-              contentBase64: `${firstChunk}${secondChunk}`
-            }
-          ]
+          entries: [{ relativePath: '', kind: 'directory' }, logo, large]
         }
       ]
     })
     runtimeEnvironmentCall
-      .mockResolvedValueOnce({
-        id: 'stat-destination-miss',
-        ok: false,
-        error: { code: 'not_found', message: 'not found' },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'create-destination-dir',
-        ok: true,
-        result: { ok: true },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'stat-miss',
-        ok: false,
-        error: { code: 'not_found', message: 'not found' },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'create-dir',
-        ok: true,
-        result: { ok: true },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'write-file',
-        ok: true,
-        result: { ok: true },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'commit-upload',
-        ok: true,
-        result: { ok: true },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'delete-temp',
-        ok: true,
-        result: { ok: true },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'write-chunk-1',
-        ok: true,
-        result: { ok: true },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'write-chunk-2',
-        ok: true,
-        result: { ok: true },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'commit-large-upload',
-        ok: true,
-        result: { ok: true },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'delete-large-temp',
-        ok: true,
-        result: { ok: true },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
+      .mockResolvedValueOnce(notFoundResponse('stat-destination-miss'))
+      .mockResolvedValueOnce(okResponse('create-destination-dir'))
+      .mockResolvedValueOnce(notFoundResponse('stat-miss'))
+      .mockResolvedValueOnce(okResponse('create-dir'))
+      .mockResolvedValueOnce(okResponse('commit-upload'))
+      .mockResolvedValueOnce(okResponse('delete-temp'))
+      .mockResolvedValueOnce(okResponse('commit-large-upload'))
+      .mockResolvedValueOnce(okResponse('delete-large-temp'))
 
     await expect(
       importExternalPathsToRuntime(
@@ -191,80 +125,32 @@ describe('runtime file client', () => {
       'files.createDir',
       'files.stat',
       'files.createDirNoClobber',
-      'files.writeBase64',
       'files.commitUpload',
       'files.delete',
-      'files.writeBase64Chunk',
-      'files.writeBase64Chunk',
       'files.commitUpload',
       'files.delete'
     ])
-    expect(transportCalls.filter((args) => args.method === 'status.get')).toHaveLength(2)
+    // Why: the whole point of the change — no file body crosses this boundary.
+    expect(transportCalls.some((args) => String(args.method).startsWith('files.writeBase64'))).toBe(
+      false
+    )
     expect(transportCalls.every((args) => args.expectedEnvironmentPairingRevision === 17)).toBe(
       true
     )
-    expect(runtimeEnvironmentCall).toHaveBeenNthCalledWith(1, {
-      selector: 'env-1',
-      method: 'files.stat',
-      params: {
-        worktree: 'id:wt-1',
-        relativePath: 'uploads'
-      },
-      timeoutMs: 15_000,
-      expectedEnvironmentPairingRevision: 17
-    })
-    expect(runtimeEnvironmentCall).toHaveBeenNthCalledWith(2, {
-      selector: 'env-1',
-      method: 'files.createDir',
-      params: {
-        worktree: 'id:wt-1',
-        relativePath: 'uploads',
-        expectedExecutionHostId: 'local'
-      },
-      timeoutMs: 15_000,
-      expectedEnvironmentPairingRevision: 17,
-      expectedEnvironmentRuntimeId: 'remote-runtime'
-    })
-    expect(runtimeEnvironmentCall).toHaveBeenNthCalledWith(3, {
-      selector: 'env-1',
-      method: 'files.stat',
-      params: {
-        worktree: 'id:wt-1',
-        relativePath: 'uploads/assets'
-      },
-      timeoutMs: 15_000,
-      expectedEnvironmentPairingRevision: 17
-    })
-    expect(runtimeEnvironmentCall).toHaveBeenNthCalledWith(4, {
-      selector: 'env-1',
-      method: 'files.createDirNoClobber',
-      params: {
-        worktree: 'id:wt-1',
-        relativePath: 'uploads/assets',
-        expectedExecutionHostId: 'local'
-      },
-      timeoutMs: 15_000,
-      expectedEnvironmentPairingRevision: 17,
-      expectedEnvironmentRuntimeId: 'remote-runtime'
-    })
-    const smallWriteCall = runtimeEnvironmentCall.mock.calls[4]?.[0] as {
-      params: { relativePath: string }
-    }
-    expect(smallWriteCall.params.relativePath).toMatch(
-      /^uploads\/assets\/\.logo\.png\.orca-upload-/
-    )
-    expect(runtimeEnvironmentCall).toHaveBeenNthCalledWith(5, {
-      selector: 'env-1',
-      method: 'files.writeBase64',
-      params: {
-        worktree: 'id:wt-1',
-        relativePath: smallWriteCall.params.relativePath,
-        contentBase64: 'cG5n',
-        expectedExecutionHostId: 'local',
-        expectedSshTargetId: undefined,
-        expectedSshConnectionGeneration: undefined
-      },
-      timeoutMs: 30_000,
+
+    const uploads = uploadRequests()
+    expect(uploads).toHaveLength(2)
+    expect(uploads[0]?.relativePath).toMatch(/^uploads\/assets\/\.logo\.png\.orca-upload-/)
+    expect(uploads[0]).toEqual({
+      environmentId: 'env-1',
+      sourceRootPath: '/Users/me/assets',
+      entryRelativePath: 'logo.png',
+      expected: identityOf(logo),
+      worktree: 'id:wt-1',
+      relativePath: uploads[0]?.relativePath,
+      expectedExecutionHostId: 'local',
+      expectedSshTargetId: undefined,
+      expectedSshConnectionGeneration: undefined,
       expectedEnvironmentPairingRevision: 17,
       expectedEnvironmentRuntimeId: 'remote-runtime'
     })
@@ -304,85 +190,11 @@ describe('runtime file client', () => {
       expectedEnvironmentPairingRevision: 17,
       expectedEnvironmentRuntimeId: 'remote-runtime'
     })
-    const largeWriteParams = runtimeEnvironmentCall.mock.calls[7]?.[0].params
-    if (
-      typeof largeWriteParams !== 'object' ||
-      largeWriteParams === null ||
-      !('relativePath' in largeWriteParams) ||
-      typeof largeWriteParams.relativePath !== 'string'
-    ) {
-      throw new Error('missing large file write call')
-    }
-    const largeWriteRelativePath = largeWriteParams.relativePath
-    expect(largeWriteRelativePath).toMatch(/^uploads\/assets\/\.large\.bin\.orca-upload-/)
-    expect(runtimeEnvironmentCall).toHaveBeenNthCalledWith(8, {
-      selector: 'env-1',
-      method: 'files.writeBase64Chunk',
-      params: {
-        worktree: 'id:wt-1',
-        relativePath: largeWriteRelativePath,
-        contentBase64: firstChunk,
-        append: false,
-        expectedExecutionHostId: 'local',
-        expectedSshTargetId: undefined,
-        expectedSshConnectionGeneration: undefined
-      },
-      timeoutMs: 30_000,
-      expectedEnvironmentPairingRevision: 17,
-      expectedEnvironmentRuntimeId: 'remote-runtime'
-    })
-    expect(runtimeEnvironmentCall).toHaveBeenNthCalledWith(9, {
-      selector: 'env-1',
-      method: 'files.writeBase64Chunk',
-      params: {
-        worktree: 'id:wt-1',
-        relativePath: largeWriteRelativePath,
-        contentBase64: secondChunk,
-        append: true,
-        expectedExecutionHostId: 'local',
-        expectedSshTargetId: undefined,
-        expectedSshConnectionGeneration: undefined
-      },
-      timeoutMs: 30_000,
-      expectedEnvironmentPairingRevision: 17,
-      expectedEnvironmentRuntimeId: 'remote-runtime'
-    })
-    expect(runtimeEnvironmentCall).toHaveBeenNthCalledWith(10, {
-      selector: 'env-1',
-      method: 'files.commitUpload',
-      params: {
-        worktree: 'id:wt-1',
-        tempRelativePath: largeWriteRelativePath,
-        finalRelativePath: 'uploads/assets/large.bin',
-        expectedExecutionHostId: 'local',
-        expectedSshTargetId: undefined,
-        expectedSshConnectionGeneration: undefined
-      },
-      timeoutMs: 30_000,
-      expectedEnvironmentPairingRevision: 17,
-      expectedEnvironmentRuntimeId: 'remote-runtime'
-    })
-    expect(runtimeEnvironmentCall).toHaveBeenNthCalledWith(11, {
-      selector: 'env-1',
-      method: 'files.delete',
-      params: {
-        worktree: 'id:wt-1',
-        relativePath: largeWriteRelativePath,
-        recursive: false,
-        expectedExecutionHostId: 'local',
-        expectedSshTargetId: undefined,
-        expectedSshConnectionGeneration: undefined
-      },
-      timeoutMs: 15_000,
-      expectedEnvironmentPairingRevision: 17,
-      expectedEnvironmentRuntimeId: 'remote-runtime'
-    })
     expect(fsImportExternalPaths).not.toHaveBeenCalled()
   })
 
-  it('chunks large staged runtime uploads below the WebSocket frame budget', async () => {
-    const firstChunk = 'A'.repeat(512 * 1024)
-    const secondChunk = 'AA=='
+  it('forwards a single staged file with the identity staging measured', async () => {
+    const entry = stagedFile('', 40 * 1024 * 1024, 55)
     fsStageExternalPathsForRuntimeUpload.mockResolvedValue({
       sources: [
         {
@@ -423,72 +235,11 @@ describe('runtime file client', () => {
       ]
     })
 
-    const chunkWriteCall = runtimeEnvironmentCall.mock.calls[3]?.[0] as {
-      params: { relativePath: string }
-    }
-    expect(chunkWriteCall.params.relativePath).toMatch(/^uploads\/\.large\.bin\.orca-upload-/)
-    expect(runtimeEnvironmentCall).toHaveBeenNthCalledWith(4, {
-      selector: 'env-1',
-      method: 'files.writeBase64Chunk',
-      params: {
-        worktree: 'id:wt-1',
-        relativePath: chunkWriteCall.params.relativePath,
-        contentBase64: firstChunk,
-        append: false,
-        expectedExecutionHostId: 'local',
-        expectedSshTargetId: undefined,
-        expectedSshConnectionGeneration: undefined
-      },
-      timeoutMs: 30_000,
-      expectedEnvironmentPairingRevision: undefined,
-      expectedEnvironmentRuntimeId: 'remote-runtime'
-    })
-    expect(runtimeEnvironmentCall).toHaveBeenNthCalledWith(5, {
-      selector: 'env-1',
-      method: 'files.writeBase64Chunk',
-      params: {
-        worktree: 'id:wt-1',
-        relativePath: chunkWriteCall.params.relativePath,
-        contentBase64: secondChunk,
-        append: true,
-        expectedExecutionHostId: 'local',
-        expectedSshTargetId: undefined,
-        expectedSshConnectionGeneration: undefined
-      },
-      timeoutMs: 30_000,
-      expectedEnvironmentPairingRevision: undefined,
-      expectedEnvironmentRuntimeId: 'remote-runtime'
-    })
-    expect(runtimeEnvironmentCall).toHaveBeenNthCalledWith(6, {
-      selector: 'env-1',
-      method: 'files.commitUpload',
-      params: {
-        worktree: 'id:wt-1',
-        tempRelativePath: chunkWriteCall.params.relativePath,
-        finalRelativePath: 'uploads/large.bin',
-        expectedExecutionHostId: 'local',
-        expectedSshTargetId: undefined,
-        expectedSshConnectionGeneration: undefined
-      },
-      timeoutMs: 30_000,
-      expectedEnvironmentPairingRevision: undefined,
-      expectedEnvironmentRuntimeId: 'remote-runtime'
-    })
-    expect(runtimeEnvironmentCall).toHaveBeenNthCalledWith(7, {
-      selector: 'env-1',
-      method: 'files.delete',
-      params: {
-        worktree: 'id:wt-1',
-        relativePath: chunkWriteCall.params.relativePath,
-        recursive: false,
-        expectedExecutionHostId: 'local',
-        expectedSshTargetId: undefined,
-        expectedSshConnectionGeneration: undefined
-      },
-      timeoutMs: 15_000,
-      expectedEnvironmentPairingRevision: undefined,
-      expectedEnvironmentRuntimeId: 'remote-runtime'
-    })
+    const upload = uploadRequests()[0]
+    expect(upload?.relativePath).toMatch(/^uploads\/\.large\.bin\.orca-upload-/)
+    expect(upload?.sourceRootPath).toBe('/Users/me/large.bin')
+    expect(upload?.entryRelativePath).toBe('')
+    expect(upload?.expected).toEqual(identityOf(entry))
     expect(runtimeEnvironmentCall).not.toHaveBeenCalledWith(
       expect.objectContaining({ method: 'files.writeBase64' })
     )

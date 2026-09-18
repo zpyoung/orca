@@ -6,8 +6,8 @@ import {
   type CodexAppServerConnection
 } from './codex-app-server-connection'
 import { isCodexAppServerUnsupportedError } from './codex-app-server-session'
-import { readCodexTurnId } from './codex-structured-thread-facts'
-import { DISPATCH_DOUBT_CODEX_TURN_UNNAMED } from '../native-chat/agent-session-journal/journal-dispatch-doubt-reasons'
+import type { CodexDispatchEchoes } from './codex-structured-dispatch-echo'
+import { DISPATCH_REJECTED_CODEX_QUEUE_FULL } from '../../shared/structured-agent-session-dispatch-rejection'
 import { decodeStructuredAgentSessionOptionValue } from '../../shared/structured-agent-session-option-codec'
 
 // Writing a Codex turn and learning which message landed where, which are not
@@ -40,7 +40,7 @@ export type CodexTurnHost = {
   options: Map<string, string>
   reportedOptions?: { model?: string }
   fastModeTierByModel: ReadonlyMap<string, string>
-  turnIdWaiters: ((turnId: string) => void)[]
+  dispatchEchoes: CodexDispatchEchoes
 }
 
 function turnInputFor(body: AgentJournalMessageItem): Record<string, unknown>[] {
@@ -91,32 +91,10 @@ function codexTurnOptions(host: CodexTurnHost): Record<string, string> {
 export async function startCodexTurn(
   host: CodexTurnHost,
   input: { clientMessageId: string; body: AgentJournalMessageItem; timeoutMs?: number }
-): Promise<string | null> {
-  // Registered BEFORE the call: on builds that ack first, `turn/started` can
-  // land while the response is still in flight.
-  let notified: ((turnId: string) => void) | null = null
-  const fromNotification = new Promise<string | null>((resolve) => {
-    notified = resolve
-    host.turnIdWaiters.push(resolve)
-    setTimeout(() => resolve(null), TURN_ID_WAIT_MS).unref?.()
-  })
-  try {
-    const started = await host.connection.request(
-      'turn/start',
-      {
-        threadId: host.threadId,
-        clientUserMessageId: input.clientMessageId,
-        input: turnInputFor(input.body),
-        ...codexTurnOptions(host)
-      },
-      { timeoutMs: input.timeoutMs }
-    )
-    return readCodexTurnId(started) ?? (await fromNotification)
-  } finally {
-    const index = notified ? host.turnIdWaiters.indexOf(notified) : -1
-    if (index !== -1) {
-      host.turnIdWaiters.splice(index, 1)
-    }
+): Promise<boolean> {
+  // Armed before the write: the echo can land while the response is in flight.
+  if (!host.dispatchEchoes.arm(input.clientMessageId)) {
+    return false
   }
   await host.connection.request(
     'turn/start',

@@ -222,6 +222,7 @@ describe('structured session acquisition options', () => {
     })
     const sessionAdapter = adapter({ origin: 'created' })
     const options = { model: 'gpt-5.6-sol', effort: 'medium', fastMode: 'false' }
+    const recordPhase = vi.fn<AgentSessionCreatePhaseRecorder>()
 
     const created = await performAttach({
       store,

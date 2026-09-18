@@ -1,4 +1,10 @@
 import { newTabSettingsRead } from '../transport/settings-read-operations'
+import {
+  type MobileRuntimeRepoSummary,
+  newTabRepoListRead,
+  preflightDetectAgentsRead,
+  preflightDetectRemoteAgentsRead
+} from './mobile-session-read-operations'
 import type { RpcClient } from '../transport/rpc-client'
 import type { RpcResponse } from '../transport/types'
 import { isFloatingWorkspaceWorktreeId } from './floating-workspace'
@@ -14,22 +20,22 @@ export async function loadMobileNewTabAgentOptions(args: {
   worktreeId: string
 }): Promise<MobileNewTabAgentOption[]> {
   const { client, worktreeId } = args
-  // Why: the floating workspace runs on the paired host, so it has no repo connection to resolve.
-  const detectedAgentsRequest = isFloatingWorkspaceWorktreeId(worktreeId)
-    ? client.sendRequest('preflight.detectAgents')
-    : loadWorkspaceDetectedAgents(client, worktreeId)
-  const [settingsResponse, detectedResponse] = await Promise.all([
+  // Started before the settings read, not inside the array: the detection request goes on the wire
+  // first, and the recorded sender order is what says so.
+  const detectedAgentsRequest = loadDetectedAgents(client, worktreeId)
+  const [settingsResponse, detectedAgents] = await Promise.all([
     newTabSettingsRead.request(client),
     detectedAgentsRequest
   ])
   const readSettings = newTabSettingsRead.interpret(settingsResponse)
-  if (!detectedResponse.ok) {
-    throw new Error((detectedResponse as RpcFailure).error.message)
-  }
+  // Interpreted after the group, not inside it: whichever peer failed first must not decide the
+  // error the sheet shows, and main raised the detection refusal only once settings had settled.
+  const detected = detectedAgents.interpret(detectedAgents.reply)
   return buildMobileNewTabAgentOptions(
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Preserve the established response shape at this boundary.
     readSettings() as MobileNewTabAgentSettings | undefined,
-    (detectedResponse as RpcSuccess).result as unknown[]
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Preserve the established response shape at this boundary.
+    detected as unknown[]
   )
 }
 

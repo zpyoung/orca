@@ -14,7 +14,7 @@ import type {
   AgentCompletionDispatchMeta,
   AgentCompletionStatusSnapshot
 } from './agent-completion-coordinator-types'
-import { countReposNeedingNotificationDisambiguation } from './terminal-notification-state'
+import { getNotificationWorkspaceLabels } from './terminal-notification-state'
 import { createTerminalAttentionSurface } from './terminal-attention-surface'
 import {
   applyAgentAttention,
@@ -167,9 +167,7 @@ export function dispatchTerminalNotification(
         ...(notificationId ? { notificationId } : {}),
         worktreeId: request.workspaceId,
         paneKey: request.subjectKey ?? undefined,
-        repoLabel: repo?.displayName,
-        worktreeLabel: worktree?.displayName || worktree?.branch || worktreeId,
-        hasMultipleActiveRepos: countReposNeedingNotificationDisambiguation(state) > 1,
+        ...getNotificationWorkspaceLabels(state, request.workspaceId, event.terminalTitle),
         terminalTitle: event.terminalTitle,
         isActiveWorktree: request.workspaceIsActive,
         ...agentSnapshot

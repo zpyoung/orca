@@ -1,7 +1,7 @@
-import type { GitHistoryItem, GitHistoryResult } from '../../../src/shared/git-history-types'
+import type { MobileGitHistoryItem, MobileGitHistoryResult } from './git-history-reply-schema'
 import { refusedRpcMessageOrFallback } from '../transport/rpc-refusal-message'
 import { gitHistoryRead } from './mobile-git-read-operations'
-import type { MobileSourceControlRpcSender } from './mobile-source-control-rpc-sender'
+import type { RpcOperationSender } from '../transport/rpc-operation-sender'
 
 export type MobileCommitRow = {
   id: string
@@ -61,15 +61,14 @@ export function mapMobileCommitRows(
 }
 
 export async function fetchMobileGitHistory(
-  client: MobileSourceControlRpcSender,
+  client: RpcOperationSender,
   worktreeId: string,
   limit = 50
-): Promise<GitHistoryResult> {
+): Promise<MobileGitHistoryResult> {
   // Not inside the try: a transport rejection must reach the caller as the original error object.
   const reply = await gitHistoryRead.request(client, { worktree: `id:${worktreeId}`, limit })
   try {
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Preserve the established response shape at this boundary.
-    return gitHistoryRead.interpret(reply) as GitHistoryResult
+    return gitHistoryRead.interpret(reply)
   } catch (error) {
     throw new Error(refusedRpcMessageOrFallback(error, 'Failed to load commit history'))
   }

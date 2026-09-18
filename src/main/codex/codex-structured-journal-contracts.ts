@@ -16,6 +16,9 @@ export type CodexJournalTranslatorDeps = {
     turnId?: string | null
   ) => void
   clearPromptTurn?: (threadId: string, turnId: string) => void
+  /** Settles a send's identity off the echoed user message, using the very
+   *  identity the journal row carries so a replay computes the same key. */
+  onUserMessageEcho?: (clientMessageId: string, identity: AgentJournalItemIdentity) => void
   primaryThreadId?: () => string | null
   subagentExecutions?: CodexSubagentExecutions
   coalesceMs?: number

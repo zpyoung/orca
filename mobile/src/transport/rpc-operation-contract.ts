@@ -160,11 +160,6 @@ export type StreamOpenerRpcDefinition<
   read?: never
 }
 
-/** Refusal is distinct from an accepted null/undefined payload. */
-export type RpcAcceptedResult<Value> =
-  | { readonly accepted: false }
-  | { readonly accepted: true; readonly value: Value }
-
 export type RpcReaderAcceptance =
   | 'require-result-or-throw'
   | 'object-result-or-null'

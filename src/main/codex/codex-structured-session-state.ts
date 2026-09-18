@@ -104,7 +104,8 @@ export type CodexSession = {
   }
   /** Exact provider-advertised Fast request value for each discovered model. */
   fastModeTierByModel: Map<string, string>
-  turnIdWaiters: ((turnId: string) => void)[]
+  /** Sends whose identity is still to be settled by the provider echo. */
+  dispatchEchoes: CodexDispatchEchoes
   translator: CodexJournalTranslator | null
   /** Ephemeral roster behind the background-tasks strip; never durable state. */
   backgroundTasks: CodexBackgroundTaskTracker

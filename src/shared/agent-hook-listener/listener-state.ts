@@ -105,6 +105,67 @@ export function createHookListenerState(
     codexLeadStateByPaneKey: new Map(),
     grokActiveTurnByPaneKey: new Map()
   }
+  legacyStatusAdapterByState.set(state, adapter)
+  return state
+}
+
+export function admitLegacyAgentStatus(
+  state: HookListenerState,
+  caller: AgentStatusLegacyIngressCaller,
+  entry: AgentHookEventPayload,
+  mode: AgentStatusLegacyAdmissionMode,
+  options?: { moveToEnd?: boolean }
+): boolean {
+  return legacyStatusAdapter(state).admit(caller, mode, entry, options)
+}
+
+export function canAdmitLegacyAgentStatusEntry(
+  state: HookListenerState,
+  caller: AgentStatusLegacyIngressCaller,
+  entry: AgentHookEventPayload,
+  mode: AgentStatusLegacyAdmissionMode
+): boolean {
+  return legacyStatusAdapter(state).canAdmit(caller, mode, entry)
+}
+
+export function deleteLegacyAgentStatus(state: HookListenerState, paneKey: string): boolean {
+  return legacyStatusAdapter(state).delete(paneKey)
+}
+
+export function clearLegacyAgentStatuses(state: HookListenerState): void {
+  legacyStatusAdapter(state).clear()
+}
+
+export function moveLegacyAgentStatuses(
+  state: HookListenerState,
+  fromPaneKey: string,
+  toPaneKey: string
+): void {
+  legacyStatusAdapter(state).move(fromPaneKey, toPaneKey)
+}
+
+export function getLegacyStatusListingOrder(
+  state: HookListenerState,
+  paneKey: string
+): number | undefined {
+  return legacyStatusAdapter(state).listingOrder(paneKey)
+}
+
+/** Test harnesses seed the same compatibility region without exposing a mutable Map. */
+export function seedLegacyAgentStatusForTests(
+  state: HookListenerState,
+  entry: AgentHookEventPayload
+): void {
+  if (
+    !admitLegacyAgentStatus(
+      state,
+      'main-status-update',
+      entry,
+      AGENT_STATUS_2A_CURRENT_PRODUCER_MODE
+    )
+  ) {
+    throw new Error('Test legacy agent-status seed was refused')
+  }
 }
 
 export function clearPaneCacheState(state: HookListenerState, paneKey: string): void {

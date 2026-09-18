@@ -1,7 +1,6 @@
 import type { RpcSendParams } from '../transport/rpc-params-contract'
 import { refusedRpcMessageOrFallback } from '../transport/rpc-refusal-message'
-import type { HostedReviewProvider } from '../../../src/shared/hosted-review'
-import type { MobileSourceControlRpcSender } from './mobile-source-control-rpc-sender'
+import type { RpcOperationSender } from '../transport/rpc-operation-sender'
 import { worktreeLinkSet, worktreeSummaryRead } from './mobile-worktree-metadata-operations'
 
 // Link / unlink review metadata via worktree.set (the same path desktop uses).
@@ -52,7 +51,7 @@ export function buildWorktreeSetHostedReviewLinkParams(
  * host sent no message, while a transport drop surfaces its own message verbatim.
  */
 async function setWorktreeReviewLink(
-  client: MobileSourceControlRpcSender,
+  client: RpcOperationSender,
   params: RpcSendParams<'worktree.set'>,
   fallback: string
 ): Promise<MobilePrLinkOutcome> {
@@ -71,7 +70,7 @@ async function setWorktreeReviewLink(
 }
 
 export function linkMobilePr(
-  client: MobileSourceControlRpcSender,
+  client: RpcOperationSender,
   worktreeId: string,
   prNumber: number
 ): Promise<MobilePrLinkOutcome> {
@@ -83,7 +82,7 @@ export function linkMobilePr(
 }
 
 export async function linkMobileHostedReview(
-  client: MobileSourceControlRpcSender,
+  client: RpcOperationSender,
   worktreeId: string,
   provider: string,
   number: number,
@@ -99,7 +98,7 @@ export async function linkMobileHostedReview(
 }
 
 export function unlinkMobilePr(
-  client: MobileSourceControlRpcSender,
+  client: RpcOperationSender,
   worktreeId: string
 ): Promise<MobilePrLinkOutcome> {
   return setWorktreeReviewLink(
@@ -112,7 +111,7 @@ export function unlinkMobilePr(
 // Reads the worktree's persisted linkedPR so the sidebar can surface a linked PR even when it's
 // closed/merged and the branch-based lookup returns nothing. Null when unset or on any failure.
 export async function fetchWorktreeLinkedPR(
-  client: MobileSourceControlRpcSender,
+  client: RpcOperationSender,
   worktreeId: string
 ): Promise<number | null> {
   try {

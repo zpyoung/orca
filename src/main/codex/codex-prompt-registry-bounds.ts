@@ -14,7 +14,7 @@ export const CODEX_PROMPT_MAX_ANSWER_BYTES = 64 * 1024
 export const MAX_CODEX_PROMPT_REGISTRY_ENTRIES = 128
 export const MAX_CODEX_PROMPT_JOURNAL_BINDINGS = 256
 export const MAX_CODEX_PROMPT_REGISTRY_BYTES = 4 * 1024 * 1024
-const CODEX_PROMPT_TURN_ID_RESERVED_BYTES = 512
+const CODEX_PROMPT_TURN_ID_RESERVED_BYTES = AGENT_SESSION_ID_MAX_LENGTH * 3
 
 type CodexPromptRegistryEntryBounds = {
   threadId: string
@@ -50,7 +50,7 @@ export function codexPromptTurnIdentity(turnId: string): {
   turnId: string | null
   turnIdDigest?: string
 } {
-  return Buffer.byteLength(turnId, 'utf8') <= CODEX_PROMPT_TURN_ID_RESERVED_BYTES
+  return turnId.length <= AGENT_SESSION_ID_MAX_LENGTH
     ? { turnId }
     : { turnId: null, turnIdDigest: digestPayload(turnId) }
 }

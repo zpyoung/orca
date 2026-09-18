@@ -21,6 +21,8 @@ import {
 import type { CodexPendingJournalPrompt } from './codex-structured-journal-settlement'
 import { readCodexTurnId } from './codex-structured-thread-facts'
 
+type CodexGroupedPendingJournalPrompt = CodexPendingJournalPrompt & { promptKey: string }
+
 export class CodexJournalPrompts {
   readonly pending = new Map<string, CodexGroupedPendingJournalPrompt>()
 
@@ -54,6 +56,7 @@ export class CodexJournalPrompts {
         this.pending.set(itemId, {
           threadId: event.threadId,
           turnId,
+          promptKey: event.promptKey,
           identity: question.identity,
           body: question.body
         })
@@ -82,6 +85,7 @@ export class CodexJournalPrompts {
     this.pending.set(itemId, {
       threadId: event.threadId,
       turnId,
+      promptKey: event.promptKey,
       identity,
       body
     })

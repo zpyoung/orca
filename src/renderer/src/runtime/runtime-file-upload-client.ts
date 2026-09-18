@@ -27,22 +27,35 @@ export async function uploadRuntimeFileWithoutClobber(
   session: RuntimeFileImportSession,
   worktreeId: string,
   relativePath: string,
-  contentBase64: string,
+  source: RuntimeUploadSource,
   expectedSshConnectionGeneration?: number,
   expectedSshTargetId?: string,
   expectedExecutionHostId?: 'local' | `ssh:${string}`
 ): Promise<void> {
   const tempRelativePath = makeRuntimeUploadTempPath(relativePath)
   try {
-    await writeRuntimeBase64File(
-      session,
-      worktreeId,
-      tempRelativePath,
-      contentBase64,
-      expectedSshConnectionGeneration,
-      expectedSshTargetId,
-      expectedExecutionHostId
-    )
+    session.assertCurrent()
+    // Why: main owns the file handle and the runtime socket, so it streams the
+    // body in slices; the renderer never holds the whole file.
+    try {
+      await window.api.fs.uploadExternalFileToRuntime({
+        environmentId: session.target.environmentId,
+        sourceRootPath: source.sourceRootPath,
+        entryRelativePath: source.entryRelativePath,
+        expected: source.expected,
+        worktree: toRuntimeWorktreeSelector(worktreeId),
+        relativePath: tempRelativePath,
+        expectedSshTargetId,
+        expectedSshConnectionGeneration,
+        expectedExecutionHostId,
+        expectedEnvironmentPairingRevision: session.expectedEnvironmentPairingRevision,
+        expectedEnvironmentRuntimeId: session.expectedEnvironmentRuntimeId
+      })
+    } catch (error) {
+      // Why: this surfaces in the import result as-is, and Electron wraps a
+      // main-process throw in "Error invoking remote method '…'".
+      throw new Error(extractIpcErrorMessage(error, 'Upload failed'))
+    }
     await callRuntimeFileImportMutation(
       session,
       'files.commitUpload',
@@ -73,50 +86,7 @@ export async function uploadRuntimeFileWithoutClobber(
   }
 }
 
-async function writeRuntimeBase64File(
-  session: RuntimeFileImportSession,
-  worktreeId: string,
-  relativePath: string,
-  contentBase64: string,
-  expectedSshConnectionGeneration?: number,
-  expectedSshTargetId?: string,
-  expectedExecutionHostId?: 'local' | `ssh:${string}`
-): Promise<void> {
-  if (contentBase64.length <= REMOTE_UPLOAD_BASE64_CHUNK_CHARS) {
-    await callRuntimeFileImportMutation(
-      session,
-      'files.writeBase64',
-      {
-        worktree: toRuntimeWorktreeSelector(worktreeId),
-        relativePath,
-        contentBase64,
-        expectedSshTargetId,
-        expectedSshConnectionGeneration,
-        expectedExecutionHostId
-      },
-      30_000
-    )
-    return
-  }
-
-  for (let offset = 0; offset < contentBase64.length; offset += REMOTE_UPLOAD_BASE64_CHUNK_CHARS) {
-    await callRuntimeFileImportMutation(
-      session,
-      'files.writeBase64Chunk',
-      {
-        worktree: toRuntimeWorktreeSelector(worktreeId),
-        relativePath,
-        contentBase64: contentBase64.slice(offset, offset + REMOTE_UPLOAD_BASE64_CHUNK_CHARS),
-        append: offset > 0,
-        expectedSshTargetId,
-        expectedSshConnectionGeneration,
-        expectedExecutionHostId
-      },
-      30_000
-    )
-  }
-}
-
+/** Hidden sibling of the destination, so a failed upload never leaves a plausible-looking file. */
 function makeRuntimeUploadTempPath(relativePath: string): string {
   const normalized = normalizeRelativePath(relativePath)
   const slashIndex = normalized.lastIndexOf('/')

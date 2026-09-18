@@ -81,8 +81,8 @@ export function fetchMobileHomeTaskProviders(
 ): void {
   Promise.all([
     settingsRead.requestSingleFlight(client, hostId),
-    sendSingleFlightRequest(client, hostId, 'preflight.check'),
-    sendSingleFlightRequest(client, hostId, 'linear.status')
+    taskPreflightRead.requestSingleFlight(client, hostId),
+    taskLinearStatusRead.requestSingleFlight(client, hostId)
   ])
     .then(([settingsResponse, preflightResponse, linearResponse]) => {
       if (disposed()) {

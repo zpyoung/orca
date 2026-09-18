@@ -6,6 +6,7 @@ import type { ConnectionState } from '../transport/types'
 import type { RpcClient } from '../transport/rpc-client'
 import { useForceReconnect } from '../transport/client-context'
 import { gitCommitCompareRead } from './mobile-git-read-operations'
+import type { MobileGitChangedFile } from './git-compare-reply-schema'
 import {
   fetchMobileGitHistory,
   mapMobileCommitRows,
@@ -109,8 +110,7 @@ export const MobileGitHistoryList = memo(function MobileGitHistoryList({
       .request(client, { worktree: `id:${worktreeId}`, commitId })
       .then((reply) => {
         const compared = gitCommitCompareRead.interpret(reply)
-        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Preserve the established response shape at this boundary.
-        const entries = compared.accepted ? (compared.value as GitBranchChangeEntry[]) : []
+        const entries = compared.accepted ? compared.value.entries : []
         if (!stale) {
           setFilesById((prev) => ({ ...prev, [commitId]: entries }))
         }

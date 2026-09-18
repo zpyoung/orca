@@ -841,7 +841,10 @@ describe('registerSettingsHandlers', () => {
   it('normalizes an agent-session-search write and hands the change to the index', async () => {
     const before = { aiVaultSearch: { enabled: false, historyDays: null } }
     store.getSettings.mockReturnValue(before)
-    store.updateSettings.mockImplementation((args: object) => ({ ...before, ...args }))
+    store.updateSettings.mockImplementation((args: Partial<GlobalSettings>) => ({
+      ...before,
+      ...args
+    }))
     registerSettingsHandlers(store as never)
     const handler = handleMock.mock.calls.find((call) => call[0] === 'settings:set')?.[1] as (
       event: typeof settingsInvokeEvent,

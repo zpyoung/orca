@@ -1,6 +1,5 @@
 import { ClaudeRewindAttempt, proveClaudeRewindRecovery } from './claude-structured-rewind'
 import {
-  AgentSessionAcquisitionExitUnprovenError,
   AgentSessionPreSpawnError,
   type AgentSessionAcquisition,
   type StructuredAgentSessionAcquireInput
@@ -44,11 +43,7 @@ import {
   type ClaudeStructuredSessionAdapterDeps,
   type ClaudeAcquireCallbacks
 } from './claude-structured-session-state'
-import {
-  claudeAcquisitionCleanupError,
-  closeClaudePublishedSessionForDeps,
-  resolveClaudeAcquisitionError
-} from './claude-structured-session-close'
+import { resolveClaudeAcquisitionError } from './claude-structured-session-close'
 import { readClaudeTranscriptEntryUuid } from './claude-tui-exit'
 import { withAgentSessionCreatePhase } from '../observability/agent-session-instrumentation'
 import { resolveClaudeAcquisitionLaunch } from './claude-structured-acquisition-launch'
@@ -247,38 +242,43 @@ export async function acquireClaudeSession({
     if (connection.closed) {
       throw new Error(`claude stream-json for session ${sessionId} exited while being acquired`)
     }
-    const publication = createClaudeSessionPublication({
-      connection,
-      init,
-      initialization,
-      claudeConfigDir: launch.claudeConfigDir,
-      leafUuid: observedLeafUuid,
-      fence: input.fence,
-      effort: readClaudeSettingsEffort(settings),
-      ...claudeStructuredSessionPublicationOptions(acquisitionOptions),
-      resumed: launch.resumed,
-      prompts,
-      translator,
-      events: input.events,
-      process,
-      acquisitionGeneration: mintClaudeAcquisitionGeneration(deps),
-      options: acquisitionOptions.options,
-      capabilities: readClaudeCapabilities(init, initialization),
-      ...(deps.mintLinkId ? { linkId: deps.mintLinkId() } : {}),
-      observedAt: deps.now?.() ?? Date.now()
-    })
+    const publication = await withAgentSessionCreatePhase('publish', input.recordPhase, async () =>
+      createClaudeSessionPublication({
+        connection,
+        init,
+        initialization,
+        claudeConfigDir: launch.claudeConfigDir,
+        leafUuid: observedLeafUuid,
+        fence: input.fence,
+        effort: readClaudeSettingsEffort(settings),
+        ...claudeStructuredSessionPublicationOptions(acquisitionOptions),
+        resumed: launch.resumed,
+        prompts,
+        translator,
+        events: input.events,
+        process,
+        acquisitionGeneration: mintClaudeAcquisitionGeneration(deps),
+        options: acquisitionOptions.options,
+        capabilities: readClaudeCapabilities(init, initialization),
+        ...(deps.mintLinkId ? { linkId: deps.mintLinkId() } : {}),
+        observedAt: deps.now?.() ?? Date.now()
+      })
+    )
+    const acquired: AgentSessionAcquisition = publication.acquisition
     liveSession = publication.session
     await withAgentSessionCreatePhase('restore_options', input.recordPhase, () =>
       restoreClaudeStructuredSessionOptions(liveSession!, deps.requestTimeoutMs)
     )
     acquisitions.assertCurrent(sessionId, attempt)
     acquisitions.deleteIfCurrent(sessionId, attempt)
-    sessions.set(sessionId, liveSession)
-    attempt.published = true
-    for (const event of attempt.buffered.splice(0)) {
-      event()
-    }
-    return publication.acquisition
+    await withAgentSessionCreatePhase('publish', input.recordPhase, async () => {
+      sessions.set(sessionId, liveSession!)
+      attempt.published = true
+      for (const event of attempt.buffered.splice(0)) {
+        event()
+      }
+    })
+    return acquired
   } catch (error) {
     initDeadline.clear()
     const acquisitionError = await resolveClaudeAcquisitionError({

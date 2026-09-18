@@ -30,18 +30,6 @@ type StructuredSessionMessageListProps = {
 const initialMessageListProps: StructuredSessionMessageListProps | null = null
 const initialApprovalCardProps: NativeChatApprovalCardProps | null = null
 
-type StructuredSessionMessageListProps = {
-  allowFileUriLinks?: boolean
-  onLinkClick?: (...args: unknown[]) => void
-  showTurnStatus?: boolean
-  showLiveTurnActivity?: boolean
-  isWorking?: boolean
-  runtimeContext?: unknown
-}
-
-const initialMessageListProps: StructuredSessionMessageListProps | null = null
-const initialApprovalCardProps: NativeChatApprovalCardProps | null = null
-
 /**
  * Shared mock state and `vi.mock` factories for the NativeChatStructuredSession test files.
  * Load it through `await vi.hoisted(async () => (await import(...)).createStructuredSessionMocks())`
@@ -66,10 +54,10 @@ export function createStructuredSessionMocks() {
     approvalCardProps: initialApprovalCardProps,
     questionCardProps: null as NativeChatQuestionCardProps | null,
     promptItems: [] as AgentJournalRenderItem[],
-    respond: vi.fn() as StructuredSessionSpy,
-    cancel: vi.fn() as StructuredSessionSpy,
-    handlePasteEvent: vi.fn() as StructuredSessionSpy,
-    pasteFromClipboard: vi.fn() as StructuredSessionSpy,
+    respond: vi.fn<(...args: never[]) => unknown>(),
+    cancel: vi.fn<(...args: never[]) => unknown>(),
+    handlePasteEvent: vi.fn<(...args: never[]) => unknown>(),
+    pasteFromClipboard: vi.fn<(...args: never[]) => unknown>(),
     submissions: [] as unknown[],
     monitoringBackgroundTasks: false,
     showBackgroundTasks: false,

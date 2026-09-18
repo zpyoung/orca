@@ -1,13 +1,10 @@
 import type { GitFileStatus, GitStagingArea } from '../../../src/shared/git-status-types'
 import type { RpcResponse } from '../transport/types'
 import type {
-  GitFileStatus,
-  GitStagingArea,
-  GitStatusEntry,
-  GitStatusResult,
-  GitUpstreamStatus
-} from '../../../src/shared/git-status-types'
-import type { RpcResponse } from '../transport/types'
+  MobileGitStatusEntry,
+  MobileGitStatusHostPayload,
+  MobileGitUpstreamStatus
+} from './git-status-reply-schema'
 
 export type MobileGitFileStatus = GitFileStatus
 export type MobileGitStagingArea = GitStagingArea

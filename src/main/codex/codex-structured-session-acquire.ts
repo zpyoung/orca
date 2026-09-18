@@ -92,7 +92,14 @@ export async function acquireCodexStructuredSession(input: {
         subagentExecutions,
         bindPromptItemId: (journalItemId, threadId, promptKey, turnId) =>
           acquisition.prompts.bindJournalItemId(journalItemId, threadId, promptKey, turnId),
-        clearPromptTurn: (threadId, turnId) => acquisition.prompts.clearTurn(threadId, turnId)
+        clearPromptTurn: (threadId, turnId) => acquisition.prompts.clearTurn(threadId, turnId),
+        onUserMessageEcho: (clientMessageId, providerIdentity) => {
+          // Only a send THIS session admitted; an echo from history restore or
+          // another client names no submission of ours to settle.
+          if (dispatchEchoes.settle(clientMessageId)) {
+            deps.onDispatchSettledLate?.({ sessionId, clientMessageId, providerIdentity })
+          }
+        }
       })
     : null
   const open = deps.openConnection ?? openCodexAppServerConnection
@@ -232,7 +239,7 @@ export async function acquireCodexStructuredSession(input: {
       options,
       reportedOptions: reportedCodexThreadOptions(opened),
       fastModeTierByModel: fastModeCatalog?.fastModeTierByModel ?? new Map(),
-      turnIdWaiters: [],
+      dispatchEchoes,
       translator,
       backgroundTasks: new CodexBackgroundTaskTracker(opened.threadId, subagentExecutions),
       forceCloseUnexpected: (reason) =>
