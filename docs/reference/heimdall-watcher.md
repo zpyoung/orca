@@ -87,15 +87,18 @@ and detail pane. The labels in the second column are what the UI actually render
 _Host unreachable_ overrides every other label whenever contact is `unverifiable`, and carries a
 last-confirmed age (`HeimdallStatusPill.tsx:8-21`).
 
-**Park reasons** (`watcher-types.ts:76-98`) — parking flips `enabled` to `false` and opens a
+**Ways a watcher parks** — the typed reasons are defined in `watcher-types.ts`; worker escalation
+and configuration failure use dedicated park paths. Each disables the enrollment and opens a
 `park-<reason>` escalation:
 
-| Reason                  | Trigger                                              | Recovery                                   |
-| ----------------------- | ---------------------------------------------------- | ------------------------------------------ |
-| `budget`                | active-time or turns spent                           | raise the budget, then resume              |
-| `stop-predicate`        | a kind's stop condition fired non-terminally         | resume                                     |
-| `worker-question`       | a dispatched worker is blocked on a question         | answer it, or resume once the worker exits |
-| `coordinator-seat-lost` | this process lost its orchestration coordinator seat | re-establish ownership                     |
+| Reason                  | Trigger                                                 | Recovery                                     |
+| ----------------------- | ------------------------------------------------------- | -------------------------------------------- |
+| `budget`                | active-time or turns spent                              | raise the budget, then resume                |
+| `stop-predicate`        | a kind's stop condition fired non-terminally            | resume                                       |
+| `worker-question`       | a dispatched worker is blocked on a question            | answer it, or resume once the worker exits   |
+| `worker-escalation`     | a worker explicitly requested operator intervention     | inspect the escalation, then resume; self-clears if that dispatch later lands |
+| `configuration-error`   | durable workspace or execution authority no longer fits | fix the configuration, then resume or re-arm |
+| `coordinator-seat-lost` | this process lost its orchestration coordinator seat    | re-establish ownership                       |
 
 ## Capability gates
 
@@ -109,10 +112,12 @@ modes:
 | `on`    | On       | the action runs unattended                                                                                                                |
 
 Approval is **scoped**, not blanket. The scope is
-`{actionKind, contentIdentity, evidenceKey, preparedCommitSha?}` (`gate.ts:45-54`), so approving a
-push of one content state does not pre-approve the next one. If the content changes, you are asked
-again. Repeated identical holds fold into one escalation with a running `foldCount` rather than
-spamming the ledger (`gate.ts:56-59`).
+`{actionKind, contentIdentity, evidenceKey, preparedCommitSha?}` (`gate.ts:45-54`), compared
+field-for-field. Approving a push of one content state does not pre-approve the next one. If the
+content or prepared commit changes, you are asked again. Repeated holds for the exact same unresolved
+scope fold into one logical escalation even when unrelated ledger rows intervene; approval resolves
+every open or escalated duplicate for that exact scope, not a broader action class
+(`gate.ts`, `approval-resolution.ts`).
 
 The gate can hold for reasons other than capability mode. These are the strings you will see in the
 decision trace (`gate.ts:100-155`):
@@ -142,8 +147,11 @@ record of something that happened.
 | ---------------------------- | ---------- | ----------------------------------------------------------------- |
 | `awaiting-approval`          | **yes**    | a `gated` capability wants an action approved                     |
 | `worker-question`            | **yes**    | a worker is blocked on a question; answer it from the detail pane |
+| `worker-escalation`          | **yes**    | a worker explicitly requested operator intervention               |
 | `park-budget`                | **yes**    | budget spent; raise it, then resume                               |
-| `park-worker-question`       | **yes**    | parked because of the above                                       |
+| `park-worker-question`       | **yes**    | parked because of the above question                              |
+| `park-worker-escalation`     | **yes**    | parked because of the above escalation                            |
+| `park-configuration-error`   | **yes**    | durable workspace or authority configuration no longer matches    |
 | `park-coordinator-seat-lost` | **yes**    | orchestration ownership lost                                      |
 | `park-stop-predicate`        | sometimes  | resume if you disagree with the stop condition                    |
 | `invalid-kind-payload`       | **yes**    | the enrollment is malformed; commands are refused on it           |
@@ -212,18 +220,23 @@ the watched host — `.git/orca-heimdall/lease/epoch-N/holder.json` for a git wo
 `.orca/heimdall/lease/epoch-N/holder.json` for a folder (`lease-store.ts:259,277`) — not in the
 Orca profile, so it fences across app instances and across SSH.
 
-The TTL is 90 seconds and the holder renews at a third of that (`runner-loop.ts:180`,
-`lease-store.ts:139-157`). A holder that stops renewing is considered expired and the next watcher
-claims a higher epoch, which fences the old one out. **A crashed app's lease self-heals after ~90
-seconds; you do not need to delete anything.**
+The TTL is 90 seconds and the holder renews at a third of that (`runner-loop.ts`,
+`lease-store.ts`). A holder that stops renewing is considered expired and the next watcher claims a
+higher epoch, which fences the old one out. Release is authenticated with both the holder identity
+and epoch: a stale holder cannot mark a successor's lease released. **A crashed app's lease
+self-heals after ~90 seconds; you do not need to delete anything.**
 
-The two failure modes look different in the UI:
+The three failure modes look different in the UI:
 
 - **`refused`** — someone else holds a live lease. The tick exits with `lease-refused` and quietly
   retries at rapid pace. No visible alarm; the watcher just never progresses.
 - **`unverifiable`** — the host or filesystem could not be reached. The status becomes
   `unreachable` / `lease-unverifiable`, any active dispatch is closed for contact loss, and the pill
-  switches to _Host unreachable · last confirmed …_ (`runner-loop.ts:184-206`).
+  switches to _Host unreachable · last confirmed …_. Contact loss is retried; it is not evidence
+  that an asynchronous effect failed or did not land.
+- **`configuration-error`** — the durable target no longer resolves to the enrolled workspace or
+  authority. The watcher disables and parks with `park-configuration-error` instead of retrying a
+  configuration that cannot become correct merely through renewed contact.
 
 ## Kind: `hosted-review` (PR Sitter)
 
@@ -323,9 +336,12 @@ throws rather than overriding the protection.
 
 ### Contention and push targets
 
-Before any action that writes the worktree, the sitter requires a clean tree and refuses while
-another agent or terminal is active in that worktree, or while one of its own abandoned fix sessions
-left the tree dirty (`contention.ts:145-211`).
+Before any action that writes the worktree, the sitter requires a complete, reachable terminal census
+and applies its clean-tree rules. A publication traces the preparation attempt's `dispatchId` to its
+still-owned orchestration terminal, so the sitter's own worker is not mistaken for a foreign agent.
+An unrelated agent or terminal still blocks; a missing, adopted, released, or otherwise unverifiable
+owned session holds conservatively, and an owned session that exited leaving uncommitted changes is
+reported as an abandoned sitter fix (`contention.ts`, `agent-publication.ts`).
 
 For pushes it resolves the review's source repo against your configured remotes and requires
 **exactly one** match. Zero or ambiguous matches make every push-dependent action fail with "push
@@ -350,31 +366,45 @@ Drives a goal to a landing bar across many tasks, dispatching planner, implement
 integrator roles into the workspace.
 
 When a worker reports completion or its execution host confirms it has exited, Heimdall settles its
-dispatch and automatically requests `orchestration.workerRelease`. The existing release path archives output before closing the worker's
-terminal; a single-pane worker tab disappears. A worker terminal adopted through user interaction,
-or otherwise no longer owned by the dispatch, is retained. Release receipts are recorded as
-`worker-terminal-released` evidence, including the retention reason. A release error is recorded
-without failing the watcher tick or undoing settlement.
+dispatch and automatically requests `orchestration.workerRelease`. The existing release path archives
+output before closing the worker's terminal; a single-pane worker tab disappears. A worker terminal
+adopted through user interaction, or otherwise no longer owned by the dispatch, is retained. Release
+receipts are recorded as `worker-terminal-released` evidence, including the retention reason. A
+release error is recorded without failing the watcher tick or undoing settlement.
 
-A dispatch confirmed exited without a `worker_done` report resolves `not-landed`, allowing the
-objective to replan. A late `worker_done` still takes precedence and follows normal report validation;
-a report on disk alone is never trusted. Contact loss remains `indeterminate`, not evidence of exit.
-Recovery also requests cleanup for older unresolved exited dispatches; a recorded release receipt
-or release error prevents duplicate cleanup attempts.
+A `worker_done` report settles with the worker's declared certainty. An explicit worker escalation is
+recorded as `worker-escalation`, closes active billing, and parks the watcher; **Resume** acknowledges
+both the park and the unresolved worker escalation before scheduling the next tick. If the dispatch
+settles before acknowledgement, its still-unresolved worker escalation is resolved.
 
-| Setting           | Values                                        | Default          | Notes                                                                                                                      |
-| ----------------- | --------------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Workspace         | repo / worktree / folder                      | —                | required; determines available landing rungs                                                                               |
-| Objective text    | ≤ 16,384 chars                                | —                | required (`contract-types.ts:4`)                                                                                           |
-| Tier              | express / standard / full                     | standard         | how much review is required — see below                                                                                    |
-| Landing bar       | 5 rungs                                       | files-on-disk    | how far to take the work — see below                                                                                       |
-| Max concurrency   | 1                                             | 1                | read-only; the schema allows 1,024 but the main process throws `max-concurrency-unsupported` above 1 (`definition.ts:156`) |
-| Write territory   | 0–64 workspace-relative globs                 | **blank = `**`** | optional; blank allows the whole workspace — see below                                                                     |
-| Active budget     | ≥ 0.25 h, 0.25 steps                          | 4                | slider tops out at 24 h, the input does not                                                                                |
-| Worker turn limit | integer ≥ 0                                   | 40               |                                                                                                                            |
-| Capabilities      | plan / implement / review / check / land      | see below        |                                                                                                                            |
-| Role agents       | planner / implementer / reviewer / integrator | automatic        |                                                                                                                            |
-| Sitter overrides  | four sitter capabilities                      | inherit          | applied at handoff                                                                                                         |
+A resolved escalation then retires its own park, but only when that dispatch settled as `landed` — a
+worker that escalated and afterwards reported `succeeded` un-parks the watcher on the next tick with
+no operator action, and the `park-worker-escalation` entry folds to `resolved`. A dispatch that
+settled any other way, including one confirmed exited without a report, keeps the watcher parked so
+an operator reads what went wrong before it runs again. An escalation nothing resolves — one carrying
+no dispatch id, or whose dispatch is still running — also keeps the park.
+
+A dispatch confirmed exited without a `worker_done` report remains `indeterminate`; process exit does
+not prove what its asynchronous work changed. A late `worker_done` still takes precedence and follows
+normal report validation, and a report on disk alone is never trusted. Contact loss is likewise
+`indeterminate`, not evidence of exit. Recovery can request cleanup for older exited dispatches, but a
+recorded release receipt or release error prevents duplicate cleanup attempts; it does not upgrade an
+ambiguous effect to `not-landed`.
+
+| Setting              | Values                                        | Default          | Notes                                                                                                                      |
+| -------------------- | --------------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Workspace            | repo / worktree / folder                      | —                | required; determines available landing rungs                                                                               |
+| Objective text       | ≤ 16,384 chars                                | —                | required (`contract-types.ts:4`)                                                                                           |
+| Existing plan source | ≤ 65,536 chars                                | blank            | optional planner input; not an approved executable plan                                                                    |
+| Tier                 | express / standard / full                     | standard         | how much review is required — see below                                                                                    |
+| Landing bar          | 5 rungs                                       | files-on-disk    | how far to take the work — see below                                                                                       |
+| Max concurrency      | 1                                             | 1                | read-only; the schema allows 1,024 but the main process throws `max-concurrency-unsupported` above 1 (`definition.ts:156`) |
+| Write territory      | 0–64 workspace-relative globs                 | **blank = `**`** | optional; blank allows the whole workspace — see below                                                                     |
+| Active budget        | ≥ 0.25 h, 0.25 steps                          | 4                | slider tops out at 24 h, the input does not                                                                                |
+| Worker turn limit    | integer ≥ 0                                   | 40               |                                                                                                                            |
+| Capabilities         | plan / implement / review / check / land      | see below        |                                                                                                                            |
+| Role agents          | planner / implementer / reviewer / integrator | automatic        |                                                                                                                            |
+| Sitter overrides     | four sitter capabilities                      | inherit          | applied at handoff                                                                                                         |
 
 ### Capability defaults are not conservative
 
@@ -391,6 +421,20 @@ land:      on    (files-on-disk)  /  gated  (every other bar)
 So a default objective enrollment dispatches real agent sessions and runs real shell commands on its
 **first tick**, without asking. Only planning and real git effects are gated. Lower the turn budget
 and narrow the territory before the first run.
+
+### Existing plan source and Plan Off
+
+**Existing plan source** accepts pasted or imported Markdown, text or JSON, but remains raw planner
+input. The planner must normalize it into the objective store's validated revision and normal Plan
+approval still applies. The raw `existingPlan` text is never dispatched directly to implementers and
+does not itself authorize execution.
+
+A new objective therefore cannot set Plan to **Off** merely because source text was supplied.
+`plan-off-requires-approved-plan` is refused unless this is a legitimate re-arm of the same objective,
+the objective store still has a usable approved revision, and the objective text and
+write-territory set match the prior contract. This prevents Plan Off from turning an unreviewed text
+blob, a stale revision, or a plan approved for different work into an executable plan
+(`definition.ts`, `objective-store-queries.ts`).
 
 ### Tier
 
@@ -566,14 +610,17 @@ retaining its audit ledger (`kernel-enrollment-lifecycle.ts`, `budget.ts`).
 
 ### Ledger and decision trace
 
-The ledger is append-only, with entry kinds `attempt`, `attempt-resolved`, `attempt-abandoned`,
-`approval`, `escalation`, `evidence`, `interval-open` / `-checkpoint` / `-close`, `turn`,
-`client-observation` and `terminal` (`ledger-types.ts:187-200`).
+The ledger is append-only while a watcher is active, with entry kinds `attempt`,
+`attempt-resolved`, `attempt-abandoned`, `approval`, `escalation`, `evidence`, `interval-open` /
+`-checkpoint` / `-close`, `turn`, `client-observation` and `terminal` (`ledger-types.ts`).
 
-Retention is two-class. Entries tagged `fact` — attempts, approvals, evidence, budget intervals, the
-terminal summary — are **never** pruned. Only `observation`-class rows that are already resolved fall
-into a bounded ring (`retention.ts:6-45`). So the audit trail of what a watcher actually did survives;
-only the noise is trimmed. The activity list shows the 30 most recent entries.
+Retention has an active and a terminal policy. While enrolled and non-terminal, fact-class rows are
+unbounded; only resolved observation-class rows and unpinned tick traces are reclaimed into bounded
+rings. Terminal transition then compacts ordinary history, retaining the `terminal` ledger row and a
+durable terminal summary with kind, terminal state, reason, timestamp, and final active-time/turn
+totals. Pinned unresolved rows remain until they can safely be released. The detail activity list
+shows the 30 most recent surviving entries. Do not treat terminal compaction as a full audit archive,
+or the active fact guarantee as a bounded-storage guarantee (`retention.ts`).
 
 The decision trace records each tick as **Saw** (the snapshot it read), **Decided** (the action
 chosen, or why none was, plus the gate verdict), and **Declined** (phases evaluated that did not
@@ -594,15 +641,26 @@ Both require live contact on both reads. Delivery is gated on the master
 ### Watchers on other hosts
 
 The fleet page merges local watchers with those owned by paired runtime environments
-(`fleet-transport.ts:161-165`), and routes detail reads and commands to whichever owns the row.
-Caveats worth knowing before you rely on it:
+(`fleet-transport.ts`). Each owner stamps rows independently: a row's `observedAtMs` advances only
+when that watcher's projection or owner revision changes, while the enclosing snapshot's
+`generatedAtMs` may advance for unrelated rows. Detail refresh and last-confirmed age use the row
+stamp, not a fleet-global freshness claim. A fleet read refreshes local state first and returns it
+with the cached remote rows; remote subscription setup and reconnect do not hold the local page open.
+
+Caveats worth knowing before you rely on paired reads:
 
 - Commands need the remote host to advertise `heimdall.commands.v1`; an older host returns
   "The owning runtime does not support Heimdall commands. Update the host and try again."
-  (`capability.ts:1`, `fleet-remote-mirrors.ts:153-159`).
+- Ledger and detail readers negotiate
+  `heimdall.dispatch-result-pre-dispatch-failure.v1`. A capable paired reader retains the optional
+  nested dispatch result `{status:'refused', reason:'pre-dispatch-failure', detail}`. For an
+  incapable paired reader, the owner omits **only** that optional nested `result`; the attempt still
+  carries `effect: 'not-landed'` and `reason: 'pre-dispatch-failure'`.
+- A dispatch error is classified `pre-dispatch-failure` only when the adapter knows worker start was
+  never invoked. Once start may have occurred, the result remains `indeterminate`; the capability
+  does not turn asynchronous uncertainty into a clean refusal.
 - Remote reads time out at 15s. A command sent as the connection drops is reported
-  **indeterminate** — it may or may not have taken effect — rather than as a clean failure
-  (`fleet-remote-operations.ts:19-23`).
+  **indeterminate** — it may or may not have taken effect — rather than as a clean failure.
 - A dropped subscription marks the mirror unreachable and retries every second; until it recovers the
   row shows _Host unreachable_, and detail falls back to the last cached read if there is one.
 
@@ -615,8 +673,11 @@ Caveats worth knowing before you rely on it:
 | Workspace lease holder                                                        | Git: `<absolute-git-dir>/orca-heimdall/lease/epoch-<n>/holder.json`; folder: `<workspace>/.orca/heimdall/lease/epoch-<n>/holder.json`, on the execution host |
 
 `<profile>` is the Electron userData directory: `~/Library/Application Support/orca-dev` under
-`pnpm dev`. To reset, quit the app first — shutdown drain is best-effort and Electron's quit barrier
-does not await it, so killing it mid-tick strands a lease for its TTL.
+`pnpm dev`. To reset, quit the app first. Heimdall's asynchronous shutdown joins Electron's quit
+barrier: it stops new work, gives active operation tails up to 1.5 seconds while retaining their
+leases, then releases with the remaining deadline before closing storage. The bound keeps quit from
+hanging, so it is not a promise that every in-flight asynchronous effect or lease release finishes;
+an interrupted lease still self-heals after its TTL.
 
 ```sh
 rm -rf ~/Library/Application\ Support/orca-dev/fork-heimdall \
@@ -666,6 +727,7 @@ debug log level, and no Heimdall-specific log environment variable.
 | Nothing happens and the trace says `awaiting-approval`                | a `gated` capability is waiting for you in the detail pane                         |
 | Watcher shows _Parked_, Resume is refused                             | budget spent — Apply budget first, then resume                                     |
 | Watcher shows _Held_ but no escalation                                | read the decision trace's hold reason; most are interlocks, not errors             |
+| Watcher parks with `configuration-error`                              | durable workspace or authority mismatch — repair it before Resume                  |
 | "push target is unverifiable"                                         | zero or more than one remote matches the review's source repo                      |
 | Sitter refuses to act on a dirty worktree                             | contention guard — commit, stash, or close the other agent in that worktree        |
 | PR Sitter control missing entirely                                    | unsupported provider, detached HEAD, or no open review on the branch               |
@@ -693,4 +755,6 @@ From the Phase 4 verification record (`tech-phase-4.md:41-52,1466-1483`):
 - **The SSH / push rung.** The relay lane is unproven; filed as a test-skip in the orca ledger.
 - **The remote sandbox suite never ran** in this worktree — no Docker host configured (`test-gap-124`).
 - **No UI end-to-end coverage.** The only e2e file is a cross-version wire unit test.
-- **Shutdown drain is best-effort** (`deferred-123`) — pause or disarm before quitting.
+- **Shutdown is bounded, not transactional across arbitrary async effects.** It joins the quit
+  barrier and drains for up to 1.5 seconds, but an operation still outstanding at the deadline may
+  require normal write-ahead recovery on restart.

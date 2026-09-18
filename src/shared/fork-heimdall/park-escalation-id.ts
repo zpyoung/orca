@@ -22,3 +22,24 @@ export function parkEscalationId(watcherId: string, reason: WatcherParkReason): 
   const base = `park:${watcherId}:${reason.kind}`
   return detail === null ? base : `${base}:${encodeURIComponent(detail)}`
 }
+
+/**
+ * The escalation identity a worker-escalation park writes. It embeds the worker escalation that
+ * halted the watcher so recovery can tell which dispatch the park is waiting on.
+ */
+export function workerEscalationParkId(watcherId: string, escalationId: string): string {
+  return `park:${watcherId}:worker-escalation:${encodeURIComponent(escalationId)}`
+}
+
+/** Inverse of `workerEscalationParkId`; null for any id it did not build. */
+export function parkedWorkerEscalationId(watcherId: string, parkId: string): string | null {
+  const prefix = `park:${watcherId}:worker-escalation:`
+  if (!parkId.startsWith(prefix)) {
+    return null
+  }
+  try {
+    return decodeURIComponent(parkId.slice(prefix.length))
+  } catch {
+    return null
+  }
+}
