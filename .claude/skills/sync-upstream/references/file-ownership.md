@@ -207,37 +207,81 @@ which and why in the commit message. Do **not** backport the missing implementat
 
 ## When upstream tightens the linter
 
-A stable tag can enable new rules in `.oxlintrc.json` (and bump the `oxlint` devDependency). Those
-rules then fire on **fork-only files the merge never touched**, byte-identical to the pre-merge
-baseline. This is not an ownership question — there is no upstream side of a fork-only file to
-resolve to — and it blocked three consecutive syncs (v1.4.183 twice, v1.4.184) before the policy
-below existed.
+A stable tag can enable new rules (and bump the `oxlint` devDependency). Those rules then fire on
+**fork-only files the merge never touched**, byte-identical to the pre-merge baseline. This is not
+an ownership question — there is no upstream side of a fork-only file to resolve to — and it
+blocked three consecutive syncs (v1.4.183 twice, v1.4.184) before the policy below existed.
 
 Diagnose it before treating a lint failure as merge damage:
 
 ```sh
-git diff "$ORIGIN_MAIN_OLD" HEAD -- .oxlintrc.json     # did the merge add rules?
-git diff --quiet "$ORIGIN_MAIN_OLD" -- <violating-file> # is the file identical to baseline?
+git diff "$ORIGIN_MAIN_OLD" HEAD -- .oxlintrc.json 'config/oxlint-*.json'   # new rules anywhere?
+git diff "$ORIGIN_MAIN_OLD" HEAD -- package.json | grep -E '^[-+].*"(lint|audit:|check:)' # new step?
+git diff --quiet "$ORIGIN_MAIN_OLD" -- <violating-file>  # is the file identical to baseline?
 ```
 
-Both true → toolchain tightening. **Adopting the new rule in the fork's own file is in scope**, but
-only mechanically:
+**`.oxlintrc.json` alone is not the question, and answering only it reads as "no new rules" when
+there are eight.** v1.4.205 left that file byte-identical and instead added
+`config/oxlint-anti-slop.json` — a whole plugin, `anti-slop`, with eight rules on — reached through
+a *new* `pnpm lint` sub-step, `audit:anti-slop`. A release can add a config, a step, or both, so
+diff every `config/oxlint-*.json` and the `lint` script together.
+
+That second command matters for a reason beyond discovery: `package.json` is a whole-file fork
+exception, so a new sub-step only reaches the fork's tree if the `ours.txt` audit three-way-merges
+it. Skip that merge and the gate passes locally while PR CI, which runs the step from its own
+workflow, fails.
+
+New rules → toolchain tightening. **Adopting a new rule in the fork's own files is the run's job,
+and it does not stop for a human.** A red lint gate is never a reason to abandon a resolution that
+is otherwise complete.
+
+Try `pnpm exec oxlint --fix <violating-file>` first, because a fixable rule costs nothing. Expect it
+to rewrite nothing: whole rule families are advisory-only. `anti-slop` shipped eight rules in
+v1.4.206 and **not one** is auto-fixable, so a run that treats `--fix` as the boundary has no move at
+all — which is exactly how v1.4.205 stalled with everything else green.
+
+**Write the fix by hand, and take the wording from upstream.** Upstream ran the same rule over its
+own tree in the release that enabled it, so its adoption commit is the reference answer for what the
+rule wants. Find it and read it before renaming anything:
 
 ```sh
-pnpm exec oxlint --fix <violating-file>
+git log --oneline "$PREV_TAG".."$UPSTREAM_TARGET" --grep 'lint' --grep 'anti-slop' -i
+git show <that commit> -- src | grep -E '^[-+]' | grep -vE '^[-+]{3}'
 ```
 
-Commit it separately from the merge and the ownership commit, and name the rule in the message. Then
-re-run the full gate — the fix is only valid if typecheck, lint, and tests all still pass.
+For v1.4.206 that gave the whole vocabulary: `no-shape-in-symbol-names` wants the decision a symbol
+carries, not the structure it inspects (`isSkillsCliAgentKeyShaped` → `isUsableSkillsCliAgentKey`,
+`RootShape` → `RootLayout`, `SourceShape` → `SourceCookieRow`); `no-reflect-get` wants typed
+property access, not a cast. Mirroring that is what keeps a hand-written fix from being an invention.
 
-Hard limits. Violate any of these and it is a human decision, not an automated one:
+Then, per rule:
 
+1. One commit per rule, named for it, separate from the merge and the ownership commit, citing the
+   upstream commit whose idiom it mirrors. That trail is what makes the change reviewable.
+2. Re-run the **whole** gate. A rename reaches callers and tests, and a narrowed parameter type can
+   reject a test's `{}` — both happened on v1.4.206 and both are part of the fix, not a new problem.
+3. Say in the PR body what changed and what did not.
+
+Hard limits. These bound *how* the fix is written; none of them is a reason to stop:
+
+- **Names and types only, never behaviour.** Rename a symbol, name a type that was `object`, narrow a
+  string key to the union it always held. Never change a branch, a message, an assertion or a
+  regex to satisfy a rule. If the only way to clear a rule is to change what the code *does*, that
+  one violation is a human decision — resolve the rest and escalate it alone.
+- Never `--fix-suggestions` or `--fix-dangerously`; both can alter behaviour.
 - Only files byte-identical to `$ORIGIN_MAIN_OLD`. A violation in a file the merge *changed* is
-  `-X ours` damage — resolve it to one real side instead (see the two sections above).
-- Only what `--fix` rewrites on its own. Never hand-write a logic change to satisfy a rule, and never
-  reach for `--fix-suggestions` or `--fix-dangerously`; both can alter behavior.
-- Never edit `.oxlintrc.json` to silence the rule. Upstream owns that file, so the next sync would
-  re-add the rule and re-block.
+  `-X ours` damage, not toolchain tightening — resolve it to one real side instead (see the two
+  sections above) rather than renaming around it.
+- Only files the fork owns. A violation in a file byte-identical to the *tag* is upstream's release
+  failing its own new rule; v1.4.205 shipped `Reflect.get` in `agent-status-legacy-adapter.ts` under
+  its own new `no-reflect-get` and fixed it on the next release branch. Retarget to the newer stable
+  tag if one exists — that is the cheapest fix and it dissolves the finding. Otherwise treat it as an
+  upstream defect and escalate that file alone. Proving it needs no checkout, unlike the vitest case
+  above: if the lint config, the plugin pin in `package.json`, and the violating file are each
+  byte-identical to the tag, the inputs are the tag's and the finding is deterministic. Three
+  `git diff --quiet` calls settle it.
+- Never edit `.oxlintrc.json` or `config/oxlint-*.json` to silence a rule, and never add a
+  suppression entry. Upstream owns those files, so the next sync re-adds the rule and re-blocks.
 
 Only violations that survive into the **merged** tree matter. Running the new config against the
 pre-merge baseline over-reports badly: most flagged files take upstream's already-compliant version
@@ -247,10 +291,15 @@ To get ahead of the next release instead of discovering this mid-sync, run the t
 against the current tree before merging — restore the baseline config afterward:
 
 ```sh
-cp .oxlintrc.json /tmp/oxlintrc.baseline.json
-git show <target-ref>:.oxlintrc.json > .oxlintrc.json
-pnpm exec oxlint; cp /tmp/oxlintrc.baseline.json .oxlintrc.json
+git diff <target-ref> -- .oxlintrc.json 'config/oxlint-*.json'
+git diff <target-ref> -- package.json | grep -E '^[-+].*"(lint|audit:|check:)'
 ```
+
+Swapping in the target's `.oxlintrc.json` and re-running `oxlint` is **not** the pre-check, for the
+same reason the diagnostic above is not: a release can put its new rules in a separate config behind
+a separate script, and that rehearsal runs neither. Read the two diffs instead, then rehearse
+whatever they actually name — for v1.4.205 that meant installing the pinned plugin and running
+`audit:anti-slop`, which the old rehearsal would have missed entirely.
 
 ## When upstream ratchets a chokepoint
 
