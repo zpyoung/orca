@@ -1,3 +1,4 @@
+import { OBJECTIVE_ABSENT_REMOTE_REF_STATE } from '../../shared/fork-heimdall-objective/contract-types'
 import { resolveConfiguredGitPushTarget } from '../../shared/git-push-target-resolution'
 import type { ObjectiveGitCommand } from './content-identity'
 
@@ -7,6 +8,14 @@ export type ObjectivePushTarget = {
   remote: string
   branch: string
   remoteSha: string
+}
+
+export function objectiveRemoteRefState(sha: string): string {
+  return sha || OBJECTIVE_ABSENT_REMOTE_REF_STATE
+}
+
+export function objectiveRemoteRefSha(state: string): string {
+  return state === OBJECTIVE_ABSENT_REMOTE_REF_STATE ? '' : state
 }
 
 function parsePushBranch(refspec: string): string | null {
@@ -80,6 +89,6 @@ export async function resolveObjectivePushTarget(
   return {
     remote,
     branch,
-    remoteSha: await readObjectiveRemoteBranchHead(runGit, remote, branch)
+    remoteSha: objectiveRemoteRefState(await readObjectiveRemoteBranchHead(runGit, remote, branch))
   }
 }

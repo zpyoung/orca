@@ -12,10 +12,18 @@ export type HeimdallMailboxWake = (address: string) => void
 let installedWake: HeimdallMailboxWake | null = null
 
 // heartbeat and status only refresh liveness, so waking on them would spend a tick to decide nothing.
-const DECISION_CHANGING_TYPES: ReadonlySet<string> = new Set(['worker_done', 'question'])
+const DECISION_CHANGING_TYPES: ReadonlySet<string> = new Set([
+  'worker_done',
+  'question',
+  'escalation'
+])
 
 export function heimdallMailboxAddressForRun(orchestrationRunId: string): string {
   return `run:${orchestrationRunId}`
+}
+
+export function heimdallMailboxAddressForDispatch(dispatchId: string): string {
+  return `dispatch:${dispatchId}`
 }
 
 export function setHeimdallMailboxWake(wake: HeimdallMailboxWake | null): void {

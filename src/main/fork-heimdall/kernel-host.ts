@@ -6,7 +6,7 @@ import {
 } from '../runtime/runtime-file-command-target'
 import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
-import type { LeaseWorkspaceTarget } from './lease-store'
+import { LeaseConfigurationError, type LeaseWorkspaceTarget } from './lease-store'
 
 type RuntimeGitTargetResolver = {
   resolveRuntimeGitTarget(selector: string): Promise<RuntimeGitTarget>
@@ -36,7 +36,7 @@ export class HeimdallKernelHost {
   async resolveLeaseTarget(key: WorkspaceKey): Promise<LeaseWorkspaceTarget> {
     const enrollment = this.findEnrollment(key)
     if (!enrollment) {
-      throw new Error(`Lease workspace is no longer enrolled: ${key}`)
+      throw new LeaseConfigurationError(`Lease workspace is no longer enrolled: ${key}`)
     }
     if (enrollment.worktreeId === null) {
       return this.resolveFolderTarget(enrollment)
@@ -49,7 +49,7 @@ export class HeimdallKernelHost {
       !('resolveRuntimeGitTarget' in runtime) ||
       typeof runtime.resolveRuntimeGitTarget !== 'function'
     ) {
-      throw new Error('Runtime cannot resolve a Heimdall Git target')
+      throw new LeaseConfigurationError('Runtime cannot resolve a Heimdall Git target')
     }
     const gitTarget = await (runtime as RuntimeGitTargetResolver).resolveRuntimeGitTarget(
       enrollment.worktreeId
@@ -59,7 +59,7 @@ export class HeimdallKernelHost {
       gitTarget.worktree.path !== enrollment.workspacePath ||
       gitTarget.executionHostId !== enrollment.executionHostId
     ) {
-      throw new Error('Resolved Git authority changed after Heimdall enrollment')
+      throw new LeaseConfigurationError('Resolved Git authority changed after Heimdall enrollment')
     }
     return {
       kind: 'git',
@@ -112,7 +112,7 @@ export class HeimdallKernelHost {
       !('resolveRuntimeFileTarget' in runtime) ||
       typeof runtime.resolveRuntimeFileTarget !== 'function'
     ) {
-      throw new Error('Runtime cannot resolve a Heimdall folder target')
+      throw new LeaseConfigurationError('Runtime cannot resolve a Heimdall folder target')
     }
     const worktreeId = `${enrollment.repoId}::${enrollment.workspacePath}`
     const fileTarget = await (runtime as RuntimeFileTargetResolver).resolveRuntimeFileTarget(
@@ -123,7 +123,9 @@ export class HeimdallKernelHost {
       fileTarget.executionHostId !== enrollment.executionHostId ||
       fileTarget.worktree.path !== enrollment.workspacePath
     ) {
-      throw new Error('Resolved folder authority changed after Heimdall enrollment')
+      throw new LeaseConfigurationError(
+        'Resolved folder authority changed after Heimdall enrollment'
+      )
     }
     const fileProvider = requireRuntimeFileProvider(fileTarget)
     return {

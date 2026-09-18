@@ -146,7 +146,8 @@ export class WatcherLedgerLifecycle {
     const absent: AttemptEntry[] = []
     for (const attempt of pending) {
       const dispatch = attempt.dispatch
-      if (!dispatch) {
+      // pending only ever holds attempted or settled-indeterminate revisions, and both still carry spec
+      if (!dispatch?.spec) {
         continue
       }
       const result = await this.dependencies.adapter.recoverDispatch({
@@ -206,7 +207,11 @@ export class WatcherLedgerLifecycle {
     this.workerIntervals.delete(attempt.attemptId)
   }
 
-  /** Settles a dispatched worker only from authoritative mailbox evidence. */
+  /**
+   * Settles a dispatched worker only from authoritative mailbox evidence. A failed outcome settles
+   * `indeterminate` rather than `not-landed`: the mailbox is authoritative that it didn't land, but
+   * not yet why, and resolveOutcome needs that gap open to classify it on the next reconciliation.
+   */
   settleWorker(input: {
     watcherId: string
     dispatchId: string
@@ -228,7 +233,10 @@ export class WatcherLedgerLifecycle {
       state: 'settled',
       effect: input.effect,
       ...(input.result === undefined ? {} : { result: input.result }),
-      ...(input.reason === undefined ? {} : { reason: input.reason })
+      ...(input.reason === undefined ? {} : { reason: input.reason }),
+      ...(input.effect === 'indeterminate' || !attempt.dispatch
+        ? {}
+        : { dispatch: this.withoutDispatchSpec(attempt.dispatch) })
     })
     const interval =
       this.workerIntervals.get(attempt.attemptId) ??
@@ -295,6 +303,14 @@ export class WatcherLedgerLifecycle {
         ...(input.taskKey ? { taskKey: input.taskKey } : {})
       }
     }
+  }
+
+  // a determinate settlement no longer needs the prompt recover() would have replayed against it
+  private withoutDispatchSpec(
+    dispatch: NonNullable<AttemptEntry['dispatch']>
+  ): AttemptEntry['dispatch'] {
+    const { spec: _spec, ...rest } = dispatch
+    return rest
   }
 
   private preDispatchRefusal(
@@ -390,7 +406,10 @@ export class WatcherLedgerLifecycle {
       state: 'settled',
       effect: result.status === 'indeterminate' ? 'indeterminate' : 'not-landed',
       reason: result.status === 'indeterminate' ? 'operation-unknown' : result.reason,
-      result
+      result,
+      ...(result.status === 'indeterminate' || !attempt.dispatch
+        ? {}
+        : { dispatch: this.withoutDispatchSpec(attempt.dispatch) })
     })
   }
   private recordRecoveredUncertainDispatch(

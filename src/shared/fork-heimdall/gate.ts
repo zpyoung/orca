@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { inspectAttemptLedger, makeAttemptFingerprint } from './attempt-fingerprint'
 import { deriveBudgetState } from './budget'
-import { getLatestApproval, getLatestEscalation, sameApprovalScope } from './ledger-queries'
+import { getLatestApproval, getLatestUnresolvedAwaitingApprovalEscalation } from './ledger-queries'
 import {
   ApprovalScopeSchema,
   type ApprovalScope,
@@ -46,29 +46,26 @@ export type GateEnrollment = Pick<WatcherEnrollment, 'enabled' | 'capabilities' 
 export function approvalScopeForAction(action: KernelAction): ApprovalScope {
   const preparedCommitSha =
     typeof action.preparedCommitSha === 'string' ? action.preparedCommitSha : undefined
+  // a bounded auto-redispatch reuses the original's approval rather than re-asking on every retry
+  const retryOf = typeof action.retryOf === 'string' ? action.retryOf : undefined
   return {
     actionKind: action.kind,
     contentIdentity: action.contentIdentity,
-    evidenceKey: action.evidenceKey,
+    evidenceKey: retryOf ?? action.evidenceKey,
     ...(preparedCommitSha === undefined ? {} : { preparedCommitSha })
   }
 }
 
 /**
- * Builds the next append-only approval escalation revision. Equal consecutive holds reuse the
- * logical escalation id and increment its cumulative fold count; no ledger row is updated.
+ * Builds the next append-only revision for one unresolved approval scope. Interleaved escalations
+ * do not split that logical escalation; a resolved logical escalation is never reopened.
  */
 export function deriveAwaitingApprovalRevision(
   ledger: WatcherLedger,
   scope: ApprovalScope
 ): GateEscalationRevision {
-  const latest = getLatestEscalation(ledger)
-  if (
-    latest?.status === 'open' &&
-    latest.escalationKind === 'awaiting-approval' &&
-    latest.approvalScope &&
-    sameApprovalScope(latest.approvalScope, scope)
-  ) {
+  const latest = getLatestUnresolvedAwaitingApprovalEscalation(ledger, scope)
+  if (latest) {
     return {
       escalationId: latest.escalationId,
       escalationKind: 'awaiting-approval',

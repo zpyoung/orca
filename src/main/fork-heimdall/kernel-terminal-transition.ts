@@ -1,3 +1,4 @@
+import { deriveBudgetState } from '../../shared/fork-heimdall/budget'
 import type { HandoffAdapter } from '../../shared/fork-heimdall/kind-contract'
 import type {
   HandoffEvidencePayload,
@@ -183,6 +184,9 @@ export class KernelTerminalTransition {
 
   recover(enrollment: WatcherEnrollment, writable = true): WatcherEnrollment {
     if (enrollment.terminalAtMs !== null) {
+      if (writable) {
+        this.compactTerminal(enrollment)
+      }
       return enrollment
     }
     const terminal = this.dependencies.ledger
@@ -200,7 +204,12 @@ export class KernelTerminalTransition {
       }
     }
     return this.requireValid(
-      this.dependencies.enrollments.markTerminal(enrollment.watcherId, terminal.atMs)
+      this.dependencies.enrollments.markTerminal(
+        enrollment.watcherId,
+        terminal.atMs,
+        undefined,
+        () => this.compactTerminal(enrollment)
+      )
     )
   }
 
@@ -267,32 +276,32 @@ export class KernelTerminalTransition {
           })
         },
         () => {
-          if (prepared.status !== 'enroll' || transaction.terminalEventId === null) {
-            return
+          if (prepared.status === 'enroll' && transaction.terminalEventId !== null) {
+            transaction.sitter = this.dependencies.enrollments.insert({
+              ...prepared.enrollment,
+              createdAtMs: atMs
+            })
+            const payload: HandoffOriginPayload = {
+              objectiveWatcherId: enrollment.watcherId,
+              objectiveTerminalEventId: transaction.terminalEventId,
+              contentIdentity: fired.detail ?? fired.predicateId,
+              reachedRung: 'hosted-review',
+              inheritedBudget: prepared.enrollment.budget,
+              derivedCapabilities: prepared.enrollment
+                .capabilities as HandoffOriginPayload['derivedCapabilities']
+            }
+            this.dependencies.ledger.append({
+              eventId: this.dependencies.createId(),
+              watcherId: transaction.sitter.watcherId,
+              atMs,
+              origin: 'owner',
+              class: 'fact',
+              kind: 'evidence',
+              evidenceKind: 'handoff-origin',
+              payload
+            })
           }
-          transaction.sitter = this.dependencies.enrollments.insert({
-            ...prepared.enrollment,
-            createdAtMs: atMs
-          })
-          const payload: HandoffOriginPayload = {
-            objectiveWatcherId: enrollment.watcherId,
-            objectiveTerminalEventId: transaction.terminalEventId,
-            contentIdentity: fired.detail ?? fired.predicateId,
-            reachedRung: 'hosted-review',
-            inheritedBudget: prepared.enrollment.budget,
-            derivedCapabilities: prepared.enrollment
-              .capabilities as HandoffOriginPayload['derivedCapabilities']
-          }
-          this.dependencies.ledger.append({
-            eventId: this.dependencies.createId(),
-            watcherId: transaction.sitter.watcherId,
-            atMs,
-            origin: 'owner',
-            class: 'fact',
-            kind: 'evidence',
-            evidenceKind: 'handoff-origin',
-            payload
-          })
+          this.compactTerminal(enrollment)
         }
       )
       const valid = this.requireValid(updated)
@@ -321,6 +330,15 @@ export class KernelTerminalTransition {
       }
       throw error
     }
+  }
+
+  private compactTerminal(enrollment: WatcherEnrollment): void {
+    const ledger = this.dependencies.ledger.read(enrollment.watcherId)
+    this.dependencies.ledger.compactTerminal(
+      enrollment.watcherId,
+      enrollment.kind,
+      deriveBudgetState(ledger, enrollment.budget)
+    )
   }
 
   private requireValid(record: EnrollmentRecord): WatcherEnrollment {

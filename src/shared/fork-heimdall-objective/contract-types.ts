@@ -7,6 +7,7 @@ export const OBJECTIVE_TERRITORY_MAX_ENTRIES = 64
 export const OBJECTIVE_ALL_WORKSPACE_PATHS_GLOB = '**'
 export const OBJECTIVE_PATH_MAX_LENGTH = 1_024
 export const OBJECTIVE_AGENT_ID_MAX_LENGTH = 256
+export const OBJECTIVE_ABSENT_REMOTE_REF_STATE = 'unborn'
 
 const BoundedTextSchema = (maximum: number) => z.string().trim().min(1).max(maximum)
 

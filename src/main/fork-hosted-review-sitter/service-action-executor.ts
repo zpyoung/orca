@@ -17,7 +17,43 @@ import {
 } from './agent-preparation'
 import { publishHostedReviewPreparation } from './agent-publication'
 import { tagHostedReviewPreDispatchError } from './provider-action-effect'
-import type { HostedReviewSitterProviderAdapter } from './provider'
+import type { HostedReviewSitterGitExecution, HostedReviewSitterProviderAdapter } from './provider'
+
+export function hostedReviewAttemptExpectation(
+  action: HostedReviewSitterAction
+): { expectedBefore: string; expectedAfter: string } | undefined {
+  switch (action.kind) {
+    case 'rerun-check':
+      return {
+        expectedBefore: action.expectedState.before,
+        expectedAfter: `rerun-observed:${action.evidenceKey}`
+      }
+    case 'publish-fix':
+    case 'publish-conflict-resolution':
+      return {
+        expectedBefore: action.expectedState.before,
+        expectedAfter: action.preparedCommitSha
+      }
+    case 'update-branch':
+      return {
+        expectedBefore: action.expectedState.before,
+        expectedAfter: `updated:${action.headSha}:${action.baseSha}`
+      }
+    case 'merge':
+      return {
+        expectedBefore: action.expectedState.before,
+        expectedAfter: `merged:${action.headSha}`
+      }
+    case 'enqueue':
+      return {
+        expectedBefore: action.expectedState.before,
+        expectedAfter: `enqueued:${action.headSha}`
+      }
+    case 'prepare-fix':
+    case 'prepare-conflict-resolution':
+      return undefined
+  }
+}
 
 function providerExpectedAfter(
   action: HostedReviewSitterAction,
@@ -101,11 +137,19 @@ export async function executeHostedReviewSitterAction(
   }
 }
 
-function observedStateForAttempt(
+function observedStateForPreparation(
   attempt: AttemptEntry,
   snapshot: LiveSnapshot<HostedReviewWorld>
 ): string {
-  const action = attempt.action as HostedReviewSitterAction
+  return snapshot.world.preparedCommit?.preparationAttemptFingerprint === attempt.fingerprint
+    ? attempt.fingerprint
+    : 'worker-dispatch-unresolved'
+}
+
+function observedStateForLiveAction(
+  action: Extract<HostedReviewSitterAction, { kind: 'rerun-check' | 'merge' | 'enqueue' }>,
+  snapshot: LiveSnapshot<HostedReviewWorld>
+): string {
   const review = snapshot.world.review
   switch (action.kind) {
     case 'rerun-check': {
@@ -129,50 +173,99 @@ function observedStateForAttempt(
         ? action.expectedState.before
         : `check-state-moved:${action.evidenceKey}`
     }
-    case 'publish-fix':
-    case 'publish-conflict-resolution':
-    case 'update-branch':
-      return review.headSha
     case 'merge':
-      if (review.lifecycle === 'merged') {
+      if (review.lifecycle === 'merged' && review.headSha === action.headSha) {
         return `merged:${action.headSha}`
       }
       return review.lifecycle === 'open' && review.headSha === action.headSha
         ? action.expectedState.before
         : `${review.lifecycle}:${review.headSha}`
     case 'enqueue':
-      if (review.queue.membership === 'enqueued') {
+      if (review.queue.membership === 'enqueued' && review.headSha === action.headSha) {
         return `enqueued:${action.headSha}`
       }
       return review.queue.membership === 'not-enqueued' && review.headSha === action.headSha
         ? action.expectedState.before
         : `${review.queue.membership}:${review.headSha}`
-    case 'prepare-fix':
-    case 'prepare-conflict-resolution':
-      return snapshot.world.preparedCommit?.preparationAttemptFingerprint === attempt.fingerprint
-        ? attempt.fingerprint
-        : 'worker-dispatch-unresolved'
   }
 }
 
-export function resolveHostedReviewSitterOutcome(
+async function resolveGitBackedOutcome(
+  action: Extract<
+    HostedReviewSitterAction,
+    { kind: 'publish-fix' | 'publish-conflict-resolution' | 'update-branch' }
+  >,
+  git: HostedReviewSitterGitExecution,
+  assertLeaseHeld?: () => Promise<void>
+): Promise<EffectCertainty> {
+  let remoteHead: string | null
+  try {
+    remoteHead = await git.remoteHeadSha()
+  } catch {
+    return 'indeterminate'
+  }
+  if (remoteHead === action.expectedState.before) {
+    return 'not-landed'
+  }
+  if (action.kind !== 'update-branch') {
+    return remoteHead === action.preparedCommitSha ? 'landed' : 'indeterminate'
+  }
+  if (!remoteHead) {
+    return 'indeterminate'
+  }
+  try {
+    if ((await git.currentHeadSha()) === remoteHead) {
+      return 'landed'
+    }
+    if (action.mode !== 'merge-base-update') {
+      return 'indeterminate'
+    }
+    const parents = await git.commitParents(remoteHead, undefined, assertLeaseHeld)
+    return parents?.length === 2 && parents[0] === action.headSha && parents[1] === action.baseSha
+      ? 'landed'
+      : 'indeterminate'
+  } catch {
+    return 'indeterminate'
+  }
+}
+
+export async function resolveHostedReviewSitterOutcome(
   attempt: AttemptEntry,
-  snapshot: LiveSnapshot<HostedReviewWorld>
-): EffectCertainty {
+  snapshot: LiveSnapshot<HostedReviewWorld>,
+  git?: HostedReviewSitterGitExecution,
+  assertLeaseHeld?: () => Promise<void>
+): Promise<EffectCertainty> {
   const action = attempt.action as HostedReviewSitterAction
   if (action.kind === 'prepare-fix' || action.kind === 'prepare-conflict-resolution') {
     return resolveByExpectedState(
-      observedStateForAttempt(attempt, snapshot),
+      observedStateForPreparation(attempt, snapshot),
       'worker-dispatch-definitely-not-landed',
       attempt.fingerprint
     )
   }
-  if (!attempt.expectedBefore || !attempt.expectedAfter) {
+  const expectation = hostedReviewAttemptExpectation(action)
+  if (!expectation) {
     return 'indeterminate'
   }
-  return resolveByExpectedState(
-    observedStateForAttempt(attempt, snapshot),
-    attempt.expectedBefore,
-    attempt.expectedAfter
-  )
+  if (
+    (attempt.expectedBefore !== undefined &&
+      attempt.expectedBefore !== expectation.expectedBefore) ||
+    (attempt.expectedAfter !== undefined && attempt.expectedAfter !== expectation.expectedAfter)
+  ) {
+    return 'indeterminate'
+  }
+  if (
+    action.kind === 'publish-fix' ||
+    action.kind === 'publish-conflict-resolution' ||
+    action.kind === 'update-branch'
+  ) {
+    return git ? resolveGitBackedOutcome(action, git, assertLeaseHeld) : 'indeterminate'
+  }
+  const observed = observedStateForLiveAction(action, snapshot)
+  if (observed === (attempt.expectedAfter ?? expectation.expectedAfter)) {
+    return 'landed'
+  }
+  return action.kind === 'merge' && observed === expectation.expectedBefore
+    ? 'not-landed'
+    : 'indeterminate'
 }

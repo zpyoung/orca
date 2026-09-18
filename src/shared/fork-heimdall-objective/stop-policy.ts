@@ -1,14 +1,27 @@
 import type { StopPredicate } from '../fork-heimdall/stop-policy'
 import { getAttemptResolution, getLatestAttempts } from '../fork-heimdall/ledger-queries'
 import type { WatcherLedger } from '../fork-heimdall/ledger-types'
-import { stopPredicateParkEscalationId } from '../fork-heimdall/park-escalation-id'
+import {
+  WORKER_ESCALATION_CONSUMED_EVIDENCE_KIND,
+  workerEscalationConsumedMessageId
+} from '../fork-heimdall/worker-escalation-consumption'
 import { ObjectiveActionResultSchema, ObjectiveActionSchema } from './objective-actions'
 import type { ObjectiveLandingBar } from './contract-types'
+import {
+  activeObjectiveRevision,
+  latestObjectiveAttempt,
+  objectiveAttemptDisposition,
+  objectiveAttempts,
+  objectiveNodeRetryCount,
+  objectiveRetryableFailure,
+  OBJECTIVE_INFRA_REDISPATCH_CAP
+} from './decision-context'
 import type { ObjectiveWorld } from './detail-types'
 import { OBJECTIVE_LANDING_LADDER, reachedRungs, stopRungForBar } from './landing-ladder'
 
 export const OBJECTIVE_BAR_REACHED_PREDICATE_ID = 'objective-bar-reached'
 export const OBJECTIVE_WORKER_ESCALATION_PREDICATE_ID = 'worker-escalation'
+export const OBJECTIVE_INFRA_RETRY_EXHAUSTED_PREDICATE_ID = 'objective-infra-retry-exhausted'
 
 function landedRungIdentityFromAttempts(
   snapshot: { contentIdentity: string; world: ObjectiveWorld },
@@ -121,19 +134,21 @@ export const objectiveBarReachedPredicate: StopPredicate<ObjectiveWorld> = {
   }
 }
 
-function latestWorkerEscalationAcknowledgementIndex(ledger: WatcherLedger): number {
-  for (let index = ledger.entries.length - 1; index >= 0; index -= 1) {
-    const entry = ledger.entries[index]
+function consumedWorkerEscalationMessageIds(ledger: WatcherLedger): ReadonlySet<string> {
+  const consumed = new Set<string>()
+  for (const entry of ledger.entries) {
     if (
-      entry.kind === 'escalation' &&
-      entry.escalationId ===
-        stopPredicateParkEscalationId(ledger.watcherId, OBJECTIVE_WORKER_ESCALATION_PREDICATE_ID) &&
-      (entry.status === 'acknowledged' || entry.status === 'resolved')
+      entry.kind !== 'evidence' ||
+      entry.evidenceKind !== WORKER_ESCALATION_CONSUMED_EVIDENCE_KIND
     ) {
-      return index
+      continue
+    }
+    const messageId = workerEscalationConsumedMessageId(entry.payload)
+    if (messageId) {
+      consumed.add(messageId)
     }
   }
-  return -1
+  return consumed
 }
 
 type WorkerEscalationMessage = { reason: string; detail?: string }
@@ -157,23 +172,80 @@ function escalationMessage(value: unknown): WorkerEscalationMessage | null {
   return body === undefined ? { reason: subject } : { reason: subject, detail: body }
 }
 
+function latestWorkerEscalationMessage(
+  ledger: WatcherLedger
+): { message: WorkerEscalationMessage; messageId?: string } | null {
+  for (let index = ledger.entries.length - 1; index >= 0; index -= 1) {
+    const entry = ledger.entries[index]
+    if (entry.kind !== 'evidence' || entry.evidenceKind !== 'orchestration-mailbox') {
+      continue
+    }
+    const message = escalationMessage(entry.payload)
+    if (message) {
+      return { message, messageId: entry.source?.messageId }
+    }
+  }
+  return null
+}
+
 export const objectiveWorkerEscalationPredicate: StopPredicate<ObjectiveWorld> = {
   id: OBJECTIVE_WORKER_ESCALATION_PREDICATE_ID,
   evaluate(_snapshot, ledger) {
-    const acknowledgedIndex = latestWorkerEscalationAcknowledgementIndex(ledger)
-    for (let index = ledger.entries.length - 1; index > acknowledgedIndex; index -= 1) {
-      const entry = ledger.entries[index]
-      if (entry.kind !== 'evidence' || entry.evidenceKind !== 'orchestration-mailbox') {
+    const latest = latestWorkerEscalationMessage(ledger)
+    if (!latest) {
+      return { stop: false }
+    }
+    const messageId = latest.messageId
+    const consumed =
+      messageId !== undefined && consumedWorkerEscalationMessageIds(ledger).has(messageId)
+    // a message with no id can never be marked consumed, so it always fires rather than wedge shut
+    if (consumed) {
+      return { stop: false }
+    }
+    return {
+      stop: true,
+      reason: latest.message.reason,
+      ...(latest.messageId === undefined ? {} : { detail: latest.messageId })
+    }
+  }
+}
+
+/** Parks rather than replans: an infra/environment death is not a plan defect. */
+export const objectiveInfraRetryExhaustedPredicate: StopPredicate<ObjectiveWorld> = {
+  id: OBJECTIVE_INFRA_RETRY_EXHAUSTED_PREDICATE_ID,
+  disposition: 'park',
+  evaluate(snapshot, ledger) {
+    const revision = activeObjectiveRevision(snapshot.world)
+    if (!revision) {
+      return { stop: false }
+    }
+    const attempts = objectiveAttempts(ledger)
+    for (const node of snapshot.world.plan.nodes) {
+      if (node.revisionId !== revision.id) {
         continue
       }
-      const message = escalationMessage(entry.payload)
-      if (message) {
-        const detail = message.detail ?? entry.source?.messageId
-        return {
-          stop: true,
-          reason: message.reason,
-          ...(detail === undefined ? {} : { detail })
-        }
+      const dispatch = latestObjectiveAttempt(
+        attempts,
+        (action) =>
+          action.kind === 'dispatch-node' &&
+          action.revisionId === revision.id &&
+          action.taskKey === node.taskKey
+      )
+      if (!dispatch || objectiveAttemptDisposition(dispatch.attempt, ledger) !== 'not-landed') {
+        continue
+      }
+      const retryable = objectiveRetryableFailure(dispatch.attempt, ledger)
+      if (retryable === null) {
+        continue
+      }
+      const retryCount = objectiveNodeRetryCount(attempts, ledger, revision.id, node.taskKey)
+      if (retryCount < OBJECTIVE_INFRA_REDISPATCH_CAP) {
+        continue
+      }
+      return {
+        stop: true,
+        reason: `${node.taskKey} exhausted ${OBJECTIVE_INFRA_REDISPATCH_CAP} infra/environment redispatches (last: ${retryable})`,
+        detail: node.taskKey
       }
     }
     return { stop: false }
@@ -182,5 +254,6 @@ export const objectiveWorkerEscalationPredicate: StopPredicate<ObjectiveWorld> =
 
 export const OBJECTIVE_STOP_PREDICATES = [
   objectiveBarReachedPredicate,
-  objectiveWorkerEscalationPredicate
+  objectiveWorkerEscalationPredicate,
+  objectiveInfraRetryExhaustedPredicate
 ] as const satisfies readonly StopPredicate<ObjectiveWorld>[]

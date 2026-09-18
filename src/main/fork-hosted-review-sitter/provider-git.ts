@@ -58,6 +58,11 @@ export type HostedReviewSitterGitExecution = {
   ): Promise<void>
   currentHeadSha(signal?: AbortSignal): Promise<string>
   remoteHeadSha(signal?: AbortSignal): Promise<string | null>
+  commitParents(
+    commitSha: string,
+    signal?: AbortSignal,
+    assertLeaseHeld?: () => Promise<void>
+  ): Promise<string[] | null>
   remoteRefForBranch(
     branch: string,
     expectedSha: string,
@@ -299,6 +304,37 @@ export async function resolveHostedReviewSitterGitExecution(
         signal
       )
       return parseRemoteHead(result.stdout, pushTarget.branchName)
+    },
+    commitParents: async (commitSha, signal, assertLeaseHeld) => {
+      const readParents = async (): Promise<string[] | null> => {
+        const [commit, ...parents] = (
+          await exec(['rev-list', '--parents', '-n', '1', commitSha], signal)
+        ).stdout
+          .trim()
+          .split(/\s+/)
+        return commit === commitSha ? parents : null
+      }
+      try {
+        return await readParents()
+      } catch {
+        const pushTarget = await reviewPushTarget(signal)
+        await assertLeaseHeld?.()
+        if (!pushTarget?.remoteUrl) {
+          return null
+        }
+        await exec(
+          [
+            'fetch',
+            '--quiet',
+            '--no-tags',
+            '--',
+            pushTarget.remoteUrl,
+            `refs/heads/${pushTarget.branchName}`
+          ],
+          signal
+        )
+        return readParents()
+      }
     },
     remoteRefForBranch: async (branch, expectedSha, signal) => {
       await exec(['check-ref-format', '--branch', branch], signal)

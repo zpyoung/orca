@@ -6,6 +6,7 @@ import type { WorkspaceKey } from '../../shared/fork-heimdall/watcher-types'
 import { resolveGitDir } from '../git/source-control/resolve-git-dir'
 import type { GitRuntimeOptions } from '../git/git-runtime-options'
 import type { IFilesystemProvider } from '../providers/types'
+import { ExecutionHostNotDispatchableError } from '../providers/execution-host-provider-dispatch'
 import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
 import { requireRuntimeGitProvider } from '../runtime/runtime-git-command-target'
 import {
@@ -40,6 +41,7 @@ export type LeaseResult =
   | { status: 'held'; epoch: number; guard: LeaseGuard }
   | { status: 'refused'; reason: 'held-by-other'; holder: string; epoch: number }
   | { status: 'unverifiable'; reason: string }
+  | { status: 'configuration-error'; reason: string }
 
 export type LeaseLocationDescription = {
   executionHostId: ExecutionHostId
@@ -49,7 +51,7 @@ export type LeaseLocationDescription = {
 
 export type LeaseStore = {
   acquireOrRenew(key: WorkspaceKey, holder: string, ttlMs: number): Promise<LeaseResult>
-  release(key: WorkspaceKey, epoch: number): Promise<void>
+  release(key: WorkspaceKey, holder: string, epoch: number): Promise<void>
   describeLocation?(key: WorkspaceKey): LeaseLocationDescription | null
 }
 
@@ -65,6 +67,13 @@ export class LeaseLostError extends Error {
   constructor(message: string) {
     super(message)
     this.name = 'LeaseLostError'
+  }
+}
+
+export class LeaseConfigurationError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'LeaseConfigurationError'
   }
 }
 
@@ -120,7 +129,7 @@ class EpochLeaseGuard implements LeaseGuard {
 
   constructor(
     readonly epoch: number,
-    private readonly holder: string,
+    readonly holder: string,
     private readonly ttlMs: number,
     private readonly location: ResolvedLeaseLocation,
     private readonly verify: (
@@ -197,10 +206,10 @@ export class HostRoutedLeaseStore implements LeaseStore {
   }
 
   async acquireOrRenew(key: WorkspaceKey, holder: string, ttlMs: number): Promise<LeaseResult> {
-    if (!holder || !Number.isSafeInteger(ttlMs) || ttlMs <= 0) {
-      throw new Error('Invalid lease acquisition request')
-    }
     try {
+      if (!holder || !Number.isSafeInteger(ttlMs) || ttlMs <= 0) {
+        throw new LeaseConfigurationError('Invalid lease acquisition request')
+      }
       const location = await this.resolveLocation(key)
       await location.fs.createDir(location.leaseDirectory)
       const epoch = highestEpoch(await location.fs.readDir(location.leaseDirectory))
@@ -234,6 +243,12 @@ export class HostRoutedLeaseStore implements LeaseStore {
       }
       return await this.claimNextEpoch(location, epoch + 1, holder, ttlMs)
     } catch (error) {
+      if (
+        error instanceof LeaseConfigurationError ||
+        error instanceof ExecutionHostNotDispatchableError
+      ) {
+        return { status: 'configuration-error', reason: error.message }
+      }
       if (error instanceof LeaseLostError) {
         return { status: 'unverifiable', reason: error.message }
       }
@@ -241,7 +256,7 @@ export class HostRoutedLeaseStore implements LeaseStore {
     }
   }
 
-  async release(key: WorkspaceKey, epoch: number): Promise<void> {
+  async release(key: WorkspaceKey, holder: string, epoch: number): Promise<void> {
     const location = this.locations.get(key) ?? (await this.resolveLocation(key))
     await this.serializeEpochOperation(location, epoch, async () => {
       const currentEpoch = highestEpoch(await location.fs.readDir(location.leaseDirectory))
@@ -250,6 +265,9 @@ export class HostRoutedLeaseStore implements LeaseStore {
       }
       const holderPath = this.holderPath(location, epoch)
       const current = parseLeaseHolderRecord((await location.fs.readFile(holderPath)).content)
+      if (current.holder !== holder) {
+        throw new LeaseLostError(`Lease epoch ${epoch} is not held by ${holder}`)
+      }
       await location.fs.writeFile(holderPath, JSON.stringify({ ...current, released: true }))
       const currentEpochAfterRelease = highestEpoch(
         await location.fs.readDir(location.leaseDirectory)
@@ -264,7 +282,7 @@ export class HostRoutedLeaseStore implements LeaseStore {
   private async resolveLocation(key: WorkspaceKey): Promise<ResolvedLeaseLocation> {
     const target = await this.dependencies.resolveTarget(key)
     if (makeWorkspaceKey(target.executionHostId, target.workspacePath) !== key) {
-      throw new Error('Lease target does not match its workspace key')
+      throw new LeaseConfigurationError('Lease target does not match its workspace key')
     }
     const fs = target.fileProvider ?? createLocalLeaseFilesystem()
     const localWorkspacePath =
@@ -279,10 +297,10 @@ export class HostRoutedLeaseStore implements LeaseStore {
       leaseDirectory = pathFlavor.join(localWorkspacePath, '.orca', 'heimdall', 'lease')
     } else {
       if (!target.gitTarget) {
-        throw new Error('Git lease target has no runtime Git target')
+        throw new LeaseConfigurationError('Git lease target has no runtime Git target')
       }
       if (target.gitTarget.executionHostId !== target.executionHostId) {
-        throw new Error('Git and filesystem routes disagree on execution host')
+        throw new LeaseConfigurationError('Git and filesystem routes disagree on execution host')
       }
       const provider = requireRuntimeGitProvider(target.gitTarget)
       const gitDirectory = provider
@@ -291,7 +309,7 @@ export class HostRoutedLeaseStore implements LeaseStore {
           ).stdout.replace(/\r?\n$/, '')
         : await resolveGitDir(target.workspacePath, target.gitTarget.localGitOptions)
       if (!gitDirectory) {
-        throw new Error('Git did not return an absolute git directory')
+        throw new LeaseConfigurationError('Git did not return an absolute git directory')
       }
       pathFlavor = resolveLeasePathFlavor(target.executionHostId, gitDirectory)
       leaseDirectory = pathFlavor.join(gitDirectory, 'orca-heimdall', 'lease')

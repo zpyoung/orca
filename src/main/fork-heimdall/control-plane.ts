@@ -61,7 +61,8 @@ export class WatcherControlPlane {
         this.commit(watcherId, expectedOwner, change, appendWithinTransaction),
       requireValidCommit: (commit) => this.requireValidCommit(commit),
       latestHaltWasAutomaticPark: (ledger) => this.latestAutomaticParkKind(ledger) !== null,
-      appendOpenParkAcknowledgements: (watcherId) => this.appendOpenParkAcknowledgements(watcherId),
+      appendResumeEscalationTransitions: (watcherId) =>
+        this.appendResumeEscalationTransitions(watcherId),
       appendDisarmTransitions: (watcherId) => this.appendDisarmTransitions(watcherId),
       now: dependencies.now
     })
@@ -383,9 +384,17 @@ export class WatcherControlPlane {
       this.dependencies.orchestration.readQuestion(enrollment, messageId)
   }
 
-  private appendOpenParkAcknowledgements(watcherId: string): void {
-    for (const entry of getLatestEscalations(this.dependencies.ledger.read(watcherId))) {
-      if (entry.status !== 'open' || !entry.escalationKind.startsWith('park-')) {
+  private appendResumeEscalationTransitions(watcherId: string): void {
+    const ledger = this.dependencies.ledger.read(watcherId)
+    const resumesWorkerEscalation =
+      this.latestAutomaticParkKind(ledger) === 'park-worker-escalation'
+    for (const entry of getLatestEscalations(ledger)) {
+      const isOpenPark = entry.status === 'open' && entry.escalationKind.startsWith('park-')
+      const isUnresolvedWorkerEscalation =
+        resumesWorkerEscalation &&
+        (entry.status === 'open' || entry.status === 'escalated') &&
+        entry.escalationKind === 'worker-escalation'
+      if (!isOpenPark && !isUnresolvedWorkerEscalation) {
         continue
       }
       this.dependencies.ledger.append({

@@ -84,18 +84,19 @@ export function kind(overrides: Partial<WatcherKind<World, KernelAction, { label
     }),
     decide: () => ({ action: null, reason: 'quiet', considered: [] }),
     execute: async () => ({ effect: 'landed' as const }),
-    resolveOutcome: () => 'not-landed' as const,
+    resolveOutcome: () => ({ effect: 'not-landed' as const }),
     ...overrides
   } satisfies WatcherKind<World, KernelAction, { label: string }>
 }
 
-function heldLease(): LeaseResult {
+function heldLease(assertHeld: () => Promise<void>): LeaseResult {
   return {
     status: 'held',
     epoch: 1,
     guard: {
       epoch: 1,
-      assertHeld: async () => {},
+      holder: 'test-holder',
+      assertHeld,
       renewLoop: () => ({ dispose: () => {} })
     }
   }
@@ -107,6 +108,7 @@ export async function harness(
     storageAuthority?: 'desktop' | 'runtime'
     lease?: () => LeaseResult
     mailbox?: () => LedgerEntry[]
+    recoverDispatch?: HeimdallOrchestrationAdapter['recoverDispatch']
     releaseWorker?: HeimdallOrchestrationAdapter['releaseWorker']
     dispatchObservation?: () => { status: 'live' | 'exited' | 'unverifiable'; reason?: string }
   } = {}
@@ -120,9 +122,10 @@ export async function harness(
   const ledgerStore = new HeimdallLedgerStore(database)
   const budgetClock = new HeimdallBudgetClock(ledgerStore, { now: () => 100 })
   const schedule: Mock<(callback: () => void, delay: number) => void> = vi.fn()
+  const assertHeld = vi.fn(async () => {})
   let identifier = 0
   const leaseStore: LeaseStore = {
-    acquireOrRenew: vi.fn(async () => options.lease?.() ?? heldLease()),
+    acquireOrRenew: vi.fn(async () => options.lease?.() ?? heldLease(assertHeld)),
     release: vi.fn(async () => {})
   }
   const orchestration: HeimdallOrchestrationAdapter = {
@@ -131,7 +134,9 @@ export async function harness(
       status: 'dispatched' as const,
       dispatchId: 'dispatch-1'
     })),
-    recoverDispatch: vi.fn(async () => ({ status: 'absent' as const })),
+    recoverDispatch: vi.fn(
+      options.recoverDispatch ?? (async () => ({ status: 'absent' as const }))
+    ),
     readDispatch: vi.fn(async () => options.dispatchObservation?.() ?? { status: 'live' as const }),
     listWorkers: vi.fn(async () => []),
     stopWorker: vi.fn(async () => ({ status: 'applied' as const, appliedAtMs: 100 })),
@@ -182,7 +187,8 @@ export async function harness(
     budgetClock,
     leaseStore,
     orchestration,
-    schedule
+    schedule,
+    assertHeld
   }
 }
 

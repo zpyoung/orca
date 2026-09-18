@@ -1,4 +1,5 @@
 import type { WatcherKind } from '../../shared/fork-heimdall/kind-contract'
+import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
 import {
@@ -16,7 +17,10 @@ import {
 import type { Store } from '../persistence'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { readHostedReviewPreparedCommit } from './agent-execution'
-import { inspectHostedReviewSitterContention } from './contention'
+import {
+  inspectHostedReviewSitterContention,
+  type HostedReviewOwnedWorkerIdentity
+} from './contention'
 import {
   authorizeHostedReviewSitterDefinition,
   hostedReviewDefinitionFromEnrollment
@@ -25,6 +29,7 @@ import { enrollmentPayloadSchema, parseHostedReviewEnrollmentPayload } from './d
 import { createHostedReviewSitterProvider, resolveHostedReviewSitterGitExecution } from './provider'
 import {
   executeHostedReviewSitterAction,
+  hostedReviewAttemptExpectation,
   resolveHostedReviewSitterOutcome
 } from './service-action-executor'
 
@@ -38,6 +43,27 @@ export type HostedReviewKernelRegistration = {
   registerKind(kind: HostedReviewKind): void
 }
 
+function ownedWorkerForAction(
+  action: HostedReviewSitterAction,
+  ledger: WatcherLedger
+): HostedReviewOwnedWorkerIdentity | undefined {
+  if (action.kind !== 'publish-fix' && action.kind !== 'publish-conflict-resolution') {
+    return undefined
+  }
+  const preparationKind =
+    action.kind === 'publish-fix' ? 'prepare-fix' : 'prepare-conflict-resolution'
+  const attempt = ledger.entries
+    .toReversed()
+    .find(
+      (entry) =>
+        entry.kind === 'attempt' &&
+        entry.attemptId === action.preparationActionId &&
+        entry.action.kind === preparationKind
+    )
+  return attempt?.kind === 'attempt' && attempt.dispatchId
+    ? { attemptId: attempt.attemptId, dispatchId: attempt.dispatchId }
+    : undefined
+}
 export function createHostedReviewKind(
   runtime: OrcaRuntimeService,
   store: Store,
@@ -79,15 +105,44 @@ export function createHostedReviewKind(
       return { ...describeHostedReviewSnapshot(snapshot) }
     },
     decide: decideHostedReview,
-    async preflight(action, snapshot) {
+    attemptExpectation: hostedReviewAttemptExpectation,
+    async preflight(action, snapshot, ledger) {
       const contention = actionWritesWorktree(action, snapshot.world.definition)
-        ? await inspectHostedReviewSitterContention(runtime, store, snapshot.world.definition)
+        ? await inspectHostedReviewSitterContention(
+            runtime,
+            store,
+            snapshot.world.definition,
+            ownedWorkerForAction(action, ledger)
+          )
         : { state: 'clear' as const }
       return hostedReviewPreflight(action, snapshot, contention)
     },
     execute: (action, context) =>
       executeHostedReviewSitterAction(runtime, store, provider, action, context),
-    resolveOutcome: resolveHostedReviewSitterOutcome,
+    async resolveOutcome(attempt, snapshot, _ledger, lease) {
+      const action = attempt.action as HostedReviewSitterAction
+      if (
+        action.kind !== 'publish-fix' &&
+        action.kind !== 'publish-conflict-resolution' &&
+        action.kind !== 'update-branch'
+      ) {
+        return { effect: await resolveHostedReviewSitterOutcome(attempt, snapshot) }
+      }
+      try {
+        const git = await resolveHostedReviewSitterGitExecution(
+          runtime,
+          store,
+          snapshot.world.definition
+        )
+        return {
+          effect: await resolveHostedReviewSitterOutcome(attempt, snapshot, git, () =>
+            lease.assertHeld()
+          )
+        }
+      } catch {
+        return { effect: 'indeterminate' }
+      }
+    },
     stopPredicates: HOSTED_REVIEW_STOP_PREDICATES,
     pacing: { pace: paceHostedReview }
   }

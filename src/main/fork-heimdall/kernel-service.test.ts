@@ -1,8 +1,6 @@
-import { describe, expect, it, vi } from 'vitest'
-import { HEIMDALL_BUDGET_GENERATION_EVIDENCE_KIND } from '../../shared/fork-heimdall/budget'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { KernelAction, WatcherKind } from '../../shared/fork-heimdall/kind-contract'
 import type { LedgerEntry } from '../../shared/fork-heimdall/ledger-types'
-import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
 import { HeimdallDatabase } from './database'
 import { HeimdallEnrollmentStore } from './enrollment-store'
 import {
@@ -14,383 +12,20 @@ import {
   runningDispatch,
   type World
 } from './kernel-service-test-harness'
+import {
+  heimdallMailboxAddressForDispatch,
+  heimdallMailboxAddressForRun,
+  notifyHeimdallMailboxArrival,
+  setHeimdallMailboxWake
+} from './mailbox-wake-registry'
 
 vi.mock('electron', () => ({}))
 
+afterEach(() => {
+  setHeimdallMailboxWake(null)
+})
+
 describe('Heimdall kernel service', () => {
-  it('refuses duplicate workspaces and remote-host-owned enrollment without mutating a second row', async () => {
-    const { service } = await harness()
-    service.registerKind(kind())
-    const first = await service.enroll(enrollmentInput())
-    expect(first.status).toBe('enrolled')
-    await expect(service.enroll(enrollmentInput())).resolves.toMatchObject({
-      status: 'refused',
-      reason: 'duplicate-workspace'
-    })
-
-    const remote = kind({
-      id: 'objective',
-      authorizeEnrollment: async (input) => ({
-        ...authorized({ ...input, kind: 'hosted-review' }, 'remote_host_service'),
-        kind: 'objective'
-      })
-    }) as unknown as WatcherKind<World, KernelAction, { label: string }>
-    service.registerKind(remote)
-    await expect(
-      service.enroll({ ...enrollmentInput(), kind: 'objective', repoId: 'repo-2' })
-    ).resolves.toEqual({
-      status: 'refused',
-      reason: 'owner-not-executable',
-      schedulerOwner: 'remote_host_service'
-    })
-    expect(await service.list()).toHaveLength(1)
-  })
-
-  it('starts a fresh budget generation when enrolling after explicit disarm', async () => {
-    const { service, ledgerStore } = await harness()
-    service.registerKind(kind())
-    const result = await service.enroll(enrollmentInput())
-    if (result.status !== 'enrolled') {
-      throw new Error('expected enrollment')
-    }
-    const watcherId = result.entry.enrollment.watcherId
-    ledgerStore.append({
-      eventId: 'open',
-      watcherId,
-      atMs: 0,
-      origin: 'owner',
-      class: 'fact',
-      kind: 'interval-open',
-      intervalId: 'interval-1',
-      cause: 'action-in-flight'
-    })
-    ledgerStore.append({
-      eventId: 'close',
-      watcherId,
-      atMs: 40,
-      origin: 'owner',
-      class: 'fact',
-      kind: 'interval-close',
-      intervalId: 'interval-1',
-      closeReason: 'settled'
-    })
-    ledgerStore.append({
-      eventId: 'turn',
-      watcherId,
-      atMs: 40,
-      origin: 'owner',
-      class: 'fact',
-      kind: 'turn',
-      dispatchKind: 'child',
-      dispatchId: 'dispatch-old'
-    })
-    for (const entry of runningDispatch(watcherId)) {
-      ledgerStore.append(entry)
-    }
-    const active = (await service.fleet()).entries.find(
-      (entry) => entry.target.watcherId === watcherId
-    )!
-    await expect(
-      service.command({
-        target: active.target,
-        expectedOwner: active.ownerFence,
-        command: { kind: 'disarm' }
-      })
-    ).resolves.toMatchObject({ status: 'applied' })
-    const rearmed = await service.enroll({
-      ...enrollmentInput(),
-      capabilities: { write: 'gated' },
-      kindPayload: { label: 'Review 1 updated' }
-    })
-    expect(rearmed.status).toBe('re-armed')
-    if (rearmed.status !== 're-armed') {
-      throw new Error('expected re-armed enrollment')
-    }
-    expect(rearmed.entry.enrollment).toMatchObject({
-      watcherId,
-      budget: { wallClockActiveMs: 100, turns: 2 },
-      capabilities: { write: 'gated' },
-      kindPayload: { label: 'Review 1 updated' }
-    })
-    expect(rearmed.entry.status.budget).toEqual({ activeMs: 0, turns: 0, exhausted: null })
-    expect(service.ledger(watcherId).entries).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ eventId: 'open', kind: 'interval-open' }),
-        expect.objectContaining({ eventId: 'close', kind: 'interval-close' }),
-        expect.objectContaining({ eventId: 'turn', kind: 'turn' }),
-        expect.objectContaining({ eventId: 'running-event', kind: 'attempt', state: 'running' }),
-        expect.objectContaining({
-          kind: 'evidence',
-          evidenceKind: HEIMDALL_BUDGET_GENERATION_EVIDENCE_KIND,
-          payload: { reason: 're-enrollment-after-explicit-disarm' }
-        })
-      ])
-    )
-    expect(
-      service
-        .ledger(watcherId)
-        .entries.some((entry) => entry.kind === 'attempt-resolved' || entry.kind === 'terminal')
-    ).toBe(false)
-
-    ledgerStore.append({
-      eventId: 'new-open',
-      watcherId,
-      atMs: 100,
-      origin: 'owner',
-      class: 'fact',
-      kind: 'interval-open',
-      intervalId: 'interval-2',
-      cause: 'action-in-flight'
-    })
-    ledgerStore.append({
-      eventId: 'new-close',
-      watcherId,
-      atMs: 125,
-      origin: 'owner',
-      class: 'fact',
-      kind: 'interval-close',
-      intervalId: 'interval-2',
-      closeReason: 'settled'
-    })
-    ledgerStore.append({
-      eventId: 'new-turn',
-      watcherId,
-      atMs: 125,
-      origin: 'owner',
-      class: 'fact',
-      kind: 'turn',
-      dispatchKind: 'child',
-      dispatchId: 'dispatch-new'
-    })
-    expect((await service.fleet()).entries[0]?.entry.status.budget).toEqual({
-      activeMs: 25,
-      turns: 1,
-      exhausted: null
-    })
-  })
-
-  it('preserves consumed usage when re-enrolling an automatically parked watcher', async () => {
-    const { service, ledgerStore } = await harness()
-    service.registerKind(kind())
-    const enrolled = await service.enroll(enrollmentInput({ wallClockActiveMs: null, turns: 1 }))
-    if (enrolled.status !== 'enrolled') {
-      throw new Error('expected enrollment')
-    }
-    const watcherId = enrolled.entry.enrollment.watcherId
-    ledgerStore.append({
-      eventId: 'spent-turn',
-      watcherId,
-      atMs: 50,
-      origin: 'owner',
-      class: 'fact',
-      kind: 'turn',
-      dispatchKind: 'child',
-      dispatchId: 'spent-dispatch'
-    })
-    await service.reconcileForTesting(watcherId)
-
-    const rearmed = await service.enroll(enrollmentInput())
-    expect(rearmed.status).toBe('re-armed')
-    if (rearmed.status !== 're-armed') {
-      throw new Error('expected re-armed enrollment')
-    }
-    expect(rearmed.entry.enrollment.budget).toEqual({ wallClockActiveMs: 100, turns: 3 })
-    expect(rearmed.entry.status.budget).toEqual({ activeMs: 0, turns: 1, exhausted: null })
-    expect(
-      service
-        .ledger(watcherId)
-        .entries.some(
-          (entry) =>
-            entry.kind === 'evidence' &&
-            entry.evidenceKind === HEIMDALL_BUDGET_GENERATION_EVIDENCE_KIND
-        )
-    ).toBe(false)
-  })
-
-  it('refuses cross-authority rearm without transferring a disabled watcher', async () => {
-    const desktop = await harness()
-    desktop.service.registerKind(kind())
-    const enrolled = await desktop.service.enroll(enrollmentInput())
-    if (enrolled.status !== 'enrolled') {
-      throw new Error('expected enrollment')
-    }
-    const active = (await desktop.service.fleet()).entries[0]!
-    await expect(
-      desktop.service.command({
-        target: active.target,
-        expectedOwner: active.ownerFence,
-        command: { kind: 'disarm' }
-      })
-    ).resolves.toMatchObject({ status: 'applied' })
-    await desktop.service.stopForShutdown()
-
-    const runtime = await harness({
-      directory: desktop.directory,
-      storageAuthority: 'runtime'
-    })
-    runtime.service.registerKind(
-      kind({
-        authorizeEnrollment: async (input) => authorized(input, 'remote_host_service')
-      })
-    )
-    await expect(runtime.service.enroll(enrollmentInput())).resolves.toEqual({
-      status: 'refused',
-      reason: 'owner-not-executable',
-      schedulerOwner: 'local_host_service'
-    })
-    expect(runtime.enrollmentStore.get(enrolled.entry.enrollment.watcherId)).toMatchObject({
-      enabled: false,
-      schedulerOwner: 'local_host_service',
-      commandRevision: 1
-    })
-    await runtime.service.stopForShutdown()
-  })
-
-  it('retains enrollment and retries when lease acquisition is refused', async () => {
-    const { service, schedule } = await harness({
-      lease: () => ({ status: 'refused', reason: 'held-by-other', holder: 'other', epoch: 7 })
-    })
-    service.registerKind(kind())
-    const result = await service.enroll(enrollmentInput())
-    if (result.status !== 'enrolled') {
-      throw new Error('expected enrollment')
-    }
-    schedule.mockClear()
-    await service.reconcileForTesting(result.entry.enrollment.watcherId)
-    expect((await service.list())[0]?.enrollment.enabled).toBe(true)
-    expect(schedule).toHaveBeenCalled()
-  })
-
-  it('re-reads live before external action and abandons a cached decision when identity moves', async () => {
-    const reads: boolean[] = []
-    let pulse = 0
-    const execute = vi.fn(async () => ({ effect: 'landed' as const }))
-    const snapshots: Snapshot<World>[] = [
-      { freshness: 'live', contentIdentity: 'base', observedAtMs: 1, world: { revision: 'base' } },
-      { freshness: 'cached', contentIdentity: 'old', observedAtMs: 2, world: { revision: 'old' } },
-      { freshness: 'live', contentIdentity: 'new', observedAtMs: 3, world: { revision: 'new' } }
-    ]
-    const { service } = await harness()
-    service.registerKind(
-      kind({
-        read: async (_enrollment, options) => {
-          reads.push(options.fresh)
-          return snapshots.shift()!
-        },
-        decide: (snapshot) => {
-          pulse++
-          if (pulse === 1) {
-            return { action: null, reason: 'initial', considered: [] }
-          }
-          return { action: action(snapshot.contentIdentity) }
-        },
-        execute
-      })
-    )
-    const result = await service.enroll(enrollmentInput())
-    if (result.status !== 'enrolled') {
-      throw new Error('expected enrollment')
-    }
-    await service.reconcileForTesting(result.entry.enrollment.watcherId)
-    await service.reconcileForTesting(result.entry.enrollment.watcherId)
-    expect(reads).toEqual([true, false, true])
-    expect(execute).not.toHaveBeenCalled()
-    expect(service.ledger(result.entry.enrollment.watcherId).entries).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ kind: 'attempt-abandoned', reason: 'workspace-moved' })
-      ])
-    )
-  })
-
-  it('parks on a stop predicate but keeps transient read failures enrolled with backoff', async () => {
-    const stopped = await harness()
-    const stoppedKind = kind({
-      read: async () => ({
-        freshness: 'live',
-        contentIdentity: 'stop',
-        observedAtMs: 1,
-        world: { revision: 'stop', stopped: true }
-      }),
-      stopPredicates: [
-        {
-          id: 'closed',
-          evaluate: (snapshot) =>
-            snapshot.world.stopped ? { stop: true, reason: 'review-closed' } : { stop: false }
-        }
-      ]
-    })
-    stopped.service.registerKind(stoppedKind)
-    const enrolled = await stopped.service.enroll(enrollmentInput())
-    if (enrolled.status !== 'enrolled') {
-      throw new Error('expected enrollment')
-    }
-    await stopped.service.reconcileForTesting(enrolled.entry.enrollment.watcherId)
-    expect((await stopped.service.list())[0]).toMatchObject({
-      enrollment: { enabled: false },
-      status: { state: 'parked', parkReason: { kind: 'stop-predicate', predicateId: 'closed' } }
-    })
-
-    await stopped.service.stopForShutdown()
-    const restarted = await harness({ directory: stopped.directory })
-    restarted.service.registerKind(stoppedKind)
-    const restoredPark = (await restarted.service.fleet()).entries[0]!
-    expect(restoredPark).toMatchObject({
-      entry: {
-        enrollment: { enabled: false },
-        status: {
-          state: 'parked',
-          phase: 'parked',
-          reason: 'stop-predicate',
-          parkReason: {
-            kind: 'stop-predicate',
-            predicateId: 'closed',
-            reason: 'review-closed'
-          }
-        }
-      }
-    })
-    await expect(
-      restarted.service.command({
-        target: restoredPark.target,
-        expectedOwner: restoredPark.ownerFence,
-        command: { kind: 'disarm' }
-      })
-    ).resolves.toMatchObject({ status: 'applied' })
-    const disarmed = (await restarted.service.fleet()).entries[0]!
-    expect(disarmed).toMatchObject({
-      ownerFence: { revision: 1 },
-      entry: { enrollment: { enabled: false }, status: { state: 'disabled' } }
-    })
-    await expect(
-      restarted.service.command({
-        target: disarmed.target,
-        expectedOwner: disarmed.ownerFence,
-        command: { kind: 'resume' }
-      })
-    ).resolves.toMatchObject({ status: 'refused', reason: 'invalid-state' })
-    await restarted.service.stopForShutdown()
-
-    const failing = await harness()
-    failing.service.registerKind(
-      kind({
-        read: async () => {
-          throw new Error('host offline')
-        }
-      })
-    )
-    const failingEnrollment = await failing.service.enroll(enrollmentInput())
-    if (failingEnrollment.status !== 'enrolled') {
-      throw new Error('expected enrollment')
-    }
-    failing.schedule.mockClear()
-    await failing.service.reconcileForTesting(failingEnrollment.entry.enrollment.watcherId)
-    expect((await failing.service.list())[0]).toMatchObject({
-      enrollment: { enabled: true },
-      status: { state: 'unreachable', reason: 'host offline' }
-    })
-    expect(failing.schedule).toHaveBeenCalled()
-  })
-
   it('settles on worker_done even while a worker process is live', async () => {
     let watcherId = ''
     const { service, ledgerStore, budgetClock, orchestration } = await harness({
@@ -521,6 +156,109 @@ describe('Heimdall kernel service', () => {
       )
     expect(latestQuestion).toMatchObject({ status: 'resolved' })
   })
+
+  it('parks once for a durable worker escalation and resumes after operator acknowledgement', async () => {
+    let watcherId = ''
+    const { service, ledgerStore, budgetClock, orchestration } = await harness({
+      mailbox: () => [
+        {
+          eventId: 'mail-escalation',
+          watcherId,
+          atMs: 20,
+          origin: 'owner',
+          class: 'fact',
+          kind: 'evidence',
+          evidenceKind: 'orchestration-mailbox',
+          source: {
+            kind: 'orchestration',
+            sequence: 1,
+            messageId: 'message-escalation',
+            deliveryId: 'delivery-escalation'
+          },
+          payload: {
+            type: 'escalation',
+            subject: 'Blocked',
+            body: 'Credentials are required',
+            payload: { dispatchId: 'dispatch-1' }
+          }
+        }
+      ]
+    })
+    service.registerKind(kind())
+    const result = await service.enroll(enrollmentInput())
+    if (result.status !== 'enrolled') {
+      throw new Error('expected enrollment')
+    }
+    watcherId = result.entry.enrollment.watcherId
+    for (const entry of runningDispatch(watcherId)) {
+      ledgerStore.append(entry)
+    }
+    budgetClock.open(watcherId, 'worker-dispatched')
+
+    await service.reconcileForTesting(watcherId)
+    expect(budgetClock.current(watcherId)).toBeNull()
+    expect(orchestration.readDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ watcherId }),
+      'dispatch-1'
+    )
+    expect((await service.fleet()).entries[0]).toMatchObject({
+      entry: {
+        enrollment: { enabled: false },
+        status: {
+          state: 'parked',
+          reason: 'Blocked: Credentials are required',
+          parkReason: null
+        }
+      }
+    })
+
+    await service.reconcileForTesting(watcherId)
+    const openRevisions = service
+      .ledger(watcherId)
+      .entries.filter(
+        (entry) =>
+          entry.kind === 'escalation' &&
+          entry.escalationKind === 'worker-escalation' &&
+          entry.status === 'open'
+      )
+    expect(openRevisions).toHaveLength(1)
+    expect(budgetClock.current(watcherId)).toBeNull()
+
+    const parkedEntry = (await service.fleet()).entries[0]!
+    await expect(
+      service.command({
+        target: parkedEntry.target,
+        expectedOwner: parkedEntry.ownerFence,
+        command: { kind: 'resume' }
+      })
+    ).resolves.toMatchObject({ status: 'applied' })
+
+    const revisions = service
+      .ledger(watcherId)
+      .entries.filter(
+        (entry): entry is Extract<LedgerEntry, { kind: 'escalation' }> =>
+          entry.kind === 'escalation' && entry.escalationKind === 'worker-escalation'
+      )
+    expect(revisions).toHaveLength(2)
+    expect(new Set(revisions.map((entry) => entry.escalationId)).size).toBe(1)
+    expect(revisions.at(-1)).toMatchObject({ status: 'acknowledged', foldCount: 2 })
+    expect(
+      service
+        .ledger(watcherId)
+        .entries.findLast(
+          (entry) =>
+            entry.kind === 'escalation' && entry.escalationKind === 'park-worker-escalation'
+        )
+    ).toMatchObject({ status: 'acknowledged' })
+
+    await service.reconcileForTesting(watcherId)
+    expect(budgetClock.current(watcherId)).not.toBeNull()
+    expect((await service.fleet()).entries[0]).toMatchObject({
+      ownerFence: { revision: 1 },
+      entry: { enrollment: { enabled: true }, status: { state: 'watching' } }
+    })
+  })
+
   it('keeps polling after a disarm that leaves work in flight so the lease is released', async () => {
     const { service, ledgerStore, leaseStore, schedule } = await harness()
     service.registerKind(kind())
@@ -582,6 +320,66 @@ describe('Heimdall kernel service', () => {
       effect: 'indeterminate',
       reason: 'transport reset'
     })
+  })
+
+  it('writes recovery expectations before execution and resolves a crashed external effect without replay', async () => {
+    const { service } = await harness()
+    const externalAction: KernelAction = {
+      ...action('revision-1'),
+      visibility: 'external',
+      expectedState: { target: 'review-1', before: 'before-1' }
+    }
+    const execute = vi.fn(
+      async (
+        _action: KernelAction,
+        context: Parameters<WatcherKind<World, KernelAction>['execute']>[1]
+      ) => {
+        expect(context.ledger.entries).toContainEqual(
+          expect.objectContaining({
+            kind: 'attempt',
+            state: 'attempted',
+            expectedBefore: 'before-1',
+            expectedAfter: 'after-1'
+          })
+        )
+        throw new Error('process lost after external effect')
+      }
+    )
+    const resolveOutcome = vi.fn(() => ({ effect: 'landed' as const }))
+    service.registerKind(
+      kind({
+        decide: () => ({ action: externalAction }),
+        attemptExpectation: () => ({
+          expectedBefore: 'before-1',
+          expectedAfter: 'after-1'
+        }),
+        execute,
+        resolveOutcome
+      })
+    )
+    const result = await service.enroll(enrollmentInput())
+    if (result.status !== 'enrolled') {
+      throw new Error('expected enrollment')
+    }
+    const watcherId = result.entry.enrollment.watcherId
+
+    await service.reconcileForTesting(watcherId)
+    expect(service.ledger(watcherId).entries).toContainEqual(
+      expect.objectContaining({
+        kind: 'attempt',
+        state: 'settled',
+        effect: 'indeterminate',
+        expectedBefore: 'before-1',
+        expectedAfter: 'after-1'
+      })
+    )
+
+    await service.reconcileForTesting(watcherId)
+    expect(resolveOutcome).toHaveBeenCalledOnce()
+    expect(execute).toHaveBeenCalledOnce()
+    expect(service.ledger(watcherId).entries).toContainEqual(
+      expect.objectContaining({ kind: 'attempt-resolved', effect: 'landed' })
+    )
   })
 
   it('does not settle an attempt twice when dispatch and executor report the same outcome', async () => {
@@ -754,6 +552,72 @@ describe('Heimdall kernel service', () => {
     expect(second.generatedAtMs).toBe(101)
   })
 
+  it('keeps per-watcher fleet stamps stable while advancing enrollment and ledger changes', async () => {
+    const { service, ledgerStore } = await harness()
+    service.registerKind(
+      kind({
+        authorizeEnrollment: async (input) => ({
+          ...authorized(input),
+          workspaceKey: `local::/workspace/${input.repoId}`,
+          workspacePath: `/workspace/${input.repoId}`
+        })
+      })
+    )
+    const enrolledA = await service.enroll({
+      ...enrollmentInput(),
+      repoId: 'repo-a',
+      worktreeId: 'worktree-a'
+    })
+    const enrolledB = await service.enroll({
+      ...enrollmentInput(),
+      repoId: 'repo-b',
+      worktreeId: 'worktree-b'
+    })
+    if (enrolledA.status !== 'enrolled' || enrolledB.status !== 'enrolled') {
+      throw new Error('expected both watchers to enroll')
+    }
+    const watcherA = enrolledA.entry.enrollment.watcherId
+    const watcherB = enrolledB.entry.enrollment.watcherId
+    const initial = await service.fleet()
+    const initialA = initial.entries.find((entry) => entry.target.watcherId === watcherA)!
+    const initialB = initial.entries.find((entry) => entry.target.watcherId === watcherB)!
+    const repeated = await service.fleet()
+    expect(
+      repeated.entries.find((entry) => entry.target.watcherId === watcherA)?.observedAtMs
+    ).toBe(initialA.observedAtMs)
+    expect(
+      repeated.entries.find((entry) => entry.target.watcherId === watcherB)?.observedAtMs
+    ).toBe(initialB.observedAtMs)
+
+    await service.command({
+      target: initialA.target,
+      expectedOwner: initialA.ownerFence,
+      command: { kind: 'pause' }
+    })
+    const afterPause = await service.fleet()
+    const pausedA = afterPause.entries.find((entry) => entry.target.watcherId === watcherA)!
+    const unchangedB = afterPause.entries.find((entry) => entry.target.watcherId === watcherB)!
+    expect(pausedA.observedAtMs).toBeGreaterThan(initialA.observedAtMs)
+    expect(unchangedB.observedAtMs).toBe(initialB.observedAtMs)
+
+    ledgerStore.append({
+      eventId: 'watcher-a-ledger-only',
+      watcherId: watcherA,
+      atMs: 101,
+      origin: 'client',
+      class: 'observation',
+      kind: 'client-observation',
+      what: 'ledger-only-change'
+    })
+    const afterLedger = await service.fleet()
+    expect(
+      afterLedger.entries.find((entry) => entry.target.watcherId === watcherA)?.observedAtMs
+    ).toBeGreaterThan(pausedA.observedAtMs)
+    expect(
+      afterLedger.entries.find((entry) => entry.target.watcherId === watcherB)?.observedAtMs
+    ).toBe(initialB.observedAtMs)
+  })
+
   it('fences an in-flight decision with a durable pause before its commit point', async () => {
     let enterPreflight!: () => void
     const enteredPreflight = new Promise<void>((resolve) => {
@@ -797,7 +661,11 @@ describe('Heimdall kernel service', () => {
     await expect(pause).resolves.toMatchObject({ status: 'applied' })
 
     expect(execute).not.toHaveBeenCalled()
-    expect(leaseStore.release).toHaveBeenCalled()
+    expect(leaseStore.release).toHaveBeenCalledWith(
+      result.entry.enrollment.workspaceKey,
+      'test-holder',
+      1
+    )
     expect((await service.fleet()).entries[0]).toMatchObject({
       paused: true,
       ownerFence: { revision: 1 },
@@ -1034,5 +902,81 @@ describe('Heimdall kernel service', () => {
       budget: enrollmentInput().budget
     })
     reopenedDatabase.close()
+  })
+})
+
+describe('Heimdall kernel service mailbox wake', () => {
+  function liveEnrollmentRow(
+    watcherId: string,
+    overrides: { orchestrationRunId?: string | null } = {}
+  ) {
+    return {
+      ...authorized(enrollmentInput()),
+      watcherId,
+      enabled: true,
+      paused: false,
+      commandRevision: 0,
+      coordinatorIdentity: { handle: 'coordinator', paneKey: 'pane' },
+      orchestrationRunId: overrides.orchestrationRunId ?? null,
+      createdAtMs: 1,
+      terminalAtMs: null
+    }
+  }
+
+  it('wakes the runner enrolled on the matching run address', async () => {
+    const { service, enrollmentStore, schedule } = await harness()
+    service.registerKind(kind())
+    enrollmentStore.insert(liveEnrollmentRow('watcher-run', { orchestrationRunId: 'run-1' }))
+
+    service.start()
+    schedule.mockClear()
+    notifyHeimdallMailboxArrival(heimdallMailboxAddressForRun('run-1'), 'worker_done')
+
+    expect(schedule).toHaveBeenCalledWith(expect.any(Function), 0)
+  })
+
+  it('does not wake a runner enrolled on a different run', async () => {
+    const { service, enrollmentStore, schedule } = await harness()
+    service.registerKind(kind())
+    enrollmentStore.insert(liveEnrollmentRow('watcher-run', { orchestrationRunId: 'run-1' }))
+
+    service.start()
+    schedule.mockClear()
+    notifyHeimdallMailboxArrival(heimdallMailboxAddressForRun('run-2'), 'worker_done')
+
+    expect(schedule).not.toHaveBeenCalled()
+  })
+
+  it('wakes the runner holding a matching in-flight dispatch', async () => {
+    const { service, enrollmentStore, ledgerStore, schedule } = await harness()
+    service.registerKind(kind())
+    enrollmentStore.insert(liveEnrollmentRow('watcher-dispatch'))
+    for (const entry of runningDispatch('watcher-dispatch')) {
+      ledgerStore.append(entry)
+    }
+
+    service.start()
+    schedule.mockClear()
+    notifyHeimdallMailboxArrival(heimdallMailboxAddressForDispatch('dispatch-1'), 'worker_done')
+
+    expect(schedule).toHaveBeenCalledWith(expect.any(Function), 0)
+  })
+
+  it('wakes nobody for a dispatch address with no matching in-flight dispatch', async () => {
+    const { service, enrollmentStore, ledgerStore, schedule } = await harness()
+    service.registerKind(kind())
+    enrollmentStore.insert(liveEnrollmentRow('watcher-dispatch'))
+    for (const entry of runningDispatch('watcher-dispatch')) {
+      ledgerStore.append(entry)
+    }
+
+    service.start()
+    schedule.mockClear()
+    notifyHeimdallMailboxArrival(
+      heimdallMailboxAddressForDispatch('dispatch-unrelated'),
+      'worker_done'
+    )
+
+    expect(schedule).not.toHaveBeenCalled()
   })
 })

@@ -68,7 +68,8 @@ export class HeimdallFleetTransport {
   }
 
   async fleet(): Promise<HeimdallFleetSnapshot> {
-    await Promise.all([this.refreshLocal(), this.remote.sync()])
+    await this.refreshLocal()
+    this.remote.sync()
     return this.snapshot()
   }
 

@@ -336,6 +336,30 @@ describe('PR sitter desired-action safety policy', () => {
     })
   })
 
+  it('stops at an explicit capability reason when conflict resolution is disabled', () => {
+    const conflicted = review({
+      behindBase: true,
+      conflicts: 'present',
+      checks: [check({ state: 'failed', failureSignature: 'failure:test' })],
+      providerReadiness: {
+        verdict: 'blocked',
+        blockers: ['behind', 'conflicts', 'checks']
+      }
+    })
+    const outcome = explainDesiredAction(
+      conflicted,
+      sitter({ capabilities: { ...sitter().capabilities, resolveConflicts: 'off' } }),
+      ledger()
+    )
+
+    expect(outcome).toEqual({
+      action: null,
+      reason: 'capability-off',
+      detail: 'resolveConflicts',
+      considered: []
+    })
+  })
+
   it('resolves conflicts that were already present when the sitter was armed', () => {
     // conflicts usually stop CI from building a merge commit, so the checks never go green at this
     // head — a gate that waits for green here can never be satisfied.

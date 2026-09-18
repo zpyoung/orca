@@ -142,6 +142,37 @@ export type LocalFleetProjectionInput = {
   workspaceLabel: string | null
 }
 
+export type LocalFleetProjectionRevision = {
+  ledgerEntryCount: number
+  firstLedgerEventId: string | null
+  lastLedgerEventId: string | null
+  traceCount: number
+  firstTraceSequence: number | null
+  lastTrace: string | null
+}
+
+/**
+ * Compact per-watcher revision evidence for detail-only data which is not present
+ * in the fleet row itself. Ledger rows are append-only, while traces are bounded
+ * and only the live tail can change in place.
+ */
+export function localFleetProjectionRevision(
+  projection: LocalFleetProjectionInput
+): LocalFleetProjectionRevision {
+  const firstLedgerEntry = projection.ledger.entries[0]
+  const lastLedgerEntry = projection.ledger.entries.at(-1)
+  const firstTrace = projection.traces[0]
+  const lastTrace = projection.traces.at(-1)
+  return {
+    ledgerEntryCount: projection.ledger.entries.length,
+    firstLedgerEventId: firstLedgerEntry?.eventId ?? null,
+    lastLedgerEventId: lastLedgerEntry?.eventId ?? null,
+    traceCount: projection.traces.length,
+    firstTraceSequence: firstTrace?.seq ?? null,
+    lastTrace: lastTrace ? (JSON.stringify(lastTrace) ?? null) : null
+  }
+}
+
 export function localFleetEntry(
   entry: WatcherListEntry,
   observedAtMs: number,

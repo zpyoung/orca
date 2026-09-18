@@ -5,7 +5,7 @@ import { KernelActionSchema } from './ledger-types'
 import { PacingDecisionSchema } from './pacing'
 
 export const TICK_TRACE_RING_CAPACITY = 50
-export const TICK_TRACE_FULL_DETAIL_COUNT = 5
+export const TICK_TRACE_FULL_DETAIL_COUNT = 20
 
 export const TickExitPathSchema = z.enum([
   'not-current',

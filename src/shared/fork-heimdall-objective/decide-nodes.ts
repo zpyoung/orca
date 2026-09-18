@@ -5,6 +5,9 @@ import {
   latestObjectiveAttempt,
   objectiveAttemptDisposition,
   objectiveNoAction,
+  objectiveNodeRetryCount,
+  objectiveRetryableFailure,
+  OBJECTIVE_INFRA_REDISPATCH_CAP,
   type ObjectiveAttempt,
   type ObjectiveDecisionOutcome
 } from './decision-context'
@@ -46,16 +49,6 @@ export function decideObjectiveNodes(
     )
     const dispatchId = node.dispatchId ?? dispatch?.attempt.dispatchId
     const report = reports.find((candidate) => candidate.dispatchId === dispatchId)
-    if (report?.outcome === 'failed' || (report && report.reportPath === null)) {
-      return decidePlannerAction(
-        snapshot,
-        ledger,
-        attempts,
-        reports,
-        'replan-after-failure',
-        revision.number
-      )
-    }
     if (report?.outcome === 'succeeded' && report.reportPath !== null && dispatchId) {
       const ingestion = latestObjectiveAttempt(
         attempts,
@@ -95,7 +88,40 @@ export function decideObjectiveNodes(
     }
     if (dispatch) {
       const disposition = objectiveAttemptDisposition(dispatch.attempt, ledger)
-      if (disposition === 'not-landed' || disposition === 'landed') {
+      if (disposition === 'not-landed') {
+        const retryable = objectiveRetryableFailure(dispatch.attempt, ledger)
+        if (retryable !== null) {
+          const retryOrdinal = objectiveNodeRetryCount(attempts, ledger, revision.id, node.taskKey)
+          if (retryOrdinal >= OBJECTIVE_INFRA_REDISPATCH_CAP) {
+            return objectiveNoAction('implementation', 'node-retry-exhausted', node.taskKey)
+          }
+          return {
+            action: {
+              kind: 'dispatch-node',
+              capability: 'implement',
+              visibility: 'local',
+              contentIdentity: snapshot.contentIdentity,
+              evidenceKey: `${revision.id}:${node.taskKey}:r${retryOrdinal}`,
+              revisionId: revision.id,
+              taskKey: node.taskKey,
+              depsOrchestrationIds:
+                dispatch.action.kind === 'dispatch-node'
+                  ? dispatch.action.depsOrchestrationIds
+                  : [],
+              retryOf: `${revision.id}:${node.taskKey}`
+            }
+          }
+        }
+        return decidePlannerAction(
+          snapshot,
+          ledger,
+          attempts,
+          reports,
+          'replan-after-failure',
+          revision.number
+        )
+      }
+      if (disposition === 'landed') {
         return decidePlannerAction(
           snapshot,
           ledger,

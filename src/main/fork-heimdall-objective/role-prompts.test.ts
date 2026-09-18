@@ -109,4 +109,104 @@ describe('objective role prompts', () => {
       })
     ).toThrow('active plan')
   })
+
+  it('names all three self-assessment results for the implementer, distinguishing fail from unknown', () => {
+    const assigned = node('assigned', 'Implement the assigned behavior')
+    const prompt = buildObjectiveRolePrompt({
+      role: 'implementer',
+      contract,
+      node: assigned,
+      reportPath: '/tmp/objective/report.json',
+      budgetBucket: 'plenty'
+    })
+
+    expect(prompt).toContain('result:"pass"|"fail"|"unknown"')
+    expect(prompt).toContain('an environment-dependent criterion you cannot verify is unknown')
+  })
+
+  it('tells the planner not to assert its own shell environment as guaranteed for the implementer', () => {
+    const prompt = buildObjectiveRolePrompt({
+      role: 'planner',
+      contract,
+      reason: 'initial',
+      reportPath: '/tmp/objective/report.json',
+      budgetBucket: 'plenty'
+    })
+
+    expect(prompt).toContain('Do not assert environment facts you only observed in your own shell')
+  })
+
+  it('renders failure context for a planner replan when supplied, but not otherwise', () => {
+    const failureContext = {
+      taskKey: 'core',
+      failureClass: 'criteria' as const,
+      narrative: 'The worker could not make the health check pass.',
+      failingCriteria: ['Health check returns 200']
+    }
+    const withContext = buildObjectiveRolePrompt({
+      role: 'planner',
+      contract,
+      reason: 'replan-after-failure',
+      reportPath: '/tmp/objective/report.json',
+      budgetBucket: 'plenty',
+      failureContext
+    })
+    const withoutContext = buildObjectiveRolePrompt({
+      role: 'planner',
+      contract,
+      reason: 'replan-after-failure',
+      reportPath: '/tmp/objective/report.json',
+      budgetBucket: 'plenty'
+    })
+
+    expect(withContext).toContain('FAILED TASK: core (criteria)')
+    expect(withContext).toContain('The worker could not make the health check pass.')
+    expect(withContext).toContain('Health check returns 200')
+    expect(withoutContext).not.toContain('FAILED TASK')
+  })
+
+  it('renders failure context without a parenthetical when the failure class is not yet known', () => {
+    const prompt = buildObjectiveRolePrompt({
+      role: 'planner',
+      contract,
+      reason: 'replan-after-failure',
+      reportPath: '/tmp/objective/report.json',
+      budgetBucket: 'plenty',
+      failureContext: {
+        taskKey: 'core',
+        narrative: 'The worker exited before self-assessing any criterion.',
+        failingCriteria: []
+      }
+    })
+
+    expect(prompt).toContain('FAILED TASK: core')
+    expect(prompt).not.toContain('FAILED TASK: core (')
+    expect(prompt).not.toContain('FAILING CRITERIA')
+  })
+
+  it('renders plan progress for a planner replan when supplied, but not otherwise', () => {
+    const withProgress = buildObjectiveRolePrompt({
+      role: 'planner',
+      contract,
+      reason: 'replan-after-block',
+      reportPath: '/tmp/objective/report.json',
+      budgetBucket: 'plenty',
+      planProgress: [
+        { taskKey: 'core', state: 'succeeded' },
+        { taskKey: 'follow-up', state: 'pending' }
+      ]
+    })
+    const withoutProgress = buildObjectiveRolePrompt({
+      role: 'planner',
+      contract,
+      reason: 'replan-after-block',
+      reportPath: '/tmp/objective/report.json',
+      budgetBucket: 'plenty'
+    })
+
+    expect(withProgress).toContain('PLAN PROGRESS:')
+    expect(withProgress).toContain('- core: succeeded')
+    expect(withProgress).toContain('- follow-up: pending')
+    expect(withoutProgress).not.toContain('PLAN PROGRESS')
+  })
 })

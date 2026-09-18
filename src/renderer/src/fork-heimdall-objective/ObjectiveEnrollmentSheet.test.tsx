@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { AppState } from '@/store/types'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { getDefaultSettings } from '../../../shared/constants'
 import {
   OBJECTIVE_ALL_WORKSPACE_PATHS_GLOB,
@@ -75,16 +76,18 @@ function EditableObjectiveFields({
     draft({ objectiveText: '', existingPlanText })
   )
   return (
-    <ObjectiveEnrollmentFields
-      draft={currentDraft}
-      selectedWorkspaceKey=""
-      workspaces={[]}
-      landingAvailability={{ workspaceKind: null, worktreeId: null }}
-      agents={[]}
-      disabled={false}
-      onWorkspaceChange={() => {}}
-      onDraftChange={setCurrentDraft}
-    />
+    <TooltipProvider delayDuration={400}>
+      <ObjectiveEnrollmentFields
+        draft={currentDraft}
+        selectedWorkspaceKey=""
+        workspaces={[]}
+        landingAvailability={{ workspaceKind: null, worktreeId: null }}
+        agents={[]}
+        disabled={false}
+        onWorkspaceChange={() => {}}
+        onDraftChange={setCurrentDraft}
+      />
+    </TooltipProvider>
   )
 }
 
@@ -252,6 +255,18 @@ describe('objective enrollment contract', () => {
         availability
       ).some((error) => error.code === 'existing-plan-too-long')
     ).toBe(true)
+  })
+  it('blocks plan-off when the form cannot establish a reusable approved plan', () => {
+    const capabilities = objectiveCapabilityModes('files-on-disk')
+    expect(
+      validateObjectiveEnrollmentDraft(
+        draft({
+          capabilities: { ...capabilities, plan: 'off' },
+          existingPlanText: '# Planner source is not an approved plan'
+        }),
+        { workspaceKind: 'git', worktreeId: 'worktree' }
+      )
+    ).toContainEqual({ code: 'plan-off-requires-approved-plan' })
   })
 
   it('prevalidates the owner rules the RPC cannot describe', () => {

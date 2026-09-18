@@ -241,6 +241,38 @@ describe('HeimdallPage fleet action history', () => {
     expect(container.textContent).not.toContain('old-action')
   })
 
+  it('refreshes detail only for the watcher whose per-row stamp changed', async () => {
+    let watcherA = row(1, 10, 'watcher-a')
+    const watcherB = row(1, 10, 'watcher-b')
+    const loadDetail = vi.fn(async (target: WatcherFleetEntry['target']) => {
+      const watcher = target.watcherId === 'watcher-a' ? watcherA : watcherB
+      return detail(watcher, `${target.watcherId}-action`, watcher.observedAtMs)
+    })
+    installDetailApi(loadDetail)
+    useAppStore.setState({
+      heimdallFleet: { entries: [watcherA, watcherB], generatedAtMs: 10 }
+    })
+
+    await renderPage(<HeimdallPage />)
+    await flushEffects()
+    expect(loadDetail).toHaveBeenCalledTimes(2)
+
+    watcherA = row(1, 20, 'watcher-a')
+    await act(async () => {
+      useAppStore.getState().applyHeimdallFleetSnapshot({
+        entries: [watcherA, watcherB],
+        generatedAtMs: 20
+      })
+      await Promise.resolve()
+    })
+    await flushEffects()
+
+    expect(loadDetail).toHaveBeenCalledTimes(3)
+    expect(
+      loadDetail.mock.calls.filter(([target]) => target.watcherId === 'watcher-b')
+    ).toHaveLength(1)
+  })
+
   it('re-requests every invalidated pending target when one watcher changes', async () => {
     const watcherA = row(1, 10, 'watcher-a')
     const watcherB = row(1, 10, 'watcher-b')

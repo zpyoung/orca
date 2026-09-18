@@ -28,6 +28,7 @@ import { runnerPacingDelay } from './runner-pacing'
 import { WatcherRunnerStopLifecycle } from './runner-stop-lifecycle'
 import { isCoordinatorSeatLost, WatcherRunnerStatusLifecycle } from './runner-status'
 import type { WatcherRunner, WatcherRunnerDependencies } from './runner-state'
+import { WatcherRunnerWorkerLifecycle } from './runner-worker-lifecycle'
 
 export class WatcherRunnerLoop {
   readonly dispatchLifecycle: WatcherLedgerLifecycle
@@ -36,6 +37,7 @@ export class WatcherRunnerLoop {
   private readonly gating: WatcherRunnerGateLifecycle
   private readonly statusLifecycle: WatcherRunnerStatusLifecycle
   private readonly stopLifecycle: WatcherRunnerStopLifecycle
+  private readonly workerLifecycle: WatcherRunnerWorkerLifecycle
 
   constructor(private readonly dependencies: WatcherRunnerDependencies) {
     this.dispatchLifecycle = new WatcherLedgerLifecycle({
@@ -70,6 +72,16 @@ export class WatcherRunnerLoop {
       createId: () => this.createId(),
       publish: (runner) => this.publishStatus(runner)
     })
+    this.workerLifecycle = new WatcherRunnerWorkerLifecycle({
+      ledgerStore: dependencies.ledgerStore,
+      orchestration: dependencies.orchestration,
+      dispatchLifecycle: this.dispatchLifecycle,
+      statusLifecycle: this.statusLifecycle,
+      schedule: (runner, delayMs) => this.schedule(runner, delayMs),
+      publish: (runner) => this.publishStatus(runner),
+      now: () => this.now(),
+      createId: () => this.createId()
+    })
     this.stopLifecycle = new WatcherRunnerStopLifecycle(this.statusLifecycle)
   }
 
@@ -79,7 +91,11 @@ export class WatcherRunnerLoop {
     return {
       enrollment,
       kind,
-      status: dormantWatcherStatus(enrollment, ledger),
+      status: dormantWatcherStatus(
+        enrollment,
+        ledger,
+        this.dependencies.ledgerStore.readTerminalSummary(enrollment.watcherId)
+      ),
       timer: null,
       operationTail: Promise.resolve(),
       tickQueued: false,
@@ -90,6 +106,7 @@ export class WatcherRunnerLoop {
       controlPending: null,
       forceFresh: false,
       consecutiveErrors: 0,
+      consecutiveGateHolds: 0,
       lastFullResyncAtMs: null,
       lastSnapshot: null,
       traceSequence: traces.at(-1)?.seq ?? 0,
@@ -173,6 +190,7 @@ export class WatcherRunnerLoop {
     })
     pushTickTrace(runner.traces, trace)
     let releaseAtEnd = false
+    let tickLease: NonNullable<WatcherRunner['leaseGuard']> | null = null
     try {
       const lease = await this.dependencies.leaseStore.acquireOrRenew(
         runner.enrollment.workspaceKey,
@@ -180,6 +198,12 @@ export class WatcherRunnerLoop {
         this.dependencies.leaseTtlMs ?? 90_000
       )
       if (lease.status !== 'held') {
+        if (lease.status === 'configuration-error') {
+          trace.exitPath = 'error'
+          trace.error = { message: lease.reason }
+          await this.parkForConfigurationError(runner, lease.reason)
+          return
+        }
         trace.exitPath = lease.status === 'refused' ? 'lease-refused' : 'lease-unverifiable'
         if (lease.status === 'unverifiable') {
           this.dependencies.ledgerStore.append(runner.enrollment.watcherId, {
@@ -209,11 +233,16 @@ export class WatcherRunnerLoop {
         }
         return
       }
+      tickLease = lease.guard
+      trace.leaseEpoch = lease.epoch
+      releaseAtEnd = true
+      if (runner.stopped || runner.suspended) {
+        trace.exitPath = 'watching'
+        return
+      }
       runner.leaseRenewal?.dispose()
       runner.leaseGuard = lease.guard
       runner.leaseRenewal = lease.guard.renewLoop()
-      trace.leaseEpoch = lease.epoch
-      releaseAtEnd = true
 
       if (!runner.recovered) {
         this.dependencies.budgetClock.recoverOnStart(runner.enrollment.watcherId)
@@ -252,57 +281,11 @@ export class WatcherRunnerLoop {
         ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
       }
 
-      const workerState = await this.actions.reconcileWorkers(runner)
-      ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
-      if (runner.enrollment.paused) {
-        runner.status = {
-          ...runner.status,
-          enabled: true,
-          state: 'held',
-          phase: 'paused',
-          reason: 'paused',
-          nextPulseAtMs: null
-        }
-        this.publishStatus(runner)
-        if (getInFlightAttempts(ledger).some((attempt) => attempt.state === 'running')) {
-          this.schedule(runner, HEIMDALL_RAPID_POLL_MS)
-        }
-        trace.exitPath = 'gate-held'
+      const refreshedLedger = await this.workerLifecycle.refresh(runner, trace)
+      if (!refreshedLedger) {
         return
       }
-      if (workerState.status === 'question') {
-        this.statusLifecycle.park(runner, {
-          kind: 'worker-question',
-          messageId: workerState.messageId
-        })
-        trace.exitPath = 'gate-held'
-        this.schedule(runner, HEIMDALL_RAPID_POLL_MS)
-        return
-      }
-      if (runner.status.parkReason?.kind === 'worker-question') {
-        this.statusLifecycle.readyToResume(runner)
-      }
-      if (workerState.status === 'unverifiable') {
-        trace.error = { message: workerState.reason }
-        runner.consecutiveErrors += 1
-        runner.status = {
-          ...runner.status,
-          state: 'unreachable',
-          phase: 'worker-unverifiable',
-          reason: workerState.reason,
-          nextPulseAtMs: null
-        }
-        this.publishStatus(runner)
-        trace.exitPath = 'error'
-        this.schedule(runner, errorBackoffMs(runner.consecutiveErrors) ?? HEIMDALL_RAPID_POLL_MS)
-        return
-      }
-      if (workerState.status === 'exited') {
-        runner.forceFresh = true
-        trace.exitPath = 'watching'
-        this.schedule(runner, 0)
-        return
-      }
+      ledger = refreshedLedger
 
       let stopped = await this.stopLifecycle.evaluate(runner, snapshot, ledger)
       if ((stopped === 'deferred' || stopped === 'parked') && snapshot.freshness === 'live') {
@@ -375,6 +358,7 @@ export class WatcherRunnerLoop {
           gateEvaluation.gate.verdict === 'escalate',
           gateEvaluation.gate.reason
         )
+        runner.consecutiveGateHolds += 1
         this.scheduleFromPacing(
           runner,
           snapshot,
@@ -440,13 +424,8 @@ export class WatcherRunnerLoop {
         trace.exitPath = 'gate-escalated'
         trace.error = null
         this.statusLifecycle.park(runner, { kind: 'coordinator-seat-lost' })
-        runner.leaseRenewal?.dispose()
-        runner.leaseRenewal = null
-        if (runner.leaseGuard) {
-          await this.dependencies.leaseStore
-            .release(runner.enrollment.workspaceKey, runner.leaseGuard.epoch)
-            .catch(() => {})
-          runner.leaseGuard = null
+        if (tickLease) {
+          await this.releaseLeaseGuard(runner, tickLease)
         }
         releaseAtEnd = false
         return
@@ -481,15 +460,36 @@ export class WatcherRunnerLoop {
         const running = getInFlightAttempts(
           this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
         ).some((attempt) => attempt.state === 'running')
-        if (!running && runner.leaseGuard) {
-          runner.leaseRenewal?.dispose()
-          runner.leaseRenewal = null
-          await this.dependencies.leaseStore
-            .release(runner.enrollment.workspaceKey, runner.leaseGuard.epoch)
-            .catch(() => {})
-          runner.leaseGuard = null
+        if ((!running || runner.stopped || runner.suspended) && tickLease) {
+          await this.releaseLeaseGuard(runner, tickLease)
         }
       }
+    }
+  }
+
+  private async parkForConfigurationError(runner: WatcherRunner, reason: string): Promise<void> {
+    const retainedGuard = runner.leaseGuard
+    this.statusLifecycle.configurationError(runner, reason)
+    if (retainedGuard) {
+      await this.releaseLeaseGuard(runner, retainedGuard)
+    }
+    this.controlLifecycle.disarm(runner)
+    runner.reconcileAgain = false
+  }
+
+  private async releaseLeaseGuard(
+    runner: WatcherRunner,
+    guard: NonNullable<WatcherRunner['leaseGuard']>
+  ): Promise<void> {
+    if (runner.leaseGuard === guard) {
+      runner.leaseRenewal?.dispose()
+      runner.leaseRenewal = null
+    }
+    await this.dependencies.leaseStore
+      .release(runner.enrollment.workspaceKey, guard.holder, guard.epoch)
+      .catch(() => {})
+    if (runner.leaseGuard === guard) {
+      runner.leaseGuard = null
     }
   }
 

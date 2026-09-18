@@ -1,19 +1,23 @@
 import {
   WORKER_EXITED_WITHOUT_COMPLETION,
   type ActionOutcome,
-  type EffectCertainty
+  type EffectCertainty,
+  type EffectCertaintyResolution,
+  type ObjectiveFailureClass
 } from '../../shared/fork-heimdall/effect-certainty'
 import { makeAttemptFingerprint } from '../../shared/fork-heimdall/attempt-fingerprint'
 import { getLatestAttempts } from '../../shared/fork-heimdall/ledger-queries'
 import type { ActionExecutor, LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
 import type { AttemptEntry, WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type { LiveSnapshot, Snapshot } from '../../shared/fork-heimdall/snapshot'
+import { requireObjectiveOriginalDispatchFingerprint } from '../../shared/fork-heimdall-objective/decision-context'
 import {
   ObjectiveActionSchema,
   type ObjectiveAction
 } from '../../shared/fork-heimdall-objective/objective-actions'
 import type { ObjectiveWorld } from '../../shared/fork-heimdall-objective/detail-types'
 import {
+  ImplementerReportSchema,
   parseAndValidateImplementerReport,
   parseAndValidateIntegratorReport,
   parseAndValidatePlannerReport,
@@ -146,26 +150,47 @@ function validateResolvedDispatchReport(args: {
   }
 }
 
+/** Only meaningful for a dispatch-node report; every other role has no per-criterion signal. */
+function classifyValidatedReportFailure(
+  report: unknown,
+  action: Extract<ObjectiveAction, { kind: `dispatch-${string}` }>
+): ObjectiveFailureClass {
+  if (action.kind !== 'dispatch-node') {
+    return 'criteria'
+  }
+  const parsed = ImplementerReportSchema.safeParse(report)
+  if (!parsed.success) {
+    return 'criteria'
+  }
+  const results = parsed.data.criteriaSelfAssessment.map((item) => item.result)
+  if (results.some((result) => result === 'fail')) {
+    return 'criteria'
+  }
+  return results.some((result) => result === 'unknown') ? 'environment' : 'criteria'
+}
+
 async function resolveDispatchOutcome(args: {
   attempt: AttemptEntry
   action: Extract<ObjectiveAction, { kind: `dispatch-${string}` }>
   ledger: WatcherLedger
   binding: ObjectiveSnapshotBinding
   objectiveStore: ObjectiveStore
-}): Promise<EffectCertainty> {
+}): Promise<EffectCertaintyResolution> {
   if (!args.attempt.dispatch) {
-    return 'not-landed'
+    return { effect: 'not-landed', failureClass: 'infra' }
   }
   const dispatchId = args.attempt.dispatchId
   if (!dispatchId) {
-    return 'indeterminate'
+    return { effect: 'indeterminate' }
   }
   const evidence = findObjectiveWorkerEvidence(args.ledger, dispatchId)
   if (!evidence) {
-    return args.attempt.reason === WORKER_EXITED_WITHOUT_COMPLETION ? 'not-landed' : 'indeterminate'
+    return args.attempt.reason === WORKER_EXITED_WITHOUT_COMPLETION
+      ? { effect: 'not-landed', failureClass: 'infra' }
+      : { effect: 'indeterminate' }
   }
-  if (evidence.outcome === 'failed') {
-    return 'not-landed'
+  if (evidence.reportPath === null) {
+    return { effect: 'not-landed', failureClass: 'criteria' }
   }
   const role =
     args.action.kind === 'dispatch-planner'
@@ -175,37 +200,57 @@ async function resolveDispatchOutcome(args: {
         : args.action.kind === 'dispatch-reviewer'
           ? 'reviewer'
           : 'integrator'
-  const read = await readObjectiveRoleReport({
-    target: args.binding.target,
-    attemptFingerprint: args.attempt.fingerprint,
-    mailboxReportPath: evidence.reportPath,
-    role,
-    ...(args.action.kind === 'dispatch-node' ? { taskKey: args.action.taskKey } : {})
-  })
-  if (!read.ok) {
-    return 'not-landed'
-  }
-  if (
-    !validateResolvedDispatchReport({
-      ...args,
-      report: read.report,
-      evidenceFiles: evidence.filesModified
-    })
-  ) {
-    return 'not-landed'
-  }
-  if (args.action.kind === 'dispatch-node' || args.action.kind === 'dispatch-integrator') {
-    const observed = await validateObjectiveWorkspaceChanges({
+  try {
+    const read = await readObjectiveRoleReport({
       target: args.binding.target,
       attemptFingerprint: args.attempt.fingerprint,
-      reportedFiles: evidence.filesModified,
-      writeTerritory: args.binding.contract.writeTerritory
+      mailboxReportPath: evidence.reportPath,
+      role,
+      ...(args.action.kind === 'dispatch-node' ? { taskKey: args.action.taskKey } : {})
     })
-    if (!observed.ok) {
-      return 'not-landed'
+    if (!read.ok) {
+      return { effect: 'not-landed', failureClass: 'criteria' }
     }
+    if (
+      !validateResolvedDispatchReport({
+        ...args,
+        report: read.report,
+        evidenceFiles: evidence.filesModified
+      })
+    ) {
+      return { effect: 'not-landed', failureClass: 'criteria' }
+    }
+    if (args.action.kind === 'dispatch-node' || args.action.kind === 'dispatch-integrator') {
+      // a retry must diff against the pre-original baseline, not one keyed to its own fingerprint
+      const baselineFingerprint =
+        args.action.kind === 'dispatch-node' && args.action.retryOf !== undefined
+          ? requireObjectiveOriginalDispatchFingerprint(args.ledger, args.action.retryOf)
+          : args.attempt.fingerprint
+      const observed = await validateObjectiveWorkspaceChanges({
+        target: args.binding.target,
+        attemptFingerprint: baselineFingerprint,
+        reportedFiles: evidence.filesModified,
+        writeTerritory: args.binding.contract.writeTerritory
+      })
+      if (!observed.ok) {
+        return { effect: 'not-landed', failureClass: 'criteria' }
+      }
+    }
+    if (evidence.outcome === 'failed') {
+      return {
+        effect: 'not-landed',
+        failureClass: classifyValidatedReportFailure(read.report, args.action)
+      }
+    }
+    return { effect: 'landed' }
+  } catch (error) {
+    // classification-only reads must not newly throw a failed dispatch out of recovery; a
+    // succeeded outcome keeps its pre-existing propagation since landing must still be authoritative
+    if (evidence.outcome === 'succeeded') {
+      throw error
+    }
+    return { effect: 'not-landed', failureClass: 'criteria' }
   }
-  return 'landed'
 }
 
 export function createObjectiveActionExecutor(
@@ -251,7 +296,7 @@ export function createObjectiveActionExecutor(
       fresh: LiveSnapshot<ObjectiveWorld>,
       ledger: WatcherLedger,
       lease: LeaseGuard
-    ): EffectCertainty | Promise<EffectCertainty> {
+    ): EffectCertaintyResolution | Promise<EffectCertaintyResolution> {
       const binding = requireObjectiveSnapshotBinding(dependencies.snapshotBindings, fresh)
       const parsed = ObjectiveActionSchema.safeParse(attempt.action)
       if (
@@ -263,7 +308,7 @@ export function createObjectiveActionExecutor(
             parsed.data.evidenceKey
           )
       ) {
-        return 'indeterminate'
+        return { effect: 'indeterminate' }
       }
       if (
         parsed.data.kind === 'commit-local-branch' ||
@@ -276,14 +321,16 @@ export function createObjectiveActionExecutor(
           binding,
           ...landingDependencies,
           lease
-        })
+        }).then((effect) => ({ effect }))
       }
       if (!parsed.data.kind.startsWith('dispatch-')) {
-        return localActionOutcome(
-          parsed.data as StoreLocalAction,
-          binding,
-          dependencies.objectiveStore
-        )
+        return {
+          effect: localActionOutcome(
+            parsed.data as StoreLocalAction,
+            binding,
+            dependencies.objectiveStore
+          )
+        }
       }
       return resolveDispatchOutcome({
         attempt,

@@ -7,6 +7,7 @@ export function mailboxBody(entry: Extract<LedgerEntry, { kind: 'evidence' }>): 
   dispatchId?: string
   outcome?: string
   result?: unknown
+  subject?: string
   body?: string
 } | null {
   if (
@@ -37,6 +38,7 @@ export function mailboxBody(entry: Extract<LedgerEntry, { kind: 'evidence' }>): 
     ...(typeof payload.dispatchId === 'string' ? { dispatchId: payload.dispatchId } : {}),
     ...(typeof payload.outcome === 'string' ? { outcome: payload.outcome } : {}),
     ...(payload.result === undefined ? {} : { result: payload.result }),
+    ...(typeof envelope.subject === 'string' ? { subject: envelope.subject } : {}),
     ...(typeof envelope.body === 'string' ? { body: envelope.body } : {})
   }
 }

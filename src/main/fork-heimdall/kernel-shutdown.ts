@@ -1,6 +1,7 @@
 import type { HeimdallDatabase } from './database'
 import type { HeimdallKernelHost } from './kernel-host'
 import { requireLeaseStore } from './kernel-service-dependencies'
+import type { HeimdallKernelService } from './kernel-service-contract'
 import type { LeaseStore } from './lease-store'
 import type { WatcherRunnerLoop } from './runner-loop'
 import type { WatcherRunner } from './runner-state'
@@ -47,6 +48,15 @@ function notifyShutdownListeners(listeners: Set<() => void>): void {
   listeners.clear()
 }
 
+export function beginHeimdallShutdown(
+  service: Pick<HeimdallKernelService, 'stopForShutdown'> | null
+): { name: 'heimdall'; promise: Promise<void> } {
+  return {
+    name: 'heimdall',
+    promise: service?.stopForShutdown() ?? Promise.resolve()
+  }
+}
+
 /** Stops new work, gives active ticks a bounded drain, then closes kernel storage. */
 export async function shutdownHeimdallKernel(
   input: KernelShutdownInput,
@@ -83,7 +93,7 @@ export async function shutdownHeimdallKernel(
       }
       releases.push(
         requireLeaseStore(input.leaseStore)
-          .release(runner.enrollment.workspaceKey, guard.epoch)
+          .release(runner.enrollment.workspaceKey, guard.holder, guard.epoch)
           .catch(() => {})
           .finally(() => {
             if (runner.leaseGuard === guard) {

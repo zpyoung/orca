@@ -357,6 +357,44 @@ describe('Heimdall orchestration adapter', () => {
     })
   })
 
+  it('settles a pre-dispatch database failure and permits later work', async () => {
+    const db = fakeDb('run-1')
+    const world = fakeRuntime(db)
+    world.runtime.getOrchestrationDb
+      .mockImplementationOnce(() => db)
+      .mockImplementationOnce(() => {
+        throw new Error('database unavailable')
+      })
+    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
+      persistOrchestrationRunId: async () => undefined
+    })
+    const watched = enrollment()
+
+    await expect(
+      adapter.dispatchWorker({
+        enrollment: watched,
+        spec: 'first work',
+        attemptFingerprint: 'pre-dispatch-database-failure'
+      })
+    ).resolves.toEqual({
+      status: 'refused',
+      reason: 'pre-dispatch-failure',
+      detail: 'database unavailable'
+    })
+    expect(upstream.mutationRun).not.toHaveBeenCalled()
+    expect(upstream.startLocalWorker).not.toHaveBeenCalled()
+
+    await expect(
+      adapter.dispatchWorker({
+        enrollment: watched,
+        spec: 'later work',
+        attemptFingerprint: 'later-work'
+      })
+    ).resolves.toEqual({ status: 'dispatched', dispatchId: 'dispatch-1' })
+    expect(upstream.mutationRun).toHaveBeenCalledOnce()
+    expect(upstream.startLocalWorker).toHaveBeenCalledOnce()
+  })
+
   it('routes a folder repo through its authoritative root worktree identity', async () => {
     const world = fakeRuntime()
     const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
@@ -774,7 +812,7 @@ describe('Heimdall orchestration adapter', () => {
     }
   )
 
-  it('returns indeterminate without retrying a pending receipt or a transport failure', async () => {
+  it('keeps a pending receipt indeterminate without retrying it', async () => {
     const world = fakeRuntime()
     const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
       persistOrchestrationRunId: async () => undefined
@@ -792,13 +830,26 @@ describe('Heimdall orchestration adapter', () => {
       requestId: orchestrationRequestIdForAttemptFingerprint('stable-attempt')
     })
     expect(upstream.mutationRun).toHaveBeenCalledOnce()
+  })
 
-    upstream.mutationRun.mockRejectedValueOnce(new Error('socket closed'))
-    await expect(adapter.dispatchWorker(input)).resolves.toEqual({
-      status: 'indeterminate',
-      requestId: orchestrationRequestIdForAttemptFingerprint('stable-attempt')
+  it('keeps an unclassified failure after worker start crosses the effect boundary indeterminate', async () => {
+    const world = fakeRuntime()
+    upstream.startLocalWorker.mockRejectedValueOnce(new Error('worker start response lost'))
+    const adapter = new RuntimeHeimdallOrchestrationAdapter(world.runtime as never, {
+      persistOrchestrationRunId: async () => undefined
     })
-    expect(upstream.mutationRun).toHaveBeenCalledTimes(2)
+
+    await expect(
+      adapter.dispatchWorker({
+        enrollment: enrollment({ orchestrationRunId: 'run-1' }),
+        spec: 'work',
+        attemptFingerprint: 'ambiguous-worker-start'
+      })
+    ).resolves.toEqual({
+      status: 'indeterminate',
+      requestId: orchestrationRequestIdForAttemptFingerprint('ambiguous-worker-start')
+    })
+    expect(upstream.startLocalWorker).toHaveBeenCalledOnce()
   })
 
   it('recovers only an existing receipt and reports a missing receipt without creating it', async () => {

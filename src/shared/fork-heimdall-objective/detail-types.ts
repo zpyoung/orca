@@ -140,7 +140,9 @@ export const ObjectivePendingReportSchema = z
     orchestrationTaskId: IdSchema.nullable(),
     taskKey: IdSchema.nullable(),
     dispatchedContentIdentity: IdSchema,
-    atMs: TimestampSchema
+    atMs: TimestampSchema,
+    subject: z.string().max(2_048).optional(),
+    body: z.string().max(8_192).optional()
   })
   .strict()
 export type ObjectivePendingReport = z.infer<typeof ObjectivePendingReportSchema>
@@ -156,7 +158,7 @@ export const ObjectiveLandingContextSchema = z
       .object({
         remote: IdSchema,
         branch: IdSchema,
-        remoteSha: z.string().max(1_024)
+        remoteSha: IdSchema
       })
       .strict()
       .nullable(),

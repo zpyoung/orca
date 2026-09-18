@@ -68,6 +68,7 @@ export type ObjectiveEnrollmentErrorCode =
   | 'territory-duplicate'
   | 'territory-invalid'
   | 'capability-set-invalid'
+  | 'plan-off-requires-approved-plan'
   | 'role-agent-unknown'
   | 'active-budget-invalid'
   | 'turn-budget-invalid'
@@ -153,6 +154,9 @@ export function validateObjectiveEnrollmentDraft(
     !OBJECTIVE_CAPABILITIES.every((key) => capabilityKeys.includes(key))
   ) {
     errors.push({ code: 'capability-set-invalid' })
+  }
+  if (draft.capabilities.plan === 'off') {
+    errors.push({ code: 'plan-off-requires-approved-plan' })
   }
   const availableAgents = new Set(draft.availableAgentIds)
   for (const role of OBJECTIVE_ROLES) {

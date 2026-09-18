@@ -11,6 +11,7 @@ import { agentSessionPtyWriteGate } from './agent-session-pty-write-gate'
 import type { RetiredTerminalSurface } from './mobile-session-terminal-retirement'
 import { parsePaneKey } from '../../shared/stable-pane-id'
 import { advertisedUrlWatcher } from '../ports/advertised-url-watcher'
+import { captureWorkerExitTail } from '../fork-heimdall/orchestration/worker-exit-tail-capture'
 
 export class OrcaRuntimeWithOnPtyExit extends OrcaRuntimeWithOnClientDisconnected {
   onPtyExit(
@@ -30,6 +31,7 @@ export class OrcaRuntimeWithOnPtyExit extends OrcaRuntimeWithOnClientDisconnecte
     if (exitIncarnationId && pty?.incarnationId && exitIncarnationId !== pty.incarnationId) {
       return
     }
+    const tail = captureWorkerExitTail(pty)
     // A bare exit code is not enough to establish why a process ended: older
     // daemons and SSH relays can report 0 for crashes and wrapper exits.
     const observedCause = options.cause ?? resolveUnreportedExitCause(exitCode)
@@ -253,7 +255,7 @@ export class OrcaRuntimeWithOnPtyExit extends OrcaRuntimeWithOnClientDisconnecte
     }
     if (!preservesAbnormalSshSurface) {
       for (const surface of exitedSurfaces) {
-        this.failActiveDispatchOnExit(surface.handle, surface.paneKey, exitCode, exitCause)
+        this.failActiveDispatchOnExit(surface.handle, surface.paneKey, exitCode, exitCause, tail)
       }
     }
     this.pruneDisconnectedPtyRecords()

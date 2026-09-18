@@ -110,14 +110,23 @@ export function getLatestEscalations(ledger: WatcherLedger): readonly Escalation
   return [...latestById.values()]
 }
 
-export function getLatestEscalation(ledger: WatcherLedger): EscalationEntry | null {
-  let latest: EscalationEntry | null = null
-  for (const entry of ledger.entries) {
-    if (entry.kind === 'escalation') {
-      latest = entry
+export function getLatestUnresolvedAwaitingApprovalEscalation(
+  ledger: WatcherLedger,
+  scope: ApprovalScope
+): EscalationEntry | null {
+  const logicalEscalations = getLatestEscalations(ledger)
+  for (let index = logicalEscalations.length - 1; index >= 0; index -= 1) {
+    const entry = logicalEscalations[index]!
+    if (
+      (entry.status === 'open' || entry.status === 'escalated') &&
+      entry.escalationKind === 'awaiting-approval' &&
+      entry.approvalScope !== undefined &&
+      sameApprovalScope(entry.approvalScope, scope)
+    ) {
+      return entry
     }
   }
-  return latest
+  return null
 }
 
 export function getLastDecidedContentIdentity(ledger: WatcherLedger): string | null {

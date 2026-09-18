@@ -2,7 +2,8 @@ import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type {
   WatcherEnrollment,
   WatcherListEntry,
-  WatcherStatus
+  WatcherStatus,
+  WatcherTerminalSummary
 } from '../../shared/fork-heimdall/watcher-types'
 import { dormantWatcherStatus } from './debug-report'
 import type { RegisteredWatcherKind } from './registry'
@@ -11,10 +12,12 @@ export function watcherListEntry(input: {
   enrollment: WatcherEnrollment
   kind: RegisteredWatcherKind | null
   ledger: WatcherLedger
+  terminalSummary: WatcherTerminalSummary | null
   status?: WatcherStatus
   malformedPayload: boolean
 }): WatcherListEntry {
-  const fallback = input.status ?? dormantWatcherStatus(input.enrollment, input.ledger)
+  const fallback =
+    input.status ?? dormantWatcherStatus(input.enrollment, input.ledger, input.terminalSummary)
   const status = input.malformedPayload
     ? {
         ...fallback,

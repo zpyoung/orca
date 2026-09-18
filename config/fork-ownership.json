@@ -142,9 +142,37 @@
         "src/renderer/src/web/web-ledger-api.ts",
         "src/shared/ledger*.ts"
       ]
+    },
+    {
+      "name": "worker-takeover-gate",
+      "purpose": "Gates the worker-terminal takeover report on real keyboard/IME/paste input, never mouse or scroll.",
+      "globs": ["**/fork-worker-takeover-gate/**"]
     }
   ],
   "seams": [
+    {
+      "path": "src/main/ipc/runtime-environment-request-connections.ts",
+      "feature": "heimdall",
+      "kind": "import-swap",
+      "lines": [
+        "import { publishRuntimeEnvironmentDiagnostics } from '../fork-heimdall/runtime-environment-diagnostics-port'"
+      ]
+    },
+    {
+      "path": "src/main/startup/main-process-preflight.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "import { installRuntimeEnvironmentDiagnosticsHost } from '../host/fork-heimdall/runtime-environment-diagnostics-host'",
+        "  installRuntimeEnvironmentDiagnosticsHost()"
+      ]
+    },
+    {
+      "path": "src/main/startup/host-port-bootstrap-wiring.test.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": ["    'installRuntimeEnvironmentDiagnosticsHost()',"]
+    },
     {
       "path": "src/main/providers/ssh-git-remote-sync-provider.ts",
       "feature": "hosted-review-sitter",
@@ -261,7 +289,18 @@
       "kind": "registration",
       "lines": [
         "import { HEIMDALL_COMMANDS_RUNTIME_CAPABILITY } from './fork-heimdall/capability'",
+        "import { HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY } from './fork-heimdall/capability'",
+        "  HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY,",
         "  HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,"
+      ]
+    },
+    {
+      "path": "src/shared/remote-runtime-client-capabilities.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "import { HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY } from './fork-heimdall/capability'",
+        "      HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY,"
       ]
     },
     {
@@ -426,7 +465,11 @@
       "path": "src/main/startup/main-process-quit.ts",
       "feature": "heimdall",
       "kind": "registration",
-      "lines": ["    state.heimdall?.stopForShutdown()"]
+      "lines": [
+        "import { beginHeimdallShutdown } from '../fork-heimdall/kernel-shutdown'",
+        "    const heimdallShutdown = beginHeimdallShutdown(state.heimdall)",
+        "      heimdallShutdown,"
+      ]
     },
     {
       "path": "src/main/runtime/rpc/methods/index.ts",
@@ -3657,6 +3700,47 @@
         "          ...hydrateWorkspaceActivityWindow(ui),",
         "          ...hydrateWorkspaceReviewFilters(ui),"
       ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/pty-connection/direct-ssh-retry-status.ts",
+      "feature": "worker-takeover-gate",
+      "kind": "registration",
+      "lines": [
+        "} from '@/lib/fork-worker-takeover-gate/keyboard-input-gate'",
+        "  primeTerminalUserInputKeyboardGate(session.pane.terminal)",
+        "    if (isTerminalUserInputFromKeyboard(session.pane.terminal)) {"
+      ]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-on-pty-exit.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": [
+        "import { captureWorkerExitTail } from '../fork-heimdall/orchestration/worker-exit-tail-capture'",
+        "    const tail = captureWorkerExitTail(pty)"
+      ]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-on-pty-exit.ts",
+      "feature": "heimdall",
+      "kind": "passthrough",
+      "lines": [
+        "        this.failActiveDispatchOnExit(surface.handle, surface.paneKey, exitCode, exitCause, tail)"
+      ]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-subscribe-to-terminal-resize.ts",
+      "feature": "heimdall",
+      "kind": "registration",
+      "lines": ["    exitTailText: string | null = null"]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-subscribe-to-terminal-resize.ts",
+      "feature": "heimdall",
+      "kind": "passthrough",
+      "lines": [
+        "        body: `Worker ${handle} stopped while running task ${named}. ${errorContext}.${settled?.status === 'circuit_broken' ? ' This task has now failed too many times, so it will not be retried automatically.' : settled?.status === 'failed' ? ' The task is ready to be dispatched again.' : ''}${exitTailText ?? ''}`,"
+      ]
     }
   ],
   "exceptions": [
@@ -4273,6 +4357,9 @@
     }
   ],
   "residuals": {
+    "src/main/ipc/runtime-environment-request-connections.ts": { "added": 1, "removed": 1 },
+    "src/main/startup/main-process-preflight.ts": { "added": 2, "removed": 0 },
+    "src/main/startup/host-port-bootstrap-wiring.test.ts": { "added": 1, "removed": 0 },
     "src/main/providers/ssh-git-remote-sync-provider.ts": { "added": 2, "removed": 2 },
     "src/relay/git-handler-registration.ts": { "added": 2, "removed": 0 },
     "src/relay/git-handler-sync-operations.ts": { "added": 2, "removed": 2 },
@@ -4717,7 +4804,7 @@
       "removed": 2
     },
     "src/main/startup/main-process-state.ts": { "added": 2, "removed": 0 },
-    "src/main/startup/main-process-quit.ts": { "added": 1, "removed": 0 },
+    "src/main/startup/main-process-quit.ts": { "added": 3, "removed": 0 },
     "src/main/telemetry/client.ts": {
       "added": 2,
       "removed": 1
@@ -5655,9 +5742,10 @@
       "removed": 1
     },
     "src/shared/protocol-version.ts": {
-      "added": 6,
+      "added": 9,
       "removed": 1
     },
+    "src/shared/remote-runtime-client-capabilities.ts": { "added": 2, "removed": 0 },
     "src/shared/remote-runtime-shared-control-protocol.ts": {
       "added": 2,
       "removed": 1
@@ -5741,6 +5829,18 @@
     "tests/e2e/cross-version-wire/release-checkout.unit.test.ts": {
       "added": 11,
       "removed": 14
+    },
+    "src/renderer/src/components/terminal-pane/pty-connection/direct-ssh-retry-status.ts": {
+      "added": 8,
+      "removed": 1
+    },
+    "src/main/runtime/orca-runtime-on-pty-exit.ts": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/main/runtime/orca-runtime-subscribe-to-terminal-resize.ts": {
+      "added": 3,
+      "removed": 2
     }
   }
 }

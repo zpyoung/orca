@@ -17,7 +17,7 @@ const ReplaySafeSchema = z.literal('replay-safe')
 const ExpectedStateSchema = z
   .object({
     target: IdSchema,
-    before: z.string().max(1_024)
+    before: IdSchema
   })
   .strict()
 
@@ -64,7 +64,9 @@ export const DispatchNodeActionSchema = z
     capability: z.literal('implement'),
     revisionId: IdSchema,
     taskKey: IdSchema,
-    depsOrchestrationIds: z.array(IdSchema).max(128)
+    depsOrchestrationIds: z.array(IdSchema).max(128),
+    /** The original dispatch's evidenceKey; present only on a bounded infra/environment redispatch. */
+    retryOf: IdSchema.optional()
   })
   .strict()
 export type DispatchNodeAction = z.infer<typeof DispatchNodeActionSchema>

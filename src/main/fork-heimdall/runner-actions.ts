@@ -17,9 +17,7 @@ import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
 import type { HeimdallOrchestrationAdapter } from './orchestration/orchestration-adapter'
 import type { WatcherLedgerLifecycle } from './ledger-lifecycle'
-import { getOpenWorkerQuestion, voidedWorkerQuestionEntries } from './question-resolution'
 import { WatcherAttemptRecovery } from './runner-attempt-recovery'
-import { hasSequenceSinceRunBoundary, mailboxBody, mailboxCursor } from './runner-mailbox'
 import { releaseSettledWorker } from './runner-worker-release'
 import type { RunnerBudgetClock, RunnerLedgerStore, WatcherRunner } from './runner-state'
 
@@ -32,12 +30,6 @@ export type WatcherRunnerActionDependencies = {
   now(): number
   createId(): string
 }
-export type WorkerReconciliation =
-  | { status: 'clear' }
-  | { status: 'question'; messageId: string }
-  | { status: 'exited' }
-  | { status: 'unverifiable'; reason: string }
-
 export function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
@@ -109,6 +101,9 @@ export class WatcherRunnerActions {
       action.kind,
       action.evidenceKey
     )
+    const expectation = recoveredAttempt
+      ? undefined
+      : runner.kind.attemptExpectation?.(action, snapshot)
     const attempt: AttemptEntry = recoveredAttempt ?? {
       eventId: this.dependencies.createId(),
       watcherId: runner.enrollment.watcherId,
@@ -119,7 +114,8 @@ export class WatcherRunnerActions {
       attemptId: this.dependencies.createId(),
       fingerprint,
       action,
-      state: 'attempted'
+      state: 'attempted',
+      ...expectation
     }
     if (attempt.fingerprint !== fingerprint || attempt.state !== 'attempted') {
       throw new Error('Recovered attempt does not match the current action')
@@ -208,153 +204,6 @@ export class WatcherRunnerActions {
     }
   }
 
-  async reconcileWorkers(runner: WatcherRunner): Promise<WorkerReconciliation> {
-    const ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
-    const entries = await this.dependencies.orchestration.drainMailbox({
-      enrollment: runner.enrollment,
-      cursor: mailboxCursor(ledger)
-    })
-    await this.assertLeaseHeld(runner)
-    let question: { messageId: string; dispatchId?: string; reason: string } | null = null
-    for (const entry of entries) {
-      if (
-        entry.kind === 'evidence' &&
-        entry.source &&
-        hasSequenceSinceRunBoundary(ledger, entry.source.sequence)
-      ) {
-        continue
-      }
-      this.append(runner, entry)
-      if (entry.kind !== 'evidence') {
-        continue
-      }
-      const body = mailboxBody(entry)
-      if (!body) {
-        continue
-      }
-      if (body.type === 'question' && body.messageId) {
-        question = {
-          messageId: body.messageId,
-          ...(body.dispatchId ? { dispatchId: body.dispatchId } : {}),
-          reason: body.body ?? 'Worker requested input'
-        }
-        if (body.dispatchId) {
-          this.dependencies.dispatchLifecycle.pauseWorker(
-            runner.enrollment.watcherId,
-            body.dispatchId
-          )
-        }
-        this.append(runner, {
-          eventId: this.dependencies.createId(),
-          watcherId: runner.enrollment.watcherId,
-          atMs: this.dependencies.now(),
-          origin: 'owner',
-          class: 'fact',
-          kind: 'escalation',
-          escalationId: `worker-question:${body.dispatchId ?? 'unknown'}:${body.messageId}`,
-          escalationKind: 'worker-question',
-          status: 'open',
-          foldCount: 1,
-          reason: `${body.messageId}: ${question.reason}`
-        })
-        continue
-      }
-      if (!body.dispatchId) {
-        continue
-      }
-      if (body.type === 'heartbeat' || body.type === 'status') {
-        this.dependencies.dispatchLifecycle.observeWorkerLive(
-          runner.enrollment.watcherId,
-          body.dispatchId
-        )
-      } else if (body.type === 'worker_done') {
-        this.dependencies.dispatchLifecycle.settleWorker({
-          watcherId: runner.enrollment.watcherId,
-          dispatchId: body.dispatchId,
-          effect:
-            body.outcome === 'succeeded'
-              ? 'landed'
-              : body.outcome === 'failed'
-                ? 'not-landed'
-                : 'indeterminate',
-          result: body.result ?? body.body,
-          reason: body.outcome
-        })
-        await releaseSettledWorker(runner, body.dispatchId, this.dependencies)
-      }
-    }
-
-    let currentLedger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
-    const pendingMessageId =
-      question?.messageId ?? getOpenWorkerQuestion(currentLedger)?.messageId ?? null
-    if (pendingMessageId) {
-      // a question raised in this drain is answerable by definition; only a carried-over one can be void
-      if (question || !(await this.voidUnanswerableQuestion(runner, pendingMessageId))) {
-        return { status: 'question', messageId: pendingMessageId }
-      }
-      currentLedger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
-    }
-
-    let exited = false
-    for (const attempt of getInFlightAttempts(currentLedger)) {
-      if (attempt.state !== 'running' || !attempt.dispatchId) {
-        continue
-      }
-      const observation = await this.dependencies.orchestration.readDispatch(
-        runner.enrollment,
-        attempt.dispatchId
-      )
-      await this.assertLeaseHeld(runner)
-      if (observation.status === 'live') {
-        this.dependencies.dispatchLifecycle.observeWorkerLive(
-          runner.enrollment.watcherId,
-          attempt.dispatchId
-        )
-      } else if (observation.status === 'exited') {
-        this.dependencies.dispatchLifecycle.settleWorker({
-          watcherId: runner.enrollment.watcherId,
-          dispatchId: attempt.dispatchId,
-          effect: 'indeterminate',
-          reason: WORKER_EXITED_WITHOUT_COMPLETION
-        })
-        await releaseSettledWorker(runner, attempt.dispatchId, this.dependencies)
-        exited = true
-      } else {
-        this.dependencies.dispatchLifecycle.closeForContactLoss(runner.enrollment.watcherId)
-        return {
-          status: 'unverifiable',
-          reason: observation.reason ?? 'Worker liveness could not be verified'
-        }
-      }
-    }
-    return exited ? { status: 'exited' } : { status: 'clear' }
-  }
-
-  /**
-   * Retires a carried-over question escalation whose thread can no longer accept an answer, so the
-   * watcher stops demanding input nobody can supply. Returns whether the escalation was retired.
-   */
-  private async voidUnanswerableQuestion(
-    runner: WatcherRunner,
-    messageId: string
-  ): Promise<boolean> {
-    const state = await this.dependencies.orchestration.readQuestion(runner.enrollment, messageId)
-    if (state.status === 'pending' || state.status === 'unverifiable') {
-      return false
-    }
-    const entries = voidedWorkerQuestionEntries(
-      this.dependencies.ledgerStore.read(runner.enrollment.watcherId),
-      runner.enrollment.watcherId,
-      messageId,
-      state.status,
-      { atMs: this.dependencies.now(), createId: this.dependencies.createId }
-    )
-    for (const entry of entries) {
-      this.append(runner, entry)
-    }
-    return entries.length > 0
-  }
-
   async recoverBeforeStop(
     runner: WatcherRunner,
     snapshot: Snapshot<unknown>,
@@ -433,7 +282,10 @@ export class WatcherRunnerActions {
       action.kind,
       action.evidenceKey
     )
-    this.abandonFingerprint(runner, fingerprint, 'gate-hold')
+    // the gate re-evaluates the same held action every tick; only the first hold is a new observation
+    if (this.latestAbandonReason(runner, fingerprint) !== 'gate-hold') {
+      this.abandonFingerprint(runner, fingerprint, 'gate-hold')
+    }
     if (verdict.verdict === 'hold' && verdict.escalation) {
       this.append(runner, {
         eventId: this.dependencies.createId(),
@@ -455,6 +307,17 @@ export class WatcherRunnerActions {
     }
   }
 
+  private latestAbandonReason(runner: WatcherRunner, fingerprint: string): string | null {
+    const ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
+    let latest: string | null = null
+    for (const entry of ledger.entries) {
+      if (entry.kind === 'attempt-abandoned' && entry.fingerprint === fingerprint) {
+        latest = entry.reason
+      }
+    }
+    return latest
+  }
+
   private executionAllowed(runner: WatcherRunner): boolean {
     return (
       !runner.stopped &&
@@ -468,6 +331,7 @@ export class WatcherRunnerActions {
   private executionLease(runner: WatcherRunner, rawLease: LeaseGuard): LeaseGuard {
     return {
       epoch: rawLease.epoch,
+      holder: rawLease.holder,
       renewLoop: () => rawLease.renewLoop(),
       assertHeld: async () => {
         this.assertExecutionAllowed(runner)
@@ -490,13 +354,6 @@ export class WatcherRunnerActions {
       effect: 'not-landed' as const,
       reason
     })
-  }
-
-  private async assertLeaseHeld(runner: WatcherRunner): Promise<void> {
-    if (!runner.leaseGuard) {
-      throw new Error('Watcher reconciliation reached persistence without a lease')
-    }
-    await runner.leaseGuard.assertHeld()
   }
 
   private append(runner: WatcherRunner, entry: LedgerEntry): void {

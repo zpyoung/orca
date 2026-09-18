@@ -10,6 +10,7 @@ import {
 import type { HeimdallDebugReport } from '../../../../fork-heimdall/debug-report'
 import { defineMethod, type RpcAnyMethod } from '../../core'
 import { requireHeimdallKernel } from './kernel-binding'
+import { projectHeimdallLedgerForClient } from './dispatch-result-wire'
 
 export const LEGACY_HEIMDALL_CHANNELS = {
   list: 'heimdall:list',
@@ -98,6 +99,10 @@ export const LEGACY_HEIMDALL_METHODS: readonly RpcAnyMethod[] = [
   defineMethod({
     name: LEGACY_HEIMDALL_CHANNELS.ledger,
     params: LegacyWatcherIdRequestSchema,
-    handler: ({ watcherId }, { runtime }) => requireHeimdallKernel(runtime).ledger(watcherId)
+    handler: ({ watcherId }, context) =>
+      projectHeimdallLedgerForClient(
+        requireHeimdallKernel(context.runtime).ledger(watcherId),
+        context
+      )
   })
 ]

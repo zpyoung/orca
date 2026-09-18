@@ -15,7 +15,6 @@ import type {
 import { resolveHostedReviewSitterGitExecution } from './provider-git'
 
 const CONTENTION_TERMINAL_LIMIT = 1_000
-const SITTER_AGENT_TITLE_PREFIX = 'PR Sitter agent · '
 
 /**
  * Whether a worktree-scoped listing actually covered the host the sitter runs on.
@@ -32,19 +31,27 @@ function listingCoversExecutionHost(
   return !listing.truncated && (listing.hostScope?.hostIds.includes(executionHostId) ?? false)
 }
 
-export function buildHostedReviewSitterAgentTitle(sitterId: string, actionId: string): string {
-  return `${SITTER_AGENT_TITLE_PREFIX}${sitterId} · ${actionId}`
+export type HostedReviewOwnedWorkerIdentity = {
+  attemptId: string
+  dispatchId: string
 }
-export type HostedReviewSitterOwnedSession =
-  | { state: 'absent' }
-  | { state: 'active'; sessionId: string }
-  | { state: 'stoppable'; sessionId: string }
-  | { state: 'unverifiable'; reason: string }
 
-function sitterActionIdFromTitle(title: string | null, sitterId: string): string | null {
-  const prefix = `${SITTER_AGENT_TITLE_PREFIX}${sitterId} · `
-  return title?.startsWith(prefix) && title.length > prefix.length
-    ? title.slice(prefix.length)
+function ownedWorkerTerminalHandle(
+  runtime: OrcaRuntimeService,
+  definition: HostedReviewSitterDefinition,
+  identity: HostedReviewOwnedWorkerIdentity | undefined
+): string | null {
+  if (!identity) {
+    return null
+  }
+  const resource = runtime
+    .getOrchestrationDb()
+    .getWorkerTerminalResourceByOwner(identity.dispatchId)
+  return resource?.origin_dispatch_id === identity.dispatchId &&
+    resource.owner_dispatch_id === identity.dispatchId &&
+    resource.worktree_id === definition.worktreeId &&
+    resource.ownership_state === 'owned'
+    ? resource.terminal_handle
     : null
 }
 
@@ -60,7 +67,7 @@ export async function inspectHostedReviewSitterContention(
   runtime: OrcaRuntimeService,
   store: Store,
   definition: HostedReviewSitterDefinition,
-  ownActionId?: string,
+  ownWorker?: HostedReviewOwnedWorkerIdentity,
   requirements: {
     requireOwnSession?: boolean
     requireOwnIdle?: boolean
@@ -110,15 +117,16 @@ export async function inspectHostedReviewSitterContention(
     return { state: 'unverifiable', reason: 'terminal-host-census-incomplete' }
   }
 
+  const ownTerminalHandle = ownedWorkerTerminalHandle(runtime, definition, ownWorker)
   let matchingOwnAgentActive = false
   let matchingOwnAgentIdle = false
   let matchingOwnAgentExited = false
   let matchingOwnSessionObserved = false
   let matchingOwnTerminalLive = false
   for (const terminal of listing.terminals) {
-    const sitterActionId = sitterActionIdFromTitle(terminal.title, definition.worktreeId)
+    const isOwnTerminal = terminal.handle === ownTerminalHandle
     if (isProvenExitCause(terminal.exitCause)) {
-      if (sitterActionId === ownActionId) {
+      if (isOwnTerminal) {
         matchingOwnSessionObserved = true
         matchingOwnAgentExited = true
       }
@@ -127,7 +135,7 @@ export async function inspectHostedReviewSitterContention(
     if (terminal.exitCause?.kind === 'unknown' || !terminal.connected) {
       return { state: 'unverifiable', reason: 'terminal-process-liveness-unverifiable' }
     }
-    if (sitterActionId === ownActionId) {
+    if (isOwnTerminal) {
       matchingOwnTerminalLive = true
     }
 
@@ -146,7 +154,7 @@ export async function inspectHostedReviewSitterContention(
       continue
     }
     if (agentStatus.status === 'idle') {
-      if (sitterActionId === ownActionId) {
+      if (isOwnTerminal) {
         matchingOwnSessionObserved = true
         matchingOwnAgentIdle = true
         continue
@@ -156,7 +164,7 @@ export async function inspectHostedReviewSitterContention(
     if (agentStatus.status === null) {
       return { state: 'unverifiable', reason: 'agent-activity-unverifiable' }
     }
-    if (sitterActionId === ownActionId) {
+    if (isOwnTerminal) {
       matchingOwnSessionObserved = true
       matchingOwnAgentActive = true
       continue
@@ -184,108 +192,29 @@ export async function inspectHostedReviewSitterContention(
     }
   }
   if (!clean) {
-    if (ownActionId && matchingOwnAgentActive) {
-      return { state: 'sitter-fix-agent', actionId: ownActionId }
+    if (ownWorker && matchingOwnAgentActive) {
+      return { state: 'sitter-fix-agent', actionId: ownWorker.attemptId }
     }
-    if (ownActionId && matchingOwnAgentIdle && requirements.requireOwnIdle) {
-      return { state: 'sitter-fix-agent', actionId: ownActionId }
+    if (ownWorker && matchingOwnAgentIdle && requirements.requireOwnIdle) {
+      return { state: 'sitter-fix-agent', actionId: ownWorker.attemptId }
     }
-    if (ownActionId && requirements.allowDirtyAfterOwnedSessionStopped) {
-      return { state: 'sitter-fix-agent', actionId: ownActionId }
+    if (ownWorker && requirements.allowDirtyAfterOwnedSessionStopped) {
+      return { state: 'sitter-fix-agent', actionId: ownWorker.attemptId }
     }
-    if (ownActionId && (matchingOwnAgentIdle || matchingOwnAgentExited)) {
+    if (ownWorker && (matchingOwnAgentIdle || matchingOwnAgentExited)) {
       return {
         state: 'abandoned-sitter-fix',
-        actionId: ownActionId,
+        actionId: ownWorker.attemptId,
         reason: 'owned-sitter-agent-finished-or-exited-with-uncommitted-changes'
       }
     }
     return { state: 'dirty', reason: 'local-changes' }
   }
   if (
-    ownActionId &&
+    ownWorker &&
     (matchingOwnAgentActive || (requirements.reportOwnLiveSession && matchingOwnTerminalLive))
   ) {
-    return { state: 'sitter-fix-agent', actionId: ownActionId }
+    return { state: 'sitter-fix-agent', actionId: ownWorker.attemptId }
   }
   return { state: 'clear' }
-}
-
-export async function inspectHostedReviewSitterOwnedSession(
-  runtime: OrcaRuntimeService,
-  store: Store,
-  definition: HostedReviewSitterDefinition,
-  actionId: string
-): Promise<HostedReviewSitterOwnedSession> {
-  const repo = store.getRepo(definition.repoId)
-  if (!repo) {
-    return { state: 'unverifiable', reason: 'repository-context-missing' }
-  }
-  const executionHostId = getRepoHostedReviewExecutionHostId(repo)
-  try {
-    const workspace = await runtime.showManagedWorktree(`id:${definition.worktreeId}`)
-    if (
-      workspace.repoId !== definition.repoId ||
-      !runtimePathsEqual(workspace.git.path, definition.repoPath)
-    ) {
-      return { state: 'unverifiable', reason: 'repository-workspace-context-mismatch' }
-    }
-  } catch (error) {
-    return {
-      state: 'unverifiable',
-      reason: `workspace-context-unverifiable: ${error instanceof Error ? error.message : String(error)}`
-    }
-  }
-
-  let listing: RuntimeTerminalListResult
-  try {
-    listing = await runtime.listTerminals(
-      `id:${definition.worktreeId}`,
-      CONTENTION_TERMINAL_LIMIT,
-      {
-        requireFreshPtyLiveness: true
-      }
-    )
-  } catch (error) {
-    return {
-      state: 'unverifiable',
-      reason: `terminal-host-unreachable: ${error instanceof Error ? error.message : String(error)}`
-    }
-  }
-  if (!listingCoversExecutionHost(listing, executionHostId)) {
-    return { state: 'unverifiable', reason: 'terminal-host-census-incomplete' }
-  }
-
-  let observed: HostedReviewSitterOwnedSession = { state: 'absent' }
-  for (const terminal of listing.terminals) {
-    if (sitterActionIdFromTitle(terminal.title, definition.worktreeId) !== actionId) {
-      continue
-    }
-    if (isProvenExitCause(terminal.exitCause)) {
-      continue
-    }
-    if (observed.state !== 'absent') {
-      return { state: 'unverifiable', reason: 'multiple-owned-agent-terminals-live' }
-    }
-    if (terminal.exitCause?.kind === 'unknown' || !terminal.connected) {
-      return { state: 'unverifiable', reason: 'owned-terminal-process-liveness-unverifiable' }
-    }
-    let status: RuntimeTerminalAgentStatus
-    try {
-      status = await runtime.getTerminalAgentStatus(terminal.handle)
-    } catch (error) {
-      return {
-        state: 'unverifiable',
-        reason: `owned-agent-status-unverifiable: ${error instanceof Error ? error.message : String(error)}`
-      }
-    }
-    if (status.isRunningAgent && status.status === null) {
-      return { state: 'unverifiable', reason: 'owned-agent-activity-unverifiable' }
-    }
-    observed =
-      status.isRunningAgent && status.status !== 'idle'
-        ? { state: 'active', sessionId: terminal.handle }
-        : { state: 'stoppable', sessionId: terminal.handle }
-  }
-  return observed
 }

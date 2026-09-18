@@ -50,6 +50,35 @@ function parseCapabilities(value: EnrollInput['capabilities']): ObjectiveCapabil
   }
   return parsed.data
 }
+/**
+ * Plan-off is safe only when this same objective already owns a usable approved plan.
+ * Free-form existingPlan text is planner input, not an executable plan seed.
+ */
+export function assertObjectiveEnrollmentHasUsablePlan(
+  candidate: AuthorizedEnrollment,
+  existing: WatcherEnrollment | null,
+  hasUsablePlan: boolean
+): void {
+  const capabilities = ObjectiveCapabilitiesSchema.parse(candidate.capabilities)
+  if (capabilities.plan !== 'off') {
+    return
+  }
+  const candidateContract = ObjectiveEnrollmentPayloadSchema.parse(candidate.kindPayload)
+  const existingContract =
+    existing?.kind === 'objective'
+      ? ObjectiveEnrollmentPayloadSchema.safeParse(existing.kindPayload)
+      : null
+  const existingPlanMatches =
+    existingContract?.success === true &&
+    existingContract.data.objectiveText === candidateContract.objectiveText &&
+    existingContract.data.writeTerritory.length === candidateContract.writeTerritory.length &&
+    existingContract.data.writeTerritory.every((glob) =>
+      candidateContract.writeTerritory.includes(glob)
+    )
+  if (!existing || !hasUsablePlan || !existingPlanMatches) {
+    throw new Error('plan-off-requires-approved-plan')
+  }
+}
 
 function assertRoleAgentsKnown(contract: ObjectiveEnrollmentPayload): void {
   for (const [role, agent] of Object.entries(contract.roleAgents)) {

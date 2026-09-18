@@ -114,6 +114,24 @@ export class ObjectiveStoreQueries {
       .get(watcherId, revisionId) as { digest: string } | undefined
     return Boolean(row && (digest === undefined || row.digest === digest))
   }
+  hasUsablePlan(watcherId: string): boolean {
+    return Boolean(
+      this.database
+        .connection()
+        .prepare(
+          `SELECT 1 FROM plan_revision approved
+           WHERE approved.watcher_id = ?
+             AND approved.status = 'approved'
+             AND approved.approved_at_ms IS NOT NULL
+             AND NOT EXISTS (
+               SELECT 1 FROM plan_revision draft
+               WHERE draft.watcher_id = ? AND draft.status = 'draft'
+             )
+           LIMIT 1`
+        )
+        .get(watcherId, watcherId)
+    )
+  }
 
   planForDispatch(
     watcherId: string,

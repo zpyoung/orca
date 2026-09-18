@@ -1,12 +1,14 @@
 import { ORCHESTRATION_WORKER_START_TASK_SPEC_MAX_BYTES } from '../../shared/orchestration-worker-start-prompt-budget'
 import type {
   ObjectiveBudgetBucket,
+  ObjectiveNodeState,
   ObjectiveReviewRole
 } from '../../shared/fork-heimdall-objective/detail-types'
 import type {
   ObjectiveEnrollmentPayload,
   ObjectiveRole
 } from '../../shared/fork-heimdall-objective/contract-types'
+import type { ObjectiveFailureClass } from '../../shared/fork-heimdall/effect-certainty'
 import type {
   ObjectivePlan,
   ObjectivePlanTask
@@ -14,6 +16,13 @@ import type {
 import { isTuiAgent } from '../../shared/tui-agent-config'
 import { isTuiAgentEnabled } from '../../shared/tui-agent-selection'
 import type { Store } from '../persistence'
+
+export type ObjectiveFailureContext = {
+  taskKey: string
+  failureClass?: ObjectiveFailureClass
+  narrative: string
+  failingCriteria: readonly string[]
+}
 
 export type ObjectiveRolePromptInput = {
   role: ObjectiveRole
@@ -23,6 +32,8 @@ export type ObjectiveRolePromptInput = {
   node?: ObjectivePlanTask
   plan?: ObjectivePlan
   reason?: 'initial' | 'replan-after-block' | 'replan-after-failure'
+  failureContext?: ObjectiveFailureContext
+  planProgress?: readonly { taskKey: string; state: ObjectiveNodeState }[]
 }
 
 function reportContract(role: ObjectiveRole): string {
@@ -39,7 +50,9 @@ function reportContract(role: ObjectiveRole): string {
     case 'implementer':
       return [
         'Write one strict JSON object: {taskKey,summary,filesModified,criteriaSelfAssessment}.',
-        'Assess every criterion exactly once with {criterionIndex,result:"pass"|"unknown",note}.',
+        'Assess every criterion exactly once with {criterionIndex,result:"pass"|"fail"|"unknown",note}.',
+        'pass: the criterion is met and you verified it. fail: the criterion is genuinely not met. unknown: you could not determine it, typically because something environmental blocked verification.',
+        'Never report unknown for a criterion you know has failed, and never report pass for one you could not verify; an environment-dependent criterion you cannot verify is unknown, with a note on what blocked it.',
         'Every modified path must be workspace-relative and inside write territory.'
       ].join('\n')
     case 'reviewer':
@@ -60,7 +73,7 @@ function reportContract(role: ObjectiveRole): string {
 function roleInstruction(input: ObjectiveRolePromptInput): string {
   switch (input.role) {
     case 'planner':
-      return `Produce the next implementable plan. Planning reason: ${input.reason ?? 'initial'}. Do not edit files.`
+      return `Produce the next implementable plan. Planning reason: ${input.reason ?? 'initial'}. Do not edit files. Do not assert environment facts you only observed in your own shell as guaranteed for the implementer; write environment-dependent steps so the implementer verifies them itself.`
     case 'implementer':
       if (!input.node) {
         throw new Error('An implementer prompt requires exactly one plan node')
@@ -109,9 +122,39 @@ function existingPlanContext(input: ObjectiveRolePromptInput): string[] {
   ]
 }
 
+function failureContextSection(input: ObjectiveRolePromptInput): string[] {
+  if (input.role !== 'planner' || !input.failureContext) {
+    return []
+  }
+  const { taskKey, failureClass, narrative, failingCriteria } = input.failureContext
+  const lines = [
+    `FAILED TASK: ${taskKey}${failureClass === undefined ? '' : ` (${failureClass})`}`,
+    `WORKER NARRATIVE:\n${narrative}`
+  ]
+  if (failingCriteria.length > 0) {
+    lines.push(
+      `FAILING CRITERIA:\n${failingCriteria.map((criterion) => `- ${criterion}`).join('\n')}`
+    )
+  }
+  return [lines.join('\n')]
+}
+
+function planProgressSection(input: ObjectiveRolePromptInput): string[] {
+  if (input.role !== 'planner' || !input.planProgress || input.planProgress.length === 0) {
+    return []
+  }
+  return [
+    `PLAN PROGRESS:\n${input.planProgress.map((node) => `- ${node.taskKey}: ${node.state}`).join('\n')}`
+  ]
+}
+
 function roleContext(input: ObjectiveRolePromptInput): string[] {
   if (input.role === 'planner') {
-    return existingPlanContext(input)
+    return [
+      ...existingPlanContext(input),
+      ...failureContextSection(input),
+      ...planProgressSection(input)
+    ]
   }
   if (input.role === 'implementer') {
     return [`ASSIGNED NODE JSON:\n${JSON.stringify(input.node)}`]

@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { LedgerEntry, WatcherLedger } from '../fork-heimdall/ledger-types'
 import type { Snapshot } from '../fork-heimdall/snapshot'
-import { parkEscalationId } from '../fork-heimdall/park-escalation-id'
 import type { ObjectiveWorld } from './detail-types'
 import { stopRungForBar } from './landing-ladder'
-import { objectiveBarReachedPredicate, objectiveWorkerEscalationPredicate } from './stop-policy'
+import {
+  objectiveBarReachedPredicate,
+  objectiveInfraRetryExhaustedPredicate,
+  objectiveWorkerEscalationPredicate
+} from './stop-policy'
 
 function snapshot(landingBar: ObjectiveWorld['contract']['landingBar']): Snapshot<ObjectiveWorld> {
   return {
@@ -333,102 +336,193 @@ describe('objective stop policy', () => {
     })
   })
 
-  it('fires for a new worker escalation and reports its subject', () => {
+  function mailboxEscalation(input: {
+    eventId: string
+    atMs: number
+    messageId?: string
+    subject?: string
+    body?: string
+  }): LedgerEntry {
+    return {
+      kind: 'evidence',
+      eventId: input.eventId,
+      watcherId: 'watcher-1',
+      atMs: input.atMs,
+      origin: 'owner',
+      class: 'fact',
+      evidenceKind: 'orchestration-mailbox',
+      ...(input.messageId
+        ? {
+            source: {
+              kind: 'orchestration',
+              sequence: input.atMs,
+              messageId: input.messageId
+            }
+          }
+        : {}),
+      payload: {
+        type: 'escalation',
+        subject: input.subject ?? 'Need a human decision',
+        ...(input.body ? { body: input.body } : {}),
+        payload: { dispatchId: 'dispatch-1' }
+      }
+    }
+  }
+
+  function consumedMarker(eventId: string, atMs: number, messageId: string): LedgerEntry {
+    return {
+      kind: 'evidence',
+      eventId,
+      watcherId: 'watcher-1',
+      atMs,
+      origin: 'owner',
+      class: 'fact',
+      evidenceKind: 'worker-escalation-consumed',
+      payload: { messageId }
+    }
+  }
+
+  it('fires for a new worker escalation and reports its subject and message id', () => {
     expect(
       objectiveWorkerEscalationPredicate.evaluate(
         snapshot('files-on-disk'),
         ledger([
-          {
-            kind: 'evidence',
+          mailboxEscalation({
             eventId: 'event-escalation',
-            watcherId: 'watcher-1',
             atMs: 20,
-            origin: 'owner',
-            class: 'fact',
-            evidenceKind: 'orchestration-mailbox',
-            payload: {
-              type: 'escalation',
-              subject: 'Need a human decision',
-              body: 'The generated API conflicts with the contract',
-              payload: { dispatchId: 'dispatch-1' }
-            }
-          }
+            messageId: 'message-1',
+            body: 'The generated API conflicts with the contract'
+          })
         ])
       )
     ).toEqual({
       stop: true,
       reason: 'Need a human decision',
-      detail: 'The generated API conflicts with the contract'
+      detail: 'message-1'
     })
   })
 
-  it('does not re-fire an escalation older than its latest park acknowledgement', () => {
+  it('fires on crash-recovery from durable mailbox evidence with no marker written yet', () => {
+    // simulates a crash between the mailbox drain append and the park that would mark it consumed
+    const durableEvidence = ledger([
+      mailboxEscalation({ eventId: 'event-escalation', atMs: 20, messageId: 'message-1' })
+    ])
+    expect(
+      objectiveWorkerEscalationPredicate.evaluate(snapshot('files-on-disk'), durableEvidence)
+    ).toMatchObject({ stop: true })
+  })
+
+  it('does not re-fire once a park has consumed the escalation message', () => {
     expect(
       objectiveWorkerEscalationPredicate.evaluate(
         snapshot('files-on-disk'),
         ledger([
-          {
-            kind: 'evidence',
-            eventId: 'event-escalation',
-            watcherId: 'watcher-1',
-            atMs: 20,
-            origin: 'owner',
-            class: 'fact',
-            evidenceKind: 'orchestration-mailbox',
-            payload: { type: 'escalation', subject: 'Old escalation', payload: {} }
-          },
-          {
-            kind: 'escalation',
-            eventId: 'event-ack',
-            watcherId: 'watcher-1',
-            atMs: 30,
-            origin: 'owner',
-            class: 'fact',
-            escalationId: 'park:watcher-1:stop-predicate:worker-escalation',
-            escalationKind: 'park-stop-predicate',
-            status: 'acknowledged',
-            foldCount: 2
-          }
+          mailboxEscalation({ eventId: 'event-escalation', atMs: 20, messageId: 'message-1' }),
+          consumedMarker('event-consumed', 30, 'message-1')
         ])
       )
     ).toEqual({ stop: false })
   })
 
-  it('reads back an acknowledgement written with the park escalation id the runner produces', () => {
-    const acknowledged: LedgerEntry = {
-      kind: 'escalation',
-      eventId: 'event-ack',
-      watcherId: 'watcher-1',
-      atMs: 30,
-      origin: 'owner',
-      class: 'fact',
-      escalationId: parkEscalationId('watcher-1', {
-        kind: 'stop-predicate',
-        predicateId: 'worker-escalation',
-        reason: 'Agent exited unexpectedly'
-      }),
-      escalationKind: 'park-stop-predicate',
-      status: 'acknowledged',
-      foldCount: 2
-    }
-
+  it('fires for a new escalation message that arrives after an earlier one was consumed', () => {
     expect(
       objectiveWorkerEscalationPredicate.evaluate(
         snapshot('files-on-disk'),
         ledger([
-          {
-            kind: 'evidence',
-            eventId: 'event-escalation',
-            watcherId: 'watcher-1',
-            atMs: 20,
-            origin: 'owner',
-            class: 'fact',
-            evidenceKind: 'orchestration-mailbox',
-            payload: { type: 'escalation', subject: 'Agent exited unexpectedly', payload: {} }
-          },
-          acknowledged
+          mailboxEscalation({ eventId: 'event-escalation-1', atMs: 20, messageId: 'message-1' }),
+          consumedMarker('event-consumed', 30, 'message-1'),
+          mailboxEscalation({ eventId: 'event-escalation-2', atMs: 40, messageId: 'message-2' })
         ])
       )
-    ).toEqual({ stop: false })
+    ).toEqual({
+      stop: true,
+      reason: 'Need a human decision',
+      detail: 'message-2'
+    })
+  })
+})
+
+describe('objective infra/environment retry exhaustion', () => {
+  function withNode(): Snapshot<ObjectiveWorld> {
+    const snap = snapshot('files-on-disk')
+    snap.world.plan.nodes = [
+      {
+        revisionId: 'revision-1',
+        taskKey: 'core',
+        deps: [],
+        orchestrationTaskId: null,
+        dispatchId: null,
+        state: 'pending',
+        criteria: []
+      }
+    ]
+    return snap
+  }
+
+  function dispatchAttempt(
+    id: string,
+    evidenceKey: string,
+    retryOf: string | undefined,
+    failureClass: 'infra' | 'environment' | 'criteria'
+  ): LedgerEntry {
+    return {
+      kind: 'attempt',
+      eventId: `event-${id}`,
+      watcherId: 'watcher-1',
+      atMs: 10,
+      origin: 'owner',
+      class: 'fact',
+      attemptId: id,
+      fingerprint: `fingerprint-${id}`,
+      state: 'settled',
+      effect: 'not-landed',
+      failureClass,
+      action: {
+        kind: 'dispatch-node',
+        capability: 'implement',
+        visibility: 'local',
+        contentIdentity: 'content-1',
+        evidenceKey,
+        revisionId: 'revision-1',
+        taskKey: 'core',
+        depsOrchestrationIds: [],
+        ...(retryOf === undefined ? {} : { retryOf })
+      }
+    }
+  }
+
+  it('declares the predicate a park, not a terminal stop', () => {
+    expect(objectiveInfraRetryExhaustedPredicate.disposition).toBe('park')
+  })
+
+  it('does not fire before the redispatch cap is reached', () => {
+    const withOneFailure = ledger([
+      dispatchAttempt('attempt-1', 'revision-1:core', undefined, 'infra')
+    ])
+    expect(objectiveInfraRetryExhaustedPredicate.evaluate(withNode(), withOneFailure)).toEqual({
+      stop: false
+    })
+  })
+
+  it('parks once a node has exhausted its infra/environment redispatch cap', () => {
+    const exhausted = ledger([
+      dispatchAttempt('attempt-1', 'revision-1:core', undefined, 'infra'),
+      dispatchAttempt('attempt-2', 'revision-1:core:r0', 'revision-1:core', 'environment'),
+      dispatchAttempt('attempt-3', 'revision-1:core:r1', 'revision-1:core', 'infra')
+    ])
+    expect(objectiveInfraRetryExhaustedPredicate.evaluate(withNode(), exhausted)).toEqual({
+      stop: true,
+      reason: 'core exhausted 2 infra/environment redispatches (last: infra)',
+      detail: 'core'
+    })
+  })
+
+  it('does not fire for a criteria failure regardless of retry count', () => {
+    const criteriaFailure = ledger([
+      dispatchAttempt('attempt-1', 'revision-1:core', undefined, 'criteria')
+    ])
+    expect(objectiveInfraRetryExhaustedPredicate.evaluate(withNode(), criteriaFailure)).toEqual({
+      stop: false
+    })
   })
 })

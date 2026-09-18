@@ -125,7 +125,7 @@ export const CriterionSelfAssessmentSchema = z
       .int()
       .nonnegative()
       .max(OBJECTIVE_TASK_MAX_CRITERIA - 1),
-    result: z.enum(['pass', 'unknown']),
+    result: z.enum(['pass', 'fail', 'unknown']),
     note: NoteSchema
   })
   .strict()

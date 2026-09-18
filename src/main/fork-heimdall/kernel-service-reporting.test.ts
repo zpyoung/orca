@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { HEIMDALL_DEBUG_REPORT_SCHEMA_VERSION } from './debug-report'
 import { enrollmentInput, harness, kind } from './kernel-service-test-harness'
 
 vi.mock('electron', () => ({}))
@@ -47,7 +48,7 @@ describe('Heimdall kernel service reporting', () => {
     const report = await service.debugReport(watcherId)
 
     expect(report).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: HEIMDALL_DEBUG_REPORT_SCHEMA_VERSION,
       budgetClock: { openIntervalId: interval.intervalId },
       malformedPayload: false,
       pendingControlOperation: false,

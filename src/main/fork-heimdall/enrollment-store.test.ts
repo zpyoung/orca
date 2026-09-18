@@ -156,6 +156,17 @@ describe('Heimdall enrollment store', () => {
     expect(enrollments.get('watcher-1')).toEqual(before)
   })
 
+  it('preserves terminal run linkage while allowing live run linkage updates', () => {
+    enrollments.insert(enrollment())
+    expect(enrollments.setOrchestrationRunId('watcher-1', 'run-original').orchestrationRunId).toBe(
+      'run-original'
+    )
+    const terminal = enrollments.markTerminal('watcher-1', 50)
+
+    expect(() => enrollments.setOrchestrationRunId('watcher-1', 'run-replacement')).toThrow()
+    expect(enrollments.get('watcher-1')).toEqual(terminal)
+  })
+
   it('rolls back the terminal update when the post-terminal hook fails', () => {
     const before = enrollments.insert(enrollment())
     let observedTerminalAtMs: number | null = null

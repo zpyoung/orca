@@ -3,6 +3,12 @@ import {
   type ObjectiveEnrollmentPayload
 } from '../../shared/fork-heimdall-objective/contract-types'
 import {
+  objectiveAttemptFailureClass,
+  objectiveAttempts,
+  objectiveNodeRetryCount,
+  OBJECTIVE_INFRA_REDISPATCH_CAP
+} from '../../shared/fork-heimdall-objective/decision-context'
+import {
   ObjectiveDetailSchema,
   ObjectiveProjectionSchema,
   type ObjectiveDetail,
@@ -294,6 +300,7 @@ function nodeStates(nodes: NodeRow[], ledger?: WatcherLedger): Map<string, Objec
     }
   }
   if (ledger) {
+    const parsedAttempts = objectiveAttempts(ledger)
     for (const attempt of getLatestAttempts(ledger)) {
       const action = attempt.action as Record<string, unknown>
       if (typeof action.revisionId !== 'string' || typeof action.taskKey !== 'string') {
@@ -302,7 +309,17 @@ function nodeStates(nodes: NodeRow[], ledger?: WatcherLedger): Map<string, Objec
       const key = `${action.revisionId}\0${action.taskKey}`
       if (action.kind === 'dispatch-node') {
         if (attempt.state === 'settled' && attempt.effect === 'not-landed') {
-          outcomes.set(key, 'failed')
+          const failureClass = objectiveAttemptFailureClass(attempt, ledger)
+          const retryCount =
+            failureClass === 'infra' || failureClass === 'environment'
+              ? objectiveNodeRetryCount(parsedAttempts, ledger, action.revisionId, action.taskKey)
+              : OBJECTIVE_INFRA_REDISPATCH_CAP
+          if (retryCount >= OBJECTIVE_INFRA_REDISPATCH_CAP) {
+            outcomes.set(key, 'failed')
+          } else {
+            // under the cap: no claim here, so the fallback below re-derives pending/awaiting-approval
+            outcomes.delete(key)
+          }
         } else if (!outcomes.has(key)) {
           outcomes.set(key, 'dispatched')
         }

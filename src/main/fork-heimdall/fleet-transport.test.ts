@@ -117,19 +117,21 @@ function kernel(): HeimdallFleetKernel {
 function environmentHarness(capabilities = ['heimdall.commands.v1']): {
   environment: FleetEnvironmentTransport
   setPairingRevision(revision: number): void
+  setAvailability(availability: 'available' | 'disconnected'): void
   setDetail(detail: WatcherDetail): void
   refuseDetails(message: string): void
   callbacks(): FleetEnvironmentSubscriptionCallbacks
   failReads(error: Error): void
 } {
   let pairingRevision = 7
+  let availability: 'available' | 'disconnected' = 'available'
   let readError: Error | null = null
   let detailResponse: RuntimeRpcResponse<unknown> | null = null
   let subscriptionCallbacks: FleetEnvironmentSubscriptionCallbacks | null = null
   const environment: FleetEnvironmentTransport = {
     list: () => [{ id: 'environment-1', pairingRevision }],
     availability: (identity) =>
-      identity.pairingRevision === pairingRevision ? 'available' : 'replaced',
+      identity.pairingRevision === pairingRevision ? availability : 'replaced',
     status: vi.fn(async () => runtimeStatus(capabilities)),
     read: vi.fn(async (_identity, method) => {
       if (readError) {
@@ -152,6 +154,9 @@ function environmentHarness(capabilities = ['heimdall.commands.v1']): {
     environment,
     setPairingRevision: (revision) => {
       pairingRevision = revision
+    },
+    setAvailability: (nextAvailability) => {
+      availability = nextAvailability
     },
     setDetail: (detail) => {
       detailResponse = successful('heimdall:detail', detail)
@@ -188,18 +193,22 @@ describe('HeimdallFleetTransport', () => {
       environments: remote.environment,
       now: () => 100
     })
+    const pushed: HeimdallFleetSnapshot[] = []
+    transport.subscribe((next) => pushed.push(next))
 
     const fleet = await transport.fleet()
 
-    expect(fleet.entries).toHaveLength(1)
-    expect(fleet.entries[0]).toMatchObject({
-      target: {
-        watcherId: 'watcher-1',
-        connectionId: 'environment-1',
-        pairingRevision: 7
-      },
-      contact: 'live',
-      readOnlyReason: expect.stringContaining('does not support Heimdall commands')
+    expect(fleet.entries).toEqual([])
+    await vi.waitFor(() => {
+      expect(pushed.at(-1)?.entries[0]).toMatchObject({
+        target: {
+          watcherId: 'watcher-1',
+          connectionId: 'environment-1',
+          pairingRevision: 7
+        },
+        contact: 'live',
+        readOnlyReason: expect.stringContaining('does not support Heimdall commands')
+      })
     })
     expect(remote.environment.read).toHaveBeenCalledWith(
       { id: 'environment-1', pairingRevision: 7 },
@@ -220,7 +229,7 @@ describe('HeimdallFleetTransport', () => {
     const pushed: HeimdallFleetSnapshot[] = []
     transport.subscribe((next) => pushed.push(next))
     await transport.fleet()
-    await Promise.resolve()
+    await vi.waitFor(() => expect(() => remote.callbacks()).not.toThrow())
 
     remote.callbacks().onError({ code: 'remote_runtime_unavailable', message: 'offline' })
 
@@ -275,6 +284,7 @@ describe('HeimdallFleetTransport', () => {
       environments: remote.environment
     })
     await transport.fleet()
+    await vi.waitFor(() => expect(() => remote.callbacks()).not.toThrow())
     remote.refuseDetails('watcher missing')
 
     await expect(
@@ -298,6 +308,7 @@ describe('HeimdallFleetTransport', () => {
       environments: remote.environment
     })
     await transport.fleet()
+    await vi.waitFor(() => expect(() => remote.callbacks()).not.toThrow())
     const freshWatcher = fleetEntry('Fresh owner detail')
     freshWatcher.ownerFence = { ...freshWatcher.ownerFence, revision: 4 }
     freshWatcher.entry.enrollment.commandRevision = 4
@@ -358,6 +369,7 @@ describe('HeimdallFleetTransport', () => {
       environments: remote.environment
     })
     await transport.fleet()
+    await vi.waitFor(() => expect(() => remote.callbacks()).not.toThrow())
     const request = commandRequest()
 
     await expect(transport.command(request)).resolves.toEqual({
@@ -388,6 +400,7 @@ describe('HeimdallFleetTransport', () => {
       environments: remote.environment
     })
     await transport.fleet()
+    await vi.waitFor(() => expect(() => remote.callbacks()).not.toThrow())
 
     await expect(transport.command(commandRequest())).resolves.toMatchObject({
       status: 'indeterminate',
@@ -404,6 +417,7 @@ describe('HeimdallFleetTransport', () => {
       environments: remote.environment
     })
     await transport.fleet()
+    await vi.waitFor(() => expect(() => remote.callbacks()).not.toThrow())
     remote.setPairingRevision(8)
     remote.failReads(new Error('replacement has not published yet'))
     await transport.fleet()
@@ -413,6 +427,86 @@ describe('HeimdallFleetTransport', () => {
       reason: 'owner-conflict'
     })
     expect(remote.environment.mutate).not.toHaveBeenCalled()
+    transport.dispose()
+  })
+
+  it('returns local fleet state while one deduplicated remote refresh remains unresolved', async () => {
+    const unresolved = new Promise<never>(() => {})
+    const environments: FleetEnvironmentTransport = {
+      list: () => [{ id: 'environment-1', pairingRevision: 7 }],
+      availability: () => 'available',
+      status: vi.fn(() => unresolved),
+      read: vi.fn(() => unresolved),
+      mutate: vi.fn(async () =>
+        successful('heimdall:command', { status: 'applied', appliedAtMs: 20 })
+      ),
+      subscribe: vi.fn(async () => ({
+        requestId: 'remote-subscription',
+        close: vi.fn(),
+        sendBinary: () => false
+      }))
+    }
+    const localKernel = kernel()
+    vi.mocked(localKernel.fleet).mockResolvedValue(snapshot())
+    const transport = new HeimdallFleetTransport({
+      kernel: localKernel,
+      userDataPath: () => '/unused',
+      environments
+    })
+
+    const first = await transport.fleet()
+    const second = await transport.fleet()
+
+    expect(first.entries).toHaveLength(1)
+    expect(first.entries[0]?.target).toEqual(LOCAL_TARGET)
+    expect(second.entries[0]?.target).toEqual(LOCAL_TARGET)
+    expect(environments.status).toHaveBeenCalledOnce()
+    expect(environments.read).toHaveBeenCalledOnce()
+    transport.dispose()
+  })
+
+  it('does not publish a remote refresh which settles after disposal', async () => {
+    const remote = environmentHarness()
+    const remoteRead = Promise.withResolvers<RuntimeRpcResponse<unknown>>()
+    vi.mocked(remote.environment.read).mockReturnValue(remoteRead.promise)
+    const transport = new HeimdallFleetTransport({
+      kernel: kernel(),
+      userDataPath: () => '/unused',
+      environments: remote.environment
+    })
+    const pushed: HeimdallFleetSnapshot[] = []
+    transport.subscribe((next) => pushed.push(next))
+
+    await transport.fleet()
+    transport.dispose()
+    remoteRead.resolve(successful('heimdall:fleet', snapshot()))
+    await remoteRead.promise
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(pushed).toEqual([])
+  })
+
+  it('serves a cached remote owner as unverifiable as soon as its environment is unavailable', async () => {
+    const remote = environmentHarness()
+    const transport = new HeimdallFleetTransport({
+      kernel: kernel(),
+      userDataPath: () => '/unused',
+      environments: remote.environment
+    })
+    const pushed: HeimdallFleetSnapshot[] = []
+    transport.subscribe((next) => pushed.push(next))
+    await transport.fleet()
+    await vi.waitFor(() => expect(pushed.at(-1)?.entries[0]?.contact).toBe('live'))
+
+    remote.setAvailability('disconnected')
+    const cached = await transport.fleet()
+
+    expect(cached.entries[0]).toMatchObject({
+      contact: 'unverifiable',
+      readOnlyReason: expect.stringContaining('last confirmed state')
+    })
+    expect(remote.environment.read).toHaveBeenCalledOnce()
     transport.dispose()
   })
 

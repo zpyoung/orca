@@ -10,7 +10,10 @@ import type {
   OpenHostedReviewAction,
   PushRefAction
 } from '../../shared/fork-heimdall-objective/objective-actions'
-import type { ObjectiveEnrollmentPayload } from '../../shared/fork-heimdall-objective/contract-types'
+import {
+  OBJECTIVE_ABSENT_REMOTE_REF_STATE,
+  type ObjectiveEnrollmentPayload
+} from '../../shared/fork-heimdall-objective/contract-types'
 import type { PlannerReport } from '../../shared/fork-heimdall-objective/plan-schema'
 import type { HostedReviewInfo } from '../../shared/hosted-review'
 import { gitExecFileAsync } from '../git/command-runner/git-exec-file'
@@ -147,6 +150,7 @@ const noForge = {
 function lease(assertHeld = vi.fn(async () => undefined), epoch = 23): LeaseGuard {
   return {
     epoch,
+    holder: 'test-holder',
     assertHeld,
     renewLoop: () => ({ dispose: () => undefined })
   }
@@ -356,7 +360,10 @@ describe('landing recovery probes', () => {
       branch: 'main',
       remote: 'origin',
       commitSha,
-      expectedState: { target: 'origin:refs/heads/main', before: '' }
+      expectedState: {
+        target: 'origin:refs/heads/main',
+        before: OBJECTIVE_ABSENT_REMOTE_REF_STATE
+      }
     }
     const unresolvedAttempt = attempt(action)
 
@@ -424,7 +431,7 @@ describe('landing recovery probes', () => {
       base: 'trunk',
       headSha,
       provider: 'github',
-      expectedState: { target: 'github:main', before: '' }
+      expectedState: { target: 'github:main', before: 'no-review' }
     }
     const unresolvedAttempt = attempt(action)
     let observed: HostedReviewInfo | null = null
@@ -488,7 +495,7 @@ describe('landing recovery probes', () => {
       base: 'trunk',
       headSha,
       provider: 'github',
-      expectedState: { target: 'github:main', before: '' }
+      expectedState: { target: 'github:main', before: 'no-review' }
     }
 
     await expect(
@@ -522,7 +529,7 @@ describe('landing recovery probes', () => {
       base: 'trunk',
       headSha,
       provider: 'github',
-      expectedState: { target: 'github:main', before: '' }
+      expectedState: { target: 'github:main', before: 'no-review' }
     }
     const getReview = vi.fn(async () => hostedReview(headSha))
     const assertHeld = vi.fn(async () => {

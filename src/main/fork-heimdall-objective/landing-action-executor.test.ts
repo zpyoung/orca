@@ -10,7 +10,10 @@ import type {
   OpenHostedReviewAction,
   PushRefAction
 } from '../../shared/fork-heimdall-objective/objective-actions'
-import type { ObjectiveEnrollmentPayload } from '../../shared/fork-heimdall-objective/contract-types'
+import {
+  OBJECTIVE_ABSENT_REMOTE_REF_STATE,
+  type ObjectiveEnrollmentPayload
+} from '../../shared/fork-heimdall-objective/contract-types'
 import type { ObjectiveWorld } from '../../shared/fork-heimdall-objective/detail-types'
 import type { PlannerReport } from '../../shared/fork-heimdall-objective/plan-schema'
 import { objectiveBarReachedPredicate } from '../../shared/fork-heimdall-objective/stop-policy'
@@ -27,6 +30,7 @@ import {
   executePushRef
 } from './landing-action-executor'
 import type { ObjectiveForgeAccess } from './objective-forge-access'
+import { objectiveRemoteRefState } from './landing-git-state'
 import { ObjectiveStore } from './objective-store'
 import { computeObjectiveWorktreeContentDigest } from './objective-workspace-manifest'
 
@@ -166,6 +170,7 @@ function context(
     },
     ledger: { watcherId: WATCHER_ID, entries: [] },
     lease: {
+      holder: 'test-holder',
       epoch: 7,
       assertHeld: vi.fn(async () => undefined),
       renewLoop: () => ({ dispose: () => undefined })
@@ -209,19 +214,45 @@ async function pushAction(
   contentIdentity: string,
   before: string
 ): Promise<PushRefAction> {
+  const beforeState = objectiveRemoteRefState(before)
   return {
     kind: 'push-ref',
     capability: 'land',
     visibility: 'external',
     contentIdentity,
-    evidenceKey: `push:${contentIdentity}:${before || 'empty'}`,
+    evidenceKey: `push:${contentIdentity}:${beforeState}`,
     rung: 'pushed-ref',
     revisionId: fixture.revisionId,
     branch: 'main',
     remote: 'origin',
     commitSha: await gitText(fixture.root, ['rev-parse', 'HEAD']),
-    expectedState: { target: 'origin:refs/heads/main', before }
+    expectedState: { target: 'origin:refs/heads/main', before: beforeState }
   }
+}
+
+async function preparePushRace(): Promise<{
+  fixture: RepositoryFixture
+  expectedBefore: string
+  remoteMove: string
+  contentIdentity: string
+}> {
+  const fixture = await repositoryFixture()
+  await git(fixture.root, ['push', 'origin', 'main'])
+  const expectedBefore = await gitText(fixture.root, ['rev-parse', 'HEAD'])
+  const producer = join(fixture.parent, 'producer')
+  await git(fixture.parent, ['clone', '--branch', 'main', fixture.remote, producer])
+  await git(producer, ['config', 'user.name', 'Remote Mover'])
+  await git(producer, ['config', 'user.email', 'mover@example.test'])
+  await writeFile(join(producer, 'remote.txt'), 'remote move\n')
+  await git(producer, ['add', 'remote.txt'])
+  await git(producer, ['commit', '-m', 'move remote'])
+  const remoteMove = await gitText(producer, ['rev-parse', 'HEAD'])
+  await git(producer, ['push', 'origin', 'HEAD:refs/heads/race-object'])
+  await writeFile(join(fixture.root, 'src', 'result.txt'), 'local move\n')
+  await git(fixture.root, ['add', 'src/result.txt'])
+  await git(fixture.root, ['commit', '-m', 'local move'])
+  const contentIdentity = await computeWorkspaceContentIdentity(fixture.target)
+  return { fixture, expectedBefore, remoteMove, contentIdentity }
 }
 
 function reviewInfo(headSha: string, overrides: Partial<HostedReviewInfo> = {}): HostedReviewInfo {
@@ -308,7 +339,7 @@ async function reviewExecutionFixture(fixture: RepositoryFixture) {
     base: 'trunk',
     headSha,
     provider: 'github',
-    expectedState: { target: 'github:main', before: '' }
+    expectedState: { target: 'github:main', before: 'no-review' }
   }
   return { action, headSha, contentIdentity }
 }
@@ -443,7 +474,7 @@ describe('landing action executor Git effects', () => {
     const trailer = `Orca-Heimdall-Attempt: ${action.attemptTrailer}`
     await writeFile(
       hook,
-      `#!/bin/sh\nset -e\ntree="$(git write-tree)"\nparent="$(git rev-parse HEAD)"\ncommit="$(printf '%s\\\\n\\\\n%s\\\\n' ${JSON.stringify(title)} ${JSON.stringify(trailer)} | git commit-tree "$tree" -p "$parent")"\ngit update-ref HEAD "$commit" "$parent"\necho "transport closed after commit" >&2\nexit 17\n`
+      `#!/bin/sh\nset -e\ntree="$(git write-tree)"\nparent="$(git rev-parse HEAD)"\ncommit="$(git commit-tree "$tree" -p "$parent" -m ${JSON.stringify(title)} -m ${JSON.stringify(trailer)})"\ngit update-ref HEAD "$commit" "$parent"\necho "transport closed after commit" >&2\nexit 17\n`
     )
     await chmod(hook, 0o755)
 
@@ -560,7 +591,7 @@ describe('landing action executor Git effects', () => {
 
     expect(outcome).toMatchObject({
       effect: 'landed',
-      expectedBefore: '',
+      expectedBefore: OBJECTIVE_ABSENT_REMOTE_REF_STATE,
       expectedAfter: action.commitSha,
       result: { kind: 'push-recorded', remoteSha: action.commitSha }
     })
@@ -576,29 +607,13 @@ describe('landing action executor Git effects', () => {
   })
 
   it('does not overwrite a remote ref that moves after inspection', async () => {
-    const fixture = await repositoryFixture()
-    await git(fixture.root, ['push', 'origin', 'main'])
-    const expectedBefore = await gitText(fixture.root, ['rev-parse', 'HEAD'])
-    const producer = join(fixture.parent, 'producer')
-    await git(fixture.parent, ['clone', '--branch', 'main', fixture.remote, producer])
-    await git(producer, ['config', 'user.name', 'Remote Mover'])
-    await git(producer, ['config', 'user.email', 'mover@example.test'])
-    await writeFile(join(producer, 'remote.txt'), 'remote move\n')
-    await git(producer, ['add', 'remote.txt'])
-    await git(producer, ['commit', '-m', 'move remote'])
-    const remoteMove = await gitText(producer, ['rev-parse', 'HEAD'])
-    await git(producer, ['push', 'origin', 'HEAD:refs/heads/race-object'])
-
-    await writeFile(join(fixture.root, 'src', 'result.txt'), 'local move\n')
-    await git(fixture.root, ['add', 'src/result.txt'])
-    await git(fixture.root, ['commit', '-m', 'local move'])
+    const { fixture, expectedBefore, remoteMove, contentIdentity } = await preparePushRace()
     const hook = join(fixture.root, '.git', 'hooks', 'pre-push')
     await writeFile(
       hook,
       `#!/bin/sh\ngit --git-dir=${JSON.stringify(fixture.remote)} update-ref refs/heads/main ${remoteMove}\n`
     )
     await chmod(hook, 0o755)
-    const contentIdentity = await computeWorkspaceContentIdentity(fixture.target)
 
     await expect(
       executePushRef({
@@ -612,6 +627,26 @@ describe('landing action executor Git effects', () => {
     expect(
       await gitText(fixture.root, ['ls-remote', '--heads', 'origin', 'refs/heads/main'])
     ).toContain(remoteMove)
+  })
+
+  it('keeps a generic push failure indeterminate when the remote moved to a third ref', async () => {
+    const { fixture, expectedBefore, remoteMove, contentIdentity } = await preparePushRace()
+    const hook = join(fixture.root, '.git', 'hooks', 'pre-push')
+    await writeFile(
+      hook,
+      `#!/bin/sh\ngit --git-dir=${JSON.stringify(fixture.remote)} update-ref refs/heads/main ${remoteMove}\necho "transport closed after push; stale info unavailable" >&2\nexit 17\n`
+    )
+    await chmod(hook, 0o755)
+
+    await expect(
+      executePushRef({
+        action: await pushAction(fixture, contentIdentity, expectedBefore),
+        binding: binding(fixture, 'pushed-ref'),
+        context: context(fixture, contentIdentity, 'pushed-ref'),
+        objectiveStore: fixture.store,
+        forge: noForge
+      })
+    ).resolves.toMatchObject({ effect: 'indeterminate', reason: 'push-state-indeterminate' })
   })
 
   it('accepts a ref that landed even when the dispatching push reports failure', async () => {

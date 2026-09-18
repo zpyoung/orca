@@ -1,6 +1,6 @@
 import type { RuntimeTerminalShow } from '../../../shared/runtime-types'
 import type { OrcaRuntimeService } from '../../runtime/orca-runtime'
-import type { RunRow } from '../../runtime/orchestration/db'
+import type { OrchestrationDb, RunRow } from '../../runtime/orchestration/db'
 import { OrchestrationError } from '../../runtime/orchestration/orchestration-error'
 import { resolveRunScope } from '../../runtime/rpc/methods/orchestration/runs/run-scope'
 import { startLocalWorker } from '../../runtime/rpc/methods/orchestration/worker/local-worker-start'
@@ -41,7 +41,11 @@ import {
 import { drainHeimdallMailbox, type MailboxDrainInput } from './mailbox-drain'
 import { answerWatcherQuestion, readWatcherQuestion } from './question-answer'
 import { listWatcherWorkers, releaseWatcherWorker, stopWatcherWorker } from './worker-controls'
-import { parseWorkerStartReceipt, type WorkerStartReceipt } from './worker-start-receipt'
+import {
+  dispatchResultFromReceipt,
+  parseWorkerStartReceipt,
+  type WorkerStartReceipt
+} from './worker-start-receipt'
 
 export {
   CoordinatorSeatLostError,
@@ -107,9 +111,11 @@ export class RuntimeHeimdallOrchestrationAdapter implements HeimdallOrchestratio
   async dispatchWorker(input: DispatchWorkerInput): Promise<DispatchResult> {
     const requestId = orchestrationRequestIdForAttemptFingerprint(input.attemptFingerprint)
     let run: RunRow
+    let db: OrchestrationDb
     try {
       const ensured = await this.ensureRun(input.enrollment)
       run = this.resolvePersistedRun(input.enrollment, ensured.runId)
+      db = this.runtime.getOrchestrationDb()
     } catch (error) {
       if (
         error instanceof CoordinatorSeatLostError ||
@@ -117,14 +123,14 @@ export class RuntimeHeimdallOrchestrationAdapter implements HeimdallOrchestratio
       ) {
         return refused('fenced', error)
       }
-      return { status: 'indeterminate', requestId }
+      return refused('pre-dispatch-failure', error)
     }
 
-    const db = this.runtime.getOrchestrationDb()
     const identity = input.enrollment.coordinatorIdentity
-    const params = workerStartParams(input)
+    let workerStartInvoked = false
 
     try {
+      const params = workerStartParams(input)
       await assertWorkerStartTaskSpecWithinPromptBudget(input.spec)
       const mode = decideWorkerStartMode({
         params,
@@ -141,8 +147,8 @@ export class RuntimeHeimdallOrchestrationAdapter implements HeimdallOrchestratio
       const receipt = (await getOrchestrationMutationExecutor(this.runtime).run(
         request,
         params,
-        (mutation) =>
-          startLocalWorker({
+        (mutation) => {
+          const startInput = {
             params: {
               ...params,
               timeoutMs: resolveWorkerStartReadinessTimeoutMs(undefined)
@@ -153,11 +159,17 @@ export class RuntimeHeimdallOrchestrationAdapter implements HeimdallOrchestratio
             coordinatorPane: identity.paneKey,
             orchestrationMutation: mutation?.identity,
             mode
-          }),
+          }
+          workerStartInvoked = true
+          return startLocalWorker(startInput)
+        },
         coordinatorIdentityFingerprint(identity)
       )) as WorkerStartReceipt
       return dispatchResultFromReceipt(receipt, requestId)
     } catch (error) {
+      if (isOrchestrationError(error, 'operation_unknown')) {
+        return { status: 'indeterminate', requestId }
+      }
       if (isOrchestrationError(error, 'consumer_fenced')) {
         return refused('fenced', error)
       }
@@ -166,6 +178,9 @@ export class RuntimeHeimdallOrchestrationAdapter implements HeimdallOrchestratio
       }
       if (error instanceof OrchestrationError && PLACEMENT_ERROR_CODES[error.code]) {
         return refused('placement-unavailable', error)
+      }
+      if (!workerStartInvoked) {
+        return refused('pre-dispatch-failure', error)
       }
       return { status: 'indeterminate', requestId }
     }
@@ -486,20 +501,6 @@ function coordinatorRuntimeFacade(
       return Reflect.set(target, property, value, target)
     }
   })
-}
-
-function dispatchResultFromReceipt(receipt: WorkerStartReceipt, requestId: string): DispatchResult {
-  if (receipt.state === 'ready' && receipt.dispatchId) {
-    return { status: 'dispatched', dispatchId: receipt.dispatchId }
-  }
-  if (receipt.state === 'outcome_unknown' || receipt.state === 'start_unknown') {
-    return { status: 'indeterminate', requestId }
-  }
-  return {
-    status: 'refused',
-    reason: 'placement-unavailable',
-    detail: receipt.lastError ?? `Worker start returned state ${receipt.state ?? 'unknown'}`
-  }
 }
 
 function refused(

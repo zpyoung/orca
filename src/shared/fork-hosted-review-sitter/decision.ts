@@ -278,6 +278,9 @@ export function explainDesiredAction(
   // the base moved, since the move is what made that check red.
   const conflictOtherwiseReady = !review.draft && (failures.length === 0 || review.behindBase)
   if (review.conflicts === 'present') {
+    if (sitter.capabilities.resolveConflicts === 'off') {
+      return fellThrough(declined('capability-off', 'resolveConflicts'))
+    }
     if (conflictOtherwiseReady) {
       const outcome = desiredConflictAction(review, ledger, context.preparedCommit)
       return outcome.action ? outcome : fellThrough(outcome)

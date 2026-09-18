@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  CriterionSelfAssessmentSchema,
   ImplementerReportSchema,
   IntegratorReportSchema,
   ObjectivePlanSchema,
@@ -74,6 +75,21 @@ describe('objective plan schema', () => {
         { writeTerritory: ['src/**'], dispatchedTaskKeys: ['already-dispatched'] }
       )
     ).toThrow('cannot be removed')
+  })
+})
+
+describe('criterion self-assessment results', () => {
+  it('accepts fail alongside the existing pass and unknown results', () => {
+    for (const result of ['pass', 'fail', 'unknown'] as const) {
+      expect(
+        CriterionSelfAssessmentSchema.safeParse({ criterionIndex: 0, result, note: 'checked' })
+          .success
+      ).toBe(true)
+    }
+    expect(
+      CriterionSelfAssessmentSchema.safeParse({ criterionIndex: 0, result: 'blocked', note: 'x' })
+        .success
+    ).toBe(false)
   })
 })
 

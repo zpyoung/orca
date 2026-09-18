@@ -28,7 +28,7 @@ export type EnrollmentControlLifecycleDependencies = {
   ): EnrollmentControlCommit
   requireValidCommit(commit: EnrollmentControlCommit): WatcherEnrollment
   latestHaltWasAutomaticPark(ledger: WatcherLedger): boolean
-  appendOpenParkAcknowledgements(watcherId: string): void
+  appendResumeEscalationTransitions(watcherId: string): void
   appendDisarmTransitions(watcherId: string): void
   now(): number
 }
@@ -96,7 +96,7 @@ export class WatcherEnrollmentControlLifecycle {
       enrollment.watcherId,
       expectedOwner,
       { enabled: true, paused: false },
-      () => this.dependencies.appendOpenParkAcknowledgements(enrollment.watcherId)
+      () => this.dependencies.appendResumeEscalationTransitions(enrollment.watcherId)
     )
     if (commit.status === 'refused') {
       return commit
@@ -221,7 +221,9 @@ export class WatcherEnrollmentControlLifecycle {
     if (!guard) {
       return
     }
-    await this.dependencies.lease.release(enrollment.workspaceKey, guard.epoch).catch(() => {})
+    await this.dependencies.lease
+      .release(enrollment.workspaceKey, guard.holder, guard.epoch)
+      .catch(() => {})
   }
 
   private applied(): WatcherCommandResult {

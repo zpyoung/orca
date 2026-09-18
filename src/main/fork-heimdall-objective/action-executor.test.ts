@@ -32,6 +32,7 @@ vi.mock('./observed-workspace-changes', () => ({
 
 const TEST_LEASE = {
   epoch: 1,
+  holder: 'test-holder',
   assertHeld: vi.fn(async () => undefined),
   renewLoop: () => ({ dispose: () => undefined })
 } satisfies LeaseGuard
@@ -242,7 +243,7 @@ describe('objective action recovery', () => {
 
     await expect(
       executor.resolveOutcome(attempt(dispatchNode), fresh, ledger, TEST_LEASE)
-    ).resolves.toBe('landed')
+    ).resolves.toEqual({ effect: 'landed' })
     expect(readReport).toHaveBeenCalledWith(
       expect.objectContaining({
         attemptFingerprint: makeAttemptFingerprint(
@@ -281,19 +282,20 @@ describe('objective action recovery', () => {
 
     await expect(
       executor.resolveOutcome(attempt(dispatchNode), fresh, ledger, TEST_LEASE)
-    ).resolves.toBe('not-landed')
+    ).resolves.toEqual({ effect: 'not-landed', failureClass: 'criteria' })
   })
 
-  it('resolves a crash before dispatch metadata as authoritatively not landed', async () => {
+  it('resolves a crash before dispatch metadata as authoritatively not landed, tagged infra', async () => {
     const { executor, fresh } = harness()
     const crashed = attempt(dispatchNode)
     delete crashed.dispatch
     delete crashed.dispatchId
     const ledger: WatcherLedger = { watcherId: 'watcher-1', entries: [crashed] }
 
-    await expect(executor.resolveOutcome(crashed, fresh, ledger, TEST_LEASE)).resolves.toBe(
-      'not-landed'
-    )
+    await expect(executor.resolveOutcome(crashed, fresh, ledger, TEST_LEASE)).resolves.toEqual({
+      effect: 'not-landed',
+      failureClass: 'infra'
+    })
     expect(readReport).not.toHaveBeenCalled()
   })
 
@@ -307,9 +309,9 @@ describe('objective action recovery', () => {
       const uncertain = attempt(dispatchNode, reason === undefined ? {} : { reason })
       const ledger: WatcherLedger = { watcherId: 'watcher-1', entries: [uncertain] }
 
-      await expect(executor.resolveOutcome(uncertain, fresh, ledger, TEST_LEASE)).resolves.toBe(
-        'indeterminate'
-      )
+      await expect(executor.resolveOutcome(uncertain, fresh, ledger, TEST_LEASE)).resolves.toEqual({
+        effect: 'indeterminate'
+      })
       expect(readReport).not.toHaveBeenCalled()
     }
   )
@@ -317,16 +319,20 @@ describe('objective action recovery', () => {
   it.each([
     { role: 'implementer', action: dispatchNode },
     { role: 'planner', action: dispatchPlanner }
-  ])('resolves an exited $role without completion evidence as not landed', async ({ action }) => {
-    const { executor, fresh } = harness()
-    const exited = attempt(action, { reason: WORKER_EXITED_WITHOUT_COMPLETION })
-    const ledger: WatcherLedger = { watcherId: 'watcher-1', entries: [exited] }
+  ])(
+    'resolves an exited $role without completion evidence as not landed, tagged infra',
+    async ({ action }) => {
+      const { executor, fresh } = harness()
+      const exited = attempt(action, { reason: WORKER_EXITED_WITHOUT_COMPLETION })
+      const ledger: WatcherLedger = { watcherId: 'watcher-1', entries: [exited] }
 
-    await expect(executor.resolveOutcome(exited, fresh, ledger, TEST_LEASE)).resolves.toBe(
-      'not-landed'
-    )
-    expect(readReport).not.toHaveBeenCalled()
-  })
+      await expect(executor.resolveOutcome(exited, fresh, ledger, TEST_LEASE)).resolves.toEqual({
+        effect: 'not-landed',
+        failureClass: 'infra'
+      })
+      expect(readReport).not.toHaveBeenCalled()
+    }
+  )
 
   it('prefers late worker_done evidence over an earlier exited-without-completion settlement', async () => {
     readReport.mockResolvedValue({
@@ -348,10 +354,24 @@ describe('objective action recovery', () => {
       entries: [exited, workerDone('succeeded')]
     }
 
-    await expect(executor.resolveOutcome(exited, fresh, ledger, TEST_LEASE)).resolves.toBe('landed')
+    await expect(executor.resolveOutcome(exited, fresh, ledger, TEST_LEASE)).resolves.toEqual({
+      effect: 'landed'
+    })
   })
 
-  it('resolves a failed worker outcome as not landed without trusting a report path', async () => {
+  it('never resolves a failed worker outcome as landed, even when its report validates cleanly', async () => {
+    readReport.mockResolvedValue({
+      ok: true,
+      role: 'implementer',
+      path: '/workspace/report.json',
+      reportDigest: 'digest-1',
+      report: {
+        taskKey: 'node-a',
+        summary: 'Attempted A',
+        filesModified: ['src/a.ts'],
+        criteriaSelfAssessment: [{ criterionIndex: 0, result: 'pass', note: 'Verified' }]
+      }
+    })
     const { executor, fresh } = harness()
     const ledger: WatcherLedger = {
       watcherId: 'watcher-1',
@@ -360,8 +380,198 @@ describe('objective action recovery', () => {
 
     await expect(
       executor.resolveOutcome(attempt(dispatchNode), fresh, ledger, TEST_LEASE)
-    ).resolves.toBe('not-landed')
-    expect(readReport).not.toHaveBeenCalled()
+    ).resolves.toEqual({ effect: 'not-landed', failureClass: 'criteria' })
+  })
+
+  it('resolves a failed worker outcome as not landed without an unreadable report changing that', async () => {
+    readReport.mockResolvedValue({ ok: false, reason: 'missing' })
+    const { executor, fresh } = harness()
+    const ledger: WatcherLedger = {
+      watcherId: 'watcher-1',
+      entries: [attempt(dispatchNode), workerDone('failed')]
+    }
+
+    await expect(
+      executor.resolveOutcome(attempt(dispatchNode), fresh, ledger, TEST_LEASE)
+    ).resolves.toEqual({ effect: 'not-landed', failureClass: 'criteria' })
+    expect(readReport).toHaveBeenCalledOnce()
+  })
+
+  it('degrades a classification read failure on a failed outcome to criteria instead of throwing', async () => {
+    readReport.mockRejectedValue(new Error('ssh connection lost'))
+    const { executor, fresh } = harness()
+    const ledger: WatcherLedger = {
+      watcherId: 'watcher-1',
+      entries: [attempt(dispatchNode), workerDone('failed')]
+    }
+
+    await expect(
+      executor.resolveOutcome(attempt(dispatchNode), fresh, ledger, TEST_LEASE)
+    ).resolves.toEqual({ effect: 'not-landed', failureClass: 'criteria' })
+  })
+
+  it('still propagates a read failure on a succeeded outcome instead of guessing landed', async () => {
+    readReport.mockRejectedValue(new Error('ssh connection lost'))
+    const { executor, fresh } = harness()
+    const ledger: WatcherLedger = {
+      watcherId: 'watcher-1',
+      entries: [attempt(dispatchNode), workerDone('succeeded')]
+    }
+
+    await expect(
+      executor.resolveOutcome(attempt(dispatchNode), fresh, ledger, TEST_LEASE)
+    ).rejects.toThrow('ssh connection lost')
+  })
+
+  it('classifies a failed worker report with a failing criterion as criteria', async () => {
+    readReport.mockResolvedValue({
+      ok: true,
+      role: 'implementer',
+      path: '/workspace/report.json',
+      reportDigest: 'digest-1',
+      report: {
+        taskKey: 'node-a',
+        summary: 'Attempted A',
+        filesModified: ['src/a.ts'],
+        criteriaSelfAssessment: [{ criterionIndex: 0, result: 'fail', note: 'Assertion failed' }]
+      }
+    })
+    const { executor, fresh } = harness()
+    const ledger: WatcherLedger = {
+      watcherId: 'watcher-1',
+      entries: [attempt(dispatchNode), workerDone('failed')]
+    }
+
+    await expect(
+      executor.resolveOutcome(attempt(dispatchNode), fresh, ledger, TEST_LEASE)
+    ).resolves.toEqual({ effect: 'not-landed', failureClass: 'criteria' })
+  })
+
+  it('classifies a failed worker report with only unknown criteria as environment', async () => {
+    readReport.mockResolvedValue({
+      ok: true,
+      role: 'implementer',
+      path: '/workspace/report.json',
+      reportDigest: 'digest-1',
+      report: {
+        taskKey: 'node-a',
+        summary: 'Attempted A',
+        filesModified: ['src/a.ts'],
+        criteriaSelfAssessment: [
+          { criterionIndex: 0, result: 'unknown', note: 'Sandbox unavailable' }
+        ]
+      }
+    })
+    const { executor, fresh } = harness()
+    const ledger: WatcherLedger = {
+      watcherId: 'watcher-1',
+      entries: [attempt(dispatchNode), workerDone('failed')]
+    }
+
+    await expect(
+      executor.resolveOutcome(attempt(dispatchNode), fresh, ledger, TEST_LEASE)
+    ).resolves.toEqual({ effect: 'not-landed', failureClass: 'environment' })
+  })
+
+  it('classifies a territory-violating report as criteria regardless of the worker outcome', async () => {
+    readReport.mockResolvedValue({
+      ok: true,
+      role: 'implementer',
+      path: '/workspace/report.json',
+      reportDigest: 'digest-1',
+      report: {
+        taskKey: 'node-a',
+        summary: 'Attempted A',
+        filesModified: ['docs/outside.md'],
+        criteriaSelfAssessment: [{ criterionIndex: 0, result: 'pass', note: 'Verified' }]
+      }
+    })
+    const { executor, fresh } = harness()
+    const ledger: WatcherLedger = {
+      watcherId: 'watcher-1',
+      entries: [attempt(dispatchNode), workerDone('failed')]
+    }
+
+    await expect(
+      executor.resolveOutcome(attempt(dispatchNode), fresh, ledger, TEST_LEASE)
+    ).resolves.toEqual({ effect: 'not-landed', failureClass: 'criteria' })
+  })
+
+  it('defaults an unclassifiable failed dispatch (no per-criterion signal) to criteria', async () => {
+    readReport.mockResolvedValue({
+      ok: true,
+      role: 'planner',
+      path: '/workspace/plan-report.json',
+      reportDigest: 'digest-2',
+      report: {
+        plan: [
+          {
+            taskKey: 'core',
+            title: 'Core',
+            spec: 'Implement core',
+            deps: [],
+            criteria: [{ body: 'works', shellCheckable: false, checkCommand: null }],
+            declaresDependencyChange: false,
+            declaredPaths: ['src/core.ts']
+          }
+        ]
+      }
+    })
+    const { executor, fresh } = harness()
+    const ledger: WatcherLedger = {
+      watcherId: 'watcher-1',
+      entries: [attempt(dispatchPlanner, { dispatchId: 'dispatch-1' }), workerDone('failed')]
+    }
+
+    await expect(
+      executor.resolveOutcome(
+        attempt(dispatchPlanner, { dispatchId: 'dispatch-1' }),
+        fresh,
+        ledger,
+        TEST_LEASE
+      )
+    ).resolves.toEqual({ effect: 'not-landed', failureClass: 'criteria' })
+  })
+
+  it('validates observed workspace changes against the original dispatch fingerprint for a retry', async () => {
+    const originalAction: ObjectiveAction = { ...dispatchNode, evidenceKey: 'revision-1:node-a' }
+    const retryAction: ObjectiveAction = {
+      ...dispatchNode,
+      evidenceKey: 'revision-1:node-a:r0',
+      retryOf: 'revision-1:node-a'
+    }
+    readReport.mockResolvedValue({
+      ok: true,
+      role: 'implementer',
+      path: '/workspace/report.json',
+      reportDigest: 'digest-1',
+      report: {
+        taskKey: 'node-a',
+        summary: 'Implemented A',
+        filesModified: ['src/a.ts'],
+        criteriaSelfAssessment: [{ criterionIndex: 0, result: 'pass', note: 'Verified' }]
+      }
+    })
+    const { executor, fresh } = harness()
+    const originalAttempt = attempt(originalAction, {
+      attemptId: 'attempt-original',
+      dispatchId: 'dispatch-original'
+    })
+    const retryAttempt = attempt(retryAction, {
+      attemptId: 'attempt-retry',
+      dispatchId: 'dispatch-1'
+    })
+    const ledger: WatcherLedger = {
+      watcherId: 'watcher-1',
+      entries: [originalAttempt, retryAttempt, workerDone('succeeded')]
+    }
+
+    await expect(executor.resolveOutcome(retryAttempt, fresh, ledger, TEST_LEASE)).resolves.toEqual(
+      { effect: 'landed' }
+    )
+    expect(validateChanges).toHaveBeenCalledWith(
+      expect.objectContaining({ attemptFingerprint: originalAttempt.fingerprint })
+    )
   })
 
   it('retries an absent check row while preserving indeterminate incomplete executions', () => {
@@ -385,12 +595,12 @@ describe('objective action recovery', () => {
 
     expect(
       absent.executor.resolveOutcome(attempt(checkAction), absent.fresh, ledger, TEST_LEASE)
-    ).toBe('not-landed')
+    ).toEqual({ effect: 'not-landed' })
     expect(
       incomplete.executor.resolveOutcome(attempt(checkAction), incomplete.fresh, ledger, TEST_LEASE)
-    ).toBe('indeterminate')
+    ).toEqual({ effect: 'indeterminate' })
     expect(
       completed.executor.resolveOutcome(attempt(checkAction), completed.fresh, ledger, TEST_LEASE)
-    ).toBe('landed')
+    ).toEqual({ effect: 'landed' })
   })
 })

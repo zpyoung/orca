@@ -151,6 +151,7 @@ describe('ObjectiveStore natural-key persistence', () => {
     const revision = ingest()
     expect(ingest()).toEqual(revision)
     expect(() => ingest(2, 'planner-1')).toThrow(/Planner dispatch natural key/)
+    expect(store.hasUsablePlan(WATCHER_ID)).toBe(false)
     const activation = {
       watcherId: WATCHER_ID,
       revisionId: revision.revisionId,
@@ -160,6 +161,7 @@ describe('ObjectiveStore natural-key persistence', () => {
     const activated = store.activatePlan(activation)
     expect(store.activatePlan({ ...activation, approvedAtMs: 201 })).toEqual(activated)
     expect(store.isPlanActivated(WATCHER_ID, revision.revisionId, revision.digest)).toBe(true)
+    expect(store.hasUsablePlan(WATCHER_ID)).toBe(true)
     expect(store.planForDispatch(WATCHER_ID, 'planner-1')).toEqual({
       revisionId: revision.revisionId,
       revisionNumber: 1,
@@ -387,7 +389,9 @@ describe('ObjectiveStore natural-key persistence', () => {
       digest: first.digest,
       approvedAtMs: 200
     })
+    expect(store.hasUsablePlan(WATCHER_ID)).toBe(true)
     expect(() => ingest(2)).not.toThrow()
+    expect(store.hasUsablePlan(WATCHER_ID)).toBe(false)
     expect(store.project(WATCHER_ID).revisions.map(({ status }) => status)).toEqual([
       'approved',
       'draft'
@@ -473,6 +477,96 @@ describe('ObjectiveStore natural-key persistence', () => {
       'succeeded',
       'failed'
     ])
+  })
+
+  it('keeps an infra/environment failure pending under the redispatch cap, but failed past it', () => {
+    const revision = ingest()
+    store.activatePlan({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      digest: revision.digest,
+      approvedAtMs: 200
+    })
+    const retryOf = `${revision.revisionId}:task-a`
+    const dispatchNode = (extras: Record<string, unknown> = {}) =>
+      action('dispatch-node', {
+        revisionId: revision.revisionId,
+        taskKey: 'task-a',
+        depsOrchestrationIds: [],
+        ...extras
+      })
+    const underCap: WatcherLedger = {
+      watcherId: WATCHER_ID,
+      entries: [
+        {
+          ...settledAttempt('under-cap', dispatchNode(), 'not-landed'),
+          failureClass: 'infra'
+        }
+      ]
+    }
+    expect(store.project(WATCHER_ID, underCap).nodes[0].state).toBe('pending')
+
+    const pastCap: WatcherLedger = {
+      watcherId: WATCHER_ID,
+      entries: [
+        {
+          ...settledAttempt('original', dispatchNode(), 'not-landed'),
+          failureClass: 'infra'
+        },
+        {
+          ...settledAttempt('retry-0', dispatchNode({ retryOf }), 'not-landed'),
+          failureClass: 'environment'
+        },
+        {
+          ...settledAttempt('retry-1', dispatchNode({ retryOf }), 'not-landed'),
+          failureClass: 'infra'
+        }
+      ]
+    }
+    expect(store.project(WATCHER_ID, pastCap).nodes[0].state).toBe('failed')
+  })
+
+  it('recognizes only the base evidence key for a dispatch-node awaiting-approval escalation', () => {
+    const revision = ingest()
+    store.activatePlan({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      digest: revision.digest,
+      approvedAtMs: 200
+    })
+    const baseKey = `${revision.revisionId}:task-a`
+
+    function pendingApproval(evidenceKey: string): WatcherLedger {
+      return {
+        watcherId: WATCHER_ID,
+        entries: [
+          {
+            eventId: `escalation-${evidenceKey}`,
+            watcherId: WATCHER_ID,
+            atMs: 50,
+            origin: 'owner',
+            class: 'fact',
+            kind: 'escalation',
+            escalationId: `awaiting-approval:${evidenceKey}`,
+            escalationKind: 'awaiting-approval',
+            status: 'open',
+            foldCount: 1,
+            approvalScope: {
+              actionKind: 'dispatch-node',
+              contentIdentity: CONTENT_IDENTITY,
+              evidenceKey
+            }
+          }
+        ]
+      }
+    }
+
+    expect(store.project(WATCHER_ID, pendingApproval(`${baseKey}:r0`)).nodes[0].state).toBe(
+      'pending'
+    )
+    expect(store.project(WATCHER_ID, pendingApproval(baseKey)).nodes[0].state).toBe(
+      'awaiting-approval'
+    )
   })
 
   it('returns schema-valid detail with bodies, checks, verdicts, and landing evidence', () => {

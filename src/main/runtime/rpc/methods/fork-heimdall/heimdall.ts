@@ -17,6 +17,7 @@ import {
   projectLegacyDebugReport,
   projectLegacyEnrollResult
 } from './legacy-wire'
+import { projectHeimdallDetailForClient } from './dispatch-result-wire'
 
 let fleetSubscriptionSequence = 0
 
@@ -68,12 +69,19 @@ export const HEIMDALL_METHODS: readonly RpcAnyMethod[] = [
   defineMethod({
     name: HEIMDALL_CHANNELS.detail,
     params: WatcherTargetSchema,
-    handler: (target, { runtime, clientKind }) => {
+    handler: async (target, context) => {
+      const { runtime, clientKind } = context
       if (clientKind === 'runtime') {
         assertLocalTarget(target)
-        return requireHeimdallKernel(runtime).detail(target)
+        return projectHeimdallDetailForClient(
+          await requireHeimdallKernel(runtime).detail(target),
+          context
+        )
       }
-      return requireHeimdallTransport(runtime).detail(target)
+      return projectHeimdallDetailForClient(
+        await requireHeimdallTransport(runtime).detail(target),
+        context
+      )
     }
   }),
   defineMethod({

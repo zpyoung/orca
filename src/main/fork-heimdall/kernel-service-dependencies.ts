@@ -37,7 +37,8 @@ export function runnerLedgerStore(store: HeimdallLedgerStore): RunnerLedgerStore
     },
     appendTickTrace: (watcherId, trace) => store.appendTickTrace(watcherId, trace),
     readTickTraces: (watcherId) => store.readTickTraces(watcherId),
-    releaseTickTracePin: (watcherId, seq) => store.releaseTickTracePin(watcherId, seq)
+    releaseTickTracePin: (watcherId, seq) => store.releaseTickTracePin(watcherId, seq),
+    readTerminalSummary: (watcherId) => store.readTerminalSummary(watcherId)
   }
 }
 

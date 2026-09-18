@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { LedgerEntry } from '../../shared/fork-heimdall/ledger-types'
+import { dormantWatcherStatus } from './debug-report'
+import { isMalformedKindPayloadEnrollment } from './enrollment-store'
 import { enrollmentInput, harness, kind, runningDispatch } from './kernel-service-test-harness'
 
 vi.mock('electron', () => ({}))
@@ -68,8 +70,9 @@ function latestEscalation(entries: readonly LedgerEntry[], escalationKind: strin
 }
 
 describe('Heimdall unanswerable worker questions', () => {
-  it('voids a carried-over question whose thread closed with its dispatch and permits a resume', async () => {
-    const { service, orchestration, watcherId } = await parkedOnQuestion()
+  it('voids a carried-over question, auto-resumes durably, refuses a further resume', async () => {
+    const { service, orchestration, watcherId, enrollmentStore, ledgerStore } =
+      await parkedOnQuestion()
     expect((await service.list())[0]).toMatchObject({
       status: { state: 'parked', parkReason: { kind: 'worker-question' } }
     })
@@ -80,7 +83,7 @@ describe('Heimdall unanswerable worker questions', () => {
     const entries = service.ledger(watcherId).entries
     expect(latestEscalation(entries, 'worker-question')).toMatchObject({ status: 'resolved' })
     expect(latestEscalation(entries, 'park-worker-question')).toMatchObject({
-      status: 'acknowledged'
+      status: 'resolved'
     })
     expect(entries).toEqual(
       expect.arrayContaining([
@@ -92,8 +95,19 @@ describe('Heimdall unanswerable worker questions', () => {
       ])
     )
     expect((await service.list())[0]).toMatchObject({
-      status: { state: 'parked', reason: 'ready-to-resume', parkReason: null }
+      enrollment: { enabled: true },
+      status: { state: 'watching', parkReason: null }
     })
+
+    // provable from a cold read of durable state alone, not the live runner's in-memory status
+    const persistedEnrollment = enrollmentStore.get(watcherId)
+    if (!persistedEnrollment || isMalformedKindPayloadEnrollment(persistedEnrollment)) {
+      throw new Error('expected a valid persisted enrollment')
+    }
+    expect(persistedEnrollment.enabled).toBe(true)
+    expect(dormantWatcherStatus(persistedEnrollment, ledgerStore.read(watcherId)).parkReason).toBe(
+      null
+    )
 
     const parked = (await service.fleet()).entries[0]!
     await expect(
@@ -102,7 +116,16 @@ describe('Heimdall unanswerable worker questions', () => {
         expectedOwner: parked.ownerFence,
         command: { kind: 'resume' }
       })
-    ).resolves.toMatchObject({ status: 'applied' })
+    ).resolves.toMatchObject({ status: 'refused', reason: 'invalid-state' })
+
+    const parkBeforeSecondTick = latestEscalation(
+      service.ledger(watcherId).entries,
+      'park-worker-question'
+    )
+    await service.reconcileForTesting(watcherId)
+    expect(latestEscalation(service.ledger(watcherId).entries, 'park-worker-question')).toEqual(
+      parkBeforeSecondTick
+    )
   })
 
   it('keeps an unreachable question open, because lost contact is not settlement', async () => {

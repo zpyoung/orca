@@ -233,13 +233,19 @@ describe('Heimdall dispatch write-ahead lifecycle', () => {
     expect(world.budgetClock.open).not.toHaveBeenCalled()
   })
 
-  it('does not charge a turn or open an interval for a refused dispatch', async () => {
+  it('settles a pre-dispatch refusal without blocking later work', async () => {
     const adapter = {
-      dispatchWorker: vi.fn(async () => ({
-        status: 'refused' as const,
-        reason: 'placement-unavailable' as const,
-        detail: 'workspace unavailable'
-      })),
+      dispatchWorker: vi
+        .fn()
+        .mockResolvedValueOnce({
+          status: 'refused' as const,
+          reason: 'pre-dispatch-failure' as const,
+          detail: 'database unavailable'
+        })
+        .mockResolvedValueOnce({
+          status: 'dispatched' as const,
+          dispatchId: 'dispatch-later'
+        }),
       recoverDispatch: vi.fn(async () => ({ status: 'absent' as const }))
     }
     const world = harness(adapter)
@@ -254,9 +260,15 @@ describe('Heimdall dispatch write-ahead lifecycle', () => {
         kind: 'attempt',
         state: 'settled',
         effect: 'not-landed',
-        reason: 'placement-unavailable'
+        reason: 'pre-dispatch-failure'
       })
     )
+
+    await expect(world.lifecycle.dispatch(input('later-attempt'))).resolves.toEqual({
+      status: 'dispatched',
+      dispatchId: 'dispatch-later'
+    })
+    expect(adapter.dispatchWorker).toHaveBeenCalledTimes(2)
   })
 
   it('repairs a crash after charging a turn without charging it twice', async () => {

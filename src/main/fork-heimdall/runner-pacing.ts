@@ -14,6 +14,7 @@ export function runnerPacingDelay(
   const tier = runner.kind.pacing?.pace(snapshot, ledger) ?? 'idle'
   const pacing = derivePacing(tier, {
     consecutiveErrors: runner.consecutiveErrors,
+    consecutiveGateHolds: runner.consecutiveGateHolds,
     lastFullResyncAtMs: runner.lastFullResyncAtMs,
     evaluatedAtMs: nowMs
   })

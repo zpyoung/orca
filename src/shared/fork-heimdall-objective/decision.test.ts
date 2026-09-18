@@ -1,178 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { WORKER_EXITED_WITHOUT_COMPLETION } from '../fork-heimdall/effect-certainty'
-import type {
-  AttemptEntry,
-  EvidenceEntry,
-  LedgerEntry,
-  WatcherLedger
-} from '../fork-heimdall/ledger-types'
-import type { Snapshot } from '../fork-heimdall/snapshot'
 import { decideObjective } from './decision'
+import {
+  attempt,
+  CONTRACT,
+  ledger,
+  node,
+  projection,
+  revision,
+  snapshot,
+  WORKER_EXITED_WITHOUT_COMPLETION,
+  workerDone,
+  workerHeartbeat
+} from './decision-test-harness'
+import { projectObjectiveReports } from './decision-context'
 import type { ObjectiveAction } from './objective-actions'
-import type {
-  ObjectiveNodeProjection,
-  ObjectiveProjection,
-  ObjectiveRevisionProjection,
-  ObjectiveWorld
-} from './detail-types'
-
-const CONTRACT: ObjectiveWorld['contract'] = {
-  objectiveText: 'Implement the objective',
-  tier: 'standard',
-  landingBar: 'files-on-disk',
-  maxConcurrency: 1,
-  workspaceKind: 'git',
-  writeTerritory: ['src/**'],
-  roleAgents: {},
-  sitterOverrides: {}
-}
-
-function revision(
-  overrides: Partial<ObjectiveRevisionProjection> = {}
-): ObjectiveRevisionProjection {
-  return {
-    id: 'revision-1',
-    number: 1,
-    status: 'approved',
-    digest: 'plan-digest',
-    createdByDispatchId: 'planner-dispatch',
-    createdAtMs: 10,
-    approvedAtMs: 20,
-    ...overrides
-  }
-}
-
-function node(
-  taskKey: string,
-  overrides: Partial<ObjectiveNodeProjection> = {}
-): ObjectiveNodeProjection {
-  return {
-    revisionId: 'revision-1',
-    taskKey,
-    deps: [],
-    orchestrationTaskId: null,
-    dispatchId: null,
-    state: 'pending',
-    criteria: [],
-    ...overrides
-  }
-}
-
-function projection(overrides: Partial<ObjectiveProjection> = {}): ObjectiveProjection {
-  return {
-    revisions: [revision()],
-    nodes: [node('core')],
-    verdicts: [],
-    landing: [],
-    ...overrides
-  }
-}
-
-function snapshot(
-  plan: ObjectiveProjection,
-  overrides: Partial<ObjectiveWorld> = {},
-  contentIdentity = 'content-current'
-): Snapshot<ObjectiveWorld> {
-  return {
-    freshness: 'live',
-    contentIdentity,
-    observedAtMs: 100,
-    world: {
-      contract: CONTRACT,
-      workspaceKind: 'git',
-      plan,
-      reports: [],
-      budget: { wallClockActiveMs: 60_000, turns: 20 },
-      landingContext: {
-        branch: 'feature/objective',
-        headSha: 'head-current',
-        worktreeContentDigest: 'worktree-digest',
-        pushTarget: { remote: 'origin', branch: 'feature/objective', remoteSha: '' },
-        hostedReview: { provider: 'github', repoKey: 'repo-1', base: 'main' }
-      },
-      ...overrides
-    }
-  }
-}
-
-function attempt(
-  action: ObjectiveAction,
-  options: {
-    state?: AttemptEntry['state']
-    effect?: AttemptEntry['effect']
-    dispatchId?: string
-    atMs?: number
-    reason?: AttemptEntry['reason']
-  } = {}
-): AttemptEntry {
-  const dispatchAction = action.kind.startsWith('dispatch-')
-  return {
-    kind: 'attempt',
-    eventId: `event-${options.dispatchId ?? action.evidenceKey}`,
-    watcherId: 'watcher-1',
-    atMs: options.atMs ?? 30,
-    origin: 'owner',
-    class: 'fact',
-    attemptId: `attempt-${options.dispatchId ?? action.evidenceKey}`,
-    fingerprint: `fingerprint-${options.dispatchId ?? action.evidenceKey}`,
-    action,
-    state: options.state ?? 'running',
-    ...(options.effect === undefined ? {} : { effect: options.effect }),
-    ...(options.reason === undefined ? {} : { reason: options.reason }),
-    ...(dispatchAction
-      ? {
-          dispatch: {
-            spec: 'role prompt',
-            taskKey: action.kind === 'dispatch-node' ? action.taskKey : action.kind,
-            dispatchKind: 'child' as const
-          }
-        }
-      : {}),
-    ...(options.dispatchId === undefined ? {} : { dispatchId: options.dispatchId })
-  }
-}
-
-function workerDone(dispatchId: string, reportPath = '/outside/report.json'): EvidenceEntry {
-  return {
-    kind: 'evidence',
-    eventId: `evidence-${dispatchId}`,
-    watcherId: 'watcher-1',
-    atMs: 40,
-    origin: 'owner',
-    class: 'fact',
-    evidenceKind: 'orchestration-mailbox',
-    payload: {
-      type: 'worker_done',
-      payload: {
-        dispatchId,
-        taskId: `task-${dispatchId}`,
-        outcome: 'succeeded',
-        reportPath,
-        filesModified: ['src/core.ts']
-      }
-    }
-  }
-}
-
-function workerHeartbeat(dispatchId: string): EvidenceEntry {
-  return {
-    kind: 'evidence',
-    eventId: `heartbeat-${dispatchId}`,
-    watcherId: 'watcher-1',
-    atMs: 35,
-    origin: 'owner',
-    class: 'fact',
-    evidenceKind: 'orchestration-mailbox',
-    payload: {
-      type: 'heartbeat',
-      payload: { dispatchId, taskId: `first-task-${dispatchId}` }
-    }
-  }
-}
-
-function ledger(entries: LedgerEntry[] = []): WatcherLedger {
-  return { watcherId: 'watcher-1', entries }
-}
 
 describe('objective deterministic phase flow', () => {
   it('dispatches the initial planner with a stable revision evidence key', () => {
@@ -793,6 +634,62 @@ describe('objective landing ladder decisions', () => {
         ledger()
       )
     ).toMatchObject({ action: null, reason: 'base-branch-unresolvable' })
+  })
+})
+
+describe('objective pending report projection', () => {
+  const dispatchNode: ObjectiveAction = {
+    kind: 'dispatch-node',
+    capability: 'implement',
+    visibility: 'local',
+    contentIdentity: 'content-current',
+    evidenceKey: 'revision-1:core',
+    revisionId: 'revision-1',
+    taskKey: 'core',
+    depsOrchestrationIds: []
+  }
+
+  it('carries the worker mailbox subject and body into the pending report', () => {
+    const reports = projectObjectiveReports(
+      ledger([
+        attempt(dispatchNode, { dispatchId: 'dispatch-core' }),
+        {
+          kind: 'evidence',
+          eventId: 'evidence-dispatch-core',
+          watcherId: 'watcher-1',
+          atMs: 40,
+          origin: 'owner',
+          class: 'fact',
+          evidenceKind: 'orchestration-mailbox',
+          payload: {
+            type: 'worker_done',
+            subject: 'Blocked on missing environment variable',
+            body: 'ORCA_SANDBOX_DOCKER_HOST was unset so the sandbox never started.',
+            payload: {
+              dispatchId: 'dispatch-core',
+              taskId: 'task-core',
+              outcome: 'failed',
+              reportPath: '/outside/report.json',
+              filesModified: ['src/core.ts']
+            }
+          }
+        }
+      ])
+    )
+    expect(reports).toHaveLength(1)
+    expect(reports[0]).toMatchObject({
+      subject: 'Blocked on missing environment variable',
+      body: 'ORCA_SANDBOX_DOCKER_HOST was unset so the sandbox never started.'
+    })
+  })
+
+  it('still parses a pending report when the worker sends no subject or body', () => {
+    const reports = projectObjectiveReports(
+      ledger([attempt(dispatchNode, { dispatchId: 'dispatch-core' }), workerDone('dispatch-core')])
+    )
+    expect(reports).toHaveLength(1)
+    expect(reports[0].subject).toBeUndefined()
+    expect(reports[0].body).toBeUndefined()
   })
 })
 

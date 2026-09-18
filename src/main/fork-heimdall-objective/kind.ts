@@ -2,6 +2,7 @@ import { deriveBudgetState } from '../../shared/fork-heimdall/budget'
 import type { GateVerdict } from '../../shared/fork-heimdall/gate'
 import type { HandoffAdapter, WatcherKind } from '../../shared/fork-heimdall/kind-contract'
 import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
+import type { PacingTier } from '../../shared/fork-heimdall/pacing'
 import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
 import type { ObjectiveEnrollmentPayload } from '../../shared/fork-heimdall-objective/contract-types'
@@ -12,12 +13,16 @@ import {
   stopRungForBar
 } from '../../shared/fork-heimdall-objective/landing-ladder'
 import { deriveHandoffInput } from '../../shared/fork-heimdall-objective/objective-handoff-policy'
-import { decideObjective } from '../../shared/fork-heimdall-objective/decision'
+import {
+  decideObjective,
+  type ObjectiveDecisionOutcome
+} from '../../shared/fork-heimdall-objective/decision'
+import { objectiveNoAction } from '../../shared/fork-heimdall-objective/decision-context'
 import {
   ObjectiveWorldSchema,
   type ObjectiveWorld
 } from '../../shared/fork-heimdall-objective/detail-types'
-import { objectivePacing } from '../../shared/fork-heimdall-objective/pacing'
+import { paceObjective } from '../../shared/fork-heimdall-objective/pacing'
 import { OBJECTIVE_STOP_PREDICATES } from '../../shared/fork-heimdall-objective/stop-policy'
 import type { Store } from '../persistence'
 import { runtimeFileSshTargetId } from '../runtime/runtime-file-command-target'
@@ -25,7 +30,11 @@ import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { createObjectiveActionExecutor } from './action-executor'
 import { computeWorkspaceContentIdentity, type ObjectiveWorkspaceTarget } from './content-identity'
 import { defaultObjectiveForgeAccess, type ObjectiveForgeAccess } from './objective-forge-access'
-import { authorizeObjectiveEnrollment, objectiveContractFromEnrollment } from './definition'
+import {
+  assertObjectiveEnrollmentHasUsablePlan,
+  authorizeObjectiveEnrollment,
+  objectiveContractFromEnrollment
+} from './definition'
 import {
   bindObjectiveSnapshot,
   requireObjectiveSnapshotBinding,
@@ -38,6 +47,33 @@ import { resolveObjectiveWorkspaceTarget } from './workspace-target'
 import type { ObjectiveAction } from '../../shared/fork-heimdall-objective/objective-actions'
 
 export type ObjectiveKind = WatcherKind<ObjectiveWorld, ObjectiveAction, ObjectiveEnrollmentPayload>
+const PLAN_OFF_WITHOUT_USABLE_PLAN = 'plan-off-without-usable-plan'
+
+export function decideObjectiveForEnrollment(
+  snapshot: Snapshot<ObjectiveWorld>,
+  ledger: WatcherLedger,
+  enrollment: WatcherEnrollment
+): ObjectiveDecisionOutcome {
+  const decision = decideObjective(snapshot, ledger)
+  const requiresPlan =
+    decision.action?.capability === 'plan' ||
+    (decision.action === null &&
+      decision.considered.some((considered) => considered.phase === 'plan'))
+  if (enrollment.capabilities.plan !== 'off' || !requiresPlan) {
+    return decision
+  }
+  return objectiveNoAction('plan', PLAN_OFF_WITHOUT_USABLE_PLAN)
+}
+
+export function paceObjectiveForEnrollment(
+  snapshot: Snapshot<ObjectiveWorld>,
+  ledger: WatcherLedger,
+  decision: ObjectiveDecisionOutcome
+): PacingTier {
+  return decision.action === null && decision.reason === PLAN_OFF_WITHOUT_USABLE_PLAN
+    ? 'idle'
+    : paceObjective(snapshot, ledger)
+}
 
 function checkTargetAvailable(target: ObjectiveWorkspaceTarget): boolean {
   if (target.fileProvider === null) {
@@ -150,6 +186,7 @@ export function createObjectiveKind(args: {
   forge?: ObjectiveForgeAccess
 }): ObjectiveKind {
   const snapshotBindings = new WeakMap<Snapshot<ObjectiveWorld>, ObjectiveSnapshotBinding>()
+  const snapshotDecisions = new WeakMap<Snapshot<ObjectiveWorld>, ObjectiveDecisionOutcome>()
   const forge = args.forge ?? defaultObjectiveForgeAccess
   const executor = createObjectiveActionExecutor({
     store: args.store,
@@ -169,6 +206,13 @@ export function createObjectiveKind(args: {
         args.storageAuthority ?? 'desktop',
         forge
       ),
+    validateEnrollment(candidate, existing) {
+      assertObjectiveEnrollmentHasUsablePlan(
+        candidate,
+        existing,
+        existing?.kind === 'objective' && args.objectiveStore.hasUsablePlan(existing.watcherId)
+      )
+    },
     describeEnrollment(enrollment) {
       const text = objectiveContractFromEnrollment(enrollment).objectiveText
       return text.length > 96 ? `${text.slice(0, 93)}...` : text
@@ -225,7 +269,15 @@ export function createObjectiveKind(args: {
         branch: snapshot.world.landingContext.branch
       }
     },
-    decide: decideObjective,
+    decide(snapshot, ledger) {
+      const decision = decideObjectiveForEnrollment(
+        snapshot,
+        ledger,
+        requireObjectiveSnapshotBinding(snapshotBindings, snapshot).enrollment
+      )
+      snapshotDecisions.set(snapshot, decision)
+      return decision
+    },
     async preflight(action, snapshot, ledger, context) {
       const binding = requireObjectiveSnapshotBinding(snapshotBindings, snapshot)
       return objectivePreflight({
@@ -239,7 +291,19 @@ export function createObjectiveKind(args: {
     execute: executor.execute,
     resolveOutcome: executor.resolveOutcome,
     stopPredicates: OBJECTIVE_STOP_PREDICATES,
-    pacing: objectivePacing,
+    pacing: {
+      pace(snapshot, ledger) {
+        const decision =
+          snapshotDecisions.get(snapshot) ??
+          decideObjectiveForEnrollment(
+            snapshot,
+            ledger,
+            requireObjectiveSnapshotBinding(snapshotBindings, snapshot).enrollment
+          )
+        snapshotDecisions.delete(snapshot)
+        return paceObjectiveForEnrollment(snapshot, ledger, decision)
+      }
+    },
     planner: {},
     handoff: objectiveHandoffAdapter(args.objectiveStore),
     debug: {

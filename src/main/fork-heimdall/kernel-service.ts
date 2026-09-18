@@ -1,8 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import {
-  deriveBudgetState,
-  HEIMDALL_BUDGET_GENERATION_EVIDENCE_KIND
-} from '../../shared/fork-heimdall/budget'
+import { HEIMDALL_BUDGET_GENERATION_EVIDENCE_KIND } from '../../shared/fork-heimdall/budget'
 import type { KernelAction, WatcherKind } from '../../shared/fork-heimdall/kind-contract'
 import {
   WatcherTargetSchema,
@@ -22,7 +19,7 @@ import type {
 } from '../../shared/fork-heimdall/watcher-types'
 import type { HeimdallDatabase } from './database'
 import type { WatcherControlPlane } from './control-plane'
-import type { HeimdallDebugReport } from './debug-report'
+import { durableWatcherBudget, type HeimdallDebugReport } from './debug-report'
 import {
   isMalformedKindPayloadEnrollment,
   type EnrollmentRecord,
@@ -39,7 +36,11 @@ import {
 } from './kernel-service-dependencies'
 import { bootHeimdallKernelService } from './kernel-service-boot'
 import { shutdownHeimdallKernel } from './kernel-shutdown'
-import { heimdallMailboxAddressForRun, setHeimdallMailboxWake } from './mailbox-wake-registry'
+import {
+  heimdallMailboxAddressForDispatch,
+  heimdallMailboxAddressForRun,
+  setHeimdallMailboxWake
+} from './mailbox-wake-registry'
 import type { KernelTerminalTransition } from './kernel-terminal-transition'
 import type { KernelReadModel } from './kernel-read-model'
 import type { HeimdallLedgerStore } from './ledger-store'
@@ -221,12 +222,30 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
   }
 
   private wakeRunnersForMailbox(address: string): void {
+    const dispatchScoped = address.startsWith('dispatch:')
     for (const runner of this.runners.values()) {
       const runId = runner.enrollment.orchestrationRunId
       if (runId && heimdallMailboxAddressForRun(runId) === address) {
         this.requireRunnerLoop().schedule(runner, 0)
+        continue
+      }
+      if (dispatchScoped && this.hasInFlightDispatchAddress(runner, address)) {
+        this.requireRunnerLoop().schedule(runner, 0)
       }
     }
+  }
+
+  // upstream notifies dispatch-scoped mailboxes for federated/remote workers, which never equal
+  // a run address; matching in-flight dispatch ids is the only way to catch that wake.
+  private hasInFlightDispatchAddress(runner: WatcherRunner, address: string): boolean {
+    const attempts = getInFlightAttempts(
+      this.requireRunnerLedger().read(runner.enrollment.watcherId)
+    )
+    return attempts.some(
+      (attempt) =>
+        attempt.dispatchId !== undefined &&
+        heimdallMailboxAddressForDispatch(attempt.dispatchId) === address
+    )
   }
 
   onShutdown(listener: () => void, phase: 'start' | 'drained' = 'start'): () => void {
@@ -356,17 +375,20 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
   private listEntry(record: EnrollmentRecord): WatcherListEntry {
     const malformed = isMalformedKindPayloadEnrollment(record)
     const enrollment = enrollmentForPresentation(record)
-    const ledger = this.requireRunnerLedger().read(enrollment.watcherId)
+    const runnerLedger = this.requireRunnerLedger()
+    const ledger = runnerLedger.read(enrollment.watcherId)
+    const terminalSummary = runnerLedger.readTerminalSummary(enrollment.watcherId)
     const runner = this.runners.get(enrollment.watcherId)
     return watcherListEntry({
       enrollment,
       kind: this.registry.get(enrollment.kind),
       ledger,
+      terminalSummary,
       ...(runner
         ? {
             status: {
               ...runner.status,
-              budget: deriveBudgetState(ledger, enrollment.budget)
+              budget: durableWatcherBudget(enrollment, ledger, terminalSummary)
             }
           }
         : {}),

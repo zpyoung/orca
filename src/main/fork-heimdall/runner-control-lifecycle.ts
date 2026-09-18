@@ -20,6 +20,9 @@ export class WatcherRunnerControlLifecycle {
       this.dependencies.clearTimer(runner.timer)
       runner.timer = null
     }
+    runner.leaseRenewal?.dispose()
+    runner.leaseRenewal = null
+    runner.leaseGuard = null
     this.dependencies.dispatchLifecycle.closeForContactLoss(runner.enrollment.watcherId)
     const openInterval =
       this.dependencies.budgetClock.current?.(runner.enrollment.watcherId) ?? null

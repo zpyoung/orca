@@ -10,8 +10,7 @@ vi.mock('./provider-git', () => ({
   resolveHostedReviewSitterGitExecution: () => ({ worktreeIsClean })
 }))
 
-const { inspectHostedReviewSitterContention, inspectHostedReviewSitterOwnedSession } =
-  await import('./contention')
+const { inspectHostedReviewSitterContention } = await import('./contention')
 
 const REPO_ID = 'repo-1'
 const WORKTREE_PATH = '/workspaces/grampus'
@@ -36,14 +35,40 @@ function fakeStore(connectionId: string | null = null): Store {
   } as unknown as Store
 }
 
-function fakeRuntime(hostScope: RuntimeListingHostScope | undefined, truncated = false) {
+function fakeRuntime(
+  hostScope: RuntimeListingHostScope | undefined,
+  truncated = false,
+  options: {
+    terminals?: { handle: string; title: string | null; connected: boolean }[]
+    agentStatus?: { isRunningAgent: boolean; status: 'idle' | 'working' | null }
+    dispatchId?: string
+  } = {}
+) {
   return {
     showManagedWorktree: async () => ({
       repoId: REPO_ID,
       git: { path: WORKTREE_PATH }
     }),
-    listTerminals: async () => ({ terminals: [], totalCount: 0, truncated, hostScope }),
-    getTerminalAgentStatus: async () => ({ isRunningAgent: false, status: null })
+    listTerminals: async () => ({
+      terminals: options.terminals ?? [],
+      totalCount: options.terminals?.length ?? 0,
+      truncated,
+      hostScope
+    }),
+    getTerminalAgentStatus: async () =>
+      options.agentStatus ?? { isRunningAgent: false, status: null },
+    getOrchestrationDb: () => ({
+      getWorkerTerminalResourceByOwner: (dispatchId: string) =>
+        dispatchId === options.dispatchId
+          ? {
+              origin_dispatch_id: dispatchId,
+              owner_dispatch_id: dispatchId,
+              worktree_id: DEFINITION.worktreeId,
+              ownership_state: 'owned',
+              terminal_handle: options.terminals?.[0]?.handle
+            }
+          : undefined
+    })
   } as unknown as OrcaRuntimeService
 }
 
@@ -102,23 +127,34 @@ describe('hosted review sitter terminal-census gate', () => {
     })
   })
 
-  it('applies the same gate when reading an owned agent session', async () => {
-    await expect(
-      inspectHostedReviewSitterOwnedSession(
-        fakeRuntime({ hostIds: ['local'], omittedHostIds: ['ssh:box-1'] }),
-        fakeStore(),
-        DEFINITION,
-        'action-1'
-      )
-    ).resolves.toEqual({ state: 'absent' })
+  it('recognizes an idle worker only through its exact durable dispatch identity', async () => {
+    const terminal = { handle: 'term-owned', title: 'unrelated title', connected: true }
+    const ownWorker = { attemptId: 'attempt-1', dispatchId: 'dispatch-owned' }
 
     await expect(
-      inspectHostedReviewSitterOwnedSession(
-        fakeRuntime({ hostIds: ['local'], omittedHostIds: ['ssh:box-1'] }),
-        fakeStore('box-1'),
+      inspectHostedReviewSitterContention(
+        fakeRuntime({ hostIds: ['local'], omittedHostIds: [] }, false, {
+          terminals: [terminal],
+          agentStatus: { isRunningAgent: true, status: 'idle' },
+          dispatchId: ownWorker.dispatchId
+        }),
+        fakeStore(),
         DEFINITION,
-        'action-1'
+        ownWorker
       )
-    ).resolves.toEqual({ state: 'unverifiable', reason: 'terminal-host-census-incomplete' })
+    ).resolves.toEqual({ state: 'clear' })
+
+    await expect(
+      inspectHostedReviewSitterContention(
+        fakeRuntime({ hostIds: ['local'], omittedHostIds: [] }, false, {
+          terminals: [terminal],
+          agentStatus: { isRunningAgent: true, status: 'idle' },
+          dispatchId: 'dispatch-foreign'
+        }),
+        fakeStore(),
+        DEFINITION,
+        ownWorker
+      )
+    ).resolves.toEqual({ state: 'foreign-agent', sessionId: terminal.handle })
   })
 })

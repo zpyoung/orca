@@ -166,7 +166,8 @@
         "existingPlanPlaceholder": "Paste the plan the planner should normalize…",
         "existingPlanCharacterCount": "{{current}} / {{maximum}} characters",
         "removeExistingPlan": "Remove plan",
-        "existingPlanPlanOff": "Plan is Off. Any source plan is saved but cannot be processed until Plan is Gated or On; a planner still converts it into executable tasks under that approval mode."
+        "existingPlanPlanOff": "Plan is Off. New objectives require Plan Gated or On unless this same workspace objective already has a usable approved plan. Existing plan source does not count as approval.",
+        "planOffRequiresApprovedPlan": "Plan can be Off only when this same objective already has a usable approved plan. Set Plan to Gated or On."
       },
       "validation": {
         "workspaceRequired": "Choose a workspace.",
@@ -178,6 +179,7 @@
         "territoryDuplicate": "Write-territory globs must be unique.",
         "territoryInvalid": "Invalid write-territory glob: {{glob}}",
         "capabilitiesInvalid": "All five objective capabilities must be configured.",
+        "planOffRequiresApprovedPlan": "Set Plan to Gated or On. This form cannot verify a reusable approved plan.",
         "roleAgentUnknown": "Agent {{agent}} is not available on the selected workspace host.",
         "activeBudgetInvalid": "Choose a positive active-work budget.",
         "turnBudgetInvalid": "Worker turns must be a whole number of zero or more.",

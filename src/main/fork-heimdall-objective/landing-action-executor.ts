@@ -15,6 +15,8 @@ import { computeWorkspaceContentIdentity, objectiveGitCommandForTarget } from '.
 import type { ObjectiveSnapshotBinding } from './execution-context'
 import { objectiveForgeContext, type ObjectiveForgeAccess } from './objective-forge-access'
 import {
+  objectiveRemoteRefSha,
+  objectiveRemoteRefState,
   readObjectiveAttachedBranch,
   readObjectiveHeadSha,
   readObjectiveRemoteBranchHead,
@@ -48,22 +50,30 @@ function indeterminate(reason: string, result?: unknown): ActionOutcome {
   return { effect: 'indeterminate', reason, ...(result === undefined ? {} : { result }) }
 }
 
-function errorOutput(error: unknown): { message: string; stderr: string } {
+function errorOutput(error: unknown): { message: string; stdout: string; stderr: string } {
   if (!error || typeof error !== 'object') {
-    return { message: String(error), stderr: '' }
+    return { message: String(error), stdout: '', stderr: '' }
   }
   return {
     message: error instanceof Error ? error.message : String(error),
+    stdout: 'stdout' in error && typeof error.stdout === 'string' ? error.stdout : '',
     stderr: 'stderr' in error && typeof error.stderr === 'string' ? error.stderr : ''
   }
 }
-
-function conditionalPushRejected(error: unknown): boolean {
+function porcelainPushWasRejected(error: unknown, remoteRef: string): boolean {
   const output = errorOutput(error)
-  return /(?:\[rejected\]|stale info|non-fast-forward|fetch first)/iu.test(
-    `${output.message}\n${output.stderr}`
+  return [output.message, output.stdout, output.stderr].some((text) =>
+    text.split(/\r?\n/u).some((line) => {
+      const [flag, refspec, summary] = line.split('\t')
+      return (
+        flag?.trim() === '!' &&
+        refspec?.endsWith(`:${remoteRef}`) === true &&
+        /^\[(?:remote )?rejected\](?: \(.+\))?$/u.test(summary ?? '')
+      )
+    })
   )
 }
+
 function commitHookRejected(error: unknown): boolean {
   const output = errorOutput(error)
   return /(?:pre-commit|prepare-commit-msg|commit-msg|hook declined|hook failed)/iu.test(
@@ -236,11 +246,13 @@ export async function executePushRef(
   await runGit(['cat-file', '-e', `${args.action.commitSha}^{commit}`])
   await args.context.lease.assertHeld()
   const remoteRef = `refs/heads/${args.action.branch}`
+  const expectedBeforeSha = objectiveRemoteRefSha(args.action.expectedState.before)
   let pushError: unknown
   try {
     await runGit([
       'push',
-      `--force-with-lease=${remoteRef}:${args.action.expectedState.before}`,
+      '--porcelain',
+      `--force-with-lease=${remoteRef}:${expectedBeforeSha}`,
       args.action.remote,
       `${args.action.commitSha}:${remoteRef}`
     ])
@@ -248,7 +260,7 @@ export async function executePushRef(
     pushError = error
   }
   await args.context.lease.assertHeld()
-  let observed: string | null
+  let observed: string
   try {
     observed = await readObjectiveRemoteBranchHead(runGit, args.action.remote, args.action.branch)
   } catch (error) {
@@ -258,6 +270,7 @@ export async function executePushRef(
     })
   }
   await args.context.lease.assertHeld()
+  const observedState = objectiveRemoteRefState(observed)
   if (observed === args.action.commitSha) {
     recordLanding(args, args.action.contentIdentity, {
       revisionId: args.action.revisionId,
@@ -278,14 +291,17 @@ export async function executePushRef(
       }
     }
   }
-  if (pushError && conditionalPushRejected(pushError)) {
-    return invalid('remote-moved', errorOutput(pushError))
+  if (pushError && porcelainPushWasRejected(pushError, remoteRef)) {
+    return invalid(
+      observedState === args.action.expectedState.before ? 'push-not-landed' : 'remote-moved',
+      errorOutput(pushError)
+    )
   }
-  if (observed === args.action.expectedState.before) {
+  if (observedState === args.action.expectedState.before) {
     return invalid('push-not-landed', pushError ? errorOutput(pushError) : undefined)
   }
   return indeterminate('push-state-indeterminate', {
-    observed,
+    observed: observedState,
     ...(pushError ? errorOutput(pushError) : {})
   })
 }

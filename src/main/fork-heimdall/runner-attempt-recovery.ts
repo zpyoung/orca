@@ -43,7 +43,12 @@ export class WatcherAttemptRecovery {
         continue
       }
       const lease = this.requireLease(runner)
-      const effect = await runner.kind.resolveOutcome(attempt, live, ledger, lease)
+      const { effect, failureClass } = await runner.kind.resolveOutcome(
+        attempt,
+        live,
+        ledger,
+        lease
+      )
       await this.assertLeaseHeld(runner, lease)
       if (
         effect === 'not-landed' &&
@@ -59,6 +64,7 @@ export class WatcherAttemptRecovery {
         atMs: this.dependencies.now(),
         state: 'settled',
         effect,
+        ...(failureClass === undefined ? {} : { failureClass }),
         reason: 'local-action-recovery-probe'
       })
     }
@@ -141,7 +147,12 @@ export class WatcherAttemptRecovery {
   ): Promise<void> {
     for (const attempt of attempts) {
       const lease = this.requireLease(runner)
-      const effect = await runner.kind.resolveOutcome(attempt, live, ledger, lease)
+      const { effect, failureClass } = await runner.kind.resolveOutcome(
+        attempt,
+        live,
+        ledger,
+        lease
+      )
       await this.assertLeaseHeld(runner, lease)
       if (effect === 'indeterminate') {
         continue
@@ -155,6 +166,7 @@ export class WatcherAttemptRecovery {
         kind: 'attempt-resolved',
         attemptId: attempt.attemptId,
         effect,
+        ...(failureClass === undefined ? {} : { failureClass }),
         evidence: runner.kind.describeSnapshot(live)
       })
     }

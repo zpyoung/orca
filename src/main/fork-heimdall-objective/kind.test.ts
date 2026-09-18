@@ -268,6 +268,30 @@ function orchestrationSimulation(
     )
     return { status: 'dispatched' as const, dispatchId }
   })
+  const queueWorkerEscalation = (enrollment: WatcherEnrollment): void => {
+    const sequence = ++nextSequence
+    queued.push({
+      eventId: `mail-escalation-${sequence}`,
+      watcherId: enrollment.watcherId,
+      atMs: 10_000 + sequence,
+      origin: 'owner',
+      class: 'fact',
+      kind: 'evidence',
+      evidenceKind: 'orchestration-mailbox',
+      source: {
+        kind: 'orchestration',
+        sequence,
+        messageId: `message-escalation-${sequence}`,
+        deliveryId: `delivery-escalation-${sequence}`
+      },
+      payload: {
+        type: 'escalation',
+        subject: 'Need a human decision',
+        body: 'The worker needs operator intervention before continuing.',
+        payload: { dispatchId: 'dispatch-blocked' }
+      }
+    })
+  }
   const adapter = {
     ensureRun: vi.fn(async () => ({ runId: 'objective-run' })),
     dispatchWorker,
@@ -289,7 +313,7 @@ function orchestrationSimulation(
     answerQuestion: vi.fn(async () => undefined),
     readQuestion: vi.fn(async () => ({ status: 'pending' as const }))
   } satisfies HeimdallOrchestrationAdapter
-  return { adapter, delivered, dispatchWorker, reportPaths }
+  return { adapter, delivered, dispatchWorker, queueWorkerEscalation, reportPaths }
 }
 
 async function kernelHarness(
@@ -310,6 +334,7 @@ async function kernelHarness(
       epoch: 1,
       guard: {
         epoch: 1,
+        holder: `holder-${instance}`,
         assertHeld: async () => undefined,
         renewLoop: () => ({ dispose: () => undefined })
       }
@@ -347,7 +372,7 @@ async function kernelHarness(
     objectiveDatabase.close()
   }
   closeables.push(close)
-  return { service, objectiveStore, orchestration, schedule, close }
+  return { service, objectiveStore, ledgerStore, orchestration, schedule, close }
 }
 
 function fingerprintFileName(fingerprint: string): string {
@@ -371,6 +396,56 @@ describe('objective kind through the Heimdall kernel', () => {
       path: world.objectiveStore.databasePath(),
       status: 'resolved'
     })
+  })
+
+  it('resumes a worker escalation once without replaying the objective stop predicate', async () => {
+    const fixture = await workspaceFixture('folder')
+    const world = await kernelHarness(fixture, 'worker-escalation')
+    const enrolled = await world.service.enroll(enrollmentInput(fixture))
+    if (enrolled.status !== 'enrolled') {
+      throw new Error('Expected objective enrollment')
+    }
+    const watcherId = enrolled.entry.enrollment.watcherId
+    world.orchestration.queueWorkerEscalation(enrolled.entry.enrollment)
+
+    await world.service.reconcileForTesting(watcherId)
+    const parkedEntry = (await world.service.fleet()).entries[0]!
+    expect(parkedEntry.entry).toMatchObject({
+      enrollment: { enabled: false },
+      status: {
+        state: 'parked',
+        reason: 'Need a human decision: The worker needs operator intervention before continuing.'
+      }
+    })
+
+    await expect(
+      world.service.command({
+        target: parkedEntry.target,
+        expectedOwner: parkedEntry.ownerFence,
+        command: { kind: 'resume' }
+      })
+    ).resolves.toMatchObject({ status: 'applied' })
+    await world.service.reconcileForTesting(watcherId)
+
+    expect(world.orchestration.dispatchWorker).toHaveBeenCalledTimes(1)
+    expect((await world.service.list())[0]).toMatchObject({
+      enrollment: { enabled: true }
+    })
+    expect((await world.service.list())[0]?.status.state).not.toBe('parked')
+    const ledger = world.service.ledger(watcherId)
+    expect(
+      ledger.entries.findLast(
+        (entry) => entry.kind === 'escalation' && entry.escalationKind === 'worker-escalation'
+      )
+    ).toMatchObject({ status: 'acknowledged' })
+    expect(
+      ledger.entries.some(
+        (entry) =>
+          entry.kind === 'escalation' &&
+          entry.escalationKind === 'park-stop-predicate' &&
+          entry.status === 'open'
+      )
+    ).toBe(false)
   })
 
   it.each(['folder', 'git'] as const)(
@@ -400,6 +475,10 @@ describe('objective kind through the Heimdall kernel', () => {
 
       await first.service.reconcileForTesting(watcherId)
       expect(first.orchestration.dispatchWorker).toHaveBeenCalledTimes(2)
+      const dispatchAttempts = getLatestAttempts(first.service.ledger(watcherId)).filter(
+        (attempt) => attempt.action.kind.startsWith('dispatch-')
+      )
+      expect(dispatchAttempts).toHaveLength(2)
       const finalIdentity = await computeWorkspaceContentIdentity(fixture.target)
       expect(finalIdentity).not.toBe(initialIdentity)
 
@@ -426,15 +505,6 @@ describe('objective kind through the Heimdall kernel', () => {
 
       await first.service.reconcileForTesting(watcherId)
       const ledger = first.service.ledger(watcherId)
-      expect(getLatestAttempts(ledger).map((attempt) => attempt.action.kind)).toEqual([
-        'dispatch-planner',
-        'ingest-plan',
-        'activate-plan',
-        'dispatch-node',
-        'ingest-report',
-        'run-check',
-        'record-landing'
-      ])
       expect(first.objectiveStore.project(watcherId).landing).toEqual([
         expect.objectContaining({ rung: 'files-on-disk', contentIdentity: finalIdentity })
       ])
@@ -446,6 +516,11 @@ describe('objective kind through the Heimdall kernel', () => {
           reason: 'files-on-disk landing bar reached'
         })
       ])
+      expect(first.ledgerStore.readTerminalSummary(watcherId)).toMatchObject({
+        kind: 'objective',
+        terminalState: 'objective-bar-reached',
+        reason: 'files-on-disk landing bar reached'
+      })
       expect(first.orchestration.delivered).toHaveLength(2)
       expect(first.orchestration.delivered.every((entry) => entry.kind === 'evidence')).toBe(true)
       expect(await readFile(join(fixture.root, 'src', 'result.txt'), 'utf8')).toBe('complete\n')
@@ -456,9 +531,6 @@ describe('objective kind through the Heimdall kernel', () => {
         code: 'ENOENT'
       })
 
-      const dispatchAttempts = getLatestAttempts(ledger).filter((attempt) =>
-        attempt.action.kind.startsWith('dispatch-')
-      )
       expect(first.orchestration.reportPaths).toHaveLength(2)
       for (const [index, reportPath] of first.orchestration.reportPaths.entries()) {
         expect(basename(reportPath)).toBe(fingerprintFileName(dispatchAttempts[index]!.fingerprint))
@@ -519,9 +591,37 @@ describe('objective kind through the Heimdall kernel', () => {
     }
     const watcherId = enrolled.entry.enrollment.watcherId
 
-    for (let pulse = 0; pulse < 6; pulse += 1) {
+    for (let pulse = 0; pulse < 7; pulse += 1) {
       await first.service.reconcileForTesting(watcherId)
     }
+    const recordEscalation = first.service
+      .ledger(watcherId)
+      .entries.findLast(
+        (entry) =>
+          entry.kind === 'escalation' &&
+          entry.status === 'open' &&
+          entry.approvalScope?.actionKind === 'record-landing'
+      )
+    if (
+      !recordEscalation ||
+      recordEscalation.kind !== 'escalation' ||
+      !recordEscalation.approvalScope
+    ) {
+      throw new Error('Expected files-on-disk approval escalation')
+    }
+    let fleetEntry = (await first.service.fleet()).entries[0]!
+    await expect(
+      first.service.command({
+        target: fleetEntry.target,
+        expectedOwner: fleetEntry.ownerFence,
+        command: { kind: 'approve', scope: recordEscalation.approvalScope }
+      })
+    ).resolves.toMatchObject({ status: 'applied' })
+
+    await first.service.reconcileForTesting(watcherId)
+    expect(getLatestAttempts(first.service.ledger(watcherId)).at(-1)?.action.kind).toBe(
+      'record-landing'
+    )
     await first.service.reconcileForTesting(watcherId)
     const commitEscalation = first.service
       .ledger(watcherId)
@@ -538,7 +638,7 @@ describe('objective kind through the Heimdall kernel', () => {
     ) {
       throw new Error('Expected commit approval escalation')
     }
-    let fleetEntry = (await first.service.fleet()).entries[0]!
+    fleetEntry = (await first.service.fleet()).entries[0]!
     await expect(
       first.service.command({
         target: fleetEntry.target,
@@ -574,17 +674,8 @@ describe('objective kind through the Heimdall kernel', () => {
 
     await first.service.reconcileForTesting(watcherId)
     const ledger = first.service.ledger(watcherId)
-    expect(getLatestAttempts(ledger).map((entry) => entry.action.kind)).toEqual([
-      'dispatch-planner',
-      'ingest-plan',
-      'activate-plan',
-      'dispatch-node',
-      'ingest-report',
-      'run-check',
-      'commit-local-branch',
-      'push-ref'
-    ])
     expect(first.objectiveStore.project(watcherId).landing.map((entry) => entry.rung)).toEqual([
+      'files-on-disk',
       'committed-local-branch',
       'pushed-ref'
     ])
@@ -598,6 +689,11 @@ describe('objective kind through the Heimdall kernel', () => {
         reason: 'pushed-ref landing bar reached'
       })
     ])
+    expect(first.ledgerStore.readTerminalSummary(watcherId)).toMatchObject({
+      kind: 'objective',
+      terminalState: 'objective-bar-reached',
+      reason: 'pushed-ref landing bar reached'
+    })
 
     first.close()
     const restarted = await kernelHarness(fixture, 'pushed-ref-restarted')

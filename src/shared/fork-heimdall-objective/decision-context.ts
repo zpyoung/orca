@@ -1,3 +1,4 @@
+import type { ObjectiveFailureClass } from '../fork-heimdall/effect-certainty'
 import type { DecisionOutcome } from '../fork-heimdall/kind-contract'
 import { getAttemptResolution, getLatestAttempts } from '../fork-heimdall/ledger-queries'
 import type { AttemptEntry, WatcherLedger } from '../fork-heimdall/ledger-types'
@@ -18,8 +19,10 @@ export type ObjectiveNoActionReason =
   | 'planner-in-flight'
   | 'plan-ingestion-in-flight'
   | 'plan-activation-in-flight'
+  | 'plan-off-without-usable-plan'
   | 'projection-refresh-pending'
   | 'node-in-flight'
+  | 'node-retry-exhausted'
   | 'dependency-task-id-unavailable'
   | 'nodes-blocked-by-dependencies'
   | 'check-in-flight'
@@ -34,6 +37,10 @@ export type ObjectiveNoActionReason =
 export type ObjectiveDecisionOutcome = DecisionOutcome<ObjectiveAction>
 export type ObjectiveAttempt = { attempt: AttemptEntry; action: ObjectiveAction }
 export type AttemptDisposition = 'in-flight' | 'landed' | 'not-landed' | 'indeterminate'
+
+/** Bounds a node's silent auto-redispatch loop; past this it must park rather than retry again. */
+export const OBJECTIVE_INFRA_REDISPATCH_CAP = 2
+export type ObjectiveRetryableFailureClass = Extract<ObjectiveFailureClass, 'infra' | 'environment'>
 
 export function objectiveNoAction(
   phase: string,
@@ -73,6 +80,90 @@ export function objectiveAttemptDisposition(
   return attempt.effect ?? 'indeterminate'
 }
 
+export function objectiveAttemptFailureClass(
+  attempt: AttemptEntry,
+  ledger: WatcherLedger
+): ObjectiveFailureClass | undefined {
+  const resolution = getAttemptResolution(ledger, attempt.attemptId)
+  return resolution ? resolution.failureClass : attempt.failureClass
+}
+
+/**
+ * Null covers every non-retryable outcome (criteria, unclassified, still landed) by construction,
+ * so a future retryable class has to be added here rather than by relaxing a caller's conditional.
+ */
+export function objectiveRetryableFailure(
+  attempt: AttemptEntry,
+  ledger: WatcherLedger
+): ObjectiveRetryableFailureClass | null {
+  if (objectiveAttemptDisposition(attempt, ledger) !== 'not-landed') {
+    return null
+  }
+  const failureClass = objectiveAttemptFailureClass(attempt, ledger)
+  return failureClass === 'infra' || failureClass === 'environment' ? failureClass : null
+}
+
+/**
+ * Counts only redispatches (retryOf set), not the original dispatch, so the first retry is r0 and
+ * this doubles as both the next ordinal and the exhaustion threshold for the same node.
+ */
+export function objectiveNodeRetryCount(
+  attempts: readonly ObjectiveAttempt[],
+  ledger: WatcherLedger,
+  revisionId: string,
+  taskKey: string
+): number {
+  let count = 0
+  for (const { attempt, action } of attempts) {
+    if (
+      action.kind !== 'dispatch-node' ||
+      action.revisionId !== revisionId ||
+      action.taskKey !== taskKey ||
+      action.retryOf === undefined
+    ) {
+      continue
+    }
+    if (objectiveRetryableFailure(attempt, ledger) !== null) {
+      count += 1
+    }
+  }
+  return count
+}
+
+/** The fingerprint the original (non-retry) dispatch captured its workspace baseline under. */
+export function objectiveOriginalDispatchFingerprint(
+  ledger: WatcherLedger,
+  retryOf: string
+): string | null {
+  for (const attempt of getLatestAttempts(ledger)) {
+    const action = ObjectiveActionSchema.safeParse(attempt.action)
+    if (
+      action.success &&
+      action.data.kind === 'dispatch-node' &&
+      action.data.evidenceKey === retryOf
+    ) {
+      return attempt.fingerprint
+    }
+  }
+  return null
+}
+
+/**
+ * A retry's `retryOf` names an evidenceKey that must already be in this append-only ledger; a miss
+ * means that invariant broke, so this throws instead of silently keying the baseline to the retry's
+ * own fingerprint, which would salvage nothing while looking like it validated the retry's report.
+ */
+export function requireObjectiveOriginalDispatchFingerprint(
+  ledger: WatcherLedger,
+  retryOf: string
+): string {
+  const fingerprint = objectiveOriginalDispatchFingerprint(ledger, retryOf)
+  if (fingerprint === null) {
+    throw new Error(`Objective retry's original dispatch is missing from the ledger: ${retryOf}`)
+  }
+  return fingerprint
+}
+
 export function latestObjectiveAttempt(
   attempts: readonly ObjectiveAttempt[],
   predicate: (action: ObjectiveAction) => boolean
@@ -85,9 +176,14 @@ export function latestObjectiveAttempt(
   return null
 }
 
+const MAILBOX_SUBJECT_MAX_CHARS = 2_048
+const MAILBOX_BODY_MAX_CHARS = 8_192
+
 function mailboxPayload(value: unknown): {
   type: string
   payload: Record<string, unknown>
+  subject?: string
+  body?: string
 } | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return null
@@ -101,7 +197,21 @@ function mailboxPayload(value: unknown): {
   ) {
     return null
   }
-  return { type: record.type, payload: record.payload as Record<string, unknown> }
+  // truncated here, not left to the schema's max(), so an oversized field can't drop the whole report
+  const subject =
+    typeof record.subject === 'string' && record.subject.length > 0
+      ? record.subject.slice(0, MAILBOX_SUBJECT_MAX_CHARS)
+      : undefined
+  const body =
+    typeof record.body === 'string' && record.body.length > 0
+      ? record.body.slice(0, MAILBOX_BODY_MAX_CHARS)
+      : undefined
+  return {
+    type: record.type,
+    payload: record.payload as Record<string, unknown>,
+    ...(subject === undefined ? {} : { subject }),
+    ...(body === undefined ? {} : { body })
+  }
 }
 
 export function projectObjectiveReports(ledger: WatcherLedger): ObjectivePendingReport[] {
@@ -171,7 +281,9 @@ export function projectObjectiveReports(ledger: WatcherLedger): ObjectivePending
       orchestrationTaskId: orchestrationTaskByDispatch.get(dispatchId) ?? null,
       taskKey: action.kind === 'dispatch-node' ? action.taskKey : null,
       dispatchedContentIdentity: action.contentIdentity,
-      atMs: entry.atMs
+      atMs: entry.atMs,
+      ...(message.subject === undefined ? {} : { subject: message.subject }),
+      ...(message.body === undefined ? {} : { body: message.body })
     })
     if (report.success) {
       byDispatch.set(dispatchId, report.data)

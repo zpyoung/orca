@@ -5,6 +5,7 @@ import {
 import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
 import { evaluateStopPredicates } from '../../shared/fork-heimdall/stop-policy'
+import { OBJECTIVE_WORKER_ESCALATION_PREDICATE_ID } from '../../shared/fork-heimdall-objective/stop-policy'
 import type { WatcherRunner } from './runner-state'
 import type { WatcherRunnerStatusLifecycle } from './runner-status'
 
@@ -34,10 +35,13 @@ export class WatcherRunnerStopLifecycle {
       return 'terminal'
     }
     await this.assertLeaseHeld(runner)
+    const isWorkerEscalation = fired.predicateId === OBJECTIVE_WORKER_ESCALATION_PREDICATE_ID
     this.status.park(runner, {
       kind: 'stop-predicate',
       predicateId: fired.predicateId,
-      reason: fired.reason
+      reason: fired.reason,
+      // detail is a mailbox message id only for this predicate; others use it for other identities
+      ...(isWorkerEscalation && fired.detail !== undefined ? { messageId: fired.detail } : {})
     })
     return 'parked'
   }

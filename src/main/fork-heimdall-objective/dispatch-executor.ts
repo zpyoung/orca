@@ -1,14 +1,30 @@
 import type { ActionOutcome } from '../../shared/fork-heimdall/effect-certainty'
 import { makeAttemptFingerprint } from '../../shared/fork-heimdall/attempt-fingerprint'
 import type { ExecuteContext } from '../../shared/fork-heimdall/kind-contract'
+import {
+  activeObjectiveRevision,
+  objectiveAttemptFailureClass,
+  objectiveAttempts,
+  projectObjectiveReports,
+  requireObjectiveOriginalDispatchFingerprint,
+  type ObjectiveAttempt
+} from '../../shared/fork-heimdall-objective/decision-context'
 import type { ObjectiveAction } from '../../shared/fork-heimdall-objective/objective-actions'
 import type { ObjectivePlan } from '../../shared/fork-heimdall-objective/plan-schema'
-import type { ObjectiveWorld } from '../../shared/fork-heimdall-objective/detail-types'
+import type {
+  ObjectiveNodeState,
+  ObjectivePendingReport,
+  ObjectiveWorld
+} from '../../shared/fork-heimdall-objective/detail-types'
 import { deriveObjectiveBudgetBucket } from '../../shared/fork-heimdall-objective/pacing'
 import type { Store } from '../persistence'
-import { buildObjectiveRolePrompt, resolveObjectiveRoleAgent } from './role-prompts'
+import {
+  buildObjectiveRolePrompt,
+  resolveObjectiveRoleAgent,
+  type ObjectiveFailureContext
+} from './role-prompts'
 import { captureObjectiveWorkspaceBaseline } from './observed-workspace-changes'
-import { issueObjectiveReportPath } from './report-ingestion'
+import { issueObjectiveReportPath, readObjectiveRoleReport } from './report-ingestion'
 import type { ObjectiveStore } from './objective-store'
 import type { ObjectiveSnapshotBinding } from './execution-context'
 
@@ -19,6 +35,141 @@ type DispatchSpec = {
   spec: string
   taskKey?: string
   deps?: string[]
+}
+
+const OBJECTIVE_FAILURE_NARRATIVE_MAX_CHARS = 4_096
+const OBJECTIVE_FAILURE_CRITERIA_MAX_COUNT = 8
+const OBJECTIVE_FAILURE_CRITERION_NOTE_MAX_CHARS = 512
+
+function truncatedForPrompt(value: string, maxChars: number): string {
+  return value.length > maxChars ? `${value.slice(0, maxChars - 1)}…` : value
+}
+
+function latestFailedDispatchNode(
+  reports: readonly ObjectivePendingReport[],
+  attempts: readonly ObjectiveAttempt[],
+  activeRevisionId: string
+): { report: ObjectivePendingReport; attempt: ObjectiveAttempt } | null {
+  let latest: { report: ObjectivePendingReport; attempt: ObjectiveAttempt } | null = null
+  for (const report of reports) {
+    if (report.actionKind !== 'dispatch-node' || report.outcome !== 'failed') {
+      continue
+    }
+    const matched = attempts.find((candidate) => candidate.attempt.dispatchId === report.dispatchId)
+    if (
+      !matched ||
+      matched.action.kind !== 'dispatch-node' ||
+      matched.action.revisionId !== activeRevisionId
+    ) {
+      continue
+    }
+    if (!latest || report.atMs > latest.report.atMs) {
+      latest = { report, attempt: matched }
+    }
+  }
+  return latest
+}
+
+async function failingCriteriaFromReport(args: {
+  binding: ObjectiveSnapshotBinding
+  objectiveStore: ObjectiveStore
+  revisionId: string
+  taskKey: string
+  attemptFingerprint: string
+  reportPath: string | null
+}): Promise<string[]> {
+  if (args.reportPath === null) {
+    return []
+  }
+  try {
+    const read = await readObjectiveRoleReport({
+      target: args.binding.target,
+      attemptFingerprint: args.attemptFingerprint,
+      mailboxReportPath: args.reportPath,
+      role: 'implementer',
+      taskKey: args.taskKey
+    })
+    if (!read.ok) {
+      return []
+    }
+    const task = args.objectiveStore.getTask(args.revisionId, args.taskKey)
+    if (!task) {
+      return []
+    }
+    return read.report.criteriaSelfAssessment
+      .filter((assessment) => assessment.result === 'fail')
+      .slice(0, OBJECTIVE_FAILURE_CRITERIA_MAX_COUNT)
+      .map((assessment) => {
+        const body =
+          task.criteria[assessment.criterionIndex]?.body ?? `criterion ${assessment.criterionIndex}`
+        return `${body} — ${truncatedForPrompt(assessment.note, OBJECTIVE_FAILURE_CRITERION_NOTE_MAX_CHARS)}`
+      })
+  } catch {
+    return []
+  }
+}
+
+/** Re-derived from the ledger on every dispatch; never persisted, so it can't go stale against it. */
+export async function deriveObjectiveFailureContext(args: {
+  action: Extract<ObjectiveAction, { kind: 'dispatch-planner' }>
+  binding: ObjectiveSnapshotBinding
+  ledger: ExecuteContext<ObjectiveWorld>['ledger']
+  objectiveStore: ObjectiveStore
+  activeRevisionId: string | undefined
+}): Promise<ObjectiveFailureContext | undefined> {
+  if (args.action.reason !== 'replan-after-failure' || args.activeRevisionId === undefined) {
+    return undefined
+  }
+  try {
+    const failed = latestFailedDispatchNode(
+      projectObjectiveReports(args.ledger),
+      objectiveAttempts(args.ledger),
+      args.activeRevisionId
+    )
+    if (!failed || failed.attempt.action.kind !== 'dispatch-node') {
+      return undefined
+    }
+    const failureClass = objectiveAttemptFailureClass(failed.attempt.attempt, args.ledger)
+    const narrative = truncatedForPrompt(
+      [failed.report.subject, failed.report.body]
+        .filter((part): part is string => Boolean(part))
+        .join('\n') || '(worker reported no narrative)',
+      OBJECTIVE_FAILURE_NARRATIVE_MAX_CHARS
+    )
+    const failingCriteria = await failingCriteriaFromReport({
+      binding: args.binding,
+      objectiveStore: args.objectiveStore,
+      revisionId: args.activeRevisionId,
+      taskKey: failed.attempt.action.taskKey,
+      attemptFingerprint: failed.attempt.attempt.fingerprint,
+      reportPath: failed.report.reportPath
+    })
+    return {
+      taskKey: failed.attempt.action.taskKey,
+      ...(failureClass === undefined ? {} : { failureClass }),
+      narrative,
+      failingCriteria
+    }
+  } catch {
+    return undefined
+  }
+}
+
+function derivePlanProgress(
+  objectiveStore: ObjectiveStore,
+  watcherId: string,
+  ledger: ExecuteContext<ObjectiveWorld>['ledger'],
+  activeRevisionId: string | undefined
+): readonly { taskKey: string; state: ObjectiveNodeState }[] | undefined {
+  if (activeRevisionId === undefined) {
+    return undefined
+  }
+  const nodes = objectiveStore
+    .project(watcherId, ledger)
+    .nodes.filter((node) => node.revisionId === activeRevisionId)
+  return nodes.length > 0
+    ? nodes.map((node) => ({ taskKey: node.taskKey, state: node.state }))
+    : undefined
 }
 
 function requirePlan(objectiveStore: ObjectiveStore, revisionId: string): ObjectivePlan {
@@ -51,8 +202,11 @@ function buildDispatchSpec(args: {
   context: ExecuteContext<ObjectiveWorld>
   objectiveStore: ObjectiveStore
   reportPath: string
+  failureContext?: ObjectiveFailureContext
+  planProgress?: readonly { taskKey: string; state: ObjectiveNodeState }[]
 }): DispatchSpec {
-  const { action, binding, context, objectiveStore, reportPath } = args
+  const { action, binding, context, objectiveStore, reportPath, failureContext, planProgress } =
+    args
   const budgetBucket = deriveObjectiveBudgetBucket(context.ledger, binding.enrollment.budget)
   if (action.kind === 'dispatch-planner') {
     return {
@@ -63,7 +217,9 @@ function buildDispatchSpec(args: {
         contract: binding.contract,
         reportPath,
         budgetBucket,
-        reason: action.reason
+        reason: action.reason,
+        ...(failureContext === undefined ? {} : { failureContext }),
+        ...(planProgress === undefined ? {} : { planProgress })
       })
     }
   }
@@ -125,14 +281,43 @@ export async function executeObjectiveDispatch(args: {
   let agent: string
   try {
     reportPath = await issueObjectiveReportPath(args.binding.target, fingerprint)
-    request = buildDispatchSpec({ ...args, reportPath })
+    const activeRevisionId =
+      args.action.kind === 'dispatch-planner'
+        ? activeObjectiveRevision(args.context.snapshot.world)?.id
+        : undefined
+    const failureContext =
+      args.action.kind === 'dispatch-planner'
+        ? await deriveObjectiveFailureContext({
+            action: args.action,
+            binding: args.binding,
+            ledger: args.context.ledger,
+            objectiveStore: args.objectiveStore,
+            activeRevisionId
+          })
+        : undefined
+    const planProgress =
+      args.action.kind === 'dispatch-planner'
+        ? derivePlanProgress(
+            args.objectiveStore,
+            args.binding.enrollment.watcherId,
+            args.context.ledger,
+            activeRevisionId
+          )
+        : undefined
+    request = buildDispatchSpec({ ...args, reportPath, failureContext, planProgress })
     agent = resolveObjectiveRoleAgent(args.store, args.binding.contract, request.role)
     if (args.action.kind === 'dispatch-node' || args.action.kind === 'dispatch-integrator') {
-      await captureObjectiveWorkspaceBaseline(args.binding.target, fingerprint)
+      // a retry's baseline must stay the pre-original tree, not a fresh capture of its own fingerprint
+      const baselineFingerprint =
+        args.action.kind === 'dispatch-node' && args.action.retryOf !== undefined
+          ? requireObjectiveOriginalDispatchFingerprint(args.context.ledger, args.action.retryOf)
+          : fingerprint
+      await captureObjectiveWorkspaceBaseline(args.binding.target, baselineFingerprint)
     }
   } catch (error) {
     return {
       effect: 'not-landed',
+      failureClass: 'infra',
       reason: error instanceof Error ? error.message : String(error)
     }
   }
@@ -144,7 +329,12 @@ export async function executeObjectiveDispatch(args: {
     ...(request.deps === undefined ? {} : { deps: request.deps })
   })
   if (result.status === 'refused') {
-    return { effect: 'not-landed', reason: result.reason, result: { detail: result.detail } }
+    return {
+      effect: 'not-landed',
+      failureClass: 'infra',
+      reason: result.reason,
+      result: { detail: result.detail }
+    }
   }
   if (result.status === 'indeterminate') {
     return { effect: 'indeterminate', reason: 'dispatch-indeterminate', result }

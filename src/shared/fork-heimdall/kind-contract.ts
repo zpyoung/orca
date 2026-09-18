@@ -1,6 +1,6 @@
 import type { z } from 'zod'
 import type { ExecutionHostId } from '../execution-host'
-import type { ActionOutcome, EffectCertainty } from './effect-certainty'
+import type { ActionOutcome, EffectCertaintyResolution } from './effect-certainty'
 import type { GateVerdict } from './gate'
 import type {
   AttemptEntry,
@@ -35,6 +35,7 @@ export type LeaseRenewal = {
 
 export type LeaseGuard = {
   readonly epoch: number
+  readonly holder: string
   assertHeld(): Promise<void>
   renewLoop(): LeaseRenewal
 }
@@ -55,7 +56,7 @@ export type DispatchResult =
   | { status: 'dispatched'; dispatchId: string }
   | {
       status: 'refused'
-      reason: 'fenced' | 'capability-invalid' | 'placement-unavailable'
+      reason: 'fenced' | 'capability-invalid' | 'placement-unavailable' | 'pre-dispatch-failure'
       detail: string
     }
   | { status: 'indeterminate'; requestId: string }
@@ -78,6 +79,11 @@ export type KindIdentity<TEnrollmentPayload = unknown> = {
   enrollmentPayloadSchema: z.ZodType<TEnrollmentPayload>
   /** Re-resolves every persisted authority field from the renderer's candidate selection. */
   authorizeEnrollment(input: EnrollInput): Promise<AuthorizedEnrollment>
+  /**
+   * Validates kind-owned progress invariants after authoritative workspace lookup.
+   * `existing` is null only for first enrollment.
+   */
+  validateEnrollment?(candidate: AuthorizedEnrollment, existing: WatcherEnrollment | null): void
 }
 
 export type SnapshotSource<TWorld> = {
@@ -96,13 +102,18 @@ export type Decision<TWorld, TAction extends KernelAction> = {
 }
 
 export type ActionExecutor<TWorld, TAction extends KernelAction> = {
+  /** Pure metadata persisted before execute can cross an external-effect boundary. */
+  attemptExpectation?(
+    action: TAction,
+    snapshot: Snapshot<TWorld>
+  ): { expectedBefore: string; expectedAfter: string } | undefined
   execute(action: TAction, context: ExecuteContext<TWorld>): Promise<ActionOutcome>
   resolveOutcome(
     attempt: AttemptEntry,
     fresh: LiveSnapshot<TWorld>,
     ledger: WatcherLedger,
     lease: LeaseGuard
-  ): EffectCertainty | Promise<EffectCertainty>
+  ): EffectCertaintyResolution | Promise<EffectCertaintyResolution>
 }
 
 export type PacingPolicy<TWorld> = {

@@ -84,7 +84,8 @@ export const WatcherParkReasonSchema = z.discriminatedUnion('kind', [
     .object({
       kind: z.literal('stop-predicate'),
       predicateId: IdSchema,
-      reason: IdSchema
+      reason: IdSchema,
+      messageId: IdSchema.optional()
     })
     .strict(),
   z
@@ -201,7 +202,7 @@ export const WatcherTerminalSummarySchema = z
     kind: WatcherKindIdSchema,
     terminalState: IdSchema,
     reason: IdSchema,
-    totals: z.record(z.string(), z.unknown()),
+    totals: BudgetStateSchema,
     atMs: TimestampSchema
   })
   .strict()

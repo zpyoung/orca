@@ -334,7 +334,7 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
     this.requireValid(watcherId)
     this.updateExisting(
       watcherId,
-      'UPDATE heimdall_enrollment SET orchestration_run_id = ? WHERE watcher_id = ?',
+      'UPDATE heimdall_enrollment SET orchestration_run_id = ? WHERE watcher_id = ? AND terminal_at_ms IS NULL',
       normalizedRunId,
       watcherId
     )

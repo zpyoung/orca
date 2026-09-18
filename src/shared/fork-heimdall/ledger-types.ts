@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { EffectCertaintySchema } from './effect-certainty'
+import { EffectCertaintySchema, ObjectiveFailureClassSchema } from './effect-certainty'
 
 const IdSchema = z
   .string()
@@ -63,9 +63,11 @@ export const AttemptEntrySchema = OwnerFactBaseSchema.extend({
   reason: z.string().optional(),
   expectedBefore: z.string().optional(),
   expectedAfter: z.string().optional(),
+  failureClass: ObjectiveFailureClassSchema.optional(),
   dispatch: z
     .object({
-      spec: IdSchema,
+      // absent once a determinate settlement no longer needs the prompt recover() would replay
+      spec: IdSchema.optional(),
       agent: IdSchema.optional(),
       taskKey: IdSchema.optional(),
       deps: z.array(IdSchema).optional(),
@@ -82,6 +84,7 @@ export const AttemptResolvedEntrySchema = OwnerFactBaseSchema.extend({
   kind: z.literal('attempt-resolved'),
   attemptId: IdSchema,
   effect: z.enum(['landed', 'not-landed']),
+  failureClass: ObjectiveFailureClassSchema.optional(),
   evidence: z.unknown()
 }).strict()
 export type AttemptResolvedEntry = z.infer<typeof AttemptResolvedEntrySchema>

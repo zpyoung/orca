@@ -1,14 +1,17 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getUnresolvedAttempts } from '../../shared/fork-heimdall/ledger-queries'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
+import { getLatestAttempts, getUnresolvedAttempts } from '../../shared/fork-heimdall/ledger-queries'
 import type { AttemptEntry, LedgerEntry } from '../../shared/fork-heimdall/ledger-types'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
+import { createTickTrace } from '../../shared/fork-heimdall/tick-trace'
 import Database from '../sqlite/sync-database'
 import { HEIMDALL_DATABASE_SCHEMA_VERSION, HeimdallDatabase } from './database'
 import { HeimdallEnrollmentStore } from './enrollment-store'
+import { WatcherLedgerLifecycle } from './ledger-lifecycle'
 import { HeimdallLedgerStore } from './ledger-store'
+import type { HeimdallOrchestrationAdapter } from './orchestration/orchestration-adapter'
 import { RETENTION_RING_CAPACITY } from './retention'
 
 let root: string
@@ -290,6 +293,56 @@ describe('Heimdall ledger store', () => {
     )
   })
 
+  it('rolls back an observation pin release when reclaim fails', () => {
+    for (let index = 1; index <= RETENTION_RING_CAPACITY + 1; index += 1) {
+      ledger.append(observation(index), { resolved: false })
+    }
+    database.connection().exec(`
+      CREATE TRIGGER fail_observation_reclaim
+      BEFORE DELETE ON heimdall_ledger
+      BEGIN
+        SELECT RAISE(ABORT, 'forced observation reclaim failure');
+      END
+    `)
+
+    expect(() => ledger.releaseRetentionPin('observation-1')).toThrow(
+      'forced observation reclaim failure'
+    )
+    database.connection().exec('DROP TRIGGER fail_observation_reclaim')
+
+    expect(() => ledger.releaseRetentionPin('observation-1')).not.toThrow()
+    expect(
+      ledger.read('watcher-1').entries.some((entry) => entry.eventId === 'observation-1')
+    ).toBe(false)
+  })
+
+  it('rolls back a trace pin release when reclaim fails', () => {
+    for (let seq = 1; seq <= RETENTION_RING_CAPACITY + 1; seq += 1) {
+      ledger.appendTickTrace('watcher-1', {
+        ...createTickTrace(seq, seq, {
+          consecutiveErrors: 0,
+          lastFullResyncAtMs: null,
+          reconcileAgain: false
+        }),
+        pinned: true
+      })
+    }
+    database.connection().exec(`
+      CREATE TRIGGER fail_trace_reclaim
+      BEFORE DELETE ON heimdall_tick_trace
+      BEGIN
+        SELECT RAISE(ABORT, 'forced trace reclaim failure');
+      END
+    `)
+
+    expect(() => ledger.releaseTickTracePin('watcher-1', 1)).toThrow('forced trace reclaim failure')
+    expect(ledger.readTickTraces('watcher-1')[0]).toMatchObject({ seq: 1, pinned: true })
+    database.connection().exec('DROP TRIGGER fail_trace_reclaim')
+
+    expect(() => ledger.releaseTickTracePin('watcher-1', 1)).not.toThrow()
+    expect(ledger.readTickTraces('watcher-1').some((trace) => trace.seq === 1)).toBe(false)
+  })
+
   it('serializes interval transitions across stale store instances', () => {
     const secondDatabase = new HeimdallDatabase(root)
     const staleLedger = new HeimdallLedgerStore(secondDatabase)
@@ -472,6 +525,22 @@ describe('Heimdall ledger store', () => {
       evidenceKind: 'fixture',
       payload: { state: 'terminal' }
     })
+    ledger.appendTickTrace('watcher-1', {
+      ...createTickTrace(1, 1, {
+        consecutiveErrors: 0,
+        lastFullResyncAtMs: null,
+        reconcileAgain: false
+      }),
+      pinned: false
+    })
+    ledger.appendTickTrace('watcher-1', {
+      ...createTickTrace(2, 2, {
+        consecutiveErrors: 0,
+        lastFullResyncAtMs: null,
+        reconcileAgain: false
+      }),
+      pinned: true
+    })
     ledger.append({
       kind: 'terminal',
       eventId: 'terminal',
@@ -484,22 +553,42 @@ describe('Heimdall ledger store', () => {
     })
 
     const beforeDismissal = ledger.read('watcher-1').entries.map((entry) => entry.eventId)
-    expect(() => ledger.compactTerminal('watcher-1', 'hosted-review', { turns: 2 })).toThrow(
-      'has not been dismissed'
-    )
+    expect(() =>
+      ledger.compactTerminal('watcher-1', 'hosted-review', {
+        activeMs: 0,
+        turns: 2,
+        exhausted: null
+      })
+    ).toThrow('has not been dismissed')
     expect(ledger.read('watcher-1').entries.map((entry) => entry.eventId)).toEqual(beforeDismissal)
 
     enrollments.markTerminal('watcher-1', 4)
-    expect(ledger.compactTerminal('watcher-1', 'hosted-review', { turns: 2 })).toMatchObject({
+    expect(
+      ledger.compactTerminal('watcher-1', 'hosted-review', {
+        activeMs: 0,
+        turns: 2,
+        exhausted: null
+      })
+    ).toMatchObject({
       watcherId: 'watcher-1',
       terminalState: 'merged',
       reason: 'completed',
-      totals: { turns: 2 }
+      totals: { activeMs: 0, turns: 2, exhausted: null }
     })
     expect(ledger.read('watcher-1').entries.map((entry) => entry.eventId)).toEqual([
       'observation-2',
-      'pinned-attempt-event'
+      'pinned-attempt-event',
+      'terminal'
     ])
+    expect(ledger.readTickTraces('watcher-1').map((trace) => trace.seq)).toEqual([2])
+
+    ledger.releaseRetentionPin('observation-2')
+    ledger.releaseTickTracePin('watcher-1', 2)
+    expect(ledger.read('watcher-1').entries.map((entry) => entry.eventId)).toEqual([
+      'pinned-attempt-event',
+      'terminal'
+    ])
+    expect(ledger.readTickTraces('watcher-1')).toEqual([])
   })
 
   it('rechecks terminal compaction idempotency after acquiring the write lock', () => {
@@ -529,14 +618,22 @@ describe('Heimdall ledger store', () => {
     ) {
       if (!raced && this === firstConnection && sql === 'BEGIN IMMEDIATE') {
         raced = true
-        competingLedger.compactTerminal('watcher-1', 'hosted-review', { winner: 'competing' })
+        competingLedger.compactTerminal('watcher-1', 'hosted-review', {
+          activeMs: 1,
+          turns: 2,
+          exhausted: null
+        })
       }
       originalExec.call(this, sql)
     })
     try {
       expect(
-        ledger.compactTerminal('watcher-1', 'hosted-review', { winner: 'stale' })
-      ).toMatchObject({ totals: { winner: 'competing' } })
+        ledger.compactTerminal('watcher-1', 'hosted-review', {
+          activeMs: 3,
+          turns: 4,
+          exhausted: null
+        })
+      ).toMatchObject({ totals: { activeMs: 1, turns: 2, exhausted: null } })
       expect(raced).toBe(true)
     } finally {
       exec.mockRestore()
@@ -581,5 +678,164 @@ describe('Heimdall ledger store', () => {
     expect(database.isReadOnly()).toBe(true)
     expect(ledger.read('watcher-1').entries).toEqual([observation(1)])
     expect(() => ledger.append(observation(2))).toThrow()
+  })
+})
+
+const dispatchAction = {
+  kind: 'publish',
+  capability: 'merge',
+  visibility: 'external' as const,
+  contentIdentity: 'content-1',
+  evidenceKey: 'evidence-1'
+}
+
+function lifecycleFor(
+  overrides: {
+    dispatchWorker?: Mock<HeimdallOrchestrationAdapter['dispatchWorker']>
+    recoverDispatch?: Mock<HeimdallOrchestrationAdapter['recoverDispatch']>
+  } = {}
+) {
+  let idCounter = 0
+  const adapter = {
+    dispatchWorker:
+      overrides.dispatchWorker ??
+      vi.fn(async () => ({ status: 'dispatched' as const, dispatchId: 'dispatch-1' })),
+    recoverDispatch: overrides.recoverDispatch ?? vi.fn(async () => ({ status: 'absent' as const }))
+  }
+  const lifecycle = new WatcherLedgerLifecycle({
+    ledgerStore: {
+      read: (watcherId) => ledger.read(watcherId),
+      append: (watcherId, entry) => {
+        if (entry.watcherId !== watcherId) {
+          throw new Error('ledger watcher envelope mismatch')
+        }
+        ledger.append(entry)
+      }
+    },
+    budgetClock: {
+      open: vi.fn((id: string) => ({ watcherId: id, intervalId: 'interval-1' })),
+      close: vi.fn(),
+      current: vi.fn(() => null)
+    },
+    adapter,
+    now: () => 100,
+    createId: () => `dispatch-lifecycle-${++idCounter}`
+  })
+  return { lifecycle, adapter }
+}
+
+describe('Heimdall ledger durable dispatch spec retention', () => {
+  it('keeps the dispatch spec on a settled-indeterminate attempt and lets recover() replay it', async () => {
+    const { lifecycle, adapter } = lifecycleFor({
+      dispatchWorker: vi.fn(async () => ({ status: 'indeterminate' as const, requestId: 'req-1' }))
+    })
+
+    const result = await lifecycle.dispatch({
+      enrollment: enrollment(),
+      action: dispatchAction,
+      fingerprint: 'fingerprint-indeterminate',
+      spec: 'objective: recover me'
+    })
+    expect(result.status).toBe('indeterminate')
+
+    const settled = getLatestAttempts(ledger.read('watcher-1'))[0]!
+    expect(settled).toMatchObject({ state: 'settled', effect: 'indeterminate' })
+    expect(settled.dispatch?.spec).toBe('objective: recover me')
+
+    adapter.recoverDispatch.mockClear()
+    await lifecycle.recover(enrollment())
+
+    expect(adapter.recoverDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ spec: 'objective: recover me' })
+    )
+  })
+
+  it('keeps the dispatch spec when settleWorker settles an indeterminate effect', async () => {
+    const { lifecycle } = lifecycleFor()
+    await lifecycle.dispatch({
+      enrollment: enrollment(),
+      action: dispatchAction,
+      fingerprint: 'fingerprint-mailbox-indeterminate',
+      spec: 'objective: mailbox says unclear'
+    })
+
+    lifecycle.settleWorker({
+      watcherId: 'watcher-1',
+      dispatchId: 'dispatch-1',
+      effect: 'indeterminate'
+    })
+
+    const settled = getLatestAttempts(ledger.read('watcher-1'))[0]!
+    expect(settled).toMatchObject({ state: 'settled', effect: 'indeterminate' })
+    expect(settled.dispatch?.spec).toBe('objective: mailbox says unclear')
+  })
+
+  it('drops the dispatch spec when settleWorker settles a determinate effect', async () => {
+    const { lifecycle } = lifecycleFor()
+    await lifecycle.dispatch({
+      enrollment: enrollment(),
+      action: dispatchAction,
+      fingerprint: 'fingerprint-landed',
+      spec: 'objective: land this'
+    })
+
+    lifecycle.settleWorker({ watcherId: 'watcher-1', dispatchId: 'dispatch-1', effect: 'landed' })
+
+    const settled = getLatestAttempts(ledger.read('watcher-1'))[0]!
+    expect(settled).toMatchObject({ state: 'settled', effect: 'landed' })
+    expect(settled.dispatch?.spec).toBeUndefined()
+    expect(settled.dispatch?.dispatchKind).toBe('child')
+  })
+
+  it('drops the dispatch spec when a fresh dispatch settles with a determinate refused result', async () => {
+    const { lifecycle } = lifecycleFor({
+      dispatchWorker: vi.fn(async () => ({
+        status: 'refused' as const,
+        reason: 'placement-unavailable' as const,
+        detail: 'no capacity'
+      }))
+    })
+
+    const result = await lifecycle.dispatch({
+      enrollment: enrollment(),
+      action: dispatchAction,
+      fingerprint: 'fingerprint-refused',
+      spec: 'objective: refused dispatch'
+    })
+    expect(result.status).toBe('refused')
+
+    const settled = getLatestAttempts(ledger.read('watcher-1'))[0]!
+    expect(settled).toMatchObject({ state: 'settled', effect: 'not-landed' })
+    expect(settled.dispatch?.spec).toBeUndefined()
+  })
+
+  it('keeps the dispatch spec on the attempted and running revisions', async () => {
+    const { lifecycle } = lifecycleFor()
+    await lifecycle.dispatch({
+      enrollment: enrollment(),
+      action: dispatchAction,
+      fingerprint: 'fingerprint-running',
+      spec: 'objective: keep me running'
+    })
+
+    const attempts = ledger
+      .read('watcher-1')
+      .entries.filter((entry): entry is AttemptEntry => entry.kind === 'attempt')
+    const attemptedEntry = attempts.find((entry) => entry.state === 'attempted')
+    const runningEntry = attempts.find((entry) => entry.state === 'running')
+
+    expect(attemptedEntry?.dispatch?.spec).toBe('objective: keep me running')
+    expect(runningEntry?.dispatch?.spec).toBe('objective: keep me running')
+  })
+
+  it('parses a pre-existing determinate settled row that still carries a spec', () => {
+    const legacyEntry: AttemptEntry = {
+      ...attempt('settled', 'attempt-legacy', 'watcher-1', 'not-landed'),
+      dispatch: { spec: 'objective: legacy row kept its spec', dispatchKind: 'child' }
+    }
+
+    expect(() => ledger.append(legacyEntry)).not.toThrow()
+    const stored = getLatestAttempts(ledger.read('watcher-1'))[0]!
+    expect(stored.dispatch?.spec).toBe('objective: legacy row kept its spec')
   })
 })

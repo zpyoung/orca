@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { deriveHandoffInput } from '../../shared/fork-heimdall-objective/objective-handoff-policy'
 import { ObjectiveEnrollmentPayloadSchema } from '../../shared/fork-heimdall-objective/contract-types'
+import type { ObjectiveWorld } from '../../shared/fork-heimdall-objective/detail-types'
+import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
+import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
 import {
   EnrollInputSchema,
   WatcherEnrollmentSchema,
@@ -12,7 +15,11 @@ import { enrollmentPayloadSchema } from '../fork-hosted-review-sitter/definition
 import type { Store } from '../persistence'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { authorizeObjectiveEnrollment, ObjectiveOwnerNotExecutableError } from './definition'
-import { createObjectiveKind } from './kind'
+import {
+  createObjectiveKind,
+  decideObjectiveForEnrollment,
+  paceObjectiveForEnrollment
+} from './kind'
 import type { ObjectiveForgeAccess } from './objective-forge-access'
 import type { ObjectiveStore } from './objective-store'
 
@@ -175,6 +182,133 @@ describe('objective enrollment authorization', () => {
     await expect(
       authorizeObjectiveEnrollment(gitRuntime('local'), store({ id: 'repo-1' }), enrollment)
     ).rejects.toThrow('max-concurrency-unsupported')
+  })
+  it('rejects plan-off enrollment when no executable plan is usable', async () => {
+    const hasUsablePlan = vi.fn(() => false)
+    const kind = createObjectiveKind({
+      runtime: gitRuntime('local'),
+      store: store({ id: 'repo-1' }),
+      objectiveStore: { hasUsablePlan } as unknown as ObjectiveStore
+    })
+    const base = input()
+    const authorized = await kind.authorizeEnrollment({
+      ...base,
+      capabilities: { ...base.capabilities, plan: 'off' },
+      kindPayload: {
+        ...(base.kindPayload as Record<string, unknown>),
+        existingPlan: '# Source that still requires planner normalization'
+      }
+    })
+
+    expect(() => kind.validateEnrollment?.(authorized, null)).toThrow(
+      'plan-off-requires-approved-plan'
+    )
+    expect(hasUsablePlan).not.toHaveBeenCalled()
+    const existing = WatcherEnrollmentSchema.parse({
+      ...authorized,
+      watcherId: 'objective-without-plan',
+      enabled: false,
+      paused: false,
+      commandRevision: 1,
+      coordinatorIdentity: { handle: 'coordinator-handle', paneKey: 'coordinator-pane' },
+      orchestrationRunId: null,
+      createdAtMs: 1,
+      terminalAtMs: null
+    })
+    expect(() => kind.validateEnrollment?.(authorized, existing)).toThrow(
+      'plan-off-requires-approved-plan'
+    )
+    expect(hasUsablePlan).toHaveBeenCalledWith('objective-without-plan')
+  })
+
+  it('accepts plan-off re-enrollment when the same objective has a usable plan', async () => {
+    const hasUsablePlan = vi.fn(() => true)
+    const kind = createObjectiveKind({
+      runtime: gitRuntime('local'),
+      store: store({ id: 'repo-1' }),
+      objectiveStore: { hasUsablePlan } as unknown as ObjectiveStore
+    })
+    const base = input()
+    const authorized = await kind.authorizeEnrollment({
+      ...base,
+      capabilities: { ...base.capabilities, plan: 'off' }
+    })
+    const existing = WatcherEnrollmentSchema.parse({
+      ...authorized,
+      watcherId: 'objective-watcher',
+      enabled: false,
+      paused: false,
+      commandRevision: 1,
+      coordinatorIdentity: { handle: 'coordinator-handle', paneKey: 'coordinator-pane' },
+      orchestrationRunId: null,
+      createdAtMs: 1,
+      terminalAtMs: null
+    })
+
+    expect(() => kind.validateEnrollment?.(authorized, existing)).not.toThrow()
+    expect(() =>
+      kind.validateEnrollment?.(
+        {
+          ...authorized,
+          kindPayload: {
+            ...(authorized.kindPayload as Record<string, unknown>),
+            objectiveText: 'A different objective'
+          }
+        },
+        existing
+      )
+    ).toThrow('plan-off-requires-approved-plan')
+    expect(hasUsablePlan).toHaveBeenCalledWith('objective-watcher')
+  })
+  it('idles a restored plan-off objective when its next action requires planning', async () => {
+    const base = input()
+    const authorized = await authorizeObjectiveEnrollment(
+      gitRuntime('local'),
+      store({ id: 'repo-1' }),
+      {
+        ...base,
+        capabilities: { ...base.capabilities, plan: 'off' }
+      }
+    )
+    const enrollment = WatcherEnrollmentSchema.parse({
+      ...authorized,
+      watcherId: 'restored-objective',
+      enabled: true,
+      paused: false,
+      commandRevision: 0,
+      coordinatorIdentity: { handle: 'coordinator-handle', paneKey: 'coordinator-pane' },
+      orchestrationRunId: null,
+      createdAtMs: 1,
+      terminalAtMs: null
+    })
+    const snapshot: Snapshot<ObjectiveWorld> = {
+      freshness: 'live',
+      contentIdentity: 'content-1',
+      observedAtMs: 1,
+      world: {
+        contract: ObjectiveEnrollmentPayloadSchema.parse(enrollment.kindPayload),
+        workspaceKind: 'git',
+        plan: { revisions: [], nodes: [], verdicts: [], landing: [] },
+        reports: [],
+        budget: enrollment.budget,
+        landingContext: {
+          branch: null,
+          headSha: null,
+          worktreeContentDigest: null,
+          pushTarget: null,
+          hostedReview: null
+        }
+      }
+    }
+    const ledger: WatcherLedger = { watcherId: enrollment.watcherId, entries: [] }
+
+    const decision = decideObjectiveForEnrollment(snapshot, ledger, enrollment)
+    expect(decision).toEqual({
+      action: null,
+      reason: 'plan-off-without-usable-plan',
+      considered: [{ phase: 'plan', reason: 'plan-off-without-usable-plan' }]
+    })
+    expect(paceObjectiveForEnrollment(snapshot, ledger, decision)).toBe('idle')
   })
 
   it('maps a hosted-review objective without an explicit worktree to invalid-payload', async () => {

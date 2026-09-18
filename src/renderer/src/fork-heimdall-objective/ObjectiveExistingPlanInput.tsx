@@ -254,11 +254,11 @@ export function ObjectiveExistingPlanInput({
         </div>
       </CollapsibleContent>
 
-      {planMode === 'off' && (open || hasPlan) ? (
+      {planMode === 'off' ? (
         <p className="mt-2 text-xs text-muted-foreground" role="status">
           {translate(
             'fork.heimdallObjective.enrollment.existingPlanPlanOff',
-            'Plan is Off. Any source plan is saved but cannot be processed until Plan is Gated or On; a planner still converts it into executable tasks under that approval mode.'
+            'Plan is Off. New objectives require Plan Gated or On unless this same workspace objective already has a usable approved plan. Existing plan source does not count as approval.'
           )}
         </p>
       ) : null}

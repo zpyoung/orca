@@ -1,4 +1,12 @@
+import type { BudgetState } from '../../shared/fork-heimdall/budget'
+import { getUnresolvedAttempts } from '../../shared/fork-heimdall/ledger-queries'
+import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import { TICK_TRACE_RING_CAPACITY } from '../../shared/fork-heimdall/tick-trace'
+import {
+  WatcherTerminalSummarySchema,
+  type WatcherKindId,
+  type WatcherTerminalSummary
+} from '../../shared/fork-heimdall/watcher-types'
 import type Database from '../sqlite/sync-database'
 
 export const RETENTION_RING_CAPACITY = TICK_TRACE_RING_CAPACITY
@@ -66,4 +74,162 @@ export function reclaimTickTraces(database: Database.Database, watcherId: string
     )
     .run(watcherId, watcherId, excess)
   return Number(result.changes)
+}
+
+type TerminalSummaryRow = {
+  watcher_id: string
+  kind: string
+  terminal_state: string
+  reason: string
+  totals_json: string
+  at_ms: number
+}
+
+type TerminalCompactionLedgerReader = (
+  database: Database.Database,
+  watcherId: string
+) => WatcherLedger
+
+export function reclaimWatcherRetention(
+  database: Database.Database,
+  watcherId: string
+): { observations: number; tickTraces: number } {
+  const ownsTransaction = !database.isTransaction
+  if (ownsTransaction) {
+    database.exec('BEGIN IMMEDIATE')
+  }
+  try {
+    const result = {
+      observations: reclaimLedgerObservations(database, watcherId),
+      tickTraces: reclaimTickTraces(database, watcherId)
+    }
+    if (ownsTransaction) {
+      database.exec('COMMIT')
+    }
+    return result
+  } catch (error) {
+    if (ownsTransaction && database.isTransaction) {
+      database.exec('ROLLBACK')
+    }
+    throw error
+  }
+}
+
+export function readTerminalRetentionSummary(
+  database: Database.Database,
+  watcherId: string
+): WatcherTerminalSummary | null {
+  const row = database
+    .prepare(
+      `SELECT watcher_id, kind, terminal_state, reason, totals_json, at_ms
+         FROM heimdall_terminal_summary
+        WHERE watcher_id = ?`
+    )
+    .get(watcherId) as TerminalSummaryRow | undefined
+  if (!row) {
+    return null
+  }
+  return WatcherTerminalSummarySchema.parse({
+    watcherId: row.watcher_id,
+    kind: row.kind,
+    terminalState: row.terminal_state,
+    reason: row.reason,
+    totals: JSON.parse(row.totals_json),
+    atMs: row.at_ms
+  })
+}
+
+export function compactTerminalRetention(
+  database: Database.Database,
+  watcherId: string,
+  kind: WatcherKindId,
+  totals: BudgetState,
+  readLedger: TerminalCompactionLedgerReader
+): WatcherTerminalSummary {
+  const ownsTransaction = !database.isTransaction
+  if (ownsTransaction) {
+    database.exec('BEGIN IMMEDIATE')
+  }
+  try {
+    const existing = readTerminalRetentionSummary(database, watcherId)
+    const ledger = readLedger(database, watcherId)
+    let summary = existing
+    if (!summary) {
+      const enrollment = database
+        .prepare(
+          `SELECT kind, terminal_at_ms
+             FROM heimdall_enrollment
+            WHERE watcher_id = ?`
+        )
+        .get(watcherId) as { kind: string; terminal_at_ms: number | null } | undefined
+      if (!enrollment || enrollment.terminal_at_ms === null) {
+        throw new Error(`Heimdall watcher ${watcherId} has not been dismissed`)
+      }
+      if (enrollment.kind !== kind) {
+        throw new Error(`Heimdall watcher ${watcherId} kind does not match its enrollment`)
+      }
+
+      const terminal = ledger.entries.find((entry) => entry.kind === 'terminal')
+      if (!terminal || terminal.kind !== 'terminal') {
+        throw new Error(`Heimdall watcher ${watcherId} has no terminal ledger entry`)
+      }
+      summary = WatcherTerminalSummarySchema.parse({
+        watcherId,
+        kind,
+        terminalState: terminal.state,
+        reason: terminal.reason,
+        totals,
+        atMs: terminal.atMs
+      })
+      database
+        .prepare(
+          `INSERT INTO heimdall_terminal_summary (
+             watcher_id, kind, terminal_state, reason, totals_json, at_ms
+           ) VALUES (?, ?, ?, ?, ?, ?)`
+        )
+        .run(
+          summary.watcherId,
+          summary.kind,
+          summary.terminalState,
+          summary.reason,
+          JSON.stringify(summary.totals),
+          summary.atMs
+        )
+    }
+
+    const pinnedEventIds = new Set(getUnresolvedAttempts(ledger).map((entry) => entry.eventId))
+    const rows = database
+      .prepare(
+        `SELECT event_id, class, kind, resolved
+           FROM heimdall_ledger
+          WHERE watcher_id = ?`
+      )
+      .all(watcherId) as {
+      event_id: string
+      class: string
+      kind: string
+      resolved: number
+    }[]
+    const deleteRow = database.prepare(
+      'DELETE FROM heimdall_ledger WHERE watcher_id = ? AND event_id = ?'
+    )
+    for (const row of rows) {
+      const isPinnedObservation = row.class === 'observation' && row.resolved === 0
+      if (row.kind !== 'terminal' && !isPinnedObservation && !pinnedEventIds.has(row.event_id)) {
+        deleteRow.run(watcherId, row.event_id)
+      }
+    }
+    database
+      .prepare('DELETE FROM heimdall_tick_trace WHERE watcher_id = ? AND pinned = 0')
+      .run(watcherId)
+    if (ownsTransaction) {
+      database.exec('COMMIT')
+    }
+    return summary
+  } catch (error) {
+    if (ownsTransaction && database.isTransaction) {
+      database.exec('ROLLBACK')
+    }
+    throw error
+  }
 }

@@ -125,6 +125,9 @@ export class ObjectiveStore {
   hasPlanRevision(watcherId: string, revisionId: string, digest?: string): boolean {
     return this.queries.hasPlanRevision(watcherId, revisionId, digest)
   }
+  hasUsablePlan(watcherId: string): boolean {
+    return this.queries.hasUsablePlan(watcherId)
+  }
 
   planForDispatch(
     watcherId: string,

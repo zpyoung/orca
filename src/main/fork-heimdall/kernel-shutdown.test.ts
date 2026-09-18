@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { HeimdallDatabase } from './database'
 import type { KernelShutdownInput } from './kernel-shutdown'
-import { shutdownHeimdallKernel } from './kernel-shutdown'
+import { beginHeimdallShutdown, shutdownHeimdallKernel } from './kernel-shutdown'
 import type { LeaseStore } from './lease-store'
 import type { WatcherRunnerLoop } from './runner-loop'
 import type { WatcherRunner } from './runner-state'
@@ -13,7 +13,7 @@ function shutdownInput(
 ): KernelShutdownInput {
   const runner = {
     operationTail,
-    leaseGuard: { epoch: 7 },
+    leaseGuard: { epoch: 7, holder: 'holder-a' },
     enrollment: { workspaceKey: 'local::/workspace' }
   } as unknown as WatcherRunner
   return {
@@ -68,7 +68,7 @@ describe('Heimdall kernel shutdown drain', () => {
     expect(close).not.toHaveBeenCalled()
 
     settleOperation?.()
-    await vi.waitFor(() => expect(release).toHaveBeenCalledWith('local::/workspace', 7))
+    await vi.waitFor(() => expect(release).toHaveBeenCalledWith('local::/workspace', 'holder-a', 7))
     expect(runner.leaseGuard).not.toBeNull()
     expect(close).not.toHaveBeenCalled()
     expect(disposeStorage).not.toHaveBeenCalled()
@@ -81,6 +81,30 @@ describe('Heimdall kernel shutdown drain', () => {
       close.mock.invocationCallOrder[0]!
     )
     expect(close).toHaveBeenCalledOnce()
+  })
+
+  it('exposes the asynchronous shutdown drain as a quit-barrier member', async () => {
+    let settle!: () => void
+    const stopForShutdown = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          settle = resolve
+        })
+    )
+    const member = beginHeimdallShutdown({ stopForShutdown })
+    let settled = false
+    void member.promise.then(() => {
+      settled = true
+    })
+
+    expect(member.name).toBe('heimdall')
+    expect(stopForShutdown).toHaveBeenCalledOnce()
+    await Promise.resolve()
+    expect(settled).toBe(false)
+
+    settle()
+    await member.promise
+    expect(settled).toBe(true)
   })
 
   it('closes after the bounded deadline when an operation does not settle', async () => {

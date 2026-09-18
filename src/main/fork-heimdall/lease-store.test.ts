@@ -178,6 +178,23 @@ describe('host-routed epoch lease', () => {
     })
   })
 
+  it('refuses release by a different holder at the current epoch', async () => {
+    const fs = new MemoryFilesystem()
+    const key = makeWorkspaceKey('ssh:host-a', '/workspace')
+    const store = new HostRoutedLeaseStore({ resolveTarget: async () => remoteTarget(fs) })
+    const first = await store.acquireOrRenew(key, 'owner-a', 90_000)
+    if (first.status !== 'held') {
+      throw new Error('expected lease')
+    }
+
+    await expect(store.release(key, 'owner-b', first.epoch)).rejects.toBeInstanceOf(LeaseLostError)
+    await expect(store.acquireOrRenew(key, 'owner-b', 90_000)).resolves.toMatchObject({
+      status: 'refused',
+      holder: 'owner-a',
+      epoch: first.epoch
+    })
+  })
+
   it('takes over at a higher epoch only after host-clock expiry', async () => {
     const fs = new MemoryFilesystem()
     const key = makeWorkspaceKey('ssh:host-a', '/workspace')
@@ -284,7 +301,9 @@ describe('host-routed epoch lease', () => {
     await store.acquireOrRenew(key, 'owner-b', 90_000)
 
     await expect(first.guard.assertHeld()).rejects.toBeInstanceOf(LeaseLostError)
-    await expect(store.release(key, first.epoch)).rejects.toBeInstanceOf(LeaseLostError)
+    await expect(store.release(key, first.guard.holder, first.epoch)).rejects.toBeInstanceOf(
+      LeaseLostError
+    )
   })
 
   it('serializes an in-flight renewal before release marks the epoch released', async () => {
@@ -313,7 +332,7 @@ describe('host-routed epoch lease', () => {
       vi.advanceTimersByTime(30_000)
       await barrier.reached
       renewal.dispose()
-      const releasePromise = store.release(key, first.epoch)
+      const releasePromise = store.release(key, first.guard.holder, first.epoch)
       for (let turn = 0; turn < 8; turn += 1) {
         await Promise.resolve()
       }
@@ -431,7 +450,7 @@ describe('host-routed epoch lease', () => {
       }
     }
 
-    const releasing = firstStore.release(key, first.epoch)
+    const releasing = firstStore.release(key, first.guard.holder, first.epoch)
     await barrier.reached
     fs.now += 90_001
     await expect(secondStore.acquireOrRenew(key, 'owner-b', 90_000)).resolves.toMatchObject({
@@ -461,6 +480,19 @@ describe('host-routed epoch lease', () => {
         message: expect.stringContaining('transport unavailable')
       })
     )
+  })
+
+  it('answers invariant target mismatch as a configuration error', async () => {
+    const fs = new MemoryFilesystem()
+    const key = makeWorkspaceKey('ssh:host-a', '/workspace')
+    const store = new HostRoutedLeaseStore({
+      resolveTarget: async () => remoteTarget(fs, '/different-workspace')
+    })
+
+    await expect(store.acquireOrRenew(key, 'owner', 90_000)).resolves.toEqual({
+      status: 'configuration-error',
+      reason: 'Lease target does not match its workspace key'
+    })
   })
 
   it('answers transport failure as unverifiable, never held', async () => {

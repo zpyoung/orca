@@ -17,6 +17,7 @@ import type { Store } from '../persistence'
 import {
   HeimdallCommandCapabilityError,
   HeimdallEnvironmentUnavailableError,
+  type FleetEnvironmentAvailability,
   type FleetEnvironmentIdentity,
   type FleetEnvironmentTransport
 } from './fleet-environment-transport'
@@ -37,9 +38,16 @@ import { projectRemoteFleetEntry, routeRemoteFleetEntry } from './fleet-projecti
 import { remoteDetailKey, RemoteFleetMirrorState } from './fleet-remote-mirror-state'
 import type { WatcherNotificationPublication } from './notification'
 
+type FleetSyncPlan = {
+  key: string
+  mirrors: RemoteFleetMirrorState[]
+}
+
 export class HeimdallRemoteFleetMirrors {
   private readonly mirrors = new Map<string, RemoteFleetMirrorState>()
   private disposed = false
+  private activeSyncKey: string | null = null
+  private pendingSync: FleetSyncPlan | null = null
 
   constructor(
     private readonly environments: FleetEnvironmentTransport,
@@ -47,32 +55,37 @@ export class HeimdallRemoteFleetMirrors {
     private readonly store?: Pick<Store, 'getSettings'>
   ) {}
 
-  async sync(): Promise<void> {
+  sync(): void {
     if (this.disposed) {
       return
     }
-    const identities = this.environments.list()
-    const retained = new Set(identities.map((identity) => identity.id))
-    for (const [environmentId, mirror] of this.mirrors) {
-      if (!retained.has(environmentId)) {
-        mirror.retire()
-        this.mirrors.delete(environmentId)
-        this.onChanged()
+    const plan = this.prepareSync()
+    if (this.activeSyncKey !== null) {
+      if (plan.key !== this.activeSyncKey && plan.key !== this.pendingSync?.key) {
+        this.pendingSync = plan
       }
+      return
     }
-    await Promise.all(
-      identities.map(async (identity) => {
-        const mirror = this.prepareMirror(identity)
-        await mirror.refresh(this.environments, () => this.disposed)
-        void this.ensureSubscription(mirror)
-      })
-    )
+    this.activeSyncKey = plan.key
+    void this.drainSync(plan).catch(() => undefined)
   }
 
   entries(): WatcherFleetEntry[] {
-    return Array.from(this.mirrors.values()).flatMap((mirror) =>
-      mirror.entries.map((entry) => projectRemoteFleetEntry(entry, mirror))
-    )
+    return Array.from(this.mirrors.values()).flatMap((mirror) => {
+      let ownerAvailable = false
+      try {
+        ownerAvailable = this.environments.availability(mirror.identity) === 'available'
+      } catch {
+        // Inventory failures cannot prove that the remote owner is still reachable.
+      }
+      return mirror.entries.map((entry) =>
+        projectRemoteFleetEntry(entry, {
+          identity: mirror.identity,
+          reachable: mirror.reachable && ownerAvailable,
+          commandSupport: mirror.commandSupport
+        })
+      )
+    })
   }
 
   async enroll(input: EnrollInput, owner: HeimdallRemoteOwner): Promise<EnrollSuccess> {
@@ -175,10 +188,91 @@ export class HeimdallRemoteFleetMirrors {
 
   dispose(): void {
     this.disposed = true
+    this.pendingSync = null
     for (const mirror of this.mirrors.values()) {
       mirror.retire()
     }
     this.mirrors.clear()
+  }
+
+  private prepareSync(): FleetSyncPlan {
+    let identities: FleetEnvironmentIdentity[]
+    try {
+      identities = this.environments.list()
+    } catch {
+      for (const mirror of this.mirrors.values()) {
+        this.markUnavailable(mirror)
+      }
+      return { key: 'inventory-unavailable', mirrors: [] }
+    }
+
+    const retained = new Set(identities.map((identity) => identity.id))
+    for (const [environmentId, mirror] of this.mirrors) {
+      if (!retained.has(environmentId)) {
+        mirror.retire()
+        this.mirrors.delete(environmentId)
+        this.onChanged()
+      }
+    }
+
+    const mirrors: RemoteFleetMirrorState[] = []
+    const keyParts: string[] = []
+    for (const identity of identities) {
+      const mirror = this.prepareMirror(identity)
+      let availability: FleetEnvironmentAvailability
+      try {
+        availability = this.environments.availability(identity)
+      } catch {
+        availability = 'disconnected'
+      }
+      keyParts.push(`${identity.id}\0${identity.pairingRevision}\0${availability}`)
+      if (availability === 'available') {
+        mirrors.push(mirror)
+      } else {
+        this.markUnavailable(mirror)
+      }
+    }
+    keyParts.sort()
+    return { key: keyParts.join('\n'), mirrors }
+  }
+
+  private async drainSync(initial: FleetSyncPlan): Promise<void> {
+    let plan: FleetSyncPlan | null = initial
+    try {
+      while (plan && !this.disposed) {
+        this.activeSyncKey = plan.key
+        await Promise.all(
+          plan.mirrors.map(async (mirror) => {
+            const incarnation = mirror.incarnation
+            try {
+              await mirror.refresh(this.environments, () => this.disposed)
+            } catch {
+              if (mirror.isCurrent(incarnation, this.disposed)) {
+                this.markUnavailable(mirror)
+              }
+            }
+            if (mirror.isCurrent(incarnation, this.disposed)) {
+              void this.ensureSubscription(mirror)
+            }
+          })
+        )
+        plan = this.pendingSync
+        this.pendingSync = null
+      }
+    } finally {
+      this.activeSyncKey = null
+      const pending = this.pendingSync
+      this.pendingSync = null
+      if (pending && !this.disposed) {
+        this.activeSyncKey = pending.key
+        void this.drainSync(pending).catch(() => undefined)
+      }
+    }
+  }
+
+  private markUnavailable(mirror: RemoteFleetMirrorState): void {
+    mirror.refreshSequence += 1
+    mirror.markUnreachable()
   }
 
   private prepareMirror(identity: FleetEnvironmentIdentity): RemoteFleetMirrorState {
@@ -200,9 +294,19 @@ export class HeimdallRemoteFleetMirrors {
       this.disposed ||
       mirror.subscription ||
       mirror.subscriptionStarting ||
-      mirror.subscriptionUnsupported ||
-      this.environments.availability(mirror.identity) !== 'available'
+      mirror.subscriptionUnsupported
     ) {
+      return
+    }
+    let availability: FleetEnvironmentAvailability
+    try {
+      availability = this.environments.availability(mirror.identity)
+    } catch {
+      this.markUnavailable(mirror)
+      return
+    }
+    if (availability !== 'available') {
+      this.markUnavailable(mirror)
       return
     }
     mirror.subscriptionStarting = true

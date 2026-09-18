@@ -150,7 +150,10 @@ function HeimdallDetailPaneContent({ row, onBack }: HeimdallDetailPaneProps): Re
       return []
     }
     return getLatestEscalations(activeDetail.ledger).filter((entry) => {
-      if (entry.status !== 'open' && entry.status !== 'escalated') {
+      if (
+        (entry.status !== 'open' && entry.status !== 'escalated') ||
+        entry.escalationKind === 'park-worker-escalation'
+      ) {
         return false
       }
       return !(

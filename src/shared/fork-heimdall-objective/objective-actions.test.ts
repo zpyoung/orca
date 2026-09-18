@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { OBJECTIVE_ABSENT_REMOTE_REF_STATE } from './contract-types'
 import {
   ObjectiveActionResultSchema,
   ObjectiveActionSchema,
@@ -111,7 +112,10 @@ describe('objective landing rung action contracts', () => {
       branch: 'feature/objective',
       remote: 'origin',
       commitSha: 'commit-1',
-      expectedState: { target: 'origin/feature/objective', before: '' }
+      expectedState: {
+        target: 'origin/feature/objective',
+        before: OBJECTIVE_ABSENT_REMOTE_REF_STATE
+      }
     })
     expect(objectiveActionNaturalKey(push)).toEqual({
       kind: 'push-ref',

@@ -103,6 +103,11 @@ function validationErrorCopy(error: ObjectiveEnrollmentError): string {
         'fork.heimdallObjective.validation.capabilitiesInvalid',
         'All five objective capabilities must be configured.'
       )
+    case 'plan-off-requires-approved-plan':
+      return translate(
+        'fork.heimdallObjective.validation.planOffRequiresApprovedPlan',
+        'Set Plan to Gated or On. This form cannot verify a reusable approved plan.'
+      )
     case 'role-agent-unknown':
       return translate(
         'fork.heimdallObjective.validation.roleAgentUnknown',
@@ -141,6 +146,12 @@ function enrollmentErrorCopy(error: unknown): string {
     return translate(
       'fork.heimdallObjective.enrollment.landingBarRequiresSupportedForge',
       'Hosted-review and merged landing bars require a GitHub or GitLab repository.'
+    )
+  }
+  if (reason.includes('plan-off-requires-approved-plan')) {
+    return translate(
+      'fork.heimdallObjective.enrollment.planOffRequiresApprovedPlan',
+      'Plan can be Off only when this same objective already has a usable approved plan. Set Plan to Gated or On.'
     )
   }
   return message
@@ -195,6 +206,7 @@ export function ObjectiveEnrollmentSheet({
     worktreeId: selectedWorkspace?.worktreeId ?? null
   }
   const validationErrors = validateObjectiveEnrollmentDraft(draft, landingAvailability)
+  const planOffBlocked = draft.capabilities.plan === 'off'
 
   useEffect(() => {
     if (!selectedWorkspace) {
@@ -371,10 +383,8 @@ export function ObjectiveEnrollmentSheet({
                 )}
               </div>
               <ul className="mt-2 list-disc space-y-1 pl-5">
-                {validationErrors.map((error, index) => (
-                  <li key={`${error.code}:${error.value ?? ''}:${index}`}>
-                    {validationErrorCopy(error)}
-                  </li>
+                {validationErrors.map((error) => (
+                  <li key={`${error.code}:${error.value ?? ''}`}>{validationErrorCopy(error)}</li>
                 ))}
               </ul>
             </div>
@@ -391,7 +401,11 @@ export function ObjectiveEnrollmentSheet({
               {translate('fork.heimdallObjective.enrollment.cancel', 'Cancel')}
             </Button>
           </SheetClose>
-          <Button type="button" disabled={submitting} onClick={() => void submit()}>
+          <Button
+            type="button"
+            disabled={submitting || planOffBlocked}
+            onClick={() => void submit()}
+          >
             {submitting ? <Loader2 className="animate-spin" aria-hidden /> : null}
             {translate('fork.heimdallObjective.enrollment.submit', 'Start objective')}
           </Button>

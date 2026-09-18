@@ -62,6 +62,7 @@ import { electronSpeechServiceFactories } from '../host/electron-speech-services
 import { setSpeechServiceFactories } from '../speech/speech-runtime-service'
 import { setWorktreeWatcherRemoval } from '../ipc/worktree-watcher-removal'
 import { desktopWorktreeWatcherRemoval } from '../ipc/filesystem-watcher'
+import { installRuntimeEnvironmentDiagnosticsHost } from '../host/fork-heimdall/runtime-environment-diagnostics-host'
 import { setDefaultProxySessionResolver } from '../network/proxy-settings'
 import { initDataPath, getCanonicalUserDataPath } from '../persistence'
 import { applyMacPressAndHoldDefaultAtStartup } from '../macos-press-and-hold-default'
@@ -233,6 +234,7 @@ export function runMainProcessPreflight(options: MainProcessPreflightOptions): b
   // tab-create-reply channel are desktop-only. A Node host installs none and the
   // runtime routes notifications to paired clients instead.
   setRuntimeDesktopSurface(electronRuntimeDesktopSurface)
+  installRuntimeEnvironmentDiagnosticsHost()
   // Why here: constructing RuntimeBrowserCommands is what pulls the Chromium browser
   // cluster into the graph. The desktop installs it; a Node host installs none and every
   // browser RPC rejects, which capability filtering already tells clients about.

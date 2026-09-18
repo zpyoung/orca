@@ -229,6 +229,98 @@ describe('gateAction', () => {
     ).toMatchObject({ verdict: 'hold', reason: 'awaiting-approval' })
   })
 
+  it('folds the exact open approval scope across unrelated entries without reopening a resolution', () => {
+    const scopedAction = { ...ACTION, preparedCommitSha: 'prepared-1' }
+    const scope = approvalScopeForAction(scopedAction)
+    const gated = { ...ENROLLMENT, capabilities: { publish: 'gated' as const } }
+    const matchingOpen: LedgerEntry = {
+      ...OWNER_FACT,
+      kind: 'escalation',
+      eventId: 'approval-open',
+      atMs: 1,
+      escalationId: 'approval-logical-1',
+      escalationKind: 'awaiting-approval',
+      status: 'open',
+      foldCount: 3,
+      approvalScope: scope
+    }
+    const matchingEscalated: LedgerEntry = {
+      ...matchingOpen,
+      eventId: 'approval-escalated',
+      atMs: 2,
+      status: 'escalated',
+      foldCount: matchingOpen.foldCount + 1
+    }
+    const workerQuestion: LedgerEntry = {
+      ...OWNER_FACT,
+      kind: 'escalation',
+      eventId: 'worker-question',
+      atMs: 2,
+      escalationId: 'worker-question:dispatch-1:message-1',
+      escalationKind: 'worker-question',
+      status: 'open',
+      foldCount: 1
+    }
+    const otherScope: LedgerEntry = {
+      ...OWNER_FACT,
+      kind: 'escalation',
+      eventId: 'other-scope',
+      atMs: 3,
+      escalationId: 'approval-logical-2',
+      escalationKind: 'awaiting-approval',
+      status: 'open',
+      foldCount: 7,
+      approvalScope: { ...scope, preparedCommitSha: 'prepared-2' }
+    }
+    const parked: LedgerEntry = {
+      ...OWNER_FACT,
+      kind: 'escalation',
+      eventId: 'parked',
+      atMs: 4,
+      escalationId: 'park:watcher-1:worker-question:message-1',
+      escalationKind: 'park-worker-question',
+      status: 'open',
+      foldCount: 1
+    }
+
+    const folded = gateAction(
+      scopedAction,
+      SNAPSHOT,
+      gated,
+      ledger(matchingOpen, matchingEscalated, workerQuestion, otherScope, parked)
+    )
+    expect(folded).toMatchObject({
+      verdict: 'hold',
+      escalation: {
+        escalationId: matchingOpen.escalationId,
+        foldCount: matchingEscalated.foldCount + 1,
+        approvalScope: scope
+      }
+    })
+
+    const resolved: LedgerEntry = {
+      ...matchingEscalated,
+      eventId: 'approval-resolved',
+      atMs: 5,
+      status: 'resolved',
+      foldCount: matchingEscalated.foldCount + 1
+    }
+    const fresh = gateAction(
+      scopedAction,
+      SNAPSHOT,
+      gated,
+      ledger(matchingOpen, matchingEscalated, workerQuestion, otherScope, parked, resolved)
+    )
+    expect(fresh).toMatchObject({
+      verdict: 'hold',
+      escalation: { foldCount: 1, approvalScope: scope }
+    })
+    if (fresh.verdict !== 'hold' || !fresh.escalation) {
+      throw new Error('Expected a fresh approval escalation')
+    }
+    expect(fresh.escalation.escalationId).not.toBe(matchingOpen.escalationId)
+  })
+
   it('deduplicates a completed attempt by fingerprint', () => {
     const fingerprint = makeAttemptFingerprint('head-1', 'publish', 'failure-1')
     const completed: LedgerEntry = {
@@ -316,5 +408,35 @@ describe('gateAction', () => {
       verdict: 'hold',
       reason: 'missing-expected-state'
     })
+  })
+
+  it('reuses the original approval once a bounded auto-redispatch carries its evidence key', () => {
+    const retry = { ...ACTION, evidenceKey: 'failure-2', retryOf: ACTION.evidenceKey }
+    const gated = { ...ENROLLMENT, capabilities: { publish: 'gated' as const } }
+    const approval: LedgerEntry = {
+      ...OWNER_FACT,
+      kind: 'approval',
+      eventId: 'approval-1',
+      atMs: 1,
+      scope: approvalScopeForAction(ACTION),
+      decision: 'approved',
+      foldCount: 1
+    }
+    expect(gateAction(retry, SNAPSHOT, gated, ledger(approval))).toEqual({ verdict: 'allow' })
+  })
+
+  it('holds a retry on the same awaiting-approval escalation as its unapproved original', () => {
+    const retry = { ...ACTION, evidenceKey: 'failure-2', retryOf: ACTION.evidenceKey }
+    const gated = { ...ENROLLMENT, capabilities: { publish: 'gated' as const } }
+    const first = gateAction(ACTION, SNAPSHOT, gated, ledger())
+    if (first.verdict !== 'hold' || !first.escalation) {
+      throw new Error('Expected an approval escalation')
+    }
+    const second = gateAction(retry, SNAPSHOT, gated, ledger())
+    expect(second).toMatchObject({ verdict: 'hold', reason: 'awaiting-approval' })
+    if (second.verdict !== 'hold' || !second.escalation) {
+      throw new Error('Expected an approval escalation')
+    }
+    expect(second.escalation.escalationId).toBe(first.escalation.escalationId)
   })
 })

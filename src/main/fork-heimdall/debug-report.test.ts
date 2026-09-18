@@ -1,14 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import type {
+  AttemptEntry,
   EscalationEntry,
   LedgerEntry,
   WatcherLedger
 } from '../../shared/fork-heimdall/ledger-types'
 import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
 import { createTickTrace } from '../../shared/fork-heimdall/tick-trace'
-import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
+import type {
+  WatcherEnrollment,
+  WatcherTerminalSummary
+} from '../../shared/fork-heimdall/watcher-types'
 import {
   DEBUG_REPORT_TRACE_LIMIT,
+  HEIMDALL_DEBUG_REPORT_SCHEMA_VERSION,
   buildHeimdallDebugReport,
   describeDebugSnapshot,
   dormantWatcherStatus,
@@ -16,6 +21,14 @@ import {
 } from './debug-report'
 
 const HOME = '/Users/someone'
+const TERMINAL_SUMMARY: WatcherTerminalSummary = {
+  watcherId: 'watcher-1',
+  kind: 'hosted-review',
+  terminalState: 'completed',
+  reason: 'objective-complete',
+  totals: { activeMs: 12_000, turns: 3, exhausted: null },
+  atMs: 250
+}
 
 function enrollment(overrides: Partial<WatcherEnrollment> = {}): WatcherEnrollment {
   return {
@@ -64,6 +77,28 @@ function escalation(
   }
 }
 
+function attemptEntry(overrides: Partial<AttemptEntry> = {}): AttemptEntry {
+  return {
+    eventId: 'attempt-1',
+    watcherId: 'watcher-1',
+    atMs: 210,
+    origin: 'owner',
+    class: 'fact',
+    kind: 'attempt',
+    attemptId: 'attempt-1',
+    fingerprint: 'fingerprint-1',
+    action: {
+      kind: 'apply-review-fix',
+      capability: 'write',
+      visibility: 'external',
+      contentIdentity: 'revision-1',
+      evidenceKey: 'review:revision-1'
+    },
+    state: 'attempted',
+    ...overrides
+  }
+}
+
 function reportInput(overrides: Partial<HeimdallDebugReportInput> = {}): HeimdallDebugReportInput {
   const watcher = enrollment()
   const watcherLedger = ledger()
@@ -71,6 +106,7 @@ function reportInput(overrides: Partial<HeimdallDebugReportInput> = {}): Heimdal
     enrollment: watcher,
     status: dormantWatcherStatus(watcher, watcherLedger),
     ledger: watcherLedger,
+    terminalSummary: null,
     traces: [],
     runner: null,
     generatedAtMs: 300,
@@ -90,27 +126,25 @@ function reportInput(overrides: Partial<HeimdallDebugReportInput> = {}): Heimdal
 describe('dormant Heimdall watcher status', () => {
   it('gives a terminal ledger fact precedence over pause and park state', () => {
     const watcher = enrollment({ enabled: false, paused: true, terminalAtMs: 250 })
-    const status = dormantWatcherStatus(
-      watcher,
-      ledger([
-        escalation('park-budget'),
-        {
-          eventId: 'terminal',
-          watcherId: 'watcher-1',
-          atMs: 250,
-          origin: 'owner',
-          class: 'fact',
-          kind: 'terminal',
-          state: 'completed',
-          reason: 'objective-complete'
-        }
-      ])
-    )
+    const compactedLedger = ledger([
+      {
+        eventId: 'terminal',
+        watcherId: 'watcher-1',
+        atMs: 250,
+        origin: 'owner',
+        class: 'fact',
+        kind: 'terminal',
+        state: 'completed',
+        reason: 'objective-complete'
+      }
+    ])
+    const status = dormantWatcherStatus(watcher, compactedLedger, TERMINAL_SUMMARY)
 
     expect(status).toMatchObject({
       state: 'terminal',
       phase: 'terminal',
-      reason: 'objective-complete'
+      reason: 'objective-complete',
+      budget: TERMINAL_SUMMARY.totals
     })
   })
 
@@ -132,6 +166,25 @@ describe('dormant Heimdall watcher status', () => {
     expect(status).toMatchObject({
       state: 'parked',
       parkReason: { kind: 'worker-question', messageId: 'message-7' }
+    })
+  })
+
+  it('reconstructs a durable worker escalation as operator-visible attention', () => {
+    const status = dormantWatcherStatus(
+      enrollment(),
+      ledger([
+        escalation('worker-escalation', {
+          escalationId: 'worker-escalation:dispatch-1:message-8',
+          reason: 'Blocked: credentials are required'
+        })
+      ])
+    )
+
+    expect(status).toMatchObject({
+      state: 'escalated',
+      phase: 'gate',
+      reason: 'Blocked: credentials are required',
+      parkReason: null
     })
   })
 
@@ -168,6 +221,25 @@ describe('dormant Heimdall watcher status', () => {
     })
   })
 
+  it('keeps a persisted configuration failure operator-visible without a new wire enum', () => {
+    const watcher = enrollment({ enabled: false })
+    const status = dormantWatcherStatus(
+      watcher,
+      ledger([
+        escalation('park-configuration-error', {
+          escalationId: 'park:watcher-1:configuration-error',
+          reason: 'Resolved Git authority changed after Heimdall enrollment'
+        })
+      ])
+    )
+
+    expect(status).toMatchObject({
+      state: 'parked',
+      reason: 'Resolved Git authority changed after Heimdall enrollment',
+      parkReason: null
+    })
+  })
+
   it('keeps an automatic park visible even when its persisted reason cannot be reconstructed', () => {
     const watcher = enrollment({ enabled: false })
     const status = dormantWatcherStatus(
@@ -196,7 +268,12 @@ describe('dormant Heimdall watcher status', () => {
 })
 
 describe('Heimdall debug report', () => {
-  it('emits schema 2, sanitizes free text, and leaves pointer paths authoritative', () => {
+  it('stamps the current schema version', () => {
+    expect(HEIMDALL_DEBUG_REPORT_SCHEMA_VERSION).toBe(3)
+    expect(buildHeimdallDebugReport(reportInput()).schemaVersion).toBe(3)
+  })
+
+  it('emits schema 3, sanitizes free text, and leaves pointer paths authoritative', () => {
     const secret = 'ghp_abcdefghijklmnopqrstuvwxyz0123456789'
     const failingTrace = createTickTrace(1, 100, {
       consecutiveErrors: 1,
@@ -224,11 +301,38 @@ describe('Heimdall debug report', () => {
       })
     )
 
-    expect(report.schemaVersion).toBe(2)
+    expect(report.schemaVersion).toBe(3)
     expect(report.ledger.entries[0]).not.toMatchObject({ reason: expect.stringContaining(secret) })
     expect(report.traces[0]?.error?.message).not.toContain(secret)
     expect(report.workersError).not.toContain(secret)
     expect(report.pointers[0]?.path).toBe(`${HOME}/work/orca`)
+  })
+
+  it('reports preserved terminal budget totals after ledger compaction', () => {
+    const watcher = enrollment({ enabled: false, terminalAtMs: 250 })
+    const compactedLedger = ledger([
+      {
+        eventId: 'terminal',
+        watcherId: 'watcher-1',
+        atMs: 250,
+        origin: 'owner',
+        class: 'fact',
+        kind: 'terminal',
+        state: 'completed',
+        reason: 'objective-complete'
+      }
+    ])
+    const report = buildHeimdallDebugReport(
+      reportInput({
+        enrollment: watcher,
+        status: dormantWatcherStatus(watcher, compactedLedger, TERMINAL_SUMMARY),
+        ledger: compactedLedger,
+        terminalSummary: TERMINAL_SUMMARY
+      })
+    )
+
+    expect(report.status.budget).toEqual(TERMINAL_SUMMARY.totals)
+    expect(report.budget).toEqual(TERMINAL_SUMMARY.totals)
   })
 
   it('collapses only local enrollment paths against the reporting kernel home', () => {
@@ -263,7 +367,8 @@ describe('Heimdall debug report', () => {
     })
   })
   it('keeps only the newest full-detail trace window', () => {
-    const traces = Array.from({ length: DEBUG_REPORT_TRACE_LIMIT + 3 }, (_unused, index) =>
+    const total = DEBUG_REPORT_TRACE_LIMIT + 3
+    const traces = Array.from({ length: total }, (_unused, index) =>
       createTickTrace(index + 1, index + 1, {
         consecutiveErrors: 0,
         lastFullResyncAtMs: null,
@@ -273,6 +378,110 @@ describe('Heimdall debug report', () => {
 
     const report = buildHeimdallDebugReport(reportInput({ traces }))
 
-    expect(report.traces.map((trace) => trace.seq)).toEqual([8, 7, 6, 5, 4])
+    expect(report.traces).toHaveLength(DEBUG_REPORT_TRACE_LIMIT)
+    expect(report.traces.map((trace) => trace.seq)).toEqual(
+      Array.from({ length: DEBUG_REPORT_TRACE_LIMIT }, (_unused, index) => total - index)
+    )
+  })
+
+  it('returns every trace when there are fewer than the full-detail window', () => {
+    const total = DEBUG_REPORT_TRACE_LIMIT - 2
+    const traces = Array.from({ length: total }, (_unused, index) =>
+      createTickTrace(index + 1, index + 1, {
+        consecutiveErrors: 0,
+        lastFullResyncAtMs: null,
+        reconcileAgain: false
+      })
+    )
+
+    const report = buildHeimdallDebugReport(reportInput({ traces }))
+
+    expect(report.traces).toHaveLength(total)
+    expect(report.traces.map((trace) => trace.seq)).toEqual(
+      Array.from({ length: total }, (_unused, index) => total - index)
+    )
+  })
+
+  it('truncates a dispatch spec that exceeds the report budget', () => {
+    const oversizedSpec = 'x'.repeat(5_000)
+    const report = buildHeimdallDebugReport(
+      reportInput({
+        ledger: ledger([attemptEntry({ dispatch: { spec: oversizedSpec, dispatchKind: 'child' } })])
+      })
+    )
+
+    const entry = report.ledger.entries[0]
+    expect(entry?.kind).toBe('attempt')
+    expect(entry?.kind === 'attempt' ? entry.dispatch?.spec : undefined).toBe(
+      `${'x'.repeat(4_000)}...`
+    )
+  })
+
+  it('leaves a dispatch spec under the report budget byte-identical', () => {
+    const spec = 'role: implementer\nobjective: fix the flaky test'
+    const report = buildHeimdallDebugReport(
+      reportInput({
+        ledger: ledger([attemptEntry({ dispatch: { spec, dispatchKind: 'child' } })])
+      })
+    )
+
+    const entry = report.ledger.entries[0]
+    expect(entry?.kind === 'attempt' ? entry.dispatch?.spec : undefined).toBe(spec)
+  })
+
+  it('leaves an attempt entry with no dispatch untouched', () => {
+    const report = buildHeimdallDebugReport(reportInput({ ledger: ledger([attemptEntry()]) }))
+
+    expect(report.ledger.entries[0]).toEqual(attemptEntry())
+  })
+
+  it('builds a version-3 report from version-2-shaped ledger entries, traces, and runner state', () => {
+    const legacyAttempt = attemptEntry()
+    expect('failureClass' in legacyAttempt).toBe(false)
+    const legacyTrace = createTickTrace(1, 100, {
+      consecutiveErrors: 0,
+      lastFullResyncAtMs: null,
+      reconcileAgain: false
+    })
+    legacyTrace.pacing = {
+      tier: 'idle',
+      delayMs: 300_000,
+      stateDelayMs: 300_000,
+      errorBackoffMs: null,
+      fullResyncDue: false,
+      nextFullResyncInMs: 900_000
+    }
+    expect('gateHoldBackoffMs' in legacyTrace.pacing).toBe(false)
+    const legacyRunner: NonNullable<HeimdallDebugReportInput['runner']> = {
+      kindId: 'hosted-review',
+      consecutiveErrors: 0,
+      lastFullResyncAtMs: null,
+      tickQueued: false,
+      reconcileAgain: false,
+      timerArmed: true,
+      actionInFlight: false,
+      leaseEpoch: 1,
+      stopped: false,
+      suspended: false,
+      controlPending: null,
+      recovered: false,
+      forceFresh: false,
+      traceSequence: 1,
+      leaseRenewalArmed: true,
+      snapshot: null
+    }
+
+    const report = buildHeimdallDebugReport(
+      reportInput({
+        ledger: ledger([legacyAttempt]),
+        traces: [legacyTrace],
+        runner: legacyRunner
+      })
+    )
+
+    expect(report.schemaVersion).toBe(3)
+    expect(report.ledger.entries[0]).toEqual(legacyAttempt)
+    expect(report.traces[0]?.pacing).toEqual(legacyTrace.pacing)
+    expect(report.runner).toEqual(legacyRunner)
   })
 })

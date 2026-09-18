@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  heimdallMailboxAddressForDispatch,
   heimdallMailboxAddressForRun,
   notifyHeimdallMailboxArrival,
   setHeimdallMailboxWake
@@ -22,10 +23,18 @@ describe('heimdall mailbox wake registry', () => {
 
     notifyHeimdallMailboxArrival(address, 'worker_done')
     notifyHeimdallMailboxArrival(address, 'question')
+    notifyHeimdallMailboxArrival(address, 'escalation')
     notifyHeimdallMailboxArrival(address, 'heartbeat')
     notifyHeimdallMailboxArrival(address, 'status')
 
-    expect(woken).toEqual([address, address])
+    expect(woken).toEqual([address, address, address])
+  })
+
+  it('builds a dispatch-scoped address distinct from a run address', () => {
+    expect(heimdallMailboxAddressForDispatch('dispatch-1')).toBe('dispatch:dispatch-1')
+    expect(heimdallMailboxAddressForDispatch('dispatch-1')).not.toBe(
+      heimdallMailboxAddressForRun('dispatch-1')
+    )
   })
 
   it('wakes on an unnamed message type rather than dropping it', () => {

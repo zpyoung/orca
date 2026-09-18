@@ -1,5 +1,6 @@
 import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type {
+  AuthorizedEnrollment,
   EnrollInput,
   EnrollResult,
   WatcherEnrollment,
@@ -53,6 +54,22 @@ function latestHaltWasExplicitDisarm(ledger: WatcherLedger): boolean {
       (entry.escalationKind.startsWith('park-') || entry.escalationKind === 'control-disarm')
   )
   return halt?.kind === 'escalation' && halt.escalationKind === 'control-disarm'
+}
+function validateEnrollment(
+  kind: RegisteredWatcherKind,
+  candidate: AuthorizedEnrollment,
+  existing: WatcherEnrollment | null
+): { status: 'refused'; reason: 'invalid-payload'; detail: string } | null {
+  try {
+    kind.validateEnrollment?.(candidate, existing)
+    return null
+  } catch (error) {
+    return {
+      status: 'refused',
+      reason: 'invalid-payload',
+      detail: error instanceof Error ? error.message : String(error)
+    }
+  }
 }
 
 export async function enrollWatcher(
@@ -110,6 +127,10 @@ export async function enrollWatcher(
         detail: `Workspace is already enrolled as ${existing.kind}`
       }
     }
+    const validationRefusal = validateEnrollment(kind, authorized, existing)
+    if (validationRefusal) {
+      return validationRefusal
+    }
     const ledger = dependencies.readLedger(existing.watcherId)
     const startsNewBudgetGeneration = latestHaltWasExplicitDisarm(ledger)
     const budget = startsNewBudgetGeneration
@@ -145,6 +166,10 @@ export async function enrollWatcher(
     }
     dependencies.publish()
     return { status: 're-armed', entry: dependencies.entry(rearmed) }
+  }
+  const validationRefusal = validateEnrollment(kind, authorized, null)
+  if (validationRefusal) {
+    return validationRefusal
   }
 
   const enrollment: WatcherEnrollment = {

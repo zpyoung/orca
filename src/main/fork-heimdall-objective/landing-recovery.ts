@@ -15,6 +15,7 @@ import { computeWorkspaceContentIdentity, objectiveGitCommandForTarget } from '.
 import type { ObjectiveSnapshotBinding } from './execution-context'
 import { objectiveForgeContext, type ObjectiveForgeAccess } from './objective-forge-access'
 import {
+  objectiveRemoteRefState,
   readObjectiveAttachedBranch,
   readObjectiveHeadSha,
   readObjectiveRemoteBranchHead
@@ -188,7 +189,7 @@ export async function probePushedRef(
     args.action.branch
   )
   const effect = resolveByExpectedState(
-    observed,
+    objectiveRemoteRefState(observed),
     args.action.expectedState.before,
     args.action.commitSha
   )

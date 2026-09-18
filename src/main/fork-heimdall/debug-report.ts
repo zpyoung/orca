@@ -13,10 +13,11 @@ import {
 import type {
   WatcherEnrollment,
   WatcherParkReason,
-  WatcherStatus
+  WatcherStatus,
+  WatcherTerminalSummary
 } from '../../shared/fork-heimdall/watcher-types'
 
-export const HEIMDALL_DEBUG_REPORT_SCHEMA_VERSION = 2
+export const HEIMDALL_DEBUG_REPORT_SCHEMA_VERSION = 3
 export const DEBUG_REPORT_LEDGER_ENTRY_LIMIT = 200
 export const DEBUG_REPORT_TRACE_LIMIT = TICK_TRACE_FULL_DETAIL_COUNT
 
@@ -50,6 +51,7 @@ export type HeimdallDebugReportInput = {
   enrollment: WatcherEnrollment
   status: WatcherStatus
   ledger: WatcherLedger
+  terminalSummary: WatcherTerminalSummary | null
   traces: readonly WatcherTickTrace[]
   runner: WatcherRunnerDebugState | null
   generatedAtMs: number
@@ -66,6 +68,7 @@ export type HeimdallDebugReportInput = {
 
 export type HeimdallDebugReport = {
   schemaVersion: number
+  // reconcile every runner.*AtMs field and each trace's pacing block against this instant, not against each other
   generatedAtMs: number
   appVersion: string
   platform: string
@@ -116,10 +119,20 @@ function sanitizeLedgerEntry(entry: LedgerEntry): LedgerEntry {
   if (entry.kind === 'attempt-abandoned') {
     return entry
   }
-  if (!('reason' in entry) || typeof entry.reason !== 'string') {
-    return entry
+  let sanitized: LedgerEntry = entry
+  if ('reason' in sanitized && typeof sanitized.reason === 'string') {
+    sanitized = { ...sanitized, reason: sanitizeCrashReportString(sanitized.reason, 2_000) }
   }
-  return { ...entry, reason: sanitizeCrashReportString(entry.reason, 2_000) }
+  if (sanitized.kind === 'attempt' && sanitized.dispatch?.spec) {
+    sanitized = {
+      ...sanitized,
+      dispatch: {
+        ...sanitized.dispatch,
+        spec: sanitizeCrashReportString(sanitized.dispatch.spec, 4_000)
+      }
+    }
+  }
+  return sanitized
 }
 function persistedParkReason(
   enrollment: WatcherEnrollment,
@@ -180,12 +193,21 @@ function decodeParkDetail(
   }
 }
 
+export function durableWatcherBudget(
+  enrollment: WatcherEnrollment,
+  ledger: WatcherLedger,
+  terminalSummary: WatcherTerminalSummary | null = null
+): BudgetState {
+  return terminalSummary?.totals ?? deriveBudgetState(ledger, enrollment.budget)
+}
+
 export function dormantWatcherStatus(
   enrollment: WatcherEnrollment,
-  ledger: WatcherLedger
+  ledger: WatcherLedger,
+  terminalSummary: WatcherTerminalSummary | null = null
 ): WatcherStatus {
   const terminal = ledger.entries.find((entry) => entry.kind === 'terminal')
-  const budget = deriveBudgetState(ledger, enrollment.budget)
+  const budget = durableWatcherBudget(enrollment, ledger, terminalSummary)
   const latestHalt = ledger.entries
     .toReversed()
     .find(
@@ -198,14 +220,18 @@ export function dormantWatcherStatus(
     latestHalt?.kind === 'escalation' &&
     latestHalt.escalationKind.startsWith('park-')
   const parkReason = enrollment.enabled ? null : persistedParkReason(enrollment, ledger, budget)
-  const approval = enrollment.enabled
+  const automaticParkDetail =
+    automaticallyParked && latestHalt?.kind === 'escalation'
+      ? (latestHalt.reason ?? 'ready-to-resume')
+      : null
+  const attentionEscalation = enrollment.enabled
     ? getLatestEscalations(ledger)
         .toReversed()
         .find(
           (entry) =>
-            entry.status === 'open' &&
-            entry.escalationKind === 'awaiting-approval' &&
-            entry.approvalScope
+            (entry.status === 'open' || entry.status === 'escalated') &&
+            (entry.escalationKind === 'worker-escalation' ||
+              (entry.escalationKind === 'awaiting-approval' && entry.approvalScope))
         )
     : null
   const state = terminal
@@ -214,7 +240,7 @@ export function dormantWatcherStatus(
       ? 'held'
       : automaticallyParked
         ? 'parked'
-        : approval
+        : attentionEscalation
           ? 'escalated'
           : enrollment.enabled
             ? 'watching'
@@ -239,8 +265,7 @@ export function dormantWatcherStatus(
       terminal?.reason ??
       (enrollment.paused
         ? 'paused'
-        : (parkReason?.kind ??
-          (automaticallyParked ? 'ready-to-resume' : (approval?.reason ?? null)))),
+        : (parkReason?.kind ?? automaticParkDetail ?? attentionEscalation?.reason ?? null)),
     parkReason,
     budget,
     startedAtMs: enrollment.createdAtMs,
@@ -280,7 +305,7 @@ export function buildHeimdallDebugReport(input: HeimdallDebugReportInput): Heimd
           : input.enrollment.workspacePath
     },
     status: input.status,
-    budget: deriveBudgetState(input.ledger, input.enrollment.budget),
+    budget: durableWatcherBudget(input.enrollment, input.ledger, input.terminalSummary),
     budgetClock: input.budgetClock,
     malformedPayload: input.malformedPayload,
     pendingControlOperation: input.pendingControlOperation,
