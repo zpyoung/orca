@@ -6,6 +6,7 @@ import { WORKTREE_METHODS } from './worktree'
 import { TERMINAL_METHODS } from './terminal'
 import { TERMINAL_ORPHAN_METHODS } from './terminal-orphan'
 import { BROWSER_CORE_METHODS } from './browser-core'
+import { BROWSER_IDENTITY_METHODS } from './browser-identity-rpc'
 import { BROWSER_EXTRA_METHODS } from './browser-extras'
 import { BROWSER_SCREENCAST_METHODS } from './browser-screencast'
 import { BROWSER_CLIENT_HOST_METHODS } from './browser-client-host'
@@ -47,6 +48,7 @@ import { ARTIFACT_METHODS } from './artifacts'
 import { LEDGER_METHODS } from './ledger'
 import { ARTIFACT_PASSWORD_METHODS } from './fork-artifact-passwords/artifact-password-methods'
 import { AGENT_HOOK_METHODS } from './agent-hooks'
+import { AGENT_LAUNCH_METHODS } from './agent-launch'
 import { ASK_METHODS } from './fork-ask-question-tool/ask'
 
 // Why: a flat manifest keeps registration order explicit and provides one
@@ -65,9 +67,11 @@ export const ALL_RPC_METHODS = [
   ...WORKTREE_METHODS,
   ...AGENT_SESSION_METHODS,
   ...STRUCTURED_AGENT_SESSION_METHODS,
+  ...AGENT_LAUNCH_METHODS,
   ...TERMINAL_METHODS,
   ...TERMINAL_ORPHAN_METHODS,
   ...BROWSER_CORE_METHODS,
+  ...BROWSER_IDENTITY_METHODS,
   ...BROWSER_SCREENCAST_METHODS,
   ...BROWSER_EXTRA_METHODS,
   ...BROWSER_CLIENT_HOST_METHODS,

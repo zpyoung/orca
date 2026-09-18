@@ -77,12 +77,10 @@ const SHELL_CONTRACT_SPECS = [
   'src/shared/posix-command-path-lookup.test.ts'
 ]
 
-/** The preflight and alias-safety suites also run in CI's unit lane. */
+/** The preflight suite also runs in CI's unit lane; every other shell contract is excluded there. */
 const UNIT_EXCLUDES = [
   ...SHELL_CONTRACT_SPECS.filter(
-    (spec) =>
-      spec !== 'src/main/pty/codex-shell-launch-preflight.test.ts' &&
-      spec !== 'src/main/pty/omp-shell-wrapper-alias-safety.test.ts'
+    (spec) => spec !== 'src/main/pty/codex-shell-launch-preflight.test.ts'
   ),
   'tests/e2e/cross-version-wire/**'
 ]

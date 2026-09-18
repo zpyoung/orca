@@ -19,6 +19,7 @@ import { VM_COMMAND_SPECS } from './vm'
 import { SKILL_COMMAND_SPECS } from './skills'
 import { ARTIFACT_COMMAND_SPECS } from './artifacts'
 import { LEDGER_COMMAND_SPECS } from './ledger'
+import { SEARCH_COMMAND_SPECS } from './search'
 
 export const COMMAND_SPECS: CommandSpec[] = [
   ...CORE_COMMAND_SPECS,
@@ -40,5 +41,6 @@ export const COMMAND_SPECS: CommandSpec[] = [
   ...VM_COMMAND_SPECS,
   ...EMULATOR_COMMAND_SPECS,
   ...SKILL_COMMAND_SPECS,
-  ...LEDGER_COMMAND_SPECS
+  ...LEDGER_COMMAND_SPECS,
+  ...SEARCH_COMMAND_SPECS
 ]

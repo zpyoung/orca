@@ -3,14 +3,15 @@
   "family": "hostedReview.eligibility",
   "namedDeltas": [],
   "runnerVersion": 1,
-  "baseline": "50e752fc66a84638b0a8c1f4bdbbd5fdc708c3e9",
+  "baseline": "a28085adbfb65d3f27393cc7a0d78cfa2b4ff07e",
   "lockfileSha256": "788c1234b38a61fc882fca292341fce6690deee9cc6695673b0575cf2c4cf571",
-  "recorderSha256": "5ec2faffa944097d2916e2e9e2259b9d0c68e364c5f865bafd8a9600faedbdc7",
+  "recorderSha256": "d08bf9cd596ee449531f079c9f4f83efcb03fbc5e8d8658d15e0407d3464ec0e",
+  "adapterSha256": "c582ce355b0704b38d7e84cbce352630096c91231bf09aecd1f6dbb409fed17f",
   "scenarioSha256": "f6a1595073abe11b33973e8865900a1d849f44221961da5c12ea13aa696f6490",
   "platform": "darwin",
   "scenarioVersion": 1,
   "projectionVersion": 2,
-  "goldenFormatVersion": 4,
+  "goldenFormatVersion": 5,
   "values": {
     "24bd84c9fb40": {
       "status": "fulfilled",
@@ -47,6 +48,11 @@
         "title": "Host title"
       },
       "prefill": "unresolved"
+    },
+    "349d5045a996": {
+      "name": "hostedReview.getCreationEligibility#1",
+      "json": "{\"id\":\"frame-1\",\"deviceToken\":\"recording-device\",\"method\":\"hostedReview.getCreationEligibility\",\"params\":{\"repo\":\"id:repo42\",\"worktree\":\"id:repo42::/p\",\"branch\":\"feature\",\"base\":null,\"linkedGitHubPR\":null,\"linkedGitLabMR\":null}}",
+      "sent": 1
     },
     "485a0942bda3": {
       "eligibility": "unfetched",
@@ -111,10 +117,6 @@
       "status": "pending",
       "startedAt": 0
     },
-    "cc09b6142ccb": {
-      "name": "hostedReview.getCreationEligibility#1",
-      "json": "{\"id\":\"frame-1\",\"deviceToken\":\"recording-device\",\"method\":\"hostedReview.getCreationEligibility\",\"params\":{\"repo\":\"id:repo42\",\"worktree\":\"id:repo42::/p\",\"branch\":\"feature\",\"base\":null,\"linkedGitHubPR\":null,\"linkedGitLabMR\":null}}"
-    },
     "e41e491351c2": {
       "name": "hostedReview.getCreationEligibility#1",
       "args": [
@@ -159,7 +161,7 @@
         "id": "pending",
         "observation": {
           "sender": ["e41e491351c2"],
-          "payloads": ["cc09b6142ccb"],
+          "payloads": ["349d5045a996"],
           "settlements": {
             "fetch": "9270aeb7d9c6"
           },
@@ -171,7 +173,7 @@
         "id": "settled",
         "observation": {
           "sender": ["899a024357b9"],
-          "payloads": ["cc09b6142ccb"],
+          "payloads": ["349d5045a996"],
           "settlements": {
             "fetch": "24bd84c9fb40"
           },

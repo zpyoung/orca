@@ -10,6 +10,7 @@ type RegisteredMethod = (typeof ALL_RPC_METHODS)[number]
 
 // These schemas reach into src/main and have no shared catalog entry.
 type UncataloguedMethod =
+  | 'agent.launch'
   | 'emulator.install'
   | 'orchestration.send'
   | 'orchestration.taskUpdate'

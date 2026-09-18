@@ -217,7 +217,9 @@ export async function launchForkSessionHandoff(
     return { ok: false, reason: 'launch-failed' }
   }
 
-  const { tabId } = launchResult
+  // Why: v1.4.206 replaced the result's `tabId: string | null` with a surface union, where
+  // host-published is the case that used to be null — the handoff waits on prompt delivery there.
+  const tabId = launchResult.surface.kind === 'host-published' ? null : launchResult.surface.tabId
   let promptDeliveryResult = launchResult.promptDeliveryResult
   if (tabId === null) {
     if (!promptDeliveryResult) {

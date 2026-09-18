@@ -444,3 +444,27 @@ PTY binding, native-chat eligibility, send queue, and migrated consumers/tests. 
 remain under the `agent-composer` feature.
 
 **Status:** pending-upstream. Not yet submitted.
+
+## Hourly base case is pinned to the repo's own package version
+
+**Defect:** `config/scripts/hourly-build-version.test.mjs`'s case *stays on the already-shipped
+hourly base after a buggy main release is unpublished* calls `getHourlyBuildIdentity`, which reads
+the repo's own `package.json`, and then asserts a hardcoded `1.4.203` base. The case therefore only
+holds while the tree sits at or below 1.4.203. It is not a fork problem: upstream's own v1.4.206 tag
+carries `"version": "1.4.206"` and fails the same assertion with `1.4.206-hourly.202609142000`.
+Upstream does not see it because its unit matrix runs on `main`, whose `package.json` is still
+`1.4.197` — the test and both implementation modules are byte-identical between `upstream/main` and
+the v1.4.206 tag.
+
+**Fork change:** resolve the base through `resolveDevChannelBaseVersion('1.4.203', publishedVersions)`
+and assert `createHourlyBuildVersion` and `nextHourlyBuildNumber` against it. Every assertion stays
+exact and the same three behaviours are covered; only the accidental dependency on whatever version
+the tree happens to carry is removed.
+
+**Why upstream, not isolated:** the case belongs to upstream's own suite and the fix is a one-scenario
+repair of its fixture. A fork copy would have to be replayed every sync for a file the fork has no
+stake in.
+
+**Paths:** `config/scripts/hourly-build-version.test.mjs`.
+
+**Status:** pending-upstream. Not yet submitted.

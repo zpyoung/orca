@@ -3,15 +3,21 @@
   "family": "project-explicit-false",
   "namedDeltas": [],
   "runnerVersion": 1,
-  "baseline": "50e752fc66a84638b0a8c1f4bdbbd5fdc708c3e9",
+  "baseline": "a28085adbfb65d3f27393cc7a0d78cfa2b4ff07e",
   "lockfileSha256": "788c1234b38a61fc882fca292341fce6690deee9cc6695673b0575cf2c4cf571",
-  "recorderSha256": "5ec2faffa944097d2916e2e9e2259b9d0c68e364c5f865bafd8a9600faedbdc7",
+  "recorderSha256": "d08bf9cd596ee449531f079c9f4f83efcb03fbc5e8d8658d15e0407d3464ec0e",
+  "adapterSha256": "d3b7f33d810e1fa420ac41a628cde9fe4a9e65fd57f89fbca0a40fc7d74951ab",
   "scenarioSha256": "b31992be2f91bd61fbe1b8a5400da3b7a56753564b0b0b2b38bc5d549812d693",
   "platform": "darwin",
   "scenarioVersion": 1,
   "projectionVersion": 2,
-  "goldenFormatVersion": 4,
+  "goldenFormatVersion": 5,
   "values": {
+    "02839f22d2db": {
+      "name": "projectMutating",
+      "value": false,
+      "sent": 1
+    },
     "0c4dced3e005": {
       "error": "",
       "mutating": true,
@@ -40,13 +46,10 @@
         "itemType": "ISSUE"
       }
     },
-    "2cd14f7121a5": {
-      "name": "projectMutating",
-      "value": false
-    },
-    "52a7a7239fbb": {
+    "219dced97206": {
       "name": "github.project.updateIssueBySlug#1",
-      "json": "{\"id\":\"frame-1\",\"deviceToken\":\"recording-device\",\"method\":\"github.project.updateIssueBySlug\",\"params\":{\"owner\":\"owner\",\"repo\":\"repo\",\"host\":\"github.enterprise.test\",\"number\":1,\"updates\":{\"addLabels\":[\"recorded\"]}}}"
+      "json": "{\"id\":\"frame-1\",\"deviceToken\":\"recording-device\",\"method\":\"github.project.updateIssueBySlug\",\"params\":{\"owner\":\"owner\",\"repo\":\"repo\",\"host\":\"github.enterprise.test\",\"number\":1,\"updates\":{\"addLabels\":[\"recorded\"]}}}",
+      "sent": 1
     },
     "6f0142de3930": {
       "name": "github.project.updateIssueBySlug#1",
@@ -87,17 +90,19 @@
         }
       }
     },
+    "7b2465eedefe": {
+      "name": "projectMutating",
+      "value": true,
+      "sent": 0
+    },
     "9270aeb7d9c6": {
       "status": "pending",
       "startedAt": 0
     },
-    "c2a271fc5d97": {
-      "name": "projectMutating",
-      "value": true
-    },
-    "d330309fabb3": {
+    "a7b76954b136": {
       "name": "projectRowDetailError",
-      "value": "Cannot read properties of null (reading 'ok')"
+      "value": "Cannot read properties of null (reading 'ok')",
+      "sent": 1
     },
     "e5673036d45e": {
       "name": "github.project.updateIssueBySlug#1",
@@ -146,26 +151,26 @@
         "id": "pending",
         "observation": {
           "sender": ["e5673036d45e"],
-          "payloads": ["52a7a7239fbb"],
+          "payloads": ["219dced97206"],
           "settlements": {
             "mount": "eb79a9b3682a",
             "submit": "9270aeb7d9c6"
           },
           "state": "0c4dced3e005",
-          "effects": ["c2a271fc5d97"]
+          "effects": ["7b2465eedefe"]
         }
       },
       {
         "id": "settled",
         "observation": {
           "sender": ["6f0142de3930"],
-          "payloads": ["52a7a7239fbb"],
+          "payloads": ["219dced97206"],
           "settlements": {
             "mount": "eb79a9b3682a",
             "submit": "eb79a9b3682a"
           },
           "state": "204a5c5728c2",
-          "effects": ["c2a271fc5d97", "d330309fabb3", "2cd14f7121a5"]
+          "effects": ["7b2465eedefe", "a7b76954b136", "02839f22d2db"]
         }
       }
     ]

@@ -9,7 +9,7 @@ const COMMAND_PATHS = COMMAND_SPECS.flatMap((spec) => [spec.path, ...(spec.alias
  * `orca ask` is a bare command AND a group prefix (`ask wait`, `ask cancel`) — the one
  * combination this codebase didn't already have a precedent for. These exercise the real
  * `parseArgs` -> `findCommandSpec` -> `dispatch` pipeline (not just ASK_HANDLERS directly) to
- * confirm the bare form still resolves after adding 'ask' to isCommandGroup/supportsBrowserPageFlag.
+ * confirm the bare form still resolves once 'ask' registers its specs and supportsBrowserPageFlag.
  */
 describe('orca ask CLI registration (real parseArgs + dispatch)', () => {
   it('parses the bare form to commandPath ["ask"] with --spec/--timeout-ms/--chunk-ms as flags', () => {
@@ -41,7 +41,7 @@ describe('orca ask CLI registration (real parseArgs + dispatch)', () => {
   // Why: isCommandGroup only affects help-path fallbacks (help.ts/index.ts) when no exact
   // spec matches; with an exact 'ask' spec present, this must never shadow dispatch routing.
   it('marks ask as a command group without preventing the exact-spec match from winning', () => {
-    expect(isCommandGroup(['ask'])).toBe(true)
+    expect(isCommandGroup(COMMAND_SPECS, ['ask'])).toBe(true)
     expect(findCommandSpec(COMMAND_SPECS, ['ask'])).toBeDefined()
   })
 
