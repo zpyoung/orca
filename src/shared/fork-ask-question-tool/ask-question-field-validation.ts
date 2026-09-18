@@ -44,7 +44,7 @@ function normalizeCredentialCandidates(value: string): string[] {
   ]
 }
 
-function isCredentialShaped(value: string): boolean {
+function mentionsCredential(value: string): boolean {
   return normalizeCredentialCandidates(value).some((normalized) => {
     if (CREDENTIAL_PATTERN.test(normalized)) {
       return true
@@ -209,7 +209,7 @@ export function validateId(raw: unknown, path: string, errors: AskValidationErro
     errors.push({ path: `${path}.id`, message: `duplicate question id '${raw}'` })
   }
   seenIds.add(raw)
-  if (isCredentialShaped(raw)) {
+  if (mentionsCredential(raw)) {
     errors.push({ path: `${path}.id`, message: 'credential-shaped id is not permitted' })
   }
   return raw
@@ -220,7 +220,7 @@ export function validateQuestionText(raw: unknown, path: string, errors: AskVali
     errors.push({ path: `${path}.question`, message: 'question text is required' })
     return ''
   }
-  if (isCredentialShaped(raw)) {
+  if (mentionsCredential(raw)) {
     errors.push({ path: `${path}.question`, message: 'credential-shaped question text is not permitted' })
   }
   return raw
@@ -247,7 +247,7 @@ function validateOption(raw: unknown, path: string, errors: AskValidationError[]
   const value = raw.value
   if (typeof value !== 'string' || value.length === 0) {
     errors.push({ path: `${path}.value`, message: 'option value is required' })
-  } else if (isCredentialShaped(value)) {
+  } else if (mentionsCredential(value)) {
     errors.push({ path: `${path}.value`, message: 'credential-shaped option value is not permitted' })
   }
   const label = raw.label
