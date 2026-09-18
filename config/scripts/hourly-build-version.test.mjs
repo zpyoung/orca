@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   createHourlyBuildVersion,
   formatHourlyReleaseName,
-  getHourlyBuildIdentity,
   nextHourlyBuildNumber
 } from './hourly-build-version.mjs'
 import { compareAppVersions } from '../../src/shared/app-version'
+import { resolveDevChannelBaseVersion } from './dev-channel-base-version.mjs'
 
 describe('createHourlyBuildVersion', () => {
   it('stamps the version with a zero-padded UTC timestamp', () => {
@@ -122,25 +122,32 @@ describe('nextHourlyBuildNumber', () => {
   })
 })
 
-describe('getHourlyBuildIdentity', () => {
+describe('hourly base resolution', () => {
   // 2026-09-14: v1.4.202's GitHub release was deleted for a bug after hourlies
   // had climbed to 1.4.203. Passing the leftover tag and the already-shipped
   // hourly keeps the next build on 1.4.203 so electron-updater will still
   // install it.
   it('stays on the already-shipped hourly base after a buggy main release is unpublished', () => {
-    const identity = getHourlyBuildIdentity(new Date('2026-09-14T20:00:00Z'), {
-      publishedVersions: [
-        'v1.4.201',
-        'v1.4.202',
-        'v1.4.202-hourly.202609141912',
-        'v1.4.203-hourly.202609140417'
-      ],
-      releaseNames: [
+    // Why the base is resolved here instead of through getHourlyBuildIdentity: that
+    // entry point reads this repo's own package.json, so the case only holds while the
+    // tree sits at or below 1.4.203. Any release bump past it — upstream's own tag, or
+    // this fork's version line — moves the base and fails a case about published tags.
+    const publishedVersions = [
+      'v1.4.201',
+      'v1.4.202',
+      'v1.4.202-hourly.202609141912',
+      'v1.4.203-hourly.202609140417'
+    ]
+    const base = resolveDevChannelBaseVersion('1.4.203', publishedVersions)
+    expect(base).toBe('1.4.203')
+    expect(createHourlyBuildVersion(base, new Date('2026-09-14T20:00:00Z'))).toBe(
+      '1.4.203-hourly.202609142000'
+    )
+    expect(
+      nextHourlyBuildNumber(base, [
         '1.4.202 • 14 • Sep 14, 12:12PM • 875b86d',
         '1.4.203 • 04 • Sep 13, 9:17PM • 2ce252f'
-      ]
-    })
-    expect(identity.version).toBe('1.4.203-hourly.202609142000')
-    expect(identity.buildNumber).toBe(5)
+      ])
+    ).toBe(5)
   })
 })

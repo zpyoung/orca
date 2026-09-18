@@ -3884,6 +3884,12 @@
       "ledger": "docs/fork-upstreaming.md#bug-2-relay-and-ssh-environment-dependent-failures"
     },
     {
+      "path": "config/scripts/hourly-build-version.test.mjs",
+      "reason": "Resolves the unpublished-release base explicitly instead of through getHourlyBuildIdentity, which reads this repo's package.json and pins the case to a tree at or below 1.4.203 — upstream's own v1.4.206 tag fails it too.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#hourly-base-case-is-pinned-to-the-repos-own-package-version"
+    },
+    {
       "path": "config/scripts/check-changed-code-quality.mjs",
       "reason": "Stops the changed-lines type-aware scan pinning the root oxlint config over mobile/, whose workspace deps are absent in the gate job so every React Native type resolves as an error type.",
       "status": "pending-upstream",
