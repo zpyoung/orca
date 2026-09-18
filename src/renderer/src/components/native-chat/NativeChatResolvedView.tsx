@@ -398,6 +398,7 @@ export function NativeChatResolvedView({
         ) : (
           <NativeChatConversation
             session={sessionWithPending}
+            isVisible={isVisible}
             isWorking={isWorking}
             fontScale={fontScale.scale}
             workingStartedAt={hookWorkingEpoch}

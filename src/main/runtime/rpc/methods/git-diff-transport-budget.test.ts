@@ -32,7 +32,17 @@ const OVERSIZED_DIFF: GitDiffResult = {
   modifiedIsBinary: true
 }
 
-const CASES: readonly { method: string; runtimeMethod: string; params: Record<string, unknown> }[] =
+/** The three runtime readers the dispatcher hands a transport budget to. */
+type BudgetedRuntimeMethod =
+  | 'getRuntimeGitDiff'
+  | 'getRuntimeGitBranchDiff'
+  | 'getRuntimeGitCommitDiff'
+
+const CASES: readonly {
+  method: string
+  runtimeMethod: BudgetedRuntimeMethod
+  params: Record<string, unknown>
+}[] =
   [
     {
       method: 'git.diff',
@@ -80,8 +90,8 @@ function stubRuntime(): OrcaRuntimeService {
   return runtime as OrcaRuntimeService
 }
 
-function budgetArgument(runtime: OrcaRuntimeService, runtimeMethod: string): unknown {
-  const spy = Reflect.get(runtime, runtimeMethod)
+function budgetArgument(runtime: OrcaRuntimeService, runtimeMethod: BudgetedRuntimeMethod): unknown {
+  const spy = runtime[runtimeMethod]
   if (!vi.isMockFunction(spy)) {
     throw new TypeError(`Expected ${runtimeMethod} to be a mock function`)
   }

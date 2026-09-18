@@ -21,7 +21,7 @@ describe('askServicesFor', () => {
   })
 
   it('opens the ask db on the first db or registry read, not on construction, then memoizes it', () => {
-    const runtimeKey = {}
+    const runtimeKey = { getRuntimeId: () => 'runtime-under-test' }
     const dbPath = join(root, 'asks.db')
 
     const services = askServicesFor(runtimeKey, () => false)
@@ -38,7 +38,7 @@ describe('askServicesFor', () => {
   })
 
   it('builds the registry over the same db and keeps both stable across calls', async () => {
-    const runtimeKey = {}
+    const runtimeKey = { getRuntimeId: () => 'runtime-under-test' }
 
     const { db, registry } = askServicesFor(runtimeKey, () => false)
     const second = askServicesFor(runtimeKey, () => false)
@@ -54,14 +54,14 @@ describe('askServicesFor', () => {
   })
 
   it('keeps separate service bundles for separate runtime keys', () => {
-    const services1 = askServicesFor({}, () => false)
-    const services2 = askServicesFor({}, () => false)
+    const services1 = askServicesFor({ getRuntimeId: () => 'runtime-under-test' }, () => false)
+    const services2 = askServicesFor({ getRuntimeId: () => 'runtime-under-test' }, () => false)
     expect(services1).not.toBe(services2)
     expect(services1.db).not.toBe(services2.db)
   })
 
   it('wires the roster to the hasLocalRendererWindow callback given at first construction', () => {
-    const runtimeKey = {}
+    const runtimeKey = { getRuntimeId: () => 'runtime-under-test' }
     const { roster } = askServicesFor(runtimeKey, () => true)
     expect(roster.hasCapableOwner('pane:never-subscribed')).toBe(true)
   })
@@ -73,7 +73,7 @@ describe('askServicesFor', () => {
 
     it('resolves unavailable once the roster reports the last capable owner detached and the grace window elapses', async () => {
       vi.useFakeTimers()
-      const { registry, roster, db } = askServicesFor({}, () => false)
+      const { registry, roster, db } = askServicesFor({ getRuntimeId: () => 'runtime-under-test' }, () => false)
       roster.recordConnectionCapabilities('conn-1', [ASK_SURFACE_CLIENT_CAPABILITY])
       roster.trackPaneSubscription('conn-1', 'pane:1')
 
@@ -93,7 +93,7 @@ describe('askServicesFor', () => {
 
     it('cancels the grace timer when the roster reports the pane reattached inside the window', async () => {
       vi.useFakeTimers()
-      const { registry, roster, db } = askServicesFor({}, () => false)
+      const { registry, roster, db } = askServicesFor({ getRuntimeId: () => 'runtime-under-test' }, () => false)
       roster.recordConnectionCapabilities('conn-1', [ASK_SURFACE_CLIENT_CAPABILITY])
       roster.trackPaneSubscription('conn-1', 'pane:1')
 

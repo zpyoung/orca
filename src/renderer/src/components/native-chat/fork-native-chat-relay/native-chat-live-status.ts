@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-live-status.ts
-// FORK-COPY-SHA: 4f7baefc4f5c49181d54046763e083a4628662d8
+// FORK-COPY-SHA: c464b1014972bd771324fed84b7de7fb100e837b
 // Pure merge of live hook turn-state into a NativeChatSession status override.
 // Kept separate from the React hook so the precedence rule (live 'working'
 // surfaces before the transcript flushes its explicit terminal record, then is

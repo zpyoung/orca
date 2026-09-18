@@ -3,14 +3,15 @@
   "family": "hostedReview.create-chain",
   "namedDeltas": [],
   "runnerVersion": 1,
-  "baseline": "50e752fc66a84638b0a8c1f4bdbbd5fdc708c3e9",
+  "baseline": "a28085adbfb65d3f27393cc7a0d78cfa2b4ff07e",
   "lockfileSha256": "788c1234b38a61fc882fca292341fce6690deee9cc6695673b0575cf2c4cf571",
-  "recorderSha256": "5ec2faffa944097d2916e2e9e2259b9d0c68e364c5f865bafd8a9600faedbdc7",
+  "recorderSha256": "d08bf9cd596ee449531f079c9f4f83efcb03fbc5e8d8658d15e0407d3464ec0e",
+  "adapterSha256": "c582ce355b0704b38d7e84cbce352630096c91231bf09aecd1f6dbb409fed17f",
   "scenarioSha256": "2deb0435ef63a3e0102e28f2f3f331039486d193d1e1ffdfb53ad86d3ff039f0",
   "platform": "darwin",
   "scenarioVersion": 1,
   "projectionVersion": 2,
-  "goldenFormatVersion": 4,
+  "goldenFormatVersion": 5,
   "values": {
     "122ef8a1f0b9": {
       "name": "hostedReview.create#1",
@@ -54,10 +55,6 @@
         }
       }
     },
-    "1617f98dc371": {
-      "name": "hostedReview.create#1",
-      "json": "{\"id\":\"frame-1\",\"deviceToken\":\"recording-device\",\"method\":\"hostedReview.create\",\"params\":{\"repo\":\"id:repo42\",\"worktree\":\"id:repo42::/p\",\"provider\":\"github\",\"base\":\"main\",\"head\":\"feature\",\"title\":\"Recorded title\",\"body\":\"Recorded body\",\"draft\":false}}"
-    },
     "3ff86ed23cf9": {
       "status": "fulfilled",
       "startedAt": 0,
@@ -69,9 +66,10 @@
         "url": "https://review.test/5"
       }
     },
-    "7b353f33f66f": {
+    "8056b0204a25": {
       "name": "worktree.set#1",
-      "json": "{\"id\":\"frame-2\",\"deviceToken\":\"recording-device\",\"method\":\"worktree.set\",\"params\":{\"worktree\":\"id:repo42::/p\",\"baseRef\":\"main\",\"linkedPR\":5}}"
+      "json": "{\"id\":\"frame-2\",\"deviceToken\":\"recording-device\",\"method\":\"worktree.set\",\"params\":{\"worktree\":\"id:repo42::/p\",\"baseRef\":\"main\",\"linkedPR\":5}}",
+      "sent": 2
     },
     "91f262b2079b": {
       "name": "worktree.set#1",
@@ -116,6 +114,11 @@
         "ok": true,
         "url": "https://review.test/5"
       }
+    },
+    "f5dea50053bb": {
+      "name": "hostedReview.create#1",
+      "json": "{\"id\":\"frame-1\",\"deviceToken\":\"recording-device\",\"method\":\"hostedReview.create\",\"params\":{\"repo\":\"id:repo42\",\"worktree\":\"id:repo42::/p\",\"provider\":\"github\",\"base\":\"main\",\"head\":\"feature\",\"title\":\"Recorded title\",\"body\":\"Recorded body\",\"draft\":false}}",
+      "sent": 1
     }
   },
   "recording": {
@@ -125,7 +128,7 @@
         "id": "settled",
         "observation": {
           "sender": ["122ef8a1f0b9", "91f262b2079b"],
-          "payloads": ["1617f98dc371", "7b353f33f66f"],
+          "payloads": ["f5dea50053bb", "8056b0204a25"],
           "settlements": {
             "create": "3ff86ed23cf9"
           },

@@ -23,7 +23,10 @@ function stubAnimationFrames(): () => void {
   }
 }
 
-function focusTabWithSurface(surface: object): void {
+/** The xterm helper textarea as this suite stubs it: the two members the redirect reads. */
+type TerminalHelperSurfaceStub = { focus: () => void; closest: (selector: string) => unknown }
+
+function focusTabWithSurface(surface: TerminalHelperSurfaceStub): void {
   // Why: the tab-wide lookup is scoped to uncovered leaves, so the stub has to
   // answer the same selector the implementation builds, not a bare descendant one.
   const helperSelector = `[data-terminal-tab-id="tab-1"] ${UNCOVERED_TERMINAL_LEAF_SELECTOR} .xterm-helper-textarea`

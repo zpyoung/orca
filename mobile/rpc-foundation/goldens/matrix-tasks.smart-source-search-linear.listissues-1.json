@@ -3,14 +3,15 @@
   "family": "tasks.smart-source-search",
   "namedDeltas": [],
   "runnerVersion": 1,
-  "baseline": "50e752fc66a84638b0a8c1f4bdbbd5fdc708c3e9",
+  "baseline": "a28085adbfb65d3f27393cc7a0d78cfa2b4ff07e",
   "lockfileSha256": "788c1234b38a61fc882fca292341fce6690deee9cc6695673b0575cf2c4cf571",
-  "recorderSha256": "5ec2faffa944097d2916e2e9e2259b9d0c68e364c5f865bafd8a9600faedbdc7",
+  "recorderSha256": "d08bf9cd596ee449531f079c9f4f83efcb03fbc5e8d8658d15e0407d3464ec0e",
+  "adapterSha256": "343b97826782820b7aecaddd13a4c8cdbbbca057c83021863d577a677934f3a3",
   "scenarioSha256": "767044526344237daee0a3f981a10615fbb9ebc3f45c2f6f41f9b8b16d362082",
   "platform": "darwin",
   "scenarioVersion": 1,
   "projectionVersion": 2,
-  "goldenFormatVersion": 4,
+  "goldenFormatVersion": 5,
   "values": {
     "090ea9e6ac63": {
       "name": "linear.listIssues#1",
@@ -101,6 +102,11 @@
         }
       ]
     },
+    "2a23cc4740e0": {
+      "name": "gitlab.listWorkItems#1",
+      "json": "{\"id\":\"frame-2\",\"deviceToken\":\"recording-device\",\"method\":\"gitlab.listWorkItems\",\"params\":{\"repo\":\"id:repo-1\",\"state\":\"opened\",\"page\":1,\"perPage\":50,\"query\":\"bug\"}}",
+      "sent": 2
+    },
     "2cfd107b9660": {
       "github": [
         {
@@ -138,10 +144,6 @@
           "title": "one"
         }
       ]
-    },
-    "3828d5880c35": {
-      "name": "gitlab.listWorkItems#1",
-      "json": "{\"id\":\"frame-2\",\"deviceToken\":\"recording-device\",\"method\":\"gitlab.listWorkItems\",\"params\":{\"repo\":\"id:repo-1\",\"state\":\"opened\",\"page\":1,\"perPage\":50,\"query\":\"bug\"}}"
     },
     "3c5eceeb8463": {
       "name": "linear.listIssues#1",
@@ -330,6 +332,16 @@
         }
       }
     },
+    "941f815566f4": {
+      "name": "linear.listIssues#1",
+      "json": "{\"id\":\"frame-5\",\"deviceToken\":\"recording-device\",\"method\":\"linear.listIssues\",\"params\":{\"filter\":\"assigned\",\"limit\":50}}",
+      "sent": 5
+    },
+    "955ddb924df7": {
+      "name": "github.listWorkItems#1",
+      "json": "{\"id\":\"frame-1\",\"deviceToken\":\"recording-device\",\"method\":\"github.listWorkItems\",\"params\":{\"repo\":\"id:repo-1\",\"limit\":36,\"query\":\"bug\"}}",
+      "sent": 1
+    },
     "957cc0c5ead6": {
       "status": "rejected",
       "startedAt": 0,
@@ -339,6 +351,11 @@
         "message": "Unexpected Linear tasks response",
         "isRpcDeliveryUnknown": false
       }
+    },
+    "9e06be33a485": {
+      "name": "repo.searchRefs#1",
+      "json": "{\"id\":\"frame-4\",\"deviceToken\":\"recording-device\",\"method\":\"repo.searchRefs\",\"params\":{\"repo\":\"id:repo-1\",\"query\":\"bug\",\"limit\":20}}",
+      "sent": 4
     },
     "a4ee5d16b4f6": {
       "status": "fulfilled",
@@ -484,10 +501,6 @@
         }
       }
     },
-    "b8b02a30b6b8": {
-      "name": "repo.searchRefs#1",
-      "json": "{\"id\":\"frame-4\",\"deviceToken\":\"recording-device\",\"method\":\"repo.searchRefs\",\"params\":{\"repo\":\"id:repo-1\",\"query\":\"bug\",\"limit\":20}}"
-    },
     "b948e8307e81": {
       "status": "rejected",
       "startedAt": 0,
@@ -539,6 +552,11 @@
         "isRpcDeliveryUnknown": true
       }
     },
+    "c9256f29d706": {
+      "name": "linear.searchIssues#1",
+      "json": "{\"id\":\"frame-3\",\"deviceToken\":\"recording-device\",\"method\":\"linear.searchIssues\",\"params\":{\"query\":\"bug\",\"limit\":50,\"workspaceId\":\"linear-workspace\"}}",
+      "sent": 3
+    },
     "d7c2c3caeb26": {
       "name": "linear.listIssues#1",
       "args": [
@@ -577,14 +595,6 @@
         }
       }
     },
-    "e97e5a589476": {
-      "name": "linear.listIssues#1",
-      "json": "{\"id\":\"frame-5\",\"deviceToken\":\"recording-device\",\"method\":\"linear.listIssues\",\"params\":{\"filter\":\"assigned\",\"limit\":50}}"
-    },
-    "ead829dd6d03": {
-      "name": "linear.searchIssues#1",
-      "json": "{\"id\":\"frame-3\",\"deviceToken\":\"recording-device\",\"method\":\"linear.searchIssues\",\"params\":{\"query\":\"bug\",\"limit\":50,\"workspaceId\":\"linear-workspace\"}}"
-    },
     "ec10770e2214": {
       "name": "linear.listIssues#1",
       "args": [
@@ -621,10 +631,6 @@
           }
         }
       }
-    },
-    "ee6fe4f97b01": {
-      "name": "github.listWorkItems#1",
-      "json": "{\"id\":\"frame-1\",\"deviceToken\":\"recording-device\",\"method\":\"github.listWorkItems\",\"params\":{\"repo\":\"id:repo-1\",\"limit\":36,\"query\":\"bug\"}}"
     },
     "f32ad26605d0": {
       "name": "gitlab.listWorkItems#1",
@@ -836,7 +842,7 @@
         "id": "tw-smart-search-all-providers.prelude:github-items",
         "observation": {
           "sender": ["5bce68072dc3"],
-          "payloads": ["ee6fe4f97b01"],
+          "payloads": ["955ddb924df7"],
           "settlements": {
             "github": "36290ab254a4"
           },
@@ -848,7 +854,7 @@
         "id": "tw-smart-search-all-providers.prelude:gitlab-items",
         "observation": {
           "sender": ["5bce68072dc3", "f32ad26605d0"],
-          "payloads": ["ee6fe4f97b01", "3828d5880c35"],
+          "payloads": ["955ddb924df7", "2a23cc4740e0"],
           "settlements": {
             "github": "36290ab254a4",
             "gitlab": "6e2d75e3bbd7"
@@ -861,7 +867,7 @@
         "id": "tw-smart-search-all-providers.prelude:linear-search",
         "observation": {
           "sender": ["5bce68072dc3", "f32ad26605d0", "6107c951646f"],
-          "payloads": ["ee6fe4f97b01", "3828d5880c35", "ead829dd6d03"],
+          "payloads": ["955ddb924df7", "2a23cc4740e0", "c9256f29d706"],
           "settlements": {
             "github": "36290ab254a4",
             "gitlab": "6e2d75e3bbd7",
@@ -875,7 +881,7 @@
         "id": "tw-smart-search-all-providers.prelude:branch-refs",
         "observation": {
           "sender": ["5bce68072dc3", "f32ad26605d0", "6107c951646f", "25f88995b39a"],
-          "payloads": ["ee6fe4f97b01", "3828d5880c35", "ead829dd6d03", "b8b02a30b6b8"],
+          "payloads": ["955ddb924df7", "2a23cc4740e0", "c9256f29d706", "9e06be33a485"],
           "settlements": {
             "github": "36290ab254a4",
             "gitlab": "6e2d75e3bbd7",
@@ -897,11 +903,11 @@
             "fe7f60b5d785"
           ],
           "payloads": [
-            "ee6fe4f97b01",
-            "3828d5880c35",
-            "ead829dd6d03",
-            "b8b02a30b6b8",
-            "e97e5a589476"
+            "955ddb924df7",
+            "2a23cc4740e0",
+            "c9256f29d706",
+            "9e06be33a485",
+            "941f815566f4"
           ],
           "settlements": {
             "github": "36290ab254a4",
@@ -925,11 +931,11 @@
             "f3a7d3f5dc3c"
           ],
           "payloads": [
-            "ee6fe4f97b01",
-            "3828d5880c35",
-            "ead829dd6d03",
-            "b8b02a30b6b8",
-            "e97e5a589476"
+            "955ddb924df7",
+            "2a23cc4740e0",
+            "c9256f29d706",
+            "9e06be33a485",
+            "941f815566f4"
           ],
           "settlements": {
             "github": "36290ab254a4",
@@ -953,11 +959,11 @@
             "7a91e9a2c1bb"
           ],
           "payloads": [
-            "ee6fe4f97b01",
-            "3828d5880c35",
-            "ead829dd6d03",
-            "b8b02a30b6b8",
-            "e97e5a589476"
+            "955ddb924df7",
+            "2a23cc4740e0",
+            "c9256f29d706",
+            "9e06be33a485",
+            "941f815566f4"
           ],
           "settlements": {
             "github": "36290ab254a4",
@@ -981,11 +987,11 @@
             "ec10770e2214"
           ],
           "payloads": [
-            "ee6fe4f97b01",
-            "3828d5880c35",
-            "ead829dd6d03",
-            "b8b02a30b6b8",
-            "e97e5a589476"
+            "955ddb924df7",
+            "2a23cc4740e0",
+            "c9256f29d706",
+            "9e06be33a485",
+            "941f815566f4"
           ],
           "settlements": {
             "github": "36290ab254a4",
@@ -1009,11 +1015,11 @@
             "f7b4f4fa8d5a"
           ],
           "payloads": [
-            "ee6fe4f97b01",
-            "3828d5880c35",
-            "ead829dd6d03",
-            "b8b02a30b6b8",
-            "e97e5a589476"
+            "955ddb924df7",
+            "2a23cc4740e0",
+            "c9256f29d706",
+            "9e06be33a485",
+            "941f815566f4"
           ],
           "settlements": {
             "github": "36290ab254a4",
@@ -1037,11 +1043,11 @@
             "b68d510a9e89"
           ],
           "payloads": [
-            "ee6fe4f97b01",
-            "3828d5880c35",
-            "ead829dd6d03",
-            "b8b02a30b6b8",
-            "e97e5a589476"
+            "955ddb924df7",
+            "2a23cc4740e0",
+            "c9256f29d706",
+            "9e06be33a485",
+            "941f815566f4"
           ],
           "settlements": {
             "github": "36290ab254a4",
@@ -1065,11 +1071,11 @@
             "3c5eceeb8463"
           ],
           "payloads": [
-            "ee6fe4f97b01",
-            "3828d5880c35",
-            "ead829dd6d03",
-            "b8b02a30b6b8",
-            "e97e5a589476"
+            "955ddb924df7",
+            "2a23cc4740e0",
+            "c9256f29d706",
+            "9e06be33a485",
+            "941f815566f4"
           ],
           "settlements": {
             "github": "36290ab254a4",
@@ -1093,11 +1099,11 @@
             "adb630f7c310"
           ],
           "payloads": [
-            "ee6fe4f97b01",
-            "3828d5880c35",
-            "ead829dd6d03",
-            "b8b02a30b6b8",
-            "e97e5a589476"
+            "955ddb924df7",
+            "2a23cc4740e0",
+            "c9256f29d706",
+            "9e06be33a485",
+            "941f815566f4"
           ],
           "settlements": {
             "github": "36290ab254a4",
@@ -1121,11 +1127,11 @@
             "d7c2c3caeb26"
           ],
           "payloads": [
-            "ee6fe4f97b01",
-            "3828d5880c35",
-            "ead829dd6d03",
-            "b8b02a30b6b8",
-            "e97e5a589476"
+            "955ddb924df7",
+            "2a23cc4740e0",
+            "c9256f29d706",
+            "9e06be33a485",
+            "941f815566f4"
           ],
           "settlements": {
             "github": "36290ab254a4",
@@ -1149,11 +1155,11 @@
             "f64e4725150b"
           ],
           "payloads": [
-            "ee6fe4f97b01",
-            "3828d5880c35",
-            "ead829dd6d03",
-            "b8b02a30b6b8",
-            "e97e5a589476"
+            "955ddb924df7",
+            "2a23cc4740e0",
+            "c9256f29d706",
+            "9e06be33a485",
+            "941f815566f4"
           ],
           "settlements": {
             "github": "36290ab254a4",
@@ -1177,11 +1183,11 @@
             "090ea9e6ac63"
           ],
           "payloads": [
-            "ee6fe4f97b01",
-            "3828d5880c35",
-            "ead829dd6d03",
-            "b8b02a30b6b8",
-            "e97e5a589476"
+            "955ddb924df7",
+            "2a23cc4740e0",
+            "c9256f29d706",
+            "9e06be33a485",
+            "941f815566f4"
           ],
           "settlements": {
             "github": "36290ab254a4",

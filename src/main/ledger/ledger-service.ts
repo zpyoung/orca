@@ -92,7 +92,7 @@ export class LedgerRuntimeService {
     const response = await store.run(async () => {
       const catalog = await this.options.catalog()
       const prepared = await this.prepareHost(request)
-      this.validateRequestShape(request, channel)
+      this.validateRequestTargeting(request, channel)
       const owner = resolveLedgerOwner(request, catalog, channel)
       this.assertLedgerTargetExists(request)
       if (request.operation === 'removal-preview') {
@@ -218,7 +218,7 @@ export class LedgerRuntimeService {
     return !['list', 'show', 'review', 'catalog'].includes(request.operation)
   }
 
-  private validateRequestShape(request: LedgerRequest, channel: 'cli' | 'ui'): void {
+  private validateRequestTargeting(request: LedgerRequest, channel: 'cli' | 'ui'): void {
     const target = request.target
     if (target?.group && target.groupSelector) {
       throw new LedgerError('invalid-target', 'group and groupSelector are mutually exclusive')

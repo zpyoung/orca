@@ -324,7 +324,7 @@
       "path": "src/cli/args.ts",
       "feature": "ask-question-tool",
       "kind": "registration",
-      "lines": ["      'ask',", "        'ask',"]
+      "lines": ["      'ask',"]
     },
     {
       "path": "src/cli/artifact-format.ts",
@@ -431,7 +431,7 @@
       ]
     },
     {
-      "path": "src/main/agent-hooks/server/server-status-update.ts",
+      "path": "src/main/agent-hooks/server/server-listeners.ts",
       "feature": "session-info",
       "kind": "registration",
       "lines": [
@@ -1519,14 +1519,6 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/dashboard-popout/AgentMapWorkspaceContextMenu.test.tsx",
-      "feature": "worktree-groups",
-      "kind": "passthrough",
-      "lines": [
-        "    const createGroup = await screen.findByText('New group from worktree', {}, { timeout: 5_000 })"
-      ]
-    },
-    {
       "path": "src/renderer/src/components/dashboard/DashboardAgentRow.tsx",
       "feature": "session-handoff",
       "kind": "registration",
@@ -2034,9 +2026,10 @@
         "import rehypeHighlight from 'rehype-highlight'",
         "  highlightCode?: boolean",
         "      highlightCode = false,",
-        "      if (highlightCode) {",
-        "          ? createDocumentCommentMarkdownComponents(onLinkClick, true)",
-        "    }, [expandImages, variant, onLinkClick, highlightCode])",
+        "          ? highlightCode || renderCodeBlock",
+        "            ? createDocumentCommentMarkdownComponents(undefined, highlightCode, renderCodeBlock)",
+        "        ? createDocumentCommentMarkdownComponents(onLinkClick, highlightCode, renderCodeBlock)",
+        "    }, [expandImages, renderCodeBlock, variant, onLinkClick, highlightCode])",
         "      () => (highlightCode ? [...rehypePlugins, rehypeHighlight] : rehypePlugins),",
         "          highlightCode && 'native-chat-code [&_pre_code]:text-inherit',",
         "          rehypePlugins={activeRehypePlugins}"
@@ -2133,7 +2126,7 @@
       "feature": "native-chat-coloring",
       "kind": "passthrough",
       "lines": [
-        "  highlightCode?: boolean",
+        "  highlightCode?: boolean,",
         "      ) : highlightCode ? (",
         "        <code className=\"rounded bg-code-accent-surface px-1.5 py-0.5 font-mono text-[0.92em] text-code-accent [overflow-wrap:anywhere]\">"
       ]
@@ -3434,7 +3427,7 @@
       "lines": [
         "import { ASK_REGISTRY_RUNTIME_CAPABILITY } from './fork-ask-question-tool/ask-question-capability'",
         "  AUTOMATION_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY,",
-        "  ASK_REGISTRY_RUNTIME_CAPABILITY"
+        "  ASK_REGISTRY_RUNTIME_CAPABILITY,"
       ]
     },
     {
@@ -3889,6 +3882,12 @@
       "reason": "Replaces bug-2 disk-heavy GC stage fixture with a bounded synthetic listing through the real POSIX pipeline.",
       "status": "pending-upstream",
       "ledger": "docs/fork-upstreaming.md#bug-2-relay-and-ssh-environment-dependent-failures"
+    },
+    {
+      "path": "config/scripts/hourly-build-version.test.mjs",
+      "reason": "Resolves the unpublished-release base explicitly instead of through getHourlyBuildIdentity, which reads this repo's package.json and pins the case to a tree at or below 1.4.203 — upstream's own v1.4.206 tag fails it too.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#hourly-base-case-is-pinned-to-the-repos-own-package-version"
     },
     {
       "path": "config/scripts/check-changed-code-quality.mjs",
@@ -4797,7 +4796,7 @@
       "removed": 0
     },
     "src/cli/args.ts": {
-      "added": 3,
+      "added": 1,
       "removed": 0
     },
     "src/cli/artifact-format.ts": {
@@ -4837,15 +4836,15 @@
       "removed": 2
     },
     "src/cli/specs/index.ts": {
-      "added": 5,
-      "removed": 1
+      "added": 4,
+      "removed": 0
     },
     "src/main/agent-hooks/server/server-lifecycle.ts": {
       "added": 2,
       "removed": 0
     },
-    "src/main/agent-hooks/server/server-status-update.ts": {
-      "added": 2,
+    "src/main/agent-hooks/server/server-listeners.ts": {
+      "added": 4,
       "removed": 0
     },
     "src/main/agent-hooks/server/server-tab-cleanup.ts": {
@@ -5141,8 +5140,8 @@
       "removed": 1
     },
     "src/main/runtime/rpc/rpc-params-type-parity.ts": {
-      "added": 6,
-      "removed": 1
+      "added": 2,
+      "removed": 0
     },
     "src/main/runtime/rpc/rpc-streaming-dispatcher.ts": {
       "added": 1,
@@ -5325,10 +5324,6 @@
       "removed": 3
     },
     "src/renderer/src/components/browser-pane/assemble-chrome/browser-page-toolbar.tsx": {
-      "added": 1,
-      "removed": 1
-    },
-    "src/renderer/src/components/dashboard-popout/AgentMapWorkspaceContextMenu.test.tsx": {
       "added": 1,
       "removed": 1
     },
@@ -5553,8 +5548,8 @@
       "removed": 0
     },
     "src/renderer/src/components/sidebar/CommentMarkdown.tsx": {
-      "added": 15,
-      "removed": 2
+      "added": 13,
+      "removed": 5
     },
     "src/renderer/src/components/sidebar/ProjectGroupDeleteDialog.tsx": {
       "added": 35,
@@ -5593,8 +5588,8 @@
       "removed": 14
     },
     "src/renderer/src/components/sidebar/comment-markdown-element-renderers.tsx": {
-      "added": 6,
-      "removed": 1
+      "added": 5,
+      "removed": 0
     },
     "src/renderer/src/components/sidebar/empty-project-placeholder-repos.ts": {
       "added": 8,
@@ -6217,8 +6212,8 @@
       "removed": 1
     },
     "src/shared/protocol-version.ts": {
-      "added": 4,
-      "removed": 1
+      "added": 3,
+      "removed": 0
     },
     "src/shared/rpc-contract/artifacts-params.ts": {
       "added": 1,

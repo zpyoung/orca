@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/use-native-chat-composer-keydown.ts
-// FORK-COPY-SHA: 4f7baefc4f5c49181d54046763e083a4628662d8
+// FORK-COPY-SHA: c464b1014972bd771324fed84b7de7fb100e837b
 import { useCallback, type Dispatch, type KeyboardEventHandler, type SetStateAction } from 'react'
 import { recallNext, recallPrevious, type HistoryState } from './agent-composer-history'
 import type { ComposerAutocomplete, NativeChatPickerItem } from '../native-chat-composer-state'

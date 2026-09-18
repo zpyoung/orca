@@ -713,7 +713,6 @@
       "useComposerState": {
         "7eb3f44ff7": "選択した Agent は無効です。作成する前に、有効な Agent を選択してください。",
         "b2ead86962": "PR ベースを解決できませんでした。",
-        "a9ff236145": "一部の添付ファイルをアップロードできませんでした。",
         "3db83fc58a": "このホスト上に、添付に使用できるプロジェクトパスがありません。",
         "ba6cb77082": "プロジェクトへの接続に失敗しました。",
         "chooseOrAddProjectBeforeWorkspace": "ワークスペースを作成する前に、プロジェクトを選択または追加してください。",
@@ -14805,27 +14804,6 @@
     }
   },
   "dashboardPopout": {
-    "view": {
-      "label": "ダッシュボード表示",
-      "board": "ダッシュボード",
-      "map": "Agent マップ"
-    },
-    "map": {
-      "host": {
-        "local": "ローカル",
-        "ssh": "SSH",
-        "wsl": "WSL",
-        "remote": "リモート"
-      },
-      "liveContainmentMap": "ライブ包含マップ",
-      "empty": "現在のフィルターに一致する Agent はありません。",
-      "canvasLabel": "プロジェクト、ワークスペース、Agent の入れ子マップ",
-      "zoomOut": "ズームアウト",
-      "zoomIn": "ズームイン",
-      "fit": "全体表示",
-      "projectCount": "{{agents}}件の Agent · {{workspaces}}件のワークスペース",
-      "agentCount": "{{count}}件の Agent"
-    },
     "placeholder": {
       "title": "Agent ダッシュボード",
       "description": "ここに、すべての Agent が一覧で表示されます。ボードは近日公開です。"
