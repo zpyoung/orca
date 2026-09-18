@@ -1,3 +1,5 @@
+import type { GitFileStatus, GitStagingArea } from '../../../src/shared/git-status-types'
+import type { RpcResponse } from '../transport/types'
 import type {
   GitFileStatus,
   GitStagingArea,
@@ -9,9 +11,11 @@ import type { RpcResponse } from '../transport/types'
 
 export type MobileGitFileStatus = GitFileStatus
 export type MobileGitStagingArea = GitStagingArea
-export type MobileGitStatusEntry = GitStatusEntry
-export type MobileGitUpstreamStatus = GitUpstreamStatus
-export type MobileGitStatusResult = GitStatusResult
+export type { MobileGitStatusEntry, MobileGitUpstreamStatus }
+
+// The shape mobile reads off `git.status`, which is the reply schema's output, not the desktop
+// aggregate: every member mobile does not read is stripped rather than re-declared here.
+export type MobileGitStatusResult = MobileGitStatusHostPayload
 
 export type MobileSourceControlSection<TEntry extends MobileGitStatusEntry = MobileGitStatusEntry> =
   {

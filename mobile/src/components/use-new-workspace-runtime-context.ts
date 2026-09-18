@@ -1,14 +1,17 @@
 import { optionalSettingsRead } from '../transport/settings-read-operations'
 import { useEffect, useState } from 'react'
 import type { PersistedTrustedOrcaHooks } from '../../../src/shared/orca-yaml-hook-types'
+import type { RpcAcceptedResult } from '../transport/rpc-accepted-result'
 import type { RpcClient } from '../transport/rpc-client'
-import type { RpcResponse, RpcSuccess } from '../transport/types'
+import type { RpcResponse } from '../transport/types'
+import { taskLinearStatusRead, taskPreflightRead } from '../tasks/mobile-task-runtime-operations'
 import {
   filterAvailableTaskProviders,
   normalizeVisibleTaskProviders,
   type TaskProvider
 } from '../tasks/mobile-task-providers'
 import type { NewWorktreeRuntimeSettings } from './new-worktree-agent-selection'
+import { newWorkspaceUiStateRead } from './new-workspace-operations'
 
 type UiGetResult = { ui?: { trustedOrcaHooks?: PersistedTrustedOrcaHooks } } | null | undefined
 
@@ -38,8 +41,8 @@ export function useNewWorkspaceRuntimeContext(
     let stale = false
     void (async () => {
       const probes = Promise.allSettled([
-        client.sendRequest('preflight.check'),
-        client.sendRequest('linear.status')
+        taskPreflightRead.request(client),
+        taskLinearStatusRead.request(client)
       ])
       const [settingsRes, uiRes] = await Promise.allSettled([
         optionalSettingsRead.request(client),
@@ -72,10 +75,12 @@ export function useNewWorkspaceRuntimeContext(
         return
       }
       const glabInstalled =
-        (settledSuccess(preflightRes)?.result as { glab?: { installed?: boolean } } | undefined)
-          ?.glab?.installed === true
+        readProbeMember(
+          readProbeMember(settledValue(preflightRes, taskPreflightRead.interpret), 'glab'),
+          'installed'
+        ) === true
       const linearConnected =
-        (settledSuccess(linearRes)?.result as { connected?: boolean } | undefined)?.connected ===
+        readProbeMember(settledValue(linearRes, taskLinearStatusRead.interpret), 'connected') ===
         true
       const visibleProviders = normalizeVisibleTaskProviders(settingsValue?.visibleTaskProviders)
       setAvailableProviders(

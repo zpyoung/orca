@@ -21,7 +21,7 @@ export function buildWorktreeSetLinkParams(
 
 export function buildWorktreeSetHostedReviewLinkParams(
   worktreeId: string,
-  provider: HostedReviewProvider,
+  provider: string,
   number: number | null,
   options?: { baseRef?: string | null }
 ): RpcSendParams<'worktree.set'> {
@@ -41,7 +41,8 @@ export function buildWorktreeSetHostedReviewLinkParams(
       return { ...base, linkedAzureDevOpsPR: number }
     case 'gitea':
       return { ...base, linkedGiteaPR: number }
-    case 'unsupported':
+    // 'unsupported', and any token this build does not know: no linked* field to write.
+    default:
       return base
   }
 }
@@ -84,7 +85,7 @@ export function linkMobilePr(
 export async function linkMobileHostedReview(
   client: MobileSourceControlRpcSender,
   worktreeId: string,
-  provider: HostedReviewProvider,
+  provider: string,
   number: number,
   options?: { baseRef?: string | null }
 ): Promise<MobilePrLinkOutcome> {

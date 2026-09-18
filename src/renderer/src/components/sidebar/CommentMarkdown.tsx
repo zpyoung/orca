@@ -12,7 +12,8 @@ import {
   createDocumentCommentMarkdownComponents,
   documentCommentMarkdownComponents,
   isTrustedCompactImageSrc,
-  type CommentMarkdownLinkClickHandler
+  type CommentMarkdownLinkClickHandler,
+  type DocumentCodeBlockRenderer
 } from './comment-markdown-element-renderers'
 import { remarkNativeChatFileLinks } from './comment-markdown-native-chat-file-links'
 
@@ -219,13 +220,15 @@ const CommentMarkdown = React.memo(
       }
       if (!onLinkClick) {
         return variant === 'document'
-          ? documentCommentMarkdownComponents
+          ? renderCodeBlock
+            ? createDocumentCommentMarkdownComponents(undefined, renderCodeBlock)
+            : documentCommentMarkdownComponents
           : expandImages
             ? createCompactCommentMarkdownComponents(undefined, true)
             : compactCommentMarkdownComponents
       }
       return variant === 'document'
-        ? createDocumentCommentMarkdownComponents(onLinkClick)
+        ? createDocumentCommentMarkdownComponents(onLinkClick, renderCodeBlock)
         : createCompactCommentMarkdownComponents(onLinkClick, expandImages)
     }, [expandImages, variant, onLinkClick, highlightCode])
     const activeRemarkPlugins = React.useMemo(() => {

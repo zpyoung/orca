@@ -1,4 +1,5 @@
 import type { CodexAppServerConnection } from './codex-app-server-connection'
+import { CODEX_PROMPT_MAX_ANSWER_BYTES } from './codex-prompt-registry-bounds'
 import {
   CODEX_PROMPT_MAX_ANSWER_BYTES,
   MAX_CODEX_PROMPT_JOURNAL_BINDINGS,
@@ -18,15 +19,15 @@ export {
   MAX_CODEX_PROMPT_REGISTRY_BYTES,
   encodeCodexJournalQuestionOptionId
 } from './codex-prompt-registry-bounds'
-
-// Codex asks for approvals and tool input by sending JSON-RPC REQUESTS back to
-// Orca, and the turn blocks until each one is answered. The journal answers them
-// much later, through a durable item id, so this module holds the live request
-// ids and turns a chosen option back into the reply payload Codex expects.
-
-export const CODEX_COMMAND_APPROVAL_METHOD = 'item/commandExecution/requestApproval'
-export const CODEX_FILE_CHANGE_APPROVAL_METHOD = 'item/fileChange/requestApproval'
-export const CODEX_USER_INPUT_METHOD = 'item/tool/requestUserInput'
+export {
+  CODEX_COMMAND_APPROVAL_METHOD,
+  CODEX_FILE_CHANGE_APPROVAL_METHOD,
+  CODEX_USER_INPUT_METHOD,
+  CodexPromptRegistry,
+  isCodexPromptMethod,
+  type CodexPendingPrompt,
+  type CodexPromptClaim
+} from './codex-prompt-registry'
 
 /** The decisions Codex accepts for both approval requests. Anything else is a
  *  client-supplied option id that never came from a Codex prompt. */
@@ -288,7 +289,7 @@ export function applyCodexPromptAnswer(
   optionId: string
 ): Record<string, unknown> | null {
   if (prompt.method !== CODEX_USER_INPUT_METHOD) {
-    if (!(CODEX_APPROVAL_DECISIONS as readonly string[]).includes(optionId)) {
+    if (!isCodexApprovalDecision(optionId)) {
       throw new Error(`${optionId} is not a Codex approval decision`)
     }
     return { decision: optionId }
@@ -312,7 +313,11 @@ export function applyCodexPromptAnswer(
   }
   const answers: Record<string, { answers: string[] }> = {}
   for (const id of prompt.questionIds) {
-    answers[id] = { answers: [prompt.answers.get(id) as string] }
+    const answer = prompt.answers.get(id)
+    if (answer === undefined) {
+      return null
+    }
+    answers[id] = { answers: [answer] }
   }
   return { answers }
 }
@@ -322,15 +327,16 @@ export function applyCodexPromptAnswer(
 export function answerCodexPrompt(
   registry: CodexPromptRegistry,
   connection: Pick<CodexAppServerConnection, 'respond'>,
-  itemId: string,
+  claim: CodexPromptClaim,
   optionId: string
 ): void {
-  const prompt = registry.find(itemId)
-  if (!prompt) {
-    throw new Error(`codex app-server is no longer waiting on ${itemId}`)
+  if (!registry.ownsClaim(claim)) {
+    throw new Error(`codex app-server is no longer waiting on ${claim.itemId}`)
   }
+  const prompt = claim.prompt
   const reply = applyCodexPromptAnswer(prompt, optionId)
   if (reply === null) {
+    registry.releaseClaim(claim)
     return
   }
   // Forget first: a second answer must find nothing rather than reply twice.

@@ -12,7 +12,6 @@ import {
   type MobileCommitRow
 } from './mobile-git-history'
 import { resolveMobileHistoryScreenView } from './mobile-history-screen-state'
-import type { GitBranchChangeEntry } from '../../../src/shared/git-diff-compare-types'
 
 type Props = {
   client: RpcClient | null
@@ -42,7 +41,7 @@ export const MobileGitHistoryList = memo(function MobileGitHistoryList({
   const [error, setError] = useState<string | null>(null)
   const [reloadNonce, setReloadNonce] = useState(0)
   const [expanded, setExpanded] = useState<string | null>(null)
-  const [filesById, setFilesById] = useState<Record<string, GitBranchChangeEntry[] | 'loading'>>({})
+  const [filesById, setFilesById] = useState<Record<string, MobileGitChangedFile[] | 'loading'>>({})
 
   // Host or worktree identity change must wipe history immediately — even while
   // disconnected — so a kept-mounted hub segment never shows another tree's commits.

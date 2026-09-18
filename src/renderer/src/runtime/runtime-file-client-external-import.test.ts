@@ -4,12 +4,67 @@ import { replaceRuntimeEnvironmentRevisions } from './runtime-environment-revisi
 import {
   fsImportExternalPaths,
   fsStageExternalPathsForRuntimeUpload,
+  fsUploadExternalFileToRuntime,
   runtimeEnvironmentCall,
   runtimeEnvironmentTransportCall,
   installRuntimeFileClientEnvironment
 } from './runtime-file-client-test-harness'
 
 installRuntimeFileClientEnvironment()
+
+const okResponse = (id: string): unknown => ({
+  id,
+  ok: true,
+  result: { ok: true },
+  _meta: { runtimeId: 'remote-runtime' }
+})
+
+const notFoundResponse = (id: string): unknown => ({
+  id,
+  ok: false,
+  error: { code: 'not_found', message: 'not found' },
+  _meta: { runtimeId: 'remote-runtime' }
+})
+
+/** Matches what main-process staging now records for a file entry. */
+const stagedFile = (
+  relativePath: string,
+  byteLength: number,
+  inode: number
+): Record<string, unknown> => ({
+  relativePath,
+  kind: 'file',
+  byteLength,
+  inode,
+  deviceId: 66,
+  modifiedAtMs: 1_700_000_000_000
+})
+
+/** The upload request main receives; `never[]` mock args widen to it without a cast. */
+type UploadRequest = {
+  environmentId: string
+  sourceRootPath: string
+  entryRelativePath: string
+  expected: Record<string, unknown>
+  worktree: string
+  relativePath: string
+  expectedExecutionHostId?: string
+  expectedSshTargetId?: string
+  expectedSshConnectionGeneration?: number
+  expectedEnvironmentPairingRevision?: number
+  expectedEnvironmentRuntimeId?: string
+}
+
+function uploadRequests(): UploadRequest[] {
+  return fsUploadExternalFileToRuntime.mock.calls.flat()
+}
+
+const identityOf = (entry: Record<string, unknown>): Record<string, unknown> => ({
+  byteLength: entry.byteLength,
+  inode: entry.inode,
+  deviceId: entry.deviceId,
+  modifiedAtMs: entry.modifiedAtMs
+})
 
 describe('runtime file client', () => {
   it('uploads a staged directory after one ownership and one cold compatibility preflight', async () => {
@@ -213,12 +268,18 @@ describe('runtime file client', () => {
       expectedEnvironmentPairingRevision: 17,
       expectedEnvironmentRuntimeId: 'remote-runtime'
     })
-    expect(runtimeEnvironmentCall).toHaveBeenNthCalledWith(6, {
+    expect(uploads[1]).toMatchObject({
+      entryRelativePath: 'large.bin',
+      expected: identityOf(large)
+    })
+    expect(uploads[1]?.relativePath).toMatch(/^uploads\/assets\/\.large\.bin\.orca-upload-/)
+
+    expect(runtimeEnvironmentCall).toHaveBeenNthCalledWith(5, {
       selector: 'env-1',
       method: 'files.commitUpload',
       params: {
         worktree: 'id:wt-1',
-        tempRelativePath: smallWriteCall.params.relativePath,
+        tempRelativePath: uploads[0]?.relativePath,
         finalRelativePath: 'uploads/assets/logo.png',
         expectedExecutionHostId: 'local',
         expectedSshTargetId: undefined,
@@ -228,12 +289,12 @@ describe('runtime file client', () => {
       expectedEnvironmentPairingRevision: 17,
       expectedEnvironmentRuntimeId: 'remote-runtime'
     })
-    expect(runtimeEnvironmentCall).toHaveBeenNthCalledWith(7, {
+    expect(runtimeEnvironmentCall).toHaveBeenNthCalledWith(6, {
       selector: 'env-1',
       method: 'files.delete',
       params: {
         worktree: 'id:wt-1',
-        relativePath: smallWriteCall.params.relativePath,
+        relativePath: uploads[0]?.relativePath,
         recursive: false,
         expectedExecutionHostId: 'local',
         expectedSshTargetId: undefined,
@@ -329,55 +390,16 @@ describe('runtime file client', () => {
           status: 'staged',
           name: 'large.bin',
           kind: 'file',
-          entries: [
-            { relativePath: '', kind: 'file', contentBase64: `${firstChunk}${secondChunk}` }
-          ]
+          entries: [entry]
         }
       ]
     })
     runtimeEnvironmentCall
-      .mockResolvedValueOnce({
-        id: 'stat-destination-miss',
-        ok: false,
-        error: { code: 'not_found', message: 'not found' },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'create-destination-dir',
-        ok: true,
-        result: { ok: true },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'stat-miss',
-        ok: false,
-        error: { code: 'not_found', message: 'not found' },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'write-chunk-1',
-        ok: true,
-        result: { ok: true },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'write-chunk-2',
-        ok: true,
-        result: { ok: true },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'commit-upload',
-        ok: true,
-        result: { ok: true },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'delete-temp',
-        ok: true,
-        result: { ok: true },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
+      .mockResolvedValueOnce(notFoundResponse('stat-destination-miss'))
+      .mockResolvedValueOnce(okResponse('create-destination-dir'))
+      .mockResolvedValueOnce(notFoundResponse('stat-miss'))
+      .mockResolvedValueOnce(okResponse('commit-upload'))
+      .mockResolvedValueOnce(okResponse('delete-temp'))
 
     await expect(
       importExternalPathsToRuntime(
@@ -470,10 +492,12 @@ describe('runtime file client', () => {
     expect(runtimeEnvironmentCall).not.toHaveBeenCalledWith(
       expect.objectContaining({ method: 'files.writeBase64' })
     )
+    expect(runtimeEnvironmentCall).not.toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'files.writeBase64Chunk' })
+    )
   })
 
-  it('stops a chunked upload when its owner generation changes between writes', async () => {
-    const firstChunk = 'A'.repeat(512 * 1024)
+  it('does not commit an upload when the owner generation changes while it streams', async () => {
     fsStageExternalPathsForRuntimeUpload.mockResolvedValue({
       sources: [
         {
@@ -481,7 +505,7 @@ describe('runtime file client', () => {
           status: 'staged',
           name: 'large.bin',
           kind: 'file',
-          entries: [{ relativePath: '', kind: 'file', contentBase64: `${firstChunk}BBBBBBBB` }]
+          entries: [stagedFile('', 40 * 1024 * 1024, 55)]
         }
       ]
     })
@@ -492,22 +516,12 @@ describe('runtime file client', () => {
         result: { size: 0, isDirectory: true, mtime: 1 },
         _meta: { runtimeId: 'remote-runtime' }
       })
-      .mockResolvedValueOnce({
-        id: 'stat-file-miss',
-        ok: false,
-        error: { code: 'not_found', message: 'not found' },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockImplementationOnce(async () => {
-        ownerChanged = true
-        return {
-          id: 'write-chunk-1',
-          ok: true,
-          result: { ok: true },
-          _meta: { runtimeId: 'remote-runtime' }
-        }
-      })
+      .mockResolvedValueOnce(notFoundResponse('stat-file-miss'))
     let ownerChanged = false
+    fsUploadExternalFileToRuntime.mockImplementation(async () => {
+      ownerChanged = true
+      return { byteLength: 40 * 1024 * 1024 }
+    })
     const assertCurrent = vi.fn(() => {
       if (ownerChanged) {
         throw new Error('runtime owner generation changed')
@@ -531,20 +545,14 @@ describe('runtime file client', () => {
 
     expect(runtimeEnvironmentCall.mock.calls.map((call) => call[0].method)).toEqual([
       'files.stat',
-      'files.stat',
-      'files.writeBase64Chunk'
+      'files.stat'
     ])
     expect(runtimeEnvironmentCall).not.toHaveBeenCalledWith(
       expect.objectContaining({ method: 'files.commitUpload' })
     )
-    expect(runtimeEnvironmentCall).not.toHaveBeenCalledWith(
-      expect.objectContaining({ method: 'files.delete' })
-    )
   })
 
-  it('cleans up staged runtime upload temp files when a later chunk fails', async () => {
-    const firstChunk = 'A'.repeat(512 * 1024)
-    const secondChunk = 'BBBBBBBB'
+  it('cleans up the staged temp path when the streamed upload fails', async () => {
     fsStageExternalPathsForRuntimeUpload.mockResolvedValue({
       sources: [
         {
@@ -552,49 +560,19 @@ describe('runtime file client', () => {
           status: 'staged',
           name: 'large.bin',
           kind: 'file',
-          entries: [
-            { relativePath: '', kind: 'file', contentBase64: `${firstChunk}${secondChunk}` }
-          ]
+          entries: [stagedFile('', 40 * 1024 * 1024, 55)]
         }
       ]
     })
     runtimeEnvironmentCall
-      .mockResolvedValueOnce({
-        id: 'stat-destination-miss',
-        ok: false,
-        error: { code: 'not_found', message: 'not found' },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'create-destination-dir',
-        ok: true,
-        result: { ok: true },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'stat-miss',
-        ok: false,
-        error: { code: 'not_found', message: 'not found' },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'write-chunk-1',
-        ok: true,
-        result: { ok: true },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'write-chunk-2',
-        ok: false,
-        error: { code: 'write_failed', message: 'disk full' },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'delete-temp',
-        ok: true,
-        result: { ok: true },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
+      .mockResolvedValueOnce(notFoundResponse('stat-destination-miss'))
+      .mockResolvedValueOnce(okResponse('create-destination-dir'))
+      .mockResolvedValueOnce(notFoundResponse('stat-miss'))
+      .mockResolvedValueOnce(okResponse('delete-temp'))
+    // Electron wraps a main-process throw; the reason must not leak that.
+    fsUploadExternalFileToRuntime.mockRejectedValue(
+      new Error("Error invoking remote method 'fs:uploadExternalFileToRuntime': Error: disk full")
+    )
 
     await expect(
       importExternalPathsToRuntime(
@@ -610,13 +588,7 @@ describe('runtime file client', () => {
       results: [{ status: 'failed', reason: 'disk full' }]
     })
 
-    const chunkCall = runtimeEnvironmentCall.mock.calls[3]?.[0] as
-      | { params: { relativePath: string } }
-      | undefined
-    if (!chunkCall) {
-      throw new Error('missing first chunk call')
-    }
-    const tempRelativePath = chunkCall.params.relativePath
+    const tempRelativePath = uploadRequests()[0]?.relativePath
     expect(runtimeEnvironmentCall).not.toHaveBeenCalledWith(
       expect.objectContaining({ method: 'files.commitUpload' })
     )
@@ -645,10 +617,7 @@ describe('runtime file client', () => {
           status: 'staged',
           name: 'assets',
           kind: 'directory',
-          entries: [
-            { relativePath: '', kind: 'directory' },
-            { relativePath: 'logo.png', kind: 'file', contentBase64: 'cG5n' }
-          ]
+          entries: [{ relativePath: '', kind: 'directory' }, stagedFile('logo.png', 3, 101)]
         }
       ]
     })
@@ -659,36 +628,11 @@ describe('runtime file client', () => {
         result: { size: 0, isDirectory: true, mtime: 1 },
         _meta: { runtimeId: 'remote-runtime' }
       })
-      .mockResolvedValueOnce({
-        id: 'stat-import-root-miss',
-        ok: false,
-        error: { code: 'not_found', message: 'not found' },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'create-import-root',
-        ok: true,
-        result: { ok: true },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'write-file',
-        ok: false,
-        error: { code: 'write_failed', message: 'disk full' },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'delete-temp',
-        ok: true,
-        result: { ok: true },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
-      .mockResolvedValueOnce({
-        id: 'delete-import-root',
-        ok: true,
-        result: { ok: true },
-        _meta: { runtimeId: 'remote-runtime' }
-      })
+      .mockResolvedValueOnce(notFoundResponse('stat-import-root-miss'))
+      .mockResolvedValueOnce(okResponse('create-import-root'))
+      .mockResolvedValueOnce(okResponse('delete-temp'))
+      .mockResolvedValueOnce(okResponse('delete-import-root'))
+    fsUploadExternalFileToRuntime.mockRejectedValue(new Error('disk full'))
 
     await expect(
       importExternalPathsToRuntime(
@@ -704,13 +648,7 @@ describe('runtime file client', () => {
       results: [{ status: 'failed', reason: 'disk full' }]
     })
 
-    const writeCall = runtimeEnvironmentCall.mock.calls[3]?.[0] as
-      | { params: { relativePath: string } }
-      | undefined
-    if (!writeCall) {
-      throw new Error('missing failed file write call')
-    }
-    expect(writeCall.params.relativePath).toMatch(/^uploads\/assets\/\.logo\.png\.orca-upload-/)
+    expect(uploadRequests()[0]?.relativePath).toMatch(/^uploads\/assets\/\.logo\.png\.orca-upload-/)
     expect(runtimeEnvironmentCall).toHaveBeenLastCalledWith({
       selector: 'env-1',
       method: 'files.delete',
@@ -763,6 +701,7 @@ describe('runtime file client', () => {
       expectedSshConnectionGeneration: 5
     })
     expect(fsStageExternalPathsForRuntimeUpload).not.toHaveBeenCalled()
+    expect(fsUploadExternalFileToRuntime).not.toHaveBeenCalled()
     expect(runtimeEnvironmentCall).not.toHaveBeenCalled()
   })
 })

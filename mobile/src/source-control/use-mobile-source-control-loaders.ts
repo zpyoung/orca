@@ -11,7 +11,7 @@ import {
   readMobileGitRefusal,
   type MobileGitStatusResult
 } from './mobile-git-status'
-import type { MobileGitBranchCompareResult } from './mobile-branch-compare'
+import type { MobileGitBranchCompareReply } from './git-compare-reply-schema'
 import {
   SELECTOR_RETRY_COUNT,
   SELECTOR_RETRY_DELAY_MS,

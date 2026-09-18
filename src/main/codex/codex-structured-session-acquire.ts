@@ -10,6 +10,7 @@ import {
 } from './codex-structured-acquisition-lifecycle'
 import { CodexBackgroundTaskTracker } from './codex-background-task-tracker'
 import { CodexSubagentExecutions } from './codex-subagent-executions'
+import { createCodexDispatchEchoes } from './codex-structured-dispatch-echo'
 import { createCodexJournalTranslator } from './codex-structured-journal-translation'
 import { openCodexAppServerConnection } from './codex-app-server-connection'
 import { codexProcessIdentity, codexProviderHandleLink } from './codex-structured-owner-identity'
@@ -81,6 +82,7 @@ export async function acquireCodexStructuredSession(input: {
       ? acquireInput.identity.providerHandle.threadId
       : null
   const subagentExecutions = new CodexSubagentExecutions()
+  const dispatchEchoes = createCodexDispatchEchoes()
   const translator = acquireInput.events
     ? createCodexJournalTranslator({
         sink: acquireInput.events,

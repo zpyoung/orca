@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
+import type { GlobalSettings } from '../../shared/global-settings-types'
 
 const {
   applyAppIconMock,

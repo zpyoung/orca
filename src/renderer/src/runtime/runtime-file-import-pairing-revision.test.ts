@@ -99,7 +99,8 @@ function repairedRuntimeResponse(method: string) {
   }
 }
 
-function mockStagedFile(sourcePath: string, name: string, contentBase64: string): void {
+/** Staging now hands over identity, not a body; the streamer in main reads the bytes. */
+function mockStagedFile(sourcePath: string, name: string, byteLength: number): void {
   stageExternalPathsForRuntimeUpload.mockResolvedValue({
     sources: [
       {
@@ -107,7 +108,16 @@ function mockStagedFile(sourcePath: string, name: string, contentBase64: string)
         status: 'staged',
         name,
         kind: 'file',
-        entries: [{ relativePath: '', kind: 'file', contentBase64 }]
+        entries: [
+          {
+            relativePath: '',
+            kind: 'file',
+            byteLength,
+            inode: 91,
+            deviceId: 66,
+            modifiedAtMs: 1_700_000_000_000
+          }
+        ]
       }
     ]
   })
@@ -146,12 +156,15 @@ beforeEach(() => {
   markRuntimeEnvironmentCompatible(ENVIRONMENT_ID)
   runtimeEnvironmentCall.mockReset()
   stageExternalPathsForRuntimeUpload.mockReset()
+  uploadExternalFileToRuntime.mockReset()
+  uploadExternalFileToRuntime.mockResolvedValue({ byteLength: 0 })
   importExternalPaths.mockReset()
   vi.stubGlobal('window', {
     api: {
       fs: {
         importExternalPaths,
-        stageExternalPathsForRuntimeUpload
+        stageExternalPathsForRuntimeUpload,
+        uploadExternalFileToRuntime
       },
       runtimeEnvironments: {
         call: runtimeEnvironmentCall
@@ -236,8 +249,8 @@ describe('runtime file import pairing revision', () => {
     expect(importExternalPaths).not.toHaveBeenCalled()
   })
 
-  it('stops a rich-markdown upload between chunks without contacting the replacement HUB', async () => {
-    mockStagedFile('/client/screenshot.png', 'screenshot.png', `${'A'.repeat(512 * 1024)}BBBBBBBB`)
+  it('never commits a streamed upload against a replacement HUB re-paired mid-stream', async () => {
+    mockStagedFile('/client/screenshot.png', 'screenshot.png', 40 * 1024 * 1024)
     runtimeEnvironmentCall.mockImplementation(async (args: RuntimeCallArgs) => {
       if (args.method === 'status.get') {
         return runtimeStatusResponse()
@@ -245,10 +258,11 @@ describe('runtime file import pairing revision', () => {
       if (args.method === 'files.stat') {
         return missingRuntimePathResponse()
       }
-      if (args.method === 'files.writeBase64Chunk') {
-        setEnvironmentRevision(REPLACEMENT_REVISION)
-      }
       return successfulRuntimeResponse(args.method)
+    })
+    uploadExternalFileToRuntime.mockImplementation(async () => {
+      setEnvironmentRevision(REPLACEMENT_REVISION)
+      return { byteLength: 40 * 1024 * 1024 }
     })
 
     await expect(
@@ -317,7 +331,7 @@ describe('runtime file import pairing revision', () => {
   })
 
   it('does not clean up against a replacement HUB after commit', async () => {
-    mockStagedFile('/client/drop.txt', 'drop.txt', 'ZHJvcA==')
+    mockStagedFile('/client/drop.txt', 'drop.txt', 4)
     runtimeEnvironmentCall.mockImplementation(async (args: RuntimeCallArgs) => {
       if (args.method === 'status.get') {
         return runtimeStatusResponse()
@@ -356,7 +370,14 @@ describe('runtime file import pairing revision', () => {
           kind: 'directory',
           entries: [
             { relativePath: '', kind: 'directory' },
-            { relativePath: 'broken.txt', kind: 'file', contentBase64: 'YnJva2Vu' }
+            {
+              relativePath: 'broken.txt',
+              kind: 'file',
+              byteLength: 6,
+              inode: 92,
+              deviceId: 66,
+              modifiedAtMs: 1_700_000_000_000
+            }
           ]
         }
       ]
@@ -368,16 +389,9 @@ describe('runtime file import pairing revision', () => {
       if (args.method === 'files.stat') {
         return missingRuntimePathResponse()
       }
-      if (args.method === 'files.writeBase64') {
-        return {
-          id: args.method,
-          ok: false,
-          error: { code: 'write_failed', message: 'disk full' },
-          _meta: { runtimeId: 'hub-runtime' }
-        }
-      }
       return successfulRuntimeResponse(args.method)
     })
+    uploadExternalFileToRuntime.mockRejectedValue(new Error('disk full'))
 
     await expect(
       importExternalPathsToRuntime(nestedSshContext, ['/client/assets'], '/ssh/repo')

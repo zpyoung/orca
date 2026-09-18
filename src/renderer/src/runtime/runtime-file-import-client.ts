@@ -21,50 +21,12 @@ import {
 import { getActiveRuntimeTarget } from './runtime-rpc-client'
 import { toRuntimeWorktreeSelector } from './runtime-worktree-selector'
 
-type StagedRuntimeImportSource =
-  | {
-      sourcePath: string
-      status: 'staged'
-      name: string
-      kind: 'file' | 'directory'
-      entries: StagedRuntimeImportEntry[]
-    }
-  | {
-      sourcePath: string
-      status: 'skipped'
-      reason: 'missing' | 'symlink' | 'permission-denied' | 'unsupported'
-    }
-  | { sourcePath: string; status: 'failed'; reason: string }
-
-type StagedRuntimeImportEntry =
-  | { relativePath: string; kind: 'directory' }
-  | { relativePath: string; kind: 'file'; contentBase64: string }
-
-type RuntimeImportResult =
-  | {
-      sourcePath: string
-      status: 'imported'
-      destPath: string
-      kind: 'file' | 'directory'
-      renamed: boolean
-    }
-  | {
-      sourcePath: string
-      status: 'skipped'
-      reason: 'missing' | 'symlink' | 'permission-denied' | 'unsupported'
-    }
-  | {
-      sourcePath: string
-      status: 'failed'
-      reason: string
-    }
-
 export async function importExternalPathsToRuntime(
   context: RuntimeFileOperationArgs,
   sourcePaths: string[],
   destinationDir: string,
   options?: { ensureDestinationDir?: boolean; assertCurrent?: () => void }
-): Promise<{ results: RuntimeImportResult[] }> {
+): Promise<{ results: ImportItemResult[] }> {
   const target = getActiveRuntimeTarget(context.settings)
   if (target.kind !== 'environment' || !context.worktreeId || !context.worktreePath) {
     return window.api.fs.importExternalPaths(
@@ -113,7 +75,7 @@ export async function importExternalPathsToRuntime(
 
   await ensureRuntimeDirectory(context, destinationDir, importSession)
 
-  for (const source of staged.sources as StagedRuntimeImportSource[]) {
+  for (const source of staged.sources) {
     if (source.status !== 'staged') {
       results.push(source)
       continue

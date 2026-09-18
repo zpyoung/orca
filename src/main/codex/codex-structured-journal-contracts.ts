@@ -1,3 +1,4 @@
+import type { AgentJournalItemIdentity } from '../../shared/agent-session-journal-types'
 import type { AgentSessionDeltaCoalescerDeps } from '../native-chat/agent-session-wire/agent-session-delta-coalescer'
 import type { StructuredAgentSessionEventSink } from '../native-chat/agent-session-wire/structured-agent-session-event-sink'
 import type { CodexStructuredSessionEvent } from './codex-structured-session-adapter'
@@ -24,6 +25,7 @@ export type CodexJournalTranslatorDeps = {
 
 export type CodexJournalTranslator = {
   handle: (event: CodexStructuredSessionEvent) => CodexJournalTranslationAdmission
+  cancelPrompt: (journalItemId: string) => CodexJournalTranslationAdmission
   restoreThread: (
     threadId: string,
     thread: Record<string, unknown>

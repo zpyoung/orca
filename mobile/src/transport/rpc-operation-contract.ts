@@ -1,5 +1,8 @@
+import type { RpcAcceptedResult } from './rpc-accepted-result'
 import type { RpcMethodName } from './rpc-params-contract'
 import type { RpcFailure, RpcResponse, RpcSuccess } from './types'
+
+export type { RpcAcceptedResult }
 
 // An operation descriptor fixes the method, the acceptance policy and the interpretation
 // barrier at definition time. Per-call freedom over those three is what produced acceptance

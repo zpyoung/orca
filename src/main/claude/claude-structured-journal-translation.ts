@@ -1,4 +1,3 @@
-import type { AgentJournalItemIdentity } from '../../shared/agent-session-journal-types'
 import { agentJournalItemKey } from '../../shared/agent-session-journal-item-key'
 import type { AgentSessionDeltaCoalescerDeps } from '../native-chat/agent-session-wire/agent-session-delta-coalescer'
 import type { StructuredAgentSessionEventSink } from '../native-chat/agent-session-wire/structured-agent-session-event-sink'
@@ -59,6 +58,10 @@ export type ClaudeJournalTranslatorDeps = {
 
 export type ClaudeJournalTranslator = {
   handle: (event: ClaudeStructuredSessionEvent) => void
+  journalPrompts: Pick<ClaudeJournalPrompts, 'cancel' | 'resolve'>
+  /** The open turn's provider id — the same id its journal row carries, and the one
+   *  a client's Stop names. Sole owner: no reader keeps a copy to disagree with. */
+  readonly currentTurnId: string | null
   flush: () => void
   /** Streamed blocks still awaiting a final frame. A settled turn leaves none. */
   readonly pendingStreamedBlocks: number
@@ -84,7 +87,7 @@ export function createClaudeJournalTranslator(
   deps: ClaudeJournalTranslatorDeps
 ): ClaudeJournalTranslator {
   const tools = new Map<string, ClaudeToolUse>()
-  const promptItems = new Map<string, AgentJournalItemIdentity[]>()
+  const prompts = new ClaudeJournalPrompts(deps)
   const streamedBlocks = createClaudeStreamedBlockRegistry()
   let currentTurn: ClaudeCurrentTurn | null = null
   /** Provider output may not reopen a turn after the session ended or a turn
@@ -99,7 +102,7 @@ export function createClaudeJournalTranslator(
   )
   const subagents = new ClaudeSubagentRoster({
     sink: deps.sink,
-    currentGroupKey: () => groupKeyOf(currentTurn)
+    currentGroupKey: () => turn.groupKey
   })
   const streamedText = createClaudeStreamedTextCheckpoints({
     ...(deps.coalesceMs === undefined ? {} : { coalesceMs: deps.coalesceMs }),
@@ -140,12 +143,13 @@ export function createClaudeJournalTranslator(
   })
 
   const publishActivity = (kind: string, payload: unknown): void => {
-    if (!currentTurn) {
+    const turnId = turn.id
+    if (turnId === null) {
       return
     }
     const text = claudeProviderFrameActivity(kind, payload)
     if (text !== undefined) {
-      deps.sink.setActivity?.(text ? { turnId: currentTurn.turnId, text } : null)
+      deps.sink.setActivity?.(text ? { turnId, text } : null)
     }
   }
 
@@ -256,6 +260,7 @@ export function createClaudeJournalTranslator(
   return {
     handle: (event) => {
       if (event.type === 'ended') {
+        prompts.retryPendingCancellations()
         streamedText.flush()
         // No event will ever settle a child once the provider is gone.
         subagents.settleSession()
@@ -280,11 +285,8 @@ export function createClaudeJournalTranslator(
       if (event.type === 'prompt') {
         journalClaudePrompt({ ...deps, promptItems }, event)
       } else if (event.type === 'prompt-cancelled') {
-        for (const identity of promptItems.get(event.promptKey) ?? []) {
-          deps.sink.appendTombstone(identity)
-        }
-        promptItems.delete(event.promptKey)
-        deps.sink.publish()
+        prompts.retryPendingCancellations()
+        prompts.cancel(event.promptKey)
       } else if (event.type === 'message' && event.message.type === 'result') {
         // Every turn this translator opens is root by construction, so a nested
         // result settles the child that produced it and never the turn. The
@@ -335,6 +337,10 @@ export function createClaudeJournalTranslator(
         publishActivity(event.kind, event.payload)
       }
     },
+    journalPrompts: prompts,
+    get currentTurnId() {
+      return turn.id
+    },
     flush: streamedText.flush,
     get pendingStreamedBlocks() {
       return streamedText.pending
@@ -342,7 +348,7 @@ export function createClaudeJournalTranslator(
     dispose: () => {
       streamedText.dispose()
       tools.clear()
-      promptItems.clear()
+      prompts.clear()
       streamedBlocks.clear()
       subagents.dispose()
     }

@@ -1,4 +1,6 @@
+import { extractIpcErrorMessage } from '@/lib/ipc-error'
 import { joinPath, normalizeRelativePath } from '@/lib/path'
+import type { StagedRuntimeUploadFileIdentity } from '../../../shared/runtime-upload-staging-contract'
 import type { RuntimeFileOperationArgs } from './runtime-file-client-types'
 import {
   callRuntimeFileImportMutation,
@@ -12,8 +14,15 @@ import {
 import { runtimePathExists } from './runtime-file-metadata-client'
 import { toRuntimeWorktreeSelector } from './runtime-worktree-selector'
 
-const REMOTE_UPLOAD_BASE64_CHUNK_CHARS = 512 * 1024
+/** Locates a staged file on the client so main can stream it without the renderer reading it. */
+export type RuntimeUploadSource = {
+  sourceRootPath: string
+  entryRelativePath: string
+  /** What staging observed; main refuses the upload if the source no longer matches. */
+  expected: StagedRuntimeUploadFileIdentity
+}
 
+/** Stream one staged file to a temp path, then commit it; the temp path is always cleaned up. */
 export async function uploadRuntimeFileWithoutClobber(
   session: RuntimeFileImportSession,
   worktreeId: string,

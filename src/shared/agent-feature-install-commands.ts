@@ -36,7 +36,7 @@ export function buildAgentFeatureSkillInstallArgs(
   }
   // Why: a value the skills CLI would drop leaves it with no target at all, which
   // is the same all-agents install as passing no --agent.
-  const unusable = agents.find((agent) => !isSkillsCliAgentKeyShaped(agent))
+  const unusable = agents.find((agent) => !isUsableSkillsCliAgentKey(agent))
   if (unusable !== undefined) {
     throw new Error(`"${unusable}" is not a usable install target.`)
   }

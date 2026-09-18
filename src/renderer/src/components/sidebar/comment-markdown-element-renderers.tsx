@@ -15,6 +15,19 @@ export type CommentMarkdownLinkClickHandler = (
   href: string | undefined
 ) => void
 
+export type DocumentCodeBlockRenderer = (props: {
+  children?: React.ReactNode
+  language?: string
+}) => React.JSX.Element
+
+function extractCodeFenceLanguage(children: React.ReactNode): string | undefined {
+  const child = React.Children.toArray(children)[0]
+  if (!React.isValidElement<{ className?: string }>(child)) {
+    return undefined
+  }
+  return child.props.className?.match(/(?:^|\s)language-([^\s]+)/)?.[1]
+}
+
 export function isTrustedCompactImageSrc(src: string | undefined): src is string {
   if (!src) {
     return false
@@ -264,6 +277,8 @@ export function createDocumentCommentMarkdownComponents(
     pre: ({ children }) =>
       isMermaidPre(children) ? (
         <>{children}</>
+      ) : renderCodeBlock ? (
+        renderCodeBlock({ children, language: extractCodeFenceLanguage(children) })
       ) : (
         <pre className="my-3 max-h-80 max-w-full overflow-x-auto rounded-md bg-accent p-3 font-mono text-[12px]">
           {children}

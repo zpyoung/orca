@@ -6,9 +6,9 @@ import { useRouter } from 'expo-router'
 import { ChevronLeft, RefreshCw } from 'lucide-react-native'
 import { colors } from '../theme/mobile-theme'
 import { useHostClient } from '../transport/client-context'
-import type { RpcSuccess } from '../transport/types'
 import type { RpcClient } from '../transport/rpc-client'
 import { readMobileRuntimeHostPlatform } from '../transport/mobile-runtime-host-platform'
+import { worktreeCatalogRead } from '../worktree/worktree-catalog-operations'
 import { getWorktreeLabel } from '../session/worktree-label'
 import {
   buildMobileAiVaultResumeLaunch,
@@ -79,12 +79,14 @@ export function MobileAgentSessionHistoryPanel({
     let cancelled = false
     void (async () => {
       try {
-        const worktreeResponse = await client.sendRequest('worktree.ps', { limit: 10000 })
+        const worktreeReply = await worktreeCatalogRead.request(client, { limit: 10000 })
         if (cancelled) {
           return
         }
-        if (worktreeResponse.ok) {
-          const result = (worktreeResponse as RpcSuccess).result as { worktrees: Worktree[] }
+        const catalog = worktreeCatalogRead.interpret(worktreeReply)
+        if (catalog.accepted) {
+          // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Preserve the established response shape at this boundary.
+          const result = catalog.value as { worktrees: Worktree[] }
           setWorktrees(result.worktrees)
         }
       } catch {
@@ -360,7 +362,7 @@ export function MobileAgentSessionHistoryPanel({
 const EMPTY_SESSIONS: AiVaultSession[] = []
 const EMPTY_ISSUES: { agent: AiVaultSession['agent']; path: string; message: string }[] = []
 
-async function loadMobileResumeMetadata(client: Pick<RpcClient, 'sendRequest'>): Promise<{
+async function loadMobileResumeMetadata(client: RpcClient): Promise<{
   repos: MobileAiVaultResumeRepo[]
   folderWorkspaces: MobileAiVaultResumeFolderWorkspace[]
   projectGroups: MobileAiVaultResumeProjectGroup[]
@@ -397,11 +399,7 @@ async function loadMobileResumeMetadata(client: Pick<RpcClient, 'sendRequest'>):
   }
   const repoResult = repoResponse.result as { repos?: MobileAiVaultResumeRepo[] }
   const folderWorkspaceResult =
-    folderWorkspaceResponse?.ok === true
-      ? (folderWorkspaceResponse.result as {
-          folderWorkspaces?: MobileAiVaultResumeFolderWorkspace[]
-        })
-      : null
+    folderWorkspaceReply && resumeFolderWorkspaceListRead.interpret(folderWorkspaceReply)
   const projectGroupResult =
     projectGroupResponse?.ok === true
       ? (projectGroupResponse.result as { groups?: MobileAiVaultResumeProjectGroup[] })

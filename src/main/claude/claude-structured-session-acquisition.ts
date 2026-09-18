@@ -37,7 +37,6 @@ import {
 } from './claude-structured-session-acquisition-options'
 import { createClaudeSessionPublication } from './claude-structured-session-publication'
 import {
-  cancelClaudeAcquisitionAttempt,
   mintClaudeAcquisitionGeneration,
   type ClaudeAcquisitionRegistry,
   type ClaudeSession,
@@ -51,6 +50,8 @@ import {
   resolveClaudeAcquisitionError
 } from './claude-structured-session-close'
 import { readClaudeTranscriptEntryUuid } from './claude-tui-exit'
+import { withAgentSessionCreatePhase } from '../observability/agent-session-instrumentation'
+import { resolveClaudeAcquisitionLaunch } from './claude-structured-acquisition-launch'
 
 export const CLAUDE_STRUCTURED_INIT_TIMEOUT_MS = 10_000
 
@@ -142,101 +143,74 @@ export async function acquireClaudeSession({
   const { canUseTool, onUserDialog } = buildClaudePermissionCallbacks({
     sessionId,
     prompts,
+    currentTurnId: () => translator?.currentTurnId ?? null,
     emit: (event) =>
       callbacks.deliver(attempt, sessionId, () => callbacks.emit(liveSession, input.events, event))
   })
 
   try {
-    if (previous && !(await cancelClaudeAcquisitionAttempt(previous))) {
-      acquisitions.restoreIfCurrent(sessionId, attempt, previous)
-      throw new AgentSessionAcquisitionExitUnprovenError(
-        new Error(`claude acquisition for session ${sessionId} could not be stopped`)
-      )
-    }
-    acquisitions.assertCurrent(sessionId, attempt)
-    let resumeSession = sessions.get(sessionId)
-    if (!(await closeClaudePublishedSessionForDeps(sessions, sessionId, deps))) {
-      throw new AgentSessionAcquisitionExitUnprovenError(
-        new Error(`claude session ${sessionId} could not be stopped`)
-      )
-    }
-    // A first-hand exit that has not yet proved its full tree still owns a cleanup
-    // obligation; never let a new acquisition hide that evidence by omission.
-    const retainedExit = exits.get(sessionId)
-    if (retainedExit) {
-      const firstProof = retainedExit.closePromise ? await retainedExit.closePromise : false
-      const proven = firstProof || (await retainedExit.connection.close().catch(() => false))
-      if (!proven) {
-        throw claudeAcquisitionCleanupError(retainedExit.connection, retainedExit.error)
-      }
-      // The old child is superseded by this acquisition. Settle its lifecycle
-      // before discarding the retained proof so its cursor and callbacks are
-      // cleaned up exactly once.
-      await callbacks.settleExit(sessionId, retainedExit)
-      resumeSession ??= retainedExit.session
-    }
-    acquisitions.assertCurrent(sessionId, attempt)
-    // Both close paths persist their final leaf, so launch validates that durable head.
-    const launchIdentity = resumeSession
-      ? {
-          ...input.identity,
-          providerHandle: {
-            kind: 'claude' as const,
-            sessionId: resumeSession.providerSessionId,
-            leafUuid: resumeSession.leafUuid
-          }
-        }
-      : input.identity
-    const launch = await deps
-      .resolveLaunch({ identity: launchIdentity })
-      .catch((error: unknown) => {
-        throw error instanceof AgentSessionPreSpawnError
-          ? error
-          : new AgentSessionPreSpawnError(error)
-      })
-    rewind.applyLaunch(launch, deps)
+    const launch = await resolveClaudeAcquisitionLaunch({
+      input,
+      deps,
+      sessions,
+      acquisitions,
+      exits,
+      callbacks,
+      previous,
+      attempt,
+      rewind
+    })
     expectedProviderSessionId = launch.providerSessionId
     observedLeafUuid = launch.resumeLeafUuid
-    acquisitions.assertCurrent(sessionId, attempt)
     const open = deps.openConnection ?? openClaudeStreamJsonConnection
-    const connection = await open(
-      {
-        pathToClaudeCodeExecutable: launch.pathToClaudeCodeExecutable,
-        options: launch.options,
-        cwd: launch.cwd,
-        env: {
-          ...launch.env,
-          [CLAUDE_SPAWN_TOKEN_ENV]: input.spawnToken,
-          // Compared against what the child would otherwise inherit, so the record's
-          // account home still wins over a diverging overlay without a needless pin.
-          // (`process` is shadowed by a local later in this function, so it is not named here.)
-          ...claudeConfigDirEnvPatch(launch.claudeConfigDir, launch.env ? { env: launch.env } : {})
-        }
-      },
-      {
-        onMessage,
-        canUseTool,
-        onUserDialog,
-        onFault: (error) => {
-          if (!attempt.published) {
-            initDeadline.reject(error)
+    const connection = await withAgentSessionCreatePhase('spawn', input.recordPhase, () =>
+      open(
+        {
+          pathToClaudeCodeExecutable: launch.pathToClaudeCodeExecutable,
+          options: launch.options,
+          cwd: launch.cwd,
+          env: {
+            ...launch.env,
+            [CLAUDE_SPAWN_TOKEN_ENV]: input.spawnToken,
+            // Compared against what the child would otherwise inherit, so the record's
+            // account home still wins over a diverging overlay without a needless pin.
+            // (`process` is shadowed by a local later in this function, so it is not named here.)
+            ...claudeConfigDirEnvPatch(
+              launch.claudeConfigDir,
+              launch.env ? { env: launch.env } : {}
+            )
           }
         },
-        onExit: (error) => {
-          if (!attempt.published) {
-            initDeadline.reject(error)
+        {
+          onMessage,
+          canUseTool,
+          onUserDialog,
+          onFault: (error) => {
+            if (!attempt.published) {
+              initDeadline.reject(error)
+            }
+          },
+          onExit: (error) => {
+            if (!attempt.published) {
+              initDeadline.reject(error)
+            }
+            callbacks.handleExit(sessionId, attempt, error)
           }
-          callbacks.handleExit(sessionId, attempt, error)
         }
-      }
+      )
     )
     attempt.connection = connection
     acquisitions.assertCurrent(sessionId, attempt)
     initDeadline.start()
-    const [initialization, init] = await Promise.all([
-      requestClaudeInitialization(connection, sessionId, initTimeoutMs),
-      initDeadline.promise
-    ])
+    const [initialization, init] = await withAgentSessionCreatePhase(
+      'init',
+      input.recordPhase,
+      () =>
+        Promise.all([
+          requestClaudeInitialization(connection, sessionId, initTimeoutMs),
+          initDeadline.promise
+        ])
+    )
     const models = readClaudeModels(initialization)
     callbacks.deliver(attempt, sessionId, () =>
       callbacks.emit(liveSession, input.events, { type: 'options', sessionId, models })
@@ -294,7 +268,9 @@ export async function acquireClaudeSession({
       observedAt: deps.now?.() ?? Date.now()
     })
     liveSession = publication.session
-    await restoreClaudeStructuredSessionOptions(liveSession, deps.requestTimeoutMs)
+    await withAgentSessionCreatePhase('restore_options', input.recordPhase, () =>
+      restoreClaudeStructuredSessionOptions(liveSession!, deps.requestTimeoutMs)
+    )
     acquisitions.assertCurrent(sessionId, attempt)
     acquisitions.deleteIfCurrent(sessionId, attempt)
     sessions.set(sessionId, liveSession)

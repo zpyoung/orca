@@ -62,17 +62,20 @@ export type ClaudeStructuredSessionEvent =
       observedAt?: number
     }
 
+export type ClaudeLateDispatchOutcome =
+  | {
+      clientMessageId: string
+      providerIdentity: AgentJournalItemIdentity
+    }
+  | { clientMessageId: string; state: 'rejected'; reason: string }
+
 export type ClaudeStructuredSessionAdapterDeps = {
   resolveLaunch: (input: {
     identity: AgentSessionJournalIdentity
   }) => Promise<ClaudeStructuredLaunch>
   onEvent?: (event: ClaudeStructuredSessionEvent) => void
-  /** Direct settlement path for a provider replay; its durable item row also reconciles delivery. */
-  onDispatchSettledLate?: (input: {
-    sessionId: string
-    clientMessageId: string
-    providerIdentity: AgentJournalItemIdentity
-  }) => void
+  /** Direct settlement path for provider-proven late dispatch outcomes. */
+  onDispatchSettledLate?: (input: { sessionId: string } & ClaudeLateDispatchOutcome) => void
   onBackgroundTasksChanged?: (
     sessionId: string,
     state: AgentSessionBackgroundTaskState | null
@@ -144,16 +147,12 @@ export type ClaudeSession = {
   restoreSkippedOptions: Set<string>
   /** CLI-advertised protocol capabilities from init; gates interrupt-receipt handling. */
   capabilities: readonly string[]
-  /** Provider uuid of the most recently admitted turn, if one is active. */
-  activeTurnId?: string
   backgroundTasks: ClaudeBackgroundTaskTracker
   /** The `/` surface the CLI reports for itself; seeded from init, kept current
    *  by later init and `commands_changed` frames. */
   commands: ClaudeSlashCommandCatalog
   /** Monotonic fence advanced when a dispatch starts, including unresolved dispatches. */
   dispatchSequence: number
-  /** Dispatch sequence that admitted activeTurnId. */
-  activeTurnSequence?: number
   /** Fences overlapping option writes so a late completion cannot restore stale state. */
   optionMutationSequence: number
   /** Shared durable-close write; a failed write clears this for a retry. */

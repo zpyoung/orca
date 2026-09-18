@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { AGENT_SESSION_ID_MAX_LENGTH } from '../../shared/agent-session-wire'
 import {
   applyCodexPromptAnswer,
   CodexPromptRegistry,

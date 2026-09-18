@@ -1,14 +1,15 @@
 import { randomUUID } from 'node:crypto'
-import type {
-  AgentJournalItemIdentity,
-  AgentJournalMessageItem
-} from '../../shared/agent-session-journal-types'
+import type { AgentJournalMessageItem } from '../../shared/agent-session-journal-types'
 import type { AgentSessionDispatchOutcome } from '../native-chat/agent-session-wire/structured-agent-session-adapter'
 import {
   claudeHasReplayContent,
   readClaudeMessageEnvelope
 } from './claude-structured-item-translation'
-import type { ClaudeDispatchWaiter, ClaudeSession } from './claude-structured-session-state'
+import type {
+  ClaudeDispatchWaiter,
+  ClaudeLateDispatchOutcome,
+  ClaudeSession
+} from './claude-structured-session-state'
 import { readClaudeFrameString } from './claude-structured-init-proof'
 import {
   claudeDispatchContentKey,
@@ -17,6 +18,7 @@ import {
 } from './claude-structured-dispatch-content'
 import { dispatchWriteOutcomeUnknownReason } from '../native-chat/agent-session-journal/journal-dispatch-doubt-reasons'
 import {
+  DISPATCH_REJECTED_CANCELLED,
   DISPATCH_REJECTED_QUEUE_FULL,
   dispatchWriteFailureReason
 } from '../../shared/structured-agent-session-dispatch-rejection'
@@ -25,11 +27,8 @@ import { claudeUserMessageWasProvablyUnwritten } from './claude-agent-sdk-user-m
 const MAX_RETIRED_DISPATCH_WAITERS = 64
 const MAX_ACTIVE_DISPATCH_WAITERS = 64
 
-/** Directly settles provider-proven delivery; the durable replay row independently reconciles it. */
-export type ClaudeLateDispatchSettlement = (input: {
-  clientMessageId: string
-  providerIdentity: AgentJournalItemIdentity
-}) => void
+/** Settles a provider-proven late outcome; replay rows independently reconcile acceptance. */
+export type ClaudeLateDispatchSettlement = (input: ClaudeLateDispatchOutcome) => void
 
 export function resolveClaudeReplayWaiter(
   session: ClaudeSession,
@@ -145,17 +144,12 @@ function settleWaiter(
   }
   waiter.settledUuid = uuid
   waiter.resolve(uuid)
-  // Dispatch returned on admission. Settle delivery unfenced while the sequence
-  // still fences which turn owns the identity; see `recoverLateIdentity`.
+  // Dispatch returned on admission, so the replay is what settles delivery.
   if (waiter.clientMessageId) {
     onSettledLate?.({
       clientMessageId: waiter.clientMessageId,
       providerIdentity: { provider: 'claude', sessionId: session.providerSessionId, uuid }
     })
-  }
-  if (waiter.dispatchSequence === session.dispatchSequence) {
-    session.activeTurnId = uuid
-    session.activeTurnSequence = waiter.dispatchSequence
   }
 }
 
@@ -177,17 +171,13 @@ function recoverLateIdentity(
     return false
   }
   // The provider acted on this dispatch, so the send it came from is delivered.
-  // Unfenced on purpose: the dispatch-sequence check below only decides which
-  // turn owns the identity, while delivery is settled for good either way.
+  // Unfenced on purpose: the dispatch-sequence check below only decides whether
+  // this replay still opens a turn, while delivery is settled for good either way.
   if (waiter.clientMessageId) {
     onSettledLate?.({
       clientMessageId: waiter.clientMessageId,
       providerIdentity: { provider: 'claude', sessionId: session.providerSessionId, uuid }
     })
-  }
-  if (waiter.dispatchSequence === session.dispatchSequence) {
-    session.activeTurnId = uuid
-    session.activeTurnSequence = waiter.dispatchSequence
   }
   return isUserReplay && waiter.dispatchSequence === session.dispatchSequence
 }
@@ -225,6 +215,34 @@ function forgetWaiter(session: ClaudeSession, waiter: ClaudeDispatchWaiter): voi
   const index = session.dispatchWaiters.indexOf(waiter)
   if (index !== -1) {
     session.dispatchWaiters.splice(index, 1)
+  }
+}
+
+export function settleCancelledClaudeDispatchWaiters(
+  session: ClaudeSession,
+  cancelledUuids: readonly string[],
+  onSettledLate?: ClaudeLateDispatchSettlement
+): void {
+  const cancelled = new Set(cancelledUuids)
+  const activeWaiters = session.dispatchWaiters.filter((waiter) => cancelled.has(waiter.sentUuid))
+  const retiredWaiters = session.retiredDispatchWaiters.filter((waiter) =>
+    cancelled.has(waiter.sentUuid)
+  )
+  for (const waiter of activeWaiters) {
+    forgetWaiter(session, waiter)
+    waiter.resolve(null)
+  }
+  for (const waiter of retiredWaiters) {
+    forgetRetiredWaiter(session, waiter)
+  }
+  for (const waiter of [...activeWaiters, ...retiredWaiters]) {
+    if (waiter.clientMessageId) {
+      onSettledLate?.({
+        clientMessageId: waiter.clientMessageId,
+        state: 'rejected',
+        reason: DISPATCH_REJECTED_CANCELLED
+      })
+    }
   }
 }
 
@@ -266,7 +284,7 @@ export async function dispatchClaudeTurn(
   if (session.dispatchWaiters.length >= MAX_ACTIVE_DISPATCH_WAITERS) {
     return { state: 'rejected', reason: DISPATCH_REJECTED_QUEUE_FULL }
   }
-  const dispatchSequence = ++session.dispatchSequence
+  ++session.dispatchSequence
   // Read the sent content, not the journal blocks: only the mapped trailing prompt decides
   // whether Claude runs a command, so the two cannot disagree about which frame settles this.
   const acceptsResult = claudeDispatchInvokesSlashCommand(content)
@@ -292,8 +310,6 @@ export async function dispatchClaudeTurn(
     if (waiter.settledUuid) {
       const uuid = await replayed
       if (uuid) {
-        session.activeTurnId = uuid
-        session.activeTurnSequence = dispatchSequence
         return {
           state: 'accepted',
           providerIdentity: { provider: 'claude', sessionId: session.providerSessionId, uuid }

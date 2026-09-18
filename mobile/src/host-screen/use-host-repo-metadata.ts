@@ -2,6 +2,7 @@ import { optionalSettingsRead } from '../transport/settings-read-operations'
 import { useCallback } from 'react'
 import { getRepoExecutionHostId } from '../../../src/shared/execution-host'
 import { setCachedRepos } from '../cache/repo-cache'
+import type { RpcAcceptedResult } from '../transport/rpc-accepted-result'
 import type { RpcClient } from '../transport/rpc-client'
 import type { ConnectionState, RpcResponse, RpcSuccess } from '../transport/types'
 import type { RepoSummary } from '../worktree/host-worktree-rpc-types'
@@ -10,6 +11,11 @@ import {
   buildHostLabelById,
   buildRepoHostIdByRepoId
 } from '../worktree/worktree-host-context-labels'
+import {
+  hostPlatformRead,
+  hostRepoCatalogRead,
+  hostSshTargetSummariesRead
+} from './host-screen-operations'
 import type { HostScreenState } from './use-host-screen-state'
 
 const REPO_METADATA_REFRESH_MS = 60_000
@@ -26,6 +32,18 @@ async function requestMetadataResponse(
     // Best-effort: hosts that predate a method still list repos; labels degrade to host ids.
     return null
   }
+}
+
+/** An accepted metadata payload, or null for a refusal or a send that never landed. */
+function acceptedMetadata(
+  reply: RpcResponse | null,
+  interpret: (reply: RpcResponse) => RpcAcceptedResult<unknown>
+): unknown {
+  if (!reply) {
+    return null
+  }
+  const verdict = interpret(reply)
+  return verdict.accepted ? verdict.value : null
 }
 
 function readSshTargets(result: unknown): SshTargetSummaryRow[] {
@@ -101,7 +119,12 @@ export function useHostRepoMetadata(args: {
           ) {
             return
           }
-          const repoResult = (repoResponse as RpcSuccess).result as { repos: RepoSummary[] }
+          const repos = repoReply && hostRepoCatalogRead.interpret(repoReply)
+          if (!repos || !repos.accepted) {
+            return
+          }
+          // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Preserve the established response shape at this boundary.
+          const repoResult = repos.value as { repos: RepoSummary[] }
           repoMetadataFetchedAtRef.current = Date.now()
           setCachedRepos(requestHostId, repoResult.repos)
           setRepoColorsByName(

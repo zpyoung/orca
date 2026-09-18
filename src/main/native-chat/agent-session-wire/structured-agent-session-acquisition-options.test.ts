@@ -16,6 +16,7 @@ import {
   type AgentSessionAttachParams
 } from './structured-agent-session-attach'
 import { performAttach } from './structured-agent-session-attach-flow'
+import type { AgentSessionCreatePhaseRecorder } from '../../observability/agent-session-instrumentation'
 
 const NOW = 1_800_000_000_000
 const SESSION = 'legacy-session'
@@ -235,11 +236,14 @@ describe('structured session acquisition options', () => {
       callerKey: 'client-1',
       params: attachParams(CREATE_OPERATION, null, options),
       now: () => NOW,
+      recordPhase,
       onAttached: () => {}
     })
 
     expect(created).toMatchObject({ ok: true })
-    expect(sessionAdapter.acquire).toHaveBeenCalledWith(expect.objectContaining({ options }))
+    expect(sessionAdapter.acquire).toHaveBeenCalledWith(
+      expect.objectContaining({ options, recordPhase })
+    )
     expect(store.getRecord(SESSION)?.options).toEqual(options)
   })
 

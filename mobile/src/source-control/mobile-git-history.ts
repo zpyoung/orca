@@ -14,7 +14,7 @@ export type MobileCommitRow = {
 
 // Short relative time for a commit list (just now / Xm / Xh / Xd / Xmo / Xy).
 // `timestampMs` is epoch ms, the unit GitHistoryItem.timestamp already carries.
-export function formatCommitTime(timestampMs: number | undefined, nowMs: number): string {
+export function formatCommitTime(timestampMs: number | null | undefined, nowMs: number): string {
   // Nullish — not falsy — so a real epoch-0 timestamp still formats.
   if (timestampMs == null) {
     return ''
@@ -42,7 +42,7 @@ export function formatCommitTime(timestampMs: number | undefined, nowMs: number)
   return `${Math.floor(months / 12)}y`
 }
 
-export function toMobileCommitRow(item: GitHistoryItem, nowMs: number): MobileCommitRow {
+export function toMobileCommitRow(item: MobileGitHistoryItem, nowMs: number): MobileCommitRow {
   return {
     id: item.id,
     shortId: item.displayId ?? item.id.slice(0, 7),
@@ -53,7 +53,10 @@ export function toMobileCommitRow(item: GitHistoryItem, nowMs: number): MobileCo
   }
 }
 
-export function mapMobileCommitRows(result: GitHistoryResult, nowMs: number): MobileCommitRow[] {
+export function mapMobileCommitRows(
+  result: MobileGitHistoryResult,
+  nowMs: number
+): MobileCommitRow[] {
   return result.items.map((item) => toMobileCommitRow(item, nowMs))
 }
 

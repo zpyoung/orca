@@ -10,6 +10,7 @@ import type {
 } from '../../../../shared/native-chat-types'
 import { deriveNativeChatRowContent } from './native-chat-row-content'
 import { NativeChatToolRun } from './NativeChatToolRun'
+import { NativeChatCodeBlock } from './NativeChatCodeBlock'
 import { NativeChatNoticeRow } from './NativeChatNoticeRow'
 import { NativeChatMessageTimestamp } from './NativeChatMessageTimestamp'
 import {
@@ -126,6 +127,7 @@ export const MessageRow = memo(function MessageRow({
                 content={markdown}
                 variant="document"
                 className="text-sm"
+                renderCodeBlock={NativeChatCodeBlock}
                 onLinkClick={onLinkClick}
                 allowFileUriLinks={allowFileUriLinks}
                 highlightCode
@@ -180,6 +182,7 @@ export const MessageRow = memo(function MessageRow({
           content={markdown}
           variant="document"
           className="text-sm"
+          renderCodeBlock={NativeChatCodeBlock}
           onLinkClick={onLinkClick}
           allowFileUriLinks={allowFileUriLinks}
           linkifyFilePaths={onLinkClick !== undefined}
