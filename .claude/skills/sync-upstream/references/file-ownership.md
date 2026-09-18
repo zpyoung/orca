@@ -269,11 +269,17 @@ Hard limits. These bound *how* the fix is written; none of them is a reason to s
   regex to satisfy a rule. If the only way to clear a rule is to change what the code *does*, that
   one violation is a human decision — resolve the rest and escalate it alone.
 - Never `--fix-suggestions` or `--fix-dangerously`; both can alter behaviour.
+- Only files byte-identical to `$ORIGIN_MAIN_OLD`. A violation in a file the merge *changed* is
+  `-X ours` damage, not toolchain tightening — resolve it to one real side instead (see the two
+  sections above) rather than renaming around it.
 - Only files the fork owns. A violation in a file byte-identical to the *tag* is upstream's release
   failing its own new rule; v1.4.205 shipped `Reflect.get` in `agent-status-legacy-adapter.ts` under
   its own new `no-reflect-get` and fixed it on the next release branch. Retarget to the newer stable
   tag if one exists — that is the cheapest fix and it dissolves the finding. Otherwise treat it as an
-  upstream defect and escalate that file alone.
+  upstream defect and escalate that file alone. Proving it needs no checkout, unlike the vitest case
+  above: if the lint config, the plugin pin in `package.json`, and the violating file are each
+  byte-identical to the tag, the inputs are the tag's and the finding is deterministic. Three
+  `git diff --quiet` calls settle it.
 - Never edit `.oxlintrc.json` or `config/oxlint-*.json` to silence a rule, and never add a
   suppression entry. Upstream owns those files, so the next sync re-adds the rule and re-blocks.
 
@@ -285,10 +291,15 @@ To get ahead of the next release instead of discovering this mid-sync, run the t
 against the current tree before merging — restore the baseline config afterward:
 
 ```sh
-cp .oxlintrc.json /tmp/oxlintrc.baseline.json
-git show <target-ref>:.oxlintrc.json > .oxlintrc.json
-pnpm exec oxlint; cp /tmp/oxlintrc.baseline.json .oxlintrc.json
+git diff <target-ref> -- .oxlintrc.json 'config/oxlint-*.json'
+git diff <target-ref> -- package.json | grep -E '^[-+].*"(lint|audit:|check:)'
 ```
+
+Swapping in the target's `.oxlintrc.json` and re-running `oxlint` is **not** the pre-check, for the
+same reason the diagnostic above is not: a release can put its new rules in a separate config behind
+a separate script, and that rehearsal runs neither. Read the two diffs instead, then rehearse
+whatever they actually name — for v1.4.205 that meant installing the pinned plugin and running
+`audit:anti-slop`, which the old rehearsal would have missed entirely.
 
 ## When upstream ratchets a chokepoint
 
