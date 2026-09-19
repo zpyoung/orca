@@ -103,8 +103,9 @@ UPSTREAM_TARGET=$(git rev-parse "${STABLE_TAG}^{commit}")
 
 Fetch before resolving, always. `ls-remote` names commits the fork has never downloaded, and any
 `git` command given one of those SHAs — `merge-base --is-ancestor` especially — exits 128 and aborts
-mid-run. Upstream tags are immutable, so a rejected non-fast-forward tag update means something is
-wrong: STOP and report rather than forcing it.
+mid-run. Upstream does not rewrite a tag in place, so a rejected non-fast-forward tag update means
+something is wrong: STOP and report rather than forcing it. It does sometimes **delete** one, which
+is a different failure and is caught in Step 2 rather than here.
 
 Capture these and keep them; every restore path depends on them:
 
@@ -132,6 +133,26 @@ range and are not fork work. Excluding `upstream/main` as well as `$UPSTREAM_TAR
 `main` already contains upstream trunk commits absorbed by previous syncs; a plain
 `$UPSTREAM_TARGET..origin/main` range reports those as fork work and inflates N by dozens.
 
+- **Before the ancestry test, check that the target is not *older* than what `main` carries.**
+  Read `upstream_synced` from `CHANGELOG.md`'s YAML frontmatter and compare by version order:
+
+  ```sh
+  SYNCED=$(sed -n 's/^upstream_synced: *//p' CHANGELOG.md | head -1)
+  [ "$STABLE_TAG" = "$SYNCED" ] \
+    || [ "$(printf '%s\n%s\n' "$STABLE_TAG" "$SYNCED" | sort -V | tail -1)" = "$STABLE_TAG" ] \
+    || echo 'target is OLDER than upstream_synced'
+  ```
+
+  Equal is the ordinary quiet day and must fall through to the next bullet, which handles it as a
+  success — only a strictly older target is the finding here, so the equality test comes first and
+  short-circuits.
+
+  If the target is older, upstream has **retracted** a stable tag this fork already absorbed. Record
+  "no new stable release", skip to Step 12, and raise it as a "needs attention" item. Do not merge:
+  Step 6 resets every upstream-owned file to `$UPSTREAM_TARGET`, so merging an older tag rolls the
+  whole fork back a release and breaks any fork commit written against the newer release's API
+  shapes. `merge-base --is-ancestor` cannot catch this on its own — stable tags live on their own
+  release branches, so it fails for an *older* tag exactly as it does for a genuinely new one.
 - If `git merge-base --is-ancestor "$UPSTREAM_TARGET" origin/main` succeeds, `main` already contains
   this release. Skip to Step 12 and note "no new stable release (already at $STABLE_TAG)". This is
   the expected outcome on most days and is a success, not a warning.
