@@ -23,6 +23,7 @@ import {
   parseAndValidatePlannerReport,
   parseAndValidateReviewerReport
 } from '../../shared/fork-heimdall-objective/plan-schema'
+import { judgmentFailureClassification } from '../../shared/fork-heimdall/judgment/objective-judgment-policy'
 import type { Store } from '../persistence'
 import type { ObjectiveForgeAccess } from './objective-forge-access'
 import { executeObjectiveDispatch } from './dispatch-executor'
@@ -175,9 +176,15 @@ async function resolveDispatchOutcome(args: {
   ledger: WatcherLedger
   binding: ObjectiveSnapshotBinding
   objectiveStore: ObjectiveStore
+  world: ObjectiveWorld
 }): Promise<EffectCertaintyResolution> {
+  const failureSubject = args.attempt.dispatchId ?? args.attempt.attemptId
+  const failed = (fallback: ObjectiveFailureClass): EffectCertaintyResolution => ({
+    effect: 'not-landed',
+    failureClass: judgmentFailureClassification(args.world, failureSubject, fallback)
+  })
   if (!args.attempt.dispatch) {
-    return { effect: 'not-landed', failureClass: 'infra' }
+    return failed('infra')
   }
   const dispatchId = args.attempt.dispatchId
   if (!dispatchId) {
@@ -186,11 +193,11 @@ async function resolveDispatchOutcome(args: {
   const evidence = findObjectiveWorkerEvidence(args.ledger, dispatchId)
   if (!evidence) {
     return args.attempt.reason === WORKER_EXITED_WITHOUT_COMPLETION
-      ? { effect: 'not-landed', failureClass: 'infra' }
+      ? failed('infra')
       : { effect: 'indeterminate' }
   }
   if (evidence.reportPath === null) {
-    return { effect: 'not-landed', failureClass: 'criteria' }
+    return failed('criteria')
   }
   const role =
     args.action.kind === 'dispatch-planner'
@@ -209,7 +216,7 @@ async function resolveDispatchOutcome(args: {
       ...(args.action.kind === 'dispatch-node' ? { taskKey: args.action.taskKey } : {})
     })
     if (!read.ok) {
-      return { effect: 'not-landed', failureClass: 'criteria' }
+      return failed('criteria')
     }
     if (
       !validateResolvedDispatchReport({
@@ -218,7 +225,7 @@ async function resolveDispatchOutcome(args: {
         evidenceFiles: evidence.filesModified
       })
     ) {
-      return { effect: 'not-landed', failureClass: 'criteria' }
+      return failed('criteria')
     }
     if (args.action.kind === 'dispatch-node' || args.action.kind === 'dispatch-integrator') {
       // a retry must diff against the pre-original baseline, not one keyed to its own fingerprint
@@ -233,14 +240,12 @@ async function resolveDispatchOutcome(args: {
         writeTerritory: args.binding.contract.writeTerritory
       })
       if (!observed.ok) {
-        return { effect: 'not-landed', failureClass: 'criteria' }
+        return failed('criteria')
       }
     }
     if (evidence.outcome === 'failed') {
-      return {
-        effect: 'not-landed',
-        failureClass: classifyValidatedReportFailure(read.report, args.action)
-      }
+      const deterministicClass = classifyValidatedReportFailure(read.report, args.action)
+      return failed(deterministicClass)
     }
     return { effect: 'landed' }
   } catch (error) {
@@ -249,7 +254,7 @@ async function resolveDispatchOutcome(args: {
     if (evidence.outcome === 'succeeded') {
       throw error
     }
-    return { effect: 'not-landed', failureClass: 'criteria' }
+    return failed('criteria')
   }
 }
 
@@ -337,6 +342,7 @@ export function createObjectiveActionExecutor(
         action: parsed.data as Extract<ObjectiveAction, { kind: `dispatch-${string}` }>,
         ledger,
         binding,
+        world: fresh.world,
         objectiveStore: dependencies.objectiveStore
       })
     }

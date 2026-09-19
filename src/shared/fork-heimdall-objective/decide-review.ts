@@ -1,5 +1,6 @@
 import type { WatcherLedger } from '../fork-heimdall/ledger-types'
 import type { Snapshot } from '../fork-heimdall/snapshot'
+import { judgmentQualityReviewSubjects } from '../fork-heimdall/judgment/objective-judgment-policy'
 import type { IngestVerdictAction, ObjectiveAction } from './objective-actions'
 import {
   decidePlannerAction,
@@ -133,6 +134,111 @@ function pendingRoleReport(
   }
   return null
 }
+function decideJudgmentQualityReview(
+  snapshot: Snapshot<ObjectiveWorld>,
+  ledger: WatcherLedger,
+  attempts: readonly ObjectiveAttempt[],
+  reports: readonly ObjectivePendingReport[],
+  revision: ObjectiveRevisionProjection
+): ObjectiveDecisionOutcome | null {
+  const verdictByDispatchId = new Map(
+    snapshot.world.plan.verdicts.map((candidate) => [candidate.dispatchId, candidate])
+  )
+  for (const subjectId of judgmentQualityReviewSubjects(snapshot.world)) {
+    const sourceAttempt = attempts.find(
+      (candidate) =>
+        candidate.attempt.dispatchId === subjectId &&
+        (candidate.action.kind === 'dispatch-node' ||
+          candidate.action.kind === 'dispatch-reviewer' ||
+          candidate.action.kind === 'dispatch-integrator') &&
+        candidate.action.revisionId === revision.id
+    )
+    if (!sourceAttempt) {
+      continue
+    }
+    const evidenceKey = `${sourceAttempt.action.evidenceKey}:judgment-review:${sourceAttempt.action.contentIdentity}`
+    const review = latestObjectiveAttempt(
+      attempts,
+      (action) =>
+        action.kind === 'dispatch-reviewer' &&
+        action.revisionId === revision.id &&
+        action.judgmentReviewOf === subjectId
+    )
+    if (!review) {
+      return {
+        action: {
+          kind: 'dispatch-reviewer',
+          capability: 'review',
+          visibility: 'local',
+          contentIdentity: snapshot.contentIdentity,
+          evidenceKey,
+          revisionId: revision.id,
+          judgmentReviewOf: subjectId
+        }
+      }
+    }
+    const judgmentVerdict =
+      review.attempt.dispatchId === undefined
+        ? undefined
+        : verdictByDispatchId.get(review.attempt.dispatchId)
+    if (judgmentVerdict?.verdict === 'block') {
+      return decidePlannerAction(
+        snapshot,
+        ledger,
+        attempts,
+        reports,
+        'replan-after-block',
+        revision.number
+      )
+    }
+    if (judgmentVerdict) {
+      continue
+    }
+    const disposition = objectiveAttemptDisposition(review.attempt, ledger)
+    const report = reports.find((candidate) => candidate.dispatchId === review.attempt.dispatchId)
+    if (report?.outcome === 'succeeded' && report.reportPath !== null) {
+      const ingestion = latestObjectiveAttempt(
+        attempts,
+        (action) => action.kind === 'ingest-verdict' && action.dispatchId === report.dispatchId
+      )
+      if (!ingestion) {
+        return {
+          action: {
+            kind: 'ingest-verdict',
+            capability: 'review',
+            visibility: 'local',
+            recovery: 'replay-safe',
+            contentIdentity: snapshot.contentIdentity,
+            evidenceKey: report.dispatchId,
+            revisionId: revision.id,
+            role: 'reviewer',
+            dispatchId: report.dispatchId,
+            reportPath: report.reportPath,
+            reviewedContentIdentity: report.dispatchedContentIdentity
+          }
+        }
+      }
+      const ingestionDisposition = objectiveAttemptDisposition(ingestion.attempt, ledger)
+      if (ingestionDisposition === 'in-flight' || ingestionDisposition === 'indeterminate') {
+        return objectiveNoAction('review', 'projection-refresh-pending', report.dispatchId)
+      }
+      continue
+    }
+    if (report && (report.outcome === 'failed' || report.reportPath === null)) {
+      continue
+    }
+    if (
+      disposition === 'in-flight' ||
+      disposition === 'indeterminate' ||
+      disposition === 'landed'
+    ) {
+      return objectiveNoAction('review', 'review-in-flight', evidenceKey)
+    }
+    // One failed disagreement review consumes this bounded review opportunity. It never rejects
+    // the successful worker claim and never spawns an unbounded retry loop.
+  }
+  return null
+}
 
 function decideReviewRole(
   snapshot: Snapshot<ObjectiveWorld>,
@@ -233,7 +339,7 @@ export function decideObjectiveReview(
   revision: ObjectiveRevisionProjection
 ): ObjectiveDecisionOutcome | null {
   if (snapshot.world.contract.tier === 'express') {
-    return null
+    return decideJudgmentQualityReview(snapshot, ledger, attempts, reports, revision)
   }
   const reviewer = decideReviewRole(snapshot, ledger, attempts, reports, revision, 'reviewer')
   if (reviewer === 'blocked') {
@@ -250,7 +356,7 @@ export function decideObjectiveReview(
     return reviewer
   }
   if (snapshot.world.contract.tier === 'standard') {
-    return null
+    return decideJudgmentQualityReview(snapshot, ledger, attempts, reports, revision)
   }
   const integrator = decideReviewRole(snapshot, ledger, attempts, reports, revision, 'integrator')
   if (integrator === 'blocked') {
@@ -263,5 +369,7 @@ export function decideObjectiveReview(
       revision.number
     )
   }
-  return integrator === 'approved' ? null : integrator
+  return integrator === 'approved'
+    ? decideJudgmentQualityReview(snapshot, ledger, attempts, reports, revision)
+    : integrator
 }

@@ -48,6 +48,97 @@ Enrollment happens on exactly two surfaces:
 | `objective`     | Sidebar → Heimdall → **New objective** (`HeimdallPage.tsx:196-205`)                                                                             |
 | `hosted-review` | Open a worktree with an open PR/MR → right sidebar Checks panel → **PR Sitter** → **Arm** (`right-sidebar/checks-panel/active-content.tsx:215`) |
 
+## Judgment: opt-in shadow observations
+
+Objective watchers can batch typed Jev judgment questions through TypeSafe directly or OpenRouter's
+[Decisions API](https://openrouter.ai/docs/api/api-reference/alphadecisions/submit-a-decisions-questions-and-answers-request).
+This is **off by default**. Every registered question also starts in **shadow mode**: answers are
+recorded, but do not change decisions. Published confidence tiers are seed values, not calibrated
+authority; graduating a question requires a code change to its mode, threshold and calibrated model.
+
+Access lives in `fork-heimdall/judgment-access.json` beside the profile's `heimdall.db`, not in an
+enrollment, objective contract, or fleet mirror:
+
+```json
+{ "enabled": true, "provider": "openrouter", "apiKey": "YOUR_OPENROUTER_API_KEY" }
+```
+
+OpenRouter uses `~typesafe/jev-latest` at `https://openrouter.ai/api/alpha/decisions`, not chat
+completions. For direct TypeSafe access, set `"provider":"typesafe"` and supply a TypeSafe key;
+omitting `provider` also selects TypeSafe. There is no automatic provider fallback.
+
+On a standard macOS installation, the active profile's file is
+`~/Library/Application Support/orca/profiles/<activeProfileId>/fork-heimdall/judgment-access.json`.
+The profile ID is in `orca-profile-index.json`; the default is `local-default`. Development builds
+normally use `orca-dev` instead of `orca`. The running build must include judgment support.
+
+On macOS/Linux the file must have private permissions (`chmod 600`). Delete it or replace its
+contents with `{"enabled":false}` to disable judgment. Invalid configuration degrades to a recorded
+absence without exposing the key in diagnostics. There is no runtime setting for graduating a
+question out of shadow mode.
+
+Enabling access permits sending bounded objective, plan, validated report, and relevant ledger
+projections to the external API. Only local desktop watchers participate; SSH, WSL and runtime-owned
+watchers record an explicit remote-host absence without reading the credentials or calling the API.
+This supports both Git and folder objectives.
+
+The read phase asks one batch per new `(contentIdentity, projection digest)`. A newly arrived report
+changes that identity even if workspace files did not change. Answers and failures are pinned
+`client-observation` ledger entries, not a second cache; replay and unchanged ticks do not ask again,
+even after changing providers. New answers record their transport provider and the exact returned
+model stamp; model aliases are not treated as calibrated versions. Choice/Score answers without
+confidence or probabilities are unavailable, never assigned synthetic confidence.
+A durable pending entry prevents a restart from repeating an interrupted invocation.
+
+Before applying the 32 KiB state limit, the judgment projection losslessly shares exact repeated
+string values through a versioned `normalization.strings` table. Each original field keeps its
+location and a reference to the shared value; record order, source claims, and relationships remain
+distinct. Native reference-looking objects are escaped. Trusted question instructions explain how
+to expand references and literal escapes; referenced worker text remains untrusted data.
+Normalization is used only when the complete encoded UTF-8 JSON is smaller, including its table
+and reference overhead. This is lossless relative to the existing judgment projection, not a
+replacement for its field filtering or latest-ledger-entry folding.
+
+If the normalized state still exceeds 32 KiB, the projection drops the oldest historical groups
+until it fits, normalizing each candidate again. This can omit the original plan seed once an approved plan supersedes it, superseded
+revisions and their nodes, and completed attempt/report history. Questions about omitted historical
+subjects are not sent. The current plan, pending/running work, and open escalation evidence remain;
+if that required context alone cannot fit, judgment is unavailable. Text is never sliced to fit.
+
+The exact encoded state, normalization format, and truncation counts/policy participate in the
+input identity, so changed bounded input does not replay an earlier oversized-state failure.
+The outcome and Decision Trace record normalization savings and any omission notice; unchanged
+input still replays without another call. The full watcher world and historical ledger entries
+are unchanged.
+
+Decoding guidance also counts toward the 256 KiB complete-request limit. If that overhead would
+overflow the request, an unencoded projection may be used with the same history-bounding policy,
+but only if both its state and complete request fit. Identity and notices follow the chosen form.
+Successful or pending judgments replay across provider changes when the retained context is
+identical; an older, more-pruned answer cannot suppress judgment of newly retained context.
+
+HTTP 429/529 get at most three attempts with 100/200 ms backoff; each attempt times out after five
+seconds. Other failures fall through to the deterministic path and are recorded.
+
+The **Decision Trace** shows participation and why answers were held (including shadow mode),
+distinct from disabled, remote, unavailable or never-completed requests. **Ledger activity** retains
+the typed answers and model stamps. Each newly observed model version produces a notice. Approval
+cards can display an advisory prediction, explicitly labelled shadow or acting; approval still
+requires the human.
+
+Registered consumers cover failure classification, task-scoped agent routing, escalation triage,
+report/verdict quality, preflight, handoff, and adversarial screening. Acting consumers require their
+own confidence threshold, an explicitly calibrated model and a clean adversarial screen. Retry
+allowances remain deterministic: every routed redispatch consumes the existing two-retry limit.
+Quality disagreement requests one additional reviewer for the immutable source claim rather than
+rejecting the worker's report.
+
+Escalation triage is recorded, but **automatic escalation rerouting is not enabled or wired**:
+the existing worker-escalation lifecycle parks before dispatch selection. Allowing judgment to
+bypass that park conflicts with the specification's prohibition on stop-predicate influence and
+requires an explicit authority decision. Stop predicates, liveness, pacing and human consent remain
+deterministic.
+
 ## The pulse
 
 Each watcher reconciles on its own timer. The kind picks a tier each tick; the kernel converts it to
@@ -91,14 +182,14 @@ last-confirmed age (`HeimdallStatusPill.tsx:8-21`).
 and configuration failure use dedicated park paths. Each disables the enrollment and opens a
 `park-<reason>` escalation:
 
-| Reason                  | Trigger                                                 | Recovery                                     |
-| ----------------------- | ------------------------------------------------------- | -------------------------------------------- |
-| `budget`                | active-time or turns spent                              | raise the budget, then resume                |
-| `stop-predicate`        | a kind's stop condition fired non-terminally            | resume                                       |
-| `worker-question`       | a dispatched worker is blocked on a question            | answer it, or resume once the worker exits   |
+| Reason                  | Trigger                                                 | Recovery                                                                      |
+| ----------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `budget`                | active-time or turns spent                              | raise the budget, then resume                                                 |
+| `stop-predicate`        | a kind's stop condition fired non-terminally            | resume                                                                        |
+| `worker-question`       | a dispatched worker is blocked on a question            | answer it, or resume once the worker exits                                    |
 | `worker-escalation`     | a worker explicitly requested operator intervention     | inspect the escalation, then resume; self-clears if that dispatch later lands |
-| `configuration-error`   | durable workspace or execution authority no longer fits | fix the configuration, then resume or re-arm |
-| `coordinator-seat-lost` | this process lost its orchestration coordinator seat    | re-establish ownership                       |
+| `configuration-error`   | durable workspace or execution authority no longer fits | fix the configuration, then resume or re-arm                                  |
+| `coordinator-seat-lost` | this process lost its orchestration coordinator seat    | re-establish ownership                                                        |
 
 ## Capability gates
 

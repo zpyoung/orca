@@ -398,14 +398,15 @@ describe('ObjectiveStore natural-key persistence', () => {
     ])
   })
 
-  it('keeps plan, node, and criterion bodies out of the cheap projection', () => {
+  it('keeps plan and node bodies out while projecting bounded criterion bodies', () => {
     const revision = ingest()
     const projection = store.project(WATCHER_ID)
     expect(projection.revisions[0]).not.toHaveProperty('payload')
     expect(projection.nodes[0]).not.toHaveProperty('title')
     expect(projection.nodes[0]).not.toHaveProperty('spec')
-    expect(projection.nodes[0].criteria[0]).not.toHaveProperty('body')
-    expect(JSON.stringify(projection)).not.toContain('Secret')
+    expect(projection.nodes[0].criteria[0].body).toBe('Secret acceptance body A')
+    expect(JSON.stringify(projection)).not.toContain('Secret node')
+    expect(JSON.stringify(projection)).not.toContain('Secret implementer')
     expect(store.getPlan(revision.revisionId)).toEqual(REPORT.plan)
     expect(store.getTask(revision.revisionId, 'task-a')?.spec).toBe(
       'Secret implementer specification A'

@@ -2,15 +2,10 @@ import { randomUUID } from 'node:crypto'
 import { deriveBudgetState } from '../../shared/fork-heimdall/budget'
 import {
   getInFlightAttempts,
-  getLastDecidedContentIdentity,
   getUnresolvedAttempts
 } from '../../shared/fork-heimdall/ledger-queries'
 import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
-import {
-  errorBackoffMs,
-  HEIMDALL_FULL_RESYNC_MS,
-  HEIMDALL_RAPID_POLL_MS
-} from '../../shared/fork-heimdall/pacing'
+import { errorBackoffMs, HEIMDALL_RAPID_POLL_MS } from '../../shared/fork-heimdall/pacing'
 import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
 import {
   createTickTrace,
@@ -19,6 +14,7 @@ import {
 } from '../../shared/fork-heimdall/tick-trace'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
 import { dormantWatcherStatus } from './debug-report'
+import { readAndRefreshJudgmentSnapshot } from './judgment/mailbox-refresh'
 import type { RegisteredWatcherKind } from './registry'
 import { WatcherLedgerLifecycle } from './ledger-lifecycle'
 import { WatcherRunnerControlLifecycle } from './runner-control-lifecycle'
@@ -29,7 +25,6 @@ import { WatcherRunnerStopLifecycle } from './runner-stop-lifecycle'
 import { isCoordinatorSeatLost, WatcherRunnerStatusLifecycle } from './runner-status'
 import type { WatcherRunner, WatcherRunnerDependencies } from './runner-state'
 import { WatcherRunnerWorkerLifecycle } from './runner-worker-lifecycle'
-
 export class WatcherRunnerLoop {
   readonly dispatchLifecycle: WatcherLedgerLifecycle
   private readonly actions: WatcherRunnerActions
@@ -38,7 +33,6 @@ export class WatcherRunnerLoop {
   private readonly statusLifecycle: WatcherRunnerStatusLifecycle
   private readonly stopLifecycle: WatcherRunnerStopLifecycle
   private readonly workerLifecycle: WatcherRunnerWorkerLifecycle
-
   constructor(private readonly dependencies: WatcherRunnerDependencies) {
     this.dispatchLifecycle = new WatcherLedgerLifecycle({
       ledgerStore: dependencies.ledgerStore,
@@ -243,7 +237,6 @@ export class WatcherRunnerLoop {
       runner.leaseRenewal?.dispose()
       runner.leaseGuard = lease.guard
       runner.leaseRenewal = lease.guard.renewLoop()
-
       if (!runner.recovered) {
         this.dependencies.budgetClock.recoverOnStart(runner.enrollment.watcherId)
         runner.recovered = true
@@ -252,41 +245,21 @@ export class WatcherRunnerLoop {
       if (this.dependencies.budgetClock.current?.(runner.enrollment.watcherId)) {
         this.dependencies.budgetClock.checkpoint(runner.enrollment.watcherId)
       }
-
-      let ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
-      const unresolvedNeedsAuthority = getUnresolvedAttempts(ledger).length > 0
-      const fullResyncDue =
-        runner.forceFresh ||
-        unresolvedNeedsAuthority ||
-        runner.lastFullResyncAtMs === null ||
-        this.now() - runner.lastFullResyncAtMs >= HEIMDALL_FULL_RESYNC_MS
-      trace.fullResyncDue = fullResyncDue
-      let snapshot = await runner.kind.read(runner.enrollment, { fresh: fullResyncDue })
-      await lease.guard.assertHeld()
-      trace.snapshotReadCount += 1
-      if (fullResyncDue && snapshot.freshness !== 'live') {
-        throw new Error('A fresh watcher read returned a cached snapshot')
-      }
-      if (snapshot.freshness === 'live') {
-        runner.lastFullResyncAtMs = this.now()
-        runner.forceFresh = false
-      }
-      runner.lastSnapshot = snapshot
-      trace.snapshot = runner.kind.describeSnapshot(snapshot)
-      trace.contentIdentity = snapshot.contentIdentity
-
-      const previousIdentity = getLastDecidedContentIdentity(ledger)
-      if (previousIdentity && previousIdentity !== snapshot.contentIdentity) {
-        this.actions.abandonPendingAttempts(runner, ledger)
-        ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
-      }
-
-      const refreshedLedger = await this.workerLifecycle.refresh(runner, trace)
-      if (!refreshedLedger) {
+      const snapshotResult = await readAndRefreshJudgmentSnapshot({
+        runner,
+        ledger: this.dependencies.ledgerStore.read(runner.enrollment.watcherId),
+        trace,
+        leaseGuard: lease.guard,
+        now: () => this.now(),
+        readLedger: () => this.dependencies.ledgerStore.read(runner.enrollment.watcherId),
+        abandonPendingAttempts: (currentLedger) =>
+          this.actions.abandonPendingAttempts(runner, currentLedger),
+        refreshWorkers: () => this.workerLifecycle.refresh(runner, trace)
+      })
+      if (!snapshotResult) {
         return
       }
-      ledger = refreshedLedger
-
+      let { snapshot, ledger } = snapshotResult
       let stopped = await this.stopLifecycle.evaluate(runner, snapshot, ledger)
       if ((stopped === 'deferred' || stopped === 'parked') && snapshot.freshness === 'live') {
         ledger = await this.actions.recoverBeforeStop(runner, snapshot, absentDispatches)
@@ -351,7 +324,12 @@ export class WatcherRunnerLoop {
         return
       }
       if (gateEvaluation.outcome === 'gated') {
-        this.actions.recordGateRejection(runner, gateEvaluation.action, gateEvaluation.gate)
+        this.actions.recordGateRejection(
+          runner,
+          gateEvaluation.action,
+          gateEvaluation.gate,
+          gateEvaluation.advisory
+        )
         trace.exitPath = gateEvaluation.gate.verdict === 'escalate' ? 'gate-escalated' : 'gate-held'
         this.statusLifecycle.gate(
           runner,
@@ -476,7 +454,6 @@ export class WatcherRunnerLoop {
     this.controlLifecycle.disarm(runner)
     runner.reconcileAgain = false
   }
-
   private async releaseLeaseGuard(
     runner: WatcherRunner,
     guard: NonNullable<WatcherRunner['leaseGuard']>

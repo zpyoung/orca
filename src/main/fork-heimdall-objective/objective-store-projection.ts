@@ -48,7 +48,7 @@ export function projectObjective(
     WHERE n.watcher_id = ? ORDER BY r.revision_number, n.task_key`)
     .all(watcherId) as unknown as NodeRow[]
   const criteria = db
-    .prepare(`SELECT id, revision_id, task_key, ordinal, shell_checkable, check_command
+    .prepare(`SELECT id, revision_id, task_key, ordinal, body, shell_checkable, check_command
     FROM acceptance_criterion WHERE watcher_id = ? ORDER BY revision_id, task_key, ordinal`)
     .all(watcherId) as unknown as CriterionRow[]
   const checks = (contentIdentity === undefined
@@ -139,7 +139,7 @@ export function detailObjective(
         state: projected.state,
         criteria: (criteriaByNode.get(key) ?? []).map((criterion) => {
           const value = projectedCriteria.get(criterion.id)
-          if (!value || criterion.body === undefined) {
+          if (!value) {
             throw new Error('Objective projection omitted a stored criterion')
           }
           return {
@@ -219,6 +219,7 @@ function buildProjection(
           return {
             id: criterion.id,
             ordinal: criterion.ordinal,
+            body: criterion.body,
             shellCheckable: criterion.shell_checkable === 1,
             checkCommand: criterion.check_command,
             lastCheck: check
@@ -312,7 +313,7 @@ function nodeStates(nodes: NodeRow[], ledger?: WatcherLedger): Map<string, Objec
           const failureClass = objectiveAttemptFailureClass(attempt, ledger)
           const retryCount =
             failureClass === 'infra' || failureClass === 'environment'
-              ? objectiveNodeRetryCount(parsedAttempts, ledger, action.revisionId, action.taskKey)
+              ? objectiveNodeRetryCount(parsedAttempts, action.revisionId, action.taskKey)
               : OBJECTIVE_INFRA_REDISPATCH_CAP
           if (retryCount >= OBJECTIVE_INFRA_REDISPATCH_CAP) {
             outcomes.set(key, 'failed')

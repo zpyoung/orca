@@ -1,5 +1,11 @@
 import { deriveBudgetState } from '../../shared/fork-heimdall/budget'
 import type { GateVerdict } from '../../shared/fork-heimdall/gate'
+import {
+  judgmentHandoffHold,
+  judgmentPreflightHold
+} from '../../shared/fork-heimdall/judgment/objective-judgment-policy'
+import { collectObjectiveJudgmentQuestions } from '../../shared/fork-heimdall/judgment/objective-question-collection'
+import { getActingJudgment } from '../../shared/fork-heimdall/judgment/registry'
 import type { HandoffAdapter, WatcherKind } from '../../shared/fork-heimdall/kind-contract'
 import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type { PacingTier } from '../../shared/fork-heimdall/pacing'
@@ -27,6 +33,8 @@ import { OBJECTIVE_STOP_PREDICATES } from '../../shared/fork-heimdall-objective/
 import type { Store } from '../persistence'
 import { runtimeFileSshTargetId } from '../runtime/runtime-file-command-target'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
+import type { JudgmentAuthority, JudgmentService } from '../fork-heimdall/judgment/service'
+import { readObjectiveJudgmentReports } from '../fork-heimdall/judgment/report-projection'
 import { createObjectiveActionExecutor } from './action-executor'
 import { computeWorkspaceContentIdentity, type ObjectiveWorkspaceTarget } from './content-identity'
 import { defaultObjectiveForgeAccess, type ObjectiveForgeAccess } from './objective-forge-access'
@@ -89,6 +97,26 @@ function checkTargetAvailable(target: ObjectiveWorkspaceTarget): boolean {
   }
 }
 
+function judgmentAuthority(
+  storageAuthority: 'desktop' | 'runtime',
+  target: ObjectiveWorkspaceTarget
+): JudgmentAuthority {
+  if (storageAuthority !== 'desktop') {
+    return 'remote-storage-authority'
+  }
+  if (
+    target.executionHostId !== 'local' ||
+    target.gitTarget?.localGitOptions?.wslDistro !== undefined
+  ) {
+    return 'remote-execution-host'
+  }
+  try {
+    return runtimeFileSshTargetId(target) === undefined ? 'local-desktop' : 'remote-execution-host'
+  } catch {
+    return 'remote-execution-host'
+  }
+}
+
 function objectivePreflight(args: {
   action: ObjectiveAction
   snapshot: Snapshot<ObjectiveWorld>
@@ -121,7 +149,8 @@ function objectivePreflight(args: {
       return { verdict: 'hold', reason: 'criteria-unverified' }
     }
   }
-  return { verdict: 'allow' }
+  const judgmentHold = judgmentPreflightHold(args.snapshot.world, args.action)
+  return judgmentHold ? { verdict: 'hold', reason: judgmentHold } : { verdict: 'allow' }
 }
 
 function objectivePhase(snapshot: Snapshot<ObjectiveWorld>): string {
@@ -148,7 +177,10 @@ function objectivePhase(snapshot: Snapshot<ObjectiveWorld>): string {
   return checksCurrent ? 'review' : 'checks'
 }
 
-function objectiveHandoffAdapter(objectiveStore: ObjectiveStore): HandoffAdapter<ObjectiveWorld> {
+function objectiveHandoffAdapter(
+  objectiveStore: ObjectiveStore,
+  latestWorlds: Map<string, ObjectiveWorld>
+): HandoffAdapter<ObjectiveWorld> {
   return {
     derive(enrollment, fired, ledger) {
       const contract = objectiveContractFromEnrollment(enrollment)
@@ -163,6 +195,13 @@ function objectiveHandoffAdapter(objectiveStore: ObjectiveStore): HandoffAdapter
       )
       if (!landing.success) {
         return { kind: 'none', reason: 'hosted-review-row-missing' }
+      }
+      const judgmentHold = latestWorlds.get(enrollment.watcherId)
+      if (judgmentHold) {
+        const reason = judgmentHandoffHold(judgmentHold)
+        if (reason) {
+          return { kind: 'none', reason }
+        }
       }
       return {
         kind: 'enroll',
@@ -183,10 +222,13 @@ export function createObjectiveKind(args: {
   store: Store
   objectiveStore: ObjectiveStore
   storageAuthority?: 'desktop' | 'runtime'
+  judgmentService?: JudgmentService
   forge?: ObjectiveForgeAccess
 }): ObjectiveKind {
   const snapshotBindings = new WeakMap<Snapshot<ObjectiveWorld>, ObjectiveSnapshotBinding>()
   const snapshotDecisions = new WeakMap<Snapshot<ObjectiveWorld>, ObjectiveDecisionOutcome>()
+  const latestWorlds = new Map<string, ObjectiveWorld>()
+  const storageAuthority = args.storageAuthority ?? 'desktop'
   const forge = args.forge ?? defaultObjectiveForgeAccess
   const executor = createObjectiveActionExecutor({
     store: args.store,
@@ -199,13 +241,7 @@ export function createObjectiveKind(args: {
     displayName: 'Objective',
     enrollmentPayloadSchema: ObjectiveEnrollmentPayloadSchema,
     authorizeEnrollment: (input) =>
-      authorizeObjectiveEnrollment(
-        args.runtime,
-        args.store,
-        input,
-        args.storageAuthority ?? 'desktop',
-        forge
-      ),
+      authorizeObjectiveEnrollment(args.runtime, args.store, input, storageAuthority, forge),
     validateEnrollment(candidate, existing) {
       assertObjectiveEnrollmentHasUsablePlan(
         candidate,
@@ -237,14 +273,38 @@ export function createObjectiveKind(args: {
         landingBar: contract.landingBar,
         forge
       })
-      const world = ObjectiveWorldSchema.parse({
+      let world = ObjectiveWorldSchema.parse({
         contract,
         workspaceKind: target.kind,
         plan: projection,
         reports: [],
         budget: enrollment.budget,
+        capabilities: enrollment.capabilities,
         landingContext
       })
+      if (args.judgmentService) {
+        const authority = judgmentAuthority(storageAuthority, target)
+        const judgmentLedger = args.judgmentService.readLedger(enrollment.watcherId)
+        if (args.judgmentService.canCollectReportEvidence(authority)) {
+          const judgmentReports = await readObjectiveJudgmentReports({
+            world,
+            ledger: judgmentLedger,
+            target,
+            enrollment
+          })
+          world = ObjectiveWorldSchema.parse({ ...world, judgmentReports })
+        }
+        const requests = collectObjectiveJudgmentQuestions(world, judgmentLedger)
+        const judgment = await args.judgmentService.evaluate({
+          watcherId: enrollment.watcherId,
+          contentIdentity,
+          world,
+          requests,
+          authority
+        })
+        world = ObjectiveWorldSchema.parse({ ...world, judgment })
+      }
+      latestWorlds.set(enrollment.watcherId, world)
       const snapshot: Snapshot<ObjectiveWorld> = {
         freshness: options.fresh ? 'live' : 'cached',
         contentIdentity,
@@ -260,13 +320,28 @@ export function createObjectiveKind(args: {
       const nodes = revision
         ? snapshot.world.plan.nodes.filter((node) => node.revisionId === revision.id)
         : []
+      const judgment = snapshot.world.judgment
+      const judgmentAnswers = Object.values(judgment?.answers ?? {})
+      const judgmentAuthoritative = judgmentAnswers.filter(
+        (recorded) =>
+          judgment &&
+          getActingJudgment(judgment, recorded.questionId, recorded.subjectId) !== undefined
+      ).length
       return {
         contentIdentity: snapshot.contentIdentity.slice(0, 12),
         revision: revision?.number ?? null,
         nodesDone: nodes.filter((node) => node.state === 'succeeded').length,
         nodesTotal: nodes.length,
         phase: objectivePhase(snapshot),
-        branch: snapshot.world.landingContext.branch
+        branch: snapshot.world.landingContext.branch,
+        judgmentStatus: judgment?.status ?? null,
+        judgmentAnswerCount: judgmentAnswers.length,
+        judgmentShadowHeld: judgmentAnswers.filter((answer) => answer.mode === 'shadow').length,
+        judgmentActing: judgmentAnswers.filter((answer) => answer.mode === 'acting').length,
+        judgmentAuthoritative,
+        judgmentHeld: judgmentAnswers.length - judgmentAuthoritative,
+        judgmentReason: judgment?.reason ?? null,
+        judgmentNotices: judgment?.notices ?? []
       }
     },
     decide(snapshot, ledger) {
@@ -305,7 +380,7 @@ export function createObjectiveKind(args: {
       }
     },
     planner: {},
-    handoff: objectiveHandoffAdapter(args.objectiveStore),
+    handoff: objectiveHandoffAdapter(args.objectiveStore, latestWorlds),
     debug: {
       pointers: () => [
         {

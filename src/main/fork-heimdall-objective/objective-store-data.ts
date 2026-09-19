@@ -227,7 +227,7 @@ export type CriterionRow = {
   revision_id: string
   task_key: string
   ordinal: number
-  body?: string
+  body: string
   shell_checkable: number
   check_command: string | null
 }

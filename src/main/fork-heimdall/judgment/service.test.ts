@@ -1,0 +1,423 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import type { ObjectiveWorld } from '../../../shared/fork-heimdall-objective/detail-types'
+import type { JudgmentQuestionRequest } from '../../../shared/fork-heimdall/judgment/types'
+import { HeimdallDatabase } from '../database'
+import { HeimdallLedgerStore } from '../ledger-store'
+import { JudgmentService, type JudgmentServiceDependencies } from './service'
+import {
+  JUDGMENT_ANSWER_OBSERVATION,
+  JUDGMENT_OUTCOME_OBSERVATION,
+  JudgmentAnswerStore
+} from './store'
+import { computeJudgmentIdentity } from './identity'
+
+const watcherId = 'judgment-watcher'
+const requests: JudgmentQuestionRequest[] = [
+  {
+    id: 'failure:dispatch-1',
+    questionId: 'failure',
+    subjectId: 'dispatch-1',
+    question: {
+      type: 'choice',
+      instructions: 'Classify the failure.',
+      criteria: { infra: 'Infrastructure', criteria: 'Acceptance criteria' }
+    }
+  }
+]
+
+function world(): ObjectiveWorld {
+  return {
+    contract: {
+      objectiveText: 'Implement the objective',
+      tier: 'standard',
+      landingBar: 'files-on-disk',
+      maxConcurrency: 1,
+      workspaceKind: 'folder',
+      writeTerritory: ['**'],
+      roleAgents: {},
+      sitterOverrides: {}
+    },
+    workspaceKind: 'folder',
+    plan: { revisions: [], nodes: [], verdicts: [], landing: [] },
+    reports: [],
+    budget: { wallClockActiveMs: null, turns: null },
+    landingContext: {
+      branch: null,
+      headSha: null,
+      worktreeContentDigest: null,
+      pushTarget: null,
+      hostedReview: null
+    }
+  }
+}
+
+let root: string
+let database: HeimdallDatabase
+let ledger: HeimdallLedgerStore
+let calls: number
+let accessReads: number
+let enabled: boolean
+let model: string
+let clientCreations: { apiKey: string; provider: 'typesafe' | 'openrouter' }[]
+let dependencies: JudgmentServiceDependencies
+
+beforeEach(() => {
+  root = mkdtempSync(join(tmpdir(), 'orca-judgment-service-'))
+  database = new HeimdallDatabase(root)
+  ledger = new HeimdallLedgerStore(database)
+  calls = 0
+  accessReads = 0
+  enabled = true
+  model = 'jev-test-1'
+  clientCreations = []
+  dependencies = {
+    store: new JudgmentAnswerStore(ledger),
+    databasePath: () => database.databasePath(),
+    readAccess: () => {
+      accessReads += 1
+      return enabled ? { enabled: true, apiKey: 'secret' } : { enabled: false }
+    },
+    questionPolicy: () => ({
+      mode: 'shadow',
+      thresholdName: 'FAILURE_CONFIDENCE',
+      calibratedModel: null
+    }),
+    createClient: (apiKey, options) => {
+      clientCreations.push({ apiKey, provider: options.provider })
+      return {
+        evaluate: async () => {
+          calls += 1
+          return {
+            model,
+            answers: {
+              'failure:dispatch-1': {
+                type: 'choice',
+                choice: 'infra',
+                probabilities: { infra: 0.98, criteria: 0.02 },
+                confidence: 0.95
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+})
+
+afterEach(() => {
+  database.close()
+  rmSync(root, { recursive: true, force: true })
+})
+
+describe('durable judgment evaluation', () => {
+  it('records OpenRouter provenance and replays it after provider changes', async () => {
+    dependencies.readAccess = () => {
+      accessReads += 1
+      return { enabled: true, provider: 'openrouter', apiKey: 'openrouter-secret' }
+    }
+    const input = {
+      watcherId,
+      contentIdentity: 'content-openrouter',
+      world: world(),
+      requests,
+      authority: 'local-desktop' as const
+    }
+    const first = await new JudgmentService(dependencies).evaluate(input)
+    expect(first.status).toBe('answered')
+    expect(first.answers['failure:dispatch-1']?.provider).toBe('openrouter')
+    expect(clientCreations).toEqual([{ apiKey: 'openrouter-secret', provider: 'openrouter' }])
+
+    dependencies.readAccess = () => ({
+      enabled: true,
+      provider: 'typesafe',
+      apiKey: 'typesafe-secret'
+    })
+    const replay = await new JudgmentService(dependencies).evaluate(input)
+    expect(replay.answers).toEqual(first.answers)
+    expect(replay.answers['failure:dispatch-1']?.provider).toBe('openrouter')
+    expect(clientCreations).toHaveLength(1)
+  })
+
+  it('replays legacy records without transport provenance', async () => {
+    const current = world()
+    const computed = computeJudgmentIdentity('legacy-content', current, ledger.read(watcherId))
+    const identity = {
+      stateIdentity: computed.stateIdentity,
+      contentIdentity: computed.contentIdentity,
+      projectionDigest: computed.projectionDigest
+    }
+    ledger.append(
+      {
+        eventId: 'legacy-answer',
+        watcherId,
+        atMs: 1,
+        origin: 'client',
+        class: 'observation',
+        kind: 'client-observation',
+        what: JUDGMENT_ANSWER_OBSERVATION,
+        detail: JSON.stringify({
+          ...identity,
+          requestId: 'failure:dispatch-1',
+          questionId: 'failure',
+          subjectId: 'dispatch-1',
+          mode: 'shadow',
+          thresholdName: 'FAILURE_CONFIDENCE',
+          calibratedModel: null,
+          model: 'jev-legacy',
+          answer: {
+            type: 'choice',
+            choice: 'infra',
+            probabilities: { infra: 0.98, criteria: 0.02 },
+            confidence: 0.95
+          }
+        })
+      },
+      { resolved: false }
+    )
+    ledger.append(
+      {
+        eventId: 'legacy-outcome',
+        watcherId,
+        atMs: 2,
+        origin: 'client',
+        class: 'observation',
+        kind: 'client-observation',
+        what: JUDGMENT_OUTCOME_OBSERVATION,
+        detail: JSON.stringify({ ...identity, status: 'answered' })
+      },
+      { resolved: false }
+    )
+
+    const replay = await new JudgmentService(dependencies).evaluate({
+      watcherId,
+      contentIdentity: 'legacy-content',
+      world: current,
+      requests,
+      authority: 'local-desktop'
+    })
+    expect(replay.status).toBe('answered')
+    expect(replay.answers['failure:dispatch-1']).toEqual({
+      questionId: 'failure',
+      subjectId: 'dispatch-1',
+      mode: 'shadow',
+      model: 'jev-legacy',
+      answer: {
+        type: 'choice',
+        choice: 'infra',
+        probabilities: { infra: 0.98, criteria: 0.02 },
+        confidence: 0.95
+      }
+    })
+    expect(clientCreations).toEqual([])
+  })
+
+  it('replays answers after reopening storage and after ordinary observation eviction', async () => {
+    const input = {
+      watcherId,
+      contentIdentity: 'content-1',
+      world: world(),
+      requests,
+      authority: 'local-desktop' as const
+    }
+    const first = await new JudgmentService(dependencies).evaluate(input)
+    expect(first.status).toBe('answered')
+    for (let index = 0; index < 80; index += 1) {
+      ledger.append({
+        eventId: `observation-${index}`,
+        watcherId,
+        atMs: index,
+        origin: 'client',
+        class: 'observation',
+        kind: 'client-observation',
+        what: 'ordinary-tick'
+      })
+    }
+    database.close()
+    database = new HeimdallDatabase(root)
+    ledger = new HeimdallLedgerStore(database)
+    dependencies.store = new JudgmentAnswerStore(ledger)
+    const replay = await new JudgmentService(dependencies).evaluate(input)
+    expect(replay.status).toBe('answered')
+    expect(replay.answers).toEqual(first.answers)
+    expect(replay.stateIdentity).toBe(first.stateIdentity)
+    expect(calls).toBe(1)
+    expect(replay.notices).toEqual([])
+  })
+
+  it('asks again when a worker report arrives without a workspace change', async () => {
+    const service = new JudgmentService(dependencies)
+    const input = {
+      watcherId,
+      contentIdentity: 'content-1',
+      world: world(),
+      requests,
+      authority: 'local-desktop' as const
+    }
+    const before = await service.evaluate(input)
+    ledger.append({
+      eventId: 'report-arrived',
+      watcherId,
+      atMs: 100,
+      origin: 'owner',
+      class: 'fact',
+      kind: 'evidence',
+      evidenceKind: 'orchestration-mailbox',
+      payload: {
+        type: 'worker_done',
+        subject: 'Build unavailable',
+        body: 'Infrastructure failed',
+        payload: { dispatchId: 'dispatch-1', outcome: 'failed' }
+      }
+    })
+    const after = await service.evaluate(input)
+    expect(after.contentIdentity).toBe(before.contentIdentity)
+    expect(after.stateIdentity).not.toBe(before.stateIdentity)
+    expect(calls).toBe(2)
+  })
+
+  it('records remote absence without reading credentials even when desktop answers exist', async () => {
+    const service = new JudgmentService(dependencies)
+    const input = {
+      watcherId,
+      contentIdentity: 'content-1',
+      world: world(),
+      requests,
+      authority: 'local-desktop' as const
+    }
+    await service.evaluate(input)
+    const readsBefore = accessReads
+    const remote = await service.evaluate({ ...input, authority: 'remote-execution-host' })
+    expect(remote.status).toBe('remote')
+    expect(remote.reason).toContain('remote')
+    expect(accessReads).toBe(readsBefore)
+    expect(calls).toBe(1)
+  })
+
+  it('allows explicit opt-in after disabled observation but does not reactivate authority when disabled', async () => {
+    const service = new JudgmentService(dependencies)
+    const input = {
+      watcherId,
+      contentIdentity: 'content-1',
+      world: world(),
+      requests,
+      authority: 'local-desktop' as const
+    }
+    enabled = false
+    expect((await service.evaluate(input)).status).toBe('disabled')
+    expect(calls).toBe(0)
+    enabled = true
+    expect((await service.evaluate(input)).status).toBe('answered')
+    enabled = false
+    expect((await service.evaluate(input)).status).toBe('disabled')
+    expect(calls).toBe(1)
+  })
+
+  it('records provider failure once and never retries unchanged state on a later tick', async () => {
+    dependencies.createClient = () => ({
+      evaluate: async () => {
+        calls += 1
+        throw new Error('secret provider error')
+      }
+    })
+    const service = new JudgmentService(dependencies)
+    const input = {
+      watcherId,
+      contentIdentity: 'content-1',
+      world: world(),
+      requests,
+      authority: 'local-desktop' as const
+    }
+    expect((await service.evaluate(input)).status).toBe('unavailable')
+    expect((await service.evaluate(input)).status).toBe('unavailable')
+    expect(calls).toBe(1)
+    expect(JSON.stringify(ledger.read(watcherId))).not.toContain('secret provider error')
+  })
+
+  it('does not repeat an invocation interrupted after its durable pending marker', async () => {
+    const current = world()
+    const computed = computeJudgmentIdentity('content-1', current, ledger.read(watcherId))
+    dependencies.store.recordPending(
+      watcherId,
+      {
+        stateIdentity: computed.stateIdentity,
+        contentIdentity: computed.contentIdentity,
+        projectionDigest: computed.projectionDigest
+      },
+      requests.map((request) => request.id)
+    )
+    const result = await new JudgmentService(dependencies).evaluate({
+      watcherId,
+      contentIdentity: 'content-1',
+      world: current,
+      requests,
+      authority: 'local-desktop'
+    })
+    expect(result.status).toBe('pending')
+    expect(calls).toBe(0)
+  })
+
+  it('records oversized state as unavailable instead of sending a truncated projection', async () => {
+    dependencies.maxStateBytes = 16
+    const result = await new JudgmentService(dependencies).evaluate({
+      watcherId,
+      contentIdentity: 'content-1',
+      world: world(),
+      requests,
+      authority: 'local-desktop'
+    })
+    expect(result.status).toBe('unavailable')
+    expect(result.reason).toContain('exceeds')
+    expect(calls).toBe(0)
+  })
+
+  it('never grants authority to stale answers when the active request set shrinks', async () => {
+    const extra = { ...requests[0]!, id: 'failure:dispatch-2', subjectId: 'dispatch-2' }
+    dependencies.createClient = () => ({
+      evaluate: async () => {
+        calls += 1
+        const answer = {
+          type: 'choice' as const,
+          choice: 'infra',
+          probabilities: { infra: 0.98, criteria: 0.02 },
+          confidence: 0.95
+        }
+        return { model, answers: { 'failure:dispatch-1': answer, 'failure:dispatch-2': answer } }
+      }
+    })
+    const service = new JudgmentService(dependencies)
+    const input = {
+      watcherId,
+      contentIdentity: 'content-1',
+      world: world(),
+      requests: [...requests, extra],
+      authority: 'local-desktop' as const
+    }
+    expect((await service.evaluate(input)).status).toBe('answered')
+    const reduced = await service.evaluate({ ...input, requests })
+    expect(reduced.status).toBe('unavailable')
+    expect(calls).toBe(1)
+  })
+
+  it('announces each newly returned model once without changing recorded answers', async () => {
+    const service = new JudgmentService(dependencies)
+    const input = {
+      watcherId,
+      contentIdentity: 'content-1',
+      world: world(),
+      requests,
+      authority: 'local-desktop' as const
+    }
+    const first = await service.evaluate(input)
+    expect(first.notices.some((notice) => notice.includes('jev-test-1'))).toBe(true)
+    model = 'jev-test-2'
+    const second = await service.evaluate({ ...input, contentIdentity: 'content-2' })
+    expect(second.notices.some((notice) => notice.includes('jev-test-2'))).toBe(true)
+    const third = await service.evaluate({ ...input, contentIdentity: 'content-3' })
+    expect(third.notices).toEqual([])
+    expect((await service.evaluate(input)).answers).toEqual(first.answers)
+    expect(calls).toBe(3)
+  })
+})

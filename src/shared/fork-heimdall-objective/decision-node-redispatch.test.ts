@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { LedgerEntry } from '../fork-heimdall/ledger-types'
 import { decideObjective } from './decision'
+import { objectiveAttempts, objectiveNodeRetryCount } from './decision-context'
 import {
   attempt,
   ledger,
@@ -96,6 +97,20 @@ describe('objective node infra/environment redispatch', () => {
       evidenceKey: 'plan:2',
       reason: 'replan-after-failure'
     })
+  })
+
+  it('counts every routed retry against the absolute cap even when it later fails criteria', () => {
+    const criteriaRetry = {
+      ...attempt(retry0, {
+        state: 'settled',
+        effect: 'not-landed',
+        dispatchId: 'dispatch-core-r0'
+      }),
+      failureClass: 'criteria' as const
+    }
+    const routed = ledger([criteriaRetry])
+
+    expect(objectiveNodeRetryCount(objectiveAttempts(routed), 'revision-1', 'core')).toBe(1)
   })
 
   it('holds in-flight while an exited-without-completion attempt is unresolved, then retries once resolved', () => {

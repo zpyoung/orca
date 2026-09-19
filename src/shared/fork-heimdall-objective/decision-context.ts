@@ -109,21 +109,17 @@ export function objectiveRetryableFailure(
  */
 export function objectiveNodeRetryCount(
   attempts: readonly ObjectiveAttempt[],
-  ledger: WatcherLedger,
   revisionId: string,
   taskKey: string
 ): number {
   let count = 0
-  for (const { attempt, action } of attempts) {
+  for (const { action } of attempts) {
     if (
-      action.kind !== 'dispatch-node' ||
-      action.revisionId !== revisionId ||
-      action.taskKey !== taskKey ||
-      action.retryOf === undefined
+      action.kind === 'dispatch-node' &&
+      action.revisionId === revisionId &&
+      action.taskKey === taskKey &&
+      action.retryOf !== undefined
     ) {
-      continue
-    }
-    if (objectiveRetryableFailure(attempt, ledger) !== null) {
       count += 1
     }
   }

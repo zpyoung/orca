@@ -44,6 +44,7 @@ import {
 import type { KernelTerminalTransition } from './kernel-terminal-transition'
 import type { KernelReadModel } from './kernel-read-model'
 import type { HeimdallLedgerStore } from './ledger-store'
+import type { JudgmentPersistencePort } from './judgment/store'
 import type { LeaseStore } from './lease-store'
 import type { MalformedEnrollmentLifecycle } from './malformed-enrollment'
 import { WatcherKindRegistry, type RegisteredWatcherKind } from './registry'
@@ -177,6 +178,24 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
     this.ensureLoaded()
     this.requireEnrollmentRecord(watcherId)
     return this.requireRunnerLedger().read(watcherId)
+  }
+
+  judgmentPersistence(): JudgmentPersistencePort {
+    return {
+      databasePath: () => {
+        this.ensureLoaded()
+        if (!this.database) {
+          throw new Error('Heimdall database is unavailable')
+        }
+        return this.database.databasePath()
+      },
+      read: (watcherId) => this.ledger(watcherId),
+      append: (entry, options) => {
+        this.ensureLoaded()
+        this.requireEnrollmentRecord(entry.watcherId)
+        return this.requireLedgerStore().append(entry, options)
+      }
+    }
   }
   async debugReport(watcherId: string): Promise<HeimdallDebugReport> {
     this.ensureLoaded()
@@ -403,11 +422,15 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
     return this.enrollments
   }
 
-  private requireRunnerLedger(): RunnerLedgerStore {
+  private requireLedgerStore(): HeimdallLedgerStore {
     if (!this.ledgerStore) {
       throw new Error('Heimdall ledger store is unavailable')
     }
-    return runnerLedgerStore(this.ledgerStore)
+    return this.ledgerStore
+  }
+
+  private requireRunnerLedger(): RunnerLedgerStore {
+    return runnerLedgerStore(this.requireLedgerStore())
   }
 
   private requireRunnerLoop(): WatcherRunnerLoop {

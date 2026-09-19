@@ -4,6 +4,9 @@ import { makeAttemptFingerprint } from '../../shared/fork-heimdall/attempt-finge
 import type { AttemptEntry, WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import { requireLiveSnapshot, type Snapshot } from '../../shared/fork-heimdall/snapshot'
 import type { WatcherTickTrace } from '../../shared/fork-heimdall/tick-trace'
+import { judgmentApprovalAdvisory } from '../../shared/fork-heimdall/judgment/objective-judgment-policy'
+import { ObjectiveWorldSchema } from '../../shared/fork-heimdall-objective/detail-types'
+import { ObjectiveActionSchema } from '../../shared/fork-heimdall-objective/objective-actions'
 import type { WatcherRunnerActions } from './runner-actions'
 import type { WatcherRunner, WatcherRunnerDependencies } from './runner-state'
 
@@ -20,6 +23,7 @@ type GatedEvaluation = {
   snapshot: Snapshot<unknown>
   action: KernelAction
   gate: Exclude<GateVerdict, { verdict: 'allow' }>
+  advisory?: string
 }
 
 type AllowedEvaluation = {
@@ -30,6 +34,14 @@ type AllowedEvaluation = {
 }
 
 export type RunnerGateEvaluation = WatchingEvaluation | GatedEvaluation | AllowedEvaluation
+
+function approvalAdvisory(snapshot: Snapshot<unknown>, action: KernelAction): string | null {
+  const world = ObjectiveWorldSchema.safeParse(snapshot.world)
+  const objectiveAction = ObjectiveActionSchema.safeParse(action)
+  return world.success && objectiveAction.success
+    ? judgmentApprovalAdvisory(world.data, objectiveAction.data)
+    : null
+}
 
 export class WatcherRunnerGateLifecycle {
   constructor(
@@ -130,7 +142,17 @@ export class WatcherRunnerGateLifecycle {
     }
     trace.gate = gate
     if (gate.verdict !== 'allow') {
-      return { outcome: 'gated', snapshot, action, gate }
+      const advisory =
+        gate.verdict === 'hold' && gate.reason === 'awaiting-approval'
+          ? approvalAdvisory(snapshot, action)
+          : null
+      return {
+        outcome: 'gated',
+        snapshot,
+        action,
+        gate,
+        ...(advisory ? { advisory } : {})
+      }
     }
     return {
       outcome: 'allowed',

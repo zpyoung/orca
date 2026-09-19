@@ -2,6 +2,10 @@ import type { ActionOutcome } from '../../shared/fork-heimdall/effect-certainty'
 import { makeAttemptFingerprint } from '../../shared/fork-heimdall/attempt-fingerprint'
 import type { ExecuteContext } from '../../shared/fork-heimdall/kind-contract'
 import {
+  judgmentRoutedAgent,
+  objectiveRoutingSubject
+} from '../../shared/fork-heimdall/judgment/objective-judgment-policy'
+import {
   activeObjectiveRevision,
   objectiveAttemptFailureClass,
   objectiveAttempts,
@@ -305,7 +309,21 @@ export async function executeObjectiveDispatch(args: {
           )
         : undefined
     request = buildDispatchSpec({ ...args, reportPath, failureContext, planProgress })
-    agent = resolveObjectiveRoleAgent(args.store, args.binding.contract, request.role)
+    const routingScope =
+      args.action.kind === 'dispatch-planner'
+        ? (activeRevisionId ?? 'initial')
+        : args.action.kind === 'dispatch-node'
+          ? args.action.taskKey
+          : args.action.revisionId
+    agent = resolveObjectiveRoleAgent(
+      args.store,
+      args.binding.contract,
+      request.role,
+      judgmentRoutedAgent(
+        args.context.snapshot.world,
+        objectiveRoutingSubject(request.role, routingScope)
+      )
+    )
     if (args.action.kind === 'dispatch-node' || args.action.kind === 'dispatch-integrator') {
       // a retry's baseline must stay the pre-original tree, not a fresh capture of its own fingerprint
       const baselineFingerprint =

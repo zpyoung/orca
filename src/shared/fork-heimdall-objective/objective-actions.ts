@@ -104,7 +104,9 @@ export const DispatchReviewerActionSchema = z
     ...ActionBase,
     kind: z.literal('dispatch-reviewer'),
     capability: z.literal('review'),
-    revisionId: IdSchema
+    revisionId: IdSchema,
+    /** Present only for the bounded reviewer added by an acting judgment quality decision. */
+    judgmentReviewOf: IdSchema.optional()
   })
   .strict()
 export type DispatchReviewerAction = z.infer<typeof DispatchReviewerActionSchema>

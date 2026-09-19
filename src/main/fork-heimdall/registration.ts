@@ -20,7 +20,13 @@ export function startHeimdall(
   const storageAuthority = isServeMode ? 'runtime' : 'desktop'
   const kernel = new HeimdallKernelServiceImpl({ runtime, store, storageAuthority })
   registerHostedReviewKind(kernel, runtime, store, storageAuthority)
-  const objective = registerObjectiveKind(kernel, runtime, store, storageAuthority)
+  const objective = registerObjectiveKind(
+    kernel,
+    runtime,
+    store,
+    storageAuthority,
+    kernel.judgmentPersistence()
+  )
   bindHeimdallObjectiveStore(runtime, objective.store)
   registerHostedReviewAgentIpcHandlers(runtime, store)
   bindHeimdallKernel(runtime, kernel)

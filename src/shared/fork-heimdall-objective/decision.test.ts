@@ -250,6 +250,7 @@ describe('objective deterministic phase flow', () => {
         {
           id: 'criterion-1',
           ordinal: 0,
+          body: 'The focused check passes.',
           shellCheckable: true,
           checkCommand: 'pnpm check',
           lastCheck: { contentIdentity: 'content-current', exitCode: 1, timedOut: false, atMs: 50 },
@@ -430,6 +431,7 @@ describe('objective landing ladder decisions', () => {
             {
               id: 'criterion-1',
               ordinal: 0,
+              body: 'The focused check passes.',
               shellCheckable: true,
               checkCommand: 'pnpm check',
               lastCheck: {

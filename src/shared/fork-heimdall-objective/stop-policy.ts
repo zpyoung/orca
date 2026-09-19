@@ -238,7 +238,7 @@ export const objectiveInfraRetryExhaustedPredicate: StopPredicate<ObjectiveWorld
       if (retryable === null) {
         continue
       }
-      const retryCount = objectiveNodeRetryCount(attempts, ledger, revision.id, node.taskKey)
+      const retryCount = objectiveNodeRetryCount(attempts, revision.id, node.taskKey)
       if (retryCount < OBJECTIVE_INFRA_REDISPATCH_CAP) {
         continue
       }

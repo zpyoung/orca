@@ -275,7 +275,8 @@ export class WatcherRunnerActions {
   recordGateRejection(
     runner: WatcherRunner,
     action: KernelAction,
-    verdict: Exclude<GateVerdict, { verdict: 'allow' }>
+    verdict: Exclude<GateVerdict, { verdict: 'allow' }>,
+    advisory?: string
   ): void {
     const fingerprint = makeAttemptFingerprint(
       action.contentIdentity,
@@ -299,7 +300,7 @@ export class WatcherRunnerActions {
         status: 'open',
         foldCount: verdict.escalation.foldCount,
         approvalScope: verdict.escalation.approvalScope,
-        reason: verdict.reason
+        reason: advisory ? `${verdict.reason}\n${advisory}` : verdict.reason
       })
       if (verdict.escalation.foldCount === 1) {
         this.dependencies.notifyApproval?.(runner.enrollment, action)

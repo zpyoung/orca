@@ -91,7 +91,7 @@ export function decideObjectiveNodes(
       if (disposition === 'not-landed') {
         const retryable = objectiveRetryableFailure(dispatch.attempt, ledger)
         if (retryable !== null) {
-          const retryOrdinal = objectiveNodeRetryCount(attempts, ledger, revision.id, node.taskKey)
+          const retryOrdinal = objectiveNodeRetryCount(attempts, revision.id, node.taskKey)
           if (retryOrdinal >= OBJECTIVE_INFRA_REDISPATCH_CAP) {
             return objectiveNoAction('implementation', 'node-retry-exhausted', node.taskKey)
           }

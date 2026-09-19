@@ -1,8 +1,11 @@
 import { z } from 'zod'
 import { BudgetPolicySchema } from '../fork-heimdall/budget'
+import { JudgmentSnapshotSchema } from '../fork-heimdall/judgment/types'
 import {
+  ObjectiveCapabilitiesSchema,
   ObjectiveEnrollmentPayloadSchema,
   ObjectiveLandingBarSchema,
+  ObjectiveRoleSchema,
   ObjectiveWorkspacePathSchema,
   ObjectiveWorkspaceKindSchema
 } from './contract-types'
@@ -44,6 +47,7 @@ export const ObjectiveCriterionProjectionSchema = z
   .object({
     id: IdSchema,
     ordinal: z.number().int().nonnegative(),
+    body: z.string().trim().min(1).max(8_192),
     shellCheckable: z.boolean(),
     checkCommand: z.string().trim().min(1).max(8_192).nullable(),
     lastCheck: ObjectiveCheckProjectionSchema.nullable(),
@@ -173,6 +177,15 @@ export const ObjectiveLandingContextSchema = z
   })
   .strict()
 export type ObjectiveLandingContext = z.infer<typeof ObjectiveLandingContextSchema>
+export const JudgmentReportEvidenceSchema = z
+  .object({
+    dispatchId: IdSchema,
+    role: ObjectiveRoleSchema,
+    digest: IdSchema,
+    payload: z.record(z.string(), z.unknown())
+  })
+  .strict()
+export type JudgmentReportEvidence = z.infer<typeof JudgmentReportEvidenceSchema>
 
 export const ObjectiveWorldSchema = z
   .object({
@@ -181,7 +194,10 @@ export const ObjectiveWorldSchema = z
     plan: ObjectiveProjectionSchema,
     reports: z.array(ObjectivePendingReportSchema),
     budget: BudgetPolicySchema,
-    landingContext: ObjectiveLandingContextSchema
+    capabilities: ObjectiveCapabilitiesSchema.optional(),
+    landingContext: ObjectiveLandingContextSchema,
+    judgmentReports: z.array(JudgmentReportEvidenceSchema).optional(),
+    judgment: JudgmentSnapshotSchema.optional()
   })
   .strict()
 export type ObjectiveWorld = z.infer<typeof ObjectiveWorldSchema>

@@ -204,9 +204,19 @@ export function buildObjectiveRolePrompt(input: ObjectiveRolePromptInput): strin
 export function resolveObjectiveRoleAgent(
   store: Pick<Store, 'getSettings'>,
   contract: ObjectiveEnrollmentPayload,
-  role: ObjectiveRole | ObjectiveReviewRole
+  role: ObjectiveRole | ObjectiveReviewRole,
+  judgmentRecommendation?: string
 ): string {
   const settings = store.getSettings()
+  const configuredAlternatives = Object.values(contract.roleAgents)
+  if (
+    judgmentRecommendation !== undefined &&
+    configuredAlternatives.includes(judgmentRecommendation) &&
+    isTuiAgent(judgmentRecommendation) &&
+    isTuiAgentEnabled(judgmentRecommendation, settings.disabledTuiAgents)
+  ) {
+    return judgmentRecommendation
+  }
   const selected = contract.roleAgents[role] ?? settings.defaultTuiAgent
   if (!isTuiAgent(selected) || !isTuiAgentEnabled(selected, settings.disabledTuiAgents)) {
     throw new Error(`No enabled TUI agent is configured for the objective ${role} role`)
