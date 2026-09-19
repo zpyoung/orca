@@ -250,7 +250,7 @@ does for a newer one. The run would then merge and, at Step 6, `git checkout v1.
 upstream-owned path: a whole-release rollback, silently breaking the fork commits written against
 the newer release (here `58a42923cb`, "adapt three fork surfaces to v1.4.206 API shapes").
 
-**The tell.** `$STABLE_TAG` is not strictly newer than `upstream_synced` in `CHANGELOG.md`'s
+**The tell.** `$STABLE_TAG` sorts *below* `upstream_synced` in `CHANGELOG.md`'s
 frontmatter. Step 2 now checks this first. Confirm the retraction rather than assuming a truncated
 listing — an exact query is unambiguous where a glob plus `tail -1` is not:
 
