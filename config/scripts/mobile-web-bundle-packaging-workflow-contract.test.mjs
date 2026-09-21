@@ -92,7 +92,8 @@ const EXPECTED_PACKAGING_JOBS = [
   'dev-channel-win-build.yml build-win',
   'hourly-mac-build.yml build-hourly-mac',
   'pr.yml package',
-  'pr.yml package_windows',
+  // This fork's pr.yml runs no Windows packaging job; dev-channel-win-build and the two
+  // win-*-survival workflows are where it packs for Windows.
   'release-cut.yml build',
   'release-mac-build.yml build-mac',
   'win-crash-survival-e2e.yml crash-survival',

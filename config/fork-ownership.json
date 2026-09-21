@@ -3984,6 +3984,11 @@
       "status": "permanent"
     },
     {
+      "path": "config/scripts/mobile-web-bundle-packaging-workflow-contract.test.mjs",
+      "status": "permanent",
+      "reason": "Packaging-job census for the fork-owned workflow set, which omits pr.yml's Windows packaging job; upstream's inventory names a job this fork does not run."
+    },
+    {
       "path": "config/scripts/pr-workflow-parallelism.test.mjs",
       "reason": "Contracts for the fork-owned PR job graph, which omits Windows packaging and must not restore upstream's exact aggregate dependency list.",
       "status": "permanent"
