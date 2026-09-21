@@ -36,11 +36,40 @@ export function NativeChatApprovalCard({
 }: NativeChatApprovalCardProps): React.JSX.Element {
   const widthClassName = useNativeChatWidthClassName()
 
+  const cardRef = useRef<HTMLDivElement>(null)
+  const hasContext = Boolean(
+    approval.description ||
+    approval.decisionReason ||
+    approval.blockedPath ||
+    approval.matchedAskRule ||
+    approval.subject ||
+    approval.detail
+  )
+  useEffect(() => {
+    if (shouldFocus) {
+      cardRef.current?.focus()
+    }
+  }, [shouldFocus])
+
   return (
-    <div className="shrink-0 bg-background">
-      <div className={cn('mx-auto w-full px-3 pt-2 pb-1 sm:px-4', widthClassName)}>
-        <div className="flex w-full flex-col gap-2 rounded-lg border border-input bg-card px-4 py-3 shadow-xs">
-          <div className="flex items-start gap-2">
+    <div className="min-h-0 shrink overflow-hidden bg-background">
+      <div className={cn('mx-auto flex h-full min-h-0 max-h-full w-full px-3 pt-2 pb-1 sm:px-4', widthClassName)}>
+        <div
+          ref={cardRef}
+          data-native-chat-approval-card="true"
+          role="group"
+          aria-label={approval.title}
+          tabIndex={-1}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && !event.nativeEvent.isComposing && onCancel) {
+              event.preventDefault()
+              event.stopPropagation()
+              onCancel()
+            }
+          }}
+          className="flex min-h-0 w-full flex-1 flex-col gap-2 overflow-hidden rounded-lg border border-input bg-card px-4 py-3 shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <div className="flex shrink-0 items-start gap-2">
             <ShieldQuestion className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             <div className="min-w-0 flex-1">
               <p className="line-clamp-2 break-words text-sm font-semibold text-foreground">

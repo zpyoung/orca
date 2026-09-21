@@ -144,6 +144,17 @@ seam file whose measured diff no longer matches its recorded budget (residual bu
 Fork edits to an upstream-owned file are not blocked by the guard — but an undeclared edit is
 reverted at the next sync, so declare it.
 
+# Writing Pull Requests
+
+Fill in [`.github/pull_request_template.md`](./.github/pull_request_template.md), written for a reviewer who has never seen this code:
+
+- No jargon — plain language, no internal shorthand.
+- The before and after as the user experiences it.
+- The mechanism you changed, not just the symptom.
+- Why this approach over the alternatives you considered.
+
+Cover all four concisely. Don't pad or walk the diff.
+
 # Considerations
 ## Running Tests: Remote Sandbox Only
 

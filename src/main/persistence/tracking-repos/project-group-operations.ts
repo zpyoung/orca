@@ -6,7 +6,7 @@ import {
   normalizeProjectGroupName
 } from '../../../shared/project-groups'
 import { folderWorkspaceKey } from '../../../shared/workspace-scope'
-import { removeWorkspaceSessionOwner } from '../restoring-sessions/session-owner-removal'
+import { removeWorkspaceSessionOwnerEverywhere } from '../restoring-sessions/session-owner-removal'
 import { releaseDeletedProjectGroupWorktreeMembership } from '../../fork-worktree-groups/project-group-membership-release'
 
 export type ProjectGroupMutationOperations = {

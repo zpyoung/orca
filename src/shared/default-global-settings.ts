@@ -140,6 +140,7 @@ export function buildDefaultSettings(args: {
     experimentalTerminalDock: false,
     dockTerminalComposerByDefault: true,
     nativeChatWidth: DEFAULT_NATIVE_CHAT_WIDTH_TIER,
+    nativeChatResumeWorkOnRestart: false,
     nativeChatSessionOptions: {},
     openInApplications: [...DEFAULT_OPEN_IN_APPLICATIONS],
     rightSidebarOpenByDefault: true,

@@ -1550,7 +1550,7 @@
       "lines": [
         "import { useNativeChatWidthClassName } from './fork-native-chat-width/use-native-chat-width'",
         "  const widthClassName = useNativeChatWidthClassName()",
-        "      <div className={cn('mx-auto w-full px-3 pt-2 pb-1 sm:px-4', widthClassName)}>"
+        "      <div className={cn('mx-auto flex h-full min-h-0 max-h-full w-full px-3 pt-2 pb-1 sm:px-4', widthClassName)}>"
       ]
     },
     {
@@ -5460,8 +5460,8 @@
       "removed": 0
     },
     "src/renderer/src/components/native-chat/use-native-chat-session-options.ts": {
-      "added": 74,
-      "removed": 11
+      "added": 66,
+      "removed": 9
     },
     "src/renderer/src/components/native-chat/use-native-chat-structured-composer-send.test.tsx": {
       "added": 1,
@@ -5689,7 +5689,7 @@
     },
     "src/renderer/src/components/sidebar/worktree-list/listing/use-filters.ts": {
       "added": 13,
-      "removed": 5
+      "removed": 4
     },
     "src/renderer/src/components/sidebar/worktree-list/listing/use-host-visible-scope.ts": {
       "added": 36,

@@ -12,6 +12,7 @@ import {
   hasDispatchedNativeChatSessionOption,
   useClaudeStartupFrameRevision
 } from './fork-native-chat-session-options/use-claude-startup-frame-revision'
+import { useAppStore } from '../../store'
 import {
   createNativeChatPtySessionOptions,
   type NativeChatPtySessionOptionsSurface
@@ -71,6 +72,9 @@ export function useNativeChatSessionOptions(args: {
    *  over the screen scrape: it is written per turn, so it outlives the scrollback
    *  and reflects a switch made outside the composer. */
   reportedSessionOptions?: NativeChatSessionOptionObservation | null
+  /** Pane whose live agent status names the provider model, for agents whose hook
+   *  reports one (OMP). Claude's model comes from its terminal frame instead. */
+  paneKey?: string
 }): {
   surface: NativeChatPtySessionOptionsSurface | null
   snapshot: SessionOptionDescriptor[]
@@ -82,8 +86,20 @@ export function useNativeChatSessionOptions(args: {
     dispatchCommand,
     onAgentPicker,
     readTerminalScreen,
-    reportedSessionOptions
+    reportedSessionOptions,
+    paneKey
   } = args
+  // Why: a primitive selector, so unrelated status pings on the pane rerender nothing.
+  const reportedModel = useAppStore((state) =>
+    paneKey ? (state.agentStatusByPaneKey[paneKey]?.model ?? null) : null
+  )
+  const canSwitchOmpModel = useAppStore((state) =>
+    paneKey ? state.agentStatusByPaneKey[paneKey]?.modelSwitchCommand === 'orca-model' : false
+  )
+  // The hook-reported model this surface last applied. Only a report that CHANGES
+  // is evidence: the same value is re-delivered on every status ping, and a
+  // session-start report cannot have observed a `/model` picked after it.
+  const appliedReportedModelRef = useRef<string | null>(null)
   // The screen text that last parsed into reported values, so a later model
   // discovery can re-resolve it against the host's real ids.
   const reportedScreenRef = useRef<string | null>(null)

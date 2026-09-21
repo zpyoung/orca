@@ -2,7 +2,32 @@ import { useCallback, useMemo } from 'react'
 import { useAppStore } from '@/store'
 import type { AppState } from '@/store'
 import { DEFAULT_SHOW_SLEEPING_WORKSPACES } from '../../../../../../shared/constants'
-import { computeClearFilterActions, sidebarHasActiveFilters } from '../../visible-worktrees'
+import {
+  computeClearFilterActions,
+  sidebarHasActiveFilters,
+  isAutomationGeneratedWorkspace,
+  isCliCreatedWorkspace,
+  isDetachedHeadWorkspace,
+  isSleepingSweepExemptWorkspace
+} from '../../visible-worktrees'
+import type { Worktree } from '../../../../../../shared/worktree/types'
+import { parseWorkspaceKey } from '../../../../../../shared/workspace-scope'
+import {
+  getWorktreeExecutionHostId,
+  getSettingsFocusedExecutionHostId
+} from '../../../../../../shared/execution-host'
+import { isDefaultBranchWorkspace } from '../../default-branch-workspace'
+import { getFolderWorkspaceExecutionHostIdForRows } from './host-filtering'
+import {
+  getPairedDeviceIdsByEnvironment,
+  isWorkspaceFromOtherDevice
+} from '../../workspace-creator-visibility'
+import { getAgentStatusEpochNow } from '@/lib/agent-status-epoch-clock'
+import { getWorktreeIdsWithLiveAgent, isInactiveWorkspace } from '@/lib/worktree-activity-state'
+import {
+  getVisibleWorktreeBrowserActivityTabs,
+  getVisibleWorktreeTerminalActivityTabs
+} from '../../visible-worktree-activity-inputs'
 import { useWorkspaceFilterChrome } from '../../fork-workspace-activity-window/use-workspace-filter-chrome'
 import type { SidebarFilterState } from '../../visible-worktree-kinds'
 
@@ -194,5 +219,11 @@ export function useSidebarWorktreeFilters() {
     setVisibleWorkspaceHostIds,
     filterState
   ])
-  return { filterState, hasFilters: sidebarHasActiveFilters(filterState), clearFilters }
+
+  return {
+    filterState,
+    hasFilters: sidebarHasActiveFilters(filterState),
+    clearFilters,
+    revealWorkspaceFilters
+  }
 }
