@@ -101,8 +101,14 @@ docs/**
 # The deployable docs app is source, not local engineering notes.
 !docs/site/
 !docs/site/**
+!docs/audits/
+!docs/audits/closed-editor-model-lifetime/
+!docs/audits/closed-editor-model-lifetime/**
 !docs/assets/
 !docs/assets/**
+!docs/audits/
+!docs/audits/plugin-uninstall-log-retirement/
+!docs/audits/plugin-uninstall-log-retirement/**
 !docs/readme/
 !docs/readme/**
 !docs/STYLEGUIDE.md
@@ -126,6 +132,7 @@ docs/**
 !docs/reference/windows-cmd-shim-resolution.md
 !docs/reference/windows-daemon-host-relocation.md
 !docs/reference/windows-edr-posture.md
+!docs/reference/windows-msys-job-breakaway.md
 !docs/reference/windows-process-enumeration.md
 !docs/reference/wsl-runner-verification.md
 !docs/reference/remote-wire-compatibility.md

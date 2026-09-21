@@ -728,6 +728,35 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
     const handle = sendNativeChatMessageWithImageAttachments(TARGET, 'what do you see?', [
       '/tmp/orca-paste-image.png'
     ])
+    expectWriteOrder(sendRuntimePtyInput.mock.calls, [
+      NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
+      '\x1b[200~@/tmp/a.png\x1b[201~ ',
+      `\x1b[200~@/tmp/b.png\x1b[201~${text ? ' ' : ''}`
+    ])
+  })
+
+  it('sends OMP image paths as framed references, preserving spaces and delayed submit', () => {
+    sendNativeChatMessageWithImageAttachments('omp', SETTINGS, PTY, 'describe', [
+      'C:\\Images\\screen shot.png'
+    ])
+    expectWriteOrder(sendRuntimePtyInput.mock.calls, [
+      NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
+      '\x1b[200~@"C:\\Images\\screen shot.png"\x1b[201~ '
+    ])
+    vi.advanceTimersByTime(NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS)
+    expect(sendRuntimePtyInput).toHaveBeenLastCalledWith(SETTINGS, PTY, 'describe')
+    vi.advanceTimersByTime(NATIVE_CHAT_SUBMIT_DELAY_MS)
+    expect(sendRuntimePtyInput).toHaveBeenLastCalledWith(SETTINGS, PTY, NATIVE_CHAT_SUBMIT)
+  })
+
+  it('clears the line, then bracket-pastes image paths before prompt text', () => {
+    const handle = sendNativeChatMessageWithImageAttachments(
+      'claude',
+      SETTINGS,
+      PTY,
+      'what do you see?',
+      ['/tmp/orca-paste-image.png']
+    )
 
     expect(handle.settleAfterMs).toBe(
       NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS + NATIVE_CHAT_SUBMIT_DELAY_MS

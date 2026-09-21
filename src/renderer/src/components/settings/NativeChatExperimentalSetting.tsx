@@ -21,6 +21,7 @@ export function NativeChatExperimentalSetting({
 }: NativeChatExperimentalSettingProps): React.JSX.Element {
   const nativeChatEnabled = settings.experimentalNativeChat === true
   const structuredNativeChatEnabled = settings.experimentalStructuredNativeChat === true
+  const resumeOnRestartEnabled = settings.nativeChatResumeWorkOnRestart === true
   const defaultView: NativeChatDefaultView =
     settings.openAgentTabsInChatByDefault === true ? 'native-chat' : 'terminal-chat'
 

@@ -195,6 +195,7 @@ export function createRepoRemovalActions(
           }
           const nextTabs = { ...s.tabsByWorktree }
           const nextLayouts = { ...s.terminalLayoutsByTabId }
+          const nextLocalOnlyScrollback = { ...s.localOnlyScrollbackByTabId }
           const nextPtyIdsByTabId = { ...s.ptyIdsByTabId }
           const nextRuntimePaneTitlesByTabId = { ...s.runtimePaneTitlesByTabId }
           for (const wId of worktreeIds) {
@@ -202,6 +203,7 @@ export function createRepoRemovalActions(
           }
           for (const tabId of killedTabIds) {
             delete nextLayouts[tabId]
+            delete nextLocalOnlyScrollback[tabId]
             delete nextPtyIdsByTabId[tabId]
             delete nextRuntimePaneTitlesByTabId[tabId]
           }
@@ -258,6 +260,7 @@ export function createRepoRemovalActions(
             ptyIdsByTabId: nextPtyIdsByTabId,
             runtimePaneTitlesByTabId: nextRuntimePaneTitlesByTabId,
             terminalLayoutsByTabId: nextLayouts,
+            localOnlyScrollbackByTabId: nextLocalOnlyScrollback,
             activeTabId: s.activeTabId && killedTabIds.has(s.activeTabId) ? null : s.activeTabId,
             openFiles: nextOpenFiles,
             activeFileIdByWorktree: nextActiveFileIdByWorktree,

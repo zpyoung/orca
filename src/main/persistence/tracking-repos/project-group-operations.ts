@@ -107,10 +107,8 @@ export class ProjectGroupPersistenceOperations {
     for (const workspace of this.state.folderWorkspaces ?? []) {
       if (deletedGroupIds.has(workspace.projectGroupId)) {
         removedFolderWorkspaceKeys.add(folderWorkspaceKey(workspace.id))
-        this.state.workspaceSession = removeWorkspaceSessionOwner(
-          this.state.workspaceSession,
-          folderWorkspaceKey(workspace.id)
-        )!
+        // Every partition, not just the local blob: the same reason `removeFolderWorkspace` does.
+        removeWorkspaceSessionOwnerEverywhere(this.state, folderWorkspaceKey(workspace.id))
         this.removeWorkspaceLineageForFolderParent(workspace.id)
       }
     }

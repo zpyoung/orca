@@ -35,6 +35,90 @@ export function useSidebarWorktreeFilters() {
   const setFilterRepoIds = useAppStore((s) => s.setFilterRepoIds)
   const setVisibleWorkspaceHostIds = useAppStore((s) => s.setVisibleWorkspaceHostIds)
 
+  const revealWorkspaceFilters = useCallback((worktree: Worktree) => {
+    const state = useAppStore.getState()
+    const repo = state.repos.find((candidate) => candidate.id === worktree.repoId)
+    let targetHostId = getWorktreeExecutionHostId(
+      worktree,
+      repo,
+      getSettingsFocusedExecutionHostId(state.settings)
+    )
+    const workspaceScope = parseWorkspaceKey(worktree.id)
+    if (workspaceScope?.type === 'folder') {
+      const folderWorkspace = state.folderWorkspaces.find(
+        (candidate) => candidate.id === workspaceScope.folderWorkspaceId
+      )
+      const projectGroup = folderWorkspace
+        ? state.projectGroups.find((candidate) => candidate.id === folderWorkspace.projectGroupId)
+        : undefined
+      if (folderWorkspace) {
+        targetHostId = getFolderWorkspaceExecutionHostIdForRows({
+          folderWorkspace,
+          projectGroup,
+          defaultHostId: getSettingsFocusedExecutionHostId(state.settings)
+        })
+      }
+    }
+
+    if (
+      !worktree.id.startsWith('folder:') &&
+      state.filterRepoIds.length > 0 &&
+      !state.filterRepoIds.includes(worktree.repoId)
+    ) {
+      state.setFilterRepoIds([...state.filterRepoIds, worktree.repoId])
+    }
+    const visibleHostIds = state.visibleWorkspaceHostIds
+    const scopedHostIds =
+      visibleHostIds ?? (state.workspaceHostScope === 'all' ? null : [state.workspaceHostScope])
+    if (scopedHostIds && !scopedHostIds.includes(targetHostId)) {
+      state.setVisibleWorkspaceHostIds([...scopedHostIds, targetHostId])
+    }
+    if (state.hideDefaultBranchWorkspace && isDefaultBranchWorkspace(worktree)) {
+      state.setHideDefaultBranchWorkspace(false)
+    }
+    if (state.hideAutomationGeneratedWorkspaces && isAutomationGeneratedWorkspace(worktree)) {
+      state.setHideAutomationGeneratedWorkspaces(false)
+    }
+    if (state.hideCliCreatedWorkspaces && isCliCreatedWorkspace(worktree)) {
+      state.setHideCliCreatedWorkspaces(false)
+    }
+    if (state.hideDetachedHeadWorkspaces && isDetachedHeadWorkspace(worktree)) {
+      state.setHideDetachedHeadWorkspaces(false)
+    }
+    if (state.hideWorkspacesFromOtherDevices) {
+      const pairedDeviceIds = getPairedDeviceIdsByEnvironment(
+        state.runtimeEnvironments,
+        state.runtimeStatusByEnvironmentId
+      )
+      if (isWorkspaceFromOtherDevice(worktree, pairedDeviceIds)) {
+        state.setHideWorkspacesFromOtherDevices(false)
+      }
+    }
+    if (!state.showSleepingWorkspaces) {
+      const tabsByWorktree = getVisibleWorktreeTerminalActivityTabs(state.tabsByWorktree)
+      const browserTabsByWorktree = getVisibleWorktreeBrowserActivityTabs(
+        state.browserTabsByWorktree
+      )
+      const liveAgentWorktrees = getWorktreeIdsWithLiveAgent(
+        state.agentStatusByPaneKey,
+        tabsByWorktree,
+        getAgentStatusEpochNow(state.agentStatusEpoch)
+      )
+      if (
+        !isSleepingSweepExemptWorkspace(worktree, state.alwaysShowDefaultBranchWorkspace) &&
+        isInactiveWorkspace(
+          worktree.id,
+          tabsByWorktree,
+          state.ptyIdsByTabId,
+          browserTabsByWorktree,
+          liveAgentWorktrees
+        )
+      ) {
+        state.setShowSleepingWorkspaces(true)
+      }
+    }
+  }, [])
+
   // Why: count hideDefaultBranchWorkspace as a filter so the Clear Filters escape hatch stays reachable when it alone empties the list.
   const filterState = useMemo<
     SidebarFilterState & Pick<AppState, 'visibleWorkspaceHostIds' | 'workspaceHostScope'>
