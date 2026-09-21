@@ -98,7 +98,13 @@ export class OpenCodeSqliteWorkerClient {
     try {
       // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the worker's list leg returns exactly this, built by the repo's own reader on the other side of a structured clone.
       const value = (await this.dispatch(
-        (id) => ({ id, kind: 'list', dbPaths: args.dbPaths, limit: args.limit }),
+        (id) => ({
+          id,
+          kind: 'list',
+          dbPaths: args.dbPaths,
+          limit: args.limit,
+          ...(args.agent ? { agent: args.agent } : {})
+        }),
         LIST_TIMEOUT_MS
       )) as OpenCodeSqliteListValue
       args.issues.push(...value.issues)
@@ -150,7 +156,8 @@ export class OpenCodeSqliteWorkerClient {
           kind: 'parse',
           dbPath: args.dbPath,
           sessionId: args.sessionId,
-          platform: args.platform
+          platform: args.platform,
+          ...(args.agent ? { agent: args.agent } : {})
         }),
         PARSE_TIMEOUT_MS
       )
@@ -186,7 +193,8 @@ export class OpenCodeSqliteWorkerClient {
           kind: 'capture',
           dbPath: args.dbPath,
           sessionId: args.sessionId,
-          platform: args.platform
+          platform: args.platform,
+          ...(args.agent ? { agent: args.agent } : {})
         }),
         CAPTURE_TIMEOUT_MS
       )

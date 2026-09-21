@@ -24,7 +24,7 @@ import { importReleaseCheckoutModule, materializeReleaseCheckout } from './relea
  * before the proof-only frame existed, which is the fallback
  * docs/reference/remote-wire-compatibility.md sanctions for exactly this case.
  */
-const PRE_STACK_REF = 'v1.4.199'
+const PRE_STACK_REF = 'v1.4.201-rc.0.zy01'
 
 const SUITE_TIMEOUT_MS = 180_000
 

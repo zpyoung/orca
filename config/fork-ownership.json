@@ -3648,6 +3648,18 @@
       "lines": ["const TERMINAL_MODE_METADATA_LEGACY_REF = 'v1.4.191-rc.0.zy01'"]
     },
     {
+      "path": "tests/e2e/cross-version-wire/cross-version-session-tabs-retirement-proof.unit.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["const PRE_STACK_REF = 'v1.4.201-rc.0.zy01'"]
+    },
+    {
+      "path": "tests/e2e/cross-version-wire/cross-version-worktree-identity-downgrade.unit.test.ts",
+      "feature": "fork-infra",
+      "kind": "passthrough",
+      "lines": ["const PRE_STACK_REF = 'v1.4.201-rc.0.zy01'"]
+    },
+    {
       "path": "tests/e2e/cross-version-wire/release-checkout.unit.test.ts",
       "feature": "fork-infra",
       "kind": "passthrough",
@@ -6306,6 +6318,14 @@
     "tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts": {
       "added": 4,
       "removed": 2
+    },
+    "tests/e2e/cross-version-wire/cross-version-session-tabs-retirement-proof.unit.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "tests/e2e/cross-version-wire/cross-version-worktree-identity-downgrade.unit.test.ts": {
+      "added": 1,
+      "removed": 1
     },
     "tests/e2e/cross-version-wire/release-checkout.unit.test.ts": {
       "added": 11,

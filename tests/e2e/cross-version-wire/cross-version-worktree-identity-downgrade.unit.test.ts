@@ -13,7 +13,7 @@ import { importReleaseCheckoutModule, materializeReleaseCheckout } from './relea
  * bytes on disk depending on which build did the rename, with no wire change anywhere — Rule 3's
  * shape applied to persistence, which is why it is measured here rather than reasoned about.
  */
-const PRE_STACK_REF = 'v1.4.199'
+const PRE_STACK_REF = 'v1.4.201-rc.0.zy01'
 const SUITE_TIMEOUT_MS = 180_000
 
 const OLD_ID = 'repo::/worktrees/before'
