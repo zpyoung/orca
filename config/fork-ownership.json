@@ -4101,12 +4101,6 @@
       "status": "permanent"
     },
     {
-      "path": "mobile/src/browser/mobile-browser-frame-state.ts",
-      "status": "pending-upstream",
-      "ledger": "docs/fork-upstreaming.md#react-doctor-changed-lines-gate",
-      "reason": "React Doctor gate: imports Buffer from `node:buffer`. Mobile disables unicorn/prefer-node-protocol for Metro's sake, but React Doctor does not read mobile/.oxlintrc.json and blocks the changed line."
-    },
-    {
       "path": "mobile/src/browser/mobile-browser-frameless-stream.test.tsx",
       "reason": "React Doctor gate: imports Buffer from `node:buffer`. Mobile disables unicorn/prefer-node-protocol for Metro's sake, but this file is a Vitest test that Metro never bundles, and React Doctor does not read mobile/.oxlintrc.json.",
       "status": "pending-upstream",
