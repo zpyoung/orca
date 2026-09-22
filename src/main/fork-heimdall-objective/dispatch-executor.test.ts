@@ -256,6 +256,99 @@ describe('executeObjectiveDispatch', () => {
       })
     )
   })
+
+  it('defaults the concurrency cap to 1 and lanes to enabled when the world has no parallel projection', async () => {
+    await executeObjectiveDispatch({
+      action: dispatchNode,
+      binding,
+      context: context(
+        { watcherId: 'watcher-1', entries: [] },
+        { status: 'dispatched', dispatchId: 'dispatch-1' }
+      ),
+      objectiveStore,
+      store: {} as Store,
+      runtime
+    })
+
+    expect(buildRolePrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ effectiveMaxConcurrency: 1, lanesEnabled: true })
+    )
+  })
+
+  it("reads the world's live effective concurrency cap so a mid-run set-concurrency reaches the next dispatch", async () => {
+    const executeContext = context(
+      { watcherId: 'watcher-1', entries: [] },
+      { status: 'dispatched', dispatchId: 'dispatch-1' }
+    )
+    executeContext.snapshot = snapshot(projection({ revisions: [], nodes: [] }), {
+      parallel: {
+        effectiveMaxConcurrency: 5,
+        runningCount: 2,
+        dispatches: []
+      }
+    })
+
+    await executeObjectiveDispatch({
+      action: dispatchNode,
+      binding,
+      context: executeContext,
+      objectiveStore,
+      store: {} as Store,
+      runtime
+    })
+
+    expect(buildRolePrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ effectiveMaxConcurrency: 5 })
+    )
+  })
+
+  it('reads lanesEnabled off the contract, forwarding false only when explicitly disabled', async () => {
+    await executeObjectiveDispatch({
+      action: dispatchNode,
+      binding: { ...binding, contract: { ...binding.contract, lanesEnabled: false } },
+      context: context(
+        { watcherId: 'watcher-1', entries: [] },
+        { status: 'dispatched', dispatchId: 'dispatch-1' }
+      ),
+      objectiveStore,
+      store: {} as Store,
+      runtime
+    })
+
+    expect(buildRolePrompt).toHaveBeenCalledWith(expect.objectContaining({ lanesEnabled: false }))
+  })
+
+  it('supplies the concurrency cap and lanesEnabled to a planner dispatch as well', async () => {
+    const plannerAction: ObjectiveAction = {
+      kind: 'dispatch-planner',
+      capability: 'plan',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'plan:1:initial',
+      revisionNumber: 1,
+      reason: 'initial'
+    }
+    const executeContext = context(
+      { watcherId: 'watcher-1', entries: [] },
+      { status: 'dispatched', dispatchId: 'dispatch-1' }
+    )
+    executeContext.snapshot = snapshot(projection({ revisions: [], nodes: [] }), {
+      parallel: { effectiveMaxConcurrency: 3, runningCount: 0, dispatches: [] }
+    })
+
+    await executeObjectiveDispatch({
+      action: plannerAction,
+      binding,
+      context: executeContext,
+      objectiveStore,
+      store: {} as Store,
+      runtime
+    })
+
+    expect(buildRolePrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ role: 'planner', effectiveMaxConcurrency: 3, lanesEnabled: true })
+    )
+  })
 })
 
 function failedNodeAttempt(args: {
