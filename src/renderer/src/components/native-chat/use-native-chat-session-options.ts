@@ -4,6 +4,7 @@ import {
   getAgentSessionOptionCatalog,
   type CatalogModel
 } from '../../../../shared/agent-session-option-catalog'
+import { matchNativeChatCatalogModelId } from '../../../../shared/native-chat-session-option-state'
 import type { SessionOptionDescriptor } from '../../../../shared/native-chat-session-options'
 import type { NativeChatSessionOptionObservation } from '../../../../shared/native-chat-types'
 import { nativeChatReportedValuesFromObservation } from './fork-native-chat-session-options/native-chat-session-option-observation'
@@ -11,6 +12,7 @@ import {
   hasDispatchedNativeChatSessionOption,
   useClaudeStartupFrameRevision
 } from './fork-native-chat-session-options/use-claude-startup-frame-revision'
+import { useAppStore } from '../../store'
 import {
   createNativeChatPtySessionOptions,
   type NativeChatPtySessionOptionsSurface
@@ -26,11 +28,13 @@ import {
   resolveNativeChatModelDiscoveryContext
 } from './native-chat-session-option-discovery'
 import { readClaudeSessionOptionsFromTerminalScreen } from './claude-terminal-session-options'
+
 import { enqueueSessionOptionSettingsWrite } from './native-chat-session-option-settings-write'
 
 const EMPTY_SNAPSHOT: SessionOptionDescriptor[] = []
 const subscribeEmpty = (): (() => void) => () => {}
 const getEmptySnapshot = (): SessionOptionDescriptor[] => EMPTY_SNAPSHOT
+
 const CLIENT_SETTINGS_TARGET = { kind: 'local' } as const
 
 /**
@@ -68,6 +72,9 @@ export function useNativeChatSessionOptions(args: {
    *  over the screen scrape: it is written per turn, so it outlives the scrollback
    *  and reflects a switch made outside the composer. */
   reportedSessionOptions?: NativeChatSessionOptionObservation | null
+  /** Pane whose live agent status names the provider model, for agents whose hook
+   *  reports one (OMP). Claude's model comes from its terminal frame instead. */
+  paneKey?: string
 }): {
   surface: NativeChatPtySessionOptionsSurface | null
   snapshot: SessionOptionDescriptor[]
@@ -79,8 +86,20 @@ export function useNativeChatSessionOptions(args: {
     dispatchCommand,
     onAgentPicker,
     readTerminalScreen,
-    reportedSessionOptions
+    reportedSessionOptions,
+    paneKey
   } = args
+  // Why: a primitive selector, so unrelated status pings on the pane rerender nothing.
+  const reportedModel = useAppStore((state) =>
+    paneKey ? (state.agentStatusByPaneKey[paneKey]?.model ?? null) : null
+  )
+  const canSwitchOmpModel = useAppStore((state) =>
+    paneKey ? state.agentStatusByPaneKey[paneKey]?.modelSwitchCommand === 'orca-model' : false
+  )
+  // The hook-reported model this surface last applied. Only a report that CHANGES
+  // is evidence: the same value is re-delivered on every status ping, and a
+  // session-start report cannot have observed a `/model` picked after it.
+  const appliedReportedModelRef = useRef<string | null>(null)
   // The screen text that last parsed into reported values, so a later model
   // discovery can re-resolve it against the host's real ids.
   const reportedScreenRef = useRef<string | null>(null)
@@ -127,6 +146,7 @@ export function useNativeChatSessionOptions(args: {
       mode: targetPtyId ? 'live' : 'draft',
       reportedValues,
       dispatchCommand,
+      canSwitchOmpModel,
       onAgentPicker,
       persistSelection: ({ modelId, optionId, value, adoptModelAsLaunchDefault }) =>
         // Paired PTY launches still assemble their launch preferences from client settings.
@@ -138,6 +158,7 @@ export function useNativeChatSessionOptions(args: {
     })
   }, [
     agent,
+    canSwitchOmpModel,
     dispatchCommand,
     discoveryContext,
     onAgentPicker,
@@ -219,6 +240,37 @@ export function useNativeChatSessionOptions(args: {
       cancelled = true
     }
   }, [agent, discoveryContext, readTerminalScreen, startupFrameRevision, surface, targetPtyId])
+
+  // Why: keyed on the scope, not the surface — the record survives a surface rebuild
+  // for the same pty, so re-applying the same report there would revert a user's pick.
+  useEffect(() => {
+    appliedReportedModelRef.current = null
+  }, [agent, targetPtyId, terminalTabId])
+
+  useEffect(() => {
+    // Why: Claude's model is read off its terminal frame above; the hook path is
+    // for agents that stamp the model on their status posts and have no frame to read.
+    if (!surface || agent === 'claude' || !reportedModel) {
+      return
+    }
+    const catalog = getAgentSessionOptionCatalog(agent)
+    if (!catalog) {
+      return
+    }
+    const models =
+      (discoveryContext ? readNativeChatEnrichedModels(agent, discoveryContext.hostKey) : null) ??
+      catalog.models
+    // OMP reports exact selectors, including models absent from cached discovery.
+    const matched =
+      agent === 'omp'
+        ? reportedModel.trim()
+        : matchNativeChatCatalogModelId({ ...catalog, models }, reportedModel)
+    if (!matched || appliedReportedModelRef.current === matched) {
+      return
+    }
+    appliedReportedModelRef.current = matched
+    surface.reportSessionOptions({ model: matched })
+  }, [agent, discoveryContext, reportedModel, surface])
 
   useEffect(() => {
     if (!surface || !discoveryContext) {

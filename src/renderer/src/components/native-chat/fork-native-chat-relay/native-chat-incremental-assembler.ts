@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/native-chat-incremental-assembler.ts
-// FORK-COPY-SHA: c464b1014972bd771324fed84b7de7fb100e837b
+// FORK-COPY-SHA: c62eca3988ce4d7fce12fbfd20c0c47b39e9ecac
 // Incremental native-chat assembler. The full `assembleNativeChatSession` does
 // an O(n log n) Map-build + sort on every call; on the hot streaming path the
 // agent emits many small append batches over a growing transcript, so the full

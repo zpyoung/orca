@@ -1,4 +1,4 @@
-import { Buffer } from 'node:buffer'
+import { Buffer } from 'buffer'
 import type { GestureResponderEvent, Image, View } from 'react-native'
 import type {
   BrowserScreencastFrame,

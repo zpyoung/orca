@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/main/native-chat/transcript-tail-reader.ts
-// FORK-COPY-SHA: c464b1014972bd771324fed84b7de7fb100e837b
+// FORK-COPY-SHA: c62eca3988ce4d7fce12fbfd20c0c47b39e9ecac
 import { open, stat } from 'node:fs/promises'
 import type { AgentType, NativeChatMessage } from '../../../shared/native-chat-types'
 import {

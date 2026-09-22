@@ -82,7 +82,10 @@ const UNIT_EXCLUDES = [
   ...SHELL_CONTRACT_SPECS.filter(
     (spec) => spec !== 'src/main/pty/codex-shell-launch-preflight.test.ts'
   ),
-  'tests/e2e/cross-version-wire/**'
+  'tests/e2e/cross-version-wire/**',
+  // Region pairing drives real relay endpoints, which the sandbox container cannot reach.
+  'tests/e2e/relay-region-compatibility.unit.test.ts',
+  'tests/e2e/relay-region-correction.unit.test.ts'
 ]
 
 const LANES = new Set(['unit', 'shell', 'e2e'])

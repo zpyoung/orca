@@ -96,7 +96,7 @@ export function createTerminalPaneClosedHandler(
         tabId,
         leafId,
         experimentalTerminalDockEnabled:
-          deps.settingsRef.current?.experimentalTerminalDock === true,
+          deps.settingsRef?.current?.experimentalTerminalDock === true,
         pruneStoreDockPaneKeys: dockPruneState.pruneTerminalDockPaneKeys
       })
     }
