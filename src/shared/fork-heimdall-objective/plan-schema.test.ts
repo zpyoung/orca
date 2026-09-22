@@ -104,22 +104,68 @@ describe('objective plan schema', () => {
   it('enforces territory and preserves every previously dispatched task key', () => {
     expect(() =>
       parseAndValidatePlannerReport(
-        { plan: [task('kept', { declaredPaths: ['src/a.ts'] })] },
+        {
+          plan: [task('kept', { declaredPaths: ['src/a.ts'], territory: ['src/**'] })],
+          assumptions: []
+        },
         { writeTerritory: ['src/**'], dispatchedTaskKeys: ['kept'] }
       )
     ).not.toThrow()
     expect(() =>
       parseAndValidatePlannerReport(
-        { plan: [task('kept', { declaredPaths: ['docs/a.txt'] })] },
+        {
+          plan: [task('kept', { declaredPaths: ['docs/a.txt'], territory: ['src/**'] })],
+          assumptions: []
+        },
         { writeTerritory: ['src/**'], dispatchedTaskKeys: ['kept'] }
       )
     ).toThrow('outside write territory')
     expect(() =>
       parseAndValidatePlannerReport(
-        { plan: [task('replacement')] },
+        { plan: [task('replacement')], assumptions: [] },
         { writeTerritory: ['src/**'], dispatchedTaskKeys: ['already-dispatched'] }
       )
     ).toThrow('cannot be removed')
+  })
+
+  it('requires every write-path task to declare territory outside the objective territory being an error', () => {
+    expect(() =>
+      parseAndValidatePlannerReport(
+        { plan: [task('a')], assumptions: [] },
+        { writeTerritory: ['src/**'], dispatchedTaskKeys: [] }
+      )
+    ).toThrow('Planner task a must declare territory')
+    expect(() =>
+      parseAndValidatePlannerReport(
+        { plan: [task('a', { territory: ['docs/**'] })], assumptions: [] },
+        { writeTerritory: ['src/**'], dispatchedTaskKeys: [] }
+      )
+    ).not.toThrow()
+  })
+
+  it('requires assumptions to be present, even when empty, on the write path', () => {
+    expect(() =>
+      parseAndValidatePlannerReport(
+        { plan: [task('a', { territory: ['src/**'] })] },
+        { writeTerritory: ['src/**'], dispatchedTaskKeys: [] }
+      )
+    ).toThrow('Planner report must declare assumptions (use [] when none)')
+  })
+
+  it('rejects an assumption that names a task outside the plan', () => {
+    expect(() =>
+      parseAndValidatePlannerReport(
+        {
+          plan: [task('a', { territory: ['src/**'] })],
+          assumptions: [{ claim: 'no migration is needed', dependentTaskKeys: ['missing'] }]
+        },
+        { writeTerritory: ['src/**'], dispatchedTaskKeys: [] }
+      )
+    ).toThrow('Assumption 0 names unknown task missing')
+  })
+
+  it('parses stored plans that predate territory and assumptions', () => {
+    expect(PlannerReportSchema.safeParse({ plan: [task('legacy')] }).success).toBe(true)
   })
 })
 

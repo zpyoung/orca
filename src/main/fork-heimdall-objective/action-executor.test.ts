@@ -651,9 +651,11 @@ describe('objective action recovery', () => {
             deps: [],
             criteria: [{ body: 'works', shellCheckable: false, checkCommand: null }],
             declaresDependencyChange: false,
-            declaredPaths: ['src/core.ts']
+            declaredPaths: ['src/core.ts'],
+            territory: ['src/core.ts']
           }
-        ]
+        ],
+        assumptions: []
       }
     })
     const { executor, fresh } = harness()
@@ -687,9 +689,11 @@ describe('objective action recovery', () => {
             deps: [],
             criteria: [{ body: 'works', shellCheckable: false, checkCommand: null }],
             declaresDependencyChange: false,
-            declaredPaths: ['src/core.ts']
+            declaredPaths: ['src/core.ts'],
+            territory: ['src/core.ts']
           }
-        ]
+        ],
+        assumptions: []
       }
     })
     const completion = workerDone('succeeded')
