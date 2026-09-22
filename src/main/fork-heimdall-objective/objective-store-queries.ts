@@ -12,7 +12,8 @@ import {
   PlannerReportSchema,
   ObjectivePlanTaskSchema,
   type ObjectivePlan,
-  type ObjectivePlanTask
+  type ObjectivePlanTask,
+  type PlannerReport
 } from '../../shared/fork-heimdall-objective/plan-schema'
 import type { ObjectiveDatabase } from './objective-database'
 import {
@@ -173,6 +174,14 @@ export class ObjectiveStoreQueries {
 
   getTask(revisionId: string, taskKey: string): ObjectivePlanTask | null {
     return this.getPlan(revisionId)?.find((task) => task.taskKey === taskKey) ?? null
+  }
+
+  getPlanReport(revisionId: string): PlannerReport | null {
+    const row = this.database
+      .connection()
+      .prepare('SELECT payload_json FROM plan_revision WHERE id = ?')
+      .get(revisionId) as { payload_json: string } | undefined
+    return row ? parseJson(PlannerReportSchema, row.payload_json, 'plan payload') : null
   }
 
   getCriterion(criterionId: string): ObjectiveStoredCriterion | null {

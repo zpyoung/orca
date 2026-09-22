@@ -140,12 +140,63 @@ export const ObjectiveLandingProjectionSchema = z
   .strict()
 export type ObjectiveLandingProjection = z.infer<typeof ObjectiveLandingProjectionSchema>
 
+export const ObjectivePlanPatchProjectionSchema = z
+  .object({
+    id: IdSchema,
+    revisionId: IdSchema,
+    createdByDispatchId: IdSchema,
+    repairOrdinal: z.number().int().nonnegative(),
+    digest: IdSchema,
+    status: z.enum(['pending', 'applied', 'rejected']),
+    rejection: z.string().max(8_192).nullable(),
+    touchedTaskKeys: z.array(IdSchema).max(128),
+    createdAtMs: TimestampSchema,
+    resolvedAtMs: TimestampSchema.nullable()
+  })
+  .strict()
+export type ObjectivePlanPatchProjection = z.infer<typeof ObjectivePlanPatchProjectionSchema>
+
+export const ObjectivePlanReviewProjectionSchema = z
+  .object({
+    id: IdSchema,
+    targetKind: z.enum(['revision', 'patch']),
+    targetId: IdSchema,
+    round: z.union([z.literal(1), z.literal(2)]),
+    dispatchId: IdSchema,
+    verdict: z.enum(['approve', 'revise', 'escalate']),
+    reportDigest: IdSchema,
+    createdAtMs: TimestampSchema
+  })
+  .strict()
+export type ObjectivePlanReviewProjection = z.infer<typeof ObjectivePlanReviewProjectionSchema>
+
+export const ObjectiveGateAttemptProjectionSchema = z
+  .object({
+    gateName: IdSchema,
+    contentIdentity: IdSchema,
+    executionHostId: IdSchema,
+    command: z.string().trim().min(1).max(8_192),
+    exitCode: z.number().int().nullable(),
+    timedOut: z.boolean().nullable(),
+    stdoutTail: z.string().max(4_096).nullable(),
+    stderrTail: z.string().max(4_096).nullable(),
+    startedAtMs: TimestampSchema,
+    completedAtMs: TimestampSchema.nullable()
+  })
+  .strict()
+export type ObjectiveGateAttemptProjection = z.infer<typeof ObjectiveGateAttemptProjectionSchema>
+
 export const ObjectiveProjectionSchema = z
   .object({
     revisions: z.array(ObjectiveRevisionProjectionSchema),
     nodes: z.array(ObjectiveNodeProjectionSchema),
     verdicts: z.array(ObjectiveVerdictProjectionSchema),
-    landing: z.array(ObjectiveLandingProjectionSchema)
+    landing: z.array(ObjectiveLandingProjectionSchema),
+    // optional so fixtures built before repair persistence existed (outside this module's
+    // ownership) stay valid
+    patches: z.array(ObjectivePlanPatchProjectionSchema).max(1_024).optional(),
+    planReviews: z.array(ObjectivePlanReviewProjectionSchema).max(1_024).optional(),
+    gateAttempts: z.array(ObjectiveGateAttemptProjectionSchema).max(1_024).optional()
   })
   .strict()
 export type ObjectiveProjection = z.infer<typeof ObjectiveProjectionSchema>

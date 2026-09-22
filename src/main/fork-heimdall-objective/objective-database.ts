@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import Database from '../sqlite/sync-database'
 import { hardenSqliteDatabaseFiles } from '../sqlite/harden-database-files'
 
-export const OBJECTIVE_DATABASE_SCHEMA_VERSION = 4
+export const OBJECTIVE_DATABASE_SCHEMA_VERSION = 5
 export const OBJECTIVE_DATABASE_BUSY_TIMEOUT_MS = 5_000
 
 export type ObjectiveProfileDirectoryProvider = {
@@ -185,6 +185,61 @@ CREATE TABLE objective_parallel_state (
 );
 `
 
+const OBJECTIVE_SCHEMA_V5_SQL = `
+CREATE TABLE plan_patch (
+  id TEXT PRIMARY KEY,
+  watcher_id TEXT NOT NULL,
+  revision_id TEXT NOT NULL REFERENCES plan_revision(id),
+  created_by_dispatch_id TEXT NOT NULL,
+  repair_ordinal INTEGER NOT NULL,
+  payload_json TEXT NOT NULL,
+  digest TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('pending', 'applied', 'rejected')),
+  rejection TEXT,
+  created_at_ms INTEGER NOT NULL,
+  resolved_at_ms INTEGER,
+  UNIQUE (watcher_id, created_by_dispatch_id)
+);
+CREATE INDEX objective_plan_patch_watcher
+  ON plan_patch (watcher_id, created_at_ms, id);
+
+CREATE TABLE plan_review (
+  id TEXT PRIMARY KEY,
+  watcher_id TEXT NOT NULL,
+  target_kind TEXT NOT NULL CHECK (target_kind IN ('revision', 'patch')),
+  target_id TEXT NOT NULL,
+  round INTEGER NOT NULL CHECK (round IN (1, 2)),
+  dispatch_id TEXT NOT NULL,
+  verdict TEXT NOT NULL CHECK (verdict IN ('approve', 'revise', 'escalate')),
+  report_json TEXT NOT NULL,
+  report_digest TEXT NOT NULL,
+  created_at_ms INTEGER NOT NULL,
+  UNIQUE (dispatch_id),
+  UNIQUE (target_kind, target_id, round)
+);
+CREATE INDEX objective_plan_review_watcher
+  ON plan_review (watcher_id, created_at_ms, id);
+
+CREATE TABLE gate_attempt (
+  id TEXT PRIMARY KEY,
+  watcher_id TEXT NOT NULL,
+  gate_name TEXT NOT NULL,
+  content_identity TEXT NOT NULL,
+  execution_host_id TEXT NOT NULL,
+  command TEXT NOT NULL,
+  exit_code INTEGER,
+  timed_out INTEGER,
+  stdout_tail TEXT,
+  stderr_tail TEXT,
+  epoch INTEGER NOT NULL,
+  started_at_ms INTEGER NOT NULL,
+  completed_at_ms INTEGER,
+  UNIQUE (watcher_id, gate_name, content_identity)
+);
+CREATE INDEX objective_gate_attempt_watcher
+  ON gate_attempt (watcher_id, started_at_ms, id);
+`
+
 /** Lazily owns the profile-scoped objective persistence database. */
 export class ObjectiveDatabase {
   private opened: Database.Database | null = null
@@ -326,6 +381,9 @@ export class ObjectiveDatabase {
       }
       if (lockedVersion < 4) {
         database.exec(OBJECTIVE_SCHEMA_V4_SQL)
+      }
+      if (lockedVersion < 5) {
+        database.exec(OBJECTIVE_SCHEMA_V5_SQL)
       }
       if (lockedVersion < OBJECTIVE_DATABASE_SCHEMA_VERSION) {
         database.pragma(`user_version = ${OBJECTIVE_DATABASE_SCHEMA_VERSION}`)

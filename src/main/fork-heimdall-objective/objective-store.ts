@@ -11,9 +11,11 @@ import {
   type ObjectiveDispatchRecord,
   type ObjectiveParallelProjection
 } from '../../shared/fork-heimdall-objective/parallel-types'
+import type { PlanReviewReport } from '../../shared/fork-heimdall-objective/plan-review-schema'
 import type {
   ObjectivePlan,
-  ObjectivePlanTask
+  ObjectivePlanTask,
+  PlannerReport
 } from '../../shared/fork-heimdall-objective/plan-schema'
 import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type { ObjectiveDatabase } from './objective-database'
@@ -37,7 +39,35 @@ import type {
   StartCheckAttemptArgs
 } from './objective-store-data'
 import { ObjectiveStoreDispatchMutations } from './objective-store-dispatch-mutations'
+import {
+  completeGateAttempt,
+  getGateAttempt,
+  listGateAttempts,
+  startGateAttempt,
+  type CompleteGateAttemptArgs,
+  type ObjectiveGateAttempt,
+  type StartGateAttemptArgs
+} from './objective-store-gate-attempts'
 import { ObjectiveStoreMutations } from './objective-store-mutations'
+import {
+  applyPlanPatch,
+  getPlanPatch,
+  ingestPlanPatch,
+  listPlanPatches,
+  rejectDraftRevision,
+  rejectPlanPatch,
+  type ApplyPlanPatchArgs,
+  type IngestPlanPatchArgs,
+  type ObjectivePlanPatchRecord,
+  type RejectPlanPatchArgs
+} from './objective-store-plan-patches'
+import {
+  getPlanReviewReport,
+  listPlanReviews,
+  recordPlanReview,
+  type ObjectivePlanReviewRecord,
+  type RecordPlanReviewArgs
+} from './objective-store-plan-reviews'
 import { detailObjective, projectObjective } from './objective-store-projection'
 import { ObjectiveStoreQueries } from './objective-store-queries'
 import { reconcileObjectiveLedger } from './objective-store-reconciliation'
@@ -61,6 +91,21 @@ export type {
   RevisionAmendmentResult,
   StartCheckAttemptArgs
 } from './objective-store-data'
+export type {
+  CompleteGateAttemptArgs,
+  ObjectiveGateAttempt,
+  StartGateAttemptArgs
+} from './objective-store-gate-attempts'
+export type {
+  ApplyPlanPatchArgs,
+  IngestPlanPatchArgs,
+  ObjectivePlanPatchRecord,
+  RejectPlanPatchArgs
+} from './objective-store-plan-patches'
+export type {
+  ObjectivePlanReviewRecord,
+  RecordPlanReviewArgs
+} from './objective-store-plan-reviews'
 
 /** Natural-keyed objective state, with large report bodies kept out of the kernel ledger. */
 export class ObjectiveStore {
@@ -161,8 +206,68 @@ export class ObjectiveStore {
     return this.queries.getPlan(revisionId)
   }
 
+  getPlanReport(revisionId: string): PlannerReport | null {
+    return this.queries.getPlanReport(revisionId)
+  }
+
   getTask(revisionId: string, taskKey: string): ObjectivePlanTask | null {
     return this.queries.getTask(revisionId, taskKey)
+  }
+
+  rejectDraftRevision(args: { watcherId: string; revisionId: string }): void {
+    return rejectDraftRevision(this.database, args)
+  }
+
+  ingestPlanPatch(args: IngestPlanPatchArgs): ObjectivePlanPatchRecord {
+    return ingestPlanPatch(this.database, args)
+  }
+
+  rejectPlanPatch(args: RejectPlanPatchArgs): ObjectivePlanPatchRecord {
+    return rejectPlanPatch(this.database, args)
+  }
+
+  applyPlanPatch(args: ApplyPlanPatchArgs): RevisionAmendmentResult {
+    return applyPlanPatch(this.database, args)
+  }
+
+  getPlanPatch(patchId: string): ObjectivePlanPatchRecord | null {
+    return getPlanPatch(this.database, patchId)
+  }
+
+  listPlanPatches(watcherId: string): ObjectivePlanPatchRecord[] {
+    return listPlanPatches(this.database, watcherId)
+  }
+
+  recordPlanReview(args: RecordPlanReviewArgs): ObjectivePlanReviewRecord {
+    return recordPlanReview(this.database, args)
+  }
+
+  listPlanReviews(watcherId: string): ObjectivePlanReviewRecord[] {
+    return listPlanReviews(this.database, watcherId)
+  }
+
+  getPlanReviewReport(id: string): PlanReviewReport | null {
+    return getPlanReviewReport(this.database, id)
+  }
+
+  startGateAttempt(args: StartGateAttemptArgs): ObjectiveGateAttempt {
+    return startGateAttempt(this.database, args)
+  }
+
+  completeGateAttempt(args: CompleteGateAttemptArgs): ObjectiveGateAttempt {
+    return completeGateAttempt(this.database, args)
+  }
+
+  getGateAttempt(
+    watcherId: string,
+    gateName: string,
+    contentIdentity: string
+  ): ObjectiveGateAttempt | null {
+    return getGateAttempt(this.database, watcherId, gateName, contentIdentity)
+  }
+
+  listGateAttempts(watcherId: string): ObjectiveGateAttempt[] {
+    return listGateAttempts(this.database, watcherId)
   }
 
   getCriterion(criterionId: string): ObjectiveStoredCriterion | null {

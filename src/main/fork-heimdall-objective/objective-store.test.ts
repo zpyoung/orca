@@ -858,6 +858,101 @@ describe('ObjectiveStore natural-key persistence', () => {
     expect(store.project(WATCHER_ID).revisions).toEqual([])
     expect(store.project('watcher-objective-2').revisions).toHaveLength(1)
   })
+
+  it('projects plan patches, plan reviews, and gate attempts, and purge clears them', () => {
+    const revision = ingest()
+    store.activatePlan({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      digest: revision.digest,
+      approvedAtMs: 200
+    })
+    const patch = store.ingestPlanPatch({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      dispatchId: 'repair-1',
+      repairOrdinal: 0,
+      report: {
+        repair: {
+          upsertTasks: [
+            {
+              taskKey: 'task-c',
+              title: 'Task C',
+              spec: 'Implement C',
+              deps: ['task-b'],
+              criteria: [{ body: 'C works', shellCheckable: false, checkCommand: null }],
+              declaresDependencyChange: false
+            }
+          ],
+          dropTaskKeys: []
+        },
+        assumptions: []
+      },
+      createdAtMs: 300
+    })
+    store.applyPlanPatch({
+      watcherId: WATCHER_ID,
+      patchId: patch.id,
+      amendedAtMs: 400,
+      frozenTaskKeys: []
+    })
+    store.recordPlanReview({
+      watcherId: WATCHER_ID,
+      targetKind: 'revision',
+      targetId: revision.revisionId,
+      round: 1,
+      dispatchId: 'plan-review-1',
+      report: { verdict: 'approve', assumptions: [], findings: [], summary: 'Looks solid' },
+      reportDigest: 'review-digest-1',
+      createdAtMs: 500
+    })
+    store.startGateAttempt({
+      watcherId: WATCHER_ID,
+      gateName: 'typecheck:node',
+      contentIdentity: CONTENT_IDENTITY,
+      executionHostId: 'local',
+      command: 'pnpm typecheck:node',
+      epoch: 1,
+      startedAtMs: 600
+    })
+    store.completeGateAttempt({
+      watcherId: WATCHER_ID,
+      gateName: 'typecheck:node',
+      contentIdentity: CONTENT_IDENTITY,
+      exitCode: 0,
+      timedOut: false,
+      stdoutTail: 'ok',
+      stderrTail: '',
+      completedAtMs: 650
+    })
+
+    const projection = store.project(WATCHER_ID)
+    expect(projection.patches).toEqual([
+      expect.objectContaining({
+        id: patch.id,
+        revisionId: revision.revisionId,
+        status: 'applied',
+        touchedTaskKeys: ['task-c']
+      })
+    ])
+    expect(projection.planReviews).toEqual([
+      expect.objectContaining({
+        targetKind: 'revision',
+        targetId: revision.revisionId,
+        round: 1,
+        verdict: 'approve'
+      })
+    ])
+    expect(projection.gateAttempts).toEqual([
+      expect.objectContaining({ gateName: 'typecheck:node', exitCode: 0, timedOut: false })
+    ])
+
+    store.purge(WATCHER_ID)
+    const purged = store.project(WATCHER_ID)
+    expect(purged.patches).toEqual([])
+    expect(purged.planReviews).toEqual([])
+    expect(purged.gateAttempts).toEqual([])
+  })
 })
 
 describe('Objective store recovery', () => {

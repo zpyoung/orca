@@ -422,6 +422,76 @@ describe('ObjectiveStore.amendRevision', () => {
     expect(store.hasVerdict('review-before-amendment')).toBe(false)
   })
 
+  it('refuses to upsert a frozen task with nothing written', () => {
+    const revision = ingestAndActivate()
+
+    const result = store.amendRevision({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      amendedAtMs: 400,
+      patch: {
+        digest: 'amend-digest-1',
+        attestation: 'Trying to touch a frozen node',
+        upsertTasks: [upsertTask({ taskKey: 'task-a' })],
+        dropTaskKeys: []
+      },
+      frozenTaskKeys: ['task-a']
+    })
+
+    expect(result).toEqual({ ok: false, reason: 'changes-frozen-node', taskKey: 'task-a' })
+    expect(store.getTask(revision.revisionId, 'task-a')?.spec).toBe('Implement A')
+    const count = database
+      .connection()
+      .prepare('SELECT COUNT(*) AS count FROM revision_amendment WHERE revision_id = ?')
+      .get(revision.revisionId) as { count: number }
+    expect(count.count).toBe(0)
+  })
+
+  it('refuses to drop a frozen task', () => {
+    const revision = ingestAndActivate()
+
+    const result = store.amendRevision({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      amendedAtMs: 400,
+      patch: {
+        digest: 'amend-digest-1',
+        attestation: 'Trying to drop a frozen node',
+        upsertTasks: [],
+        dropTaskKeys: ['task-c']
+      },
+      frozenTaskKeys: ['task-c']
+    })
+
+    expect(result).toEqual({ ok: false, reason: 'changes-frozen-node', taskKey: 'task-c' })
+    expect(store.getTask(revision.revisionId, 'task-c')).not.toBeNull()
+  })
+
+  it('permits an amendment that leaves frozen task keys untouched', () => {
+    const revision = ingestAndActivate()
+
+    const result = store.amendRevision({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      amendedAtMs: 400,
+      patch: {
+        digest: 'amend-digest-1',
+        attestation: 'Corrected B, task-a is frozen',
+        upsertTasks: [upsertTask({ taskKey: 'task-b', deps: ['task-a'] })],
+        dropTaskKeys: []
+      },
+      frozenTaskKeys: ['task-a']
+    })
+
+    expect(result).toEqual({
+      ok: true,
+      revisionId: revision.revisionId,
+      digest: 'amend-digest-1',
+      ordinal: 0,
+      replayed: false
+    })
+  })
+
   it('rejects amending a revision that is not approved', () => {
     const revision = store.ingestPlan({
       watcherId: WATCHER_ID,
