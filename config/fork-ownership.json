@@ -1711,7 +1711,16 @@
       "path": "src/renderer/src/components/native-chat/native-chat-pty-session-options.ts",
       "feature": "native-chat-session-options",
       "kind": "registration",
-      "lines": ["  ): boolean =>", "  const applyReport = ("]
+      "lines": [
+        "import { withUltracodeRung } from './fork-native-chat-session-options/claude-ultracode-effort-rung'",
+        "import { reconcileClaudeUltracodeEffortReport } from './fork-native-chat-session-options/native-chat-session-option-observation'",
+        "  const applyReport = (",
+        "  ): boolean => {",
+        "    const reported = reconcileClaudeUltracodeEffortReport({ agent: args.agent, record, values })",
+        "      markNativeChatSessionOptionReport(args.scopeKey, reported) &&",
+        "      applyNativeChatReportedSessionOptions(record, reported, observedAt)",
+        "    withUltracodeRung(args.agent, withTrackedNativeChatModel(catalog, models, record))"
+      ]
     },
     {
       "path": "src/renderer/src/components/native-chat/native-chat-session-option-cache.ts",
@@ -4763,7 +4772,7 @@
       "removed": 1
     },
     "config/localization-coverage-allowlist.json": {
-      "added": 7,
+      "added": 14,
       "removed": 0
     },
     "config/scripts/build-notification-status-macos.mjs": {
@@ -5431,8 +5440,8 @@
       "removed": 17
     },
     "src/renderer/src/components/native-chat/native-chat-pty-session-options.ts": {
-      "added": 25,
-      "removed": 8
+      "added": 33,
+      "removed": 9
     },
     "src/renderer/src/components/native-chat/native-chat-session-option-cache.ts": {
       "added": 32,

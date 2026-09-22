@@ -222,5 +222,12 @@
     "text": ". Switch to System shell or choose an executable on this host.",
     "dynamic": false,
     "count": 1
+  },
+  {
+    "filePath": "src/renderer/src/components/native-chat/fork-native-chat-session-options/claude-ultracode-effort-rung.ts",
+    "kind": "object-property:label",
+    "text": "Ultracode",
+    "dynamic": false,
+    "count": 1
   }
 ]

@@ -1,0 +1,9 @@
+{
+  "capturedAt": "2026-09-22T11:04:15.685Z",
+  "platform": "darwin",
+  "command": ["claude", "--effort", "high"],
+  "cols": 120,
+  "rows": 40,
+  "note": "claude 2.1.278 already-running session after /effort ultracode",
+  "exitCode": 129
+}

@@ -14,7 +14,10 @@ import type {
   NativeChatSessionOptionObservation
 } from '../../../../../shared/native-chat-types'
 import type { SessionOptionValue } from '../../../../../shared/native-chat-session-options'
-import { matchNativeChatCatalogModelId } from '../../../../../shared/native-chat-session-option-state'
+import {
+  matchNativeChatCatalogModelId,
+  type NativeChatSessionOptionRecord
+} from '../../../../../shared/native-chat-session-option-state'
 
 /**
  * Resolve the catalog id for a model the provider named, most specific first: an
@@ -59,6 +62,31 @@ export function nativeChatReportedValuesFromObservation(args: {
     optionsForModelId(args.agent, args.models, modelId).some((o) => o.id === 'effort')
   ) {
     values.effort = effort
+  }
+  return values
+}
+
+/** Preserve a Claude Ultracode pick when the readable report collapses it to xhigh. */
+export function reconcileClaudeUltracodeEffortReport(args: {
+  agent: AgentType
+  record: NativeChatSessionOptionRecord
+  values: Record<string, SessionOptionValue>
+}): Record<string, SessionOptionValue> {
+  const modelId = typeof args.values.model === 'string' ? args.values.model : null
+  const trackedEffort = modelId ? args.record.valuesByModel[modelId]?.effort : undefined
+  if (
+    args.agent !== 'claude' ||
+    args.values.effort !== 'xhigh' ||
+    trackedEffort?.source !== 'dispatched' ||
+    trackedEffort.value !== 'ultracode'
+  ) {
+    return args.values
+  }
+  const values: Record<string, SessionOptionValue> = {}
+  for (const [id, value] of Object.entries(args.values)) {
+    if (id !== 'effort') {
+      values[id] = value
+    }
   }
   return values
 }

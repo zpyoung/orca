@@ -21,6 +21,8 @@ import {
   readNativeChatSessionOptionCache,
   writeNativeChatSessionOptionCache
 } from './native-chat-session-option-cache'
+import { withUltracodeRung } from './fork-native-chat-session-options/claude-ultracode-effort-rung'
+import { reconcileClaudeUltracodeEffortReport } from './fork-native-chat-session-options/native-chat-session-option-observation'
 import { createSessionOptionAppliers } from './native-chat-session-option-apply'
 import {
   buildNativeChatSessionOptionSnapshot,
@@ -90,9 +92,13 @@ export function createNativeChatPtySessionOptions(
   const applyReport = (
     values: Record<string, SessionOptionValue>,
     observedAt?: number | null
-  ): boolean =>
-    markNativeChatSessionOptionReport(args.scopeKey, values) &&
-    applyNativeChatReportedSessionOptions(record, values, observedAt)
+  ): boolean => {
+    const reported = reconcileClaudeUltracodeEffortReport({ agent: args.agent, record, values })
+    return (
+      markNativeChatSessionOptionReport(args.scopeKey, reported) &&
+      applyNativeChatReportedSessionOptions(record, reported, observedAt)
+    )
+  }
 
   if (args.reportedValues && applyReport(args.reportedValues)) {
     writeNativeChatSessionOptionCache(args.scopeKey, record)
@@ -114,7 +120,8 @@ export function createNativeChatPtySessionOptions(
   if (untrackRetiredModel()) {
     writeNativeChatSessionOptionCache(args.scopeKey, record)
   }
-  const activeModels = (): CatalogModel[] => withTrackedNativeChatModel(catalog, models, record)
+  const activeModels = (): CatalogModel[] =>
+    withUltracodeRung(args.agent, withTrackedNativeChatModel(catalog, models, record))
   let snapshot = buildNativeChatSessionOptionSnapshot({
     catalog,
     models: activeModels(),
