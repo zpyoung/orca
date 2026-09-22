@@ -69,6 +69,7 @@ export type ObjectiveEnrollmentDraft = {
 export type ObjectiveLandingBarAvailability = {
   workspaceKind: ObjectiveWorkspaceKind | null
   worktreeId: string | null
+  parallelUnsupported?: boolean
 }
 
 export type ObjectiveEnrollmentErrorCode =
@@ -92,6 +93,7 @@ export type ObjectiveEnrollmentErrorCode =
   | 'gate-timeout-invalid'
   | 'gate-name-duplicate'
   | 'gates-too-many'
+  | 'gates-unsupported-host'
 
 export type ObjectiveEnrollmentError = {
   code: ObjectiveEnrollmentErrorCode
@@ -192,6 +194,9 @@ export function validateObjectiveEnrollmentDraft(
   }
   if (draft.gates.length > OBJECTIVE_GATES_MAX) {
     errors.push({ code: 'gates-too-many' })
+  }
+  if (draft.gates.length > 0 && landingAvailability.parallelUnsupported) {
+    errors.push({ code: 'gates-unsupported-host' })
   }
   const gateNames = new Set<string>()
   for (const gateDraft of draft.gates) {

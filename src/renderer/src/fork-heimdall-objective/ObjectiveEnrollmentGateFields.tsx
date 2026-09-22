@@ -18,18 +18,22 @@ function GateRow({
   gate,
   index,
   disabled,
+  parallelUnsupported,
   onChange,
   onRemove
 }: {
   gate: ObjectiveEnrollmentGateDraft
   index: number
   disabled: boolean
+  parallelUnsupported: boolean
   onChange: (gate: ObjectiveEnrollmentGateDraft) => void
   onRemove: () => void
 }): React.JSX.Element {
   const nameId = useId()
   const commandId = useId()
   const timeoutId = useId()
+  // rows stay removable on an unsupported host so declared-but-unusable gates can be cleared
+  const fieldsDisabled = disabled || parallelUnsupported
 
   return (
     <div className="grid grid-cols-[1fr_1fr_96px_auto] items-end gap-2">
@@ -40,7 +44,7 @@ function GateRow({
         <Input
           id={nameId}
           value={gate.name}
-          disabled={disabled}
+          disabled={fieldsDisabled}
           placeholder="lint"
           className="h-8 text-xs"
           onChange={(event) => onChange({ ...gate, name: event.currentTarget.value })}
@@ -53,7 +57,7 @@ function GateRow({
         <Input
           id={commandId}
           value={gate.command}
-          disabled={disabled}
+          disabled={fieldsDisabled}
           className="h-8 font-mono text-xs"
           onChange={(event) => onChange({ ...gate, command: event.currentTarget.value })}
         />
@@ -69,7 +73,7 @@ function GateRow({
           max="14400"
           step="1"
           value={gate.timeoutSecondsText}
-          disabled={disabled}
+          disabled={fieldsDisabled}
           placeholder={String(OBJECTIVE_GATE_DEFAULT_TIMEOUT_SECONDS)}
           className="h-8 text-xs tabular-nums"
           onChange={(event) => onChange({ ...gate, timeoutSecondsText: event.currentTarget.value })}
@@ -94,10 +98,12 @@ function GateRow({
 export function ObjectiveEnrollmentGateFields({
   draft,
   disabled,
+  parallelUnsupported,
   onDraftChange
 }: {
   draft: ObjectiveEnrollmentDraft
   disabled: boolean
+  parallelUnsupported: boolean
   onDraftChange: (draft: ObjectiveEnrollmentDraft) => void
 }): React.JSX.Element {
   const atMax = draft.gates.length >= OBJECTIVE_GATES_MAX
@@ -116,12 +122,21 @@ export function ObjectiveEnrollmentGateFields({
           'Gates run on the integrated branch after every plan node has merged, before review and landing. Put the full test suite and other whole-tree checks here, not in plan nodes.'
         )}
       </p>
+      {parallelUnsupported ? (
+        <p className="text-[11px] text-destructive" role="status">
+          {translate(
+            'fork.heimdallObjective.enrollment.gatesUnsupportedHost',
+            "Gates are unavailable on this host's Orca version. Remove any gates below to continue."
+          )}
+        </p>
+      ) : null}
       {draft.gates.map((gate, index) => (
         <GateRow
           key={index}
           gate={gate}
           index={index}
           disabled={disabled}
+          parallelUnsupported={parallelUnsupported}
           onChange={(next) =>
             onDraftChange({
               ...draft,
@@ -143,7 +158,7 @@ export function ObjectiveEnrollmentGateFields({
         variant="outline"
         size="sm"
         className="h-8 text-xs"
-        disabled={disabled || atMax}
+        disabled={disabled || atMax || parallelUnsupported}
         onClick={() =>
           onDraftChange({
             ...draft,

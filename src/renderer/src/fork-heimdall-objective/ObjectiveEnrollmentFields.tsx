@@ -24,6 +24,7 @@ import {
   objectiveTierHelp,
   type ObjectiveEnrollmentHelpCopy
 } from './ObjectiveEnrollmentFieldHelp'
+import { ObjectiveEnrollmentGateFields } from './ObjectiveEnrollmentGateFields'
 import { ObjectiveExistingPlanInput } from './ObjectiveExistingPlanInput'
 import { ObjectiveEnrollmentParallelFields } from './ObjectiveEnrollmentParallelFields'
 import { ObjectiveWorkspacePicker } from './ObjectiveWorkspacePicker'
@@ -239,6 +240,12 @@ export function ObjectiveEnrollmentFields({
           }}
         />
         <ObjectiveEnrollmentParallelFields
+          draft={draft}
+          disabled={disabled}
+          parallelUnsupported={parallelUnsupported}
+          onDraftChange={onDraftChange}
+        />
+        <ObjectiveEnrollmentGateFields
           draft={draft}
           disabled={disabled}
           parallelUnsupported={parallelUnsupported}
