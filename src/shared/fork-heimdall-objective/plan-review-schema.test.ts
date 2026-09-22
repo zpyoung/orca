@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseAndValidatePlanReviewReport } from './plan-review-schema'
+import { PlanReviewReportSchema, parseAndValidatePlanReviewReport } from './plan-review-schema'
 import type { ObjectivePlanAssumption } from './plan-schema'
 
 function report(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -11,6 +11,18 @@ function report(overrides: Record<string, unknown> = {}): Record<string, unknown
     ...overrides
   }
 }
+
+describe('PlanReviewReportSchema', () => {
+  it('rejects an approve verdict alongside a blocking finding', () => {
+    const result = PlanReviewReportSchema.safeParse({
+      verdict: 'approve',
+      assumptions: [],
+      findings: [{ taskKey: null, severity: 'blocking', body: 'block' }],
+      summary: 'x'
+    })
+    expect(result.success).toBe(false)
+  })
+})
 
 describe('parseAndValidatePlanReviewReport', () => {
   it('rejects a malformed report with the schema failure', () => {

@@ -37,6 +37,18 @@ export const PlanReviewReportSchema = z
     summary: z.string().trim().min(1).max(OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH)
   })
   .strict()
+  .superRefine((report, ctx) => {
+    if (
+      report.verdict === 'approve' &&
+      report.findings.some((finding) => finding.severity === 'blocking')
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Plan review approves despite a blocking finding',
+        path: ['verdict']
+      })
+    }
+  })
 export type PlanReviewReport = z.infer<typeof PlanReviewReportSchema>
 
 function assessesEveryAssumptionOnce(
@@ -50,9 +62,9 @@ function assessesEveryAssumptionOnce(
 }
 
 /**
- * Parses a reviewer's plan verdict and enforces the invariants a schema alone cannot express: full,
- * once-each assumption coverage, and an `approve` verdict that is never contradicted by a blocking
- * finding or (when the assumption list is supplied) an unverified assumption other tasks depend on.
+ * Parses a reviewer's plan verdict and enforces the invariants the schema cannot express on its
+ * own: full, once-each assumption coverage, and (when the assumption list is supplied) an
+ * `approve` verdict that never leaves an unverified assumption other tasks depend on.
  */
 export function parseAndValidatePlanReviewReport(
   raw: unknown,
@@ -63,13 +75,7 @@ export function parseAndValidatePlanReviewReport(
   if (!assessesEveryAssumptionOnce(report.assumptions, assumptionCount)) {
     throw new Error('Plan review must assess every assumption exactly once')
   }
-  if (report.verdict !== 'approve') {
-    return report
-  }
-  if (report.findings.some((finding) => finding.severity === 'blocking')) {
-    throw new Error('Plan review approves despite a blocking finding')
-  }
-  if (assumptions !== undefined) {
+  if (report.verdict === 'approve' && assumptions !== undefined) {
     const approvesUnverifiedLoadBearingAssumption = report.assumptions.some((assessment) => {
       if (assessment.status !== 'unverified') {
         return false
