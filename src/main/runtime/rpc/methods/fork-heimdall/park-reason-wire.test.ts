@@ -188,6 +188,27 @@ describe('parallel execution fleet wire projection', () => {
     expect(capable.entries[0]?.parallel).toEqual(source.entries[0]?.parallel)
     expect(capable.entries[0]?.entry.enrollment.kindPayload).toHaveProperty('lanesEnabled', true)
   })
+
+  it('strips gates for a legacy reader even without lane enrollment', () => {
+    const source = snapshot(null)
+    source.entries[0]!.entry.enrollment.kindPayload = {
+      objectiveText: 'Ship it',
+      tier: 'standard',
+      landingBar: 'files-on-disk',
+      maxConcurrency: 3,
+      workspaceKind: 'git',
+      writeTerritory: ['**'],
+      roleAgents: {},
+      sitterOverrides: {},
+      gates: [{ name: 'lint', command: 'pnpm lint', timeoutSeconds: 600 }]
+    }
+
+    const legacy = projectHeimdallFleetSnapshotForClient(source, LEGACY_CONTEXT)
+    const capable = projectHeimdallFleetSnapshotForClient(source, PARALLEL_CONTEXT)
+
+    expect(legacy.entries[0]?.entry.enrollment.kindPayload).not.toHaveProperty('gates')
+    expect(capable.entries[0]?.entry.enrollment.kindPayload).toHaveProperty('gates')
+  })
 })
 
 describe('projectHeimdallDetailParkReasonForClient', () => {
@@ -216,7 +237,8 @@ describe('projectObjectiveDetailParallelForClient', () => {
       workspaceKind: 'git',
       writeTerritory: ['**'],
       roleAgents: {},
-      sitterOverrides: {}
+      sitterOverrides: {},
+      gates: [{ name: 'lint', command: 'pnpm lint', timeoutSeconds: 600 }]
     },
     revisions: [],
     nodes: [
@@ -241,6 +263,7 @@ describe('projectObjectiveDetailParallelForClient', () => {
     const projected = projectObjectiveDetailParallelForClient(source, LEGACY_CONTEXT)
     expect(projected).not.toHaveProperty('parallel')
     expect(projected.contract).not.toHaveProperty('lanesEnabled')
+    expect(projected.contract).not.toHaveProperty('gates')
     expect(projected.nodes[0]).not.toHaveProperty('laneTaskKeys')
   })
 

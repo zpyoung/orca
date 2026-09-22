@@ -1,7 +1,9 @@
-import type {
-  ObjectiveEnrollmentPayload,
-  ObjectiveRoleAgents,
-  ObjectiveSitterOverrides
+import {
+  OBJECTIVE_GATE_DEFAULT_TIMEOUT_SECONDS,
+  type ObjectiveEnrollmentPayload,
+  type ObjectiveGate,
+  type ObjectiveRoleAgents,
+  type ObjectiveSitterOverrides
 } from '../../../shared/fork-heimdall-objective/contract-types'
 import type { EnrollInput } from '../../../shared/fork-heimdall/watcher-types'
 import {
@@ -39,6 +41,13 @@ export function buildObjectiveEnrollmentSubmission(
     }
   }
   const existingPlan = draft.existingPlanText.trim()
+  const gates: ObjectiveGate[] = draft.gates.map((gateDraft) => ({
+    name: gateDraft.name.trim(),
+    command: gateDraft.command.trim(),
+    timeoutSeconds: gateDraft.timeoutSecondsText.trim()
+      ? Number(gateDraft.timeoutSecondsText)
+      : OBJECTIVE_GATE_DEFAULT_TIMEOUT_SECONDS
+  }))
   const parallelKindPayload: ObjectiveEnrollmentPayload = {
     objectiveText: draft.objectiveText.trim(),
     ...(existingPlan ? { existingPlan } : {}),
@@ -49,13 +58,18 @@ export function buildObjectiveEnrollmentSubmission(
     workspaceKind: workspace.workspaceKind,
     writeTerritory: parseWriteTerritory(draft.writeTerritoryText),
     roleAgents,
-    sitterOverrides
+    sitterOverrides,
+    ...(gates.length > 0 ? { gates } : {})
   }
   const kindPayload: EnrollInput['kindPayload'] =
     workspace.parallelExecutionSupported !== false
       ? parallelKindPayload
       : (() => {
-          const { lanesEnabled: _lanesEnabled, ...legacyKindPayload } = parallelKindPayload
+          const {
+            lanesEnabled: _lanesEnabled,
+            gates: _gates,
+            ...legacyKindPayload
+          } = parallelKindPayload
           return { ...legacyKindPayload, maxConcurrency: 1 }
         })()
   return {

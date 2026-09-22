@@ -70,10 +70,13 @@ function degradeParallelListEntry(entry: WatcherListEntry): WatcherListEntry {
     return entry
   }
   const parsed = ObjectiveEnrollmentPayloadSchema.safeParse(enrollment.kindPayload)
-  if (!parsed.success || parsed.data.lanesEnabled === undefined) {
+  if (
+    !parsed.success ||
+    (parsed.data.lanesEnabled === undefined && parsed.data.gates === undefined)
+  ) {
     return entry
   }
-  const { lanesEnabled: _lanesEnabled, ...kindPayload } = parsed.data
+  const { lanesEnabled: _lanesEnabled, gates: _gates, ...kindPayload } = parsed.data
   return { ...entry, enrollment: { ...enrollment, kindPayload } }
 }
 
@@ -133,7 +136,7 @@ export function projectObjectiveDetailParallelForClient(
   if (negotiatedParallelExecution(context)) {
     return detail
   }
-  const { lanesEnabled: _lanesEnabled, ...contract } = detail.contract
+  const { lanesEnabled: _lanesEnabled, gates: _gates, ...contract } = detail.contract
   const nodes = detail.nodes.map((node) => {
     if (node.laneTaskKeys === undefined) {
       return node

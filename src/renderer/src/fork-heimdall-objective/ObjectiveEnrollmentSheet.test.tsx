@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AppState } from '@/store/types'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { getDefaultSettings } from '../../../shared/constants'
@@ -13,6 +13,7 @@ import {
 } from '../../../shared/fork-heimdall-objective/contract-types'
 import { defaultWatcherOwnerDraft } from '../fork-heimdall/watcher-owner-draft'
 import { ObjectiveEnrollmentFields } from './ObjectiveEnrollmentFields'
+import { ObjectiveEnrollmentGateFields } from './ObjectiveEnrollmentGateFields'
 import { buildObjectiveEnrollmentSubmission } from './objective-enrollment-request'
 import {
   isObjectiveLandingBarAvailable,
@@ -45,6 +46,7 @@ function draft(overrides: Partial<ObjectiveEnrollmentDraft> = {}): ObjectiveEnro
       fixChecks: 'inherit',
       merge: 'inherit'
     },
+    gates: [],
     activeBudgetHours: 4,
     turns: '40',
     availableAgentIds: ['codex'],
@@ -90,6 +92,46 @@ function EditableObjectiveFields({
         onWorkspaceChange={() => {}}
         onDraftChange={setCurrentDraft}
       />
+    </TooltipProvider>
+  )
+}
+
+function EditableObjectiveGateFields({
+  onSubmit
+}: {
+  onSubmit: (draft: ObjectiveEnrollmentDraft) => void
+}): React.JSX.Element {
+  const [currentDraft, setCurrentDraft] = useState(() => draft())
+  const [showValidation, setShowValidation] = useState(false)
+  const errors = validateObjectiveEnrollmentDraft(currentDraft, {
+    workspaceKind: 'git',
+    worktreeId: 'worktree'
+  })
+  return (
+    <TooltipProvider delayDuration={400}>
+      <ObjectiveEnrollmentGateFields
+        draft={currentDraft}
+        disabled={false}
+        onDraftChange={setCurrentDraft}
+      />
+      {showValidation
+        ? errors.map((error) => (
+            <p key={error.code} role="alert">
+              {error.code}
+            </p>
+          ))
+        : null}
+      <button
+        type="button"
+        onClick={() => {
+          setShowValidation(true)
+          if (errors.length === 0) {
+            onSubmit(currentDraft)
+          }
+        }}
+      >
+        Start objective
+      </button>
     </TooltipProvider>
   )
 }
@@ -471,5 +513,35 @@ describe('objective enrollment contract', () => {
 
     expect(submission.input.owner).toEqual({ agent: 'claude', model: 'opus', effort: 'high' })
     expect(submission.input.ownerInterventionCapability).toBe('gated')
+  })
+
+  it('adds a gate and sends it in the enrollment submission', () => {
+    const onSubmit = vi.fn()
+    render(<EditableObjectiveGateFields onSubmit={onSubmit} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add gate' }))
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'lint' } })
+    fireEvent.change(screen.getByLabelText('Command'), { target: { value: 'pnpm lint' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Start objective' }))
+
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+    const submittedDraft = onSubmit.mock.calls[0]?.[0] as ObjectiveEnrollmentDraft
+    const submission = buildObjectiveEnrollmentSubmission(submittedDraft, objectiveWorkspace())
+    expect(submission.input.kindPayload).toMatchObject({
+      gates: [{ name: 'lint', command: 'pnpm lint', timeoutSeconds: 1_800 }]
+    })
+  })
+
+  it('shows the invalid gate name error and blocks submit', () => {
+    const onSubmit = vi.fn()
+    render(<EditableObjectiveGateFields onSubmit={onSubmit} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add gate' }))
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Lint' } })
+    fireEvent.change(screen.getByLabelText('Command'), { target: { value: 'pnpm lint' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Start objective' }))
+
+    expect(screen.getByRole('alert').textContent).toBe('gate-name-invalid')
+    expect(onSubmit).not.toHaveBeenCalled()
   })
 })

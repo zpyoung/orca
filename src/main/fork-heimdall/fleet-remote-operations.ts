@@ -39,10 +39,11 @@ export function enrollmentForParallelCompatibility(
   ) {
     return input
   }
-  const { lanesEnabled: _lanesEnabled, ...legacyKindPayload } = input.kindPayload as Record<
-    string,
-    unknown
-  >
+  const {
+    lanesEnabled: _lanesEnabled,
+    gates: _gates,
+    ...legacyKindPayload
+  } = input.kindPayload as Record<string, unknown>
   return {
     ...input,
     kindPayload: { ...legacyKindPayload, maxConcurrency: 1 }

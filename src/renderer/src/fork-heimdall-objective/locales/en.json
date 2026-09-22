@@ -182,7 +182,22 @@
         "removeExistingPlan": "Remove plan",
         "existingPlanPlanOff": "Plan is Off. New objectives require Plan Gated or On unless this same workspace objective already has a usable approved plan. Existing plan source does not count as approval.",
         "planOffRequiresApprovedPlan": "Plan can be Off only when this same objective already has a usable approved plan. Set Plan to Gated or On.",
-        "ownerNotSupported": "The remote host does not support enrolling a watcher with an owner yet. Update it, or leave the owning agent off and try again."
+        "ownerNotSupported": "The remote host does not support enrolling a watcher with an owner yet. Update it, or leave the owning agent off and try again.",
+        "gatesHelpLabel": "Gates help",
+        "gatesHelpSummary": "Named whole-tree commands the kernel runs on the integrated branch after every plan node has merged, before review and landing.",
+        "gatesHelp": {
+          "whenLabel": "When",
+          "when": "After the last plan node merges, before review and landing.",
+          "whatLabel": "What belongs here",
+          "what": "The full test suite and other whole-tree checks, not per-node checks."
+        },
+        "gateName": "Name",
+        "gateCommand": "Command",
+        "gateTimeout": "Timeout (s)",
+        "removeGate": "Remove gate {{n}}",
+        "gates": "Gates",
+        "gatesHelpLine": "Gates run on the integrated branch after every plan node has merged, before review and landing. Put the full test suite and other whole-tree checks here, not in plan nodes.",
+        "addGate": "Add gate"
       },
       "validation": {
         "workspaceRequired": "Choose a workspace.",
@@ -198,7 +213,12 @@
         "roleAgentUnknown": "Agent {{agent}} is not available on the selected workspace host.",
         "activeBudgetInvalid": "Choose a positive active-work budget.",
         "turnBudgetInvalid": "Worker turns must be a whole number of zero or more.",
-        "existingPlanTooLong": "The existing plan must be 65,536 characters or fewer."
+        "existingPlanTooLong": "The existing plan must be 65,536 characters or fewer.",
+        "gateNameInvalid": "Gate name {{name}} must be lowercase letters, digits, or hyphens, starting with a letter or digit, up to 40 characters.",
+        "gateCommandInvalid": "Enter a gate command of up to 8,192 characters.",
+        "gateTimeoutInvalid": "Gate timeout must be a whole number of seconds from 10 to 14,400.",
+        "gateNameDuplicate": "Gate names must be unique.",
+        "gatesTooMany": "Objectives support at most 8 declared gates."
       },
       "detail": {
         "title": "Objective",
