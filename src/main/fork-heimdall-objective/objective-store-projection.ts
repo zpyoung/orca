@@ -20,6 +20,7 @@ import { deriveObjectiveLanes } from '../../shared/fork-heimdall-objective/paral
 import { getLatestAttempts } from '../../shared/fork-heimdall/ledger-queries'
 import { WatcherLedgerSchema, type WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type { ObjectiveDatabase } from './objective-database'
+import { projectGateAttempts } from './objective-store-gate-attempts'
 import {
   CriteriaResultsSchema,
   DependenciesSchema,
@@ -33,6 +34,8 @@ import {
   type RevisionRow,
   type VerdictRow
 } from './objective-store-data'
+import { projectPlanPatches } from './objective-store-plan-patches'
+import { projectPlanReviews } from './objective-store-plan-reviews'
 
 export function projectObjective(
   database: ObjectiveDatabase,
@@ -95,8 +98,8 @@ export function projectObjective(
         .all(watcherId) as unknown as { dispatch_id: string }[]
     ).map((row) => row.dispatch_id)
   )
-  return ObjectiveProjectionSchema.parse(
-    buildProjection(
+  return ObjectiveProjectionSchema.parse({
+    ...buildProjection(
       revisions,
       nodes,
       criteria,
@@ -107,8 +110,11 @@ export function projectObjective(
       isolatedDispatchIds,
       appliedDispatchIds,
       ledger ? WatcherLedgerSchema.parse(ledger) : undefined
-    )
-  )
+    ),
+    patches: projectPlanPatches(db, watcherId),
+    planReviews: projectPlanReviews(db, watcherId),
+    gateAttempts: projectGateAttempts(db, watcherId)
+  })
 }
 
 export function detailObjective(
@@ -227,7 +233,7 @@ function buildProjection(
   isolatedDispatchIds: ReadonlySet<string>,
   appliedDispatchIds: ReadonlySet<string>,
   ledger?: WatcherLedger
-): unknown {
+) {
   const amendmentsByRevision = new Map<string, ReturnType<typeof buildAmendmentProjection>[]>()
   for (const row of amendmentRows) {
     const list = amendmentsByRevision.get(row.revision_id) ?? []

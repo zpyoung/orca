@@ -434,7 +434,10 @@ export class ObjectiveStoreMutations {
         'review_verdict',
         'check_attempt',
         'acceptance_criterion',
+        'gate_attempt',
+        'plan_review',
         'revision_amendment',
+        'plan_patch',
         'plan_node',
         'plan_revision'
       ]) {

@@ -227,12 +227,16 @@ export type AmendRevisionArgs = {
   /** Task keys with an unsettled dispatch, e.g. from `objectiveInFlightTaskKeys`; the store has no
    *  ledger of its own, so a caller that can see one must supply this to guard a running drop. */
   inFlightTaskKeys?: readonly string[]
+  /** Succeeded-or-in-flight task keys a repair must not touch; absent keeps owner amend-revision
+   *  behavior unchanged. */
+  frozenTaskKeys?: readonly string[]
 }
 
 export type RevisionAmendmentRefusal =
   | { ok: false; reason: 'drops-succeeded-node'; taskKey: string }
   | { ok: false; reason: 'drops-in-flight-node'; taskKey: string }
   | { ok: false; reason: 'invalid-dependency-graph'; detail: string }
+  | { ok: false; reason: 'changes-frozen-node'; taskKey: string }
 
 export type RevisionAmendmentApplied = {
   ok: true

@@ -29,105 +29,125 @@ export function amendObjectiveRevision(
   database: ObjectiveDatabase,
   args: AmendRevisionArgs
 ): RevisionAmendmentResult {
+  return runObjectiveMutation(database, (db) => amendObjectiveRevisionInTransaction(db, args))
+}
+
+/**
+ * The amendment body, taking an already-open connection so a caller that must apply an amendment
+ * alongside other writes (e.g. a plan patch's own status transition) can share its transaction
+ * instead of nesting one.
+ */
+export function amendObjectiveRevisionInTransaction(
+  db: Database.Database,
+  args: AmendRevisionArgs
+): RevisionAmendmentResult {
   const patch = RevisionAmendmentPatchSchema.parse(args.patch)
-  return runObjectiveMutation(database, (db): RevisionAmendmentResult => {
-    const revision = db
-      .prepare('SELECT status, payload_json FROM plan_revision WHERE id = ? AND watcher_id = ?')
-      .get(args.revisionId, args.watcherId) as
-      | { status: ObjectiveRevisionStatus; payload_json: string }
-      | undefined
-    if (!revision) {
-      throw new Error('Plan revision was not found for amendment')
-    }
-    if (revision.status !== 'approved') {
-      throw new Error(`Plan revision cannot be amended from ${revision.status}`)
-    }
+  const revision = db
+    .prepare('SELECT status, payload_json FROM plan_revision WHERE id = ? AND watcher_id = ?')
+    .get(args.revisionId, args.watcherId) as
+    | { status: ObjectiveRevisionStatus; payload_json: string }
+    | undefined
+  if (!revision) {
+    throw new Error('Plan revision was not found for amendment')
+  }
+  if (revision.status !== 'approved') {
+    throw new Error(`Plan revision cannot be amended from ${revision.status}`)
+  }
 
-    const replay = db
-      .prepare('SELECT ordinal FROM revision_amendment WHERE revision_id = ? AND digest = ?')
-      .get(args.revisionId, patch.digest) as { ordinal: number } | undefined
-    if (replay) {
-      return {
-        ok: true,
-        revisionId: args.revisionId,
-        digest: patch.digest,
-        ordinal: replay.ordinal,
-        replayed: true
-      }
+  const replay = db
+    .prepare('SELECT ordinal FROM revision_amendment WHERE revision_id = ? AND digest = ?')
+    .get(args.revisionId, patch.digest) as { ordinal: number } | undefined
+  if (replay) {
+    return {
+      ok: true,
+      revisionId: args.revisionId,
+      digest: patch.digest,
+      ordinal: replay.ordinal,
+      replayed: true
     }
+  }
 
-    const currentPlan = parseJson(PlannerReportSchema, revision.payload_json, 'plan payload').plan
-    const unknownDrops = unknownAmendmentDropTaskKeys(currentPlan, patch)
-    if (unknownDrops.length > 0) {
-      throw new Error(`Amendment cannot drop unknown task key ${unknownDrops[0]}`)
+  const frozenTaskKeys = new Set(args.frozenTaskKeys ?? [])
+  for (const task of patch.upsertTasks) {
+    if (frozenTaskKeys.has(task.taskKey)) {
+      return { ok: false, reason: 'changes-frozen-node', taskKey: task.taskKey }
     }
+  }
+  for (const taskKey of patch.dropTaskKeys) {
+    if (frozenTaskKeys.has(taskKey)) {
+      return { ok: false, reason: 'changes-frozen-node', taskKey }
+    }
+  }
 
-    // a plan row only ever records a *successful* dispatch; an in-flight node has none either, so
-    // the caller-supplied ledger read is the only signal that distinguishes it from a failed one
-    const succeededTaskKeys = new Set(
-      (
-        db
-          .prepare(
-            'SELECT task_key FROM plan_node WHERE revision_id = ? AND dispatch_id IS NOT NULL'
-          )
-          .all(args.revisionId) as { task_key: string }[]
-      ).map((row) => row.task_key)
+  const currentPlan = parseJson(PlannerReportSchema, revision.payload_json, 'plan payload').plan
+  const unknownDrops = unknownAmendmentDropTaskKeys(currentPlan, patch)
+  if (unknownDrops.length > 0) {
+    throw new Error(`Amendment cannot drop unknown task key ${unknownDrops[0]}`)
+  }
+
+  // a plan row only ever records a *successful* dispatch; an in-flight node has none either, so
+  // the caller-supplied ledger read is the only signal that distinguishes it from a failed one
+  const succeededTaskKeys = new Set(
+    (
+      db
+        .prepare('SELECT task_key FROM plan_node WHERE revision_id = ? AND dispatch_id IS NOT NULL')
+        .all(args.revisionId) as { task_key: string }[]
+    ).map((row) => row.task_key)
+  )
+  const inFlightTaskKeys = new Set(args.inFlightTaskKeys ?? [])
+  for (const taskKey of patch.dropTaskKeys) {
+    if (succeededTaskKeys.has(taskKey)) {
+      return { ok: false, reason: 'drops-succeeded-node', taskKey }
+    }
+    if (inFlightTaskKeys.has(taskKey)) {
+      return { ok: false, reason: 'drops-in-flight-node', taskKey }
+    }
+  }
+
+  const amended = applyRevisionAmendmentPatch(currentPlan, patch)
+  if (!amended.ok) {
+    return amended
+  }
+
+  db.prepare(
+    'UPDATE plan_revision SET payload_json = ?, digest = ? WHERE id = ? AND watcher_id = ?'
+  ).run(JSON.stringify({ plan: amended.plan }), patch.digest, args.revisionId, args.watcherId)
+  db.prepare('DELETE FROM review_verdict WHERE revision_id = ?').run(args.revisionId)
+
+  for (const taskKey of patch.dropTaskKeys) {
+    dropAmendedNode(db, args.revisionId, taskKey)
+  }
+  const ordinalByTaskKey = new Map(
+    amended.plan.map((task, ordinal) => [task.taskKey, ordinal] as const)
+  )
+  for (const [taskKey, ordinal] of ordinalByTaskKey) {
+    db.prepare('UPDATE plan_node SET ordinal = ? WHERE revision_id = ? AND task_key = ?').run(
+      ordinal,
+      args.revisionId,
+      taskKey
     )
-    const inFlightTaskKeys = new Set(args.inFlightTaskKeys ?? [])
-    for (const taskKey of patch.dropTaskKeys) {
-      if (succeededTaskKeys.has(taskKey)) {
-        return { ok: false, reason: 'drops-succeeded-node', taskKey }
-      }
-      if (inFlightTaskKeys.has(taskKey)) {
-        return { ok: false, reason: 'drops-in-flight-node', taskKey }
-      }
-    }
+  }
+  for (const task of patch.upsertTasks) {
+    upsertAmendedNode(db, args, task, ordinalByTaskKey.get(task.taskKey)!)
+  }
 
-    const amended = applyRevisionAmendmentPatch(currentPlan, patch)
-    if (!amended.ok) {
-      return amended
-    }
-
-    db.prepare(
-      'UPDATE plan_revision SET payload_json = ?, digest = ? WHERE id = ? AND watcher_id = ?'
-    ).run(JSON.stringify({ plan: amended.plan }), patch.digest, args.revisionId, args.watcherId)
-    db.prepare('DELETE FROM review_verdict WHERE revision_id = ?').run(args.revisionId)
-
-    for (const taskKey of patch.dropTaskKeys) {
-      dropAmendedNode(db, args.revisionId, taskKey)
-    }
-    const ordinalByTaskKey = new Map(
-      amended.plan.map((task, ordinal) => [task.taskKey, ordinal] as const)
-    )
-    for (const [taskKey, ordinal] of ordinalByTaskKey) {
-      db.prepare('UPDATE plan_node SET ordinal = ? WHERE revision_id = ? AND task_key = ?').run(
-        ordinal,
-        args.revisionId,
-        taskKey
-      )
-    }
-    for (const task of patch.upsertTasks) {
-      upsertAmendedNode(db, args, task, ordinalByTaskKey.get(task.taskKey)!)
-    }
-
-    const ordinal = nextAmendmentOrdinal(db, args.revisionId)
-    db.prepare(
-      `INSERT INTO revision_amendment (
+  const ordinal = nextAmendmentOrdinal(db, args.revisionId)
+  db.prepare(
+    `INSERT INTO revision_amendment (
         id, watcher_id, revision_id, ordinal, digest, amended_at_ms, attestation, touched_task_keys_json
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      naturalId('objective_amendment', args.revisionId, patch.digest),
-      args.watcherId,
-      args.revisionId,
-      ordinal,
-      patch.digest,
-      args.amendedAtMs,
-      patch.attestation,
-      JSON.stringify(revisionAmendmentTouchedTaskKeys(patch))
-    )
+  ).run(
+    naturalId('objective_amendment', args.revisionId, patch.digest),
+    args.watcherId,
+    args.revisionId,
+    ordinal,
+    patch.digest,
+    args.amendedAtMs,
+    patch.attestation,
+    JSON.stringify(revisionAmendmentTouchedTaskKeys(patch))
+  )
 
-    return { ok: true, revisionId: args.revisionId, digest: patch.digest, ordinal, replayed: false }
-  })
+  return { ok: true, revisionId: args.revisionId, digest: patch.digest, ordinal, replayed: false }
 }
 
 function dropAmendedNode(db: Database.Database, revisionId: string, taskKey: string): void {
