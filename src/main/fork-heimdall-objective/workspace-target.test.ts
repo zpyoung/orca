@@ -68,6 +68,34 @@ describe('resolveObjectiveWorkspaceTarget', () => {
     })
   })
 
+  it('resolves a canonical folder workspace by its persisted folder key', async () => {
+    const resolveRuntimeFileTarget = vi.fn().mockResolvedValue({
+      ...fileTarget('local'),
+      worktree: {
+        id: 'folder:folder-1',
+        repoId: 'folder-workspace:group-1',
+        path: '/srv/project'
+      }
+    })
+    const canonical = {
+      ...enrollment(),
+      repoId: 'folder-workspace:group-1',
+      worktreeId: 'folder:folder-1'
+    }
+
+    const target = await resolveObjectiveWorkspaceTarget(
+      { resolveRuntimeFileTarget } as unknown as OrcaRuntimeService,
+      canonical
+    )
+
+    expect(resolveRuntimeFileTarget).toHaveBeenCalledWith('id:folder:folder-1')
+    expect(target).toMatchObject({
+      kind: 'folder',
+      executionHostId: 'local',
+      workspacePath: '/srv/project'
+    })
+  })
+
   it('keeps the canonical folder repo root bound to its enrolled SSH host', async () => {
     const provider = {} as IFilesystemProvider
     registerSshFilesystemProvider(SSH_TARGET, provider)

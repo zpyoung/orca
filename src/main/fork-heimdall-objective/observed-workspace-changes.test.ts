@@ -1,12 +1,14 @@
 import { chmod, mkdir, mkdtemp, readdir, rm, symlink, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, posix } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { gitExecFileAsync } from '../git/command-runner/git-exec-file'
 import {
   registerSshFilesystemProvider,
   unregisterSshFilesystemProvider
 } from '../providers/ssh-filesystem-dispatch'
+import { registerSshGitProvider, unregisterSshGitProvider } from '../providers/ssh-git-dispatch'
+import type { SshGitProvider } from '../providers/ssh-git-provider'
 import type { FileStat, IFilesystemProvider } from '../providers/types'
 import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
 import type { ObjectiveWorkspaceTarget } from './content-identity'
@@ -74,6 +76,14 @@ async function gitRepository(prefix: string): Promise<string> {
   return root
 }
 
+async function gitRepositoryWithIgnore(prefix: string, pattern: string): Promise<string> {
+  const root = await gitRepository(prefix)
+  await writeFile(join(root, '.gitignore'), `${pattern}\n`)
+  await writeFile(join(root, 'src', 'tracked.ts'), 'before\n')
+  await commitAll(root, 'initial')
+  return root
+}
+
 type MemoryNode =
   | { type: 'directory'; mtime: number }
   | { type: 'file'; content: string; mtime: number }
@@ -138,6 +148,14 @@ class MemoryFilesystemProvider {
     return this.lstat(path)
   }
 
+  async realpath(path: string): Promise<string> {
+    this.observedPaths.push(path)
+    if (!this.nodes.has(path)) {
+      throw this.missing()
+    }
+    return path
+  }
+
   async writeFile(path: string, content: string): Promise<void> {
     this.observedPaths.push(path)
     this.put(path, content)
@@ -182,6 +200,7 @@ class MemoryFilesystemProvider {
 
 afterEach(async () => {
   unregisterSshFilesystemProvider(SSH_TARGET)
+  unregisterSshGitProvider(SSH_TARGET)
   await Promise.all(
     temporaryDirectories
       .splice(0)
@@ -222,6 +241,216 @@ describe('objective observed workspace changes', () => {
         writeTerritory: ['src/**']
       })
     ).resolves.toEqual({ ok: true, changedPaths: ['src/changed.ts'] })
+  })
+
+  it('accepts an existing ignored report without allowing an observed tracked change to be omitted', async () => {
+    const root = await gitRepositoryWithIgnore(
+      'orca-objective-observed-ignored-',
+      'generated/*.json'
+    )
+    const target = gitTarget(root)
+    await captureObjectiveWorkspaceBaseline(target, 'ignored-attempt')
+
+    await writeFile(join(root, 'src', 'tracked.ts'), 'after\n')
+    await mkdir(join(root, 'generated'))
+    await writeFile(join(root, 'generated', 'cache.json'), '{"generated":true}\n')
+
+    await expect(
+      validateObjectiveWorkspaceChanges({
+        target,
+        attemptFingerprint: 'ignored-attempt',
+        reportedFiles: ['src/tracked.ts', 'generated/cache.json'],
+        writeTerritory: ['src/**', 'generated/**']
+      })
+    ).resolves.toEqual({
+      ok: true,
+      changedPaths: ['generated/cache.json', 'src/tracked.ts']
+    })
+    await expect(
+      validateObjectiveWorkspaceChanges({
+        target,
+        attemptFingerprint: 'ignored-attempt',
+        reportedFiles: ['generated/cache.json'],
+        writeTerritory: ['src/**', 'generated/**']
+      })
+    ).resolves.toEqual({
+      ok: false,
+      reason: 'reported-files-do-not-match-observed-changes',
+      observedFiles: ['src/tracked.ts']
+    })
+  })
+
+  it('rejects a reported ignored path that does not exist', async () => {
+    const root = await gitRepositoryWithIgnore(
+      'orca-objective-observed-missing-ignored-',
+      'generated/*.json'
+    )
+    const target = gitTarget(root)
+    await captureObjectiveWorkspaceBaseline(target, 'missing-ignored-attempt')
+
+    await expect(
+      validateObjectiveWorkspaceChanges({
+        target,
+        attemptFingerprint: 'missing-ignored-attempt',
+        reportedFiles: ['generated/missing.json'],
+        writeTerritory: ['generated/**']
+      })
+    ).resolves.toEqual({
+      ok: false,
+      reason: 'reported-files-do-not-match-observed-changes',
+      observedFiles: []
+    })
+  })
+
+  it('rejects an existing ignored report outside write territory', async () => {
+    const root = await gitRepositoryWithIgnore(
+      'orca-objective-observed-ignored-territory-',
+      'docs/*.cache'
+    )
+    const target = gitTarget(root)
+    await captureObjectiveWorkspaceBaseline(target, 'ignored-territory-attempt')
+    await mkdir(join(root, 'docs'))
+    await writeFile(join(root, 'docs', 'generated.cache'), 'outside\n')
+
+    await expect(
+      validateObjectiveWorkspaceChanges({
+        target,
+        attemptFingerprint: 'ignored-territory-attempt',
+        reportedFiles: ['docs/generated.cache'],
+        writeTerritory: ['src/**']
+      })
+    ).resolves.toEqual({
+      ok: false,
+      reason: 'reported-files-invalid',
+      observedFiles: []
+    })
+  })
+
+  it('rejects an unsafe reported path before checking whether it is ignored', async () => {
+    const root = await gitRepositoryWithIgnore('orca-objective-observed-unsafe-ignored-', '*.cache')
+    const target = gitTarget(root)
+    await captureObjectiveWorkspaceBaseline(target, 'unsafe-ignored-attempt')
+
+    await expect(
+      validateObjectiveWorkspaceChanges({
+        target,
+        attemptFingerprint: 'unsafe-ignored-attempt',
+        reportedFiles: ['../escape.cache'],
+        writeTerritory: ['**']
+      })
+    ).resolves.toEqual({
+      ok: false,
+      reason: 'reported-files-invalid',
+      observedFiles: []
+    })
+  })
+
+  it.skipIf(process.platform === 'win32')(
+    'rejects an ignored symlink that resolves outside the workspace',
+    async () => {
+      const root = await gitRepositoryWithIgnore(
+        'orca-objective-observed-ignored-symlink-',
+        'generated/*.json'
+      )
+      const outside = await temporaryDirectory('orca-objective-observed-ignored-outside-')
+      await writeFile(join(outside, 'outside.json'), '{"outside":true}\n')
+      const target = gitTarget(root)
+      await captureObjectiveWorkspaceBaseline(target, 'ignored-symlink-attempt')
+      await mkdir(join(root, 'generated'))
+      await symlink(join(outside, 'outside.json'), join(root, 'generated', 'link.json'))
+
+      await expect(
+        validateObjectiveWorkspaceChanges({
+          target,
+          attemptFingerprint: 'ignored-symlink-attempt',
+          reportedFiles: ['generated/link.json'],
+          writeTerritory: ['generated/**']
+        })
+      ).resolves.toEqual({
+        ok: false,
+        reason: 'reported-files-do-not-match-observed-changes',
+        observedFiles: []
+      })
+    }
+  )
+
+  it('does not accept an unchanged tracked path merely because it matches an ignore rule', async () => {
+    const root = await gitRepository('orca-objective-observed-tracked-ignore-')
+    await writeFile(join(root, '.gitignore'), 'src/*.log\n')
+    await writeFile(join(root, 'src', 'tracked.log'), 'tracked\n')
+    await git(root, ['add', '-f', '.gitignore', 'src/tracked.log'])
+    await commitAll(root, 'initial')
+    const target = gitTarget(root)
+    await captureObjectiveWorkspaceBaseline(target, 'tracked-ignore-attempt')
+
+    await expect(
+      validateObjectiveWorkspaceChanges({
+        target,
+        attemptFingerprint: 'tracked-ignore-attempt',
+        reportedFiles: ['src/tracked.log'],
+        writeTerritory: ['src/**']
+      })
+    ).resolves.toEqual({
+      ok: false,
+      reason: 'reported-files-do-not-match-observed-changes',
+      observedFiles: []
+    })
+  })
+
+  it('checks ignored reports through the SSH Git and filesystem authorities', async () => {
+    const fileProvider = new MemoryFilesystemProvider()
+    const exec = vi.fn(async (args: string[]) => {
+      if (args[0] === 'rev-parse' && args[1] === '--absolute-git-dir') {
+        return { stdout: '/srv/objective/.git\n', stderr: '' }
+      }
+      if (args[0] === 'rev-parse' && args[1] === '--verify') {
+        return { stdout: `${'1'.repeat(40)}\n`, stderr: '' }
+      }
+      if (args[0] === 'status') {
+        return { stdout: '', stderr: '' }
+      }
+      throw new Error(`Unexpected Git command: ${args.join(' ')}`)
+    })
+    const checkIgnoredPaths = vi.fn(async (_worktreePath: string, paths: string[]) =>
+      paths.filter((path) => path === 'generated/remote.json')
+    )
+    const gitProvider = { exec, checkIgnoredPaths } as unknown as SshGitProvider
+    registerSshFilesystemProvider(SSH_TARGET, fileProvider as unknown as IFilesystemProvider)
+    registerSshGitProvider(SSH_TARGET, gitProvider)
+    const workspacePath = '/srv/objective'
+    const target: ObjectiveWorkspaceTarget = {
+      kind: 'git',
+      executionHostId: `ssh:${SSH_TARGET}`,
+      workspacePath,
+      fileProvider: fileProvider as unknown as IFilesystemProvider,
+      gitTarget: {
+        executionHostId: `ssh:${SSH_TARGET}`,
+        worktree: {
+          id: `objective-remote::${workspacePath}`,
+          repoId: 'objective-remote',
+          path: workspacePath,
+          git: {
+            path: workspacePath,
+            branch: 'main',
+            isBare: false,
+            isMainWorktree: true
+          }
+        } as unknown as RuntimeGitTarget['worktree']
+      }
+    }
+    await captureObjectiveWorkspaceBaseline(target, 'ssh-ignored-attempt')
+    fileProvider.put('/srv/objective/generated/remote.json', '{"remote":true}\n')
+
+    await expect(
+      validateObjectiveWorkspaceChanges({
+        target,
+        attemptFingerprint: 'ssh-ignored-attempt',
+        reportedFiles: ['generated/remote.json'],
+        writeTerritory: ['generated/**']
+      })
+    ).resolves.toEqual({ ok: true, changedPaths: ['generated/remote.json'] })
+    expect(checkIgnoredPaths).toHaveBeenCalledWith('/srv/objective', ['generated/remote.json'])
+    expect(fileProvider.observedPaths.every((path) => path.startsWith('/srv/objective'))).toBe(true)
   })
 
   it.skipIf(process.platform === 'win32')(
@@ -396,7 +625,8 @@ describe('objective observed workspace changes', () => {
 
     expect(result).toEqual({
       ok: false,
-      reason: 'observed-change-outside-write-territory:docs/escape.md'
+      reason: 'observed-change-outside-write-territory:docs/escape.md',
+      observedFiles: ['docs/escape.md']
     })
   })
 
@@ -416,7 +646,8 @@ describe('objective observed workspace changes', () => {
       })
     ).resolves.toEqual({
       ok: false,
-      reason: 'reported-files-do-not-match-observed-changes'
+      reason: 'reported-files-do-not-match-observed-changes',
+      observedFiles: ['src/hidden.ts']
     })
   })
 

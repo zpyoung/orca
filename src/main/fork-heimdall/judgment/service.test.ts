@@ -6,13 +6,14 @@ import type { ObjectiveWorld } from '../../../shared/fork-heimdall-objective/det
 import type { JudgmentQuestionRequest } from '../../../shared/fork-heimdall/judgment/types'
 import { HeimdallDatabase } from '../database'
 import { HeimdallLedgerStore } from '../ledger-store'
+import { JudgmentClientFailure, type JudgmentClientFailureDiagnostic } from './client'
+import { computeJudgmentIdentity } from './identity'
 import { JudgmentService, type JudgmentServiceDependencies } from './service'
 import {
   JUDGMENT_ANSWER_OBSERVATION,
   JUDGMENT_OUTCOME_OBSERVATION,
   JudgmentAnswerStore
 } from './store'
-import { computeJudgmentIdentity } from './identity'
 
 const watcherId = 'judgment-watcher'
 const requests: JudgmentQuestionRequest[] = [
@@ -315,11 +316,12 @@ describe('durable judgment evaluation', () => {
     expect(calls).toBe(1)
   })
 
-  it('records provider failure once and never retries unchanged state on a later tick', async () => {
+  it('records an unknown provider failure once without persisting arbitrary error text', async () => {
+    const secret = 'secret provider error'
     dependencies.createClient = () => ({
       evaluate: async () => {
         calls += 1
-        throw new Error('secret provider error')
+        throw new Error(secret)
       }
     })
     const service = new JudgmentService(dependencies)
@@ -330,10 +332,92 @@ describe('durable judgment evaluation', () => {
       requests,
       authority: 'local-desktop' as const
     }
-    expect((await service.evaluate(input)).status).toBe('unavailable')
-    expect((await service.evaluate(input)).status).toBe('unavailable')
+    const first = await service.evaluate(input)
+    const replay = await service.evaluate(input)
+    expect(first.status).toBe('unavailable')
+    expect(first.reason).not.toContain(secret)
+    expect(replay.reason).toBe(first.reason)
     expect(calls).toBe(1)
-    expect(JSON.stringify(ledger.read(watcherId))).not.toContain('secret provider error')
+    expect(JSON.stringify(ledger.read(watcherId))).not.toContain(secret)
+  })
+
+  it('persists distinct safe client failure categories and replays them without new calls', async () => {
+    const unsafeText = 'private-key provider-body'
+    const cases: {
+      diagnostic: JudgmentClientFailureDiagnostic
+      reasonCode: string
+    }[] = [
+      { diagnostic: { code: 'timeout' }, reasonCode: 'timeout' },
+      {
+        diagnostic: { code: 'http-status', status: 503 },
+        reasonCode: 'http-status:503'
+      },
+      {
+        diagnostic: { code: 'retry-exhausted', status: 429, attempts: 3 },
+        reasonCode: 'retry-exhausted:429'
+      },
+      {
+        diagnostic: { code: 'state-size' },
+        reasonCode: 'state-size'
+      },
+      {
+        diagnostic: { code: 'request-size' },
+        reasonCode: 'request-size'
+      },
+      {
+        diagnostic: { code: 'response-size' },
+        reasonCode: 'response-size'
+      },
+      {
+        diagnostic: { code: 'malformed-response' },
+        reasonCode: 'malformed-response'
+      }
+    ]
+
+    for (const [index, testCase] of cases.entries()) {
+      dependencies.createClient = () => ({
+        evaluate: async () => {
+          calls += 1
+          throw new JudgmentClientFailure(unsafeText, testCase.diagnostic)
+        }
+      })
+      const input = {
+        watcherId,
+        contentIdentity: `failure-${index}`,
+        world: world(),
+        requests,
+        authority: 'local-desktop' as const
+      }
+      const callsBefore = calls
+      const first = await new JudgmentService(dependencies).evaluate(input)
+      const replay = await new JudgmentService(dependencies).evaluate(input)
+      expect(first.status).toBe('unavailable')
+      expect(first.reason).toContain(testCase.reasonCode)
+      expect(replay.reason).toBe(first.reason)
+      expect(calls).toBe(callsBefore + 1)
+    }
+    const persisted = JSON.stringify(ledger.read(watcherId))
+    expect(persisted).not.toContain('private-key')
+    expect(persisted).not.toContain('provider-body')
+  })
+
+  it('classifies a malformed result returned through the client port', async () => {
+    dependencies.createClient = () => ({
+      evaluate: async () => {
+        calls += 1
+        return { model: 'jev-test', answers: {} }
+      }
+    })
+    const result = await new JudgmentService(dependencies).evaluate({
+      watcherId,
+      contentIdentity: 'malformed-client-result',
+      world: world(),
+      requests,
+      authority: 'local-desktop'
+    })
+    expect(result.status).toBe('unavailable')
+    expect(result.reason).toContain('malformed-response')
+    expect(calls).toBe(1)
   })
 
   it('does not repeat an invocation interrupted after its durable pending marker', async () => {
@@ -369,7 +453,7 @@ describe('durable judgment evaluation', () => {
       authority: 'local-desktop'
     })
     expect(result.status).toBe('unavailable')
-    expect(result.reason).toContain('exceeds')
+    expect(result.reason).toContain('state-size')
     expect(calls).toBe(0)
   })
 

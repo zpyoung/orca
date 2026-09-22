@@ -1,3 +1,4 @@
+import { HEIMDALL_PARALLEL_EXECUTION_UNSUPPORTED_NOTE } from '../../shared/fork-heimdall/capability'
 import type {
   HeimdallFleetSnapshot,
   WatcherDetail,
@@ -18,6 +19,7 @@ export type RemoteFleetProjection = {
   identity: FleetEnvironmentIdentity
   reachable: boolean
   commandSupport: HeimdallCommandSupport
+  parallelExecutionSupport: HeimdallCommandSupport
 }
 
 export function routeRemoteFleetEntry(
@@ -52,10 +54,17 @@ export function projectRemoteFleetEntry(
       : projection.commandSupport === 'unknown'
         ? HEIMDALL_COMMANDS_UNVERIFIED_DETAIL
         : entry.readOnlyReason
+  const capabilityNotes =
+    entry.entry.enrollment.kind === 'objective' &&
+    projection.parallelExecutionSupport === 'unsupported' &&
+    !entry.capabilityNotes.includes(HEIMDALL_PARALLEL_EXECUTION_UNSUPPORTED_NOTE)
+      ? [...entry.capabilityNotes, HEIMDALL_PARALLEL_EXECUTION_UNSUPPORTED_NOTE]
+      : entry.capabilityNotes
   return {
     ...entry,
     contact: ownerReachable ? entry.contact : 'unverifiable',
-    readOnlyReason
+    readOnlyReason,
+    capabilityNotes
   }
 }
 

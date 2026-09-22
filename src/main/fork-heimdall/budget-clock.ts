@@ -23,6 +23,8 @@ export type BudgetClock = {
   close(handle: IntervalHandle, reason: IntervalCloseReason): void
   recoverOnStart(watcherId: string): boolean
   current(watcherId: string): IntervalHandle | null
+  /** Returns only the interval whose sampler is owned by this clock instance. */
+  owned(watcherId: string): IntervalHandle | null
 }
 
 export type HeimdallBudgetClockOptions = {
@@ -41,6 +43,7 @@ type DurableInterval = {
 type OwnedInterval = DurableInterval & {
   timer: NodeJS.Timeout
   failure: Error | null
+  references: number
 }
 
 /** Ledger-backed active-time clock. It owns timers only while observable work is active. */
@@ -61,12 +64,22 @@ export class HeimdallBudgetClock implements BudgetClock {
 
   open(watcherId: string, cause: IntervalCause): IntervalHandle {
     this.requireWatcherId(watcherId)
-    if (cause !== 'action-in-flight' && cause !== 'worker-dispatched') {
+    if (
+      cause !== 'action-in-flight' &&
+      cause !== 'worker-dispatched' &&
+      cause !== 'owner-in-flight'
+    ) {
       throw new Error(`Unknown Heimdall budget interval cause: ${String(cause)}`)
     }
     const ownedInterval = this.active.get(watcherId)
     if (ownedInterval) {
-      throw new Error(`Heimdall watcher ${watcherId} already has an open budget interval`)
+      if (ownedInterval.closedAtMs !== null) {
+        throw new Error(
+          `Heimdall budget interval ${ownedInterval.handle.intervalId} is already closed`
+        )
+      }
+      ownedInterval.references += 1
+      return ownedInterval.handle
     }
     const durableIntervals = this.foldIntervals(this.ledger.read(watcherId).entries)
     if (durableIntervals.some((interval) => interval.closedAtMs === null)) {
@@ -100,7 +113,8 @@ export class HeimdallBudgetClock implements BudgetClock {
       checkpointAtMs: null,
       closedAtMs: null,
       timer: setInterval(() => this.sample(watcherId), ACTIVE_TIME_CHECKPOINT_MS),
-      failure: null
+      failure: null,
+      references: 1
     }
     owned.timer.unref?.()
     this.active.set(watcherId, owned)
@@ -171,7 +185,10 @@ export class HeimdallBudgetClock implements BudgetClock {
     if (interval.closedAtMs !== null) {
       throw new Error(`Heimdall budget interval ${handle.intervalId} is already closed`)
     }
-
+    if (interval.references > 1) {
+      interval.references -= 1
+      return
+    }
     const lastDurableAtMs = interval.checkpointAtMs ?? interval.openedAtMs
     const atMs =
       reason === 'contact-lost' ? lastDurableAtMs : Math.max(this.timestamp(), lastDurableAtMs)
@@ -227,6 +244,11 @@ export class HeimdallBudgetClock implements BudgetClock {
       }
     }
     return true
+  }
+
+  owned(watcherId: string): IntervalHandle | null {
+    this.requireWatcherId(watcherId)
+    return this.active.get(watcherId)?.handle ?? null
   }
 
   current(watcherId: string): IntervalHandle | null {

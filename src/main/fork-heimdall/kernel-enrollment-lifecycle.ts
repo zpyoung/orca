@@ -141,7 +141,8 @@ export async function enrollWatcher(
       {
         capabilities: authorized.capabilities,
         budget,
-        kindPayload: authorized.kindPayload
+        kindPayload: authorized.kindPayload,
+        owner: authorized.owner
       },
       startsNewBudgetGeneration
         ? () => dependencies.appendBudgetGeneration(existing.watcherId)

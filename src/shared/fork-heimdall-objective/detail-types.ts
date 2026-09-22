@@ -1,6 +1,8 @@
 import { z } from 'zod'
+import { ReportValidationProvenanceSchema } from '../fork-heimdall/effect-certainty'
 import { BudgetPolicySchema } from '../fork-heimdall/budget'
 import { JudgmentSnapshotSchema } from '../fork-heimdall/judgment/types'
+import { OWNER_INTERVENTION_TEXT_MAX_LENGTH } from '../fork-heimdall/owner/intervention'
 import {
   ObjectiveCapabilitiesSchema,
   ObjectiveEnrollmentPayloadSchema,
@@ -9,6 +11,7 @@ import {
   ObjectiveWorkspacePathSchema,
   ObjectiveWorkspaceKindSchema
 } from './contract-types'
+import { ObjectiveParallelProjectionSchema } from './parallel-types'
 
 const IdSchema = z.string().trim().min(1).max(1_024)
 const TimestampSchema = z.number().int().nonnegative()
@@ -60,6 +63,19 @@ export const ObjectiveCriterionProjectionSchema = z
   )
 export type ObjectiveCriterionProjection = z.infer<typeof ObjectiveCriterionProjectionSchema>
 
+export const ObjectiveRevisionAmendmentProjectionSchema = z
+  .object({
+    ordinal: z.number().int().nonnegative(),
+    digest: IdSchema,
+    amendedAtMs: TimestampSchema,
+    attestation: z.string().trim().min(1).max(OWNER_INTERVENTION_TEXT_MAX_LENGTH),
+    touchedTaskKeys: z.array(IdSchema).max(128)
+  })
+  .strict()
+export type ObjectiveRevisionAmendmentProjection = z.infer<
+  typeof ObjectiveRevisionAmendmentProjectionSchema
+>
+
 export const ObjectiveRevisionProjectionSchema = z
   .object({
     id: IdSchema,
@@ -68,7 +84,9 @@ export const ObjectiveRevisionProjectionSchema = z
     digest: IdSchema,
     createdByDispatchId: IdSchema.nullable(),
     createdAtMs: TimestampSchema,
-    approvedAtMs: TimestampSchema.nullable()
+    approvedAtMs: TimestampSchema.nullable(),
+    // optional so fixtures built before amendments existed (outside this module's ownership) stay valid
+    amendments: z.array(ObjectiveRevisionAmendmentProjectionSchema).max(1_024).optional()
   })
   .strict()
 export type ObjectiveRevisionProjection = z.infer<typeof ObjectiveRevisionProjectionSchema>
@@ -94,6 +112,9 @@ export const ObjectiveVerdictProjectionSchema = z
     verdict: ObjectiveVerdictSchema,
     contentIdentity: IdSchema,
     reportDigest: IdSchema,
+    // optional so fixtures built before this field existed (outside this module's ownership) stay
+    // valid; true for a `skip-review` verdict, since no real reviewer ever produced that approval
+    synthesizedByOwner: z.boolean().optional(),
     atMs: TimestampSchema
   })
   .strict()
@@ -141,6 +162,8 @@ export const ObjectivePendingReportSchema = z
     outcome: z.enum(['succeeded', 'failed']),
     reportPath: IdSchema.nullable(),
     filesModified: z.array(ObjectiveWorkspacePathSchema).max(256),
+    evidenceIssue: z.literal('files-modified-malformed').optional(),
+    reportValidation: ReportValidationProvenanceSchema.optional(),
     orchestrationTaskId: IdSchema.nullable(),
     taskKey: IdSchema.nullable(),
     dispatchedContentIdentity: IdSchema,
@@ -197,6 +220,7 @@ export const ObjectiveWorldSchema = z
     capabilities: ObjectiveCapabilitiesSchema.optional(),
     landingContext: ObjectiveLandingContextSchema,
     judgmentReports: z.array(JudgmentReportEvidenceSchema).optional(),
+    parallel: ObjectiveParallelProjectionSchema.optional(),
     judgment: JudgmentSnapshotSchema.optional()
   })
   .strict()
@@ -227,6 +251,7 @@ export const ObjectiveDetailNodeSchema = z
     revisionId: IdSchema,
     orchestrationTaskId: IdSchema.nullable(),
     dispatchId: IdSchema.nullable(),
+    laneTaskKeys: z.array(IdSchema).min(1).max(5).optional(),
     state: ObjectiveNodeStateSchema,
     criteria: z.array(ObjectiveDetailCriterionSchema).max(64)
   })
@@ -244,6 +269,7 @@ export const ObjectiveDetailSchema = z
         role: true,
         verdict: true,
         contentIdentity: true,
+        synthesizedByOwner: true,
         atMs: true
       }).strict()
     ),
@@ -254,6 +280,7 @@ export const ObjectiveDetailSchema = z
         atMs: true
       }).strict()
     ),
+    parallel: ObjectiveParallelProjectionSchema.optional(),
     asOfMs: TimestampSchema
   })
   .strict()

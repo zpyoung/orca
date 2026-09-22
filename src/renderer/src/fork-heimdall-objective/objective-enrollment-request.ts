@@ -5,6 +5,10 @@ import type {
 } from '../../../shared/fork-heimdall-objective/contract-types'
 import type { EnrollInput } from '../../../shared/fork-heimdall/watcher-types'
 import {
+  watcherOwnerFromDraft,
+  watcherOwnerInterventionCapability
+} from '../fork-heimdall/watcher-owner-draft'
+import {
   OBJECTIVE_ROLES,
   OBJECTIVE_SITTER_CAPABILITIES,
   parseWriteTerritory
@@ -35,17 +39,25 @@ export function buildObjectiveEnrollmentSubmission(
     }
   }
   const existingPlan = draft.existingPlanText.trim()
-  const kindPayload: ObjectiveEnrollmentPayload = {
+  const parallelKindPayload: ObjectiveEnrollmentPayload = {
     objectiveText: draft.objectiveText.trim(),
     ...(existingPlan ? { existingPlan } : {}),
     tier: draft.tier,
     landingBar: draft.landingBar,
-    maxConcurrency: 1,
+    lanesEnabled: draft.lanesEnabled,
+    maxConcurrency: workspace.workspaceKind === 'folder' ? 1 : draft.maxConcurrency,
     workspaceKind: workspace.workspaceKind,
     writeTerritory: parseWriteTerritory(draft.writeTerritoryText),
     roleAgents,
     sitterOverrides
   }
+  const kindPayload: EnrollInput['kindPayload'] =
+    workspace.parallelExecutionSupported !== false
+      ? parallelKindPayload
+      : (() => {
+          const { lanesEnabled: _lanesEnabled, ...legacyKindPayload } = parallelKindPayload
+          return { ...legacyKindPayload, maxConcurrency: 1 }
+        })()
   return {
     input: {
       kind: 'objective',
@@ -56,7 +68,9 @@ export function buildObjectiveEnrollmentSubmission(
         wallClockActiveMs: Math.round(draft.activeBudgetHours * 60 * 60 * 1_000),
         turns: Number(draft.turns)
       },
-      kindPayload
+      kindPayload,
+      owner: watcherOwnerFromDraft(draft.owner),
+      ownerInterventionCapability: watcherOwnerInterventionCapability(draft.owner)
     },
     owner: workspace.owner
   }

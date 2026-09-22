@@ -3,105 +3,34 @@ import { WORKER_EXITED_WITHOUT_COMPLETION } from '../../shared/fork-heimdall/eff
 import {
   getInFlightAttempts,
   getLatestAttempts,
-  getLatestEscalations
+  getLatestEscalations,
+  getUnresolvedAttempts,
+  hasPendingAttemptOutcome
 } from '../../shared/fork-heimdall/ledger-queries'
-import type {
-  EscalationEntry,
-  LedgerEntry,
-  WatcherLedger
-} from '../../shared/fork-heimdall/ledger-types'
+import type { LedgerEntry, WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import { errorBackoffMs, HEIMDALL_RAPID_POLL_MS } from '../../shared/fork-heimdall/pacing'
-import { parkedWorkerEscalationId } from '../../shared/fork-heimdall/park-escalation-id'
 import type { WatcherTickTrace } from '../../shared/fork-heimdall/tick-trace'
 import type { HeimdallOrchestrationAdapter } from './orchestration/orchestration-adapter'
 import type { WatcherLedgerLifecycle } from './ledger-lifecycle'
 import { getOpenWorkerQuestion, voidedWorkerQuestionEntries } from './question-resolution'
-import { hasSequenceSinceRunBoundary, mailboxBody, mailboxCursor } from './runner-mailbox'
+import { recordWorkerDeviationIfOwned } from './runner-worker-deviation'
+import {
+  hasSequenceSinceRunBoundary,
+  mailboxBody,
+  mailboxCursor,
+  mailboxDeliveryCheckpoint
+} from './runner-mailbox'
 import type { WatcherRunnerStatusLifecycle } from './runner-status'
 import type { RunnerLedgerStore, WatcherRunner } from './runner-state'
 import { releaseSettledWorker } from './runner-worker-release'
-
-/**
- * The watcher's most recent halt when it was an automatic park, or null once a later disarm
- * supersedes it — the same status-agnostic "latest halt" check the human resume command uses.
- */
-function latestAutomaticPark(ledger: WatcherLedger): EscalationEntry | null {
-  const halt = ledger.entries.findLast(
-    (entry) =>
-      entry.kind === 'escalation' &&
-      (entry.escalationKind.startsWith('park-') || entry.escalationKind === 'control-disarm')
-  )
-  return halt?.kind === 'escalation' && halt.escalationKind.startsWith('park-') ? halt : null
-}
-
-export function parkedForWorkerQuestion(ledger: WatcherLedger): boolean {
-  return latestAutomaticPark(ledger)?.escalationKind === 'park-worker-question'
-}
-
-/**
- * Whether a worker-escalation park has become self-clearing: the escalation that caused it is no
- * longer unresolved and the dispatch that raised it settled as landed. A dispatch that failed or
- * was confirmed exited stays parked, so an operator still reads the report that went wrong.
- */
-export function workerEscalationParkRecovered(ledger: WatcherLedger): boolean {
-  const park = latestAutomaticPark(ledger)
-  if (
-    park?.escalationKind !== 'park-worker-escalation' ||
-    unresolvedWorkerEscalations(ledger).length > 0
-  ) {
-    return false
-  }
-  const escalationId = parkedWorkerEscalationId(park.watcherId, park.escalationId)
-  const dispatchId = escalationId ? parseWorkerEscalationId(escalationId)?.dispatchId : null
-  return (
-    dispatchId !== null &&
-    dispatchId !== undefined &&
-    getLatestAttempts(ledger).some(
-      (attempt) =>
-        attempt.dispatchId === dispatchId &&
-        attempt.state === 'settled' &&
-        attempt.effect === 'landed'
-    )
-  )
-}
-
-function unresolvedWorkerEscalations(ledger: WatcherLedger): readonly EscalationEntry[] {
-  return getLatestEscalations(ledger).filter(
-    (entry) =>
-      entry.escalationKind === 'worker-escalation' &&
-      (entry.status === 'open' || entry.status === 'escalated')
-  )
-}
-
-function decodeSegment(value: string): string | null {
-  try {
-    return decodeURIComponent(value)
-  } catch {
-    return null
-  }
-}
-
-/** Inverts appendWorkerEscalation's `worker-escalation:<dispatchId>:<messageId>` encoding. */
-function parseWorkerEscalationId(
-  escalationId: string
-): { dispatchId: string | null; messageId: string | null } | null {
-  const parts = escalationId.split(':')
-  if (parts.length !== 3 || parts[0] !== 'worker-escalation') {
-    return null
-  }
-  return { dispatchId: decodeSegment(parts[1]), messageId: decodeSegment(parts[2]) }
-}
-
-function workerEscalationMessageId(escalationId: string): string {
-  return parseWorkerEscalationId(escalationId)?.messageId ?? escalationId
-}
-
-type WorkerReconciliation =
-  | { status: 'clear' }
-  | { status: 'question'; messageId: string }
-  | { status: 'escalation'; escalationId: string; messageId: string; reason: string }
-  | { status: 'exited' }
-  | { status: 'unverifiable'; reason: string }
+import {
+  parkedForWorkerQuestion,
+  parseWorkerEscalationId,
+  type WorkerReconciliation,
+  unresolvedWorkerEscalations,
+  workerEscalationMessageId,
+  workerEscalationParkRecovered
+} from './runner-worker-state'
 
 export type WatcherRunnerWorkerLifecycleDependencies = {
   ledgerStore: RunnerLedgerStore
@@ -117,7 +46,15 @@ export type WatcherRunnerWorkerLifecycleDependencies = {
   createId(): string
 }
 
-/** Reconciles worker mailbox/liveness state and applies the resulting runner transition. */
+/**
+ * Reconciles worker mailbox/liveness state and applies the resulting runner transition.
+ *
+ * Every branch below used to return `null`, which skipped stop-policy evaluation and attempt
+ * recovery for the rest of the tick (bug-146). Each now records its deviation (only when an owner
+ * is configured — an unowned watcher's ledger stays exactly as before) and returns the ledger so the
+ * caller keeps going; only `paused` additionally withholds the owner wake, via the enrollment check
+ * `driveOwnerDeviation` itself applies.
+ */
 export class WatcherRunnerWorkerLifecycle {
   constructor(private readonly dependencies: WatcherRunnerWorkerLifecycleDependencies) {}
 
@@ -134,22 +71,45 @@ export class WatcherRunnerWorkerLifecycle {
         nextPulseAtMs: null
       }
       this.dependencies.publish(runner)
-      if (getInFlightAttempts(ledger).some((attempt) => attempt.state === 'running')) {
+      if (hasPendingAttemptOutcome(ledger)) {
         this.dependencies.schedule(runner, HEIMDALL_RAPID_POLL_MS)
       }
       trace.exitPath = 'gate-held'
-      return null
+      return ledger
     }
     if (workerState.status === 'question') {
+      const scoped = this.isDispatchScoped(runner, workerState.dispatchId, ledger)
+      recordWorkerDeviationIfOwned(this.dependencies, runner, {
+        kind: 'worker-question',
+        messageId: workerState.messageId,
+        dispatchId: workerState.dispatchId,
+        question: 'Worker requested input'
+      })
+      if (scoped) {
+        return this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
+      }
       this.dependencies.statusLifecycle.park(runner, {
         kind: 'worker-question',
         messageId: workerState.messageId
       })
       trace.exitPath = 'gate-held'
       this.dependencies.schedule(runner, HEIMDALL_RAPID_POLL_MS)
-      return null
+      // re-read: park/deviation recording appended after `ledger`; a stale read here would let a
+      // stop predicate re-fire on evidence it already consumed this tick
+      return this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
     }
     if (workerState.status === 'escalation') {
+      const scoped = this.isDispatchScoped(runner, workerState.dispatchId, ledger)
+      recordWorkerDeviationIfOwned(this.dependencies, runner, {
+        kind: 'worker-escalation',
+        escalationId: workerState.escalationId,
+        messageId: workerState.messageId,
+        dispatchId: workerState.dispatchId,
+        reason: workerState.reason
+      })
+      if (scoped) {
+        return this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
+      }
       this.dependencies.statusLifecycle.parkForWorkerEscalation(
         runner,
         workerState.escalationId,
@@ -158,7 +118,7 @@ export class WatcherRunnerWorkerLifecycle {
       )
       trace.exitPath = 'gate-escalated'
       this.dependencies.schedule(runner, HEIMDALL_RAPID_POLL_MS)
-      return null
+      return this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
     }
     if (
       !runner.enrollment.enabled &&
@@ -181,20 +141,30 @@ export class WatcherRunnerWorkerLifecycle {
         nextPulseAtMs: null
       }
       this.dependencies.publish(runner)
+      recordWorkerDeviationIfOwned(this.dependencies, runner, {
+        kind: 'worker-unverifiable',
+        dispatchId: workerState.dispatchId,
+        reason: workerState.reason
+      })
       trace.exitPath = 'error'
       this.dependencies.schedule(
         runner,
         errorBackoffMs(runner.consecutiveErrors) ?? HEIMDALL_RAPID_POLL_MS
       )
-      return null
+      return this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
     }
     if (workerState.status === 'exited') {
       runner.forceFresh = true
+      recordWorkerDeviationIfOwned(this.dependencies, runner, {
+        kind: 'worker-exited',
+        dispatchId: workerState.dispatchId,
+        exitTail: null
+      })
       trace.exitPath = 'watching'
       this.dependencies.schedule(runner, 0)
-      return null
+      return this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
     }
-    return ledger
+    return this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
   }
 
   private async reconcileWorkers(runner: WatcherRunner): Promise<WorkerReconciliation> {
@@ -206,11 +176,16 @@ export class WatcherRunnerWorkerLifecycle {
     await this.assertLeaseHeld(runner)
     let question: { messageId: string; dispatchId?: string; reason: string } | null = null
     for (const entry of entries) {
-      if (
-        entry.kind === 'evidence' &&
-        entry.source &&
-        hasSequenceSinceRunBoundary(ledger, entry.source.sequence)
-      ) {
+      const eventRecorded = ledger.entries.some((current) => current.eventId === entry.eventId)
+      if (entry.kind === 'evidence' && entry.source) {
+        if (hasSequenceSinceRunBoundary(ledger, entry.source.sequence)) {
+          continue
+        }
+        if (eventRecorded) {
+          this.append(runner, mailboxDeliveryCheckpoint(entry))
+          continue
+        }
+      } else if (eventRecorded) {
         continue
       }
       this.append(runner, entry)
@@ -276,28 +251,72 @@ export class WatcherRunnerWorkerLifecycle {
           body.dispatchId
         )
       } else if (body.type === 'worker_done') {
-        this.dependencies.dispatchLifecycle.settleWorker({
-          watcherId: runner.enrollment.watcherId,
-          dispatchId: body.dispatchId,
-          // a failed outcome still needs resolveOutcome to read the report and classify why
-          effect: body.outcome === 'succeeded' ? 'landed' : 'indeterminate',
-          result: body.result ?? body.body,
-          reason: body.outcome
-        })
-        await releaseSettledWorker(runner, body.dispatchId, this.dependencies)
-        this.resolveWorkerEscalations(runner, body.dispatchId)
+        await this.settleRunningWorker(
+          runner,
+          body.dispatchId,
+          body.outcome,
+          body.result ?? body.body
+        )
+      }
+    }
+
+    const reconciliationLedger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
+    const pendingDispatches = [
+      ...getInFlightAttempts(reconciliationLedger),
+      ...getUnresolvedAttempts(reconciliationLedger)
+    ]
+    const inspectedDispatches = new Set<string>()
+    for (const pending of pendingDispatches) {
+      if (!pending.dispatchId || inspectedDispatches.has(pending.dispatchId)) {
+        continue
+      }
+      inspectedDispatches.add(pending.dispatchId)
+      const report = await this.dependencies.orchestration.readAuthoritativeWorkerReport(
+        runner.enrollment,
+        pending.dispatchId
+      )
+      await this.assertLeaseHeld(runner)
+      if (!report) {
+        continue
+      }
+      const current = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
+      const completionRecorded = current.entries.some((entry) => entry.eventId === report.eventId)
+      if (!completionRecorded) {
+        this.append(runner, report)
+      }
+      const completion = mailboxBody(report)
+      const latest = getLatestAttempts(current).find(
+        (attempt) => attempt.dispatchId === pending.dispatchId
+      )
+      if (
+        completion?.type === 'worker_done' &&
+        completion.dispatchId === pending.dispatchId &&
+        latest?.state === 'running'
+      ) {
+        await this.settleRunningWorker(
+          runner,
+          pending.dispatchId,
+          completion.outcome,
+          completion.result ?? completion.body
+        )
       }
     }
 
     let currentLedger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
-    const pendingMessageId =
-      question?.messageId ?? getOpenWorkerQuestion(currentLedger)?.messageId ?? null
+    const openQuestion = getOpenWorkerQuestion(currentLedger)
+    const pendingMessageId = question?.messageId ?? openQuestion?.messageId ?? null
+    const pendingQuestionDispatchId = question?.dispatchId ?? openQuestion?.dispatchId ?? null
+    let pendingQuestion: { messageId: string; dispatchId: string | null } | null = null
     if (pendingMessageId) {
       // a question raised in this drain is answerable by definition; only a carried-over one can be void
       if (question || !(await this.voidUnanswerableQuestion(runner, pendingMessageId))) {
-        return { status: 'question', messageId: pendingMessageId }
+        pendingQuestion = {
+          messageId: pendingMessageId,
+          dispatchId: pendingQuestionDispatchId ?? null
+        }
+      } else {
+        currentLedger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
       }
-      currentLedger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
     }
     const workerEscalations = unresolvedWorkerEscalations(currentLedger)
     const inFlightAttempts = getInFlightAttempts(currentLedger)
@@ -318,8 +337,12 @@ export class WatcherRunnerWorkerLifecycle {
     }
 
     let exited = false
+    let exitedDispatchId: string | null = null
     for (const attempt of inFlightAttempts) {
       if (attempt.state !== 'running' || !attempt.dispatchId) {
+        continue
+      }
+      if (pendingQuestion?.dispatchId === attempt.dispatchId) {
         continue
       }
       const observation = await this.dependencies.orchestration.readDispatch(
@@ -344,12 +367,24 @@ export class WatcherRunnerWorkerLifecycle {
         await releaseSettledWorker(runner, attempt.dispatchId, this.dependencies)
         this.resolveWorkerEscalations(runner, attempt.dispatchId)
         exited = true
+        exitedDispatchId = attempt.dispatchId
       } else {
-        this.dependencies.dispatchLifecycle.closeForContactLoss(runner.enrollment.watcherId)
+        this.dependencies.dispatchLifecycle.closeWorkerForContactLoss(
+          runner.enrollment.watcherId,
+          attempt.dispatchId
+        )
         return {
           status: 'unverifiable',
+          dispatchId: attempt.dispatchId,
           reason: observation.reason ?? 'Worker liveness could not be verified'
         }
+      }
+    }
+    if (pendingQuestion) {
+      return {
+        status: 'question',
+        messageId: pendingQuestion.messageId,
+        dispatchId: pendingQuestion.dispatchId
       }
     }
     const pendingEscalation = unresolvedWorkerEscalations(
@@ -360,11 +395,30 @@ export class WatcherRunnerWorkerLifecycle {
           status: 'escalation',
           escalationId: pendingEscalation.escalationId,
           messageId: workerEscalationMessageId(pendingEscalation.escalationId),
+          dispatchId: parseWorkerEscalationId(pendingEscalation.escalationId)?.dispatchId ?? null,
           reason: pendingEscalation.reason ?? 'Worker requested operator intervention'
         }
       : exited
-        ? { status: 'exited' }
+        ? { status: 'exited', dispatchId: exitedDispatchId }
         : { status: 'clear' }
+  }
+
+  private async settleRunningWorker(
+    runner: WatcherRunner,
+    dispatchId: string,
+    outcome: string | undefined,
+    result: unknown
+  ): Promise<void> {
+    this.dependencies.dispatchLifecycle.settleWorker({
+      watcherId: runner.enrollment.watcherId,
+      dispatchId,
+      // a failed outcome still needs resolveOutcome to read the report and classify why
+      effect: outcome === 'succeeded' ? 'landed' : 'indeterminate',
+      ...(result === undefined ? {} : { result }),
+      reason: outcome
+    })
+    await releaseSettledWorker(runner, dispatchId, this.dependencies)
+    this.resolveWorkerEscalations(runner, dispatchId)
   }
 
   private appendWorkerEscalation(
@@ -438,6 +492,20 @@ export class WatcherRunnerWorkerLifecycle {
       this.append(runner, entry)
     }
     return entries.length > 0
+  }
+
+  private isDispatchScoped(
+    runner: WatcherRunner,
+    dispatchId: string | null,
+    ledger: WatcherLedger
+  ): boolean {
+    if (!dispatchId || !runner.kind.concurrency) {
+      return false
+    }
+    const attempt = getLatestAttempts(ledger).find(
+      (candidate) => candidate.dispatchId === dispatchId
+    )
+    return attempt ? runner.kind.concurrency.isIsolatedAttempt(attempt, ledger) : false
   }
 
   private async assertLeaseHeld(runner: WatcherRunner): Promise<void> {

@@ -9,8 +9,13 @@ import type {
 } from '../../shared/fork-heimdall/watcher-types'
 import type { HeimdallOrchestrationAdapter } from './orchestration/orchestration-adapter'
 import type { LeaseGuard, LeaseStore } from './lease-store'
+import type { OwnerRuntimeDependencies } from './owner/deviation-routing'
 import type { RegisteredWatcherKind } from './registry'
-import type { DispatchLifecycleBudgetClock, DispatchLifecycleLedgerStore } from './ledger-lifecycle'
+import type {
+  DispatchIntervalHandle,
+  DispatchLifecycleBudgetClock,
+  DispatchLifecycleLedgerStore
+} from './ledger-lifecycle'
 
 export type RunnerLedgerStore = {
   appendTickTrace(watcherId: string, trace: WatcherTickTrace): void
@@ -22,6 +27,7 @@ export type RunnerLedgerStore = {
 export type RunnerBudgetClock = {
   checkpoint(watcherId: string): void
   recoverOnStart(watcherId: string): boolean
+  owned(watcherId: string): DispatchIntervalHandle | null
 } & DispatchLifecycleBudgetClock
 
 export type WatcherRunner = {
@@ -34,7 +40,7 @@ export type WatcherRunner = {
   reconcileAgain: boolean
   stopped: boolean
   suspended: boolean
-  controlPending: 'pause' | 'disarm' | null
+  controlPending: 'pause' | 'disarm' | 'delete' | 'set-concurrency' | null
   recovered: boolean
   forceFresh: boolean
   consecutiveErrors: number
@@ -45,6 +51,7 @@ export type WatcherRunner = {
   traces: WatcherTickTrace[]
   leaseGuard: LeaseGuard | null
   leaseRenewal: { dispose(): void } | null
+  ownerBudgetInterval: DispatchIntervalHandle | null
 }
 
 export type WatcherRunnerDependencies = {
@@ -62,4 +69,6 @@ export type WatcherRunnerDependencies = {
   leaseTtlMs?: number
   onStatus?(status: WatcherStatus): void
   notifyApproval?(enrollment: WatcherEnrollment, action: KernelAction): void
+  /** Absent means no owner support is wired at all; every deviation branch stays inert. */
+  owner?: OwnerRuntimeDependencies
 }

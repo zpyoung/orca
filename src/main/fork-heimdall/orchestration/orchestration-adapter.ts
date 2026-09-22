@@ -1,4 +1,3 @@
-import type { RuntimeTerminalShow } from '../../../shared/runtime-types'
 import type { OrcaRuntimeService } from '../../runtime/orca-runtime'
 import type { OrchestrationDb, RunRow } from '../../runtime/orchestration/db'
 import { OrchestrationError } from '../../runtime/orchestration/orchestration-error'
@@ -22,12 +21,19 @@ import type {
   DispatchWorkerInput
 } from '../../../shared/fork-heimdall/kind-contract'
 import type { WatcherCommandResult, WatcherWorker } from '../../../shared/fork-heimdall/fleet-types'
-import type { LedgerEntry } from '../../../shared/fork-heimdall/ledger-types'
+import type { EvidenceEntry, LedgerEntry } from '../../../shared/fork-heimdall/ledger-types'
 import type { WatcherEnrollment } from '../../../shared/fork-heimdall/watcher-types'
 import { resolveWorkerStartReadinessTimeoutMs } from '../../../shared/orchestration-timing-budgets'
 import { ORCHESTRATION_CONTRACT_VERSION } from '../../../shared/protocol-version'
 import { isStructuredWorkerHandle } from '../../runtime/structured-worker-identity'
+import { readAuthoritativeWorkerReportEvidence } from './authoritative-worker-report'
 import { coordinatorIdentityFingerprint } from './coordinator-identity'
+import { coordinatorRuntimeFacade } from './coordinator-runtime-facade'
+import {
+  dispatchResultWithTerminal,
+  workerStartParams,
+  workspaceRuntimeId
+} from './worker-dispatch-routing'
 import {
   CoordinatorSeatLostError,
   orchestrationRequestIdForAttemptFingerprint,
@@ -50,7 +56,8 @@ import {
 export {
   CoordinatorSeatLostError,
   orchestrationRequestIdForAttemptFingerprint,
-  QuestionAlreadyAnsweredError
+  QuestionAlreadyAnsweredError,
+  workspaceRuntimeId
 }
 export type { DispatchResult, DispatchWorkerInput }
 export type {
@@ -153,7 +160,11 @@ export class RuntimeHeimdallOrchestrationAdapter implements HeimdallOrchestratio
               ...params,
               timeoutMs: resolveWorkerStartReadinessTimeoutMs(undefined)
             },
-            runtime: coordinatorRuntimeFacade(this.runtime, input.enrollment),
+            runtime: coordinatorRuntimeFacade(
+              this.runtime,
+              input.enrollment,
+              workspaceRuntimeId(input.enrollment)
+            ),
             db,
             run,
             coordinatorPane: identity.paneKey,
@@ -165,7 +176,7 @@ export class RuntimeHeimdallOrchestrationAdapter implements HeimdallOrchestratio
         },
         coordinatorIdentityFingerprint(identity)
       )) as WorkerStartReceipt
-      return dispatchResultFromReceipt(receipt, requestId)
+      return dispatchResultWithTerminal(db, dispatchResultFromReceipt(receipt, requestId))
     } catch (error) {
       if (isOrchestrationError(error, 'operation_unknown')) {
         return { status: 'indeterminate', requestId }
@@ -215,7 +226,7 @@ export class RuntimeHeimdallOrchestrationAdapter implements HeimdallOrchestratio
     }
     const completed = parseWorkerStartReceipt(receipt.receipt)
     return completed
-      ? dispatchResultFromReceipt(completed, requestId)
+      ? dispatchResultWithTerminal(db, dispatchResultFromReceipt(completed, requestId))
       : { status: 'indeterminate', requestId }
   }
 
@@ -291,6 +302,26 @@ export class RuntimeHeimdallOrchestrationAdapter implements HeimdallOrchestratio
       return { status: 'unverifiable', reason: errorDetail(error) }
     }
   }
+
+  async readAuthoritativeWorkerReport(
+    enrollment: WatcherEnrollment,
+    dispatchId: string
+  ): Promise<EvidenceEntry | null> {
+    if (!dispatchId.trim()) {
+      throw new Error('dispatchId must be non-empty')
+    }
+    if (!enrollment.orchestrationRunId) {
+      return null
+    }
+    const run = this.resolvePersistedRun(enrollment, enrollment.orchestrationRunId)
+    return readAuthoritativeWorkerReportEvidence({
+      db: this.runtime.getOrchestrationDb(),
+      enrollment,
+      runId: run.id,
+      dispatchId
+    })
+  }
+
   async listWorkers(enrollment: WatcherEnrollment): Promise<WatcherWorker[]> {
     if (!enrollment.orchestrationRunId) {
       return []
@@ -441,66 +472,6 @@ export class RuntimeHeimdallOrchestrationAdapter implements HeimdallOrchestratio
       )
     }
   }
-}
-
-function workerStartParams(input: DispatchWorkerInput) {
-  return {
-    spec: input.spec,
-    from: input.enrollment.coordinatorIdentity.handle,
-    worktree: `id:${workspaceRuntimeId(input.enrollment)}`,
-    ...(input.agent ? { agent: input.agent } : {}),
-    ...(input.deps ? { deps: JSON.stringify(input.deps) } : {}),
-    ...(input.taskKey ? { taskTitle: input.taskKey } : {})
-  }
-}
-
-export function workspaceRuntimeId(enrollment: WatcherEnrollment): string {
-  return enrollment.worktreeId ?? `${enrollment.repoId}::${enrollment.workspacePath}`
-}
-
-function coordinatorRuntimeFacade(
-  runtime: OrcaRuntimeService,
-  enrollment: WatcherEnrollment
-): OrcaRuntimeService {
-  const identity = enrollment.coordinatorIdentity
-  const workspaceId = workspaceRuntimeId(enrollment)
-  const boundMethods = new Map<PropertyKey, { source: object; bound: object }>()
-  const syntheticShow = async (handle: string) => {
-    if (handle === identity.handle) {
-      return { worktreeId: workspaceId } as RuntimeTerminalShow
-    }
-    return runtime.showTerminal(handle)
-  }
-  const syntheticPaneKey = (handle: string) =>
-    handle === identity.handle ? identity.paneKey : runtime.getTerminalPaneKey(handle)
-
-  // The two exact-handle overrides expose only the authority worker-start needs. Every other
-  // method stays bound to the real runtime, so private fields and runtime state cannot land on
-  // the facade.
-  return new Proxy(runtime, {
-    get(target, property) {
-      if (property === 'showTerminal') {
-        return syntheticShow
-      }
-      if (property === 'getTerminalPaneKey') {
-        return syntheticPaneKey
-      }
-      const value = Reflect.get(target, property, target)
-      if (typeof value !== 'function') {
-        return value
-      }
-      const cached = boundMethods.get(property)
-      if (cached && cached.source === value) {
-        return cached.bound
-      }
-      const bound = value.bind(target) as object
-      boundMethods.set(property, { source: value, bound })
-      return bound
-    },
-    set(target, property, value) {
-      return Reflect.set(target, property, value, target)
-    }
-  })
 }
 
 function refused(

@@ -1,6 +1,7 @@
 import type { WatcherLedger } from '../../../shared/fork-heimdall/ledger-types'
 import type { ObjectiveWorld } from '../../../shared/fork-heimdall-objective/detail-types'
 import { activeEscalationIds, buildOmissionUnits, type OmissionUnit } from './history-retention'
+import { searchMinimalOmissionPrefix } from './omission-budget-search'
 import {
   normalizeJudgmentState,
   type JudgmentNormalizationResult,
@@ -295,25 +296,9 @@ export function projectBoundedJudgmentState(
     )
   }
 
-  if (units.length === 0) {
-    return base
-  }
-  const maximum = project(units.length)
-  if (!maximum.fitsStateBudget) {
-    return maximum
-  }
   // The codec assigns IDs from every sorted value before selecting profitable definitions.
   // Dropping history cannot widen retained refs, and ref-to-inline cutovers remove their table cost,
   // so normalization preserves the monotone prefix-size invariant required by this search.
-  let low = 1
-  let high = units.length
-  while (low < high) {
-    const middle = Math.floor((low + high) / 2)
-    if (project(middle).fitsStateBudget) {
-      high = middle
-    } else {
-      low = middle + 1
-    }
-  }
-  return low === units.length ? maximum : project(low)
+  const found = searchMinimalOmissionPrefix(units.length, project)
+  return found ? found.result : base
 }

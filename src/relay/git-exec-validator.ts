@@ -9,6 +9,7 @@ import {
   isSafeGitRemoteName,
   isSafePushTargetRemoteUrl
 } from '../shared/git-push-target-validation'
+import { isHeimdallObjectiveGitExecArgs } from './fork-heimdall-objective/git-exec-allowlist'
 
 // Why: only read-only git subcommands are allowed via exec, except for the
 // exact init/empty-commit shapes used by SSH Create Project after the parent
@@ -152,6 +153,9 @@ function matchesDeniedFlag(arg: string, denySet: Set<string>): boolean {
 }
 
 export function validateGitExecArgs(args: string[]): void {
+  if (isHeimdallObjectiveGitExecArgs(args)) {
+    return
+  }
   // Why: git accepts `-c key=value` before the subcommand, which can override
   // config and execute arbitrary commands (e.g. core.sshCommand). Reject any
   // arguments before the subcommand that look like global git flags.

@@ -66,7 +66,7 @@ function harness(entries: unknown[] = []) {
     enroll: vi.fn(async () => ({ status: 'enrolled' as const, entry: ENTRY })),
     list: vi.fn(async () => [ENTRY]),
     ledger: vi.fn(() => ledger),
-    detail: vi.fn(async () => ({ watcher: {}, ledger, traces: [], workers: [] })),
+    detail: vi.fn(async () => ({ watcher: { entry: ENTRY }, ledger, traces: [], workers: [] })),
     debugReport: vi.fn(async () => debugReport),
     disarm: vi.fn(),
     disarmAll: vi.fn(),

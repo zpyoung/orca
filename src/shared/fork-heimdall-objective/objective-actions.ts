@@ -1,12 +1,26 @@
 import { z } from 'zod'
+import { OWNER_INTERVENTION_TEXT_MAX_LENGTH } from '../fork-heimdall/owner/intervention'
+import { OWNER_INTERVENTION_CAPABILITY } from '../fork-heimdall/owner/owner-capability'
 import {
+  OBJECTIVE_AGENT_ID_MAX_LENGTH,
+  OBJECTIVE_TASK_SPEC_MAX_LENGTH,
   ObjectiveLandingBarSchema,
   ObjectiveWorkspacePathSchema,
   OBJECTIVE_PATH_MAX_LENGTH
 } from './contract-types'
-import { ObjectiveReviewRoleSchema, ObjectiveVerdictSchema } from './detail-types'
+import { ObjectiveReviewRoleSchema } from './detail-types'
+import { RevisionAmendmentPatchSchema } from './revision-amendment'
 
 const IdSchema = z.string().trim().min(1).max(1_024)
+
+/**
+ * Marks a `skip-review` action's synthetic dispatchId, namespaced so it can never collide with a
+ * real orchestration dispatch id. The one place that has to agree with this is
+ * `objective-store-projection.ts`, which uses the same prefix to flag a verdict row as
+ * owner-synthesized rather than infer it from anything content-dependent.
+ */
+export const OWNER_SKIP_REVIEW_DISPATCH_PREFIX = 'owner-skip-review:'
+
 const ActionBase = {
   capability: IdSchema,
   visibility: z.literal('local'),
@@ -21,13 +35,22 @@ const ExpectedStateSchema = z
   })
   .strict()
 
+/** An owner-intervention action stamps this capability over the kind's own; the schema must accept both. */
+function ownerOverridableCapability<T extends string>(capability: T) {
+  return z.union([z.literal(capability), z.literal(OWNER_INTERVENTION_CAPABILITY)])
+}
+
 export const DispatchPlannerActionSchema = z
   .object({
     ...ActionBase,
     kind: z.literal('dispatch-planner'),
-    capability: z.literal('plan'),
+    capability: ownerOverridableCapability('plan'),
     revisionNumber: z.number().int().positive(),
-    reason: z.enum(['initial', 'replan-after-block', 'replan-after-failure'])
+    reason: z.enum(['initial', 'replan-after-block', 'replan-after-failure', 'owner-directed']),
+    /** Free-text steer for the planner prompt; only ever set on an owner-directed dispatch. */
+    guidance: z.string().trim().min(1).max(OWNER_INTERVENTION_TEXT_MAX_LENGTH).optional(),
+    /** Landing-ladder stage an owner asked to skip, kept separate from the exact rationale text. */
+    requestedSkipStage: IdSchema.optional()
   })
   .strict()
 export type DispatchPlannerAction = z.infer<typeof DispatchPlannerActionSchema>
@@ -61,12 +84,16 @@ export const DispatchNodeActionSchema = z
   .object({
     ...ActionBase,
     kind: z.literal('dispatch-node'),
-    capability: z.literal('implement'),
+    capability: ownerOverridableCapability('implement'),
     revisionId: IdSchema,
     taskKey: IdSchema,
     depsOrchestrationIds: z.array(IdSchema).max(128),
-    /** The original dispatch's evidenceKey; present only on a bounded infra/environment redispatch. */
-    retryOf: IdSchema.optional()
+    /** The original dispatch's evidenceKey; present on a bounded infra/environment or owner redispatch. */
+    retryOf: IdSchema.optional(),
+    /** Set only by an owner `retry-node`; overrides the plan task's spec for this dispatch only. */
+    ownerAmendedSpec: z.string().trim().min(1).max(OBJECTIVE_TASK_SPEC_MAX_LENGTH).optional(),
+    /** Set only by an owner `retry-node`; overrides normal agent routing for this dispatch only. */
+    ownerAgent: z.string().trim().min(1).max(OBJECTIVE_AGENT_ID_MAX_LENGTH).optional()
   })
   .strict()
 export type DispatchNodeAction = z.infer<typeof DispatchNodeActionSchema>
@@ -87,6 +114,20 @@ export const IngestReportActionSchema = z
   })
   .strict()
 export type IngestReportAction = z.infer<typeof IngestReportActionSchema>
+
+/** Applies one validated isolated dispatch commit to the enrolled branch. */
+export const ApplyNodeActionSchema = z
+  .object({
+    ...ActionBase,
+    kind: z.literal('apply-node'),
+    capability: z.literal('implement'),
+    recovery: ReplaySafeSchema,
+    revisionId: IdSchema,
+    taskKey: IdSchema,
+    dispatchId: IdSchema
+  })
+  .strict()
+export type ApplyNodeAction = z.infer<typeof ApplyNodeActionSchema>
 
 export const RunCheckActionSchema = z
   .object({
@@ -198,12 +239,72 @@ export const OpenHostedReviewActionSchema = z
   .strict()
 export type OpenHostedReviewAction = z.infer<typeof OpenHostedReviewActionSchema>
 
+/** An owner override that lands a node despite a rejected report; the attestation is the audit trail. */
+export const AcceptReportActionSchema = z
+  .object({
+    ...ActionBase,
+    kind: z.literal('accept-report'),
+    capability: ownerOverridableCapability('implement'),
+    recovery: ReplaySafeSchema,
+    revisionId: IdSchema,
+    taskKey: IdSchema,
+    dispatchId: IdSchema,
+    attestation: z.string().trim().min(1).max(OWNER_INTERVENTION_TEXT_MAX_LENGTH)
+  })
+  .strict()
+export type AcceptReportAction = z.infer<typeof AcceptReportActionSchema>
+
+/** An owner correction to an approved revision, applied via `ObjectiveStoreMutations.amendRevision`. */
+export const AmendPlanActionSchema = z
+  .object({
+    ...ActionBase,
+    kind: z.literal('amend-plan'),
+    capability: ownerOverridableCapability('plan'),
+    recovery: ReplaySafeSchema,
+    revisionId: IdSchema,
+    patch: RevisionAmendmentPatchSchema,
+    /** The owner's own rationale for the intervention; `patch.attestation` is what the store persists. */
+    attestation: z.string().trim().min(1).max(OWNER_INTERVENTION_TEXT_MAX_LENGTH)
+  })
+  .strict()
+export type AmendPlanAction = z.infer<typeof AmendPlanActionSchema>
+
+/** Records a synthetic 'approve' verdict, bypassing a reviewer/integrator dispatch entirely. */
+export const SkipReviewActionSchema = z
+  .object({
+    ...ActionBase,
+    kind: z.literal('skip-review'),
+    capability: ownerOverridableCapability('review'),
+    recovery: ReplaySafeSchema,
+    revisionId: IdSchema,
+    role: ObjectiveReviewRoleSchema,
+    dispatchId: IdSchema,
+    reviewedContentIdentity: IdSchema,
+    rationale: z.string().trim().min(1).max(OWNER_INTERVENTION_TEXT_MAX_LENGTH)
+  })
+  .strict()
+export type SkipReviewAction = z.infer<typeof SkipReviewActionSchema>
+
+/** Records a synthetic passing check result, bypassing `run-check` for one criterion. */
+export const SkipCheckActionSchema = z
+  .object({
+    ...ActionBase,
+    kind: z.literal('skip-check'),
+    capability: ownerOverridableCapability('check'),
+    recovery: ReplaySafeSchema,
+    criterionId: IdSchema,
+    rationale: z.string().trim().min(1).max(OWNER_INTERVENTION_TEXT_MAX_LENGTH)
+  })
+  .strict()
+export type SkipCheckAction = z.infer<typeof SkipCheckActionSchema>
+
 export const ObjectiveActionSchema = z.discriminatedUnion('kind', [
   DispatchPlannerActionSchema,
   IngestPlanActionSchema,
   ActivatePlanActionSchema,
   DispatchNodeActionSchema,
   IngestReportActionSchema,
+  ApplyNodeActionSchema,
   RunCheckActionSchema,
   DispatchReviewerActionSchema,
   DispatchIntegratorActionSchema,
@@ -211,7 +312,11 @@ export const ObjectiveActionSchema = z.discriminatedUnion('kind', [
   RecordLandingActionSchema,
   CommitLocalBranchActionSchema,
   PushRefActionSchema,
-  OpenHostedReviewActionSchema
+  OpenHostedReviewActionSchema,
+  AcceptReportActionSchema,
+  AmendPlanActionSchema,
+  SkipReviewActionSchema,
+  SkipCheckActionSchema
 ])
 export type ObjectiveAction = z.infer<typeof ObjectiveActionSchema>
 
@@ -221,6 +326,14 @@ export const ObjectiveActionNaturalKeySchema = z.discriminatedUnion('kind', [
   z
     .object({
       kind: z.literal('implementer-report'),
+      revisionId: IdSchema,
+      taskKey: IdSchema,
+      dispatchId: IdSchema
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('node-application'),
       revisionId: IdSchema,
       taskKey: IdSchema,
       dispatchId: IdSchema
@@ -259,7 +372,8 @@ export const ObjectiveActionNaturalKeySchema = z.discriminatedUnion('kind', [
       branch: IdSchema,
       headSha: IdSchema
     })
-    .strict()
+    .strict(),
+  z.object({ kind: z.literal('plan-amendment'), revisionId: IdSchema, digest: IdSchema }).strict()
 ])
 export type ObjectiveActionNaturalKey = z.infer<typeof ObjectiveActionNaturalKeySchema>
 
@@ -274,6 +388,13 @@ export function objectiveActionNaturalKey(
     case 'ingest-report':
       return {
         kind: 'implementer-report',
+        revisionId: action.revisionId,
+        taskKey: action.taskKey,
+        dispatchId: action.dispatchId
+      }
+    case 'apply-node':
+      return {
+        kind: 'node-application',
         revisionId: action.revisionId,
         taskKey: action.taskKey,
         dispatchId: action.dispatchId
@@ -312,6 +433,23 @@ export function objectiveActionNaturalKey(
         branch: action.branch,
         headSha: action.headSha
       }
+    case 'accept-report':
+      return {
+        kind: 'implementer-report',
+        revisionId: action.revisionId,
+        taskKey: action.taskKey,
+        dispatchId: action.dispatchId
+      }
+    case 'amend-plan':
+      return { kind: 'plan-amendment', revisionId: action.revisionId, digest: action.patch.digest }
+    case 'skip-review':
+      return { kind: 'review-verdict', dispatchId: action.dispatchId }
+    case 'skip-check':
+      return {
+        kind: 'check-attempt',
+        criterionId: action.criterionId,
+        contentIdentity: action.contentIdentity
+      }
     case 'dispatch-planner':
     case 'dispatch-node':
     case 'dispatch-reviewer':
@@ -319,57 +457,3 @@ export function objectiveActionNaturalKey(
       return null
   }
 }
-
-const NaturalKeyResultBase = {
-  naturalKey: ObjectiveActionNaturalKeySchema,
-  digest: IdSchema
-} as const
-
-export const ObjectiveActionResultSchema = z.discriminatedUnion('kind', [
-  z
-    .object({ ...NaturalKeyResultBase, kind: z.literal('plan-ingested'), revisionId: IdSchema })
-    .strict(),
-  z.object({ ...NaturalKeyResultBase, kind: z.literal('plan-activated') }).strict(),
-  z.object({ ...NaturalKeyResultBase, kind: z.literal('report-ingested') }).strict(),
-  z
-    .object({
-      ...NaturalKeyResultBase,
-      kind: z.literal('check-recorded'),
-      exitCode: z.number().int().nullable(),
-      timedOut: z.boolean()
-    })
-    .strict(),
-  z
-    .object({
-      ...NaturalKeyResultBase,
-      kind: z.literal('verdict-ingested'),
-      verdict: ObjectiveVerdictSchema
-    })
-    .strict(),
-  z.object({ ...NaturalKeyResultBase, kind: z.literal('landing-recorded') }).strict(),
-  z
-    .object({
-      naturalKey: ObjectiveActionNaturalKeySchema,
-      kind: z.literal('commit-recorded'),
-      commitSha: IdSchema,
-      contentIdentity: IdSchema,
-      outsideTerritoryPaths: z.array(ObjectiveWorkspacePathSchema).max(256)
-    })
-    .strict(),
-  z
-    .object({
-      naturalKey: ObjectiveActionNaturalKeySchema,
-      kind: z.literal('push-recorded'),
-      remoteSha: IdSchema
-    })
-    .strict(),
-  z
-    .object({
-      naturalKey: ObjectiveActionNaturalKeySchema,
-      kind: z.literal('review-recorded'),
-      reviewNumber: z.number().int().positive().safe(),
-      reviewUrl: z.string().trim().url()
-    })
-    .strict()
-])
-export type ObjectiveActionResult = z.infer<typeof ObjectiveActionResultSchema>

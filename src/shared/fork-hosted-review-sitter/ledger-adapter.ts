@@ -97,6 +97,17 @@ export function getCompletedHostedReviewAttempt(
   return entry ? asHostedReviewAttempt(entry) : null
 }
 
+/** The dispatch a worker-backed action's latest ledger attempt ran under, if any. */
+export function getHostedReviewAttemptDispatchId(
+  ledger: WatcherLedger,
+  action: HostedReviewSitterAction
+): string | null {
+  return (
+    getLatestAttemptForFingerprint(ledger, hostedReviewAttemptFingerprint(action))?.dispatchId ??
+    null
+  )
+}
+
 export function getUnresolvedHostedReviewAttempts(
   ledger: WatcherLedger
 ): readonly HostedReviewAttemptEntry[] {
@@ -111,6 +122,18 @@ export function getInFlightHostedReviewAttempts(
   return getInFlightAttempts(ledger)
     .map(asHostedReviewAttempt)
     .filter((entry): entry is HostedReviewAttemptEntry => entry !== null)
+}
+
+/**
+ * True when some in-flight attempt matches, independent of its evidenceKey. An owner's retry-rung
+ * mints a fresh evidenceKey for the same kind/head, so the canonical fingerprint stays `unresolved`
+ * while the retry is running; deciding by fingerprint alone would re-deviate on top of it.
+ */
+export function hasInFlightHostedReviewAttemptMatching(
+  ledger: WatcherLedger,
+  match: (action: HostedReviewSitterAction) => boolean
+): boolean {
+  return getInFlightHostedReviewAttempts(ledger).some((entry) => match(entry.action))
 }
 
 export function getHostedReviewEscalations(ledger: WatcherLedger): readonly EscalationEntry[] {

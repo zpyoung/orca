@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { ORCHESTRATION_WORKER_START_TASK_SPEC_MAX_BYTES } from '../../shared/orchestration-worker-start-prompt-budget'
-import type { ObjectiveEnrollmentPayload } from '../../shared/fork-heimdall-objective/contract-types'
+import { OWNER_INTERVENTION_TEXT_MAX_LENGTH } from '../../shared/fork-heimdall/owner/intervention'
+import {
+  OBJECTIVE_TASK_SPEC_MAX_LENGTH,
+  OBJECTIVE_TEXT_MAX_LENGTH,
+  type ObjectiveEnrollmentPayload
+} from '../../shared/fork-heimdall-objective/contract-types'
 import type { ObjectivePlanTask } from '../../shared/fork-heimdall-objective/plan-schema'
 import { buildObjectiveRolePrompt } from './role-prompts'
 
@@ -88,8 +93,8 @@ describe('objective role prompts', () => {
   it('keeps the largest legal implementer node inside the upstream worker-start byte budget', () => {
     const prompt = buildObjectiveRolePrompt({
       role: 'implementer',
-      contract: { ...contract, objectiveText: 'o'.repeat(16_384) },
-      node: node('largest', 's'.repeat(16_384)),
+      contract: { ...contract, objectiveText: '界'.repeat(OBJECTIVE_TEXT_MAX_LENGTH) },
+      node: node('largest', '界'.repeat(OBJECTIVE_TASK_SPEC_MAX_LENGTH)),
       reportPath: `/tmp/${'p'.repeat(900)}.json`,
       budgetBucket: 'nearly-spent'
     })
@@ -108,32 +113,6 @@ describe('objective role prompts', () => {
         budgetBucket: 'plenty'
       })
     ).toThrow('active plan')
-  })
-
-  it('names all three self-assessment results for the implementer, distinguishing fail from unknown', () => {
-    const assigned = node('assigned', 'Implement the assigned behavior')
-    const prompt = buildObjectiveRolePrompt({
-      role: 'implementer',
-      contract,
-      node: assigned,
-      reportPath: '/tmp/objective/report.json',
-      budgetBucket: 'plenty'
-    })
-
-    expect(prompt).toContain('result:"pass"|"fail"|"unknown"')
-    expect(prompt).toContain('an environment-dependent criterion you cannot verify is unknown')
-  })
-
-  it('tells the planner not to assert its own shell environment as guaranteed for the implementer', () => {
-    const prompt = buildObjectiveRolePrompt({
-      role: 'planner',
-      contract,
-      reason: 'initial',
-      reportPath: '/tmp/objective/report.json',
-      budgetBucket: 'plenty'
-    })
-
-    expect(prompt).toContain('Do not assert environment facts you only observed in your own shell')
   })
 
   it('renders failure context for a planner replan when supplied, but not otherwise', () => {
@@ -208,5 +187,20 @@ describe('objective role prompts', () => {
     expect(withProgress).toContain('- core: succeeded')
     expect(withProgress).toContain('- follow-up: pending')
     expect(withoutProgress).not.toContain('PLAN PROGRESS')
+  })
+  it('keeps a requested skip stage structurally separate from the full owner rationale', () => {
+    const rationale = 'r'.repeat(OWNER_INTERVENTION_TEXT_MAX_LENGTH)
+    const prompt = buildObjectiveRolePrompt({
+      role: 'planner',
+      contract,
+      reason: 'owner-directed',
+      reportPath: '/tmp/objective/report.json',
+      budgetBucket: 'plenty',
+      requestedSkipStage: 'hosted-review',
+      ownerGuidance: rationale
+    })
+
+    expect(prompt).toContain('OWNER REQUESTED SKIP STAGE:\nhosted-review')
+    expect(prompt).toContain(`OWNER GUIDANCE:\n${rationale}`)
   })
 })

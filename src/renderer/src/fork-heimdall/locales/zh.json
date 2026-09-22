@@ -69,6 +69,9 @@
         "resume": "继续",
         "pause": "暂停",
         "disarm": "停用",
+        "delete": "删除监视器",
+        "deleteTitle": "删除监视器？",
+        "deleteDescription": "监视器“{{name}}”及其保存的历史记录将被永久删除。工作进程终端不会停止。",
         "approve": "批准",
         "budgetResumeWarning": "该监视器已耗尽预算。请先提高限制，否则恢复后它会再次进入停驻状态。"
       },

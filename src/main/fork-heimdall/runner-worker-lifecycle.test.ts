@@ -6,7 +6,7 @@ import type {
   WatcherLedger
 } from '../../shared/fork-heimdall/ledger-types'
 import { workerEscalationParkId } from '../../shared/fork-heimdall/park-escalation-id'
-import { parkedForWorkerQuestion, workerEscalationParkRecovered } from './runner-worker-lifecycle'
+import { parkedForWorkerQuestion, workerEscalationParkRecovered } from './runner-worker-state'
 
 function haltEntry(escalationKind: string, atMs: number): EscalationEntry {
   return {

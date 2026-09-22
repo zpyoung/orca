@@ -13,6 +13,9 @@ export function parkEscalationId(watcherId: string, reason: WatcherParkReason): 
   if (reason.kind === 'stop-predicate') {
     return stopPredicateParkEscalationId(watcherId, reason.predicateId)
   }
+  if (reason.kind === 'worker-escalation') {
+    return workerEscalationParkId(watcherId, reason.escalationId)
+  }
   const detail =
     reason.kind === 'worker-question'
       ? reason.messageId

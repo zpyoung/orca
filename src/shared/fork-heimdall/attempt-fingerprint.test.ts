@@ -4,7 +4,7 @@ import {
   inspectAttemptLedger,
   makeAttemptFingerprint
 } from './attempt-fingerprint'
-import { getInFlightAttempts } from './ledger-queries'
+import { getInFlightAttempts, hasPendingAttemptOutcome } from './ledger-queries'
 import type { EffectCertainty } from './effect-certainty'
 import type { LedgerEntry, WatcherLedger } from './ledger-types'
 
@@ -72,5 +72,49 @@ describe('attempt recovery disposition', () => {
       hasUnresolved: false
     })
     expect(getInFlightAttempts(ledger)).toEqual([])
+  })
+})
+
+describe('pending attempt outcome', () => {
+  it('stays pending after indeterminate settlement until an explicit resolution', () => {
+    const fingerprint = makeAttemptFingerprint('head-1', 'publish', 'failure-1')
+    const unsettled: WatcherLedger = {
+      watcherId: 'watcher-1',
+      entries: [
+        {
+          eventId: 'attempt-event-1',
+          watcherId: 'watcher-1',
+          atMs: 1,
+          origin: 'owner',
+          class: 'fact',
+          kind: 'attempt',
+          attemptId: 'attempt-1',
+          fingerprint,
+          action: ACTION,
+          state: 'settled',
+          effect: 'indeterminate'
+        }
+      ]
+    }
+    expect(hasPendingAttemptOutcome(unsettled)).toBe(true)
+
+    const resolved: WatcherLedger = {
+      ...unsettled,
+      entries: [
+        ...unsettled.entries,
+        {
+          eventId: 'resolution-event-1',
+          watcherId: 'watcher-1',
+          atMs: 2,
+          origin: 'owner',
+          class: 'fact',
+          kind: 'attempt-resolved',
+          attemptId: 'attempt-1',
+          effect: 'not-landed',
+          evidence: { observed: 'not-landed' }
+        }
+      ]
+    }
+    expect(hasPendingAttemptOutcome(resolved)).toBe(false)
   })
 })

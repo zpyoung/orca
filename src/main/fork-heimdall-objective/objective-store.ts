@@ -6,6 +6,11 @@ import type {
   ObjectiveDetail,
   ObjectiveProjection
 } from '../../shared/fork-heimdall-objective/detail-types'
+import {
+  ObjectiveParallelProjectionSchema,
+  type ObjectiveDispatchRecord,
+  type ObjectiveParallelProjection
+} from '../../shared/fork-heimdall-objective/parallel-types'
 import type {
   ObjectivePlan,
   ObjectivePlanTask
@@ -15,6 +20,7 @@ import type { ObjectiveDatabase } from './objective-database'
 import type {
   ActivatePlanArgs,
   ActivatePlanResult,
+  AmendRevisionArgs,
   CompleteCheckAttemptArgs,
   IngestPlanArgs,
   IngestPlanResult,
@@ -25,9 +31,12 @@ import type {
   RecordLandingArgs,
   RecordLandingResult,
   RecordNodeDispatchArgs,
+  RecordOwnerCheckSkipArgs,
   RecordVerdictArgs,
+  RevisionAmendmentResult,
   StartCheckAttemptArgs
 } from './objective-store-data'
+import { ObjectiveStoreDispatchMutations } from './objective-store-dispatch-mutations'
 import { ObjectiveStoreMutations } from './objective-store-mutations'
 import { detailObjective, projectObjective } from './objective-store-projection'
 import { ObjectiveStoreQueries } from './objective-store-queries'
@@ -36,6 +45,7 @@ import { reconcileObjectiveLedger } from './objective-store-reconciliation'
 export type {
   ActivatePlanArgs,
   ActivatePlanResult,
+  AmendRevisionArgs,
   CompleteCheckAttemptArgs,
   IngestPlanArgs,
   IngestPlanResult,
@@ -46,21 +56,74 @@ export type {
   RecordLandingArgs,
   RecordLandingResult,
   RecordNodeDispatchArgs,
+  RecordOwnerCheckSkipArgs,
   RecordVerdictArgs,
+  RevisionAmendmentResult,
   StartCheckAttemptArgs
 } from './objective-store-data'
 
 /** Natural-keyed objective state, with large report bodies kept out of the kernel ledger. */
 export class ObjectiveStore {
   private readonly mutations: ObjectiveStoreMutations
+  private readonly dispatchMutations: ObjectiveStoreDispatchMutations
   private readonly queries: ObjectiveStoreQueries
 
   constructor(
     private readonly database: ObjectiveDatabase,
     private readonly now: () => number = Date.now
   ) {
+    this.dispatchMutations = new ObjectiveStoreDispatchMutations(database)
     this.mutations = new ObjectiveStoreMutations(database)
     this.queries = new ObjectiveStoreQueries(database)
+  }
+
+  getDispatch(attemptFingerprint: string): ObjectiveDispatchRecord | null {
+    return this.queries.getDispatch(attemptFingerprint)
+  }
+
+  listDispatches(watcherId: string): ObjectiveDispatchRecord[] {
+    return this.queries.listDispatches(watcherId)
+  }
+
+  dispatchForId(watcherId: string, dispatchId: string): ObjectiveDispatchRecord | null {
+    return this.queries.dispatchForId(watcherId, dispatchId)
+  }
+
+  saveDispatch(record: ObjectiveDispatchRecord): ObjectiveDispatchRecord {
+    return this.dispatchMutations.save(record)
+  }
+
+  setParallelNote(watcherId: string, note: string | null): void {
+    this.dispatchMutations.setNote(watcherId, note, this.now())
+  }
+
+  clearParallelNoteWithPrefix(watcherId: string, prefix: string): void {
+    this.dispatchMutations.clearNoteWithPrefix(watcherId, prefix)
+  }
+
+  parallelProjection(
+    watcherId: string,
+    contract: ObjectiveEnrollmentPayload
+  ): ObjectiveParallelProjection {
+    const dispatches = this.queries.listDispatches(watcherId)
+    const effectiveMaxConcurrency =
+      contract.workspaceKind === 'folder' ? 1 : contract.maxConcurrency
+    const note =
+      contract.workspaceKind === 'folder' && contract.maxConcurrency > 1
+        ? 'Folder workspaces cannot create dispatch worktrees; concurrency is limited to 1.'
+        : this.queries.parallelNote(watcherId)
+    return ObjectiveParallelProjectionSchema.parse({
+      effectiveMaxConcurrency,
+      runningCount: dispatches.filter(
+        (dispatch) =>
+          dispatch.state === 'running' ||
+          dispatch.state === 'waiting-to-apply' ||
+          dispatch.state === 'applying' ||
+          dispatch.state === 'resolving-conflict'
+      ).length,
+      ...(note ? { note } : {}),
+      dispatches
+    })
   }
 
   databasePath(): string {
@@ -77,6 +140,14 @@ export class ObjectiveStore {
 
   recordNodeDispatch(args: RecordNodeDispatchArgs): RecordNodeDispatchArgs {
     return this.mutations.recordNodeDispatch(args)
+  }
+
+  amendRevision(args: AmendRevisionArgs): RevisionAmendmentResult {
+    return this.mutations.amendRevision(args)
+  }
+
+  hasAmendment(revisionId: string, digest: string): boolean {
+    return this.queries.hasAmendment(revisionId, digest)
   }
 
   nodeForDispatch(
@@ -100,6 +171,10 @@ export class ObjectiveStore {
 
   startCheckAttempt(args: StartCheckAttemptArgs): ObjectiveCheckAttempt {
     return this.mutations.startCheckAttempt(args)
+  }
+
+  recordOwnerCheckSkip(args: RecordOwnerCheckSkipArgs): ObjectiveCheckAttempt {
+    return this.mutations.recordOwnerCheckSkip(args)
   }
 
   completeCheckAttempt(args: CompleteCheckAttemptArgs): ObjectiveCheckAttempt {
@@ -169,7 +244,10 @@ export class ObjectiveStore {
     contract: ObjectiveEnrollmentPayload,
     ledger?: WatcherLedger
   ): ObjectiveDetail {
-    return detailObjective(this.database, this.now, watcherId, contract, ledger)
+    return {
+      ...detailObjective(this.database, this.now, watcherId, contract, ledger),
+      parallel: this.parallelProjection(watcherId, contract)
+    }
   }
 
   purge(watcherId: string): void {

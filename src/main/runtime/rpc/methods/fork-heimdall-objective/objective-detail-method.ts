@@ -8,6 +8,7 @@ import { requireHeimdallKernel } from '../fork-heimdall/kernel-binding'
 import { getCanonicalUserDataPath } from '../../../../persistence'
 import { requireHeimdallObjectiveStore } from './objective-binding'
 import { ObjectiveDetailReaderSchema } from './objective-detail-reader-schema'
+import { projectObjectiveDetailParallelForClient } from '../fork-heimdall/park-reason-wire'
 
 async function readLocalObjectiveDetail(runtime: object, watcherId: string) {
   const target = { watcherId, connectionId: null, pairingRevision: null } as const
@@ -44,25 +45,31 @@ export const HEIMDALL_OBJECTIVE_METHODS: readonly RpcAnyMethod[] = [
   defineMethod({
     name: HEIMDALL_CHANNELS.objectiveDetail,
     params: WatcherTargetSchema,
-    handler: async (target, { runtime, clientKind }) => {
+    handler: async (target, context) => {
+      const { runtime, clientKind } = context
       if (clientKind === 'runtime') {
         if (target.connectionId !== null || target.pairingRevision !== null) {
           throw new Error('A remote runtime can only serve locally owned Heimdall objectives')
         }
-        return ObjectiveDetailSchema.parse(
-          await readLocalObjectiveDetail(runtime, target.watcherId)
+        return projectObjectiveDetailParallelForClient(
+          ObjectiveDetailSchema.parse(await readLocalObjectiveDetail(runtime, target.watcherId)),
+          context
         )
       }
       if (target.connectionId === null) {
-        return ObjectiveDetailSchema.parse(
-          await readLocalObjectiveDetail(runtime, target.watcherId)
+        return projectObjectiveDetailParallelForClient(
+          ObjectiveDetailSchema.parse(await readLocalObjectiveDetail(runtime, target.watcherId)),
+          context
         )
       }
-      return readRemoteObjectiveDetail({
-        watcherId: target.watcherId,
-        connectionId: target.connectionId,
-        pairingRevision: target.pairingRevision!
-      })
+      return projectObjectiveDetailParallelForClient(
+        await readRemoteObjectiveDetail({
+          watcherId: target.watcherId,
+          connectionId: target.connectionId,
+          pairingRevision: target.pairingRevision!
+        }),
+        context
+      )
     }
   })
 ]

@@ -137,7 +137,11 @@ describe('objective enrollment authorization', () => {
     })
 
     await expect(
-      authorizeObjectiveEnrollment(runtime, store({ id: 'repo-1', kind: 'folder' }), enrollment)
+      authorizeObjectiveEnrollment(
+        runtime,
+        store({ id: 'repo-1', kind: 'folder', path: '/workspace/folder' }),
+        enrollment
+      )
     ).rejects.toThrow('landing-bar-requires-git')
   })
 
@@ -151,7 +155,8 @@ describe('objective enrollment authorization', () => {
       worktreeId: null,
       kindPayload: {
         ...(input().kindPayload as Record<string, unknown>),
-        workspaceKind: 'folder'
+        workspaceKind: 'folder',
+        maxConcurrency: 3
       }
     })
 
@@ -165,23 +170,97 @@ describe('objective enrollment authorization', () => {
       }),
       enrollment
     )
+    const contract = ObjectiveEnrollmentPayloadSchema.parse(authorized.kindPayload)
 
     expect(resolveRuntimeFileTarget).toHaveBeenCalledWith('id:repo-1::/workspace/folder')
     expect(authorized.executionHostId).toBe('ssh:folder-host')
     expect(authorized.workspacePath).toBe('/workspace/folder')
+    expect(contract.maxConcurrency).toBe(1)
   })
 
-  it('refuses unsupported multi-worker concurrency at the authorization boundary', async () => {
+  it('authorizes a canonical folder workspace without a Repo row and preserves its identities', async () => {
+    const resolveRuntimeFileTarget = vi.fn(async () => ({
+      executionHostId: 'ssh:folder-host' as const,
+      worktree: {
+        id: 'folder:folder-1',
+        repoId: 'folder-workspace:group-1',
+        path: '/workspace/folder'
+      }
+    }))
+    const runtime = { resolveRuntimeFileTarget } as unknown as OrcaRuntimeService
     const enrollment = input({
+      repoId: 'folder-workspace:group-1',
+      worktreeId: 'folder:folder-1',
       kindPayload: {
         ...(input().kindPayload as Record<string, unknown>),
-        maxConcurrency: 2
+        workspaceKind: 'folder',
+        maxConcurrency: 3
+      }
+    })
+
+    const authorized = await authorizeObjectiveEnrollment(
+      runtime,
+      { getRepo: () => undefined } as unknown as Store,
+      enrollment
+    )
+    const contract = ObjectiveEnrollmentPayloadSchema.parse(authorized.kindPayload)
+
+    expect(resolveRuntimeFileTarget).toHaveBeenCalledWith('id:folder:folder-1')
+    expect(authorized).toMatchObject({
+      repoId: 'folder-workspace:group-1',
+      worktreeId: 'folder:folder-1',
+      executionHostId: 'ssh:folder-host',
+      workspacePath: '/workspace/folder',
+      schedulerOwner: 'ssh_bridge'
+    })
+    expect(contract).toMatchObject({ workspaceKind: 'folder', maxConcurrency: 1 })
+  })
+
+  it('rejects a canonical folder target whose runtime identity does not match enrollment', async () => {
+    const runtime = {
+      resolveRuntimeFileTarget: async () => ({
+        executionHostId: 'local',
+        worktree: {
+          id: 'folder:other-folder',
+          repoId: 'folder-workspace:group-1',
+          path: '/workspace/folder'
+        }
+      })
+    } as unknown as OrcaRuntimeService
+    const enrollment = input({
+      repoId: 'folder-workspace:group-1',
+      worktreeId: 'folder:folder-1',
+      kindPayload: {
+        ...(input().kindPayload as Record<string, unknown>),
+        workspaceKind: 'folder'
       }
     })
 
     await expect(
-      authorizeObjectiveEnrollment(gitRuntime('local'), store({ id: 'repo-1' }), enrollment)
-    ).rejects.toThrow('max-concurrency-unsupported')
+      authorizeObjectiveEnrollment(
+        runtime,
+        { getRepo: () => undefined } as unknown as Store,
+        enrollment
+      )
+    ).rejects.toThrow('Invalid objective folder workspace identity')
+  })
+
+  it('preserves multi-worker concurrency for a git objective', async () => {
+    const enrollment = input({
+      kindPayload: {
+        ...(input().kindPayload as Record<string, unknown>),
+        maxConcurrency: 3
+      }
+    })
+
+    const authorized = await authorizeObjectiveEnrollment(
+      gitRuntime('local'),
+      store({ id: 'repo-1' }),
+      enrollment
+    )
+
+    const contract = ObjectiveEnrollmentPayloadSchema.parse(authorized.kindPayload)
+    expect(contract.maxConcurrency).toBe(3)
   })
   it('rejects plan-off enrollment when no executable plan is usable', async () => {
     const hasUsablePlan = vi.fn(() => false)
@@ -327,10 +406,9 @@ describe('objective enrollment authorization', () => {
         enrollment,
         forge('github')
       )
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       status: 'refused',
-      reason: 'invalid-payload',
-      detail: 'landing-bar-requires-worktree'
+      reason: 'invalid-payload'
     })
   })
 

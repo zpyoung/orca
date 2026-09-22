@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { HEIMDALL_CHANNELS } from '../../shared/fork-heimdall/api'
+import { HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY } from '../../shared/fork-heimdall/capability'
 import type { HandlerContext } from '../dispatch'
 import { HEIMDALL_HANDLERS } from './handlers'
 
@@ -93,6 +94,150 @@ describe('orca heimdall debug handler', () => {
     ).rejects.toMatchObject({
       code: 'invalid_argument',
       message: '--out requires a value; it was passed with none.'
+    })
+    expect(callMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('orca heimdall set-concurrency handler', () => {
+  it('targets the fleet owner fence and sends the new cap', async () => {
+    const target = {
+      watcherId: 'watcher-1',
+      connectionId: null,
+      pairingRevision: null
+    }
+    const expectedOwner = {
+      executionHostId: 'local',
+      schedulerOwner: 'local_host_service',
+      workspaceKey: 'local::/repo',
+      revision: 4
+    }
+    const entry = {
+      enrollment: {
+        kind: 'objective',
+        kindPayload: { workspaceKind: 'git' }
+      }
+    }
+    callMock
+      .mockResolvedValueOnce({
+        id: 'status-1',
+        ok: true,
+        result: { capabilities: [HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY] }
+      })
+      .mockResolvedValueOnce({
+        id: 'fleet-1',
+        ok: true,
+        result: {
+          generatedAtMs: 10,
+          entries: [{ target, ownerFence: expectedOwner, entry }]
+        }
+      })
+      .mockResolvedValueOnce({
+        id: 'command-1',
+        ok: true,
+        result: { status: 'applied', appliedAtMs: 5 }
+      })
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await HEIMDALL_HANDLERS['heimdall set-concurrency'](
+      context([
+        ['watcher-id', 'watcher-1'],
+        ['max-concurrency', '3']
+      ])
+    )
+
+    expect(callMock).toHaveBeenNthCalledWith(1, 'status.get')
+    expect(callMock).toHaveBeenNthCalledWith(2, HEIMDALL_CHANNELS.fleet, {})
+    expect(callMock).toHaveBeenNthCalledWith(3, HEIMDALL_CHANNELS.command, {
+      target,
+      expectedOwner,
+      command: { kind: 'set-concurrency', maxConcurrency: 3 }
+    })
+  })
+
+  it('refuses before reading the fleet when the runtime lacks parallel execution support', async () => {
+    callMock.mockResolvedValueOnce({
+      id: 'status-1',
+      ok: true,
+      result: { capabilities: [] }
+    })
+
+    await expect(
+      HEIMDALL_HANDLERS['heimdall set-concurrency'](
+        context([
+          ['watcher-id', 'watcher-1'],
+          ['max-concurrency', '3']
+        ])
+      )
+    ).rejects.toMatchObject({
+      code: 'incompatible_runtime',
+      message: expect.stringContaining('does not support live objective concurrency changes')
+    })
+    expect(callMock).toHaveBeenCalledOnce()
+    expect(callMock).toHaveBeenCalledWith('status.get')
+  })
+
+  it('clamps a folder watcher and reports the effective cap', async () => {
+    const target = { watcherId: 'watcher-1', connectionId: null, pairingRevision: null }
+    const expectedOwner = {
+      executionHostId: 'local',
+      schedulerOwner: 'local_host_service',
+      workspaceKey: 'local::/repo',
+      revision: 4
+    }
+    callMock
+      .mockResolvedValueOnce({
+        id: 'status-1',
+        ok: true,
+        result: { capabilities: [HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY] }
+      })
+      .mockResolvedValueOnce({
+        id: 'fleet-1',
+        ok: true,
+        result: {
+          generatedAtMs: 10,
+          entries: [
+            {
+              target,
+              ownerFence: expectedOwner,
+              entry: { enrollment: { kind: 'objective', kindPayload: { workspaceKind: 'folder' } } }
+            }
+          ]
+        }
+      })
+      .mockResolvedValueOnce({
+        id: 'command-1',
+        ok: true,
+        result: { status: 'applied', appliedAtMs: 5 }
+      })
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await HEIMDALL_HANDLERS['heimdall set-concurrency'](
+      context([
+        ['watcher-id', 'watcher-1'],
+        ['max-concurrency', '3']
+      ])
+    )
+
+    expect(callMock).toHaveBeenNthCalledWith(3, HEIMDALL_CHANNELS.command, {
+      target,
+      expectedOwner,
+      command: { kind: 'set-concurrency', maxConcurrency: 1 }
+    })
+    expect(log).toHaveBeenCalledWith('Set Heimdall watcher watcher-1 concurrency to 1.')
+  })
+
+  it.each(['0', '1.5', '1025'])('rejects an invalid cap of %s locally', async (value) => {
+    await expect(
+      HEIMDALL_HANDLERS['heimdall set-concurrency'](
+        context([
+          ['watcher-id', 'watcher-1'],
+          ['max-concurrency', value]
+        ])
+      )
+    ).rejects.toMatchObject({
+      code: 'invalid_argument',
+      message: '--max-concurrency must be a whole number from 1 to 1024'
     })
     expect(callMock).not.toHaveBeenCalled()
   })

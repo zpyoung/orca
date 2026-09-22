@@ -80,7 +80,7 @@ describe('ClaudeRuntimeAuthService', () => {
     expect(testState.runtimeWriteConfigDir).toBe(expectedRuntimeConfigDir())
   })
 
-  it('restores system default instead of materializing corrupt managed credentials', async () => {
+  it('falls back to ambient host auth and preserves WSL selection for corrupt managed credentials', async () => {
     const runtimeCredentialsPath = join(testState.fakeHomeDir, '.claude', '.credentials.json')
     const systemCredentials = createClaudeCredentialsJson('system@example.com', 'system')
     writeFileSync(runtimeCredentialsPath, systemCredentials, 'utf-8')
@@ -89,15 +89,24 @@ describe('ClaudeRuntimeAuthService', () => {
     const managedAuthPath = createManagedClaudeAuth(testState.userDataDir, 'account-1', '{not-json')
     const settings = createSettings({
       claudeManagedAccounts: [createClaudeAccount('account-1', managedAuthPath)],
-      activeClaudeManagedAccountId: 'account-1'
+      activeClaudeManagedAccountId: null,
+      activeClaudeManagedAccountIdsByRuntime: {
+        host: 'account-1',
+        wsl: { Ubuntu: 'wsl-account' }
+      }
     })
     const store = createStore(settings)
 
     const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
     const service = new ClaudeRuntimeAuthService(store as never)
-    await service.syncForCurrentSelection()
+    const preparation = await service.prepareForClaudeLaunch()
 
     expect(store.getSettings().activeClaudeManagedAccountId).toBeNull()
+    expect(store.getSettings().activeClaudeManagedAccountIdsByRuntime).toEqual({
+      host: null,
+      wsl: { Ubuntu: 'wsl-account' }
+    })
+    expect(preparation.stripAuthEnv).toBe(false)
     expect(readFileSync(runtimeCredentialsPath, 'utf-8')).toBe(systemCredentials)
     expect(testState.scopedKeychainCredentials).toBe(systemCredentials)
     expect(testState.legacyKeychainCredentials).toBe(systemCredentials)
@@ -126,7 +135,7 @@ describe('ClaudeRuntimeAuthService', () => {
     expect(testState.legacyKeychainCredentials).toBe(systemCredentials)
   })
 
-  it('does not materialize managed credentials from unowned auth paths', async () => {
+  it('falls back to ambient host auth and preserves WSL selection for an unowned auth path', async () => {
     const runtimeCredentialsPath = join(testState.fakeHomeDir, '.claude', '.credentials.json')
     const systemCredentials = createClaudeCredentialsJson('system@example.com', 'system')
     const managedCredentials = createClaudeCredentialsJson('user@example.com', 'managed')
@@ -141,15 +150,24 @@ describe('ClaudeRuntimeAuthService', () => {
     )
     const settings = createSettings({
       claudeManagedAccounts: [createClaudeAccount('account-1', unownedAuthPath)],
-      activeClaudeManagedAccountId: 'account-1'
+      activeClaudeManagedAccountId: null,
+      activeClaudeManagedAccountIdsByRuntime: {
+        host: 'account-1',
+        wsl: { Ubuntu: 'wsl-account' }
+      }
     })
     const store = createStore(settings)
 
     const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
     const service = new ClaudeRuntimeAuthService(store as never)
-    await service.syncForCurrentSelection()
+    const preparation = await service.prepareForClaudeLaunch()
 
     expect(store.getSettings().activeClaudeManagedAccountId).toBeNull()
+    expect(store.getSettings().activeClaudeManagedAccountIdsByRuntime).toEqual({
+      host: null,
+      wsl: { Ubuntu: 'wsl-account' }
+    })
+    expect(preparation.stripAuthEnv).toBe(false)
     expect(readFileSync(runtimeCredentialsPath, 'utf-8')).toBe(systemCredentials)
   })
 

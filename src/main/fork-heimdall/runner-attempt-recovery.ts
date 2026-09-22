@@ -113,9 +113,13 @@ export class WatcherAttemptRecovery {
     }
   }
 
-  abandonPendingAttempts(runner: WatcherRunner, ledger: WatcherLedger): void {
+  abandonPendingAttempts(
+    runner: WatcherRunner,
+    ledger: WatcherLedger,
+    preserve: (attempt: AttemptEntry) => boolean = () => false
+  ): void {
     for (const attempt of getInFlightAttempts(ledger)) {
-      if (attempt.state !== 'attempted' || !attempt.dispatch) {
+      if (attempt.state !== 'attempted' || !attempt.dispatch || preserve(attempt)) {
         continue
       }
       this.append(runner, {
@@ -147,7 +151,7 @@ export class WatcherAttemptRecovery {
   ): Promise<void> {
     for (const attempt of attempts) {
       const lease = this.requireLease(runner)
-      const { effect, failureClass } = await runner.kind.resolveOutcome(
+      const { effect, failureClass, reportValidation } = await runner.kind.resolveOutcome(
         attempt,
         live,
         ledger,
@@ -167,6 +171,7 @@ export class WatcherAttemptRecovery {
         attemptId: attempt.attemptId,
         effect,
         ...(failureClass === undefined ? {} : { failureClass }),
+        ...(reportValidation === undefined ? {} : { reportValidation }),
         evidence: runner.kind.describeSnapshot(live)
       })
     }

@@ -142,14 +142,21 @@ export function objectiveConcurrencyHelp(): ObjectiveEnrollmentHelpCopy {
     ),
     summary: translate(
       'fork.heimdallObjective.enrollment.maxConcurrencyHelpSummary',
-      'Sets the worker limit.'
+      'Limits isolated implementer dispatches for this watcher.'
     ),
     values: [
       {
         label: '1',
         description: translate(
           'fork.heimdallObjective.enrollment.maxConcurrencyHelp.one',
-          'Only supported value; actions run serially.'
+          'Runs in place without dispatch worktrees.'
+        )
+      },
+      {
+        label: '3',
+        description: translate(
+          'fork.heimdallObjective.enrollment.maxConcurrencyHelp.three',
+          'Default. Runs up to three independent nodes or lanes.'
         )
       }
     ]

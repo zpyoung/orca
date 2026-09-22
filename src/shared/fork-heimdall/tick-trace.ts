@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { BudgetStateSchema } from './budget'
 import { GateVerdictSchema } from './gate'
 import { KernelActionSchema } from './ledger-types'
+import { DeviationSchema } from './owner/deviation'
 import { PacingDecisionSchema } from './pacing'
 
 export const TICK_TRACE_RING_CAPACITY = 50
@@ -40,7 +41,8 @@ const TraceDecisionSchema = z.union([
       detail: z.string().optional(),
       considered: z.array(ConsideredPhaseSchema)
     })
-    .strict()
+    .strict(),
+  z.object({ action: z.null(), deviation: DeviationSchema }).strict()
 ])
 
 export const TraceSnapshotSummarySchema = z.record(z.string(), z.unknown())

@@ -7,6 +7,7 @@ import {
   LIST_TABLE_ROW_CLASS,
   LIST_TABLE_ROW_SELECTED_CLASS
 } from '@/lib/list-table-layout'
+import { ObjectiveEnrollmentPayloadSchema } from '../../../shared/fork-heimdall-objective/contract-types'
 import type { WatcherFleetEntry, WatcherTarget } from '../../../shared/fork-heimdall/fleet-types'
 import { formatHeimdallAge, formatHeimdallDuration } from './fleet-format'
 import {
@@ -82,6 +83,22 @@ function ActivityIndicator({
   asOfMs: number
 }): React.JSX.Element {
   const activity = resolveFleetActivity(row)
+  const parsedObjectivePayload =
+    row.entry.enrollment.kind === 'objective'
+      ? ObjectiveEnrollmentPayloadSchema.safeParse(row.entry.enrollment.kindPayload)
+      : null
+  const objectivePayload = parsedObjectivePayload?.success ? parsedObjectivePayload.data : null
+  const objectiveConcurrency =
+    row.parallel?.effectiveMaxConcurrency ??
+    (objectivePayload === null
+      ? null
+      : objectivePayload.workspaceKind === 'folder'
+        ? 1
+        : objectivePayload.maxConcurrency)
+  const objectiveRunningCount =
+    row.parallel?.effectiveMaxConcurrency === 1 && activity.kind === 'agent-in-flight'
+      ? Math.max(row.parallel.runningCount, activity.count)
+      : (row.parallel?.runningCount ?? 0)
   if (activity.kind === 'unverifiable') {
     const detail = translate('fork.heimdall.activity.lastConfirmed', 'Last confirmed {{age}}', {
       age: formatHeimdallAge(activity.lastConfirmedAtMs, asOfMs)
@@ -111,12 +128,23 @@ function ActivityIndicator({
   if (activity.kind === 'waiting') {
     const waiting = row.entry.status.state === 'watching'
     return (
-      <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
-        <Clock3 className="size-3.5 shrink-0" aria-hidden />
-        <span className="truncate text-xs">
-          {waiting
-            ? translate('fork.heimdall.activity.waiting', 'Waiting for change')
-            : translate('fork.heimdall.activity.inactive', 'No active work')}
+      <span className="flex min-w-0 items-start gap-1.5 text-muted-foreground">
+        <Clock3 className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+        <span className="min-w-0">
+          <span className="block truncate text-xs">
+            {objectiveConcurrency === null
+              ? waiting
+                ? translate('fork.heimdall.activity.waiting', 'Waiting for change')
+                : translate('fork.heimdall.activity.inactive', 'No active work')
+              : translate(
+                  'fork.heimdall.activity.objectiveConcurrencyRunning',
+                  '{{count}} of {{cap}} running',
+                  { count: objectiveRunningCount, cap: objectiveConcurrency }
+                )}
+          </span>
+          {row.parallel?.note ? (
+            <span className="block truncate text-[11px]">{row.parallel.note}</span>
+          ) : null}
         </span>
       </span>
     )
@@ -128,16 +156,30 @@ function ActivityIndicator({
       : translate('fork.heimdall.activity.started', 'Started {{age}}', {
           age: formatHeimdallAge(activity.startedAtMs, asOfMs)
         })
-  const detail = [activity.detail?.replace(/[-_]+/g, ' '), started]
+  const detail = [row.parallel?.note, activity.detail?.replace(/[-_]+/g, ' '), started]
     .filter((value): value is string => Boolean(value))
     .join(' · ')
-  const label =
-    activity.kind === 'agent-in-flight'
-      ? activity.count === 1
-        ? translate('fork.heimdall.activity.agentInFlight', 'Agent work in flight')
-        : translate('fork.heimdall.activity.agentsInFlight', '{{count}} agent tasks in flight', {
-            count: activity.count
-          })
+  const label = row.parallel
+    ? translate(
+        'fork.heimdall.activity.objectiveConcurrencyRunning',
+        '{{count}} of {{cap}} running',
+        {
+          count: objectiveRunningCount,
+          cap: row.parallel.effectiveMaxConcurrency
+        }
+      )
+    : activity.kind === 'agent-in-flight'
+      ? objectiveConcurrency === null
+        ? activity.count === 1
+          ? translate('fork.heimdall.activity.agentInFlight', 'Agent work in flight')
+          : translate('fork.heimdall.activity.agentsInFlight', '{{count}} agent tasks in flight', {
+              count: activity.count
+            })
+        : translate(
+            'fork.heimdall.activity.objectiveConcurrencyRunning',
+            '{{count}} of {{cap}} running',
+            { count: activity.count, cap: objectiveConcurrency }
+          )
       : activity.kind === 'check-running'
         ? translate('fork.heimdall.activity.checkRunning', 'Check running')
         : translate('fork.heimdall.activity.actionRunning', 'Action running')

@@ -85,6 +85,22 @@ export function getInFlightAttempts(ledger: WatcherLedger): readonly AttemptEntr
   )
 }
 
+export function hasPendingAttemptOutcome(ledger: WatcherLedger): boolean {
+  const resolvedAttemptIds = new Set<string>()
+  for (const entry of ledger.entries) {
+    if (entry.kind === 'attempt-resolved') {
+      resolvedAttemptIds.add(entry.attemptId)
+    }
+  }
+  return getLatestAttempts(ledger).some(
+    (entry) =>
+      !resolvedAttemptIds.has(entry.attemptId) &&
+      (entry.state === 'attempted' ||
+        entry.state === 'running' ||
+        (entry.state === 'settled' && entry.effect === 'indeterminate'))
+  )
+}
+
 export function getLatestApproval(
   ledger: WatcherLedger,
   scope: ApprovalScope

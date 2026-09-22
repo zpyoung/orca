@@ -1,7 +1,7 @@
 import { win32 } from 'node:path'
 import { objectivePathMatchesTerritory } from '../../shared/fork-heimdall-objective/plan-schema'
 import { resolveLeasePathFlavor } from '../fork-heimdall/lease-host-filesystem'
-import { parseObjectiveDirtyPaths } from './content-identity'
+import { isObjectiveMetadataPath, parseObjectiveDirtyPaths } from './content-identity'
 import type { ObjectiveSnapshotBinding } from './execution-context'
 
 export function objectiveDirtyPathsByTerritory(
@@ -14,7 +14,11 @@ export function objectiveDirtyPathsByTerritory(
     ? binding.contract.writeTerritory.map((pattern) => pattern.toLowerCase())
     : binding.contract.writeTerritory
   const paths = [
-    ...new Set(parseObjectiveDirtyPaths(status, caseInsensitive).entries.map((entry) => entry.path))
+    ...new Set(
+      parseObjectiveDirtyPaths(status, caseInsensitive)
+        .entries.map((entry) => entry.path)
+        .filter((path) => !isObjectiveMetadataPath(path, caseInsensitive))
+    )
   ]
   const inside: string[] = []
   const outside: string[] = []

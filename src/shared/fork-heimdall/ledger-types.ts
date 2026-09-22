@@ -1,5 +1,9 @@
 import { z } from 'zod'
-import { EffectCertaintySchema, ObjectiveFailureClassSchema } from './effect-certainty'
+import {
+  EffectCertaintySchema,
+  ObjectiveFailureClassSchema,
+  ReportValidationProvenanceSchema
+} from './effect-certainty'
 
 const IdSchema = z
   .string()
@@ -71,6 +75,8 @@ export const AttemptEntrySchema = OwnerFactBaseSchema.extend({
       agent: IdSchema.optional(),
       taskKey: IdSchema.optional(),
       deps: z.array(IdSchema).optional(),
+      workspaceId: IdSchema.optional(),
+      reuseTerminal: IdSchema.optional(),
       dispatchKind: z.enum(['planner', 'child'])
     })
     .strict()
@@ -85,6 +91,7 @@ export const AttemptResolvedEntrySchema = OwnerFactBaseSchema.extend({
   attemptId: IdSchema,
   effect: z.enum(['landed', 'not-landed']),
   failureClass: ObjectiveFailureClassSchema.optional(),
+  reportValidation: ReportValidationProvenanceSchema.optional(),
   evidence: z.unknown()
 }).strict()
 export type AttemptResolvedEntry = z.infer<typeof AttemptResolvedEntrySchema>
@@ -141,7 +148,7 @@ export type EvidenceEntry = z.infer<typeof EvidenceEntrySchema>
 export const IntervalOpenEntrySchema = OwnerFactBaseSchema.extend({
   kind: z.literal('interval-open'),
   intervalId: IdSchema,
-  cause: z.enum(['action-in-flight', 'worker-dispatched'])
+  cause: z.enum(['action-in-flight', 'worker-dispatched', 'owner-in-flight'])
 }).strict()
 export type IntervalOpenEntry = z.infer<typeof IntervalOpenEntrySchema>
 

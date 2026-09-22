@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { AutomationSchedulerOwner } from '../automations-types'
 import { parseExecutionHostId, type ExecutionHostId } from '../execution-host'
 import { BudgetExhaustionSchema, BudgetPolicySchema, BudgetStateSchema } from './budget'
+import { WatcherOwnerConfigSchema } from './owner/owner-config'
 
 const IdSchema = z
   .string()
@@ -64,7 +65,9 @@ export const WatcherEnrollmentSchema = z
     coordinatorIdentity: CoordinatorIdentitySchema,
     orchestrationRunId: IdSchema.nullable(),
     createdAtMs: TimestampSchema,
-    terminalAtMs: TimestampSchema.nullable()
+    terminalAtMs: TimestampSchema.nullable(),
+    /** Absent means no owning agent. */
+    owner: WatcherOwnerConfigSchema.optional()
   })
   .strict()
   .refine(
@@ -94,7 +97,27 @@ export const WatcherParkReasonSchema = z.discriminatedUnion('kind', [
       messageId: IdSchema
     })
     .strict(),
-  z.object({ kind: z.literal('coordinator-seat-lost') }).strict()
+  z.object({ kind: z.literal('coordinator-seat-lost') }).strict(),
+  z
+    .object({
+      kind: z.literal('worker-escalation'),
+      escalationId: IdSchema,
+      messageId: IdSchema
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('configuration-error'),
+      reason: z.string().trim().min(1)
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('owner-escalation'),
+      escalationId: IdSchema,
+      reason: z.string().trim().min(1)
+    })
+    .strict()
 ])
 export type WatcherParkReason = z.infer<typeof WatcherParkReasonSchema>
 
@@ -143,7 +166,11 @@ export const EnrollInputSchema = z
     worktreeId: IdSchema.nullable(),
     capabilities: z.record(z.string().min(1), CapabilityModeSchema),
     budget: BudgetPolicySchema,
-    kindPayload: z.unknown()
+    kindPayload: z.unknown(),
+    /** Candidate owning-agent selection; re-validated at authorization, never trusted as-is. */
+    owner: WatcherOwnerConfigSchema.optional(),
+    /** Kept out of `capabilities` so kind-owned strict capability schemas never see this key. */
+    ownerInterventionCapability: CapabilityModeSchema.optional()
   })
   .strict()
 export type EnrollInput = z.infer<typeof EnrollInputSchema>
@@ -160,7 +187,8 @@ export const AuthorizedEnrollmentSchema = z
     schedulerOwner: AutomationSchedulerOwnerSchema,
     capabilities: z.record(z.string().min(1), CapabilityModeSchema),
     budget: BudgetPolicySchema,
-    kindPayload: z.unknown()
+    kindPayload: z.unknown(),
+    owner: WatcherOwnerConfigSchema.optional()
   })
   .strict()
   .refine(

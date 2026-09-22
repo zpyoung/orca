@@ -525,4 +525,24 @@ describe('objective infra/environment retry exhaustion', () => {
       stop: false
     })
   })
+
+  it('re-derives the real retry count and last failure class for the owner deviation', () => {
+    const exhausted = ledger([
+      dispatchAttempt('attempt-1', 'revision-1:core', undefined, 'infra'),
+      dispatchAttempt('attempt-2', 'revision-1:core:r0', 'revision-1:core', 'environment'),
+      dispatchAttempt('attempt-3', 'revision-1:core:r1', 'revision-1:core', 'infra')
+    ])
+    const verdict = objectiveInfraRetryExhaustedPredicate.evaluate(withNode(), exhausted)
+    if (!verdict.stop) {
+      throw new Error('expected the predicate to fire')
+    }
+    expect(
+      objectiveInfraRetryExhaustedPredicate.deviationForFiring?.(verdict, withNode(), exhausted)
+    ).toEqual({
+      kind: 'retry-exhausted',
+      taskKey: 'core',
+      retryCount: 2,
+      lastFailureClass: 'infra'
+    })
+  })
 })

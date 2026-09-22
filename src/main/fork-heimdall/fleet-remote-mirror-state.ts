@@ -1,5 +1,10 @@
 import { HEIMDALL_CHANNELS } from '../../shared/fork-heimdall/api'
-import { HEIMDALL_COMMANDS_RUNTIME_CAPABILITY } from '../../shared/fork-heimdall/capability'
+import {
+  HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,
+  HEIMDALL_ENROLL_OWNER_RUNTIME_CAPABILITY,
+  HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY,
+  HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
+} from '../../shared/fork-heimdall/capability'
 import {
   HeimdallFleetSnapshotSchema,
   type HeimdallFleetSnapshot,
@@ -7,6 +12,9 @@ import {
   type WatcherFleetEntry,
   type WatcherTarget
 } from '../../shared/fork-heimdall/fleet-types'
+import type { RuntimeCapability } from '../../shared/protocol-version'
+import type { RuntimeRpcResponse } from '../../shared/runtime-rpc-envelope'
+import type { RuntimeStatus } from '../../shared/runtime-types'
 import type {
   FleetEnvironmentAvailability,
   FleetEnvironmentIdentity,
@@ -14,10 +22,24 @@ import type {
 } from './fleet-environment-transport'
 import { routeRemoteFleetEntry, type HeimdallCommandSupport } from './fleet-projection'
 
+/** Reads one advertised-capability check off a `status()` outcome; unsettled or refused reads as unknown. */
+function statusCapabilitySupport(
+  status: PromiseSettledResult<RuntimeRpcResponse<RuntimeStatus>>,
+  capability: RuntimeCapability
+): HeimdallCommandSupport {
+  if (status.status !== 'fulfilled' || status.value.ok !== true) {
+    return 'unknown'
+  }
+  return status.value.result.capabilities?.includes(capability) ? 'supported' : 'unsupported'
+}
+
 export class RemoteFleetMirrorState {
   incarnation = 1
   reachable = false
   commandSupport: HeimdallCommandSupport = 'unknown'
+  deleteSupport: HeimdallCommandSupport = 'unknown'
+  enrollOwnerSupport: HeimdallCommandSupport = 'unknown'
+  parallelExecutionSupport: HeimdallCommandSupport = 'unknown'
   ownerGeneratedAtMs = -1
   entries: WatcherFleetEntry[] = []
   readonly details = new Map<string, WatcherDetail>()
@@ -43,6 +65,9 @@ export class RemoteFleetMirrorState {
     this.incarnation += 1
     this.reachable = false
     this.commandSupport = 'unknown'
+    this.deleteSupport = 'unknown'
+    this.enrollOwnerSupport = 'unknown'
+    this.parallelExecutionSupport = 'unknown'
     this.ownerGeneratedAtMs = -1
     this.subscriptionUnsupported = false
     this.eventProcessing = Promise.resolve()
@@ -69,21 +94,31 @@ export class RemoteFleetMirrorState {
       return
     }
     const previousSupport = this.commandSupport
-    this.commandSupport =
-      status.status === 'fulfilled' &&
-      status.value.ok === true &&
-      status.value.result.capabilities?.includes(HEIMDALL_COMMANDS_RUNTIME_CAPABILITY)
-        ? 'supported'
-        : status.status === 'fulfilled' && status.value.ok === true
-          ? 'unsupported'
-          : 'unknown'
+    const previousDeleteSupport = this.deleteSupport
+    const previousEnrollOwnerSupport = this.enrollOwnerSupport
+    const previousParallelExecutionSupport = this.parallelExecutionSupport
+    this.commandSupport = statusCapabilitySupport(status, HEIMDALL_COMMANDS_RUNTIME_CAPABILITY)
+    this.deleteSupport = statusCapabilitySupport(status, HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY)
+    this.enrollOwnerSupport = statusCapabilitySupport(
+      status,
+      HEIMDALL_ENROLL_OWNER_RUNTIME_CAPABILITY
+    )
+    this.parallelExecutionSupport = statusCapabilitySupport(
+      status,
+      HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
+    )
+    const supportChanged = (): boolean =>
+      previousSupport !== this.commandSupport ||
+      previousDeleteSupport !== this.deleteSupport ||
+      previousEnrollOwnerSupport !== this.enrollOwnerSupport ||
+      previousParallelExecutionSupport !== this.parallelExecutionSupport
     if (fleet.status === 'fulfilled' && fleet.value.ok === true) {
       const parsed = HeimdallFleetSnapshotSchema.safeParse(fleet.value.result)
       if (parsed.success) {
         if (parsed.data.generatedAtMs <= this.ownerGeneratedAtMs) {
           const contactChanged = !this.reachable
           this.reachable = true
-          if (contactChanged || previousSupport !== this.commandSupport) {
+          if (contactChanged || supportChanged()) {
             this.onChanged()
           }
           return
@@ -94,7 +129,7 @@ export class RemoteFleetMirrorState {
       }
     }
     this.markUnreachable()
-    if (previousSupport !== this.commandSupport) {
+    if (supportChanged()) {
       this.onChanged()
     }
   }

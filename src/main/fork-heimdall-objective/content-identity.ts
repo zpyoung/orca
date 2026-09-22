@@ -2,6 +2,10 @@ import { createHash } from 'node:crypto'
 import { lstat } from 'node:fs/promises'
 import { posix, win32 } from 'node:path'
 import type { ExecutionHostId } from '../../shared/execution-host'
+import {
+  OBJECTIVE_SYMLINK_OID_ALIAS,
+  OBJECTIVE_SYMLINK_OID_ALIAS_CONFIG
+} from '../../shared/fork-heimdall/objective-git-exec-shapes'
 import { resolveWorktreeHostPath } from '../../shared/git-metadata-path'
 import { gitExecFileAsync } from '../git/command-runner/git-exec-file'
 import type { IFilesystemProvider } from '../providers/types'
@@ -37,7 +41,6 @@ export type GitWorkspaceObservation = { treeOid: string; dirty: GitDirtyFingerpr
 
 // Every porcelain-v2 arm records the same tag, so the identity hash re-injects it as a constant.
 const DIRTY_ENTRY_METADATA = 'worktree'
-const SYMLINK_OID_ALIAS = 'orca-objective-symlink-oid'
 type ObservedStat = { type: string; mode?: number }
 
 function sha256(parts: readonly string[]): string {
@@ -255,8 +258,8 @@ async function readWorkingTreeStat(
 async function symlinkBlobObjectId(runGit: ObjectiveGitCommand, path: string): Promise<string> {
   const { stdout } = await runGit([
     '-c',
-    `alias.${SYMLINK_OID_ALIAS}=!f() { test "$1" = -- && shift; for path do case "$path" in -*) path="./$path";; esac; printf "%s" "$(readlink "$path")" | git hash-object --stdin | tr -d "\\n"; printf "\\0"; done; }; f`,
-    SYMLINK_OID_ALIAS,
+    OBJECTIVE_SYMLINK_OID_ALIAS_CONFIG,
+    OBJECTIVE_SYMLINK_OID_ALIAS,
     '--',
     path
   ])

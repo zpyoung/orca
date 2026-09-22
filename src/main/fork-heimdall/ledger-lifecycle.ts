@@ -29,8 +29,14 @@ export type DispatchLifecycleInput = {
   fingerprint: string
   spec: string
   agent?: string
+  model?: string
+  effort?: string
   taskKey?: string
   deps?: readonly string[]
+  workspaceId?: string
+  reuseTerminal?: string
+  allowConcurrent?: boolean
+  allowBudgetExhausted?: boolean
   lease?: LeaseGuard
   dispatchKind?: 'planner' | 'child'
 }
@@ -66,7 +72,7 @@ export class WatcherLedgerLifecycle {
 
   async dispatch(input: DispatchLifecycleInput): Promise<DispatchResult> {
     const ledger = this.dependencies.ledgerStore.read(input.enrollment.watcherId)
-    const budgetRefusal = this.preDispatchRefusal(input.enrollment, ledger)
+    const budgetRefusal = this.preDispatchRefusal(input, ledger)
     if (budgetRefusal) {
       return budgetRefusal
     }
@@ -100,14 +106,14 @@ export class WatcherLedgerLifecycle {
     }
     const ledger = this.dependencies.ledgerStore.read(input.enrollment.watcherId)
     const budget = deriveBudgetState(ledger, input.enrollment.budget)
-    if (budget.exhausted) {
+    if (budget.exhausted && !input.allowBudgetExhausted) {
       return {
         status: 'refused',
         reason: 'capability-invalid',
         detail: `budget-${budget.exhausted.kind}`
       }
     }
-    if (getUnresolvedAttempts(ledger).length > 0) {
+    if (!input.allowConcurrent && getUnresolvedAttempts(ledger).length > 0) {
       return {
         status: 'refused',
         reason: 'capability-invalid',
@@ -117,7 +123,7 @@ export class WatcherLedgerLifecycle {
     const otherInFlight = getInFlightAttempts(ledger).some(
       (candidate) => candidate.attemptId !== attempt.attemptId
     )
-    if (otherInFlight) {
+    if (!input.allowConcurrent && otherInFlight) {
       return { status: 'refused', reason: 'capability-invalid', detail: 'attempt-in-flight' }
     }
     const dispatchAttempt = this.withDispatchMetadata(attempt, input)
@@ -156,7 +162,9 @@ export class WatcherLedgerLifecycle {
         spec: dispatch.spec,
         ...(dispatch.agent ? { agent: dispatch.agent } : {}),
         ...(dispatch.taskKey ? { taskKey: dispatch.taskKey } : {}),
-        ...(dispatch.deps ? { deps: dispatch.deps } : {})
+        ...(dispatch.deps ? { deps: dispatch.deps } : {}),
+        ...(dispatch.workspaceId ? { workspaceId: dispatch.workspaceId } : {}),
+        ...(dispatch.reuseTerminal ? { reuseTerminal: dispatch.reuseTerminal } : {})
       })
       await lease?.assertHeld()
       if (attempt.state === 'settled') {
@@ -182,10 +190,9 @@ export class WatcherLedgerLifecycle {
     ) {
       return
     }
-    const current = this.dependencies.budgetClock.current?.(watcherId) ?? null
     this.workerIntervals.set(
       attempt.attemptId,
-      current ?? this.dependencies.budgetClock.open(watcherId, 'worker-dispatched')
+      this.dependencies.budgetClock.open(watcherId, 'worker-dispatched')
     )
   }
   pauseWorker(watcherId: string, dispatchId: string): void {
@@ -196,10 +203,7 @@ export class WatcherLedgerLifecycle {
     if (!attempt) {
       return
     }
-    const interval =
-      this.workerIntervals.get(attempt.attemptId) ??
-      this.dependencies.budgetClock.current?.(watcherId) ??
-      null
+    const interval = this.workerIntervals.get(attempt.attemptId)
     if (!interval) {
       return
     }
@@ -238,14 +242,26 @@ export class WatcherLedgerLifecycle {
         ? {}
         : { dispatch: this.withoutDispatchSpec(attempt.dispatch) })
     })
-    const interval =
-      this.workerIntervals.get(attempt.attemptId) ??
-      this.dependencies.budgetClock.current?.(input.watcherId) ??
-      null
+    const interval = this.workerIntervals.get(attempt.attemptId)
     if (interval) {
       this.dependencies.budgetClock.close(interval, 'settled')
       this.workerIntervals.delete(attempt.attemptId)
     }
+  }
+
+  closeWorkerForContactLoss(watcherId: string, dispatchId: string): void {
+    const attempt = getInFlightAttempts(this.dependencies.ledgerStore.read(watcherId)).find(
+      (candidate) => candidate.state === 'running' && candidate.dispatchId === dispatchId
+    )
+    if (!attempt) {
+      return
+    }
+    const interval = this.workerIntervals.get(attempt.attemptId)
+    if (!interval) {
+      return
+    }
+    this.dependencies.budgetClock.close(interval, 'contact-lost')
+    this.workerIntervals.delete(attempt.attemptId)
   }
 
   closeForContactLoss(watcherId: string): void {
@@ -284,7 +300,9 @@ export class WatcherLedgerLifecycle {
         dispatchKind: input.dispatchKind ?? 'child',
         ...(input.agent ? { agent: input.agent } : {}),
         ...(input.deps ? { deps: [...input.deps] } : {}),
-        ...(input.taskKey ? { taskKey: input.taskKey } : {})
+        ...(input.taskKey ? { taskKey: input.taskKey } : {}),
+        ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
+        ...(input.reuseTerminal ? { reuseTerminal: input.reuseTerminal } : {})
       }
     }
   }
@@ -300,7 +318,9 @@ export class WatcherLedgerLifecycle {
         dispatchKind: input.dispatchKind ?? 'child',
         ...(input.agent ? { agent: input.agent } : {}),
         ...(input.deps ? { deps: [...input.deps] } : {}),
-        ...(input.taskKey ? { taskKey: input.taskKey } : {})
+        ...(input.taskKey ? { taskKey: input.taskKey } : {}),
+        ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
+        ...(input.reuseTerminal ? { reuseTerminal: input.reuseTerminal } : {})
       }
     }
   }
@@ -314,25 +334,25 @@ export class WatcherLedgerLifecycle {
   }
 
   private preDispatchRefusal(
-    enrollment: WatcherEnrollment,
+    input: DispatchLifecycleInput,
     ledger: WatcherLedger
   ): Extract<DispatchResult, { status: 'refused' }> | null {
-    const budget = deriveBudgetState(ledger, enrollment.budget)
-    if (budget.exhausted) {
+    const budget = deriveBudgetState(ledger, input.enrollment.budget)
+    if (budget.exhausted && !input.allowBudgetExhausted) {
       return {
         status: 'refused',
         reason: 'capability-invalid',
         detail: `budget-${budget.exhausted.kind}`
       }
     }
-    if (getUnresolvedAttempts(ledger).length > 0) {
+    if (!input.allowConcurrent && getUnresolvedAttempts(ledger).length > 0) {
       return {
         status: 'refused',
         reason: 'capability-invalid',
         detail: 'unresolved-attempt'
       }
     }
-    if (getInFlightAttempts(ledger).length > 0) {
+    if (!input.allowConcurrent && getInFlightAttempts(ledger).length > 0) {
       return { status: 'refused', reason: 'capability-invalid', detail: 'attempt-in-flight' }
     }
     return null
@@ -355,8 +375,12 @@ export class WatcherLedgerLifecycle {
       attemptFingerprint: input.fingerprint,
       spec: input.spec,
       ...(input.agent ? { agent: input.agent } : {}),
+      ...(input.model ? { model: input.model } : {}),
+      ...(input.effort ? { effort: input.effort } : {}),
       ...(input.deps ? { deps: input.deps } : {}),
-      ...(input.taskKey ? { taskKey: input.taskKey } : {})
+      ...(input.taskKey ? { taskKey: input.taskKey } : {}),
+      ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
+      ...(input.reuseTerminal ? { reuseTerminal: input.reuseTerminal } : {})
     }
   }
 
@@ -390,10 +414,9 @@ export class WatcherLedgerLifecycle {
         !this.workerIntervals.has(attempt.attemptId) &&
         !attemptPredatesCurrentBudgetGeneration(ledger, attempt.attemptId)
       ) {
-        const current = this.dependencies.budgetClock.current?.(enrollment.watcherId) ?? null
         this.workerIntervals.set(
           attempt.attemptId,
-          current ?? this.dependencies.budgetClock.open(enrollment.watcherId, 'worker-dispatched')
+          this.dependencies.budgetClock.open(enrollment.watcherId, 'worker-dispatched')
         )
       }
       return

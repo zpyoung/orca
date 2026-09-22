@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { HEIMDALL_COMMANDS_RUNTIME_CAPABILITY } from '../../shared/fork-heimdall/capability'
+import {
+  HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,
+  HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
+} from '../../shared/fork-heimdall/capability'
 import { RUNTIME_CAPABILITIES, RUNTIME_PROTOCOL_VERSION } from '../../shared/protocol-version'
 import { createSharedControlSubscription } from '../../shared/remote-runtime-shared-control-subscriptions'
 import { getCleanupRequest } from '../../shared/remote-runtime-shared-control-protocol'
@@ -8,6 +11,7 @@ import { shouldRouteSubscriptionBySupport } from '../ipc/runtime-environment-sup
 describe('Heimdall remote shared-control route', () => {
   it('advertises mutations without changing the runtime protocol version', () => {
     expect(RUNTIME_CAPABILITIES).toContain(HEIMDALL_COMMANDS_RUNTIME_CAPABILITY)
+    expect(RUNTIME_CAPABILITIES).toContain(HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY)
     expect(RUNTIME_PROTOCOL_VERSION).toBe(3)
   })
 

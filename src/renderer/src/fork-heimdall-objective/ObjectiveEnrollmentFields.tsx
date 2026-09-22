@@ -14,17 +14,18 @@ import { translate } from '@/i18n/i18n'
 import { OBJECTIVE_TEXT_MAX_LENGTH } from '../../../shared/fork-heimdall-objective/contract-types'
 import type { CapabilityMode } from '../../../shared/fork-heimdall/watcher-types'
 import type { AgentCatalogEntry } from '@/lib/agent-catalog'
+import { WatcherOwnerPicker } from '../fork-heimdall/WatcherOwnerPicker'
 import {
   ObjectiveEnrollmentFieldHelp,
   objectiveCapabilityHelp,
   objectiveCapabilityModesHelp,
-  objectiveConcurrencyHelp,
   objectiveLandingBarHelp,
   objectiveTerritoryHelp,
   objectiveTierHelp,
   type ObjectiveEnrollmentHelpCopy
 } from './ObjectiveEnrollmentFieldHelp'
 import { ObjectiveExistingPlanInput } from './ObjectiveExistingPlanInput'
+import { ObjectiveEnrollmentParallelFields } from './ObjectiveEnrollmentParallelFields'
 import { ObjectiveWorkspacePicker } from './ObjectiveWorkspacePicker'
 import {
   isObjectiveLandingBarAvailable,
@@ -117,7 +118,6 @@ export function ObjectiveEnrollmentFields({
   const objectiveId = useId()
   const workspaceLabelId = useId()
   const territoryId = useId()
-  const concurrencyId = useId()
   const activeBudgetId = useId()
   const activeBudgetInputId = useId()
   const turnBudgetId = useId()
@@ -141,6 +141,8 @@ export function ObjectiveEnrollmentFields({
     },
     ...capabilityOptions
   ]
+  const selectedWorkspace = workspaces.find((workspace) => workspace.key === selectedWorkspaceKey)
+  const parallelUnsupported = selectedWorkspace?.parallelExecutionSupported === false
 
   return (
     <div className="space-y-6">
@@ -236,23 +238,12 @@ export function ObjectiveEnrollmentFields({
             })
           }}
         />
-        <div className="grid grid-cols-[minmax(0,1fr)_148px] items-center gap-3">
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-1">
-              <Label htmlFor={concurrencyId}>
-                {translate('fork.heimdallObjective.enrollment.maxConcurrency', 'Max concurrency')}
-              </Label>
-              <ObjectiveEnrollmentFieldHelp {...objectiveConcurrencyHelp()} />
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              {translate(
-                'fork.heimdallObjective.enrollment.maxConcurrencyFixedHelp',
-                'Fixed at 1 while objective workers run serially.'
-              )}
-            </p>
-          </div>
-          <Input id={concurrencyId} value="1" readOnly disabled className="text-xs" />
-        </div>
+        <ObjectiveEnrollmentParallelFields
+          draft={draft}
+          disabled={disabled}
+          parallelUnsupported={parallelUnsupported}
+          onDraftChange={onDraftChange}
+        />
         <div className="space-y-2">
           <div className="flex items-center gap-1">
             <Label htmlFor={territoryId}>
@@ -422,6 +413,12 @@ export function ObjectiveEnrollmentFields({
           />
         ))}
       </section>
+
+      <WatcherOwnerPicker
+        draft={draft.owner}
+        disabled={disabled}
+        onChange={(owner) => onDraftChange({ ...draft, owner })}
+      />
 
       <section className="space-y-3">
         <div>

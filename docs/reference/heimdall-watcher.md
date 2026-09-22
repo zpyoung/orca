@@ -22,7 +22,7 @@ pnpm dev
 `pnpm dev` writes `orca` / `orca-dev` wrappers pointing at `out/cli/index.js`
 (`config/scripts/dev-cli-terminal-wrapper.mjs:13`) but never builds it. Irrelevant for an
 observation-only sitter; required before any objective run, because dispatched workers finish by
-calling `orca orchestration send` (`src/main/fork-heimdall-objective/role-prompts.ts:99`).
+calling `orca orchestration send` (`src/main/fork-heimdall-objective/role-prompts.ts:177`).
 
 The dev profile is `~/Library/Application Support/orca-dev`, **shared by every worktree's `pnpm dev`**
 (`config/scripts/run-electron-vite-dev.mjs:428-433`). Two running instances means two writers on the
@@ -119,6 +119,10 @@ identical; an older, more-pruned answer cannot suppress judgment of newly retain
 
 HTTP 429/529 get at most three attempts with 100/200 ms backoff; each attempt times out after five
 seconds. Other failures fall through to the deterministic path and are recorded.
+Unavailable outcomes distinguish timeout, HTTP status, exhausted retries, state/request/response
+size, and malformed responses using bounded diagnostic codes. Unknown errors stay generic; API keys
+and provider response bodies are not persisted. Replaying the same unavailable identity makes no
+new provider call.
 
 The **Decision Trace** shows participation and why answers were held (including shadow mode),
 distinct from disabled, remote, unavailable or never-completed requests. **Ledger activity** retains
@@ -154,6 +158,11 @@ a delay (`src/shared/fork-heimdall/pacing.ts:3-8`).
 A forced full resync runs every 15 minutes regardless of tier. Consecutive errors add exponential
 backoff from 30s to a 15-minute ceiling (`pacing.ts:34-40`).
 
+The same pulse reconciles durable report outcomes when mailbox notifications are missing. Both
+in-flight and settled-but-unresolved attempts keep recovery scheduled, including after restart or
+while parked/disabled; this does not authorize new work or bypass approval and budget gates.
+Recovered report evidence does not advance the mailbox delivery cursor past unread messages.
+
 Enrolling and resuming both schedule an **immediate** first tick (`kernel-service.ts:419`), so the
 first ledger entries appear within seconds. After that you wait the real interval — there is no
 fast-forward. `reconcileForTesting` exists but is wired to no IPC channel; it is for unit tests only.
@@ -182,14 +191,15 @@ last-confirmed age (`HeimdallStatusPill.tsx:8-21`).
 and configuration failure use dedicated park paths. Each disables the enrollment and opens a
 `park-<reason>` escalation:
 
-| Reason                  | Trigger                                                 | Recovery                                                                      |
-| ----------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `budget`                | active-time or turns spent                              | raise the budget, then resume                                                 |
-| `stop-predicate`        | a kind's stop condition fired non-terminally            | resume                                                                        |
-| `worker-question`       | a dispatched worker is blocked on a question            | answer it, or resume once the worker exits                                    |
-| `worker-escalation`     | a worker explicitly requested operator intervention     | inspect the escalation, then resume; self-clears if that dispatch later lands |
-| `configuration-error`   | durable workspace or execution authority no longer fits | fix the configuration, then resume or re-arm                                  |
-| `coordinator-seat-lost` | this process lost its orchestration coordinator seat    | re-establish ownership                                                        |
+| Reason                  | Trigger                                                  | Recovery                                                                      |
+| ----------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `budget`                | active-time or turns spent                               | raise the budget, then resume                                                 |
+| `stop-predicate`        | a kind's stop condition fired non-terminally             | resume                                                                        |
+| `worker-question`       | a dispatched worker is blocked on a question             | answer it, or resume once the worker exits                                    |
+| `worker-escalation`     | a worker explicitly requested operator intervention      | inspect the escalation, then resume; self-clears if that dispatch later lands |
+| `configuration-error`   | durable workspace or execution authority no longer fits  | fix the configuration, then resume or re-arm                                  |
+| `coordinator-seat-lost` | this process lost its orchestration coordinator seat     | re-establish ownership                                                        |
+| `owner-escalation`      | the watcher's owning agent could not resolve a deviation | answer as the human, then resume — see The owner                              |
 
 ## Capability gates
 
@@ -211,7 +221,7 @@ every open or escalated duplicate for that exact scope, not a broader action cla
 (`gate.ts`, `approval-resolution.ts`).
 
 The gate can hold for reasons other than capability mode. These are the strings you will see in the
-decision trace (`gate.ts:100-155`):
+decision trace (`gate.ts:88-153`):
 
 | Hold reason                            | Meaning                                                     |
 | -------------------------------------- | ----------------------------------------------------------- |
@@ -228,6 +238,57 @@ decision trace (`gate.ts:100-155`):
 
 `unresolved-attempt` and `missing-expected-state` are the safety interlocks that stop a watcher from
 repeating an external effect it cannot confirm.
+
+## The owner
+
+An enrollment may name an **owning agent**. It is optional, and a watcher with none behaves exactly
+as it always has. The owner is not the human and not a worker: it is a long-lived agent woken only
+when the deterministic kernel hits a **deviation** — a non-happy-path event it cannot resolve on its
+own.
+
+The cycle is file-based, not message-based:
+
+1. The kernel records a deviation occurrence with a unique wake nonce and derives the report path
+   from its wake token (`sha256(wakeToken).json`). A retry advances the fold; a later recurrence gets
+   a new nonce. Existing pre-nonce in-flight records retain their issued tokens.
+2. The owner receives a brief bounded to 32 KiB for the complete normalized state envelope. Safe
+   completed history is omitted oldest-first with counts and canonical references; the current
+   deviation, triggering task/check, live work, and rejection feedback remain required. If that
+   minimum cannot fit, the watcher escalates without issuing a report path or sending a turn.
+3. The owner writes a JSON **intervention** to the issued path and submits the matching `ready`
+   status. Reserved owner statuses require the exact active, already-sent turn and its owner
+   identity; an early or stale status cannot authorize a report.
+4. The next tick reads the accepted submission. A kind-specific intervention must pass both its
+   native capability gate (for example, `plan`) and the separate `owner-intervention` gate. Owner
+   authority never enables a capability set to **Off**.
+
+Configuring an owner grants **no extra authority**. It only redirects what would have been an
+automatic replan into a typed deviation the owner gets a say in — for objective watchers that covers
+the plan, node, check, review and landing failure branches.
+
+Initial planning is not a deviation: a fresh objective dispatches its planner under `plan`, waits
+while it runs, and ingests its result. The owner is consulted only when planning actually fails or
+produces no usable result, not merely because no revision exists yet.
+
+A valid intervention blocked by **Ask** remains pending in the ordinary scoped approval flow.
+The watcher retains the report, notifies the operator, and applies it after matching approval;
+waiting does not re-prompt the owner, consume its retry allowance, or charge owner-active time.
+Writing the report and sending `ready` confirms submission only, not approval or execution.
+
+If the owner does not answer, a bounded retry-once policy re-wakes it once; after that the watcher
+parks with `owner-escalation` and waits for you. That budget is shared across all failure causes —
+an unreachable owner and a malformed reply draw on the same single retry.
+Deterministic preflight rejection is different: the active owner can correct the same file without
+spending this allowance. Its bounded rejection diagnostic is available to the next applicable
+re-wake; canonical intervention text is never silently shortened into validity.
+
+Local owner report directories are hardened to `0700`. Reports can also be read over SSH, through a
+bounded reader.
+
+> **Status.** The owner layer is new and not yet committed. Treat this section as a description of
+> intent as much as of shipped behaviour, and re-read the code before relying on any detail.
+> `heimdall.enroll-owner.v1` is the wire capability a client must see advertised before it may send
+> owner fields to a remote host; `owner-intervention` is the separate per-enrollment action gate.
 
 ## Escalations
 
@@ -276,9 +337,11 @@ generation. Pause/resume and re-enrollment from an automatic park do not create 
 they preserve consumed usage.
 
 An interval is opened by the budget clock when an action goes in flight or a worker is dispatched,
-sampled every 15s, and durably checkpointed at most once a minute (`budget-clock.ts:9-10`). On
-restart, any interval left open by a crash is force-closed as `contact-lost`
-(`budget-clock.ts:198-230`).
+sampled every 15s, and durably checkpointed at most once a minute. After acquiring the workspace
+lease, startup recovery closes prior-process intervals as `contact-lost` at their last checkpoint.
+Suspend, stop, and delete close only intervals owned by their local clock. They do not infer that an
+unowned interval is stale before lease-gated recovery, so teardown before the first pulse neither
+throws a stale-handle error nor closes another clock's live interval.
 
 When either limit is reached the watcher does not merely stop acting — it **parks**: `enabled` flips
 to `false`, a `park-budget` escalation opens, and the status pill reads _Parked_
@@ -286,7 +349,7 @@ to `false`, a `park-budget` escalation opens, and the status pill reads _Parked_
 
 Recovering from a parked watcher is a two-step sequence, and the order matters:
 
-1. Raise the limit with **Apply budget** in the detail pane (`HeimdallDetailPane.tsx:412-508`). This
+1. Raise the limit with **Apply budget** in the detail pane (`HeimdallDetailPane.tsx:414-424`). This
    has no enabled/paused precondition and applies immediately.
 2. Then **Resume**.
 
@@ -463,7 +526,8 @@ adopted through user interaction, or otherwise no longer owned by the dispatch, 
 receipts are recorded as `worker-terminal-released` evidence, including the retention reason. A
 release error is recorded without failing the watcher tick or undoing settlement.
 
-A `worker_done` report settles with the worker's declared certainty. An explicit worker escalation is
+An accepted `worker_done` report settles with the worker's declared certainty. An authoritative
+rejected report remains a failure even if the worker originally claimed success. An explicit worker escalation is
 recorded as `worker-escalation`, closes active billing, and parks the watcher; **Resume** acknowledges
 both the park and the unresolved worker escalation before scheduling the next tick. If the dispatch
 settles before acknowledgement, its still-unresolved worker escalation is resolved.
@@ -482,20 +546,31 @@ normal report validation, and a report on disk alone is never trusted. Contact l
 recorded release receipt or release error prevents duplicate cleanup attempts; it does not upgrade an
 ambiguous effect to `not-landed`.
 
-| Setting              | Values                                        | Default          | Notes                                                                                                                      |
-| -------------------- | --------------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Workspace            | repo / worktree / folder                      | —                | required; determines available landing rungs                                                                               |
-| Objective text       | ≤ 16,384 chars                                | —                | required (`contract-types.ts:4`)                                                                                           |
-| Existing plan source | ≤ 65,536 chars                                | blank            | optional planner input; not an approved executable plan                                                                    |
-| Tier                 | express / standard / full                     | standard         | how much review is required — see below                                                                                    |
-| Landing bar          | 5 rungs                                       | files-on-disk    | how far to take the work — see below                                                                                       |
-| Max concurrency      | 1                                             | 1                | read-only; the schema allows 1,024 but the main process throws `max-concurrency-unsupported` above 1 (`definition.ts:156`) |
-| Write territory      | 0–64 workspace-relative globs                 | **blank = `**`** | optional; blank allows the whole workspace — see below                                                                     |
-| Active budget        | ≥ 0.25 h, 0.25 steps                          | 4                | slider tops out at 24 h, the input does not                                                                                |
-| Worker turn limit    | integer ≥ 0                                   | 40               |                                                                                                                            |
-| Capabilities         | plan / implement / review / check / land      | see below        |                                                                                                                            |
-| Role agents          | planner / implementer / reviewer / integrator | automatic        |                                                                                                                            |
-| Sitter overrides     | four sitter capabilities                      | inherit          | applied at handoff                                                                                                         |
+When completion mail is missing, recovery binds the exact durable report fact to the dispatch,
+task result, original message, outcome, and Run-home authority. It uses the report identified by the
+settled task result, not a later duplicate observation. Repeated pulses and eventual mailbox delivery
+do not settle or release the worker twice. A terminal task row or report file alone is insufficient.
+
+Report rejection provenance survives resolution, projection, and owner routing: schema, path,
+file-evidence, workspace, and unavailable-host causes are not collapsed into a generic task failure.
+An omitted optional completion `filesModified` field means no reported paths; a supplied malformed
+value remains an error. Display diagnostics mark abbreviations; canonical report data is unchanged.
+
+| Setting              | Values                                        | Default          | Notes                                                                                     |
+| -------------------- | --------------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------- |
+| Workspace            | repo / worktree / folder                      | —                | required; determines available landing rungs                                              |
+| Objective text       | ≤ 16,384 chars                                | —                | required (`contract-types.ts:4`)                                                          |
+| Existing plan source | ≤ 65,536 chars                                | blank            | optional planner input; not an approved executable plan                                   |
+| Tier                 | express / standard / full                     | standard         | how much review is required — see below                                                   |
+| Landing bar          | 5 rungs                                       | files-on-disk    | how far to take the work — see below                                                      |
+| Max concurrency      | 1–1,024                                       | 3                | live cap on implementer dispatches; folder workspaces clamp to 1 — see Parallel execution |
+| Lanes                | on / off                                      | on               | one warm worker session per one-to-one dependency chain                                   |
+| Write territory      | 0–64 workspace-relative globs                 | **blank = `**`** | optional; blank allows the whole workspace — see below                                    |
+| Active budget        | ≥ 0.25 h, 0.25 steps                          | 4                | slider tops out at 24 h, the input does not                                               |
+| Worker turn limit    | integer ≥ 0                                   | 40               |                                                                                           |
+| Capabilities         | plan / implement / review / check / land      | see below        |                                                                                           |
+| Role agents          | planner / implementer / reviewer / integrator | automatic        |                                                                                           |
+| Sitter overrides     | four sitter capabilities                      | inherit          | applied at handoff                                                                        |
 
 ### Capability defaults are not conservative
 
@@ -527,6 +602,53 @@ write-territory set match the prior contract. This prevents Plan Off from turnin
 blob, a stale revision, or a plan approved for different work into an executable plan
 (`definition.ts`, `objective-store-queries.ts`).
 
+### Parallel execution
+
+With an effective cap above 1, implementer work fans out. Planning, review and integration still run
+one at a time in the enrolled worktree. At cap 1 the watcher runs **in place**, exactly as before,
+with one commit at landing.
+
+- **Slots.** Each tick fills free slots with the ready node or lane that has the longest remaining
+  dependency chain, ties by plan order (`parallel-scheduling.ts`). A node is ready only once every
+  dependency is **applied**, meaning its commit is on the enrolled branch.
+- **Dispatch worktrees.** Each slot gets a child worktree of the enrolled worktree, created on the
+  execution host (SSH included) from the enrolled branch as it stands. Its report is validated
+  against that worktree's own starting commit (`dispatch-worktree.ts`).
+- **Merge train.** A validated node becomes one commit. Holding the workspace lease, the kernel
+  applies commits to the enrolled branch one at a time, in completion order
+  (`merge-train-git.ts`, `merge-train-action-executor.ts`). A dispatch moves through `running` →
+  `waiting-to-apply` → `applying` → `applied`, or ends `failed` / `discarded`.
+- **Conflicts.** A commit that does not apply cleanly sends the node to `resolving-conflict`. Its
+  own session resumes (or a fresh one takes over) with the conflicting paths plus the other nodes'
+  specs and reports. The kernel then re-validates the report and runs the shell-checkable criteria
+  of the resolver and every node it conflicted with before the commit rejoins the train. Each
+  attempt spends the node's normal retry budget. Exhaustion becomes a node-failure deviation that
+  names the paths and dispatches.
+- **Lanes.** A lane is a one-to-one dependency chain. One session runs up to 5 of its nodes in
+  order, and each node is validated and applied before the next starts. When a lane session dies, a
+  fresh one resumes at the next unfinished node. Turn lanes off with the enrollment switch.
+- **Failure isolation.** A question, stall or failure affects only its own dispatch. Only nodes
+  that depend on a failed node wait.
+- **Budgets.** Wall-clock counts elapsed active time, so it does not burn faster in parallel; turns
+  count across every dispatch. On exhaustion nothing new starts, and in-flight dispatches finish and
+  apply first.
+- **Amendments.** Dispatches whose nodes survive unchanged keep running. The rest are stopped and
+  their unapplied work is discarded (`amendment-dispatch-reconciliation.ts`).
+- **Operator edits.** Uncommitted changes in the enrolled worktree pause the train with the note
+  `Merge train paused by operator edits: …`. A parallel run never leaves that tree dirty itself, so
+  those changes are always yours. The train resumes once the tree is clean.
+- **Cleanup.** An applied dispatch's worktree is removed. A failed or conflict-retained worktree
+  stays for inspection until the watcher is deleted. Setup or cleanup interrupted by a restart is
+  repaired on boot (`dispatch-worktree-lifecycle.ts`).
+- **Dispatch branches are never pushed.** Only the enrolled branch lands, through the ladder below.
+  On a parallel run, `committed-local-branch` records the enrolled head, which already holds the
+  per-node commits, plus one final commit for anything left uncommitted.
+
+Folder workspaces enroll at any requested cap but clamp to 1, with a note. A host without the
+`HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY` runs in place with a note, and enrollment is never
+refused. Change the cap mid-run with `orca heimdall set-concurrency <watcherId> <n>` or the fleet
+page control: lowering it drains in-flight work, and raising it takes effect on the next tick.
+
 ### Tier
 
 Tier controls how many review roles must approve before work can land
@@ -538,8 +660,8 @@ Tier controls how many review roles must approve before work can land
 | `standard` | must approve | skipped      |
 | `full`     | must approve | must approve |
 
-A `block` verdict from either role does not stop the run — it triggers a replan
-(`replan-after-block`).
+A `block` verdict from either role becomes a typed deviation when an owner is configured, so the
+owner can intervene. Without an owner, it triggers a replan (`replan-after-block`).
 
 ### Landing bar
 
@@ -596,9 +718,11 @@ It is enforced in five places, and the last two do not trust the agent:
 3. **Implementer report** — a reported modified path outside is rejected (`plan-schema.ts:311`).
 4. **Observed disk changes** — a fingerprint manifest is taken before dispatch and diffed after. Any
    path that actually changed outside the territory fails the attempt with
-   `observed-change-outside-write-territory:<path>`, whatever the agent reported. The reported list
-   must then exactly equal the observed list, so under- and over-reporting both fail
-   (`observed-workspace-changes.ts:297-313`).
+   `observed-change-outside-write-territory:<path>`, whatever the agent reported. Every observed path
+   must be reported. An additional reported Git path is accepted only if Git identifies it as ignored
+   and the execution host confirms it exists and resolves inside the workspace; it must also be inside
+   the write territory. This proves existence, not that ignored bytes changed during the attempt.
+   Missing, unsafe, and other unobserved reported paths still fail (`observed-workspace-changes.ts`).
 5. **Commit staging** — `git add` / `git commit` receive only inside-territory paths
    (`landing-action-executor.ts:133-147`). Outside-territory dirt is left uncommitted and surfaced as
    `outsideTerritoryPaths` rather than swept in.
@@ -624,8 +748,44 @@ text, tier, landing bar, budget bucket, `CONCURRENCY: 1`, the write territory as
 role instruction, role context (the assigned node, or the plan review view), a strict JSON report
 contract, and the exact `orca orchestration send --type worker_done` line to finish with. The report
 must be written atomically to an absolute path the kernel supplies; the kernel parses and validates
-it against a schema, so a malformed or out-of-territory report fails the attempt rather than being
-interpreted loosely.
+it against a schema, so malformed or out-of-territory reports are rejected rather than interpreted
+loosely.
+
+Field limits are shared by validation and the agent-facing contracts:
+
+| Field                                                              | Maximum UTF-16 code units |
+| ------------------------------------------------------------------ | ------------------------- |
+| Task spec and implementer/reviewer/integrator report summary       | 16,384                    |
+| Generic/objective owner rationale, attestation, guidance or answer | 8,192                     |
+| Per-criterion report note                                          | 4,096                     |
+| Hosted-review owner retry/skip rationale                           | 2,048                     |
+
+String limits use JavaScript `string.length`, not Unicode code points or UTF-8 bytes. The complete
+JSON file has an independent UTF-8 budget: 256 KiB for role reports and 64 KiB for owner interventions.
+Field limits do not override the aggregate byte budget, particularly with non-ASCII text or many
+criteria. Keep the completion mailbox body brief;
+the issued report file carries the full report. Put larger evidence in a permitted workspace
+file and reference it rather than copying all output into a summary.
+
+For recognized watcher submissions, deterministic validation runs before accepting `worker_done`
+or the owner's `ready` status. Local preflight and capable protocol-3 federation peers return an
+actionable rejection without settling the dispatch or inserting completion mail. Correct the issued
+file and resubmit only when the rejection confirms that the same dispatch remains active. A
+federated correction needs a new request; replaying the rejected request preserves its rejection.
+
+Protocol-1/2 peers settle locally before Run-home validation and cannot offer this correction flow.
+A rejected report instead becomes a durable failed home task/dispatch with the original validation
+cause. Do not resend or start a replacement automatically: the owner must review the failure and
+verify no live work remains before authorizing a fresh dispatch. Protocol-3 correction support must
+belong to the runtime epoch returned by the peer, not a stale capability response.
+
+Owner report files are not consumed until accepted `ready` evidence matches the current wake.
+The subject supplied in the owner brief contains that wake's token; a prior wake's status cannot
+authorize a new report or spend its retry allowance.
+
+Preflight does not grant approval or replace ingestion-time validation. Approval gates still apply;
+unverifiable execution-host state follows the existing reconciliation path rather than being
+reported as an agent input error.
 
 Role agents resolve as `contract.roleAgents[role] ?? settings.defaultTuiAgent`, so leaving a role on
 _automatic_ uses the **owning host's** default TUI agent. An unknown agent id is rejected at
@@ -670,7 +830,7 @@ checklist (`renderReviewBody`, `:92-101`).
 
 The header shows `{active} active · {attention} need attention` plus **New objective** and a refresh
 button. Below: the watcher list, then a fleet-wide activity feed. Selecting a row opens the detail
-pane (`HeimdallDetailPane.tsx:344-568`), which carries, in order: owner controls (pause / resume /
+pane (`HeimdallDetailPane.tsx:247-488`), which carries, in order: owner controls (pause / resume /
 disarm), budget with editable limits and **Apply budget**, escalations with an Approve action,
 kind-specific detail, live workers, the decision trace, and the watcher ledger.
 
@@ -679,7 +839,7 @@ than blanking (`HeimdallPage.tsx:219-230`).
 
 ### Controls
 
-Seven commands, all routed through `heimdall:command` and fenced by owner identity and a command
+Eight commands, all routed through `heimdall:command` and fenced by owner identity and a command
 revision, so a stale or wrong-owner request is refused (`control-plane.ts:107-131,400-431`).
 
 | Command           | Precondition                   | Effect                                                                                 |
@@ -690,6 +850,7 @@ revision, so a stale or wrong-owner request is refused (`control-plane.ts:107-13
 | `approve`         | not disabled or paused         | approves one action scope and reschedules immediately                                  |
 | `adjust-budget`   | none                           | commits a new budget and updates the live status                                       |
 | `answer-question` | question still open            | answers the worker and un-parks the watcher                                            |
+| `set-concurrency` | objective watcher              | commits a new cap; lowering drains, raising applies next tick; folders stay at 1       |
 | `stop-worker`     | exact process identity matches | stops one worker                                                                       |
 
 **Disarm cannot be undone with Resume.** `resume` requires `paused` or an automatic park. A later

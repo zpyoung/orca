@@ -33,9 +33,11 @@ async function committedCandidatePaths(
   }
   const { stdout } = await runGit([
     'diff-tree',
+    '--no-commit-id',
+    '--name-only',
+    '--no-renames',
     '-r',
     '-z',
-    '--name-only',
     before.treeOid,
     after.treeOid
   ])

@@ -7,6 +7,106 @@ manifest `exceptions[]` row (`status: "pending-upstream"`, `ledger` pointing at 
 anchor) are created and removed together — see `config/scripts/fork-ownership-manifest.mjs` for
 the invariant this enforces.
 
+## Folder workspace scheduler authority
+
+**What:** exposes the existing execution-host-to-scheduler-owner mapping independently of a
+repository record. Repository-based callers retain their existing behavior.
+
+**Why upstream, not isolated:** canonical folder workspaces have execution-host authority but
+no repository record. They need the same native, WSL, and SSH scheduling policy as repositories,
+not a parallel fork-owned mapping.
+
+**Paths:**
+
+- `src/main/persistence/scheduling-automations/automation-context-migration.ts`
+
+**Excluded when preparing the upstream PR:** Heimdall's folder enrollment and picker changes.
+
+**Status:** pending-upstream. Not yet submitted.
+
+## Git exec mutation cache invalidation
+
+**What:** classifies index staging, reset, and cherry-pick as Git mutations and finds the
+subcommand after global Git options. Read-only `remote` operations still preserve cached reads.
+
+**Why upstream, not isolated:** native and SSH providers share this cache-invalidation predicate.
+Ignoring a mutation leaves stale status and diffs for every consumer, not only Heimdall.
+
+**Paths:**
+
+- `src/shared/git-exec-mutation.ts`
+- `src/shared/git-exec-mutation.test.ts`
+
+**Excluded when preparing the upstream PR:** the fork-only relay allowlist and its registration
+seam. This entry covers only the generic mutation classifier.
+
+**Status:** pending-upstream. Not yet submitted.
+
+## Federated rejection replay
+
+**What:** preserves a rejected lifecycle verdict when the same federated relay is delivered again.
+Rejected submissions remain durable for cursor acknowledgement but can be suppressed from the
+coordinator inbox. A corrected submission must use a new request; changing report bytes cannot turn
+the original rejected request into a successful completion.
+Accepted federated reports record the same exact dispatch-bound observation as direct reports.
+Legacy peers that cannot correct a report on an active dispatch settle rejected reports as failed,
+with distinct rejected observation authority rather than accepted completion. Rejection wrappers
+retain the original body and validation reason so notification-loss recovery can verify the
+canonical report without trusting terminal status alone.
+
+**Why upstream, not isolated:** lifecycle idempotency and report observations belong to the
+orchestration database settlement/import transaction. Re-evaluating a rejected relay against mutable
+state or losing its original evidence violates settlement independently of the rejecting consumer.
+
+**Paths:**
+
+- `src/main/runtime/orchestration/db/federation/federation-relay-import.ts`
+- `src/main/runtime/orchestration/db/lifecycle-rejection-marker.ts`
+- `src/main/runtime/orchestration/db/lifecycle-rejection-marker.test.ts`
+- `src/main/runtime/orchestration/db/dispatch-context/worker-report-settlement.ts`
+- `src/main/runtime/orchestration/db/messages/message-inbox.ts`
+
+**Excluded when preparing the upstream PR:** Heimdall report validators, forked submission callers,
+and their import swaps. The database change is generic.
+
+**Status:** pending-upstream. Not yet submitted.
+
+## Claude host auth fallback selection
+
+**What:** clears both the legacy host account selection and its runtime-map entry when a managed
+account's auth path is unowned or its credentials are missing or invalid. Previously the runtime map
+still selected the unusable account, so structured Claude launches stripped ambient authentication
+even after the auth service had fallen back to the system default. Other WSL selections are preserved.
+
+**Why upstream, not isolated:** this is a shared account-selection consistency bug affecting ordinary
+structured sessions as well as Heimdall owners; a fork-only launch workaround would leave it intact.
+
+**Paths:**
+
+- `src/main/claude-accounts/runtime-auth/runtime-auth-sync.ts`
+- `src/main/claude-accounts/runtime-auth-service-materialization.test.ts`
+
+**Status:** pending-upstream. Not yet submitted.
+
+## Wire compat Rule 1 strict schemas
+
+**What:** corrects Rule 1 of the remote wire-compatibility contract. It claimed every JSON payload
+is parsed with a decoder that ignores unknown keys, citing zod `.strip()` on RPC params. That holds
+only for a default schema. A `.strict()` schema rejects the entire payload on an unknown key, so
+adding an optional field to one is a breaking change, not a safe one.
+
+**Why upstream, not isolated:** the rule is upstream's contract and the defect is upstream's. Two
+independent changes added an optional field to a strict schema on the same day, each believing they
+were complying with Rule 1 as written. A fork-local correction would leave upstream readers acting
+on the false premise.
+
+**Paths:** `docs/reference/remote-wire-compatibility.md`.
+
+**Excluded when preparing the upstream PR:** the worked example cites `EnrollInputSchema`, which is
+fork-only. Replace it with an upstream strict request schema, or state the shape generically.
+
+**Status:** pending-upstream. Not yet submitted.
+
 ## Warning status tokens
 
 **What:** adds the warning hue, surface, foreground and border roles to the canonical light/dark

@@ -1,6 +1,11 @@
+import { z } from 'zod'
 import { beforeAll, describe, expect, it } from 'vitest'
+import { projectWatcherListEntryForClient } from '../../../../src/main/runtime/rpc/methods/fork-heimdall/park-reason-wire'
 import { HEIMDALL_METHODS } from '../../../../src/main/runtime/rpc/methods/fork-heimdall/heimdall'
-import { HEIMDALL_COMMANDS_RUNTIME_CAPABILITY } from '../../../../src/shared/fork-heimdall/capability'
+import {
+  HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,
+  HEIMDALL_WATCHER_PARK_REASON_V2_RUNTIME_CAPABILITY
+} from '../../../../src/shared/fork-heimdall/capability'
 import { RUNTIME_CAPABILITIES } from '../../../../src/shared/protocol-version'
 import {
   EnrollSuccessSchema,
@@ -14,8 +19,13 @@ import {
   EnrollSuccessReaderSchema,
   HeimdallSubscriptionEventReaderSchema,
   WatcherCommandResultReaderSchema,
-  WatcherDetailReaderSchema
+  WatcherDetailReaderSchema,
+  remoteReaderSchema
 } from '../../../../src/shared/fork-heimdall/remote-reader-schemas'
+import {
+  WatcherParkReasonSchema,
+  WatcherStatusSchema
+} from '../../../../src/shared/fork-heimdall/watcher-types'
 import { ObjectiveDetailSchema } from '../../../../src/shared/fork-heimdall-objective/detail-types'
 import { ObjectiveDetailReaderSchema } from '../../../../src/main/runtime/rpc/methods/fork-heimdall-objective/objective-detail-reader-schema'
 import {
@@ -313,5 +323,81 @@ describe('Heimdall cross-version wire registration', () => {
     )
     expect(methodNames(HEIMDALL_METHODS)).toContain('heimdall:command')
     expect(RUNTIME_CAPABILITIES).toContain(HEIMDALL_COMMANDS_RUNTIME_CAPABILITY)
+  })
+})
+
+// No release tag carries fork-heimdall yet (the whole feature is unreleased), so there is no real
+// prior build to check out for this one. A reader is rebuilt instead: the current WatcherParkReason
+// union narrowed to the four kinds that predate this capability, run through the same
+// remoteReaderSchema relaxation a real old client would compile. Adding a member later without
+// gating it makes this ratchet fail, the same way it would have caught worker-escalation.
+const BASELINE_PARK_REASON_KINDS = new Set([
+  'budget',
+  'stop-predicate',
+  'worker-question',
+  'coordinator-seat-lost'
+])
+
+function discriminatedUnionLiteralKind(option: z.ZodType): string {
+  const shape = Reflect.get(option, 'shape') as Record<string, z.ZodType> | undefined
+  const kindSchema = shape?.kind
+  const values = kindSchema
+    ? (Reflect.get(kindSchema, 'def') as { values?: unknown[] })?.values
+    : undefined
+  const value = values?.[0]
+  if (typeof value !== 'string') {
+    throw new Error('Heimdall park reason option has no literal "kind" discriminant')
+  }
+  return value
+}
+
+const baselineParkReasonOptions = WatcherParkReasonSchema.def.options.filter((option) =>
+  BASELINE_PARK_REASON_KINDS.has(discriminatedUnionLiteralKind(option))
+)
+if (baselineParkReasonOptions.length !== BASELINE_PARK_REASON_KINDS.size) {
+  throw new Error(
+    'Heimdall baseline park reason fixture is missing a kind the current union still declares'
+  )
+}
+const BaselineWatcherStatusSchema = z
+  .object({
+    ...WatcherStatusSchema.shape,
+    parkReason: z
+      .discriminatedUnion('kind', baselineParkReasonOptions as [z.ZodType, ...z.ZodType[]])
+      .nullable()
+  })
+  .strict()
+const BaselineWatcherStatusReaderSchema = remoteReaderSchema(BaselineWatcherStatusSchema)
+
+const parkedWorkerEscalationEntry = {
+  ...listEntryWithExtraKeys,
+  status: {
+    ...listEntryWithExtraKeys.status,
+    parkReason: { kind: 'worker-escalation', escalationId: 'escalation-1', messageId: 'message-1' }
+  }
+} as const
+
+describe('Heimdall watcher park reason capability gating', () => {
+  it('would have failed an old reader on an undegraded worker-escalation park', () => {
+    expect(
+      BaselineWatcherStatusReaderSchema.safeParse(parkedWorkerEscalationEntry.status).success
+    ).toBe(false)
+  })
+
+  it('lets an old reader parse the status the capability gate publishes when unnegotiated', () => {
+    const degraded = projectWatcherListEntryForClient(parkedWorkerEscalationEntry, {
+      clientKind: 'runtime',
+      clientCapabilities: []
+    })
+    expect(degraded.status.parkReason).toBeNull()
+    expect(BaselineWatcherStatusReaderSchema.safeParse(degraded.status).success).toBe(true)
+  })
+
+  it('publishes the typed value once the reader negotiates the capability', () => {
+    const negotiated = projectWatcherListEntryForClient(parkedWorkerEscalationEntry, {
+      clientKind: 'runtime',
+      clientCapabilities: [HEIMDALL_WATCHER_PARK_REASON_V2_RUNTIME_CAPABILITY]
+    })
+    expect(negotiated.status.parkReason).toEqual(parkedWorkerEscalationEntry.status.parkReason)
   })
 })

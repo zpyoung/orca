@@ -22,6 +22,15 @@ function Decision({ trace }: { trace: WatcherTickTrace }): React.JSX.Element {
       </span>
     )
   }
+  if ('deviation' in trace.decision) {
+    return (
+      <span>
+        {translate('fork.heimdall.trace.decidedDeviation', 'Deviation: {{kind}}', {
+          kind: trace.decision.deviation.kind
+        })}
+      </span>
+    )
+  }
   return (
     <div>
       <span>{trace.decision.reason}</span>

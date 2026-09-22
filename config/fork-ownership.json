@@ -151,6 +151,48 @@
   ],
   "seams": [
     {
+      "path": "src/relay/git-exec-validator.ts",
+      "feature": "heimdall-objective",
+      "kind": "registration",
+      "lines": [
+        "import { isHeimdallObjectiveGitExecArgs } from './fork-heimdall-objective/git-exec-allowlist'",
+        "  if (isHeimdallObjectiveGitExecArgs(args)) {"
+      ]
+    },
+    {
+      "path": "src/main/runtime/orchestration/federation-sync.test.ts",
+      "feature": "heimdall",
+      "kind": "import-swap",
+      "lines": [
+        "import { parseRelayedMessage } from './federation-sync-message'",
+        "import { syncFederatedDispatch } from '../../fork-heimdall/orchestration/federation-sync'"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/orchestration/federation/federated-transport-safety.test.ts",
+      "feature": "heimdall",
+      "kind": "import-swap",
+      "lines": [
+        "import { syncFederatedDispatch } from '../../../../../fork-heimdall/orchestration/federation-sync'"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/orchestration/messaging/send-methods.ts",
+      "feature": "heimdall",
+      "kind": "import-swap",
+      "lines": [
+        "import { sendPointToPointMessage } from '../../../../../fork-heimdall/orchestration/send-point-to-point'"
+      ]
+    },
+    {
+      "path": "src/main/runtime/runtime-orchestration-federation.ts",
+      "feature": "heimdall",
+      "kind": "import-swap",
+      "lines": [
+        "import { syncFederatedDispatch } from '../fork-heimdall/orchestration/federation-sync'"
+      ]
+    },
+    {
       "path": "src/main/ipc/runtime-environment-request-connections.ts",
       "feature": "heimdall",
       "kind": "import-swap",
@@ -289,9 +331,17 @@
       "kind": "registration",
       "lines": [
         "import { HEIMDALL_COMMANDS_RUNTIME_CAPABILITY } from './fork-heimdall/capability'",
+        "import { HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY } from './fork-heimdall/capability'",
         "import { HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY } from './fork-heimdall/capability'",
+        "import { HEIMDALL_WATCHER_PARK_REASON_V2_RUNTIME_CAPABILITY } from './fork-heimdall/capability'",
+        "import { HEIMDALL_ENROLL_OWNER_RUNTIME_CAPABILITY } from './fork-heimdall/capability'",
+        "import { HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY } from './fork-heimdall/capability'",
         "  HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY,",
-        "  HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,"
+        "  HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,",
+        "  HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY,",
+        "  HEIMDALL_WATCHER_PARK_REASON_V2_RUNTIME_CAPABILITY,",
+        "  HEIMDALL_ENROLL_OWNER_RUNTIME_CAPABILITY,",
+        "  HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY,"
       ]
     },
     {
@@ -300,7 +350,11 @@
       "kind": "registration",
       "lines": [
         "import { HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY } from './fork-heimdall/capability'",
-        "      HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY,"
+        "import { HEIMDALL_WATCHER_PARK_REASON_V2_RUNTIME_CAPABILITY } from './fork-heimdall/capability'",
+        "import { HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY } from './fork-heimdall/capability'",
+        "      HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY,",
+        "      HEIMDALL_WATCHER_PARK_REASON_V2_RUNTIME_CAPABILITY,",
+        "      HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY,"
       ]
     },
     {
@@ -522,7 +576,7 @@
       "kind": "registration",
       "lines": [
         "    name: 'heimdall',",
-        "    keys: ['heimdall debug'],",
+        "    keys: ['heimdall debug', 'heimdall set-concurrency'],",
         "    load: async () => (await import('./fork-heimdall/handlers.js')).HEIMDALL_HANDLERS"
       ]
     },
@@ -3745,6 +3799,72 @@
   ],
   "exceptions": [
     {
+      "path": "src/main/persistence/scheduling-automations/automation-context-migration.ts",
+      "reason": "Expose the existing execution-host scheduler authority mapping for canonical folder workspaces that have no repository record.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#folder-workspace-scheduler-authority"
+    },
+    {
+      "path": "src/shared/git-exec-mutation.ts",
+      "reason": "Invalidate host Git read caches for index, reset, and cherry-pick mutations, including commands preceded by Git global options.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#git-exec-mutation-cache-invalidation"
+    },
+    {
+      "path": "src/shared/git-exec-mutation.test.ts",
+      "reason": "Defend generic Git mutation classification across global options and read-only remote operations.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#git-exec-mutation-cache-invalidation"
+    },
+    {
+      "path": "src/main/runtime/orchestration/db/federation/federation-relay-import.ts",
+      "reason": "Persist federated rejection verdicts across replay, settle legacy terminal rejections, and record exact dispatch-bound report observations for notification-loss recovery.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#federated-rejection-replay"
+    },
+    {
+      "path": "src/main/runtime/orchestration/db/lifecycle-rejection-marker.ts",
+      "reason": "Preserve lifecycle rejection codes, original reasons, and original message bodies so replay and authoritative recovery cannot confuse rejected reports with accepted completion.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#federated-rejection-replay"
+    },
+    {
+      "path": "src/main/runtime/orchestration/db/dispatch-context/worker-report-settlement.ts",
+      "reason": "Record rejected worker-report observations without granting accepted outcome authority, preserving exact report provenance alongside terminal legacy settlement.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#federated-rejection-replay"
+    },
+    {
+      "path": "src/main/runtime/orchestration/db/messages/message-inbox.ts",
+      "reason": "Retain the original message body and validation reason when wrapping lifecycle rejection mail so durable report recovery can verify the original submission.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#federated-rejection-replay"
+    },
+    {
+      "path": "src/main/runtime/orchestration/db/lifecycle-rejection-marker.test.ts",
+      "reason": "Regression coverage for preserving original rejection evidence through lifecycle message wrapping and replay.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#federated-rejection-replay"
+    },
+    {
+      "path": "src/main/claude-accounts/runtime-auth/runtime-auth-sync.ts",
+      "reason": "Clear the host runtime account selection together with the legacy selection when managed credentials are missing, invalid, or unowned; otherwise structured launches strip valid system authentication after fallback.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#claude-host-auth-fallback-selection"
+    },
+    {
+      "path": "src/main/claude-accounts/runtime-auth-service-materialization.test.ts",
+      "reason": "Regression coverage for host managed-auth fallback clearing the effective account selection while preserving unrelated WSL selections and allowing system authentication.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#claude-host-auth-fallback-selection"
+    },
+    {
+      "path": "docs/reference/remote-wire-compatibility.md",
+      "reason": "Rule 1 stated that every JSON payload is parsed with a decoder that ignores unknown keys, which is false for a `.strict()` schema: the strict side rejects the whole payload instead. Two independent changes shipped the same wire regression while believing they complied. The corrected rule names the strict-vs-default condition and how to check it, and belongs upstream because the defect is upstream's.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#wire-compat-rule-1-strict-schemas"
+    },
+    {
       "path": "src/renderer/src/assets/main.css",
       "reason": "Adds canonical light/dark warning surface and foreground tokens for non-error attention states; the design-system extension belongs upstream rather than in feature-local CSS.",
       "status": "pending-upstream",
@@ -4357,6 +4477,17 @@
     }
   ],
   "residuals": {
+    "src/relay/git-exec-validator.ts": { "added": 4, "removed": 0 },
+    "src/main/runtime/orchestration/federation-sync.test.ts": { "added": 2, "removed": 1 },
+    "src/main/runtime/rpc/methods/orchestration/federation/federated-transport-safety.test.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/main/runtime/rpc/methods/orchestration/messaging/send-methods.ts": {
+      "added": 1,
+      "removed": 1
+    },
+    "src/main/runtime/runtime-orchestration-federation.ts": { "added": 1, "removed": 1 },
     "src/main/ipc/runtime-environment-request-connections.ts": { "added": 1, "removed": 1 },
     "src/main/startup/main-process-preflight.ts": { "added": 2, "removed": 0 },
     "src/main/startup/host-port-bootstrap-wiring.test.ts": { "added": 1, "removed": 0 },
@@ -5742,10 +5873,10 @@
       "removed": 1
     },
     "src/shared/protocol-version.ts": {
-      "added": 9,
+      "added": 19,
       "removed": 1
     },
-    "src/shared/remote-runtime-client-capabilities.ts": { "added": 2, "removed": 0 },
+    "src/shared/remote-runtime-client-capabilities.ts": { "added": 6, "removed": 0 },
     "src/shared/remote-runtime-shared-control-protocol.ts": {
       "added": 2,
       "removed": 1

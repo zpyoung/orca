@@ -63,7 +63,7 @@ export async function drainHeimdallMailbox(input: {
     .map(({ id }) => requireMailboxMessage(db, input.run.id, id))
     .filter((message) => message.sequence > input.cursor.lastSequence)
     .sort((left, right) => left.sequence - right.sequence)
-    .map((message) => mailboxEvidence(input.enrollment, checked.deliveryId, message))
+    .map((message) => mailboxEvidenceForMessage(input.enrollment, checked.deliveryId, message))
 }
 
 function assertMailboxCursor(cursor: MailboxCursor): void {
@@ -80,10 +80,11 @@ function requireMailboxMessage(db: OrchestrationDb, runId: string, id: string): 
   return message
 }
 
-function mailboxEvidence(
+export function mailboxEvidenceForMessage(
   enrollment: WatcherEnrollment,
   deliveryId: string | null,
-  message: MessageRow
+  message: MessageRow,
+  includeDeliverySource: boolean = true
 ): EvidenceEntry {
   const atMs = Date.parse(message.created_at)
   if (!Number.isFinite(atMs) || atMs < 0) {
@@ -97,12 +98,16 @@ function mailboxEvidence(
     class: 'fact',
     kind: 'evidence',
     evidenceKind: 'orchestration-mailbox',
-    source: {
-      kind: 'orchestration',
-      sequence: message.sequence,
-      messageId: message.id,
-      ...(deliveryId ? { deliveryId } : {})
-    },
+    ...(includeDeliverySource
+      ? {
+          source: {
+            kind: 'orchestration' as const,
+            sequence: message.sequence,
+            messageId: message.id,
+            ...(deliveryId ? { deliveryId } : {})
+          }
+        }
+      : {}),
     payload: normalizedMailboxFact(message)
   }
 }
@@ -115,9 +120,10 @@ function normalizedMailboxFact(message: MessageRow): {
     dispatchId?: string
     taskId?: string
     outcome?: string
-    result?: string
+    result?: unknown
     reportPath?: string
-    filesModified?: string[]
+    filesModified?: unknown
+    reportRejection?: { code: string; reason: string }
   }
 } {
   let raw: Record<string, unknown> = {}
@@ -131,25 +137,68 @@ function normalizedMailboxFact(message: MessageRow): {
       raw = {}
     }
   }
+  const lifecycleRejection =
+    message.type === 'worker_done' ? normalizedLifecycleRejection(raw) : null
+  const reportRejection = lifecycleRejection
+    ? { code: lifecycleRejection.code, reason: lifecycleRejection.reason }
+    : null
   return {
     type: message.type,
     payload: {
       ...(typeof raw.dispatchId === 'string' ? { dispatchId: raw.dispatchId } : {}),
       ...(typeof raw.taskId === 'string' ? { taskId: raw.taskId } : {}),
-      ...(message.type === 'worker_done' && typeof raw.outcome === 'string'
-        ? { outcome: raw.outcome }
-        : {}),
+      ...(message.type === 'worker_done' && reportRejection
+        ? { outcome: 'failed' }
+        : message.type === 'worker_done' && typeof raw.outcome === 'string'
+          ? { outcome: raw.outcome }
+          : {}),
       ...(message.type === 'worker_done' && typeof raw.reportPath === 'string'
         ? { reportPath: raw.reportPath }
         : {}),
-      ...(message.type === 'worker_done' &&
-      Array.isArray(raw.filesModified) &&
-      raw.filesModified.every((file): file is string => typeof file === 'string')
+      ...(message.type === 'worker_done' && Object.hasOwn(raw, 'filesModified')
         ? { filesModified: raw.filesModified }
         : {}),
-      ...(message.type === 'worker_done' ? { result: message.body } : {})
+      ...(message.type === 'worker_done'
+        ? {
+            result: reportRejection
+              ? {
+                  body: lifecycleRejection?.originalBody ?? message.body,
+                  reportRejection
+                }
+              : message.body,
+            ...(reportRejection ? { reportRejection } : {})
+          }
+        : {})
     },
-    ...(message.type === 'escalation' ? { subject: message.subject } : {}),
-    ...(message.type === 'question' || message.type === 'escalation' ? { body: message.body } : {})
+    ...(message.type === 'status' || message.type === 'escalation'
+      ? { subject: message.subject }
+      : {}),
+    ...(message.type === 'status' || message.type === 'question' || message.type === 'escalation'
+      ? { body: message.body }
+      : {})
+  }
+}
+
+function normalizedLifecycleRejection(
+  payload: Record<string, unknown>
+): { code: string; reason: string; originalBody?: string } | null {
+  const marker = payload._orcaLifecycleRejection
+  if (!marker || typeof marker !== 'object') {
+    return null
+  }
+  const rejection = marker as Record<string, unknown>
+  const reason =
+    typeof rejection.originalReason === 'string'
+      ? rejection.originalReason
+      : typeof rejection.reason === 'string'
+        ? rejection.reason
+        : null
+  if (typeof rejection.code !== 'string' || !rejection.code.trim() || reason === null) {
+    return null
+  }
+  return {
+    code: rejection.code,
+    reason,
+    ...(typeof rejection.originalBody === 'string' ? { originalBody: rejection.originalBody } : {})
   }
 }

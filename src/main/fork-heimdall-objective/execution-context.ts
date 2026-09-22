@@ -8,7 +8,10 @@ import {
   type ObjectiveAction
 } from '../../shared/fork-heimdall-objective/objective-actions'
 import type { ObjectiveEnrollmentPayload } from '../../shared/fork-heimdall-objective/contract-types'
-import type { ObjectiveWorld } from '../../shared/fork-heimdall-objective/detail-types'
+import {
+  ObjectivePendingReportSchema,
+  type ObjectiveWorld
+} from '../../shared/fork-heimdall-objective/detail-types'
 import type { ObjectiveWorkspaceTarget } from './content-identity'
 
 export type ObjectiveSnapshotBinding = {
@@ -27,6 +30,9 @@ export type ObjectiveWorkerEvidence = {
   outcome: 'succeeded' | 'failed'
   reportPath: string | null
   filesModified: string[]
+  filesModifiedValid: boolean
+  reportRejection: { code: string; reason: string } | null
+  reportRejectionValid: boolean
   orchestrationTaskId: string | null
   atMs: number
 }
@@ -94,6 +100,28 @@ function mailboxRecord(value: unknown): {
   return { type: message.type, payload: message.payload as Record<string, unknown> }
 }
 
+function reportRejection(value: unknown): {
+  value: { code: string; reason: string } | null
+  valid: boolean
+} {
+  if (value === undefined) {
+    return { value: null, valid: true }
+  }
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return { value: null, valid: false }
+  }
+  const record = value as Record<string, unknown>
+  if (
+    typeof record.code !== 'string' ||
+    record.code.trim().length === 0 ||
+    typeof record.reason !== 'string' ||
+    record.reason.trim().length === 0
+  ) {
+    return { value: null, valid: false }
+  }
+  return { value: { code: record.code, reason: record.reason }, valid: true }
+}
+
 export function findObjectiveWorkerEvidence(
   ledger: WatcherLedger,
   dispatchId: string
@@ -118,13 +146,18 @@ export function findObjectiveWorkerEvidence(
     ) {
       continue
     }
+    const parsedFiles = Object.hasOwn(payload, 'filesModified')
+      ? ObjectivePendingReportSchema.shape.filesModified.safeParse(payload.filesModified)
+      : null
+    const parsedRejection = reportRejection(payload.reportRejection)
     found = {
       dispatchId,
       outcome: payload.outcome,
       reportPath: typeof payload.reportPath === 'string' ? payload.reportPath : null,
-      filesModified: Array.isArray(payload.filesModified)
-        ? payload.filesModified.filter((file): file is string => typeof file === 'string')
-        : [],
+      filesModified: parsedFiles?.success ? parsedFiles.data : [],
+      filesModifiedValid: parsedFiles === null || parsedFiles.success,
+      reportRejection: parsedRejection.value,
+      reportRejectionValid: parsedRejection.valid,
       atMs: entry.atMs
     }
   }

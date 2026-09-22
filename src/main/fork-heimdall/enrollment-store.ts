@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { BudgetPolicySchema } from '../../shared/fork-heimdall/budget'
 import type { WatcherOwnerFence } from '../../shared/fork-heimdall/fleet-types'
+import { WatcherOwnerConfigSchema } from '../../shared/fork-heimdall/owner/owner-config'
 import {
   CapabilityModeSchema,
   WatcherEnrollmentSchema,
@@ -8,12 +9,21 @@ import {
   type WorkspaceKey
 } from '../../shared/fork-heimdall/watcher-types'
 import type { HeimdallDatabase } from './database'
+import {
+  completePendingKindPurge,
+  deleteWatcherEnrollment,
+  readPendingKindPurges,
+  type EnrollmentDeleteCommit,
+  type PendingKindPurge
+} from './enrollment-deletion'
+import type { EnrollmentRow } from './enrollment-row'
 
 const EnrollmentRearmConfigurationSchema = z
   .object({
     capabilities: z.record(z.string().min(1), CapabilityModeSchema),
     budget: BudgetPolicySchema,
-    kindPayload: z.unknown()
+    kindPayload: z.unknown(),
+    owner: WatcherOwnerConfigSchema.optional()
   })
   .strict()
 
@@ -23,7 +33,8 @@ const EnrollmentControlChangeSchema = z
   .object({
     enabled: z.boolean().optional(),
     paused: z.boolean().optional(),
-    budget: BudgetPolicySchema.optional()
+    budget: BudgetPolicySchema.optional(),
+    kindPayload: z.unknown().optional()
   })
   .strict()
 
@@ -51,28 +62,6 @@ export function isMalformedKindPayloadEnrollment(
   return 'malformedKindPayload' in enrollment
 }
 
-type EnrollmentRow = {
-  watcher_id: string
-  kind: string
-  workspace_key: string
-  execution_host_id: string
-  repo_id: string
-  worktree_id: string | null
-  workspace_path: string
-  scheduler_owner: string
-  enabled: number
-  paused: number
-  command_revision: number
-  capabilities_json: string
-  budget_json: string
-  kind_payload_json: string
-  coordinator_handle: string
-  coordinator_pane_key: string
-  orchestration_run_id: string | null
-  created_at_ms: number
-  terminal_at_ms: number | null
-}
-
 export type EnrollmentStore = {
   get(watcherId: string): EnrollmentRecord | null
   list(): EnrollmentRecord[]
@@ -84,6 +73,9 @@ export type EnrollmentStore = {
     change: EnrollmentControlChange,
     appendWithinTransaction?: () => void
   ): EnrollmentControlCommit
+  deleteWatcher(watcherId: string, expectedOwner: WatcherOwnerFence): EnrollmentDeleteCommit
+  pendingKindPurges(): PendingKindPurge[]
+  completeKindPurge(watcherId: string): void
   setEnabled(watcherId: string, enabled: boolean): EnrollmentRecord
   rearm(
     watcherId: string,
@@ -110,7 +102,8 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
         `SELECT watcher_id, kind, workspace_key, execution_host_id, repo_id, worktree_id,
                 workspace_path, scheduler_owner, enabled, paused, command_revision,
                 capabilities_json, budget_json, kind_payload_json, coordinator_handle,
-                coordinator_pane_key, orchestration_run_id, created_at_ms, terminal_at_ms
+                coordinator_pane_key, orchestration_run_id, created_at_ms, terminal_at_ms,
+                owner_json
            FROM heimdall_enrollment
           WHERE watcher_id = ?`
       )
@@ -125,7 +118,8 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
         `SELECT watcher_id, kind, workspace_key, execution_host_id, repo_id, worktree_id,
                 workspace_path, scheduler_owner, enabled, paused, command_revision,
                 capabilities_json, budget_json, kind_payload_json, coordinator_handle,
-                coordinator_pane_key, orchestration_run_id, created_at_ms, terminal_at_ms
+                coordinator_pane_key, orchestration_run_id, created_at_ms, terminal_at_ms,
+                owner_json
            FROM heimdall_enrollment
           ORDER BY created_at_ms, watcher_id`
       )
@@ -140,7 +134,8 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
         `SELECT watcher_id, kind, workspace_key, execution_host_id, repo_id, worktree_id,
                 workspace_path, scheduler_owner, enabled, paused, command_revision,
                 capabilities_json, budget_json, kind_payload_json, coordinator_handle,
-                coordinator_pane_key, orchestration_run_id, created_at_ms, terminal_at_ms
+                coordinator_pane_key, orchestration_run_id, created_at_ms, terminal_at_ms,
+                owner_json
            FROM heimdall_enrollment
           WHERE workspace_key = ? AND terminal_at_ms IS NULL`
       )
@@ -158,8 +153,8 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
            watcher_id, kind, workspace_key, execution_host_id, repo_id, worktree_id,
            workspace_path, scheduler_owner, enabled, paused, command_revision, capabilities_json,
            budget_json, kind_payload_json, coordinator_handle, coordinator_pane_key,
-           orchestration_run_id, created_at_ms, terminal_at_ms
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           orchestration_run_id, created_at_ms, terminal_at_ms, owner_json
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         parsed.watcherId,
@@ -180,7 +175,8 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
         parsed.coordinatorIdentity.paneKey,
         parsed.orchestrationRunId,
         parsed.createdAtMs,
-        parsed.terminalAtMs
+        parsed.terminalAtMs,
+        this.serializeOwner(parsed.owner)
       )
     return parsed
   }
@@ -209,6 +205,7 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
     const capabilities = this.serializeJson('capabilities', parsed.capabilities)
     const budget = this.serializeJson('budget', parsed.budget)
     const kindPayload = this.serializeJson('kind payload', parsed.kindPayload)
+    const owner = this.serializeOwner(parsed.owner)
     this.database.assertWritable()
     const connection = this.database.connection()
     connection.exec('BEGIN IMMEDIATE')
@@ -221,13 +218,14 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
                   command_revision = command_revision + 1,
                   capabilities_json = ?,
                   budget_json = ?,
-                  kind_payload_json = ?
+                  kind_payload_json = ?,
+                  owner_json = ?
             WHERE watcher_id = ?
               AND terminal_at_ms IS NULL
               AND enabled = 0
               AND json_valid(kind_payload_json)`
         )
-        .run(capabilities, budget, kindPayload, watcherId)
+        .run(capabilities, budget, kindPayload, owner, watcherId)
       if (Number(result.changes) !== 1) {
         throw new Error(`Unknown or immutable Heimdall watcher: ${watcherId}`)
       }
@@ -294,6 +292,11 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
           detail: `Heimdall watcher ${watcherId} is terminal`
         }
       }
+      const kindPayload = Object.hasOwn(change, 'kindPayload')
+        ? change.kindPayload
+        : 'kindPayload' in current
+          ? current.kindPayload
+          : null
 
       const result = connection
         .prepare(
@@ -301,6 +304,7 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
               SET enabled = ?,
                   paused = ?,
                   budget_json = ?,
+                  kind_payload_json = ?,
                   command_revision = command_revision + 1
             WHERE watcher_id = ? AND command_revision = ? AND terminal_at_ms IS NULL`
         )
@@ -308,6 +312,7 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
           (change.enabled ?? current.enabled) ? 1 : 0,
           (change.paused ?? current.paused) ? 1 : 0,
           this.serializeJson('budget', change.budget ?? current.budget),
+          this.serializeJson('kind payload', kindPayload),
           watcherId,
           expectedOwner.revision
         )
@@ -324,6 +329,22 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
       }
       throw error
     }
+  }
+  deleteWatcher(watcherId: string, expectedOwner: WatcherOwnerFence): EnrollmentDeleteCommit {
+    return deleteWatcherEnrollment({
+      database: this.database,
+      watcherId,
+      expectedOwner,
+      read: () => this.get(watcherId)
+    })
+  }
+
+  pendingKindPurges(): PendingKindPurge[] {
+    return readPendingKindPurges(this.database)
+  }
+
+  completeKindPurge(watcherId: string): void {
+    completePendingKindPurge(this.database, watcherId)
   }
 
   setOrchestrationRunId(watcherId: string, runId: string | null): WatcherEnrollment {
@@ -424,6 +445,10 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
     return serialized
   }
 
+  private serializeOwner(owner: WatcherEnrollment['owner']): string | null {
+    return owner ? JSON.stringify(owner) : null
+  }
+
   private parseRecord(row: EnrollmentRow): EnrollmentRecord {
     let kindPayload: unknown
     try {
@@ -462,6 +487,7 @@ export class HeimdallEnrollmentStore implements EnrollmentStore {
         handle: row.coordinator_handle,
         paneKey: row.coordinator_pane_key
       },
+      owner: row.owner_json ? JSON.parse(row.owner_json) : undefined,
       orchestrationRunId: row.orchestration_run_id,
       createdAtMs: row.created_at_ms,
       terminalAtMs: row.terminal_at_ms

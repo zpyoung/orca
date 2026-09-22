@@ -55,6 +55,15 @@ export const WatcherFleetWorkspaceSchema = z
   .strict()
 export type WatcherFleetWorkspace = z.infer<typeof WatcherFleetWorkspaceSchema>
 
+export const WatcherFleetParallelSummarySchema = z
+  .object({
+    runningCount: z.number().int().nonnegative(),
+    effectiveMaxConcurrency: z.number().int().positive(),
+    note: z.string().trim().min(1).optional()
+  })
+  .strict()
+export type WatcherFleetParallelSummary = z.infer<typeof WatcherFleetParallelSummarySchema>
+
 export const WatcherFleetEntrySchema = z
   .object({
     target: WatcherTargetSchema,
@@ -67,6 +76,7 @@ export const WatcherFleetEntrySchema = z
     paused: z.boolean(),
     workflowPhase: IdSchema.nullable().optional(),
     activity: WatcherFleetActivitySchema.optional(),
+    parallel: WatcherFleetParallelSummarySchema.optional(),
     workspace: WatcherFleetWorkspaceSchema.optional()
   })
   .strict()
@@ -114,11 +124,18 @@ export const WatcherDetailSchema = z
 export type WatcherDetail = z.infer<typeof WatcherDetailSchema>
 
 export const WatcherCommandSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('delete') }).strict(),
   z.object({ kind: z.literal('pause') }).strict(),
   z.object({ kind: z.literal('resume') }).strict(),
   z.object({ kind: z.literal('disarm') }).strict(),
   z.object({ kind: z.literal('approve'), scope: ApprovalScopeSchema }).strict(),
   z.object({ kind: z.literal('adjust-budget'), budget: BudgetPolicySchema }).strict(),
+  z
+    .object({
+      kind: z.literal('set-concurrency'),
+      maxConcurrency: z.number().int().min(1).max(1_024)
+    })
+    .strict(),
   z.object({ kind: z.literal('answer-question'), messageId: IdSchema, body: IdSchema }).strict(),
   z.object({ kind: z.literal('stop-worker'), dispatchId: IdSchema }).strict()
 ])

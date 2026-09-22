@@ -1,21 +1,84 @@
-import type { ObjectiveLandingBar } from '../../shared/fork-heimdall-objective/contract-types'
 import {
+  ObjectiveWorkspacePathSchema,
+  type ObjectiveLandingBar
+} from '../../shared/fork-heimdall-objective/contract-types'
+import {
+  ObjectiveDispatchRecordSchema,
+  type ObjectiveDispatchRecord
+} from '../../shared/fork-heimdall-objective/parallel-types'
+import {
+  ImplementerReportSchema,
   ObjectiveCriterionSchema,
   PlannerReportSchema,
+  ObjectivePlanTaskSchema,
   type ObjectivePlan,
   type ObjectivePlanTask
 } from '../../shared/fork-heimdall-objective/plan-schema'
 import type { ObjectiveDatabase } from './objective-database'
 import {
+  DependenciesSchema,
   parseJson,
   parseLandingPayloadJson,
   type CheckRow,
   type CriterionRow,
+  type DispatchRow,
   type LandingRow,
   type ObjectiveCheckAttempt,
   type ObjectiveLandingPayload,
   type ObjectiveStoredCriterion
 } from './objective-store-data'
+
+const DISPATCH_COLUMNS = `attempt_fingerprint, watcher_id, execution_host_id, revision_id, task_key, plan_task_digest,
+  dispatch_id, workspace_id, workspace_path, base_commit, lane_task_keys_json, session_node_count,
+  state, commit_sha, applied_commit_sha, report_digest, conflict_paths_json,
+  conflicting_task_keys_json, conflicting_dispatch_ids_json, created_at_ms, completed_at_ms,
+  terminal_handle, setup_state, report_path, report_json, task_json`
+
+function dispatchRecord(row: DispatchRow): ObjectiveDispatchRecord {
+  return ObjectiveDispatchRecordSchema.parse({
+    attemptFingerprint: row.attempt_fingerprint,
+    watcherId: row.watcher_id,
+    executionHostId: row.execution_host_id,
+    revisionId: row.revision_id,
+    taskKey: row.task_key,
+    planTaskDigest: row.plan_task_digest,
+    dispatchId: row.dispatch_id,
+    workspaceId: row.workspace_id,
+    workspacePath: row.workspace_path,
+    baseCommit: row.base_commit,
+    laneTaskKeys: parseJson(DependenciesSchema, row.lane_task_keys_json, 'dispatch lane task keys'),
+    sessionNodeCount: row.session_node_count,
+    state: row.state,
+    commitSha: row.commit_sha,
+    appliedCommitSha: row.applied_commit_sha,
+    reportDigest: row.report_digest,
+    conflictPaths: parseJson(
+      ObjectiveWorkspacePathSchema.array().max(256),
+      row.conflict_paths_json,
+      'dispatch conflict paths'
+    ),
+    conflictingTaskKeys: parseJson(
+      DependenciesSchema,
+      row.conflicting_task_keys_json,
+      'dispatch conflicting task keys'
+    ),
+    conflictingDispatchIds: parseJson(
+      DependenciesSchema,
+      row.conflicting_dispatch_ids_json,
+      'conflicting dispatch ids'
+    ),
+    createdAtMs: row.created_at_ms,
+    completedAtMs: row.completed_at_ms,
+    terminalHandle: row.terminal_handle,
+    setupState: row.setup_state,
+    reportPath: row.report_path,
+    report:
+      row.report_json === null
+        ? null
+        : parseJson(ImplementerReportSchema, row.report_json, 'dispatch report'),
+    task: parseJson(ObjectivePlanTaskSchema, row.task_json, 'dispatch task')
+  })
+}
 
 export function readObjectiveCheckAttempt(
   database: ObjectiveDatabase,
@@ -25,7 +88,8 @@ export function readObjectiveCheckAttempt(
   const row = database
     .connection()
     .prepare(`SELECT id, watcher_id, criterion_id, content_identity,
-    execution_host_id, command, exit_code, timed_out, stdout_tail, stderr_tail, epoch, started_at_ms, completed_at_ms
+    execution_host_id, command, exit_code, timed_out, stdout_tail, stderr_tail, epoch, started_at_ms, completed_at_ms,
+    owner_skip
     FROM check_attempt WHERE criterion_id = ? AND content_identity = ?`)
     .get(criterionId, contentIdentity) as CheckRow | undefined
   return row
@@ -42,13 +106,49 @@ export function readObjectiveCheckAttempt(
         timedOut: row.timed_out === 1,
         stdoutTail: row.stdout_tail,
         stderrTail: row.stderr_tail,
-        completedAtMs: row.completed_at_ms
+        completedAtMs: row.completed_at_ms,
+        ownerSkip: row.owner_skip === 1
       }
     : null
 }
 
 export class ObjectiveStoreQueries {
   constructor(private readonly database: ObjectiveDatabase) {}
+
+  getDispatch(attemptFingerprint: string): ObjectiveDispatchRecord | null {
+    const row = this.database
+      .connection()
+      .prepare(`SELECT ${DISPATCH_COLUMNS} FROM objective_dispatch WHERE attempt_fingerprint = ?`)
+      .get(attemptFingerprint) as DispatchRow | undefined
+    return row ? dispatchRecord(row) : null
+  }
+
+  listDispatches(watcherId: string): ObjectiveDispatchRecord[] {
+    const rows = this.database
+      .connection()
+      .prepare(`SELECT ${DISPATCH_COLUMNS} FROM objective_dispatch
+        WHERE watcher_id = ?
+        ORDER BY COALESCE(completed_at_ms, 9223372036854775807), created_at_ms, attempt_fingerprint`)
+      .all(watcherId) as unknown as DispatchRow[]
+    return rows.map(dispatchRecord)
+  }
+
+  dispatchForId(watcherId: string, dispatchId: string): ObjectiveDispatchRecord | null {
+    const row = this.database
+      .connection()
+      .prepare(`SELECT ${DISPATCH_COLUMNS} FROM objective_dispatch
+        WHERE watcher_id = ? AND dispatch_id = ?`)
+      .get(watcherId, dispatchId) as DispatchRow | undefined
+    return row ? dispatchRecord(row) : null
+  }
+
+  parallelNote(watcherId: string): string | null {
+    const row = this.database
+      .connection()
+      .prepare('SELECT note FROM objective_parallel_state WHERE watcher_id = ?')
+      .get(watcherId) as { note: string | null } | undefined
+    return row?.note ?? null
+  }
 
   nodeForDispatch(
     watcherId: string,
@@ -175,6 +275,15 @@ export class ObjectiveStoreQueries {
           'SELECT 1 FROM landing_evidence WHERE watcher_id = ? AND rung = ? AND content_identity = ?'
         )
         .get(watcherId, rung, contentIdentity)
+    )
+  }
+
+  hasAmendment(revisionId: string, digest: string): boolean {
+    return Boolean(
+      this.database
+        .connection()
+        .prepare('SELECT 1 FROM revision_amendment WHERE revision_id = ? AND digest = ?')
+        .get(revisionId, digest)
     )
   }
 

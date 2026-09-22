@@ -16,6 +16,7 @@ import type { RuntimeRpcResponse } from '../../shared/runtime-rpc-envelope'
 import type { Store } from '../persistence'
 import {
   HeimdallCommandCapabilityError,
+  HeimdallEnrollOwnerCapabilityError,
   HeimdallEnvironmentUnavailableError,
   type FleetEnvironmentAvailability,
   type FleetEnvironmentIdentity,
@@ -28,12 +29,12 @@ import {
   readConfirmedRemoteDetail
 } from './fleet-remote-detail'
 import {
+  enrollmentForParallelCompatibility,
   enrollRemoteWatcher,
   OWNER_UNREACHABLE,
-  readRemoteDebugReport,
-  refused,
-  sendRemoteWatcherCommand
+  readRemoteDebugReport
 } from './fleet-remote-operations'
+import { commandRemoteWatcher } from './fleet-remote-command'
 import { projectRemoteFleetEntry, routeRemoteFleetEntry } from './fleet-projection'
 import { remoteDetailKey, RemoteFleetMirrorState } from './fleet-remote-mirror-state'
 import type { WatcherNotificationPublication } from './notification'
@@ -82,7 +83,8 @@ export class HeimdallRemoteFleetMirrors {
         projectRemoteFleetEntry(entry, {
           identity: mirror.identity,
           reachable: mirror.reachable && ownerAvailable,
-          commandSupport: mirror.commandSupport
+          commandSupport: mirror.commandSupport,
+          parallelExecutionSupport: mirror.parallelExecutionSupport
         })
       )
     })
@@ -94,7 +96,17 @@ export class HeimdallRemoteFleetMirrors {
     if (mirror.commandSupport === 'unsupported') {
       throw new HeimdallCommandCapabilityError()
     }
-    return enrollRemoteWatcher(this.environments, identity, input)
+    if (
+      (input.owner !== undefined || input.ownerInterventionCapability !== undefined) &&
+      mirror.enrollOwnerSupport === 'unsupported'
+    ) {
+      throw new HeimdallEnrollOwnerCapabilityError()
+    }
+    return enrollRemoteWatcher(
+      this.environments,
+      identity,
+      enrollmentForParallelCompatibility(input, mirror.parallelExecutionSupport === 'supported')
+    )
   }
 
   async detail(target: WatcherTarget): Promise<WatcherDetail> {
@@ -141,40 +153,13 @@ export class HeimdallRemoteFleetMirrors {
     }
   }
 
-  async command(request: WatcherCommandRequest): Promise<WatcherCommandResult> {
-    const identity = {
-      id: request.target.connectionId!,
-      pairingRevision: request.target.pairingRevision!
-    }
-    const mirror = this.mirrors.get(identity.id)
-    if (!mirror || mirror.identity.pairingRevision !== identity.pairingRevision) {
-      return refused(
-        'owner-conflict',
-        'The runtime environment pairing changed; refresh and try again.'
-      )
-    }
-    const availability = this.environments.availability(identity)
-    if (availability === 'replaced') {
-      return refused(
-        'owner-conflict',
-        'The runtime environment pairing changed; refresh and try again.'
-      )
-    }
-    if (!mirror.reachable || availability !== 'available') {
-      return refused('owner-unreachable', OWNER_UNREACHABLE)
-    }
-    if (mirror.commandSupport !== 'supported') {
-      return refused(
-        'unsupported-capability',
-        mirror.commandSupport === 'unsupported'
-          ? 'The owning runtime does not support Heimdall commands. Update the host and try again.'
-          : 'Heimdall command support could not be verified. Refresh the owner state and try again.'
-      )
-    }
-    return sendRemoteWatcherCommand(this.environments, identity, request, () => {
-      mirror.commandSupport = 'unsupported'
-      this.onChanged()
-    })
+  command(request: WatcherCommandRequest): Promise<WatcherCommandResult> {
+    return commandRemoteWatcher(
+      this.environments,
+      this.mirrors.get(request.target.connectionId!),
+      request,
+      this.onChanged
+    )
   }
 
   async debugReport(target: WatcherTarget): Promise<unknown> {

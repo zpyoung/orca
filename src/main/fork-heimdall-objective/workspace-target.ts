@@ -1,4 +1,5 @@
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
+import { parseWorkspaceKey } from '../../shared/workspace-scope'
 import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
 import {
   requireRuntimeFileProvider,
@@ -31,11 +32,17 @@ export async function resolveObjectiveWorkspaceTarget(
   enrollment: WatcherEnrollment
 ): Promise<ObjectiveWorkspaceTarget> {
   const resolver = runtime as unknown as ObjectiveRuntimeResolver
-  if (enrollment.worktreeId === null) {
-    const target = await resolver.resolveRuntimeFileTarget(
-      `id:${enrollment.repoId}::${enrollment.workspacePath}`
-    )
+  const folderWorktreeId =
+    enrollment.worktreeId && parseWorkspaceKey(enrollment.worktreeId)?.type === 'folder'
+      ? enrollment.worktreeId
+      : null
+  if (enrollment.worktreeId === null || folderWorktreeId) {
+    const selector = folderWorktreeId ?? `${enrollment.repoId}::${enrollment.workspacePath}`
+    const target = await resolver.resolveRuntimeFileTarget(`id:${selector}`)
     assertResolvedAuthority(enrollment, target)
+    if (folderWorktreeId && target.worktree.id !== folderWorktreeId) {
+      throw new Error('Resolved objective folder workspace identity changed after enrollment')
+    }
     return {
       kind: 'folder',
       executionHostId: enrollment.executionHostId,

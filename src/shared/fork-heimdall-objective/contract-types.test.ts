@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   OBJECTIVE_ALL_WORKSPACE_PATHS_GLOB,
   OBJECTIVE_EXISTING_PLAN_MAX_LENGTH,
+  OBJECTIVE_TEXT_MAX_LENGTH,
   ObjectiveCapabilitiesSchema,
   ObjectiveEnrollmentPayloadSchema,
   objectiveCapabilityModes,
@@ -40,6 +41,13 @@ describe('objective enrollment payload', () => {
     }
   })
 
+  it('keeps lane enrollment optional for older payloads and preserves an explicit opt-out', () => {
+    expect(ObjectiveEnrollmentPayloadSchema.parse(payload()).lanesEnabled).toBeUndefined()
+    expect(
+      ObjectiveEnrollmentPayloadSchema.parse(payload({ lanesEnabled: false })).lanesEnabled
+    ).toBe(false)
+  })
+
   it('accepts the canonical whole-workspace territory', () => {
     expect(
       ObjectiveEnrollmentPayloadSchema.parse(
@@ -64,13 +72,21 @@ describe('objective enrollment payload', () => {
     ).toBe(false)
   })
 
-  it('rejects unknown fields and unbounded objective text', () => {
+  it('rejects unknown fields and enforces objective text in UTF-16 code units', () => {
     expect(
       ObjectiveEnrollmentPayloadSchema.safeParse({ ...payload(), ignored: true }).success
     ).toBe(false)
+
+    const multibyteObjective = '界'.repeat(OBJECTIVE_TEXT_MAX_LENGTH)
+    expect(Buffer.byteLength(multibyteObjective, 'utf8')).toBeGreaterThan(OBJECTIVE_TEXT_MAX_LENGTH)
     expect(
-      ObjectiveEnrollmentPayloadSchema.safeParse(payload({ objectiveText: 'x'.repeat(16_385) }))
+      ObjectiveEnrollmentPayloadSchema.safeParse(payload({ objectiveText: multibyteObjective }))
         .success
+    ).toBe(true)
+    expect(
+      ObjectiveEnrollmentPayloadSchema.safeParse(
+        payload({ objectiveText: `${multibyteObjective}界` })
+      ).success
     ).toBe(false)
   })
 
@@ -126,5 +142,22 @@ describe('objective enrollment payload', () => {
     expect(
       ObjectiveCapabilitiesSchema.safeParse({ ...capabilities, unexpected: 'on' }).success
     ).toBe(false)
+  })
+
+  it('parses an enrollment with no owner-intervention key exactly as it did before that key existed', () => {
+    const capabilities = objectiveCapabilityModes('files-on-disk')
+    const parsed = ObjectiveCapabilitiesSchema.parse(capabilities)
+    expect(parsed).toEqual(capabilities)
+    expect('owner-intervention' in parsed).toBe(false)
+  })
+
+  it('parses an owner-intervention key the kernel stamps onto an owner-configured enrollment', () => {
+    const capabilities = {
+      ...objectiveCapabilityModes('files-on-disk'),
+      'owner-intervention': 'on' as const
+    }
+    const parsed = ObjectiveCapabilitiesSchema.safeParse(capabilities)
+    expect(parsed.success).toBe(true)
+    expect(parsed.success && parsed.data['owner-intervention']).toBe('on')
   })
 })

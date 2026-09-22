@@ -135,13 +135,23 @@ export class WatcherRunnerActions {
         ledger: this.dependencies.ledgerStore.read(runner.enrollment.watcherId),
         dispatchWorker: async (request) => {
           await executionLease.assertHeld()
+          const dispatchLedger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
+          const concurrency = runner.kind.concurrency
+          const activeActions = getInFlightAttempts(dispatchLedger)
+            .filter((candidate) => candidate.attemptId !== attempt.attemptId)
+            .map((candidate) => candidate.action)
           const result = await this.dependencies.dispatchLifecycle.dispatchAttempt(attempt, {
             lease: executionLease,
             enrollment: runner.enrollment,
             action,
             fingerprint,
             dispatchKind: 'child',
-            ...request
+            ...request,
+            allowConcurrent:
+              concurrency?.canRunAlongside(action, activeActions, snapshot, dispatchLedger) ??
+              false,
+            allowBudgetExhausted:
+              concurrency?.canRunWhenBudgetExhausted(action, snapshot, dispatchLedger) ?? false
           })
           dispatched = result.status === 'dispatched'
           return result
@@ -194,11 +204,8 @@ export class WatcherRunnerActions {
       }
       throw error
     } finally {
-      const running = getInFlightAttempts(
-        this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
-      ).some((entry) => entry.attemptId === attempt.attemptId && entry.state === 'running')
       const currentInterval = this.dependencies.budgetClock.current?.(runner.enrollment.watcherId)
-      if (!running && currentInterval?.intervalId === interval.intervalId) {
+      if (currentInterval?.intervalId === interval.intervalId) {
         this.dependencies.budgetClock.close(interval, 'settled')
       }
     }
@@ -251,8 +258,16 @@ export class WatcherRunnerActions {
     this.attemptRecovery.settleAbsentDispatches(runner, attempts)
   }
 
-  abandonPendingAttempts(runner: WatcherRunner, ledger: WatcherLedger): void {
-    this.attemptRecovery.abandonPendingAttempts(runner, ledger)
+  abandonPendingAttempts(
+    runner: WatcherRunner,
+    snapshot: Snapshot<unknown>,
+    ledger: WatcherLedger
+  ): void {
+    this.attemptRecovery.abandonPendingAttempts(runner, ledger, (attempt) => {
+      return (
+        runner.kind.concurrency?.preserveAttemptOnContentChange(attempt, snapshot, ledger) ?? false
+      )
+    })
   }
 
   abandonFingerprint(

@@ -1,7 +1,4 @@
-import {
-  parkEscalationId,
-  workerEscalationParkId
-} from '../../shared/fork-heimdall/park-escalation-id'
+import { parkEscalationId } from '../../shared/fork-heimdall/park-escalation-id'
 import { deriveBudgetState } from '../../shared/fork-heimdall/budget'
 import type { LedgerEntry } from '../../shared/fork-heimdall/ledger-types'
 import type { FiredStopPredicate } from '../../shared/fork-heimdall/stop-policy'
@@ -79,6 +76,7 @@ export class WatcherRunnerStatusLifecycle {
     reason: string,
     messageId: string
   ): void {
+    const parkReason: WatcherParkReason = { kind: 'worker-escalation', escalationId, messageId }
     if (runner.enrollment.enabled) {
       runner.enrollment = this.dependencies.persistEnabled(runner, false)
       this.append(runner, {
@@ -88,7 +86,7 @@ export class WatcherRunnerStatusLifecycle {
         origin: 'owner',
         class: 'fact',
         kind: 'escalation',
-        escalationId: workerEscalationParkId(runner.enrollment.watcherId, escalationId),
+        escalationId: parkEscalationId(runner.enrollment.watcherId, parkReason),
         escalationKind: 'park-worker-escalation',
         status: 'open',
         foldCount: 1,
@@ -102,7 +100,7 @@ export class WatcherRunnerStatusLifecycle {
       state: 'parked',
       phase: 'parked',
       reason,
-      parkReason: null,
+      parkReason,
       budget: deriveBudgetState(
         this.dependencies.ledgerStore.read(runner.enrollment.watcherId),
         runner.enrollment.budget
@@ -113,6 +111,7 @@ export class WatcherRunnerStatusLifecycle {
   }
 
   configurationError(runner: WatcherRunner, reason: string): void {
+    const parkReason: WatcherParkReason = { kind: 'configuration-error', reason }
     if (runner.enrollment.enabled) {
       runner.enrollment = this.dependencies.persistEnabled(runner, false)
       this.append(runner, {
@@ -122,7 +121,7 @@ export class WatcherRunnerStatusLifecycle {
         origin: 'owner',
         class: 'fact',
         kind: 'escalation',
-        escalationId: `park:${runner.enrollment.watcherId}:configuration-error`,
+        escalationId: parkEscalationId(runner.enrollment.watcherId, parkReason),
         escalationKind: 'park-configuration-error',
         status: 'open',
         foldCount: 1,
@@ -135,7 +134,7 @@ export class WatcherRunnerStatusLifecycle {
       state: 'parked',
       phase: 'configuration-error',
       reason,
-      parkReason: null,
+      parkReason,
       budget: deriveBudgetState(
         this.dependencies.ledgerStore.read(runner.enrollment.watcherId),
         runner.enrollment.budget

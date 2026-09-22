@@ -1,12 +1,15 @@
 import { gateAction, type GateVerdict } from '../../shared/fork-heimdall/gate'
 import type { KernelAction } from '../../shared/fork-heimdall/kind-contract'
 import { makeAttemptFingerprint } from '../../shared/fork-heimdall/attempt-fingerprint'
+import { deriveBudgetState } from '../../shared/fork-heimdall/budget'
+import { getInFlightAttempts } from '../../shared/fork-heimdall/ledger-queries'
 import type { AttemptEntry, WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import { requireLiveSnapshot, type Snapshot } from '../../shared/fork-heimdall/snapshot'
 import type { WatcherTickTrace } from '../../shared/fork-heimdall/tick-trace'
 import { judgmentApprovalAdvisory } from '../../shared/fork-heimdall/judgment/objective-judgment-policy'
 import { ObjectiveWorldSchema } from '../../shared/fork-heimdall-objective/detail-types'
 import { ObjectiveActionSchema } from '../../shared/fork-heimdall-objective/objective-actions'
+import { recordDeviation } from './owner/deviation-ledger'
 import type { WatcherRunnerActions } from './runner-actions'
 import type { WatcherRunner, WatcherRunnerDependencies } from './runner-state'
 
@@ -34,6 +37,47 @@ type AllowedEvaluation = {
 }
 
 export type RunnerGateEvaluation = WatchingEvaluation | GatedEvaluation | AllowedEvaluation
+export function gateRunnerAction(
+  runner: WatcherRunner,
+  action: KernelAction,
+  snapshot: Snapshot<unknown>,
+  ledger: WatcherLedger,
+  ignoredAttemptId?: string
+): GateVerdict {
+  const baseLedger = ignoredAttemptId
+    ? {
+        ...ledger,
+        entries: ledger.entries.filter(
+          (entry) => entry.kind !== 'attempt' || entry.attemptId !== ignoredAttemptId
+        )
+      }
+    : ledger
+  const concurrency = runner.kind.concurrency
+  const activeActions = getInFlightAttempts(baseLedger).map((attempt) => attempt.action)
+  const concurrent = concurrency?.canRunAlongside(action, activeActions, snapshot, ledger) ?? false
+  const fingerprint = makeAttemptFingerprint(
+    action.contentIdentity,
+    action.kind,
+    action.evidenceKey
+  )
+  const gateLedger = concurrent
+    ? {
+        ...baseLedger,
+        entries: baseLedger.entries.filter(
+          (entry) => entry.kind !== 'attempt' || entry.fingerprint === fingerprint
+        )
+      }
+    : baseLedger
+  const budgetExhausted = deriveBudgetState(ledger, runner.enrollment.budget).exhausted !== null
+  const enrollment =
+    budgetExhausted && concurrency?.canRunWhenBudgetExhausted(action, snapshot, ledger)
+      ? {
+          ...runner.enrollment,
+          budget: { wallClockActiveMs: null, turns: null }
+        }
+      : runner.enrollment
+  return gateAction(action, snapshot, enrollment, gateLedger)
+}
 
 function approvalAdvisory(snapshot: Snapshot<unknown>, action: KernelAction): string | null {
   const world = ObjectiveWorldSchema.safeParse(snapshot.world)
@@ -46,7 +90,9 @@ function approvalAdvisory(snapshot: Snapshot<unknown>, action: KernelAction): st
 export class WatcherRunnerGateLifecycle {
   constructor(
     private readonly dependencies: Pick<WatcherRunnerDependencies, 'ledgerStore'>,
-    private readonly actions: WatcherRunnerActions
+    private readonly actions: WatcherRunnerActions,
+    private readonly now: () => number,
+    private readonly createId: () => string
   ) {}
 
   async evaluate(
@@ -62,9 +108,26 @@ export class WatcherRunnerGateLifecycle {
     trace.decision = decision
     trace.declined = 'considered' in decision ? decision.considered : []
     if (!decision.action) {
+      // recording a deviation reschedules immediately so the owner wakes on its own cadence,
+      // not whatever idle-pacing tier the kind would otherwise pick for plain watching
+      let deviationRecorded = false
+      if ('deviation' in decision && runner.enrollment.owner) {
+        recordDeviation(
+          { ledgerStore: this.dependencies.ledgerStore, now: this.now, createId: this.createId },
+          runner.enrollment.watcherId,
+          decision.deviation
+        )
+        deviationRecorded = true
+      }
       this.actions.settleAbsentDispatches(runner, absentDispatches)
       ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
-      return { outcome: 'watching', snapshot, ledger, immediate: false, successful: true }
+      return {
+        outcome: 'watching',
+        snapshot,
+        ledger,
+        immediate: deviationRecorded,
+        successful: true
+      }
     }
 
     let action = decision.action
@@ -78,8 +141,7 @@ export class WatcherRunnerGateLifecycle {
       this.actions.settleAbsentDispatches(runner, absentDispatches)
       ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
     }
-    const gateLedger = this.withoutAttempt(ledger, recoveredAttempt?.attemptId)
-    let gate = gateAction(action, snapshot, runner.enrollment, gateLedger)
+    let gate = gateRunnerAction(runner, action, snapshot, ledger, recoveredAttempt?.attemptId)
     if (gate.verdict === 'allow' && runner.kind.preflight) {
       gate = await runner.kind.preflight(action, snapshot, ledger, {
         enrollment: runner.enrollment
@@ -122,7 +184,7 @@ export class WatcherRunnerGateLifecycle {
         this.actions.abandonFingerprint(runner, cachedFingerprint, 'workspace-moved')
         return { outcome: 'watching', snapshot: live, ledger, immediate: true, successful: false }
       }
-      gate = gateAction(action, live, runner.enrollment, gateLedger)
+      gate = gateRunnerAction(runner, action, live, ledger, recoveredAttempt?.attemptId)
       if (gate.verdict === 'allow' && runner.kind.preflight) {
         gate = await runner.kind.preflight(action, live, ledger, {
           enrollment: runner.enrollment
@@ -184,12 +246,7 @@ export class WatcherRunnerGateLifecycle {
       return { verdict: 'hold', reason: 'paused' }
     }
     const ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
-    return gateAction(
-      action,
-      snapshot,
-      runner.enrollment,
-      this.withoutAttempt(ledger, ignoredAttemptId)
-    )
+    return gateRunnerAction(runner, action, snapshot, ledger, ignoredAttemptId)
   }
 
   private async assertLeaseHeld(runner: WatcherRunner): Promise<void> {
@@ -197,17 +254,5 @@ export class WatcherRunnerGateLifecycle {
       throw new Error('Watcher gate reached a durable outcome without a lease')
     }
     await runner.leaseGuard.assertHeld()
-  }
-
-  private withoutAttempt(ledger: WatcherLedger, attemptId?: string): WatcherLedger {
-    if (!attemptId) {
-      return ledger
-    }
-    return {
-      ...ledger,
-      entries: ledger.entries.filter(
-        (entry) => entry.kind !== 'attempt' || entry.attemptId !== attemptId
-      )
-    }
   }
 }

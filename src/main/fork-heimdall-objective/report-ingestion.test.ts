@@ -117,15 +117,40 @@ describe('objective role report ingestion', () => {
     expect(readFile).not.toHaveBeenCalled()
   })
 
-  it('rejects a report above 256 KiB without parsing it', async () => {
+  it('enforces the complete report cap in UTF-8 bytes independently of field code units', async () => {
     const target = await localFolderTarget()
-    const path = await issueObjectiveReportPath(target, 'oversize-attempt')
-    await writeFile(path, Buffer.alloc(MAX_OBJECTIVE_REPORT_BYTES + 1, 0x20))
+    const path = await issueObjectiveReportPath(target, 'report-byte-boundary')
+    const report = JSON.stringify({
+      plan: [
+        {
+          taskKey: 'core',
+          title: 'Core',
+          spec: '界',
+          deps: [],
+          criteria: [{ body: 'Works', shellCheckable: false, checkCommand: null }],
+          declaresDependencyChange: false
+        }
+      ]
+    })
+    const exact = `${report}${' '.repeat(MAX_OBJECTIVE_REPORT_BYTES - Buffer.byteLength(report, 'utf8'))}`
 
+    expect(exact.length).toBeLessThan(MAX_OBJECTIVE_REPORT_BYTES)
+    expect(Buffer.byteLength(exact, 'utf8')).toBe(MAX_OBJECTIVE_REPORT_BYTES)
+    await writeFile(path, exact)
     await expect(
       readObjectiveRoleReport({
         target,
-        attemptFingerprint: 'oversize-attempt',
+        attemptFingerprint: 'report-byte-boundary',
+        mailboxReportPath: path,
+        role: 'planner'
+      })
+    ).resolves.toMatchObject({ ok: true })
+
+    await writeFile(path, `${exact} `)
+    await expect(
+      readObjectiveRoleReport({
+        target,
+        attemptFingerprint: 'report-byte-boundary',
         mailboxReportPath: path,
         role: 'planner'
       })

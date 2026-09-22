@@ -1,4 +1,9 @@
-import type { ObjectiveFailureClass } from '../fork-heimdall/effect-certainty'
+import {
+  createReportValidationProvenance,
+  ReportValidationProvenanceSchema,
+  type ObjectiveFailureClass,
+  type ReportValidationProvenance
+} from '../fork-heimdall/effect-certainty'
 import type { DecisionOutcome } from '../fork-heimdall/kind-contract'
 import { getAttemptResolution, getLatestAttempts } from '../fork-heimdall/ledger-queries'
 import type { AttemptEntry, WatcherLedger } from '../fork-heimdall/ledger-types'
@@ -88,6 +93,29 @@ export function objectiveAttemptFailureClass(
   return resolution ? resolution.failureClass : attempt.failureClass
 }
 
+export function objectiveAttemptReportValidation(
+  attempt: AttemptEntry,
+  ledger: WatcherLedger
+): ReportValidationProvenance | null {
+  const resolution = getAttemptResolution(ledger, attempt.attemptId)
+  if (resolution?.reportValidation) {
+    return resolution.reportValidation
+  }
+  const result =
+    attempt.result !== null && typeof attempt.result === 'object'
+      ? (attempt.result as Record<string, unknown>)
+      : null
+  const parsed = ReportValidationProvenanceSchema.safeParse(result?.reportValidation)
+  return parsed.success ? parsed.data : null
+}
+
+export function objectiveReportValidationDetail(provenance: ReportValidationProvenance): string {
+  const sourceCode =
+    provenance.sourceCode === undefined ? '' : `; sourceCode=${provenance.sourceCode}`
+  const classification = `report ${provenance.status}: ${provenance.code}${sourceCode}; role=${provenance.role}; hostVerifiable=${String(provenance.hostVerifiable)}`
+  return provenance.detail ? `${classification}\n${provenance.detail}` : classification
+}
+
 /**
  * Null covers every non-retryable outcome (criteria, unclassified, still landed) by construction,
  * so a future retryable class has to be added here rather than by relaxing a caller's conditional.
@@ -124,6 +152,28 @@ export function objectiveNodeRetryCount(
     }
   }
   return count
+}
+
+/**
+ * Task keys whose latest dispatch-node attempt in this revision is still unsettled. A plan row only
+ * ever records a *successful* dispatch (`plan_node.dispatch_id`), so this is the one place that can
+ * tell an in-flight node from a failed one — both have no dispatch row, but only the former is
+ * actively running work an amendment must not silently drop.
+ */
+export function objectiveInFlightTaskKeys(ledger: WatcherLedger, revisionId: string): Set<string> {
+  const inFlight = new Set<string>()
+  for (const { action, attempt } of objectiveAttempts(ledger)) {
+    if (action.kind !== 'dispatch-node' || action.revisionId !== revisionId) {
+      continue
+    }
+    const disposition = objectiveAttemptDisposition(attempt, ledger)
+    if (disposition === 'in-flight' || disposition === 'indeterminate') {
+      inFlight.add(action.taskKey)
+    } else {
+      inFlight.delete(action.taskKey)
+    }
+  }
+  return inFlight
 }
 
 /** The fingerprint the original (non-retry) dispatch captured its workspace baseline under. */
@@ -210,6 +260,50 @@ function mailboxPayload(value: unknown): {
   }
 }
 
+function projectedReportRejection(args: {
+  action: Extract<ObjectiveAction, { kind: `dispatch-${string}` }>
+  dispatchId: string
+  reportPath: string | null
+  filesModified: readonly string[]
+  value: unknown
+}): ReportValidationProvenance | null {
+  if (args.value === undefined) {
+    return null
+  }
+  const record =
+    typeof args.value === 'object' && args.value !== null && !Array.isArray(args.value)
+      ? (args.value as Record<string, unknown>)
+      : null
+  const sourceCode =
+    record !== null && typeof record.code === 'string' && record.code.trim().length > 0
+      ? record.code
+      : 'malformed-report-rejection-evidence'
+  const detail =
+    record !== null && typeof record.reason === 'string' && record.reason.trim().length > 0
+      ? record.reason
+      : 'Worker completion carried malformed report-rejection evidence'
+  const role =
+    args.action.kind === 'dispatch-planner'
+      ? 'planner'
+      : args.action.kind === 'dispatch-node'
+        ? 'implementer'
+        : args.action.kind === 'dispatch-reviewer'
+          ? 'reviewer'
+          : 'integrator'
+  return createReportValidationProvenance({
+    status: 'rejected',
+    code: 'semantic-invalid',
+    sourceCode,
+    role,
+    dispatchId: args.dispatchId,
+    ...(args.action.kind === 'dispatch-node' ? { taskKey: args.action.taskKey } : {}),
+    reportPath: args.reportPath,
+    detail,
+    reportedFiles: args.filesModified,
+    hostVerifiable: true
+  })
+}
+
 export function projectObjectiveReports(ledger: WatcherLedger): ObjectivePendingReport[] {
   const dispatchById = new Map<string, ObjectiveAttempt>()
   for (const objectiveAttempt of objectiveAttempts(ledger)) {
@@ -264,16 +358,31 @@ export function projectObjectiveReports(ledger: WatcherLedger): ObjectivePending
     ) {
       continue
     }
-    const filesModified = Array.isArray(message.payload.filesModified)
-      ? message.payload.filesModified.filter((file): file is string => typeof file === 'string')
-      : []
+    const parsedFiles = Object.hasOwn(message.payload, 'filesModified')
+      ? ObjectivePendingReportSchema.shape.filesModified.safeParse(message.payload.filesModified)
+      : null
+    const filesModified = parsedFiles?.success ? parsedFiles.data : []
+    const reportPath =
+      typeof message.payload.reportPath === 'string' ? message.payload.reportPath : null
+    const reportValidation = projectedReportRejection({
+      action,
+      dispatchId,
+      reportPath,
+      filesModified,
+      value: message.payload.reportRejection
+    })
     const report = ObjectivePendingReportSchema.safeParse({
       dispatchId,
       actionKind: action.kind,
       outcome,
-      reportPath:
-        typeof message.payload.reportPath === 'string' ? message.payload.reportPath : null,
+      reportPath,
       filesModified,
+      ...(parsedFiles !== null &&
+      !parsedFiles.success &&
+      message.payload.reportRejection === undefined
+        ? { evidenceIssue: 'files-modified-malformed' as const }
+        : {}),
+      ...(reportValidation === null ? {} : { reportValidation }),
       orchestrationTaskId: orchestrationTaskByDispatch.get(dispatchId) ?? null,
       taskKey: action.kind === 'dispatch-node' ? action.taskKey : null,
       dispatchedContentIdentity: action.contentIdentity,
@@ -285,7 +394,7 @@ export function projectObjectiveReports(ledger: WatcherLedger): ObjectivePending
       byDispatch.set(dispatchId, report.data)
     }
   }
-  return [...byDispatch.values()]
+  return [...byDispatch.values()].sort((left, right) => left.atMs - right.atMs)
 }
 
 export function activeObjectiveRevision(world: ObjectiveWorld): ObjectiveRevisionProjection | null {
@@ -327,7 +436,14 @@ export function decidePlannerAction(
   if (planner?.action.kind === 'dispatch-planner') {
     const disposition = objectiveAttemptDisposition(planner.attempt, ledger)
     const report = reports.find((candidate) => candidate.dispatchId === planner.attempt.dispatchId)
-    if (report?.outcome === 'succeeded' && report.reportPath !== null) {
+    const reportValidation = objectiveAttemptReportValidation(planner.attempt, ledger)
+    if (
+      report?.outcome === 'succeeded' &&
+      report.reportPath !== null &&
+      report.evidenceIssue === undefined &&
+      report.reportValidation === undefined &&
+      reportValidation === null
+    ) {
       const ingestion = latestObjectiveAttempt(
         attempts,
         (action) => action.kind === 'ingest-plan' && action.dispatchId === report.dispatchId

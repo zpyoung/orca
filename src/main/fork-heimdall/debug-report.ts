@@ -4,6 +4,7 @@ import type { WatcherWorker } from '../../shared/fork-heimdall/fleet-types'
 import type { DebugPointer } from '../../shared/fork-heimdall/kind-contract'
 import { getLatestEscalations } from '../../shared/fork-heimdall/ledger-queries'
 import type { LedgerEntry, WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
+import { parkedWorkerEscalationId } from '../../shared/fork-heimdall/park-escalation-id'
 import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
 import {
   TICK_TRACE_FULL_DETAIL_COUNT,
@@ -16,6 +17,10 @@ import type {
   WatcherStatus,
   WatcherTerminalSummary
 } from '../../shared/fork-heimdall/watcher-types'
+import {
+  WORKER_ESCALATION_CONSUMED_EVIDENCE_KIND,
+  workerEscalationConsumedMessageId
+} from '../../shared/fork-heimdall/worker-escalation-consumption'
 
 export const HEIMDALL_DEBUG_REPORT_SCHEMA_VERSION = 3
 export const DEBUG_REPORT_LEDGER_ENTRY_LIMIT = 200
@@ -32,7 +37,7 @@ export type WatcherRunnerDebugState = {
   leaseEpoch: number | null
   stopped: boolean
   suspended: boolean
-  controlPending: 'pause' | 'disarm' | null
+  controlPending: 'pause' | 'disarm' | 'delete' | 'set-concurrency' | null
   recovered: boolean
   forceFresh: boolean
   traceSequence: number
@@ -172,9 +177,33 @@ function persistedParkReason(
       null
     return messageId ? { kind: 'worker-question', messageId } : null
   }
+  if (park.escalationKind === 'park-worker-escalation') {
+    const escalationId = parkedWorkerEscalationId(enrollment.watcherId, park.escalationId)
+    const messageId = lastWorkerEscalationConsumedMessageId(ledger)
+    return escalationId && messageId ? { kind: 'worker-escalation', escalationId, messageId } : null
+  }
+  if (park.escalationKind === 'park-configuration-error') {
+    return { kind: 'configuration-error', reason: park.reason ?? 'configuration-error' }
+  }
   return park.escalationKind === 'park-coordinator-seat-lost'
     ? { kind: 'coordinator-seat-lost' }
     : null
+}
+
+function lastWorkerEscalationConsumedMessageId(ledger: WatcherLedger): string | null {
+  for (let index = ledger.entries.length - 1; index >= 0; index -= 1) {
+    const entry = ledger.entries[index]!
+    if (
+      entry.kind === 'evidence' &&
+      entry.evidenceKind === WORKER_ESCALATION_CONSUMED_EVIDENCE_KIND
+    ) {
+      const messageId = workerEscalationConsumedMessageId(entry.payload)
+      if (messageId) {
+        return messageId
+      }
+    }
+  }
+  return null
 }
 
 function decodeParkDetail(
@@ -199,6 +228,18 @@ export function durableWatcherBudget(
   terminalSummary: WatcherTerminalSummary | null = null
 ): BudgetState {
   return terminalSummary?.totals ?? deriveBudgetState(ledger, enrollment.budget)
+}
+
+/**
+ * `parkReason.kind` is a fine `reason` fallback for a kind whose ledger-persisted detail is the
+ * kind name itself (`budget`, `stop-predicate`, `worker-question`, `coordinator-seat-lost`), but
+ * `configuration-error` and `worker-escalation` both carry a real human sentence one step further
+ * down this chain (`automaticParkDetail`) — falling to `.kind` first hides it behind the bare enum
+ * token. Scoped to only these two rather than the whole union: the other four's current fallthrough
+ * ordering is relied on elsewhere and changing it is a separate, wider decision.
+ */
+function bareKindFallsBackHonestly(parkReason: WatcherParkReason): boolean {
+  return parkReason.kind !== 'configuration-error' && parkReason.kind !== 'worker-escalation'
 }
 
 export function dormantWatcherStatus(
@@ -265,7 +306,10 @@ export function dormantWatcherStatus(
       terminal?.reason ??
       (enrollment.paused
         ? 'paused'
-        : (parkReason?.kind ?? automaticParkDetail ?? attentionEscalation?.reason ?? null)),
+        : ((parkReason && bareKindFallsBackHonestly(parkReason) ? parkReason.kind : null) ??
+          automaticParkDetail ??
+          attentionEscalation?.reason ??
+          null)),
     parkReason,
     budget,
     startedAtMs: enrollment.createdAtMs,

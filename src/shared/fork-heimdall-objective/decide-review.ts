@@ -1,15 +1,22 @@
 import type { WatcherLedger } from '../fork-heimdall/ledger-types'
 import type { Snapshot } from '../fork-heimdall/snapshot'
-import { judgmentQualityReviewSubjects } from '../fork-heimdall/judgment/objective-judgment-policy'
+import { objectiveCheckFailedDeviation } from './deviation-context'
 import type { IngestVerdictAction, ObjectiveAction } from './objective-actions'
 import {
   decidePlannerAction,
   latestObjectiveAttempt,
   objectiveAttemptDisposition,
+  objectiveAttemptReportValidation,
   objectiveNoAction,
+  objectiveReportValidationDetail,
   type ObjectiveAttempt,
   type ObjectiveDecisionOutcome
 } from './decision-context'
+import {
+  decideBlockedReview,
+  decideJudgmentQualityReview,
+  type ReviewBlocked
+} from './decide-judgment-quality-review'
 import type {
   ObjectivePendingReport,
   ObjectiveReviewRole,
@@ -17,17 +24,18 @@ import type {
   ObjectiveWorld
 } from './detail-types'
 import { lineageBaseIdentity } from './landing-ladder'
-type ReviewDispatchAction = Extract<
-  ObjectiveAction,
-  { kind: 'dispatch-reviewer' | 'dispatch-integrator' }
->
+import {
+  objectiveReviewDispatchEvidenceKey,
+  objectiveVerdictIngestionEvidenceKey
+} from './review-identity'
 
 export function decideObjectiveChecks(
   snapshot: Snapshot<ObjectiveWorld>,
   ledger: WatcherLedger,
   attempts: readonly ObjectiveAttempt[],
   reports: readonly ObjectivePendingReport[],
-  revision: ObjectiveRevisionProjection
+  revision: ObjectiveRevisionProjection,
+  ownerConfigured = false
 ): ObjectiveDecisionOutcome | null {
   const criteria = snapshot.world.plan.nodes
     .filter((node) => node.revisionId === revision.id)
@@ -39,6 +47,17 @@ export function decideObjectiveChecks(
       criterion.lastCheck?.contentIdentity === lineageIdentity ? criterion.lastCheck : null
     if (current) {
       if (current.exitCode !== 0 || current.timedOut) {
+        if (ownerConfigured) {
+          return {
+            action: null,
+            deviation: objectiveCheckFailedDeviation({
+              criterionId: criterion.id,
+              command: criterion.checkCommand,
+              exitCode: current.exitCode,
+              timedOut: current.timedOut
+            })
+          }
+        }
         return decidePlannerAction(
           snapshot,
           ledger,
@@ -60,6 +79,18 @@ export function decideObjectiveChecks(
     if (check) {
       const disposition = objectiveAttemptDisposition(check.attempt, ledger)
       if (disposition === 'not-landed') {
+        if (ownerConfigured) {
+          return {
+            action: null,
+            deviation: objectiveCheckFailedDeviation({
+              criterionId: criterion.id,
+              command: criterion.checkCommand,
+              exitCode: null,
+              timedOut: false,
+              detail: 'the check attempt itself failed to land'
+            })
+          }
+        }
         return decidePlannerAction(
           snapshot,
           ledger,
@@ -72,6 +103,18 @@ export function decideObjectiveChecks(
       return objectiveNoAction('checks', 'check-in-flight', criterion.id)
     }
     if (!criterion.checkCommand) {
+      if (ownerConfigured) {
+        return {
+          action: null,
+          deviation: objectiveCheckFailedDeviation({
+            criterionId: criterion.id,
+            command: null,
+            exitCode: null,
+            timedOut: false,
+            detail: 'criterion has no check command configured'
+          })
+        }
+      }
       return decidePlannerAction(
         snapshot,
         ledger,
@@ -96,19 +139,25 @@ export function decideObjectiveChecks(
   return null
 }
 
-function reportDispatchAction(
+type ReviewDispatchAttempt = {
+  attempt: ObjectiveAttempt['attempt']
+  action: Extract<ObjectiveAction, { kind: 'dispatch-reviewer' | 'dispatch-integrator' }>
+}
+
+function reportDispatchAttempt(
   attempts: readonly ObjectiveAttempt[],
   report: ObjectivePendingReport
-): ReviewDispatchAction | null {
+): ReviewDispatchAttempt | null {
   for (let index = attempts.length - 1; index >= 0; index -= 1) {
-    const { action, attempt } = attempts[index]
+    const candidate = attempts[index]
+    const { action, attempt } = candidate
     if (
       attempt.dispatchId === report.dispatchId &&
+      (action.kind === 'dispatch-reviewer' || action.kind === 'dispatch-integrator') &&
       action.kind === report.actionKind &&
-      action.contentIdentity === report.dispatchedContentIdentity &&
-      (action.kind === 'dispatch-reviewer' || action.kind === 'dispatch-integrator')
+      action.contentIdentity === report.dispatchedContentIdentity
     ) {
-      return action
+      return { action, attempt }
     }
   }
   return null
@@ -127,115 +176,14 @@ function pendingRoleReport(
     if (report.actionKind !== actionKind || alreadyIngested.has(report.dispatchId)) {
       continue
     }
-    const dispatch = reportDispatchAction(attempts, report)
-    if (dispatch?.revisionId === revision.id) {
+    const dispatch = reportDispatchAttempt(attempts, report)
+    if (
+      dispatch?.action.revisionId === revision.id &&
+      dispatch.action.evidenceKey ===
+        objectiveReviewDispatchEvidenceKey(revision, dispatch.action.contentIdentity)
+    ) {
       return report
     }
-  }
-  return null
-}
-function decideJudgmentQualityReview(
-  snapshot: Snapshot<ObjectiveWorld>,
-  ledger: WatcherLedger,
-  attempts: readonly ObjectiveAttempt[],
-  reports: readonly ObjectivePendingReport[],
-  revision: ObjectiveRevisionProjection
-): ObjectiveDecisionOutcome | null {
-  const verdictByDispatchId = new Map(
-    snapshot.world.plan.verdicts.map((candidate) => [candidate.dispatchId, candidate])
-  )
-  for (const subjectId of judgmentQualityReviewSubjects(snapshot.world)) {
-    const sourceAttempt = attempts.find(
-      (candidate) =>
-        candidate.attempt.dispatchId === subjectId &&
-        (candidate.action.kind === 'dispatch-node' ||
-          candidate.action.kind === 'dispatch-reviewer' ||
-          candidate.action.kind === 'dispatch-integrator') &&
-        candidate.action.revisionId === revision.id
-    )
-    if (!sourceAttempt) {
-      continue
-    }
-    const evidenceKey = `${sourceAttempt.action.evidenceKey}:judgment-review:${sourceAttempt.action.contentIdentity}`
-    const review = latestObjectiveAttempt(
-      attempts,
-      (action) =>
-        action.kind === 'dispatch-reviewer' &&
-        action.revisionId === revision.id &&
-        action.judgmentReviewOf === subjectId
-    )
-    if (!review) {
-      return {
-        action: {
-          kind: 'dispatch-reviewer',
-          capability: 'review',
-          visibility: 'local',
-          contentIdentity: snapshot.contentIdentity,
-          evidenceKey,
-          revisionId: revision.id,
-          judgmentReviewOf: subjectId
-        }
-      }
-    }
-    const judgmentVerdict =
-      review.attempt.dispatchId === undefined
-        ? undefined
-        : verdictByDispatchId.get(review.attempt.dispatchId)
-    if (judgmentVerdict?.verdict === 'block') {
-      return decidePlannerAction(
-        snapshot,
-        ledger,
-        attempts,
-        reports,
-        'replan-after-block',
-        revision.number
-      )
-    }
-    if (judgmentVerdict) {
-      continue
-    }
-    const disposition = objectiveAttemptDisposition(review.attempt, ledger)
-    const report = reports.find((candidate) => candidate.dispatchId === review.attempt.dispatchId)
-    if (report?.outcome === 'succeeded' && report.reportPath !== null) {
-      const ingestion = latestObjectiveAttempt(
-        attempts,
-        (action) => action.kind === 'ingest-verdict' && action.dispatchId === report.dispatchId
-      )
-      if (!ingestion) {
-        return {
-          action: {
-            kind: 'ingest-verdict',
-            capability: 'review',
-            visibility: 'local',
-            recovery: 'replay-safe',
-            contentIdentity: snapshot.contentIdentity,
-            evidenceKey: report.dispatchId,
-            revisionId: revision.id,
-            role: 'reviewer',
-            dispatchId: report.dispatchId,
-            reportPath: report.reportPath,
-            reviewedContentIdentity: report.dispatchedContentIdentity
-          }
-        }
-      }
-      const ingestionDisposition = objectiveAttemptDisposition(ingestion.attempt, ledger)
-      if (ingestionDisposition === 'in-flight' || ingestionDisposition === 'indeterminate') {
-        return objectiveNoAction('review', 'projection-refresh-pending', report.dispatchId)
-      }
-      continue
-    }
-    if (report && (report.outcome === 'failed' || report.reportPath === null)) {
-      continue
-    }
-    if (
-      disposition === 'in-flight' ||
-      disposition === 'indeterminate' ||
-      disposition === 'landed'
-    ) {
-      return objectiveNoAction('review', 'review-in-flight', evidenceKey)
-    }
-    // One failed disagreement review consumes this bounded review opportunity. It never rejects
-    // the successful worker claim and never spawns an unbounded retry loop.
   }
   return null
 }
@@ -247,8 +195,9 @@ function decideReviewRole(
   reports: readonly ObjectivePendingReport[],
   revision: ObjectiveRevisionProjection,
   role: ObjectiveReviewRole
-): ObjectiveDecisionOutcome | 'approved' | 'blocked' {
+): ObjectiveDecisionOutcome | 'approved' | ReviewBlocked {
   const lineageIdentity = lineageBaseIdentity(snapshot.world.plan.landing, snapshot.contentIdentity)
+  const dispatchEvidenceKey = objectiveReviewDispatchEvidenceKey(revision, snapshot.contentIdentity)
   const verdict = snapshot.world.plan.verdicts
     .filter(
       (candidate) =>
@@ -258,23 +207,62 @@ function decideReviewRole(
     )
     .sort((left, right) => right.atMs - left.atMs)[0]
   if (verdict) {
-    return verdict.verdict === 'approve' ? 'approved' : 'blocked'
+    return verdict.verdict === 'approve'
+      ? 'approved'
+      : { status: 'blocked', dispatchId: verdict.dispatchId, summary: null }
   }
 
   const pending = pendingRoleReport(snapshot.world, attempts, reports, revision, role)
   if (pending) {
     const report = pending
-    if (report.outcome === 'failed' || report.reportPath === null) {
-      return 'blocked'
+    const dispatch = reportDispatchAttempt(attempts, report)
+    const dispatchValidation =
+      report.reportValidation ??
+      (dispatch === null ? null : objectiveAttemptReportValidation(dispatch.attempt, ledger))
+    if (report.evidenceIssue === 'files-modified-malformed') {
+      return {
+        status: 'blocked',
+        dispatchId: report.dispatchId,
+        summary: report.body ?? null,
+        detail:
+          `report rejected: evidence-malformed; role=${role}; hostVerifiable=true\n` +
+          'Worker completion filesModified must be an array of workspace-relative paths'
+      }
     }
+    if (dispatchValidation) {
+      return {
+        status: 'blocked',
+        dispatchId: report.dispatchId,
+        summary: report.body ?? null,
+        detail: objectiveReportValidationDetail(dispatchValidation)
+      }
+    }
+    if (report.outcome === 'failed' || report.reportPath === null) {
+      return { status: 'blocked', dispatchId: report.dispatchId, summary: report.body ?? null }
+    }
+    const ingestionEvidenceKey = objectiveVerdictIngestionEvidenceKey(
+      revision,
+      role,
+      report.dispatchId,
+      report.dispatchedContentIdentity
+    )
     const ingestion = latestObjectiveAttempt(
       attempts,
-      (action) => action.kind === 'ingest-verdict' && action.dispatchId === report.dispatchId
+      (action) =>
+        action.kind === 'ingest-verdict' &&
+        action.dispatchId === report.dispatchId &&
+        action.evidenceKey === ingestionEvidenceKey
     )
     if (ingestion) {
       const disposition = objectiveAttemptDisposition(ingestion.attempt, ledger)
       if (disposition === 'not-landed') {
-        return 'blocked'
+        const validation = objectiveAttemptReportValidation(ingestion.attempt, ledger)
+        return {
+          status: 'blocked',
+          dispatchId: report.dispatchId,
+          summary: report.body ?? null,
+          ...(validation === null ? {} : { detail: objectiveReportValidationDetail(validation) })
+        }
       }
       return objectiveNoAction('review', 'projection-refresh-pending', report.dispatchId)
     }
@@ -284,7 +272,7 @@ function decideReviewRole(
       visibility: 'local',
       recovery: 'replay-safe',
       contentIdentity: snapshot.contentIdentity,
-      evidenceKey: report.dispatchId,
+      evidenceKey: ingestionEvidenceKey,
       revisionId: revision.id,
       role,
       dispatchId: report.dispatchId,
@@ -304,6 +292,8 @@ function decideReviewRole(
     if (
       candidate.action.kind === actionKind &&
       candidate.action.revisionId === revision.id &&
+      candidate.action.evidenceKey ===
+        objectiveReviewDispatchEvidenceKey(revision, candidate.action.contentIdentity) &&
       (candidate.attempt.dispatchId === undefined ||
         !ingestedDispatchIds.has(candidate.attempt.dispatchId))
     ) {
@@ -314,7 +304,13 @@ function decideReviewRole(
   if (dispatch) {
     const disposition = objectiveAttemptDisposition(dispatch.attempt, ledger)
     if (disposition === 'not-landed' || disposition === 'landed') {
-      return 'blocked'
+      const validation = objectiveAttemptReportValidation(dispatch.attempt, ledger)
+      return {
+        status: 'blocked',
+        dispatchId: dispatch.attempt.dispatchId ?? dispatch.action.evidenceKey,
+        summary: null,
+        ...(validation === null ? {} : { detail: objectiveReportValidationDetail(validation) })
+      }
     }
     return objectiveNoAction('review', 'review-in-flight', role)
   }
@@ -325,10 +321,16 @@ function decideReviewRole(
       capability: 'review',
       visibility: 'local',
       contentIdentity: snapshot.contentIdentity,
-      evidenceKey: `${revision.id}:review:${snapshot.contentIdentity}`,
+      evidenceKey: dispatchEvidenceKey,
       revisionId: revision.id
     }
   }
+}
+
+function isBlocked(
+  outcome: ObjectiveDecisionOutcome | 'approved' | ReviewBlocked
+): outcome is ReviewBlocked {
+  return typeof outcome === 'object' && 'status' in outcome && outcome.status === 'blocked'
 }
 
 export function decideObjectiveReview(
@@ -336,40 +338,59 @@ export function decideObjectiveReview(
   ledger: WatcherLedger,
   attempts: readonly ObjectiveAttempt[],
   reports: readonly ObjectivePendingReport[],
-  revision: ObjectiveRevisionProjection
+  revision: ObjectiveRevisionProjection,
+  ownerConfigured = false
 ): ObjectiveDecisionOutcome | null {
   if (snapshot.world.contract.tier === 'express') {
-    return decideJudgmentQualityReview(snapshot, ledger, attempts, reports, revision)
-  }
-  const reviewer = decideReviewRole(snapshot, ledger, attempts, reports, revision, 'reviewer')
-  if (reviewer === 'blocked') {
-    return decidePlannerAction(
+    return decideJudgmentQualityReview(
       snapshot,
       ledger,
       attempts,
       reports,
-      'replan-after-block',
-      revision.number
+      revision,
+      ownerConfigured
+    )
+  }
+  const reviewer = decideReviewRole(snapshot, ledger, attempts, reports, revision, 'reviewer')
+  if (isBlocked(reviewer)) {
+    return decideBlockedReview(
+      snapshot,
+      ledger,
+      attempts,
+      reports,
+      revision,
+      'reviewer',
+      reviewer,
+      ownerConfigured
     )
   }
   if (reviewer !== 'approved') {
     return reviewer
   }
   if (snapshot.world.contract.tier === 'standard') {
-    return decideJudgmentQualityReview(snapshot, ledger, attempts, reports, revision)
-  }
-  const integrator = decideReviewRole(snapshot, ledger, attempts, reports, revision, 'integrator')
-  if (integrator === 'blocked') {
-    return decidePlannerAction(
+    return decideJudgmentQualityReview(
       snapshot,
       ledger,
       attempts,
       reports,
-      'replan-after-block',
-      revision.number
+      revision,
+      ownerConfigured
+    )
+  }
+  const integrator = decideReviewRole(snapshot, ledger, attempts, reports, revision, 'integrator')
+  if (isBlocked(integrator)) {
+    return decideBlockedReview(
+      snapshot,
+      ledger,
+      attempts,
+      reports,
+      revision,
+      'integrator',
+      integrator,
+      ownerConfigured
     )
   }
   return integrator === 'approved'
-    ? decideJudgmentQualityReview(snapshot, ledger, attempts, reports, revision)
+    ? decideJudgmentQualityReview(snapshot, ledger, attempts, reports, revision, ownerConfigured)
     : integrator
 }

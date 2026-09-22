@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { Snapshot } from './snapshot'
 import type { WatcherLedger } from './ledger-types'
+import type { Deviation } from './owner/deviation'
 
 export const StopDispositionSchema = z.enum(['park', 'terminal'])
 export type StopDisposition = z.infer<typeof StopDispositionSchema>
@@ -16,11 +17,23 @@ export const StopVerdictSchema = z.discriminatedUnion('stop', [
     .strict()
 ])
 export type StopVerdict = z.infer<typeof StopVerdictSchema>
+export type FiredStopVerdict = Extract<StopVerdict, { stop: true }>
 
 export type StopPredicate<TWorld> = {
   id: string
   disposition?: StopDisposition
   evaluate(snapshot: Snapshot<TWorld>, ledger: WatcherLedger): StopVerdict
+  /**
+   * Opts a `park`-disposition predicate into owner routing: when the firing watcher has an owner
+   * configured, this builds the deviation it is woken with instead of parking. Never consulted for
+   * a `terminal` disposition. A predicate that omits this always parks, exactly as before this
+   * existed — the kernel only calls it when a kind explicitly supplies it.
+   */
+  deviationForFiring?(
+    verdict: FiredStopVerdict,
+    snapshot: Snapshot<TWorld>,
+    ledger: WatcherLedger
+  ): Deviation
 }
 
 export type FiredStopPredicate = {
@@ -28,6 +41,8 @@ export type FiredStopPredicate = {
   disposition: StopDisposition
   reason: string
   detail?: string
+  /** Present only when the firing predicate supplied `deviationForFiring`. */
+  deviation?: Deviation
 }
 
 /** Returns the first registered fatal predicate, preserving kind declaration order. */
@@ -43,7 +58,10 @@ export function evaluateStopPredicates<TWorld>(
         predicateId: predicate.id,
         disposition: predicate.disposition ?? 'park',
         reason: verdict.reason,
-        ...(verdict.detail === undefined ? {} : { detail: verdict.detail })
+        ...(verdict.detail === undefined ? {} : { detail: verdict.detail }),
+        ...(predicate.deviationForFiring
+          ? { deviation: predicate.deviationForFiring(verdict, snapshot, ledger) }
+          : {})
       }
     }
   }

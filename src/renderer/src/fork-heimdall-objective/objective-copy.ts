@@ -13,6 +13,7 @@ import type {
   ObjectiveRevisionStatus,
   ObjectiveVerdict
 } from '../../../shared/fork-heimdall-objective/detail-types'
+import type { ObjectiveDispatchState } from '../../../shared/fork-heimdall-objective/parallel-types'
 import type { CapabilityMode } from '../../../shared/fork-heimdall/watcher-types'
 
 export function objectiveTierLabel(value: ObjectiveTier): string {
@@ -118,6 +119,25 @@ export function objectiveNodeStateLabel(value: ObjectiveNodeState): string {
       return translate('fork.heimdallObjective.value.node.failed', 'Failed')
     case 'replanned':
       return translate('fork.heimdallObjective.value.node.replanned', 'Replanned')
+  }
+}
+
+export function objectiveTrainStateLabel(value: ObjectiveDispatchState): string {
+  switch (value) {
+    case 'running':
+      return translate('fork.heimdallObjective.value.train.running', 'Running')
+    case 'waiting-to-apply':
+      return translate('fork.heimdallObjective.value.train.waitingToApply', 'Waiting to apply')
+    case 'applying':
+      return translate('fork.heimdallObjective.value.train.applying', 'Applying')
+    case 'resolving-conflict':
+      return translate('fork.heimdallObjective.value.train.resolvingConflict', 'Resolving conflict')
+    case 'applied':
+      return translate('fork.heimdallObjective.value.train.applied', 'Applied')
+    case 'failed':
+      return translate('fork.heimdallObjective.value.train.failed', 'Failed')
+    case 'discarded':
+      return translate('fork.heimdallObjective.value.train.discarded', 'Discarded')
   }
 }
 

@@ -121,7 +121,6 @@ type FakeDatabase = {
   listWorkerTerminalResources: Mock
   listFederatedDispatchesByIds: Mock
   getMutationReceipt: Mock
-  getMessageById: Mock
   getQuestion: Mock
   answerQuestion: Mock
 }
@@ -149,7 +148,6 @@ function fakeDb(id: string): FakeDatabase {
     listWorkerTerminalResources: vi.fn(() => []),
     listFederatedDispatchesByIds: vi.fn(() => []),
     getMutationReceipt: vi.fn(),
-    getMessageById: vi.fn(),
     getQuestion: vi.fn(),
     answerQuestion: vi.fn(() => ({
       message: { id: 'message-answer' },

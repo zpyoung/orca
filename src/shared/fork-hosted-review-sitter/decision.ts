@@ -1,10 +1,13 @@
 import type { DecisionOutcome } from '../fork-heimdall/kind-contract'
 import type { WatcherLedger } from '../fork-heimdall/ledger-types'
+import type { Deviation } from '../fork-heimdall/owner/deviation'
 import type { Freshness } from '../fork-heimdall/snapshot'
 import {
   getCompletedHostedReviewAttempt,
   getHostedReviewAttemptDisposition,
-  getLatestHostedReviewAttempts
+  getHostedReviewAttemptDispatchId,
+  getLatestHostedReviewAttempts,
+  hasInFlightHostedReviewAttemptMatching
 } from './ledger-adapter'
 import {
   buildMergeAction,
@@ -26,6 +29,7 @@ import type {
   HostedReviewPreparedCommit,
   HostedReviewReadinessBlocker,
   HostedReviewSitterAction,
+  HostedReviewSitterActionKind,
   HostedReviewSitterDefinition,
   HostedReviewSnapshot,
   HostedReviewWorldSnapshot,
@@ -33,6 +37,24 @@ import type {
 } from './types'
 
 const UPDATE_READY_BLOCKERS: readonly HostedReviewReadinessBlocker[] = ['behind']
+
+function deviated(deviation: Deviation): { action: null; deviation: Deviation } {
+  return { action: null, deviation }
+}
+
+/** A step the sitter dispatched or published to never settled cleanly; the owner decides what next. */
+function landingFailedDeviation(
+  rung: HostedReviewSitterActionKind,
+  reason: string,
+  contentIdentity: string
+): Deviation {
+  return { kind: 'landing-failed', rung, reason, contentIdentity }
+}
+
+/** A worker the sitter dispatched to prepare a fix never produced a trustworthy outcome. */
+function workerUnverifiableDeviation(dispatchId: string | null, reason: string): Deviation {
+  return { kind: 'worker-unverifiable', dispatchId, reason }
+}
 
 export type HostedReviewSitterNoActionReason =
   | 'review-not-open'
@@ -53,6 +75,7 @@ export type HostedReviewSitterNoActionReason =
   | 'merge-gates-unsatisfied'
   | 'queue-already-enqueued'
   | 'merge-already-attempted'
+  | 'owner-retry-in-flight'
 
 export type HostedReviewSitterDecisionPhase = 'conflicts' | 'fix-checks' | 'update-branch'
 
@@ -66,6 +89,7 @@ export type HostedReviewSitterConsideredPhase = {
 type PhaseOutcome =
   | { action: HostedReviewSitterAction }
   | { action: null; reason: HostedReviewSitterNoActionReason; detail?: string }
+  | { action: null; deviation: Deviation }
 
 export type HostedReviewSitterDecisionOutcome = DecisionOutcome<HostedReviewSitterAction>
 
@@ -158,7 +182,23 @@ function desiredFixAction(
     if (rerunDisposition === 'retryable-failure') {
       return { action: buildRerunAction(review, group) }
     }
-    if (rerunDisposition === 'unresolved' || rerunEntry.action.kind !== 'rerun-check') {
+    if (rerunDisposition === 'unresolved') {
+      if (
+        hasInFlightHostedReviewAttemptMatching(
+          ledger,
+          (action) =>
+            action.kind === 'rerun-check' &&
+            action.headSha === review.headSha &&
+            action.checkKey === group.checkKey
+        )
+      ) {
+        return declined('owner-retry-in-flight')
+      }
+      return deviated(
+        landingFailedDeviation('rerun-check', 'rerun disposition never settled', review.headSha)
+      )
+    }
+    if (rerunEntry.action.kind !== 'rerun-check') {
       return declined('rerun-unresolved')
     }
     const freshFailures = freshFailedChecksAfterRerun(review, group, rerunEntry.action)
@@ -175,6 +215,25 @@ function desiredFixAction(
   if (disposition === 'unseen' || disposition === 'retryable-failure') {
     return { action: preparation }
   }
+  if (disposition === 'unresolved') {
+    if (
+      hasInFlightHostedReviewAttemptMatching(
+        ledger,
+        (action) =>
+          action.kind === 'prepare-fix' &&
+          action.headSha === review.headSha &&
+          action.checkKey === group.checkKey
+      )
+    ) {
+      return declined('owner-retry-in-flight')
+    }
+    return deviated(
+      workerUnverifiableDeviation(
+        getHostedReviewAttemptDispatchId(ledger, preparation),
+        'prepare-fix dispatch never produced a verifiable outcome'
+      )
+    )
+  }
   if (disposition !== 'completed') {
     return declined('fix-already-attempted', disposition)
   }
@@ -185,11 +244,21 @@ function desiredFixAction(
   }
   const publication = buildPublishFixAction(preparation, completed, preparedCommit)
   if (!publication) {
-    return declined('fix-preparation-unusable')
+    return deviated(
+      workerUnverifiableDeviation(
+        completed.dispatchId ?? null,
+        'completed prepare-fix produced no usable prepared commit'
+      )
+    )
   }
   const publicationDisposition = getHostedReviewAttemptDisposition(ledger, publication)
   if (publicationDisposition === 'unseen' || publicationDisposition === 'retryable-failure') {
     return { action: publication }
+  }
+  if (publicationDisposition === 'unresolved') {
+    return deviated(
+      landingFailedDeviation('publish-fix', 'publish disposition never settled', review.headSha)
+    )
   }
   return declined('fix-already-published', publicationDisposition)
 }
@@ -204,6 +273,23 @@ function desiredConflictAction(
   if (disposition === 'unseen' || disposition === 'retryable-failure') {
     return { action: preparation }
   }
+  if (disposition === 'unresolved') {
+    if (
+      hasInFlightHostedReviewAttemptMatching(
+        ledger,
+        (action) =>
+          action.kind === 'prepare-conflict-resolution' && action.headSha === review.headSha
+      )
+    ) {
+      return declined('owner-retry-in-flight')
+    }
+    return deviated(
+      workerUnverifiableDeviation(
+        getHostedReviewAttemptDispatchId(ledger, preparation),
+        'prepare-conflict-resolution dispatch never produced a verifiable outcome'
+      )
+    )
+  }
   if (disposition !== 'completed') {
     return declined('conflict-resolution-already-attempted', disposition)
   }
@@ -214,11 +300,25 @@ function desiredConflictAction(
   }
   const publication = buildPublishConflictAction(preparation, completed, preparedCommit)
   if (!publication) {
-    return declined('conflict-preparation-unusable')
+    return deviated(
+      workerUnverifiableDeviation(
+        completed.dispatchId ?? null,
+        'completed prepare-conflict-resolution produced no usable prepared commit'
+      )
+    )
   }
   const publicationDisposition = getHostedReviewAttemptDisposition(ledger, publication)
   if (publicationDisposition === 'unseen' || publicationDisposition === 'retryable-failure') {
     return { action: publication }
+  }
+  if (publicationDisposition === 'unresolved') {
+    return deviated(
+      landingFailedDeviation(
+        'publish-conflict-resolution',
+        'publish disposition never settled',
+        review.headSha
+      )
+    )
   }
   return declined('conflict-resolution-already-published', publicationDisposition)
 }
@@ -262,11 +362,14 @@ export function explainDesiredAction(
   context: HostedReviewDecisionContext
 ): HostedReviewSitterDecisionOutcome {
   const considered: HostedReviewSitterConsideredPhase[] = []
-  const fellThrough = (outcome: {
-    action: null
-    reason: HostedReviewSitterNoActionReason
-    detail?: string
-  }): HostedReviewSitterDecisionOutcome => ({ ...outcome, considered })
+  const fellThrough = (
+    outcome:
+      | { action: null; reason: HostedReviewSitterNoActionReason; detail?: string }
+      | { action: null; deviation: Deviation }
+  ): HostedReviewSitterDecisionOutcome =>
+    'deviation' in outcome
+      ? { action: null, deviation: outcome.deviation }
+      : { ...outcome, considered }
 
   if (review.lifecycle !== 'open') {
     return fellThrough(declined('review-not-open', review.lifecycle))
@@ -296,6 +399,9 @@ export function explainDesiredAction(
       if (outcome.action) {
         return outcome
       }
+      if ('deviation' in outcome) {
+        return fellThrough(outcome)
+      }
       considered.push({ phase: 'fix-checks', reason: outcome.reason, detail: outcome.detail })
     }
   }
@@ -315,10 +421,29 @@ export function explainDesiredAction(
         if (disposition === 'unseen' || disposition === 'retryable-failure') {
           return { action }
         }
+        if (
+          disposition === 'unresolved' &&
+          !hasInFlightHostedReviewAttemptMatching(
+            ledger,
+            (candidate) =>
+              candidate.kind === 'update-branch' && candidate.headSha === review.headSha
+          )
+        ) {
+          return fellThrough(
+            deviated(
+              landingFailedDeviation(
+                'update-branch',
+                'update disposition never settled',
+                review.headSha
+              )
+            )
+          )
+        }
         considered.push({
           phase: 'update-branch',
-          reason: 'update-already-attempted',
-          detail: disposition
+          reason:
+            disposition === 'unresolved' ? 'owner-retry-in-flight' : 'update-already-attempted',
+          detail: disposition === 'unresolved' ? undefined : disposition
         })
       }
     }
@@ -326,6 +451,13 @@ export function explainDesiredAction(
 
   const unsatisfied = unsatisfiedMergeGates(review, sitter, checksGreen, context.freshness)
   if (unsatisfied.length > 0) {
+    if (review.queue.required && review.queue.membership === 'ejected') {
+      return fellThrough(
+        deviated(
+          landingFailedDeviation('enqueue', 'merge queue ejected the review', review.headSha)
+        )
+      )
+    }
     return fellThrough(declined('merge-gates-unsatisfied', unsatisfied.join(',')))
   }
 
@@ -336,6 +468,17 @@ export function explainDesiredAction(
   const disposition = getHostedReviewAttemptDisposition(ledger, action)
   if (disposition === 'unseen' || disposition === 'retryable-failure') {
     return { action }
+  }
+  if (disposition === 'unresolved') {
+    return fellThrough(
+      deviated(
+        landingFailedDeviation(
+          action.kind,
+          `${action.kind} disposition never settled`,
+          review.headSha
+        )
+      )
+    )
   }
   return fellThrough(declined('merge-already-attempted', disposition))
 }

@@ -446,7 +446,7 @@ describe('bounded judgment service', () => {
     }
     const first = await new JudgmentService(dependencies).evaluate(input)
     expect(first.status).toBe('unavailable')
-    expect(first.reason).toContain('request exceeds transport limits')
+    expect(first.reason).toContain('request-size')
     expect(calls).toBe(0)
 
     const replay = await new JudgmentService(dependencies).evaluate(input)

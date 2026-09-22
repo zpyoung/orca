@@ -1,36 +1,47 @@
 import type { ActionOutcome } from '../../shared/fork-heimdall/effect-certainty'
 import { makeAttemptFingerprint } from '../../shared/fork-heimdall/attempt-fingerprint'
-import type { ExecuteContext } from '../../shared/fork-heimdall/kind-contract'
+import type { DispatchResult, ExecuteContext } from '../../shared/fork-heimdall/kind-contract'
 import {
   judgmentRoutedAgent,
   objectiveRoutingSubject
 } from '../../shared/fork-heimdall/judgment/objective-judgment-policy'
 import {
   activeObjectiveRevision,
-  objectiveAttemptFailureClass,
-  objectiveAttempts,
-  projectObjectiveReports,
-  requireObjectiveOriginalDispatchFingerprint,
-  type ObjectiveAttempt
+  requireObjectiveOriginalDispatchFingerprint
 } from '../../shared/fork-heimdall-objective/decision-context'
 import type { ObjectiveAction } from '../../shared/fork-heimdall-objective/objective-actions'
-import type { ObjectivePlan } from '../../shared/fork-heimdall-objective/plan-schema'
+import type { ObjectiveDispatchRecord } from '../../shared/fork-heimdall-objective/parallel-types'
+import {
+  ObjectivePlanTaskSchema,
+  type ImplementerReport,
+  type ObjectivePlan,
+  type ObjectivePlanTask
+} from '../../shared/fork-heimdall-objective/plan-schema'
 import type {
   ObjectiveNodeState,
-  ObjectivePendingReport,
   ObjectiveWorld
 } from '../../shared/fork-heimdall-objective/detail-types'
 import { deriveObjectiveBudgetBucket } from '../../shared/fork-heimdall-objective/pacing'
 import type { Store } from '../persistence'
+import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import {
   buildObjectiveRolePrompt,
   resolveObjectiveRoleAgent,
+  type ObjectiveConflictContext,
   type ObjectiveFailureContext
 } from './role-prompts'
 import { captureObjectiveWorkspaceBaseline } from './observed-workspace-changes'
-import { issueObjectiveReportPath, readObjectiveRoleReport } from './report-ingestion'
+import { issueObjectiveReportPath } from './report-ingestion'
 import type { ObjectiveStore } from './objective-store'
-import type { ObjectiveSnapshotBinding } from './execution-context'
+import { objectiveResultDigest, type ObjectiveSnapshotBinding } from './execution-context'
+import {
+  ObjectiveEnrolledWorkspaceDirtyError,
+  prepareObjectiveDispatchWorkspace,
+  type PreparedObjectiveDispatchWorkspace
+} from './dispatch-worktree'
+import { resolveObjectiveSerialLaneTerminal } from './dispatch-session'
+import { deriveObjectiveFailureContext } from './dispatch-failure-context'
+export { deriveObjectiveFailureContext } from './dispatch-failure-context'
 
 type DispatchAction = Extract<ObjectiveAction, { kind: `dispatch-${string}` }>
 
@@ -39,124 +50,6 @@ type DispatchSpec = {
   spec: string
   taskKey?: string
   deps?: string[]
-}
-
-const OBJECTIVE_FAILURE_NARRATIVE_MAX_CHARS = 4_096
-const OBJECTIVE_FAILURE_CRITERIA_MAX_COUNT = 8
-const OBJECTIVE_FAILURE_CRITERION_NOTE_MAX_CHARS = 512
-
-function truncatedForPrompt(value: string, maxChars: number): string {
-  return value.length > maxChars ? `${value.slice(0, maxChars - 1)}…` : value
-}
-
-function latestFailedDispatchNode(
-  reports: readonly ObjectivePendingReport[],
-  attempts: readonly ObjectiveAttempt[],
-  activeRevisionId: string
-): { report: ObjectivePendingReport; attempt: ObjectiveAttempt } | null {
-  let latest: { report: ObjectivePendingReport; attempt: ObjectiveAttempt } | null = null
-  for (const report of reports) {
-    if (report.actionKind !== 'dispatch-node' || report.outcome !== 'failed') {
-      continue
-    }
-    const matched = attempts.find((candidate) => candidate.attempt.dispatchId === report.dispatchId)
-    if (
-      !matched ||
-      matched.action.kind !== 'dispatch-node' ||
-      matched.action.revisionId !== activeRevisionId
-    ) {
-      continue
-    }
-    if (!latest || report.atMs > latest.report.atMs) {
-      latest = { report, attempt: matched }
-    }
-  }
-  return latest
-}
-
-async function failingCriteriaFromReport(args: {
-  binding: ObjectiveSnapshotBinding
-  objectiveStore: ObjectiveStore
-  revisionId: string
-  taskKey: string
-  attemptFingerprint: string
-  reportPath: string | null
-}): Promise<string[]> {
-  if (args.reportPath === null) {
-    return []
-  }
-  try {
-    const read = await readObjectiveRoleReport({
-      target: args.binding.target,
-      attemptFingerprint: args.attemptFingerprint,
-      mailboxReportPath: args.reportPath,
-      role: 'implementer',
-      taskKey: args.taskKey
-    })
-    if (!read.ok) {
-      return []
-    }
-    const task = args.objectiveStore.getTask(args.revisionId, args.taskKey)
-    if (!task) {
-      return []
-    }
-    return read.report.criteriaSelfAssessment
-      .filter((assessment) => assessment.result === 'fail')
-      .slice(0, OBJECTIVE_FAILURE_CRITERIA_MAX_COUNT)
-      .map((assessment) => {
-        const body =
-          task.criteria[assessment.criterionIndex]?.body ?? `criterion ${assessment.criterionIndex}`
-        return `${body} — ${truncatedForPrompt(assessment.note, OBJECTIVE_FAILURE_CRITERION_NOTE_MAX_CHARS)}`
-      })
-  } catch {
-    return []
-  }
-}
-
-/** Re-derived from the ledger on every dispatch; never persisted, so it can't go stale against it. */
-export async function deriveObjectiveFailureContext(args: {
-  action: Extract<ObjectiveAction, { kind: 'dispatch-planner' }>
-  binding: ObjectiveSnapshotBinding
-  ledger: ExecuteContext<ObjectiveWorld>['ledger']
-  objectiveStore: ObjectiveStore
-  activeRevisionId: string | undefined
-}): Promise<ObjectiveFailureContext | undefined> {
-  if (args.action.reason !== 'replan-after-failure' || args.activeRevisionId === undefined) {
-    return undefined
-  }
-  try {
-    const failed = latestFailedDispatchNode(
-      projectObjectiveReports(args.ledger),
-      objectiveAttempts(args.ledger),
-      args.activeRevisionId
-    )
-    if (!failed || failed.attempt.action.kind !== 'dispatch-node') {
-      return undefined
-    }
-    const failureClass = objectiveAttemptFailureClass(failed.attempt.attempt, args.ledger)
-    const narrative = truncatedForPrompt(
-      [failed.report.subject, failed.report.body]
-        .filter((part): part is string => Boolean(part))
-        .join('\n') || '(worker reported no narrative)',
-      OBJECTIVE_FAILURE_NARRATIVE_MAX_CHARS
-    )
-    const failingCriteria = await failingCriteriaFromReport({
-      binding: args.binding,
-      objectiveStore: args.objectiveStore,
-      revisionId: args.activeRevisionId,
-      taskKey: failed.attempt.action.taskKey,
-      attemptFingerprint: failed.attempt.attempt.fingerprint,
-      reportPath: failed.report.reportPath
-    })
-    return {
-      taskKey: failed.attempt.action.taskKey,
-      ...(failureClass === undefined ? {} : { failureClass }),
-      narrative,
-      failingCriteria
-    }
-  } catch {
-    return undefined
-  }
 }
 
 function derivePlanProgress(
@@ -208,9 +101,19 @@ function buildDispatchSpec(args: {
   reportPath: string
   failureContext?: ObjectiveFailureContext
   planProgress?: readonly { taskKey: string; state: ObjectiveNodeState }[]
+  conflictContext?: ObjectiveConflictContext
+  dispatchedNode?: ObjectivePlanTask
 }): DispatchSpec {
-  const { action, binding, context, objectiveStore, reportPath, failureContext, planProgress } =
-    args
+  const {
+    action,
+    binding,
+    context,
+    objectiveStore,
+    reportPath,
+    failureContext,
+    conflictContext,
+    planProgress
+  } = args
   const budgetBucket = deriveObjectiveBudgetBucket(context.ledger, binding.enrollment.budget)
   if (action.kind === 'dispatch-planner') {
     return {
@@ -223,13 +126,17 @@ function buildDispatchSpec(args: {
         budgetBucket,
         reason: action.reason,
         ...(failureContext === undefined ? {} : { failureContext }),
-        ...(planProgress === undefined ? {} : { planProgress })
+        ...(planProgress === undefined ? {} : { planProgress }),
+        ...(action.requestedSkipStage === undefined
+          ? {}
+          : { requestedSkipStage: action.requestedSkipStage }),
+        ...(action.guidance === undefined ? {} : { ownerGuidance: action.guidance })
       })
     }
   }
   const plan = requirePlan(objectiveStore, action.revisionId)
   if (action.kind === 'dispatch-node') {
-    const node = objectiveStore.getTask(action.revisionId, action.taskKey)
+    const node = args.dispatchedNode ?? objectiveStore.getTask(action.revisionId, action.taskKey)
     if (!node) {
       throw new Error(`Objective task ${action.taskKey} is unavailable`)
     }
@@ -243,7 +150,8 @@ function buildDispatchSpec(args: {
         plan,
         node,
         reportPath,
-        budgetBucket
+        budgetBucket,
+        ...(conflictContext === undefined ? {} : { conflictContext })
       })
     }
   }
@@ -267,11 +175,97 @@ function buildDispatchSpec(args: {
   }
 }
 
+function dispatchWithReport(
+  records: readonly ObjectiveDispatchRecord[],
+  dispatchId: string
+): ObjectiveDispatchRecord & { dispatchId: string; report: ImplementerReport } {
+  const record = records.find((candidate) => candidate.dispatchId === dispatchId)
+  if (!record || record.dispatchId === null || record.report === null) {
+    throw new Error(`Conflict context for objective Dispatch ${dispatchId} is unavailable`)
+  }
+  return record as ObjectiveDispatchRecord & { dispatchId: string; report: ImplementerReport }
+}
+
+function resolvingDispatchWithReport(
+  records: readonly ObjectiveDispatchRecord[],
+  retry: ObjectiveDispatchRecord
+): ObjectiveDispatchRecord & { dispatchId: string; report: ImplementerReport } {
+  const matches = records.filter(
+    (candidate) =>
+      candidate.attemptFingerprint !== retry.attemptFingerprint &&
+      candidate.workspaceId === retry.workspaceId &&
+      candidate.taskKey === retry.taskKey &&
+      candidate.state === 'resolving-conflict' &&
+      candidate.dispatchId !== null &&
+      candidate.report !== null
+  )
+  const record = matches.sort((left, right) => right.createdAtMs - left.createdAtMs)[0]
+  if (!record || record.dispatchId === null || record.report === null) {
+    throw new Error(
+      `Resolving conflict Dispatch for objective task ${retry.taskKey} is unavailable`
+    )
+  }
+  return record as ObjectiveDispatchRecord & {
+    dispatchId: string
+    report: ImplementerReport
+  }
+}
+
+function dispatchConflictContext(
+  objectiveStore: ObjectiveStore,
+  prepared: PreparedObjectiveDispatchWorkspace | null
+): ObjectiveConflictContext | undefined {
+  const record = prepared?.record
+  if (!record || record.state !== 'resolving-conflict') {
+    return undefined
+  }
+  if (record.conflictPaths.length === 0 || record.conflictingDispatchIds.length === 0) {
+    throw new Error('Conflict resolution dispatch is missing conflicting paths or Dispatches')
+  }
+  const records = objectiveStore.listDispatches(record.watcherId)
+  const resolving = resolvingDispatchWithReport(records, record)
+  return {
+    enrolledHead: record.baseCommit,
+    paths: record.conflictPaths,
+    resolving: {
+      dispatchId: resolving.dispatchId,
+      task: resolving.task,
+      report: resolving.report
+    },
+    conflicting: record.conflictingDispatchIds.map((dispatchId) => {
+      const conflicting = dispatchWithReport(records, dispatchId)
+      return {
+        dispatchId,
+        task: conflicting.task,
+        report: conflicting.report
+      }
+    })
+  }
+}
+
+async function saveDispatchFailure(
+  objectiveStore: ObjectiveStore,
+  prepared: PreparedObjectiveDispatchWorkspace | null,
+  context: ExecuteContext<ObjectiveWorld>
+): Promise<void> {
+  if (!prepared) {
+    return
+  }
+  await context.lease.assertHeld()
+  objectiveStore.saveDispatch({
+    ...prepared.record,
+    state: 'failed',
+    setupState: 'retained',
+    completedAtMs: prepared.record.completedAtMs ?? Date.now()
+  })
+}
+
 export async function executeObjectiveDispatch(args: {
   action: DispatchAction
   binding: ObjectiveSnapshotBinding
   context: ExecuteContext<ObjectiveWorld>
   objectiveStore: ObjectiveStore
+  runtime: OrcaRuntimeService
   store: Store
 }): Promise<ActionOutcome> {
   const fingerprint = makeAttemptFingerprint(
@@ -283,8 +277,49 @@ export async function executeObjectiveDispatch(args: {
   let reportPath: string
   let request: DispatchSpec
   let agent: string
+  let prepared: PreparedObjectiveDispatchWorkspace | null = null
+  let serialReuseTerminal: string | null = null
+  let target = args.binding.target
   try {
-    reportPath = await issueObjectiveReportPath(args.binding.target, fingerprint)
+    let dispatchedNode: ObjectivePlanTask | undefined
+    if (args.action.kind === 'dispatch-node') {
+      const storedNode = args.objectiveStore.getTask(args.action.revisionId, args.action.taskKey)
+      if (!storedNode) {
+        throw new Error(`Objective task ${args.action.taskKey} is unavailable`)
+      }
+      const planTaskDigest = objectiveResultDigest(ObjectivePlanTaskSchema.parse(storedNode))
+      dispatchedNode = args.action.ownerAmendedSpec
+        ? { ...storedNode, spec: args.action.ownerAmendedSpec }
+        : storedNode
+      prepared = await prepareObjectiveDispatchWorkspace({
+        runtime: args.runtime,
+        binding: args.binding,
+        context: args.context,
+        objectiveStore: args.objectiveStore,
+        action: args.action,
+        attemptFingerprint: fingerprint,
+        task: dispatchedNode,
+        planTaskDigest
+      })
+      if (prepared) {
+        target = prepared.target
+      } else {
+        serialReuseTerminal = await resolveObjectiveSerialLaneTerminal({
+          runtime: args.runtime,
+          binding: args.binding,
+          context: args.context,
+          action: args.action
+        })
+      }
+    }
+
+    reportPath = await issueObjectiveReportPath(target, fingerprint)
+    if (prepared) {
+      const record = { ...prepared.record, reportPath }
+      await args.context.lease.assertHeld()
+      args.objectiveStore.saveDispatch(record)
+      prepared = { ...prepared, record }
+    }
     const activeRevisionId =
       args.action.kind === 'dispatch-planner'
         ? activeObjectiveRevision(args.context.snapshot.world)?.id
@@ -308,45 +343,83 @@ export async function executeObjectiveDispatch(args: {
             activeRevisionId
           )
         : undefined
-    request = buildDispatchSpec({ ...args, reportPath, failureContext, planProgress })
+    request = buildDispatchSpec({
+      ...args,
+      reportPath,
+      failureContext,
+      planProgress,
+      dispatchedNode,
+      conflictContext: dispatchConflictContext(args.objectiveStore, prepared)
+    })
     const routingScope =
       args.action.kind === 'dispatch-planner'
         ? (activeRevisionId ?? 'initial')
         : args.action.kind === 'dispatch-node'
           ? args.action.taskKey
           : args.action.revisionId
-    agent = resolveObjectiveRoleAgent(
-      args.store,
-      args.binding.contract,
-      request.role,
-      judgmentRoutedAgent(
-        args.context.snapshot.world,
-        objectiveRoutingSubject(request.role, routingScope)
-      )
-    )
+    agent =
+      args.action.kind === 'dispatch-node' && args.action.ownerAgent
+        ? args.action.ownerAgent
+        : resolveObjectiveRoleAgent(
+            args.store,
+            args.binding.contract,
+            request.role,
+            judgmentRoutedAgent(
+              args.context.snapshot.world,
+              objectiveRoutingSubject(request.role, routingScope)
+            )
+          )
     if (args.action.kind === 'dispatch-node' || args.action.kind === 'dispatch-integrator') {
-      // a retry's baseline must stay the pre-original tree, not a fresh capture of its own fingerprint
-      const baselineFingerprint =
-        args.action.kind === 'dispatch-node' && args.action.retryOf !== undefined
+      const baselineFingerprint = prepared
+        ? fingerprint
+        : args.action.kind === 'dispatch-node' && args.action.retryOf !== undefined
           ? requireObjectiveOriginalDispatchFingerprint(args.context.ledger, args.action.retryOf)
           : fingerprint
-      await captureObjectiveWorkspaceBaseline(args.binding.target, baselineFingerprint)
+      await captureObjectiveWorkspaceBaseline(
+        target,
+        baselineFingerprint,
+        prepared?.record.state === 'resolving-conflict' ? args.binding.target : target
+      )
     }
   } catch (error) {
+    if (error instanceof ObjectiveEnrolledWorkspaceDirtyError) {
+      return {
+        effect: 'not-landed',
+        reason: 'objective-train-paused',
+        result: error.result
+      }
+    }
+    await saveDispatchFailure(args.objectiveStore, prepared, args.context)
     return {
       effect: 'not-landed',
       failureClass: 'infra',
       reason: error instanceof Error ? error.message : String(error)
     }
   }
+
   await args.context.lease.assertHeld()
-  const result = await args.context.dispatchWorker({
-    spec: request.spec,
-    agent,
-    ...(request.taskKey === undefined ? {} : { taskKey: request.taskKey }),
-    ...(request.deps === undefined ? {} : { deps: request.deps })
-  })
+  let result: DispatchResult
+  try {
+    result = await args.context.dispatchWorker({
+      spec: request.spec,
+      agent,
+      ...(request.taskKey === undefined ? {} : { taskKey: request.taskKey }),
+      ...(request.deps === undefined ? {} : { deps: request.deps }),
+      ...(prepared === null ? {} : { workspaceId: prepared.record.workspaceId }),
+      ...(prepared?.reuseTerminal || serialReuseTerminal
+        ? { reuseTerminal: prepared?.reuseTerminal ?? serialReuseTerminal ?? undefined }
+        : {})
+    })
+  } catch (error) {
+    await saveDispatchFailure(args.objectiveStore, prepared, args.context)
+    return {
+      effect: 'not-landed',
+      failureClass: 'infra',
+      reason: error instanceof Error ? error.message : String(error)
+    }
+  }
   if (result.status === 'refused') {
+    await saveDispatchFailure(args.objectiveStore, prepared, args.context)
     return {
       effect: 'not-landed',
       failureClass: 'infra',
@@ -357,5 +430,41 @@ export async function executeObjectiveDispatch(args: {
   if (result.status === 'indeterminate') {
     return { effect: 'indeterminate', reason: 'dispatch-indeterminate', result }
   }
-  return { effect: 'landed', result: { dispatchId: result.dispatchId, reportPath } }
+  if (prepared) {
+    const completedRecord: ObjectiveDispatchRecord = {
+      ...prepared.record,
+      dispatchId: result.dispatchId,
+      terminalHandle: result.terminalHandle ?? prepared.reuseTerminal,
+      setupState: 'ready',
+      reportPath
+    }
+    await args.context.lease.assertHeld()
+    args.objectiveStore.saveDispatch(completedRecord)
+    if (completedRecord.state === 'resolving-conflict') {
+      for (const record of args.objectiveStore.listDispatches(completedRecord.watcherId)) {
+        if (
+          record.attemptFingerprint !== completedRecord.attemptFingerprint &&
+          record.workspaceId === completedRecord.workspaceId &&
+          record.taskKey === completedRecord.taskKey &&
+          record.state === 'resolving-conflict'
+        ) {
+          await args.context.lease.assertHeld()
+          args.objectiveStore.saveDispatch({
+            ...record,
+            state: 'discarded',
+            setupState: 'retained',
+            completedAtMs: record.completedAtMs ?? Date.now()
+          })
+        }
+      }
+    }
+  }
+  return {
+    effect: 'landed',
+    result: {
+      dispatchId: result.dispatchId,
+      reportPath,
+      ...(result.terminalHandle ? { terminalHandle: result.terminalHandle } : {})
+    }
+  }
 }

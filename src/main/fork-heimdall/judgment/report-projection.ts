@@ -146,13 +146,27 @@ export async function readObjectiveJudgmentReports(args: {
 
     try {
       if (candidate.role === 'implementer') {
-        const read = await readObjectiveRoleReport({
-          target: args.target,
-          attemptFingerprint: origin.attempt.fingerprint,
-          mailboxReportPath: projectedReport.reportPath,
-          role: 'implementer',
-          taskKey: candidate.node.taskKey
-        })
+        const persisted = args.world.parallel?.dispatches.find(
+          (dispatch) =>
+            dispatch.dispatchId === candidate.dispatchId &&
+            dispatch.attemptFingerprint === origin.attempt.fingerprint &&
+            dispatch.revisionId === activeRevision.id &&
+            dispatch.taskKey === candidate.node.taskKey
+        )
+        const read =
+          persisted?.report && persisted.reportDigest
+            ? {
+                ok: true as const,
+                report: persisted.report,
+                reportDigest: persisted.reportDigest
+              }
+            : await readObjectiveRoleReport({
+                target: args.target,
+                attemptFingerprint: origin.attempt.fingerprint,
+                mailboxReportPath: projectedReport.reportPath,
+                role: 'implementer',
+                taskKey: candidate.node.taskKey
+              })
         if (!read.ok) {
           continue
         }

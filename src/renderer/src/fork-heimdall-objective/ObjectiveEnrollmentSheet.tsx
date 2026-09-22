@@ -13,6 +13,7 @@ import { translate } from '@/i18n/i18n'
 import { getAgentCatalog } from '@/lib/agent-catalog'
 import { useAppStore } from '@/store'
 import { objectiveCapabilityModes } from '../../../shared/fork-heimdall-objective/contract-types'
+import { defaultWatcherOwnerDraft } from '../fork-heimdall/watcher-owner-draft'
 import { ObjectiveEnrollmentFields } from './ObjectiveEnrollmentFields'
 import {
   OBJECTIVE_ROLES,
@@ -34,7 +35,8 @@ function newDraft(): ObjectiveEnrollmentDraft {
     existingPlanText: '',
     tier: 'standard',
     landingBar: 'files-on-disk',
-    maxConcurrency: 1,
+    maxConcurrency: 3,
+    lanesEnabled: true,
     workspaceKind: null,
     writeTerritoryText: '',
     capabilities: objectiveCapabilityModes('files-on-disk'),
@@ -47,7 +49,8 @@ function newDraft(): ObjectiveEnrollmentDraft {
     },
     activeBudgetHours: DEFAULT_ACTIVE_BUDGET_HOURS,
     turns: DEFAULT_TURN_BUDGET,
-    availableAgentIds: []
+    availableAgentIds: [],
+    owner: defaultWatcherOwnerDraft()
   }
 }
 
@@ -77,10 +80,10 @@ function validationErrorCopy(error: ObjectiveEnrollmentError): string {
         'fork.heimdallObjective.enrollment.landingBarRequiresWorktree',
         'Hosted-review and merged landing bars require a git worktree.'
       )
-    case 'max-concurrency-unsupported':
+    case 'max-concurrency-invalid':
       return translate(
         'fork.heimdallObjective.validation.maxConcurrency',
-        'This release supports exactly one objective worker at a time.'
+        'Max concurrency must be a whole number from 1 to 1,024.'
       )
     case 'territory-too-many':
       return translate(
@@ -154,6 +157,12 @@ function enrollmentErrorCopy(error: unknown): string {
       'Plan can be Off only when this same objective already has a usable approved plan. Set Plan to Gated or On.'
     )
   }
+  if (reason.includes('owner-not-supported')) {
+    return translate(
+      'fork.heimdallObjective.enrollment.ownerNotSupported',
+      'The remote host does not support enrolling a watcher with an owner yet. Update it, or leave the owning agent off and try again.'
+    )
+  }
   return message
 }
 
@@ -168,33 +177,48 @@ export function ObjectiveEnrollmentSheet({
 }: ObjectiveEnrollmentSheetProps): React.JSX.Element {
   const repos = useAppStore((state) => state.repos)
   const worktreesByRepo = useAppStore((state) => state.worktreesByRepo)
+  const folderWorkspaces = useAppStore((state) => state.folderWorkspaces)
+  const projectGroups = useAppStore((state) => state.projectGroups)
   const runtimeEnvironments = useAppStore((state) => state.runtimeEnvironments)
   const detectedAgentIds = useAppStore((state) => state.detectedAgentIds)
   const remoteDetectedAgentIds = useAppStore((state) => state.remoteDetectedAgentIds)
   const runtimeDetectedAgentIds = useAppStore((state) => state.runtimeDetectedAgentIds)
+  const runtimeStatusByEnvironmentId = useAppStore((state) => state.runtimeStatusByEnvironmentId)
   const settings = useAppStore((state) => state.settings)
   const hydrateFleet = useAppStore((state) => state.hydrateHeimdallFleet)
+  const fetchAllWorktrees = useAppStore((state) => state.fetchAllWorktrees)
   const workspaces = useMemo(
     () =>
       buildObjectiveWorkspaceOptions({
         repos,
         worktreesByRepo,
+        folderWorkspaces,
+        projectGroups,
         runtimeEnvironments,
         detectedAgentIds,
         remoteDetectedAgentIds,
         runtimeDetectedAgentIds,
+        runtimeStatusByEnvironmentId,
         settings
       }),
     [
       detectedAgentIds,
+      folderWorkspaces,
+      projectGroups,
       remoteDetectedAgentIds,
       repos,
       runtimeDetectedAgentIds,
+      runtimeStatusByEnvironmentId,
       runtimeEnvironments,
       settings,
       worktreesByRepo
     ]
   )
+  useEffect(() => {
+    if (open) {
+      void fetchAllWorktrees()
+    }
+  }, [fetchAllWorktrees, open])
   const [selectedWorkspaceKey, setSelectedWorkspaceKey] = useState('')
   const [draft, setDraft] = useState<ObjectiveEnrollmentDraft>(newDraft)
   const [showValidation, setShowValidation] = useState(false)

@@ -207,7 +207,11 @@ describe('Heimdall kernel service', () => {
         status: {
           state: 'parked',
           reason: 'Blocked: Credentials are required',
-          parkReason: null
+          parkReason: {
+            kind: 'worker-escalation',
+            escalationId: 'worker-escalation:dispatch-1:message-escalation',
+            messageId: 'message-escalation'
+          }
         }
       }
     })

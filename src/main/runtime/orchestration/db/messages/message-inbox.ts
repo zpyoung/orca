@@ -61,7 +61,8 @@ export function convertLifecycleMessageToRejection(
   this: OrchestrationDb,
   messageId: string,
   code: string,
-  reason: string
+  reason: string,
+  details?: { originalReason?: string }
 ): MessageRow | undefined {
   const message = this.getMessageById(messageId)
   if (
@@ -73,7 +74,10 @@ export function convertLifecycleMessageToRejection(
 
   const originalBody = message.body ? `\n\nOriginal body:\n${message.body}` : ''
   const body = `Orca rejected this ${message.type}: ${reason}${originalBody}`
-  const payload = addLifecycleRejectionMarker(message.payload, code, reason)
+  const payload = addLifecycleRejectionMarker(message.payload, code, reason, {
+    ...details,
+    originalBody: message.body
+  })
   // Why: rejected lifecycle signals stay auditable but must not reach read paths as actionable completion/liveness events.
   this.db
     .prepare(

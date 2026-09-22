@@ -86,7 +86,12 @@ describe('local Heimdall fleet projection', () => {
       localFleetEntry(objectiveEntry(), 90, true, {
         ledger,
         traces: [trace],
-        workspaceLabel: 'Objective worktree'
+        workspaceLabel: 'Objective worktree',
+        parallel: {
+          runningCount: 2,
+          effectiveMaxConcurrency: 3,
+          note: 'One lane is waiting to apply.'
+        }
       })
     ).toMatchObject({
       workflowPhase: 'planning',
@@ -96,6 +101,12 @@ describe('local Heimdall fleet projection', () => {
         detail: 'planning',
         startedAtMs: 75
       },
+      parallel: {
+        runningCount: 2,
+        effectiveMaxConcurrency: 3,
+
+        note: 'One lane is waiting to apply.'
+      },
       workspace: {
         label: 'Objective worktree',
         kind: 'git',
@@ -103,5 +114,18 @@ describe('local Heimdall fleet projection', () => {
       },
       entry: { status: { phase: 'watching' } }
     })
+  })
+  it('projects a newly persisted cap before a paused runner refreshes its snapshot', () => {
+    const entry = objectiveEntry()
+    entry.enrollment.kindPayload = { workspaceKind: 'git', maxConcurrency: 1 }
+
+    const projected = localFleetEntry(entry, 90, true, {
+      ledger: { watcherId: 'watcher-objective', entries: [] },
+      traces: [],
+      workspaceLabel: 'Objective worktree',
+      parallel: { runningCount: 2, effectiveMaxConcurrency: 3 }
+    })
+
+    expect(projected.parallel).toEqual({ runningCount: 2, effectiveMaxConcurrency: 1 })
   })
 })

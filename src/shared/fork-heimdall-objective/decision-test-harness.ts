@@ -100,6 +100,13 @@ export function snapshot(
   }
 }
 
+/**
+ * `attemptId` is derived from `dispatchId ?? action.evidenceKey`, not the action `kind` — two
+ * attempts for actions that legitimately share that string (e.g. a `dispatch-node` and the
+ * `ingest-report` that follows it, whose `evidenceKey` is the same dispatchId by convention) get
+ * the same synthetic id unless one call passes a distinct `options.dispatchId`. `getLatestAttempts`
+ * then silently keeps only the later one, starving a decision of the earlier attempt.
+ */
 export function attempt(
   action: ObjectiveAction,
   options: {

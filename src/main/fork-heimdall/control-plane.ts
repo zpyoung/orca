@@ -6,10 +6,8 @@ import {
   type WatcherOwnerFence,
   type WatcherWorker
 } from '../../shared/fork-heimdall/fleet-types'
-import { getLatestApproval, getLatestEscalations } from '../../shared/fork-heimdall/ledger-queries'
-import type { ApprovalScope, WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
+import { getLatestApproval } from '../../shared/fork-heimdall/ledger-queries'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
-import { getApprovalEscalationsToResolve } from './approval-resolution'
 import {
   appendAnsweredQuestionTransitions,
   appendVoidedQuestionTransitions,
@@ -17,6 +15,8 @@ import {
   type QuestionLedgerAccess
 } from './question-resolution'
 import { WatcherEnrollmentControlLifecycle } from './control-enrollment-lifecycle'
+import { WatcherDeletionLifecycle } from './control-delete-lifecycle'
+import { WatcherControlEscalationLifecycle } from './control-escalation-lifecycle'
 import {
   isMalformedKindPayloadEnrollment,
   type EnrollmentControlChange,
@@ -41,17 +41,36 @@ type ControlPlaneDependencies = {
   orchestration: HeimdallOrchestrationAdapter
   runnerLoop: WatcherRunnerLoop
   runner(watcherId: string): WatcherRunner | null
+  removeRunner(watcherId: string): void
+  purgeKindData(enrollment: EnrollmentRecord): Promise<void>
   owns(enrollment: EnrollmentRecord): boolean
   now(): number
   createId(): string
   changed(): void
 }
-
 export class WatcherControlPlane {
   private readonly operationTails = new Map<string, Promise<void>>()
   private readonly enrollmentLifecycle: WatcherEnrollmentControlLifecycle
+  private readonly deletionLifecycle: WatcherDeletionLifecycle
+  private readonly escalations: WatcherControlEscalationLifecycle
 
   constructor(private readonly dependencies: ControlPlaneDependencies) {
+    this.escalations = new WatcherControlEscalationLifecycle({
+      ledger: dependencies.ledger,
+      now: dependencies.now,
+      createId: dependencies.createId
+    })
+    this.deletionLifecycle = new WatcherDeletionLifecycle({
+      enrollments: dependencies.enrollments,
+      lease: dependencies.lease,
+      runnerControl: dependencies.runnerLoop.controlLifecycle,
+      runner: dependencies.runner,
+      removeRunner: dependencies.removeRunner,
+      purgeKindData: dependencies.purgeKindData,
+      owns: dependencies.owns,
+      now: dependencies.now,
+      changed: dependencies.changed
+    })
     this.enrollmentLifecycle = new WatcherEnrollmentControlLifecycle({
       ledger: dependencies.ledger,
       lease: dependencies.lease,
@@ -60,10 +79,11 @@ export class WatcherControlPlane {
       commit: (watcherId, expectedOwner, change, appendWithinTransaction) =>
         this.commit(watcherId, expectedOwner, change, appendWithinTransaction),
       requireValidCommit: (commit) => this.requireValidCommit(commit),
-      latestHaltWasAutomaticPark: (ledger) => this.latestAutomaticParkKind(ledger) !== null,
+      latestHaltWasAutomaticPark: (ledger) =>
+        this.escalations.latestAutomaticParkKind(ledger) !== null,
       appendResumeEscalationTransitions: (watcherId) =>
-        this.appendResumeEscalationTransitions(watcherId),
-      appendDisarmTransitions: (watcherId) => this.appendDisarmTransitions(watcherId),
+        this.escalations.appendResumeTransitions(watcherId),
+      appendDisarmTransitions: (watcherId) => this.escalations.appendDisarmTransitions(watcherId),
       now: dependencies.now
     })
   }
@@ -111,6 +131,9 @@ export class WatcherControlPlane {
   }
 
   private async apply(request: WatcherCommandRequest): Promise<WatcherCommandResult> {
+    if (request.command.kind === 'delete') {
+      return await this.deletionLifecycle.delete(request.target.watcherId, request.expectedOwner)
+    }
     const precondition = this.precondition(request.target.watcherId, request.expectedOwner)
     if ('status' in precondition) {
       return precondition
@@ -136,6 +159,12 @@ export class WatcherControlPlane {
           enrollment,
           request.expectedOwner,
           request.command.budget
+        )
+      case 'set-concurrency':
+        return this.enrollmentLifecycle.setConcurrency(
+          enrollment,
+          request.expectedOwner,
+          request.command.maxConcurrency
         )
       case 'answer-question':
         return await this.answerQuestion(
@@ -177,7 +206,7 @@ export class WatcherControlPlane {
         decision: 'approved',
         foldCount: (previous?.foldCount ?? 0) + 1
       })
-      this.appendApprovalResolutionTransitions(enrollment.watcherId, scope.data)
+      this.escalations.appendApprovalResolution(enrollment.watcherId, scope.data)
     })
     if (commit.status === 'refused') {
       return commit
@@ -205,7 +234,10 @@ export class WatcherControlPlane {
     const workerStillPresentsQuestion = workers.some(
       (worker) => worker.question?.messageId === messageId
     )
-    const ledgerStillPresentsQuestion = this.hasOpenWorkerQuestion(enrollment.watcherId, messageId)
+    const ledgerStillPresentsQuestion = this.escalations.hasOpenWorkerQuestion(
+      enrollment.watcherId,
+      messageId
+    )
     if (!workerStillPresentsQuestion && !ledgerStillPresentsQuestion) {
       return refused('question-already-answered', `Question ${messageId} is no longer pending`)
     }
@@ -217,7 +249,8 @@ export class WatcherControlPlane {
     const restoreAutoQuestionPark =
       !current.enabled &&
       !current.paused &&
-      this.latestHaltWasAutomaticQuestionPark(this.dependencies.ledger.read(current.watcherId))
+      this.escalations.latestAutomaticParkKind(this.dependencies.ledger.read(current.watcherId)) ===
+        'park-worker-question'
     try {
       await this.dependencies.orchestration.answerQuestion(current, messageId, body)
     } catch (error) {
@@ -328,48 +361,6 @@ export class WatcherControlPlane {
     return this.applied()
   }
 
-  /** The kind of the newest halt escalation, or null when the newest halt was an explicit disarm. */
-  private latestAutomaticParkKind(ledger: WatcherLedger): string | null {
-    const halt = ledger.entries
-      .toReversed()
-      .find(
-        (entry) =>
-          entry.kind === 'escalation' &&
-          (entry.escalationKind.startsWith('park-') || entry.escalationKind === 'control-disarm')
-      )
-    return halt?.kind === 'escalation' && halt.escalationKind.startsWith('park-')
-      ? halt.escalationKind
-      : null
-  }
-
-  private latestHaltWasAutomaticQuestionPark(ledger: WatcherLedger): boolean {
-    return this.latestAutomaticParkKind(ledger) === 'park-worker-question'
-  }
-
-  private hasOpenWorkerQuestion(watcherId: string, messageId: string): boolean {
-    return getLatestEscalations(this.dependencies.ledger.read(watcherId)).some(
-      (entry) =>
-        entry.status === 'open' &&
-        entry.escalationKind === 'worker-question' &&
-        entry.escalationId.endsWith(`:${messageId}`)
-    )
-  }
-
-  private appendApprovalResolutionTransitions(watcherId: string, scope: ApprovalScope): void {
-    for (const entry of getApprovalEscalationsToResolve(
-      this.dependencies.ledger.read(watcherId),
-      scope
-    )) {
-      this.dependencies.ledger.append({
-        ...entry,
-        eventId: this.dependencies.createId(),
-        atMs: this.dependencies.now(),
-        status: 'resolved',
-        foldCount: entry.foldCount + 1
-      })
-    }
-  }
-
   private get questionLedger(): QuestionLedgerAccess {
     return {
       read: (watcherId) => this.dependencies.ledger.read(watcherId),
@@ -382,57 +373,6 @@ export class WatcherControlPlane {
   private readQuestion(enrollment: WatcherEnrollment) {
     return (messageId: string) =>
       this.dependencies.orchestration.readQuestion(enrollment, messageId)
-  }
-
-  private appendResumeEscalationTransitions(watcherId: string): void {
-    const ledger = this.dependencies.ledger.read(watcherId)
-    const resumesWorkerEscalation =
-      this.latestAutomaticParkKind(ledger) === 'park-worker-escalation'
-    for (const entry of getLatestEscalations(ledger)) {
-      const isOpenPark = entry.status === 'open' && entry.escalationKind.startsWith('park-')
-      const isUnresolvedWorkerEscalation =
-        resumesWorkerEscalation &&
-        (entry.status === 'open' || entry.status === 'escalated') &&
-        entry.escalationKind === 'worker-escalation'
-      if (!isOpenPark && !isUnresolvedWorkerEscalation) {
-        continue
-      }
-      this.dependencies.ledger.append({
-        ...entry,
-        eventId: this.dependencies.createId(),
-        atMs: this.dependencies.now(),
-        status: 'acknowledged',
-        foldCount: entry.foldCount + 1
-      })
-    }
-  }
-
-  private appendDisarmTransitions(watcherId: string): void {
-    for (const entry of getLatestEscalations(this.dependencies.ledger.read(watcherId))) {
-      if (entry.status !== 'open') {
-        continue
-      }
-      this.dependencies.ledger.append({
-        ...entry,
-        eventId: this.dependencies.createId(),
-        atMs: this.dependencies.now(),
-        status: 'resolved',
-        foldCount: entry.foldCount + 1
-      })
-    }
-    this.dependencies.ledger.append({
-      eventId: this.dependencies.createId(),
-      watcherId,
-      atMs: this.dependencies.now(),
-      origin: 'owner',
-      class: 'fact',
-      kind: 'escalation',
-      escalationId: `control-disarm:${watcherId}:${this.dependencies.createId()}`,
-      escalationKind: 'control-disarm',
-      status: 'resolved',
-      foldCount: 1,
-      reason: 'explicit-disarm'
-    })
   }
 
   private precondition(

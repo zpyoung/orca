@@ -10,6 +10,20 @@ import type {
 } from '../../../shared/fork-heimdall-objective/detail-types'
 import { ObjectivePlan } from './ObjectivePlan'
 
+function verdict(
+  overrides: Partial<ObjectiveDetail['verdicts'][number]> = {}
+): ObjectiveDetail['verdicts'][number] {
+  return {
+    dispatchId: 'dispatch-1',
+    role: 'reviewer',
+    verdict: 'approve',
+    contentIdentity: 'content-1',
+    synthesizedByOwner: false,
+    atMs: 1,
+    ...overrides
+  }
+}
+
 function revision(number: number, status: ObjectiveRevisionStatus): ObjectiveDetailRevision {
   return {
     id: `revision-${number}`,
@@ -22,7 +36,10 @@ function revision(number: number, status: ObjectiveRevisionStatus): ObjectiveDet
   }
 }
 
-function detail(revisions: readonly ObjectiveDetailRevision[]): ObjectiveDetail {
+function detail(
+  revisions: readonly ObjectiveDetailRevision[],
+  verdicts: readonly ObjectiveDetail['verdicts'][number][] = []
+): ObjectiveDetail {
   return {
     contract: {
       objectiveText: 'Ship the thing',
@@ -44,7 +61,7 @@ function detail(revisions: readonly ObjectiveDetailRevision[]): ObjectiveDetail 
       state: 'pending' as const,
       criteria: []
     })),
-    verdicts: [],
+    verdicts: [...verdicts],
     landing: [],
     asOfMs: 1
   }
@@ -115,5 +132,29 @@ describe('ObjectivePlan', () => {
       )
     )
     expect(trigger().getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('marks a verdict the owner synthesized instead of a real reviewer', async () => {
+    await act(async () =>
+      root.render(
+        <ObjectivePlan
+          detail={detail([revision(1, 'draft')], [verdict({ synthesizedByOwner: true })])}
+        />
+      )
+    )
+
+    expect(container.textContent).toContain('Synthesized by owner')
+  })
+
+  it('leaves a real reviewer verdict unmarked', async () => {
+    await act(async () =>
+      root.render(
+        <ObjectivePlan
+          detail={detail([revision(1, 'draft')], [verdict({ synthesizedByOwner: false })])}
+        />
+      )
+    )
+
+    expect(container.textContent).not.toContain('Synthesized by owner')
   })
 })

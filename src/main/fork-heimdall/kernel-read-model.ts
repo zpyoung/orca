@@ -1,15 +1,18 @@
 import { homedir } from 'node:os'
 import { isDeepStrictEqual } from 'node:util'
 import {
+  WatcherFleetParallelSummarySchema,
   WatcherTargetSchema,
   type HeimdallFleetSnapshot,
   type WatcherDetail,
   type WatcherFleetEntry,
+  type WatcherFleetParallelSummary,
   type WatcherTarget,
   type WatcherWorker
 } from '../../shared/fork-heimdall/fleet-types'
 import { getInFlightAttempts } from '../../shared/fork-heimdall/ledger-queries'
 import type { WatcherListEntry } from '../../shared/fork-heimdall/watcher-types'
+import { parseWorkspaceKey } from '../../shared/workspace-scope'
 import type { Store } from '../persistence'
 import {
   buildHeimdallDebugReport,
@@ -58,9 +61,54 @@ type LocalFleetStampState = {
 }
 
 function readFleetWorkspaceLabel(store: Store, record: EnrollmentRecord): string | null {
-  return record.worktreeId === null
-    ? (store.getRepo(record.repoId)?.displayName ?? null)
+  if (record.worktreeId === null) {
+    return store.getRepo(record.repoId)?.displayName ?? null
+  }
+  const scope = parseWorkspaceKey(record.worktreeId)
+  return scope?.type === 'folder'
+    ? (store.getFolderWorkspace(scope.folderWorkspaceId)?.name ?? null)
     : (store.getWorktreeMetaForHost(record.worktreeId, record.executionHostId)?.displayName ?? null)
+}
+
+function fleetParallelSummary(
+  runner: WatcherRunner | null
+): WatcherFleetParallelSummary | undefined {
+  const enrollment = runner?.enrollment
+  const kindPayload = enrollment?.kindPayload
+  if (
+    enrollment?.kind !== 'objective' ||
+    typeof kindPayload !== 'object' ||
+    kindPayload === null ||
+    !('maxConcurrency' in kindPayload) ||
+    typeof kindPayload.maxConcurrency !== 'number'
+  ) {
+    return undefined
+  }
+  const effectiveMaxConcurrency =
+    'workspaceKind' in kindPayload && kindPayload.workspaceKind === 'folder'
+      ? 1
+      : kindPayload.maxConcurrency
+  const world = runner?.lastSnapshot?.world
+  const parallel =
+    typeof world === 'object' &&
+    world !== null &&
+    'parallel' in world &&
+    typeof world.parallel === 'object' &&
+    world.parallel !== null
+      ? world.parallel
+      : null
+  const candidate = {
+    runningCount:
+      parallel && 'runningCount' in parallel && typeof parallel.runningCount === 'number'
+        ? parallel.runningCount
+        : 0,
+    effectiveMaxConcurrency,
+    ...(parallel && 'note' in parallel && typeof parallel.note === 'string'
+      ? { note: parallel.note }
+      : {})
+  }
+  const parsed = WatcherFleetParallelSummarySchema.safeParse(candidate)
+  return parsed.success ? parsed.data : undefined
 }
 
 export class KernelReadModel {
@@ -82,7 +130,8 @@ export class KernelReadModel {
       const projection: LocalFleetProjectionInput = {
         ledger: this.dependencies.ledger.read(record.watcherId),
         traces: runner?.traces ?? this.dependencies.ledger.readTickTraces(record.watcherId),
-        workspaceLabel: readFleetWorkspaceLabel(this.dependencies.store, record)
+        workspaceLabel: readFleetWorkspaceLabel(this.dependencies.store, record),
+        parallel: fleetParallelSummary(runner)
       }
       return this.projectFleetEntry(record, projection)
     })
@@ -95,6 +144,7 @@ export class KernelReadModel {
       throw new Error('The local Heimdall owner cannot read a remote watcher target')
     }
     const owned = this.dependencies.owns(record)
+    const runner = this.dependencies.runner(record.watcherId)
     const workers = (await this.readWorkers(record)).workers
     const ledger = this.dependencies.ledger.read(record.watcherId)
     const traces = this.dependencies.ledger.readTickTraces(record.watcherId)
@@ -107,7 +157,8 @@ export class KernelReadModel {
         {
           ledger,
           traces,
-          workspaceLabel: readFleetWorkspaceLabel(this.dependencies.store, record)
+          workspaceLabel: readFleetWorkspaceLabel(this.dependencies.store, record),
+          parallel: fleetParallelSummary(runner)
         }
       ),
       ledger,

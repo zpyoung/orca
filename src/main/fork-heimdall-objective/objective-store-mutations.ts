@@ -5,13 +5,15 @@ import {
   PlannerReportSchema,
   ReviewerReportSchema
 } from '../../shared/fork-heimdall-objective/plan-schema'
-import type Database from '../sqlite/sync-database'
 import type { ObjectiveDatabase } from './objective-database'
+import { runObjectiveMutation } from './objective-database-transaction'
+import { amendObjectiveRevision } from './objective-store-amend-revision'
 import {
   parseLandingPayload,
   naturalId,
   type ActivatePlanArgs,
   type ActivatePlanResult,
+  type AmendRevisionArgs,
   type CompleteCheckAttemptArgs,
   type IngestPlanArgs,
   type IngestPlanResult,
@@ -19,7 +21,9 @@ import {
   type RecordLandingArgs,
   type RecordLandingResult,
   type RecordNodeDispatchArgs,
+  type RecordOwnerCheckSkipArgs,
   type RecordVerdictArgs,
+  type RevisionAmendmentResult,
   type StartCheckAttemptArgs,
   type VerdictRow
 } from './objective-store-data'
@@ -92,19 +96,22 @@ export class ObjectiveStoreMutations {
       ) {
         throw new Error('Plan revision natural key was replayed with different content')
       }
-      for (const task of report.plan) {
+      report.plan.forEach((task, ordinal) => {
         db.prepare(`INSERT INTO plan_node (
-          id, watcher_id, revision_id, task_key, title, spec, deps_json, orchestration_task_id, dispatch_id, dispatched_at_ms
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)
+          id, watcher_id, revision_id, task_key, title, spec, deps_json, orchestration_task_id, dispatch_id,
+          dispatched_at_ms, ordinal
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?)
         ON CONFLICT (revision_id, task_key) DO UPDATE SET
-          title = excluded.title, spec = excluded.spec, deps_json = excluded.deps_json`).run(
+          title = excluded.title, spec = excluded.spec, deps_json = excluded.deps_json,
+          ordinal = excluded.ordinal`).run(
           naturalId('objective_node', stored.id, task.taskKey),
           args.watcherId,
           stored.id,
           task.taskKey,
           task.title,
           task.spec,
-          JSON.stringify(task.deps)
+          JSON.stringify(task.deps),
+          ordinal
         )
         task.criteria.forEach((criterion, ordinal) => {
           db.prepare(`INSERT INTO acceptance_criterion (
@@ -122,7 +129,7 @@ export class ObjectiveStoreMutations {
             criterion.checkCommand
           )
         })
-      }
+      })
       return { revisionId: stored.id, revisionNumber: args.revisionNumber, digest: args.digest }
     })
   }
@@ -277,6 +284,58 @@ export class ObjectiveStoreMutations {
     })
   }
 
+  /**
+   * Records an owner's check waiver as the settled attempt for one criterion at one content
+   * identity, replacing a `run-check` attempt already stored under that natural key. A check has
+   * to have run to be known bad, so the waiver that answers it always arrives second; replaying a
+   * waiver over a waiver leaves the first one standing.
+   */
+  recordOwnerCheckSkip(args: RecordOwnerCheckSkipArgs): ObjectiveCheckAttempt {
+    return this.mutate(() => {
+      this.database
+        .connection()
+        .prepare(`INSERT INTO check_attempt (
+        id, watcher_id, criterion_id, content_identity, execution_host_id, command,
+        exit_code, timed_out, stdout_tail, stderr_tail, epoch, started_at_ms, completed_at_ms,
+        owner_skip
+      ) VALUES (?, ?, ?, ?, ?, ?, 0, 0, '', ?, ?, ?, ?, 1)
+      ON CONFLICT (criterion_id, content_identity) DO UPDATE SET
+        watcher_id = excluded.watcher_id,
+        execution_host_id = excluded.execution_host_id,
+        command = excluded.command,
+        exit_code = excluded.exit_code,
+        timed_out = excluded.timed_out,
+        stdout_tail = excluded.stdout_tail,
+        stderr_tail = excluded.stderr_tail,
+        epoch = excluded.epoch,
+        started_at_ms = excluded.started_at_ms,
+        completed_at_ms = excluded.completed_at_ms,
+        owner_skip = 1
+      WHERE check_attempt.owner_skip = 0`)
+        .run(
+          naturalId('objective_check', args.criterionId, args.contentIdentity),
+          args.watcherId,
+          args.criterionId,
+          args.contentIdentity,
+          args.executionHostId,
+          args.note,
+          args.note,
+          args.epoch,
+          args.recordedAtMs,
+          args.recordedAtMs
+        )
+      const stored = readObjectiveCheckAttempt(
+        this.database,
+        args.criterionId,
+        args.contentIdentity
+      )
+      if (!stored || !stored.ownerSkip || stored.exitCode !== 0 || stored.completedAtMs === null) {
+        throw new Error('Owner check waiver was not recorded')
+      }
+      return stored
+    })
+  }
+
   recordVerdict(args: RecordVerdictArgs): { dispatchId: string; reportDigest: string } {
     const report =
       args.role === 'integrator'
@@ -369,10 +428,13 @@ export class ObjectiveStoreMutations {
     this.mutate(() => {
       const db = this.database.connection()
       for (const table of [
+        'objective_parallel_state',
+        'objective_dispatch',
         'landing_evidence',
         'review_verdict',
         'check_attempt',
         'acceptance_criterion',
+        'revision_amendment',
         'plan_node',
         'plan_revision'
       ]) {
@@ -381,19 +443,11 @@ export class ObjectiveStoreMutations {
     })
   }
 
+  amendRevision(args: AmendRevisionArgs): RevisionAmendmentResult {
+    return amendObjectiveRevision(this.database, args)
+  }
+
   private mutate<T>(operation: () => T): T {
-    this.database.assertWritable()
-    const db: Database.Database = this.database.connection()
-    db.exec('BEGIN IMMEDIATE')
-    try {
-      const result = operation()
-      db.exec('COMMIT')
-      return result
-    } catch (error) {
-      if (db.isTransaction) {
-        db.exec('ROLLBACK')
-      }
-      throw error
-    }
+    return runObjectiveMutation(this.database, () => operation())
   }
 }

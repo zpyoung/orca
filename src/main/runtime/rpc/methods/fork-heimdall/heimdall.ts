@@ -6,7 +6,8 @@ import {
   HeimdallUnsubscribeRequestSchema,
   WatcherCommandRequestSchema,
   WatcherTargetSchema,
-  type HeimdallFleetSnapshot
+  type HeimdallFleetSnapshot,
+  type WatcherDetail
 } from '../../../../../shared/fork-heimdall/api'
 import { requireHeimdallKernel, requireHeimdallTransport } from './kernel-binding'
 import { HEIMDALL_OBJECTIVE_METHODS } from '../fork-heimdall-objective/objective-detail-method'
@@ -18,6 +19,11 @@ import {
   projectLegacyEnrollResult
 } from './legacy-wire'
 import { projectHeimdallDetailForClient } from './dispatch-result-wire'
+import {
+  projectHeimdallDetailParkReasonForClient,
+  projectHeimdallFleetSnapshotForClient,
+  projectWatcherListEntryForClient
+} from './park-reason-wire'
 
 let fleetSubscriptionSequence = 0
 
@@ -36,13 +42,17 @@ export const HEIMDALL_METHODS: readonly RpcAnyMethod[] = [
   defineMethod({
     name: HEIMDALL_CHANNELS.enroll,
     params: HeimdallEnrollRequestSchema.or(LegacyHeimdallEnrollRequestSchema),
-    handler: async (request, { runtime, clientKind }) => {
+    handler: async (request, context) => {
+      const { runtime, clientKind } = context
       if (!('input' in request)) {
         const legacy = await requireHeimdallKernel(runtime).enroll(request)
         if (legacy.status === 'refused') {
           throw new Error(`Heimdall enrollment refused: ${legacy.reason}`)
         }
-        return projectLegacyEnrollResult(legacy)
+        return projectLegacyEnrollResult({
+          ...legacy,
+          entry: projectWatcherListEntryForClient(legacy.entry, context)
+        })
       }
       const { input, owner } = request
       if (clientKind === 'runtime' && owner !== null) {
@@ -55,31 +65,35 @@ export const HEIMDALL_METHODS: readonly RpcAnyMethod[] = [
       if (result.status === 'refused') {
         throw new Error(`Heimdall enrollment refused: ${result.reason}`)
       }
-      return result
+      return { ...result, entry: projectWatcherListEntryForClient(result.entry, context) }
     }
   }),
   defineMethod({
     name: HEIMDALL_CHANNELS.fleet,
     params: EmptyHeimdallRequestSchema,
-    handler: (_params, { runtime, clientKind }) =>
-      clientKind === 'runtime'
-        ? requireHeimdallKernel(runtime).fleet()
-        : requireHeimdallTransport(runtime).fleet()
+    handler: async (_params, context) => {
+      const { runtime, clientKind } = context
+      const snapshot =
+        clientKind === 'runtime'
+          ? await requireHeimdallKernel(runtime).fleet()
+          : await requireHeimdallTransport(runtime).fleet()
+      return projectHeimdallFleetSnapshotForClient(snapshot, context)
+    }
   }),
   defineMethod({
     name: HEIMDALL_CHANNELS.detail,
     params: WatcherTargetSchema,
     handler: async (target, context) => {
       const { runtime, clientKind } = context
+      let detail: WatcherDetail
       if (clientKind === 'runtime') {
         assertLocalTarget(target)
-        return projectHeimdallDetailForClient(
-          await requireHeimdallKernel(runtime).detail(target),
-          context
-        )
+        detail = await requireHeimdallKernel(runtime).detail(target)
+      } else {
+        detail = await requireHeimdallTransport(runtime).detail(target)
       }
       return projectHeimdallDetailForClient(
-        await requireHeimdallTransport(runtime).detail(target),
+        projectHeimdallDetailParkReasonForClient(detail, context),
         context
       )
     }
@@ -114,7 +128,8 @@ export const HEIMDALL_METHODS: readonly RpcAnyMethod[] = [
   defineStreamingMethod({
     name: HEIMDALL_CHANNELS.subscribe,
     params: EmptyHeimdallRequestSchema,
-    handler: async (_params, { runtime, clientKind, connectionId, signal }, emit) => {
+    handler: async (_params, context, emit) => {
+      const { runtime, clientKind, connectionId, signal } = context
       await new Promise<void>((resolve) => {
         let closed = false
         let emission = Promise.resolve()
@@ -142,11 +157,13 @@ export const HEIMDALL_METHODS: readonly RpcAnyMethod[] = [
               if (closed) {
                 return
               }
-              const snapshot =
+              const snapshot = projectHeimdallFleetSnapshotForClient(
                 supplied ??
-                (clientKind === 'runtime'
-                  ? await requireHeimdallKernel(runtime).fleet()
-                  : await requireHeimdallTransport(runtime).fleet())
+                  (clientKind === 'runtime'
+                    ? await requireHeimdallKernel(runtime).fleet()
+                    : await requireHeimdallTransport(runtime).fleet()),
+                context
+              )
               if (!closed) {
                 emit(type === 'ready' ? { type, subscriptionId, snapshot } : { type, snapshot })
               }

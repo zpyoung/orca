@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
+import { HEIMDALL_PARALLEL_EXECUTION_UNSUPPORTED_NOTE } from '../../../shared/fork-heimdall/capability'
 import {
   getLatestApproval,
   getLatestEscalations
@@ -18,6 +19,8 @@ import type {
 import { formatHeimdallAge, formatHeimdallTime } from './fleet-format'
 import { openHeimdallWorker } from './heimdall-worker-navigation'
 import { getHeimdallControlApi } from './heimdall-control-api'
+import { HeimdallConcurrencyControl } from './HeimdallConcurrencyControl'
+import { HeimdallDeleteWatcherAction } from './HeimdallDeleteWatcherAction'
 import { HeimdallBudgetCard } from './HeimdallBudgetCard'
 import { HeimdallDebugReportButton } from './HeimdallDebugReportButton'
 import { HeimdallDecisionTrace } from './HeimdallDecisionTrace'
@@ -186,6 +189,7 @@ function HeimdallDetailPaneContent({ row, onBack }: HeimdallDetailPaneProps): Re
     if (!api || busyKey || readOnly || (requiresDetailEvidence && detailEvidenceStale)) {
       return null
     }
+    let watcherDeleted = false
     setBusyKey(key)
     setNotice(null)
     try {
@@ -194,7 +198,12 @@ function HeimdallDetailPaneContent({ row, onBack }: HeimdallDetailPaneProps): Re
         expectedOwner: displayedRow.ownerFence,
         command
       })
-      setNotice(commandNotice(result))
+      if (command.kind === 'delete' && result.status === 'applied') {
+        watcherDeleted = true
+        onBack()
+      } else {
+        setNotice(commandNotice(result))
+      }
       return result
     } catch (cause) {
       setNotice({
@@ -208,9 +217,13 @@ function HeimdallDetailPaneContent({ row, onBack }: HeimdallDetailPaneProps): Re
       return null
     } finally {
       const refreshes: Promise<unknown>[] = [hydrateFleet()]
-      refreshes.push(loadDetail())
+      if (!watcherDeleted) {
+        refreshes.push(loadDetail())
+      }
       await Promise.allSettled(refreshes)
-      setBusyKey(null)
+      if (!watcherDeleted) {
+        setBusyKey(null)
+      }
     }
   }
 
@@ -369,7 +382,25 @@ function HeimdallDetailPaneContent({ row, onBack }: HeimdallDetailPaneProps): Re
                 {translate('fork.heimdall.controls.disarm', 'Disarm')}
               </Button>
             ) : null}
+            <HeimdallDeleteWatcherAction
+              watcherName={displayedRow.entry.name}
+              disabled={readOnly || busyKey !== null}
+              deleting={busyKey === 'delete'}
+              onCommand={runCommand}
+            />
           </div>
+          <HeimdallConcurrencyControl
+            enrollment={displayedRow.entry.enrollment}
+            readOnly={readOnly}
+            busy={busyKey !== null}
+            supported={
+              !displayedRow.capabilityNotes.includes(HEIMDALL_PARALLEL_EXECUTION_UNSUPPORTED_NOTE)
+            }
+            updating={busyKey === 'set-concurrency'}
+            onChange={(maxConcurrency) => {
+              void runCommand('set-concurrency', { kind: 'set-concurrency', maxConcurrency })
+            }}
+          />
           {pausedOrParked && resumeBlockedByBudget ? (
             <p className="mt-2 text-xs text-status-warning">
               {translate(

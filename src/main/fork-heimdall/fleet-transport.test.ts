@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
+import {
+  HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY,
+  HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
+} from '../../shared/fork-heimdall/capability'
 import { RemoteRuntimeClientError } from '../../shared/remote-runtime-client-error'
 import type { RuntimeRpcResponse } from '../../shared/runtime-rpc-envelope'
 import type { RuntimeStatus } from '../../shared/runtime-types'
@@ -8,9 +12,11 @@ import type {
   WatcherDetail,
   WatcherFleetEntry
 } from '../../shared/fork-heimdall/fleet-types'
-import type {
-  FleetEnvironmentSubscriptionCallbacks,
-  FleetEnvironmentTransport
+import type { EnrollInput } from '../../shared/fork-heimdall/watcher-types'
+import {
+  HeimdallEnrollOwnerCapabilityError,
+  type FleetEnvironmentSubscriptionCallbacks,
+  type FleetEnvironmentTransport
 } from './fleet-environment-transport'
 import { HeimdallFleetTransport, type HeimdallFleetKernel } from './fleet-transport'
 
@@ -181,6 +187,23 @@ function commandRequest(): WatcherCommandRequest {
     target: { watcherId: 'watcher-1', connectionId: 'environment-1', pairingRevision: 7 },
     expectedOwner: fleetEntry().ownerFence,
     command: { kind: 'pause' }
+  }
+}
+function deleteCommandRequest(): WatcherCommandRequest {
+  return { ...commandRequest(), command: { kind: 'delete' } }
+}
+
+const REMOTE_OWNER = { connectionId: 'environment-1', pairingRevision: 7 }
+
+function enrollInput(owner?: EnrollInput['owner']): EnrollInput {
+  return {
+    kind: 'hosted-review',
+    repoId: 'repo-1',
+    worktreeId: 'worktree-1',
+    capabilities: {},
+    budget: { wallClockActiveMs: null, turns: null },
+    kindPayload: {},
+    owner
   }
 }
 
@@ -361,6 +384,54 @@ describe('HeimdallFleetTransport', () => {
     transport.dispose()
   })
 
+  it('refuses permanent deletion before sending to an older owner', async () => {
+    const remote = environmentHarness(['heimdall.commands.v1'])
+    const local = kernel()
+    const transport = new HeimdallFleetTransport({
+      kernel: local,
+      userDataPath: () => '/unused',
+      environments: remote.environment
+    })
+    await transport.fleet()
+    await vi.waitFor(() => expect(() => remote.callbacks()).not.toThrow())
+
+    await expect(transport.command(deleteCommandRequest())).resolves.toMatchObject({
+      status: 'refused',
+      reason: 'unsupported-capability',
+      detail: expect.stringContaining('permanent watcher deletion')
+    })
+    expect(remote.environment.mutate).not.toHaveBeenCalled()
+    expect(local.command).not.toHaveBeenCalled()
+    transport.dispose()
+  })
+
+  it('negotiates the deletion capability again when sending the destructive command', async () => {
+    const remote = environmentHarness([
+      'heimdall.commands.v1',
+      HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
+    ])
+    const transport = new HeimdallFleetTransport({
+      kernel: kernel(),
+      userDataPath: () => '/unused',
+      environments: remote.environment
+    })
+    await transport.fleet()
+    await vi.waitFor(() => expect(() => remote.callbacks()).not.toThrow())
+    const request = deleteCommandRequest()
+
+    await expect(transport.command(request)).resolves.toMatchObject({ status: 'applied' })
+    expect(remote.environment.mutate).toHaveBeenCalledWith(
+      { id: 'environment-1', pairingRevision: 7 },
+      'heimdall:command',
+      {
+        ...request,
+        target: { watcherId: 'watcher-1', connectionId: null, pairingRevision: null }
+      },
+      HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
+    )
+    transport.dispose()
+  })
+
   it('routes a remote command with a local owner target and the original owner fence', async () => {
     const remote = environmentHarness()
     const transport = new HeimdallFleetTransport({
@@ -523,6 +594,123 @@ describe('HeimdallFleetTransport', () => {
     const second = await transport.fleet()
 
     expect(second.generatedAtMs).toBeGreaterThan(first.generatedAtMs)
+    transport.dispose()
+  })
+
+  it('downgrades objective concurrency when enrolling against an older remote', async () => {
+    const remote = environmentHarness(['heimdall.commands.v1'])
+    remote.environment.mutate = vi.fn(async () =>
+      successful('heimdall:enroll', { status: 'enrolled', entry: fleetEntry().entry })
+    )
+    const transport = new HeimdallFleetTransport({
+      kernel: kernel(),
+      userDataPath: () => '/unused',
+      environments: remote.environment
+    })
+    const input: EnrollInput = {
+      ...enrollInput(undefined),
+      kind: 'objective',
+      kindPayload: { lanesEnabled: true, maxConcurrency: 3, objective: 'Keep this field' }
+    }
+
+    const result = await transport.enroll(input, REMOTE_OWNER)
+
+    expect(result.status).toBe('enrolled')
+    expect(remote.environment.mutate).toHaveBeenCalledWith(
+      { id: 'environment-1', pairingRevision: 7 },
+      'heimdall:enroll',
+      {
+        input: {
+          ...input,
+          kindPayload: { maxConcurrency: 1, objective: 'Keep this field' }
+        },
+        owner: null
+      }
+    )
+    transport.dispose()
+  })
+
+  it('preserves objective concurrency when the remote advertises parallel execution', async () => {
+    const remote = environmentHarness([
+      'heimdall.commands.v1',
+      HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
+    ])
+    remote.environment.mutate = vi.fn(async () =>
+      successful('heimdall:enroll', { status: 'enrolled', entry: fleetEntry().entry })
+    )
+    const transport = new HeimdallFleetTransport({
+      kernel: kernel(),
+      userDataPath: () => '/unused',
+      environments: remote.environment
+    })
+    const input: EnrollInput = {
+      ...enrollInput(undefined),
+      kind: 'objective',
+      kindPayload: { lanesEnabled: false, maxConcurrency: 4 }
+    }
+
+    const result = await transport.enroll(input, REMOTE_OWNER)
+
+    expect(result.status).toBe('enrolled')
+    expect(remote.environment.mutate).toHaveBeenCalledWith(
+      { id: 'environment-1', pairingRevision: 7 },
+      'heimdall:enroll',
+      { input, owner: null }
+    )
+    transport.dispose()
+  })
+
+  it('refuses to enroll an owner against a remote that has not negotiated owner support', async () => {
+    const remote = environmentHarness(['heimdall.commands.v1'])
+    const transport = new HeimdallFleetTransport({
+      kernel: kernel(),
+      userDataPath: () => '/unused',
+      environments: remote.environment
+    })
+
+    await expect(transport.enroll(enrollInput({ agent: 'claude' }), REMOTE_OWNER)).rejects.toThrow(
+      HeimdallEnrollOwnerCapabilityError
+    )
+    expect(remote.environment.mutate).not.toHaveBeenCalled()
+    transport.dispose()
+  })
+
+  it('lets an ownerless enroll through a remote that has not negotiated owner support', async () => {
+    const remote = environmentHarness(['heimdall.commands.v1'])
+    remote.environment.mutate = vi.fn(async () =>
+      successful('heimdall:enroll', { status: 'enrolled', entry: fleetEntry().entry })
+    )
+    const transport = new HeimdallFleetTransport({
+      kernel: kernel(),
+      userDataPath: () => '/unused',
+      environments: remote.environment
+    })
+
+    const result = await transport.enroll(enrollInput(undefined), REMOTE_OWNER)
+
+    expect(result.status).toBe('enrolled')
+    transport.dispose()
+  })
+
+  it('sends the owner selection once the remote negotiates owner support', async () => {
+    const remote = environmentHarness(['heimdall.commands.v1', 'heimdall.enroll-owner.v1'])
+    remote.environment.mutate = vi.fn(async () =>
+      successful('heimdall:enroll', { status: 'enrolled', entry: fleetEntry().entry })
+    )
+    const transport = new HeimdallFleetTransport({
+      kernel: kernel(),
+      userDataPath: () => '/unused',
+      environments: remote.environment
+    })
+
+    const result = await transport.enroll(enrollInput({ agent: 'claude' }), REMOTE_OWNER)
+
+    expect(result.status).toBe('enrolled')
+    expect(remote.environment.mutate).toHaveBeenCalledWith(
+      { id: 'environment-1', pairingRevision: 7 },
+      'heimdall:enroll',
+      { input: enrollInput({ agent: 'claude' }), owner: null }
+    )
     transport.dispose()
   })
 })

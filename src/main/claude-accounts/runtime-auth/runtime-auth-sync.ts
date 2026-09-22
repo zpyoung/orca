@@ -151,7 +151,16 @@ export class ClaudeRuntimeAuthSync extends ClaudeRuntimeAuthPreparationService {
           await this.restoreSystemDefaultSnapshot(this.lastWrittenCredentialsJson, undefined)
         }
       }
-      this.store.updateSettings({ activeClaudeManagedAccountId: null })
+      const nextSelection = setSelectedClaudeAccountIdForTarget(
+        normalizeClaudeRuntimeSelection(settings),
+        null,
+        normalizedTarget
+      )
+      this.store.updateSettings({
+        activeClaudeManagedAccountId:
+          normalizedTarget.runtime === 'host' ? null : settings.activeClaudeManagedAccountId,
+        activeClaudeManagedAccountIdsByRuntime: nextSelection
+      })
       this.lastSyncedAccountId = null
       return
     }
@@ -176,7 +185,16 @@ export class ClaudeRuntimeAuthSync extends ClaudeRuntimeAuthPreparationService {
           await this.restoreSystemDefaultSnapshot(this.lastWrittenCredentialsJson, undefined)
         }
       }
-      this.store.updateSettings({ activeClaudeManagedAccountId: null })
+      const nextSelection = setSelectedClaudeAccountIdForTarget(
+        normalizeClaudeRuntimeSelection(settings),
+        null,
+        normalizedTarget
+      )
+      this.store.updateSettings({
+        activeClaudeManagedAccountId:
+          normalizedTarget.runtime === 'host' ? null : settings.activeClaudeManagedAccountId,
+        activeClaudeManagedAccountIdsByRuntime: nextSelection
+      })
       this.lastSyncedAccountId = null
       return
     }

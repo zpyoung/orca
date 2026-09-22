@@ -1,6 +1,7 @@
 import type {
   WatcherFleetActivity,
   WatcherFleetEntry,
+  WatcherFleetParallelSummary,
   WatcherFleetWorkspace,
   WatcherOwnerFence
 } from '../../shared/fork-heimdall/fleet-types'
@@ -140,6 +141,7 @@ export type LocalFleetProjectionInput = {
   ledger: WatcherLedger
   traces: readonly WatcherTickTrace[]
   workspaceLabel: string | null
+  parallel?: WatcherFleetParallelSummary
 }
 
 export type LocalFleetProjectionRevision = {
@@ -179,13 +181,40 @@ export function localFleetEntry(
   owned: boolean,
   projection: LocalFleetProjectionInput
 ): WatcherFleetEntry {
-  const capabilityNotes =
-    entry.enrollment.schedulerOwner === 'ssh_bridge'
-      ? [
-          'SSH control requires this desktop client to stay connected; use a remote runtime for unattended work.'
-        ]
-      : []
+  const capabilityNotes: string[] = []
+  if (entry.enrollment.schedulerOwner === 'ssh_bridge') {
+    capabilityNotes.push(
+      'SSH control requires this desktop client to stay connected; use a remote runtime for unattended work.'
+    )
+  }
+  const kindPayload = entry.enrollment.kindPayload
+  if (
+    entry.enrollment.kind === 'objective' &&
+    typeof kindPayload === 'object' &&
+    kindPayload !== null &&
+    'workspaceKind' in kindPayload &&
+    kindPayload.workspaceKind === 'folder'
+  ) {
+    capabilityNotes.push(
+      'Folder workspaces cannot create worktrees, so objective concurrency is limited to 1.'
+    )
+  }
   const activity = activitySummary(projection.ledger, owned)
+  const parallel =
+    projection.parallel &&
+    entry.enrollment.kind === 'objective' &&
+    typeof kindPayload === 'object' &&
+    kindPayload !== null &&
+    'maxConcurrency' in kindPayload &&
+    typeof kindPayload.maxConcurrency === 'number'
+      ? {
+          ...projection.parallel,
+          effectiveMaxConcurrency:
+            'workspaceKind' in kindPayload && kindPayload.workspaceKind === 'folder'
+              ? 1
+              : kindPayload.maxConcurrency
+        }
+      : projection.parallel
   return {
     target: { watcherId: entry.enrollment.watcherId, connectionId: null, pairingRevision: null },
     entry,
@@ -200,6 +229,7 @@ export function localFleetEntry(
         ? latestSnapshotString(projection.traces, 'phase')
         : entry.status.phase,
     ...(activity ? { activity } : {}),
+    ...(parallel ? { parallel } : {}),
     workspace: workspaceSummary(entry, projection.traces, projection.workspaceLabel)
   }
 }

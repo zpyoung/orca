@@ -6,7 +6,9 @@ import type {
   WorkerReportSettlement
 } from '../../types'
 import { OrchestrationError } from '../../orchestration-error'
+import { readLifecycleRejectionMarker } from '../lifecycle-rejection-marker'
 import type { OrchestrationDb } from '../orchestration-db'
+import { workerReportObservation } from '../../worker-report-observation'
 
 export function importFederatedRelayItem(
   this: OrchestrationDb,
@@ -34,7 +36,15 @@ export function importFederatedRelayItem(
           outcome: WorkerReportOutcome
           result: string
         }
-      | { kind: 'rejected'; code: string; reason: string }
+      | {
+          kind: 'terminal_rejection'
+          taskId: string
+          code: string
+          reason: string
+          originalReason: string
+          result: string
+        }
+      | { kind: 'rejected'; code: string; reason: string; suppressMessage?: boolean }
   }
 ): {
   message: MessageRow
@@ -88,14 +98,45 @@ export function importFederatedRelayItem(
       | WorkerReportSettlement
       | { action: 'rejected'; code: string; reason: string }
       | undefined
-    if (params.lifecycle.kind === 'heartbeat' && !duplicate) {
+    const persistedRejection = duplicate ? readLifecycleRejectionMarker(message.payload) : null
+    if (params.lifecycle.kind === 'terminal_rejection') {
+      lifecycle = this.settleWorkerReportInTransaction({
+        taskId: params.lifecycle.taskId,
+        dispatchId: params.dispatchId,
+        outcome: 'failed',
+        result: params.lifecycle.result,
+        observation: {
+          ...workerReportObservation(message),
+          status: 'rejected',
+          reason: params.lifecycle.originalReason
+        }
+      })
+      const rejection =
+        lifecycle.action === 'rejected'
+          ? { code: lifecycle.code, reason: lifecycle.reason }
+          : { code: params.lifecycle.code, reason: params.lifecycle.reason }
+      if (!duplicate) {
+        message = this.convertLifecycleMessageToRejection(
+          message.id,
+          rejection.code,
+          rejection.reason,
+          {
+            originalReason:
+              lifecycle.action === 'rejected' ? lifecycle.reason : params.lifecycle.originalReason
+          }
+        ) as MessageRow
+      }
+    } else if (persistedRejection) {
+      lifecycle = { action: 'rejected', ...persistedRejection }
+    } else if (params.lifecycle.kind === 'heartbeat' && !duplicate) {
       this.recordHeartbeat(params.dispatchId, params.lifecycle.at)
     } else if (params.lifecycle.kind === 'worker_report') {
       lifecycle = this.settleWorkerReportInTransaction({
         taskId: params.lifecycle.taskId,
         dispatchId: params.dispatchId,
         outcome: params.lifecycle.outcome,
-        result: params.lifecycle.result
+        result: params.lifecycle.result,
+        observation: workerReportObservation(message)
       })
       if (lifecycle.action === 'rejected' && !duplicate) {
         message = this.convertLifecycleMessageToRejection(
@@ -116,6 +157,10 @@ export function importFederatedRelayItem(
           params.lifecycle.code,
           params.lifecycle.reason
         ) as MessageRow
+        if (params.lifecycle.suppressMessage) {
+          this.db.prepare('UPDATE messages SET read = 1 WHERE id = ?').run(message.id)
+          message = this.getMessageById(message.id) as MessageRow
+        }
       }
     }
     if (!duplicate) {

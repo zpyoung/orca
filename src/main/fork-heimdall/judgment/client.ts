@@ -122,14 +122,36 @@ export type JudgmentClientOptions = {
   timeoutMs?: number
 }
 
-class JudgmentClientFailure extends Error {}
+export type JudgmentClientFailureDiagnostic =
+  | { code: 'timeout' }
+  | { code: 'http-status'; status: number }
+  | { code: 'retry-exhausted'; status: number; attempts: number }
+  | { code: 'state-size' | 'request-size' | 'response-size' }
+  | { code: 'malformed-response' }
+  | { code: 'unknown' }
+
+export class JudgmentClientFailure extends Error {
+  constructor(
+    message: string,
+    readonly diagnostic: JudgmentClientFailureDiagnostic = { code: 'unknown' }
+  ) {
+    super(message)
+  }
+}
 
 type AttemptResult =
   | { response: JudgmentResponse; status?: never }
   | { response?: never; status: number }
 
-function failure(provider: JudgmentProvider, message: string): JudgmentClientFailure {
-  return new JudgmentClientFailure(`${JUDGMENT_TRANSPORTS[provider].label} judgment ${message}`)
+function failure(
+  provider: JudgmentProvider,
+  message: string,
+  diagnostic: JudgmentClientFailureDiagnostic = { code: 'unknown' }
+): JudgmentClientFailure {
+  return new JudgmentClientFailure(
+    `${JUDGMENT_TRANSPORTS[provider].label} judgment ${message}`,
+    diagnostic
+  )
 }
 
 type SerializedRequest = {
@@ -146,8 +168,11 @@ function serializeState(provider: JudgmentProvider, state: unknown): string {
     if (serialized === undefined) {
       throw failure(provider, 'state is invalid')
     }
-    if (Buffer.byteLength(serialized, 'utf8') > JUDGMENT_MAX_STATE_BYTES) {
-      throw failure(provider, `state exceeds the ${JUDGMENT_MAX_STATE_BYTES}-byte limit`)
+    const serializedBytes = Buffer.byteLength(serialized, 'utf8')
+    if (serializedBytes > JUDGMENT_MAX_STATE_BYTES) {
+      throw failure(provider, `state exceeds the ${JUDGMENT_MAX_STATE_BYTES}-byte limit`, {
+        code: 'state-size'
+      })
     }
     return serialized
   } catch (error) {
@@ -174,8 +199,11 @@ function serializeRequest(
   const questionsJson = JSON.stringify(parsedQuestions)
   const modelJson = JSON.stringify(JUDGMENT_TRANSPORTS[provider].model)
   const body = `{"model":${modelJson},"state":${stateJson},"questions":${questionsJson}}`
-  if (Buffer.byteLength(body, 'utf8') > JUDGMENT_MAX_REQUEST_BYTES) {
-    throw failure(provider, `request exceeds the ${JUDGMENT_MAX_REQUEST_BYTES}-byte limit`)
+  const bodyBytes = Buffer.byteLength(body, 'utf8')
+  if (bodyBytes > JUDGMENT_MAX_REQUEST_BYTES) {
+    throw failure(provider, `request exceeds the ${JUDGMENT_MAX_REQUEST_BYTES}-byte limit`, {
+      code: 'request-size'
+    })
   }
   return { body, questions: parsedQuestions }
 }
@@ -200,7 +228,9 @@ async function readBoundedResponse(
   const declaredBytes = Number(response.headers.get('content-length') ?? '0')
   if (Number.isFinite(declaredBytes) && declaredBytes > JUDGMENT_MAX_RESPONSE_BYTES) {
     await cancelUnreadResponseBody(response)
-    throw failure(provider, `response exceeds the ${JUDGMENT_MAX_RESPONSE_BYTES}-byte limit`)
+    throw failure(provider, `response exceeds the ${JUDGMENT_MAX_RESPONSE_BYTES}-byte limit`, {
+      code: 'response-size'
+    })
   }
   if (!response.body) {
     return ''
@@ -217,7 +247,9 @@ async function readBoundedResponse(
     totalBytes += chunk.value.byteLength
     if (totalBytes > JUDGMENT_MAX_RESPONSE_BYTES) {
       await reader.cancel().catch(() => undefined)
-      throw failure(provider, `response exceeds the ${JUDGMENT_MAX_RESPONSE_BYTES}-byte limit`)
+      throw failure(provider, `response exceeds the ${JUDGMENT_MAX_RESPONSE_BYTES}-byte limit`, {
+        code: 'response-size'
+      })
     }
     chunks.push(chunk.value)
   }
@@ -231,7 +263,7 @@ async function readBoundedResponse(
   try {
     return new TextDecoder('utf-8', { fatal: true }).decode(bytes)
   } catch {
-    throw failure(provider, 'response is invalid')
+    throw failure(provider, 'response is invalid', { code: 'malformed-response' })
   }
 }
 
@@ -370,21 +402,19 @@ async function parseResponse(
   response: Response,
   questions: Record<string, JudgmentQuestion>
 ): Promise<JudgmentResponse> {
+  const body = await readBoundedResponse(provider, response)
   let raw: unknown
   try {
-    raw = JSON.parse(await readBoundedResponse(provider, response))
-  } catch (error) {
-    if (error instanceof JudgmentClientFailure) {
-      throw error
-    }
-    throw failure(provider, 'response is invalid')
+    raw = JSON.parse(body)
+  } catch {
+    throw failure(provider, 'response is invalid', { code: 'malformed-response' })
   }
 
   try {
     if (provider === 'typesafe') {
       const parsed = JudgmentVendorResponseSchema.parse(raw)
       if (!answersMatchQuestions(parsed.answers, questions)) {
-        throw failure(provider, 'response is invalid')
+        throw failure(provider, 'response is invalid', { code: 'malformed-response' })
       }
       return { model: parsed.model, answers: parsed.answers }
     }
@@ -392,14 +422,14 @@ async function parseResponse(
     const parsed = JudgmentOpenRouterResponseSchema.parse(raw)
     const answers = normalizeOpenRouterAnswers(parsed.answers, questions)
     if (answers === null || !answersMatchQuestions(answers, questions)) {
-      throw failure(provider, 'response is invalid')
+      throw failure(provider, 'response is invalid', { code: 'malformed-response' })
     }
     return { model: parsed.model, answers }
   } catch (error) {
     if (error instanceof JudgmentClientFailure) {
       throw error
     }
-    throw failure(provider, 'response is invalid')
+    throw failure(provider, 'response is invalid', { code: 'malformed-response' })
   }
 }
 
@@ -449,7 +479,7 @@ export function createJudgmentClient(
         })
       } catch {
         throw controller.signal.aborted
-          ? failure(provider, 'request timed out')
+          ? failure(provider, 'request timed out', { code: 'timeout' })
           : failure(provider, 'request failed')
       }
 
@@ -460,7 +490,7 @@ export function createJudgmentClient(
       return { response: await parseResponse(provider, response, questions) }
     } catch (error) {
       if (controller.signal.aborted) {
-        throw failure(provider, 'request timed out')
+        throw failure(provider, 'request timed out', { code: 'timeout' })
       }
       if (error instanceof JudgmentClientFailure) {
         throw error
@@ -479,8 +509,18 @@ export function createJudgmentClient(
         if (result.response) {
           return result.response
         }
-        if ((result.status !== 429 && result.status !== 529) || attempt === MAX_ATTEMPTS - 1) {
-          throw failure(provider, `request failed with HTTP ${result.status}`)
+        if (result.status !== 429 && result.status !== 529) {
+          throw failure(provider, `request failed with HTTP ${result.status}`, {
+            code: 'http-status',
+            status: result.status
+          })
+        }
+        if (attempt === MAX_ATTEMPTS - 1) {
+          throw failure(provider, `request failed with HTTP ${result.status}`, {
+            code: 'retry-exhausted',
+            status: result.status,
+            attempts: MAX_ATTEMPTS
+          })
         }
         try {
           await sleep(RETRY_BASE_DELAY_MS * 2 ** attempt)

@@ -36,6 +36,13 @@ import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { JudgmentAuthority, JudgmentService } from '../fork-heimdall/judgment/service'
 import { readObjectiveJudgmentReports } from '../fork-heimdall/judgment/report-projection'
 import { createObjectiveActionExecutor } from './action-executor'
+import { reconcileAmendedObjectiveDispatches } from './amendment-dispatch-reconciliation'
+import { createObjectiveConcurrencyPolicy } from './objective-concurrency'
+import { shouldRetainObjectiveWorker } from './dispatch-session'
+import {
+  purgeObjectiveDispatchWorktrees,
+  reconcileObjectiveDispatchWorktrees
+} from './dispatch-worktree'
 import { computeWorkspaceContentIdentity, type ObjectiveWorkspaceTarget } from './content-identity'
 import { defaultObjectiveForgeAccess, type ObjectiveForgeAccess } from './objective-forge-access'
 import {
@@ -50,7 +57,9 @@ import {
 } from './execution-context'
 import { readObjectiveLandingContext } from './landing-snapshot'
 import { HostedReviewLandingPayloadSchema } from './objective-store-data'
+import { createObjectiveOwnerAdapter } from './owner-adapter'
 import type { ObjectiveStore } from './objective-store'
+import { createObjectiveSubmissionAdapter } from './report-submission-preflight'
 import { resolveObjectiveWorkspaceTarget } from './workspace-target'
 import type { ObjectiveAction } from '../../shared/fork-heimdall-objective/objective-actions'
 
@@ -62,10 +71,11 @@ export function decideObjectiveForEnrollment(
   ledger: WatcherLedger,
   enrollment: WatcherEnrollment
 ): ObjectiveDecisionOutcome {
-  const decision = decideObjective(snapshot, ledger)
+  const decision = decideObjective(snapshot, ledger, enrollment.owner !== undefined)
   const requiresPlan =
     decision.action?.capability === 'plan' ||
     (decision.action === null &&
+      'considered' in decision &&
       decision.considered.some((considered) => considered.phase === 'plan'))
   if (enrollment.capabilities.plan !== 'off' || !requiresPlan) {
     return decision
@@ -78,7 +88,9 @@ export function paceObjectiveForEnrollment(
   ledger: WatcherLedger,
   decision: ObjectiveDecisionOutcome
 ): PacingTier {
-  return decision.action === null && decision.reason === PLAN_OFF_WITHOUT_USABLE_PLAN
+  return decision.action === null &&
+    'reason' in decision &&
+    decision.reason === PLAN_OFF_WITHOUT_USABLE_PLAN
     ? 'idle'
     : paceObjective(snapshot, ledger)
 }
@@ -124,8 +136,18 @@ function objectivePreflight(args: {
   enrollment: WatcherEnrollment
   target: ObjectiveWorkspaceTarget
 }): GateVerdict {
+  const action = args.action
+  const conflictContinuation =
+    action.kind === 'dispatch-node' &&
+    args.snapshot.world.parallel?.dispatches.some(
+      (dispatch) =>
+        dispatch.state === 'resolving-conflict' &&
+        dispatch.revisionId === action.revisionId &&
+        dispatch.taskKey === action.taskKey
+    )
   if (
     args.action.kind.startsWith('dispatch-') &&
+    !conflictContinuation &&
     deriveBudgetState(args.ledger, args.enrollment.budget).exhausted
   ) {
     return { verdict: 'hold', reason: 'budget-bucket-exhausted' }
@@ -228,13 +250,44 @@ export function createObjectiveKind(args: {
   const snapshotBindings = new WeakMap<Snapshot<ObjectiveWorld>, ObjectiveSnapshotBinding>()
   const snapshotDecisions = new WeakMap<Snapshot<ObjectiveWorld>, ObjectiveDecisionOutcome>()
   const latestWorlds = new Map<string, ObjectiveWorld>()
+  const latestEnrollments = new Map<string, WatcherEnrollment>()
   const storageAuthority = args.storageAuthority ?? 'desktop'
   const forge = args.forge ?? defaultObjectiveForgeAccess
   const executor = createObjectiveActionExecutor({
+    runtime: args.runtime,
     store: args.store,
     objectiveStore: args.objectiveStore,
     snapshotBindings,
     forge
+  })
+  const concurrency = createObjectiveConcurrencyPolicy({
+    objectiveStore: args.objectiveStore,
+    snapshotBindings,
+    retainWorker: (attempt, ledger) =>
+      shouldRetainObjectiveWorker(
+        args.objectiveStore,
+        attempt,
+        ledger,
+        latestEnrollments.get(attempt.watcherId)
+      ),
+    async reconcile(snapshot, ledger, context) {
+      await reconcileAmendedObjectiveDispatches({
+        ledger,
+        objectiveStore: args.objectiveStore,
+        lease: context.lease,
+        stopWorker: context.stopWorker
+      })
+      if (args.objectiveStore.listDispatches(context.enrollment.watcherId).length > 0) {
+        await context.lease.assertHeld()
+        await reconcileObjectiveDispatchWorktrees({
+          runtime: args.runtime,
+          binding: requireObjectiveSnapshotBinding(snapshotBindings, snapshot),
+          objectiveStore: args.objectiveStore,
+          lease: context.lease,
+          workerReleaseConfirmed: context.workerReleaseConfirmed
+        })
+      }
+    }
   })
   return {
     id: 'objective',
@@ -248,6 +301,16 @@ export function createObjectiveKind(args: {
         existing,
         existing?.kind === 'objective' && args.objectiveStore.hasUsablePlan(existing.watcherId)
       )
+    },
+    async purge(watcherId) {
+      await purgeObjectiveDispatchWorktrees({
+        runtime: args.runtime,
+        watcherId,
+        objectiveStore: args.objectiveStore
+      })
+      latestWorlds.delete(watcherId)
+      latestEnrollments.delete(watcherId)
+      args.objectiveStore.purge(watcherId)
     },
     describeEnrollment(enrollment) {
       const text = objectiveContractFromEnrollment(enrollment).objectiveText
@@ -280,7 +343,8 @@ export function createObjectiveKind(args: {
         reports: [],
         budget: enrollment.budget,
         capabilities: enrollment.capabilities,
-        landingContext
+        landingContext,
+        parallel: args.objectiveStore.parallelProjection(enrollment.watcherId, contract)
       })
       if (args.judgmentService) {
         const authority = judgmentAuthority(storageAuthority, target)
@@ -305,6 +369,7 @@ export function createObjectiveKind(args: {
         world = ObjectiveWorldSchema.parse({ ...world, judgment })
       }
       latestWorlds.set(enrollment.watcherId, world)
+      latestEnrollments.set(enrollment.watcherId, enrollment)
       const snapshot: Snapshot<ObjectiveWorld> = {
         freshness: options.fresh ? 'live' : 'cached',
         contentIdentity,
@@ -333,6 +398,9 @@ export function createObjectiveKind(args: {
         nodesDone: nodes.filter((node) => node.state === 'succeeded').length,
         nodesTotal: nodes.length,
         phase: objectivePhase(snapshot),
+        runningCount: snapshot.world.parallel?.runningCount ?? 0,
+        effectiveMaxConcurrency: snapshot.world.parallel?.effectiveMaxConcurrency ?? 1,
+        parallelNote: snapshot.world.parallel?.note ?? null,
         branch: snapshot.world.landingContext.branch,
         judgmentStatus: judgment?.status ?? null,
         judgmentAnswerCount: judgmentAnswers.length,
@@ -365,6 +433,7 @@ export function createObjectiveKind(args: {
     },
     execute: executor.execute,
     resolveOutcome: executor.resolveOutcome,
+    concurrency,
     stopPredicates: OBJECTIVE_STOP_PREDICATES,
     pacing: {
       pace(snapshot, ledger) {
@@ -381,6 +450,11 @@ export function createObjectiveKind(args: {
     },
     planner: {},
     handoff: objectiveHandoffAdapter(args.objectiveStore, latestWorlds),
+    submission: createObjectiveSubmissionAdapter({
+      runtime: args.runtime,
+      objectiveStore: args.objectiveStore
+    }),
+    owner: createObjectiveOwnerAdapter(),
     debug: {
       pointers: () => [
         {

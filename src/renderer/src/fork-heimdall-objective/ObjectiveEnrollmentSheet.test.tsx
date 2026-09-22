@@ -11,6 +11,7 @@ import {
   OBJECTIVE_EXISTING_PLAN_MAX_LENGTH,
   objectiveCapabilityModes
 } from '../../../shared/fork-heimdall-objective/contract-types'
+import { defaultWatcherOwnerDraft } from '../fork-heimdall/watcher-owner-draft'
 import { ObjectiveEnrollmentFields } from './ObjectiveEnrollmentFields'
 import { buildObjectiveEnrollmentSubmission } from './objective-enrollment-request'
 import {
@@ -33,6 +34,7 @@ function draft(overrides: Partial<ObjectiveEnrollmentDraft> = {}): ObjectiveEnro
     tier: 'standard',
     landingBar: 'files-on-disk',
     maxConcurrency: 1,
+    lanesEnabled: true,
     workspaceKind: 'git',
     writeTerritoryText: 'src/**\ntests/**',
     capabilities: objectiveCapabilityModes('files-on-disk'),
@@ -46,6 +48,7 @@ function draft(overrides: Partial<ObjectiveEnrollmentDraft> = {}): ObjectiveEnro
     activeBudgetHours: 4,
     turns: '40',
     availableAgentIds: ['codex'],
+    owner: defaultWatcherOwnerDraft(),
     ...overrides
   }
 }
@@ -105,10 +108,13 @@ function runtimeState(): Pick<
   AppState,
   | 'repos'
   | 'worktreesByRepo'
+  | 'folderWorkspaces'
+  | 'projectGroups'
   | 'runtimeEnvironments'
   | 'detectedAgentIds'
   | 'remoteDetectedAgentIds'
   | 'runtimeDetectedAgentIds'
+  | 'runtimeStatusByEnvironmentId'
   | 'settings'
 > {
   return {
@@ -120,7 +126,7 @@ function runtimeState(): Pick<
         badgeColor: 'gray',
         addedAt: 1,
         kind: 'git',
-        executionHostId: 'runtime:hermes'
+        executionHostId: 'ssh:build'
       },
       {
         id: 'folder-repo',
@@ -152,10 +158,12 @@ function runtimeState(): Pick<
           isPinned: false,
           sortOrder: 0,
           lastActivityAt: 1,
-          hostId: 'runtime:hermes'
+          hostId: 'ssh:build'
         }
       ]
     },
+    folderWorkspaces: [],
+    projectGroups: [],
     runtimeEnvironments: [
       {
         id: 'hermes',
@@ -170,8 +178,9 @@ function runtimeState(): Pick<
       }
     ],
     detectedAgentIds: ['claude'],
-    remoteDetectedAgentIds: {},
+    remoteDetectedAgentIds: { build: ['claude'] },
     runtimeDetectedAgentIds: { hermes: ['codex'] },
+    runtimeStatusByEnvironmentId: new Map(),
     settings: { ...getDefaultSettings('/tmp'), disabledTuiAgents: [] }
   }
 }
@@ -274,7 +283,7 @@ describe('objective enrollment contract', () => {
       draft({
         workspaceKind: 'folder',
         landingBar: 'merged',
-        maxConcurrency: 2,
+        maxConcurrency: 0,
         writeTerritoryText: '.g*/**\nsrc/**\nsrc/**',
         roleAgents: { planner: 'claude', implementer: '', reviewer: '', integrator: '' }
       }),
@@ -283,7 +292,7 @@ describe('objective enrollment contract', () => {
 
     expect(errors.map((error) => error.code)).toEqual([
       'landing-bar-requires-git',
-      'max-concurrency-unsupported',
+      'max-concurrency-invalid',
       'territory-duplicate',
       'territory-invalid',
       'role-agent-unknown'
@@ -331,7 +340,7 @@ describe('objective enrollment contract', () => {
     )
   })
 
-  it('routes both git and folder selections to their actual runtime owner', () => {
+  it('routes SSH Git and an unhydrated runtime folder Repo to their actual hosts', () => {
     const options = buildObjectiveWorkspaceOptions(runtimeState())
     const git = options.find((option) => option.workspaceKind === 'git')
     const folder = options.find((option) => option.workspaceKind === 'folder')
@@ -339,14 +348,60 @@ describe('objective enrollment contract', () => {
     expect(git).toMatchObject({
       repoId: 'git-repo',
       worktreeId: 'git-repo::/workspace/git',
-      owner: { connectionId: 'hermes', pairingRevision: 22 },
-      availableAgentIds: ['codex']
+      owner: undefined,
+      availableAgentIds: ['claude']
     })
     expect(folder).toMatchObject({
       repoId: 'folder-repo',
       worktreeId: null,
       owner: { connectionId: 'hermes', pairingRevision: 22 },
       availableAgentIds: ['codex']
+    })
+  })
+
+  it('uses the canonical local folder-workspace identity for enrollment', () => {
+    const options = buildObjectiveWorkspaceOptions({
+      ...runtimeState(),
+      folderWorkspaces: [
+        {
+          id: 'notes',
+          projectGroupId: 'personal',
+          name: 'Notes',
+          folderPath: '/workspace/notes',
+          linkedTask: null,
+          comment: '',
+          isArchived: false,
+          isUnread: false,
+          isPinned: false,
+          sortOrder: 0,
+          lastActivityAt: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          executionHostId: 'local'
+        }
+      ],
+      projectGroups: [
+        {
+          id: 'personal',
+          name: 'Personal',
+          parentPath: '/workspace',
+          parentGroupId: null,
+          createdFrom: 'manual',
+          tabOrder: 0,
+          isCollapsed: false,
+          color: null,
+          createdAt: 1,
+          updatedAt: 1
+        }
+      ]
+    })
+
+    expect(options.find((option) => option.workspacePath === '/workspace/notes')).toMatchObject({
+      repoId: 'folder-workspace:personal',
+      worktreeId: 'folder:notes',
+      workspaceKind: 'folder',
+      owner: undefined,
+      availableAgentIds: ['claude']
     })
   })
 
@@ -376,6 +431,7 @@ describe('objective enrollment contract', () => {
       kindPayload: {
         objectiveText: 'Ship it',
         maxConcurrency: 1,
+        lanesEnabled: true,
         existingPlan: '# Supplied plan\n\nShip task A.',
         workspaceKind: 'git',
         writeTerritory: ['src/**', 'tests/**'],
@@ -387,5 +443,33 @@ describe('objective enrollment contract', () => {
       buildObjectiveEnrollmentSubmission(draft({ existingPlanText: ' \n\t' }), objectiveWorkspace())
         .input.kindPayload
     ).not.toHaveProperty('existingPlan')
+  })
+
+  it('strips parallel-only fields when enrolling on an older remote host', () => {
+    const workspace = { ...objectiveWorkspace(), parallelExecutionSupported: false }
+    const submission = buildObjectiveEnrollmentSubmission(
+      draft({ lanesEnabled: true, maxConcurrency: 7 }),
+      workspace
+    )
+
+    expect(submission.input.kindPayload).toMatchObject({ maxConcurrency: 1 })
+    expect(submission.input.kindPayload).not.toHaveProperty('lanesEnabled')
+  })
+
+  it('omits owner and its capability from the submission when no owner is configured', () => {
+    const submission = buildObjectiveEnrollmentSubmission(draft(), objectiveWorkspace())
+
+    expect(submission.input.owner).toBeUndefined()
+    expect(submission.input.ownerInterventionCapability).toBeUndefined()
+  })
+
+  it('submits a configured claude owner and its gated intervention capability', () => {
+    const submission = buildObjectiveEnrollmentSubmission(
+      draft({ owner: { enabled: true, model: 'opus', effort: 'high' } }),
+      objectiveWorkspace()
+    )
+
+    expect(submission.input.owner).toEqual({ agent: 'claude', model: 'opus', effort: 'high' })
+    expect(submission.input.ownerInterventionCapability).toBe('gated')
   })
 })

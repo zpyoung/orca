@@ -79,7 +79,7 @@ export async function readAndRefreshJudgmentSnapshot(args: {
   leaseGuard: NonNullable<WatcherRunner['leaseGuard']>
   now: () => number
   readLedger: () => WatcherLedger
-  abandonPendingAttempts: (ledger: WatcherLedger) => void
+  abandonPendingAttempts: (snapshot: Snapshot<unknown>, ledger: WatcherLedger) => void
   refreshWorkers: () => Promise<WatcherLedger | null>
 }): Promise<{ snapshot: Snapshot<unknown>; ledger: WatcherLedger } | null> {
   let ledger = args.ledger
@@ -105,7 +105,7 @@ export async function readAndRefreshJudgmentSnapshot(args: {
 
   const previousIdentity = getLastDecidedContentIdentity(ledger)
   if (previousIdentity && previousIdentity !== snapshot.contentIdentity) {
-    args.abandonPendingAttempts(ledger)
+    args.abandonPendingAttempts(snapshot, ledger)
     ledger = args.readLedger()
   }
 

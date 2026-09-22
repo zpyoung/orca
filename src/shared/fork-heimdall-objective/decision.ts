@@ -1,5 +1,6 @@
 import type { WatcherLedger } from '../fork-heimdall/ledger-types'
 import type { Snapshot } from '../fork-heimdall/snapshot'
+import { objectiveLandingFailedDeviation } from './deviation-context'
 import {
   activeObjectiveRevision,
   decidePlannerAction,
@@ -20,6 +21,19 @@ import { highestReachedRung, nextRung, reachedRungs, stopRungForBar } from './la
 
 export type { ObjectiveDecisionOutcome, ObjectiveNoActionReason }
 export { projectObjectiveReports }
+export {
+  deriveObjectiveLanes,
+  objectiveLaneForTask,
+  objectiveParallelSlotState,
+  objectiveRemainingChainLengths,
+  prioritizeReadyObjectiveTaskKeys
+} from './parallel-scheduling'
+export type {
+  ObjectiveLane,
+  ObjectiveLaneOptions,
+  ObjectiveParallelSlotState,
+  ObjectiveSchedulingNode
+} from './parallel-scheduling'
 
 function latestLandingEntry(
   landing: readonly ObjectiveLandingProjection[],
@@ -151,7 +165,8 @@ function decideNextLandingRung(
 
 export function decideObjective(
   snapshot: Snapshot<ObjectiveWorld>,
-  ledger: WatcherLedger
+  ledger: WatcherLedger,
+  ownerConfigured = false
 ): ObjectiveDecisionOutcome {
   const attempts = objectiveAttempts(ledger)
   const landing = snapshot.world.plan.landing
@@ -166,7 +181,7 @@ export function decideObjective(
   }
 
   const reports = projectObjectiveReports(ledger)
-  const planDecision = decideObjectivePlan(snapshot, ledger, attempts, reports)
+  const planDecision = decideObjectivePlan(snapshot, ledger, attempts, reports, ownerConfigured)
   if (planDecision) {
     return planDecision
   }
@@ -174,15 +189,36 @@ export function decideObjective(
   if (!revision) {
     return objectiveNoAction('plan', 'projection-refresh-pending')
   }
-  const nodeDecision = decideObjectiveNodes(snapshot, ledger, attempts, reports, revision)
+  const nodeDecision = decideObjectiveNodes(
+    snapshot,
+    ledger,
+    attempts,
+    reports,
+    revision,
+    ownerConfigured
+  )
   if (nodeDecision) {
     return nodeDecision
   }
-  const checkDecision = decideObjectiveChecks(snapshot, ledger, attempts, reports, revision)
+  const checkDecision = decideObjectiveChecks(
+    snapshot,
+    ledger,
+    attempts,
+    reports,
+    revision,
+    ownerConfigured
+  )
   if (checkDecision) {
     return checkDecision
   }
-  const reviewDecision = decideObjectiveReview(snapshot, ledger, attempts, reports, revision)
+  const reviewDecision = decideObjectiveReview(
+    snapshot,
+    ledger,
+    attempts,
+    reports,
+    revision,
+    ownerConfigured
+  )
   if (reviewDecision) {
     return reviewDecision
   }
@@ -194,6 +230,16 @@ export function decideObjective(
   )
   if (landingAttempt) {
     if (objectiveAttemptDisposition(landingAttempt.attempt, ledger) === 'not-landed') {
+      if (ownerConfigured) {
+        return {
+          action: null,
+          deviation: objectiveLandingFailedDeviation({
+            rung: 'files-on-disk',
+            contentIdentity: snapshot.contentIdentity,
+            reason: landingAttempt.attempt.reason ?? null
+          })
+        }
+      }
       return decidePlannerAction(
         snapshot,
         ledger,

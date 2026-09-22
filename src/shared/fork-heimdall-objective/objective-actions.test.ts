@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { OBJECTIVE_ABSENT_REMOTE_REF_STATE } from './contract-types'
-import {
-  ObjectiveActionResultSchema,
-  ObjectiveActionSchema,
-  objectiveActionNaturalKey
-} from './objective-actions'
+import { ObjectiveActionResultSchema } from './objective-action-results'
+import { ObjectiveActionSchema, objectiveActionNaturalKey } from './objective-actions'
 
 describe('objective action recovery contracts', () => {
   it('derives report and check natural keys entirely from persisted actions', () => {

@@ -8,6 +8,7 @@ import {
   objectiveNodeRetryCount,
   OBJECTIVE_INFRA_REDISPATCH_CAP
 } from '../../shared/fork-heimdall-objective/decision-context'
+import { OWNER_SKIP_REVIEW_DISPATCH_PREFIX } from '../../shared/fork-heimdall-objective/objective-actions'
 import {
   ObjectiveDetailSchema,
   ObjectiveProjectionSchema,
@@ -15,6 +16,7 @@ import {
   type ObjectiveNodeState,
   type ObjectiveProjection
 } from '../../shared/fork-heimdall-objective/detail-types'
+import { deriveObjectiveLanes } from '../../shared/fork-heimdall-objective/parallel-scheduling'
 import { getLatestAttempts } from '../../shared/fork-heimdall/ledger-queries'
 import { WatcherLedgerSchema, type WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type { ObjectiveDatabase } from './objective-database'
@@ -23,6 +25,7 @@ import {
   DependenciesSchema,
   parseLandingPayloadJson,
   parseJson,
+  type AmendmentRow,
   type CriterionRow,
   type LandingRow,
   type NodeRow,
@@ -43,9 +46,9 @@ export function projectObjective(
     FROM plan_revision WHERE watcher_id = ? ORDER BY revision_number, id`)
     .all(watcherId) as unknown as RevisionRow[]
   const nodes = db
-    .prepare(`SELECT n.revision_id, r.status AS revision_status, n.task_key, n.deps_json,
+    .prepare(`SELECT n.revision_id, r.status AS revision_status, n.task_key, n.deps_json, n.ordinal,
     n.orchestration_task_id, n.dispatch_id FROM plan_node n JOIN plan_revision r ON r.id = n.revision_id
-    WHERE n.watcher_id = ? ORDER BY r.revision_number, n.task_key`)
+    WHERE n.watcher_id = ? ORDER BY r.revision_number, n.ordinal, n.task_key`)
     .all(watcherId) as unknown as NodeRow[]
   const criteria = db
     .prepare(`SELECT id, revision_id, task_key, ordinal, body, shell_checkable, check_command
@@ -68,6 +71,30 @@ export function projectObjective(
     .prepare(`SELECT rung, content_identity, payload_json, created_at_ms
     FROM landing_evidence WHERE watcher_id = ? ORDER BY created_at_ms, rung`)
     .all(watcherId) as unknown as LandingRow[]
+  const amendments = db
+    .prepare(`SELECT revision_id, ordinal, digest, amended_at_ms, attestation, touched_task_keys_json
+    FROM revision_amendment WHERE watcher_id = ? ORDER BY revision_id, ordinal`)
+    .all(watcherId) as unknown as AmendmentRow[]
+  const isolatedDispatchIds = new Set(
+    (
+      db
+        .prepare(
+          `SELECT dispatch_id FROM objective_dispatch
+          WHERE watcher_id = ? AND dispatch_id IS NOT NULL`
+        )
+        .all(watcherId) as unknown as { dispatch_id: string }[]
+    ).map((row) => row.dispatch_id)
+  )
+  const appliedDispatchIds = new Set(
+    (
+      db
+        .prepare(
+          `SELECT dispatch_id FROM objective_dispatch
+          WHERE watcher_id = ? AND state = 'applied' AND dispatch_id IS NOT NULL`
+        )
+        .all(watcherId) as unknown as { dispatch_id: string }[]
+    ).map((row) => row.dispatch_id)
+  )
   return ObjectiveProjectionSchema.parse(
     buildProjection(
       revisions,
@@ -76,6 +103,9 @@ export function projectObjective(
       checks,
       verdicts,
       landing,
+      amendments,
+      isolatedDispatchIds,
+      appliedDispatchIds,
       ledger ? WatcherLedgerSchema.parse(ledger) : undefined
     )
   )
@@ -93,8 +123,9 @@ export function detailObjective(
   const db = database.connection()
   const nodes = db
     .prepare(`SELECT n.revision_id, r.status AS revision_status, n.task_key, n.title, n.deps_json,
-    n.orchestration_task_id, n.dispatch_id FROM plan_node n JOIN plan_revision r ON r.id = n.revision_id
-    WHERE n.watcher_id = ? ORDER BY r.revision_number, n.task_key`)
+    n.ordinal, n.orchestration_task_id, n.dispatch_id
+    FROM plan_node n JOIN plan_revision r ON r.id = n.revision_id
+    WHERE n.watcher_id = ? ORDER BY r.revision_number, n.ordinal, n.task_key`)
     .all(watcherId) as unknown as NodeRow[]
   const criteria = db
     .prepare(`SELECT id, revision_id, task_key, ordinal, body, shell_checkable, check_command
@@ -103,6 +134,18 @@ export function detailObjective(
   const projectedNodes = new Map(
     projection.nodes.map((node) => [`${node.revisionId}\0${node.taskKey}`, node])
   )
+  const laneTaskKeysByNode = new Map<string, string[]>()
+  for (const revision of projection.revisions) {
+    const lanes = deriveObjectiveLanes(
+      projection.nodes.filter((node) => node.revisionId === revision.id),
+      { enabled: parsedContract.lanesEnabled }
+    )
+    for (const lane of lanes) {
+      for (const taskKey of lane.taskKeys) {
+        laneTaskKeysByNode.set(`${revision.id}\0${taskKey}`, lane.taskKeys)
+      }
+    }
+  }
   const criteriaByNode = new Map<string, CriterionRow[]>()
   for (const criterion of criteria) {
     const key = `${criterion.revision_id}\0${criterion.task_key}`
@@ -111,13 +154,14 @@ export function detailObjective(
   return ObjectiveDetailSchema.parse({
     contract: parsedContract,
     revisions: projection.revisions.map(
-      ({ id, number, status, digest, createdAtMs, approvedAtMs }) => ({
+      ({ id, number, status, digest, createdAtMs, approvedAtMs, amendments }) => ({
         id,
         number,
         status,
         digest,
         createdAtMs,
         approvedAtMs,
+        amendments,
         nodeCount: nodes.filter((node) => node.revision_id === id).length
       })
     ),
@@ -136,6 +180,7 @@ export function detailObjective(
         revisionId: node.revision_id,
         orchestrationTaskId: node.orchestration_task_id,
         dispatchId: node.dispatch_id,
+        laneTaskKeys: laneTaskKeysByNode.get(key) ?? [node.task_key],
         state: projected.state,
         criteria: (criteriaByNode.get(key) ?? []).map((criterion) => {
           const value = projectedCriteria.get(criterion.id)
@@ -152,13 +197,16 @@ export function detailObjective(
         })
       }
     }),
-    verdicts: projection.verdicts.map(({ dispatchId, role, verdict, contentIdentity, atMs }) => ({
-      dispatchId,
-      role,
-      verdict,
-      contentIdentity,
-      atMs
-    })),
+    verdicts: projection.verdicts.map(
+      ({ dispatchId, role, verdict, contentIdentity, synthesizedByOwner, atMs }) => ({
+        dispatchId,
+        role,
+        verdict,
+        contentIdentity,
+        synthesizedByOwner,
+        atMs
+      })
+    ),
     landing: projection.landing.map(({ rung, contentIdentity, atMs }) => ({
       rung,
       contentIdentity,
@@ -175,8 +223,17 @@ function buildProjection(
   checks: ProjectionCheckRow[],
   verdictRows: VerdictRow[],
   landingRows: LandingRow[],
+  amendmentRows: AmendmentRow[],
+  isolatedDispatchIds: ReadonlySet<string>,
+  appliedDispatchIds: ReadonlySet<string>,
   ledger?: WatcherLedger
 ): unknown {
+  const amendmentsByRevision = new Map<string, ReturnType<typeof buildAmendmentProjection>[]>()
+  for (const row of amendmentRows) {
+    const list = amendmentsByRevision.get(row.revision_id) ?? []
+    list.push(buildAmendmentProjection(row))
+    amendmentsByRevision.set(row.revision_id, list)
+  }
   const checkByCriterion = new Map(checks.map((check) => [check.criterion_id, check]))
   const reviewByCriterion = new Map<string, 'pass' | 'block'>()
   for (const verdict of verdictRows) {
@@ -191,7 +248,7 @@ function buildProjection(
       )
     }
   }
-  const states = nodeStates(nodes, ledger)
+  const states = nodeStates(nodes, isolatedDispatchIds, appliedDispatchIds, ledger)
   return {
     revisions: revisions.map((row) => ({
       id: row.id,
@@ -200,7 +257,8 @@ function buildProjection(
       digest: row.digest,
       createdByDispatchId: row.created_by_dispatch_id,
       createdAtMs: row.created_at_ms,
-      approvedAtMs: row.approved_at_ms
+      approvedAtMs: row.approved_at_ms,
+      amendments: amendmentsByRevision.get(row.id) ?? []
     })),
     nodes: nodes.map((node) => ({
       revisionId: node.revision_id,
@@ -244,6 +302,7 @@ function buildProjection(
       verdict: row.verdict,
       contentIdentity: row.content_identity,
       reportDigest: row.report_digest,
+      synthesizedByOwner: row.dispatch_id.startsWith(OWNER_SKIP_REVIEW_DISPATCH_PREFIX),
       atMs: row.created_at_ms
     })),
     landing: landingRows.map((row) => {
@@ -292,12 +351,30 @@ function buildProjection(
   }
 }
 
-function nodeStates(nodes: NodeRow[], ledger?: WatcherLedger): Map<string, ObjectiveNodeState> {
+function buildAmendmentProjection(row: AmendmentRow) {
+  return {
+    ordinal: row.ordinal,
+    digest: row.digest,
+    amendedAtMs: row.amended_at_ms,
+    attestation: row.attestation,
+    touchedTaskKeys: parseJson(DependenciesSchema, row.touched_task_keys_json, 'touched task keys')
+  }
+}
+
+function nodeStates(
+  nodes: NodeRow[],
+  isolatedDispatchIds: ReadonlySet<string>,
+  appliedDispatchIds: ReadonlySet<string>,
+  ledger?: WatcherLedger
+): Map<string, ObjectiveNodeState> {
   const states = new Map<string, ObjectiveNodeState>()
   const outcomes = new Map<string, ObjectiveNodeState>()
+  const persistedSucceeded = new Set<string>()
   for (const node of nodes) {
     if (node.dispatch_id) {
-      outcomes.set(`${node.revision_id}\0${node.task_key}`, 'succeeded')
+      const key = `${node.revision_id}\0${node.task_key}`
+      persistedSucceeded.add(key)
+      outcomes.set(key, 'succeeded')
     }
   }
   if (ledger) {
@@ -308,6 +385,12 @@ function nodeStates(nodes: NodeRow[], ledger?: WatcherLedger): Map<string, Objec
         continue
       }
       const key = `${action.revisionId}\0${action.taskKey}`
+      // The store records a node only after its dispatch has actually applied. Historical retry
+      // attempts cannot demote that authoritative success; amendments clear plan_node.dispatch_id,
+      // so obsolete applied work is intentionally not protected here.
+      if (persistedSucceeded.has(key)) {
+        continue
+      }
       if (action.kind === 'dispatch-node') {
         if (attempt.state === 'settled' && attempt.effect === 'not-landed') {
           const failureClass = objectiveAttemptFailureClass(attempt, ledger)
@@ -325,10 +408,17 @@ function nodeStates(nodes: NodeRow[], ledger?: WatcherLedger): Map<string, Objec
           outcomes.set(key, 'dispatched')
         }
       } else if (action.kind === 'ingest-report' && attempt.state === 'settled') {
-        if (attempt.effect === 'landed') {
-          outcomes.set(key, 'succeeded')
-        } else if (attempt.effect === 'not-landed') {
+        if (
+          attempt.effect === 'not-landed' &&
+          !(typeof action.dispatchId === 'string' && appliedDispatchIds.has(action.dispatchId))
+        ) {
           outcomes.set(key, 'failed')
+        } else if (
+          attempt.effect === 'landed' &&
+          typeof action.dispatchId === 'string' &&
+          !isolatedDispatchIds.has(action.dispatchId)
+        ) {
+          outcomes.set(key, 'succeeded')
         }
       }
     }

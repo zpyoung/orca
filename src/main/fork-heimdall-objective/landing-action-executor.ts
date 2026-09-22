@@ -2,6 +2,7 @@ import type { HostedReviewInfo } from '../../shared/hosted-review'
 import type { ActionOutcome } from '../../shared/fork-heimdall/effect-certainty'
 import { makeAttemptFingerprint } from '../../shared/fork-heimdall/attempt-fingerprint'
 import type { ExecuteContext } from '../../shared/fork-heimdall/kind-contract'
+import { OBJECTIVE_GIT_EXEC_PATH_BATCH_SIZE } from '../../shared/fork-heimdall/objective-git-exec-shapes'
 import {
   objectiveActionNaturalKey,
   type CommitLocalBranchAction,
@@ -32,7 +33,6 @@ import type { RecordLandingArgs } from './objective-store-data'
 import { computeObjectiveWorktreeContentDigest } from './objective-workspace-manifest'
 
 const ATTEMPT_TRAILER = 'Orca-Heimdall-Attempt'
-const PATH_BATCH_SIZE = 200
 
 type LandingExecutorArgs<TAction> = {
   action: TAction
@@ -142,17 +142,51 @@ export async function executeCommitLocalBranch(
   const status = await runGit(['status', '--porcelain=v2', '-z', '--untracked-files=all', '--'])
   const paths = objectiveDirtyPathsByTerritory(status.stdout, args.binding)
   if (paths.inside.length === 0) {
-    return invalid('nothing-to-commit')
+    const parallelRun = (args.context.snapshot.world.parallel?.dispatches.length ?? 0) > 0
+    if (!parallelRun || paths.outside.length > 0) {
+      return invalid('nothing-to-commit', { outsideTerritoryPaths: paths.outside.slice(0, 256) })
+    }
+    const treeOid = (await runGit(['rev-parse', 'HEAD^{tree}'])).stdout.trim()
+    await args.context.lease.assertHeld()
+    recordLanding(args, args.action.contentIdentity, {
+      revisionId: args.action.revisionId,
+      fromContentIdentity: args.action.fromContentIdentity,
+      commitSha: headSha,
+      treeOid,
+      branch
+    })
+    return {
+      effect: 'landed',
+      result: {
+        kind: 'commit-recorded',
+        naturalKey: objectiveActionNaturalKey(args.action),
+        commitSha: headSha,
+        contentIdentity: args.action.contentIdentity,
+        outsideTerritoryPaths: []
+      }
+    }
   }
   await args.context.lease.assertHeld()
-  for (let index = 0; index < paths.inside.length; index += PATH_BATCH_SIZE) {
-    await runGit(['add', '--', ...paths.inside.slice(index, index + PATH_BATCH_SIZE)])
+  for (let index = 0; index < paths.inside.length; index += OBJECTIVE_GIT_EXEC_PATH_BATCH_SIZE) {
+    await runGit([
+      'add',
+      '--',
+      ...paths.inside
+        .slice(index, index + OBJECTIVE_GIT_EXEC_PATH_BATCH_SIZE)
+        .map((path) => `:(literal)${path}`)
+    ])
   }
   await args.context.lease.assertHeld()
   const message = `${revisionTitle(args.binding)}\n\n${ATTEMPT_TRAILER}: ${args.action.attemptTrailer}`
   let commitError: unknown
   try {
-    await runGit(['commit', '-m', message, '--', ...paths.inside])
+    await runGit([
+      'commit',
+      '-m',
+      message,
+      '--',
+      ...paths.inside.map((path) => `:(literal)${path}`)
+    ])
   } catch (error) {
     commitError = error
   }

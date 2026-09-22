@@ -14,11 +14,12 @@ import type {
   EnrollInput,
   WatcherEnrollment
 } from '../../shared/fork-heimdall/watcher-types'
+import { parseWorkspaceKey } from '../../shared/workspace-scope'
 import { isFolderRepo } from '../../shared/repo-kind'
 import { isTuiAgent } from '../../shared/tui-agent-config'
 import type { Repo } from '../../shared/repo-types'
 import type { Store } from '../persistence'
-import { getAutomationSchedulerOwner } from '../persistence/scheduling-automations/automation-context-migration'
+import { getAutomationSchedulerOwnerForExecutionHost } from '../persistence/scheduling-automations/automation-context-migration'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import {
   defaultObjectiveForgeAccess,
@@ -101,11 +102,10 @@ function assertOwnerExecutable(
 }
 
 function schedulerOwnerFor(
-  repo: Repo,
   executionHostId: ExecutionHostId,
   storageAuthority: 'desktop' | 'runtime'
 ): AutomationSchedulerOwner {
-  const routeOwner = getAutomationSchedulerOwner({ ...repo, executionHostId })
+  const routeOwner = getAutomationSchedulerOwnerForExecutionHost(executionHostId)
   assertOwnerExecutable(routeOwner, storageAuthority)
   return storageAuthority === 'runtime' ? 'remote_host_service' : routeOwner
 }
@@ -115,8 +115,10 @@ async function resolveGitWorkspace(
   repoId: string,
   worktreeId: string
 ): Promise<{
+  kind: 'git'
   executionHostId: ExecutionHostId
   workspacePath: string
+  worktreeId: string
   gitTarget: RuntimeGitTarget
 }> {
   const target = await runtime.resolveRuntimeGitTarget(`id:${worktreeId}`)
@@ -128,18 +130,22 @@ async function resolveGitWorkspace(
     throw new Error('Objective Git workspace is unavailable')
   }
   return {
+    kind: 'git',
     executionHostId: target.executionHostId,
     workspacePath: worktree.path,
+    worktreeId,
     gitTarget: target
   }
 }
 
-async function resolveFolderWorkspace(
+async function resolveLegacyFolderWorkspace(
   runtime: ObjectiveRuntimeResolver,
   repo: Repo
 ): Promise<{
+  kind: 'folder'
   executionHostId: ExecutionHostId
   workspacePath: string
+  worktreeId: null
   gitTarget?: never
 }> {
   const target = await runtime.resolveRuntimeFileTarget(`id:${repo.id}::${repo.path}`)
@@ -147,7 +153,36 @@ async function resolveFolderWorkspace(
   if (worktree.repoId !== repo.id || worktree.path !== repo.path) {
     throw new Error('Invalid objective folder workspace identity')
   }
-  return { executionHostId: target.executionHostId, workspacePath: worktree.path }
+  return {
+    kind: 'folder',
+    executionHostId: target.executionHostId,
+    workspacePath: worktree.path,
+    worktreeId: null
+  }
+}
+
+async function resolveCanonicalFolderWorkspace(
+  runtime: ObjectiveRuntimeResolver,
+  repoId: string,
+  worktreeId: string
+): Promise<{
+  kind: 'folder'
+  executionHostId: ExecutionHostId
+  workspacePath: string
+  worktreeId: string
+  gitTarget?: never
+}> {
+  const target = await runtime.resolveRuntimeFileTarget(`id:${worktreeId}`)
+  const worktree = target.worktree
+  if (worktree.id !== worktreeId || worktree.repoId !== repoId || !worktree.path) {
+    throw new Error('Invalid objective folder workspace identity')
+  }
+  return {
+    kind: 'folder',
+    executionHostId: target.executionHostId,
+    workspacePath: worktree.path,
+    worktreeId
+  }
 }
 
 /** Rebuilds every workspace and execution-host authority field from runtime/store state. */
@@ -163,15 +198,50 @@ export async function authorizeObjectiveEnrollment(
   }
   const capabilities = parseCapabilities(input.capabilities)
   const candidate = ObjectiveEnrollmentPayloadSchema.parse(input.kindPayload)
+  const folderScope = input.worktreeId ? parseWorkspaceKey(input.worktreeId) : null
+  const canonicalFolderWorktreeId = folderScope?.type === 'folder' ? input.worktreeId : null
   const repo = store.getRepo(input.repoId)
-  if (!repo) {
+  if (!repo && canonicalFolderWorktreeId === null) {
     throw new Error('Objective repository is unavailable')
   }
 
-  const folder = isFolderRepo(repo)
+  let workspace:
+    | Awaited<ReturnType<typeof resolveGitWorkspace>>
+    | Awaited<ReturnType<typeof resolveLegacyFolderWorkspace>>
+    | Awaited<ReturnType<typeof resolveCanonicalFolderWorkspace>>
+  if (canonicalFolderWorktreeId !== null) {
+    workspace = await resolveCanonicalFolderWorkspace(
+      runtime as unknown as ObjectiveRuntimeResolver,
+      input.repoId,
+      canonicalFolderWorktreeId
+    )
+  } else if (repo && isFolderRepo(repo)) {
+    if (input.worktreeId !== null) {
+      throw new Error('Folder objective enrollment cannot name a Git worktree')
+    }
+    workspace = await resolveLegacyFolderWorkspace(
+      runtime as unknown as ObjectiveRuntimeResolver,
+      repo
+    )
+  } else {
+    if (!repo) {
+      throw new Error('Objective repository is unavailable')
+    }
+    if (!input.worktreeId) {
+      throw new Error('Git objective enrollment requires an explicit worktree')
+    }
+    workspace = await resolveGitWorkspace(
+      runtime as unknown as ObjectiveRuntimeResolver,
+      repo.id,
+      input.worktreeId
+    )
+  }
+
+  const folder = workspace.kind === 'folder'
   const contract: ObjectiveEnrollmentPayload = {
     ...candidate,
-    workspaceKind: folder ? 'folder' : 'git'
+    workspaceKind: folder ? 'folder' : 'git',
+    maxConcurrency: folder ? 1 : candidate.maxConcurrency
   }
   if (folder && contract.landingBar !== 'files-on-disk') {
     throw new Error('landing-bar-requires-git')
@@ -182,27 +252,9 @@ export async function authorizeObjectiveEnrollment(
   if (!folder && input.worktreeId === null && requiresHostedReview) {
     throw new Error('landing-bar-requires-worktree')
   }
-  if (contract.maxConcurrency > 1) {
-    throw new Error('max-concurrency-unsupported')
-  }
   assertRoleAgentsKnown(contract)
 
-  const resolver = runtime as unknown as ObjectiveRuntimeResolver
-  const workspace = folder
-    ? input.worktreeId === null
-      ? await resolveFolderWorkspace(resolver, repo)
-      : (() => {
-          throw new Error('Folder objective enrollment cannot name a Git worktree')
-        })()
-    : input.worktreeId
-      ? await resolveGitWorkspace(resolver, repo.id, input.worktreeId)
-      : (() => {
-          throw new Error('Git objective enrollment requires an explicit worktree')
-        })()
-  if (!folder && requiresHostedReview) {
-    if (!workspace.gitTarget) {
-      throw new Error('landing-bar-requires-worktree')
-    }
+  if (workspace.kind === 'git' && requiresHostedReview) {
     const provider = await forge.detectProvider(
       objectiveForgeContext({
         kind: 'git',
@@ -216,14 +268,14 @@ export async function authorizeObjectiveEnrollment(
       throw new Error('landing-bar-requires-supported-forge')
     }
   }
-  const schedulerOwner = schedulerOwnerFor(repo, workspace.executionHostId, storageAuthority)
+  const schedulerOwner = schedulerOwnerFor(workspace.executionHostId, storageAuthority)
 
   return {
     kind: 'objective',
     workspaceKey: `${workspace.executionHostId}::${workspace.workspacePath}`,
     executionHostId: workspace.executionHostId,
-    repoId: repo.id,
-    worktreeId: folder ? null : input.worktreeId,
+    repoId: input.repoId,
+    worktreeId: workspace.worktreeId,
     workspacePath: workspace.workspacePath,
     schedulerOwner,
     capabilities,

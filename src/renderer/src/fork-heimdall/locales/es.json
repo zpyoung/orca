@@ -69,6 +69,9 @@
         "resume": "Reanudar",
         "pause": "Pausar",
         "disarm": "Desactivar",
+        "delete": "Eliminar vigilante",
+        "deleteTitle": "¿Eliminar vigilante?",
+        "deleteDescription": "El vigilante «{{name}}» y su historial guardado se eliminarán permanentemente. Los terminales de los agentes no se detendrán.",
         "approve": "Aprobar",
         "budgetResumeWarning": "Este vigilante ha agotado su presupuesto. Aumenta el límite antes de reanudarlo o volverá a quedar aparcado."
       },

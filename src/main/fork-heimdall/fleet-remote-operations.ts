@@ -1,4 +1,8 @@
 import { HEIMDALL_CHANNELS, type EnrollSuccess } from '../../shared/fork-heimdall/api'
+import {
+  HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY,
+  HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
+} from '../../shared/fork-heimdall/capability'
 import type {
   WatcherCommandRequest,
   WatcherCommandResult,
@@ -22,6 +26,28 @@ export const OWNER_UNREACHABLE =
   'The owning runtime cannot be reached. The watcher may still be running.'
 const COMMAND_INDETERMINATE =
   'The connection failed after the command was sent. It may or may not have taken effect; refresh the owner state before trying again.'
+
+export function enrollmentForParallelCompatibility(
+  input: EnrollInput,
+  parallelExecutionSupported: boolean
+): EnrollInput {
+  if (
+    parallelExecutionSupported ||
+    input.kind !== 'objective' ||
+    typeof input.kindPayload !== 'object' ||
+    input.kindPayload === null
+  ) {
+    return input
+  }
+  const { lanesEnabled: _lanesEnabled, ...legacyKindPayload } = input.kindPayload as Record<
+    string,
+    unknown
+  >
+  return {
+    ...input,
+    kindPayload: { ...legacyKindPayload, maxConcurrency: 1 }
+  }
+}
 
 export async function enrollRemoteWatcher(
   environments: FleetEnvironmentTransport,
@@ -78,7 +104,22 @@ export async function sendRemoteWatcherCommand(
     }
   }
   try {
-    const response = await environments.mutate(identity, HEIMDALL_CHANNELS.command, localRequest)
+    const response =
+      request.command.kind === 'delete'
+        ? await environments.mutate(
+            identity,
+            HEIMDALL_CHANNELS.command,
+            localRequest,
+            HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
+          )
+        : request.command.kind === 'set-concurrency'
+          ? await environments.mutate(
+              identity,
+              HEIMDALL_CHANNELS.command,
+              localRequest,
+              HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
+            )
+          : await environments.mutate(identity, HEIMDALL_CHANNELS.command, localRequest)
     if (response.ok !== true) {
       return response.error.code === 'method_not_found'
         ? refused('unsupported-capability', 'The owning runtime does not expose Heimdall commands.')

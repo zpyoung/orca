@@ -1,6 +1,7 @@
 import type { AutomationSchedulerOwner } from '../../shared/automations-types'
 import { deriveBudgetState, type BudgetPolicy } from '../../shared/fork-heimdall/budget'
 import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
+import { OWNER_INTERVENTION_CAPABILITY } from '../../shared/fork-heimdall/owner/owner-capability'
 import {
   AuthorizedEnrollmentSchema,
   EnrollInputSchema,
@@ -11,6 +12,10 @@ import {
 } from '../../shared/fork-heimdall/watcher-types'
 import type { RegisteredWatcherKind, WatcherKindRegistry } from './registry'
 import { isMalformedKindPayloadEnrollment, type EnrollmentRecord } from './enrollment-store'
+
+// mirrors the runtime-side check in owner/owner-session.ts: only claude has a resumable,
+// non-PTY structured session, so every other agent is refused before it ever wakes.
+const SUPPORTED_OWNER_AGENTS: ReadonlySet<string> = new Set(['claude'])
 
 export type EnrollmentAuthorizationRefusal = Exclude<
   Extract<EnrollResult, { status: 'refused' }>,
@@ -48,6 +53,13 @@ export async function authorizeKindEnrollment(
     return { status: 'refused', reason: 'invalid-payload', detail: inputResult.error.message }
   }
   const input = inputResult.data
+  if (input.owner && !SUPPORTED_OWNER_AGENTS.has(input.owner.agent)) {
+    return {
+      status: 'refused',
+      reason: 'invalid-payload',
+      detail: `Heimdall owner agent "${input.owner.agent}" has no structured session; only "claude" is supported in this slice.`
+    }
+  }
   const kind = registry.get(input.kind)
   if (!kind) {
     return { status: 'refused', reason: 'unknown-kind', detail: input.kind }
@@ -105,7 +117,23 @@ export async function authorizeKindEnrollment(
       schedulerOwner: authorized.schedulerOwner
     }
   }
-  return { status: 'authorized', authorized, kind }
+  // The kind's own capability schema is strict and knows nothing about owner-intervention, so the
+  // key is added here rather than passed through `input.capabilities`, and only when a caller
+  // actually asks for it — an absent key already means 'off' to gate 5 (gate.ts), so every
+  // enrollment that doesn't touch this stays byte-for-byte on the kind's own capability set.
+  const authorizedWithOwner: AuthorizedEnrollment = {
+    ...authorized,
+    owner: input.owner,
+    ...(input.ownerInterventionCapability === undefined
+      ? {}
+      : {
+          capabilities: {
+            ...authorized.capabilities,
+            [OWNER_INTERVENTION_CAPABILITY]: input.ownerInterventionCapability
+          }
+        })
+  }
+  return { status: 'authorized', authorized: authorizedWithOwner, kind }
 }
 
 export function extendBudgetForRearm(

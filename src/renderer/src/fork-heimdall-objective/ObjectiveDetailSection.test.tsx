@@ -9,6 +9,8 @@ import {
   type WatcherFleetEntry
 } from '../../../shared/fork-heimdall/fleet-types'
 import type { ObjectiveDetail } from '../../../shared/fork-heimdall-objective/detail-types'
+import { useAppStore } from '@/store'
+import { ObjectiveDetailContent } from './ObjectiveDetailContent'
 import { ObjectiveDetailSection } from './ObjectiveDetailSection'
 
 type Deferred<T> = {
@@ -125,6 +127,7 @@ afterEach(async () => {
   await act(async () => root.unmount())
   document.body.replaceChildren()
   Object.defineProperty(window, 'api', { configurable: true, value: previousApi })
+  useAppStore.setState({ folderWorkspaces: [] })
 })
 
 function installApi(overrides: Partial<HeimdallApi>): void {
@@ -158,6 +161,46 @@ describe('ObjectiveDetailSection', () => {
 
     expect(container.textContent).toContain('Objective detail is not available from this host.')
     expect(container.textContent).not.toContain('could not be loaded')
+  })
+
+  it('labels a canonical folder workspace from its host-qualified catalog row', async () => {
+    const folderRow = row(1)
+    folderRow.entry.enrollment = {
+      ...folderRow.entry.enrollment,
+      executionHostId: 'local',
+      repoId: 'folder-workspace:personal',
+      worktreeId: 'folder:notes',
+      workspacePath: '/workspace/notes'
+    }
+    const folderDetail = detail('Maintain notes', 1)
+    folderDetail.contract = { ...folderDetail.contract, workspaceKind: 'folder' }
+    useAppStore.setState({
+      folderWorkspaces: [
+        {
+          id: 'notes',
+          projectGroupId: 'personal',
+          name: 'Canonical notes',
+          folderPath: '/workspace/notes',
+          linkedTask: null,
+          comment: '',
+          isArchived: false,
+          isUnread: false,
+          isPinned: false,
+          sortOrder: 0,
+          lastActivityAt: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          executionHostId: 'local'
+        }
+      ]
+    })
+
+    await act(async () =>
+      root.render(<ObjectiveDetailContent detail={folderDetail} ledger={null} row={folderRow} />)
+    )
+
+    expect(container.textContent).toContain('Folder · Canonical notes')
+    expect(container.textContent).not.toContain('folder:notes')
   })
 
   it('does not let an older response overwrite a newer owner revision', async () => {

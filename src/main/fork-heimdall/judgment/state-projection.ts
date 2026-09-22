@@ -35,7 +35,7 @@ export type LedgerProjection = {
   attempts: AttemptItem[]
   approvals: ProjectedItem[]
   escalations: (ProjectedItem & { status: string })[]
-  latestEscalation: unknown | null
+  latestEscalation: unknown
   reports: ReportItem[]
 }
 
@@ -50,7 +50,7 @@ export type JudgmentLedgerState = {
   attempts: unknown[]
   approvals: unknown[]
   escalations: unknown[]
-  latestEscalation: unknown | null
+  latestEscalation: unknown
   reports: unknown[]
 }
 

@@ -2,34 +2,41 @@ import { randomUUID } from 'node:crypto'
 import { deriveBudgetState } from '../../shared/fork-heimdall/budget'
 import {
   getInFlightAttempts,
-  getUnresolvedAttempts
+  getUnresolvedAttempts,
+  hasPendingAttemptOutcome
 } from '../../shared/fork-heimdall/ledger-queries'
 import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import { errorBackoffMs, HEIMDALL_RAPID_POLL_MS } from '../../shared/fork-heimdall/pacing'
-import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
+import { requireLiveSnapshot, type Snapshot } from '../../shared/fork-heimdall/snapshot'
 import {
   createTickTrace,
   pushTickTrace,
   type WatcherTickTrace
 } from '../../shared/fork-heimdall/tick-trace'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
-import { dormantWatcherStatus } from './debug-report'
 import { readAndRefreshJudgmentSnapshot } from './judgment/mailbox-refresh'
 import type { RegisteredWatcherKind } from './registry'
+import { createWatcherRunner } from './runner-factory'
 import { WatcherLedgerLifecycle } from './ledger-lifecycle'
 import { WatcherRunnerControlLifecycle } from './runner-control-lifecycle'
-import { errorText, WatcherRunnerActions } from './runner-actions'
+import { WatcherRunnerActions } from './runner-actions'
+import { runActionLoop } from './runner-action-loop'
+import { WatcherRunnerErrorLifecycle } from './runner-error-lifecycle'
 import { WatcherRunnerGateLifecycle } from './runner-gating'
 import { runnerPacingDelay } from './runner-pacing'
 import { WatcherRunnerStopLifecycle } from './runner-stop-lifecycle'
-import { isCoordinatorSeatLost, WatcherRunnerStatusLifecycle } from './runner-status'
+import { WatcherRunnerStatusLifecycle } from './runner-status'
 import type { WatcherRunner, WatcherRunnerDependencies } from './runner-state'
 import { WatcherRunnerWorkerLifecycle } from './runner-worker-lifecycle'
+import { releaseEligibleSettledWorkers, workerReleaseConfirmed } from './runner-worker-release'
+import { runOwnerDeviationTick } from './owner/deviation-tick'
+
 export class WatcherRunnerLoop {
   readonly dispatchLifecycle: WatcherLedgerLifecycle
   private readonly actions: WatcherRunnerActions
-  private readonly controlLifecycle: WatcherRunnerControlLifecycle
+  readonly controlLifecycle: WatcherRunnerControlLifecycle
   private readonly gating: WatcherRunnerGateLifecycle
+  private readonly errorLifecycle: WatcherRunnerErrorLifecycle
   private readonly statusLifecycle: WatcherRunnerStatusLifecycle
   private readonly stopLifecycle: WatcherRunnerStopLifecycle
   private readonly workerLifecycle: WatcherRunnerWorkerLifecycle
@@ -57,7 +64,12 @@ export class WatcherRunnerLoop {
       clearTimer: (timer) => this.clearTimer(timer),
       publish: (runner) => this.publishStatus(runner)
     })
-    this.gating = new WatcherRunnerGateLifecycle(dependencies, this.actions)
+    this.gating = new WatcherRunnerGateLifecycle(
+      dependencies,
+      this.actions,
+      () => this.now(),
+      () => this.createId()
+    )
     this.statusLifecycle = new WatcherRunnerStatusLifecycle({
       ledgerStore: dependencies.ledgerStore,
       persistEnabled: (runner, enabled) => dependencies.persistEnabled(runner.enrollment, enabled),
@@ -65,6 +77,14 @@ export class WatcherRunnerLoop {
       now: () => this.now(),
       createId: () => this.createId(),
       publish: (runner) => this.publishStatus(runner)
+    })
+    this.errorLifecycle = new WatcherRunnerErrorLifecycle({
+      dispatchLifecycle: this.dispatchLifecycle,
+      statusLifecycle: this.statusLifecycle,
+      schedule: (runner, delayMs) => this.schedule(runner, delayMs),
+      disarm: (runner) => this.controlLifecycle.disarm(runner),
+      publish: (runner) => this.publishStatus(runner),
+      releaseLease: (runner, guard) => this.releaseLeaseGuard(runner, guard)
     })
     this.workerLifecycle = new WatcherRunnerWorkerLifecycle({
       ledgerStore: dependencies.ledgerStore,
@@ -76,38 +96,15 @@ export class WatcherRunnerLoop {
       now: () => this.now(),
       createId: () => this.createId()
     })
-    this.stopLifecycle = new WatcherRunnerStopLifecycle(this.statusLifecycle)
+    this.stopLifecycle = new WatcherRunnerStopLifecycle(this.statusLifecycle, {
+      ledgerStore: dependencies.ledgerStore,
+      now: () => this.now(),
+      createId: () => this.createId()
+    })
   }
 
   createRunner(enrollment: WatcherEnrollment, kind: RegisteredWatcherKind): WatcherRunner {
-    const ledger = this.dependencies.ledgerStore.read(enrollment.watcherId)
-    const traces = this.dependencies.ledgerStore.readTickTraces(enrollment.watcherId)
-    return {
-      enrollment,
-      kind,
-      status: dormantWatcherStatus(
-        enrollment,
-        ledger,
-        this.dependencies.ledgerStore.readTerminalSummary(enrollment.watcherId)
-      ),
-      timer: null,
-      operationTail: Promise.resolve(),
-      tickQueued: false,
-      reconcileAgain: false,
-      stopped: enrollment.terminalAtMs !== null,
-      suspended: false,
-      recovered: false,
-      controlPending: null,
-      forceFresh: false,
-      consecutiveErrors: 0,
-      consecutiveGateHolds: 0,
-      lastFullResyncAtMs: null,
-      lastSnapshot: null,
-      traceSequence: traces.at(-1)?.seq ?? 0,
-      traces,
-      leaseGuard: null,
-      leaseRenewal: null
-    }
+    return createWatcherRunner(enrollment, kind, this.dependencies.ledgerStore)
   }
 
   schedule(runner: WatcherRunner, delayMs: number): void {
@@ -195,7 +192,7 @@ export class WatcherRunnerLoop {
         if (lease.status === 'configuration-error') {
           trace.exitPath = 'error'
           trace.error = { message: lease.reason }
-          await this.parkForConfigurationError(runner, lease.reason)
+          await this.errorLifecycle.parkForConfigurationError(runner, lease.reason)
           return
         }
         trace.exitPath = lease.status === 'refused' ? 'lease-refused' : 'lease-unverifiable'
@@ -252,14 +249,47 @@ export class WatcherRunnerLoop {
         leaseGuard: lease.guard,
         now: () => this.now(),
         readLedger: () => this.dependencies.ledgerStore.read(runner.enrollment.watcherId),
-        abandonPendingAttempts: (currentLedger) =>
-          this.actions.abandonPendingAttempts(runner, currentLedger),
+        abandonPendingAttempts: (currentSnapshot, currentLedger) =>
+          this.actions.abandonPendingAttempts(runner, currentSnapshot, currentLedger),
         refreshWorkers: () => this.workerLifecycle.refresh(runner, trace)
       })
       if (!snapshotResult) {
         return
       }
       let { snapshot, ledger } = snapshotResult
+      if (trace.exitPath === 'error') {
+        return
+      }
+      if (runner.stopped || runner.controlPending === 'delete') {
+        trace.exitPath = 'watching'
+        return
+      }
+      await releaseEligibleSettledWorkers(runner, {
+        ledgerStore: this.dependencies.ledgerStore,
+        orchestration: this.dependencies.orchestration,
+        now: () => this.now(),
+        createId: () => this.createId()
+      })
+      ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
+      if (snapshot.freshness === 'live' && runner.kind.concurrency?.reconcile) {
+        await runner.kind.concurrency.reconcile(snapshot, ledger, {
+          enrollment: runner.enrollment,
+          lease: lease.guard,
+          stopWorker: (dispatchId) =>
+            this.dependencies.orchestration.stopWorker(runner.enrollment, dispatchId),
+          workerReleaseConfirmed: (dispatchId) => workerReleaseConfirmed(ledger, dispatchId)
+        })
+        await lease.guard.assertHeld()
+        snapshot = requireLiveSnapshot(await runner.kind.read(runner.enrollment, { fresh: true }))
+        await lease.guard.assertHeld()
+        trace.snapshotReadCount += 1
+        runner.lastSnapshot = snapshot
+        runner.lastFullResyncAtMs = this.now()
+        runner.forceFresh = false
+        trace.snapshot = runner.kind.describeSnapshot(snapshot)
+        trace.contentIdentity = snapshot.contentIdentity
+        ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
+      }
       let stopped = await this.stopLifecycle.evaluate(runner, snapshot, ledger)
       if ((stopped === 'deferred' || stopped === 'parked') && snapshot.freshness === 'live') {
         ledger = await this.actions.recoverBeforeStop(runner, snapshot, absentDispatches)
@@ -268,7 +298,7 @@ export class WatcherRunnerLoop {
         }
       }
       if (stopped !== 'clear') {
-        if (stopped === 'deferred' || getInFlightAttempts(ledger).length > 0) {
+        if (stopped === 'deferred' || hasPendingAttemptOutcome(ledger)) {
           this.schedule(runner, HEIMDALL_RAPID_POLL_MS)
         }
         trace.exitPath = 'watching'
@@ -281,14 +311,26 @@ export class WatcherRunnerLoop {
 
       const budget = deriveBudgetState(ledger, runner.enrollment.budget)
       trace.budget = budget
-      if (budget.exhausted) {
+      const drainingBudget =
+        budget.exhausted && (runner.kind.concurrency?.shouldDrainBudget(snapshot, ledger) ?? false)
+      if (budget.exhausted && !drainingBudget) {
         this.actions.settleAbsentDispatches(runner, absentDispatches)
         ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
         this.statusLifecycle.park(runner, { kind: 'budget', exhaustion: budget.exhausted })
         trace.exitPath = 'budget-exhausted'
-        if (getInFlightAttempts(ledger).length > 0) {
+        if (hasPendingAttemptOutcome(ledger)) {
           this.schedule(runner, HEIMDALL_RAPID_POLL_MS)
         }
+        return
+      }
+      // owner-driving runs before the enabled/paused checks below: a worker-question or
+      // worker-escalation deviation already disabled the watcher earlier this tick (via `park`),
+      // so gating this on `enabled` would make its own deviation unreachable the same way a park
+      // predicate's used to be. `driveOwnerDeviation` excludes paused watchers itself.
+      if (await this.driveOwner(runner, snapshot)) {
+        trace.exitPath = 'gate-held'
+        this.publishStatus(runner)
+        this.schedule(runner, HEIMDALL_RAPID_POLL_MS)
         return
       }
       if (!runner.enrollment.enabled) {
@@ -296,133 +338,39 @@ export class WatcherRunnerLoop {
         ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
         trace.exitPath = 'watching'
         this.publishStatus(runner)
-        // a disarm with work still in flight keeps polling so the finally can release the lease
-        if (getInFlightAttempts(ledger).length > 0) {
+        // Disabled watchers keep reconciling already-authorized work whose outcome is still pending.
+        if (hasPendingAttemptOutcome(ledger)) {
           this.schedule(runner, HEIMDALL_RAPID_POLL_MS)
         }
         return
       }
-
-      const gateEvaluation = await this.gating.evaluate(
-        runner,
-        snapshot,
-        ledger,
-        absentDispatches,
-        trace
-      )
-      snapshot = gateEvaluation.snapshot
-      if (gateEvaluation.outcome === 'watching') {
-        trace.exitPath = 'watching'
-        if (gateEvaluation.immediate) {
-          this.schedule(runner, 0)
-        } else {
-          this.scheduleFromPacing(runner, snapshot, gateEvaluation.ledger, trace)
-        }
-        if (gateEvaluation.successful) {
-          this.statusLifecycle.markSuccessful(runner, 'watching')
-        }
-        return
-      }
-      if (gateEvaluation.outcome === 'gated') {
-        this.actions.recordGateRejection(
-          runner,
-          gateEvaluation.action,
-          gateEvaluation.gate,
-          gateEvaluation.advisory
-        )
-        trace.exitPath = gateEvaluation.gate.verdict === 'escalate' ? 'gate-escalated' : 'gate-held'
-        this.statusLifecycle.gate(
-          runner,
-          gateEvaluation.gate.verdict === 'escalate',
-          gateEvaluation.gate.reason
-        )
-        runner.consecutiveGateHolds += 1
-        this.scheduleFromPacing(
-          runner,
-          snapshot,
-          this.dependencies.ledgerStore.read(runner.enrollment.watcherId),
-          trace
-        )
-        return
-      }
-
-      const executed = await this.actions.execute(
-        runner,
-        snapshot,
-        gateEvaluation.action,
-        gateEvaluation.recoveredAttempt
-      )
-      if (!executed) {
+      // paused must still reach here (stop-policy + recovery already ran above), but must not
+      // reach gating: `commitGate` also holds on `paused` too, which would record a gate-hold that
+      // never happened before this fix. Status and rescheduling are already `refresh`'s from
+      // earlier this tick; nothing since has touched either.
+      if (runner.enrollment.paused) {
         trace.exitPath = 'gate-held'
         return
       }
-      trace.exitPath = 'acted'
-      ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
-      if (runner.enrollment.paused) {
-        runner.status = {
-          ...runner.status,
-          enabled: true,
-          state: 'held',
-          phase: 'paused',
-          reason: 'paused',
-          nextPulseAtMs: null
-        }
-        this.publishStatus(runner)
-        if (getInFlightAttempts(ledger).length > 0) {
-          this.schedule(runner, HEIMDALL_RAPID_POLL_MS)
-        }
-        return
-      }
-      if (!runner.enrollment.enabled) {
-        runner.status = {
-          ...runner.status,
-          enabled: false,
-          state: 'disabled',
-          phase: 'disarmed',
-          reason: null,
-          parkReason: null,
-          nextPulseAtMs: null
-        }
-        this.publishStatus(runner)
-        if (getInFlightAttempts(ledger).length > 0) {
-          this.schedule(runner, HEIMDALL_RAPID_POLL_MS)
-        }
-        return
-      }
-      this.statusLifecycle.markSuccessful(runner, 'acting')
-      const afterStop = await this.stopLifecycle.evaluate(runner, snapshot, ledger)
-      if (afterStop === 'clear' || afterStop === 'deferred') {
-        // The next decision is a pure function of the ledger and the snapshot, and attempt
-        // fingerprints stop a settled action being retried, so waiting only adds latency.
-        this.schedule(runner, 0)
-      }
+
+      await runActionLoop({
+        runner,
+        snapshot,
+        ledger,
+        recoverableDispatches: absentDispatches,
+        trace,
+        gating: this.gating,
+        actions: this.actions,
+        statusLifecycle: this.statusLifecycle,
+        stopLifecycle: this.stopLifecycle,
+        ledgerStore: this.dependencies.ledgerStore,
+        schedule: (activeRunner, delayMs) => this.schedule(activeRunner, delayMs),
+        publishStatus: (activeRunner) => this.publishStatus(activeRunner),
+        scheduleFromPacing: (activeRunner, activeSnapshot, activeLedger, activeTrace) =>
+          this.scheduleFromPacing(activeRunner, activeSnapshot, activeLedger, activeTrace)
+      })
     } catch (error) {
-      this.dispatchLifecycle.closeForContactLoss(runner.enrollment.watcherId)
-      if (isCoordinatorSeatLost(error)) {
-        trace.exitPath = 'gate-escalated'
-        trace.error = null
-        this.statusLifecycle.park(runner, { kind: 'coordinator-seat-lost' })
-        if (tickLease) {
-          await this.releaseLeaseGuard(runner, tickLease)
-        }
-        releaseAtEnd = false
-        return
-      }
-      trace.exitPath = 'error'
-      trace.error = {
-        message: errorText(error),
-        ...(error instanceof Error && error.stack ? { stack: error.stack } : {})
-      }
-      runner.consecutiveErrors += 1
-      runner.status = {
-        ...runner.status,
-        state: 'unreachable',
-        phase: 'error',
-        reason: errorText(error),
-        nextPulseAtMs: null
-      }
-      this.publishStatus(runner)
-      this.schedule(runner, errorBackoffMs(runner.consecutiveErrors) ?? HEIMDALL_RAPID_POLL_MS)
+      releaseAtEnd = await this.errorLifecycle.handle(runner, error, trace, tickLease)
     } finally {
       trace.durationMs = Math.max(0, this.now() - startedAtMs)
       if (trace.exitPath === null) {
@@ -445,15 +393,6 @@ export class WatcherRunnerLoop {
     }
   }
 
-  private async parkForConfigurationError(runner: WatcherRunner, reason: string): Promise<void> {
-    const retainedGuard = runner.leaseGuard
-    this.statusLifecycle.configurationError(runner, reason)
-    if (retainedGuard) {
-      await this.releaseLeaseGuard(runner, retainedGuard)
-    }
-    this.controlLifecycle.disarm(runner)
-    runner.reconcileAgain = false
-  }
   private async releaseLeaseGuard(
     runner: WatcherRunner,
     guard: NonNullable<WatcherRunner['leaseGuard']>
@@ -468,6 +407,11 @@ export class WatcherRunnerLoop {
     if (runner.leaseGuard === guard) {
       runner.leaseGuard = null
     }
+  }
+
+  private driveOwner(runner: WatcherRunner, snapshot: Snapshot<unknown>): Promise<boolean> {
+    const { dependencies, actions, statusLifecycle } = this
+    return runOwnerDeviationTick({ dependencies, actions, statusLifecycle, runner, snapshot })
   }
 
   private scheduleFromPacing(

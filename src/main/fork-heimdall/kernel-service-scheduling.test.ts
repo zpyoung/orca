@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { HEIMDALL_BUDGET_GENERATION_EVIDENCE_KIND } from '../../shared/fork-heimdall/budget'
 import type { KernelAction, WatcherKind } from '../../shared/fork-heimdall/kind-contract'
 import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
+import type { LedgerEntry } from '../../shared/fork-heimdall/ledger-types'
 import {
   action,
   authorized,
@@ -11,6 +12,7 @@ import {
   runningDispatch,
   type World
 } from './kernel-service-test-harness'
+import { notifyHeimdallMailboxArrival } from './mailbox-wake-registry'
 
 vi.mock('electron', () => ({}))
 
@@ -278,7 +280,10 @@ describe('Heimdall kernel enrollment and scheduling', () => {
         state: 'parked',
         phase: 'configuration-error',
         reason: 'Resolved Git authority changed after Heimdall enrollment',
-        parkReason: null
+        parkReason: {
+          kind: 'configuration-error',
+          reason: 'Resolved Git authority changed after Heimdall enrollment'
+        }
       }
     })
     expect(permanent.schedule).not.toHaveBeenCalled()
@@ -309,6 +314,59 @@ describe('Heimdall kernel enrollment and scheduling', () => {
       status: { state: 'unreachable', phase: 'lease-unverifiable', reason: 'host offline' }
     })
     expect(transient.schedule).toHaveBeenCalled()
+  })
+
+  it('restores and dispatch-wakes a disabled watcher with an unresolved attempt', async () => {
+    const first = await harness()
+    first.service.registerKind(kind())
+    const enrolled = await first.service.enroll(enrollmentInput())
+    if (enrolled.status !== 'enrolled') {
+      throw new Error('expected enrollment')
+    }
+    const watcherId = enrolled.entry.enrollment.watcherId
+    for (const entry of runningDispatch(watcherId)) {
+      first.ledgerStore.append(entry)
+    }
+    const running = first.service
+      .ledger(watcherId)
+      .entries.findLast(
+        (entry): entry is Extract<LedgerEntry, { kind: 'attempt' }> =>
+          entry.kind === 'attempt' && entry.state === 'running'
+      )
+    if (!running) {
+      throw new Error('expected running attempt')
+    }
+    first.ledgerStore.append({
+      ...running,
+      eventId: 'settled-before-restart',
+      atMs: 12,
+      state: 'settled',
+      effect: 'indeterminate',
+      reason: 'worker outcome pending'
+    })
+    const active = (await first.service.fleet()).entries[0]!
+    await expect(
+      first.service.command({
+        target: active.target,
+        expectedOwner: active.ownerFence,
+        command: { kind: 'disarm' }
+      })
+    ).resolves.toMatchObject({ status: 'applied' })
+    await first.service.stopForShutdown()
+
+    const restarted = await harness({ directory: first.directory })
+    restarted.service.registerKind(kind())
+    await restarted.service.list()
+    expect(restarted.schedule).toHaveBeenCalled()
+
+    restarted.service.start()
+    restarted.schedule.mockClear()
+    notifyHeimdallMailboxArrival('dispatch:dispatch-1', 'worker_done')
+    expect(restarted.schedule).toHaveBeenCalledWith(expect.any(Function), 0)
+    expect(restarted.orchestration.dispatchWorker).not.toHaveBeenCalled()
+    await restarted.service.reconcileForTesting(watcherId)
+    expect(restarted.orchestration.dispatchWorker).not.toHaveBeenCalled()
+    await restarted.service.stopForShutdown()
   })
 
   it('disposes lease renewal on suspend and still releases the in-flight tick lease', async () => {

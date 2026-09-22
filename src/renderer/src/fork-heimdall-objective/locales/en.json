@@ -51,6 +51,15 @@
           "failed": "Failed",
           "replanned": "Replanned"
         },
+        "train": {
+          "running": "Running",
+          "waitingToApply": "Waiting to apply",
+          "applying": "Applying",
+          "resolvingConflict": "Resolving conflict",
+          "applied": "Applied",
+          "failed": "Failed",
+          "discarded": "Discarded"
+        },
         "revision": {
           "draft": "Draft",
           "approved": "Approved",
@@ -85,9 +94,14 @@
         "landingBar": "Landing bar",
         "maxConcurrency": "Max concurrency",
         "maxConcurrencyHelp": {
-          "one": "Only supported value; actions run serially."
+          "one": "Runs in place without dispatch worktrees.",
+          "three": "Default. Runs up to three independent nodes or lanes."
         },
-        "maxConcurrencyFixedHelp": "Fixed at 1 while objective workers run serially.",
+        "maxConcurrencyDescription": "Workers may use up to this many isolated dispatch slots.",
+        "folderConcurrencyHelp": "Folder workspaces cannot create worktrees, so concurrency is limited to 1.",
+        "hostConcurrencyHelp": "This host does not support parallel execution yet; the watcher will run in place.",
+        "lanes": "Keep dependent work in lanes",
+        "lanesHelp": "Reuse one worker session for one-to-one task chains.",
         "territory": "Write territory",
         "territoryHelp": "Leave blank to allow the whole workspace. Otherwise enter one workspace-relative glob per line.",
         "budgets": "Budgets",
@@ -127,7 +141,7 @@
           "merged": "Watcher handoff for gated merge; GitHub/GitLab worktree required."
         },
         "maxConcurrencyHelpLabel": "Max concurrency help",
-        "maxConcurrencyHelpSummary": "Sets the worker limit.",
+        "maxConcurrencyHelpSummary": "Limits isolated implementer dispatches for this watcher.",
         "territoryHelpLabel": "Write territory help",
         "territoryTooltipSummary": "Limits writes; protected .git and .orca paths are always excluded.",
         "territoryTooltip": {
@@ -167,14 +181,15 @@
         "existingPlanCharacterCount": "{{current}} / {{maximum}} characters",
         "removeExistingPlan": "Remove plan",
         "existingPlanPlanOff": "Plan is Off. New objectives require Plan Gated or On unless this same workspace objective already has a usable approved plan. Existing plan source does not count as approval.",
-        "planOffRequiresApprovedPlan": "Plan can be Off only when this same objective already has a usable approved plan. Set Plan to Gated or On."
+        "planOffRequiresApprovedPlan": "Plan can be Off only when this same objective already has a usable approved plan. Set Plan to Gated or On.",
+        "ownerNotSupported": "The remote host does not support enrolling a watcher with an owner yet. Update it, or leave the owning agent off and try again."
       },
       "validation": {
         "workspaceRequired": "Choose a workspace.",
         "objectiveRequired": "Enter an objective.",
         "objectiveTooLong": "The objective must be 16,384 characters or fewer.",
         "landingBarRequiresGit": "Folder workspaces support only the files-on-disk landing bar.",
-        "maxConcurrency": "This release supports exactly one objective worker at a time.",
+        "maxConcurrency": "Max concurrency must be a whole number from 1 to 1,024.",
         "territoryTooMany": "Write territory supports at most 64 globs.",
         "territoryDuplicate": "Write-territory globs must be unique.",
         "territoryInvalid": "Invalid write-territory glob: {{glob}}",
@@ -202,6 +217,16 @@
         "workspaceGitValue": "{{kind}} · {{repo}} / {{worktree}}",
         "workspaceFolderValue": "{{kind}} · {{repo}}",
         "maxConcurrency": "Concurrency",
+        "lanes": "Lanes",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "parallelExecution": "Parallel execution",
+        "runningAgainstCap": "{{running}} of {{cap}} running",
+        "noParallelDispatches": "No isolated dispatches yet.",
+        "trainState": "Train: {{state}}",
+        "lane": "Lane",
+        "node": "Node",
+        "conflicts": "Conflicts: {{paths}}",
         "territory": "Write territory",
         "capabilities": "Capabilities",
         "budget": "Budget",
@@ -234,7 +259,8 @@
         "openReview": "Open review",
         "watchedBySitter": "Watched by sitter",
         "merged": "Merged",
-        "landingHelp": "Rungs above the reached one are pending; the run stops at its bar."
+        "landingHelp": "Rungs above the reached one are pending; the run stops at its bar.",
+        "verdictSynthesizedByOwner": "Synthesized by owner"
       },
       "workspacePicker": {
         "placeholder": "Choose a workspace",

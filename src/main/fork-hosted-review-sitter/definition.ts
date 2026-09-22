@@ -1,5 +1,6 @@
 import type { AutomationSchedulerOwner } from '../../shared/automations-types'
 import { getRepoExecutionHostId } from '../../shared/execution-host'
+import { OWNER_INTERVENTION_CAPABILITY } from '../../shared/fork-heimdall/owner/owner-capability'
 import type { AuthorizedEnrollment, EnrollInput } from '../../shared/fork-heimdall/watcher-types'
 import type {
   HostedReviewEnrollmentPayload,
@@ -15,13 +16,25 @@ import { parseHostedReviewEnrollmentPayload } from './definition-store'
 
 const CAPABILITY_KEYS = ['updateBranch', 'resolveConflicts', 'fixChecks', 'merge'] as const
 
+/**
+ * Requires exactly the four sitter capabilities. `owner-intervention` is tolerated as an optional
+ * fifth key — the kernel stamps it onto a persisted enrollment's `capabilities` record outside this
+ * kind's own authorization, so a re-parse of that persisted record must not reject it — but it is
+ * never part of `HostedReviewSitterCapabilities`: gate 5 reads it straight off the enrollment, and
+ * this kind's own gates never widen a sitter capability because of it.
+ */
 function parseCapabilities(value: EnrollInput['capabilities']): HostedReviewSitterCapabilities {
-  const keys = Object.keys(value).sort()
-  if (
-    keys.length !== CAPABILITY_KEYS.length ||
-    CAPABILITY_KEYS.some((key) => !Object.hasOwn(value, key))
-  ) {
-    throw new Error('Hosted review enrollment requires exactly its four capability modes')
+  const hasAllRequired = CAPABILITY_KEYS.every((key) => Object.hasOwn(value, key))
+  const extraKeys = Object.keys(value).filter(
+    (key) => !(CAPABILITY_KEYS as readonly string[]).includes(key)
+  )
+  const extrasAreOnlyOwnerIntervention =
+    extraKeys.length === 0 ||
+    (extraKeys.length === 1 && extraKeys[0] === OWNER_INTERVENTION_CAPABILITY)
+  if (!hasAllRequired || !extrasAreOnlyOwnerIntervention) {
+    throw new Error(
+      'Hosted review enrollment requires exactly its four capability modes, plus an optional owner-intervention mode'
+    )
   }
   return {
     updateBranch: value.updateBranch!,

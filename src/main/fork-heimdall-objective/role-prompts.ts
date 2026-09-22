@@ -4,24 +4,52 @@ import type {
   ObjectiveNodeState,
   ObjectiveReviewRole
 } from '../../shared/fork-heimdall-objective/detail-types'
-import type {
-  ObjectiveEnrollmentPayload,
-  ObjectiveRole
-} from '../../shared/fork-heimdall-objective/contract-types'
 import type { ObjectiveFailureClass } from '../../shared/fork-heimdall/effect-certainty'
-import type {
-  ObjectivePlan,
-  ObjectivePlanTask
+import {
+  OBJECTIVE_CHECK_COMMAND_MAX_LENGTH,
+  OBJECTIVE_CRITERION_BODY_MAX_LENGTH,
+  OBJECTIVE_CRITERION_NOTE_MAX_LENGTH,
+  OBJECTIVE_PATH_MAX_LENGTH,
+  OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH,
+  OBJECTIVE_TASK_KEY_MAX_LENGTH,
+  OBJECTIVE_TASK_SPEC_MAX_LENGTH,
+  OBJECTIVE_TASK_TITLE_MAX_LENGTH,
+  type ObjectiveEnrollmentPayload,
+  type ObjectiveRole
+} from '../../shared/fork-heimdall-objective/contract-types'
+import {
+  OBJECTIVE_PLAN_MAX_TASKS,
+  OBJECTIVE_REPORT_MAX_FILES,
+  OBJECTIVE_TASK_MAX_CRITERIA,
+  type ObjectivePlan,
+  type ImplementerReport,
+  type ObjectivePlanTask
 } from '../../shared/fork-heimdall-objective/plan-schema'
 import { isTuiAgent } from '../../shared/tui-agent-config'
 import { isTuiAgentEnabled } from '../../shared/tui-agent-selection'
 import type { Store } from '../persistence'
+import { MAX_OBJECTIVE_REPORT_BYTES } from './report-ingestion'
 
 export type ObjectiveFailureContext = {
   taskKey: string
   failureClass?: ObjectiveFailureClass
   narrative: string
   failingCriteria: readonly string[]
+}
+
+export type ObjectiveConflictContext = {
+  enrolledHead: string
+  paths: readonly string[]
+  resolving: {
+    dispatchId: string
+    task: ObjectivePlanTask
+    report: ImplementerReport | null
+  }
+  conflicting: readonly {
+    dispatchId: string
+    task: ObjectivePlanTask
+    report: ImplementerReport | null
+  }[]
 }
 
 export type ObjectiveRolePromptInput = {
@@ -31,40 +59,58 @@ export type ObjectiveRolePromptInput = {
   budgetBucket: ObjectiveBudgetBucket
   node?: ObjectivePlanTask
   plan?: ObjectivePlan
-  reason?: 'initial' | 'replan-after-block' | 'replan-after-failure'
+  reason?: 'initial' | 'replan-after-block' | 'replan-after-failure' | 'owner-directed'
   failureContext?: ObjectiveFailureContext
+  conflictContext?: ObjectiveConflictContext
   planProgress?: readonly { taskKey: string; state: ObjectiveNodeState }[]
+  /** Landing-ladder stage named by a `skip-stage` intervention, separate from its rationale. */
+  requestedSkipStage?: string
+  /** Free-text steer from an owning agent's `dispatch-planner` or `set-role-agent` intervention. */
+  ownerGuidance?: string
 }
 
 function reportContract(role: ObjectiveRole): string {
+  const stringUnit =
+    'String maxima below use JavaScript UTF-16 code units (`string.length`), not UTF-8 bytes.'
   switch (role) {
     case 'planner':
       return [
+        stringUnit,
         'Write one strict JSON object: {"plan":[task,...]}.',
-        'Each task is {taskKey,title,spec,deps,criteria,declaresDependencyChange,declaredPaths?}.',
-        'Each criterion is {body,shellCheckable,checkCommand}; checkCommand is non-null exactly when shellCheckable is true.',
+        `plan contains 1-${OBJECTIVE_PLAN_MAX_TASKS} tasks. Each task is {taskKey,title,spec,deps,criteria,declaresDependencyChange,declaredPaths?}.`,
+        `taskKey has max ${OBJECTIVE_TASK_KEY_MAX_LENGTH}; title max ${OBJECTIVE_TASK_TITLE_MAX_LENGTH}; spec max ${OBJECTIVE_TASK_SPEC_MAX_LENGTH}. Summarize context and cite existing files or artifacts instead of pasting unlimited verbatim output.`,
+        `deps has max ${OBJECTIVE_PLAN_MAX_TASKS} task keys. criteria has 1-${OBJECTIVE_TASK_MAX_CRITERIA} entries.`,
+        `Each criterion is {body,shellCheckable,checkCommand}; body has max ${OBJECTIVE_CRITERION_BODY_MAX_LENGTH}; checkCommand is null exactly when shellCheckable is false, otherwise non-empty with max ${OBJECTIVE_CHECK_COMMAND_MAX_LENGTH}.`,
         'Task keys are unique, dependencies name other tasks, and the graph is acyclic.',
-        'When known, declaredPaths contains only concrete workspace-relative file paths inside write territory.',
+        `When known, declaredPaths contains at most ${OBJECTIVE_REPORT_MAX_FILES} concrete workspace-relative file paths, each with max ${OBJECTIVE_PATH_MAX_LENGTH}, inside write territory.`,
         'Never use globs or copy write-territory patterns into declaredPaths; omit declaredPaths when exact files are unknown.'
       ].join('\n')
     case 'implementer':
       return [
+        stringUnit,
         'Write one strict JSON object: {taskKey,summary,filesModified,criteriaSelfAssessment}.',
-        'Assess every criterion exactly once with {criterionIndex,result:"pass"|"fail"|"unknown",note}.',
+        `taskKey has max ${OBJECTIVE_TASK_KEY_MAX_LENGTH}. summary is plain text with max ${OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH}; summarize evidence instead of pasting unlimited verbatim output. If supporting evidence does not fit, write it to a fixture or sidecar file inside write territory, list that file in filesModified, and cite its path in the summary.`,
+        `filesModified has max ${OBJECTIVE_REPORT_MAX_FILES} concrete workspace-relative paths, each with max ${OBJECTIVE_PATH_MAX_LENGTH}.`,
+        `Assess every criterion exactly once with {criterionIndex,result:"pass"|"fail"|"unknown",note}; criteriaSelfAssessment has max ${OBJECTIVE_TASK_MAX_CRITERIA}, criterionIndex is 0-${OBJECTIVE_TASK_MAX_CRITERIA - 1}, and note is plain text with max ${OBJECTIVE_CRITERION_NOTE_MAX_LENGTH}.`,
         'pass: the criterion is met and you verified it. fail: the criterion is genuinely not met. unknown: you could not determine it, typically because something environmental blocked verification.',
         'Never report unknown for a criterion you know has failed, and never report pass for one you could not verify; an environment-dependent criterion you cannot verify is unknown, with a note on what blocked it.',
         'Every modified path must be workspace-relative and inside write territory.'
       ].join('\n')
     case 'reviewer':
       return [
+        stringUnit,
         'Write one strict JSON object: {verdict:"approve"|"block",criteriaResults,summary}.',
-        'Cover every plan criterion exactly once with {taskKey,criterionIndex,result:"pass"|"block",note}.',
+        `summary is plain text with max ${OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH}; summarize evidence instead of pasting unlimited verbatim output. Put per-criterion evidence in each note (plain text, max ${OBJECTIVE_CRITERION_NOTE_MAX_LENGTH}) and cite existing evidence by location when fuller detail is needed.`,
+        `criteriaResults has max ${OBJECTIVE_PLAN_MAX_TASKS * OBJECTIVE_TASK_MAX_CRITERIA} entries. Cover every plan criterion exactly once with {taskKey,criterionIndex,result:"pass"|"block",note}; taskKey has max ${OBJECTIVE_TASK_KEY_MAX_LENGTH} and criterionIndex is 0-${OBJECTIVE_TASK_MAX_CRITERIA - 1}.`,
         'The verdict must be block exactly when at least one criterion blocks.'
       ].join('\n')
     case 'integrator':
       return [
+        stringUnit,
         'Write one strict JSON object: {verdict:"approve"|"block",criteriaResults,summary,checksRun}.',
-        'Cover every plan criterion exactly once. checksRun entries are {command,exitCode}.',
+        `summary is plain text with max ${OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH}; summarize evidence instead of pasting unlimited verbatim output. Put per-criterion evidence in each note (plain text, max ${OBJECTIVE_CRITERION_NOTE_MAX_LENGTH}); if fuller evidence must be preserved, write it to a fixture or sidecar file inside write territory and cite its path in the summary and worker_done filesModified.`,
+        `criteriaResults has max ${OBJECTIVE_PLAN_MAX_TASKS * OBJECTIVE_TASK_MAX_CRITERIA} entries. Cover every plan criterion exactly once with {taskKey,criterionIndex,result:"pass"|"block",note}; taskKey has max ${OBJECTIVE_TASK_KEY_MAX_LENGTH} and criterionIndex is 0-${OBJECTIVE_TASK_MAX_CRITERIA - 1}.`,
+        `checksRun has max ${OBJECTIVE_TASK_MAX_CRITERIA} entries shaped {command,exitCode}; command has max ${OBJECTIVE_CHECK_COMMAND_MAX_LENGTH}.`,
         'The verdict must be block exactly when at least one criterion blocks.'
       ].join('\n')
   }
@@ -78,7 +124,9 @@ function roleInstruction(input: ObjectiveRolePromptInput): string {
       if (!input.node) {
         throw new Error('An implementer prompt requires exactly one plan node')
       }
-      return 'Implement only the assigned node. You may inspect context, but modify only declared write territory. Run focused checks when useful.'
+      return input.conflictContext
+        ? `Resolve this node's integration conflict in its existing dispatch worktree. Rebase the dispatch branch onto exact enrolled HEAD ${input.conflictContext.enrolledHead}, resolve only with the intent and evidence below, and re-run focused checks for both sides. Never push this dispatch branch or any child-worktree branch.`
+        : 'Implement only the assigned node. You may inspect context, but modify only declared write territory. Run focused checks when useful. Never push this dispatch branch or any child-worktree branch.'
     case 'reviewer':
       return 'Review the files on disk against every active-plan criterion. Do not modify files.'
     case 'integrator':
@@ -157,7 +205,12 @@ function roleContext(input: ObjectiveRolePromptInput): string[] {
     ]
   }
   if (input.role === 'implementer') {
-    return [`ASSIGNED NODE JSON:\n${JSON.stringify(input.node)}`]
+    return [
+      `ASSIGNED NODE JSON:\n${JSON.stringify(input.node)}`,
+      ...(input.conflictContext
+        ? [`CONFLICT RESOLUTION CONTEXT JSON:\n${JSON.stringify(input.conflictContext)}`]
+        : [])
+    ]
   }
   if (input.role === 'reviewer' || input.role === 'integrator') {
     if (!input.plan) {
@@ -171,8 +224,13 @@ function roleContext(input: ObjectiveRolePromptInput): string[] {
 function finishInstructions(reportPath: string): string {
   return [
     `Write the JSON report atomically to this exact absolute path: ${JSON.stringify(reportPath)}`,
+    `The complete report file is limited to ${MAX_OBJECTIVE_REPORT_BYTES} UTF-8 bytes, independently of the JavaScript UTF-16 code-unit limits on its string fields.`,
+    `This worker-start task prompt is independently limited to ${ORCHESTRATION_WORKER_START_TASK_SPEC_MAX_BYTES} UTF-8 bytes before dispatch.`,
     'Then finish using the worker identifiers Orca supplied in your preamble:',
-    `orca orchestration send --from <workerHandle> --type worker_done --outcome succeeded --task-id <taskId> --dispatch-id <dispatchId> --report-path ${JSON.stringify(reportPath)} [--files-modified a,b,c] --subject "<one line>" --body "<summary>"`,
+    `orca orchestration send --from <workerHandle> --type worker_done --outcome succeeded --task-id <taskId> --dispatch-id <dispatchId> --report-path ${JSON.stringify(reportPath)} [--files-modified a,b,c] --subject "<one line>" --body "<brief completion notification; do not copy the full report summary>"`,
+    'Orca validates the report before accepting worker_done.',
+    'Correct this same report file and resend the same worker_done command only when lifecycle.action is "rejected" and either lifecycle.authority is "run_home", or lifecycle.code is "heimdall_report_invalid" and its local/direct preflight reason explicitly says this Dispatch is still active.',
+    'A terminal or legacy receipt such as {action:"completed",authority:"worker_server_legacy"}, or any rejection without one of those active confirmations, is not corrective authorization. Do not resend or self-redispatch; await owner review and an owner-authorized fresh Dispatch after live work is ruled out.',
     'If the work itself failed, still write the most complete valid report possible and send worker_done with --outcome failed.'
   ].join('\n')
 }
@@ -188,6 +246,10 @@ export function buildObjectiveRolePrompt(input: ObjectiveRolePromptInput): strin
     `WRITE TERRITORY:\n${input.contract.writeTerritory.map((path) => `- ${path}`).join('\n')}`,
     roleInstruction(input),
     ...roleContext(input),
+    ...(input.requestedSkipStage === undefined
+      ? []
+      : [`OWNER REQUESTED SKIP STAGE:\n${input.requestedSkipStage}`]),
+    ...(input.ownerGuidance === undefined ? [] : [`OWNER GUIDANCE:\n${input.ownerGuidance}`]),
     `REPORT CONTRACT:\n${reportContract(input.role)}`,
     finishInstructions(input.reportPath)
   ]

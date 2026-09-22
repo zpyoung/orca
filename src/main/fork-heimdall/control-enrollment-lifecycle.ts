@@ -1,11 +1,12 @@
 import { deriveBudgetState } from '../../shared/fork-heimdall/budget'
+import { ObjectiveEnrollmentPayloadSchema } from '../../shared/fork-heimdall-objective/contract-types'
 import type {
   WatcherCommandResult,
   WatcherOwnerFence
 } from '../../shared/fork-heimdall/fleet-types'
 import {
-  getInFlightAttempts,
-  getLatestEscalations
+  getLatestEscalations,
+  hasPendingAttemptOutcome
 } from '../../shared/fork-heimdall/ledger-queries'
 import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
@@ -62,7 +63,7 @@ export class WatcherEnrollmentControlLifecycle {
         reason: 'paused',
         nextPulseAtMs: null
       }
-      if (getInFlightAttempts(this.dependencies.ledger.read(updated.watcherId)).length > 0) {
+      if (hasPendingAttemptOutcome(this.dependencies.ledger.read(updated.watcherId))) {
         this.dependencies.runnerLoop.schedule(runner, 0)
       } else {
         const guard = runner.leaseGuard
@@ -149,7 +150,7 @@ export class WatcherEnrollmentControlLifecycle {
         parkReason: null,
         nextPulseAtMs: null
       }
-      if (getInFlightAttempts(this.dependencies.ledger.read(updated.watcherId)).length === 0) {
+      if (!hasPendingAttemptOutcome(this.dependencies.ledger.read(updated.watcherId))) {
         const guard = runner.leaseGuard
         this.dependencies.runnerLoop.disarm(runner)
         await this.releaseRunnerLease(updated, guard)
@@ -182,10 +183,47 @@ export class WatcherEnrollmentControlLifecycle {
     return this.applied()
   }
 
+  async setConcurrency(
+    enrollment: WatcherEnrollment,
+    expectedOwner: WatcherOwnerFence,
+    maxConcurrency: number
+  ): Promise<WatcherCommandResult> {
+    if (enrollment.kind !== 'objective') {
+      return refused('invalid-state', 'Only objective watchers have a concurrency cap')
+    }
+    const parsed = ObjectiveEnrollmentPayloadSchema.safeParse(enrollment.kindPayload)
+    if (!parsed.success) {
+      return refused('invalid-state', 'The objective watcher has an invalid execution contract')
+    }
+    const contract = parsed.data
+    const currentMaxConcurrency = contract.workspaceKind === 'folder' ? 1 : contract.maxConcurrency
+    const effectiveMaxConcurrency = contract.workspaceKind === 'folder' ? 1 : maxConcurrency
+    const change = {
+      kindPayload: { ...contract, maxConcurrency: effectiveMaxConcurrency }
+    }
+    const activeRunner = this.dependencies.runner(enrollment.watcherId)
+    const commit =
+      activeRunner && effectiveMaxConcurrency < currentMaxConcurrency
+        ? await this.commitAfterExecutionFence(enrollment, expectedOwner, 'set-concurrency', change)
+        : this.dependencies.commit(enrollment.watcherId, expectedOwner, change)
+    if (commit.status === 'refused') {
+      return commit
+    }
+    const updated = this.dependencies.requireValidCommit(commit)
+    const runner = this.dependencies.runner(updated.watcherId)
+    if (runner) {
+      runner.enrollment = updated
+      if (updated.enabled && !updated.paused) {
+        this.dependencies.runnerLoop.schedule(runner, 0)
+      }
+    }
+    return this.applied()
+  }
+
   private async commitAfterExecutionFence(
     enrollment: WatcherEnrollment,
     expectedOwner: WatcherOwnerFence,
-    control: 'pause' | 'disarm',
+    control: 'pause' | 'disarm' | 'set-concurrency',
     change: EnrollmentControlChange,
     appendWithinTransaction?: () => void
   ): Promise<EnrollmentControlCommit> {

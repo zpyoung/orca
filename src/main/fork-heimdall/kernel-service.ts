@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import { HEIMDALL_BUDGET_GENERATION_EVIDENCE_KIND } from '../../shared/fork-heimdall/budget'
-import type { KernelAction, WatcherKind } from '../../shared/fork-heimdall/kind-contract'
+import { hasPendingAttemptOutcome } from '../../shared/fork-heimdall/ledger-queries'
+import type {
+  KernelAction,
+  SubmissionPreflightResult,
+  WatcherKind
+} from '../../shared/fork-heimdall/kind-contract'
 import {
   WatcherTargetSchema,
   type HeimdallFleetSnapshot,
@@ -9,7 +14,6 @@ import {
   type WatcherDetail,
   type WatcherTarget
 } from '../../shared/fork-heimdall/fleet-types'
-import { getInFlightAttempts } from '../../shared/fork-heimdall/ledger-queries'
 import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type {
   EnrollInput,
@@ -29,24 +33,26 @@ import { enrollmentForPresentation } from './kernel-enrollment'
 import { enrollWatcher } from './kernel-enrollment-lifecycle'
 import type { HeimdallKernelHost } from './kernel-host'
 import { watcherListEntry } from './kernel-list-entry'
-import type { HeimdallKernelService } from './kernel-service-contract'
+import type {
+  HeimdallKernelService,
+  HeimdallOrchestrationSubmission
+} from './kernel-service-contract'
+import { preflightKernelSubmission } from './kernel-submission-preflight'
 import {
   runnerLedgerStore,
   type HeimdallKernelServiceDependencies
 } from './kernel-service-dependencies'
+import { hasKernelStorage, wakeHeimdallMailboxRunners } from './kernel-runtime-lifecycle'
 import { bootHeimdallKernelService } from './kernel-service-boot'
 import { shutdownHeimdallKernel } from './kernel-shutdown'
-import {
-  heimdallMailboxAddressForDispatch,
-  heimdallMailboxAddressForRun,
-  setHeimdallMailboxWake
-} from './mailbox-wake-registry'
+import { setHeimdallMailboxWake } from './mailbox-wake-registry'
 import type { KernelTerminalTransition } from './kernel-terminal-transition'
 import type { KernelReadModel } from './kernel-read-model'
 import type { HeimdallLedgerStore } from './ledger-store'
 import type { JudgmentPersistencePort } from './judgment/store'
 import type { LeaseStore } from './lease-store'
 import type { MalformedEnrollmentLifecycle } from './malformed-enrollment'
+import { drainPendingKindPurges } from './pending-kind-purge'
 import { WatcherKindRegistry, type RegisteredWatcherKind } from './registry'
 import type { WatcherRunnerLoop } from './runner-loop'
 import type { RunnerLedgerStore, WatcherRunner } from './runner-state'
@@ -83,6 +89,9 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
     this.registry.register(kind as RegisteredWatcherKind)
     if (!this.loaded) {
       return
+    }
+    if (this.database?.isReadOnly() !== true) {
+      void drainPendingKindPurges(this.requireEnrollments(), this.registry, kind.id)
     }
     for (const record of this.requireEnrollments().list()) {
       if (
@@ -180,6 +189,19 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
     return this.requireRunnerLedger().read(watcherId)
   }
 
+  async preflightSubmission(
+    submission: HeimdallOrchestrationSubmission
+  ): Promise<SubmissionPreflightResult> {
+    this.ensureLoaded()
+    return await preflightKernelSubmission(submission, {
+      enrollments: this.requireEnrollments(),
+      runners: this.runners,
+      ledgerStore: this.requireRunnerLedger(),
+      host: this.requireHost(),
+      ownsEnrollment: (enrollment) => this.ownsEnrollment(enrollment)
+    })
+  }
+
   judgmentPersistence(): JudgmentPersistencePort {
     return {
       databasePath: () => {
@@ -221,50 +243,20 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
   }
 
   start(): void {
-    if (!this.dependencies.database) {
-      const store: unknown = this.dependencies.store
-      if (
-        typeof store !== 'object' ||
-        store === null ||
-        !('getProfileStorageDirectory' in store) ||
-        typeof store.getProfileStorageDirectory !== 'function'
-      ) {
-        return
-      }
-      const directory = store.getProfileStorageDirectory()
-      if (typeof directory !== 'string' || directory.length === 0) {
-        return
-      }
+    if (!hasKernelStorage(this.dependencies)) {
+      return
     }
     this.ensureLoaded()
     setHeimdallMailboxWake((address) => this.wakeRunnersForMailbox(address))
   }
 
   private wakeRunnersForMailbox(address: string): void {
-    const dispatchScoped = address.startsWith('dispatch:')
-    for (const runner of this.runners.values()) {
-      const runId = runner.enrollment.orchestrationRunId
-      if (runId && heimdallMailboxAddressForRun(runId) === address) {
-        this.requireRunnerLoop().schedule(runner, 0)
-        continue
-      }
-      if (dispatchScoped && this.hasInFlightDispatchAddress(runner, address)) {
-        this.requireRunnerLoop().schedule(runner, 0)
-      }
-    }
-  }
-
-  // upstream notifies dispatch-scoped mailboxes for federated/remote workers, which never equal
-  // a run address; matching in-flight dispatch ids is the only way to catch that wake.
-  private hasInFlightDispatchAddress(runner: WatcherRunner, address: string): boolean {
-    const attempts = getInFlightAttempts(
-      this.requireRunnerLedger().read(runner.enrollment.watcherId)
-    )
-    return attempts.some(
-      (attempt) =>
-        attempt.dispatchId !== undefined &&
-        heimdallMailboxAddressForDispatch(attempt.dispatchId) === address
-    )
+    wakeHeimdallMailboxRunners({
+      address,
+      runners: this.runners.values(),
+      ledgerStore: this.requireRunnerLedger(),
+      runnerLoop: this.requireRunnerLoop()
+    })
   }
 
   onShutdown(listener: () => void, phase: 'start' | 'drained' = 'start'): () => void {
@@ -338,6 +330,9 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
     this.loaded = true
     this.unsubscribeLedger = boot.ledgerStore.subscribe(() => this.publishChanged())
     const writable = !boot.database.isReadOnly()
+    if (writable) {
+      void drainPendingKindPurges(boot.enrollments, this.registry)
+    }
     boot.host.attachPowerMonitor()
     for (const record of boot.enrollments.list()) {
       if (!this.ownsEnrollment(record)) {
@@ -374,12 +369,13 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
     }
     const runner = this.requireRunnerLoop().createRunner(enrollment, kind)
     this.runners.set(enrollment.watcherId, runner)
-    const hasInFlight =
-      getInFlightAttempts(this.requireRunnerLedger().read(enrollment.watcherId)).length > 0
+    const hasPendingOutcome = hasPendingAttemptOutcome(
+      this.requireRunnerLedger().read(enrollment.watcherId)
+    )
     if (
       schedule &&
       enrollment.terminalAtMs === null &&
-      ((!enrollment.paused && enrollment.enabled) || hasInFlight)
+      ((!enrollment.paused && enrollment.enabled) || hasPendingOutcome)
     ) {
       this.requireRunnerLoop().schedule(runner, 0)
     }
@@ -438,6 +434,13 @@ export class HeimdallKernelServiceImpl implements HeimdallKernelService {
       throw new Error('Heimdall runner is unavailable')
     }
     return this.runnerLoop
+  }
+
+  private requireHost(): HeimdallKernelHost {
+    if (!this.host) {
+      throw new Error('Heimdall kernel host is unavailable')
+    }
+    return this.host
   }
   private requireTerminalTransition(): KernelTerminalTransition {
     if (!this.terminalTransition) {

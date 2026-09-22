@@ -297,6 +297,7 @@ function orchestrationSimulation(
     dispatchWorker,
     recoverDispatch: vi.fn(async () => ({ status: 'absent' as const })),
     readDispatch: vi.fn(async () => ({ status: 'live' as const })),
+    readAuthoritativeWorkerReport: vi.fn(async () => null),
     listWorkers: vi.fn(async () => []),
     stopWorker: vi.fn(async () => ({ status: 'applied' as const, appliedAtMs: 1 })),
     releaseWorker: vi.fn(async (_enrollment: WatcherEnrollment, dispatchId: string) => ({

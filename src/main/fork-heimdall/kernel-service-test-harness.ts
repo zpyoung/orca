@@ -107,10 +107,14 @@ export async function harness(
     directory?: string
     storageAuthority?: 'desktop' | 'runtime'
     lease?: () => LeaseResult
-    mailbox?: () => LedgerEntry[]
+    mailbox?: (input: Parameters<HeimdallOrchestrationAdapter['drainMailbox']>[0]) => LedgerEntry[]
     recoverDispatch?: HeimdallOrchestrationAdapter['recoverDispatch']
     releaseWorker?: HeimdallOrchestrationAdapter['releaseWorker']
-    dispatchObservation?: () => { status: 'live' | 'exited' | 'unverifiable'; reason?: string }
+    authoritativeWorkerReport?: HeimdallOrchestrationAdapter['readAuthoritativeWorkerReport']
+    dispatchObservation?: (dispatchId: string) => {
+      status: 'live' | 'exited' | 'unverifiable'
+      reason?: string
+    }
   } = {}
 ) {
   const directory = options.directory ?? (await mkdtemp(join(tmpdir(), 'heimdall-kernel-')))
@@ -137,7 +141,11 @@ export async function harness(
     recoverDispatch: vi.fn(
       options.recoverDispatch ?? (async () => ({ status: 'absent' as const }))
     ),
-    readDispatch: vi.fn(async () => options.dispatchObservation?.() ?? { status: 'live' as const }),
+    readDispatch: vi.fn(
+      async (_enrollment, dispatchId) =>
+        options.dispatchObservation?.(dispatchId) ?? { status: 'live' as const }
+    ),
+    readAuthoritativeWorkerReport: vi.fn(options.authoritativeWorkerReport ?? (async () => null)),
     listWorkers: vi.fn(async () => []),
     stopWorker: vi.fn(async () => ({ status: 'applied' as const, appliedAtMs: 100 })),
     releaseWorker: vi.fn(
@@ -149,7 +157,7 @@ export async function harness(
           archive: null
         }))
     ),
-    drainMailbox: vi.fn(async () => options.mailbox?.() ?? []),
+    drainMailbox: vi.fn(async (input) => options.mailbox?.(input) ?? []),
     answerQuestion: vi.fn(async () => {}),
     readQuestion: vi.fn(async () => ({ status: 'pending' as const }))
   }

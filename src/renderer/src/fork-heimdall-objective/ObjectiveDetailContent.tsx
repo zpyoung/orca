@@ -3,10 +3,13 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
+import { findIndexedFolderWorkspaceOwner } from '@/lib/worktree-runtime-owner-index'
+import { HEIMDALL_PARALLEL_EXECUTION_UNSUPPORTED_NOTE } from '../../../shared/fork-heimdall/capability'
 import type { ObjectiveDetail } from '../../../shared/fork-heimdall-objective/detail-types'
 import { OBJECTIVE_LANDING_LADDER } from '../../../shared/fork-heimdall-objective/landing-ladder'
 import type { WatcherLedger } from '../../../shared/fork-heimdall/ledger-types'
 import type { WatcherFleetEntry } from '../../../shared/fork-heimdall/fleet-types'
+import { parseWorkspaceKey } from '../../../shared/workspace-scope'
 import { formatHeimdallTime } from '../fork-heimdall/fleet-format'
 import { sameWatcherTarget } from '../fork-heimdall/fleet-selectors'
 import {
@@ -23,6 +26,7 @@ import {
   objectiveRoleLabel,
   objectiveSitterCapabilityLabel,
   objectiveTierLabel,
+  objectiveTrainStateLabel,
   objectiveWorkspaceKindLabel
 } from './objective-copy'
 import { ObjectivePlan } from './ObjectivePlan'
@@ -50,6 +54,19 @@ function ObjectiveContract({
   row: WatcherFleetEntry
 }): React.JSX.Element {
   const contract = detail.contract
+  const enrollment = row.entry.enrollment
+  const folderScope = parseWorkspaceKey(enrollment.worktreeId ?? '')
+  const folderWorkspaceName = useAppStore((state) => {
+    if (contract.workspaceKind !== 'folder' || folderScope?.type !== 'folder') {
+      return null
+    }
+    const owner = findIndexedFolderWorkspaceOwner(
+      state.folderWorkspaces,
+      folderScope.folderWorkspaceId,
+      enrollment.executionHostId
+    )
+    return state.folderWorkspaces.find((workspace) => workspace === owner)?.name ?? null
+  })
   const roleAgents = OBJECTIVE_ROLES.flatMap((role) => {
     const agent = contract.roleAgents[role]
     return agent ? [{ role, agent }] : []
@@ -82,14 +99,14 @@ function ObjectiveContract({
           {objectiveLandingBarLabel(contract.landingBar)}
         </ContractValue>
         <ContractValue label={translate('fork.heimdallObjective.detail.workspace', 'Workspace')}>
-          {row.entry.enrollment.worktreeId
+          {contract.workspaceKind === 'git' && enrollment.worktreeId
             ? translate(
                 'fork.heimdallObjective.detail.workspaceGitValue',
                 '{{kind}} · {{repo}} / {{worktree}}',
                 {
                   kind: objectiveWorkspaceKindLabel(contract.workspaceKind),
-                  repo: row.entry.enrollment.repoId,
-                  worktree: row.entry.enrollment.worktreeId
+                  repo: enrollment.repoId,
+                  worktree: enrollment.worktreeId
                 }
               )
             : translate(
@@ -97,7 +114,7 @@ function ObjectiveContract({
                 '{{kind}} · {{repo}}',
                 {
                   kind: objectiveWorkspaceKindLabel(contract.workspaceKind),
-                  repo: row.entry.enrollment.repoId
+                  repo: folderWorkspaceName ?? enrollment.repoId
                 }
               )}
         </ContractValue>
@@ -105,6 +122,12 @@ function ObjectiveContract({
           label={translate('fork.heimdallObjective.detail.maxConcurrency', 'Concurrency')}
         >
           {contract.maxConcurrency}
+        </ContractValue>
+        <ContractValue label={translate('fork.heimdallObjective.detail.lanes', 'Lanes')}>
+          {contract.lanesEnabled !== false &&
+          !row.capabilityNotes.includes(HEIMDALL_PARALLEL_EXECUTION_UNSUPPORTED_NOTE)
+            ? translate('fork.heimdallObjective.detail.enabled', 'Enabled')
+            : translate('fork.heimdallObjective.detail.disabled', 'Disabled')}
         </ContractValue>
         <ContractValue
           label={translate('fork.heimdallObjective.detail.territory', 'Write territory')}
@@ -160,6 +183,86 @@ function ObjectiveContract({
             : translate('fork.heimdallObjective.detail.defaults', 'Landing defaults')}
         </ContractValue>
       </div>
+    </section>
+  )
+}
+
+function ObjectiveParallelExecution({
+  parallel
+}: {
+  parallel: NonNullable<ObjectiveDetail['parallel']>
+}): React.JSX.Element {
+  return (
+    <section aria-labelledby="objective-parallel-title">
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+        <h3
+          id="objective-parallel-title"
+          className="text-xs font-semibold uppercase tracking-[0.05em] text-muted-foreground"
+        >
+          {translate('fork.heimdallObjective.detail.parallelExecution', 'Parallel execution')}
+        </h3>
+        <span className="text-xs font-medium tabular-nums">
+          {translate(
+            'fork.heimdallObjective.detail.runningAgainstCap',
+            '{{running}} of {{cap}} running',
+            {
+              running: parallel.runningCount,
+              cap: parallel.effectiveMaxConcurrency
+            }
+          )}
+        </span>
+      </div>
+      {parallel.note ? (
+        <p
+          className="mb-2 rounded-md border border-status-warning-border bg-status-warning-background px-3 py-2 text-xs text-status-warning-foreground"
+          role="status"
+        >
+          {parallel.note}
+        </p>
+      ) : null}
+      {parallel.dispatches.length === 0 ? (
+        <p className="rounded-md border border-border bg-muted/10 px-3 py-4 text-xs text-muted-foreground">
+          {translate(
+            'fork.heimdallObjective.detail.noParallelDispatches',
+            'No isolated dispatches yet.'
+          )}
+        </p>
+      ) : (
+        <ol className="divide-y divide-border rounded-md border border-border bg-muted/10">
+          {parallel.dispatches.map((dispatch) => {
+            const lane = dispatch.laneTaskKeys.length > 1
+            return (
+              <li
+                key={dispatch.attemptFingerprint}
+                className="flex flex-wrap items-start gap-2 px-3 py-2.5 text-xs"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-foreground">
+                    {lane
+                      ? translate('fork.heimdallObjective.detail.lane', 'Lane')
+                      : translate('fork.heimdallObjective.detail.node', 'Node')}
+                  </p>
+                  <p className="mt-0.5 break-words font-mono text-[11px] text-muted-foreground">
+                    {dispatch.laneTaskKeys.join(' → ')}
+                  </p>
+                  {dispatch.conflictPaths.length > 0 ? (
+                    <p className="mt-1 break-words text-[11px] text-status-warning-foreground">
+                      {translate(
+                        'fork.heimdallObjective.detail.conflicts',
+                        'Conflicts: {{paths}}',
+                        { paths: dispatch.conflictPaths.join(', ') }
+                      )}
+                    </p>
+                  ) : null}
+                </div>
+                <Badge variant={dispatch.state === 'applied' ? 'secondary' : 'outline'}>
+                  {objectiveTrainStateLabel(dispatch.state)}
+                </Badge>
+              </li>
+            )
+          })}
+        </ol>
+      )}
     </section>
   )
 }
@@ -320,6 +423,7 @@ export function ObjectiveDetailContent({
 }): React.JSX.Element {
   return (
     <div className="space-y-6">
+      {detail.parallel ? <ObjectiveParallelExecution parallel={detail.parallel} /> : null}
       <ObjectiveContract detail={detail} row={row} />
       <ObjectivePlan detail={detail} />
       <ObjectiveLanding detail={detail} ledger={ledger} row={row} />

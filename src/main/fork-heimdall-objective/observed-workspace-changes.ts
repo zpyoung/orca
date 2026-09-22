@@ -1,9 +1,21 @@
 import { randomUUID } from 'node:crypto'
-import { chmod, lstat, mkdir, readFile, writeFile } from 'node:fs/promises'
+import { chmod, lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/promises'
+import { isPathInsideOrEqual } from '../../shared/cross-platform-path'
 import { objectivePathMatchesTerritory } from '../../shared/fork-heimdall-objective/plan-schema'
+import { resolveWorktreeHostPath } from '../../shared/git-metadata-path'
+import { checkIgnoredPaths } from '../git/check-ignored-paths'
+import { isENOENT } from '../ipc/filesystem-path-containment'
 import type { IFilesystemProvider } from '../providers/types'
+import {
+  localGitOptionsForTarget,
+  requireRuntimeGitProvider
+} from '../runtime/runtime-git-command-target'
 import { resolveLeasePathFlavor } from '../fork-heimdall/lease-host-filesystem'
-import { observeGitWorkspaceState, type ObjectiveWorkspaceTarget } from './content-identity'
+import {
+  mapConcurrent,
+  observeGitWorkspaceState,
+  type ObjectiveWorkspaceTarget
+} from './content-identity'
 import { computeGitWorkspaceChangedPaths } from './git-workspace-changed-set'
 import {
   GIT_BASELINE_VERSION,
@@ -21,6 +33,7 @@ import {
 import { resolveExpectedObjectiveReportPath } from './report-ingestion'
 
 const MAX_BASELINE_BYTES = 64 * 1024 * 1024
+const REPORTED_PATH_PROBE_CONCURRENCY = 8
 
 type BaselineRead =
   | { state: 'ok'; baseline: WorkspaceBaseline }
@@ -148,7 +161,8 @@ async function writeBaseline(
 
 export async function captureObjectiveWorkspaceBaseline(
   target: ObjectiveWorkspaceTarget,
-  attemptFingerprint: string
+  attemptFingerprint: string,
+  sourceTarget: ObjectiveWorkspaceTarget = target
 ): Promise<void> {
   const provider = objectiveFilesystemProviderForTarget(target)
   const location = await baselinePath(target, attemptFingerprint)
@@ -165,19 +179,22 @@ export async function captureObjectiveWorkspaceBaseline(
   if (existing.state !== 'missing') {
     throw new Error(`Objective workspace baseline is ${existing.state}`)
   }
+  if (target.kind !== sourceTarget.kind) {
+    throw new Error('Objective workspace baseline source kind does not match its destination')
+  }
   const baseline: WorkspaceBaseline =
     target.kind === 'git'
       ? {
           version: GIT_BASELINE_VERSION,
           attemptFingerprint,
           target: targetDescriptor(target),
-          git: await observeGitWorkspaceState(target)
+          git: await observeGitWorkspaceState(sourceTarget)
         }
       : {
           version: LEGACY_BASELINE_VERSION,
           attemptFingerprint,
           target: targetDescriptor(target),
-          entries: await observeObjectiveWorkspaceManifest(target)
+          entries: await observeObjectiveWorkspaceManifest(sourceTarget)
         }
   await writeBaseline(target, baseline, location.directory, location.path)
 }
@@ -189,12 +206,84 @@ function changedPaths(before: readonly ManifestEntry[], after: readonly Manifest
   return [...paths].filter((path) => beforeByPath.get(path) !== afterByPath.get(path)).sort()
 }
 
+async function ignoredReportedPaths(
+  target: ObjectiveWorkspaceTarget,
+  paths: readonly string[]
+): Promise<Set<string>> {
+  if (target.kind !== 'git' || paths.length === 0) {
+    return new Set()
+  }
+  const gitTarget = target.gitTarget
+  if (
+    !gitTarget ||
+    gitTarget.executionHostId !== target.executionHostId ||
+    gitTarget.worktree.path !== target.workspacePath
+  ) {
+    throw new Error('Objective Git and filesystem authorities disagree')
+  }
+  const provider = requireRuntimeGitProvider(gitTarget)
+  const ignored = provider
+    ? await provider.checkIgnoredPaths(target.workspacePath, [...paths])
+    : await checkIgnoredPaths(target.workspacePath, [...paths], {
+        ...localGitOptionsForTarget(gitTarget),
+        admissionTier: 'background'
+      })
+  const requested = new Set(paths)
+  if (ignored.some((path) => !requested.has(path))) {
+    throw new Error('Git returned an unrequested ignored path')
+  }
+  return new Set(ignored)
+}
+
+async function existingContainedPaths(
+  target: ObjectiveWorkspaceTarget,
+  paths: ReadonlySet<string>
+): Promise<Set<string>> {
+  if (paths.size === 0) {
+    return new Set()
+  }
+  const provider = objectiveFilesystemProviderForTarget(target)
+  const root =
+    target.fileProvider || !target.gitTarget
+      ? target.workspacePath
+      : (resolveWorktreeHostPath(
+          target.workspacePath,
+          localGitOptionsForTarget(target.gitTarget)
+        ) ?? target.workspacePath)
+  const flavor = resolveLeasePathFlavor(target.executionHostId, root)
+  const canonicalRoot = provider ? await provider.realpath(root) : await realpath(root)
+  const entries = await mapConcurrent(
+    [...paths],
+    REPORTED_PATH_PROBE_CONCURRENCY,
+    async (path): Promise<[string, boolean]> => {
+      try {
+        const candidate = flavor.join(root, ...path.split('/'))
+        const canonicalCandidate = provider
+          ? await provider.realpath(candidate)
+          : await realpath(candidate)
+        return [path, isPathInsideOrEqual(canonicalRoot, canonicalCandidate)]
+      } catch (error) {
+        if (isMissing(error) || isENOENT(error)) {
+          return [path, false]
+        }
+        throw error
+      }
+    }
+  )
+  return new Set(entries.filter(([, exists]) => exists).map(([path]) => path))
+}
+
+export type ObjectiveWorkspaceChangesValidation =
+  | { ok: true; changedPaths: string[] }
+  /** `observedFiles` is the real workspace diff; absent only when observation itself never ran. */
+  | { ok: false; reason: string; observedFiles?: string[] }
+
 export async function validateObjectiveWorkspaceChanges(args: {
   target: ObjectiveWorkspaceTarget
   attemptFingerprint: string
   reportedFiles: readonly string[]
   writeTerritory: readonly string[]
-}): Promise<{ ok: true; changedPaths: string[] } | { ok: false; reason: string }> {
+}): Promise<ObjectiveWorkspaceChangesValidation> {
   let provider: IFilesystemProvider | null
   let location: BaselineLocation
   try {
@@ -231,20 +320,47 @@ export async function validateObjectiveWorkspaceChanges(args: {
   }
   const outside = observed.find((path) => !objectivePathMatchesTerritory(path, args.writeTerritory))
   if (outside) {
-    return { ok: false, reason: `observed-change-outside-write-territory:${outside}` }
+    return {
+      ok: false,
+      reason: `observed-change-outside-write-territory:${outside}`,
+      observedFiles: observed
+    }
   }
   if (
     new Set(args.reportedFiles).size !== args.reportedFiles.length ||
     args.reportedFiles.some((path) => !objectivePathMatchesTerritory(path, args.writeTerritory))
   ) {
-    return { ok: false, reason: 'reported-files-invalid' }
+    return { ok: false, reason: 'reported-files-invalid', observedFiles: observed }
   }
   const reported = [...args.reportedFiles].sort()
-  if (
-    reported.length !== observed.length ||
-    reported.some((path, index) => path !== observed[index])
-  ) {
-    return { ok: false, reason: 'reported-files-do-not-match-observed-changes' }
+  const reportedSet = new Set(reported)
+  if (observed.some((path) => !reportedSet.has(path))) {
+    return {
+      ok: false,
+      reason: 'reported-files-do-not-match-observed-changes',
+      observedFiles: observed
+    }
   }
-  return { ok: true, changedPaths: observed }
+  const observedSet = new Set(observed)
+  const unobservedReported = reported.filter((path) => !observedSet.has(path))
+  // Ignored paths are invisible to Git; the owning host must still prove existence and containment.
+  let acknowledged: Set<string>
+  try {
+    const ignored = await ignoredReportedPaths(args.target, unobservedReported)
+    acknowledged = await existingContainedPaths(args.target, ignored)
+  } catch {
+    return {
+      ok: false,
+      reason: 'objective-workspace-observation-failed',
+      observedFiles: observed
+    }
+  }
+  if (unobservedReported.some((path) => !acknowledged.has(path))) {
+    return {
+      ok: false,
+      reason: 'reported-files-do-not-match-observed-changes',
+      observedFiles: observed
+    }
+  }
+  return { ok: true, changedPaths: reported }
 }

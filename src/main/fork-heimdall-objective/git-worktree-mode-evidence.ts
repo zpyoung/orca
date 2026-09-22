@@ -1,6 +1,9 @@
+import {
+  OBJECTIVE_GIT_EXEC_PATH_BATCH_SIZE,
+  OBJECTIVE_PATH_MODES_ALIAS,
+  OBJECTIVE_PATH_MODES_ALIAS_CONFIG
+} from '../../shared/fork-heimdall/objective-git-exec-shapes'
 import type { ObjectiveGitCommand } from './content-identity'
-
-const MODE_PROBE_BATCH_SIZE = 200
 
 export type GitPathModeEvidence = { modeIdentity: string; symlinkTarget?: string }
 
@@ -9,15 +12,15 @@ export async function gitPathModeEvidence(
   paths: readonly string[]
 ): Promise<GitPathModeEvidence[]> {
   const evidence: GitPathModeEvidence[] = []
-  for (let index = 0; index < paths.length; index += MODE_PROBE_BATCH_SIZE) {
-    const batch = paths.slice(index, index + MODE_PROBE_BATCH_SIZE)
+  for (let index = 0; index < paths.length; index += OBJECTIVE_GIT_EXEC_PATH_BATCH_SIZE) {
+    const batch = paths.slice(index, index + OBJECTIVE_GIT_EXEC_PATH_BATCH_SIZE)
     // Git !aliases use Git's bundled POSIX shell on Windows. Paths remain positional "$@"
     // arguments, never interpolated into shell source, so metacharacters cannot become syntax.
     const stdout = (
       await runGit([
         '-c',
-        'alias.orca-objective-modes=!f() { test "$1" = -- && shift; for path do case "$path" in -*) path="./$path";; esac; if test -L "$path"; then printf "symlink\\\\0"; readlink "$path" || exit; printf "\\\\0"; elif test -x "$path"; then printf "file:executable\\\\0"; else printf "file:regular\\\\0"; fi; done; }; f',
-        'orca-objective-modes',
+        OBJECTIVE_PATH_MODES_ALIAS_CONFIG,
+        OBJECTIVE_PATH_MODES_ALIAS,
         '--',
         ...batch
       ])

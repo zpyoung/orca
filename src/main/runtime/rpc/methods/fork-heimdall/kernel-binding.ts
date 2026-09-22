@@ -1,11 +1,15 @@
 import type { HeimdallKernelService } from '../../../../fork-heimdall/kernel-service'
 import type { HeimdallFleetTransport } from '../../../../fork-heimdall/fleet-transport'
+import { bindOrchestrationSubmissionPreflight } from '../../../../fork-heimdall/orchestration/submission-preflight'
 
 const kernels = new WeakMap<object, HeimdallKernelService>()
 const transports = new WeakMap<object, HeimdallFleetTransport>()
 
 export function bindHeimdallKernel(runtime: object, kernel: HeimdallKernelService): void {
   kernels.set(runtime, kernel)
+  bindOrchestrationSubmissionPreflight(runtime, (submission) =>
+    kernel.preflightSubmission(submission)
+  )
 }
 export function bindHeimdallTransport(runtime: object, transport: HeimdallFleetTransport): void {
   transports.set(runtime, transport)

@@ -20,6 +20,7 @@ import {
 import type { KindEnrollmentAuthorization } from './kernel-enrollment'
 import type { HeimdallLedgerStore } from './ledger-store'
 import type { RegisteredWatcherKind } from './registry'
+import { WatcherDeletePendingError } from './runner-control-lifecycle'
 import type { WatcherRunner } from './runner-state'
 
 export type KernelTerminalTransitionDependencies = {
@@ -175,6 +176,9 @@ export class KernelTerminalTransition {
       throw new Error('Watcher terminal transition reached persistence without a lease')
     }
     await runner.leaseGuard.assertHeld()
+    if (runner.stopped || runner.controlPending === 'delete') {
+      throw new WatcherDeletePendingError()
+    }
     const result = this.commit(runner.enrollment, fired, prepared)
     if (result.handoff.status === 'enrolled' && prepared.status === 'enroll') {
       activate(result.handoff.enrollment, prepared.kind)

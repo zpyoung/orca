@@ -1,6 +1,7 @@
 import type { StopPredicate } from '../fork-heimdall/stop-policy'
 import type { WatcherLedger } from '../fork-heimdall/ledger-types'
 import { getAttemptResolution } from '../fork-heimdall/ledger-queries'
+import type { CheckFailedDeviation } from '../fork-heimdall/owner/deviation'
 import {
   getHostedReviewAttemptDisposition,
   getHostedReviewFixAttributions,
@@ -146,17 +147,24 @@ export function hasRepeatedFailureAfterOwnFix(
   return getRepeatedFailureAfterOwnFixEvidence(review, ledger).length > 0
 }
 
-export function hasUnverifiableReproducedFailure(
+export type UnverifiableReproducedFailureEvidence = {
+  checkKey: string
+  rerunAttemptId: string
+}
+
+/** A completed rerun still fails without a classifiable signature: the check itself, not the rerun, is unverifiable. */
+export function getUnverifiableReproducedFailureEvidence(
   review: HostedReviewSnapshot,
   ledger: WatcherLedger
-): boolean {
-  return getLatestHostedReviewAttempts(ledger).some((entry) => {
+): readonly UnverifiableReproducedFailureEvidence[] {
+  const evidence: UnverifiableReproducedFailureEvidence[] = []
+  for (const entry of getLatestHostedReviewAttempts(ledger)) {
     if (
       getHostedReviewAttemptDisposition(ledger, entry.action) !== 'completed' ||
       entry.action.kind !== 'rerun-check' ||
       entry.action.headSha !== review.headSha
     ) {
-      return false
+      continue
     }
     const rerun = entry.action
     const original = new Set(rerun.observationIds)
@@ -165,11 +173,21 @@ export function hasUnverifiableReproducedFailure(
         check.required && check.headSha === review.headSha && check.checkKey === rerun.checkKey
     )
     if (current.length === 0 || current.some((check) => original.has(check.observationId))) {
-      return false
+      continue
     }
     const failures = current.filter((check) => check.state === 'failed')
-    return failures.length > 0 && failures.every((check) => check.failureSignature === null)
-  })
+    if (failures.length > 0 && failures.every((check) => check.failureSignature === null)) {
+      evidence.push({ checkKey: rerun.checkKey, rerunAttemptId: entry.attemptId })
+    }
+  }
+  return evidence
+}
+
+export function hasUnverifiableReproducedFailure(
+  review: HostedReviewSnapshot,
+  ledger: WatcherLedger
+): boolean {
+  return getUnverifiableReproducedFailureEvidence(review, ledger).length > 0
 }
 
 export const hostedReviewLifecycleTerminalPredicate: StopPredicate<HostedReviewWorld> = {
@@ -199,6 +217,19 @@ export const HOSTED_REVIEW_STOP_PREDICATES: readonly StopPredicate<HostedReviewW
               .sort()
               .join(',')
           }
+    },
+    deviationForFiring(_verdict, snapshot, ledger): CheckFailedDeviation {
+      // re-derived rather than parsed back out of `verdict.detail`; guaranteed non-empty since
+      // `evaluate` only fires with at least one entry, using the same snapshot and ledger
+      const [primary] = getRepeatedFailureAfterOwnFixEvidence(snapshot.world.review, ledger)
+      return {
+        kind: 'check-failed',
+        criterionId: primary!.checkKey,
+        command: null,
+        exitCode: null,
+        timedOut: null,
+        detail: `same failure recurred after the sitter's own fix (produced ${primary!.producedHeadSha})`
+      }
     }
   },
   {
@@ -207,6 +238,17 @@ export const HOSTED_REVIEW_STOP_PREDICATES: readonly StopPredicate<HostedReviewW
       return hasUnverifiableReproducedFailure(snapshot.world.review, ledger)
         ? { stop: true, reason: 'unverifiable-reproduced-failure' }
         : { stop: false }
+    },
+    deviationForFiring(_verdict, snapshot, ledger): CheckFailedDeviation {
+      const [primary] = getUnverifiableReproducedFailureEvidence(snapshot.world.review, ledger)
+      return {
+        kind: 'check-failed',
+        criterionId: primary!.checkKey,
+        command: null,
+        exitCode: null,
+        timedOut: null,
+        detail: 'a rerun reproduced this failure with no classifiable signature'
+      }
     }
   }
 ]

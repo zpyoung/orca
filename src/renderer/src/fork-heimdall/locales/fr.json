@@ -69,6 +69,9 @@
         "resume": "Reprendre",
         "pause": "Mettre en pause",
         "disarm": "Désarmer",
+        "delete": "Supprimer l’observateur",
+        "deleteTitle": "Supprimer l’observateur ?",
+        "deleteDescription": "L’observateur « {{name}} » et son historique enregistré seront définitivement supprimés. Les terminaux des agents ne seront pas arrêtés.",
         "approve": "Approuver",
         "budgetResumeWarning": "Le budget de cet observateur est épuisé. Augmentez la limite avant de le reprendre, sinon il sera de nouveau mis en pause."
       },

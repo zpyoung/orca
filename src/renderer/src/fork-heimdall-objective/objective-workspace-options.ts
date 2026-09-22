@@ -1,4 +1,5 @@
 import type { AppState } from '@/store/types'
+import { collectActiveDashboardWorkspaces } from '@/components/dashboard/dashboard-snapshot-workspaces'
 import type { ObjectiveWorkspaceKind } from '../../../shared/fork-heimdall-objective/contract-types'
 import {
   getRepoExecutionHostId,
@@ -7,6 +8,7 @@ import {
 } from '../../../shared/execution-host'
 import { isFolderRepo } from '../../../shared/repo-kind'
 import type { HeimdallRemoteOwner } from '../../../shared/fork-heimdall/api'
+import { HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY } from '../../../shared/fork-heimdall/capability'
 import {
   filterEnabledTuiAgents,
   TUI_AGENT_AUTO_PICK_ORDER
@@ -24,6 +26,7 @@ export type ObjectiveWorkspaceOption = {
   detail: string
   owner: HeimdallRemoteOwner | undefined
   ownerUnavailable: boolean
+  parallelExecutionSupported?: boolean
   availableAgentIds: readonly string[]
 }
 
@@ -31,10 +34,13 @@ type ObjectiveWorkspaceState = Pick<
   AppState,
   | 'repos'
   | 'worktreesByRepo'
+  | 'folderWorkspaces'
+  | 'projectGroups'
   | 'runtimeEnvironments'
   | 'detectedAgentIds'
   | 'remoteDetectedAgentIds'
   | 'runtimeDetectedAgentIds'
+  | 'runtimeStatusByEnvironmentId'
   | 'settings'
 >
 
@@ -55,10 +61,14 @@ function agentsForHost(state: ObjectiveWorkspaceState, hostId: string): readonly
 function remoteOwner(
   state: ObjectiveWorkspaceState,
   hostId: string
-): Pick<ObjectiveWorkspaceOption, 'owner' | 'ownerUnavailable'> {
+): Pick<ObjectiveWorkspaceOption, 'owner' | 'ownerUnavailable' | 'parallelExecutionSupported'> {
   const host = parseExecutionHostId(hostId)
   if (host?.kind !== 'runtime') {
-    return { owner: undefined, ownerUnavailable: false }
+    return {
+      owner: undefined,
+      ownerUnavailable: false,
+      parallelExecutionSupported: true
+    }
   }
   const environment = state.runtimeEnvironments.find(
     (candidate) => candidate.id === host.environmentId
@@ -69,52 +79,85 @@ function remoteOwner(
           connectionId: environment.id,
           pairingRevision: environment.pairingRevision ?? environment.createdAt
         },
-        ownerUnavailable: false
+        ownerUnavailable: false,
+        parallelExecutionSupported:
+          state.runtimeStatusByEnvironmentId
+            .get(environment.id)
+            ?.status?.capabilities?.includes(HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY) ===
+          true
       }
-    : { owner: undefined, ownerUnavailable: true }
+    : {
+        owner: undefined,
+        ownerUnavailable: true,
+        parallelExecutionSupported: false
+      }
 }
 
 export function buildObjectiveWorkspaceOptions(
   state: ObjectiveWorkspaceState
 ): ObjectiveWorkspaceOption[] {
   const options: ObjectiveWorkspaceOption[] = []
-  for (const repo of state.repos) {
-    const repoHostId = getRepoExecutionHostId(repo)
-    if (isFolderRepo(repo)) {
-      options.push({
-        key: `${repoHostId}:${repo.id}:folder`,
-        repoId: repo.id,
-        repoPath: repo.path,
-        worktreeId: null,
-        workspacePath: repo.path,
-        branch: null,
-        workspaceKind: 'folder',
-        label: repo.displayName,
-        detail: `${repo.path} · ${repoHostId}`,
-        ...remoteOwner(state, repoHostId),
-        availableAgentIds: agentsForHost(state, repoHostId)
-      })
+  const optionKeys = new Set<string>()
+  for (const workspace of collectActiveDashboardWorkspaces(state)) {
+    const { repo, worktree } = workspace
+    if (worktree.isBare) {
       continue
     }
-    for (const worktree of state.worktreesByRepo[repo.id] ?? []) {
-      const worktreeHostId = getWorktreeExecutionHostId(worktree, repo)
-      if (worktree.isArchived || worktree.isBare) {
-        continue
-      }
-      options.push({
-        key: `${worktreeHostId}:${repo.id}:${worktree.id}`,
-        repoId: repo.id,
-        repoPath: repo.path,
-        worktreeId: worktree.id,
-        workspacePath: worktree.path,
-        branch: worktree.branch,
-        workspaceKind: 'git',
-        label: `${repo.displayName} / ${worktree.displayName || worktree.branch || worktree.path}`,
-        detail: `${worktree.path} · ${worktreeHostId}`,
-        ...remoteOwner(state, worktreeHostId),
-        availableAgentIds: agentsForHost(state, worktreeHostId)
-      })
+    const worktreeHostId = getWorktreeExecutionHostId(worktree, repo ?? undefined)
+    const folder = workspace.workspaceKind === 'folder' || Boolean(repo && isFolderRepo(repo))
+    const repoId = repo?.id ?? worktree.repoId
+    const repoPath = repo?.path ?? worktree.path
+    // Legacy folder projects resolve through their Repo root; canonical FolderWorkspace rows
+    // have no Repo row, so enrollment must carry the scoped folder key to the runtime resolver.
+    const worktreeId = folder && repo ? null : worktree.id
+    const workspacePath = folder && repo ? repo.path : worktree.path
+    const label = repo
+      ? folder
+        ? repo.displayName
+        : `${repo.displayName} / ${worktree.displayName || worktree.branch || worktree.path}`
+      : workspace.projectName === worktree.displayName
+        ? worktree.displayName
+        : `${workspace.projectName} / ${worktree.displayName}`
+    const key = `${worktreeHostId}:${repoId}:${worktreeId ?? 'folder'}`
+    optionKeys.add(key)
+    options.push({
+      key,
+      repoId,
+      repoPath,
+      worktreeId,
+      workspacePath,
+      branch: folder ? null : worktree.branch,
+      workspaceKind: folder ? 'folder' : 'git',
+      label,
+      detail: `${workspacePath} · ${worktreeHostId}`,
+      ...remoteOwner(state, worktreeHostId),
+      availableAgentIds: agentsForHost(state, worktreeHostId)
+    })
+  }
+  // A folder Repo is independently authoritative; it remains eligible before its synthetic
+  // worktree row is hydrated. The shared projection above supplies the row once available.
+  for (const repo of state.repos) {
+    if (!isFolderRepo(repo)) {
+      continue
     }
+    const hostId = getRepoExecutionHostId(repo)
+    const key = `${hostId}:${repo.id}:folder`
+    if (optionKeys.has(key)) {
+      continue
+    }
+    options.push({
+      key,
+      repoId: repo.id,
+      repoPath: repo.path,
+      worktreeId: null,
+      workspacePath: repo.path,
+      branch: null,
+      workspaceKind: 'folder',
+      label: repo.displayName,
+      detail: `${repo.path} · ${hostId}`,
+      ...remoteOwner(state, hostId),
+      availableAgentIds: agentsForHost(state, hostId)
+    })
   }
   return options.sort((left, right) => left.label.localeCompare(right.label))
 }

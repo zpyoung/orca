@@ -1,5 +1,12 @@
 import { z } from 'zod'
 import {
+  OBJECTIVE_CHECK_COMMAND_MAX_LENGTH,
+  OBJECTIVE_CRITERION_BODY_MAX_LENGTH,
+  OBJECTIVE_CRITERION_NOTE_MAX_LENGTH,
+  OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH,
+  OBJECTIVE_TASK_KEY_MAX_LENGTH,
+  OBJECTIVE_TASK_SPEC_MAX_LENGTH,
+  OBJECTIVE_TASK_TITLE_MAX_LENGTH,
   ObjectiveWorkspacePathSchema,
   isObjectiveConcreteWorkspacePath,
   type ObjectiveEnrollmentPayload
@@ -13,16 +20,16 @@ const TaskKeySchema = z
   .string()
   .trim()
   .min(1)
-  .max(128)
+  .max(OBJECTIVE_TASK_KEY_MAX_LENGTH)
   .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/u)
-const TitleSchema = z.string().trim().min(1).max(512)
-const NoteSchema = z.string().trim().min(1).max(4_096)
+const TitleSchema = z.string().trim().min(1).max(OBJECTIVE_TASK_TITLE_MAX_LENGTH)
+const NoteSchema = z.string().trim().min(1).max(OBJECTIVE_CRITERION_NOTE_MAX_LENGTH)
 
 export const ObjectiveCriterionSchema = z
   .object({
-    body: z.string().trim().min(1).max(2_048),
+    body: z.string().trim().min(1).max(OBJECTIVE_CRITERION_BODY_MAX_LENGTH),
     shellCheckable: z.boolean(),
-    checkCommand: z.string().trim().min(1).max(8_192).nullable()
+    checkCommand: z.string().trim().min(1).max(OBJECTIVE_CHECK_COMMAND_MAX_LENGTH).nullable()
   })
   .strict()
   .refine(
@@ -35,7 +42,7 @@ export const ObjectivePlanTaskSchema = z
   .object({
     taskKey: TaskKeySchema,
     title: TitleSchema,
-    spec: z.string().trim().min(1).max(16_384),
+    spec: z.string().trim().min(1).max(OBJECTIVE_TASK_SPEC_MAX_LENGTH),
     deps: z.array(TaskKeySchema).max(OBJECTIVE_PLAN_MAX_TASKS),
     criteria: z.array(ObjectiveCriterionSchema).min(1).max(OBJECTIVE_TASK_MAX_CRITERIA),
     declaresDependencyChange: z.boolean(),
@@ -134,7 +141,7 @@ export type CriterionSelfAssessment = z.infer<typeof CriterionSelfAssessmentSche
 export const ImplementerReportSchema = z
   .object({
     taskKey: TaskKeySchema,
-    summary: z.string().trim().min(1).max(8_192),
+    summary: z.string().trim().min(1).max(OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH),
     filesModified: z.array(ObjectiveWorkspacePathSchema).max(OBJECTIVE_REPORT_MAX_FILES),
     criteriaSelfAssessment: z.array(CriterionSelfAssessmentSchema).max(OBJECTIVE_TASK_MAX_CRITERIA)
   })
@@ -171,7 +178,7 @@ const ReviewerReportObjectSchema = z
     criteriaResults: z
       .array(ReviewCriterionResultSchema)
       .max(OBJECTIVE_PLAN_MAX_TASKS * OBJECTIVE_TASK_MAX_CRITERIA),
-    summary: z.string().trim().min(1).max(8_192)
+    summary: z.string().trim().min(1).max(OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH)
   })
   .strict()
 
@@ -196,7 +203,10 @@ export const ReviewerReportSchema = ReviewerReportObjectSchema.superRefine((repo
 export type ReviewerReport = z.infer<typeof ReviewerReportSchema>
 
 export const IntegratorCheckSchema = z
-  .object({ command: z.string().trim().min(1).max(8_192), exitCode: z.number().int() })
+  .object({
+    command: z.string().trim().min(1).max(OBJECTIVE_CHECK_COMMAND_MAX_LENGTH),
+    exitCode: z.number().int()
+  })
   .strict()
 export type IntegratorCheck = z.infer<typeof IntegratorCheckSchema>
 

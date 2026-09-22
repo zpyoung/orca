@@ -26,6 +26,7 @@ import {
   hostedReviewDefinitionFromEnrollment
 } from './definition'
 import { enrollmentPayloadSchema, parseHostedReviewEnrollmentPayload } from './definition-store'
+import { createHostedReviewOwnerAdapter } from './owner-adapter'
 import { createHostedReviewSitterProvider, resolveHostedReviewSitterGitExecution } from './provider'
 import {
   executeHostedReviewSitterAction,
@@ -144,7 +145,8 @@ export function createHostedReviewKind(
       }
     },
     stopPredicates: HOSTED_REVIEW_STOP_PREDICATES,
-    pacing: { pace: paceHostedReview }
+    pacing: { pace: paceHostedReview },
+    owner: createHostedReviewOwnerAdapter()
   }
 }
 

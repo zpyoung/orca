@@ -40,13 +40,19 @@ afterEach(() => {
 })
 
 describe('Heimdall budget clock', () => {
-  it('allows at most one open interval per watcher', () => {
+  it('measures overlapping activity as one union interval', () => {
     const clock = makeClock()
-    const handle = clock.open('watcher-1', 'action-in-flight')
+    const first = clock.open('watcher-1', 'action-in-flight')
+    const second = clock.open('watcher-1', 'worker-dispatched')
 
-    expect(() => clock.open('watcher-1', 'worker-dispatched')).toThrow()
+    expect(second).toEqual(first)
     expect(entries().filter((entry) => entry.kind === 'interval-open')).toHaveLength(1)
-    expect(clock.current('watcher-1')).toEqual(handle)
+    clock.close(first, 'settled')
+    expect(entries().filter((entry) => entry.kind === 'interval-close')).toHaveLength(0)
+    expect(clock.current('watcher-1')).toEqual(second)
+    clock.close(second, 'settled')
+    expect(entries().filter((entry) => entry.kind === 'interval-close')).toHaveLength(1)
+    expect(clock.current('watcher-1')).toBeNull()
   })
 
   it('samples every 15 seconds but durably checkpoints at most once per 60 seconds', () => {
@@ -155,6 +161,22 @@ describe('Heimdall budget clock', () => {
 
     expect(() => original.close(handle, 'settled')).toThrow()
     expect(original.current('watcher-1')).toBeNull()
+    expect(entries().filter((entry) => entry.kind === 'interval-close')).toHaveLength(1)
+  })
+
+  it('exposes only local ownership and keeps direct close fenced to that clock', () => {
+    const owner = makeClock()
+    const handle = owner.open('watcher-1', 'worker-dispatched')
+    const foreign = makeClock()
+
+    expect(owner.owned('watcher-1')).toEqual(handle)
+    expect(foreign.owned('watcher-1')).toBeNull()
+    expect(foreign.current('watcher-1')).toEqual(handle)
+    expect(() => foreign.close(handle, 'shutdown')).toThrow('not owned by this clock')
+    expect(entries().filter((entry) => entry.kind === 'interval-close')).toHaveLength(0)
+
+    owner.close(handle, 'shutdown')
+    expect(owner.owned('watcher-1')).toBeNull()
     expect(entries().filter((entry) => entry.kind === 'interval-close')).toHaveLength(1)
   })
 

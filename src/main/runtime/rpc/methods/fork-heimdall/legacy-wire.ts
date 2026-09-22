@@ -11,6 +11,7 @@ import type { HeimdallDebugReport } from '../../../../fork-heimdall/debug-report
 import { defineMethod, type RpcAnyMethod } from '../../core'
 import { requireHeimdallKernel } from './kernel-binding'
 import { projectHeimdallLedgerForClient } from './dispatch-result-wire'
+import { projectWatcherListEntryForClient } from './park-reason-wire'
 
 export const LEGACY_HEIMDALL_CHANNELS = {
   list: 'heimdall:list',
@@ -78,8 +79,10 @@ export const LEGACY_HEIMDALL_METHODS: readonly RpcAnyMethod[] = [
   defineMethod({
     name: LEGACY_HEIMDALL_CHANNELS.list,
     params: z.object({}).strict(),
-    handler: async (_params, { runtime }) =>
-      (await requireHeimdallKernel(runtime).list()).map(projectLegacyListEntry)
+    handler: async (_params, context) =>
+      (await requireHeimdallKernel(context.runtime).list()).map((entry) =>
+        projectLegacyListEntry(projectWatcherListEntryForClient(entry, context))
+      )
   }),
   defineMethod({
     name: LEGACY_HEIMDALL_CHANNELS.disarm,

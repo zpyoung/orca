@@ -16,5 +16,20 @@ export const HEIMDALL_COMMAND_SPECS: CommandSpec[] = [
       'orca heimdall debug watcher_01J000000000000000000000',
       'orca heimdall debug watcher_01J000000000000000000000 --out ./heimdall-report.json'
     ]
+  },
+  {
+    path: ['heimdall', 'set-concurrency'],
+    summary: 'Change a live objective watcher concurrency cap',
+    usage: 'orca heimdall set-concurrency <watcherId> <maxConcurrency> [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'watcher-id', 'max-concurrency'],
+    positionalArgs: ['watcher-id', 'max-concurrency'],
+    notes: [
+      'Lowering the cap lets in-flight dispatches finish; raising it takes effect on the next watcher tick.',
+      'Folder workspaces remain capped at 1.'
+    ],
+    examples: [
+      'orca heimdall set-concurrency watcher_01J000000000000000000000 3',
+      'orca heimdall set-concurrency watcher_01J000000000000000000000 1 --json'
+    ]
   }
 ]

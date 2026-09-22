@@ -1,4 +1,8 @@
-import type { LedgerEntry, WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
+import type {
+  EvidenceEntry,
+  LedgerEntry,
+  WatcherLedger
+} from '../../shared/fork-heimdall/ledger-types'
 import type { MailboxCursor } from './orchestration/mailbox-drain'
 
 export function mailboxBody(entry: Extract<LedgerEntry, { kind: 'evidence' }>): {
@@ -40,6 +44,21 @@ export function mailboxBody(entry: Extract<LedgerEntry, { kind: 'evidence' }>): 
     ...(payload.result === undefined ? {} : { result: payload.result }),
     ...(typeof envelope.subject === 'string' ? { subject: envelope.subject } : {}),
     ...(typeof envelope.body === 'string' ? { body: envelope.body } : {})
+  }
+}
+
+export function mailboxDeliveryCheckpoint(entry: EvidenceEntry): EvidenceEntry {
+  if (!entry.source) {
+    throw new Error('Mailbox delivery checkpoint requires cursor-authoritative evidence')
+  }
+  return {
+    ...entry,
+    eventId: `orchestration-mail-cursor:${encodeURIComponent(entry.source.messageId)}:${entry.source.sequence}`,
+    evidenceKind: 'orchestration-mailbox-cursor',
+    payload: {
+      messageId: entry.source.messageId,
+      sequence: entry.source.sequence
+    }
   }
 }
 

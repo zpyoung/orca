@@ -29,7 +29,7 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
   },
   {
     name: 'heimdall',
-    keys: ['heimdall debug'],
+    keys: ['heimdall debug', 'heimdall set-concurrency'],
     load: async () => (await import('./fork-heimdall/handlers.js')).HEIMDALL_HANDLERS
   },
   {

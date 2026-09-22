@@ -12,7 +12,7 @@ import {
 import { OBJECTIVE_JUDGMENT_QUESTION_IDS } from '../../../shared/fork-heimdall/judgment/registry'
 import type { WatcherLedger } from '../../../shared/fork-heimdall/ledger-types'
 import type { ObjectiveWorld } from '../../../shared/fork-heimdall-objective/detail-types'
-import { judgmentRequestFitsTransportLimits } from './client'
+import { JudgmentClientFailure, judgmentRequestFitsTransportLimits } from './client'
 import { computeJudgmentIdentity, type ComputedJudgmentIdentity } from './identity'
 import { expandJudgmentState, JUDGMENT_STATE_NORMALIZATION_GUIDANCE } from './state-normalization'
 import type {
@@ -123,6 +123,40 @@ function validatedRequests(
 
 function withStateNotices(reason: string, notices: readonly string[]): string {
   return notices.length === 0 ? reason : `${reason}; ${notices.join(' ')}`
+}
+
+const GENERIC_EVALUATION_FAILURE_REASON = 'judgment unavailable: evaluation failed'
+
+function evaluationFailureReason(error: unknown): string {
+  if (!(error instanceof JudgmentClientFailure)) {
+    return GENERIC_EVALUATION_FAILURE_REASON
+  }
+
+  const diagnostic = error.diagnostic
+  switch (diagnostic.code) {
+    case 'timeout':
+      return 'judgment unavailable: timeout'
+    case 'http-status':
+      return Number.isInteger(diagnostic.status) &&
+        diagnostic.status >= 100 &&
+        diagnostic.status <= 599
+        ? `judgment unavailable: http-status:${diagnostic.status}`
+        : GENERIC_EVALUATION_FAILURE_REASON
+    case 'retry-exhausted':
+      return diagnostic.status === 429 || diagnostic.status === 529
+        ? `judgment unavailable: retry-exhausted:${diagnostic.status}`
+        : GENERIC_EVALUATION_FAILURE_REASON
+    case 'state-size':
+      return 'judgment unavailable: state-size'
+    case 'request-size':
+      return 'judgment unavailable: request-size'
+    case 'response-size':
+      return 'judgment unavailable: response-size'
+    case 'malformed-response':
+      return 'judgment unavailable: malformed-response'
+    case 'unknown':
+      return GENERIC_EVALUATION_FAILURE_REASON
+  }
 }
 
 function withNormalizationGuidance(question: JudgmentQuestion): JudgmentQuestion {
@@ -405,8 +439,8 @@ export class JudgmentService {
       !computed.fitsStateBudget || computed.serializedBytes > this.maxStateBytes
     if (stateExceedsBudget || !requestFits) {
       const reason = stateExceedsBudget
-        ? `judgment unavailable: mandatory state exceeds the ${this.maxStateBytes}-byte limit`
-        : 'judgment unavailable: evaluation request exceeds transport limits'
+        ? 'judgment unavailable: state-size'
+        : 'judgment unavailable: request-size'
       this.dependencies.store.recordOutcome(
         input.watcherId,
         identity,
@@ -436,7 +470,9 @@ export class JudgmentService {
             !JudgmentAnswerSchema.safeParse(response.answers[request.id]).success
         )
       ) {
-        throw new Error('invalid judgment response')
+        throw new JudgmentClientFailure('Judgment response is invalid', {
+          code: 'malformed-response'
+        })
       }
 
       if (!this.dependencies.store.hasModelVersion(input.watcherId, response.model)) {
@@ -469,8 +505,8 @@ export class JudgmentService {
         answeredReason(recorded.answerDetails),
         notices
       )
-    } catch {
-      const reason = 'judgment unavailable: evaluation failed'
+    } catch (error) {
+      const reason = evaluationFailureReason(error)
       this.dependencies.store.recordOutcome(
         input.watcherId,
         identity,

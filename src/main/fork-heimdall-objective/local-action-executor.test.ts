@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -11,6 +11,7 @@ import { computeWorkspaceContentIdentity } from './content-identity'
 import { ObjectiveDatabase } from './objective-database'
 import type { ObjectiveSnapshotBinding } from './execution-context'
 import { executeObjectiveLocalAction } from './local-action-executor'
+import { captureObjectiveWorkspaceBaseline } from './observed-workspace-changes'
 import { issueObjectiveReportPath } from './report-ingestion'
 import { ObjectiveStore } from './objective-store'
 
@@ -325,14 +326,188 @@ describe('objective report ingestion execution', () => {
           context,
           objectiveStore
         })
-      ).resolves.toEqual({
+      ).resolves.toMatchObject({
         effect: 'not-landed',
         reason: 'planner-report-malformed',
         result: {
-          detail: 'plan[0].declaredPaths[0]: Path must be a concrete workspace-relative path'
+          detail: 'plan[0].declaredPaths[0]: Path must be a concrete workspace-relative path',
+          reportValidation: {
+            status: 'rejected',
+            code: 'malformed',
+            role: 'planner',
+            dispatchId: 'dispatch-planner-1',
+            hostVerifiable: true
+          }
         }
       })
       expect(objectiveStore.project(WATCHER_ID).revisions).toEqual([])
+    } finally {
+      await rm(workspacePath, { recursive: true, force: true })
+    }
+  })
+
+  it("resolves a retried dispatch-node's baseline to the ORIGINAL dispatch, not the retry", async () => {
+    const database = new ObjectiveDatabase(':memory:')
+    opened.push(database)
+    const objectiveStore = new ObjectiveStore(database)
+    const revision = objectiveStore.ingestPlan({
+      watcherId: WATCHER_ID,
+      revisionNumber: 1,
+      dispatchId: 'dispatch-planner-1',
+      report: PLAN,
+      digest: 'digest-1',
+      createdAtMs: 1
+    })
+    objectiveStore.activatePlan({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      digest: revision.digest,
+      approvedAtMs: 2
+    })
+    const workspacePath = await mkdtemp(join(tmpdir(), 'objective-retry-baseline-'))
+    try {
+      const target = {
+        kind: 'folder' as const,
+        executionHostId: 'local' as const,
+        workspacePath,
+        fileProvider: null
+      }
+      const originalAction = {
+        kind: 'dispatch-node',
+        capability: 'implement',
+        visibility: 'local',
+        contentIdentity: 'content-original',
+        evidenceKey: `${revision.revisionId}:node-1`,
+        revisionId: revision.revisionId,
+        taskKey: 'node-1',
+        depsOrchestrationIds: []
+      } satisfies ObjectiveAction
+      const originalFingerprint = makeAttemptFingerprint(
+        originalAction.contentIdentity,
+        originalAction.kind,
+        originalAction.evidenceKey
+      )
+      // the baseline is captured under the ORIGINAL dispatch's fingerprint before the workspace changes
+      await captureObjectiveWorkspaceBaseline(target, originalFingerprint)
+      await mkdir(join(workspacePath, 'src'), { recursive: true })
+      await writeFile(join(workspacePath, 'src', 'node-1.ts'), 'export const done = true\n')
+
+      const retryAction = {
+        kind: 'dispatch-node',
+        capability: 'implement',
+        visibility: 'local',
+        contentIdentity: 'content-retry',
+        evidenceKey: `${revision.revisionId}:node-1:r0`,
+        revisionId: revision.revisionId,
+        taskKey: 'node-1',
+        depsOrchestrationIds: [],
+        retryOf: originalAction.evidenceKey
+      } satisfies ObjectiveAction
+      const retryFingerprint = makeAttemptFingerprint(
+        retryAction.contentIdentity,
+        retryAction.kind,
+        retryAction.evidenceKey
+      )
+      const reportPath = await issueObjectiveReportPath(target, retryFingerprint)
+      await writeFile(
+        reportPath,
+        JSON.stringify({
+          taskKey: 'node-1',
+          summary: 'Implemented node one.',
+          filesModified: ['src/node-1.ts'],
+          criteriaSelfAssessment: [{ criterionIndex: 0, result: 'pass', note: 'Verified locally.' }]
+        })
+      )
+
+      const binding = {
+        enrollment: { watcherId: WATCHER_ID },
+        contract: { writeTerritory: ['src/**'] },
+        target
+      } as unknown as ObjectiveSnapshotBinding
+      const context = {
+        snapshot: { contentIdentity: 'content-current' },
+        ledger: {
+          watcherId: WATCHER_ID,
+          entries: [
+            {
+              eventId: 'attempt-node-1-original',
+              watcherId: WATCHER_ID,
+              atMs: 3,
+              origin: 'owner',
+              class: 'fact',
+              kind: 'attempt',
+              attemptId: 'attempt-node-1-original',
+              fingerprint: originalFingerprint,
+              action: originalAction,
+              state: 'settled',
+              effect: 'not-landed',
+              dispatch: { spec: 'Implement node one.', deps: [], dispatchKind: 'child' },
+              dispatchId: 'dispatch-node-1-original'
+            },
+            {
+              eventId: 'attempt-node-1-retry',
+              watcherId: WATCHER_ID,
+              atMs: 4,
+              origin: 'owner',
+              class: 'fact',
+              kind: 'attempt',
+              attemptId: 'attempt-node-1-retry',
+              fingerprint: retryFingerprint,
+              action: retryAction,
+              state: 'settled',
+              effect: 'indeterminate',
+              dispatch: { spec: 'Implement node one.', deps: [], dispatchKind: 'child' },
+              dispatchId: 'dispatch-node-1-retry'
+            },
+            {
+              eventId: 'evidence-node-1-retry',
+              watcherId: WATCHER_ID,
+              atMs: 5,
+              origin: 'owner',
+              class: 'fact',
+              kind: 'evidence',
+              evidenceKind: 'orchestration-mailbox',
+              payload: {
+                type: 'worker_done',
+                payload: {
+                  dispatchId: 'dispatch-node-1-retry',
+                  taskId: 'orchestration-node-1',
+                  outcome: 'succeeded',
+                  reportPath,
+                  filesModified: ['src/node-1.ts']
+                }
+              }
+            }
+          ]
+        },
+        lease: { assertHeld: vi.fn(async () => undefined) },
+        dispatchWorker: vi.fn()
+      } as unknown as ExecuteContext<ObjectiveWorld>
+
+      const ingestAction = {
+        kind: 'ingest-report',
+        capability: 'implement',
+        visibility: 'local',
+        recovery: 'replay-safe',
+        contentIdentity: 'content-current',
+        evidenceKey: 'dispatch-node-1-retry',
+        revisionId: revision.revisionId,
+        dispatchId: 'dispatch-node-1-retry',
+        taskKey: 'node-1',
+        orchestrationTaskId: 'orchestration-node-1',
+        reportPath,
+        filesModified: ['src/node-1.ts'],
+        dispatchedContentIdentity: retryAction.contentIdentity
+      } satisfies ObjectiveAction
+
+      const outcome = await executeObjectiveLocalAction({
+        action: ingestAction,
+        binding,
+        context,
+        objectiveStore
+      })
+
+      expect(outcome).toMatchObject({ effect: 'landed', result: { kind: 'report-ingested' } })
     } finally {
       await rm(workspacePath, { recursive: true, force: true })
     }

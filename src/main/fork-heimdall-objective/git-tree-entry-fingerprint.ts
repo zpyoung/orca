@@ -1,4 +1,5 @@
 import { posix } from 'node:path'
+import { OBJECTIVE_GIT_EXEC_PATH_BATCH_SIZE } from '../../shared/fork-heimdall/objective-git-exec-shapes'
 import {
   computeGitRepositoryIdentity,
   isObjectiveMetadataPath,
@@ -7,7 +8,6 @@ import {
   type ObjectiveWorkspaceTarget
 } from './content-identity'
 
-const TREE_PATH_BATCH_SIZE = 200
 const TREE_LISTING_CONCURRENCY = 4
 
 export type TreeEntryFingerprintRequest = {
@@ -105,15 +105,14 @@ export async function resolveTreeEntryFingerprints(
   paths: readonly string[]
 ): Promise<Map<string, string>> {
   const resolved = new Map<string, string>()
-  for (let index = 0; index < paths.length; index += TREE_PATH_BATCH_SIZE) {
-    const batch = paths.slice(index, index + TREE_PATH_BATCH_SIZE)
+  for (let index = 0; index < paths.length; index += OBJECTIVE_GIT_EXEC_PATH_BATCH_SIZE) {
+    const batch = paths.slice(index, index + OBJECTIVE_GIT_EXEC_PATH_BATCH_SIZE)
     const { stdout } = await request.runGit([
-      '--literal-pathspecs',
       'ls-tree',
       '-z',
       request.treeOid,
       '--',
-      ...batch
+      ...batch.map((path) => `:(literal)${path}`)
     ])
     await collectEntries(request, parseTreeEntries(stdout), resolved)
   }
@@ -127,7 +126,7 @@ export async function resolveTreeEntryFingerprints(
 export async function listAllTreeEntryFingerprints(
   request: TreeEntryFingerprintRequest
 ): Promise<Map<string, string>> {
-  const { stdout } = await request.runGit(['--literal-pathspecs', 'ls-tree', '-z', request.treeOid])
+  const { stdout } = await request.runGit(['ls-tree', '-z', request.treeOid])
   const topLevel = parseTreeEntries(stdout)
   const listed = new Map<string, string>()
   await collectEntries(request, topLevel, listed)
@@ -140,13 +139,12 @@ export async function listAllTreeEntryFingerprints(
     parseTreeEntries(
       (
         await request.runGit([
-          '--literal-pathspecs',
           'ls-tree',
           '-r',
           '-z',
           request.treeOid,
           '--',
-          entry.path
+          `:(literal)${entry.path}`
         ])
       ).stdout
     )

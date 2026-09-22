@@ -4,7 +4,7 @@ import type {
   DispatchWorkerInput
 } from '../../../shared/fork-heimdall/kind-contract'
 import type { WatcherCommandResult, WatcherWorker } from '../../../shared/fork-heimdall/fleet-types'
-import type { LedgerEntry } from '../../../shared/fork-heimdall/ledger-types'
+import type { EvidenceEntry, LedgerEntry } from '../../../shared/fork-heimdall/ledger-types'
 import type { WatcherEnrollment } from '../../../shared/fork-heimdall/watcher-types'
 import type { WorkerReleaseReceipt } from '../../runtime/rpc/methods/orchestration/worker/worker-release-completion'
 import type { MailboxDrainInput } from './mailbox-drain'
@@ -52,6 +52,10 @@ export type HeimdallOrchestrationAdapter = {
   dispatchWorker(input: DispatchWorkerInput): Promise<DispatchResult>
   recoverDispatch(input: DispatchWorkerInput): Promise<RecoverDispatchResult>
   readDispatch(enrollment: WatcherEnrollment, dispatchId: string): Promise<DispatchObservation>
+  readAuthoritativeWorkerReport(
+    enrollment: WatcherEnrollment,
+    dispatchId: string
+  ): Promise<EvidenceEntry | null>
   listWorkers(enrollment: WatcherEnrollment): Promise<WatcherWorker[]>
   stopWorker(enrollment: WatcherEnrollment, dispatchId: string): Promise<WatcherCommandResult>
   releaseWorker(enrollment: WatcherEnrollment, dispatchId: string): Promise<WorkerReleaseReceipt>

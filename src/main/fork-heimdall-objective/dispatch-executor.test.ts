@@ -1,20 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { makeAttemptFingerprint } from '../../shared/fork-heimdall/attempt-fingerprint'
+import { OWNER_INTERVENTION_TEXT_MAX_LENGTH } from '../../shared/fork-heimdall/owner/intervention'
 import type { DispatchResult, ExecuteContext } from '../../shared/fork-heimdall/kind-contract'
 import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
+import { projection, snapshot } from '../../shared/fork-heimdall-objective/decision-test-harness'
 import type { ObjectiveAction } from '../../shared/fork-heimdall-objective/objective-actions'
 import type { ObjectiveWorld } from '../../shared/fork-heimdall-objective/detail-types'
 import type { Store } from '../persistence'
+import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { deriveObjectiveFailureContext, executeObjectiveDispatch } from './dispatch-executor'
 import type { ObjectiveSnapshotBinding } from './execution-context'
 import type { ObjectiveStore } from './objective-store'
+const runtime = {} as OrcaRuntimeService
 
-const { issueReportPath, captureBaseline, resolveAgent, readRoleReport } = vi.hoisted(() => ({
-  issueReportPath: vi.fn(),
-  captureBaseline: vi.fn(),
-  resolveAgent: vi.fn(),
-  readRoleReport: vi.fn()
-}))
+const { issueReportPath, captureBaseline, resolveAgent, readRoleReport, buildRolePrompt } =
+  vi.hoisted(() => ({
+    issueReportPath: vi.fn(),
+    captureBaseline: vi.fn(),
+    resolveAgent: vi.fn(),
+    readRoleReport: vi.fn(),
+    buildRolePrompt: vi.fn()
+  }))
 vi.mock('./report-ingestion', () => ({
   issueObjectiveReportPath: issueReportPath,
   readObjectiveRoleReport: readRoleReport
@@ -23,7 +28,7 @@ vi.mock('./observed-workspace-changes', () => ({
   captureObjectiveWorkspaceBaseline: captureBaseline
 }))
 vi.mock('./role-prompts', () => ({
-  buildObjectiveRolePrompt: () => 'implement the task',
+  buildObjectiveRolePrompt: buildRolePrompt,
   resolveObjectiveRoleAgent: resolveAgent
 }))
 
@@ -100,32 +105,16 @@ const objectiveStore = {
     criteria: [{ body: 'A works', shellCheckable: false, checkCommand: null }],
     declaresDependencyChange: false,
     declaredPaths: ['src/a.ts']
-  })
+  }),
+  clearParallelNoteWithPrefix: vi.fn()
 } as unknown as ObjectiveStore
-
-function originalAttempt(fingerprint: string): WatcherLedger['entries'][number] {
-  return {
-    eventId: 'event-original',
-    watcherId: 'watcher-1',
-    atMs: 1,
-    origin: 'owner',
-    class: 'fact',
-    kind: 'attempt',
-    attemptId: 'attempt-original',
-    fingerprint,
-    action: dispatchNode,
-    state: 'settled',
-    effect: 'not-landed',
-    failureClass: 'infra'
-  }
-}
 
 function context(
   ledger: WatcherLedger,
   dispatchResult: DispatchResult
 ): ExecuteContext<ObjectiveWorld> {
   return {
-    snapshot: {} as ExecuteContext<ObjectiveWorld>['snapshot'],
+    snapshot: snapshot(projection({ revisions: [], nodes: [] })),
     lease: {
       epoch: 1,
       holder: 'test',
@@ -143,9 +132,11 @@ describe('executeObjectiveDispatch', () => {
     captureBaseline.mockReset()
     resolveAgent.mockReset()
     readRoleReport.mockReset()
+    buildRolePrompt.mockReset()
     issueReportPath.mockResolvedValue('/workspace/report.json')
     resolveAgent.mockReturnValue('claude')
     readRoleReport.mockResolvedValue({ ok: false, reason: 'missing' })
+    buildRolePrompt.mockReturnValue('implement the task')
   })
 
   it('dispatches a node and returns landed with the issued report path', async () => {
@@ -157,7 +148,8 @@ describe('executeObjectiveDispatch', () => {
         { status: 'dispatched', dispatchId: 'dispatch-1' }
       ),
       objectiveStore,
-      store: {} as Store
+      store: {} as Store,
+      runtime
     })
     expect(outcome).toEqual({
       effect: 'landed',
@@ -177,7 +169,8 @@ describe('executeObjectiveDispatch', () => {
         { status: 'dispatched', dispatchId: 'dispatch-1' }
       ),
       objectiveStore,
-      store: {} as Store
+      store: {} as Store,
+      runtime
     })
     expect(outcome).toEqual({
       effect: 'not-landed',
@@ -196,7 +189,8 @@ describe('executeObjectiveDispatch', () => {
         { status: 'refused', reason: 'fenced', detail: 'lease unavailable' }
       ),
       objectiveStore,
-      store: {} as Store
+      store: {} as Store,
+      runtime
     })
     expect(outcome).toEqual({
       effect: 'not-landed',
@@ -204,26 +198,6 @@ describe('executeObjectiveDispatch', () => {
       reason: 'fenced',
       result: { detail: 'lease unavailable' }
     })
-  })
-
-  it('captures the original dispatch fingerprint as the baseline for a retry', async () => {
-    const originalFingerprint = makeAttemptFingerprint(
-      'content-before',
-      'dispatch-node',
-      'revision-1:node-a'
-    )
-    const ledger: WatcherLedger = {
-      watcherId: 'watcher-1',
-      entries: [originalAttempt(originalFingerprint)]
-    }
-    await executeObjectiveDispatch({
-      action: retryDispatchNode,
-      binding,
-      context: context(ledger, { status: 'dispatched', dispatchId: 'dispatch-1' }),
-      objectiveStore,
-      store: {} as Store
-    })
-    expect(captureBaseline).toHaveBeenCalledWith(binding.target, originalFingerprint)
   })
 
   it('refuses a retry as infra when its original dispatch is missing from the ledger', async () => {
@@ -235,7 +209,8 @@ describe('executeObjectiveDispatch', () => {
         { status: 'dispatched', dispatchId: 'dispatch-1' }
       ),
       objectiveStore,
-      store: {} as Store
+      store: {} as Store,
+      runtime
     })
     expect(outcome).toEqual({
       effect: 'not-landed',
@@ -245,20 +220,40 @@ describe('executeObjectiveDispatch', () => {
     expect(captureBaseline).not.toHaveBeenCalled()
   })
 
-  it('captures its own fingerprint as the baseline for a non-retry dispatch', async () => {
+  it('forwards a requested skip stage separately from the full owner rationale', async () => {
+    const rationale = 'r'.repeat(OWNER_INTERVENTION_TEXT_MAX_LENGTH)
+    const plannerAction: ObjectiveAction = {
+      kind: 'dispatch-planner',
+      capability: 'plan',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'plan:1:owner-directed:content-current',
+      revisionNumber: 1,
+      reason: 'owner-directed',
+      requestedSkipStage: 'hosted-review',
+      guidance: rationale
+    }
+    const executeContext = context(
+      { watcherId: 'watcher-1', entries: [] },
+      { status: 'dispatched', dispatchId: 'dispatch-1' }
+    )
+    executeContext.snapshot = snapshot(projection({ revisions: [], nodes: [] }))
+
     await executeObjectiveDispatch({
-      action: dispatchNode,
+      action: plannerAction,
       binding,
-      context: context(
-        { watcherId: 'watcher-1', entries: [] },
-        { status: 'dispatched', dispatchId: 'dispatch-1' }
-      ),
+      context: executeContext,
       objectiveStore,
-      store: {} as Store
+      store: {} as Store,
+      runtime
     })
-    expect(captureBaseline).toHaveBeenCalledWith(
-      binding.target,
-      makeAttemptFingerprint('content-current', 'dispatch-node', 'revision-1:node-a')
+
+    expect(buildRolePrompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: 'planner',
+        requestedSkipStage: 'hosted-review',
+        ownerGuidance: rationale
+      })
     )
   })
 })

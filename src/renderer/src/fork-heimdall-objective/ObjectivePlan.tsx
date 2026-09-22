@@ -13,6 +13,7 @@ import {
   objectiveCriterionReviewLabel,
   objectiveNodeStateLabel,
   objectiveReviewRoleLabel,
+  objectiveTrainStateLabel,
   objectiveRevisionStatusLabel,
   objectiveVerdictLabel
 } from './objective-copy'
@@ -73,6 +74,19 @@ function RevisionPlan({
   revisionId: string
 }): React.JSX.Element {
   const nodes = detail.nodes.filter((node) => node.revisionId === revisionId)
+  const dispatchByTaskKey = new Map<
+    string,
+    NonNullable<ObjectiveDetail['parallel']>['dispatches'][number]
+  >()
+  for (const dispatch of detail.parallel?.dispatches ?? []) {
+    if (dispatch.revisionId !== revisionId) {
+      continue
+    }
+    const previous = dispatchByTaskKey.get(dispatch.taskKey)
+    if (!previous || previous.createdAtMs <= dispatch.createdAtMs) {
+      dispatchByTaskKey.set(dispatch.taskKey, dispatch)
+    }
+  }
   if (nodes.length === 0) {
     return (
       <p className="rounded-md border border-border bg-muted/10 px-3 py-5 text-center text-xs text-muted-foreground">
@@ -82,47 +96,67 @@ function RevisionPlan({
   }
   return (
     <ol className="space-y-2">
-      {nodes.map((node) => (
-        <li key={node.taskKey} className="rounded-md border border-border bg-muted/10 p-3">
-          <div className="flex flex-wrap items-start gap-2">
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium text-foreground">{node.title}</p>
-              <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">{node.taskKey}</p>
+      {nodes.map((node) => {
+        const dispatch = dispatchByTaskKey.get(node.taskKey)
+        const laneTaskKeys = dispatch?.laneTaskKeys ?? node.laneTaskKeys ?? [node.taskKey]
+        return (
+          <li key={node.taskKey} className="rounded-md border border-border bg-muted/10 p-3">
+            <div className="flex flex-wrap items-start gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-foreground">{node.title}</p>
+                <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">{node.taskKey}</p>
+              </div>
+              <Badge variant="outline">{objectiveNodeStateLabel(node.state)}</Badge>
+              {dispatch ? (
+                <Badge variant="secondary">
+                  {translate('fork.heimdallObjective.detail.trainState', 'Train: {{state}}', {
+                    state: objectiveTrainStateLabel(dispatch.state)
+                  })}
+                </Badge>
+              ) : null}
             </div>
-            <Badge variant="outline">{objectiveNodeStateLabel(node.state)}</Badge>
-          </div>
-          {node.state === 'awaiting-approval' ? (
-            <a
-              href="#heimdall-escalations-title"
-              className="mt-2 inline-block text-xs font-medium text-foreground underline underline-offset-2"
-            >
-              {translate('fork.heimdallObjective.detail.reviewApproval', 'Review approval request')}
-            </a>
-          ) : null}
-          {node.orchestrationTaskId || node.dispatchId ? (
-            <p className="mt-2 break-all font-mono text-[10px] text-muted-foreground">
-              {node.orchestrationTaskId
-                ? translate('fork.heimdallObjective.detail.taskId', 'Task {{id}}', {
-                    id: node.orchestrationTaskId
-                  })
-                : ''}
-              {node.orchestrationTaskId && node.dispatchId ? ' · ' : ''}
-              {node.dispatchId
-                ? translate('fork.heimdallObjective.detail.dispatchId', 'Dispatch {{id}}', {
-                    id: node.dispatchId
-                  })
-                : ''}
-            </p>
-          ) : null}
-          {node.criteria.length > 0 ? (
-            <ul className="mt-3 space-y-2">
-              {node.criteria.map((criterion) => (
-                <Criterion key={criterion.id} criterion={criterion} />
-              ))}
-            </ul>
-          ) : null}
-        </li>
-      ))}
+            {laneTaskKeys.length > 1 ? (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                {translate('fork.heimdallObjective.detail.lane', 'Lane')}:{' '}
+                <span className="font-mono">{laneTaskKeys.join(' → ')}</span>
+              </p>
+            ) : null}
+            {node.state === 'awaiting-approval' ? (
+              <a
+                href="#heimdall-escalations-title"
+                className="mt-2 inline-block text-xs font-medium text-foreground underline underline-offset-2"
+              >
+                {translate(
+                  'fork.heimdallObjective.detail.reviewApproval',
+                  'Review approval request'
+                )}
+              </a>
+            ) : null}
+            {node.orchestrationTaskId || node.dispatchId ? (
+              <p className="mt-2 break-all font-mono text-[10px] text-muted-foreground">
+                {node.orchestrationTaskId
+                  ? translate('fork.heimdallObjective.detail.taskId', 'Task {{id}}', {
+                      id: node.orchestrationTaskId
+                    })
+                  : ''}
+                {node.orchestrationTaskId && node.dispatchId ? ' · ' : ''}
+                {node.dispatchId
+                  ? translate('fork.heimdallObjective.detail.dispatchId', 'Dispatch {{id}}', {
+                      id: node.dispatchId
+                    })
+                  : ''}
+              </p>
+            ) : null}
+            {node.criteria.length > 0 ? (
+              <ul className="mt-3 space-y-2">
+                {node.criteria.map((criterion) => (
+                  <Criterion key={criterion.id} criterion={criterion} />
+                ))}
+              </ul>
+            ) : null}
+          </li>
+        )
+      })}
     </ol>
   )
 }
@@ -234,6 +268,14 @@ export function ObjectivePlan({ detail }: { detail: ObjectiveDetail }): React.JS
                 >
                   <Badge variant="outline">{objectiveReviewRoleLabel(verdict.role)}</Badge>
                   <span>{objectiveVerdictLabel(verdict.verdict)}</span>
+                  {verdict.synthesizedByOwner ? (
+                    <Badge variant="secondary">
+                      {translate(
+                        'fork.heimdallObjective.detail.verdictSynthesizedByOwner',
+                        'Synthesized by owner'
+                      )}
+                    </Badge>
+                  ) : null}
                   <time dateTime={new Date(verdict.atMs).toISOString()}>
                     {formatHeimdallTime(verdict.atMs)}
                   </time>

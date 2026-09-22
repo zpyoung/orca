@@ -100,10 +100,10 @@ describe('decision trace grouping', () => {
     [
       'decision reason',
       (older, newer) => {
-        if (older.decision && !older.decision.action) {
+        if (older.decision && !older.decision.action && 'reason' in older.decision) {
           older.decision.reason = 'reason-old'
         }
-        if (newer.decision && !newer.decision.action) {
+        if (newer.decision && !newer.decision.action && 'reason' in newer.decision) {
           newer.decision.reason = 'reason-new'
         }
       }

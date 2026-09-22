@@ -1,12 +1,17 @@
-import { mkdirSync, mkdtempSync, rmSync, statSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { createReportValidationProvenance } from '../../shared/fork-heimdall/effect-certainty'
 import type {
   ObjectiveEnrollmentPayload,
   ObjectiveLandingBar
 } from '../../shared/fork-heimdall-objective/contract-types'
-import { ObjectiveDetailSchema } from '../../shared/fork-heimdall-objective/detail-types'
+import {
+  ObjectiveDetailSchema,
+  type ObjectiveWorld
+} from '../../shared/fork-heimdall-objective/detail-types'
+import type { ObjectiveDispatchRecord } from '../../shared/fork-heimdall-objective/parallel-types'
 import type {
   PlannerReport,
   ReviewerReport
@@ -16,8 +21,9 @@ import type {
   KernelAction,
   WatcherLedger
 } from '../../shared/fork-heimdall/ledger-types'
-import Database from '../sqlite/sync-database'
-import { OBJECTIVE_DATABASE_SCHEMA_VERSION, ObjectiveDatabase } from './objective-database'
+import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
+import { decideObjective } from '../../shared/fork-heimdall-objective/decision'
+import { ObjectiveDatabase } from './objective-database'
 import type { ObjectiveLandingPayload } from './objective-store-data'
 import { ObjectiveStore } from './objective-store'
 
@@ -480,6 +486,209 @@ describe('ObjectiveStore natural-key persistence', () => {
     ])
   })
 
+  it('keeps a later durably applied dispatch succeeded despite an earlier retryable failure', () => {
+    const revision = ingest()
+    store.activatePlan({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      digest: revision.digest,
+      approvedAtMs: 200
+    })
+    const dispatchId = 'dispatch-task-a-d2'
+    const record: ObjectiveDispatchRecord = {
+      attemptFingerprint: 'fingerprint-dispatch-task-a-d2',
+      watcherId: WATCHER_ID,
+      executionHostId: 'local',
+      revisionId: revision.revisionId,
+      taskKey: 'task-a',
+      planTaskDigest: 'task-a-digest',
+      dispatchId,
+      workspaceId: 'worktree-task-a-d2',
+      workspacePath: '/workspace/task-a-d2',
+      baseCommit: 'base-commit',
+      laneTaskKeys: ['task-a'],
+      sessionNodeCount: 1,
+      state: 'applied',
+      commitSha: 'node-commit',
+      appliedCommitSha: 'applied-commit',
+      reportDigest: 'report-digest',
+      conflictPaths: [],
+      conflictingTaskKeys: [],
+      conflictingDispatchIds: [],
+      createdAtMs: 300,
+      completedAtMs: 400,
+      terminalHandle: null,
+      setupState: 'retained',
+      reportPath: '.orca/reports/task-a.json',
+      report: {
+        taskKey: 'task-a',
+        summary: 'Applied the second dispatch',
+        filesModified: ['src/task-a.ts'],
+        criteriaSelfAssessment: [{ criterionIndex: 0, result: 'pass', note: 'Verified' }]
+      },
+      task: REPORT.plan[0]!
+    }
+    store.saveDispatch(record)
+    store.recordNodeDispatch({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      taskKey: 'task-a',
+      orchestrationTaskId: 'orchestration-task-a-d2',
+      dispatchId,
+      dispatchedAtMs: 400
+    })
+    const ledger: WatcherLedger = {
+      watcherId: WATCHER_ID,
+      entries: [
+        {
+          ...settledAttempt(
+            'dispatch-task-a-d1',
+            action('dispatch-node', {
+              revisionId: revision.revisionId,
+              taskKey: 'task-a',
+              depsOrchestrationIds: []
+            }),
+            'not-landed'
+          ),
+          failureClass: 'infra'
+        },
+        settledAttempt(
+          'dispatch-task-a-d2',
+          action('dispatch-node', {
+            revisionId: revision.revisionId,
+            taskKey: 'task-a',
+            depsOrchestrationIds: []
+          }),
+          'landed'
+        ),
+        settledAttempt(
+          'ingest-task-a-d2',
+          action('ingest-report', {
+            revisionId: revision.revisionId,
+            taskKey: 'task-a',
+            dispatchId
+          }),
+          'landed'
+        )
+      ]
+    }
+
+    expect(store.project(WATCHER_ID, ledger).nodes[0]?.state).toBe('succeeded')
+  })
+
+  it('preserves a rejected report cause through real projection into the owner decision', () => {
+    const revision = ingest()
+    store.activatePlan({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      digest: revision.digest,
+      approvedAtMs: 200
+    })
+    const dispatchId = 'dispatch-task-a-rejected'
+    const reportPath = '/workspace/report.json'
+    const dispatchAction = action('dispatch-node', {
+      capability: 'implement',
+      revisionId: revision.revisionId,
+      taskKey: 'task-a',
+      depsOrchestrationIds: [],
+      evidenceKey: `${revision.revisionId}:task-a`
+    })
+    const ingestAction = action('ingest-report', {
+      capability: 'implement',
+      recovery: 'replay-safe',
+      revisionId: revision.revisionId,
+      taskKey: 'task-a',
+      dispatchId,
+      orchestrationTaskId: 'orchestration-task-a',
+      reportPath,
+      filesModified: ['src/task-a.ts'],
+      dispatchedContentIdentity: CONTENT_IDENTITY,
+      evidenceKey: dispatchId
+    })
+    const dispatchAttempt = {
+      ...settledAttempt('dispatch-rejected', dispatchAction, 'landed'),
+      dispatchId
+    }
+    const rejectedAttempt = {
+      ...settledAttempt('ingest-rejected', ingestAction, 'not-landed', {
+        detail: 'summary: expected string',
+        reportedFiles: ['src/task-a.ts'],
+        observedFiles: [],
+        reportValidation: createReportValidationProvenance({
+          status: 'rejected',
+          code: 'malformed',
+          role: 'implementer',
+          dispatchId,
+          taskKey: 'task-a',
+          reportPath,
+          detail: 'summary: expected string',
+          reportedFiles: ['src/task-a.ts'],
+          hostVerifiable: true
+        })
+      }),
+      reason: 'implementer-report-malformed'
+    }
+    const ledger: WatcherLedger = {
+      watcherId: WATCHER_ID,
+      entries: [
+        dispatchAttempt,
+        {
+          eventId: 'worker-done-rejected',
+          watcherId: WATCHER_ID,
+          atMs: 1_001,
+          origin: 'owner',
+          class: 'fact',
+          kind: 'evidence',
+          evidenceKind: 'orchestration-mailbox',
+          payload: {
+            type: 'worker_done',
+            payload: {
+              dispatchId,
+              taskId: 'orchestration-task-a',
+              outcome: 'succeeded',
+              reportPath,
+              filesModified: ['src/task-a.ts']
+            }
+          }
+        },
+        rejectedAttempt
+      ]
+    }
+    const plan = store.project(WATCHER_ID, ledger)
+    expect(plan.nodes.find((node) => node.taskKey === 'task-a')?.state).toBe('failed')
+    const objectiveSnapshot = {
+      freshness: 'live',
+      contentIdentity: CONTENT_IDENTITY,
+      observedAtMs: 2_000,
+      world: {
+        contract: CONTRACT,
+        workspaceKind: 'git',
+        plan,
+        reports: [],
+        budget: { wallClockActiveMs: 60_000, turns: 10 },
+        landingContext: {
+          branch: null,
+          headSha: null,
+          worktreeContentDigest: null,
+          pushTarget: null,
+          hostedReview: null
+        }
+      }
+    } satisfies Snapshot<ObjectiveWorld>
+
+    expect(decideObjective(objectiveSnapshot, ledger, true)).toMatchObject({
+      action: null,
+      deviation: {
+        kind: 'report-rejected',
+        dispatchId,
+        taskKey: 'task-a',
+        rejectionReason: 'implementer-report-malformed',
+        reportedFiles: ['src/task-a.ts'],
+        detail: expect.stringContaining('summary: expected string')
+      }
+    })
+  })
+
   it('keeps an infra/environment failure pending under the redispatch cap, but failed past it', () => {
     const revision = ingest()
     store.activatePlan({
@@ -625,6 +834,10 @@ describe('ObjectiveStore natural-key persistence', () => {
       lastCheck: { exitCode: 0, timedOut: false },
       lastReview: 'pass'
     })
+    expect(detail.nodes.map((node) => node.laneTaskKeys)).toEqual([
+      ['task-a', 'task-b'],
+      ['task-a', 'task-b']
+    ])
     expect(detail.landing).toEqual([
       { rung: 'files-on-disk', contentIdentity: CONTENT_IDENTITY, atMs: 600 }
     ])
@@ -647,53 +860,7 @@ describe('ObjectiveStore natural-key persistence', () => {
   })
 })
 
-describe('Objective database initialization and recovery', () => {
-  it('creates only the v1 objective tables with durable connection settings and POSIX hardening', () => {
-    const disk = new ObjectiveDatabase(root)
-    opened.push(disk)
-    const connection = disk.connection()
-    const tables = connection
-      .prepare(
-        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
-      )
-      .all() as unknown as { name: string }[]
-    expect(tables.map(({ name }) => name)).toEqual([
-      'acceptance_criterion',
-      'check_attempt',
-      'landing_evidence',
-      'plan_node',
-      'plan_revision',
-      'review_verdict'
-    ])
-    expect(connection.pragma('user_version', { simple: true })).toBe(
-      OBJECTIVE_DATABASE_SCHEMA_VERSION
-    )
-    expect(connection.pragma('journal_mode', { simple: true })).toBe('wal')
-    expect(connection.pragma('busy_timeout', { simple: true })).toBe(5_000)
-    expect(connection.pragma('foreign_keys', { simple: true })).toBe(1)
-    expect(connection.pragma('synchronous', { simple: true })).toBe(2)
-    if (process.platform !== 'win32') {
-      expect(statSync(disk.databasePath()).mode & 0o777).toBe(0o600)
-    }
-  })
-
-  it('opens a future schema read-only without downgrading it', () => {
-    const path = join(root, 'fork-heimdall-objective', 'objective.db')
-    mkdirSync(join(root, 'fork-heimdall-objective'), { recursive: true })
-    const future = new Database(path)
-    future.pragma(`user_version = ${OBJECTIVE_DATABASE_SCHEMA_VERSION + 1}`)
-    future.close()
-    const disk = new ObjectiveDatabase(root)
-    opened.push(disk)
-    const futureStore = new ObjectiveStore(disk)
-
-    expect(disk.isReadOnly()).toBe(true)
-    expect(disk.connection().pragma('user_version', { simple: true })).toBe(
-      OBJECTIVE_DATABASE_SCHEMA_VERSION + 1
-    )
-    expect(() => futureStore.purge(WATCHER_ID)).toThrow(/read-only/)
-  })
-
+describe('Objective store recovery', () => {
   it('reconciles only settled landed mutations whose ledger data is complete', () => {
     const revision = ingest()
     const dispatchId = 'reconciled-dispatch'

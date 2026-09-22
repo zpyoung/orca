@@ -16,6 +16,7 @@ import type { ObjectiveForgeAccess } from '../fork-heimdall-objective/objective-
 import type { ObjectiveStore } from '../fork-heimdall-objective/objective-store'
 import { decideObjective } from '../../shared/fork-heimdall-objective/decision'
 import type { Store } from '../persistence'
+import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { WatcherAttemptRecovery } from './runner-attempt-recovery'
 import type { RunnerLedgerStore, WatcherRunner } from './runner-state'
 
@@ -158,6 +159,7 @@ function buildHarness(): {
         declaredPaths: ['src/a.ts']
       }
     ],
+    getDispatch: () => null,
     getTask: () => ({
       taskKey: 'node-a',
       title: 'Node A',
@@ -226,6 +228,7 @@ function buildHarness(): {
   })
 
   const executor = createObjectiveActionExecutor({
+    runtime: {} as OrcaRuntimeService,
     store: {} as Store,
     objectiveStore,
     snapshotBindings,
@@ -285,6 +288,83 @@ describe('WatcherAttemptRecovery / objective classifier integration', () => {
       attemptId: 'attempt-1',
       effect: 'not-landed',
       failureClass: 'environment'
+    })
+  })
+
+  it('retains a remote report-read unverifiable cause without turning diagnostic loss into a task retry', async () => {
+    readReport.mockRejectedValue(
+      Object.assign(new Error('remote transport detail'), { code: 'ECONNRESET' })
+    )
+    const { recovery, runner, snapshot, ledgerStore, entries } = buildHarness()
+
+    await recovery.recover(runner, snapshot, ledgerStore.read('watcher-1'))
+
+    const resolved = entries.find((entry) => entry.kind === 'attempt-resolved')
+    expect(resolved).toMatchObject({
+      kind: 'attempt-resolved',
+      attemptId: 'attempt-1',
+      effect: 'not-landed',
+      failureClass: 'criteria',
+      reportValidation: {
+        status: 'unverifiable',
+        code: 'read-unverifiable',
+        role: 'implementer',
+        dispatchId: 'dispatch-1',
+        taskKey: 'node-a',
+        detail: 'Report authority could not be read (ECONNRESET)',
+        hostVerifiable: false
+      }
+    })
+
+    const decision = decideObjective(snapshot, ledgerStore.read('watcher-1'))
+    expect(decision.action?.kind).not.toBe('dispatch-node')
+    expect(decision.action).toMatchObject({
+      kind: 'dispatch-planner',
+      reason: 'replan-after-failure'
+    })
+  })
+
+  it('carries a normalized legacy terminal rejection through recovery into report-rejected', async () => {
+    const { recovery, runner, snapshot, ledgerStore, entries } = buildHarness()
+    const completion = entries.find(
+      (entry) => entry.kind === 'evidence' && entry.evidenceKind === 'orchestration-mailbox'
+    )
+    if (!completion || completion.kind !== 'evidence') {
+      throw new Error('expected worker completion evidence')
+    }
+    const message = completion.payload as {
+      payload: Record<string, unknown>
+    }
+    message.payload.reportRejection = {
+      code: 'sender_not_assignee',
+      reason: 'The submitting worker is not the authoritative assignee.'
+    }
+
+    await recovery.recover(runner, snapshot, ledgerStore.read('watcher-1'))
+
+    expect(entries.find((entry) => entry.kind === 'attempt-resolved')).toMatchObject({
+      kind: 'attempt-resolved',
+      attemptId: 'attempt-1',
+      effect: 'not-landed',
+      failureClass: 'criteria',
+      reportValidation: {
+        status: 'rejected',
+        code: 'semantic-invalid',
+        sourceCode: 'sender_not_assignee',
+        detail: 'The submitting worker is not the authoritative assignee.'
+      }
+    })
+    expect(readReport).not.toHaveBeenCalled()
+    expect(validateChanges).not.toHaveBeenCalled()
+    expect(decideObjective(snapshot, ledgerStore.read('watcher-1'), true)).toMatchObject({
+      action: null,
+      deviation: {
+        kind: 'report-rejected',
+        dispatchId: 'dispatch-1',
+        taskKey: 'node-a',
+        rejectionReason: 'sender_not_assignee',
+        detail: expect.stringContaining('The submitting worker is not the authoritative assignee.')
+      }
     })
   })
 

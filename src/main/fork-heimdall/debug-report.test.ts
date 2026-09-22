@@ -7,6 +7,7 @@ import type {
 } from '../../shared/fork-heimdall/ledger-types'
 import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
 import { createTickTrace } from '../../shared/fork-heimdall/tick-trace'
+import { WORKER_ESCALATION_CONSUMED_EVIDENCE_KIND } from '../../shared/fork-heimdall/worker-escalation-consumption'
 import type {
   WatcherEnrollment,
   WatcherTerminalSummary
@@ -221,7 +222,13 @@ describe('dormant Heimdall watcher status', () => {
     })
   })
 
-  it('keeps a persisted configuration failure operator-visible without a new wire enum', () => {
+  // Originally this kept `parkReason` untyped (null) so an old reader's compiled union never had
+  // to learn a new discriminant. It is typed now — `park-reason-wire.ts`'s capability gate degrades
+  // it back to null on the wire for a reader that has not negotiated
+  // `heimdall.watcher-park-reason.v2`, so the in-process value this function returns can stay
+  // honest without reopening the compatibility risk this test used to guard by omission. A revert
+  // to null belongs here, not in the wire projection, if that trade is ever taken back.
+  it('keeps a persisted configuration failure operator-visible with a typed, capability-gated park reason', () => {
     const watcher = enrollment({ enabled: false })
     const status = dormantWatcherStatus(
       watcher,
@@ -236,8 +243,64 @@ describe('dormant Heimdall watcher status', () => {
     expect(status).toMatchObject({
       state: 'parked',
       reason: 'Resolved Git authority changed after Heimdall enrollment',
-      parkReason: null
+      parkReason: {
+        kind: 'configuration-error',
+        reason: 'Resolved Git authority changed after Heimdall enrollment'
+      }
     })
+  })
+
+  it('keeps a persisted worker escalation operator-visible with its original reason text', () => {
+    const watcher = enrollment({ enabled: false })
+    const originalEscalationId = 'worker-escalation:dispatch-1:message-1'
+    const status = dormantWatcherStatus(
+      watcher,
+      ledger([
+        escalation('park-worker-escalation', {
+          escalationId: `park:watcher-1:worker-escalation:${encodeURIComponent(originalEscalationId)}`,
+          reason: 'Blocked: credentials are required'
+        }),
+        {
+          eventId: 'consumed-1',
+          watcherId: 'watcher-1',
+          atMs: 201,
+          origin: 'owner',
+          class: 'fact',
+          kind: 'evidence',
+          evidenceKind: WORKER_ESCALATION_CONSUMED_EVIDENCE_KIND,
+          payload: { messageId: 'message-1' }
+        }
+      ])
+    )
+
+    expect(status).toMatchObject({
+      state: 'parked',
+      reason: 'Blocked: credentials are required',
+      parkReason: {
+        kind: 'worker-escalation',
+        escalationId: originalEscalationId,
+        messageId: 'message-1'
+      }
+    })
+  })
+
+  // Documents the current, narrower boundary of the configuration-error/worker-escalation fix
+  // above: the other four `WatcherParkReason` kinds still fall back to the bare `.kind` token
+  // first. `kernel-service-scheduling.test.ts`'s stop-predicate restart test locks this in for
+  // `stop-predicate` specifically — widening this is a separate decision, not made here.
+  it('still falls back to the bare kind for a stop-predicate park', () => {
+    const watcher = enrollment({ enabled: false })
+    const status = dormantWatcherStatus(
+      watcher,
+      ledger([
+        escalation('park-stop-predicate', {
+          escalationId: 'park:watcher-1:stop-predicate:review%2Dmerged',
+          reason: 'The review merged'
+        })
+      ])
+    )
+
+    expect(status.reason).toBe('stop-predicate')
   })
 
   it('keeps an automatic park visible even when its persisted reason cannot be reconstructed', () => {

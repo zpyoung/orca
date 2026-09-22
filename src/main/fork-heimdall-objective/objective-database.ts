@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import Database from '../sqlite/sync-database'
 import { hardenSqliteDatabaseFiles } from '../sqlite/harden-database-files'
 
-export const OBJECTIVE_DATABASE_SCHEMA_VERSION = 1
+export const OBJECTIVE_DATABASE_SCHEMA_VERSION = 4
 export const OBJECTIVE_DATABASE_BUSY_TIMEOUT_MS = 5_000
 
 export type ObjectiveProfileDirectoryProvider = {
@@ -100,6 +100,88 @@ CREATE TABLE landing_evidence (
   epoch INTEGER NOT NULL,
   created_at_ms INTEGER NOT NULL,
   UNIQUE (watcher_id, rung, content_identity)
+);
+`
+
+const OBJECTIVE_SCHEMA_V2_SQL = `
+ALTER TABLE plan_node ADD COLUMN amended_at_ms INTEGER;
+
+CREATE TABLE revision_amendment (
+  id TEXT PRIMARY KEY,
+  watcher_id TEXT NOT NULL,
+  revision_id TEXT NOT NULL REFERENCES plan_revision(id),
+  ordinal INTEGER NOT NULL CHECK (ordinal >= 0),
+  digest TEXT NOT NULL,
+  amended_at_ms INTEGER NOT NULL,
+  attestation TEXT NOT NULL,
+  touched_task_keys_json TEXT NOT NULL,
+  UNIQUE (revision_id, ordinal),
+  UNIQUE (revision_id, digest)
+);
+CREATE INDEX objective_revision_amendment_watcher
+  ON revision_amendment (watcher_id, revision_id);
+`
+
+const OBJECTIVE_SCHEMA_V3_SQL = `
+ALTER TABLE check_attempt ADD COLUMN owner_skip INTEGER NOT NULL DEFAULT 0
+  CHECK (owner_skip IN (0, 1));
+`
+
+const OBJECTIVE_SCHEMA_V4_SQL = `
+ALTER TABLE plan_node ADD COLUMN ordinal INTEGER NOT NULL DEFAULT 0
+  CHECK (ordinal >= 0);
+
+UPDATE plan_node
+SET ordinal = COALESCE((
+  SELECT CAST(item.key AS INTEGER)
+  FROM plan_revision AS revision, json_each(revision.payload_json, '$.plan') AS item
+  WHERE revision.id = plan_node.revision_id
+    AND json_extract(item.value, '$.taskKey') = plan_node.task_key
+), 0);
+
+CREATE TABLE objective_dispatch (
+  attempt_fingerprint TEXT PRIMARY KEY,
+  watcher_id TEXT NOT NULL,
+  execution_host_id TEXT NOT NULL,
+  revision_id TEXT NOT NULL REFERENCES plan_revision(id),
+  task_key TEXT NOT NULL,
+  plan_task_digest TEXT NOT NULL,
+  dispatch_id TEXT,
+  workspace_id TEXT NOT NULL,
+  workspace_path TEXT NOT NULL,
+  base_commit TEXT NOT NULL,
+  lane_task_keys_json TEXT NOT NULL,
+  session_node_count INTEGER NOT NULL CHECK (session_node_count BETWEEN 1 AND 5),
+  state TEXT NOT NULL CHECK (state IN (
+    'running', 'waiting-to-apply', 'applying', 'resolving-conflict',
+    'applied', 'failed', 'discarded'
+  )),
+  commit_sha TEXT,
+  applied_commit_sha TEXT,
+  report_digest TEXT,
+  conflict_paths_json TEXT NOT NULL,
+  conflicting_task_keys_json TEXT NOT NULL,
+  conflicting_dispatch_ids_json TEXT NOT NULL,
+  created_at_ms INTEGER NOT NULL,
+  completed_at_ms INTEGER,
+  terminal_handle TEXT,
+  setup_state TEXT NOT NULL CHECK (setup_state IN (
+    'pending', 'ready', 'cleanup-pending', 'retained', 'cleaned'
+  )),
+  report_path TEXT,
+  report_json TEXT,
+  task_json TEXT NOT NULL,
+  UNIQUE (watcher_id, dispatch_id)
+);
+CREATE INDEX objective_dispatch_watcher_created
+  ON objective_dispatch (watcher_id, created_at_ms, attempt_fingerprint);
+CREATE INDEX objective_dispatch_train
+  ON objective_dispatch (watcher_id, state, completed_at_ms, attempt_fingerprint);
+
+CREATE TABLE objective_parallel_state (
+  watcher_id TEXT PRIMARY KEY,
+  note TEXT,
+  updated_at_ms INTEGER NOT NULL
 );
 `
 
@@ -235,6 +317,15 @@ export class ObjectiveDatabase {
       }
       if (lockedVersion < 1) {
         database.exec(OBJECTIVE_SCHEMA_V1_SQL)
+      }
+      if (lockedVersion < 2) {
+        database.exec(OBJECTIVE_SCHEMA_V2_SQL)
+      }
+      if (lockedVersion < 3) {
+        database.exec(OBJECTIVE_SCHEMA_V3_SQL)
+      }
+      if (lockedVersion < 4) {
+        database.exec(OBJECTIVE_SCHEMA_V4_SQL)
       }
       if (lockedVersion < OBJECTIVE_DATABASE_SCHEMA_VERSION) {
         database.pragma(`user_version = ${OBJECTIVE_DATABASE_SCHEMA_VERSION}`)

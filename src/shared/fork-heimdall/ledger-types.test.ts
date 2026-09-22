@@ -95,4 +95,32 @@ describe('AttemptResolvedEntrySchema failureClass', () => {
     }
     expect(AttemptResolvedEntrySchema.safeParse(row).success).toBe(true)
   })
+
+  it('parses bounded report validation provenance while preserving old rows', () => {
+    const row = {
+      kind: 'attempt-resolved' as const,
+      eventId: 'event-6',
+      watcherId: 'watcher-1',
+      atMs: 1,
+      origin: 'owner' as const,
+      class: 'fact' as const,
+      attemptId: 'attempt-1',
+      effect: 'not-landed' as const,
+      failureClass: 'criteria' as const,
+      reportValidation: {
+        status: 'rejected' as const,
+        code: 'malformed' as const,
+        role: 'implementer' as const,
+        dispatchId: 'dispatch-1',
+        taskKey: 'core',
+        reportPath: '/workspace/report.json',
+        detail: 'summary: expected string',
+        reportedFiles: ['src/core.ts'],
+        observedFiles: [],
+        hostVerifiable: true
+      },
+      evidence: { summary: 'objective' }
+    }
+    expect(AttemptResolvedEntrySchema.safeParse(row).success).toBe(true)
+  })
 })

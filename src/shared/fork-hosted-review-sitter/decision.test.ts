@@ -473,7 +473,17 @@ describe('PR sitter desired-action safety policy', () => {
     expect(evaluateRegisteredStop(reproduced, history)).toEqual({
       predicateId: 'unverifiable-reproduced-failure',
       disposition: 'park',
-      reason: 'unverifiable-reproduced-failure'
+      reason: 'unverifiable-reproduced-failure',
+      // evaluateStopPredicates always computes this once a firing predicate opts in; only the
+      // runner loop's owner check decides whether it replaces the park or is left unused
+      deviation: {
+        kind: 'check-failed',
+        criterionId: 'test',
+        command: null,
+        exitCode: null,
+        timedOut: null,
+        detail: 'a rerun reproduced this failure with no classifiable signature'
+      }
     })
     expect(deriveHostedReviewSitterDiscrepancies(reproduced, history)).toContainEqual(
       expect.objectContaining({ kind: 'unverifiable-failure', status: 'escalated' })
@@ -594,7 +604,15 @@ describe('PR sitter desired-action safety policy', () => {
       predicateId: 'repeated-failure-after-own-fix',
       disposition: 'park',
       reason: 'repeated-failure-after-own-fix',
-      detail: 'test'
+      detail: 'test',
+      deviation: {
+        kind: 'check-failed',
+        criterionId: 'test',
+        command: null,
+        exitCode: null,
+        timedOut: null,
+        detail: "same failure recurred after the sitter's own fix (produced head-2)"
+      }
     })
     expect(deriveHostedReviewSitterDiscrepancies(fixedHead, history)).toContainEqual(
       expect.objectContaining({ kind: 'fix-did-not-resolve', status: 'escalated' })
@@ -649,7 +667,15 @@ describe('PR sitter desired-action safety policy', () => {
       predicateId: 'repeated-failure-after-own-fix',
       disposition: 'park',
       reason: 'repeated-failure-after-own-fix',
-      detail: 'test'
+      detail: 'test',
+      deviation: {
+        kind: 'check-failed',
+        criterionId: 'test',
+        command: null,
+        exitCode: null,
+        timedOut: null,
+        detail: "same failure recurred after the sitter's own fix (produced head-2)"
+      }
     })
     expect(deriveHostedReviewSitterDiscrepancies(repeated, history)).toContainEqual(
       expect.objectContaining({ kind: 'fix-did-not-resolve', status: 'escalated' })
@@ -709,7 +735,15 @@ describe('PR sitter desired-action safety policy', () => {
       predicateId: 'repeated-failure-after-own-fix',
       disposition: 'park',
       reason: 'repeated-failure-after-own-fix',
-      detail: 'test'
+      detail: 'test',
+      deviation: {
+        kind: 'check-failed',
+        criterionId: 'test',
+        command: null,
+        exitCode: null,
+        timedOut: null,
+        detail: "same failure recurred after the sitter's own fix (produced head-2)"
+      }
     })
     expect(deriveHostedReviewSitterDiscrepancies(repeated, history)).toContainEqual(
       expect.objectContaining({ kind: 'fix-did-not-resolve', status: 'escalated' })
@@ -756,7 +790,15 @@ describe('PR sitter desired-action safety policy', () => {
       predicateId: 'repeated-failure-after-own-fix',
       disposition: 'park',
       reason: 'repeated-failure-after-own-fix',
-      detail: 'test-a'
+      detail: 'test-a',
+      deviation: {
+        kind: 'check-failed',
+        criterionId: 'test-a',
+        command: null,
+        exitCode: null,
+        timedOut: null,
+        detail: "same failure recurred after the sitter's own fix (produced head-2)"
+      }
     })
   })
 })
@@ -790,7 +832,7 @@ describe('PR sitter no-action reasons', () => {
     const outcome = explainDesiredAction(review({ freshness: 'cached' }), sitter(), ledger())
     expect(outcome).toMatchObject({ action: null, reason: 'merge-gates-unsatisfied' })
     expect(outcome.action).toBeNull()
-    if (outcome.action === null) {
+    if (outcome.action === null && 'reason' in outcome) {
       expect(outcome.detail).toBe('freshness')
     }
   })
@@ -823,7 +865,7 @@ describe('PR sitter no-action reasons', () => {
 
     const outcome = explainDesiredAction(red, sitter(), inFlightRerun)
     expect(outcome).toMatchObject({ action: null, reason: 'merge-gates-unsatisfied' })
-    if (outcome.action === null) {
+    if (outcome.action === null && 'considered' in outcome) {
       expect(outcome.considered).toContainEqual(
         expect.objectContaining({ phase: 'fix-checks', reason: 'rerun-in-flight' })
       )
@@ -833,7 +875,7 @@ describe('PR sitter no-action reasons', () => {
     const settledRerun = ledger([completedAction(rerunAction)])
     const fellThrough = explainDesiredAction(red, sitter(), settledRerun)
     expect(fellThrough.action).toBeNull()
-    if (fellThrough.action === null) {
+    if (fellThrough.action === null && 'reason' in fellThrough) {
       expect(fellThrough.reason).toBe('merge-gates-unsatisfied')
       expect(fellThrough.considered).toContainEqual(
         expect.objectContaining({ phase: 'fix-checks' })
@@ -859,7 +901,7 @@ describe('PR sitter no-action reasons', () => {
       ledger()
     )
     expect(outcome.action).toBeNull()
-    if (outcome.action === null) {
+    if (outcome.action === null && 'considered' in outcome) {
       expect(outcome.considered).toContainEqual({
         phase: 'fix-checks',
         reason: 'capability-off',

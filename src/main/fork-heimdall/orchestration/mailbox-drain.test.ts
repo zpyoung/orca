@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WatcherEnrollment } from '../../../shared/fork-heimdall/watcher-types'
 import { RuntimeHeimdallOrchestrationAdapter } from './orchestration-adapter'
+import { mailboxEvidenceForMessage } from './mailbox-drain'
 
 const upstream = vi.hoisted(() => ({
   checkRunMailbox: vi.fn(),
@@ -56,6 +57,18 @@ function message(id: string, sequence: number, body: string) {
     delivered_at: null,
     sender_pane_key: 'worker-pane'
   }
+}
+
+function normalizedPayload(entry: { payload: unknown }): object {
+  const envelope = entry.payload
+  if (!envelope || typeof envelope !== 'object' || !('payload' in envelope)) {
+    throw new Error('Expected normalized mailbox envelope')
+  }
+  const payload = envelope.payload
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error('Expected normalized mailbox payload')
+  }
+  return payload
 }
 
 describe('Heimdall orchestration mailbox drain', () => {
@@ -198,6 +211,81 @@ describe('Heimdall orchestration mailbox drain', () => {
     ])
     expect(upstream.checkRunMailbox.mock.calls[1]![0].params.ack).toBeUndefined()
     expect(upstream.checkRunMailbox.mock.calls[2]![0].params.ack).toBe('delivery-1')
+  })
+
+  it('normalizes a lifecycle-rejected completion as failed with durable rejection detail', () => {
+    const row = {
+      ...message('message-rejected', 9, 'Orca rejected worker report.'),
+      payload: JSON.stringify({
+        dispatchId: 'dispatch-9',
+        outcome: 'succeeded',
+        taskId: 'task-9',
+        reportPath: '/repo/.orca/reports/node-9.json',
+        filesModified: ['src/rejected.ts'],
+        _orcaLifecycleRejection: {
+          code: 'invalid_report',
+          reason: 'terminal diagnostic',
+          originalReason: 'missing required evidence',
+          originalBody: 'worker claimed success'
+        }
+      })
+    }
+
+    expect(mailboxEvidenceForMessage(ENROLLMENT, 'delivery-9', row)).toEqual(
+      expect.objectContaining({
+        source: expect.objectContaining({
+          sequence: 9,
+          messageId: 'message-rejected',
+          deliveryId: 'delivery-9'
+        }),
+        payload: {
+          type: 'worker_done',
+          payload: {
+            dispatchId: 'dispatch-9',
+            taskId: 'task-9',
+            outcome: 'failed',
+            reportPath: '/repo/.orca/reports/node-9.json',
+            filesModified: ['src/rejected.ts'],
+            reportRejection: {
+              code: 'invalid_report',
+              reason: 'missing required evidence'
+            },
+            result: {
+              body: 'worker claimed success',
+              reportRejection: {
+                code: 'invalid_report',
+                reason: 'missing required evidence'
+              }
+            }
+          }
+        }
+      })
+    )
+  })
+
+  it('preserves supplied malformed files evidence while leaving omission absent', () => {
+    const malformed = mailboxEvidenceForMessage(ENROLLMENT, null, {
+      ...message('message-malformed-files', 10, 'finished'),
+      payload: JSON.stringify({
+        dispatchId: 'dispatch-10',
+        taskId: 'task-10',
+        outcome: 'succeeded',
+        filesModified: ['src/valid.ts', 42]
+      })
+    })
+    const omitted = mailboxEvidenceForMessage(ENROLLMENT, null, {
+      ...message('message-omitted-files', 11, 'finished'),
+      payload: JSON.stringify({
+        dispatchId: 'dispatch-11',
+        taskId: 'task-11',
+        outcome: 'succeeded'
+      })
+    })
+    const malformedPayload = normalizedPayload(malformed)
+    const omittedPayload = normalizedPayload(omitted)
+
+    expect(malformedPayload).toHaveProperty('filesModified', ['src/valid.ts', 42])
+    expect(omittedPayload).not.toHaveProperty('filesModified')
   })
 
   it('does not acknowledge the batch it is returning', async () => {

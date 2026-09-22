@@ -8,7 +8,11 @@ import {
   sendRemoteRuntimeRequestWithStatusPreflight,
   type RemoteRuntimeSubscription
 } from '../../shared/remote-runtime-client'
-import { HEIMDALL_COMMANDS_RUNTIME_CAPABILITY } from '../../shared/fork-heimdall/capability'
+import {
+  HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,
+  HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY,
+  HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
+} from '../../shared/fork-heimdall/capability'
 import { isRuntimeEnvironmentManuallyDisconnected } from '../ipc/runtime-environment-manual-disconnect'
 import {
   callRuntimeEnvironment,
@@ -43,7 +47,11 @@ export type FleetEnvironmentTransport = {
   mutate(
     identity: FleetEnvironmentIdentity,
     method: string,
-    params: unknown
+    params: unknown,
+    requiredCapability?:
+      | typeof HEIMDALL_COMMANDS_RUNTIME_CAPABILITY
+      | typeof HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
+      | typeof HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
   ): Promise<RuntimeRpcResponse<unknown>>
   subscribe(
     identity: FleetEnvironmentIdentity,
@@ -54,9 +62,30 @@ export type FleetEnvironmentTransport = {
 }
 
 export class HeimdallCommandCapabilityError extends Error {
-  constructor() {
-    super('The owning runtime does not support Heimdall commands. Update the host and try again.')
+  constructor(
+    requiredCapability:
+      | typeof HEIMDALL_COMMANDS_RUNTIME_CAPABILITY
+      | typeof HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
+      | typeof HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY = HEIMDALL_COMMANDS_RUNTIME_CAPABILITY
+  ) {
+    super(
+      requiredCapability === HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
+        ? 'The owning runtime does not support permanent watcher deletion. Update the host and try again.'
+        : requiredCapability === HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY
+          ? 'The owning runtime does not support parallel objective execution. Update the host and try again.'
+          : 'The owning runtime does not support Heimdall commands. Update the host and try again.'
+    )
     this.name = 'HeimdallCommandCapabilityError'
+  }
+}
+
+export class HeimdallEnrollOwnerCapabilityError extends Error {
+  constructor() {
+    super(
+      'unsupported-capability: owner-not-supported: the owning runtime does not support ' +
+        'enrolling a watcher with an owner. Update the host and try again.'
+    )
+    this.name = 'HeimdallEnrollOwnerCapabilityError'
   }
 }
 
@@ -127,7 +156,12 @@ export function createFleetEnvironmentTransport(
       assertAvailable(identity)
       return response
     },
-    mutate: (identity, method, params) => {
+    mutate: (
+      identity,
+      method,
+      params,
+      requiredCapability = HEIMDALL_COMMANDS_RUNTIME_CAPABILITY
+    ) => {
       const environment = assertAvailable(identity)
       const pairing = getPreferredPairingOffer(environment)
       return sendRemoteRuntimeRequestWithStatusPreflight(
@@ -137,11 +171,8 @@ export function createFleetEnvironmentTransport(
         REMOTE_FLEET_TIMEOUT_MS,
         (response) => {
           assertAvailable(identity)
-          if (
-            response.ok !== true ||
-            !response.result.capabilities?.includes(HEIMDALL_COMMANDS_RUNTIME_CAPABILITY)
-          ) {
-            throw new HeimdallCommandCapabilityError()
+          if (response.ok !== true || !response.result.capabilities?.includes(requiredCapability)) {
+            throw new HeimdallCommandCapabilityError(requiredCapability)
           }
         },
         undefined,

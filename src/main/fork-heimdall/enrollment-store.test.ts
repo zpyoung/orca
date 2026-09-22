@@ -167,6 +167,22 @@ describe('Heimdall enrollment store', () => {
     expect(enrollments.get('watcher-1')).toEqual(terminal)
   })
 
+  it('round-trips an owner through insert, and full-replaces it on rearm', () => {
+    const owner = { agent: 'claude', model: 'opus', effort: 'high' }
+    const before = enrollments.insert(enrollment({ enabled: false, owner }))
+    expect(before.owner).toEqual(owner)
+    expect(enrollments.get('watcher-1')).toMatchObject({ owner })
+
+    const rearmedOwner = { agent: 'claude', model: 'sonnet' }
+    expect(
+      enrollments.rearm('watcher-1', { ...REARM_CONFIGURATION, owner: rearmedOwner })
+    ).toMatchObject({ owner: rearmedOwner })
+
+    enrollments.setEnabled('watcher-1', false)
+    const cleared = enrollments.rearm('watcher-1', REARM_CONFIGURATION)
+    expect(cleared.owner).toBeUndefined()
+  })
+
   it('rolls back the terminal update when the post-terminal hook fails', () => {
     const before = enrollments.insert(enrollment())
     let observedTerminalAtMs: number | null = null

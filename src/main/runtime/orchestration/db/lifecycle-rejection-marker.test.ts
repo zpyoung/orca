@@ -6,10 +6,18 @@ import {
 
 describe('lifecycle-rejection-marker', () => {
   it('adds a marker onto an object payload and recognizes it', () => {
-    const marked = addLifecycleRejectionMarker('{"keep":true}', 'rejected', 'not current')
+    const marked = addLifecycleRejectionMarker('{"keep":true}', 'rejected', 'not current', {
+      originalReason: 'report file is invalid',
+      originalBody: 'worker authored body'
+    })
     expect(JSON.parse(marked)).toMatchObject({
       keep: true,
-      _orcaLifecycleRejection: { code: 'rejected', reason: 'not current' }
+      _orcaLifecycleRejection: {
+        code: 'rejected',
+        reason: 'not current',
+        originalReason: 'report file is invalid',
+        originalBody: 'worker authored body'
+      }
     })
     expect(hasLifecycleRejectionMarker(marked)).toBe(true)
   })

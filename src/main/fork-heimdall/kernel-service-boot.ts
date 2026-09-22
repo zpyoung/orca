@@ -139,6 +139,11 @@ export function bootHeimdallKernelService(
     budgetClock: budgetClock as RunnerBudgetClock,
     leaseStore,
     orchestration,
+    owner: {
+      runtime: dependencies.runtime,
+      resolveWorkspaceTarget: (key) => host.resolveLeaseTarget(key),
+      ensureRun: (enrollment) => orchestration.ensureRun(enrollment)
+    },
     onStatus: () => context.publishChanged(),
     persistEnabled: (enrollment, enabled) => {
       const updated = enrollments.setEnabled(enrollment.watcherId, enabled)
@@ -172,6 +177,16 @@ export function bootHeimdallKernelService(
     orchestration,
     runnerLoop,
     runner: (watcherId) => context.runners.get(watcherId) ?? null,
+    removeRunner: (watcherId) => {
+      context.runners.delete(watcherId)
+    },
+    purgeKindData: async (enrollment) => {
+      const kind = context.registry.get(enrollment.kind)
+      if (!kind) {
+        throw new Error(`Unknown Heimdall watcher kind: ${enrollment.kind}`)
+      }
+      await kind.purge?.(enrollment.watcherId)
+    },
     owns: (enrollment) => ownsEnrollment(context.storageAuthority(), enrollment),
     now: context.now,
     createId: context.createId,

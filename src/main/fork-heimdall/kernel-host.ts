@@ -1,5 +1,6 @@
 import * as electron from 'electron'
 import type { WorkspaceKey, WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
+import { parseWorkspaceKey } from '../../shared/workspace-scope'
 import {
   requireRuntimeFileProvider,
   type ResolvedRuntimeFileTarget
@@ -38,7 +39,11 @@ export class HeimdallKernelHost {
     if (!enrollment) {
       throw new LeaseConfigurationError(`Lease workspace is no longer enrolled: ${key}`)
     }
-    if (enrollment.worktreeId === null) {
+    const folderWorktreeId =
+      enrollment.worktreeId && parseWorkspaceKey(enrollment.worktreeId)?.type === 'folder'
+        ? enrollment.worktreeId
+        : null
+    if (enrollment.worktreeId === null || folderWorktreeId) {
       return this.resolveFolderTarget(enrollment)
     }
 
@@ -114,12 +119,13 @@ export class HeimdallKernelHost {
     ) {
       throw new LeaseConfigurationError('Runtime cannot resolve a Heimdall folder target')
     }
-    const worktreeId = `${enrollment.repoId}::${enrollment.workspacePath}`
+    const worktreeId = enrollment.worktreeId ?? `${enrollment.repoId}::${enrollment.workspacePath}`
     const fileTarget = await (runtime as RuntimeFileTargetResolver).resolveRuntimeFileTarget(
       `id:${worktreeId}`
     )
     if (
       fileTarget.worktree.id !== worktreeId ||
+      fileTarget.worktree.repoId !== enrollment.repoId ||
       fileTarget.executionHostId !== enrollment.executionHostId ||
       fileTarget.worktree.path !== enrollment.workspacePath
     ) {

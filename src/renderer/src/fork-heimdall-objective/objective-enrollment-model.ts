@@ -14,6 +14,7 @@ import {
   type ObjectiveWorkspaceKind
 } from '../../../shared/fork-heimdall-objective/contract-types'
 import type { CapabilityMode } from '../../../shared/fork-heimdall/watcher-types'
+import type { WatcherOwnerDraft } from '../fork-heimdall/watcher-owner-draft'
 
 export const OBJECTIVE_TIERS = ObjectiveTierSchema.options
 export type { ObjectiveTier }
@@ -41,6 +42,7 @@ export type ObjectiveEnrollmentDraft = {
   tier: ObjectiveTier
   landingBar: ObjectiveLandingBar
   maxConcurrency: number
+  lanesEnabled: boolean
   workspaceKind: ObjectiveWorkspaceKind | null
   writeTerritoryText: string
   capabilities: Record<ObjectiveCapability, CapabilityMode>
@@ -49,6 +51,7 @@ export type ObjectiveEnrollmentDraft = {
   activeBudgetHours: number
   turns: string
   availableAgentIds: readonly string[]
+  owner: WatcherOwnerDraft
 }
 
 export type ObjectiveLandingBarAvailability = {
@@ -63,7 +66,7 @@ export type ObjectiveEnrollmentErrorCode =
   | 'existing-plan-too-long'
   | 'landing-bar-requires-git'
   | 'landing-bar-requires-worktree'
-  | 'max-concurrency-unsupported'
+  | 'max-concurrency-invalid'
   | 'territory-too-many'
   | 'territory-duplicate'
   | 'territory-invalid'
@@ -131,8 +134,12 @@ export function validateObjectiveEnrollmentDraft(
           : 'landing-bar-requires-worktree'
     })
   }
-  if (draft.maxConcurrency !== 1) {
-    errors.push({ code: 'max-concurrency-unsupported' })
+  if (
+    !Number.isInteger(draft.maxConcurrency) ||
+    draft.maxConcurrency < 1 ||
+    draft.maxConcurrency > 1_024
+  ) {
+    errors.push({ code: 'max-concurrency-invalid' })
   }
 
   const territory = parseWriteTerritory(draft.writeTerritoryText)

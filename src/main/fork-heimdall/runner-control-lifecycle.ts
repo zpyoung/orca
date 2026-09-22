@@ -8,8 +8,18 @@ export type RunnerControlLifecycleDependencies = {
   clearTimer(timer: NodeJS.Timeout): void
   publish(runner: WatcherRunner): void
 }
+export type RunnerDeleteFence = {
+  wasStopped: boolean
+  shouldResume: boolean
+}
+export class WatcherDeletePendingError extends Error {
+  constructor() {
+    super('Watcher deletion superseded the in-flight transition')
+    this.name = 'WatcherDeletePendingError'
+  }
+}
 
-/** Owns local runner suspension and shutdown without changing persisted user control state. */
+/** Owns local runner suspension, deletion quiescence, and shutdown without worker process control. */
 export class WatcherRunnerControlLifecycle {
   constructor(private readonly dependencies: RunnerControlLifecycleDependencies) {}
 
@@ -24,11 +34,7 @@ export class WatcherRunnerControlLifecycle {
     runner.leaseRenewal = null
     runner.leaseGuard = null
     this.dependencies.dispatchLifecycle.closeForContactLoss(runner.enrollment.watcherId)
-    const openInterval =
-      this.dependencies.budgetClock.current?.(runner.enrollment.watcherId) ?? null
-    if (openInterval) {
-      this.dependencies.budgetClock.close(openInterval, 'contact-lost')
-    }
+    this.closeOwnedBudgetInterval(runner, 'contact-lost')
     runner.status = { ...runner.status, phase: 'suspended', nextPulseAtMs: null }
     this.dependencies.publish(runner)
   }
@@ -54,6 +60,47 @@ export class WatcherRunnerControlLifecycle {
     this.dependencies.publish(runner)
   }
 
+  beginDelete(runner: WatcherRunner): RunnerDeleteFence {
+    const fence = {
+      wasStopped: runner.stopped,
+      shouldResume: runner.timer !== null || runner.tickQueued || runner.reconcileAgain
+    }
+    runner.controlPending = 'delete'
+    runner.stopped = true
+    if (runner.timer) {
+      this.dependencies.clearTimer(runner.timer)
+      runner.timer = null
+    }
+    return fence
+  }
+
+  rollbackDelete(runner: WatcherRunner, fence: RunnerDeleteFence): void {
+    runner.controlPending = null
+    runner.stopped = fence.wasStopped || runner.enrollment.terminalAtMs !== null
+    if (
+      !runner.stopped &&
+      (fence.shouldResume || (runner.enrollment.enabled && !runner.enrollment.paused))
+    ) {
+      this.dependencies.schedule(runner, 0)
+    }
+  }
+
+  remove(runner: WatcherRunner): void {
+    runner.stopped = true
+    runner.controlPending = 'delete'
+    if (runner.timer) {
+      this.dependencies.clearTimer(runner.timer)
+    }
+    runner.timer = null
+    runner.leaseRenewal?.dispose()
+    runner.leaseRenewal = null
+    runner.leaseGuard = null
+    this.dependencies.dispatchLifecycle.closeForContactLoss(runner.enrollment.watcherId)
+    this.closeOwnedBudgetInterval(runner, 'shutdown')
+    runner.status = { ...runner.status, nextPulseAtMs: null }
+    this.dependencies.publish(runner)
+  }
+
   stop(runner: WatcherRunner): void {
     runner.stopped = true
     if (runner.timer) {
@@ -63,12 +110,19 @@ export class WatcherRunnerControlLifecycle {
     runner.leaseRenewal?.dispose()
     runner.leaseRenewal = null
     this.dependencies.dispatchLifecycle.closeForShutdown()
-    const openInterval =
-      this.dependencies.budgetClock.current?.(runner.enrollment.watcherId) ?? null
-    if (openInterval) {
-      this.dependencies.budgetClock.close(openInterval, 'shutdown')
-    }
+    this.closeOwnedBudgetInterval(runner, 'shutdown')
     runner.status = { ...runner.status, nextPulseAtMs: null }
     this.dependencies.publish(runner)
+  }
+
+  private closeOwnedBudgetInterval(
+    runner: WatcherRunner,
+    reason: 'contact-lost' | 'shutdown'
+  ): void {
+    const openInterval = this.dependencies.budgetClock.owned(runner.enrollment.watcherId)
+    if (openInterval) {
+      this.dependencies.budgetClock.close(openInterval, reason)
+    }
+    runner.ownerBudgetInterval = null
   }
 }

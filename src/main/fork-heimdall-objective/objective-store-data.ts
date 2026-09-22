@@ -1,10 +1,15 @@
 import { createHash } from 'node:crypto'
 import { z } from 'zod'
+import type { ExecutionHostId } from '../../shared/execution-host'
 import type { ObjectiveLandingBar } from '../../shared/fork-heimdall-objective/contract-types'
 import type {
   ObjectiveRevisionStatus,
   ObjectiveReviewRole
 } from '../../shared/fork-heimdall-objective/detail-types'
+import type {
+  ObjectiveDispatchSetupState,
+  ObjectiveDispatchState
+} from '../../shared/fork-heimdall-objective/parallel-types'
 import {
   ReviewCriterionResultSchema,
   type IntegratorReport,
@@ -12,6 +17,7 @@ import {
   type PlannerReport,
   type ReviewerReport
 } from '../../shared/fork-heimdall-objective/plan-schema'
+import type { RevisionAmendmentPatch } from '../../shared/fork-heimdall-objective/revision-amendment'
 
 const IdSchema = z.string().trim().min(1).max(1_024)
 
@@ -161,6 +167,17 @@ export type ObjectiveCheckAttempt = StartCheckAttemptArgs & {
   stdoutTail: string
   stderrTail: string
   completedAtMs: number | null
+  ownerSkip: boolean
+}
+
+export type RecordOwnerCheckSkipArgs = {
+  watcherId: string
+  criterionId: string
+  contentIdentity: string
+  executionHostId: string
+  note: string
+  epoch: number
+  recordedAtMs: number
 }
 
 export type ObjectiveStoredCriterion = ObjectiveCriterion & {
@@ -202,6 +219,31 @@ export type RecordLandingResult = {
 
 export type ObjectiveReconcileResult = { reconciled: number; skipped: number }
 
+export type AmendRevisionArgs = {
+  watcherId: string
+  revisionId: string
+  patch: RevisionAmendmentPatch
+  amendedAtMs: number
+  /** Task keys with an unsettled dispatch, e.g. from `objectiveInFlightTaskKeys`; the store has no
+   *  ledger of its own, so a caller that can see one must supply this to guard a running drop. */
+  inFlightTaskKeys?: readonly string[]
+}
+
+export type RevisionAmendmentRefusal =
+  | { ok: false; reason: 'drops-succeeded-node'; taskKey: string }
+  | { ok: false; reason: 'drops-in-flight-node'; taskKey: string }
+  | { ok: false; reason: 'invalid-dependency-graph'; detail: string }
+
+export type RevisionAmendmentApplied = {
+  ok: true
+  revisionId: string
+  digest: string
+  ordinal: number
+  replayed: boolean
+}
+
+export type RevisionAmendmentResult = RevisionAmendmentApplied | RevisionAmendmentRefusal
+
 export type RevisionRow = {
   id: string
   revision_number: number
@@ -218,6 +260,7 @@ export type NodeRow = {
   task_key: string
   title?: string
   deps_json: string
+  ordinal: number
   orchestration_task_id: string | null
   dispatch_id: string | null
 }
@@ -246,6 +289,7 @@ export type CheckRow = {
   epoch: number
   started_at_ms: number
   completed_at_ms: number | null
+  owner_skip: number
 }
 
 export type ProjectionCheckRow = Pick<
@@ -274,6 +318,44 @@ export type LandingRow = {
   content_identity: string
   payload_json: string
   created_at_ms: number
+}
+
+export type AmendmentRow = {
+  revision_id: string
+  ordinal: number
+  digest: string
+  amended_at_ms: number
+  attestation: string
+  touched_task_keys_json: string
+}
+
+export type DispatchRow = {
+  attempt_fingerprint: string
+  watcher_id: string
+  execution_host_id: ExecutionHostId
+  revision_id: string
+  task_key: string
+  plan_task_digest: string
+  dispatch_id: string | null
+  workspace_id: string
+  workspace_path: string
+  base_commit: string
+  lane_task_keys_json: string
+  session_node_count: number
+  state: ObjectiveDispatchState
+  commit_sha: string | null
+  applied_commit_sha: string | null
+  report_digest: string | null
+  conflict_paths_json: string
+  conflicting_task_keys_json: string
+  conflicting_dispatch_ids_json: string
+  created_at_ms: number
+  completed_at_ms: number | null
+  terminal_handle: string | null
+  setup_state: ObjectiveDispatchSetupState
+  report_path: string | null
+  report_json: string | null
+  task_json: string
 }
 
 export function naturalId(prefix: string, ...parts: (string | number)[]): string {

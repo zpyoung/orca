@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
+  OBJECTIVE_CHECK_COMMAND_MAX_LENGTH,
+  OBJECTIVE_CRITERION_BODY_MAX_LENGTH,
+  OBJECTIVE_CRITERION_NOTE_MAX_LENGTH,
+  OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH,
+  OBJECTIVE_TASK_KEY_MAX_LENGTH,
+  OBJECTIVE_TASK_SPEC_MAX_LENGTH,
+  OBJECTIVE_TASK_TITLE_MAX_LENGTH
+} from './contract-types'
+import {
   CriterionSelfAssessmentSchema,
   ImplementerReportSchema,
   IntegratorReportSchema,
@@ -51,6 +60,42 @@ describe('objective plan schema', () => {
       ObjectivePlanSchema.safeParse([
         task('a', {
           criteria: [{ body: 'broken pair', shellCheckable: true, checkCommand: null }]
+        })
+      ]).success
+    ).toBe(false)
+  })
+
+  it('enforces the published planner string maxima at the exact boundary', () => {
+    const taskKey = 'k'.repeat(OBJECTIVE_TASK_KEY_MAX_LENGTH)
+    expect(ObjectivePlanSchema.safeParse([task(taskKey)]).success).toBe(true)
+    expect(ObjectivePlanSchema.safeParse([task(`${taskKey}k`)]).success).toBe(false)
+
+    const title = 't'.repeat(OBJECTIVE_TASK_TITLE_MAX_LENGTH)
+    expect(ObjectivePlanSchema.safeParse([task('title-at-cap', { title })]).success).toBe(true)
+    expect(
+      ObjectivePlanSchema.safeParse([task('title-over-cap', { title: `${title}t` })]).success
+    ).toBe(false)
+
+    const body = 'b'.repeat(OBJECTIVE_CRITERION_BODY_MAX_LENGTH)
+    const command = 'c'.repeat(OBJECTIVE_CHECK_COMMAND_MAX_LENGTH)
+    expect(
+      ObjectivePlanSchema.safeParse([
+        task('criterion-at-cap', {
+          criteria: [{ body, shellCheckable: true, checkCommand: command }]
+        })
+      ]).success
+    ).toBe(true)
+    expect(
+      ObjectivePlanSchema.safeParse([
+        task('criterion-body-over-cap', {
+          criteria: [{ body: `${body}b`, shellCheckable: true, checkCommand: command }]
+        })
+      ]).success
+    ).toBe(false)
+    expect(
+      ObjectivePlanSchema.safeParse([
+        task('check-command-over-cap', {
+          criteria: [{ body, shellCheckable: true, checkCommand: `${command}c` }]
         })
       ]).success
     ).toBe(false)
@@ -170,6 +215,50 @@ describe('objective role report schemas', () => {
     }
     expect(ReviewerReportSchema.safeParse(inconsistent).success).toBe(false)
     expect(IntegratorReportSchema.safeParse({ ...inconsistent, checksRun: [] }).success).toBe(false)
+  })
+
+  it('enforces the canonical report text boundaries in UTF-16 code units', () => {
+    const summary = 's'.repeat(OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH)
+    const reports = [
+      [
+        ImplementerReportSchema,
+        { taskKey: 'core', summary, filesModified: [], criteriaSelfAssessment: [] }
+      ],
+      [ReviewerReportSchema, { verdict: 'approve', criteriaResults: [], summary }],
+      [IntegratorReportSchema, { verdict: 'approve', criteriaResults: [], summary, checksRun: [] }]
+    ] as const
+
+    for (const [schema, report] of reports) {
+      expect(schema.safeParse(report).success).toBe(true)
+      expect(schema.safeParse({ ...report, summary: `${summary}x` }).success).toBe(false)
+    }
+    expect(
+      ObjectivePlanSchema.safeParse([
+        task('task-spec-at-cap', { spec: 's'.repeat(OBJECTIVE_TASK_SPEC_MAX_LENGTH) })
+      ]).success
+    ).toBe(true)
+    expect(
+      ObjectivePlanSchema.safeParse([
+        task('task-spec-over-cap', { spec: 's'.repeat(OBJECTIVE_TASK_SPEC_MAX_LENGTH + 1) })
+      ]).success
+    ).toBe(false)
+
+    const multibyteNote = '界'.repeat(OBJECTIVE_CRITERION_NOTE_MAX_LENGTH)
+    expect(Buffer.byteLength(multibyteNote, 'utf8')).toBeGreaterThan(multibyteNote.length)
+    expect(
+      CriterionSelfAssessmentSchema.safeParse({
+        criterionIndex: 0,
+        result: 'pass',
+        note: multibyteNote
+      }).success
+    ).toBe(true)
+    expect(
+      CriterionSelfAssessmentSchema.safeParse({
+        criterionIndex: 0,
+        result: 'pass',
+        note: `${multibyteNote}界`
+      }).success
+    ).toBe(false)
   })
 
   it('keeps report objects strict and bounded', () => {

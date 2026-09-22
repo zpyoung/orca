@@ -75,6 +75,11 @@
         "resume": "Resume",
         "pause": "Pause",
         "disarm": "Disarm",
+        "maxConcurrency": "Max concurrency",
+        "updateConcurrency": "Update cap",
+        "delete": "Delete watcher",
+        "deleteTitle": "Delete watcher?",
+        "deleteDescription": "The watcher “{{name}}” and its saved history will be permanently removed. Worker terminals will not be stopped.",
         "approve": "Approve",
         "budgetResumeWarning": "This watcher exhausted its budget. Increase the limit before resuming or it will park again.",
         "approveAction": "Approve: {{action}}"
@@ -135,7 +140,8 @@
         "decided": "Decided",
         "gate": "Gate",
         "declined": "Declined",
-        "noneDeclined": "No phase declined"
+        "noneDeclined": "No phase declined",
+        "decidedDeviation": "Deviation: {{kind}}"
       },
       "activity": {
         "title": "Fleet action history",
@@ -150,6 +156,7 @@
         "started": "Started {{age}}",
         "agentInFlight": "Agent work in flight",
         "agentsInFlight": "{{count}} agent tasks in flight",
+        "objectiveConcurrencyRunning": "{{count}} of {{cap}} running",
         "checkRunning": "Check running",
         "actionRunning": "Action running"
       },
@@ -244,6 +251,16 @@
       "workspace": {
         "folder": "Folder",
         "branchUnavailable": "Branch unavailable"
+      },
+      "owner": {
+        "modelAutomatic": "Automatic",
+        "effortAutomatic": "Automatic",
+        "title": "Owning agent",
+        "help": "Optional. When set, Heimdall wakes this agent on a deviation instead of replanning automatically. Off keeps automatic replan-on-failure.",
+        "harness": "Harness",
+        "harnessUnavailableHelp": "Only Claude has a resumable session Heimdall can wake between turns. Other harnesses cannot own a watcher yet.",
+        "model": "Model",
+        "effort": "Effort"
       }
     }
   }

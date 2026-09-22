@@ -286,7 +286,7 @@ describe('objective tier review policy', () => {
   it('standard dispatches the reviewer before landing', () => {
     expect(decideObjective(snapshot(implemented), ledger()).action).toMatchObject({
       kind: 'dispatch-reviewer',
-      evidenceKey: 'revision-1:review:content-current'
+      evidenceKey: 'revision-1:plan-digest:review:content-current'
     })
   })
 
@@ -296,7 +296,7 @@ describe('objective tier review policy', () => {
       capability: 'review',
       visibility: 'local',
       contentIdentity: 'content-before-review',
-      evidenceKey: 'revision-1:review:content-before-review',
+      evidenceKey: 'revision-1:plan-digest:review:content-before-review',
       revisionId: 'revision-1'
     }
     const decision = decideObjective(
@@ -328,7 +328,7 @@ describe('objective tier review policy', () => {
     )
     expect(decision.action).toMatchObject({
       kind: 'dispatch-integrator',
-      evidenceKey: 'revision-1:review:content-current'
+      evidenceKey: 'revision-1:plan-digest:review:content-current'
     })
   })
 
@@ -692,6 +692,212 @@ describe('objective pending report projection', () => {
     expect(reports).toHaveLength(1)
     expect(reports[0].subject).toBeUndefined()
     expect(reports[0].body).toBeUndefined()
+  })
+
+  it.each([
+    {
+      role: 'planner',
+      action: {
+        kind: 'dispatch-planner',
+        capability: 'plan',
+        visibility: 'local',
+        contentIdentity: 'content-current',
+        evidenceKey: 'plan:1',
+        revisionNumber: 1,
+        reason: 'initial'
+      } satisfies ObjectiveAction
+    },
+    {
+      role: 'reviewer',
+      action: {
+        kind: 'dispatch-reviewer',
+        capability: 'review',
+        visibility: 'local',
+        contentIdentity: 'content-current',
+        evidenceKey: 'revision-1:review',
+        revisionId: 'revision-1'
+      } satisfies ObjectiveAction
+    }
+  ])('treats omitted $role filesModified evidence as a valid empty list', ({ action }) => {
+    const dispatchId = `dispatch-${action.kind}`
+    const reports = projectObjectiveReports(
+      ledger([
+        attempt(action, { dispatchId }),
+        {
+          kind: 'evidence',
+          eventId: `evidence-${dispatchId}`,
+          watcherId: 'watcher-1',
+          atMs: 40,
+          origin: 'owner',
+          class: 'fact',
+          evidenceKind: 'orchestration-mailbox',
+          payload: {
+            type: 'worker_done',
+            payload: {
+              dispatchId,
+              taskId: `task-${dispatchId}`,
+              outcome: 'succeeded',
+              reportPath: '/outside/report.json'
+            }
+          }
+        }
+      ])
+    )
+    expect(reports).toMatchObject([{ dispatchId, filesModified: [] }])
+    expect(reports[0]?.evidenceIssue).toBeUndefined()
+  })
+
+  it('marks malformed filesModified evidence instead of silently projecting it as an empty list', () => {
+    const evidence = {
+      kind: 'evidence' as const,
+      eventId: 'evidence-malformed-files',
+      watcherId: 'watcher-1',
+      atMs: 40,
+      origin: 'owner' as const,
+      class: 'fact' as const,
+      evidenceKind: 'orchestration-mailbox',
+      payload: {
+        type: 'worker_done',
+        payload: {
+          dispatchId: 'dispatch-core',
+          taskId: 'task-core',
+          outcome: 'succeeded',
+          reportPath: '/outside/report.json',
+          filesModified: ['src/core.ts', 42]
+        }
+      }
+    }
+    const reportLedger = ledger([attempt(dispatchNode, { dispatchId: 'dispatch-core' }), evidence])
+    expect(projectObjectiveReports(reportLedger)).toMatchObject([
+      {
+        dispatchId: 'dispatch-core',
+        filesModified: [],
+        evidenceIssue: 'files-modified-malformed'
+      }
+    ])
+    expect(
+      decideObjective(
+        snapshot(projection({ nodes: [node('core', { state: 'dispatched' })] })),
+        reportLedger,
+        true
+      )
+    ).toMatchObject({
+      action: null,
+      deviation: {
+        kind: 'report-rejected',
+        dispatchId: 'dispatch-core',
+        rejectionReason: 'implementer-report-evidence-malformed',
+        detail: expect.stringContaining('filesModified must be an array')
+      }
+    })
+  })
+
+  it('keeps a failed task without a report distinct from malformed report evidence', () => {
+    const failedTaskLedger = ledger([
+      attempt(dispatchNode, {
+        dispatchId: 'dispatch-core',
+        state: 'settled',
+        effect: 'not-landed',
+        reason: 'worker failed'
+      }),
+      {
+        kind: 'evidence',
+        eventId: 'evidence-failed-task',
+        watcherId: 'watcher-1',
+        atMs: 40,
+        origin: 'owner',
+        class: 'fact',
+        evidenceKind: 'orchestration-mailbox',
+        payload: {
+          type: 'worker_done',
+          payload: {
+            dispatchId: 'dispatch-core',
+            taskId: 'task-core',
+            outcome: 'failed'
+          }
+        }
+      }
+    ])
+    expect(projectObjectiveReports(failedTaskLedger)).toMatchObject([
+      {
+        dispatchId: 'dispatch-core',
+        outcome: 'failed',
+        reportPath: null,
+        filesModified: []
+      }
+    ])
+    expect(projectObjectiveReports(failedTaskLedger)[0]?.evidenceIssue).toBeUndefined()
+    expect(
+      decideObjective(
+        snapshot(projection({ nodes: [node('core', { state: 'dispatched' })] })),
+        failedTaskLedger,
+        true
+      )
+    ).toMatchObject({
+      action: null,
+      deviation: {
+        kind: 'node-failed',
+        taskKey: 'core',
+        summary: 'worker failed'
+      }
+    })
+  })
+
+  it('projects a legacy terminal rejection into the exact owner-facing report rejection', () => {
+    const reportLedger = ledger([
+      attempt(dispatchNode, { dispatchId: 'dispatch-core' }),
+      {
+        kind: 'evidence',
+        eventId: 'evidence-legacy-rejection',
+        watcherId: 'watcher-1',
+        atMs: 40,
+        origin: 'owner',
+        class: 'fact',
+        evidenceKind: 'orchestration-mailbox',
+        payload: {
+          type: 'worker_done',
+          payload: {
+            dispatchId: 'dispatch-core',
+            taskId: 'task-core',
+            outcome: 'failed',
+            reportPath: '/outside/report.json',
+            filesModified: ['src/core.ts'],
+            reportRejection: {
+              code: 'sender_not_assignee',
+              reason: 'The submitting worker is not the authoritative assignee.'
+            }
+          }
+        }
+      }
+    ])
+    expect(projectObjectiveReports(reportLedger)).toMatchObject([
+      {
+        dispatchId: 'dispatch-core',
+        outcome: 'failed',
+        reportValidation: {
+          status: 'rejected',
+          code: 'semantic-invalid',
+          sourceCode: 'sender_not_assignee',
+          detail: 'The submitting worker is not the authoritative assignee.'
+        }
+      }
+    ])
+    expect(
+      decideObjective(
+        snapshot(projection({ nodes: [node('core', { state: 'dispatched' })] })),
+        reportLedger,
+        true
+      )
+    ).toMatchObject({
+      action: null,
+      deviation: {
+        kind: 'report-rejected',
+        dispatchId: 'dispatch-core',
+        taskKey: 'core',
+        rejectionReason: 'sender_not_assignee',
+        detail: expect.stringContaining('The submitting worker is not the authoritative assignee.')
+      }
+    })
   })
 })
 

@@ -12,6 +12,7 @@ import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types
 import type { ObjectiveAction } from '../../shared/fork-heimdall-objective/objective-actions'
 import type { ObjectiveWorld } from '../../shared/fork-heimdall-objective/detail-types'
 import type { Store } from '../persistence'
+import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { createObjectiveActionExecutor } from './action-executor'
 import { findObjectiveWorkerEvidence, type ObjectiveSnapshotBinding } from './execution-context'
 import type { ObjectiveForgeAccess } from './objective-forge-access'
@@ -162,6 +163,9 @@ function harness(storeOverrides: Partial<ObjectiveStore> = {}) {
     }
   })
   const objectiveStore = {
+    getDispatch: () => null,
+    listDispatches: () => [],
+    dispatchForId: () => null,
     getPlan: () => [
       {
         taskKey: 'node-a',
@@ -188,7 +192,8 @@ function harness(storeOverrides: Partial<ObjectiveStore> = {}) {
     store: {} as Store,
     objectiveStore,
     snapshotBindings: bindings,
-    forge: {} as ObjectiveForgeAccess
+    forge: {} as ObjectiveForgeAccess,
+    runtime: {} as OrcaRuntimeService
   })
   return { executor, fresh }
 }
@@ -257,6 +262,73 @@ describe('objective action recovery', () => {
     )
   })
 
+  it('rejects malformed completion file evidence instead of validating it as an empty list', async () => {
+    const malformed = workerDone('succeeded')
+    const message =
+      malformed.kind === 'evidence' ? (malformed.payload as Record<string, unknown>) : {}
+    const payload =
+      typeof message.payload === 'object' && message.payload !== null
+        ? (message.payload as Record<string, unknown>)
+        : {}
+    payload.filesModified = ['src/a.ts', 42]
+    const { executor, fresh } = harness()
+    const ledger: WatcherLedger = {
+      watcherId: 'watcher-1',
+      entries: [attempt(dispatchNode), malformed]
+    }
+
+    await expect(
+      executor.resolveOutcome(attempt(dispatchNode), fresh, ledger, TEST_LEASE)
+    ).resolves.toMatchObject({
+      effect: 'not-landed',
+      failureClass: 'criteria',
+      reportValidation: {
+        status: 'rejected',
+        code: 'evidence-malformed',
+        reportedFiles: [],
+        hostVerifiable: true
+      }
+    })
+    expect(readReport).not.toHaveBeenCalled()
+  })
+
+  it('preserves a terminal legacy rejection cause without reading or accepting the report', async () => {
+    const rejected = workerDone('failed')
+    const message =
+      rejected.kind === 'evidence' ? (rejected.payload as Record<string, unknown>) : {}
+    const payload =
+      typeof message.payload === 'object' && message.payload !== null
+        ? (message.payload as Record<string, unknown>)
+        : {}
+    payload.reportRejection = {
+      code: 'sender_not_assignee',
+      reason: 'The submitting worker is not the authoritative assignee.'
+    }
+    const { executor, fresh } = harness()
+    const ledger: WatcherLedger = {
+      watcherId: 'watcher-1',
+      entries: [attempt(dispatchNode), rejected]
+    }
+
+    await expect(
+      executor.resolveOutcome(attempt(dispatchNode), fresh, ledger, TEST_LEASE)
+    ).resolves.toMatchObject({
+      effect: 'not-landed',
+      failureClass: 'criteria',
+      reportValidation: {
+        status: 'rejected',
+        code: 'semantic-invalid',
+        sourceCode: 'sender_not_assignee',
+        detail: 'The submitting worker is not the authoritative assignee.',
+        role: 'implementer',
+        dispatchId: 'dispatch-1',
+        taskKey: 'node-a'
+      }
+    })
+    expect(readReport).not.toHaveBeenCalled()
+    expect(validateChanges).not.toHaveBeenCalled()
+  })
+
   it('does not recover a successful worker whose observed changes contradict its report', async () => {
     readReport.mockResolvedValue({
       ok: true,
@@ -282,7 +354,16 @@ describe('objective action recovery', () => {
 
     await expect(
       executor.resolveOutcome(attempt(dispatchNode), fresh, ledger, TEST_LEASE)
-    ).resolves.toEqual({ effect: 'not-landed', failureClass: 'criteria' })
+    ).resolves.toMatchObject({
+      effect: 'not-landed',
+      failureClass: 'criteria',
+      reportValidation: {
+        status: 'rejected',
+        code: 'workspace-invalid',
+        detail: 'reported-files-do-not-match-observed-changes',
+        hostVerifiable: true
+      }
+    })
   })
 
   it('resolves a crash before dispatch metadata as authoritatively not landed, tagged infra', async () => {
@@ -383,6 +464,27 @@ describe('objective action recovery', () => {
     ).resolves.toEqual({ effect: 'not-landed', failureClass: 'criteria' })
   })
 
+  it('keeps a failed task without report evidence distinct from a rejected report', async () => {
+    const failed = workerDone('failed')
+    const message = failed.kind === 'evidence' ? (failed.payload as Record<string, unknown>) : {}
+    const payload =
+      typeof message.payload === 'object' && message.payload !== null
+        ? (message.payload as Record<string, unknown>)
+        : {}
+    delete payload.reportPath
+    delete payload.filesModified
+    const { executor, fresh } = harness()
+    const ledger: WatcherLedger = {
+      watcherId: 'watcher-1',
+      entries: [attempt(dispatchNode), failed]
+    }
+
+    await expect(
+      executor.resolveOutcome(attempt(dispatchNode), fresh, ledger, TEST_LEASE)
+    ).resolves.toEqual({ effect: 'not-landed', failureClass: 'criteria' })
+    expect(readReport).not.toHaveBeenCalled()
+  })
+
   it('resolves a failed worker outcome as not landed without an unreadable report changing that', async () => {
     readReport.mockResolvedValue({ ok: false, reason: 'missing' })
     const { executor, fresh } = harness()
@@ -393,12 +495,24 @@ describe('objective action recovery', () => {
 
     await expect(
       executor.resolveOutcome(attempt(dispatchNode), fresh, ledger, TEST_LEASE)
-    ).resolves.toEqual({ effect: 'not-landed', failureClass: 'criteria' })
+    ).resolves.toMatchObject({
+      effect: 'not-landed',
+      failureClass: 'criteria',
+      reportValidation: {
+        status: 'rejected',
+        code: 'missing',
+        role: 'implementer',
+        dispatchId: 'dispatch-1',
+        hostVerifiable: true
+      }
+    })
     expect(readReport).toHaveBeenCalledOnce()
   })
 
-  it('degrades a classification read failure on a failed outcome to criteria instead of throwing', async () => {
-    readReport.mockRejectedValue(new Error('ssh connection lost'))
+  it('retains a bounded unverifiable classification read failure on a failed outcome', async () => {
+    readReport.mockRejectedValue(
+      Object.assign(new Error('ssh connection lost'), { code: 'ECONNRESET' })
+    )
     const { executor, fresh } = harness()
     const ledger: WatcherLedger = {
       watcherId: 'watcher-1',
@@ -407,10 +521,19 @@ describe('objective action recovery', () => {
 
     await expect(
       executor.resolveOutcome(attempt(dispatchNode), fresh, ledger, TEST_LEASE)
-    ).resolves.toEqual({ effect: 'not-landed', failureClass: 'criteria' })
+    ).resolves.toMatchObject({
+      effect: 'not-landed',
+      failureClass: 'criteria',
+      reportValidation: {
+        status: 'unverifiable',
+        code: 'read-unverifiable',
+        detail: 'Report authority could not be read (ECONNRESET)',
+        hostVerifiable: false
+      }
+    })
   })
 
-  it('still propagates a read failure on a succeeded outcome instead of guessing landed', async () => {
+  it('keeps a succeeded outcome indeterminate when its report authority is unverifiable', async () => {
     readReport.mockRejectedValue(new Error('ssh connection lost'))
     const { executor, fresh } = harness()
     const ledger: WatcherLedger = {
@@ -420,7 +543,15 @@ describe('objective action recovery', () => {
 
     await expect(
       executor.resolveOutcome(attempt(dispatchNode), fresh, ledger, TEST_LEASE)
-    ).rejects.toThrow('ssh connection lost')
+    ).resolves.toMatchObject({
+      effect: 'indeterminate',
+      reportValidation: {
+        status: 'unverifiable',
+        code: 'read-unverifiable',
+        detail: 'Report authority could not be read',
+        hostVerifiable: false
+      }
+    })
   })
 
   it('classifies a failed worker report with a failing criterion as criteria', async () => {
@@ -494,7 +625,15 @@ describe('objective action recovery', () => {
 
     await expect(
       executor.resolveOutcome(attempt(dispatchNode), fresh, ledger, TEST_LEASE)
-    ).resolves.toEqual({ effect: 'not-landed', failureClass: 'criteria' })
+    ).resolves.toMatchObject({
+      effect: 'not-landed',
+      failureClass: 'criteria',
+      reportValidation: {
+        status: 'rejected',
+        code: 'semantic-invalid',
+        detail: 'Implementer modified path outside write territory: docs/outside.md'
+      }
+    })
   })
 
   it('defaults an unclassifiable failed dispatch (no per-criterion signal) to criteria', async () => {
@@ -531,6 +670,44 @@ describe('objective action recovery', () => {
         TEST_LEASE
       )
     ).resolves.toEqual({ effect: 'not-landed', failureClass: 'criteria' })
+  })
+
+  it('accepts an omitted filesModified field on a successful planner completion', async () => {
+    readReport.mockResolvedValue({
+      ok: true,
+      role: 'planner',
+      path: '/workspace/report.json',
+      reportDigest: 'digest-planner',
+      report: {
+        plan: [
+          {
+            taskKey: 'core',
+            title: 'Core',
+            spec: 'Implement core',
+            deps: [],
+            criteria: [{ body: 'works', shellCheckable: false, checkCommand: null }],
+            declaresDependencyChange: false,
+            declaredPaths: ['src/core.ts']
+          }
+        ]
+      }
+    })
+    const completion = workerDone('succeeded')
+    if (completion.kind !== 'evidence') {
+      throw new Error('expected completion evidence')
+    }
+    const message = completion.payload as { payload: Record<string, unknown> }
+    delete message.payload.filesModified
+    const { executor, fresh } = harness()
+    const dispatched = attempt(dispatchPlanner, { dispatchId: 'dispatch-1' })
+    const ledger: WatcherLedger = {
+      watcherId: 'watcher-1',
+      entries: [dispatched, completion]
+    }
+
+    await expect(executor.resolveOutcome(dispatched, fresh, ledger, TEST_LEASE)).resolves.toEqual({
+      effect: 'landed'
+    })
   })
 
   it('validates observed workspace changes against the original dispatch fingerprint for a retry', async () => {

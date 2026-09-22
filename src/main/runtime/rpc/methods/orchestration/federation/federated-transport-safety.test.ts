@@ -11,7 +11,7 @@ import type { FederatedDispatchRow } from '../../../../orchestration/types'
 import { readFederatedWorkerOutput } from './federated-worker-read'
 import { parseRemoteReleaseReceipt, releaseFederatedWorker } from './federated-worker-release'
 import { callFederatedWorkerShow } from '../worker/worker-observation'
-import { syncFederatedDispatch } from '../../../../orchestration/federation-sync'
+import { syncFederatedDispatch } from '../../../../../fork-heimdall/orchestration/federation-sync'
 import { ORCHESTRATION_WORKER_STOP_METHODS } from '../worker/worker-stop'
 
 const server = {

@@ -17,7 +17,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('orca heimdall debug CLI registration', () => {
+describe('orca heimdall CLI registration', () => {
   it('normalizes the watcher id positional and accepts output flags', () => {
     const parsed = normalizeCommandPositionals(
       COMMAND_SPECS,
@@ -31,7 +31,20 @@ describe('orca heimdall debug CLI registration', () => {
     expect(() => validateCommandAndFlags(COMMAND_SPECS, parsed)).not.toThrow()
   })
 
-  it('registers Heimdall as a group and the debug leaf in both live registries', () => {
+  it('normalizes the set-concurrency positionals', () => {
+    const parsed = normalizeCommandPositionals(
+      COMMAND_SPECS,
+      parseArgs(['heimdall', 'set-concurrency', 'watcher-1', '3', '--json'], COMMAND_PATHS)
+    )
+
+    expect(parsed.commandPath).toEqual(['heimdall', 'set-concurrency'])
+    expect(parsed.flags.get('watcher-id')).toBe('watcher-1')
+    expect(parsed.flags.get('max-concurrency')).toBe('3')
+    expect(parsed.flags.get('json')).toBe(true)
+    expect(() => validateCommandAndFlags(COMMAND_SPECS, parsed)).not.toThrow()
+  })
+
+  it('registers Heimdall and both live leaves in the command registries', () => {
     const debugSpec = findCommandSpec(COMMAND_SPECS, ['heimdall', 'debug'])
     if (!debugSpec) {
       throw new Error('Missing heimdall debug spec')
@@ -39,6 +52,7 @@ describe('orca heimdall debug CLI registration', () => {
 
     expect(isCommandGroup(['heimdall'])).toBe(true)
     expect(HANDLER_COMMAND_KEYS.has('heimdall debug')).toBe(true)
+    expect(HANDLER_COMMAND_KEYS.has('heimdall set-concurrency')).toBe(true)
     expect(effectiveAllowedFlags(debugSpec)).not.toContain('page')
   })
 

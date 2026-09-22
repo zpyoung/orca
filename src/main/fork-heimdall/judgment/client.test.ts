@@ -5,6 +5,7 @@ import {
   JUDGMENT_MAX_RESPONSE_BYTES,
   JUDGMENT_MAX_STATE_BYTES,
   JudgmentAnswerSchema,
+  JudgmentClientFailure,
   JudgmentResponseSchema,
   type JudgmentFetch,
   type JudgmentQuestion
@@ -68,6 +69,16 @@ function jsonResponse(body: unknown, status = 200): Response {
     status,
     headers: { 'Content-Type': 'application/json' }
   })
+}
+
+async function clientFailure(request: Promise<unknown>): Promise<JudgmentClientFailure> {
+  try {
+    await request
+  } catch (error) {
+    expect(error).toBeInstanceOf(JudgmentClientFailure)
+    return error as JudgmentClientFailure
+  }
+  throw new Error('Expected judgment client to reject')
 }
 
 afterEach(() => {
@@ -145,12 +156,13 @@ describe('judgment client', () => {
       const answer = (payload.answers as Record<string, Record<string, unknown>>)[answerId]!
       delete answer[field]
       const fetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(payload))
-      await expect(
+      const error = await clientFailure(
         createJudgmentClient(API_KEY, { provider: 'openrouter', fetch: fetcher }).evaluate(
           'state',
           QUESTIONS
         )
-      ).rejects.toThrow('OpenRouter judgment response is invalid')
+      )
+      expect(error.diagnostic).toEqual({ code: 'malformed-response' })
       expect(fetcher).toHaveBeenCalledTimes(1)
     }
   })
@@ -160,15 +172,29 @@ describe('judgment client', () => {
     const fetcher = vi.fn<JudgmentFetch>(
       async () => new Response(`provider echoed ${openRouterKey}`, { status: 500 })
     )
-    const request = createJudgmentClient(openRouterKey, {
-      provider: 'openrouter',
-      fetch: fetcher
-    }).evaluate('state', QUESTIONS)
+    const error = await clientFailure(
+      createJudgmentClient(openRouterKey, {
+        provider: 'openrouter',
+        fetch: fetcher
+      }).evaluate('state', QUESTIONS)
+    )
 
-    await expect(request).rejects.toThrow('OpenRouter judgment request failed with HTTP 500')
-    await expect(request).rejects.not.toThrow(openRouterKey)
-    await expect(request).rejects.not.toThrow('provider echoed')
+    expect(error.diagnostic).toEqual({ code: 'http-status', status: 500 })
+    expect(error.message).not.toContain(openRouterKey)
+    expect(error.message).not.toContain('provider echoed')
     expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+
+  it('classifies malformed provider payload without exposing its body', async () => {
+    const providerBody = `malformed response containing ${API_KEY}`
+    const fetcher = vi.fn<JudgmentFetch>(async () => new Response(providerBody))
+    const error = await clientFailure(
+      createJudgmentClient(API_KEY, { fetch: fetcher }).evaluate('state', QUESTIONS)
+    )
+
+    expect(error.diagnostic).toEqual({ code: 'malformed-response' })
+    expect(error.message).not.toContain(API_KEY)
+    expect(error.message).not.toContain(providerBody)
   })
 
   it('accepts a noul answer without confidence and keeps schemas strict and finite', () => {
@@ -219,9 +245,14 @@ describe('judgment client', () => {
     const fetcher = vi.fn<JudgmentFetch>(async () => new Response(null, { status: 429 }))
     const sleep = vi.fn<(milliseconds: number) => Promise<void>>(async () => undefined)
 
-    await expect(
+    const error = await clientFailure(
       createJudgmentClient(API_KEY, { fetch: fetcher, sleep }).evaluate('state', QUESTIONS)
-    ).rejects.toThrow('TypeSafe judgment request failed with HTTP 429')
+    )
+    expect(error.diagnostic).toEqual({
+      code: 'retry-exhausted',
+      status: 429,
+      attempts: 3
+    })
     expect(fetcher).toHaveBeenCalledTimes(3)
     expect(sleep.mock.calls).toEqual([[100], [200]])
   })
@@ -231,24 +262,23 @@ describe('judgment client', () => {
     const httpFetcher = vi.fn<JudgmentFetch>(
       async () => new Response(`provider echoed ${API_KEY}`, { status: 500 })
     )
-    const httpRequest = createJudgmentClient(API_KEY, { fetch: httpFetcher, sleep }).evaluate(
-      'state',
-      QUESTIONS
+    const httpError = await clientFailure(
+      createJudgmentClient(API_KEY, { fetch: httpFetcher, sleep }).evaluate('state', QUESTIONS)
     )
-    await expect(httpRequest).rejects.toThrow('TypeSafe judgment request failed with HTTP 500')
-    await expect(httpRequest).rejects.not.toThrow(API_KEY)
+    expect(httpError.diagnostic).toEqual({ code: 'http-status', status: 500 })
+    expect(httpError.message).not.toContain(API_KEY)
+    expect(httpError.message).not.toContain('provider echoed')
     expect(httpFetcher).toHaveBeenCalledTimes(1)
     expect(sleep).not.toHaveBeenCalled()
 
     const transportFetcher = vi.fn<JudgmentFetch>(async () => {
       throw new Error(`transport exposed ${API_KEY}`)
     })
-    const transportRequest = createJudgmentClient(API_KEY, { fetch: transportFetcher }).evaluate(
-      'state',
-      QUESTIONS
+    const transportError = await clientFailure(
+      createJudgmentClient(API_KEY, { fetch: transportFetcher }).evaluate('state', QUESTIONS)
     )
-    await expect(transportRequest).rejects.toThrow('TypeSafe judgment request failed')
-    await expect(transportRequest).rejects.not.toThrow(API_KEY)
+    expect(transportError.diagnostic).toEqual({ code: 'unknown' })
+    expect(transportError.message).not.toContain(API_KEY)
     expect(transportFetcher).toHaveBeenCalledTimes(1)
   })
 
@@ -260,9 +290,10 @@ describe('judgment client', () => {
 
     for (const payload of [missing, unexpected]) {
       const fetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(payload))
-      await expect(
+      const error = await clientFailure(
         createJudgmentClient(API_KEY, { fetch: fetcher }).evaluate('state', QUESTIONS)
-      ).rejects.toThrow('TypeSafe judgment response is invalid')
+      )
+      expect(error.diagnostic).toEqual({ code: 'malformed-response' })
     }
   })
 
@@ -284,9 +315,10 @@ describe('judgment client', () => {
 
     for (const payload of [unknownOption, invalidDistribution]) {
       const fetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(payload))
-      await expect(
+      const error = await clientFailure(
         createJudgmentClient(API_KEY, { fetch: fetcher }).evaluate('state', QUESTIONS)
-      ).rejects.toThrow('TypeSafe judgment response is invalid')
+      )
+      expect(error.diagnostic).toEqual({ code: 'malformed-response' })
     }
   })
 
@@ -318,9 +350,10 @@ describe('judgment client', () => {
 
     for (const payload of [wrongLegend, outOfRange, inconsistentScore]) {
       const fetcher = vi.fn<JudgmentFetch>(async () => jsonResponse(payload))
-      await expect(
+      const error = await clientFailure(
         createJudgmentClient(API_KEY, { fetch: fetcher }).evaluate('state', QUESTIONS)
-      ).rejects.toThrow('TypeSafe judgment response is invalid')
+      )
+      expect(error.diagnostic).toEqual({ code: 'malformed-response' })
     }
   })
 
@@ -340,28 +373,31 @@ describe('judgment client', () => {
       'state',
       QUESTIONS
     )
-    const rejection = expect(pending).rejects.toThrow('TypeSafe judgment request timed out')
+    const rejection = clientFailure(pending)
 
     await vi.advanceTimersByTimeAsync(5)
-    await rejection
-    await expect(pending).rejects.not.toThrow(API_KEY)
+    const error = await rejection
+    expect(error.diagnostic).toEqual({ code: 'timeout' })
+    expect(error.message).not.toContain(API_KEY)
   })
 
   it('rejects oversized state and request bodies before egress without truncating', async () => {
     const fetcher = vi.fn<JudgmentFetch>()
     const client = createJudgmentClient(API_KEY, { fetch: fetcher })
 
-    await expect(client.evaluate('x'.repeat(JUDGMENT_MAX_STATE_BYTES), QUESTIONS)).rejects.toThrow(
-      `${JUDGMENT_MAX_STATE_BYTES}-byte limit`
+    const stateError = await clientFailure(
+      client.evaluate('x'.repeat(JUDGMENT_MAX_STATE_BYTES), QUESTIONS)
     )
-    await expect(
+    expect(stateError.diagnostic).toEqual({ code: 'state-size' })
+    const requestError = await clientFailure(
       client.evaluate('state', {
         only: {
           type: 'noul',
           instructions: 'x'.repeat(JUDGMENT_MAX_REQUEST_BYTES)
         }
       })
-    ).rejects.toThrow(`${JUDGMENT_MAX_REQUEST_BYTES}-byte limit`)
+    )
+    expect(requestError.diagnostic).toEqual({ code: 'request-size' })
     expect(fetcher).not.toHaveBeenCalled()
   })
 
@@ -372,10 +408,12 @@ describe('judgment client', () => {
           headers: { 'Content-Length': String(JUDGMENT_MAX_RESPONSE_BYTES + 1) }
         })
     )
-    const request = createJudgmentClient(API_KEY, { fetch: fetcher }).evaluate('state', QUESTIONS)
+    const error = await clientFailure(
+      createJudgmentClient(API_KEY, { fetch: fetcher }).evaluate('state', QUESTIONS)
+    )
 
-    await expect(request).rejects.toThrow(`${JUDGMENT_MAX_RESPONSE_BYTES}-byte limit`)
-    await expect(request).rejects.not.toThrow(API_KEY)
+    expect(error.diagnostic).toEqual({ code: 'response-size' })
+    expect(error.message).not.toContain(API_KEY)
   })
 
   it('enforces the response limit when content-length is absent', async () => {
@@ -383,8 +421,9 @@ describe('judgment client', () => {
       async () => new Response('x'.repeat(JUDGMENT_MAX_RESPONSE_BYTES + 1))
     )
 
-    await expect(
+    const error = await clientFailure(
       createJudgmentClient(API_KEY, { fetch: fetcher }).evaluate('state', QUESTIONS)
-    ).rejects.toThrow(`${JUDGMENT_MAX_RESPONSE_BYTES}-byte limit`)
+    )
+    expect(error.diagnostic).toEqual({ code: 'response-size' })
   })
 })
