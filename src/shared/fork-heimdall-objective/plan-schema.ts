@@ -7,6 +7,8 @@ import {
   OBJECTIVE_TASK_KEY_MAX_LENGTH,
   OBJECTIVE_TASK_SPEC_MAX_LENGTH,
   OBJECTIVE_TASK_TITLE_MAX_LENGTH,
+  OBJECTIVE_TERRITORY_MAX_ENTRIES,
+  ObjectiveTerritoryGlobSchema,
   ObjectiveWorkspacePathSchema,
   isObjectiveConcreteWorkspacePath,
   type ObjectiveEnrollmentPayload
@@ -15,8 +17,10 @@ import {
 export const OBJECTIVE_PLAN_MAX_TASKS = 128
 export const OBJECTIVE_TASK_MAX_CRITERIA = 64
 export const OBJECTIVE_REPORT_MAX_FILES = 256
+export const OBJECTIVE_PLAN_ASSUMPTIONS_MAX_ENTRIES = 64
+export const OBJECTIVE_PLAN_REVIEW_TEXT_MAX_LENGTH = 2_000
 
-const TaskKeySchema = z
+export const TaskKeySchema = z
   .string()
   .trim()
   .min(1)
@@ -46,7 +50,12 @@ export const ObjectivePlanTaskSchema = z
     deps: z.array(TaskKeySchema).max(OBJECTIVE_PLAN_MAX_TASKS),
     criteria: z.array(ObjectiveCriterionSchema).min(1).max(OBJECTIVE_TASK_MAX_CRITERIA),
     declaresDependencyChange: z.boolean(),
-    declaredPaths: z.array(ObjectiveWorkspacePathSchema).max(OBJECTIVE_REPORT_MAX_FILES).optional()
+    declaredPaths: z.array(ObjectiveWorkspacePathSchema).max(OBJECTIVE_REPORT_MAX_FILES).optional(),
+    territory: z
+      .array(ObjectiveTerritoryGlobSchema)
+      .min(1)
+      .max(OBJECTIVE_TERRITORY_MAX_ENTRIES)
+      .optional()
   })
   .strict()
   .refine(
@@ -59,7 +68,29 @@ export const ObjectivePlanTaskSchema = z
       new Set(task.declaredPaths).size === task.declaredPaths.length,
     'Declared paths must be unique'
   )
+  .refine(
+    (task) =>
+      task.territory === undefined || new Set(task.territory).size === task.territory.length,
+    'Territory globs must be unique'
+  )
 export type ObjectivePlanTask = z.infer<typeof ObjectivePlanTaskSchema>
+
+/**
+ * A planner's claim about the objective's state, with the tasks whose validity depends on it — an
+ * empty list means the claim is informational and never blocks a plan review's approval.
+ */
+export const ObjectivePlanAssumptionSchema = z
+  .object({
+    claim: z.string().trim().min(1).max(OBJECTIVE_PLAN_REVIEW_TEXT_MAX_LENGTH),
+    dependentTaskKeys: z.array(TaskKeySchema).max(OBJECTIVE_PLAN_MAX_TASKS)
+  })
+  .strict()
+  .refine(
+    (assumption) =>
+      new Set(assumption.dependentTaskKeys).size === assumption.dependentTaskKeys.length,
+    'Assumption dependent task keys must be unique'
+  )
+export type ObjectivePlanAssumption = z.infer<typeof ObjectivePlanAssumptionSchema>
 
 function addPlanGraphIssues(tasks: readonly ObjectivePlanTask[], context: z.RefinementCtx): void {
   const byKey = new Map<string, ObjectivePlanTask>()
@@ -122,7 +153,15 @@ export const ObjectivePlanSchema = z
   .superRefine(addPlanGraphIssues)
 export type ObjectivePlan = z.infer<typeof ObjectivePlanSchema>
 
-export const PlannerReportSchema = z.object({ plan: ObjectivePlanSchema }).strict()
+export const PlannerReportSchema = z
+  .object({
+    plan: ObjectivePlanSchema,
+    assumptions: z
+      .array(ObjectivePlanAssumptionSchema)
+      .max(OBJECTIVE_PLAN_ASSUMPTIONS_MAX_ENTRIES)
+      .optional()
+  })
+  .strict()
 export type PlannerReport = z.infer<typeof PlannerReportSchema>
 
 export const CriterionSelfAssessmentSchema = z
@@ -236,7 +275,7 @@ export const IntegratorReportSchema = ReviewerReportObjectSchema.extend({
   })
 export type IntegratorReport = z.infer<typeof IntegratorReportSchema>
 
-function segmentMatches(pattern: string, value: string): boolean {
+export function segmentMatches(pattern: string, value: string): boolean {
   let expression = '^'
   for (const character of pattern) {
     if (character === '*') {
@@ -287,6 +326,35 @@ export type PlanRevisionValidation = {
   dispatchedTaskKeys: readonly string[]
 }
 
+/** Write-path requiredness: every task must declare `territory`, matching the planner write contract. */
+export function assertPlannerTaskTerritoryDeclared(task: ObjectivePlanTask): void {
+  if (task.territory === undefined) {
+    throw new Error(`Planner task ${task.taskKey} must declare territory`)
+  }
+}
+
+/** Write-path requiredness: `assumptions` must be present, even when empty. */
+export function assertPlannerAssumptionsDeclared(
+  assumptions: readonly ObjectivePlanAssumption[] | undefined
+): asserts assumptions is readonly ObjectivePlanAssumption[] {
+  if (assumptions === undefined) {
+    throw new Error('Planner report must declare assumptions (use [] when none)')
+  }
+}
+
+export function assertPlannerAssumptionsNameKnownTasks(
+  assumptions: readonly ObjectivePlanAssumption[],
+  taskKeys: ReadonlySet<string>
+): void {
+  assumptions.forEach((assumption, index) => {
+    for (const taskKey of assumption.dependentTaskKeys) {
+      if (!taskKeys.has(taskKey)) {
+        throw new Error(`Assumption ${index} names unknown task ${taskKey}`)
+      }
+    }
+  })
+}
+
 export function parseAndValidatePlannerReport(
   input: unknown,
   validation: PlanRevisionValidation
@@ -305,6 +373,11 @@ export function parseAndValidatePlannerReport(
       }
     }
   }
+  for (const task of report.plan) {
+    assertPlannerTaskTerritoryDeclared(task)
+  }
+  assertPlannerAssumptionsDeclared(report.assumptions)
+  assertPlannerAssumptionsNameKnownTasks(report.assumptions, taskKeys)
   return report
 }
 

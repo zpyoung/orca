@@ -3,7 +3,12 @@ import {
   PlannerReportSchema,
   type ObjectivePlanTask
 } from '../../shared/fork-heimdall-objective/plan-schema'
-import { RevisionAmendmentPatchSchema } from '../../shared/fork-heimdall-objective/revision-amendment'
+import {
+  RevisionAmendmentPatchSchema,
+  applyRevisionAmendmentPatch,
+  revisionAmendmentTouchedTaskKeys,
+  unknownAmendmentDropTaskKeys
+} from '../../shared/fork-heimdall-objective/revision-amendment'
 import type Database from '../sqlite/sync-database'
 import type { ObjectiveDatabase } from './objective-database'
 import { runObjectiveMutation } from './objective-database-transaction'
@@ -13,11 +18,6 @@ import {
   type AmendRevisionArgs,
   type RevisionAmendmentResult
 } from './objective-store-data'
-import {
-  applyRevisionAmendmentPatch,
-  revisionAmendmentTouchedTaskKeys,
-  unknownAmendmentDropTaskKeys
-} from './revision-amendment-plan'
 
 /**
  * Corrects an approved plan revision in place: the revision keeps its id and `approved` status, so
