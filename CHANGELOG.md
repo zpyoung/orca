@@ -1,5 +1,5 @@
 ---
-last_released_commit: 8ee9f04c4dcf4cd017dd969bcdc1d0667938d5f5
+last_released_commit: d328fee766c3b0d30d32e5cd5ee6ed55cc4461e0
 upstream_synced: v1.4.206
 ---
 
@@ -11,6 +11,29 @@ line per release, and detailed in each GitHub release's generated notes.
 
 This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It is maintained by the
 `release` skill — see `.claude/skills/release/SKILL.md`.
+
+## [1.4.207-rc.0.zy02] - 2026-09-21
+
+Re-synced to upstream [v1.4.206](https://github.com/stablyai/orca/releases/tag/v1.4.206). Upstream
+retracted the v1.4.206 tag that 1.4.207-rc.0.zy01 was built on and re-cut it from trunk at a
+different commit, adding 325 commits the retracted tag never carried.
+
+### Added
+- Upstream's mobile web app bundle, terminal performance work, editor diff improvements and
+  OpenCode 2 beta support arrive with the re-cut release.
+
+### Fixed
+- The docked terminal composer no longer crashes pane close in setups that report no settings
+  snapshot, which previously surfaced as a failure when closing a split or a pending pane.
+- Mobile browser frames decode image data again in the browser-served mobile app; the frame reader
+  had been importing Node's Buffer in a form the web bundle cannot resolve.
+
+### Changed
+- The fork's packaging and sandbox test inventories now describe this repository's own job set
+  rather than upstream's, so they stop reporting a Windows packaging job the fork does not run and
+  they skip the same relay region suites CI does.
+- Native chat keeps reading the agent's own session log for its model and effort while also using
+  upstream's new live agent-status model discovery, rather than one replacing the other.
 
 ## [1.4.207-rc.0.zy01] - 2026-09-18
 
