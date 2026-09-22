@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 
+import '@testing-library/jest-dom/vitest'
 import { useState } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -96,22 +97,30 @@ function EditableObjectiveFields({
   )
 }
 
+const NO_GATES: ObjectiveEnrollmentDraft['gates'] = []
+
 function EditableObjectiveGateFields({
-  onSubmit
+  onSubmit,
+  parallelUnsupported = false,
+  initialGates = NO_GATES
 }: {
   onSubmit: (draft: ObjectiveEnrollmentDraft) => void
+  parallelUnsupported?: boolean
+  initialGates?: ObjectiveEnrollmentDraft['gates']
 }): React.JSX.Element {
-  const [currentDraft, setCurrentDraft] = useState(() => draft())
+  const [currentDraft, setCurrentDraft] = useState(() => draft({ gates: initialGates }))
   const [showValidation, setShowValidation] = useState(false)
   const errors = validateObjectiveEnrollmentDraft(currentDraft, {
     workspaceKind: 'git',
-    worktreeId: 'worktree'
+    worktreeId: 'worktree',
+    parallelUnsupported
   })
   return (
     <TooltipProvider delayDuration={400}>
       <ObjectiveEnrollmentGateFields
         draft={currentDraft}
         disabled={false}
+        parallelUnsupported={parallelUnsupported}
         onDraftChange={setCurrentDraft}
       />
       {showValidation
@@ -235,6 +244,17 @@ describe('objective enrollment contract', () => {
     fireEvent.change(objective, { target: { value: 'Ship the visible objective' } })
 
     expect((objective as HTMLTextAreaElement).value).toBe('Ship the visible objective')
+  })
+
+  it('renders the gate editor immediately after the parallel-execution fields', () => {
+    render(<EditableObjectiveFields />)
+
+    const headings = screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)
+    const executionIndex = headings.indexOf('Execution contract')
+    const gatesIndex = headings.indexOf('Gates')
+
+    expect(executionIndex).toBeGreaterThanOrEqual(0)
+    expect(gatesIndex).toBe(executionIndex + 1)
   })
 
   it('keeps the prior source plan when an imported file exceeds the pre-read size limit', () => {
@@ -542,6 +562,43 @@ describe('objective enrollment contract', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start objective' }))
 
     expect(screen.getByRole('alert').textContent).toBe('gate-name-invalid')
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('disables gate inputs and Add on a parallel-unsupported host, but keeps rows removable', () => {
+    const onSubmit = vi.fn()
+    render(
+      <EditableObjectiveGateFields
+        onSubmit={onSubmit}
+        parallelUnsupported
+        initialGates={[{ name: 'lint', command: 'pnpm lint', timeoutSecondsText: '' }]}
+      />
+    )
+
+    expect(screen.getByText(/Gates are unavailable on this host's Orca version/)).toBeVisible()
+    expect(screen.getByLabelText('Name')).toBeDisabled()
+    expect(screen.getByLabelText('Command')).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Add gate' })).toBeDisabled()
+    const removeButton = screen.getByRole('button', { name: 'Remove gate 1' })
+    expect(removeButton).toBeEnabled()
+
+    fireEvent.click(removeButton)
+    expect(screen.queryByLabelText('Name')).toBeNull()
+  })
+
+  it('blocks submit with gates-unsupported-host while a gate is present on that host', () => {
+    const onSubmit = vi.fn()
+    render(
+      <EditableObjectiveGateFields
+        onSubmit={onSubmit}
+        parallelUnsupported
+        initialGates={[{ name: 'lint', command: 'pnpm lint', timeoutSecondsText: '' }]}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start objective' }))
+
+    expect(screen.getByRole('alert').textContent).toBe('gates-unsupported-host')
     expect(onSubmit).not.toHaveBeenCalled()
   })
 })

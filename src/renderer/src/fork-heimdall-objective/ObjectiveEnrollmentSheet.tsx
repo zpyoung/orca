@@ -15,7 +15,6 @@ import { useAppStore } from '@/store'
 import { objectiveCapabilityModes } from '../../../shared/fork-heimdall-objective/contract-types'
 import { defaultWatcherOwnerDraft } from '../fork-heimdall/watcher-owner-draft'
 import { ObjectiveEnrollmentFields } from './ObjectiveEnrollmentFields'
-import { ObjectiveEnrollmentGateFields } from './ObjectiveEnrollmentGateFields'
 import {
   OBJECTIVE_ROLES,
   validateObjectiveEnrollmentDraft,
@@ -155,6 +154,11 @@ function validationErrorCopy(error: ObjectiveEnrollmentError): string {
         'fork.heimdallObjective.validation.gatesTooMany',
         'Objectives support at most 8 declared gates.'
       )
+    case 'gates-unsupported-host':
+      return translate(
+        'fork.heimdallObjective.validation.gatesUnsupportedHost',
+        "Gates are unavailable on this host's Orca version. Remove all gates to continue."
+      )
   }
 }
 
@@ -255,7 +259,8 @@ export function ObjectiveEnrollmentSheet({
   const selectedWorkspace = workspaces.find((workspace) => workspace.key === selectedWorkspaceKey)
   const landingAvailability: ObjectiveLandingBarAvailability = {
     workspaceKind: selectedWorkspace?.workspaceKind ?? null,
-    worktreeId: selectedWorkspace?.worktreeId ?? null
+    worktreeId: selectedWorkspace?.worktreeId ?? null,
+    parallelUnsupported: selectedWorkspace?.parallelExecutionSupported === false
   }
   const validationErrors = validateObjectiveEnrollmentDraft(draft, landingAvailability)
   const planOffBlocked = draft.capabilities.plan === 'off'
@@ -420,11 +425,6 @@ export function ObjectiveEnrollmentSheet({
             agents={getAgentCatalog()}
             disabled={submitting}
             onWorkspaceChange={selectWorkspace}
-            onDraftChange={setDraft}
-          />
-          <ObjectiveEnrollmentGateFields
-            draft={draft}
-            disabled={submitting}
             onDraftChange={setDraft}
           />
           {showValidation && validationErrors.length > 0 ? (

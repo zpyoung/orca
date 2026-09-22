@@ -101,4 +101,19 @@ describe('objective enrollment gate validation', () => {
       code: 'gates-too-many'
     })
   })
+
+  it('rejects declared gates on a parallel-unsupported host', () => {
+    expect(
+      validateObjectiveEnrollmentDraft(draft({ gates: [gateDraft()] }), {
+        ...AVAILABILITY,
+        parallelUnsupported: true
+      })
+    ).toContainEqual({ code: 'gates-unsupported-host' })
+  })
+
+  it('accepts an empty gate list on a parallel-unsupported host', () => {
+    expect(
+      validateObjectiveEnrollmentDraft(draft(), { ...AVAILABILITY, parallelUnsupported: true })
+    ).toEqual([])
+  })
 })
