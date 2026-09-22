@@ -14,10 +14,12 @@ import {
   OBJECTIVE_TASK_KEY_MAX_LENGTH,
   OBJECTIVE_TASK_SPEC_MAX_LENGTH,
   OBJECTIVE_TASK_TITLE_MAX_LENGTH,
+  OBJECTIVE_TERRITORY_MAX_ENTRIES,
   type ObjectiveEnrollmentPayload,
   type ObjectiveRole
 } from '../../shared/fork-heimdall-objective/contract-types'
 import {
+  OBJECTIVE_PLAN_ASSUMPTIONS_MAX_ENTRIES,
   OBJECTIVE_PLAN_MAX_TASKS,
   OBJECTIVE_REPORT_MAX_FILES,
   OBJECTIVE_TASK_MAX_CRITERIA,
@@ -28,7 +30,17 @@ import {
 import { isTuiAgent } from '../../shared/tui-agent-config'
 import { isTuiAgentEnabled } from '../../shared/tui-agent-selection'
 import type { Store } from '../persistence'
+import { buildPlannerPromptPolicySection } from './planner-prompt-policy'
+import { fitRepairPlanContext, type RepairPlanContext } from './repair-plan-context'
 import { MAX_OBJECTIVE_REPORT_BYTES } from './report-ingestion'
+
+/**
+ * Reserves room for the OMITTED line and section separators the repair-context fit pass appends
+ * after budgeting the context itself; sized for a worst case of every plan task naming a full-length
+ * key in up to two omission phrases (frozen tasks can be trimmed twice: summary, then key-only).
+ */
+const REPAIR_CONTEXT_SEPARATOR_RESERVE_BYTES =
+  OBJECTIVE_PLAN_MAX_TASKS * 2 * (OBJECTIVE_TASK_KEY_MAX_LENGTH + 40)
 
 export type ObjectiveFailureContext = {
   taskKey: string
@@ -57,6 +69,10 @@ export type ObjectiveRolePromptInput = {
   contract: ObjectiveEnrollmentPayload
   reportPath: string
   budgetBucket: ObjectiveBudgetBucket
+  /** The kernel's live parallel dispatch cap, read at dispatch time so it tracks `set-concurrency`. */
+  effectiveMaxConcurrency: number
+  /** Whether one-to-one dependency chains ("lanes") share one warm session for this run. */
+  lanesEnabled: boolean
   node?: ObjectivePlanTask
   plan?: ObjectivePlan
   reason?: 'initial' | 'replan-after-block' | 'replan-after-failure' | 'owner-directed'
@@ -67,27 +83,58 @@ export type ObjectiveRolePromptInput = {
   requestedSkipStage?: string
   /** Free-text steer from an owning agent's `dispatch-planner` or `set-role-agent` intervention. */
   ownerGuidance?: string
+  /** Selects the planner report contract: a full plan, or a patch against the frozen plan. */
+  shape?: 'full' | 'repair'
+  /** Open/frozen task context for a repair planner prompt; ignored unless `shape` is `'repair'`. */
+  repairContext?: RepairPlanContext
+  /** Prior plan-review verdict text to react to, for either report shape. */
+  planReviewFindings?: string
 }
 
-function reportContract(role: ObjectiveRole): string {
-  const stringUnit =
-    'String maxima below use JavaScript UTF-16 code units (`string.length`), not UTF-8 bytes.'
+const STRING_UNIT_NOTE =
+  'String maxima below use JavaScript UTF-16 code units (`string.length`), not UTF-8 bytes.'
+
+/** Task-shape limits shared by the full-plan and repair report contracts. */
+function plannerTaskShapeLines(): string[] {
+  return [
+    `taskKey has max ${OBJECTIVE_TASK_KEY_MAX_LENGTH}; title max ${OBJECTIVE_TASK_TITLE_MAX_LENGTH}; spec max ${OBJECTIVE_TASK_SPEC_MAX_LENGTH}. Summarize context and cite existing files or artifacts instead of pasting unlimited verbatim output.`,
+    `deps has max ${OBJECTIVE_PLAN_MAX_TASKS} task keys. criteria has 1-${OBJECTIVE_TASK_MAX_CRITERIA} entries.`,
+    `Each criterion is {body,shellCheckable,checkCommand}; body has max ${OBJECTIVE_CRITERION_BODY_MAX_LENGTH}; checkCommand is null exactly when shellCheckable is false, otherwise non-empty with max ${OBJECTIVE_CHECK_COMMAND_MAX_LENGTH}.`,
+    `territory is required on every task: 1-${OBJECTIVE_TERRITORY_MAX_ENTRIES} globs inside write territory naming what it will modify.`,
+    `When known, declaredPaths contains at most ${OBJECTIVE_REPORT_MAX_FILES} concrete workspace-relative file paths, each with max ${OBJECTIVE_PATH_MAX_LENGTH}, inside write territory.`,
+    'Never use globs or copy write-territory patterns into declaredPaths; omit declaredPaths when exact files are unknown.',
+    `assumptions is a required array (use [] when none), max ${OBJECTIVE_PLAN_ASSUMPTIONS_MAX_ENTRIES} entries, each {claim,dependentTaskKeys} naming the task keys whose validity depends on the claim.`
+  ]
+}
+
+function plannerFullReportContract(): string {
+  return [
+    STRING_UNIT_NOTE,
+    'Write one strict JSON object: {"plan":[task,...],"assumptions":[assumption,...]}.',
+    `plan contains 1-${OBJECTIVE_PLAN_MAX_TASKS} tasks. Each task is {taskKey,title,spec,deps,criteria,declaresDependencyChange,territory,declaredPaths?}.`,
+    ...plannerTaskShapeLines(),
+    'Task keys are unique, dependencies name other tasks, and the graph is acyclic.'
+  ].join('\n')
+}
+
+function plannerRepairReportContract(): string {
+  return [
+    STRING_UNIT_NOTE,
+    'Write only open tasks: one strict JSON object {"repair":{"upsertTasks":[task,...],"dropTaskKeys":[taskKey,...]},"assumptions":[assumption,...]}.',
+    'Frozen tasks cannot be changed or dropped; new tasks may depend on frozen tasks by their task key.',
+    `upsertTasks and dropTaskKeys each has max ${OBJECTIVE_PLAN_MAX_TASKS} entries; a task key must not appear in both.`,
+    'Each upserted task is {taskKey,title,spec,deps,criteria,declaresDependencyChange,territory,declaredPaths?}, using the same limits as a full plan task.',
+    ...plannerTaskShapeLines()
+  ].join('\n')
+}
+
+function reportContract(role: ObjectiveRole, shape: 'full' | 'repair' | undefined): string {
   switch (role) {
     case 'planner':
-      return [
-        stringUnit,
-        'Write one strict JSON object: {"plan":[task,...]}.',
-        `plan contains 1-${OBJECTIVE_PLAN_MAX_TASKS} tasks. Each task is {taskKey,title,spec,deps,criteria,declaresDependencyChange,declaredPaths?}.`,
-        `taskKey has max ${OBJECTIVE_TASK_KEY_MAX_LENGTH}; title max ${OBJECTIVE_TASK_TITLE_MAX_LENGTH}; spec max ${OBJECTIVE_TASK_SPEC_MAX_LENGTH}. Summarize context and cite existing files or artifacts instead of pasting unlimited verbatim output.`,
-        `deps has max ${OBJECTIVE_PLAN_MAX_TASKS} task keys. criteria has 1-${OBJECTIVE_TASK_MAX_CRITERIA} entries.`,
-        `Each criterion is {body,shellCheckable,checkCommand}; body has max ${OBJECTIVE_CRITERION_BODY_MAX_LENGTH}; checkCommand is null exactly when shellCheckable is false, otherwise non-empty with max ${OBJECTIVE_CHECK_COMMAND_MAX_LENGTH}.`,
-        'Task keys are unique, dependencies name other tasks, and the graph is acyclic.',
-        `When known, declaredPaths contains at most ${OBJECTIVE_REPORT_MAX_FILES} concrete workspace-relative file paths, each with max ${OBJECTIVE_PATH_MAX_LENGTH}, inside write territory.`,
-        'Never use globs or copy write-territory patterns into declaredPaths; omit declaredPaths when exact files are unknown.'
-      ].join('\n')
+      return shape === 'repair' ? plannerRepairReportContract() : plannerFullReportContract()
     case 'implementer':
       return [
-        stringUnit,
+        STRING_UNIT_NOTE,
         'Write one strict JSON object: {taskKey,summary,filesModified,criteriaSelfAssessment}.',
         `taskKey has max ${OBJECTIVE_TASK_KEY_MAX_LENGTH}. summary is plain text with max ${OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH}; summarize evidence instead of pasting unlimited verbatim output. If supporting evidence does not fit, write it to a fixture or sidecar file inside write territory, list that file in filesModified, and cite its path in the summary.`,
         `filesModified has max ${OBJECTIVE_REPORT_MAX_FILES} concrete workspace-relative paths, each with max ${OBJECTIVE_PATH_MAX_LENGTH}.`,
@@ -98,7 +145,7 @@ function reportContract(role: ObjectiveRole): string {
       ].join('\n')
     case 'reviewer':
       return [
-        stringUnit,
+        STRING_UNIT_NOTE,
         'Write one strict JSON object: {verdict:"approve"|"block",criteriaResults,summary}.',
         `summary is plain text with max ${OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH}; summarize evidence instead of pasting unlimited verbatim output. Put per-criterion evidence in each note (plain text, max ${OBJECTIVE_CRITERION_NOTE_MAX_LENGTH}) and cite existing evidence by location when fuller detail is needed.`,
         `criteriaResults has max ${OBJECTIVE_PLAN_MAX_TASKS * OBJECTIVE_TASK_MAX_CRITERIA} entries. Cover every plan criterion exactly once with {taskKey,criterionIndex,result:"pass"|"block",note}; taskKey has max ${OBJECTIVE_TASK_KEY_MAX_LENGTH} and criterionIndex is 0-${OBJECTIVE_TASK_MAX_CRITERIA - 1}.`,
@@ -106,7 +153,7 @@ function reportContract(role: ObjectiveRole): string {
       ].join('\n')
     case 'integrator':
       return [
-        stringUnit,
+        STRING_UNIT_NOTE,
         'Write one strict JSON object: {verdict:"approve"|"block",criteriaResults,summary,checksRun}.',
         `summary is plain text with max ${OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH}; summarize evidence instead of pasting unlimited verbatim output. Put per-criterion evidence in each note (plain text, max ${OBJECTIVE_CRITERION_NOTE_MAX_LENGTH}); if fuller evidence must be preserved, write it to a fixture or sidecar file inside write territory and cite its path in the summary and worker_done filesModified.`,
         `criteriaResults has max ${OBJECTIVE_PLAN_MAX_TASKS * OBJECTIVE_TASK_MAX_CRITERIA} entries. Cover every plan criterion exactly once with {taskKey,criterionIndex,result:"pass"|"block",note}; taskKey has max ${OBJECTIVE_TASK_KEY_MAX_LENGTH} and criterionIndex is 0-${OBJECTIVE_TASK_MAX_CRITERIA - 1}.`,
@@ -125,8 +172,8 @@ function roleInstruction(input: ObjectiveRolePromptInput): string {
         throw new Error('An implementer prompt requires exactly one plan node')
       }
       return input.conflictContext
-        ? `Resolve this node's integration conflict in its existing dispatch worktree. Rebase the dispatch branch onto exact enrolled HEAD ${input.conflictContext.enrolledHead}, resolve only with the intent and evidence below, and re-run focused checks for both sides. Never push this dispatch branch or any child-worktree branch.`
-        : 'Implement only the assigned node. You may inspect context, but modify only declared write territory. Run focused checks when useful. Never push this dispatch branch or any child-worktree branch.'
+        ? `Resolve this node's integration conflict in its existing dispatch worktree. Rebase the dispatch branch onto exact enrolled HEAD ${input.conflictContext.enrolledHead}, resolve only with the intent and evidence below, and re-run focused checks for both sides. Run only the checks scoped to your task — never the full test suite, a whole-tree typecheck, or whole-tree lint. Never push this dispatch branch or any child-worktree branch.`
+        : 'Implement only the assigned node. You may inspect context, but modify only declared write territory. Run only the checks scoped to your task — never the full test suite, a whole-tree typecheck, or whole-tree lint. Never push this dispatch branch or any child-worktree branch.'
     case 'reviewer':
       return 'Review the files on disk against every active-plan criterion. Do not modify files.'
     case 'integrator':
@@ -196,12 +243,37 @@ function planProgressSection(input: ObjectiveRolePromptInput): string[] {
   ]
 }
 
+function planReviewFindingsSection(input: ObjectiveRolePromptInput): string[] {
+  if (input.role !== 'planner' || input.planReviewFindings === undefined) {
+    return []
+  }
+  return [`PLAN REVIEW FINDINGS:\n${input.planReviewFindings}`]
+}
+
+/** Renders a repair planner's context: the open tasks it may write, and frozen history it may not. */
+function renderRepairPlanContext(context: RepairPlanContext): string {
+  const frozenLines =
+    context.frozenTasks.length === 0
+      ? '(none)'
+      : context.frozenTasks
+          .map(
+            (task) =>
+              `${task.taskKey} | ${task.title} | ${task.state} | ${task.summary ?? ''} | ${(task.filesModified ?? []).join(', ')}`
+          )
+          .join('\n')
+  return [
+    `OPEN TASKS JSON:\n${JSON.stringify(context.openTasks)}`,
+    `FROZEN TASKS:\n${frozenLines}`
+  ].join('\n\n')
+}
+
 function roleContext(input: ObjectiveRolePromptInput): string[] {
   if (input.role === 'planner') {
     return [
       ...existingPlanContext(input),
       ...failureContextSection(input),
-      ...planProgressSection(input)
+      ...planProgressSection(input),
+      ...planReviewFindingsSection(input)
     ]
   }
   if (input.role === 'implementer') {
@@ -235,25 +307,60 @@ function finishInstructions(reportPath: string): string {
   ].join('\n')
 }
 
-export function buildObjectiveRolePrompt(input: ObjectiveRolePromptInput): string {
-  const sections = [
+function buildSections(
+  input: ObjectiveRolePromptInput,
+  repairSection: readonly string[]
+): string[] {
+  return [
     `ROLE: Objective ${input.role}`,
     `OBJECTIVE:\n${input.contract.objectiveText}`,
     `TIER: ${input.contract.tier}`,
     `LANDING BAR: ${input.contract.landingBar}`,
     `BUDGET: ${input.budgetBucket}`,
-    'CONCURRENCY: 1',
+    `CONCURRENCY: ${input.effectiveMaxConcurrency}`,
     `WRITE TERRITORY:\n${input.contract.writeTerritory.map((path) => `- ${path}`).join('\n')}`,
     roleInstruction(input),
+    ...(input.role === 'planner'
+      ? [
+          buildPlannerPromptPolicySection({
+            effectiveMaxConcurrency: input.effectiveMaxConcurrency,
+            lanesEnabled: input.lanesEnabled,
+            gates: input.contract.gates
+          })
+        ]
+      : []),
     ...roleContext(input),
+    ...repairSection,
     ...(input.requestedSkipStage === undefined
       ? []
       : [`OWNER REQUESTED SKIP STAGE:\n${input.requestedSkipStage}`]),
     ...(input.ownerGuidance === undefined ? [] : [`OWNER GUIDANCE:\n${input.ownerGuidance}`]),
-    `REPORT CONTRACT:\n${reportContract(input.role)}`,
+    `REPORT CONTRACT:\n${reportContract(input.role, input.shape)}`,
     finishInstructions(input.reportPath)
   ]
-  const prompt = sections.join('\n\n')
+}
+
+export function buildObjectiveRolePrompt(input: ObjectiveRolePromptInput): string {
+  let repairSection: string[] = []
+  if (input.role === 'planner' && input.shape === 'repair' && input.repairContext) {
+    const restBytes = Buffer.byteLength(buildSections(input, []).join('\n\n'), 'utf8')
+    const budget = Math.max(
+      0,
+      ORCHESTRATION_WORKER_START_TASK_SPEC_MAX_BYTES -
+        restBytes -
+        REPAIR_CONTEXT_SEPARATOR_RESERVE_BYTES
+    )
+    const { context: fitted, omitted } = fitRepairPlanContext(
+      input.repairContext,
+      budget,
+      renderRepairPlanContext
+    )
+    repairSection = [
+      renderRepairPlanContext(fitted),
+      ...(omitted.length > 0 ? [`OMITTED: ${omitted.join('; ')}`] : [])
+    ]
+  }
+  const prompt = buildSections(input, repairSection).join('\n\n')
   const bytes = Buffer.byteLength(prompt, 'utf8')
   if (bytes > ORCHESTRATION_WORKER_START_TASK_SPEC_MAX_BYTES) {
     throw new Error(

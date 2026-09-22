@@ -115,6 +115,8 @@ function buildDispatchSpec(args: {
     planProgress
   } = args
   const budgetBucket = deriveObjectiveBudgetBucket(context.ledger, binding.enrollment.budget)
+  const effectiveMaxConcurrency = context.snapshot.world.parallel?.effectiveMaxConcurrency ?? 1
+  const lanesEnabled = binding.contract.lanesEnabled !== false
   if (action.kind === 'dispatch-planner') {
     return {
       role: 'planner',
@@ -124,6 +126,8 @@ function buildDispatchSpec(args: {
         contract: binding.contract,
         reportPath,
         budgetBucket,
+        effectiveMaxConcurrency,
+        lanesEnabled,
         reason: action.reason,
         ...(failureContext === undefined ? {} : { failureContext }),
         ...(planProgress === undefined ? {} : { planProgress }),
@@ -151,6 +155,8 @@ function buildDispatchSpec(args: {
         node,
         reportPath,
         budgetBucket,
+        effectiveMaxConcurrency,
+        lanesEnabled,
         ...(conflictContext === undefined ? {} : { conflictContext })
       })
     }
@@ -170,7 +176,9 @@ function buildDispatchSpec(args: {
       contract: binding.contract,
       plan,
       reportPath,
-      budgetBucket
+      budgetBucket,
+      effectiveMaxConcurrency,
+      lanesEnabled
     })
   }
 }
