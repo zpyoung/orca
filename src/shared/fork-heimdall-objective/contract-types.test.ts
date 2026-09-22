@@ -2,12 +2,24 @@ import { describe, expect, it } from 'vitest'
 import {
   OBJECTIVE_ALL_WORKSPACE_PATHS_GLOB,
   OBJECTIVE_EXISTING_PLAN_MAX_LENGTH,
+  OBJECTIVE_GATES_MAX,
   OBJECTIVE_TEXT_MAX_LENGTH,
   ObjectiveCapabilitiesSchema,
   ObjectiveEnrollmentPayloadSchema,
+  ObjectiveGateSchema,
   objectiveCapabilityModes,
-  type ObjectiveEnrollmentPayload
+  type ObjectiveEnrollmentPayload,
+  type ObjectiveGate
 } from './contract-types'
+
+function gate(overrides: Partial<ObjectiveGate> = {}): ObjectiveGate {
+  return {
+    name: 'lint',
+    command: 'pnpm lint',
+    timeoutSeconds: 1_800,
+    ...overrides
+  }
+}
 
 function payload(overrides: Partial<ObjectiveEnrollmentPayload> = {}): ObjectiveEnrollmentPayload {
   return {
@@ -159,5 +171,41 @@ describe('objective enrollment payload', () => {
     const parsed = ObjectiveCapabilitiesSchema.safeParse(capabilities)
     expect(parsed.success).toBe(true)
     expect(parsed.success && parsed.data['owner-intervention']).toBe('on')
+  })
+
+  it('accepts a valid gate list and parses a payload without gates', () => {
+    const gates = [gate({ name: 'lint' }), gate({ name: 'typecheck-node', timeoutSeconds: 600 })]
+    expect(ObjectiveEnrollmentPayloadSchema.parse(payload({ gates })).gates).toEqual(gates)
+    expect(ObjectiveEnrollmentPayloadSchema.parse(payload()).gates).toBeUndefined()
+  })
+
+  it.each(['Lint', '-x', 'a'.repeat(41)])('rejects an invalid gate name: %s', (name) => {
+    expect(ObjectiveGateSchema.safeParse(gate({ name })).success).toBe(false)
+  })
+
+  it('rejects an empty gate command', () => {
+    expect(ObjectiveGateSchema.safeParse(gate({ command: '' })).success).toBe(false)
+  })
+
+  it.each([9, 14_401, 1.5])(
+    'rejects an out-of-range or non-integer gate timeout: %s',
+    (timeoutSeconds) => {
+      expect(ObjectiveGateSchema.safeParse(gate({ timeoutSeconds })).success).toBe(false)
+    }
+  )
+
+  it('rejects duplicate gate names', () => {
+    expect(
+      ObjectiveEnrollmentPayloadSchema.safeParse(
+        payload({ gates: [gate({ name: 'lint' }), gate({ name: 'lint' })] })
+      ).success
+    ).toBe(false)
+  })
+
+  it('rejects more than the maximum number of declared gates', () => {
+    const gates = Array.from({ length: OBJECTIVE_GATES_MAX + 1 }, (_, index) =>
+      gate({ name: `gate-${index}` })
+    )
+    expect(ObjectiveEnrollmentPayloadSchema.safeParse(payload({ gates })).success).toBe(false)
   })
 })

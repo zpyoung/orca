@@ -20,6 +20,11 @@ export const OBJECTIVE_ALL_WORKSPACE_PATHS_GLOB = '**'
 export const OBJECTIVE_PATH_MAX_LENGTH = 1_024
 export const OBJECTIVE_AGENT_ID_MAX_LENGTH = 256
 export const OBJECTIVE_ABSENT_REMOTE_REF_STATE = 'unborn'
+export const OBJECTIVE_GATE_DEFAULT_TIMEOUT_SECONDS = 1_800
+export const OBJECTIVE_GATE_MIN_TIMEOUT_SECONDS = 10
+export const OBJECTIVE_GATE_MAX_TIMEOUT_SECONDS = 14_400
+export const OBJECTIVE_GATES_MAX = 8
+export const OBJECTIVE_GATE_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,39}$/u
 
 const BoundedTextSchema = (maximum: number) => z.string().trim().min(1).max(maximum)
 
@@ -151,6 +156,19 @@ export const ObjectiveTerritoryGlobSchema = z
     'Territory must be ** or a bounded workspace-relative glob that excludes .git and .orca'
   )
 
+export const ObjectiveGateSchema = z
+  .object({
+    name: z.string().regex(OBJECTIVE_GATE_NAME_PATTERN),
+    command: z.string().trim().min(1).max(OBJECTIVE_CHECK_COMMAND_MAX_LENGTH),
+    timeoutSeconds: z
+      .number()
+      .int()
+      .min(OBJECTIVE_GATE_MIN_TIMEOUT_SECONDS)
+      .max(OBJECTIVE_GATE_MAX_TIMEOUT_SECONDS)
+  })
+  .strict()
+export type ObjectiveGate = z.infer<typeof ObjectiveGateSchema>
+
 export const ObjectiveEnrollmentPayloadSchema = z
   .object({
     objectiveText: BoundedTextSchema(OBJECTIVE_TEXT_MAX_LENGTH),
@@ -166,7 +184,15 @@ export const ObjectiveEnrollmentPayloadSchema = z
       .max(OBJECTIVE_TERRITORY_MAX_ENTRIES)
       .refine((values) => new Set(values).size === values.length, 'Territory globs must be unique'),
     roleAgents: ObjectiveRoleAgentsSchema,
-    sitterOverrides: ObjectiveSitterOverridesSchema
+    sitterOverrides: ObjectiveSitterOverridesSchema,
+    gates: z
+      .array(ObjectiveGateSchema)
+      .max(OBJECTIVE_GATES_MAX)
+      .refine(
+        (values) => new Set(values.map((gate) => gate.name)).size === values.length,
+        'Gate names must be unique'
+      )
+      .optional()
   })
   .strict()
 export type ObjectiveEnrollmentPayload = z.infer<typeof ObjectiveEnrollmentPayloadSchema>

@@ -238,6 +238,35 @@ export function objectiveCapabilityModesHelp(): ObjectiveEnrollmentHelpCopy {
   }
 }
 
+export function objectiveGatesHelp(): ObjectiveEnrollmentHelpCopy {
+  return {
+    label: translate('fork.heimdallObjective.enrollment.gatesHelpLabel', 'Gates help'),
+    summary: translate(
+      'fork.heimdallObjective.enrollment.gatesHelpSummary',
+      'Named whole-tree commands the kernel runs on the integrated branch after every plan node has merged, before review and landing.'
+    ),
+    values: [
+      {
+        label: translate('fork.heimdallObjective.enrollment.gatesHelp.whenLabel', 'When'),
+        description: translate(
+          'fork.heimdallObjective.enrollment.gatesHelp.when',
+          'After the last plan node merges, before review and landing.'
+        )
+      },
+      {
+        label: translate(
+          'fork.heimdallObjective.enrollment.gatesHelp.whatLabel',
+          'What belongs here'
+        ),
+        description: translate(
+          'fork.heimdallObjective.enrollment.gatesHelp.what',
+          'The full test suite and other whole-tree checks, not per-node checks.'
+        )
+      }
+    ]
+  }
+}
+
 export function objectiveCapabilityHelp(
   capability: ObjectiveCapability
 ): ObjectiveEnrollmentHelpCopy {

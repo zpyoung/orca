@@ -1,7 +1,12 @@
 import {
   OBJECTIVE_ALL_WORKSPACE_PATHS_GLOB,
   OBJECTIVE_CAPABILITY_KEYS,
+  OBJECTIVE_CHECK_COMMAND_MAX_LENGTH,
   OBJECTIVE_EXISTING_PLAN_MAX_LENGTH,
+  OBJECTIVE_GATES_MAX,
+  OBJECTIVE_GATE_MAX_TIMEOUT_SECONDS,
+  OBJECTIVE_GATE_MIN_TIMEOUT_SECONDS,
+  OBJECTIVE_GATE_NAME_PATTERN,
   OBJECTIVE_ROLES as SHARED_OBJECTIVE_ROLES,
   OBJECTIVE_TERRITORY_MAX_ENTRIES,
   OBJECTIVE_TEXT_MAX_LENGTH,
@@ -36,6 +41,12 @@ export const OBJECTIVE_SITTER_CAPABILITIES = [
 ] as const
 export type ObjectiveSitterCapability = (typeof OBJECTIVE_SITTER_CAPABILITIES)[number]
 
+export type ObjectiveEnrollmentGateDraft = {
+  name: string
+  command: string
+  timeoutSecondsText: string
+}
+
 export type ObjectiveEnrollmentDraft = {
   objectiveText: string
   existingPlanText: string
@@ -48,6 +59,7 @@ export type ObjectiveEnrollmentDraft = {
   capabilities: Record<ObjectiveCapability, CapabilityMode>
   roleAgents: Record<ObjectiveRole, string>
   sitterOverrides: Record<ObjectiveSitterCapability, CapabilityMode | 'inherit'>
+  gates: ObjectiveEnrollmentGateDraft[]
   activeBudgetHours: number
   turns: string
   availableAgentIds: readonly string[]
@@ -75,6 +87,11 @@ export type ObjectiveEnrollmentErrorCode =
   | 'role-agent-unknown'
   | 'active-budget-invalid'
   | 'turn-budget-invalid'
+  | 'gate-name-invalid'
+  | 'gate-command-invalid'
+  | 'gate-timeout-invalid'
+  | 'gate-name-duplicate'
+  | 'gates-too-many'
 
 export type ObjectiveEnrollmentError = {
   code: ObjectiveEnrollmentErrorCode
@@ -171,6 +188,35 @@ export function validateObjectiveEnrollmentDraft(
     if (agentId && !availableAgents.has(agentId)) {
       errors.push({ code: 'role-agent-unknown', value: agentId })
       break
+    }
+  }
+  if (draft.gates.length > OBJECTIVE_GATES_MAX) {
+    errors.push({ code: 'gates-too-many' })
+  }
+  const gateNames = new Set<string>()
+  for (const gateDraft of draft.gates) {
+    const name = gateDraft.name.trim()
+    if (!OBJECTIVE_GATE_NAME_PATTERN.test(name)) {
+      errors.push({ code: 'gate-name-invalid', value: gateDraft.name })
+    } else if (gateNames.has(name)) {
+      errors.push({ code: 'gate-name-duplicate', value: name })
+    } else {
+      gateNames.add(name)
+    }
+    const command = gateDraft.command.trim()
+    if (!command || command.length > OBJECTIVE_CHECK_COMMAND_MAX_LENGTH) {
+      errors.push({ code: 'gate-command-invalid' })
+    }
+    const timeoutText = gateDraft.timeoutSecondsText.trim()
+    if (timeoutText) {
+      const timeoutSeconds = Number(timeoutText)
+      if (
+        !Number.isInteger(timeoutSeconds) ||
+        timeoutSeconds < OBJECTIVE_GATE_MIN_TIMEOUT_SECONDS ||
+        timeoutSeconds > OBJECTIVE_GATE_MAX_TIMEOUT_SECONDS
+      ) {
+        errors.push({ code: 'gate-timeout-invalid', value: gateDraft.timeoutSecondsText })
+      }
     }
   }
   if (!Number.isFinite(draft.activeBudgetHours) || draft.activeBudgetHours <= 0) {

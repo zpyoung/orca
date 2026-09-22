@@ -245,6 +245,50 @@ describe('objective enrollment authorization', () => {
     ).rejects.toThrow('Invalid objective folder workspace identity')
   })
 
+  it('keeps declared gates unchanged in the authorized contract for a git objective', async () => {
+    const gates = [{ name: 'lint', command: 'pnpm lint', timeoutSeconds: 600 }]
+    const enrollment = input({
+      kindPayload: { ...(input().kindPayload as Record<string, unknown>), gates }
+    })
+
+    const authorized = await authorizeObjectiveEnrollment(
+      gitRuntime('local'),
+      store({ id: 'repo-1' }),
+      enrollment
+    )
+
+    const contract = ObjectiveEnrollmentPayloadSchema.parse(authorized.kindPayload)
+    expect(contract.gates).toEqual(gates)
+  })
+
+  it('keeps declared gates unchanged for a folder objective that clamps concurrency', async () => {
+    const gates = [{ name: 'ownership-guard', command: 'pnpm run guard', timeoutSeconds: 300 }]
+    const resolveRuntimeFileTarget = vi.fn(async () => ({
+      executionHostId: 'ssh:folder-host' as const,
+      worktree: { repoId: 'repo-1', path: '/workspace/folder' }
+    }))
+    const runtime = { resolveRuntimeFileTarget } as unknown as OrcaRuntimeService
+    const enrollment = input({
+      worktreeId: null,
+      kindPayload: {
+        ...(input().kindPayload as Record<string, unknown>),
+        workspaceKind: 'folder',
+        maxConcurrency: 3,
+        gates
+      }
+    })
+
+    const authorized = await authorizeObjectiveEnrollment(
+      runtime,
+      store({ id: 'repo-1', kind: 'folder', path: '/workspace/folder' }),
+      enrollment
+    )
+    const contract = ObjectiveEnrollmentPayloadSchema.parse(authorized.kindPayload)
+
+    expect(contract.gates).toEqual(gates)
+    expect(contract.maxConcurrency).toBe(1)
+  })
+
   it('preserves multi-worker concurrency for a git objective', async () => {
     const enrollment = input({
       kindPayload: {

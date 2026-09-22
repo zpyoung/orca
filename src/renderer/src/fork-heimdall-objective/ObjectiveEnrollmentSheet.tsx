@@ -15,6 +15,7 @@ import { useAppStore } from '@/store'
 import { objectiveCapabilityModes } from '../../../shared/fork-heimdall-objective/contract-types'
 import { defaultWatcherOwnerDraft } from '../fork-heimdall/watcher-owner-draft'
 import { ObjectiveEnrollmentFields } from './ObjectiveEnrollmentFields'
+import { ObjectiveEnrollmentGateFields } from './ObjectiveEnrollmentGateFields'
 import {
   OBJECTIVE_ROLES,
   validateObjectiveEnrollmentDraft,
@@ -47,6 +48,7 @@ function newDraft(): ObjectiveEnrollmentDraft {
       fixChecks: 'inherit',
       merge: 'inherit'
     },
+    gates: [],
     activeBudgetHours: DEFAULT_ACTIVE_BUDGET_HOURS,
     turns: DEFAULT_TURN_BUDGET,
     availableAgentIds: [],
@@ -126,6 +128,32 @@ function validationErrorCopy(error: ObjectiveEnrollmentError): string {
       return translate(
         'fork.heimdallObjective.validation.turnBudgetInvalid',
         'Worker turns must be a whole number of zero or more.'
+      )
+    case 'gate-name-invalid':
+      return translate(
+        'fork.heimdallObjective.validation.gateNameInvalid',
+        'Gate name {{name}} must be lowercase letters, digits, or hyphens, starting with a letter or digit, up to 40 characters.',
+        { name: error.value ?? '' }
+      )
+    case 'gate-command-invalid':
+      return translate(
+        'fork.heimdallObjective.validation.gateCommandInvalid',
+        'Enter a gate command of up to 8,192 characters.'
+      )
+    case 'gate-timeout-invalid':
+      return translate(
+        'fork.heimdallObjective.validation.gateTimeoutInvalid',
+        'Gate timeout must be a whole number of seconds from 10 to 14,400.'
+      )
+    case 'gate-name-duplicate':
+      return translate(
+        'fork.heimdallObjective.validation.gateNameDuplicate',
+        'Gate names must be unique.'
+      )
+    case 'gates-too-many':
+      return translate(
+        'fork.heimdallObjective.validation.gatesTooMany',
+        'Objectives support at most 8 declared gates.'
       )
   }
 }
@@ -392,6 +420,11 @@ export function ObjectiveEnrollmentSheet({
             agents={getAgentCatalog()}
             disabled={submitting}
             onWorkspaceChange={selectWorkspace}
+            onDraftChange={setDraft}
+          />
+          <ObjectiveEnrollmentGateFields
+            draft={draft}
+            disabled={submitting}
             onDraftChange={setDraft}
           />
           {showValidation && validationErrors.length > 0 ? (
