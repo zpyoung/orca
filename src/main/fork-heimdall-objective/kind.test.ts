@@ -44,9 +44,11 @@ const PLAN: PlannerReport = {
         }
       ],
       declaresDependencyChange: false,
-      declaredPaths: [...EXPECTED_CHANGED_PATHS]
+      declaredPaths: [...EXPECTED_CHANGED_PATHS],
+      territory: ['src/**']
     }
-  ]
+  ],
+  assumptions: []
 }
 
 const temporaryDirectories: string[] = []
