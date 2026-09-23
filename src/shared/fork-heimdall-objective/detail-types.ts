@@ -149,7 +149,7 @@ export const ObjectivePlanPatchProjectionSchema = z
     digest: IdSchema,
     status: z.enum(['pending', 'applied', 'rejected']),
     rejection: z.string().max(8_192).nullable(),
-    touchedTaskKeys: z.array(IdSchema).max(128),
+    touchedTaskKeys: z.array(IdSchema).max(256),
     createdAtMs: TimestampSchema,
     resolvedAtMs: TimestampSchema.nullable()
   })

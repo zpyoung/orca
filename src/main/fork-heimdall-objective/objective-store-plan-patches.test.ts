@@ -3,6 +3,7 @@ import type { PlannerRepairReport } from '../../shared/fork-heimdall-objective/p
 import type { PlannerReport } from '../../shared/fork-heimdall-objective/plan-schema'
 import { ObjectiveDatabase } from './objective-database'
 import { ObjectiveStore } from './objective-store'
+import { projectPlanPatches } from './objective-store-plan-patches'
 
 const WATCHER_ID = 'watcher-plan-patches-1'
 const REPORT: PlannerReport = {
@@ -296,5 +297,49 @@ describe('ObjectiveStore plan patches', () => {
     expect(() =>
       store.rejectDraftRevision({ watcherId: WATCHER_ID, revisionId: revision.revisionId })
     ).toThrow(/cannot be rejected from approved/)
+  })
+
+  it('caps the projection at the newest 1,024 patches out of 1,025 stored', () => {
+    const revision = ingestAndActivate()
+    for (let i = 0; i < 1_025; i++) {
+      store.ingestPlanPatch({
+        watcherId: WATCHER_ID,
+        revisionId: revision.revisionId,
+        dispatchId: `repair-${i}`,
+        repairOrdinal: i,
+        report: DROP_PATCH,
+        createdAtMs: 1_000 + i
+      })
+    }
+
+    const projected = projectPlanPatches(database.connection(), WATCHER_ID)
+    expect(projected).toHaveLength(1_024)
+    expect(projected[0]?.createdByDispatchId).toBe('repair-1024')
+    expect(projected.at(-1)?.createdByDispatchId).toBe('repair-1')
+    expect(projected.some((patch) => patch.createdByDispatchId === 'repair-0')).toBe(false)
+  })
+
+  it('projects a repair touching 256 distinct task keys (128 upserted, 128 dropped)', () => {
+    const revision = ingestAndActivate()
+    const upsertTasks = Array.from({ length: 128 }, (_, i) => ({
+      taskKey: `task-up-${i}`,
+      title: `Task up ${i}`,
+      spec: `Implement up ${i}`,
+      deps: [],
+      criteria: [{ body: 'works', shellCheckable: false, checkCommand: null }],
+      declaresDependencyChange: false
+    }))
+    const dropTaskKeys = Array.from({ length: 128 }, (_, i) => `task-drop-${i}`)
+    store.ingestPlanPatch({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      dispatchId: 'repair-wide',
+      repairOrdinal: 0,
+      report: { repair: { upsertTasks, dropTaskKeys }, assumptions: [] },
+      createdAtMs: 500
+    })
+
+    const projection = store.project(WATCHER_ID)
+    expect(projection.patches?.[0]?.touchedTaskKeys).toHaveLength(256)
   })
 })

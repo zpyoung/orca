@@ -169,7 +169,8 @@ export function projectPlanReviews(
 }[] {
   const rows = db
     .prepare(
-      `SELECT ${PLAN_REVIEW_COLUMNS} FROM plan_review WHERE watcher_id = ? ORDER BY created_at_ms DESC, id DESC`
+      `SELECT ${PLAN_REVIEW_COLUMNS} FROM plan_review WHERE watcher_id = ?
+       ORDER BY created_at_ms DESC, id DESC LIMIT 1024`
     )
     .all(watcherId) as unknown as PlanReviewRow[]
   return rows.map((row) => ({
