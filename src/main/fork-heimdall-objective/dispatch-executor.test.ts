@@ -9,6 +9,7 @@ import {
 } from '../../shared/fork-heimdall-objective/decision-test-harness'
 import type { ObjectiveAction } from '../../shared/fork-heimdall-objective/objective-actions'
 import type { ObjectiveWorld } from '../../shared/fork-heimdall-objective/detail-types'
+import { ObjectivePlanTaskSchema } from '../../shared/fork-heimdall-objective/plan-schema'
 import type { Store } from '../persistence'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { deriveObjectiveFailureContext, executeObjectiveDispatch } from './dispatch-executor'
@@ -214,6 +215,23 @@ describe('executeObjectiveDispatch', () => {
       reason: 'fenced',
       result: { detail: 'lease unavailable' }
     })
+  })
+
+  it('classifies a Zod validation failure as criteria, not infra, since it will not clear on retry', async () => {
+    const zodError = ObjectivePlanTaskSchema.safeParse({}).error
+    issueReportPath.mockRejectedValue(zodError)
+    const outcome = await executeObjectiveDispatch({
+      action: dispatchNode,
+      binding,
+      context: context(
+        { watcherId: 'watcher-1', entries: [] },
+        { status: 'dispatched', dispatchId: 'dispatch-1' }
+      ),
+      objectiveStore,
+      store: {} as Store,
+      runtime
+    })
+    expect(outcome).toMatchObject({ effect: 'not-landed', failureClass: 'criteria' })
   })
 
   it('refuses a retry as infra when its original dispatch is missing from the ledger', async () => {

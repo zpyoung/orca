@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { ORCHESTRATION_WORKER_START_TASK_SPEC_MAX_BYTES } from '../../shared/orchestration-worker-start-prompt-budget'
 import { OWNER_INTERVENTION_TEXT_MAX_LENGTH } from '../../shared/fork-heimdall/owner/intervention'
 import {
+  OBJECTIVE_DISPATCH_TASK_SNAPSHOT_MAX_BYTES,
   OBJECTIVE_TASK_SPEC_MAX_LENGTH,
   OBJECTIVE_TEXT_MAX_LENGTH,
   type ObjectiveEnrollmentPayload,
@@ -99,6 +100,21 @@ describe('objective role prompts', () => {
     expect(prompt).toContain('"taskKey":"assigned"')
     expect(prompt).not.toContain(siblingSecret)
     expect(prompt).toContain('BUDGET: tight')
+  })
+
+  it('tells the implementer node history is append-only', () => {
+    const assigned = node('assigned', 'Implement the assigned behavior')
+    const prompt = buildObjectiveRolePrompt({
+      role: 'implementer',
+      contract,
+      node: assigned,
+      reportPath: '/tmp/objective/report.json',
+      budgetBucket: 'plenty',
+      ...parallel
+    })
+
+    expect(prompt).toContain('append-only')
+    expect(prompt).toContain('never amend, rebase, squash or reset')
   })
 
   it('keeps the largest legal implementer node inside the upstream worker-start byte budget', () => {
@@ -446,6 +462,29 @@ describe('objective role prompts', () => {
       expect(prompt).toContain('Frozen tasks cannot be changed or dropped')
       expect(prompt).toContain('new tasks may depend on frozen tasks')
       expect(prompt).not.toContain('"plan":[task,...]')
+    })
+
+    it('states the per-task dispatch snapshot byte cap in both the full-plan and repair contracts', () => {
+      const fullShape = buildObjectiveRolePrompt({
+        role: 'planner',
+        contract,
+        reportPath: '/tmp/objective/report.json',
+        budgetBucket: 'plenty',
+        ...parallel
+      })
+      const repairShape = buildObjectiveRolePrompt({
+        role: 'planner',
+        contract,
+        reportPath: '/tmp/objective/report.json',
+        budgetBucket: 'plenty',
+        ...parallel,
+        shape: 'repair'
+      })
+
+      for (const prompt of [fullShape, repairShape]) {
+        expect(prompt).toContain(`under ${OBJECTIVE_DISPATCH_TASK_SNAPSHOT_MAX_BYTES} bytes`)
+        expect(prompt).toContain('can never dispatch')
+      }
     })
   })
 

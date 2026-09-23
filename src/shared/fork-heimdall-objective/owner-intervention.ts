@@ -142,7 +142,9 @@ export function describeObjectiveInterventions(): string {
       ' rejected report anyway; attestation must state why the mismatch is benign. Never excuses a' +
       ` change outside write territory. dispatchId and taskKey each have max ${codeUnits(OWNER_INTERVENTION_ID_MAX_LENGTH)}; attestation max ${codeUnits(OWNER_INTERVENTION_TEXT_MAX_LENGTH)}.`,
     '{"kind":"retry-node","taskKey":"...","amendedSpec":"...","agent":"..."} — redispatch the' +
-      ` task, optionally with a corrected spec or a different agent. taskKey has max ${codeUnits(OWNER_INTERVENTION_ID_MAX_LENGTH)}; amendedSpec max ${codeUnits(OBJECTIVE_TASK_SPEC_MAX_LENGTH)}; agent max ${codeUnits(OBJECTIVE_AGENT_ID_MAX_LENGTH)}.`,
+      ` task, optionally with a corrected spec or a different agent. taskKey has max ${codeUnits(OWNER_INTERVENTION_ID_MAX_LENGTH)}; amendedSpec max ${codeUnits(OBJECTIVE_TASK_SPEC_MAX_LENGTH)}; agent max ${codeUnits(OBJECTIVE_AGENT_ID_MAX_LENGTH)}.` +
+      ' Node history is append-only: the retry must add a new commit, never amend, rebase, squash or' +
+      ' reset an existing one — including to fix a commit message.',
     '{"kind":"skip-node","taskKey":"...","rationale":"..."} — drop the task from the plan;' +
       ' refused for a task that already succeeded or is still in flight, permitted once it failed.' +
       ` taskKey has max ${codeUnits(OWNER_INTERVENTION_ID_MAX_LENGTH)}; rationale max ${codeUnits(OWNER_INTERVENTION_TEXT_MAX_LENGTH)}.`,

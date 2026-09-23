@@ -3,6 +3,7 @@ import {
   OBJECTIVE_CHECK_COMMAND_MAX_LENGTH,
   OBJECTIVE_CRITERION_BODY_MAX_LENGTH,
   OBJECTIVE_CRITERION_NOTE_MAX_LENGTH,
+  OBJECTIVE_DISPATCH_TASK_SNAPSHOT_MAX_BYTES,
   OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH,
   OBJECTIVE_TASK_KEY_MAX_LENGTH,
   OBJECTIVE_TASK_SPEC_MAX_LENGTH,
@@ -162,6 +163,23 @@ describe('objective plan schema', () => {
         { writeTerritory: ['src/**'], dispatchedTaskKeys: [] }
       )
     ).toThrow('Assumption 0 names unknown task missing')
+  })
+
+  it('rejects a task whose dispatch snapshot exceeds the byte cap, naming the task and the limit', () => {
+    const oversized = task('too-big', {
+      spec: 's'.repeat(OBJECTIVE_TASK_SPEC_MAX_LENGTH),
+      territory: ['src/**']
+    })
+    expect(() =>
+      parseAndValidatePlannerReport(
+        { plan: [oversized], assumptions: [] },
+        { writeTerritory: ['src/**'], dispatchedTaskKeys: [] }
+      )
+    ).toThrow(
+      new RegExp(
+        `Task too-big dispatch snapshot is \\d+ bytes, exceeding the ${OBJECTIVE_DISPATCH_TASK_SNAPSHOT_MAX_BYTES}-byte limit`
+      )
+    )
   })
 
   it('parses stored plans that predate territory and assumptions', () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   OBJECTIVE_ALL_WORKSPACE_PATHS_GLOB,
+  OBJECTIVE_DISPATCH_TASK_SNAPSHOT_MAX_BYTES,
   OBJECTIVE_EXISTING_PLAN_MAX_LENGTH,
   OBJECTIVE_GATES_MAX,
   OBJECTIVE_TEXT_MAX_LENGTH,
@@ -8,6 +9,7 @@ import {
   ObjectiveEnrollmentPayloadSchema,
   ObjectiveGateSchema,
   objectiveCapabilityModes,
+  objectiveDispatchTaskSnapshotByteLength,
   type ObjectiveEnrollmentPayload,
   type ObjectiveGate
 } from './contract-types'
@@ -34,6 +36,22 @@ function payload(overrides: Partial<ObjectiveEnrollmentPayload> = {}): Objective
     ...overrides
   }
 }
+
+describe('objectiveDispatchTaskSnapshotByteLength', () => {
+  it('measures the exact UTF-8 byte length of the serialized snapshot', () => {
+    const snapshot = { taskKey: 'a', spec: '界'.repeat(4) }
+    expect(objectiveDispatchTaskSnapshotByteLength(snapshot)).toBe(
+      new TextEncoder().encode(JSON.stringify(snapshot)).byteLength
+    )
+    expect(objectiveDispatchTaskSnapshotByteLength(snapshot)).toBeGreaterThan(
+      JSON.stringify(snapshot).length
+    )
+  })
+
+  it('is 16 KiB, matching the durable dispatch record cap', () => {
+    expect(OBJECTIVE_DISPATCH_TASK_SNAPSHOT_MAX_BYTES).toBe(16 * 1_024)
+  })
+})
 
 describe('objective enrollment payload', () => {
   it('accepts the three review tiers and keeps the complete landing ladder', () => {

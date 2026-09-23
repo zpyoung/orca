@@ -9,6 +9,7 @@ import {
   assertPlannerAssumptionsDeclared,
   assertPlannerAssumptionsNameKnownTasks,
   assertPlannerTaskTerritoryDeclared,
+  assertPlannerTaskWithinDispatchSnapshotCap,
   objectivePathMatchesTerritory,
   type ObjectivePlanTask
 } from './plan-schema'
@@ -68,6 +69,7 @@ export function parseAndValidatePlannerRepairReport(
   }
   for (const task of upsertTasks) {
     assertPlannerTaskTerritoryDeclared(task)
+    assertPlannerTaskWithinDispatchSnapshotCap(task)
     for (const path of task.declaredPaths ?? []) {
       if (!objectivePathMatchesTerritory(path, contract.writeTerritory)) {
         throw new Error(`Task ${task.taskKey} declares path outside write territory: ${path}`)

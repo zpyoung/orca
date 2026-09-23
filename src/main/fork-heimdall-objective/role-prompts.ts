@@ -9,6 +9,7 @@ import {
   OBJECTIVE_CHECK_COMMAND_MAX_LENGTH,
   OBJECTIVE_CRITERION_BODY_MAX_LENGTH,
   OBJECTIVE_CRITERION_NOTE_MAX_LENGTH,
+  OBJECTIVE_DISPATCH_TASK_SNAPSHOT_MAX_BYTES,
   OBJECTIVE_PATH_MAX_LENGTH,
   OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH,
   OBJECTIVE_TASK_KEY_MAX_LENGTH,
@@ -118,6 +119,7 @@ const STRING_UNIT_NOTE =
 function plannerTaskShapeLines(): string[] {
   return [
     `taskKey has max ${OBJECTIVE_TASK_KEY_MAX_LENGTH}; title max ${OBJECTIVE_TASK_TITLE_MAX_LENGTH}; spec max ${OBJECTIVE_TASK_SPEC_MAX_LENGTH}. Summarize context and cite existing files or artifacts instead of pasting unlimited verbatim output.`,
+    `The whole task — taskKey, title, spec, deps, criteria, territory and declaredPaths together — must serialize to under ${OBJECTIVE_DISPATCH_TASK_SNAPSHOT_MAX_BYTES} bytes of JSON; a task over that limit can never dispatch, so split it instead of maximizing every field.`,
     `deps has max ${OBJECTIVE_PLAN_MAX_TASKS} task keys. criteria has 1-${OBJECTIVE_TASK_MAX_CRITERIA} entries.`,
     `Each criterion is {body,shellCheckable,checkCommand}; body has max ${OBJECTIVE_CRITERION_BODY_MAX_LENGTH}; checkCommand is null exactly when shellCheckable is false, otherwise non-empty with max ${OBJECTIVE_CHECK_COMMAND_MAX_LENGTH}.`,
     `territory is required on every task: 1-${OBJECTIVE_TERRITORY_MAX_ENTRIES} globs inside write territory naming what it will modify.`,
@@ -211,7 +213,7 @@ function roleInstruction(input: ObjectiveRolePromptInput): string {
       }
       return input.conflictContext
         ? `Resolve this node's integration conflict in its existing dispatch worktree. Rebase the dispatch branch onto exact enrolled HEAD ${input.conflictContext.enrolledHead}, resolve only with the intent and evidence below, and re-run focused checks for both sides. Run only the checks scoped to your task — never the full test suite, a whole-tree typecheck, or whole-tree lint. Never push this dispatch branch or any child-worktree branch.`
-        : 'Implement only the assigned node. You may inspect context, but modify only declared write territory. Run only the checks scoped to your task — never the full test suite, a whole-tree typecheck, or whole-tree lint. Never push this dispatch branch or any child-worktree branch.'
+        : 'Implement only the assigned node. You may inspect context, but modify only declared write territory. Run only the checks scoped to your task — never the full test suite, a whole-tree typecheck, or whole-tree lint. Never push this dispatch branch or any child-worktree branch. Node history is append-only: make changes as new commits, and never amend, rebase, squash or reset an existing commit, even to fix a commit message.'
     case 'reviewer':
       return input.mode === 'plan-review'
         ? 'Review the plan before it is activated. Do not modify files. Read the input file at the given path, verify every declared assumption against the repository — read code and fixtures, or run read-only commands — and mark each verified (with evidence) or unverified. Judge task sizing, whether declared dependencies are real, whether checks are properly scoped, and the declared conflict pairs and lint findings. Return verdict approve, revise, or escalate.'

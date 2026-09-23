@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import {
+  OBJECTIVE_DISPATCH_TASK_SNAPSHOT_MAX_BYTES,
+  OBJECTIVE_TASK_SPEC_MAX_LENGTH
+} from './contract-types'
 import { parseAndValidatePlannerRepairReport } from './plan-repair-schema'
 import type { ObjectivePlanTask } from './plan-schema'
 
@@ -65,6 +69,31 @@ describe('parseAndValidatePlannerRepairReport', () => {
         [task('a')]
       )
     ).toThrow('Planner task a must declare territory')
+  })
+
+  it('rejects an upserted task whose dispatch snapshot exceeds the byte cap', () => {
+    expect(() =>
+      parseAndValidatePlannerRepairReport(
+        {
+          repair: {
+            upsertTasks: [
+              task('too-big', {
+                territory: ['src/**'],
+                spec: 's'.repeat(OBJECTIVE_TASK_SPEC_MAX_LENGTH)
+              })
+            ],
+            dropTaskKeys: []
+          },
+          assumptions: []
+        },
+        CONTRACT,
+        [task('a')]
+      )
+    ).toThrow(
+      new RegExp(
+        `Task too-big dispatch snapshot is \\d+ bytes, exceeding the ${OBJECTIVE_DISPATCH_TASK_SNAPSHOT_MAX_BYTES}-byte limit`
+      )
+    )
   })
 
   it('rejects a declared path outside the objective write territory', () => {
