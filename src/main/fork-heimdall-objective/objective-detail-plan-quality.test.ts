@@ -202,6 +202,110 @@ describe('buildObjectiveDetailPlanQuality', () => {
     ])
   })
 
+  it('maps an applied patch assumption to its own review, not the revision review', () => {
+    const revision = store.ingestPlan({
+      watcherId: WATCHER_ID,
+      revisionNumber: 1,
+      dispatchId: 'planner-1',
+      report: {
+        plan: [TASK],
+        assumptions: [{ claim: 'Revision assumption', dependentTaskKeys: ['task-a'] }]
+      },
+      digest: 'digest-1',
+      createdAtMs: 100
+    })
+    store.activatePlan({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      digest: revision.digest,
+      approvedAtMs: 200
+    })
+    store.recordPlanReview({
+      watcherId: WATCHER_ID,
+      targetKind: 'revision',
+      targetId: revision.revisionId,
+      round: 1,
+      dispatchId: 'plan-review-1',
+      report: {
+        verdict: 'approve',
+        assumptions: [{ index: 0, status: 'verified', evidence: 'Revision checked' }],
+        findings: [],
+        summary: 'Looks solid'
+      },
+      reportDigest: 'review-digest-1',
+      createdAtMs: 300
+    })
+
+    const patch = store.ingestPlanPatch({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      dispatchId: 'repair-1',
+      repairOrdinal: 0,
+      report: {
+        repair: {
+          upsertTasks: [{ ...TASK, taskKey: 'task-b', title: 'Task B' }],
+          dropTaskKeys: []
+        },
+        assumptions: [
+          { claim: 'Patch assumption A', dependentTaskKeys: ['task-a'] },
+          { claim: 'Patch assumption B', dependentTaskKeys: [] }
+        ]
+      },
+      createdAtMs: 400
+    })
+    store.applyPlanPatch({
+      watcherId: WATCHER_ID,
+      patchId: patch.id,
+      amendedAtMs: 500,
+      frozenTaskKeys: []
+    })
+    store.recordPlanReview({
+      watcherId: WATCHER_ID,
+      targetKind: 'patch',
+      targetId: patch.id,
+      round: 1,
+      dispatchId: 'plan-review-2',
+      report: {
+        verdict: 'approve',
+        assumptions: [
+          { index: 0, status: 'verified', evidence: 'A checked' },
+          { index: 1, status: 'unverified', evidence: 'B pending' }
+        ],
+        findings: [],
+        summary: 'Patch approved'
+      },
+      reportDigest: 'review-digest-2',
+      createdAtMs: 600
+    })
+
+    const result = buildObjectiveDetailPlanQuality(
+      database,
+      WATCHER_ID,
+      CONTRACT,
+      store.project(WATCHER_ID)
+    )
+    expect(result.assumptions).toEqual([
+      {
+        claim: 'Revision assumption',
+        dependentTaskKeys: ['task-a'],
+        status: 'verified',
+        evidence: 'Revision checked'
+      },
+      {
+        claim: 'Patch assumption A',
+        dependentTaskKeys: ['task-a'],
+        status: 'verified',
+        evidence: 'A checked'
+      },
+      {
+        claim: 'Patch assumption B',
+        dependentTaskKeys: [],
+        status: 'unverified',
+        evidence: 'B pending'
+      }
+    ])
+  })
+
   it('shows a rejected patch when it is the newest for the approved revision', () => {
     const revision = store.ingestPlan({
       watcherId: WATCHER_ID,

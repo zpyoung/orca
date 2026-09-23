@@ -1,5 +1,7 @@
 import type { ExecuteContext } from '../../shared/fork-heimdall/kind-contract'
 import {
+  latestObjectiveAttempt,
+  objectiveAttemptDisposition,
   objectiveAttemptFailureClass,
   objectiveAttempts,
   projectObjectiveReports,
@@ -160,10 +162,16 @@ function latestRejectedRepairPatchRejection(args: {
   }
 }
 
-/** The first declared gate (if any) with a completed, failing attempt at the dispatch's content identity. */
+/**
+ * The first declared gate (if any) with a completed, failing attempt at the dispatch's content
+ * identity. A `run-gate` attempt that never completed but settled `not-landed` has no completed row
+ * to read, so it falls back to the ledger's latest such attempt for that gate — the planner still
+ * needs a gate name and command to react to, even with no exit code or output to show.
+ */
 function deriveGateFailureContext(args: {
   binding: ObjectiveSnapshotBinding
   objectiveStore: ObjectiveStore
+  ledger: ExecuteContext<ObjectiveWorld>['ledger']
   contentIdentity: string
 }): ObjectiveFailureContext['gateFailure'] | undefined {
   try {
@@ -172,6 +180,7 @@ function deriveGateFailureContext(args: {
       return undefined
     }
     const watcherId = args.binding.enrollment.watcherId
+    const attempts = objectiveAttempts(args.ledger)
     for (const gate of gates) {
       const attempt = args.objectiveStore.getGateAttempt(watcherId, gate.name, args.contentIdentity)
       if (
@@ -186,6 +195,28 @@ function deriveGateFailureContext(args: {
           timedOut: attempt.timedOut,
           stdoutTail: attempt.stdoutTail,
           stderrTail: attempt.stderrTail
+        }
+      }
+      const notLanded = latestObjectiveAttempt(
+        attempts,
+        (action) =>
+          action.kind === 'run-gate' &&
+          action.gateName === gate.name &&
+          action.contentIdentity === args.contentIdentity
+      )
+      if (
+        notLanded &&
+        notLanded.action.kind === 'run-gate' &&
+        objectiveAttemptDisposition(notLanded.attempt, args.ledger) === 'not-landed'
+      ) {
+        return {
+          gateName: notLanded.action.gateName,
+          command: notLanded.action.command,
+          exitCode: null,
+          timedOut: false,
+          stdoutTail: null,
+          stderrTail: null,
+          detail: 'the gate attempt itself failed to land'
         }
       }
     }
@@ -210,6 +241,7 @@ export async function deriveObjectiveFailureContext(args: {
   const gateFailure = deriveGateFailureContext({
     binding: args.binding,
     objectiveStore: args.objectiveStore,
+    ledger: args.ledger,
     contentIdentity: args.action.contentIdentity
   })
   const previousRepairRejection =

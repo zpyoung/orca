@@ -94,7 +94,7 @@ describe('buildPlanReviewInput', () => {
     )
   })
 
-  it('truncates a criterion body once no spec is left above target, until the input fits', () => {
+  it('leaves an oversized criterion body untouched, since only task specs are shrunk', () => {
     const huge = 'y'.repeat(1_200_000)
     const built = buildPlanReviewInput(
       input({
@@ -102,19 +102,38 @@ describe('buildPlanReviewInput', () => {
       })
     )
     const bytes = Buffer.byteLength(JSON.stringify(built), 'utf8')
-    expect(bytes).toBeLessThanOrEqual(1024 * 1024)
-    expect(built.plan[0]?.criteria[0]?.body.endsWith('…[truncated]')).toBe(true)
-    expect(built.plan[0]?.criteria[0]?.body.length).toBeLessThan(huge.length)
+    expect(bytes).toBeGreaterThan(1024 * 1024)
+    expect(built.plan[0]?.criteria[0]?.body).toBe(huge)
   })
 
-  it('truncates an assumption claim once no spec or criterion is left above target', () => {
+  it('leaves an oversized assumption claim untouched, since only task specs are shrunk', () => {
     const huge = 'z'.repeat(1_200_000)
     const built = buildPlanReviewInput(
       input({ assumptions: [{ claim: huge, dependentTaskKeys: [] }] })
     )
     const bytes = Buffer.byteLength(JSON.stringify(built), 'utf8')
-    expect(bytes).toBeLessThanOrEqual(1024 * 1024)
-    expect(built.assumptions[0]?.claim.endsWith('…[truncated]')).toBe(true)
+    expect(bytes).toBeGreaterThan(1024 * 1024)
+    expect(built.assumptions[0]?.claim).toBe(huge)
+  })
+
+  it('never drops write-territory, task-territory, or lint-finding entries under size pressure', () => {
+    const writeTerritory = Array.from({ length: 200 }, (_, index) => `src/dir-${index}/**`)
+    const territory = Array.from({ length: 50 }, (_, index) => `src/task-${index}/**`)
+    const findings = Array.from({ length: 100 }, (_, index) => ({
+      code: 'missing-territory' as const,
+      taskKey: null,
+      detail: `finding-${index}-${'d'.repeat(200)}`
+    }))
+    const built = buildPlanReviewInput(
+      input({
+        plan: [task({ spec: 'x'.repeat(1_200_000), territory })],
+        writeTerritory,
+        lint: { ...LINT, findings }
+      })
+    )
+    expect(built.writeTerritory).toEqual(writeTerritory)
+    expect(built.plan[0]?.territory).toEqual(territory)
+    expect(built.lint.findings).toEqual(findings)
   })
 
   it('never re-selects an already-truncated field, so shrinking terminates', () => {

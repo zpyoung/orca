@@ -79,7 +79,8 @@ export function amendObjectiveRevisionInTransaction(
     }
   }
 
-  const currentPlan = parseJson(PlannerReportSchema, revision.payload_json, 'plan payload').plan
+  const currentReport = parseJson(PlannerReportSchema, revision.payload_json, 'plan payload')
+  const currentPlan = currentReport.plan
   const unknownDrops = unknownAmendmentDropTaskKeys(currentPlan, patch)
   if (unknownDrops.length > 0) {
     throw new Error(`Amendment cannot drop unknown task key ${unknownDrops[0]}`)
@@ -109,9 +110,24 @@ export function amendObjectiveRevisionInTransaction(
     return amended
   }
 
+  // preserve the stored planner assumptions across the rewrite, same as mergeAssumptionsOntoRevision:
+  // a dropped task can no longer be depended on, so its key falls out of dependentTaskKeys
+  const amendedTaskKeys = new Set(amended.plan.map((task) => task.taskKey))
+  const assumptions = (currentReport.assumptions ?? []).map((assumption) => ({
+    ...assumption,
+    dependentTaskKeys: assumption.dependentTaskKeys.filter((taskKey) =>
+      amendedTaskKeys.has(taskKey)
+    )
+  }))
+
   db.prepare(
     'UPDATE plan_revision SET payload_json = ?, digest = ? WHERE id = ? AND watcher_id = ?'
-  ).run(JSON.stringify({ plan: amended.plan }), patch.digest, args.revisionId, args.watcherId)
+  ).run(
+    JSON.stringify({ plan: amended.plan, assumptions }),
+    patch.digest,
+    args.revisionId,
+    args.watcherId
+  )
   db.prepare('DELETE FROM review_verdict WHERE revision_id = ?').run(args.revisionId)
 
   for (const taskKey of patch.dropTaskKeys) {

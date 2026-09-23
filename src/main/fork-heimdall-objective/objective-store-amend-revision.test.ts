@@ -492,6 +492,47 @@ describe('ObjectiveStore.amendRevision', () => {
     })
   })
 
+  it('keeps stored assumptions across an amendment, filtering dependentTaskKeys to surviving tasks', () => {
+    const reportWithAssumptions: PlannerReport = {
+      ...REPORT,
+      assumptions: [
+        { claim: 'A and C share a config format', dependentTaskKeys: ['task-a', 'task-c'] },
+        { claim: 'B needs no external service', dependentTaskKeys: ['task-b'] }
+      ]
+    }
+    const revision = store.ingestPlan({
+      watcherId: WATCHER_ID,
+      revisionNumber: 1,
+      dispatchId: 'planner-1',
+      report: reportWithAssumptions,
+      digest: 'plan-digest-1',
+      createdAtMs: 100
+    })
+    store.activatePlan({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      digest: revision.digest,
+      approvedAtMs: 200
+    })
+
+    store.amendRevision({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      amendedAtMs: 400,
+      patch: {
+        digest: 'amend-digest-1',
+        attestation: 'Dropping task C',
+        upsertTasks: [],
+        dropTaskKeys: ['task-c']
+      }
+    })
+
+    expect(store.getPlanReport(revision.revisionId)?.assumptions).toEqual([
+      { claim: 'A and C share a config format', dependentTaskKeys: ['task-a'] },
+      { claim: 'B needs no external service', dependentTaskKeys: ['task-b'] }
+    ])
+  })
+
   it('rejects amending a revision that is not approved', () => {
     const revision = store.ingestPlan({
       watcherId: WATCHER_ID,

@@ -23,6 +23,7 @@ import {
   type ObjectivePlanTask
 } from '../../shared/fork-heimdall-objective/plan-schema'
 import type { ObjectiveDatabase } from './objective-database'
+import { getPlanPatch } from './objective-store-plan-patches'
 import { getPlanReviewReport } from './objective-store-plan-reviews'
 import { ObjectiveStoreQueries } from './objective-store-queries'
 
@@ -83,11 +84,17 @@ function buildNodeDetail(
   return detail
 }
 
-/** Status/evidence for the plan's own assumptions, from the newest plan review targeting this revision. */
+/**
+ * Status/evidence for the plan's assumptions. The revision's own assumptions are assessed by the
+ * newest review targeting the revision; each applied patch's appended assumptions are assessed by
+ * that patch's own newest review, so the patch-local indices its review scored against have to be
+ * remapped onto the merged positions `mergeAssumptionsOntoRevision` appended them at.
+ */
 function buildAssumptions(
   database: ObjectiveDatabase,
   planAssumptions: readonly ObjectivePlanAssumption[],
   reviews: readonly ObjectivePlanReviewProjection[],
+  patches: readonly ObjectivePlanPatchProjection[],
   revisionId: string
 ): ObjectiveDetailAssumption[] {
   const newestReview = reviews.find(
@@ -97,6 +104,29 @@ function buildAssumptions(
   const assessmentByIndex = new Map(
     (fullReport?.assumptions ?? []).map((assessment) => [assessment.index, assessment])
   )
+
+  const appliedPatches = patches
+    .filter((patch) => patch.revisionId === revisionId && patch.status === 'applied')
+    .slice()
+    .sort((left, right) => (left.resolvedAtMs ?? 0) - (right.resolvedAtMs ?? 0))
+  const appliedPatchAssumptionCounts = appliedPatches.map(
+    (patch) => getPlanPatch(database, patch.id)?.report.assumptions?.length ?? 0
+  )
+  let mergedOffset =
+    planAssumptions.length - appliedPatchAssumptionCounts.reduce((sum, count) => sum + count, 0)
+  appliedPatches.forEach((patch, patchIndex) => {
+    const newestPatchReview = reviews.find(
+      (review) => review.targetKind === 'patch' && review.targetId === patch.id
+    )
+    const patchReport = newestPatchReview
+      ? getPlanReviewReport(database, newestPatchReview.id)
+      : null
+    for (const assessment of patchReport?.assumptions ?? []) {
+      assessmentByIndex.set(mergedOffset + assessment.index, assessment)
+    }
+    mergedOffset += appliedPatchAssumptionCounts[patchIndex] ?? 0
+  })
+
   return planAssumptions.map((assumption, index) => {
     const assessment = assessmentByIndex.get(index)
     return {
@@ -215,6 +245,7 @@ export function buildObjectiveDetailPlanQuality(
           database,
           report.assumptions,
           projection.planReviews ?? [],
+          projection.patches ?? [],
           focusRevision.id
         )
       }
