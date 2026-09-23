@@ -90,7 +90,9 @@ const SHELL_SEPARATOR_REGEX = /&&|\|\||\||;/u
 function matchesUnscoped(command: string): boolean {
   return command
     .split(SHELL_SEPARATOR_REGEX)
-    .some((segment) => UNSCOPED_INVOCATION_REGEX.test(segment) && !PATH_ARGUMENT_REGEX.test(segment))
+    .some(
+      (segment) => UNSCOPED_INVOCATION_REGEX.test(segment) && !PATH_ARGUMENT_REGEX.test(segment)
+    )
 }
 
 const NON_RELATIVE_PATH_REGEX = /(^|\s)\/[A-Za-z]|[A-Za-z]:\\/u

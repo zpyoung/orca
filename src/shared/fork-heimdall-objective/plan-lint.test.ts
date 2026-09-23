@@ -129,9 +129,9 @@ describe('lintObjectivePlan check-command findings', () => {
 
   it('judges each shell-chained segment for an unscoped invocation independently', () => {
     expect(codesFor(withCommand('echo src/foo && vitest run'), 'a')).toContain('unscoped-check')
-    expect(
-      codesFor(withCommand('vitest run src/a.test.ts && echo done'), 'a')
-    ).not.toContain('unscoped-check')
+    expect(codesFor(withCommand('vitest run src/a.test.ts && echo done'), 'a')).not.toContain(
+      'unscoped-check'
+    )
   })
 
   it('flags an absolute or non-relative path in a check command', () => {
