@@ -6,6 +6,10 @@ import type Database from '../sqlite/sync-database'
 import type { ObjectiveDatabase } from './objective-database'
 import { runObjectiveMutation } from './objective-database-transaction'
 import { naturalId, parseJson } from './objective-store-data'
+import {
+  rejectDraftRevisionInTransaction,
+  rejectPlanPatchInTransaction
+} from './objective-store-plan-patches'
 
 export type PlanReviewTargetKind = 'revision' | 'patch'
 
@@ -72,6 +76,61 @@ function readPlanReviewRowByDispatch(
 }
 
 /**
+ * The `recordPlanReview` body, taking an already-open connection and the pre-parsed report so a
+ * caller that must record the review alongside other writes (e.g. the round-one `revise` rejection
+ * of its target) can share its transaction instead of nesting one.
+ */
+function recordPlanReviewInTransaction(
+  db: Database.Database,
+  args: RecordPlanReviewArgs,
+  report: PlanReviewReport,
+  reportJson: string
+): ObjectivePlanReviewRecord {
+  const byDispatch = readPlanReviewRowByDispatch(db, args.dispatchId)
+  if (byDispatch) {
+    if (
+      byDispatch.watcher_id !== args.watcherId ||
+      byDispatch.target_kind !== args.targetKind ||
+      byDispatch.target_id !== args.targetId ||
+      byDispatch.round !== args.round ||
+      byDispatch.report_json !== reportJson ||
+      byDispatch.report_digest !== args.reportDigest
+    ) {
+      throw new Error('Plan review natural key was replayed with different content')
+    }
+    return planReviewRecord(byDispatch)
+  }
+  const bySlot = db
+    .prepare(
+      'SELECT dispatch_id FROM plan_review WHERE target_kind = ? AND target_id = ? AND round = ?'
+    )
+    .get(args.targetKind, args.targetId, args.round) as { dispatch_id: string } | undefined
+  if (bySlot) {
+    throw new Error(
+      `Plan review round ${args.round} for ${args.targetKind} ${args.targetId} was already recorded by a different dispatch`
+    )
+  }
+  db.prepare(
+    `INSERT INTO plan_review (
+      id, watcher_id, target_kind, target_id, round, dispatch_id, verdict, report_json,
+      report_digest, created_at_ms
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    naturalId('objective_plan_review', args.watcherId, args.dispatchId),
+    args.watcherId,
+    args.targetKind,
+    args.targetId,
+    args.round,
+    args.dispatchId,
+    report.verdict,
+    reportJson,
+    args.reportDigest,
+    args.createdAtMs
+  )
+  return planReviewRecord(readPlanReviewRowByDispatch(db, args.dispatchId)!)
+}
+
+/**
  * Records a plan-critic verdict on a revision or a patch, natural-keyed on `dispatchId` so a
  * replayed dispatch returns the original row unchanged. A second dispatch naming the same
  * (targetKind, targetId, round) is a distinct review attempt at a slot the schema allows only one
@@ -83,49 +142,40 @@ export function recordPlanReview(
 ): ObjectivePlanReviewRecord {
   const report = PlanReviewReportSchema.parse(args.report)
   const reportJson = JSON.stringify(report)
+  return runObjectiveMutation(database, (db) =>
+    recordPlanReviewInTransaction(db, args, report, reportJson)
+  )
+}
+
+/**
+ * Records a plan-critic verdict and, when it is a round-one `revise`, the target's rejection — in
+ * the same transaction, so `ingest-plan-review`'s effect-certainty check (which reports the action
+ * landed as soon as the review row exists) can never observe a landed review whose target was left
+ * unrejected by a crash between two separate writes.
+ */
+export function recordPlanReviewAndRejectRoundOneTarget(
+  database: ObjectiveDatabase,
+  args: RecordPlanReviewArgs
+): ObjectivePlanReviewRecord {
+  const report = PlanReviewReportSchema.parse(args.report)
+  const reportJson = JSON.stringify(report)
   return runObjectiveMutation(database, (db) => {
-    const byDispatch = readPlanReviewRowByDispatch(db, args.dispatchId)
-    if (byDispatch) {
-      if (
-        byDispatch.watcher_id !== args.watcherId ||
-        byDispatch.target_kind !== args.targetKind ||
-        byDispatch.target_id !== args.targetId ||
-        byDispatch.round !== args.round ||
-        byDispatch.report_json !== reportJson ||
-        byDispatch.report_digest !== args.reportDigest
-      ) {
-        throw new Error('Plan review natural key was replayed with different content')
+    const record = recordPlanReviewInTransaction(db, args, report, reportJson)
+    if (report.verdict === 'revise' && args.round === 1) {
+      if (args.targetKind === 'revision') {
+        rejectDraftRevisionInTransaction(db, {
+          watcherId: args.watcherId,
+          revisionId: args.targetId
+        })
+      } else {
+        rejectPlanPatchInTransaction(db, {
+          patchId: args.targetId,
+          rejection: 'plan-review-revise',
+          resolvedAtMs: args.createdAtMs
+        })
       }
-      return planReviewRecord(byDispatch)
     }
-    const bySlot = db
-      .prepare(
-        'SELECT dispatch_id FROM plan_review WHERE target_kind = ? AND target_id = ? AND round = ?'
-      )
-      .get(args.targetKind, args.targetId, args.round) as { dispatch_id: string } | undefined
-    if (bySlot) {
-      throw new Error(
-        `Plan review round ${args.round} for ${args.targetKind} ${args.targetId} was already recorded by a different dispatch`
-      )
-    }
-    db.prepare(
-      `INSERT INTO plan_review (
-        id, watcher_id, target_kind, target_id, round, dispatch_id, verdict, report_json,
-        report_digest, created_at_ms
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      naturalId('objective_plan_review', args.watcherId, args.dispatchId),
-      args.watcherId,
-      args.targetKind,
-      args.targetId,
-      args.round,
-      args.dispatchId,
-      report.verdict,
-      reportJson,
-      args.reportDigest,
-      args.createdAtMs
-    )
-    return planReviewRecord(readPlanReviewRowByDispatch(db, args.dispatchId)!)
+    return record
   })
 }
 
