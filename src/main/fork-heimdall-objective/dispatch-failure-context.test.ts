@@ -106,6 +106,69 @@ const plannerReplanAfterFailure: Extract<ObjectiveAction, { kind: 'dispatch-plan
 
 const emptyLedger: WatcherLedger = { watcherId: 'watcher-1', entries: [] }
 
+function runGateAction(
+  gateName: string,
+  contentIdentity = 'content-current'
+): Extract<ObjectiveAction, { kind: 'run-gate' }> {
+  return {
+    kind: 'run-gate',
+    capability: 'check',
+    visibility: 'local',
+    contentIdentity,
+    evidenceKey: `objective-gate:${gateName}:${contentIdentity}`,
+    gateName,
+    command: 'pnpm test',
+    timeoutSeconds: 900
+  }
+}
+
+function notLandedGateAttemptLedger(
+  gateName: string,
+  contentIdentity = 'content-current'
+): WatcherLedger {
+  return {
+    watcherId: 'watcher-1',
+    entries: [
+      {
+        eventId: 'event-gate-attempt',
+        watcherId: 'watcher-1',
+        atMs: 1,
+        origin: 'owner',
+        class: 'fact',
+        kind: 'attempt',
+        attemptId: 'attempt-gate-1',
+        fingerprint: 'fingerprint-gate-1',
+        action: runGateAction(gateName, contentIdentity),
+        state: 'settled',
+        effect: 'not-landed'
+      }
+    ]
+  }
+}
+
+function inFlightGateAttemptLedger(
+  gateName: string,
+  contentIdentity = 'content-current'
+): WatcherLedger {
+  return {
+    watcherId: 'watcher-1',
+    entries: [
+      {
+        eventId: 'event-gate-attempt',
+        watcherId: 'watcher-1',
+        atMs: 1,
+        origin: 'owner',
+        class: 'fact',
+        kind: 'attempt',
+        attemptId: 'attempt-gate-1',
+        fingerprint: 'fingerprint-gate-1',
+        action: runGateAction(gateName, contentIdentity),
+        state: 'attempted'
+      }
+    ]
+  }
+}
+
 describe('deriveObjectiveFailureContext gate failure', () => {
   beforeEach(() => {
     readRoleReport.mockReset()
@@ -186,6 +249,53 @@ describe('deriveObjectiveFailureContext gate failure', () => {
     })
 
     expect(context?.gateFailure?.gateName).toBe('full-suite')
+  })
+
+  it('derives the gate name, command, and failure detail from a not-landed run-gate ledger attempt (E)', async () => {
+    const context = await deriveObjectiveFailureContext({
+      action: plannerReplanAfterFailure,
+      binding: binding([gate({ name: 'unit', command: 'pnpm test' })]),
+      ledger: notLandedGateAttemptLedger('unit'),
+      objectiveStore: storeWithGateAttempts({ unit: null }),
+      activeRevisionId: undefined
+    })
+
+    expect(context).toEqual({
+      gateFailure: {
+        gateName: 'unit',
+        command: 'pnpm test',
+        exitCode: null,
+        timedOut: false,
+        stdoutTail: null,
+        stderrTail: null,
+        detail: 'the gate attempt itself failed to land'
+      }
+    })
+  })
+
+  it('prefers a completed failed gate-attempt row over a not-landed ledger attempt', async () => {
+    const context = await deriveObjectiveFailureContext({
+      action: plannerReplanAfterFailure,
+      binding: binding([gate({ name: 'unit' })]),
+      ledger: notLandedGateAttemptLedger('unit'),
+      objectiveStore: storeWithGateAttempts({ unit: gateAttempt() }),
+      activeRevisionId: undefined
+    })
+
+    expect(context?.gateFailure).toMatchObject({ gateName: 'unit', exitCode: 1 })
+    expect(context?.gateFailure).not.toHaveProperty('detail')
+  })
+
+  it('returns undefined for a still in-flight run-gate ledger attempt, not yet not-landed', async () => {
+    const context = await deriveObjectiveFailureContext({
+      action: plannerReplanAfterFailure,
+      binding: binding([gate({ name: 'unit' })]),
+      ledger: inFlightGateAttemptLedger('unit'),
+      objectiveStore: storeWithGateAttempts({ unit: null }),
+      activeRevisionId: undefined
+    })
+
+    expect(context).toBeUndefined()
   })
 
   it('returns undefined for a reason other than replan-after-failure even with a failed gate', async () => {

@@ -56,6 +56,8 @@ export type ObjectiveFailureContext = {
     timedOut: boolean | null
     stdoutTail: string | null
     stderrTail: string | null
+    /** Set when the gate attempt itself never completed, so there is no exit code or output to show. */
+    detail?: string
   }
   /** A prior repair patch's rejection text, for a rejection other than a plan-review `revise`. */
   previousRepairRejection?: string
@@ -288,7 +290,8 @@ function failureContextSection(input: ObjectiveRolePromptInput): string[] {
         `EXIT CODE: ${gateFailure.exitCode === null ? '(none)' : gateFailure.exitCode}`,
         `TIMED OUT: ${gateFailure.timedOut === null ? '(unknown)' : String(gateFailure.timedOut)}`,
         `STDOUT TAIL:\n${gateFailure.stdoutTail ?? '(none)'}`,
-        `STDERR TAIL:\n${gateFailure.stderrTail ?? '(none)'}`
+        `STDERR TAIL:\n${gateFailure.stderrTail ?? '(none)'}`,
+        ...(gateFailure.detail === undefined ? [] : [`DETAIL: ${gateFailure.detail}`])
       ].join('\n')
     )
   }
