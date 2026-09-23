@@ -82,7 +82,9 @@ function matchesFullSuite(text: string): boolean {
 }
 
 const UNSCOPED_INVOCATION_REGEX = /\bvitest\b|\bpnpm (run )?test(:\S+)?\b|\btsc\b/u
-const PATH_ARGUMENT_REGEX = /(^|\s)(?!-)\S*\/\S*/u
+// a scope argument either contains a path separator or names a file by extension
+// (`vitest run a.test.ts`, `tsc -p tsconfig.json`), so a bare filename still counts
+const PATH_ARGUMENT_REGEX = /(^|\s)(?!-)\S*\/\S*|(^|\s)(?!-)\S+\.[A-Za-z0-9]+/u
 const SHELL_SEPARATOR_REGEX = /&&|\|\||\||;/u
 
 // a shell chain can scope one segment and leave another bare (`echo src/foo && vitest run`),

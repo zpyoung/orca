@@ -127,6 +127,16 @@ describe('lintObjectivePlan check-command findings', () => {
     expect(codesFor(withCommand('vitest run src/a.test.ts'), 'a')).not.toContain('unscoped-check')
   })
 
+  it('accepts a filename-only scope with no path separator (C2)', () => {
+    expect(codesFor(withCommand('vitest run a.test.ts'), 'a')).not.toContain('unscoped-check')
+    expect(codesFor(withCommand('tsc -p tsconfig.json'), 'a')).not.toContain('unscoped-check')
+  })
+
+  it('still flags a bare invocation with no scope argument at all (C2)', () => {
+    expect(codesFor(withCommand('vitest run'), 'a')).toContain('unscoped-check')
+    expect(codesFor(withCommand('pnpm test'), 'a')).toContain('unscoped-check')
+  })
+
   it('judges each shell-chained segment for an unscoped invocation independently', () => {
     expect(codesFor(withCommand('echo src/foo && vitest run'), 'a')).toContain('unscoped-check')
     expect(codesFor(withCommand('vitest run src/a.test.ts && echo done'), 'a')).not.toContain(
