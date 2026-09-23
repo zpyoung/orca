@@ -155,7 +155,7 @@ export async function ingestObjectivePlanReviewReport(args: {
   }
 
   await args.context.lease.assertHeld()
-  args.objectiveStore.recordPlanReview({
+  args.objectiveStore.recordPlanReviewAndRejectRoundOneTarget({
     watcherId: args.binding.enrollment.watcherId,
     targetKind: action.target.kind,
     targetId: targetId(action.target),
@@ -165,20 +165,6 @@ export async function ingestObjectivePlanReviewReport(args: {
     reportDigest,
     createdAtMs: evidence.atMs
   })
-  if (report.verdict === 'revise' && origin.action.round === 1) {
-    if (action.target.kind === 'revision') {
-      args.objectiveStore.rejectDraftRevision({
-        watcherId: args.binding.enrollment.watcherId,
-        revisionId: action.target.revisionId
-      })
-    } else {
-      args.objectiveStore.rejectPlanPatch({
-        patchId: action.target.patchId,
-        rejection: 'plan-review-revise',
-        resolvedAtMs: Date.now()
-      })
-    }
-  }
   return {
     effect: 'landed',
     result: {

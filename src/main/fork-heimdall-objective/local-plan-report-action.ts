@@ -10,6 +10,7 @@ import {
   type PlannerRepairReport
 } from '../../shared/fork-heimdall-objective/plan-repair-schema'
 import {
+  OBJECTIVE_PLAN_ASSUMPTIONS_MAX_ENTRIES,
   parseAndValidatePlannerReport,
   type PlannerReport
 } from '../../shared/fork-heimdall-objective/plan-schema'
@@ -190,6 +191,25 @@ function firstFrozenTouchedTaskKey(
   return null
 }
 
+/**
+ * Best-effort early check: the target revision's assumptions count as seen here can go stale before
+ * the patch is actually applied (another patch may land first), so `applyPlanPatch` still owns the
+ * authoritative, transactional check — this only lets a planner learn of an over-limit repair without
+ * waiting for the apply step to reject it.
+ */
+function assumptionsLimitRejection(
+  objectiveStore: ObjectiveStore,
+  targetRevisionId: string,
+  report: PlannerRepairReport
+): string | null {
+  const currentAssumptionsCount =
+    objectiveStore.getPlanReport(targetRevisionId)?.assumptions?.length ?? 0
+  const mergedCount = currentAssumptionsCount + (report.assumptions?.length ?? 0)
+  return mergedCount > OBJECTIVE_PLAN_ASSUMPTIONS_MAX_ENTRIES
+    ? `merged ${mergedCount} exceeds the ${OBJECTIVE_PLAN_ASSUMPTIONS_MAX_ENTRIES}-assumption limit`
+    : null
+}
+
 function repairPatchOutcome(
   action: IngestPlanAction,
   stored: ObjectivePlanPatchRecord
@@ -275,6 +295,10 @@ async function ingestObjectivePlanRepair(args: {
     targetRevisionId
   )
   const frozenTaskKey = firstFrozenTouchedTaskKey(report, frozen)
+  const rejection =
+    frozenTaskKey !== null
+      ? `changes-frozen-node:${frozenTaskKey}`
+      : assumptionsLimitRejection(args.objectiveStore, targetRevisionId, report)
   await args.context.lease.assertHeld()
   const stored = args.objectiveStore.ingestPlanPatch({
     watcherId,
@@ -283,7 +307,7 @@ async function ingestObjectivePlanRepair(args: {
     repairOrdinal: args.repairOrdinal,
     report,
     createdAtMs: args.evidenceAtMs,
-    ...(frozenTaskKey === null ? {} : { rejection: `changes-frozen-node:${frozenTaskKey}` })
+    ...(rejection === null ? {} : { rejection })
   })
   return repairPatchOutcome(args.action, stored)
 }

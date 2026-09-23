@@ -93,6 +93,53 @@ describe('buildPlanReviewInput', () => {
       huge.length
     )
   })
+
+  it('truncates a criterion body once no spec is left above target, until the input fits', () => {
+    const huge = 'y'.repeat(1_200_000)
+    const built = buildPlanReviewInput(
+      input({
+        plan: [task({ criteria: [{ body: huge, shellCheckable: false, checkCommand: null }] })]
+      })
+    )
+    const bytes = Buffer.byteLength(JSON.stringify(built), 'utf8')
+    expect(bytes).toBeLessThanOrEqual(1024 * 1024)
+    expect(built.plan[0]?.criteria[0]?.body.endsWith('…[truncated]')).toBe(true)
+    expect(built.plan[0]?.criteria[0]?.body.length).toBeLessThan(huge.length)
+  })
+
+  it('truncates an assumption claim once no spec or criterion is left above target', () => {
+    const huge = 'z'.repeat(1_200_000)
+    const built = buildPlanReviewInput(
+      input({ assumptions: [{ claim: huge, dependentTaskKeys: [] }] })
+    )
+    const bytes = Buffer.byteLength(JSON.stringify(built), 'utf8')
+    expect(bytes).toBeLessThanOrEqual(1024 * 1024)
+    expect(built.assumptions[0]?.claim.endsWith('…[truncated]')).toBe(true)
+  })
+
+  it('never re-selects an already-truncated field, so shrinking terminates', () => {
+    const huge = 'w'.repeat(1_200_000)
+    const built = buildPlanReviewInput(input({ plan: [task({ spec: huge })] }))
+    // truncating twice would grow the marker back on, not shrink it further
+    expect(built.plan[0]?.spec).toBe(`${huge.slice(0, 200)}…[truncated]`)
+  })
+
+  it('stays oversized when every field is already within target but there are too many of them', () => {
+    const plan = Array.from({ length: 128 }, (_, taskIndex) =>
+      task({
+        taskKey: `task-${taskIndex}`,
+        spec: 'ok',
+        criteria: Array.from({ length: 64 }, (_, criterionIndex) => ({
+          body: `criterion-${taskIndex}-${criterionIndex}-${'c'.repeat(150)}`,
+          shellCheckable: false,
+          checkCommand: null
+        }))
+      })
+    )
+    const built = buildPlanReviewInput(input({ plan }))
+    const bytes = Buffer.byteLength(JSON.stringify(built), 'utf8')
+    expect(bytes).toBeGreaterThan(1024 * 1024)
+  })
 })
 
 describe('writePlanReviewInputFile', () => {
@@ -125,5 +172,29 @@ describe('writePlanReviewInputFile', () => {
       '/srv/objective/.orca/heimdall/objective/reports/deadbeef.plan-review-input.json'
     )
     expect(writeFileMock).toHaveBeenCalledWith(written, JSON.stringify(input()))
+  })
+
+  it('fails the dispatch instead of writing a file still oversized after every field is trimmed', async () => {
+    const target = await localFolderTarget()
+    const reportPath = await issueObjectiveReportPath(target, 'attempt-oversized')
+    const plan = Array.from({ length: 128 }, (_, taskIndex) =>
+      task({
+        taskKey: `task-${taskIndex}`,
+        spec: 'ok',
+        criteria: Array.from({ length: 64 }, (_, criterionIndex) => ({
+          body: `criterion-${taskIndex}-${criterionIndex}-${'c'.repeat(150)}`,
+          shellCheckable: false,
+          checkCommand: null
+        }))
+      })
+    )
+    const oversized = buildPlanReviewInput(input({ plan }))
+
+    await expect(writePlanReviewInputFile(target, reportPath, oversized)).rejects.toThrow(
+      /exceeding the 1048576-byte cap/
+    )
+    await expect(
+      readFile(reportPath.replace(/\.json$/u, '.plan-review-input.json'), 'utf8')
+    ).rejects.toThrow()
   })
 })

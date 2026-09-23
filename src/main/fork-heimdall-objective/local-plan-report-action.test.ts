@@ -55,7 +55,8 @@ afterEach(() => {
 })
 
 function repairFixture(
-  dispatchOverrides: Partial<Extract<ObjectiveAction, { kind: 'dispatch-planner' }>> = {}
+  dispatchOverrides: Partial<Extract<ObjectiveAction, { kind: 'dispatch-planner' }>> = {},
+  report: PlannerReport = PLAN
 ): {
   objectiveStore: ObjectiveStore
   revisionId: string
@@ -71,7 +72,7 @@ function repairFixture(
     watcherId: WATCHER_ID,
     revisionNumber: 1,
     dispatchId: 'planner-1',
-    report: PLAN,
+    report,
     digest: 'digest-1',
     createdAtMs: 1
   })
@@ -289,6 +290,40 @@ describe('objective repair-shaped plan ingestion', () => {
     expect(patches).toHaveLength(1)
     expect(patches[0]?.status).toBe('rejected')
     expect(patches[0]?.rejection).toBe('changes-frozen-node:extra')
+  })
+
+  it('rejects a repair patch that would push merged assumptions past the entry limit', async () => {
+    const revisionWith64Assumptions: PlannerReport = {
+      plan: PLAN.plan,
+      assumptions: Array.from({ length: 64 }, (_, i) => ({
+        claim: `assumption ${i}`,
+        dependentTaskKeys: []
+      }))
+    }
+    const fixture = repairFixture({}, revisionWith64Assumptions)
+    readReport.mockResolvedValue({
+      ok: true,
+      role: 'planner',
+      path: REPORT_PATH,
+      report: {
+        repair: { upsertTasks: [], dropTaskKeys: ['extra'] },
+        assumptions: [{ claim: 'one more assumption', dependentTaskKeys: [] }]
+      },
+      reportDigest: 'digest-repair-limit'
+    })
+
+    const outcome = await ingestObjectivePlanReport({
+      action: ingestAction(fixture),
+      binding: fixture.binding,
+      context: fixture.contextWith(),
+      objectiveStore: fixture.objectiveStore
+    })
+
+    expect(outcome).toMatchObject({ effect: 'landed', result: { kind: 'plan-patch-ingested' } })
+    const patches = fixture.objectiveStore.listPlanPatches(WATCHER_ID)
+    expect(patches).toHaveLength(1)
+    expect(patches[0]?.status).toBe('rejected')
+    expect(patches[0]?.rejection).toMatch(/65 exceeds the 64-assumption limit/)
   })
 
   it('refuses ingestion without persisting a patch when targetRevisionId is missing', async () => {

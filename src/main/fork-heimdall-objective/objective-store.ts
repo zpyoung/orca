@@ -57,6 +57,7 @@ import {
   rejectDraftRevision,
   rejectPlanPatch,
   type ApplyPlanPatchArgs,
+  type ApplyPlanPatchResult,
   type IngestPlanPatchArgs,
   type ObjectivePlanPatchRecord,
   type RejectPlanPatchArgs
@@ -65,6 +66,7 @@ import {
   getPlanReviewReport,
   listPlanReviews,
   recordPlanReview,
+  recordPlanReviewAndRejectRoundOneTarget,
   type ObjectivePlanReviewRecord,
   type RecordPlanReviewArgs
 } from './objective-store-plan-reviews'
@@ -98,6 +100,7 @@ export type {
 } from './objective-store-gate-attempts'
 export type {
   ApplyPlanPatchArgs,
+  ApplyPlanPatchResult,
   IngestPlanPatchArgs,
   ObjectivePlanPatchRecord,
   RejectPlanPatchArgs
@@ -226,7 +229,7 @@ export class ObjectiveStore {
     return rejectPlanPatch(this.database, args)
   }
 
-  applyPlanPatch(args: ApplyPlanPatchArgs): RevisionAmendmentResult {
+  applyPlanPatch(args: ApplyPlanPatchArgs): ApplyPlanPatchResult {
     return applyPlanPatch(this.database, args)
   }
 
@@ -240,6 +243,11 @@ export class ObjectiveStore {
 
   recordPlanReview(args: RecordPlanReviewArgs): ObjectivePlanReviewRecord {
     return recordPlanReview(this.database, args)
+  }
+
+  /** Records a plan review and, when it is a round-one `revise`, rejects its target atomically. */
+  recordPlanReviewAndRejectRoundOneTarget(args: RecordPlanReviewArgs): ObjectivePlanReviewRecord {
+    return recordPlanReviewAndRejectRoundOneTarget(this.database, args)
   }
 
   listPlanReviews(watcherId: string): ObjectivePlanReviewRecord[] {

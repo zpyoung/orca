@@ -42,36 +42,188 @@ export type PlanReviewInput = {
 
 const PLAN_REVIEW_INPUT_MAX_BYTES = 1024 * 1024
 const TRUNCATION_MARKER = '…[truncated]'
-const TRUNCATED_SPEC_TARGET_CHARS = 200
+const TRUNCATED_TEXT_TARGET_CHARS = 200
+// a location already at exactly this length is a prior truncation's own output; re-selecting it
+// would slice+re-append the same marker forever without shrinking anything
+const TRUNCATED_TEXT_RESULT_LENGTH = TRUNCATED_TEXT_TARGET_CHARS + TRUNCATION_MARKER.length
 
-type SpecLocation = { kind: 'plan' | 'patch'; index: number; spec: string }
+/** Every free-text field long enough to be worth truncating under size pressure. */
+type TextLocation =
+  | { field: 'plan-spec'; index: number; value: string }
+  | { field: 'patch-spec'; index: number; value: string }
+  | { field: 'plan-criterion'; taskIndex: number; criterionIndex: number; value: string }
+  | { field: 'patch-criterion'; taskIndex: number; criterionIndex: number; value: string }
+  | { field: 'assumption'; index: number; value: string }
+  | { field: 'lint-detail'; index: number; value: string }
 
-/** The next spec to shrink: the longest one still above the truncated target, plan tasks then patch upserts. */
-function longestUntruncatedSpec(input: PlanReviewInput): SpecLocation | null {
-  let best: SpecLocation | null = null
-  const consider = (kind: SpecLocation['kind'], index: number, spec: string): void => {
-    if (spec.length > TRUNCATED_SPEC_TARGET_CHARS && (!best || spec.length > best.spec.length)) {
-      best = { kind, index, spec }
+/** The next field to shrink: the longest text still above the truncated target, spec text first. */
+function longestUntruncatedText(input: PlanReviewInput): TextLocation | null {
+  let best: TextLocation | null = null
+  const consider = (location: TextLocation): void => {
+    if (
+      location.value.length > TRUNCATED_TEXT_RESULT_LENGTH &&
+      (!best || location.value.length > best.value.length)
+    ) {
+      best = location
     }
   }
-  input.plan.forEach((task, index) => consider('plan', index, task.spec))
-  input.patch?.repair.upsertTasks.forEach((task, index) => consider('patch', index, task.spec))
+  input.plan.forEach((task, index) => consider({ field: 'plan-spec', index, value: task.spec }))
+  input.patch?.repair.upsertTasks.forEach((task, index) =>
+    consider({ field: 'patch-spec', index, value: task.spec })
+  )
+  input.plan.forEach((task, taskIndex) =>
+    task.criteria.forEach((criterion, criterionIndex) =>
+      consider({ field: 'plan-criterion', taskIndex, criterionIndex, value: criterion.body })
+    )
+  )
+  input.patch?.repair.upsertTasks.forEach((task, taskIndex) =>
+    task.criteria.forEach((criterion, criterionIndex) =>
+      consider({ field: 'patch-criterion', taskIndex, criterionIndex, value: criterion.body })
+    )
+  )
+  input.assumptions.forEach((assumption, index) =>
+    consider({ field: 'assumption', index, value: assumption.claim })
+  )
+  input.lint.findings.forEach((finding, index) =>
+    consider({ field: 'lint-detail', index, value: finding.detail })
+  )
   return best
 }
 
-function withTruncatedSpec(input: PlanReviewInput, location: SpecLocation): PlanReviewInput {
-  const nextSpec = `${location.spec.slice(0, TRUNCATED_SPEC_TARGET_CHARS)}${TRUNCATION_MARKER}`
-  if (location.kind === 'plan') {
-    const plan = input.plan.map((task, index) =>
-      index === location.index ? { ...task, spec: nextSpec } : task
-    )
-    return { ...input, plan }
+function truncatedText(value: string): string {
+  return `${value.slice(0, TRUNCATED_TEXT_TARGET_CHARS)}${TRUNCATION_MARKER}`
+}
+
+function withTruncatedText(input: PlanReviewInput, location: TextLocation): PlanReviewInput {
+  const next = truncatedText(location.value)
+  switch (location.field) {
+    case 'plan-spec':
+      return {
+        ...input,
+        plan: input.plan.map((task, index) =>
+          index === location.index ? { ...task, spec: next } : task
+        )
+      }
+    case 'patch-spec': {
+      const patch = input.patch!
+      return {
+        ...input,
+        patch: {
+          ...patch,
+          repair: {
+            ...patch.repair,
+            upsertTasks: patch.repair.upsertTasks.map((task, index) =>
+              index === location.index ? { ...task, spec: next } : task
+            )
+          }
+        }
+      }
+    }
+    case 'plan-criterion':
+      return {
+        ...input,
+        plan: input.plan.map((task, taskIndex) =>
+          taskIndex === location.taskIndex
+            ? {
+                ...task,
+                criteria: task.criteria.map((criterion, criterionIndex) =>
+                  criterionIndex === location.criterionIndex
+                    ? { ...criterion, body: next }
+                    : criterion
+                )
+              }
+            : task
+        )
+      }
+    case 'patch-criterion': {
+      const patch = input.patch!
+      return {
+        ...input,
+        patch: {
+          ...patch,
+          repair: {
+            ...patch.repair,
+            upsertTasks: patch.repair.upsertTasks.map((task, taskIndex) =>
+              taskIndex === location.taskIndex
+                ? {
+                    ...task,
+                    criteria: task.criteria.map((criterion, criterionIndex) =>
+                      criterionIndex === location.criterionIndex
+                        ? { ...criterion, body: next }
+                        : criterion
+                    )
+                  }
+                : task
+            )
+          }
+        }
+      }
+    }
+    case 'assumption':
+      return {
+        ...input,
+        assumptions: input.assumptions.map((assumption, index) =>
+          index === location.index ? { ...assumption, claim: next } : assumption
+        )
+      }
+    case 'lint-detail':
+      return {
+        ...input,
+        lint: {
+          ...input.lint,
+          findings: input.lint.findings.map((finding, index) =>
+            index === location.index ? { ...finding, detail: next } : finding
+          )
+        }
+      }
   }
-  const patch = input.patch!
-  const upsertTasks = patch.repair.upsertTasks.map((task, index) =>
-    index === location.index ? { ...task, spec: nextSpec } : task
+}
+
+/** The largest bounded array still worth shrinking by count once no text is left to truncate. */
+type ArrayLocation =
+  | { field: 'write-territory' }
+  | { field: 'task-territory'; taskIndex: number }
+  | { field: 'lint-findings' }
+
+function largestNonEmptyArray(input: PlanReviewInput): ArrayLocation | null {
+  const candidates: { location: ArrayLocation; length: number }[] = [
+    { location: { field: 'write-territory' }, length: input.writeTerritory.length },
+    { location: { field: 'lint-findings' }, length: input.lint.findings.length },
+    ...input.plan.map((task, taskIndex) => ({
+      location: { field: 'task-territory' as const, taskIndex },
+      length: task.territory?.length ?? 0
+    }))
+  ]
+  const best = candidates.reduce<{ location: ArrayLocation; length: number } | null>(
+    (max, candidate) =>
+      candidate.length > 0 && (!max || candidate.length > max.length) ? candidate : max,
+    null
   )
-  return { ...input, patch: { ...patch, repair: { ...patch.repair, upsertTasks } } }
+  return best?.location ?? null
+}
+
+/** Drops the last element of the given bounded array, e.g. dropping the least-prioritized territory glob. */
+function withDroppedArrayEntry(input: PlanReviewInput, location: ArrayLocation): PlanReviewInput {
+  switch (location.field) {
+    case 'write-territory':
+      return { ...input, writeTerritory: input.writeTerritory.slice(0, -1) }
+    case 'lint-findings':
+      return {
+        ...input,
+        lint: { ...input.lint, findings: input.lint.findings.slice(0, -1), truncated: true }
+      }
+    case 'task-territory':
+      return {
+        ...input,
+        plan: input.plan.map((task, taskIndex) => {
+          if (taskIndex !== location.taskIndex) {
+            return task
+          }
+          const shrunk = task.territory?.slice(0, -1)
+          return { ...task, territory: shrunk && shrunk.length > 0 ? shrunk : undefined }
+        })
+      }
+  }
 }
 
 function serializedByteLength(input: PlanReviewInput): number {
@@ -80,18 +232,24 @@ function serializedByteLength(input: PlanReviewInput): number {
 
 /**
  * Assembles the reviewer's plan-review input: a pure function of already-resolved data (the caller
- * applies a repair patch to its base plan before calling this). Truncates the longest task spec
- * strings first, one at a time, until the serialized input fits the 1 MiB cap or nothing more can
- * be shrunk.
+ * applies a repair patch to its base plan before calling this). Shrinks the longest free-text field
+ * first — task specs, then criteria bodies, assumption claims, and lint details — and once none of
+ * those are left above target, drops trailing entries from the largest bounded array (territory
+ * globs, lint findings), until the serialized input fits the 1 MiB cap or nothing more can be shrunk.
  */
 export function buildPlanReviewInput(input: PlanReviewInput): PlanReviewInput {
   let working = input
   while (serializedByteLength(working) > PLAN_REVIEW_INPUT_MAX_BYTES) {
-    const location = longestUntruncatedSpec(working)
-    if (!location) {
+    const textLocation = longestUntruncatedText(working)
+    if (textLocation) {
+      working = withTruncatedText(working, textLocation)
+      continue
+    }
+    const arrayLocation = largestNonEmptyArray(working)
+    if (!arrayLocation) {
       break
     }
-    working = withTruncatedSpec(working, location)
+    working = withDroppedArrayEntry(working, arrayLocation)
   }
   return working
 }
@@ -100,6 +258,10 @@ export function buildPlanReviewInput(input: PlanReviewInput): PlanReviewInput {
  * Writes the plan-review input JSON beside the issued report path, at
  * `<report directory>/<attemptFingerprint>.plan-review-input.json` — derived from `reportPath`
  * itself rather than a separately-passed fingerprint, since `reportPath`'s basename already is one.
+ *
+ * `buildPlanReviewInput` shrinks best-effort; this is the last gate before anything is written, so a
+ * plan pathological enough to still exceed the cap fails the dispatch instead of writing an oversized
+ * file a downstream reader may reject.
  */
 export async function writePlanReviewInputFile(
   target: ObjectiveWorkspaceTarget,
@@ -111,6 +273,13 @@ export async function writePlanReviewInputFile(
   const fingerprintName = pathFlavor.basename(reportPath, '.json')
   const inputPath = pathFlavor.join(directory, `${fingerprintName}.plan-review-input.json`)
   const serialized = JSON.stringify(input)
+  const serializedBytes = Buffer.byteLength(serialized, 'utf8')
+  if (serializedBytes > PLAN_REVIEW_INPUT_MAX_BYTES) {
+    throw new Error(
+      `Plan review input for ${inputPath} is ${serializedBytes} bytes after truncation, ` +
+        `exceeding the ${PLAN_REVIEW_INPUT_MAX_BYTES}-byte cap`
+    )
+  }
   if (target.fileProvider) {
     await target.fileProvider.writeFile(inputPath, serialized)
     return inputPath

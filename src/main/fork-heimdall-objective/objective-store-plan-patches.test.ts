@@ -174,6 +174,57 @@ describe('ObjectiveStore plan patches', () => {
     expect(store.getPlanReport(revision.revisionId)?.assumptions).toHaveLength(1)
   })
 
+  it('refuses to apply a patch that would push merged assumptions past the entry limit', () => {
+    const revisionReport: PlannerReport = {
+      plan: REPORT.plan,
+      assumptions: Array.from({ length: 64 }, (_, i) => ({
+        claim: `assumption ${i}`,
+        dependentTaskKeys: []
+      }))
+    }
+    const revision = store.ingestPlan({
+      watcherId: WATCHER_ID,
+      revisionNumber: 1,
+      dispatchId: 'planner-1',
+      report: revisionReport,
+      digest: 'plan-digest-64',
+      createdAtMs: 100
+    })
+    store.activatePlan({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      digest: revision.digest,
+      approvedAtMs: 200
+    })
+    const patch = store.ingestPlanPatch({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      dispatchId: 'repair-1',
+      repairOrdinal: 0,
+      report: UPSERT_PATCH,
+      createdAtMs: 500
+    })
+
+    const result = store.applyPlanPatch({
+      watcherId: WATCHER_ID,
+      patchId: patch.id,
+      amendedAtMs: 600,
+      frozenTaskKeys: []
+    })
+
+    if (result.ok || result.reason !== 'assumptions-limit-exceeded') {
+      throw new Error('expected an assumptions-limit-exceeded refusal')
+    }
+    expect(result.detail).toMatch(/64/)
+    const stored = store.getPlanPatch(patch.id)
+    expect(stored?.status).toBe('rejected')
+    expect(stored?.rejection).toMatch(/assumption/i)
+    // the task-upsert half of the patch must not have landed either — the whole patch is refused
+    expect(store.getPlan(revision.revisionId)?.map((task) => task.taskKey)).toEqual(['task-a'])
+    expect(() => store.getPlanReport(revision.revisionId)).not.toThrow()
+    expect(store.getPlanReport(revision.revisionId)?.assumptions).toHaveLength(64)
+  })
+
   it('refuses to apply a patch that touches a frozen task, marking the patch rejected', () => {
     const revision = ingestAndActivate()
     const patch = store.ingestPlanPatch({

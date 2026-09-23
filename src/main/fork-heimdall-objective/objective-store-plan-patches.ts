@@ -3,6 +3,7 @@ import {
   type PlannerRepairReport
 } from '../../shared/fork-heimdall-objective/plan-repair-schema'
 import {
+  OBJECTIVE_PLAN_ASSUMPTIONS_MAX_ENTRIES,
   PlannerReportSchema,
   type ObjectivePlanAssumption
 } from '../../shared/fork-heimdall-objective/plan-schema'
@@ -154,30 +155,40 @@ export function ingestPlanPatch(
   })
 }
 
+/**
+ * The `rejectPlanPatch` body, taking an already-open connection so a caller that must reject a patch
+ * alongside other writes (e.g. recording the plan review that triggered the rejection) can share its
+ * transaction instead of nesting one.
+ */
+export function rejectPlanPatchInTransaction(
+  db: Database.Database,
+  args: RejectPlanPatchArgs
+): ObjectivePlanPatchRecord {
+  const row = readPlanPatchRowById(db, args.patchId)
+  if (!row) {
+    throw new Error('Plan patch was not found')
+  }
+  if (row.status === 'applied') {
+    throw new Error('Plan patch cannot be rejected from applied')
+  }
+  if (row.status === 'rejected') {
+    if (row.rejection !== args.rejection) {
+      throw new Error('Plan patch rejection was replayed with a different reason')
+    }
+    return planPatchRecord(row)
+  }
+  db.prepare(
+    `UPDATE plan_patch SET status = 'rejected', rejection = ?, resolved_at_ms = ? WHERE id = ?`
+  ).run(args.rejection, args.resolvedAtMs, args.patchId)
+  return planPatchRecord(readPlanPatchRowById(db, args.patchId)!)
+}
+
 /** Rejects a pending patch outright, e.g. after a `revise`/`escalate` plan review verdict. */
 export function rejectPlanPatch(
   database: ObjectiveDatabase,
   args: RejectPlanPatchArgs
 ): ObjectivePlanPatchRecord {
-  return runObjectiveMutation(database, (db) => {
-    const row = readPlanPatchRowById(db, args.patchId)
-    if (!row) {
-      throw new Error('Plan patch was not found')
-    }
-    if (row.status === 'applied') {
-      throw new Error('Plan patch cannot be rejected from applied')
-    }
-    if (row.status === 'rejected') {
-      if (row.rejection !== args.rejection) {
-        throw new Error('Plan patch rejection was replayed with a different reason')
-      }
-      return planPatchRecord(row)
-    }
-    db.prepare(
-      `UPDATE plan_patch SET status = 'rejected', rejection = ?, resolved_at_ms = ? WHERE id = ?`
-    ).run(args.rejection, args.resolvedAtMs, args.patchId)
-    return planPatchRecord(readPlanPatchRowById(db, args.patchId)!)
-  })
+  return runObjectiveMutation(database, (db) => rejectPlanPatchInTransaction(db, args))
 }
 
 function mergeAssumptionsOntoRevision(
@@ -201,16 +212,36 @@ function mergeAssumptionsOntoRevision(
   )
 }
 
+/** A patch refused because merging its assumptions onto the revision would exceed the entry cap. */
+export type PlanPatchAssumptionsLimitRefusal = {
+  ok: false
+  reason: 'assumptions-limit-exceeded'
+  detail: string
+}
+
+export type ApplyPlanPatchResult = RevisionAmendmentResult | PlanPatchAssumptionsLimitRefusal
+
+function assumptionsLimitRejection(mergedCount: number): string {
+  return (
+    `Patch assumptions would merge to ${mergedCount}, exceeding the ` +
+    `${OBJECTIVE_PLAN_ASSUMPTIONS_MAX_ENTRIES}-assumption limit`
+  )
+}
+
 /**
  * Applies a pending patch to its revision inside one transaction: the amendment and the patch's own
  * `applied`/`rejected` transition either both land or neither does. Replaying an already-applied
  * patch re-runs `amendObjectiveRevisionInTransaction`, which recognizes its own digest and reports
  * `replayed: true` without writing anything again.
+ *
+ * A patch whose assumptions would merge past `OBJECTIVE_PLAN_ASSUMPTIONS_MAX_ENTRIES` is refused
+ * before the amendment ever runs — the merged payload has no schema check on write, so applying it
+ * would strand the revision the moment anything next reads it back through `PlannerReportSchema`.
  */
 export function applyPlanPatch(
   database: ObjectiveDatabase,
   args: ApplyPlanPatchArgs
-): RevisionAmendmentResult {
+): ApplyPlanPatchResult {
   return runObjectiveMutation(database, (db) => {
     const row = readPlanPatchRowById(db, args.patchId)
     if (!row || row.watcher_id !== args.watcherId) {
@@ -227,39 +258,46 @@ export function applyPlanPatch(
       ? (parseJson(PlannerReportSchema, previousRevision.payload_json, 'plan payload')
           .assumptions ?? [])
       : []
+    const patchAssumptions = report.assumptions ?? []
+    const mergedAssumptionsCount = previousAssumptions.length + patchAssumptions.length
 
-    const result = amendObjectiveRevisionInTransaction(db, {
-      watcherId: args.watcherId,
-      revisionId: row.revision_id,
-      amendedAtMs: args.amendedAtMs,
-      frozenTaskKeys: args.frozenTaskKeys,
-      patch: {
-        digest: row.digest,
-        attestation: `planner-repair:${args.patchId}`,
-        upsertTasks: report.repair.upsertTasks,
-        dropTaskKeys: report.repair.dropTaskKeys
-      }
-    })
+    const result: ApplyPlanPatchResult =
+      row.status === 'pending' && mergedAssumptionsCount > OBJECTIVE_PLAN_ASSUMPTIONS_MAX_ENTRIES
+        ? {
+            ok: false,
+            reason: 'assumptions-limit-exceeded',
+            detail: assumptionsLimitRejection(mergedAssumptionsCount)
+          }
+        : amendObjectiveRevisionInTransaction(db, {
+            watcherId: args.watcherId,
+            revisionId: row.revision_id,
+            amendedAtMs: args.amendedAtMs,
+            frozenTaskKeys: args.frozenTaskKeys,
+            patch: {
+              digest: row.digest,
+              attestation: `planner-repair:${args.patchId}`,
+              upsertTasks: report.repair.upsertTasks,
+              dropTaskKeys: report.repair.dropTaskKeys
+            }
+          })
 
     if (row.status !== 'pending') {
       return result
     }
     if (result.ok) {
-      mergeAssumptionsOntoRevision(
-        db,
-        row.revision_id,
-        previousAssumptions,
-        report.assumptions ?? []
-      )
+      mergeAssumptionsOntoRevision(db, row.revision_id, previousAssumptions, patchAssumptions)
       db.prepare(`UPDATE plan_patch SET status = 'applied', resolved_at_ms = ? WHERE id = ?`).run(
         args.amendedAtMs,
         args.patchId
       )
     } else {
-      const offender = 'taskKey' in result ? result.taskKey : result.detail
+      const rejection =
+        result.reason === 'assumptions-limit-exceeded'
+          ? result.detail
+          : `${result.reason}:${'taskKey' in result ? result.taskKey : result.detail}`
       db.prepare(
         `UPDATE plan_patch SET status = 'rejected', rejection = ?, resolved_at_ms = ? WHERE id = ?`
-      ).run(`${result.reason}:${offender}`, args.amendedAtMs, args.patchId)
+      ).run(rejection, args.amendedAtMs, args.patchId)
     }
     return result
   })
@@ -286,29 +324,39 @@ export function listPlanPatches(
   return rows.map(planPatchRecord)
 }
 
+/**
+ * The `rejectDraftRevision` body, taking an already-open connection so a caller that must reject a
+ * draft alongside other writes (e.g. recording the plan review that triggered the rejection) can
+ * share its transaction instead of nesting one.
+ */
+export function rejectDraftRevisionInTransaction(
+  db: Database.Database,
+  args: { watcherId: string; revisionId: string }
+): void {
+  const row = db
+    .prepare('SELECT status FROM plan_revision WHERE id = ? AND watcher_id = ?')
+    .get(args.revisionId, args.watcherId) as { status: string } | undefined
+  if (!row) {
+    throw new Error('Plan revision was not found for rejection')
+  }
+  if (row.status === 'rejected') {
+    return
+  }
+  if (row.status !== 'draft') {
+    throw new Error(`Plan revision cannot be rejected from ${row.status}`)
+  }
+  db.prepare("UPDATE plan_revision SET status = 'rejected' WHERE id = ? AND watcher_id = ?").run(
+    args.revisionId,
+    args.watcherId
+  )
+}
+
 /** Frees a watcher's one-draft slot so a new draft can be ingested without waiting on owner review. */
 export function rejectDraftRevision(
   database: ObjectiveDatabase,
   args: { watcherId: string; revisionId: string }
 ): void {
-  runObjectiveMutation(database, (db) => {
-    const row = db
-      .prepare('SELECT status FROM plan_revision WHERE id = ? AND watcher_id = ?')
-      .get(args.revisionId, args.watcherId) as { status: string } | undefined
-    if (!row) {
-      throw new Error('Plan revision was not found for rejection')
-    }
-    if (row.status === 'rejected') {
-      return
-    }
-    if (row.status !== 'draft') {
-      throw new Error(`Plan revision cannot be rejected from ${row.status}`)
-    }
-    db.prepare("UPDATE plan_revision SET status = 'rejected' WHERE id = ? AND watcher_id = ?").run(
-      args.revisionId,
-      args.watcherId
-    )
-  })
+  runObjectiveMutation(database, (db) => rejectDraftRevisionInTransaction(db, args))
 }
 
 function touchedTaskKeys(report: PlannerRepairReport): string[] {

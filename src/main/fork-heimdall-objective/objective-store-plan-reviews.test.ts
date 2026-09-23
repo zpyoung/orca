@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { PlanReviewReport } from '../../shared/fork-heimdall-objective/plan-review-schema'
+import type { PlannerReport } from '../../shared/fork-heimdall-objective/plan-schema'
 import { ObjectiveDatabase } from './objective-database'
 import { ObjectiveStore } from './objective-store'
 import { projectPlanReviews } from './objective-store-plan-reviews'
@@ -16,6 +17,18 @@ const REVISE_REPORT: PlanReviewReport = {
   assumptions: [],
   findings: [{ taskKey: 'task-a', severity: 'blocking', body: 'Missing coverage' }],
   summary: 'Needs another pass'
+}
+const PLAN_REPORT: PlannerReport = {
+  plan: [
+    {
+      taskKey: 'task-a',
+      title: 'Task A',
+      spec: 'Implement A',
+      deps: [],
+      criteria: [{ body: 'A works', shellCheckable: false, checkCommand: null }],
+      declaresDependencyChange: false
+    }
+  ]
 }
 
 let database: ObjectiveDatabase
@@ -151,5 +164,142 @@ describe('ObjectiveStore plan reviews', () => {
     expect(projected[0]?.dispatchId).toBe('plan-review-1024')
     expect(projected.at(-1)?.dispatchId).toBe('plan-review-1')
     expect(projected.some((review) => review.dispatchId === 'plan-review-0')).toBe(false)
+  })
+})
+
+describe('recordPlanReviewAndRejectRoundOneTarget', () => {
+  it('records the review and rejects the draft revision in one call', () => {
+    const draft = store.ingestPlan({
+      watcherId: WATCHER_ID,
+      revisionNumber: 1,
+      dispatchId: 'planner-1',
+      report: PLAN_REPORT,
+      digest: 'plan-digest-1',
+      createdAtMs: 100
+    })
+
+    const record = store.recordPlanReviewAndRejectRoundOneTarget({
+      watcherId: WATCHER_ID,
+      targetKind: 'revision',
+      targetId: draft.revisionId,
+      round: 1,
+      dispatchId: 'plan-review-1',
+      report: REVISE_REPORT,
+      reportDigest: 'digest-1',
+      createdAtMs: 500
+    })
+
+    expect(record.report).toEqual(REVISE_REPORT)
+    expect(store.project(WATCHER_ID).revisions[0]?.status).toBe('rejected')
+  })
+
+  it('records the review and rejects the pending patch in one call', () => {
+    const revision = store.ingestPlan({
+      watcherId: WATCHER_ID,
+      revisionNumber: 1,
+      dispatchId: 'planner-1',
+      report: PLAN_REPORT,
+      digest: 'plan-digest-1',
+      createdAtMs: 100
+    })
+    store.activatePlan({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      digest: revision.digest,
+      approvedAtMs: 200
+    })
+    const patch = store.ingestPlanPatch({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      dispatchId: 'repair-1',
+      repairOrdinal: 0,
+      report: { repair: { upsertTasks: [], dropTaskKeys: ['task-a'] }, assumptions: [] },
+      createdAtMs: 300
+    })
+
+    store.recordPlanReviewAndRejectRoundOneTarget({
+      watcherId: WATCHER_ID,
+      targetKind: 'patch',
+      targetId: patch.id,
+      round: 1,
+      dispatchId: 'plan-review-1',
+      report: REVISE_REPORT,
+      reportDigest: 'digest-1',
+      createdAtMs: 500
+    })
+
+    expect(store.getPlanPatch(patch.id)).toMatchObject({
+      status: 'rejected',
+      rejection: 'plan-review-revise'
+    })
+  })
+
+  it('does not reject the target for an approve verdict or a round-two revise', () => {
+    const draft = store.ingestPlan({
+      watcherId: WATCHER_ID,
+      revisionNumber: 1,
+      dispatchId: 'planner-1',
+      report: PLAN_REPORT,
+      digest: 'plan-digest-1',
+      createdAtMs: 100
+    })
+
+    store.recordPlanReviewAndRejectRoundOneTarget({
+      watcherId: WATCHER_ID,
+      targetKind: 'revision',
+      targetId: draft.revisionId,
+      round: 1,
+      dispatchId: 'plan-review-approve',
+      report: APPROVE_REPORT,
+      reportDigest: 'digest-1',
+      createdAtMs: 500
+    })
+    expect(store.project(WATCHER_ID).revisions[0]?.status).toBe('draft')
+
+    store.recordPlanReviewAndRejectRoundOneTarget({
+      watcherId: WATCHER_ID,
+      targetKind: 'revision',
+      targetId: draft.revisionId,
+      round: 2,
+      dispatchId: 'plan-review-round-2',
+      report: REVISE_REPORT,
+      reportDigest: 'digest-2',
+      createdAtMs: 600
+    })
+    expect(store.project(WATCHER_ID).revisions[0]?.status).toBe('draft')
+  })
+
+  it('leaves no review row when the round-one rejection write fails', () => {
+    const revision = store.ingestPlan({
+      watcherId: WATCHER_ID,
+      revisionNumber: 1,
+      dispatchId: 'planner-1',
+      report: PLAN_REPORT,
+      digest: 'plan-digest-1',
+      createdAtMs: 100
+    })
+    // an already-approved revision can no longer be rejected as a draft, so its round-one
+    // rejection write fails after the review row would otherwise have been inserted
+    store.activatePlan({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      digest: revision.digest,
+      approvedAtMs: 200
+    })
+
+    expect(() =>
+      store.recordPlanReviewAndRejectRoundOneTarget({
+        watcherId: WATCHER_ID,
+        targetKind: 'revision',
+        targetId: revision.revisionId,
+        round: 1,
+        dispatchId: 'plan-review-atomic',
+        report: REVISE_REPORT,
+        reportDigest: 'digest-atomic',
+        createdAtMs: 700
+      })
+    ).toThrow(/cannot be rejected from approved/)
+
+    expect(store.listPlanReviews(WATCHER_ID)).toEqual([])
   })
 })
