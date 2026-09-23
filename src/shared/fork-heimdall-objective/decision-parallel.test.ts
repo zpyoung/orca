@@ -395,6 +395,118 @@ describe('parallel objective decisions', () => {
     })
   })
 
+  it('routes a criteria-classified ingest rejection to the failed-node path instead of retrying', () => {
+    const dispatch = dispatchAction('node-1')
+    const ingestAction: Extract<ObjectiveAction, { kind: 'ingest-report' }> = {
+      kind: 'ingest-report',
+      capability: 'implement',
+      visibility: 'local',
+      recovery: 'replay-safe',
+      contentIdentity: 'content-current',
+      evidenceKey: 'dispatch-node-1',
+      revisionId: 'revision-1',
+      dispatchId: 'dispatch-node-1',
+      taskKey: 'node-1',
+      orchestrationTaskId: 'orchestration-node-1',
+      reportPath: '/reports/node-1.json',
+      filesModified: ['src/node-1.ts'],
+      dispatchedContentIdentity: 'content-current'
+    }
+    const durableReport = dispatchRecord('node-1', 'running', {
+      dispatchId: 'dispatch-node-1',
+      reportDigest: 'digest-node-1',
+      report: {
+        taskKey: 'node-1',
+        summary: 'Implemented node one.',
+        filesModified: ['src/node-1.ts'],
+        criteriaSelfAssessment: [{ criterionIndex: 0, result: 'pass', note: 'Verified locally.' }]
+      }
+    })
+    const plan = projection({
+      nodes: [node('node-1', { state: 'dispatched', dispatchId: 'dispatch-node-1' })]
+    })
+    const rejectionReason = 'Objective node HEAD does not descend from its dispatch baseline'
+
+    const decision = decideObjective(
+      snapshot(plan, {
+        parallel: { effectiveMaxConcurrency: 3, runningCount: 1, dispatches: [durableReport] }
+      }),
+      ledger([
+        attempt(dispatch, { state: 'settled', effect: 'landed', dispatchId: 'dispatch-node-1' }),
+        workerDone('dispatch-node-1', 'node-1', 40),
+        {
+          ...attempt(ingestAction, {
+            state: 'settled',
+            effect: 'not-landed',
+            dispatchId: 'ingest-dispatch-node-1',
+            reason: rejectionReason
+          }),
+          failureClass: 'criteria'
+        }
+      ]),
+      true
+    )
+
+    expect(decision).toMatchObject({
+      action: null,
+      deviation: { kind: 'report-rejected', taskKey: 'node-1', rejectionReason }
+    })
+  })
+
+  it('keeps re-emitting ingest-report while the same durable rejection is classified infra', () => {
+    const dispatch = dispatchAction('node-1')
+    const ingestAction: Extract<ObjectiveAction, { kind: 'ingest-report' }> = {
+      kind: 'ingest-report',
+      capability: 'implement',
+      visibility: 'local',
+      recovery: 'replay-safe',
+      contentIdentity: 'content-current',
+      evidenceKey: 'dispatch-node-1',
+      revisionId: 'revision-1',
+      dispatchId: 'dispatch-node-1',
+      taskKey: 'node-1',
+      orchestrationTaskId: 'orchestration-node-1',
+      reportPath: '/reports/node-1.json',
+      filesModified: ['src/node-1.ts'],
+      dispatchedContentIdentity: 'content-current'
+    }
+    const durableReport = dispatchRecord('node-1', 'running', {
+      dispatchId: 'dispatch-node-1',
+      reportDigest: 'digest-node-1',
+      report: {
+        taskKey: 'node-1',
+        summary: 'Implemented node one.',
+        filesModified: ['src/node-1.ts'],
+        criteriaSelfAssessment: [{ criterionIndex: 0, result: 'pass', note: 'Verified locally.' }]
+      }
+    })
+    const plan = projection({
+      nodes: [node('node-1', { state: 'dispatched', dispatchId: 'dispatch-node-1' })]
+    })
+
+    const decision = decideObjective(
+      snapshot(plan, {
+        parallel: { effectiveMaxConcurrency: 3, runningCount: 1, dispatches: [durableReport] }
+      }),
+      ledger([
+        attempt(dispatch, { state: 'settled', effect: 'landed', dispatchId: 'dispatch-node-1' }),
+        workerDone('dispatch-node-1', 'node-1', 40),
+        {
+          ...attempt(ingestAction, {
+            state: 'settled',
+            effect: 'not-landed',
+            dispatchId: 'ingest-dispatch-node-1',
+            reason: 'git process spawn failed: ENOENT'
+          }),
+          failureClass: 'infra'
+        }
+      ]),
+      true
+    )
+
+    expect(decision.action).toMatchObject({ kind: 'ingest-report', dispatchId: 'dispatch-node-1' })
+  })
+
   it('keeps planner work exclusive from implementer fanout', () => {
     const planner: ObjectiveAction = {
       kind: 'dispatch-planner',
