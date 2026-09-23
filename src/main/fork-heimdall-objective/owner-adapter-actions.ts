@@ -66,32 +66,42 @@ function ownerGuidancePlannerAction(
   requestedSkipStage?: string,
   ledger?: WatcherLedger
 ): DispatchPlannerAction {
-  const nextNumber =
-    world.plan.revisions.reduce((max, revision) => Math.max(max, revision.number), 0) + 1
   const approved = activeObjectiveRevision(world)
-  const repairFields =
-    approved === null
-      ? {}
-      : ({
-          shape: 'repair',
-          repairRevisionId: approved.id,
-          repairOrdinal: nextObjectiveRepairOrdinal(
-            world,
-            ledger === undefined ? [] : objectiveAttempts(ledger),
-            approved.id
-          )
-        } as const)
+  if (approved === null) {
+    const nextNumber =
+      world.plan.revisions.reduce((max, revision) => Math.max(max, revision.number), 0) + 1
+    return {
+      kind: 'dispatch-planner',
+      capability: 'plan',
+      visibility: 'local',
+      contentIdentity: snapshot.contentIdentity,
+      evidenceKey: `plan:${nextNumber}:owner-directed:${snapshot.contentIdentity}`,
+      revisionNumber: nextNumber,
+      reason: 'owner-directed',
+      guidance,
+      ...(requestedSkipStage === undefined ? {} : { requestedSkipStage })
+    }
+  }
+  // an owner-directed repair still patches the approved revision, so its revisionNumber must be
+  // that revision's own number, matching what decideRepairPlannerAction later carries onto ingest
+  const repairOrdinal = nextObjectiveRepairOrdinal(
+    world,
+    ledger === undefined ? [] : objectiveAttempts(ledger),
+    approved.id
+  )
   return {
     kind: 'dispatch-planner',
     capability: 'plan',
     visibility: 'local',
     contentIdentity: snapshot.contentIdentity,
-    evidenceKey: `plan:${nextNumber}:owner-directed:${snapshot.contentIdentity}`,
-    revisionNumber: nextNumber,
+    evidenceKey: `plan-repair:${approved.id}:${repairOrdinal}:owner-directed:${snapshot.contentIdentity}`,
+    revisionNumber: approved.number,
     reason: 'owner-directed',
     guidance,
     ...(requestedSkipStage === undefined ? {} : { requestedSkipStage }),
-    ...repairFields
+    shape: 'repair',
+    repairRevisionId: approved.id,
+    repairOrdinal
   }
 }
 

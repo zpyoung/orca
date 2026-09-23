@@ -228,7 +228,11 @@ describe('objectiveActionForIntervention: owner-directed planner shape', () => {
       kind: 'dispatch-planner',
       shape: 'repair',
       repairRevisionId: 'revision-1',
-      repairOrdinal: 1
+      repairOrdinal: 1,
+      // must carry the approved revision's own number, not a freshly minted one, or
+      // ingestObjectivePlanReport rejects the landed report as a dispatch/ingest mismatch (C1)
+      revisionNumber: 1,
+      evidenceKey: 'plan-repair:revision-1:1:owner-directed:content-current'
     })
   })
 
@@ -253,7 +257,28 @@ describe('objectiveActionForIntervention: owner-directed planner shape', () => {
     expect(action).toMatchObject({
       shape: 'repair',
       repairRevisionId: 'revision-1',
-      repairOrdinal: 3
+      repairOrdinal: 3,
+      revisionNumber: 1
+    })
+  })
+
+  it('carries the approved revision number rather than a freshly minted one when other revisions exist', () => {
+    const plan = projection({
+      revisions: [
+        revision({ number: 1 }),
+        revision({ id: 'revision-2', number: 5, status: 'draft' })
+      ]
+    })
+    const action = objectiveActionForIntervention(
+      { kind: 'dispatch-planner', guidance: 'Steer the plan.' },
+      snapshot(plan),
+      ledger()
+    )
+    expect(action).toMatchObject({
+      kind: 'dispatch-planner',
+      shape: 'repair',
+      repairRevisionId: 'revision-1',
+      revisionNumber: 1
     })
   })
 })

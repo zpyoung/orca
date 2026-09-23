@@ -54,7 +54,9 @@ afterEach(() => {
   opened.length = 0
 })
 
-function repairFixture(): {
+function repairFixture(
+  dispatchOverrides: Partial<Extract<ObjectiveAction, { kind: 'dispatch-planner' }>> = {}
+): {
   objectiveStore: ObjectiveStore
   revisionId: string
   binding: ObjectiveSnapshotBinding
@@ -99,7 +101,8 @@ function repairFixture(): {
     reason: 'replan-after-block',
     shape: 'repair',
     repairOrdinal: 1,
-    repairRevisionId: revision.revisionId
+    repairRevisionId: revision.revisionId,
+    ...dispatchOverrides
   } satisfies ObjectiveAction
   const fingerprint = makeAttemptFingerprint(
     dispatchAction.contentIdentity,
@@ -313,7 +316,9 @@ describe('objective repair-shaped plan ingestion', () => {
   })
 
   it('refuses ingestion without persisting a patch when the target revision is unknown', async () => {
-    const fixture = repairFixture()
+    // origin and ingest agree on the (nonexistent) revision id, so this exercises the store
+    // lookup failing rather than the origin/ingest shape-match check
+    const fixture = repairFixture({ repairRevisionId: 'revision-unknown' })
     readReport.mockResolvedValue({
       ok: true,
       role: 'planner',
@@ -334,5 +339,86 @@ describe('objective repair-shaped plan ingestion', () => {
       reason: 'planner-repair-target-revision-missing'
     })
     expect(fixture.objectiveStore.listPlanPatches(WATCHER_ID)).toHaveLength(0)
+  })
+
+  it('rejects a repair ingest whose targetRevisionId does not match the originating dispatch repairRevisionId', async () => {
+    const fixture = repairFixture()
+
+    const outcome = await ingestObjectivePlanReport({
+      action: ingestAction(fixture, { targetRevisionId: 'revision-other' }),
+      binding: fixture.binding,
+      context: fixture.contextWith(),
+      objectiveStore: fixture.objectiveStore
+    })
+
+    expect(outcome).toMatchObject({
+      effect: 'not-landed',
+      reason: 'planner-repair-origin-mismatch'
+    })
+    expect(fixture.objectiveStore.listPlanPatches(WATCHER_ID)).toHaveLength(0)
+  })
+
+  it('rejects a full-shaped ingest whose origin dispatch was repair-shaped', async () => {
+    const fixture = repairFixture()
+
+    const outcome = await ingestObjectivePlanReport({
+      action: ingestAction(fixture, { shape: undefined, targetRevisionId: undefined }),
+      binding: fixture.binding,
+      context: fixture.contextWith(),
+      objectiveStore: fixture.objectiveStore
+    })
+
+    expect(outcome).toMatchObject({
+      effect: 'not-landed',
+      reason: 'planner-repair-origin-mismatch'
+    })
+    expect(fixture.objectiveStore.listPlanPatches(WATCHER_ID)).toHaveLength(0)
+  })
+
+  it('rejects a repair-shaped ingest whose origin dispatch was full-shaped', async () => {
+    const fixture = repairFixture({
+      shape: undefined,
+      repairOrdinal: undefined,
+      repairRevisionId: undefined
+    })
+
+    const outcome = await ingestObjectivePlanReport({
+      action: ingestAction(fixture),
+      binding: fixture.binding,
+      context: fixture.contextWith(),
+      objectiveStore: fixture.objectiveStore
+    })
+
+    expect(outcome).toMatchObject({ effect: 'not-landed', reason: 'planner-dispatch-mismatch' })
+    expect(fixture.objectiveStore.listPlanPatches(WATCHER_ID)).toHaveLength(0)
+  })
+
+  it('accepts a repair report whose origin dispatch was owner-directed', async () => {
+    // mirrors the fixed shape: an owner-directed repair dispatch carries the approved revision's
+    // own number, so its landed report ingests without a dispatch/ingest revisionNumber mismatch
+    const fixture = repairFixture({
+      reason: 'owner-directed',
+      revisionNumber: 1,
+      evidenceKey: 'plan-repair:revision-1:1:owner-directed:content-1'
+    })
+    readReport.mockResolvedValue({
+      ok: true,
+      role: 'planner',
+      path: REPORT_PATH,
+      report: { repair: { upsertTasks: [], dropTaskKeys: ['extra'] }, assumptions: [] },
+      reportDigest: 'digest-repair-owner-1'
+    })
+
+    const outcome = await ingestObjectivePlanReport({
+      action: ingestAction(fixture, { revisionNumber: 1 }),
+      binding: fixture.binding,
+      context: fixture.contextWith(),
+      objectiveStore: fixture.objectiveStore
+    })
+
+    expect(outcome).toMatchObject({
+      effect: 'landed',
+      result: { kind: 'plan-patch-ingested', status: 'pending' }
+    })
   })
 })

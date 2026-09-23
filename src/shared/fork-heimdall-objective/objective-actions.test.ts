@@ -209,6 +209,56 @@ describe('objective repair plumbing action contracts', () => {
     ).toBe(true)
   })
 
+  it('rejects repairOrdinal or repairRevisionId on a dispatch-planner action unless shape is repair', () => {
+    const full = {
+      kind: 'dispatch-planner',
+      capability: 'plan',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'plan:1',
+      revisionNumber: 1,
+      reason: 'initial'
+    }
+    expect(ObjectiveActionSchema.safeParse(full).success).toBe(true)
+    expect(ObjectiveActionSchema.safeParse({ ...full, repairOrdinal: 1 }).success).toBe(false)
+    expect(
+      ObjectiveActionSchema.safeParse({ ...full, repairRevisionId: 'revision-1' }).success
+    ).toBe(false)
+    expect(
+      ObjectiveActionSchema.safeParse({
+        ...full,
+        shape: 'full',
+        repairOrdinal: 1,
+        repairRevisionId: 'revision-1'
+      }).success
+    ).toBe(false)
+  })
+
+  it('rejects targetRevisionId on an ingest-plan action unless shape is repair', () => {
+    const full = {
+      kind: 'ingest-plan',
+      capability: 'plan',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'dispatch-plan',
+      recovery: 'replay-safe',
+      dispatchId: 'dispatch-plan',
+      revisionNumber: 1,
+      reportPath: '/outside/plan.json'
+    }
+    expect(ObjectiveActionSchema.safeParse(full).success).toBe(true)
+    expect(
+      ObjectiveActionSchema.safeParse({ ...full, targetRevisionId: 'revision-1' }).success
+    ).toBe(false)
+    expect(
+      ObjectiveActionSchema.safeParse({
+        ...full,
+        shape: 'full',
+        targetRevisionId: 'revision-1'
+      }).success
+    ).toBe(false)
+  })
+
   it('parses apply-plan-patch and derives its patchId natural key', () => {
     const raw = {
       kind: 'apply-plan-patch',
