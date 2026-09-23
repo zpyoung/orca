@@ -98,6 +98,16 @@ describe('objective detail plan-quality fields', () => {
     )
   })
 
+  it('accepts a pending patch that omits rejection (C12)', () => {
+    const { rejection: _rejection, ...patchWithoutRejection } = {
+      id: 'patch-1',
+      status: 'pending' as const,
+      rejection: null,
+      touchedTaskKeys: []
+    }
+    expect(ObjectiveDetailPendingPatchSchema.safeParse(patchWithoutRejection).success).toBe(true)
+  })
+
   it('accepts a gate with and without a last result', () => {
     const gate = { name: 'lint', command: 'pnpm lint', timeoutSeconds: 600 }
     expect(ObjectiveDetailGateSchema.safeParse(gate).success).toBe(true)

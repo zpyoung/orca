@@ -112,7 +112,7 @@ describe('decideObjective repair episode, end to end', () => {
     })
   })
 
-  it('waits on the running sibling instead of starting a repair planner early', () => {
+  it('starts a repair planner for a failed node while a sibling is still running', () => {
     const plan = projection({
       nodes: [
         node('failed-task', { state: 'failed', dispatchId: 'dispatch-failed' }),
@@ -129,7 +129,13 @@ describe('decideObjective repair episode, end to end', () => {
       }),
       ledger()
     )
-    expect(decision).toMatchObject({ action: null, reason: 'node-in-flight' })
+    expect(decision.action).toMatchObject({
+      kind: 'dispatch-planner',
+      shape: 'repair',
+      repairRevisionId: 'revision-1',
+      repairOrdinal: 1,
+      reason: 'replan-after-failure'
+    })
   })
 
   it('still applies a running sibling queued to merge while a node has failed', () => {

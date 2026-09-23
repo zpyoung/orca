@@ -352,9 +352,10 @@ export type ObjectiveDetailPlanReview = z.infer<typeof ObjectiveDetailPlanReview
 export const ObjectiveDetailPendingPatchSchema = ObjectivePlanPatchProjectionSchema.pick({
   id: true,
   status: true,
-  rejection: true,
   touchedTaskKeys: true
-}).strict()
+})
+  .extend({ rejection: z.string().max(8_192).nullable().optional() })
+  .strict()
 export type ObjectiveDetailPendingPatch = z.infer<typeof ObjectiveDetailPendingPatchSchema>
 
 export const ObjectiveDetailGateLastResultSchema = z

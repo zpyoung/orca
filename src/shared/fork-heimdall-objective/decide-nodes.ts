@@ -487,14 +487,16 @@ export function decideObjectiveNodes(
   const incomplete = nodes.filter(
     (node) => node.state !== 'succeeded' && node.state !== 'replanned'
   )
+  // a failed node's outcome starts immediately; running siblings with no pending ingest/apply
+  // work are frozen, not waited for (earlier returns above already gave them precedence)
+  if (failureOutcomes.length > 0) {
+    return failureOutcomes[0]
+  }
   const activeTaskKey =
     incomplete.find((node) => activeTaskKeys.has(node.taskKey) && !failedTaskKeys.has(node.taskKey))
       ?.taskKey ?? null
   if (activeTaskKey !== null) {
     return objectiveNoAction('implementation', 'node-in-flight', activeTaskKey)
-  }
-  if (failureOutcomes.length > 0) {
-    return failureOutcomes[0]
   }
   if (incomplete.length > 0) {
     const lengths = objectiveRemainingChainLengths(nodes)
