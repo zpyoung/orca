@@ -228,6 +228,33 @@ export const DispatchIntegratorActionSchema = z
   .strict()
 export type DispatchIntegratorAction = z.infer<typeof DispatchIntegratorActionSchema>
 
+export const PlanReviewTargetSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('revision'), revisionId: IdSchema }).strict(),
+  z.object({ kind: z.literal('patch'), patchId: IdSchema }).strict()
+])
+
+export const DispatchPlanReviewActionSchema = z
+  .object({
+    ...ActionBase,
+    kind: z.literal('dispatch-plan-review'),
+    capability: z.literal('review'),
+    target: PlanReviewTargetSchema,
+    round: z.union([z.literal(1), z.literal(2)])
+  })
+  .strict()
+
+export const IngestPlanReviewActionSchema = z
+  .object({
+    ...ActionBase,
+    kind: z.literal('ingest-plan-review'),
+    capability: z.literal('review'),
+    recovery: ReplaySafeSchema,
+    dispatchId: IdSchema,
+    reportPath: z.string().trim().min(1).max(OBJECTIVE_PATH_MAX_LENGTH),
+    target: PlanReviewTargetSchema
+  })
+  .strict()
+
 export const IngestVerdictActionSchema = z
   .object({
     ...ActionBase,
@@ -384,7 +411,9 @@ export const ObjectiveActionSchema = z.discriminatedUnion('kind', [
   AmendPlanActionSchema,
   SkipReviewActionSchema,
   SkipCheckActionSchema,
-  ApplyPlanPatchActionSchema
+  ApplyPlanPatchActionSchema,
+  DispatchPlanReviewActionSchema,
+  IngestPlanReviewActionSchema
 ])
 export type ObjectiveAction = z.infer<typeof ObjectiveActionSchema>
 
@@ -445,7 +474,8 @@ export const ObjectiveActionNaturalKeySchema = z.discriminatedUnion('kind', [
   z
     .object({ kind: z.literal('gate-attempt'), gateName: IdSchema, contentIdentity: IdSchema })
     .strict(),
-  z.object({ kind: z.literal('plan-patch'), patchId: IdSchema }).strict()
+  z.object({ kind: z.literal('plan-patch'), patchId: IdSchema }).strict(),
+  z.object({ kind: z.literal('plan-review'), dispatchId: IdSchema }).strict()
 ])
 export type ObjectiveActionNaturalKey = z.infer<typeof ObjectiveActionNaturalKeySchema>
 
@@ -458,82 +488,53 @@ export function objectiveActionNaturalKey(
     case 'activate-plan':
       return { kind: 'plan-activation', revisionId: action.revisionId, digest: action.digest }
     case 'ingest-report':
-      return {
-        kind: 'implementer-report',
-        revisionId: action.revisionId,
-        taskKey: action.taskKey,
-        dispatchId: action.dispatchId
-      }
-    case 'apply-node':
-      return {
-        kind: 'node-application',
-        revisionId: action.revisionId,
-        taskKey: action.taskKey,
-        dispatchId: action.dispatchId
-      }
+    case 'accept-report': {
+      const { revisionId, taskKey, dispatchId } = action
+      return { kind: 'implementer-report', revisionId, taskKey, dispatchId }
+    }
+    case 'apply-node': {
+      const { revisionId, taskKey, dispatchId } = action
+      return { kind: 'node-application', revisionId, taskKey, dispatchId }
+    }
     case 'run-check':
-      return {
-        kind: 'check-attempt',
-        criterionId: action.criterionId,
-        contentIdentity: action.contentIdentity
-      }
+    case 'skip-check': {
+      const { criterionId, contentIdentity } = action
+      return { kind: 'check-attempt', criterionId, contentIdentity }
+    }
     case 'ingest-verdict':
-      return { kind: 'review-verdict', dispatchId: action.dispatchId }
-    case 'record-landing':
-      return {
-        kind: 'landing-evidence',
-        rung: action.rung,
-        contentIdentity: action.contentIdentity
-      }
-    case 'commit-local-branch':
-      return {
-        kind: 'commit-local-branch',
-        revisionId: action.revisionId,
-        fromContentIdentity: action.fromContentIdentity
-      }
-    case 'push-ref':
-      return {
-        kind: 'push-ref',
-        commitSha: action.commitSha,
-        remote: action.remote,
-        branch: action.branch
-      }
-    case 'open-hosted-review':
-      return {
-        kind: 'open-hosted-review',
-        provider: action.provider,
-        branch: action.branch,
-        headSha: action.headSha
-      }
-    case 'accept-report':
-      return {
-        kind: 'implementer-report',
-        revisionId: action.revisionId,
-        taskKey: action.taskKey,
-        dispatchId: action.dispatchId
-      }
-    case 'amend-plan':
-      return { kind: 'plan-amendment', revisionId: action.revisionId, digest: action.patch.digest }
     case 'skip-review':
       return { kind: 'review-verdict', dispatchId: action.dispatchId }
-    case 'skip-check':
-      return {
-        kind: 'check-attempt',
-        criterionId: action.criterionId,
-        contentIdentity: action.contentIdentity
-      }
-    case 'run-gate':
-      return {
-        kind: 'gate-attempt',
-        gateName: action.gateName,
-        contentIdentity: action.contentIdentity
-      }
+    case 'record-landing': {
+      const { rung, contentIdentity } = action
+      return { kind: 'landing-evidence', rung, contentIdentity }
+    }
+    case 'commit-local-branch': {
+      const { revisionId, fromContentIdentity } = action
+      return { kind: 'commit-local-branch', revisionId, fromContentIdentity }
+    }
+    case 'push-ref': {
+      const { commitSha, remote, branch } = action
+      return { kind: 'push-ref', commitSha, remote, branch }
+    }
+    case 'open-hosted-review': {
+      const { provider, branch, headSha } = action
+      return { kind: 'open-hosted-review', provider, branch, headSha }
+    }
+    case 'amend-plan':
+      return { kind: 'plan-amendment', revisionId: action.revisionId, digest: action.patch.digest }
+    case 'run-gate': {
+      const { gateName, contentIdentity } = action
+      return { kind: 'gate-attempt', gateName, contentIdentity }
+    }
     case 'apply-plan-patch':
       return { kind: 'plan-patch', patchId: action.patchId }
+    case 'ingest-plan-review':
+      return { kind: 'plan-review', dispatchId: action.dispatchId }
     case 'dispatch-planner':
     case 'dispatch-node':
     case 'dispatch-reviewer':
     case 'dispatch-integrator':
+    case 'dispatch-plan-review':
       return null
   }
 }

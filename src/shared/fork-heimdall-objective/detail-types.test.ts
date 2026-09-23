@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { ObjectiveDetailSchema, ObjectiveLandingProjectionSchema } from './detail-types'
+import {
+  ObjectiveDetailSchema,
+  ObjectiveDetailGateSchema,
+  ObjectiveDetailNodeSchema,
+  ObjectiveDetailPendingPatchSchema,
+  ObjectiveLandingProjectionSchema
+} from './detail-types'
 
 const CONTRACT = {
   objectiveText: 'Implement the objective',
@@ -51,5 +57,113 @@ describe('objective landing projection boundaries', () => {
         landing: [{ ...detail.landing[0], fromContentIdentity: 'checked-content' }]
       }).success
     ).toBe(false)
+  })
+})
+
+describe('objective detail plan-quality fields', () => {
+  const NODE = {
+    taskKey: 'task-a',
+    title: 'Task A',
+    revisionId: 'revision-1',
+    orchestrationTaskId: null,
+    dispatchId: null,
+    state: 'pending' as const,
+    criteria: []
+  }
+
+  it('accepts a node with territory and overrun paths', () => {
+    expect(
+      ObjectiveDetailNodeSchema.safeParse({
+        ...NODE,
+        territory: ['src/**'],
+        overrunPaths: ['docs/outside.md']
+      }).success
+    ).toBe(true)
+  })
+
+  it('rejects an unknown key on the node schema', () => {
+    expect(ObjectiveDetailNodeSchema.safeParse({ ...NODE, extra: true }).success).toBe(false)
+  })
+
+  it('accepts a pending patch with a null rejection and rejects an unknown key', () => {
+    const patch = {
+      id: 'patch-1',
+      status: 'pending' as const,
+      rejection: null,
+      touchedTaskKeys: []
+    }
+    expect(ObjectiveDetailPendingPatchSchema.safeParse(patch).success).toBe(true)
+    expect(ObjectiveDetailPendingPatchSchema.safeParse({ ...patch, extra: true }).success).toBe(
+      false
+    )
+  })
+
+  it('accepts a gate with and without a last result', () => {
+    const gate = { name: 'lint', command: 'pnpm lint', timeoutSeconds: 600 }
+    expect(ObjectiveDetailGateSchema.safeParse(gate).success).toBe(true)
+    expect(
+      ObjectiveDetailGateSchema.safeParse({
+        ...gate,
+        lastResult: {
+          contentIdentity: 'content-1',
+          pass: false,
+          exitCode: 1,
+          timedOut: false,
+          completedAtMs: 100
+        }
+      }).success
+    ).toBe(true)
+  })
+
+  it('parses a full detail payload carrying every new C12 field', () => {
+    const detail = {
+      contract: CONTRACT,
+      revisions: [],
+      nodes: [{ ...NODE, territory: ['src/**'], overrunPaths: [] }],
+      verdicts: [],
+      landing: [],
+      planLint: {
+        findings: [],
+        truncated: false,
+        conflictPairs: [],
+        criticalPathLength: 1,
+        maxWidth: 1
+      },
+      assumptions: [
+        { claim: 'The API is stable', dependentTaskKeys: ['task-a'], status: 'verified' }
+      ],
+      planReviews: [
+        {
+          targetKind: 'revision' as const,
+          targetId: 'revision-1',
+          round: 1 as const,
+          verdict: 'approve' as const,
+          summary: 'Looks solid',
+          createdAtMs: 100
+        }
+      ],
+      pendingPatch: {
+        id: 'patch-1',
+        status: 'rejected' as const,
+        rejection: 'names a frozen task',
+        touchedTaskKeys: ['task-b']
+      },
+      gates: [{ name: 'lint', command: 'pnpm lint', timeoutSeconds: 600 }],
+      asOfMs: 100
+    }
+    expect(ObjectiveDetailSchema.safeParse(detail).success).toBe(true)
+  })
+
+  it('accepts noGateDeclared without a gates array', () => {
+    const detail = {
+      contract: CONTRACT,
+      revisions: [],
+      nodes: [],
+      verdicts: [],
+      landing: [],
+      noGateDeclared: true as const,
+      asOfMs: 100
+    }
+    expect(ObjectiveDetailSchema.safeParse(detail).success).toBe(true)
   })
 })

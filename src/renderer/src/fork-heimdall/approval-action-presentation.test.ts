@@ -138,6 +138,54 @@ describe('approval action presentation', () => {
     expect(presentation.details.map((detail) => detail.value)).toContain('revision-1')
   })
 
+  it('labels a dispatch-plan-review action with its own title and explanation', () => {
+    const scope: ApprovalScope = {
+      actionKind: 'dispatch-plan-review',
+      contentIdentity: 'content-current',
+      evidenceKey: 'revision-1:1'
+    }
+    const action: KernelAction = {
+      kind: 'dispatch-plan-review',
+      capability: 'review',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'revision-1:1',
+      target: { kind: 'revision', revisionId: 'revision-1' },
+      round: 1
+    }
+
+    const presentation = approvalActionPresentation(scope, action)
+
+    expect(presentation.title).toBe('Review the plan')
+    expect(presentation.explanation).toBe(
+      'Start the plan critic review of a draft revision or a pending patch.'
+    )
+  })
+
+  it('labels an ingest-plan-review action with its own title and explanation', () => {
+    const scope: ApprovalScope = {
+      actionKind: 'ingest-plan-review',
+      contentIdentity: 'content-current',
+      evidenceKey: 'dispatch-plan-review-1'
+    }
+    const action: KernelAction = {
+      kind: 'ingest-plan-review',
+      capability: 'review',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'dispatch-plan-review-1',
+      recovery: 'replay-safe',
+      dispatchId: 'dispatch-plan-review-1',
+      reportPath: '/outside/plan-review.json',
+      target: { kind: 'patch', patchId: 'patch-1' }
+    }
+
+    const presentation = approvalActionPresentation(scope, action)
+
+    expect(presentation.title).toBe('Record the plan review')
+    expect(presentation.explanation).toBe('Read a plan review verdict into the objective state.')
+  })
+
   it('keeps an unknown future action kind visible without inventing a label', () => {
     const scope: ApprovalScope = {
       actionKind: 'future-provider-action',

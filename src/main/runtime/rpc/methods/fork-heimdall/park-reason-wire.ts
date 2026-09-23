@@ -129,6 +129,25 @@ export function projectHeimdallDetailParkReasonForClient(
   return watcher === detail.watcher ? detail : { ...detail, watcher }
 }
 
+function degradeObjectiveDetailNode(
+  node: ObjectiveDetail['nodes'][number]
+): ObjectiveDetail['nodes'][number] {
+  if (
+    node.laneTaskKeys === undefined &&
+    node.territory === undefined &&
+    node.overrunPaths === undefined
+  ) {
+    return node
+  }
+  const {
+    laneTaskKeys: _laneTaskKeys,
+    territory: _territory,
+    overrunPaths: _overrunPaths,
+    ...legacyNode
+  } = node
+  return legacyNode
+}
+
 export function projectObjectiveDetailParallelForClient(
   detail: ObjectiveDetail,
   context: HeimdallWireProjectionContext
@@ -137,16 +156,16 @@ export function projectObjectiveDetailParallelForClient(
     return detail
   }
   const { lanesEnabled: _lanesEnabled, gates: _gates, ...contract } = detail.contract
-  const nodes = detail.nodes.map((node) => {
-    if (node.laneTaskKeys === undefined) {
-      return node
-    }
-    const { laneTaskKeys: _laneTaskKeys, ...legacyNode } = node
-    return legacyNode
-  })
-  if (detail.parallel === undefined) {
-    return { ...detail, contract, nodes }
-  }
-  const { parallel: _parallel, ...legacyDetail } = detail
+  const nodes = detail.nodes.map(degradeObjectiveDetailNode)
+  const {
+    parallel: _parallel,
+    planLint: _planLint,
+    assumptions: _assumptions,
+    planReviews: _planReviews,
+    pendingPatch: _pendingPatch,
+    gates: _detailGates,
+    noGateDeclared: _noGateDeclared,
+    ...legacyDetail
+  } = detail
   return { ...legacyDetail, contract, nodes }
 }

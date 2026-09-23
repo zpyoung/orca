@@ -197,7 +197,9 @@
           "pushRef": "Push branch",
           "openHostedReview": "Open hosted review",
           "runGate": "Run objective gate",
-          "applyPlanPatch": "Apply plan repair"
+          "applyPlanPatch": "Apply plan repair",
+          "dispatchPlanReview": "Review the plan",
+          "ingestPlanReview": "Record the plan review"
         },
         "explanation": {
           "dispatchPlanner": "Start the planner for this objective.",
@@ -223,7 +225,9 @@
           "enqueue": "Enter the hosted review in its merge queue.",
           "unknown": "Approve this exact requested action.",
           "runGate": "Run a whole-tree command on the integrated branch before review and landing.",
-          "applyPlanPatch": "Apply a planner repair patch to the approved objective plan."
+          "applyPlanPatch": "Apply a planner repair patch to the approved objective plan.",
+          "dispatchPlanReview": "Start the plan critic review of a draft revision or a pending patch.",
+          "ingestPlanReview": "Read a plan review verdict into the objective state."
         },
         "detail": {
           "task": "Task",

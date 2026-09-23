@@ -183,6 +183,34 @@ const objectiveDetailWithExtraKeys = {
   nodes: [],
   verdicts: [],
   landing: [],
+  planLint: {
+    findings: [],
+    truncated: false,
+    conflictPairs: [],
+    criticalPathLength: 0,
+    maxWidth: 0,
+    hostPlanLintField: true
+  },
+  assumptions: [{ claim: 'The API is stable', dependentTaskKeys: [], hostAssumptionField: true }],
+  planReviews: [
+    {
+      targetKind: 'revision',
+      targetId: 'revision-1',
+      round: 1,
+      verdict: 'approve',
+      summary: 'Looks solid',
+      createdAtMs: 1,
+      hostPlanReviewField: true
+    }
+  ],
+  pendingPatch: {
+    id: 'patch-1',
+    status: 'pending',
+    rejection: null,
+    touchedTaskKeys: [],
+    hostPendingPatchField: true
+  },
+  gates: [{ name: 'lint', command: 'pnpm lint', timeoutSeconds: 600, hostGateField: true }],
   asOfMs: 20,
   hostObjectiveDetailField: true
 } as const
@@ -244,7 +272,15 @@ const remoteReaderFixtures = [
       ...objectiveDetailWithExtraKeys,
       contract: { ...objectiveDetailWithExtraKeys.contract, tier: 'future-tier' }
     },
-    strippedPaths: ['hostObjectiveDetailField', 'contract.hostContractField']
+    strippedPaths: [
+      'hostObjectiveDetailField',
+      'contract.hostContractField',
+      'planLint.hostPlanLintField',
+      'assumptions.0.hostAssumptionField',
+      'planReviews.0.hostPlanReviewField',
+      'pendingPatch.hostPendingPatchField',
+      'gates.0.hostGateField'
+    ]
   }
 ] as const
 

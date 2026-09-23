@@ -25,7 +25,11 @@ import {
   type ObjectiveWorkspaceChangesValidation
 } from './observed-workspace-changes'
 import type { ObjectiveStore } from './objective-store'
-import { readObjectiveRoleReport, type ObjectiveRoleReportReadResult } from './report-ingestion'
+import {
+  readObjectiveRoleReport,
+  type ObjectiveReportRole,
+  type ObjectiveRoleReportReadResult
+} from './report-ingestion'
 
 export async function resolveObjectiveDispatchOutcome(args: {
   attempt: AttemptEntry
@@ -94,6 +98,10 @@ export async function resolveObjectiveDispatchOutcome(args: {
       : { effect: 'indeterminate' }
   }
   const role = dispatchReportRole(args.action)
+  // a plan critic is dispatched as the wire `reviewer` role, but its report is the differently
+  // shaped internal 'plan-review' kind, not a normal reviewer report
+  const reportRole: ObjectiveReportRole =
+    args.action.kind === 'dispatch-plan-review' ? 'plan-review' : role
   const provenance = (
     status: ReportValidationProvenance['status'],
     code: ReportValidationCode,
@@ -184,7 +192,7 @@ export async function resolveObjectiveDispatchOutcome(args: {
       target: validationTarget,
       attemptFingerprint: args.attempt.fingerprint,
       mailboxReportPath: evidence.reportPath,
-      role,
+      role: reportRole,
       ...(args.action.kind === 'dispatch-node' ? { taskKey: args.action.taskKey } : {})
     })
   } catch (error) {

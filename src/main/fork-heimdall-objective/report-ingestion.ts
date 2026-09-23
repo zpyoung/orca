@@ -17,6 +17,10 @@ import {
   type PlannerRepairReport
 } from '../../shared/fork-heimdall-objective/plan-repair-schema'
 import {
+  PlanReviewReportSchema,
+  type PlanReviewReport
+} from '../../shared/fork-heimdall-objective/plan-review-schema'
+import {
   isPathInsideOrEqual,
   normalizeRuntimePathForComparison
 } from '../../shared/cross-platform-path'
@@ -37,19 +41,28 @@ const MAX_REPORT_SCHEMA_ISSUES = 5
 const MAX_REPORT_SCHEMA_ISSUE_MESSAGE_CHARS = 512
 const MAX_REPORT_SCHEMA_DETAIL_CHARS = 2_048
 
-export type ObjectiveReportRole = 'planner' | 'implementer' | 'reviewer' | 'integrator'
+// 'plan-review' is an internal report-kind, not a wire ObjectiveRole: the plan critic is still the
+// dispatched `reviewer` role, just reading a differently-shaped report file.
+export type ObjectiveReportRole =
+  | 'planner'
+  | 'implementer'
+  | 'reviewer'
+  | 'integrator'
+  | 'plan-review'
 export type ObjectiveRoleReport =
   | PlannerReport
   | PlannerRepairReport
   | ImplementerReport
   | ReviewerReport
   | IntegratorReport
+  | PlanReviewReport
 
 type ObjectiveReportByRole = {
   planner: PlannerReport | PlannerRepairReport
   implementer: ImplementerReport
   reviewer: ReviewerReport
   integrator: IntegratorReport
+  'plan-review': PlanReviewReport
 }
 
 export type ObjectiveReportReadFailureReason =
@@ -290,7 +303,9 @@ function parseReportForRole<R extends ObjectiveReportRole>(
       ? ImplementerReportSchema.safeParse(input)
       : role === 'reviewer'
         ? ReviewerReportSchema.safeParse(input)
-        : IntegratorReportSchema.safeParse(input)
+        : role === 'plan-review'
+          ? PlanReviewReportSchema.safeParse(input)
+          : IntegratorReportSchema.safeParse(input)
   return result.success
     ? { success: true, data: result.data as ObjectiveReportByRole[R] }
     : { success: false, detail: formatReportSchemaIssues(result.error.issues) }
@@ -303,7 +318,8 @@ function matchesAnotherRole(input: unknown, expectedRole: ObjectiveReportRole): 
         PlannerRepairReportSchema.safeParse(input).success)) ||
     (expectedRole !== 'implementer' && ImplementerReportSchema.safeParse(input).success) ||
     (expectedRole !== 'reviewer' && ReviewerReportSchema.safeParse(input).success) ||
-    (expectedRole !== 'integrator' && IntegratorReportSchema.safeParse(input).success)
+    (expectedRole !== 'integrator' && IntegratorReportSchema.safeParse(input).success) ||
+    (expectedRole !== 'plan-review' && PlanReviewReportSchema.safeParse(input).success)
   )
 }
 

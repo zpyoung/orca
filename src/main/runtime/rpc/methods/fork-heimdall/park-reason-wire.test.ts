@@ -249,6 +249,8 @@ describe('projectObjectiveDetailParallelForClient', () => {
         orchestrationTaskId: null,
         dispatchId: null,
         laneTaskKeys: ['task-a', 'task-b'],
+        territory: ['src/**'],
+        overrunPaths: ['docs/outside.md'],
         state: 'pending',
         criteria: []
       }
@@ -256,6 +258,26 @@ describe('projectObjectiveDetailParallelForClient', () => {
     verdicts: [],
     landing: [],
     parallel: { runningCount: 0, effectiveMaxConcurrency: 3, dispatches: [] },
+    planLint: {
+      findings: [],
+      truncated: false,
+      conflictPairs: [],
+      criticalPathLength: 1,
+      maxWidth: 1
+    },
+    assumptions: [{ claim: 'The API is stable', dependentTaskKeys: [] }],
+    planReviews: [
+      {
+        targetKind: 'revision',
+        targetId: 'revision-1',
+        round: 1,
+        verdict: 'approve',
+        summary: 'Looks solid',
+        createdAtMs: 1
+      }
+    ],
+    pendingPatch: { id: 'patch-1', status: 'pending', rejection: null, touchedTaskKeys: [] },
+    gates: [{ name: 'lint', command: 'pnpm lint', timeoutSeconds: 600 }],
     asOfMs: 1
   }
 
@@ -265,6 +287,20 @@ describe('projectObjectiveDetailParallelForClient', () => {
     expect(projected.contract).not.toHaveProperty('lanesEnabled')
     expect(projected.contract).not.toHaveProperty('gates')
     expect(projected.nodes[0]).not.toHaveProperty('laneTaskKeys')
+    expect(projected.nodes[0]).not.toHaveProperty('territory')
+    expect(projected.nodes[0]).not.toHaveProperty('overrunPaths')
+    expect(projected).not.toHaveProperty('planLint')
+    expect(projected).not.toHaveProperty('assumptions')
+    expect(projected).not.toHaveProperty('planReviews')
+    expect(projected).not.toHaveProperty('pendingPatch')
+    expect(projected).not.toHaveProperty('gates')
+  })
+
+  it('strips a noGateDeclared detail without a parallel summary for legacy readers', () => {
+    const { parallel: _parallel, gates: _gates, ...rest } = source
+    const withoutGates: ObjectiveDetail = { ...rest, noGateDeclared: true }
+    const projected = projectObjectiveDetailParallelForClient(withoutGates, LEGACY_CONTEXT)
+    expect(projected).not.toHaveProperty('noGateDeclared')
   })
 
   it('keeps every parallel-only field for capable readers', () => {

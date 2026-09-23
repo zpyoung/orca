@@ -279,6 +279,84 @@ describe('objective repair plumbing action contracts', () => {
   })
 })
 
+describe('plan review action contracts', () => {
+  it('parses a dispatch-plan-review action for a revision or a patch target and derives no natural key', () => {
+    const revisionDispatch = ObjectiveActionSchema.parse({
+      kind: 'dispatch-plan-review',
+      capability: 'review',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'revision-1:1',
+      target: { kind: 'revision', revisionId: 'revision-1' },
+      round: 1
+    })
+    expect(objectiveActionNaturalKey(revisionDispatch)).toBeNull()
+
+    const patchDispatch = ObjectiveActionSchema.parse({
+      kind: 'dispatch-plan-review',
+      capability: 'review',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'patch-1:2',
+      target: { kind: 'patch', patchId: 'patch-1' },
+      round: 2
+    })
+    expect(patchDispatch).toMatchObject({ target: { kind: 'patch', patchId: 'patch-1' }, round: 2 })
+  })
+
+  it('rejects a dispatch-plan-review action with an out-of-range round or an unknown target kind', () => {
+    const base = {
+      kind: 'dispatch-plan-review',
+      capability: 'review',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'revision-1:1',
+      target: { kind: 'revision', revisionId: 'revision-1' },
+      round: 1
+    }
+    expect(ObjectiveActionSchema.safeParse(base).success).toBe(true)
+    expect(ObjectiveActionSchema.safeParse({ ...base, round: 3 }).success).toBe(false)
+    expect(
+      ObjectiveActionSchema.safeParse({ ...base, target: { kind: 'objective' } }).success
+    ).toBe(false)
+  })
+
+  it('parses ingest-plan-review and derives its dispatchId natural key', () => {
+    const action = ObjectiveActionSchema.parse({
+      kind: 'ingest-plan-review',
+      capability: 'review',
+      visibility: 'local',
+      recovery: 'replay-safe',
+      contentIdentity: 'content-current',
+      evidenceKey: 'plan-review-dispatch-1',
+      dispatchId: 'plan-review-dispatch-1',
+      reportPath: '/outside/plan-review.json',
+      target: { kind: 'patch', patchId: 'patch-1' }
+    })
+    expect(objectiveActionNaturalKey(action)).toEqual({
+      kind: 'plan-review',
+      dispatchId: 'plan-review-dispatch-1'
+    })
+  })
+
+  it('requires replay-safe on ingest-plan-review', () => {
+    const ingestion = {
+      kind: 'ingest-plan-review',
+      capability: 'review',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'plan-review-dispatch-1',
+      dispatchId: 'plan-review-dispatch-1',
+      reportPath: '/outside/plan-review.json',
+      target: { kind: 'revision', revisionId: 'revision-1' }
+    }
+    expect(ObjectiveActionSchema.safeParse(ingestion).success).toBe(false)
+    expect(ObjectiveActionSchema.safeParse({ ...ingestion, recovery: 'replay-safe' }).success).toBe(
+      true
+    )
+  })
+})
+
 describe('objective landing rung action contracts', () => {
   it('pins local replay while external rungs remain probe-only by omission', () => {
     const commit = ObjectiveActionSchema.parse({

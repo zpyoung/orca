@@ -257,6 +257,64 @@ describe('objective report submission preflight', () => {
     ).resolves.toEqual({ status: 'accepted' })
   })
 
+  it('validates a dispatch-plan-review report against its target revision assumptions', async () => {
+    const dispatchId = 'dispatch-plan-review-1'
+    const action: ObjectiveAction = {
+      kind: 'dispatch-plan-review',
+      capability: 'review',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'revision-1:1',
+      target: { kind: 'revision', revisionId: 'revision-1' },
+      round: 1
+    }
+    const planReviewLedger = { watcherId: 'watcher-1', entries: [attempt(action, { dispatchId })] }
+    const store = {
+      getDispatch: () => null,
+      getPlanReport: () => ({
+        plan: [TASK],
+        assumptions: [{ claim: 'The fixture already exists.', dependentTaskKeys: ['core'] }]
+      })
+    } as unknown as ObjectiveStore
+    const adapter = createObjectiveSubmissionAdapter({
+      runtime: {} as OrcaRuntimeService,
+      objectiveStore: store
+    })
+    const planReviewReportPath = await issueObjectiveReportPath(target, `fingerprint-${dispatchId}`)
+    const submission = {
+      dispatchId,
+      payload: { reportPath: planReviewReportPath, filesModified: [] }
+    } as const
+    const context = { enrollment: ENROLLMENT, snapshot: null, ledger: planReviewLedger }
+
+    await writeFile(
+      planReviewReportPath,
+      JSON.stringify({
+        verdict: 'approve',
+        assumptions: [{ index: 0, status: 'unverified', evidence: 'Could not confirm.' }],
+        findings: [],
+        summary: 'Looks fine.'
+      })
+    )
+    expect(await adapter.preflightWorkerReport(submission, context)).toMatchObject({
+      status: 'rejected',
+      code: 'heimdall_report_invalid'
+    })
+
+    await writeFile(
+      planReviewReportPath,
+      JSON.stringify({
+        verdict: 'approve',
+        assumptions: [{ index: 0, status: 'verified', evidence: 'Confirmed in src/core.ts.' }],
+        findings: [],
+        summary: 'Looks fine.'
+      })
+    )
+    await expect(adapter.preflightWorkerReport(submission, context)).resolves.toEqual({
+      status: 'accepted'
+    })
+  })
+
   it('rejects a full-shaped report submitted for a repair dispatch-planner', async () => {
     const adapter = createObjectiveSubmissionAdapter({
       runtime: {} as OrcaRuntimeService,

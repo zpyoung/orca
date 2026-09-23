@@ -4,14 +4,26 @@ import { BudgetPolicySchema } from '../fork-heimdall/budget'
 import { JudgmentSnapshotSchema } from '../fork-heimdall/judgment/types'
 import { OWNER_INTERVENTION_TEXT_MAX_LENGTH } from '../fork-heimdall/owner/intervention'
 import {
+  OBJECTIVE_GATES_MAX,
+  OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH,
+  OBJECTIVE_TERRITORY_MAX_ENTRIES,
   ObjectiveCapabilitiesSchema,
   ObjectiveEnrollmentPayloadSchema,
+  ObjectiveGateSchema,
   ObjectiveLandingBarSchema,
   ObjectiveRoleSchema,
+  ObjectiveTerritoryGlobSchema,
   ObjectiveWorkspacePathSchema,
   ObjectiveWorkspaceKindSchema
 } from './contract-types'
 import { ObjectiveParallelProjectionSchema } from './parallel-types'
+import { ObjectivePlanLintSchema } from './plan-lint'
+import {
+  OBJECTIVE_PLAN_ASSUMPTIONS_MAX_ENTRIES,
+  OBJECTIVE_PLAN_MAX_TASKS,
+  OBJECTIVE_PLAN_REVIEW_TEXT_MAX_LENGTH,
+  TaskKeySchema
+} from './plan-schema'
 
 const IdSchema = z.string().trim().min(1).max(1_024)
 const TimestampSchema = z.number().int().nonnegative()
@@ -208,7 +220,8 @@ export const ObjectivePendingReportSchema = z
       'dispatch-planner',
       'dispatch-node',
       'dispatch-reviewer',
-      'dispatch-integrator'
+      'dispatch-integrator',
+      'dispatch-plan-review'
     ]),
     outcome: z.enum(['succeeded', 'failed']),
     reportPath: IdSchema.nullable(),
@@ -303,11 +316,62 @@ export const ObjectiveDetailNodeSchema = z
     orchestrationTaskId: IdSchema.nullable(),
     dispatchId: IdSchema.nullable(),
     laneTaskKeys: z.array(IdSchema).min(1).max(5).optional(),
+    territory: z
+      .array(ObjectiveTerritoryGlobSchema)
+      .min(1)
+      .max(OBJECTIVE_TERRITORY_MAX_ENTRIES)
+      .optional(),
+    overrunPaths: z.array(ObjectiveWorkspacePathSchema).max(256).optional(),
     state: ObjectiveNodeStateSchema,
     criteria: z.array(ObjectiveDetailCriterionSchema).max(64)
   })
   .strict()
 export type ObjectiveDetailNode = z.infer<typeof ObjectiveDetailNodeSchema>
+
+export const ObjectiveDetailAssumptionSchema = z
+  .object({
+    claim: z.string().trim().min(1).max(OBJECTIVE_PLAN_REVIEW_TEXT_MAX_LENGTH),
+    dependentTaskKeys: z.array(TaskKeySchema).max(OBJECTIVE_PLAN_MAX_TASKS),
+    status: z.enum(['verified', 'unverified']).optional(),
+    evidence: z.string().trim().min(1).max(OBJECTIVE_PLAN_REVIEW_TEXT_MAX_LENGTH).optional()
+  })
+  .strict()
+export type ObjectiveDetailAssumption = z.infer<typeof ObjectiveDetailAssumptionSchema>
+
+export const ObjectiveDetailPlanReviewSchema = ObjectivePlanReviewProjectionSchema.pick({
+  targetKind: true,
+  targetId: true,
+  round: true,
+  verdict: true,
+  createdAtMs: true
+})
+  .extend({ summary: z.string().trim().min(1).max(OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH) })
+  .strict()
+export type ObjectiveDetailPlanReview = z.infer<typeof ObjectiveDetailPlanReviewSchema>
+
+export const ObjectiveDetailPendingPatchSchema = ObjectivePlanPatchProjectionSchema.pick({
+  id: true,
+  status: true,
+  rejection: true,
+  touchedTaskKeys: true
+}).strict()
+export type ObjectiveDetailPendingPatch = z.infer<typeof ObjectiveDetailPendingPatchSchema>
+
+export const ObjectiveDetailGateLastResultSchema = z
+  .object({
+    contentIdentity: IdSchema,
+    pass: z.boolean(),
+    exitCode: z.number().int().nullable(),
+    timedOut: z.boolean(),
+    completedAtMs: TimestampSchema
+  })
+  .strict()
+export type ObjectiveDetailGateLastResult = z.infer<typeof ObjectiveDetailGateLastResultSchema>
+
+export const ObjectiveDetailGateSchema = ObjectiveGateSchema.extend({
+  lastResult: ObjectiveDetailGateLastResultSchema.optional()
+}).strict()
+export type ObjectiveDetailGate = z.infer<typeof ObjectiveDetailGateSchema>
 
 export const ObjectiveDetailSchema = z
   .object({
@@ -332,6 +396,15 @@ export const ObjectiveDetailSchema = z
       }).strict()
     ),
     parallel: ObjectiveParallelProjectionSchema.optional(),
+    planLint: ObjectivePlanLintSchema.optional(),
+    assumptions: z
+      .array(ObjectiveDetailAssumptionSchema)
+      .max(OBJECTIVE_PLAN_ASSUMPTIONS_MAX_ENTRIES)
+      .optional(),
+    planReviews: z.array(ObjectiveDetailPlanReviewSchema).max(16).optional(),
+    pendingPatch: ObjectiveDetailPendingPatchSchema.optional(),
+    gates: z.array(ObjectiveDetailGateSchema).max(OBJECTIVE_GATES_MAX).optional(),
+    noGateDeclared: z.literal(true).optional(),
     asOfMs: TimestampSchema
   })
   .strict()

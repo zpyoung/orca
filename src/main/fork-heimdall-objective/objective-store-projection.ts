@@ -20,6 +20,7 @@ import { deriveObjectiveLanes } from '../../shared/fork-heimdall-objective/paral
 import { getLatestAttempts } from '../../shared/fork-heimdall/ledger-queries'
 import { WatcherLedgerSchema, type WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type { ObjectiveDatabase } from './objective-database'
+import { buildObjectiveDetailPlanQuality } from './objective-detail-plan-quality'
 import { projectGateAttempts } from './objective-store-gate-attempts'
 import {
   CriteriaResultsSchema,
@@ -157,6 +158,12 @@ export function detailObjective(
     const key = `${criterion.revision_id}\0${criterion.task_key}`
     criteriaByNode.set(key, [...(criteriaByNode.get(key) ?? []), criterion])
   }
+  const { nodeDetailByKey, ...planQuality } = buildObjectiveDetailPlanQuality(
+    database,
+    watcherId,
+    parsedContract,
+    projection
+  )
   return ObjectiveDetailSchema.parse({
     contract: parsedContract,
     revisions: projection.revisions.map(
@@ -180,6 +187,7 @@ export function detailObjective(
       const projectedCriteria = new Map(
         projected.criteria.map((criterion) => [criterion.id, criterion])
       )
+      const nodeDetail = nodeDetailByKey.get(key)
       return {
         taskKey: node.task_key,
         title: node.title,
@@ -187,6 +195,8 @@ export function detailObjective(
         orchestrationTaskId: node.orchestration_task_id,
         dispatchId: node.dispatch_id,
         laneTaskKeys: laneTaskKeysByNode.get(key) ?? [node.task_key],
+        ...(nodeDetail?.territory ? { territory: nodeDetail.territory } : {}),
+        ...(nodeDetail?.overrunPaths ? { overrunPaths: nodeDetail.overrunPaths } : {}),
         state: projected.state,
         criteria: (criteriaByNode.get(key) ?? []).map((criterion) => {
           const value = projectedCriteria.get(criterion.id)
@@ -218,6 +228,7 @@ export function detailObjective(
       contentIdentity,
       atMs
     })),
+    ...planQuality,
     asOfMs: now()
   })
 }

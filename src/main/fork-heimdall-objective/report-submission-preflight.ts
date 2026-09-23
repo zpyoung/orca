@@ -17,6 +17,8 @@ import {
   parseAndValidateReviewerReport
 } from '../../shared/fork-heimdall-objective/plan-schema'
 import { parseAndValidatePlannerRepairReport } from '../../shared/fork-heimdall-objective/plan-repair-schema'
+import { parseAndValidatePlanReviewReport } from '../../shared/fork-heimdall-objective/plan-review-schema'
+import type { ObjectivePlanAssumption } from '../../shared/fork-heimdall-objective/plan-schema'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { requireObjectiveOriginalDispatchFingerprint } from '../../shared/fork-heimdall-objective/decision-context'
 import type { ObjectiveWorkspaceTarget } from './content-identity'
@@ -44,7 +46,24 @@ function roleForAction(action: DispatchAction): ObjectiveReportRole {
       ? 'implementer'
       : action.kind === 'dispatch-reviewer'
         ? 'reviewer'
-        : 'integrator'
+        : action.kind === 'dispatch-plan-review'
+          ? 'plan-review'
+          : 'integrator'
+}
+
+/**
+ * The declared assumptions a plan review must assess: the draft revision's, or a pending patch's
+ * own. `undefined` means the target itself is unavailable, distinct from a target with none declared.
+ */
+function planReviewTargetAssumptions(
+  objectiveStore: ObjectiveStore,
+  target: Extract<DispatchAction, { kind: 'dispatch-plan-review' }>['target']
+): readonly ObjectivePlanAssumption[] | undefined {
+  const found =
+    target.kind === 'revision'
+      ? objectiveStore.getPlanReport(target.revisionId)
+      : objectiveStore.getPlanPatch(target.patchId)?.report
+  return found === null || found === undefined ? undefined : (found.assumptions ?? [])
 }
 
 function rejected(role: ObjectiveReportRole, reason: string): SubmissionPreflightResult {
@@ -210,6 +229,19 @@ export function createObjectiveSubmissionAdapter(args: {
               error instanceof Error ? error.message : 'report validation failed.'
             )
           }
+        }
+      } else if (action.kind === 'dispatch-plan-review') {
+        const assumptions = planReviewTargetAssumptions(args.objectiveStore, action.target)
+        if (assumptions === undefined) {
+          return ACCEPTED
+        }
+        try {
+          parseAndValidatePlanReviewReport(read.report, assumptions.length, assumptions)
+        } catch (error) {
+          return rejected(
+            role,
+            error instanceof Error ? error.message : 'report validation failed.'
+          )
         }
       } else {
         const plan = args.objectiveStore.getPlan(action.revisionId)

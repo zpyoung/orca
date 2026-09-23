@@ -219,6 +219,16 @@ const dispatchPlanner: ObjectiveAction = {
   reason: 'replan-after-failure'
 }
 
+const dispatchPlanReview: ObjectiveAction = {
+  kind: 'dispatch-plan-review',
+  capability: 'review',
+  visibility: 'local',
+  contentIdentity: 'old-content',
+  evidenceKey: 'plan-review:revision:revision-1:1',
+  target: { kind: 'revision', revisionId: 'revision-1' },
+  round: 1
+}
+
 describe('objective action recovery', () => {
   beforeEach(() => {
     readReport.mockReset()
@@ -260,6 +270,31 @@ describe('objective action recovery', () => {
         taskKey: 'node-a'
       })
     )
+  })
+
+  it('reads a dispatch-plan-review report as the internal plan-review kind, not reviewer', async () => {
+    readReport.mockResolvedValue({
+      ok: true,
+      role: 'plan-review',
+      path: '/workspace/report.json',
+      reportDigest: 'digest-1',
+      report: {
+        verdict: 'approve',
+        assumptions: [],
+        findings: [],
+        summary: 'Plan looks sound.'
+      }
+    })
+    const { executor, fresh } = harness({ getPlanReport: () => ({ assumptions: [] }) as never })
+    const ledger: WatcherLedger = {
+      watcherId: 'watcher-1',
+      entries: [attempt(dispatchPlanReview), workerDone('succeeded')]
+    }
+
+    await expect(
+      executor.resolveOutcome(attempt(dispatchPlanReview), fresh, ledger, TEST_LEASE)
+    ).resolves.toEqual({ effect: 'landed' })
+    expect(readReport).toHaveBeenCalledWith(expect.objectContaining({ role: 'plan-review' }))
   })
 
   it('rejects malformed completion file evidence instead of validating it as an empty list', async () => {
@@ -862,6 +897,42 @@ describe('objective action recovery', () => {
       rejected.executor.resolveOutcome(
         attempt(applyPlanPatchAction),
         rejected.fresh,
+        ledger,
+        TEST_LEASE
+      )
+    ).toEqual({ effect: 'landed' })
+  })
+
+  it('lands ingest-plan-review exactly when a plan review with its dispatchId is recorded', () => {
+    const ingestPlanReviewAction: ObjectiveAction = {
+      kind: 'ingest-plan-review',
+      capability: 'review',
+      visibility: 'local',
+      contentIdentity: 'new-content',
+      evidenceKey: 'dispatch-plan-review-1',
+      recovery: 'replay-safe',
+      dispatchId: 'dispatch-plan-review-1',
+      reportPath: '/workspace/report.json',
+      target: { kind: 'revision', revisionId: 'revision-1' }
+    }
+    const ledger: WatcherLedger = { watcherId: 'watcher-1', entries: [] }
+    const absent = harness({ listPlanReviews: () => [] })
+    const present = harness({
+      listPlanReviews: () => [{ dispatchId: 'dispatch-plan-review-1' }] as never
+    })
+
+    expect(
+      absent.executor.resolveOutcome(
+        attempt(ingestPlanReviewAction),
+        absent.fresh,
+        ledger,
+        TEST_LEASE
+      )
+    ).toEqual({ effect: 'not-landed' })
+    expect(
+      present.executor.resolveOutcome(
+        attempt(ingestPlanReviewAction),
+        present.fresh,
         ledger,
         TEST_LEASE
       )
