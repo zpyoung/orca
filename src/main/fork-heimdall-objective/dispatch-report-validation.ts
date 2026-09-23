@@ -17,7 +17,6 @@ import {
   parseAndValidatePlannerReport,
   parseAndValidateReviewerReport
 } from '../../shared/fork-heimdall-objective/plan-schema'
-import { parseAndValidatePlannerRepairReport } from '../../shared/fork-heimdall-objective/plan-repair-schema'
 import { parseAndValidatePlanReviewReport } from '../../shared/fork-heimdall-objective/plan-review-schema'
 import type { ObjectiveSnapshotBinding } from './execution-context'
 import type { ObjectiveStore } from './objective-store'
@@ -84,19 +83,10 @@ export function validateResolvedDispatchReport(args: {
     })
   })
   try {
+    // a repair report's schema/semantic validity is never checked here: dispatch-outcome-resolver
+    // resolves a repair dispatch as landed before this runs, deferring entirely to
+    // ingestObjectivePlanRepair so an invalid report lands as a stored rejected patch (X1)
     if (action.kind === 'dispatch-planner') {
-      if (action.shape === 'repair') {
-        const currentPlan = objectiveStore.getPlan(action.repairRevisionId ?? '')
-        if (!currentPlan) {
-          return rejected('semantic-invalid', `Plan ${action.repairRevisionId} is unavailable`)
-        }
-        parseAndValidatePlannerRepairReport(
-          report,
-          { writeTerritory: binding.contract.writeTerritory },
-          currentPlan
-        )
-        return { ok: true }
-      }
       parseAndValidatePlannerReport(report, {
         writeTerritory: binding.contract.writeTerritory,
         dispatchedTaskKeys: dispatchedTaskKeys(args.ledger)

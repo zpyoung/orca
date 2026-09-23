@@ -168,6 +168,15 @@ export async function resolveObjectiveDispatchOutcome(args: {
           provenance('rejected', 'missing', 'Successful worker completion omitted its report path')
         )
   }
+  if (args.action.kind === 'dispatch-planner' && args.action.shape === 'repair') {
+    // a repair report's schema/semantic validity is the ingest step's concern (X1): resolving here
+    // regardless of content lets an invalid report reach ingestObjectivePlanRepair and land as a
+    // stored rejected patch, so the repair retry budget actually counts it instead of the dispatch
+    // silently redispatching forever
+    return evidence.outcome === 'failed'
+      ? persistDispatchFailure(failed('criteria'))
+      : { effect: 'landed' }
+  }
   let validationTarget = args.binding.target
   if (dispatchRecord) {
     try {

@@ -20,6 +20,52 @@ import {
 const REPAIR_ESCALATION_REJECTED_PATCH_THRESHOLD = 2
 
 /**
+ * A repair report that could not even be read (missing file, non-JSON) never reaches a stored
+ * patch — its `ingest-plan` attempt just settles not-landed. Counts those alongside
+ * `rejectedPatchCount` so an unreadable report consumes the retry budget exactly as a stored
+ * `invalid-report:` rejection does (X1), instead of letting the episode redispatch unbounded.
+ */
+function notLandedRepairIngestionCount(
+  ledger: WatcherLedger,
+  attempts: readonly ObjectiveAttempt[],
+  revisionId: string,
+  sinceOrdinal: number
+): number {
+  const ordinalByDispatchId = new Map<string, number>()
+  for (const { attempt, action } of attempts) {
+    if (
+      action.kind === 'dispatch-planner' &&
+      action.shape === 'repair' &&
+      action.repairRevisionId === revisionId &&
+      action.repairOrdinal !== undefined &&
+      attempt.dispatchId !== undefined
+    ) {
+      ordinalByDispatchId.set(attempt.dispatchId, action.repairOrdinal)
+    }
+  }
+  let count = 0
+  for (const { attempt, action } of attempts) {
+    if (
+      action.kind !== 'ingest-plan' ||
+      action.shape !== 'repair' ||
+      action.targetRevisionId !== revisionId
+    ) {
+      continue
+    }
+    const ordinal = ordinalByDispatchId.get(action.dispatchId)
+    if (
+      ordinal === undefined ||
+      ordinal <= sinceOrdinal ||
+      objectiveAttemptDisposition(attempt, ledger) !== 'not-landed'
+    ) {
+      continue
+    }
+    count += 1
+  }
+  return count
+}
+
+/**
  * `decidePlannerAction`'s counterpart once an approved revision exists: every redispatch patches
  * that revision instead of replacing it, so this never mints a new revision number.
  */
@@ -101,6 +147,9 @@ export function decideRepairPlannerAction(
   }
 
   const repairOrdinal = nextObjectiveRepairOrdinal(snapshot.world, attempts, revisionId)
+  const consumedRetryBudget =
+    episode.rejectedPatchCount +
+    notLandedRepairIngestionCount(ledger, attempts, revisionId, episode.sinceOrdinal)
   return {
     action: {
       kind: 'dispatch-planner',
@@ -113,7 +162,7 @@ export function decideRepairPlannerAction(
       shape: 'repair',
       repairOrdinal,
       repairRevisionId: revisionId,
-      ...(episode.rejectedPatchCount >= REPAIR_ESCALATION_REJECTED_PATCH_THRESHOLD
+      ...(consumedRetryBudget >= REPAIR_ESCALATION_REJECTED_PATCH_THRESHOLD
         ? { approvalRequired: true }
         : {})
     }

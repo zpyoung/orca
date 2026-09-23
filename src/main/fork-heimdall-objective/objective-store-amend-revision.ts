@@ -113,21 +113,21 @@ export function amendObjectiveRevisionInTransaction(
   // preserve the stored planner assumptions across the rewrite, same as mergeAssumptionsOntoRevision:
   // a dropped task can no longer be depended on, so its key falls out of dependentTaskKeys
   const amendedTaskKeys = new Set(amended.plan.map((task) => task.taskKey))
-  const assumptions = (currentReport.assumptions ?? []).map((assumption) => ({
+  const assumptions = currentReport.assumptions?.map((assumption) => ({
     ...assumption,
     dependentTaskKeys: assumption.dependentTaskKeys.filter((taskKey) =>
       amendedTaskKeys.has(taskKey)
     )
   }))
 
+  // omit `assumptions` entirely for a legacy report that never declared it, so plan-lint's
+  // missing-assumptions check still fires instead of reading a falsely-declared empty list
+  const amendedPayload =
+    assumptions === undefined ? { plan: amended.plan } : { plan: amended.plan, assumptions }
+
   db.prepare(
     'UPDATE plan_revision SET payload_json = ?, digest = ? WHERE id = ? AND watcher_id = ?'
-  ).run(
-    JSON.stringify({ plan: amended.plan, assumptions }),
-    patch.digest,
-    args.revisionId,
-    args.watcherId
-  )
+  ).run(JSON.stringify(amendedPayload), patch.digest, args.revisionId, args.watcherId)
   db.prepare('DELETE FROM review_verdict WHERE revision_id = ?').run(args.revisionId)
 
   for (const taskKey of patch.dropTaskKeys) {

@@ -78,6 +78,12 @@ type ObjectiveReportReadFailure = {
   ok: false
   reason: ObjectiveReportReadFailureReason
   detail?: string
+  /**
+   * The parsed JSON when the file read as valid JSON but failed role/schema validation, absent for
+   * every other failure reason. Lets a repair-shaped report that reads but doesn't validate still
+   * reach `ingestObjectivePlanRepair` and land as a stored rejected patch (X1).
+   */
+  rawInput?: unknown
 }
 
 type ObjectiveReportReadSuccess<R extends ObjectiveReportRole> = R extends ObjectiveReportRole
@@ -521,6 +527,7 @@ export async function readObjectiveRoleReport<R extends ObjectiveReportRole>(
     return {
       ok: false,
       reason,
+      rawInput: input,
       ...(reason === 'malformed' ? { detail: parsed.detail } : {})
     }
   }

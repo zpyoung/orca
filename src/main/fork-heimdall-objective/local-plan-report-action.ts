@@ -114,9 +114,24 @@ export async function ingestObjectivePlanReport(args: {
     target: args.binding.target,
     attemptFingerprint: origin.attempt.fingerprint,
     mailboxReportPath: args.action.reportPath,
-    role: 'planner'
+    role: 'planner',
+    ...(args.action.shape === 'repair' ? { plannerShape: 'repair' } : {})
   })
   if (!read.ok) {
+    // a repair report that reads as JSON but fails schema/role validation still reaches
+    // ingestObjectivePlanRepair, so it lands as a stored rejected patch that counts toward the
+    // episode's retry budget (X1) instead of vanishing as a bare not-landed ingest
+    if (args.action.shape === 'repair' && read.rawInput !== undefined) {
+      return ingestObjectivePlanRepair({
+        action: args.action,
+        repairOrdinal: origin.action.repairOrdinal as number,
+        rawReport: read.rawInput,
+        evidenceAtMs: evidence.atMs,
+        binding: args.binding,
+        context: args.context,
+        objectiveStore: args.objectiveStore
+      })
+    }
     return invalidObjectiveReport({
       reason: `planner-report-${read.reason}`,
       code: read.reason,
