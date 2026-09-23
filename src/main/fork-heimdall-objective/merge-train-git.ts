@@ -17,6 +17,19 @@ import {
 const OBJECT_ID_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/iu
 const NODE_TASK_TRAILER = 'Orca-Heimdall-Task'
 
+/**
+ * Thrown when a node's ingested report fails a deterministic Git invariant — the dispatch baseline
+ * is not an ancestor of HEAD, or the normalized commit's own shape is wrong — that replaying the
+ * same ingest cannot pass without new evidence. Callers route this to the failed-node path instead
+ * of retrying.
+ */
+export class ObjectiveNodeIngestRejectedError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ObjectiveNodeIngestRejectedError'
+  }
+}
+
 export const OBJECTIVE_MERGE_TRAIN_MAX_PATHS = 256
 
 /** Inputs that identify the clean dispatch baseline and the node owning the normalized commit. */
@@ -240,7 +253,9 @@ export async function createObjectiveNodeCommit(
     readRequiredCommit(runGit, 'HEAD')
   ])
   if (!(await isAncestor(runGit, baseCommit, headCommit))) {
-    throw new Error('Objective node HEAD does not descend from its dispatch baseline')
+    throw new ObjectiveNodeIngestRejectedError(
+      'Objective node HEAD does not descend from its dispatch baseline'
+    )
   }
 
   await lease.assertHeld()
@@ -286,10 +301,14 @@ export async function createObjectiveNodeCommit(
     objectiveDirtyPaths(runGit, target)
   ])
   if (parentSha !== baseCommit) {
-    throw new Error('Normalized objective node commit has the wrong parent')
+    throw new ObjectiveNodeIngestRejectedError(
+      'Normalized objective node commit has the wrong parent'
+    )
   }
   if (remainingDirty.length > 0) {
-    throw new Error('Normalized objective node commit left objective changes uncommitted')
+    throw new ObjectiveNodeIngestRejectedError(
+      'Normalized objective node commit left objective changes uncommitted'
+    )
   }
   return { commitSha }
 }

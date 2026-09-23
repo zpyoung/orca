@@ -2,7 +2,11 @@ import type { LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
 import type { ObjectiveDispatchRecord } from '../../shared/fork-heimdall-objective/parallel-types'
 import type { ImplementerReport } from '../../shared/fork-heimdall-objective/plan-schema'
 import type { ObjectiveWorkspaceTarget } from './content-identity'
-import { createObjectiveNodeCommit, runObjectiveConflictChecks } from './merge-train-git'
+import {
+  createObjectiveNodeCommit,
+  ObjectiveNodeIngestRejectedError,
+  runObjectiveConflictChecks
+} from './merge-train-git'
 import type { ObjectiveStore } from './objective-store'
 
 export type QueueObjectiveDispatchReportResult =
@@ -37,7 +41,9 @@ export async function queueObjectiveDispatchReport(args: {
     return { kind: 'dispatch-not-queueable', state: args.record.state }
   }
   if (args.record.reportDigest !== null && args.record.reportDigest !== args.reportDigest) {
-    throw new Error('Durable dispatch report checkpoint has a different digest')
+    throw new ObjectiveNodeIngestRejectedError(
+      'Durable dispatch report checkpoint has a different digest'
+    )
   }
   const validatedRecord: ObjectiveDispatchRecord = {
     ...args.record,

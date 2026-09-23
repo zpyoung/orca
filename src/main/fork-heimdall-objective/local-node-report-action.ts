@@ -19,6 +19,7 @@ import {
   rejectedWorkerReport,
   reportActionNaturalKey
 } from './local-report-validation'
+import { ObjectiveNodeIngestRejectedError } from './merge-train-git'
 import {
   queueObjectiveDispatchReport,
   type QueueObjectiveDispatchReportResult
@@ -282,7 +283,9 @@ export async function ingestObjectiveNodeReport(args: {
     } catch (error) {
       return {
         effect: 'not-landed',
-        failureClass: 'infra',
+        // a rejected invariant cannot pass on replay without new evidence, unlike a transient
+        // git/IO failure — route it to the failed-node path instead of retrying forever
+        failureClass: error instanceof ObjectiveNodeIngestRejectedError ? 'criteria' : 'infra',
         reason: error instanceof Error ? error.message : String(error)
       }
     }

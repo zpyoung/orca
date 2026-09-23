@@ -11,6 +11,7 @@ import {
   applyObjectiveNodeCommit,
   createObjectiveNodeCommit,
   OBJECTIVE_MERGE_TRAIN_MAX_PATHS,
+  ObjectiveNodeIngestRejectedError,
   runObjectiveConflictChecks
 } from './merge-train-git'
 
@@ -209,6 +210,40 @@ describe('objective merge train Git mechanics', () => {
       (await git(fixture.source, ['status', '--ignored', '--short', '--', 'dist/unreported.bin']))
         .stdout
     ).toBe('!! dist/unreported.bin\n')
+  })
+
+  it('rejects a node commit with a typed error when HEAD does not descend from the dispatch baseline', async () => {
+    const fixture = await repositoryFixture()
+    // simulates a worker that amended away its original commit, leaving HEAD on unrelated history
+    await git(fixture.source, ['checkout', '--orphan', 'rewritten'])
+    await writeFile(join(fixture.source, 'shared.txt'), 'rewritten\n')
+    await git(fixture.source, ['add', '--all'])
+    await git(fixture.source, ['commit', '-m', 'amended worker commit'])
+
+    await expect(
+      createObjectiveNodeCommit(
+        fixture.sourceTarget,
+        {
+          baseCommit: fixture.baseCommit,
+          taskKey: 'amended-node',
+          title: 'Amended node',
+          reportedPaths: []
+        },
+        leaseGuard
+      )
+    ).rejects.toThrow(ObjectiveNodeIngestRejectedError)
+    await expect(
+      createObjectiveNodeCommit(
+        fixture.sourceTarget,
+        {
+          baseCommit: fixture.baseCommit,
+          taskKey: 'amended-node',
+          title: 'Amended node',
+          reportedPaths: []
+        },
+        leaseGuard
+      )
+    ).rejects.toThrow('Objective node HEAD does not descend from its dispatch baseline')
   })
 
   it('does not reset a node worktree after its lease is lost', async () => {
