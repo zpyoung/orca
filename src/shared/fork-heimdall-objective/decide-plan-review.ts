@@ -112,12 +112,102 @@ function objectivePlanReviewWireTarget(target: ObjectivePlanReviewGateTarget): P
     : { kind: 'patch', patchId: target.patch.id }
 }
 
+type PlanReviewDispatchLookup =
+  | { status: 'no-attempt' }
+  | { status: 'not-landed' }
+  | { status: 'outcome'; outcome: ObjectiveDecisionOutcome }
+
+/**
+ * Resolves a single `dispatch-plan-review` evidence key to its current standing: no attempt yet
+ * (caller should dispatch), settled `not-landed` (caller decides whether to retry or escalate), or
+ * an outcome to return as-is (still in flight, awaiting ingestion, or awaiting a projection refresh).
+ */
+function objectivePlanReviewDispatchLookup(
+  snapshot: Snapshot<ObjectiveWorld>,
+  ledger: WatcherLedger,
+  attempts: readonly ObjectiveAttempt[],
+  reports: readonly ObjectivePendingReport[],
+  wireTarget: PlanReviewTarget,
+  evidenceKey: string
+): PlanReviewDispatchLookup {
+  const dispatch = latestObjectiveAttempt(
+    attempts,
+    (candidate) =>
+      candidate.kind === 'dispatch-plan-review' && candidate.evidenceKey === evidenceKey
+  )
+  if (!dispatch) {
+    return { status: 'no-attempt' }
+  }
+  const disposition = objectiveAttemptDisposition(dispatch.attempt, ledger)
+  if (disposition === 'not-landed') {
+    return { status: 'not-landed' }
+  }
+  if (disposition !== 'landed') {
+    // in-flight or indeterminate: nothing new to do at this evidence key yet.
+    return {
+      status: 'outcome',
+      outcome: objectiveNoAction('plan', 'plan-review-in-flight', evidenceKey)
+    }
+  }
+  const report = reports.find((candidate) => candidate.dispatchId === dispatch.attempt.dispatchId)
+  if (
+    report?.outcome !== 'succeeded' ||
+    report.reportPath === null ||
+    report.evidenceIssue !== undefined ||
+    report.reportValidation !== undefined
+  ) {
+    // a landed disposition is only ever recorded once the report validated cleanly, so this is
+    // unreachable in practice; treated as still-settling rather than redispatched, since the
+    // evidence key can't change to name a fresh attempt at the same (target, round).
+    return {
+      status: 'outcome',
+      outcome: objectiveNoAction('plan', 'plan-review-in-flight', evidenceKey)
+    }
+  }
+  const ingestion = latestObjectiveAttempt(
+    attempts,
+    (candidate) =>
+      candidate.kind === 'ingest-plan-review' && candidate.dispatchId === report.dispatchId
+  )
+  if (!ingestion) {
+    return {
+      status: 'outcome',
+      outcome: {
+        action: {
+          kind: 'ingest-plan-review',
+          capability: 'review',
+          visibility: 'local',
+          recovery: 'replay-safe',
+          contentIdentity: snapshot.contentIdentity,
+          evidenceKey: report.dispatchId,
+          dispatchId: report.dispatchId,
+          reportPath: report.reportPath,
+          target: wireTarget
+        }
+      }
+    }
+  }
+  const ingestionDisposition = objectiveAttemptDisposition(ingestion.attempt, ledger)
+  if (ingestionDisposition === 'in-flight' || ingestionDisposition === 'indeterminate') {
+    return {
+      status: 'outcome',
+      outcome: objectiveNoAction('plan', 'plan-review-in-flight', report.dispatchId)
+    }
+  }
+  return {
+    status: 'outcome',
+    outcome: objectiveNoAction('plan', 'projection-refresh-pending', report.dispatchId)
+  }
+}
+
 /**
  * Wraps a ready-to-emit `activate-plan` or `apply-plan-patch` action with the plan-review gate: off
  * or a pre-upgrade draft passes it through unchanged; otherwise a review is dispatched, ingested, and
  * its verdict resolved before the wrapped action ever lands. A round-1 `revise` rejects the target
  * (already done by ingestion) and redispatches the planner instead of emitting the wrapped action;
  * `escalate` or a round-2 `revise` emits it with `approvalRequired` for a human or owner to decide.
+ * A `not-landed` dispatch is retried once at a distinct evidence key for the same (target, round);
+ * if the retry also settles `not-landed`, that is treated the same as an `escalate` verdict.
  */
 export function decideObjectivePlanReviewGate(
   snapshot: Snapshot<ObjectiveWorld>,
@@ -161,70 +251,59 @@ export function decideObjectivePlanReviewGate(
     return { action: { ...action, approvalRequired: true } }
   }
 
-  const evidenceKey = `plan-review:${target.kind}:${targetId}:${round}`
-  const dispatch = latestObjectiveAttempt(
+  const primaryEvidenceKey = `plan-review:${target.kind}:${targetId}:${round}`
+  const primaryLookup = objectivePlanReviewDispatchLookup(
+    snapshot,
+    ledger,
     attempts,
-    (candidate) =>
-      candidate.kind === 'dispatch-plan-review' && candidate.evidenceKey === evidenceKey
+    reports,
+    wireTarget,
+    primaryEvidenceKey
   )
-  if (dispatch) {
-    const disposition = objectiveAttemptDisposition(dispatch.attempt, ledger)
-    if (disposition === 'landed') {
-      const report = reports.find(
-        (candidate) => candidate.dispatchId === dispatch.attempt.dispatchId
-      )
-      if (
-        report?.outcome === 'succeeded' &&
-        report.reportPath !== null &&
-        report.evidenceIssue === undefined &&
-        report.reportValidation === undefined
-      ) {
-        const ingestion = latestObjectiveAttempt(
-          attempts,
-          (candidate) =>
-            candidate.kind === 'ingest-plan-review' && candidate.dispatchId === report.dispatchId
-        )
-        if (!ingestion) {
-          return {
-            action: {
-              kind: 'ingest-plan-review',
-              capability: 'review',
-              visibility: 'local',
-              recovery: 'replay-safe',
-              contentIdentity: snapshot.contentIdentity,
-              evidenceKey: report.dispatchId,
-              dispatchId: report.dispatchId,
-              reportPath: report.reportPath,
-              target: wireTarget
-            }
-          }
-        }
-        const ingestionDisposition = objectiveAttemptDisposition(ingestion.attempt, ledger)
-        if (ingestionDisposition === 'in-flight' || ingestionDisposition === 'indeterminate') {
-          return objectiveNoAction('plan', 'plan-review-in-flight', report.dispatchId)
-        }
-        return objectiveNoAction('plan', 'projection-refresh-pending', report.dispatchId)
+  if (primaryLookup.status === 'outcome') {
+    return primaryLookup.outcome
+  }
+  if (primaryLookup.status === 'no-attempt') {
+    return {
+      action: {
+        kind: 'dispatch-plan-review',
+        capability: 'review',
+        visibility: 'local',
+        contentIdentity: snapshot.contentIdentity,
+        evidenceKey: primaryEvidenceKey,
+        target: wireTarget,
+        round
       }
-      // a landed disposition is only ever recorded once the report validated cleanly, so this is
-      // unreachable in practice; treated as still-settling rather than redispatched, since the
-      // evidence key can't change to name a fresh attempt at the same (target, round).
-      return objectiveNoAction('plan', 'plan-review-in-flight', evidenceKey)
     }
-    // in-flight, indeterminate, or a failed dispatch attempt: nothing new to do at this evidence key.
-    return objectiveNoAction('plan', 'plan-review-in-flight', evidenceKey)
   }
 
-  return {
-    action: {
-      kind: 'dispatch-plan-review',
-      capability: 'review',
-      visibility: 'local',
-      contentIdentity: snapshot.contentIdentity,
-      evidenceKey,
-      target: wireTarget,
-      round
+  const retryEvidenceKey = `${primaryEvidenceKey}:retry-1`
+  const retryLookup = objectivePlanReviewDispatchLookup(
+    snapshot,
+    ledger,
+    attempts,
+    reports,
+    wireTarget,
+    retryEvidenceKey
+  )
+  if (retryLookup.status === 'outcome') {
+    return retryLookup.outcome
+  }
+  if (retryLookup.status === 'no-attempt') {
+    return {
+      action: {
+        kind: 'dispatch-plan-review',
+        capability: 'review',
+        visibility: 'local',
+        contentIdentity: snapshot.contentIdentity,
+        evidenceKey: retryEvidenceKey,
+        target: wireTarget,
+        round
+      }
     }
   }
+  // the retry also settled not-landed: stop retrying, the same outcome as an `escalate` verdict.
+  return { action: { ...action, approvalRequired: true } }
 }
 
 /**

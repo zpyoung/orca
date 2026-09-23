@@ -442,4 +442,128 @@ describe('decideObjectivePlanReviewGate', () => {
     expect(result.action).toBeNull()
     expect(result).toMatchObject({ reason: 'plan-review-in-flight' })
   })
+
+  describe('a not-landed plan-review dispatch attempt (S2)', () => {
+    function notLandedDispatch(evidenceKey: string, dispatchId: string) {
+      const action: ObjectiveAction = {
+        kind: 'dispatch-plan-review',
+        capability: 'review',
+        visibility: 'local',
+        contentIdentity: 'content-current',
+        evidenceKey,
+        target: { kind: 'patch', patchId: 'patch-1' },
+        round: 1
+      }
+      return attempt(action, { dispatchId, state: 'settled', effect: 'not-landed' })
+    }
+
+    it('retries once at a distinct evidence key instead of holding plan-review-in-flight forever', () => {
+      const world = { ...projection(), patches: [pendingPatch] }
+      const result = decide(
+        { kind: 'patch', patch: pendingPatch, revision: approvedRevision },
+        applyAction,
+        world,
+        ledger([notLandedDispatch('plan-review:patch:patch-1:1', 'review-dispatch-1')])
+      )
+      expect(result.action).toMatchObject({
+        kind: 'dispatch-plan-review',
+        evidenceKey: 'plan-review:patch:patch-1:1:retry-1',
+        target: { kind: 'patch', patchId: 'patch-1' },
+        round: 1
+      })
+    })
+
+    it('holds no-action while the retry dispatch is in flight', () => {
+      const world = { ...projection(), patches: [pendingPatch] }
+      const retry = attempt(
+        {
+          kind: 'dispatch-plan-review',
+          capability: 'review',
+          visibility: 'local',
+          contentIdentity: 'content-current',
+          evidenceKey: 'plan-review:patch:patch-1:1:retry-1',
+          target: { kind: 'patch', patchId: 'patch-1' },
+          round: 1
+        },
+        { dispatchId: 'review-dispatch-2', state: 'running' }
+      )
+      const result = decide(
+        { kind: 'patch', patch: pendingPatch, revision: approvedRevision },
+        applyAction,
+        world,
+        ledger([notLandedDispatch('plan-review:patch:patch-1:1', 'review-dispatch-1'), retry])
+      )
+      expect(result.action).toBeNull()
+      expect(result).toMatchObject({ reason: 'plan-review-in-flight' })
+    })
+
+    it('ingests a landed retry report, treating it as the same (target, round) as the original', () => {
+      const world = { ...projection(), patches: [pendingPatch] }
+      const retryDispatch: ObjectiveAction = {
+        kind: 'dispatch-plan-review',
+        capability: 'review',
+        visibility: 'local',
+        contentIdentity: 'content-current',
+        evidenceKey: 'plan-review:patch:patch-1:1:retry-1',
+        target: { kind: 'patch', patchId: 'patch-1' },
+        round: 1
+      }
+      const result = decide(
+        { kind: 'patch', patch: pendingPatch, revision: approvedRevision },
+        applyAction,
+        world,
+        ledger([
+          notLandedDispatch('plan-review:patch:patch-1:1', 'review-dispatch-1'),
+          attempt(retryDispatch, {
+            dispatchId: 'review-dispatch-2',
+            state: 'settled',
+            effect: 'landed'
+          }),
+          workerDone('review-dispatch-2')
+        ])
+      )
+      expect(result.action).toMatchObject({
+        kind: 'ingest-plan-review',
+        dispatchId: 'review-dispatch-2',
+        target: { kind: 'patch', patchId: 'patch-1' }
+      })
+    })
+
+    it('applies the patch once the retry review is ingested and approves at the same round', () => {
+      const world = {
+        ...projection(),
+        patches: [pendingPatch],
+        planReviews: [
+          planReview({
+            targetKind: 'patch',
+            targetId: 'patch-1',
+            round: 1,
+            dispatchId: 'review-dispatch-2',
+            verdict: 'approve'
+          })
+        ]
+      }
+      const result = decide(
+        { kind: 'patch', patch: pendingPatch, revision: approvedRevision },
+        applyAction,
+        world,
+        ledger([notLandedDispatch('plan-review:patch:patch-1:1', 'review-dispatch-1')])
+      )
+      expect(result).toEqual({ action: applyAction })
+    })
+
+    it('requires approval instead of retrying again when the retry also settles not-landed', () => {
+      const world = { ...projection(), patches: [pendingPatch] }
+      const result = decide(
+        { kind: 'patch', patch: pendingPatch, revision: approvedRevision },
+        applyAction,
+        world,
+        ledger([
+          notLandedDispatch('plan-review:patch:patch-1:1', 'review-dispatch-1'),
+          notLandedDispatch('plan-review:patch:patch-1:1:retry-1', 'review-dispatch-2')
+        ])
+      )
+      expect(result).toEqual({ action: { ...applyAction, approvalRequired: true } })
+    })
+  })
 })

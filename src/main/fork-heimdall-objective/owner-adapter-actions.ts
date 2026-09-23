@@ -79,7 +79,8 @@ function ownerGuidancePlannerAction(
       revisionNumber: nextNumber,
       reason: 'owner-directed',
       guidance,
-      ...(requestedSkipStage === undefined ? {} : { requestedSkipStage })
+      ...(requestedSkipStage === undefined ? {} : { requestedSkipStage }),
+      shape: 'full'
     }
   }
   // an owner-directed repair still patches the approved revision, so its revisionNumber must be

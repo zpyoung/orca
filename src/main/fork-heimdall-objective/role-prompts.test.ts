@@ -237,6 +237,29 @@ describe('objective role prompts', () => {
     expect(prompt).toContain('TIMED OUT: true')
   })
 
+  it('renders a previous repair rejection section when supplied, but not otherwise (C5)', () => {
+    const withRejection = buildObjectiveRolePrompt({
+      role: 'planner',
+      contract,
+      reason: 'replan-after-failure',
+      reportPath: '/tmp/objective/report.json',
+      budgetBucket: 'plenty',
+      ...parallel,
+      failureContext: { previousRepairRejection: 'changes-frozen-node:core' }
+    })
+    const withoutRejection = buildObjectiveRolePrompt({
+      role: 'planner',
+      contract,
+      reason: 'replan-after-failure',
+      reportPath: '/tmp/objective/report.json',
+      budgetBucket: 'plenty',
+      ...parallel
+    })
+
+    expect(withRejection).toContain('PREVIOUS REPAIR REJECTED:\nchanges-frozen-node:core')
+    expect(withoutRejection).not.toContain('PREVIOUS REPAIR REJECTED')
+  })
+
   it('renders plan progress for a planner replan when supplied, but not otherwise', () => {
     const withProgress = buildObjectiveRolePrompt({
       role: 'planner',

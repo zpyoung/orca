@@ -277,4 +277,32 @@ describe('decideObjective repair episode, end to end', () => {
       digest: 'patch-digest-1'
     })
   })
+
+  it('redispatches with replan-after-block when the rejection is a plan-review revise (C5)', () => {
+    const plan = {
+      ...projection({ nodes: [node('open-task', { state: 'pending' })] }),
+      patches: [planPatch({ status: 'rejected', rejection: 'plan-review-revise' })]
+    }
+    const decision = decideObjective(snapshot(plan), ledger())
+    expect(decision.action).toMatchObject({
+      kind: 'dispatch-planner',
+      reason: 'replan-after-block',
+      shape: 'repair',
+      repairRevisionId: 'revision-1'
+    })
+  })
+
+  it('redispatches with replan-after-failure when the rejection is not a plan-review revise (C5)', () => {
+    const plan = {
+      ...projection({ nodes: [node('open-task', { state: 'pending' })] }),
+      patches: [planPatch({ status: 'rejected', rejection: 'changes-frozen-node:core' })]
+    }
+    const decision = decideObjective(snapshot(plan), ledger())
+    expect(decision.action).toMatchObject({
+      kind: 'dispatch-planner',
+      reason: 'replan-after-failure',
+      shape: 'repair',
+      repairRevisionId: 'revision-1'
+    })
+  })
 })

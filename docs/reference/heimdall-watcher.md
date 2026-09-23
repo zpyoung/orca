@@ -873,11 +873,14 @@ A **repair episode** stays open from the repair planner dispatch until its patch
 dispatch starts while it is open, but tasks already running keep running.
 
 The patch itself moves pending → applied or rejected. It is rejected if it touches a frozen task
-(named in the rejection), or if plan review returns revise or escalate for it. A rejection is
+(named in the rejection), or if a round-one plan review returns revise for it; an escalate verdict or
+a round-two revise instead leaves it pending, requiring approval before it applies. A rejection is
 retried once — the planner is redispatched with the reason — and a second rejection escalates the
-same way plan review does. Owner-directed replans use the repair shape too. A full replan (a new
-revision) happens only when no plan is approved yet; once a revision is approved, every later
-correction is a repair to it.
+same way plan review does. A plan-review dispatch that settles not-landed is retried once at a fresh
+evidence key for the same target and round; a second not-landed settlement leaves the patch pending
+and requiring approval, the same as an escalate verdict. Owner-directed replans use the repair shape
+too. A full replan (a new revision) happens only when no plan is approved yet; once a revision is
+approved, every later correction is a repair to it.
 
 **Objective gates.** Declared at enrollment: name, shell command, and a timeout (default 1800 s), up
 to 8 per objective, unique names. Unavailable on a host without the parallel execution runtime

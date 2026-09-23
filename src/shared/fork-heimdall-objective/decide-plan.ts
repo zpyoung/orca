@@ -48,12 +48,16 @@ function decideObjectivePlanPatchApplication(
     return null
   }
   if (targetPatch.status === 'rejected') {
+    // a plan-review-revise rejection recovers its findings from review history; any other rejection
+    // needs 'replan-after-failure' so deriveObjectiveFailureContext can surface its rejection text
     return decidePlannerAction(
       snapshot,
       ledger,
       attempts,
       reports,
-      'replan-after-block',
+      targetPatch.rejection === 'plan-review-revise'
+        ? 'replan-after-block'
+        : 'replan-after-failure',
       revision.number
     )
   }
