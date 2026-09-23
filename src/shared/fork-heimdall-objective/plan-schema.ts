@@ -3,6 +3,7 @@ import {
   OBJECTIVE_CHECK_COMMAND_MAX_LENGTH,
   OBJECTIVE_CRITERION_BODY_MAX_LENGTH,
   OBJECTIVE_CRITERION_NOTE_MAX_LENGTH,
+  OBJECTIVE_DISPATCH_TASK_SNAPSHOT_MAX_BYTES,
   OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH,
   OBJECTIVE_TASK_KEY_MAX_LENGTH,
   OBJECTIVE_TASK_SPEC_MAX_LENGTH,
@@ -11,6 +12,7 @@ import {
   ObjectiveTerritoryGlobSchema,
   ObjectiveWorkspacePathSchema,
   isObjectiveConcreteWorkspacePath,
+  objectiveDispatchTaskSnapshotByteLength,
   type ObjectiveEnrollmentPayload
 } from './contract-types'
 
@@ -333,6 +335,19 @@ export function assertPlannerTaskTerritoryDeclared(task: ObjectivePlanTask): voi
   }
 }
 
+/**
+ * Write-path requiredness: a task's dispatch snapshot must fit the durable dispatch record's cap, or
+ * it can never dispatch — reject it here so the planner learns immediately instead of on dispatch.
+ */
+export function assertPlannerTaskWithinDispatchSnapshotCap(task: ObjectivePlanTask): void {
+  const bytes = objectiveDispatchTaskSnapshotByteLength(task)
+  if (bytes > OBJECTIVE_DISPATCH_TASK_SNAPSHOT_MAX_BYTES) {
+    throw new Error(
+      `Task ${task.taskKey} dispatch snapshot is ${bytes} bytes, exceeding the ${OBJECTIVE_DISPATCH_TASK_SNAPSHOT_MAX_BYTES}-byte limit`
+    )
+  }
+}
+
 /** Write-path requiredness: `assumptions` must be present, even when empty. */
 export function assertPlannerAssumptionsDeclared(
   assumptions: readonly ObjectivePlanAssumption[] | undefined
@@ -375,6 +390,7 @@ export function parseAndValidatePlannerReport(
   }
   for (const task of report.plan) {
     assertPlannerTaskTerritoryDeclared(task)
+    assertPlannerTaskWithinDispatchSnapshotCap(task)
   }
   assertPlannerAssumptionsDeclared(report.assumptions)
   assertPlannerAssumptionsNameKnownTasks(report.assumptions, taskKeys)

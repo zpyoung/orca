@@ -1,6 +1,10 @@
 import { z } from 'zod'
 import { ExecutionHostIdSchema } from '../fork-heimdall/watcher-types'
-import { ObjectiveWorkspacePathSchema } from './contract-types'
+import {
+  OBJECTIVE_DISPATCH_TASK_SNAPSHOT_MAX_BYTES,
+  ObjectiveWorkspacePathSchema,
+  objectiveDispatchTaskSnapshotByteLength
+} from './contract-types'
 import { ImplementerReportSchema, ObjectivePlanTaskSchema } from './plan-schema'
 
 const IdSchema = z.string().trim().min(1).max(1_024)
@@ -71,8 +75,14 @@ export const ObjectiveDispatchRecordSchema = z
         message: 'Dispatch task snapshot must match its task key'
       })
     }
-    if (new TextEncoder().encode(JSON.stringify(record.task)).byteLength > 16 * 1_024) {
-      context.addIssue({ code: 'custom', message: 'Dispatch task snapshot exceeds 16 KiB' })
+    if (
+      objectiveDispatchTaskSnapshotByteLength(record.task) >
+      OBJECTIVE_DISPATCH_TASK_SNAPSHOT_MAX_BYTES
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: `Dispatch task snapshot exceeds ${OBJECTIVE_DISPATCH_TASK_SNAPSHOT_MAX_BYTES} bytes`
+      })
     }
     if (record.report !== null && record.report.taskKey !== record.taskKey) {
       context.addIssue({ code: 'custom', message: 'Dispatch report must match its task key' })

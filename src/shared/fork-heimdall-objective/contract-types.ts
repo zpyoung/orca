@@ -26,6 +26,14 @@ export const OBJECTIVE_GATE_MAX_TIMEOUT_SECONDS = 14_400
 export const OBJECTIVE_GATES_MAX = 8
 export const OBJECTIVE_GATE_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,39}$/u
 
+/** Cap on a planner task's serialized JSON size, matching what a dispatch record can durably store. */
+export const OBJECTIVE_DISPATCH_TASK_SNAPSHOT_MAX_BYTES = 16 * 1_024
+
+/** Measures a task snapshot exactly as `ObjectiveDispatchRecordSchema`'s size check does. */
+export function objectiveDispatchTaskSnapshotByteLength(task: unknown): number {
+  return new TextEncoder().encode(JSON.stringify(task)).byteLength
+}
+
 const BoundedTextSchema = (maximum: number) => z.string().trim().min(1).max(maximum)
 
 export const ObjectiveTierSchema = z.enum(['express', 'standard', 'full'])

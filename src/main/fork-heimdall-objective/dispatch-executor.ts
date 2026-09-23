@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { ActionOutcome } from '../../shared/fork-heimdall/effect-certainty'
 import { makeAttemptFingerprint } from '../../shared/fork-heimdall/attempt-fingerprint'
 import type { DispatchResult, ExecuteContext } from '../../shared/fork-heimdall/kind-contract'
@@ -427,7 +428,9 @@ export async function executeObjectiveDispatch(args: {
     await saveDispatchFailure(args.objectiveStore, prepared, args.context)
     return {
       effect: 'not-landed',
-      failureClass: 'infra',
+      // a Zod validation failure (e.g. saving an oversized dispatch task snapshot) is deterministic
+      // and won't clear on retry, unlike an infra failure
+      failureClass: error instanceof z.ZodError ? 'criteria' : 'infra',
       reason: error instanceof Error ? error.message : String(error)
     }
   }
