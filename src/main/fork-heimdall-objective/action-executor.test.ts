@@ -784,4 +784,87 @@ describe('objective action recovery', () => {
       completed.executor.resolveOutcome(attempt(checkAction), completed.fresh, ledger, TEST_LEASE)
     ).toEqual({ effect: 'landed' })
   })
+
+  it('retries an absent gate attempt while preserving indeterminate incomplete executions', () => {
+    const gateAction: ObjectiveAction = {
+      kind: 'run-gate',
+      capability: 'check',
+      visibility: 'local',
+      contentIdentity: 'new-content',
+      evidenceKey: 'objective-gate:full-suite:new-content',
+      gateName: 'full-suite',
+      command: 'pnpm test',
+      timeoutSeconds: 1_800
+    }
+    const ledger: WatcherLedger = { watcherId: 'watcher-1', entries: [] }
+    const absent = harness({ getGateAttempt: () => null })
+    const incomplete = harness({
+      getGateAttempt: () => ({ completedAtMs: null }) as never
+    })
+    const completed = harness({
+      getGateAttempt: () => ({ completedAtMs: 12 }) as never
+    })
+
+    expect(
+      absent.executor.resolveOutcome(attempt(gateAction), absent.fresh, ledger, TEST_LEASE)
+    ).toEqual({ effect: 'not-landed' })
+    expect(
+      incomplete.executor.resolveOutcome(attempt(gateAction), incomplete.fresh, ledger, TEST_LEASE)
+    ).toEqual({ effect: 'indeterminate' })
+    expect(
+      completed.executor.resolveOutcome(attempt(gateAction), completed.fresh, ledger, TEST_LEASE)
+    ).toEqual({ effect: 'landed' })
+  })
+
+  it('treats a pending plan patch as not-landed and an applied or rejected one as landed', () => {
+    const applyPlanPatchAction: ObjectiveAction = {
+      kind: 'apply-plan-patch',
+      capability: 'plan',
+      visibility: 'local',
+      contentIdentity: 'new-content',
+      evidenceKey: 'plan-patch:patch-1',
+      recovery: 'replay-safe',
+      revisionId: 'revision-1',
+      patchId: 'patch-1',
+      digest: 'patch-digest-1'
+    }
+    const ledger: WatcherLedger = { watcherId: 'watcher-1', entries: [] }
+    const missing = harness({ getPlanPatch: () => null })
+    const pending = harness({ getPlanPatch: () => ({ status: 'pending' }) as never })
+    const applied = harness({ getPlanPatch: () => ({ status: 'applied' }) as never })
+    const rejected = harness({ getPlanPatch: () => ({ status: 'rejected' }) as never })
+
+    expect(
+      missing.executor.resolveOutcome(
+        attempt(applyPlanPatchAction),
+        missing.fresh,
+        ledger,
+        TEST_LEASE
+      )
+    ).toEqual({ effect: 'not-landed' })
+    expect(
+      pending.executor.resolveOutcome(
+        attempt(applyPlanPatchAction),
+        pending.fresh,
+        ledger,
+        TEST_LEASE
+      )
+    ).toEqual({ effect: 'not-landed' })
+    expect(
+      applied.executor.resolveOutcome(
+        attempt(applyPlanPatchAction),
+        applied.fresh,
+        ledger,
+        TEST_LEASE
+      )
+    ).toEqual({ effect: 'landed' })
+    expect(
+      rejected.executor.resolveOutcome(
+        attempt(applyPlanPatchAction),
+        rejected.fresh,
+        ledger,
+        TEST_LEASE
+      )
+    ).toEqual({ effect: 'landed' })
+  })
 })

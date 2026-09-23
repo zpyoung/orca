@@ -55,10 +55,12 @@ describe('objective check deviations, owner configured', () => {
     })
   })
 
-  it('still replans automatically for the same check failure when no owner is configured', () => {
+  it('still repairs automatically for the same check failure when no owner is configured', () => {
     const decision = decideObjective(snapshot(projection({ nodes: [checked] })), ledger())
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
+      shape: 'repair',
+      repairRevisionId: 'revision-1',
       reason: 'replan-after-failure'
     })
     expect('deviation' in decision).toBe(false)
@@ -89,10 +91,12 @@ describe('objective review deviations, owner configured', () => {
     })
   })
 
-  it('still replans automatically for the same blocked review when no owner is configured', () => {
+  it('still repairs automatically for the same blocked review when no owner is configured', () => {
     const decision = decideObjective(snapshot(blocked), ledger())
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
+      shape: 'repair',
+      repairRevisionId: 'revision-1',
       reason: 'replan-after-block'
     })
     expect('deviation' in decision).toBe(false)
@@ -291,11 +295,13 @@ describe('judgment quality review deviations', () => {
     })
   })
 
-  it('still replans automatically for a judgment review block without an owner', () => {
+  it('still repairs automatically for a judgment review block without an owner', () => {
     const decision = decideJudgmentReview('express', [judgmentBlock], false)
 
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
+      shape: 'repair',
+      repairRevisionId: 'revision-1',
       reason: 'replan-after-block'
     })
     expect('deviation' in decision).toBe(false)

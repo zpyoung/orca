@@ -6,9 +6,10 @@ import type {
   WatcherLedger
 } from '../fork-heimdall/ledger-types'
 import type { Snapshot } from '../fork-heimdall/snapshot'
-import { OBJECTIVE_ABSENT_REMOTE_REF_STATE } from './contract-types'
+import { OBJECTIVE_ABSENT_REMOTE_REF_STATE, type ObjectiveGate } from './contract-types'
 import type { ObjectiveAction } from './objective-actions'
 import type {
+  ObjectiveGateAttemptProjection,
   ObjectiveNodeProjection,
   ObjectiveProjection,
   ObjectiveRevisionProjection,
@@ -55,6 +56,33 @@ export function node(
     dispatchId: null,
     state: 'pending',
     criteria: [],
+    ...overrides
+  }
+}
+
+export function gate(name: string, overrides: Partial<ObjectiveGate> = {}): ObjectiveGate {
+  return {
+    name,
+    command: 'pnpm test',
+    timeoutSeconds: 1_800,
+    ...overrides
+  }
+}
+
+export function gateAttempt(
+  overrides: Partial<ObjectiveGateAttemptProjection> = {}
+): ObjectiveGateAttemptProjection {
+  return {
+    gateName: 'full-suite',
+    contentIdentity: 'content-current',
+    executionHostId: 'local',
+    command: 'pnpm test',
+    exitCode: 0,
+    timedOut: false,
+    stdoutTail: null,
+    stderrTail: null,
+    startedAtMs: 10,
+    completedAtMs: 20,
     ...overrides
   }
 }

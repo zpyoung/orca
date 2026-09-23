@@ -195,7 +195,9 @@
           "recordLanding": "Record completed work",
           "commitLocalBranch": "Commit local branch",
           "pushRef": "Push branch",
-          "openHostedReview": "Open hosted review"
+          "openHostedReview": "Open hosted review",
+          "runGate": "Run objective gate",
+          "applyPlanPatch": "Apply plan repair"
         },
         "explanation": {
           "dispatchPlanner": "Start the planner for this objective.",
@@ -219,7 +221,9 @@
           "updateBranch": "Update the hosted review branch from its base branch.",
           "merge": "Merge the hosted review.",
           "enqueue": "Enter the hosted review in its merge queue.",
-          "unknown": "Approve this exact requested action."
+          "unknown": "Approve this exact requested action.",
+          "runGate": "Run a whole-tree command on the integrated branch before review and landing.",
+          "applyPlanPatch": "Apply a planner repair patch to the approved objective plan."
         },
         "detail": {
           "task": "Task",

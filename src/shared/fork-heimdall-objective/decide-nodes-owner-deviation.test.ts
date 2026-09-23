@@ -273,13 +273,15 @@ describe('objective node deviations, owner configured', () => {
     })
   })
 
-  it('still replans automatically for every site above when no owner is configured', () => {
+  it('still repairs automatically for every site above when no owner is configured', () => {
     const failed = projection({
       nodes: [node('core', { state: 'failed', dispatchId: 'dispatch-core' })]
     })
     const decision = decideObjective(snapshot(failed), ledger())
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
+      shape: 'repair',
+      repairRevisionId: 'revision-1',
       reason: 'replan-after-failure'
     })
     expect('deviation' in decision).toBe(false)

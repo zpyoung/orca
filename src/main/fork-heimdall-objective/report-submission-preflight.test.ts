@@ -63,6 +63,24 @@ const OBJECTIVE_STORE = {
   getDispatch: () => null
 } as unknown as ObjectiveStore
 
+const PLANNER_DISPATCH_ID = 'dispatch-planner-repair'
+const REPAIR_PLANNER_ACTION: ObjectiveAction = {
+  kind: 'dispatch-planner',
+  capability: 'plan',
+  visibility: 'local',
+  contentIdentity: 'content-current',
+  evidenceKey: 'plan-repair:revision-1:1',
+  revisionNumber: 1,
+  reason: 'replan-after-failure',
+  shape: 'repair',
+  repairOrdinal: 1,
+  repairRevisionId: 'revision-1'
+}
+const REPAIR_PLANNER_LEDGER = {
+  watcherId: 'watcher-1',
+  entries: [attempt(REPAIR_PLANNER_ACTION, { dispatchId: PLANNER_DISPATCH_ID })]
+}
+
 function expectActionableRejection(
   result: SubmissionPreflightResult,
   expectedDetail: string
@@ -196,5 +214,67 @@ describe('objective report submission preflight', () => {
       )
     ).resolves.toEqual({ status: 'accepted' })
     expect(fileProvider.realpath).toHaveBeenCalled()
+  })
+
+  it('accepts a real repair-shaped report for a repair dispatch-planner', async () => {
+    const adapter = createObjectiveSubmissionAdapter({
+      runtime: {} as OrcaRuntimeService,
+      objectiveStore: OBJECTIVE_STORE
+    })
+    const repairReportPath = await issueObjectiveReportPath(
+      target,
+      `fingerprint-${PLANNER_DISPATCH_ID}`
+    )
+    await writeFile(
+      repairReportPath,
+      JSON.stringify({
+        repair: {
+          upsertTasks: [
+            {
+              taskKey: 'core-2',
+              title: 'Core follow-up',
+              spec: 'Implement the core follow-up work.',
+              deps: [],
+              criteria: [{ body: 'Follow-up works', shellCheckable: false, checkCommand: null }],
+              declaresDependencyChange: false,
+              territory: ['src/**']
+            }
+          ],
+          dropTaskKeys: []
+        },
+        assumptions: []
+      })
+    )
+
+    await expect(
+      adapter.preflightWorkerReport(
+        {
+          dispatchId: PLANNER_DISPATCH_ID,
+          payload: { reportPath: repairReportPath, filesModified: [] }
+        },
+        { enrollment: ENROLLMENT, snapshot: null, ledger: REPAIR_PLANNER_LEDGER }
+      )
+    ).resolves.toEqual({ status: 'accepted' })
+  })
+
+  it('rejects a full-shaped report submitted for a repair dispatch-planner', async () => {
+    const adapter = createObjectiveSubmissionAdapter({
+      runtime: {} as OrcaRuntimeService,
+      objectiveStore: OBJECTIVE_STORE
+    })
+    const repairReportPath = await issueObjectiveReportPath(
+      target,
+      `fingerprint-${PLANNER_DISPATCH_ID}`
+    )
+    await writeFile(repairReportPath, JSON.stringify({ plan: [TASK] }))
+
+    const result = await adapter.preflightWorkerReport(
+      {
+        dispatchId: PLANNER_DISPATCH_ID,
+        payload: { reportPath: repairReportPath, filesModified: [] }
+      },
+      { enrollment: ENROLLMENT, snapshot: null, ledger: REPAIR_PLANNER_LEDGER }
+    )
+    expect(result).toMatchObject({ status: 'rejected', code: 'heimdall_report_invalid' })
   })
 })

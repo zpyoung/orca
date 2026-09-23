@@ -41,6 +41,22 @@ describe('objective action recovery contracts', () => {
       criterionId: 'criterion-1',
       contentIdentity: 'content-current'
     })
+
+    const gate = ObjectiveActionSchema.parse({
+      kind: 'run-gate',
+      capability: 'check',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'objective-gate:full-suite:content-current',
+      gateName: 'full-suite',
+      command: 'pnpm test',
+      timeoutSeconds: 1_800
+    })
+    expect(objectiveActionNaturalKey(gate)).toEqual({
+      kind: 'gate-attempt',
+      gateName: 'full-suite',
+      contentIdentity: 'content-current'
+    })
   })
 
   it('requires replay-safe on store ingestion and forbids it on checks', () => {
@@ -72,6 +88,144 @@ describe('objective action recovery contracts', () => {
     expect(ObjectiveActionSchema.safeParse({ ...check, recovery: 'replay-safe' }).success).toBe(
       false
     )
+  })
+
+  it('rejects a run-gate action with an out-of-pattern name or an out-of-range timeout', () => {
+    const gate = {
+      kind: 'run-gate',
+      capability: 'check',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'objective-gate:full-suite:content-current',
+      gateName: 'full-suite',
+      command: 'pnpm test',
+      timeoutSeconds: 1_800
+    }
+    expect(ObjectiveActionSchema.safeParse(gate).success).toBe(true)
+    expect(ObjectiveActionSchema.safeParse({ ...gate, gateName: 'Full_Suite' }).success).toBe(false)
+    expect(ObjectiveActionSchema.safeParse({ ...gate, timeoutSeconds: 9 }).success).toBe(false)
+    expect(ObjectiveActionSchema.safeParse({ ...gate, timeoutSeconds: 14_401 }).success).toBe(false)
+    expect(ObjectiveActionSchema.safeParse({ ...gate, recovery: 'replay-safe' }).success).toBe(
+      false
+    )
+  })
+})
+
+describe('objective repair plumbing action contracts', () => {
+  it('parses an unshaped dispatch-planner and ingest-plan action exactly as before', () => {
+    const dispatch = ObjectiveActionSchema.parse({
+      kind: 'dispatch-planner',
+      capability: 'plan',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'plan:1',
+      revisionNumber: 1,
+      reason: 'initial'
+    })
+    expect(dispatch).toMatchObject({ kind: 'dispatch-planner', revisionNumber: 1 })
+
+    const ingest = ObjectiveActionSchema.parse({
+      kind: 'ingest-plan',
+      capability: 'plan',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'dispatch-plan',
+      recovery: 'replay-safe',
+      dispatchId: 'dispatch-plan',
+      revisionNumber: 1,
+      reportPath: '/outside/plan.json'
+    })
+    expect(ingest).toMatchObject({ kind: 'ingest-plan', revisionNumber: 1 })
+  })
+
+  it('requires repairOrdinal and repairRevisionId on a repair-shaped dispatch-planner action', () => {
+    const base = {
+      kind: 'dispatch-planner',
+      capability: 'plan',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'plan:2',
+      revisionNumber: 2,
+      reason: 'replan-after-block',
+      shape: 'repair'
+    }
+    expect(ObjectiveActionSchema.safeParse(base).success).toBe(false)
+    expect(ObjectiveActionSchema.safeParse({ ...base, repairOrdinal: 1 }).success).toBe(false)
+    expect(
+      ObjectiveActionSchema.safeParse({ ...base, repairRevisionId: 'revision-1' }).success
+    ).toBe(false)
+    expect(
+      ObjectiveActionSchema.safeParse({
+        ...base,
+        repairOrdinal: 1,
+        repairRevisionId: 'revision-1'
+      }).success
+    ).toBe(true)
+  })
+
+  it('accepts approvalRequired on dispatch-planner and activate-plan without changing other fields', () => {
+    const escalatedDispatch = ObjectiveActionSchema.parse({
+      kind: 'dispatch-planner',
+      capability: 'plan',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'plan:1',
+      revisionNumber: 1,
+      reason: 'initial',
+      approvalRequired: true
+    })
+    expect(escalatedDispatch).toMatchObject({ approvalRequired: true })
+
+    const escalatedActivate = ObjectiveActionSchema.parse({
+      kind: 'activate-plan',
+      capability: 'plan',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'revision-1:digest-1',
+      recovery: 'replay-safe',
+      revisionId: 'revision-1',
+      digest: 'digest-1',
+      approvalRequired: true
+    })
+    expect(escalatedActivate).toMatchObject({ approvalRequired: true })
+  })
+
+  it('requires targetRevisionId only on a repair-shaped ingest-plan action', () => {
+    const base = {
+      kind: 'ingest-plan',
+      capability: 'plan',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'dispatch-plan',
+      recovery: 'replay-safe',
+      dispatchId: 'dispatch-plan',
+      revisionNumber: 2,
+      reportPath: '/outside/plan.json',
+      shape: 'repair'
+    }
+    expect(ObjectiveActionSchema.safeParse(base).success).toBe(false)
+    expect(
+      ObjectiveActionSchema.safeParse({ ...base, targetRevisionId: 'revision-1' }).success
+    ).toBe(true)
+  })
+
+  it('parses apply-plan-patch and derives its patchId natural key', () => {
+    const raw = {
+      kind: 'apply-plan-patch',
+      capability: 'plan',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'plan-patch:patch-1',
+      recovery: 'replay-safe',
+      revisionId: 'revision-1',
+      patchId: 'patch-1',
+      digest: 'patch-digest-1'
+    } as const
+    const action = ObjectiveActionSchema.parse(raw)
+    expect(objectiveActionNaturalKey(action)).toEqual({ kind: 'plan-patch', patchId: 'patch-1' })
+
+    const escalated = ObjectiveActionSchema.parse({ ...raw, approvalRequired: true })
+    expect(escalated).toMatchObject({ approvalRequired: true })
   })
 })
 

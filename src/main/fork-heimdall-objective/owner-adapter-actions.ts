@@ -1,6 +1,11 @@
+import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type { Intervention } from '../../shared/fork-heimdall/owner/intervention'
 import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
-import { activeObjectiveRevision } from '../../shared/fork-heimdall-objective/decision-context'
+import {
+  activeObjectiveRevision,
+  objectiveAttempts
+} from '../../shared/fork-heimdall-objective/decision-context'
+import { nextObjectiveRepairOrdinal } from '../../shared/fork-heimdall-objective/objective-repair-state'
 import {
   OWNER_SKIP_REVIEW_DISPATCH_PREFIX,
   type DispatchPlannerAction,
@@ -58,10 +63,24 @@ function ownerGuidancePlannerAction(
   world: ObjectiveWorld,
   snapshot: Snapshot<ObjectiveWorld>,
   guidance: string,
-  requestedSkipStage?: string
+  requestedSkipStage?: string,
+  ledger?: WatcherLedger
 ): DispatchPlannerAction {
   const nextNumber =
     world.plan.revisions.reduce((max, revision) => Math.max(max, revision.number), 0) + 1
+  const approved = activeObjectiveRevision(world)
+  const repairFields =
+    approved === null
+      ? {}
+      : ({
+          shape: 'repair',
+          repairRevisionId: approved.id,
+          repairOrdinal: nextObjectiveRepairOrdinal(
+            world,
+            ledger === undefined ? [] : objectiveAttempts(ledger),
+            approved.id
+          )
+        } as const)
   return {
     kind: 'dispatch-planner',
     capability: 'plan',
@@ -71,14 +90,16 @@ function ownerGuidancePlannerAction(
     revisionNumber: nextNumber,
     reason: 'owner-directed',
     guidance,
-    ...(requestedSkipStage === undefined ? {} : { requestedSkipStage })
+    ...(requestedSkipStage === undefined ? {} : { requestedSkipStage }),
+    ...repairFields
   }
 }
 
 /** Translates a validated objective-specific intervention into the write-ahead action `execute` applies. */
 export function objectiveActionForIntervention(
   intervention: Intervention,
-  snapshot: Snapshot<ObjectiveWorld>
+  snapshot: Snapshot<ObjectiveWorld>,
+  ledger?: WatcherLedger
 ): ObjectiveAction {
   const parsed = ObjectiveSpecificInterventionSchema.parse(intervention)
   const world = snapshot.world
@@ -155,7 +176,7 @@ export function objectiveActionForIntervention(
         attestation: parsed.attestation
       }
     case 'dispatch-planner':
-      return ownerGuidancePlannerAction(world, snapshot, parsed.guidance)
+      return ownerGuidancePlannerAction(world, snapshot, parsed.guidance, undefined, ledger)
     case 'skip-stage': {
       if (parsed.stage === 'reviewer' || parsed.stage === 'integrator') {
         const revisionId = activeObjectiveRevision(world)?.id ?? 'unknown-revision'
@@ -193,13 +214,15 @@ export function objectiveActionForIntervention(
       // a landing-ladder rung has no forgeable evidence to fabricate; gate 2 refuses every
       // mandated one anyway, so this only ever runs for a rung the bar never required in the
       // first place, where the pipeline was never going to try to reach it regardless
-      return ownerGuidancePlannerAction(world, snapshot, parsed.rationale, parsed.stage)
+      return ownerGuidancePlannerAction(world, snapshot, parsed.rationale, parsed.stage, ledger)
     }
     case 'set-role-agent':
       return ownerGuidancePlannerAction(
         world,
         snapshot,
-        `Prefer agent "${parsed.agent}" for the ${parsed.role} role going forward.`
+        `Prefer agent "${parsed.agent}" for the ${parsed.role} role going forward.`,
+        undefined,
+        ledger
       )
   }
 }

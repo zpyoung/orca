@@ -32,6 +32,8 @@ function objectiveActionTitle(actionKind: string): string | null {
       return translate('fork.heimdall.approval.action.ingestReport', 'Read implementation report')
     case 'run-check':
       return translate('fork.heimdall.approval.action.runCheck', 'Run acceptance check')
+    case 'run-gate':
+      return translate('fork.heimdall.approval.action.runGate', 'Run objective gate')
     case 'dispatch-reviewer':
       return translate('fork.heimdall.approval.action.dispatchReviewer', 'Start review')
     case 'dispatch-integrator':
@@ -49,6 +51,8 @@ function objectiveActionTitle(actionKind: string): string | null {
       return translate('fork.heimdall.approval.action.pushRef', 'Push branch')
     case 'open-hosted-review':
       return translate('fork.heimdall.approval.action.openHostedReview', 'Open hosted review')
+    case 'apply-plan-patch':
+      return translate('fork.heimdall.approval.action.applyPlanPatch', 'Apply plan repair')
     default:
       return null
   }
@@ -90,6 +94,11 @@ function genericExplanation(actionKind: string): string {
         'fork.heimdall.approval.explanation.runCheck',
         'Run an acceptance command for the objective.'
       )
+    case 'run-gate':
+      return translate(
+        'fork.heimdall.approval.explanation.runGate',
+        'Run a whole-tree command on the integrated branch before review and landing.'
+      )
     case 'dispatch-reviewer':
       return translate(
         'fork.heimdall.approval.explanation.dispatchReviewer',
@@ -124,6 +133,11 @@ function genericExplanation(actionKind: string): string {
       return translate(
         'fork.heimdall.approval.explanation.openHostedReview',
         'Open a hosted review for the objective branch.'
+      )
+    case 'apply-plan-patch':
+      return translate(
+        'fork.heimdall.approval.explanation.applyPlanPatch',
+        'Apply a planner repair patch to the approved objective plan.'
       )
     case 'rerun-check':
       return translate(

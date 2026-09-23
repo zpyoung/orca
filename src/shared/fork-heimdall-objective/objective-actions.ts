@@ -3,6 +3,10 @@ import { OWNER_INTERVENTION_TEXT_MAX_LENGTH } from '../fork-heimdall/owner/inter
 import { OWNER_INTERVENTION_CAPABILITY } from '../fork-heimdall/owner/owner-capability'
 import {
   OBJECTIVE_AGENT_ID_MAX_LENGTH,
+  OBJECTIVE_CHECK_COMMAND_MAX_LENGTH,
+  OBJECTIVE_GATE_MAX_TIMEOUT_SECONDS,
+  OBJECTIVE_GATE_MIN_TIMEOUT_SECONDS,
+  OBJECTIVE_GATE_NAME_PATTERN,
   OBJECTIVE_TASK_SPEC_MAX_LENGTH,
   ObjectiveLandingBarSchema,
   ObjectiveWorkspacePathSchema,
@@ -50,9 +54,35 @@ export const DispatchPlannerActionSchema = z
     /** Free-text steer for the planner prompt; only ever set on an owner-directed dispatch. */
     guidance: z.string().trim().min(1).max(OWNER_INTERVENTION_TEXT_MAX_LENGTH).optional(),
     /** Landing-ladder stage an owner asked to skip, kept separate from the exact rationale text. */
-    requestedSkipStage: IdSchema.optional()
+    requestedSkipStage: IdSchema.optional(),
+    /** Absent means a wholesale replan; 'repair' asks the planner to patch the approved revision. */
+    shape: z.enum(['full', 'repair']).optional(),
+    repairOrdinal: z.number().int().positive().optional(),
+    /** The approved revision this repair targets; only set alongside `shape: 'repair'`. */
+    repairRevisionId: IdSchema.optional(),
+    /** Escalation: the next gate check treats an 'on' capability as 'gated' for this action. */
+    approvalRequired: z.literal(true).optional()
   })
   .strict()
+  .superRefine((action, context) => {
+    if (action.shape !== 'repair') {
+      return
+    }
+    if (action.repairOrdinal === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['repairOrdinal'],
+        message: 'repairOrdinal is required when shape is repair'
+      })
+    }
+    if (action.repairRevisionId === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['repairRevisionId'],
+        message: 'repairRevisionId is required when shape is repair'
+      })
+    }
+  })
 export type DispatchPlannerAction = z.infer<typeof DispatchPlannerActionSchema>
 
 export const IngestPlanActionSchema = z
@@ -63,9 +93,21 @@ export const IngestPlanActionSchema = z
     recovery: ReplaySafeSchema,
     dispatchId: IdSchema,
     revisionNumber: z.number().int().positive(),
-    reportPath: z.string().trim().min(1).max(OBJECTIVE_PATH_MAX_LENGTH)
+    reportPath: z.string().trim().min(1).max(OBJECTIVE_PATH_MAX_LENGTH),
+    /** Absent means a wholesale replan; 'repair' ingests a patch against `targetRevisionId`. */
+    shape: z.enum(['full', 'repair']).optional(),
+    targetRevisionId: IdSchema.optional()
   })
   .strict()
+  .superRefine((action, context) => {
+    if (action.shape === 'repair' && action.targetRevisionId === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['targetRevisionId'],
+        message: 'targetRevisionId is required when shape is repair'
+      })
+    }
+  })
 export type IngestPlanAction = z.infer<typeof IngestPlanActionSchema>
 
 export const ActivatePlanActionSchema = z
@@ -75,10 +117,28 @@ export const ActivatePlanActionSchema = z
     capability: z.literal('plan'),
     recovery: ReplaySafeSchema,
     revisionId: IdSchema,
-    digest: IdSchema
+    digest: IdSchema,
+    /** Escalation: the next gate check treats an 'on' capability as 'gated' for this action. */
+    approvalRequired: z.literal(true).optional()
   })
   .strict()
 export type ActivatePlanAction = z.infer<typeof ActivatePlanActionSchema>
+
+/** Applies a stored planner repair patch to its revision via the amend path. */
+export const ApplyPlanPatchActionSchema = z
+  .object({
+    ...ActionBase,
+    kind: z.literal('apply-plan-patch'),
+    capability: z.literal('plan'),
+    recovery: ReplaySafeSchema,
+    revisionId: IdSchema,
+    patchId: IdSchema,
+    digest: IdSchema,
+    /** Escalation: the next gate check treats an 'on' capability as 'gated' for this action. */
+    approvalRequired: z.literal(true).optional()
+  })
+  .strict()
+export type ApplyPlanPatchAction = z.infer<typeof ApplyPlanPatchActionSchema>
 
 export const DispatchNodeActionSchema = z
   .object({
@@ -139,6 +199,22 @@ export const RunCheckActionSchema = z
   })
   .strict()
 export type RunCheckAction = z.infer<typeof RunCheckActionSchema>
+
+export const RunGateActionSchema = z
+  .object({
+    ...ActionBase,
+    kind: z.literal('run-gate'),
+    capability: z.literal('check'),
+    gateName: z.string().regex(OBJECTIVE_GATE_NAME_PATTERN),
+    command: z.string().trim().min(1).max(OBJECTIVE_CHECK_COMMAND_MAX_LENGTH),
+    timeoutSeconds: z
+      .number()
+      .int()
+      .min(OBJECTIVE_GATE_MIN_TIMEOUT_SECONDS)
+      .max(OBJECTIVE_GATE_MAX_TIMEOUT_SECONDS)
+  })
+  .strict()
+export type RunGateAction = z.infer<typeof RunGateActionSchema>
 
 export const DispatchReviewerActionSchema = z
   .object({
@@ -306,6 +382,7 @@ export const ObjectiveActionSchema = z.discriminatedUnion('kind', [
   IngestReportActionSchema,
   ApplyNodeActionSchema,
   RunCheckActionSchema,
+  RunGateActionSchema,
   DispatchReviewerActionSchema,
   DispatchIntegratorActionSchema,
   IngestVerdictActionSchema,
@@ -316,7 +393,8 @@ export const ObjectiveActionSchema = z.discriminatedUnion('kind', [
   AcceptReportActionSchema,
   AmendPlanActionSchema,
   SkipReviewActionSchema,
-  SkipCheckActionSchema
+  SkipCheckActionSchema,
+  ApplyPlanPatchActionSchema
 ])
 export type ObjectiveAction = z.infer<typeof ObjectiveActionSchema>
 
@@ -373,7 +451,11 @@ export const ObjectiveActionNaturalKeySchema = z.discriminatedUnion('kind', [
       headSha: IdSchema
     })
     .strict(),
-  z.object({ kind: z.literal('plan-amendment'), revisionId: IdSchema, digest: IdSchema }).strict()
+  z.object({ kind: z.literal('plan-amendment'), revisionId: IdSchema, digest: IdSchema }).strict(),
+  z
+    .object({ kind: z.literal('gate-attempt'), gateName: IdSchema, contentIdentity: IdSchema })
+    .strict(),
+  z.object({ kind: z.literal('plan-patch'), patchId: IdSchema }).strict()
 ])
 export type ObjectiveActionNaturalKey = z.infer<typeof ObjectiveActionNaturalKeySchema>
 
@@ -450,6 +532,14 @@ export function objectiveActionNaturalKey(
         criterionId: action.criterionId,
         contentIdentity: action.contentIdentity
       }
+    case 'run-gate':
+      return {
+        kind: 'gate-attempt',
+        gateName: action.gateName,
+        contentIdentity: action.contentIdentity
+      }
+    case 'apply-plan-patch':
+      return { kind: 'plan-patch', patchId: action.patchId }
     case 'dispatch-planner':
     case 'dispatch-node':
     case 'dispatch-reviewer':

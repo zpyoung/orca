@@ -4,7 +4,10 @@ import { getInFlightAttempts } from '../../shared/fork-heimdall/ledger-queries'
 import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
 import type { ObjectiveWorld } from '../../shared/fork-heimdall-objective/detail-types'
-import type { ObjectiveAction } from '../../shared/fork-heimdall-objective/objective-actions'
+import {
+  ObjectiveActionSchema,
+  type ObjectiveAction
+} from '../../shared/fork-heimdall-objective/objective-actions'
 import { objectiveParallelSlotState } from '../../shared/fork-heimdall-objective/parallel-scheduling'
 import { objectiveHasPendingDrain } from '../../shared/fork-heimdall-objective/stop-policy'
 import { requireObjectiveSnapshotBinding, type ObjectiveSnapshotBinding } from './execution-context'
@@ -14,6 +17,15 @@ type Policy = KindConcurrencyPolicy<ObjectiveWorld, ObjectiveAction>
 
 function fingerprint(action: KernelAction): string {
   return makeAttemptFingerprint(action.contentIdentity, action.kind, action.evidenceKey)
+}
+
+/** The gate name of a `run-gate` action, or null for every other kind (including malformed input). */
+function runGateName(action: KernelAction): string | null {
+  if (action.kind !== 'run-gate') {
+    return null
+  }
+  const parsed = ObjectiveActionSchema.safeParse(action)
+  return parsed.success && parsed.data.kind === 'run-gate' ? parsed.data.gateName : null
 }
 
 export function createObjectiveConcurrencyPolicy(args: {
@@ -35,6 +47,15 @@ export function createObjectiveConcurrencyPolicy(args: {
   return {
     canRunAlongside(action, activeActions, snapshot, ledger: WatcherLedger) {
       const binding = requireObjectiveSnapshotBinding(args.snapshotBindings, snapshot)
+      if (
+        action.kind === 'run-gate' &&
+        activeActions.every((active) => {
+          const activeGateName = runGateName(active)
+          return activeGateName !== null && activeGateName !== action.gateName
+        })
+      ) {
+        return true
+      }
       if (activeActions.some((active) => !isolatedAction(active, binding))) {
         return false
       }

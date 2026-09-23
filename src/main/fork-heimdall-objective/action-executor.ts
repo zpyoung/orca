@@ -87,6 +87,17 @@ function localActionOutcome(
       }
       return check.completedAtMs !== null ? 'landed' : 'indeterminate'
     }
+    case 'run-gate': {
+      const attempt = objectiveStore.getGateAttempt(
+        watcherId,
+        action.gateName,
+        action.contentIdentity
+      )
+      if (attempt === null) {
+        return 'not-landed'
+      }
+      return attempt.completedAtMs !== null ? 'landed' : 'indeterminate'
+    }
     case 'ingest-verdict':
       return objectiveStore.hasVerdict(action.dispatchId) ? 'landed' : 'not-landed'
     case 'record-landing':
@@ -119,6 +130,13 @@ function localActionOutcome(
         return 'not-landed'
       }
       return check.completedAtMs !== null ? 'landed' : 'indeterminate'
+    }
+    case 'apply-plan-patch': {
+      const patch = objectiveStore.getPlanPatch(action.patchId)
+      if (!patch || patch.status === 'pending') {
+        return 'not-landed'
+      }
+      return 'landed'
     }
   }
 }

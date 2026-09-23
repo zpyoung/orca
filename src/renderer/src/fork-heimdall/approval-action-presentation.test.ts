@@ -85,6 +85,59 @@ describe('approval action presentation', () => {
     )
   })
 
+  it('labels a run-gate action with its own title and explanation', () => {
+    const scope: ApprovalScope = {
+      actionKind: 'run-gate',
+      contentIdentity: 'content-current',
+      evidenceKey: 'objective-gate:full-suite:content-current'
+    }
+    const action: KernelAction = {
+      kind: 'run-gate',
+      capability: 'check',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'objective-gate:full-suite:content-current',
+      gateName: 'full-suite',
+      command: 'pnpm test',
+      timeoutSeconds: 1_800
+    }
+
+    const presentation = approvalActionPresentation(scope, action)
+
+    expect(presentation.title).toBe('Run objective gate')
+    expect(presentation.explanation).toBe(
+      'Run a whole-tree command on the integrated branch before review and landing.'
+    )
+    expect(presentation.details.map((detail) => detail.value)).toContain('pnpm test')
+  })
+
+  it('labels an apply-plan-patch action with its own title and explanation', () => {
+    const scope: ApprovalScope = {
+      actionKind: 'apply-plan-patch',
+      contentIdentity: 'content-current',
+      evidenceKey: 'plan-patch:patch-1'
+    }
+    const action: KernelAction = {
+      kind: 'apply-plan-patch',
+      capability: 'plan',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'plan-patch:patch-1',
+      recovery: 'replay-safe',
+      revisionId: 'revision-1',
+      patchId: 'patch-1',
+      digest: 'patch-digest-1'
+    }
+
+    const presentation = approvalActionPresentation(scope, action)
+
+    expect(presentation.title).toBe('Apply plan repair')
+    expect(presentation.explanation).toBe(
+      'Apply a planner repair patch to the approved objective plan.'
+    )
+    expect(presentation.details.map((detail) => detail.value)).toContain('revision-1')
+  })
+
   it('keeps an unknown future action kind visible without inventing a label', () => {
     const scope: ApprovalScope = {
       actionKind: 'future-provider-action',

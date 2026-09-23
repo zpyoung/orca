@@ -87,15 +87,18 @@ async function failingCriteriaFromReport(args: {
   }
 }
 
-/** Re-derived from the ledger on every dispatch; never persisted, so it can't go stale against it. */
-export async function deriveObjectiveFailureContext(args: {
-  action: Extract<ObjectiveAction, { kind: 'dispatch-planner' }>
+type NodeFailureContext = Pick<
+  ObjectiveFailureContext,
+  'taskKey' | 'failureClass' | 'narrative' | 'failingCriteria'
+>
+
+async function deriveNodeFailureContext(args: {
   binding: ObjectiveSnapshotBinding
   ledger: ExecuteContext<ObjectiveWorld>['ledger']
   objectiveStore: ObjectiveStore
   activeRevisionId: string | undefined
-}): Promise<ObjectiveFailureContext | undefined> {
-  if (args.action.reason !== 'replan-after-failure' || args.activeRevisionId === undefined) {
+}): Promise<NodeFailureContext | undefined> {
+  if (args.activeRevisionId === undefined) {
     return undefined
   }
   try {
@@ -130,5 +133,66 @@ export async function deriveObjectiveFailureContext(args: {
     }
   } catch {
     return undefined
+  }
+}
+
+/** The first declared gate (if any) with a completed, failing attempt at the dispatch's content identity. */
+function deriveGateFailureContext(args: {
+  binding: ObjectiveSnapshotBinding
+  objectiveStore: ObjectiveStore
+  contentIdentity: string
+}): ObjectiveFailureContext['gateFailure'] | undefined {
+  try {
+    const gates = args.binding.contract.gates
+    if (!gates || gates.length === 0) {
+      return undefined
+    }
+    const watcherId = args.binding.enrollment.watcherId
+    for (const gate of gates) {
+      const attempt = args.objectiveStore.getGateAttempt(watcherId, gate.name, args.contentIdentity)
+      if (
+        attempt &&
+        attempt.completedAtMs !== null &&
+        (attempt.exitCode !== 0 || attempt.timedOut === true)
+      ) {
+        return {
+          gateName: attempt.gateName,
+          command: attempt.command,
+          exitCode: attempt.exitCode,
+          timedOut: attempt.timedOut,
+          stdoutTail: attempt.stdoutTail,
+          stderrTail: attempt.stderrTail
+        }
+      }
+    }
+    return undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** Re-derived from the ledger on every dispatch; never persisted, so it can't go stale against it. */
+export async function deriveObjectiveFailureContext(args: {
+  action: Extract<ObjectiveAction, { kind: 'dispatch-planner' }>
+  binding: ObjectiveSnapshotBinding
+  ledger: ExecuteContext<ObjectiveWorld>['ledger']
+  objectiveStore: ObjectiveStore
+  activeRevisionId: string | undefined
+}): Promise<ObjectiveFailureContext | undefined> {
+  if (args.action.reason !== 'replan-after-failure') {
+    return undefined
+  }
+  const nodeFailure = await deriveNodeFailureContext(args)
+  const gateFailure = deriveGateFailureContext({
+    binding: args.binding,
+    objectiveStore: args.objectiveStore,
+    contentIdentity: args.action.contentIdentity
+  })
+  if (nodeFailure === undefined && gateFailure === undefined) {
+    return undefined
+  }
+  return {
+    ...nodeFailure,
+    ...(gateFailure === undefined ? {} : { gateFailure })
   }
 }

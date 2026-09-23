@@ -16,6 +16,7 @@ import {
   parseAndValidatePlannerReport,
   parseAndValidateReviewerReport
 } from '../../shared/fork-heimdall-objective/plan-schema'
+import { parseAndValidatePlannerRepairReport } from '../../shared/fork-heimdall-objective/plan-repair-schema'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { requireObjectiveOriginalDispatchFingerprint } from '../../shared/fork-heimdall-objective/decision-context'
 import type { ObjectiveWorkspaceTarget } from './content-identity'
@@ -168,7 +169,8 @@ export function createObjectiveSubmissionAdapter(args: {
           attemptFingerprint: origin.attempt.fingerprint,
           mailboxReportPath: reportPath,
           role,
-          ...(action.kind === 'dispatch-node' ? { taskKey: action.taskKey } : {})
+          ...(action.kind === 'dispatch-node' ? { taskKey: action.taskKey } : {}),
+          ...(action.kind === 'dispatch-planner' ? { plannerShape: action.shape ?? 'full' } : {})
         })
       } catch {
         return ACCEPTED
@@ -179,16 +181,35 @@ export function createObjectiveSubmissionAdapter(args: {
 
       let evidenceFiles: readonly string[] = []
       if (action.kind === 'dispatch-planner') {
-        try {
-          parseAndValidatePlannerReport(read.report, {
-            writeTerritory: contract.writeTerritory,
-            dispatchedTaskKeys: dispatchedTaskKeys(context.ledger)
-          })
-        } catch (error) {
-          return rejected(
-            role,
-            error instanceof Error ? error.message : 'report validation failed.'
-          )
+        if (action.shape === 'repair') {
+          const currentPlan = args.objectiveStore.getPlan(action.repairRevisionId ?? '')
+          if (!currentPlan) {
+            return ACCEPTED
+          }
+          try {
+            parseAndValidatePlannerRepairReport(
+              read.report,
+              { writeTerritory: contract.writeTerritory },
+              currentPlan
+            )
+          } catch (error) {
+            return rejected(
+              role,
+              error instanceof Error ? error.message : 'report validation failed.'
+            )
+          }
+        } else {
+          try {
+            parseAndValidatePlannerReport(read.report, {
+              writeTerritory: contract.writeTerritory,
+              dispatchedTaskKeys: dispatchedTaskKeys(context.ledger)
+            })
+          } catch (error) {
+            return rejected(
+              role,
+              error instanceof Error ? error.message : 'report validation failed.'
+            )
+          }
         }
       } else {
         const plan = args.objectiveStore.getPlan(action.revisionId)
