@@ -180,6 +180,7 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerRuntimeEnv
       this.rollbackTransportStart()
       throw error
     }
+    this.startOpenCodeBinderLoop()
   }
 
   private rollbackTransportStart(): void {
@@ -193,6 +194,7 @@ export abstract class AgentHookServerLifecycle extends AgentHookServerRuntimeEnv
   stop(): void {
     // Why: flush the pending debounced write before clearing the map, else a hook <250ms before quit is lost on relaunch.
     this.flushStatusPersistSync()
+    this.stopOpenCodeBinderLoop()
     this.rollbackTransportStart()
     this.env = 'production'
     this.onAgentStatus = null
