@@ -89,6 +89,8 @@ function objectiveDraftReviewRound(
  * A patch's review round counts `revise`-rejected patches earlier in the same repair episode,
  * excluding the patch itself — it may already show as `rejected` by the time this runs (round-1
  * `revise` rejects atomically with recording the verdict), and must not count toward its own round.
+ * A predecessor rejected for touching a frozen task or an invalid report never escalated a review,
+ * so it must not advance the round either.
  */
 function objectivePatchReviewRound(
   world: ObjectiveWorld,
@@ -101,7 +103,8 @@ function objectivePatchReviewRound(
       candidate.revisionId === patch.revisionId &&
       candidate.repairOrdinal > sinceOrdinal &&
       candidate.repairOrdinal < patch.repairOrdinal &&
-      candidate.status === 'rejected'
+      candidate.status === 'rejected' &&
+      candidate.rejection === 'plan-review-revise'
   ).length
   return Math.min(2, 1 + priorRejectedCount) as 1 | 2
 }
@@ -194,6 +197,11 @@ function objectivePlanReviewDispatchLookup(
       outcome: objectiveNoAction('plan', 'plan-review-in-flight', report.dispatchId)
     }
   }
+  if (ingestionDisposition === 'not-landed') {
+    // no review row was recorded; treat it as the dispatch itself failing so the caller's bounded
+    // retry-then-escalate path applies instead of stalling on projection-refresh-pending forever.
+    return { status: 'not-landed' }
+  }
   return {
     status: 'outcome',
     outcome: objectiveNoAction('plan', 'projection-refresh-pending', report.dispatchId)
@@ -206,8 +214,9 @@ function objectivePlanReviewDispatchLookup(
  * its verdict resolved before the wrapped action ever lands. A round-1 `revise` rejects the target
  * (already done by ingestion) and redispatches the planner instead of emitting the wrapped action;
  * `escalate` or a round-2 `revise` emits it with `approvalRequired` for a human or owner to decide.
- * A `not-landed` dispatch is retried once at a distinct evidence key for the same (target, round);
- * if the retry also settles `not-landed`, that is treated the same as an `escalate` verdict.
+ * A `not-landed` dispatch, or a landed dispatch whose report fails ingestion, is retried once at a
+ * distinct evidence key for the same (target, round); if the retry also fails that way, that is
+ * treated the same as an `escalate` verdict.
  */
 export function decideObjectivePlanReviewGate(
   snapshot: Snapshot<ObjectiveWorld>,

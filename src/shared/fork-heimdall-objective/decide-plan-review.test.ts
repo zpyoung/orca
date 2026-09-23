@@ -566,4 +566,175 @@ describe('decideObjectivePlanReviewGate', () => {
       expect(result).toEqual({ action: { ...applyAction, approvalRequired: true } })
     })
   })
+
+  describe('an ingest-plan-review attempt that settles not-landed (F)', () => {
+    function landedReviewDispatch(evidenceKey: string, dispatchId: string) {
+      const action: ObjectiveAction = {
+        kind: 'dispatch-plan-review',
+        capability: 'review',
+        visibility: 'local',
+        contentIdentity: 'content-current',
+        evidenceKey,
+        target: { kind: 'patch', patchId: 'patch-1' },
+        round: 1
+      }
+      return attempt(action, { dispatchId, state: 'settled', effect: 'landed' })
+    }
+
+    function notLandedIngestion(reviewDispatchId: string, ingestDispatchId: string) {
+      const action: ObjectiveAction = {
+        kind: 'ingest-plan-review',
+        capability: 'review',
+        visibility: 'local',
+        recovery: 'replay-safe',
+        contentIdentity: 'content-current',
+        evidenceKey: reviewDispatchId,
+        dispatchId: reviewDispatchId,
+        reportPath: '/outside/report.json',
+        target: { kind: 'patch', patchId: 'patch-1' }
+      }
+      return attempt(action, {
+        dispatchId: ingestDispatchId,
+        state: 'settled',
+        effect: 'not-landed'
+      })
+    }
+
+    it('retries the review once at a distinct evidence key instead of stalling on projection-refresh-pending', () => {
+      const world = { ...projection(), patches: [pendingPatch] }
+      const result = decide(
+        { kind: 'patch', patch: pendingPatch, revision: approvedRevision },
+        applyAction,
+        world,
+        ledger([
+          landedReviewDispatch('plan-review:patch:patch-1:1', 'review-dispatch-1'),
+          workerDone('review-dispatch-1'),
+          notLandedIngestion('review-dispatch-1', 'ingest-review-1')
+        ])
+      )
+      expect(result.action).toMatchObject({
+        kind: 'dispatch-plan-review',
+        evidenceKey: 'plan-review:patch:patch-1:1:retry-1',
+        target: { kind: 'patch', patchId: 'patch-1' },
+        round: 1
+      })
+    })
+
+    it('requires approval instead of retrying again when the retry report also fails ingestion', () => {
+      const world = { ...projection(), patches: [pendingPatch] }
+      const result = decide(
+        { kind: 'patch', patch: pendingPatch, revision: approvedRevision },
+        applyAction,
+        world,
+        ledger([
+          landedReviewDispatch('plan-review:patch:patch-1:1', 'review-dispatch-1'),
+          workerDone('review-dispatch-1'),
+          notLandedIngestion('review-dispatch-1', 'ingest-review-1'),
+          landedReviewDispatch('plan-review:patch:patch-1:1:retry-1', 'review-dispatch-2'),
+          workerDone('review-dispatch-2'),
+          notLandedIngestion('review-dispatch-2', 'ingest-review-2')
+        ])
+      )
+      expect(result).toEqual({ action: { ...applyAction, approvalRequired: true } })
+    })
+
+    it('keeps in-flight ingestion as no-action rather than treating it as not-landed', () => {
+      const world = { ...projection(), patches: [pendingPatch] }
+      const reviewDispatch: ObjectiveAction = {
+        kind: 'dispatch-plan-review',
+        capability: 'review',
+        visibility: 'local',
+        contentIdentity: 'content-current',
+        evidenceKey: 'plan-review:patch:patch-1:1',
+        target: { kind: 'patch', patchId: 'patch-1' },
+        round: 1
+      }
+      const ingestReview: ObjectiveAction = {
+        kind: 'ingest-plan-review',
+        capability: 'review',
+        visibility: 'local',
+        recovery: 'replay-safe',
+        contentIdentity: 'content-current',
+        evidenceKey: 'review-dispatch-1',
+        dispatchId: 'review-dispatch-1',
+        reportPath: '/outside/report.json',
+        target: { kind: 'patch', patchId: 'patch-1' }
+      }
+      const result = decide(
+        { kind: 'patch', patch: pendingPatch, revision: approvedRevision },
+        applyAction,
+        world,
+        ledger([
+          attempt(reviewDispatch, {
+            dispatchId: 'review-dispatch-1',
+            state: 'settled',
+            effect: 'landed'
+          }),
+          workerDone('review-dispatch-1'),
+          attempt(ingestReview, {
+            dispatchId: 'ingest-review-1',
+            state: 'settled',
+            effect: 'indeterminate'
+          })
+        ])
+      )
+      expect(result.action).toBeNull()
+      expect(result).toMatchObject({ reason: 'plan-review-in-flight' })
+    })
+  })
+
+  describe('a patch review round that follows a prior rejected patch (A)', () => {
+    const priorPatch = patch({
+      id: 'patch-1',
+      repairOrdinal: 1,
+      status: 'rejected',
+      resolvedAtMs: 20
+    })
+    const currentPatch = patch({
+      id: 'patch-2',
+      repairOrdinal: 2,
+      status: 'pending'
+    })
+    const currentApplyAction: ApplyPlanPatchAction = {
+      ...applyAction,
+      evidenceKey: 'patch-2',
+      patchId: 'patch-2'
+    }
+
+    it('stays at round 1 when the prior rejection was not a plan-review revise', () => {
+      const world = {
+        ...projection(),
+        patches: [{ ...priorPatch, rejection: 'invalid-report:missing-summary' }, currentPatch]
+      }
+      const result = decide(
+        { kind: 'patch', patch: currentPatch, revision: approvedRevision },
+        currentApplyAction,
+        world
+      )
+      expect(result.action).toMatchObject({
+        kind: 'dispatch-plan-review',
+        evidenceKey: 'plan-review:patch:patch-2:1',
+        target: { kind: 'patch', patchId: 'patch-2' },
+        round: 1
+      })
+    })
+
+    it('advances to round 2 when the prior rejection was a plan-review revise', () => {
+      const world = {
+        ...projection(),
+        patches: [{ ...priorPatch, rejection: 'plan-review-revise' }, currentPatch]
+      }
+      const result = decide(
+        { kind: 'patch', patch: currentPatch, revision: approvedRevision },
+        currentApplyAction,
+        world
+      )
+      expect(result.action).toMatchObject({
+        kind: 'dispatch-plan-review',
+        evidenceKey: 'plan-review:patch:patch-2:2',
+        target: { kind: 'patch', patchId: 'patch-2' },
+        round: 2
+      })
+    })
+  })
 })
