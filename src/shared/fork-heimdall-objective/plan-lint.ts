@@ -57,16 +57,15 @@ export type LintObjectivePlanInput = {
   frozenTaskKeys?: ReadonlySet<string>
 }
 
-const TEST_ONLY_LAST_SEGMENT_PATTERNS: readonly RegExp[] = [
-  /(^|\/)\*\.test\.[^/]*$/u,
-  /(^|\/)\*\.spec\.[^/]*$/u
-]
+// matches a literal (a.test.ts) or wildcard (*.spec.tsx) final segment, not just a bare `*.test.ts` glob
+const TEST_ONLY_LAST_SEGMENT_REGEX = /\.(test|spec)\.[^/]+$/u
 
 function isTestOnlyGlob(glob: string): boolean {
-  if (TEST_ONLY_LAST_SEGMENT_PATTERNS.some((pattern) => pattern.test(glob))) {
+  const segments = glob.split('/')
+  const lastSegment = segments.at(-1) ?? ''
+  if (TEST_ONLY_LAST_SEGMENT_REGEX.test(lastSegment)) {
     return true
   }
-  const segments = glob.split('/')
   return segments.includes('__tests__') || segments[0] === 'tests'
 }
 
@@ -84,9 +83,14 @@ function matchesFullSuite(text: string): boolean {
 
 const UNSCOPED_INVOCATION_REGEX = /\bvitest\b|\bpnpm (run )?test(:\S+)?\b|\btsc\b/u
 const PATH_ARGUMENT_REGEX = /(^|\s)(?!-)\S*\/\S*/u
+const SHELL_SEPARATOR_REGEX = /&&|\|\||\||;/u
 
+// a shell chain can scope one segment and leave another bare (`echo src/foo && vitest run`),
+// so each segment is judged independently rather than the command as a whole
 function matchesUnscoped(command: string): boolean {
-  return UNSCOPED_INVOCATION_REGEX.test(command) && !PATH_ARGUMENT_REGEX.test(command)
+  return command
+    .split(SHELL_SEPARATOR_REGEX)
+    .some((segment) => UNSCOPED_INVOCATION_REGEX.test(segment) && !PATH_ARGUMENT_REGEX.test(segment))
 }
 
 const NON_RELATIVE_PATH_REGEX = /(^|\s)\/[A-Za-z]|[A-Za-z]:\\/u

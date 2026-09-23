@@ -70,6 +70,26 @@ describe('lintObjectivePlan territory findings', () => {
     })
     expect(codesFor(mixed, 'a')).not.toContain('test-only-node')
   })
+
+  it('flags a concrete test-file territory, not just a wildcard glob', () => {
+    const literalFile = lint({
+      writeTerritory: ['src/**'],
+      plan: [task('a', { territory: ['src/a.test.ts'] })]
+    })
+    expect(codesFor(literalFile, 'a')).toContain('test-only-node')
+
+    const wildcardStem = lint({
+      writeTerritory: ['src/**'],
+      plan: [task('a', { territory: ['src/a/foo*.spec.tsx'] })]
+    })
+    expect(codesFor(wildcardStem, 'a')).toContain('test-only-node')
+
+    const mixed = lint({
+      writeTerritory: ['src/**'],
+      plan: [task('a', { territory: ['src/a.test.ts', 'src/b.ts'] })]
+    })
+    expect(codesFor(mixed, 'a')).not.toContain('test-only-node')
+  })
 })
 
 describe('lintObjectivePlan check-command findings', () => {
@@ -105,6 +125,13 @@ describe('lintObjectivePlan check-command findings', () => {
   it('flags an unscoped test invocation and accepts a path-scoped one', () => {
     expect(codesFor(withCommand('vitest run'), 'a')).toContain('unscoped-check')
     expect(codesFor(withCommand('vitest run src/a.test.ts'), 'a')).not.toContain('unscoped-check')
+  })
+
+  it('judges each shell-chained segment for an unscoped invocation independently', () => {
+    expect(codesFor(withCommand('echo src/foo && vitest run'), 'a')).toContain('unscoped-check')
+    expect(
+      codesFor(withCommand('vitest run src/a.test.ts && echo done'), 'a')
+    ).not.toContain('unscoped-check')
   })
 
   it('flags an absolute or non-relative path in a check command', () => {
