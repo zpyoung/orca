@@ -249,7 +249,9 @@ describe('objective enrollment contract', () => {
   it('renders the gate editor immediately after the parallel-execution fields', () => {
     render(<EditableObjectiveFields />)
 
-    const headings = screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)
+    const headings = screen
+      .getAllByRole('heading', { level: 3 })
+      .map((heading) => heading.textContent)
     const executionIndex = headings.indexOf('Execution contract')
     const gatesIndex = headings.indexOf('Gates')
 
