@@ -62,6 +62,23 @@ export async function ingestObjectivePlanReport(args: {
       detail: 'Ingest action does not match its planner dispatch'
     })
   }
+  const originIsRepair = origin.action.shape === 'repair'
+  const actionIsRepair = args.action.shape === 'repair'
+  if (
+    originIsRepair !== actionIsRepair ||
+    (actionIsRepair &&
+      args.action.targetRevisionId !== undefined &&
+      origin.action.repairRevisionId !== args.action.targetRevisionId)
+  ) {
+    return invalidObjectiveReport({
+      reason: 'planner-repair-origin-mismatch',
+      code: 'evidence-mismatch',
+      role: 'planner',
+      dispatchId: args.action.dispatchId,
+      reportPath: args.action.reportPath,
+      detail: 'Repair ingest action does not match its originating dispatch-planner shape'
+    })
+  }
   const evidence = findObjectiveWorkerEvidence(args.context.ledger, args.action.dispatchId)
   const rejection = rejectedWorkerReport({
     evidence,

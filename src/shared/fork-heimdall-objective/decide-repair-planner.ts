@@ -66,7 +66,9 @@ export function decideRepairPlannerAction(
             contentIdentity: snapshot.contentIdentity,
             evidenceKey: report.dispatchId,
             dispatchId: report.dispatchId,
-            revisionNumber: revision.number,
+            // sourced from the dispatch that produced this report, not recomputed, so an
+            // owner-directed dispatch's revisionNumber is guaranteed to match on ingest
+            revisionNumber: latest.action.revisionNumber,
             reportPath: report.reportPath,
             shape: 'repair',
             targetRevisionId: revisionId

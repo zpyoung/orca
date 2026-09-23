@@ -44,6 +44,15 @@ function ownerOverridableCapability<T extends string>(capability: T) {
   return z.union([z.literal(capability), z.literal(OWNER_INTERVENTION_CAPABILITY)])
 }
 
+/** A repair-only field must be present exactly when `shape` is `'repair'` — never both, never neither. */
+function repairIssue(ok: boolean, repair: boolean, path: string, ctx: z.RefinementCtx): void {
+  if (ok) {
+    return
+  }
+  const verb = repair ? 'is required' : 'is only allowed'
+  ctx.addIssue({ code: 'custom', path: [path], message: `${path} ${verb} when shape is repair` })
+}
+
 export const DispatchPlannerActionSchema = z
   .object({
     ...ActionBase,
@@ -64,24 +73,10 @@ export const DispatchPlannerActionSchema = z
     approvalRequired: z.literal(true).optional()
   })
   .strict()
-  .superRefine((action, context) => {
-    if (action.shape !== 'repair') {
-      return
-    }
-    if (action.repairOrdinal === undefined) {
-      context.addIssue({
-        code: 'custom',
-        path: ['repairOrdinal'],
-        message: 'repairOrdinal is required when shape is repair'
-      })
-    }
-    if (action.repairRevisionId === undefined) {
-      context.addIssue({
-        code: 'custom',
-        path: ['repairRevisionId'],
-        message: 'repairRevisionId is required when shape is repair'
-      })
-    }
+  .superRefine((action, ctx) => {
+    const repair = action.shape === 'repair'
+    repairIssue(repair === (action.repairOrdinal !== undefined), repair, 'repairOrdinal', ctx)
+    repairIssue(repair === (action.repairRevisionId !== undefined), repair, 'repairRevisionId', ctx)
   })
 export type DispatchPlannerAction = z.infer<typeof DispatchPlannerActionSchema>
 
@@ -99,14 +94,9 @@ export const IngestPlanActionSchema = z
     targetRevisionId: IdSchema.optional()
   })
   .strict()
-  .superRefine((action, context) => {
-    if (action.shape === 'repair' && action.targetRevisionId === undefined) {
-      context.addIssue({
-        code: 'custom',
-        path: ['targetRevisionId'],
-        message: 'targetRevisionId is required when shape is repair'
-      })
-    }
+  .superRefine((action, ctx) => {
+    const repair = action.shape === 'repair'
+    repairIssue(repair === (action.targetRevisionId !== undefined), repair, 'targetRevisionId', ctx)
   })
 export type IngestPlanAction = z.infer<typeof IngestPlanActionSchema>
 

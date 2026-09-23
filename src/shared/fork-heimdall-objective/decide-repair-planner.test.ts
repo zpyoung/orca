@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { decideRepairPlannerAction } from './decide-repair-planner'
 import { objectiveAttempts, projectObjectiveReports } from './decision-context'
-import { attempt, ledger, projection, snapshot, workerDone } from './decision-test-harness'
+import {
+  attempt,
+  ledger,
+  projection,
+  revision,
+  snapshot,
+  workerDone
+} from './decision-test-harness'
 import type { ObjectiveAction } from './objective-actions'
 import type { ObjectivePlanPatchProjection } from './detail-types'
 import type { WatcherLedger } from '../fork-heimdall/ledger-types'
@@ -110,6 +117,23 @@ describe('decideRepairPlannerAction', () => {
       shape: 'repair',
       targetRevisionId: 'revision-1'
     })
+  })
+
+  it('sources the ingest revisionNumber from the originating dispatch rather than the current revision projection', () => {
+    // the active revision's own number can diverge from what an in-flight dispatch actually
+    // carried (e.g. an owner-directed repair minted before this world snapshot); the ingest
+    // action must still match the dispatch that produced it, or ingestion rejects it (C1)
+    const world = { ...projection(), revisions: [revision({ number: 7 })] }
+    const landed = ledger([
+      attempt(repairDispatch({ revisionNumber: 3, reason: 'owner-directed' }), {
+        state: 'settled',
+        effect: 'landed',
+        dispatchId: 'repair-planner-1'
+      }),
+      workerDone('repair-planner-1', '/outside/repair.json')
+    ])
+    const decision = decide(world, landed)
+    expect(decision.action).toMatchObject({ kind: 'ingest-plan', revisionNumber: 3 })
   })
 
   it('holds no-action while a landed report is being ingested', () => {
