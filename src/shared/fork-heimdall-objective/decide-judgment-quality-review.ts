@@ -30,6 +30,38 @@ export type ReviewBlocked = {
   detail?: string
 }
 
+/** A node-subject block checks the owner-retry of that one task; a revision-level block (the
+ *  acceptance reviewer/integrator judging the whole revision) has no single task to point at, so any
+ *  owner-retry of the revision counts. */
+export type OwnerRetryCheck = { taskKey: string } | { anyTaskInRevision: true }
+
+/** An owner `retry-node` carries this evidence-key shape (see owner-adapter-actions.ts's `retry-node`
+ *  handling); matching it is how a blocked-review decision recognizes the owner already acted, rather
+ *  than the raw dispatchId. Returns the matched task so the caller can report it, or null if no
+ *  matching retry is in flight. */
+function inFlightOwnerRetryTaskKey(
+  attempts: readonly ObjectiveAttempt[],
+  ledger: WatcherLedger,
+  revisionId: string,
+  check: OwnerRetryCheck
+): string | null {
+  const retry = latestObjectiveAttempt(
+    attempts,
+    (action) =>
+      action.kind === 'dispatch-node' &&
+      action.revisionId === revisionId &&
+      ('taskKey' in check ? action.taskKey === check.taskKey : true) &&
+      action.evidenceKey.startsWith(`${revisionId}:${action.taskKey}:owner-retry:`)
+  )
+  if (!retry || retry.action.kind !== 'dispatch-node') {
+    return null
+  }
+  const disposition = objectiveAttemptDisposition(retry.attempt, ledger)
+  return disposition === 'in-flight' || disposition === 'indeterminate'
+    ? retry.action.taskKey
+    : null
+}
+
 export function decideBlockedReview(
   snapshot: Snapshot<ObjectiveWorld>,
   ledger: WatcherLedger,
@@ -38,9 +70,17 @@ export function decideBlockedReview(
   revision: ObjectiveRevisionProjection,
   role: ObjectiveReviewRole,
   blocked: ReviewBlocked,
-  ownerConfigured: boolean
+  ownerConfigured: boolean,
+  ownerRetry?: OwnerRetryCheck
 ): ObjectiveDecisionOutcome {
   if (ownerConfigured) {
+    const retryTaskKey =
+      ownerRetry === undefined
+        ? null
+        : inFlightOwnerRetryTaskKey(attempts, ledger, revision.id, ownerRetry)
+    if (retryTaskKey !== null) {
+      return objectiveNoAction('implementation', 'node-in-flight', retryTaskKey)
+    }
     return {
       action: null,
       deviation: objectiveReviewBlockedDeviation({
@@ -84,6 +124,10 @@ export function decideJudgmentQualityReview(
     if (!sourceAttempt) {
       continue
     }
+    const ownerRetry: OwnerRetryCheck | undefined =
+      sourceAttempt.action.kind === 'dispatch-node'
+        ? { taskKey: sourceAttempt.action.taskKey }
+        : undefined
     const evidenceKey = objectiveJudgmentReviewEvidenceKey(
       revision,
       sourceAttempt.action.evidenceKey,
@@ -133,7 +177,8 @@ export function decideJudgmentQualityReview(
         revision,
         'reviewer',
         { status: 'blocked', dispatchId: judgmentVerdict.dispatchId, summary: null },
-        ownerConfigured
+        ownerConfigured,
+        ownerRetry
       )
     }
     if (judgmentVerdict) {
@@ -167,7 +212,8 @@ export function decideJudgmentQualityReview(
             summary: report.body ?? null,
             detail
           },
-          true
+          true,
+          ownerRetry
         )
       }
       continue
@@ -222,7 +268,8 @@ export function decideJudgmentQualityReview(
             summary: report.body ?? null,
             ...(validation === null ? {} : { detail: objectiveReportValidationDetail(validation) })
           },
-          true
+          true,
+          ownerRetry
         )
       }
       continue
@@ -237,7 +284,8 @@ export function decideJudgmentQualityReview(
           revision,
           'reviewer',
           { status: 'blocked', dispatchId: report.dispatchId, summary: report.body ?? null },
-          true
+          true,
+          ownerRetry
         )
       }
       continue

@@ -361,7 +361,8 @@ export function decideObjectiveReview(
       revision,
       'reviewer',
       reviewer,
-      ownerConfigured
+      ownerConfigured,
+      { anyTaskInRevision: true }
     )
   }
   if (reviewer !== 'approved') {
@@ -387,7 +388,8 @@ export function decideObjectiveReview(
       revision,
       'integrator',
       integrator,
-      ownerConfigured
+      ownerConfigured,
+      { anyTaskInRevision: true }
     )
   }
   return integrator === 'approved'

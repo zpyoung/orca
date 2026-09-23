@@ -101,6 +101,54 @@ describe('objective review deviations, owner configured', () => {
     })
     expect('deviation' in decision).toBe(false)
   })
+
+  const ownerRetryOfRevisionNode: ObjectiveAction = {
+    kind: 'dispatch-node',
+    capability: 'implement',
+    visibility: 'local',
+    contentIdentity: 'content-current',
+    evidenceKey: 'revision-1:ultracode-report-reconcile:owner-retry:content-current',
+    revisionId: 'revision-1',
+    taskKey: 'ultracode-report-reconcile',
+    depsOrchestrationIds: [],
+    retryOf: 'revision-1:ultracode-report-reconcile'
+  }
+
+  it('withholds the deviation while an owner retry-node of a revision node is in flight', () => {
+    const decision = decideObjective(
+      snapshot(blocked),
+      ledger([
+        attempt(ownerRetryOfRevisionNode, { state: 'running', dispatchId: 'owner-retry-dispatch' })
+      ]),
+      true
+    )
+
+    expect(decision).toMatchObject({
+      action: null,
+      reason: 'node-in-flight',
+      detail: 'ultracode-report-reconcile'
+    })
+    expect('deviation' in decision).toBe(false)
+  })
+
+  it('resumes raising the deviation once that owner retry-node settles', () => {
+    const decision = decideObjective(
+      snapshot(blocked),
+      ledger([
+        attempt(ownerRetryOfRevisionNode, {
+          state: 'settled',
+          effect: 'landed',
+          dispatchId: 'owner-retry-dispatch'
+        })
+      ]),
+      true
+    )
+
+    expect(decision).toMatchObject({
+      action: null,
+      deviation: { kind: 'review-blocked', role: 'reviewer', dispatchId: 'review-dispatch' }
+    })
+  })
 })
 
 describe('objective report provenance deviations', () => {
@@ -320,6 +368,88 @@ describe('judgment quality review deviations', () => {
       revisionId: 'revision-1'
     })
     expect('deviation' in decision).toBe(false)
+  })
+
+  const ownerRetryOfSource: ObjectiveAction = {
+    kind: 'dispatch-node',
+    capability: 'implement',
+    visibility: 'local',
+    contentIdentity: 'content-current',
+    evidenceKey: 'revision-1:core:owner-retry:content-current',
+    revisionId: 'revision-1',
+    taskKey: 'core',
+    depsOrchestrationIds: [],
+    retryOf: 'revision-1:core'
+  }
+
+  it('withholds the deviation while an owner retry-node for the blocked task is in flight', () => {
+    judgmentQualityReviewSubjectsMock.mockReturnValue(['source-dispatch'])
+    const decision = decideObjective(
+      snapshot(
+        projection({
+          nodes: [node('core', { state: 'succeeded' })],
+          verdicts: [judgmentBlock]
+        }),
+        { contract: { ...CONTRACT, tier: 'express' } }
+      ),
+      ledger([
+        attempt(sourceDispatch, {
+          state: 'settled',
+          effect: 'landed',
+          dispatchId: 'source-dispatch'
+        }),
+        attempt(judgmentReviewDispatch, {
+          state: 'settled',
+          effect: 'landed',
+          dispatchId: 'judgment-review-dispatch'
+        }),
+        attempt(ownerRetryOfSource, { state: 'running', dispatchId: 'owner-retry-dispatch' })
+      ]),
+      true
+    )
+
+    expect(decision).toMatchObject({ action: null, reason: 'node-in-flight' })
+    expect('deviation' in decision).toBe(false)
+  })
+
+  it('resumes raising the deviation once the owner retry-node settles', () => {
+    judgmentQualityReviewSubjectsMock.mockReturnValue(['source-dispatch'])
+    const decision = decideObjective(
+      snapshot(
+        projection({
+          nodes: [node('core', { state: 'succeeded' })],
+          verdicts: [judgmentBlock]
+        }),
+        { contract: { ...CONTRACT, tier: 'express' } }
+      ),
+      ledger([
+        attempt(sourceDispatch, {
+          state: 'settled',
+          effect: 'landed',
+          dispatchId: 'source-dispatch'
+        }),
+        attempt(judgmentReviewDispatch, {
+          state: 'settled',
+          effect: 'landed',
+          dispatchId: 'judgment-review-dispatch'
+        }),
+        attempt(ownerRetryOfSource, {
+          state: 'settled',
+          effect: 'landed',
+          dispatchId: 'owner-retry-dispatch'
+        })
+      ]),
+      true
+    )
+
+    expect(decision).toMatchObject({
+      action: null,
+      deviation: {
+        kind: 'review-blocked',
+        role: 'reviewer',
+        dispatchId: 'judgment-review-dispatch'
+      }
+    })
   })
 
   it('does not clear the block with a real approval or owner approvals for another revision or role', () => {
