@@ -533,6 +533,24 @@ describe('ObjectiveStore.amendRevision', () => {
     ])
   })
 
+  it('leaves assumptions undeclared for a legacy revision whose stored report omitted them', () => {
+    const revision = ingestAndActivate()
+
+    store.amendRevision({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      amendedAtMs: 400,
+      patch: {
+        digest: 'amend-digest-1',
+        attestation: 'Correcting B on a pre-assumptions plan',
+        upsertTasks: [upsertTask({ taskKey: 'task-b', deps: ['task-a'] })],
+        dropTaskKeys: []
+      }
+    })
+
+    expect(store.getPlanReport(revision.revisionId)?.assumptions).toBeUndefined()
+  })
+
   it('rejects amending a revision that is not approved', () => {
     const revision = store.ingestPlan({
       watcherId: WATCHER_ID,

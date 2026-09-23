@@ -11,7 +11,7 @@ import {
 } from './decision-test-harness'
 import type { ObjectiveAction } from './objective-actions'
 import type { ObjectivePlanPatchProjection } from './detail-types'
-import type { WatcherLedger } from '../fork-heimdall/ledger-types'
+import type { LedgerEntry, WatcherLedger } from '../fork-heimdall/ledger-types'
 
 function repairDispatch(
   overrides: Partial<Extract<ObjectiveAction, { kind: 'dispatch-planner' }>> = {}
@@ -49,11 +49,48 @@ function planPatch(
   }
 }
 
-function decide(world = projection(), rawLedger: WatcherLedger = ledger()) {
+function decide(
+  world = projection(),
+  rawLedger: WatcherLedger = ledger(),
+  reason: Extract<ObjectiveAction, { kind: 'dispatch-planner' }>['reason'] = 'replan-after-failure'
+) {
   const snap = snapshot(world)
   const attempts = objectiveAttempts(rawLedger)
   const reports = projectObjectiveReports(rawLedger)
-  return decideRepairPlannerAction(snap, rawLedger, attempts, reports, 'replan-after-failure')
+  return decideRepairPlannerAction(snap, rawLedger, attempts, reports, reason)
+}
+
+/** A repair report the ingest step could not even read (missing file, non-JSON): the ingest-plan
+ *  attempt settles not-landed and no plan patch is ever stored for its ordinal. */
+function unreadableRepairRound(ordinal: number): LedgerEntry[] {
+  const dispatchId = `repair-planner-${ordinal}`
+  const ingestDispatchId = `ingest-repair-${ordinal}`
+  return [
+    attempt(
+      repairDispatch({
+        evidenceKey: `plan-repair:revision-1:${ordinal}`,
+        repairOrdinal: ordinal
+      }),
+      { state: 'settled', effect: 'landed', dispatchId }
+    ),
+    workerDone(dispatchId, `/outside/repair-${ordinal}.json`),
+    attempt(
+      {
+        kind: 'ingest-plan',
+        capability: 'plan',
+        visibility: 'local',
+        recovery: 'replay-safe',
+        contentIdentity: 'content-current',
+        evidenceKey: dispatchId,
+        dispatchId,
+        revisionNumber: 1,
+        reportPath: `/outside/repair-${ordinal}.json`,
+        shape: 'repair',
+        targetRevisionId: 'revision-1'
+      },
+      { state: 'settled', effect: 'not-landed', dispatchId: ingestDispatchId }
+    )
+  ]
 }
 
 describe('decideRepairPlannerAction', () => {
@@ -246,6 +283,39 @@ describe('decideRepairPlannerAction', () => {
       kind: 'dispatch-planner',
       shape: 'repair',
       repairOrdinal: 4
+    })
+    expect(decision.action).not.toHaveProperty('approvalRequired')
+  })
+
+  it('escalates instead of dispatching a third planner attempt after two unreadable repair reports', () => {
+    const rawLedger = ledger([...unreadableRepairRound(1), ...unreadableRepairRound(2)])
+    const decision = decide(projection(), rawLedger)
+    expect(decision.action).toMatchObject({
+      kind: 'dispatch-planner',
+      shape: 'repair',
+      repairOrdinal: 3,
+      approvalRequired: true
+    })
+  })
+
+  it('escalates on an owner-directed episode too, not just the default replan reason', () => {
+    const rawLedger = ledger([...unreadableRepairRound(1), ...unreadableRepairRound(2)])
+    const decision = decide(projection(), rawLedger, 'owner-directed')
+    expect(decision.action).toMatchObject({
+      kind: 'dispatch-planner',
+      shape: 'repair',
+      repairOrdinal: 3,
+      approvalRequired: true
+    })
+  })
+
+  it('does not escalate after a single unreadable repair report', () => {
+    const rawLedger = ledger([...unreadableRepairRound(1)])
+    const decision = decide(projection(), rawLedger)
+    expect(decision.action).toMatchObject({
+      kind: 'dispatch-planner',
+      shape: 'repair',
+      repairOrdinal: 2
     })
     expect(decision.action).not.toHaveProperty('approvalRequired')
   })

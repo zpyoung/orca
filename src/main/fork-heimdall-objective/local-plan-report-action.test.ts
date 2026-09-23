@@ -456,4 +456,42 @@ describe('objective repair-shaped plan ingestion', () => {
       result: { kind: 'plan-patch-ingested', status: 'pending' }
     })
   })
+
+  it('stores a repair report that reads as JSON but fails schema validation as a rejected patch (X1)', async () => {
+    const fixture = repairFixture()
+    readReport.mockResolvedValue({
+      ok: false,
+      reason: 'malformed',
+      detail: 'repair.upsertTasks: Required',
+      rawInput: { repair: { dropTaskKeys: ['extra'] } }
+    })
+
+    const outcome = await ingestObjectivePlanReport({
+      action: ingestAction(fixture),
+      binding: fixture.binding,
+      context: fixture.contextWith(),
+      objectiveStore: fixture.objectiveStore
+    })
+
+    expect(outcome).toMatchObject({ effect: 'landed', result: { kind: 'plan-patch-ingested' } })
+    const patches = fixture.objectiveStore.listPlanPatches(WATCHER_ID)
+    expect(patches).toHaveLength(1)
+    expect(patches[0]?.status).toBe('rejected')
+    expect(patches[0]?.rejection).toMatch(/^invalid-report:/)
+  })
+
+  it('refuses ingestion without persisting a patch when the repair report cannot be read as JSON at all', async () => {
+    const fixture = repairFixture()
+    readReport.mockResolvedValue({ ok: false, reason: 'missing' })
+
+    const outcome = await ingestObjectivePlanReport({
+      action: ingestAction(fixture),
+      binding: fixture.binding,
+      context: fixture.contextWith(),
+      objectiveStore: fixture.objectiveStore
+    })
+
+    expect(outcome).toMatchObject({ effect: 'not-landed', reason: 'planner-report-missing' })
+    expect(fixture.objectiveStore.listPlanPatches(WATCHER_ID)).toHaveLength(0)
+  })
 })

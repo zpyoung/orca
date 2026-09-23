@@ -172,6 +172,40 @@ describe('objective role report ingestion', () => {
     ).resolves.toMatchObject({ ok: false, reason: 'malformed' })
   })
 
+  it('exposes the parsed JSON on a schema-invalid repair report so the ingest step can still store it (X1)', async () => {
+    const target = await localFolderTarget()
+    const path = await issueObjectiveReportPath(target, 'repair-schema-invalid')
+    await writeFile(path, JSON.stringify({ repair: { dropTaskKeys: ['extra'] } }))
+
+    const result = await readObjectiveRoleReport({
+      target,
+      attemptFingerprint: 'repair-schema-invalid',
+      mailboxReportPath: path,
+      role: 'planner',
+      plannerShape: 'repair'
+    })
+
+    expect(result).toMatchObject({ ok: false, reason: 'malformed' })
+    if (!result.ok) {
+      expect(result.rawInput).toEqual({ repair: { dropTaskKeys: ['extra'] } })
+    }
+  })
+
+  it('omits rawInput when the file never parsed as JSON', async () => {
+    const target = await localFolderTarget()
+    const path = await issueObjectiveReportPath(target, 'not-json')
+    await writeFile(path, 'not json at all')
+
+    const result = await readObjectiveRoleReport({
+      target,
+      attemptFingerprint: 'not-json',
+      mailboxReportPath: path,
+      role: 'planner'
+    })
+
+    expect(result).toEqual({ ok: false, reason: 'malformed' })
+  })
+
   it('rejects planner globs with an actionable field path while preserving classification', async () => {
     const target = await localFolderTarget()
     const path = await issueObjectiveReportPath(target, 'planner-glob-attempt')
@@ -199,7 +233,7 @@ describe('objective role report ingestion', () => {
       role: 'planner'
     })
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: false,
       reason: 'malformed',
       detail: 'plan[0].declaredPaths[0]: Path must be a concrete workspace-relative path'
@@ -224,7 +258,7 @@ describe('objective role report ingestion', () => {
         mailboxReportPath: path,
         role: 'integrator'
       })
-    ).resolves.toEqual({ ok: false, reason: 'role-mismatch' })
+    ).resolves.toMatchObject({ ok: false, reason: 'role-mismatch' })
   })
 
   it('reads a plan-review report under the internal plan-review role, distinct from reviewer', async () => {
@@ -258,7 +292,7 @@ describe('objective role report ingestion', () => {
         mailboxReportPath: path,
         role: 'reviewer'
       })
-    ).resolves.toEqual({ ok: false, reason: 'role-mismatch' })
+    ).resolves.toMatchObject({ ok: false, reason: 'role-mismatch' })
   })
 
   it('accepts a real repair-shaped report for role planner when no shape is specified', async () => {
