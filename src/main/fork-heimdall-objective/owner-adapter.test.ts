@@ -8,6 +8,7 @@ import {
   ledger,
   node,
   projection,
+  revision,
   snapshot
 } from '../../shared/fork-heimdall-objective/decision-test-harness'
 import {
@@ -201,6 +202,58 @@ describe('objectiveActionForIntervention: skip-stage', () => {
       reason: 'owner-directed',
       requestedSkipStage: 'hosted-review',
       guidance: rationale
+    })
+  })
+})
+
+describe('objectiveActionForIntervention: owner-directed planner shape', () => {
+  it('emits a full-shaped dispatch when no revision is approved yet', () => {
+    const plan = projection({ revisions: [revision({ status: 'draft' })] })
+    const action = objectiveActionForIntervention(
+      { kind: 'dispatch-planner', guidance: 'Steer the plan.' },
+      snapshot(plan),
+      ledger()
+    )
+    expect(action).toMatchObject({ kind: 'dispatch-planner', guidance: 'Steer the plan.' })
+    expect('shape' in action).toBe(false)
+  })
+
+  it('emits a repair-shaped dispatch targeting the approved revision when one exists', () => {
+    const action = objectiveActionForIntervention(
+      { kind: 'dispatch-planner', guidance: 'Steer the plan.' },
+      snapshot(projection()),
+      ledger()
+    )
+    expect(action).toMatchObject({
+      kind: 'dispatch-planner',
+      shape: 'repair',
+      repairRevisionId: 'revision-1',
+      repairOrdinal: 1
+    })
+  })
+
+  it('numbers the repair ordinal past the highest one already claimed for the revision', () => {
+    const priorRepair: ObjectiveAction = {
+      kind: 'dispatch-planner',
+      capability: 'plan',
+      visibility: 'local',
+      contentIdentity: 'content-prior',
+      evidenceKey: 'plan:2:owner-directed:content-prior',
+      revisionNumber: 2,
+      reason: 'owner-directed',
+      shape: 'repair',
+      repairOrdinal: 2,
+      repairRevisionId: 'revision-1'
+    }
+    const action = objectiveActionForIntervention(
+      { kind: 'dispatch-planner', guidance: 'Steer the plan again.' },
+      snapshot(projection()),
+      ledger([attempt(priorRepair)])
+    )
+    expect(action).toMatchObject({
+      shape: 'repair',
+      repairRevisionId: 'revision-1',
+      repairOrdinal: 3
     })
   })
 })

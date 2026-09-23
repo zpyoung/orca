@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeAttemptFingerprint } from '../../shared/fork-heimdall/attempt-fingerprint'
 import type { ExecuteContext } from '../../shared/fork-heimdall/kind-contract'
 import type { ObjectiveAction } from '../../shared/fork-heimdall-objective/objective-actions'
@@ -14,6 +14,9 @@ import { executeObjectiveLocalAction } from './local-action-executor'
 import { captureObjectiveWorkspaceBaseline } from './observed-workspace-changes'
 import { issueObjectiveReportPath } from './report-ingestion'
 import { ObjectiveStore } from './objective-store'
+
+const { runCriterionCheckMock } = vi.hoisted(() => ({ runCriterionCheckMock: vi.fn() }))
+vi.mock('./check-runner', () => ({ runCriterionCheck: runCriterionCheckMock }))
 
 const WATCHER_ID = 'watcher-1'
 
@@ -43,6 +46,10 @@ afterEach(() => {
     item.close()
   }
   opened.length = 0
+})
+
+beforeEach(() => {
+  runCriterionCheckMock.mockReset()
 })
 
 type ObjectiveStoreFixture = {
@@ -511,5 +518,243 @@ describe('objective report ingestion execution', () => {
     } finally {
       await rm(workspacePath, { recursive: true, force: true })
     }
+  })
+})
+
+describe('objective gate execution', () => {
+  const declaredGate = { name: 'full-suite', command: 'pnpm test', timeoutSeconds: 900 }
+
+  async function gateFixture(): Promise<{
+    fixture: ObjectiveStoreFixture
+    workspacePath: string
+    target: ObjectiveSnapshotBinding['target']
+    contentIdentity: string
+    binding: ObjectiveSnapshotBinding
+    context: ExecuteContext<ObjectiveWorld>
+  }> {
+    const fixture = objectiveStoreFixture()
+    const workspacePath = await mkdtemp(join(tmpdir(), 'objective-gate-'))
+    const target = {
+      kind: 'folder' as const,
+      executionHostId: 'local' as const,
+      workspacePath,
+      fileProvider: null
+    }
+    const contentIdentity = await computeWorkspaceContentIdentity(target)
+    const binding = {
+      enrollment: { watcherId: WATCHER_ID },
+      contract: { gates: [declaredGate] },
+      target
+    } as unknown as ObjectiveSnapshotBinding
+    const context = {
+      snapshot: { contentIdentity },
+      ledger: { watcherId: WATCHER_ID, entries: [] },
+      lease: { assertHeld: vi.fn(async () => undefined), epoch: 1 },
+      dispatchWorker: vi.fn()
+    } as unknown as ExecuteContext<ObjectiveWorld>
+    return { fixture, workspacePath, target, contentIdentity, binding, context }
+  }
+
+  function gateAction(contentIdentity: string): Extract<ObjectiveAction, { kind: 'run-gate' }> {
+    return {
+      kind: 'run-gate',
+      capability: 'check',
+      visibility: 'local',
+      contentIdentity,
+      evidenceKey: `objective-gate:${declaredGate.name}:${contentIdentity}`,
+      gateName: declaredGate.name,
+      command: declaredGate.command,
+      timeoutSeconds: declaredGate.timeoutSeconds
+    }
+  }
+
+  it("runs the gate command with the action's declared timeout and persists the completed attempt", async () => {
+    const { fixture, workspacePath, target, contentIdentity, binding, context } =
+      await gateFixture()
+    try {
+      runCriterionCheckMock.mockResolvedValue({
+        command: declaredGate.command,
+        pass: true,
+        exitCode: 0,
+        timedOut: false,
+        stdoutTail: 'all green',
+        stderrTail: '',
+        error: null,
+        startedAtMs: 1,
+        completedAtMs: 2,
+        durationMs: 1
+      })
+
+      const outcome = await executeObjectiveLocalAction({
+        action: gateAction(contentIdentity),
+        binding,
+        context,
+        objectiveStore: fixture.objectiveStore
+      })
+
+      expect(runCriterionCheckMock).toHaveBeenCalledWith({
+        command: declaredGate.command,
+        target,
+        timeoutSeconds: declaredGate.timeoutSeconds
+      })
+      expect(outcome).toMatchObject({
+        effect: 'landed',
+        result: {
+          kind: 'check-recorded',
+          naturalKey: {
+            kind: 'gate-attempt',
+            gateName: declaredGate.name,
+            contentIdentity
+          },
+          exitCode: 0,
+          timedOut: false
+        }
+      })
+      expect(
+        fixture.objectiveStore.getGateAttempt(WATCHER_ID, declaredGate.name, contentIdentity)
+      ).toMatchObject({ exitCode: 0, timedOut: false, completedAtMs: 2 })
+    } finally {
+      await rm(workspacePath, { recursive: true, force: true })
+    }
+  })
+
+  it('replays the same completed result without throwing when the same attempt clock repeats', async () => {
+    const { fixture, workspacePath, contentIdentity, binding, context } = await gateFixture()
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000)
+    try {
+      runCriterionCheckMock.mockResolvedValue({
+        command: declaredGate.command,
+        pass: false,
+        exitCode: 1,
+        timedOut: false,
+        stdoutTail: '',
+        stderrTail: 'failed',
+        error: null,
+        startedAtMs: 1,
+        completedAtMs: 2,
+        durationMs: 1
+      })
+
+      const action = gateAction(contentIdentity)
+      const first = await executeObjectiveLocalAction({
+        action,
+        binding,
+        context,
+        objectiveStore: fixture.objectiveStore
+      })
+      const second = await executeObjectiveLocalAction({
+        action,
+        binding,
+        context,
+        objectiveStore: fixture.objectiveStore
+      })
+
+      expect(first).toMatchObject({ effect: 'landed', result: { exitCode: 1 } })
+      expect(second).toMatchObject({ effect: 'landed', result: { exitCode: 1 } })
+    } finally {
+      now.mockRestore()
+      await rm(workspacePath, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses to run a gate command that no longer matches the enrolled declaration', async () => {
+    const { fixture, workspacePath, contentIdentity, context } = await gateFixture()
+    try {
+      const staleBinding = {
+        enrollment: { watcherId: WATCHER_ID },
+        contract: { gates: [{ ...declaredGate, command: 'pnpm test:changed' }] },
+        target: { kind: 'folder', executionHostId: 'local', workspacePath, fileProvider: null }
+      } as unknown as ObjectiveSnapshotBinding
+
+      const outcome = await executeObjectiveLocalAction({
+        action: gateAction(contentIdentity),
+        binding: staleBinding,
+        context,
+        objectiveStore: fixture.objectiveStore
+      })
+
+      expect(outcome).toEqual({
+        effect: 'not-landed',
+        reason: 'gate-declaration-mismatch'
+      })
+      expect(runCriterionCheckMock).not.toHaveBeenCalled()
+    } finally {
+      await rm(workspacePath, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('objective plan patch execution', () => {
+  it('routes apply-plan-patch through the patch executor and lands the applied outcome', async () => {
+    const database = new ObjectiveDatabase(':memory:')
+    opened.push(database)
+    const objectiveStore = new ObjectiveStore(database)
+    const revision = objectiveStore.ingestPlan({
+      watcherId: WATCHER_ID,
+      revisionNumber: 1,
+      dispatchId: 'planner-1',
+      report: PLAN,
+      digest: 'digest-1',
+      createdAtMs: 1
+    })
+    objectiveStore.activatePlan({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      digest: revision.digest,
+      approvedAtMs: 2
+    })
+    const patch = objectiveStore.ingestPlanPatch({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      dispatchId: 'dispatch-planner-repair-1',
+      repairOrdinal: 1,
+      report: {
+        repair: {
+          upsertTasks: [
+            {
+              taskKey: 'follow-up',
+              title: 'Follow up',
+              spec: 'Do the follow-up work',
+              deps: [],
+              criteria: [{ body: 'Follow-up is done', shellCheckable: false, checkCommand: null }],
+              declaresDependencyChange: false
+            }
+          ],
+          dropTaskKeys: []
+        },
+        assumptions: []
+      },
+      createdAtMs: 3
+    })
+    const binding = { enrollment: { watcherId: WATCHER_ID } } as unknown as ObjectiveSnapshotBinding
+    const context = {
+      snapshot: { contentIdentity: 'content-1', world: { plan: { nodes: [] } } },
+      ledger: { watcherId: WATCHER_ID, entries: [] },
+      lease: { assertHeld: vi.fn(async () => undefined) },
+      dispatchWorker: vi.fn()
+    } as unknown as ExecuteContext<ObjectiveWorld>
+
+    const outcome = await executeObjectiveLocalAction({
+      action: {
+        kind: 'apply-plan-patch',
+        capability: 'plan',
+        visibility: 'local',
+        contentIdentity: 'content-1',
+        evidenceKey: `plan-patch:${patch.id}`,
+        recovery: 'replay-safe',
+        revisionId: patch.revisionId,
+        patchId: patch.id,
+        digest: patch.digest
+      },
+      binding,
+      context,
+      objectiveStore
+    })
+
+    expect(outcome).toMatchObject({
+      effect: 'landed',
+      result: { kind: 'plan-patch-applied', patchId: patch.id }
+    })
+    expect(objectiveStore.getPlanPatch(patch.id)?.status).toBe('applied')
   })
 })

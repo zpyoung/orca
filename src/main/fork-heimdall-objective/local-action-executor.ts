@@ -22,6 +22,7 @@ import {
   skipOwnerReview
 } from './owner-override-executor'
 import { executeObjectiveApplyNode } from './merge-train-action-executor'
+import { executeApplyPlanPatch } from './plan-patch-action'
 
 type LocalAction = Exclude<
   ObjectiveAction,
@@ -73,6 +74,60 @@ async function runCheck(args: {
   await args.context.lease.assertHeld()
   args.objectiveStore.completeCheckAttempt({
     criterionId: criterion.id,
+    contentIdentity: args.action.contentIdentity,
+    exitCode: check.exitCode,
+    timedOut: check.timedOut,
+    stdoutTail: check.stdoutTail,
+    stderrTail: check.stderrTail,
+    completedAtMs: check.completedAtMs
+  })
+  return {
+    effect: 'landed',
+    result: {
+      kind: 'check-recorded',
+      naturalKey: naturalKey(args.action),
+      digest: objectiveResultDigest(check),
+      exitCode: check.exitCode,
+      timedOut: check.timedOut
+    }
+  }
+}
+
+async function runGate(args: {
+  action: Extract<LocalAction, { kind: 'run-gate' }>
+  binding: ObjectiveSnapshotBinding
+  context: ExecuteContext<ObjectiveWorld>
+  objectiveStore: ObjectiveStore
+}): Promise<ActionOutcome> {
+  const gate = args.binding.contract.gates?.find(
+    (candidate) => candidate.name === args.action.gateName
+  )
+  if (
+    !gate ||
+    gate.command !== args.action.command ||
+    gate.timeoutSeconds !== args.action.timeoutSeconds
+  ) {
+    return invalid('gate-declaration-mismatch')
+  }
+  await args.context.lease.assertHeld()
+  args.objectiveStore.startGateAttempt({
+    watcherId: args.binding.enrollment.watcherId,
+    gateName: args.action.gateName,
+    contentIdentity: args.action.contentIdentity,
+    executionHostId: args.binding.target.executionHostId,
+    command: args.action.command,
+    epoch: args.context.lease.epoch,
+    startedAtMs: Date.now()
+  })
+  const check = await runCriterionCheck({
+    command: args.action.command,
+    target: args.binding.target,
+    timeoutSeconds: args.action.timeoutSeconds
+  })
+  await args.context.lease.assertHeld()
+  args.objectiveStore.completeGateAttempt({
+    watcherId: args.binding.enrollment.watcherId,
+    gateName: args.action.gateName,
     contentIdentity: args.action.contentIdentity,
     exitCode: check.exitCode,
     timedOut: check.timedOut,
@@ -174,6 +229,9 @@ export async function executeObjectiveLocalAction(args: {
   if (args.action.kind === 'run-check') {
     return runCheck({ ...args, action: args.action })
   }
+  if (args.action.kind === 'run-gate') {
+    return runGate({ ...args, action: args.action })
+  }
   if (args.action.kind === 'ingest-verdict') {
     return ingestObjectiveVerdictReport({ ...args, action: args.action })
   }
@@ -188,6 +246,9 @@ export async function executeObjectiveLocalAction(args: {
   }
   if (args.action.kind === 'skip-check') {
     return skipOwnerCheck({ ...args, action: args.action })
+  }
+  if (args.action.kind === 'apply-plan-patch') {
+    return executeApplyPlanPatch({ ...args, action: args.action })
   }
   await args.context.lease.assertHeld()
   if (

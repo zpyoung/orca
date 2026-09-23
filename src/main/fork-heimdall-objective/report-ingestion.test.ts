@@ -227,6 +227,114 @@ describe('objective role report ingestion', () => {
     ).resolves.toEqual({ ok: false, reason: 'role-mismatch' })
   })
 
+  it('accepts a real repair-shaped report for role planner when no shape is specified', async () => {
+    const target = await localFolderTarget()
+    const path = await issueObjectiveReportPath(target, 'repair-attempt-unspecified')
+    await writeFile(
+      path,
+      JSON.stringify({
+        repair: {
+          upsertTasks: [
+            {
+              taskKey: 'core-2',
+              title: 'Core follow-up',
+              spec: 'Implement the core follow-up work.',
+              deps: [],
+              criteria: [{ body: 'Follow-up works', shellCheckable: false, checkCommand: null }],
+              declaresDependencyChange: false,
+              territory: ['src/**']
+            }
+          ],
+          dropTaskKeys: []
+        },
+        assumptions: []
+      })
+    )
+
+    const result = await readObjectiveRoleReport({
+      target,
+      attemptFingerprint: 'repair-attempt-unspecified',
+      mailboxReportPath: path,
+      role: 'planner'
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok && 'repair' in result.report) {
+      expect(result.report.repair.upsertTasks[0]?.taskKey).toBe('core-2')
+    }
+  })
+
+  it('accepts a real repair-shaped report when plannerShape is repair', async () => {
+    const target = await localFolderTarget()
+    const path = await issueObjectiveReportPath(target, 'repair-attempt-explicit')
+    await writeFile(
+      path,
+      JSON.stringify({
+        repair: { upsertTasks: [], dropTaskKeys: ['dropped-task'] }
+      })
+    )
+
+    const result = await readObjectiveRoleReport({
+      target,
+      attemptFingerprint: 'repair-attempt-explicit',
+      mailboxReportPath: path,
+      role: 'planner',
+      plannerShape: 'repair'
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok && 'repair' in result.report) {
+      expect(result.report.repair.dropTaskKeys).toEqual(['dropped-task'])
+    }
+  })
+
+  it('rejects a full-plan report when plannerShape is repair', async () => {
+    const target = await localFolderTarget()
+    const path = await issueObjectiveReportPath(target, 'repair-attempt-mismatched')
+    await writeFile(
+      path,
+      JSON.stringify({
+        plan: [
+          {
+            taskKey: 'core',
+            title: 'Core',
+            spec: 'Implement core.',
+            deps: [],
+            criteria: [{ body: 'Works', shellCheckable: false, checkCommand: null }],
+            declaresDependencyChange: false
+          }
+        ]
+      })
+    )
+
+    await expect(
+      readObjectiveRoleReport({
+        target,
+        attemptFingerprint: 'repair-attempt-mismatched',
+        mailboxReportPath: path,
+        role: 'planner',
+        plannerShape: 'repair'
+      })
+    ).resolves.toMatchObject({ ok: false, reason: 'malformed' })
+  })
+
+  it('rejects a repair-shaped report when plannerShape is full', async () => {
+    const target = await localFolderTarget()
+    const path = await issueObjectiveReportPath(target, 'full-attempt-mismatched')
+    await writeFile(
+      path,
+      JSON.stringify({ repair: { upsertTasks: [], dropTaskKeys: ['dropped-task'] } })
+    )
+
+    await expect(
+      readObjectiveRoleReport({
+        target,
+        attemptFingerprint: 'full-attempt-mismatched',
+        mailboxReportPath: path,
+        role: 'planner',
+        plannerShape: 'full'
+      })
+    ).resolves.toMatchObject({ ok: false, reason: 'malformed' })
+  })
+
   it('requires an implementer report to name the dispatched task', async () => {
     const target = await localFolderTarget()
     const path = await issueObjectiveReportPath(target, 'task-attempt')
@@ -400,7 +508,7 @@ describe('objective role report ingestion', () => {
       role: 'planner'
     })
     expect(result.ok).toBe(true)
-    if (result.ok) {
+    if (result.ok && 'plan' in result.report) {
       expect(result.report.plan[0]?.taskKey).toBe('task-1')
       expect(result.report.plan[0]?.declaredPaths).toEqual(['src/behavior.ts'])
       expect(result.reportDigest).toMatch(/^[0-9a-f]{64}$/u)

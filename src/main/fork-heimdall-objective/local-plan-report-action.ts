@@ -3,6 +3,12 @@ import type { ExecuteContext } from '../../shared/fork-heimdall/kind-contract'
 import { getLatestAttempts } from '../../shared/fork-heimdall/ledger-queries'
 import type { ObjectiveAction } from '../../shared/fork-heimdall-objective/objective-actions'
 import type { ObjectiveWorld } from '../../shared/fork-heimdall-objective/detail-types'
+import { objectiveFrozenTaskKeys } from '../../shared/fork-heimdall-objective/objective-repair-state'
+import {
+  PlannerRepairReportSchema,
+  parseAndValidatePlannerRepairReport,
+  type PlannerRepairReport
+} from '../../shared/fork-heimdall-objective/plan-repair-schema'
 import {
   parseAndValidatePlannerReport,
   type PlannerReport
@@ -12,7 +18,7 @@ import {
   findObjectiveWorkerEvidence,
   type ObjectiveSnapshotBinding
 } from './execution-context'
-import type { ObjectiveStore } from './objective-store'
+import type { ObjectivePlanPatchRecord, ObjectiveStore } from './objective-store'
 import {
   invalidObjectiveReport,
   rejectedWorkerReport,
@@ -21,6 +27,8 @@ import {
 import { readObjectiveRoleReport } from './report-ingestion'
 
 type IngestPlanAction = Extract<ObjectiveAction, { kind: 'ingest-plan' }>
+
+const PLAN_PATCH_REJECTION_MAX_LENGTH = 2_000
 
 function dispatchedTaskKeys(context: ExecuteContext<ObjectiveWorld>): string[] {
   const keys = new Set<string>()
@@ -42,7 +50,8 @@ export async function ingestObjectivePlanReport(args: {
   const origin = findObjectiveDispatchAttempt(args.context.ledger, args.action.dispatchId)
   if (
     origin?.action.kind !== 'dispatch-planner' ||
-    origin.action.revisionNumber !== args.action.revisionNumber
+    origin.action.revisionNumber !== args.action.revisionNumber ||
+    (args.action.shape === 'repair' && origin.action.repairOrdinal === undefined)
   ) {
     return invalidObjectiveReport({
       reason: 'planner-dispatch-mismatch',
@@ -99,6 +108,18 @@ export async function ingestObjectivePlanReport(args: {
       ...(read.detail === undefined ? {} : { detail: read.detail })
     })
   }
+  if (args.action.shape === 'repair') {
+    return ingestObjectivePlanRepair({
+      action: args.action,
+      repairOrdinal: origin.action.repairOrdinal as number,
+      rawReport: read.report,
+      evidenceAtMs: evidence.atMs,
+      binding: args.binding,
+      context: args.context,
+      objectiveStore: args.objectiveStore
+    })
+  }
+
   let report: PlannerReport
   try {
     report = parseAndValidatePlannerReport(read.report, {
@@ -133,4 +154,119 @@ export async function ingestObjectivePlanReport(args: {
       revisionId: stored.revisionId
     }
   }
+}
+
+function firstFrozenTouchedTaskKey(
+  report: PlannerRepairReport,
+  frozen: ReadonlySet<string>
+): string | null {
+  for (const task of report.repair.upsertTasks) {
+    if (frozen.has(task.taskKey)) {
+      return task.taskKey
+    }
+  }
+  for (const taskKey of report.repair.dropTaskKeys) {
+    if (frozen.has(taskKey)) {
+      return taskKey
+    }
+  }
+  return null
+}
+
+function repairPatchOutcome(
+  action: IngestPlanAction,
+  stored: ObjectivePlanPatchRecord
+): ActionOutcome {
+  return {
+    effect: 'landed',
+    result: {
+      kind: 'plan-patch-ingested',
+      naturalKey: reportActionNaturalKey(action),
+      patchId: stored.id,
+      status: stored.status,
+      ...(stored.rejection === null ? {} : { rejection: stored.rejection })
+    }
+  }
+}
+
+/**
+ * Ingests a planner repair proposal as a plan patch, always landing: a validation failure or a
+ * frozen-node conflict is stored as a rejected patch rather than discarded, so a repeated planner
+ * mistake shows up as a retry rather than a silent no-op.
+ */
+async function ingestObjectivePlanRepair(args: {
+  action: IngestPlanAction
+  repairOrdinal: number
+  rawReport: unknown
+  evidenceAtMs: number
+  binding: ObjectiveSnapshotBinding
+  context: ExecuteContext<ObjectiveWorld>
+  objectiveStore: ObjectiveStore
+}): Promise<ActionOutcome> {
+  const targetRevisionId = args.action.targetRevisionId
+  if (targetRevisionId === undefined) {
+    return invalidObjectiveReport({
+      reason: 'planner-repair-target-revision-missing',
+      code: 'semantic-invalid',
+      role: 'planner',
+      dispatchId: args.action.dispatchId,
+      reportPath: args.action.reportPath,
+      detail: 'Repair ingestion requires targetRevisionId'
+    })
+  }
+  const currentPlan = args.objectiveStore.getPlan(targetRevisionId)
+  if (!currentPlan) {
+    return invalidObjectiveReport({
+      reason: 'planner-repair-target-revision-missing',
+      code: 'semantic-invalid',
+      role: 'planner',
+      dispatchId: args.action.dispatchId,
+      reportPath: args.action.reportPath,
+      detail: `Target revision ${targetRevisionId} was not found`
+    })
+  }
+  const watcherId = args.binding.enrollment.watcherId
+
+  let report: PlannerRepairReport
+  try {
+    report = parseAndValidatePlannerRepairReport(
+      args.rawReport,
+      { writeTerritory: args.binding.contract.writeTerritory },
+      currentPlan
+    )
+  } catch (error) {
+    const message = (
+      error instanceof Error ? error.message : 'Planner repair report validation failed'
+    ).slice(0, PLAN_PATCH_REJECTION_MAX_LENGTH)
+    const rawShape = PlannerRepairReportSchema.safeParse(args.rawReport)
+    await args.context.lease.assertHeld()
+    const stored = args.objectiveStore.ingestPlanPatch({
+      watcherId,
+      revisionId: targetRevisionId,
+      dispatchId: args.action.dispatchId,
+      repairOrdinal: args.repairOrdinal,
+      report: rawShape.success ? rawShape.data : { repair: { upsertTasks: [], dropTaskKeys: [] } },
+      createdAtMs: args.evidenceAtMs,
+      rejection: `invalid-report:${message}`
+    })
+    return repairPatchOutcome(args.action, stored)
+  }
+
+  const frozen = objectiveFrozenTaskKeys(
+    args.context.snapshot.world,
+    args.context.ledger,
+    targetRevisionId
+  )
+  const frozenTaskKey = firstFrozenTouchedTaskKey(report, frozen)
+  await args.context.lease.assertHeld()
+  const stored = args.objectiveStore.ingestPlanPatch({
+    watcherId,
+    revisionId: targetRevisionId,
+    dispatchId: args.action.dispatchId,
+    repairOrdinal: args.repairOrdinal,
+    report,
+    createdAtMs: args.evidenceAtMs,
+    ...(frozenTaskKey === null ? {} : { rejection: `changes-frozen-node:${frozenTaskKey}` })
+  })
+  return repairPatchOutcome(args.action, stored)
 }

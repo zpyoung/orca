@@ -69,6 +69,22 @@ function record(taskKey: string, workspacePath = `/children/${taskKey}`): Object
   }
 }
 
+function runGate(
+  name: string,
+  contentIdentity = 'content-current'
+): Extract<ObjectiveAction, { kind: 'run-gate' }> {
+  return {
+    kind: 'run-gate',
+    capability: 'check',
+    visibility: 'local',
+    contentIdentity,
+    evidenceKey: `objective-gate:${name}:${contentIdentity}`,
+    gateName: name,
+    command: 'pnpm test',
+    timeoutSeconds: 900
+  }
+}
+
 function fixture(records: ObjectiveDispatchRecord[], cap: number) {
   const store = {
     getDispatch: (key: string) => records.find((entry) => entry.attemptFingerprint === key) ?? null,
@@ -164,5 +180,29 @@ describe('objective concurrency admission', () => {
     expect(policy.canRunAlongside(dispatch('b'), [dispatch('a')], world, ledger())).toBe(false)
     const current = attempt(dispatch('a'))
     expect(policy.preserveAttemptOnContentChange(current, world, ledger())).toBe(false)
+  })
+})
+
+describe('objective gate concurrency carve-out', () => {
+  it('runs two gates for different names concurrently', () => {
+    const { policy, world } = fixture([], 1)
+    expect(policy.canRunAlongside(runGate('full-suite'), [runGate('unit')], world, ledger())).toBe(
+      true
+    )
+  })
+
+  it('refuses a second run-gate for the same gate name', () => {
+    const { policy, world } = fixture([], 1)
+    expect(policy.canRunAlongside(runGate('unit'), [runGate('unit')], world, ledger())).toBe(false)
+  })
+
+  it('refuses a gate that would start beside any other action kind', () => {
+    const { policy, world } = fixture([], 1)
+    expect(policy.canRunAlongside(runGate('unit'), [dispatch('a')], world, ledger())).toBe(false)
+  })
+
+  it('refuses every other kind while a gate is active', () => {
+    const { policy, world } = fixture([], 1)
+    expect(policy.canRunAlongside(dispatch('a'), [runGate('unit')], world, ledger())).toBe(false)
   })
 })

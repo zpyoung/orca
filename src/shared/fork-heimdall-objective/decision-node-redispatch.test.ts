@@ -78,7 +78,7 @@ describe('objective node infra/environment redispatch', () => {
     expect(decision).toMatchObject({ reason: 'node-retry-exhausted' })
   })
 
-  it('replans once a retry itself resolves as a criteria failure instead of retrying again', () => {
+  it('repairs once a retry itself resolves as a criteria failure instead of retrying again', () => {
     const original = {
       ...attempt(dispatch, { state: 'settled', effect: 'not-landed', dispatchId: 'dispatch-core' }),
       failureClass: 'infra' as const
@@ -94,7 +94,9 @@ describe('objective node infra/environment redispatch', () => {
     const decision = decideObjective(snapshot(projection()), ledger([original, retried]))
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
-      evidenceKey: 'plan:2',
+      evidenceKey: 'plan-repair:revision-1:1',
+      shape: 'repair',
+      repairRevisionId: 'revision-1',
       reason: 'replan-after-failure'
     })
   })
@@ -150,7 +152,7 @@ describe('objective node infra/environment redispatch', () => {
     })
   })
 
-  it('replans instead of retrying once the resolution itself lands as a criteria failure', () => {
+  it('repairs instead of retrying once the resolution itself lands as a criteria failure', () => {
     const unresolved = attempt(dispatch, {
       state: 'settled',
       effect: 'indeterminate',
@@ -172,7 +174,9 @@ describe('objective node infra/environment redispatch', () => {
     const decision = decideObjective(snapshot(projection()), ledger([unresolved, resolution]))
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
-      evidenceKey: 'plan:2',
+      evidenceKey: 'plan-repair:revision-1:1',
+      shape: 'repair',
+      repairRevisionId: 'revision-1',
       reason: 'replan-after-failure'
     })
   })
@@ -230,12 +234,12 @@ describe('objective node infra/environment redispatch', () => {
     }
   )
 
-  it('replans a cleanly failed worker immediately, since settleWorker settles it with no failure class to classify', () => {
+  it('repairs a cleanly failed worker immediately, since settleWorker settles it with no failure class to classify', () => {
     // pins the gap found while verifying this phase: settleWorker (ledger-lifecycle.ts) settles a
     // worker_done{outcome:'failed'} straight to effect:'not-landed', never 'indeterminate', so
     // resolveOutcome/resolveDispatchOutcome — the only place failureClass gets computed — never
-    // runs for this attempt. There is no in-flight window here at all; it replans on the same tick,
-    // exactly as it did before this phase, with retryable failure classes structurally unreachable.
+    // runs for this attempt. There is no in-flight window here at all; it repairs on the same tick,
+    // exactly as it replanned before this phase, with retryable failure classes structurally unreachable.
     const settledDirectly = attempt(dispatch, {
       state: 'settled',
       effect: 'not-landed',
@@ -266,7 +270,9 @@ describe('objective node infra/environment redispatch', () => {
     )
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
-      evidenceKey: 'plan:2',
+      evidenceKey: 'plan-repair:revision-1:1',
+      shape: 'repair',
+      repairRevisionId: 'revision-1',
       reason: 'replan-after-failure'
     })
   })

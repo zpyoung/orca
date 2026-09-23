@@ -13,6 +13,10 @@ import {
   type ReviewerReport
 } from '../../shared/fork-heimdall-objective/plan-schema'
 import {
+  PlannerRepairReportSchema,
+  type PlannerRepairReport
+} from '../../shared/fork-heimdall-objective/plan-repair-schema'
+import {
   isPathInsideOrEqual,
   normalizeRuntimePathForComparison
 } from '../../shared/cross-platform-path'
@@ -36,12 +40,13 @@ const MAX_REPORT_SCHEMA_DETAIL_CHARS = 2_048
 export type ObjectiveReportRole = 'planner' | 'implementer' | 'reviewer' | 'integrator'
 export type ObjectiveRoleReport =
   | PlannerReport
+  | PlannerRepairReport
   | ImplementerReport
   | ReviewerReport
   | IntegratorReport
 
 type ObjectiveReportByRole = {
-  planner: PlannerReport
+  planner: PlannerReport | PlannerRepairReport
   implementer: ImplementerReport
   reviewer: ReviewerReport
   integrator: IntegratorReport
@@ -82,6 +87,11 @@ export type ObjectiveRoleReportReadRequest<R extends ObjectiveReportRole = Objec
   mailboxReportPath: string | null | undefined
   role: R
   taskKey?: string
+  /**
+   * Selects the planner report contract; ignored for other roles. Omit when the originating
+   * `dispatch-planner` action isn't known here — a 'planner' role then accepts either shape.
+   */
+  plannerShape?: 'full' | 'repair'
 }
 
 function fingerprintFileName(attemptFingerprint: string): string {
@@ -233,18 +243,54 @@ function formatReportSchemaIssues(issues: readonly ZodIssue[]): string {
   return `${issueDetails.slice(0, MAX_REPORT_SCHEMA_DETAIL_CHARS - 1)}…`
 }
 
+/**
+ * A repair dispatch only ever accepts the repair schema, and a known full dispatch only the full
+ * schema — those are today's exact behaviors. A caller with no action to check `shape` against
+ * passes no `plannerShape`, which tries the full schema first (preserving its error detail on a
+ * total mismatch) and falls back to the repair schema, so either report shape still parses.
+ */
+function parsePlannerReport(
+  input: unknown,
+  plannerShape: 'full' | 'repair' | undefined
+):
+  | { success: true; data: PlannerReport | PlannerRepairReport }
+  | { success: false; detail: string } {
+  if (plannerShape === 'repair') {
+    const repair = PlannerRepairReportSchema.safeParse(input)
+    return repair.success
+      ? { success: true, data: repair.data }
+      : { success: false, detail: formatReportSchemaIssues(repair.error.issues) }
+  }
+  const full = PlannerReportSchema.safeParse(input)
+  if (full.success) {
+    return { success: true, data: full.data }
+  }
+  if (plannerShape === undefined) {
+    const repair = PlannerRepairReportSchema.safeParse(input)
+    if (repair.success) {
+      return { success: true, data: repair.data }
+    }
+  }
+  return { success: false, detail: formatReportSchemaIssues(full.error.issues) }
+}
+
 function parseReportForRole<R extends ObjectiveReportRole>(
   role: R,
-  input: unknown
+  input: unknown,
+  plannerShape: 'full' | 'repair' | undefined
 ): { success: true; data: ObjectiveReportByRole[R] } | { success: false; detail: string } {
+  if (role === 'planner') {
+    const parsed = parsePlannerReport(input, plannerShape)
+    return parsed.success
+      ? { success: true, data: parsed.data as ObjectiveReportByRole[R] }
+      : parsed
+  }
   const result =
-    role === 'planner'
-      ? PlannerReportSchema.safeParse(input)
-      : role === 'implementer'
-        ? ImplementerReportSchema.safeParse(input)
-        : role === 'reviewer'
-          ? ReviewerReportSchema.safeParse(input)
-          : IntegratorReportSchema.safeParse(input)
+    role === 'implementer'
+      ? ImplementerReportSchema.safeParse(input)
+      : role === 'reviewer'
+        ? ReviewerReportSchema.safeParse(input)
+        : IntegratorReportSchema.safeParse(input)
   return result.success
     ? { success: true, data: result.data as ObjectiveReportByRole[R] }
     : { success: false, detail: formatReportSchemaIssues(result.error.issues) }
@@ -252,7 +298,9 @@ function parseReportForRole<R extends ObjectiveReportRole>(
 
 function matchesAnotherRole(input: unknown, expectedRole: ObjectiveReportRole): boolean {
   return (
-    (expectedRole !== 'planner' && PlannerReportSchema.safeParse(input).success) ||
+    (expectedRole !== 'planner' &&
+      (PlannerReportSchema.safeParse(input).success ||
+        PlannerRepairReportSchema.safeParse(input).success)) ||
     (expectedRole !== 'implementer' && ImplementerReportSchema.safeParse(input).success) ||
     (expectedRole !== 'reviewer' && ReviewerReportSchema.safeParse(input).success) ||
     (expectedRole !== 'integrator' && IntegratorReportSchema.safeParse(input).success)
@@ -451,7 +499,7 @@ export async function readObjectiveRoleReport<R extends ObjectiveReportRole>(
   } catch {
     return { ok: false, reason: 'malformed' }
   }
-  const parsed = parseReportForRole(request.role, input)
+  const parsed = parseReportForRole(request.role, input, request.plannerShape)
   if (!parsed.success) {
     const reason = matchesAnotherRole(input, request.role) ? 'role-mismatch' : 'malformed'
     return {

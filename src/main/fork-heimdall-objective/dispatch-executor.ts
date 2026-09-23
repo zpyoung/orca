@@ -32,6 +32,7 @@ import {
 } from './role-prompts'
 import { captureObjectiveWorkspaceBaseline } from './observed-workspace-changes'
 import { issueObjectiveReportPath } from './report-ingestion'
+import type { RepairPlanContext } from './repair-plan-context'
 import type { ObjectiveStore } from './objective-store'
 import { objectiveResultDigest, type ObjectiveSnapshotBinding } from './execution-context'
 import {
@@ -41,6 +42,7 @@ import {
 } from './dispatch-worktree'
 import { resolveObjectiveSerialLaneTerminal } from './dispatch-session'
 import { deriveObjectiveFailureContext } from './dispatch-failure-context'
+import { deriveObjectiveRepairContext } from './dispatch-repair-context'
 export { deriveObjectiveFailureContext } from './dispatch-failure-context'
 
 type DispatchAction = Extract<ObjectiveAction, { kind: `dispatch-${string}` }>
@@ -103,6 +105,7 @@ function buildDispatchSpec(args: {
   planProgress?: readonly { taskKey: string; state: ObjectiveNodeState }[]
   conflictContext?: ObjectiveConflictContext
   dispatchedNode?: ObjectivePlanTask
+  repairContext?: RepairPlanContext
 }): DispatchSpec {
   const {
     action,
@@ -112,7 +115,8 @@ function buildDispatchSpec(args: {
     reportPath,
     failureContext,
     conflictContext,
-    planProgress
+    planProgress,
+    repairContext
   } = args
   const budgetBucket = deriveObjectiveBudgetBucket(context.ledger, binding.enrollment.budget)
   const effectiveMaxConcurrency = context.snapshot.world.parallel?.effectiveMaxConcurrency ?? 1
@@ -134,7 +138,9 @@ function buildDispatchSpec(args: {
         ...(action.requestedSkipStage === undefined
           ? {}
           : { requestedSkipStage: action.requestedSkipStage }),
-        ...(action.guidance === undefined ? {} : { ownerGuidance: action.guidance })
+        ...(action.guidance === undefined ? {} : { ownerGuidance: action.guidance }),
+        ...(action.shape === undefined ? {} : { shape: action.shape }),
+        ...(repairContext === undefined ? {} : { repairContext })
       })
     }
   }
@@ -351,11 +357,24 @@ export async function executeObjectiveDispatch(args: {
             activeRevisionId
           )
         : undefined
+    const repairContext =
+      args.action.kind === 'dispatch-planner' &&
+      args.action.shape === 'repair' &&
+      args.action.repairRevisionId !== undefined
+        ? deriveObjectiveRepairContext(
+            args.objectiveStore,
+            args.binding.enrollment.watcherId,
+            args.context.ledger,
+            args.context.snapshot.world,
+            args.action.repairRevisionId
+          )
+        : undefined
     request = buildDispatchSpec({
       ...args,
       reportPath,
       failureContext,
       planProgress,
+      repairContext,
       dispatchedNode,
       conflictContext: dispatchConflictContext(args.objectiveStore, prepared)
     })

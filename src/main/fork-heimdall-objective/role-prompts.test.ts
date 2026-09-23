@@ -179,6 +179,64 @@ describe('objective role prompts', () => {
     expect(prompt).not.toContain('FAILING CRITERIA')
   })
 
+  it('renders a gate failure section when no node failure is present', () => {
+    const prompt = buildObjectiveRolePrompt({
+      role: 'planner',
+      contract,
+      reason: 'replan-after-failure',
+      reportPath: '/tmp/objective/report.json',
+      budgetBucket: 'plenty',
+      ...parallel,
+      failureContext: {
+        gateFailure: {
+          gateName: 'full-suite',
+          command: 'pnpm test',
+          exitCode: 1,
+          timedOut: false,
+          stdoutTail: 'running suite...',
+          stderrTail: 'assertion failed'
+        }
+      }
+    })
+
+    expect(prompt).toContain('FAILED OBJECTIVE GATE: full-suite')
+    expect(prompt).toContain('COMMAND: pnpm test')
+    expect(prompt).toContain('EXIT CODE: 1')
+    expect(prompt).toContain('TIMED OUT: false')
+    expect(prompt).toContain('running suite...')
+    expect(prompt).toContain('assertion failed')
+    expect(prompt).not.toContain('FAILED TASK')
+  })
+
+  it('renders both a node failure and a gate failure when both are present', () => {
+    const prompt = buildObjectiveRolePrompt({
+      role: 'planner',
+      contract,
+      reason: 'replan-after-failure',
+      reportPath: '/tmp/objective/report.json',
+      budgetBucket: 'plenty',
+      ...parallel,
+      failureContext: {
+        taskKey: 'core',
+        narrative: 'The worker could not make the health check pass.',
+        failingCriteria: [],
+        gateFailure: {
+          gateName: 'full-suite',
+          command: 'pnpm test',
+          exitCode: null,
+          timedOut: true,
+          stdoutTail: null,
+          stderrTail: null
+        }
+      }
+    })
+
+    expect(prompt).toContain('FAILED TASK: core')
+    expect(prompt).toContain('FAILED OBJECTIVE GATE: full-suite')
+    expect(prompt).toContain('EXIT CODE: (none)')
+    expect(prompt).toContain('TIMED OUT: true')
+  })
+
   it('renders plan progress for a planner replan when supplied, but not otherwise', () => {
     const withProgress = buildObjectiveRolePrompt({
       role: 'planner',

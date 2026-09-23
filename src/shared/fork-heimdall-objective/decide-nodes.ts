@@ -2,6 +2,7 @@ import { deriveBudgetState } from '../fork-heimdall/budget'
 import type { WatcherLedger } from '../fork-heimdall/ledger-types'
 import type { Snapshot } from '../fork-heimdall/snapshot'
 import { objectiveRetryExhaustedDeviation } from './deviation-context'
+import { objectiveRepairEpisodeOpen } from './objective-repair-state'
 import {
   latestObjectiveAttempt,
   objectiveAttemptDisposition,
@@ -414,7 +415,19 @@ export function decideObjectiveNodes(
   const exclusiveRoleInFlight = objectiveExclusiveRoleInFlight(attempts, ledger)
   const slotState = objectiveParallelSlotState(snapshot.world, ledger, revision.id)
   const budgetExhausted = deriveBudgetState(ledger, snapshot.world.budget).exhausted !== null
-  if (!budgetExhausted && !exclusiveRoleInFlight && slotState.availableSlots > 0) {
+  // an open repair episode may still rewrite or drop pending nodes; nothing new starts until it closes
+  const repairEpisodeOpen = objectiveRepairEpisodeOpen(
+    snapshot.world,
+    ledger,
+    attempts,
+    revision.id
+  )
+  if (
+    !repairEpisodeOpen &&
+    !budgetExhausted &&
+    !exclusiveRoleInFlight &&
+    slotState.availableSlots > 0
+  ) {
     const retryableTaskKeys = new Set(retryByTaskKey.keys())
     const schedulingUnavailable = new Set(
       [...unavailableTaskKeys].filter((taskKey) => !retryableTaskKeys.has(taskKey))

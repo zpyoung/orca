@@ -138,7 +138,9 @@ export function gateAction<TWorld>(
   if (capabilityMode === 'off') {
     return { verdict: 'hold', reason: 'capability-off' }
   }
-  if (capabilityMode === 'gated') {
+  // an escalated action re-asks for approval even on an 'on' capability; 'gated' already asks
+  const escalated = action.approvalRequired === true
+  if (capabilityMode === 'gated' || escalated) {
     const scope = approvalScopeForAction(action)
     const approval = getLatestApproval(ledger, scope)
     if (approval?.decision !== 'approved') {

@@ -13,6 +13,7 @@ import {
   type ObjectiveDecisionOutcome,
   type ObjectiveNoActionReason
 } from './decision-context'
+import { decideObjectiveGates } from './decide-gates'
 import { decideObjectiveNodes } from './decide-nodes'
 import { decideObjectivePlan } from './decide-plan'
 import { decideObjectiveChecks, decideObjectiveReview } from './decide-review'
@@ -210,6 +211,17 @@ export function decideObjective(
   )
   if (checkDecision) {
     return checkDecision
+  }
+  const gateDecision = decideObjectiveGates(
+    snapshot,
+    ledger,
+    attempts,
+    reports,
+    revision,
+    ownerConfigured
+  )
+  if (gateDecision) {
+    return gateDecision
   }
   const reviewDecision = decideObjectiveReview(
     snapshot,

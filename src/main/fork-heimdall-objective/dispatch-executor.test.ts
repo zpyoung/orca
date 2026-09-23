@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { OWNER_INTERVENTION_TEXT_MAX_LENGTH } from '../../shared/fork-heimdall/owner/intervention'
 import type { DispatchResult, ExecuteContext } from '../../shared/fork-heimdall/kind-contract'
 import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
-import { projection, snapshot } from '../../shared/fork-heimdall-objective/decision-test-harness'
+import {
+  node,
+  projection,
+  snapshot
+} from '../../shared/fork-heimdall-objective/decision-test-harness'
 import type { ObjectiveAction } from '../../shared/fork-heimdall-objective/objective-actions'
 import type { ObjectiveWorld } from '../../shared/fork-heimdall-objective/detail-types'
 import type { Store } from '../persistence'
@@ -347,6 +351,128 @@ describe('executeObjectiveDispatch', () => {
 
     expect(buildRolePrompt).toHaveBeenCalledWith(
       expect.objectContaining({ role: 'planner', effectiveMaxConcurrency: 3, lanesEnabled: true })
+    )
+  })
+
+  it('builds a repair-shaped planner prompt with frozen and open task context', async () => {
+    const repairAction: ObjectiveAction = {
+      kind: 'dispatch-planner',
+      capability: 'plan',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'plan-repair:revision-1:1',
+      revisionNumber: 1,
+      reason: 'replan-after-failure',
+      shape: 'repair',
+      repairOrdinal: 1,
+      repairRevisionId: 'revision-1'
+    }
+    const openTask = {
+      taskKey: 'node-b',
+      title: 'Node B',
+      spec: 'Implement B',
+      deps: [],
+      criteria: [{ body: 'B works', shellCheckable: false, checkCommand: null }],
+      declaresDependencyChange: false
+    }
+    const frozenTask = {
+      taskKey: 'node-a',
+      title: 'Node A',
+      spec: 'Implement A',
+      deps: [],
+      criteria: [{ body: 'A works', shellCheckable: false, checkCommand: null }],
+      declaresDependencyChange: false
+    }
+    const repairStore = {
+      ...objectiveStore,
+      getPlan: () => [frozenTask, openTask],
+      project: () => ({
+        revisions: [],
+        nodes: [
+          {
+            revisionId: 'revision-1',
+            taskKey: 'node-a',
+            deps: [],
+            orchestrationTaskId: null,
+            dispatchId: 'dispatch-node-a',
+            state: 'succeeded',
+            criteria: []
+          }
+        ],
+        verdicts: [],
+        landing: []
+      }),
+      listDispatches: () => [
+        {
+          attemptFingerprint: 'fp-node-a',
+          watcherId: 'watcher-1',
+          executionHostId: 'local',
+          revisionId: 'revision-1',
+          taskKey: 'node-a',
+          planTaskDigest: 'digest-node-a',
+          dispatchId: 'dispatch-node-a',
+          workspaceId: 'workspace-node-a',
+          workspacePath: '/workspaces/node-a',
+          baseCommit: 'base',
+          laneTaskKeys: ['node-a'],
+          sessionNodeCount: 1,
+          state: 'applied',
+          commitSha: 'commit',
+          appliedCommitSha: 'commit',
+          reportDigest: 'report-digest',
+          conflictPaths: [],
+          conflictingTaskKeys: [],
+          conflictingDispatchIds: [],
+          createdAtMs: 10,
+          completedAtMs: 20,
+          terminalHandle: null,
+          setupState: 'retained',
+          reportPath: '/reports/node-a.json',
+          report: {
+            taskKey: 'node-a',
+            summary: 'Implemented node-a.',
+            filesModified: ['src/a.ts'],
+            criteriaSelfAssessment: []
+          },
+          task: frozenTask
+        }
+      ]
+    } as unknown as ObjectiveStore
+    const executeContext = context(
+      { watcherId: 'watcher-1', entries: [] },
+      { status: 'dispatched', dispatchId: 'dispatch-1' }
+    )
+    executeContext.snapshot = snapshot(
+      projection({ revisions: [], nodes: [node('node-a', { state: 'succeeded' })] })
+    )
+
+    await executeObjectiveDispatch({
+      action: repairAction,
+      binding,
+      context: executeContext,
+      objectiveStore: repairStore,
+      store: {} as Store,
+      runtime
+    })
+
+    expect(buildRolePrompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: 'planner',
+        shape: 'repair',
+        repairContext: {
+          openTasks: [openTask],
+          frozenTasks: [
+            {
+              taskKey: 'node-a',
+              title: 'Node A',
+              state: 'succeeded',
+              summary: 'Implemented node-a.',
+              filesModified: ['src/a.ts'],
+              completedAtMs: 20
+            }
+          ]
+        }
+      })
     )
   })
 })

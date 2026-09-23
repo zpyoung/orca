@@ -42,11 +42,20 @@ import { MAX_OBJECTIVE_REPORT_BYTES } from './report-ingestion'
 const REPAIR_CONTEXT_SEPARATOR_RESERVE_BYTES =
   OBJECTIVE_PLAN_MAX_TASKS * 2 * (OBJECTIVE_TASK_KEY_MAX_LENGTH + 40)
 
+/** A planner replan may carry a node failure, a gate failure, or both; each renders independently. */
 export type ObjectiveFailureContext = {
-  taskKey: string
+  taskKey?: string
   failureClass?: ObjectiveFailureClass
-  narrative: string
-  failingCriteria: readonly string[]
+  narrative?: string
+  failingCriteria?: readonly string[]
+  gateFailure?: {
+    gateName: string
+    command: string
+    exitCode: number | null
+    timedOut: boolean | null
+    stdoutTail: string | null
+    stderrTail: string | null
+  }
 }
 
 export type ObjectiveConflictContext = {
@@ -221,17 +230,33 @@ function failureContextSection(input: ObjectiveRolePromptInput): string[] {
   if (input.role !== 'planner' || !input.failureContext) {
     return []
   }
-  const { taskKey, failureClass, narrative, failingCriteria } = input.failureContext
-  const lines = [
-    `FAILED TASK: ${taskKey}${failureClass === undefined ? '' : ` (${failureClass})`}`,
-    `WORKER NARRATIVE:\n${narrative}`
-  ]
-  if (failingCriteria.length > 0) {
-    lines.push(
-      `FAILING CRITERIA:\n${failingCriteria.map((criterion) => `- ${criterion}`).join('\n')}`
+  const { taskKey, failureClass, narrative, failingCriteria, gateFailure } = input.failureContext
+  const sections: string[] = []
+  if (taskKey !== undefined && narrative !== undefined) {
+    const lines = [
+      `FAILED TASK: ${taskKey}${failureClass === undefined ? '' : ` (${failureClass})`}`,
+      `WORKER NARRATIVE:\n${narrative}`
+    ]
+    if (failingCriteria !== undefined && failingCriteria.length > 0) {
+      lines.push(
+        `FAILING CRITERIA:\n${failingCriteria.map((criterion) => `- ${criterion}`).join('\n')}`
+      )
+    }
+    sections.push(lines.join('\n'))
+  }
+  if (gateFailure !== undefined) {
+    sections.push(
+      [
+        `FAILED OBJECTIVE GATE: ${gateFailure.gateName}`,
+        `COMMAND: ${gateFailure.command}`,
+        `EXIT CODE: ${gateFailure.exitCode === null ? '(none)' : gateFailure.exitCode}`,
+        `TIMED OUT: ${gateFailure.timedOut === null ? '(unknown)' : String(gateFailure.timedOut)}`,
+        `STDOUT TAIL:\n${gateFailure.stdoutTail ?? '(none)'}`,
+        `STDERR TAIL:\n${gateFailure.stderrTail ?? '(none)'}`
+      ].join('\n')
     )
   }
-  return [lines.join('\n')]
+  return sections
 }
 
 function planProgressSection(input: ObjectiveRolePromptInput): string[] {

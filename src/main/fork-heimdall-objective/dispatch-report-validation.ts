@@ -17,6 +17,7 @@ import {
   parseAndValidatePlannerReport,
   parseAndValidateReviewerReport
 } from '../../shared/fork-heimdall-objective/plan-schema'
+import { parseAndValidatePlannerRepairReport } from '../../shared/fork-heimdall-objective/plan-repair-schema'
 import type { ObjectiveSnapshotBinding } from './execution-context'
 import type { ObjectiveStore } from './objective-store'
 
@@ -83,6 +84,18 @@ export function validateResolvedDispatchReport(args: {
   })
   try {
     if (action.kind === 'dispatch-planner') {
+      if (action.shape === 'repair') {
+        const currentPlan = objectiveStore.getPlan(action.repairRevisionId ?? '')
+        if (!currentPlan) {
+          return rejected('semantic-invalid', `Plan ${action.repairRevisionId} is unavailable`)
+        }
+        parseAndValidatePlannerRepairReport(
+          report,
+          { writeTerritory: binding.contract.writeTerritory },
+          currentPlan
+        )
+        return { ok: true }
+      }
       parseAndValidatePlannerReport(report, {
         writeTerritory: binding.contract.writeTerritory,
         dispatchedTaskKeys: dispatchedTaskKeys(args.ledger)

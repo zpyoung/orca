@@ -77,12 +77,15 @@ describe('objective deterministic phase flow', () => {
     })
   })
 
-  it('replans with new evidence after a failed node instead of retrying it', () => {
+  it('repairs the approved revision after a failed node instead of retrying it', () => {
     const plan = projection({ nodes: [node('core', { state: 'failed', dispatchId: 'failed' })] })
     expect(decideObjective(snapshot(plan), ledger()).action).toMatchObject({
       kind: 'dispatch-planner',
-      evidenceKey: 'plan:2',
-      revisionNumber: 2,
+      evidenceKey: 'plan-repair:revision-1:1',
+      revisionNumber: 1,
+      shape: 'repair',
+      repairRevisionId: 'revision-1',
+      repairOrdinal: 1,
       reason: 'replan-after-failure'
     })
   })
@@ -136,12 +139,14 @@ describe('objective deterministic phase flow', () => {
     )
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
-      evidenceKey: 'plan:2',
+      evidenceKey: 'plan-repair:revision-1:1',
+      shape: 'repair',
+      repairRevisionId: 'revision-1',
       reason: 'replan-after-failure'
     })
   })
 
-  it('replans after a reportless worker death resolves as not landed', () => {
+  it('repairs after a reportless worker death resolves as not landed', () => {
     const dispatch: ObjectiveAction = {
       kind: 'dispatch-node',
       capability: 'implement',
@@ -181,13 +186,15 @@ describe('objective deterministic phase flow', () => {
 
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
-      evidenceKey: 'plan:2',
-      revisionNumber: 2,
+      evidenceKey: 'plan-repair:revision-1:1',
+      revisionNumber: 1,
+      shape: 'repair',
+      repairRevisionId: 'revision-1',
       reason: 'replan-after-failure'
     })
   })
 
-  it('replans after a settled worker omits its required report', () => {
+  it('repairs after a settled worker omits its required report', () => {
     const dispatch: ObjectiveAction = {
       kind: 'dispatch-node',
       capability: 'implement',
@@ -206,7 +213,9 @@ describe('objective deterministic phase flow', () => {
     )
     expect(decision.action).toMatchObject({
       kind: 'dispatch-planner',
-      evidenceKey: 'plan:2',
+      evidenceKey: 'plan-repair:revision-1:1',
+      shape: 'repair',
+      repairRevisionId: 'revision-1',
       reason: 'replan-after-failure'
     })
   })
@@ -262,7 +271,9 @@ describe('objective deterministic phase flow', () => {
       decideObjective(snapshot(projection({ nodes: [checked] })), ledger()).action
     ).toMatchObject({
       kind: 'dispatch-planner',
-      evidenceKey: 'plan:2',
+      evidenceKey: 'plan-repair:revision-1:1',
+      shape: 'repair',
+      repairRevisionId: 'revision-1',
       reason: 'replan-after-failure'
     })
   })
@@ -381,7 +392,9 @@ describe('objective tier review policy', () => {
     })
     expect(decideObjective(snapshot(blocked), ledger()).action).toMatchObject({
       kind: 'dispatch-planner',
-      evidenceKey: 'plan:2',
+      evidenceKey: 'plan-repair:revision-1:1',
+      shape: 'repair',
+      repairRevisionId: 'revision-1',
       reason: 'replan-after-block'
     })
   })

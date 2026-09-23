@@ -425,6 +425,37 @@ describe('gateAction', () => {
     expect(gateAction(retry, SNAPSHOT, gated, ledger(approval))).toEqual({ verdict: 'allow' })
   })
 
+  it('escalates an approvalRequired action on an "on" capability into the gated approval path', () => {
+    const escalated = { ...ACTION, approvalRequired: true }
+    const on = { ...ENROLLMENT, capabilities: { publish: 'on' as const } }
+    expect(gateAction(escalated, SNAPSHOT, on, ledger())).toMatchObject({
+      verdict: 'hold',
+      reason: 'awaiting-approval'
+    })
+    const approval: LedgerEntry = {
+      ...OWNER_FACT,
+      kind: 'approval',
+      eventId: 'approval-escalated-1',
+      atMs: 1,
+      scope: approvalScopeForAction(escalated),
+      decision: 'approved',
+      foldCount: 1
+    }
+    expect(gateAction(escalated, SNAPSHOT, on, ledger(approval))).toEqual({ verdict: 'allow' })
+  })
+
+  it('does not escalate approvalRequired past a capability that is off, and ignores it on gated', () => {
+    const escalated = { ...ACTION, approvalRequired: true }
+    const off = { ...ENROLLMENT, capabilities: { publish: 'off' as const } }
+    expect(gateAction(escalated, SNAPSHOT, off, ledger())).toEqual({
+      verdict: 'hold',
+      reason: 'capability-off'
+    })
+    const gated = { ...ENROLLMENT, capabilities: { publish: 'gated' as const } }
+    const first = gateAction(escalated, SNAPSHOT, gated, ledger())
+    expect(first).toMatchObject({ verdict: 'hold', reason: 'awaiting-approval' })
+  })
+
   it('holds a retry on the same awaiting-approval escalation as its unapproved original', () => {
     const retry = { ...ACTION, evidenceKey: 'failure-2', retryOf: ACTION.evidenceKey }
     const gated = { ...ENROLLMENT, capabilities: { publish: 'gated' as const } }

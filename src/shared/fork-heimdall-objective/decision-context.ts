@@ -8,6 +8,7 @@ import type { DecisionOutcome } from '../fork-heimdall/kind-contract'
 import { getAttemptResolution, getLatestAttempts } from '../fork-heimdall/ledger-queries'
 import type { AttemptEntry, WatcherLedger } from '../fork-heimdall/ledger-types'
 import type { Snapshot } from '../fork-heimdall/snapshot'
+import { decideRepairPlannerAction } from './decide-repair-planner'
 import {
   ObjectiveActionSchema,
   type ObjectiveAction,
@@ -25,12 +26,14 @@ export type ObjectiveNoActionReason =
   | 'plan-ingestion-in-flight'
   | 'plan-activation-in-flight'
   | 'plan-off-without-usable-plan'
+  | 'plan-repair-pending'
   | 'projection-refresh-pending'
   | 'node-in-flight'
   | 'node-retry-exhausted'
   | 'dependency-task-id-unavailable'
   | 'nodes-blocked-by-dependencies'
   | 'check-in-flight'
+  | 'gate-in-flight'
   | 'review-in-flight'
   | 'review-report-unavailable'
   | 'landing-in-flight'
@@ -429,6 +432,10 @@ export function decidePlannerAction(
   reason: DispatchPlannerAction['reason'],
   afterRevisionNumber: number
 ): ObjectiveDecisionOutcome {
+  // an approved revision turns every redispatch into a patch against it, never a new revision
+  if (activeObjectiveRevision(snapshot.world)) {
+    return decideRepairPlannerAction(snapshot, ledger, attempts, reports, reason)
+  }
   const planner = latestObjectiveAttempt(
     attempts,
     (action) => action.kind === 'dispatch-planner' && action.revisionNumber > afterRevisionNumber
