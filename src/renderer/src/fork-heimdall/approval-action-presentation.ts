@@ -53,6 +53,10 @@ function objectiveActionTitle(actionKind: string): string | null {
       return translate('fork.heimdall.approval.action.openHostedReview', 'Open hosted review')
     case 'apply-plan-patch':
       return translate('fork.heimdall.approval.action.applyPlanPatch', 'Apply plan repair')
+    case 'dispatch-plan-review':
+      return translate('fork.heimdall.approval.action.dispatchPlanReview', 'Review the plan')
+    case 'ingest-plan-review':
+      return translate('fork.heimdall.approval.action.ingestPlanReview', 'Record the plan review')
     default:
       return null
   }
@@ -138,6 +142,16 @@ function genericExplanation(actionKind: string): string {
       return translate(
         'fork.heimdall.approval.explanation.applyPlanPatch',
         'Apply a planner repair patch to the approved objective plan.'
+      )
+    case 'dispatch-plan-review':
+      return translate(
+        'fork.heimdall.approval.explanation.dispatchPlanReview',
+        'Start the plan critic review of a draft revision or a pending patch.'
+      )
+    case 'ingest-plan-review':
+      return translate(
+        'fork.heimdall.approval.explanation.ingestPlanReview',
+        'Read a plan review verdict into the objective state.'
       )
     case 'rerun-check':
       return translate(

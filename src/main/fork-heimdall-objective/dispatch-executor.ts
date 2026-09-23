@@ -31,6 +31,8 @@ import {
   type ObjectiveFailureContext
 } from './role-prompts'
 import { captureObjectiveWorkspaceBaseline } from './observed-workspace-changes'
+import { buildObjectivePlannerDispatchSpec } from './dispatch-planner-spec'
+import { planReviewRoutingScope, preparePlanReviewDispatchSpec } from './plan-review-input'
 import { issueObjectiveReportPath } from './report-ingestion'
 import type { RepairPlanContext } from './repair-plan-context'
 import type { ObjectiveStore } from './objective-store'
@@ -96,7 +98,7 @@ function completedNodeDependencies(
 }
 
 function buildDispatchSpec(args: {
-  action: DispatchAction
+  action: Exclude<DispatchAction, { kind: 'dispatch-plan-review' }>
   binding: ObjectiveSnapshotBinding
   context: ExecuteContext<ObjectiveWorld>
   objectiveStore: ObjectiveStore
@@ -122,27 +124,19 @@ function buildDispatchSpec(args: {
   const effectiveMaxConcurrency = context.snapshot.world.parallel?.effectiveMaxConcurrency ?? 1
   const lanesEnabled = binding.contract.lanesEnabled !== false
   if (action.kind === 'dispatch-planner') {
-    return {
-      role: 'planner',
-      taskKey: `objective-plan-${action.revisionNumber}`,
-      spec: buildObjectiveRolePrompt({
-        role: 'planner',
-        contract: binding.contract,
-        reportPath,
-        budgetBucket,
-        effectiveMaxConcurrency,
-        lanesEnabled,
-        reason: action.reason,
-        ...(failureContext === undefined ? {} : { failureContext }),
-        ...(planProgress === undefined ? {} : { planProgress }),
-        ...(action.requestedSkipStage === undefined
-          ? {}
-          : { requestedSkipStage: action.requestedSkipStage }),
-        ...(action.guidance === undefined ? {} : { ownerGuidance: action.guidance }),
-        ...(action.shape === undefined ? {} : { shape: action.shape }),
-        ...(repairContext === undefined ? {} : { repairContext })
-      })
-    }
+    return buildObjectivePlannerDispatchSpec({
+      action,
+      binding,
+      context,
+      objectiveStore,
+      reportPath,
+      budgetBucket,
+      effectiveMaxConcurrency,
+      lanesEnabled,
+      ...(failureContext === undefined ? {} : { failureContext }),
+      ...(planProgress === undefined ? {} : { planProgress }),
+      ...(repairContext === undefined ? {} : { repairContext })
+    })
   }
   const plan = requirePlan(objectiveStore, action.revisionId)
   if (action.kind === 'dispatch-node') {
@@ -369,21 +363,35 @@ export async function executeObjectiveDispatch(args: {
             args.action.repairRevisionId
           )
         : undefined
-    request = buildDispatchSpec({
-      ...args,
-      reportPath,
-      failureContext,
-      planProgress,
-      repairContext,
-      dispatchedNode,
-      conflictContext: dispatchConflictContext(args.objectiveStore, prepared)
-    })
+    request =
+      args.action.kind === 'dispatch-plan-review'
+        ? await preparePlanReviewDispatchSpec({
+            action: args.action,
+            binding: args.binding,
+            objectiveStore: args.objectiveStore,
+            world: args.context.snapshot.world,
+            ledger: args.context.ledger,
+            workspaceTarget: target,
+            reportPath
+          })
+        : buildDispatchSpec({
+            ...args,
+            action: args.action,
+            reportPath,
+            failureContext,
+            planProgress,
+            repairContext,
+            dispatchedNode,
+            conflictContext: dispatchConflictContext(args.objectiveStore, prepared)
+          })
     const routingScope =
       args.action.kind === 'dispatch-planner'
         ? (activeRevisionId ?? 'initial')
         : args.action.kind === 'dispatch-node'
           ? args.action.taskKey
-          : args.action.revisionId
+          : args.action.kind === 'dispatch-plan-review'
+            ? planReviewRoutingScope(args.action.target)
+            : args.action.revisionId
     agent =
       args.action.kind === 'dispatch-node' && args.action.ownerAgent
         ? args.action.ownerAgent

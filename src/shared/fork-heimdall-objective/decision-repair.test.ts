@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { decideObjective } from './decision'
-import { attempt, ledger, node, projection, snapshot } from './decision-test-harness'
+import {
+  attempt,
+  capabilities,
+  ledger,
+  node,
+  planReview,
+  projection,
+  snapshot,
+  workerDone
+} from './decision-test-harness'
 import type { ObjectiveAction } from './objective-actions'
 import type { ObjectiveDispatchRecord } from './parallel-types'
 import type { ObjectivePlanPatchProjection } from './detail-types'
@@ -171,7 +180,11 @@ describe('decideObjective repair episode, end to end', () => {
       ...projection({ nodes: [node('open-task', { state: 'pending' })] }),
       patches: [planPatch({ status: 'pending' })]
     }
-    const decision = decideObjective(snapshot(plan), ledger())
+    // review off: this case is about patch-vs-node scheduling priority, not the review gate
+    const decision = decideObjective(
+      snapshot(plan, { capabilities: capabilities({ review: 'off' }) }),
+      ledger()
+    )
     expect(decision.action).toEqual({
       kind: 'apply-plan-patch',
       capability: 'plan',
@@ -204,5 +217,64 @@ describe('decideObjective repair episode, end to end', () => {
     const decision = decideObjective(snapshot(plan), ledger())
     expect(decision.action).toMatchObject({ kind: 'dispatch-node', taskKey: 'open-task' })
     expect(decision.action).not.toMatchObject({ taskKey: 'done-task' })
+  })
+
+  it('reviews a pending repair patch before applying it', () => {
+    const plan = {
+      ...projection({ nodes: [node('open-task', { state: 'pending' })] }),
+      patches: [planPatch({ status: 'pending' })]
+    }
+
+    const dispatched = decideObjective(snapshot(plan), ledger())
+    expect(dispatched.action).toMatchObject({
+      kind: 'dispatch-plan-review',
+      evidenceKey: 'plan-review:patch:patch-1:1',
+      target: { kind: 'patch', patchId: 'patch-1' },
+      round: 1
+    })
+
+    const reviewDispatch = dispatched.action as Extract<
+      ObjectiveAction,
+      { kind: 'dispatch-plan-review' }
+    >
+    const reviewedLedger = ledger([
+      attempt(reviewDispatch, {
+        dispatchId: 'review-dispatch-1',
+        state: 'settled',
+        effect: 'landed'
+      }),
+      workerDone('review-dispatch-1')
+    ])
+    const ingested = decideObjective(snapshot(plan), reviewedLedger)
+    expect(ingested.action).toMatchObject({
+      kind: 'ingest-plan-review',
+      dispatchId: 'review-dispatch-1',
+      target: { kind: 'patch', patchId: 'patch-1' }
+    })
+
+    const approvedPlan = {
+      ...plan,
+      planReviews: [
+        planReview({
+          targetKind: 'patch',
+          targetId: 'patch-1',
+          round: 1,
+          dispatchId: 'review-dispatch-1',
+          verdict: 'approve'
+        })
+      ]
+    }
+    const applied = decideObjective(snapshot(approvedPlan), reviewedLedger)
+    expect(applied.action).toEqual({
+      kind: 'apply-plan-patch',
+      capability: 'plan',
+      visibility: 'local',
+      recovery: 'replay-safe',
+      contentIdentity: 'content-current',
+      evidenceKey: 'patch-1',
+      revisionId: 'revision-1',
+      patchId: 'patch-1',
+      digest: 'patch-digest-1'
+    })
   })
 })

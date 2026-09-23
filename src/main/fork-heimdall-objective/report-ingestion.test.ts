@@ -227,6 +227,40 @@ describe('objective role report ingestion', () => {
     ).resolves.toEqual({ ok: false, reason: 'role-mismatch' })
   })
 
+  it('reads a plan-review report under the internal plan-review role, distinct from reviewer', async () => {
+    const target = await localFolderTarget()
+    const path = await issueObjectiveReportPath(target, 'plan-review-attempt')
+    await writeFile(
+      path,
+      JSON.stringify({
+        verdict: 'approve',
+        assumptions: [],
+        findings: [],
+        summary: 'Plan looks sound.'
+      })
+    )
+
+    const result = await readObjectiveRoleReport({
+      target,
+      attemptFingerprint: 'plan-review-attempt',
+      mailboxReportPath: path,
+      role: 'plan-review'
+    })
+    expect(result).toMatchObject({ ok: true, role: 'plan-review' })
+    if (result.ok) {
+      expect(result.report).toMatchObject({ verdict: 'approve' })
+    }
+
+    await expect(
+      readObjectiveRoleReport({
+        target,
+        attemptFingerprint: 'plan-review-attempt',
+        mailboxReportPath: path,
+        role: 'reviewer'
+      })
+    ).resolves.toEqual({ ok: false, reason: 'role-mismatch' })
+  })
+
   it('accepts a real repair-shaped report for role planner when no shape is specified', async () => {
     const target = await localFolderTarget()
     const path = await issueObjectiveReportPath(target, 'repair-attempt-unspecified')

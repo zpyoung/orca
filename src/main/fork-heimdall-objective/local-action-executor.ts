@@ -14,6 +14,7 @@ import { objectiveResultDigest, type ObjectiveSnapshotBinding } from './executio
 import type { ObjectiveStore } from './objective-store'
 import { ingestObjectiveNodeReport } from './local-node-report-action'
 import { ingestObjectivePlanReport } from './local-plan-report-action'
+import { ingestObjectivePlanReviewReport } from './local-plan-review-report-action'
 import { ingestObjectiveVerdictReport } from './local-verdict-report-action'
 import {
   acceptOwnerReport,
@@ -234,6 +235,9 @@ export async function executeObjectiveLocalAction(args: {
   }
   if (args.action.kind === 'ingest-verdict') {
     return ingestObjectiveVerdictReport({ ...args, action: args.action })
+  }
+  if (args.action.kind === 'ingest-plan-review') {
+    return ingestObjectivePlanReviewReport({ ...args, action: args.action })
   }
   if (args.action.kind === 'accept-report') {
     return acceptOwnerReport({ ...args, action: args.action })

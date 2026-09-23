@@ -16,14 +16,21 @@ import type { ObjectiveSnapshotBinding } from './execution-context'
 import type { ObjectiveStore } from './objective-store'
 const runtime = {} as OrcaRuntimeService
 
-const { issueReportPath, captureBaseline, resolveAgent, readRoleReport, buildRolePrompt } =
-  vi.hoisted(() => ({
-    issueReportPath: vi.fn(),
-    captureBaseline: vi.fn(),
-    resolveAgent: vi.fn(),
-    readRoleReport: vi.fn(),
-    buildRolePrompt: vi.fn()
-  }))
+const {
+  issueReportPath,
+  captureBaseline,
+  resolveAgent,
+  readRoleReport,
+  buildRolePrompt,
+  preparePlanReviewDispatchSpec
+} = vi.hoisted(() => ({
+  issueReportPath: vi.fn(),
+  captureBaseline: vi.fn(),
+  resolveAgent: vi.fn(),
+  readRoleReport: vi.fn(),
+  buildRolePrompt: vi.fn(),
+  preparePlanReviewDispatchSpec: vi.fn()
+}))
 vi.mock('./report-ingestion', () => ({
   issueObjectiveReportPath: issueReportPath,
   readObjectiveRoleReport: readRoleReport
@@ -34,6 +41,11 @@ vi.mock('./observed-workspace-changes', () => ({
 vi.mock('./role-prompts', () => ({
   buildObjectiveRolePrompt: buildRolePrompt,
   resolveObjectiveRoleAgent: resolveAgent
+}))
+vi.mock('./plan-review-input', () => ({
+  preparePlanReviewDispatchSpec,
+  planReviewRoutingScope: (target: { kind: string; revisionId?: string; patchId?: string }) =>
+    target.kind === 'revision' ? target.revisionId : target.patchId
 }))
 
 const binding: ObjectiveSnapshotBinding = {
@@ -258,6 +270,102 @@ describe('executeObjectiveDispatch', () => {
         requestedSkipStage: 'hosted-review',
         ownerGuidance: rationale
       })
+    )
+  })
+
+  it("carries the latest revise review's findings into a redispatched planner's prompt", async () => {
+    const plannerRedispatch: ObjectiveAction = {
+      kind: 'dispatch-planner',
+      capability: 'plan',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'plan:3',
+      revisionNumber: 3,
+      reason: 'replan-after-block',
+      shape: 'full'
+    }
+    const reviewingStore = {
+      ...objectiveStore,
+      getPlanReviewReport: vi.fn().mockReturnValue({
+        verdict: 'revise',
+        assumptions: [
+          { index: 0, status: 'unverified', evidence: 'could not verify the migration' }
+        ],
+        findings: [
+          { taskKey: 'node-a', severity: 'blocking', body: 'ordering is wrong' },
+          { taskKey: null, severity: 'advisory', body: 'minor nit' }
+        ],
+        summary: 'Needs task ordering fixed.'
+      })
+    } as unknown as ObjectiveStore
+    const executeContext = context(
+      { watcherId: 'watcher-1', entries: [] },
+      { status: 'dispatched', dispatchId: 'dispatch-1' }
+    )
+    executeContext.snapshot = snapshot(
+      projection({
+        revisions: [],
+        nodes: [],
+        planReviews: [
+          {
+            id: 'plan-review-1',
+            targetKind: 'revision',
+            targetId: 'revision-2',
+            round: 1,
+            dispatchId: 'review-dispatch-1',
+            verdict: 'revise',
+            reportDigest: 'review-digest-1',
+            createdAtMs: 10
+          }
+        ]
+      })
+    )
+
+    await executeObjectiveDispatch({
+      action: plannerRedispatch,
+      binding,
+      context: executeContext,
+      objectiveStore: reviewingStore,
+      store: {} as Store,
+      runtime
+    })
+
+    expect(buildRolePrompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        planReviewFindings:
+          'Needs task ordering fixed.\nnode-a: ordering is wrong\nassumption[0]: could not verify the migration'
+      })
+    )
+  })
+
+  it('omits planReviewFindings when the latest review in the lineage approved', async () => {
+    const plannerRedispatch: ObjectiveAction = {
+      kind: 'dispatch-planner',
+      capability: 'plan',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'plan:1',
+      revisionNumber: 1,
+      reason: 'initial',
+      shape: 'full'
+    }
+    const executeContext = context(
+      { watcherId: 'watcher-1', entries: [] },
+      { status: 'dispatched', dispatchId: 'dispatch-1' }
+    )
+    executeContext.snapshot = snapshot(projection({ revisions: [], nodes: [] }))
+
+    await executeObjectiveDispatch({
+      action: plannerRedispatch,
+      binding,
+      context: executeContext,
+      objectiveStore,
+      store: {} as Store,
+      runtime
+    })
+
+    expect(buildRolePrompt).toHaveBeenCalledWith(
+      expect.not.objectContaining({ planReviewFindings: expect.anything() })
     )
   })
 
@@ -527,6 +635,98 @@ function workerDoneEvidence(args: {
     }
   }
 }
+
+describe('executeObjectiveDispatch for dispatch-plan-review', () => {
+  beforeEach(() => {
+    issueReportPath.mockReset()
+    resolveAgent.mockReset()
+    preparePlanReviewDispatchSpec.mockReset()
+    issueReportPath.mockResolvedValue('/workspace/reports/abc.json')
+    resolveAgent.mockReturnValue('claude')
+  })
+
+  it('dispatches a plan review for a revision target using its prepared task key and spec', async () => {
+    const action: ObjectiveAction = {
+      kind: 'dispatch-plan-review',
+      capability: 'review',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'revision-1:1',
+      target: { kind: 'revision', revisionId: 'revision-1' },
+      round: 1
+    }
+    preparePlanReviewDispatchSpec.mockResolvedValue({
+      role: 'reviewer',
+      taskKey: 'objective-plan-review-revision-1-1',
+      spec: 'review the plan'
+    })
+    const dispatchContext = context(
+      { watcherId: 'watcher-1', entries: [] },
+      { status: 'dispatched', dispatchId: 'dispatch-1' }
+    )
+
+    const outcome = await executeObjectiveDispatch({
+      action,
+      binding,
+      context: dispatchContext,
+      objectiveStore,
+      store: {} as Store,
+      runtime
+    })
+
+    expect(outcome).toEqual({
+      effect: 'landed',
+      result: { dispatchId: 'dispatch-1', reportPath: '/workspace/reports/abc.json' }
+    })
+    expect(preparePlanReviewDispatchSpec).toHaveBeenCalledWith(
+      expect.objectContaining({ action, reportPath: '/workspace/reports/abc.json' })
+    )
+    expect(dispatchContext.dispatchWorker).toHaveBeenCalledWith(
+      expect.objectContaining({
+        spec: 'review the plan',
+        taskKey: 'objective-plan-review-revision-1-1'
+      })
+    )
+  })
+
+  it('dispatches a plan review for a patch target using the patch id in its task key', async () => {
+    const action: ObjectiveAction = {
+      kind: 'dispatch-plan-review',
+      capability: 'review',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'patch-1:2',
+      target: { kind: 'patch', patchId: 'patch-1' },
+      round: 2
+    }
+    preparePlanReviewDispatchSpec.mockResolvedValue({
+      role: 'reviewer',
+      taskKey: 'objective-plan-review-patch-1-2',
+      spec: 'review the patch'
+    })
+    const dispatchContext = context(
+      { watcherId: 'watcher-1', entries: [] },
+      { status: 'dispatched', dispatchId: 'dispatch-2' }
+    )
+
+    const outcome = await executeObjectiveDispatch({
+      action,
+      binding,
+      context: dispatchContext,
+      objectiveStore,
+      store: {} as Store,
+      runtime
+    })
+
+    expect(outcome).toEqual({
+      effect: 'landed',
+      result: { dispatchId: 'dispatch-2', reportPath: '/workspace/reports/abc.json' }
+    })
+    expect(dispatchContext.dispatchWorker).toHaveBeenCalledWith(
+      expect.objectContaining({ taskKey: 'objective-plan-review-patch-1-2' })
+    )
+  })
+})
 
 describe('deriveObjectiveFailureContext', () => {
   const plannerReplanAfterFailure: Extract<ObjectiveAction, { kind: 'dispatch-planner' }> = {

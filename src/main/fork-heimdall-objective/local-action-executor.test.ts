@@ -758,3 +758,123 @@ describe('objective plan patch execution', () => {
     expect(objectiveStore.getPlanPatch(patch.id)?.status).toBe('applied')
   })
 })
+
+describe('objective plan review execution', () => {
+  it('routes ingest-plan-review through the plan-review executor and records the verdict', async () => {
+    const database = new ObjectiveDatabase(':memory:')
+    opened.push(database)
+    const objectiveStore = new ObjectiveStore(database)
+    const revision = objectiveStore.ingestPlan({
+      watcherId: WATCHER_ID,
+      revisionNumber: 1,
+      dispatchId: 'planner-1',
+      report: PLAN,
+      digest: 'digest-1',
+      createdAtMs: 1
+    })
+    const workspacePath = await mkdtemp(join(tmpdir(), 'objective-plan-review-routing-'))
+    try {
+      const target = {
+        kind: 'folder' as const,
+        executionHostId: 'local' as const,
+        workspacePath,
+        fileProvider: null
+      }
+      const dispatchAction = {
+        kind: 'dispatch-plan-review',
+        capability: 'review',
+        visibility: 'local',
+        contentIdentity: 'content-1',
+        evidenceKey: `${revision.revisionId}:1`,
+        target: { kind: 'revision', revisionId: revision.revisionId },
+        round: 1
+      } satisfies ObjectiveAction
+      const fingerprint = makeAttemptFingerprint(
+        dispatchAction.contentIdentity,
+        dispatchAction.kind,
+        dispatchAction.evidenceKey
+      )
+      const reportPath = await issueObjectiveReportPath(target, fingerprint)
+      await writeFile(
+        reportPath,
+        JSON.stringify({
+          verdict: 'approve',
+          assumptions: [],
+          findings: [],
+          summary: 'The plan is sound.'
+        })
+      )
+      const binding = {
+        enrollment: { watcherId: WATCHER_ID },
+        target
+      } as unknown as ObjectiveSnapshotBinding
+      const context = {
+        ledger: {
+          watcherId: WATCHER_ID,
+          entries: [
+            {
+              eventId: 'attempt-plan-review-1',
+              watcherId: WATCHER_ID,
+              atMs: 1,
+              origin: 'owner',
+              class: 'fact',
+              kind: 'attempt',
+              attemptId: 'attempt-plan-review-1',
+              fingerprint,
+              action: dispatchAction,
+              state: 'settled',
+              effect: 'indeterminate',
+              dispatch: { spec: 'Review the plan.', deps: [], dispatchKind: 'reviewer' },
+              dispatchId: 'dispatch-plan-review-1'
+            },
+            {
+              eventId: 'evidence-plan-review-1',
+              watcherId: WATCHER_ID,
+              atMs: 2,
+              origin: 'owner',
+              class: 'fact',
+              kind: 'evidence',
+              evidenceKind: 'orchestration-mailbox',
+              payload: {
+                type: 'worker_done',
+                payload: {
+                  dispatchId: 'dispatch-plan-review-1',
+                  outcome: 'succeeded',
+                  reportPath,
+                  filesModified: []
+                }
+              }
+            }
+          ]
+        },
+        lease: { assertHeld: vi.fn(async () => undefined) },
+        dispatchWorker: vi.fn()
+      } as unknown as ExecuteContext<ObjectiveWorld>
+
+      const outcome = await executeObjectiveLocalAction({
+        action: {
+          kind: 'ingest-plan-review',
+          capability: 'review',
+          visibility: 'local',
+          contentIdentity: 'content-1',
+          evidenceKey: 'dispatch-plan-review-1',
+          recovery: 'replay-safe',
+          dispatchId: 'dispatch-plan-review-1',
+          reportPath,
+          target: { kind: 'revision', revisionId: revision.revisionId }
+        },
+        binding,
+        context,
+        objectiveStore
+      })
+
+      expect(outcome).toMatchObject({
+        effect: 'landed',
+        result: { kind: 'plan-review-ingested', verdict: 'approve' }
+      })
+      expect(objectiveStore.listPlanReviews(WATCHER_ID)).toHaveLength(1)
+    } finally {
+      await rm(workspacePath, { recursive: true, force: true })
+    }
+  })
+})

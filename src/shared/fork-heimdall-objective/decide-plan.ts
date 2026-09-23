@@ -11,56 +11,83 @@ import {
   type ObjectiveAttempt,
   type ObjectiveDecisionOutcome
 } from './decision-context'
+import { decideObjectivePlanReviewGate } from './decide-plan-review'
 import { objectivePlanFailedDeviation } from './deviation-context'
 import type {
   ObjectivePendingReport,
   ObjectiveRevisionProjection,
   ObjectiveWorld
 } from './detail-types'
+import { objectiveRepairEpisodeAttempts } from './objective-repair-state'
 
 /**
- * Emits the apply for R's oldest still-`pending` plan patch, or the in-flight/projection-lag
- * no-actions while that apply settles. Kept separate so a future plan-review gate can wrap it
- * without touching the rest of `decideObjectivePlan`.
+ * Emits the apply for R's oldest unresolved plan patch, gated by plan review (C7). A patch already
+ * `rejected` (an invalid repair report, a frozen-node conflict, or a round-1 plan-review `revise`)
+ * never applies; falling through to the planner reuses its own retry/escalation budget instead of
+ * stalling forever on a patch `decideObjectivePlan` would otherwise never revisit.
  */
 function decideObjectivePlanPatchApplication(
   snapshot: Snapshot<ObjectiveWorld>,
   ledger: WatcherLedger,
   attempts: readonly ObjectiveAttempt[],
+  reports: readonly ObjectivePendingReport[],
   revision: ObjectiveRevisionProjection
 ): ObjectiveDecisionOutcome | null {
-  const pendingPatch = (snapshot.world.plan.patches ?? [])
-    .filter((patch) => patch.revisionId === revision.id && patch.status === 'pending')
+  // scoped to the open episode: an older episode's rejected patch never blocked a later one from
+  // being created, so an unbounded search could resurface it after the repair has moved on
+  const { sinceOrdinal } = objectiveRepairEpisodeAttempts(snapshot.world, attempts, revision.id)
+  const targetPatch = (snapshot.world.plan.patches ?? [])
+    .filter(
+      (patch) =>
+        patch.revisionId === revision.id &&
+        patch.repairOrdinal > sinceOrdinal &&
+        patch.status !== 'applied'
+    )
     .sort((left, right) => left.repairOrdinal - right.repairOrdinal)[0]
-  if (!pendingPatch) {
+  if (!targetPatch) {
     return null
+  }
+  if (targetPatch.status === 'rejected') {
+    return decidePlannerAction(
+      snapshot,
+      ledger,
+      attempts,
+      reports,
+      'replan-after-block',
+      revision.number
+    )
   }
   const application = latestObjectiveAttempt(
     attempts,
-    (action) => action.kind === 'apply-plan-patch' && action.patchId === pendingPatch.id
+    (action) => action.kind === 'apply-plan-patch' && action.patchId === targetPatch.id
   )
   if (application) {
     const disposition = objectiveAttemptDisposition(application.attempt, ledger)
     if (disposition === 'in-flight' || disposition === 'indeterminate') {
-      return objectiveNoAction('plan', 'plan-activation-in-flight', pendingPatch.id)
+      return objectiveNoAction('plan', 'plan-activation-in-flight', targetPatch.id)
     }
     if (disposition === 'landed') {
-      return objectiveNoAction('plan', 'projection-refresh-pending', pendingPatch.id)
+      return objectiveNoAction('plan', 'projection-refresh-pending', targetPatch.id)
     }
   }
-  return {
-    action: {
+  return decideObjectivePlanReviewGate(
+    snapshot,
+    ledger,
+    attempts,
+    reports,
+    { kind: 'patch', patch: targetPatch, revision },
+    {
       kind: 'apply-plan-patch',
       capability: 'plan',
       visibility: 'local',
       recovery: 'replay-safe',
       contentIdentity: snapshot.contentIdentity,
-      evidenceKey: pendingPatch.id,
+      evidenceKey: targetPatch.id,
       revisionId: revision.id,
-      patchId: pendingPatch.id,
-      digest: pendingPatch.digest
+      patchId: targetPatch.id,
+      digest: targetPatch.digest
     }
-  }
+  )
 }
 
 export function decideObjectivePlan(
@@ -76,17 +103,23 @@ export function decideObjectivePlan(
     .sort((left, right) => right.number - left.number)[0]
   if (!draft) {
     if (approved) {
-      return decideObjectivePlanPatchApplication(snapshot, ledger, attempts, approved)
+      return decideObjectivePlanPatchApplication(snapshot, ledger, attempts, reports, approved)
     }
+    // a round-1 plan-review `revise` is the only way a revision reaches 'rejected'; redispatching
+    // against its own number (not 0) stops decidePlannerAction from treating its already-landed
+    // ingest-plan as still pending and stalling on projection-refresh-pending forever
+    const rejected = snapshot.world.plan.revisions
+      .filter((candidate) => candidate.status === 'rejected')
+      .sort((left, right) => right.number - left.number)[0]
     const planning = decidePlannerAction(
       snapshot,
       ledger,
       attempts,
       reports,
-      'replan-after-failure',
-      0
+      rejected ? 'replan-after-block' : 'replan-after-failure',
+      rejected?.number ?? 0
     )
-    if (!ownerConfigured) {
+    if (!ownerConfigured || rejected) {
       return planning
     }
     const planner = latestObjectiveAttempt(
@@ -161,8 +194,13 @@ export function decideObjectivePlan(
       draft.number
     )
   }
-  return {
-    action: {
+  return decideObjectivePlanReviewGate(
+    snapshot,
+    ledger,
+    attempts,
+    reports,
+    { kind: 'revision', revision: draft },
+    {
       kind: 'activate-plan',
       capability: 'plan',
       visibility: 'local',
@@ -172,5 +210,5 @@ export function decideObjectivePlan(
       revisionId: draft.id,
       digest: draft.digest
     }
-  }
+  )
 }

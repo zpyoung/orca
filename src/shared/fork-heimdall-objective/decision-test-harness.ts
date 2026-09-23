@@ -6,11 +6,17 @@ import type {
   WatcherLedger
 } from '../fork-heimdall/ledger-types'
 import type { Snapshot } from '../fork-heimdall/snapshot'
-import { OBJECTIVE_ABSENT_REMOTE_REF_STATE, type ObjectiveGate } from './contract-types'
+import {
+  OBJECTIVE_ABSENT_REMOTE_REF_STATE,
+  type ObjectiveCapabilities,
+  type ObjectiveGate
+} from './contract-types'
 import type { ObjectiveAction } from './objective-actions'
 import type {
   ObjectiveGateAttemptProjection,
   ObjectiveNodeProjection,
+  ObjectivePlanPatchProjection,
+  ObjectivePlanReviewProjection,
   ObjectiveProjection,
   ObjectiveRevisionProjection,
   ObjectiveWorld
@@ -56,6 +62,46 @@ export function node(
     dispatchId: null,
     state: 'pending',
     criteria: [],
+    ...overrides
+  }
+}
+
+export function capabilities(
+  overrides: Partial<ObjectiveCapabilities> = {}
+): ObjectiveCapabilities {
+  return { plan: 'on', implement: 'on', review: 'on', check: 'on', land: 'on', ...overrides }
+}
+
+export function patch(
+  overrides: Partial<ObjectivePlanPatchProjection> = {}
+): ObjectivePlanPatchProjection {
+  return {
+    id: 'patch-1',
+    revisionId: 'revision-1',
+    createdByDispatchId: 'repair-planner-1',
+    repairOrdinal: 1,
+    digest: 'patch-digest-1',
+    status: 'pending',
+    rejection: null,
+    touchedTaskKeys: [],
+    createdAtMs: 10,
+    resolvedAtMs: null,
+    ...overrides
+  }
+}
+
+export function planReview(
+  overrides: Partial<ObjectivePlanReviewProjection> = {}
+): ObjectivePlanReviewProjection {
+  return {
+    id: 'plan-review-1',
+    targetKind: 'revision',
+    targetId: 'revision-1',
+    round: 1,
+    dispatchId: 'plan-review-dispatch-1',
+    verdict: 'approve',
+    reportDigest: 'plan-review-digest-1',
+    createdAtMs: 15,
     ...overrides
   }
 }

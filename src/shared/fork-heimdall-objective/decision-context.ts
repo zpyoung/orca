@@ -27,6 +27,7 @@ export type ObjectiveNoActionReason =
   | 'plan-activation-in-flight'
   | 'plan-off-without-usable-plan'
   | 'plan-repair-pending'
+  | 'plan-review-in-flight'
   | 'projection-refresh-pending'
   | 'node-in-flight'
   | 'node-retry-exhausted'
@@ -290,7 +291,7 @@ function projectedReportRejection(args: {
       ? 'planner'
       : args.action.kind === 'dispatch-node'
         ? 'implementer'
-        : args.action.kind === 'dispatch-reviewer'
+        : args.action.kind === 'dispatch-reviewer' || args.action.kind === 'dispatch-plan-review'
           ? 'reviewer'
           : 'integrator'
   return createReportValidationProvenance({
@@ -357,7 +358,8 @@ export function projectObjectiveReports(ledger: WatcherLedger): ObjectivePending
       action.kind !== 'dispatch-planner' &&
       action.kind !== 'dispatch-node' &&
       action.kind !== 'dispatch-reviewer' &&
-      action.kind !== 'dispatch-integrator'
+      action.kind !== 'dispatch-integrator' &&
+      action.kind !== 'dispatch-plan-review'
     ) {
       continue
     }
@@ -493,7 +495,8 @@ export function decidePlannerAction(
       contentIdentity: snapshot.contentIdentity,
       evidenceKey: `plan:${revisionNumber}`,
       revisionNumber,
-      reason: revisionNumber === 1 ? 'initial' : reason
+      reason: revisionNumber === 1 ? 'initial' : reason,
+      shape: 'full'
     }
   }
 }

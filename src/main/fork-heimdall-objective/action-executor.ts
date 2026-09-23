@@ -100,6 +100,12 @@ function localActionOutcome(
     }
     case 'ingest-verdict':
       return objectiveStore.hasVerdict(action.dispatchId) ? 'landed' : 'not-landed'
+    case 'ingest-plan-review':
+      return objectiveStore
+        .listPlanReviews(watcherId)
+        .some((review) => review.dispatchId === action.dispatchId)
+        ? 'landed'
+        : 'not-landed'
     case 'record-landing':
       return objectiveStore.hasLanding(watcherId, action.rung, action.contentIdentity)
         ? 'landed'

@@ -21,6 +21,7 @@ import {
 import {
   OBJECTIVE_PLAN_ASSUMPTIONS_MAX_ENTRIES,
   OBJECTIVE_PLAN_MAX_TASKS,
+  OBJECTIVE_PLAN_REVIEW_TEXT_MAX_LENGTH,
   OBJECTIVE_REPORT_MAX_FILES,
   OBJECTIVE_TASK_MAX_CRITERIA,
   type ObjectivePlan,
@@ -98,6 +99,12 @@ export type ObjectiveRolePromptInput = {
   repairContext?: RepairPlanContext
   /** Prior plan-review verdict text to react to, for either report shape. */
   planReviewFindings?: string
+  /** Selects the plan-critic reviewer contract in place of the normal review-the-files-on-disk mode. */
+  mode?: 'plan-review'
+  /** Absolute path to the plan-review input file the dispatch executor wrote beside the report path. */
+  planReviewInputPath?: string
+  /** Compact plan summary (task key, title, deps, territory, lint codes) inlined for mode 'plan-review'. */
+  planReviewSummary?: string
 }
 
 const STRING_UNIT_NOTE =
@@ -137,7 +144,25 @@ function plannerRepairReportContract(): string {
   ].join('\n')
 }
 
-function reportContract(role: ObjectiveRole, shape: 'full' | 'repair' | undefined): string {
+function planReviewReportContract(): string {
+  return [
+    STRING_UNIT_NOTE,
+    'Write one strict JSON object: {verdict:"approve"|"revise"|"escalate",assumptions,findings,summary}.',
+    `assumptions has exactly one entry per declared assumption index 0..n-1, max ${OBJECTIVE_PLAN_ASSUMPTIONS_MAX_ENTRIES}: {index,status:"verified"|"unverified",evidence}; evidence is plain text with max ${OBJECTIVE_PLAN_REVIEW_TEXT_MAX_LENGTH}.`,
+    `findings has max 128 entries: {taskKey:TaskKey|null,severity:"blocking"|"advisory",body}; body is plain text with max ${OBJECTIVE_PLAN_REVIEW_TEXT_MAX_LENGTH}.`,
+    `summary is plain text with max ${OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH}.`,
+    'approve requires no blocking finding and no unverified assumption any task depends on.'
+  ].join('\n')
+}
+
+function reportContract(
+  role: ObjectiveRole,
+  shape: 'full' | 'repair' | undefined,
+  mode: 'plan-review' | undefined
+): string {
+  if (role === 'reviewer' && mode === 'plan-review') {
+    return planReviewReportContract()
+  }
   switch (role) {
     case 'planner':
       return shape === 'repair' ? plannerRepairReportContract() : plannerFullReportContract()
@@ -184,7 +209,9 @@ function roleInstruction(input: ObjectiveRolePromptInput): string {
         ? `Resolve this node's integration conflict in its existing dispatch worktree. Rebase the dispatch branch onto exact enrolled HEAD ${input.conflictContext.enrolledHead}, resolve only with the intent and evidence below, and re-run focused checks for both sides. Run only the checks scoped to your task — never the full test suite, a whole-tree typecheck, or whole-tree lint. Never push this dispatch branch or any child-worktree branch.`
         : 'Implement only the assigned node. You may inspect context, but modify only declared write territory. Run only the checks scoped to your task — never the full test suite, a whole-tree typecheck, or whole-tree lint. Never push this dispatch branch or any child-worktree branch.'
     case 'reviewer':
-      return 'Review the files on disk against every active-plan criterion. Do not modify files.'
+      return input.mode === 'plan-review'
+        ? 'Review the plan before it is activated. Do not modify files. Read the input file at the given path, verify every declared assumption against the repository — read code and fixtures, or run read-only commands — and mark each verified (with evidence) or unverified. Judge task sizing, whether declared dependencies are real, whether checks are properly scoped, and the declared conflict pairs and lint findings. Return verdict approve, revise, or escalate.'
+        : 'Review the files on disk against every active-plan criterion. Do not modify files.'
     case 'integrator':
       return 'Integrate and repair the files on disk as needed, then evaluate every active-plan criterion.'
   }
@@ -309,6 +336,16 @@ function roleContext(input: ObjectiveRolePromptInput): string[] {
         : [])
     ]
   }
+  if (input.role === 'reviewer' && input.mode === 'plan-review') {
+    return [
+      ...(input.planReviewInputPath === undefined
+        ? []
+        : [`PLAN REVIEW INPUT FILE:\n${input.planReviewInputPath}`]),
+      ...(input.planReviewSummary === undefined
+        ? []
+        : [`PLAN SUMMARY:\n${input.planReviewSummary}`])
+    ]
+  }
   if (input.role === 'reviewer' || input.role === 'integrator') {
     if (!input.plan) {
       throw new Error(`${input.role} prompt requires the active plan`)
@@ -360,7 +397,7 @@ function buildSections(
       ? []
       : [`OWNER REQUESTED SKIP STAGE:\n${input.requestedSkipStage}`]),
     ...(input.ownerGuidance === undefined ? [] : [`OWNER GUIDANCE:\n${input.ownerGuidance}`]),
-    `REPORT CONTRACT:\n${reportContract(input.role, input.shape)}`,
+    `REPORT CONTRACT:\n${reportContract(input.role, input.shape, input.mode)}`,
     finishInstructions(input.reportPath)
   ]
 }

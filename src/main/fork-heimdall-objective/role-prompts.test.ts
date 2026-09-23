@@ -540,4 +540,56 @@ describe('objective role prompts', () => {
       )
     })
   })
+
+  describe('plan-review reviewer mode', () => {
+    it('carries the input file path and compact summary instead of the normal reviewer plan view', () => {
+      const assigned = node('assigned', 'Implement the assigned behavior')
+      const prompt = buildObjectiveRolePrompt({
+        role: 'reviewer',
+        contract,
+        mode: 'plan-review',
+        planReviewInputPath: '/tmp/objective/reports/abc.plan-review-input.json',
+        planReviewSummary: 'assigned | Task assigned | deps: none | territory: src/**',
+        reportPath: '/tmp/objective/report.json',
+        budgetBucket: 'plenty',
+        ...parallel
+      })
+
+      expect(prompt).toContain('/tmp/objective/reports/abc.plan-review-input.json')
+      expect(prompt).toContain('assigned | Task assigned | deps: none | territory: src/**')
+      expect(prompt).not.toContain('ACTIVE PLAN REVIEW VIEW JSON')
+      expect(prompt).toContain('Do not modify files')
+      expect(prompt).not.toContain(JSON.stringify(assigned))
+    })
+
+    it('states the plan-review report contract instead of the normal reviewer contract', () => {
+      const prompt = buildObjectiveRolePrompt({
+        role: 'reviewer',
+        contract,
+        mode: 'plan-review',
+        planReviewInputPath: '/tmp/objective/reports/abc.plan-review-input.json',
+        reportPath: '/tmp/objective/report.json',
+        budgetBucket: 'plenty',
+        ...parallel
+      })
+
+      expect(prompt).toContain('verdict:"approve"|"revise"|"escalate"')
+      expect(prompt).toContain('assumptions')
+      expect(prompt).toContain('findings')
+      expect(prompt).not.toContain('verdict:"approve"|"block"')
+    })
+
+    it('does not require an active plan for the plan-review reviewer mode', () => {
+      expect(() =>
+        buildObjectiveRolePrompt({
+          role: 'reviewer',
+          contract,
+          mode: 'plan-review',
+          reportPath: '/tmp/objective/report.json',
+          budgetBucket: 'plenty',
+          ...parallel
+        })
+      ).not.toThrow()
+    })
+  })
 })

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { getLatestAttempts } from '../../shared/fork-heimdall/ledger-queries'
 import type { EvidenceEntry } from '../../shared/fork-heimdall/ledger-types'
 import type { EnrollInput, WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
+import type { PlanReviewReport } from '../../shared/fork-heimdall-objective/plan-review-schema'
 import type { PlannerReport } from '../../shared/fork-heimdall-objective/plan-schema'
 import { gitExecFileAsync } from '../git/command-runner/git-exec-file'
 import { HeimdallBudgetClock } from '../fork-heimdall/budget-clock'
@@ -49,6 +50,18 @@ const PLAN: PlannerReport = {
     }
   ],
   assumptions: []
+}
+
+/** Assesses every declared assumption in `PLAN` (none) with an approving verdict and no findings. */
+const PLAN_REVIEW_APPROVAL: PlanReviewReport = {
+  verdict: 'approve',
+  assumptions: (PLAN.assumptions ?? []).map((_, index) => ({
+    index,
+    status: 'verified',
+    evidence: 'Verified against the plan fixture.'
+  })),
+  findings: [],
+  summary: 'Plan reviewed; no blocking findings.'
 }
 
 const temporaryDirectories: string[] = []
@@ -236,7 +249,10 @@ function orchestrationSimulation(
     expect(input.spec).toContain(JSON.stringify(reportPath))
     const planner = input.spec.startsWith('ROLE: Objective planner')
     const implementer = input.spec.startsWith('ROLE: Objective implementer')
-    if (!planner && !implementer) {
+    const planReview =
+      input.spec.startsWith('ROLE: Objective reviewer') &&
+      input.spec.includes('PLAN REVIEW INPUT FILE:')
+    if (!planner && !implementer && !planReview) {
       throw new Error('Unexpected objective role dispatch')
     }
     if (implementer) {
@@ -251,12 +267,14 @@ function orchestrationSimulation(
     }
     const report = planner
       ? PLAN
-      : {
-          taskKey: 'write-result',
-          summary: 'Wrote the completed result.',
-          filesModified: [...EXPECTED_CHANGED_PATHS],
-          criteriaSelfAssessment: [{ criterionIndex: 0, result: 'pass', note: 'File updated.' }]
-        }
+      : planReview
+        ? PLAN_REVIEW_APPROVAL
+        : {
+            taskKey: 'write-result',
+            summary: 'Wrote the completed result.',
+            filesModified: [...EXPECTED_CHANGED_PATHS],
+            criteriaSelfAssessment: [{ criterionIndex: 0, result: 'pass', note: 'File updated.' }]
+          }
     await writeFile(reportPath, JSON.stringify(report))
     queued.push(
       mailboxCompletion({
@@ -471,17 +489,36 @@ describe('objective kind through the Heimdall kernel', () => {
       expect(first.objectiveStore.project(watcherId).revisions).toEqual([
         expect.objectContaining({ number: 1, status: 'draft' })
       ])
+
+      await first.service.reconcileForTesting(watcherId)
+      expect(first.orchestration.dispatchWorker).toHaveBeenCalledTimes(2)
+      const planReviewDispatch = getLatestAttempts(first.service.ledger(watcherId)).find(
+        (attempt) => attempt.action.kind === 'dispatch-plan-review'
+      )
+      expect(planReviewDispatch).toBeDefined()
+
+      await first.service.reconcileForTesting(watcherId)
+      expect(first.objectiveStore.project(watcherId).planReviews ?? []).toContainEqual(
+        expect.objectContaining({ targetKind: 'revision', verdict: 'approve' })
+      )
+
       await first.service.reconcileForTesting(watcherId)
       expect(first.objectiveStore.project(watcherId).revisions[0]).toMatchObject({
         status: 'approved'
       })
+      const activateAttempt = getLatestAttempts(first.service.ledger(watcherId)).find(
+        (attempt) => attempt.action.kind === 'activate-plan'
+      )
+      expect(activateAttempt).toBeDefined()
+      // proves the plan-review dispatch landed before the gated activation, not merely both present
+      expect(planReviewDispatch!.atMs).toBeLessThanOrEqual(activateAttempt!.atMs)
 
       await first.service.reconcileForTesting(watcherId)
-      expect(first.orchestration.dispatchWorker).toHaveBeenCalledTimes(2)
+      expect(first.orchestration.dispatchWorker).toHaveBeenCalledTimes(3)
       const dispatchAttempts = getLatestAttempts(first.service.ledger(watcherId)).filter(
         (attempt) => attempt.action.kind.startsWith('dispatch-')
       )
-      expect(dispatchAttempts).toHaveLength(2)
+      expect(dispatchAttempts).toHaveLength(3)
       const finalIdentity = await computeWorkspaceContentIdentity(fixture.target)
       expect(finalIdentity).not.toBe(initialIdentity)
 
@@ -490,8 +527,8 @@ describe('objective kind through the Heimdall kernel', () => {
         first.objectiveStore.project(watcherId, first.service.ledger(watcherId)).nodes[0]
       ).toMatchObject({
         taskKey: 'write-result',
-        orchestrationTaskId: 'task-2',
-        dispatchId: 'dispatch-2',
+        orchestrationTaskId: 'task-3',
+        dispatchId: 'dispatch-3',
         state: 'succeeded'
       })
       await first.service.reconcileForTesting(watcherId)
@@ -524,7 +561,7 @@ describe('objective kind through the Heimdall kernel', () => {
         terminalState: 'objective-bar-reached',
         reason: 'files-on-disk landing bar reached'
       })
-      expect(first.orchestration.delivered).toHaveLength(2)
+      expect(first.orchestration.delivered).toHaveLength(3)
       expect(first.orchestration.delivered.every((entry) => entry.kind === 'evidence')).toBe(true)
       expect(await readFile(join(fixture.root, 'src', 'result.txt'), 'utf8')).toBe('complete\n')
       expect(await readFile(join(fixture.root, 'src', 'created.txt'), 'utf8')).toBe('created\n')
@@ -534,7 +571,7 @@ describe('objective kind through the Heimdall kernel', () => {
         code: 'ENOENT'
       })
 
-      expect(first.orchestration.reportPaths).toHaveLength(2)
+      expect(first.orchestration.reportPaths).toHaveLength(3)
       for (const [index, reportPath] of first.orchestration.reportPaths.entries()) {
         expect(basename(reportPath)).toBe(fingerprintFileName(dispatchAttempts[index]!.fingerprint))
       }
@@ -594,7 +631,8 @@ describe('objective kind through the Heimdall kernel', () => {
     }
     const watcherId = enrolled.entry.enrollment.watcherId
 
-    for (let pulse = 0; pulse < 7; pulse += 1) {
+    // plan, draft, plan-review dispatch, plan-review ingest, activate, node, report, check, land
+    for (let pulse = 0; pulse < 9; pulse += 1) {
       await first.service.reconcileForTesting(watcherId)
     }
     const recordEscalation = first.service
@@ -725,7 +763,8 @@ describe('objective kind through the Heimdall kernel', () => {
     }
     const watcherId = enrolled.entry.enrollment.watcherId
 
-    for (let pulse = 0; pulse < 5; pulse += 1) {
+    // plan, draft, plan-review dispatch, plan-review ingest, activate, node, report
+    for (let pulse = 0; pulse < 7; pulse += 1) {
       await world.service.reconcileForTesting(watcherId)
     }
 
@@ -747,5 +786,33 @@ describe('objective kind through the Heimdall kernel', () => {
       )
     ).toBe(false)
     expect(ledger.entries.some((entry) => entry.kind === 'terminal')).toBe(false)
+  })
+
+  it('activates a draft without a plan-review dispatch when review is off', async () => {
+    const fixture = await workspaceFixture('folder')
+    const world = await kernelHarness(fixture, 'review-off')
+    const baseInput = enrollmentInput(fixture)
+    const enrolled = await world.service.enroll({
+      ...baseInput,
+      capabilities: { ...baseInput.capabilities, review: 'off' }
+    })
+    if (enrolled.status !== 'enrolled') {
+      throw new Error('Expected objective enrollment')
+    }
+    const watcherId = enrolled.entry.enrollment.watcherId
+
+    await world.service.reconcileForTesting(watcherId) // dispatch-planner
+    await world.service.reconcileForTesting(watcherId) // ingest-plan -> draft
+    await world.service.reconcileForTesting(watcherId) // activate-plan -> approved
+
+    expect(world.objectiveStore.project(watcherId).revisions[0]).toMatchObject({
+      status: 'approved'
+    })
+    expect(world.orchestration.dispatchWorker).toHaveBeenCalledTimes(1)
+    expect(
+      getLatestAttempts(world.service.ledger(watcherId)).some(
+        (attempt) => attempt.action.kind === 'dispatch-plan-review'
+      )
+    ).toBe(false)
   })
 })

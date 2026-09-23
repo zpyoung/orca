@@ -282,7 +282,47 @@
         "watchedBySitter": "Watched by sitter",
         "merged": "Merged",
         "landingHelp": "Rungs above the reached one are pending; the run stops at its bar.",
-        "verdictSynthesizedByOwner": "Synthesized by owner"
+        "verdictSynthesizedByOwner": "Synthesized by owner",
+        "overrunPaths": "Outside territory: {{paths}}",
+        "criticalPathLength": "Critical path: {{length}}",
+        "maxWidth": "Max width: {{width}}",
+        "conflictPairs": "Conflicts: {{pairs}}",
+        "planLevelFinding": "Plan-level",
+        "planReviewRound": "Round {{round}}",
+        "noGateDeclared": "No objective gate declared.",
+        "planQuality": "Plan quality",
+        "lintCode": {
+          "missingTerritory": "Missing territory",
+          "territoryOutsideObjective": "Territory outside objective",
+          "testOnlyNode": "Test-only territory",
+          "fullSuiteCheck": "Full-suite command",
+          "unscopedCheck": "Unscoped command",
+          "nonRelativeCheck": "Non-relative path",
+          "conflictPair": "Territory conflict",
+          "duplicatesGate": "Duplicates a gate",
+          "noGateDeclared": "No gate declared",
+          "missingAssumptions": "Missing assumptions"
+        },
+        "planReviewVerdict": {
+          "approve": "Approve",
+          "revise": "Revise",
+          "escalate": "Escalate"
+        },
+        "assumptionStatus": {
+          "verified": "Verified",
+          "unverified": "Unverified"
+        },
+        "patchStatus": {
+          "pending": "Pending",
+          "applied": "Applied",
+          "rejected": "Rejected"
+        },
+        "gateResult": {
+          "notRun": "Not run",
+          "timedOut": "Timed out",
+          "pass": "Pass",
+          "failed": "Failed (exit {{code}})"
+        }
       },
       "workspacePicker": {
         "placeholder": "Choose a workspace",

@@ -18,6 +18,7 @@ import {
   parseAndValidateReviewerReport
 } from '../../shared/fork-heimdall-objective/plan-schema'
 import { parseAndValidatePlannerRepairReport } from '../../shared/fork-heimdall-objective/plan-repair-schema'
+import { parseAndValidatePlanReviewReport } from '../../shared/fork-heimdall-objective/plan-review-schema'
 import type { ObjectiveSnapshotBinding } from './execution-context'
 import type { ObjectiveStore } from './objective-store'
 
@@ -41,7 +42,7 @@ export function dispatchReportRole(
     ? 'planner'
     : action.kind === 'dispatch-node'
       ? 'implementer'
-      : action.kind === 'dispatch-reviewer'
+      : action.kind === 'dispatch-reviewer' || action.kind === 'dispatch-plan-review'
         ? 'reviewer'
         : 'integrator'
 }
@@ -100,6 +101,19 @@ export function validateResolvedDispatchReport(args: {
         writeTerritory: binding.contract.writeTerritory,
         dispatchedTaskKeys: dispatchedTaskKeys(args.ledger)
       })
+      return { ok: true }
+    }
+    if (action.kind === 'dispatch-plan-review') {
+      const target = action.target
+      const found =
+        target.kind === 'revision'
+          ? objectiveStore.getPlanReport(target.revisionId)
+          : objectiveStore.getPlanPatch(target.patchId)?.report
+      if (!found) {
+        return rejected('semantic-invalid', `Plan review target ${target.kind} is unavailable`)
+      }
+      const assumptions = found.assumptions ?? []
+      parseAndValidatePlanReviewReport(report, assumptions.length, assumptions)
       return { ok: true }
     }
     const plan = objectiveStore.getPlan(action.revisionId)

@@ -17,6 +17,7 @@ import {
   objectiveRevisionStatusLabel,
   objectiveVerdictLabel
 } from './objective-copy'
+import { ObjectivePlanQuality } from './ObjectivePlanQuality'
 
 function Criterion({
   criterion
@@ -119,6 +120,21 @@ function RevisionPlan({
               <p className="mt-2 text-[11px] text-muted-foreground">
                 {translate('fork.heimdallObjective.detail.lane', 'Lane')}:{' '}
                 <span className="font-mono">{laneTaskKeys.join(' → ')}</span>
+              </p>
+            ) : null}
+            {node.territory && node.territory.length > 0 ? (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                {translate('fork.heimdallObjective.detail.territory', 'Write territory')}:{' '}
+                <span className="font-mono">{node.territory.join(', ')}</span>
+              </p>
+            ) : null}
+            {node.overrunPaths && node.overrunPaths.length > 0 ? (
+              <p className="mt-1 text-[11px] text-status-warning-foreground">
+                {translate(
+                  'fork.heimdallObjective.detail.overrunPaths',
+                  'Outside territory: {{paths}}',
+                  { paths: node.overrunPaths.join(', ') }
+                )}
               </p>
             ) : null}
             {node.state === 'awaiting-approval' ? (
@@ -256,6 +272,7 @@ export function ObjectivePlan({ detail }: { detail: ObjectiveDetail }): React.JS
               {translate('fork.heimdallObjective.detail.noPlan', 'No plan revision yet.')}
             </p>
           )}
+          <ObjectivePlanQuality detail={detail} />
           {detail.verdicts.length > 0 ? (
             <div className="mt-3 space-y-1.5">
               <h4 className="text-[11px] font-semibold text-muted-foreground">
