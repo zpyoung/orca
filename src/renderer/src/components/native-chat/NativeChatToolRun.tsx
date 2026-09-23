@@ -240,7 +240,7 @@ export function NativeChatToolRun({
             <NativeChatToolRunIcon iconName={settledHeaderIcon} className="text-muted-foreground" />
           ) : null}
           <NativeChatToolCategoryDots blocks={blocks} />
-          <span className="shrink-0 font-mono text-[11px] font-bold text-muted-foreground transition-colors group-hover:text-foreground/80">
+          <span className="shrink-0 font-mono text-[11px] font-bold text-muted-foreground transition-colors group-hover/tool-run:text-foreground/80">
             {callCount}×
           </span>
           {summaryMembers.length > 0 ? (

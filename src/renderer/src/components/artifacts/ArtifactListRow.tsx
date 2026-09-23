@@ -29,6 +29,7 @@ import {
 } from './artifact-display-labels'
 import { copyArtifactLink, openArtifactInBrowser } from './artifact-link-actions'
 import { ARTIFACTS_TABLE_GRID_CLASS } from './artifacts-table-layout'
+import { ArtifactNameWithProtection } from './fork-artifact-passwords/artifact-protection-display'
 import {
   LIST_TABLE_ROW_CLASS,
   LIST_TABLE_ROW_DIVIDER_CLASS,
@@ -127,9 +128,7 @@ export function ArtifactListRow({
             isSelected && LIST_TABLE_ROW_SELECTED_CLASS
           )}
         >
-          <span className="min-w-0 truncate font-medium" title={name}>
-            {name}
-          </span>
+          <ArtifactNameWithProtection item={item} name={name} />
           <span className="min-w-0 truncate text-muted-foreground" title={typeLabel}>
             {typeLabel}
           </span>
