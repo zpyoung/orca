@@ -566,6 +566,7 @@ value remains an error. Display diagnostics mark abbreviations; canonical report
 | Max concurrency      | 1–1,024                                       | 3                | live cap on implementer dispatches; folder workspaces clamp to 1 — see Parallel execution |
 | Lanes                | on / off                                      | on               | one warm worker session per one-to-one dependency chain                                   |
 | Write territory      | 0–64 workspace-relative globs                 | **blank = `**`** | optional; blank allows the whole workspace — see below                                    |
+| Gates                | 0–8 named commands                            | none             | objective gates run on the integrated tree after nodes apply — see Plan generation        |
 | Active budget        | ≥ 0.25 h, 0.25 steps                          | 4                | slider tops out at 24 h, the input does not                                               |
 | Worker turn limit    | integer ≥ 0                                   | 40               |                                                                                           |
 | Capabilities         | plan / implement / review / check / land      | see below        |                                                                                           |
@@ -800,6 +801,100 @@ local worktree and a remote one.
 > interval) but no turns, until the active-time budget runs out and it parks. The symptom is a
 > watcher that replans endlessly and never dispatches.
 
+## Plan generation
+
+A plan is a DAG of **tasks**, projected as nodes. Before a draft runs it passes **plan lint**, then
+**plan review**. Once running, corrections come through **repair**, never a rewrite. After every
+node applies, **objective gates** verify the integrated tree before the tier's review roles and
+landing.
+
+**What the planner is told.** The planner prompt (`buildObjectiveRolePrompt`, `role-prompts.ts:239`)
+states, in order: the sizing rule — one coherent change verifiable by its own scoped checks, with no
+node-count bounds; tests ship with the code they cover, so a test-only node exists only for
+pre-existing upstream tests a change breaks; the live concurrency cap
+(`effectiveMaxConcurrency`, default 3 — see Parallel execution above); a node starts only once every
+dependency is **applied** to the enrolled branch, so list only real dependencies; one-to-one chains
+share one warm session when lanes are on; a fresh node spends about 30% of its time orienting; node
+checks must be scoped, finish within `OBJECTIVE_CHECK_TIMEOUT_SECONDS` (300 s, `check-runner.ts:6`),
+and run from any worktree — no absolute paths; declared objective gates run the whole-tree checks and
+the PR opens at the `open-hosted-review` rung, so "run gates" and "open PR" are never plan nodes;
+every task requires a **territory**; the plan declares the **assumptions** it rests on, each naming
+the tasks that depend on it.
+
+**Task territory.** A task's territory is the globs it is expected to write, each within the
+objective's write territory. It predicts merge-train conflicts for plan lint and plan review — it is
+never enforced, and the scheduler does not read it. A worker that writes outside its task's
+territory is accepted; the overrun paths are recorded on the node and shown in plan detail, to plan
+review, and to the owner. The objective's **write territory** (above) is unaffected and stays a hard
+boundary: task-territory overruns are flagged, not rejected, while a write-territory violation still
+fails the attempt.
+
+**Plan lint.** Deterministic checks over a draft or repair patch. Lint never rejects a plan —
+findings are recorded and surfaced to plan review and to plan detail.
+
+| Code                          | Meaning                                                                                              |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `missing-territory`           | a task has no declared territory                                                                     |
+| `territory-outside-objective` | a task's territory is not within the objective's write territory                                     |
+| `test-only-node`              | every territory glob of the task matches a test pattern — new-code tests should ship with their code |
+| `full-suite-check`            | a criterion or the task spec runs the full suite, typecheck, or another whole-tree check             |
+| `unscoped-check`              | a check invokes `vitest`, `pnpm test`, or `tsc` without a path argument                              |
+| `non-relative-check`          | a check contains an absolute path, or `cd`s to one                                                   |
+| `conflict-pair`               | two tasks with overlapping territory and no dependency path between them — they could run together   |
+| `duplicates-gate`             | a node's check command or title duplicates a declared objective gate                                 |
+| `no-gate-declared`            | the objective has no objective gate configured                                                       |
+| `missing-assumptions`         | the plan or patch carries no assumptions list                                                        |
+
+Lint also reports **critical-path length** (the longest dependency chain, in nodes) and **maximum
+width** (an approximation of the largest number of tasks at one dependency depth) as information, not
+findings.
+
+**Plan review.** Runs for a new draft from an upgraded planner (one that declares a repair `shape`)
+and for every repair patch; skipped when the `review` capability is off, and skipped for a draft from
+a pre-upgrade planner dispatch (no `shape`). It dispatches the existing `reviewer` role in
+plan-review mode, fresh context, one at a time in the enrolled worktree. The reviewer verifies each
+declared assumption against the repository — reading code and fixtures, or running read-only
+commands — and marks it verified, with evidence, or unverified; it does not second-guess
+decomposition it cannot check.
+
+Verdicts: **approve** — no blocking finding and no unverified assumption with dependent tasks; the
+draft activates or the patch applies, still subject to `plan=gated` approval where configured.
+**revise** — the draft or patch is rejected, and the planner is redispatched once with the review
+findings. **escalate** — an approval hold: the next plan action carries `approvalRequired`, shown as
+an ordinary human approval card, or reaching a configured owner as a `gate-held` deviation. There is
+one revise round; a second `revise` escalates the same way.
+
+**Repair replans.** A repair triggers on a node failure, a reviewer block, a failed objective gate,
+or an owner-directed replan — all use the same repair shape. The planner sees open tasks (pending,
+failed, awaiting approval) in full, and **frozen tasks** — succeeded or running, including a dispatch
+that finished but has not yet merged onto the enrolled branch — as key, title, state, report summary
+and files changed. It may only add, change, or drop open tasks; new tasks may depend on frozen ones.
+A **repair episode** stays open from the repair planner dispatch until its patch applies: no new node
+dispatch starts while it is open, but tasks already running keep running.
+
+The patch itself moves pending → applied or rejected. It is rejected if it touches a frozen task
+(named in the rejection), or if plan review returns revise or escalate for it. A rejection is
+retried once — the planner is redispatched with the reason — and a second rejection escalates the
+same way plan review does. Owner-directed replans use the repair shape too. A full replan (a new
+revision) happens only when no plan is approved yet; once a revision is approved, every later
+correction is a repair to it.
+
+**Objective gates.** Declared at enrollment: name, shell command, and a timeout (default 1800 s), up
+to 8 per objective, unique names. Unavailable on a host without the parallel execution runtime
+capability. Once every node has applied — before the tier's review roles and landing — the kernel
+runs every declared gate lacking a result for the current tree; independent gates run concurrently.
+Each result is keyed to the tree's content identity, so an unchanged tree is not re-run and a changed
+one is. A failed gate feeds a repair replan when no owner is configured, or a `check-failed` deviation
+to the owner with criterion id `objective-gate:<name>`. Gate commands run on the enrolled branch on
+the execution host, local or SSH, the same as check commands. No gate declared means landing proceeds
+as before, with a note that no gate exists.
+
+**In plan detail.** Per-node territory and overrun paths; plan lint findings and conflict pairs;
+assumptions with their verified/unverified status; recent plan reviews (verdict, summary); the
+pending repair patch (status, rejection reason, touched task keys) when one exists; each declared
+gate with its command, timeout, and last result (pass/fail, exit code, timed out, when); a note when
+no gate is declared.
+
 ## The handoff
 
 An objective that reaches `hosted-review` terminates and enrolls a sitter for the PR it opened. This
@@ -923,6 +1018,10 @@ Caveats worth knowing before you rely on paired reads:
 | Kernel DB (enrollments, ledger, tick traces, terminal summaries — both kinds) | `<profile>/fork-heimdall/heimdall.db` (`database.ts:187`)                                                                                                    |
 | Objective plans and reports                                                   | `<profile>/fork-heimdall-objective/objective.db`                                                                                                             |
 | Workspace lease holder                                                        | Git: `<absolute-git-dir>/orca-heimdall/lease/epoch-<n>/holder.json`; folder: `<workspace>/.orca/heimdall/lease/epoch-<n>/holder.json`, on the execution host |
+
+The objective database is schema v5: `plan_patch` (repair patches), `plan_review` (plan-review
+verdicts), and `gate_attempt` (objective gate results) are additive over v4, so an older build still
+opens the file read-only.
 
 `<profile>` is the Electron userData directory: `~/Library/Application Support/orca-dev` under
 `pnpm dev`. To reset, quit the app first. Heimdall's asynchronous shutdown joins Electron's quit
