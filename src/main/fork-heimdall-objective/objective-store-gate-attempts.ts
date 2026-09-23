@@ -153,6 +153,7 @@ export function completeGateAttempt(
     if (
       !stored ||
       stored.exit_code !== args.exitCode ||
+      (stored.timed_out === 1) !== args.timedOut ||
       stored.stdout_tail !== args.stdoutTail ||
       stored.stderr_tail !== args.stderrTail ||
       stored.completed_at_ms !== args.completedAtMs

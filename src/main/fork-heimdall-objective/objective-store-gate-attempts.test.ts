@@ -144,6 +144,41 @@ describe('ObjectiveStore gate attempts', () => {
     ).toThrow(/different result/)
   })
 
+  it('refuses replaying a completion with the same exit code but a different timedOut', () => {
+    store.startGateAttempt({
+      watcherId: WATCHER_ID,
+      gateName: 'typecheck:node',
+      contentIdentity: CONTENT_IDENTITY,
+      executionHostId: 'local',
+      command: 'pnpm typecheck:node',
+      epoch: 1,
+      startedAtMs: 100
+    })
+    store.completeGateAttempt({
+      watcherId: WATCHER_ID,
+      gateName: 'typecheck:node',
+      contentIdentity: CONTENT_IDENTITY,
+      exitCode: 1,
+      timedOut: true,
+      stdoutTail: '',
+      stderrTail: 'timeout',
+      completedAtMs: 150
+    })
+
+    expect(() =>
+      store.completeGateAttempt({
+        watcherId: WATCHER_ID,
+        gateName: 'typecheck:node',
+        contentIdentity: CONTENT_IDENTITY,
+        exitCode: 1,
+        timedOut: false,
+        stdoutTail: '',
+        stderrTail: 'timeout',
+        completedAtMs: 150
+      })
+    ).toThrow(/different result/)
+  })
+
   it('returns null for an attempt that was never started', () => {
     expect(store.getGateAttempt(WATCHER_ID, 'typecheck:node', CONTENT_IDENTITY)).toBeNull()
   })

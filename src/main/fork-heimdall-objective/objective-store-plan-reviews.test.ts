@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { PlanReviewReport } from '../../shared/fork-heimdall-objective/plan-review-schema'
 import { ObjectiveDatabase } from './objective-database'
 import { ObjectiveStore } from './objective-store'
+import { projectPlanReviews } from './objective-store-plan-reviews'
 
 const WATCHER_ID = 'watcher-plan-reviews-1'
 const APPROVE_REPORT: PlanReviewReport = {
@@ -129,5 +130,26 @@ describe('ObjectiveStore plan reviews', () => {
     })
 
     expect(store.listPlanReviews(WATCHER_ID)).toEqual([second, first])
+  })
+
+  it('caps the projection at the newest 1,024 reviews out of 1,025 stored', () => {
+    for (let i = 0; i < 1_025; i++) {
+      store.recordPlanReview({
+        watcherId: WATCHER_ID,
+        targetKind: 'patch',
+        targetId: `patch-${i}`,
+        round: 1,
+        dispatchId: `plan-review-${i}`,
+        report: APPROVE_REPORT,
+        reportDigest: `digest-${i}`,
+        createdAtMs: 1_000 + i
+      })
+    }
+
+    const projected = projectPlanReviews(database.connection(), WATCHER_ID)
+    expect(projected).toHaveLength(1_024)
+    expect(projected[0]?.dispatchId).toBe('plan-review-1024')
+    expect(projected.at(-1)?.dispatchId).toBe('plan-review-1')
+    expect(projected.some((review) => review.dispatchId === 'plan-review-0')).toBe(false)
   })
 })

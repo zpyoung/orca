@@ -338,7 +338,8 @@ export function projectPlanPatches(
 }[] {
   const rows = db
     .prepare(
-      `SELECT ${PLAN_PATCH_COLUMNS} FROM plan_patch WHERE watcher_id = ? ORDER BY created_at_ms DESC, id DESC`
+      `SELECT ${PLAN_PATCH_COLUMNS} FROM plan_patch WHERE watcher_id = ?
+       ORDER BY created_at_ms DESC, id DESC LIMIT 1024`
     )
     .all(watcherId) as unknown as PlanPatchRow[]
   return rows.map((row) => {
