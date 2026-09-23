@@ -5,6 +5,7 @@ import type { ObjectiveAction } from '../../shared/fork-heimdall-objective/objec
 import { deriveObjectiveFailureContext } from './dispatch-failure-context'
 import type { ObjectiveSnapshotBinding } from './execution-context'
 import type { ObjectiveGateAttempt } from './objective-store-gate-attempts'
+import type { ObjectivePlanPatchRecord } from './objective-store-plan-patches'
 import type { ObjectiveStore } from './objective-store'
 
 const { readRoleReport } = vi.hoisted(() => ({ readRoleReport: vi.fn() }))
@@ -66,6 +67,30 @@ function storeWithGateAttempts(
 ): ObjectiveStore {
   return {
     getGateAttempt: (_watcherId: string, gateName: string) => attempts[gateName] ?? null
+  } as unknown as ObjectiveStore
+}
+
+function planPatch(overrides: Partial<ObjectivePlanPatchRecord> = {}): ObjectivePlanPatchRecord {
+  return {
+    id: 'patch-1',
+    watcherId: 'watcher-1',
+    revisionId: 'revision-1',
+    createdByDispatchId: 'repair-planner-1',
+    repairOrdinal: 1,
+    report: {} as ObjectivePlanPatchRecord['report'],
+    digest: 'patch-digest-1',
+    status: 'rejected',
+    rejection: 'invalid-report:malformed json',
+    createdAtMs: 10,
+    resolvedAtMs: 20,
+    ...overrides
+  }
+}
+
+function storeWithPlanPatches(patches: ObjectivePlanPatchRecord[]): ObjectiveStore {
+  return {
+    getGateAttempt: () => null,
+    listPlanPatches: (_watcherId: string) => patches
   } as unknown as ObjectiveStore
 }
 
@@ -189,6 +214,87 @@ describe('deriveObjectiveFailureContext gate failure', () => {
         ledger: emptyLedger,
         objectiveStore,
         activeRevisionId: undefined
+      })
+    ).resolves.toBeUndefined()
+  })
+})
+
+describe('deriveObjectiveFailureContext previous repair rejection (C5)', () => {
+  beforeEach(() => {
+    readRoleReport.mockReset()
+    readRoleReport.mockResolvedValue({ ok: false, reason: 'missing' })
+  })
+
+  it('carries the most recent rejected patch not caused by a plan-review revise', async () => {
+    const context = await deriveObjectiveFailureContext({
+      action: plannerReplanAfterFailure,
+      binding: binding(undefined),
+      ledger: emptyLedger,
+      objectiveStore: storeWithPlanPatches([
+        planPatch({ id: 'patch-1', repairOrdinal: 1, rejection: 'invalid-report:malformed json' }),
+        planPatch({ id: 'patch-2', repairOrdinal: 2, rejection: 'changes-frozen-node:core' })
+      ]),
+      activeRevisionId: 'revision-1'
+    })
+
+    expect(context).toEqual({ previousRepairRejection: 'changes-frozen-node:core' })
+  })
+
+  it('omits a rejection caused by a plan-review revise, since that recovers findings elsewhere', async () => {
+    const context = await deriveObjectiveFailureContext({
+      action: plannerReplanAfterFailure,
+      binding: binding(undefined),
+      ledger: emptyLedger,
+      objectiveStore: storeWithPlanPatches([
+        planPatch({ id: 'patch-1', repairOrdinal: 1, rejection: 'plan-review-revise' })
+      ]),
+      activeRevisionId: 'revision-1'
+    })
+
+    expect(context).toBeUndefined()
+  })
+
+  it('ignores a rejected patch from a different revision', async () => {
+    const context = await deriveObjectiveFailureContext({
+      action: plannerReplanAfterFailure,
+      binding: binding(undefined),
+      ledger: emptyLedger,
+      objectiveStore: storeWithPlanPatches([
+        planPatch({ id: 'patch-1', revisionId: 'revision-other', rejection: 'invalid-report:x' })
+      ]),
+      activeRevisionId: 'revision-1'
+    })
+
+    expect(context).toBeUndefined()
+  })
+
+  it('returns undefined when there is no active revision to look up patches for', async () => {
+    const context = await deriveObjectiveFailureContext({
+      action: plannerReplanAfterFailure,
+      binding: binding(undefined),
+      ledger: emptyLedger,
+      objectiveStore: storeWithPlanPatches([planPatch()]),
+      activeRevisionId: undefined
+    })
+
+    expect(context).toBeUndefined()
+  })
+
+  it('swallows a listPlanPatches failure instead of throwing', async () => {
+    const objectiveStore = {
+      getGateAttempt: () => null,
+      listPlanPatches: () => {
+        throw new Error('database unavailable')
+      }
+    } as unknown as ObjectiveStore
+
+    await expect(
+      deriveObjectiveFailureContext({
+        action: plannerReplanAfterFailure,
+        binding: binding(undefined),
+        ledger: emptyLedger,
+        objectiveStore,
+        activeRevisionId: 'revision-1'
       })
     ).resolves.toBeUndefined()
   })

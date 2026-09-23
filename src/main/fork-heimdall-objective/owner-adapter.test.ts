@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { createReportValidationProvenance } from '../../shared/fork-heimdall/effect-certainty'
 import { OWNER_INTERVENTION_TEXT_MAX_LENGTH } from '../../shared/fork-heimdall/owner/intervention'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
+import { decideObjectivePlanReviewGate } from '../../shared/fork-heimdall-objective/decide-plan-review'
+import { objectiveAttempts } from '../../shared/fork-heimdall-objective/decision-context'
 import {
   attempt,
   CONTRACT,
@@ -13,6 +15,7 @@ import {
 } from '../../shared/fork-heimdall-objective/decision-test-harness'
 import {
   ObjectiveActionSchema,
+  type ActivatePlanAction,
   type ObjectiveAction
 } from '../../shared/fork-heimdall-objective/objective-actions'
 import { ObjectiveOwnerInterventionSchema } from '../../shared/fork-heimdall-objective/owner-intervention'
@@ -214,8 +217,56 @@ describe('objectiveActionForIntervention: owner-directed planner shape', () => {
       snapshot(plan),
       ledger()
     )
-    expect(action).toMatchObject({ kind: 'dispatch-planner', guidance: 'Steer the plan.' })
-    expect('shape' in action).toBe(false)
+    expect(action).toMatchObject({
+      kind: 'dispatch-planner',
+      guidance: 'Steer the plan.',
+      shape: 'full'
+    })
+  })
+
+  // S1: an owner-directed full dispatch with no `shape` reads as pre-upgrade to
+  // decideObjectivePlanReviewGate, which then skips mandatory plan review entirely.
+  it('gates the resulting draft for plan review, unlike a pre-upgrade dispatch with no shape', () => {
+    const action = objectiveActionForIntervention(
+      { kind: 'dispatch-planner', guidance: 'Steer the plan.' },
+      snapshot(projection({ revisions: [] })),
+      ledger()
+    )
+    if (action.kind !== 'dispatch-planner') {
+      throw new Error('Expected a dispatch-planner action')
+    }
+    const draft = revision({
+      id: 'revision-new',
+      number: action.revisionNumber,
+      status: 'draft',
+      digest: 'draft-digest-new',
+      createdByDispatchId: 'planner-dispatch-new',
+      approvedAtMs: null
+    })
+    const plannerAttempt = attempt(action, {
+      dispatchId: 'planner-dispatch-new',
+      state: 'settled',
+      effect: 'landed'
+    })
+    const activateAction: ActivatePlanAction = {
+      kind: 'activate-plan',
+      capability: 'plan',
+      visibility: 'local',
+      recovery: 'replay-safe',
+      contentIdentity: 'content-current',
+      evidenceKey: draft.id,
+      revisionId: draft.id,
+      digest: draft.digest
+    }
+    const result = decideObjectivePlanReviewGate(
+      snapshot(projection({ revisions: [draft] })),
+      ledger([plannerAttempt]),
+      objectiveAttempts(ledger([plannerAttempt])),
+      [],
+      { kind: 'revision', revision: draft },
+      activateAction
+    )
+    expect(result.action).toMatchObject({ kind: 'dispatch-plan-review' })
   })
 
   it('emits a repair-shaped dispatch targeting the approved revision when one exists', () => {

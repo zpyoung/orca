@@ -136,6 +136,30 @@ async function deriveNodeFailureContext(args: {
   }
 }
 
+/**
+ * The most recently rejected repair patch's rejection text for the active revision, or `undefined`
+ * when none exists or its rejection was a plan-review `revise` (that case already carries its own
+ * findings via `objectivePlannerReviewFindings`, so restating it here would be redundant).
+ */
+function latestRejectedRepairPatchRejection(args: {
+  objectiveStore: ObjectiveStore
+  binding: ObjectiveSnapshotBinding
+  activeRevisionId: string
+}): string | undefined {
+  try {
+    const latest = args.objectiveStore
+      .listPlanPatches(args.binding.enrollment.watcherId)
+      .filter((patch) => patch.revisionId === args.activeRevisionId && patch.status === 'rejected')
+      .sort((left, right) => right.repairOrdinal - left.repairOrdinal)[0]
+    if (!latest || latest.rejection === null || latest.rejection === 'plan-review-revise') {
+      return undefined
+    }
+    return latest.rejection
+  } catch {
+    return undefined
+  }
+}
+
 /** The first declared gate (if any) with a completed, failing attempt at the dispatch's content identity. */
 function deriveGateFailureContext(args: {
   binding: ObjectiveSnapshotBinding
@@ -188,11 +212,24 @@ export async function deriveObjectiveFailureContext(args: {
     objectiveStore: args.objectiveStore,
     contentIdentity: args.action.contentIdentity
   })
-  if (nodeFailure === undefined && gateFailure === undefined) {
+  const previousRepairRejection =
+    args.activeRevisionId === undefined
+      ? undefined
+      : latestRejectedRepairPatchRejection({
+          objectiveStore: args.objectiveStore,
+          binding: args.binding,
+          activeRevisionId: args.activeRevisionId
+        })
+  if (
+    nodeFailure === undefined &&
+    gateFailure === undefined &&
+    previousRepairRejection === undefined
+  ) {
     return undefined
   }
   return {
     ...nodeFailure,
-    ...(gateFailure === undefined ? {} : { gateFailure })
+    ...(gateFailure === undefined ? {} : { gateFailure }),
+    ...(previousRepairRejection === undefined ? {} : { previousRepairRejection })
   }
 }

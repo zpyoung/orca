@@ -57,6 +57,8 @@ export type ObjectiveFailureContext = {
     stdoutTail: string | null
     stderrTail: string | null
   }
+  /** A prior repair patch's rejection text, for a rejection other than a plan-review `revise`. */
+  previousRepairRejection?: string
 }
 
 export type ObjectiveConflictContext = {
@@ -257,7 +259,14 @@ function failureContextSection(input: ObjectiveRolePromptInput): string[] {
   if (input.role !== 'planner' || !input.failureContext) {
     return []
   }
-  const { taskKey, failureClass, narrative, failingCriteria, gateFailure } = input.failureContext
+  const {
+    taskKey,
+    failureClass,
+    narrative,
+    failingCriteria,
+    gateFailure,
+    previousRepairRejection
+  } = input.failureContext
   const sections: string[] = []
   if (taskKey !== undefined && narrative !== undefined) {
     const lines = [
@@ -282,6 +291,9 @@ function failureContextSection(input: ObjectiveRolePromptInput): string[] {
         `STDERR TAIL:\n${gateFailure.stderrTail ?? '(none)'}`
       ].join('\n')
     )
+  }
+  if (previousRepairRejection !== undefined) {
+    sections.push(`PREVIOUS REPAIR REJECTED:\n${previousRepairRejection}`)
   }
   return sections
 }
