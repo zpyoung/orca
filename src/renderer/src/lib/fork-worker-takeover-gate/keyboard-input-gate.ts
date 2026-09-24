@@ -14,6 +14,14 @@ export function primeTerminalUserInputKeyboardGate(terminal: Terminal): void {
     return
   }
 
+  // test doubles without a real xterm shape must be tolerated, not crash the caller
+  if (typeof terminal.onKey !== 'function') {
+    return
+  }
+  if (terminal.element && typeof terminal.element.addEventListener !== 'function') {
+    return
+  }
+
   const gate: TerminalKeyboardInputGate = { event: null }
   keyboardInputGates.set(terminal, gate)
 
