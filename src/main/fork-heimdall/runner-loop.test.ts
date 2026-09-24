@@ -93,6 +93,46 @@ describe('lease-refused status', () => {
       }
     })
   })
+
+  it('resyncs the runner enrollment on lease-refused so a regained lease takes the disabled path', async () => {
+    let leaseHeld = false
+    const world = await harness({
+      lease: (): LeaseResult =>
+        leaseHeld
+          ? {
+              status: 'held',
+              epoch: 1,
+              guard: {
+                epoch: 1,
+                holder: 'test-holder',
+                assertHeld: async () => {},
+                renewLoop: () => ({ dispose: () => {} })
+              }
+            }
+          : { status: 'refused', reason: 'held-by-other', holder: 'other-host', epoch: 7 }
+    })
+    const decide = vi.fn(() => ({ action: action('revision-1') }))
+    world.service.registerKind(kind({ decide }))
+    const result = await world.service.enroll(enrollmentInput())
+    if (result.status !== 'enrolled') {
+      throw new Error('expected enrollment')
+    }
+    const watcherId = result.entry.enrollment.watcherId
+
+    // another owner disables the watcher directly in the store while this runner still
+    // holds the pre-disable (enabled) enrollment in memory, and the lease is held elsewhere
+    world.enrollmentStore.setEnabled(watcherId, false)
+    await world.service.reconcileForTesting(watcherId)
+
+    leaseHeld = true
+    await world.service.reconcileForTesting(watcherId)
+
+    expect(decide).not.toHaveBeenCalled()
+    expect((await world.service.list())[0]).toMatchObject({
+      enrollment: { enabled: false },
+      status: { state: 'disabled' }
+    })
+  })
 })
 
 describe('gate-hold pacing', () => {
