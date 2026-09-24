@@ -413,13 +413,10 @@ export async function prepareObjectiveDispatchWorkspace(args: {
   })
   await args.context.lease.assertHeld()
   if (created.worktree.git?.head !== baseCommit && created.worktree.head !== baseCommit) {
-    await args.runtime.removeManagedWorktree(
-      `id:${created.worktree.id}`,
-      true,
-      false,
-      false,
-      args.binding.enrollment.executionHostId
-    )
+    await args.runtime.removeManagedWorktree(`id:${created.worktree.id}`, {
+      force: true,
+      hostId: args.binding.enrollment.executionHostId
+    })
     throw new Error('Dispatch worktree did not start at the enrolled branch HEAD')
   }
   const ready: ObjectiveDispatchRecord = {

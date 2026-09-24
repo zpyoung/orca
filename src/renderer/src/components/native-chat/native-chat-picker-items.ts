@@ -18,13 +18,18 @@ export type NativeChatPickerItem =
       kind: 'command'
       id: string
       name: string
+      /** Exactly what a pick inserts — the form the agent invokes. */
+      token: string
       description?: string
+      /** How the provider says the command is invoked, e.g. `<objective>`. */
+      argumentHint?: string
       skillCollision: boolean
     }
   | {
       kind: 'skill'
       id: string
       name: string
+      token: string
       description: string | null
       /** Owning plugin, when a single plugin owns every source behind this row. */
       pluginName?: string
@@ -49,10 +54,13 @@ export function buildNativeChatPickerItems(
   commands: readonly SlashCommandSuggestion[],
   skills: readonly DiscoveredSkill[],
   query: string,
-  prefix: '/' | '$',
+  skillSigil: '/' | '$',
   sessionSkillNames?: readonly string[],
   namespacePluginSkills = false
 ): NativeChatPickerItem[] {
+  // A name can only collide when both kinds invoke through the same sigil;
+  // where skills carry their own, `/review` and `$review` are distinct entries.
+  const sharedSigil = skillSigil === '/'
   const unclassifiedNames = new Set(
     commands.filter((command) => command.kindUnspecified).map((command) => command.name)
   )
@@ -60,11 +68,12 @@ export function buildNativeChatPickerItems(
     skills,
     sessionSkillNames,
     unclassifiedNames,
+    skillSigil,
     namespacePluginSkills
   )
   const skillNames = new Set(mergedSkills.map((skill) => skill.name))
   const resolvedCommands = commands.filter(
-    (command) => !(command.kindUnspecified && skillNames.has(command.name))
+    (command) => !(sharedSigil && command.kindUnspecified && skillNames.has(command.name))
   )
   const commandNames = new Set(resolvedCommands.map((command) => command.name))
   const commandItems = rankItems(
@@ -75,8 +84,12 @@ export function buildNativeChatPickerItems(
         // it is inserted verbatim; only untrusted skill text gets sanitized.
         id: `command:${command.name}`,
         name: command.name,
+        token: `/${command.name}`,
         description: command.description ? sanitizePickerText(command.description, 240) : undefined,
-        skillCollision: prefix === '/' && skillNames.has(command.name)
+        argumentHint: command.argumentHint
+          ? sanitizePickerText(command.argumentHint, 80)
+          : undefined,
+        skillCollision: sharedSigil && skillNames.has(command.name)
       },
       stableOrder: index
     })),
@@ -84,7 +97,7 @@ export function buildNativeChatPickerItems(
   )
   const skillItems = rankItems(
     mergedSkills
-      .filter((skill) => !(prefix === '/' && commandNames.has(skill.name)))
+      .filter((skill) => !(sharedSigil && commandNames.has(skill.name)))
       .map((item, index) => ({ item, stableOrder: index })),
     query
   )
@@ -98,6 +111,7 @@ function mergeNativeChatSkills(
   skills: readonly DiscoveredSkill[],
   sessionSkillNames: readonly string[] | undefined,
   unclassifiedNames: ReadonlySet<string>,
+  skillSigil: '/' | '$',
   namespacePluginSkills: boolean
 ): Extract<NativeChatPickerItem, { kind: 'skill' }>[] {
   const exactPaths = new Map<string, DiscoveredSkill>()
@@ -128,7 +142,7 @@ function mergeNativeChatSkills(
         ]
       : [...byName.keys()]
   return [...new Set(names)]
-    .flatMap((name) => pickerSkills(name, byName.get(name) ?? [], namespacePluginSkills))
+    .flatMap((name) => pickerSkills(name, byName.get(name) ?? [], skillSigil, namespacePluginSkills))
     .sort(comparePickerSkills)
 }
 
@@ -138,10 +152,11 @@ function mergeNativeChatSkills(
 function pickerSkills(
   name: string,
   namedSkills: readonly DiscoveredSkill[],
+  skillSigil: '/' | '$',
   namespacePluginSkills: boolean
 ): Extract<NativeChatPickerItem, { kind: 'skill' }>[] {
   if (!namespacePluginSkills) {
-    return [pickerSkill(name, namedSkills)]
+    return [pickerSkill(name, namedSkills, skillSigil)]
   }
   const byToken = new Map<string, DiscoveredSkill[]>()
   for (const skill of namedSkills) {
@@ -150,14 +165,15 @@ function pickerSkills(
     byToken.set(token, [...(byToken.get(token) ?? []), skill])
   }
   if (byToken.size === 0) {
-    return [pickerSkill(name, [])]
+    return [pickerSkill(name, [], skillSigil)]
   }
-  return [...byToken.entries()].map(([token, group]) => pickerSkill(token, group))
+  return [...byToken.entries()].map(([token, group]) => pickerSkill(token, group, skillSigil))
 }
 
 function pickerSkill(
   name: string,
-  namedSkills: readonly DiscoveredSkill[]
+  namedSkills: readonly DiscoveredSkill[],
+  skillSigil: '/' | '$'
 ): Extract<NativeChatPickerItem, { kind: 'skill' }> {
   const sorted = [...namedSkills].sort(compareDiscoveredSkills)
   const sources = sorted.map((skill) => {
@@ -173,6 +189,7 @@ function pickerSkill(
     kind: 'skill' as const,
     id: `skill:${name}`,
     name,
+    token: `${skillSigil}${name}`,
     description: sorted[0]?.description ? sanitizePickerText(sorted[0].description, 240) : null,
     ...(pluginNames.length === 1 ? { pluginName: pluginNames[0] } : {}),
     sources
@@ -299,23 +316,27 @@ function comparePickerSkills(
   )
 }
 
+// `/` is the composer's only trigger, for every agent. A draft-leading slash is
+// the one that can dispatch; elsewhere the token starts after whitespace and its
+// query stops at the next `/` so file paths stay prose.
+export const LEADING_SLASH_TRIGGER = /^\/(\S*)$/
+export const MID_PROMPT_SLASH_TRIGGER = /\s\/([^\s/]*)$/
+
+/** Replaces the typed `/token` with the item's own token, which for a skill is
+ *  the agent-native form even though every agent is typed the same way. */
 export function applyPickerSuggestion(
   draft: string,
   caret: number,
-  item: NativeChatPickerItem,
-  prefix: '/' | '$'
+  item: NativeChatPickerItem
 ): { draft: string; caret: number; insertedToken: string } {
   const before = draft.slice(0, caret)
   const after = draft.slice(caret)
-  // Why: this fork's composer offers the slash picker mid-draft, not only on a
-  // draft that starts with it, so the token is matched after any whitespace.
-  const match = before.match(prefix === '/' ? /(^|\s)\/(\S*)$/ : /(^|\s)\$(\S*)$/)
+  const match = before.match(LEADING_SLASH_TRIGGER) ?? before.match(MID_PROMPT_SLASH_TRIGGER)
   if (!match) {
     return { draft, caret, insertedToken: '' }
   }
   const query = match.at(-1) ?? ''
   const tokenStart = before.length - query.length - 1
-  const insertedToken = `${prefix}${item.name}`
-  const nextBefore = `${before.slice(0, tokenStart)}${insertedToken} `
-  return { draft: nextBefore + after, caret: nextBefore.length, insertedToken }
+  const nextBefore = `${before.slice(0, tokenStart)}${item.token} `
+  return { draft: nextBefore + after, caret: nextBefore.length, insertedToken: item.token }
 }

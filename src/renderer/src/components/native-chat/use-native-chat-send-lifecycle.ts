@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
-import type { NativeChatSendHandle } from './native-chat-runtime-send'
+import { invalidateNativeChatPtySends, type NativeChatSendHandle } from './native-chat-runtime-send'
+import { subscribeTerminalInputQuarantine } from '../terminal-pane/terminal-input-quarantine'
 
 export type NativeChatSendLifecycle = {
   cancelPendingSends: () => void
@@ -56,6 +57,20 @@ export function useNativeChatSendLifecycle(
       pendingSendHandlesRef.current.delete(handle)
     }, handle.settleAfterMs)
   }, [])
+
+  // Quarantine can arm without a PTY prop change. Invalidate synchronously so
+  // a delayed Enter cannot beat the parent canSend rerender; unlike ordinary
+  // cancellation this never sends cleanup bytes into the replacement shell.
+  useLayoutEffect(
+    () =>
+      subscribeTerminalInputQuarantine(terminalTabId, (armed) => {
+        if (armed && targetPtyId) {
+          invalidateNativeChatPtySends(targetPtyId)
+          cancelPendingSends()
+        }
+      }),
+    [cancelPendingSends, targetPtyId, terminalTabId]
+  )
 
   // Why: delayed Enter/image writes belong to the exact PTY target. A pane
   // swap or unmount must cancel them before that PTY can close or be reused.

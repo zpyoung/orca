@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ARTIFACT_PASSWORD_METHODS } from './artifact-password-methods'
 import { DESKTOP_RENDERER_CLIENT_ID } from './artifact-password-local-caller'
-import { WriteRequest } from '../artifacts'
+import { WriteRequest } from '../../../../../shared/rpc-contract/artifacts-params'
 
 const validRequest = {
   sourceKey: '/repo/report.html',
@@ -57,11 +57,11 @@ describe('artifact password RPC methods', () => {
                 fileName: 'report.html'
               }
         expect(() =>
-          method.handler(
-            params,
-            { runtime, clientKind, clientId: 'paired-device-token' } as never,
-            (() => {}) as never
-          )
+          method.handler(params as never, {
+            runtime,
+            clientKind,
+            clientId: 'paired-device-token'
+          } as never)
         ).toThrow(/local Orca desktop and CLI/)
       }
       expect(runtime.getPublishedArtifactLink).not.toHaveBeenCalled()
@@ -106,7 +106,7 @@ describe('artifact password RPC methods', () => {
                 fileName: 'report.html'
               }
         expect(() =>
-          method.handler(params, { runtime, ...caller } as never, (() => {}) as never)
+          method.handler(params as never, { runtime, ...caller } as never)
         ).not.toThrow()
       }
     }

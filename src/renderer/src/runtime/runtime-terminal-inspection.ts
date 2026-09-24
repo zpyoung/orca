@@ -340,16 +340,23 @@ export async function sendRuntimePtyInputAcceptance(
 export async function sendRuntimePtyInputVerified(
   settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
   ptyId: string,
-  data: string
+  data: string,
+  isCancelled?: () => boolean
 ): Promise<boolean> {
   const tooLarge = isRuntimePtyInputTooLarge(data)
   if (typeof tooLarge === 'boolean' ? tooLarge : await tooLarge) {
+    return false
+  }
+  if (isCancelled?.()) {
     return false
   }
   const { target, terminal } = resolveRuntimeSendTarget(settings, ptyId)
   if (target.kind !== 'environment' || !terminal) {
     const accepted = await window.api.pty.writeAccepted(ptyId, data)
     if (!accepted) {
+      if (isCancelled?.()) {
+        return false
+      }
       window.api.pty.write(ptyId, data)
       // Why: SSH/local fallback writes are fire-and-forget. Callers use this
       // boolean to continue UX flow, while hook telemetry confirms real turns.

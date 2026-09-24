@@ -8,6 +8,7 @@ import {
   realpathMock,
   getStatusMock,
   abortMergeMock,
+  getDiffMock,
   abortRebaseMock,
   stageFileMock,
   bulkStageFilesMock,
@@ -340,6 +341,95 @@ describe('registerFilesystemHandlers', () => {
 
     await handlers.get('git:cancelStatus')!(secondEvent, { requestToken: 'status-1' })
     await expect(secondRequest).rejects.toThrow('aborted')
+  })
+
+  it('aborts tokenized diff work without crossing renderer boundaries', async () => {
+    registerWorktreeRootsForRepo(store as never, 'repo-1', [REPO_PATH, WORKTREE_FEATURE_PATH])
+    const signals = new Map<string, AbortSignal>()
+    const cancellableDiff = (
+      worktreePath: string,
+      _filePath: string,
+      _staged: boolean,
+      _compareAgainstHead: boolean | undefined,
+      options?: { signal?: AbortSignal }
+    ) => {
+      const pending = Promise.withResolvers<never>()
+      if (options?.signal) {
+        signals.set(worktreePath, options.signal)
+        options.signal.addEventListener('abort', () => pending.reject(new Error('aborted')), {
+          once: true
+        })
+      }
+      return pending.promise
+    }
+    getDiffMock.mockImplementation(cancellableDiff)
+    const sshProvider = { getDiff: vi.fn(cancellableDiff) }
+    getSshGitProviderMock.mockReturnValue(sshProvider)
+    registerFilesystemHandlers(store as never)
+
+    const firstEvent = { sender: { id: 7 } }
+    const secondEvent = { sender: { id: 8 } }
+    const firstRequest = Promise.resolve(
+      handlers.get('git:diff')!(firstEvent, {
+        worktreePath: WORKTREE_FEATURE_PATH,
+        filePath: 'src/file.ts',
+        staged: false,
+        requestToken: 'diff-1'
+      })
+    )
+    const secondRequest = Promise.resolve(
+      handlers.get('git:diff')!(secondEvent, {
+        worktreePath: '/remote/repo',
+        filePath: 'src/file.ts',
+        staged: false,
+        connectionId: 'ssh-1',
+        requestToken: 'diff-1'
+      })
+    )
+    await vi.waitFor(() => expect(signals.size).toBe(2))
+
+    await handlers.get('git:cancelDiff')!(firstEvent, { requestToken: 'diff-1' })
+    expect(signals.get(WORKTREE_FEATURE_PATH)?.aborted).toBe(true)
+    expect(signals.get('/remote/repo')?.aborted).toBe(false)
+    await expect(firstRequest).rejects.toThrow('aborted')
+
+    await handlers.get('git:cancelDiff')!(secondEvent, { requestToken: 'diff-1' })
+    await expect(secondRequest).rejects.toThrow('aborted')
+  })
+
+  it('removes a diff cancellation token after the request settles', async () => {
+    registerWorktreeRootsForRepo(store as never, 'repo-1', [REPO_PATH, WORKTREE_FEATURE_PATH])
+    let settledSignal: AbortSignal | undefined
+    getDiffMock.mockImplementation(
+      async (
+        _worktreePath: string,
+        _filePath: string,
+        _staged: boolean,
+        _compareAgainstHead: boolean | undefined,
+        options?: { signal?: AbortSignal }
+      ) => {
+        settledSignal = options?.signal
+        return {
+          kind: 'text',
+          originalContent: '',
+          modifiedContent: 'changed',
+          originalIsBinary: false,
+          modifiedIsBinary: false
+        }
+      }
+    )
+    registerFilesystemHandlers(store as never)
+    const event = { sender: { id: 7 } }
+
+    await handlers.get('git:diff')!(event, {
+      worktreePath: WORKTREE_FEATURE_PATH,
+      filePath: 'src/file.ts',
+      staged: false,
+      requestToken: 'diff-1'
+    })
+    await handlers.get('git:cancelDiff')!(event, { requestToken: 'diff-1' })
+
+    expect(settledSignal?.aborted).toBe(false)
   })
 
   it('checks ignored paths through local and SSH git providers', async () => {

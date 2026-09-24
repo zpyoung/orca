@@ -4,7 +4,7 @@ import { resolveWorktreeHostPath } from '../../../shared/git-metadata-path'
 import { stableInFlightKey } from '../../../shared/in-flight-promise-dedupe'
 import type { GitRuntimeOptions } from '../git-runtime-options'
 import { gitRuntimeOptionsKey } from './git-runtime-options-cache-key'
-import { gitDiffReadDedupe, settledDiffCache } from './git-read-cache-invalidation'
+import { fileDiffReadLeaseOwner, settledDiffCache } from './git-read-cache-invalidation'
 import { readWorktreeDiffStamp } from './worktree-diff-stamp'
 import { buildDiffResult } from './diff-result'
 import {
@@ -44,17 +44,11 @@ export async function getDiff(
     compareAgainstHead,
     ...gitRuntimeOptionsKey(options)
   ])
-  // Why: register the dedupe synchronously (before any await) so concurrent identical reads
-  // coalesce — including on the settled-cache lookup, which is itself I/O.
-  return gitDiffReadDedupe.run(readKey, () =>
-    loadDiffThroughSettledCache(
-      readKey,
-      worktreePath,
-      filePath,
-      staged,
-      compareAgainstHead,
-      options
-    )
+  return fileDiffReadLeaseOwner.lease(readKey, options.signal, (sharedSignal) =>
+    loadDiffThroughSettledCache(readKey, worktreePath, filePath, staged, compareAgainstHead, {
+      ...options,
+      ...(options.signal ? { signal: sharedSignal } : {})
+    })
   )
 }
 
@@ -79,6 +73,7 @@ async function loadDiffThroughSettledCache(
   const readGeneration = settledDiffCache.beginRead()
   // A staged diff compares HEAD to the index, so the working tree is not one of its inputs.
   const stamp = await readWorktreeDiffStamp(worktreePath, filePath, !staged, options)
+  options.signal?.throwIfAborted()
   const cached = settledDiffCache.get(readKey, stamp)
   if (cached) {
     return cached
@@ -194,6 +189,7 @@ async function loadDiff(
     }
   } catch {
     // Fallback
+    options.signal?.throwIfAborted()
     readFailed = true
   }
 

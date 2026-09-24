@@ -1,10 +1,16 @@
 import { translate } from '@/i18n/i18n'
 import { isRemoteRuntimePtyId } from '@/runtime/runtime-terminal-inspection'
-import type { getSettingsForAgentTabRuntimeOwner } from '@/lib/agent-paste-draft'
+import type { GlobalSettings } from '../../../../shared/global-settings-types'
+
+export type NativeChatRuntimeSettings =
+  | Pick<GlobalSettings, 'activeRuntimeEnvironmentId'>
+  | null
+  | undefined
 
 export type NativeChatResolvedTarget = {
+  terminalTabId: string
   ptyId: string
-  settings: ReturnType<typeof getSettingsForAgentTabRuntimeOwner>
+  settings: NativeChatRuntimeSettings
 }
 
 /** Upper bound for clipboard text pulled into the composer via Cmd/Ctrl+V, so a
@@ -28,7 +34,4 @@ export function nativeChatComposerTargetIsRemote(ptyId: string | null): boolean 
   return ptyId !== null && isRemoteRuntimePtyId(ptyId)
 }
 
-export function formatNativeChatFileReference(filePath: string): string {
-  const escaped = filePath.replace(/"/g, '\\"')
-  return /\s/.test(filePath) ? `@"${escaped}"` : `@${filePath}`
-}
+export { formatNativeChatFileReference } from '../../../../shared/agent-image-paste'

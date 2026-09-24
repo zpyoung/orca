@@ -50,7 +50,7 @@ describe('orca heimdall CLI registration', () => {
       throw new Error('Missing heimdall debug spec')
     }
 
-    expect(isCommandGroup(['heimdall'])).toBe(true)
+    expect(isCommandGroup(COMMAND_SPECS, ['heimdall'])).toBe(true)
     expect(HANDLER_COMMAND_KEYS.has('heimdall debug')).toBe(true)
     expect(HANDLER_COMMAND_KEYS.has('heimdall set-concurrency')).toBe(true)
     expect(effectiveAllowedFlags(debugSpec)).not.toContain('page')

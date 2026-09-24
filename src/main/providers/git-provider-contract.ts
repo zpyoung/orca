@@ -34,7 +34,8 @@ export type IGitProvider = {
     worktreePath: string,
     filePath: string,
     staged: boolean,
-    compareAgainstHead?: boolean
+    compareAgainstHead?: boolean,
+    options?: { signal?: AbortSignal }
   ): Promise<GitDiffResult>
   stageFile(worktreePath: string, filePath: string): Promise<void>
   unstageFile(worktreePath: string, filePath: string): Promise<void>

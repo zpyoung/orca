@@ -10,13 +10,11 @@ import {
 import { agentSessionPtyWriteGate } from './agent-session-pty-write-gate'
 import {
   AGENT_PROMPT_SUBMIT,
+  agentPromptSubmitJoinsPasteFrame,
   getAgentPromptSubmitDelayMs,
   getTerminalPasteIngestMs
 } from '../../shared/agent-prompt-injection'
-import type {
-  AgentPromptActivity,
-  AgentPromptWaitTextCache
-} from './agent-prompt-submission-verification'
+import type { AgentPromptWaitTextCache } from './agent-prompt-submission-verification'
 import {
   isTerminalSendSettlementAgent,
   resolveAgentPromptEffectTimeoutMs,
@@ -36,43 +34,38 @@ export class OrcaRuntimeWithWriteTerminalAgentPrompt extends OrcaRuntimeWithReso
     const permissionBaseline = this.getAgentPromptActivity(handle, ptyId)
     this.assertAgentPromptPermissionSafe(permissionBaseline, permissionBaseline)
     const admitted = agentSessionPtyWriteGate.assertAdmitted(ptyId)
-    const ptyAgent = this.getPtyAgent(ptyId)
-    const atomicOmpSubmit = ptyAgent === 'omp'
-    const writeHostPlatform = atomicOmpSubmit ? null : this.getPtyWriteHostPlatform(ptyId)
+    const writeHostPlatform = this.getPtyWriteHostPlatform(ptyId)
+    const pty = this.ptysById.get(ptyId)
+    // OMP treats a large bracketed paste as a menu unless submit arrives in the same PTY write.
+    // Once a foreground agent is known, it is the process that will consume the bytes;
+    // launchAgent is only the fallback during startup before process detection settles.
+    // launchedAgent covers OMP under Bun, whose foreground name is unrecognized after launch authority retires.
+    const submitWithPaste = agentPromptSubmitJoinsPasteFrame(
+      pty?.foregroundAgent ?? pty?.launchAgent ?? pty?.launchedAgent
+    )
     const pasteByteLength = Buffer.byteLength(pastePayload, 'utf8')
-    const renderGate = atomicOmpSubmit
-      ? null
-      : this.createAgentPromptRenderGate(
-          ptyId,
-          getTerminalPasteIngestMs(writeHostPlatform!, pasteByteLength)
-        )
+    const pasteIngestMs = getTerminalPasteIngestMs(writeHostPlatform, pasteByteLength)
+    const renderGate = this.createAgentPromptRenderGate(ptyId, pasteIngestMs)
     const waitTextCache: AgentPromptWaitTextCache = {}
-    let baseline: AgentPromptActivity
+    const preSubmitBaseline = submitWithPaste
+      ? this.getAgentPromptActivity(handle, ptyId, waitTextCache)
+      : undefined
     try {
       assertAgentPromptRequestActive(options.signal)
       this.assertAgentPromptGeneration(ptyId, generation)
       await options.beforeWrite?.(ptyId)
       assertAgentPromptRequestActive(options.signal)
       this.assertAgentPromptGeneration(ptyId, generation)
-      const activityBeforeWrite = this.getAgentPromptActivity(
-        handle,
-        ptyId,
-        atomicOmpSubmit ? waitTextCache : undefined
+      this.assertAgentPromptPermissionSafe(
+        permissionBaseline,
+        this.getAgentPromptActivity(handle, ptyId)
       )
-      this.assertAgentPromptPermissionSafe(permissionBaseline, activityBeforeWrite)
       agentSessionPtyWriteGate.assertReadmitted(ptyId, admitted)
-      if (atomicOmpSubmit) {
-        // OMP recognizes a trailing submit only when it arrives with the completed
-        // bracketed paste. A delayed bare CR instead selects its large-paste menu.
-        baseline = activityBeforeWrite
-      }
       // Keep the bracketed paste frame in one PTY write; Claude's composer can drop the
-      // beginning when a large frame is split into independently processed chunks. OMP
-      // additionally needs its one submit byte appended to that complete frame.
+      // beginning when a large frame is split into independently processed chunks.
       renderGate?.arm()
-      // Template folding can emit a literal CR, which JavaScript normalizes to LF.
-      const writePayload = atomicOmpSubmit ? pastePayload + AGENT_PROMPT_SUBMIT : pastePayload
-      if (!this.ptyController?.write(ptyId, writePayload)) {
+      const initialWrite = submitWithPaste ? pastePayload + AGENT_PROMPT_SUBMIT : pastePayload
+      if (!this.ptyController?.write(ptyId, initialWrite)) {
         throw new Error('terminal_not_writable')
       }
     } catch (error) {
@@ -80,22 +73,25 @@ export class OrcaRuntimeWithWriteTerminalAgentPrompt extends OrcaRuntimeWithReso
       throw error
     }
 
-    if (!atomicOmpSubmit) {
-      if (renderGate) {
-        try {
-          await waitForAgentPromptPromise(renderGate.wait(), options.signal)
-        } finally {
-          renderGate.dispose()
-        }
-      } else {
-        await waitForAgentPromptDelay(
-          getAgentPromptSubmitDelayMs(writeHostPlatform!, pasteByteLength),
-          options.signal
-        )
+    if (submitWithPaste) {
+      // The Enter was part of the paste frame; waiting here would only delay receipt settlement.
+      renderGate?.dispose()
+    } else if (renderGate) {
+      try {
+        await waitForAgentPromptPromise(renderGate.wait(), options.signal)
+      } finally {
+        renderGate.dispose()
       }
-      assertAgentPromptRequestActive(options.signal)
-      this.assertAgentPromptGeneration(ptyId, generation)
-      agentSessionPtyWriteGate.assertReadmitted(ptyId, admitted)
+    } else {
+      await waitForAgentPromptDelay(
+        getAgentPromptSubmitDelayMs(writeHostPlatform, pasteByteLength),
+        options.signal
+      )
+    }
+    assertAgentPromptRequestActive(options.signal)
+    this.assertAgentPromptGeneration(ptyId, generation)
+    agentSessionPtyWriteGate.assertReadmitted(ptyId, admitted)
+    if (!submitWithPaste) {
       try {
         await options.beforeWrite?.(ptyId)
       } catch (error) {
@@ -106,9 +102,11 @@ export class OrcaRuntimeWithWriteTerminalAgentPrompt extends OrcaRuntimeWithReso
       }
       assertAgentPromptRequestActive(options.signal)
       this.assertAgentPromptGeneration(ptyId, generation)
-      baseline = this.getAgentPromptActivity(handle, ptyId, waitTextCache)
-      this.assertAgentPromptPermissionSafe(permissionBaseline, baseline)
-      agentSessionPtyWriteGate.assertReadmitted(ptyId, admitted)
+    }
+    const baseline = preSubmitBaseline ?? this.getAgentPromptActivity(handle, ptyId, waitTextCache)
+    this.assertAgentPromptPermissionSafe(permissionBaseline, baseline)
+    agentSessionPtyWriteGate.assertReadmitted(ptyId, admitted)
+    if (!submitWithPaste) {
       if (!this.ptyController?.write(ptyId, AGENT_PROMPT_SUBMIT)) {
         throw new Error(options.suffixFailureError ?? 'terminal_not_writable')
       }
@@ -145,7 +143,7 @@ export class OrcaRuntimeWithWriteTerminalAgentPrompt extends OrcaRuntimeWithReso
     const checkpoint: RuntimeTerminalSend = {
       handle,
       accepted: true,
-      bytesWritten: pasteByteLength + 1,
+      bytesWritten: Buffer.byteLength(pastePayload, 'utf8') + 1,
       prompt: inputAccepted
     }
     options.onInputAccepted?.(checkpoint)

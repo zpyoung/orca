@@ -1,6 +1,6 @@
 // FORK-COPY-OF: src/renderer/src/lib/fix-checks-agent-launch.ts
 // FORK-COPY-SHA: 494e45f9c1f2fde90b4aaf5d04ae4296c36a338e
-// Upstream comparison baseline 9aa0f7e77d366c23a3cc8de2da32ae550d397dc0. Kept fork-owned so manual
+// Upstream comparison baseline 1457d3966cf7b4165d17b18c57668d1e829f7674. Kept fork-owned so manual
 // checks fixes share the PR Sitter's main-process policy launch without adding an upstream logic block.
 import { toast } from 'sonner'
 import { getConnectionId } from '@/lib/connection-context'
@@ -236,9 +236,7 @@ export async function startFixChecksAgent(args: StartFixChecksAgentArgs): Promis
       toast.error(agentArgsPlan.error)
       return false
     }
-    if (!revealTargetWorkspace()) {
-      return false
-    }
+    let revealFailed = false
     const result = launchAgentInNewTab({
       agent,
       worktreeId: targetWorktreeId,
@@ -251,19 +249,25 @@ export async function startFixChecksAgent(args: StartFixChecksAgentArgs): Promis
       agentArgs: recipe.agentArgs,
       promptDelivery: 'submit-after-ready',
       launchPlatform,
-      launchSource: args.launchSource
+      launchSource: args.launchSource,
+      beforeSurfaceOpen: () => {
+        revealFailed = !revealTargetWorkspace()
+        return !revealFailed
+      }
     })
     if (!result) {
-      toast.error(
-        translate(
-          'auto.lib.fix.checks.agent.launch.fb6c294e85',
-          'Could not build the agent launch command.'
+      if (!revealFailed) {
+        toast.error(
+          translate(
+            'auto.lib.fix.checks.agent.launch.fb6c294e85',
+            'Could not build the agent launch command.'
+          )
         )
-      )
+      }
       return false
     }
-    if (result.tabId) {
-      focusTerminalTabSurface(result.tabId)
+    if (result.surface.kind === 'local-terminal') {
+      focusTerminalTabSurface(result.surface.tabId)
     }
     return true
   }

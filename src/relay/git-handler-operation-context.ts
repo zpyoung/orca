@@ -1,5 +1,6 @@
 import type { RequestContext } from './dispatcher'
 import type { InFlightPromiseDedupe } from '../shared/in-flight-promise-dedupe'
+import type { GitStatusReadLeaseOwner } from '../shared/git-status-read-lease-owner'
 import type { GitCapabilityCache } from '../shared/git-capability-cache'
 import type { SubmodulePathsCache } from './git-handler-submodule-ops'
 import type { RelayFilesystemWatchRegistry } from './relay-filesystem-watch-registry'
@@ -21,6 +22,7 @@ export type GitHandlerWatcherRegistry = Pick<RelayFilesystemWatchRegistry, 'runW
 
 export type GitHandlerOperationHost = {
   readonly gitDiffReadDedupe: InFlightPromiseDedupe<unknown>
+  readonly gitFileDiffReadLeaseOwner: GitStatusReadLeaseOwner<unknown>
   readonly gitCapabilities: GitCapabilityCache
   readonly submodulePathsCache: SubmodulePathsCache
   readonly watcherRegistry: GitHandlerWatcherRegistry | undefined
@@ -29,7 +31,7 @@ export type GitHandlerOperationHost = {
     cwd: string,
     opts?: GitHandlerCommandOptions
   ): Promise<GitHandlerCommandResult>
-  gitBuffer(args: string[], cwd: string): Promise<Buffer>
+  gitBuffer(args: string[], cwd: string, opts?: { signal?: AbortSignal }): Promise<Buffer>
   spawnClone(
     args: string[],
     cwd: string,
@@ -52,6 +54,10 @@ export abstract class GitHandlerOperationContext {
     return this.host.gitDiffReadDedupe
   }
 
+  protected get gitFileDiffReadLeaseOwner(): GitStatusReadLeaseOwner<unknown> {
+    return this.host.gitFileDiffReadLeaseOwner
+  }
+
   protected get gitCapabilities(): GitCapabilityCache {
     return this.host.gitCapabilities
   }
@@ -72,8 +78,12 @@ export abstract class GitHandlerOperationContext {
     return this.host.git(args, cwd, opts)
   }
 
-  protected gitBuffer(args: string[], cwd: string): Promise<Buffer> {
-    return this.host.gitBuffer(args, cwd)
+  protected gitBuffer(
+    args: string[],
+    cwd: string,
+    opts?: { signal?: AbortSignal }
+  ): Promise<Buffer> {
+    return this.host.gitBuffer(args, cwd, opts)
   }
 
   protected spawnClone(

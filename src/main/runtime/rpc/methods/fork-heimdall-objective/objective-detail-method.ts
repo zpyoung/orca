@@ -1,4 +1,4 @@
-import { defineMethod, type RpcAnyMethod } from '../../core'
+import { defineMethod } from '../../core'
 import { HEIMDALL_CHANNELS } from '../../../../../shared/fork-heimdall/api'
 import { WatcherTargetSchema } from '../../../../../shared/fork-heimdall/fleet-types'
 import { ObjectiveDetailSchema } from '../../../../../shared/fork-heimdall-objective/detail-types'
@@ -41,7 +41,7 @@ async function readRemoteObjectiveDetail(target: {
   return ObjectiveDetailReaderSchema.parse(response.result)
 }
 
-export const HEIMDALL_OBJECTIVE_METHODS: readonly RpcAnyMethod[] = [
+export const HEIMDALL_OBJECTIVE_METHODS = [
   defineMethod({
     name: HEIMDALL_CHANNELS.objectiveDetail,
     params: WatcherTargetSchema,

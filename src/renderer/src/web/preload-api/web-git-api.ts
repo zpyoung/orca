@@ -1,3 +1,4 @@
+import type { GitDiffResult } from '../../../../shared/git-diff-compare-types'
 import type { PreloadApi } from '../../../../preload/api-types'
 import { callAbortableRuntimeEnvironment } from '../../runtime/abortable-runtime-environment-call'
 import { toRuntimeWorktreeSelector } from '../../runtime/runtime-worktree-selector'
@@ -10,21 +11,31 @@ import {
 } from './web-runtime-worktree-catalog'
 
 export const webGitStatusAbortControllers = new Map<string, AbortController>()
+export const webGitDiffAbortControllers = new Map<string, AbortController>()
 
-export async function callAbortableRuntimeStatus<TResult>(
-  requestToken: string,
-  params: unknown
-): Promise<TResult> {
+/**
+ * Runs one token-scoped Git request over the subscription bridge so a later cancel aborts the
+ * host's work, and resolves the request's params only after the token is registered, so a cancel
+ * racing that resolution still finds the controller.
+ */
+async function callAbortableRuntimeGitRequest<TResult>(request: {
+  controllers: Map<string, AbortController>
+  method: string
+  requestToken: string
+  timeoutMs?: number
+  resolveParams: () => unknown
+}): Promise<TResult> {
+  const { controllers, method, requestToken } = request
   const environment = requireActiveEnvironment()
-  webGitStatusAbortControllers.get(requestToken)?.abort()
+  controllers.get(requestToken)?.abort()
   const controller = new AbortController()
-  webGitStatusAbortControllers.set(requestToken, controller)
+  controllers.set(requestToken, controller)
   try {
     const response = await callAbortableRuntimeEnvironment(
       environment.id,
-      'git.status',
-      params,
-      undefined,
+      method,
+      await request.resolveParams(),
+      request.timeoutMs,
       controller.signal
     )
     updateEnvironmentFromResponse(environment, response)
@@ -33,10 +44,22 @@ export async function callAbortableRuntimeStatus<TResult>(
     }
     return response.result as TResult
   } finally {
-    if (webGitStatusAbortControllers.get(requestToken) === controller) {
-      webGitStatusAbortControllers.delete(requestToken)
+    if (controllers.get(requestToken) === controller) {
+      controllers.delete(requestToken)
     }
   }
+}
+
+export async function callAbortableRuntimeStatus<TResult>(
+  requestToken: string,
+  params: unknown
+): Promise<TResult> {
+  return callAbortableRuntimeGitRequest<TResult>({
+    controllers: webGitStatusAbortControllers,
+    method: 'git.status',
+    requestToken,
+    resolveParams: () => params
+  })
 }
 
 export function createGitApi(): NonNullable<Partial<PreloadApi>['git']> {
@@ -113,14 +136,30 @@ export function createGitApi(): NonNullable<Partial<PreloadApi>['git']> {
         worktree: toRuntimeWorktreeSelector(worktree.id)
       })
     },
-    diff: async ({ worktreePath, filePath, staged, compareAgainstHead }) => {
-      const file = await resolveRuntimeFilePath(filePath, worktreePath)
-      return callRuntimeResult('git.diff', {
-        worktree: toRuntimeWorktreeSelector(file.worktree.id),
-        filePath: file.relativePath,
-        staged,
-        compareAgainstHead
+    diff: async ({ worktreePath, filePath, staged, compareAgainstHead, requestToken }) => {
+      const resolveParams = async (): Promise<Record<string, unknown>> => {
+        const file = await resolveRuntimeFilePath(filePath, worktreePath)
+        return {
+          worktree: toRuntimeWorktreeSelector(file.worktree.id),
+          filePath: file.relativePath,
+          staged,
+          compareAgainstHead
+        }
+      }
+      if (!requestToken) {
+        return callRuntimeResult('git.diff', await resolveParams())
+      }
+      return callAbortableRuntimeGitRequest<GitDiffResult>({
+        controllers: webGitDiffAbortControllers,
+        method: 'git.diff',
+        requestToken,
+        // Why: the subscription bridge has no deadline of its own; keep the pooled call's budget.
+        timeoutMs: 30_000,
+        resolveParams
       })
+    },
+    cancelDiff: async ({ requestToken }) => {
+      webGitDiffAbortControllers.get(requestToken)?.abort()
     },
     branchCompare: async ({ worktreePath, baseRef, admissionTier }) => {
       const worktree = await resolveRuntimeWorktreeByPath(worktreePath)

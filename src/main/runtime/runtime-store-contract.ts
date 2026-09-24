@@ -88,6 +88,7 @@ export type RuntimeStore = {
     terminalWindowsShell?: GlobalSettings['terminalWindowsShell']
     floatingTerminalEnabled?: GlobalSettings['floatingTerminalEnabled']
     agentStatusHooksEnabled?: GlobalSettings['agentStatusHooksEnabled']
+    terminalCopyTrimsGutter?: GlobalSettings['terminalCopyTrimsGutter']
     experimentalNativeChat?: GlobalSettings['experimentalNativeChat']
     openAgentTabsInChatByDefault?: GlobalSettings['openAgentTabsInChatByDefault']
     experimentalStructuredNativeChat?: GlobalSettings['experimentalStructuredNativeChat']
@@ -120,6 +121,7 @@ export type RuntimeStore = {
     hostSettingOverrides?: GlobalSettings['hostSettingOverrides']
     agentSkillSharingEnabled?: GlobalSettings['agentSkillSharingEnabled']
     nativeChatSessionOptions?: GlobalSettings['nativeChatSessionOptions']
+    aiVaultSearch?: GlobalSettings['aiVaultSearch']
   }
   // Why: narrow to `unknown` return so test mocks can return void without
   // a cast. The runtime never reads the return value — the persisted value

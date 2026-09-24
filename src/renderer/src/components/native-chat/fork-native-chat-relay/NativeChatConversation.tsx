@@ -7,6 +7,7 @@ import type { NativeChatLiveSession } from './use-native-chat-live-session'
  *  notice above it. Split out so the view file dispatches surfaces only. */
 export function NativeChatConversation({
   session,
+  isVisible,
   isWorking,
   fontScale,
   workingStartedAt,
@@ -17,6 +18,7 @@ export function NativeChatConversation({
   readError
 }: {
   session: NativeChatLiveSession
+  isVisible?: boolean
   isWorking: boolean
   fontScale: number
   workingStartedAt?: number | null
@@ -31,6 +33,7 @@ export function NativeChatConversation({
       {readError ? <NativeChatReadErrorNotice message={readError} /> : null}
       <NativeChatMessageList
         session={session}
+        isVisible={isVisible}
         isWorking={isWorking}
         expandSignal={false}
         fontScale={fontScale}

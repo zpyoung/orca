@@ -15,7 +15,7 @@ import type {
   WatcherListEntry,
   WatcherParkReason
 } from '../../../../../shared/fork-heimdall/watcher-types'
-import { isStreamingMethod, type RpcContext, type RpcMethod } from '../../core'
+import { eraseRpcMethods, isStreamingMethod, type RpcContext, type RpcMethod } from '../../core'
 import { HEIMDALL_METHODS } from './heimdall'
 import { bindHeimdallKernel, bindHeimdallTransport } from './kernel-binding'
 
@@ -86,7 +86,7 @@ function snapshot(parkReason: WatcherParkReason | null): HeimdallFleetSnapshot {
 }
 
 function method(name: string): RpcMethod {
-  const found = HEIMDALL_METHODS.find((candidate) => candidate.name === name)
+  const found = eraseRpcMethods(HEIMDALL_METHODS).find((candidate) => candidate.name === name)
   if (!found || isStreamingMethod(found)) {
     throw new Error(`Missing Heimdall RPC method ${name}`)
   }
@@ -223,7 +223,7 @@ describe('Heimdall watcher park reason capability gating', () => {
     Object.assign(runtime, {
       registerSubscriptionCleanup: (_id: string, cleanup: () => void) => cleanups.push(cleanup)
     })
-    const subscribeMethod = HEIMDALL_METHODS.find(
+    const subscribeMethod = eraseRpcMethods(HEIMDALL_METHODS).find(
       (candidate) => candidate.name === HEIMDALL_CHANNELS.subscribe && isStreamingMethod(candidate)
     )
     if (!subscribeMethod || !isStreamingMethod(subscribeMethod)) {

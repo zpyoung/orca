@@ -25,6 +25,10 @@ import {
   terminalTabHasUnreadActivity,
   type TerminalTabAttentionBadge
 } from '@/components/tab-bar/terminal-tab-activity-status'
+import {
+  selectTabHasPendingAsk,
+  selectWorktreeHasPendingAsk
+} from '@/components/fork-ask-question-tool/pending-ask-attention'
 import { translate } from '@/i18n/i18n'
 import type { LiveAgentWorktreeStatus } from '@/lib/worktree-activity-state'
 import {
@@ -203,10 +207,11 @@ export function PaletteWorktreeStatusDot({
   worktree: Pick<Worktree, 'id'>
 }): React.JSX.Element | null {
   const live = useLiveStatus()
+  const hasPendingAsk = useAppStore((s) => selectWorktreeHasPendingAsk(s, worktree.id))
   if (!live) {
     return null
   }
-  const status = getWorktreeStatus(
+  const heuristic = getWorktreeStatus(
     live.tabsByWorktree[worktree.id] ?? [],
     live.browserTabsByWorktree[worktree.id] ?? [],
     live.paneSources.ptyIdsByTabId,
@@ -218,6 +223,7 @@ export function PaletteWorktreeStatusDot({
       terminalLayoutsByTabId: live.paneSources.terminalLayoutsByTabId
     }
   )
+  const status = hasPendingAsk ? 'permission' : heuristic
   return (
     <>
       <StatusIndicator status={status} aria-hidden="true" />
@@ -239,9 +245,14 @@ export function PaletteRecentTabStatusDot({
 }): React.JSX.Element {
   const live = useLiveStatus()
   const terminalTabId = row?.terminalTab?.id
+  const hasPendingAsk = useAppStore((s) =>
+    terminalTabId == null ? false : selectTabHasPendingAsk(s, terminalTabId)
+  )
   const status: WorktreeStatus | null =
     live && row?.terminalTab
-      ? resolveRecentWorkspaceTabStatus(row, live.paneSources, live.now)
+      ? hasPendingAsk
+        ? 'permission'
+        : resolveRecentWorkspaceTabStatus(row, live.paneSources, live.now)
       : null
   const hasUnread =
     live != null &&

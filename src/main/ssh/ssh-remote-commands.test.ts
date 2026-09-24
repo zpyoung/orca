@@ -23,7 +23,6 @@ import {
   commandInRemoteDirectory,
   commandWithNodePath,
   listRelayBaseDirsCommand,
-  MAX_RELAY_GC_LISTING_ENTRIES,
   makeRemoteDirectoryCommand,
   moveRemoteTreeCommand,
   promoteRemoteTreeContentsCommand,
@@ -279,22 +278,30 @@ describe('ssh remote command builders', () => {
   })
 
   it.runIf(process.platform !== 'win32')(
-    'bounds real POSIX GC output with more than the exec-cap stage population',
+    'filters a stage listing larger than the exec cap before emitting real POSIX GC entries',
     async () => {
       const root = mkdtempSync(join(tmpdir(), 'orca-relay-gc-scale-'))
       try {
-        for (let index = 0; index < 15_197; index += 1) {
-          mkdirSync(join(root, `relay-0.1.0+abc.upload-${String(index).padStart(12, '0')}`))
-        }
+        const stagePrefix = `/relay-0.1.0+abc.upload-${'x'.repeat(256)}`
         mkdirSync(join(root, 'relay-0.1.0+aaa'))
         mkdirSync(join(root, 'relay-0.1.0+bbb'))
 
-        const output = await runShellCommand(listRelayBaseDirsCommand(posix, root))
+        const command = `
+find() {
+  index=0
+  while [ "$index" -lt 4096 ]; do
+    printf '%s%s\\n' '${stagePrefix}' "$index"
+    index=$((index + 1))
+  done
+  command find "$@"
+}
+${listRelayBaseDirsCommand(posix, root)}`
+        const output = await runShellCommand(command)
         const entries = output.trim().split('\n')
 
-        expect(entries).toEqual(['relay-0.1.0+aaa', 'relay-0.1.0+bbb'])
+        // find enumerates in filesystem order, which is insertion-ordered on ext4 but not APFS
+        expect([...entries].sort()).toEqual(['relay-0.1.0+aaa', 'relay-0.1.0+bbb'])
         expect(Buffer.byteLength(output)).toBeLessThan(1_024)
-        expect(entries.length).toBeLessThanOrEqual(MAX_RELAY_GC_LISTING_ENTRIES)
       } finally {
         rmSync(root, { recursive: true, force: true })
       }

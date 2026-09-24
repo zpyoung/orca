@@ -34,14 +34,20 @@ mocks.sendNativeChatMessage.mockReturnValue(mocks.sendHandle)
 vi.mock('../native-chat-runtime-send', () => ({
   sendNativeChatMessage: (...args: unknown[]) => mocks.sendNativeChatMessage(...args),
   sendNativeChatMessageWithImageAttachments: vi.fn(),
-  submitNativeChatPrompt: vi.fn()
+  submitNativeChatPrompt: vi.fn(),
+  invalidateNativeChatPtySends: vi.fn()
 }))
 
 import { buildAgentTuiClearInputForText } from '../../../../../shared/agent-tui-input-clear'
 import { AgentComposer } from './AgentComposer'
+import {
+  _resetTerminalInputQuarantineForTests,
+  armTerminalInputQuarantine
+} from '../../terminal-pane/terminal-input-quarantine'
 
 afterEach(() => {
   cleanup()
+  _resetTerminalInputQuarantineForTests()
   vi.clearAllMocks()
 })
 
@@ -59,10 +65,9 @@ describe('AgentComposer bare mount', () => {
 
     // Retention/outcome wiring applies even with no sendTier (r4-4): a bare
     // mount still gets clearInput + an onOutcome, just no verified confirm.
-    const options = mocks.sendNativeChatMessage.mock.calls[0]?.[3]
+    const options = mocks.sendNativeChatMessage.mock.calls[0]?.[2]
     expect(mocks.sendNativeChatMessage).toHaveBeenCalledWith(
-      {},
-      'pty-1',
+      { terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} },
       'hello there',
       expect.objectContaining({ onOutcome: expect.any(Function) })
     )
@@ -85,7 +90,7 @@ describe('AgentComposer bare mount', () => {
     fireEvent.change(screen.getByRole('textbox'), { target: { value: draft } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
-    expect(mocks.sendNativeChatMessage.mock.calls[0]?.[2]).toBe(draft)
+    expect(mocks.sendNativeChatMessage.mock.calls[0]?.[1]).toBe(draft)
   })
 
   it('never requires anything beyond core props to render the composer field', () => {
@@ -112,7 +117,7 @@ describe('AgentComposer bare mount', () => {
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'first\nsecond' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
-    const options = mocks.sendNativeChatMessage.mock.calls[0]?.[3]
+    const options = mocks.sendNativeChatMessage.mock.calls[0]?.[2]
     expect(options.clearInput).toBe(buildAgentTuiClearInputForText('first\nsecond'))
     expect(options.confirmCleared()).toBe(true)
     expect(options.confirmSubmitted()).toBe(true)
@@ -133,7 +138,7 @@ describe('AgentComposer bare mount', () => {
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'hello' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
-    const options = mocks.sendNativeChatMessage.mock.calls[0]?.[3]
+    const options = mocks.sendNativeChatMessage.mock.calls[0]?.[2]
     expect(options.clearInput).toBe(buildAgentTuiClearInputForText('hello'))
     expect(options.confirmCleared).toBeUndefined()
     expect(options.confirmSubmitted).toBeUndefined()
@@ -154,7 +159,7 @@ describe('AgentComposer bare mount', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
     fireEvent.change(textarea, { target: { value: 'typed after send' } })
 
-    const options = mocks.sendNativeChatMessage.mock.calls[0]?.[3]
+    const options = mocks.sendNativeChatMessage.mock.calls[0]?.[2]
     act(() => options.onOutcome('may-not-have-sent'))
 
     expect(textarea.value).toBe('possibly lost\n\ntyped after send')
@@ -177,6 +182,25 @@ describe('AgentComposer bare mount', () => {
     fireEvent.change(textarea, { target: { value: 'draft while card is open' } })
     expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
     fireEvent.keyDown(textarea, { key: 'Enter' })
+    expect(mocks.sendNativeChatMessage).not.toHaveBeenCalled()
+  })
+
+  it('preserves the draft when quarantine arms before the send handler runs', () => {
+    render(
+      <AgentComposer
+        terminalTabId="tab-quarantined"
+        paneKey="pane-quarantined"
+        targetPtyId="pty-quarantined"
+        agent="claude"
+      />
+    )
+    const textarea = screen.getByRole('textbox')
+    fireEvent.change(textarea, { target: { value: 'keep this draft' } })
+
+    act(() => armTerminalInputQuarantine('tab-quarantined'))
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    expect(textarea).toHaveValue('keep this draft')
     expect(mocks.sendNativeChatMessage).not.toHaveBeenCalled()
   })
 

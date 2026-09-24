@@ -86,13 +86,10 @@ it('retains an unreleased dispatch worktree while cleaning a released sibling wo
   })
 
   expect(removeManagedWorktree).toHaveBeenCalledOnce()
-  expect(removeManagedWorktree).toHaveBeenCalledWith(
-    `id:${released.workspaceId}`,
-    true,
-    false,
-    false,
-    'local'
-  )
+  expect(removeManagedWorktree).toHaveBeenCalledWith(`id:${released.workspaceId}`, {
+    force: true,
+    hostId: 'local'
+  })
   expect(records.get(unsafe.attemptFingerprint)?.setupState).toBe('ready')
   expect(records.get(released.attemptFingerprint)?.setupState).toBe('cleaned')
 })

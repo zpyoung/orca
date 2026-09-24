@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { defineMethod, type RpcMethod } from '../core'
+import { defineMethod } from '../core'
 import type { LedgerRequest } from '../../../../shared/ledger'
 import { verifyAndConsumeLedgerUiAttestation } from '../ledger-ui-attestation'
 
@@ -96,7 +96,7 @@ const ledgerRequestSchema: z.ZodType<LedgerRequest> = ledgerRequestBaseSchema.su
   }
 ) as z.ZodType<LedgerRequest>
 
-export const LEDGER_METHODS: RpcMethod[] = [
+export const LEDGER_METHODS = [
   defineMethod({
     name: 'ledger.request',
     params: z.object({ request: ledgerRequestSchema }).strict(),

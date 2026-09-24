@@ -8,7 +8,7 @@ import {
   type WatcherListEntry
 } from '../../../../../shared/fork-heimdall/watcher-types'
 import type { HeimdallDebugReport } from '../../../../fork-heimdall/debug-report'
-import { defineMethod, type RpcAnyMethod } from '../../core'
+import { defineMethod } from '../../core'
 import { requireHeimdallKernel } from './kernel-binding'
 import { projectHeimdallLedgerForClient } from './dispatch-result-wire'
 import { projectWatcherListEntryForClient } from './park-reason-wire'
@@ -75,7 +75,7 @@ function refuseUnfencedLegacyMutation(): never {
   throw new LegacyHeimdallFencingRequiredError()
 }
 
-export const LEGACY_HEIMDALL_METHODS: readonly RpcAnyMethod[] = [
+export const LEGACY_HEIMDALL_METHODS = [
   defineMethod({
     name: LEGACY_HEIMDALL_CHANNELS.list,
     params: z.object({}).strict(),

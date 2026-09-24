@@ -59,6 +59,7 @@ export async function readGitBlobAtIndexPath(
 
     return { ...bufferToBlob(stdout, filePath), exists: true }
   } catch (error) {
+    options.signal?.throwIfAborted()
     if (isMaxBufferOverflowError(error)) {
       return { content: '', isBinary: true, exists: true }
     }
@@ -85,6 +86,7 @@ export async function readGitBlobAtOidPath(
 
     return { ...bufferToBlob(stdout, filePath), exists: true }
   } catch (error) {
+    options.signal?.throwIfAborted()
     if (isMaxBufferOverflowError(error)) {
       return { content: '', isBinary: true, exists: true }
     }

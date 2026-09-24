@@ -7,7 +7,7 @@ import {
 } from '../../../../../shared/protocol-version'
 import { remoteRuntimeClientCapabilities } from '../../../../../shared/remote-runtime-client-capabilities'
 import type { WatcherListEntry } from '../../../../../shared/fork-heimdall/watcher-types'
-import { isStreamingMethod, type RpcContext, type RpcMethod } from '../../core'
+import { eraseRpcMethods, isStreamingMethod, type RpcContext, type RpcMethod } from '../../core'
 import { HEIMDALL_METHODS } from './heimdall'
 import { bindHeimdallKernel } from './kernel-binding'
 import { LEGACY_HEIMDALL_CHANNELS } from './legacy-wire'
@@ -32,7 +32,7 @@ const ENTRY = {
 } as unknown as WatcherListEntry
 
 function method(name: string): RpcMethod {
-  const found = HEIMDALL_METHODS.find((candidate) => candidate.name === name)
+  const found = eraseRpcMethods(HEIMDALL_METHODS).find((candidate) => candidate.name === name)
   if (!found || isStreamingMethod(found)) {
     throw new Error(`Missing Heimdall RPC method ${name}`)
   }

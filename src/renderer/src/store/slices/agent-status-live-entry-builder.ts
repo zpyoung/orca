@@ -232,6 +232,7 @@ export function buildAgentStatusLiveEntry(
     agentType: identity.agentType,
     model:
       payload.model ?? (existing?.agentType === identity.agentType ? existing.model : undefined),
+    ...(payload.modelSwitchCommand ? { modelSwitchCommand: payload.modelSwitchCommand } : {}),
     paneKey,
     terminalHandle: statusTerminalHandle,
     worktreeId:
@@ -256,6 +257,7 @@ export function buildAgentStatusLiveEntry(
     lastAssistantMessageIsToolOutput: payload.lastAssistantMessageIsToolOutput,
     ...(lastCompletedAssistantMessage ? { lastCompletedAssistantMessage } : {}),
     orchestration,
+    ...(payload.subagentObservation ? { subagentObservation: payload.subagentObservation } : {}),
     subagents: agentSubagentsEqual(existing?.subagents, payload.subagents)
       ? existing?.subagents
       : payload.subagents,

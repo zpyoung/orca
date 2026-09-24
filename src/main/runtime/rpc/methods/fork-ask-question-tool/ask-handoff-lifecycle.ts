@@ -1,21 +1,29 @@
 import { clampOrchestrationAskTimeoutMs } from '../../../../../shared/orchestration-ask-timeout'
 import {
   isTerminalAskStatus,
+  pendingEnvelope,
   type AskAnswers,
   type AskEnvelope,
   type AskResultBody,
   type PersistedAskStatus
 } from '../../../../../shared/fork-ask-question-tool/ask-answer-envelope'
-import type { AskPartial, AskRegistryEvent, AskSpec } from '../../../../../shared/fork-ask-question-tool/ask-question-schema'
+import type {
+  AskPartial,
+  AskRegistryEvent,
+  AskSpec
+} from '../../../../../shared/fork-ask-question-tool/ask-question-schema'
 import type { AskDb, AskRow } from '../../../../fork-ask-question-tool/ask-db'
 import { buildResultSummary } from '../../../../fork-ask-question-tool/ask-answer-value-parsing'
-import { flattenAskSpecToQuestion, mapCoordinatorReply } from '../../../../fork-ask-question-tool/ask-handoff-flatten'
+import {
+  flattenAskSpecToQuestion,
+  mapCoordinatorReply
+} from '../../../../fork-ask-question-tool/ask-handoff-flatten'
 import { buildTimeoutResult } from '../../../../fork-ask-question-tool/ask-registry-timeout-answers'
 import type { OrchestrationDb } from '../../../orchestration/db'
 import { OrchestrationError } from '../../../orchestration/orchestration-error'
 import type { DispatchContextRow } from '../../../orchestration/types'
 import type { OrcaRuntimeService } from '../../../orca-runtime'
-import { envelopeFromAskRow, pendingEnvelope, unknownAskEnvelope } from './ask-envelope-from-row'
+import { envelopeFromAskRow, unknownAskEnvelope } from './ask-envelope-from-row'
 import type { AskAttribution } from './ask-pane-attribution'
 
 export type AskHandoffOrigin = { runId: string; dispatchId: string; askerHandle: string }
@@ -37,7 +45,10 @@ function listenersFor(runtime: OrcaRuntimeService): Set<HandoffListener> {
  * `commitHandoffTerminal` for why those never go through `AskRegistry`) — the counterpart
  * `ask.subscribe` merges alongside `AskRegistry.onAskChanged` (tech.md C7).
  */
-export function onHandoffAskChanged(runtime: OrcaRuntimeService, listener: HandoffListener): () => void {
+export function onHandoffAskChanged(
+  runtime: OrcaRuntimeService,
+  listener: HandoffListener
+): () => void {
   const listeners = listenersFor(runtime)
   listeners.add(listener)
   return () => listeners.delete(listener)
@@ -77,8 +88,10 @@ export function resolveHandoffDispatch(
 ): AskHandoffOrigin | null {
   const db = runtime.getOrchestrationDb()
   const dispatch =
-    db.getActiveDispatchForIdentity(attribution.dispatchLookupHandle, attribution.paneKey ?? undefined) ??
-    findActiveDispatchForWorktree(db, attribution.worktreeId)
+    db.getActiveDispatchForIdentity(
+      attribution.dispatchLookupHandle,
+      attribution.paneKey ?? undefined
+    ) ?? findActiveDispatchForWorktree(db, attribution.worktreeId)
   if (!dispatch) {
     return null
   }
@@ -138,7 +151,9 @@ function skippedIds(spec: AskSpec): string[] {
 // window recover (adopt the orphaned question) instead of creating a second one.
 function findExistingHandoffQuestion(orchestrationDb: OrchestrationDb, row: AskRow): string | null {
   const dispatchHandle = `dispatch:${row.handoff_dispatch_id}`
-  const messages = orchestrationDb.getAllMessagesForHandle(`run:${row.handoff_run_id}`, 500, ['question'])
+  const messages = orchestrationDb.getAllMessagesForHandle(`run:${row.handoff_run_id}`, 500, [
+    'question'
+  ])
   for (const message of messages) {
     if (message.from_handle !== dispatchHandle) {
       continue
@@ -155,9 +170,15 @@ function ensureHandoffQuestionCreated(
   runtime: OrcaRuntimeService,
   askDb: AskDb,
   row: AskRow
-): { status: 'ok'; questionId: string; dispatchId: string } | { status: 'unavailable'; envelope: AskEnvelope } {
+):
+  | { status: 'ok'; questionId: string; dispatchId: string }
+  | { status: 'unavailable'; envelope: AskEnvelope } {
   if (row.handoff_question_id) {
-    return { status: 'ok', questionId: row.handoff_question_id, dispatchId: row.handoff_dispatch_id as string }
+    return {
+      status: 'ok',
+      questionId: row.handoff_question_id,
+      dispatchId: row.handoff_dispatch_id as string
+    }
   }
   const spec = JSON.parse(row.spec_json) as AskSpec
   const orchestrationDb = runtime.getOrchestrationDb()
@@ -165,7 +186,11 @@ function ensureHandoffQuestionCreated(
   const existingQuestionId = findExistingHandoffQuestion(orchestrationDb, row)
   if (existingQuestionId) {
     askDb.setHandoffQuestionId(row.ask_id, existingQuestionId)
-    return { status: 'ok', questionId: existingQuestionId, dispatchId: row.handoff_dispatch_id as string }
+    return {
+      status: 'ok',
+      questionId: existingQuestionId,
+      dispatchId: row.handoff_dispatch_id as string
+    }
   }
 
   try {
@@ -253,8 +278,14 @@ export async function waitHandoffChunk(
     }
     const now = Date.now()
     if (now >= overallDeadline) {
-      const partial: AskPartial = current?.partial_json ? (JSON.parse(current.partial_json) as AskPartial) : {}
-      return commitHandoffTerminal(runtime, askDb, askId, 'timed_out', buildTimeoutResult(spec, partial))
+      const partial: AskPartial = current?.partial_json ? JSON.parse(current.partial_json) : {}
+      return commitHandoffTerminal(
+        runtime,
+        askDb,
+        askId,
+        'timed_out',
+        buildTimeoutResult(spec, partial)
+      )
     }
     if (now >= chunkDeadline) {
       return pendingEnvelope(askId)
@@ -266,7 +297,11 @@ export async function waitHandoffChunk(
   }
 }
 
-export function cancelHandoff(runtime: OrcaRuntimeService, askDb: AskDb, askId: string): AskEnvelope {
+export function cancelHandoff(
+  runtime: OrcaRuntimeService,
+  askDb: AskDb,
+  askId: string
+): AskEnvelope {
   const row = askDb.getAsk(askId)
   if (!row) {
     return unknownAskEnvelope(askId)

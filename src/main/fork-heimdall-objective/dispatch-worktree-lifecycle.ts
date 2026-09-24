@@ -21,13 +21,10 @@ async function removeDispatchWorktree(
   if (isPendingWorkspace(record)) {
     return
   }
-  await runtime.removeManagedWorktree(
-    `id:${record.workspaceId}`,
-    true,
-    false,
-    false,
-    record.executionHostId
-  )
+  await runtime.removeManagedWorktree(`id:${record.workspaceId}`, {
+    force: true,
+    hostId: record.executionHostId
+  })
 }
 function workspaceWorkersReleased(
   objectiveStore: ObjectiveStore,

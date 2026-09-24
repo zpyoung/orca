@@ -9,6 +9,7 @@ import {
   selectRuntimePaneTitlesForWorktree
 } from './worktree-card-status-inputs'
 import { selectWorktreeAgentActivitySummary } from './worktree-agent-activity-summary'
+import { selectWorktreeHasPendingAsk } from '../fork-ask-question-tool/pending-ask-attention'
 
 type WorktreeActivityStatusState = Pick<
   AppState,
@@ -50,7 +51,7 @@ export function selectWorktreeActivityStatuses(
         agentStatusPaneIdsByTabId,
         stalePaneIdsByTabId,
         terminalLayoutRootsByTabId: selectTerminalLayoutRootsForWorktree(statusInputs, worktreeId),
-        hasPermission,
+        hasPermission: hasPermission || selectWorktreeHasPendingAsk(statusInputs, worktreeId),
         hasLiveWorking,
         hasLiveMonitoring,
         hasInterrupted,

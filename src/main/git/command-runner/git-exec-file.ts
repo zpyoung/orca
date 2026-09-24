@@ -192,11 +192,14 @@ export async function gitExecFileAsyncBuffer(
     wslDistro?: string
     preferWslDirectGit?: boolean
     admissionTier?: GitAdmissionTier
+    signal?: AbortSignal
   }
 ): Promise<{ stdout: Buffer }> {
   return withGitSpan({ args, cwd: options.cwd }, async (span) => {
     if (isWslLinkedWorktreeGitRoutingCandidate(options.cwd, options.wslDistro)) {
-      await prepareWslLinkedWorktreeGitRouting(options.cwd, options.wslDistro)
+      await prepareWslLinkedWorktreeGitRouting(options.cwd, options.wslDistro, {
+        signal: options.signal
+      })
     }
     const readEnvironmentReady = pendingWslDirectGitReadEnvironment(args, options)
     if (readEnvironmentReady) {
@@ -206,7 +209,7 @@ export async function gitExecFileAsyncBuffer(
     // still matters for the login-shell fallback: these are raw blob bytes going
     // straight to the diff/blob viewer, where a banner becomes file content.
     let resolved = resolveGitCommand(args, options, false, true)
-    const environmentReady = prepareWindowsHostGitEnvironment(resolved, undefined)
+    const environmentReady = prepareWindowsHostGitEnvironment(resolved, undefined, options.signal)
     if (environmentReady) {
       await environmentReady
     }
@@ -215,7 +218,8 @@ export async function gitExecFileAsyncBuffer(
       args,
       cwd: options.cwd,
       wslDistro: options.wslDistro,
-      tier: options.admissionTier
+      tier: options.admissionTier,
+      signal: options.signal
     })
     span?.setAttribute('git.queue_wait_ms', grant.queueWaitMs)
     const timeoutMs = gitCommandTimeoutMs(args, options.timeout, options.timeoutMsForTest)
@@ -225,19 +229,23 @@ export async function gitExecFileAsyncBuffer(
       termination = new Promise<void>((resolve) => {
         reportTerminated = resolve
       })
-      const { stdout } = (await execFileCapture(resolved.binary, resolved.args, {
+      const result = await execFileCapture(resolved.binary, resolved.args, {
         cwd: resolved.cwd,
         encoding: 'buffer',
         maxBuffer: options.maxBuffer,
         timeout: timeoutMs,
         env: untranslatedGitOutputEnv(options.env),
         admissionTier: options.admissionTier,
+        signal: options.signal,
         onChildTerminated: reportTerminated,
         ...(timeoutMs === undefined
           ? {}
           : { createTimeoutError: () => new GitCommandTimeoutError(timeoutMs) })
-      })) as { stdout: Buffer }
-      return { stdout: readCapturedGitBuffer(stdout, resolved) }
+      })
+      if (!Buffer.isBuffer(result.stdout)) {
+        throw new TypeError('Expected buffered git output')
+      }
+      return { stdout: readCapturedGitBuffer(result.stdout, resolved) }
     } finally {
       if (termination) {
         void termination.then(grant.release)

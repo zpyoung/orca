@@ -55,6 +55,7 @@ vi.mock('../../store', () => {
   const state = {
     dictationState: 'idle',
     settings: { voice: { enabled: false }, nativeChatSessionOptions: {} },
+    agentStatusByPaneKey: {},
     updateSettings: vi.fn(),
     clearNativeChatLaunchDraft: mocks.clearNativeChatLaunchDraft,
     markNativeChatLaunchDraftAdopted: mocks.markNativeChatLaunchDraftAdopted
@@ -300,12 +301,14 @@ describe('NativeChatComposer', () => {
     expect(mocks.setDraft).toHaveBeenCalledWith('')
   })
 
-  // The structured menu offers only what the dispatcher can carry out. Listing the
-  // agent's TUI catalog here answered every pick with "not available in chat sessions".
+  // The structured menu offers only what a pick can carry out: the host's own
+  // commands, plus the ones the agent itself runs from message text (Codex `/goal`).
+  // Listing the agent's whole TUI catalog here answered every pick with
+  // "not available in chat sessions".
   it.each([
-    ['claude', 'compact'],
-    ['codex', 'vim']
-  ] as const)('offers %s only actionable structured slash commands', (agent, withheld) => {
+    ['claude', 'compact', ['model', 'effort']],
+    ['codex', 'vim', ['model', 'effort', 'goal']]
+  ] as const)('offers %s only actionable structured slash commands', (agent, withheld, offered) => {
     mocks.draft = '/'
     render(
       <NativeChatComposer
@@ -334,7 +337,7 @@ describe('NativeChatComposer', () => {
     const names = (mocks.fieldProps?.autocomplete?.items ?? [])
       .filter((item) => item.kind === 'command')
       .map((item) => item.name)
-    expect(names).toEqual(['model', 'effort'])
+    expect(names).toEqual([...offered])
     expect(names).not.toContain(withheld)
   })
 
@@ -423,8 +426,7 @@ describe('NativeChatComposer', () => {
     act(() => mocks.fieldProps?.onSend?.())
 
     expect(mocks.sendNativeChatMessageWithImageAttachments).toHaveBeenCalledWith(
-      {},
-      'pty-1',
+      { terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} },
       'hello',
       ['/tmp/pasted.png'],
       expect.anything()
@@ -444,7 +446,10 @@ describe('NativeChatComposer', () => {
 
     act(() => mocks.fieldProps?.onSend?.())
 
-    expect(mocks.sendNativeChatTypedCommand).toHaveBeenCalledWith({}, 'pty-1', '/status')
+    expect(mocks.sendNativeChatTypedCommand).toHaveBeenCalledWith(
+      { terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} },
+      '/status'
+    )
     expect(mocks.sendNativeChatMessage).not.toHaveBeenCalled()
   })
 
@@ -462,8 +467,7 @@ describe('NativeChatComposer', () => {
     act(() => mocks.fieldProps?.onSend?.())
 
     expect(mocks.sendNativeChatMessage).toHaveBeenCalledWith(
-      {},
-      'pty-1',
+      { terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} },
       '$ref-oss',
       expect.anything()
     )
@@ -484,8 +488,7 @@ describe('NativeChatComposer', () => {
     act(() => mocks.fieldProps?.onSend?.())
 
     expect(mocks.sendNativeChatMessage).toHaveBeenCalledWith(
-      {},
-      'pty-1',
+      { terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} },
       '/clear',
       expect.anything()
     )
@@ -727,8 +730,7 @@ describe('NativeChatComposer', () => {
     })
 
     expect(mocks.sendNativeChatMessageVerified).toHaveBeenCalledWith(
-      {},
-      'pty-1',
+      { terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} },
       '/model opus',
       expect.any(AbortSignal)
     )
@@ -760,8 +762,7 @@ describe('NativeChatComposer', () => {
     })
 
     expect(mocks.sendNativeChatMessageVerified).toHaveBeenCalledWith(
-      {},
-      'pty-1',
+      { terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} },
       '/model fable',
       expect.any(AbortSignal)
     )
@@ -800,8 +801,7 @@ describe('NativeChatComposer', () => {
     })
 
     expect(mocks.typeNativeChatCommand).toHaveBeenCalledWith(
-      {},
-      'pty-1',
+      { terminalTabId: 'tab-1', ptyId: 'pty-1', settings: {} },
       '/model',
       expect.any(AbortSignal)
     )

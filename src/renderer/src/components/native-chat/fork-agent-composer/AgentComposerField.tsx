@@ -1,5 +1,5 @@
 // FORK-COPY-OF: src/renderer/src/components/native-chat/NativeChatComposerField.tsx
-// FORK-COPY-SHA: e0826956fcfc532f5a1e55b5e081f2e57e553c43
+// FORK-COPY-SHA: 6238fd6d4dc6fa4fcdb85dab65ad6cf8bda860b8
 import type { ClipboardEventHandler, KeyboardEventHandler, RefObject } from 'react'
 import { useLayoutEffect, useRef } from 'react'
 import type { useImeEnterGestureOwnership } from '@/lib/ime-composition-keyboard-event'
@@ -182,7 +182,7 @@ export function AgentComposerField({
             layout === 'dock' ? 'flex h-full min-h-0 flex-col' : cn('mx-auto', widthClassName)
           )}
         >
-          {autocomplete.mode === 'slash' || autocomplete.mode === 'skill' ? (
+          {autocomplete.mode === 'slash' ? (
             <NativeChatPickerMenu
               autocomplete={autocomplete}
               activeIndex={activeSuggestion}
@@ -209,6 +209,14 @@ export function AgentComposerField({
               // focus target.
               'border border-border p-1.5 shadow-xs',
               'bg-muted/50 dark:bg-input/40',
+              // Why (#10481): the native caret blink invalidates paint up to the
+              // nearest containment boundary; without this the whole transcript
+              // re-rasterizes twice a second. Pickers are siblings and every menu
+              // and tooltip in here is a Radix portal, so nothing floating clips.
+              // Tightest descendant is the attachment remove button, which
+              // overhangs its thumbnail by 6px and clears this box's padding by
+              // 4px — keep that slack if the padding below ever shrinks.
+              '[contain:paint]',
               layout === 'dock'
                 ? 'flex min-h-0 flex-1 flex-col overflow-hidden rounded-none'
                 : 'rounded-lg'
@@ -292,15 +300,10 @@ export function AgentComposerField({
                 }}
                 onPaste={onPaste}
                 onSelect={(e) => onTextareaSelect(e.currentTarget)}
-                aria-expanded={autocomplete.mode === 'slash' || autocomplete.mode === 'skill'}
-                aria-controls={
-                  autocomplete.mode === 'slash' || autocomplete.mode === 'skill'
-                    ? pickerListboxId
-                    : undefined
-                }
+                aria-expanded={autocomplete.mode === 'slash'}
+                aria-controls={autocomplete.mode === 'slash' ? pickerListboxId : undefined}
                 aria-activedescendant={
-                  (autocomplete.mode === 'slash' || autocomplete.mode === 'skill') &&
-                  autocomplete.items.length > 0
+                  autocomplete.mode === 'slash' && autocomplete.items.length > 0
                     ? `${pickerListboxId}-option-${Math.min(activeSuggestion, autocomplete.items.length - 1)}`
                     : undefined
                 }

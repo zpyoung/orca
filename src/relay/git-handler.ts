@@ -5,6 +5,7 @@ import type { RelayContext } from './context'
 import { expandTilde } from './context'
 import { InFlightPromiseDedupe } from '../shared/in-flight-promise-dedupe'
 import { GitCapabilityCache } from '../shared/git-capability-cache'
+import { GitStatusReadLeaseOwner } from '../shared/git-status-read-lease-owner'
 import {
   clearSubmodulePathsCache,
   createSubmodulePathsCache,
@@ -66,6 +67,7 @@ function execFileWithStdin(
 export class GitHandler {
   private dispatcher: RelayDispatcher
   private readonly gitDiffReadDedupe = new InFlightPromiseDedupe<unknown>()
+  private readonly gitFileDiffReadLeaseOwner = new GitStatusReadLeaseOwner<unknown>()
   private readonly gitCapabilities = new GitCapabilityCache()
   // Why: cache .gitmodules per instance to avoid SSH reads and test leakage.
   private submodulePathsCache: SubmodulePathsCache = createSubmodulePathsCache()
@@ -84,12 +86,13 @@ export class GitHandler {
     this.dispatcher = dispatcher
     const handlers = createGitHandlerOperationSet({
       gitDiffReadDedupe: this.gitDiffReadDedupe,
+      gitFileDiffReadLeaseOwner: this.gitFileDiffReadLeaseOwner,
       gitCapabilities: this.gitCapabilities,
       submodulePathsCache: this.submodulePathsCache,
       watcherRegistry: this.watcherRegistry,
       git: (args, cwd, opts) =>
         opts === undefined ? this.git(args, cwd) : this.git(args, cwd, opts),
-      gitBuffer: (args, cwd) => this.gitBuffer(args, cwd),
+      gitBuffer: (args, cwd, opts) => this.gitBuffer(args, cwd, opts),
       spawnClone: (args, cwd, progressId, context) =>
         this.spawnClone(args, cwd, progressId, context),
       clearGitMutationReadCaches: () => this.clearGitMutationReadCaches(),
@@ -138,6 +141,7 @@ export class GitHandler {
 
   private clearGitMutationReadCaches(): void {
     this.gitDiffReadDedupe.clear()
+    this.gitFileDiffReadLeaseOwner.invalidate()
     invalidateGitBranchLineTotalInFlight()
     clearGitStatusLineStatsCache()
     clearSubmodulePathsCache(this.submodulePathsCache)
@@ -187,14 +191,22 @@ export class GitHandler {
       : run()
   }
 
-  private async gitBuffer(args: string[], cwd: string): Promise<Buffer> {
-    const { stdout } = (await execFileAsync('git', args, {
+  private async gitBuffer(
+    args: string[],
+    cwd: string,
+    opts?: { signal?: AbortSignal }
+  ): Promise<Buffer> {
+    const result = await execFileAsync('git', args, {
       cwd,
       env: buildRelayGitEnv(),
       encoding: 'buffer',
-      maxBuffer: MAX_GIT_BUFFER
-    })) as { stdout: Buffer }
-    return stdout
+      maxBuffer: MAX_GIT_BUFFER,
+      signal: opts?.signal
+    })
+    if (!Buffer.isBuffer(result.stdout)) {
+      throw new TypeError('Expected buffered git output')
+    }
+    return result.stdout
   }
 
   private async spawnClone(

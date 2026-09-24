@@ -7,7 +7,7 @@ import { verifyRequiredReleaseAssets } from './verify-release-required-assets.mj
 
 const API_VERSION = '2022-11-28'
 const RELEASE_CUT_AUTHOR = 'github-actions[bot]'
-const DESKTOP_RC_TAG_PATTERN = /^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$/
+const DESKTOP_RC_TAG_PATTERN = /^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+(?:\.zy[0-9]{2})?$/
 
 export function isReleaseCutDraft(release) {
   return (

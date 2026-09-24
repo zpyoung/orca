@@ -17,7 +17,7 @@ import type {
   ForkSessionHandoffLineageRecord,
   LineageEndpointIdentity
 } from '../../../../../shared/fork-session-handoff/session-lineage-types'
-import { parsePaneKey } from '../../../../../shared/stable-pane-id'
+import { parseLegacyNumericPaneKey, parsePaneKey } from '../../../../../shared/stable-pane-id'
 import { parseWorkspaceKey } from '../../../../../shared/workspace-scope'
 import {
   enrichSessionLineage,
@@ -117,12 +117,21 @@ export function findAgentSessionLineage(
   })
 }
 
+// Why: a legacy numeric pane key names its pane by position, unambiguous only in a one-leaf tab.
+function legacyPaneKeyNamesOnlyPane(state: LiveLineageState, paneKey: string): boolean {
+  const legacy = parseLegacyNumericPaneKey(paneKey)
+  return legacy ? state.terminalLayoutsByTabId?.[legacy.tabId]?.root?.type === 'leaf' : false
+}
+
 function resolveLineagePaneCandidate(
   state: LiveLineageState,
   paneKey: string,
   worktreeIdHint?: string,
   tabIdHint?: string
 ): ReturnType<typeof resolveOriginalPaneTarget> {
+  if (!parsePaneKey(paneKey) && !legacyPaneKeyNamesOnlyPane(state, paneKey)) {
+    return null
+  }
   return resolveOriginalPaneTarget({ state, paneKey, worktreeIdHint, tabIdHint })
 }
 

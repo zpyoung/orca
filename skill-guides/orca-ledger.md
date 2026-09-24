@@ -52,12 +52,12 @@ retrying.
 Every entry has a type, fixed at filing time and never editable. Each type requires its own
 content flags:
 
-| type | required flags |
-| --- | --- |
-| `bug` | `--title --file --description --severity` |
-| `deferred` | `--title --why-deferred --priority` |
-| `test-gap` | `--title --file-under-test --reason-skipped` |
-| `proposal` | `--title --context --recommendation` |
+| type       | required flags                                         |
+| ---------- | ------------------------------------------------------ |
+| `bug`      | `--title --file --description --severity`              |
+| `deferred` | `--title --why-deferred --priority`                    |
+| `test-gap` | `--title --file-under-test --reason-skipped`           |
+| `proposal` | `--title --context --recommendation`                   |
 | `decision` | `--title --context --decision --consequences --status` |
 
 Three fields are closed sets, validated by the runtime rather than the CLI, so a wrong value
@@ -187,6 +187,14 @@ ORCA ledger import --json
 **A nonzero exit code here does not mean the command failed.** Any skip sets the exit code
 while the response still reports `ok: true`. Read `result.importResult.skipped` for the
 anchors that were skipped and why, and treat an empty `skipped` array as a clean import.
+
+Labels may be plain (`Key: value`) or bold with the colon inside or outside (`**Key:** value`,
+`**Key**: value`). Extra legacy fields are preserved; severity, priority, and decision status
+are enum-checked only for the entry type that owns them.
+
+A failed record commit is reported in `skipped`; successful commits remain visible in
+`created` or `updated`, and later records are still attempted. Re-running the import uses
+the persisted source anchors to recognize successful records and retry failed ones.
 
 ## Errors
 

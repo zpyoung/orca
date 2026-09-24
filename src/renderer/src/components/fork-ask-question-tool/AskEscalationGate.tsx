@@ -22,9 +22,7 @@ function AskPaneEscalation({ paneKey }: { paneKey: string }): null {
 }
 
 /**
- * Escalates every unanswered ask to an OS notification once its pane has gone unattended, not
- * just the one on screen. The Questions panel follows the focused session, so a question waiting
- * on a background pane has no on-screen trace at all — this is what makes it reachable.
+ * Escalates unattended asks to OS notifications; the titlebar badge only reports their count.
  *
  * One child per pane because the escalation hook owns a single timer; keying on pane keys alone
  * means an answer on one pane does not re-subscribe the others.

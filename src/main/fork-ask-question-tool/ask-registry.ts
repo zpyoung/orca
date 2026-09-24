@@ -5,13 +5,17 @@ import { buildTimeoutResult } from './ask-registry-timeout-answers'
 import { buildResultSummary } from './ask-answer-value-parsing'
 import {
   isTerminalAskStatus,
+  pendingEnvelope,
   type AskAnswers,
   type AskEnvelope,
-  type AskPendingEnvelope,
   type AskResultBody,
   type PersistedAskStatus
 } from '../../shared/fork-ask-question-tool/ask-answer-envelope'
-import type { AskPartial, AskRegistryEvent, AskSpec } from '../../shared/fork-ask-question-tool/ask-question-schema'
+import type {
+  AskPartial,
+  AskRegistryEvent,
+  AskSpec
+} from '../../shared/fork-ask-question-tool/ask-question-schema'
 
 /**
  * Grace window between a pane detaching and its surfaced ask resolving `unavailable` (tech.md
@@ -75,7 +79,11 @@ export class AskRegistry {
   }
 
   /** Durably inserts before returning the id, on every path; idempotent on `options.requestId`. */
-  async register(spec: AskSpec, origin: AskOrigin, options: AskRegisterOptions): Promise<RegisterResult> {
+  async register(
+    spec: AskSpec,
+    origin: AskOrigin,
+    options: AskRegisterOptions
+  ): Promise<RegisterResult> {
     const askId = `ask_${randomUUID()}`
     const specJson = JSON.stringify(spec)
     const { row, created } = this.db.registerAsk({
@@ -91,7 +99,9 @@ export class AskRegistry {
 
     if (!created) {
       if (row.spec_json !== specJson) {
-        throw new Error(`requestId ${options.requestId} was already registered with a different ask spec`)
+        throw new Error(
+          `requestId ${options.requestId} was already registered with a different ask spec`
+        )
       }
       return { askId: row.ask_id }
     }
@@ -112,7 +122,14 @@ export class AskRegistry {
       live.surfaced = this.paneQueue.enqueue(live.paneKey, live.askId)
     }
     if (live.surfaced) {
-      this.emit({ seq: row.seq, epoch: this.epoch, askId: live.askId, paneKey: live.paneKey, status: 'registered', spec })
+      this.emit({
+        seq: row.seq,
+        epoch: this.epoch,
+        askId: live.askId,
+        paneKey: live.paneKey,
+        status: 'registered',
+        spec
+      })
     }
     return { askId: live.askId }
   }
@@ -144,15 +161,15 @@ export class AskRegistry {
         live.waiters.delete(release)
         resolve(envelope)
       }
-      const onAbort = (): void => release(this.pendingEnvelope(askId))
+      const onAbort = (): void => release(pendingEnvelope(askId))
 
       if (signal.aborted) {
-        release(this.pendingEnvelope(askId))
+        release(pendingEnvelope(askId))
         return
       }
       live.waiters.add(release)
       signal.addEventListener('abort', onAbort, { once: true })
-      chunkTimer = setTimeout(() => release(this.pendingEnvelope(askId)), chunkMs)
+      chunkTimer = setTimeout(() => release(pendingEnvelope(askId)), chunkMs)
     })
   }
 
@@ -212,7 +229,10 @@ export class AskRegistry {
     if (!live || live.livenessGraceTimer) {
       return
     }
-    live.livenessGraceTimer = setTimeout(() => this.resolveLivenessExpiry(live.askId), ASK_LIVENESS_GRACE_MS)
+    live.livenessGraceTimer = setTimeout(
+      () => this.resolveLivenessExpiry(live.askId),
+      ASK_LIVENESS_GRACE_MS
+    )
   }
 
   /** Cancels the surfaced ask's liveness grace timer for `paneKey`, if one is running. */
@@ -270,7 +290,7 @@ export class AskRegistry {
       return
     }
     const row = this.db.getAsk(askId)
-    const partial: AskPartial = row?.partial_json ? (JSON.parse(row.partial_json) as AskPartial) : {}
+    const partial: AskPartial = row?.partial_json ? JSON.parse(row.partial_json) : {}
     this.commitTerminal(live, 'timed_out', buildTimeoutResult(live.spec, partial))
   }
 
@@ -287,7 +307,11 @@ export class AskRegistry {
     })
   }
 
-  private commitTerminal(live: LiveAsk, status: Exclude<PersistedAskStatus, 'registered'>, result: AskResultBody): void {
+  private commitTerminal(
+    live: LiveAsk,
+    status: Exclude<PersistedAskStatus, 'registered'>,
+    result: AskResultBody
+  ): void {
     if (live.timeoutTimer) {
       clearTimeout(live.timeoutTimer)
     }
@@ -298,7 +322,14 @@ export class AskRegistry {
     this.live.delete(live.askId)
 
     const envelope = this.envelopeFromRow(row)
-    this.emit({ seq: row.seq, epoch: this.epoch, askId: live.askId, paneKey: row.pane_key, status, result })
+    this.emit({
+      seq: row.seq,
+      epoch: this.epoch,
+      askId: live.askId,
+      paneKey: row.pane_key,
+      status,
+      result
+    })
     for (const release of live.waiters) {
       release(envelope)
     }
@@ -353,10 +384,6 @@ export class AskRegistry {
       case 'registered':
         throw new Error(`ask ${askId} has non-terminal status ${row.status}`)
     }
-  }
-
-  private pendingEnvelope(askId: string): AskPendingEnvelope {
-    return { status: 'pending', askId, instruction: `orca ask wait --id ${askId}` }
   }
 
   private unknownAskEnvelope(askId: string): AskEnvelope {

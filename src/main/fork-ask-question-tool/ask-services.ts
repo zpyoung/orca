@@ -6,16 +6,27 @@ import {
   createAskAttachedSurfaceRoster,
   type AskAttachedSurfaceRoster
 } from './ask-attached-surface-roster'
+import {
+  createAskWaitConcurrencyGate,
+  type AskWaitConcurrencyGate
+} from './ask-wait-concurrency-gate'
 
 export type AskServices = {
   readonly db: AskDb
   readonly registry: AskRegistry
   readonly roster: AskAttachedSurfaceRoster
+  readonly waitGate: AskWaitConcurrencyGate
 }
 
 type DurableAskStore = { db: AskDb; registry: AskRegistry }
 
-const servicesByRuntime = new WeakMap<object, AskServices>()
+/**
+ * The runtime instance a roster belongs to. Held weakly and compared by identity — the id is
+ * what makes two runtimes distinguishable, and nothing here reads any other member.
+ */
+export type AskServicesOwner = { getRuntimeId: () => string }
+
+const servicesByRuntime = new WeakMap<AskServicesOwner, AskServices>()
 
 /**
  * Lazily builds and memoizes the ask db, registry, and attached-surface roster for one runtime
@@ -24,7 +35,7 @@ const servicesByRuntime = new WeakMap<object, AskServices>()
  * read, so connection bookkeeping alone never touches sqlite or the app-environment port.
  */
 export function askServicesFor(
-  runtime: object,
+  runtime: AskServicesOwner,
   hasLocalRendererWindow: () => boolean
 ): AskServices {
   let services = servicesByRuntime.get(runtime)
@@ -50,6 +61,7 @@ export function askServicesFor(
         notePaneAttached: (paneKey) => durable?.registry.notePaneAttached(paneKey)
       }
     )
+    const waitGate = createAskWaitConcurrencyGate()
     services = {
       get db() {
         return openDurable().db
@@ -57,7 +69,8 @@ export function askServicesFor(
       get registry() {
         return openDurable().registry
       },
-      roster
+      roster,
+      waitGate
     }
     servicesByRuntime.set(runtime, services)
   }

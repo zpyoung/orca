@@ -1,4 +1,3 @@
-import type { RpcAnyMethod } from '../core'
 import { STATUS_METHODS } from './status'
 import { AI_VAULT_METHODS } from './ai-vault'
 import { AUTOMATION_METHODS } from './automations'
@@ -7,6 +6,7 @@ import { WORKTREE_METHODS } from './worktree'
 import { TERMINAL_METHODS } from './terminal'
 import { TERMINAL_ORPHAN_METHODS } from './terminal-orphan'
 import { BROWSER_CORE_METHODS } from './browser-core'
+import { BROWSER_IDENTITY_METHODS } from './browser-identity-rpc'
 import { BROWSER_EXTRA_METHODS } from './browser-extras'
 import { BROWSER_SCREENCAST_METHODS } from './browser-screencast'
 import { BROWSER_CLIENT_HOST_METHODS } from './browser-client-host'
@@ -38,6 +38,7 @@ import { PLUGIN_METHODS } from './plugins'
 import { SKILL_METHODS } from './skills'
 import { CLIPBOARD_METHODS } from './clipboard'
 import { HOST_CAPABILITY_METHODS } from './host-capabilities'
+import { MOBILE_WEB_BUNDLE_METHODS } from './mobile-web-bundle'
 import { RUNTIME_CLIENT_CAPABILITY_METHODS } from './runtime-client-capabilities'
 import { EMULATOR_METHODS } from './emulator'
 import { PAIRING_METHODS } from './pairing'
@@ -48,13 +49,14 @@ import { ARTIFACT_METHODS } from './artifacts'
 import { LEDGER_METHODS } from './ledger'
 import { ARTIFACT_PASSWORD_METHODS } from './fork-artifact-passwords/artifact-password-methods'
 import { AGENT_HOOK_METHODS } from './agent-hooks'
+import { AGENT_LAUNCH_METHODS } from './agent-launch'
 import { ASK_METHODS } from './fork-ask-question-tool/ask'
 import { HEIMDALL_METHODS } from './fork-heimdall/heimdall'
 
 // Why: a flat manifest keeps registration order explicit and provides one
 // grep-point for "what methods does the RPC server expose?" — useful when
 // auditing the security boundary or wiring new CLI commands.
-export const ALL_RPC_METHODS: readonly RpcAnyMethod[] = [
+export const ALL_RPC_METHODS = [
   ...STATUS_METHODS,
   ...AGENT_HOOK_METHODS,
   ...AI_VAULT_METHODS,
@@ -68,9 +70,11 @@ export const ALL_RPC_METHODS: readonly RpcAnyMethod[] = [
   ...WORKTREE_METHODS,
   ...AGENT_SESSION_METHODS,
   ...STRUCTURED_AGENT_SESSION_METHODS,
+  ...AGENT_LAUNCH_METHODS,
   ...TERMINAL_METHODS,
   ...TERMINAL_ORPHAN_METHODS,
   ...BROWSER_CORE_METHODS,
+  ...BROWSER_IDENTITY_METHODS,
   ...BROWSER_SCREENCAST_METHODS,
   ...BROWSER_EXTRA_METHODS,
   ...BROWSER_CLIENT_HOST_METHODS,
@@ -100,6 +104,7 @@ export const ALL_RPC_METHODS: readonly RpcAnyMethod[] = [
   ...SKILL_METHODS,
   ...CLIPBOARD_METHODS,
   ...HOST_CAPABILITY_METHODS,
+  ...MOBILE_WEB_BUNDLE_METHODS,
   ...RUNTIME_CLIENT_CAPABILITY_METHODS,
   ...CLIENT_EVENT_METHODS,
   ...CLIENT_UI_METHODS,

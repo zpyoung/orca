@@ -1,10 +1,34 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
+import type * as AbortableRuntimeEnvironmentCall from '../runtime/abortable-runtime-environment-call'
 import {
   TEST_COMMIT_OID,
   installBrowserGlobals,
   writeStoredRuntimeEnvironment
 } from './web-preload-api-test-harness'
+
+const TEST_WORKTREE = {
+  id: 'wt-1',
+  repoId: 'repo-1',
+  path: '/workspace/repo',
+  head: 'abc123',
+  branch: 'refs/heads/main',
+  isBare: false,
+  isMainWorktree: true,
+  displayName: 'repo',
+  comment: '',
+  linkedIssue: null,
+  linkedPR: null,
+  linkedLinearIssue: null,
+  linkedGitLabMR: null,
+  linkedGitLabIssue: null,
+  isArchived: false,
+  isUnread: false,
+  isPinned: false,
+  sortOrder: 0,
+  lastActivityAt: 0,
+  workspaceStatus: 'todo'
+}
 
 describe('web git preload API', () => {
   beforeEach(() => {
@@ -14,32 +38,11 @@ describe('web git preload API', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
     vi.doUnmock('./web-runtime-client')
+    vi.doUnmock('../runtime/abortable-runtime-environment-call')
   })
 
   it('routes remote commit URL requests through the runtime git API', async () => {
     const runtimeCalls: { method: string; params: unknown }[] = []
-    const worktree = {
-      id: 'wt-1',
-      repoId: 'repo-1',
-      path: '/workspace/repo',
-      head: 'abc123',
-      branch: 'refs/heads/main',
-      isBare: false,
-      isMainWorktree: true,
-      displayName: 'repo',
-      comment: '',
-      linkedIssue: null,
-      linkedPR: null,
-      linkedLinearIssue: null,
-      linkedGitLabMR: null,
-      linkedGitLabIssue: null,
-      isArchived: false,
-      isUnread: false,
-      isPinned: false,
-      sortOrder: 0,
-      lastActivityAt: 0,
-      workspaceStatus: 'todo'
-    }
     vi.doMock('./web-runtime-client', () => ({
       WebRuntimeClient: class {
         call(method: string, params?: unknown): Promise<RuntimeRpcResponse<unknown>> {
@@ -56,7 +59,7 @@ describe('web git preload API', () => {
             return Promise.resolve({
               id: `call-${runtimeCalls.length}`,
               ok: true,
-              result: { repoId: 'repo-1', authoritative: true, worktrees: [worktree] },
+              result: { repoId: 'repo-1', authoritative: true, worktrees: [TEST_WORKTREE] },
               _meta: { runtimeId: 'runtime-1' }
             })
           }
@@ -100,28 +103,6 @@ describe('web git preload API', () => {
 
   it('sends the branch line total merge base only when the chip asked for one', async () => {
     const runtimeCalls: { method: string; params: unknown }[] = []
-    const worktree = {
-      id: 'wt-1',
-      repoId: 'repo-1',
-      path: '/workspace/repo',
-      head: 'abc123',
-      branch: 'refs/heads/main',
-      isBare: false,
-      isMainWorktree: true,
-      displayName: 'repo',
-      comment: '',
-      linkedIssue: null,
-      linkedPR: null,
-      linkedLinearIssue: null,
-      linkedGitLabMR: null,
-      linkedGitLabIssue: null,
-      isArchived: false,
-      isUnread: false,
-      isPinned: false,
-      sortOrder: 0,
-      lastActivityAt: 0,
-      workspaceStatus: 'todo'
-    }
     vi.doMock('./web-runtime-client', () => ({
       WebRuntimeClient: class {
         call(method: string, params?: unknown): Promise<RuntimeRpcResponse<unknown>> {
@@ -138,7 +119,7 @@ describe('web git preload API', () => {
             return Promise.resolve({
               id: `call-${runtimeCalls.length}`,
               ok: true,
-              result: { repoId: 'repo-1', authoritative: true, worktrees: [worktree] },
+              result: { repoId: 'repo-1', authoritative: true, worktrees: [TEST_WORKTREE] },
               _meta: { runtimeId: 'runtime-1' }
             })
           }
@@ -218,5 +199,85 @@ describe('web git preload API', () => {
         admissionTier: 'background'
       }
     })
+  })
+
+  it('registers a diff cancel token before resolving the request params', async () => {
+    const detectedList = Promise.withResolvers<RuntimeRpcResponse<unknown>>()
+    const abortableSignals: AbortSignal[] = []
+    vi.doMock('./web-runtime-client', () => ({
+      WebRuntimeClient: class {
+        call(method: string): Promise<RuntimeRpcResponse<unknown>> {
+          if (method === 'repo.list') {
+            return Promise.resolve({
+              id: 'call-repos',
+              ok: true,
+              result: { repos: [{ id: 'repo-1' }] },
+              _meta: { runtimeId: 'runtime-1' }
+            })
+          }
+          if (method === 'worktree.detectedList') {
+            return detectedList.promise
+          }
+          return Promise.resolve({
+            id: 'call-other',
+            ok: false,
+            error: { code: 'unexpected_method', message: `Unexpected method: ${method}` },
+            _meta: { runtimeId: 'runtime-1' }
+          })
+        }
+
+        close(): void {}
+      }
+    }))
+    vi.doMock('../runtime/abortable-runtime-environment-call', async (importOriginal) => {
+      const actual = await importOriginal<typeof AbortableRuntimeEnvironmentCall>()
+      return {
+        ...actual,
+        callAbortableRuntimeEnvironment: (
+          _environmentId: string,
+          _method: string,
+          _params: unknown,
+          _timeoutMs: number | undefined,
+          signal: AbortSignal
+        ): Promise<RuntimeRpcResponse<unknown>> => {
+          abortableSignals.push(signal)
+          return signal.aborted
+            ? Promise.reject(actual.createRuntimeRpcAbortError())
+            : Promise.resolve({
+                id: 'call-diff',
+                ok: true,
+                result: { kind: 'text', originalContent: '', modifiedContent: 'hello' },
+                _meta: { runtimeId: 'runtime-1' }
+              })
+        }
+      }
+    })
+
+    const globals = installBrowserGlobals('Linux')
+    writeStoredRuntimeEnvironment(globals.storage)
+    const { installWebPreloadApi } = await import('./web-preload-api')
+    const { webGitDiffAbortControllers } = await import('./preload-api/web-git-api')
+    installWebPreloadApi()
+
+    const diff = globals.window.api.git.diff({
+      worktreePath: '/workspace/repo',
+      filePath: '/workspace/repo/src/file.ts',
+      staged: false,
+      requestToken: 'diff-1'
+    })
+    // The cancel has to find a controller while the worktree lookup is still in flight.
+    await vi.waitFor(() => expect(webGitDiffAbortControllers.has('diff-1')).toBe(true))
+    await globals.window.api.git.cancelDiff({ requestToken: 'diff-1' })
+    detectedList.resolve({
+      id: 'call-detected',
+      ok: true,
+      result: { repoId: 'repo-1', authoritative: true, worktrees: [TEST_WORKTREE] },
+      _meta: { runtimeId: 'runtime-1' }
+    })
+
+    await expect(diff).rejects.toThrow('Runtime request aborted')
+    expect(abortableSignals).toHaveLength(1)
+    expect(abortableSignals[0]?.aborted).toBe(true)
+    expect(webGitDiffAbortControllers.size).toBe(0)
   })
 })

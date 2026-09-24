@@ -1,3 +1,4 @@
+import { createAgentSessionKeyboardOptions } from '@/runtime/agent-session-keyboard-capability'
 /* eslint-disable max-lines -- Why: remote PTY transport keeps lifecycle, JSON fallback, and binary stream wiring together so reconnect/destroy ordering stays testable as one behavior surface. */
 import type { RuntimeRpcResponse } from '../../../../shared/runtime-rpc-envelope'
 import {
@@ -33,6 +34,7 @@ import type {
 } from './pty-transport-types'
 import { createPtyOutputProcessor } from './pty-transport'
 import { isSshSessionGoneError } from './pty-connection/pty-connect-limits'
+import { armTerminalInputQuarantine } from './terminal-input-quarantine'
 import { RuntimeRpcCallError, unwrapRuntimeRpcResult } from '../../runtime/runtime-rpc-client'
 import {
   getRemoteRuntimePtyEnvironmentId,
@@ -150,6 +152,7 @@ export function createRemoteRuntimePtyTransport(
     launchToken,
     launchAgent,
     terminalColorQueryReplies,
+    terminalKittyKeyboardProtocol,
     agentPrompt,
     agentPromptDelivery,
     agentArgsOverride,
@@ -405,6 +408,7 @@ export function createRemoteRuntimePtyTransport(
   // Why: reconnect retries must replay one host operation instead of creating
   // another fresh agent when the first response was lost.
   const agentCreateOperation = createAgentSessionCreateOperation()
+  const agentKeyboardOptions = createAgentSessionKeyboardOptions(terminalKittyKeyboardProtocol)
   const outputProcessor = createPtyOutputProcessor({
     onTitleChange,
     onBell,
@@ -645,18 +649,21 @@ export function createRemoteRuntimePtyTransport(
       try {
         snapshot =
           request === 'list'
-            ? await listRemoteRuntimeSessionTabsDeduped({
-                environmentId: currentRuntimeEnvironmentId,
-                worktreeId,
-                load: () =>
-                  callRuntime<RuntimeMobileSessionTabsResult>(
-                    'session.tabs.list',
-                    {
-                      worktree
-                    },
-                    requestRemainingMs
-                  )
-              })
+            ? (
+                await listRemoteRuntimeSessionTabsDeduped({
+                  environmentId: currentRuntimeEnvironmentId,
+                  worktreeId,
+                  load: async () => ({
+                    snapshot: await callRuntime<RuntimeMobileSessionTabsResult>(
+                      'session.tabs.list',
+                      {
+                        worktree
+                      },
+                      requestRemainingMs
+                    )
+                  })
+                })
+              ).snapshot
             : await activateHostSessionSurface(hostTabId, worktree, 'user', requestRemainingMs)
       } catch (error) {
         if (request === 'list') {
@@ -806,18 +813,21 @@ export function createRemoteRuntimePtyTransport(
       try {
         const listed =
           request === 'list'
-            ? await listRemoteRuntimeSessionTabsDeduped({
-                environmentId: currentRuntimeEnvironmentId,
-                worktreeId,
-                load: () =>
-                  callRuntime<RuntimeMobileSessionTabsResult>(
-                    'session.tabs.list',
-                    {
-                      worktree
-                    },
-                    requestRemainingMs
-                  )
-              })
+            ? (
+                await listRemoteRuntimeSessionTabsDeduped({
+                  environmentId: currentRuntimeEnvironmentId,
+                  worktreeId,
+                  load: async () => ({
+                    snapshot: await callRuntime<RuntimeMobileSessionTabsResult>(
+                      'session.tabs.list',
+                      {
+                        worktree
+                      },
+                      requestRemainingMs
+                    )
+                  })
+                })
+              ).snapshot
             : // Why: reconnect recovery, not a user gesture — a pane the user slept
               // must stay slept even though it publishes the same pending status.
               await activateHostSessionSurface(hostTabId, worktree, 'automatic', requestRemainingMs)
@@ -1232,13 +1242,14 @@ export function createRemoteRuntimePtyTransport(
     }
     if (terminal.worktreeId === undefined) {
       const worktree = toRuntimeWorktreeSelector(worktreeId)
-      const listed = await listRemoteRuntimeSessionTabsDeduped({
+      const { snapshot: listed } = await listRemoteRuntimeSessionTabsDeduped({
         environmentId: currentRuntimeEnvironmentId,
         worktreeId,
-        load: () =>
-          callRuntime<RuntimeMobileSessionTabsResult>('session.tabs.list', {
+        load: async () => ({
+          snapshot: await callRuntime<RuntimeMobileSessionTabsResult>('session.tabs.list', {
             worktree
           })
+        })
       })
       const exactLegacyOwner = getHostSessionTerminalSurfaces(listed, tabId, {
         matchRequestedLeaf: true
@@ -1328,6 +1339,9 @@ export function createRemoteRuntimePtyTransport(
         unregisterShutdownHandlers(replacedPtyId)
         registerShutdownHandlers(remotePtyId)
         connected = true
+        // recoverPane always spawns a shell, even when a legacy host reuses its handle or omits
+        // the incarnation stamp, so neither identity carries the evidence the pane bind needs.
+        armTerminalInputQuarantine(tabId)
         if (
           replacedPtyId &&
           (replacedPtyId !== remotePtyId || previousIncarnationId !== authoritativePtyIncarnationId)
@@ -2223,6 +2237,9 @@ export function createRemoteRuntimePtyTransport(
           ...(launchTokenToSend !== undefined ? { launchToken: launchTokenToSend } : {}),
           ...(launchAgentToSend !== undefined ? { launchAgent: launchAgentToSend } : {}),
           ...(terminalColorQueryReplies ? { terminalColorQueryReplies } : {}),
+          ...(terminalKittyKeyboardProtocol === true
+            ? { terminalKittyKeyboardProtocol: true }
+            : {}),
           tabId,
           leafId,
           focus: false,
@@ -2246,8 +2263,9 @@ export function createRemoteRuntimePtyTransport(
             createEnvironmentId,
             connectLifecycleEpoch
           )
-        const hostAuthorityCreate = () =>
-          createWithUnknownOutcomeRecovery(
+        const hostAuthorityCreate = async () => {
+          const keyboardOptions = await agentKeyboardOptions(createEnvironmentId)
+          return createWithUnknownOutcomeRecovery(
             'agent-session',
             (timeoutMs) =>
               resumeProviderSessionToSend
@@ -2256,6 +2274,7 @@ export function createRemoteRuntimePtyTransport(
                     'terminal.ensureAgentSession',
                     {
                       kind: 'explicit',
+                      ...keyboardOptions,
                       worktree: toRuntimeTerminalWorktreeSelector(worktreeId),
                       agent: launchAgentToSend!,
                       providerSession: resumeProviderSessionToSend,
@@ -2276,6 +2295,7 @@ export function createRemoteRuntimePtyTransport(
                     'terminal.createAgentSession',
                     withAgentSessionCreateOperationId(
                       {
+                        ...keyboardOptions,
                         worktree: toRuntimeTerminalWorktreeSelector(worktreeId),
                         agent: launchAgentToSend!,
                         ...(agentPrompt ? { prompt: agentPrompt } : {}),
@@ -2296,6 +2316,7 @@ export function createRemoteRuntimePtyTransport(
             createEnvironmentId,
             connectLifecycleEpoch
           )
+        }
         const resumeHostAuthorityCapability = resumeProviderSessionToSend
           ? agentResumeHostAuthorityCapability(launchAgentToSend)
           : undefined

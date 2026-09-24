@@ -39,6 +39,28 @@ grew. Confirm with a line count — `git show "${UPSTREAM_TARGET}:<path>" | wc -
 worktree copy — and list what replaced it with
 `git ls-tree -r --name-only "$UPSTREAM_TARGET" -- <path-without-.ts>/`.
 
+**Do not read "thousands" as the threshold.** v1.4.202 moved every RPC param schema into
+`src/shared/rpc-contract/*-params.ts` and left four `src/main/runtime/rpc/methods/*-schemas.ts`
+files as re-export barrels — 241 lines down to 8, 229 to 14, 215 to 18. The drifts were
+`+249/-5`, `+278/-14`, `+216/-18`: hundreds, not thousands, and a fork feature that genuinely
+grew a seam file could plausibly show the same number. The line count is what decides, so run it
+on **every** drifted seam rather than only the ones with an eye-catching residual:
+
+```sh
+while IFS= read -r p; do
+  printf '%-70s tag=%-6s fork=%-6s now=%s\n' "$p" \
+    "$(git show "${UPSTREAM_TARGET}:$p" 2>/dev/null | wc -l | tr -d ' ')" \
+    "$(git show "${MERGE_HEAD_PRE}:$p" 2>/dev/null | wc -l | tr -d ' ')" \
+    "$(wc -l < "$p" | tr -d ' ')"
+done < <drifted-paths>
+```
+
+`tag` far below `fork` is a split. And `now` **above** `fork` is its own finding: the merge took
+upstream's additions but not its deletions, so the file now holds both implementations.
+v1.4.202 did that to `NativeChatToolRun.tsx` (tag 348, fork 462, merged 467, residual `+119/-0`)
+and `TerminalContextMenu.tsx` (355 / 383 / 473). Both are repaired the same way as a split:
+`git checkout "$UPSTREAM_TARGET" -- <path>`, then replay the fork delta onto the tag.
+
 Two adjacent tells worth knowing. A seam path that no longer exists in the tag at all is the same
 situation one step further along; compare the manifest's seam paths against
 `git ls-tree -r --name-only "$UPSTREAM_TARGET"` as sets — in Python, or with `LC_ALL=C` on both the
@@ -127,3 +149,86 @@ Two adjacent moves are wrong, and both look tempting:
 not upstream re-implementing it. Record the collision outcome (`agent-composer: possible` here), raise
 it, and keep resolving: the withdrawal costs no fork behaviour, so it is not a decision that has to
 wait for a human.
+
+## A type-level CI gate whose failure names nothing
+
+**What happened.** v1.4.202 added `src/main/runtime/rpc/rpc-params-type-parity.ts`: a compile-time
+assertion that every registered RPC method's handler params match the generated shared catalog.
+Two things about it bite a fork at once.
+
+Fork-only methods (`ask.*`, `ledger.*`, the artifact-password methods) have no shared-contract
+schema, so they land in the generated `RPC_METHODS_WITHOUT_SHARED_PARAMS` array — but the gate
+reads a **hand-written** union, `UncataloguedMethod`, that lists only upstream's own three. That
+part is obvious once read.
+
+The second is not. The gate reads each method's **literal** `name` off the registry tuple, and a
+fork helper that wraps a method array erases those literals. `withArtifactProtectionProjection`
+was declared `<TMethod extends ProjectableMethod>(methods: readonly TMethod[]): readonly TMethod[]`
+with `ProjectableMethod = { name: string; … }`. That constraint widens `name` to `string` at the
+inference site, so `ARTIFACT_METHODS[number]['name']` became `string` and the whole assertion
+collapsed to:
+
+```
+src/main/runtime/rpc/rpc-params-type-parity.ts(44,47): error TS2344:
+  Type 'string' does not satisfy the constraint 'never'.
+```
+
+No method name, no file but the gate's own, and the line it points at is the assertion rather than
+the cause. `const` type parameters do not fix it, and neither does a variadic `readonly [...T]`
+tuple — the constraint is what widens, so it has to go.
+
+**The tell.** `Type 'string' does not satisfy the constraint 'never'` from a type-only gate.
+`string` there means some registered member widened; a genuine gap prints the offending names as a
+union instead. Find which array widened with a generated probe rather than by reading code —
+it takes one typecheck:
+
+```sh
+python3 - <<'PY' > src/main/runtime/rpc/__probe.ts
+import re
+src = open('src/main/runtime/rpc/methods/index.ts').read()
+imps = re.findall(r"^import \{ ([A-Z0-9_]+) \} from '(\./[^']+)'", src, flags=re.M)
+print("import type { RpcMethodName } from '../../../shared/rpc-contract/rpc-params-catalog.generated'")
+for name, mod in imps:
+    print(f"import {{ {name} }} from './methods/{mod[2:]}'")
+for i, (name, _) in enumerate(imps):
+    print(f"const p{i}: never = null as unknown as "
+          f"Exclude<(typeof {name})[number]['name'], RpcMethodName> // {name}")
+print('export {}')
+PY
+find config -maxdepth 1 -name '*.tsbuildinfo' -delete
+pnpm run typecheck:node 2>&1 | grep "__probe"
+rm -f src/main/runtime/rpc/__probe.ts
+```
+
+Every line that prints a **union** of names is fine — those are the genuinely uncatalogued methods.
+The one that prints `string` is the widened array.
+
+**The right move.** Two edits, neither of which touches what the gate checks:
+
+1. Drop the widening constraint from the wrapper's inference site —
+   `<TMethods extends readonly unknown[]>(methods: TMethods): TMethods`, casting internally — and
+   drop any `: readonly RpcAnyMethod[]` / `: RpcMethod[]` annotation from the fork's own method
+   arrays, which upstream removed from its own in the same release.
+2. Declare the fork's uncatalogued method names in a fork-owned module and union it into
+   `UncataloguedMethod` as a two-line seam. Do not paste fifteen names into the upstream file.
+
+Then regenerate the catalog (`node config/scripts/generate-rpc-params-catalog.mjs`) — it picks up
+fork methods on its own, so this part self-heals every sync. Two upstream methods can land in the
+fork's list too: `projectGroup.delete` and `repo.rm` both take a main-side schema once the
+project-ledger feature extends them, which weakens wire parity for exactly those two until the
+schema moves shared-side. Say so in the PR rather than leaving it implicit.
+
+## Re-measuring residuals reads the worktree, not `HEAD`
+
+**What happened.** After a fix that changed a seam, re-measuring every budget with
+`git diff --numstat "$UPSTREAM_TARGET" HEAD -- <paths>` reported *zero* changes, and
+`--verify-residuals` then failed on the one file that had actually moved. The uncommitted fix was
+invisible to a `HEAD`-to-`HEAD` diff.
+
+**The tell.** A re-measure that reports no changes immediately before `--verify-residuals` reports
+drift. The two disagree because they are reading different trees.
+
+**The right move.** Drop the second ref: `git diff --numstat "$UPSTREAM_TARGET" -- <path>` compares
+the tag against the **working tree**, which is what `--verify-residuals` measures. Either re-measure
+that way, or commit first and keep the explicit `HEAD`. Do not re-baseline from a `HEAD`-form
+measurement taken over uncommitted work.

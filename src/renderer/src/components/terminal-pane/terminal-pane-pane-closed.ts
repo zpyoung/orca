@@ -59,6 +59,7 @@ export function createTerminalPaneClosedHandler(
     disposeMapEntry(refs.fileLinkClickFallbackDisposablesRef.current, paneId)
     disposeMapEntry(refs.httpLinkClickFallbackDisposablesRef.current, paneId)
     disposeMapEntry(refs.selectionDisposablesRef.current, paneId)
+    disposeMapEntry(refs.nativeCopyDisposablesRef.current, paneId)
     disposeMapEntry(refs.imeCompositionDisposablesRef.current, paneId)
     disposeMapEntry(refs.imeNativeTextForwarderDisposablesRef.current, paneId)
     const timer = refs.selectionCaptureTimersRef.current.get(paneId)
@@ -95,7 +96,7 @@ export function createTerminalPaneClosedHandler(
         tabId,
         leafId,
         experimentalTerminalDockEnabled:
-          deps.settingsRef.current?.experimentalTerminalDock === true,
+          deps.settingsRef?.current?.experimentalTerminalDock === true,
         pruneStoreDockPaneKeys: dockPruneState.pruneTerminalDockPaneKeys
       })
     }

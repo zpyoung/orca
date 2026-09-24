@@ -1,4 +1,4 @@
-import { defineMethod, defineStreamingMethod, type RpcAnyMethod } from '../../core'
+import { defineMethod, defineStreamingMethod } from '../../core'
 import {
   EmptyHeimdallRequestSchema,
   HEIMDALL_CHANNELS,
@@ -36,7 +36,7 @@ function assertLocalTarget(target: {
   }
 }
 
-export const HEIMDALL_METHODS: readonly RpcAnyMethod[] = [
+export const HEIMDALL_METHODS = [
   ...LEGACY_HEIMDALL_METHODS,
   ...HEIMDALL_OBJECTIVE_METHODS,
   defineMethod({

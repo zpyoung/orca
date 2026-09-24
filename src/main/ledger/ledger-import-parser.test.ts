@@ -4,31 +4,43 @@ import { parseLedgerImportSources } from './ledger-import-parser'
 const base = { kind: 'project' as const, id: 'project-1', host: 'ssh:builder' }
 
 describe('legacy ledger import parser', () => {
-  it('parses multiline labeled records and structures locations', () => {
-    const result = parseLedgerImportSources(
-      [
-        {
-          path: 'BUGS.md',
-          content: [
-            '## BUG-3: Escaped parser',
-            'Title: Escaped parser',
-            'File: src/parser.ts:17',
-            'Description: First paragraph',
-            '  second paragraph',
-            'Severity: HIGH'
-          ].join('\n')
+  it.each(['plain', 'bold-colon-inside', 'bold-colon-outside'])(
+    'parses multiline labeled records with %s labels and structures locations',
+    (style) => {
+      const label = (key: string, value: string): string => {
+        if (style === 'bold-colon-inside') {
+          return `- **${key}:** ${value}`
         }
-      ],
-      base
-    )
-    expect(result.skipped).toEqual([])
-    expect(result.records[0].content).toMatchObject({
-      title: 'Escaped parser',
-      description: 'First paragraph\nsecond paragraph',
-      severity: 'high',
-      file: { path: 'src/parser.ts', line: 17, base }
-    })
-  })
+        if (style === 'bold-colon-outside') {
+          return `- **${key}**: ${value}`
+        }
+        return `${key}: ${value}`
+      }
+      const result = parseLedgerImportSources(
+        [
+          {
+            path: 'BUGS.md',
+            content: [
+              '## BUG-3: Escaped parser',
+              label('Title', 'Escaped parser'),
+              label('File', 'src/parser.ts:17'),
+              label('Description', 'First paragraph'),
+              '  second paragraph',
+              label('Severity', 'HIGH')
+            ].join('\n')
+          }
+        ],
+        base
+      )
+      expect(result.skipped).toEqual([])
+      expect(result.records[0].content).toMatchObject({
+        title: 'Escaped parser',
+        description: 'First paragraph\nsecond paragraph',
+        severity: 'high',
+        file: { path: 'src/parser.ts', line: 17, base }
+      })
+    }
+  )
 
   it('preserves escaped pipes and code spans in tables', () => {
     const result = parseLedgerImportSources(

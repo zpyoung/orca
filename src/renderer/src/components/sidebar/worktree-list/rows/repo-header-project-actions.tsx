@@ -7,6 +7,7 @@ import {
   FolderInput,
   FolderTree,
   Plus,
+  // `Shapes` is lucide-react's own export name; exempted in config/oxlint-anti-slop.json.
   Shapes,
   SlidersHorizontal,
   Trash2
