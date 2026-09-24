@@ -3,6 +3,8 @@ import {
   type ObjectiveEnrollmentPayload,
   type ObjectiveGate,
   type ObjectiveRoleAgents,
+  type ObjectiveRoleLaunch,
+  type ObjectiveRoleLaunchEntry,
   type ObjectiveSitterOverrides
 } from '../../../shared/fork-heimdall-objective/contract-types'
 import type { EnrollInput } from '../../../shared/fork-heimdall/watcher-types'
@@ -23,6 +25,30 @@ export type ObjectiveEnrollmentSubmission = {
   owner: ObjectiveWorkspaceOption['owner']
 }
 
+function buildRoleLaunch(
+  roleLaunch: ObjectiveEnrollmentDraft['roleLaunch']
+): ObjectiveRoleLaunch | undefined {
+  if (!roleLaunch) {
+    return undefined
+  }
+  const result: ObjectiveRoleLaunch = {}
+  for (const role of OBJECTIVE_ROLES) {
+    const draftEntry = roleLaunch[role]
+    if (!draftEntry) {
+      continue
+    }
+    const model = draftEntry.model.trim()
+    const entry: ObjectiveRoleLaunchEntry = {
+      ...(model ? { model } : {}),
+      ...(draftEntry.effort ? { effort: draftEntry.effort } : {})
+    }
+    if (Object.keys(entry).length > 0) {
+      result[role] = entry
+    }
+  }
+  return Object.keys(result).length > 0 ? result : undefined
+}
+
 export function buildObjectiveEnrollmentSubmission(
   draft: ObjectiveEnrollmentDraft,
   workspace: ObjectiveWorkspaceOption
@@ -41,6 +67,7 @@ export function buildObjectiveEnrollmentSubmission(
     }
   }
   const existingPlan = draft.existingPlanText.trim()
+  const roleLaunch = buildRoleLaunch(draft.roleLaunch)
   const gates: ObjectiveGate[] = draft.gates.map((gateDraft) => ({
     name: gateDraft.name.trim(),
     command: gateDraft.command.trim(),
@@ -58,6 +85,7 @@ export function buildObjectiveEnrollmentSubmission(
     workspaceKind: workspace.workspaceKind,
     writeTerritory: parseWriteTerritory(draft.writeTerritoryText),
     roleAgents,
+    ...(roleLaunch ? { roleLaunch } : {}),
     sitterOverrides,
     ...(gates.length > 0 ? { gates } : {})
   }

@@ -98,3 +98,43 @@ describe('buildObjectiveEnrollmentSubmission gates', () => {
     expect(submission.input.kindPayload).not.toHaveProperty('lanesEnabled')
   })
 })
+
+describe('buildObjectiveEnrollmentSubmission roleLaunch', () => {
+  it('omits roleLaunch when the draft has no per-role launch entries', () => {
+    const submission = buildObjectiveEnrollmentSubmission(draft(), objectiveWorkspace())
+
+    expect(submission.input.kindPayload).not.toHaveProperty('roleLaunch')
+  })
+
+  it('omits roleLaunch when every entry has neither model nor effort set', () => {
+    const submission = buildObjectiveEnrollmentSubmission(
+      draft({ roleLaunch: { planner: { model: '  ', effort: '' } } }),
+      objectiveWorkspace()
+    )
+
+    expect(submission.input.kindPayload).not.toHaveProperty('roleLaunch')
+  })
+
+  it('forwards trimmed model and effort for roles with a launch override set', () => {
+    const submission = buildObjectiveEnrollmentSubmission(
+      draft({
+        roleLaunch: {
+          planner: { model: ' gpt-5 ', effort: 'high' },
+          implementer: { model: '', effort: 'low' },
+          reviewer: { model: 'sonnet', effort: '' },
+          integrator: { model: '', effort: '' }
+        }
+      }),
+      objectiveWorkspace()
+    )
+
+    expect(submission.input.kindPayload).toMatchObject({
+      roleLaunch: {
+        planner: { model: 'gpt-5', effort: 'high' },
+        implementer: { effort: 'low' },
+        reviewer: { model: 'sonnet' }
+      }
+    })
+    expect(JSON.stringify(submission.input.kindPayload)).not.toContain('integrator')
+  })
+})
