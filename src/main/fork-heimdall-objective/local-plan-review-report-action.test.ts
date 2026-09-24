@@ -528,6 +528,7 @@ async function ingestPlanReview(
     enrollment: { watcherId: WATCHER_ID },
     target
   } as unknown as ObjectiveSnapshotBinding
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this action only reads context.ledger and context.lease; ExecuteContext's snapshot/dispatchWorker fields are unused here and not worth faking.
   const context = {
     ledger: {
       watcherId: WATCHER_ID,
@@ -742,6 +743,7 @@ async function ingestRoundTwoDeltaReview(
     enrollment: { watcherId: WATCHER_ID },
     target
   } as unknown as ObjectiveSnapshotBinding
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this action only reads context.ledger and context.lease; ExecuteContext's snapshot/dispatchWorker fields are unused here and not worth faking.
   const context = {
     ledger: {
       watcherId: WATCHER_ID,

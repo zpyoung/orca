@@ -48,8 +48,8 @@ function transitiveDependents(
 ): Set<TaskKey> {
   const result = new Set<TaskKey>()
   const queue = [...seeds]
-  while (queue.length > 0) {
-    const key = queue.shift() as TaskKey
+  for (let index = 0; index < queue.length; index++) {
+    const key = queue[index]
     for (const dependent of dependents.get(key) ?? []) {
       if (!result.has(dependent)) {
         result.add(dependent)

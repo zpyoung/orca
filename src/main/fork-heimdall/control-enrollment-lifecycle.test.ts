@@ -39,6 +39,7 @@ function enrollment(maxConcurrency: number): WatcherEnrollment {
 describe('WatcherEnrollmentControlLifecycle.resume', () => {
   it('resyncs an already-enabled, unpaused watcher instead of refusing it', () => {
     const current = enrollment(1)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this test double only needs the enrollment/status fields resume() reads; WatcherRunner has 20 fields the resume path never touches.
     const runner = {
       enrollment: current,
       status: { phase: 'lease-refused', reason: 'stale' }
@@ -47,6 +48,7 @@ describe('WatcherEnrollmentControlLifecycle.resume', () => {
     const schedule = vi.fn()
     const read = vi.fn(() => ({ watcherId: 'watcher-1', entries: [] }))
     const lifecycle = new WatcherEnrollmentControlLifecycle({
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: only `.read` is exercised by resume(); HeimdallLedgerStore's other methods are unused here.
       ledger: { read } as never,
       lease: {} as never,
       runnerLoop: { schedule } as never,

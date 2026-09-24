@@ -27,11 +27,13 @@ function context(dispatchResult: DispatchResult): ExecuteContext<ObjectiveWorld>
 }
 
 function objectiveStore(overrides: Partial<ObjectiveStore> = {}): ObjectiveStore {
-  return {
+  const store = {
     saveDispatch: vi.fn(),
     listDispatches: vi.fn(() => []),
     ...overrides
-  } as unknown as ObjectiveStore
+  }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: ObjectiveStore is a class with private fields, so a structural test double can never satisfy it without this cast; only the overridden methods above are ever invoked by the code under test.
+  return store as unknown as ObjectiveStore
 }
 
 function preparedWorkspace(
@@ -39,16 +41,39 @@ function preparedWorkspace(
 ): PreparedObjectiveDispatchWorkspace {
   return {
     record: {
+      attemptFingerprint: 'attempt-node-a',
       watcherId: 'watcher-1',
+      executionHostId: 'local',
+      revisionId: 'revision-1',
       taskKey: 'node-a',
+      planTaskDigest: 'plan-digest-node-a',
       workspaceId: 'workspace-node-a',
       workspacePath: '/workspaces/node-a',
+      baseCommit: 'base-commit',
+      laneTaskKeys: ['node-a'],
+      sessionNodeCount: 1,
       state: 'applied',
+      commitSha: null,
+      appliedCommitSha: null,
+      reportDigest: null,
+      conflictPaths: [],
+      conflictingTaskKeys: [],
+      conflictingDispatchIds: [],
+      createdAtMs: 1,
       completedAtMs: null,
       dispatchId: null,
       terminalHandle: null,
-      setupState: 'preparing',
+      setupState: 'ready',
       reportPath: null,
+      report: null,
+      task: {
+        taskKey: 'node-a',
+        title: 'node-a',
+        spec: 'Implement node-a',
+        deps: [],
+        criteria: [{ body: 'node-a works', shellCheckable: false, checkCommand: null }],
+        declaresDependencyChange: false
+      },
       ...overrides
     },
     target: {
@@ -59,7 +84,7 @@ function preparedWorkspace(
     },
     reuseTerminal: null,
     isolated: true
-  } as unknown as PreparedObjectiveDispatchWorkspace
+  }
 }
 
 const noLaunch: Pick<ObjectiveEnrollmentPayload, 'roleLaunch'> = {}

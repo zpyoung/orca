@@ -360,14 +360,15 @@
       "feature": "heimdall",
       "kind": "registration",
       "lines": [
-        "import { HEIMDALL_COMMANDS_RUNTIME_CAPABILITY } from './fork-heimdall/capability'",
-        "import { HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY } from './fork-heimdall/capability'",
-        "import { HEIMDALL_WATCHER_ANSWER_ESCALATION_RUNTIME_CAPABILITY } from './fork-heimdall/capability'",
-        "import { HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY } from './fork-heimdall/capability'",
-        "import { HEIMDALL_WATCHER_PARK_REASON_V2_RUNTIME_CAPABILITY } from './fork-heimdall/capability'",
-        "import { HEIMDALL_ENROLL_OWNER_RUNTIME_CAPABILITY } from './fork-heimdall/capability'",
-        "import { HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY } from './fork-heimdall/capability'",
-        "import { HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY } from './fork-heimdall/capability'",
+        "  HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,",
+        "  HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY,",
+        "  HEIMDALL_WATCHER_ANSWER_ESCALATION_RUNTIME_CAPABILITY,",
+        "  HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY,",
+        "  HEIMDALL_WATCHER_PARK_REASON_V2_RUNTIME_CAPABILITY,",
+        "  HEIMDALL_ENROLL_OWNER_RUNTIME_CAPABILITY,",
+        "  HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY,",
+        "  HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY",
+        "} from './fork-heimdall/capability'",
         "  HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY,",
         "  HEIMDALL_COMMANDS_RUNTIME_CAPABILITY,",
         "  HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY,",
@@ -6711,7 +6712,7 @@
       "removed": 1
     },
     "src/shared/protocol-version.ts": {
-      "added": 22,
+      "added": 24,
       "removed": 0
     },
     "src/shared/remote-runtime-client-capabilities.ts": {

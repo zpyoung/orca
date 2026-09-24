@@ -2,9 +2,12 @@ import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
+import {
+  ledger as watcherLedger,
+  projection,
+  snapshot
+} from '../../shared/fork-heimdall-objective/decision-test-harness'
 import type { ObjectivePlanLint } from '../../shared/fork-heimdall-objective/plan-lint'
-import type { ObjectiveWorld } from '../../shared/fork-heimdall-objective/detail-types'
 import type {
   ObjectivePlanTask,
   PlannerReport
@@ -262,8 +265,8 @@ describe('resolveObjectivePlanReviewDispatch delta wiring', () => {
       round,
       watcherId: WATCHER_ID,
       objectiveStore: store,
-      world: { plan: { nodes: [] } } as unknown as ObjectiveWorld,
-      ledger: { entries: [] } as unknown as WatcherLedger,
+      world: snapshot(projection({ nodes: [] })).world,
+      ledger: watcherLedger(),
       writeTerritory: ['src/**'],
       gates: undefined,
       effectiveMaxConcurrency: 1,

@@ -242,6 +242,7 @@ describe('WatcherRunnerControlLifecycle budget teardown', () => {
     const clock = makeClock()
     const lifecycle = new WatcherRunnerControlLifecycle({
       budgetClock: clock,
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: WatcherLedgerLifecycle is a class with private fields, so a structural test double can never satisfy it without this cast; only the two overridden methods are exercised by the code under test.
       dispatchLifecycle: {
         closeForContactLoss: vi.fn(() => {
           throw new Error('worker interval teardown failed')

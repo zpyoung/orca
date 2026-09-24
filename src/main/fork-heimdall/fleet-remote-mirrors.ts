@@ -44,23 +44,19 @@ type FleetSyncPlan = {
   mirrors: RemoteFleetMirrorState[]
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 /** Strips `roleLaunch` from an objective enrollment when the remote host has not negotiated it. */
 function enrollmentWithoutUnsupportedRoleLaunch(
   input: EnrollInput,
   roleLaunchSupported: boolean
 ): EnrollInput {
-  if (
-    roleLaunchSupported ||
-    input.kind !== 'objective' ||
-    typeof input.kindPayload !== 'object' ||
-    input.kindPayload === null
-  ) {
+  if (roleLaunchSupported || input.kind !== 'objective' || !isRecord(input.kindPayload)) {
     return input
   }
-  const { roleLaunch: _roleLaunch, ...legacyKindPayload } = input.kindPayload as Record<
-    string,
-    unknown
-  >
+  const { roleLaunch: _roleLaunch, ...legacyKindPayload } = input.kindPayload
   return { ...input, kindPayload: legacyKindPayload }
 }
 
