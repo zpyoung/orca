@@ -130,7 +130,7 @@ describe('lease-refused status', () => {
     expect(decide).not.toHaveBeenCalled()
     expect((await world.service.list())[0]).toMatchObject({
       enrollment: { enabled: false },
-      status: { state: 'disabled' }
+      status: { enabled: false, state: 'disabled', phase: 'disabled' }
     })
   })
 })
@@ -158,7 +158,10 @@ describe('lease re-acquisition resync', () => {
     await world.service.reconcileForTesting(watcherId)
 
     expect(decide).not.toHaveBeenCalled()
-    expect((await world.service.list())[0]).toMatchObject({ enrollment: { enabled: false } })
+    expect((await world.service.list())[0]).toMatchObject({
+      enrollment: { enabled: false },
+      status: { enabled: false, state: 'disabled', phase: 'disabled' }
+    })
   })
 })
 
