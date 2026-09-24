@@ -71,12 +71,14 @@ export function validatePlanReviewBasis(
     if (basis === 'reverified') {
       continue
     }
-    if (!evidencedSet.has(index)) {
-      unsupportedBasis.push(index)
+    if (basis === 'carried') {
+      if (!carryEligible.has(index)) {
+        ineligibleCarried.push(index)
+      }
       continue
     }
-    if (basis === 'carried' && !carryEligible.has(index)) {
-      ineligibleCarried.push(index)
+    if (!evidencedSet.has(index)) {
+      unsupportedBasis.push(index)
     }
   }
 

@@ -117,9 +117,23 @@ describe('validatePlanReviewBasis basis consistency', () => {
     expect(validatePlanReviewBasis(assumptions, assessments, new Set([0]))).toBeNull()
   })
 
-  it('rejects a carried basis with no recorded evidence even when the index is carry-eligible', () => {
+  it('accepts a carried basis with no recorded evidence when the index is carry-eligible', () => {
     const assumptions = [plainAssumption('carried but never had evidence')]
     const assessments = [assessment(0, { basis: 'carried' })]
+    expect(validatePlanReviewBasis(assumptions, assessments, new Set([0]))).toBeNull()
+  })
+
+  it('rejects a carried basis on an index outside a non-empty carry-eligible set', () => {
+    const assumptions = [plainAssumption('not part of this delta')]
+    const assessments = [assessment(0, { basis: 'carried' })]
+    expect(validatePlanReviewBasis(assumptions, assessments, new Set([5]))).toMatch(
+      /basis:'carried'/
+    )
+  })
+
+  it('rejects a planner-evidence basis on a carry-eligible index with no recorded evidence', () => {
+    const assumptions = [plainAssumption('eligible but never evidenced')]
+    const assessments = [assessment(0, { basis: 'planner-evidence' })]
     expect(validatePlanReviewBasis(assumptions, assessments, new Set([0]))).toMatch(
       /no planner evidence/
     )
