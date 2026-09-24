@@ -29,6 +29,17 @@ import {
 } from './objective-store-data'
 import { readObjectiveCheckAttempt } from './objective-store-queries'
 
+export type AbandonCheckAttemptArgs = {
+  criterionId: string
+  contentIdentity: string
+}
+
+export type AbandonGateAttemptArgs = {
+  watcherId: string
+  gateName: string
+  contentIdentity: string
+}
+
 export class ObjectiveStoreMutations {
   constructor(private readonly database: ObjectiveDatabase) {}
 
@@ -281,6 +292,33 @@ export class ObjectiveStoreMutations {
         throw new Error('Check attempt natural key was replayed with a different result')
       }
       return stored
+    })
+  }
+
+  /**
+   * Removes a check attempt that never completed because the workspace content changed mid-run, so
+   * a decision replay finds no row for this criterion/identity and can re-issue a fresh attempt.
+   */
+  abandonCheckAttempt(args: AbandonCheckAttemptArgs): void {
+    this.mutate(() => {
+      this.database
+        .connection()
+        .prepare(
+          `DELETE FROM check_attempt WHERE criterion_id = ? AND content_identity = ? AND completed_at_ms IS NULL`
+        )
+        .run(args.criterionId, args.contentIdentity)
+    })
+  }
+
+  /** Gate equivalent of `abandonCheckAttempt`, keyed like `startGateAttempt`/`completeGateAttempt`. */
+  abandonGateAttempt(args: AbandonGateAttemptArgs): void {
+    this.mutate(() => {
+      this.database
+        .connection()
+        .prepare(
+          `DELETE FROM gate_attempt WHERE watcher_id = ? AND gate_name = ? AND content_identity = ? AND completed_at_ms IS NULL`
+        )
+        .run(args.watcherId, args.gateName, args.contentIdentity)
     })
   }
 

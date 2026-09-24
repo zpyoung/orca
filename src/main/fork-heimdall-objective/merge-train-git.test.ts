@@ -1,10 +1,11 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { gitExecFileAsync } from '../git/command-runner/git-exec-file'
 import type { RuntimeGitTarget } from '../runtime/runtime-git-command-target'
 import type { LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
+import { OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH } from '../../shared/fork-heimdall-objective/contract-types'
 import type { CriterionCheckResult } from './check-runner'
 import type { ObjectiveWorkspaceTarget } from './content-identity'
 import {
@@ -169,7 +170,7 @@ describe('objective merge train Git mechanics', () => {
     expect(await readFile(join(fixture.source, 'shared.txt'), 'utf8')).toBe('final worktree\n')
     expect(await gitText(fixture.source, ['show', 'HEAD:untracked.txt'])).toBe('untracked')
     expect(await gitText(fixture.source, ['show', '--format=%B', '--no-patch', 'HEAD'])).toBe(
-      'Implement the node\n\nOrca-Heimdall-Task: implement-node'
+      'Implement the node\n\nworker commit two\n\nworker commit one\n\nOrca-Heimdall-Task: implement-node'
     )
     expect(
       (await git(fixture.source, ['ls-tree', '-r', '--name-only', 'HEAD', '--', '.orca'])).stdout
@@ -244,6 +245,112 @@ describe('objective merge train Git mechanics', () => {
         leaseGuard
       )
     ).rejects.toThrow('Objective node HEAD does not descend from its dispatch baseline')
+  })
+
+  it('normalizes the commit past a failing repository pre-commit hook', async () => {
+    const fixture = await repositoryFixture()
+    const hookPath = join(fixture.source, '.git', 'hooks', 'pre-commit')
+    await writeFile(hookPath, '#!/bin/sh\nexit 1\n')
+    await chmod(hookPath, 0o755)
+    await writeFile(join(fixture.source, 'hook-guarded.txt'), 'guarded\n')
+
+    const normalized = await createObjectiveNodeCommit(
+      fixture.sourceTarget,
+      {
+        baseCommit: fixture.baseCommit,
+        taskKey: 'hook-guarded-node',
+        title: 'Normalize past a failing hook',
+        reportedPaths: []
+      },
+      leaseGuard
+    )
+
+    expect(normalized.commitSha).toBe(await gitText(fixture.source, ['rev-parse', 'HEAD']))
+    expect(await gitText(fixture.source, ['show', 'HEAD:hook-guarded.txt'])).toBe('guarded')
+  })
+
+  it('carries a worker commit body into the normalized commit message', async () => {
+    const fixture = await repositoryFixture()
+    await writeFile(join(fixture.source, 'notes.txt'), 'notes\n')
+    await commitAll(fixture.source, 'worker commit\n\ndetailed work notes')
+
+    await createObjectiveNodeCommit(
+      fixture.sourceTarget,
+      {
+        baseCommit: fixture.baseCommit,
+        taskKey: 'worker-notes',
+        title: 'Retain worker notes',
+        reportedPaths: []
+      },
+      leaseGuard
+    )
+
+    expect(await gitText(fixture.source, ['show', '--format=%B', '--no-patch', 'HEAD'])).toBe(
+      'Retain worker notes\n\nworker commit\n\ndetailed work notes\n\nOrca-Heimdall-Task: worker-notes'
+    )
+  })
+
+  it('strips a duplicate Orca-Heimdall-Task trailer already present in a worker commit body', async () => {
+    const fixture = await repositoryFixture()
+    await writeFile(join(fixture.source, 'notes.txt'), 'notes\n')
+    await commitAll(
+      fixture.source,
+      'worker commit\n\nwith a body line\n\nOrca-Heimdall-Task: stale-task'
+    )
+
+    await createObjectiveNodeCommit(
+      fixture.sourceTarget,
+      {
+        baseCommit: fixture.baseCommit,
+        taskKey: 'fresh-task',
+        title: 'Strip the stale trailer',
+        reportedPaths: []
+      },
+      leaseGuard
+    )
+
+    const finalMessage = await gitText(fixture.source, [
+      'show',
+      '--format=%B',
+      '--no-patch',
+      'HEAD'
+    ])
+    expect(finalMessage).toBe(
+      'Strip the stale trailer\n\nworker commit\n\nwith a body line\n\nOrca-Heimdall-Task: fresh-task'
+    )
+    expect(finalMessage.match(/Orca-Heimdall-Task:/gu)).toHaveLength(1)
+  })
+
+  it('bounds the carried-over worker body to OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH', async () => {
+    const fixture = await repositoryFixture()
+    await writeFile(join(fixture.source, 'notes.txt'), 'notes\n')
+    const oversizedBody = 'x'.repeat(OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH + 1_000)
+    await commitAll(fixture.source, `worker commit\n\n${oversizedBody}`)
+
+    await createObjectiveNodeCommit(
+      fixture.sourceTarget,
+      {
+        baseCommit: fixture.baseCommit,
+        taskKey: 'bounded-task',
+        title: 'Bound the carried body',
+        reportedPaths: []
+      },
+      leaseGuard
+    )
+
+    const finalMessage = await gitText(fixture.source, [
+      'show',
+      '--format=%B',
+      '--no-patch',
+      'HEAD'
+    ])
+    const trailer = '\n\nOrca-Heimdall-Task: bounded-task'
+    expect(finalMessage.endsWith(trailer)).toBe(true)
+    const body = finalMessage.slice('Bound the carried body\n\n'.length, -trailer.length)
+    expect(body.length).toBe(OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH)
+    expect(body).toBe(
+      `worker commit\n\n${oversizedBody}`.slice(0, OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH)
+    )
   })
 
   it('does not reset a node worktree after its lease is lost', async () => {

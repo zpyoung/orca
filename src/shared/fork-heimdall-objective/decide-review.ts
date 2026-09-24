@@ -13,6 +13,10 @@ import {
   type ObjectiveDecisionOutcome
 } from './decision-context'
 import {
+  objectiveReadOnlyWorkerInFlight,
+  objectiveStaleEvidenceReissueEvidenceKey
+} from './decide-stale-evidence'
+import {
   decideBlockedReview,
   decideJudgmentQualityReview,
   type ReviewBlocked
@@ -79,6 +83,33 @@ export function decideObjectiveChecks(
     if (check) {
       const disposition = objectiveAttemptDisposition(check.attempt, ledger)
       if (disposition === 'not-landed') {
+        if (check.action.kind === 'run-check' && check.attempt.reason === 'check-evidence-stale') {
+          const reissueEvidenceKey = objectiveStaleEvidenceReissueEvidenceKey(
+            `${criterion.id}:${snapshot.contentIdentity}`,
+            attempts,
+            ledger,
+            (action) =>
+              action.kind === 'run-check' &&
+              action.criterionId === criterion.id &&
+              action.contentIdentity === snapshot.contentIdentity
+          )
+          if (reissueEvidenceKey) {
+            if (objectiveReadOnlyWorkerInFlight(attempts, ledger)) {
+              return objectiveNoAction('checks', 'read-only-worker-in-flight')
+            }
+            return {
+              action: {
+                kind: 'run-check',
+                capability: 'check',
+                visibility: 'local',
+                contentIdentity: snapshot.contentIdentity,
+                evidenceKey: reissueEvidenceKey,
+                criterionId: criterion.id,
+                command: check.action.command
+              }
+            }
+          }
+        }
         if (ownerConfigured) {
           return {
             action: null,
@@ -123,6 +154,9 @@ export function decideObjectiveChecks(
         'replan-after-failure',
         revision.number
       )
+    }
+    if (objectiveReadOnlyWorkerInFlight(attempts, ledger)) {
+      return objectiveNoAction('checks', 'read-only-worker-in-flight')
     }
     return {
       action: {

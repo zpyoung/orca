@@ -1,6 +1,7 @@
 import { win32 } from 'node:path'
 import type { LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
 import { OBJECTIVE_GIT_EXEC_PATH_BATCH_SIZE } from '../../shared/fork-heimdall/objective-git-exec-shapes'
+import { OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH } from '../../shared/fork-heimdall-objective/contract-types'
 import { extractExecError } from '../git/exec-error'
 import { resolveLeasePathFlavor } from '../fork-heimdall/lease-host-filesystem'
 import { runCriterionCheck, type CriterionCheckResult } from './check-runner'
@@ -72,14 +73,14 @@ export type ObjectiveConflictChecksResult =
 
 function assertObjectId(value: string, label: string): void {
   if (!OBJECT_ID_PATTERN.test(value)) {
-    throw new Error(`${label} must be a Git object id`)
+    throw new ObjectiveNodeIngestRejectedError(`${label} must be a Git object id`)
   }
 }
 
 function assertMessageField(value: string, label: string): string {
   const normalized = value.trim()
   if (!normalized || /[\r\n\0]/u.test(normalized)) {
-    throw new Error(`${label} must be a non-empty single line`)
+    throw new ObjectiveNodeIngestRejectedError(`${label} must be a non-empty single line`)
   }
   return normalized
 }
@@ -118,10 +119,15 @@ async function readOptionalCommit(
   }
 }
 
-async function readRequiredCommit(runGit: ObjectiveGitCommand, revision: string): Promise<string> {
+async function readRequiredCommit(
+  runGit: ObjectiveGitCommand,
+  revision: string,
+  buildMissingError: (revision: string) => Error = (rev) =>
+    new Error(`Git commit ${rev} does not exist`)
+): Promise<string> {
   const sha = await readOptionalCommit(runGit, revision)
   if (!sha) {
-    throw new Error(`Git commit ${revision} does not exist`)
+    throw buildMissingError(revision)
   }
   return sha
 }
@@ -197,14 +203,49 @@ async function readCherryPickHead(runGit: ObjectiveGitCommand): Promise<string |
   return readOptionalCommit(runGit, 'CHERRY_PICK_HEAD')
 }
 
+// a nonexistent hooksPath is a no-op hook lookup for Git, so this needs no directory to be created;
+// resolving it via the repository's own git-dir keeps it correct for worktrees and portable across
+// native, WSL and SSH hosts without touching the filesystem directly
+async function normalizationCommitHooksPath(runGit: ObjectiveGitCommand): Promise<string> {
+  const { stdout } = await runGit(['rev-parse', '--absolute-git-dir'])
+  return `${stdout.trim()}/orca-objective-empty-hooks`
+}
+
+function withoutTaskTrailerLines(text: string): string {
+  return text
+    .split('\n')
+    .filter((line) => !line.trimStart().startsWith(`${NODE_TASK_TRAILER}:`))
+    .join('\n')
+}
+
+function boundedCommitBody(value: string): string {
+  return value.length > OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH
+    ? value.slice(0, OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH)
+    : value
+}
+
+/** Carries the dispatched worker's own commit messages into the normalized commit, minus any trailer it already wrote. */
+async function readWorkerCommitBodies(
+  runGit: ObjectiveGitCommand,
+  baseCommit: string,
+  headCommit: string
+): Promise<string> {
+  const { stdout } = await runGit(['log', '--format=%B', `${baseCommit}..${headCommit}`])
+  return boundedCommitBody(withoutTaskTrailerLines(stdout).trim())
+}
+
 async function assertNoInProgressOperation(runGit: ObjectiveGitCommand): Promise<void> {
   for (const revision of ['CHERRY_PICK_HEAD', 'MERGE_HEAD', 'REVERT_HEAD', 'REBASE_HEAD']) {
     if (await readOptionalCommit(runGit, revision)) {
-      throw new Error(`Cannot mutate an objective worktree during ${revision}`)
+      throw new ObjectiveNodeIngestRejectedError(
+        `Cannot mutate an objective worktree during ${revision}`
+      )
     }
   }
   if ((await rawUnmergedPaths(runGit)).length > 0) {
-    throw new Error('Cannot mutate an objective worktree with unresolved Git conflicts')
+    throw new ObjectiveNodeIngestRejectedError(
+      'Cannot mutate an objective worktree with unresolved Git conflicts'
+    )
   }
 }
 
@@ -249,7 +290,11 @@ export async function createObjectiveNodeCommit(
   await assertNoInProgressOperation(runGit)
 
   const [baseCommit, headCommit] = await Promise.all([
-    readRequiredCommit(runGit, input.baseCommit),
+    readRequiredCommit(
+      runGit,
+      input.baseCommit,
+      (revision) => new ObjectiveNodeIngestRejectedError(`Git commit ${revision} does not exist`)
+    ),
     readRequiredCommit(runGit, 'HEAD')
   ])
   if (!(await isAncestor(runGit, baseCommit, headCommit))) {
@@ -257,6 +302,7 @@ export async function createObjectiveNodeCommit(
       'Objective node HEAD does not descend from its dispatch baseline'
     )
   }
+  const workerBodies = await readWorkerCommitBodies(runGit, baseCommit, headCommit)
 
   await lease.assertHeld()
   await runGit(['reset', '--mixed', baseCommit])
@@ -292,9 +338,12 @@ export async function createObjectiveNodeCommit(
     ])
   }
 
-  const message = `${title}\n\n${NODE_TASK_TRAILER}: ${taskKey}`
+  const message = workerBodies
+    ? `${title}\n\n${workerBodies}\n\n${NODE_TASK_TRAILER}: ${taskKey}`
+    : `${title}\n\n${NODE_TASK_TRAILER}: ${taskKey}`
+  const hooksPath = await normalizationCommitHooksPath(runGit)
   await lease.assertHeld()
-  await runGit(['commit', '--allow-empty', '-m', message])
+  await runGit(['-c', `core.hooksPath=${hooksPath}`, 'commit', '--allow-empty', '-m', message])
   const [commitSha, parentSha, remainingDirty] = await Promise.all([
     readRequiredCommit(runGit, 'HEAD'),
     readRequiredCommit(runGit, 'HEAD^'),

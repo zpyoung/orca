@@ -170,6 +170,95 @@ describe('decideObjectiveGates', () => {
       deviation: { kind: 'check-failed', criterionId: 'objective-gate:full-suite' }
     })
   })
+
+  it('holds gates while a read-only worker is in flight', () => {
+    const reviewDispatch: ObjectiveAction = {
+      kind: 'dispatch-reviewer',
+      capability: 'review',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'revision-1:plan-digest:review:content-current',
+      revisionId: 'revision-1'
+    }
+    const attempts = [
+      {
+        attempt: attempt(reviewDispatch, { dispatchId: 'review-dispatch' }),
+        action: reviewDispatch
+      }
+    ]
+    const snap = withGates([gate('unit')])
+    const decision = decideObjectiveGates(snap, ledger(), attempts, [], revision())
+    expect(decision).toMatchObject({ action: null, reason: 'read-only-worker-in-flight' })
+  })
+
+  it('re-issues a stale gate attempt with a distinct suffixed evidence key', () => {
+    const staleAction: ObjectiveAction = {
+      kind: 'run-gate',
+      capability: 'check',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'objective-gate:unit:content-current',
+      gateName: 'unit',
+      command: 'pnpm test',
+      timeoutSeconds: 1_800
+    }
+    const attempts = [
+      {
+        attempt: attempt(staleAction, {
+          state: 'settled',
+          effect: 'not-landed',
+          reason: 'check-evidence-stale'
+        }),
+        action: staleAction
+      }
+    ]
+    const snap = withGates([gate('unit')])
+    const decision = decideObjectiveGates(snap, ledger(), attempts, [], revision())
+    expect(decision?.action).toMatchObject({
+      kind: 'run-gate',
+      gateName: 'unit',
+      contentIdentity: 'content-current',
+      evidenceKey: 'objective-gate:unit:content-current#stale-1'
+    })
+  })
+
+  it('treats a stale gate attempt as an ordinary failure once retries reach the cap', () => {
+    const staleEvidenceKeys = [
+      'objective-gate:unit:content-current',
+      'objective-gate:unit:content-current#stale-1',
+      'objective-gate:unit:content-current#stale-2'
+    ]
+    const attempts = staleEvidenceKeys.map((evidenceKey, index) => {
+      const action: ObjectiveAction = {
+        kind: 'run-gate',
+        capability: 'check',
+        visibility: 'local',
+        contentIdentity: 'content-current',
+        evidenceKey,
+        gateName: 'unit',
+        command: 'pnpm test',
+        timeoutSeconds: 1_800
+      }
+      return {
+        attempt: attempt(action, {
+          state: 'settled',
+          effect: 'not-landed',
+          reason: 'check-evidence-stale',
+          dispatchId: `stale-${index}`
+        }),
+        action
+      }
+    })
+    const snap = withGates([gate('unit')])
+    const decision = decideObjectiveGates(snap, ledger(), attempts, [], revision(), true)
+    expect(decision).toMatchObject({
+      deviation: {
+        kind: 'check-failed',
+        criterionId: 'objective-gate:unit',
+        detail: 'the gate attempt itself failed to land'
+      }
+    })
+  })
 })
 
 describe('objective gates run between checks and review', () => {

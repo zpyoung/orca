@@ -10,6 +10,10 @@ import {
   type ObjectiveAttempt,
   type ObjectiveDecisionOutcome
 } from './decision-context'
+import {
+  objectiveReadOnlyWorkerInFlight,
+  objectiveStaleEvidenceReissueEvidenceKey
+} from './decide-stale-evidence'
 import type {
   ObjectivePendingReport,
   ObjectiveRevisionProjection,
@@ -22,6 +26,7 @@ type GateClassification =
   | { status: 'failed'; exitCode: number | null; timedOut: boolean; detail?: string }
   | { status: 'in-flight' }
   | { status: 'missing' }
+  | { status: 'stale-reissue'; evidenceKey: string }
 
 /**
  * A gate is keyed like a check (lineage identity, not the raw snapshot identity) so a rebase back
@@ -60,6 +65,20 @@ function classifyGate(
   }
   const disposition = objectiveAttemptDisposition(inFlight.attempt, ledger)
   if (disposition === 'not-landed') {
+    if (inFlight.attempt.reason === 'check-evidence-stale') {
+      const reissueEvidenceKey = objectiveStaleEvidenceReissueEvidenceKey(
+        `objective-gate:${gate.name}:${snapshot.contentIdentity}`,
+        attempts,
+        ledger,
+        (action) =>
+          action.kind === 'run-gate' &&
+          action.gateName === gate.name &&
+          action.contentIdentity === snapshot.contentIdentity
+      )
+      if (reissueEvidenceKey) {
+        return { status: 'stale-reissue', evidenceKey: reissueEvidenceKey }
+      }
+    }
     return {
       status: 'failed',
       exitCode: null,
@@ -87,6 +106,33 @@ export function decideObjectiveGates(
     gate,
     classification: classifyGate(gate, snapshot, ledger, attempts, lineageIdentity)
   }))
+
+  const staleReissue = classified.find(
+    (
+      entry
+    ): entry is {
+      gate: ObjectiveGate
+      classification: Extract<GateClassification, { status: 'stale-reissue' }>
+    } => entry.classification.status === 'stale-reissue'
+  )
+  const missing = classified.find((entry) => entry.classification.status === 'missing')
+  if (staleReissue) {
+    if (objectiveReadOnlyWorkerInFlight(attempts, ledger)) {
+      return objectiveNoAction('gates', 'read-only-worker-in-flight')
+    }
+    return {
+      action: {
+        kind: 'run-gate',
+        capability: 'check',
+        visibility: 'local',
+        contentIdentity: snapshot.contentIdentity,
+        evidenceKey: staleReissue.classification.evidenceKey,
+        gateName: staleReissue.gate.name,
+        command: staleReissue.gate.command,
+        timeoutSeconds: staleReissue.gate.timeoutSeconds
+      }
+    }
+  }
 
   const failed = classified.find(
     (
@@ -121,8 +167,10 @@ export function decideObjectiveGates(
     )
   }
 
-  const missing = classified.find((entry) => entry.classification.status === 'missing')
   if (missing) {
+    if (objectiveReadOnlyWorkerInFlight(attempts, ledger)) {
+      return objectiveNoAction('gates', 'read-only-worker-in-flight')
+    }
     return {
       action: {
         kind: 'run-gate',

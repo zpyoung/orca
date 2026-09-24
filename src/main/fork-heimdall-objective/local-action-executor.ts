@@ -59,6 +59,10 @@ async function runCheck(args: {
     return invalid('criterion-check-mismatch')
   }
   await args.context.lease.assertHeld()
+  const preIdentity = await computeWorkspaceContentIdentity(args.binding.target)
+  if (preIdentity !== args.action.contentIdentity) {
+    return { effect: 'not-landed', reason: 'check-evidence-stale' }
+  }
   args.objectiveStore.startCheckAttempt({
     watcherId: args.binding.enrollment.watcherId,
     criterionId: criterion.id,
@@ -73,6 +77,14 @@ async function runCheck(args: {
     target: args.binding.target
   })
   await args.context.lease.assertHeld()
+  const postIdentity = await computeWorkspaceContentIdentity(args.binding.target)
+  if (postIdentity !== args.action.contentIdentity) {
+    args.objectiveStore.abandonCheckAttempt({
+      criterionId: criterion.id,
+      contentIdentity: args.action.contentIdentity
+    })
+    return { effect: 'not-landed', reason: 'check-evidence-stale' }
+  }
   args.objectiveStore.completeCheckAttempt({
     criterionId: criterion.id,
     contentIdentity: args.action.contentIdentity,
@@ -111,6 +123,10 @@ async function runGate(args: {
     return invalid('gate-declaration-mismatch')
   }
   await args.context.lease.assertHeld()
+  const preIdentity = await computeWorkspaceContentIdentity(args.binding.target)
+  if (preIdentity !== args.action.contentIdentity) {
+    return { effect: 'not-landed', reason: 'check-evidence-stale' }
+  }
   args.objectiveStore.startGateAttempt({
     watcherId: args.binding.enrollment.watcherId,
     gateName: args.action.gateName,
@@ -126,6 +142,15 @@ async function runGate(args: {
     timeoutSeconds: args.action.timeoutSeconds
   })
   await args.context.lease.assertHeld()
+  const postIdentity = await computeWorkspaceContentIdentity(args.binding.target)
+  if (postIdentity !== args.action.contentIdentity) {
+    args.objectiveStore.abandonGateAttempt({
+      watcherId: args.binding.enrollment.watcherId,
+      gateName: args.action.gateName,
+      contentIdentity: args.action.contentIdentity
+    })
+    return { effect: 'not-landed', reason: 'check-evidence-stale' }
+  }
   args.objectiveStore.completeGateAttempt({
     watcherId: args.binding.enrollment.watcherId,
     gateName: args.action.gateName,

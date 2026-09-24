@@ -265,7 +265,11 @@ describe('parallel objective train recovery', () => {
         }),
         recoveryLedger()
       )
-      expect(validated.action).toEqual(ingestAction())
+      // a settled not-landed ingest needs a new evidence key or the kernel gate holds the replay
+      expect(validated.action).toEqual({
+        ...ingestAction(),
+        evidenceKey: 'dispatch-core#ingest-retry-1'
+      })
 
       const committed = decideObjective(
         snapshot(plan, {
@@ -277,7 +281,10 @@ describe('parallel objective train recovery', () => {
         }),
         recoveryLedger()
       )
-      expect(committed.action).toEqual(ingestAction())
+      expect(committed.action).toEqual({
+        ...ingestAction(),
+        evidenceKey: 'dispatch-core#ingest-retry-1'
+      })
     }
   })
 

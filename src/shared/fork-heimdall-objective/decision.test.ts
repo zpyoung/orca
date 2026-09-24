@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { decideObjective } from './decision'
+import { decideObjectiveChecks } from './decide-review'
 import {
   attempt,
   CONTRACT,
@@ -275,6 +276,97 @@ describe('objective deterministic phase flow', () => {
       shape: 'repair',
       repairRevisionId: 'revision-1',
       reason: 'replan-after-failure'
+    })
+  })
+})
+
+describe('objective checks hold for read-only workers and stale evidence', () => {
+  const unchecked = node('core', {
+    state: 'succeeded',
+    criteria: [
+      {
+        id: 'criterion-1',
+        ordinal: 0,
+        body: 'The focused check passes.',
+        shellCheckable: true,
+        checkCommand: 'pnpm check',
+        lastCheck: null,
+        lastReview: null
+      }
+    ]
+  })
+  const staleCheck = (evidenceKey: string, dispatchId: string) => {
+    const action: ObjectiveAction = {
+      kind: 'run-check',
+      capability: 'check',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey,
+      criterionId: 'criterion-1',
+      command: 'pnpm check'
+    }
+    return {
+      attempt: attempt(action, {
+        state: 'settled',
+        effect: 'not-landed',
+        reason: 'check-evidence-stale',
+        dispatchId
+      }),
+      action
+    }
+  }
+
+  it('holds checks while a read-only worker is in flight', () => {
+    const planReview: ObjectiveAction = {
+      kind: 'dispatch-plan-review',
+      capability: 'review',
+      visibility: 'local',
+      contentIdentity: 'content-current',
+      evidenceKey: 'revision-1:plan-digest:plan-review:1',
+      target: { kind: 'revision', revisionId: 'revision-1' },
+      round: 1
+    }
+    const decision = decideObjectiveChecks(
+      snapshot(projection({ nodes: [unchecked] })),
+      ledger(),
+      [
+        { attempt: attempt(planReview, { dispatchId: 'plan-review-dispatch' }), action: planReview }
+      ],
+      [],
+      revision()
+    )
+    expect(decision).toMatchObject({ action: null, reason: 'read-only-worker-in-flight' })
+  })
+
+  it('re-issues a stale check with a distinct suffixed evidence key', () => {
+    const decision = decideObjectiveChecks(
+      snapshot(projection({ nodes: [unchecked] })),
+      ledger(),
+      [staleCheck('criterion-1:content-current', 'stale-0')],
+      [],
+      revision()
+    )
+    expect(decision?.action).toMatchObject({
+      kind: 'run-check',
+      criterionId: 'criterion-1',
+      evidenceKey: 'criterion-1:content-current#stale-1'
+    })
+  })
+
+  it('falls through to the ordinary failure path once stale retries reach the cap', () => {
+    const decision = decideObjectiveChecks(
+      snapshot(projection({ nodes: [unchecked] })),
+      ledger(),
+      [
+        staleCheck('criterion-1:content-current', 'stale-0'),
+        staleCheck('criterion-1:content-current#stale-1', 'stale-1'),
+        staleCheck('criterion-1:content-current#stale-2', 'stale-2')
+      ],
+      [],
+      revision()
+    )
+    expect(decision).toMatchObject({
+      action: { kind: 'dispatch-planner', shape: 'repair', reason: 'replan-after-failure' }
     })
   })
 })
