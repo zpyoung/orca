@@ -77,6 +77,9 @@ type BundledWriter = {
   }
   assertAgentPromptPermissionSafe: () => void
   getPtyAgent: () => 'omp'
+  getPtyWriteHostPlatform: () => 'linux'
+  createAgentPromptRenderGate: () => null
+  ptysById: Map<string, { launchedAgent: 'omp'; launchAgent: null; foregroundAgent: null }>
   ptyController: { write: (ptyId: string, data: string) => boolean }
   writeTerminalAgentPrompt(
     handle: string,
@@ -190,6 +193,12 @@ describe('OMP agent prompt submission', () => {
     })
     runtime.assertAgentPromptPermissionSafe = () => {}
     runtime.getPtyAgent = () => 'omp'
+    runtime.getPtyWriteHostPlatform = () => 'linux'
+    runtime.createAgentPromptRenderGate = () => null
+    // launch authority already retired and Bun is the foreground process, so only launchedAgent names OMP
+    runtime.ptysById = new Map([
+      [PTY_ID, { launchedAgent: 'omp', launchAgent: null, foregroundAgent: null }]
+    ])
     runtime.ptyController = {
       write: (_ptyId, data) => {
         writes.push(data)
