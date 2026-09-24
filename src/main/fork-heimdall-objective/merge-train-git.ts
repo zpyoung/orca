@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { win32 } from 'node:path'
 import type { LeaseGuard } from '../../shared/fork-heimdall/kind-contract'
 import { OBJECTIVE_GIT_EXEC_PATH_BATCH_SIZE } from '../../shared/fork-heimdall/objective-git-exec-shapes'
@@ -205,10 +206,11 @@ async function readCherryPickHead(runGit: ObjectiveGitCommand): Promise<string |
 
 // a nonexistent hooksPath is a no-op hook lookup for Git, so this needs no directory to be created;
 // resolving it via the repository's own git-dir keeps it correct for worktrees and portable across
-// native, WSL and SSH hosts without touching the filesystem directly
+// native, WSL and SSH hosts without touching the filesystem directly. the name carries a fresh
+// random component so a worker cannot pre-plant a hook at a path it can predict
 async function normalizationCommitHooksPath(runGit: ObjectiveGitCommand): Promise<string> {
   const { stdout } = await runGit(['rev-parse', '--absolute-git-dir'])
-  return `${stdout.trim()}/orca-objective-empty-hooks`
+  return `${stdout.trim()}/orca-objective-empty-hooks-${randomUUID()}`
 }
 
 function withoutTaskTrailerLines(text: string): string {

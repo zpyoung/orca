@@ -269,6 +269,33 @@ describe('objective merge train Git mechanics', () => {
     expect(await gitText(fixture.source, ['show', 'HEAD:hook-guarded.txt'])).toBe('guarded')
   })
 
+  it('normalizes the commit even when a worker has pre-planted a hook at the old fixed hooksPath', async () => {
+    const fixture = await repositoryFixture()
+    const staleHooksDir = join(fixture.source, '.git', 'orca-objective-empty-hooks')
+    await mkdir(staleHooksDir, { recursive: true })
+    const staleHookPath = join(staleHooksDir, 'pre-commit')
+    await writeFile(staleHookPath, '#!/bin/sh\nexit 1\n')
+    await chmod(staleHookPath, 0o755)
+    const repoHookPath = join(fixture.source, '.git', 'hooks', 'pre-commit')
+    await writeFile(repoHookPath, '#!/bin/sh\nexit 1\n')
+    await chmod(repoHookPath, 0o755)
+    await writeFile(join(fixture.source, 'planted-hook.txt'), 'planted\n')
+
+    const normalized = await createObjectiveNodeCommit(
+      fixture.sourceTarget,
+      {
+        baseCommit: fixture.baseCommit,
+        taskKey: 'planted-hook-node',
+        title: 'Normalize past a pre-planted hook',
+        reportedPaths: []
+      },
+      leaseGuard
+    )
+
+    expect(normalized.commitSha).toBe(await gitText(fixture.source, ['rev-parse', 'HEAD']))
+    expect(await gitText(fixture.source, ['show', 'HEAD:planted-hook.txt'])).toBe('planted')
+  })
+
   it('carries a worker commit body into the normalized commit message', async () => {
     const fixture = await repositoryFixture()
     await writeFile(join(fixture.source, 'notes.txt'), 'notes\n')
