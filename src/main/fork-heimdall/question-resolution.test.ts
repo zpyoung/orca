@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
+import { getLatestEscalations } from '../../shared/fork-heimdall/ledger-queries'
 import type { LedgerEntry } from '../../shared/fork-heimdall/ledger-types'
 import { dormantWatcherStatus } from './debug-report'
 import { isMalformedKindPayloadEnrollment } from './enrollment-store'
 import { enrollmentInput, harness, kind, runningDispatch } from './kernel-service-test-harness'
+import { voidUnanswerableQuestion, type QuestionLedgerAccess } from './question-resolution'
 
 vi.mock('electron', () => ({}))
 
@@ -116,7 +118,7 @@ describe('Heimdall unanswerable worker questions', () => {
         expectedOwner: parked.ownerFence,
         command: { kind: 'resume' }
       })
-    ).resolves.toMatchObject({ status: 'refused', reason: 'invalid-state' })
+    ).resolves.toMatchObject({ status: 'applied' })
 
     const parkBeforeSecondTick = latestEscalation(
       service.ledger(watcherId).entries,
@@ -162,8 +164,8 @@ describe('Heimdall unanswerable worker questions', () => {
     })
   })
 
-  it('refuses an answer to a closed thread and clears the escalation it can never satisfy', async () => {
-    const { service, orchestration, watcherId } = await parkedOnQuestion()
+  it('refuses an answer to a closed thread, clears the escalation, and reschedules the watcher', async () => {
+    const { service, orchestration, watcherId, schedule } = await parkedOnQuestion()
     vi.mocked(orchestration.answerQuestion).mockRejectedValue(
       Object.assign(
         new Error('Question message-question is closed because its Dispatch is inactive.'),
@@ -174,6 +176,7 @@ describe('Heimdall unanswerable worker questions', () => {
     )
 
     const parked = (await service.fleet()).entries[0]!
+    schedule.mockClear()
     await expect(
       service.command({
         target: parked.target,
@@ -188,5 +191,132 @@ describe('Heimdall unanswerable worker questions', () => {
     expect(latestEscalation(service.ledger(watcherId).entries, 'worker-question')).toMatchObject({
       status: 'resolved'
     })
+    expect(schedule).toHaveBeenCalled()
+  })
+})
+
+describe('voidUnanswerableQuestion', () => {
+  function openQuestionEntries(watcherId: string, messageId: string): LedgerEntry[] {
+    return [
+      {
+        eventId: 'question-open',
+        watcherId,
+        atMs: 10,
+        origin: 'owner',
+        class: 'fact',
+        kind: 'escalation',
+        escalationId: `worker-question:dispatch-1:${messageId}`,
+        escalationKind: 'worker-question',
+        status: 'open',
+        foldCount: 1
+      },
+      {
+        eventId: 'question-park',
+        watcherId,
+        atMs: 11,
+        origin: 'owner',
+        class: 'fact',
+        kind: 'escalation',
+        escalationId: `park:${watcherId}:worker-question:${messageId}`,
+        escalationKind: 'park-worker-question',
+        status: 'open',
+        foldCount: 1
+      }
+    ]
+  }
+
+  function fakeAccess(entries: LedgerEntry[]): QuestionLedgerAccess {
+    let nextId = 0
+    return {
+      read: () => ({ watcherId: 'watcher-1', entries }),
+      append: (entry) => entries.push(entry),
+      now: () => 100,
+      createId: () => `event-${(nextId += 1)}`
+    }
+  }
+
+  it('voids a question once orchestration reports it closed', async () => {
+    const entries = openQuestionEntries('watcher-1', 'message-1')
+    const access = fakeAccess(entries)
+
+    await voidUnanswerableQuestion(access, async () => ({ status: 'closed' }), 'watcher-1')
+
+    expect(
+      entries.some(
+        (entry) => entry.kind === 'evidence' && entry.evidenceKind === 'worker-question-void'
+      )
+    ).toBe(true)
+    expect(
+      getLatestEscalations({ watcherId: 'watcher-1', entries }).every(
+        (entry) => entry.status === 'resolved' || entry.status === 'acknowledged'
+      )
+    ).toBe(true)
+  })
+
+  it('never voids a question whose orchestration status is unverifiable', async () => {
+    const entries = openQuestionEntries('watcher-1', 'message-1')
+    const access = fakeAccess(entries)
+    const before = entries.length
+
+    await voidUnanswerableQuestion(
+      access,
+      async () => ({ status: 'unverifiable', reason: 'seat unreachable' }),
+      'watcher-1'
+    )
+
+    expect(entries).toHaveLength(before)
+  })
+
+  it('voids a still-pending question once the dispatch that asked it has exited', async () => {
+    const entries = openQuestionEntries('watcher-1', 'message-1')
+    const access = fakeAccess(entries)
+
+    await voidUnanswerableQuestion(
+      access,
+      async () => ({ status: 'pending' }),
+      'watcher-1',
+      async () => 'exited'
+    )
+
+    expect(
+      entries.some(
+        (entry) => entry.kind === 'evidence' && entry.evidenceKind === 'worker-question-void'
+      )
+    ).toBe(true)
+    expect(
+      getLatestEscalations({ watcherId: 'watcher-1', entries }).every(
+        (entry) => entry.status === 'resolved' || entry.status === 'acknowledged'
+      )
+    ).toBe(true)
+  })
+
+  it('never voids a pending question whose dispatch liveness is unverifiable', async () => {
+    const entries = openQuestionEntries('watcher-1', 'message-1')
+    const access = fakeAccess(entries)
+    const before = entries.length
+
+    await voidUnanswerableQuestion(
+      access,
+      async () => ({ status: 'pending' }),
+      'watcher-1',
+      async () => 'unverifiable'
+    )
+
+    expect(entries).toHaveLength(before)
+  })
+
+  it('never voids a pending question whose dispatch is still live', async () => {
+    const entries = openQuestionEntries('watcher-1', 'message-1')
+    const access = fakeAccess(entries)
+    const before = entries.length
+
+    await voidUnanswerableQuestion(
+      access,
+      async () => ({ status: 'pending' }),
+      'watcher-1',
+      async () => 'live'
+    )
+
+    expect(entries).toHaveLength(before)
   })
 })

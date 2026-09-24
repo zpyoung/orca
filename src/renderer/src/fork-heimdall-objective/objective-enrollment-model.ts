@@ -11,9 +11,11 @@ import {
   OBJECTIVE_TERRITORY_MAX_ENTRIES,
   OBJECTIVE_TEXT_MAX_LENGTH,
   ObjectiveLandingBarSchema,
+  ObjectiveLaunchEffortSchema,
   ObjectiveTierSchema,
   isAllowedObjectiveTerritoryGlob,
   type ObjectiveLandingBar,
+  type ObjectiveLaunchEffort,
   type ObjectiveRole,
   type ObjectiveTier,
   type ObjectiveWorkspaceKind
@@ -32,6 +34,15 @@ export type ObjectiveCapability = (typeof OBJECTIVE_CAPABILITIES)[number]
 
 export const OBJECTIVE_ROLES = SHARED_OBJECTIVE_ROLES
 export type { ObjectiveRole }
+
+export const OBJECTIVE_LAUNCH_EFFORTS = ObjectiveLaunchEffortSchema.options
+export type { ObjectiveLaunchEffort }
+
+/** A blank `model` or `effort` means unset: the role launches with the agent CLI's own default. */
+export type ObjectiveRoleLaunchDraft = {
+  model: string
+  effort: ObjectiveLaunchEffort | ''
+}
 
 export const OBJECTIVE_SITTER_CAPABILITIES = [
   'updateBranch',
@@ -58,6 +69,8 @@ export type ObjectiveEnrollmentDraft = {
   writeTerritoryText: string
   capabilities: Record<ObjectiveCapability, CapabilityMode>
   roleAgents: Record<ObjectiveRole, string>
+  /** Absent, like an unset per-role entry, means every role launches with today's behavior. */
+  roleLaunch?: Partial<Record<ObjectiveRole, ObjectiveRoleLaunchDraft>>
   sitterOverrides: Record<ObjectiveSitterCapability, CapabilityMode | 'inherit'>
   gates: ObjectiveEnrollmentGateDraft[]
   activeBudgetHours: number

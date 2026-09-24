@@ -436,7 +436,8 @@ async function sendOwnerBrief(
     ledger,
     deviation,
     owner,
-    ...(previousSubmissionRejection === undefined ? {} : { previousSubmissionRejection })
+    ...(previousSubmissionRejection === undefined ? {} : { previousSubmissionRejection }),
+    ...(current.humanReply === undefined ? {} : { operatorAnswer: current.humanReply.body })
   })
   if (!brief.fitsStateBudget) {
     return (

@@ -5,9 +5,13 @@ import type {
   WatcherLedger
 } from '../../shared/fork-heimdall/ledger-types'
 import type {
+  DispatchObservation,
   UnanswerableQuestionStatus,
   WatcherQuestionState
 } from './orchestration/orchestration-contract'
+
+/** The liveness of the dispatch that asked a question, keyed by dispatch id. */
+export type ReadDispatchLiveness = (dispatchId: string) => Promise<DispatchObservation['status']>
 
 export type QuestionEscalationTransition = {
   entry: EscalationEntry
@@ -147,19 +151,32 @@ export function appendVoidedQuestionTransitions(
   }
 }
 
-/** Retires an open question whose thread can no longer take an answer, so `resume` stops refusing. */
+/**
+ * Retires an open question whose thread can no longer take an answer, so `resume` stops refusing.
+ * A question still `pending` in orchestration is also retired once `readDispatchLiveness` confirms
+ * the dispatch that asked it has exited — otherwise it would block resume forever, since the worker
+ * that could answer it is gone. Loss of contact is never evidence of exit, so `unverifiable` (of the
+ * question or the dispatch) never voids.
+ */
 export async function voidUnanswerableQuestion(
   access: QuestionLedgerAccess,
   readQuestion: (messageId: string) => Promise<WatcherQuestionState>,
-  watcherId: string
+  watcherId: string,
+  readDispatchLiveness?: ReadDispatchLiveness
 ): Promise<void> {
   const open = getOpenWorkerQuestion(access.read(watcherId))
   if (!open) {
     return
   }
   const state = await readQuestion(open.messageId)
-  if (state.status === 'pending' || state.status === 'unverifiable') {
+  if (state.status !== 'pending' && state.status !== 'unverifiable') {
+    appendVoidedQuestionTransitions(access, watcherId, open.messageId, state.status)
     return
   }
-  appendVoidedQuestionTransitions(access, watcherId, open.messageId, state.status)
+  if (state.status === 'pending' && open.dispatchId && readDispatchLiveness) {
+    const liveness = await readDispatchLiveness(open.dispatchId)
+    if (liveness === 'exited') {
+      appendVoidedQuestionTransitions(access, watcherId, open.messageId, 'closed')
+    }
+  }
 }

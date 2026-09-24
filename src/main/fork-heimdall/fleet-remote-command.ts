@@ -67,6 +67,19 @@ export function commandRemoteWatcher(
       )
     )
   }
+  if (
+    request.command.kind === 'answer-escalation' &&
+    mirror.answerEscalationSupport !== 'supported'
+  ) {
+    return Promise.resolve(
+      refused(
+        'unsupported-capability',
+        mirror.answerEscalationSupport === 'unsupported'
+          ? 'The owning runtime does not support answering an owner escalation. Update the host and try again.'
+          : 'Owner escalation answer support could not be verified. Refresh the owner state and try again.'
+      )
+    )
+  }
   return sendRemoteWatcherCommand(environments, identity, request, () => {
     if (request.command.kind === 'set-concurrency') {
       mirror.parallelExecutionSupport = 'unsupported'
@@ -75,6 +88,8 @@ export function commandRemoteWatcher(
     }
     if (request.command.kind === 'delete') {
       mirror.deleteSupport = 'unsupported'
+    } else if (request.command.kind === 'answer-escalation') {
+      mirror.answerEscalationSupport = 'unsupported'
     } else {
       mirror.commandSupport = 'unsupported'
     }

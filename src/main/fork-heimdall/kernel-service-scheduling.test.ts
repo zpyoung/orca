@@ -512,7 +512,7 @@ describe('Heimdall kernel enrollment and scheduling', () => {
         status: {
           state: 'parked',
           phase: 'parked',
-          reason: 'stop-predicate',
+          reason: 'review-closed',
           parkReason: {
             kind: 'stop-predicate',
             predicateId: 'closed',

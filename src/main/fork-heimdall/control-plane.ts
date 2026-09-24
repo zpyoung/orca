@@ -147,7 +147,11 @@ export class WatcherControlPlane {
         await voidUnanswerableQuestion(
           this.questionLedger,
           this.readQuestion(enrollment),
-          enrollment.watcherId
+          enrollment.watcherId,
+          (dispatchId) =>
+            this.dependencies.orchestration
+              .readDispatch(enrollment, dispatchId)
+              .then((observation) => observation.status)
         )
         return this.enrollmentLifecycle.resume(enrollment, request.expectedOwner)
       case 'disarm':
@@ -175,7 +179,54 @@ export class WatcherControlPlane {
         )
       case 'stop-worker':
         return await this.stopWorker(enrollment, request.expectedOwner, request.command.dispatchId)
+      case 'answer-escalation':
+        return this.answerEscalation(
+          enrollment,
+          request.expectedOwner,
+          request.command.escalationId,
+          request.command.body
+        )
     }
+  }
+
+  private answerEscalation(
+    enrollment: WatcherEnrollment,
+    expectedOwner: WatcherOwnerFence,
+    escalationId: string,
+    body: string
+  ): WatcherCommandResult {
+    const preparation = this.escalations.prepareAnswerEscalation(
+      enrollment.watcherId,
+      escalationId,
+      body
+    )
+    if (preparation.status === 'refused') {
+      return refused('invalid-state', preparation.detail)
+    }
+    const commit = this.commit(
+      enrollment.watcherId,
+      expectedOwner,
+      { enabled: true },
+      preparation.apply
+    )
+    if (commit.status === 'refused') {
+      return commit
+    }
+    const updated = this.requireValidCommit(commit)
+    const runner = this.dependencies.runner(updated.watcherId)
+    if (runner) {
+      runner.enrollment = updated
+      runner.status = {
+        ...runner.status,
+        enabled: true,
+        state: 'watching',
+        phase: 'operator-answered',
+        reason: null,
+        parkReason: null
+      }
+      this.dependencies.runnerLoop.schedule(runner, 0)
+    }
+    return this.applied()
   }
 
   private approve(
@@ -269,6 +320,10 @@ export class WatcherControlPlane {
       }
       if (errorCode(error) === 'dispatch_inactive') {
         appendVoidedQuestionTransitions(this.questionLedger, current.watcherId, messageId, 'closed')
+        const runner = this.dependencies.runner(current.watcherId)
+        if (runner) {
+          this.dependencies.runnerLoop.schedule(runner, 0)
+        }
         return refused('question-already-answered', errorText(error))
       }
       return { status: 'indeterminate', detail: errorText(error) }

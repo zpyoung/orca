@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { OBJECTIVE_TASK_SPEC_MAX_LENGTH } from '../../shared/fork-heimdall-objective/contract-types'
 import type { PlannerReport } from '../../shared/fork-heimdall-objective/plan-schema'
 import type { RevisionAmendmentPatch } from '../../shared/fork-heimdall-objective/revision-amendment'
 import { ObjectiveDatabase } from './objective-database'
@@ -180,6 +181,31 @@ describe('ObjectiveStore.amendRevision', () => {
       .prepare('SELECT COUNT(*) AS count FROM revision_amendment WHERE revision_id = ?')
       .get(revision.revisionId) as { count: number }
     expect(count.count).toBe(1)
+  })
+
+  it('refuses an owner upsert whose task exceeds the dispatch snapshot cap', () => {
+    const revision = ingestAndActivate()
+
+    expect(() =>
+      store.amendRevision({
+        watcherId: WATCHER_ID,
+        revisionId: revision.revisionId,
+        amendedAtMs: 400,
+        patch: {
+          digest: 'amend-digest-oversized',
+          attestation: 'Corrected B with an oversized spec',
+          upsertTasks: [
+            upsertTask({
+              taskKey: 'task-b',
+              deps: ['task-a'],
+              spec: 'x'.repeat(OBJECTIVE_TASK_SPEC_MAX_LENGTH)
+            })
+          ],
+          dropTaskKeys: []
+        }
+      })
+    ).toThrow(/dispatch snapshot/)
+    expect(store.getTask(revision.revisionId, 'task-b')?.spec).toBe('Implement B')
   })
 
   it('refuses to drop a task that already succeeded', () => {

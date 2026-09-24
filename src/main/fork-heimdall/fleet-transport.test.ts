@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY,
+  HEIMDALL_WATCHER_ANSWER_ESCALATION_RUNTIME_CAPABILITY,
   HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
 } from '../../shared/fork-heimdall/capability'
 import { RemoteRuntimeClientError } from '../../shared/remote-runtime-client-error'
@@ -191,6 +192,12 @@ function commandRequest(): WatcherCommandRequest {
 }
 function deleteCommandRequest(): WatcherCommandRequest {
   return { ...commandRequest(), command: { kind: 'delete' } }
+}
+function answerEscalationCommandRequest(): WatcherCommandRequest {
+  return {
+    ...commandRequest(),
+    command: { kind: 'answer-escalation', escalationId: 'escalation-1', body: 'Use main.' }
+  }
 }
 
 const REMOTE_OWNER = { connectionId: 'environment-1', pairingRevision: 7 }
@@ -428,6 +435,53 @@ describe('HeimdallFleetTransport', () => {
         target: { watcherId: 'watcher-1', connectionId: null, pairingRevision: null }
       },
       HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY
+    )
+    transport.dispose()
+  })
+
+  it('refuses answering an owner escalation before sending to an older owner', async () => {
+    const remote = environmentHarness(['heimdall.commands.v1'])
+    const local = kernel()
+    const transport = new HeimdallFleetTransport({
+      kernel: local,
+      userDataPath: () => '/unused',
+      environments: remote.environment
+    })
+    await transport.fleet()
+    await vi.waitFor(() => expect(() => remote.callbacks()).not.toThrow())
+
+    await expect(transport.command(answerEscalationCommandRequest())).resolves.toMatchObject({
+      status: 'refused',
+      reason: 'unsupported-capability',
+      detail: expect.stringContaining('owner escalation')
+    })
+    expect(remote.environment.mutate).not.toHaveBeenCalled()
+    expect(local.command).not.toHaveBeenCalled()
+    transport.dispose()
+  })
+
+  it('sends an answer-escalation command once the remote negotiates the capability', async () => {
+    const remote = environmentHarness([
+      'heimdall.commands.v1',
+      HEIMDALL_WATCHER_ANSWER_ESCALATION_RUNTIME_CAPABILITY
+    ])
+    const transport = new HeimdallFleetTransport({
+      kernel: kernel(),
+      userDataPath: () => '/unused',
+      environments: remote.environment
+    })
+    await transport.fleet()
+    await vi.waitFor(() => expect(() => remote.callbacks()).not.toThrow())
+    const request = answerEscalationCommandRequest()
+
+    await expect(transport.command(request)).resolves.toMatchObject({ status: 'applied' })
+    expect(remote.environment.mutate).toHaveBeenCalledWith(
+      { id: 'environment-1', pairingRevision: 7 },
+      'heimdall:command',
+      {
+        ...request,
+        target: { watcherId: 'watcher-1', connectionId: null, pairingRevision: null }
+      }
     )
     transport.dispose()
   })

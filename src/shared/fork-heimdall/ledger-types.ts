@@ -116,6 +116,14 @@ export type ApprovalEntry = z.infer<typeof ApprovalEntrySchema>
  * Escalations are revisions, not mutable rows. Revisions sharing an escalationId fold by
  * latest-wins query; foldCount is the cumulative count written on that new revision.
  */
+export const HumanReplySchema = z
+  .object({
+    body: z.string(),
+    atMs: TimestampSchema
+  })
+  .strict()
+export type HumanReply = z.infer<typeof HumanReplySchema>
+
 export const EscalationEntrySchema = OwnerFactBaseSchema.extend({
   kind: z.literal('escalation'),
   escalationId: IdSchema,
@@ -123,7 +131,8 @@ export const EscalationEntrySchema = OwnerFactBaseSchema.extend({
   status: z.enum(['open', 'acknowledged', 'resolved', 'escalated']),
   foldCount: z.number().int().positive(),
   approvalScope: ApprovalScopeSchema.optional(),
-  reason: z.string().optional()
+  reason: z.string().optional(),
+  humanReply: HumanReplySchema.optional()
 }).strict()
 export type EscalationEntry = z.infer<typeof EscalationEntrySchema>
 

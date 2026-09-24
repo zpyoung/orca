@@ -284,11 +284,7 @@ describe('dormant Heimdall watcher status', () => {
     })
   })
 
-  // Documents the current, narrower boundary of the configuration-error/worker-escalation fix
-  // above: the other four `WatcherParkReason` kinds still fall back to the bare `.kind` token
-  // first. `kernel-service-scheduling.test.ts`'s stop-predicate restart test locks this in for
-  // `stop-predicate` specifically — widening this is a separate decision, not made here.
-  it('still falls back to the bare kind for a stop-predicate park', () => {
+  it('uses the persisted reason for a stop-predicate park instead of the bare kind', () => {
     const watcher = enrollment({ enabled: false })
     const status = dormantWatcherStatus(
       watcher,
@@ -300,7 +296,49 @@ describe('dormant Heimdall watcher status', () => {
       ])
     )
 
-    expect(status.reason).toBe('stop-predicate')
+    expect(status.reason).toBe('The review merged')
+  })
+
+  it('reconstructs a persisted owner escalation park with its original reason text', () => {
+    const watcher = enrollment({ enabled: false })
+    const originalEscalationId = 'owner-escalation:dispatch-1'
+    const status = dormantWatcherStatus(
+      watcher,
+      ledger([
+        escalation('park-owner-escalation', {
+          escalationId: `park:watcher-1:owner-escalation:${encodeURIComponent(originalEscalationId)}`,
+          reason: 'The owner must resolve this before the watcher can continue'
+        })
+      ])
+    )
+
+    expect(status).toMatchObject({
+      state: 'parked',
+      reason: 'The owner must resolve this before the watcher can continue',
+      parkReason: {
+        kind: 'owner-escalation',
+        escalationId: originalEscalationId,
+        reason: 'The owner must resolve this before the watcher can continue'
+      }
+    })
+  })
+
+  it('falls back to the bare kind for a worker-question park', () => {
+    const watcher = enrollment({ enabled: false })
+    const status = dormantWatcherStatus(
+      watcher,
+      ledger([
+        escalation('worker-question', {
+          escalationId: 'worker-question:dispatch-1:message-7',
+          atMs: 199
+        }),
+        escalation('park-worker-question', {
+          escalationId: 'park:watcher-1:worker-question:message-7'
+        })
+      ])
+    )
+
+    expect(status.reason).toBe('worker-question')
   })
 
   it('keeps an automatic park visible even when its persisted reason cannot be reconstructed', () => {

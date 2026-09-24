@@ -201,6 +201,10 @@ and configuration failure use dedicated park paths. Each disables the enrollment
 | `coordinator-seat-lost` | this process lost its orchestration coordinator seat     | re-establish ownership                                                        |
 | `owner-escalation`      | the watcher's owning agent could not resolve a deviation | answer as the human, then resume — see The owner                              |
 
+`status.reason` and the debug report show the park's own reason text — the stop predicate's reason,
+or the owner's escalation detail — not a bare kind such as `owner-escalation`
+(`park-reason-description.ts`). This applies to the hosted-review sitter's status content too.
+
 ## Capability gates
 
 Every action a watcher wants to take names a capability, and every capability is in one of three
@@ -281,6 +285,21 @@ an unreachable owner and a malformed reply draw on the same single retry.
 Deterministic preflight rejection is different: the active owner can correct the same file without
 spending this allowance. Its bounded rejection diagnostic is available to the next applicable
 re-wake; canonical intervention text is never silently shortened into validity.
+
+**You can answer in its place.** The `answer-escalation` command carries your reply while the
+watcher is parked on that exact escalation (`heimdall:command`, same path as every other watcher
+command). It reopens the deviation with a fresh retry-once budget, records the reply on the
+escalation entry, unparks the watcher, and schedules it immediately. The owner's next brief includes
+an "Operator answer" section with your text. Answering the wrong escalation, or answering after the
+watcher has moved on, is refused as `invalid-state`. Older hosts that have not negotiated
+`heimdall.watcher-answer-escalation.v1` refuse the command as `unsupported-capability` instead of
+rejecting the request outright; the reply itself is stripped from the ledger for any reader that has
+not negotiated that capability. A UI reply box is not built yet — send the command directly.
+
+A plain **Resume** also reopens the deviation the active park is waiting on, without recording a
+reply — but only that one. An unrelated escalation sitting in the same ledger, such as a stall
+escalated on a different dispatch, is left alone; reopening every escalated deviation on resume
+would silently retry stalls that were deliberately handed to a human.
 
 Local owner report directories are hardened to `0700`. Reports can also be read over SSH, through a
 bounded reader.
@@ -382,8 +401,9 @@ self-heals after ~90 seconds; you do not need to delete anything.**
 
 The three failure modes look different in the UI:
 
-- **`refused`** — someone else holds a live lease. The tick exits with `lease-refused` and quietly
-  retries at rapid pace. No visible alarm; the watcher just never progresses.
+- **`refused`** — someone else holds a live lease. The tick exits with `lease-refused`, publishes a
+  truthful status naming the holder and epoch (phase `lease-refused`, reason `Lease held by <holder>
+  (epoch <epoch>)`) instead of leaving a stale parked copy on screen, and retries at rapid pace.
 - **`unverifiable`** — the host or filesystem could not be reached. The status becomes
   `unreachable` / `lease-unverifiable`, any active dispatch is closed for contact loss, and the pill
   switches to _Host unreachable · last confirmed …_. Contact loss is retried; it is not evidence
@@ -742,6 +762,18 @@ Every tick the objective decides at most one action (`objective-actions.ts`):
 | `review`    | `dispatch-reviewer`, `dispatch-integrator`, `ingest-verdict`              |
 | `land`      | `record-landing`, `commit-local-branch`, `push-ref`, `open-hosted-review` |
 
+Some ticks deliberately take no action even though checks or gates are due. These surface in the
+decision trace as a named no-action reason, not an error:
+
+| Reason                      | Meaning                                                                                     |
+| ---------------------------- | --------------------------------------------------------------------------------------------- |
+| `read-only-worker-in-flight` | a plan-review, reviewer, or integrator dispatch is running or its outcome is still unknown; new checks and gates wait for it to land |
+| `check-evidence-stale`       | a check or gate's evidence no longer matches the workspace content it ran against; it is re-issued at the current content, not failed |
+
+`check-evidence-stale` retries are capped: a criterion that keeps drifting out from under its own
+check is re-issued up to 3 times before it falls through to the ordinary not-landed path (deviation
+or replan), so a workspace that never holds still cannot loop forever.
+
 ### What the agents are told
 
 Each dispatched worker gets a structured prompt (`role-prompts.ts:105-121`) carrying the objective
@@ -937,19 +969,20 @@ than blanking (`HeimdallPage.tsx:219-230`).
 
 ### Controls
 
-Eight commands, all routed through `heimdall:command` and fenced by owner identity and a command
+Nine commands, all routed through `heimdall:command` and fenced by owner identity and a command
 revision, so a stale or wrong-owner request is refused (`control-plane.ts:107-131,400-431`).
 
-| Command           | Precondition                   | Effect                                                                                 |
-| ----------------- | ------------------------------ | -------------------------------------------------------------------------------------- |
-| `pause`           | active                         | waits for the in-flight tick, commits `paused`, releases the lease                     |
-| `resume`          | paused or auto-parked          | re-enables; **refuses** if budget is still exhausted or a worker question is open      |
-| `disarm`          | not already disarmed           | stops the current enrollment generation, resolves open escalations, releases the lease |
-| `approve`         | not disabled or paused         | approves one action scope and reschedules immediately                                  |
-| `adjust-budget`   | none                           | commits a new budget and updates the live status                                       |
-| `answer-question` | question still open            | answers the worker and un-parks the watcher                                            |
-| `set-concurrency` | objective watcher              | commits a new cap; lowering drains, raising applies next tick; folders stay at 1       |
-| `stop-worker`     | exact process identity matches | stops one worker                                                                       |
+| Command             | Precondition                          | Effect                                                                                  |
+| ------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `pause`             | active                                 | waits for the in-flight tick, commits `paused`, releases the lease                       |
+| `resume`            | paused or auto-parked                  | re-enables; **refuses** if budget is still exhausted or a worker question is open        |
+| `disarm`            | not already disarmed                   | stops the current enrollment generation, resolves open escalations, releases the lease   |
+| `approve`           | not disabled or paused                 | approves one action scope and reschedules immediately                                    |
+| `adjust-budget`     | none                                    | commits a new budget and updates the live status                                         |
+| `answer-question`   | question still open                    | answers the worker and un-parks the watcher                                              |
+| `answer-escalation` | parked on that exact owner escalation  | reopens the deviation with a fresh retry-once budget, records your reply, and un-parks    |
+| `set-concurrency`   | objective watcher                      | commits a new cap; lowering drains, raising applies next tick; folders stay at 1         |
+| `stop-worker`       | exact process identity matches         | stops one worker                                                                          |
 
 **Disarm cannot be undone with Resume.** `resume` requires `paused` or an automatic park. A later
 `enroll` for the same workspace re-arms the stable watcher record as a new budget generation while

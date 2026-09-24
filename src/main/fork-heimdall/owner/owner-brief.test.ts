@@ -3,7 +3,7 @@ import type { KernelAction, OwnerAdapter } from '../../../shared/fork-heimdall/k
 import type { LedgerEntry, WatcherLedger } from '../../../shared/fork-heimdall/ledger-types'
 import type { Deviation } from '../../../shared/fork-heimdall/owner/deviation'
 import type { Snapshot } from '../../../shared/fork-heimdall/snapshot'
-import { buildOwnerBrief, expandOwnerBrief } from './owner-brief'
+import { buildOwnerBrief, buildOwnerPromptText, expandOwnerBrief } from './owner-brief'
 
 type World = { revision: string }
 
@@ -195,5 +195,69 @@ describe('buildOwnerBrief state budget', () => {
     })
     expect(previous?.reason.length).toBe(4_096)
     expect(rejection.startsWith(previous?.reason ?? '')).toBe(true)
+  })
+
+  it('bounds a supplied operator answer and omits the field when none was given', () => {
+    const withAnswer = buildOwnerBrief({
+      contentIdentity: snapshot.contentIdentity,
+      snapshot,
+      ledger: ledger(),
+      deviation,
+      owner: owner(() => ({ text: '{"current":true}', truncated: false })),
+      operatorAnswer: 'Use main.'
+    })
+    const withoutAnswer = buildOwnerBrief({
+      contentIdentity: snapshot.contentIdentity,
+      snapshot,
+      ledger: ledger(),
+      deviation,
+      owner: owner(() => ({ text: '{"current":true}', truncated: false }))
+    })
+
+    expect(expandOwnerBrief(withAnswer.state).operatorAnswer).toMatchObject({
+      body: 'Use main.',
+      reference: 'operator reply to the owner escalation'
+    })
+    expect(expandOwnerBrief(withoutAnswer.state).operatorAnswer).toBeUndefined()
+  })
+})
+
+describe('buildOwnerPromptText operator answer section', () => {
+  it('renders an OPERATOR ANSWER section only when the brief carries one', () => {
+    const withAnswer = buildOwnerBrief({
+      contentIdentity: snapshot.contentIdentity,
+      snapshot,
+      ledger: ledger(),
+      deviation,
+      owner: owner(() => ({ text: '{"current":true}', truncated: false })),
+      operatorAnswer: 'Use main.'
+    })
+    const withoutAnswer = buildOwnerBrief({
+      contentIdentity: snapshot.contentIdentity,
+      snapshot,
+      ledger: ledger(),
+      deviation,
+      owner: owner(() => ({ text: '{"current":true}', truncated: false }))
+    })
+
+    const promptWithAnswer = buildOwnerPromptText({
+      watcherId: 'watcher-1',
+      wakeToken: 'wake-1',
+      runId: 'run-1',
+      interventionVocabulary: 'kind-specific',
+      reportPath: '/tmp/report.json',
+      brief: withAnswer
+    })
+    const promptWithoutAnswer = buildOwnerPromptText({
+      watcherId: 'watcher-1',
+      wakeToken: 'wake-1',
+      runId: 'run-1',
+      interventionVocabulary: 'kind-specific',
+      reportPath: '/tmp/report.json',
+      brief: withoutAnswer
+    })
+
+    expect(promptWithAnswer).toContain('OPERATOR ANSWER:\nUse main.')
+    expect(promptWithoutAnswer).not.toContain('OPERATOR ANSWER')
   })
 })

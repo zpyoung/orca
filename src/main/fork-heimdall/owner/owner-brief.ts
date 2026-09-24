@@ -65,6 +65,12 @@ type PreviousSubmissionRejectionBrief = {
   reference: 'previous rejected owner submission diagnostic'
 }
 
+type OperatorAnswerBrief = {
+  body: string
+  omittedCodeUnits?: number
+  reference: 'operator reply to the owner escalation'
+}
+
 type OwnerBriefTruncation = {
   policy: 'oldest-history-first'
   version: 1
@@ -84,6 +90,7 @@ export type OwnerBriefState = {
   kindState: { text: string; truncated: boolean }
   triggeringReport: unknown
   previousSubmissionRejection: PreviousSubmissionRejectionBrief | null
+  operatorAnswer?: OperatorAnswerBrief
   recentAttempts: unknown[]
   interventionVocabulary: string
   gates: OwnerGateSummary
@@ -128,6 +135,20 @@ function boundedPreviousSubmissionRejection(
   }
 }
 
+function boundedOperatorAnswer(answer: string | undefined): OperatorAnswerBrief | undefined {
+  if (answer === undefined) {
+    return undefined
+  }
+  const includedCodeUnits = Math.min(answer.length, OWNER_INTERVENTION_TEXT_MAX_LENGTH)
+  return {
+    body: answer.slice(0, includedCodeUnits),
+    ...(includedCodeUnits < answer.length
+      ? { omittedCodeUnits: answer.length - includedCodeUnits }
+      : {}),
+    reference: 'operator reply to the owner escalation'
+  }
+}
+
 function compareAttemptChronology(left: AttemptItem, right: AttemptItem): number {
   return (
     left.atMs - right.atMs ||
@@ -168,7 +189,8 @@ function baseState(
   interventionVocabulary: string,
   gates: OwnerGateSummary,
   omittedAttempts: readonly AttemptItem[],
-  previousSubmissionRejection: string | undefined
+  previousSubmissionRejection: string | undefined,
+  operatorAnswer: string | undefined
 ): OwnerBriefState {
   const omittedKeys = new Set(omittedAttempts.map((item) => item.key))
   const omissionDigest =
@@ -177,12 +199,16 @@ function baseState(
       : createHash('sha256')
           .update(JSON.stringify(omittedAttempts.map((item) => item.key)))
           .digest('hex')
+  const boundedOperatorAnswerBrief = boundedOperatorAnswer(operatorAnswer)
   return {
     contentIdentity,
     deviation: sanitized(deviation),
     kindState,
     triggeringReport: triggeringReport(reports, deviation),
     previousSubmissionRejection: boundedPreviousSubmissionRejection(previousSubmissionRejection),
+    ...(boundedOperatorAnswerBrief === undefined
+      ? {}
+      : { operatorAnswer: boundedOperatorAnswerBrief }),
     recentAttempts: attempts
       .filter((item) => !omittedKeys.has(item.key))
       .map((item) => sanitized(item.value)),
@@ -230,6 +256,7 @@ export function buildOwnerBrief<TWorld, TAction extends KernelAction>(args: {
   owner: OwnerAdapter<TWorld, TAction>
   maxStateBytes?: number
   previousSubmissionRejection?: string
+  operatorAnswer?: string
 }): OwnerBriefResult {
   const maxStateBytes = args.maxStateBytes ?? OWNER_BRIEF_MAX_STATE_BYTES
   const projected = projectRelevantLedger(args.ledger)
@@ -263,7 +290,8 @@ export function buildOwnerBrief<TWorld, TAction extends KernelAction>(args: {
       interventionVocabulary,
       DEFAULT_OWNER_GATE_SUMMARY,
       droppableAttempts.slice(0, dropCount),
-      args.previousSubmissionRejection
+      args.previousSubmissionRejection,
+      args.operatorAnswer
     )
   const projectWithKindState = (kindState: {
     text: string
@@ -323,6 +351,7 @@ export function buildOwnerPromptText(args: {
   reportPath: string
   brief: OwnerBriefResult
 }): string {
+  const operatorAnswer = expandOwnerBrief(args.brief.state).operatorAnswer
   return [
     'ROLE: Heimdall owning agent',
     `A deterministic watcher (${args.watcherId}) hit something it cannot resolve on its own and is` +
@@ -331,6 +360,15 @@ export function buildOwnerPromptText(args: {
     `INTERVENTION VOCABULARY:\n${args.interventionVocabulary}`,
     'GATES YOU CANNOT CROSS:',
     Object.values(DEFAULT_OWNER_GATE_SUMMARY).join('\n'),
+    ...(operatorAnswer
+      ? [
+          `OPERATOR ANSWER:\n${operatorAnswer.body}${
+            operatorAnswer.omittedCodeUnits
+              ? ` (truncated; ${operatorAnswer.omittedCodeUnits} code units omitted)`
+              : ''
+          }`
+        ]
+      : []),
     `STATE (bounded, oldest-history-first if truncated):\n${args.brief.serializedState}`,
     `Write your JSON answer to this exact absolute path: ${JSON.stringify(args.reportPath)}`,
     `The complete intervention file is limited to ${MAX_OWNER_REPORT_BYTES} UTF-8 bytes, independently of each field's UTF-16 code-unit limit.`,

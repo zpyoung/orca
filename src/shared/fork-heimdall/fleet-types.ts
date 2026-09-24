@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { BudgetPolicySchema } from './budget'
 import { ApprovalScopeSchema, WatcherLedgerSchema } from './ledger-types'
+import { OWNER_INTERVENTION_TEXT_MAX_LENGTH } from './owner/intervention'
 import { WatcherTickTraceSchema } from './tick-trace'
 import {
   AutomationSchedulerOwnerSchema,
@@ -137,7 +138,14 @@ export const WatcherCommandSchema = z.discriminatedUnion('kind', [
     })
     .strict(),
   z.object({ kind: z.literal('answer-question'), messageId: IdSchema, body: IdSchema }).strict(),
-  z.object({ kind: z.literal('stop-worker'), dispatchId: IdSchema }).strict()
+  z.object({ kind: z.literal('stop-worker'), dispatchId: IdSchema }).strict(),
+  z
+    .object({
+      kind: z.literal('answer-escalation'),
+      escalationId: IdSchema,
+      body: z.string().trim().min(1).max(OWNER_INTERVENTION_TEXT_MAX_LENGTH)
+    })
+    .strict()
 ])
 export type WatcherCommand = z.infer<typeof WatcherCommandSchema>
 

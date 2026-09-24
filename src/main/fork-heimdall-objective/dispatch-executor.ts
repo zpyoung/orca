@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { ActionOutcome } from '../../shared/fork-heimdall/effect-certainty'
 import { makeAttemptFingerprint } from '../../shared/fork-heimdall/attempt-fingerprint'
-import type { DispatchResult, ExecuteContext } from '../../shared/fork-heimdall/kind-contract'
+import type { ExecuteContext } from '../../shared/fork-heimdall/kind-contract'
 import {
   judgmentRoutedAgent,
   objectiveRoutingSubject
@@ -14,6 +14,7 @@ import type { ObjectiveAction } from '../../shared/fork-heimdall-objective/objec
 import type { ObjectiveDispatchRecord } from '../../shared/fork-heimdall-objective/parallel-types'
 import {
   ObjectivePlanTaskSchema,
+  assertPlannerTaskWithinDispatchSnapshotCap,
   type ImplementerReport,
   type ObjectivePlan,
   type ObjectivePlanTask
@@ -46,6 +47,7 @@ import {
 import { resolveObjectiveSerialLaneTerminal } from './dispatch-session'
 import { deriveObjectiveFailureContext } from './dispatch-failure-context'
 import { deriveObjectiveRepairContext } from './dispatch-repair-context'
+import { dispatchObjectiveWorker, saveDispatchFailure } from './dispatch-worker-launch'
 export { deriveObjectiveFailureContext } from './dispatch-failure-context'
 
 type DispatchAction = Extract<ObjectiveAction, { kind: `dispatch-${string}` }>
@@ -252,23 +254,6 @@ function dispatchConflictContext(
   }
 }
 
-async function saveDispatchFailure(
-  objectiveStore: ObjectiveStore,
-  prepared: PreparedObjectiveDispatchWorkspace | null,
-  context: ExecuteContext<ObjectiveWorld>
-): Promise<void> {
-  if (!prepared) {
-    return
-  }
-  await context.lease.assertHeld()
-  objectiveStore.saveDispatch({
-    ...prepared.record,
-    state: 'failed',
-    setupState: 'retained',
-    completedAtMs: prepared.record.completedAtMs ?? Date.now()
-  })
-}
-
 export async function executeObjectiveDispatch(args: {
   action: DispatchAction
   binding: ObjectiveSnapshotBinding
@@ -300,6 +285,13 @@ export async function executeObjectiveDispatch(args: {
       dispatchedNode = args.action.ownerAmendedSpec
         ? { ...storedNode, spec: args.action.ownerAmendedSpec }
         : storedNode
+      // an owner amend/retry can grow the merged node past the cap even when its own spec field fits
+      try {
+        assertPlannerTaskWithinDispatchSnapshotCap(dispatchedNode)
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error)
+        return { effect: 'not-landed', failureClass: 'criteria', reason }
+      }
       prepared = await prepareObjectiveDispatchWorkspace({
         runtime: args.runtime,
         binding: args.binding,
@@ -435,74 +427,14 @@ export async function executeObjectiveDispatch(args: {
     }
   }
 
-  await args.context.lease.assertHeld()
-  let result: DispatchResult
-  try {
-    result = await args.context.dispatchWorker({
-      spec: request.spec,
-      agent,
-      ...(request.taskKey === undefined ? {} : { taskKey: request.taskKey }),
-      ...(request.deps === undefined ? {} : { deps: request.deps }),
-      ...(prepared === null ? {} : { workspaceId: prepared.record.workspaceId }),
-      ...(prepared?.reuseTerminal || serialReuseTerminal
-        ? { reuseTerminal: prepared?.reuseTerminal ?? serialReuseTerminal ?? undefined }
-        : {})
-    })
-  } catch (error) {
-    await saveDispatchFailure(args.objectiveStore, prepared, args.context)
-    return {
-      effect: 'not-landed',
-      failureClass: 'infra',
-      reason: error instanceof Error ? error.message : String(error)
-    }
-  }
-  if (result.status === 'refused') {
-    await saveDispatchFailure(args.objectiveStore, prepared, args.context)
-    return {
-      effect: 'not-landed',
-      failureClass: 'infra',
-      reason: result.reason,
-      result: { detail: result.detail }
-    }
-  }
-  if (result.status === 'indeterminate') {
-    return { effect: 'indeterminate', reason: 'dispatch-indeterminate', result }
-  }
-  if (prepared) {
-    const completedRecord: ObjectiveDispatchRecord = {
-      ...prepared.record,
-      dispatchId: result.dispatchId,
-      terminalHandle: result.terminalHandle ?? prepared.reuseTerminal,
-      setupState: 'ready',
-      reportPath
-    }
-    await args.context.lease.assertHeld()
-    args.objectiveStore.saveDispatch(completedRecord)
-    if (completedRecord.state === 'resolving-conflict') {
-      for (const record of args.objectiveStore.listDispatches(completedRecord.watcherId)) {
-        if (
-          record.attemptFingerprint !== completedRecord.attemptFingerprint &&
-          record.workspaceId === completedRecord.workspaceId &&
-          record.taskKey === completedRecord.taskKey &&
-          record.state === 'resolving-conflict'
-        ) {
-          await args.context.lease.assertHeld()
-          args.objectiveStore.saveDispatch({
-            ...record,
-            state: 'discarded',
-            setupState: 'retained',
-            completedAtMs: record.completedAtMs ?? Date.now()
-          })
-        }
-      }
-    }
-  }
-  return {
-    effect: 'landed',
-    result: {
-      dispatchId: result.dispatchId,
-      reportPath,
-      ...(result.terminalHandle ? { terminalHandle: result.terminalHandle } : {})
-    }
-  }
+  return dispatchObjectiveWorker({
+    context: args.context,
+    objectiveStore: args.objectiveStore,
+    request,
+    agent,
+    contract: args.binding.contract,
+    prepared,
+    serialReuseTerminal,
+    reportPath
+  })
 }

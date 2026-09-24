@@ -44,6 +44,26 @@ type FleetSyncPlan = {
   mirrors: RemoteFleetMirrorState[]
 }
 
+/** Strips `roleLaunch` from an objective enrollment when the remote host has not negotiated it. */
+function enrollmentWithoutUnsupportedRoleLaunch(
+  input: EnrollInput,
+  roleLaunchSupported: boolean
+): EnrollInput {
+  if (
+    roleLaunchSupported ||
+    input.kind !== 'objective' ||
+    typeof input.kindPayload !== 'object' ||
+    input.kindPayload === null
+  ) {
+    return input
+  }
+  const { roleLaunch: _roleLaunch, ...legacyKindPayload } = input.kindPayload as Record<
+    string,
+    unknown
+  >
+  return { ...input, kindPayload: legacyKindPayload }
+}
+
 export class HeimdallRemoteFleetMirrors {
   private readonly mirrors = new Map<string, RemoteFleetMirrorState>()
   private disposed = false
@@ -105,7 +125,10 @@ export class HeimdallRemoteFleetMirrors {
     return enrollRemoteWatcher(
       this.environments,
       identity,
-      enrollmentForParallelCompatibility(input, mirror.parallelExecutionSupport === 'supported')
+      enrollmentWithoutUnsupportedRoleLaunch(
+        enrollmentForParallelCompatibility(input, mirror.parallelExecutionSupport === 'supported'),
+        mirror.roleLaunchSupport === 'supported'
+      )
     )
   }
 
