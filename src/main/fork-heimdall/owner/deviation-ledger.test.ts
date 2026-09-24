@@ -233,3 +233,25 @@ describe('retry-once-then-escalate bookkeeping', () => {
     ).toBe('escalated')
   })
 })
+
+describe('humanReply propagation', () => {
+  it('carries an answered reply forward across a re-raise and a later escalation to human', () => {
+    const deps = memoryStore()
+    const entry = recordDeviation(deps, 'watcher-1', questionDeviation)
+    const answered = {
+      ...entry,
+      eventId: 'answered',
+      atMs: deps.now(),
+      status: 'open' as const,
+      foldCount: 1,
+      humanReply: { body: 'Use main.', atMs: 5 }
+    }
+    deps.ledgerStore.append('watcher-1', answered)
+
+    const rewoken = reRaiseDeviation(deps, 'watcher-1', answered, 'gate rejection')
+    expect(rewoken.humanReply).toEqual({ body: 'Use main.', atMs: 5 })
+
+    const escalated = escalateDeviationToHuman(deps, 'watcher-1', rewoken, 'unreachable')
+    expect(escalated.humanReply).toEqual({ body: 'Use main.', atMs: 5 })
+  })
+})

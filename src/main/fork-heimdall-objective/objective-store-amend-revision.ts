@@ -1,6 +1,7 @@
 import type { ObjectiveRevisionStatus } from '../../shared/fork-heimdall-objective/detail-types'
 import {
   PlannerReportSchema,
+  assertPlannerTaskWithinDispatchSnapshotCap,
   type ObjectivePlanTask
 } from '../../shared/fork-heimdall-objective/plan-schema'
 import {
@@ -103,6 +104,10 @@ export function amendObjectiveRevisionInTransaction(
     if (inFlightTaskKeys.has(taskKey)) {
       return { ok: false, reason: 'drops-in-flight-node', taskKey }
     }
+  }
+
+  for (const task of patch.upsertTasks) {
+    assertPlannerTaskWithinDispatchSnapshotCap(task)
   }
 
   const amended = applyRevisionAmendmentPatch(currentPlan, patch)

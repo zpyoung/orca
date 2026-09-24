@@ -1,9 +1,22 @@
-import { HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY } from '../../../../../shared/fork-heimdall/capability'
+import {
+  HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY,
+  HEIMDALL_WATCHER_ANSWER_ESCALATION_RUNTIME_CAPABILITY
+} from '../../../../../shared/fork-heimdall/capability'
 import type { WatcherDetail } from '../../../../../shared/fork-heimdall/fleet-types'
 import type { LedgerEntry, WatcherLedger } from '../../../../../shared/fork-heimdall/ledger-types'
+import type { RuntimeCapability } from '../../../../../shared/protocol-version'
 import type { RpcContext } from '../../core'
 
 type HeimdallWireProjectionContext = Pick<RpcContext, 'clientKind' | 'clientCapabilities'>
+
+function needsProjection(
+  context: HeimdallWireProjectionContext,
+  capability: RuntimeCapability
+): boolean {
+  return (
+    context.clientKind !== undefined && context.clientCapabilities?.includes(capability) !== true
+  )
+}
 
 function hasPreDispatchFailureResult(entry: LedgerEntry): boolean {
   if (entry.kind !== 'attempt' || typeof entry.result !== 'object' || entry.result === null) {
@@ -13,7 +26,11 @@ function hasPreDispatchFailureResult(entry: LedgerEntry): boolean {
   return result.status === 'refused' && result.reason === 'pre-dispatch-failure'
 }
 
-function projectEntry(entry: LedgerEntry): LedgerEntry {
+function hasHumanReply(entry: LedgerEntry): boolean {
+  return entry.kind === 'escalation' && entry.humanReply !== undefined
+}
+
+function stripPreDispatchFailure(entry: LedgerEntry): LedgerEntry {
   if (!hasPreDispatchFailureResult(entry) || entry.kind !== 'attempt') {
     return entry
   }
@@ -22,21 +39,39 @@ function projectEntry(entry: LedgerEntry): LedgerEntry {
   return projected
 }
 
-/** Keeps the durable certainty fields but hides the expanded DispatchResult enum from old readers. */
+function stripHumanReply(entry: LedgerEntry): LedgerEntry {
+  if (entry.kind !== 'escalation' || entry.humanReply === undefined) {
+    return entry
+  }
+  const projected = { ...entry }
+  delete projected.humanReply
+  return projected
+}
+
+/**
+ * Keeps the durable certainty fields but hides the expanded DispatchResult enum and the operator's
+ * answer-escalation reply from readers that have not negotiated the capabilities that describe them.
+ */
 export function projectHeimdallLedgerForClient(
   ledger: WatcherLedger,
   context: HeimdallWireProjectionContext
 ): WatcherLedger {
-  if (
-    context.clientKind === undefined ||
-    context.clientCapabilities?.includes(
-      HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY
-    ) === true ||
-    !ledger.entries.some(hasPreDispatchFailureResult)
-  ) {
+  const stripDispatchResult =
+    needsProjection(context, HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY) &&
+    ledger.entries.some(hasPreDispatchFailureResult)
+  const stripReply =
+    needsProjection(context, HEIMDALL_WATCHER_ANSWER_ESCALATION_RUNTIME_CAPABILITY) &&
+    ledger.entries.some(hasHumanReply)
+  if (!stripDispatchResult && !stripReply) {
     return ledger
   }
-  return { ...ledger, entries: ledger.entries.map(projectEntry) }
+  return {
+    ...ledger,
+    entries: ledger.entries.map((entry) => {
+      const withoutDispatchResult = stripDispatchResult ? stripPreDispatchFailure(entry) : entry
+      return stripReply ? stripHumanReply(withoutDispatchResult) : withoutDispatchResult
+    })
+  }
 }
 
 export function projectHeimdallDetailForClient(

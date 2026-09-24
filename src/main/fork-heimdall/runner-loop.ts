@@ -14,6 +14,7 @@ import {
   type WatcherTickTrace
 } from '../../shared/fork-heimdall/tick-trace'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
+import { dormantWatcherStatus } from './debug-report'
 import { readAndRefreshJudgmentSnapshot } from './judgment/mailbox-refresh'
 import type { RegisteredWatcherKind } from './registry'
 import { createWatcherRunner } from './runner-factory'
@@ -220,6 +221,15 @@ export class WatcherRunnerLoop {
           this.publishStatus(runner)
           this.schedule(runner, errorBackoffMs(runner.consecutiveErrors) ?? HEIMDALL_RAPID_POLL_MS)
         } else {
+          runner.status = {
+            ...dormantWatcherStatus(
+              runner.enrollment,
+              this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
+            ),
+            phase: 'lease-refused',
+            reason: `Lease held by ${lease.holder} (epoch ${lease.epoch})`
+          }
+          this.publishStatus(runner)
           this.schedule(runner, HEIMDALL_RAPID_POLL_MS)
         }
         return

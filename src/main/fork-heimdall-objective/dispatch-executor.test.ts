@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { OWNER_INTERVENTION_TEXT_MAX_LENGTH } from '../../shared/fork-heimdall/owner/intervention'
+import { OBJECTIVE_TASK_SPEC_MAX_LENGTH } from '../../shared/fork-heimdall-objective/contract-types'
 import type { DispatchResult, ExecuteContext } from '../../shared/fork-heimdall/kind-contract'
 import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import {
@@ -174,6 +175,48 @@ describe('executeObjectiveDispatch', () => {
     })
   })
 
+  it('passes model and effort to dispatchWorker when set for the dispatched role', async () => {
+    const executeContext = context(
+      { watcherId: 'watcher-1', entries: [] },
+      { status: 'dispatched', dispatchId: 'dispatch-1' }
+    )
+    await executeObjectiveDispatch({
+      action: dispatchNode,
+      binding: {
+        ...binding,
+        contract: {
+          ...binding.contract,
+          roleLaunch: { implementer: { model: 'opus', effort: 'high' } }
+        }
+      },
+      context: executeContext,
+      objectiveStore,
+      store: {} as Store,
+      runtime
+    })
+    expect(executeContext.dispatchWorker).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'opus', effort: 'high' })
+    )
+  })
+
+  it('omits model and effort from dispatchWorker when unset for the role', async () => {
+    const executeContext = context(
+      { watcherId: 'watcher-1', entries: [] },
+      { status: 'dispatched', dispatchId: 'dispatch-1' }
+    )
+    await executeObjectiveDispatch({
+      action: dispatchNode,
+      binding,
+      context: executeContext,
+      objectiveStore,
+      store: {} as Store,
+      runtime
+    })
+    const call = vi.mocked(executeContext.dispatchWorker).mock.calls[0][0]
+    expect(call).not.toHaveProperty('model')
+    expect(call).not.toHaveProperty('effort')
+  })
+
   it('tags a pre-dispatch failure as infra', async () => {
     resolveAgent.mockImplementation(() => {
       throw new Error('no agent configured')
@@ -232,6 +275,26 @@ describe('executeObjectiveDispatch', () => {
       runtime
     })
     expect(outcome).toMatchObject({ effect: 'not-landed', failureClass: 'criteria' })
+  })
+
+  it('refuses an owner-amended spec that exceeds the dispatch snapshot cap as criteria, not infra', async () => {
+    const oversizedAction: ObjectiveAction = {
+      ...dispatchNode,
+      ownerAmendedSpec: 'x'.repeat(OBJECTIVE_TASK_SPEC_MAX_LENGTH)
+    }
+    const outcome = await executeObjectiveDispatch({
+      action: oversizedAction,
+      binding,
+      context: context(
+        { watcherId: 'watcher-1', entries: [] },
+        { status: 'dispatched', dispatchId: 'dispatch-1' }
+      ),
+      objectiveStore,
+      store: {} as Store,
+      runtime
+    })
+    expect(outcome).toMatchObject({ effect: 'not-landed', failureClass: 'criteria' })
+    expect(captureBaseline).not.toHaveBeenCalled()
   })
 
   it('refuses a retry as infra when its original dispatch is missing from the ledger', async () => {

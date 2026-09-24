@@ -1,4 +1,5 @@
 import { parkEscalationId } from '../../shared/fork-heimdall/park-escalation-id'
+import { describeParkReason } from '../../shared/fork-heimdall/park-reason-description'
 import { deriveBudgetState } from '../../shared/fork-heimdall/budget'
 import type { LedgerEntry } from '../../shared/fork-heimdall/ledger-types'
 import type { FiredStopPredicate } from '../../shared/fork-heimdall/stop-policy'
@@ -48,7 +49,7 @@ export class WatcherRunnerStatusLifecycle {
         escalationKind: `park-${reason.kind}`,
         status: 'open',
         foldCount: 1,
-        reason: reason.kind === 'stop-predicate' ? reason.reason : reason.kind
+        reason: describeParkReason(reason)
       })
       if (reason.kind === 'stop-predicate' && reason.messageId !== undefined) {
         this.appendWorkerEscalationConsumedMarker(runner, reason.messageId)
@@ -59,7 +60,7 @@ export class WatcherRunnerStatusLifecycle {
       enabled: false,
       state: 'parked',
       phase: 'parked',
-      reason: reason.kind,
+      reason: describeParkReason(reason),
       parkReason: reason,
       budget: deriveBudgetState(
         this.dependencies.ledgerStore.read(runner.enrollment.watcherId),

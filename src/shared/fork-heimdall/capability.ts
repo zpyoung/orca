@@ -2,6 +2,10 @@ export const HEIMDALL_COMMANDS_RUNTIME_CAPABILITY = 'heimdall.commands.v1' as co
 // Why: delete extends the strict Heimdall command union and is destructive. Clients must not send
 // it to an older host that only advertises the original commands capability.
 export const HEIMDALL_WATCHER_DELETE_RUNTIME_CAPABILITY = 'heimdall.watcher-delete.v1' as const
+// Why: humanReply rides a new strict command and a new EscalationEntry field. Clients must not send
+// answer-escalation to an older host, and servers must strip humanReply from readers that lack it.
+export const HEIMDALL_WATCHER_ANSWER_ESCALATION_RUNTIME_CAPABILITY =
+  'heimdall.watcher-answer-escalation.v1' as const
 // Why: a new DispatchResult refusal reason is persisted inside ledger rows. Servers must project
 // that optional result away unless the paired reader explicitly advertises the expanded enum.
 export const HEIMDALL_DISPATCH_RESULT_PRE_DISPATCH_FAILURE_RUNTIME_CAPABILITY =
@@ -21,3 +25,7 @@ export const HEIMDALL_PARALLEL_EXECUTION_RUNTIME_CAPABILITY =
   'heimdall.parallel-execution.v1' as const
 export const HEIMDALL_PARALLEL_EXECUTION_UNSUPPORTED_NOTE =
   'This host does not support parallel objective execution yet; the watcher runs in place.'
+// Why: roleLaunch rides the same strict objective enrollment schema, so an old host's compiled
+// schema rejects it outright unless a client confirms this capability first.
+export const HEIMDALL_OBJECTIVE_ROLE_LAUNCH_RUNTIME_CAPABILITY =
+  'heimdall.objective-role-launch.v1' as const

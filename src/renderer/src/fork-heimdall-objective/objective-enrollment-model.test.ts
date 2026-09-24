@@ -25,6 +25,12 @@ function draft(overrides: Partial<ObjectiveEnrollmentDraft> = {}): ObjectiveEnro
     writeTerritoryText: 'src/**',
     capabilities: objectiveCapabilityModes('files-on-disk'),
     roleAgents: { planner: '', implementer: '', reviewer: '', integrator: '' },
+    roleLaunch: {
+      planner: { model: '', effort: '' },
+      implementer: { model: '', effort: '' },
+      reviewer: { model: '', effort: '' },
+      integrator: { model: '', effort: '' }
+    },
     sitterOverrides: {
       updateBranch: 'inherit',
       resolveConflicts: 'inherit',
@@ -114,6 +120,28 @@ describe('objective enrollment gate validation', () => {
   it('accepts an empty gate list on a parallel-unsupported host', () => {
     expect(
       validateObjectiveEnrollmentDraft(draft(), { ...AVAILABILITY, parallelUnsupported: true })
+    ).toEqual([])
+  })
+
+  it('accepts a missing roleLaunch as no per-role override', () => {
+    expect(
+      validateObjectiveEnrollmentDraft(draft({ roleLaunch: undefined }), AVAILABILITY)
+    ).toEqual([])
+  })
+
+  it('accepts a per-role model and effort override', () => {
+    expect(
+      validateObjectiveEnrollmentDraft(
+        draft({
+          roleLaunch: {
+            planner: { model: 'opus', effort: 'high' },
+            implementer: { model: '', effort: '' },
+            reviewer: { model: '', effort: 'low' },
+            integrator: { model: '', effort: '' }
+          }
+        }),
+        AVAILABILITY
+      )
     ).toEqual([])
   })
 })

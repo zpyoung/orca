@@ -4,10 +4,12 @@ import {
   OBJECTIVE_DISPATCH_TASK_SNAPSHOT_MAX_BYTES,
   OBJECTIVE_EXISTING_PLAN_MAX_LENGTH,
   OBJECTIVE_GATES_MAX,
+  OBJECTIVE_LAUNCH_MODEL_MAX_LENGTH,
   OBJECTIVE_TEXT_MAX_LENGTH,
   ObjectiveCapabilitiesSchema,
   ObjectiveEnrollmentPayloadSchema,
   ObjectiveGateSchema,
+  ObjectiveRoleLaunchSchema,
   objectiveCapabilityModes,
   objectiveDispatchTaskSnapshotByteLength,
   type ObjectiveEnrollmentPayload,
@@ -225,5 +227,35 @@ describe('objective enrollment payload', () => {
       gate({ name: `gate-${index}` })
     )
     expect(ObjectiveEnrollmentPayloadSchema.safeParse(payload({ gates })).success).toBe(false)
+  })
+
+  it('keeps roleLaunch optional and parses a per-role model/effort override', () => {
+    expect(ObjectiveEnrollmentPayloadSchema.parse(payload()).roleLaunch).toBeUndefined()
+    const roleLaunch = {
+      planner: { model: 'opus' },
+      reviewer: { effort: 'low' as const }
+    }
+    expect(ObjectiveEnrollmentPayloadSchema.parse(payload({ roleLaunch })).roleLaunch).toEqual(
+      roleLaunch
+    )
+  })
+
+  it('rejects an out-of-bounds model or an invalid effort', () => {
+    expect(ObjectiveRoleLaunchSchema.safeParse({ planner: { model: '' } }).success).toBe(false)
+    expect(
+      ObjectiveRoleLaunchSchema.safeParse({
+        planner: { model: 'x'.repeat(OBJECTIVE_LAUNCH_MODEL_MAX_LENGTH + 1) }
+      }).success
+    ).toBe(false)
+    expect(ObjectiveRoleLaunchSchema.safeParse({ planner: { effort: 'extreme' } }).success).toBe(
+      false
+    )
+  })
+
+  it('rejects a role key outside the objective role set and unknown fields on an entry', () => {
+    expect(ObjectiveRoleLaunchSchema.safeParse({ owner: { model: 'opus' } }).success).toBe(false)
+    expect(
+      ObjectiveRoleLaunchSchema.safeParse({ planner: { model: 'opus', temperature: 0.2 } }).success
+    ).toBe(false)
   })
 })

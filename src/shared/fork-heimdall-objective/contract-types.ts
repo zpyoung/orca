@@ -81,6 +81,29 @@ export const ObjectiveRoleAgentsSchema = z
   .strict()
 export type ObjectiveRoleAgents = z.infer<typeof ObjectiveRoleAgentsSchema>
 
+export const OBJECTIVE_LAUNCH_MODEL_MAX_LENGTH = 128
+export const ObjectiveLaunchEffortSchema = z.enum(['low', 'medium', 'high', 'xhigh', 'max'])
+export type ObjectiveLaunchEffort = z.infer<typeof ObjectiveLaunchEffortSchema>
+
+export const ObjectiveRoleLaunchEntrySchema = z
+  .object({
+    model: BoundedTextSchema(OBJECTIVE_LAUNCH_MODEL_MAX_LENGTH).optional(),
+    effort: ObjectiveLaunchEffortSchema.optional()
+  })
+  .strict()
+export type ObjectiveRoleLaunchEntry = z.infer<typeof ObjectiveRoleLaunchEntrySchema>
+
+/** Absent means today's behavior: the agent CLI's own model/effort defaults. */
+export const ObjectiveRoleLaunchSchema = z
+  .object({
+    planner: ObjectiveRoleLaunchEntrySchema.optional(),
+    implementer: ObjectiveRoleLaunchEntrySchema.optional(),
+    reviewer: ObjectiveRoleLaunchEntrySchema.optional(),
+    integrator: ObjectiveRoleLaunchEntrySchema.optional()
+  })
+  .strict()
+export type ObjectiveRoleLaunch = z.infer<typeof ObjectiveRoleLaunchSchema>
+
 export const ObjectiveSitterOverridesSchema = z
   .object({
     updateBranch: CapabilityModeSchema.optional(),
@@ -192,6 +215,7 @@ export const ObjectiveEnrollmentPayloadSchema = z
       .max(OBJECTIVE_TERRITORY_MAX_ENTRIES)
       .refine((values) => new Set(values).size === values.length, 'Territory globs must be unique'),
     roleAgents: ObjectiveRoleAgentsSchema,
+    roleLaunch: ObjectiveRoleLaunchSchema.optional(),
     sitterOverrides: ObjectiveSitterOverridesSchema,
     gates: z
       .array(ObjectiveGateSchema)

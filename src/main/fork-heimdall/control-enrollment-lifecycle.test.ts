@@ -36,6 +36,46 @@ function enrollment(maxConcurrency: number): WatcherEnrollment {
   }
 }
 
+describe('WatcherEnrollmentControlLifecycle.resume', () => {
+  it('resyncs an already-enabled, unpaused watcher instead of refusing it', () => {
+    const current = enrollment(1)
+    const runner = {
+      enrollment: current,
+      status: { phase: 'lease-refused', reason: 'stale' }
+    } as unknown as WatcherRunner
+    const commit = vi.fn()
+    const schedule = vi.fn()
+    const read = vi.fn(() => ({ watcherId: 'watcher-1', entries: [] }))
+    const lifecycle = new WatcherEnrollmentControlLifecycle({
+      ledger: { read } as never,
+      lease: {} as never,
+      runnerLoop: { schedule } as never,
+      runner: () => runner,
+      commit,
+      requireValidCommit: () => {
+        throw new Error('resume must not commit for an already-enabled, unpaused watcher')
+      },
+      latestHaltWasAutomaticPark: () => false,
+      appendResumeEscalationTransitions: vi.fn(),
+      appendDisarmTransitions: vi.fn(),
+      now: () => 10
+    })
+
+    const result = lifecycle.resume(current, {
+      executionHostId: 'local',
+      schedulerOwner: 'local_host_service',
+      workspaceKey: 'local::/repo',
+      revision: 1
+    })
+
+    expect(result).toMatchObject({ status: 'applied' })
+    expect(commit).not.toHaveBeenCalled()
+    expect(runner.enrollment).toBe(current)
+    expect(runner.status.phase).not.toBe('lease-refused')
+    expect(schedule).toHaveBeenCalledWith(runner, 0)
+  })
+})
+
 describe('WatcherEnrollmentControlLifecycle concurrency fencing', () => {
   it('waits for the active tick before committing a lower cap', async () => {
     let finishTick!: () => void

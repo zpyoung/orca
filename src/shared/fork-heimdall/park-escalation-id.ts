@@ -21,7 +21,9 @@ export function parkEscalationId(watcherId: string, reason: WatcherParkReason): 
       ? reason.messageId
       : reason.kind === 'budget'
         ? reason.exhaustion.kind
-        : null
+        : reason.kind === 'owner-escalation'
+          ? reason.escalationId
+          : null
   const base = `park:${watcherId}:${reason.kind}`
   return detail === null ? base : `${base}:${encodeURIComponent(detail)}`
 }

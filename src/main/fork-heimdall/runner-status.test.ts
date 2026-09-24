@@ -111,6 +111,28 @@ describe('WatcherRunnerStatusLifecycle worker-escalation consumption marker', ()
   })
 })
 
+describe('WatcherRunnerStatusLifecycle.park reason', () => {
+  it('describes a stop-predicate park with its persisted reason, not the bare kind', () => {
+    const { status, runner, entries } = harness()
+    status.park(runner, {
+      kind: 'stop-predicate',
+      predicateId: 'objective-bar-reached',
+      reason: 'files-on-disk landing bar reached'
+    })
+    expect(runner.status.reason).toBe('files-on-disk landing bar reached')
+    const parkEntry = entries.find((entry) => entry.kind === 'escalation')
+    expect(parkEntry).toMatchObject({ reason: 'files-on-disk landing bar reached' })
+  })
+
+  it('falls back to the bare kind for a budget park', () => {
+    const { status, runner, entries } = harness()
+    status.park(runner, { kind: 'budget', exhaustion: { kind: 'turns' } })
+    expect(runner.status.reason).toBe('budget')
+    const parkEntry = entries.find((entry) => entry.kind === 'escalation')
+    expect(parkEntry).toMatchObject({ reason: 'budget' })
+  })
+})
+
 describe('WatcherRunnerStatusLifecycle.readyToResume', () => {
   it('persists enabled and folds the park-worker-question escalation to resolved', () => {
     const { status, runner, entries } = harness({

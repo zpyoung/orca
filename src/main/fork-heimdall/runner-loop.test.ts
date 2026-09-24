@@ -35,6 +35,33 @@ function inFlightAttempt(watcherId: string): LedgerEntry[] {
   ]
 }
 
+describe('lease-refused status', () => {
+  it('publishes a truthful lease-refused status while retrying', async () => {
+    const world = await harness({
+      lease: (): LeaseResult => ({
+        status: 'refused',
+        reason: 'held-by-other',
+        holder: 'other-host',
+        epoch: 7
+      })
+    })
+    world.service.registerKind(kind())
+    const result = await world.service.enroll(enrollmentInput())
+    if (result.status !== 'enrolled') {
+      throw new Error('expected enrollment')
+    }
+    const watcherId = result.entry.enrollment.watcherId
+    world.schedule.mockClear()
+    await world.service.reconcileForTesting(watcherId)
+
+    expect((await world.service.list())[0]).toMatchObject({
+      enrollment: { enabled: true },
+      status: { phase: 'lease-refused', reason: 'Lease held by other-host (epoch 7)' }
+    })
+    expect(world.schedule).toHaveBeenCalled()
+  })
+})
+
 describe('gate-hold pacing', () => {
   it('ramps the reschedule delay across repeated gate holds, not a flat rapid tier', async () => {
     const world = await harness()

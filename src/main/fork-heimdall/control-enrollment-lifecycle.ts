@@ -10,6 +10,7 @@ import {
 } from '../../shared/fork-heimdall/ledger-queries'
 import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
+import { dormantWatcherStatus } from './debug-report'
 import type { EnrollmentControlChange, EnrollmentControlCommit } from './enrollment-store'
 import type { HeimdallLedgerStore } from './ledger-store'
 import type { LeaseStore } from './lease-store'
@@ -76,6 +77,15 @@ export class WatcherEnrollmentControlLifecycle {
 
   resume(enrollment: WatcherEnrollment, expectedOwner: WatcherOwnerFence): WatcherCommandResult {
     const ledger = this.dependencies.ledger.read(enrollment.watcherId)
+    if (enrollment.enabled && !enrollment.paused) {
+      const runner = this.dependencies.runner(enrollment.watcherId)
+      if (runner) {
+        runner.enrollment = enrollment
+        runner.status = dormantWatcherStatus(enrollment, ledger)
+        this.dependencies.runnerLoop.schedule(runner, 0)
+      }
+      return this.applied()
+    }
     const parked = !enrollment.enabled && this.dependencies.latestHaltWasAutomaticPark(ledger)
     if (!enrollment.paused && !parked) {
       return refused(
