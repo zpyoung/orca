@@ -301,7 +301,8 @@
           "conflictPair": "Territory conflict",
           "duplicatesGate": "Duplicates a gate",
           "noGateDeclared": "No gate declared",
-          "missingAssumptions": "Missing assumptions"
+          "missingAssumptions": "Missing assumptions",
+          "branchHistoryCheck": "Reads branch history"
         },
         "planReviewVerdict": {
           "approve": "Approve",

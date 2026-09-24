@@ -32,6 +32,11 @@ export function objectivePlanLintCodeLabel(code: PlanLintCode): string {
         'fork.heimdallObjective.detail.lintCode.nonRelativeCheck',
         'Non-relative path'
       )
+    case 'branch-history-check':
+      return translate(
+        'fork.heimdallObjective.detail.lintCode.branchHistoryCheck',
+        'Reads branch history'
+      )
     case 'conflict-pair':
       return translate('fork.heimdallObjective.detail.lintCode.conflictPair', 'Territory conflict')
     case 'duplicates-gate':
