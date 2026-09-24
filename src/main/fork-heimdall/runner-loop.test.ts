@@ -60,6 +60,39 @@ describe('lease-refused status', () => {
     })
     expect(world.schedule).toHaveBeenCalled()
   })
+
+  it('recomputes the published status from the durable enrollment, not the runner cache', async () => {
+    const world = await harness({
+      lease: (): LeaseResult => ({
+        status: 'refused',
+        reason: 'held-by-other',
+        holder: 'other-host',
+        epoch: 7
+      })
+    })
+    world.service.registerKind(kind())
+    const result = await world.service.enroll(enrollmentInput())
+    if (result.status !== 'enrolled') {
+      throw new Error('expected enrollment')
+    }
+    const watcherId = result.entry.enrollment.watcherId
+
+    // simulates another owner disabling the watcher directly in the store while this
+    // runner still holds the pre-disable enrollment in memory
+    world.enrollmentStore.setEnabled(watcherId, false)
+
+    world.schedule.mockClear()
+    await world.service.reconcileForTesting(watcherId)
+
+    expect((await world.service.list())[0]).toMatchObject({
+      enrollment: { enabled: false },
+      status: {
+        phase: 'lease-refused',
+        state: 'disabled',
+        reason: 'Lease held by other-host (epoch 7)'
+      }
+    })
+  })
 })
 
 describe('gate-hold pacing', () => {

@@ -156,6 +156,13 @@ export function bootHeimdallKernelService(
       terminalTransition.terminate(runner, fired, (sitter, kind) =>
         context.activateHandoff(sitter, kind)
       ),
+    readEnrollment: (watcherId) => {
+      const record = enrollments.get(watcherId)
+      if (!record || isMalformedKindPayloadEnrollment(record)) {
+        return null
+      }
+      return record
+    },
     notifyApproval: (enrollment, action) =>
       notifyWatcher(
         dependencies.store,

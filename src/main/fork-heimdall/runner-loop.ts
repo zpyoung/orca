@@ -221,9 +221,11 @@ export class WatcherRunnerLoop {
           this.publishStatus(runner)
           this.schedule(runner, errorBackoffMs(runner.consecutiveErrors) ?? HEIMDALL_RAPID_POLL_MS)
         } else {
+          const savedEnrollment =
+            this.dependencies.readEnrollment(runner.enrollment.watcherId) ?? runner.enrollment
           runner.status = {
             ...dormantWatcherStatus(
-              runner.enrollment,
+              savedEnrollment,
               this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
             ),
             phase: 'lease-refused',
