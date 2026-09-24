@@ -29,6 +29,7 @@ import {
   type NativeChatSessionOptionMode
 } from './native-chat-session-option-snapshot'
 import type { NativeChatSessionOptionDispatchCommand } from './native-chat-session-option-command-dispatch'
+import * as ultracode from './fork-claude-ultracode-effort/claude-ultracode-effort'
 
 type PersistSelection = (args: {
   modelId: string
@@ -92,7 +93,7 @@ export function createNativeChatPtySessionOptions(
     observedAt?: number | null
   ): boolean =>
     markNativeChatSessionOptionReport(args.scopeKey, values) &&
-    applyNativeChatReportedSessionOptions(record, values, observedAt)
+    applyNativeChatReportedSessionOptions(record, ultracode.reconciled(record, values), observedAt)
 
   if (args.reportedValues && applyReport(args.reportedValues)) {
     writeNativeChatSessionOptionCache(args.scopeKey, record)
@@ -114,7 +115,8 @@ export function createNativeChatPtySessionOptions(
   if (untrackRetiredModel()) {
     writeNativeChatSessionOptionCache(args.scopeKey, record)
   }
-  const activeModels = (): CatalogModel[] => withTrackedNativeChatModel(catalog, models, record)
+  const activeModels = (): CatalogModel[] =>
+    ultracode.withChoice(args.agent, withTrackedNativeChatModel(catalog, models, record))
   let snapshot = buildNativeChatSessionOptionSnapshot({
     catalog,
     models: activeModels(),
@@ -181,7 +183,7 @@ export function createNativeChatPtySessionOptions(
 
   /** Every persist path — picker applies and typed commands — funnels through here. */
   const persist = (modelId: string | null, optionId: string, value: SessionOptionValue): void => {
-    if (modelId) {
+    if (modelId && !ultracode.isSessionOnly(args.agent, optionId, value)) {
       void args.persistSelection?.({
         modelId,
         optionId,

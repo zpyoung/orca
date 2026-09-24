@@ -1717,6 +1717,18 @@
       "lines": ["  ): boolean =>", "  const applyReport = ("]
     },
     {
+      "path": "src/renderer/src/components/native-chat/native-chat-pty-session-options.ts",
+      "feature": "claude-ultracode-effort",
+      "kind": "registration",
+      "lines": [
+        "import * as ultracode from './fork-claude-ultracode-effort/claude-ultracode-effort'",
+        "    applyNativeChatReportedSessionOptions(record, ultracode.reconciled(record, values), observedAt)",
+        "  const activeModels = (): CatalogModel[] =>",
+        "    ultracode.withChoice(args.agent, withTrackedNativeChatModel(catalog, models, record))",
+        "    if (modelId && !ultracode.isSessionOnly(args.agent, optionId, value)) {"
+      ]
+    },
+    {
       "path": "src/renderer/src/components/native-chat/native-chat-session-option-cache.ts",
       "feature": "native-chat-session-options",
       "kind": "registration",
@@ -5434,8 +5446,8 @@
       "removed": 17
     },
     "src/renderer/src/components/native-chat/native-chat-pty-session-options.ts": {
-      "added": 25,
-      "removed": 8
+      "added": 29,
+      "removed": 10
     },
     "src/renderer/src/components/native-chat/native-chat-session-option-cache.ts": {
       "added": 32,
