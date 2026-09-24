@@ -856,6 +856,62 @@ describe('driveOwnerDeviation: a stalled dispatch wakes the owner with no other 
     await expect(driveOwnerDeviation(deps, runner, snapshot)).resolves.toBe('idle')
     expect(sendOwnerTurn).toHaveBeenCalledTimes(1)
   })
+
+  it('raises a second dispatch stall once the first has been escalated', async () => {
+    const ledgerStore = memoryLedgerStore()
+    const thresholdMs = 15 * 60_000
+    ledgerStore.append('watcher-1', {
+      eventId: 'attempt-a',
+      watcherId: 'watcher-1',
+      atMs: 0,
+      origin: 'owner',
+      class: 'fact',
+      kind: 'attempt',
+      attemptId: 'attempt-a',
+      fingerprint: 'fp-a',
+      action: {
+        kind: 'dispatch-node',
+        capability: 'write',
+        visibility: 'local',
+        contentIdentity: 'revision-1',
+        evidenceKey: 'evidence-a'
+      },
+      state: 'running',
+      dispatchId: 'dispatch-a'
+    })
+    const runner = buildRunner({ paused: false, owner: { agent: 'claude' } })
+    const deps = baseDeps(ledgerStore)
+    deps.ledgerRecord.now = () => thresholdMs + 1
+    await driveOwnerDeviation(deps, runner, snapshot)
+    const pendingA = requireOpenOwnerDeviation(ledgerStore)
+    escalateDeviationToHuman(deps.ledgerRecord, 'watcher-1', pendingA, 'operator required')
+
+    ledgerStore.append('watcher-1', {
+      eventId: 'attempt-b',
+      watcherId: 'watcher-1',
+      atMs: 0,
+      origin: 'owner',
+      class: 'fact',
+      kind: 'attempt',
+      attemptId: 'attempt-b',
+      fingerprint: 'fp-b',
+      action: {
+        kind: 'dispatch-node',
+        capability: 'write',
+        visibility: 'local',
+        contentIdentity: 'revision-2',
+        evidenceKey: 'evidence-b'
+      },
+      state: 'running',
+      dispatchId: 'dispatch-b'
+    })
+
+    const outcome = await driveOwnerDeviation(deps, runner, snapshot)
+    expect(outcome).toBe('handled')
+    const pendingB = requireOpenOwnerDeviation(ledgerStore)
+    expect(pendingB.escalationId).toContain('dispatch-b')
+    expect(sendOwnerTurn).toHaveBeenCalledTimes(2)
+  })
 })
 
 describe('deviationIsDispatchScoped', () => {

@@ -70,6 +70,28 @@ function resolvedStall(atMs: number, dispatchId = 'dispatch-1'): EscalationEntry
   }
 }
 
+function escalatedStall(atMs: number, dispatchId = 'dispatch-1'): EscalationEntry {
+  const deviation: StallDeviation = {
+    kind: 'stall',
+    what: 'dispatch-node',
+    dispatchId,
+    inFlightSinceMs: 0,
+    thresholdMs: 100
+  }
+  return {
+    eventId: `escalated-${dispatchId}-${atMs}`,
+    watcherId: 'watcher-1',
+    atMs,
+    origin: 'owner',
+    class: 'fact',
+    kind: 'escalation',
+    escalationId: ownerDeviationEscalationId('watcher-1', deviation),
+    escalationKind: 'owner-deviation',
+    status: 'escalated',
+    foldCount: 1
+  }
+}
+
 describe('detectStall', () => {
   it('is null when nothing is running', () => {
     expect(detectStall(ledger([]), 1_000_000)).toBeNull()
@@ -159,6 +181,28 @@ describe('detectStall', () => {
       100
     )
     expect(found?.dispatchId).toBe('dispatch-1')
+  })
+
+  it('does not return an already-escalated stall', () => {
+    const found = detectStall(
+      ledger([runningAttempt(0, 'dispatch-1'), escalatedStall(200, 'dispatch-1')]),
+      1_000,
+      100
+    )
+    expect(found).toBeNull()
+  })
+
+  it('continues to another stalled dispatch when the first is escalated', () => {
+    const found = detectStall(
+      ledger([
+        runningAttempt(0, 'dispatch-1'),
+        runningAttempt(0, 'dispatch-2'),
+        escalatedStall(200, 'dispatch-1')
+      ]),
+      250,
+      100
+    )
+    expect(found?.dispatchId).toBe('dispatch-2')
   })
 
   it('ignores an attempted (not yet running) attempt', () => {

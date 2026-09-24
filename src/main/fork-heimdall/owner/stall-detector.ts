@@ -58,6 +58,9 @@ export function detectStall(
     const escalationId = ownerDeviationEscalationId(ledger.watcherId, stall)
     latestEscalations ??= getLatestEscalations(ledger)
     const latest = latestEscalations.find((entry) => entry.escalationId === escalationId)
+    if (latest?.status === 'escalated') {
+      continue
+    }
     if (latest?.status === 'resolved') {
       let resolvedOccurrences = 0
       for (const entry of ledger.entries) {
