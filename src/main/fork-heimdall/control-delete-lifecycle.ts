@@ -31,6 +31,7 @@ export class WatcherDeletionLifecycle {
     const runner = this.dependencies.runner(watcherId)
     const deleteFence = runner ? this.dependencies.runnerControl.beginDelete(runner) : null
     let deleted = false
+    let removeStarted = false
     try {
       if (runner) {
         await runner.operationTail
@@ -41,6 +42,7 @@ export class WatcherDeletionLifecycle {
       }
       const leaseGuard = runner?.leaseGuard ?? null
       if (runner) {
+        removeStarted = true
         this.dependencies.runnerControl.remove(runner)
       }
       if (leaseGuard) {
@@ -58,8 +60,15 @@ export class WatcherDeletionLifecycle {
       await this.dependencies.purgeKindData(fenced.enrollment)
       this.dependencies.enrollments.completeKindPurge(watcherId)
       return { status: 'applied', appliedAtMs: this.dependencies.now() }
+    } catch (error) {
+      // once remove() has torn the runner down, surface the failure as a refusal instead of
+      // letting it propagate and rollbackDelete re-arm a runner that is no longer intact
+      if (removeStarted && !deleted) {
+        return refused('invalid-state', errorDetail(error))
+      }
+      throw error
     } finally {
-      if (runner && deleteFence && !deleted) {
+      if (runner && deleteFence && !deleted && !removeStarted) {
         this.dependencies.runnerControl.rollbackDelete(runner, deleteFence)
       }
     }
@@ -98,4 +107,8 @@ function refused(
   detail: string
 ): WatcherCommandResult {
   return { status: 'refused', reason, detail }
+}
+
+function errorDetail(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }

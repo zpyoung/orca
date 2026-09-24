@@ -54,6 +54,8 @@ export type DispatchLifecycleLedgerStore = {
 export type DispatchLifecycleBudgetClock = {
   open(watcherId: string, cause: 'action-in-flight' | 'worker-dispatched'): DispatchIntervalHandle
   close(handle: DispatchIntervalHandle, reason: 'settled' | 'contact-lost' | 'shutdown'): void
+  /** Best-effort teardown: a no-op when the interval is already durably closed. */
+  release?(handle: DispatchIntervalHandle, reason: 'settled' | 'contact-lost' | 'shutdown'): void
   current?(watcherId: string): DispatchIntervalHandle | null
 }
 
@@ -207,8 +209,8 @@ export class WatcherLedgerLifecycle {
     if (!interval) {
       return
     }
-    this.dependencies.budgetClock.close(interval, 'settled')
     this.workerIntervals.delete(attempt.attemptId)
+    this.releaseInterval(interval, 'settled')
   }
 
   /**
@@ -244,8 +246,8 @@ export class WatcherLedgerLifecycle {
     })
     const interval = this.workerIntervals.get(attempt.attemptId)
     if (interval) {
-      this.dependencies.budgetClock.close(interval, 'settled')
       this.workerIntervals.delete(attempt.attemptId)
+      this.releaseInterval(interval, 'settled')
     }
   }
 
@@ -260,8 +262,8 @@ export class WatcherLedgerLifecycle {
     if (!interval) {
       return
     }
-    this.dependencies.budgetClock.close(interval, 'contact-lost')
     this.workerIntervals.delete(attempt.attemptId)
+    this.releaseInterval(interval, 'contact-lost')
   }
 
   closeForContactLoss(watcherId: string): void {
@@ -269,15 +271,36 @@ export class WatcherLedgerLifecycle {
       if (interval.watcherId !== watcherId) {
         continue
       }
-      this.dependencies.budgetClock.close(interval, 'contact-lost')
       this.workerIntervals.delete(attemptId)
+      try {
+        this.releaseInterval(interval, 'contact-lost')
+      } catch (error) {
+        console.warn('[heimdall] worker interval release failed on contact loss:', error)
+      }
     }
   }
 
   closeForShutdown(): void {
     for (const [attemptId, interval] of this.workerIntervals) {
-      this.dependencies.budgetClock.close(interval, 'shutdown')
       this.workerIntervals.delete(attemptId)
+      try {
+        this.releaseInterval(interval, 'shutdown')
+      } catch (error) {
+        console.warn('[heimdall] worker interval release failed on shutdown:', error)
+      }
+    }
+  }
+
+  // test doubles predating release() have only close(); real clocks always provide release()
+  private releaseInterval(
+    interval: DispatchIntervalHandle,
+    reason: 'settled' | 'contact-lost' | 'shutdown'
+  ): void {
+    const budgetClock = this.dependencies.budgetClock
+    if (budgetClock.release) {
+      budgetClock.release(interval, reason)
+    } else {
+      budgetClock.close(interval, reason)
     }
   }
 

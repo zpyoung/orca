@@ -95,8 +95,12 @@ export class WatcherRunnerControlLifecycle {
     runner.leaseRenewal?.dispose()
     runner.leaseRenewal = null
     runner.leaseGuard = null
-    this.dependencies.dispatchLifecycle.closeForContactLoss(runner.enrollment.watcherId)
-    this.closeOwnedBudgetInterval(runner, 'shutdown')
+    try {
+      this.dependencies.dispatchLifecycle.closeForContactLoss(runner.enrollment.watcherId)
+    } catch (error) {
+      console.warn('[heimdall] worker interval teardown failed during delete:', error)
+    }
+    this.releaseOwnedBudgetInterval(runner, 'shutdown')
     runner.status = { ...runner.status, nextPulseAtMs: null }
     this.dependencies.publish(runner)
   }
@@ -122,6 +126,27 @@ export class WatcherRunnerControlLifecycle {
     const openInterval = this.dependencies.budgetClock.owned(runner.enrollment.watcherId)
     if (openInterval) {
       this.dependencies.budgetClock.close(openInterval, reason)
+    }
+    runner.ownerBudgetInterval = null
+  }
+
+  // deletion must proceed even when the owned interval cannot be torn down
+  private releaseOwnedBudgetInterval(
+    runner: WatcherRunner,
+    reason: 'contact-lost' | 'shutdown'
+  ): void {
+    const openInterval = this.dependencies.budgetClock.owned(runner.enrollment.watcherId)
+    if (openInterval) {
+      try {
+        const budgetClock = this.dependencies.budgetClock
+        if (budgetClock.release) {
+          budgetClock.release(openInterval, reason)
+        } else {
+          budgetClock.close(openInterval, reason)
+        }
+      } catch (error) {
+        console.warn('[heimdall] owned interval release failed during delete:', error)
+      }
     }
     runner.ownerBudgetInterval = null
   }

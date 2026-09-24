@@ -199,4 +199,49 @@ describe('Heimdall budget clock', () => {
     expect(entries()).toEqual([])
     expect(vi.getTimerCount()).toBe(0)
   })
+
+  it('no-ops release on an interval already durably closed, unlike strict close', () => {
+    const clock = makeClock()
+    const handle = clock.open('watcher-1', 'action-in-flight')
+    vi.setSystemTime(10_000)
+    clock.close(handle, 'settled')
+    const closed = entries()
+
+    expect(() => clock.release(handle, 'shutdown')).not.toThrow()
+    expect(entries()).toEqual(closed)
+    expect(() => clock.close(handle, 'shutdown')).toThrow('already closed')
+  })
+
+  it('releases a live interval exactly like a strict close', () => {
+    const clock = makeClock()
+    const handle = clock.open('watcher-1', 'worker-dispatched')
+    vi.setSystemTime(10_000)
+
+    clock.release(handle, 'settled')
+
+    expect(entries().at(-1)).toMatchObject({
+      kind: 'interval-close',
+      intervalId: handle.intervalId,
+      closeReason: 'settled'
+    })
+    expect(clock.current('watcher-1')).toBeNull()
+  })
+
+  it('still rejects release of an interval this clock never owned', () => {
+    const owner = makeClock()
+    const handle = owner.open('watcher-1', 'worker-dispatched')
+    const foreign = makeClock()
+
+    expect(() => foreign.release(handle, 'shutdown')).toThrow('not owned by this clock')
+  })
+
+  it('no-ops release when another clock already closed the interval durably, unlike strict close', () => {
+    const original = makeClock()
+    const handle = original.open('watcher-1', 'worker-dispatched')
+    expect(makeClock().recoverOnStart('watcher-1')).toBe(true)
+
+    expect(() => original.release(handle, 'settled')).not.toThrow()
+    expect(original.owned('watcher-1')).toBeNull()
+    expect(entries().filter((entry) => entry.kind === 'interval-close')).toHaveLength(1)
+  })
 })
