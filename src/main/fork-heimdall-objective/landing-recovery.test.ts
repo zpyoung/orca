@@ -447,6 +447,20 @@ describe('landing recovery probes', () => {
         forge
       })
     ).resolves.toBe('not-landed')
+    for (const state of ['closed', 'merged'] as const) {
+      observed = hostedReview(headSha, { state })
+      await expect(
+        probeHostedReview({
+          action,
+          attempt: unresolvedAttempt,
+          binding: fixture.binding,
+          objectiveStore: fixture.store,
+          lease: lease(),
+          forge
+        })
+      ).resolves.toBe('not-landed')
+      expect(fixture.store.hasLanding(WATCHER_ID, 'hosted-review', contentIdentity)).toBe(false)
+    }
     observed = hostedReview('f'.repeat(40))
     await expect(
       probeHostedReview({

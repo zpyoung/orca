@@ -36,8 +36,8 @@ export type ObjectiveNoActionReason =
   | 'check-in-flight'
   | 'gate-in-flight'
   | 'review-in-flight'
-  | 'review-report-unavailable'
   | 'landing-in-flight'
+  | 'landing-retry-exhausted'
   | 'landed-at-bar'
   | 'branch-not-attached'
   | 'push-target-unavailable'
@@ -49,6 +49,8 @@ export type AttemptDisposition = 'in-flight' | 'landed' | 'not-landed' | 'indete
 
 /** Bounds a node's silent auto-redispatch loop; past this it must park rather than retry again. */
 export const OBJECTIVE_INFRA_REDISPATCH_CAP = 2
+/** Maximum hosted-review retries after the initial not-landed attempt. */
+export const OBJECTIVE_LANDING_REVIEW_RETRY_CAP = 2
 export type ObjectiveRetryableFailureClass = Extract<ObjectiveFailureClass, 'infra' | 'environment'>
 
 export function objectiveNoAction(

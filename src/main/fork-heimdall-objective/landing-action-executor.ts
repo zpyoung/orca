@@ -24,6 +24,8 @@ import {
   resolveObjectivePushTarget
 } from './landing-git-state'
 import {
+  hostedReviewIsLive,
+  hostedReviewMatchesAction,
   observeCommittedLocalBranch,
   type CommittedLocalBranchObservation
 } from './landing-recovery'
@@ -340,17 +342,6 @@ export async function executePushRef(
   })
 }
 
-function reviewMatches(
-  review: HostedReviewInfo | null,
-  action: OpenHostedReviewAction
-): review is HostedReviewInfo {
-  return Boolean(
-    review &&
-    (review.state === 'open' || review.state === 'draft') &&
-    review.headSha === action.headSha
-  )
-}
-
 async function recordMatchingReview(
   args: LandingExecutorArgs<OpenHostedReviewAction>,
   review: { number: number; url: string }
@@ -418,10 +409,10 @@ export async function executeOpenHostedReview(
   } catch (error) {
     return indeterminate('hosted-review-probe-failed', errorOutput(error))
   }
-  if (reviewMatches(existing, args.action)) {
+  if (hostedReviewMatchesAction(existing, args.action)) {
     return recordMatchingReview(args, existing)
   }
-  if (existing) {
+  if (existing && hostedReviewIsLive(existing)) {
     return indeterminate('hosted-review-state-moved')
   }
   try {
@@ -468,10 +459,10 @@ export async function executeOpenHostedReview(
       probe: errorOutput(error)
     })
   }
-  if (reviewMatches(authoritative, args.action)) {
+  if (hostedReviewMatchesAction(authoritative, args.action)) {
     return recordMatchingReview(args, authoritative)
   }
-  if (authoritative) {
+  if (authoritative && hostedReviewIsLive(authoritative)) {
     return indeterminate('hosted-review-state-moved')
   }
   if (creationError) {

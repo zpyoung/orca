@@ -2,18 +2,16 @@ import { getLatestEscalations } from '../../../shared/fork-heimdall/ledger-queri
 import type { EscalationEntry, WatcherLedger } from '../../../shared/fork-heimdall/ledger-types'
 import {
   DeviationSchema,
-  deviationNaturalKey,
+  ownerDeviationEscalationId,
   type Deviation
 } from '../../../shared/fork-heimdall/owner/deviation'
 import type { RunnerLedgerStore } from '../runner-state'
 
+export { ownerDeviationEscalationId }
+
 export const OWNER_DEVIATION_ESCALATION_KIND = 'owner-deviation'
 
 export type OwnerDeviationEscalation = EscalationEntry & { escalationKind: 'owner-deviation' }
-
-export function ownerDeviationEscalationId(watcherId: string, deviation: Deviation): string {
-  return `owner-deviation:${watcherId}:${deviationNaturalKey(deviation)}`
-}
 
 export function ownerDeviationWakeToken(entry: OwnerDeviationEscalation): string {
   const wakeId = decodeReason(entry.reason)?.wakeId

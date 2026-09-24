@@ -290,9 +290,20 @@ export class WatcherRunnerLoop {
         trace.contentIdentity = snapshot.contentIdentity
         ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
       }
+      const recoveredUncertainBeforeStop =
+        snapshot.freshness === 'live' && getUnresolvedAttempts(ledger).length > 0
+      if (recoveredUncertainBeforeStop) {
+        await this.actions.recoverAttempts(runner, snapshot, ledger)
+        ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
+      }
       let stopped = await this.stopLifecycle.evaluate(runner, snapshot, ledger)
       if ((stopped === 'deferred' || stopped === 'parked') && snapshot.freshness === 'live') {
-        ledger = await this.actions.recoverBeforeStop(runner, snapshot, absentDispatches)
+        if (recoveredUncertainBeforeStop) {
+          this.actions.settleAbsentDispatches(runner, absentDispatches)
+          ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
+        } else {
+          ledger = await this.actions.recoverBeforeStop(runner, snapshot, absentDispatches)
+        }
         if (stopped === 'deferred') {
           stopped = await this.stopLifecycle.evaluate(runner, snapshot, ledger)
         }
@@ -304,7 +315,7 @@ export class WatcherRunnerLoop {
         trace.exitPath = 'watching'
         return
       }
-      if (snapshot.freshness === 'live') {
+      if (snapshot.freshness === 'live' && !recoveredUncertainBeforeStop) {
         await this.actions.recoverAttempts(runner, snapshot, ledger)
       }
       ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)

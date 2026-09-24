@@ -1,27 +1,30 @@
 import { describe, expect, it } from 'vitest'
 import type {
   AttemptEntry,
+  EscalationEntry,
   EvidenceEntry,
   WatcherLedger
 } from '../../../shared/fork-heimdall/ledger-types'
+import type { StallDeviation } from '../../../shared/fork-heimdall/owner/deviation'
+import { ownerDeviationEscalationId } from './deviation-ledger'
 import { detectStall } from './stall-detector'
 
 function runningAttempt(atMs: number, dispatchId = 'dispatch-1'): AttemptEntry {
   return {
-    eventId: 'attempt-event',
+    eventId: `attempt-event-${dispatchId}`,
     watcherId: 'watcher-1',
     atMs,
     origin: 'owner',
     class: 'fact',
     kind: 'attempt',
-    attemptId: 'attempt-1',
-    fingerprint: 'fp-1',
+    attemptId: `attempt-${dispatchId}`,
+    fingerprint: `fp-${dispatchId}`,
     action: {
       kind: 'dispatch-node',
       capability: 'write',
       visibility: 'local',
       contentIdentity: 'revision-1',
-      evidenceKey: 'evidence-1'
+      evidenceKey: `evidence-${dispatchId}`
     },
     state: 'running',
     dispatchId
@@ -43,6 +46,28 @@ function heartbeat(atMs: number, dispatchId: string): EvidenceEntry {
 
 function ledger(entries: WatcherLedger['entries']): WatcherLedger {
   return { watcherId: 'watcher-1', entries }
+}
+
+function resolvedStall(atMs: number, dispatchId = 'dispatch-1'): EscalationEntry {
+  const deviation: StallDeviation = {
+    kind: 'stall',
+    what: 'dispatch-node',
+    dispatchId,
+    inFlightSinceMs: 0,
+    thresholdMs: 100
+  }
+  return {
+    eventId: `resolved-${dispatchId}-${atMs}`,
+    watcherId: 'watcher-1',
+    atMs,
+    origin: 'owner',
+    class: 'fact',
+    kind: 'escalation',
+    escalationId: ownerDeviationEscalationId('watcher-1', deviation),
+    escalationKind: 'owner-deviation',
+    status: 'resolved',
+    foldCount: 2
+  }
 }
 
 describe('detectStall', () => {
@@ -78,6 +103,62 @@ describe('detectStall', () => {
     const entries = [runningAttempt(0), heartbeat(thresholdMs - 1, 'dispatch-other')]
     const found = detectStall(ledger(entries), thresholdMs + 1, thresholdMs)
     expect(found?.inFlightSinceMs).toBe(0)
+  })
+
+  it('waits two thresholds after one resolution and four after the next', () => {
+    const thresholdMs = 100
+    const firstResolved = resolvedStall(200)
+    let entries: WatcherLedger['entries'] = [runningAttempt(0), firstResolved]
+    expect(
+      detectStall(ledger(entries), firstResolved.atMs + 2 * thresholdMs - 1, thresholdMs)
+    ).toBeNull()
+    expect(
+      detectStall(ledger(entries), firstResolved.atMs + 2 * thresholdMs, thresholdMs)
+    ).toMatchObject({ dispatchId: 'dispatch-1' })
+
+    const secondResolved = resolvedStall(401)
+    entries = [...entries, secondResolved]
+    expect(
+      detectStall(ledger(entries), secondResolved.atMs + 4 * thresholdMs - 1, thresholdMs)
+    ).toBeNull()
+    expect(
+      detectStall(ledger(entries), secondResolved.atMs + 4 * thresholdMs, thresholdMs)
+    ).toMatchObject({ dispatchId: 'dispatch-1' })
+  })
+
+  it('caps resolved-stall backoff at eight thresholds', () => {
+    const thresholdMs = 100
+    const entries: WatcherLedger['entries'] = [
+      runningAttempt(0),
+      ...Array.from({ length: 5 }, (_, index) => resolvedStall((index + 1) * thresholdMs))
+    ]
+    const resolvedAt = 5 * thresholdMs
+    expect(detectStall(ledger(entries), resolvedAt + 8 * thresholdMs - 1, thresholdMs)).toBeNull()
+    expect(detectStall(ledger(entries), resolvedAt + 8 * thresholdMs, thresholdMs)).toMatchObject({
+      dispatchId: 'dispatch-1'
+    })
+  })
+
+  it('continues to another stalled dispatch while the first is backed off', () => {
+    const found = detectStall(
+      ledger([
+        runningAttempt(0, 'dispatch-1'),
+        runningAttempt(0, 'dispatch-2'),
+        resolvedStall(200, 'dispatch-1')
+      ]),
+      250,
+      100
+    )
+    expect(found?.dispatchId).toBe('dispatch-2')
+  })
+
+  it('does not apply a resolved escalation for another dispatch', () => {
+    const found = detectStall(
+      ledger([runningAttempt(0, 'dispatch-1'), resolvedStall(200, 'dispatch-other')]),
+      1_000,
+      100
+    )
+    expect(found?.dispatchId).toBe('dispatch-1')
   })
 
   it('ignores an attempted (not yet running) attempt', () => {

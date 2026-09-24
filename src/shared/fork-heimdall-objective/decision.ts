@@ -8,6 +8,7 @@ import {
   objectiveAttempts,
   objectiveAttemptDisposition,
   objectiveNoAction,
+  OBJECTIVE_LANDING_REVIEW_RETRY_CAP,
   projectObjectiveReports,
   type ObjectiveAttempt,
   type ObjectiveDecisionOutcome,
@@ -143,13 +144,34 @@ function decideNextLandingRung(
   if (preceding.branch === undefined || preceding.commitSha === undefined) {
     return objectiveNoAction('landing', 'projection-refresh-pending', highest)
   }
+  const evidenceKey = `hosted-review:${hostedReview.provider}:${preceding.branch}:${preceding.commitSha}`
+  const retryPrefix = `${evidenceKey}:retry-`
+  let notLandedAttempts = 0
+  for (const candidate of attempts) {
+    if (
+      candidate.action.kind !== 'open-hosted-review' ||
+      candidate.action.contentIdentity !== contentIdentity ||
+      (candidate.action.evidenceKey !== evidenceKey &&
+        !candidate.action.evidenceKey.startsWith(retryPrefix))
+    ) {
+      continue
+    }
+    if (objectiveAttemptDisposition(candidate.attempt, ledger) === 'not-landed') {
+      notLandedAttempts += 1
+    }
+  }
+  if (notLandedAttempts > OBJECTIVE_LANDING_REVIEW_RETRY_CAP) {
+    return objectiveNoAction('landing', 'landing-retry-exhausted', next)
+  }
+  const retryEvidenceKey =
+    notLandedAttempts === 0 ? evidenceKey : `${evidenceKey}:retry-${notLandedAttempts}`
   return {
     action: {
       kind: 'open-hosted-review',
       capability: 'land',
       visibility: 'external',
       contentIdentity,
-      evidenceKey: `hosted-review:${hostedReview.provider}:${preceding.branch}:${preceding.commitSha}`,
+      evidenceKey: retryEvidenceKey,
       rung: 'hosted-review',
       revisionId: preceding.revisionId,
       branch: preceding.branch,

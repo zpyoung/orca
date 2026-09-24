@@ -30,6 +30,7 @@ import {
 } from './deviation-routing'
 import { deviationIsDispatchScoped } from './deviation-scope'
 import type { OwnerReportReadResult } from './owner-report-io'
+import { OWNER_STALL_THRESHOLD_MS } from './stall-detector'
 
 const { ensureOwnerSession, sendOwnerTurn, readOwnerReport, issueOwnerReportPath } = vi.hoisted(
   () => ({
@@ -764,6 +765,60 @@ describe('driveOwnerDeviation: a stalled dispatch wakes the owner with no other 
     expect(sendOwnerTurn).toHaveBeenCalledTimes(1)
     const pending = findOldestOpenOwnerDeviation(ledgerStore.read('watcher-1'))
     expect(pending?.escalationId).toContain('stall:')
+  })
+
+  it('backs off a stall after the owner continues and prompts again after two thresholds', async () => {
+    const ledgerStore = memoryLedgerStore()
+    const thresholdMs = OWNER_STALL_THRESHOLD_MS
+    let nowMs = thresholdMs + 1
+    ledgerStore.append('watcher-1', {
+      eventId: 'attempt-stalled',
+      watcherId: 'watcher-1',
+      atMs: 0,
+      origin: 'owner',
+      class: 'fact',
+      kind: 'attempt',
+      attemptId: 'attempt-stalled',
+      fingerprint: 'fp-stalled',
+      action: {
+        kind: 'dispatch-node',
+        capability: 'write',
+        visibility: 'local',
+        contentIdentity: 'revision-1',
+        evidenceKey: 'evidence-stalled'
+      },
+      state: 'running',
+      dispatchId: 'dispatch-stalled'
+    })
+    const runner = buildRunner({ paused: false, owner: { agent: 'claude' } })
+    const deps = baseDeps(ledgerStore)
+    deps.ledgerRecord.now = () => nowMs
+
+    await expect(driveOwnerDeviation(deps, runner, snapshot)).resolves.toBe('handled')
+    const pending = requireOpenOwnerDeviation(ledgerStore)
+    appendAcceptedOwnerReady(ledgerStore, pending)
+    readOwnerReport.mockResolvedValue({
+      ok: true,
+      path: '/report/path.json',
+      report: { kind: 'continue' }
+    })
+    await expect(driveOwnerDeviation(deps, runner, snapshot)).resolves.toBe('handled')
+    expect(findOldestOpenOwnerDeviation(ledgerStore.read('watcher-1'))).toBeNull()
+
+    const resolved = getLatestEscalations(ledgerStore.read('watcher-1')).find(
+      (entry) => entry.escalationId === pending.escalationId
+    )
+    if (!resolved) {
+      throw new Error('Expected resolved stall deviation')
+    }
+
+    nowMs = resolved.atMs + 1
+    await expect(driveOwnerDeviation(deps, runner, snapshot)).resolves.toBe('idle')
+    expect(sendOwnerTurn).toHaveBeenCalledTimes(1)
+
+    nowMs = resolved.atMs + 2 * thresholdMs + 1
+    await expect(driveOwnerDeviation(deps, runner, snapshot)).resolves.toBe('handled')
+    expect(sendOwnerTurn).toHaveBeenCalledTimes(2)
   })
 
   it('does not send another owner turn after the stalled dispatch was escalated', async () => {

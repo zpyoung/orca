@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { getUnresolvedAttempts } from '../../shared/fork-heimdall/ledger-queries'
 import { makeAttemptFingerprint } from '../../shared/fork-heimdall/attempt-fingerprint'
 import type {
   WatcherCommandResult,
@@ -182,4 +183,65 @@ describe('gate-hold pacing', () => {
     expect(delays[0]).toBe(30_000)
     expect(delays[1]).toBe(60_000)
   })
+})
+
+describe('uncertain attempt recovery before stop predicates', () => {
+  for (const effect of ['landed', 'indeterminate'] as const) {
+    it(`${effect === 'landed' ? 'does not park' : 'parks'} after probing an aged uncertain attempt that is ${effect}`, async () => {
+      const world = await harness()
+      const resolveOutcome = vi.fn(() => ({ effect }))
+      world.service.registerKind(
+        kind({
+          resolveOutcome,
+          stopPredicates: [
+            {
+              id: 'uncertain-attempt-stuck',
+              evaluate: (_snapshot, ledger) =>
+                getUnresolvedAttempts(ledger).length > 0
+                  ? { stop: true, reason: 'uncertain attempt remained stuck' }
+                  : { stop: false }
+            }
+          ]
+        })
+      )
+      const result = await world.service.enroll(
+        enrollmentInput({ wallClockActiveMs: 100_000, turns: 100 })
+      )
+      if (result.status !== 'enrolled') {
+        throw new Error('expected enrollment')
+      }
+      const watcherId = result.entry.enrollment.watcherId
+      world.ledgerStore.append({
+        eventId: 'uncertain-attempt',
+        watcherId,
+        atMs: 10,
+        origin: 'owner',
+        class: 'fact',
+        kind: 'attempt',
+        attemptId: 'uncertain-1',
+        fingerprint: makeAttemptFingerprint('revision-1', 'apply-review-fix', 'review:revision-1'),
+        action: action('revision-1'),
+        state: 'settled',
+        effect: 'indeterminate',
+        reason: 'review-state-unknown'
+      })
+
+      await world.service.reconcileForTesting(watcherId)
+
+      expect(resolveOutcome).toHaveBeenCalledTimes(1)
+      expect((await world.service.fleet()).entries[0]?.entry.status.state).toBe(
+        effect === 'landed' ? 'watching' : 'parked'
+      )
+      expect(
+        world.ledgerStore
+          .read(watcherId)
+          .entries.some(
+            (entry) =>
+              entry.kind === 'attempt-resolved' &&
+              entry.attemptId === 'uncertain-1' &&
+              entry.effect === 'landed'
+          )
+      ).toBe(effect === 'landed')
+    })
+  }
 })

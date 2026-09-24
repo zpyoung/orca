@@ -216,3 +216,7 @@ export function deviationNaturalKey(deviation: Deviation): string {
       return `stall:${encodeURIComponent(deviation.dispatchId)}`
   }
 }
+
+export function ownerDeviationEscalationId(watcherId: string, deviation: Deviation): string {
+  return `owner-deviation:${watcherId}:${deviationNaturalKey(deviation)}`
+}

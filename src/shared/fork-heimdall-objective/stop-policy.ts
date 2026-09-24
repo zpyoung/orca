@@ -24,6 +24,7 @@ import { objectiveRetryExhaustedDeviation } from './deviation-context'
 import type { ObjectiveWorld } from './detail-types'
 import { OBJECTIVE_LANDING_LADDER, reachedRungs, stopRungForBar } from './landing-ladder'
 import { prioritizeReadyObjectiveTaskKeys } from './parallel-scheduling'
+import { objectiveLandingStuckPredicate } from './landing-stuck-policy'
 
 export const OBJECTIVE_BAR_REACHED_PREDICATE_ID = 'objective-bar-reached'
 export const OBJECTIVE_WORKER_ESCALATION_PREDICATE_ID = 'worker-escalation'
@@ -407,5 +408,6 @@ export const objectiveInfraRetryExhaustedPredicate: StopPredicate<ObjectiveWorld
 export const OBJECTIVE_STOP_PREDICATES = [
   objectiveBarReachedPredicate,
   objectiveWorkerEscalationPredicate,
-  objectiveInfraRetryExhaustedPredicate
+  objectiveInfraRetryExhaustedPredicate,
+  objectiveLandingStuckPredicate
 ] as const satisfies readonly StopPredicate<ObjectiveWorld>[]

@@ -695,6 +695,30 @@ describe('landing action executor hosted reviews', () => {
   })
 
   it.each([
+    ['closed review at a different head', 'closed', false],
+    ['merged review', 'merged', false],
+    ['closed review at the requested head', 'closed', true]
+  ] as const)('creates a new review when it finds a %s', async (_label, state, sameHead) => {
+    const fixture = await repositoryFixture()
+    const prepared = await reviewExecutionFixture(fixture)
+    const existingHead = sameHead ? prepared.headSha : 'f'.repeat(40)
+    const fake = reviewForge({
+      reviews: [reviewInfo(existingHead, { state }), reviewInfo(prepared.headSha)]
+    })
+
+    const outcome = await executeOpenHostedReview({
+      action: prepared.action,
+      binding: binding(fixture, 'hosted-review'),
+      context: context(fixture, prepared.contentIdentity, 'hosted-review'),
+      objectiveStore: fixture.store,
+      forge: fake.forge
+    })
+
+    expect(outcome).toMatchObject({ effect: 'landed', result: { reviewNumber: 42 } })
+    expect(fake.createReview).toHaveBeenCalledOnce()
+  })
+
+  it.each([
     ['created', { ok: true, number: 42, url: 'https://github.test/acme/repo/pull/42' }],
     [
       'already exists',
@@ -807,5 +831,52 @@ describe('landing action executor hosted reviews', () => {
       })
     ).resolves.toEqual({ effect: 'indeterminate', reason: 'hosted-review-state-moved' })
     expect(fake.createReview).not.toHaveBeenCalled()
+  })
+
+  it('keeps a draft review at a different head indeterminate', async () => {
+    const fixture = await repositoryFixture()
+    const prepared = await reviewExecutionFixture(fixture)
+    const fake = reviewForge({ reviews: [reviewInfo('f'.repeat(40), { state: 'draft' })] })
+
+    await expect(
+      executeOpenHostedReview({
+        action: prepared.action,
+        binding: binding(fixture, 'hosted-review'),
+        context: context(fixture, prepared.contentIdentity, 'hosted-review'),
+        objectiveStore: fixture.store,
+        forge: fake.forge
+      })
+    ).resolves.toEqual({ effect: 'indeterminate', reason: 'hosted-review-state-moved' })
+    expect(fake.createReview).not.toHaveBeenCalled()
+  })
+
+  it('does not verify a successful create with a closed review', async () => {
+    const fixture = await repositoryFixture()
+    const prepared = await reviewExecutionFixture(fixture)
+    const fake = reviewForge({
+      reviews: [null, reviewInfo(prepared.headSha, { state: 'closed' })],
+      createResult: {
+        ok: true,
+        number: 42,
+        url: 'https://github.test/acme/repo/pull/42'
+      }
+    })
+
+    await expect(
+      executeOpenHostedReview({
+        action: prepared.action,
+        binding: binding(fixture, 'hosted-review'),
+        context: context(fixture, prepared.contentIdentity, 'hosted-review'),
+        objectiveStore: fixture.store,
+        forge: fake.forge
+      })
+    ).resolves.toMatchObject({
+      effect: 'indeterminate',
+      reason: 'hosted-review-create-unverifiable'
+    })
+    expect(fake.createReview).toHaveBeenCalledOnce()
+    expect(fixture.store.hasLanding(WATCHER_ID, 'hosted-review', prepared.contentIdentity)).toBe(
+      false
+    )
   })
 })

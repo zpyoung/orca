@@ -68,15 +68,15 @@ function messageHasAttemptTrailer(message: string, expected: string): boolean {
   )
 }
 
-function reviewMatchesAction(
+export function hostedReviewIsLive(review: HostedReviewInfo | null): review is HostedReviewInfo {
+  return review !== null && (review.state === 'open' || review.state === 'draft')
+}
+
+export function hostedReviewMatchesAction(
   review: HostedReviewInfo | null,
   action: OpenHostedReviewAction
-): boolean {
-  return Boolean(
-    review &&
-    (review.state === 'open' || review.state === 'draft') &&
-    review.headSha === action.headSha
-  )
+): review is HostedReviewInfo {
+  return hostedReviewIsLive(review) && review.headSha === action.headSha
 }
 
 async function recordRecoveryLanding(
@@ -219,10 +219,10 @@ export async function probeHostedReview(
     branch: args.action.branch,
     githubCurrentHeadOid: args.action.headSha
   })
-  if (!review) {
+  if (!hostedReviewIsLive(review)) {
     return 'not-landed'
   }
-  if (!reviewMatchesAction(review, args.action)) {
+  if (!hostedReviewMatchesAction(review, args.action)) {
     return 'indeterminate'
   }
   await recordRecoveryLanding(args, args.action.contentIdentity, {
