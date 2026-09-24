@@ -20,6 +20,7 @@ import {
   type ObjectiveRevisionProjection,
   type ObjectiveWorld
 } from './detail-types'
+import type { ObjectiveDispatchRecord } from './parallel-types'
 
 export type ObjectiveNoActionReason =
   | 'planner-in-flight'
@@ -42,6 +43,7 @@ export type ObjectiveNoActionReason =
   | 'branch-not-attached'
   | 'push-target-unavailable'
   | 'base-branch-unresolvable'
+  | 'read-only-worker-in-flight'
 
 export type ObjectiveDecisionOutcome = DecisionOutcome<ObjectiveAction>
 export type ObjectiveAttempt = { attempt: AttemptEntry; action: ObjectiveAction }
@@ -49,6 +51,8 @@ export type AttemptDisposition = 'in-flight' | 'landed' | 'not-landed' | 'indete
 
 /** Bounds a node's silent auto-redispatch loop; past this it must park rather than retry again. */
 export const OBJECTIVE_INFRA_REDISPATCH_CAP = 2
+/** Bounds ingest-report re-emission after a normalization failure; past this the node is rejected. */
+export const OBJECTIVE_INGEST_REEMISSION_CAP = 2
 /** Maximum hosted-review retries after the initial not-landed attempt. */
 export const OBJECTIVE_LANDING_REVIEW_RETRY_CAP = 2
 export type ObjectiveRetryableFailureClass = Extract<ObjectiveFailureClass, 'infra' | 'environment'>
@@ -158,6 +162,53 @@ export function objectiveNodeRetryCount(
     }
   }
   return count
+}
+
+/** Task keys with a merge-train dispatch mid-flight: queued to apply, applying, or resolving a conflict. */
+export function objectiveActiveDispatchTaskKeys(
+  dispatches: readonly ObjectiveDispatchRecord[],
+  revisionId: string
+): Set<string> {
+  const taskKeys = new Set<string>()
+  for (const dispatch of dispatches) {
+    if (
+      dispatch.revisionId === revisionId &&
+      (dispatch.state === 'running' ||
+        dispatch.state === 'waiting-to-apply' ||
+        dispatch.state === 'applying' ||
+        dispatch.state === 'resolving-conflict')
+    ) {
+      taskKeys.add(dispatch.taskKey)
+    }
+  }
+  return taskKeys
+}
+
+/**
+ * Re-emits an ingest-report action with a fresh evidenceKey suffix, or returns null once the
+ * dispatch's settled not-landed ingest-report attempts (original emission and retries alike, since a
+ * retry is distinguished by its evidenceKey suffix rather than a retryOf field) reach the cap and the
+ * caller must fall through to rejection instead.
+ */
+export function objectiveIngestReportReemission(
+  action: Extract<ObjectiveAction, { kind: 'ingest-report' }>,
+  attempts: readonly ObjectiveAttempt[],
+  ledger: WatcherLedger
+): ObjectiveAction | null {
+  let settledCount = 0
+  for (const candidate of attempts) {
+    if (
+      candidate.action.kind === 'ingest-report' &&
+      candidate.action.dispatchId === action.dispatchId &&
+      objectiveAttemptDisposition(candidate.attempt, ledger) === 'not-landed'
+    ) {
+      settledCount += 1
+    }
+  }
+  if (settledCount >= OBJECTIVE_INGEST_REEMISSION_CAP) {
+    return null
+  }
+  return { ...action, evidenceKey: `${action.evidenceKey}#ingest-retry-${settledCount}` }
 }
 
 /**

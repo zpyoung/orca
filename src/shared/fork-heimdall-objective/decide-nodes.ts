@@ -5,9 +5,11 @@ import { objectiveRetryExhaustedDeviation } from './deviation-context'
 import { objectiveRepairEpisodeOpen } from './objective-repair-state'
 import {
   latestObjectiveAttempt,
+  objectiveActiveDispatchTaskKeys,
   objectiveAttemptDisposition,
   objectiveAttemptFailureClass,
   objectiveInFlightTaskKeys,
+  objectiveIngestReportReemission,
   objectiveNoAction,
   objectiveNodeRetryCount,
   objectiveRetryableFailure,
@@ -52,16 +54,8 @@ export function decideObjectiveNodes(
   const activeTaskKeys = new Set(inFlightTaskKeys)
   const failedTaskKeys = new Set<string>()
   const projectedDispatches = snapshot.world.parallel?.dispatches ?? []
-  for (const dispatch of projectedDispatches) {
-    if (
-      dispatch.revisionId === revision.id &&
-      (dispatch.state === 'running' ||
-        dispatch.state === 'waiting-to-apply' ||
-        dispatch.state === 'applying' ||
-        dispatch.state === 'resolving-conflict')
-    ) {
-      activeTaskKeys.add(dispatch.taskKey)
-    }
+  for (const taskKey of objectiveActiveDispatchTaskKeys(projectedDispatches, revision.id)) {
+    activeTaskKeys.add(taskKey)
   }
   const failureContext = { snapshot, ledger, attempts, reports, revision, ownerConfigured }
 
@@ -151,12 +145,14 @@ export function decideObjectiveNodes(
           candidate.report !== null &&
           candidate.reportDigest !== null
       )
-      const ingestionFailureClass = objectiveAttemptFailureClass(ingestion.attempt, ledger)
-      if (
+      const retryable =
         (durableReport?.state === 'running' || durableReport?.state === 'resolving-conflict') &&
-        ingestionFailureClass !== 'criteria'
-      ) {
-        return { action: ingestionAction }
+        objectiveAttemptFailureClass(ingestion.attempt, ledger) !== 'criteria'
+      const reemission = retryable
+        ? objectiveIngestReportReemission(ingestionAction, attempts, ledger)
+        : null
+      if (reemission) {
+        return { action: reemission }
       }
       if (durableReport?.state === 'resolving-conflict') {
         continue

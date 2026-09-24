@@ -218,6 +218,111 @@ describe('objective landing execution', () => {
   })
 })
 
+describe('objective check execution', () => {
+  async function checkFixture(): Promise<{
+    fixture: ObjectiveStoreFixture
+    workspacePath: string
+    contentIdentity: string
+    binding: ObjectiveSnapshotBinding
+    context: ExecuteContext<ObjectiveWorld>
+  }> {
+    const fixture = objectiveStoreFixture()
+    const workspacePath = await mkdtemp(join(tmpdir(), 'objective-check-'))
+    await writeFile(join(workspacePath, 'result.txt'), 'before')
+    const target = {
+      kind: 'folder' as const,
+      executionHostId: 'local' as const,
+      workspacePath,
+      fileProvider: null
+    }
+    const contentIdentity = await computeWorkspaceContentIdentity(target)
+    const binding = {
+      enrollment: { watcherId: WATCHER_ID },
+      contract: { tier: 'express' },
+      target
+    } as unknown as ObjectiveSnapshotBinding
+    const context = {
+      snapshot: { contentIdentity },
+      ledger: { watcherId: WATCHER_ID, entries: [] },
+      lease: { assertHeld: vi.fn(async () => undefined), epoch: 1 },
+      dispatchWorker: vi.fn()
+    } as unknown as ExecuteContext<ObjectiveWorld>
+    return { fixture, workspacePath, contentIdentity, binding, context }
+  }
+
+  function checkAction(
+    fixture: ObjectiveStoreFixture,
+    contentIdentity: string
+  ): Extract<ObjectiveAction, { kind: 'run-check' }> {
+    return {
+      kind: 'run-check',
+      capability: 'check',
+      visibility: 'local',
+      contentIdentity,
+      evidenceKey: `${fixture.criterionId}:${contentIdentity}`,
+      criterionId: fixture.criterionId,
+      command: 'true'
+    }
+  }
+
+  it('returns a stale outcome without starting a check attempt when identity already drifted before the run', async () => {
+    const { fixture, workspacePath, contentIdentity, binding, context } = await checkFixture()
+    try {
+      await writeFile(join(workspacePath, 'result.txt'), 'after with a different size')
+
+      const outcome = await executeObjectiveLocalAction({
+        action: checkAction(fixture, contentIdentity),
+        binding,
+        context,
+        objectiveStore: fixture.objectiveStore
+      })
+
+      expect(outcome).toEqual({ effect: 'not-landed', reason: 'check-evidence-stale' })
+      expect(runCriterionCheckMock).not.toHaveBeenCalled()
+      expect(
+        fixture.objectiveStore.getCheckAttempt(fixture.criterionId, contentIdentity)
+      ).toBeNull()
+    } finally {
+      await rm(workspacePath, { recursive: true, force: true })
+    }
+  })
+
+  it('abandons the started check attempt and returns a stale outcome when identity drifts during the run', async () => {
+    const { fixture, workspacePath, contentIdentity, binding, context } = await checkFixture()
+    try {
+      runCriterionCheckMock.mockImplementation(async () => {
+        await writeFile(join(workspacePath, 'result.txt'), 'changed mid-run')
+        return {
+          command: 'true',
+          pass: true,
+          exitCode: 0,
+          timedOut: false,
+          stdoutTail: '',
+          stderrTail: '',
+          error: null,
+          startedAtMs: 1,
+          completedAtMs: 2,
+          durationMs: 1
+        }
+      })
+
+      const outcome = await executeObjectiveLocalAction({
+        action: checkAction(fixture, contentIdentity),
+        binding,
+        context,
+        objectiveStore: fixture.objectiveStore
+      })
+
+      expect(outcome).toEqual({ effect: 'not-landed', reason: 'check-evidence-stale' })
+      expect(
+        fixture.objectiveStore.getCheckAttempt(fixture.criterionId, contentIdentity)
+      ).toBeNull()
+    } finally {
+      await rm(workspacePath, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('objective report ingestion execution', () => {
   it('returns planner schema detail without persisting a malformed plan', async () => {
     const database = new ObjectiveDatabase(':memory:')
@@ -678,6 +783,63 @@ describe('objective gate execution', () => {
         reason: 'gate-declaration-mismatch'
       })
       expect(runCriterionCheckMock).not.toHaveBeenCalled()
+    } finally {
+      await rm(workspacePath, { recursive: true, force: true })
+    }
+  })
+
+  it('returns a stale outcome without starting a gate attempt when identity already drifted before the run', async () => {
+    const { fixture, workspacePath, contentIdentity, binding, context } = await gateFixture()
+    try {
+      await writeFile(join(workspacePath, 'result.txt'), 'after with a different size')
+
+      const outcome = await executeObjectiveLocalAction({
+        action: gateAction(contentIdentity),
+        binding,
+        context,
+        objectiveStore: fixture.objectiveStore
+      })
+
+      expect(outcome).toEqual({ effect: 'not-landed', reason: 'check-evidence-stale' })
+      expect(runCriterionCheckMock).not.toHaveBeenCalled()
+      expect(
+        fixture.objectiveStore.getGateAttempt(WATCHER_ID, declaredGate.name, contentIdentity)
+      ).toBeNull()
+    } finally {
+      await rm(workspacePath, { recursive: true, force: true })
+    }
+  })
+
+  it('abandons the started gate attempt and returns a stale outcome when identity drifts during the run', async () => {
+    const { fixture, workspacePath, contentIdentity, binding, context } = await gateFixture()
+    try {
+      runCriterionCheckMock.mockImplementation(async () => {
+        await writeFile(join(workspacePath, 'result.txt'), 'changed mid-run')
+        return {
+          command: declaredGate.command,
+          pass: true,
+          exitCode: 0,
+          timedOut: false,
+          stdoutTail: '',
+          stderrTail: '',
+          error: null,
+          startedAtMs: 1,
+          completedAtMs: 2,
+          durationMs: 1
+        }
+      })
+
+      const outcome = await executeObjectiveLocalAction({
+        action: gateAction(contentIdentity),
+        binding,
+        context,
+        objectiveStore: fixture.objectiveStore
+      })
+
+      expect(outcome).toEqual({ effect: 'not-landed', reason: 'check-evidence-stale' })
+      expect(
+        fixture.objectiveStore.getGateAttempt(WATCHER_ID, declaredGate.name, contentIdentity)
+      ).toBeNull()
     } finally {
       await rm(workspacePath, { recursive: true, force: true })
     }

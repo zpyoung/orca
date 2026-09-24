@@ -17,9 +17,11 @@ import {
   node,
   projection,
   revision,
-  snapshot
+  snapshot,
+  workerDone
 } from './decision-test-harness'
 import type { ObjectiveAction } from './objective-actions'
+import type { ObjectiveDispatchRecord } from './parallel-types'
 
 const dispatch: ObjectiveAction = {
   kind: 'dispatch-node',
@@ -30,6 +32,52 @@ const dispatch: ObjectiveAction = {
   revisionId: 'revision-1',
   taskKey: 'core',
   depsOrchestrationIds: []
+}
+
+function runningDispatchRecord(
+  overrides: Partial<ObjectiveDispatchRecord> = {}
+): ObjectiveDispatchRecord {
+  return {
+    attemptFingerprint: 'fingerprint-dispatch-core',
+    watcherId: 'watcher-1',
+    executionHostId: 'local',
+    revisionId: 'revision-1',
+    taskKey: 'core',
+    dispatchId: 'dispatch-core',
+    workspaceId: 'workspace-core',
+    workspacePath: '/workspaces/core',
+    baseCommit: 'base-commit',
+    laneTaskKeys: ['core'],
+    sessionNodeCount: 1,
+    state: 'running',
+    commitSha: null,
+    appliedCommitSha: null,
+    reportDigest: 'report-core',
+    conflictPaths: [],
+    conflictingTaskKeys: [],
+    conflictingDispatchIds: [],
+    planTaskDigest: 'plan-digest-core',
+    createdAtMs: 10,
+    completedAtMs: null,
+    terminalHandle: 'terminal-core',
+    setupState: 'ready',
+    reportPath: '/outside/report.json',
+    report: {
+      taskKey: 'core',
+      summary: 'Implemented core.',
+      filesModified: ['src/core.ts'],
+      criteriaSelfAssessment: [{ criterionIndex: 0, result: 'pass', note: 'Verified locally.' }]
+    },
+    task: {
+      taskKey: 'core',
+      title: 'Task core',
+      spec: 'Implement core',
+      deps: [],
+      criteria: [{ body: 'core works', shellCheckable: false, checkCommand: null }],
+      declaresDependencyChange: false
+    },
+    ...overrides
+  }
 }
 
 describe('objective node deviations, owner configured', () => {
@@ -187,6 +235,87 @@ describe('objective node deviations, owner configured', () => {
         taskKey: 'core',
         rejectionReason: 'implementer-report-malformed',
         detail: 'summary: Invalid input: expected string, received object'
+      }
+    })
+  })
+
+  it('re-emits ingest-report under the reemission cap, then rejects once it is reached', () => {
+    const dispatched = attempt(dispatch, {
+      state: 'settled',
+      effect: 'landed',
+      dispatchId: 'dispatch-core'
+    })
+    const done = workerDone('dispatch-core')
+    const durableReport = runningDispatchRecord()
+    const plan = projection({
+      nodes: [node('core', { state: 'dispatched', dispatchId: 'dispatch-core' })]
+    })
+    const snapshotWithRunningDispatch = snapshot(plan, {
+      parallel: { effectiveMaxConcurrency: 1, runningCount: 1, dispatches: [durableReport] }
+    })
+    const originalIngest: ObjectiveAction = {
+      kind: 'ingest-report',
+      capability: 'implement',
+      visibility: 'local',
+      recovery: 'replay-safe',
+      contentIdentity: 'content-current',
+      evidenceKey: 'dispatch-core',
+      revisionId: 'revision-1',
+      dispatchId: 'dispatch-core',
+      taskKey: 'core',
+      orchestrationTaskId: 'orchestration-core',
+      reportPath: '/outside/report.json',
+      filesModified: ['src/core.ts'],
+      dispatchedContentIdentity: 'content-current'
+    }
+    const retryIngest: ObjectiveAction = {
+      ...originalIngest,
+      evidenceKey: 'dispatch-core#ingest-retry-1'
+    }
+    const failedOriginal = {
+      // a distinct harness dispatchId keeps this attempt's synthetic id from colliding with the
+      // dispatch attempt above, which shares the same real evidenceKey by production convention
+      ...attempt(originalIngest, {
+        state: 'settled',
+        effect: 'not-landed',
+        reason: 'git commit failed: pre-commit hook rejected the normalization commit',
+        dispatchId: 'ingest-attempt-original'
+      }),
+      failureClass: 'infra' as const
+    }
+    const failedRetry = {
+      ...attempt(retryIngest, {
+        state: 'settled',
+        effect: 'not-landed',
+        reason: 'git commit failed: pre-commit hook rejected the normalization commit',
+        dispatchId: 'ingest-attempt-retry-1'
+      }),
+      failureClass: 'infra' as const
+    }
+
+    const belowCap = decideObjective(
+      snapshotWithRunningDispatch,
+      ledger([dispatched, done, failedOriginal]),
+      true
+    )
+    expect(belowCap.action).toMatchObject({
+      kind: 'ingest-report',
+      dispatchId: 'dispatch-core',
+      evidenceKey: 'dispatch-core#ingest-retry-1'
+    })
+
+    const atCap = decideObjective(
+      snapshotWithRunningDispatch,
+      ledger([dispatched, done, failedOriginal, failedRetry]),
+      true
+    )
+    expect(atCap.action).toBeNull()
+    expect(atCap).toMatchObject({
+      deviation: {
+        kind: 'report-rejected',
+        taskKey: 'core',
+        dispatchId: 'dispatch-core',
+        rejectionReason: 'git commit failed: pre-commit hook rejected the normalization commit'
       }
     })
   })

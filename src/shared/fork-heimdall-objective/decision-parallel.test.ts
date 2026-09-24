@@ -453,7 +453,7 @@ describe('parallel objective decisions', () => {
     })
   })
 
-  it('keeps re-emitting ingest-report while the same durable rejection is classified infra', () => {
+  it('re-emits ingest-report with a fresh evidence key while under the reemission cap and classified infra', () => {
     const dispatch = dispatchAction('node-1')
     const ingestAction: Extract<ObjectiveAction, { kind: 'ingest-report' }> = {
       kind: 'ingest-report',
@@ -504,7 +504,11 @@ describe('parallel objective decisions', () => {
       true
     )
 
-    expect(decision.action).toMatchObject({ kind: 'ingest-report', dispatchId: 'dispatch-node-1' })
+    expect(decision.action).toMatchObject({
+      kind: 'ingest-report',
+      dispatchId: 'dispatch-node-1',
+      evidenceKey: 'dispatch-node-1#ingest-retry-1'
+    })
   })
 
   it('keeps planner work exclusive from implementer fanout', () => {

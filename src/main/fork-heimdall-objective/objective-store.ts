@@ -48,7 +48,11 @@ import {
   type ObjectiveGateAttempt,
   type StartGateAttemptArgs
 } from './objective-store-gate-attempts'
-import { ObjectiveStoreMutations } from './objective-store-mutations'
+import {
+  ObjectiveStoreMutations,
+  type AbandonCheckAttemptArgs,
+  type AbandonGateAttemptArgs
+} from './objective-store-mutations'
 import {
   applyPlanPatch,
   getPlanPatch,
@@ -98,6 +102,7 @@ export type {
   ObjectiveGateAttempt,
   StartGateAttemptArgs
 } from './objective-store-gate-attempts'
+export type { AbandonCheckAttemptArgs, AbandonGateAttemptArgs } from './objective-store-mutations'
 export type {
   ApplyPlanPatchArgs,
   ApplyPlanPatchResult,
@@ -278,6 +283,10 @@ export class ObjectiveStore {
     return listGateAttempts(this.database, watcherId)
   }
 
+  abandonGateAttempt(args: AbandonGateAttemptArgs): void {
+    this.mutations.abandonGateAttempt(args)
+  }
+
   getCriterion(criterionId: string): ObjectiveStoredCriterion | null {
     return this.queries.getCriterion(criterionId)
   }
@@ -296,6 +305,10 @@ export class ObjectiveStore {
 
   getCheckAttempt(criterionId: string, contentIdentity: string): ObjectiveCheckAttempt | null {
     return this.queries.getCheckAttempt(criterionId, contentIdentity)
+  }
+
+  abandonCheckAttempt(args: AbandonCheckAttemptArgs): void {
+    this.mutations.abandonCheckAttempt(args)
   }
 
   hasCheckAttempt(criterionId: string, contentIdentity: string, completed = false): boolean {
