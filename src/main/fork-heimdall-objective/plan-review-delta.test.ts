@@ -246,6 +246,70 @@ describe('resolvePlanReviewDelta', () => {
     expect(delta?.carryEligible).toEqual([])
   })
 
+  it('ignores an older round-1 revise review that is not the immediate predecessor', () => {
+    const first = ingestRevision(1, plan(), 'planner-1')
+    store.recordPlanReviewAndRejectRoundOneTarget({
+      watcherId: WATCHER_ID,
+      targetKind: 'revision',
+      targetId: first.revisionId,
+      round: 1,
+      dispatchId: 'review-1',
+      report: reviseReport(),
+      reportDigest: 'review-digest-1',
+      createdAtMs: 2
+    })
+    const second = ingestRevision(2, plan(), 'planner-2')
+    // second is rejected without ever recording a round-1 review of its own, so third's
+    // immediate predecessor (second) has no revise review even though first does.
+    store.rejectDraftRevision({ watcherId: WATCHER_ID, revisionId: second.revisionId })
+    const third = ingestRevision(3, plan(), 'planner-3')
+
+    expect(
+      resolvePlanReviewDelta(
+        store,
+        WATCHER_ID,
+        { kind: 'revision', revisionId: third.revisionId },
+        2
+      )
+    ).toBeNull()
+  })
+
+  it('resolves a delta from the immediate predecessor even when an older revision has a more recent revise review', () => {
+    const first = ingestRevision(1, plan(), 'planner-1')
+    // recorded later in wall-clock time than review-2, so a recency-based scan would pick it first.
+    store.recordPlanReviewAndRejectRoundOneTarget({
+      watcherId: WATCHER_ID,
+      targetKind: 'revision',
+      targetId: first.revisionId,
+      round: 1,
+      dispatchId: 'review-1',
+      report: reviseReport({ summary: 'First pass findings.' }),
+      reportDigest: 'review-digest-1',
+      createdAtMs: 100
+    })
+    const second = ingestRevision(2, plan(), 'planner-2')
+    store.recordPlanReviewAndRejectRoundOneTarget({
+      watcherId: WATCHER_ID,
+      targetKind: 'revision',
+      targetId: second.revisionId,
+      round: 1,
+      dispatchId: 'review-2',
+      report: reviseReport({ summary: 'Second pass findings.' }),
+      reportDigest: 'review-digest-2',
+      createdAtMs: 5
+    })
+    const third = ingestRevision(3, plan(), 'planner-3')
+
+    const delta = resolvePlanReviewDelta(
+      store,
+      WATCHER_ID,
+      { kind: 'revision', revisionId: third.revisionId },
+      2
+    )
+
+    expect(delta?.previousReport.summary).toBe('Second pass findings.')
+  })
+
   it('falls back to a full review (null) when more than half the plan changed', () => {
     const first = ingestRevision(
       1,

@@ -32,6 +32,20 @@ export function resolvePlanReviewDelta(
   if (target.kind !== 'revision' || round !== 2) {
     return null
   }
+  // revisionNumber isn't carried on the wire target, so resolve the target's immediate
+  // predecessor (revisionNumber - 1) from the store's revision list rather than matching any
+  // round-1 revise review in the watcher's history.
+  const revisions = store.project(watcherId).revisions
+  const targetRevision = revisions.find((revision) => revision.id === target.revisionId)
+  if (!targetRevision) {
+    return null
+  }
+  const precedingRevision = revisions.find(
+    (revision) => revision.number === targetRevision.number - 1
+  )
+  if (!precedingRevision) {
+    return null
+  }
   const previousReview = store
     .listPlanReviews(watcherId)
     .find(
@@ -39,7 +53,7 @@ export function resolvePlanReviewDelta(
         review.targetKind === 'revision' &&
         review.round === 1 &&
         review.report.verdict === 'revise' &&
-        review.targetId !== target.revisionId
+        review.targetId === precedingRevision.id
     )
   if (!previousReview) {
     return null
