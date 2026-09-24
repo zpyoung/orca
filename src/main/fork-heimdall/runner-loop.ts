@@ -221,10 +221,7 @@ export class WatcherRunnerLoop {
           this.publishStatus(runner)
           this.schedule(runner, errorBackoffMs(runner.consecutiveErrors) ?? HEIMDALL_RAPID_POLL_MS)
         } else {
-          const savedEnrollment = this.dependencies.readEnrollment(runner.enrollment.watcherId)
-          if (savedEnrollment) {
-            runner.enrollment = savedEnrollment
-          }
+          this.resyncEnrollment(runner)
           runner.status = {
             ...dormantWatcherStatus(
               runner.enrollment,
@@ -245,6 +242,7 @@ export class WatcherRunnerLoop {
         trace.exitPath = 'watching'
         return
       }
+      this.resyncEnrollment(runner)
       runner.leaseRenewal?.dispose()
       runner.leaseGuard = lease.guard
       runner.leaseRenewal = lease.guard.renewLoop()
@@ -415,6 +413,14 @@ export class WatcherRunnerLoop {
           await this.releaseLeaseGuard(runner, tickLease)
         }
       }
+    }
+  }
+
+  /** keeps the runner's cached enrollment from outliving a durable disable/pause written elsewhere */
+  private resyncEnrollment(runner: WatcherRunner): void {
+    const savedEnrollment = this.dependencies.readEnrollment(runner.enrollment.watcherId)
+    if (savedEnrollment) {
+      runner.enrollment = savedEnrollment
     }
   }
 

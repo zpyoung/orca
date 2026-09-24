@@ -135,6 +135,33 @@ describe('lease-refused status', () => {
   })
 })
 
+describe('lease re-acquisition resync', () => {
+  it('resyncs the runner enrollment on every held-lease tick, not only on lease-refused', async () => {
+    const world = await harness()
+    const decide = vi.fn(() => ({ action: null, reason: 'quiet', considered: [] }))
+    world.service.registerKind(kind({ decide }))
+    const result = await world.service.enroll(enrollmentInput())
+    if (result.status !== 'enrolled') {
+      throw new Error('expected enrollment')
+    }
+    const watcherId = result.entry.enrollment.watcherId
+
+    await world.service.reconcileForTesting(watcherId)
+    expect(decide).toHaveBeenCalledTimes(1)
+
+    // another owner disables the watcher directly in the store while this runner still holds
+    // the pre-disable (enabled) enrollment in memory; the lease stays held across both ticks,
+    // so there is no lease-refused tick to trigger the older resync path
+    world.enrollmentStore.setEnabled(watcherId, false)
+
+    decide.mockClear()
+    await world.service.reconcileForTesting(watcherId)
+
+    expect(decide).not.toHaveBeenCalled()
+    expect((await world.service.list())[0]).toMatchObject({ enrollment: { enabled: false } })
+  })
+})
+
 describe('gate-hold pacing', () => {
   it('ramps the reschedule delay across repeated gate holds, not a flat rapid tier', async () => {
     const world = await harness()
