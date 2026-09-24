@@ -360,6 +360,9 @@ export class WatcherRunnerLoop {
         this.actions.settleAbsentDispatches(runner, absentDispatches)
         ledger = this.dependencies.ledgerStore.read(runner.enrollment.watcherId)
         trace.exitPath = 'watching'
+        // resync above may have picked up a durable disable written elsewhere this tick, so the
+        // published status must be recomputed from it, not the runner's stale in-memory cache
+        runner.status = dormantWatcherStatus(runner.enrollment, ledger)
         this.publishStatus(runner)
         // Disabled watchers keep reconciling already-authorized work whose outcome is still pending.
         if (hasPendingAttemptOutcome(ledger)) {
