@@ -135,7 +135,10 @@ function localActionOutcome(
       if (check === null) {
         return 'not-landed'
       }
-      return check.completedAtMs !== null ? 'landed' : 'indeterminate'
+      if (check.completedAtMs === null) {
+        return 'indeterminate'
+      }
+      return check.ownerSkip ? 'landed' : 'not-landed'
     }
     case 'apply-plan-patch': {
       const patch = objectiveStore.getPlanPatch(action.patchId)

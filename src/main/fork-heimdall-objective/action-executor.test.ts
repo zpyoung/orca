@@ -820,6 +820,58 @@ describe('objective action recovery', () => {
     ).toEqual({ effect: 'landed' })
   })
 
+  it('resolves skip-check recovery to landed only for a completed owner-skip row', () => {
+    const skipCheckAction: ObjectiveAction = {
+      kind: 'skip-check',
+      capability: 'check',
+      visibility: 'local',
+      contentIdentity: 'new-content',
+      evidenceKey: 'criterion-1:new-content',
+      recovery: 'replay-safe',
+      criterionId: 'criterion-1',
+      rationale: 'Flaky infra check waived by owner.'
+    }
+    const ledger: WatcherLedger = { watcherId: 'watcher-1', entries: [] }
+    const absent = harness({ getCheckAttempt: () => null })
+    const incomplete = harness({
+      getCheckAttempt: () => ({ completedAtMs: null, ownerSkip: true }) as never
+    })
+    const completedSkip = harness({
+      getCheckAttempt: () => ({ completedAtMs: 12, ownerSkip: true }) as never
+    })
+    const completedNonSkip = harness({
+      getCheckAttempt: () => ({ completedAtMs: 12, ownerSkip: false }) as never
+    })
+
+    expect(
+      absent.executor.resolveOutcome(attempt(skipCheckAction), absent.fresh, ledger, TEST_LEASE)
+    ).toEqual({ effect: 'not-landed' })
+    expect(
+      incomplete.executor.resolveOutcome(
+        attempt(skipCheckAction),
+        incomplete.fresh,
+        ledger,
+        TEST_LEASE
+      )
+    ).toEqual({ effect: 'indeterminate' })
+    expect(
+      completedSkip.executor.resolveOutcome(
+        attempt(skipCheckAction),
+        completedSkip.fresh,
+        ledger,
+        TEST_LEASE
+      )
+    ).toEqual({ effect: 'landed' })
+    expect(
+      completedNonSkip.executor.resolveOutcome(
+        attempt(skipCheckAction),
+        completedNonSkip.fresh,
+        ledger,
+        TEST_LEASE
+      )
+    ).toEqual({ effect: 'not-landed' })
+  })
+
   it('retries an absent gate attempt while preserving indeterminate incomplete executions', () => {
     const gateAction: ObjectiveAction = {
       kind: 'run-gate',
