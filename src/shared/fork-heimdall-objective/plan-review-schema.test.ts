@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { PlanReviewReportSchema, parseAndValidatePlanReviewReport } from './plan-review-schema'
+import {
+  PlanReviewAssumptionAssessmentSchema,
+  PlanReviewReportSchema,
+  parseAndValidatePlanReviewReport
+} from './plan-review-schema'
 import type { ObjectivePlanAssumption } from './plan-schema'
 
 function report(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -90,5 +94,107 @@ describe('parseAndValidatePlanReviewReport', () => {
     expect(parseAndValidatePlanReviewReport(unverified, 1, assumptions)).toMatchObject({
       verdict: 'approve'
     })
+  })
+
+  it.each([
+    [0, 0],
+    [1, 1],
+    [2, 2],
+    [8, 2],
+    [9, 3]
+  ])(
+    'enforces the spot-check floor of %i reverified for |E| = %i evidenced assumptions',
+    (evidencedCount, required) => {
+      const assumptions: ObjectivePlanAssumption[] = Array.from(
+        { length: evidencedCount },
+        (_, index) => ({
+          claim: `claim-${index}`,
+          dependentTaskKeys: [],
+          evidence: { command: `check-${index}`, observed: 'confirmed' }
+        })
+      )
+      const assessmentsWith = (reverifiedCount: number) =>
+        report({
+          assumptions: Array.from({ length: evidencedCount }, (_, index) => ({
+            index,
+            status: 'verified',
+            evidence: 'spot-checked',
+            basis: index < reverifiedCount ? 'reverified' : 'planner-evidence'
+          }))
+        })
+      expect(
+        parseAndValidatePlanReviewReport(assessmentsWith(required), evidencedCount, assumptions)
+      ).toMatchObject({ verdict: 'approve' })
+      if (required > 0) {
+        expect(() =>
+          parseAndValidatePlanReviewReport(
+            assessmentsWith(required - 1),
+            evidencedCount,
+            assumptions
+          )
+        ).toThrow(/Spot-check/)
+      }
+    }
+  )
+
+  it('rejects basis:planner-evidence on an assumption the planner recorded no evidence for', () => {
+    const assumptions: ObjectivePlanAssumption[] = [
+      { claim: 'no evidence recorded', dependentTaskKeys: [] }
+    ]
+    const withUnsupportedBasis = report({
+      assumptions: [
+        { index: 0, status: 'verified', evidence: 'trusted', basis: 'planner-evidence' }
+      ]
+    })
+    expect(() => parseAndValidatePlanReviewReport(withUnsupportedBasis, 1, assumptions)).toThrow(
+      /no planner evidence/
+    )
+  })
+
+  it("rejects basis:'carried' in this task, since carryEligible defaults to empty", () => {
+    const assumptions: ObjectivePlanAssumption[] = [
+      { claim: 'evidenced claim', dependentTaskKeys: [], evidence: { command: 'x', observed: 'y' } }
+    ]
+    const withCarried = report({
+      assumptions: [{ index: 0, status: 'verified', evidence: 'carried forward', basis: 'carried' }]
+    })
+    expect(() => parseAndValidatePlanReviewReport(withCarried, 1, assumptions)).toThrow(
+      /basis:'carried'/
+    )
+  })
+})
+
+describe('PlanReviewAssumptionAssessmentSchema basis', () => {
+  it('is optional and absent by default', () => {
+    const parsed = PlanReviewAssumptionAssessmentSchema.parse({
+      index: 0,
+      status: 'verified',
+      evidence: 'ok'
+    })
+    expect(parsed.basis).toBeUndefined()
+  })
+
+  it('accepts each declared basis value', () => {
+    for (const basis of ['reverified', 'planner-evidence', 'carried'] as const) {
+      expect(
+        PlanReviewAssumptionAssessmentSchema.safeParse({
+          index: 0,
+          status: 'verified',
+          evidence: 'ok',
+          basis
+        }).success
+      ).toBe(true)
+    }
+  })
+
+  it('rejects an unknown basis value', () => {
+    expect(
+      PlanReviewAssumptionAssessmentSchema.safeParse({
+        index: 0,
+        status: 'verified',
+        evidence: 'ok',
+        basis: 'guessed'
+      }).success
+    ).toBe(false)
   })
 })

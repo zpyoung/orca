@@ -26,6 +26,7 @@ import { objectiveContractFromEnrollment } from './definition'
 import { findObjectiveDispatchAttempt } from './execution-context'
 import { resolveObjectiveAttemptTarget } from './dispatch-worktree'
 import type { ObjectiveStore } from './objective-store'
+import { resolvePlanReviewDelta } from './plan-review-delta'
 import { validateObjectiveWorkspaceChanges } from './observed-workspace-changes'
 import {
   MAX_OBJECTIVE_REPORT_BYTES,
@@ -236,7 +237,18 @@ export function createObjectiveSubmissionAdapter(args: {
           return ACCEPTED
         }
         try {
-          parseAndValidatePlanReviewReport(read.report, assumptions.length, assumptions)
+          const delta = resolvePlanReviewDelta(
+            args.objectiveStore,
+            context.enrollment.watcherId,
+            action.target,
+            action.round
+          )
+          parseAndValidatePlanReviewReport(
+            read.report,
+            assumptions.length,
+            assumptions,
+            new Set(delta?.carryEligible ?? [])
+          )
         } catch (error) {
           return rejected(
             role,

@@ -22,12 +22,13 @@ export function buildPlannerPromptPolicySection(input: PlannerPromptPolicyInput)
     ...(input.lanesEnabled ? ['One-to-one dependency chains share one warm session.'] : []),
     'A fresh session spends about 30% of a node orienting.',
     `Node checks must be scoped to the task, finish within ${OBJECTIVE_CHECK_TIMEOUT_SECONDS} seconds, and run from any worktree using workspace-relative paths.`,
+    'Node checks judge file contents or run scoped tests, never commit ranges, because checks run after every node lands.',
     gateNames.length > 0
       ? `OBJECTIVE GATES: ${gateNames.join(', ')}`
       : 'OBJECTIVE GATES: none declared',
     'Objective gates run the full suite and whole-tree checks, and the PR opens at the open-hosted-review rung — "run gates" and "open PR" are never nodes.',
     'Every task must declare territory: globs inside write territory naming what it will modify.',
-    'Declare assumptions naming the task keys that depend on each one.'
+    'Declare assumptions naming the task keys that depend on each one, with evidence on the ones you verified yourself.'
   ]
   return `PLAN SHAPING POLICY:\n${lines.join('\n')}`
 }

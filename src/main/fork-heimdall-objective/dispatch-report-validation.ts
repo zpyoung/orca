@@ -20,6 +20,7 @@ import {
 import { parseAndValidatePlanReviewReport } from '../../shared/fork-heimdall-objective/plan-review-schema'
 import type { ObjectiveSnapshotBinding } from './execution-context'
 import type { ObjectiveStore } from './objective-store'
+import { resolvePlanReviewDelta } from './plan-review-delta'
 
 export type ObjectiveDispatchAction = Extract<ObjectiveAction, { kind: `dispatch-${string}` }>
 
@@ -103,7 +104,18 @@ export function validateResolvedDispatchReport(args: {
         return rejected('semantic-invalid', `Plan review target ${target.kind} is unavailable`)
       }
       const assumptions = found.assumptions ?? []
-      parseAndValidatePlanReviewReport(report, assumptions.length, assumptions)
+      const delta = resolvePlanReviewDelta(
+        objectiveStore,
+        binding.enrollment.watcherId,
+        target,
+        action.round
+      )
+      parseAndValidatePlanReviewReport(
+        report,
+        assumptions.length,
+        assumptions,
+        new Set(delta?.carryEligible ?? [])
+      )
       return { ok: true }
     }
     const plan = objectiveStore.getPlan(action.revisionId)
