@@ -18,6 +18,7 @@ import {
 } from './execution-context'
 import { invalidObjectiveReport, rejectedWorkerReport } from './local-report-validation'
 import type { ObjectiveStore } from './objective-store'
+import { resolvePlanReviewDelta } from './plan-review-delta'
 import { readObjectiveRoleReport } from './report-ingestion'
 
 type IngestPlanReviewAction = Extract<ObjectiveAction, { kind: 'ingest-plan-review' }>
@@ -139,7 +140,18 @@ export async function ingestObjectivePlanReviewReport(args: {
         ...(read.detail === undefined ? {} : { detail: read.detail })
       })
     }
-    report = parseAndValidatePlanReviewReport(read.report, assumptions.length, assumptions)
+    const delta = resolvePlanReviewDelta(
+      args.objectiveStore,
+      args.binding.enrollment.watcherId,
+      action.target,
+      origin.action.round
+    )
+    report = parseAndValidatePlanReviewReport(
+      read.report,
+      assumptions.length,
+      assumptions,
+      new Set(delta?.carryEligible ?? [])
+    )
     reportDigest = read.reportDigest
   } catch (error) {
     return invalidObjectiveReport({

@@ -23,6 +23,7 @@ import { resolveLeasePathFlavor } from '../fork-heimdall/lease-host-filesystem'
 import type { ObjectiveWorkspaceTarget } from './content-identity'
 import type { ObjectiveSnapshotBinding } from './execution-context'
 import type { ObjectiveStore } from './objective-store'
+import { resolvePlanReviewDelta, type PlanReviewDelta } from './plan-review-delta'
 import { buildObjectiveRolePrompt } from './role-prompts'
 
 export type PlanReviewTarget = z.infer<typeof PlanReviewTargetSchema>
@@ -38,6 +39,7 @@ export type PlanReviewInput = {
   writeTerritory: readonly string[]
   gates: readonly ObjectiveGate[] | undefined
   effectiveMaxConcurrency: number
+  delta?: PlanReviewDelta
 }
 
 const PLAN_REVIEW_INPUT_MAX_BYTES = 1024 * 1024
@@ -198,6 +200,8 @@ function planReviewCompactSummary(plan: ObjectivePlan, lint: ObjectivePlanLint):
  */
 export async function resolveObjectivePlanReviewDispatch(args: {
   target: PlanReviewTarget
+  round: 1 | 2
+  watcherId: string
   objectiveStore: ObjectiveStore
   world: ObjectiveWorld
   ledger: WatcherLedger
@@ -206,7 +210,7 @@ export async function resolveObjectivePlanReviewDispatch(args: {
   effectiveMaxConcurrency: number
   workspaceTarget: ObjectiveWorkspaceTarget
   reportPath: string
-}): Promise<{ inputPath: string; summary: string }> {
+}): Promise<{ inputPath: string; summary: string; delta: PlanReviewDelta | undefined }> {
   const { target, objectiveStore } = args
   let plan: ObjectivePlan
   let assumptions: readonly ObjectivePlanAssumption[]
@@ -251,6 +255,8 @@ export async function resolveObjectivePlanReviewDispatch(args: {
     gates: args.gates,
     frozenTaskKeys
   })
+  const delta =
+    resolvePlanReviewDelta(objectiveStore, args.watcherId, target, args.round) ?? undefined
   const input = buildPlanReviewInput({
     target,
     plan,
@@ -260,10 +266,11 @@ export async function resolveObjectivePlanReviewDispatch(args: {
     lint,
     writeTerritory: args.writeTerritory,
     gates: args.gates,
-    effectiveMaxConcurrency: args.effectiveMaxConcurrency
+    effectiveMaxConcurrency: args.effectiveMaxConcurrency,
+    ...(delta === undefined ? {} : { delta })
   })
   const inputPath = await writePlanReviewInputFile(args.workspaceTarget, args.reportPath, input)
-  return { inputPath, summary: planReviewCompactSummary(plan, lint) }
+  return { inputPath, summary: planReviewCompactSummary(plan, lint), delta }
 }
 
 function planReviewDispatchTaskKey(target: PlanReviewTarget, round: 1 | 2): string {
@@ -287,8 +294,10 @@ export async function preparePlanReviewDispatchSpec(args: {
 }): Promise<{ role: 'reviewer'; taskKey: string; spec: string }> {
   const { action, binding } = args
   const effectiveMaxConcurrency = args.world.parallel?.effectiveMaxConcurrency ?? 1
-  const { inputPath, summary } = await resolveObjectivePlanReviewDispatch({
+  const { inputPath, summary, delta } = await resolveObjectivePlanReviewDispatch({
     target: action.target,
+    round: action.round,
+    watcherId: binding.enrollment.watcherId,
     objectiveStore: args.objectiveStore,
     world: args.world,
     ledger: args.ledger,
@@ -310,7 +319,23 @@ export async function preparePlanReviewDispatchSpec(args: {
       lanesEnabled: binding.contract.lanesEnabled !== false,
       mode: 'plan-review',
       planReviewInputPath: inputPath,
-      planReviewSummary: summary
+      planReviewSummary: summary,
+      ...(delta === undefined ? {} : { planReviewDelta: planReviewDeltaPromptContext(delta) })
     })
+  }
+}
+
+/** The delta's prior-blocking-findings text, diff, and carry-eligible indices, for the prompt section. */
+function planReviewDeltaPromptContext(delta: PlanReviewDelta): {
+  priorBlockingFindings: readonly string[]
+  diff: PlanReviewDelta['diff']
+  carryEligible: readonly number[]
+} {
+  return {
+    priorBlockingFindings: delta.previousReport.findings
+      .filter((finding) => finding.severity === 'blocking')
+      .map((finding) => `${finding.taskKey ?? '(plan)'}: ${finding.body}`),
+    diff: delta.diff,
+    carryEligible: delta.carryEligible
   }
 }

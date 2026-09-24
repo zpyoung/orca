@@ -117,6 +117,41 @@ describe('objective role prompts', () => {
     expect(prompt).toContain('never amend, rebase, squash or reset')
   })
 
+  it('tells the implementer the watcher owns the commit subject and the task trailer', () => {
+    const assigned = node('assigned', 'Implement the assigned behavior')
+    const prompt = buildObjectiveRolePrompt({
+      role: 'implementer',
+      contract,
+      node: assigned,
+      reportPath: '/tmp/objective/report.json',
+      budgetBucket: 'plenty',
+      ...parallel
+    })
+
+    expect(prompt).toContain('watcher owns the commit subject and the task trailer')
+  })
+
+  it('tells the planner and acceptance reviewer criteria and verdicts must not depend on commit messages', () => {
+    const plannerPrompt = buildObjectiveRolePrompt({
+      role: 'planner',
+      contract,
+      reportPath: '/tmp/objective/report.json',
+      budgetBucket: 'plenty',
+      ...parallel
+    })
+    const reviewerPrompt = buildObjectiveRolePrompt({
+      role: 'reviewer',
+      contract,
+      plan: [node('assigned', 'Implement the assigned behavior')],
+      reportPath: '/tmp/objective/report.json',
+      budgetBucket: 'plenty',
+      ...parallel
+    })
+
+    expect(plannerPrompt).toContain('must not depend on commit messages')
+    expect(reviewerPrompt).toContain('must not depend on commit messages')
+  })
+
   it('keeps the largest legal implementer node inside the upstream worker-start byte budget', () => {
     const prompt = buildObjectiveRolePrompt({
       role: 'implementer',
@@ -447,6 +482,22 @@ describe('objective role prompts', () => {
       expect(prompt).toContain('"plan":[task,...],"assumptions":[assumption,...]')
     })
 
+    it('describes the optional evidence field and tells the planner never to fabricate it', () => {
+      const prompt = buildObjectiveRolePrompt({
+        role: 'planner',
+        contract,
+        reportPath: '/tmp/objective/report.json',
+        budgetBucket: 'plenty',
+        ...parallel
+      })
+
+      expect(prompt).toContain('{claim,dependentTaskKeys,evidence?}')
+      expect(prompt).toContain('evidence:{command,observed}')
+      expect(prompt).toContain(
+        'Record evidence on an assumption only when you actually ran the command yourself'
+      )
+    })
+
     it('replaces the full-plan contract with the repair contract when shape is repair', () => {
       const prompt = buildObjectiveRolePrompt({
         role: 'planner',
@@ -639,6 +690,75 @@ describe('objective role prompts', () => {
       expect(prompt).toContain('assumptions')
       expect(prompt).toContain('findings')
       expect(prompt).not.toContain('verdict:"approve"|"block"')
+    })
+
+    it('states the spot-check rule, the contradiction rule, and the basis field', () => {
+      const prompt = buildObjectiveRolePrompt({
+        role: 'reviewer',
+        contract,
+        mode: 'plan-review',
+        planReviewInputPath: '/tmp/objective/reports/abc.plan-review-input.json',
+        reportPath: '/tmp/objective/report.json',
+        budgetBucket: 'plenty',
+        ...parallel
+      })
+
+      expect(prompt).toContain('basis?')
+      expect(prompt).toContain('"reverified"|"planner-evidence"|"carried"')
+      expect(prompt).toContain('at least 2 of them, or a quarter, whichever is more')
+      expect(prompt).toContain(
+        'stop trusting the hand-off: re-verify every assumption from scratch'
+      )
+      expect(prompt).toContain(
+        'state how many assumptions you reverified, trusted on planner evidence, and carried forward'
+      )
+    })
+
+    it('renders the delta section with prior blocking findings, the diff, and carry-eligible indices', () => {
+      const prompt = buildObjectiveRolePrompt({
+        role: 'reviewer',
+        contract,
+        mode: 'plan-review',
+        planReviewInputPath: '/tmp/objective/reports/abc.plan-review-input.json',
+        reportPath: '/tmp/objective/report.json',
+        budgetBucket: 'plenty',
+        planReviewDelta: {
+          priorBlockingFindings: ['node-1: Sizing is off.'],
+          diff: {
+            added: ['node-2'],
+            removed: [],
+            changed: [],
+            unchanged: ['node-1'],
+            affected: ['node-2'],
+            fullReviewRequired: false
+          },
+          carryEligible: [0]
+        },
+        ...parallel
+      })
+
+      expect(prompt).toContain('PRIOR BLOCKING FINDINGS')
+      expect(prompt).toContain('node-1: Sizing is off.')
+      expect(prompt).toContain('PLAN DIFF JSON')
+      expect(prompt).toContain('"added":["node-2"]')
+      expect(prompt).toContain('CARRY-ELIGIBLE ASSUMPTION INDICES: 0')
+      expect(prompt).toContain('delta review of a revised draft')
+      expect(prompt).toContain("fully review every task named in the diff's affected set")
+    })
+
+    it('omits the delta section outside delta mode', () => {
+      const prompt = buildObjectiveRolePrompt({
+        role: 'reviewer',
+        contract,
+        mode: 'plan-review',
+        planReviewInputPath: '/tmp/objective/reports/abc.plan-review-input.json',
+        reportPath: '/tmp/objective/report.json',
+        budgetBucket: 'plenty',
+        ...parallel
+      })
+
+      expect(prompt).not.toContain('PRIOR BLOCKING FINDINGS')
+      expect(prompt).not.toContain('delta review of a revised draft')
     })
 
     it('does not require an active plan for the plan-review reviewer mode', () => {

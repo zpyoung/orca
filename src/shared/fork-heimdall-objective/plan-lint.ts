@@ -18,6 +18,7 @@ export const PlanLintCodeSchema = z.enum([
   'full-suite-check',
   'unscoped-check',
   'non-relative-check',
+  'branch-history-check',
   'conflict-pair',
   'duplicates-gate',
   'no-gate-declared',
@@ -101,6 +102,15 @@ const NON_RELATIVE_PATH_REGEX = /(^|\s)\/[A-Za-z]|[A-Za-z]:\\/u
 
 function matchesNonRelative(command: string): boolean {
   return NON_RELATIVE_PATH_REGEX.test(command)
+}
+
+// `\.\.` alone also matches a relative pathspec (`git log -- ../dir/file.ts`); requiring a
+// non-space run on both sides restricts it to a ref range like `base..HEAD`.
+const BRANCH_HISTORY_CHECK_REGEX =
+  /\bgit\s+(diff|log|rev-list)\b[^\n]*(\bmerge-base\b|\borigin\/|\bHEAD~\d|\bHEAD\^|\$\{?base\b|\S+\.\.\S*)|\bgit\s+merge-base\b/u
+
+function matchesBranchHistory(command: string): boolean {
+  return BRANCH_HISTORY_CHECK_REGEX.test(command)
 }
 
 function normalizeCommand(command: string): string {
@@ -290,6 +300,15 @@ function lintTask(
         code: 'non-relative-check',
         taskKey,
         detail: `Task ${taskKey} criterion ${index} references an absolute or non-worktree path.`
+      })
+    }
+  })
+  task.criteria.forEach((criterion, index) => {
+    if (criterion.checkCommand !== null && matchesBranchHistory(criterion.checkCommand)) {
+      findings.push({
+        code: 'branch-history-check',
+        taskKey,
+        detail: `Task ${taskKey} criterion ${index} reads branch history or a commit range instead of file contents.`
       })
     }
   })

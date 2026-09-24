@@ -29,6 +29,7 @@ import {
   type ImplementerReport,
   type ObjectivePlanTask
 } from '../../shared/fork-heimdall-objective/plan-schema'
+import type { ObjectivePlanDiff } from '../../shared/fork-heimdall-objective/plan-diff'
 import { isTuiAgent } from '../../shared/tui-agent-config'
 import { isTuiAgentEnabled } from '../../shared/tui-agent-selection'
 import type { Store } from '../persistence'
@@ -110,6 +111,12 @@ export type ObjectiveRolePromptInput = {
   planReviewInputPath?: string
   /** Compact plan summary (task key, title, deps, territory, lint codes) inlined for mode 'plan-review'. */
   planReviewSummary?: string
+  /** Set only when the plan-review target qualifies for a delta review of a revised draft. */
+  planReviewDelta?: {
+    priorBlockingFindings: readonly string[]
+    diff: ObjectivePlanDiff
+    carryEligible: readonly number[]
+  }
 }
 
 const STRING_UNIT_NOTE =
@@ -125,7 +132,8 @@ function plannerTaskShapeLines(): string[] {
     `territory is required on every task: 1-${OBJECTIVE_TERRITORY_MAX_ENTRIES} globs inside write territory naming what it will modify.`,
     `When known, declaredPaths contains at most ${OBJECTIVE_REPORT_MAX_FILES} concrete workspace-relative file paths, each with max ${OBJECTIVE_PATH_MAX_LENGTH}, inside write territory.`,
     'Never use globs or copy write-territory patterns into declaredPaths; omit declaredPaths when exact files are unknown.',
-    `assumptions is a required array (use [] when none), max ${OBJECTIVE_PLAN_ASSUMPTIONS_MAX_ENTRIES} entries, each {claim,dependentTaskKeys} naming the task keys whose validity depends on the claim.`
+    `assumptions is a required array (use [] when none), max ${OBJECTIVE_PLAN_ASSUMPTIONS_MAX_ENTRIES} entries, each {claim,dependentTaskKeys,evidence?} naming the task keys whose validity depends on the claim.`,
+    'When you verified an assumption yourself, set evidence:{command,observed} to the command you ran and what it showed, so the reviewer can spot-check it instead of re-running everything; omit evidence for an assumption you did not verify.'
   ]
 }
 
@@ -154,9 +162,10 @@ function planReviewReportContract(): string {
   return [
     STRING_UNIT_NOTE,
     'Write one strict JSON object: {verdict:"approve"|"revise"|"escalate",assumptions,findings,summary}.',
-    `assumptions has exactly one entry per declared assumption index 0..n-1, max ${OBJECTIVE_PLAN_ASSUMPTIONS_MAX_ENTRIES}: {index,status:"verified"|"unverified",evidence}; evidence is plain text with max ${OBJECTIVE_PLAN_REVIEW_TEXT_MAX_LENGTH}.`,
+    `assumptions has exactly one entry per declared assumption index 0..n-1, max ${OBJECTIVE_PLAN_ASSUMPTIONS_MAX_ENTRIES}: {index,status:"verified"|"unverified",evidence,basis?}; evidence is plain text with max ${OBJECTIVE_PLAN_REVIEW_TEXT_MAX_LENGTH}.`,
+    `basis is "reverified"|"planner-evidence"|"carried" and describes how you reached the status, not a claim about the planner; omit it (or use "reverified") when you verified the assumption yourself. Use "planner-evidence" only on an index where the planner's assumption carries evidence, and trust it only within the spot-check rule below.`,
     `findings has max 128 entries: {taskKey:TaskKey|null,severity:"blocking"|"advisory",body}; body is plain text with max ${OBJECTIVE_PLAN_REVIEW_TEXT_MAX_LENGTH}.`,
-    `summary is plain text with max ${OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH}.`,
+    `summary is plain text with max ${OBJECTIVE_REPORT_SUMMARY_MAX_LENGTH}; state how many assumptions you reverified, trusted on planner evidence, and carried forward.`,
     'approve requires no blocking finding and no unverified assumption any task depends on.'
   ].join('\n')
 }
@@ -206,18 +215,25 @@ function reportContract(
 function roleInstruction(input: ObjectiveRolePromptInput): string {
   switch (input.role) {
     case 'planner':
-      return `Produce the next implementable plan. Planning reason: ${input.reason ?? 'initial'}. Do not edit files. Do not assert environment facts you only observed in your own shell as guaranteed for the implementer; write environment-dependent steps so the implementer verifies them itself.`
+      return `Produce the next implementable plan. Planning reason: ${input.reason ?? 'initial'}. Do not edit files. Do not assert environment facts you only observed in your own shell as guaranteed for the implementer; write environment-dependent steps so the implementer verifies them itself. Criteria and verdicts must not depend on commit messages: node checks run after every node lands, so they see history that does not belong to any one node. Record evidence on an assumption only when you actually ran the command yourself; a fabricated or guessed evidence entry is worse than none, since the reviewer may trust it.`
     case 'implementer':
       if (!input.node) {
         throw new Error('An implementer prompt requires exactly one plan node')
       }
       return input.conflictContext
         ? `Resolve this node's integration conflict in its existing dispatch worktree. Rebase the dispatch branch onto exact enrolled HEAD ${input.conflictContext.enrolledHead}, resolve only with the intent and evidence below, and re-run focused checks for both sides. Run only the checks scoped to your task — never the full test suite, a whole-tree typecheck, or whole-tree lint. Never push this dispatch branch or any child-worktree branch.`
-        : 'Implement only the assigned node. You may inspect context, but modify only declared write territory. Run only the checks scoped to your task — never the full test suite, a whole-tree typecheck, or whole-tree lint. Never push this dispatch branch or any child-worktree branch. Node history is append-only: make changes as new commits, and never amend, rebase, squash or reset an existing commit, even to fix a commit message.'
+        : 'Implement only the assigned node. You may inspect context, but modify only declared write territory. Run only the checks scoped to your task — never the full test suite, a whole-tree typecheck, or whole-tree lint. Never push this dispatch branch or any child-worktree branch. Node history is append-only: make changes as new commits, and never amend, rebase, squash or reset an existing commit, even to fix a commit message. The watcher owns the commit subject and the task trailer; do not write either yourself.'
     case 'reviewer':
       return input.mode === 'plan-review'
-        ? 'Review the plan before it is activated. Do not modify files. Read the input file at the given path, verify every declared assumption against the repository — read code and fixtures, or run read-only commands — and mark each verified (with evidence) or unverified. Judge task sizing, whether declared dependencies are real, whether checks are properly scoped, and the declared conflict pairs and lint findings. Return verdict approve, revise, or escalate.'
-        : 'Review the files on disk against every active-plan criterion. Do not modify files.'
+        ? [
+            'Review the plan before it is activated. Do not modify files. Read the input file at the given path, verify every declared assumption against the repository — read code and fixtures, or run read-only commands — and mark each verified (with evidence) or unverified. Judge task sizing, whether declared dependencies are real, whether checks are properly scoped, and the declared conflict pairs and lint findings. Return verdict approve, revise, or escalate. For an assumption the planner backed with evidence, you may trust it, but always re-verify (basis:"reverified") the ones with no evidence, any evidence you judge weak, and a spot check of the rest — at least 2 of them, or a quarter, whichever is more. If a spot check contradicts the planner\'s recorded evidence, stop trusting the hand-off: re-verify every assumption from scratch and say so in summary.',
+            ...(input.planReviewDelta
+              ? [
+                  'This is a delta review of a revised draft. Confirm each finding under PRIOR BLOCKING FINDINGS below is resolved, and fully review every task named in the diff\'s affected set (and the assumptions those tasks depend on). You may mark an assumption basis:"carried" only at an index listed under CARRY-ELIGIBLE ASSUMPTION INDICES, and only when you accept the earlier verification as still valid.'
+                ]
+              : [])
+          ].join(' ')
+        : 'Review the files on disk against every active-plan criterion. Do not modify files. Criteria and verdicts must not depend on commit messages: judge file contents and check output.'
     case 'integrator':
       return 'Integrate and repair the files on disk as needed, then evaluate every active-plan criterion.'
   }
@@ -336,6 +352,25 @@ function renderRepairPlanContext(context: RepairPlanContext): string {
   ].join('\n\n')
 }
 
+/** Prior blocking findings, the plan diff, and carry-eligible indices for a delta plan review. */
+function planReviewDeltaSection(delta: {
+  priorBlockingFindings: readonly string[]
+  diff: ObjectivePlanDiff
+  carryEligible: readonly number[]
+}): string {
+  const findingsText =
+    delta.priorBlockingFindings.length === 0
+      ? '(none)'
+      : delta.priorBlockingFindings.map((finding) => `- ${finding}`).join('\n')
+  const carryEligibleText =
+    delta.carryEligible.length === 0 ? '(none)' : delta.carryEligible.join(', ')
+  return [
+    `PRIOR BLOCKING FINDINGS:\n${findingsText}`,
+    `PLAN DIFF JSON:\n${JSON.stringify(delta.diff)}`,
+    `CARRY-ELIGIBLE ASSUMPTION INDICES: ${carryEligibleText}`
+  ].join('\n\n')
+}
+
 function roleContext(input: ObjectiveRolePromptInput): string[] {
   if (input.role === 'planner') {
     return [
@@ -360,7 +395,10 @@ function roleContext(input: ObjectiveRolePromptInput): string[] {
         : [`PLAN REVIEW INPUT FILE:\n${input.planReviewInputPath}`]),
       ...(input.planReviewSummary === undefined
         ? []
-        : [`PLAN SUMMARY:\n${input.planReviewSummary}`])
+        : [`PLAN SUMMARY:\n${input.planReviewSummary}`]),
+      ...(input.planReviewDelta === undefined
+        ? []
+        : [planReviewDeltaSection(input.planReviewDelta)])
     ]
   }
   if (input.role === 'reviewer' || input.role === 'integrator') {

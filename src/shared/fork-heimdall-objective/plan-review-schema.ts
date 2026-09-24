@@ -6,14 +6,24 @@ import {
   TaskKeySchema,
   type ObjectivePlanAssumption
 } from './plan-schema'
+import { validatePlanReviewBasis } from './plan-review-basis'
 
 const PLAN_REVIEW_FINDINGS_MAX_ENTRIES = 128
+
+/** Absent means `'reverified'` — the pre-spot-check behavior, kept for older reports. */
+export const PLAN_REVIEW_ASSUMPTION_BASIS_VALUES = [
+  'reverified',
+  'planner-evidence',
+  'carried'
+] as const
+export type PlanReviewAssumptionBasis = (typeof PLAN_REVIEW_ASSUMPTION_BASIS_VALUES)[number]
 
 export const PlanReviewAssumptionAssessmentSchema = z
   .object({
     index: z.number().int().nonnegative(),
     status: z.enum(['verified', 'unverified']),
-    evidence: z.string().trim().min(1).max(OBJECTIVE_PLAN_REVIEW_TEXT_MAX_LENGTH)
+    evidence: z.string().trim().min(1).max(OBJECTIVE_PLAN_REVIEW_TEXT_MAX_LENGTH),
+    basis: z.enum(PLAN_REVIEW_ASSUMPTION_BASIS_VALUES).optional()
   })
   .strict()
 export type PlanReviewAssumptionAssessment = z.infer<typeof PlanReviewAssumptionAssessmentSchema>
@@ -63,17 +73,25 @@ function assessesEveryAssumptionOnce(
 
 /**
  * Parses a reviewer's plan verdict and enforces the invariants the schema cannot express on its
- * own: full, once-each assumption coverage, and (when the assumption list is supplied) an
- * `approve` verdict that never leaves an unverified assumption other tasks depend on.
+ * own: full, once-each assumption coverage; the spot-check rule on planner-handed evidence (when
+ * the assumption list is supplied); and an `approve` verdict that never leaves an unverified
+ * assumption other tasks depend on. `carryEligible` is empty until delta review can populate it.
  */
 export function parseAndValidatePlanReviewReport(
   raw: unknown,
   assumptionCount: number,
-  assumptions?: readonly ObjectivePlanAssumption[]
+  assumptions?: readonly ObjectivePlanAssumption[],
+  carryEligible: ReadonlySet<number> = new Set()
 ): PlanReviewReport {
   const report = PlanReviewReportSchema.parse(raw)
   if (!assessesEveryAssumptionOnce(report.assumptions, assumptionCount)) {
     throw new Error('Plan review must assess every assumption exactly once')
+  }
+  if (assumptions !== undefined) {
+    const basisProblem = validatePlanReviewBasis(assumptions, report.assumptions, carryEligible)
+    if (basisProblem !== null) {
+      throw new Error(basisProblem)
+    }
   }
   if (report.verdict === 'approve' && assumptions !== undefined) {
     const approvesUnverifiedLoadBearingAssumption = report.assumptions.some((assessment) => {

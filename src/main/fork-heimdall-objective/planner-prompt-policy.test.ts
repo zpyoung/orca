@@ -19,6 +19,7 @@ describe('buildPlannerPromptPolicySection', () => {
       'One-to-one dependency chains share one warm session.',
       'A fresh session spends about 30% of a node orienting.',
       'Node checks must be scoped',
+      'Node checks judge file contents',
       'OBJECTIVE GATES: none declared',
       'Objective gates run the full suite',
       'Every task must declare territory',
@@ -30,6 +31,30 @@ describe('buildPlannerPromptPolicySection', () => {
       expect(index).toBeGreaterThan(cursor)
       cursor = index
     }
+  })
+
+  it('says checks judge file contents or scoped tests, never commit ranges', () => {
+    const section = buildPlannerPromptPolicySection({
+      effectiveMaxConcurrency: 1,
+      lanesEnabled: false,
+      gates: undefined
+    })
+
+    expect(section).toContain(
+      'Node checks judge file contents or run scoped tests, never commit ranges'
+    )
+  })
+
+  it('tells the planner to record evidence on assumptions it verified itself', () => {
+    const section = buildPlannerPromptPolicySection({
+      effectiveMaxConcurrency: 1,
+      lanesEnabled: false,
+      gates: undefined
+    })
+
+    expect(section).toContain(
+      'Declare assumptions naming the task keys that depend on each one, with evidence on the ones you verified yourself.'
+    )
   })
 
   it('omits the lanes line when lanesEnabled is false', () => {

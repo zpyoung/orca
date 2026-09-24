@@ -151,6 +151,18 @@ describe('lintObjectivePlan check-command findings', () => {
     expect(codesFor(withCommand(String.raw`C:\repo\x`), 'a')).toContain('non-relative-check')
   })
 
+  it('flags a check command that reads branch history or commit ranges', () => {
+    expect(codesFor(withCommand('git diff --name-only $base HEAD'), 'a')).toContain(
+      'branch-history-check'
+    )
+    expect(codesFor(withCommand('git diff --quiet -- <path>'), 'a')).not.toContain(
+      'branch-history-check'
+    )
+    expect(codesFor(withCommand('git log -- ../dir/file.ts'), 'a')).not.toContain(
+      'branch-history-check'
+    )
+  })
+
   it('flags a check command or task title that duplicates a declared gate', () => {
     const gates = [{ name: 'lint', command: 'pnpm lint' }]
     const commandResult = lint({

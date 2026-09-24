@@ -2,13 +2,21 @@ import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { WatcherLedger } from '../../shared/fork-heimdall/ledger-types'
 import type { ObjectivePlanLint } from '../../shared/fork-heimdall-objective/plan-lint'
-import type { ObjectivePlanTask } from '../../shared/fork-heimdall-objective/plan-schema'
+import type { ObjectiveWorld } from '../../shared/fork-heimdall-objective/detail-types'
+import type {
+  ObjectivePlanTask,
+  PlannerReport
+} from '../../shared/fork-heimdall-objective/plan-schema'
 import type { IFilesystemProvider } from '../providers/types'
 import type { ObjectiveWorkspaceTarget } from './content-identity'
+import { ObjectiveDatabase } from './objective-database'
+import { ObjectiveStore } from './objective-store'
 import { issueObjectiveReportPath } from './report-ingestion'
 import {
   buildPlanReviewInput,
+  resolveObjectivePlanReviewDispatch,
   writePlanReviewInputFile,
   type PlanReviewInput
 } from './plan-review-input'
@@ -215,5 +223,157 @@ describe('writePlanReviewInputFile', () => {
     await expect(
       readFile(reportPath.replace(/\.json$/u, '.plan-review-input.json'), 'utf8')
     ).rejects.toThrow()
+  })
+})
+
+describe('resolveObjectivePlanReviewDispatch delta wiring', () => {
+  const WATCHER_ID = 'watcher-plan-review-input-delta'
+  const openedDatabases: ObjectiveDatabase[] = []
+
+  afterEach(() => {
+    for (const database of openedDatabases.splice(0)) {
+      database.close()
+    }
+  })
+
+  function planReport(overrides: Partial<PlannerReport> = {}): PlannerReport {
+    return {
+      plan: [task()],
+      assumptions: [{ claim: 'The fixture already exists.', dependentTaskKeys: ['core'] }],
+      ...overrides
+    }
+  }
+
+  function newStore(): ObjectiveStore {
+    const database = new ObjectiveDatabase(':memory:')
+    openedDatabases.push(database)
+    return new ObjectiveStore(database, () => 9_999)
+  }
+
+  async function dispatchFor(
+    store: ObjectiveStore,
+    target: PlanReviewInput['target'],
+    round: 1 | 2
+  ) {
+    const workspaceTarget = await localFolderTarget()
+    const reportPath = await issueObjectiveReportPath(workspaceTarget, `attempt-${round}`)
+    return resolveObjectivePlanReviewDispatch({
+      target,
+      round,
+      watcherId: WATCHER_ID,
+      objectiveStore: store,
+      world: { plan: { nodes: [] } } as unknown as ObjectiveWorld,
+      ledger: { entries: [] } as unknown as WatcherLedger,
+      writeTerritory: ['src/**'],
+      gates: undefined,
+      effectiveMaxConcurrency: 1,
+      workspaceTarget,
+      reportPath
+    })
+  }
+
+  it('carries no delta for a round-1 revision review', async () => {
+    const store = newStore()
+    const revision = store.ingestPlan({
+      watcherId: WATCHER_ID,
+      revisionNumber: 1,
+      dispatchId: 'planner-1',
+      report: planReport(),
+      digest: 'digest-1',
+      createdAtMs: 1
+    })
+
+    const { delta, inputPath } = await dispatchFor(
+      store,
+      { kind: 'revision', revisionId: revision.revisionId },
+      1
+    )
+
+    expect(delta).toBeUndefined()
+    const written = JSON.parse(await readFile(inputPath, 'utf8'))
+    expect(written.delta).toBeUndefined()
+  })
+
+  it('carries a delta with matching carryEligible once round 2 follows a round-1 revise', async () => {
+    const store = newStore()
+    const first = store.ingestPlan({
+      watcherId: WATCHER_ID,
+      revisionNumber: 1,
+      dispatchId: 'planner-1',
+      report: planReport(),
+      digest: 'digest-1',
+      createdAtMs: 1
+    })
+    store.recordPlanReviewAndRejectRoundOneTarget({
+      watcherId: WATCHER_ID,
+      targetKind: 'revision',
+      targetId: first.revisionId,
+      round: 1,
+      dispatchId: 'review-1',
+      report: {
+        verdict: 'revise',
+        assumptions: [{ index: 0, status: 'verified', evidence: 'Confirmed.' }],
+        findings: [{ taskKey: 'core', severity: 'blocking', body: 'Sizing is off.' }],
+        summary: 'Needs another pass.'
+      },
+      reportDigest: 'review-digest-1',
+      createdAtMs: 2
+    })
+    const second = store.ingestPlan({
+      watcherId: WATCHER_ID,
+      revisionNumber: 2,
+      dispatchId: 'planner-2',
+      report: planReport({
+        plan: [task(), task({ taskKey: 'extra', deps: [] })],
+        assumptions: [{ claim: '  The fixture already exists.  ', dependentTaskKeys: ['core'] }]
+      }),
+      digest: 'digest-2',
+      createdAtMs: 3
+    })
+
+    const { delta, inputPath } = await dispatchFor(
+      store,
+      { kind: 'revision', revisionId: second.revisionId },
+      2
+    )
+
+    expect(delta?.diff.added).toEqual(['extra'])
+    expect(delta?.carryEligible).toEqual([0])
+    const written = JSON.parse(await readFile(inputPath, 'utf8'))
+    expect(written.delta.carryEligible).toEqual([0])
+    expect(written.delta.previousReport.verdict).toBe('revise')
+  })
+
+  it('never resolves a delta for a patch target, even at round 2', async () => {
+    const store = newStore()
+    const revision = store.ingestPlan({
+      watcherId: WATCHER_ID,
+      revisionNumber: 1,
+      dispatchId: 'planner-1',
+      report: planReport(),
+      digest: 'digest-1',
+      createdAtMs: 1
+    })
+    store.activatePlan({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      digest: revision.digest,
+      approvedAtMs: 2
+    })
+    const patch = store.ingestPlanPatch({
+      watcherId: WATCHER_ID,
+      revisionId: revision.revisionId,
+      dispatchId: 'planner-repair-1',
+      repairOrdinal: 1,
+      report: {
+        repair: { upsertTasks: [task({ taskKey: 'follow-up' })], dropTaskKeys: [] },
+        assumptions: []
+      },
+      createdAtMs: 3
+    })
+
+    const { delta } = await dispatchFor(store, { kind: 'patch', patchId: patch.id }, 2)
+
+    expect(delta).toBeUndefined()
   })
 })

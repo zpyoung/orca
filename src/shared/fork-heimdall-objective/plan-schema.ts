@@ -77,14 +77,25 @@ export const ObjectivePlanTaskSchema = z
   )
 export type ObjectivePlanTask = z.infer<typeof ObjectivePlanTaskSchema>
 
+export const ObjectivePlanAssumptionEvidenceSchema = z
+  .object({
+    command: z.string().trim().min(1).max(OBJECTIVE_PLAN_REVIEW_TEXT_MAX_LENGTH),
+    observed: z.string().trim().min(1).max(OBJECTIVE_PLAN_REVIEW_TEXT_MAX_LENGTH)
+  })
+  .strict()
+export type ObjectivePlanAssumptionEvidence = z.infer<typeof ObjectivePlanAssumptionEvidenceSchema>
+
 /**
  * A planner's claim about the objective's state, with the tasks whose validity depends on it — an
- * empty list means the claim is informational and never blocks a plan review's approval.
+ * empty list means the claim is informational and never blocks a plan review's approval. The
+ * optional `evidence` records the command the planner ran and what it observed, so a plan review can
+ * spot-check the claim instead of re-verifying it from zero.
  */
 export const ObjectivePlanAssumptionSchema = z
   .object({
     claim: z.string().trim().min(1).max(OBJECTIVE_PLAN_REVIEW_TEXT_MAX_LENGTH),
-    dependentTaskKeys: z.array(TaskKeySchema).max(OBJECTIVE_PLAN_MAX_TASKS)
+    dependentTaskKeys: z.array(TaskKeySchema).max(OBJECTIVE_PLAN_MAX_TASKS),
+    evidence: ObjectivePlanAssumptionEvidenceSchema.optional()
   })
   .strict()
   .refine(

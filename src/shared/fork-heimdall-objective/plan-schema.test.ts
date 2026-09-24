@@ -13,7 +13,9 @@ import {
   CriterionSelfAssessmentSchema,
   ImplementerReportSchema,
   IntegratorReportSchema,
+  ObjectivePlanAssumptionSchema,
   ObjectivePlanSchema,
+  OBJECTIVE_PLAN_REVIEW_TEXT_MAX_LENGTH,
   PlannerReportSchema,
   ReviewerReportSchema,
   objectivePathMatchesTerritory,
@@ -184,6 +186,61 @@ describe('objective plan schema', () => {
 
   it('parses stored plans that predate territory and assumptions', () => {
     expect(PlannerReportSchema.safeParse({ plan: [task('legacy')] }).success).toBe(true)
+  })
+})
+
+describe('ObjectivePlanAssumptionSchema evidence', () => {
+  it('is optional', () => {
+    expect(
+      ObjectivePlanAssumptionSchema.safeParse({ claim: 'ok', dependentTaskKeys: [] }).success
+    ).toBe(true)
+  })
+
+  it('accepts a bounded command and observed pair', () => {
+    expect(
+      ObjectivePlanAssumptionSchema.safeParse({
+        claim: 'ok',
+        dependentTaskKeys: [],
+        evidence: { command: 'pnpm test', observed: 'all green' }
+      }).success
+    ).toBe(true)
+  })
+
+  it('rejects evidence text over the max length', () => {
+    expect(
+      ObjectivePlanAssumptionSchema.safeParse({
+        claim: 'ok',
+        dependentTaskKeys: [],
+        evidence: { command: 'x'.repeat(OBJECTIVE_PLAN_REVIEW_TEXT_MAX_LENGTH + 1), observed: 'ok' }
+      }).success
+    ).toBe(false)
+  })
+
+  it('rejects an empty command or observed string', () => {
+    expect(
+      ObjectivePlanAssumptionSchema.safeParse({
+        claim: 'ok',
+        dependentTaskKeys: [],
+        evidence: { command: '', observed: 'ok' }
+      }).success
+    ).toBe(false)
+    expect(
+      ObjectivePlanAssumptionSchema.safeParse({
+        claim: 'ok',
+        dependentTaskKeys: [],
+        evidence: { command: 'ok', observed: '' }
+      }).success
+    ).toBe(false)
+  })
+
+  it('rejects unknown evidence fields under strict mode', () => {
+    expect(
+      ObjectivePlanAssumptionSchema.safeParse({
+        claim: 'ok',
+        dependentTaskKeys: [],
+        evidence: { command: 'pnpm test', observed: 'ok', extra: true }
+      }).success
+    ).toBe(false)
   })
 })
 
