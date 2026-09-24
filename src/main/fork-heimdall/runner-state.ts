@@ -61,6 +61,8 @@ export type WatcherRunnerDependencies = {
   orchestration: HeimdallOrchestrationAdapter
   persistEnabled(enrollment: WatcherEnrollment, enabled: boolean): WatcherEnrollment
   persistTerminal(runner: WatcherRunner, fired: FiredStopPredicate): Promise<WatcherEnrollment>
+  /** Reads the durable enrollment record; null if the watcher is gone or its payload is malformed. */
+  readEnrollment(watcherId: string): WatcherEnrollment | null
   now?: () => number
   createId?: () => string
   setTimer?: typeof setTimeout
