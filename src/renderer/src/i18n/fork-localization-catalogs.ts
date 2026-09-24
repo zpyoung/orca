@@ -79,6 +79,11 @@ import askQuestionToolES from '../components/fork-ask-question-tool/locales/es.j
 import askQuestionToolJA from '../components/fork-ask-question-tool/locales/ja.json'
 import askQuestionToolKO from '../components/fork-ask-question-tool/locales/ko.json'
 import askQuestionToolZH from '../components/fork-ask-question-tool/locales/zh.json'
+import claudeUltracodeEN from '../components/native-chat/fork-claude-ultracode-effort/locales/en.json'
+import claudeUltracodeES from '../components/native-chat/fork-claude-ultracode-effort/locales/es.json'
+import claudeUltracodeJA from '../components/native-chat/fork-claude-ultracode-effort/locales/ja.json'
+import claudeUltracodeKO from '../components/native-chat/fork-claude-ultracode-effort/locales/ko.json'
+import claudeUltracodeZH from '../components/native-chat/fork-claude-ultracode-effort/locales/zh.json'
 
 type ForkLocale = 'en' | 'es' | 'ja' | 'ko' | 'zh'
 type ForkCatalog = Record<string, unknown>
@@ -113,7 +118,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     artifactPasswordsEN,
     activityWindowEN,
     reviewFiltersEN,
-    askQuestionToolEN
+    askQuestionToolEN,
+    claudeUltracodeEN
   ],
   es: [
     relayES,
@@ -131,7 +137,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     artifactPasswordsES,
     activityWindowES,
     reviewFiltersES,
-    askQuestionToolES
+    askQuestionToolES,
+    claudeUltracodeES
   ],
   ja: [
     relayJA,
@@ -149,7 +156,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     artifactPasswordsJA,
     activityWindowJA,
     reviewFiltersJA,
-    askQuestionToolJA
+    askQuestionToolJA,
+    claudeUltracodeJA
   ],
   ko: [
     relayKO,
@@ -167,7 +175,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     artifactPasswordsKO,
     activityWindowKO,
     reviewFiltersKO,
-    askQuestionToolKO
+    askQuestionToolKO,
+    claudeUltracodeKO
   ],
   zh: [
     relayZH,
@@ -185,7 +194,8 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     artifactPasswordsZH,
     activityWindowZH,
     reviewFiltersZH,
-    askQuestionToolZH
+    askQuestionToolZH,
+    claudeUltracodeZH
   ]
 }
 

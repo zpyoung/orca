@@ -1,0 +1,10 @@
+{
+  "components": {
+    "native-chat": {
+      "claude-ultracode-effort": {
+        "label": "Ultracode",
+        "description": "複数AIワークフローによる最高度の思考 · このセッションのみ"
+      }
+    }
+  }
+}

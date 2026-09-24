@@ -1,0 +1,10 @@
+{
+  "components": {
+    "native-chat": {
+      "claude-ultracode-effort": {
+        "label": "Ultracode",
+        "description": "Extra high effort with multi-agent workflows · this session only"
+      }
+    }
+  }
+}

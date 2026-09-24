@@ -39,6 +39,11 @@
       "globs": ["**/fork-native-chat-session-options/**"]
     },
     {
+      "name": "claude-ultracode-effort",
+      "purpose": "Offers Claude's session-only Ultracode effort in the terminal-backed effort picker.",
+      "globs": ["**/fork-claude-ultracode-effort/**"]
+    },
+    {
       "name": "live-plugin-marketplaces",
       "purpose": "Points the skill picker at a directory-sourced marketplace's live plugin directory, the one the Claude Code harness loads, instead of the frozen cache copy that goes stale between `claude plugin update` runs.",
       "globs": ["**/fork-live-plugin-marketplaces/**"]
@@ -173,9 +178,7 @@
       "path": "src/renderer/src/components/native-chat/native-chat-composer-workspace-file-drop.test.tsx",
       "feature": "input-quarantine",
       "kind": "registration",
-      "lines": [
-        "            terminalTabId: 'terminal-tab-1',"
-      ]
+      "lines": ["            terminalTabId: 'terminal-tab-1',"]
     },
     {
       "path": "src/renderer/src/components/sidebar/use-worktree-activity-status.ts",

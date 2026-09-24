@@ -1,0 +1,10 @@
+{
+  "components": {
+    "native-chat": {
+      "claude-ultracode-effort": {
+        "label": "Ultracode",
+        "description": "Esfuerzo extra alto con flujos de trabajo multi-AI · solo esta sesión"
+      }
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "components": {
+    "native-chat": {
+      "claude-ultracode-effort": {
+        "label": "Ultracode",
+        "description": "다중 AI 워크플로를 사용하는 최고 수준의 노력 · 이 세션에서만"
+      }
+    }
+  }
+}

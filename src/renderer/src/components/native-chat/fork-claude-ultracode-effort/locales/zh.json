@@ -1,0 +1,10 @@
+{
+  "components": {
+    "native-chat": {
+      "claude-ultracode-effort": {
+        "label": "Ultracode",
+        "description": "通过多 AI 工作流提供超高强度推理 · 仅限此会话"
+      }
+    }
+  }
+}
