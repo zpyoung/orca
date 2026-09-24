@@ -16,7 +16,7 @@ import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { createObjectiveActionExecutor } from './action-executor'
 import { findObjectiveWorkerEvidence, type ObjectiveSnapshotBinding } from './execution-context'
 import type { ObjectiveForgeAccess } from './objective-forge-access'
-import type { ObjectiveStore } from './objective-store'
+import type { ObjectiveCheckAttempt, ObjectiveStore } from './objective-store'
 
 const { readReport, validateChanges } = vi.hoisted(() => ({
   readReport: vi.fn(),
@@ -86,6 +86,26 @@ function snapshot(contentIdentity = 'new-content'): LiveSnapshot<ObjectiveWorld>
         hostedReview: null
       }
     }
+  }
+}
+
+function checkAttempt(overrides: Partial<ObjectiveCheckAttempt> = {}): ObjectiveCheckAttempt {
+  return {
+    id: 'check-1',
+    watcherId: 'watcher-1',
+    criterionId: 'criterion-1',
+    contentIdentity: 'new-content',
+    executionHostId: 'host-1',
+    command: 'npm test',
+    epoch: 0,
+    startedAtMs: 0,
+    exitCode: null,
+    timedOut: false,
+    stdoutTail: '',
+    stderrTail: '',
+    completedAtMs: null,
+    ownerSkip: false,
+    ...overrides
   }
 }
 
@@ -834,13 +854,13 @@ describe('objective action recovery', () => {
     const ledger: WatcherLedger = { watcherId: 'watcher-1', entries: [] }
     const absent = harness({ getCheckAttempt: () => null })
     const incomplete = harness({
-      getCheckAttempt: () => ({ completedAtMs: null, ownerSkip: true }) as never
+      getCheckAttempt: () => checkAttempt({ completedAtMs: null, ownerSkip: true })
     })
     const completedSkip = harness({
-      getCheckAttempt: () => ({ completedAtMs: 12, ownerSkip: true }) as never
+      getCheckAttempt: () => checkAttempt({ completedAtMs: 12, ownerSkip: true })
     })
     const completedNonSkip = harness({
-      getCheckAttempt: () => ({ completedAtMs: 12, ownerSkip: false }) as never
+      getCheckAttempt: () => checkAttempt({ completedAtMs: 12, ownerSkip: false })
     })
 
     expect(

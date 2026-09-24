@@ -6,7 +6,11 @@ import type {
 } from '../../shared/fork-heimdall/ledger-types'
 import type { WatcherEnrollment } from '../../shared/fork-heimdall/watcher-types'
 import { WatcherControlPlane } from './control-plane'
-import type { EnrollmentControlChange, EnrollmentControlCommit } from './enrollment-store'
+import type {
+  EnrollmentControlChange,
+  EnrollmentControlCommit,
+  EnrollmentStore
+} from './enrollment-store'
 import type { HeimdallLedgerStore } from './ledger-store'
 import type { WatcherRunner } from './runner-state'
 
@@ -25,6 +29,7 @@ function fakeLedger(initial: LedgerEntry[] = []): {
       return entries.length
     }
   }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: HeimdallLedgerStore is a class with private fields, so a structural test double can never satisfy it without this cast; only read/append are exercised by the code under test.
   return { store: store as unknown as HeimdallLedgerStore, entries }
 }
 
@@ -61,7 +66,7 @@ const OWNER_FENCE = {
 
 function fakeEnrollments(initial: WatcherEnrollment) {
   let record = initial
-  const store = {
+  const store: EnrollmentStore = {
     get: (watcherId: string) => (watcherId === record.watcherId ? record : null),
     list: () => [record],
     findLiveByWorkspace: () => null,
@@ -168,6 +173,7 @@ function harness(entries: LedgerEntry[]) {
   const { store: ledger, entries: ledgerEntries } = fakeLedger(entries)
   const { store: enrollments } = fakeEnrollments(enrollment())
   const schedule = vi.fn()
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this test double only needs the enrollment/status fields the control plane reads; WatcherRunner has 20 fields the exercised paths never touch.
   const runner = {
     enrollment: enrollment(),
     status: {
@@ -185,10 +191,11 @@ function harness(entries: LedgerEntry[]) {
   } as unknown as WatcherRunner
   let id = 0
   const controlPlane = new WatcherControlPlane({
-    enrollments: enrollments as never,
-    ledger: ledger as never,
+    enrollments,
+    ledger,
     lease: {} as never,
     orchestration: {} as never,
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: WatcherRunnerLoop is a class with private fields, so a structural test double can never satisfy it without this cast; only `.schedule` is exercised by the code under test.
     runnerLoop: { schedule, controlLifecycle: {} as never } as never,
     runner: () => runner,
     removeRunner: vi.fn(),

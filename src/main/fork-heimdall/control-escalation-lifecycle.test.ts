@@ -22,6 +22,7 @@ function fakeLedger(initial: LedgerEntry[] = []): {
       return entries.length
     }
   }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: HeimdallLedgerStore is a class with private fields, so a structural test double can never satisfy it without this cast; only read/append are exercised by the code under test.
   return { store: store as unknown as HeimdallLedgerStore, entries }
 }
 
