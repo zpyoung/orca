@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Snapshot } from '../../shared/fork-heimdall/snapshot'
-import { enrollmentInput, harness, kind, type World } from './kernel-service-test-harness'
+import { HeimdallBudgetClock } from './budget-clock'
+import {
+  enrollmentInput,
+  harness,
+  kind,
+  runningDispatch,
+  type World
+} from './kernel-service-test-harness'
 
 vi.mock('electron', () => ({}))
 
@@ -116,7 +123,7 @@ describe('Heimdall watcher deletion', () => {
     await world.service.stopForShutdown()
   })
 
-  it('keeps deletion owner-fenced and retryable when an owned interval close cannot persist', async () => {
+  it('applies a delete and leaves the runner stopped when the owned interval cannot be released', async () => {
     const purge = vi.fn()
     const world = await harness()
     world.service.registerKind(kind({ purge }))
@@ -128,10 +135,8 @@ describe('Heimdall watcher deletion', () => {
     const interval = world.budgetClock.open(watcherId, 'worker-dispatched')
     const initial = (await world.service.fleet()).entries[0]!
     const append = world.ledgerStore.append.bind(world.ledgerStore)
-    let failRecovery = true
     vi.spyOn(world.ledgerStore, 'append').mockImplementation((entry, options) => {
-      if (entry.kind === 'interval-close' && failRecovery) {
-        failRecovery = false
+      if (entry.kind === 'interval-close') {
         throw new Error('budget close persistence failed')
       }
       return append(entry, options)
@@ -143,19 +148,76 @@ describe('Heimdall watcher deletion', () => {
         expectedOwner: initial.ownerFence,
         command: { kind: 'delete' }
       })
-    ).resolves.toEqual({
-      status: 'indeterminate',
-      detail: 'budget close persistence failed'
-    })
-    expect(world.enrollmentStore.get(watcherId)).not.toBeNull()
-    expect(purge).not.toHaveBeenCalled()
-    expect(world.budgetClock.owned(watcherId)).toEqual(interval)
+    ).resolves.toMatchObject({ status: 'applied' })
 
-    const retry = (await world.service.fleet()).entries[0]!
+    expect(purge).toHaveBeenCalledOnce()
+    expect(world.enrollmentStore.get(watcherId)).toBeNull()
+    expect(world.budgetClock.owned(watcherId)).toEqual(interval)
+    await expect(world.service.reconcileForTesting(watcherId)).rejects.toThrow(
+      `Unknown Heimdall runner: ${watcherId}`
+    )
+    await world.service.stopForShutdown()
+  })
+
+  it('refuses without rollback when deleteWatcher throws after remove has started', async () => {
+    const purge = vi.fn()
+    const world = await harness()
+    world.service.registerKind(kind({ purge }))
+    const enrolled = await world.service.enroll(enrollmentInput())
+    if (enrolled.status !== 'enrolled') {
+      throw new Error('expected enrollment')
+    }
+    const watcherId = enrolled.entry.enrollment.watcherId
+    const row = (await world.service.fleet()).entries[0]!
+    vi.spyOn(world.enrollmentStore, 'deleteWatcher').mockImplementation(() => {
+      throw new Error('enrollment store unavailable')
+    })
+    world.schedule.mockClear()
+
     await expect(
       world.service.command({
-        target: retry.target,
-        expectedOwner: retry.ownerFence,
+        target: row.target,
+        expectedOwner: row.ownerFence,
+        command: { kind: 'delete' }
+      })
+    ).resolves.toMatchObject({
+      status: 'refused',
+      reason: 'invalid-state',
+      detail: 'enrollment store unavailable'
+    })
+
+    expect(purge).not.toHaveBeenCalled()
+    expect(world.enrollmentStore.get(watcherId)).not.toBeNull()
+    expect(world.schedule).not.toHaveBeenCalled()
+    await world.service.stopForShutdown()
+  })
+
+  it('applies a delete despite a stale workerIntervals entry left by an out-of-process recovery', async () => {
+    const purge = vi.fn()
+    const world = await harness()
+    world.service.registerKind(kind({ purge }))
+    const enrolled = await world.service.enroll(enrollmentInput())
+    if (enrolled.status !== 'enrolled') {
+      throw new Error('expected enrollment')
+    }
+    const watcherId = enrolled.entry.enrollment.watcherId
+    for (const entry of runningDispatch(watcherId)) {
+      world.ledgerStore.append(entry)
+    }
+    await world.service.reconcileForTesting(watcherId)
+    expect(
+      world.ledgerStore.read(watcherId).entries.filter((entry) => entry.kind === 'interval-open')
+    ).toHaveLength(1)
+
+    // simulates a prior process recovering the interval out from under this process's dispatch lifecycle
+    const recoveryClock = new HeimdallBudgetClock(world.ledgerStore, { now: () => 500 })
+    expect(recoveryClock.recoverOnStart(watcherId)).toBe(true)
+
+    const row = (await world.service.fleet()).entries[0]!
+    await expect(
+      world.service.command({
+        target: row.target,
+        expectedOwner: row.ownerFence,
         command: { kind: 'delete' }
       })
     ).resolves.toMatchObject({ status: 'applied' })

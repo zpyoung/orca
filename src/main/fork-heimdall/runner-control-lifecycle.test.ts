@@ -214,4 +214,52 @@ describe('WatcherRunnerControlLifecycle budget teardown', () => {
       })
     ])
   })
+
+  it('removes a runner even when the owned interval cannot be released, logging instead of throwing', () => {
+    const clock = makeClock()
+    clock.open('watcher-1', 'worker-dispatched')
+    const append = ledger.append.bind(ledger)
+    vi.spyOn(ledger, 'append').mockImplementation((entry, options) => {
+      if (entry.kind === 'interval-close') {
+        throw new Error('control release persistence failed')
+      }
+      return append(entry, options)
+    })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const lifecycle = makeLifecycle(clock)
+    const runner = makeRunner()
+
+    expect(() => lifecycle.remove(runner)).not.toThrow()
+
+    expect(runner.stopped).toBe(true)
+    expect(runner.controlPending).toBe('delete')
+    expect(runner.ownerBudgetInterval).toBeNull()
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('removes a runner even when worker interval teardown throws', () => {
+    const clock = makeClock()
+    const lifecycle = new WatcherRunnerControlLifecycle({
+      budgetClock: clock,
+      dispatchLifecycle: {
+        closeForContactLoss: vi.fn(() => {
+          throw new Error('worker interval teardown failed')
+        }),
+        closeForShutdown: vi.fn()
+      } as unknown as WatcherLedgerLifecycle,
+      schedule: vi.fn(),
+      clearTimer: vi.fn(),
+      publish: vi.fn()
+    })
+    const runner = makeRunner()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    expect(() => lifecycle.remove(runner)).not.toThrow()
+
+    expect(runner.stopped).toBe(true)
+    expect(runner.controlPending).toBe('delete')
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
 })

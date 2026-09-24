@@ -21,6 +21,8 @@ export type BudgetClock = {
   open(watcherId: string, cause: IntervalCause): IntervalHandle
   checkpoint(watcherId: string): void
   close(handle: IntervalHandle, reason: IntervalCloseReason): void
+  /** Best-effort teardown: a no-op when the interval is already durably closed. */
+  release(handle: IntervalHandle, reason: IntervalCloseReason): void
   recoverOnStart(watcherId: string): boolean
   current(watcherId: string): IntervalHandle | null
   /** Returns only the interval whose sampler is owned by this clock instance. */
@@ -169,6 +171,18 @@ export class HeimdallBudgetClock implements BudgetClock {
   }
 
   close(handle: IntervalHandle, reason: IntervalCloseReason): void {
+    this.closeOrRelease(handle, reason, 'strict')
+  }
+
+  release(handle: IntervalHandle, reason: IntervalCloseReason): void {
+    this.closeOrRelease(handle, reason, 'tolerant')
+  }
+
+  private closeOrRelease(
+    handle: IntervalHandle,
+    reason: IntervalCloseReason,
+    mode: 'strict' | 'tolerant'
+  ): void {
     this.requireHandle(handle)
     if (reason !== 'settled' && reason !== 'contact-lost' && reason !== 'shutdown') {
       throw new Error(`Unknown Heimdall budget close reason: ${String(reason)}`)
@@ -178,11 +192,17 @@ export class HeimdallBudgetClock implements BudgetClock {
     if (!interval || interval.handle.intervalId !== handle.intervalId) {
       const durable = this.findInterval(handle.watcherId, handle.intervalId)
       if (durable?.closedAtMs != null) {
+        if (mode === 'tolerant') {
+          return
+        }
         throw new Error(`Heimdall budget interval ${handle.intervalId} is already closed`)
       }
       throw new Error(`Heimdall budget interval ${handle.intervalId} is not owned by this clock`)
     }
     if (interval.closedAtMs !== null) {
+      if (mode === 'tolerant') {
+        return
+      }
       throw new Error(`Heimdall budget interval ${handle.intervalId} is already closed`)
     }
     if (interval.references > 1) {
@@ -204,7 +224,10 @@ export class HeimdallBudgetClock implements BudgetClock {
         closeReason: reason
       })
     } catch (error) {
-      this.retireIfDurablyClosed(interval)
+      const alreadyDurablyClosed = this.retireIfDurablyClosed(interval)
+      if (mode === 'tolerant' && alreadyDurablyClosed) {
+        return
+      }
       throw error
     }
     interval.closedAtMs = atMs
