@@ -505,7 +505,7 @@
       "path": "src/shared/top-level-view.ts",
       "feature": "heimdall",
       "kind": "passthrough",
-      "lines": ["  heimdall: true"]
+      "lines": ["  heimdall: true,"]
     },
     {
       "path": "src/shared/ui-chrome-types.ts",
