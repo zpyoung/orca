@@ -140,6 +140,24 @@ describe('related and files selection modes', () => {
       expect(() => readSelectionList(escapingPath)).toThrow('escapes')
     })
 
+    it('rejects an entry starting with "-" so it cannot be parsed as a vitest flag', () => {
+      const directory = mkdtempSync(join(tmpdir(), 'orca-selection-'))
+      directories.push(directory)
+      const listPath = join(directory, 'flag-like.txt')
+      writeFileSync(listPath, 'package.json\n--coverage\n')
+
+      expect(() => readSelectionList(listPath)).toThrow('--coverage')
+    })
+
+    it('rejects an empty selection file (blank lines only) instead of selecting the whole suite', () => {
+      const directory = mkdtempSync(join(tmpdir(), 'orca-selection-'))
+      directories.push(directory)
+      const listPath = join(directory, 'empty.txt')
+      writeFileSync(listPath, '\n\n  \n')
+
+      expect(() => readSelectionList(listPath)).toThrow('no paths')
+    })
+
     it('exits 2 via fail() when the runner is invoked with an unreadable --files-from list', () => {
       const result = spawnSync(
         'node',
@@ -154,6 +172,31 @@ describe('related and files selection modes', () => {
       expect(result.status).toBe(2)
       expect(result.stderr).toContain('run-sandboxed-test-shards')
     })
+
+    it('exits 2 via fail() for an empty --files-from list without reaching the Docker probe', () => {
+      const directory = mkdtempSync(join(tmpdir(), 'orca-selection-'))
+      directories.push(directory)
+      const listPath = join(directory, 'empty.txt')
+      writeFileSync(listPath, '\n')
+
+      const result = spawnSync(
+        'node',
+        [
+          resolve(projectDir, 'config/scripts/run-sandboxed-test-shards.mjs'),
+          '--select=related',
+          `--files-from=${listPath}`
+        ],
+        { encoding: 'utf8' }
+      )
+
+      expect(result.status).toBe(2)
+      expect(result.stderr).toContain('run-sandboxed-test-shards')
+      expect(result.stdout).not.toContain('Docker daemon')
+    })
+  })
+
+  it('returns no buckets for an empty selection instead of one that runs unfiltered', () => {
+    expect(resolveSelectionBuckets([], 3)).toEqual([])
   })
 
   it('splits a selection into buckets: at most RELATED_SINGLE_CONTAINER_MAX files run in one container', () => {

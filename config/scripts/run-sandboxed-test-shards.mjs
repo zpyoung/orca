@@ -238,7 +238,14 @@ export function readSelectionList(filesFromPath) {
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
 
+  if (paths.length === 0) {
+    throw new Error(`--files-from file has no paths after trimming blank lines: ${filesFromPath}`)
+  }
+
   for (const file of paths) {
+    if (file.startsWith('-')) {
+      throw new Error(`--files-from entries must not start with "-", got "${file}"`)
+    }
     if (path.isAbsolute(file)) {
       throw new Error(`--files-from entries must be repo-relative, got "${file}"`)
     }
@@ -470,6 +477,9 @@ function resolveShards(options) {
  * under RELATED_SINGLE_CONTAINER_MAX, otherwise up to 3 (the host's proven limit).
  */
 export function resolveSelectionBuckets(paths, jobs) {
+  if (paths.length === 0) {
+    return []
+  }
   if (paths.length <= RELATED_SINGLE_CONTAINER_MAX) {
     return [paths]
   }
