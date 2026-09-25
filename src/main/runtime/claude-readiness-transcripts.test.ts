@@ -92,10 +92,14 @@ describe('Claude Code tui-idle wait at cold start', () => {
       const internals = runtime as unknown as { ptysById: Map<string, { launchAgent?: string }> }
       internals.ptysById.get(TRANSCRIPT_PANE_PTY_ID)!.launchAgent = 'claude'
       let reads = 0
-      // The first read lands before Claude has drawn anything, as a worker start's does.
+      // The first reads land before Claude has drawn anything, as a worker start's do: one finds
+      // no provider screen yet, the next a blank one.
       vi.spyOn(runtime, 'readTerminal').mockImplementation(async () => {
         reads += 1
-        return { source: 'screen', tail: reads === 1 ? [] : readyScreen } as never
+        if (reads === 1) {
+          return null as never
+        }
+        return { source: 'screen', tail: reads === 2 ? [] : readyScreen } as never
       })
 
       const result = (await runtime.waitForTerminal(handle, {
@@ -104,7 +108,7 @@ describe('Claude Code tui-idle wait at cold start', () => {
       })) as { satisfied?: boolean }
 
       expect(result.satisfied).toBe(true)
-      expect(reads).toBeGreaterThan(1)
+      expect(reads).toBeGreaterThan(2)
     }, 15_000)
   }
 })

@@ -69,11 +69,13 @@ export class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRuntimeWith
       null
     )
       .then((projection) => {
-        if (
-          !projection ||
-          projection.source !== 'screen' ||
-          !this.terminalWaiters.get(waiter.handle)?.has(waiter)
-        ) {
+        if (!this.terminalWaiters.get(waiter.handle)?.has(waiter)) {
+          return
+        }
+        // Why re-arm on a missing screen too: a fresh pane's first snapshot can time out or come
+        // back before the provider holds a screen, and that says nothing about readiness.
+        if (!projection || projection.source !== 'screen') {
+          this.rearmTuiIdleVisibleReadProbe(waiter, deadlineMs)
           return
         }
         const snapshotText = projection.tail.join('\n')
@@ -88,7 +90,9 @@ export class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRuntimeWith
         }
         this.terminalWaiters.resolve(waiter, result)
       })
-      .catch(() => {})
+      .catch(() => {
+        this.rearmTuiIdleVisibleReadProbe(waiter, deadlineMs)
+      })
   }
 
   /** Looks again only while the screen is still the only usable evidence and the waiter has time left. */
