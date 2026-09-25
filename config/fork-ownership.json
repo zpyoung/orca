@@ -4307,6 +4307,18 @@
       "ledger": "docs/fork-upstreaming.md#git-exec-mutation-cache-invalidation"
     },
     {
+      "path": "src/main/runtime/rpc/methods/orchestration-structured-worker-session.ts",
+      "reason": "Wait for an admitted structured preamble to settle before judging it, so Claude worker and owner starts are not misreported as unknown.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#structured-preamble-waits-for-admitted-settlement"
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/orchestration-structured-worker-session.test.ts",
+      "reason": "Defend preamble settlement for admitted, rejected, and unsettled Claude sends.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#structured-preamble-waits-for-admitted-settlement"
+    },
+    {
       "path": "src/main/runtime/orchestration/db/federation/federation-relay-import.ts",
       "reason": "Persist federated rejection verdicts across replay, settle legacy terminal rejections, and record exact dispatch-bound report observations for notification-loss recovery.",
       "status": "pending-upstream",

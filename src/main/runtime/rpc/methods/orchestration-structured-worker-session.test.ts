@@ -224,10 +224,22 @@ describe('structured worker session hold', () => {
 })
 
 describe('structured worker dispatch preamble', () => {
-  function hostWithSubmission(submission: Record<string, unknown>) {
+  function hostWithSubmission(
+    submission: Record<string, unknown>,
+    settled?: Record<string, unknown> | Error
+  ) {
+    const waitForSendSettlement = vi.fn(async () => {
+      if (settled instanceof Error) {
+        throw settled
+      }
+      return settled
+        ? { cursor: 1, value: { clientMessageId: 'c1', submission: settled } }
+        : undefined
+    })
     return {
       deps: { store: { getRecord: () => ({ lease: { runtimeFence: 7 } }) } },
-      send: async () => ({ ok: true, value: { clientMessageId: 'c1', submission } })
+      send: async () => ({ ok: true, value: { clientMessageId: 'c1', submission } }),
+      waitForSendSettlement
     } as never
   }
 
@@ -254,6 +266,39 @@ describe('structured worker dispatch preamble', () => {
       // `outcome_unknown` with the worker-show / worker-abandon recovery commands.
       expect(isUnknownWorkerStartOutcome(error, 'dispatch_input')).toBe(true)
     }
+  })
+
+  it('waits for an admitted preamble to settle before judging it', async () => {
+    // Claude settles a send on admission: the write returns while the submission is still
+    // pending, and the provider echo promotes it to accepted moments later.
+    const host = hostWithSubmission(
+      { dispatchState: 'pending', reason: null },
+      { dispatchState: 'accepted', reason: null }
+    )
+    await expect(send(host)).resolves.toBeUndefined()
+    expect(
+      (host as unknown as { waitForSendSettlement: ReturnType<typeof vi.fn> }).waitForSendSettlement
+    ).toHaveBeenCalledWith('s1', 'c1')
+  })
+
+  it('keeps an admitted preamble that settles rejected a proven failure', async () => {
+    const error = await send(
+      hostWithSubmission(
+        { dispatchState: 'pending', reason: null },
+        { dispatchState: 'rejected', reason: 'fence moved' }
+      )
+    ).catch((thrown: unknown) => thrown)
+    expect((error as { code?: string }).code).toBe('dispatch_preamble_undelivered')
+  })
+
+  it('reports an admitted preamble whose settlement wait fails as unknown', async () => {
+    const error = await send(
+      hostWithSubmission(
+        { dispatchState: 'pending', reason: null },
+        new Error('agent session send disappeared before settlement')
+      )
+    ).catch((thrown: unknown) => thrown)
+    expect((error as { code?: string }).code).toBe('operation_unknown')
   })
 
   it('keeps a rejected preamble a proven failure under a code of its own', async () => {

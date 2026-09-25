@@ -7,6 +7,28 @@ manifest `exceptions[]` row (`status: "pending-upstream"`, `ledger` pointing at 
 anchor) are created and removed together — see `config/scripts/fork-ownership-manifest.mjs` for
 the invariant this enforces.
 
+## Structured preamble waits for admitted settlement
+
+**What:** `sendStructuredWorkerPreamble` in
+`src/main/runtime/rpc/methods/orchestration-structured-worker-session.ts` waits on
+`host.waitForSendSettlement` when the preamble submission comes back `pending`, then judges the
+settled submission. A wait that times out or fails still reports `operation_unknown`.
+
+**Why upstream, not isolated:** since the settle-on-admission change (#19863), a Claude structured
+send returns `admitted` as soon as the frame is written, and the submission stays `pending` until
+the provider echo. The preamble check accepts only `accepted`, so every Claude structured worker
+start settles `outcome_unknown` although the worker is running, and Heimdall's owner turns, which
+use the same function, are never recorded as sent (ledger bug-194). The host already exposes the
+settlement wait for clients that predate admitted pending replies; the preamble sender is one of
+those clients. The defect is in upstream's shared function, so a fork copy would only move it.
+
+**Paths:**
+
+- `src/main/runtime/rpc/methods/orchestration-structured-worker-session.ts`
+- `src/main/runtime/rpc/methods/orchestration-structured-worker-session.test.ts`
+
+**Status:** pending-upstream. Not yet submitted.
+
 ## Folder workspace scheduler authority
 
 **What:** exposes the existing execution-host-to-scheduler-owner mapping independently of a

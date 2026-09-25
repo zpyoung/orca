@@ -244,7 +244,15 @@ export async function sendStructuredWorkerPreamble(args: {
   if (!result.ok) {
     throw new Error(`The dispatch preamble was refused: ${result.refusal.message}`)
   }
-  const submission = result.value.submission
+  // claude settles a send on admission, so a fresh preamble is pending until the provider echo
+  const submission =
+    result.value.submission.dispatchState === 'pending'
+      ? ((
+          await args.host
+            .waitForSendSettlement(args.sessionId, result.value.clientMessageId)
+            .catch(() => undefined)
+        )?.value.submission ?? result.value.submission)
+      : result.value.submission
   if (submission.dispatchState === 'accepted') {
     return
   }
