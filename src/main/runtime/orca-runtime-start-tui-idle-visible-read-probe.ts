@@ -69,6 +69,12 @@ export class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRuntimeWith
       null
     )
       .then((projection) => {
+        console.warn(
+          '[DBG-probe]',
+          waiter.handle,
+          projection?.source ?? 'null',
+          JSON.stringify((projection?.tail ?? []).slice(-4)).slice(0, 300)
+        )
         if (!this.terminalWaiters.get(waiter.handle)?.has(waiter)) {
           return
         }
@@ -110,6 +116,13 @@ export class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRuntimeWith
         const record =
           this.getLivePtyForHandle(waiter.handle)?.pty ??
           this.getLiveLeafForHandle(waiter.handle).leaf
+        console.warn(
+          '[DBG-rearm]',
+          waiter.handle,
+          record.lastAgentStatus,
+          this.getPaneAgentForTuiIdle(record.ptyId),
+          buildTerminalWaitText(record.tailBuffer, record.tailPartialLine, record.preview).length
+        )
         if (
           !tuiIdleNeedsVisibleScreenProbe(
             record.lastAgentStatus,
