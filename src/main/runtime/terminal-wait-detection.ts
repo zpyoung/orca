@@ -103,13 +103,10 @@ const CLAUDE_EMPTY_INPUT_PLACEHOLDER = 'try "'
 
 // Why the placeholder: Claude Code paints no idle OSC title, and it draws `Try "…"` only in the
 // empty input box of a session with no turns, so the last prompt carrying it proves a cold start.
+// No banner check: SessionStart hook output routinely pushes the banner off the visible screen.
 function findClaudeReadyPromptIndex(normalized: string): number | null {
-  const headerIndex = normalized.lastIndexOf('claude code')
-  if (headerIndex === -1) {
-    return null
-  }
   const promptIndex = normalized.lastIndexOf(CLAUDE_PROMPT_GLYPH)
-  if (promptIndex < headerIndex) {
+  if (promptIndex === -1) {
     return null
   }
   let cursor = promptIndex + CLAUDE_PROMPT_GLYPH.length
@@ -120,6 +117,20 @@ function findClaudeReadyPromptIndex(normalized: string): number | null {
     cursor += 1
   }
   return normalized.startsWith(CLAUDE_EMPTY_INPUT_PLACEHOLDER, cursor) ? promptIndex : null
+}
+
+/**
+ * Whether a tui-idle wait should read the provider's visible screen.
+ *
+ * Why Claude even with runtime text: it paints with cursor moves, so what reaches the tail is a
+ * few status rows below its prompt box, never the prompt the ready rule needs.
+ */
+export function tuiIdleNeedsVisibleScreenProbe(
+  lastAgentStatus: AgentStatus | null,
+  waitText: string,
+  agent: string | null | undefined
+): boolean {
+  return lastAgentStatus === null && (waitText.length === 0 || agent === 'claude')
 }
 
 // Why: match the banner's last occurrence to skip the trust dialog's own "Cursor Agent" text; "→" is cursor-agent's persistent input prompt.

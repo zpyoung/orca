@@ -11,7 +11,8 @@ import {
 import { withTimeout } from './runtime-async-boundaries'
 import {
   detectTerminalWaitBlockedReason,
-  isKnownReadyPromptPreview
+  isKnownReadyPromptPreview,
+  tuiIdleNeedsVisibleScreenProbe
 } from './terminal-wait-detection'
 import type {
   RuntimeTerminalWait,
@@ -90,7 +91,7 @@ export class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRuntimeWith
       .catch(() => {})
   }
 
-  /** Looks again only while the poll still has nothing to read and the waiter has time left. */
+  /** Looks again only while the screen is still the only usable evidence and the waiter has time left. */
   protected rearmTuiIdleVisibleReadProbe(waiter: TerminalWaiter, deadlineMs: number): void {
     const remainingMs = deadlineMs - Date.now() - TUI_IDLE_VISIBLE_PROBE_RETRY_MS
     if (remainingMs <= 0) {
@@ -106,9 +107,11 @@ export class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRuntimeWith
           this.getLivePtyForHandle(waiter.handle)?.pty ??
           this.getLiveLeafForHandle(waiter.handle).leaf
         if (
-          record.lastAgentStatus !== null ||
-          buildTerminalWaitText(record.tailBuffer, record.tailPartialLine, record.preview).length >
-            0
+          !tuiIdleNeedsVisibleScreenProbe(
+            record.lastAgentStatus,
+            buildTerminalWaitText(record.tailBuffer, record.tailPartialLine, record.preview),
+            this.getPaneAgentForTuiIdle(record.ptyId)
+          )
         ) {
           return
         }

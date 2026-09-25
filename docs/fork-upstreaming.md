@@ -12,7 +12,9 @@ the invariant this enforces.
 **What:** a Claude Code ready-prompt rule in `src/main/runtime/terminal-wait-detection.ts` (the last
 `❯` prompt carries the empty-input `Try "…"` placeholder), and a `tui-idle` visible-screen probe in
 `src/main/runtime/orca-runtime-start-tui-idle-visible-read-probe.ts` that re-arms every second while
-the waiter is pending and the pane's newline tail is still empty.
+the waiter is pending and the screen is still the only usable evidence; `runtime-terminal-wait.ts`
+starts that probe for a Claude pane even when a short preview exists, because the preview holds
+only the status rows below Claude's prompt box.
 
 **Why upstream, not isolated:** since the tui-idle evidence ranking (#20155), a quiet foreground
 process no longer proves idle for a known agent, so a Claude pane can settle only on an explicit
@@ -29,6 +31,7 @@ recorded with `config/scripts/capture-agent-pty-transcript.mjs` against Claude C
 
 - `src/main/runtime/terminal-wait-detection.ts`
 - `src/main/runtime/orca-runtime-start-tui-idle-visible-read-probe.ts`
+- `src/main/runtime/runtime-terminal-wait.ts`
 - `src/main/runtime/claude-readiness-transcripts.test.ts`
 - `src/main/runtime/__fixtures__/claude-code-*.txt` and `.meta.json`
 

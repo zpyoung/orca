@@ -4,7 +4,8 @@ import type {
 } from '../../shared/runtime-types'
 import {
   detectTerminalWaitBlockedReason,
-  isKnownReadyPromptPreview
+  isKnownReadyPromptPreview,
+  tuiIdleNeedsVisibleScreenProbe
 } from './terminal-wait-detection'
 import {
   buildPtyTerminalWaitBlockedResult,
@@ -140,7 +141,13 @@ export class RuntimeTerminalWait {
             this.waiters.resolve(waiter, buildPtyTerminalWaitResult(handle, condition, live.pty))
           } else {
             this.polls.startPty(waiter, live.pty)
-            if (live.pty.lastAgentStatus === null && livePtyWaitText.length === 0) {
+            if (
+              tuiIdleNeedsVisibleScreenProbe(
+                live.pty.lastAgentStatus,
+                livePtyWaitText,
+                this.deps.getPaneAgent(live.pty.ptyId)
+              )
+            ) {
               this.deps.startVisibleReadProbe(waiter, effectiveTimeoutMs)
             }
           }
@@ -232,7 +239,13 @@ export class RuntimeTerminalWait {
             // while the last OSC title is still "working"; keep polling the
             // preview/title until the waiter resolves or hits its timeout.
             this.polls.startLeaf(waiter, live.leaf)
-            if (live.leaf.lastAgentStatus === null && liveLeafWaitText.length === 0) {
+            if (
+              tuiIdleNeedsVisibleScreenProbe(
+                live.leaf.lastAgentStatus,
+                liveLeafWaitText,
+                this.deps.getPaneAgent(live.leaf.ptyId)
+              )
+            ) {
               this.deps.startVisibleReadProbe(waiter, effectiveTimeoutMs)
             }
           }

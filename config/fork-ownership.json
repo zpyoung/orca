@@ -4325,6 +4325,12 @@
       "ledger": "docs/fork-upstreaming.md#claude-terminal-readiness-from-the-visible-screen"
     },
     {
+      "path": "src/main/runtime/runtime-terminal-wait.ts",
+      "reason": "Start the visible-screen probe for a Claude pane whose short preview never holds its prompt.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#claude-terminal-readiness-from-the-visible-screen"
+    },
+    {
       "path": "src/main/runtime/orca-runtime-start-tui-idle-visible-read-probe.ts",
       "reason": "Re-probe the visible screen while a tui-idle waiter's newline tail is empty, so cursor-addressed TUIs can settle.",
       "status": "pending-upstream",
