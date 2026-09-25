@@ -419,12 +419,31 @@ export class WatcherRunnerLoop {
     }
   }
 
-  /** keeps the runner's cached enrollment from outliving a durable disable/pause written elsewhere */
+  /**
+   * Keeps the runner's cached enrollment, and the status published from it, from outliving a
+   * durable enable/disable/pause written elsewhere, whichever path the rest of the tick takes.
+   */
   private resyncEnrollment(runner: WatcherRunner): void {
     const savedEnrollment = this.dependencies.readEnrollment(runner.enrollment.watcherId)
-    if (savedEnrollment) {
-      runner.enrollment = savedEnrollment
+    if (!savedEnrollment) {
+      return
     }
+    const controlChanged =
+      savedEnrollment.enabled !== runner.enrollment.enabled ||
+      savedEnrollment.paused !== runner.enrollment.paused
+    runner.enrollment = savedEnrollment
+    if (!controlChanged) {
+      return
+    }
+    runner.status = {
+      ...dormantWatcherStatus(
+        savedEnrollment,
+        this.dependencies.ledgerStore.read(savedEnrollment.watcherId)
+      ),
+      lastSuccessfulTickAtMs: runner.status.lastSuccessfulTickAtMs,
+      nextPulseAtMs: runner.status.nextPulseAtMs
+    }
+    this.publishStatus(runner)
   }
 
   private async releaseLeaseGuard(

@@ -163,6 +163,66 @@ describe('lease re-acquisition resync', () => {
       status: { enabled: false, state: 'disabled', phase: 'disabled' }
     })
   })
+
+  it('publishes a durable re-enable picked up by the resync, not the cached disabled status', async () => {
+    const world = await harness()
+    const decide = vi.fn(() => ({ action: null, reason: 'quiet', considered: [] }))
+    world.service.registerKind(kind({ decide }))
+    const result = await world.service.enroll(enrollmentInput())
+    if (result.status !== 'enrolled') {
+      throw new Error('expected enrollment')
+    }
+    const watcherId = result.entry.enrollment.watcherId
+
+    world.enrollmentStore.setEnabled(watcherId, false)
+    await world.service.reconcileForTesting(watcherId)
+    expect(decide).not.toHaveBeenCalled()
+
+    world.enrollmentStore.setEnabled(watcherId, true)
+    await world.service.reconcileForTesting(watcherId)
+
+    expect(decide).toHaveBeenCalledTimes(1)
+    const [entry] = await world.service.list()
+    expect(entry).toMatchObject({ enrollment: { enabled: true }, status: { enabled: true } })
+    expect(entry.status.state).not.toBe('disabled')
+  })
+
+  it('publishes a resynced disable even when the tick exits early on an error', async () => {
+    const world = await harness()
+    let failRead = false
+    world.service.registerKind(
+      kind({
+        read: async () => {
+          if (failRead) {
+            throw new Error('read failed')
+          }
+          return {
+            freshness: 'live',
+            contentIdentity: 'revision-1',
+            observedAtMs: 1,
+            world: { revision: 'revision-1' }
+          }
+        }
+      })
+    )
+    const result = await world.service.enroll(enrollmentInput())
+    if (result.status !== 'enrolled') {
+      throw new Error('expected enrollment')
+    }
+    const watcherId = result.entry.enrollment.watcherId
+    await world.service.reconcileForTesting(watcherId)
+
+    // the disable lands between ticks and the next tick fails after the resync but before the
+    // disabled-path status recompute, so only the resync itself can publish it
+    world.enrollmentStore.setEnabled(watcherId, false)
+    failRead = true
+    await world.service.reconcileForTesting(watcherId)
+
+    expect((await world.service.list())[0]).toMatchObject({
+      enrollment: { enabled: false },
+      status: { enabled: false }
+    })
+  })
 })
 
 describe('gate-hold pacing', () => {
