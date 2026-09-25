@@ -92,9 +92,34 @@ function findKnownReadyPromptIndex(normalized: string): number | null {
   const indexes = [
     findCodexReadyPromptIndex(normalized),
     findAntigravityReadyPromptIndex(normalized),
-    findCursorReadyPromptIndex(normalized)
+    findCursorReadyPromptIndex(normalized),
+    findClaudeReadyPromptIndex(normalized)
   ].filter((index): index is number => index !== null)
   return indexes.length > 0 ? Math.max(...indexes) : null
+}
+
+const CLAUDE_PROMPT_GLYPH = '\u276f'
+const CLAUDE_EMPTY_INPUT_PLACEHOLDER = 'try "'
+
+// Why the placeholder: Claude Code paints no idle OSC title, and it draws `Try "…"` only in the
+// empty input box of a session with no turns, so the last prompt carrying it proves a cold start.
+function findClaudeReadyPromptIndex(normalized: string): number | null {
+  const headerIndex = normalized.lastIndexOf('claude code')
+  if (headerIndex === -1) {
+    return null
+  }
+  const promptIndex = normalized.lastIndexOf(CLAUDE_PROMPT_GLYPH)
+  if (promptIndex < headerIndex) {
+    return null
+  }
+  let cursor = promptIndex + CLAUDE_PROMPT_GLYPH.length
+  while (
+    cursor < normalized.length &&
+    (isTerminalWaitWhitespace(normalized, cursor) || normalized.charCodeAt(cursor) === 0xa0)
+  ) {
+    cursor += 1
+  }
+  return normalized.startsWith(CLAUDE_EMPTY_INPUT_PLACEHOLDER, cursor) ? promptIndex : null
 }
 
 // Why: match the banner's last occurrence to skip the trust dialog's own "Cursor Agent" text; "→" is cursor-agent's persistent input prompt.

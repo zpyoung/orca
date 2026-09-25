@@ -4319,6 +4319,60 @@
       "ledger": "docs/fork-upstreaming.md#structured-preamble-waits-for-admitted-settlement"
     },
     {
+      "path": "src/main/runtime/terminal-wait-detection.ts",
+      "reason": "Recognize Claude Code's cold-start input box as a ready prompt, since Claude paints no idle title.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#claude-terminal-readiness-from-the-visible-screen"
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-start-tui-idle-visible-read-probe.ts",
+      "reason": "Re-probe the visible screen while a tui-idle waiter's newline tail is empty, so cursor-addressed TUIs can settle.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#claude-terminal-readiness-from-the-visible-screen"
+    },
+    {
+      "path": "src/main/runtime/claude-readiness-transcripts.test.ts",
+      "reason": "Pin Claude Code readiness to captured transcripts.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#claude-terminal-readiness-from-the-visible-screen"
+    },
+    {
+      "path": "src/main/runtime/__fixtures__/claude-code-ready-cold-start.txt",
+      "reason": "Captured Claude Code 2.1.282 transcript behind the Claude readiness rule.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#claude-terminal-readiness-from-the-visible-screen"
+    },
+    {
+      "path": "src/main/runtime/__fixtures__/claude-code-ready-cold-start.meta.json",
+      "reason": "Captured Claude Code 2.1.282 transcript behind the Claude readiness rule.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#claude-terminal-readiness-from-the-visible-screen"
+    },
+    {
+      "path": "src/main/runtime/__fixtures__/claude-code-busy-mid-turn.txt",
+      "reason": "Captured Claude Code 2.1.282 transcript behind the Claude readiness rule.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#claude-terminal-readiness-from-the-visible-screen"
+    },
+    {
+      "path": "src/main/runtime/__fixtures__/claude-code-busy-mid-turn.meta.json",
+      "reason": "Captured Claude Code 2.1.282 transcript behind the Claude readiness rule.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#claude-terminal-readiness-from-the-visible-screen"
+    },
+    {
+      "path": "src/main/runtime/__fixtures__/claude-code-idle-after-turn.txt",
+      "reason": "Captured Claude Code 2.1.282 transcript behind the Claude readiness rule.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#claude-terminal-readiness-from-the-visible-screen"
+    },
+    {
+      "path": "src/main/runtime/__fixtures__/claude-code-idle-after-turn.meta.json",
+      "reason": "Captured Claude Code 2.1.282 transcript behind the Claude readiness rule.",
+      "status": "pending-upstream",
+      "ledger": "docs/fork-upstreaming.md#claude-terminal-readiness-from-the-visible-screen"
+    },
+    {
       "path": "src/main/runtime/orchestration/db/federation/federation-relay-import.ts",
       "reason": "Persist federated rejection verdicts across replay, settle legacy terminal rejections, and record exact dispatch-bound report observations for notification-loss recovery.",
       "status": "pending-upstream",

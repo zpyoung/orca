@@ -7,6 +7,33 @@ manifest `exceptions[]` row (`status: "pending-upstream"`, `ledger` pointing at 
 anchor) are created and removed together — see `config/scripts/fork-ownership-manifest.mjs` for
 the invariant this enforces.
 
+## Claude terminal readiness from the visible screen
+
+**What:** a Claude Code ready-prompt rule in `src/main/runtime/terminal-wait-detection.ts` (the last
+`❯` prompt carries the empty-input `Try "…"` placeholder), and a `tui-idle` visible-screen probe in
+`src/main/runtime/orca-runtime-start-tui-idle-visible-read-probe.ts` that re-arms every second while
+the waiter is pending and the pane's newline tail is still empty.
+
+**Why upstream, not isolated:** since the tui-idle evidence ranking (#20155), a quiet foreground
+process no longer proves idle for a known agent, so a Claude pane can settle only on an explicit
+`✳` title or ready-prompt body. Claude Code 2.1.28x paints no OSC title at all and draws with
+cursor moves, so the runtime's newline tail stays empty and the body check never sees it; the
+visible-screen probe that covers such panes looked once, before Claude's first frame. Every Claude
+terminal worker start therefore times out at `agent_readiness` (ledger bug-195). Both halves sit
+in upstream's shared readiness path; a fork copy would have to be replayed every release.
+
+**Evidence:** `src/main/runtime/__fixtures__/claude-code-{ready-cold-start,busy-mid-turn,idle-after-turn}.txt`,
+recorded with `config/scripts/capture-agent-pty-transcript.mjs` against Claude Code 2.1.282.
+
+**Paths:**
+
+- `src/main/runtime/terminal-wait-detection.ts`
+- `src/main/runtime/orca-runtime-start-tui-idle-visible-read-probe.ts`
+- `src/main/runtime/claude-readiness-transcripts.test.ts`
+- `src/main/runtime/__fixtures__/claude-code-*.txt` and `.meta.json`
+
+**Status:** pending-upstream. Not yet submitted.
+
 ## Structured preamble waits for admitted settlement
 
 **What:** `sendStructuredWorkerPreamble` in

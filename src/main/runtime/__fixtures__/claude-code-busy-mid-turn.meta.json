@@ -1,0 +1,9 @@
+{
+  "capturedAt": "2026-09-25T15:22:58.819Z",
+  "platform": "darwin",
+  "command": ["claude", "--dangerously-skip-permissions"],
+  "cols": 120,
+  "rows": 40,
+  "note": "Claude Code 2.1.282, OAuth subscription, --dangerously-skip-permissions, user statusline and hooks; stopped mid-turn during a sleep tool call",
+  "exitCode": 129
+}
