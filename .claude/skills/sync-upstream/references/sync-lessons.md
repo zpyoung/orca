@@ -232,3 +232,59 @@ drift. The two disagree because they are reading different trees.
 the tag against the **working tree**, which is what `--verify-residuals` measures. Either re-measure
 that way, or commit first and keep the explicit `HEAD`. Do not re-baseline from a `HEAD`-form
 measurement taken over uncommitted work.
+
+## Upstream can delete a stable tag the fork has already absorbed
+
+**What happened.** The 2026-09-17 run merged `v1.4.206` (`c464b10149`, "release: v1.4.206",
+2026-09-18) and the fork shipped `v1.4.207-rc.0.zy01` on it. By 2026-09-19 upstream had **deleted**
+`refs/tags/v1.4.206` — no `v1.4.206`, no `v1.4.206-rc.*`, nothing — leaving `v1.4.205` (a day
+*older* than what `main` carries) as the newest strict `vX.Y.Z` tag on the remote. Upstream had
+re-cut `release/v1.4.206-adhoc` at `b10226a7ed`, a commit that does **not** descend from the
+retracted release commit.
+
+Every guard in Step 1 and Step 2 passes this through as an ordinary sync. `ls-remote` exits 0,
+`$STABLE_TAG` matches `^v[0-9]+\.[0-9]+\.[0-9]+$`, the fetch-by-refspec succeeds, and
+`merge-base --is-ancestor "$UPSTREAM_TARGET" origin/main` fails — which reads as "new release to
+take", because stable tags never live on `main` and that check fails for an older tag exactly as it
+does for a newer one. The run would then merge and, at Step 6, `git checkout v1.4.205 --` every
+upstream-owned path: a whole-release rollback, silently breaking the fork commits written against
+the newer release (here `58a42923cb`, "adapt three fork surfaces to v1.4.206 API shapes").
+
+**The tell.** `$STABLE_TAG` sorts *below* `upstream_synced` in `CHANGELOG.md`'s
+frontmatter. Step 2 now checks this first. Confirm the retraction rather than assuming a truncated
+listing — an exact query is unambiguous where a glob plus `tail -1` is not:
+
+```sh
+git ls-remote upstream "refs/tags/${SYNCED}"     # prints nothing: the tag is gone
+git tag -l "$SYNCED"                             # prints it: the fork still has it locally
+```
+
+A local tag with no remote counterpart is the signature. `ls-remote` printing nothing for an exact
+ref is not the truncation failure Step 1 warns about; that one shows up as a non-zero exit or a
+short ref count.
+
+**The right move.** Change nothing. Record "no new stable release (main already carries
+`$SYNCED`; latest remaining upstream stable tag `$STABLE_TAG` is older)", do Steps 12–14 as usual —
+`main` was never touched, so the mirror branch, the backup prune, and the release check all still
+apply — and raise the retraction as "needs attention". Do **not** merge the older tag, do not
+substitute `upstream/main`, and do not delete the local tag to tidy up.
+
+Two consequences a human needs to hear about, neither of which the run can settle:
+
+- **The fork may be shipping a release upstream pulled.** `v1.4.207-rc.0.zy01` is built on a commit
+  upstream has since untagged. Why it was retracted is upstream's information, not the run's.
+- **The local tag is now load-bearing for the release skill.** `release` resolves its anchor with
+  `git describe --tags ... HEAD`, which reads *local* tags. With `v1.4.206` present the anchor is
+  correct; prune it (a fresh clone, or `git fetch --prune-tags`) and the anchor silently falls back
+  to `v1.4.203`, which would compute `1.4.204-rc.0.zyNN` — **below** the already-published
+  `1.4.207-rc.0.zy01`, regressing the series and breaking auto-update ordering. That is the
+  `release` skill's to fix, so report it; do not edit that skill from a sync run.
+
+**Do not mistake this for the Step 2 short-circuit's usual shape.** "Already at `$STABLE_TAG`" means
+`main` contains the tag. Here `main` contains something upstream no longer publishes, and the two
+want the same action for opposite reasons — so say which one happened in the report.
+
+**Do not mistake a re-cut `release/*` branch for a resolution either.** If upstream re-tags
+`v1.4.206` at `b10226a7ed`, the next run sees a tag `main` does not contain and merges it, leaving
+`main` with two distinct "release: v1.4.206" commits. That merge is legitimate — the tag would be a
+real new release — but the duplicate is worth expecting rather than diagnosing from scratch.
