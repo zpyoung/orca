@@ -61,7 +61,7 @@ on every seam and feature path, either auto-resolving disjoint hunks or leaving 
 Open each listed path and check it by hand against the manifest's declared `lines` for that path —
 those lines are the protected floor, not the whole file — before continuing.
 
-Upstream owns every key it defines, so the manifest leaves `src/renderer/src/locales/*.json`
+Upstream owns every key it defines, so the manifest leaves `src/renderer/src/i18n/locales/*.json`
 unclaimed and they reset to the tag through `checkout.txt` like any other upstream file. The fork's
 own keys live in per-feature bundles under the feature directories, which a feature glob claims. Keep
 that split: a fork entry duplicating a key upstream defines shadows upstream's real translation with
@@ -74,8 +74,17 @@ now fails `verify:localization-catalog` with
 day before had only en/es/ja/ko/zh. Sweep after resolution:
 
 ```sh
-comm -23 <(ls src/renderer/src/locales/*.json | xargs -n1 basename | sort) \
+comm -23 <(ls src/renderer/src/i18n/locales/*.json | xargs -n1 basename | sort) \
          <(ls <fork bundle dir> | sort)
+```
+
+Resolve the upstream locale directory rather than pasting the path: it has moved once already, and
+a sweep pointed at a directory that no longer exists finds zero locales and reports every fork
+bundle complete. `ls` at least errors; a glob in Python or a `find` returns an empty set silently,
+which reads exactly like a pass. Confirm the set is non-empty before trusting the comparison.
+
+```sh
+dirname "$(git ls-files 'src/renderer/**/locales/en.json' | grep -v fork- )"
 ```
 
 `pnpm sync:localization-catalog` will **not** fix this — `--fix` only repairs catalog registration
@@ -276,6 +285,31 @@ the **mock** in upstream's own tests, so an upstream test can fail with a parse 
 fork — the fork's direct call skipped a queued mock response and the next consumer read the wrong
 frame. And the fork's own tests mock whatever the fork used to call, so they have to move to the new
 module too.
+
+## When a seam meets an upstream test double
+
+Upstream's own suites drive every seam, and their fixtures are partial doubles built for upstream's
+code — they supply only what upstream's path reads. A seam that dereferences anything the fixture
+does not provide throws inside upstream's test, so one fork line fails suites the fork has no stake
+in, in files it does not own.
+
+v1.4.206 added a pending-close fixture with no `settingsRef`. The terminal-dock seam read
+`deps.settingsRef.current?.experimentalTerminalDock` — optional on `.current`, but not on the ref
+itself — and three pending-close suites threw `Cannot read properties of undefined (reading
+'current')` across three separate shards.
+
+The tell is a `TypeError` whose stack runs from an upstream test, through an upstream fixture, into
+one fork line in an upstream file. That shape is never a merge-resolution question: the seam is
+present and correct, and `--verify-seams` passes. Read the fixture before reading the seam.
+
+Write every seam so it degrades to its feature being off:
+
+- optional-chain the whole access path, not just its last hop
+- treat absent state as the feature disabled, never as a reason to throw
+- open durable state lazily, so merely importing the module in a test does not touch a store
+
+This is not the fixture's bug to fix. Upstream's fixture is upstream-owned and resets to the tag
+every sync, so hardening it there is undone at the next release; the guard belongs in the seam.
 
 ## Verifying
 
