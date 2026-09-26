@@ -1473,12 +1473,12 @@
       ]
     },
     {
-      "path": "src/renderer/src/components/artifacts/ArtifactListRows.tsx",
+      "path": "src/renderer/src/components/artifacts/ArtifactListRow.tsx",
       "feature": "artifact-passwords",
       "kind": "registration",
       "lines": [
         "import { ArtifactNameWithProtection } from './fork-artifact-passwords/artifact-protection-display'",
-        "                <ArtifactNameWithProtection item={item} name={name} />"
+        "          <ArtifactNameWithProtection item={item} name={name} />"
       ]
     },
     {
@@ -5318,7 +5318,7 @@
       "added": 3,
       "removed": 13
     },
-    "src/renderer/src/components/artifacts/ArtifactListRows.tsx": {
+    "src/renderer/src/components/artifacts/ArtifactListRow.tsx": {
       "added": 2,
       "removed": 3
     },

@@ -597,7 +597,9 @@ module.exports = {
     provider: 'github',
     owner: 'zpyoung',
     repo: 'orca',
-    releaseType: 'release'
+    // Why draft: `--publish always` otherwise creates a public GitHub release as soon as the
+    // first platform uploads; release-cut undrafts only after every required asset exists.
+    releaseType: 'draft'
   }
 }
 

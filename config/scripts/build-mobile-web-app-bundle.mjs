@@ -55,6 +55,13 @@ export const MOBILE_WEB_APP_SHIMS = [
     appliesTo: (options) => options.banner?.js?.includes('globalThis.process ??=') === true
   },
   {
+    // Zod probes for a usable JIT with `new Function('')`, which the shell's CSP reports even
+    // though Zod catches the throw and runs interpreted. Turned off before any module, because a
+    // schema constructed at module scope reaches the probe before our own code can run.
+    name: 'zod-jitless-banner',
+    appliesTo: (options) => options.banner?.js?.includes('__zod_globalConfig') === true
+  },
+  {
     // lucide-react-native@1.14.0's barrel re-exports LucideProvider from a context.mjs that does
     // not export it. Metro's loose CJS interop tolerates it; esbuild's strict ESM does not.
     // Web-build only: patching the package would change what the shipped native app consumes.
@@ -111,6 +118,27 @@ const PAGE_ASYNC_STORAGE_MODULE = join(
   'page-async-storage.ts'
 )
 
+/**
+ * Zod's compiled path, off before any module runs.
+ *
+ * Zod decides whether it may compile by constructing `new Function('')` and reading the throw as
+ * "no JIT here". Under the shell's `script-src 'self'` that throw is exactly what happens, Zod
+ * catches it and takes the interpreted path — but the browser files a `securitypolicyviolation`
+ * report first, and it does so on every page load. Zod's own source gates the probe on `jitless`
+ * for this case, so nothing here is a workaround.
+ *
+ * In the banner rather than a module that calls `z.config`, because a module cannot win the race.
+ * `$ZodObject` reads `allowsEval` when a schema is *constructed*, not parsed, so the first
+ * module-scope `z.object(...)` in the bundle fires the probe — and esbuild evaluates the chunk
+ * holding zod and its callers before the chunk holding any module of ours that imports zod. An
+ * entry import placed first was measured losing that race; the banner runs before every module.
+ *
+ * `globalConfig` is `globalThis.__zod_globalConfig`, which zod adopts with `??=` rather than
+ * replacing, so setting the flag on it here is what zod itself reads.
+ */
+const ZOD_JITLESS_BANNER =
+  'globalThis.__zod_globalConfig ??= {}; globalThis.__zod_globalConfig.jitless = true;'
+
 const ROUTE_MANIFEST_PLUGIN_NAME = 'orca-route-manifest'
 const LUCIDE_PLUGIN_NAME = 'orca-lucide-barrel-provider'
 
@@ -132,7 +160,11 @@ function routeManifestPlugin(manifestSource) {
   }
 }
 
-const lucideBarrelPlugin = {
+/**
+ * Exported so a component-level render check builds the icons the same way the page does, rather
+ * than carrying a second copy of this shim that could drift from it.
+ */
+export const lucideBarrelPlugin = {
   name: LUCIDE_PLUGIN_NAME,
   setup(build) {
     build.onLoad({ filter: /lucide-react-native[\\/].*[\\/]context\.mjs$/ }, async (args) => ({
@@ -210,7 +242,7 @@ export function mobileWebAppBuildOptions(routes) {
     // script would resolve against the route instead.
     publicPath: '/assets',
     banner: {
-      js: "globalThis.process ??= { env: { NODE_ENV: 'production', EXPO_OS: 'web' }, platform: 'web', version: '', nextTick: (fn) => setTimeout(fn, 0) };"
+      js: `globalThis.process ??= { env: { NODE_ENV: 'production', EXPO_OS: 'web' }, platform: 'web', version: '', nextTick: (fn) => setTimeout(fn, 0) };${ZOD_JITLESS_BANNER}`
     },
     define: {
       global: 'globalThis',
@@ -341,26 +373,42 @@ const isScriptOutput = (path) => path.endsWith('.js')
 /**
  * Every source module one page route reaches, as the builder itself resolves them.
  *
- * One definition of "what a page contains", read from `metafile.inputs` — the modules the route
- * pulls in — rather than from `entryStaticClosure`, which walks emitted chunks and answers what a
- * browser must download. Both entry points are needed: `app/h/_layout.tsx` wraps every route under
- * it, and its imports are part of the page as surely as the route module's.
+ * Both entry points are needed: `app/h/_layout.tsx` wraps every route under it, and its imports are
+ * part of the page as surely as the route module's.
+ */
+export async function mobileWebAppRouteClosure(routeModule) {
+  return await mobileWebAppModuleClosure(['app/h/_layout', routeModule])
+}
+
+/**
+ * The same closure for any entry modules, which a route plus the layout is one case of.
  *
- * `splitting: false` and a per-name output are required for a two-entry build; with the defaults
+ * One definition of "what a page contains", read from `metafile.inputs` — the modules the entries
+ * pull in — rather than from `entryStaticClosure`, which walks emitted chunks and answers what a
+ * browser must download.
+ *
+ * A component a route mounts rather than one the router registers — `MobileBrowserPane` is the
+ * first with a pin of its own — has a closure to certify and no route to name it by. Pass it alone
+ * to read what it reaches on its own, or beside `app/h/_layout` to read what it adds to a page.
+ *
+ * `splitting: false` and a per-name output are required for a multi-entry build; with the defaults
  * esbuild fails on two outputs claiming `dist/entry.js`.
  *
  * Note for anyone comparing this with a parity pin: `c1-page-closure.ts`, and the closures C2.6,
  * C5.2 and C3.2 generate, derive theirs by the C1.6 method inside the mobile suite. The two are
  * not the same computation, and a divergence between them is a finding rather than noise.
  */
-export async function mobileWebAppRouteClosure(routeModule) {
+export async function mobileWebAppModuleClosure(entryModules, { absWorkingDir } = {}) {
   const base = mobileWebAppBuildOptions(MOBILE_WEB_PAGE_ROUTES)
   const result = await esbuild.build({
     ...base,
+    // A census that plants a module to show the walk would report it needs a tree of its own; the
+    // real ones never pass this and keep measuring `mobile/`.
+    ...(absWorkingDir ? { absWorkingDir } : {}),
     // Extensionless, so `resolveExtensions` picks the same file the bundle ships: a route with a
     // `.web.tsx` sibling resolves to that one, and naming the `.tsx` path explicitly would measure
     // the native switch no browser ever loads.
-    entryPoints: ['app/h/_layout', routeModule.replace(/\.tsx?$/, '')],
+    entryPoints: entryModules.map((entry) => entry.replace(/\.tsx?$/, '')),
     splitting: false,
     entryNames: '[name]',
     plugins: base.plugins.filter((plugin) => plugin.name !== ROUTE_MANIFEST_PLUGIN_NAME),

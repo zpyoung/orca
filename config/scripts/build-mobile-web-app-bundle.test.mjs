@@ -11,15 +11,13 @@ import {
   entryStaticClosure,
   mobileWebAppBuildOptions,
   renameOutputsByContent,
-  resolveMobileWebPageRoutes,
   routeChunkNames
 } from './build-mobile-web-app-bundle.mjs'
 import {
   MOBILE_WEB_APP_ROUTE_ROOT,
   ROUTE_SOURCE_LOADERS,
   collectMobileWebAppRouteKeys,
-  collectMobileWebAppRoutes,
-  routePathnameFromKey
+  collectMobileWebAppRoutes
 } from './mobile-web-app-route-manifest.mjs'
 import {
   MOBILE_WEB_APP_BUNDLE_MAX_ENTRY_BYTES,
@@ -36,7 +34,6 @@ import {
   assertNoCarriageReturnsInSource
 } from './verify-mobile-web-bundle.mjs'
 import {
-  computeMobileWebBundleBuildId,
   hashedAsset,
   readDesktopVersion,
   readProtocolWindow,
@@ -71,71 +68,6 @@ async function withScratch(run) {
     await rm(scratch, { recursive: true, force: true })
   }
 }
-
-/**
- * Every page route this bundle declares, written out rather than read from the source that
- * produces it: the point is to pin the list, and comparing the manifest to its own input would
- * pass whatever that input became. Shared by the two assertions below, which is also what keeps
- * this file under the 600-line cap.
- */
-const EXPECTED_PAGE_ROUTES = [
-  { pathname: '/h/[hostId]', grants: ['navigate', 'storage'] },
-  { pathname: '/h/[hostId]/agent-history/[worktreeId]', grants: ['navigate', 'storage'] },
-  {
-    pathname: '/h/[hostId]/tasks',
-    grants: ['navigate', 'storage', 'externalLink', 'native.clipboard.write']
-  },
-  { pathname: '/h/[hostId]/files/[worktreeId]', grants: ['navigate', 'storage', 'externalLink'] },
-  {
-    pathname: '/h/[hostId]/files/preview/[worktreeId]',
-    grants: ['navigate', 'storage', 'externalLink']
-  }
-]
-
-describe('the page routes the manifest declares', () => {
-  it('turns a route key into the URL pattern expo-router gives it', () => {
-    expect(routePathnameFromKey('./h/[hostId]/index.tsx')).toBe('/h/[hostId]')
-    expect(routePathnameFromKey('./h/[hostId]/tasks.tsx')).toBe('/h/[hostId]/tasks')
-    expect(routePathnameFromKey('./h/[hostId]/session/[worktreeId].tsx')).toBe(
-      '/h/[hostId]/session/[worktreeId]'
-    )
-  })
-
-  it('answers null for a layout, which is not a screen anyone navigates to', () => {
-    expect(routePathnameFromKey('./h/_layout.tsx')).toBeNull()
-    expect(routePathnameFromKey('./h/[hostId]/_layout.tsx')).toBeNull()
-  })
-
-  it('declares only routes the bundle has a module for', async () => {
-    const keys = await collectMobileWebAppRouteKeys(appDir)
-    expect(resolveMobileWebPageRoutes(keys)).toEqual(EXPECTED_PAGE_ROUTES)
-  })
-
-  it('fails the build on a declaration the bundle cannot render', () => {
-    // The mismatch reaches a phone as a route the shell opens the page for and the page then
-    // paints as Unmatched. This is the only place whoever wrote the declaration can see it.
-    expect(() =>
-      resolveMobileWebPageRoutes(
-        ['./h/[hostId]/index.tsx'],
-        [{ pathname: '/h/[hostId]/gone', grants: [] }]
-      )
-    ).toThrow('has no module in the bundle')
-  })
-
-  itBundling(
-    'reaches the built manifest, where the build id does not move for it',
-    async () => {
-      await withScratch(async (scratch) => {
-        const { manifest } = await buildMobileWebAppBundle({ outDir: join(scratch, 'bundle') })
-        expect(manifest.routes).toEqual(EXPECTED_PAGE_ROUTES)
-        // The routes are derived from the same tree the script is built from, so the assets
-        // already decide them and the id has no reason to carry them as well.
-        expect(manifest.buildId).toBe(computeMobileWebBundleBuildId(manifest.assets))
-      })
-    },
-    240_000
-  )
-})
 
 describe('the CRLF pin', () => {
   it('exempts the same extensions in .gitattributes as the CRLF scan skips', async () => {
@@ -374,8 +306,8 @@ describeBundling('the app bundle', () => {
 
   it('fails the named shim, not the whole build, when its option goes missing', async () => {
     const options = mobileWebAppBuildOptions(await collectMobileWebAppRoutes(appDir))
-    // Each shim reads a different option, so removing one leaves the other five true. Without
-    // that, the list could name a shim the build stopped applying.
+    // Each shim reads an option of its own (two read `banner.js`), so stripping every option
+    // leaves none applying. Without that, the list could name a shim the build stopped applying.
     const stripped = {
       ...options,
       alias: {},
@@ -530,15 +462,17 @@ describe('the Phase C budget', () => {
   })
 
   it('derives the chunk ceiling from the route count, not from a measured number', async () => {
-    // A chunk is emitted per distinct set of importers, so the count is combinatorial rather than
-    // one per route. Measured while building this: 8 routes emit 23 chunks, 10 emit 40, 12 emit
-    // 47, 14 emit 53 -- about 3 more per route at the top. The ceiling allows 4 and starts 16
-    // above zero, so the next few routes land under it instead of failing on a pinned number.
+    // A chunk is emitted per distinct set of importers, so the count is not a function of the
+    // route count alone. Re-measured on this head, by copying the route tree and dropping routes
+    // from the end of the sorted key list -- both siblings of each, because deleting a .web.tsx
+    // alone leaves the native file for the builder to resolve and measures a different closure.
+    // The 14-route reading is the real tree and includes the one script the deferred mermaid
+    // artifact costs.
     for (const [routes, measured] of [
-      [8, 23],
-      [10, 40],
-      [12, 47],
-      [14, 53]
+      [8, 32],
+      [10, 43],
+      [12, 61],
+      [14, 69]
     ]) {
       expect(mobileWebAppBundleMaxChunks(routes), `${String(routes)} routes`).toBeGreaterThan(
         measured
@@ -546,6 +480,29 @@ describe('the Phase C budget', () => {
     }
     expect(mobileWebAppBundleMaxChunks(14)).toBe(72)
     expect(mobileWebAppBundleMaxChunks(15) - mobileWebAppBundleMaxChunks(14)).toBe(4)
+    // Between four and nine more per route above, so the ceiling is a bound and not a fit -- and
+    // at 14 routes it is a close one. 69 measured against 72, with the last two routes having cost
+    // the 8 the ceiling grants for two: the next route that shares less than its neighbours fails
+    // here, which is what this is for.
+    expect(mobileWebAppBundleMaxChunks(14) - mobileWebAppBundleMaxChunks(12)).toBe(8)
+  })
+
+  it('refuses an engine chunked along its own lazy boundaries, and passes one artifact', () => {
+    // The two builds this ceiling has to tell apart, both measured at 14 routes.
+    //
+    // The page reaches mermaid through one pre-bundled artifact and the bundle emits 69 scripts
+    // (68 of them the page's own split, one the deferred engine). Importing the package instead
+    // emitted 172: mermaid lazily imports each of its own diagram types and esbuild splits along
+    // those boundaries, all of it inside the generation the phone has already downloaded. The
+    // route term is the only term precisely so that the second of those fails here -- a ceiling
+    // raised to admit 172 would have admitted any split at all.
+    const ROUTES = 14
+    const WITH_ONE_ARTIFACT = 69
+    const CHUNKED_ALONG_THE_ENGINE = 172
+    expect(WITH_ONE_ARTIFACT).toBeLessThanOrEqual(mobileWebAppBundleMaxChunks(ROUTES))
+    expect(CHUNKED_ALONG_THE_ENGINE).toBeGreaterThan(mobileWebAppBundleMaxChunks(ROUTES))
+    // And the assets that came with it: 215 against 112, of the 256 the shell will load.
+    expect(mobileWebAppBundleMaxAssets(ROUTES, 42)).toBeLessThan(CHUNKED_ALONG_THE_ENGINE + 42 + 1)
   })
 
   it('derives the asset ceiling so the chunk ceiling is always the one that trips first', () => {
@@ -586,7 +543,8 @@ describe('the Phase C budget', () => {
   it('fails the build when the derived ceiling passes what the phone will accept', async () => {
     // The shell hands back null for a manifest over its own ceiling, so a derived ceiling above
     // that ships a green build no device can open. At the 42 images the tree carries, 4r + 16 +
-    // 42 + 1 crosses 256 at 50 routes, which Phase C reaches.
+    // 42 + 1 crosses 256 at 50 routes, which Phase C reaches. A deferred engine kept to one
+    // artifact leaves that where it is; the 103-script version of it moved the crossing to 24.
     expect(await readMobileWebBundleMaxAssets()).toBe(MOBILE_WEB_BUNDLE_MAX_ASSETS)
     expect(assertAssetCeilingFitsShell(49, 42, MOBILE_WEB_BUNDLE_MAX_ASSETS)).toBe(255)
     expect(() => assertAssetCeilingFitsShell(50, 42, MOBILE_WEB_BUNDLE_MAX_ASSETS)).toThrow(
