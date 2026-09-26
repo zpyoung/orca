@@ -153,6 +153,17 @@ env -u GITHUB_TOKEN gh pr list --repo zpyoung/orca --state open \
   --json number,title,url,headRefName,headRefOid
 ```
 
+**A sync PR for an older tag stops the run here.** If an open PR is titled
+`sync: absorb upstream <tag>` for any tag other than `$STABLE_TAG`, upstream shipped a newer stable
+release while an earlier sync was still unlanded. Neither continuation is safe: stable tags live on
+per-release branches, so the older tag is not an ancestor of the newer one and the adoption checks
+below fail by construction; and merging `$STABLE_TAG` onto a fresh `main` re-derives the older PR's
+resolution and races it. Stop before Step 3 — nothing backed up, merged, or pushed — and report
+"needs attention: sync PR #<n> for <tag> is still open; land or close it before syncing
+`$STABLE_TAG`". Once it lands, the newer tag is an ordinary one-release sync; once it is closed, the
+next run syncs `$STABLE_TAG` fresh. Hit on 2026-09-10 (#48, v1.4.198 vs v1.4.199) and 2026-09-26
+(#92, v1.4.209 vs v1.4.212).
+
 A PR titled `sync: absorb upstream $STABLE_TAG` is this run's work, already done. **Adopt it — do not
 re-merge.** Verify it before you build on it, because its body is its own account and not evidence:
 
