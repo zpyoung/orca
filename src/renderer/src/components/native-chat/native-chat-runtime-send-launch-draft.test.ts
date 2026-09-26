@@ -22,10 +22,16 @@ import {
 import type { NativeChatResolvedTarget } from './native-chat-composer-target'
 import type { RuntimeSettings } from './native-chat-runtime-send'
 import {
+  NATIVE_CHAT_CLEAR_CHUNK_GAP_MS,
+  NATIVE_CHAT_CLEAR_CHUNK_MAX_BYTES,
   NATIVE_CHAT_CLEAR_CONFIRM_MS,
   NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT
 } from './fork-agent-composer/native-chat-runtime-clear'
-import { buildNativeChatPasteBytes, NATIVE_CHAT_SUBMIT } from './native-chat-send'
+import {
+  buildNativeChatImagePasteBytes,
+  buildNativeChatPasteBytes,
+  NATIVE_CHAT_SUBMIT
+} from './native-chat-send'
 import {
   AGENT_TUI_CLEAR_INPUT_MAX,
   buildAgentTuiClearInputForText
@@ -56,6 +62,15 @@ const writes = (): string[] => {
   return entries.sort((a, b) => a.order - b.order).map((entry) => entry.bytes)
 }
 
+// Clear bursts reach the pty in paced chunks, so compare them by concatenation.
+const clearBytesBefore = (bytes: string): string => {
+  const order = writes()
+  return order.slice(0, order.indexOf(bytes)).join('')
+}
+const MAX_CLEAR_PACING_MS =
+  Math.ceil(AGENT_TUI_CLEAR_INPUT_MAX.length / NATIVE_CHAT_CLEAR_CHUNK_MAX_BYTES) *
+  NATIVE_CHAT_CLEAR_CHUNK_GAP_MS
+
 beforeEach(() => {
   vi.useFakeTimers()
   sendRuntimePtyInput.mockClear()
@@ -73,8 +88,9 @@ describe('sendNativeChatMessage with a parked multi-line draft', () => {
   it('leads with a clear sized to every line of the draft, not one Ctrl+U', async () => {
     const clearInput = buildAgentTuiClearInputForText(DRAFT)
     sendNativeChatMessage(TARGET, 'edited text', { clearInput })
-    await vi.advanceTimersByTimeAsync(0)
-    expect(writes()).toEqual([clearInput, buildNativeChatPasteBytes('edited text')])
+    await vi.advanceTimersByTimeAsync(MAX_CLEAR_PACING_MS)
+    expect(clearBytesBefore(buildNativeChatPasteBytes('edited text'))).toBe(clearInput)
+    expect(writes().at(-1)).toBe(buildNativeChatPasteBytes('edited text'))
     expect(clearInput).not.toBe(NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT)
   })
 
@@ -90,11 +106,13 @@ describe('sendNativeChatMessage with a parked multi-line draft', () => {
       confirmCleared: () => true
     })
     // Body must NOT ride out with the clear — the confirm happens in between.
-    expect(writes()).toEqual([clearInput])
+    await vi.advanceTimersByTimeAsync(MAX_CLEAR_PACING_MS)
+    expect(writes().join('')).toBe(clearInput)
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_CLEAR_CONFIRM_MS)
-    expect(writes()).toEqual([clearInput, buildNativeChatPasteBytes('edited')])
+    expect(clearBytesBefore(buildNativeChatPasteBytes('edited'))).toBe(clearInput)
+    expect(writes().at(-1)).toBe(buildNativeChatPasteBytes('edited'))
     await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS)
-    expect(writes()).toEqual([clearInput, buildNativeChatPasteBytes('edited'), NATIVE_CHAT_SUBMIT])
+    expect(writes().slice(-2)).toEqual([buildNativeChatPasteBytes('edited'), NATIVE_CHAT_SUBMIT])
   })
 
   it('preserves the body-to-Enter gap when the renderer stalls past both nominal deadlines', async () => {
@@ -138,12 +156,13 @@ describe('sendNativeChatMessage with a parked multi-line draft', () => {
       clearInput,
       confirmCleared: () => false
     })
-    await vi.advanceTimersByTimeAsync(NATIVE_CHAT_CLEAR_CONFIRM_MS)
-    expect(writes()).toEqual([
-      clearInput,
-      AGENT_TUI_CLEAR_INPUT_MAX,
-      buildNativeChatPasteBytes('edited')
-    ])
+    await vi.advanceTimersByTimeAsync(
+      MAX_CLEAR_PACING_MS + NATIVE_CHAT_CLEAR_CONFIRM_MS + MAX_CLEAR_PACING_MS
+    )
+    expect(clearBytesBefore(buildNativeChatPasteBytes('edited'))).toBe(
+      clearInput + AGENT_TUI_CLEAR_INPUT_MAX
+    )
+    expect(writes().at(-1)).toBe(buildNativeChatPasteBytes('edited'))
   })
 
   it('re-clears before the body, never after it', async () => {
@@ -151,11 +170,13 @@ describe('sendNativeChatMessage with a parked multi-line draft', () => {
       clearInput: buildAgentTuiClearInputForText(DRAFT),
       confirmCleared: () => false
     })
-    await vi.advanceTimersByTimeAsync(NATIVE_CHAT_CLEAR_CONFIRM_MS + NATIVE_CHAT_SUBMIT_DELAY_MS)
-    const order = writes()
-    expect(order.indexOf(AGENT_TUI_CLEAR_INPUT_MAX)).toBeLessThan(
-      order.indexOf(buildNativeChatPasteBytes('edited'))
+    await vi.advanceTimersByTimeAsync(
+      2 * MAX_CLEAR_PACING_MS + NATIVE_CHAT_CLEAR_CONFIRM_MS + NATIVE_CHAT_SUBMIT_DELAY_MS
     )
+    const order = writes()
+    const bodyIndex = order.indexOf(buildNativeChatPasteBytes('edited'))
+    expect(order.slice(0, bodyIndex).join('')).toContain(AGENT_TUI_CLEAR_INPUT_MAX)
+    expect(order.slice(bodyIndex + 1)).toEqual([NATIVE_CHAT_SUBMIT])
   })
 
   it('charges the confirm gap to the handle so the send card outlives the Enter', () => {
@@ -176,10 +197,13 @@ describe('sendNativeChatMessage with a parked multi-line draft', () => {
     })
     sendNativeChatMessage(TARGET, 'second')
 
-    await vi.advanceTimersByTimeAsync(NATIVE_CHAT_CLEAR_CONFIRM_MS + NATIVE_CHAT_SUBMIT_DELAY_MS)
+    await vi.advanceTimersByTimeAsync(
+      2 * MAX_CLEAR_PACING_MS + NATIVE_CHAT_CLEAR_CONFIRM_MS + NATIVE_CHAT_SUBMIT_DELAY_MS
+    )
 
-    expect(writes()).toEqual([
-      clearInput,
+    expect(clearBytesBefore(buildNativeChatPasteBytes('first'))).toBe(clearInput)
+    const order = writes()
+    expect(order.slice(order.indexOf(buildNativeChatPasteBytes('first')))).toEqual([
       buildNativeChatPasteBytes('first'),
       NATIVE_CHAT_SUBMIT,
       NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT,
@@ -189,21 +213,24 @@ describe('sendNativeChatMessage with a parked multi-line draft', () => {
 })
 
 describe('image sends with a parked multi-line draft', () => {
-  it('clears every draft line before pasting, so no line rides along with the image', () => {
+  it('clears every draft line before pasting, so no line rides along with the image', async () => {
     const clearInput = buildAgentTuiClearInputForText(DRAFT)
     sendNativeChatMessageWithImageAttachments(TARGET, 'caption', ['/tmp/a.png'], {
       clearInput
     })
-    expect(writes()[0]).toBe(clearInput)
+    await vi.advanceTimersByTimeAsync(MAX_CLEAR_PACING_MS)
+    expect(clearBytesBefore(buildNativeChatImagePasteBytes('/tmp/a.png'))).toBe(clearInput)
   })
 
-  it('clears exactly once — a second Ctrl+U would wipe the just-pasted image', () => {
+  it('clears exactly once — a second Ctrl+U would wipe the just-pasted image', async () => {
     const clearInput = buildAgentTuiClearInputForText(DRAFT)
     sendNativeChatMessageWithImageAttachments(TARGET, 'caption', ['/tmp/a.png'], {
       clearInput
     })
-    vi.advanceTimersByTime(10_000)
-    expect(writes().filter((write) => write === clearInput)).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(10_000)
+    const ctrlUCount = (bytes: string): number =>
+      bytes.split(NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT).length - 1
+    expect(ctrlUCount(writes().join(''))).toBe(ctrlUCount(clearInput))
   })
 
   it('submits the image send before a queued message starts', async () => {
@@ -215,7 +242,8 @@ describe('image sends with a parked multi-line draft', () => {
     sendNativeChatMessage(TARGET, 'second')
 
     await vi.advanceTimersByTimeAsync(
-      NATIVE_CHAT_CLEAR_CONFIRM_MS +
+      2 * MAX_CLEAR_PACING_MS +
+        NATIVE_CHAT_CLEAR_CONFIRM_MS +
         NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS +
         NATIVE_CHAT_SUBMIT_DELAY_MS
     )

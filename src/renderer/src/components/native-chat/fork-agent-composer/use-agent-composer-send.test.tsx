@@ -38,6 +38,7 @@ import {
   resetNativeChatPtySendQueuesForTests
 } from '../native-chat-runtime-send'
 import { buildNativeChatPasteBytes, NATIVE_CHAT_SUBMIT } from '../native-chat-send'
+import { NATIVE_CHAT_CLEAR_CHUNK_GAP_MS } from './native-chat-runtime-clear'
 
 function useHarness(props: AgentComposerCoreProps) {
   const core = useAgentComposerCoreState(props)
@@ -72,8 +73,11 @@ describe('useAgentComposerSend (tier-independent retention)', () => {
 
     act(() => result.current.core.setDraft('plain send'))
     act(() => result.current.send())
+    // the one-line slack clear spans two paced chunks before the body
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(NATIVE_CHAT_SUBMIT_DELAY_MS)
+      await vi.advanceTimersByTimeAsync(
+        NATIVE_CHAT_SUBMIT_DELAY_MS + NATIVE_CHAT_CLEAR_CHUNK_GAP_MS
+      )
     })
 
     expect(sendRuntimePtyInputAcceptance).toHaveBeenCalledWith(
