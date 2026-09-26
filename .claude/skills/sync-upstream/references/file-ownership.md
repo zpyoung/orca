@@ -297,7 +297,9 @@ absorbed a line the fork was carrying, and the seam should be re-read before the
 Re-baseline by rerunning the recorder and committing the new numbers with the resolution, never as a
 sweep to make the check quiet.
 
-`pnpm typecheck` and `pnpm lint` are absolute: a failure is a failure. Neither is run against a
+Typecheck and `pnpm lint` are absolute: a failure is a failure. Run the typecheck as the four
+per-project commands in `SKILL.md` § Step 8, never as `pnpm typecheck` — `AGENTS.md` forbids the
+parallel form on this machine. Neither is run against a
 baseline for comparison, and there is nothing to compare against — the tree either compiles and
 lints or it does not.
 

@@ -417,12 +417,33 @@ fail in Step 8 with a lockfile error that names nothing about ownership.
 deletions were decided against the *previous* tag's import graph; a new release can add files that
 import a module the fork deletes. Nothing reports it — `remove.txt` honours the deletion, both
 manifest checks pass, and the ownership guard passes — so it surfaces as `TS2307` against upstream's
-own new files. Sweep right after `remove.txt` is applied:
+own new files. Sweep right after `remove.txt` is applied.
+
+Grep the **merged working tree**, not `$UPSTREAM_TARGET`. The tag is upstream's view, where nothing
+the fork deletes has been deleted and nothing it replaces has been replaced, so every consumer the
+fork owns still carries its upstream import there and the sweep reports it. On v1.4.207 a
+tag-reading form printed three findings against a true answer of zero. The merged tree is also the
+tree `tsc` compiles, so a hit here is the `TS2307` you would otherwise meet in Step 8:
 
 ```sh
-git grep -n "from '\./" "$UPSTREAM_TARGET" -- <dir of each deleted path> \
-  | grep -Ff <(sed 's|.*/||;s|\.[^.]*$||' <out-dir>/remove.txt)
+python3 - <<'SWEEP'
+import json, subprocess
+m = json.load(open('config/fork-ownership.json'))
+gone = {e['path'] for e in m['exceptions'] if e.get('deleted')}
+hit = False
+for p in sorted(gone):
+    mod = p.rsplit('/', 1)[-1].rsplit('.', 1)[0]
+    live = subprocess.run(['git', 'grep', '-lE', f"from '[^']*/{mod}'"],
+                          capture_output=True, text=True).stdout.split()
+    if live:
+        hit = True
+        print(f'{p} still imported by {len(live)}: {live[:3]}')
+print('NONE' if not hit else '^^ withdraw the deletion')
+SWEEP
 ```
+
+Match an import specifier, not a bare occurrence of the module name: a `vi.mock('./mod', () => ...)`
+with a factory never resolves the module, so it is not evidence of anything.
 
 Withdraw the deletion rather than extending it: restore the module and its test from the tag and
 drop the exception. Never delete the new upstream files to match, and never repoint an upstream
@@ -515,7 +536,32 @@ specifies, including the manifest checks (`--verify-seams`, `--verify-residuals`
 fakes a result if skipped.
 
 Order: `pnpm install --frozen-lockfile` (re-run it here — the merge may have taken upstream's
-`pnpm-lock.yaml`) → manifest checks → `pnpm typecheck` → `pnpm lint`.
+`pnpm-lock.yaml`) → manifest checks → typecheck → `pnpm lint`.
+
+**Never run `pnpm typecheck` here.** `AGENTS.md` forbids it on this machine: it is
+`run-typecheck-projects-in-parallel.mjs`, which spawns a `tsc --noEmit` per project concurrently,
+and with several sync worktrees open that saturates every core. Run the same four projects one
+after another instead — same coverage, no concurrency — clearing the build cache before each, since
+composite projects cache errors across the `git checkout` swaps this step is full of:
+
+```sh
+find config -maxdepth 1 -name '*.tsbuildinfo' -delete && pnpm run typecheck:node
+find config -maxdepth 1 -name '*.tsbuildinfo' -delete && pnpm run typecheck:web
+find config -maxdepth 1 -name '*.tsbuildinfo' -delete && pnpm run typecheck:cli
+find config -maxdepth 1 -name '*.tsbuildinfo' -delete && \
+  pnpm exec tsc --noEmit -p config/tsconfig.mobile-web.json
+```
+
+Four separate commands on purpose, not a loop: under the sandboxed shell a command in a `for` body
+can come back "command not found", which inverts the result silently, and a loop's `|| break` would
+swallow the exit code this gate turns on. Read each one's status before running the next. `zsh` has
+no `PIPESTATUS`, so do not pipe these into `tail` and expect `$?` to mean anything — redirect to a
+file instead.
+
+`typecheck:e2e` is **not** one of them, and running it will cost you a diagnosis. It is absent from
+`pnpm typecheck` and from the `typecheck` job in `pr.yml`, so `config/tsconfig.e2e.json` has drifted
+unchecked — 216 errors across 110 files on `main` at v1.4.207, none of them a sync's doing. Do not
+add it to the gate, and do not treat its output as merge damage.
 
 Every step is absolute: stop at the first failure and treat it as a hard fail. The reference's
 rule-tightening carve-out is the one exception, and it is an exception about *how the tree is
