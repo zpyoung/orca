@@ -8,19 +8,20 @@ import { CLAUDE_MODEL_LIST_ARGS, CLAUDE_MODEL_LIST_STDIN } from './claude-model-
 
 type PrimaryAgentSpecDeps = {
   CLAUDE_THINKING_LEVELS: ThinkingLevel[]
-  OPENAI_THINKING_LEVELS: ThinkingLevel[]
+  CODEX_THINKING_LEVELS: ThinkingLevel[]
   parseClaudeModels: (stdout: string) => CommitMessageModel[]
   parseCodexModels: (stdout: string) => CommitMessageModel[]
   parseLineModels: (stdout: string) => CommitMessageModel[]
   parsePiModels: (stdout: string) => CommitMessageModel[]
   withOpenAiThinking: (
-    id: string
+    id: string,
+    levels?: ThinkingLevel[]
   ) => Pick<CommitMessageModel, 'thinkingLevels' | 'defaultThinkingLevel'>
 }
 
 export function buildPrimaryCommitMessageAgentSpecs({
   CLAUDE_THINKING_LEVELS,
-  OPENAI_THINKING_LEVELS,
+  CODEX_THINKING_LEVELS,
   parseClaudeModels,
   parseCodexModels,
   parseLineModels,
@@ -112,25 +113,25 @@ export function buildPrimaryCommitMessageAgentSpecs({
         {
           id: 'gpt-5.5',
           label: 'GPT-5.5',
-          thinkingLevels: OPENAI_THINKING_LEVELS,
+          thinkingLevels: CODEX_THINKING_LEVELS,
           defaultThinkingLevel: 'low'
         },
         {
           id: 'gpt-5.4',
           label: 'GPT-5.4',
-          thinkingLevels: OPENAI_THINKING_LEVELS,
+          thinkingLevels: CODEX_THINKING_LEVELS,
           defaultThinkingLevel: 'low'
         },
         {
           id: 'gpt-5.4-mini',
           label: 'GPT-5.4 Mini',
-          thinkingLevels: OPENAI_THINKING_LEVELS,
+          thinkingLevels: CODEX_THINKING_LEVELS,
           defaultThinkingLevel: 'low'
         },
         {
           id: 'gpt-5.3-codex',
           label: 'GPT-5.3 Codex',
-          thinkingLevels: OPENAI_THINKING_LEVELS,
+          thinkingLevels: CODEX_THINKING_LEVELS,
           defaultThinkingLevel: 'low'
         },
         {
@@ -140,13 +141,13 @@ export function buildPrimaryCommitMessageAgentSpecs({
           // tier, not the effort flag.
           id: 'gpt-5.3-codex-spark',
           label: 'GPT-5.3 Codex Spark',
-          thinkingLevels: OPENAI_THINKING_LEVELS,
+          thinkingLevels: CODEX_THINKING_LEVELS,
           defaultThinkingLevel: 'low'
         },
         {
           id: 'gpt-5.2',
           label: 'GPT-5.2',
-          thinkingLevels: OPENAI_THINKING_LEVELS,
+          thinkingLevels: CODEX_THINKING_LEVELS,
           defaultThinkingLevel: 'low'
         }
       ],
@@ -207,7 +208,11 @@ export function buildPrimaryCommitMessageAgentSpecs({
       modelDiscovery: { binary: 'opencode2', args: ['models'], parse: parseLineModels },
       models: [
         { id: 'opencode/deepseek-v4-flash-free', label: 'OpenCode DeepSeek V4 Flash Free' },
-        { id: 'opencode/gpt-5.4-mini', label: 'OpenCode GPT 5.4 Mini', ...withOpenAiThinking('gpt-5.4-mini') }
+        {
+          id: 'opencode/gpt-5.4-mini',
+          label: 'OpenCode GPT 5.4 Mini',
+          ...withOpenAiThinking('gpt-5.4-mini')
+        }
       ],
       defaultModelId: 'opencode/deepseek-v4-flash-free'
     },

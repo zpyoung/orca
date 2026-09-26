@@ -131,6 +131,19 @@ export const WorkspaceRunContext = z
   .optional()
   .nullable()
 
+const LaunchOverrideValue = z.union([z.string().min(1).max(128), z.boolean()])
+const LaunchOverrideOptionValues = z
+  .record(z.string().min(1).max(64), LaunchOverrideValue)
+  .refine((values) => Object.keys(values).length <= 16, 'Too many launch option values')
+export const LaunchOverrides = z
+  .object({
+    model: z.string().min(1).max(128).optional(),
+    optionValues: LaunchOverrideOptionValues.optional(),
+    agentArgs: z.string().max(4096).optional()
+  })
+  .optional()
+  .nullable()
+
 export const SshTargetGeneration = requiredNumber('Missing SSH target generation').refine(
   (value) => Number.isSafeInteger(value) && value >= 1,
   { message: 'Invalid SSH target generation' }
@@ -189,6 +202,7 @@ export const AutomationCreate = z.object({
   prompt: requiredString('Missing automation prompt'),
   precheck: AutomationPrecheck,
   agentId: TuiAgent,
+  launchOverrides: LaunchOverrides,
   runContext: WorkspaceRunContext,
   sourceContext: TaskSourceContext,
   repo: OptionalString,
@@ -210,6 +224,7 @@ export const AutomationUpdateFields = z.object({
   prompt: OptionalString,
   precheck: AutomationPrecheck,
   agentId: TuiAgent.optional(),
+  launchOverrides: LaunchOverrides,
   runContext: WorkspaceRunContext,
   sourceContext: TaskSourceContext,
   repo: OptionalString,

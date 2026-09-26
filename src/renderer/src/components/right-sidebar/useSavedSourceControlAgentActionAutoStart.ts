@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { AgentLaunchOptionSelection } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
+import { useStableAgentLaunchOptionSelection } from './fork-automation-launch-settings/useSourceControlAgentActionDraftEdits'
 import type {
   SourceControlActionRecipe,
   SourceControlLaunchActionId
@@ -22,6 +24,7 @@ type UseSavedSourceControlAgentActionAutoStartArgs = {
   savedAgentId?: TuiAgent | null
   savedCommandInputTemplate?: string | null
   savedAgentArgs?: string | null
+  savedLaunchOptions?: AgentLaunchOptionSelection | null
   settings: Pick<GlobalSettings, 'sourceControlAi' | 'commitMessageAi'> | null | undefined
   repo: Pick<Repo, 'sourceControlAi'> | null
   repoId?: string | null
@@ -55,6 +58,7 @@ function buildSavedLaunchRecipe(input: {
   savedAgentId?: TuiAgent | null
   savedCommandInputTemplate?: string | null
   savedAgentArgs?: string | null
+  savedLaunchOptions?: AgentLaunchOptionSelection | null
 }): SourceControlActionRecipe | null {
   if (!input.savedAgentId) {
     return null
@@ -62,7 +66,8 @@ function buildSavedLaunchRecipe(input: {
   return {
     agentId: input.savedAgentId,
     commandInputTemplate: input.savedCommandInputTemplate ?? '{basePrompt}',
-    agentArgs: input.savedAgentArgs ?? ''
+    agentArgs: input.savedAgentArgs ?? '',
+    ...(input.savedLaunchOptions ? { launchOptions: input.savedLaunchOptions } : {})
   }
 }
 
@@ -109,6 +114,7 @@ function buildReceiptKey(input: {
   savedAgentId: TuiAgent
   savedCommandInputTemplate?: string | null
   savedAgentArgs?: string | null
+  savedLaunchOptions?: AgentLaunchOptionSelection | null
   repoId?: string | null
   connectionId?: string | null
   worktreeId?: string | null
@@ -120,6 +126,7 @@ function buildReceiptKey(input: {
     input.savedAgentId,
     input.savedCommandInputTemplate ?? '{basePrompt}',
     input.savedAgentArgs ?? '',
+    input.savedLaunchOptions ?? null,
     input.repoId ?? null,
     input.connectionId ?? null,
     input.worktreeId ?? null,
@@ -136,6 +143,7 @@ export function useSavedSourceControlAgentActionAutoStart({
   savedAgentId,
   savedCommandInputTemplate,
   savedAgentArgs,
+  savedLaunchOptions,
   settings,
   repo,
   repoId,
@@ -152,15 +160,17 @@ export function useSavedSourceControlAgentActionAutoStart({
 }: UseSavedSourceControlAgentActionAutoStartArgs): SavedSourceControlAgentActionAutoStartResult {
   const autoStartedOpenCycleRef = useRef(0)
   const [receiptState, setReceiptState] = useState<AutoLaunchReceiptState | null>(null)
+  const stableSavedLaunchOptions = useStableAgentLaunchOptionSelection(savedLaunchOptions)
 
   const savedLaunchRecipe = useMemo(
     () =>
       buildSavedLaunchRecipe({
         savedAgentId,
         savedCommandInputTemplate,
-        savedAgentArgs
+        savedAgentArgs,
+        savedLaunchOptions: stableSavedLaunchOptions
       }),
-    [savedAgentArgs, savedAgentId, savedCommandInputTemplate]
+    [savedAgentArgs, savedAgentId, savedCommandInputTemplate, stableSavedLaunchOptions]
   )
   const matchedSavedReceiptTargetValue = useMemo(
     () =>
@@ -183,6 +193,7 @@ export function useSavedSourceControlAgentActionAutoStart({
       savedAgentId,
       savedCommandInputTemplate,
       savedAgentArgs,
+      savedLaunchOptions: stableSavedLaunchOptions,
       repoId,
       connectionId,
       worktreeId,
@@ -197,6 +208,7 @@ export function useSavedSourceControlAgentActionAutoStart({
     savedAgentArgs,
     savedAgentId,
     savedCommandInputTemplate,
+    stableSavedLaunchOptions,
     worktreeId
   ])
 

@@ -1,4 +1,8 @@
 import type { AgentLaunchPreferences } from '../../shared/agent-session-host-authority'
+import {
+  agentLaunchOverridesToSessionOptionValues,
+  type AgentLaunchOverrides
+} from '../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { Repo } from '../../shared/repo-types'
 import type { TuiAgent } from '../../shared/tui-agent'
 import type { WorktreeStartupLaunch } from '../../shared/worktree/launch-types'
@@ -130,26 +134,31 @@ export function buildWorktreeStartupForAgent(
     agent: TuiAgent
     prompt?: string
     launchPreferences?: AgentLaunchPreferences
+    launchOverrides?: AgentLaunchOverrides
     toSessionOptions: (
       preferences?: AgentLaunchPreferences
     ) => Parameters<typeof buildAgentStartupPlan>[0]['sessionOptions'] | undefined
   }
 ): { agent: TuiAgent; startup: WorktreeStartupLaunch; followup?: WorktreeStartupFollowup } {
-  const { agent, repo, settings } = environment
+  const { agent, repo, settings, launchOverrides } = environment
   if (!isTuiAgentEnabled(agent, settings.disabledTuiAgents)) {
     throw new Error('Selected agent is disabled. Choose an enabled agent before creating.')
   }
   const platform = environment.getLaunchPlatform()
   const isRemote = repoIsRemote(repo)
-  const sessionOptions = environment.toSessionOptions(environment.launchPreferences)
+  const sessionOptions = launchOverrides
+    ? agentLaunchOverridesToSessionOptionValues(launchOverrides)
+    : environment.toSessionOptions(environment.launchPreferences)
+  const inheritedAgentArgs = resolveTuiAgentLaunchArgs(agent, settings.agentDefaultArgs)
   const startupPlan = buildAgentStartupPlan({
     agent,
     prompt: environment.prompt ?? '',
     cmdOverrides: settings.agentCmdOverrides ?? {},
-    agentArgs: resolveTuiAgentLaunchArgs(agent, settings.agentDefaultArgs),
+    agentArgs: launchOverrides?.agentArgs?.trim() ? launchOverrides.agentArgs : inheritedAgentArgs,
     agentEnv: resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
     sessionOptions,
     sessionOptionsOverrideAgentArgs: Boolean(sessionOptions),
+    includeSessionOptionCatalogDefaults: launchOverrides ? false : undefined,
     platform,
     shell: resolveLocalWindowsAgentStartupShell({
       platform,

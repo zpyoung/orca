@@ -157,6 +157,11 @@
       "name": "input-quarantine",
       "purpose": "Prevents stale terminal and native-chat input from reaching a replacement PTY after reattachment.",
       "globs": ["**/fork-input-quarantine/**"]
+    },
+    {
+      "name": "automation-launch-settings",
+      "purpose": "Carries structured model, effort, and agent-argument overrides from automations and source-control recipes into agent launches.",
+      "globs": ["**/fork-automation-launch-settings/**"]
     }
   ],
   "seams": [
@@ -173,9 +178,7 @@
       "path": "src/renderer/src/components/native-chat/native-chat-composer-workspace-file-drop.test.tsx",
       "feature": "input-quarantine",
       "kind": "registration",
-      "lines": [
-        "            terminalTabId: 'terminal-tab-1',"
-      ]
+      "lines": ["            terminalTabId: 'terminal-tab-1',"]
     },
     {
       "path": "src/renderer/src/components/sidebar/use-worktree-activity-status.ts",
@@ -3760,6 +3763,804 @@
         "      'https://github.com/zpyoung/orca/releases/tag/v1.4.160-rc.3'",
         "    expect(getReleaseNotesUrlForVersion(null)).toBe('https://github.com/zpyoung/orca/releases')"
       ]
+    },
+    {
+      "path": "src/cli/handlers/automations.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["} from './fork-automation-launch-settings/automation-launch-overrides'"]
+    },
+    {
+      "path": "src/cli/specs/automations.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["const AUTOMATION_LAUNCH_FLAGS = ['model', 'effort', 'agent-args']"]
+    },
+    {
+      "path": "src/main/automations/headless-dispatch.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import type { AutomationRunLaunchSettings } from '../../shared/fork-automation-launch-settings/automation-run-launch-settings'"
+      ]
+    },
+    {
+      "path": "src/main/automations/headless-workspace-create.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["    startupLaunchOverrides: automation.launchOverrides ?? undefined,"]
+    },
+    {
+      "path": "src/main/persistence/scheduling-automations/automation-definition-operations.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import { normalizeAgentLaunchOverrides } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/main/persistence/scheduling-automations/automation-run-operations.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import { normalizeAutomationRunLaunchSettings } from './fork-automation-launch-settings/automation-run-launch-settings-normalization'"
+      ]
+    },
+    {
+      "path": "src/main/text-generation/commit-message-text-generation.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import { materializeSourceControlTextGenerationParams } from '../../shared/fork-automation-launch-settings/source-control-text-launch-args'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/automations/AutomationEditorDialog.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import type { AgentLaunchOverrides } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/automations/AutomationEditorSettingsSidebar.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import { AutomationAgentLaunchFields } from './fork-automation-launch-settings/AutomationAgentLaunchFields'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/automations/AutomationRunHistory.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["} from './fork-automation-launch-settings/automation-run-launch-display'"]
+    },
+    {
+      "path": "src/renderer/src/components/automations/AutomationSchedulePicker.test.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["  launchOverrides: {},"]
+    },
+    {
+      "path": "src/renderer/src/components/editor/CheckRunDetailsPanel.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["                savedLaunchOptions={savedLaunchOptions}"]
+    },
+    {
+      "path": "src/renderer/src/components/editor/check-run-details-fix-with-ai.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["  savedLaunchOptions: SourceControlActionRecipe['launchOptions'] | null"]
+    },
+    {
+      "path": "src/renderer/src/components/feature-wall/AiCommitPrSettingsCard.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["            recipeOverrides={recipeOverrides}"]
+    },
+    {
+      "path": "src/renderer/src/components/feature-wall/AiCommitPrSettingsFields.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import type { TextGenerationRecipeOverrides } from './fork-automation-launch-settings/text-generation-recipe-overrides'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/feature-wall/useAiCommitPrSettings.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import { describeTextGenerationRecipeOverrides } from './fork-automation-launch-settings/text-generation-recipe-overrides'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/native-chat-session-option-discovery.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["export function resolveAutomationModelDiscoveryHostKey("]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-native-chat-session-options.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import { retireAutomationLaunchModelsMissingFromDiscovery } from './fork-automation-launch-settings/retire-automation-launch-models'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/pull-request-page/checks/fix-dialog.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["      savedLaunchOptions={fixChecksRecipe.launchOptions ?? null}"]
+    },
+    {
+      "path": "src/renderer/src/components/pull-request-page/checks/fix-launch.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["  launchOptions: Parameters<typeof launchWorkItemDirect>[0]['launchOptions']"]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/SourceControlAgentActionDialog.test.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["      launchOptions: {}"]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/SourceControlAgentActionDialog.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import type { AgentLaunchOptionSelection } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/SourceControlAgentActionDialogForm.test.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["      launchOptions: {},"]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/SourceControlAgentActionDialogForm.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import { SourceControlAgentLaunchOverridesFields } from './fork-automation-launch-settings/SourceControlAgentLaunchOverridesFields'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/SourceControlTextGenerationDialog.test.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["      recipeAgentArgs: '--model gpt-5.5',"]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/buildSourceControlAgentDeliveryPlan.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "} from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/runSourceControlAgentActionStart.test.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["          launchOptions: { model: 'gpt-5.3', optionValues: { effort: 'high' } },"]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/runSourceControlAgentActionStart.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "} from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/source-control-action-recipe-match.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "} from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/source-control-agent-action-dialog-result.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "} from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/source-control-fix-split-button.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["  savedLaunchOptions?: SourceControlActionRecipe['launchOptions'] | null"]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/source-control/ai/recovery-launch.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import { agentLaunchOverridesToSessionOptionValues } from '../../../../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/source-control/ai/text-generation-defaults.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["  launchOptions?: SourceControlActionRecipe['launchOptions'] | null"]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/source-control/ai/text-generation-dialog-form.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import { AgentLaunchOverridesFields } from '@/components/fork-automation-launch-settings/AgentLaunchOverridesFields'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/source-control/ai/text-generation-dialog.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["        baseParams?.launchOptions ?? null,"]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/source-control/ai/text-generation-params.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import type { AgentLaunchOptionSelection } from '../../../../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/source-control/commit/recovery-notice.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["    savedLaunchOptions: recipe?.launchOptions ?? null,"]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/source-control/commit/use-commit-message-generation.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import { materializeSourceControlTextGenerationParams } from '../../../../../../shared/fork-automation-launch-settings/source-control-text-launch-args'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/source-control/panel/dialog-layer.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["        savedLaunchOptions={savedResolveConflictsLaunchOptions}"]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/source-control/panel/panel-dialogs.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["        getLaunchActionRecipe('resolveConflicts').launchOptions ?? null"]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/source-control/review/use-create-pr-intent-commit-message.ts",
+      "feature": "automation-launch-settings",
+      "kind": "import-swap",
+      "lines": [
+        "import { materializeSourceControlTextGenerationParams } from '../../../../../../shared/fork-automation-launch-settings/source-control-text-launch-args'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/use-create-pull-request-field-generation.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import { materializeSourceControlTextGenerationParams } from '../../../../shared/fork-automation-launch-settings/source-control-text-launch-args'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/useSavedSourceControlAgentActionAutoStart.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import type { AgentLaunchOptionSelection } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/useSourceControlAgentActionDialog.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import type { AgentLaunchOverrides } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/useSourceControlAgentActionStart.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import type { AgentLaunchOptionSelection } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/CommitMessageAiPane.test.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["          actions: { fixChecks: { agentArgs: '--verbose' } },"]
+    },
+    {
+      "path": "src/renderer/src/components/settings/RepositorySourceControlAiActionRows.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "} from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/RepositorySourceControlAiSection.test.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "    expect(markup).toContain('repo-repo-1-source-control-action-fixCommitFailure-model')"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/RepositorySourceControlAiSection.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["        onActionLaunchOptionsChange={updateActionLaunchOptions}"]
+    },
+    {
+      "path": "src/renderer/src/components/settings/SourceControlActionRecipeRow.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "} from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/SourceControlAiActionRecipeDefaults.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["              onLaunchOptionsChange={onActionLaunchOptionsChange}"]
+    },
+    {
+      "path": "src/renderer/src/components/settings/repository-source-control-ai-draft.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import type { AgentLaunchOptionSelection } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/repository-source-control-ai-global-ux.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import type { AgentLaunchOptionSelection } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/repository-source-control-ai-labels.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import type { AgentLaunchOptionSelection } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/source-control-action-recipe-draft-state.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import type { AgentLaunchOptionSelection } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/source-control-ai-action-recipe-draft.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "} from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/agent-background-session-contract.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import type { AgentLaunchOverrides } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/fix-checks-agent-launch.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import { agentLaunchOverridesToSessionOptionValues } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/launch-agent-background-session.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import { resolveAgentBackgroundLaunchSettings } from '@/lib/fork-automation-launch-settings/agent-background-launch-settings'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/launch-agent-in-new-tab-web-runtime.test.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["      includeSessionOptionCatalogDefaults: false"]
+    },
+    {
+      "path": "src/renderer/src/lib/launch-agent-in-new-tab.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["  includeSessionOptionCatalogDefaults?: boolean"]
+    },
+    {
+      "path": "src/renderer/src/lib/launch-agent-web-host-tab.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "  const launchPreferences = toAgentLaunchPreferences(startupPlan.sessionOptions, {"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/launch-work-item-direct-agent.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["} from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'"]
+    },
+    {
+      "path": "src/renderer/src/lib/launch-work-item-direct-types.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import type { AgentLaunchOptionSelection } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/launch-work-item-direct.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["    launchOptions"]
+    },
+    {
+      "path": "src/renderer/src/lib/runtime-agent-background-create.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["  const launchPreferences = toAgentLaunchPreferences(args.sessionOptions, {"]
+    },
+    {
+      "path": "src/renderer/src/lib/source-control-agent-action-plan.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["  includeSessionOptionCatalogDefaults?: boolean"]
+    },
+    {
+      "path": "src/renderer/src/runtime/agent-session-create-operation.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["  sessionOptions: Record<string, SessionOptionValue> | null | undefined,"]
+    },
+    {
+      "path": "src/shared/agent-session-host-authority.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["  optionValues?: Record<string, SessionOptionValue>"]
+    },
+    {
+      "path": "src/shared/automations-types.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import type { AgentLaunchOverrides } from './fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/shared/commit-message-agent-spec.test.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["      'minimal',"]
+    },
+    {
+      "path": "src/shared/commit-message-agent-spec.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["      agentId === 'codex' ? CODEX_THINKING_LEVELS : OPENAI_THINKING_LEVELS"]
+    },
+    {
+      "path": "src/shared/commit-message-plan.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import { applyCommitMessageRecipeEffortOverrides } from './fork-automation-launch-settings/commit-message-recipe-effort-overrides'"
+      ]
+    },
+    {
+      "path": "src/shared/protocol-version.ts",
+      "feature": "automation-launch-settings",
+      "kind": "registration",
+      "lines": [
+        "export const AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY = 'agent-launch-overrides.v1' as const"
+      ]
+    },
+    {
+      "path": "src/shared/source-control-ai-actions.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["} from './fork-automation-launch-settings/agent-launch-overrides'"]
+    },
+    {
+      "path": "src/shared/source-control-ai-recipe-save.test.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["        launchOptions: { model: 'sonnet', optionValues: { effort: 'high' } }"]
+    },
+    {
+      "path": "src/shared/source-control-ai-recipe-save.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["  launchOptions?: SourceControlActionRecipe['launchOptions'] | null"]
+    },
+    {
+      "path": "src/shared/source-control-ai-types.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import type { AgentLaunchOptionSelection } from './fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/shared/source-control-ai.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["  launchOptions?: SourceControlActionRecipe['launchOptions']"]
+    },
+    {
+      "path": "src/shared/tui-agent-launch-command.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["  includeSessionOptionCatalogDefaults?: boolean"]
+    },
+    {
+      "path": "src/shared/tui-agent-startup.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["  includeSessionOptionCatalogDefaults?: boolean"]
+    },
+    {
+      "path": "src/cli/automation-format.ts",
+      "feature": "automation-launch-settings",
+      "kind": "registration",
+      "lines": [
+        "import { formatAutomationLaunchOverrides } from './fork-automation-launch-settings/automation-launch-format'"
+      ]
+    },
+    {
+      "path": "src/main/automations/headless-dispatch-runner.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["      launchSettings: launch.launchSettings ?? null"]
+    },
+    {
+      "path": "src/renderer/src/components/automations/automation-edit-draft.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import { normalizeAgentLaunchOverrides } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/automations/AutomationSchedulePicker.render.test.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["  launchOverrides: {},"]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/checks-panel/active-content.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["        savedLaunchOptions={"]
+    },
+    {
+      "path": "src/renderer/src/hooks/automation-dispatch-handler.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import { buildAutomationRunLaunchSettings } from '../../../shared/fork-automation-launch-settings/automation-run-launch-settings'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/runtime/web-runtime-session-types.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["  hostAuthorityCapability?: RuntimeCapability"]
+    },
+    {
+      "path": "src/renderer/src/runtime/web-runtime-terminal-create-operation.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["        args.hostAuthorityCapability ??"]
+    },
+    {
+      "path": "src/shared/commit-message-model-parsers.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["export const CODEX_THINKING_LEVELS: ThinkingLevel[] = ["]
+    },
+    {
+      "path": "src/shared/commit-message-agent-specs-primary.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["  CODEX_THINKING_LEVELS: ThinkingLevel[]"]
+    },
+    {
+      "path": "src/shared/source-control-ai-repo-settings.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["      if (item.launchOptions === null) {"]
+    },
+    {
+      "path": "src/shared/source-control-ai-operation-policy.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["): SourceControlActionRecipe & { commandInputTemplate: string } {"]
+    },
+    {
+      "path": "src/renderer/src/components/automations/automations-page-test-harness.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "  runtimeEnvironmentSupportsCapability: async (environmentId: string, capability: string) => {"
+      ]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-activate-managed-worktree.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import { resolveAutomationRunLaunchSettings } from './fork-automation-launch-settings/automation-run-launch-settings'",
+        "    launchOverrides?: AgentLaunchOverrides"
+      ]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-create-agent-session.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "          request.launchPreferences?.optionValues === undefined ? undefined : false,"
+      ]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-create-managed-worktree.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["            args.startupLaunchOverrides"]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-get-agent-session-execution-namespace.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["      ...preferences.optionValues,"]
+    },
+    {
+      "path": "src/main/runtime/orca-runtime-terminal-create-deduplication.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["      launchOverrides?: AgentLaunchOverrides"]
+    },
+    {
+      "path": "src/main/runtime/runtime-automation-controller.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["        launchOverrides: input.launchOverrides,", "      'launchOverrides',"]
+    },
+    {
+      "path": "src/main/runtime/runtime-managed-worktree-create-types.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["  startupLaunchOverrides?: AgentLaunchOverrides"]
+    },
+    {
+      "path": "src/main/runtime/runtime-worktree-agent-startup.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["} from '../../shared/fork-automation-launch-settings/agent-launch-overrides'"]
+    },
+    {
+      "path": "src/main/startup/main-process-automations.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "          const launchSettings = runtime.buildAutomationRunLaunchSettings(automation, target.repo)",
+        "              launchOverrides: automation.launchOverrides ?? undefined"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/automations/AutomationRunDetailsPage.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "import { formatAutomationRunLaunchSettings } from './fork-automation-launch-settings/automation-run-launch-display'"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/automations/AutomationsPageSurface.tsx",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["        launchOverridesGate={launchOverridesGate}"]
+    },
+    {
+      "path": "src/renderer/src/components/automations/automation-orca-save.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["} from './fork-automation-launch-settings/automation-launch-overrides-save'"]
+    },
+    {
+      "path": "src/renderer/src/components/automations/automation-save-context.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["  launchOverridesGate: AutomationLaunchOverridesGate"]
+    },
+    {
+      "path": "src/renderer/src/components/automations/use-automation-draft-effects.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["        launchOverrides: {},"]
+    },
+    {
+      "path": "src/renderer/src/components/automations/use-automation-editor-actions.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["      launchOverrides: {},"]
+    },
+    {
+      "path": "src/renderer/src/components/automations/use-automations-page-controller.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": [
+        "  const launchOverridesGate = useAutomationLaunchOverridesGateState({ store, local, destination })"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/automations/use-automations-page-local-state.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["    launchOverrides: {},"]
+    },
+    {
+      "path": "src/renderer/src/lib/launch-work-item-direct-agent-routing.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["    launchOptions: args.launchOptions,"]
+    },
+    {
+      "path": "src/renderer/src/lib/launch-work-item-direct-route-preparation.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["    launchOptions: args.launchOptions,"]
+    },
+    {
+      "path": "src/shared/rpc-contract/agent-session-params.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["    optionValues: LaunchPreferenceOptionValues.optional()"]
+    },
+    {
+      "path": "src/shared/rpc-contract/automation-params.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["  launchOverrides: LaunchOverrides,"]
+    },
+    {
+      "path": "src/shared/rpc-contract/git-params.ts",
+      "feature": "automation-launch-settings",
+      "kind": "passthrough",
+      "lines": ["        launchOptions: SourceControlLaunchOptions.nullable().optional()"]
     }
   ],
   "exceptions": [
@@ -5459,8 +6260,8 @@
       "removed": 0
     },
     "src/renderer/src/components/native-chat/use-native-chat-session-options.ts": {
-      "added": 66,
-      "removed": 9
+      "added": 84,
+      "removed": 11
     },
     "src/renderer/src/components/native-chat/use-native-chat-structured-composer-send.test.tsx": {
       "added": 1,
@@ -6223,7 +7024,7 @@
       "removed": 1
     },
     "src/shared/protocol-version.ts": {
-      "added": 3,
+      "added": 5,
       "removed": 0
     },
     "src/shared/rpc-contract/artifacts-params.ts": {
@@ -6275,15 +7076,15 @@
       "removed": 1
     },
     "src/shared/tui-agent-launch-command.ts": {
-      "added": 15,
-      "removed": 6
+      "added": 17,
+      "removed": 7
     },
     "src/shared/tui-agent-resume-startup.ts": {
       "added": 11,
       "removed": 2
     },
     "src/shared/tui-agent-startup.ts": {
-      "added": 3,
+      "added": 7,
       "removed": 1
     },
     "src/shared/ui-chrome-types.ts": {
@@ -6369,6 +7170,454 @@
     "src/renderer/src/components/UpdateCard.error-card.test.tsx": {
       "added": 5,
       "removed": 5
+    },
+    "src/cli/automation-format.ts": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/cli/handlers/automations.ts": {
+      "added": 52,
+      "removed": 4
+    },
+    "src/cli/specs/automations.ts": {
+      "added": 8,
+      "removed": 2
+    },
+    "src/main/automations/headless-dispatch-runner.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/main/automations/headless-dispatch.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/automations/headless-workspace-create.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/main/persistence/scheduling-automations/automation-definition-operations.ts": {
+      "added": 12,
+      "removed": 0
+    },
+    "src/main/persistence/scheduling-automations/automation-run-operations.ts": {
+      "added": 5,
+      "removed": 0
+    },
+    "src/main/text-generation/commit-message-text-generation.ts": {
+      "added": 5,
+      "removed": 1
+    },
+    "src/renderer/src/components/automations/AutomationEditorDialog.tsx": {
+      "added": 6,
+      "removed": 0
+    },
+    "src/renderer/src/components/automations/AutomationEditorSettingsSidebar.tsx": {
+      "added": 12,
+      "removed": 19
+    },
+    "src/renderer/src/components/automations/AutomationRunHistory.tsx": {
+      "added": 26,
+      "removed": 0
+    },
+    "src/renderer/src/components/automations/AutomationSchedulePicker.render.test.tsx": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/components/automations/AutomationSchedulePicker.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/components/automations/automation-edit-draft.ts": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/renderer/src/components/editor/CheckRunDetailsPanel.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/editor/check-run-details-fix-with-ai.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/feature-wall/AiCommitPrSettingsCard.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/feature-wall/AiCommitPrSettingsFields.tsx": {
+      "added": 53,
+      "removed": 24
+    },
+    "src/renderer/src/components/feature-wall/useAiCommitPrSettings.ts": {
+      "added": 6,
+      "removed": 1
+    },
+    "src/renderer/src/components/native-chat/native-chat-session-option-discovery.ts": {
+      "added": 16,
+      "removed": 0
+    },
+    "src/renderer/src/components/pull-request-page/checks/fix-dialog.tsx": {
+      "added": 4,
+      "removed": 2
+    },
+    "src/renderer/src/components/pull-request-page/checks/fix-launch.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/right-sidebar/SourceControlAgentActionDialog.test.tsx": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/renderer/src/components/right-sidebar/SourceControlAgentActionDialog.tsx": {
+      "added": 7,
+      "removed": 2
+    },
+    "src/renderer/src/components/right-sidebar/SourceControlAgentActionDialogForm.test.tsx": {
+      "added": 8,
+      "removed": 5
+    },
+    "src/renderer/src/components/right-sidebar/SourceControlAgentActionDialogForm.tsx": {
+      "added": 20,
+      "removed": 8
+    },
+    "src/renderer/src/components/right-sidebar/SourceControlTextGenerationDialog.test.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/components/right-sidebar/buildSourceControlAgentDeliveryPlan.ts": {
+      "added": 20,
+      "removed": 8
+    },
+    "src/renderer/src/components/right-sidebar/checks-panel/active-content.tsx": {
+      "added": 9,
+      "removed": 0
+    },
+    "src/renderer/src/components/right-sidebar/runSourceControlAgentActionStart.test.ts": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/renderer/src/components/right-sidebar/runSourceControlAgentActionStart.ts": {
+      "added": 16,
+      "removed": 2
+    },
+    "src/renderer/src/components/right-sidebar/source-control-action-recipe-match.ts": {
+      "added": 23,
+      "removed": 2
+    },
+    "src/renderer/src/components/right-sidebar/source-control-agent-action-dialog-result.ts": {
+      "added": 8,
+      "removed": 1
+    },
+    "src/renderer/src/components/right-sidebar/source-control-fix-split-button.tsx": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/renderer/src/components/right-sidebar/source-control/ai/recovery-launch.ts": {
+      "added": 6,
+      "removed": 0
+    },
+    "src/renderer/src/components/right-sidebar/source-control/ai/text-generation-defaults.ts": {
+      "added": 12,
+      "removed": 2
+    },
+    "src/renderer/src/components/right-sidebar/source-control/ai/text-generation-dialog-form.tsx": {
+      "added": 36,
+      "removed": 24
+    },
+    "src/renderer/src/components/right-sidebar/source-control/ai/text-generation-dialog.tsx": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/components/right-sidebar/source-control/ai/text-generation-params.ts": {
+      "added": 26,
+      "removed": 7
+    },
+    "src/renderer/src/components/right-sidebar/source-control/commit/recovery-notice.tsx": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/components/right-sidebar/source-control/commit/use-commit-message-generation.ts": {
+      "added": 12,
+      "removed": 1
+    },
+    "src/renderer/src/components/right-sidebar/source-control/panel/dialog-layer.tsx": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/renderer/src/components/right-sidebar/source-control/panel/panel-dialogs.tsx": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/renderer/src/components/right-sidebar/source-control/review/use-create-pr-intent-commit-message.ts": {
+      "added": 4,
+      "removed": 1
+    },
+    "src/renderer/src/components/right-sidebar/use-create-pull-request-field-generation.ts": {
+      "added": 14,
+      "removed": 2
+    },
+    "src/renderer/src/components/right-sidebar/useSavedSourceControlAgentActionAutoStart.ts": {
+      "added": 15,
+      "removed": 3
+    },
+    "src/renderer/src/components/right-sidebar/useSourceControlAgentActionDialog.ts": {
+      "added": 35,
+      "removed": 22
+    },
+    "src/renderer/src/components/right-sidebar/useSourceControlAgentActionStart.ts": {
+      "added": 8,
+      "removed": 0
+    },
+    "src/renderer/src/components/settings/CommitMessageAiPane.test.tsx": {
+      "added": 4,
+      "removed": 3
+    },
+    "src/renderer/src/components/settings/RepositorySourceControlAiActionRows.tsx": {
+      "added": 49,
+      "removed": 18
+    },
+    "src/renderer/src/components/settings/RepositorySourceControlAiSection.test.ts": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/renderer/src/components/settings/RepositorySourceControlAiSection.tsx": {
+      "added": 4,
+      "removed": 2
+    },
+    "src/renderer/src/components/settings/SourceControlActionRecipeRow.tsx": {
+      "added": 46,
+      "removed": 28
+    },
+    "src/renderer/src/components/settings/SourceControlAiActionRecipeDefaults.tsx": {
+      "added": 14,
+      "removed": 7
+    },
+    "src/renderer/src/components/settings/repository-source-control-ai-draft.ts": {
+      "added": 22,
+      "removed": 9
+    },
+    "src/renderer/src/components/settings/repository-source-control-ai-global-ux.ts": {
+      "added": 20,
+      "removed": 2
+    },
+    "src/renderer/src/components/settings/repository-source-control-ai-labels.ts": {
+      "added": 11,
+      "removed": 1
+    },
+    "src/renderer/src/components/settings/source-control-action-recipe-draft-state.ts": {
+      "added": 43,
+      "removed": 13
+    },
+    "src/renderer/src/components/settings/source-control-ai-action-recipe-draft.ts": {
+      "added": 22,
+      "removed": 1
+    },
+    "src/renderer/src/hooks/automation-dispatch-handler.ts": {
+      "added": 10,
+      "removed": 0
+    },
+    "src/renderer/src/lib/agent-background-session-contract.ts": {
+      "added": 5,
+      "removed": 0
+    },
+    "src/renderer/src/lib/fix-checks-agent-launch.ts": {
+      "added": 7,
+      "removed": 0
+    },
+    "src/renderer/src/lib/launch-agent-background-session.ts": {
+      "added": 47,
+      "removed": 27
+    },
+    "src/renderer/src/lib/launch-agent-in-new-tab-web-runtime.test.ts": {
+      "added": 27,
+      "removed": 0
+    },
+    "src/renderer/src/lib/launch-agent-in-new-tab.ts": {
+      "added": 11,
+      "removed": 1
+    },
+    "src/renderer/src/lib/launch-agent-web-host-tab.ts": {
+      "added": 21,
+      "removed": 3
+    },
+    "src/renderer/src/lib/launch-work-item-direct-agent.ts": {
+      "added": 20,
+      "removed": 8
+    },
+    "src/renderer/src/lib/launch-work-item-direct-types.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/lib/launch-work-item-direct.ts": {
+      "added": 3,
+      "removed": 1
+    },
+    "src/renderer/src/lib/runtime-agent-background-create.ts": {
+      "added": 10,
+      "removed": 1
+    },
+    "src/renderer/src/lib/source-control-agent-action-plan.ts": {
+      "added": 7,
+      "removed": 1
+    },
+    "src/renderer/src/runtime/agent-session-create-operation.ts": {
+      "added": 8,
+      "removed": 3
+    },
+    "src/renderer/src/runtime/web-runtime-session-types.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/runtime/web-runtime-terminal-create-operation.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/shared/agent-session-host-authority.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/shared/automations-types.ts": {
+      "added": 7,
+      "removed": 0
+    },
+    "src/shared/commit-message-agent-spec.test.ts": {
+      "added": 7,
+      "removed": 2
+    },
+    "src/shared/commit-message-agent-spec.ts": {
+      "added": 6,
+      "removed": 2
+    },
+    "src/shared/commit-message-agent-specs-primary.ts": {
+      "added": 15,
+      "removed": 10
+    },
+    "src/shared/commit-message-model-parsers.ts": {
+      "added": 10,
+      "removed": 4
+    },
+    "src/shared/commit-message-plan.ts": {
+      "added": 10,
+      "removed": 2
+    },
+    "src/shared/source-control-ai-actions.ts": {
+      "added": 14,
+      "removed": 1
+    },
+    "src/shared/source-control-ai-operation-policy.ts": {
+      "added": 29,
+      "removed": 18
+    },
+    "src/shared/source-control-ai-recipe-save.test.ts": {
+      "added": 8,
+      "removed": 4
+    },
+    "src/shared/source-control-ai-recipe-save.ts": {
+      "added": 11,
+      "removed": 1
+    },
+    "src/shared/source-control-ai-repo-settings.ts": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/shared/source-control-ai-types.ts": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/shared/source-control-ai.ts": {
+      "added": 5,
+      "removed": 1
+    },
+    "src/renderer/src/components/automations/automations-page-test-harness.tsx": {
+      "added": 5,
+      "removed": 0
+    },
+    "src/main/runtime/orca-runtime-activate-managed-worktree.ts": {
+      "added": 27,
+      "removed": 1
+    },
+    "src/main/runtime/orca-runtime-create-agent-session.ts": {
+      "added": 8,
+      "removed": 0
+    },
+    "src/main/runtime/orca-runtime-create-managed-worktree.ts": {
+      "added": 2,
+      "removed": 1
+    },
+    "src/main/runtime/orca-runtime-get-agent-session-execution-namespace.ts": {
+      "added": 4,
+      "removed": 2
+    },
+    "src/main/runtime/orca-runtime-terminal-create-deduplication.ts": {
+      "added": 14,
+      "removed": 2
+    },
+    "src/main/runtime/runtime-automation-controller.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/runtime/runtime-managed-worktree-create-types.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/main/runtime/runtime-worktree-agent-startup.ts": {
+      "added": 12,
+      "removed": 3
+    },
+    "src/main/startup/main-process-automations.ts": {
+      "added": 4,
+      "removed": 1
+    },
+    "src/renderer/src/components/automations/AutomationRunDetailsPage.tsx": {
+      "added": 21,
+      "removed": 7
+    },
+    "src/renderer/src/components/automations/AutomationsPageSurface.tsx": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/automations/automation-orca-save.ts": {
+      "added": 16,
+      "removed": 1
+    },
+    "src/renderer/src/components/automations/automation-save-context.ts": {
+      "added": 2,
+      "removed": 0
+    },
+    "src/renderer/src/components/automations/use-automation-draft-effects.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/components/automations/use-automation-editor-actions.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/components/automations/use-automations-page-controller.ts": {
+      "added": 5,
+      "removed": 1
+    },
+    "src/renderer/src/components/automations/use-automations-page-local-state.ts": {
+      "added": 1,
+      "removed": 0
+    },
+    "src/renderer/src/lib/launch-work-item-direct-agent-routing.ts": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/renderer/src/lib/launch-work-item-direct-route-preparation.ts": {
+      "added": 3,
+      "removed": 0
+    },
+    "src/shared/rpc-contract/agent-session-params.ts": {
+      "added": 12,
+      "removed": 1
+    },
+    "src/shared/rpc-contract/automation-params.ts": {
+      "added": 15,
+      "removed": 0
+    },
+    "src/shared/rpc-contract/git-params.ts": {
+      "added": 15,
+      "removed": 2
     }
   }
 }

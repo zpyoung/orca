@@ -165,6 +165,11 @@ vi.mock('@/store/selectors', () => ({
 vi.mock('@/runtime/runtime-rpc-client', () => ({
   callRuntimeRpc: (...args: unknown[]) => mocks.callRuntimeRpc(...args),
   getRuntimeEnvironmentStatus: (...args: unknown[]) => mocks.getRuntimeEnvironmentStatus(...args),
+  // Derived from the status mock so a host's declared capabilities stay one source of truth.
+  runtimeEnvironmentSupportsCapability: async (environmentId: string, capability: string) => {
+    const status = await mocks.getRuntimeEnvironmentStatus(environmentId)
+    return Boolean(status?.capabilities?.includes(capability))
+  },
   // Matches the real matcher's contract: the code is a `: <token>` message tail.
   hasRuntimeRpcErrorCode: (error: unknown, code: string) =>
     error instanceof Error && error.message.trimEnd().endsWith(`: ${code}`)

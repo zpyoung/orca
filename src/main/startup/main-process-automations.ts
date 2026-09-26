@@ -28,6 +28,7 @@ export function initializeMainProcessAutomations(): AutomationService {
           let terminalPtyId: string | null = null
           let workspaceId: string
           let workspaceDisplayName: string | null = null
+          const launchSettings = runtime.buildAutomationRunLaunchSettings(automation, target.repo)
           if (automation.workspaceMode === 'new_per_run') {
             const created = await runtime.createManagedWorktree(
               buildHeadlessAutomationWorktreeCreateArgs({ automation, run, repo: target.repo })
@@ -51,7 +52,8 @@ export function initializeMainProcessAutomations(): AutomationService {
             const terminal = await runtime.launchAgentTerminal(`id:${automation.workspaceId}`, {
               agent: automation.agentId,
               prompt: automation.prompt,
-              title: run.title
+              title: run.title,
+              launchOverrides: automation.launchOverrides ?? undefined
             })
             terminalHandle = terminal.handle
             terminalSessionId = terminal.tabId ?? null
@@ -89,6 +91,7 @@ export function initializeMainProcessAutomations(): AutomationService {
             terminalSessionId,
             terminalPaneKey,
             terminalPtyId,
+            launchSettings,
             completion
           }
         }

@@ -1,0 +1,23 @@
+{
+  "auto": {
+    "components": {
+      "agent": {
+        "launch": {
+          "AgentLaunchOverridesFields": {
+            "on": "Activado",
+            "off": "Desactivado",
+            "setByCliArguments": "Definido por argumentos de CLI",
+            "default": "Predeterminado",
+            "cliArguments": "Argumentos de CLI",
+            "inheritedHint": "Predeterminado: {{value0}}",
+            "model": "Modelo",
+            "defaultFromSettings": "Predeterminado (de Ajustes)",
+            "staleModel": "El modelo guardado {{value0}} no está en la lista de modelos actual.",
+            "advanced": "Avanzado",
+            "reuseSessionNote": "Se aplica cuando la sesión se inicia por primera vez. Las ejecuciones reutilizadas conservan la configuración original de la sesión."
+          }
+        }
+      }
+    }
+  }
+}

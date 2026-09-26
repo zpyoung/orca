@@ -38,6 +38,7 @@ import {
   sourceControlAiSettingsFromLegacy as settingsFromLegacy
 } from './source-control-ai-settings'
 import { hasActionAgentRecipe } from './source-control-ai-command-template'
+import type { SourceControlActionRecipe } from './source-control-ai-actions'
 import type {
   SourceControlAiOperation,
   SourceControlAiPrCreationDefaults
@@ -52,6 +53,8 @@ export type ResolvedSourceControlAiGenerationParams = {
   customPrompt?: string
   commandInputTemplate?: string
   agentArgs?: string
+  recipeAgentArgs?: string
+  launchOptions?: SourceControlActionRecipe['launchOptions']
   customAgentCommand?: string
   agentCommandOverride?: string
 }
@@ -152,7 +155,8 @@ export function resolveSourceControlAiForOperation(
       legacy?.customPrompt
     ),
     commandInputTemplate: actionRecipe.commandInputTemplate,
-    ...(actionRecipe.agentArgs !== undefined ? { agentArgs: actionRecipe.agentArgs } : {})
+    ...(actionRecipe.agentArgs !== undefined ? { agentArgs: actionRecipe.agentArgs } : {}),
+    ...(actionRecipe.launchOptions ? { launchOptions: actionRecipe.launchOptions } : {})
   }
   if (isCustomAgentId(agentChoice)) {
     if (!customAgentCommand) {

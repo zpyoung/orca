@@ -8,10 +8,12 @@ import { isNativeChatTranscriptLocalReadable } from '@/lib/native-chat-transcrip
 import { resolveSourceControlLaunchPlatform } from '@/lib/source-control-launch-platform'
 import { preflightAgentTrust } from '@/lib/agent-trust-preflight'
 import { beginStructuredAgentSessionProvisionalLaunch } from '@/lib/structured-agent-session-provisional-tab'
+import type { AgentLaunchOptionSelection } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 
 export function buildDirectWorkItemStartup(args: {
   agent: TuiAgent | null
   agentArgs?: string | null
+  launchOptions?: AgentLaunchOptionSelection | null
   draftContent: string
   promptDelivery: PromptDelivery
   settings: AppState['settings']
@@ -30,6 +32,7 @@ export function buildDirectWorkItemStartup(args: {
   return buildDirectWorkItemAgentStartupPlan({
     agent: args.agent,
     agentArgs: args.agentArgs,
+    launchOptions: args.launchOptions,
     draftContent: args.draftContent,
     promptDelivery: args.promptDelivery,
     settings: args.settings,

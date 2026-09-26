@@ -1,0 +1,23 @@
+{
+  "auto": {
+    "components": {
+      "agent": {
+        "launch": {
+          "AgentLaunchOverridesFields": {
+            "on": "オン",
+            "off": "オフ",
+            "setByCliArguments": "CLI 引数で設定",
+            "default": "デフォルト",
+            "cliArguments": "CLI 引数",
+            "inheritedHint": "デフォルト: {{value0}}",
+            "model": "モデル",
+            "defaultFromSettings": "デフォルト（設定から）",
+            "staleModel": "保存されたモデル {{value0}} は現在のモデル一覧にありません。",
+            "advanced": "詳細",
+            "reuseSessionNote": "セッションの初回開始時に適用されます。再利用された実行では、セッションの元の設定が保持されます。"
+          }
+        }
+      }
+    }
+  }
+}

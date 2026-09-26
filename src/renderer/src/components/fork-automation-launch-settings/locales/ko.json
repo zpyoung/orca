@@ -1,0 +1,23 @@
+{
+  "auto": {
+    "components": {
+      "agent": {
+        "launch": {
+          "AgentLaunchOverridesFields": {
+            "on": "켬",
+            "off": "끔",
+            "setByCliArguments": "CLI 인수로 설정",
+            "default": "기본값",
+            "cliArguments": "CLI 인수",
+            "inheritedHint": "기본값: {{value0}}",
+            "model": "모델",
+            "defaultFromSettings": "기본값(설정에서)",
+            "staleModel": "저장된 모델 {{value0}}이(가) 현재 모델 목록에 없습니다.",
+            "advanced": "고급",
+            "reuseSessionNote": "세션이 처음 시작될 때 적용됩니다. 재사용된 실행은 세션의 원래 설정을 유지합니다."
+          }
+        }
+      }
+    }
+  }
+}

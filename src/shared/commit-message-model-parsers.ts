@@ -61,12 +61,18 @@ function* iterateModelOutputLines(output: string): Generator<string> {
   }
 }
 
+// Why: `codex exec` forwards the level to `model_reasoning_effort`, which
+// accepts minimal; Copilot's `--effort` shares OPENAI_THINKING_LEVELS and does not.
+export const CODEX_THINKING_LEVELS: ThinkingLevel[] = [
+  { id: 'minimal', label: 'Minimal' },
+  ...OPENAI_THINKING_LEVELS
+]
+
 export function withOpenAiThinking(
-  id: string
+  id: string,
+  levels: ThinkingLevel[] = OPENAI_THINKING_LEVELS
 ): Pick<CommitMessageModel, 'thinkingLevels' | 'defaultThinkingLevel'> {
-  return /(?:gpt-5|codex)/i.test(id)
-    ? { thinkingLevels: OPENAI_THINKING_LEVELS, defaultThinkingLevel: 'low' }
-    : {}
+  return /(?:gpt-5|codex)/i.test(id) ? { thinkingLevels: levels, defaultThinkingLevel: 'low' } : {}
 }
 
 export function parseClaudeModels(stdout: string): CommitMessageModel[] {

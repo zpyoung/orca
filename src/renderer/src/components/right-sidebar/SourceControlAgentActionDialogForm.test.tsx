@@ -52,6 +52,7 @@ function renderForm(
       statusCopy: null,
       agentArgs: '',
       agentArgsApply: true,
+      launchOptions: {},
       commandTemplate: '{basePrompt}',
       savedCommandInputTemplate: '{basePrompt}',
       saveLaunchRecipe: true,
@@ -68,7 +69,7 @@ function renderForm(
       isStarting: false,
       startLabel: 'Start agent',
       onSelectedAgentChange: () => {},
-      onAgentArgsChange: () => {},
+      onLaunchOverridesChange: () => {},
       onCommandTemplateChange: () => {},
       onSaveLaunchRecipeChange: () => {},
       onSaveAgentDefaultChange: () => {},
@@ -163,19 +164,21 @@ describe('SourceControlAgentActionDialogForm', () => {
 })
 
 describe('CLI arguments field applicability', () => {
+  // Why: aider carries no session-option catalog, so the field renders directly
+  // instead of behind the catalog-only "Advanced" collapsible.
   it('offers the field when the launch would apply the arguments', () => {
-    const markup = renderForm({ agentArgsApply: true })
+    const markup = renderForm({ agentArgsApply: true, selectedAgent: 'aider' })
 
-    expect(markup).toContain('source-control-agent-cli-args')
+    expect(markup).toContain('source-control-agent-agent-args')
     expect(markup).toContain('CLI arguments')
   })
 
   // Why: absent, not disabled — a structured native chat session reads no CLI arguments,
   // so the dialog must not show a control that launch would drop.
   it('leaves the field out entirely when they would not apply', () => {
-    const markup = renderForm({ agentArgsApply: false })
+    const markup = renderForm({ agentArgsApply: false, selectedAgent: 'aider' })
 
-    expect(markup).not.toContain('source-control-agent-cli-args')
+    expect(markup).not.toContain('source-control-agent-agent-args')
     expect(markup).not.toContain('CLI arguments')
   })
 })

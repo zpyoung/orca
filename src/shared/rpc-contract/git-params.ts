@@ -123,6 +123,15 @@ export const CommitMessageAiSettings = z.object({
   customAgentCommand: z.string()
 })
 
+export const SourceControlLaunchOptionValue = z.union([z.string().min(1).max(128), z.boolean()])
+export const SourceControlLaunchOptions = z.object({
+  model: z.string().min(1).max(128).optional(),
+  optionValues: z
+    .record(z.string().min(1).max(64), SourceControlLaunchOptionValue)
+    .refine((values) => Object.keys(values).length <= 16, 'Too many launch option values')
+    .optional()
+})
+
 export const SourceControlAiSettings = CommitMessageAiSettings.omit({ customPrompt: true }).extend({
   actions: z
     .record(
@@ -130,7 +139,8 @@ export const SourceControlAiSettings = CommitMessageAiSettings.omit({ customProm
       z.object({
         agentId: z.string().nullable().optional(),
         commandInputTemplate: z.string().optional(),
-        agentArgs: z.string().optional()
+        agentArgs: z.string().optional(),
+        launchOptions: SourceControlLaunchOptions.nullable().optional()
       })
     )
     .optional(),
@@ -161,7 +171,8 @@ export const SourceControlAiSettings = CommitMessageAiSettings.omit({ customProm
       z.object({
         agentId: z.string().nullable().optional(),
         commandInputTemplate: z.string().optional(),
-        agentArgs: z.string().optional()
+        agentArgs: z.string().optional(),
+        launchOptions: SourceControlLaunchOptions.nullable().optional()
       })
     )
     .optional()
@@ -174,6 +185,8 @@ export const ResolvedSourceControlAiGenerationParams = z.object({
   customPrompt: z.string().optional(),
   commandInputTemplate: z.string().optional(),
   agentArgs: z.string().optional(),
+  recipeAgentArgs: z.string().optional(),
+  launchOptions: SourceControlLaunchOptions.optional(),
   customAgentCommand: z.string().optional(),
   agentCommandOverride: z.string().optional()
 })

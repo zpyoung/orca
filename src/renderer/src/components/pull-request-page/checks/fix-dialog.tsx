@@ -52,6 +52,7 @@ export function ChecksFixDialog({
       savedAgentId={readSourceControlLaunchRecipeAgentId(fixChecksRecipe)}
       savedCommandInputTemplate={fixChecksRecipe.commandInputTemplate ?? null}
       savedAgentArgs={fixChecksRecipe.agentArgs ?? null}
+      savedLaunchOptions={fixChecksRecipe.launchOptions ?? null}
       onSaveAgentDefault={(target, actionId, recipe) =>
         saveFixChecksActionDefault(target, actionId, recipe, updateSettings, updateRepo)
       }
@@ -63,13 +64,14 @@ export function ChecksFixDialog({
           )
         )
       }}
-      onStart={({ agent, commandInput, agentArgs }) =>
+      onStart={({ agent, commandInput, agentArgs, launchOptions }) =>
         startFixChecksFromDialog({
           targetRepoId,
           item,
           agent,
           commandInput,
-          agentArgs
+          agentArgs,
+          launchOptions
         })
       }
     />

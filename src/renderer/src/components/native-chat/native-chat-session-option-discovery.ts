@@ -19,7 +19,10 @@ import {
   getRuntimeGitScope,
   type RuntimeGitContext
 } from '@/runtime/runtime-git-client'
+import { getIndexedRepoMap } from '@/store/worktree-repo-index'
 import { useAppStore } from '@/store'
+import { getAutomationRunRepoId } from '../../../../shared/automation-run-identity'
+import type { Automation } from '../../../../shared/automations-types'
 
 export type NativeChatModelDiscoveryContext = {
   hostKey: string
@@ -67,6 +70,19 @@ export function resolveNativeChatModelDiscoveryContext(
       ...(connectionId ? { connectionId } : {})
     }
   }
+}
+
+/** Host key for an automation's own run target, or null when its repo is unknown. */
+export function resolveAutomationModelDiscoveryHostKey(
+  automation: Pick<Automation, 'projectId' | 'runContext'>
+): string | null {
+  const state = useAppStore.getState()
+  const repo = getIndexedRepoMap(state.repos).get(getAutomationRunRepoId(automation))
+  if (!repo) {
+    return null
+  }
+  const scope = getRuntimeGitScope(state.settings, repo.connectionId ?? null)
+  return resolveNativeChatModelDiscoveryHostKey(state, null, repo.path, scope)
 }
 
 export async function discoverNativeChatCatalogModels(

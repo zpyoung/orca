@@ -30,6 +30,7 @@ export function AutomationsPageSurface({
     pageRefresh,
     draftEffects,
     editorActions,
+    launchOverridesGate,
     saveAutomation,
     managementActions,
     runActions,
@@ -158,6 +159,7 @@ export function AutomationsPageSurface({
         canSave={presentation.canSaveDraft}
         isEditingExternal={editingExternalTarget !== null}
         createTarget={createTarget}
+        launchOverridesGate={launchOverridesGate}
         createDestination={destination.createDestination.control}
         editDestination={
           destinationForm.isOrcaForm ? destinationForm.editDestinationControl : undefined
