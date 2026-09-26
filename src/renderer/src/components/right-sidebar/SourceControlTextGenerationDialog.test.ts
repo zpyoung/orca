@@ -208,6 +208,7 @@ describe('buildCommitMessageGenerationParams', () => {
       thinkingLevel: 'xhigh',
       commandInputTemplate: '{basePrompt}\n\nUse Conventional Commits.',
       agentArgs: '--model gpt-5.5',
+      recipeAgentArgs: '--model gpt-5.5',
       agentCommandOverride: 'codex --profile work'
     })
   })

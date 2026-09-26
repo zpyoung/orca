@@ -1,4 +1,8 @@
 import type { getAgentCatalog } from '@/lib/agent-catalog'
+import type {
+  AgentLaunchOptionSelection,
+  AgentLaunchOverrides
+} from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { useAppStore } from '@/store'
 import type { useRepoById } from '@/store/selectors'
 import type { TuiAgent } from '../../../../shared/tui-agent'
@@ -21,6 +25,7 @@ export type UseSourceControlAgentActionDialogResult = {
   agentArgs: string
   /** False when this launch would be a structured native chat session, which reads no CLI arguments. */
   agentArgsApply: boolean
+  launchOptions: AgentLaunchOptionSelection
   commandTemplate: string
   saveLaunchRecipe: boolean
   saveTargetValue: string
@@ -31,7 +36,9 @@ export type UseSourceControlAgentActionDialogResult = {
   canStart: boolean
   isStarting: boolean
   onSelectedAgentChange: (agent: TuiAgent | null) => void
-  onAgentArgsChange: (value: string) => void
+  onLaunchOverridesChange: (
+    updater: (current: AgentLaunchOverrides) => AgentLaunchOverrides
+  ) => void
   onCommandTemplateChange: (value: string) => void
   onSaveLaunchRecipeChange: (value: boolean) => void
   onSaveAgentDefaultChange: (value: string) => void

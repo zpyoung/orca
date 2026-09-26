@@ -1,4 +1,5 @@
 import type { AgentLaunchPreferences } from '../../shared/agent-session-host-authority'
+import type { AgentLaunchOverrides } from '../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import type { CreateWorktreeArgs } from '../../shared/worktree/create-types'
 import type {
   AutomationWorkspaceProvenance,
@@ -50,6 +51,7 @@ export type RuntimeManagedWorktreeCreateArgs = {
   createdWithAgent?: TuiAgent
   startupAgent?: TuiAgent
   startupLaunchPreferences?: AgentLaunchPreferences
+  startupLaunchOverrides?: AgentLaunchOverrides
   startupPrompt?: string
   pendingFirstAgentMessageRename?: boolean
   automationProvenance?: AutomationWorkspaceProvenance

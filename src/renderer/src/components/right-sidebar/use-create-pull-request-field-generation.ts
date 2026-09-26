@@ -10,6 +10,7 @@ import type { HostedReviewCreationEligibility } from '../../../../shared/hosted-
 import type { ResolveSourceControlAiResult } from '../../../../shared/source-control-ai'
 import type { SourceControlAiPrCreationDefaults } from '../../../../shared/source-control-ai-types'
 import type { PullRequestFieldRevisions } from '@/store/slices/pull-request-generation'
+import { materializeSourceControlTextGenerationParams } from '../../../../shared/fork-automation-launch-settings/source-control-text-launch-args'
 import { stripBaseRef } from './create-pull-request-base-ref-normalization'
 import type {
   GenerationSeed,
@@ -103,11 +104,21 @@ export function useCreatePullRequestFieldGeneration({
       if (!worktreePath || !base.trim() || effectiveGenerating || generateDisabled) {
         return
       }
+      const resolvedParams =
+        overrides?.sourceControlAiResolvedParams ??
+        (resolvedPullRequestAi?.ok ? resolvedPullRequestAi.value.params : undefined)
+      const effectiveOverrides = resolvedParams
+        ? {
+            ...overrides,
+            sourceControlAiResolvedParams:
+              materializeSourceControlTextGenerationParams(resolvedParams)
+          }
+        : overrides
       if (generation) {
         generation.onGenerate(
           { base, title, body, draft },
           { ...fieldRevisionsRef.current },
-          overrides
+          effectiveOverrides
         )
         return
       }
@@ -142,7 +153,7 @@ export function useCreatePullRequestFieldGeneration({
             provider: eligibility?.provider,
             useTemplate: resolvedPrDefaults.useTemplate
           },
-          overrides
+          effectiveOverrides
         )
         if (result.branchChangedByPreparation) {
           await onBranchChangedByGeneration?.()
@@ -197,6 +208,7 @@ export function useCreatePullRequestFieldGeneration({
       generationSeedRef,
       onBranchChangedByGeneration,
       resolvedPrDefaults.useTemplate,
+      resolvedPullRequestAi,
       setGenerateError,
       setGenerating,
       settings,

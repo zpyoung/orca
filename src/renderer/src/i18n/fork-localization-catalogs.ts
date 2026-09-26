@@ -79,6 +79,21 @@ import askQuestionToolES from '../components/fork-ask-question-tool/locales/es.j
 import askQuestionToolJA from '../components/fork-ask-question-tool/locales/ja.json'
 import askQuestionToolKO from '../components/fork-ask-question-tool/locales/ko.json'
 import askQuestionToolZH from '../components/fork-ask-question-tool/locales/zh.json'
+import launchFieldsEN from '../components/fork-automation-launch-settings/locales/en.json'
+import launchFieldsES from '../components/fork-automation-launch-settings/locales/es.json'
+import launchFieldsJA from '../components/fork-automation-launch-settings/locales/ja.json'
+import launchFieldsKO from '../components/fork-automation-launch-settings/locales/ko.json'
+import launchFieldsZH from '../components/fork-automation-launch-settings/locales/zh.json'
+import automationLaunchEN from '../components/automations/fork-automation-launch-settings/locales/en.json'
+import automationLaunchES from '../components/automations/fork-automation-launch-settings/locales/es.json'
+import automationLaunchJA from '../components/automations/fork-automation-launch-settings/locales/ja.json'
+import automationLaunchKO from '../components/automations/fork-automation-launch-settings/locales/ko.json'
+import automationLaunchZH from '../components/automations/fork-automation-launch-settings/locales/zh.json'
+import recipeOverridesEN from '../components/feature-wall/fork-automation-launch-settings/locales/en.json'
+import recipeOverridesES from '../components/feature-wall/fork-automation-launch-settings/locales/es.json'
+import recipeOverridesJA from '../components/feature-wall/fork-automation-launch-settings/locales/ja.json'
+import recipeOverridesKO from '../components/feature-wall/fork-automation-launch-settings/locales/ko.json'
+import recipeOverridesZH from '../components/feature-wall/fork-automation-launch-settings/locales/zh.json'
 
 type ForkLocale = 'en' | 'es' | 'ja' | 'ko' | 'zh'
 type ForkCatalog = Record<string, unknown>
@@ -113,7 +128,10 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     artifactPasswordsEN,
     activityWindowEN,
     reviewFiltersEN,
-    askQuestionToolEN
+    askQuestionToolEN,
+    launchFieldsEN,
+    automationLaunchEN,
+    recipeOverridesEN
   ],
   es: [
     relayES,
@@ -131,7 +149,10 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     artifactPasswordsES,
     activityWindowES,
     reviewFiltersES,
-    askQuestionToolES
+    askQuestionToolES,
+    launchFieldsES,
+    automationLaunchES,
+    recipeOverridesES
   ],
   ja: [
     relayJA,
@@ -149,7 +170,10 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     artifactPasswordsJA,
     activityWindowJA,
     reviewFiltersJA,
-    askQuestionToolJA
+    askQuestionToolJA,
+    launchFieldsJA,
+    automationLaunchJA,
+    recipeOverridesJA
   ],
   ko: [
     relayKO,
@@ -167,7 +191,10 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     artifactPasswordsKO,
     activityWindowKO,
     reviewFiltersKO,
-    askQuestionToolKO
+    askQuestionToolKO,
+    launchFieldsKO,
+    automationLaunchKO,
+    recipeOverridesKO
   ],
   zh: [
     relayZH,
@@ -185,7 +212,10 @@ const FORK_CATALOGS: Record<ForkLocale, ForkCatalog[]> = {
     artifactPasswordsZH,
     activityWindowZH,
     reviewFiltersZH,
-    askQuestionToolZH
+    askQuestionToolZH,
+    launchFieldsZH,
+    automationLaunchZH,
+    recipeOverridesZH
   ]
 }
 

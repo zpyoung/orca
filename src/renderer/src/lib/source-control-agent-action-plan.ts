@@ -38,6 +38,7 @@ export function planSourceControlAgentActionLaunch(args: {
   cmdOverrides?: Partial<Record<TuiAgent, string>>
   agentArgs?: string | null
   sessionOptions?: Record<string, SessionOptionValue>
+  includeSessionOptionCatalogDefaults?: boolean
   platform?: NodeJS.Platform
   terminalWindowsShell?: string | null
   /** Why: SSH remotes deploy the CLI shim as plain `orca`, so the Linux-only
@@ -110,6 +111,7 @@ export function planSourceControlAgentActionLaunch(args: {
       isRemote,
       agentArgs: args.agentArgs,
       sessionOptions: args.sessionOptions,
+      includeSessionOptionCatalogDefaults: args.includeSessionOptionCatalogDefaults,
       allowEmptyPromptLaunch: true
     })
     delivery = 'paste-submit'
@@ -122,7 +124,8 @@ export function planSourceControlAgentActionLaunch(args: {
       shell,
       isRemote,
       agentArgs: args.agentArgs,
-      sessionOptions: args.sessionOptions
+      sessionOptions: args.sessionOptions,
+      includeSessionOptionCatalogDefaults: args.includeSessionOptionCatalogDefaults
     })
     if (draftLaunchPlan) {
       startupPlan = {
@@ -150,6 +153,7 @@ export function planSourceControlAgentActionLaunch(args: {
         isRemote,
         agentArgs: args.agentArgs,
         sessionOptions: args.sessionOptions,
+        includeSessionOptionCatalogDefaults: args.includeSessionOptionCatalogDefaults,
         allowEmptyPromptLaunch: true
       })
       delivery = 'draft-paste'
@@ -164,6 +168,7 @@ export function planSourceControlAgentActionLaunch(args: {
       isRemote,
       agentArgs: args.agentArgs,
       sessionOptions: args.sessionOptions,
+      includeSessionOptionCatalogDefaults: args.includeSessionOptionCatalogDefaults,
       allowEmptyPromptLaunch: true
     })
     delivery = 'draft-paste'
@@ -177,6 +182,7 @@ export function planSourceControlAgentActionLaunch(args: {
       isRemote,
       agentArgs: args.agentArgs,
       sessionOptions: args.sessionOptions,
+      includeSessionOptionCatalogDefaults: args.includeSessionOptionCatalogDefaults,
       allowEmptyPromptLaunch: false
     })
     delivery = 'argv'

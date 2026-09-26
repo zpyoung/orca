@@ -62,6 +62,7 @@ describe('RepositorySourceControlAiActionRows', () => {
         onActionAgentChange: () => {},
         onActionTemplateChange: () => {},
         onActionAgentArgsChange: () => {},
+        onActionLaunchOptionsChange: () => {},
         onAppendVariable: () => {},
         onActionDiscard: () => {},
         onActionSave: () => {}
@@ -74,6 +75,8 @@ describe('RepositorySourceControlAiActionRows', () => {
     expect(markup).toContain('Discard')
     expect(markup).toContain('Save')
     expect(markup).toContain('repo-repo-1-source-control-ai-fixCommitFailure')
+    expect(markup).toContain('repo-repo-1-source-control-action-fixCommitFailure-model')
+    expect(markup).toContain('Advanced')
   })
 })
 

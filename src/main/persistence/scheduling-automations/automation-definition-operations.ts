@@ -6,6 +6,7 @@ import type {
   AutomationUpdateInput
 } from '../../../shared/automations-types'
 import type { PersistedState } from '../../../shared/persisted-state-types'
+import { normalizeAgentLaunchOverrides } from '../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import { normalizeAutomationPrecheck } from '../../../shared/automation-precheck'
 import { nextAutomationOccurrenceAfter } from '../../../shared/automation-schedule-occurrences'
 import {
@@ -79,6 +80,7 @@ export function createAutomation(
   }
   const schedulerOwner = getAutomationSchedulerOwner(repo)
   const contexts = getAutomationContextsForRepo(repo, operations.state.projectHostSetups ?? [])
+  const launchOverrides = normalizeAgentLaunchOverrides(input.launchOverrides)
   const automation: Automation = {
     id: randomUUID(),
     ...(input.creationKey ? { creationKey: input.creationKey } : {}),
@@ -86,6 +88,7 @@ export function createAutomation(
     prompt: input.prompt,
     precheck: normalizeAutomationPrecheck(input.precheck),
     agentId: input.agentId,
+    ...(launchOverrides ? { launchOverrides } : {}),
     // Why own contexts win: a wire context speaks the client's perspective —
     // 'runtime:<id>' is a client-assigned name this store cannot interpret, and
     // persisting it makes the projection orphan a record this authority owns.
@@ -159,6 +162,11 @@ export function updateAutomation(
   const dtstart = updates.dtstart ?? current.dtstart
   const scheduleChanged = updates.rrule !== undefined || updates.dtstart !== undefined
   const workspaceMode = updates.workspaceMode ?? current.workspaceMode
+  const normalizedLaunchOverrides = Object.hasOwn(definedUpdates, 'launchOverrides')
+    ? definedUpdates.launchOverrides === null
+      ? null
+      : normalizeAgentLaunchOverrides(definedUpdates.launchOverrides)
+    : current.launchOverrides
   const merged: Automation = {
     ...current,
     ...definedUpdates,
@@ -166,6 +174,7 @@ export function updateAutomation(
     precheck: Object.hasOwn(definedUpdates, 'precheck')
       ? normalizeAutomationPrecheck(definedUpdates.precheck)
       : normalizeAutomationPrecheck(current.precheck),
+    ...(normalizedLaunchOverrides ? { launchOverrides: normalizedLaunchOverrides } : {}),
     projectId: repoId,
     // Why the wire object is ignored: contexts are the storing authority's own
     // registry speaking. A move restates them from that registry, anything else
@@ -215,6 +224,9 @@ export function updateAutomation(
       ? nextAutomationOccurrenceAfter(rrule, dtstart, Date.now())
       : current.nextRunAt,
     updatedAt: Date.now()
+  }
+  if (Object.hasOwn(definedUpdates, 'launchOverrides') && !normalizedLaunchOverrides) {
+    delete merged.launchOverrides
   }
   const previousPin = automationWorkspaceSshPin(operations.state, current.workspaceId)
   const workspaceSshPin = automationWorkspaceSshPin(operations.state, merged.workspaceId)

@@ -62,6 +62,9 @@ export class OrcaRuntimeWithCreateAgentSession extends OrcaRuntimeWithGetAgentSe
           request.launchPreferences?.model ?? null,
           request.launchPreferences?.effort ?? null,
           request.launchPreferences?.mode ?? null,
+          Object.entries(request.launchPreferences?.optionValues ?? {}).sort(([left], [right]) =>
+            left.localeCompare(right)
+          ),
           request.startupCwd ?? null,
           request.presentation ?? null,
           request.placement?.tabId ?? null,
@@ -139,6 +142,9 @@ export class OrcaRuntimeWithCreateAgentSession extends OrcaRuntimeWithGetAgentSe
             request.launchPreferences?.model ?? null,
             request.launchPreferences?.effort ?? null,
             request.launchPreferences?.mode ?? null,
+            Object.entries(request.launchPreferences?.optionValues ?? {}).sort(([left], [right]) =>
+              left.localeCompare(right)
+            ),
             startupCwd ?? null,
             request.presentation ?? null,
             request.placement?.tabId ?? null,
@@ -170,6 +176,8 @@ export class OrcaRuntimeWithCreateAgentSession extends OrcaRuntimeWithGetAgentSe
             : resolveTuiAgentLaunchArgs(request.agent, settings.agentDefaultArgs),
         agentEnv: resolveTuiAgentLaunchEnv(request.agent, settings.agentDefaultEnv),
         sessionOptions: this.toAgentSessionOptions(request.launchPreferences),
+        includeSessionOptionCatalogDefaults:
+          request.launchPreferences?.optionValues === undefined ? undefined : false,
         platform,
         shell,
         isRemote

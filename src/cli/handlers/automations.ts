@@ -46,6 +46,13 @@ import {
   getSourceContextFlag,
   getWorkspaceModeFlag
 } from './automation-handler-flags'
+import {
+  assertAutomationLaunchOverridesRuntimeSupported,
+  getAutomationLaunchOverridesForCreate,
+  getAutomationLaunchOverridesForEdit,
+  hasAutomationLaunchOverrideFlags,
+  resetAutomationLaunchOverridesForAgentChange
+} from './fork-automation-launch-settings/automation-launch-overrides'
 
 type AutomationCreateParams = Omit<AutomationCreateInput, 'projectId' | 'timezone'> & {
   destination?: AutomationDestination
@@ -130,6 +137,8 @@ async function getExplicitTarget(
  * asks the authority that stores the record. A host too old to answer sends
  * nothing, and that host has no fence to satisfy either.
  */
+type AutomationShowResult = { automation: Automation; owner?: AutomationOwnerPrecondition }
+
 async function resolveExpectedOwner(
   client: Parameters<CommandHandler>[0]['client'],
   id: string
@@ -176,6 +185,8 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
     }
     const target = await resolveDefaultTarget(flags, cwd, client)
     const sourceContext = getSourceContextFlag(flags)
+    const agentId = getProviderFlag(flags)
+    const launchOverrides = getAutomationLaunchOverridesForCreate(flags, agentId)
     const workspaceMode =
       getWorkspaceModeFlag(flags) ?? (target.workspace ? 'existing' : 'new_per_run')
     // Built before the destination read so a contradictory flag still fails without a runtime call.
@@ -183,7 +194,8 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
       name: getRequiredStringFlag(flags, 'name'),
       prompt: getRequiredStringFlag(flags, 'prompt'),
       precheck: getPrecheckFlag(flags),
-      agentId: getProviderFlag(flags),
+      agentId,
+      ...(launchOverrides ? { launchOverrides } : {}),
       ...(target.runContext ? { runContext: target.runContext } : {}),
       ...(sourceContext !== undefined ? { sourceContext } : {}),
       repo: target.repo,
@@ -196,6 +208,7 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
       missedRunGraceMinutes: getOptionalPositiveIntegerFlag(flags, 'missed-run-grace-minutes'),
       ...schedule
     } satisfies AutomationCreateParams
+    await assertAutomationLaunchOverridesRuntimeSupported(client, flags)
     const destination = await resolveAutomationDestination(client, target)
     const result = await client.call<{ automation: Automation }>('automation.create', {
       ...create,
@@ -208,12 +221,13 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
     const schedule = getScheduleFlag(flags, false)
     const sourceContext = getSourceContextFlag(flags)
     const id = getRequiredStringFlag(flags, 'id')
+    const agentId = getOptionalProviderFlag(flags)
     // Built before the owner read so a contradictory flag still fails without a runtime call.
     const updates = {
       name: getOptionalStringFlag(flags, 'name'),
       prompt: getOptionalStringFlag(flags, 'prompt'),
       precheck: getPrecheckFlag(flags),
-      agentId: getOptionalProviderFlag(flags),
+      agentId,
       ...(target.runContext ? { runContext: target.runContext } : {}),
       ...(sourceContext !== undefined ? { sourceContext } : {}),
       repo: target.repo,
@@ -226,14 +240,48 @@ export const AUTOMATION_HANDLERS: Record<string, CommandHandler> = {
       missedRunGraceMinutes: getOptionalPositiveIntegerFlag(flags, 'missed-run-grace-minutes'),
       ...schedule
     } satisfies AutomationUpdateParams
-    const expectedOwner = await resolveExpectedOwner(client, id)
+    const hasLaunchOverrideFlags = hasAutomationLaunchOverrideFlags(flags)
+    // Why: the launch-override merge and the owner fence both need the saved record; read it once.
+    let shown: AutomationShowResult | null = null
+    const showAutomation = async (): Promise<AutomationShowResult> => {
+      shown ??= (await client.call<AutomationShowResult>('automation.show', { id })).result
+      return shown
+    }
+    let launchOverrides: AutomationUpdateInput['launchOverrides'] | undefined
+    if (hasLaunchOverrideFlags || agentId) {
+      if (hasLaunchOverrideFlags) {
+        await assertAutomationLaunchOverridesRuntimeSupported(client, flags)
+      }
+      const current = (await showAutomation()).automation
+      const agentChanged = Boolean(agentId && agentId !== current.agentId)
+      const resetOverrides = agentChanged
+        ? resetAutomationLaunchOverridesForAgentChange(current.launchOverrides)
+        : undefined
+      if (!hasLaunchOverrideFlags && resetOverrides !== undefined) {
+        await assertAutomationLaunchOverridesRuntimeSupported(client, flags, true)
+      }
+      launchOverrides = hasLaunchOverrideFlags
+        ? getAutomationLaunchOverridesForEdit({
+            flags,
+            agent: agentId ?? current.agentId,
+            current:
+              agentChanged && resetOverrides !== undefined
+                ? resetOverrides
+                : current.launchOverrides
+          })
+        : resetOverrides
+    }
+    const expectedOwner = (await showAutomation()).owner
     // Why: expectedOwner only fences the host the record is leaving; an edit that moves it needs the arrival fenced too.
     const destination = await resolveAutomationDestination(client, target)
     const result = await client.call<{ automation: Automation }>('automation.update', {
       id,
       ...(expectedOwner ? { expectedOwner } : {}),
       ...(destination ? { destination } : {}),
-      updates
+      updates: {
+        ...updates,
+        ...(launchOverrides !== undefined ? { launchOverrides } : {})
+      } satisfies AutomationUpdateParams
     })
     printResult(result, json, formatAutomationShow)
   },

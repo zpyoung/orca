@@ -1,0 +1,23 @@
+{
+  "auto": {
+    "components": {
+      "agent": {
+        "launch": {
+          "AgentLaunchOverridesFields": {
+            "on": "On",
+            "off": "Off",
+            "setByCliArguments": "Set by CLI arguments",
+            "default": "Default",
+            "cliArguments": "CLI arguments",
+            "inheritedHint": "Default: {{value0}}",
+            "model": "Model",
+            "defaultFromSettings": "Default (from Settings)",
+            "staleModel": "Saved model {{value0}} is not in the current model list.",
+            "advanced": "Advanced",
+            "reuseSessionNote": "Applies when the session first starts. Reused runs keep the session's original settings."
+          }
+        }
+      }
+    }
+  }
+}

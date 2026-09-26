@@ -3,6 +3,7 @@ import { createAgentSessionKeyboardOptions } from '@/runtime/agent-session-keybo
 import type { SleepingAgentLaunchConfig } from '../../../shared/agent-session-resume'
 import type { StartupCommandDelivery } from '../../../shared/codex-startup-delivery'
 import type { SessionOptionValue } from '../../../shared/native-chat-session-options'
+import { AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
 import type { RuntimeTerminalCreate } from '../../../shared/runtime-types'
 import type { TuiAgent } from '../../../shared/tui-agent'
 import {
@@ -22,6 +23,8 @@ export async function createRuntimeAgentBackgroundTerminal(args: {
   agent: TuiAgent
   prompt?: string
   sessionOptions?: Record<string, SessionOptionValue>
+  agentArgs?: string
+  useLaunchOverrides?: boolean
   legacy: {
     command: string
     env: Record<string, string>
@@ -34,7 +37,9 @@ export async function createRuntimeAgentBackgroundTerminal(args: {
   const keyboardProtocol = buildDefaultTerminalOptions().vtExtensions?.kittyKeyboard
   const keyboardOptions = createAgentSessionKeyboardOptions(keyboardProtocol)
   const operation = createAgentSessionCreateOperation()
-  const launchPreferences = toAgentLaunchPreferences(args.sessionOptions)
+  const launchPreferences = toAgentLaunchPreferences(args.sessionOptions, {
+    includeOptionValues: args.useLaunchOverrides
+  })
   return await runRemoteAgentSessionLaunch({
     environmentId: args.environmentId,
     hostAuthority: () =>
@@ -50,6 +55,7 @@ export async function createRuntimeAgentBackgroundTerminal(args: {
               ...(args.prompt
                 ? { prompt: args.prompt, promptDelivery: 'auto-submit' as const }
                 : {}),
+              ...(args.useLaunchOverrides ? { agentArgs: args.agentArgs ?? '' } : {}),
               ...(launchPreferences ? { launchPreferences } : {}),
               placement: { tabId: args.tabId, leafId: args.leafId },
               // Why: local renderer owns the hidden tab; remote runtime should not reveal UI.
@@ -60,6 +66,9 @@ export async function createRuntimeAgentBackgroundTerminal(args: {
           { timeoutMs: 15_000 }
         )
       ),
+    ...(args.useLaunchOverrides
+      ? { hostAuthorityCapability: AGENT_LAUNCH_OVERRIDES_RUNTIME_CAPABILITY }
+      : {}),
     legacy: ({ skipCompatibilityCheck }) =>
       callRuntimeRpc<{ terminal: RuntimeTerminalCreate }>(
         { kind: 'environment', environmentId: args.environmentId },

@@ -3,6 +3,7 @@ import { OrcaRuntimeWithListManagedWorktrees } from './orca-runtime-list-managed
 import type { RuntimeNavigationTarget } from '../../shared/runtime-navigation'
 import { navigationTargetsClients, navigationTargetsHost } from '../../shared/runtime-navigation'
 import { getRepoExecutionHostId } from '../../shared/execution-host'
+import { repoIsRemote } from '../../shared/agent-launch-remote'
 import type { Repo } from '../../shared/repo-types'
 import type { TuiAgent } from '../../shared/tui-agent'
 import type { WorktreeStartupLaunch } from '../../shared/worktree/launch-types'
@@ -17,6 +18,10 @@ import {
   markRemoteWorktreeTrusted
 } from './runtime-worktree-agent-startup'
 import type { AgentLaunchPreferences } from '../../shared/agent-session-host-authority'
+import type { AgentLaunchOverrides } from '../../shared/fork-automation-launch-settings/agent-launch-overrides'
+import type { Automation } from '../../shared/automations-types'
+import type { AutomationRunLaunchSettings } from '../../shared/fork-automation-launch-settings/automation-run-launch-settings'
+import { resolveAutomationRunLaunchSettings } from './fork-automation-launch-settings/automation-run-launch-settings'
 import type { Worktree } from '../../shared/worktree/types'
 import type { WorktreeLineageResolution } from './runtime-worktree-lineage-resolution'
 import type {
@@ -139,19 +144,40 @@ export class OrcaRuntimeWithActivateManagedWorktree extends OrcaRuntimeWithListM
     repo: Repo,
     agent: TuiAgent,
     prompt: string | undefined,
-    launchPreferences?: AgentLaunchPreferences
+    launchPreferences?: AgentLaunchPreferences,
+    launchOverrides?: AgentLaunchOverrides
   ): { agent: TuiAgent; startup: WorktreeStartupLaunch; followup?: WorktreeStartupFollowup } {
     if (!this.store) {
       throw new Error('runtime_unavailable')
+    }
+    if (launchPreferences && launchOverrides) {
+      throw new Error('Launch preferences and launch overrides cannot be combined.')
     }
     return buildWorktreeStartupForAgent({
       repo,
       agent,
       ...(prompt !== undefined ? { prompt } : {}),
       ...(launchPreferences ? { launchPreferences } : {}),
+      ...(launchOverrides ? { launchOverrides } : {}),
       settings: this.store.getSettings(),
       getLaunchPlatform: () => this.getAgentLaunchPlatformForRepo(repo),
       toSessionOptions: (preferences) => this.toAgentSessionOptions(preferences)
+    })
+  }
+
+  /** Snapshot the launch settings using the target host's actual shell and defaults. */
+  buildAutomationRunLaunchSettings(
+    automation: Automation,
+    repo: Repo
+  ): AutomationRunLaunchSettings | null {
+    if (!this.store) {
+      throw new Error('runtime_unavailable')
+    }
+    return resolveAutomationRunLaunchSettings({
+      automation,
+      settings: this.store.getSettings(),
+      platform: this.getAgentLaunchPlatformForRepo(repo),
+      isRemote: repoIsRemote(repo)
     })
   }
 

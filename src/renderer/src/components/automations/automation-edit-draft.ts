@@ -8,6 +8,7 @@
 
 import type { Automation, ExternalAutomationJob } from '../../../../shared/automations-types'
 import { getAutomationRunRepoId } from '../../../../shared/automation-run-identity'
+import { normalizeAgentLaunchOverrides } from '../../../../shared/fork-automation-launch-settings/agent-launch-overrides'
 import {
   isRunnableAutomationCronSchedule,
   isRunnableAutomationSchedule,
@@ -24,6 +25,7 @@ export function buildAutomationEditDraft(automation: Automation): AutomationDraf
     name: automation.name,
     prompt: automation.prompt,
     agentId: automation.agentId,
+    launchOverrides: normalizeAgentLaunchOverrides(automation.launchOverrides) ?? {},
     projectId: getAutomationRunRepoId(automation),
     workspaceMode: automation.workspaceMode,
     workspaceId: automation.workspaceId ?? '',
@@ -58,6 +60,7 @@ export function buildExternalAutomationEditDraft(
     name: job.name,
     prompt: job.prompt ?? job.promptPreview,
     agentId: 'hermes',
+    launchOverrides: {},
     projectId: placement.projectId,
     workspaceMode: 'existing',
     workspaceId: placement.workspaceId,

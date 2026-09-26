@@ -9,6 +9,7 @@ import type {
   RuntimeEnsureAgentSessionRequest,
   RuntimeEnsureAgentSessionResult
 } from '../../shared/agent-session-host-authority'
+import type { SessionOptionValue } from '../../shared/native-chat-session-options'
 import { canonicalizeAgentSessionIdentity } from './agent-session-claim-identity'
 import { isTuiAgentEnabled } from '../../shared/tui-agent-selection'
 import { resolveLocalWindowsAgentStartupShell } from '../../shared/windows-terminal-shell'
@@ -76,11 +77,12 @@ export class OrcaRuntimeWithGetAgentSessionExecutionNamespace extends OrcaRuntim
 
   protected toAgentSessionOptions(
     preferences: AgentLaunchPreferences | undefined
-  ): Record<string, string> | undefined {
+  ): Record<string, SessionOptionValue> | undefined {
     if (!preferences) {
       return undefined
     }
-    const options = {
+    const options: Record<string, SessionOptionValue> = {
+      ...preferences.optionValues,
       ...(preferences.model ? { model: preferences.model } : {}),
       ...(preferences.effort ? { effort: preferences.effort } : {}),
       ...(preferences.mode ? { mode: preferences.mode } : {})

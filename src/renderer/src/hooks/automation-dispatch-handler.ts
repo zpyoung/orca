@@ -10,6 +10,7 @@ import type {
   AutomationDispatchRequest,
   AutomationDispatchResult
 } from '../../../shared/automations-types'
+import { buildAutomationRunLaunchSettings } from '../../../shared/fork-automation-launch-settings/automation-run-launch-settings'
 import { createAutomationDispatchCompletion } from './automation-dispatch-completion'
 import {
   prepareAutomationDispatchWorkspace,
@@ -168,6 +169,7 @@ export async function handleAutomationDispatchRequest({
       agent: automation.agentId,
       worktreeId: worktree.id,
       prompt: automation.prompt,
+      launchOverrides: automation.launchOverrides ?? null,
       launchSource: 'unknown',
       title: run.title,
       onData: completion.appendOutput,
@@ -193,6 +195,13 @@ export async function handleAutomationDispatchRequest({
       releaseTerminalOwnership()
     }
     const launchedTabId = result.tabId
+    const launchSettings = buildAutomationRunLaunchSettings({
+      agentId: automation.agentId,
+      overrides: automation.launchOverrides,
+      effectiveAgentArgs: result.effectiveAgentArgs ?? '',
+      agentArgsSource: automation.launchOverrides?.agentArgs?.trim() ? 'explicit' : 'inherited',
+      shell: result.startupShell
+    })
     completion.observeAgentStatus(result.paneKey, dispatchStartedAt)
     try {
       await markDispatchResult({
@@ -203,6 +212,7 @@ export async function handleAutomationDispatchRequest({
         terminalSessionId: launchedTabId,
         terminalPaneKey: result.paneKey,
         terminalPtyId: result.ptyId,
+        launchSettings,
         precheckResult: resolved.context.precheckResult,
         error: null
       })

@@ -7,6 +7,7 @@ import type {
   AgentPromptDelivery
 } from '../../../shared/agent-session-host-authority'
 import type { StartupCommandDelivery } from '../../../shared/codex-startup-delivery'
+import type { RuntimeCapability } from '../../../shared/protocol-version'
 import type { RuntimeTerminalCreate } from '../../../shared/runtime-types'
 import type { TuiAgent } from '../../../shared/tui-agent'
 
@@ -36,6 +37,7 @@ export type CreateWebRuntimeSessionTerminalArgs = {
   /** Explicit CLI override; omission leaves the remote host's defaults authoritative. */
   agentArgs?: string | null
   launchPreferences?: AgentLaunchPreferences
+  hostAuthorityCapability?: RuntimeCapability
   providerSession?: AgentProviderSessionMetadata
   viewMode?: 'terminal' | 'chat'
   activate?: boolean

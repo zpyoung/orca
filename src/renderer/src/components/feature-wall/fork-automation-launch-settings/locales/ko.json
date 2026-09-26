@@ -1,0 +1,14 @@
+{
+  "auto": {
+    "components": {
+      "feature": {
+        "wall": {
+          "AiCommitPrSettingsFields": {
+            "a8a91aa917": "작업 레시피에서 설정됨.",
+            "b66be73624": "{{value0}}의 경우 작업 레시피로 재정의됩니다."
+          }
+        }
+      }
+    }
+  }
+}

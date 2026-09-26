@@ -51,6 +51,16 @@ export const Placement = z
     message: 'Placement must include a tab or leaf ID'
   })
 
+export const LaunchPreferenceOptionValues = z
+  .record(
+    StrictNonEmptyString(MAX_LAUNCH_PREFERENCE_LENGTH, 'Invalid launch option id'),
+    z.union([
+      StrictNonEmptyString(MAX_LAUNCH_PREFERENCE_LENGTH, 'Invalid launch option value'),
+      z.boolean()
+    ])
+  )
+  .refine((values) => Object.keys(values).length <= 16, 'Too many launch option values')
+
 export const LaunchPreferences = z
   .object({
     model: StrictNonEmptyString(
@@ -61,7 +71,8 @@ export const LaunchPreferences = z
       MAX_LAUNCH_PREFERENCE_LENGTH,
       'Invalid effort preference'
     ).optional(),
-    mode: StrictNonEmptyString(MAX_LAUNCH_PREFERENCE_LENGTH, 'Invalid mode preference').optional()
+    mode: StrictNonEmptyString(MAX_LAUNCH_PREFERENCE_LENGTH, 'Invalid mode preference').optional(),
+    optionValues: LaunchPreferenceOptionValues.optional()
   })
   .strict()
 

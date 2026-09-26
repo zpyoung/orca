@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { generateRuntimeCommitMessage } from '@/runtime/runtime-git-client'
 import { useAppStore } from '@/store'
 import { isCustomAgentId } from '../../../../../../shared/commit-message-agent-spec'
+import { materializeSourceControlTextGenerationParams } from '../../../../../../shared/fork-automation-launch-settings/source-control-text-launch-args'
 import type { CreatePrIntentRunToken } from './create-pr-intent-flow'
 import { hasConfiguredCommitMessageGenerationDefaults } from '../ai/text-generation-defaults'
 import type { SourceControlAi } from '../ai/use-ai'
@@ -60,7 +61,9 @@ export function useSourceControlCreatePrIntentCommitMessage({
       setGenerateErrors((prev) => ({ ...prev, [target.worktreeId]: null }))
       try {
         const result = await generateRuntimeCommitMessage(target, {
-          sourceControlAiResolvedParams: resolvedCommitMessageAi.value.params
+          sourceControlAiResolvedParams: materializeSourceControlTextGenerationParams(
+            resolvedCommitMessageAi.value.params
+          )
         })
         if (!result.success) {
           if (!result.canceled) {

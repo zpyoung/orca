@@ -7,6 +7,7 @@ import { buildSecondaryCommitMessageAgentSpecs } from './commit-message-agent-sp
 import {
   BASIC_THINKING_LEVELS,
   CLAUDE_THINKING_LEVELS,
+  CODEX_THINKING_LEVELS,
   OPENAI_THINKING_LEVELS,
   parseAntigravityModels,
   parseClaudeModels,
@@ -114,7 +115,7 @@ export const COMMIT_MESSAGE_AGENT_SPECS: Partial<Record<TuiAgent, CommitMessageA
   },
   ...buildPrimaryCommitMessageAgentSpecs({
     CLAUDE_THINKING_LEVELS,
-    OPENAI_THINKING_LEVELS,
+    CODEX_THINKING_LEVELS,
     parseClaudeModels,
     parseCodexModels,
     parseLineModels,
@@ -181,7 +182,10 @@ export function getCommitMessageModel(
   return {
     id: modelId,
     label: labelFromModelId(modelId),
-    ...withOpenAiThinking(modelId)
+    ...withOpenAiThinking(
+      modelId,
+      agentId === 'codex' ? CODEX_THINKING_LEVELS : OPENAI_THINKING_LEVELS
+    )
   }
 }
 

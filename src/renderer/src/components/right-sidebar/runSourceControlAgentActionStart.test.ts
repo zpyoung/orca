@@ -270,6 +270,7 @@ describe('runSourceControlAgentActionStart', () => {
       runSourceControlAgentActionStart(
         buildArgs({
           onStart,
+          launchOptions: { model: 'gpt-5.3', optionValues: { effort: 'high' } },
           worktreeId: undefined,
           groupId: undefined
         })
@@ -279,7 +280,8 @@ describe('runSourceControlAgentActionStart', () => {
     expect(onStart).toHaveBeenCalledWith({
       agent: 'codex',
       commandInput: 'Fix the bug',
-      agentArgs: '--model gpt-5'
+      agentArgs: '--model gpt-5',
+      launchOptions: { model: 'gpt-5.3', optionValues: { effort: 'high' } }
     })
     expect(mocks.launchAgentInNewTab).not.toHaveBeenCalled()
     expect(mocks.onLaunched).toHaveBeenCalledTimes(1)

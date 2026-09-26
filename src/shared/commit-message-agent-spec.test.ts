@@ -146,7 +146,13 @@ describe('COMMIT_MESSAGE_AGENT_SPECS', () => {
   it('exposes thinking levels on the Spark variant (it accepts model_reasoning_effort)', () => {
     const spark = getCommitMessageModel('codex', 'gpt-5.3-codex-spark')
     expect(spark).toBeDefined()
-    expect(spark?.thinkingLevels?.map((l) => l.id)).toEqual(['low', 'medium', 'high', 'xhigh'])
+    expect(spark?.thinkingLevels?.map((l) => l.id)).toEqual([
+      'minimal',
+      'low',
+      'medium',
+      'high',
+      'xhigh'
+    ])
     expect(spark?.defaultThinkingLevel).toBe('low')
   })
 
@@ -657,7 +663,6 @@ describe('buildArgs (Antigravity)', () => {
     expect(COMMIT_MESSAGE_AGENT_SPECS.antigravity?.defaultModelId).toBe('Gemini 3.5 Flash (Medium)')
   })
 })
-
 
 describe('Pi Source Control AI model selection', () => {
   it('leaves provider selection to Pi for the config default', () => {

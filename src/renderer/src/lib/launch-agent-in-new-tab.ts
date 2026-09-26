@@ -23,6 +23,7 @@ import {
 import { resolveLocalWindowsAgentStartupShell } from '../../../shared/windows-terminal-shell'
 import { TUI_AGENT_CONFIG } from '../../../shared/tui-agent-config'
 import { seedCommandCodeSubmittedPromptStatus } from '@/lib/command-code-prompt-status-seed'
+import type { SessionOptionValue } from '../../../shared/native-chat-session-options'
 import type { TuiAgent } from '../../../shared/tui-agent'
 import type { LaunchSource } from '../../../shared/telemetry-events'
 import { getConnectionIdFromState } from '@/lib/connection-context'
@@ -45,6 +46,9 @@ export type LaunchAgentInNewTabArgs = {
   prompt?: string
   /** Optional CLI arguments appended to the selected agent command. */
   agentArgs?: string | null
+  /** Explicit entity session options; omission keeps native-chat launch defaults. */
+  sessionOptions?: Record<string, SessionOptionValue>
+  includeSessionOptionCatalogDefaults?: boolean
   initialCwd?: string | null
   /** How to deliver the prompt: `draft` leaves it editable, `submit-after-ready` sends it once the TUI is ready. */
   promptDelivery?: 'auto-submit' | 'draft' | 'submit-after-ready'
@@ -104,6 +108,8 @@ function launchAgentInNewTabInternal(args: LaunchAgentInNewTabArgs): LaunchAgent
     groupId,
     prompt,
     agentArgs,
+    sessionOptions,
+    includeSessionOptionCatalogDefaults,
     initialCwd,
     promptDelivery = 'auto-submit',
     launchSource,
@@ -166,7 +172,10 @@ function launchAgentInNewTabInternal(args: LaunchAgentInNewTabArgs): LaunchAgent
     isRemote,
     agentArgs: effectiveAgentArgs,
     agentEnv,
-    sessionOptions: resolveInitialNativeChatSessionOptions(store.settings, initialViewModeOptions)
+    sessionOptions:
+      sessionOptions ??
+      resolveInitialNativeChatSessionOptions(store.settings, initialViewModeOptions),
+    includeSessionOptionCatalogDefaults
   }
   const { startupPlan, pasteDraftAfterLaunch, submitPastedPrompt } = planLaunchAgentStartupPrompt({
     base: startupPlanBase,
@@ -197,6 +206,7 @@ function launchAgentInNewTabInternal(args: LaunchAgentInNewTabArgs): LaunchAgent
       pastePromptAfterReady: pasteDraftAfterLaunch,
       submitPastedPrompt,
       agentArgs,
+      useLaunchOverrides: includeSessionOptionCatalogDefaults === false,
       // Why: omission means terminal locally, but would let a paired host apply
       // its own default; send the client's resolved terminal choice explicitly.
       viewMode: initialViewModeProps.viewMode ?? 'terminal',

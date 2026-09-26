@@ -1,0 +1,23 @@
+{
+  "auto": {
+    "components": {
+      "agent": {
+        "launch": {
+          "AgentLaunchOverridesFields": {
+            "on": "开启",
+            "off": "关闭",
+            "setByCliArguments": "由 CLI 参数设置",
+            "default": "默认",
+            "cliArguments": "CLI 参数",
+            "inheritedHint": "默认值：{{value0}}",
+            "model": "模型",
+            "defaultFromSettings": "默认（来自设置）",
+            "staleModel": "已保存的模型 {{value0}} 不在当前模型列表中。",
+            "advanced": "高级",
+            "reuseSessionNote": "在会话首次启动时应用。复用的运行会保留会话的原始设置。"
+          }
+        }
+      }
+    }
+  }
+}

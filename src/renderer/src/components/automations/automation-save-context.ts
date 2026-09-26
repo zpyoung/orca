@@ -5,6 +5,7 @@ import type { AutomationsPageSetupState } from './use-automations-page-setup-sta
 import type { AutomationsPageStoreState } from './use-automations-page-store-state'
 import type { AutomationsPageDestinationState } from './use-automations-page-destination-state'
 import type { AutomationsPageDestinationFormState } from './use-automations-page-destination-form'
+import type { AutomationLaunchOverridesGate } from './fork-automation-launch-settings/automation-launch-overrides-gate'
 
 export type AutomationSaveContext = {
   store: AutomationsPageStoreState
@@ -14,4 +15,5 @@ export type AutomationSaveContext = {
   destination: AutomationsPageDestinationState
   destinationForm: AutomationsPageDestinationFormState
   pageRefresh: AutomationsPageRefresh
+  launchOverridesGate: AutomationLaunchOverridesGate
 }
