@@ -142,6 +142,20 @@ range and are not fork work. Excluding `upstream/main` as well as `$UPSTREAM_TAR
   no direct push to `main` anywhere in this flow.
 - Otherwise continue.
 
+Then check that the **previous** stable tag is still an ancestor:
+
+```sh
+git merge-base --is-ancestor "$PREV_TAG" origin/main
+```
+
+If it fails, the last sync PR was squash-merged. `main` still carries that release's *content*, so
+nothing looks wrong, but the tag commit is gone from the lineage and `git merge` resolves its base a
+release further back — v1.4.205 merged against a v1.4.203-era base and produced 2,536 differing
+paths and 287 conflicted files instead of a one-release step. Proceed with the normal procedure:
+`-X ours` plus Step 6 still resolve it, and `$PREV_TAG` is still the right content baseline for
+every Step 6 audit diff. But say so in the report — it is a violated invariant of this flow, not a
+quirk of the release — and expect the ownership lists to be several times their usual size.
+
 ### An earlier run's PR may already resolve this tag
 
 This automation opens one run a day, and a run that stops with CI red leaves its PR open. The next
@@ -261,6 +275,21 @@ before merging, so an install failure is never mistaken for a resolution failure
 ```sh
 pnpm install --frozen-lockfile
 ```
+
+**One dirty-tree case is not someone's work and must not stop the run.** The worktree setup installs
+with whatever `pnpm` is on `PATH`, and an ambient pnpm 10 rewrites the pnpm-12 lockfile in place —
+`pnpm-lock.yaml` alone modified, its `packageManagerDependencies` block dropped and the rest
+reflowed. Confirm it is only that file and only that shape, then restore it and take the pinned
+toolchain for the whole run, since `package.json`'s `packageManager` is not self-enforcing here:
+
+```sh
+git checkout -- pnpm-lock.yaml
+corepack pnpm -v            # must print the packageManager pin, e.g. 12.0.0
+```
+
+Put a `pnpm` shim that execs `corepack pnpm` at the front of `PATH` for the run — repo scripts
+invoke bare `pnpm` internally, so switching only your own calls is not enough. Anything else dirty
+is a stop.
 
 If any check or the install fails, STOP and go to Step 13 with "needs attention: unusable run
 workspace (<which check failed>) — nothing merged, nothing pushed".
@@ -484,14 +513,22 @@ A fix may:
   changed line on a sync PR, so `static analysis` reports findings upstream's own CI never sees.
   Rewrite upstream's code to satisfy the rule and declare the file `pending-upstream` under the
   existing ledger section — never add it to a suppression list
-- apply mechanical lint/format fixes (`oxlint --fix`, `pnpm format`), committed on their own
+- apply lint and format fixes, committed one commit per rule. A stable tag can enable whole rule
+  families that `--fix` cannot rewrite, and adopting those in fork-owned files **is the run's job** —
+  it is never an escalation on its own. The fix is names and types only, taken from upstream's own
+  adoption commit for that rule; `references/file-ownership.md` § *When upstream tightens the linter*
+  has the method and its limits
 
 Escalate — stop, leave the PR open, report "needs attention" — for:
 
 - any resolution that would cost fork feature functionality: upstream reworked the code a fork
   feature hangs off, and every fix available loses behavior this fork ships
 - the Step 6 human decisions (feature collision, pending-upstream item, unresolvable conflict)
-- an upstream defect the fork would have to work around
+- an upstream defect the fork would have to work around — including a new lint rule that upstream's
+  own release violates in its own file. Retarget to a newer stable tag first if one exists; that
+  usually dissolves it
+- a single lint violation that cannot be cleared without changing what the code does. Adopt every
+  other rule, and escalate that one file alone rather than the run
 
 Never, on either gate:
 
@@ -535,7 +572,17 @@ A hard fail here is not the end of the run — work it under the fix policy abov
 gate from the top. Re-run it whole: a fix for a typecheck error routinely breaks lint, and a partial
 re-run is how a broken tree reaches the PR.
 
-If the policy says escalate, or the same failure survives your fixes, restore and bail:
+If the policy says escalate, or the same failure survives your fixes, **tag the resolution before
+you throw it away**. The reset is mandatory, but a run that escalates has usually produced a
+complete, correct resolution that only a human decision blocks, and the tag lives in the shared
+`.git`, so it survives this worktree being deleted:
+
+```sh
+git tag "sync-resolved/${STABLE_TAG}-<stamp>" HEAD
+```
+
+Name that tag and its SHA in the report, so the rerun after the decision starts from it instead of
+redoing hours of ownership work. Then restore and bail:
 `git reset --hard $ORIGIN_MAIN_OLD`, then go to Step 13 with "needs attention: merge resolved but
 <install|manifest|typecheck|lint> failed — manual resolution required; backup at
 origin/<BACKUP_REF>". Include the first ~20 lines of the failure output.
@@ -712,7 +759,28 @@ Then confirm and capture the new tip:
 git fetch origin main
 MAIN_NEW=$(git rev-parse origin/main)
 git merge-base --is-ancestor "$UPSTREAM_TARGET" origin/main   # must succeed
+git rev-list --parents -n1 "$MAIN_NEW" | wc -w                # must be 3: the commit and two parents
 ```
+
+**Both checks are load-bearing — run them and act on the result.** A squash puts the tag's
+*content* on `main` while leaving its *commit* out of the lineage, so the ancestor check fails and
+the parent count reads 2 instead of 3. Verified on PR #82: after it was squashed,
+`git merge-base --is-ancestor v1.4.204 origin/main` exits 1 while `main`'s tree verifies clean
+against v1.4.204. The parent count is the more direct signal, because it also catches a rebase
+merge, whose single parent still carries the content forward.
+
+Nothing else notices for a long time, and what eventually does is confusing. The fork ownership
+guard picks the newest stable tag *reachable from HEAD*, so it silently falls back a release and
+reports every seam re-baselined since as drift — on **every** PR, including ones that touch nothing.
+#82 left #83 red that way, with ~25 false residual failures and no fault of its own. The next sync
+then merges against a base a release further back: v1.4.205 resolved against a v1.4.203-era base and
+produced 2,536 differing paths and 287 conflicted files for what should have been a one-release step.
+
+If either check fails, `main` has the content but not the lineage. Do not reset or force anything —
+the next sync's own merge commit restores the ancestry. Report "needs attention: $STABLE_TAG was not
+merged as a merge commit — the ownership guard will compare every PR against $PREV_TAG", and name
+the tag the next run will find missing. The repo still allows `allow_squash_merge` and
+`allow_rebase_merge`, so this can recur; turning them off is the repo owner's call, not the run's.
 
 The fork does not delete branches on merge, and this automation opens one a day, so clean up the
 remote branch best-effort: `git push origin --delete "$SYNC_BRANCH"`. A failure here is worth a line
