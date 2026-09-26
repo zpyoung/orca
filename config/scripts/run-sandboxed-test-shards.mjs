@@ -90,6 +90,9 @@ const UNIT_EXCLUDES = [
 
 const LANES = new Set(['unit', 'shell', 'e2e'])
 
+/** related/files selection above this file count splits across buckets instead of one container. */
+export const RELATED_SINGLE_CONTAINER_MAX = 300
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main()
 }
@@ -109,16 +112,18 @@ function main() {
     console.log(`Reusing image ${imageTag}`)
   }
 
-  const sourceTarPath = createSourceTar()
+  const sourceTarPath = options.sourceRef
+    ? createSourceRefTar(options.sourceRef)
+    : createSourceTar()
   mkdirSync(options.logsDir, { recursive: true })
 
-  const shards = resolveShards(options)
+  const workItems = options.select ? selectionWorkItems(options) : shardWorkItems(options)
   console.log(
-    `Running lane "${options.lane}" as ${shards.length} shard(s), ${options.jobs} at a time` +
+    `Running lane "${options.lane}" as ${workItems.length} shard(s), ${options.jobs} at a time` +
       `${options.dockerHost ? ` on ${options.dockerHost}` : ''}`
   )
 
-  runShards({ shards, options, imageTag, sourceTarPath, dockerEnv })
+  runShards({ workItems, options, imageTag, sourceTarPath, dockerEnv })
     .then((results) => {
       rmSync(path.dirname(sourceTarPath), { recursive: true, force: true })
       report(results, options.logsDir)
@@ -146,12 +151,31 @@ function readOptions() {
       logs: { type: 'string', default: '.orca-sandbox-logs' },
       env: { type: 'string', multiple: true, default: [] },
       rebuild: { type: 'boolean', default: false },
-      'keep-failed': { type: 'boolean', default: false }
+      'keep-failed': { type: 'boolean', default: false },
+      select: { type: 'string' },
+      'files-from': { type: 'string' },
+      'source-ref': { type: 'string' }
     }
   })
 
   if (!LANES.has(values.lane)) {
     fail(`--lane must be one of ${[...LANES].join(', ')}`)
+  }
+
+  let selectionMode
+  try {
+    selectionMode = parseSelectMode(values)
+  } catch (error) {
+    fail(error.message)
+  }
+
+  let selection = null
+  if (selectionMode.select) {
+    try {
+      selection = readSelectionList(path.resolve(process.cwd(), selectionMode.filesFrom))
+    } catch (error) {
+      fail(error.message)
+    }
   }
 
   const shardTotal = values.lane === 'shell' ? 1 : readPositiveInteger(values.shards, '--shards')
@@ -171,8 +195,66 @@ function readOptions() {
     extraEnv: values.env.map(readEnvPair),
     rebuild: values.rebuild,
     keepFailed: values['keep-failed'],
+    select: selectionMode.select,
+    selection,
+    sourceRef: values['source-ref'] || null,
     extraArgs: positionals
   }
+}
+
+/**
+ * Validates that `--select` and `--files-from` are used together, since the new
+ * modes need both to know what to run and where the path list lives.
+ */
+export function parseSelectMode(values) {
+  const rawSelect = values.select
+  const filesFrom = values['files-from']
+
+  if (rawSelect === undefined && filesFrom === undefined) {
+    return { select: null, filesFrom: null }
+  }
+  if (rawSelect === undefined) {
+    throw new Error('--files-from requires --select=related or --select=files')
+  }
+  if (rawSelect !== 'related' && rawSelect !== 'files') {
+    throw new Error(`--select must be "related" or "files", got "${rawSelect}"`)
+  }
+  if (filesFrom === undefined) {
+    throw new Error('--select requires --files-from')
+  }
+  return { select: rawSelect, filesFrom }
+}
+
+/**
+ * Reads and validates a `--files-from` list: every entry must be a repo-relative
+ * path inside PROJECT_DIR, since the container has no notion of the host filesystem.
+ */
+export function readSelectionList(filesFromPath) {
+  if (!existsSync(filesFromPath)) {
+    throw new Error(`--files-from file not found: ${filesFromPath}`)
+  }
+  const paths = readFileSync(filesFromPath, 'utf8')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+
+  if (paths.length === 0) {
+    throw new Error(`--files-from file has no paths after trimming blank lines: ${filesFromPath}`)
+  }
+
+  for (const file of paths) {
+    if (file.startsWith('-')) {
+      throw new Error(`--files-from entries must not start with "-", got "${file}"`)
+    }
+    if (path.isAbsolute(file)) {
+      throw new Error(`--files-from entries must be repo-relative, got "${file}"`)
+    }
+    const resolved = path.resolve(PROJECT_DIR, file)
+    if (resolved !== PROJECT_DIR && !resolved.startsWith(`${PROJECT_DIR}${path.sep}`)) {
+      throw new Error(`--files-from entry escapes the project directory: "${file}"`)
+    }
+  }
+  return paths
 }
 
 /**
@@ -312,6 +394,49 @@ function createSourceTar() {
   return writeTar(trackedFiles(), 'orca-sandbox-source-')
 }
 
+/** Tars a git tree-ish (e.g. the merge base) for the base-check leg, unrelated to the working tree. */
+function createSourceRefTar(sourceRef) {
+  const stagingDir = mkdtempSync(path.join(tmpdir(), 'orca-sandbox-ref-'))
+  const tarPath = path.join(stagingDir, 'context.tar')
+  // A file, not a pipe, so this matches writeTar()'s stdin-fd pattern for runShard().
+  const archive = spawnSync('git', ['archive', '--format=tar', '--output', tarPath, sourceRef], {
+    cwd: PROJECT_DIR,
+    encoding: 'utf8'
+  })
+  if (archive.status !== 0) {
+    rmSync(stagingDir, { recursive: true, force: true })
+    fail(`git archive failed for "${sourceRef}": ${(archive.stderr || '').trim()}`)
+  }
+  return tarPath
+}
+
+/**
+ * Copies a source tar and appends the selection list at the fixed container path
+ * `.orca-sandbox/selection.txt`, so the path list travels inside stdin rather than argv
+ * (argv hits ARG_MAX for a large selection).
+ */
+export function buildSelectionTar(baseTarPath, paths) {
+  const stagingDir = mkdtempSync(path.join(tmpdir(), 'orca-sandbox-selection-'))
+  const tarPath = path.join(stagingDir, 'context.tar')
+  copyFileSync(baseTarPath, tarPath)
+  const selectionDir = path.join(stagingDir, '.orca-sandbox')
+  mkdirSync(selectionDir, { recursive: true })
+  writeFileSync(path.join(selectionDir, 'selection.txt'), `${paths.join('\n')}\n`)
+  const append = spawnSync(
+    'tar',
+    ['-r', '--format', 'ustar', '-f', tarPath, '-C', stagingDir, '.orca-sandbox/selection.txt'],
+    {
+      encoding: 'utf8',
+      env: { ...process.env, COPYFILE_DISABLE: '1' }
+    }
+  )
+  if (append.status !== 0) {
+    rmSync(stagingDir, { recursive: true, force: true })
+    fail(`could not add the selection list to the sandbox tar: ${(append.stderr || '').trim()}`)
+  }
+  return tarPath
+}
+
 function writeTar(files, prefix) {
   const stagingDir = mkdtempSync(path.join(tmpdir(), prefix))
   const listPath = path.join(stagingDir, 'files.txt')
@@ -347,24 +472,62 @@ function resolveShards(options) {
   return options.only
 }
 
-async function runShards({ shards, options, imageTag, sourceTarPath, dockerEnv }) {
+/**
+ * Splits a related/files selection into containers: one container for a selection at or
+ * under RELATED_SINGLE_CONTAINER_MAX, otherwise up to 3 (the host's proven limit).
+ */
+export function resolveSelectionBuckets(paths, jobs) {
+  if (paths.length === 0) {
+    return []
+  }
+  if (paths.length <= RELATED_SINGLE_CONTAINER_MAX) {
+    return [paths]
+  }
+  const bucketCount = Math.min(jobs, 3)
+  const buckets = Array.from({ length: bucketCount }, () => [])
+  paths.forEach((file, index) => buckets[index % bucketCount].push(file))
+  return buckets
+}
+
+function shardWorkItems(options) {
+  return resolveShards(options).map((shard) => ({
+    id: shard,
+    total: options.shardTotal,
+    logPath: path.join(options.logsDir, `${options.lane}-shard-${shard}.log`),
+    selectionPaths: null
+  }))
+}
+
+function selectionWorkItems(options) {
+  const buckets = resolveSelectionBuckets(options.selection, options.jobs)
+  return buckets.map((paths, index) => ({
+    id: index + 1,
+    total: buckets.length,
+    logPath: path.join(options.logsDir, `unit-bucket-${index + 1}.log`),
+    selectionPaths: paths
+  }))
+}
+
+async function runShards({ workItems, options, imageTag, sourceTarPath, dockerEnv }) {
   const results = []
-  const queue = [...shards]
+  const queue = [...workItems]
   const workers = Array.from({ length: options.jobs }, async () => {
     while (queue.length > 0) {
-      const shard = queue.shift()
-      results.push(await runShard({ shard, options, imageTag, sourceTarPath, dockerEnv }))
+      const item = queue.shift()
+      results.push(await runShard({ item, options, imageTag, sourceTarPath, dockerEnv }))
     }
   })
   await Promise.all(workers)
   return results.sort((left, right) => left.shard - right.shard)
 }
 
-function runShard({ shard, options, imageTag, sourceTarPath, dockerEnv }) {
-  const containerName = `orca-test-${options.lane}-${shard}-${process.pid}`
-  const logPath = path.join(options.logsDir, `${options.lane}-shard-${shard}.log`)
-  const logFd = openSync(logPath, 'w')
+function runShard({ item, options, imageTag, sourceTarPath, dockerEnv }) {
+  const containerName = `orca-test-${options.lane}-${item.id}-${process.pid}`
+  const logFd = openSync(item.logPath, 'w')
   const startedAt = Date.now()
+  const stdinTarPath = item.selectionPaths
+    ? buildSelectionTar(sourceTarPath, item.selectionPaths)
+    : sourceTarPath
 
   const dockerArgs = [
     'run',
@@ -374,21 +537,24 @@ function runShard({ shard, options, imageTag, sourceTarPath, dockerEnv }) {
     ...options.extraEnv.flatMap((pair) => ['--env', pair]),
     ...(options.mountDockerSocket ? ['--volume', '/var/run/docker.sock:/var/run/docker.sock'] : []),
     imageTag,
-    ...laneCommand(options, shard)
+    ...laneCommand(options, item.id)
   ]
 
   return new Promise((resolve) => {
     const child = spawn('docker', dockerArgs, {
-      stdio: [openSync(sourceTarPath, 'r'), logFd, logFd],
+      stdio: [openSync(stdinTarPath, 'r'), logFd, logFd],
       env: dockerEnv
     })
     child.on('close', (code) => {
       const durationMs = Date.now() - startedAt
       console.log(
-        `${code === 0 ? 'pass' : 'FAIL'}  shard ${shard}/${options.shardTotal}  ` +
-          `${formatDuration(durationMs)}  ${path.relative(PROJECT_DIR, logPath)}`
+        `${code === 0 ? 'pass' : 'FAIL'}  shard ${item.id}/${item.total}  ` +
+          `${formatDuration(durationMs)}  ${path.relative(PROJECT_DIR, item.logPath)}`
       )
-      resolve({ shard, code: code ?? 1, durationMs, logPath })
+      if (item.selectionPaths) {
+        rmSync(path.dirname(stdinTarPath), { recursive: true, force: true })
+      }
+      resolve({ shard: item.id, code: code ?? 1, durationMs, logPath: item.logPath })
     })
   })
 }
@@ -431,6 +597,13 @@ export function laneCommand(options, shard) {
     ]
   }
 
+  if (options.select === 'related') {
+    return selectionLaneCommand('related', ['--run', ...options.extraArgs])
+  }
+  if (options.select === 'files') {
+    return selectionLaneCommand('run', options.extraArgs)
+  }
+
   return [
     'pnpm',
     'exec',
@@ -442,6 +615,39 @@ export function laneCommand(options, shard) {
     `--shard=${shard}/${options.shardTotal}`,
     ...options.extraArgs
   ]
+}
+
+/**
+ * Builds the unit-lane related/files command as a shell script: the selected paths are
+ * read from `.orca-sandbox/selection.txt` at runtime rather than passed as argv, so a
+ * large selection cannot hit ARG_MAX on `docker run`.
+ */
+function selectionLaneCommand(vitestSubcommand, tailArgs) {
+  const headArgs = [
+    'pnpm',
+    'exec',
+    'vitest',
+    vitestSubcommand,
+    '--config',
+    'config/vitest.config.ts',
+    ...UNIT_EXCLUDES.map((spec) => `--exclude=${spec}`)
+  ]
+  const head = headArgs.map(shellSingleQuote).join(' ')
+  const tail = tailArgs.map(shellSingleQuote).join(' ')
+  const script = [
+    'set -e',
+    'set --',
+    // POSIX-safe read of a possibly-unterminated last line, appending each path as a positional arg.
+    'while IFS= read -r selected_path || [ -n "$selected_path" ]; do',
+    '  [ -z "$selected_path" ] || set -- "$@" "$selected_path"',
+    'done < .orca-sandbox/selection.txt',
+    `exec ${head} "$@"${tail ? ` ${tail}` : ''}`
+  ].join('\n')
+  return ['sh', '-c', script]
+}
+
+function shellSingleQuote(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`
 }
 
 function report(results, logsDir) {
