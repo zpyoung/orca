@@ -106,26 +106,40 @@ passes. It surfaces only as `TS2307: Cannot find module` — reported against *u
 directory the fork never edited, which reads at first like merge damage somewhere else entirely.
 
 **The tell.** A typecheck error naming a path the fork does not own, pointing at a relative import
-of a path that is in `remove.txt`. Confirm with a set comparison rather than by reading the error:
+of a path that is in `remove.txt`. Confirm with a set comparison rather than by reading the error.
+
+**Grep the merged working tree, not the tag.** The tag is the wrong tree to ask: it is upstream's
+view, where nothing the fork deletes has been deleted and nothing the fork replaces has been
+replaced. Every consumer the fork owns still carries its upstream import there, so the sweep reports
+it. The tag-reading form printed three findings on v1.4.207 against a true answer of zero —
+`NativeChatComposer.tsx`, `NativeChatView.test.tsx` and three send tests, every one of them a file
+the fork already replaces, whose own copy imports nothing that was deleted. Excluding the paths the
+manifest claims is not enough on its own either; reading the right tree is what fixes it. Match a
+real import specifier too, rather than a bare occurrence of the module name: a
+`vi.mock('./mod', () => ...)` with a factory never resolves the module, so it is not evidence of
+anything.
 
 ```sh
-python3 - "$UPSTREAM_TARGET" <<'PY'
-import json, subprocess, sys
+python3 - <<'SWEEP'
+import json, subprocess
 m = json.load(open('config/fork-ownership.json'))
 gone = {e['path'] for e in m['exceptions'] if e.get('deleted')}
-tag = sys.argv[1]
+hit = False
 for p in sorted(gone):
     mod = p.rsplit('/', 1)[-1].rsplit('.', 1)[0]
-    hits = subprocess.run(['git', 'grep', '-l', f"/{mod}'", tag, '--', p.rsplit('/', 1)[0]],
+    live = subprocess.run(['git', 'grep', '-lE', f"from '[^']*/{mod}'"],
                           capture_output=True, text=True).stdout.split()
-    live = [h.split(':', 1)[1] for h in hits if h.split(':', 1)[1] not in gone]
     if live:
+        hit = True
         print(f'{p} still imported by {len(live)}: {live[:3]}')
-PY
+print('NONE' if not hit else '^^ withdraw the deletion')
+SWEEP
 ```
 
 Run it right after `remove.txt` is applied, not after the typecheck fails — the classifier will
-never raise it, because a deletion the manifest declares is, to the classifier, resolved.
+never raise it, because a deletion the manifest declares is, to the classifier, resolved. Reading
+the merged tree is also what makes the sweep agree with `tsc`: the tree it greps is the tree the
+typecheck compiles, so a hit is a `TS2307` and a clean run means there is nothing to find.
 
 **The right move.** Withdraw the deletion; do not extend it. Restore the module (and its test) from
 the tag, drop the `deleted: true` exception, and leave every fork replacement exactly where it is.
