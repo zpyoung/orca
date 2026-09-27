@@ -11,6 +11,11 @@ import {
   AGENT_TUI_CLEAR_INPUT_MAX,
   buildAgentTuiClearInput
 } from '../../../../../shared/agent-tui-input-clear'
+import {
+  enqueueNativeChatPtySend,
+  invalidateNativeChatPtySends,
+  resetNativeChatPtySendQueuesForTests
+} from '../native-chat-pty-send-queue'
 import type { RuntimeSettings } from '../native-chat-runtime-send'
 import {
   clearThenWrite,
@@ -51,6 +56,7 @@ beforeEach(() => {
   sendRuntimePtyInputAcceptance.mockResolvedValue(true)
 })
 afterEach(() => {
+  resetNativeChatPtySendQueuesForTests()
   vi.useRealTimers()
 })
 
@@ -105,13 +111,80 @@ describe('clearThenWrite', () => {
   })
 })
 
+const ptyWrites = (): string[] => sendRuntimePtyInput.mock.calls.map((call) => String(call[2]))
+
 describe('clearUnsubmittedAgentInput', () => {
   it('delivers a long-draft cleanup clear in sub-paste writes', async () => {
-    clearUnsubmittedAgentInput(SETTINGS, PTY, { clearInput: LONG_DRAFT_CLEAR })
+    const cleared = clearUnsubmittedAgentInput(
+      SETTINGS,
+      PTY,
+      { clearInput: LONG_DRAFT_CLEAR },
+      delay
+    )
+    await vi.runAllTimersAsync()
+    await cleared
+
+    expect(ptyWrites().join('')).toBe(LONG_DRAFT_CLEAR)
+    expectBelowPasteThreshold(ptyWrites())
+  })
+
+  it('settles only once the last chunk is written', async () => {
+    let settled = false
+    void clearUnsubmittedAgentInput(SETTINGS, PTY, { clearInput: LONG_DRAFT_CLEAR }, delay).then(
+      () => {
+        settled = true
+      }
+    )
+    await vi.advanceTimersByTimeAsync(NATIVE_CHAT_CLEAR_CHUNK_GAP_MS)
+    expect(settled).toBe(false)
+    await vi.runAllTimersAsync()
+    expect(settled).toBe(true)
+  })
+})
+
+describe('cancelled-send cleanup on the PTY send queue', () => {
+  const CANCEL_PTY = 'pty-cancel-cleanup'
+  const TAB = 'tab-cancel-cleanup'
+
+  const enqueueUnsubmittedSend = (): ReturnType<typeof enqueueNativeChatPtySend> =>
+    enqueueNativeChatPtySend(CANCEL_PTY, 60_000, () => {}, {
+      terminalTabId: TAB,
+      onCancelUnsubmitted: (cleanupDelay) =>
+        clearUnsubmittedAgentInput(
+          SETTINGS,
+          CANCEL_PTY,
+          { clearInput: LONG_DRAFT_CLEAR },
+          cleanupDelay
+        )
+    })
+
+  it('finishes the cleanup clear before the next queued send writes its body', async () => {
+    const cancelled = enqueueUnsubmittedSend()
+    enqueueNativeChatPtySend(
+      CANCEL_PTY,
+      0,
+      () => {
+        sendRuntimePtyInput(SETTINGS, CANCEL_PTY, 'NEXT-BODY')
+      },
+      { terminalTabId: TAB }
+    )
+
+    cancelled.cancel()
     await vi.runAllTimersAsync()
 
-    const writes = sendRuntimePtyInput.mock.calls.map((call) => String(call[2]))
-    expect(writes.join('')).toBe(LONG_DRAFT_CLEAR)
-    expectBelowPasteThreshold(writes)
+    expect(ptyWrites().join('')).toBe(`${LONG_DRAFT_CLEAR}NEXT-BODY`)
+    expect(ptyWrites().at(-1)).toBe('NEXT-BODY')
+  })
+
+  it('drops the unwritten cleanup chunks when the PTY is invalidated', async () => {
+    const cancelled = enqueueUnsubmittedSend()
+
+    cancelled.cancel()
+    expect(ptyWrites()).toHaveLength(1)
+    invalidateNativeChatPtySends(CANCEL_PTY)
+    await vi.runAllTimersAsync()
+
+    expect(ptyWrites()).toHaveLength(1)
+    await expect(cancelled.settled).resolves.toBeUndefined()
   })
 })

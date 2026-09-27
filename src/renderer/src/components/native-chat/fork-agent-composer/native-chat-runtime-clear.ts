@@ -26,23 +26,39 @@ function splitClearBurst(clearBytes: string): string[] {
   return chunks
 }
 
-/** Best-effort cleanup clear (e.g. after cancel) — not gating a body write,
- *  so it stays on the fire-and-forget transport. */
+/**
+ * Best-effort cleanup clear (e.g. after cancel) — not gating a body write,
+ * so it stays on the fire-and-forget transport. Later chunks are paced through
+ * `delay`, which must be owned by the PTY send queue so they cannot outlive the
+ * line; the promise settles once the last chunk is written.
+ */
 export function clearUnsubmittedAgentInput(
   settings: RuntimeSettings,
   ptyId: string,
-  options?: NativeChatSendOptions
-): boolean {
+  options: NativeChatSendOptions | undefined,
+  delay: (ms: number, fn: () => void) => void
+): Promise<void> {
   const [first = '', ...rest] = splitClearBurst(
     options?.clearInput ?? NATIVE_CHAT_CLEAR_UNSUBMITTED_INPUT
   )
-  rest.forEach((chunk, index) => {
-    setTimeout(
-      () => sendRuntimePtyInput(settings, ptyId, chunk),
-      (index + 1) * NATIVE_CHAT_CLEAR_CHUNK_GAP_MS
-    )
+  sendRuntimePtyInput(settings, ptyId, first)
+  return new Promise<void>((resolve) => {
+    if (rest.length === 0) {
+      resolve()
+      return
+    }
+    rest.forEach((chunk, index) => {
+      delay((index + 1) * NATIVE_CHAT_CLEAR_CHUNK_GAP_MS, () => {
+        try {
+          sendRuntimePtyInput(settings, ptyId, chunk)
+        } finally {
+          if (index === rest.length - 1) {
+            resolve()
+          }
+        }
+      })
+    })
   })
-  return sendRuntimePtyInput(settings, ptyId, first)
 }
 
 /** Resolves true only once every chunk of the burst is accepted, in order. */
